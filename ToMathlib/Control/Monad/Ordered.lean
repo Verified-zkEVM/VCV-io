@@ -6,9 +6,9 @@ Authors: Quang Dao
 
 import Mathlib.Control.Monad.Cont
 import Mathlib.CategoryTheory.Monad.Basic
-import ToMathlib.Control.MonadAlgebra
-import ToMathlib.Control.MonadRelation
-import ToMathlib.Control.MonadTransformer
+import ToMathlib.Control.Monad.Algebra
+import ToMathlib.Control.Monad.Relation
+import ToMathlib.Control.Monad.Transformer
 import Mathlib.Order.Monotone.Basic
 
 /-!

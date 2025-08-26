@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.SPMF
-import ToMathlib.Control.MonadHom
+import ToMathlib.Control.Monad.Hom
 
 /-!
 # Support of a Monadic Computation

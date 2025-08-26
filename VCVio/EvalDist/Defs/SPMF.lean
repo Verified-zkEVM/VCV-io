@@ -6,7 +6,7 @@ Authors: Devon Tuma, František Silváši
 import Mathlib.Probability.ProbabilityMassFunction.Monad
 import ToMathlib.General
 import Batteries.Control.AlternativeMonad
-import ToMathlib.Control.MonadHom
+import ToMathlib.Control.Monad.Hom
 
 open ENNReal
 

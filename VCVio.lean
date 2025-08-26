@@ -23,6 +23,7 @@ import VCVio.EvalDist.Monad.Alternative
 import VCVio.EvalDist.Monad.Bind
 import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
+import VCVio.EvalDist.Option
 import VCVio.EvalDist.OptionT
 import VCVio.EvalDist.Prod
 import VCVio.OracleComp.Coercions.Append
@@ -52,6 +53,5 @@ import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.ProgramLogic.Relational.Basic
-import VCVio.ProgramLogic.Unary.DijkstraMonad
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
