@@ -47,6 +47,5 @@ import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Support
 import VCVio.OracleComp.Traversal
 import VCVio.ProgramLogic.Relational.Basic
-import VCVio.ProgramLogic.Unary.DijkstraMonad
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple

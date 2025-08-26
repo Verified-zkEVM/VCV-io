@@ -3,10 +3,10 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
--- import ToMathlib.Control.FreeMonad
+-- import ToMathlib.Control.Monad.Free
 import Batteries.Control.AlternativeMonad
 import Batteries.Control.OptionT
-import ToMathlib.Control.MonadHom
+import ToMathlib.Control.Monad.Hom
 import ToMathlib.General
 
 /-!

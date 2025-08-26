@@ -4,32 +4,80 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import Mathlib.Probability.ProbabilityMassFunction.Monad
-import ToMathlib.Control.MonadAlgebra
+import ToMathlib.Control.Monad.Algebra
 
 /-!
 # Morphisms Between Monads
+
+TODO: extends the hierarchy with type classes such as `{Nat/Pure/Bind/Monad}HomClass`
 -/
 
-universe u v w
+universe u v w z
 
+/-- A natural morphism / transformation between two type-level functions (endofunctors).
+
+This represents a family of functions `m α → n α` that is natural in `α`, meaning it commutes
+with functions between types. -/
+structure NatHom (m : Type u → Type v) (n : Type u → Type w) where
+  toFun : {α : Type u} → m α → n α
+
+namespace NatHom
+
+variable {m : Type u → Type v} {n : Type u → Type w}
+
+instance : CoeFun (NatHom m n) (λ _ ↦ {α : Type u} → m α → n α) where
+  coe f {_} x := f.toFun x
+
+end NatHom
+
+/-- A natural morphism / transformation that preserves the `pure` operation. -/
+structure PureHom (m : Type u → Type v) [Pure m] (n : Type u → Type w) [Pure n]
+    extends NatHom m n where
+  toFun_pure' {α : Type u} (x : α) : toFun (pure x) = (pure x : n α)
+
+namespace PureHom
+
+variable {m : Type u → Type v} [Pure m] {n : Type u → Type w} [Pure n]
+
+instance : Coe (PureHom m n) (NatHom m n) where
+  coe f := f.toNatHom
+
+end PureHom
+
+/-- A natural morphism / transformation that preserves the `bind` operation. -/
+structure BindHom (m : Type u → Type v) [Bind m] (n : Type u → Type w) [Bind n]
+    extends NatHom m n where
+  toFun_bind' {α β : Type u} (x : m α) (y : α → m β) :
+    toFun (x >>= y) = toFun x >>= (fun a => toFun (y a))
+
+namespace BindHom
+
+variable {m : Type u → Type v} [Bind m] {n : Type u → Type w} [Bind n]
+
+instance : Coe (BindHom m n) (NatHom m n) where
+  coe f := f.toNatHom
+
+end BindHom
+
+/-- A monad homomorphism is a natural morphism / transformation that preserves both `pure` and
+`bind` operations.
+
+This is similar to `MonadLift` but isn't a type-class but rather an explicit object. This is useful
+for non-canonical mappings that shouldn't be applied automatically in general. The laws enforced are
+similar to those of `LawfulMonadLift`. -/
+structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
+    (n : Type u → Type w) [Pure n] [Bind n] extends NatHom m n, PureHom m n, BindHom m n
+
+@[inherit_doc]
+infixr:25 " →ᵐ " => MonadHom
+
+/-- A natural transformation `f` between two monads `m` and `n` is a monad morphism if it
+preserves the monad structure, i.e. `f (pure x) = pure x` and `f (x >>= y) = f x >>= f ∘ y`. -/
 class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n]
     (f : {α : Type u} → m α → n α) where
   map_pure {α} (x : α) : f (pure x) = pure x
   map_bind {α β} (x : m α) (y : α → m β) : f (x >>= y) = f x >>= f ∘ y
-
-/-- Structure to represent a well-behaved mapping between computations in two monads `m` and `n`.
-This is similar to `MonadLift` but isn't a type-class but rather an actual object.
-This is useful for non-canonical mappings that shouldn't be applied automatically in general.
-We also enforce similar laws to `LawfulMonadLift`. -/
-structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
-    (n : Type u → Type w) [Pure n] [Bind n] where
-  toFun {α : Type u} : m α → n α
-  toFun_pure' {α : Type u} (x : α) : toFun (pure x) = (pure x : n α)
-  toFun_bind' {α β : Type u} (x : m α) (y : α → m β) :
-    toFun (x >>= y) = toFun x >>= (fun a => toFun (y a))
-
-infixr:25 " →ᵐ " => MonadHom
 
 instance (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n] (F : m →ᵐ n) :
@@ -49,6 +97,7 @@ variable {m : Type u → Type v} [Monad m] {n : Type u → Type w} [Monad n] {α
 
 -- Note some potential confusion between `mmap` in applying Hom sense and `Seq.map`
 -- This slightly differs from naming conventions of e.g. `map_mul` for `MulHomClass`.
+-- Quang: should we change `mmap` to `toFun`?
 
 @[simp]
 lemma mmap_pure (F : m →ᵐ n) (x : α) :

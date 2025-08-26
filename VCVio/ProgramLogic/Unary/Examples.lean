@@ -3,7 +3,7 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import ToMathlib.Control.OrderedMonad
+import ToMathlib.Control.Monad.Ordered
 
 /-!
 # Examples of ordered monads in program verification

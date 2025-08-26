@@ -6,8 +6,8 @@ Authors: Quang Dao
 import Mathlib.Control.Monad.Basic
 import Mathlib.Control.Monad.Cont
 import Mathlib.CategoryTheory.Monad.Basic
-import ToMathlib.Control.OrderedMonad
-import ToMathlib.Control.FreeMonad
+import ToMathlib.Control.Monad.Ordered
+import ToMathlib.Control.Monad.Free
 
 /-!
 # Dijkstra monad
