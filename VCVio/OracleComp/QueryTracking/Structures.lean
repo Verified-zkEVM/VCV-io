@@ -55,22 +55,22 @@ Marked as reducible and can generally be treated as just a function.
 
 namespace QueryCount
 
--- /-- Pointwise addition as the `Monoid` operation used for `WriterT`. -/
--- instance : Monoid (QueryCount spec) where
---   mul qc qc' := qc + qc'
---   mul_assoc := add_assoc
---   one := 0
---   one_mul := zero_add
---   mul_one := add_zero
+/-- Pointwise addition as the `Monoid` operation used for `WriterT`. -/
+instance : Monoid (QueryCount ι spec) where
+  mul qc qc' := qc + qc'
+  mul_assoc := add_assoc
+  one := 0
+  one_mul := zero_add
+  mul_one := add_zero
 
--- @[simp] lemma monoid_mul_def (qc qc' : QueryCount spec) :
---   (@HMul.hMul _ _ _ (@instHMul _ (Monoid.toMulOneClass.toMul)) qc qc')
---      = (qc : ι → ℕ) + (qc' : ι → ℕ) := rfl
+@[simp] lemma monoid_mul_def (qc qc' : QueryCount ι spec) :
+  (@HMul.hMul _ _ _ (@instHMul _ (Monoid.toMulOneClass.toMul)) qc qc')
+     = (qc : ι → ℕ) + (qc' : ι → ℕ) := rfl
 
--- @[simp] lemma monoid_one_def :
---     (@OfNat.ofNat (QueryCount spec) 1 (@One.toOfNat1 _ (Monoid.toOne))) = (0 : ι → ℕ) := rfl
+@[simp] lemma monoid_one_def :
+    (@OfNat.ofNat (QueryCount ι spec) 1 (@One.toOfNat1 _ (Monoid.toOne))) = (0 : ι → ℕ) := rfl
 
--- def single [DecidableEq ι] (i : ι) : QueryCount spec := Function.update 0 i 1
+def single [DecidableEq ι] (i : ι) : QueryCount ι spec := Function.update 0 i 1
 
 -- @[simp]
 -- lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount spec) :
@@ -89,13 +89,10 @@ end QueryCount
 /-- Log of queries represented by a list of dependent product's tagging the oracle's index.
 `(i : ι) → spec.domain i × spec.range i` is slightly more restricted as it doesn't
 keep track of query ordering between different oracles. -/
-@[reducible]
-def QueryLog (spec : OracleSpec) : Type _ :=
+@[reducible] def QueryLog (spec : OracleSpec) : Type _ :=
   List ((t : spec.domain) × spec.range t)
 
 namespace QueryLog
-
-instance : Append (QueryLog spec) := ⟨List.append⟩
 
 /-- Dummy `Monoid` instance to be used with `WriterT`, actual calls should use `append`. -/
 instance : Monoid (QueryLog spec) where
@@ -237,10 +234,10 @@ end prod
 
 end QueryLog
 
--- /-- Type to represent a store of seed values to use in a computation, represented as a function.
--- Updates to individual seed lists are performed via continuation passing. -/
--- def QuerySeed (spec : OracleSpec) : Type _ :=
---   (i : ι) → List (spec.range i)
+/-- Type to represent a store of seed values to use in a computation, represented as a function.
+Updates to individual seed lists are performed via continuation passing. -/
+def QuerySeed (spec : OracleSpec) (ι : Type u) [HasIndexing spec ι] : Type _ :=
+  (i : ι) → List (HasIndexing.xdi spec i)
 
 -- namespace QuerySeed
 

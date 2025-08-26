@@ -51,30 +51,42 @@ end uniformSelect
 
 section uniformSelectList
 
+#check Option.getM
+
 /-- Select a random element from a list by indexing into it with a uniform value.
 If the list is empty we instead just fail rather than choose a default value.
 This means selecting from a vector is often preferable, as we can prove at the type level
 that there is an element in the list, avoiding the defualt case of empty lists. -/
 instance hasUniformSelectList (α : Type) [Inhabited α] :
     HasUniformSelect (List α) α where
-  uniformSelect := fun xs ↦ do match xs with
-    | [] => failure
-    | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length]
+  uniformSelect xs := do Option.getM (← (xs[·]?) <$> $[0..xs.length])
 
--- variable {α : Type} [Inhabited α]
+variable {α : Type} [Inhabited α]
 
--- @[simp]
--- lemma uniformSelectList_nil : ($ ([] : List α) : ProbComp α) = pure default := rfl
+@[simp] lemma uniformSelectList_nil :
+    ($ ([] : List α) : OptionT ProbComp α) = liftM $[0..0] *> failure := by
+  simp [hasUniformSelectList]
+  rfl
 
 -- lemma uniformSelectList_cons (x : α) (xs : List α) :
---     ($ x :: xs : ProbComp α) = ((x :: xs)[·]) <$> $[0..xs.length] := rfl
+--     ($ (x :: xs)) = ((x :: xs)[·]) <$> $[0..xs.length] := rfl
 
--- -- @[simp] lemma probOutput_uniformSelectList (xs : List α)
+-- @[simp] lemma run_uniformSelectList (xs : List α) :
+--     OptionT.run ($ xs) = (xs[·]?) <$> $[0..xs.length] := by
+--   induction xs with
+--   | nil =>
+--     simp
 
 
--- @[simp] lemma evalDist_uniformSelectList (xs : List α) : evalDist ($ xs) =
---     match xs with
---     | [] => PMF.pure none
+--   | cons x xs h =>
+--     simp [uniformSelectList_cons]
+--     simp [getElem?_def]
+--     sorry
+
+
+-- @[simp] lemma evalDist_uniformSelectList (xs : List α) :
+--     evalDist ($ xs) = match xs with
+--     | [] => failure
 --     | x :: xs => (PMF.uniformOfFintype (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
 --   match xs with
 --   | [] => by simp only [uniformSelectList_nil, evalDist_failure]; rfl
@@ -129,11 +141,11 @@ section uniformSelectVector
 TODO: different types of vectors in mathlib now -/
 instance hasUniformSelectVector (α : Type) (n : ℕ) :
     HasUniformSelect! (Vector α (n + 1)) α where
-  uniformSelect! xs := do return xs[← $[0..n]]
+  uniformSelect! xs := (xs[·]) <$> $[0..n]
 
 instance hasUniformSelectListVector (α : Type) (n : ℕ) :
     HasUniformSelect! (List.Vector α (n + 1)) α where
-  uniformSelect! xs := do return xs[← $[0..n]]
+  uniformSelect! xs := (xs[·]) <$> $[0..n]
 
 -- lemma uniformSelectVector_def {α : Type} {n : ℕ} (xs : Vector α (n + 1)) :
 --     ($ xs) = ($ xs.toList) := rfl

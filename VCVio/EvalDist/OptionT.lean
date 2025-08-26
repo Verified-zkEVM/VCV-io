@@ -3,7 +3,7 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Monad.Bind
+import VCVio.EvalDist.Option
 import ToMathlib.Control.OptionT
 
 /-!
@@ -64,16 +64,28 @@ noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalDist m] :
           rw [hx'.2]
           exact hx'.1
 
-@[simp] lemma probOutput_eq [HasEvalDist m] (mx : OptionT m α) (x : α) :
+@[simp] lemma evalDist_eq [HasEvalDist m] (mx : OptionT m α) :
+    evalDist mx = OptionT.mapM' evalDist mx := rfl
+
+lemma probOutput_eq [HasEvalDist m] (mx : OptionT m α) (x : α) :
     Pr[= x | mx] = Pr[= some x | mx.run] := by
+  simp [probOutput_def, OptionT.mapM']
   sorry
 
-@[simp] lemma probEvent_eq [HasEvalDist m] (mx : OptionT m α) (p : α → Prop) :
+lemma probEvent_eq [HasEvalDist m] (mx : OptionT m α) (p : α → Prop) :
     Pr[p | mx] = Pr[Option.rec false p | mx.run] := by
   sorry
 
-@[simp] lemma probFailure_eq [HasEvalDist m] (mx : OptionT m α) :
+lemma probFailure_eq [HasEvalDist m] (mx : OptionT m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] := by
   sorry
+
+@[simp] lemma probOutput_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (x : α) :
+    Pr[= x | OptionT.lift mx] = Pr[= x | mx] := by
+  simp [probOutput_eq]
+
+@[simp] lemma probEvent_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (p : α → Prop) :
+    Pr[p | OptionT.lift mx] = Pr[p | mx] := by
+  simp [probEvent_def]
 
 end OptionT

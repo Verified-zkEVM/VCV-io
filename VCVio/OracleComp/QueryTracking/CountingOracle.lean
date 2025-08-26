@@ -18,30 +18,33 @@ Tracking individually is not necessary, but gives tighter security bounds in som
 It also allows for generating things like seed values for a computation more tightly.
 -/
 
--- open OracleSpec OracleComp
+open OracleSpec OracleComp
 
--- universe u v w
+universe u v w
 
--- variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι} {α β γ : Type u}
+variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec} {α β γ : Type u}
 
--- namespace QueryImpl
+namespace QueryImpl
 
--- variable {m : Type u → Type v} [Monad m]
+variable {m : Type u → Type v} [Monad m]
 
--- def withCounting (so : QueryImpl spec m) : QueryImpl spec (WriterT spec.QueryCount m) where
---   impl | q => tell (QueryCount.single q.index) *> ↑(so.impl q)
+/-- Count the queries made by the computation using `idx` to categorize them. -/
+def withCounting (so : QueryImpl spec m) (idx : spec.domain → ι) :
+    QueryImpl spec (WriterT (spec.QueryCount ι) m) :=
+  fun t => tell (QueryCount.single (idx t)) *> so t
 
 -- @[simp] lemma withCounting_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
 --     so.withCounting.impl q = tell (QueryCount.single q.index) *> ↑(so.impl q) := rfl
 
--- end QueryImpl
+end QueryImpl
 
--- /-- Oracle for counting the number of queries made by a computation. The count is stored as a
--- function from oracle indices to counts, to give finer grained information about the count. -/
--- def countingOracle : QueryImpl spec (WriterT (QueryCount spec) (OracleComp spec)) :=
---   idOracle.withCounting
+/-- Oracle for counting the number of queries made by a computation. The count is stored as a
+function from oracle indices to counts, to give finer grained information about the count. -/
+def countingOracle (idx : spec.domain → ι) :
+    QueryImpl spec (WriterT (QueryCount ι spec) (OracleComp spec)) :=
+  idOracle.withCounting idx
 
--- namespace countingOracle
+namespace countingOracle
 
 -- @[simp]
 -- protected lemma impl_apply_eq (q : OracleQuery spec α) :

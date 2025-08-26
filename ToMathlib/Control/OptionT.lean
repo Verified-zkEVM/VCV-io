@@ -67,22 +67,23 @@ protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
     simp
     simp
 
--- @[simp]
--- lemma mapM'_lift {m : Type u → Type v} {n : Type u → Type w}
---     [Monad m] [AlternativeMonad n] [LawfulAlternative n]
---     (f : m →ᵐ n) (x : m α) : OptionT.mapM' f (OptionT.lift x) = f x := by
---   simp [OptionT.mapM', OptionT.lift]
+@[simp]
+lemma mapM'_lift {m : Type u → Type v} {n : Type u → Type w}
+    [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
+    (f : m →ᵐ n) (x : m α) : OptionT.mapM' f (OptionT.lift x) = f x := by
+  simp [OptionT.mapM', OptionT.lift]
 
--- @[simp]
--- lemma mapM'_failure {m : Type u → Type v} {n : Type u → Type w}
---     [Monad m] [AlternativeMonad n] [LawfulAlternative n]
---     (f : m →ᵐ n) : OptionT.mapM' f (failure : OptionT m α) = failure := by
---   simp [OptionT.mapM']
+@[simp]
+lemma mapM'_failure {m : Type u → Type v} {n : Type u → Type w}
+    [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
+    (f : m →ᵐ n) : OptionT.mapM' f (failure : OptionT m α) = failure := by
+  simp [OptionT.mapM']
 
--- lemma mapM_pure [Monad m] [Monad n] [LawfulMonad n] [AlternativeMonad n] [LawfulAlternative n]
---     (h : ∀ {α} (x : α), f (OptionT.pure x).run = pure x) (x : α) :
---     OptionT.mapM f (pure x : OptionT m α) = pure x := by
---   simp [OptionT.mapM, h, OptionT.monad_pure_eq_pure]
+lemma mapM_pure [Monad m] [Monad n] [LawfulMonad n] [AlternativeMonad n] [LawfulAlternative n]
+    (h : ∀ {α} (x : α), f (OptionT.pure x).run = pure x) (x : α) :
+    OptionT.mapM f (pure x : OptionT m α) = pure x := by
+  simp [OptionT.mapM, h, OptionT.monad_pure_eq_pure]
+  sorry
 
 
 end mapM

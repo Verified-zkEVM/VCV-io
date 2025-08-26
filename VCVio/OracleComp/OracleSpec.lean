@@ -33,6 +33,13 @@ abbrev OracleSpec.domain (spec : OracleSpec) : Type _ := spec.A
 /-- Type of the range for calls to the oracle corresponding to index `i`. -/
 abbrev OracleSpec.range (spec : OracleSpec) (i : spec.A) := spec.B i
 
+/-- An oracle spec has indexing in a type `ι` if the `range` function factors through `ι`.
+dtumad: not sure if this is really the right approach for e.g. `pregen`. -/
+class HasIndexing (spec : OracleSpec) (ι : Type w) where
+  idx : spec.domain → ι
+  xdi : ι → Type _
+  range_idx (t : spec.domain) : spec.range t = xdi (idx t)
+
 abbrev emptySpec := 0
 notation "[]ₒ" => 0
 
