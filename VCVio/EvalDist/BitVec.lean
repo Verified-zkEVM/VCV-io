@@ -30,7 +30,7 @@ File for lemmas about `evalDist` and `support` involving `BitVec`.
 --   probOutput_map_eq_probOutput_inverse oa toFin ofFin (congrFun rfl) (congrFun rfl) x
 
 -- /-- Choose a random bit-vector by converting a random number in number between `0` and `2 ^ n`-/
--- instance (n : ℕ) : SelectableType (BitVec n) where
+-- instance (n : ℕ) : SampleableType (BitVec n) where
 --   selectElem := ofFin <$> ($ᵗ Fin (2 ^ n))
 --   mem_support_selectElem x := by simp
 --   probOutput_selectElem_eq x y := by simp only [probOutput_bitVec_ofFin_map,

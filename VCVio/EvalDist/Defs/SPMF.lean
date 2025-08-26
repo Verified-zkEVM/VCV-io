@@ -1,4 +1,3 @@
--- dt: This should all end up in mathlib
 /-
 Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
@@ -7,6 +6,7 @@ Authors: Devon Tuma, František Silváši
 import Mathlib.Probability.ProbabilityMassFunction.Monad
 import ToMathlib.General
 import Batteries.Control.AlternativeMonad
+import ToMathlib.Control.MonadHom
 
 open ENNReal
 
@@ -55,4 +55,48 @@ lemma apply'_none_eq_run (p : SPMF α) :
     let p' : PMF (Option α) := p
     p' none = p.run none := rfl
 
+protected def support : SPMF →ᵐ SetM where
+  toFun x := Function.support x
+  toFun_pure' x := by
+    refine Set.ext fun y => ?_
+    simp
+  toFun_bind' x y := by
+    refine Set.ext fun y => ?_
+    simp [Option.elimM, Function.comp_def]
+    refine ⟨fun h => ?_, fun h => ?_⟩
+    · obtain ⟨z, hz⟩ := h
+      cases z with
+      | none =>
+          simp at hz
+      | some z =>
+          use z
+          simp at hz
+          simp [hz]
+    · obtain ⟨z, hz⟩ := h
+      use some z
+      simp [hz]
+
 end SPMF
+
+namespace PMF
+
+/-- Convert a `PMF` to an `SPMF` in the canonical way. -/
+@[reducible] noncomputable def toSPMF : PMF →ᵐ SPMF where
+  toFun := fun p ↦ OptionT.mk (p.map some)
+  toFun_pure' x := by
+    ext y
+    refine (tsum_eq_single x ?_).trans ?_ <;> aesop
+  toFun_bind' p q := by
+    ext y
+    simp [Function.comp_def]
+    simp [PMF.map, Option.elimM]
+    refine (tsum_eq_single y ?_).trans ?_
+    · aesop
+    · simp
+      refine tsum_congr fun x => congr_arg (p x * ·) ?_
+      refine trans ?_ (tsum_eq_single y ?_).symm <;> aesop
+
+@[simp] lemma toSPMF_none (p : PMF α) :
+    p.toSPMF.run none = 0 := by simp
+
+end PMF

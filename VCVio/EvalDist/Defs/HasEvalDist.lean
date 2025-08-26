@@ -31,14 +31,22 @@ universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
-/-- The monad `m` has a well-behaved embedding into the `SPMF` monad.
-TODO: modify this to extend `MonadHom` to get some lemmas for free. -/
+/-- The monad `m` has a canonical embedding into the `SPMF` monad. -/
 class HasEvalDist (m : Type u → Type v) [Monad m]
     extends HasSupportM m where
   evalDist : m →ᵐ SPMF
   support_eq {α : Type u} (mx : m α) : support mx = {x | evalDist mx x ≠ 0}
 
 export HasEvalDist (evalDist)
+
+/-- The monad `m` has a canonical embedding into the `PMF` monad.
+dt: more support for this in general. -/
+class HasEvalDist.HasPMF (m : Type u → Type v) [Monad m]
+    extends HasEvalDist m where
+  toPMF : m →ᵐ PMF
+  toSPMF_comp_toPMF {α : Type u} (mx : m α) : PMF.toSPMF.comp toPMF = evalDist
+
+export HasEvalDist.HasPMF (toPMF toSPMF_comp_toPMF)
 
 /-- Probability that a computation `mx` returns the value `x`. -/
 def probOutput [HasEvalDist m] (mx : m α) (x : α) : ℝ≥0∞ := evalDist mx x
@@ -51,13 +59,13 @@ noncomputable def probEvent [HasEvalDist m] (mx : m α) (p : α → Prop) : ℝ�
 def probFailure [HasEvalDist m] (mx : m α) : ℝ≥0∞ := (evalDist mx).run none
 
 /-- Probability that a computation returns a particular output. -/
-notation "Pr[=" x "|" mx "]" => probOutput mx x
+notation "Pr[=" x " | " mx "]" => probOutput mx x
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
-notation "Pr[" p "|" mx "]" => probEvent mx p
+notation "Pr[" p " | " mx "]" => probEvent mx p
 
 /-- Probability that a computation fails to return a value. -/
-notation "Pr[⊥" "|" mx "]" => probFailure mx
+notation "Pr[⊥" " | " mx "]" => probFailure mx
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
 syntax (name := probEventBinding1)
@@ -130,6 +138,15 @@ lemma probOutput_pure_eq_indicator (x y : α) :
 @[simp] lemma evalDist_ite (p : Prop) [Decidable p] (mx mx' : m α) :
     evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by
   by_cases hp : p <;> simp [hp]
+
+section support
+
+lemma mem_support_iff (mx : m α) (x : α) : x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
+  have := HasEvalDist.support_eq mx
+  simp [this]
+  rfl
+
+end support
 
 section sums
 
@@ -208,7 +225,7 @@ variable (mx : m α) (my : α → m β)
 
 lemma probOutput_bind_eq_tsum (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
-  simp [probOutput, evalDist_bind, tsum_option _ ENNReal.summable, Option.elimM]
+  simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
 
 end bind
 
@@ -224,14 +241,12 @@ lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEval
 
 namespace SPMF
 
-instance : HasSupportM SPMF := sorry
+variable (p : SPMF α) (x : α)
 
 /-- Add instance for `SPMF` just to give access to notation. -/
 instance hasEvalDist : HasEvalDist SPMF where
   evalDist := MonadHom.id SPMF
-  support_eq := sorry
-
-variable (p : SPMF α) (x : α)
+  support_eq p := by simp [Function.support]
 
 @[simp] lemma evalDist_eq : evalDist p = p := rfl
 
@@ -245,15 +260,17 @@ end SPMF
 
 namespace PMF
 
-instance hasSupportM : HasSupportM PMF := sorry
+variable (p : PMF α) (x : α)
 
 noncomputable instance hasEvalDist : HasEvalDist PMF where
   evalDist := MonadHom.ofLift PMF SPMF
-  support_eq := sorry
-
-variable (p : PMF α) (x : α)
+  support_eq mx := by simp [PMF.monad_map_eq_map]; rfl
 
 @[simp] lemma evalDist_eq : evalDist p = liftM p := rfl
+
+noncomputable instance : HasEvalDist.HasPMF PMF where
+  toPMF := MonadHom.id PMF
+  toSPMF_comp_toPMF x := by ext; simp [PMF.monad_map_eq_map]
 
 @[simp] lemma probOutput_eq : probOutput p = p := by
   refine funext fun x => ?_

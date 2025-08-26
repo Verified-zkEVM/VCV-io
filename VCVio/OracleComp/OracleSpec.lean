@@ -55,6 +55,9 @@ By adding `1` to the index we avoid selection from the empty type `Fin 0 ≃ emp
 @[simp] lemma domain_unifSpec : unifSpec.domain = ℕ := rfl
 @[simp] lemma range_unifSpec (t : unifSpec.domain) : unifSpec.range t = Fin (t + 1) := rfl
 
+instance : unifSpec.Fintype where fintype_B n := inferInstanceAs (Fintype (Fin (n + 1)))
+instance : unifSpec.Inhabited where inhabited_B n := inferInstanceAs (Inhabited (Fin (n + 1)))
+
 /-- dtumad: should or shouldn't we switch to this. Compare to `(· + m) <$> $[0..n]`.
 One question is that we may have empty selection
 Select uniformly from a range (not starting from zero).-/

@@ -13,7 +13,7 @@ This file defines a function `runIO` for executing a computation via the `IO` mo
 The semantics mirror `evalDist` in that the oracle will respond uniformly at random,
 however we need to limit the oracle set to `unifSpec` to get computability of the function.
 In particular we can't choose randomly from arbitrary types.
-Usually it's possible to reduce to this anyway using `SelectableType` instances (see `unifOracle`).
+Usually it's possible to reduce to this anyway using `SampleableType` instances (see `unifOracle`).
 -/
 
 open OracleSpec

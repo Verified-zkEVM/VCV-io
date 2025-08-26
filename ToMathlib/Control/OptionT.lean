@@ -51,22 +51,21 @@ protected def mapM {m : Type u → Type v} {n : Type u → Type w}
     {α : Type u} (x : OptionT m α) : n α :=
   do (← f x.run).getM
 
--- protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
---     [Monad m] [Monad n] [AlternativeMonad n] [LawfulAlternative n]
---     (f : m →ᵐ n) : OptionT m →ᵐ n where
---   toFun x := do match (← f x.run) with
---     | some x => return x
---     | none => failure
---   toFun_pure' x := by
---     simp
---     rw [pure_bind]
---   toFun_bind' x y := by
---     simp
---     congr 1
---     ext x
---     cases x
---     simp
---     simp
+protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
+    [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
+    (f : m →ᵐ n) : OptionT m →ᵐ n where
+  toFun x := do match (← f x.run) with
+    | some x => return x
+    | none => failure
+  toFun_pure' x := by
+    simp
+  toFun_bind' x y := by
+    simp [Option.elimM]
+    congr 1
+    ext x
+    cases x
+    simp
+    simp
 
 -- @[simp]
 -- lemma mapM'_lift {m : Type u → Type v} {n : Type u → Type w}

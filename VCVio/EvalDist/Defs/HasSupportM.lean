@@ -103,27 +103,41 @@ end LawfulFailure
 namespace PMF
 
 instance : HasSupportM PMF where
-  toFun := fun p => {x | p x ≠ 0}
-  toFun_pure' x := by simp
-  toFun_bind' p q := Set.ext fun x => by simp
+  toFun := PMF.support
+  toFun_pure' := by simp
+  toFun_bind' := by simp
 
-protected lemma support_def {α} (p : PMF α) : support p = {x | p x ≠ 0} := rfl
+@[simp] lemma support_eq {α} (p : PMF α) : support p = PMF.support p := rfl
 
 end PMF
 
 namespace SPMF
 
 instance : HasSupportM SPMF where
-  toFun {α} := fun p : SPMF α => by
-    have : Set (Option α) := support (OptionT.run p)
-    refine ⋃ x ∈ this, match x with | some x => {x} | none => ∅
-  toFun_pure' x := sorry
-  toFun_bind' p q := sorry
+  toFun x := Function.support x
+  toFun_pure' x := by
+    refine Set.ext fun y => ?_
+    simp
+  toFun_bind' x y := by
+    refine Set.ext fun y => ?_
+    simp [Option.elimM, Function.comp_def]
+    refine ⟨fun h => ?_, fun h => ?_⟩
+    · obtain ⟨z, hz⟩ := h
+      cases z with
+      | none =>
+          simp at hz
+      | some z =>
+          use z
+          simp at hz
+          simp [hz]
+    · obtain ⟨z, hz⟩ := h
+      use some z
+      simp [hz]
 
--- protected lemma support_def
+@[simp] lemma support_eq {α} (p : SPMF α) : support p = Function.support p := rfl
 
 instance : HasSupportM.LawfulFailure SPMF where
-  support_failure' := sorry
+  support_failure' {α} := by ext; simp
 
 end SPMF
 

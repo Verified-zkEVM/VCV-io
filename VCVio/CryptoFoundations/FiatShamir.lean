@@ -24,17 +24,17 @@ For simplicity we construct signature schemes rather than general proofs of know
 -- --     (X W : ℕ → Type) (p : {n : ℕ} → X n → W n → Bool)
 -- --     (PC SC Ω P M : ℕ → Type)
 -- --     [Π n, Inhabited (Ω n)] [Π n, DecidableEq (Ω n)]
--- --     [Π n, Fintype (Ω n)] [Π n, SelectableType (Ω n)]
+-- --     [Π n, Fintype (Ω n)] [Π n, SampleableType (Ω n)]
 -- --     [Π n, DecidableEq (PC n)] [Π n, DecidableEq (M n)]
--- --     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SelectableType (X n)]
--- --     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SelectableType (W n)]
+-- --     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
+-- --     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
 
 
 -- section genrel
 
 -- variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type v} {σ X W : Type}
 --     {p : X → W → Bool} {PC SC Ω P : Type} [Monad m]
---     [SelectableType X] [SelectableType W] (M : Type)
+--     [SampleableType X] [SampleableType W] (M : Type)
 
 
 -- -- /-- Given a Σ-protocol we get a signature algorithm by using a random oracle to generate
@@ -45,7 +45,7 @@ For simplicity we construct signature schemes rather than general proofs of know
 
 -- structure GenerableRelation
 --     (X W : Type) (r : X → W → Bool)
---     [SelectableType X] [SelectableType W] where
+--     [SampleableType X] [SampleableType W] where
 --   gen : ProbComp (X × W)
 --   gen_sound (x : X) (w : W) : (x, w) ∈ gen.support → r x w
 --   gen_uniform_right (x : X) : [= x | Prod.fst <$> gen] = [= x | $ᵗ X]
@@ -54,8 +54,8 @@ For simplicity we construct signature schemes rather than general proofs of know
 -- end genrel
 
 -- variable {ι : Type} {spec : OracleSpec ι} {σ X W PC SC Ω P : Type}
---     {p : X → W → Bool} [SelectableType X] [SelectableType W]
---     [DecidableEq PC] [DecidableEq Ω] [SelectableType Ω]
+--     {p : X → W → Bool} [SampleableType X] [SampleableType W]
+--     [DecidableEq PC] [DecidableEq Ω] [SampleableType Ω]
 
 -- def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
 --     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :

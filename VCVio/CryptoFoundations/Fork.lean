@@ -107,7 +107,7 @@ import VCVio.OracleComp.Coercions.Append
 -- namespace OracleComp
 
 -- variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
---   [∀ i, SelectableType (spec.range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
+--   [∀ i, SampleableType (spec.range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 --   {α β γ : Type}
 
 -- structure forkInput (spec : OracleSpec ι) (α : Type) where

@@ -10,7 +10,7 @@ import ToMathlib.Control.MonadAlgebra
 # Morphisms Between Monads
 -/
 
-universe u v w
+universe u v w w'
 
 class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n]
@@ -22,7 +22,7 @@ class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
 This is similar to `MonadLift` but isn't a type-class but rather an actual object.
 This is useful for non-canonical mappings that shouldn't be applied automatically in general.
 We also enforce similar laws to `LawfulMonadLift`. -/
-structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
+@[ext 900] structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n] where
   toFun {α : Type u} : m α → n α
   toFun_pure' {α : Type u} (x : α) : toFun (pure x) = (pure x : n α)
@@ -45,7 +45,14 @@ instance (m : Type u → Type v) [Pure m] [Bind m] (n : Type u → Type w) [Pure
 
 namespace MonadHom
 
-variable {m : Type u → Type v} [Monad m] {n : Type u → Type w} [Monad n] {α β γ : Type u}
+variable {m : Type u → Type v} [Monad m]
+  {n : Type u → Type w} [Monad n]
+  {n' : Type u → Type w'} [Monad n']
+  {α β γ : Type u}
+
+@[ext] protected def ext' {F G : m →ᵐ n} (h : ∀ α (x : m α), F x = G x) : F = G := by
+  ext
+  simp [h]
 
 -- Note some potential confusion between `mmap` in applying Hom sense and `Seq.map`
 -- This slightly differs from naming conventions of e.g. `map_mul` for `MulHomClass`.
@@ -100,5 +107,22 @@ def id (m : Type u → Type v) [Monad m] : m →ᵐ m where
   toFun_bind' _ _ := rfl
 
 @[simp] lemma id_apply (mx : m α) : MonadHom.id m mx = mx := rfl
+
+/-- Compose two `MonadHom`s together by applying them in sequence. -/
+protected def comp (G : n →ᵐ n') (F : m →ᵐ n) : m →ᵐ n' where
+  toFun := G.toFun ∘ F.toFun
+  toFun_pure' := by simp
+  toFun_bind' := by simp
+
+infixr:90 " ∘ₘ "  => MonadHom.comp
+
+@[simp] lemma comp_apply (G : n →ᵐ n') (F : m →ᵐ n) (x : m α) :
+    (G ∘ₘ F) x = G (F x) := rfl
+
+@[simp] lemma comp_id (F : m →ᵐ n) : F.comp (MonadHom.id m) = F := by
+  simp [MonadHom.ext'_iff]
+
+@[simp] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by
+  simp [MonadHom.ext'_iff]
 
 end MonadHom

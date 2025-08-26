@@ -22,7 +22,7 @@ classical discrete log based assumptions.
 -- open OracleComp OracleSpec ENNReal
 
 -- variable {G P : Type} [AddCommGroup G] [AddTorsor G P]
---     [SelectableType P] [SelectableType G]
+--     [SampleableType P] [SampleableType G]
 
 -- def vectorizationAdversary (G P : Type) := P → P → ProbComp G
 
@@ -60,6 +60,6 @@ classical discrete log based assumptions.
 --   let b' ← adversary x x₁ x₂ x₃
 --   guard (b = b')
 
--- noncomputable def parallelTestingAdvantage [SelectableType P] [SelectableType G] [DecidableEq G]
+-- noncomputable def parallelTestingAdvantage [SampleableType P] [SampleableType G] [DecidableEq G]
 --     (adversary : parallelTestingAdversary G P) : ℝ≥0∞ :=
 --   [= () | parallelTesting_experiment adversary] - 1 / 2

@@ -96,13 +96,13 @@ This file defines a number of basic simulation oracles, as well as operations to
 -- /-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
 -- The resulting computation is still identical under `evalDist`.
 -- The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
--- def unifOracle [∀ i, SelectableType (spec.range i)] :
+-- def unifOracle [∀ i, SampleableType (spec.range i)] :
 --     QueryImpl spec ProbComp where
 --   impl | query i _ => $ᵗ spec.range i
 
 -- namespace unifOracle
 
--- variable [∀ i, SelectableType (spec.range i)] {α : Type}
+-- variable [∀ i, SampleableType (spec.range i)] {α : Type}
 
 -- @[simp]
 -- lemma apply_eq (q : OracleQuery spec α) :

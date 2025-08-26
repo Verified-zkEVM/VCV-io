@@ -38,7 +38,7 @@
 -- Messages are base points in `P` (in practice this is some encoding of messages),
 -- The public key is a pair of base points in `P` chosen uniformly at random,
 -- and the secret key is their vectorization in `G`. Signatures are also a pair of base points. -/
--- @[simps!] def elgamalAsymmEnc (G P : Type) [SelectableType G] [SelectableType P]
+-- @[simps!] def elgamalAsymmEnc (G P : Type) [SampleableType G] [SampleableType P]
 --     [AddGroup G] [Group P] [AddTorsor G P] : AsymmEncAlg ProbComp
 --     (M := P) (PK := P × P) (SK := G) (C := P × P) where
 --   keygen := do
@@ -53,7 +53,7 @@
 
 -- namespace elgamalAsymmEnc
 
--- variable {G P : Type} [SelectableType G] [SelectableType P]
+-- variable {G P : Type} [SampleableType G] [SampleableType P]
 --     [AddCommGroup G] [Group P] [AddTorsor G P]
 
 -- @[simp] lemma toExecutionMethod_eq :

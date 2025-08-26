@@ -106,17 +106,17 @@ lemma replicate_pure (x : α) :
 --       xs.length = n ∧ xs.all (· ∈ oa.finSupport) := by
 --   simp [mem_finSupport_iff_mem_support]
 
--- section SelectableTypeVector
+-- section SampleableTypeVector
 
 -- /-- Vectors can be selected uniformly if the underlying type can be.
 -- Note: this isn't very efficient as an actual implementation in practice. -/
--- instance (α : Type) [SelectableType α] (n : ℕ) :
---     SelectableType (Vector α n) where
+-- instance (α : Type) [SampleableType α] (n : ℕ) :
+--     SampleableType (Vector α n) where
 --   selectElem := ($ᵗ α).replicate n
 --   mem_support_selectElem xs := by simp
 --   probOutput_selectElem_eq xs ys := by simp
 --   probFailure_selectElem := by simp
 
--- end SelectableTypeVector
+-- end SampleableTypeVector
 
 end OracleComp

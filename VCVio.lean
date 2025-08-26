@@ -23,6 +23,7 @@ import VCVio.EvalDist.Monad.Alternative
 import VCVio.EvalDist.Monad.Bind
 import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
+import VCVio.EvalDist.OptionT
 import VCVio.EvalDist.Prod
 import VCVio.OracleComp.Coercions.Append
 import VCVio.OracleComp.Coercions.SimOracle
@@ -30,7 +31,6 @@ import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.UniformSelect
-import VCVio.OracleComp.DistSemantics.ActiveOracles
 import VCVio.OracleComp.DistSemantics.EvalDist
 import VCVio.OracleComp.DistSemantics.Simulate
 import VCVio.OracleComp.EvalDist
