@@ -23,6 +23,8 @@ We also define a number of specific cases:
 For the last case, we assume `mx` has an `OptionT` transformer to represent the failure.
 In future it may be nice to generalize to any `AlternativeMonad` using an additional typeclass
   (note that it can't extend the existing one as it outputs in an `SPMF`).
+
+`LawfulProbFailure` says that `failure` has all probability mass on `none`/failing.
 -/
 
 open ENNReal
@@ -115,16 +117,6 @@ lemma probFailure_def (mx : m α) : Pr[⊥ | mx] = (evalDist mx).run none := rfl
     evalDist.toFun ∘ (pure : β → m β) ∘ f = pure ∘ f := by
   simp only [← Function.comp_assoc, evalDist_comp_pure]
 
-@[simp] lemma probOutput_pure [DecidableEq α] (x y : α) :
-    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by simp [probOutput_def]
-
-lemma probOutput_pure_eq_indicator (x y : α) :
-    Pr[= x | (pure y : m α)] = Set.indicator (M := ℝ≥0∞) {y} (Function.const _ 1) x := by
-  simp only [probOutput_def, evalDist_pure, OptionT.run_pure, PMF.monad_pure_eq_pure,
-    PMF.pure_apply, Option.some.injEq, Set.indicator, Set.mem_singleton_iff, Function.const_apply]
-  rw [Option.some_inj]
-  rfl
-
 @[simp] lemma evalDist_map [LawfulMonad m] (mx : m α) (f : α → β) :
     evalDist (f <$> mx) = f <$> (evalDist mx) := by
   simp [map_eq_bind_pure_comp]
@@ -139,14 +131,12 @@ lemma probOutput_pure_eq_indicator (x y : α) :
     evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by
   by_cases hp : p <;> simp [hp]
 
-section support
+/-- dtumad: unsure if this is always the right way to simplify. -/
+@[simp] lemma evalDist_eqRec (h : α = β) (oa : m α) :
+    evalDist (h ▸ oa : m β) = h ▸ evalDist oa := by induction h; rfl
 
 lemma mem_support_iff (mx : m α) (x : α) : x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
-  have := HasEvalDist.support_eq mx
-  simp [this]
-  rfl
-
-end support
+  simp [HasEvalDist.support_eq mx]; rfl
 
 section sums
 
@@ -207,6 +197,33 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 end bounds
 
+
+-- lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
+--     ∑' x : α, [= x | oa] = 1 - [⊥ | oa] := by
+--   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
+
+-- lemma sum_probOutput_eq_sub [Fintype α] (oa : OracleComp spec α) :
+--     ∑ x : α, [= x | oa] = 1 - [⊥ | oa] := by
+--   rw [← tsum_fintype, tsum_probOutput_eq_sub]
+
+-- lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
+--     [⊥ | oa] = 1 - ∑' x : α, [= x | oa] := by
+--   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
+--     (probFailure_add_tsum_probOutput oa)
+
+-- lemma probFailure_eq_sub_sum [Fintype α] (oa : OracleComp spec α) :
+--     [⊥ | oa] = 1 - ∑ x : α, [= x | oa] := by
+--   rw [← tsum_fintype, probFailure_eq_sub_tsum]
+
+-- lemma tsum_probOutput_eq_one (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
+--     ∑' x : α, [= x | oa] = 1 := by
+--   rw [tsum_probOutput_eq_sub, h, tsub_zero]
+
+-- lemma sum_probOutput_eq_one [Fintype α] (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
+--     ∑ x : α, [= x | oa] = 1 := by
+--   rw [sum_probOutput_eq_sub, h, tsub_zero]
+
+
 section LawfulProbFailure
 
 /-- Class for `HasEvalDist` instances that assign full failure chance to `failure`. -/
@@ -218,26 +235,6 @@ export LawfulProbFailure (probFailure_failure)
 attribute [simp] probFailure_failure
 
 end LawfulProbFailure
-
-section bind
-
-variable (mx : m α) (my : α → m β)
-
-lemma probOutput_bind_eq_tsum (y : β) :
-    Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
-  simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
-
-end bind
-
-lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalDist m]
-    (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
-  rw [probEvent_eq_tsum_indicator]
-  rw [probOutput_bind_eq_tsum]
-  refine tsum_congr fun α => ?_
-  simp [Set.indicator]
-  congr
-  rw [eq_true_eq_id]
-  rfl
 
 namespace SPMF
 
@@ -262,6 +259,7 @@ namespace PMF
 
 variable (p : PMF α) (x : α)
 
+/-- Evaluation distribution on `PMF` using the canoncial monad lift into `SPMF`. -/
 noncomputable instance hasEvalDist : HasEvalDist PMF where
   evalDist := MonadHom.ofLift PMF SPMF
   support_eq mx := by simp [PMF.monad_map_eq_map]; rfl

@@ -53,20 +53,24 @@ lemma simulateQ_def [Monad m] [LawfulMonad m] (so : QueryImpl spec m) :
 
 variable [Monad m] [LawfulMonad m] (so : QueryImpl spec m)
 
-@[simp] lemma simulateQ_ite (p : Prop) [Decidable p] (oa oa' : OracleComp spec α) :
-    simulateQ so (ite p oa oa') = ite p (simulateQ so oa) (simulateQ so oa') := by
-  split_ifs <;> rfl
+@[simp] lemma simulateQ_query (t : spec.domain) : simulateQ so (query t) = so t := by
+  simp [simulateQ_def, query_eq_lift]
 
-@[simp] lemma simulateQ_query (t : spec.domain) :
-    simulateQ so (query t) = so t := by
-  simp [simulateQ_def, query_def]
+@[simp] lemma simulateQ_liftM (q : spec α) :
+    simulateQ so (liftM q) = q.2 <$> so q.1 := by simp [simulateQ_def]
+
+@[simp] lemma simulateQ_lift (q : spec α) :
+    simulateQ so (PFunctor.FreeM.lift q) = q.2 <$> so q.1 := by simp [simulateQ_def]
+
+@[simp] lemma simulateQ_liftPos (t : spec.domain) :
+    simulateQ so (PFunctor.FreeM.liftPos t) = so t := by simp [simulateQ_def]
 
 @[simp] lemma simulateQ_pure (x : α) : simulateQ so (pure x) = pure x := by
   simp [simulateQ_def]
 
 @[simp] lemma simulateQ_query_bind (t : spec.domain) (ou : spec.range t → OracleComp spec β) :
     simulateQ so (query t >>= ou) = so t >>= fun u => simulateQ so (ou u) := by
-  simp [simulateQ_def, query_def]
+  simp [simulateQ_def, query_eq_lift]
 
 @[simp] lemma simulateQ_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     simulateQ so (oa >>= ob) = simulateQ so oa >>= fun u => simulateQ so (ob u) := by
@@ -85,6 +89,10 @@ variable [Monad m] [LawfulMonad m] (so : QueryImpl spec m)
 
 @[simp] lemma simulateQ_seqRight (oa : OracleComp spec α) (ob : OracleComp spec β) :
     simulateQ so (oa *> ob) = simulateQ so oa *> simulateQ so ob := by simp [seqRight_eq]
+
+@[simp] lemma simulateQ_ite (p : Prop) [Decidable p] (oa oa' : OracleComp spec α) :
+    simulateQ so (ite p oa oa') = ite p (simulateQ so oa) (simulateQ so oa') := by
+  split_ifs <;> rfl
 
 -- dtumad: I don't think this is true in general
 -- @[simp] lemma simulateQ_orElse (oa oa' : OracleComp spec α) :

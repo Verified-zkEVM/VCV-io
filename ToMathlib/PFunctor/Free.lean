@@ -153,11 +153,6 @@ protected def mapM [Pure m] [Bind m] (s : (a : P.A) → m (P.B a)) : FreeM P α 
   | .pure a => Pure.pure a
   | .roll a r => (s a) >>= (λ u ↦ (r u).mapM s)
 
-@[simp]
-lemma mapM_lift [Monad m] [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
-    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
-  simp [FreeM.mapM, FreeM.lift]
-
 variable [Monad m] (s : (a : P.A) → m (P.B a))
 
 @[simp]
@@ -173,6 +168,15 @@ lemma mapM_bind {α β} [LawfulMonad m] (x : FreeM P α) (y : α → FreeM P β)
   induction x using FreeM.inductionOn with
   | pure _ => simp
   | roll x r h => simp [h]
+
+@[simp]
+lemma mapM_lift [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
+    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
+  simp [FreeM.mapM, FreeM.lift]
+
+@[simp]
+lemma mapM_liftPos [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.A) :
+    FreeM.mapM s (FreeM.liftPos x) = s x := by simp [liftPos]
 
 /-- `FreeM.mapM` as a monad homomorphism. -/
 protected def mapMHom [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where

@@ -66,20 +66,35 @@ instance (spec : OracleSpec) : LawfulMonad (OracleComp spec) :=
 
 instance [Inhabited α] : Inhabited (OracleComp spec α) := ⟨pure default⟩
 
+section lift
+
+instance : MonadLift spec (OracleComp spec) :=
+  inferInstanceAs (MonadLift spec (PFunctor.FreeM spec))
+
+@[simp] lemma lift_ne_pure (q : spec α) (x : α) : (liftM q : OracleComp spec α) ≠ pure x :=
+  PFunctor.FreeM.lift_ne_pure q x
+
+@[simp] lemma pure_ne_lift (x : α) (q : spec α) : pure x ≠ (liftM q : OracleComp spec α) :=
+  PFunctor.FreeM.pure_ne_lift q x
+
+end lift
+
 section query
+
+-- dtumad: do we want this @[deprecated "" (since := "PFunctor Update")]
+abbrev OracleQuery (spec : OracleSpec) (α : Type u) : Type _ := spec α
 
 /-- query an oracle on in input `t` to get a result in the corresponding `range t`. -/
 def query (t : spec.domain) : OracleComp spec (spec.range t) :=
   PFunctor.FreeM.lift ⟨t, id⟩
 
-lemma query_def : query (spec := spec) = fun t => PFunctor.FreeM.lift ⟨t, id⟩ := rfl
+lemma query_eq_lift : query (spec := spec) = fun t => PFunctor.FreeM.lift ⟨t, id⟩ := rfl
 
-/-- Version of `query_def` using a positive definition of lifting. -/
-lemma query_def' : query (spec := spec) = fun t => PFunctor.FreeM.liftPos t := rfl
+lemma query_eq_liftPos : query (spec := spec) = fun t => PFunctor.FreeM.liftPos t := rfl
 
 @[simp] lemma mapM_query {m} [Monad m] [LawfulMonad m]
     (f : (x : spec.domain) → m (spec.range x)) (t : spec.domain) :
-    PFunctor.FreeM.mapM f (query t) = f t := by simp [query_def]
+    PFunctor.FreeM.mapM f (query t) = f t := by simp [query_eq_lift]
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[reducible, inline] def coin : OracleComp coinSpec Bool :=

@@ -18,41 +18,46 @@ We use the notation `spec ⊂ₒ spec'` to represent that one set of oracles is 
 where the non-inclusive subset symbol reflects that we avoid defining this instance reflexively.
 -/
 
--- open OracleSpec OracleComp BigOperators ENNReal
+open OracleSpec OracleComp BigOperators ENNReal
 
--- universe u v w w'
+universe u v w w'
 
--- variable {ι : Type u} {τ : Type v}
---   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α β γ : Type w}
+variable {ι : Type u} {τ : Type v}
+  {spec : OracleSpec} {superSpec : OracleSpec} {α β γ : Type w}
 
--- namespace OracleSpec
+namespace OracleSpec
 
--- /-- Relation defining an inclusion of one set of oracles into another, where the mapping
--- doesn't affect the underlying probability distribution of the computation.
--- Informally, `spec ⊂ₒ superSpec` means that for any query to an oracle of `sub_spec`,
--- it can be perfectly simulated by a computation using the oracles of `superSpec`.
+/-- Relation defining an inclusion of one set of oracles into another, where the mapping
+doesn't affect the underlying probability distribution of the computation.
+Informally, `spec ⊂ₒ superSpec` means that for any query to an oracle of `sub_spec`,
+it can be perfectly simulated by a computation using the oracles of `superSpec`.
 
--- We avoid implementing this via the built-in subset notation as we care about the actual data
--- of the mapping rather than just its existence, which is needed when defining type coercions. -/
--- class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec τ)
---   extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
+We avoid implementing this via the built-in subset notation as we care about the actual data
+of the mapping rather than just its existence, which is needed when defining type coercions. -/
+class SubSpec (spec : OracleSpec.{u,w}) (superSpec : OracleSpec)
+  extends MonadLift spec superSpec where
 
--- infix : 50 " ⊂ₒ " => SubSpec
+infix : 50 " ⊂ₒ " => SubSpec
 
--- namespace SubSpec
+namespace SubSpec
 
--- variable [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+variable [h : MonadLift spec superSpec]
 
--- -- TODO: this may be a good simp lemma for normalization in general?
--- -- Guessing the rhs is almost always easier to prove things about
--- @[simp] lemma liftM_query_eq_liftM_liftM (q : OracleQuery spec α) :
---     (q : OracleComp superSpec α) = ((q : OracleQuery superSpec α) : OracleComp superSpec α) := rfl
+-- -- -- TODO: this may be a good simp lemma for normalization in general?
+-- -- -- Guessing the rhs is almost always easier to prove things about
+-- -- @[simp] lemma liftM_query_eq_liftM_liftM (q : spec α) :
+-- --     (q : superSpec α) = ((q : superSpec α) : OracleComp superSpec α) := rfl
 
 -- -- TODO: Nameing
--- lemma evalDist_lift_query [superSpec.FiniteRange] [Fintype α] [Nonempty α]
---     (q : OracleQuery spec α) :
---     evalDist ((q : OracleQuery superSpec α) : OracleComp superSpec α) =
+-- lemma evalDist_lift_query [superSpec.Fintype] [superSpec.Inhabited]
+--     [Fintype α] [Nonempty α]
+--     (q : spec α) :
+--     evalDist ((q : superSpec α) : OracleComp superSpec α) =
 --       OptionT.lift (PMF.uniformOfFintype α) := by
+--   simp
+
+--   simp only [PFunctor.FreeM.monadLift_eq_lift]
+
 --   rw [evalDist_liftM]
 
 -- @[simp] lemma evalDist_liftM [superSpec.FiniteRange] [Fintype α] [Nonempty α]

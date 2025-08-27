@@ -7,7 +7,7 @@ Authors: Quang Dao
 import VCVio.OracleComp.EvalDist
 import Mathlib.Control.Lawful
 import ToMathlib.Control.Monad.Relative
-import VCVio.OracleComp.DistSemantics.EvalDist
+import VCVio.OracleComp.EvalDist
 
 /-!
 # Hoare triples for `OracleComp` and extensions

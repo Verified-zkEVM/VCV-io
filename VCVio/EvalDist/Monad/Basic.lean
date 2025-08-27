@@ -8,8 +8,51 @@ import VCVio.EvalDist.Defs.HasFinEvalDist
 /-!
 # Evaluation Distributions of Computations with `Bind`
 
-File for lemmas about `evalDist` and `support` involving the monadic `bind`.
+File for lemmas about `evalDist` and `support` involving the monadic `bind` and `pure`.
 -/
+universe u v w
+
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [HasEvalDist m]
+
+open ENNReal
+
+
+@[simp] lemma probOutput_pure [DecidableEq α] (x y : α) :
+    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by simp [probOutput_def]
+
+@[simp] lemma probOutput_pure_self (x : α) :
+    Pr[= x | (pure x : m α)] = 1 := by simp [probOutput_def]
+
+@[simp] lemma probFailure_pure (x : α) : Pr[⊥ | (pure x : m α)] = 0 := by
+  simp [probFailure_def]
+
+lemma probOutput_pure_eq_indicator (x y : α) :
+    Pr[= x | (pure y : m α)] = Set.indicator (M := ℝ≥0∞) {y} (Function.const _ 1) x := by
+  simp only [probOutput_def, evalDist_pure, OptionT.run_pure, PMF.monad_pure_eq_pure,
+    PMF.pure_apply, Option.some.injEq, Set.indicator, Set.mem_singleton_iff, Function.const_apply]
+  rw [Option.some_inj]
+  rfl
+
+
+section bind
+
+variable (mx : m α) (my : α → m β)
+
+lemma probOutput_bind_eq_tsum (y : β) :
+    Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
+  simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
+
+end bind
+
+lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalDist m]
+    (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
+  rw [probEvent_eq_tsum_indicator]
+  rw [probOutput_bind_eq_tsum]
+  refine tsum_congr fun α => ?_
+  simp [Set.indicator]
+  congr
+  rw [eq_true_eq_id]
+  rfl
 
 -- section bind_congr -- TODO: we should have tactics for this kind of thing
 

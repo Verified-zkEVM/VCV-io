@@ -40,6 +40,10 @@ instance (m : Type u → Type v) [Monad m] [HasSupportM m] :
 @[simp] lemma support_eq [HasSupportM m] (mx : OptionT m α) :
     support mx = {x | some x ∈ support mx.run} := rfl
 
+@[simp] lemma support_failure [HasSupportM m] :
+    support (failure : OptionT m α) = ∅ := by
+  simp [support_eq]
+
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalDist m] :
     HasEvalDist (OptionT m) where
   evalDist := OptionT.mapM' evalDist
@@ -77,7 +81,7 @@ lemma probEvent_eq [HasEvalDist m] (mx : OptionT m α) (p : α → Prop) :
   sorry
 
 lemma probFailure_eq [HasEvalDist m] (mx : OptionT m α) :
-    Pr[⊥ | mx] = Pr[⊥ | mx.run] := by
+    Pr[⊥ | mx] = Pr[= none | mx.run] := by
   sorry
 
 @[simp] lemma probOutput_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (x : α) :
@@ -87,5 +91,9 @@ lemma probFailure_eq [HasEvalDist m] (mx : OptionT m α) :
 @[simp] lemma probEvent_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (p : α → Prop) :
     Pr[p | OptionT.lift mx] = Pr[p | mx] := by
   simp [probEvent_def]
+
+instance (m : Type u → Type v) [Monad m] [HasEvalDist m] :
+    LawfulProbFailure (OptionT m) where
+    probFailure_failure := by simp [probFailure_eq]
 
 end OptionT
