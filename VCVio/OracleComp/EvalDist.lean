@@ -54,7 +54,7 @@ lemma evalDist_def (mx : OracleComp spec α) : evalDist mx =
   simp [evalDist_def]
 
 /-- The `HasEvalDist` instance on `OracleComp` extends to a `PMF` as base computations never fail.
-For those that might you need to use `OptionT` to allow for failure. -/
+For those that might want failure, we need to use `OptionT` explicitly. -/
 noncomputable instance : HasEvalDist.HasPMF (OracleComp spec) where
   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
   toSPMF_comp_toPMF mx := by
@@ -64,7 +64,13 @@ noncomputable instance : HasEvalDist.HasPMF (OracleComp spec) where
     · aesop
     simp [evalDist_def]
     simp [OptionT.mk, OptionT.run]
-    sorry
+    unfold simulateQ
+    simp_rw [← bind_pure_comp]
+    simp [OptionT.instMonad]
+    induction my with
+    | pure x => simp [OptionT.instMonad, OptionT.pure, OptionT.mk]; aesop
+    | roll t my ih =>
+      simp [ih, OptionT.instMonad, OptionT.bind, OptionT.mk]
 
 lemma toPMF_def (mx : OracleComp spec α) : toPMF mx =
     simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) mx := rfl

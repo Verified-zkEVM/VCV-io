@@ -13,6 +13,8 @@ This file defines a type `OracleSpec` to represent a set of available oracles.
 The available oracles are all indexed by some (potentially infinite) indexing set `ι`,
 and for each index `i` a pair of types `domain i` and `range i`.
 
+TODO: update documentation (now there is a single dependent oracle)
+
 We also define a number of basic oracle constructions:
 * `T →ₒ U`: Access to a single oracle with given input and output
 * `coinSpec`: A single oracle for flipping a coin
