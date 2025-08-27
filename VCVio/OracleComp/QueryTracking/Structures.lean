@@ -28,6 +28,12 @@ namespace QueryCache
 
 instance : EmptyCollection (QueryCache spec) := ⟨fun _ _ => none⟩
 
+@[ext, grind ext]
+theorem ext {c1 c2 : QueryCache spec} (h : ∀ i t, c1 i t = c2 i t) : c1 = c2 :=
+  funext (λ i ↦ funext (λ t ↦ h i t))
+
+section cacheQuery
+
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
 /-- Add a index + input pair to the cache by updating the function -/
@@ -44,6 +50,41 @@ lemma cacheQuery_eq_ite_ite (i : ι) (t : spec.domain i) (u : spec.range i) :
     · simp [ht, cacheQuery]
     · simp [ht, cacheQuery]
   · simp [h, cacheQuery]
+
+end cacheQuery
+
+/--
+We say that `c1` is a subcache of `c2` if every query in `c1` is also present in `c2`.
+This is a useful concept because in the course of a computation, the cache should only grow.
+-/
+def subcache (c1 c2 : QueryCache spec) : Prop :=
+  ∀ i input output, c1 i input = some output → c2 i input = some output
+
+instance : HasSubset (QueryCache spec) := ⟨subcache⟩
+
+instance : HasSSubset (QueryCache spec) := ⟨fun c1 c2 => c1 ⊆ c2 ∧ ¬ c2 ⊆ c1⟩
+
+theorem subcache_def (c1 c2 : QueryCache spec) : c1 ⊆ c2 ↔
+  ∀ i input output, c1 i input = some output → c2 i input = some output := Iff.rfl
+
+instance : PartialOrder (QueryCache spec) where
+  le := (· ⊆ ·)
+  lt := (· ⊂ ·)
+  le_refl _ _ := by grind
+  le_trans c1 c2 c3 h12 h23 i input output h := by apply h23 i input output (h12 i input output h)
+  le_antisymm c1 c2 h12 h21 := by
+    ext i input output
+    simp [OracleSpec.QueryCache.subcache_def] at h12 h21
+    grind
+
+instance : IsRefl (QueryCache spec) (· ⊆ ·) :=
+  show IsRefl (QueryCache spec) (· ≤ ·) by infer_instance
+
+instance : IsTrans (QueryCache spec) (· ⊆ ·) :=
+  show IsTrans (QueryCache spec) (· ≤ ·) by infer_instance
+
+instance : IsAntisymm (QueryCache spec) (· ⊆ ·) :=
+  show IsAntisymm (QueryCache spec) (· ≤ ·) by infer_instance
 
 end QueryCache
 
