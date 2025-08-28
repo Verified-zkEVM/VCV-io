@@ -65,7 +65,7 @@ end BindHom
 This is similar to `MonadLift` but isn't a type-class but rather an explicit object. This is useful
 for non-canonical mappings that shouldn't be applied automatically in general. The laws enforced are
 similar to those of `LawfulMonadLift`. -/
-structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
+@[ext] structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n] extends NatHom m n, PureHom m n, BindHom m n
 
 @[inherit_doc]
@@ -93,7 +93,14 @@ instance (m : Type u → Type v) [Pure m] [Bind m] (n : Type u → Type w) [Pure
 
 namespace MonadHom
 
-variable {m : Type u → Type v} [Monad m] {n : Type u → Type w} [Monad n] {α β γ : Type u}
+variable {m : Type u → Type v} [Monad m]
+  {n : Type u → Type w} [Monad n]
+  {n' : Type u → Type z} [Monad n']
+  {α β γ : Type u}
+
+@[ext] protected def ext' {F G : m →ᵐ n} (h : ∀ α (x : m α), F x = G x) : F = G := by
+  ext
+  simp [h]
 
 -- Note some potential confusion between `mmap` in applying Hom sense and `Seq.map`
 -- This slightly differs from naming conventions of e.g. `map_mul` for `MulHomClass`.
@@ -142,5 +149,29 @@ lemma mmap_ofLift (m : Type u → Type v) (n : Type u → Type v) [Monad m] [Mon
     (x : m α) : ofLift m n x = liftM x := rfl
 
 end ofLift
+
+def id (m : Type u → Type v) [Monad m] : m →ᵐ m where
+  toFun mx := mx
+  toFun_pure' _ := rfl
+  toFun_bind' _ _ := rfl
+
+@[simp] lemma id_apply (mx : m α) : MonadHom.id m mx = mx := rfl
+
+/-- Compose two `MonadHom`s together by applying them in sequence. -/
+protected def comp (G : n →ᵐ n') (F : m →ᵐ n) : m →ᵐ n' where
+  toFun := G.toFun ∘ F.toFun
+  toFun_pure' := by simp
+  toFun_bind' := by simp
+
+infixr:90 " ∘ₘ "  => MonadHom.comp
+
+@[simp] lemma comp_apply (G : n →ᵐ n') (F : m →ᵐ n) (x : m α) :
+    (G ∘ₘ F) x = G (F x) := rfl
+
+@[simp] lemma comp_id (F : m →ᵐ n) : F.comp (MonadHom.id m) = F := by
+  simp [MonadHom.ext'_iff]
+
+@[simp] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by
+  simp [MonadHom.ext'_iff]
 
 end MonadHom

@@ -40,6 +40,12 @@ def lift (x : P.Obj α) : FreeM P α := FreeM.roll x.1 (fun y ↦ FreeM.pure (x.
 instance : MonadLift P (FreeM P) where
   monadLift x := FreeM.lift x
 
+@[simp] lemma lift_ne_pure (x : P α) (y : α) :
+    (lift x : FreeM P α) ≠ PFunctor.FreeM.pure y := by simp [lift]
+
+@[simp] lemma pure_ne_lift (x : P α) (y : α) :
+    PFunctor.FreeM.pure y ≠ (lift x : FreeM P α) := by simp [lift]
+
 @[simp]
 lemma monadLift_eq_lift (x : P.Obj α) : (x : FreeM P α) = FreeM.lift x := rfl
 
@@ -61,14 +67,20 @@ lemma bind_roll (a : P.A) (r : P.B a → FreeM P β) (g : β → FreeM P γ) :
 lemma bind_lift (x : P.Obj α) (r : α → FreeM P β) :
     FreeM.bind (FreeM.lift x) r = FreeM.roll x.1 (fun a ↦ r (x.2 a)) := rfl
 
+@[simp] lemma bind_eq_pure_iff (x : FreeM P α) (y : α → FreeM P β) (y' : β) :
+    FreeM.bind x y = FreeM.pure y' ↔ ∃ x', x = pure x' ∧ y x' = pure y' := by
+  cases x <;> simp
+
+@[simp] lemma pure_eq_bind_iff (x : FreeM P α) (y : α → FreeM P β) (y' : β) :
+    FreeM.pure y' = FreeM.bind x y ↔ ∃ x', x = pure x' ∧ pure y' = y x' := by
+  cases x <;> simp
+
 instance : Monad (FreeM P) where
   pure := FreeM.pure
   bind := FreeM.bind
 
-@[simp]
 lemma monad_pure_def (x : α) : (pure x : FreeM P α) = FreeM.pure x := rfl
 
-@[simp]
 lemma monad_bind_def (x : FreeM P α) (g : α → FreeM P β) :
     x >>= g = FreeM.bind x g := rfl
 
@@ -83,6 +95,18 @@ instance : LawfulMonad (FreeM P) :=
       induction' x with α a _ h
       · rfl
       · exact congr_arg (FreeM.roll a) (funext λ i ↦ h i))
+
+lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by simp
+
+@[simp] lemma roll_inj (x x' : P.A) (y : P.B x → P.FreeM α) (y' : P.B x' → P.FreeM α) :
+    FreeM.roll x y = FreeM.roll x' y' ↔ ∃ h : x = x', h ▸ y = y' := by
+  simp
+  by_cases hx : x = x'
+  · cases hx
+    simp
+  · simp [hx]
+
+-- @[simp] lemma bind
 
 /-- Proving a predicate `C` of `FreeM P α` requires two cases:
 * `pure x` for some `x : α`
@@ -116,7 +140,7 @@ lemma construct_pure (y : α) : FreeM.construct h_pure h_roll (pure y) = h_pure 
 @[simp]
 lemma construct_roll (x : P.A) (r : P.B x → FreeM P α) :
     (FreeM.construct h_pure h_roll (FreeM.roll x r) : C (FreeM.roll x r)) =
-      (h_roll x r (λ u ↦ FreeM.construct h_pure h_roll (r u))) := rfl
+      (h_roll x r (fun u => FreeM.construct h_pure h_roll (r u))) := rfl
 
 end construct
 
@@ -129,20 +153,6 @@ protected def mapM [Pure m] [Bind m] (s : (a : P.A) → m (P.B a)) : FreeM P α 
   | .pure a => Pure.pure a
   | .roll a r => (s a) >>= (λ u ↦ (r u).mapM s)
 
-/-- `FreeM.mapM` as a monad homomorphism. -/
-protected def mapMHom [Monad m] [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
-  toFun := FreeM.mapM s
-  toFun_pure' x := rfl
-  toFun_bind' x y := by
-    induction x using FreeM.inductionOn with
-    | pure x => simp [FreeM.mapM]
-    | roll x r h => simp at h; simp [FreeM.mapM, h]
-
-@[simp]
-lemma mapM_lift [Monad m] [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
-    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
-  simp [FreeM.mapM, FreeM.lift]
-
 variable [Monad m] (s : (a : P.A) → m (P.B a))
 
 @[simp]
@@ -150,7 +160,36 @@ lemma mapM_pure (x : α) : (FreeM.pure x : FreeM P α).mapM s = Pure.pure x := r
 
 @[simp]
 lemma mapM_roll (x : P.A) (r : P.B x → FreeM P α) :
-    (FreeM.roll x r).mapM s = s x >>= λ u ↦ (r u).mapM s := rfl
+    (FreeM.roll x r).mapM s = s x >>= fun u => (r u).mapM s := rfl
+
+@[simp]
+lemma mapM_bind {α β} [LawfulMonad m] (x : FreeM P α) (y : α → FreeM P β) :
+    (FreeM.bind x y).mapM s = x.mapM s >>= fun u => (y u).mapM s := by
+  induction x using FreeM.inductionOn with
+  | pure _ => simp
+  | roll x r h => simp [h]
+
+@[simp]
+lemma mapM_lift [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
+    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
+  simp [FreeM.mapM, FreeM.lift]
+
+@[simp]
+lemma mapM_liftPos [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.A) :
+    FreeM.mapM s (FreeM.liftPos x) = s x := by simp [liftPos]
+
+/-- `FreeM.mapM` as a monad homomorphism. -/
+protected def mapMHom [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
+  toFun := FreeM.mapM s
+  toFun_pure' x := rfl
+  toFun_bind' x y := by
+    induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
+
+@[simp] lemma mapMHom_toFun_eq [LawfulMonad m] (s : (a : P.A) → m (P.B a)) :
+    ((FreeM.mapMHom s).toFun : FreeM P α → m α) = FreeM.mapM s := rfl
+
+
+-- TODO: other monad operations
 
 end mapM
 

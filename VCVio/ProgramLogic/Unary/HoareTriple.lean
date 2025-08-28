@@ -4,7 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.DistSemantics.EvalDist
+import VCVio.OracleComp.EvalDist
+import Mathlib.Control.Lawful
+import ToMathlib.Control.Monad.Relative
+import VCVio.OracleComp.EvalDist
 
 /-!
 # Hoare triples for `OracleComp` and extensions
@@ -15,7 +18,7 @@ universe u v
 
 namespace OracleComp
 
-open OracleComp OracleSpec
+open OracleComp
 
 open scoped ENNReal
 

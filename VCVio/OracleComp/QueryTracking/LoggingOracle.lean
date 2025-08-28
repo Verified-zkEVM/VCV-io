@@ -16,23 +16,29 @@ universe u v w
 
 open OracleSpec OracleComp
 
-variable {ι : Type u} {spec : OracleSpec ι}
+variable {ι : Type u} {spec : OracleSpec}
 
 namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
-/-- Add logging to an existing query implementation, using `StateT` to extend the final monad. -/
-def withLogging (so : QueryImpl spec m) :
-    QueryImpl spec (WriterT (QueryLog spec) m) where
-  impl | q => do
-    let x ← liftM (so.impl q)
-    tell (QueryLog.singleton q x)
-    return x
+def withLogging (so : QueryImpl spec m) : QueryImpl spec (WriterT (QueryLog spec) m) :=
+  fun t => do
+    let u ← so t
+    tell (QueryLog.singleton t u)
+    return u
 
-@[simp] lemma withLogging_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
-    so.withLogging.impl q =
-      do let x ← liftM (so.impl q); tell (QueryLog.singleton q x); return x := rfl
+-- /-- Add logging to an existing query implementation, using `StateT` to extend the final monad. -/
+-- def withLogging (so : QueryImpl spec m) :
+--     QueryImpl spec (WriterT (QueryLog spec) m) where
+--   impl | q => do
+--     let x ← liftM (so.impl q)
+--     tell (QueryLog.singleton q x)
+--     return x
+
+-- @[simp] lemma withLogging_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
+--     so.withLogging.impl q =
+--       do let x ← liftM (so.impl q); tell (QueryLog.singleton q x); return x := rfl
 
 end QueryImpl
 
@@ -44,33 +50,38 @@ def loggingOracle : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :
 
 namespace loggingOracle
 
-variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+-- variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 
-@[simp] lemma apply_eq (q : OracleQuery spec α) : loggingOracle.impl q =
-    do let u ← q; tell (QueryLog.singleton q u); return u := rfl
+-- @[simp] lemma apply_eq (q : OracleQuery spec α) : loggingOracle.impl q =
+--     do let u ← q; tell (QueryLog.singleton q u); return u := rfl
 
-/-- Taking only the main output after logging queries is the original compuation. -/
-@[simp]
-lemma fst_map_run_simulateQ (oa : OracleComp spec α) :
-    (Prod.fst <$> (simulateQ loggingOracle oa).run) = oa :=
-  fst_map_writerT_run_simulateQ (by simp) oa
+-- /-- Taking only the main output after logging queries is the original compuation. -/
+-- @[simp]
+-- lemma fst_map_run_simulateQ (oa : OracleComp spec α) :
+--     (Prod.fst <$> (simulateQ loggingOracle oa).run) = oa :=
+--   fst_map_writerT_run_simulateQ (by simp) oa
 
-/-- Throwing away the query log after simulation looks like running the original computation. -/
-@[simp]
-lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
-    ((simulateQ loggingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
-  rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
+-- /-- Throwing away the query log after simulation looks like running the original computation. -/
+-- @[simp]
+-- lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+--     ((simulateQ loggingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
+--   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
-@[simp]
-lemma probFailure_run_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) :
-    [⊥ | (simulateQ loggingOracle oa).run] = [⊥ | oa] :=
-  probFailure_writerT_run_simulateQ (by simp) (by simp) oa
+-- @[simp]
+-- lemma probFailure_run_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) :
+--     [⊥ | (simulateQ loggingOracle oa).run] = [⊥ | oa] :=
+--   probFailure_writerT_run_simulateQ (by simp) (by simp) oa
 
-@[simp]
-lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
-    neverFails (simulateQ loggingOracle oa).run ↔ neverFails oa :=
-  neverFails_writerT_run_simulateQ_iff (by simp) (by sorry) oa
+-- @[simp]
+-- lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
+--     neverFails (simulateQ loggingOracle oa).run ↔ neverFails oa :=
+--   neverFails_writerT_run_simulateQ_iff (by simp) (by sorry) oa
 
-alias ⟨_, neverFails_simulateQ⟩ := neverFails_run_simulateQ_iff
+-- alias ⟨_, neverFails_simulateQ⟩ := neverFails_run_simulateQ_iff
 
 end loggingOracle
+
+/-- Add a query log to a computation using a logging oracle.  -/
+@[reducible] def OracleComp.withQueryLog {α} (mx : OracleComp spec α) :
+    OracleComp spec (α × QueryLog spec) :=
+  WriterT.run (simulateQ idOracle.withLogging mx)

@@ -22,10 +22,10 @@ universe u v w
 
 /-- An `ExecutionMethod m` provides a way to map computations in the monad `m` into `ProbComp`.
 In particular it allows computations in `m` -/
-structure ExecutionMethod (m : Type u → Type v) where
-    exec {α : Type u} : m α → ProbComp α
-    lift_probComp {α : Type u} : ProbComp α → m α
-    exec_lift_probComp {α : Type u} (px : ProbComp α) :
+structure ExecutionMethod (m : Type → Type v) where
+    exec {α : Type} : m α → ProbComp α
+    lift_probComp {α : Type} : ProbComp α → m α
+    exec_lift_probComp {α : Type} (px : ProbComp α) :
       exec (lift_probComp px) = px
 
 namespace ExecutionMethod

@@ -3,10 +3,8 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, František Silváši
 -/
--- import ToMathlib.ProbabilityTheory.Coupling
-import Mathlib.Probability.ProbabilityMassFunction.Monad
-import ToMathlib.General
-
+import VCVio.EvalDist.Defs.SPMF
+import VCVio.EvalDist.Defs.HasSupportM
 
 /-!
 # Denotational Semantics for Output Distributions
@@ -25,6 +23,8 @@ We also define a number of specific cases:
 For the last case, we assume `mx` has an `OptionT` transformer to represent the failure.
 In future it may be nice to generalize to any `AlternativeMonad` using an additional typeclass
   (note that it can't extend the existing one as it outputs in an `SPMF`).
+
+`LawfulProbFailure` says that `failure` has all probability mass on `none`/failing.
 -/
 
 open ENNReal
@@ -33,59 +33,22 @@ universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
-/-- Subprobability distribution. -/
-@[reducible] def SPMF : Type u → Type u := OptionT PMF
+/-- The monad `m` has a canonical embedding into the `SPMF` monad. -/
+class HasEvalDist (m : Type u → Type v) [Monad m]
+    extends HasSupportM m where
+  evalDist : m →ᵐ SPMF
+  support_eq {α : Type u} (mx : m α) : support mx = {x | evalDist mx x ≠ 0}
 
-namespace SPMF
+export HasEvalDist (evalDist)
 
-lemma tsum_run_some_eq_one_sub (p : SPMF α) :
-    ∑' x, p.run (some x) = 1 - p.run none := by
-  rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]
-  exact (ENNReal.add_sub_cancel_left (PMF.apply_ne_top p none)).symm
+/-- The monad `m` has a canonical embedding into the `PMF` monad.
+dt: more support for this in general. -/
+class HasEvalDist.HasPMF (m : Type u → Type v) [Monad m]
+    extends HasEvalDist m where
+  toPMF : m →ᵐ PMF
+  toSPMF_comp_toPMF {α : Type u} (mx : m α) : PMF.toSPMF.comp toPMF = evalDist
 
-@[simp] lemma tsum_run_some_ne_top (p : SPMF α) :
-    ∑' x, p.run (some x) ≠ ⊤ :=
-  ne_top_of_le_ne_top one_ne_top (p.tsum_run_some_eq_one_sub ▸ tsub_le_self)
-
-lemma run_none_eq_one_sub (p : SPMF α) :
-    p.run none = 1 - ∑' x, p.run (some x) := by
-  rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]
-  refine ENNReal.eq_sub_of_add_eq ?_ rfl
-  simp only [ne_eq, tsum_run_some_ne_top, not_false_eq_true]
-
-@[simp] lemma run_none_ne_top (p : SPMF α) : p.run none ≠ ⊤ := PMF.apply_ne_top p none
-
-@[ext] lemma ext {p q : SPMF α} (h : ∀ x : α, p.run (some x) = q.run (some x)) : p = q :=
-  PMF.ext fun
-    | some x => h x
-    | none =>  calc p.run none
-        _ = 1 - ∑' x, p.run (some x) := by rw [run_none_eq_one_sub]
-        _ = 1 - ∑' x, q.run (some x) := by simp only [h]
-        _ = q.run none := by rw [run_none_eq_one_sub]
-
--- Should we do it this way or add the instance on `Option α` instead?
-instance : FunLike (SPMF α) α ENNReal where
-  coe sp x := sp.run (some x)
-  coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
-
-@[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
-
-lemma apply'_none_eq_run (p : SPMF α) :
-    let p' : PMF (Option α) := p
-    p' none = p.run none := rfl
-
-end SPMF
-
-/-- The monad `m` has a well-behaved embedding into the `SPMF` monad.
-TODO: modify this to extend `MonadHom` to get some lemmas for free. -/
-class HasEvalDist (m : Type u → Type v) [Monad m] where
-  evalDist {α : Type u} (mx : m α) : SPMF α
-  evalDist_pure {α : Type u} (x : α) : evalDist (pure x : m α) = pure x
-  evalDist_bind {α β : Type u} (mx : m α) (my : α → m β) :
-    evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x)
-
-export HasEvalDist (evalDist evalDist_pure evalDist_bind)
-attribute [simp] evalDist_pure evalDist_bind
+export HasEvalDist.HasPMF (toPMF toSPMF_comp_toPMF)
 
 /-- Probability that a computation `mx` returns the value `x`. -/
 def probOutput [HasEvalDist m] (mx : m α) (x : α) : ℝ≥0∞ := evalDist mx x
@@ -94,17 +57,17 @@ def probOutput [HasEvalDist m] (mx : m α) (x : α) : ℝ≥0∞ := evalDist mx 
 noncomputable def probEvent [HasEvalDist m] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
   (evalDist mx).run.toOuterMeasure (some '' {x | p x})
 
-/-- Probability that a compuutation `mx` will fail to return a value. -/
+/-- Probability that a computation `mx` will fail to return a value. -/
 def probFailure [HasEvalDist m] (mx : m α) : ℝ≥0∞ := (evalDist mx).run none
 
 /-- Probability that a computation returns a particular output. -/
-notation "Pr[=" x "|" mx "]" => probOutput mx x
+notation "Pr[=" x " | " mx "]" => probOutput mx x
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
-notation "Pr[" p "|" mx "]" => probEvent mx p
+notation "Pr[" p " | " mx "]" => probEvent mx p
 
 /-- Probability that a computation fails to return a value. -/
-notation "Pr[⊥" "|" mx "]" => probFailure mx
+notation "Pr[⊥" " | " mx "]" => probFailure mx
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
 syntax (name := probEventBinding1)
@@ -140,21 +103,26 @@ lemma probEvent_def (mx : m α) (p : α → Prop) :
 
 lemma probFailure_def (mx : m α) : Pr[⊥ | mx] = (evalDist mx).run none := rfl
 
-@[simp] lemma evalDist_comp_pure : evalDist ∘ (pure : α → m α) = pure := by
-  simp [funext_iff, Function.comp_apply, evalDist_pure]
+@[simp] lemma evalDist_pure {α : Type u} (x : α) : evalDist (pure x : m α) = pure x :=
+  MonadHom.toFun_pure' _ x
 
-@[simp] lemma evalDist_comp_pure' (f : α → β) : evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by
+@[simp] lemma evalDist_bind {α β : Type u} (mx : m α) (my : α → m β) :
+    evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
+  MonadHom.toFun_bind' _ mx my
+
+@[simp] lemma evalDist_comp_pure : evalDist.toFun ∘ (pure : α → m α) = pure := by
+  simp [funext_iff, Function.comp_apply]
+
+@[simp] lemma evalDist_comp_pure' (f : α → β) :
+    evalDist.toFun ∘ (pure : β → m β) ∘ f = pure ∘ f := by
   simp only [← Function.comp_assoc, evalDist_comp_pure]
-
-@[simp] lemma probOutput_pure [DecidableEq α] (x y : α) :
-    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by simp [probOutput_def]
 
 @[simp] lemma evalDist_map [LawfulMonad m] (mx : m α) (f : α → β) :
     evalDist (f <$> mx) = f <$> (evalDist mx) := by
   simp [map_eq_bind_pure_comp]
 
-@[simp] lemma evalDist_comp_map [LawfulMonad m] (mx : m α) :
-    evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> evalDist mx := by simp [funext_iff]
+@[simp] lemma evalDist_comp_map [LawfulMonad m] (mx : m α) : evalDist.toFun ∘ (fun f => f <$> mx) =
+    fun f : (α → β) => f <$> evalDist mx := by simp [funext_iff]
 
 @[simp] lemma evalDist_seq [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
     evalDist (mf <*> mx) = evalDist mf <*> evalDist mx := by simp [seq_eq_bind_map]
@@ -162,6 +130,13 @@ lemma probFailure_def (mx : m α) : Pr[⊥ | mx] = (evalDist mx).run none := rfl
 @[simp] lemma evalDist_ite (p : Prop) [Decidable p] (mx mx' : m α) :
     evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by
   by_cases hp : p <;> simp [hp]
+
+/-- dtumad: unsure if this is always the right way to simplify. -/
+@[simp] lemma evalDist_eqRec (h : α = β) (oa : m α) :
+    evalDist (h ▸ oa : m β) = h ▸ evalDist oa := by induction h; rfl
+
+lemma mem_support_iff (mx : m α) (x : α) : x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
+  simp [HasEvalDist.support_eq mx]; rfl
 
 section sums
 
@@ -222,35 +197,53 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 end bounds
 
-section bind
 
-variable (mx : m α) (my : α → m β)
+-- lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
+--     ∑' x : α, [= x | oa] = 1 - [⊥ | oa] := by
+--   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
 
-lemma probOutput_bind_eq_tsum (y : β) :
-    Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
-  simp [probOutput, evalDist_bind, tsum_option _ ENNReal.summable, Option.elimM]
+-- lemma sum_probOutput_eq_sub [Fintype α] (oa : OracleComp spec α) :
+--     ∑ x : α, [= x | oa] = 1 - [⊥ | oa] := by
+--   rw [← tsum_fintype, tsum_probOutput_eq_sub]
 
-end bind
+-- lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
+--     [⊥ | oa] = 1 - ∑' x : α, [= x | oa] := by
+--   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
+--     (probFailure_add_tsum_probOutput oa)
 
-lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalDist m]
-    (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
-  rw [probEvent_eq_tsum_indicator]
-  rw [probOutput_bind_eq_tsum]
-  refine tsum_congr fun α => ?_
-  simp [Set.indicator]
-  congr
-  rw [eq_true_eq_id]
-  rfl
+-- lemma probFailure_eq_sub_sum [Fintype α] (oa : OracleComp spec α) :
+--     [⊥ | oa] = 1 - ∑ x : α, [= x | oa] := by
+--   rw [← tsum_fintype, probFailure_eq_sub_tsum]
+
+-- lemma tsum_probOutput_eq_one (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
+--     ∑' x : α, [= x | oa] = 1 := by
+--   rw [tsum_probOutput_eq_sub, h, tsub_zero]
+
+-- lemma sum_probOutput_eq_one [Fintype α] (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
+--     ∑ x : α, [= x | oa] = 1 := by
+--   rw [sum_probOutput_eq_sub, h, tsub_zero]
+
+
+section LawfulProbFailure
+
+/-- Class for `HasEvalDist` instances that assign full failure chance to `failure`. -/
+class LawfulProbFailure (m : Type _ → Type _) [AlternativeMonad m] [HasEvalDist m] where
+    probFailure_failure {α : Type _} : Pr[⊥ | (failure : m α)] = 1
+
+export LawfulProbFailure (probFailure_failure)
+
+attribute [simp] probFailure_failure
+
+end LawfulProbFailure
 
 namespace SPMF
 
+variable (p : SPMF α) (x : α)
+
 /-- Add instance for `SPMF` just to give access to notation. -/
 instance hasEvalDist : HasEvalDist SPMF where
-  evalDist := id
-  evalDist_pure _ := rfl
-  evalDist_bind _ _ := rfl
-
-variable (p : SPMF α) (x : α)
+  evalDist := MonadHom.id SPMF
+  support_eq p := by simp [Function.support]
 
 @[simp] lemma evalDist_eq : evalDist p = p := rfl
 
@@ -264,20 +257,22 @@ end SPMF
 
 namespace PMF
 
-noncomputable instance hasEvalDist : HasEvalDist PMF where
-  evalDist p := OptionT.mk p
-  evalDist_pure _ := by simp; rfl
-  evalDist_bind x y := sorry
-
 variable (p : PMF α) (x : α)
+
+/-- Evaluation distribution on `PMF` using the canoncial monad lift into `SPMF`. -/
+noncomputable instance hasEvalDist : HasEvalDist PMF where
+  evalDist := MonadHom.ofLift PMF SPMF
+  support_eq mx := by simp [PMF.monad_map_eq_map]; rfl
 
 @[simp] lemma evalDist_eq : evalDist p = liftM p := rfl
 
+noncomputable instance : HasEvalDist.HasPMF PMF where
+  toPMF := MonadHom.id PMF
+  toSPMF_comp_toPMF x := by ext; simp [PMF.monad_map_eq_map]
+
 @[simp] lemma probOutput_eq : probOutput p = p := by
   refine funext fun x => ?_
-  simp only [probOutput_def, evalDist_eq, monad_pure_eq_pure, monad_bind_eq_bind, OptionT.run_mk,
-    pure_apply, Option.some.injEq, mul_ite, mul_one, mul_zero]
-  simp
+  simp only [probOutput_def, evalDist_eq, OptionT.run_monadLift, monadLift_self]
   refine (PMF.map_apply _ _ _).trans ?_
   refine (tsum_eq_single x ?_).trans ?_
   · simp

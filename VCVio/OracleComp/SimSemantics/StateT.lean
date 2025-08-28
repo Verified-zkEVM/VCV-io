@@ -19,8 +19,7 @@ open OracleSpec
 
 namespace OracleComp
 
-variable {ι : Type*} {spec : OracleSpec ι} {m : Type u → Type v} [AlternativeMonad m]
-  [LawfulAlternative m]
+variable {ι : Type*} {spec : OracleSpec} {m : Type u → Type v} [Monad m] [LawfulMonad m]
   {σ : Type u} [Subsingleton σ] (so : QueryImpl spec (StateT σ m))
 
 /-- If the state type is `Subsingleton`, then we can represent simulation in terms of `simulate'`,
@@ -32,7 +31,7 @@ lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} (oa : OracleComp spec α) 
   simp [this]
 
 lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (OracleComp spec)))
-    (h : ∀ α (q : OracleQuery spec α) s, (so.impl q).run' s = q)
+    (h : ∀ t s, (so t).run' s = query t)
     (oa : OracleComp spec α) (s : σ) : (simulateQ so oa).run' s = oa := by
   sorry
 

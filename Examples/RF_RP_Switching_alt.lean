@@ -27,7 +27,7 @@ open OracleSpec OracleComp ENNReal
 
 -- variable {α : ℕ → Type} [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)]
---     [∀ n, SelectableType (α n)]
+--     [∀ n, SampleableType (α n)]
 
 -- /-- Run a `RF_RP_Adv` using a random function to answer queries,
 -- implemented as a simulation with a random oracle. -/

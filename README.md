@@ -1,12 +1,18 @@
 # Formally Verified Cryptography Proofs in Lean 4
 
+temp changelog:
+  - simulateQ now a monad hom
+  - `uniformRange` selection with auto derived bound checking
+  - `query` is now just an `OracleComp`, `OracleQuery` is removed
+  - `OracleComp.mapM` replaced with `PFunctor.FreeM.mapM`
+
 This library aims to provide a foundational framework in Lean for reasoning about cryptographic protocols in the computational model. The core part of the framework provides:
 
 * A monadic syntax for representing computations with oracle access (`OracleComp`), with probabilistic computations (`ProbComp`) as a special case of having uniform selection oracles
 * A denotational semantics (`evalDist`) for assigning probability distributions to probabilistic computations, and tools for reasoning about the probabilities of particular outputs or events (`probOutput`/`probEvent`/`probFailure`).
 * An operational semantics (`simulateQ`) for implementing/simulating the behavior of a computation's oracles, including implementations of random oracles, query logging, reductions, etc.
 
-It also provides definitions for cryptographic primitives such as symmetric/asymmetric encryption, (ring) signatures, $\Sigma$-protocols, hashing algorithms, etc. 
+It also provides definitions for cryptographic primitives such as symmetric/asymmetric encryption, (ring) signatures, $\Sigma$-protocols, hashing algorithms, etc.
 
 Assuming Lean 4 and lake are already installed, the project can be built by just running:
 
@@ -22,8 +28,8 @@ It allows for fully foundational proofs of things like forking/rewinding adversa
 Asymptotic reasoning is also supported, but tooling and automation for this is currently limited.
 Computational complexity is not considered.
 
-The `VCVio` directory provides all of the foundations and framework definitions / APIs. 
-`Examples` contains example constructions of standard cryptographic algorithms. 
+The `VCVio` directory provides all of the foundations and framework definitions / APIs.
+`Examples` contains example constructions of standard cryptographic algorithms.
 `ToMathlib` contains constructions that eventually should be moved to another project.
 
 Contributions to the library are welcome via PR.
