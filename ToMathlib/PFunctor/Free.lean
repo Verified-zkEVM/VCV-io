@@ -183,9 +183,7 @@ protected def mapMHom [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P �
   toFun := FreeM.mapM s
   toFun_pure' x := rfl
   toFun_bind' x y := by
-    induction x using FreeM.inductionOn with
-    | pure x => simp [FreeM.mapM, FreeM.monad_bind_def]
-    | roll x r h => simp at h; simp [FreeM.mapM, h, FreeM.monad_bind_def]
+    induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
 
 @[simp] lemma mapMHom_toFun_eq [LawfulMonad m] (s : (a : P.A) → m (P.B a)) :
     ((FreeM.mapMHom s).toFun : FreeM P α → m α) = FreeM.mapM s := rfl

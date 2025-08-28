@@ -82,6 +82,9 @@ end lift
 section query
 
 -- dtumad: do we want this @[deprecated "" (since := "PFunctor Update")]
+/-- An oracle query returning a result of type `α`
+is a dependent pair of a query `i : spec.domain` and a response function `spec.range i → α`.
+This is a wrapper around `PFunctor.Obj`. -/
 abbrev OracleQuery (spec : OracleSpec) (α : Type u) : Type _ := spec α
 
 /-- query an oracle on in input `t` to get a result in the corresponding `range t`. -/

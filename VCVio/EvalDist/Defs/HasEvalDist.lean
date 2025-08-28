@@ -57,7 +57,7 @@ def probOutput [HasEvalDist m] (mx : m α) (x : α) : ℝ≥0∞ := evalDist mx 
 noncomputable def probEvent [HasEvalDist m] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
   (evalDist mx).run.toOuterMeasure (some '' {x | p x})
 
-/-- Probability that a compuutation `mx` will fail to return a value. -/
+/-- Probability that a computation `mx` will fail to return a value. -/
 def probFailure [HasEvalDist m] (mx : m α) : ℝ≥0∞ := (evalDist mx).run none
 
 /-- Probability that a computation returns a particular output. -/
