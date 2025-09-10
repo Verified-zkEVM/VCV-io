@@ -33,8 +33,8 @@
 
 -- @[simp]
 -- lemma support_orElse {ι : Type u} {spec : OracleSpec ι} {α : Type u}
---     (oa oa' : OracleComp spec α) [Decidable oa.neverFails] : (oa <|> oa').support =
---       if oa.neverFails then oa.support else oa.support ∪ oa'.support := by
+--     (oa oa' : OracleComp spec α) [Decidable oa.NeverFail] : (oa <|> oa').support =
+--       if oa.NeverFail then oa.support else oa.support ∪ oa'.support := by
 --   sorry
 
 -- end OracleComp

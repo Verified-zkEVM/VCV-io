@@ -54,7 +54,7 @@ lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasSPMF
 
 -- section bind_congr -- TODO: we should have tactics for this kind of thing
 
--- variable {ι : Type v} {spec : OracleSpec ι} {α β γ δ : Type u} [spec.FiniteRange]
+-- variable {ι : Type v} {spec : OracleSpec ι} {α β γ δ : Type u} [spec.Fintype]
 
 -- lemma probFailure_bind_congr (oa : OracleComp spec α)
 --     {ob : α → OracleComp spec β} {oc : α → OracleComp spec γ}

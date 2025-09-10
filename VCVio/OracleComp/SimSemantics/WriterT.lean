@@ -52,12 +52,12 @@ variable {ι : Type u} {spec : OracleSpec} {α : Type u} {ω : Type u} [Monoid �
 --         _ = (↑(Fintype.card (spec.range i)))⁻¹ := by rw [hso, probOutput_query]
 --   | failure => simp
 
--- -- TODO: less general version with `neverFailsWhen`
--- lemma neverFails_writerT_run_simulateQ_iff
+-- -- TODO: less general version with `NeverFailWhen`
+-- lemma NeverFail_writerT_run_simulateQ_iff
 --     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
 --     (hso : ∀ {α}, ∀ q : OracleQuery spec α, (fst <$> (so.impl q).run).support = ⊤)
---     (hso' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).run.neverFails)
---     (oa : OracleComp spec α) : (simulateQ so oa).run.neverFails ↔ oa.neverFails := by
+--     (hso' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).run.NeverFail)
+--     (oa : OracleComp spec α) : (simulateQ so oa).run.NeverFail ↔ oa.NeverFail := by
 --   sorry
   -- induction oa using OracleComp.inductionOn with
   -- | pure x => simp

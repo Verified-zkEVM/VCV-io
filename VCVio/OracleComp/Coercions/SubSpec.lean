@@ -185,8 +185,8 @@ variable [h : MonadLift spec superSpec]
 --     [p | liftComp oa superSpec] = [p | oa] := by
 --   simp only [probEvent_def, evalDist_liftComp]
 
--- @[simp] lemma neverFails_lift_comp_iff (oa : OracleComp spec α) :
---     (liftComp oa superSpec).neverFails ↔ oa.neverFails := by
+-- @[simp] lemma NeverFail_lift_comp_iff (oa : OracleComp spec α) :
+--     (liftComp oa superSpec).NeverFail ↔ oa.NeverFail := by
 --   simp [liftComp]
 --   sorry
 

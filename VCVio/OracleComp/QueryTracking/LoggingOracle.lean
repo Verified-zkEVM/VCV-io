@@ -73,11 +73,11 @@ namespace loggingOracle
 --   probFailure_writerT_run_simulateQ (by simp) (by simp) oa
 
 -- @[simp]
--- lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
---     neverFails (simulateQ loggingOracle oa).run ↔ neverFails oa :=
---   neverFails_writerT_run_simulateQ_iff (by simp) (by sorry) oa
+-- lemma NeverFail_run_simulateQ_iff (oa : OracleComp spec α) :
+--     NeverFail (simulateQ loggingOracle oa).run ↔ NeverFail oa :=
+--   NeverFail_writerT_run_simulateQ_iff (by simp) (by sorry) oa
 
--- alias ⟨_, neverFails_simulateQ⟩ := neverFails_run_simulateQ_iff
+-- alias ⟨_, NeverFail_simulateQ⟩ := NeverFail_run_simulateQ_iff
 
 end loggingOracle
 

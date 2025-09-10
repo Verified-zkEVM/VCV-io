@@ -30,7 +30,7 @@ variable {m : Type u → Type v} [Monad m]
 
 /-- Count the queries made by the computation using `idx` to categorize them. -/
 def withCounting (so : QueryImpl spec m) (idx : spec.domain → ι) :
-    QueryImpl spec (WriterT (spec.QueryCount ι) m) :=
+    QueryImpl spec (WriterT (QueryCount ι) m) :=
   fun t => tell (QueryCount.single (idx t)) *> so t
 
 -- @[simp] lemma withCounting_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
@@ -41,7 +41,7 @@ end QueryImpl
 /-- Oracle for counting the number of queries made by a computation. The count is stored as a
 function from oracle indices to counts, to give finer grained information about the count. -/
 def countingOracle (idx : spec.domain → ι) :
-    QueryImpl spec (WriterT (QueryCount ι spec) (OracleComp spec)) :=
+    QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
   idOracle.withCounting idx
 
 namespace countingOracle
@@ -67,11 +67,11 @@ namespace countingOracle
 --   probFailure_writerT_run_simulateQ (by simp) (by simp) oa
 
 -- @[simp]
--- lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
---     neverFails (simulateQ countingOracle oa).run ↔ neverFails oa :=
---   neverFails_writerT_run_simulateQ_iff (by simp) (by sorry) oa
+-- lemma NeverFail_run_simulateQ_iff (oa : OracleComp spec α) :
+--     NeverFail (simulateQ countingOracle oa).run ↔ NeverFail oa :=
+--   NeverFail_writerT_run_simulateQ_iff (by simp) (by sorry) oa
 
--- alias ⟨_, neverFails_simulateQ⟩ := neverFails_run_simulateQ_iff
+-- alias ⟨_, NeverFail_simulateQ⟩ := NeverFail_run_simulateQ_iff
 
 -- -- lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : ι → ℕ) :
 -- --     (simulateT countingOracle oa).run qc =

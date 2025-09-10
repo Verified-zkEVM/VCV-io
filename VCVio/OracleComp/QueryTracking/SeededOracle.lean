@@ -49,7 +49,7 @@ def withPregen (so : QueryImpl spec m) :
 --       | u :: us => ReaderT.adapt (fun seed => seed.update i us) (return u)
 --       | [] => so.impl (query i t)) := rfl
 
--- end QueryImpl
+end QueryImpl
 
 /-- Use pregenerated oracle responses for queries. -/
 @[inline, reducible] def seededOracle [DecidableEq ι] :

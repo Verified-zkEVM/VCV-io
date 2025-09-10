@@ -12,7 +12,9 @@ import VCVio.OracleComp.OracleSpec
 import ToMathlib.PFunctor.Basic
 
 -- /-!
--- # Computations with Oracle Access
+-- # Computations with Oracle Access (DEPRECATED)
+
+-- We no longer use this since the switch to `PFunctor.FreeM`.
 
 -- A value `oa : OracleComp spec α` represents a computation with return type `α`,
 -- with access to any of the oracles specified by `spec : OracleSpec`.

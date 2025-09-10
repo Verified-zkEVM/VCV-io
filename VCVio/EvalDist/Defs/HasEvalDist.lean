@@ -72,11 +72,17 @@ export HasPMF (toPMF)
 
 namespace HasPMF
 
+/-- A `HasPMF m` gives rise to a `HasSPMF m` instance due to injection -/
 noncomputable instance [HasPMF m] : HasSPMF m where
   toSPMF := PMF.toSPMF.comp toPMF
 
 lemma support_eq [HasPMF m] {α : Type u} (mx : m α) : support mx = {x | toPMF mx x ≠ 0} := by
   simp [HasSPMF.support_eq, instHasSPMF]
+
+@[simp] lemma evalDist_some [HasPMF m] (mx : m α) (x : α) :
+    (evalDist.toFun mx).1 (some x) = toPMF mx x := by
+  simp [evalDist, toSPMF, OptionT.mk, PMF.map, PMF.bind, PMF.pure, DFunLike.coe]
+  sorry
 
 end HasPMF
 

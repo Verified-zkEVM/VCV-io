@@ -10,7 +10,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 /-!
 # Output Distribution of Computations
 
-This file defines a `HasSPMF` for `OracleComp`, assuming uniform outputs of computations.
+This file defines a `HasPMF` for `OracleComp`, assuming uniform outputs of computations.
 -/
 
 open OracleSpec Option ENNReal BigOperators
@@ -37,40 +37,30 @@ lemma support_def (mx : OracleComp spec α) :
 
 variable [spec.Fintype] [spec.Inhabited]
 
-/-- The standard evaluation distribution on `OracleComp` given by mapping queries to a uniform
-output distribution. In the case of `ProbComp` this is exactly the distribution coming from
-each uniform selection responding uniformly. -/
-noncomputable instance : HasSPMF (OracleComp spec) where
-  evalDist := simulateQ fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))
-  support_eq mx := by induction mx using OracleComp.inductionOn with
-    | pure x => simp
-    | query_bind t my h => simp [h, Set.ext_iff]
+/-- The standard (no failure) evaluation distribution `HasPMF` on `OracleComp` given by mapping
+  queries to a uniform output distribution. In the case of `ProbComp` this is exactly the
+  distribution coming from each uniform selection responding uniformly. -/
+noncomputable instance : HasPMF (OracleComp spec) where
+  toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
 
 lemma evalDist_def (mx : OracleComp spec α) : evalDist mx =
-    simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) mx := rfl
+    simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) mx := by
+  simp [instHasPMF, HasPMF.instHasSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
+  rw [← PMF.monad_map_eq_map]
+  simp [simulateQ]
+  -- ext a
+  -- simp [OptionT.run, evalDist, OptionT.mk, simulateQ]
+  -- have aux {x y : α} : (some x = some y) = (y = x) := by aesop
+  -- conv =>
+  --   enter [1, 1, a, 1]
+  --   rw [aux]
+  sorry
+  -- classical
+  -- rw [tsum_ite_eq a (PFunctor.FreeM.mapM (fun t ↦ PMF.uniformOfFintype (spec.range t)) mx)]
 
 @[simp] lemma evalDist_query (t : spec.domain) :
     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
   simp [evalDist_def]
-
-/-- The `HasSPMF` instance on `OracleComp` extends to a `PMF` as base computations never fail.
-For those that might want failure, we need to use `OptionT` explicitly. -/
-noncomputable instance : HasPMF (OracleComp spec) where
-  toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
-  toSPMF_comp_toPMF mx := by
-    ext α my x
-    simp
-    refine (tsum_eq_single x ?_).trans ?_
-    · aesop
-    simp [evalDist_def]
-    simp [OptionT.mk, OptionT.run]
-    unfold simulateQ
-    simp_rw [← bind_pure_comp]
-    simp [OptionT.instMonad]
-    induction my with
-    | pure x => simp [OptionT.instMonad, OptionT.pure, OptionT.mk]; aesop
-    | roll t my ih =>
-      simp [ih, OptionT.instMonad, OptionT.bind, OptionT.mk]
 
 lemma toPMF_def (mx : OracleComp spec α) : toPMF mx =
     simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) mx := rfl
@@ -81,11 +71,11 @@ lemma toPMF_def (mx : OracleComp spec α) : toPMF mx =
 section finSupport
 
 open Classical -- We need decidable equality for the `finset` binds
--- dtumad: could avoid classical by instead having some
+-- dtumad: could avoid classical by instead having [DecidableEq] instance?
 
 protected noncomputable instance finSupport [spec.Fintype] [spec.Inhabited] :
     HasFinSupport (OracleComp spec) where
-  finSupport mx := OracleComp.construct (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) mx
+  finSupport mx := OracleComp.construct (fun x => {x}) (fun t oa r => Finset.univ.biUnion r) mx
   mem_finSupport_iff mx x := by
     induction mx using OracleComp.inductionOn with
     | pure x => simp
@@ -145,63 +135,54 @@ section uniform
 
 end uniform
 
-end OracleComp
+lemma evalDist_query_bind [spec.Fintype] [spec.Inhabited]
+    (t : spec.domain) (ou : spec.range t → OracleComp spec α) :
+    evalDist ((query t : OracleComp spec _) >>= ou) =
+      (OptionT.lift (PMF.uniformOfFintype (spec.range t))) >>= (evalDist.toFun ∘ ou) := by
+  rw [evalDist_bind, evalDist_query]
+  rfl
 
+@[simp]
+lemma evalDist_coin : evalDist coin = OptionT.lift (PMF.uniformOfFintype Bool) := by
+  rw [coin, evalDist_query]
+  rfl
 
+@[simp]
+lemma evalDist_uniformFin (n : ℕ) :
+    evalDist $[0..n] = OptionT.lift (PMF.uniformOfFintype (Fin (n + 1))) := by
+  rw [uniformFin, evalDist_query]
+  rfl
 
+section support
 
+-- TODO: maybe these should be implicit for some lemmas
+variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α) (p q : α → Prop)
 
+/-- An output has non-zero probability iff it is in the `support` of the computation. -/
+@[simp]
+lemma mem_support_evalDist_iff :
+    some x ∈ support (evalDist oa).run ↔ x ∈ support oa := by
+  induction oa using OracleComp.inductionOn with
+  -- Should think about better simp pathways here
+  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]
+  | query_bind t oa hoa => simp [hoa, OptionT.lift, elimM]; sorry
 
+alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
 
-
-
--- lemma evalDist_query_bind (i : ι) (t : spec.domain i) (ou : spec.range i → OracleComp spec α) :
---     evalDist ((query i t : OracleComp spec _) >>= ou) =
---       (OptionT.lift (PMF.uniformOfFintype (spec.range i))) >>= (evalDist ∘ ou) := by
---   rw [evalDist_bind, evalDist_query]
-
-
--- @[simp]
--- lemma evalDist_coin : evalDist coin = OptionT.lift (PMF.uniformOfFintype Bool) := by
---   rw [coin, evalDist_query]
-
--- @[simp]
--- lemma evalDist_uniformFin (n : ℕ) :
---     evalDist $[0..n] = OptionT.lift (PMF.uniformOfFintype (Fin (n + 1))) := by
---   rw [uniformFin, evalDist_query]
-
--- end evalDist
-
-
--- section support
-
--- -- TODO: maybe these should be implicit for some lemmas
--- variable (oa : OracleComp spec α) (x : α) (p q : α → Prop)
-
--- /-- An output has non-zero probability iff it is in the `support` of the computation. -/
--- @[simp]
--- lemma mem_support_evalDist_iff (oa : OracleComp spec α) (x : α) :
---     some x ∈ (evalDist oa).run.support ↔ x ∈ oa.support := by
---   induction oa using OracleComp.inductionOn with
---   | pure => simp
---   | query_bind i t oa hoa => simp [hoa, OptionT.lift, elimM]
---   | failure => simp
--- alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
-
--- /-- An output has non-zero probability iff it is in the `finSupport` of the computation. -/
--- @[simp]
--- lemma mem_support_evalDist_iff' [spec.DecidableEq] [DecidableEq α]
---     (oa : OracleComp spec α) (x : α) :
---     some x ∈ (evalDist oa).run.support ↔ x ∈ oa.finSupport := by
+/-- An output has non-zero probability iff it is in the `finSupport` of the computation. -/
+@[simp]
+lemma mem_support_evalDist_iff' [DecidableEq α]
+    (oa : OracleComp spec α) (x : α) :
+    some x ∈ (evalDist oa).run.support ↔ x ∈ finSupport oa := by sorry
 --   rw [mem_support_evalDist_iff, mem_finSupport_iff_mem_support]
 -- alias ⟨mem_finSupport_of_mem_support_evalDist, mem_support_evalDist'⟩ := mem_support_evalDist_iff'
 
--- @[simp]
--- lemma evalDist_apply_eq_zero_iff (x : Option α) :
---     (evalDist oa).run x = 0 ↔ x.rec ([⊥ | oa] = 0) (· ∉ oa.support) :=
---   match x with
---   | none => by simp [probFailure_def]
---   | some x => by simp [OptionT.run, ← mem_support_evalDist_iff]
+@[simp]
+lemma evalDist_apply_eq_zero_iff (x : Option α) :
+    (evalDist oa).run x = 0 ↔ x.rec (Pr[⊥ | oa] = 0) (· ∉ support oa) :=
+  match x with
+  | none => by simp [probFailure_def]
+  | some x => by simp [OptionT.run, ← mem_support_evalDist_iff]
 
 -- @[simp]
 -- lemma evalDist_apply_eq_zero_iff' [spec.DecidableEq] [DecidableEq α] (x : Option α) :
@@ -396,7 +377,7 @@ end OracleComp
 --     (h : evalDist oa = evalDist oa') (x : α) : x ∈ oa.finSupport ↔ x ∈ oa'.finSupport := by
 --   simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
 
--- end support
+end support
 
 -- @[simp] lemma probEvent_eq_eq_probOutput (oa : OracleComp spec α) (x : α) :
 --     [(· = x) | oa] = [= x | oa] := by
@@ -664,12 +645,12 @@ end OracleComp
 --     (hr : ∀ x ∈ oa.support, [⊥ | ob x] ≤ r) : [⊥ | oa >>= ob] ≤ s + r := sorry
 
 -- /-- Version of `probFailure_bind_le_of_forall` when `oa` never fails. -/
--- lemma probFailure_bind_le_of_le_of_neverFails {oa : OracleComp spec α}
---     (h' : oa.neverFails) {ob : α → OracleComp spec β} {r : ℝ≥0∞}
+-- lemma probFailure_bind_le_of_le_of_NeverFail {oa : OracleComp spec α}
+--     (h' : oa.NeverFail) {ob : α → OracleComp spec β} {r : ℝ≥0∞}
 --     (hr : ∀ x ∈ oa.support, [⊥ | ob x] ≤ r) : [⊥ | oa >>= ob] ≤ r := sorry
 
--- lemma probFailure_bind_of_neverFails {oa : OracleComp spec α}
---     (h : neverFails oa) (ob : α → OracleComp spec β) :
+-- lemma probFailure_bind_of_NeverFail {oa : OracleComp spec α}
+--     (h : NeverFail oa) (ob : α → OracleComp spec β) :
 --     [⊥ | oa >>= ob] = ∑' x : α, [= x | oa] * [⊥ | ob x] := sorry
 
 -- end bind
@@ -860,12 +841,12 @@ end OracleComp
 
 -- end map
 
--- section neverFails
+-- section NeverFail
 
 -- -- TODO: expand api and include `mayFail` versions for `probFailure_pos`.
 
 -- @[simp]
--- lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : [⊥ | oa] = 0 ↔ oa.neverFails := by
+-- lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : [⊥ | oa] = 0 ↔ oa.NeverFail := by
 --   sorry
 --   -- induction oa using OracleComp.inductionOn with
 --   -- | pure x => simp
@@ -873,16 +854,16 @@ end OracleComp
 --   -- | query_bind i t oa h => simp [probFailure_bind_eq_tsum, h]
 
 -- @[simp]
--- lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < [⊥ | oa] ↔ ¬ oa.neverFails := by
+-- lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < [⊥ | oa] ↔ ¬ oa.NeverFail := by
 --   sorry --rw [pos_iff_ne_zero, ne_eq, probFailure_eq_zero_iff]
 
 -- lemma noFailure_of_probFailure_eq_zero {oa : OracleComp spec α} (h : [⊥ | oa] = 0) :
---     neverFails oa := by rwa [← probFailure_eq_zero_iff]
+--     NeverFail oa := by rwa [← probFailure_eq_zero_iff]
 
 -- lemma not_noFailure_of_probFailure_pos {oa : OracleComp spec α} (h : 0 < [⊥ | oa]) :
---     ¬ neverFails oa := by rwa [← probFailure_pos_iff]
+--     ¬ NeverFail oa := by rwa [← probFailure_pos_iff]
 
--- end neverFails
+-- end NeverFail
 
 -- section unit
 
@@ -902,7 +883,7 @@ end OracleComp
 --   rw [ENNReal.sub_sub_cancel (by simp) (by simp)]
 
 -- lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp spec α}
---     (h : oa.neverFails) {p : α → Prop} [DecidablePred p] :
+--     (h : oa.NeverFail) {p : α → Prop} [DecidablePred p] :
 --     [= () | do let a ← oa; guard (p a)] = 1 - [= () | do let a ← oa; guard (¬ p a)] := by
 --   rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
 --   simp
@@ -1091,4 +1072,4 @@ end OracleComp
 --     sorry
 --   }
 
--- end OracleComp
+end OracleComp

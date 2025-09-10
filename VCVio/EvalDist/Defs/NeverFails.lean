@@ -140,7 +140,7 @@ end spmf
 would never fails -/
 instance [HasPMF m] (mx : m α) : NeverFail mx where
   probFailure_eq_zero := by
-    simp [probFailure, instHasSPMFOfHasPMF, OptionT.run, evalDist, OptionT.mk]
+    simp [probFailure, HasPMF.instHasSPMF, OptionT.run, evalDist, OptionT.mk]
 
 end NeverFail
 

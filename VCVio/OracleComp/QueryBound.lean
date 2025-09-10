@@ -19,35 +19,38 @@ Calculating this is generally expensive, and so it shouldn't be used in actual a
 but it can be useful in some proofs that only care about the existence of a bound.
 -/
 
--- open OracleSpec Prod
+open OracleSpec Prod
 
--- universe u v w
+universe u v w
 
--- namespace OracleComp
+namespace OracleComp
 
--- section IsQueryBound
+section IsQueryBound
 
--- variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι} {α β γ : Type u}
+variable {spec : OracleSpec} {ι : Type _} [HasIndexing spec ι] [DecidableEq ι] {α β γ : Type u}
 
--- /-- Predicate expressing that `qb` is a bound on the number of queries made by `oa`.
--- In particular any simulation with a `countingOracle` produces counts that are smaller. -/
--- def IsQueryBound (oa : OracleComp spec α) (qb : ι → ℕ) : Prop :=
---     ∀ qc ∈ (snd <$> (simulateQ countingOracle oa).run).support, qc ≤ qb
+/-- Predicate expressing that `queryBound` is a bound on the number of queries made by `oa`.
+In particular any simulation with a `countingOracle` produces counts that are smaller. -/
+def IsQueryBound (oa : OracleComp spec α) (queryBound : QueryCount ι) : Prop :=
+    ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
+      qc ≤ queryBound
 
--- lemma isQueryBound_def (oa : OracleComp spec α) (qb : QueryCount spec) :
---     IsQueryBound oa qb ↔ ∀ qc ∈ (snd <$> (simulateQ countingOracle oa).run).support, qc ≤ qb :=
---   Iff.rfl
+lemma isQueryBound_def (oa : OracleComp spec α) (qb : QueryCount ι) :
+    IsQueryBound oa qb ↔
+      ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
+        qc ≤ qb :=
+  Iff.rfl
 
--- lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι → ℕ}
---     (h' : IsQueryBound oa qb) (h : qb ≤ qb') : IsQueryBound oa qb' :=
---   λ qc hqc ↦ le_trans (h' qc hqc) h
+lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι → ℕ}
+    (h' : IsQueryBound oa qb) (h : qb ≤ qb') : IsQueryBound oa qb' :=
+  λ qc hqc ↦ le_trans (h' qc hqc) h
 
--- lemma isQueryBound_iff_probEvent [spec.FiniteRange] {oa : OracleComp spec α} {qb : ι → ℕ} :
---     IsQueryBound oa qb ↔
---       [(· ≤ qb) | snd <$> (simulateQ countingOracle oa).run <|> return 0] = 1 := by
---   simp [probEvent_eq_one_iff, isQueryBound_def]
---   sorry
---   -- split_ifs <;> simp
+lemma isQueryBound_iff_probEvent [spec.Fintype] [spec.Inhabited] {oa : OracleComp spec α} {qb : ι → ℕ} :
+    IsQueryBound oa qb ↔
+      Pr[(· ≤ qb) | snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run] = 1 := by
+  simp [probEvent_eq_one_iff, isQueryBound_def]
+  sorry
+  -- split_ifs <;> simp
 
 -- @[simp]
 -- lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : OracleComp spec α) qb := by
@@ -132,7 +135,7 @@ but it can be useful in some proofs that only care about the existence of a boun
 
 -- -- section minimalQueryBound
 
--- -- -- def minimalQueryBound [spec.FiniteRange] [DecidableEq ι] [spec.DecidableEq]
+-- -- -- def minimalQueryBound [spec.Fintype] [DecidableEq ι] [spec.DecidableEq]
 -- -- --   {α : Type} (oa : OracleComp spec α) : (ι → ℕ) := by
 -- -- --   induction oa using OracleComp.construct with
 -- -- --   | pure x => exact 0

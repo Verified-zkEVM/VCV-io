@@ -31,63 +31,52 @@ instance : EmptyCollection (QueryCache spec) := ⟨fun _ => none⟩
 
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
-/-- Add a index + input pair to the cache by updating the function -/
+/-- Add a index + input pair to the cache by updating the function (wrapper around `Function.update`) -/
 def cacheQuery (t : spec.domain) (u : spec.range t) : QueryCache spec :=
   Function.update cache t u
-
--- lemma cacheQuery_eq_ite_ite (i : ι) (t : spec.domain i) (u : spec.range i) :
---     cache.cacheQuery i t u = λ j t' ↦
---       if h : j = i then (if h ▸ t' = t then some (h ▸ u) else cache j t') else cache j t' := by
---   refine funext (λ j ↦ funext (λ t' ↦ ?_))
---   by_cases h : j = i
---   · induction h
---     by_cases ht : t' = t
---     · simp [ht, cacheQuery]
---     · simp [ht, cacheQuery]
---   · simp [h, cacheQuery]
 
 end QueryCache
 
 /-- Simple wrapper in order to introduce the `Monoid` structure for `countingOracle`.
 Marked as reducible and can generally be treated as just a function.
 `idx` gives the "index" for a given input -/
-@[reducible] def QueryCount (ι : Type*) (_spec : OracleSpec) := ι → ℕ
+@[reducible] def QueryCount (ι : Type*) := ι → ℕ
 
 namespace QueryCount
 
 /-- Pointwise addition as the `Monoid` operation used for `WriterT`. -/
-instance : Monoid (QueryCount ι spec) where
+instance : Monoid (QueryCount ι) where
   mul qc qc' := qc + qc'
   mul_assoc := add_assoc
   one := 0
   one_mul := zero_add
   mul_one := add_zero
 
-@[simp] lemma monoid_mul_def (qc qc' : QueryCount ι spec) :
+@[simp] lemma monoid_mul_def (qc qc' : QueryCount ι) :
   (@HMul.hMul _ _ _ (@instHMul _ (Monoid.toMulOneClass.toMul)) qc qc')
      = (qc : ι → ℕ) + (qc' : ι → ℕ) := rfl
 
 @[simp] lemma monoid_one_def :
-    (@OfNat.ofNat (QueryCount ι spec) 1 (@One.toOfNat1 _ (Monoid.toOne))) = (0 : ι → ℕ) := rfl
+    (@OfNat.ofNat (QueryCount ι) 1 (@One.toOfNat1 _ (Monoid.toOne))) = (0 : ι → ℕ) := rfl
 
-def single [DecidableEq ι] (i : ι) : QueryCount ι spec := Function.update 0 i 1
+def single [DecidableEq ι] (i : ι) : QueryCount ι := Function.update 0 i 1
 
--- @[simp]
--- lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount spec) :
---     single i ≤ qc ↔ 0 < qc i := by
---   simp [single, Function.update, Pi.hasLe]
---   constructor <;> intro h
---   · have : 1 ≤ qc i := by simpa using h i
---     exact this
---   · intro j
---     by_cases hj : j = i
---     · simp [hj]; omega
---     · simp [hj]
+@[simp]
+lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
+    single i ≤ qc ↔ 0 < qc i := by
+  simp [single, Function.update, Pi.hasLe]
+  constructor <;> intro h
+  · have : 1 ≤ qc i := by simpa using h i
+    exact this
+  · intro j
+    by_cases hj : j = i
+    · simp [hj]; omega
+    · simp [hj]
 
 end QueryCount
 
 /-- Log of queries represented by a list of dependent product's tagging the oracle's index.
-`(i : ι) → spec.domain i × spec.range i` is slightly more restricted as it doesn't
+`(t : spec.domain) × (spec.range t)` is slightly more restricted as it doesn't
 keep track of query ordering between different oracles. -/
 @[reducible] def QueryLog (spec : OracleSpec) : Type _ :=
   List ((t : spec.domain) × spec.range t)
@@ -130,8 +119,9 @@ def getQ (log : QueryLog spec) (p : spec.domain → Prop) [DecidablePred p] :
   List.foldr (fun ⟨t, u⟩ xs => if p t then ⟨t, u⟩ :: xs else xs) [] log
 
 -- -- NOTE: should this simp? feels bad to simp with ▸ and pattern matching in target
--- lemma getQ_singleton {α} (q : OracleQuery spec α) (u : α) (i : ι) :
---     getQ (singleton q u) i = match q with
+-- lemma getQ_singleton {α} (q : OracleQuery spec α) (u : α)
+--     (p : spec.domain → Prop) [DecidablePred p] :
+--     getQ (singleton q u) p = match q with
 --       | query j t => if h : j = i then [h ▸ (t, u)] else [] := by
 --   cases q with | query i t => ?_
 --   simp [getQ, singleton]
@@ -209,161 +199,172 @@ def wasQueried [spec.DecidableEq] (log : QueryLog spec) (t : spec.domain) : Bool
 
 section prod
 
--- variable {ι₁ ι₂ : Type*} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+variable {spec₁ : OracleSpec} {spec₂ : OracleSpec}
 
--- /-- Get only the portion of the log for queries in `spec₁`. -/
--- protected def fst (log : QueryLog (spec₁ ++ₒ spec₂)) : QueryLog spec₁ :=
---   log.filterMap (fun | ⟨.inl i, t, u⟩ => some ⟨i, t, u⟩ | _ => none)
+/-- Get only the portion of the log for queries in `spec₁`. -/
+protected def fst (log : QueryLog (spec₁ + spec₂)) : QueryLog spec₁ :=
+  log.filterMap (fun | ⟨.inl t, u⟩ => some ⟨t, u⟩ | _ => none)
 
--- /-- Get only the portion of the log for queries in `spec₂`. -/
--- protected def snd (log : QueryLog (spec₁ ++ₒ spec₂)) : QueryLog spec₂ :=
---   log.filterMap (fun | ⟨.inr i, t, u⟩ => some ⟨i, t, u⟩ | _ => none)
+/-- Get only the portion of the log for queries in `spec₂`. -/
+protected def snd (log : QueryLog (spec₁ + spec₂)) : QueryLog spec₂ :=
+  log.filterMap (fun | ⟨.inr t, u⟩ => some ⟨t, u⟩ | _ => none)
 
--- /-- View a log for `spec₁` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
--- protected def inl (log : QueryLog spec₁) : QueryLog (spec₁ ++ₒ spec₂) :=
---   log.map fun ⟨i, t, u⟩ => ⟨.inl i, t, u⟩
+/-- View a log for `spec₁` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
+protected def inl (log : QueryLog spec₁) : QueryLog (spec₁ + spec₂) :=
+  log.map fun ⟨t, u⟩ => ⟨.inl t, u⟩
 
--- /-- View a log for `spec₂` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
--- protected def inr (log : QueryLog spec₂) : QueryLog (spec₁ ++ₒ spec₂) :=
---   log.map fun ⟨i, t, u⟩ => ⟨.inr i, t, u⟩
+/-- View a log for `spec₂` as one for `spec₁ ++ₒ spec₂` by inclusion. -/
+protected def inr (log : QueryLog spec₂) : QueryLog (spec₁ + spec₂) :=
+  log.map fun ⟨t, u⟩ => ⟨.inr t, u⟩
 
--- instance : Coe (QueryLog spec₁) (QueryLog (spec₁ ++ₒ spec₂)) := ⟨QueryLog.inl⟩
--- instance : Coe (QueryLog spec₂) (QueryLog (spec₁ ++ₒ spec₂)) := ⟨QueryLog.inr⟩
+instance : Coe (QueryLog spec₁) (QueryLog (spec₁ + spec₂)) := ⟨QueryLog.inl⟩
+instance : Coe (QueryLog spec₂) (QueryLog (spec₁ + spec₂)) := ⟨QueryLog.inr⟩
 
 end prod
 
 end QueryLog
 
-/-- Type to represent a store of seed values to use in a computation, represented as a function.
+/-- Type to represent a store of (random) seed values to use in a computation, represented as a function.
 Updates to individual seed lists are performed via continuation passing. -/
 def QuerySeed (spec : OracleSpec) (ι : Type u) [HasIndexing spec ι] : Type _ :=
   (i : ι) → List (HasIndexing.xdi spec i)
 
--- namespace QuerySeed
+namespace QuerySeed
 
--- instance : DFunLike (QuerySeed spec) ι (λ i ↦ List (spec.range i)) where
---   coe := λ seed ↦ seed
---   coe_injective' := Function.injective_id
+variable [HasIndexing spec ι]
 
--- @[ext]
--- protected lemma ext (seed₁ seed₂ : QuerySeed spec) (h : ∀ i, seed₁ i = seed₂ i) : seed₁ = seed₂ :=
---     DFunLike.ext seed₁ seed₂ h
+instance : DFunLike (QuerySeed spec ι) ι (λ i ↦ List (HasIndexing.xdi spec i)) where
+  coe := id
+  coe_injective' := Function.injective_id
 
--- @[simp] instance : EmptyCollection (QuerySeed spec) := ⟨λ _ ↦ []⟩
+@[ext]
+protected lemma ext (seed₁ seed₂ : QuerySeed spec ι) (h : ∀ i, seed₁ i = seed₂ i) :
+    seed₁ = seed₂ :=
+  DFunLike.ext seed₁ seed₂ h
 
--- def update [DecidableEq ι] (seed : QuerySeed spec) (i : ι)
---     (xs : List (spec.range i)) : QuerySeed spec :=
---   Function.update seed i xs
+@[simp] instance : EmptyCollection (QuerySeed spec ι) := ⟨λ _ ↦ []⟩
 
--- section addValues
+def update [DecidableEq ι] (seed : QuerySeed spec ι) (i : ι)
+    (xs : List (HasIndexing.xdi spec i)) : QuerySeed spec ι :=
+  Function.update seed i xs
 
--- /-- Add a list of values to the query seed.-/
--- def addValues [DecidableEq ι] {i : ι}
---     (us : List (spec.range i)) (seed : QuerySeed spec) : QuerySeed spec :=
---   Function.update seed i (seed i ++ us)
+section addValues
 
--- variable [DecidableEq ι] {i : ι} (seed : QuerySeed spec) (us : List (spec.range i))
+variable [DecidableEq ι] {i : ι} (seed : QuerySeed spec ι)
+
+/-- Add a list of values to the query seed.-/
+def addValues (us : List (HasIndexing.xdi spec i)): QuerySeed spec ι :=
+  Function.update seed i (seed i ++ us)
+
+variable (us : List (HasIndexing.xdi spec i))
+
+@[simp]
+lemma addValues_apply (j : ι) : seed.addValues us j =
+    Function.update seed i (seed i ++ us) j := rfl
+
+@[simp]
+lemma addValues_nil {i : ι} (seed : QuerySeed spec ι) :
+    seed.addValues (i := i) [] = seed := by
+  simp only [addValues, List.append_nil, Function.update_eq_self]
+
+/-- Add a single value into the seed, by adding a singleton list -/
+abbrev addValue (seed : QuerySeed spec ι) (i : ι) (u : HasIndexing.xdi spec i) :
+    QuerySeed spec ι :=
+  seed.addValues [u]
+
+end addValues
+
+section takeAtIndex
+
+variable [DecidableEq ι] (seed : QuerySeed spec ι)
+
+/-- Take only the first `n` values of the seed at index `i`. -/
+def takeAtIndex (i : ι) (n : ℕ) : QuerySeed spec ι :=
+  Function.update seed i ((seed i).take n)
+
+variable (i : ι) (n : ℕ)
+
+@[simp]
+lemma takeAtIndex_apply (j : ι) : seed.takeAtIndex i n j =
+    (Function.update seed i ((seed i).take n) j) := rfl
+
+@[simp]
+lemma takeAtIndex_addValues (seed : QuerySeed spec ι) {i : ι} (n : ℕ)
+    (xs : List (HasIndexing.xdi spec i)) :
+    (seed.addValues xs).takeAtIndex i n = if n ≤ (seed i).length
+      then seed.takeAtIndex i n else seed.addValues (xs.take (n - (seed i).length)) := by
+  refine funext (λ j ↦ ?_)
+  by_cases hj : j = i
+  · induction hj
+    split_ifs with hn
+    · simp [hn]
+    · suffices List.take n (seed j ++ xs) = seed j ++ List.take (n - (seed j).length) xs
+      by simpa using this
+      rw [List.take_append]
+      simpa using le_of_not_ge hn
+  · split_ifs with _ <;> simp [hj]
 
 -- @[simp]
--- lemma addValues_apply (j : ι) : seed.addValues us j =
---     Function.update seed i (seed i ++ us) j := rfl
+-- lemma addValues_takeAtIndex (seed : QuerySeed spec) {i : ι} (xs : List (spec.range i)) (n : ℕ) :
+--     (seed.takeAtIndex i n).addValues xs =
 
--- @[simp]
--- lemma addValues_nil {i : ι} (seed : QuerySeed spec) : seed.addValues (i := i) [] = seed := by
---   simp only [addValues, List.append_nil, Function.update_eq_self]
+@[simp]
+lemma takeAtIndex_length (seed : QuerySeed spec ι) (i : ι) :
+    seed.takeAtIndex i (seed i).length = seed := funext (λ j ↦ by simp)
 
--- /-- Add a single value into the seed, by adding a singleton list -/
--- abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.range i) : QuerySeed spec :=
---   seed.addValues [u]
+lemma eq_takeAtIndex_length_iff (seed seed' : QuerySeed spec ι) (i : ι) :
+    seed = seed'.takeAtIndex i (seed i).length ↔
+      seed' = seed.addValues ((seed' i).drop (seed i).length) := by
+  refine ⟨λ h ↦ QuerySeed.ext _ _ (λ j ↦ ?_), λ h ↦ ?_⟩
+  · by_cases hj : j = i
+    · induction hj
+      rw [h]
+      suffices (seed j).length ≤ (seed' j).length
+      by simp [this]
+      simpa using congr_arg List.length (congr_fun h j)
+    · rw [h]
+      simp [hj]
+  · rw [h]
+    simp
 
--- end addValues
+end takeAtIndex
 
--- section takeAtIndex
+section ofList
 
--- /-- Take only the first `n` values of the seed at index `i`. -/
--- def takeAtIndex [DecidableEq ι] (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
---   Function.update seed i ((seed i).take n)
+/-- Construct a query seed from a list -/
+def ofList [DecidableEq ι] {i : ι} (xs : List (HasIndexing.xdi spec i)) :
+    QuerySeed spec ι :=
+  fun j => if h : i = j then h ▸ xs else []
 
--- variable [DecidableEq ι] (seed : QuerySeed spec) (i : ι) (n : ℕ)
+end ofList
 
--- @[simp]
--- lemma takeAtIndex_apply (j : ι) : seed.takeAtIndex i n j =
---     (Function.update seed i ((seed i).take n) j) := rfl
+-- def nextSeed [DecidableEq ι] {α : Type _} (q : OracleQuery spec α) :
+--     StateT (QuerySeed spec ι) (OracleComp spec) α :=
+--   do
+--     let seed ← get
+--     -- return List.get?
+--     match seed q.index with
+--       | u :: us => return (u, Function.update seed q.index us)
+--       | [] => failure
 
--- @[simp]
--- lemma takeAtIndex_addValues (seed : QuerySeed spec) {i : ι} (n : ℕ) (xs : List (spec.range i)) :
---     (seed.addValues xs).takeAtIndex i n = if n ≤ (seed i).length
---       then seed.takeAtIndex i n else seed.addValues (xs.take (n - (seed i).length)) := by
---   refine funext (λ j ↦ ?_)
---   by_cases hj : j = i
---   · induction hj
---     split_ifs with hn
---     · simp [hn]
---     · suffices List.take n (seed j ++ xs) = seed j ++ List.take (n - (seed j).length) xs
---       by simpa using this
---       rw [List.take_append_eq_append_take]
---       simpa using le_of_not_le hn
---   · split_ifs with _ <;> simp [hj]
+lemma eq_addValues_iff [DecidableEq ι] (seed seed' : QuerySeed spec ι)
+    {i : ι} (xs : List (HasIndexing.xdi spec i)) :
+    seed = seed'.addValues xs ↔ seed' = seed.takeAtIndex i (seed' i).length ∧
+      xs = (seed i).drop (seed' i).length := by
+  refine ⟨λ h ↦ ?_, λ ⟨h1, h2⟩ ↦ ?_⟩
+  · simp [h]
+  · rw [h1, h2]
+    refine funext (λ j ↦ ?_)
+    by_cases hj : j = i
+    · induction hj; simp
+    · simp [hj]
 
--- -- @[simp]
--- -- lemma addValues_takeAtIndex (seed : QuerySeed spec) {i : ι} (xs : List (spec.range i)) (n : ℕ) :
--- --     (seed.takeAtIndex i n).addValues xs =
+lemma addValues_eq_iff [DecidableEq ι] (seed seed' : QuerySeed spec ι)
+    {i : ι} (xs : List (HasIndexing.xdi spec i)) :
+    seed.addValues xs = seed' ↔ seed = seed'.takeAtIndex i (seed i).length ∧
+      xs = (seed' i).drop (seed i).length :=
+  eq_comm.trans (eq_addValues_iff seed' seed xs)
 
--- @[simp]
--- lemma takeAtIndex_length (seed : QuerySeed spec) (i : ι) :
---     seed.takeAtIndex i (seed i).length = seed := funext (λ j ↦ by simp)
-
--- lemma eq_takeAtIndex_length_iff (seed seed' : QuerySeed spec) (i : ι) :
---     seed = seed'.takeAtIndex i (seed i).length ↔
---       seed' = seed.addValues ((seed' i).drop (seed i).length) := by
---   refine ⟨λ h ↦ QuerySeed.ext _ _ (λ j ↦ ?_), λ h ↦ ?_⟩
---   · by_cases hj : j = i
---     · induction hj
---       rw [h]
---       suffices (seed j).length ≤ (seed' j).length
---       by simp [this]
---       simpa using congr_arg List.length (congr_fun h j)
---     · rw [h]
---       simp [hj]
---   · rw [h]
---     simp
-
--- end takeAtIndex
-
--- section ofList
-
--- def ofList [DecidableEq ι] {i : ι} (xs : List (spec.range i)) : QuerySeed spec :=
---   fun j => if h : i = j then h ▸ xs else []
-
--- end ofList
-
--- -- def nextSeed [DecidableEq ι] {α : Type} :
--- --     (q : OracleQuery spec α) → StateT (QuerySeed spec) (OracleComp spec) α
--- --   | query i t => do
--- --     let seed ← get
--- --     return List.get?
--- --     match (← get) i with
--- --       | u :: us => return (u, Function.update seed i us)
--- --       | [] => failure
-
--- lemma eq_addValues_iff [DecidableEq ι] (seed seed' : QuerySeed spec)
---     {i : ι} (xs : List (spec.range i)) :
---     seed = seed'.addValues xs ↔ seed' = seed.takeAtIndex i (seed' i).length ∧
---       xs = (seed i).drop (seed' i).length := by
---   refine ⟨λ h ↦ ?_, λ ⟨h1, h2⟩ ↦ ?_⟩
---   · simp [h]
---   · rw [h1, h2]
---     refine funext (λ j ↦ ?_)
---     by_cases hj : j = i
---     · induction hj; simp
---     · simp [hj]
-
--- lemma addValues_eq_iff [DecidableEq ι] (seed seed' : QuerySeed spec)
---     {i : ι} (xs : List (spec.range i)) :
---     seed.addValues xs = seed' ↔ seed = seed'.takeAtIndex i (seed i).length ∧
---       xs = (seed' i).drop (seed i).length :=
---   eq_comm.trans (eq_addValues_iff seed' seed xs)
-
--- end QuerySeed
+end QuerySeed
 
 end OracleSpec

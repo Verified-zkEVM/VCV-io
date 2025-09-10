@@ -162,32 +162,49 @@ lemma mapM_pure (x : α) : (FreeM.pure x : FreeM P α).mapM s = Pure.pure x := r
 lemma mapM_roll (x : P.A) (r : P.B x → FreeM P α) :
     (FreeM.roll x r).mapM s = s x >>= fun u => (r u).mapM s := rfl
 
+variable [LawfulMonad m]
+
 @[simp]
-lemma mapM_bind {α β} [LawfulMonad m] (x : FreeM P α) (y : α → FreeM P β) :
+lemma mapM_bind {α β} (x : FreeM P α) (y : α → FreeM P β) :
     (FreeM.bind x y).mapM s = x.mapM s >>= fun u => (y u).mapM s := by
   induction x using FreeM.inductionOn with
   | pure _ => simp
   | roll x r h => simp [h]
 
 @[simp]
-lemma mapM_lift [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
+lemma mapM_bind' {α β} (x : FreeM P α) (y : α → FreeM P β) :
+    (x >>= y).mapM s = x.mapM s >>= fun u => (y u).mapM s :=
+  mapM_bind _ _ _
+
+@[simp]
+lemma mapM_map {α β} (x : FreeM P α) (f : α → β) :
+    FreeM.mapM s (f <$> x) = f <$> FreeM.mapM s x := by
+  simp [← bind_pure_comp]; rfl
+
+@[simp]
+lemma mapM_seq {α β}
+    (s : (a : P.A) → m (P.B a)) (x : FreeM P (α → β)) (y : FreeM P α) :
+    FreeM.mapM s (x <*> y) = (FreeM.mapM s x) <*> (FreeM.mapM s y) := by
+  simp [seq_eq_bind]
+
+@[simp]
+lemma mapM_lift (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
     FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
   simp [FreeM.mapM, FreeM.lift]
 
 @[simp]
-lemma mapM_liftA [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.A) :
+lemma mapM_liftA (s : (a : P.A) → m (P.B a)) (x : P.A) :
     FreeM.mapM s (FreeM.liftA x) = s x := by simp [liftA]
 
 /-- `FreeM.mapM` as a monad homomorphism. -/
-protected def mapMHom [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
+protected def mapMHom (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
   toFun := FreeM.mapM s
   toFun_pure' x := rfl
   toFun_bind' x y := by
     induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
 
-@[simp] lemma mapMHom_toFun_eq [LawfulMonad m] (s : (a : P.A) → m (P.B a)) :
+@[simp] lemma mapMHom_toFun_eq (s : (a : P.A) → m (P.B a)) :
     ((FreeM.mapMHom s).toFun : FreeM P α → m α) = FreeM.mapM s := rfl
-
 
 -- TODO: other monad operations
 
