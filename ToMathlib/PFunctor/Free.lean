@@ -29,13 +29,13 @@ namespace FreeM
 
 variable {P : PFunctor.{uA, uB}} {α β γ : Type v}
 
-/-- Lift a position of the base polynomial functor into the free monad. -/
-@[always_inline, inline]
-def liftPos (a : P.A) : FreeM P (P.B a) := FreeM.roll a FreeM.pure
-
 /-- Lift an object of the base polynomial functor into the free monad. -/
 @[always_inline, inline]
 def lift (x : P.Obj α) : FreeM P α := FreeM.roll x.1 (fun y ↦ FreeM.pure (x.2 y))
+
+/-- Lift a position of the base polynomial functor into the free monad. -/
+@[always_inline, inline]
+def liftA (a : P.A) : FreeM P (P.B a) := lift ⟨a, id⟩
 
 instance : MonadLift P (FreeM P) where
   monadLift x := FreeM.lift x
@@ -175,8 +175,8 @@ lemma mapM_lift [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
   simp [FreeM.mapM, FreeM.lift]
 
 @[simp]
-lemma mapM_liftPos [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.A) :
-    FreeM.mapM s (FreeM.liftPos x) = s x := by simp [liftPos]
+lemma mapM_liftA [LawfulMonad m] (s : (a : P.A) → m (P.B a)) (x : P.A) :
+    FreeM.mapM s (FreeM.liftA x) = s x := by simp [liftA]
 
 /-- `FreeM.mapM` as a monad homomorphism. -/
 protected def mapMHom [LawfulMonad m] (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where

@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.SPMF
 import ToMathlib.Control.Monad.Hom
+import ToMathlib.Control.StateT
 
 /-!
 # Support of a Monadic Computation
@@ -16,20 +17,20 @@ open ENNReal
 
 universe u v w
 
-section HasSupportM
+section HasSupport
 
 /-- Class for monads with a lawful embedding into `Set`, representing the possible outputs
 for the computation, using the `SetM` definition to get a monad instance on `Set`.
 For monads like `StateM` should consider all possible input states. -/
-class HasSupportM (m : Type u → Type v) [Monad m]
+class HasSupport (m : Type u → Type v) [Monad m]
   extends m →ᵐ SetM
 
 /-- Given a monad with a lawful set embedding get the support by applying the map.
 dt: might be good to call this `supportM` due to namespacing. -/
 def support {m : Type u → Type v} [Monad m] {α : Type u}
-    [hm : HasSupportM m] (mx : m α) : Set α := SetM.run (hm.toFun mx)
+    [hm : HasSupport m] (mx : m α) : Set α := SetM.run (hm.toFun mx)
 
-variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [hm : HasSupportM m]
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [hm : HasSupport m]
 
 @[simp] lemma support_pure (x : α) : support (pure x : m α) = {x} :=
   hm.toFun_pure' x
@@ -74,35 +75,35 @@ lemma mem_support_ite_iff (p : Prop) [Decidable p] (mx mx' : m α) (x : α) :
       (∃ h : p, x ∈ support (mx h)) ∨ (∃ h : ¬ p, x ∈ support (mx' h)) := by
   split_ifs with h <;> simp [h]
 
-end HasSupportM
+end HasSupport
 
 section decidable
 
 /-- Typeclass for decidable membership in the support of a computation. -/
-class HasSupportM.decidable {m : Type _ → Type _} [Monad m] [HasSupportM m] where
+class HasSupport.Decidable {m : Type _ → Type _} [Monad m] [HasSupport m] where
   mem_support_decidable {α : Type _} (mx : m α) : DecidablePred (· ∈ support mx)
 
 end decidable
 
 section LawfulFailure
 
-/-- Mixin typeclass for `HasSupportM` embeddings that give no support to `failure`.
-This isn't an actual extend to avoid complex instance trees with `HasEvalDist` and others. -/
-class HasSupportM.LawfulFailure (m : Type u → Type v)
-    [AlternativeMonad m] [hm : HasSupportM m] : Prop where
+/-- Mixin typeclass for `HasSupport` embeddings that give no support to `failure`.
+This isn't an actual extend to avoid complex instance trees with `HasSPMF` and others. -/
+class HasSupport.LawfulFailure (m : Type u → Type v)
+    [AlternativeMonad m] [hm : HasSupport m] : Prop where
   support_failure' {α : Type u} : support (failure : m α) = ∅
 
 variable {α β γ : Type u} {m : Type u → Type v}
-  [AlternativeMonad m] [hm : HasSupportM m] [HasSupportM.LawfulFailure m]
+  [AlternativeMonad m] [hm : HasSupport m] [HasSupport.LawfulFailure m]
 
 @[simp] lemma support_failure : support (failure : m α) = ∅ :=
-  HasSupportM.LawfulFailure.support_failure'
+  HasSupport.LawfulFailure.support_failure'
 
 end LawfulFailure
 
 namespace PMF
 
-instance : HasSupportM PMF where
+instance : HasSupport PMF where
   toFun := PMF.support
   toFun_pure' := by simp
   toFun_bind' := by simp
@@ -113,7 +114,7 @@ end PMF
 
 namespace SPMF
 
-instance : HasSupportM SPMF where
+instance : HasSupport SPMF where
   toFun x := Function.support x
   toFun_pure' x := by
     refine Set.ext fun y => ?_
@@ -136,20 +137,42 @@ instance : HasSupportM SPMF where
 
 @[simp] lemma support_eq {α} (p : SPMF α) : support p = Function.support p := rfl
 
-instance : HasSupportM.LawfulFailure SPMF where
+instance : HasSupport.LawfulFailure SPMF where
   support_failure' {α} := by ext; simp
 
 end SPMF
 
 namespace StateT
 
-/-- Support of a stateful computation is the union of support for each possible initial states. -/
-instance {m : Type _ → Type _} [Monad m] [HasSupportM m]
-    {σ : Type _} : HasSupportM (StateT σ m) where
-  toFun {α} := fun mx => ⋃ s : σ, support (mx.run' s)
-  toFun_pure' := sorry
-  toFun_bind' := sorry
+variable {σ : Type u} {m : Type u → Type v} [Monad m] [HasSupport m]
+variable {α β : Type u}
 
--- protected lemma support_def
+/-- Pair-level support for `StateT`: the set of reachable `(α, σ)` pairs from an initial state `s`.
+This is the lawful notion that composes through bind. -/
+def supportPair (mx : StateT σ m α) (s : σ) : Set (α × σ) :=
+  support (mx.run s)
+
+@[simp] lemma supportPair_pure (x : α) (s : σ) :
+    supportPair (pure x : StateT σ m α) s = {(x, s)} := by
+  change support (pure ((x, s) : α × σ) : m (α × σ)) = { (x, s) }
+  simp
+
+@[simp] lemma supportPair_bind (x : StateT σ m α) (y : α → StateT σ m β) (s : σ) :
+    supportPair (x >>= y) s = ⋃ p ∈ supportPair x s, supportPair (y p.1) p.2 := by
+  -- Unfold and apply `support_bind` at the base monad level.
+  -- `(x >>= y).run s = do let (a, s') ← x.run s; (y a).run s'`
+  change support ((x >>= y).run s) = _
+  -- Use the definitional bind for StateT.
+  -- `StateT.run_bind` is available via the imported helpers; fall back to simp if needed.
+  simp [supportPair, StateT.run, StateT.bind, bind, support_bind]
+
+/-- Projected (α-only) support at a fixed initial state, obtained from `supportPair`.
+This is a convenient view, but does not compose as a monad hom without threading the state. -/
+def supportAt (mx : StateT σ m α) (s : σ) : Set α :=
+  Prod.fst '' supportPair mx s
+
+@[simp] lemma supportAt_pure (x : α) (s : σ) :
+    supportAt (pure x : StateT σ m α) s = {x} := by
+  simp [supportAt, supportPair_pure, Set.image_singleton]
 
 end StateT

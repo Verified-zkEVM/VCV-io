@@ -12,7 +12,7 @@ import ToMathlib.Control.Monad.Algebra
 TODO: extends the hierarchy with type classes such as `{Nat/Pure/Bind/Monad}HomClass`
 -/
 
-universe u v w z
+universe u v w x y z
 
 /-- A natural morphism / transformation between two type-level functions (endofunctors).
 
@@ -95,7 +95,8 @@ namespace MonadHom
 
 variable {m : Type u → Type v} [Monad m]
   {n : Type u → Type w} [Monad n]
-  {n' : Type u → Type z} [Monad n']
+  {n' : Type u → Type x} [Monad n']
+  {n'' : Type u → Type y} [Monad n'']
   {α β γ : Type u}
 
 @[ext] protected def ext' {F G : m →ᵐ n} (h : ∀ α (x : m α), F x = G x) : F = G := by
@@ -173,5 +174,10 @@ infixr:90 " ∘ₘ "  => MonadHom.comp
 
 @[simp] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by
   simp [MonadHom.ext'_iff]
+
+lemma comp_assoc (H : n' →ᵐ n'') (G : n →ᵐ n') (F : m →ᵐ n) :
+    (H ∘ₘ G) ∘ₘ F = H ∘ₘ (G ∘ₘ F) := by
+  ext
+  simp
 
 end MonadHom

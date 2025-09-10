@@ -93,7 +93,7 @@ def query (t : spec.domain) : OracleComp spec (spec.range t) :=
 
 lemma query_eq_lift : query (spec := spec) = fun t => PFunctor.FreeM.lift ⟨t, id⟩ := rfl
 
-lemma query_eq_liftPos : query (spec := spec) = fun t => PFunctor.FreeM.liftPos t := rfl
+lemma query_eq_liftA : query (spec := spec) = fun t => PFunctor.FreeM.liftA t := rfl
 
 @[simp] lemma mapM_query {m} [Monad m] [LawfulMonad m]
     (f : (x : spec.domain) → m (spec.range x)) (t : spec.domain) :

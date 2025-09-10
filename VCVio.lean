@@ -13,9 +13,9 @@ import VCVio.CryptoFoundations.SigmaAlg
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.EvalDist.BitVec
-import VCVio.EvalDist.Defs.HasEvalDist
-import VCVio.EvalDist.Defs.HasFinEvalDist
-import VCVio.EvalDist.Defs.HasSupportM
+import VCVio.EvalDist.Defs.HasSPMF
+import VCVio.EvalDist.Defs.HasFinSupport
+import VCVio.EvalDist.Defs.HasSupport
 import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Defs.SPMF
 import VCVio.EvalDist.List

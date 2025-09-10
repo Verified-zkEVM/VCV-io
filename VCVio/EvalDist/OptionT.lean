@@ -21,8 +21,8 @@ variable (m : Type u → Type v) [Monad m] {α β γ : Type u}
 
 namespace OptionT
 
-instance (m : Type u → Type v) [Monad m] [HasSupportM m] :
-    HasSupportM (OptionT m) where
+instance (m : Type u → Type v) [Monad m] [HasSupport m] :
+    HasSupport (OptionT m) where
   toFun mx := {x | some x ∈ support mx.run}
   toFun_pure' := by simp
   toFun_bind' x y := by
@@ -37,62 +37,47 @@ instance (m : Type u → Type v) [Monad m] [HasSupportM m] :
       use some i
       simp [hi]
 
-@[simp] lemma support_eq [HasSupportM m] (mx : OptionT m α) :
+@[simp] lemma support_eq [HasSupport m] (mx : OptionT m α) :
     support mx = {x | some x ∈ support mx.run} := rfl
 
-@[simp] lemma support_failure [HasSupportM m] :
+@[simp] lemma support_failure [HasSupport m] :
     support (failure : OptionT m α) = ∅ := by
   simp [support_eq]
 
-noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalDist m] :
-    HasEvalDist (OptionT m) where
-  evalDist := OptionT.mapM' evalDist
-  support_eq mx := by
-    simp
-    ext x
-    simp [mem_support_iff]
-    simp [OptionT.mapM', Option.elimM, Function.comp_def]
-    refine ⟨fun h => ?_, fun h => ?_⟩
-    · use x
-      simp
-      exact h
-    · obtain ⟨x', hx'⟩ := h
-      cases x' with
-      | none => simp at hx'
-      | some x' =>
-        simp at hx'
-        cases x' with
-        | none => simp at hx'
-        | some x' =>
-          simp at hx'
-          rw [hx'.2]
-          exact hx'.1
+/-- If we have a `HasPMF m` instance, we can lift it to `HasSPMF (OptionT m)`
 
-@[simp] lemma evalDist_eq [HasEvalDist m] (mx : OptionT m α) :
+NOTE: we do _not_ want to lift `HasSPMF` to itself (wrapped in `OptionT`). This means we only support one layer of failure (i.e. `OracleComp` satisfies `HasPMF`, and so `OptionT OracleComp` satisfies `HasSPMF`). This suffices for all known purposes. -/
+noncomputable instance (m : Type u → Type v) [Monad m] [HasPMF m] :
+    HasSPMF (OptionT m) where
+  toSPMF := OptionT.mapM' evalDist
+
+@[simp] lemma evalDist_eq [HasPMF m] (mx : OptionT m α) :
     evalDist mx = OptionT.mapM' evalDist mx := rfl
 
-lemma probOutput_eq [HasEvalDist m] (mx : OptionT m α) (x : α) :
+@[simp]
+lemma probOutput_eq [HasPMF m] (mx : OptionT m α) (x : α) :
     Pr[= x | mx] = Pr[= some x | mx.run] := by
-  simp [probOutput_def, OptionT.mapM']
+  simp [probOutput_def, OptionT.mapM', run]
   sorry
 
-lemma probEvent_eq [HasEvalDist m] (mx : OptionT m α) (p : α → Prop) :
+lemma probEvent_eq [HasPMF m] (mx : OptionT m α) (p : α → Prop) :
     Pr[p | mx] = Pr[Option.rec false p | mx.run] := by
+  simp [probEvent_def, run]
   sorry
 
-lemma probFailure_eq [HasEvalDist m] (mx : OptionT m α) :
+lemma probFailure_eq [HasPMF m] (mx : OptionT m α) :
     Pr[⊥ | mx] = Pr[= none | mx.run] := by
   sorry
 
-@[simp] lemma probOutput_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (x : α) :
+@[simp] lemma probOutput_lift [HasPMF m] [LawfulMonad m] (mx : m α) (x : α) :
     Pr[= x | OptionT.lift mx] = Pr[= x | mx] := by
   simp [probOutput_eq]
 
-@[simp] lemma probEvent_lift [HasEvalDist m] [LawfulMonad m] (mx : m α) (p : α → Prop) :
+@[simp] lemma probEvent_lift [HasPMF m] [LawfulMonad m] (mx : m α) (p : α → Prop) :
     Pr[p | OptionT.lift mx] = Pr[p | mx] := by
   simp [probEvent_def]
 
-instance (m : Type u → Type v) [Monad m] [HasEvalDist m] :
+instance (m : Type u → Type v) [Monad m] [HasPMF m] :
     LawfulProbFailure (OptionT m) where
     probFailure_failure := by simp [probFailure_eq]
 

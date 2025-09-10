@@ -62,8 +62,8 @@ variable [Monad m] [LawfulMonad m] (so : QueryImpl spec m)
 @[simp] lemma simulateQ_lift (q : spec α) :
     simulateQ so (PFunctor.FreeM.lift q) = q.2 <$> so q.1 := by simp [simulateQ_def]
 
-@[simp] lemma simulateQ_liftPos (t : spec.domain) :
-    simulateQ so (PFunctor.FreeM.liftPos t) = so t := by simp [simulateQ_def]
+@[simp] lemma simulateQ_liftA (t : spec.domain) :
+    simulateQ so (PFunctor.FreeM.liftA t) = so t := by simp [simulateQ_def]
 
 @[simp] lemma simulateQ_pure (x : α) : simulateQ so (pure x) = pure x := by
   simp [simulateQ_def]

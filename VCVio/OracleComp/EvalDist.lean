@@ -10,7 +10,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 /-!
 # Output Distribution of Computations
 
-This file defines a `HasEvalDist` for `OracleComp`, assuming uniform outputs of computations.
+This file defines a `HasSPMF` for `OracleComp`, assuming uniform outputs of computations.
 -/
 
 open OracleSpec Option ENNReal BigOperators
@@ -26,7 +26,7 @@ local instance : LawfulMonad SetM := Set.instLawfulMonad
 section instances
 
 /-- The support of a computation assuming any possible return value of queries. -/
-protected instance hasSupportM : HasSupportM (OracleComp spec) where
+protected instance HasSupport : HasSupport (OracleComp spec) where
   __ := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
 
 lemma support_def (mx : OracleComp spec α) :
@@ -40,7 +40,7 @@ variable [spec.Fintype] [spec.Inhabited]
 /-- The standard evaluation distribution on `OracleComp` given by mapping queries to a uniform
 output distribution. In the case of `ProbComp` this is exactly the distribution coming from
 each uniform selection responding uniformly. -/
-noncomputable instance : HasEvalDist (OracleComp spec) where
+noncomputable instance : HasSPMF (OracleComp spec) where
   evalDist := simulateQ fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))
   support_eq mx := by induction mx using OracleComp.inductionOn with
     | pure x => simp
@@ -53,9 +53,9 @@ lemma evalDist_def (mx : OracleComp spec α) : evalDist mx =
     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
   simp [evalDist_def]
 
-/-- The `HasEvalDist` instance on `OracleComp` extends to a `PMF` as base computations never fail.
+/-- The `HasSPMF` instance on `OracleComp` extends to a `PMF` as base computations never fail.
 For those that might want failure, we need to use `OptionT` explicitly. -/
-noncomputable instance : HasEvalDist.HasPMF (OracleComp spec) where
+noncomputable instance : HasPMF (OracleComp spec) where
   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
   toSPMF_comp_toPMF mx := by
     ext α my x
@@ -78,13 +78,13 @@ lemma toPMF_def (mx : OracleComp spec α) : toPMF mx =
 @[simp] lemma toPMF_query (t : spec.domain) :
     toPMF (query t) = PMF.uniformOfFintype (spec.range t) := by simp [toPMF_def]
 
-section hasFinEvalDist
+section finSupport
 
 open Classical -- We need decidable equality for the `finset` binds
 -- dtumad: could avoid classical by instead having some
 
-protected noncomputable instance hasFinEvalDist [spec.Fintype] [spec.Inhabited] :
-    HasFinEvalDist (OracleComp spec) where
+protected noncomputable instance finSupport [spec.Fintype] [spec.Inhabited] :
+    HasFinSupport (OracleComp spec) where
   finSupport mx := OracleComp.construct (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) mx
   mem_finSupport_iff mx x := by
     induction mx using OracleComp.inductionOn with
@@ -97,7 +97,7 @@ lemma finSupport_def (mx : OracleComp spec α) : finSupport mx =
 @[simp] lemma finSupport_query (t : spec.domain) :
     finSupport (query t) = Finset.univ := by simp [finSupport_def]
 
-end hasFinEvalDist
+end finSupport
 
 end instances
 
@@ -107,9 +107,9 @@ section lift
     support (m := OracleComp spec) (PFunctor.FreeM.lift q) = Set.range q.2 := by
   simp [support_def, SetM.run]
 
-@[simp] lemma support_liftPos (t : spec.domain) :
-    support (m := OracleComp spec) (PFunctor.FreeM.liftPos t) = Set.univ := by
-  simp [PFunctor.FreeM.liftPos, support_def, SetM.run]
+@[simp] lemma support_liftA (t : spec.domain) :
+    support (m := OracleComp spec) (PFunctor.FreeM.liftA t) = Set.univ := by
+  simp [PFunctor.FreeM.liftA, support_def, SetM.run]
   exact Set.iUnion_of_singleton (spec.B t)
 
 lemma support_liftM (q : spec α) :
@@ -122,8 +122,8 @@ variable [spec.Fintype] [spec.Inhabited]
       q.2 <$> OptionT.mk (some <$> PMF.uniformOfFintype (spec.range q.1)) := by
   simp [evalDist_def]
 
-@[simp] lemma evalDist_liftPos (t : spec.domain) :
-    evalDist (m := OracleComp spec) (PFunctor.FreeM.liftPos t) =
+@[simp] lemma evalDist_liftA (t : spec.domain) :
+    evalDist (m := OracleComp spec) (PFunctor.FreeM.liftA t) =
       OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
   simp [evalDist_def]
 

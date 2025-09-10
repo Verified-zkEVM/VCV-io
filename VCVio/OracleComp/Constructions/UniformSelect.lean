@@ -303,7 +303,7 @@ variable (α : Type) [hα : SampleableType α]
 @[simp] lemma probFailure_uniformOfFintype : Pr[⊥ | $ᵗ α] = 0 :=
   SampleableType.probFailure_selectElem
 
-@[simp] lemma neverFails_uniformOfFintype : HasEvalDist.neverFails ($ᵗ α) :=
+@[simp] lemma neverFails_uniformOfFintype : HasSPMF.neverFails ($ᵗ α) :=
   sorry --neverFails_of_probFailure_eq_zero (probFailure_uniformOfFintype α)
 
 @[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :

@@ -3,7 +3,7 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Defs.HasFinEvalDist
+import VCVio.EvalDist.Defs.HasFinSupport
 
 /-!
 # Evaluation Distributions of Computations with `Bind`
@@ -12,10 +12,9 @@ File for lemmas about `evalDist` and `support` involving the monadic `bind` and 
 -/
 universe u v w
 
-variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [HasEvalDist m]
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [HasSPMF m]
 
 open ENNReal
-
 
 @[simp] lemma probOutput_pure [DecidableEq α] (x y : α) :
     Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by simp [probOutput_def]
@@ -33,7 +32,6 @@ lemma probOutput_pure_eq_indicator (x y : α) :
   rw [Option.some_inj]
   rfl
 
-
 section bind
 
 variable (mx : m α) (my : α → m β)
@@ -44,7 +42,7 @@ lemma probOutput_bind_eq_tsum (y : β) :
 
 end bind
 
-lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalDist m]
+lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasSPMF m]
     (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
   rw [probEvent_eq_tsum_indicator]
   rw [probOutput_bind_eq_tsum]

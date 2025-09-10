@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, František Silváši
 -/
 import VCVio.EvalDist.Defs.SPMF
-import VCVio.EvalDist.Defs.HasSupportM
+import VCVio.EvalDist.Defs.HasSupport
 
 /-!
 # Denotational Semantics for Output Distributions
@@ -34,31 +34,61 @@ universe u v w
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 /-- The monad `m` has a canonical embedding into the `SPMF` monad. -/
-class HasEvalDist (m : Type u → Type v) [Monad m]
-    extends HasSupportM m where
-  evalDist : m →ᵐ SPMF
-  support_eq {α : Type u} (mx : m α) : support mx = {x | evalDist mx x ≠ 0}
+class HasSPMF (m : Type u → Type v) [Monad m] where
+    -- extends HasSupport m where
+  toSPMF : m →ᵐ SPMF
+  -- support_eq {α : Type u} (mx : m α) : support mx = {x | toSPMF mx x ≠ 0}
 
-export HasEvalDist (evalDist)
+export HasSPMF (toSPMF)
+
+alias evalDist := toSPMF
+
+namespace HasSPMF
+
+instance [HasSPMF m] : HasSupport m where
+  toFun := SPMF.instHasSupport.toFun.comp toSPMF.toFun
+  toFun_pure' := by simp
+  toFun_bind' := by simp
+
+instance : HasSPMF SPMF where
+  toSPMF := MonadHom.id SPMF
+
+noncomputable instance : HasSPMF PMF where
+  toSPMF := PMF.toSPMF
+
+lemma support_eq [HasSPMF m] {α : Type u} (mx : m α) : support mx = {x | toSPMF mx x ≠ 0} := by
+  rfl
+
+end HasSPMF
 
 /-- The monad `m` has a canonical embedding into the `PMF` monad.
 dt: more support for this in general. -/
-class HasEvalDist.HasPMF (m : Type u → Type v) [Monad m]
-    extends HasEvalDist m where
+class HasPMF (m : Type u → Type v) [Monad m] where
+    -- extends HasSPMF m where
   toPMF : m →ᵐ PMF
-  toSPMF_comp_toPMF {α : Type u} (mx : m α) : PMF.toSPMF.comp toPMF = evalDist
+  -- toSPMF_comp_toPMF {α : Type u} (mx : m α) : PMF.toSPMF.comp toPMF = toSPMF
 
-export HasEvalDist.HasPMF (toPMF toSPMF_comp_toPMF)
+export HasPMF (toPMF)
+
+namespace HasPMF
+
+noncomputable instance [HasPMF m] : HasSPMF m where
+  toSPMF := PMF.toSPMF.comp toPMF
+
+lemma support_eq [HasPMF m] {α : Type u} (mx : m α) : support mx = {x | toPMF mx x ≠ 0} := by
+  simp [HasSPMF.support_eq, instHasSPMF]
+
+end HasPMF
 
 /-- Probability that a computation `mx` returns the value `x`. -/
-def probOutput [HasEvalDist m] (mx : m α) (x : α) : ℝ≥0∞ := evalDist mx x
+def probOutput [HasSPMF m] (mx : m α) (x : α) : ℝ≥0∞ := toSPMF mx x
 
 /-- Probability that a computation `mx` outputs a value satisfying `p`. -/
-noncomputable def probEvent [HasEvalDist m] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
+noncomputable def probEvent [HasSPMF m] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
   (evalDist mx).run.toOuterMeasure (some '' {x | p x})
 
 /-- Probability that a computation `mx` will fail to return a value. -/
-def probFailure [HasEvalDist m] (mx : m α) : ℝ≥0∞ := (evalDist mx).run none
+def probFailure [HasSPMF m] (mx : m α) : ℝ≥0∞ := (evalDist mx).run none
 
 /-- Probability that a computation returns a particular output. -/
 notation "Pr[=" x " | " mx "]" => probOutput mx x
@@ -86,7 +116,7 @@ macro_rules (kind := probEventBinding2)
   | `(Pr{$items*}[$t]) => `(probOutput (do $items:doSeqItem* return $t:term) True)
 
 /-- Test for all the different probability notations. -/
-example {m : Type → Type u} [Monad m] [HasEvalDist m] (mx : m ℕ) : Unit :=
+example {m : Type → Type u} [Monad m] [HasSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[= 10 | mx]
   let _ := Pr[fun x => x^2 + x < 10 | mx]
   let _ := Pr[x^2 + x < 10 | x ← mx]
@@ -94,7 +124,7 @@ example {m : Type → Type u} [Monad m] [HasEvalDist m] (mx : m ℕ) : Unit :=
   let _ := Pr[⊥ | mx]
   ()
 
-variable [HasEvalDist m]
+variable [_root_.HasSPMF m]
 
 lemma probOutput_def (mx : m α) (x : α) : Pr[= x | mx] = (evalDist mx).run (some x) := rfl
 
@@ -132,11 +162,11 @@ lemma probFailure_def (mx : m α) : Pr[⊥ | mx] = (evalDist mx).run none := rfl
   by_cases hp : p <;> simp [hp]
 
 /-- dtumad: unsure if this is always the right way to simplify. -/
-@[simp] lemma evalDist_eqRec (h : α = β) (oa : m α) :
-    evalDist (h ▸ oa : m β) = h ▸ evalDist oa := by induction h; rfl
+lemma evalDist_eqRec (h : α = β) (oa : m α) :
+  evalDist (h ▸ oa : m β) = h ▸ evalDist oa := by induction h; rfl
 
 lemma mem_support_iff (mx : m α) (x : α) : x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by
-  simp [HasEvalDist.support_eq mx]; rfl
+  simp [HasSPMF.support_eq mx]; rfl
 
 section sums
 
@@ -197,7 +227,6 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 end bounds
 
-
 -- lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
 --     ∑' x : α, [= x | oa] = 1 - [⊥ | oa] := by
 --   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
@@ -223,11 +252,10 @@ end bounds
 --     ∑ x : α, [= x | oa] = 1 := by
 --   rw [sum_probOutput_eq_sub, h, tsub_zero]
 
-
 section LawfulProbFailure
 
-/-- Class for `HasEvalDist` instances that assign full failure chance to `failure`. -/
-class LawfulProbFailure (m : Type _ → Type _) [AlternativeMonad m] [HasEvalDist m] where
+/-- Class for `HasSPMF` instances that assign full failure chance to `failure`. -/
+class LawfulProbFailure (m : Type _ → Type _) [AlternativeMonad m] [HasSPMF m] where
     probFailure_failure {α : Type _} : Pr[⊥ | (failure : m α)] = 1
 
 export LawfulProbFailure (probFailure_failure)
@@ -241,9 +269,8 @@ namespace SPMF
 variable (p : SPMF α) (x : α)
 
 /-- Add instance for `SPMF` just to give access to notation. -/
-instance hasEvalDist : HasEvalDist SPMF where
-  evalDist := MonadHom.id SPMF
-  support_eq p := by simp [Function.support]
+instance HasSPMF : HasSPMF SPMF where
+  toSPMF := MonadHom.id SPMF
 
 @[simp] lemma evalDist_eq : evalDist p = p := rfl
 
@@ -260,15 +287,15 @@ namespace PMF
 variable (p : PMF α) (x : α)
 
 /-- Evaluation distribution on `PMF` using the canoncial monad lift into `SPMF`. -/
-noncomputable instance hasEvalDist : HasEvalDist PMF where
-  evalDist := MonadHom.ofLift PMF SPMF
-  support_eq mx := by simp [PMF.monad_map_eq_map]; rfl
+noncomputable instance HasSPMF : HasSPMF PMF where
+  toSPMF := MonadHom.ofLift PMF SPMF
+  -- support_eq mx := by simp [PMF.monad_map_eq_map]; rfl
 
 @[simp] lemma evalDist_eq : evalDist p = liftM p := rfl
 
-noncomputable instance : HasEvalDist.HasPMF PMF where
+noncomputable instance : HasPMF PMF where
   toPMF := MonadHom.id PMF
-  toSPMF_comp_toPMF x := by ext; simp [PMF.monad_map_eq_map]
+  -- toSPMF_comp_toPMF := rfl
 
 @[simp] lemma probOutput_eq : probOutput p = p := by
   refine funext fun x => ?_
