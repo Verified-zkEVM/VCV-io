@@ -64,9 +64,7 @@ end HasSPMF
 /-- The monad `m` has a canonical embedding into the `PMF` monad.
 dt: more support for this in general. -/
 class HasPMF (m : Type u → Type v) [Monad m] where
-    -- extends HasSPMF m where
   toPMF : m →ᵐ PMF
-  -- toSPMF_comp_toPMF {α : Type u} (mx : m α) : PMF.toSPMF.comp toPMF = toSPMF
 
 export HasPMF (toPMF)
 
@@ -79,10 +77,27 @@ noncomputable instance [HasPMF m] : HasSPMF m where
 lemma support_eq [HasPMF m] {α : Type u} (mx : m α) : support mx = {x | toPMF mx x ≠ 0} := by
   simp [HasSPMF.support_eq, instHasSPMF]
 
+@[simp]
+lemma evalDist_eq_toPMF [HasPMF m] (mx : m α) : evalDist mx = toPMF mx := by
+  simp [evalDist, toSPMF, OptionT.mk, PMF.map, PMF.bind, PMF.pure, DFunLike.coe, liftM, monadLift, OptionT.instMonadLift, OptionT.lift]
+
 @[simp] lemma evalDist_some [HasPMF m] (mx : m α) (x : α) :
-    (evalDist.toFun mx).1 (some x) = toPMF mx x := by
-  simp [evalDist, toSPMF, OptionT.mk, PMF.map, PMF.bind, PMF.pure, DFunLike.coe]
-  sorry
+    (evalDist mx).1 (some x) = toPMF mx x := by
+  simp [liftM, monadLift, MonadLift.monadLift, OptionT.lift, OptionT.mk, PMF.bind]
+  have {x y : α} : some x = some y ↔ y = x := by aesop
+  conv =>
+    enter [1, 1, a, 1]
+    rw [this]
+  classical
+  rw [tsum_eq_single x]
+  · simp
+  · intro b' a
+    split
+    next h =>
+      subst h
+      simp_all only [Option.some.injEq, ne_eq, not_true_eq_false]
+    next h => simp_all only [Option.some.injEq, ne_eq, not_false_eq_true]
+  · intro a; exact decEq a x
 
 end HasPMF
 
@@ -233,30 +248,30 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 end bounds
 
--- lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
---     ∑' x : α, [= x | oa] = 1 - [⊥ | oa] := by
---   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
+lemma tsum_probOutput_eq_sub (oa : m α) :
+    ∑' x : α, Pr[= x | oa] = 1 - Pr[⊥ | oa] := by
+  refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
 
--- lemma sum_probOutput_eq_sub [Fintype α] (oa : OracleComp spec α) :
---     ∑ x : α, [= x | oa] = 1 - [⊥ | oa] := by
---   rw [← tsum_fintype, tsum_probOutput_eq_sub]
+lemma sum_probOutput_eq_sub [Fintype α] (oa : m α) :
+    ∑ x : α, Pr[= x | oa] = 1 - Pr[⊥ | oa] := by
+  rw [← tsum_fintype, tsum_probOutput_eq_sub]
 
--- lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
---     [⊥ | oa] = 1 - ∑' x : α, [= x | oa] := by
---   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
---     (probFailure_add_tsum_probOutput oa)
+lemma probFailure_eq_sub_tsum (oa : m α) :
+    Pr[⊥ | oa] = 1 - ∑' x : α, Pr[= x | oa] := by
+  refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
+    (probFailure_add_tsum_probOutput oa)
 
--- lemma probFailure_eq_sub_sum [Fintype α] (oa : OracleComp spec α) :
---     [⊥ | oa] = 1 - ∑ x : α, [= x | oa] := by
---   rw [← tsum_fintype, probFailure_eq_sub_tsum]
+lemma probFailure_eq_sub_sum [Fintype α] (oa : m α) :
+    Pr[⊥ | oa] = 1 - ∑ x : α, Pr[= x | oa] := by
+  rw [← tsum_fintype, probFailure_eq_sub_tsum]
 
--- lemma tsum_probOutput_eq_one (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
---     ∑' x : α, [= x | oa] = 1 := by
---   rw [tsum_probOutput_eq_sub, h, tsub_zero]
+lemma tsum_probOutput_eq_one (oa : m α) (h : Pr[⊥ | oa] = 0) :
+    ∑' x : α, Pr[= x | oa] = 1 := by
+  rw [tsum_probOutput_eq_sub, h, tsub_zero]
 
--- lemma sum_probOutput_eq_one [Fintype α] (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
---     ∑ x : α, [= x | oa] = 1 := by
---   rw [sum_probOutput_eq_sub, h, tsub_zero]
+lemma sum_probOutput_eq_one [Fintype α] (oa : m α) (h : Pr[⊥ | oa] = 0) :
+    ∑ x : α, Pr[= x | oa] = 1 := by
+  rw [sum_probOutput_eq_sub, h, tsub_zero]
 
 section LawfulProbFailure
 
@@ -295,13 +310,11 @@ variable (p : PMF α) (x : α)
 /-- Evaluation distribution on `PMF` using the canoncial monad lift into `SPMF`. -/
 noncomputable instance HasSPMF : HasSPMF PMF where
   toSPMF := MonadHom.ofLift PMF SPMF
-  -- support_eq mx := by simp [PMF.monad_map_eq_map]; rfl
 
 @[simp] lemma evalDist_eq : evalDist p = liftM p := rfl
 
 noncomputable instance : HasPMF PMF where
   toPMF := MonadHom.id PMF
-  -- toSPMF_comp_toPMF := rfl
 
 @[simp] lemma probOutput_eq : probOutput p = p := by
   refine funext fun x => ?_

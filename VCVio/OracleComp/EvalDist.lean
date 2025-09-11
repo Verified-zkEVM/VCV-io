@@ -29,8 +29,8 @@ section instances
 protected instance HasSupport : HasSupport (OracleComp spec) where
   __ := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
 
-lemma support_def (mx : OracleComp spec α) :
-    support mx = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) mx) := rfl
+lemma support_def (oa : OracleComp spec α) :
+    support oa = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) oa) := rfl
 
 @[simp] lemma support_query (t : spec.domain) : support (query t) = Set.univ := by
   simp [support_def, SetM.run]
@@ -43,27 +43,30 @@ variable [spec.Fintype] [spec.Inhabited]
 noncomputable instance : HasPMF (OracleComp spec) where
   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
 
-lemma evalDist_def (mx : OracleComp spec α) : evalDist mx =
-    simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) mx := by
-  simp [instHasPMF, HasPMF.instHasSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
-  rw [← PMF.monad_map_eq_map]
-  simp [simulateQ]
+lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
+    simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp; sorry
+  | query_bind t oa h => simp; sorry
+  -- simp [instHasPMF, HasPMF.instHasSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
+  -- rw [← PMF.monad_map_eq_map]
+  -- simp [simulateQ]
   -- ext a
   -- simp [OptionT.run, evalDist, OptionT.mk, simulateQ]
   -- have aux {x y : α} : (some x = some y) = (y = x) := by aesop
   -- conv =>
   --   enter [1, 1, a, 1]
   --   rw [aux]
-  sorry
+  -- sorry
   -- classical
-  -- rw [tsum_ite_eq a (PFunctor.FreeM.mapM (fun t ↦ PMF.uniformOfFintype (spec.range t)) mx)]
+  -- rw [tsum_ite_eq a (PFunctor.FreeM.mapM (fun t ↦ PMF.uniformOfFintype (spec.range t)) oa)]
 
 @[simp] lemma evalDist_query (t : spec.domain) :
     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
-  simp [evalDist_def]
+  simp [liftM, monadLift, MonadLift.monadLift, OptionT.lift, OptionT.mk, PMF.bind, instHasPMF, PMF.instMonad]
 
-lemma toPMF_def (mx : OracleComp spec α) : toPMF mx =
-    simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) mx := rfl
+lemma toPMF_def (oa : OracleComp spec α) : toPMF oa =
+    simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) oa := rfl
 
 @[simp] lemma toPMF_query (t : spec.domain) :
     toPMF (query t) = PMF.uniformOfFintype (spec.range t) := by simp [toPMF_def]
@@ -75,14 +78,14 @@ open Classical -- We need decidable equality for the `finset` binds
 
 protected noncomputable instance finSupport [spec.Fintype] [spec.Inhabited] :
     HasFinSupport (OracleComp spec) where
-  finSupport mx := OracleComp.construct (fun x => {x}) (fun t oa r => Finset.univ.biUnion r) mx
-  mem_finSupport_iff mx x := by
-    induction mx using OracleComp.inductionOn with
+  finSupport oa := OracleComp.construct (fun x => {x}) (fun t oa r => Finset.univ.biUnion r) oa
+  mem_finSupport_iff oa x := by
+    induction oa using OracleComp.inductionOn with
     | pure x => simp
     | query_bind t my h => simp [h]
 
-lemma finSupport_def (mx : OracleComp spec α) : finSupport mx =
-    OracleComp.construct (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) mx := rfl
+lemma finSupport_def (oa : OracleComp spec α) : finSupport oa =
+    OracleComp.construct (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) oa := rfl
 
 @[simp] lemma finSupport_query (t : spec.domain) :
     finSupport (query t) = Finset.univ := by simp [finSupport_def]
@@ -164,7 +167,7 @@ lemma mem_support_evalDist_iff :
     some x ∈ support (evalDist oa).run ↔ x ∈ support oa := by
   induction oa using OracleComp.inductionOn with
   -- Should think about better simp pathways here
-  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]
+  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]; sorry
   | query_bind t oa hoa => simp [hoa, OptionT.lift, elimM]; sorry
 
 alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
