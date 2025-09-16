@@ -24,12 +24,13 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β γ δ : Type v}
 lemma probOutput_prod_mk_seq_map_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (z : α × β) :
     [= z | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= z.1 | oa] * [= z.2 | ob] := by
-  sorry
+    obtain ⟨fst, snd⟩ := z
+    simp_all only [probOutput_seq_map_prod_mk_eq_mul]
 
 lemma probOutput_prod_mk_seq_map_eq_mul' [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (x : α) (y : β) :
     [= (x, y) | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= x | oa] * [= y | ob] := by
-  sorry
+    simp_all only [probOutput_seq_map_prod_mk_eq_mul]
 
 lemma probOutput_prod_mk_apply_seq_map_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β)
@@ -41,7 +42,7 @@ lemma probOutput_prod_mk_apply_seq_map_eq_mul' [spec.FiniteRange] (oa : OracleCo
     (ob : OracleComp spec β)
     (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
     [= (x, y) | (f ·, g ·) <$> oa <*> ob] = [= x | f <$> oa] * [= y | g <$> ob] := by
-  sorry
+    rw [@probOutput_prod_mk_apply_seq_map_eq_mul]
 
 lemma probOutput_bind_bind_prod_mk_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (f : α → γ) (g : β → δ) (z : γ × δ) :
@@ -54,11 +55,11 @@ lemma probOutput_bind_bind_prod_mk_eq_mul' [spec.FiniteRange] (oa : OracleComp s
     (ob : OracleComp spec β) (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
     [= (x, y) | do let x ← oa; let y ← ob; return (f x, g y)] =
       [= x | f <$> oa] * [= y | g <$> ob] := by
-  sorry
+      rw [@probOutput_bind_bind_prod_mk_eq_mul]
 
 lemma map_ite (oa₁ oa₂ : OracleComp spec α) (f : α → β) (p : Prop) [Decidable p] :
-    f <$> (if p then oa₁ else oa₂) = if p then (f <$> oa₁) else (f <$> oa₂) :=
-  apply_ite _ _ _ _
+    f <$> (if p then oa₁ else oa₂) = if p then (f <$> oa₁) else (f <$> oa₂) := by
+    rw [← @apply_ite]
 
 lemma probFailure_bind_eq_sum_probFailure [spec.FiniteRange] (oa : OracleComp spec α)
     {ob : α → OracleComp spec β} {σ : Type u} {s : Finset σ}
@@ -165,7 +166,7 @@ theorem exists_log_of_mem_support_fork (x₁ x₂ : α)
       (log₁.getQ i)[s].1 = (log₂.getQ i)[s].1 ∧
       (log₁.getQ i)[s].2 ≠ (log₂.getQ i)[s].2 ∧
       (x₁, log₁) ∈ (simulateQ loggingOracle main).run.support ∧
-      (x₂, log₂) ∈ (simulateQ loggingOracle main).run.support :=
+      (x₂, log₂) ∈ (simulateQ loggingOracle main).run.support := by
   sorry
 
 lemma le_probOutput_fork (s : Fin (qb i + 1)) :
@@ -271,7 +272,7 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
         congr 1
         · sorry
         · refine probOutput_bind_congr_div_const fun seed hseed => ?_
-          have : (↑(s + 1) : ℕ) < (seed i).length := sorry
+          have : (↑(s + 1) : ℕ) < (seed i).length := by sorry
           let u : spec.range i := ((seed i)[↑(s + 1)])
           simp [probOutput_bind_eq_tsum, probOutput_map_eq_tsum, div_eq_mul_inv,
             ← ENNReal.tsum_mul_right, ← ENNReal.tsum_mul_left]

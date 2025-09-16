@@ -112,7 +112,8 @@ lemma probOutput_IND_CPA_experiment_eq_add {encAlg : AsymmEncAlg ProbComp M PK S
         guard ¬b] / 2 := by
   unfold IND_CPA_experiment
   rw [probOutput_bind_eq_sum_finSupport]
-  have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by field_simp; rw [mul_comm, mul_div, mul_one]
+  have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by
+    rw [@ENNReal.div_eq_inv_mul]
   simp [this]
 
 end IND_CPA

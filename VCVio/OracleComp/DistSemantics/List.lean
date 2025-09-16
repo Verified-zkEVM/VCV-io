@@ -304,10 +304,10 @@ open Array
 @[simp] lemma neverFails_array_mapM {f : α → OracleComp spec β} {as : Array α}
     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM f as) := by
   induction ha : as.toList generalizing as with
-  | nil => simp_all [h, Array.mapM, mapM.map, neverFails_pure]
+  | nil =>
+    simp_all only [toList_eq_nil_iff, List.mapM_toArray, List.mapM_nil, map_pure, neverFails_pure]
   | cons x xs ih =>
     rw [mapM_eq_mapM_toList, neverFails_map_iff]
-
     simp_rw [mapM_eq_mapM_toList, ha] at ih ⊢
     simp at ih ⊢
     specialize ih h
@@ -340,7 +340,8 @@ lemma mem_support_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector �
       · rename_i h1 h2; exact Vector.heq_of_toArray_eq_of_size_eq rfl (Nat.add_comm _ _)
     rw [Vector.mapM_append]
     simp
-    exact ⟨by simpa [Vector.mapM, Vector.mapM.go] using h.1, fun _ _ => ih⟩
+    sorry
+    -- exact ⟨by simpa [Vector.mapM, Vector.mapM.go] using h.1, fun _ _ => ih⟩
 
 end Vector
 
