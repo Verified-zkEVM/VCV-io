@@ -30,7 +30,7 @@ Changing this would just require adding a `String` to the `failure` constructor 
 protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
   oa.mapM (fail := throw (IO.userError "Computation failed during execution"))
     -- Problem with bump to v4.22.0-rc2: `IO.rand` returns `Nat` instead of `Fin`
-    (query_map := λ (query i _) ↦ sorry) -- Queries become random selection
+    (query_map := λ ⟨i, _⟩ ↦ (Fin.ofNat (i + 1)) <$> IO.rand 0 i) -- Queries become random selection
 
 -- protected def runIO' {α : Type} (oa : OracleComp probSpec α) : IO α :=
 --   oa.mapM (fail := throw (IO.userError "Computation failed during execution"))

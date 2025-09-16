@@ -79,8 +79,7 @@ def someWhen (possible_outputs : {α : Type v} → OracleQuery spec α → Set �
   | query_bind i t oa h => {
     rw [bind_assoc, allWhen_query_bind]
     simp [h, supportWhen]
-
-    sorry
+    grind only [cases Or]
   }
 
 -- @[simp] lemma allWhen
@@ -114,7 +113,8 @@ lemma neverFailsWhen_simulate {ι' : Type*} {spec' : OracleSpec ι'}
     (so : QueryImpl spec (OracleComp spec'))
     (h' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).support ⊆ possible_outputs q)
     (hso : ∀ {α}, ∀ q : OracleQuery spec α, neverFails (so.impl q)) :
-    neverFails (simulateQ so oa) := sorry
+    neverFails (simulateQ so oa) := by
+    sorry
 
 lemma neverFails_eq_oracleComp_construct (oa : OracleComp spec α) :
     oa.neverFails = OracleComp.construct
