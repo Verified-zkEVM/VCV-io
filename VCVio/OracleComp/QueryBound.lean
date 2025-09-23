@@ -46,8 +46,37 @@ lemma isQueryBound_iff_probEvent [spec.FiniteRange] {oa : OracleComp spec α} {q
     IsQueryBound oa qb ↔
       [(· ≤ qb) | snd <$> (simulateQ countingOracle oa).run <|> return 0] = 1 := by
   simp [probEvent_eq_one_iff, isQueryBound_def]
-  sorry
-  -- split_ifs <;> simp
+  apply Iff.intro
+  · intro a x a_1
+    split at a_1
+    next h =>
+      simp_all only [Set.mem_image, Prod.exists, exists_eq_right]
+      obtain ⟨w, h_1⟩ := a_1
+      apply a
+      · exact h_1
+    next h =>
+      simp_all only [Set.mem_insert_iff, Set.mem_image, Prod.exists, exists_eq_right]
+      cases a_1 with
+      | inl h_1 =>
+        subst h_1
+        simp_all only [zero_le]
+      | inr h_2 =>
+        obtain ⟨w, h_1⟩ := h_2
+        apply a
+        · exact h_1
+  · intro a qc x h
+    split at a
+    next h_1 =>
+      simp_all only [Set.mem_image, Prod.exists, exists_eq_right, forall_exists_index]
+      apply a
+      · exact h
+    next
+      h_1 =>
+      simp_all only [Set.mem_insert_iff, Set.mem_image,
+                    Prod.exists, exists_eq_right, forall_eq_or_imp, zero_le,
+        forall_exists_index, true_and]
+      apply a
+      · exact h
 
 @[simp]
 lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : OracleComp spec α) qb := by
@@ -60,7 +89,7 @@ lemma isQueryBound_failure (qb : ι → ℕ) : IsQueryBound (failure : OracleCom
 @[simp]
 lemma isQueryBound_query_iff_pos [Nonempty α] (q : OracleQuery spec α) (qb : ι → ℕ) :
     IsQueryBound (q : OracleComp spec α) qb ↔ 0 < qb q.index := by
-  simp [isQueryBound_def, liftM_query_eq_liftM_liftM]
+  simp [isQueryBound_def]
 
 -- lemma isQueryBound_query (i : ι) (t : spec.domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
 --     IsQueryBound (query i t : OracleComp spec _) qb :=

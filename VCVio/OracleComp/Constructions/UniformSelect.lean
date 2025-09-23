@@ -276,7 +276,7 @@ variable (α : Type) [hα : SelectableType α]
 @[simp] lemma probFailure_uniformOfFintype : [⊥ | $ᵗ α] = 0 :=
   SelectableType.probFailure_selectElem
 
-@[simp] lemma neverFails_uniformOfFintype : neverFails ($ᵗ α) :=
+@[simp] lemma neverFails_uniformOfFintype : neverFails ($ᵗ α) := by
   sorry --neverFails_of_probFailure_eq_zero (probFailure_uniformOfFintype α)
 
 @[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
@@ -402,14 +402,15 @@ instance (α : Type) (n m : ℕ) [SelectableType α] : SelectableType (Matrix (F
   probOutput_selectElem_eq x y := by induction n with
   | zero =>
     simp
-    sorry
+    rfl
   | succ m ih =>
     sorry
   probFailure_selectElem := by induction n with
   | zero => simp
   | succ m ih =>
-    simp [ih, probFailure_seq, probFailure_pure, probFailure_ite]
-    sorry
+    simp_all only [bind_pure_comp, probFailure_eq_zero_iff, neverFails_bind_iff,
+                  neverFails_uniformOfFintype, support_uniformOfFintype, Set.mem_univ,
+                  neverFails_map_iff, imp_self, implies_true, and_self]
 
 end instances
 
