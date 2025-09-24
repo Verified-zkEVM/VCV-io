@@ -78,6 +78,22 @@ def someWhen (Q : spec.domain → Prop) (P : {α : Type v} → α → Prop)
 
 --     sorry
 --   }
+-- TODO: We need a full theory of `supportWhen` to make this work well.
+-- @[simp] lemma allWhen_bind_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+--     (oa >>= ob).allWhen Q F possible_outputs ↔ oa.allWhen Q F possible_outputs ∧
+--       ∀ x ∈ oa.supportWhen possible_outputs, (ob x).allWhen Q F possible_outputs := by
+--   induction oa using OracleComp.inductionOn with
+--   | pure x => {
+--     simp [supportWhen]
+--   }
+--   | failure => {
+--     simp [supportWhen]
+--   }
+--   | query_bind i t oa h => {
+--     rw [bind_assoc, allWhen_query_bind]
+--     simp [h, supportWhen]
+--     grind only [cases Or]
+--   }
 
 -- @[simp] lemma allWhen
 
@@ -102,6 +118,17 @@ end When
 -- /-- `oa` might fail if queries can output any possible value. -/
 -- @[reducible, inline] def mayFail (oa : OracleComp spec α) : Prop :=
 --   mayFailWhen oa fun _ => Set.univ
+-- TOOD: generalize when `hso` is `neverFailsWhen` for some other `poss`.
+-- lemma neverFailsWhen_simulate {ι' : Type*} {spec' : OracleSpec ι'}
+--     (oa : OracleComp spec α)
+--     (possible_outputs : {α : Type v} → OracleQuery spec α → Set α)
+--     (h : neverFailsWhen oa possible_outputs)
+--     -- {m : Type v → Type _} [Monad m]
+--     (so : QueryImpl spec (OracleComp spec'))
+--     (h' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).support ⊆ possible_outputs q)
+--     (hso : ∀ {α}, ∀ q : OracleQuery spec α, neverFails (so.impl q)) :
+--     neverFails (simulateQ so oa) := by
+--     sorry
 
 -- -- TOOD: generalize when `hso` is `NeverFailWhen` for some other `poss`.
 -- lemma NeverFailWhen_simulate {ι' : Type*} {spec' : OracleSpec ι'}

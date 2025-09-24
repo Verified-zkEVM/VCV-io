@@ -76,6 +76,13 @@ namespace loggingOracle
 -- lemma NeverFail_run_simulateQ_iff (oa : OracleComp spec α) :
 --     NeverFail (simulateQ loggingOracle oa).run ↔ NeverFail oa :=
 --   NeverFail_writerT_run_simulateQ_iff (by simp) (by sorry) oa
+-- @[simp]
+-- lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
+--     neverFails (simulateQ loggingOracle oa).run ↔ neverFails oa :=
+--   neverFails_writerT_run_simulateQ_iff (by simp) (by simp only [apply_eq, liftM_query_writerT,
+--     bind_pure_comp, WriterT.run_bind, WriterT.run_monadLift, QueryLog.monoid_one_def,
+--     QueryLog.monoid_mul_def, WriterT.run_map, WriterT.run_tell, map_pure, Prod.map_apply, id_eq,
+--     Functor.map_map, List.nil_append, neverFails_map_iff, neverFails_query, implies_true]) oa
 
 -- alias ⟨_, NeverFail_simulateQ⟩ := NeverFail_run_simulateQ_iff
 

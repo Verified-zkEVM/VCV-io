@@ -8,6 +8,7 @@ Authors: Devon Tuma, Quang Dao
 import ToMathlib.Control.Monad.Hom
 import Mathlib.Data.PFunctor.Univariate.Basic
 import Mathlib.Data.ENat.Lattice
+import Mathlib.Tactic
 
 /-!
 # Free Monads

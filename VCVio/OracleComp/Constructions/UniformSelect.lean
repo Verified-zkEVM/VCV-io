@@ -437,7 +437,7 @@ instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (F
   probOutput_selectElem_eq x y := by induction n with
   | zero =>
     simp
-    sorry
+    rfl
   | succ m ih =>
     sorry
   probFailure_selectElem := by
