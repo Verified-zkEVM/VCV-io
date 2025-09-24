@@ -77,70 +77,64 @@ lemma mem_support_ite_iff (p : Prop) [Decidable p] (mx mx' : m α) (x : α) :
 
 end HasSupport
 
-section decidable
 
-/-- Typeclass for decidable membership in the support of a computation. -/
-class HasSupport.Decidable {m : Type _ → Type _} [Monad m] [HasSupport m] where
-  mem_support_decidable {α : Type _} (mx : m α) : DecidablePred (· ∈ support mx)
 
-end decidable
+-- section LawfulFailure
 
-section LawfulFailure
+-- /-- Mixin typeclass for `HasSupport` embeddings that give no support to `failure`.
+-- This isn't an actual extend to avoid complex instance trees with `HasSPMF` and others. -/
+-- class HasSupport.LawfulFailure (m : Type u → Type v)
+--     [AlternativeMonad m] [hm : HasSupport m] : Prop where
+--   support_failure' {α : Type u} : support (failure : m α) = ∅
 
-/-- Mixin typeclass for `HasSupport` embeddings that give no support to `failure`.
-This isn't an actual extend to avoid complex instance trees with `HasSPMF` and others. -/
-class HasSupport.LawfulFailure (m : Type u → Type v)
-    [AlternativeMonad m] [hm : HasSupport m] : Prop where
-  support_failure' {α : Type u} : support (failure : m α) = ∅
+-- variable {α β γ : Type u} {m : Type u → Type v}
+--   [AlternativeMonad m] [hm : HasSupport m] [HasSupport.LawfulFailure m]
 
-variable {α β γ : Type u} {m : Type u → Type v}
-  [AlternativeMonad m] [hm : HasSupport m] [HasSupport.LawfulFailure m]
+-- @[simp] lemma support_failure : support (failure : m α) = ∅ :=
+--   HasSupport.LawfulFailure.support_failure'
 
-@[simp] lemma support_failure : support (failure : m α) = ∅ :=
-  HasSupport.LawfulFailure.support_failure'
+-- end LawfulFailure
 
-end LawfulFailure
+-- namespace PMF
 
-namespace PMF
+-- instance : HasSupport PMF where
+--   toFun := PMF.support
+--   toFun_pure' := by simp
+--   toFun_bind' := by simp
 
-instance : HasSupport PMF where
-  toFun := PMF.support
-  toFun_pure' := by simp
-  toFun_bind' := by simp
+-- @[simp] lemma support_eq {α} (p : PMF α) : support p = PMF.support p := rfl
 
-@[simp] lemma support_eq {α} (p : PMF α) : support p = PMF.support p := rfl
+-- end PMF
 
-end PMF
+-- namespace SPMF
 
-namespace SPMF
+-- instance : HasSupport SPMF where
+--   toFun x := Function.support x
+--   toFun_pure' x := by
+--     refine Set.ext fun y => ?_
+--     simp
+--   toFun_bind' x y := by
+--     refine Set.ext fun y => ?_
+--     simp [Option.elimM, Function.comp_def]
+--     refine ⟨fun h => ?_, fun h => ?_⟩
+--     · obtain ⟨z, hz⟩ := h
+--       cases z with
+--       | none =>
+--           simp at hz
+--       | some z =>
+--           use z
+--           simp at hz
+--           simp [hz]
+--     · obtain ⟨z, hz⟩ := h
+--       use some z
+--       simp [hz]
 
-instance : HasSupport SPMF where
-  toFun x := Function.support x
-  toFun_pure' x := by
-    refine Set.ext fun y => ?_
-    simp
-  toFun_bind' x y := by
-    refine Set.ext fun y => ?_
-    simp [Option.elimM, Function.comp_def]
-    refine ⟨fun h => ?_, fun h => ?_⟩
-    · obtain ⟨z, hz⟩ := h
-      cases z with
-      | none =>
-          simp at hz
-      | some z =>
-          use z
-          simp at hz
-          simp [hz]
-    · obtain ⟨z, hz⟩ := h
-      use some z
-      simp [hz]
+-- @[simp] lemma support_eq {α} (p : SPMF α) : support p = Function.support p := rfl
 
-@[simp] lemma support_eq {α} (p : SPMF α) : support p = Function.support p := rfl
+-- instance : HasSupport.LawfulFailure SPMF where
+--   support_failure' {α} := by ext; simp
 
-instance : HasSupport.LawfulFailure SPMF where
-  support_failure' {α} := by ext; simp
-
-end SPMF
+-- end SPMF
 
 namespace StateT
 

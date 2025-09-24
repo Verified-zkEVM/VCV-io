@@ -19,6 +19,8 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 namespace SPMF
 
+def mk (p : OptionT PMF α) : SPMF α := p
+
 lemma tsum_run_some_eq_one_sub (p : SPMF α) :
     ∑' x, p.run (some x) = 1 - p.run none := by
   rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]
@@ -48,6 +50,15 @@ lemma run_none_eq_one_sub (p : SPMF α) :
 instance : FunLike (SPMF α) α ENNReal where
   coe sp x := sp.run (some x)
   coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
+
+protected noncomputable def zero (α : Type u) : SPMF α := SPMF.mk (PMF.pure none)
+
+noncomputable instance : Zero (SPMF α) where zero := SPMF.zero α
+
+lemma zero_def : (0 : SPMF α) = SPMF.zero α := rfl
+
+@[simp] lemma zero_apply (x : α) : (0 : SPMF α) x = 0 := by
+  sorry
 
 @[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
 

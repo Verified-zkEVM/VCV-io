@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma, František Silváši
+Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.SPMF
 
@@ -38,15 +38,14 @@ class HasEvalPMF (m : Type u → Type v) [Monad m] where
   toPMF : m →ᵐ PMF
 
 /-- Given a `SPMF` evaluation instance, set the support to values of `non-zero` probability.-/
-instance [HasEvalSPMF m] : HasEvalSet m where
+instance hasEvalSet_of_hasEvalSPMF [HasEvalSPMF m] : HasEvalSet m where
   toSet := MonadHom.comp SPMF.support HasEvalSPMF.toSPMF
 
 /-- Given a `PMF` evaluation instance, get a `SPMF` evaluation by the natural lifting. -/
-noncomputable instance [HasEvalPMF m] : HasEvalSPMF m where
+noncomputable instance hasEvalSPMF_of_hasEvalPMF [HasEvalPMF m] : HasEvalSPMF m where
   toSPMF := MonadHom.comp PMF.toSPMF HasEvalPMF.toPMF
 
-/-- The set of possible outputs of running the monadic computation `mx`.
-dtumad: does namespacing ever become an issue exposing this globally? -/
+/-- The set of possible outputs of running the monadic computation `mx`. -/
 def support [HasEvalSet m] (mx : m α) : Set α :=
   HasEvalSet.toSet.toFun mx
 
@@ -68,7 +67,7 @@ instance [HasEvalSet m] : MonadHomClass m Set support := by
 instance [HasEvalSPMF m] : MonadHomClass m SPMF evalDist := by
   refine inferInstanceAs (MonadHomClass m SPMF HasEvalSPMF.toSPMF.toFun)
 
-section probability
+section probability_notation
 
 /-- Probability that a computation `mx` returns the value `x`. -/
 def probOutput [HasEvalSPMF m] (mx : m α) (x : α) : ℝ≥0∞ :=
@@ -107,7 +106,7 @@ macro_rules (kind := probEventBinding2)
   -- `doSeqIndent`
   | `(Pr{$items*}[$t]) => `(probOutput (do $items:doSeqItem* return $t:term) True)
 
-/-- Test for all the different probability notations. -/
+/-- Tests for all the different probability notations. -/
 example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[= 10 | mx]
   let _ := Pr[fun x => x^2 + x < 10 | mx]
@@ -116,4 +115,24 @@ example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[⊥ | mx]
   ()
 
-end probability
+end probability_notation
+
+section decidable
+
+/-- Typeclass for decidable membership in the support of a computation. -/
+protected class HasEvalSet.Decidable (m : Type u → Type v) [Monad m] [HasEvalSet m] where
+  mem_support_decidable {α : Type u} (mx : m α) : DecidablePred (· ∈ support mx)
+
+instance [HasEvalSet m] [HasEvalSet.Decidable m] (mx : m α) :
+    DecidablePred (· ∈ support mx) :=
+  HasEvalSet.Decidable.mem_support_decidable mx
+
+instance [HasEvalSet m] [HasEvalSet.Decidable m] [HasEvalFinset m] (mx : m α) :
+    DecidablePred (· ∈ finSupport mx) := by
+  sorry
+
+instance [HasEvalSPMF m] [HasEvalSet.Decidable m] (mx : m α) :
+    DecidablePred (Pr[= · | mx] = 0) :=
+  sorry
+
+end decidable
