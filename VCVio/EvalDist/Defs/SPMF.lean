@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma, František Silváši
+Authors: Devon Tuma
 -/
 import Mathlib.Probability.ProbabilityMassFunction.Monad
 import ToMathlib.General
@@ -14,7 +14,8 @@ universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
-/-- Subprobability distribution. -/
+/-- Subprobability distribution.
+dtumad: this should move to mathlib -/
 @[reducible] def SPMF : Type u → Type u := OptionT PMF
 
 namespace SPMF
