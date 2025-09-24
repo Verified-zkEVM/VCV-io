@@ -73,7 +73,7 @@ infixr:25 " →ᵐ " => MonadHom
 
 /-- A natural transformation `f` between two monads `m` and `n` is a monad morphism if it
 preserves the monad structure, i.e. `f (pure x) = pure x` and `f (x >>= y) = f x >>= f ∘ y`. -/
-class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
+class MonadHomClass (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n]
     (f : {α : Type u} → m α → n α) where
   map_pure {α} (x : α) : f (pure x) = pure x
@@ -81,7 +81,7 @@ class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
 
 instance (m : Type u → Type v) [Pure m] [Bind m]
     (n : Type u → Type w) [Pure n] [Bind n] (F : m →ᵐ n) :
-    IsMonadHom m n F.toFun where
+    MonadHomClass m n F.toFun where
   map_pure := F.toFun_pure'
   map_bind := F.toFun_bind'
 
