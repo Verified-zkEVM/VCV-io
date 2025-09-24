@@ -49,10 +49,10 @@ instance (m : Type u → Type v) [Monad m] [HasSupport m] :
 NOTE: we do _not_ want to lift `HasSPMF` to itself (wrapped in `OptionT`). This means we only support one layer of failure (i.e. `OracleComp` satisfies `HasPMF`, and so `OptionT OracleComp` satisfies `HasSPMF`). This suffices for all known purposes. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasPMF m] :
     HasSPMF (OptionT m) where
-  toSPMF := OptionT.mapM' evalDist
+  toSPMF := OptionT.mapM' HasSPMF.toSPMF
 
 @[simp] lemma evalDist_eq [HasPMF m] (mx : OptionT m α) :
-    evalDist mx = OptionT.mapM' evalDist mx := rfl
+    evalDist mx = OptionT.mapM' HasSPMF.toSPMF mx := rfl
 
 @[simp]
 lemma probOutput_eq [HasPMF m] (mx : OptionT m α) (x : α) :

@@ -87,14 +87,14 @@ lemma monad_bind_def (x : FreeM P α) (g : α → FreeM P β) :
 instance : LawfulMonad (FreeM P) :=
   LawfulMonad.mk' (FreeM P)
     (λ x ↦ by
-      induction' x with α a _ h
-      · rfl
-      · refine congr_arg (FreeM.roll a) (funext λ i ↦ h i))
+      induction x with
+      | pure _ => rfl
+      | roll a _ h => refine congr_arg (FreeM.roll a) (funext λ i ↦ h i))
     (λ x f ↦ rfl)
     (λ x f g ↦ by
-      induction' x with α a _ h
-      · rfl
-      · exact congr_arg (FreeM.roll a) (funext λ i ↦ h i))
+      induction x with
+      | pure _ => rfl
+      | roll a _ h => refine congr_arg (FreeM.roll a) (funext λ i ↦ h i))
 
 lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by simp
 

@@ -48,6 +48,7 @@ lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι �
 lemma isQueryBound_iff_probEvent [spec.Fintype] [spec.Inhabited] {oa : OracleComp spec α} {qb : ι → ℕ} :
     IsQueryBound oa qb ↔
       Pr[(· ≤ qb) | snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run] = 1 := by
+  stop
   simp [probEvent_eq_one_iff, isQueryBound_def]
   apply Iff.intro
   · intro a x a_1
@@ -85,14 +86,14 @@ lemma isQueryBound_iff_probEvent [spec.Fintype] [spec.Inhabited] {oa : OracleCom
 lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : OracleComp spec α) qb := by
   simp [isQueryBound_def]
 
-@[simp]
-lemma isQueryBound_failure (qb : ι → ℕ) : IsQueryBound (failure : OracleComp spec α) qb := by
-  simp [isQueryBound_def]
+-- @[simp]
+-- lemma isQueryBound_failure (qb : ι → ℕ) : IsQueryBound (failure : OracleComp spec α) qb := by
+--   simp [isQueryBound_def]
 
-@[simp]
-lemma isQueryBound_query_iff_pos [Nonempty α] (q : OracleQuery spec α) (qb : ι → ℕ) :
-    IsQueryBound (q : OracleComp spec α) qb ↔ 0 < qb q.index := by
-  simp [isQueryBound_def]
+-- @[simp]
+-- lemma isQueryBound_query_iff_pos [Nonempty α] (q : OracleQuery spec α) (qb : ι → ℕ) :
+--     IsQueryBound (q : OracleComp spec α) qb ↔ 0 < qb q.index := by
+--   simp [isQueryBound_def]
 
 -- lemma isQueryBound_query (i : ι) (t : spec.domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
 --     IsQueryBound (query i t : OracleComp spec _) qb :=

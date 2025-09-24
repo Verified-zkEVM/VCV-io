@@ -46,7 +46,7 @@ noncomputable instance : HasPMF (OracleComp spec) where
 lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
     simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) oa := by
   induction oa using OracleComp.inductionOn with
-  | pure x => simp; sorry
+  | pure x => simp
   | query_bind t oa h => simp; sorry
   -- simp [instHasPMF, HasPMF.instHasSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
   -- rw [← PMF.monad_map_eq_map]
@@ -63,7 +63,7 @@ lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
 
 @[simp] lemma evalDist_query (t : spec.domain) :
     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
-  simp [liftM, monadLift, MonadLift.monadLift, OptionT.lift, OptionT.mk, PMF.bind, instHasPMF, PMF.instMonad]
+  simp [evalDist_def]
 
 lemma toPMF_def (oa : OracleComp spec α) : toPMF oa =
     simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) oa := rfl
@@ -141,7 +141,7 @@ end uniform
 lemma evalDist_query_bind [spec.Fintype] [spec.Inhabited]
     (t : spec.domain) (ou : spec.range t → OracleComp spec α) :
     evalDist ((query t : OracleComp spec _) >>= ou) =
-      (OptionT.lift (PMF.uniformOfFintype (spec.range t))) >>= (evalDist.toFun ∘ ou) := by
+      (OptionT.lift (PMF.uniformOfFintype (spec.range t))) >>= (evalDist ∘ ou) := by
   rw [evalDist_bind, evalDist_query]
   rfl
 
@@ -167,7 +167,7 @@ lemma mem_support_evalDist_iff :
     some x ∈ support (evalDist oa).run ↔ x ∈ support oa := by
   induction oa using OracleComp.inductionOn with
   -- Should think about better simp pathways here
-  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]; sorry
+  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]
   | query_bind t oa hoa => simp [hoa, OptionT.lift, elimM]; sorry
 
 alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
@@ -185,7 +185,7 @@ lemma evalDist_apply_eq_zero_iff (x : Option α) :
     (evalDist oa).run x = 0 ↔ x.rec (Pr[⊥ | oa] = 0) (· ∉ support oa) :=
   match x with
   | none => by simp [probFailure_def]
-  | some x => by simp [OptionT.run, ← mem_support_evalDist_iff]
+  | some x => by simp [OptionT.run, ← mem_support_evalDist_iff]; sorry
 
 -- @[simp]
 -- lemma evalDist_apply_eq_zero_iff' [spec.DecidableEq] [DecidableEq α] (x : Option α) :

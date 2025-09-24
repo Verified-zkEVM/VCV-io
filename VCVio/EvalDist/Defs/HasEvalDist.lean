@@ -41,7 +41,9 @@ class HasSPMF (m : Type u → Type v) [Monad m] where
 
 export HasSPMF (toSPMF)
 
-alias evalDist := toSPMF
+@[reducible] def evalDist {m : Type u → Type v} [Monad m] [HasSPMF m]
+    {α : Type u} (x : m α) : SPMF α :=
+  HasSPMF.toSPMF x
 
 namespace HasSPMF
 
@@ -77,27 +79,12 @@ noncomputable instance [HasPMF m] : HasSPMF m where
 lemma support_eq [HasPMF m] {α : Type u} (mx : m α) : support mx = {x | toPMF mx x ≠ 0} := by
   simp [HasSPMF.support_eq, instHasSPMF]
 
-@[simp]
 lemma evalDist_eq_toPMF [HasPMF m] (mx : m α) : evalDist mx = toPMF mx := by
   simp [evalDist, toSPMF, OptionT.mk, PMF.map, PMF.bind, PMF.pure, DFunLike.coe, liftM, monadLift, OptionT.instMonadLift, OptionT.lift]
 
 @[simp] lemma evalDist_some [HasPMF m] (mx : m α) (x : α) :
     (evalDist mx).1 (some x) = toPMF mx x := by
-  simp [liftM, monadLift, MonadLift.monadLift, OptionT.lift, OptionT.mk, PMF.bind]
-  have {x y : α} : some x = some y ↔ y = x := by aesop
-  conv =>
-    enter [1, 1, a, 1]
-    rw [this]
-  classical
-  rw [tsum_eq_single x]
-  · simp
-  · intro b' a
-    split
-    next h =>
-      subst h
-      simp_all only [Option.some.injEq, ne_eq, not_true_eq_false]
-    next h => simp_all only [Option.some.injEq, ne_eq, not_false_eq_true]
-  · intro a; exact decEq a x
+  refine (tsum_eq_single x ?_).trans ?_ <;> aesop
 
 end HasPMF
 
@@ -161,18 +148,18 @@ lemma probFailure_def (mx : m α) : Pr[⊥ | mx] = (evalDist mx).run none := rfl
     evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
   MonadHom.toFun_bind' _ mx my
 
-@[simp] lemma evalDist_comp_pure : evalDist.toFun ∘ (pure : α → m α) = pure := by
+@[simp] lemma evalDist_comp_pure : evalDist ∘ (pure : α → m α) = pure := by
   simp [funext_iff, Function.comp_apply]
 
 @[simp] lemma evalDist_comp_pure' (f : α → β) :
-    evalDist.toFun ∘ (pure : β → m β) ∘ f = pure ∘ f := by
+    evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by
   simp only [← Function.comp_assoc, evalDist_comp_pure]
 
 @[simp] lemma evalDist_map [LawfulMonad m] (mx : m α) (f : α → β) :
     evalDist (f <$> mx) = f <$> (evalDist mx) := by
   simp [map_eq_bind_pure_comp]
 
-@[simp] lemma evalDist_comp_map [LawfulMonad m] (mx : m α) : evalDist.toFun ∘ (fun f => f <$> mx) =
+@[simp] lemma evalDist_comp_map [LawfulMonad m] (mx : m α) : evalDist ∘ (fun f => f <$> mx) =
     fun f : (α → β) => f <$> evalDist mx := by simp [funext_iff]
 
 @[simp] lemma evalDist_seq [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
