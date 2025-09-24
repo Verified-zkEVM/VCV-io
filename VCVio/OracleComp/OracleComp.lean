@@ -85,7 +85,7 @@ section query
 /-- An oracle query returning a result of type `α`
 is a dependent pair of a query `i : spec.domain` and a response function `spec.range i → α`.
 This is a wrapper around `PFunctor.Obj`. -/
-abbrev OracleQuery (spec : OracleSpec) (α : Type u) : Type _ := spec α
+abbrev OracleQuery (spec : OracleSpec) (α : Type u) : Type _ := spec.Obj α
 
 /-- query an oracle on in input `t` to get a result in the corresponding `range t`. -/
 def query (t : spec.domain) : OracleComp spec (spec.range t) :=

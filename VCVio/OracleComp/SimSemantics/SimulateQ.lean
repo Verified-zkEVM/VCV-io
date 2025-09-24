@@ -48,6 +48,29 @@ NOTE: could change the output type to `OracleComp spec →ᵐ m`, makes some stu
 def simulateQ [Monad m] [LawfulMonad m] (so : QueryImpl spec m) :
     OracleComp spec →ᵐ m := PFunctor.FreeM.mapMHom so
 
+/-- Monad can embed oracle queries and execute them in a lawful way. -/
+class HasSimulateQ (spec : OracleSpec) (m : Type u → Type v)
+    [Monad m] [MonadLiftT (OracleQuery spec) m]
+    (n : Type u → Type w) [Monad n] where
+  simulateQ (impl : (x : spec.domain) → n (spec.range x)) : m →ᵐ n
+  simulateQ_liftM (impl : (x : spec.domain) → n (spec.range x))
+    {α : Type u}(q : OracleQuery spec α) :
+    simulateQ impl q = q.2 <$> impl q.1
+
+instance {n : Type u → Type w} [Monad n] [LawfulMonad n] :
+    HasSimulateQ spec (OracleComp spec) n where
+  simulateQ := PFunctor.FreeM.mapMHom
+  simulateQ_liftM impl q := by simp
+
+instance [Monad m] [MonadLiftT (OracleQuery spec) m]
+    {n : Type u → Type w} [AlternativeMonad n] [LawfulMonad n]
+    [LawfulAlternative n] [h : HasSimulateQ spec m n] :
+    HasSimulateQ spec (OptionT m) n where
+  simulateQ impl := OptionT.mapM' (h.simulateQ impl)
+  simulateQ_liftM impl q := by
+    simp [OptionT.mapM', liftM, monadLift,
+      MonadLift.monadLift, h.simulateQ_liftM]
+
 lemma simulateQ_def [Monad m] [LawfulMonad m] (so : QueryImpl spec m) :
     simulateQ so = PFunctor.FreeM.mapMHom so := rfl
 
