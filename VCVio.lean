@@ -13,11 +13,11 @@ import VCVio.CryptoFoundations.SigmaAlg
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.EvalDist.BitVec
-import VCVio.EvalDist.Defs.HasEvalDist
-import VCVio.EvalDist.Defs.HasFinSupport
-import VCVio.EvalDist.Defs.HasSupport
+import VCVio.EvalDist.Defs.AlternativeMonad
+import VCVio.EvalDist.Defs.Basic
 import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Defs.SPMF
+import VCVio.EvalDist.Defs.Support
 import VCVio.EvalDist.List
 import VCVio.EvalDist.Monad.Alternative
 import VCVio.EvalDist.Monad.Basic
@@ -32,6 +32,7 @@ import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.DistSemantics.List
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.OracleComp

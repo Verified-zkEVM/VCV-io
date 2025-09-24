@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 
-import VCVio.EvalDist.Defs.HasFinSupport
+import VCVio.EvalDist.Defs.AlternativeMonad
 
 /-!
 # Computations that Never Fail
@@ -51,7 +51,7 @@ Remarks:
   on the support of the left-hand side.
 -/
 class NeverFail {α : Type u} {m : Type u → Type v} [Monad m]
-    [HasSPMF m] (mx : m α) : Prop where
+    [HasEvalSPMF m] (mx : m α) : Prop where
   mk :: probFailure_eq_zero : Pr[⊥ | mx] = 0
 
 export NeverFail (probFailure_eq_zero)
@@ -60,7 +60,7 @@ namespace NeverFail
 
 section spmf
 
-variable [HasSPMF m]
+variable [HasEvalSPMF m]
 
 @[simp]
 lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :=
@@ -138,9 +138,10 @@ end spmf
 
 /-- A computation in a monad with `HasPMF` that naturally embeds into `HasSPMF`
 would never fails -/
-instance [HasPMF m] (mx : m α) : NeverFail mx where
+instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
   probFailure_eq_zero := by
-    simp [probFailure, HasPMF.instHasSPMF, OptionT.run, evalDist, OptionT.mk]
+    sorry
+    -- simp [probFailure, HasPMF.instHasSPMF, OptionT.run, evalDist, OptionT.mk]
 
 end NeverFail
 

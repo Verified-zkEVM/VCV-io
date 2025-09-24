@@ -19,9 +19,9 @@ universe u v w x y z
 preserves the monad structure, i.e. `f (pure x) = pure x` and `f (x >>= y) = f x >>= f ∘ y`. -/
 class MonadHomClass (m : Type u → Type v) [Monad m]
     (n : Type u → Type w) [Monad n]
-    (f : {α : Type u} → m α → n α) where
-  map_pure {α} (x : α) : f (pure x) = pure x
-  map_bind {α β} (x : m α) (y : α → m β) : f (x >>= y) = f x >>= f ∘ y
+    (f : (α : Type u) → m α → n α) where
+  map_pure {α} (x : α) : f α (pure x) = pure x
+  map_bind {α β} (x : m α) (y : α → m β) : f β (x >>= y) = f α x >>= f β ∘ y
 
 namespace MonadHomClass
 
@@ -29,29 +29,29 @@ variable (m : Type u → Type v) [Monad m]
   (n : Type u → Type w) [Monad n]
   {α β γ : Type u}
 
-@[simp] lemma mmap_pure (F : {α : Type u} → m α → n α) [MonadHomClass m n F]
-    (x : α) : F (pure x) = pure x :=
+@[simp] lemma mmap_pure (F : (α : Type u) → m α → n α) [MonadHomClass m n F]
+    (x : α) : F α (pure x) = pure x :=
   MonadHomClass.map_pure x
 
 -- dt: should we be using `F ∘ my`?
-@[simp] lemma mmap_bind (F : {α : Type u} → m α → n α) [MonadHomClass m n F]
-    (mx : m α) (my : α → m β) : F (mx >>= my) = F mx >>= fun x => F (my x) :=
+@[simp] lemma mmap_bind (F : (α : Type u) → m α → n α) [MonadHomClass m n F]
+    (mx : m α) (my : α → m β) : F β (mx >>= my) = F α mx >>= fun x => F β (my x) :=
   MonadHomClass.map_bind mx my
 
-@[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : {α : Type u} → m α → n α)
-    [MonadHomClass m n F] (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by
+@[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+    [MonadHomClass m n F] (x : m α) (g : α → β) : F β (g <$> x) = g <$> F α x := by
   simp [map_eq_bind_pure_comp]
 
-@[simp] lemma mmap_seq [LawfulMonad m] [LawfulMonad n] (F : {α : Type u} → m α → n α)
-    [MonadHomClass m n F] (x : m (α → β)) (y : m α) : F (x <*> y) = F x <*> F y := by
+@[simp] lemma mmap_seq [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+    [MonadHomClass m n F] (x : m (α → β)) (y : m α) : F β (x <*> y) = F _ x <*> F α y := by
   simp [seq_eq_bind_map]
 
-@[simp] lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n] (F : {α : Type u} → m α → n α)
-    [MonadHomClass m n F] (x : m α) (y : m β) : F (x <* y) = F x <* F y := by
+@[simp] lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+    [MonadHomClass m n F] (x : m α) (y : m β) : F α (x <* y) = F α x <* F β y := by
   simp [seqLeft_eq]
 
-@[simp] lemma mmap_seqRight [LawfulMonad m] [LawfulMonad n] (F : {α : Type u} → m α → n α)
-    [MonadHomClass m n F] (x : m α) (y : m β) : F (x *> y) = F x *> F y := by
+@[simp] lemma mmap_seqRight [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+    [MonadHomClass m n F] (x : m α) (y : m β) : F β (x *> y) = F α x *> F β y := by
   simp [seqRight_eq]
 
 end MonadHomClass
@@ -95,14 +95,14 @@ similar to those of `LawfulMonadLift`. -/
 @[inherit_doc] infixr:25 " →ᵐ " => MonadHom
 
 instance {m : Type u → Type v} {n : Type u → Type w}
-    [Monad m] [Monad n] (F : m →ᵐ n) : MonadHomClass m n F.toFun where
+    [Monad m] [Monad n] (F : m →ᵐ n) : MonadHomClass m n (@F.toFun) where
   map_pure := F.toFun_pure'
   map_bind := F.toFun_bind'
 
 /-- View a monad map as a function between computations. Note we can't have a full
 `FunLike` instance because the type parameter `α` isn't constrained by the types. -/
 instance (m : Type u → Type v) [Pure m] [Bind m] (n : Type u → Type w) [Pure n] [Bind n] :
-    CoeFun (m →ᵐ n) (fun _ => {α : Type u} → m α → n α) where
+    CoeFun (m →ᵐ n) (fun _ => (α : Type u) → m α → n α) where
   coe f {_} x := f.toFun x
 
 namespace MonadHom
