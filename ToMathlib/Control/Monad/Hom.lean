@@ -14,7 +14,7 @@ TODO: extends the hierarchy with type classes such as `{Nat/Pure/Bind/Monad}HomC
 
 universe u v w x y z
 
--- dtumad: we should generalize this similar to below as part of upstreaming
+-- dt: we should generalize this similar to below as part of upstreaming
 /-- A natural transformation `f` between two monads `m` and `n` is a monad morphism if it
 preserves the monad structure, i.e. `f (pure x) = pure x` and `f (x >>= y) = f x >>= f ∘ y`. -/
 class MonadHomClass (m : Type u → Type v) [Monad m]

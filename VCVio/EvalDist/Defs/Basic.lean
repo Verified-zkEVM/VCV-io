@@ -8,7 +8,7 @@ import VCVio.EvalDist.Defs.SPMF
 /-!
 # Typeclasses for Denotational Monad Semantics
 
-dtumad: should evaluate if making the definitions `reducible` is a good idea.
+dt: should evaluate if making the definitions `reducible` is a good idea.
 Depends how well `MonadHomClass` works to be fair.
 -/
 
@@ -209,7 +209,7 @@ end ite
 
 section eqRec
 
-/-- dtumad: unsure if this is always the right way to simplify. -/
+/-- dt: unsure if this is always the right way to simplify. -/
 lemma evalDist_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) :
     evalDist (h ▸ mx : m β) = h ▸ evalDist mx := by induction h; rfl
 

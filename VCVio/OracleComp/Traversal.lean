@@ -99,7 +99,7 @@ def someWhen (Q : spec.domain → Prop) (P : {α : Type v} → α → Prop)
 
 end When
 
--- dtumad: All of this should be part of `evalDist` stuff now.
+-- dt: All of this should be part of `evalDist` stuff now.
 
 -- /-- `oa` never fails if when responses to queries `q` are in `possible_outputs q`. -/
 -- def NeverFailWhen (oa : OracleComp spec α)

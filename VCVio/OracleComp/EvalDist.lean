@@ -74,7 +74,7 @@ noncomputable instance [spec.Fintype] [spec.Inhabited] :
 -- section finSupport
 
 -- open Classical -- We need decidable equality for the `finset` binds
--- -- dtumad: could avoid classical by instead having [DecidableEq] instance?
+-- -- dt: could avoid classical by instead having [DecidableEq] instance?
 
 -- protected noncomputable instance finSupport [spec.Fintype] [spec.Inhabited] :
 --     HasEvalFinsupport (OracleComp spec) where

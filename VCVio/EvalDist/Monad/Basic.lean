@@ -77,7 +77,7 @@ section bind
 lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β) :
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
 
--- dtumad: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
+-- dt: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
 @[simp] lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m] [DecidableEq β]
     (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop

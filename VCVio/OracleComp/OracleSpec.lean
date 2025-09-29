@@ -36,7 +36,7 @@ abbrev OracleSpec.domain (spec : OracleSpec) : Type _ := spec.A
 abbrev OracleSpec.range (spec : OracleSpec) (i : spec.A) := spec.B i
 
 /-- An oracle spec has indexing in a type `ι` if the `range` function factors through `ι`.
-dtumad: not sure if this is really the right approach for e.g. `pregen`. -/
+dt: not sure if this is really the right approach for e.g. `pregen`. -/
 class HasIndexing (spec : OracleSpec) (ι : Type w) where
   idx : spec.domain → ι
   xdi : ι → Type _
@@ -67,7 +67,7 @@ By adding `1` to the index we avoid selection from the empty type `Fin 0 ≃ emp
 instance : unifSpec.Fintype where fintype_B n := inferInstanceAs (Fintype (Fin (n + 1)))
 instance : unifSpec.Inhabited where inhabited_B n := inferInstanceAs (Inhabited (Fin (n + 1)))
 
-/-- dtumad: should or shouldn't we switch to this. Compare to `(· + m) <$> $[0..n]`.
+/-- dt: should or shouldn't we switch to this. Compare to `(· + m) <$> $[0..n]`.
 One question is that we may have empty selection
 Select uniformly from a range (not starting from zero).-/
 @[inline, reducible] def probSpec : OracleSpec.{0,0} where

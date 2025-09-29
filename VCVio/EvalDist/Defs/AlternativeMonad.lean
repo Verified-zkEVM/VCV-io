@@ -20,7 +20,7 @@ variable {m : Type u → Type v} [AlternativeMonad m] {α β γ : Type u}
 
 section alternative
 
--- dtumad: for now I'm trying to stick with mixin type-classes for this type of thing.
+-- dt: for now I'm trying to stick with mixin type-classes for this type of thing.
 -- /-- Extension of `HasEvalSPMF` that are lawful to an `AlternativeMonad` structure. -/
 -- class HasAlternativeEvalSPMF (m : Type u → Type v) [AlternativeMonad m]
 --     extends HasEvalSPMF m where

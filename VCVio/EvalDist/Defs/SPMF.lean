@@ -23,7 +23,7 @@ declare_aesop_rule_sets [UnfoldEvalDist]
 end PMF
 
 /-- Subprobability distribution.
-dtumad: this should move to mathlib -/
+dt: this should move to mathlib -/
 @[reducible] def SPMF : Type u → Type u := OptionT PMF
 
 namespace SPMF
@@ -72,7 +72,7 @@ instance : FunLike (SPMF α) α ENNReal where
   coe sp x := sp.run (some x)
   coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
 
--- dtumad: is this really what we also want to simplify to?
+-- dt: is this really what we also want to simplify to?
 @[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
 
 section zero

@@ -12,7 +12,7 @@ import ToMathlib.Control.OptionT
 This file gives an instance to extend a `evalDist` instance on a monad to one transformed by
 the `OptionT` monad transformer.
 
-dtumad: should add more instances and connecting lemmas
+dt: should add more instances and connecting lemmas
 -/
 
 universe u v w

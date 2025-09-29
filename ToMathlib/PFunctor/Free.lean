@@ -30,11 +30,11 @@ namespace FreeM
 variable {P : PFunctor.{uA, uB}} {α β γ : Type v}
 
 /-- Lift an object of the base polynomial functor into the free monad. -/
-@[always_inline, inline]
+@[always_inline, inline, reducible]
 def lift (x : P.Obj α) : FreeM P α := FreeM.roll x.1 (fun y ↦ FreeM.pure (x.2 y))
 
 /-- Lift a position of the base polynomial functor into the free monad. -/
-@[always_inline, inline]
+@[always_inline, inline, reducible]
 def liftA (a : P.A) : FreeM P (P.B a) := lift ⟨a, id⟩
 
 instance : MonadLift P (FreeM P) where
@@ -46,7 +46,7 @@ instance : MonadLift P (FreeM P) where
 @[simp] lemma pure_ne_lift (x : P α) (y : α) :
     PFunctor.FreeM.pure y ≠ (lift x : FreeM P α) := by simp [lift]
 
-@[simp]
+-- @[simp]
 lemma monadLift_eq_lift (x : P.Obj α) : (x : FreeM P α) = FreeM.lift x := rfl
 
 /-- Bind operator on `FreeM P` operation used in the monad definition. -/
@@ -205,6 +205,15 @@ protected def mapMHom (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
 
 @[simp] lemma mapMHom_toFun_eq (s : (a : P.A) → m (P.B a)) :
     ((FreeM.mapMHom s).toFun : FreeM P α → m α) = FreeM.mapM s := rfl
+
+protected def mapMHom' (s : NatHom P.Obj m) : FreeM P →ᵐ m where
+  toFun := FreeM.mapM (fun t => s ⟨t, id⟩)
+  toFun_pure' x := rfl
+  toFun_bind' x y := by
+    induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
+
+@[simp] lemma mapMHom'_toFun_eq (s : NatHom P.Obj m) :
+    ((FreeM.mapMHom' s).toFun : FreeM P α → m α) = FreeM.mapM (fun t => s ⟨t, id⟩) := rfl
 
 -- TODO: other monad operations
 
