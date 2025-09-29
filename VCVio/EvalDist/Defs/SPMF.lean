@@ -18,6 +18,7 @@ namespace PMF
 
 attribute [simp] coe_le_one PMF.apply_ne_top
 
+declare_aesop_rule_sets [UnfoldEvalDist]
 
 end PMF
 

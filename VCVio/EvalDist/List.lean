@@ -1,15 +1,25 @@
 /-
-Copyright (c) 2025 Devon Tuma. All rights reserved.
+Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Monad.Basic
+import VCVio.OracleComp.EvalDist
+import ToMathlib.General
 
 /-!
-# Evaluation Distributions of Computations with `Prod`
+# Distribution Semantics for Computations with Lists and Vectors
 
-File for lemmas about `evalDist` and `support` involving `Prod`.
+This file contains lemmas for `probEvent` and `probOutput` of computations involving `List`.
+We also include `Vector` as a related case.
 -/
+
+-- open OracleSpec OracleComp
+
+-- universe u v w
+
+-- namespace OracleComp
+
+-- variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
 
 -- section List
 
@@ -98,9 +108,9 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 -- -- lemma mem_support_list_mapM {f : α → OracleComp spec β} {as : List α}
 -- --     (x : List β) : x ∈ (List.mapM f as).support ↔ ∀ i : Fin x.length, x[i] ∈ (f (as[i]'(by simp))).support := by
 -- --   induction as with
--- --   | nil => simp [NeverFail_pure]
+-- --   | nil => simp [neverFails_pure]
 -- --   | cons a as ih =>
--- --     simp [List.mapM_cons, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff, Vector.insertIdx]
+-- --     simp [List.mapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
 
 -- @[simp]
 -- lemma probFailure_list_mapM_loop {α β : Type*} [spec.FiniteRange]
@@ -181,59 +191,59 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 
 -- end mapM
 
--- section NeverFail
+-- section neverFails
 
 -- /-- If each element of a list is mapped to a computation that never fails, then the computation
 --   obtained by monadic mapping over the list also never fails. -/
--- @[simp] lemma NeverFail_list_mapM {f : α → OracleComp spec β} {as : List α}
---     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (mapM f as) := by
+-- @[simp] lemma neverFails_list_mapM {f : α → OracleComp spec β} {as : List α}
+--     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM f as) := by
 --   induction as with
---   | nil => simp only [mapM, mapM.loop, reverse_nil, NeverFail_pure]
+--   | nil => simp only [mapM, mapM.loop, reverse_nil, neverFails_pure]
 --   | cons a as ih =>
 --     simp [mapM_cons, h]
 --     exact fun _ _ => ih (by simp at h; exact h.2)
 
--- @[simp] lemma NeverFail_list_mapM' {f : α → OracleComp spec β} {as : List α}
---     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (mapM' f as) := by
+-- @[simp] lemma neverFails_list_mapM' {f : α → OracleComp spec β} {as : List α}
+--     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM' f as) := by
 --   rw [mapM'_eq_mapM]
---   exact NeverFail_list_mapM h
+--   exact neverFails_list_mapM h
 
--- @[simp] lemma NeverFail_list_flatMapM {f : α → OracleComp spec (List β)} {as : List α}
---     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (flatMapM f as) := by
+-- @[simp] lemma neverFails_list_flatMapM {f : α → OracleComp spec (List β)} {as : List α}
+--     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (flatMapM f as) := by
 --   induction as with
---   | nil => simp only [flatMapM_nil, NeverFail_pure]
+--   | nil => simp only [flatMapM_nil, neverFails_pure]
 --   | cons a as ih =>
---     simp only [flatMapM_cons, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff]
+--     simp only [flatMapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
 --     exact ⟨h a (by simp), fun y hy => ih (fun x hx => h x (by simp [hx]))⟩
 
--- @[simp] lemma NeverFail_list_filterMapM {f : α → OracleComp spec (Option β)} {as : List α}
---     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (filterMapM f as) := by
+-- @[simp] lemma neverFails_list_filterMapM {f : α → OracleComp spec (Option β)} {as : List α}
+--     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (filterMapM f as) := by
 --   induction as with
---   | nil => simp only [filterMapM_nil, NeverFail_pure]
+--   | nil => simp only [filterMapM_nil, neverFails_pure]
 --   | cons a as ih =>
---     simp only [filterMapM_cons, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff]
+--     simp only [filterMapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
 --     refine ⟨h a (by simp), fun y hy => ?_⟩
 --     rcases y with _ | y <;> simp <;> exact ih (fun x hx => h x (by simp [hx]))
 
 -- variable {s : Type v}
 
--- @[simp] lemma NeverFail_list_foldlM {f : s → α → OracleComp spec s} {init : s} {as : List α}
---     (h : ∀ i, ∀ x ∈ as, NeverFail (f i x)) : NeverFail (foldlM f init as) := by
+-- @[simp] lemma neverFails_list_foldlM {f : s → α → OracleComp spec s} {init : s} {as : List α}
+--     (h : ∀ i, ∀ x ∈ as, neverFails (f i x)) : neverFails (foldlM f init as) := by
 --   induction as generalizing init with
---   | nil => simp only [foldlM, reverse_nil, NeverFail_pure]
+--   | nil => simp only [foldlM, reverse_nil, neverFails_pure]
 --   | cons b bs ih =>
---       simp only [foldlM_cons, NeverFail_bind_iff, mem_cons, true_or, h, true_and]
+--       simp only [foldlM_cons, neverFails_bind_iff, mem_cons, true_or, h, true_and]
 --       exact fun _ _ => ih (fun i x hx' => h i x (by simp [hx']))
 
--- @[simp] lemma NeverFail_list_foldrM {f : α → s → OracleComp spec s} {init : s} {as : List α}
---     (h : ∀ i, ∀ x ∈ as, NeverFail (f x i)) : NeverFail (foldrM f init as) := by
+-- @[simp] lemma neverFails_list_foldrM {f : α → s → OracleComp spec s} {init : s} {as : List α}
+--     (h : ∀ i, ∀ x ∈ as, neverFails (f x i)) : neverFails (foldrM f init as) := by
 --   induction as generalizing init with
---   | nil => simp only [foldrM, reverse_nil, foldlM_nil, NeverFail_pure]
+--   | nil => simp only [foldrM, reverse_nil, foldlM_nil, neverFails_pure]
 --   | cons b bs ih =>
---       simp only [foldrM_cons, NeverFail_bind_iff]
+--       simp only [foldrM_cons, neverFails_bind_iff]
 --       exact ⟨ih (fun i x hx => h i x (by simp [hx])), fun y _ => h y b (by simp)⟩
 
--- end NeverFail
+-- end neverFails
 
 -- end List
 
@@ -277,12 +287,12 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 
 -- variable {n : ℕ}
 
--- @[simp] lemma NeverFail_list_vector_mmap {f : α → OracleComp spec β} {as : List.Vector α n}
---     (h : ∀ x ∈ as.toList, NeverFail (f x)) : NeverFail (List.Vector.mmap f as) := by
+-- @[simp] lemma neverFails_list_vector_mmap {f : α → OracleComp spec β} {as : List.Vector α n}
+--     (h : ∀ x ∈ as.toList, neverFails (f x)) : neverFails (List.Vector.mmap f as) := by
 --   induction as with
---   | nil => simp only [List.Vector.mmap, NeverFail_pure]
+--   | nil => simp only [List.Vector.mmap, neverFails_pure]
 --   | @cons n x xs ih =>
---     simp only [List.Vector.mmap_cons, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff]
+--     simp only [List.Vector.mmap_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
 --     exact ⟨h x (by simp), fun y hy => ih (fun x' hx' => h x' (by simp [hx']))⟩
 
 -- end List.Vector
@@ -291,13 +301,13 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 
 -- open Array
 
--- @[simp] lemma NeverFail_array_mapM {f : α → OracleComp spec β} {as : Array α}
---     (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (mapM f as) := by
+-- @[simp] lemma neverFails_array_mapM {f : α → OracleComp spec β} {as : Array α}
+--     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM f as) := by
 --   induction ha : as.toList generalizing as with
---   | nil => simp_all [h, Array.mapM, mapM.map, NeverFail_pure]
+--   | nil =>
+--     simp_all only [toList_eq_nil_iff, List.mapM_toArray, List.mapM_nil, map_pure, neverFails_pure]
 --   | cons x xs ih =>
---     rw [mapM_eq_mapM_toList, NeverFail_map_iff]
-
+--     rw [mapM_eq_mapM_toList, neverFails_map_iff]
 --     simp_rw [mapM_eq_mapM_toList, ha] at ih ⊢
 --     simp at ih ⊢
 --     specialize ih h
@@ -311,18 +321,18 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 -- lemma mem_support_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n} {x : Vector β n} :
 --     x ∈ (Vector.mapM f as).support ↔ ∀ i : Fin n, x[i] ∈ (f as[i]).support := by
 --   induction as using Vector.induction with
---   | v_empty => simp [NeverFail_pure]
+--   | v_empty => simp [neverFails_pure]
 --   | v_insert hd tl ih =>
---     simp [Vector.mapM_append, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff, Vector.insertIdx]
+--     simp [Vector.mapM_append, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
 --     sorry
 
--- @[simp] lemma NeverFail_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n}
---     (h : ∀ x ∈ as.toList, NeverFail (f x)) : NeverFail (Vector.mapM f as) := by
+-- @[simp] lemma neverFails_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n}
+--     (h : ∀ x ∈ as.toList, neverFails (f x)) : neverFails (Vector.mapM f as) := by
 --   induction as using Vector.induction with
---   | v_empty => simp [NeverFail_pure]
+--   | v_empty => simp [neverFails_pure]
 --   | v_insert hd tl ih =>
---     simp_all [Vector.mapM_append, bind_pure_comp, NeverFail_bind_iff, NeverFail_map_iff, Vector.insertIdx]
---     suffices hnew : (Vector.mapM f (#v[hd] ++ tl)).NeverFail by
+--     simp_all [Vector.mapM_append, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
+--     suffices hnew : (Vector.mapM f (#v[hd] ++ tl)).neverFails by
 --       simp only [HAppend.hAppend, Append.append, Vector.append] at hnew
 --       convert hnew using 2
 --       · exact Nat.add_comm _ _
@@ -330,7 +340,8 @@ File for lemmas about `evalDist` and `support` involving `Prod`.
 --       · rename_i h1 h2; exact Vector.heq_of_toArray_eq_of_size_eq rfl (Nat.add_comm _ _)
 --     rw [Vector.mapM_append]
 --     simp
---     exact ⟨by simpa [Vector.mapM, Vector.mapM.go] using h.1, fun _ _ => ih⟩
+--     sorry
+--     -- exact ⟨by simpa [Vector.mapM, Vector.mapM.go] using h.1, fun _ _ => ih⟩
 
 -- end Vector
 

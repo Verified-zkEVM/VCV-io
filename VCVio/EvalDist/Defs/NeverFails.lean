@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.AlternativeMonad
+import VCVio.EvalDist.Defs.Instances
 
 /-!
 # Computations that Never Fail
