@@ -14,7 +14,7 @@ produces failure mass, together with lemmas for how the property behaves under c
 monadic combinators.
 
 Definitions are given relative to a canonical embedding `evalDist : m →ᵐ SPMF` provided by
-`[HasSPMF m]`. We write
+`[HasEvalSPMF m]`. We write
 
   `Pr[⊥ | mx] := (evalDist mx).run none`
 
@@ -34,7 +34,7 @@ Design notes
 
 universe u v w
 
-namespace HasSPMF
+namespace HasEvalSPMF
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
@@ -136,13 +136,13 @@ instance instSeqRight {mx : m α} {my : m β}
 
 end spmf
 
-/-- A computation in a monad with `HasPMF` that naturally embeds into `HasSPMF`
+/-- A computation in a monad with `HasEvalPMF` that naturally embeds into `HasEvalSPMF`
 would never fails -/
 instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
   probFailure_eq_zero := by
     sorry
-    -- simp [probFailure, HasPMF.instHasSPMF, OptionT.run, evalDist, OptionT.mk]
+    -- simp [probFailure, HasEvalPMF.instHasEvalSPMF, OptionT.run, evalDist, OptionT.mk]
 
 end NeverFail
 
-end HasSPMF
+end HasEvalSPMF

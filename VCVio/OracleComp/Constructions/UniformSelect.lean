@@ -303,7 +303,7 @@ variable (α : Type) [hα : SampleableType α]
 @[simp] lemma probFailure_uniformOfFintype : Pr[⊥ | $ᵗ α] = 0 :=
   SampleableType.probFailure_selectElem
 
-@[simp] instance : HasSPMF.NeverFail ($ᵗ α) := inferInstance
+@[simp] instance : HasEvalSPMF.NeverFail ($ᵗ α) := inferInstance
 
 @[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
     evalDist ($ᵗ α) = OptionT.lift (PMF.uniformOfFintype α) := by

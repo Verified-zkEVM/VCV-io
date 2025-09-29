@@ -8,42 +8,136 @@ import VCVio.EvalDist.Defs.Basic
 /-!
 # Evaluation Distributions of Computations with `Bind`
 
-File for lemmas about `evalDist` and `support` involving the monadic `bind` and `pure`.
+File for lemmas about `evalDist` and `support` involving the monadic `pure` and `bind`.
 -/
 universe u v w
 
-variable {α β γ : Type u} {m : Type u → Type v} [Monad m] [HasSPMF m]
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 open ENNReal
 
-@[simp] lemma probOutput_pure [DecidableEq α] (x y : α) :
-    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by simp [probOutput_def]
+section pure
 
-@[simp] lemma probOutput_pure_self (x : α) :
-    Pr[= x | (pure x : m α)] = 1 := by simp [probOutput_def]
+@[simp] lemma support_pure [HasEvalSet m] (x : α) :
+    support (pure x : m α) = {x} := by aesop
 
-@[simp] lemma probFailure_pure (x : α) : Pr[⊥ | (pure x : m α)] = 0 := by
-  simp [probFailure_def]
+lemma mem_support_pure_iff [HasEvalSet m] (x y : α) :
+    x ∈ support (pure y : m α) ↔ x = y := by aesop
+lemma mem_support_pure_iff' [HasEvalSet m] (x y : α) :
+    x ∈ support (pure y : m α) ↔ y = x := by aesop
 
-lemma probOutput_pure_eq_indicator (x y : α) :
-    Pr[= x | (pure y : m α)] = Set.indicator (M := ℝ≥0∞) {y} (Function.const _ 1) x := by
-  simp only [probOutput_def, evalDist_pure, OptionT.run_pure, PMF.monad_pure_eq_pure,
-    PMF.pure_apply, Option.some.injEq, Set.indicator, Set.mem_singleton_iff, Function.const_apply]
-  rw [Option.some_inj]
-  rfl
+@[simp] lemma finSupport_pure [HasEvalSet m] [HasEvalFinset m] (x : α) :
+    finSupport (pure x : m α) = {x} := by aesop
+
+lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] (x y : α) :
+    x ∈ finSupport (pure y : m α) ↔ x = y := by aesop
+lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] (x y : α) :
+    x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
+
+lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
+    evalDist (pure x : m α) = pure x := by aesop
+
+@[simp] lemma evalDist_comp_pure [HasEvalSPMF m] :
+    evalDist ∘ (pure : α → m α) = pure := by aesop
+
+@[simp] lemma evalDist_comp_pure' [HasEvalSPMF m] (f : α → β) :
+    evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by aesop
+
+@[simp] lemma probOutput_pure [HasEvalSPMF m] [DecidableEq α] (x y : α) :
+    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by aesop
+
+@[simp] lemma probOutput_pure_self [HasEvalSPMF m] (x : α) :
+    Pr[= x | (pure x : m α)] = 1 := by aesop
+
+@[simp] lemma probFailure_pure [HasEvalSPMF m] (x : α) :
+    Pr[⊥ | (pure x : m α)] = 0 := by aesop
+
+/-- Fallback when we don't have decidable equality. -/
+lemma probOutput_pure_eq_indicator [HasEvalSPMF m] (x y : α) :
+    Pr[= x | (pure y : m α)] = Set.indicator {y} (Function.const α 1) x := by aesop
+
+@[simp] lemma probEvent_pure [HasEvalSPMF m] (x : α) (p : α → Prop) [DecidablePred p] :
+    Pr[p | (pure x : m α)] = if p x then 1 else 0 := by aesop
+
+/-- Fallback when we don't have decidable equality. -/
+lemma probEvent_pure_eq_indicator [HasEvalSPMF m] (x : α) (p : α → Prop) :
+    Pr[p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by aesop
+
+
+end pure
 
 section bind
 
-variable (mx : m α) (my : α → m β)
+@[simp] lemma support_bind [HasEvalSet m] (mx : m α) (my : α → m β) :
+    support (mx >>= my) = ⋃ x ∈ support mx, support (my x) := by aesop
 
-lemma probOutput_bind_eq_tsum (y : β) :
+lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β) :
+    y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
+
+-- dtumad: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
+@[simp] lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m]
+    [DecidableEq β] (mx : m α) (my : α → m β) :
+    finSupport (mx >>= my) = Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
+
+lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m]
+    [DecidableEq β] (mx : m α) (my : α → m β) (y : β) :
+    y ∈ finSupport (mx >>= my) ↔ ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
+
+@[simp] lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
+    evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
+  MonadHom.toFun_bind' _ mx my
+
+lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
   simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
 
+
+
 end bind
 
-lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasSPMF m]
+section map
+
+-- @[simp] lemma support_map [LawfulMonad m] (f : α → β) (mx : m α) :
+--     support (f <$> mx) = f '' support mx := by
+--   rw [map_eq_bind_pure_comp]
+--   aesop
+
+
+-- @[simp] lemma evalDist_map [LawfulMonad m] (mx : m α) (f : α → β) :
+--     evalDist (f <$> mx) = f <$> (evalDist mx) := by
+--   simp [map_eq_bind_pure_comp]
+
+-- @[simp] lemma evalDist_comp_map [LawfulMonad m] (mx : m α) : evalDist ∘ (fun f => f <$> mx) =
+--     fun f : (α → β) => f <$> evalDist mx := by simp [funext_iff]
+
+
+end map
+
+
+
+-- @[simp] lemma support_seq [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+--     support (mf <*> mx) = ⋃ f ∈ support mf, f '' support mx := by
+--   simp [seq_eq_bind_map]
+
+
+-- @[simp] lemma evalDist_seq [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+--     evalDist (mf <*> mx) = evalDist mf <*> evalDist mx := by simp [seq_eq_bind_map]
+
+
+-- open Classical in
+-- @[simp] lemma support_seqLeft [LawfulMonad m] (mx : m α) (my : m β) :
+--     support (mx <* my) = if support my = ∅ then ∅ else support mx := by
+--   simp [seqLeft_eq, Set.ext_iff]
+
+-- open Classical in
+-- @[simp] lemma support_seqRight [LawfulMonad m] (mx : m α) (my : m β) :
+--     support (mx *> my) = if support mx = ∅ then ∅ else support my := by
+--   simp [seqRight_eq, Set.ext_iff]
+
+
+lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalSPMF m]
     (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
+  stop
   rw [probEvent_eq_tsum_indicator]
   rw [probOutput_bind_eq_tsum]
   refine tsum_congr fun α => ?_

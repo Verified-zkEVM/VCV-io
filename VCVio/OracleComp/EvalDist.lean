@@ -10,7 +10,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 /-!
 # Output Distribution of Computations
 
-This file defines a `HasPMF` for `OracleComp`, assuming uniform outputs of computations.
+This file defines a `HasEvalPMF` for `OracleComp`, assuming uniform outputs of computations.
 -/
 
 open OracleSpec Option ENNReal BigOperators
@@ -26,7 +26,7 @@ local instance : LawfulMonad SetM := Set.instLawfulMonad
 section instances
 
 /-- The support of a computation assuming any possible return value of queries. -/
-protected instance HasSupport : HasSupport (OracleComp spec) where
+protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
   __ := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
 
 lemma support_def (oa : OracleComp spec α) :
@@ -37,10 +37,10 @@ lemma support_def (oa : OracleComp spec α) :
 
 variable [spec.Fintype] [spec.Inhabited]
 
-/-- The standard (no failure) evaluation distribution `HasPMF` on `OracleComp` given by mapping
+/-- The standard (no failure) evaluation distribution `HasEvalPMF` on `OracleComp` given by mapping
   queries to a uniform output distribution. In the case of `ProbComp` this is exactly the
   distribution coming from each uniform selection responding uniformly. -/
-noncomputable instance : HasPMF (OracleComp spec) where
+noncomputable instance : HasEvalPMF (OracleComp spec) where
   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
 
 lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
@@ -48,7 +48,7 @@ lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t oa h => simp; sorry
-  -- simp [instHasPMF, HasPMF.instHasSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
+  -- simp [instHasEvalPMF, HasEvalPMF.instHasEvalSPMF, PMF.toSPMF, instMonad, evalDist, OptionT.mk]
   -- rw [← PMF.monad_map_eq_map]
   -- simp [simulateQ]
   -- ext a
@@ -77,7 +77,7 @@ open Classical -- We need decidable equality for the `finset` binds
 -- dtumad: could avoid classical by instead having [DecidableEq] instance?
 
 protected noncomputable instance finSupport [spec.Fintype] [spec.Inhabited] :
-    HasFinSupport (OracleComp spec) where
+    HasEvalFinsupport (OracleComp spec) where
   finSupport oa := OracleComp.construct (fun x => {x}) (fun t oa r => Finset.univ.biUnion r) oa
   mem_finSupport_iff oa x := by
     induction oa using OracleComp.inductionOn with
@@ -167,7 +167,7 @@ lemma mem_support_evalDist_iff :
     some x ∈ support (evalDist oa).run ↔ x ∈ support oa := by
   induction oa using OracleComp.inductionOn with
   -- Should think about better simp pathways here
-  | pure a => simp [PMF.instHasSupport, PMF.pure, support, SetM.run, DFunLike.coe]
+  | pure a => simp [PMF.instHasEvalSet, PMF.pure, support, SetM.run, DFunLike.coe]
   | query_bind t oa hoa => simp [hoa, OptionT.lift, elimM]; sorry
 
 alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff

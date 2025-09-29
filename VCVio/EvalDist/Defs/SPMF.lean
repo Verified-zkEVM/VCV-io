@@ -14,18 +14,37 @@ universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
+namespace PMF
+
+attribute [simp] coe_le_one PMF.apply_ne_top
+
+
+end PMF
+
 /-- Subprobability distribution.
 dtumad: this should move to mathlib -/
 @[reducible] def SPMF : Type u → Type u := OptionT PMF
 
 namespace SPMF
 
-def mk (p : OptionT PMF α) : SPMF α := p
+def mk (p : PMF (Option α)) : SPMF α := p
+
+@[simp] lemma run_mk (p : PMF (Option α)) : (mk p).run = p := rfl
+
+@[simp] lemma mk_run (p : SPMF α) : mk p.run = p := rfl
 
 lemma tsum_run_some_eq_one_sub (p : SPMF α) :
     ∑' x, p.run (some x) = 1 - p.run none := by
   rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]
   exact (ENNReal.add_sub_cancel_left (PMF.apply_ne_top p none)).symm
+
+@[simp] lemma tsum_run_some_add_run_none (p : SPMF α) :
+    (∑' x, p.run (some x)) + p.run none = 1 := by
+  rw [tsum_run_some_eq_one_sub, ENNReal.sub_add_eq_add_sub] <;> aesop
+
+@[simp] lemma run_none_add_tsum_run_some (p : SPMF α) :
+    p.run none + (∑' x, p.run (some x)) = 1 := by
+  simp [tsum_run_some_eq_one_sub]
 
 @[simp] lemma tsum_run_some_ne_top (p : SPMF α) :
     ∑' x, p.run (some x) ≠ ⊤ :=
@@ -52,6 +71,11 @@ instance : FunLike (SPMF α) α ENNReal where
   coe sp x := sp.run (some x)
   coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
 
+-- dtumad: is this really what we also want to simplify to?
+@[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
+
+section zero
+
 protected noncomputable def zero (α : Type u) : SPMF α := SPMF.mk (PMF.pure none)
 
 noncomputable instance : Zero (SPMF α) where zero := SPMF.zero α
@@ -59,13 +83,9 @@ noncomputable instance : Zero (SPMF α) where zero := SPMF.zero α
 lemma zero_def : (0 : SPMF α) = SPMF.zero α := rfl
 
 @[simp] lemma zero_apply (x : α) : (0 : SPMF α) x = 0 := by
-  sorry
+  simp [zero_def, SPMF.zero]
 
-@[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
-
-lemma apply'_none_eq_run (p : SPMF α) :
-    let p' : PMF (Option α) := p
-    p' none = p.run none := rfl
+end zero
 
 protected def support : SPMF →ᵐ SetM where
   toFun x := Function.support x
@@ -108,7 +128,7 @@ namespace PMF
       refine tsum_congr fun x => congr_arg (p x * ·) ?_
       refine trans ?_ (tsum_eq_single y ?_).symm <;> aesop
 
-@[simp] lemma toSPMF_none (p : PMF α) :
+@[simp] lemma run_toSPMF_none (p : PMF α) :
     p.toSPMF.run none = 0 := by simp
 
 end PMF

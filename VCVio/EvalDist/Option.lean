@@ -14,7 +14,7 @@ File for lemmas about `evalDist` on optional values.
 
 universe u v w
 
-variable {m : Type u → Type v} [Monad m] [HasSPMF m] {α β γ : Type u}
+variable {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α β γ : Type u}
 
 @[simp] lemma probOutput_some_map_some (mx : m α) (x : α) :
     Pr[= some x | some <$> mx] = Pr[= x | mx] := by
