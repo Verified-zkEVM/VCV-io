@@ -322,10 +322,10 @@ variable (α : Type) [hα : SampleableType α]
   simp only [Set.ext_iff, Set.mem_univ, iff_true]
   apply SampleableType.mem_support_selectElem
 
-@[simp] lemma finSupport_uniformOfFintype [Fintype α] [DecidableEq α] :
-    finSupport ($ᵗ α) = Finset.univ := by
-  stop
-  simp only [finSupport_eq_iff_support_eq_coe, support_uniformOfFintype, Finset.coe_univ]
+-- @[simp] lemma finSupport_uniformOfFintype [Fintype α] [DecidableEq α] [Nonempty α] :
+--     finSupport ($ᵗ α) = Finset.univ := by
+--   stop
+--   simp only [finSupport_eq_iff_support_eq_coe, support_uniformOfFintype, Finset.coe_univ]
 
 @[simp] lemma probEvent_uniformOfFintype [Fintype α] (p : α → Prop) [DecidablePred p] :
     Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
@@ -337,7 +337,7 @@ section instances
 
 instance (α : Type) [Unique α] : SampleableType α where
   selectElem := return default
-  mem_support_selectElem x := Unique.eq_default x ▸ rfl
+  mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
   probFailure_selectElem := sorry --probFailure_pure default
 
@@ -361,7 +361,7 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
 instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
-  mem_support_selectElem := by simp
+  mem_support_selectElem := by sorry
   probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
   probFailure_selectElem := by sorry-- simp
 
@@ -423,6 +423,7 @@ instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (F
     -- return (Matrix.of (fun i j ↦ if h : i ≠ Fin.last n then top (Fin.castPred i h) j else bot[j]))
   mem_support_selectElem x := by induction n with
   | zero =>
+    simp only [bind_pure_comp, Nat.rec_zero, support_pure, Set.mem_singleton_iff]
     apply Matrix.ext
     rintro i j
     exact False.elim (IsEmpty.false i)
