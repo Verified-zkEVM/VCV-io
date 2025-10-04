@@ -46,7 +46,7 @@ end QueryImpl
 behavior of the oracle. Requires decidable equality of the indexing set to determine
 which list to update when queries come in. -/
 def loggingOracle : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
-  idOracle.withLogging
+  (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
 namespace loggingOracle
 
@@ -91,4 +91,4 @@ end loggingOracle
 /-- Add a query log to a computation using a logging oracle.  -/
 @[reducible] def OracleComp.withQueryLog {α} (mx : OracleComp spec α) :
     OracleComp spec (α × QueryLog spec) :=
-  WriterT.run (simulateQ idOracle.withLogging mx)
+  WriterT.run (simulateQ (QueryImpl.ofLift spec (OracleComp spec)).withLogging mx)

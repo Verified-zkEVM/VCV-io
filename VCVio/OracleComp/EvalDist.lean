@@ -25,9 +25,9 @@ noncomputable instance [spec.Fintype] [spec.Inhabited] :
     HasEvalPMF (OracleComp spec) where
   toPMF := PFunctor.FreeM.mapMHom fun t : spec.domain => PMF.uniformOfFintype (spec.range t)
 
--- /-- The support of a computation assuming any possible return value of queries. -/
--- protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
---   __ := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
+/-- The support of a computation assuming any possible return value of queries. -/
+protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
+  toSet := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
 
 -- lemma support_def (oa : OracleComp spec α) :
 --     support oa = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) oa) := rfl

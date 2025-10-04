@@ -42,7 +42,7 @@ end QueryImpl
 function from oracle indices to counts, to give finer grained information about the count. -/
 def countingOracle (idx : spec.domain → ι) :
     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
-  idOracle.withCounting idx
+  (QueryImpl.ofLift spec (OracleComp spec)).withCounting idx
 
 namespace countingOracle
 
