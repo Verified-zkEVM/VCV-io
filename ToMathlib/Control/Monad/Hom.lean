@@ -118,12 +118,12 @@ variable {m : Type u → Type v} [Monad m]
 
 /-- Construct a `MonadHom` from a lawful monad lift. -/
 def ofLift (m : Type u → Type v) (n : Type u → Type w) [Monad m] [Monad n]
-    [MonadLift m n] [LawfulMonadLift m n] : m →ᵐ n where
+    [MonadLiftT m n] [LawfulMonadLiftT m n] : m →ᵐ n where
   toFun := liftM
   toFun_pure' := liftM_pure
   toFun_bind' := liftM_bind
 
-@[simp] lemma ofLift_apply [MonadLift m n] [LawfulMonadLift m n] {α : Type u} (x : m α) :
+@[simp] lemma ofLift_apply [MonadLiftT m n] [LawfulMonadLiftT m n] {α : Type u} (x : m α) :
     ofLift m n x = liftM x := rfl
 
 /-- The identity morphism between a monad and itself. -/

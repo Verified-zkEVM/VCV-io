@@ -73,6 +73,14 @@ class HasSimulateQ (spec : OracleSpec)
 
 export HasSimulateQ (simulateQ simulateQ_liftM)
 
+/-- List `simulateQ` but takes in a target `r` to lift the final computation to.
+Requires the instance be lawful to get an actual monad hom. -/
+def simulateQL [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
+    [HasSimulateQ spec m n] (r : Type u → Type*) [Monad r]
+    [MonadLiftT n r] [LawfulMonadLiftT n r]
+    (impl : QueryImpl spec n) : m →ᵐ r :=
+  (MonadHom.ofLift n r).comp (simulateQ impl)
+
 attribute [simp] simulateQ_liftM
 
 section simulateQ
@@ -143,87 +151,110 @@ instance [Monad m] [MonadLiftT (OracleQuery spec) m]
   simulateQ_liftM impl q := by
     simp [OptionT.mapM', liftM, monadLift, MonadLift.monadLift, h.simulateQ_liftM]
 
--- /-- Simulate under an optional transformer-/
--- instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
---     [HasSimulateQ spec m n] :
---     HasSimulateQ spec (OptionT m) (OptionT n) where
---   simulateQ impl := {
---     toFun mx := by
---       have : n (Option α) := simulateQ impl (OptionT.run mx)
---       sorry
---     toFun_pure' := _
---     toFun_bind' := _
---   }
---   simulateQ_liftM impl q := sorry
-
-/-- Simulate under a state transformer. -/
+/-- Simulate under an optional transformer-/
 instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
-    [HasSimulateQ spec m n] (σ : Type u) :
-    HasSimulateQ spec (StateT σ m) (StateT σ n) where
+    [LawfulMonad n]
+    [h : HasSimulateQ spec m n] :
+    HasSimulateQ spec (OptionT m) (OptionT n) where
   simulateQ impl := {
-    toFun {α} mx σ := by
-      specialize mx σ
-      stop
-      refine StateT.map _
+    toFun {α} mx := by
+      refine OptionT.mapM' ?_ mx
+      have := h.simulateQ
+
+      have mx' : m (Option α) := mx.run
+      refine OptionT.mk ?_
+
+      -- refine (Option.mapM ?_) <$> mx'
+      refine simulateQ (spec := spec) ?_ (mx')
+      intro t
+      specialize impl t
+
+
+      have : OptionT n α := simulateQ impl (OptionT.run mx)
       sorry
-    toFun_pure' := sorry
-    toFun_bind' := sorry
+    toFun_pure' := _
+    toFun_bind' := _
   }
   simulateQ_liftM impl q := sorry
 
-/-- Simulate underneath both state and option transformers.
-NOTE: `OptionT` behaves weird with type-classes because it is marked `expose`. -/
-instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
-    [HasSimulateQ spec m n] (σ : Type u) :
-    HasSimulateQ spec (StateT σ (OptionT m)) (StateT σ (OptionT n)) where
-  simulateQ impl := sorry
-  simulateQ_liftM impl q := sorry
+-- /-- Simulate under a state transformer. -/
+-- instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
+--     [HasSimulateQ spec m n] (σ : Type u) :
+--     HasSimulateQ spec (StateT σ m) (StateT σ n) where
+--   simulateQ impl := {
+--     toFun {α} mx σ := by
+--       specialize mx σ
+--       stop
+--       refine StateT.map _
+--       sorry
+--     toFun_pure' := sorry
+--     toFun_bind' := sorry
+--   }
+--   simulateQ_liftM impl q := sorry
+
+-- /-- Simulate underneath both state and option transformers.
+-- NOTE: `OptionT` behaves weird with type-classes because it is marked `expose`. -/
+-- instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
+--     [HasSimulateQ spec m n] (σ : Type u) :
+--     HasSimulateQ spec (StateT σ (OptionT m)) (StateT σ (OptionT n)) where
+--   simulateQ impl := sorry
+--   simulateQ_liftM impl q := sorry
 
 section tests
-
--- Note that keeping `OptionT` "inside" helps with inference
 
 example {spec₁ spec₂ : OracleSpec} (mx : OracleComp spec₁ α)
     (impl₁ : QueryImpl spec₁ (OracleComp spec₂))
     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂))) :
     OptionT (OracleComp spec₂) α :=
   simulateQ impl₂ <| simulateQ impl₁ mx
+  -- ((simulateQ impl₂).comp (simulateQ impl₁)) mx
 
 example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
-    (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
-    StateT β (OptionT (OracleComp spec₃)) α :=
-  simulateQ impl₂ <| simulateQ impl₁ mx
-
-example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
-    (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
-    (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
-    StateT β (OptionT (OracleComp spec₃)) α :=
-  simulateQ impl₂ <| simulateQ impl₁ mx
-
-example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
-    (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
-    (impl₃ : QueryImpl spec₂ (StateT β (OracleComp spec₃)))
-    (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂)))
-    (impl₄ : QueryImpl spec₃ (StateT β (OracleComp spec₁))) :
-    StateT β (OptionT (OracleComp spec₁)) α :=
+    (impl₂ : QueryImpl spec₂ (OracleComp spec₃))
+    (impl₃ : QueryImpl spec₃ (OptionT (OracleComp spec₁)))
+    (impl₄ : QueryImpl spec₁ (OracleComp spec₂)) :
+    (OptionT (OracleComp spec₂)) α :=
   simulateQ impl₄.liftTarget <|
-    simulateQ impl₃.liftTarget <|
+    simulateQ impl₃ <|
     simulateQ impl₂.liftTarget <|
-    liftM (simulateQ impl₁ mx)
+    simulateQ impl₁ mx
 
-example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
-    (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
-    (impl₂ : QueryImpl spec₂ (StateT β (OracleComp spec₃))) :
-    StateT β (OptionT (OracleComp spec₃)) α :=
-  simulateQ impl₂.liftTarget <|
-    liftM (simulateQ impl₁ mx)
+-- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
+--     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
+--     (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
+--     StateT β (OptionT (OracleComp spec₃)) α :=
+--   simulateQ impl₂ <| simulateQ impl₁ mx
 
-example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
-    (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
-    (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₃))) :
-    (StateT β (OptionT (OracleComp spec₃))) α :=
-  simulateQ impl₂.liftTarget <| -- Need `liftTarget`
-    liftM <| simulateQ impl₁ mx
+-- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
+--     (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
+--     (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
+--     StateT β (OptionT (OracleComp spec₃)) α :=
+--   simulateQ impl₂ <| simulateQ impl₁ mx
+
+-- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
+--     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
+--     (impl₃ : QueryImpl spec₂ (StateT β (OracleComp spec₃)))
+--     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂)))
+--     (impl₄ : QueryImpl spec₃ (StateT β (OracleComp spec₁))) :
+--     StateT β (OptionT (OracleComp spec₁)) α :=
+--   simulateQ impl₄.liftTarget <|
+--     simulateQ impl₃.liftTarget <|
+--     simulateQ impl₂.liftTarget <|
+--     simulateQ impl₁ mx)
+
+-- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
+--     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
+--     (impl₂ : QueryImpl spec₂ (StateT β (OracleComp spec₃))) :
+--     StateT β (OptionT (OracleComp spec₃)) α :=
+--   simulateQ impl₂.liftTarget <|
+--     liftM (simulateQ impl₁ mx)
+
+-- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
+--     (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
+--     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₃))) :
+--     (StateT β (OptionT (OracleComp spec₃))) α :=
+--   simulateQ impl₂.liftTarget <| -- Need `liftTarget`
+--     liftM (simulateQ impl₁ mx : (StateT β (OracleComp spec₂)) α)
 
 end tests
