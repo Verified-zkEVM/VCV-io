@@ -307,7 +307,7 @@ lemma tsum_probOutput_eq_sub [HasEvalSPMF m] (mx : m α) :
 
 lemma sum_probOutput_eq_sub [HasEvalSPMF m] [Fintype α] (mx : m α) :
     ∑ x : α, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
-  rw [← tsum_fintype, tsum_probOutput_eq_sub]
+  rw [← tsum_fintype (L := .unconditional _), tsum_probOutput_eq_sub]
 
 lemma probFailure_eq_sub_tsum [HasEvalSPMF m] (mx : m α) :
     Pr[⊥ | mx] = 1 - ∑' x : α, Pr[= x | mx] := by
@@ -316,7 +316,7 @@ lemma probFailure_eq_sub_tsum [HasEvalSPMF m] (mx : m α) :
 
 lemma probFailure_eq_sub_sum [HasEvalSPMF m] [Fintype α] (mx : m α) :
     Pr[⊥ | mx] = 1 - ∑ x : α, Pr[= x | mx] := by
-  rw [← tsum_fintype, probFailure_eq_sub_tsum]
+  rw [← tsum_fintype (L := .unconditional _), probFailure_eq_sub_tsum]
 
 @[aesop safe apply]
 lemma tsum_probOutput_eq_one' [HasEvalSPMF m] (mx : m α) (h : Pr[⊥ | mx] = 0) :
