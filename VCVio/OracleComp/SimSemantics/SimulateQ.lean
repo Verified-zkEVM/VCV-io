@@ -15,33 +15,31 @@ open OracleComp Prod
 
 universe u v w
 
-variable {α β γ : Type u} {spec : OracleSpec}
-    {m : Type u → Type v} {n : Type u → Type w}
+variable {α β γ : Type u}
 
 /-- Specifies a way to simulate a set of oracles using another set of oracles.
 e.g. using uniform selection oracles with a query cache to simulate a random oracle.
 `simulateQ` gives a method for applying a simulation oracle to a specific computation. -/
-def QueryImpl (spec : OracleSpec) (m : Type u → Type v) :=
+@[reducible] def QueryImpl (spec : OracleSpec) (m : Type u → Type v) :=
   (x : spec.domain) → m (spec.range x)
 
 namespace QueryImpl
 
-instance [spec.Inhabited] [Pure m] :
-  Inhabited (QueryImpl spec m) := ⟨fun _ => pure default⟩
+variable {spec : OracleSpec} {m : Type u → Type v} {n : Type u → Type w}
+
+instance [spec.Inhabited] [Pure m] : Inhabited (QueryImpl spec m) := ⟨fun _ => pure default⟩
 
 /-- Two query implementations are the same if they are the same on all query inputs. -/
 @[ext] lemma ext {so so' : QueryImpl spec m}
     (h : ∀ x : spec.domain, so x = so' x) : so = so' := funext h
 
--- instance [MonadLift m n] : Coe (QueryImpl spec m) (QueryImpl spec n) where
---   coe impl := fun x => liftM (impl x)
-
-/-- Gadget for auto-adding a lift to the end of a query implementation.
-Useful when chaining simulations with different monad transformers. -/
-def liftTarget {spec : OracleSpec} {m : Type u → Type v}
-    {n : Type u → Type w} [MonadLiftT m n]
+/-- Gadget for auto-adding a lift to the end of a query implementation. -/
+def liftTarget (n : Type u → Type*) [MonadLiftT m n]
     (impl : QueryImpl spec m) : QueryImpl spec n :=
   fun t : spec.domain => liftM (impl t)
+
+@[simp] lemma liftTarget_apply (n : Type u → Type*) [MonadLiftT m n]
+    (impl : QueryImpl spec m) (t : spec.domain) : impl.liftTarget n t = liftM (impl t) := rfl
 
 /-- Given that queries in `spec` lift to the monad `m` we get an implementation via lifting. -/
 def ofLift (spec : OracleSpec) (m : Type u → Type v)
@@ -49,54 +47,46 @@ def ofLift (spec : OracleSpec) (m : Type u → Type v)
   fun t : spec.domain => liftM (query t)
 
 @[simp] lemma ofLift_apply (spec : OracleSpec) (m : Type u → Type v)
-    [MonadLiftT (OracleQuery spec) m] (t : spec.domain) :
-    ofLift spec m t = liftM (query t) := rfl
-
-/-- Implement the oracles by returning default values.  -/
-def ofDefault (spec : OracleSpec) [spec.Inhabited] (m : Type u → Type v) [Pure m] :
-    QueryImpl spec m := fun _ => pure default
-
-@[simp] lemma ofDefault_apply (spec : OracleSpec) [spec.Inhabited] (m : Type u → Type v) [Pure m]
-    (t : spec.domain) : QueryImpl.ofDefault spec m t = pure default := rfl
+    [MonadLiftT (OracleQuery spec) m] (t : spec.domain) : ofLift spec m t = liftM (query t) := rfl
 
 end QueryImpl
 
-/-- `HasSimulateQ spec m n` means that `OracleQuery spec` can lift into `m`,
-and a `MonadHom` `simulateQ` that lifts an implementation of queries to a
-map between the two monads. -/
-class HasSimulateQ (spec : OracleSpec)
-    (m : outParam (Type u → Type v)) (n : Type u → Type w)
-    [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n] where
-  simulateQ (impl : QueryImpl spec n) : m →ᵐ n
-  simulateQ_liftM (impl : QueryImpl spec n) {α : Type u} (q : OracleQuery spec α) :
-    simulateQ impl (q : m α) = q.2 <$> impl q.1
+/-- `HasSimulateQ spec r m n` means that an implementation of `OracleQuery spec` in terms of
+a computation in `r` results in a implementation of computations in `m` in terms of `n`.
+This implementation is given by a bundled monad hom `simulateQ`. We also require that queries
+can be lifted into `m`, and that `simulateQ` behaves naturally with this lift.
+
+The standard example is `HasSimulateQ spec r (OracleComp spec) r` which takes an implementation of
+queries to `spec` in `r` and recursively substitutes that implementation in an `OracleComp spec`
+computation, to get a value in the new spec `r`.
+For example taking `r` to be `PMF` lets you asign output distributions to queries and
+get an output distribution for the whole computaiton. -/
+class HasSimulateQ (spec : OracleSpec) (r : Type u → Type*)
+    (m : outParam (Type u → Type v)) [Monad m] [MonadLiftT (OracleQuery spec) m]
+    (n : outParam (Type u → Type w)) [Monad n] [MonadLiftT r n] where
+  simulateQ (impl : QueryImpl spec r) : m →ᵐ n
+  simulateQ_liftM (impl : QueryImpl spec r) {α : Type u} (q : OracleQuery spec α) :
+    (simulateQ impl).toFun (liftM q : m α) = q.2 <$> liftM (impl q.1)
 
 export HasSimulateQ (simulateQ simulateQ_liftM)
-
-/-- List `simulateQ` but takes in a target `r` to lift the final computation to.
-Requires the instance be lawful to get an actual monad hom. -/
-def simulateQL [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
-    [HasSimulateQ spec m n] (r : Type u → Type*) [Monad r]
-    [MonadLiftT n r] [LawfulMonadLiftT n r]
-    (impl : QueryImpl spec n) : m →ᵐ r :=
-  (MonadHom.ofLift n r).comp (simulateQ impl)
 
 attribute [simp] simulateQ_liftM
 
 section simulateQ
 
-variable [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
-    [HasSimulateQ spec m n] (impl : QueryImpl spec n)
+variable {spec : OracleSpec} {r m n : Type u → Type*}
+    [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
+    [MonadLiftT r n] [HasSimulateQ spec r m n] (impl : QueryImpl spec r)
 
 @[simp] lemma simulateQ_query [LawfulMonad n] (t : spec.domain) :
-    simulateQ impl (query t : m _) = impl t := by
+    simulateQ impl (query t : m (spec.range t)) = liftM (impl t) := by
   simp [query_def, HasSimulateQ.simulateQ_liftM (m := m)]
 
 @[simp] lemma simulateQ_query_bind [LawfulMonad n] (t : spec.domain) (ou : spec.range t → m β) :
     simulateQ impl ((query t : m _) >>= ou) =
-      impl t >>= fun u => simulateQ impl (ou u) := by aesop
+      liftM (impl t) >>= fun u => simulateQ impl (ou u) := by aesop
 
-lemma simulateQ_pure (x : α) : simulateQ impl (pure x : m α) = pure x := by simp
+lemma simulateQ_pure (x : α) : simulateQ impl (pure x : m α) = (pure x : n α) := by simp
 
 lemma simulateQ_bind [LawfulMonad n] (mx : m α) (my : α → m β) :
     simulateQ impl (mx >>= my) = simulateQ impl mx >>= fun u => simulateQ impl (my u) := by simp
@@ -119,20 +109,41 @@ lemma simulateQ_seqRight [LawfulMonad m] [LawfulMonad n] (mx : m α) (my : m β)
 
 end simulateQ
 
+namespace OracleQuery
+
+variable {spec spec' : OracleSpec}
+
+/-- Given a map from queries in `spec` to queries in `spec'` we get a map on `OracleComp` as well
+by substituting each query for the new implementation in `spec'`. -/
+instance {spec spec' : OracleSpec} :
+    HasSimulateQ spec (OracleQuery spec') (OracleComp spec) (OracleComp spec') where
+  simulateQ impl := PFunctor.FreeM.mapMHom fun x => PFunctor.FreeM.lift (impl x)
+  simulateQ_liftM _ _ _ := rfl
+
+lemma simulateQ_def (impl : QueryImpl spec (OracleQuery spec')) :
+    (simulateQ impl : OracleComp spec →ᵐ OracleComp spec') =
+      PFunctor.FreeM.mapMHom fun x => PFunctor.FreeM.lift (impl x) := rfl
+
+end OracleQuery
+
 namespace OracleComp
 
-/-- Canonical lifting of a function `NatOracleQuery spec α → m α`
-to a morphism `OracleComp spec →ᵐ m` by preserving `bind`, `pure` -/
+/-- Given a `QueryImpl` of `spec` in terms of `n` we map any computation in
+`OracleComp spec` to `n` by replacing queries with the corresponding implementation.
+Taking `n` to be `PMF`, `Set`, etc. makes it possible to substitute each query for some denotation
+like an output distribution and get the corresponding value for the entire computation.  -/
 instance {spec : OracleSpec} {n : Type u → Type w} [Monad n] [LawfulMonad n] :
-    HasSimulateQ spec (OracleComp spec) n where
+    HasSimulateQ spec n (OracleComp spec) n where
   simulateQ impl := PFunctor.FreeM.mapMHom impl
   simulateQ_liftM impl q := by simp [PFunctor.FreeM.mapM]
 
-variable [Monad n] [LawfulMonad n] (impl : QueryImpl spec n)
+variable {spec : OracleSpec} {n : Type u → Type v}
+  [Monad n] [LawfulMonad n] (impl : QueryImpl spec n)
 
 lemma simulateQ_def (impl : QueryImpl spec n) :
     (simulateQ impl : OracleComp spec →ᵐ n) = PFunctor.FreeM.mapMHom impl := rfl
 
+/-- Replacing queries with themselves has no effect. -/
 @[simp] lemma simulateQ_ofLift_eq_self (mx : OracleComp spec α) :
     simulateQ (QueryImpl.ofLift spec (OracleComp spec)) mx = mx := by
   induction mx using OracleComp.inductionOn with
@@ -141,64 +152,41 @@ lemma simulateQ_def (impl : QueryImpl spec n) :
 
 end OracleComp
 
-/-- Simulate with an `OptionT` failure chance in any `AlternativeMonad`,
-sending the additional value to `failure`. -/
-instance [Monad m] [MonadLiftT (OracleQuery spec) m]
-    {n : Type u → Type w} [AlternativeMonad n] [LawfulMonad n]
-    [LawfulAlternative n] [h : HasSimulateQ spec m n] :
-    HasSimulateQ spec (OptionT m) n where
-  simulateQ impl := OptionT.mapM' (h.simulateQ impl)
-  simulateQ_liftM impl q := by
-    simp [OptionT.mapM', liftM, monadLift, MonadLift.monadLift, h.simulateQ_liftM]
+section OptionT
 
-/-- Simulate under an optional transformer-/
-instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
-    [LawfulMonad n]
-    [h : HasSimulateQ spec m n] :
-    HasSimulateQ spec (OptionT m) (OptionT n) where
-  simulateQ impl := {
-    toFun {α} mx := by
-      refine OptionT.mapM' ?_ mx
-      have := h.simulateQ
+variable {spec : OracleSpec} {r m n : Type u → Type*}
 
-      have mx' : m (Option α) := mx.run
-      refine OptionT.mk ?_
+/-- Apply `simulateQ` "underneath" an `OptionT` transformer. -/
+instance t [Monad r] [Monad m] [MonadLiftT (OracleQuery spec) m]
+    [Monad n] [LawfulMonad n] [MonadLiftT r n]
+    [HasSimulateQ spec r m n] : HasSimulateQ spec r (OptionT m) (OptionT n) where
+  simulateQ impl := by
+    have : m →ᵐ n := simulateQ impl
+    refine OptionT.mapM' ?_
+    refine MonadHom.comp ?_ this
+    refine MonadHom.ofLift n (OptionT n)
+  simulateQ_liftM impl α q := by
+    refine OptionT.ext ?_
+    simp
+    have : (liftM q : OptionT m α) = OptionT.lift (liftM q) := rfl
+    simp [OptionT.mapM']
+    simp [OptionT.run]
+    rw [this]
+    simp [OptionT.lift, OptionT.mk]
+    simp only [map_eq_bind_pure_comp, Function.comp_def]
+    rfl
 
-      -- refine (Option.mapM ?_) <$> mx'
-      refine simulateQ (spec := spec) ?_ (mx')
-      intro t
-      specialize impl t
+end OptionT
+
+section ErrorT
 
 
-      have : OptionT n α := simulateQ impl (OptionT.run mx)
-      sorry
-    toFun_pure' := _
-    toFun_bind' := _
-  }
-  simulateQ_liftM impl q := sorry
+end ErrorT
 
--- /-- Simulate under a state transformer. -/
--- instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
---     [HasSimulateQ spec m n] (σ : Type u) :
---     HasSimulateQ spec (StateT σ m) (StateT σ n) where
---   simulateQ impl := {
---     toFun {α} mx σ := by
---       specialize mx σ
---       stop
---       refine StateT.map _
---       sorry
---     toFun_pure' := sorry
---     toFun_bind' := sorry
---   }
---   simulateQ_liftM impl q := sorry
+section StateT
 
--- /-- Simulate underneath both state and option transformers.
--- NOTE: `OptionT` behaves weird with type-classes because it is marked `expose`. -/
--- instance [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
---     [HasSimulateQ spec m n] (σ : Type u) :
---     HasSimulateQ spec (StateT σ (OptionT m)) (StateT σ (OptionT n)) where
---   simulateQ impl := sorry
---   simulateQ_liftM impl q := sorry
+
+end StateT
 
 section tests
 
@@ -206,55 +194,14 @@ example {spec₁ spec₂ : OracleSpec} (mx : OracleComp spec₁ α)
     (impl₁ : QueryImpl spec₁ (OracleComp spec₂))
     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂))) :
     OptionT (OracleComp spec₂) α :=
-  simulateQ impl₂ <| simulateQ impl₁ mx
-  -- ((simulateQ impl₂).comp (simulateQ impl₁)) mx
-
-example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
-    (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
-    (impl₂ : QueryImpl spec₂ (OracleComp spec₃))
-    (impl₃ : QueryImpl spec₃ (OptionT (OracleComp spec₁)))
-    (impl₄ : QueryImpl spec₁ (OracleComp spec₂)) :
-    (OptionT (OracleComp spec₂)) α :=
-  simulateQ impl₄.liftTarget <|
-    simulateQ impl₃ <|
-    simulateQ impl₂.liftTarget <|
+  simulateQ impl₂ <|
     simulateQ impl₁ mx
 
--- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
---     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
---     (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
---     StateT β (OptionT (OracleComp spec₃)) α :=
---   simulateQ impl₂ <| simulateQ impl₁ mx
-
--- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
---     (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
---     (impl₂ : QueryImpl spec₂ (StateT β (OptionT (OracleComp spec₃)))) :
---     StateT β (OptionT (OracleComp spec₃)) α :=
---   simulateQ impl₂ <| simulateQ impl₁ mx
-
--- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
---     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
---     (impl₃ : QueryImpl spec₂ (StateT β (OracleComp spec₃)))
---     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂)))
---     (impl₄ : QueryImpl spec₃ (StateT β (OracleComp spec₁))) :
---     StateT β (OptionT (OracleComp spec₁)) α :=
---   simulateQ impl₄.liftTarget <|
---     simulateQ impl₃.liftTarget <|
---     simulateQ impl₂.liftTarget <|
---     simulateQ impl₁ mx)
-
--- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
---     (impl₁ : QueryImpl spec₁ (OptionT (OracleComp spec₂)))
---     (impl₂ : QueryImpl spec₂ (StateT β (OracleComp spec₃))) :
---     StateT β (OptionT (OracleComp spec₃)) α :=
---   simulateQ impl₂.liftTarget <|
---     liftM (simulateQ impl₁ mx)
-
--- example {spec₁ spec₂ spec₃ : OracleSpec} (mx : OracleComp spec₁ α)
---     (impl₁ : QueryImpl spec₁ (StateT β (OracleComp spec₂)))
---     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₃))) :
---     (StateT β (OptionT (OracleComp spec₃))) α :=
---   simulateQ impl₂.liftTarget <| -- Need `liftTarget`
---     liftM (simulateQ impl₁ mx : (StateT β (OracleComp spec₂)) α)
+example {spec₁ spec₂ spec₃ spec₄ : OracleSpec} (mx : OracleComp spec₁ α)
+    (impl₁ : QueryImpl spec₁ (OracleComp spec₂))
+    (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₃)))
+    (impl₃ : QueryImpl spec₃ (OptionT (OracleComp spec₄))) :
+    OptionT (OptionT (OracleComp spec₄)) α :=
+  simulateQ impl₃ <| simulateQ impl₂ <| simulateQ impl₁ mx
 
 end tests
