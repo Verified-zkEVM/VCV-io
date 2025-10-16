@@ -16,39 +16,39 @@ universe u v w
 
 open OracleSpec OracleComp
 
-variable {ι : Type u} {spec : OracleSpec}
+variable {spec : OracleSpec} {α β γ : Type u}
 
 namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
-def withLogging (so : QueryImpl spec m) : QueryImpl spec (WriterT (QueryLog spec) m) :=
-  fun t => do
-    let u ← so t
-    tell (QueryLog.singleton t u)
-    return u
+def withLogging (so : QueryImpl spec m) :
+    QueryImpl spec (WriterT (QueryLog spec) m) := fun t => do
+  let u ← so t
+  tell (QueryLog.singleton t u)
+  return u
 
--- /-- Add logging to an existing query implementation, using `StateT` to extend the final monad. -/
--- def withLogging (so : QueryImpl spec m) :
---     QueryImpl spec (WriterT (QueryLog spec) m) where
---   impl | q => do
---     let x ← liftM (so.impl q)
---     tell (QueryLog.singleton q x)
---     return x
-
--- @[simp] lemma withLogging_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
---     so.withLogging.impl q =
---       do let x ← liftM (so.impl q); tell (QueryLog.singleton q x); return x := rfl
+@[simp] lemma withLogging_apply (so : QueryImpl spec m) (t : spec.domain) :
+    so.withLogging t = do let x ← liftM (so t); tell (QueryLog.singleton t x); return x := rfl
 
 end QueryImpl
 
 /-- Simulation oracle for tracking the quries in a `QueryLog`, without modifying the actual
 behavior of the oracle. Requires decidable equality of the indexing set to determine
 which list to update when queries come in. -/
-def loggingOracle : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
+def loggingOracle {spec : OracleSpec} : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
 namespace loggingOracle
+
+@[simp] -- TODO: more general version/class for query impls that never have failures
+lemma probFailure_simulateQ {spec : OracleSpec.{0,0}} {α : Type}
+    [spec.Fintype] [spec.Inhabited]
+    (oa : OracleComp spec α) :
+    Pr[⊥ | ((simulateQ loggingOracle oa).run : OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
+  induction oa using OracleComp.induction with
+  | pure a => simp
+  | query_bind t oa ih => simp
 
 -- variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 

@@ -105,6 +105,12 @@ lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q :
   simp [probEvent_def, evalDist_bind, PMF.toOuterMeasure_bind_apply,
     tsum_option _ ENNReal.summable, evalDist_apply_some, elimM]
 
+@[simp]
+lemma probFailure_bind_eq_zero_iff [HasEvalSPMF m] (mx : m α) (my : α → m β) :
+    Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by
+  simp [probFailure_bind_eq_tsum]
+  grind
+
 /-- Version of `probOutput_bind_eq_tsum` that sums only over the subtype given by the support
 of the first computation. This can be useful to avoid looking at edge cases that can't actually
 happen in practice after the first computation. A common example is if the first computation

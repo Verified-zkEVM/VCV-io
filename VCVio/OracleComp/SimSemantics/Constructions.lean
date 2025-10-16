@@ -13,11 +13,11 @@ import VCVio.OracleComp.EvalDist
 This file defines a number of basic simulation oracles, as well as operations to combine them.
 -/
 
--- open OracleSpec OracleComp Prod Sum
+open OracleSpec OracleComp Prod Sum
 
--- universe u v w
+universe u v w
 
--- variable {ι ι' : Type*} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type u}
+variable {spec : OracleSpec} {α β γ : Type u}
 
 -- namespace QueryImpl
 
@@ -93,12 +93,11 @@ This file defines a number of basic simulation oracles, as well as operations to
 
 -- end QueryImpl
 
--- /-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
--- The resulting computation is still identical under `evalDist`.
--- The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
--- def unifOracle [∀ i, SampleableType (spec.range i)] :
---     QueryImpl spec ProbComp where
---   impl | query i _ => $ᵗ spec.range i
+/-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
+The resulting computation is still identical under `evalDist`.
+The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
+def uniformSampleImpl [∀ i, SampleableType (spec.range i)] :
+    QueryImpl spec ProbComp := fun t => $ᵗ spec.range t
 
 -- namespace unifOracle
 

@@ -28,6 +28,7 @@ import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.OptionT
 import VCVio.EvalDist.Prod
+import VCVio.EvalDist.ReaderT
 import VCVio.OracleComp.Coercions.Append
 import VCVio.OracleComp.Coercions.SimOracle
 import VCVio.OracleComp.Coercions.SubSpec
