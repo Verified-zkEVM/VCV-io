@@ -49,6 +49,15 @@ def ofLift (spec : OracleSpec) (m : Type u → Type v)
 @[simp] lemma ofLift_apply (spec : OracleSpec) (m : Type u → Type v)
     [MonadLiftT (OracleQuery spec) m] (t : spec.domain) : ofLift spec m t = liftM (query t) := rfl
 
+/-- View a function from oracle inputs to outputs as an implementation in the `Id` monad.
+Can be used to run a computation to get a specific value. -/
+def ofFn (spec : OracleSpec) (f : (t : spec.domain) → spec.range t) :
+    QueryImpl spec Id := f
+
+/-- Version of `ofFn` that allows queries to fail to return a value. -/
+def ofFn? (spec : OracleSpec) (f : (t : spec.domain) → Option (spec.range t)) :
+    QueryImpl spec Option := f
+
 end QueryImpl
 
 /-- `HasSimulateQ spec r m n` means that an implementation of `OracleQuery spec` in terms of
