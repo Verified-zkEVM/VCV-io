@@ -41,6 +41,9 @@ def liftTarget (n : Type u → Type*) [MonadLiftT m n]
 @[simp] lemma liftTarget_apply (n : Type u → Type*) [MonadLiftT m n]
     (impl : QueryImpl spec m) (t : spec.domain) : impl.liftTarget n t = liftM (impl t) := rfl
 
+@[simp] lemma liftTarget_self (impl : QueryImpl spec m) :
+    impl.liftTarget m = impl := rfl
+
 /-- Given that queries in `spec` lift to the monad `m` we get an implementation via lifting. -/
 def ofLift (spec : OracleSpec) (m : Type u → Type v)
     [MonadLiftT (OracleQuery spec) m] : QueryImpl spec m :=
@@ -214,3 +217,9 @@ example {spec₁ spec₂ spec₃ spec₄ : OracleSpec} (mx : OracleComp spec₁ 
   simulateQ impl₃ <| simulateQ impl₂ <| simulateQ impl₁ mx
 
 end tests
+
+instance (priority := high) {spec : OracleSpec} :
+    MonadLiftT (OracleComp []ₒ) (OracleComp spec) where
+  monadLift mx :=
+    let impl : QueryImpl []ₒ (OracleQuery spec) := fun t => PEmpty.elim t
+    simulateQ impl mx

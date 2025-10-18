@@ -7,19 +7,47 @@ import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.OracleComp.Coercions.Append
 
 /-!
-# Append Operation for Simulation Oracles
-
-This file defines an operation `SimOracle.append` that takes two simulation oracles `so` and `so'`
-from `spec₁` and `spec₂` respectively to a shared target spec `specₜ`,
-and constructs a new simulation oracle from `spec₁ ++ spec₂` to `specₜ`.
-
-This operation is also compatible with the `SubSpec` instances involving `OracleSpec.append`.
-For example if `oa : OracleComp spec₁ α` is coerced to `↑oa : OracleComp (spec₁ ++ spec₂) α`,
-then we have `simulate' (so ++ₛₒ so') ↑oa s = simulate' so oa s.1`, as the additional
-oracles from the coercion will never actually be called.
-
-TODO: simp lemmas are not always applied properly, seemingly due to the free `n` variable.
+# Append/Add Operation for Simulation Oracles
 -/
+
+universe u v w
+
+namespace QueryImpl
+
+variable {spec₁ spec₂ : OracleSpec} {m n r : Type u → Type*}
+
+/-- Simplest version of adding queries when all implementations are in the same monad.
+The actual add notation for `QueryImpl` uses `QueryImpl.addLift` which adds monad lifting
+to this definition for greater flexibility. -/
+protected def add (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m) :
+    QueryImpl (spec₁ + spec₂) m | .inl t => impl₁ t | .inr t => impl₂ t
+
+/-- Add two `QueryImpl` to get an implementation on the sum of the two `OracleSpec`.-/
+instance : HAdd (QueryImpl spec₁ m) (QueryImpl spec₂ m) (QueryImpl (spec₁ + spec₂) m) where
+  hAdd := QueryImpl.add
+
+lemma add_apply (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
+    (t : OracleSpec.domain (spec₁ + spec₂)) : (impl₁ + impl₂) t =
+      match t with | .inl t => impl₁ t | .inr t => impl₂ t := rfl
+
+@[simp] lemma add_apply_inl (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
+    (t : spec₁.domain) : (impl₁ + impl₂) (.inl t) = impl₁ t := rfl
+
+@[simp] lemma add_apply_inr (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
+    (t : spec₂.domain) : (impl₁ + impl₂) (.inr t) = impl₂ t := rfl
+
+/-- Version of `QueryImpl.add` that also lifts the two implementations to a shared lift monad. -/
+def addLift {spec₁ spec₂ : OracleSpec} {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
+    (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ n) : QueryImpl (spec₁ + spec₂) r :=
+  (impl₁.liftTarget r) + (impl₂.liftTarget r)
+
+@[simp] lemma addLift_def {spec₁ spec₂ : OracleSpec}
+    {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
+    (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ n) :
+    (impl₁.addLift impl₂ : QueryImpl (spec₁ + spec₂) r) =
+      (impl₁.liftTarget r) + (impl₂.liftTarget r) := rfl
+
+end QueryImpl
 
 -- open OracleSpec OracleComp Prod Sum
 

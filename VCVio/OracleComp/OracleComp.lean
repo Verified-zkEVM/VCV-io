@@ -42,10 +42,20 @@ open OracleSpec
 
 /-- An oracle query returning a result of type `α`
 is a dependent pair of a query `i : spec.domain` and a response function `spec.range i → α`.
-This is a wrapper around `PFunctor.Obj`. -/
-def OracleQuery (spec : OracleSpec.{u,v}) :
-    Type w → Type (max u v w) :=
+This is a wrapper around `PFunctor.Obj`.
+dt: we could make this reducible to auto-derive instances? -/
+def OracleQuery (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
   spec.Obj
+
+namespace OracleQuery
+
+instance {spec : OracleSpec} : Functor (OracleQuery spec) :=
+  inferInstanceAs (Functor spec.Obj)
+
+instance {α} : IsEmpty (OracleQuery []ₒ α) where
+  false q := PEmpty.elim q.1
+
+end OracleQuery
 
 /-- `OracleComp spec α` represents computations with oracle access to oracles in `spec`,
 where the final return value has type `α`.
@@ -55,8 +65,7 @@ In practive computations in `OracleComp spec α` have have one of three forms:
 * `return x` to succeed with some `x : α` as the result.
 * `do u ← query i t; oa u` where `oa` is a continutation to run with the query result
 See `OracleComp.inductionOn` for an explicit induction principle. -/
-def OracleComp (spec : OracleSpec.{u,v}) :
-    Type w → Type (max u v w) :=
+def OracleComp (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
   PFunctor.FreeM spec
 
 /-- Simplified notation for computations with no oracles besides random inputs. -/
