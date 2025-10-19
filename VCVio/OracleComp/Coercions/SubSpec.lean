@@ -35,32 +35,28 @@ it can be perfectly simulated by a computation using the oracles of `superSpec`.
 We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
 class SubSpec (spec : OracleSpec.{u,w}) (superSpec : OracleSpec)
-  extends MonadLift spec superSpec where
+  extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
 
 infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
-variable [h : MonadLift spec superSpec]
+variable [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
--- -- -- TODO: this may be a good simp lemma for normalization in general?
--- -- -- Guessing the rhs is almost always easier to prove things about
--- -- @[simp] lemma liftM_query_eq_liftM_liftM (q : spec α) :
--- --     (q : superSpec α) = ((q : superSpec α) : OracleComp superSpec α) := rfl
+-- -- TODO: this may be a good simp lemma for normalization in general?
+-- -- Guessing the rhs is almost always easier to prove things about
+-- @[simp] lemma liftM_query_eq_liftM_liftM (q : spec α) :
+--     (q : superSpec α) = ((q : superSpec α) : OracleComp superSpec α) := rfl
 
--- -- TODO: Nameing
+-- TODO: Nameing
 -- lemma evalDist_lift_query [superSpec.Fintype] [superSpec.Inhabited]
 --     [Fintype α] [Nonempty α]
---     (q : spec α) :
---     evalDist ((q : superSpec α) : OracleComp superSpec α) =
+--     (q : OracleQuery spec α) :
+--     evalDist ((q : OracleQuery superSpec α) : OracleComp superSpec α) =
 --       OptionT.lift (PMF.uniformOfFintype α) := by
---   simp
+--   sorry
 
---   simp only [PFunctor.FreeM.monadLift_eq_lift]
-
---   rw [evalDist_liftM]
-
--- @[simp] lemma evalDist_liftM [superSpec.FiniteRange] [Fintype α] [Nonempty α]
+-- @[simp] lemma evalDist_liftM [superSpec.Fintype] [Fintype α] [Nonempty α]
 --     (q : OracleQuery spec α) :
 --     evalDist (q : OracleComp superSpec α) =
 --       OptionT.lift (PMF.uniformOfFintype α) := by
@@ -97,37 +93,40 @@ variable [h : MonadLift spec superSpec]
 --       (Finset.univ.filter p).card / Fintype.card α := by
 --   rw [probEvent_liftM_eq_div]
 
--- -- /-- The empty set of oracles is a subspec of any other oracle set.
--- -- We require `ι` to be inhabited to prevent the reflexive case.  -/
--- -- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
--- --   monadLift | query i _ => i.elim
+-- /-- The empty set of oracles is a subspec of any other oracle set.
+-- We require `ι` to be inhabited to prevent the reflexive case.  -/
+-- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
+--   monadLift | query i _ => i.elim
 
--- end SubSpec
+end SubSpec
 
--- end OracleSpec
+end OracleSpec
 
 
--- namespace OracleComp
+namespace OracleComp
 
--- section liftComp
+section liftComp
 
--- /-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries. -/
--- def liftComp (oa : OracleComp spec α) (superSpec : OracleSpec τ)
---       [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
---       OracleComp superSpec α := simulateQ ⟨liftM⟩ oa
+/-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries. -/
+def liftComp (oa : OracleComp spec α) (superSpec : OracleSpec)
+      [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+      OracleComp superSpec α :=
+    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa
 
--- variable (superSpec : OracleSpec τ) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+variable (superSpec : OracleSpec) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
--- lemma liftComp_def (oa : OracleComp spec α) :
---     liftComp oa superSpec = simulateQ (m := OracleComp superSpec) ⟨liftM⟩ oa := rfl
+lemma liftComp_def (oa : OracleComp spec α) : liftComp oa superSpec =
+    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa := rfl
 
--- @[simp]
--- lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec = pure x := rfl
+@[simp]
+lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec = pure x := rfl
 
 -- @[simp]
 -- lemma liftComp_query (q : OracleQuery spec α) :
 --     liftComp (q : OracleComp spec _) superSpec = liftM q :=
---   by simp [liftComp_def]
+--   sorry
+--   -- by simp [liftComp_def]
+
 
 -- @[simp]
 -- lemma liftComp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
@@ -190,17 +189,17 @@ variable [h : MonadLift spec superSpec]
 --   simp [liftComp]
 --   sorry
 
--- end liftComp
+end liftComp
 
--- /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
--- instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
---     MonadLift (OracleComp spec) (OracleComp superSpec) where
---   monadLift oa := liftComp oa superSpec
+/-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
+instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLift (OracleComp spec) (OracleComp superSpec) where
+  monadLift oa := liftComp oa superSpec
 
--- variable [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+variable [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
--- @[simp]
--- lemma liftM_eq_liftComp (oa : OracleComp spec α) :
---     (liftM oa : OracleComp superSpec α) = liftComp oa superSpec := rfl
+@[simp]
+lemma liftM_eq_liftComp (oa : OracleComp spec α) :
+    (liftM oa : OracleComp superSpec α) = liftComp oa superSpec := rfl
 
--- end OracleComp
+end OracleComp

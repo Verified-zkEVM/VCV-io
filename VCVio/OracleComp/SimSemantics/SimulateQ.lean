@@ -134,7 +134,7 @@ instance {spec spec' : OracleSpec} :
 
 lemma simulateQ_def (impl : QueryImpl spec (OracleQuery spec')) :
     (simulateQ impl : OracleComp spec →ᵐ OracleComp spec') =
-      PFunctor.FreeM.mapMHom fun x => PFunctor.FreeM.lift (impl x) := rfl
+      PFunctor.FreeM.mapMHom fun x => liftM (impl x) := rfl
 
 end OracleQuery
 

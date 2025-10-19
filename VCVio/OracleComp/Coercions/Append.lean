@@ -14,15 +14,15 @@ in the sense that the two oracle sets correspond to `Sum.inl` and `Sum.inr`.
 Note that this operation is never associative, as `Sum` is not associative
 
 We also define a number of coercions involving append.
-These instances allow an `OracleSpec` of the form `spec₁ ++ₒ ... ++ₒ spec₂`
-to coerce to one of the form `spec'₁ ++ₒ ... ++ₒ spec'₂`, assuming that
+These instances allow an `OracleSpec` of the form `spec₁ + ... + spec₂`
+to coerce to one of the form `spec'₁ + ... + spec'₂`, assuming that
 the set of oracles in the first is a sub-sequence of the oracles in the second.
 We also include associativity instances, so parenthisization of the sequence is irrelevant.
 
 Note that this requires the ordering of oracles in each to match,
 and so we generally adopt a standard ordering of `OracleSpec` for computations
 in order to make this apply as often as possible. We specifically adopt the following convention:
-  `{coin_oracle} ++ₒ {unif_spec} ++ₒ {random oracle} ++ₒ {adversary oracles} ++ₒ ...`,
+  `{coin_oracle} + {unif_spec} + {random oracle} + {adversary oracles} + ...`,
 where any of the individual parts may be ommited. The adversary oracles are for
 things like a signing oracle in unforgeability experiments of a signature scheme.
 
@@ -41,147 +41,144 @@ This ordering is chosen to both give a generally applicable instance tree,
 and avoid an infinite typeclass search whether or not an instance exists.
 -/
 
--- open Sum
+open Sum
 
--- namespace OracleSpec
+namespace OracleSpec
 
--- universe u v w
+universe u v w
 
--- variable {ι₁ ι₂ ι₃ ι₄: Type*} (spec₁ : OracleSpec ι₁) (spec₂ : OracleSpec ι₂)
---   (spec₃ : OracleSpec ι₃) (spec₄ : OracleSpec ι₄) {α β γ : Type u}
+variable (spec₁ spec₂ spec₃ spec₄ : OracleSpec) {α β γ : Type u}
 
--- section instances
+section instances
 
--- /-- Add additional oracles to the right side of the existing ones. -/
--- instance subSpec_append_left : spec₁ ⊂ₒ (spec₁ ++ₒ spec₂) where
---   monadLift | query i t => query (inl i) t
+/-- Add additional oracles to the right side of the existing ones. -/
+instance subSpec_append_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
+  monadLift | q => ⟨.inl q.1, q.2⟩
 
--- @[simp]
--- lemma liftM_append_left_eq (q : OracleQuery spec₁ α) :
---     (liftM q : OracleQuery (spec₁ ++ₒ spec₂) α) =
---       match q with | query i t => query (inl i) t := rfl
+@[simp] lemma liftM_append_left_eq (q : OracleQuery spec₁ α) :
+    (liftM q : OracleQuery (spec₁ + spec₂) α) = ⟨.inl q.1, q.2⟩ := rfl
 
--- /-- Add additional oracles to the left side of the exiting ones-/
--- instance subSpec_append_right : spec₂ ⊂ₒ (spec₁ ++ₒ spec₂) where
---   monadLift | query i t => query (inr i) t
+/-- Add additional oracles to the left side of the exiting ones-/
+instance subSpec_append_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
+  monadLift | q => ⟨.inr q.1, q.2⟩
 
--- @[simp]
--- lemma liftM_append_right_eq (q : OracleQuery spec₂ α) :
---     (liftM q : OracleQuery (spec₁ ++ₒ spec₂) α) =
---       match q with | query i t => query (inr i) t := rfl
+@[simp] lemma liftM_append_right_eq (q : OracleQuery spec₂ α) :
+    (liftM q : OracleQuery (spec₁ + spec₂) α) = ⟨.inr q.1, q.2⟩ := rfl
 
--- instance subSpec_left_append_left_append_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
---     spec₁ ++ₒ spec₂ ⊂ₒ spec₃ ++ₒ spec₂ where
---   monadLift
---     | query (inl i) t => liftM (query i t)
---     | query (inr i) t => query (inr i) t
+instance subSpec_left_append_left_append_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
+    spec₁ + spec₂ ⊂ₒ spec₃ + spec₂ where
+  monadLift
+    | ⟨.inl q, f⟩ => h.monadLift ⟨q, f⟩
+    | ⟨.inr q, f⟩ => ⟨.inr q, f⟩
 
--- @[simp]
--- lemma liftM_left_append_left_append_eq [h : spec₁ ⊂ₒ spec₃]
---     (q : OracleQuery (spec₁ ++ₒ spec₂) α) : (liftM q : OracleQuery (spec₃ ++ₒ spec₂) α) =
---     match q with | query (inl i) t => liftM (query i t) | query (inr i) t => query (inr i) t := rfl
+@[simp]
+lemma liftM_left_append_left_append_eq [h : spec₁ ⊂ₒ spec₃]
+    (q : OracleQuery (spec₁ + spec₂) α) : (liftM q : OracleQuery (spec₃ + spec₂) α) =
+    match q with
+    | ⟨.inl q, f⟩ => h.monadLift ⟨q, f⟩
+    | ⟨.inr q, f⟩ => ⟨.inr q, f⟩ := rfl
 
--- instance subSpec_right_append_right_append_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
---     spec₁ ++ₒ spec₂ ⊂ₒ spec₁ ++ₒ spec₃ where
---   monadLift
---     | query (inl i) t => query (inl i) t
---     | query (inr i) t => liftM (query i t)
+instance subSpec_right_append_right_append_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
+    spec₁ + spec₂ ⊂ₒ spec₁ + spec₃ where
+  monadLift
+    | ⟨.inl q, f⟩ => ⟨.inl q, f⟩
+    | ⟨.inr q, f⟩ => h.monadLift ⟨q, f⟩
 
--- @[simp]
--- lemma liftM_right_append_right_append_eq [h : spec₂ ⊂ₒ spec₃]
---     (q : OracleQuery (spec₁ ++ₒ spec₂) α) : (liftM q : OracleQuery (spec₁ ++ₒ spec₃) α) =
---     match q with | query (inl i) t => liftM (query i t) | query (inr i) t => query (inr i) t := rfl
+@[simp]
+lemma liftM_right_append_right_append_eq [h : spec₂ ⊂ₒ spec₃]
+    (q : OracleQuery (spec₁ + spec₂) α) : (liftM q : OracleQuery (spec₁ + spec₃) α) =
+    match q with
+    | ⟨.inl q, f⟩ => ⟨.inl q, f⟩
+    | ⟨.inr q, f⟩ => h.monadLift ⟨q, f⟩ := rfl
 
--- instance subSpec_assoc : spec₁ ++ₒ (spec₂ ++ₒ spec₃) ⊂ₒ spec₁ ++ₒ spec₂ ++ₒ spec₃ where
---   monadLift
---     | query (inl i) t => query (inl (inl i)) t
---     | query (inr (inl i)) t => query (inl (inr i)) t
---     | query (inr (inr i)) t => query (inr i) t
+instance subSpec_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec₂ + spec₃ where
+  monadLift
+    | ⟨.inl t, f⟩ => ⟨.inl (.inl t), f⟩
+    | ⟨.inr (.inl t), f⟩ => ⟨.inl (.inr t), f⟩
+    | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩
 
--- end instances
+end instances
 
--- end OracleSpec
+end OracleSpec
 
--- section tests
+section tests
 
--- set_option linter.unusedVariables false
+set_option linter.unusedVariables false
 
--- -- This set of examples serves as sort of a "unit test" for the coercions above
--- variable (α ι₁ ι₂ ι₃ ι₄ ι₅ ι₆ : Type)
---   (spec₁ : OracleSpec ι₁) (spec₂ : OracleSpec ι₂)
---   (spec₃ : OracleSpec ι₃) (spec₄ : OracleSpec ι₄)
---   (coeSpec : OracleSpec ι₅) (coeSuperSpec : OracleSpec ι₆)
---   [coeSpec ⊂ₒ coeSuperSpec]
+-- This set of examples serves as sort of a "unit test" for the coercions above
+variable (α : Type)
+  (spec₁ spec₂ spec₃ spec₄ coeSpec coeSuperSpec : OracleSpec)
+  [coeSpec ⊂ₒ coeSuperSpec]
 
--- -- coerce a single `coin_spec` and then append extra oracles
--- example (oa : OracleComp coeSpec α) :
---   OracleComp (coeSuperSpec ++ₒ spec₂ ++ₒ spec₃) α := oa
--- example (oa : OracleComp coeSpec α) :
---   OracleComp (spec₁ ++ₒ coeSuperSpec ++ₒ spec₂) α := oa
--- example (oa : OracleComp coeSpec α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ coeSuperSpec) α := oa
+-- coerce a single `coin_spec` and then append extra oracles
+example (oa : OracleComp coeSpec α) :
+  OracleComp (coeSuperSpec + spec₂ + spec₃) α := oa
+example (oa : OracleComp coeSpec α) :
+  OracleComp (spec₁ + coeSuperSpec + spec₂) α := oa
+example (oa : OracleComp coeSpec α) :
+  OracleComp (spec₁ + spec₂ + coeSuperSpec) α := oa
 
--- -- coerce left side of append and then append on additional oracles
--- example (oa : OracleComp (coeSpec ++ₒ spec₁) α) :
---   OracleComp (coeSuperSpec ++ₒ spec₁ ++ₒ spec₂) α := oa
--- example (oa : OracleComp (coeSpec ++ₒ spec₁) α) :
---   OracleComp (coeSuperSpec ++ₒ spec₂ ++ₒ spec₁) α := oa
--- example (oa : OracleComp (coeSpec ++ₒ spec₁) α) :
---   OracleComp (spec₂ ++ₒ coeSuperSpec ++ₒ spec₁) α := oa
+-- coerce left side of append and then append on additional oracles
+example (oa : OracleComp (coeSpec + spec₁) α) :
+  OracleComp (coeSuperSpec + spec₁ + spec₂) α := oa
+example (oa : OracleComp (coeSpec + spec₁) α) :
+  OracleComp (coeSuperSpec + spec₂ + spec₁) α := oa
+example (oa : OracleComp (coeSpec + spec₁) α) :
+  OracleComp (spec₂ + coeSuperSpec + spec₁) α := oa
 
--- -- coerce right side of append and then append on additional oracles
--- example (oa : OracleComp (spec₁ ++ₒ coeSpec) α) :
---   OracleComp (spec₁ ++ₒ coeSuperSpec ++ₒ spec₂) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ coeSpec) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ coeSuperSpec) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ coeSpec) α) :
---   OracleComp (spec₂ ++ₒ spec₁ ++ₒ coeSuperSpec) α := oa
+-- coerce right side of append and then append on additional oracles
+example (oa : OracleComp (spec₁ + coeSpec) α) :
+  OracleComp (spec₁ + coeSuperSpec + spec₂) α := oa
+example (oa : OracleComp (spec₁ + coeSpec) α) :
+  OracleComp (spec₁ + spec₂ + coeSuperSpec) α := oa
+example (oa : OracleComp (spec₁ + coeSpec) α) :
+  OracleComp (spec₂ + spec₁ + coeSuperSpec) α := oa
 
--- -- coerce an inside part while also applying associativity
--- example (oa : OracleComp (spec₁ ++ₒ (spec₂ ++ₒ coeSpec)) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ coeSuperSpec) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ (coeSpec ++ₒ spec₂)) α) :
---   OracleComp (spec₁ ++ₒ coeSuperSpec ++ₒ spec₂) α := oa
--- example (oa : OracleComp (coeSpec ++ₒ (spec₁ ++ₒ spec₂)) α) :
---   OracleComp (coeSuperSpec ++ₒ spec₁ ++ₒ spec₂) α := oa
+-- coerce an inside part while also applying associativity
+example (oa : OracleComp (spec₁ + (spec₂ + coeSpec)) α) :
+  OracleComp (spec₁ + spec₂ + coeSuperSpec) α := oa
+example (oa : OracleComp (spec₁ + (coeSpec + spec₂)) α) :
+  OracleComp (spec₁ + coeSuperSpec + spec₂) α := oa
+example (oa : OracleComp (coeSpec + (spec₁ + spec₂)) α) :
+  OracleComp (coeSuperSpec + spec₁ + spec₂) α := oa
 
--- -- coerce two oracles up to four oracles
--- example (oa : OracleComp (spec₁ ++ₒ spec₂) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ spec₃) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₂ ++ₒ spec₃) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₂ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₃ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
+-- coerce two oracles up to four oracles
+example (oa : OracleComp (spec₁ + spec₂) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₁ + spec₃) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₁ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₂ + spec₃) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₂ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₃ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
 
--- -- coerce threee oracles up to four oracles
--- example (oa : OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₁ ++ₒ spec₃ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp (spec₂ ++ₒ spec₃ ++ₒ spec₄) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
+-- coerce threee oracles up to four oracles
+example (oa : OracleComp (spec₁ + spec₂ + spec₃) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₁ + spec₂ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₁ + spec₃ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp (spec₂ + spec₃ + spec₄) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + spec₄) α := oa
 
--- -- four oracles with associativity and internal coercion
--- example (oa : OracleComp ((coeSpec ++ₒ spec₂) ++ₒ (spec₃ ++ₒ spec₄)) α) :
---   OracleComp (coeSuperSpec ++ₒ spec₂ ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp ((spec₁ ++ₒ spec₂) ++ₒ (coeSpec ++ₒ spec₄)) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ coeSuperSpec ++ₒ spec₄) α := oa
--- example (oa : OracleComp ((spec₁ ++ₒ coeSpec) ++ₒ (spec₃ ++ₒ spec₄)) α) :
---   OracleComp (spec₁ ++ₒ coeSuperSpec ++ₒ spec₃ ++ₒ spec₄) α := oa
--- example (oa : OracleComp ((spec₁ ++ₒ spec₂) ++ₒ (spec₃ ++ₒ coeSuperSpec)) α) :
---   OracleComp (spec₁ ++ₒ spec₂ ++ₒ spec₃ ++ₒ coeSuperSpec) α := oa
+-- four oracles with associativity and internal coercion
+example (oa : OracleComp ((coeSpec + spec₂) + (spec₃ + spec₄)) α) :
+  OracleComp (coeSuperSpec + spec₂ + spec₃ + spec₄) α := oa
+example (oa : OracleComp ((spec₁ + spec₂) + (coeSpec + spec₄)) α) :
+  OracleComp (spec₁ + spec₂ + coeSuperSpec + spec₄) α := oa
+example (oa : OracleComp ((spec₁ + coeSpec) + (spec₃ + spec₄)) α) :
+  OracleComp (spec₁ + coeSuperSpec + spec₃ + spec₄) α := oa
+example (oa : OracleComp ((spec₁ + spec₂) + (spec₃ + coeSuperSpec)) α) :
+  OracleComp (spec₁ + spec₂ + spec₃ + coeSuperSpec) α := oa
 
--- /-- coercion makes it possible to mix computations on individual oracles -/
--- example : OracleComp (unifSpec ++ₒ spec₁) Bool := do
---   let n : Fin 315 ←$[0..314]; let m : Fin 315 ←$[0..314]
---   if n = m then return true else $ᵗ Bool
+/-- coercion makes it possible to mix computations on individual oracles -/
+example : OracleComp (unifSpec + spec₁) Bool := do
+  let n : Fin 315 ←$[0..314]; let m : Fin 315 ←$[0..314]
+  if n = m then return true else $ᵗ Bool
 
--- end tests
+end tests

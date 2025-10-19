@@ -45,15 +45,26 @@ is a dependent pair of a query `i : spec.domain` and a response function `spec.r
 This is a wrapper around `PFunctor.Obj`.
 dt: we could make this reducible to auto-derive instances? -/
 def OracleQuery (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
-  spec.Obj
+  PFunctor.Obj ↑spec
 
 namespace OracleQuery
 
 instance {spec : OracleSpec} : Functor (OracleQuery spec) :=
-  inferInstanceAs (Functor spec.Obj)
+  inferInstanceAs (Functor (PFunctor.Obj ↑spec))
 
 instance {α} : IsEmpty (OracleQuery []ₒ α) where
   false q := PEmpty.elim q.1
+
+variable {spec : OracleSpec}
+
+/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
+Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
+def query (t : spec.domain) : OracleQuery spec (spec.range t) := ⟨t, id⟩
+
+lemma query_def (t : spec.domain) : query t = ⟨t, id⟩ := rfl
+
+@[simp] lemma fst_query (t : spec.domain) : (query t).fst = t := rfl
+@[simp] lemma snd_query (t : spec.domain) : (query t).snd = id := rfl
 
 end OracleQuery
 
@@ -66,7 +77,7 @@ In practive computations in `OracleComp spec α` have have one of three forms:
 * `do u ← query i t; oa u` where `oa` is a continutation to run with the query result
 See `OracleComp.inductionOn` for an explicit induction principle. -/
 def OracleComp (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
-  PFunctor.FreeM spec
+  PFunctor.FreeM ↑spec
 
 /-- Simplified notation for computations with no oracles besides random inputs. -/
 abbrev ProbComp : Type → Type := OracleComp unifSpec
@@ -75,14 +86,16 @@ variable {α β γ : Type v} {spec : OracleSpec.{u,v}}
 
 namespace OracleComp
 
+export OracleQuery (query query_def)
+
 instance (spec : OracleSpec) : Monad (OracleComp spec) :=
-  inferInstanceAs (Monad spec.FreeM)
+  inferInstanceAs (Monad (PFunctor.FreeM ↑spec))
 
 instance (spec : OracleSpec) : LawfulMonad (OracleComp spec) :=
-  inferInstanceAs (LawfulMonad spec.FreeM)
+  inferInstanceAs (LawfulMonad (PFunctor.FreeM ↑spec))
 
 instance : MonadLift (OracleQuery spec) (OracleComp spec) :=
-  inferInstanceAs (MonadLift spec (PFunctor.FreeM spec))
+  inferInstanceAs (MonadLift (PFunctor.Obj ↑spec) (PFunctor.FreeM spec))
 
 protected lemma liftM_def (q : OracleQuery spec α) :
     (q : OracleComp spec α) = PFunctor.FreeM.lift q := rfl
@@ -94,15 +107,6 @@ protected lemma liftM_def (q : OracleQuery spec α) :
 @[simp] lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
     pure x ≠ (liftM q : OracleComp spec α) :=
   PFunctor.FreeM.pure_ne_lift q x
-
-/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
-Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
-def query (t : spec.domain) : OracleQuery spec (spec.range t) := ⟨t, id⟩
-
-lemma query_def (t : spec.domain) : query t = ⟨t, id⟩ := rfl
-
-@[simp] lemma fst_query (t : spec.domain) : (query t).fst = t := rfl
-@[simp] lemma snd_query (t : spec.domain) : (query t).snd = id := rfl
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[reducible, inline] def coin : OracleComp coinSpec Bool :=
@@ -298,13 +302,13 @@ section inj
 @[simp] lemma pure_inj (x y : α) : pure (f := OracleComp spec) x = pure y ↔ x = y :=
   PFunctor.FreeM.pure_inj x y
 
-/-- Doing something with a query result is equal iff they query the same oracle
-and perform identical computations on the output. -/
-@[simp] lemma queryBind_inj (t t' : spec.domain) (ob : spec.range t → OracleComp spec β)
-    (ob' : spec.range t' → OracleComp spec β) :
-    (query t : OracleComp spec _) >>= ob = (query t' : OracleComp spec _) >>= ob' ↔
-      ∃ h : t = t', h ▸ ob = ob' :=
-  PFunctor.FreeM.roll_inj t t' ob ob'
+-- /-- Doing something with a query result is equal iff they query the same oracle
+-- and perform identical computations on the output. -/
+-- @[simp] lemma queryBind_inj (t t' : spec.domain) (ob : spec.range t → OracleComp spec β)
+--     (ob' : spec.range t' → OracleComp spec β) :
+--     (query t : OracleComp spec _) >>= ob = (query t' : OracleComp spec _) >>= ob' ↔
+--       ∃ h : t = t', h ▸ ob = ob' := by
+--   convert PFunctor.FreeM.roll_inj t t' ob ob'
 
 /-- Binding two computations gives a pure operation iff the first computation is pure
 and the second computation does something pure with the result. -/
