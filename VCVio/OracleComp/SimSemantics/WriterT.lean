@@ -49,7 +49,7 @@ variable {ι : Type u} {spec : OracleSpec} {α : Type u} {ω : Type u} [Monoid �
 --       congr 1
 --       calc ∑' (w : ω), [=(x, w) | (so.impl (query i t)).run]
 --         _ = [= x | fst <$> (so.impl (query i t)).run] := by rw [probOutput_fst_map_eq_tsum]
---         _ = (↑(Fintype.card (spec.range i)))⁻¹ := by rw [hso, probOutput_query]
+--         _ = (↑(Fintype.card (spec.Range i)))⁻¹ := by rw [hso, probOutput_query]
 --   | failure => simp
 
 -- -- TODO: less general version with `NeverFailWhen`

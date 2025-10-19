@@ -27,14 +27,14 @@ instance : HAdd (QueryImpl spec₁ m) (QueryImpl spec₂ m) (QueryImpl (spec₁ 
   hAdd := QueryImpl.add
 
 lemma add_apply (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
-    (t : OracleSpec.domain (spec₁ + spec₂)) : (impl₁ + impl₂) t =
+    (t : OracleSpec.Domain (spec₁ + spec₂)) : (impl₁ + impl₂) t =
       match t with | .inl t => impl₁ t | .inr t => impl₂ t := rfl
 
 @[simp] lemma add_apply_inl (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
-    (t : spec₁.domain) : (impl₁ + impl₂) (.inl t) = impl₁ t := rfl
+    (t : spec₁.Domain) : (impl₁ + impl₂) (.inl t) = impl₁ t := rfl
 
 @[simp] lemma add_apply_inr (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
-    (t : spec₂.domain) : (impl₁ + impl₂) (.inr t) = impl₂ t := rfl
+    (t : spec₂.Domain) : (impl₁ + impl₂) (.inr t) = impl₂ t := rfl
 
 /-- Version of `QueryImpl.add` that also lifts the two implementations to a shared lift monad. -/
 def addLift {spec₁ spec₂ : OracleSpec} {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
@@ -74,11 +74,11 @@ end QueryImpl
 --     (so : QueryImpl spec₁ m₁) (so' : QueryImpl spec₂ m₂)
 
 -- @[simp]
--- lemma append_apply_inl (i : ι₁) (t : spec₁.domain i) :
+-- lemma append_apply_inl (i : ι₁) (t : spec₁.Domain i) :
 --     (so ++ₛₒ so' : QueryImpl _ n).impl (query (inl i) t) = so.impl (query i t) := rfl
 
 -- @[simp]
--- lemma append_apply_inr (i : ι₂) (t : spec₂.domain i) :
+-- lemma append_apply_inr (i : ι₂) (t : spec₂.Domain i) :
 --     (so ++ₛₒ so' : QueryImpl _ n).impl (query (inr i) t) = so'.impl (query i t) := rfl
 
 -- variable [AlternativeMonad n] [LawfulAlternative n] [LawfulMonad n]

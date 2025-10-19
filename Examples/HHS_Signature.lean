@@ -75,7 +75,7 @@ open OracleSpec OracleComp
 --     [AddCommGroup G] [HomogeneousSpace G P] {n : ℕ}
 
 -- variable [(j : (unifSpec ++ (Unit →ₒ Vector Bool n)).ι) →
---   SampleableType ((unifSpec ++ (Unit →ₒ Vector Bool n)).range j)]
+--   SampleableType ((unifSpec ++ (Unit →ₒ Vector Bool n)).Range j)]
 
 -- def mockSignOracle  (x₀ pk : P) :
 --     let randSpec := (Vector P n × M) →ₒ Vector Bool n

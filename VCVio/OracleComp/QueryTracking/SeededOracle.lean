@@ -38,7 +38,7 @@ def withPregen (so : QueryImpl spec m) :
     let i := HasIndexing.idx t
     do match seed i with
       | u :: us =>
-        let u' : spec.range t := HasIndexing.range_idx (ι := ι) t ▸ u
+        let u' : spec.Range t := HasIndexing.range_idx (ι := ι) t ▸ u
         ReaderT.adapt (fun seed => Function.update seed i us) (return u')
       | [] => so t
 
@@ -68,7 +68,7 @@ end QueryImpl
 -- @[simp]
 -- lemma probOutput_generateSeed_bind_simulateQ_bind {ι : Type _} {spec : OracleSpec ι}
 --     {α β : Type _} [DecidableEq ι]
---     [∀ i, SampleableType (spec.range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
+--     [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
 --     (qc : ι → ℕ) (js : List ι)
 --     (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
 --     [= y | do
@@ -80,7 +80,7 @@ end QueryImpl
 -- @[simp]
 -- lemma probOutput_generateSeed_bind_map_simulateQ {ι : Type _} {spec : OracleSpec ι}
 --     {α β : Type _} [DecidableEq ι]
---     [∀ i, SampleableType (spec.range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
+--     [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
 --     (qc : ι → ℕ) (js : List ι)
 --     (oa : OracleComp spec α) (f : α → β) (y : β) :
 --     [= y | do

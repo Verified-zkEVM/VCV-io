@@ -28,8 +28,8 @@ and `range` gives the output type of the oracle for a given index.
 This type is essentially a copy of `PFunctor` used to hide certain abstractions
 in a form that is more familiar to an average user. -/
 structure OracleSpec where
-  domain : Type u
-  range : domain → Type v
+  Domain : Type u
+  Range : Domain → Type v
   deriving Inhabited
 
 namespace OracleSpec
@@ -37,40 +37,38 @@ namespace OracleSpec
 variable {spec : OracleSpec}
 
 instance : Coe OracleSpec PFunctor where
-  coe spec := { A := spec.domain, B := spec.range }
+  coe spec := { A := spec.Domain, B := spec.Range }
 
 @[simp] lemma coe_def (spec : OracleSpec) :
-    (↑spec : PFunctor) = { A := spec.domain, B := spec.range } := rfl
+    (↑spec : PFunctor) = { A := spec.Domain, B := spec.Range } := rfl
 
 @[reducible, simp] def ofPFunctor (P : PFunctor) : OracleSpec :=
-  { domain := P.A, range := P.B }
+  { Domain := P.A, Range := P.B }
 
 /-- An oracle spec has indexing in a type `ι` if the `range` function factors through `ι`.
 dt: not sure if this is really the right approach for e.g. `pregen`. -/
 class HasIndexing (spec : OracleSpec) (ι : Type w) where
-  idx : spec.domain → ι
+  idx : spec.Domain → ι
   xdi : ι → Type _
-  range_idx (t : spec.domain) : spec.range t = xdi (idx t)
+  range_idx (t : spec.Domain) : spec.Range t = xdi (idx t)
 
 protected class Fintype (spec : OracleSpec) extends PFunctor.Fintype ↑spec
 protected class Inhabited (spec : OracleSpec) extends PFunctor.Inhabited ↑spec
 protected class DecidableEq (spec : OracleSpec) extends PFunctor.DecidableEq ↑spec
 
-instance [h : spec.Fintype] (t : spec.domain) : Fintype (spec.range t) := h.fintype_B t
-instance [h : spec.Inhabited] (t : spec.domain) : Inhabited (spec.range t) := h.inhabited_B t
-instance [h : spec.DecidableEq] : DecidableEq spec.domain := h.decidableEq_A
-instance [h : spec.DecidableEq] (t : spec.domain) : DecidableEq (spec.range t) := h.decidableEq_B t
+instance [h : spec.Fintype] (t : spec.Domain) : Fintype (spec.Range t) := h.fintype_B t
+instance [h : spec.Inhabited] (t : spec.Domain) : Inhabited (spec.Range t) := h.inhabited_B t
+instance [h : spec.DecidableEq] : DecidableEq spec.Domain := h.decidableEq_A
+instance [h : spec.DecidableEq] (t : spec.Domain) : DecidableEq (spec.Range t) := h.decidableEq_B t
 
 instance : Add OracleSpec where add spec spec' := ofPFunctor (spec + spec')
 
 @[simp] lemma domain_add (spec spec' : OracleSpec) :
-    (spec + spec').domain = (spec.domain ⊕ spec'.domain) := rfl
-
-@[simp] lemma range_add_inl (spec spec' : OracleSpec) (t : spec.domain) :
-    (spec + spec').range (.inl t) = spec.range t := rfl
-
-@[simp] lemma range_add_inr (spec spec' : OracleSpec) (t : spec'.domain) :
-    (spec + spec').range (.inr t) = spec'.range t := rfl
+    (spec + spec').Domain = (spec.Domain ⊕ spec'.Domain) := rfl
+@[simp] lemma range_add_inl (spec spec' : OracleSpec) (t : spec.Domain) :
+    (spec + spec').Range (.inl t) = spec.Range t := rfl
+@[simp] lemma range_add_inr (spec spec' : OracleSpec) (t : spec'.Domain) :
+    (spec + spec').Range (.inr t) = spec'.Range t := rfl
 
 end OracleSpec
 
@@ -85,17 +83,17 @@ weaker than `unifSpec`, as we have only finitely many coin flips. -/
 @[inline, reducible]
 def coinSpec : OracleSpec.{0,0} := Unit →ₒ Bool
 
-@[simp] lemma domain_coinSpec : coinSpec.domain = Unit := rfl
-@[simp] lemma range_coinSpec (t : coinSpec.domain) : coinSpec.range t = Bool := rfl
+@[simp] lemma domain_coinSpec : coinSpec.Domain = Unit := rfl
+@[simp] lemma range_coinSpec (t : coinSpec.Domain) : coinSpec.Range t = Bool := rfl
 
 /-- Access to oracles for uniformly selecting from `Fin (n + 1)` for arbitrary `n : ℕ`.
 By adding `1` to the index we avoid selection from the empty type `Fin 0 ≃ empty`.-/
 @[inline, reducible] def unifSpec : OracleSpec.{0,0} where
-  domain := ℕ
-  range n := Fin (n + 1)
+  Domain := ℕ
+  Range n := Fin (n + 1)
 
-@[simp] lemma domain_unifSpec : unifSpec.domain = ℕ := rfl
-@[simp] lemma range_unifSpec (t : unifSpec.domain) : unifSpec.range t = Fin (t + 1) := rfl
+@[simp] lemma domain_unifSpec : unifSpec.Domain = ℕ := rfl
+@[simp] lemma range_unifSpec (t : unifSpec.Domain) : unifSpec.Range t = Fin (t + 1) := rfl
 
 instance : unifSpec.Fintype where fintype_B n := inferInstanceAs (Fintype (Fin (n + 1)))
 instance : unifSpec.Inhabited where inhabited_B n := inferInstanceAs (Inhabited (Fin (n + 1)))
@@ -104,5 +102,5 @@ instance : unifSpec.Inhabited where inhabited_B n := inferInstanceAs (Inhabited 
 One question is that we may have empty selection
 Select uniformly from a range (not starting from zero).-/
 @[inline, reducible] def probSpec : OracleSpec.{0,0} where
-  domain := ℕ × ℕ
-  range r := Fin (r.2 + 1)
+  Domain := ℕ × ℕ
+  Range r := Fin (r.2 + 1)

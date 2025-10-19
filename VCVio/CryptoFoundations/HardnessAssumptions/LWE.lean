@@ -43,7 +43,7 @@ secret `s`.
 --   let A ←$ᵗ Matrix (Fin n) (Fin m) (Fin p)
 --   let s ←$ᵗ Vector (Fin p) n
 --   -- Sampled each entry of `e` independently using `errSamp`
---   let e ← (Vector.range m).mapM (fun _ ↦ errSamp)
+--   let e ← (Vector.Range m).mapM (fun _ ↦ errSamp)
 --   let u := A.vecMul s.get + e.get
 --   return (A, Vector.ofFn u)
 
@@ -93,7 +93,7 @@ secret `s`.
 --   let A ←$ᵗ Matrix (Fin n) (Fin m) (Fin p)
 --   let s ←$ᵗ Vector (Fin p) n
 --   -- Sampled each entry of `e` independently using `errSamp`
---   let e ← (Vector.range m).mapM (fun _ ↦ errSamp)
+--   let e ← (Vector.Range m).mapM (fun _ ↦ errSamp)
 --   let u := A.vecMul s.get + e.get
 --   let s' ← adv (A, Vector.ofFn u)
 --   return s' = s

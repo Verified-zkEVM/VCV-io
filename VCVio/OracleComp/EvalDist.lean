@@ -23,16 +23,16 @@ variable {spec : OracleSpec} {spec' : OracleSpec} {α β γ : Type w}
 
 noncomputable instance [spec.Fintype] [spec.Inhabited] :
     HasEvalPMF (OracleComp spec) where
-  toPMF := PFunctor.FreeM.mapMHom fun t : spec.domain => PMF.uniformOfFintype (spec.range t)
+  toPMF := PFunctor.FreeM.mapMHom fun t : spec.Domain => PMF.uniformOfFintype (spec.Range t)
 
 /-- The support of a computation assuming any possible return value of queries. -/
 protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
-  toSet := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.domain => Set.univ
+  toSet := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.Domain => Set.univ
 
 -- lemma support_def (oa : OracleComp spec α) :
 --     support oa = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) oa) := rfl
 
--- @[simp] lemma support_query (t : spec.domain) : support (query t) = Set.univ := by
+-- @[simp] lemma support_query (t : spec.Domain) : support (query t) = Set.univ := by
 --   simp [support_def, SetM.run]
 
 -- variable [spec.Fintype] [spec.Inhabited]
@@ -41,10 +41,10 @@ protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
 --   queries to a uniform output distribution. In the case of `ProbComp` this is exactly the
 --   distribution coming from each uniform selection responding uniformly. -/
 -- noncomputable instance : HasEvalPMF (OracleComp spec) where
---   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.range t)
+--   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.Range t)
 
 -- lemma evalDist_def (oa : OracleComp spec α) : evalDist oa =
---     simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t))) oa := by
+--     simulateQ (fun t => OptionT.mk (some <$> PMF.uniformOfFintype (spec.Range t))) oa := by
 --   induction oa using OracleComp.inductionOn with
 --   | pure x => simp
 --   | query_bind t oa h => simp; sorry
@@ -59,17 +59,17 @@ protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
 --   --   rw [aux]
 --   -- sorry
 --   -- classical
---   -- rw [tsum_ite_eq a (PFunctor.FreeM.mapM (fun t ↦ PMF.uniformOfFintype (spec.range t)) oa)]
+--   -- rw [tsum_ite_eq a (PFunctor.FreeM.mapM (fun t ↦ PMF.uniformOfFintype (spec.Range t)) oa)]
 
--- @[simp] lemma evalDist_query (t : spec.domain) :
---     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
+-- @[simp] lemma evalDist_query (t : spec.Domain) :
+--     evalDist (query t) = OptionT.mk (some <$> PMF.uniformOfFintype (spec.Range t)) := by
 --   simp [evalDist_def]
 
 -- lemma toPMF_def (oa : OracleComp spec α) : toPMF oa =
---     simulateQ (fun t => PMF.uniformOfFintype (spec.range t)) oa := rfl
+--     simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) oa := rfl
 
--- @[simp] lemma toPMF_query (t : spec.domain) :
---     toPMF (query t) = PMF.uniformOfFintype (spec.range t) := by simp [toPMF_def]
+-- @[simp] lemma toPMF_query (t : spec.Domain) :
+--     toPMF (query t) = PMF.uniformOfFintype (spec.Range t) := by simp [toPMF_def]
 
 -- section finSupport
 
@@ -87,7 +87,7 @@ protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
 -- lemma finSupport_def (oa : OracleComp spec α) : finSupport oa =
 --     OracleComp.construct (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) oa := rfl
 
--- @[simp] lemma finSupport_query (t : spec.domain) :
+-- @[simp] lemma finSupport_query (t : spec.Domain) :
 --     finSupport (query t) = Finset.univ := by simp [finSupport_def]
 
 -- end finSupport
@@ -97,32 +97,32 @@ protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
 -- section lift
 
 -- @[simp] lemma support_lift (q : spec α) :
---     support (m := OracleComp spec) (PFunctor.FreeM.lift q) = Set.range q.2 := by
+--     support (m := OracleComp spec) (PFunctor.FreeM.lift q) = Set.Range q.2 := by
 --   simp [support_def, SetM.run]
 
--- @[simp] lemma support_liftA (t : spec.domain) :
+-- @[simp] lemma support_liftA (t : spec.Domain) :
 --     support (m := OracleComp spec) (PFunctor.FreeM.liftA t) = Set.univ := by
 --   simp [PFunctor.FreeM.liftA, support_def, SetM.run]
 --   exact Set.iUnion_of_singleton (spec.B t)
 
 -- lemma support_liftM (q : spec α) :
---     support (liftM q : OracleComp spec α) = Set.range q.2 := by simp
+--     support (liftM q : OracleComp spec α) = Set.Range q.2 := by simp
 
 -- variable [spec.Fintype] [spec.Inhabited]
 
 -- @[simp] lemma evalDist_lift (q : spec α) :
 --     evalDist (m := OracleComp spec) (PFunctor.FreeM.lift q) =
---       q.2 <$> OptionT.mk (some <$> PMF.uniformOfFintype (spec.range q.1)) := by
+--       q.2 <$> OptionT.mk (some <$> PMF.uniformOfFintype (spec.Range q.1)) := by
 --   simp [evalDist_def]
 
--- @[simp] lemma evalDist_liftA (t : spec.domain) :
+-- @[simp] lemma evalDist_liftA (t : spec.Domain) :
 --     evalDist (m := OracleComp spec) (PFunctor.FreeM.liftA t) =
---       OptionT.mk (some <$> PMF.uniformOfFintype (spec.range t)) := by
+--       OptionT.mk (some <$> PMF.uniformOfFintype (spec.Range t)) := by
 --   simp [evalDist_def]
 
 -- lemma evalDist_liftM (q : spec α) :
 --     evalDist (liftM q : OracleComp spec α) =
---       q.2 <$> OptionT.mk (some <$> PMF.uniformOfFintype (spec.range q.1)) := by simp
+--       q.2 <$> OptionT.mk (some <$> PMF.uniformOfFintype (spec.Range q.1)) := by simp
 
 -- end lift
 
@@ -139,9 +139,9 @@ protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
 -- end uniform
 
 -- lemma evalDist_query_bind [spec.Fintype] [spec.Inhabited]
---     (t : spec.domain) (ou : spec.range t → OracleComp spec α) :
+--     (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
 --     evalDist ((query t : OracleComp spec _) >>= ou) =
---       (OptionT.lift (PMF.uniformOfFintype (spec.range t))) >>= (evalDist ∘ ou) := by
+--       (OptionT.lift (PMF.uniformOfFintype (spec.Range t))) >>= (evalDist ∘ ou) := by
 --   rw [evalDist_bind, evalDist_query]
 --   rfl
 
@@ -547,26 +547,26 @@ end support
 
 -- section query
 
--- variable (i : ι) (t : spec.domain i)
+-- variable (i : ι) (t : spec.Domain i)
 
 -- @[simp]
 -- lemma probOutput_liftM [Fintype α] (q : OracleQuery spec α) (u : α) :
 --     [= u | (q : OracleComp spec α)] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
---   have : Inhabited α := q.rangeInhabited
+--   have : Inhabited α := q.RangeInhabited
 --   simp [probOutput, PMF.monad_map_eq_map, OptionT.lift]
 --   refine (tsum_eq_single u ?_).trans ?_
 --   · simp [not_imp_not]
 --   · simp only [↓reduceIte, inv_inj, Nat.cast_inj]
 
--- lemma probOutput_query (u : spec.range i) :
---     [= u | (query i t : OracleComp spec _)] = (Fintype.card (spec.range i) : ℝ≥0∞)⁻¹ := by
+-- lemma probOutput_query (u : spec.Range i) :
+--     [= u | (query i t : OracleComp spec _)] = (Fintype.card (spec.Range i) : ℝ≥0∞)⁻¹ := by
 --   rw [probOutput_liftM]
 
 -- @[simp]
 -- lemma probFailure_liftM (q : OracleQuery spec α) :
 --     [⊥ | (q : OracleComp spec _)] = 0 := by
---   have : Fintype α := q.rangeFintype
---   have : Inhabited α := q.rangeInhabited
+--   have : Fintype α := q.RangeFintype
+--   have : Inhabited α := q.RangeInhabited
 --   simp only [probFailure, evalDist_liftM]
 --   erw [PMF.bind_apply]
 --   simp only [PMF.uniformOfFintype_apply, ENNReal.tsum_eq_zero, mul_eq_zero, ENNReal.inv_eq_zero,
@@ -584,9 +584,9 @@ end support
 --       (Finset.univ.filter p).card * (↑(Fintype.card α))⁻¹ := by
 --   simp [probEvent_eq_sum_fintype_ite]
 
--- lemma probEvent_query_eq_mul_inv (p : spec.range i → Prop) [DecidablePred p] :
+-- lemma probEvent_query_eq_mul_inv (p : spec.Range i → Prop) [DecidablePred p] :
 --     [p | (query i t : OracleComp spec _)] =
---       (Finset.univ.filter p).card * (↑(Fintype.card (spec.range i)))⁻¹ := by
+--       (Finset.univ.filter p).card * (↑(Fintype.card (spec.Range i)))⁻¹ := by
 --   rw [probEvent_liftM_eq_mul_inv]
 
 -- lemma probEvent_liftM_eq_inv_mul [Fintype α] (q : OracleQuery spec α)
@@ -594,9 +594,9 @@ end support
 --       (↑(Fintype.card α))⁻¹ * (Finset.univ.filter p).card := by
 --   rw [probEvent_liftM_eq_mul_inv, mul_comm]
 
--- lemma probEvent_query_eq_inv_mul [spec.DecidableEq] (p : spec.range i → Prop) [DecidablePred p] :
+-- lemma probEvent_query_eq_inv_mul [spec.DecidableEq] (p : spec.Range i → Prop) [DecidablePred p] :
 --     [p | (query i t : OracleComp spec _)] =
---       (↑(Fintype.card (spec.range i)))⁻¹ * (Finset.univ.filter p).card := by
+--       (↑(Fintype.card (spec.Range i)))⁻¹ * (Finset.univ.filter p).card := by
 --   rw [probEvent_query_eq_mul_inv, mul_comm]
 
 -- lemma probEvent_liftM_eq_div [Fintype α] (q : OracleQuery spec α)
@@ -604,9 +604,9 @@ end support
 --       (Finset.univ.filter p).card / (Fintype.card α) := by
 --   rw [div_eq_mul_inv, probEvent_liftM_eq_mul_inv]
 
--- lemma probEvent_query_eq_div [spec.DecidableEq] (p : spec.range i → Prop) [DecidablePred p] :
+-- lemma probEvent_query_eq_div [spec.DecidableEq] (p : spec.Range i → Prop) [DecidablePred p] :
 --     [p | (query i t : OracleComp spec _)] =
---       (Finset.univ.filter p).card / (Fintype.card (spec.range i)) := by
+--       (Finset.univ.filter p).card / (Fintype.card (spec.Range i)) := by
 --   rw [probEvent_liftM_eq_div]
 
 -- end query
@@ -789,7 +789,7 @@ end support
 
 -- @[simp]
 -- lemma probOutput_uniformFin (x : Fin (n + 1)) : [= x | $[0..n]] = ((n : ℝ≥0∞) + 1)⁻¹ := by
---   simp [uniformFin, probOutput_query (spec := unifSpec), OracleSpec.range]
+--   simp [uniformFin, probOutput_query (spec := unifSpec), OracleSpec.Range]
 
 -- @[simp]
 -- lemma probFailure_uniformFin : [⊥ | $[0..n]] = 0 := probFailure_query _ _
@@ -857,7 +857,7 @@ end support
 -- lemma evalDist_simulate'_eq_evalDist {σ α : Type u}
 --     (so : QueryImpl spec (StateT σ (OracleComp spec)))
 --     (h : ∀ i t s, (evalDist ((so.impl (query i t)).run' s)) =
---       OptionT.lift (PMF.uniformOfFintype (spec.range i)))
+--       OptionT.lift (PMF.uniformOfFintype (spec.Range i)))
 --     (s : σ) (oa : OracleComp spec α) : evalDist ((simulateQ so oa).run' s) = evalDist oa := by
 --   revert s
 --   induction oa using OracleComp.inductionOn with

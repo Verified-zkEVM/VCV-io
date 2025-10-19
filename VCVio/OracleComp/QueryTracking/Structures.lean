@@ -23,7 +23,7 @@ variable {ι : Type u} {spec : OracleSpec}
 /-- Type to represent a cache of queries to oracles in `spec`.
 Defined to be a function from (indexed) inputs to an optional output. -/
 def QueryCache (spec : OracleSpec.{u,v}) : Type (max u v) :=
-  (t : spec.domain) → Option (spec.range t)
+  (t : spec.Domain) → Option (spec.Range t)
 
 namespace QueryCache
 
@@ -32,7 +32,7 @@ instance : EmptyCollection (QueryCache spec) := ⟨fun _ => none⟩
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
 /-- Add a index + input pair to the cache by updating the function (wrapper around `Function.update`) -/
-def cacheQuery (t : spec.domain) (u : spec.range t) : QueryCache spec :=
+def cacheQuery (t : spec.Domain) (u : spec.Range t) : QueryCache spec :=
   Function.update cache t u
 
 end QueryCache
@@ -76,10 +76,10 @@ lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
 end QueryCount
 
 /-- Log of queries represented by a list of dependent product's tagging the oracle's index.
-`(t : spec.domain) × (spec.range t)` is slightly more restricted as it doesn't
+`(t : spec.Domain) × (spec.Range t)` is slightly more restricted as it doesn't
 keep track of query ordering between different oracles. -/
 @[reducible] def QueryLog (spec : OracleSpec.{u,v}) : Type (max u v) :=
-  List ((t : spec.domain) × spec.range t)
+  List ((t : spec.Domain) × spec.Range t)
 
 namespace QueryLog
 
@@ -99,11 +99,11 @@ lemma monoid_mul_def (qc qc' : QueryLog spec) :
 @[simp] lemma monoid_one_def : (1 : QueryLog spec) = List.nil := rfl
 
 /-- Query log with a single entry. -/
-def singleton (t : spec.domain) (u : spec.range t) : QueryLog spec := [⟨t, u⟩]
+def singleton (t : spec.Domain) (u : spec.Range t) : QueryLog spec := [⟨t, u⟩]
 
 /-- Update a query log by adding a new element to the appropriate list.
 Note that this requires decidable equality on the indexing set. -/
-def logQuery (log : QueryLog spec) (t : spec.domain) (u : spec.range t) : QueryLog spec :=
+def logQuery (log : QueryLog spec) (t : spec.Domain) (u : spec.Range t) : QueryLog spec :=
   log ++ singleton t u
 
 instance [spec.DecidableEq] : DecidableEq (QueryLog spec) :=
@@ -114,20 +114,20 @@ section getQ
 -- variable [DecidableEq ι]
 
 /-- Get all the queries with inputs satisfying `p` -/
-def getQ (log : QueryLog spec) (p : spec.domain → Prop) [DecidablePred p] :
-    List ((t : spec.domain) × spec.range t) :=
+def getQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
+    List ((t : spec.Domain) × spec.Range t) :=
   List.foldr (fun ⟨t, u⟩ xs => if p t then ⟨t, u⟩ :: xs else xs) [] log
 
 -- -- NOTE: should this simp? feels bad to simp with ▸ and pattern matching in target
 -- lemma getQ_singleton {α} (q : OracleQuery spec α) (u : α)
---     (p : spec.domain → Prop) [DecidablePred p] :
+--     (p : spec.Domain → Prop) [DecidablePred p] :
 --     getQ (singleton q u) p = match q with
 --       | query j t => if h : j = i then [h ▸ (t, u)] else [] := by
 --   cases q with | query i t => ?_
 --   simp [getQ, singleton]
 
 -- @[simp]
--- lemma getQ_singleton_self (i : ι) (t : spec.domain i) (u : spec.range i) :
+-- lemma getQ_singleton_self (i : ι) (t : spec.Domain i) (u : spec.Range i) :
 --     getQ (singleton (query i t) u) i = [(t, u)] := by simp [getQ_singleton]
 
 -- lemma getQ_singleton_of_ne {α} {q : OracleQuery spec α} {u : α} {i : ι}
@@ -135,7 +135,7 @@ def getQ (log : QueryLog spec) (p : spec.domain → Prop) [DecidablePred p] :
 --   cases q with | query i t => simpa [getQ_singleton] using h
 
 -- @[simp]
--- lemma getQ_cons (log : QueryLog spec) (q : (i : ι) × spec.domain i × spec.range i) (i : ι) :
+-- lemma getQ_cons (log : QueryLog spec) (q : (i : ι) × spec.Domain i × spec.Range i) (i : ι) :
 --     getQ (q :: log) i =
 --       if h : q.1 = i then h ▸ (q.2.1, q.2.2) :: getQ log i else getQ log i := by
 --   simp [getQ]
@@ -168,7 +168,7 @@ section countQ
 -- variable [DecidableEq ι]
 
 /-- Count the number of queries with inputs satisfying `p`. -/
-def countQ (log : QueryLog spec) (p : spec.domain → Prop) [DecidablePred p] : ℕ :=
+def countQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] : ℕ :=
   (log.getQ p).length
 
 -- @[simp]
@@ -178,7 +178,7 @@ def countQ (log : QueryLog spec) (p : spec.domain → Prop) [DecidablePred p] : 
 --   simp only [countQ, getQ_singleton, OracleQuery.index_query]
 --   split_ifs with hi <;> rfl
 
--- lemma countQ_singleton_self (i : ι) (t : spec.domain i) (u : spec.range i) :
+-- lemma countQ_singleton_self (i : ι) (t : spec.Domain i) (u : spec.Range i) :
 --     countQ (singleton (query i t) u) i = 1 := by simp
 
 -- @[simp]
@@ -194,7 +194,7 @@ end countQ
 
 /-- Check if an element was ever queried in a log of queries.
 Relies on decidable equality of the domain types of oracles. -/
-def wasQueried [spec.DecidableEq] (log : QueryLog spec) (t : spec.domain) : Bool :=
+def wasQueried [spec.DecidableEq] (log : QueryLog spec) (t : spec.Domain) : Bool :=
   log.getQ (· = t) ≠ []
 
 section prod
@@ -305,7 +305,7 @@ lemma takeAtIndex_addValues (seed : QuerySeed spec ι) {i : ι} (n : ℕ)
   · split_ifs with _ <;> simp [hj]
 
 -- @[simp]
--- lemma addValues_takeAtIndex (seed : QuerySeed spec) {i : ι} (xs : List (spec.range i)) (n : ℕ) :
+-- lemma addValues_takeAtIndex (seed : QuerySeed spec) {i : ι} (xs : List (spec.Range i)) (n : ℕ) :
 --     (seed.takeAtIndex i n).addValues xs =
 
 @[simp]

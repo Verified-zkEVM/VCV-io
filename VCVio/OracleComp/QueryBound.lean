@@ -95,11 +95,11 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 --     IsQueryBound (q : OracleComp spec α) qb ↔ 0 < qb q.index := by
 --   simp [isQueryBound_def]
 
--- lemma isQueryBound_query (i : ι) (t : spec.domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
+-- lemma isQueryBound_query (i : ι) (t : spec.Domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
 --     IsQueryBound (query i t : OracleComp spec _) qb :=
 --   (isQueryBound_query_iff i t qb).2 hqb
 
--- lemma update_isQueryBound_query (i : ι) (t : spec.domain i) (f : ι → ℕ) (n : ℕ) :
+-- lemma update_isQueryBound_query (i : ι) (t : spec.Domain i) (f : ι → ℕ) (n : ℕ) :
 --     IsQueryBound (query i t : OracleComp spec _) (Function.update f i (n + 1)) :=
 --   isQueryBound_query i t (by simp)
 
@@ -149,8 +149,8 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 --   --     · exact h
 --   --     · refine le_trans le_self_add h
 
--- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.domain i)
--- --     (oa : spec.range i → OracleComp spec α) (qb : ι → ℕ) :
+-- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.Domain i)
+-- --     (oa : spec.Range i → OracleComp spec α) (qb : ι → ℕ) :
 -- --     IsQueryBound (query i t >>= oa) qb ↔
 -- --       qb i ≠ 0 ∧ ∀ u, IsQueryBound (oa u) (Function.update qb i (qb i - 1)) := by
 -- --   refine ⟨λ h ↦ ?_, λ h ↦ ?_⟩
@@ -171,11 +171,11 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 --     IsQueryBound (q : OracleComp spec α) qb ↔ 0 < qb q.index := by
 --   simp [isQueryBound_def, liftM_query_eq_liftM_liftM]
 
--- -- lemma isQueryBound_query (i : ι) (t : spec.domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
+-- -- lemma isQueryBound_query (i : ι) (t : spec.Domain i) {qb : ι → ℕ} (hqb : qb i ≠ 0) :
 -- --     IsQueryBound (query i t : OracleComp spec _) qb :=
 -- --   (isQueryBound_query_iff i t qb).2 hqb
 
--- -- lemma update_isQueryBound_query (i : ι) (t : spec.domain i) (f : ι → ℕ) (n : ℕ) :
+-- -- lemma update_isQueryBound_query (i : ι) (t : spec.Domain i) (f : ι → ℕ) (n : ℕ) :
 -- --     IsQueryBound (query i t : OracleComp spec _) (Function.update f i (n + 1)) :=
 -- --   isQueryBound_query i t (by simp)
 
@@ -225,8 +225,8 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 -- --   --     · exact h
 -- --   --     · refine le_trans le_self_add h
 
--- -- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.domain i)
--- -- --     (oa : spec.range i → OracleComp spec α) (qb : ι → ℕ) :
+-- -- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.Domain i)
+-- -- --     (oa : spec.Range i → OracleComp spec α) (qb : ι → ℕ) :
 -- -- --     IsQueryBound (query i t >>= oa) qb ↔
 -- -- --       qb i ≠ 0 ∧ ∀ u, IsQueryBound (oa u) (Function.update qb i (qb i - 1)) := by
 -- -- --   refine ⟨λ h ↦ ?_, λ h ↦ ?_⟩
@@ -263,14 +263,14 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 -- -- --     minimalQueryBound (pure x : OracleComp spec α) = 0 := rfl
 
 -- -- -- @[simp]
--- -- -- lemma minimalQueryBound_query_bind (i : ι) (t : spec.domain i)
--- -- --     (oa : spec.range i → OracleComp spec α) :
+-- -- -- lemma minimalQueryBound_query_bind (i : ι) (t : spec.Domain i)
+-- -- --     (oa : spec.Range i → OracleComp spec α) :
 -- -- --     minimalQueryBound (query i t >>= oa) = λ j ↦ (if j = i then 1 else 0) +
 -- -- --       (Finset.max' (Finset.univ.image <| λ u ↦ minimalQueryBound (oa u) j)
 -- -- --         (Finset.image_nonempty.2 Finset.univ_nonempty)) := rfl
 
 -- -- -- @[simp]
--- -- -- lemma minimalQueryBound_query (i : ι) (t : spec.domain i) :
+-- -- -- lemma minimalQueryBound_query (i : ι) (t : spec.Domain i) :
 -- -- --     minimalQueryBound (query i t) = Function.update (0 : ι → ℕ) i 1 := by
 -- -- --   rw [query_def, minimalQueryBound]
 -- -- --   refine funext (λ j ↦ ?_)
@@ -381,8 +381,8 @@ lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : Orac
 
 -- -- end minimalQueryBound
 
--- -- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.domain i)
--- -- --     (oa : spec.range i → OracleComp spec α) (qc : ι → ℕ) :
+-- -- -- lemma isQueryBound_query_bind_iff (i : ι) (t : spec.Domain i)
+-- -- --     (oa : spec.Range i → OracleComp spec α) (qc : ι → ℕ) :
 -- -- --     IsQueryBound (query i t >>= oa) qc ↔ qc i ≠ 0 ∧
 -- -- --       ∀ u, IsQueryBound (oa u) (Function.update qc i (qc i - 1)) := by
 -- -- --   refine ⟨λ h ↦ ⟨?_, ?_⟩, λ h ↦ ?_⟩

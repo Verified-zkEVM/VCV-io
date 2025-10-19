@@ -25,7 +25,7 @@
 --   keygen := do
 --     let A ←$ᵗ Matrix (Fin n) (Fin m) (Fin p)
 --     let s ←$ᵗ Vector (Fin p) n
---     let e ← (Vector.range m).mapM (fun _ ↦ errSampKG)
+--     let e ← (Vector.Range m).mapM (fun _ ↦ errSampKG)
 --     return ((A, Vector.ofFn (Matrix.vecMul s.get A) + e), s)
 --   encrypt := λ (A, y) msg ↦ do
 --     let r2 ←$ᵗ Vector (Fin 2) m

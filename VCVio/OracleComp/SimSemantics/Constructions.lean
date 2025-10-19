@@ -96,16 +96,16 @@ variable {spec : OracleSpec} {α β γ : Type u}
 /-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
 The resulting computation is still identical under `evalDist`.
 The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
-def uniformSampleImpl [∀ i, SampleableType (spec.range i)] :
-    QueryImpl spec ProbComp := fun t => $ᵗ spec.range t
+def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
+    QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
 
 -- namespace unifOracle
 
--- variable [∀ i, SampleableType (spec.range i)] {α : Type}
+-- variable [∀ i, SampleableType (spec.Range i)] {α : Type}
 
 -- @[simp]
 -- lemma apply_eq (q : OracleQuery spec α) :
---     unifOracle.impl q = match q with | query i t => $ᵗ spec.range i :=
+--     unifOracle.impl q = match q with | query i t => $ᵗ spec.Range i :=
 --   match q with | query i t => rfl
 
 -- @[simp]

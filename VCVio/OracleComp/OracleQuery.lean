@@ -20,7 +20,7 @@ import ToMathlib.PFunctor.Basic
 -- with access to any of the oracles specified by `spec : OracleSpec`.
 -- Returning a value `x` corresponds to the computation `pure' α x`.
 -- The computation `queryBind' i t α ou` represents querying the oracle corresponding to index `i`
--- on input `t`, getting a result `u : spec.range i`, and then running `ou u`.
+-- on input `t`, getting a result `u : spec.Range i`, and then running `ou u`.
 -- We also allow for a `failure'` operation for quitting out.
 -- These operations induce `Monad` and `Alternative` instances on `OracleComp spec`.
 
@@ -52,7 +52,7 @@ import ToMathlib.PFunctor.Basic
 
 -- variable {ι : Type u} {spec : OracleSpec} {α β : Type v}
 
--- def defaultOutput [∀ i, Inhabited (spec.range i)] : (q : OracleQuery spec α) → α
+-- def defaultOutput [∀ i, Inhabited (spec.Range i)] : (q : OracleQuery spec α) → α
 --   | query t => default
 
 -- def input : (q : OracleQuery spec α) → spec.A | query t => t
@@ -63,7 +63,7 @@ import ToMathlib.PFunctor.Basic
 -- lemma range_index : (q : OracleQuery spec α) → spec.B q.input = α | query t => rfl
 
 -- lemma eq_query_index_input : (q : OracleQuery spec α) →
---     q = q.range_index ▸ OracleQuery.query q.input | query t => rfl
+--     q = q.Range_index ▸ OracleQuery.query q.input | query t => rfl
 
 -- def rangeDecidableEq [spec.DecidableEq] : OracleQuery spec α → DecidableEq α
 --   | query t => inferInstance
@@ -96,8 +96,8 @@ import ToMathlib.PFunctor.Basic
 
 -- -- /-- `PFunctor` corresponding to querying from oracles in `spec`. -/
 -- -- def toPFunctor {ι : Type u} (spec : OracleSpec.{u,v}) : PFunctor where
--- --   A := (i : ι) × spec.domain i
--- --   B := fun q => spec.range q.1
+-- --   A := (i : ι) × spec.Domain i
+-- --   B := fun q => spec.Range q.1
 
 -- def OracleQuery.lift_toPFunctor (spec : OracleSpec.{u,v})
 --     {α : Type v} (q : OracleQuery spec α) : spec α :=

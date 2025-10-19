@@ -21,7 +21,7 @@ variable {α β γ : Type u}
 e.g. using uniform selection oracles with a query cache to simulate a random oracle.
 `simulateQ` gives a method for applying a simulation oracle to a specific computation. -/
 @[reducible] def QueryImpl (spec : OracleSpec) (m : Type u → Type v) :=
-  (x : spec.domain) → m (spec.range x)
+  (x : spec.Domain) → m (spec.Range x)
 
 namespace QueryImpl
 
@@ -31,15 +31,15 @@ instance [spec.Inhabited] [Pure m] : Inhabited (QueryImpl spec m) := ⟨fun _ =>
 
 /-- Two query implementations are the same if they are the same on all query inputs. -/
 @[ext] lemma ext {so so' : QueryImpl spec m}
-    (h : ∀ x : spec.domain, so x = so' x) : so = so' := funext h
+    (h : ∀ x : spec.Domain, so x = so' x) : so = so' := funext h
 
 /-- Gadget for auto-adding a lift to the end of a query implementation. -/
 def liftTarget (n : Type u → Type*) [MonadLiftT m n]
     (impl : QueryImpl spec m) : QueryImpl spec n :=
-  fun t : spec.domain => liftM (impl t)
+  fun t : spec.Domain => liftM (impl t)
 
 @[simp] lemma liftTarget_apply (n : Type u → Type*) [MonadLiftT m n]
-    (impl : QueryImpl spec m) (t : spec.domain) : impl.liftTarget n t = liftM (impl t) := rfl
+    (impl : QueryImpl spec m) (t : spec.Domain) : impl.liftTarget n t = liftM (impl t) := rfl
 
 @[simp] lemma liftTarget_self (impl : QueryImpl spec m) :
     impl.liftTarget m = impl := rfl
@@ -47,18 +47,18 @@ def liftTarget (n : Type u → Type*) [MonadLiftT m n]
 /-- Given that queries in `spec` lift to the monad `m` we get an implementation via lifting. -/
 def ofLift (spec : OracleSpec) (m : Type u → Type v)
     [MonadLiftT (OracleQuery spec) m] : QueryImpl spec m :=
-  fun t : spec.domain => liftM (query t)
+  fun t : spec.Domain => liftM (query t)
 
 @[simp] lemma ofLift_apply (spec : OracleSpec) (m : Type u → Type v)
-    [MonadLiftT (OracleQuery spec) m] (t : spec.domain) : ofLift spec m t = liftM (query t) := rfl
+    [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) : ofLift spec m t = liftM (query t) := rfl
 
 /-- View a function from oracle inputs to outputs as an implementation in the `Id` monad.
 Can be used to run a computation to get a specific value. -/
-def ofFn (spec : OracleSpec) (f : (t : spec.domain) → spec.range t) :
+def ofFn (spec : OracleSpec) (f : (t : spec.Domain) → spec.Range t) :
     QueryImpl spec Id := f
 
 /-- Version of `ofFn` that allows queries to fail to return a value. -/
-def ofFn? (spec : OracleSpec) (f : (t : spec.domain) → Option (spec.range t)) :
+def ofFn? (spec : OracleSpec) (f : (t : spec.Domain) → Option (spec.Range t)) :
     QueryImpl spec Option := f
 
 end QueryImpl
@@ -90,11 +90,11 @@ variable {spec : OracleSpec} {r m n : Type u → Type*}
     [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
     [MonadLiftT r n] [HasSimulateQ spec r m n] (impl : QueryImpl spec r)
 
-@[simp] lemma simulateQ_query [LawfulMonad n] (t : spec.domain) :
-    simulateQ impl (query t : m (spec.range t)) = liftM (impl t) := by
+@[simp] lemma simulateQ_query [LawfulMonad n] (t : spec.Domain) :
+    simulateQ impl (query t : m (spec.Range t)) = liftM (impl t) := by
   simp [query_def, HasSimulateQ.simulateQ_liftM (m := m)]
 
-@[simp] lemma simulateQ_query_bind [LawfulMonad n] (t : spec.domain) (ou : spec.range t → m β) :
+@[simp] lemma simulateQ_query_bind [LawfulMonad n] (t : spec.Domain) (ou : spec.Range t → m β) :
     simulateQ impl ((query t : m _) >>= ou) =
       liftM (impl t) >>= fun u => simulateQ impl (ou u) := by aesop
 

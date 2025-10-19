@@ -33,7 +33,7 @@ def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache
         let u ← so t
         modifyGet fun cache => (u, cache.cacheQuery t u)
 
-@[simp] lemma withCaching_apply (so : QueryImpl spec m) (t : spec.domain) :
+@[simp] lemma withCaching_apply (so : QueryImpl spec m) (t : spec.Domain) :
     so.withCaching t = (do match (← get) t with
     | Option.some u => return u
     | Option.none =>
@@ -43,7 +43,7 @@ def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache
 end QueryImpl
 
 @[inline, reducible] def randomOracle
-    [∀ t : spec.domain, SampleableType (spec.range t)] :
+    [∀ t : spec.Domain, SampleableType (spec.Range t)] :
     QueryImpl spec (StateT spec.QueryCache ProbComp) :=
   uniformSampleImpl.withCaching
 
@@ -54,7 +54,7 @@ end QueryImpl
 
 namespace cachingOracle
 
-lemma apply_eq (t : spec.domain) : cachingOracle t =
+lemma apply_eq (t : spec.Domain) : cachingOracle t =
   (do match (← get) t with
     | Option.some u => return u
     | Option.none =>
@@ -67,19 +67,19 @@ end cachingOracle
 -- variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
 
 -- /-- Random Oracle implemented as a uniform selection oracle with caching -/
--- @[inline, reducible] def randomOracle [(i : spec.domain) → SampleableType (spec.range i)] :
+-- @[inline, reducible] def randomOracle [(i : spec.Domain) → SampleableType (spec.Range i)] :
 --     QueryImpl spec (StateT spec.QueryCache (OracleComp unifSpec)) :=
 --   unifOracle.withCaching
 
 -- namespace randOracle
 
--- variable [(i : ι) → SampleableType (spec.range i)]
+-- variable [(i : ι) → SampleableType (spec.Range i)]
 
 -- lemma apply_eq {α} (q : OracleQuery spec α) : randomOracle.impl q =
 --     match q with | query i t => (do match (← get) i t with
 --       | Option.some u => return u
 --       | Option.none =>
---           let u ←$ᵗ (spec.range i)
+--           let u ←$ᵗ (spec.Range i)
 --           modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
 
 -- end randOracle

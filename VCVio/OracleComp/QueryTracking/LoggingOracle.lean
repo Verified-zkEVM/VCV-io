@@ -28,7 +28,7 @@ def withLogging (so : QueryImpl spec m) :
   tell (QueryLog.singleton t u)
   return u
 
-@[simp] lemma withLogging_apply (so : QueryImpl spec m) (t : spec.domain) :
+@[simp] lemma withLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
     so.withLogging t = do let x ← liftM (so t); tell (QueryLog.singleton t x); return x := rfl
 
 end QueryImpl

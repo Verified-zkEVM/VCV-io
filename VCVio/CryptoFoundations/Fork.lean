@@ -108,7 +108,7 @@ import VCVio.OracleComp.Coercions.Append
 -- namespace OracleComp
 
 -- variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
---   [∀ i, SampleableType (spec.range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
+--   [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 --   {α β γ : Type}
 
 -- structure forkInput (spec : OracleSpec ι) (α : Type) where
@@ -128,7 +128,7 @@ import VCVio.OracleComp.Coercions.Append
 --   let seed ← generateSeed spec qb js
 --   let x₁ ← (simulateQ seededOracle main).run seed
 --   let s : Fin (qb i + 1) ← (cf x₁).getM
---   let u ←$ᵗ spec.range i -- Choose new output for query
+--   let u ←$ᵗ spec.Range i -- Choose new output for query
 --   guard ((seed i)[s + 1]? ≠ some u) -- Didn't pick the same output
 --   let seed' := (seed.takeAtIndex i s).addValue i u
 --   let x₂ ← (simulateQ seededOracle main).run seed'
@@ -170,10 +170,10 @@ import VCVio.OracleComp.Coercions.Append
 --   sorry
 
 -- lemma le_probOutput_fork (s : Fin (qb i + 1)) :
---     let h : ℝ≥0∞ := ↑(Fintype.card (spec.range i))
+--     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
 --     [= s | cf <$> main] ^ 2 - [= s | cf <$> main] / h
 --       ≤ [= (s, s) | Prod.map cf cf <$> fork main qb js i cf] :=
---   let h : ℝ≥0∞ := ↑(Fintype.card (spec.range i))
+--   let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
 --   have : DecidableEq α := Classical.decEq α -- :(
 --   have : DecidableEq spec.QuerySeed := Classical.decEq _
 --   calc [= (s, s) | Prod.map cf cf <$> fork main qb js i cf]
@@ -187,7 +187,7 @@ import VCVio.OracleComp.Coercions.Append
 --     _ = [= (s, s) | do
 --           let seed ← liftM (generateSeed spec qb js)
 --           let x₁ ← (simulateQ seededOracle main).run seed
---           let u ←$ᵗ spec.range i
+--           let u ←$ᵗ spec.Range i
 --           guard ((seed i)[s + 1]? ≠ u)
 --           let seed' := (seed.takeAtIndex i s).addValue i u
 --           let x₂ ← (simulateQ seededOracle main).run seed'
@@ -213,14 +213,14 @@ import VCVio.OracleComp.Coercions.Append
 --     _ ≥ [= (s, s) | do
 --           let seed ← liftM (generateSeed spec qb js)
 --           let x₁ ← (simulateQ seededOracle main).run seed
---           let u ←$ᵗ spec.range i
+--           let u ←$ᵗ spec.Range i
 --           let seed' := (seed.takeAtIndex i s).addValue i u
 --           let x₂ ← (simulateQ seededOracle main).run seed'
 --           return (cf x₁, cf x₂)] -
 --         [= (s, s) | do
 --           let seed ← liftM (generateSeed spec qb js)
 --           let x₁ ← (simulateQ seededOracle main).run seed
---           let u ←$ᵗ spec.range i
+--           let u ←$ᵗ spec.Range i
 --           guard ((seed i)[s + 1]? = u)
 --           let seed' := (seed.takeAtIndex i s).addValue i u
 --           let x₂ ← (simulateQ seededOracle main).run seed'
@@ -241,14 +241,14 @@ import VCVio.OracleComp.Coercions.Append
 --     _ ≥ [= (s, s) | do
 --           let seed ← liftM (generateSeed spec qb js)
 --           let x₁ ← (simulateQ seededOracle main).run seed
---           let u ←$ᵗ spec.range i
+--           let u ←$ᵗ spec.Range i
 --           let seed' := (seed.takeAtIndex i s).addValue i u
 --           let x₂ ← (simulateQ seededOracle main).run seed'
 --           return (cf x₁, cf x₂)] -
 --         [= s | do
 --           let seed ← liftM (generateSeed spec qb js)
 --           let x₁ ← (simulateQ seededOracle main).run seed
---           let u ←$ᵗ spec.range i
+--           let u ←$ᵗ spec.Range i
 --           guard ((seed i)[s + 1]? = u)
 --           return (cf x₁)] := by {
 --         refine tsub_le_tsub le_rfl ?_
@@ -273,7 +273,7 @@ import VCVio.OracleComp.Coercions.Append
 --         · sorry
 --         · refine probOutput_bind_congr_div_const fun seed hseed => ?_
 --           have : (↑(s + 1) : ℕ) < (seed i).length := by sorry
---           let u : spec.range i := ((seed i)[↑(s + 1)])
+--           let u : spec.Range i := ((seed i)[↑(s + 1)])
 --           simp [probOutput_bind_eq_tsum, probOutput_map_eq_tsum, div_eq_mul_inv,
 --             ← ENNReal.tsum_mul_right, ← ENNReal.tsum_mul_left]
 --           refine tsum_congr fun x => ?_
@@ -347,11 +347,11 @@ import VCVio.OracleComp.Coercions.Append
 
 -- theorem probFailure_fork_le :
 --     let acc : ℝ≥0∞ := ∑ s, [= some s | cf <$> main]
---     let h : ℝ≥0∞ := Fintype.card (spec.range i)
+--     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
 --     let q := qb i + 1
 --     [⊥ | fork main qb js i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
 --   let acc : ℝ≥0∞ := ∑ s, [= some s | cf <$> main]
---   let h : ℝ≥0∞ := Fintype.card (spec.range i)
+--   let h : ℝ≥0∞ := Fintype.card (spec.Range i)
 --   let q := qb i + 1
 --   calc [⊥ | fork main qb js i cf]
 --     _ = 1 - ∑ s, [= (some s, some s) | Prod.map cf cf <$> fork main qb js i cf] := by

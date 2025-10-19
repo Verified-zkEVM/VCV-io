@@ -24,45 +24,45 @@ which
 
 -- variable {ι : Type} [DecidableEq ι]
 
--- def generateSeedT (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- def generateSeedT (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 --     (qc : ι → ℕ) (activeOracles : List ι) :
 --     StateT (QuerySeed spec) ProbComp Unit :=
 --   for j in activeOracles do
---     modify (QuerySeed.addValues (← ($ᵗ spec.range j).replicate (qc j)))
+--     modify (QuerySeed.addValues (← ($ᵗ spec.Range j).replicate (qc j)))
 
 -- /-- Generate a `QuerySeed` uniformly at random for some set of oracles `spec : OracleSpec ι`,
 -- with `qc i : ℕ` values seeded for each index `i ∈ js`. Note that `js` is allowed
 -- to contain duplicates, but usually wouldn't in practice. -/
--- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 --     (qc : ι → ℕ) (js : List ι) : ProbComp (QuerySeed spec) := do
 --   let mut seed : QuerySeed spec := ∅
 --   for j in js do
---     seed := seed.addValues (← ($ᵗ spec.range j).replicate (qc j))
+--     seed := seed.addValues (← ($ᵗ spec.Range j).replicate (qc j))
 --   return seed
 
--- def generateSingleSeed (spec : OracleSpec ι) (i : ι) [SampleableType (spec.range i)]
+-- def generateSingleSeed (spec : OracleSpec ι) (i : ι) [SampleableType (spec.Range i)]
 --     (n : ℕ) : ProbComp (QuerySeed spec) :=
---   QuerySeed.ofList <$> ($ᵗ spec.range i).replicate n
+--   QuerySeed.ofList <$> ($ᵗ spec.Range i).replicate n
 
 --   -- Prod.snd <$> (generateSeedT spec qc activeOracles).run ∅
--- -- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- -- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 -- --   (qc : ι → ℕ) (j : ι) (js : List ι)
 
--- -- lemma probOutput_generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- -- lemma probOutput_generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 -- --     (qc : ι → ℕ) (js : List ι) (seed : QuerySeed spec)
 -- --     (h : seed ∈ (generateSeed spec qc js).support) :
 -- --     [= seed | generateSeed spec qc js] =
--- --       1 / (js.map (λ j ↦ (Fintype.card (spec.range j)) ^ qc j)).prod :=
+-- --       1 / (js.map (λ j ↦ (Fintype.card (spec.Range j)) ^ qc j)).prod :=
 -- --   sorry
 
--- -- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- -- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 -- --     (qc : ι → ℕ) (activeOracles : List ι) : ProbComp (QuerySeed spec) :=
 -- --   match activeOracles with
 -- --   | [] => return ∅
 -- --   | j :: js => QuerySeed.addValues <$> generateSeed spec qc js <*>
--- --       (Array.toList <$> Vector.toArray <$> replicate ($ᵗ (spec.range j)) (qc j))
+-- --       (Array.toList <$> Vector.toArray <$> replicate ($ᵗ (spec.Range j)) (qc j))
 
--- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.range i)]
+-- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
 --   (qc : ι → ℕ) (j : ι) (js : List ι)
 
 -- @[simp]
@@ -70,7 +70,7 @@ which
 
 -- @[simp]
 -- lemma generateSeed_cons : generateSeed spec qc (j :: js) =
---     ($ᵗ (spec.range j)).replicate (qc j) >>= λ xs ↦
+--     ($ᵗ (spec.Range j)).replicate (qc j) >>= λ xs ↦
 --       generateSeed spec qc js := by
 --   simp [generateSeed, map_eq_bind_pure_comp,
 --     seq_eq_bind, bind_assoc]
@@ -118,7 +118,7 @@ which
 
 -- lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
 --     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
---     1 / (js.map (λ j ↦ (Fintype.card (spec.range j)) ^ qc j)).prod := by
+--     1 / (js.map (λ j ↦ (Fintype.card (spec.Range j)) ^ qc j)).prod := by
 --   revert seed
 --   induction js using List.reverseRecOn with
 --   | nil => {

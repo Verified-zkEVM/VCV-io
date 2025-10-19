@@ -26,7 +26,7 @@
 -- inductive PolyTimeOC {ι : Type} {spec : OracleSpec} :
 --     {α β : Type} → (α → OracleComp spec β) → Prop
 --   -- If computing the query input is poly-time then so is the query
---   | polyTime_query {α : Type} (i : ι) (f : α → spec.domain)
+--   | polyTime_query {α : Type} (i : ι) (f : α → spec.Domain)
 --       (hf : Σ ea eb, Turing.TM2ComputableInPolyTime ea eb f) :
 --     PolyTimeOC (λ x ↦ (query (f x) : OracleComp spec _))
 --   -- Returning a poly-time value is also poly-time

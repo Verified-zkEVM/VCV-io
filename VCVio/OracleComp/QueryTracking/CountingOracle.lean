@@ -29,7 +29,7 @@ namespace QueryImpl
 variable {m : Type u → Type v} [Monad m]
 
 /-- Count the queries made by the computation using `idx` to categorize them. -/
-def withCounting (so : QueryImpl spec m) (idx : spec.domain → ι) :
+def withCounting (so : QueryImpl spec m) (idx : spec.Domain → ι) :
     QueryImpl spec (WriterT (QueryCount ι) m) :=
   fun t => tell (QueryCount.single (idx t)) *> so t
 
@@ -40,7 +40,7 @@ end QueryImpl
 
 /-- Oracle for counting the number of queries made by a computation. The count is stored as a
 function from oracle indices to counts, to give finer grained information about the count. -/
-def countingOracle (idx : spec.domain → ι) :
+def countingOracle (idx : spec.Domain → ι) :
     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withCounting idx
 
@@ -216,8 +216,8 @@ namespace countingOracle
 -- --     z ∈ (simulate countingOracle qc (pure x : OracleComp spec α)).support ↔ z = (x, qc) := by
 -- --   simp only [simulate_pure, support_pure, Set.mem_singleton_iff]
 
--- -- lemma apply_ne_zero_of_mem_support_simulate_queryBind {i : ι} {t : spec.domain i}
--- --     {oa : spec.range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
+-- -- lemma apply_ne_zero_of_mem_support_simulate_queryBind {i : ι} {t : spec.Domain i}
+-- --     {oa : spec.Range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
 -- --     (hz : z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support) :
 -- --       z.2 i ≠ 0 := by
 -- --   rw [mem_support_simulate_iff, simulate_query_bind] at hz
@@ -232,8 +232,8 @@ namespace countingOracle
 -- --   -- refine Nat.add_pos_right ?_ ?_
 -- --   -- refine Nat.lt_of_succ_le this
 
--- -- lemma exists_mem_support_of_mem_support_simulate_queryBind {i : ι} {t : spec.domain i}
--- --     {oa : spec.range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
+-- -- lemma exists_mem_support_of_mem_support_simulate_queryBind {i : ι} {t : spec.Domain i}
+-- --     {oa : spec.Range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
 -- --     (hz : z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support) :
 -- --     ∃ u, (z.1, Function.update z.2 i (z.2 i - 1)) ∈
 -- --       (simulate countingOracle qc (oa u)).support := by
@@ -285,8 +285,8 @@ namespace countingOracle
 -- --         rwa [pos_iff_ne_zero]
 -- --     · simp [hj]
 
--- -- lemma mem_support_simulate_queryBind_iff (i : ι) (t : spec.domain i)
--- --     (oa : spec.range i → OracleComp spec α) (qc : ι → ℕ) (z : α × (ι → ℕ)) :
+-- -- lemma mem_support_simulate_queryBind_iff (i : ι) (t : spec.Domain i)
+-- --     (oa : spec.Range i → OracleComp spec α) (qc : ι → ℕ) (z : α × (ι → ℕ)) :
 -- --     z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support ↔
 -- --       z.2 i ≠ 0 ∧ ∃ u, (z.1, Function.update z.2 i (z.2 i - 1)) ∈
 -- --         (simulate countingOracle qc (oa u)).support := by

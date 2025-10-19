@@ -29,8 +29,8 @@ section When
 
 /-- Given that oracle outputs are bounded by `possible_outputs`, all query inputs in the
 computation satisfy `Q` and all pure values satisfy `P`. -/
-def allWhen (Q : spec.domain → Prop) (P : {α : Type v} → α → Prop)
-    (possible_outputs : (x : spec.domain) → Set (spec.range x))
+def allWhen (Q : spec.Domain → Prop) (P : {α : Type v} → α → Prop)
+    (possible_outputs : (x : spec.Domain) → Set (spec.Range x))
     (oa : OracleComp spec α) : Prop := by
   induction oa using OracleComp.construct with
   | pure x => exact P x
@@ -38,8 +38,8 @@ def allWhen (Q : spec.domain → Prop) (P : {α : Type v} → α → Prop)
 
 /-- Given that oracle outputs are bounded by `possible_outputs`, some query input in the
 computation satisfies `Q` or some pure value satisfyies `P`. -/
-def someWhen (Q : spec.domain → Prop) (P : {α : Type v} → α → Prop)
-    (possible_outputs : (x : spec.domain) → Set (spec.range x))
+def someWhen (Q : spec.Domain → Prop) (P : {α : Type v} → α → Prop)
+    (possible_outputs : (x : spec.Domain) → Set (spec.Range x))
     (oa : OracleComp spec α) : Prop := by
   induction oa using OracleComp.construct with
   | pure x => exact P x
