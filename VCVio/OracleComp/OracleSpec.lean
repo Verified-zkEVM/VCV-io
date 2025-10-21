@@ -78,6 +78,10 @@ protected def sigma {ι : Type*} (spec : ι → OracleSpec) : OracleSpec where
 @[simp] lemma coe_sigma {ι : Type*} (spec : ι → OracleSpec) :
     (↑(OracleSpec.sigma spec) : PFunctor) = PFunctor.sigma fun i => ↑(spec i) := rfl
 
+@[simp] lemma ofPFunctor_sigma {ι : Type*} (F : ι → PFunctor) :
+    OracleSpec.ofPFunctor (PFunctor.sigma F) =
+      OracleSpec.sigma fun i => OracleSpec.ofPFunctor (F i) := rfl
+
 instance : Mul OracleSpec where mul spec spec' := ofPFunctor (spec * spec')
 
 @[simp] lemma Domain_mul (spec spec' : OracleSpec) :
@@ -91,6 +95,10 @@ protected def pi {ι : Type*} (spec : ι → OracleSpec) : OracleSpec where
 
 @[simp] lemma coe_pi {ι : Type*} (spec : ι → OracleSpec) :
     (↑(OracleSpec.pi spec) : PFunctor) = PFunctor.pi fun i => ↑(spec i) := rfl
+
+@[simp] lemma ofPFunctor_pi {ι : Type*} (F : ι → PFunctor) :
+    OracleSpec.ofPFunctor (PFunctor.pi F) =
+      OracleSpec.pi fun i => OracleSpec.ofPFunctor (F i) := rfl
 
 end OracleSpec
 

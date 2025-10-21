@@ -16,7 +16,6 @@ Taken from [Zulip thread](https://leanprover.zulipchat.com/#narrow/channel/27067
 
 universe u v w
 
-/-- -/
 class MonadTransformer (t : (Type u → Type v) → Type u → Type w) where
   [mapMonad (m) [Monad m] : Monad (t m)]
   [transform (m) [Monad m] : MonadLift m (t m)]

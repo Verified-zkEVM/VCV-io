@@ -40,10 +40,10 @@ import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
-import VCVio.OracleComp.QueryBound
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO

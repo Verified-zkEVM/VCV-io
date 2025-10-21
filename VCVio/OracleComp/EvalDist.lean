@@ -25,9 +25,12 @@ noncomputable instance [spec.Fintype] [spec.Inhabited] :
     HasEvalPMF (OracleComp spec) where
   toPMF := PFunctor.FreeM.mapMHom fun t : spec.Domain => PMF.uniformOfFintype (spec.Range t)
 
-/-- The support of a computation assuming any possible return value of queries. -/
-protected instance HasEvalSet : HasEvalSet (OracleComp spec) where
+/-- The support of a computation assuming any possible return value of queries.
+NOTE: should consider how well the "duplicate" instance works here. -/
+protected instance HasEvalSet_unbounded : HasEvalSet (OracleComp spec) where
   toSet := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.Domain => Set.univ
+
+end OracleComp
 
 -- lemma support_def (oa : OracleComp spec α) :
 --     support oa = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) oa) := rfl
@@ -371,56 +374,6 @@ end support
 
 -- /-- The probability of an event written as a sum over the set `{x | p x}` viewed as a subtype.
 -- This notably doesn't require decidability of the predicate `p` unlike many other lemmas. -/
--- lemma probEvent_eq_tsum_subtype : [p | oa] = ∑' x : {x | p x}, [= x | oa] := by
---   rw [probEvent_eq_tsum_indicator, tsum_subtype]
-
--- /-- Version `probEvent_eq_tsum_subtype` that preemptively filters out elements that
--- aren't in the support, since they will have no mass contribution anyways.
--- This can make some proofs simpler by handling things on the level of subtypes. -/
--- lemma probEvent_eq_tsum_subtype_mem_support :
---     [p | oa] = ∑' x : {x ∈ oa.support | p x}, [= x | oa] := by
---   simp_rw [probEvent_eq_tsum_subtype, tsum_subtype]
---   refine tsum_congr (λ x ↦ ?_)
---   by_cases hpx : p x
---   · refine (if_pos hpx).trans ?_
---     by_cases hx : x ∈ oa.support
---     · simp only [Set.indicator, Set.mem_setOf_eq, hx, hpx, and_self, ↓reduceIte]
---     · simp only [Set.indicator, Set.mem_setOf_eq, hx, hpx, and_true, ↓reduceIte,
---       probOutput_eq_zero_iff, not_false_eq_true]
---   · exact (if_neg hpx).trans (by simp [Set.indicator, hpx])
-
--- lemma probEvent_eq_tsum_subtype_support_ite [DecidablePred p] :
---     [p | oa] = ∑' x : oa.support, if p x then [= x | oa] else 0 :=
--- calc
---   [p | oa] = (∑' x, if p x then [= x | oa] else 0) := by rw [probEvent_eq_tsum_ite oa p]
---   _ = ∑' x, oa.support.indicator (λ x ↦ if p x then [= x | oa] else 0) x := by
---     refine tsum_congr (λ x ↦ ?_)
---     unfold Set.indicator
---     split_ifs with h1 h2 h2 <;> simp [h1, h2]
---   _ = ∑' x : oa.support, if p x then [= x | oa] else 0 := by
---     rw [tsum_subtype (support oa) (λ x ↦ if p x then [= x | oa] else 0)]
-
--- lemma probEvent_eq_sum_fintype_indicator [Fintype α] (oa : OracleComp spec α) (p : α → Prop) :
---     [p | oa] = ∑ x : α, {x | p x}.indicator ([= · | oa]) x :=
---   (probEvent_eq_tsum_indicator oa p).trans (tsum_fintype _)
-
--- lemma probEvent_eq_sum_fintype_ite [DecidablePred p] [Fintype α] :
---     [p | oa] = ∑ x : α, if p x then [= x | oa] else 0 :=
---   (probEvent_eq_tsum_ite oa p).trans (tsum_fintype _)
-
--- lemma probEvent_eq_sum_filter_univ [DecidablePred p] [Fintype α] :
---     [p | oa] = ∑ x ∈ Finset.univ.filter p, [= x | oa] := by
---   rw [probEvent_eq_sum_fintype_ite, Finset.sum_filter]
-
--- lemma probEvent_eq_sum_filter_finSupport [spec.DecidableEq] [DecidablePred p] [DecidableEq α] :
---     [p | oa] = ∑ x ∈ oa.finSupport.filter p, [= x | oa] :=
---   (probEvent_eq_tsum_ite oa p).trans <|
---     (tsum_eq_sum' <| by simp; tauto).trans
---       (Finset.sum_congr rfl <| λ x hx ↦ if_pos (Finset.mem_filter.1 hx).2)
-
--- lemma probEvent_eq_sum_finSupport_ite [spec.DecidableEq] [DecidablePred p] [DecidableEq α] :
---     [p | oa] = ∑ x ∈ oa.finSupport, if p x then [= x | oa] else 0 := by
---   rw [probEvent_eq_sum_filter_finSupport, Finset.sum_filter]
 
 -- end sums
 
@@ -888,5 +841,3 @@ end support
 
 --     sorry
 --   }
-
-end OracleComp

@@ -46,12 +46,9 @@ instance {cont β : Type} [h : HasUniformSelect! cont β] :
     HasUniformSelect cont β where
   uniformSelect cont := OptionT.mk (some <$> ($! cont))
 
-
 end uniformSelect
 
 section uniformSelectList
-
-#check Option.getM
 
 /-- Select a random element from a list by indexing into it with a uniform value.
 If the list is empty we instead just fail rather than choose a default value.
@@ -296,7 +293,6 @@ variable (α : Type) [hα : SampleableType α]
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
   refine ENNReal.eq_inv_of_mul_eq_one_left ?_
   simp_rw [this, Finset.mul_sum, mul_one]
-  stop
   rw [← sum_probOutput_eq_one ($ᵗ α) SampleableType.probFailure_selectElem]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
@@ -306,17 +302,7 @@ variable (α : Type) [hα : SampleableType α]
 @[simp] instance : HasEvalSPMF.NeverFail ($ᵗ α) := inferInstance
 
 @[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
-    evalDist ($ᵗ α) = OptionT.lift (PMF.uniformOfFintype α) := by
-  refine OptionT.ext ?_
-  simp
-  stop
-  refine PMF.ext λ x ↦ match x with
-  | none => by simp
-  | some x => by
-      simp [evalDist_apply_some]
-      refine symm ((tsum_eq_single x ?_).trans ?_)
-      · simp [@eq_comm _ x]
-      · simp
+    evalDist ($ᵗ α) = PMF.uniformOfFintype α := by simp
 
 @[simp] lemma support_uniformOfFintype : support ($ᵗ α) = Set.univ := by
   simp only [Set.ext_iff, Set.mem_univ, iff_true]
@@ -329,7 +315,6 @@ variable (α : Type) [hα : SampleableType α]
 
 @[simp] lemma probEvent_uniformOfFintype [Fintype α] (p : α → Prop) [DecidablePred p] :
     Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
-  stop
   simp only [probEvent_eq_sum_filter_univ, probOutput_uniformOfFintype, Finset.sum_const,
     nsmul_eq_mul, div_eq_mul_inv]
 
@@ -339,11 +324,11 @@ instance (α : Type) [Unique α] : SampleableType α where
   selectElem := return default
   mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
-  probFailure_selectElem := sorry --probFailure_pure default
+  probFailure_selectElem := by simp
 
 instance : SampleableType Bool where
   selectElem := $! #v[true, false]
-  mem_support_selectElem x := by sorry --simp
+  mem_support_selectElem x := by sorry
   probOutput_selectElem_eq x y := by sorry --simp
   probFailure_selectElem := by sorry --simp
 

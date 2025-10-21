@@ -20,11 +20,12 @@ open OracleSpec
 namespace OracleComp
 
 variable {ι : Type*} {spec : OracleSpec} {m : Type u → Type v} [Monad m] [LawfulMonad m]
-  {σ : Type u} [Subsingleton σ] (so : QueryImpl spec (StateT σ m))
+  {σ : Type u} (so : QueryImpl spec (StateT σ m))
 
 /-- If the state type is `Subsingleton`, then we can represent simulation in terms of `simulate'`,
 adding back any state at the end of the computation. -/
-lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} (oa : OracleComp spec α) (s s' : σ) :
+lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} [Subsingleton σ]
+    (oa : OracleComp spec α) (s s' : σ) :
     (simulateQ so oa).run s = (·, s') <$> (simulateQ so oa).run' s := by
   have : (λ x : α × σ ↦ (x.1, s')) = id :=
     funext λ (x, s) ↦ Prod.eq_iff_fst_eq_snd_eq.2 ⟨rfl, Subsingleton.elim _ _⟩
@@ -33,6 +34,13 @@ lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} (oa : OracleComp spec α) 
 lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ t s, (so t).run' s = query t)
     (oa : OracleComp spec α) (s : σ) : (simulateQ so oa).run' s = oa := by
-  sorry
+  revert s
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih =>
+      intro s
+      simp at ih
+      have := congr_arg (· >>= oa) (h t s)
+      simpa [ih] using this
 
 end OracleComp

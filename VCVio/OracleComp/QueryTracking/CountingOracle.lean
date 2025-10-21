@@ -321,4 +321,4 @@ namespace countingOracle
 
 -- -- end support
 
--- end countingOracle
+end countingOracle

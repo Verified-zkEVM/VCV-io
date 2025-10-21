@@ -330,8 +330,6 @@ protected structure Equiv (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB
 
 @[inherit_doc] scoped[PFunctor] infixl:25 " ≃ₚ " => PFunctor.Equiv
 
-#check Equiv.symm_apply_apply
-
 namespace Equiv
 
 /-- The identity equivalence between a polynomial functor `P` and itself. -/
@@ -357,13 +355,6 @@ def cast {P Q : PFunctor.{uA, uB}} (hA : P.A = Q.A) (hB : ∀ a, P.B a = Q.B (ca
     P ≃ₚ Q where
   equivA := _root_.Equiv.cast hA
   equivB := fun a => _root_.Equiv.cast (hB a)
-
-@[simp]
-theorem symm_symm {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (e : P ≃ₚ Q) :
-    e.symm.symm = e := by
-  ext a
-  · simp [Equiv.symm]
-  · simp [Equiv.symm]; ext a b; simp; sorry
 
 @[simp]
 theorem symm_comp_self {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (e : P ≃ₚ Q) :

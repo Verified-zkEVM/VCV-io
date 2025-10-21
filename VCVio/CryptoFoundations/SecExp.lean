@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.Constructions.UniformSelect
-import VCVio.OracleComp.QueryBound
+import VCVio.OracleComp.QueryTracking.QueryBound
 
 /-!
 # Security Experiments

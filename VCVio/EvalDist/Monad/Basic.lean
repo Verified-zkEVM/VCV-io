@@ -96,8 +96,14 @@ lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y 
 
 lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
-  simp[probFailure_def, OptionT.run]
+
+  simp [probFailure_eq_sub_tsum, probOutput_bind_eq_tsum]
+
+
   sorry
+  -- simp[probFailure_def, OptionT.run]
+
+  -- sorry
 
 lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
     Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by

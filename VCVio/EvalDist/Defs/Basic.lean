@@ -167,6 +167,12 @@ example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[⊥ | mx]
   ()
 
+lemma evalDist_ext {m : Type u → Type v} [Monad m] [HasEvalSPMF m]
+    {n : Type u → Type w} [Monad n] [HasEvalSPMF n]
+    {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) :
+    evalDist mx = evalDist mx' := by
+  sorry
+
 end probability_notation
 
 section decidable
@@ -301,6 +307,12 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 end bounds
 
+-- dtumad: we should organize the stuff below better
+
+lemma probEvent_false_eq [HasEvalSPMF m] (mx : m α) :
+    Pr[fun _ => False | mx] = 0 := by
+  simp [probEvent_def]
+
 lemma tsum_probOutput_eq_sub [HasEvalSPMF m] (mx : m α) :
     ∑' x : α, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure mx)
@@ -327,3 +339,31 @@ lemma tsum_probOutput_eq_one' [HasEvalSPMF m] (mx : m α) (h : Pr[⊥ | mx] = 0)
 lemma sum_probOutput_eq_one [HasEvalSPMF m] [Fintype α] (mx : m α) (h : Pr[⊥ | mx] = 0) :
     ∑ x : α, Pr[= x | mx] = 1 := by
   rw [sum_probOutput_eq_sub, h, tsub_zero]
+
+@[simp] lemma probEvent_true_eq_sub [HasEvalSPMF m] (mx : m α) :
+    Pr[fun _ => True | mx] = 1 - Pr[⊥ | mx] := by
+  simp [probEvent_eq_tsum_indicator, probFailure_eq_sub_tsum]
+  rw [sub_sub_cancel] <;> aesop
+
+lemma probFailure_eq_one_sub_probEvent [HasEvalSPMF m] (mx : m α) :
+    Pr[⊥ | mx] = 1 - Pr[fun _ => True | mx] := by
+  refine ENNReal.eq_sub_of_add_eq (by simp only [ne_eq, probEvent_ne_top, not_false_eq_true]) ?_
+  simp
+
+lemma probEvent_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
+    Pr[p | mx] = ∑' x : {x | p x}, Pr[= x | mx] := by
+  rw [probEvent_eq_tsum_indicator, tsum_subtype]
+
+lemma probEvent_eq_sum_fintype_indicator [HasEvalSPMF m] [Fintype α] (oa : m α) (p : α → Prop) :
+    Pr[p | oa] = ∑ x : α, {x | p x}.indicator (Pr[= · | oa]) x :=
+  (probEvent_eq_tsum_indicator oa p).trans (tsum_fintype _)
+
+lemma probEvent_eq_sum_fintype_ite [HasEvalSPMF m] [Fintype α]
+    (oa : m α) (p : α → Prop) [DecidablePred p] :
+    Pr[p | oa] = ∑ x : α, if p x then Pr[= x | oa] else 0 :=
+  (probEvent_eq_tsum_ite oa p).trans (tsum_fintype _)
+
+lemma probEvent_eq_sum_filter_univ [HasEvalSPMF m] [Fintype α]
+    (oa : m α) (p : α → Prop) [DecidablePred p] :
+    Pr[p | oa] = ∑ x ∈ Finset.univ.filter p, Pr[= x | oa] := by
+  rw [probEvent_eq_sum_fintype_ite, Finset.sum_filter]
