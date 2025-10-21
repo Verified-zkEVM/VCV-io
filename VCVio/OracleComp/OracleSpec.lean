@@ -63,12 +63,34 @@ instance [h : spec.DecidableEq] (t : spec.Domain) : DecidableEq (spec.Range t) :
 
 instance : Add OracleSpec where add spec spec' := ofPFunctor (spec + spec')
 
-@[simp] lemma domain_add (spec spec' : OracleSpec) :
+@[simp] lemma Domain_add (spec spec' : OracleSpec) :
     (spec + spec').Domain = (spec.Domain ⊕ spec'.Domain) := rfl
-@[simp] lemma range_add_inl (spec spec' : OracleSpec) (t : spec.Domain) :
+@[simp] lemma Range_add_inl (spec spec' : OracleSpec) (t : spec.Domain) :
     (spec + spec').Range (.inl t) = spec.Range t := rfl
-@[simp] lemma range_add_inr (spec spec' : OracleSpec) (t : spec'.Domain) :
+@[simp] lemma Range_add_inr (spec spec' : OracleSpec) (t : spec'.Domain) :
     (spec + spec').Range (.inr t) = spec'.Range t := rfl
+
+/-- Indexed union/sum over `OracleSpec`. -/
+protected def sigma {ι : Type*} (spec : ι → OracleSpec) : OracleSpec where
+  Domain := (i : ι) × (spec i).Domain
+  Range := fun ⟨i, t⟩ => (spec i).Range t
+
+@[simp] lemma coe_sigma {ι : Type*} (spec : ι → OracleSpec) :
+    (↑(OracleSpec.sigma spec) : PFunctor) = PFunctor.sigma fun i => ↑(spec i) := rfl
+
+instance : Mul OracleSpec where mul spec spec' := ofPFunctor (spec * spec')
+
+@[simp] lemma Domain_mul (spec spec' : OracleSpec) :
+    (spec * spec').Domain = (spec.Domain × spec'.Domain) := rfl
+@[simp] lemma Range_mul (spec spec' : OracleSpec) (t : spec.Domain × spec'.Domain) :
+    (spec * spec').Range t = (spec.Range t.1 ⊕ spec'.Range t.2) := rfl
+
+protected def pi {ι : Type*} (spec : ι → OracleSpec) : OracleSpec where
+  Domain := (i : ι) → (spec i).Domain
+  Range f := (i : ι) × (spec i).Range (f i)
+
+@[simp] lemma coe_pi {ι : Type*} (spec : ι → OracleSpec) :
+    (↑(OracleSpec.pi spec) : PFunctor) = PFunctor.pi fun i => ↑(spec i) := rfl
 
 end OracleSpec
 
