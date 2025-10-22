@@ -27,7 +27,7 @@ universe u u' v w
 and `range` gives the output type of the oracle for a given index.
 This type is essentially a copy of `PFunctor` used to hide certain abstractions
 in a form that is more familiar to an average user. -/
-structure OracleSpec where
+structure OracleSpec : Type (max u v + 1) where
   Domain : Type u
   Range : Domain → Type v
   deriving Inhabited

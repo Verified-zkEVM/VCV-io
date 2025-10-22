@@ -107,10 +107,8 @@ lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
   rw [probEvent_bind_eq_tsum]
   simp
   simp [ENNReal.mul_sub]
-  stop
-  rw [ENNReal.tsum_sub]
 
-  rw [probFailure_def, SPMF.run_none_eq_one_sub]
+  -- rw [probFailure_def, SPMF.run_none_eq_one_sub]
   stop
   simp only [MonadHomClass.mmap_bind]
 

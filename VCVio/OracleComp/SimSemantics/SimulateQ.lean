@@ -52,14 +52,28 @@ def ofLift (spec : OracleSpec) (m : Type u → Type v)
 @[simp] lemma ofLift_apply (spec : OracleSpec) (m : Type u → Type v)
     [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) : ofLift spec m t = liftM (query t) := rfl
 
+/-- Implement queries to `spec` in terms of themselves by preserving queries.  -/
+@[reducible, inline] def id (spec : OracleSpec) :
+    QueryImpl spec (OracleQuery spec) := ofLift _ _
+
+/-- Version of `id` that targets `OracleComp` instead of `OracleQuery`. -/
+@[reducible, inline] def id' (spec : OracleSpec) :
+    QueryImpl spec (OracleComp spec) := ofLift _ _
+
 /-- View a function from oracle inputs to outputs as an implementation in the `Id` monad.
 Can be used to run a computation to get a specific value. -/
-def ofFn (spec : OracleSpec) (f : (t : spec.Domain) → spec.Range t) :
+def ofFn (f : (t : spec.Domain) → spec.Range t) :
     QueryImpl spec Id := f
 
+@[simp] lemma ofFn_apply (f : (t : spec.Domain) → spec.Range t)
+    (t : spec.Domain) : ofFn f t = f t := rfl
+
 /-- Version of `ofFn` that allows queries to fail to return a value. -/
-def ofFn? (spec : OracleSpec) (f : (t : spec.Domain) → Option (spec.Range t)) :
+def ofFn? (f : (t : spec.Domain) → Option (spec.Range t)) :
     QueryImpl spec Option := f
+
+@[simp] lemma ofFn?_apply (f : (t : spec.Domain) → Option (spec.Range t))
+    (t : spec.Domain) : ofFn? f t = f t := rfl
 
 end QueryImpl
 
