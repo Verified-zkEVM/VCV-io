@@ -16,6 +16,39 @@ in general mathlib than in the project itself.
 
 universe u v w
 
+section sum_thing
+
+open Filter Finset Function Topology SummationFilter
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq' {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (b = ·)] (a : α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b = b' then a else 1) = a := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb', @eq_comm _ b]
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq_apply {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (· = b)] (f : β → α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b' = b then f b' else 1) = f b := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb']
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq_apply' {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (b = ·)] (f : β → α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b = b' then f b' else 1) = f b := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb', @eq_comm _ b]
+
+end sum_thing
+
 section abs
 
 variable {G : Type*} [CommRing G] [LinearOrder G] [IsStrictOrderedRing G] {a b : G}

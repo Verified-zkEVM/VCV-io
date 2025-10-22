@@ -168,10 +168,9 @@ example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   ()
 
 lemma evalDist_ext {m : Type u → Type v} [Monad m] [HasEvalSPMF m]
-    {n : Type u → Type w} [Monad n] [HasEvalSPMF n]
-    {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) :
-    evalDist mx = evalDist mx' := by
-  sorry
+    {n : Type u → Type w} [Monad n] [HasEvalSPMF n] {mx : m α} {mx' : n α}
+    (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : evalDist mx = evalDist mx' :=
+  SPMF.ext h
 
 end probability_notation
 

@@ -190,7 +190,7 @@ lemma mapM_seq {α β}
 @[simp]
 lemma mapM_lift (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
     FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
-  simp [FreeM.mapM, FreeM.lift]
+  simp [FreeM.mapM]
 
 @[simp]
 lemma mapM_liftA (s : (a : P.A) → m (P.B a)) (x : P.A) :

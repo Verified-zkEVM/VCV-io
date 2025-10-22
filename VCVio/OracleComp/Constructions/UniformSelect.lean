@@ -301,8 +301,9 @@ variable (α : Type) [hα : SampleableType α]
 
 @[simp] instance : HasEvalSPMF.NeverFail ($ᵗ α) := inferInstance
 
+open Classical in
 @[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
-    evalDist ($ᵗ α) = PMF.uniformOfFintype α := by simp
+    evalDist ($ᵗ α) = (PMF.uniformOfFintype α : SPMF α) := by simp
 
 @[simp] lemma support_uniformOfFintype : support ($ᵗ α) = Set.univ := by
   simp only [Set.ext_iff, Set.mem_univ, iff_true]

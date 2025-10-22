@@ -34,6 +34,9 @@ def mk (p : PMF (Option α)) : SPMF α := p
 
 @[simp] lemma mk_run (p : SPMF α) : mk p.run = p := rfl
 
+@[simp] lemma liftM_PMF_eq (p : PMF α) :
+    (liftM p : SPMF α) = SPMF.mk (p.map Option.some) := rfl
+
 lemma tsum_run_some_eq_one_sub (p : SPMF α) :
     ∑' x, p.run (some x) = 1 - p.run none := by
   rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]

@@ -136,11 +136,24 @@ lemma evalDist_of_hasEvalPMF_def (mx : m α) :
   refine tsum_congr fun x => ?_
   refine (tsum_eq_single x (by aesop)).trans (by aesop)
 
-@[simp] lemma HasEvalPMF.evalDist_ext_iff (mx : m α) (p : PMF α) :
-    evalDist mx = liftM p ↔ ∀ x, Pr[= x | mx] = p x := by
-  sorry
+@[simp] lemma HasEvalPMF.evalDist_eq_liftM_iff [DecidableEq α]
+    (mx : m α) (p : PMF α) : evalDist mx = liftM p ↔ ∀ x, Pr[= x | mx] = p x := by
+  refine ⟨fun h x => ?_, fun h => ?_⟩
+  · rw [probOutput_def, h]
+    simp [@eq_comm _ x]
+  · simp [SPMF.ext_iff]
+    intro x
+    specialize h x
+    rw [probOutput_def] at h
+    rw [← h]
+    rfl
 
-lemma HasEvalPMF.evalDist_ext {mx : m α} {p : PMF α}
+@[simp] lemma HasEvalPMF.evalDist_eq_mk_iff [DecidableEq α]
+    (mx : m α) (p : PMF (Option α)) : evalDist mx = SPMF.mk p ↔
+      ∀ x, Pr[= x | mx] = p (some x) := by
+  aesop
+
+lemma HasEvalPMF.evalDist_ext [DecidableEq α] {mx : m α} {p : PMF α}
     (h : ∀ x, Pr[= x | mx] = p x) : evalDist mx = liftM p := by aesop
 
 end hasEvalSPMF_of_hasEvalPMF

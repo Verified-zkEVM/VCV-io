@@ -90,8 +90,8 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 @[simp]
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
 
-instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
-    LawfulAlternative (WriterT ω m) := sorry
+-- instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
+--     LawfulAlternative (WriterT ω m) := sorry
   -- map_failure f := sorry
   -- failure_seq f := sorry
   -- orElse_failure f := sorry
