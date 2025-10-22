@@ -94,8 +94,27 @@ lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y 
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
   simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
 
+lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
+    Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by
+  simp [probEvent_eq_tsum_indicator, probOutput_bind_eq_tsum,
+    Set.indicator, ← ENNReal.tsum_mul_left]
+  rw [ENNReal.tsum_comm]
+  refine tsum_congr fun x => by split_ifs <;> simp
+
 lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
+  rw [probFailure_eq_one_sub_probEvent]
+  rw [probEvent_bind_eq_tsum]
+  simp
+  simp [ENNReal.mul_sub]
+  stop
+  rw [ENNReal.tsum_sub]
+
+  rw [probFailure_def, SPMF.run_none_eq_one_sub]
+  stop
+  simp only [MonadHomClass.mmap_bind]
+
+  simp only [OptionT.run_bind, PMF.monad_pure_eq_pure]
 
   simp [probFailure_eq_sub_tsum, probOutput_bind_eq_tsum]
 
@@ -104,12 +123,6 @@ lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
   -- simp[probFailure_def, OptionT.run]
 
   -- sorry
-
-lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
-    Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by
-  stop
-  simp [probEvent_def, evalDist_bind, PMF.toOuterMeasure_bind_apply,
-    tsum_option _ ENNReal.summable, evalDist_apply_some, elimM]
 
 @[simp]
 lemma probFailure_bind_eq_zero_iff [HasEvalSPMF m] (mx : m α) (my : α → m β) :
