@@ -533,25 +533,34 @@ def jointCondition {A : Type*} /- [MeasurableSpace V] -/
       ∃ (𝓕_ : I → MeasurableSpace (α → V))
         (μ_ : I → PMF (α → V))
         (p_ : I → Permission α)
-        (k_ : I → A → PMF (α → V)),
+        (k_ : I → A → PMF (α → V))
+        (h :
+          ∀ i,
+            let _ : MeasurableSpace (α → V) := 𝓕_ i;
+            let ps₁ : PSp (α → V) := some (ProbabilitySpace.ofPMF (μ_ i));
+            PSp.compatiblePerm (ps₁, p_ i).1 (ps₁, p_ i).2
+        )
+        (h' :
+          ∀ υ i,
+            let _ : MeasurableSpace (α → V) := 𝓕_ i;
+            let ps₂ : PSp (α → V) := some (ProbabilitySpace.ofPMF (k_ i υ));
+            PSp.compatiblePerm (ps₂, p_ i).1 (ps₂, p_ i).2
+        ),
         -- (𝓕_, μ_, p_)
         let P₁ : IndexedPSpPm I α V := λ i ↦
           let _ : MeasurableSpace (α → V) := 𝓕_ i
           let ps₁ : PSp (α → V) := some (ProbabilitySpace.ofPMF (μ_ i))
-          {val := (ps₁, p_ i), property := sorry}
+          {val := (ps₁, p_ i), property := h i}
         -- (𝓕_, k_ (I)(υ), p_)
         let P₂ υ : IndexedPSpPm I α V := λ i ↦
           let _ : MeasurableSpace (α → V) := 𝓕_ i
           let ps₂ : PSp (α → V) := some (ProbabilitySpace.ofPMF (k_ i υ))
-          {val := (ps₂, p_ i), property := sorry}
+          {val := (ps₂, p_ i), property := h' υ i}
         P₁ ≤ a ∧ ∀ i : I, μ_ i = μ.bind (k_ i) ∧ ∀ υ ∈ μ.support, K υ (P₂ υ)
-  , upper' := λ a b h ↦ by
-      rintro ⟨𝓕_, μ_, p_, k_, h'⟩
-      use 𝓕_
-      use μ_
-      use p_
-      use k_
-      exact And.intro (le_trans h'.1 h) h'.2
+  , upper' := λ a b ord ↦ by
+      rintro ⟨𝓕_, μ_, p_, k_, h, h', h₀⟩
+      use 𝓕_; use μ_; use p_; use k_; use h; use h'
+      exact And.intro (le_trans h₀.1 ord) h₀.2
   }
 
   -- { carrier a :=
