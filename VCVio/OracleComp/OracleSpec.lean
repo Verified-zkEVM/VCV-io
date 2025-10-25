@@ -8,33 +8,30 @@ import ToMathlib.PFunctor.Basic
 
 /-!
 # Specifications of Available Oracles
-
-This file defines a type `OracleSpec` to represent a set of available oracles.
-The available oracles are all indexed by some (potentially infinite) indexing set `ι`,
-and for each index `i` a pair of types `domain i` and `range i`.
-
-TODO: update documentation (now there is a single dependent oracle)
-
-We also define a number of basic oracle constructions:
-* `T →ₒ U`: Access to a single oracle with given input and output
-* `coinSpec`: A single oracle for flipping a coin
-* `unifSpec`: A family of oracles for selecting from `[0..n]` for any `n`
 -/
 
 universe u u' v w
 
-/-- Oracles are specified by a polynomial functor, where `domain` is the index/input of the oracle,
-and `range` gives the output type of the oracle for a given index.
-This type is essentially a copy of `PFunctor` used to hide certain abstractions
-in a form that is more familiar to an average user. -/
-structure OracleSpec : Type (max u v + 1) where
-  Domain : Type u
-  Range : Domain → Type v
-  deriving Inhabited
+-- /-- Oracles are specified by a polynomial functor, where `domain` is the index/input of the oracle,
+-- and `range` gives the output type of the oracle for a given index.
+-- This type is essentially a copy of `PFunctor` used to hide certain abstractions
+-- in a form that is more familiar to an average user. -/
+-- structure OracleSpec : Type (max u v + 1) where
+--   Domain : Type u
+--   Range : Domain → Type v
+--   deriving Inhabited
+
+/-- An `OracleSpec ι` is specieifes a set of oracles indexed by `ι`.
+Defined as a map from each input to the type of the oracle's output. -/
+def OracleSpec (ι : Type u) : Type (max u (v + 1)) :=
+  ι → Type v
 
 namespace OracleSpec
 
-variable {spec : OracleSpec}
+variable {ι : Type u}
+
+def toPFunctor {ι : Type u} (spec : OracleSpec ι) : PFunctor :=
+  { A := ι, B := spec }
 
 instance : Coe OracleSpec PFunctor where
   coe spec := { A := spec.Domain, B := spec.Range }
@@ -105,8 +102,10 @@ end OracleSpec
 def emptySpec : OracleSpec := .ofPFunctor 0
 notation "[]ₒ" => emptySpec
 
-def singletonSpec (A B : Type*) : OracleSpec := .ofPFunctor (PFunctor.ofConst A B)
-infixl : 25 " →ₒ " => singletonSpec
+@[reducible] def singletonSpec (A : Type*) (B : A → Type*) : OracleSpec :=
+  { Domain := A, Range := B }
+
+notation:25 A:25 " →ₒ " B:26 => singletonSpec A (fun _ => B)
 
 /-- Access to a coin flipping oracle. Because of termination rules in Lean this is slightly
 weaker than `unifSpec`, as we have only finitely many coin flips. -/
