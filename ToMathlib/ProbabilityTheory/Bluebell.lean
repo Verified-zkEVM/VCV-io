@@ -2,6 +2,7 @@ import Iris
 import Iris.Algebra.CMRA
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.IndepProduct
+import Mathlib.Data.ENNReal.Basic
 
 /-! # Formalizing the Bluebell paper -/
 /-
@@ -12,6 +13,9 @@ import ToMathlib.ProbabilityTheory.IndepProduct
       (see `MeasureTheory.Measure.toPMF` and `PMF.toMeasure`);
       Note: μ(a) abbreviates μ({a})
 -/
+
+#check MeasureTheory.Measure.toPMF
+#check PMF.toMeasure
 
 open Iris ProbabilityTheory MeasureTheory
 
@@ -255,6 +259,57 @@ instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
   elim := sorry
   -- mul_right_mono := sorry
 
+#check Measure.prod
+
+open ENNReal in
+def PMF.prod {Ω₁ Ω₂ : Type u}
+  (μ : PMF Ω₁)
+  (ν : PMF Ω₂) :
+  PMF (Ω₁ × Ω₂)
+:=
+  -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
+  -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
+  ⟨ λ a ↦ μ a.1 * ν a.2
+  , by
+      let h₁ := μ.2
+      -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
+      -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
+      -- have h₁ : HasSum μ' 1 := by sorry
+      have _ : IsTopologicalSemiring ℝ≥0∞ := sorry
+      rw [←(one_mul 1)]
+      apply HasSum.mul (f := μ) (g := ν) (s := 1) (t := 1)
+      apply μ.2
+      apply ν.2
+      sorry
+  ⟩
+
+#check HasSum.prod_mk
+#check HasSum.mul
+
+
+def Measure.prod {Ω₁ Ω₂ : Type u} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
+  (μ : Measure Ω₁)
+  (ν : Measure Ω₂) :
+  Measure (Ω₁ × Ω₂)
+:=
+  sorry
+
+def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
+  (ps₁ : ProbabilitySpace Ω₁)
+  (ps₂ : ProbabilitySpace Ω₂) :
+  ProbabilitySpace (Ω₁ × Ω₂)
+:=
+  let v₁ := ps₁.volume
+  let v₂ := ps₂.volume
+  let _ : IsProbabilityMeasure (Measure.prod v₁ v₂) :=
+    ⟨by
+      unfold_projs
+      unfold Measure.prod
+      sorry
+    ⟩
+  -- ProbabilitySpace.mk sorry
+  sorry
+
 variable {V : Type*}
 
 open Classical in
@@ -270,9 +325,9 @@ def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α
     let chosenOne : ProbabilitySpace ({a // p a = 0} → V) := 1;
     ∃ _P' : ProbabilitySpace ({a // p a > 0} → V),
       let bla :=
-        MeasurableSpace.prod'' _P'.toMeasurableSpace
-          chosenOne.toMeasurableSpace;
+        ProbabilitySpace.prod _P' chosenOne
       _P = bla
+
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
 def PSp.compatiblePerm (P : PSp (α → V)) (p : Permission α) : Prop := match P with
