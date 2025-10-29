@@ -33,7 +33,7 @@ class Valid (M : Type*) where
 
 export Valid (valid)
 
-prefix:50 "✓" => Valid.valid
+prefix:50(priority := high) "✓" => Valid.valid
 
 instance {α : Type*} [Valid α] (p : α → Prop) : Valid (Subtype p) where
   valid := fun x => Valid.valid x.1
@@ -197,7 +197,7 @@ instance {I : Type*} : OrderedUnitalResourceAlgebra (I → M) where
   elim := by intro _ _ _ h; exact fun i => mul_right_mono (h i)
 
 /-- Define a discrete `CMRA` instance given an `OrderedUnitalResourceAlgebra` instance -/
-instance instCMRA : DiscreteCMRA M := sorry
+instance instCMRA [Valid M] : DiscreteCMRA M := sorry
 
 end OrderedUnitalResourceAlgebra
 
@@ -286,13 +286,39 @@ def PMF.prod {Ω₁ Ω₂ : Type u}
 #check HasSum.prod_mk
 #check HasSum.mul
 
+#check Set.image
 
 def Measure.prod {Ω₁ Ω₂ : Type u} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
   (μ : Measure Ω₁)
   (ν : Measure Ω₂) :
   Measure (Ω₁ × Ω₂)
-:=
-  sorry
+where
+  measureOf := λ S ↦
+    let S₀ : Set Ω₁ := Prod.fst '' S
+    let S₁ : Set Ω₂ := Prod.snd '' S
+    (μ.measureOf S₀) * (ν.measureOf S₁)
+  empty := by
+    aesop
+  mono := by
+    intro s₁ s₂ h
+    have := @μ.mono (Prod.fst '' s₁) (Prod.fst '' s₂)
+      (by
+        rw [Set.image_subset_iff]
+        exact Set.Subset.trans h
+          (Set.subset_preimage_image Prod.fst s₂)
+      )
+    have := @ν.mono (Prod.snd '' s₁) (Prod.snd '' s₂)
+      (by
+        rw [Set.image_subset_iff]
+        exact Set.Subset.trans h
+          (Set.subset_preimage_image Prod.snd s₂)
+      )
+    aesop (add safe (by mono))
+  iUnion_nat := by
+
+    sorry
+  m_iUnion := sorry
+  trim_le := sorry
 
 def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   (ps₁ : ProbabilitySpace Ω₁)
@@ -321,12 +347,13 @@ open Classical in
 -- Wrong
 -- We need product and union spaces
 def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α → V)) (p : Permission α) : Prop :=
-  ∀ h : Nonempty ({a // p a = 0} → V),
+  ∀ _ : Nonempty ({a // p a = 0} → V),
     let chosenOne : ProbabilitySpace ({a // p a = 0} → V) := 1;
     ∃ _P' : ProbabilitySpace ({a // p a > 0} → V),
-      let bla :=
+      let _P'' :=
         ProbabilitySpace.prod _P' chosenOne
-      _P = bla
+      True
+      -- _P = bla
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
@@ -358,7 +385,7 @@ instance [Nonempty V] : One (PSpPm α V) where
 @[simp]
 instance [Nonempty V] : Mul (PSpPm α V) where
   -- TODO: need to prove product preserves compatibility
-  mul Pp₁ Pp₂ := ⟨⟨Pp₁.1.1 * Pp₂.1.1, Pp₁.1.2 * Pp₂.1.2⟩, by sorry⟩
+  mul Pp₁ Pp₂ := ⟨⟨Pp₁.1.1 * Pp₂.1.1, Pp₁.1.2 * Pp₂.1.2⟩, by simp only; sorry⟩
 
 -- TODO (Andrei): We need validity defined
 -- instance : Valid (PSpPm α V) := inferInstanceAs <|
@@ -471,10 +498,39 @@ def or (P Q : HyperAssertion I α V) : HyperAssertion I α V :=
 -- wrong direction
 
 -- Not sure how to define these either
-def sForall (P : HyperAssertion I α V → Prop) : HyperAssertion I α V := sorry
-  -- ⟨setOf (fun a => P (fun b => a ≤ b)), fun _ _ hab h b hb => P.upper' (hab b) hb⟩
+def sForall (Ψ : HyperAssertion I α V → Prop) : HyperAssertion I α V :=
+  ⟨
+    fun σ ↦ ∀ p, Ψ p → p σ,
+    by
+      intros a b h
+      rw [Set.mem_def, Set.mem_def]
+      intros φ p h'
+      have := p.2
+      specialize φ p h'
+      unfold IsUpperSet at this
+      simp_all only [UpperSet.carrier_eq_coe, SetLike.mem_coe]
+      apply this
+      on_goal 2 => {exact φ}
+      · simp_all only
+  ⟩
 
-def sExists (P : HyperAssertion I α V → Prop) : HyperAssertion I α V := sorry
+def sExists (Ψ : HyperAssertion I α V → Prop) : HyperAssertion I α V :=
+  ⟨
+    fun σ ↦ ∃ p, Ψ p ∧ p σ,
+    by
+      intros a b h
+      rw [Set.mem_def, Set.mem_def]
+      rintro ⟨p, hΨ, hp⟩
+      use p
+      apply And.intro hΨ
+      have := p.2
+      unfold IsUpperSet at this
+      simp_all only [UpperSet.carrier_eq_coe, SetLike.mem_coe]
+      apply this
+      on_goal 2 => {exact hp
+      }
+      · simp_all only
+  ⟩
 
 /-- Existential quantification over hyper-assertions -/
 def «exists» {β : Sort*} (P : β → HyperAssertion I α V) : HyperAssertion I α V :=
@@ -503,13 +559,13 @@ instance : BIBase (HyperAssertion I α V) where
   pure := pure
   and := and
   or := or
-  imp := sorry
-  sForall := sorry
-  sExists := sorry
+  imp P Q := ⟨fun _ ↦ (∀ x, P x → Q x), by aesop⟩
+  sForall := sForall
+  sExists := sExists
   sep := sep
   wand := wand
-  persistently := sorry
-  later := sorry
+  persistently := id
+  later := id
 
 section Ownership
 
