@@ -84,7 +84,7 @@ variable {α : Type} [Inhabited α]
 -- @[simp] lemma evalDist_uniformSelectList (xs : List α) :
 --     evalDist ($ xs) = match xs with
 --     | [] => failure
---     | x :: xs => (PMF.uniformOfFintype (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
+--     | x :: xs => (PMF.uniformSample (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
 --   match xs with
 --   | [] => by simp only [uniformSelectList_nil, evalDist_failure]; rfl
 --   | x :: xs => by
@@ -164,7 +164,7 @@ instance hasUniformSelectListVector (α : Type) (n : ℕ) :
 
 -- @[simp]
 -- lemma evalDist_uniformSelectVector (xs : Vector α (n + 1)) :
---     evalDist ($ xs) = (PMF.uniformOfFintype (Fin (n + 1))).map (xs[·]) := by
+--     evalDist ($ xs) = (PMF.uniformSample (Fin (n + 1))).map (xs[·]) := by
 --   simp [uniformSelectVector_def]
 --   sorry
 
@@ -280,14 +280,14 @@ class SampleableType (β : Type) where
 
 /-- Select uniformly from the type `β` using a type-class provided definition.
 NOTE: naming is somewhat strange now that `Fintype` isn't explicitly required. -/
-def uniformOfFintype (β : Type) [h : SampleableType β] :
+def uniformSample (β : Type) [h : SampleableType β] :
     ProbComp β := h.selectElem
 
-prefix : 90 "$ᵗ" => uniformOfFintype
+prefix : 90 "$ᵗ" => uniformSample
 
 variable (α : Type) [hα : SampleableType α]
 
-@[simp] lemma probOutput_uniformOfFintype [Fintype α] (x : α) :
+@[simp] lemma probOutput_uniformSample [Fintype α] (x : α) :
     Pr[= x | $ᵗ α] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
   have : (Fintype.card α : ℝ≥0∞) = ∑ y : α, 1 :=
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
@@ -296,27 +296,28 @@ variable (α : Type) [hα : SampleableType α]
   rw [← sum_probOutput_eq_one ($ᵗ α) SampleableType.probFailure_selectElem]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
-@[simp] lemma probFailure_uniformOfFintype : Pr[⊥ | $ᵗ α] = 0 :=
+@[simp] lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=
   SampleableType.probFailure_selectElem
 
 @[simp] instance : HasEvalSPMF.NeverFail ($ᵗ α) := inferInstance
 
-open Classical in
-@[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
-    evalDist ($ᵗ α) = (PMF.uniformOfFintype α : SPMF α) := by simp
+-- open Classical in
+@[simp] lemma evalDist_uniformSample [Fintype α] [Inhabited α] :
+    evalDist ($ᵗ α) = liftM (PMF.uniformOfFintype α) := by
+  simp [SPMF.evalDist_eq_iff]
 
-@[simp] lemma support_uniformOfFintype : support ($ᵗ α) = Set.univ := by
+@[simp] lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
   simp only [Set.ext_iff, Set.mem_univ, iff_true]
   apply SampleableType.mem_support_selectElem
 
--- @[simp] lemma finSupport_uniformOfFintype [Fintype α] [DecidableEq α] [Nonempty α] :
+-- @[simp] lemma finSupport_uniformSample [Fintype α] [DecidableEq α] [Nonempty α] :
 --     finSupport ($ᵗ α) = Finset.univ := by
 --   stop
---   simp only [finSupport_eq_iff_support_eq_coe, support_uniformOfFintype, Finset.coe_univ]
+--   simp only [finSupport_eq_iff_support_eq_coe, support_uniformSample, Finset.coe_univ]
 
-@[simp] lemma probEvent_uniformOfFintype [Fintype α] (p : α → Prop) [DecidablePred p] :
+@[simp] lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
     Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
-  simp only [probEvent_eq_sum_filter_univ, probOutput_uniformOfFintype, Finset.sum_const,
+  simp only [probEvent_eq_sum_filter_univ, probOutput_uniformSample, Finset.sum_const,
     nsmul_eq_mul, div_eq_mul_inv]
 
 section instances
@@ -341,7 +342,7 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
   probOutput_selectElem_eq := by
     stop
     simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
-      probOutput_uniformOfFintype, forall_const, implies_true]
+      probOutput_uniformSample, forall_const, implies_true]
   probFailure_selectElem := by sorry --simp [probFailure_seq]
 
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
@@ -387,7 +388,7 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
     stop
     rw [← Vector.push_pop_back x, ← Vector.push_pop_back y]
     simp [probOutput_seq_map_vec_push_eq_mul, -Vector.push_pop_back]
-    unfold uniformOfFintype
+    unfold uniformSample
     rw [SampleableType.probOutput_selectElem_eq x.back y.back]
     exact congrFun (congrArg HMul.hMul (ih x.pop y.pop)) Pr[= y.back | SampleableType.selectElem]
   probFailure_selectElem := by
@@ -397,7 +398,8 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
     | succ m ih => simp [ih, probFailure_seq]
 
 /-- Select a uniform element from `Matrix α n` by independently selecting `α` at each index. -/
-instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (Fin n) (Fin m) α) where
+instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
+    SampleableType (Matrix (Fin n) (Fin m) α) where
   -- selectElem := (fun x ↦ (fun i j ↦ x)) <$> ($ᵗ α)
   selectElem := by induction n with
   | zero => exact pure (Matrix.of ![])

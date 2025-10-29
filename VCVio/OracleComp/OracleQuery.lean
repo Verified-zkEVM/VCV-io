@@ -1,107 +1,95 @@
 /-
-Copyright (c) 2024 Devon Tuma. All rights reserved.
+Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.Monad.Free
-import ToMathlib.Control.WriterT
-import ToMathlib.Control.AlternativeMonad
-import ToMathlib.Control.OptionT
-import Mathlib.Control.Lawful
 import VCVio.OracleComp.OracleSpec
-import ToMathlib.PFunctor.Basic
 
--- /-!
--- # Computations with Oracle Access (DEPRECATED)
+universe u v w z
 
--- We no longer use this since the switch to `PFunctor.FreeM`.
+open OracleSpec
 
--- A value `oa : OracleComp spec α` represents a computation with return type `α`,
--- with access to any of the oracles specified by `spec : OracleSpec`.
--- Returning a value `x` corresponds to the computation `pure' α x`.
--- The computation `queryBind' i t α ou` represents querying the oracle corresponding to index `i`
--- on input `t`, getting a result `u : spec.Range i`, and then running `ou u`.
--- We also allow for a `failure'` operation for quitting out.
--- These operations induce `Monad` and `Alternative` instances on `OracleComp spec`.
+/-- Functor to represent queries to oracles specified by an `OracleSpec ι`,
+defined to be the object type of the corresponding `PFunctor`.
+In particular an element of `OracleQuery spec α` consists of an input value `t : spec.Domain`,
+and a continuation `f : spec.Range t → α` specifying what to do with the result.
+See `OracleQuery.query` for the case when the continuation `f` just returns the query result. -/
+def OracleQuery {ι : Type u} (spec : OracleSpec.{u,v} ι) :
+    Type w → Type (max u v w) :=
+  PFunctor.Obj spec.toPFunctor
 
--- `pure' α a` gives a monadic `pure` operation, while a more general `>>=` operator
--- is derived by induction on the first computation (see `OracleComp.bind`).
--- This importantly allows us to define a `LawfulMonad` instance on `OracleComp spec`,
--- which isn't possible if a general bind operator is included in the main syntax.
+@[reducible] protected def OracleQuery.mk {ι α} {spec : OracleSpec ι}
+    (t : spec.Domain) (f : spec.Range t → α) : OracleQuery spec α := ⟨t, f⟩
 
--- We also define simple operations like `coin : OracleComp coinSpec Bool` for flipping a fair coin,
--- and `$[0..n] : ProbComp (Fin (n + 1))` for selecting from an inclusive range.
+namespace OracleQuery
 
--- Note that the monadic structure on `OracleComp` exists only for a fixed `OracleSpec`,
--- so it isn't possible to combine computations where one has a superset of oracles of the other.
--- We later introduce a set of type coercions that mitigate this for most common cases,
--- such as calling a computation with `spec` as part of a computation with `spec ++ spec'`.
--- -/
+variable {ι} {spec : OracleSpec ι}
 
--- universe u v w z
+/-- `OracleQuery spec` inherets the functorial structure from `PFunctor.Obj`. -/
+instance {spec : OracleSpec ι} : Functor (OracleQuery spec) where
+  map := spec.toPFunctor.map
 
--- namespace OracleSpec
+instance {spec : OracleSpec ι} : LawfulFunctor (OracleQuery spec) :=
+  inferInstanceAs (LawfulFunctor (PFunctor.Obj spec.toPFunctor))
 
--- /-- An `OracleQuery` to one of the oracles in `spec`, bundling an index and the input to
--- use for querying that oracle, implemented as a dependent pair.
--- Implemented as a functor with the oracle output type as the constructor result. -/
--- inductive OracleQuery (spec : OracleSpec.{u,v}) : Type v → Type (max u v)
---   | query (t : spec.A) : OracleQuery spec (spec.B t)
+/-- The oracle input used in an oracle query. -/
+@[inline] def input {α} (q : OracleQuery spec α) : spec.Domain := q.1
 
--- namespace OracleQuery
+@[simp] lemma input_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
+    input (OracleQuery.mk t f) = t := rfl
 
--- variable {ι : Type u} {spec : OracleSpec} {α β : Type v}
+@[simp] lemma input_map {α β} (q : OracleQuery spec α) (f : α → β) :
+    (f <$> q).input = q.input := rfl
 
--- def defaultOutput [∀ i, Inhabited (spec.Range i)] : (q : OracleQuery spec α) → α
---   | query t => default
+@[simp] lemma input_map' {α β} (q : OracleQuery spec α) (f : α → β) :
+    OracleQuery.input (PFunctor.map spec.toPFunctor f q) = q.input := rfl
 
--- def input : (q : OracleQuery spec α) → spec.A | query t => t
+/-- The continutation used for the result of an oracle query. -/
+@[inline] def cont {α} (q : OracleQuery spec α) (f : spec.Range q.input) : α := q.2 f
 
--- @[simp] lemma input_query (t : spec.A) : (query t).input = t := rfl
+@[simp] lemma cont_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
+    cont (OracleQuery.mk t f) = f := rfl
 
--- @[simp]
--- lemma range_index : (q : OracleQuery spec α) → spec.B q.input = α | query t => rfl
+@[simp] lemma cont_map {α β} (q : OracleQuery spec α) (f : α → β) :
+    (f <$> q).cont = f ∘ q.cont := rfl
 
--- lemma eq_query_index_input : (q : OracleQuery spec α) →
---     q = q.Range_index ▸ OracleQuery.query q.input | query t => rfl
+@[simp] lemma cont_map' {α β} (q : OracleQuery spec α) (f : α → β) :
+    OracleQuery.cont (PFunctor.map spec.toPFunctor f q) = f ∘ q.cont := rfl
 
--- def rangeDecidableEq [spec.DecidableEq] : OracleQuery spec α → DecidableEq α
---   | query t => inferInstance
+/-- Two oracles queries are equal if they query for the same input and run
+extensionally equal continuation on the results of the query. -/
+@[ext] lemma ext {α} {q q' : OracleQuery spec α}
+    (h : q.input = q'.input) (h' : q.cont ≍ q'.cont) : q = q' := Sigma.ext h h'
 
--- def rangeFintype [spec.Fintype] : OracleQuery spec α → Fintype α
---   | query t => inferInstance
+/-- If an oracle exists and the output type is non-empty then the type of queries is non-empty. -/
+instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) where
+  default := OracleQuery.mk default fun _ => default
 
--- def rangeInhabited [spec.Inhabited] : OracleQuery spec α → Inhabited α
---   | query t => inferInstance
+/-- If there are no oracles available then the type of queries is empty. -/
+instance {α} [h : IsEmpty ι] : IsEmpty (OracleQuery spec α) where
+  false q := h.elim q.1
 
--- instance isEmpty : IsEmpty (OracleQuery []ₒ α) where false | query t => t.elim
+/-- If there is a at most one oracle and output, then ther is at most one query.-/
+instance {α} [h : Subsingleton ι] [h' : Subsingleton α] :
+    Subsingleton (OracleQuery spec α) where
+  allEq := fun ⟨t, f⟩ ⟨u, g⟩ => by
+    cases h.allEq t u
+    simp [OracleQuery.ext_iff, funext_iff]
+    refine fun x => h'.allEq (f x) (g x)
 
--- -- instance[hd : ∀ t, DecidableEq (spec.A t)] {α : Type u} :
--- --     DecidableEq (OracleQuery spec α)
--- --   | query i t => λ q ↦ match hι i q.index with
--- --     | isTrue h => by
--- --         have : q = query i (h ▸ q.input) := by
--- --           refine q.eq_query_index_input.trans (eq_of_heq (eqRec_heq_iff_heq.2 ?_))
--- --           congr
--- --           · exact h.symm
--- --           · exact HEq.symm (eqRec_heq (Eq.symm h) q.input)
--- --         rw [this, query.injEq]
--- --         exact hd i t _
--- --     | isFalse h => isFalse λ h' ↦ h (congr_arg index h')
+/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
+Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
+def query (t : spec.Domain) : OracleQuery spec (spec.Range t) := OracleQuery.mk t id
 
--- end OracleQuery
+lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
 
--- -- Put `query` in the main `OracleSpec` namespace
--- export OracleQuery (query)
+@[simp] lemma input_query (t : spec.Domain) : (query t).input = t := rfl
+@[simp] lemma cont_query (t : spec.Domain) : (query t).cont = id := rfl
 
--- -- /-- `PFunctor` corresponding to querying from oracles in `spec`. -/
--- -- def toPFunctor {ι : Type u} (spec : OracleSpec.{u,v}) : PFunctor where
--- --   A := (i : ι) × spec.Domain i
--- --   B := fun q => spec.Range q.1
+@[simp] lemma cont_map_query_input {α} (q : OracleQuery spec α) :
+    q.cont <$> (query q.input) = q := rfl
 
--- def OracleQuery.lift_toPFunctor (spec : OracleSpec.{u,v})
---     {α : Type v} (q : OracleQuery spec α) : spec α :=
---   match q with
---   | query t => ⟨t, id⟩
+@[simp] lemma cont_map_query_input' {α} (q : OracleQuery spec α) :
+    PFunctor.map spec.toPFunctor q.cont (query q.input) = q := rfl
 
--- end OracleSpec
+end OracleQuery

@@ -23,7 +23,7 @@ universe u v w
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec} {α β γ : Type v}
+variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
 
 section When
 

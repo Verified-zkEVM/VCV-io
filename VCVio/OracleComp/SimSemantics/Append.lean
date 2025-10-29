@@ -14,7 +14,7 @@ universe u v w
 
 namespace QueryImpl
 
-variable {spec₁ spec₂ : OracleSpec} {m n r : Type u → Type*}
+variable {ι₁ ι₂} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂} {m n r : Type u → Type*}
 
 /-- Simplest version of adding queries when all implementations are in the same monad.
 The actual add notation for `QueryImpl` uses `QueryImpl.addLift` which adds monad lifting
@@ -37,11 +37,12 @@ lemma add_apply (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m)
     (t : spec₂.Domain) : (impl₁ + impl₂) (.inr t) = impl₂ t := rfl
 
 /-- Version of `QueryImpl.add` that also lifts the two implementations to a shared lift monad. -/
-def addLift {spec₁ spec₂ : OracleSpec} {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
+def addLift {ι₁ ι₂} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
     (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ n) : QueryImpl (spec₁ + spec₂) r :=
   (impl₁.liftTarget r) + (impl₂.liftTarget r)
 
-@[simp] lemma addLift_def {spec₁ spec₂ : OracleSpec}
+@[simp] lemma addLift_def {ι₁ ι₂} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {m n r : Type u → Type*} [MonadLiftT m r] [MonadLiftT n r]
     (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ n) :
     (impl₁.addLift impl₂ : QueryImpl (spec₁ + spec₂) r) =

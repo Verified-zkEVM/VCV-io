@@ -23,7 +23,7 @@ declare_aesop_rule_sets [UnfoldEvalDist]
 end PMF
 
 /-- Subprobability distribution.
-dt: this should move to mathlib -/
+dt: Should expand the API a and port to mathlib. -/
 @[reducible] def SPMF : Type u → Type u := OptionT PMF
 
 namespace SPMF
@@ -34,7 +34,7 @@ def mk (p : PMF (Option α)) : SPMF α := p
 
 @[simp] lemma mk_run (p : SPMF α) : mk p.run = p := rfl
 
-@[simp] lemma liftM_PMF_eq (p : PMF α) :
+lemma liftM_eq_map (p : PMF α) :
     (liftM p : SPMF α) = SPMF.mk (p.map Option.some) := rfl
 
 lemma tsum_run_some_eq_one_sub (p : SPMF α) :
@@ -75,8 +75,30 @@ instance : FunLike (SPMF α) α ENNReal where
   coe sp x := sp.run (some x)
   coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
 
--- dt: is this really what we also want to simplify to?
-@[simp] lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
+lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
+
+@[simp] lemma liftM_apply (p : PMF α) (x : α) :
+    (liftM p : SPMF α) x = p x := by
+  simp only [liftM_eq_map, apply_eq_run_some, run_mk, PMF.map_apply, Option.some.injEq]
+  refine (tsum_eq_single x ?_).trans ?_
+  · aesop
+  · aesop
+
+lemma eq_liftM_iff_forall (p : SPMF α) (q : PMF α) :
+    p = liftM q ↔ ∀ x, p x = q x := by
+  sorry
+
+@[simp] lemma pure_apply [DecidableEq α] (x y : α) :
+    (pure x : SPMF α) y = if y = x then 1 else 0 := by
+  simp [SPMF.apply_eq_run_some]
+
+@[simp] lemma pure_apply_self (x : α) :
+    (pure x : SPMF α) x = 1 := by
+  simp [SPMF.apply_eq_run_some]
+
+@[simp] lemma bind_apply_eq_tsum (p : SPMF α) (q : α → SPMF β) (y : β) :
+    (p >>= q) y = ∑' x, p x * q x y := by
+  simp [SPMF.apply_eq_run_some, Option.elimM, tsum_option]
 
 section zero
 
@@ -87,7 +109,7 @@ noncomputable instance : Zero (SPMF α) where zero := SPMF.zero α
 lemma zero_def : (0 : SPMF α) = SPMF.zero α := rfl
 
 @[simp] lemma zero_apply (x : α) : (0 : SPMF α) x = 0 := by
-  simp [zero_def, SPMF.zero]
+  simp [zero_def, SPMF.zero, SPMF.apply_eq_run_some]
 
 end zero
 
@@ -95,10 +117,10 @@ protected def support : SPMF →ᵐ SetM where
   toFun x := Function.support x
   toFun_pure' x := by
     refine Set.ext fun y => ?_
-    simp
+    simp [SPMF.apply_eq_run_some]
   toFun_bind' x y := by
     refine Set.ext fun y => ?_
-    simp [Option.elimM, Function.comp_def]
+    simp [Option.elimM, Function.comp_def, SPMF.apply_eq_run_some]
     refine ⟨fun h => ?_, fun h => ?_⟩
     · obtain ⟨z, hz⟩ := h
       cases z with
@@ -116,7 +138,8 @@ end SPMF
 
 namespace PMF
 
-/-- Convert a `PMF` to an `SPMF` in the canonical way. -/
+/-- Convert a `PMF` to an `SPMF` in the canonical way.
+dtumad: this should probably be a bare function with a hom-class instance.  -/
 @[reducible] noncomputable def toSPMF : PMF →ᵐ SPMF where
   toFun := fun p ↦ OptionT.mk (p.map some)
   toFun_pure' x := by

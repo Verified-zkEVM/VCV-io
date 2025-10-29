@@ -27,23 +27,23 @@ namespace OracleComp
 
 section IsQueryBound
 
-variable {spec : OracleSpec} {ι : Type _} [HasIndexing spec ι] [DecidableEq ι] {α β γ : Type u}
+-- variable {ι} {spec : OracleSpec ι} {ι : Type _} [HasIndexing spec ι] [DecidableEq ι] {α β γ : Type u}
 
-/-- Predicate expressing that `queryBound` is a bound on the number of queries made by `oa`.
-In particular any simulation with a `countingOracle` produces counts that are smaller. -/
-def IsQueryBound (oa : OracleComp spec α) (queryBound : QueryCount ι) : Prop :=
-    ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
-      qc ≤ queryBound
+-- /-- Predicate expressing that `queryBound` is a bound on the number of queries made by `oa`.
+-- In particular any simulation with a `countingOracle` produces counts that are smaller. -/
+-- def IsQueryBound (oa : OracleComp spec α) (queryBound : QueryCount ι) : Prop :=
+--     ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
+--       qc ≤ queryBound
 
-lemma isQueryBound_def (oa : OracleComp spec α) (qb : QueryCount ι) :
-    IsQueryBound oa qb ↔
-      ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
-        qc ≤ qb :=
-  Iff.rfl
+-- lemma isQueryBound_def (oa : OracleComp spec α) (qb : QueryCount ι) :
+--     IsQueryBound oa qb ↔
+--       ∀ qc ∈ support (snd <$> (simulateQ (countingOracle HasIndexing.idx) oa).run),
+--         qc ≤ qb :=
+--   Iff.rfl
 
-lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι → ℕ}
-    (h' : IsQueryBound oa qb) (h : qb ≤ qb') : IsQueryBound oa qb' :=
-  λ qc hqc ↦ le_trans (h' qc hqc) h
+-- lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι → ℕ}
+--     (h' : IsQueryBound oa qb) (h : qb ≤ qb') : IsQueryBound oa qb' :=
+--   λ qc hqc ↦ le_trans (h' qc hqc) h
 
 -- lemma isQueryBound_iff_probEvent [spec.Fintype] [spec.Inhabited] {oa : OracleComp spec α} {qb : ι → ℕ} :
 --     IsQueryBound oa qb ↔
@@ -82,9 +82,9 @@ lemma isQueryBound_mono {oa : OracleComp spec α} (qb : ι → ℕ) {qb' : ι �
 --       apply a
 --       · exact h
 
-@[simp]
-lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : OracleComp spec α) qb := by
-  simp [isQueryBound_def]
+-- @[simp]
+-- lemma isQueryBound_pure (a : α) (qb : ι → ℕ) : IsQueryBound (pure a : OracleComp spec α) qb := by
+--   simp [isQueryBound_def]
 
 -- @[simp]
 -- lemma isQueryBound_failure (qb : ι → ℕ) : IsQueryBound (failure : OracleComp spec α) qb := by

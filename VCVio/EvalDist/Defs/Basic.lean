@@ -24,12 +24,67 @@ Should not be implemented manually if a `HasEvalSPMF` instance already exists. -
 class HasEvalSet (m : Type u → Type v) [Monad m] where
   toSet : m →ᵐ SetM
 
+/-- The set of possible outputs of running the monadic computation `mx`. -/
+def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
+  HasEvalSet.toSet.toFun mx
+
+@[aesop norm (rule_sets := [UnfoldEvalDist])]
+lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
+    support mx = HasEvalSet.toSet.toFun mx := rfl
+
+instance [HasEvalSet m] : MonadHomClass m SetM (@support m _ _) :=
+  inferInstanceAs (MonadHomClass m SetM @HasEvalSet.toSet.toFun)
+
 /-- The monad `m` can be evaluated to get a finite set of possible outputs.
-Note: this definition avoids needing `Finset` monad instances. -/
+We restrict to the case of decidable equality of the output type, so `Finset.biUnion` exists. -/
 class HasEvalFinset (m : Type u → Type v) [Monad m] [HasEvalSet m] where
-  toFinset : NatHom m Finset
-  coe_toFinset {α : Type u} (mx : m α) :
-    ((toFinset mx) : Set α) = HasEvalSet.toSet mx
+  finSupport {α : Type u} [DecidableEq α] (mx : m α) : Finset α
+  coe_toFinset {α : Type u} [DecidableEq α] (mx : m α) :
+    ((finSupport mx) : Set α) = support mx
+
+export HasEvalFinset (finSupport)
+
+-- /-- The finite set of outputs of running the monadic computation `mx`. -/
+-- def finSupport [HasEvalSet m] [HasEvalFinset m] {α : Type u} [DecidableEq α]
+--     (mx : m α) : Finset α :=
+--   HasEvalFinset.finSupport mx
+
+-- lemma finSupport_def [HasEvalSet m] [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+--     finSupport mx = HasEvalFinset.finSupport mx := rfl
+
+@[simp] lemma coe_finSupport [HasEvalSet m] [h : HasEvalFinset m] [DecidableEq α]
+    (mx : m α) : (↑(finSupport mx) : Set α) = support mx := h.coe_toFinset mx
+
+lemma mem_finSupport_iff_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    (mx : m α) (x : α) : x ∈ finSupport mx ↔ x ∈ support mx := by
+  rw [← Finset.mem_coe, coe_finSupport]
+
+lemma finSupport_eq_iff_support_eq_coe [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    (mx : m α) (s : Finset α) : finSupport mx = s ↔ support mx = ↑s := by
+  rw [← Finset.coe_inj, coe_finSupport]
+
+@[aesop unsafe 60% apply]
+lemma finSupport_eq_of_support_eq_coe [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {s : Finset α} (h : support mx = ↑s) : finSupport mx = s := by
+  rwa [finSupport_eq_iff_support_eq_coe]
+
+@[aesop unsafe 85% apply]
+lemma mem_finSupport_of_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {x : α} (h : x ∈ support mx) : x ∈ finSupport mx := by
+  rwa [← Finset.mem_coe, coe_finSupport]
+
+lemma mem_support_of_mem_finSupport [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {x : α} (h : x ∈ finSupport mx) : x ∈ support mx := by
+  rwa [← Finset.mem_coe, coe_finSupport] at h
+
+@[aesop unsafe 85% apply]
+lemma not_mem_finSupport_of_not_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {x : α} (h : x ∉ support mx) : x ∉ finSupport mx := by
+  rwa [← Finset.mem_coe, coe_finSupport]
+
+lemma not_mem_support_of_not_mem_finSupport [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {x : α} (h : x ∉ finSupport mx) : x ∉ support mx := by
+  rwa [← Finset.mem_coe, coe_finSupport] at h
 
 /-- The monad `m` can be evaluated to get a sub-distribution of outputs.
 Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
@@ -40,68 +95,9 @@ class HasEvalSPMF (m : Type u → Type v) [Monad m] where
 class HasEvalPMF (m : Type u → Type v) [Monad m] where
   toPMF : m →ᵐ PMF
 
-/-- Evaluate a `SPMF` to itself via identity. Mostly exists to give notation access. -/
-instance : HasEvalSPMF SPMF where toSPMF := MonadHom.id SPMF
-
-/-- Evaluate a `PMF` to itself via identity. Mostly exists to give notation access.
-Note: this requires `SPMF` to avoid circular type-class search. -/
-instance : HasEvalPMF PMF where toPMF := MonadHom.id PMF
-
-/-- The set of possible outputs of running the monadic computation `mx`. -/
-def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
-  HasEvalSet.toSet.toFun mx
-
-@[aesop norm (rule_sets := [UnfoldEvalDist])]
-lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
-    support mx = HasEvalSet.toSet.toFun mx := rfl
-
-/-- The finite set of outputs of running the monadic computation `mx`. -/
-def finSupport [HasEvalSet m] [HasEvalFinset m] {α : Type u} (mx : m α) : Finset α :=
-  HasEvalFinset.toFinset.toFun mx
-
-lemma finSupport_def [HasEvalSet m] [HasEvalFinset m] {α : Type u} (mx : m α) :
-    finSupport mx = HasEvalFinset.toFinset.toFun mx := rfl
-
-@[simp] lemma coe_finSupport [HasEvalSet m] [HasEvalFinset m]
-    (mx : m α) : (↑(finSupport mx) : Set α) = support mx := HasEvalFinset.coe_toFinset mx
-
-lemma mem_finSupport_iff_mem_support [HasEvalSet m] [HasEvalFinset m] (mx : m α) (x : α) :
-    x ∈ finSupport mx ↔ x ∈ support mx := by
-  rw [← Finset.mem_coe, coe_finSupport]
-
-lemma finSupport_eq_iff_support_eq_coe [HasEvalSet m] [HasEvalFinset m]
-    (mx : m α) (s : Finset α) : finSupport mx = s ↔ support mx = ↑s := by
-  rw [← Finset.coe_inj, coe_finSupport]
-
-@[aesop unsafe 60% apply]
-lemma finSupport_eq_of_support_eq_coe [HasEvalSet m] [HasEvalFinset m]
-    {mx : m α} {s : Finset α} (h : support mx = ↑s) : finSupport mx = s := by
-  rwa [finSupport_eq_iff_support_eq_coe]
-
-@[aesop unsafe 85% apply]
-lemma mem_finSupport_of_mem_support [HasEvalSet m] [HasEvalFinset m]
-    {mx : m α} {x : α} (h : x ∈ support mx) : x ∈ finSupport mx := by
-  rwa [← Finset.mem_coe, coe_finSupport]
-
-lemma mem_support_of_mem_finSupport [HasEvalSet m] [HasEvalFinset m]
-    {mx : m α} {x : α} (h : x ∈ finSupport mx) : x ∈ support mx := by
-  rwa [← Finset.mem_coe, coe_finSupport] at h
-
-@[aesop unsafe 85% apply]
-lemma not_mem_finSupport_of_not_mem_support [HasEvalSet m] [HasEvalFinset m]
-    {mx : m α} {x : α} (h : x ∉ support mx) : x ∉ finSupport mx := by
-  rwa [← Finset.mem_coe, coe_finSupport]
-
-lemma not_mem_support_of_not_mem_finSupport [HasEvalSet m] [HasEvalFinset m]
-    {mx : m α} {x : α} (h : x ∉ finSupport mx) : x ∉ support mx := by
-  rwa [← Finset.mem_coe, coe_finSupport] at h
-
 /-- The resulting distribution of running the monadic computation `mx`. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
-
-instance [HasEvalSet m] : MonadHomClass m SetM (@support m _ _) :=
-  inferInstanceAs (MonadHomClass m SetM @HasEvalSet.toSet.toFun)
 
 instance [HasEvalSPMF m] : MonadHomClass m SPMF (@evalDist m _ _) :=
   inferInstanceAs (MonadHomClass m SPMF @HasEvalSPMF.toSPMF.toFun)
@@ -129,6 +125,7 @@ notation "Pr[" p " | " mx "]" => probEvent mx p
 /-- Probability that a computation fails to return a value. -/
 notation "Pr[⊥" " | " mx "]" => probFailure mx
 
+-- dtumad: I think maybe we want to simp in the `←` direction here?
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma probOutput_def [HasEvalSPMF m] (mx : m α) (x : α) :
     Pr[= x | mx] = evalDist mx x := rfl
@@ -167,10 +164,14 @@ example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[⊥ | mx]
   ()
 
-lemma evalDist_ext {m : Type u → Type v} [Monad m] [HasEvalSPMF m]
-    {n : Type u → Type w} [Monad n] [HasEvalSPMF n] {mx : m α} {mx' : n α}
-    (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : evalDist mx = evalDist mx' :=
+lemma evalDist_ext {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : evalDist mx = evalDist mx' :=
   SPMF.ext h
+
+lemma evalDist_ext_iff {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    {mx : m α} {mx' : n α} : evalDist mx = evalDist mx' ↔ ∀ x, Pr[= x | mx] = Pr[= x | mx'] := by
+  refine ⟨fun h => ?_, evalDist_ext⟩
+  simp [probOutput_def, h]
 
 end probability_notation
 
@@ -233,20 +234,22 @@ section sums
 
 lemma probEvent_eq_tsum_indicator [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
     Pr[p | mx] = ∑' x : α, {x | p x}.indicator (Pr[= · | mx]) x := by
-  simp [probEvent_def, PMF.toOuterMeasure_apply, Set.indicator_image (Option.some_injective _),
-    tsum_option _ ENNReal.summable, probOutput_def, Function.comp_def]
+  simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable,
+    Set.indicator_image (Option.some_injective _), Function.comp_def, probOutput_def,
+    SPMF.apply_eq_run_some]
 
 lemma probEvent_eq_tsum_ite [HasEvalSPMF m] (mx : m α) (p : α → Prop) [DecidablePred p] :
     Pr[p | mx] = ∑' x : α, if p x then Pr[= x | mx] else 0 := by
   simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable,
-    Set.indicator, probOutput_def]
-
-@[simp] lemma probFailure_add_tsum_probOutput [HasEvalSPMF m] (mx : m α) :
-    Pr[⊥ | mx] + ∑' x, Pr[= x | mx] = 1 := by aesop (rule_sets := [UnfoldEvalDist])
+    Set.indicator, probOutput_def, SPMF.apply_eq_run_some]
 
 @[simp] lemma tsum_probOutput_add_probFailure [HasEvalSPMF m] (mx : m α) :
-    ∑' x, Pr[= x | mx] + Pr[⊥ | mx] = 1 :=
-  by rw [add_comm, probFailure_add_tsum_probOutput]
+    (∑' x, Pr[= x | mx]) + Pr[⊥ | mx] = 1 := by
+  exact SPMF.tsum_run_some_add_run_none (evalDist mx)
+
+@[simp] lemma probFailure_add_tsum_probOutput [HasEvalSPMF m] (mx : m α) :
+    Pr[⊥ | mx] + ∑' x, Pr[= x | mx] = 1 := by
+  rw [add_comm, tsum_probOutput_add_probFailure]
 
 end sums
 
@@ -254,7 +257,7 @@ end sums
 lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalSPMF m]
     (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
   rw [probEvent_eq_tsum_indicator, probOutput_def]
-  simp [PMF.monad_map_eq_map, tsum_option]
+  simp [PMF.monad_map_eq_map, tsum_option, SPMF.apply_eq_run_some]
   refine tsum_congr fun α => ?_
   aesop
 

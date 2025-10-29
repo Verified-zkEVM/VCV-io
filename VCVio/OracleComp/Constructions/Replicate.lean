@@ -23,15 +23,15 @@ universe u v w
 namespace OracleComp
 
 /-- Run the computation `oa` repeatedly `n` times to get a vector of `n` results. -/
-def replicate {spec : OracleSpec} {α : Type v}
+def replicate {ι} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
   (List.replicate n ()).mapM fun () => oa
 
-def replicateTR {spec : OracleSpec} {α : Type v}
+def replicateTR {ι} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
   (List.replicateTR n ()).mapM fun () => oa
 
-variable {spec : OracleSpec} {α β : Type v}
+variable {ι} {spec : OracleSpec ι} {α β : Type v}
   (oa : OracleComp spec α) (n : ℕ)
 
 @[simp]

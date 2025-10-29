@@ -3,8 +3,8 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.OracleComp
-import ToMathlib.Control.StateT
+import VCVio.OracleComp.SimSemantics.QueryImpl
+import ToMathlib.Control.OptionT
 
 /-!
 # Simulation Semantics for Oracles in a Computation
@@ -17,66 +17,6 @@ universe u v w
 
 variable {α β γ : Type u}
 
-/-- Specifies a way to simulate a set of oracles using another set of oracles.
-e.g. using uniform selection oracles with a query cache to simulate a random oracle.
-`simulateQ` gives a method for applying a simulation oracle to a specific computation. -/
-@[reducible] def QueryImpl (spec : OracleSpec) (m : Type u → Type v) :=
-  (x : spec.Domain) → m (spec.Range x)
-
-namespace QueryImpl
-
-variable {spec : OracleSpec} {m : Type u → Type v} {n : Type u → Type w}
-
-instance [spec.Inhabited] [Pure m] : Inhabited (QueryImpl spec m) := ⟨fun _ => pure default⟩
-
-/-- Two query implementations are the same if they are the same on all query inputs. -/
-@[ext] lemma ext {so so' : QueryImpl spec m}
-    (h : ∀ x : spec.Domain, so x = so' x) : so = so' := funext h
-
-/-- Gadget for auto-adding a lift to the end of a query implementation. -/
-def liftTarget (n : Type u → Type*) [MonadLiftT m n]
-    (impl : QueryImpl spec m) : QueryImpl spec n :=
-  fun t : spec.Domain => liftM (impl t)
-
-@[simp] lemma liftTarget_apply (n : Type u → Type*) [MonadLiftT m n]
-    (impl : QueryImpl spec m) (t : spec.Domain) : impl.liftTarget n t = liftM (impl t) := rfl
-
-@[simp] lemma liftTarget_self (impl : QueryImpl spec m) :
-    impl.liftTarget m = impl := rfl
-
-/-- Given that queries in `spec` lift to the monad `m` we get an implementation via lifting. -/
-def ofLift (spec : OracleSpec) (m : Type u → Type v)
-    [MonadLiftT (OracleQuery spec) m] : QueryImpl spec m :=
-  fun t : spec.Domain => liftM (query t)
-
-@[simp] lemma ofLift_apply (spec : OracleSpec) (m : Type u → Type v)
-    [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) : ofLift spec m t = liftM (query t) := rfl
-
-/-- Implement queries to `spec` in terms of themselves by preserving queries.  -/
-@[reducible, inline] def id (spec : OracleSpec) :
-    QueryImpl spec (OracleQuery spec) := ofLift _ _
-
-/-- Version of `id` that targets `OracleComp` instead of `OracleQuery`. -/
-@[reducible, inline] def id' (spec : OracleSpec) :
-    QueryImpl spec (OracleComp spec) := ofLift _ _
-
-/-- View a function from oracle inputs to outputs as an implementation in the `Id` monad.
-Can be used to run a computation to get a specific value. -/
-def ofFn (f : (t : spec.Domain) → spec.Range t) :
-    QueryImpl spec Id := f
-
-@[simp] lemma ofFn_apply (f : (t : spec.Domain) → spec.Range t)
-    (t : spec.Domain) : ofFn f t = f t := rfl
-
-/-- Version of `ofFn` that allows queries to fail to return a value. -/
-def ofFn? (f : (t : spec.Domain) → Option (spec.Range t)) :
-    QueryImpl spec Option := f
-
-@[simp] lemma ofFn?_apply (f : (t : spec.Domain) → Option (spec.Range t))
-    (t : spec.Domain) : ofFn? f t = f t := rfl
-
-end QueryImpl
-
 /-- `HasSimulateQ spec r m n` means that an implementation of `OracleQuery spec` in terms of
 a computation in `r` results in a implementation of computations in `m` in terms of `n`.
 This implementation is given by a bundled monad hom `simulateQ`. We also require that queries
@@ -87,12 +27,12 @@ queries to `spec` in `r` and recursively substitutes that implementation in an `
 computation, to get a value in the new spec `r`.
 For example taking `r` to be `PMF` lets you asign output distributions to queries and
 get an output distribution for the whole computaiton. -/
-class HasSimulateQ (spec : OracleSpec) (r : Type u → Type*)
+class HasSimulateQ {ι} (spec : OracleSpec ι) (r : Type u → Type*)
     (m : outParam (Type u → Type v)) [Monad m] [MonadLiftT (OracleQuery spec) m]
     (n : outParam (Type u → Type w)) [Monad n] [MonadLiftT r n] where
   simulateQ (impl : QueryImpl spec r) : m →ᵐ n
   simulateQ_liftM (impl : QueryImpl spec r) {α : Type u} (q : OracleQuery spec α) :
-    (simulateQ impl).toFun (liftM q : m α) = q.2 <$> liftM (impl q.1)
+    (simulateQ impl).toFun (liftM q : m α) = q.cont <$> liftM (impl q.input)
 
 export HasSimulateQ (simulateQ simulateQ_liftM)
 
@@ -100,7 +40,7 @@ attribute [simp] simulateQ_liftM
 
 section simulateQ
 
-variable {spec : OracleSpec} {r m n : Type u → Type*}
+variable {ι} {spec : OracleSpec ι} {r m n : Type u → Type*}
     [Monad m] [MonadLiftT (OracleQuery spec) m] [Monad n]
     [MonadLiftT r n] [HasSimulateQ spec r m n] (impl : QueryImpl spec r)
 
@@ -137,11 +77,11 @@ end simulateQ
 
 namespace OracleQuery
 
-variable {spec spec' : OracleSpec}
+variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
 
-/-- Given a map from queries in `spec` to queries in `spec'` we get a map on `OracleComp` as well
+/-- Given a map from queries in `spec` to queries in `spec'`, lift to a map on `OracleComp`
 by substituting each query for the new implementation in `spec'`. -/
-instance {spec spec' : OracleSpec} :
+instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} :
     HasSimulateQ spec (OracleQuery spec') (OracleComp spec) (OracleComp spec') where
   simulateQ impl := PFunctor.FreeM.mapMHom fun x => PFunctor.FreeM.lift (impl x)
   simulateQ_liftM _ _ _ := rfl
@@ -158,12 +98,12 @@ namespace OracleComp
 `OracleComp spec` to `n` by replacing queries with the corresponding implementation.
 Taking `n` to be `PMF`, `Set`, etc. makes it possible to substitute each query for some denotation
 like an output distribution and get the corresponding value for the entire computation.  -/
-instance {spec : OracleSpec} {n : Type u → Type w} [Monad n] [LawfulMonad n] :
+instance {ι} {spec : OracleSpec ι} {n : Type u → Type w} [Monad n] [LawfulMonad n] :
     HasSimulateQ spec n (OracleComp spec) n where
   simulateQ impl := PFunctor.FreeM.mapMHom impl
-  simulateQ_liftM impl q := by simp [PFunctor.FreeM.mapM]
+  simulateQ_liftM impl q := by simp [PFunctor.FreeM.mapM]; intro q'; rfl
 
-variable {spec : OracleSpec} {n : Type u → Type v}
+variable {ι} {spec : OracleSpec ι} {n : Type u → Type v}
   [Monad n] [LawfulMonad n] (impl : QueryImpl spec n)
 
 lemma simulateQ_def (impl : QueryImpl spec n) :
@@ -180,7 +120,7 @@ end OracleComp
 
 section OptionT
 
-variable {spec : OracleSpec} {r m n : Type u → Type*}
+variable {ι} {spec : OracleSpec ι} {r m n : Type u → Type*}
 
 /-- Apply `simulateQ` "underneath" an `OptionT` transformer. -/
 instance t [Monad r] [Monad m] [MonadLiftT (OracleQuery spec) m]
@@ -216,14 +156,18 @@ end StateT
 
 section tests
 
-example {spec₁ spec₂ : OracleSpec} (mx : OracleComp spec₁ α)
+variable {ι₁ ι₂ ι₃ ι₄}
+  {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+  {spec₃ : OracleSpec ι₃} {spec₄ : OracleSpec ι₄}
+
+example (mx : OracleComp spec₁ α)
     (impl₁ : QueryImpl spec₁ (OracleComp spec₂))
     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₂))) :
     OptionT (OracleComp spec₂) α :=
   simulateQ impl₂ <|
     simulateQ impl₁ mx
 
-example {spec₁ spec₂ spec₃ spec₄ : OracleSpec} (mx : OracleComp spec₁ α)
+example (mx : OracleComp spec₁ α)
     (impl₁ : QueryImpl spec₁ (OracleComp spec₂))
     (impl₂ : QueryImpl spec₂ (OptionT (OracleComp spec₃)))
     (impl₃ : QueryImpl spec₃ (OptionT (OracleComp spec₄))) :
@@ -232,8 +176,10 @@ example {spec₁ spec₂ spec₃ spec₄ : OracleSpec} (mx : OracleComp spec₁ 
 
 end tests
 
-instance (priority := high) {spec : OracleSpec} :
-    MonadLiftT (OracleComp []ₒ) (OracleComp spec) where
-  monadLift mx :=
-    let impl : QueryImpl []ₒ (OracleQuery spec) := fun t => PEmpty.elim t
-    simulateQ impl mx
+-- handled by sub-spec stuff
+-- /-- A computation with no oracles naturally lifts to one with any number of oracles. -/
+-- instance (priority := high) {ι} {spec : OracleSpec ι} :
+--     MonadLiftT (OracleComp []ₒ) (OracleComp spec) where
+--   monadLift mx :=
+--     let impl : QueryImpl []ₒ (OracleQuery spec) := fun t => PEmpty.elim t
+--     simulateQ impl mx

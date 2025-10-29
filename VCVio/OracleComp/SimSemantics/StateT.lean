@@ -19,7 +19,7 @@ open OracleSpec
 
 namespace OracleComp
 
-variable {ι : Type*} {spec : OracleSpec} {m : Type u → Type v} [Monad m] [LawfulMonad m]
+variable {ι : Type*} {spec : OracleSpec ι} {m : Type u → Type v} [Monad m] [LawfulMonad m]
   {σ : Type u} (so : QueryImpl spec (StateT σ m))
 
 /-- If the state type is `Subsingleton`, then we can represent simulation in terms of `simulate'`,

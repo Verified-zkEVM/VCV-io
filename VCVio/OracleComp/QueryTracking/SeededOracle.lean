@@ -24,37 +24,37 @@ open OracleComp OracleSpec
 
 universe u v w
 
-variable {ι : Type u} {spec : OracleSpec} [DecidableEq ι] [HasIndexing spec ι]
+variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι] --[HasIndexing spec ι]
 
-namespace QueryImpl
+-- namespace QueryImpl
 
-variable {m : Type u → Type v} [Monad m]
+-- variable {m : Type u → Type v} [Monad m]
 
-/-- Modify a `QueryImpl` to check for pregenerated responses for oracle queries first -/
-def withPregen (so : QueryImpl spec m) :
-    QueryImpl spec (ReaderT (spec.QuerySeed ι) m) :=
-  fun t => do
-    let seed ← read
-    let i := HasIndexing.idx t
-    do match seed i with
-      | u :: us =>
-        let u' : spec.Range t := HasIndexing.range_idx (ι := ι) t ▸ u
-        ReaderT.adapt (fun seed => Function.update seed i us) (return u')
-      | [] => so t
-
--- @[simp] lemma withPregen_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
---     so.withPregen.impl q = match q with | query i t => (do
+-- /-- Modify a `QueryImpl` to check for pregenerated responses for oracle queries first -/
+-- def withPregen (so : QueryImpl spec m) :
+--     QueryImpl spec (ReaderT (spec.QuerySeed ι) m) :=
+--   fun t => do
 --     let seed ← read
+--     let i := HasIndexing.idx t
 --     do match seed i with
---       | u :: us => ReaderT.adapt (fun seed => seed.update i us) (return u)
---       | [] => so.impl (query i t)) := rfl
+--       | u :: us =>
+--         let u' : spec.Range t := HasIndexing.range_idx (ι := ι) t ▸ u
+--         ReaderT.adapt (fun seed => Function.update seed i us) (return u')
+--       | [] => so t
 
-end QueryImpl
+-- -- @[simp] lemma withPregen_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
+-- --     so.withPregen.impl q = match q with | query i t => (do
+-- --     let seed ← read
+-- --     do match seed i with
+-- --       | u :: us => ReaderT.adapt (fun seed => seed.update i us) (return u)
+-- --       | [] => so.impl (query i t)) := rfl
 
-/-- Use pregenerated oracle responses for queries. -/
-@[inline, reducible] def seededOracle [DecidableEq ι] :
-    QueryImpl spec (ReaderT (QuerySeed spec ι) (OracleComp spec)) :=
-  (QueryImpl.ofLift spec (OracleComp spec)).withPregen
+-- end QueryImpl
+
+-- /-- Use pregenerated oracle responses for queries. -/
+-- @[inline, reducible] def seededOracle [DecidableEq ι] :
+--     QueryImpl spec (ReaderT (QuerySeed spec ι) (OracleComp spec)) :=
+--   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 
 -- namespace seededOracle
 

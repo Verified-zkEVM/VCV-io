@@ -10,7 +10,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 /-!
 # Output Distribution of Computations
 
-This file defines a `HasEvalPMF` for `OracleComp`, assuming uniform outputs of computations.
+This file defines `HasEvalDist` and related instances for `OracleComp`.
 -/
 
 open OracleSpec Option ENNReal BigOperators
@@ -19,18 +19,78 @@ universe u v w
 
 namespace OracleComp
 
-variable {spec : OracleSpec} {spec' : OracleSpec} {α β γ : Type w}
+variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}
 
-noncomputable instance [spec.Fintype] [spec.Inhabited] :
-    HasEvalPMF (OracleComp spec) where
-  toPMF := PFunctor.FreeM.mapMHom fun t : spec.Domain => PMF.uniformOfFintype (spec.Range t)
+section support
 
-/-- The support of a computation assuming any possible return value of queries.
-NOTE: should consider how well the "duplicate" instance works here. -/
-protected instance HasEvalSet_unbounded : HasEvalSet (OracleComp spec) where
-  toSet := PFunctor.FreeM.mapMHom (m := SetM) fun _ : spec.Domain => Set.univ
+/-- The possible outputs of `mx` when queries can output values in the specified sets. -/
+def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
+  simulateQ (r := SetM) o mx
+
+/-- The support of a computation assuming any possible return value of queries. -/
+instance : HasEvalSet (OracleComp spec) where
+  toSet := simulateQ (r := SetM) fun _ : spec.Domain => Set.univ
+
+lemma support_eq_simulateQ (mx : OracleComp spec α) :
+    support mx = simulateQ (r := SetM) (fun _ : spec.Domain => Set.univ) mx := rfl
+
+@[simp] lemma support_query (t : spec.Domain) :
+    support (liftM (query t) : OracleComp spec _) = Set.univ := by
+  simp [support_eq_simulateQ]
+
+end support
+
+section evalDist
+
+/-- The output distribution of `mx` when queries follow the specified distribution. -/
+noncomputable def evalDistWhen (d : QueryImpl spec SPMF) (mx : OracleComp spec α) : SPMF α :=
+  simulateQ (r := SPMF) d mx
+
+noncomputable instance [spec.Fintype] [spec.Inhabited] : HasEvalPMF (OracleComp spec) where
+  toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.Range t)
+
+lemma evalDist_eq_simulateQ [spec.Fintype] [spec.Inhabited] (mx : OracleComp spec α) :
+    evalDist mx = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
+
+@[simp] lemma evalDist_query [spec.Fintype] [spec.Inhabited] (t : spec.Domain) :
+    evalDist (liftM (query t) : OracleComp spec _) = PMF.uniformOfFintype (spec.Range t) := by
+  simp [evalDist_eq_simulateQ]
+
+end evalDist
+
+section finSupport
+
+/-- Finite version of support for when oracles have a finite set of possible outputs. -/
+instance [spec.Fintype] [spec.Inhabited] [spec.DecidableEq] :
+    HasEvalFinset (OracleComp spec) where
+  finSupport {α} _ mx := OracleComp.construct
+    (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) mx
+  coe_toFinset {α} _ mx := by
+    induction mx using OracleComp.inductionOn with
+    | pure x => simp
+    | query_bind t mx h => simp [h]
+
+@[simp] lemma finSupport_query [spec.Fintype] [spec.Inhabited] [spec.DecidableEq]
+    (t : spec.Domain) : finSupport (liftM (query t) : OracleComp spec _) = Finset.univ := by
+  simp [finSupport_eq_iff_support_eq_coe]
+
+end finSupport
 
 end OracleComp
+
+
+
+
+
+
+
+-- NOTE: most of below has been moved but need to confirm
+
+
+
+
+
+
 
 -- lemma support_def (oa : OracleComp spec α) :
 --     support oa = SetM.run (PFunctor.FreeM.mapM (fun _ => Set.univ) oa) := rfl

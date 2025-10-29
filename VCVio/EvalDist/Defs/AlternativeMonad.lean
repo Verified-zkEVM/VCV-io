@@ -45,7 +45,7 @@ protected class HasEvalSet.LawfulFailure (m : Type u → Type v)
     support (failure : m α) = ∅ := HasEvalSet.LawfulFailure.support_failure'
 
 @[simp] lemma finSupport_failure [HasEvalSet m] [HasEvalSet.LawfulFailure m]
-    [HasEvalFinset m] : finSupport (failure : m α) = ∅ := by
-  rw [← Finset.coe_inj, coe_finSupport, support_failure, Finset.coe_empty]
+    [HasEvalFinset m] [DecidableEq α] : finSupport (failure : m α) = ∅ := by
+  simp [finSupport_eq_iff_support_eq_coe]
 
 end alternative

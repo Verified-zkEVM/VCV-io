@@ -17,7 +17,7 @@ open OracleSpec OracleComp Prod Sum
 
 universe u v w
 
-variable {spec : OracleSpec} {α β γ : Type u}
+variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 
 -- namespace QueryImpl
 

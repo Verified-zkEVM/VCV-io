@@ -16,7 +16,7 @@ universe u v w
 
 open OracleSpec OracleComp
 
-variable {spec : OracleSpec} {α β γ : Type u}
+variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 
 namespace QueryImpl
 
@@ -36,13 +36,13 @@ end QueryImpl
 /-- Simulation oracle for tracking the quries in a `QueryLog`, without modifying the actual
 behavior of the oracle. Requires decidable equality of the indexing set to determine
 which list to update when queries come in. -/
-def loggingOracle {spec : OracleSpec} : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
+def loggingOracle {spec : OracleSpec ι} : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
 namespace loggingOracle
 
 @[simp] -- TODO: more general version/class for query impls that never have failures
-lemma probFailure_simulateQ {spec : OracleSpec.{0,0}} {α : Type}
+lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
     Pr[⊥ | ((simulateQ loggingOracle oa).run : OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by

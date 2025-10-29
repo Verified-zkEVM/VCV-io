@@ -20,7 +20,7 @@ universe u v w
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec} {α : Type u} {ω : Type u} [Monoid ω]
+variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoid ω]
 
 -- lemma fst_map_writerT_run_simulateQ
 --     {so : QueryImpl spec (WriterT ω (OracleComp spec))}

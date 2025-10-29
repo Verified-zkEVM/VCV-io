@@ -22,27 +22,27 @@ open OracleSpec OracleComp
 
 universe u v w
 
-variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec} {α β γ : Type u}
+variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type u}
 
 namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
-/-- Count the queries made by the computation using `idx` to categorize them. -/
-def withCounting (so : QueryImpl spec m) (idx : spec.Domain → ι) :
-    QueryImpl spec (WriterT (QueryCount ι) m) :=
-  fun t => tell (QueryCount.single (idx t)) *> so t
+-- /-- Count the queries made by the computation using `idx` to categorize them. -/
+-- def withCounting (so : QueryImpl spec m) {χ} (idx : spec.Domain → χ) :
+--     QueryImpl spec (WriterT (QueryCount ι) m) :=
+--   fun t => tell (QueryCount.single (idx t)) *> so t
 
 -- @[simp] lemma withCounting_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
 --     so.withCounting.impl q = tell (QueryCount.single q.index) *> ↑(so.impl q) := rfl
 
 end QueryImpl
 
-/-- Oracle for counting the number of queries made by a computation. The count is stored as a
-function from oracle indices to counts, to give finer grained information about the count. -/
-def countingOracle (idx : spec.Domain → ι) :
-    QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
-  (QueryImpl.ofLift spec (OracleComp spec)).withCounting idx
+-- /-- Oracle for counting the number of queries made by a computation. The count is stored as a
+-- function from oracle indices to counts, to give finer grained information about the count. -/
+-- def countingOracle (idx : spec.Domain → ι) :
+--     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
+--   (QueryImpl.ofLift spec (OracleComp spec)).withCounting idx
 
 namespace countingOracle
 

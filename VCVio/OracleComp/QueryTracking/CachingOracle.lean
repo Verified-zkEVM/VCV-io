@@ -19,7 +19,7 @@ open OracleComp OracleSpec
 
 universe u v w
 
-variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec} [spec.DecidableEq]
+variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
 
 namespace QueryImpl
 
@@ -42,7 +42,7 @@ def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache
 
 end QueryImpl
 
-@[inline, reducible] def randomOracle
+@[inline, reducible] def randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
     [∀ t : spec.Domain, SampleableType (spec.Range t)] :
     QueryImpl spec (StateT spec.QueryCache ProbComp) :=
   uniformSampleImpl.withCaching

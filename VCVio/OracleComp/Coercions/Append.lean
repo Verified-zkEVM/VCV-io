@@ -47,7 +47,9 @@ namespace OracleSpec
 
 universe u v w
 
-variable (spec₁ spec₂ spec₃ spec₄ : OracleSpec) {α β γ : Type u}
+variable {ι₁ ι₂ ι₃ ι₄}
+  {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+  {spec₃ : OracleSpec ι₃} {spec₄ : OracleSpec ι₄} {α β γ : Type u}
 
 section instances
 
@@ -107,7 +109,10 @@ set_option linter.unusedVariables false
 
 -- This set of examples serves as sort of a "unit test" for the coercions above
 variable (α : Type)
-  (spec₁ spec₂ spec₃ spec₄ coeSpec coeSuperSpec : OracleSpec)
+  {ι₁ ι₂ ι₃ ι₄ ι ι'}
+  {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+  {spec₃ : OracleSpec ι₃} {spec₄ : OracleSpec ι₄}
+  (coeSpec : OracleSpec ι) (coeSuperSpec : OracleSpec ι')
   [coeSpec ⊂ₒ coeSuperSpec]
 
 -- coerce a single `coin_spec` and then append extra oracles

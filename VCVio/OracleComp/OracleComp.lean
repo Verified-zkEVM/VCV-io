@@ -3,99 +3,41 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.Monad.Free
-import ToMathlib.Control.WriterT
-import ToMathlib.Control.AlternativeMonad
-import ToMathlib.Control.OptionT
-import Mathlib.Control.Lawful
 import VCVio.OracleComp.OracleQuery
 import ToMathlib.PFunctor.Free
 
 /-!
 # Computations with Oracle Access
 
-A value `oa : OracleComp spec α` represents a computation with return type `α`,
-with access to any of the oracles specified by `spec : OracleSpec`.
-Returning a value `x` corresponds to the computation `pure' α x`.
-The computation `queryBind' i t α ou` represents querying the oracle corresponding to index `i`
-on input `t`, getting a result `u : spec.Range i`, and then running `ou u`.
-We also allow for a `failure'` operation for quitting out.
-These operations induce `Monad` and `Alternative` instances on `OracleComp spec`.
-
-`pure' α a` gives a monadic `pure` operation, while a more general `>>=` operator
-is derived by induction on the first computation (see `OracleComp.bind`).
-This importantly allows us to define a `LawfulMonad` instance on `OracleComp spec`,
-which isn't possible if a general bind operator is included in the main syntax.
-
-We also define simple operations like `coin : OracleComp coinSpec Bool` for flipping a fair coin,
-and `$[0..n] : ProbComp (Fin (n + 1))` for selecting from an inclusive range.
-
-Note that the monadic structure on `OracleComp` exists only for a fixed `OracleSpec`,
-so it isn't possible to combine computations where one has a superset of oracles of the other.
-We later introduce a set of type coercions that mitigate this for most common cases,
-such as calling a computation with `spec` as part of a computation with `spec ++ spec'`.
 -/
 
-universe u v w z
-
-open OracleSpec
-
-/-- An oracle query returning a result of type `α`
-is a dependent pair of a query `i : spec.Domain` and a response function `spec.Range i → α`.
-This is a wrapper around `PFunctor.Obj`.
-dt: we could make this reducible to auto-derive instances? -/
-def OracleQuery (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
-  PFunctor.Obj ↑spec
-
-namespace OracleQuery
-
-instance {spec : OracleSpec} : Functor (OracleQuery spec) :=
-  inferInstanceAs (Functor (PFunctor.Obj ↑spec))
-
-instance {α} : IsEmpty (OracleQuery []ₒ α) where
-  false q := PEmpty.elim q.1
-
-variable {spec : OracleSpec}
-
-/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
-Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
-def query (t : spec.Domain) : OracleQuery spec (spec.Range t) := ⟨t, id⟩
-
-lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
-
-@[simp] lemma fst_query (t : spec.Domain) : (query t).fst = t := rfl
-@[simp] lemma snd_query (t : spec.Domain) : (query t).snd = id := rfl
-
-end OracleQuery
+universe u v w
 
 /-- `OracleComp spec α` represents computations with oracle access to oracles in `spec`,
-where the final return value has type `α`.
-The basic computation is just an `OracleQuery`, augmented with `pure` and `bind` by `FreeMonad`,
-and `failure` is also added after by the `OptionT` transformer.
-In practive computations in `OracleComp spec α` have have one of three forms:
-* `return x` to succeed with some `x : α` as the result.
-* `do u ← query i t; oa u` where `oa` is a continutation to run with the query result
-See `OracleComp.inductionOn` for an explicit induction principle. -/
-def OracleComp (spec : OracleSpec.{u,v}) : Type w → Type (max u v w) :=
-  PFunctor.FreeM ↑spec
+where the final return value has type `α`, represented as a free monad over the `PFunctor`
+corresponding to `spec.` -/
+def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) :
+    Type w → Type (max u v w) :=
+  PFunctor.FreeM spec.toPFunctor
 
-/-- Simplified notation for computations with no oracles besides random inputs. -/
+/-- Simplified notation for computations with no oracles besides random inputs.
+This specific case can be used with `#eval` to run a random program, see `OracleComp.runIO`. -/
 abbrev ProbComp : Type → Type := OracleComp unifSpec
 
-variable {α β γ : Type v} {spec : OracleSpec.{u,v}}
+variable {α β γ : Type v} {ι} {spec : OracleSpec.{u,v} ι}
 
 namespace OracleComp
 
 export OracleQuery (query query_def)
 
-instance (spec : OracleSpec) : Monad (OracleComp spec) :=
-  inferInstanceAs (Monad (PFunctor.FreeM ↑spec))
+instance (spec : OracleSpec ι) : Monad (OracleComp spec) :=
+  inferInstanceAs (Monad (PFunctor.FreeM spec.toPFunctor))
 
-instance (spec : OracleSpec) : LawfulMonad (OracleComp spec) :=
-  inferInstanceAs (LawfulMonad (PFunctor.FreeM ↑spec))
+instance (spec : OracleSpec ι) : LawfulMonad (OracleComp spec) :=
+  inferInstanceAs (LawfulMonad (PFunctor.FreeM spec.toPFunctor))
 
 instance : MonadLift (OracleQuery spec) (OracleComp spec) :=
-  inferInstanceAs (MonadLift (PFunctor.Obj ↑spec) (PFunctor.FreeM spec))
+  inferInstanceAs (MonadLift (PFunctor.Obj spec.toPFunctor) (PFunctor.FreeM spec.toPFunctor))
 
 protected lemma liftM_def (q : OracleQuery spec α) :
     (q : OracleComp spec α) = PFunctor.FreeM.lift q := rfl
@@ -158,7 +100,7 @@ protected lemma bind_congr' {oa oa' : OracleComp spec α} {ob ob' : α → Oracl
     (h : oa = oa') (h' : ∀ x, ob x = ob' x) : oa >>= ob = oa' >>= ob' := h ▸ bind_congr h'
 
 @[simp] -- NOTE: debatable if this should be simp
-lemma guard_eq {spec : OracleSpec} (p : Prop) [Decidable p] :
+lemma guard_eq {spec : OracleSpec ι} (p : Prop) [Decidable p] :
     (guard p : OptionT (OracleComp spec) Unit) = if p then pure () else failure := rfl
 
 -- NOTE: This should maybe be a `@[simp]` lemma? `apply_ite` can't be a simp lemma in general.

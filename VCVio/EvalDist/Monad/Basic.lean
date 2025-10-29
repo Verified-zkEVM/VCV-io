@@ -26,13 +26,17 @@ lemma mem_support_pure_iff [HasEvalSet m] (x y : α) :
 lemma mem_support_pure_iff' [HasEvalSet m] (x y : α) :
     x ∈ support (pure y : m α) ↔ y = x := by aesop
 
-@[simp] lemma finSupport_pure [HasEvalSet m] [HasEvalFinset m] (x : α) :
-    finSupport (pure x : m α) = {x} := by aesop
+instance [HasEvalSet m] (x : α) : Fintype (support (pure x : m α)) := by
+  rw [support_pure]
+  infer_instance
 
-lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] (x y : α) :
-    x ∈ finSupport (pure y : m α) ↔ x = y := by aesop
-lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] (x y : α) :
-    x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
+@[simp] lemma finSupport_pure [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    (x : α) : finSupport (pure x : m α) = {x} := by aesop
+
+lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    (x y : α) : x ∈ finSupport (pure y : m α) ↔ x = y := by aesop
+lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
 lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
     evalDist (pure x : m α) = pure x := by aesop
@@ -55,7 +59,8 @@ lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
 /-- Fallback when we don't have decidable equality. -/
 lemma probOutput_pure_eq_indicator [HasEvalSPMF m] (x y : α) :
     Pr[= x | (pure y : m α)] = Set.indicator {y} (Function.const α 1) x := by
-  aesop (rule_sets := [UnfoldEvalDist])
+  have : DecidableEq α := Classical.decEq α
+  simp [Set.indicator]
 
 @[simp] lemma probEvent_pure [HasEvalSPMF m] (x : α) (p : α → Prop) [DecidablePred p] :
     Pr[p | (pure x : m α)] = if p x then 1 else 0 := by
@@ -78,12 +83,12 @@ lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
 
 -- dt: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
-@[simp] lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m] [DecidableEq β]
-    (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
+@[simp] lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    [DecidableEq β] (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
 
-lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq β]
-    (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
+lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+    [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
 @[simp] lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
@@ -92,7 +97,7 @@ lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq β]
 
 lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
-  simp [probOutput, tsum_option _ ENNReal.summable, Option.elimM]
+  simp [probOutput_def]
 
 lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
     Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by

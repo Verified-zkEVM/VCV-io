@@ -23,7 +23,7 @@ open OracleSpec OracleComp BigOperators ENNReal
 universe u v w w'
 
 variable {ι : Type u} {τ : Type v}
-  {spec : OracleSpec} {superSpec : OracleSpec} {α β γ : Type w}
+  {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α β γ : Type w}
 
 namespace OracleSpec
 
@@ -34,7 +34,7 @@ it can be perfectly simulated by a computation using the oracles of `superSpec`.
 
 We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
-class SubSpec (spec : OracleSpec.{u,w}) (superSpec : OracleSpec)
+class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec τ)
   extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
 
 infix : 50 " ⊂ₒ " => SubSpec
@@ -108,12 +108,12 @@ namespace OracleComp
 section liftComp
 
 /-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries. -/
-def liftComp (oa : OracleComp spec α) (superSpec : OracleSpec)
+def liftComp (oa : OracleComp spec α) (superSpec : OracleSpec τ)
       [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
       OracleComp superSpec α :=
     simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa
 
-variable (superSpec : OracleSpec) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+variable (superSpec : OracleSpec τ) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 lemma liftComp_def (oa : OracleComp spec α) : liftComp oa superSpec =
     simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa := rfl
