@@ -543,8 +543,36 @@ def «forall» {β : Sort*} (P : β → HyperAssertion I α V) : HyperAssertion 
 /-- Separating conjunction of two hyper-assertions, `P ∗ Q`, defined for every `a` as the existence of elements
   `b₁ ∈ P` and `b₂ ∈ Q` respectively, such that `b₁ * b₂ ≤ a`. -/
 def sep (P : HyperAssertion I α V) (Q : HyperAssertion I α V) : HyperAssertion I α V :=
-  ⟨setOf (fun a => ∀ b, valid (a * b) → P b → Q (a * b)), fun a a' ha h b hb₁ hb₂ => by
-    simp_all; sorry⟩
+  ⟨
+    setOf (fun a => ∃ a₀ a₁ : IndexedPSpPm I α V, a = a₀ * a₁ ∧ P a₀ ∧ Q a₁),
+    by
+      intros a b a_b_ord
+      simp only [Set.mem_setOf]
+      rintro ⟨a₀, a₁, h⟩
+      have : ∃ c, b = a * c := by
+
+
+        -- apply?
+        -- unfold_projs at a_b_ord
+
+        -- apply?
+        sorry
+      rcases this with ⟨c, h'⟩
+      rw [h.1] at h'
+      use a₀
+      use (a₁ * c)
+      rw [h']
+      apply And.intro
+      · exact mul_assoc a₀ a₁ c
+      · apply And.intro
+        · exact h.2.1
+        · have := Q.2
+          unfold IsUpperSet at this
+          specialize @this a₁ (a₁ * c) sorry h.2.2
+          exact this
+  ⟩
+  -- ⟨setOf (fun a => ∀ b, valid (a * b) → P b → Q (a * b)), fun a a' ha h b hb₁ hb₂ => by
+  --   simp_all; sorry⟩
 
 /-- Separating implication of two hyper-assertions, `P -∗ Q`, defined for every `a` as the existence of elements
   `b₁ ∈ P` and `b₂ ∈ Q` respectively, such that `b₁ * b₂ ≤ a`. -/
