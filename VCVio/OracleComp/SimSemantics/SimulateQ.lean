@@ -30,7 +30,9 @@ get an output distribution for the whole computaiton. -/
 class HasSimulateQ {ι} (spec : OracleSpec ι) (r : Type u → Type*)
     (m : outParam (Type u → Type v)) [Monad m] [MonadLiftT (OracleQuery spec) m]
     (n : outParam (Type u → Type w)) [Monad n] [MonadLiftT r n] where
+  /-- The mapping from `m` to `n` induced by implementing `spec` in terms of `r`. -/
   simulateQ (impl : QueryImpl spec r) : m →ᵐ n
+  /-- Simulating a query is the same as applying the implementation to the query input. -/
   simulateQ_liftM (impl : QueryImpl spec r) {α : Type u} (q : OracleQuery spec α) :
     (simulateQ impl).toFun (liftM q : m α) = q.cont <$> liftM (impl q.input)
 
@@ -69,8 +71,8 @@ lemma simulateQ_seqLeft [LawfulMonad m] [LawfulMonad n] (mx : m α) (my : m β) 
 lemma simulateQ_seqRight [LawfulMonad m] [LawfulMonad n] (mx : m α) (my : m β) :
     simulateQ impl (mx *> my) = simulateQ impl mx *> simulateQ impl my := by simp
 
-@[simp] lemma simulateQ_ite (p : Prop) [Decidable p] (mx oa' : m α) :
-    simulateQ impl (ite p mx oa') = ite p (simulateQ impl mx) (simulateQ impl oa') := by
+@[simp] lemma simulateQ_ite (p : Prop) [Decidable p] (mx mx' : m α) :
+    simulateQ impl (ite p mx mx') = ite p (simulateQ impl mx) (simulateQ impl mx') := by
   split_ifs <;> rfl
 
 end simulateQ
@@ -89,6 +91,17 @@ instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} :
 lemma simulateQ_def (impl : QueryImpl spec (OracleQuery spec')) :
     (simulateQ impl : OracleComp spec →ᵐ OracleComp spec') =
       PFunctor.FreeM.mapMHom fun x => liftM (impl x) := rfl
+
+/-- `QueryImpl.id` is an identity for `simulateQ` with implementaiton in `OracleQuery spec`. -/
+@[simp] lemma simulateQ_id (mx : OracleComp spec α) :
+    simulateQ (QueryImpl.id spec) mx = mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx h => simp [h]
+
+/-- Lifting queries to their original implementation has no effect on a computation. -/
+lemma simulateQ_ofLift_eq_self {α} (mx : OracleComp spec α) :
+    simulateQ (QueryImpl.ofLift spec (OracleQuery spec)) mx = mx := by simp
 
 end OracleQuery
 
@@ -109,12 +122,16 @@ variable {ι} {spec : OracleSpec ι} {n : Type u → Type v}
 lemma simulateQ_def (impl : QueryImpl spec n) :
     (simulateQ impl : OracleComp spec →ᵐ n) = PFunctor.FreeM.mapMHom impl := rfl
 
-/-- Replacing queries with themselves has no effect. -/
-@[simp] lemma simulateQ_ofLift_eq_self (mx : OracleComp spec α) :
-    simulateQ (QueryImpl.ofLift spec (OracleComp spec)) mx = mx := by
+/-- `QueryImpl.id'` is an identity for `simulateQ` with implementaiton in `OracleComp spec`. -/
+@[simp] lemma simulateQ_id' (mx : OracleComp spec α) :
+    simulateQ (QueryImpl.id' spec) mx = mx := by
   induction mx using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx h => simp [h]
+
+/-- Lifting queries to their original implementation has no effect on a computation. -/
+lemma simulateQ_ofLift_eq_self {α} (mx : OracleComp spec α) :
+    simulateQ (QueryImpl.ofLift spec (OracleComp spec)) mx = mx := by simp
 
 end OracleComp
 
@@ -123,7 +140,7 @@ section OptionT
 variable {ι} {spec : OracleSpec ι} {r m n : Type u → Type*}
 
 /-- Apply `simulateQ` "underneath" an `OptionT` transformer. -/
-instance t [Monad r] [Monad m] [MonadLiftT (OracleQuery spec) m]
+instance [Monad r] [Monad m] [MonadLiftT (OracleQuery spec) m]
     [Monad n] [LawfulMonad n] [MonadLiftT r n]
     [HasSimulateQ spec r m n] : HasSimulateQ spec r (OptionT m) (OptionT n) where
   simulateQ impl := by
@@ -146,13 +163,9 @@ end OptionT
 
 section ErrorT
 
+-- TODO
 
 end ErrorT
-
-section StateT
-
-
-end StateT
 
 section tests
 

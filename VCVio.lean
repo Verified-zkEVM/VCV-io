@@ -38,6 +38,7 @@ import VCVio.OracleComp.Constructions.UniformSelect
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.OracleComp
+import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.QueryTracking.CachingOracle
@@ -49,6 +50,7 @@ import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT

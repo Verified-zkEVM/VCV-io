@@ -1,9 +1,11 @@
 /-
-Copyright (c) 2024 Devon Tuma. All rights reserved.
+Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.OracleComp
+import Mathlib.Algebra.Polynomial.Eval.Defs
+import Mathlib.Algebra.MvPolynomial.Eval
 
 /-!
 # Implementing Oracle Queries in Other Monads
@@ -44,6 +46,8 @@ def mapQuery {α} [Functor m] (impl : QueryImpl spec m)
     (t : spec.Domain) : impl.mapQuery (query t) = impl t := by
   simp [mapQuery]
 
+section liftTarget
+
 /-- Gadget for auto-adding a lift to the end of a query implementation. -/
 def liftTarget (n : Type u → Type*) [MonadLiftT m n]
     (impl : QueryImpl spec m) : QueryImpl spec n :=
@@ -52,6 +56,7 @@ def liftTarget (n : Type u → Type*) [MonadLiftT m n]
 @[simp] lemma liftTarget_apply (n : Type u → Type*) [MonadLiftT m n]
     (impl : QueryImpl spec m) (t : spec.Domain) : impl.liftTarget n t = liftM (impl t) := rfl
 
+/-- Lifting an implementation to the original monad has no effect. -/
 @[simp] lemma liftTarget_self (impl : QueryImpl spec m) :
     impl.liftTarget m = impl := rfl
 
@@ -60,6 +65,35 @@ def liftTarget (n : Type u → Type*) [MonadLiftT m n]
     [LawfulMonadLiftT m n] (impl : QueryImpl spec m) (q : OracleQuery spec α) :
     (impl.liftTarget n).mapQuery q = liftM (impl.mapQuery q) := by
   simp [mapQuery]
+
+end liftTarget
+
+section id
+
+/-- Identity implementation for queries, sending `q : OracleQuery spec α` to itself. -/
+protected def id (spec : OracleSpec ι) :
+    QueryImpl spec (OracleQuery spec) := query
+
+@[simp] lemma id_apply {spec : OracleSpec ι} (t : spec.Domain) :
+    QueryImpl.id spec t = query t := rfl
+
+@[simp] lemma mapQuery_id {α} {spec : OracleSpec ι} (q : OracleQuery spec α) :
+    (QueryImpl.id spec).mapQuery q = q := rfl
+
+/-- Version of `QueryImpl.id` that automatically lifts into `OracleComp spec` rather than
+just implementing queries in the lower level `OracleQuery spec` monad -/
+protected def id' {ι} (spec : OracleSpec ι) :
+    QueryImpl spec (OracleComp spec) := QueryImpl.liftTarget _ (QueryImpl.id spec)
+
+@[simp] lemma id'_apply {spec : OracleSpec ι} (t : spec.Domain) :
+    QueryImpl.id' spec t = liftM (query t) := rfl
+
+@[simp] lemma mapQuery_id' {α} {spec : OracleSpec ι} (q : OracleQuery spec α) :
+    (QueryImpl.id' spec).mapQuery q = q := rfl
+
+end id
+
+section ofLift
 
 /-- Given that queries in `spec` lift to the monad `m` we get an implementation via lifting. -/
 def ofLift (spec : OracleSpec ι) (m : Type u → Type v)
@@ -74,13 +108,13 @@ def ofLift (spec : OracleSpec ι) (m : Type u → Type v)
     (ofLift spec m).mapQuery q = q.cont <$> liftM (query q.input) := by
   simp [mapQuery]
 
-/-- Implement queries to `spec` in terms of themselves by preserving queries.  -/
-@[reducible] protected def id (spec : OracleSpec ι) :
-    QueryImpl spec (OracleQuery spec) := ofLift _ _
+@[simp] lemma ofLift_eq_id : ofLift spec (OracleQuery spec) = QueryImpl.id spec := rfl
 
-/-- Version of `id` that targets `OracleComp` instead of `OracleQuery`. -/
-@[reducible] protected def id' {ι} (spec : OracleSpec ι) :
-    QueryImpl spec (OracleComp spec) := ofLift _ _
+@[simp] lemma ofLift_eq_id' : ofLift spec (OracleComp spec) = QueryImpl.id' spec := rfl
+
+end ofLift
+
+section ofFn
 
 /-- View a function from oracle inputs to outputs as an implementation in the `Id` monad.
 Can be used to run a computation to get a specific value. -/
@@ -93,6 +127,10 @@ def ofFn (f : (t : spec.Domain) → spec.Range t) :
 @[simp] lemma mapQuery_ofFn {α} (f : (t : spec.Domain) → spec.Range t)
     (q : OracleQuery spec α) : (ofFn f).mapQuery q = q.cont (f q.input) := rfl
 
+end ofFn
+
+section ofFn?
+
 /-- Version of `ofFn` that allows queries to fail to return a value. -/
 def ofFn? (f : (t : spec.Domain) → Option (spec.Range t)) :
     QueryImpl spec Option := f
@@ -102,5 +140,27 @@ def ofFn? (f : (t : spec.Domain) → Option (spec.Range t)) :
 
 @[simp] lemma mapQuery_ofFn? {α} (f : (t : spec.Domain) → Option (spec.Range t))
     (q : OracleQuery spec α) : (ofFn? f).mapQuery q = (f q.input).map q.cont := rfl
+
+end ofFn?
+
+/-- Implement a single oracle as evaluation of a `Polynomial`. -/
+@[reducible] def ofPolynomial {R} [Semiring R] (p : Polynomial R) :
+    QueryImpl (R →ₒ R) Id :=
+  .ofFn fun t : R => p.eval t
+
+/-- Implement a single oracle as the evaluation of an `MvPolynomial. -/
+@[reducible] def ofMvPolynomial {R σ} [CommSemiring R] (p : MvPolynomial σ R) :
+    QueryImpl ((σ → R) →ₒ R) Id :=
+  .ofFn fun t : σ → R => p.eval t
+
+/-- Implement a single oracle as indexing into a `Vector`. -/
+@[reducible] def ofVector {α n} (v : Vector α n) :
+    QueryImpl (Fin n →ₒ α) Id :=
+  .ofFn fun t : Fin n => v[t]
+
+/-- Oracle context for ability to query elements of a vector `v`. -/
+@[reducible] def ofListVector {α n} (v : List.Vector α n) :
+    QueryImpl (Fin n →ₒ α) Id :=
+  .ofFn fun t : Fin n => v[t]
 
 end QueryImpl

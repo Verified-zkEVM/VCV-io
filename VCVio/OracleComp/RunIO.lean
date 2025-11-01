@@ -31,15 +31,19 @@ def test1 : ProbComp (ℕ × ℕ × ℕ) := do
   let y ← $[0..3141]
   return (x, y, x + y)
 
-def test2 (n : ℕ) : ProbComp (List ℕ) :=
+def test2 (n : ℕ) : ProbComp (List ℕ) := do
   match n with
   | 0 => return []
-  | n + 1 => do
-      let x ← $[0..10]
-      let xs ← test2 n
-      return x :: xs
+  | n + 1 => return (← $[0..10]) :: (← test2 n)
+
+def test3 (n : ℕ) : ProbComp (List ℕ) := do
+  let mut xs := []
+  for _ in List.range n do
+    xs := (← $[0..10]) :: xs
+  return xs
 
 -- #eval test1
 -- #eval test2 100
+-- #eval test3 100
 
 end OracleComp
