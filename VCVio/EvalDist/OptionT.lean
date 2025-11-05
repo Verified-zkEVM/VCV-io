@@ -47,12 +47,12 @@ variable (m : Type u → Type v) [Monad m] {α β γ : Type u}
 -- /-- If we have a `HasEvalPMF m` instance, we can lift it to `HasEvalSPMF (OptionT m)`
 
 -- NOTE: we do _not_ want to lift `HasEvalSPMF` to itself (wrapped in `OptionT`). This means we only support one layer of failure (i.e. `OracleComp` satisfies `HasEvalPMF`, and so `OptionT OracleComp` satisfies `HasEvalSPMF`). This suffices for all known purposes. -/
--- noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
---     HasEvalSPMF (OptionT m) where
---   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
+noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
+    HasEvalSPMF (OptionT m) where
+  toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
 
--- @[simp] lemma evalDist_eq [HasEvalPMF m] (mx : OptionT m α) :
---     evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
+@[simp] lemma evalDist_eq [HasEvalPMF m] (mx : OptionT m α) :
+    evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
 
 -- @[simp]
 -- lemma probOutput_eq [HasEvalPMF m] (mx : OptionT m α) (x : α) :
