@@ -103,14 +103,38 @@ def MeasureTheory.MeasureSpace.indepProduct (m₁ : MeasureSpace Ω) (m₂ : Mea
   · exact none
 
 /-- The partial operation of independent product on `ProbabilitySpace`s, when it exists -/
-def ProbabilityTheory.ProbabilitySpace.indepProduct (m₁ : ProbabilitySpace Ω) (m₂ : ProbabilitySpace Ω) : Option (ProbabilitySpace Ω) := by
+def ProbabilityTheory.ProbabilitySpace.indepProduct (m₁ : ProbabilitySpace Ω) (m₂ : ProbabilitySpace Ω) :
+  Option (ProbabilitySpace Ω)
+:= by
   classical
   by_cases h : (m₁.toMeasureSpace.indepProduct m₂.toMeasureSpace).isSome
-  · exact some (@ProbabilitySpace.mk Ω ((m₁.toMeasureSpace.indepProduct m₂.toMeasureSpace).get h) (by
-    sorry))
+  · exact
+      some
+        (@ProbabilitySpace.mk Ω ((m₁.toMeasureSpace.indepProduct m₂.toMeasureSpace).get h)
+          (by
+            constructor
+            have h' := h
+            simp [MeasureSpace.indepProduct] at h'
+            unfold volume
+            simp [Option.get]
+            simp [MeasureSpace.indepProduct] at h ⊢
+            split
+            rename_i x x_1 x_2 x_3 heq heq_1
+            simp
+            simp_all only [↓reduceDIte, Option.some.injEq, heq_eq_eq]
+            subst heq
+            simp_all only [Option.isSome_some]
+            unfold_projs
+            simp [OuterMeasure.measureOf]
+            unfold Measure.IndependentProduct.μ
+            sorry
+          )
+        )
   · exact none
 
 end
+
+#check MeasureTheory.Measure
 
 end IndependentProduct
 

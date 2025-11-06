@@ -259,8 +259,6 @@ instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
   elim := sorry
   -- mul_right_mono := sorry
 
-#check Measure.prod
-
 open ENNReal in
 def PMF.prod {Ω₁ Ω₂ : Type u}
   (μ : PMF Ω₁)
@@ -315,10 +313,20 @@ where
       )
     aesop (add safe (by mono))
   iUnion_nat := by
-
     sorry
   m_iUnion := sorry
   trim_le := sorry
+
+
+lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
+  Nonempty Ω
+:= by
+  have measure_univ := ps.is_prob.1
+  simp only [DFunLike.coe] at measure_univ
+  have measure_ne_zero := ne_zero_of_eq_one measure_univ
+  have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
+  rcases univ_nonempty with ⟨x, _⟩
+  exact Nonempty.intro x
 
 def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   (ps₁ : ProbabilitySpace Ω₁)
@@ -326,15 +334,26 @@ def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   ProbabilitySpace (Ω₁ × Ω₂)
 :=
   let v₁ := ps₁.volume
+  have p₁ := ps₁.is_prob
   let v₂ := ps₂.volume
+  have p₂ := ps₂.is_prob
   let _ : IsProbabilityMeasure (Measure.prod v₁ v₂) :=
     ⟨by
-      unfold_projs
+      simp only [DFunLike.coe, Measure.instFunLike, Measure.toOuterMeasure]
       unfold Measure.prod
-      sorry
+      simp
+      simp_all only [v₁, v₂]
+      simp only
+        [ Set.range,
+          Prod.exists,
+          exists_eq,
+          exists_comm
+        ]
+      have ne₁ : Nonempty Ω₁ := ProbabilitySpace.event_space_nonepmty ps₁
+      have ne₂ : Nonempty Ω₂ := ProbabilitySpace.event_space_nonepmty ps₂
+      simp [ne₁, ne₂, p₁, p₂]
     ⟩
-  -- ProbabilitySpace.mk sorry
-  sorry
+  ProbabilitySpace.mk
 
 variable {V : Type*}
 
@@ -550,12 +569,14 @@ def sep (P : HyperAssertion I α V) (Q : HyperAssertion I α V) : HyperAssertion
       simp only [Set.mem_setOf]
       rintro ⟨a₀, a₁, h⟩
       have : ∃ c, b = a * c := by
-
-
-        -- apply?
-        -- unfold_projs at a_b_ord
-
-        -- apply?
+        unfold LE.le Pi.hasLe
+          at a_b_ord
+        dsimp only [LE.le] at a_b_ord
+        have c : IndexedPSpPm I α V := by
+          intro i
+          specialize a_b_ord i
+          sorry
+        unfold_projs
         sorry
       rcases this with ⟨c, h'⟩
       rw [h.1] at h'
