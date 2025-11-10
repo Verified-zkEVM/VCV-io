@@ -281,11 +281,6 @@ def PMF.prod {Ω₁ Ω₂ : Type u}
       sorry
   ⟩
 
-#check HasSum.prod_mk
-#check HasSum.mul
-
-#check Set.image
-
 def Measure.prod {Ω₁ Ω₂ : Type u} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
   (μ : Measure Ω₁)
   (ν : Measure Ω₂) :
@@ -313,10 +308,32 @@ where
       )
     aesop (add safe (by mono))
   iUnion_nat := by
-    sorry
-  m_iUnion := sorry
-  trim_le := sorry
+    simp only
+      [ OuterMeasure.measureOf_eq_coe,
+        Measure.coe_toOuterMeasure
+      ]
+    intro s pw
+    let h₁ := μ.iUnion_nat (fun n ↦ Prod.fst '' (s n))
 
+    let h₂ := ν.iUnion_nat
+
+    intro a ha
+    simp [tsum_def] at ha
+    simp [tsum_meas_le_meas_iUnion_of_disjoint]
+    sorry
+  m_iUnion := by
+    intro f ms_ pw
+    let h₁ := μ.m_iUnion
+    let h₂ := ν.m_iUnion
+    simp
+    simp only [DFunLike.coe]
+    simp
+    sorry
+  trim_le := by
+    simp
+    sorry
+
+#check OuterMeasure.trim_eq
 
 lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
   Nonempty Ω
@@ -357,6 +374,30 @@ def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
 
 variable {V : Type*}
 
+open ENNReal in
+def abc {p : Permission α} :
+  ({ a // p a > 0 } → ℝ≥0∞) × ({ a // p a = 0 } → ℝ≥0∞) ≃ (α → ℝ≥0∞)
+where
+  toFun := by
+    rintro ⟨f₁, f₂⟩ a
+    by_cases pos : p a > 0
+    · apply f₁
+      use a
+    · apply f₂
+      simp_all only [gt_iff_lt, not_lt, NNRat.nonpos_iff_eq_zero]
+      use a
+  invFun := by
+    intro f
+    constructor
+    · intro pos
+      apply f
+      use pos
+    · intro pos
+      apply f
+      use pos
+  left_inv := sorry
+  right_inv := sorry
+
 open Classical in
 -- Needs to encode the term `P = P' ⊗ 𝟙_ (p.support → V)` in the paper
 /-- Compatibility of a probability space with a permission, defined as the existence of a splitting between:
@@ -371,8 +412,12 @@ def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α
     ∃ _P' : ProbabilitySpace ({a // p a > 0} → V),
       let _P'' :=
         ProbabilitySpace.prod _P' chosenOne
-      True
+      by
+        -- have : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) = { a // p a = 0 } → V :=
+        exact _P'' = _P''
       -- _P = bla
+
+#check Equiv
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
