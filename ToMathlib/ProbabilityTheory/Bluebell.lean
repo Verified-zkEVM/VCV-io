@@ -328,12 +328,23 @@ where
     simp
     simp only [DFunLike.coe]
     simp
+    -- apply?
     sorry
   trim_le := by
     simp
     sorry
 
-#check OuterMeasure.trim_eq
+#check tsum_prod'
+#check tsum_eq_tsum_of_hasSum_iff_hasSum
+#check tsum_image
+#check tsum_meas_le_meas_iUnion_of_disjoint
+#check tsum_meas_le_meas_iUnion_of_disjoint₀
+#check tsum_mul_tsum_eq_tsum_sum_antidiagonal
+#check tsum_mul_tsum_of_summable_norm
+-- #check tsum_
+
+#check measure_biUnion_finset₀
+#check ENNReal.tsum_eq_iSup_sum
 
 lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
   Nonempty Ω
