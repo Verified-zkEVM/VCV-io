@@ -64,15 +64,6 @@ def MeasurableSpace.prod'' {Ω₁ Ω₂ : Type u}
     return X₁.prod X₂
   MeasurableSpace.generateFrom seed
 
-lemma prod_eq_prod' {Ω} {m₁ m₂ : MeasurableSpace Ω} :
-  MeasurableSpace.prod m₁ m₂ = MeasurableSpace.prod' m₁ m₂
-:= by
-  unfold MeasurableSpace.prod MeasurableSpace.prod'
-  -- simp
-  unfold_projs
-  simp
-  sorry
-
 notation(priority := high) m₁ " ⨂ " m₂ => MeasurableSpace.prod' m₁ m₂
 
 /-- The class of **discrete** cameras, which do not care about step-indexing -/
@@ -281,80 +272,15 @@ def PMF.prod {Ω₁ Ω₂ : Type u}
       sorry
   ⟩
 
-def Measure.prod {Ω₁ Ω₂ : Type u} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
-  (μ : Measure Ω₁)
-  (ν : Measure Ω₂) :
-  Measure (Ω₁ × Ω₂)
-where
-  measureOf := λ S ↦
-    let S₀ : Set Ω₁ := Prod.fst '' S
-    let S₁ : Set Ω₂ := Prod.snd '' S
-    (μ.measureOf S₀) * (ν.measureOf S₁)
-  empty := by
-    aesop
-  mono := by
-    intro s₁ s₂ h
-    have := @μ.mono (Prod.fst '' s₁) (Prod.fst '' s₂)
-      (by
-        rw [Set.image_subset_iff]
-        exact Set.Subset.trans h
-          (Set.subset_preimage_image Prod.fst s₂)
-      )
-    have := @ν.mono (Prod.snd '' s₁) (Prod.snd '' s₂)
-      (by
-        rw [Set.image_subset_iff]
-        exact Set.Subset.trans h
-          (Set.subset_preimage_image Prod.snd s₂)
-      )
-    aesop (add safe (by mono))
-  iUnion_nat := by
-    simp only
-      [ OuterMeasure.measureOf_eq_coe,
-        Measure.coe_toOuterMeasure
-      ]
-    intro s pw
-    let h₁ := μ.iUnion_nat (fun n ↦ Prod.fst '' (s n))
-
-    let h₂ := ν.iUnion_nat
-
-    intro a ha
-    simp [tsum_def] at ha
-    simp [tsum_meas_le_meas_iUnion_of_disjoint]
-    sorry
-  m_iUnion := by
-    intro f ms_ pw
-    let h₁ := μ.m_iUnion
-    let h₂ := ν.m_iUnion
-    simp
-    simp only [DFunLike.coe]
-    simp
-    -- apply?
-    sorry
-  trim_le := by
-    simp
-    sorry
-
-#check tsum_prod'
-#check tsum_eq_tsum_of_hasSum_iff_hasSum
-#check tsum_image
-#check tsum_meas_le_meas_iUnion_of_disjoint
-#check tsum_meas_le_meas_iUnion_of_disjoint₀
-#check tsum_mul_tsum_eq_tsum_sum_antidiagonal
-#check tsum_mul_tsum_of_summable_norm
--- #check tsum_
-
-#check measure_biUnion_finset₀
-#check ENNReal.tsum_eq_iSup_sum
-
-lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
-  Nonempty Ω
-:= by
-  have measure_univ := ps.is_prob.1
-  simp only [DFunLike.coe] at measure_univ
-  have measure_ne_zero := ne_zero_of_eq_one measure_univ
-  have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
-  rcases univ_nonempty with ⟨x, _⟩
-  exact Nonempty.intro x
+-- lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
+--   Nonempty Ω
+-- := by
+--   have measure_univ := ps.is_prob.1
+--   simp only [DFunLike.coe] at measure_univ
+--   have measure_ne_zero := ne_zero_of_eq_one measure_univ
+--   have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
+--   rcases univ_nonempty with ⟨x, _⟩
+--   exact Nonempty.intro x
 
 def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   (ps₁ : ProbabilitySpace Ω₁)
@@ -365,22 +291,7 @@ def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   have p₁ := ps₁.is_prob
   let v₂ := ps₂.volume
   have p₂ := ps₂.is_prob
-  let _ : IsProbabilityMeasure (Measure.prod v₁ v₂) :=
-    ⟨by
-      simp only [DFunLike.coe, Measure.instFunLike, Measure.toOuterMeasure]
-      unfold Measure.prod
-      simp
-      simp_all only [v₁, v₂]
-      simp only
-        [ Set.range,
-          Prod.exists,
-          exists_eq,
-          exists_comm
-        ]
-      have ne₁ : Nonempty Ω₁ := ProbabilitySpace.event_space_nonepmty ps₁
-      have ne₂ : Nonempty Ω₂ := ProbabilitySpace.event_space_nonepmty ps₂
-      simp [ne₁, ne₂, p₁, p₂]
-    ⟩
+  let _ : IsProbabilityMeasure (Measure.prod v₁ v₂) := ⟨by simp⟩
   ProbabilitySpace.mk
 
 variable {V : Type*}
@@ -427,8 +338,6 @@ def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α
         -- have : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) = { a // p a = 0 } → V :=
         exact _P'' = _P''
       -- _P = bla
-
-#check Equiv
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
