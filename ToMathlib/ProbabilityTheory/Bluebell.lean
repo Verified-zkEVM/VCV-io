@@ -3,7 +3,7 @@ import Iris.Algebra.CMRA
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.IndepProduct
 import Mathlib.Data.ENNReal.Basic
-import Mathlib.Tactic
+-- import Mathlib.Tactic
 -- import Mathlib
 -- import Mathlib.Tactic.EquivRW
 
