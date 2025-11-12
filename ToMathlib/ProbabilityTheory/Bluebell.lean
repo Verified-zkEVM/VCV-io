@@ -413,7 +413,10 @@ instance [Nonempty V] : Mul (PSpPm α V) where
 
 /-- The resource algebra instance on `PSpPm α V` -/
 instance [Nonempty V] : OrderedUnitalResourceAlgebra (PSpPm α V) where
-  one_mul := by simp; intro P p h; sorry
+  one_mul := by
+    unfold_projs
+    dsimp
+    simp; intro P p h; sorry
   valid_one := by simp [Valid.valid, One.one]; sorry
   valid_mul := by sorry
   valid_mono := by sorry
@@ -609,7 +612,7 @@ instance : BIBase (HyperAssertion I α V) where
   pure := pure
   and := and
   or := or
-  imp P Q := ⟨fun _ ↦ (∀ x, P x → Q x), by aesop⟩
+  imp P Q := ⟨fun y ↦ (∀ x, y ≤ x → P x → Q x), by sorry⟩
   sForall := sForall
   sExists := sExists
   sep := sep
