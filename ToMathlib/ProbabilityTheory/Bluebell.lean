@@ -285,7 +285,7 @@ def PMF.prod {Ω₁ Ω₂ : Type u}
 --   rcases univ_nonempty with ⟨x, _⟩
 --   exact Nonempty.intro x
 
-def ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
+def ProbabilityTheory.ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
   (ps₁ : ProbabilitySpace Ω₁)
   (ps₂ : ProbabilitySpace Ω₂) :
   ProbabilitySpace (Ω₁ × Ω₂)
@@ -309,7 +309,7 @@ variable {V : Type*}
 
 def MeasureSpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ → Ω₂) (m : MeasureSpace Ω₁) :
   MeasureSpace Ω₂
-:=
+:= 
   let _ : MeasurableSpace Ω₂ := m.toMeasurableSpace.map f
   let v : Measure Ω₂ := m.volume.map f
   .mk v
@@ -317,21 +317,26 @@ def MeasureSpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ → Ω₂) (m : MeasureSpa
 def ProbabilitySpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ ≃ Ω₂) (ps : ProbabilitySpace Ω₁) :
   ProbabilitySpace Ω₂
 :=
-  let measureS₁ : MeasureSpace Ω₁ := ps.toMeasureSpace
-  let measureS₂ : MeasureSpace Ω₂ := MeasureSpace.map f measureS₁
+  let measureS₂ : MeasureSpace Ω₂ := MeasureSpace.map f ps.toMeasureSpace
   let _ : IsProbabilityMeasure measureS₂.volume := by
-    constructor
-    unfold volume measureS₂ MeasureSpace.map
-    dsimp
-    unfold volume measureS₁
-    have hp := ps.is_prob.1
-    unfold volume at hp
-    rw [Measure.map_apply]
-    · simp
-      exact hp
-    · exact fun ⦃t⦄ a ↦ a
-    · simp
+    suffices (Measure.map ⇑f ℙ) Set.univ = 1 by constructor; simpa
+    rw [Measure.map_apply (show Measurable ⇑f from fun _ ↦ (·)) (by simp)]
+    simp [ps.is_prob.1]
   .mk
+
+def ProbabilityTheory.ProbabilitySpace.store_prod_equiv {α V : Type*}
+  (p : Permission α) : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) ≃ (α → V) :=
+  {
+    toFun f x := if h : p x > 0 then f.1 ⟨x, h⟩ else f.2 ⟨x, by simpa using h⟩,
+    invFun f := ⟨(f ·), (f ·)⟩,
+    left_inv := by
+      simp only [Function.LeftInverse, gt_iff_lt, Subtype.coe_eta, Prod.forall, Prod.mk.injEq]
+      intros f₁ f₂
+      constructor <;> ext x <;> simp [x.2],
+    right_inv := by
+      simp only [Function.RightInverse, Function.LeftInverse, gt_iff_lt, dite_eq_ite, ite_self,
+        implies_true]
+  }
 
 open Classical in
 -- Needs to encode the term `P = P' ⊗ 𝟙_ (p.support → V)` in the paper
@@ -343,37 +348,8 @@ open Classical in
 -- We need product and union spaces
 def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α → V)) (p : Permission α) : Prop :=
   ∀ _ : Nonempty ({a // p a = 0} → V),
-    let chosenOne : ProbabilitySpace ({a // p a = 0} → V) := 1;
     ∃ _P' : ProbabilitySpace ({a // p a > 0} → V),
-      let _P'' := ProbabilitySpace.prod _P' chosenOne
-      let mEquiv : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) ≃ᵐ (α → V) := {
-        toEquiv := store_prod_equiv
-        measurable_toFun := sorry
-        measurable_invFun := sorry
-      }
-      ProbabilitySpace.map mEquiv _P'' = _P
-where
-  store_prod_equiv : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) ≃ (α → V) :=
-    { toFun := by
-        rintro ⟨f₁, f₂⟩ a
-        by_cases pos : p a > 0
-        · apply f₁
-          use a
-        · apply f₂
-          simp_all only [gt_iff_lt, not_lt, NNRat.nonpos_iff_eq_zero]
-          exact ⟨a, pos⟩
-    , invFun := by
-        intro f
-        constructor
-        · intro pos
-          apply f
-          use pos
-        · intro pos
-          apply f
-          apply pos.1
-    , left_inv := sorry
-    , right_inv := sorry
-    }
+      ProbabilitySpace.map (store_prod_equiv p) (_P'.prod 1) = _P
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
