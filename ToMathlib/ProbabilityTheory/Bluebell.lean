@@ -229,7 +229,8 @@ noncomputable section
 -- We want the trivial `{∅, Ω}` sigma algebra, upon which the measure is defined to be `0` on `∅`
 -- and `1` on `Ω`
 instance [inst : Nonempty Ω] : One (ProbabilitySpace Ω) where
-  one := @ProbabilitySpace.mk Ω (@MeasureSpace.mk Ω ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst)))
+  one :=
+    @ProbabilitySpace.mk Ω (@MeasureSpace.mk Ω ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst)))
     (by constructor; simp [Measure.dirac])
 
 abbrev PSp (Ω : Type*) := WithTop (ProbabilitySpace Ω)
@@ -285,17 +286,48 @@ def PMF.prod {Ω₁ Ω₂ : Type u}
 --   rcases univ_nonempty with ⟨x, _⟩
 --   exact Nonempty.intro x
 
-def ProbabilityTheory.ProbabilitySpace.prod {Ω₁ Ω₂ : Type u}
-  (ps₁ : ProbabilitySpace Ω₁)
-  (ps₂ : ProbabilitySpace Ω₂) :
-  ProbabilitySpace (Ω₁ × Ω₂)
-:=
-  let v₁ := ps₁.volume
-  have p₁ := ps₁.is_prob
-  let v₂ := ps₂.volume
-  have p₂ := ps₂.is_prob
-  let _ : IsProbabilityMeasure (Measure.prod v₁ v₂) := ⟨by simp⟩
-  ProbabilitySpace.mk
+variable {Ω₁ Ω₂ : Type*} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
+  {volume₁ : Measure Ω₁} {is_prob₁ : IsProbabilityMeasure volume₁}
+  {volume₂ : Measure Ω₂} {is_prob₂ : IsProbabilityMeasure volume₂}
+
+-- lemma one_prod_one {Ω₁ Ω₂} [Nonempty Ω₁] [Nonempty Ω₂] :
+--   (1 : ProbabilitySpace Ω₁).prod (1 : ProbabilitySpace Ω₂) = (1 : ProbabilitySpace (Ω₁ × Ω₂))
+-- := by
+--   -- generalize_proofs
+--   have _ : ProbabilitySpace Ω₁ := (1 : ProbabilitySpace Ω₁)
+--   have _ : ProbabilitySpace Ω₂ := (1 : ProbabilitySpace Ω₂)
+--     -- @ProbabilitySpace.mk Ω₁ ((1 : ProbabilitySpace Ω₁).toMeasureSpace) sorry
+--   unfold ProbabilitySpace.prod volume
+--   simp
+--   unfold_projs
+--   congr 1
+--   -- simp [Measure.dirac]
+
+--   unfold Measure.prod.measureSpace
+--   -- let bot : MeasurableSpace (Ω₁ × Ω₂) := ⊥
+--   -- apply MeasurableSpace.ext (α := (Ω₁ × Ω₂))
+--   -- ext
+--   unfold volume
+--   simp only
+--   rw [Measure.prod_eq]
+
+--   congr 1
+--   · simp [Prod.instMeasurableSpace]
+--     ext s
+--     -- unfold_projs
+--     unfold MeasurableSet MeasurableSpace.prod
+--     simp
+--   ·
+--     rw [heq_iff_eq (α := Measure (Ω₁ × Ω₂))]
+--     unfold volume
+--     -- apply heq_of_eq
+--     -- simp [heq_iff_eq, Measure.prod_prod]
+--     -- apply heq_iff_eq.2
+--     -- rw [heq_iff_eq]
+--     -- ext
+--     -- simp
+--     -- simp [Measure.prod_prod]
+
 
 variable {V : Type*}
 
@@ -309,7 +341,7 @@ variable {V : Type*}
 
 def MeasureSpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ → Ω₂) (m : MeasureSpace Ω₁) :
   MeasureSpace Ω₂
-:= 
+:=
   let _ : MeasurableSpace Ω₂ := m.toMeasurableSpace.map f
   let v : Measure Ω₂ := m.volume.map f
   .mk v
@@ -338,6 +370,8 @@ def ProbabilityTheory.ProbabilitySpace.store_prod_equiv {α V : Type*}
         implies_true]
   }
 
+
+
 open Classical in
 -- Needs to encode the term `P = P' ⊗ 𝟙_ (p.support → V)` in the paper
 /-- Compatibility of a probability space with a permission, defined as the existence of a splitting between:
@@ -346,10 +380,29 @@ open Classical in
 - another probability space `P'` on the non-zero part of the permission -/
 -- Wrong
 -- We need product and union spaces
-def ProbabilityTheory.ProbabilitySpace.compatiblePerm (_P : ProbabilitySpace (α → V)) (p : Permission α) : Prop :=
-  ∀ _ : Nonempty ({a // p a = 0} → V),
-    ∃ _P' : ProbabilitySpace ({a // p a > 0} → V),
-      ProbabilitySpace.map (store_prod_equiv p) (_P'.prod 1) = _P
+def ProbabilityTheory.ProbabilitySpace.compatiblePerm [MeasurableSpace (α → V)]
+  (volume : Measure (α → V))
+  (is_prob : IsProbabilityMeasure volume)
+  (_P : Set (Set (α → V)))
+  (p : Permission α)
+  [inst : Nonempty ({a // p a = 0} → V)] :
+  Prop
+:=
+  -- ∀ _ : Nonempty ({a // p a = 0} → V),
+  -- let ν : @Measure ({a // p a = 0} → V) ⊥ :=
+  --   @Measure.dirac _ ⊥ (Classical.choice inst)
+  let ms := @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst))
+  -- let prod : @Measure ((α → V) × ({a // p a = 0} → V)) ⊥ := volume.prod μ
+  ∃ (_P' : Set (Set ({a // p a > 0} → V)))
+    (inst : MeasurableSpace (({a // p a > 0} → V)))
+    (μ : Measure ({a // p a > 0} → V))
+    (is_prob' : IsProbabilityMeasure μ),
+      let product := μ.prod ms.volume
+      -- let space : Set (Set (({a // p a > 0} → V)) × ({a // p a = 0} → V)) :=
+      --   MeasurableSpace.MeasurableSet' (inst.prod ms)
+      True
+      -- μ.prod ν = volume
+    -- ProbabilitySpace.map (store_prod_equiv p) (_P'.prod 1) = _P
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
@@ -373,9 +426,33 @@ namespace PSpPm
 def liftProb (μ : ProbabilitySpace (α → V)) : PSpPm α V :=
   ⟨⟨μ, 1⟩, by sorry⟩
 
+#synth One (Permission _)
+
 @[simp]
 instance [Nonempty V] : One (PSpPm α V) where
-  one := ⟨⟨One.one, One.one⟩, by simp [One.one, PSp.compatiblePerm, ProbabilitySpace.compatiblePerm]; sorry⟩
+  one :=
+    { val := ⟨One.one, fun _ ↦ 0⟩
+      property := by
+        simp
+        intro
+        use 1
+        simp
+        congr
+        simp only
+          [ ProbabilitySpace.map,
+            ProbabilitySpace.store_prod_equiv,
+            gt_iff_lt,
+            Equiv.coe_fn_mk
+          ]
+        congr
+        unfold ProbabilitySpace.toMeasureSpace ProbabilitySpace.prod volume
+        dsimp
+        unfold Measure.prod.measureSpace MeasureSpace.map volume
+        simp
+        unfold_projs
+        simp only [Measure.prod_prod]
+        sorry
+    }
 
 /-- Multiplication is pointwise product of the probability space and the permission -/
 @[simp]
