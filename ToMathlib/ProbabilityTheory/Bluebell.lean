@@ -370,8 +370,6 @@ def ProbabilityTheory.ProbabilitySpace.store_prod_equiv {α V : Type*}
         implies_true]
   }
 
-
-
 open Classical in
 -- Needs to encode the term `P = P' ⊗ 𝟙_ (p.support → V)` in the paper
 /-- Compatibility of a probability space with a permission, defined as the existence of a splitting between:
@@ -380,29 +378,25 @@ open Classical in
 - another probability space `P'` on the non-zero part of the permission -/
 -- Wrong
 -- We need product and union spaces
-def ProbabilityTheory.ProbabilitySpace.compatiblePerm [MeasurableSpace (α → V)]
+def ProbabilityTheory.ProbabilitySpace.compatiblePerm [inst₁ : MeasurableSpace (α → V)]
   (volume : Measure (α → V))
-  (is_prob : IsProbabilityMeasure volume)
-  (_P : Set (Set (α → V)))
+  -- (is_prob : IsProbabilityMeasure volume)
   (p : Permission α)
   [inst : Nonempty ({a // p a = 0} → V)] :
   Prop
 :=
-  -- ∀ _ : Nonempty ({a // p a = 0} → V),
-  -- let ν : @Measure ({a // p a = 0} → V) ⊥ :=
-  --   @Measure.dirac _ ⊥ (Classical.choice inst)
-  let ms := @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst))
-  -- let prod : @Measure ((α → V) × ({a // p a = 0} → V)) ⊥ := volume.prod μ
+  let ms : MeasureSpace ({ a // p a = 0 } → V) :=
+    @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst))
   ∃ (_P' : Set (Set ({a // p a > 0} → V)))
-    (inst : MeasurableSpace (({a // p a > 0} → V)))
-    (μ : Measure ({a // p a > 0} → V))
-    (is_prob' : IsProbabilityMeasure μ),
-      let product := μ.prod ms.volume
-      -- let space : Set (Set (({a // p a > 0} → V)) × ({a // p a = 0} → V)) :=
-      --   MeasurableSpace.MeasurableSet' (inst.prod ms)
-      True
-      -- μ.prod ν = volume
-    -- ProbabilitySpace.map (store_prod_equiv p) (_P'.prod 1) = _P
+    (inst : MeasurableSpace ({a // p a > 0} → V))
+    (μ : Measure ({a // p a > 0} → V)),
+    -- (is_prob' : IsProbabilityMeasure μ),
+      let volumeProduct := μ.prod ms.volume
+      let volume' := volume.map (store_prod_equiv p).2
+      let spaceProduct : MeasurableSpace (({a // p a > 0} → V) × ({a // p a = 0} → V)) :=
+        inst.prod ms.toMeasurableSpace
+      spaceProduct.MeasurableSet' = Set.image (Set.image (store_prod_equiv p).2) inst₁.MeasurableSet'
+        ∧ volumeProduct = volume'
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
