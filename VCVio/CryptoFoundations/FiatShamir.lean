@@ -6,7 +6,7 @@ Authors: Devon Tuma
 import VCVio.CryptoFoundations.SigmaAlg
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.OracleComp.QueryTracking.CachingOracle
-import VCVio.OracleComp.Coercions.Append
+import VCVio.OracleComp.Coercions.Add
 
 /-!
 # Fiat-Shamir Transform

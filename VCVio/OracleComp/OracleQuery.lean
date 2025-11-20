@@ -36,7 +36,7 @@ instance {spec : OracleSpec ι} : LawfulFunctor (OracleQuery spec) :=
 @[inline] def input {α} (q : OracleQuery spec α) : spec.Domain := q.1
 
 @[simp] lemma input_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
-    input (OracleQuery.mk t f) = t := rfl
+    input ⟨t, f⟩ = t := rfl
 
 @[simp] lemma input_map {α β} (q : OracleQuery spec α) (f : α → β) :
     (f <$> q).input = q.input := rfl
@@ -48,7 +48,7 @@ instance {spec : OracleSpec ι} : LawfulFunctor (OracleQuery spec) :=
 @[inline] def cont {α} (q : OracleQuery spec α) (f : spec.Range q.input) : α := q.2 f
 
 @[simp] lemma cont_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
-    cont (OracleQuery.mk t f) = f := rfl
+    cont ⟨t, f⟩ = f := rfl
 
 @[simp] lemma cont_map {α β} (q : OracleQuery spec α) (f : α → β) :
     (f <$> q).cont = f ∘ q.cont := rfl
@@ -62,12 +62,12 @@ extensionally equal continuation on the results of the query. -/
     (h : q.input = q'.input) (h' : q.cont ≍ q'.cont) : q = q' := Sigma.ext h h'
 
 /-- If an oracle exists and the output type is non-empty then the type of queries is non-empty. -/
-instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) where
-  default := OracleQuery.mk default fun _ => default
+instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) :=
+  inferInstanceAs (Inhabited ((t : spec.Domain) × (spec.Range t → α)))
 
 /-- If there are no oracles available then the type of queries is empty. -/
-instance {α} [h : IsEmpty ι] : IsEmpty (OracleQuery spec α) where
-  false q := h.elim q.1
+instance {α} [h : IsEmpty ι] : IsEmpty (OracleQuery spec α) :=
+  inferInstanceAs (IsEmpty ((t : spec.Domain) × (spec.Range t → α)))
 
 /-- If there is a at most one oracle and output, then ther is at most one query.-/
 instance {α} [h : Subsingleton ι] [h' : Subsingleton α] :
@@ -86,10 +86,23 @@ lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
 @[simp] lemma input_query (t : spec.Domain) : (query t).input = t := rfl
 @[simp] lemma cont_query (t : spec.Domain) : (query t).cont = id := rfl
 
+@[simp] lemma fst_query (t : spec.Domain) : (query t).1 = t := rfl
+@[simp] lemma snd_query (t : spec.Domain) : (query t).2 = id := rfl
+
 @[simp] lemma cont_map_query_input {α} (q : OracleQuery spec α) :
     q.cont <$> (query q.input) = q := rfl
 
 @[simp] lemma cont_map_query_input' {α} (q : OracleQuery spec α) :
     PFunctor.map spec.toPFunctor q.cont (query q.input) = q := rfl
+
+@[simp] lemma query_eq_mk_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
+    query t = OracleQuery.mk t cont ↔ cont = id := by
+  rw [OracleQuery.ext_iff]
+  aesop
+
+@[simp] lemma mk_eq_query_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
+    OracleQuery.mk t cont = query t ↔ cont = id := by
+  rw [OracleQuery.ext_iff]
+  aesop
 
 end OracleQuery

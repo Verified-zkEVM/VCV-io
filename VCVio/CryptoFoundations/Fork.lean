@@ -6,7 +6,7 @@ Authors: Devon Tuma
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.Coercions.Append
+import VCVio.OracleComp.Coercions.Add
 
 /-!
 # Forking Lemma

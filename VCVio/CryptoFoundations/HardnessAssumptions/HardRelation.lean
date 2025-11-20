@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.Asymptotics.Negligible
-import VCVio.OracleComp.Coercions.Append
+import VCVio.OracleComp.Coercions.Add
 
 /-!
 # Hard Relations

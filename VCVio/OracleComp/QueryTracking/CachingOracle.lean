@@ -19,7 +19,7 @@ open OracleComp OracleSpec
 
 universe u v w
 
-variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
+variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
 
 namespace QueryImpl
 
