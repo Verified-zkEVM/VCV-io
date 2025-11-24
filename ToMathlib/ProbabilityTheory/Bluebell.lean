@@ -376,26 +376,24 @@ open Classical in
 
 - the trivial probability space on the zero part of the permission `𝟙_ ({a // p a = 0} → V)`
 - another probability space `P'` on the non-zero part of the permission -/
--- Wrong
 -- We need product and union spaces
-def ProbabilityTheory.ProbabilitySpace.compatiblePerm [inst₁ : MeasurableSpace (α → V)]
+def ProbabilityTheory.ProbabilitySpace.compatiblePerm [storeMeasurable : MeasurableSpace (α → V)]
   (volume : Measure (α → V))
   -- (is_prob : IsProbabilityMeasure volume)
   (p : Permission α)
-  [inst : Nonempty ({a // p a = 0} → V)] :
+  [nonempty : Nonempty ({a // p a = 0} → V)] :
   Prop
 :=
   let ms : MeasureSpace ({ a // p a = 0 } → V) :=
-    @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst))
-  ∃ (_P' : Set (Set ({a // p a > 0} → V)))
-    (inst : MeasurableSpace ({a // p a > 0} → V))
+    @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice nonempty))
+  ∃ (storePermMeasurable : MeasurableSpace ({a // p a > 0} → V))
     (μ : Measure ({a // p a > 0} → V)),
     -- (is_prob' : IsProbabilityMeasure μ),
       let volumeProduct := μ.prod ms.volume
       let volume' := volume.map (store_prod_equiv p).2
       let spaceProduct : MeasurableSpace (({a // p a > 0} → V) × ({a // p a = 0} → V)) :=
-        inst.prod ms.toMeasurableSpace
-      spaceProduct.MeasurableSet' = Set.image (Set.image (store_prod_equiv p).2) inst₁.MeasurableSet'
+        storePermMeasurable.prod ms.toMeasurableSpace
+      spaceProduct.MeasurableSet' = Set.image (Set.image (store_prod_equiv p).2) storeMeasurable.MeasurableSet'
         ∧ volumeProduct = volume'
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
