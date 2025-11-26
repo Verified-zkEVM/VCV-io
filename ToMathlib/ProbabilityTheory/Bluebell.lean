@@ -11,10 +11,11 @@ import Mathlib.Data.ENNReal.Basic
 /-
   Given a set of possible outcomes Ω (sample space),
     - An event space is a σ-algebra 𝓕 ∈ 𝔸(Ω), represented as `𝓕 : MeasurableSpace Ω`;
-    - A probability distribution μ : 𝓕 → [0, 1] ∈ 𝔻(𝓕), is represented as
-      `μ : Measure Ω` or a probability mass functions `μ : PMF Ω`
-      (see `MeasureTheory.Measure.toPMF` and `PMF.toMeasure`);
-      Note: μ(a) abbreviates μ({a})
+      In Bluebell terms, an event is a set of outcomes.
+    - A probability distribution μ : 𝓕 → [0, 1] ∈ 𝔻(𝓕), is represented as a
+      `μ : Measure Ω` with the property `IsProbabilityMeasure μ` or a
+      probability mass functions `μ : PMF Ω` (see `MeasureTheory.Measure.toPMF`
+      and `PMF.toMeasure`); Note: μ(a) abbreviates μ({a})
 -/
 
 #check MeasureTheory.Measure.toPMF
