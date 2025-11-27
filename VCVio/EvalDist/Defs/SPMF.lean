@@ -75,6 +75,7 @@ instance : FunLike (SPMF α) α ENNReal where
   coe sp x := sp.run (some x)
   coe_injective' p q h := by simpa [SPMF.ext_iff] using congr_fun h
 
+-- NOTE: maybe this should be a simp?
 lemma apply_eq_run_some (p : SPMF α) (x : α) : p x = p.run (some x) := rfl
 
 @[simp] lemma liftM_apply (p : PMF α) (x : α) :

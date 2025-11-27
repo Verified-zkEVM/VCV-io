@@ -108,10 +108,18 @@ lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q :
 
 lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
-  rw [probFailure_eq_one_sub_probEvent]
-  rw [probEvent_bind_eq_tsum]
+  rw [probFailure_eq_sub_tsum]
+  conv =>
+    left
+    right
+    congr
+    ext
+    rw [probOutput_bind_eq_tsum]
+  simp only [probFailure_eq_sub_tsum]
+
   simp
   simp [ENNReal.mul_sub]
+
 
   -- rw [probFailure_def, SPMF.run_none_eq_one_sub]
   stop
