@@ -152,4 +152,13 @@ infixr:90 " ∘ₘ "  => MonadHom.comp
 lemma comp_assoc (H : n' →ᵐ n'') (G : n →ᵐ n') (F : m →ᵐ n) :
     (H ∘ₘ G) ∘ₘ F = H ∘ₘ (G ∘ₘ F) := by aesop
 
+/-- `pure`/`return` lawfully embed the `Id` monad into any lawful monad. -/
+protected def pure (m) [Monad m] [LawfulMonad m] : Id →ᵐ m where
+  toFun mx := pure mx.run
+  toFun_pure' x := rfl
+  toFun_bind' mx my := by simp only [Id.run_bind, bind_pure_comp, map_pure]
+
+@[simp] lemma pure_apply (m) [Monad m] [LawfulMonad m] (x : Id α) :
+    MonadHom.pure m x = pure x.run := rfl
+
 end MonadHom

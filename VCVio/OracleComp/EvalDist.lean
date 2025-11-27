@@ -65,7 +65,7 @@ instance [spec.Fintype] [spec.Inhabited] [spec.DecidableEq] :
     HasEvalFinset (OracleComp spec) where
   finSupport {α} _ mx := OracleComp.construct
     (fun x => {x}) (fun _ _ r => Finset.univ.biUnion r) mx
-  coe_toFinset {α} _ mx := by
+  coe_finSupport {α} _ mx := by
     induction mx using OracleComp.inductionOn with
     | pure x => simp
     | query_bind t mx h => simp [h]

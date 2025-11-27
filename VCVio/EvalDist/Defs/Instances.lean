@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.Basic
+import VCVio.EvalDist.Defs.Support
 
 /-!
 # Instances Connecting Different Evaluation Semantics
@@ -11,24 +12,6 @@ import VCVio.EvalDist.Defs.Basic
 -/
 
 universe u v w
-
-namespace SPMF
-
-variable {α β γ}
-
-/-- Evaluate a `SPMF` to itself via identity. Mostly exists to give notation access. -/
-instance : HasEvalSPMF SPMF where toSPMF := MonadHom.id SPMF
-
-@[simp] lemma evalDist_eq (p : SPMF α) : evalDist p = p := rfl
-
-@[simp] lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
-
-lemma evalDist_eq_iff {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α : Type u}
-    (mx : m α) (p : SPMF α) : evalDist mx = p ↔ ∀ x, Pr[= x | mx] = Pr[= x | p] := by
-  rw [SPMF.ext_iff]
-  rfl
-
-end SPMF
 
 section hasEvalSet_of_hasEvalSPMF
 
@@ -46,6 +29,11 @@ lemma support_of_hasEvalSPMF_def  (mx : m α) :
 
 -- instance [HasEvalSet.Decidable m] (mx : m α) :
 --     DecidablePred (Pr[= · | mx] = 0) := sorry
+
+
+instance decidablePred_probOutput_eq_zero [HasEvalSet.Decidable m] :
+    DecidablePred (Pr[= · | mx] = 0) := by
+  sorry
 
 lemma mem_support_iff (mx : m α) (x : α) :
     x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by rfl
@@ -127,9 +115,23 @@ lemma probEvent_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α]
 
 end hasEvalSet_of_hasEvalSPMF
 
-namespace PMF
+namespace SPMF
 
-variable {α β γ}
+variable {α}
+
+/-- Evaluate a `SPMF` to itself via identity. Mostly exists to give notation access. -/
+instance : HasEvalSPMF SPMF where toSPMF := MonadHom.id SPMF
+
+@[simp] lemma evalDist_eq (p : SPMF α) : evalDist p = p := rfl
+
+@[simp] lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
+
+lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
+    evalDist mx = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
+
+end SPMF
+
+namespace PMF
 
 /-- Evaluate a `PMF` to itself via identity. Mostly exists to give notation access.
 Note: this requires `SPMF` to avoid circular type-class search. -/
