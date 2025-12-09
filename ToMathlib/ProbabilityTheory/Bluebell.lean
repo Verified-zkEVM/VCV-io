@@ -3,7 +3,7 @@ import Iris.Algebra.CMRA
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.IndepProduct
 import Mathlib.Data.ENNReal.Basic
--- import Mathlib.Tactic
+import Mathlib.Tactic
 -- import Mathlib
 -- import Mathlib.Tactic.EquivRW
 
@@ -16,6 +16,13 @@ import Mathlib.Data.ENNReal.Basic
       `μ : Measure Ω` with the property `IsProbabilityMeasure μ` or a
       probability mass functions `μ : PMF Ω` (see `MeasureTheory.Measure.toPMF`
       and `PMF.toMeasure`); Note: μ(a) abbreviates μ({a})
+-/
+
+/-
+X ⊂ X'
+μ₁ X < μ₁ X'
+X ∩ Y = X' ∩ Y
+μ₁ X' * μ₂ Y = μ (X' ∩ Y) = μ (X ∩ Y) = μ₁ X * μ₂ Y
 -/
 
 #check MeasureTheory.Measure.toPMF
@@ -205,7 +212,7 @@ We need to have the `Multiplicative` tag in order to specify that multiplication
 addition, and unit is the constant zero map. -/
 @[reducible] def Permission (α : Type*) := Multiplicative (α → ℚ≥0)
 
-variable {α : Type*}
+variable {α β : Type*}
 
 -- instance : Preorder (Permission α) := inferInstanceAs (Preorder (Multiplicative (α → ℚ≥0)))
 -- instance : MulOneClass (Permission α) := inferInstanceAs (MulOneClass (Multiplicative (α → ℚ≥0)))
@@ -227,69 +234,230 @@ variable {Ω : Type*}
 
 noncomputable section
 
--- We want the trivial `{∅, Ω}` sigma algebra, upon which the measure is defined to be `0` on `∅`
--- and `1` on `Ω`
-instance [inst : Nonempty Ω] : One (ProbabilitySpace Ω) where
-  one :=
-    @ProbabilitySpace.mk Ω (@MeasureSpace.mk Ω ⊥ (@Measure.dirac _ ⊥ (Classical.choice inst)))
-    (by constructor; simp [Measure.dirac])
+-- Tried without success:
 
-abbrev PSp (Ω : Type*) := WithTop (ProbabilitySpace Ω)
+-- abbrev Measure' {α : Type} (ms : MeasurableSpace α) := @Measure α ms
+
+-- def Measure' (Ω : Type*) := (ms : MeasurableSpace Ω) → @Measure Ω ms
+
+#check IsProbabilityMeasure
+
+open Function in
+@[ext]structure MeasureOnSpace (α : Type*) extends OuterMeasure α where
+  measurableSpace : MeasurableSpace α
+  m_iUnion ⦃f : ℕ → Set α⦄ :
+    (∀ i, MeasurableSet (f i)) →
+    Pairwise (Disjoint on f) →
+    toOuterMeasure (⋃ i, f i) = ∑' i, toOuterMeasure (f i)
+  trim_le : toOuterMeasure.trim ≤ toOuterMeasure
+
+def MeasureOnSpace.toMeasure (ms' : MeasureOnSpace Ω) : (@Measure Ω ms'.measurableSpace) :=
+  let _ := ms'.measurableSpace
+  ⟨ms'.toOuterMeasure, ms'.m_iUnion, ms'.trim_le⟩
+
+def ofMeasure [ms : MeasurableSpace Ω] (μ : Measure Ω) : MeasureOnSpace Ω :=
+  ⟨μ.toOuterMeasure, ms, μ.m_iUnion, μ.trim_le⟩
+
+def MeasureOnSpace.σAlg (M : MeasureOnSpace Ω) : MeasurableSpace Ω := M.measurableSpace
+def MeasureOnSpace.μ (M : MeasureOnSpace Ω) : Measure[M.σAlg] Ω := M.toMeasure
+
+#check MeasureSpace.indepProduct
+/-- The partial operation of independent product on `MeasureSpace`s, when it exists -/
+def MeasureOnSpace.indepProduct (m₁ m₂ : MeasureOnSpace Ω) :
+  Option (MeasureOnSpace Ω)
+:= by
+  classical
+  by_cases h : Nonempty (Measure.IndependentProduct m₁.μ m₂.μ)
+  · exact some (@ofMeasure Ω (m₁.σAlg.sum m₂.σAlg) (Classical.choice h).μ)
+  · exact none
+
+noncomputable def MeasureOnSpace.ofPMF [MeasurableSpace Ω] (pmf : PMF Ω) : MeasureOnSpace Ω :=
+  ofMeasure pmf.toMeasure
+
+def MeasureOnSpace.map (f : α → β) (M : MeasureOnSpace α) : MeasureOnSpace β :=
+  let _ := M.σAlg
+  let _ := M.σAlg.map f
+  let m := M.toMeasure.map f
+  ofMeasure m
+
+instance [inst : Nonempty Ω] : One (MeasureOnSpace Ω) where
+  one :=
+    let _ : MeasurableSpace Ω := ⊥
+    let measure := Measure.dirac (Classical.choice inst)
+    ofMeasure measure
+
+instance (Ω : Type*) : Preorder (MeasureOnSpace Ω) where
+  -- Stolen from instPreorderProbabilitySpace
+  le m₁ m₂ := (m₁.σAlg ≤ m₂.σAlg) ∧ m₁.μ = (@Measure.map _ _ m₂.σAlg m₁.σAlg id m₂.μ)
+  le_refl := by simp only [LE.le, imp_self, implies_true, Measure.map_id, and_self]
+  le_trans := by
+    rintro ⟨ℱ₁, μ₁, _⟩ ⟨ℱ₂, μ₂, _⟩ ⟨ℱ₃, μ₃, _⟩ ⟨hℱ₁₂, hμ₁₂⟩ ⟨hℱ₂₃, hμ₂₃⟩
+    simp_all
+    refine ⟨le_trans hℱ₁₂ hℱ₂₃, ?_⟩
+    · rw [Measure.map_map] <;> aesop
+
+#check MeasurableSpace.GenerateMeasurable
+example [inst : Nonempty Ω] :
+  (1 : MeasureOnSpace Ω).indepProduct 1 = (1 : MeasureOnSpace Ω)
+:= by
+  unfold_projs
+  unfold MeasureOnSpace.indepProduct
+  split
+  next h =>
+    congr 1
+    simp only [bot_eq_false] at h ⊢
+    simp
+      [
+        MeasureOnSpace.σAlg,
+        Measure.dirac, OuterMeasure.dirac,
+        ofMeasure
+        ] at h ⊢
+    constructor
+    · simp [
+        MeasureOnSpace.μ,
+        ofMeasure,
+        MeasureOnSpace.toMeasure,
+        MeasurableSpace.sum,
+        MeasurableSpace.generateFrom,
+        Measure.toOuterMeasure
+        ] at h ⊢
+      sorry
+    · simp [MeasurableSpace.sum]
+      unfold MeasurableSet
+      unfold_projs
+      nth_rw 1 [Bot.bot, OrderBot.toBot, GaloisConnection.liftOrderBot]
+      dsimp
+      unfold MeasurableSpace.generateFrom
+      dsimp
+      sorry
+      -- simp [MeasurableSpace.measurableSet_bot_iff]
+      -- rw [MeasurableSpace.generateFrom_empty]
+    -- simp [Measure.dirac, OuterMeasure.dirac]
+    -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
+    -- simp only [Set.bot_eq_empty]
+    -- simp
+    -- rw [←Set.empty_def]
+    -- simp only [MeasurableSpace.generateFrom_empty]
+    -- -- simp [OrderBot.mk]
+    -- constructor
+    -- · unfold MeasurableSet
+    --   simp [Set.union]
+    --   -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
+    --   -- simp only [bot_eq_false]
+    --   -- simp only [MeasurableSpace.generateFrom]
+    -- · sorry
+    --   grind
+    -- congr
+    -- unfold MeasurableSet
+    -- unfold_projs
+    -- -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
+    -- unfold_projs
+    -- -- simp only [MeasurableSpace.MeasurableSet']
+    -- -- simp only [MeasurableSpace.generateFrom]
+    -- simp at h
+
+    -- done
+  next h => sorry
+
+#check MeasurableSpace.MeasurableSet'
+
+abbrev PSp (Ω : Type*) := WithTop (MeasureOnSpace Ω)
+
+instance [inst : Nonempty Ω] : One (PSp Ω) where
+  one := some One.one
 
 @[simp]
 instance : Valid (PSp Ω) where
   valid := fun x => match x with | some _ => True | none => False
 
-instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
+#check ProbabilitySpace.indepProduct
+variable [MeasurableSpace Ω]
+#synth Max (Measure Ω)
+
+#check Measure.prod_prod
+#check MeasurableSpace.prod
+#check Measure.IndependentProduct.inter_eq_prod
+-- #synth HMul (ProbabilitySpace Ω)
+
+instance : Mul (PSp Ω) where
   mul := fun x y => match x, y with
-    | some x, some y => if h : (x.indepProduct y).isSome then (x.indepProduct y).get h else none
+    | some x, some y => x.indepProduct y
     | _, _ => none
+
+open Mathlib in
+instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
+  one_mul p := by
+    unfold_projs
+    simp
+    split
+    · expose_names
+      injection heq with heq
+      subst heq
+      -- rcases y_1 with ⟨om, ms, h₁, h₂⟩
+      unfold MeasureOnSpace.indepProduct
+      split
+      · expose_names
+        congr
+        ext
+        next z =>
+          skip
+          unfold ofMeasure
+          unfold MeasureOnSpace.μ MeasureOnSpace.toMeasure
+          simp
+          -- simp [Measure.IndependentProduct.inter_eq_prod]
+
+          -- unfold Measure.dirac OuterMeasure.dirac
+          -- rw [dirac_apply]
+          -- rw [← @OuterMeasure.measureOf_eq_coe]
+          sorry
+          done
+        · sorry
+      · sorry
+    · sorry
+  valid := valid
+  elim := sorry
   valid_one := by simp
-  valid_mul := by intro a b hab; cases a <;> cases b <;> simp_all
   valid_mono := by
     intro a b h h'; cases a <;> cases b <;> simp_all
     have h' : (⊤ : PSp Ω) ≤ WithTop.some _ := h
     contrapose! h'
     simp
-  one_mul := sorry
-  elim := sorry
-  -- mul_right_mono := sorry
+  valid_mul := by intro a b hab; cases a <;> cases b <;> simp_all
 
-open ENNReal in
-def PMF.prod {Ω₁ Ω₂ : Type u}
-  (μ : PMF Ω₁)
-  (ν : PMF Ω₂) :
-  PMF (Ω₁ × Ω₂)
-:=
-  -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
-  -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
-  ⟨ λ a ↦ μ a.1 * ν a.2
-  , by
-      let h₁ := μ.2
-      -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
-      -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
-      -- have h₁ : HasSum μ' 1 := by sorry
-      have _ : IsTopologicalSemiring ℝ≥0∞ := sorry
-      rw [←(one_mul 1)]
-      apply HasSum.mul (f := μ) (g := ν) (s := 1) (t := 1)
-      apply μ.2
-      apply ν.2
-      sorry
-  ⟩
+-- open ENNReal in
+-- def PMF.prod {Ω₁ Ω₂ : Type u}
+--   (μ : PMF Ω₁)
+--   (ν : PMF Ω₂) :
+--   PMF (Ω₁ × Ω₂)
+-- :=
+--   -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
+--   -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
+--   ⟨ λ a ↦ μ a.1 * ν a.2
+--   , by
+--       let h₁ := μ.2
+--       -- let μ' (x : Ω₁ × Ω₂) : ℝ≥0∞ := μ x.1
+--       -- let ν' (x : Ω₁ × Ω₂) : ℝ≥0∞ := ν x.2
+--       -- have h₁ : HasSum μ' 1 := by sorry
+--       have _ : IsTopologicalSemiring ℝ≥0∞ := sorry
+--       rw [←(one_mul 1)]
+--       apply HasSum.mul (f := μ) (g := ν) (s := 1) (t := 1)
+--       apply μ.2
+--       apply ν.2
+--       sorry
+--   ⟩
 
--- lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} (ps : ProbabilitySpace Ω) :
---   Nonempty Ω
--- := by
---   have measure_univ := ps.is_prob.1
---   simp only [DFunLike.coe] at measure_univ
---   have measure_ne_zero := ne_zero_of_eq_one measure_univ
---   have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
---   rcases univ_nonempty with ⟨x, _⟩
---   exact Nonempty.intro x
 
-variable {Ω₁ Ω₂ : Type*} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
-  {volume₁ : Measure Ω₁} {is_prob₁ : IsProbabilityMeasure volume₁}
-  {volume₂ : Measure Ω₂} {is_prob₂ : IsProbabilityMeasure volume₂}
+lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} [instMeasurable : MeasurableSpace Ω]
+  (volume : Measure Ω)
+  (is_prob : IsProbabilityMeasure volume) :
+  Nonempty Ω
+:= by
+  have measure_univ := is_prob.1
+  simp only [DFunLike.coe] at measure_univ
+  have measure_ne_zero := ne_zero_of_eq_one measure_univ
+  have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
+  rcases univ_nonempty with ⟨x, _⟩
+  exact Nonempty.intro x
 
 -- lemma one_prod_one {Ω₁ Ω₂} [Nonempty Ω₁] [Nonempty Ω₂] :
 --   (1 : ProbabilitySpace Ω₁).prod (1 : ProbabilitySpace Ω₂) = (1 : ProbabilitySpace (Ω₁ × Ω₂))
@@ -332,14 +500,6 @@ variable {Ω₁ Ω₂ : Type*} [MeasurableSpace Ω₁] [MeasurableSpace Ω₂]
 
 variable {V : Type*}
 
--- #check ProbabilitySpace.map
--- #check MeasureSpace.map
-#check MeasurableSpace.map
-#check Measure.le_map_apply_image
-#check Measure.map_apply
-#check MeasurableEquiv
--- #check Equiv.preimage_univ
-
 def MeasureSpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ → Ω₂) (m : MeasureSpace Ω₁) :
   MeasureSpace Ω₂
 :=
@@ -347,18 +507,19 @@ def MeasureSpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ → Ω₂) (m : MeasureSpa
   let v : Measure Ω₂ := m.volume.map f
   .mk v
 
-def ProbabilitySpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ ≃ Ω₂) (ps : ProbabilitySpace Ω₁) :
-  ProbabilitySpace Ω₂
-:=
-  let measureS₂ : MeasureSpace Ω₂ := MeasureSpace.map f ps.toMeasureSpace
-  let _ : IsProbabilityMeasure measureS₂.volume := by
-    suffices (Measure.map ⇑f ℙ) Set.univ = 1 by constructor; simpa
-    rw [Measure.map_apply (show Measurable ⇑f from fun _ ↦ (·)) (by simp)]
-    simp [ps.is_prob.1]
-  .mk
+-- def ProbabilitySpace.map {Ω₁ Ω₂ : Type*} (f : Ω₁ ≃ Ω₂) (ps : ProbabilitySpace Ω₁) :
+--   ProbabilitySpace Ω₂
+-- :=
+--   let measureS₂ : MeasureSpace Ω₂ := MeasureSpace.map f ps.toMeasureSpace
+--   let _ : IsProbabilityMeasure measureS₂.volume := by
+--     suffices (Measure.map ⇑f ℙ) Set.univ = 1 by constructor; simpa
+--     rw [Measure.map_apply (show Measurable ⇑f from fun _ ↦ (·)) (by simp)]
+--     simp [ps.is_prob.1]
+--   .mk
 
-def ProbabilityTheory.ProbabilitySpace.store_prod_equiv {α V : Type*}
-  (p : Permission α) : ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) ≃ (α → V) :=
+def store_prod_equiv {α V : Type*} (p : Permission α) :
+  ({ a // p a > 0 } → V) × ({ a // p a = 0 } → V) ≃ (α → V)
+:=
   {
     toFun f x := if h : p x > 0 then f.1 ⟨x, h⟩ else f.2 ⟨x, by simpa using h⟩,
     invFun f := ⟨(f ·), (f ·)⟩,
@@ -378,29 +539,29 @@ open Classical in
 - the trivial probability space on the zero part of the permission `𝟙_ ({a // p a = 0} → V)`
 - another probability space `P'` on the non-zero part of the permission -/
 -- We need product and union spaces
-def ProbabilityTheory.ProbabilitySpace.compatiblePerm [storeMeasurable : MeasurableSpace (α → V)]
-  (volume : Measure (α → V))
-  -- (is_prob : IsProbabilityMeasure volume)
-  (p : Permission α)
-  [nonempty : Nonempty ({a // p a = 0} → V)] :
+def MeasureOnSpace.compatiblePerm
+  (M : MeasureOnSpace (α → V))
+  -- (is_prob : IsProbabilityMeasure M)
+  (p : Permission α) :
   Prop
-:=
-  let ms : MeasureSpace ({ a // p a = 0 } → V) :=
-    @MeasureSpace.mk _ ⊥ (@Measure.dirac _ ⊥ (Classical.choice nonempty))
-  ∃ (storePermMeasurable : MeasurableSpace ({a // p a > 0} → V))
-    (μ : Measure ({a // p a > 0} → V)),
-    -- (is_prob' : IsProbabilityMeasure μ),
-      let volumeProduct := μ.prod ms.volume
-      let volume' := volume.map (store_prod_equiv p).2
-      let spaceProduct : MeasurableSpace (({a // p a > 0} → V) × ({a // p a = 0} → V)) :=
-        storePermMeasurable.prod ms.toMeasurableSpace
-      spaceProduct.MeasurableSet' = Set.image (Set.image (store_prod_equiv p).2) storeMeasurable.MeasurableSet'
-        ∧ volumeProduct = volume'
+:= ∀ _ : Nonempty ({a // p a = 0} → V),
+  let one : MeasureOnSpace ({ a // p a = 0 } → V) := One.one
+  let _ := one.measurableSpace
+  ∃ (M' : MeasureOnSpace ({a // p a > 0} → V)),
+      let _ : MeasurableSpace ({ a // p a > 0 } → V) := M'.measurableSpace
+      -- let spaceProduct : MeasurableSpace (({a // p a > 0} → V) × ({a // p a = 0} → V)) :=
+      --   μ_space.prod one_space
+      let measureProduct : MeasureOnSpace (({ a // p a > 0 } → V) × ({ a // p a = 0 } → V)) :=
+        M'.toMeasure.prod one.toMeasure |> ofMeasure
+      let M' : MeasureOnSpace (({ a // p a > 0 } → V) × ({ a // p a = 0 } → V)) :=
+        M.map (store_prod_equiv p).2
+      -- spaceProduct.MeasurableSet' = Set.image (Set.image (store_prod_equiv p).2) M.measurableSpace.MeasurableSet'
+      measureProduct = M'
 
 /-- Generalize compatibility of `ProbabilitySpace` with `Permission` to `PSp` by letting `⊤` be
   compatible with all permission maps -/
 def PSp.compatiblePerm (P : PSp (α → V)) (p : Permission α) : Prop := match P with
-  | some P => ProbabilitySpace.compatiblePerm P p
+  | some P => P.compatiblePerm p
   | none => True
 
 /-- The joint structure of a probability space and a permission that are compatible.
@@ -409,15 +570,15 @@ This is given a resource algebra structure by pointwise product of the underlyin
 and permission RAs, up to compatibility. -/
 @[reducible]
 def PSpPm (α : Type*) (V : Type*) :=
-  {Pp : PSp (α → V) × Permission α // Pp.1.compatiblePerm Pp.2}
+  {p : PSp (α → V) × Permission α // p.1.compatiblePerm p.2}
 
 namespace PSpPm
 
 /-- Lift a probability space to a probability space-permission pair, via coupling it with the
   all-one permission -/
 -- TODO (Andrei): In the Bluebell paper, μ is used for distribution, while 𝓟 is used for probability spaces
-def liftProb (μ : ProbabilitySpace (α → V)) : PSpPm α V :=
-  ⟨⟨μ, 1⟩, by sorry⟩
+def liftProb (volume : MeasureOnSpace (α → V)) : PSpPm α V :=
+  ⟨⟨volume, 1⟩, by sorry⟩
 
 #synth One (Permission _)
 
@@ -429,18 +590,6 @@ instance [Nonempty V] : One (PSpPm α V) where
         simp
         intro
         use 1
-        simp
-        congr
-        simp only
-          [ ProbabilitySpace.map,
-            ProbabilitySpace.store_prod_equiv,
-            gt_iff_lt,
-            Equiv.coe_fn_mk
-          ]
-        congr
-        unfold ProbabilitySpace.toMeasureSpace ProbabilitySpace.prod volume
-        dsimp
-        unfold Measure.prod.measureSpace MeasureSpace.map volume
         simp
         unfold_projs
         simp only [Measure.prod_prod]
@@ -486,7 +635,7 @@ variable {I α V : Type*}
 
 /-- Lift an indexed set of probability spaces to an indexed set of probability space-permission
   pairs, via pointwise lifting -/
-def liftProb (μ : I → ProbabilitySpace (α → V)) : IndexedPSpPm I α V :=
+def liftProb (μ : I → MeasureOnSpace (α → V)) : IndexedPSpPm I α V :=
   fun i => PSpPm.liftProb (μ i)
 
 instance : FunLike (IndexedPSpPm I α V) I (PSpPm α V) where
@@ -526,10 +675,7 @@ def pred (P : HyperAssertion I α V) : IndexedPSpPm I α V → Prop := (· ∈ P
 
   Note that there may be multiple such `J`. -/
 def isIrrelevant [DecidableEq I] [Fintype I] (J : Set I) (P : HyperAssertion I α V) : Prop :=
-  ∀ a, (∃ a' : IndexedPSpPm I α V,
-  -- The paper writes `a = a' \ J`, but it's not clear what this operation is (should there be a
-  -- "default" value for all unused indices?)
-    valid a' ∧ (a = a') ∧ P a') → P a
+  ∀ a, (∃ a' : IndexedPSpPm I α V, valid a' ∧ (∀ i ∉ J, a i = a' i) ∧ P a') → P a
 
 /-- The relevant indices `idx(P)` of a hyper-assertion `P` is the smallest subset of `I` whose
   complement is irrelevant for `P`. -/
@@ -677,7 +823,7 @@ def own (b : IndexedPSpPm I α V) : HyperAssertion I α V :=
 /-- Ownership of an indexed tuple of probability spaces `P : I → PSp (α → V)` and permissions
   `p : I → Permission α`, defined as the existence of compatibility proofs `h` for each element, such
   that we have ownership of the overall tuple (with the compatibility proof). -/
-def ownIndexedTuple (P : I → ProbabilitySpace (α → V)) (p : I → Permission α) : HyperAssertion I α V :=
+def ownIndexedTuple (P : I → MeasureOnSpace (α → V)) (p : I → Permission α) : HyperAssertion I α V :=
   «exists» (fun h : ∀ i, (P i).compatiblePerm (p i) => own (fun i => ⟨⟨P i, p i⟩, h i⟩))
 
 variable [DecidableEq I] [Nonempty V] {β : Type*} [MeasurableSpace β]
@@ -685,14 +831,14 @@ variable [DecidableEq I] [Nonempty V] {β : Type*} [MeasurableSpace β]
 /-- Ownership of an indexed probability spaces `P : I → PSp (α → V)`, defined as the
   existence of a compatible indexed permission `p : I → Permission α` such that we have
   ownership of the overall tuple. -/
-def ownIndexedProb (P : I → ProbabilitySpace (α → V)) : HyperAssertion I α V :=
+def ownIndexedProb (P : I → MeasureOnSpace (α → V)) : HyperAssertion I α V :=
   «exists» (fun p : I → Permission α => ownIndexedTuple P p)
 
 /-- The hyper-assertion `E⟨i⟩ ∼ μ`, for some expression `E : (α → V) → β`, index `i : I`,
   and discrete probability distribution `μ : PMF β`, is defined as
   `∃ P, Own P ∗ lift ((E⟨i⟩ is a.e. measurable for (P i)) ∧ μ = (P i).μ.map E)`-/
 def assertSampledFrom (i : I) (E : (α → V) → β) (μ : PMF β) : HyperAssertion I α V :=
-  «exists» (fun P : I → ProbabilitySpace (α → V) =>
+  «exists» (fun P : I → MeasureOnSpace (α → V) =>
     sep (ownIndexedProb P)
       (lift (@AEMeasurable _ _ _ (P i).σAlg E (P i).μ ∧ μ.toMeasure = @Measure.map _ _ (P i).σAlg _ E (P i).μ)))
 
@@ -723,7 +869,7 @@ This is useful when defining pre-conditions at the beginning of the program (whe
 precondition `P` and all variables have permission `1`) -/
 def assertPermission (P : HyperAssertion I α V) (p : I → Permission α) : HyperAssertion I α V :=
   and P <|
-    «exists» (fun compatP : {P : I → ProbabilitySpace (α → V) // ∀ i, (P i).compatiblePerm (p i)} =>
+    «exists» (fun compatP : {P : I → MeasureOnSpace (α → V) // ∀ i, (P i).compatiblePerm (p i)} =>
       own (fun i => ⟨⟨compatP.1 i, p i⟩, compatP.2 i⟩))
 
 end Ownership
@@ -747,24 +893,24 @@ def jointCondition {A : Type*} /- [MeasurableSpace V] -/
         (h :
           ∀ i,
             let _ : MeasurableSpace (α → V) := 𝓕_ i;
-            let ps₁ : PSp (α → V) := some (ProbabilitySpace.ofPMF (μ_ i));
+            let ps₁ : PSp (α → V) := some (MeasureOnSpace.ofPMF (μ_ i));
             PSp.compatiblePerm (ps₁, p_ i).1 (ps₁, p_ i).2
         )
         (h' :
           ∀ υ i,
             let _ : MeasurableSpace (α → V) := 𝓕_ i;
-            let ps₂ : PSp (α → V) := some (ProbabilitySpace.ofPMF (k_ i υ));
+            let ps₂ : PSp (α → V) := some (MeasureOnSpace.ofPMF (k_ i υ));
             PSp.compatiblePerm (ps₂, p_ i).1 (ps₂, p_ i).2
         ),
         -- (𝓕_, μ_, p_)
         let P₁ : IndexedPSpPm I α V := λ i ↦
           let _ : MeasurableSpace (α → V) := 𝓕_ i
-          let ps₁ : PSp (α → V) := some (ProbabilitySpace.ofPMF (μ_ i))
+          let ps₁ : PSp (α → V) := some (MeasureOnSpace.ofPMF (μ_ i))
           {val := (ps₁, p_ i), property := h i}
         -- (𝓕_, k_ (I)(υ), p_)
         let P₂ υ : IndexedPSpPm I α V := λ i ↦
           let _ : MeasurableSpace (α → V) := 𝓕_ i
-          let ps₂ : PSp (α → V) := some (ProbabilitySpace.ofPMF (k_ i υ))
+          let ps₂ : PSp (α → V) := some (MeasureOnSpace.ofPMF (k_ i υ))
           {val := (ps₂, p_ i), property := h' υ i}
         P₁ ≤ a ∧ ∀ i : I, μ_ i = μ.bind (k_ i) ∧ ∀ υ ∈ μ.support, K υ (P₂ υ)
   , upper' := λ a b ord ↦ by
