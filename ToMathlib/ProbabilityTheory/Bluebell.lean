@@ -262,14 +262,17 @@ def MeasureOnSpace.σAlg (M : MeasureOnSpace Ω) : MeasurableSpace Ω := M.measu
 def MeasureOnSpace.μ (M : MeasureOnSpace Ω) : Measure[M.σAlg] Ω := M.toMeasure
 
 #check MeasureSpace.indepProduct
+open Classical in
 /-- The partial operation of independent product on `MeasureSpace`s, when it exists -/
 def MeasureOnSpace.indepProduct (m₁ m₂ : MeasureOnSpace Ω) :
   Option (MeasureOnSpace Ω)
-:= by
-  classical
-  by_cases h : Nonempty (Measure.IndependentProduct m₁.μ m₂.μ)
-  · exact some (@ofMeasure Ω (m₁.σAlg.sum m₂.σAlg) (Classical.choice h).μ)
-  · exact none
+:=
+  if h :
+      ∃ μ : Measure[MeasurableSpace.sum m₁.measurableSpace m₂.measurableSpace] Ω,
+        ∀ (X Y : Set Ω) (_ : MeasurableSet[m₁.measurableSpace] X) (_ : MeasurableSet[m₂.measurableSpace] Y),
+          μ (X ∩ Y) = m₁.toMeasure X * m₂.toMeasure Y
+  then some (@ofMeasure Ω (m₁.σAlg.sum m₂.σAlg) (Classical.choose h))
+  else none
 
 noncomputable def MeasureOnSpace.ofPMF [MeasurableSpace Ω] (pmf : PMF Ω) : MeasureOnSpace Ω :=
   ofMeasure pmf.toMeasure
@@ -296,7 +299,6 @@ instance (Ω : Type*) : Preorder (MeasureOnSpace Ω) where
     refine ⟨le_trans hℱ₁₂ hℱ₂₃, ?_⟩
     · rw [Measure.map_map] <;> aesop
 
-#check MeasurableSpace.GenerateMeasurable
 example [inst : Nonempty Ω] :
   (1 : MeasureOnSpace Ω).indepProduct 1 = (1 : MeasureOnSpace Ω)
 := by
@@ -306,12 +308,8 @@ example [inst : Nonempty Ω] :
   next h =>
     congr 1
     simp only [bot_eq_false] at h ⊢
-    simp
-      [
-        MeasureOnSpace.σAlg,
-        Measure.dirac, OuterMeasure.dirac,
-        ofMeasure
-        ] at h ⊢
+    simp only [Measure.dirac, OuterMeasure.dirac, ofMeasure, toMeasure_toOuterMeasure,
+      MeasureOnSpace.σAlg, MeasureOnSpace.mk.injEq] at h ⊢
     constructor
     · simp [
         MeasureOnSpace.μ,
@@ -321,7 +319,41 @@ example [inst : Nonempty Ω] :
         MeasurableSpace.generateFrom,
         Measure.toOuterMeasure
         ] at h ⊢
-      sorry
+      let μ' := Classical.choose h
+      let h' := Classical.choose_spec h
+      ext X
+      unfold OuterMeasure.trim
+      by_cases h₀ : @MeasurableSet Ω ⊥ X
+      · specialize h' X Set.univ h₀ (by simp)
+        have : X ∩ Set.univ = X := by simp
+        rw [this] at h'
+        simp only [Measure.coe_toOuterMeasure]
+        rw [h']
+        rw [@measure_eq_inducedOuterMeasure]
+        unfold inducedOuterMeasure OuterMeasure.ofFunction
+        simp
+        -- have := @OuterMeasure.map_apply
+        unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal Measure.instFunLike
+        unfold_projs
+        simp
+        split
+        expose_names
+        unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal at heq
+        simp only at heq
+
+
+        #exit
+
+
+
+
+        sorry
+      ·
+
+
+
+
+        sorry
     · simp [MeasurableSpace.sum]
       unfold MeasurableSet
       unfold_projs
