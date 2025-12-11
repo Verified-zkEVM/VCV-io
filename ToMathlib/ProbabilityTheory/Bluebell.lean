@@ -185,7 +185,7 @@ namespace OrderedUnitalResourceAlgebra
 
 variable {I M : Type*} [OrderedUnitalResourceAlgebra M]
 
-instance : MulRightMono M := ⟨fun _ _ _ h ↦ mul_right_mono h⟩
+instance : MulRightMono M := ⟨fun _ _ _ h ↦ mul_left_mono h⟩
 
 /-- Lifting the validity predicate to indexed tuples by requiring all elements to be valid -/
 @[simp]
@@ -198,7 +198,7 @@ instance {I : Type*} : OrderedUnitalResourceAlgebra (I → M) where
   valid_one := by intro i; exact valid_one
   valid_mono := by intro _ _ hab hb i; exact valid_mono (hab i) (hb i)
   valid_mul := by intro _ _ hab i; exact valid_mul (hab i)
-  elim := by intro _ _ _ h; exact fun i => mul_right_mono (h i)
+  elim := by intro _ _ _ h; exact fun i => mul_left_mono (h i)
 
 /-- Define a discrete `CMRA` instance given an `OrderedUnitalResourceAlgebra` instance -/
 instance instCMRA [Valid M] : DiscreteCMRA M := sorry
@@ -225,8 +225,9 @@ variable {α β : Type*}
 instance : OrderedUnitalResourceAlgebra (Permission α) where
   valid := fun p => p ≤ 1
   valid_one := by simp
-  valid_mul := by intro a b hab; simp_all only [le_one_iff_eq_one, LeftCancelMonoid.mul_eq_one,
-    le_refl]
+  valid_mul := by
+    intro a b hab
+    simp_all only [le_one_iff_eq_one, mul_eq_one, le_refl]
   valid_mono := by intro a b h h'; simp_all only [le_one_iff_eq_one]
   -- mul_right_mono := by intro a b c h i; sorry
 
@@ -270,8 +271,10 @@ def MeasureOnSpace.indepProduct (m₁ m₂ : MeasureOnSpace Ω) :
   Option (MeasureOnSpace Ω)
 :=
   if h :
-      ∃ μ : Measure[MeasurableSpace.sum m₁.measurableSpace m₂.measurableSpace] Ω,
-        ∀ (X Y : Set Ω) (_ : MeasurableSet[m₁.measurableSpace] X) (_ : MeasurableSet[m₂.measurableSpace] Y),
+    ∃ μ : Measure[MeasurableSpace.sum m₁.measurableSpace m₂.measurableSpace] Ω,
+      ∀ (X Y : Set Ω)
+        (_ : MeasurableSet[m₁.measurableSpace] X)
+        (_ : MeasurableSet[m₂.measurableSpace] Y),
           μ (X ∩ Y) = m₁.toMeasure X * m₂.toMeasure Y
   then some (@ofMeasure Ω (m₁.σAlg.sum m₂.σAlg) (Classical.choose h))
   else none
@@ -339,23 +342,14 @@ example [inst : Nonempty Ω] :
         unfold_projs
         simp
         split
-        expose_names
-        unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal at heq
-        simp only at heq
-
-
-        #exit
-
-
-
-
-        sorry
-      ·
-
-
-
-
-        sorry
+        · expose_names
+          unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal at heq
+          simp only at heq
+          sorry
+        · sorry
+        · sorry
+        · sorry
+      · sorry
     · simp [MeasurableSpace.sum]
       unfold MeasurableSet
       unfold_projs
@@ -436,7 +430,7 @@ instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
         next z =>
           skip
           unfold ofMeasure
-          unfold MeasureOnSpace.μ MeasureOnSpace.toMeasure
+          -- unfold MeasureOnSpace.μ MeasureOnSpace.toMeasure
           simp
           -- simp [Measure.IndependentProduct.inter_eq_prod]
 
