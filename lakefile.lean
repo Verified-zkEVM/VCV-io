@@ -20,14 +20,14 @@ package VCVio where
   leanOptions := #[
     ⟨`pp.unicode.fun, true⟩, -- pretty-prints `fun a ↦ b`
     ⟨`pp.proofs.withType, false⟩,
-    ⟨`autoImplicit, false⟩,
-    ⟨`relaxedAutoImplicit, false⟩]
+    ⟨`autoImplicit, true⟩,
+    ⟨`relaxedAutoImplicit, true⟩]
     ++ vcvLinters.map fun s ↦
       { s with name := `weak ++ s.name }
 
-require "leanprover-community" / "mathlib" @ git "v4.24.0-rc1"
+require "leanprover-community" / "mathlib" @ git "v4.24.0"
 
-require iris from git "https://github.com/leanprover-community/iris-lean"
+require iris from git "https://github.com/leanprover-community/iris-lean" @ "36d042d249311727eb87acbef36b9d401bf44450"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import ToMathlib.Control.MonadTransformer
+import ToMathlib.Control.Monad.Transformer
 import Batteries.Control.AlternativeMonad
 
 /-!
@@ -87,7 +87,7 @@ theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × 
   · intro ⟨h1, h2⟩
     simp [pure_eq_pmf_pure, liftM, monadLift, OptionT.instMonadLift, OptionT.lift, OptionT.mk] at h1 h2
     have : (x : Option α) → (Prod.fst <$> c) x = (some <$> PMF.pure a) x := by
-      rw [h1]; intro x; congr; simp [Functor.map]
+      rw [h1]; intro x; congr
     sorry
   · intro h; constructor <;> simp [h, ← liftM_map]
 

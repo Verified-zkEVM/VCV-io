@@ -25,10 +25,8 @@ X ∩ Y = X' ∩ Y
 μ₁ X' * μ₂ Y = μ (X' ∩ Y) = μ (X ∩ Y) = μ₁ X * μ₂ Y
 -/
 
-#check MeasureTheory.Measure.toPMF
-#check PMF.toMeasure
-
-open Iris ProbabilityTheory MeasureTheory
+attribute [local instance] Set.monad
+open ProbabilityTheory MeasureTheory
 
 -- Indexed tuples
 def indexedTuple (α : Type*) (I : Finset ℕ) := I → α
@@ -51,7 +49,6 @@ instance {α : Type*} [Valid α] (p : α → Prop) : Valid (Subtype p) where
 
 instance {α β : Type*} [Valid α] [Valid β] : Valid (α × β) where
   valid := fun x => Valid.valid x.1 ∧ Valid.valid x.2
-
 
 /--
   The product of two measurable spaces on `Ω` and `Ω` is the measurable space
@@ -118,6 +115,7 @@ example : valid x → equiv x (y₁ * y₂) → ∃ z₁ z₂, equiv x (z₁ * z
 
 end DiscreteCMRA
 
+open Iris in
 instance DiscreteCMRA.instOFE (α : Type*) [DiscreteCMRA α] : OFE α where
   Equiv := equiv
   Dist := fun _ ↦ equiv
@@ -125,25 +123,29 @@ instance DiscreteCMRA.instOFE (α : Type*) [DiscreteCMRA α] : OFE α where
   equiv_dist := by simp
   dist_lt := fun h _ ↦ h
 
+open Iris in
 /-- A discrete CMRA can be converted to a regular CMRA -/
 instance DiscreteCMRA.instCMRA {α : Type*} [DiscreteCMRA α] : CMRA α :=
   {
     pcore := pcore
     op := (·*·)
-    validN := fun _ x ↦ valid x
-    valid := valid
+    ValidN := fun _ x ↦ valid x
+    Valid := valid
     op_ne := ⟨fun _ _ _ h ↦ mul_equiv h⟩
     pcore_ne := pcore_equiv
     validN_ne := valid_equiv
-    valid_validN := by simp
+    valid_iff_validN := by simp
     validN_succ := by simp
     assoc := by simp [mul_assoc]
     comm := by simp [mul_comm]
-    pcore_l := pcore_left
+    pcore_op_left := pcore_left
     pcore_idem := λ h ↦ by obtain ⟨_, h₁, h₂⟩ := pcore_equiv (pcore_idem h) h
                            exact h₁ ▸ OFE.Equiv.symm h₂
-    pcore_mono' := pcore_mono'
-    validN_op_l := valid_mul
+    pcore_op_mono := fun {x cx} h y ↦ by
+      rcases @pcore_mono' α _ x y cx h with ⟨cy, h⟩
+      use cy
+      rw [h]
+    validN_op_left := valid_mul
     extend {_ _ y₁ y₂ _ _} := by use y₁, y₂; simpa
   }
 
