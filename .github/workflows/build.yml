@@ -4,7 +4,7 @@ on:
 jobs:
   # Cancels previous runs of jobs in this file
   cancel:
-    name: 'Cancel Previous Runs (CI)'
+    name: "Cancel Previous Runs (CI)"
     runs-on: ubuntu-latest
     steps:
       - uses: styfle/cancel-workflow-action@0.12.1
@@ -22,6 +22,7 @@ jobs:
         run: |
           git ls-files 'VCVio/*.lean' | LC_ALL=C sort | sed 's/\.lean//;s,/,.,g;s/^/import /' > VCVio.lean
           git ls-files 'Examples/*.lean' | LC_ALL=C sort | sed 's/\.lean//;s,/,.,g;s/^/import /' > Examples.lean
+          git ls-files 'ToMathlib/*.lean' | LC_ALL=C sort | sed 's/\.lean//;s,/,.,g;s/^/import /' > ToMathlib.lean
 
       - name: check that all files are imported
         run: git diff --exit-code

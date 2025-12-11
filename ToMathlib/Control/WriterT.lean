@@ -3,8 +3,8 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.LawfulFailure
 import Mathlib.Control.Monad.Writer
+import Batteries.Control.AlternativeMonad
 
 /-!
 # Laws for well behaved monadic `failure` operation
@@ -90,13 +90,20 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 @[simp]
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
 
-instance [Monoid ω] [LawfulAlternative m] : LawfulAlternative (WriterT ω m) := sorry
+instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
+    LawfulAlternative (WriterT ω m) := sorry
+  -- map_failure f := sorry
+  -- failure_seq f := sorry
+  -- orElse_failure f := sorry
+  -- failure_orElse f := sorry
+  -- orElse_assoc x y z := sorry
+  -- map_orElse f := sorry
 
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x
   monadLift_bind {α β} x y := by
     show WriterT.mk _ = WriterT.mk _
-    simp [monadLift_def, map_eq_bind_pure_comp, WriterT.mk, bind_assoc]
+    simp [monadLift_def, WriterT.mk]
 
 end fail
 

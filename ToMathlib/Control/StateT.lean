@@ -3,8 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.FreeMonad
-import ToMathlib.Control.LawfulFailure
+import ToMathlib.Control.Monad.Free
 import ToMathlib.General
 import Batteries.Control.Lemmas
 

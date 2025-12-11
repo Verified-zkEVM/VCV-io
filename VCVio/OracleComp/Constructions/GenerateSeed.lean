@@ -3,10 +3,11 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.SimSemantics.QueryTracking.SeededOracle
+-- import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.UniformSelect
 import Mathlib.Data.List.Basic
+import VCVio.OracleComp.QueryTracking.Structures
 
 /-!
 # Counting Queries Made by a Computation
@@ -17,7 +18,7 @@ which
 
 -/
 
-open OracleSpec BigOperators
+open OracleSpec BigOperators ENNReal
 
 namespace OracleComp
 
@@ -30,11 +31,20 @@ def generateSeedT (spec : OracleSpec ι) [∀ i, SelectableType (spec.range i)]
     modify (QuerySeed.addValues (← ($ᵗ spec.range j).replicate (qc j)))
 
 /-- Generate a `QuerySeed` uniformly at random for some set of oracles `spec : OracleSpec ι`,
-with `qc i : ℕ` values seeded for each `i ∈ activeOracles`.
-Note that `activeOracles` is allowed to contain duplicates, but usually won't in practice. -/
+with `qc i : ℕ` values seeded for each index `i ∈ js`. Note that `js` is allowed
+to contain duplicates, but usually wouldn't in practice. -/
 def generateSeed (spec : OracleSpec ι) [∀ i, SelectableType (spec.range i)]
-    (qc : ι → ℕ) (activeOracles : List ι) : ProbComp (QuerySeed spec) :=
-  Prod.snd <$> (generateSeedT spec qc activeOracles).run ∅
+    (qc : ι → ℕ) (js : List ι) : ProbComp (QuerySeed spec) := do
+  let mut seed : QuerySeed spec := ∅
+  for j in js do
+    seed := seed.addValues (← ($ᵗ spec.range j).replicate (qc j))
+  return seed
+
+def generateSingleSeed (spec : OracleSpec ι) (i : ι) [SelectableType (spec.range i)]
+    (n : ℕ) : ProbComp (QuerySeed spec) :=
+  QuerySeed.ofList <$> ($ᵗ spec.range i).replicate n
+
+  -- Prod.snd <$> (generateSeedT spec qc activeOracles).run ∅
 -- variable (spec : OracleSpec ι) [∀ i, SelectableType (spec.range i)]
 --   (qc : ι → ℕ) (j : ι) (js : List ι)
 
@@ -101,6 +111,11 @@ lemma support_generateSeed : (generateSeed spec qc js).support =
 --           simp [h, mul_add_one]
 --   }
 
+@[simp]
+lemma finSupport_generateSeed_ne_empty [DecidableEq spec.QuerySeed] :
+    (generateSeed spec qc js).finSupport ≠ ∅ := by
+  sorry
+
 lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
     1 / (js.map (λ j ↦ (Fintype.card (spec.range j)) ^ qc j)).prod := by
@@ -118,6 +133,12 @@ lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
     -- rw [Array.forIn_toList]
     sorry
   }
+
+lemma probOutput_generateSeed' [spec.FiniteRange]
+    [DecidableEq spec.QuerySeed] (seed : QuerySeed spec)
+    (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
+    ((generateSeed spec qc js).finSupport.card : ℝ≥0∞)⁻¹ := by
+  sorry
 
   -- sorry
 --   revert seed

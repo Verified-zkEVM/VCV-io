@@ -1,4 +1,15 @@
-.lake
-*/.lake
-.vscode
-package-lock.json
+/.lake/
+.DS_Store
+/.ignore/
+
+# LaTeX compilation files
+*.aux
+*.paux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.blg

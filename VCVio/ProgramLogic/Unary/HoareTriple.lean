@@ -5,8 +5,6 @@ Authors: Quang Dao
 -/
 
 import VCVio.OracleComp.DistSemantics.EvalDist
--- import ToMathlib.Control.Lawful
--- import ToMathlib.Control.RelativeMonad
 
 /-!
 # Hoare triples for `OracleComp` and extensions
@@ -21,7 +19,9 @@ open OracleComp OracleSpec
 
 open scoped ENNReal
 
--- Notation: we want to write pre and post-conditions as `{P} e {Q}_⦃ ε ⦄` for a probabilistic program `e`, which means that assuming pre-condition `P`, the program `e` after execution satisfies post-condition `Q` except with probability `ε`.
+-- Notation: we want to write pre and post-conditions as `{P} e {Q}_⦃ ε ⦄` for a probabilistic
+-- program `e`, which means that assuming pre-condition `P`, the program `e` after execution
+-- satisfies post-condition `Q` except with probability `ε`.
 
 namespace StateM
 
@@ -208,7 +208,8 @@ theorem set_rule_forward (P : PreCondition σ) (s' : σ) :
   refine strengthen_rule h' _ ?_
   aesop
 
-/-- Weakest precondition for get: To ensure Q holds after get, Q must hold for the state value we read -/
+/-- Weakest precondition for get: To ensure Q holds after get,
+Q must hold for the state value we read -/
 theorem get_rule_backward (Q : σ → σ → σ → Prop) :
     HoareTriple (fun s => Q s s s) get Q := by
   intro s h
@@ -240,13 +241,15 @@ class StrongestPostcondition (P : PreCondition σ) (comp : StateM σ α) where
   hQ : HoareTriple P comp Q
   hStrong : ∀ Q', HoareTriple P comp Q' → Q' ≤ Q
 
-instance {comp : StateM σ α} {Q : PostCondition σ α} : Subsingleton (WeakestPrecondition comp Q) := by
+instance {comp : StateM σ α} {Q : PostCondition σ α} :
+    Subsingleton (WeakestPrecondition comp Q) := by
   constructor
   intro ⟨P₁, hP₁, hP₁_imp⟩ ⟨P₂, hP₂, hP₂_imp⟩
   congr
   exact le_antisymm (hP₁_imp P₂ hP₂) (hP₂_imp P₁ hP₁)
 
-instance {P : PreCondition σ} {comp : StateM σ α} : Subsingleton (StrongestPostcondition P comp) := by
+instance {P : PreCondition σ} {comp : StateM σ α} :
+    Subsingleton (StrongestPostcondition P comp) := by
   constructor
   intro ⟨Q₁, hQ₁, hQ₁_imp⟩ ⟨Q₂, hQ₂, hQ₂_imp⟩
   congr
@@ -254,12 +257,14 @@ instance {P : PreCondition σ} {comp : StateM σ α} : Subsingleton (StrongestPo
 
 section pure
 
-instance {Q : PostCondition σ α} {x : α} : Inhabited (WeakestPrecondition (pure x : StateM σ α) Q) where
+instance {Q : PostCondition σ α} {x : α} :
+    Inhabited (WeakestPrecondition (pure x : StateM σ α) Q) where
   default := ⟨fun s => Q s x s, HoareTriple.pure_rule_backward x, fun _ hP' => hP'⟩
 
 instance {Q : PostCondition σ σ} {x : σ} : WeakestPrecondition (pure x : StateM σ σ) Q := default
 
-instance {P : PreCondition σ} {x : α} : Inhabited (StrongestPostcondition P (pure x : StateM σ α)) where
+instance {P : PreCondition σ} {x : α} :
+    Inhabited (StrongestPostcondition P (pure x : StateM σ α)) where
   default := ⟨fun s a s' => s = s' ∧ a = x ∧ P s, HoareTriple.pure_rule_forward x,
     fun y hP hy => by aesop⟩
 
@@ -273,7 +278,9 @@ section bind
 --     [∀ x, Inhabited (WeakestPrecondition (comp₂ x) Q)]
 --     [Inhabited (WeakestPrecondition comp₁ Q₁)]
 --       Inhabited (WeakestPrecondition (comp₁ >>= comp₂) Q) where
---   default := ⟨fun s => ∃ x s', Q₁ s x s' ∧ P₂ x s', HoareTriple.bind_rule (default : WeakestPrecondition comp₁ Q₁) (fun x => default : StrongestPostcondition (fun s => Q₁ s ∧ P₂ s) (comp₂ x)),
+--   default := ⟨fun s => ∃ x s', Q₁ s x s' ∧ P₂ x s', HoareTriple.bind_rule
+-- (default : WeakestPrecondition comp₁ Q₁) (fun x => default :
+-- StrongestPostcondition (fun s => Q₁ s ∧ P₂ s) (comp₂ x)),
 --     fun P' hP' s h_p => by aesop⟩
 
 end bind
@@ -289,11 +296,13 @@ end get
 
 section set
 
-instance {P : PreCondition σ} {s' : σ} : Inhabited (StrongestPostcondition P (set s' : StateM σ Unit)) where
+instance {P : PreCondition σ} {s' : σ} :
+    Inhabited (StrongestPostcondition P (set s' : StateM σ Unit)) where
   default := ⟨fun s _ s'' => P s ∧ s'' = s', HoareTriple.set_rule_forward P s',
     fun Q' hQ' _ => by aesop⟩
 
-instance {P : PreCondition σ} {s' : σ} : StrongestPostcondition P (set s' : StateM σ Unit) := default
+instance {P : PreCondition σ} {s' : σ} :
+  StrongestPostcondition P (set s' : StateM σ Unit) := default
 
 end set
 
@@ -332,8 +341,8 @@ def flatten : (t : Tree' α) → List α
   | .leaf a => [a]
   | .node l r => flatten l ++ flatten r
 
-theorem flatten_relabel {t : Tree' α} {n : ℕ} : List.Nodup (flatten ((relabelM t).run n).1) := by
-  sorry
+-- theorem flatten_relabel {t : Tree' α} {n : ℕ} : List.Nodup (flatten ((relabelM t).run n).1) := by
+--   sorry
 
 def size : Tree' α → ℕ
   | .leaf _ => 1
@@ -343,12 +352,6 @@ def Nat.seq : ℕ → ℕ → List ℕ
   | _, 0 => []
   | n, m + 1 => n :: Nat.seq (n + 1) m
 
--- Horrible with Hoare state...
--- def relabelSpec : (t : Tree' α) → HoareState (PreCondition.top _) (Tree' ℕ)
---   (fun _ t s' => s' = t ∧ size t = size s')
---   | .leaf x =>
---     HoareState.get >>=ₕ (fun ⟨n, h⟩ => HoareState.set (n + 1))
---       >>=ₕ fun _ => HoareState.pure (Tree'.leaf n)
---   | .node l r => relabelSpec l >>=ₕ fun l' => relabelSpec r >>=ₕ fun r' => HoareState.pure (Tree'.node l' r')
-
 end Example
+
+end OracleComp

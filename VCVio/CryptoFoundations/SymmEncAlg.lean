@@ -20,36 +20,51 @@ open OracleSpec OracleComp
 
 /-- Symmetric encryption algorithm with access to oracles in `spec` (simulated with state `σ`),
 where `M` is the space of messages, `K` is the key space, and `C` is the ciphertext space. -/
-structure SymmEncAlg {ι : Type w} (spec : OracleSpec ι) (em : Type → Type v) (M K C : Type u)
-    extends ExecutionMethod spec em where
-  keygen : OracleComp spec K
-  encrypt (k : K) (m : M) : OracleComp spec C
-  decrypt (k : K) (c : C) : OracleComp spec M
+structure SymmEncAlg (m : Type u → Type v)
+    (M K C : Type u) extends ExecutionMethod m where
+  keygen : m K
+  encrypt (k : K) (msg : M) : m C
+  decrypt (k : K) (c : C) : Option M
 
 namespace SymmEncAlg
 
-variable {ι : Type w} {spec : OracleSpec ι} {em : Type → Type v} {M K C : Type}
-    [AlternativeMonad em] [LawfulAlternative em]
+variable {ι : Type w} {spec : OracleSpec ι} {m : Type → Type v} {M K C : Type}
+    [AlternativeMonad m] [LawfulAlternative m]
 
-section sound
+section complete
 
 variable [DecidableEq M]
 
-/-- Experiment to check that an encryption and decryption are inverses of each other. -/
-def soundnessExp (encAlg : SymmEncAlg spec em M K C)
-    (m : M) : SecExp spec em where
-  main := do
-    let k ← encAlg.keygen
-    let σ ← encAlg.encrypt k m
-    let m' ← encAlg.decrypt k σ
-    guard (m' = m)
-  __ := encAlg
+/-- A `SymmEncAlg` is complete if decrypting an encrypted message always returns that original
+message, captured here by a `guard` statement.
 
-/-- A symmetric encryption algorithm is complete if correctly generated ciphertexts
-always decrypt to the original plaintext. -/
-def isComplete (encAlg : SymmEncAlg spec em M K C) : Prop :=
-  ∀ m : M, (soundnessExp encAlg m).advantage = 1
+TODO: should this be a class?-/
+class Complete (encAlg : SymmEncAlg m M K C) : Prop where
+  decrypt_encrypt_eq_message (msg : M) : [= some msg | encAlg.exec
+    do let k ← encAlg.keygen; return encAlg.decrypt k (← encAlg.encrypt k msg)] = 1
 
-end sound
+end complete
+
+section perfectSecrecy
+
+open ENNReal
+
+def perfectSecrecy (encAlg : SymmEncAlg m M K C) : Prop :=
+  ∀ mgen : ProbComp M, ∀ msg : M, ∀ σ : C,
+    [= (msg, σ) | encAlg.exec do
+      let msg' ← encAlg.lift_probComp mgen
+      (msg', ·) <$> encAlg.encrypt (← encAlg.keygen) msg'] =
+    [= msg | mgen]
+
+/-- Shanon's theorem on perfect secrecy, showing that encryption and decryption must be determined
+bijections between message and cipher-text space, and that keys must be chosen uniformly. -/
+theorem perfectSecrecy_iff_of_card_eq [Fintype M] [Fintype K] [Fintype C]
+    (encAlg : SymmEncAlg m M K C) [encAlg.Complete] (h1 : Fintype.card M = Fintype.card K)
+    (h2 : Fintype.card K = Fintype.card C) : encAlg.perfectSecrecy ↔
+      (∀ k, [= k | encAlg.exec encAlg.keygen] = (Fintype.card K : ℝ≥0∞)⁻¹) ∧
+      (∀ m c, ∃! k, k ∈ (encAlg.exec encAlg.keygen).support ∧ encAlg.encrypt k m = c) :=
+  sorry
+
+end perfectSecrecy
 
 end SymmEncAlg

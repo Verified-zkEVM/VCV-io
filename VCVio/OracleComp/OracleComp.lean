@@ -3,8 +3,11 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.FreeMonad
+import ToMathlib.Control.Monad.Free
+import ToMathlib.Control.WriterT
+import ToMathlib.Control.AlternativeMonad
 import ToMathlib.Control.OptionT
+import Mathlib.Control.Lawful
 import VCVio.OracleComp.OracleSpec
 
 /-!
@@ -39,8 +42,7 @@ namespace OracleSpec
 /-- An `OracleQuery` to one of the oracles in `spec`, bundling an index and the input to
 use for querying that oracle, implemented as a dependent pair.
 Implemented as a functor with the oracle output type as the constructor result. -/
-inductive OracleQuery {ι : Type u} (spec : OracleSpec.{u,v} ι) :
-    Type v → Type (max u v)
+inductive OracleQuery {ι : Type u} (spec : OracleSpec.{u,v} ι) : Type v → Type (max u v)
   | query (i : ι) (t : spec.domain i) : OracleQuery spec (spec.range i)
 
 namespace OracleQuery
@@ -121,6 +123,9 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β : Type v}
 instance : AlternativeMonad (OracleComp spec) :=
   inferInstanceAs (AlternativeMonad (OptionT (FreeMonad (OracleQuery spec))))
 
+instance : LawfulMonad (OracleComp spec) :=
+  inferInstanceAs (LawfulMonad (OptionT (FreeMonad (OracleQuery spec))))
+
 instance : LawfulAlternative (OracleComp spec) :=
   inferInstanceAs (LawfulAlternative (OptionT (FreeMonad (OracleQuery spec))))
 
@@ -166,12 +171,15 @@ lemma query_bind_eq_roll (q : OracleQuery spec α) (ob : α → OracleComp spec 
 
 end lift
 
-lemma pure_def (x : α) : (pure x : OracleComp spec α) = OptionT.pure x := rfl
+protected lemma pure_def (x : α) : (pure x : OracleComp spec α) = OptionT.pure x := rfl
 
-lemma bind_def (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+protected lemma bind_def (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     oa >>= ob = OptionT.bind oa ob := rfl
 
-lemma failure_def : (failure : OracleComp spec α) = OptionT.fail := rfl
+protected lemma failure_def : (failure : OracleComp spec α) = OptionT.fail := rfl
+
+protected lemma orElse_def (oa oa' : OracleComp spec α) : (oa <|> oa') = OptionT.mk
+      (do match ← OptionT.run oa with | some a => pure (some a) | _  => OptionT.run oa') := rfl
 
 protected lemma bind_congr' {oa oa' : OracleComp spec α} {ob ob' : α → OracleComp spec β}
     (h : oa = oa') (h' : ∀ x, ob x = ob' x) : oa >>= ob = oa' >>= ob' := h ▸ bind_congr h'
@@ -190,14 +198,15 @@ By making this range inclusive we avoid the case of choosing from the empty rang
 
 notation "$[0.." n "]" => uniformFin n
 
+-- TODO: could consider this notation if we switch to probspec
 notation:50 "$[" n "⋯" m "]" => uniformFin' n m
 
 example : OracleComp probSpec ℕ := do
-  let x ← $[314⋯31415]; let y ← $[161⋯1618033]
+  let x ← $[314⋯31415]; let y ← $[0⋯x]
   return x + 2 * y
 
 @[simp] -- NOTE: debatable if this should be simp
-lemma guard_eq (p : Prop) [Decidable p] :
+lemma guard_eq {ι : Type} {spec : OracleSpec ι} (p : Prop) [Decidable p] :
     (guard p : OracleComp spec Unit) = if p then pure () else failure := rfl
 
 -- NOTE: This should maybe be a `@[simp]` lemma? `apply_ite` can't be a simp lemma in general.
@@ -376,8 +385,8 @@ lemma mapM_bind [LawfulMonad m] (oa : OracleComp spec α) (ob : α → OracleCom
   | failure => simp [hfail]
 
 @[simp]
-lemma mapM_bind' {m : Type v → Type w} [AlternativeMonad m] [LawfulAlternative m]
-    (qm : {α : Type v} → OracleQuery spec α → m α)
+lemma mapM_bind' {m : Type v → Type w} [AlternativeMonad m] [LawfulMonad m]
+    [LawfulAlternative m] (qm : {α : Type v} → OracleQuery spec α → m α)
     (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     (oa >>= ob).mapM failure qm =
       oa.mapM failure qm >>= λ x ↦ (ob x).mapM failure qm :=
@@ -393,7 +402,7 @@ lemma mapM_map [LawfulMonad m] (oa : OracleComp spec α) (f : α → β)
 
 @[simp]
 lemma mapM_map' {m : Type v → Type w} [AlternativeMonad m] [LawfulAlternative m]
-    (qm : {α : Type v} → OracleQuery spec α → m α)
+    [LawfulMonad m] (qm : {α : Type v} → OracleQuery spec α → m α)
     (oa : OracleComp spec α) (f : α → β) :
     (f <$> oa).mapM failure qm = f <$> oa.mapM failure qm := by
   induction oa using OracleComp.inductionOn with
@@ -426,14 +435,16 @@ def defaultResult [spec.FiniteRange] (oa : OracleComp spec α) : Option α :=
 Can be a helpful alternative to `sizeOf` when proving recursive calls terminate. -/
 def totalQueries [FiniteRange spec] {α : Type v} (oa : OracleComp spec α) : ℕ := by
   induction oa using OracleComp.construct' with
-  | query_bind i t _ n => exact 1 + ∑ x, n x
-  | _ => exact 0
+  | pure x => exact 0
+  | failure => exact 0
+  | query_bind i t oa rec_n =>
+    exact 1 + ∑ x, rec_n x
 
 section inj
 
 @[simp]
 lemma pure_inj (x y : α) : (pure x : OracleComp spec α) = pure y ↔ x = y := by
-  simp [pure_def, OptionT.pure, OptionT.mk]
+  simp [OracleComp.pure_def, OptionT.pure, OptionT.mk]
   rw [FreeMonad.pure.injEq, Option.some_inj]
 
 @[simp]
@@ -452,8 +463,8 @@ lemma query_inj (i : ι) (t t' : spec.domain i) :
 lemma queryBind_inj (q q' : OracleQuery spec α) (ob ob' : α → OracleComp spec β) :
     (q : OracleComp spec α) >>= ob = (q' : OracleComp spec α) >>= ob' ↔ q = q' ∧ ob = ob' := by
   simp only [OracleComp.liftM_def, OptionT.lift, OptionT.mk, FreeMonad.monad_pure_def,
-    FreeMonad.monad_bind_def, FreeMonad.bind_lift, bind_def, OptionT.bind, FreeMonad.bind_roll,
-    FreeMonad.bind_pure]
+    FreeMonad.monad_bind_def, FreeMonad.bind_lift, OracleComp.bind_def, OptionT.bind,
+    FreeMonad.bind_roll, FreeMonad.bind_pure]
   rw [FreeMonad.roll.injEq]
   simp only [heq_eq_eq, true_and]
 

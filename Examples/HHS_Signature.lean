@@ -9,7 +9,7 @@ import Mathlib.Data.Vector.Zip
 /-!
 # HHS Based Schnorr Signature
 
-TODO: this should come from Fiat-Shamir instead
+TODO: remove fully for sigma alg version
 -/
 
 -- def statelessSimOracle {ι : Type} {spec : OracleSpec}
@@ -35,19 +35,20 @@ open OracleSpec OracleComp
 
 -- end commits
 
--- def HHS_signature (G P M : Type) [DecidableEq M]
---     [AddCommGroup G] [HomogeneousSpace G P] (n : ℕ) :
+-- def HHS_signature (G P M : Type) [DecidableEq M] [SelectableType P] [SelectableType G]
+--     [AddCommGroup G] [AddTorsor G P] (n : ℕ) :
 --     SignatureAlg
 --       (unifSpec ++ₒ ((Vector P n × M) →ₒ Vector Bool n))
+--       ProbComp
 --       M (P × P) G (Vector G n × Vector Bool n) where
---   keygen := λ () ↦ do
+--   keygen := do
 --     let x₀ ← $ᵗ P; let sk ← $ᵗ G
 --     return ((x₀, sk +ᵥ x₀), sk)
 --   -- Sign a message by choosing `n` random commitments, and querying the oracle on them
 --   -- For each 1 bit in the resulting hash, subtract the secret key from corresponding commitment
 --   sign := λ (_, pk) sk m ↦ do
---     let gs ← $ᵗ Vector G n
---     let xs : Vector P n := gs.map (· +ᵥ pk)
+--     let gs : List G ← ($ᵗ G).replicate n
+--     let xs : List P := gs.map (· +ᵥ pk)
 --     -- Note: would be better if we didn't need to do this. Outparam issue?
 --     -- let j : (unifSpec ++ₒ ((Vector P n × M) →ₒ Vector Bool n)).ι := inr ()
 --     let bs : Vector Bool n ← query (inr ()) (xs, m)
@@ -60,10 +61,13 @@ open OracleSpec OracleComp
 --     -- let j : (unifSpec ++ ((Vector P n × M) →ₒ Vector Bool n)).ι := inr ()
 --     let bs' : Vector Bool n ← query (inr ()) (xs, m)
 --     return (bs' = bs)
---   -- Treat the second oracle as a random oracle
---   baseSimOracle := SimOracle.equivState
---     (idOracle ++ₛₒ randOracle) (Equiv.punitProd _)
---   init_state := ∅
+--   impl := sorry
+--   exec_as_probComp := sorry
+
+  -- Treat the second oracle as a random oracle
+  -- baseSimOracle := SimOracle.equivState
+  --   (idOracle ++ₛₒ randOracle) (Equiv.punitProd _)
+  -- init_state := ∅
 
 -- namespace HHS_signature
 

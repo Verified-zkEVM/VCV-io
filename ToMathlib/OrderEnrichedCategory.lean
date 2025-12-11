@@ -16,27 +16,27 @@ namespace Preord
 
 /-- The category of preorders is monoidal. -/
 instance : MonoidalCategory (Preord) where
-  tensorObj X Y := Bundled.of (X × Y)
-  whiskerLeft X Y := fun f => ⟨fun x => (x.1, f.1 x.2),
-      (by simp [Monotone, Bundled.of]; intro _ _ _ _ h h'; exact ⟨h, f.2 h'⟩)⟩
-  whiskerRight f Y := ⟨fun y => (f.1 y.1, y.2),
-      (by simp [Monotone, Bundled.of]; intro _ _ _ _ h h'; exact ⟨f.2 h, h'⟩)⟩
-  tensorUnit := Bundled.of PUnit
+  tensorObj X Y := ⟨X.carrier × Y.carrier⟩
+  whiskerLeft X Y := fun f => ofHom ⟨fun x => (x.1, f.1 x.2),
+      (by simp [Monotone]; intro _ _ _ _ h h'; exact ⟨h, f.hom.2 h'⟩)⟩
+  whiskerRight f Y := ofHom ⟨fun y => (f.hom y.1, y.2),
+      (by simp [Monotone]; intro _ _ _ _ h h'; exact ⟨f.hom.2 h, h'⟩)⟩
+  tensorUnit := ⟨PUnit⟩
   associator X Y Z := {
-    hom := ⟨fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩, by
-      simp only [Monotone, Bundled.of, Prod.mk_le_mk, Prod.forall, and_imp]
+    hom := ofHom ⟨fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩, by
+      simp only [Monotone, Prod.mk_le_mk, Prod.forall, and_imp]
       intro _ _ _ _ _ _ h1 h2 h3; exact ⟨h1, h2, h3⟩⟩
-    inv := ⟨fun ⟨x, ⟨y, z⟩⟩ => ⟨⟨x, y⟩, z⟩, by
-      simp only [Monotone, Bundled.of, Prod.mk_le_mk, Prod.forall, and_imp]
+    inv := ofHom ⟨fun ⟨x, ⟨y, z⟩⟩ => ⟨⟨x, y⟩, z⟩, by
+      simp only [Monotone, Prod.mk_le_mk, Prod.forall, and_imp]
       intro _ _ _ _ _ _ h1 h2 h3; exact ⟨⟨h1, h2⟩, h3⟩⟩ }
   leftUnitor X := {
-    hom := ⟨Prod.snd, (by simp [Monotone, Bundled.of])⟩
-    inv := ⟨fun x => (PUnit.unit, x), by simp [Monotone, Bundled.of]⟩ }
+    hom := ofHom ⟨Prod.snd, (by simp [Monotone])⟩
+    inv := ofHom ⟨fun x => (PUnit.unit, x), by simp [Monotone]⟩ }
   rightUnitor X := {
-    hom := ⟨Prod.fst, (by simp [Monotone, Bundled.of])⟩
-    inv := ⟨fun x => (x, PUnit.unit), by simp [Monotone, Bundled.of]⟩ }
+    hom := ofHom ⟨Prod.fst, (by simp [Monotone])⟩
+    inv := ofHom ⟨fun x => (x, PUnit.unit), by simp [Monotone]⟩ }
   tensorHom_def f g := rfl
-  tensor_id _ _ := rfl
+  -- tensor_id _ _ := rfl
   tensor_comp f₁ f₂ g₁ g₂ := rfl
   whiskerLeft_id _ _ := rfl
   id_whiskerRight _ _ := rfl
@@ -63,7 +63,8 @@ variable (C : Type u₁) (D : Type u₂) [𝒞 : EnrichedCategory V C] [𝒟 : E
 @[simps]
 instance instProduct : EnrichedCategory V (C × D) where
   Hom X Y := (𝒞.Hom X.1 Y.1) ⊗ (𝒟.Hom X.2 Y.2)
-  id X := (λ_ _).inv ≫ ((𝒞.id X.1) ⊗ (𝒟.id X.2))
+  id X := (λ_ _).inv ≫ (sorry)
+  -- ((𝒞.id X.1) ⊗ (𝒟.id X.2))
   comp X Y Z := by stop simpa using (𝒞.comp X.1 Y.1 Z.1) ⊗ (𝒟.comp X.2 Y.2 Z.2)
   -- (α_ _ _ _).inv ≫ (
   -- id_comp X Y := by

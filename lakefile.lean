@@ -25,7 +25,7 @@ package VCVio where
     ++ vcvLinters.map fun s ↦
       { s with name := `weak ++ s.name }
 
-require "leanprover-community" / "mathlib" @ git "v4.18.0-rc1"
+require "leanprover-community" / "mathlib" @ git "v4.24.0-rc1"
 
 require iris from git "https://github.com/leanprover-community/iris-lean"
 
@@ -56,4 +56,4 @@ target libsodium.o pkg : System.FilePath := do
 extern_lib libleanffi pkg := do
   let ffiO ← libsodium.o.fetch
   let name := nameToStaticLib "leanlibsodium"
-  buildStaticLib (pkg.nativeLibDir / name) #[ffiO]
+  buildStaticLib (pkg.sharedLibDir / name) #[ffiO]

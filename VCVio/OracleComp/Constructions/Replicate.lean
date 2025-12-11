@@ -26,11 +26,11 @@ namespace OracleComp
 /-- Run the computation `oa` repeatedly `n` times to get a vector of `n` results. -/
 def replicate {ι : Type u} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
-  (List.replicate n PUnit.unit).mapM (λ _ : PUnit.{v + 1} ↦ oa)
+  (List.replicate n ()).mapM fun () => oa
 
 def replicateTR {ι : Type u} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
-  (List.replicateTR n ()).mapM (λ () ↦ oa)
+  (List.replicateTR n ()).mapM fun () => oa
 
 variable {ι : Type u} {spec : OracleSpec ι} {α β : Type v}
   (oa : OracleComp spec α) (n : ℕ)
@@ -111,9 +111,10 @@ lemma mem_finSupport_replicate [spec.FiniteRange] [spec.DecidableEq] [DecidableE
 
 -- /-- Vectors can be selected uniformly if the underlying type can be.
 -- Note: this isn't very efficient as an actual implementation in practice. -/
--- instance (α : Type) [Fintype α] [Inhabited α] [SelectableType α] (n : ℕ) :
+-- instance (α : Type) [SelectableType α] (n : ℕ) :
 --     SelectableType (Vector α n) where
---   selectElem := _ <$> ($ᵗ α).replicate n
+--   selectElem := ($ᵗ α).replicate n
+--   mem_support_selectElem xs := by simp
 --   probOutput_selectElem_eq xs ys := by simp
 --   probFailure_selectElem := by simp
 

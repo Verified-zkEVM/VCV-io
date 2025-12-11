@@ -70,7 +70,12 @@ section append
 /-- `spec₁ ++ spec₂` combines the two sets of oracles disjointly using `Sum` for the indexing set.
 `inl i` is a query to oracle `i` of `spec`, and `inr i` for oracle `i` of `spec'`. -/
 def append {ι₁ : Type u} {ι₂ : Type u'} (spec₁ : OracleSpec ι₁) (spec₂ : OracleSpec ι₂) :
-    OracleSpec (ι₁ ⊕ ι₂) := Sum.elim spec₁ spec₂
+    OracleSpec (ι₁ ⊕ ι₂) := 
+  fun | .inl i => spec₁ i | .inr i => spec₂ i
+    
+    -- Sum.elim spec₁ spec₂
+
+
 
 infixl : 65 " ++ₒ " => OracleSpec.append
 

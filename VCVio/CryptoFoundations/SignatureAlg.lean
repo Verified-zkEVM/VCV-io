@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.Constructions.UniformSelect
-import VCVio.OracleComp.SimSemantics.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append
 
 /-!
@@ -18,71 +18,70 @@ public/secret keys `PK` and `SK`, and ciphertext space `C`.
 
 universe u v
 
-open OracleSpec OracleComp
+open OracleSpec OracleComp ENNReal
 
-/-- Signature algorithm with access to oracles in `spec` (simulated with state `σ`),
+/-- Signature algorithm with computations in the monad `m`,
 where `M` is the space of messages, `PK`/`SK` are the spaces of the public/private keys,
-and `S` is the type of the final signature.
-`em` is the execution monad used in the implementation of the oracles. -/
-structure SignatureAlg {ι : Type} (spec : OracleSpec ι) (em : Type → Type)
-    (M PK SK S : Type) extends ExecutionMethod spec em where
-  keygen : OracleComp spec (PK × SK)
-  sign (pk : PK) (sk : SK) (m : M) : OracleComp spec S
-  verify (pk : PK) (m : M) (s : S) : OracleComp spec Bool
+and `S` is the type of the final signature. -/
+structure SignatureAlg (m : Type → Type v) (M PK SK S : Type)
+    extends ExecutionMethod m where
+  keygen : m (PK × SK)
+  sign (pk : PK) (sk : SK) (msg : M) : m S
+  verify (pk : PK) (msg : M) (σ : S) : m Bool
 
 namespace SignatureAlg
 
-variable {ι : Type} {spec : OracleSpec ι} {em : Type → Type} {σ M PK SK S : Type}
-  [AlternativeMonad em] [LawfulAlternative em]
+section signingOracle
+
+variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
+
+def signingOracle (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) :
+    QueryImpl (M →ₒ S) (WriterT (QueryLog (M →ₒ S)) m) :=
+  QueryImpl.withLogging ⟨fun | query () msg => sigAlg.sign pk sk msg⟩
+
+end signingOracle
 
 section sound
 
-def IsSound (sigAlg : SignatureAlg spec em M PK SK S) : Prop :=
-  ∀ m : M, [= true | sigAlg.exec do
+variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
+
+/-- a `SignatureAlg` is perfectly complete if honest signatures are always verified. -/
+def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
+  ∀ msg : M, [= true | sigAlg.exec do
     let (pk, sk) ← sigAlg.keygen
-    let sig ← sigAlg.sign pk sk m
-    sigAlg.verify pk m sig] = 1
-
--- /-- Experiment to check that valid signatures succeed at being verified. -/
--- def soundnessExp (sigAlg : SignatureAlg spec σ M PK SK S)
---     (m : M) : SecExp spec σ where
---   main := do
---     let (pk, sk) ← sigAlg.keygen
---     let sig ← sigAlg.sign pk sk m
---     let b ← sigAlg.verify pk m sig
---     guard b
---   __ := sigAlg
-
--- /-- A signature algorithm is complete if valid signatures always verify. -/
--- def IsComplete (sigAlg : SignatureAlg spec σ M PK SK S) : Prop :=
---   ∀ m : M, (sigAlg.soundnessExp m).advantage = 1
+    let sig ← sigAlg.sign pk sk msg
+    sigAlg.verify pk msg sig] = 1
 
 end sound
 
 section unforgeable
 
-variable [DecidableEq ι] [Inhabited S] [Fintype S] [DecidableEq S] [DecidableEq M]
+variable {ι : Type u} {spec : OracleSpec ι} {σ M PK SK S : Type}
+  [DecidableEq M] [DecidableEq S]
 
-def signingOracle (sigAlg : SignatureAlg spec em M PK SK S)
-    (pk : PK) (sk : SK) : QueryImpl (M →ₒ S)
-    (StateT (QueryLog (M →ₒ S)) (OracleComp spec)) where
-  impl | query () m => do
-    let σ ← sigAlg.sign pk sk m
-    modifyGet λ log ↦ (σ, log.logQuery ⟨(), m⟩ σ)
+/-- Adversary for testing the unforgeability of a signature scheme.
+We only define this if the monad for the protocol is `OracleComp spec`,
+as we need to be able to give the adversary access to a signing oracle. -/
+structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
+  main (pk : PK) : OracleComp (spec ++ₒ (M →ₒ S)) (M × S)
 
-abbrev unforgeableAdv (_sigAlg : SignatureAlg spec em M PK SK S) :=
-  SecAdv (spec ++ₒ (M →ₒ S)) PK (M × S)
-
-def unforgeableExp {sigAlg : SignatureAlg spec em M PK SK S}
-    (adv : unforgeableAdv sigAlg) : SecExp spec em where
-  main := do
+/-- Unforgeability expiriment for a signature algorithm runs the adversary and checks returns
+whether or not the adversary successfully forged a signature-/
+def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : unforgeableAdv sigAlg) : ProbComp Bool :=
+  sigAlg.exec do
     let (pk, sk) ← sigAlg.keygen
-    let adv_so : QueryImpl (spec ++ₒ (M →ₒ S)) (StateT (M →ₒ S).QueryLog _) :=
-      idOracle (spec := spec) ++ₛₒ sigAlg.signingOracle pk sk
-    let ((m, σ), log) ← (simulateQ adv_so (adv.run pk)).run []
-    let b ← sigAlg.verify pk m σ
-    guard (!(log.wasQueried () m) && b)
-  __ := sigAlg
+    -- Simulate the adversary's signing oracle with the public / secret keys
+    let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+      simulateQ (idOracle ++ₛₒ sigAlg.signingOracle pk sk) (adv.main pk)
+    -- Run the adversary and check that they successfully forged a signature
+    let ((m, σ), log) ← sim_adv.run
+    return !(log.wasQueried () m) && (← sigAlg.verify pk m σ)
+
+/-- Advantage -/
+noncomputable def unforgeableAdv.advantage
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := [= true | unforgeableExp adv]
 
 end unforgeable
 

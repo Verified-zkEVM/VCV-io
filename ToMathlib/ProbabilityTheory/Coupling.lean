@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
 import ToMathlib.Control.MonadTransformer
-import ToMathlib.Control.LawfulFailure
+import Batteries.Control.AlternativeMonad
 
 /-!
 # Coupling for probability distributions
@@ -31,18 +31,20 @@ def Coupling (p : PMF α) (q : PMF β) :=
 end PMF
 
 /-- Subprobability distribution. -/
-@[reducible]
-def SPMF : Type u → Type u := OptionT PMF
+-- @[reducible]
+abbrev SPMF : Type u → Type u := OptionT PMF
 
 namespace SPMF
 
 variable {α β : Type u}
 
-instance : Monad SPMF := inferInstance
+-- @[reducible] protected def mk (m : PMF (Option α)) : SPMF α := OptionT.mk m
 
-instance : LawfulMonad SPMF := inferInstance
+-- @[reducible] protected def run (m : SPMF α) : PMF (Option α) := OptionT.run m
 
--- instance : Alternative SPMF := inferInstance
+-- instance : AlternativeMonad SPMF := inferInstance
+
+-- instance : LawfulAlternative SPMF := inferInstance
 
 instance : FunLike (SPMF α) (Option α) ENNReal :=
   inferInstanceAs (FunLike (PMF (Option α)) (Option α) ENNReal)
@@ -50,8 +52,6 @@ instance : FunLike (SPMF α) (Option α) ENNReal :=
 -- instance : MonadLift PMF SPMF := inferInstance
 
 -- instance : LawfulMonadLift PMF SPMF := inferInstance
-
--- instance : LawfulFailure SPMF := inferInstance
 
 theorem pure_eq_pmf_pure {a : α} : (pure a : SPMF α) = PMF.pure a := by
   simp [pure, liftM, OptionT.pure, monadLift, MonadLift.monadLift, OptionT.lift, PMF.instMonad]
@@ -61,6 +61,12 @@ theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
   simp [bind, liftM, OptionT.bind, monadLift, MonadLift.monadLift, OptionT.lift,
     PMF.instMonad, OptionT.mk]
   rfl
+
+@[simp] lemma map_some_apply_some (p : PMF α) (x : α) : p.map some (some x) = p x := by
+  sorry
+
+@[simp] lemma PMF.map_some_apply_some (p : PMF α) (x : α) : (some <$> p) (some x) = p x := by
+  sorry
 
 @[ext]
 class IsCoupling (c : SPMF (α × β)) (p : SPMF α) (q : SPMF β) : Prop where

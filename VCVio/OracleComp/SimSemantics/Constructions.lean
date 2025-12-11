@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.SimSemantics.Simulate
+import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.Constructions.UniformSelect
 import VCVio.OracleComp.DistSemantics.Prod
 
@@ -23,7 +23,7 @@ namespace QueryImpl
 
 section compose
 
-variable {m : Type u → Type v} [AlternativeMonad m] [LawfulAlternative m]
+variable {m : Type u → Type v} [AlternativeMonad m]
 
 /-- Given an implementation of `spec` in terms of a new set of oracles `spec'`,
 and an implementation of `spec'` in terms of arbitrary `m`, implement `spec` in terms of `m`. -/
@@ -38,11 +38,12 @@ lemma apply_compose (so' : QueryImpl spec' m) (so : QueryImpl spec (OracleComp s
     (q : OracleQuery spec α) : (so' ∘ₛ so).impl q = simulateQ so' (so.impl q) := rfl
 
 @[simp]
-lemma simulateQ_compose (so' : QueryImpl spec' m) (so : QueryImpl spec (OracleComp spec'))
+lemma simulateQ_compose [LawfulMonad m] [LawfulAlternative m] (so' : QueryImpl spec' m)
+    (so : QueryImpl spec (OracleComp spec'))
     (oa : OracleComp spec α) : simulateQ (so' ∘ₛ so) oa = simulateQ so' (simulateQ so oa) := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
-  | query_bind i t oa hoa => simp [hoa]
+  | query_bind i t oa hoa => simp [hoa, Function.comp_def]
   | failure => simp
 
 end compose
@@ -75,51 +76,22 @@ lemma equivState_subsingleton [Subsingleton σ] (e : σ ≃ σ) :
 lemma equivState_equivState : (so.equivState e).equivState e.symm = so :=
   QueryImpl.ext' λ q ↦ by simp [Prod.map]
 
-@[simp]
-lemma simulate_equivState (s : τ) (oa : OracleComp spec α) :
-    simulate (so.equivState e) s oa = map id e <$> simulate so (e.symm s) oa := by
-  revert s; induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind i t oa hoa =>
-      intro s
-      simp [hoa, map_eq_bind_pure_comp, StateT.run]
+-- @[simp]
+-- lemma simulate_equivState (s : τ) (oa : OracleComp spec α) :
+--     simulateQ (so.equivState e) oa = fun s => map id e <$> simulateQ so oa (e.symm s) := by
+--   sorry
 
-      sorry
-  | failure => simp
-
-/-- Masking the state doesn't affect the main output of a simulation. -/
-@[simp]
-lemma simulate'_equivState (s : τ) (oa : OracleComp spec α) :
-    simulate' (so.equivState e) s oa = simulate' so (e.symm s) (oa) := by
-  simp only [StateT.run'_eq, simulate_equivState, Functor.map_map, map_fst, id_eq]
+-- /-- Masking the state doesn't affect the main output of a simulation. -/
+-- @[simp]
+-- lemma simulate'_equivState (s : τ) (oa : OracleComp spec α) :
+--     (simulateQ (so.equivState e) oa).run' s = (simulateQ so oa).run' (e.symm s) := by
+--   simp only [StateT.run'_eq, StateT.run, simulate_equivState, Functor.map_map, map_fst, id_eq]
+--   simp [equivState, Functor.map_map]
+--   sorry
 
 end equivState
 
 end QueryImpl
-
-/-- Simulate a computation using the original oracles by "replacing" queries with queries.
-This operates as an actual identity for `simulate'`, in that we get an exact equality
-between the new and original computation.
-This can be useful especially with `SimOracle.append`, in order to simulate a single oracle
-in a larger set of oracles, leaving the behavior of other oracles unchanged.
-The relevant spec can usually be inferred automatically, so we leave it implicit. -/
-def idOracle : QueryImpl spec (OracleComp spec) where
-  impl q := OracleComp.lift q
-
-namespace idOracle
-
-@[simp]
-lemma apply_eq (q : OracleQuery spec α) : idOracle.impl q = q := rfl
-
-@[simp]
-lemma simulateQ_eq (oa : OracleComp spec α) :
-    simulateQ idOracle oa = oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => rfl
-  | query_bind i t oa hoa => simp [hoa]
-  | failure => rfl
-
-end idOracle
 
 /-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
 The resulting computation is still identical under `evalDist`.
@@ -170,28 +142,3 @@ lemma probEvent_simulateQ [spec.FiniteRange] (oa : OracleComp spec α)
   refine probEvent_congr (fun _ => Iff.rfl) (evalDist_simulateQ oa)
 
 end unifOracle
-
-/-- Simulate a computation by having each oracle return the default value of the query output type
-for all queries. This gives a way to run arbitrary computations to get *some* output.
-Mostly useful in some existence proofs, not usually used in an actual implementation.
-NOTE: output monad should really be `Id` but doesn't exist currently. -/
-def defaultOracle [spec.FiniteRange] : QueryImpl spec (OracleComp []ₒ) where
-  impl | q => do return q.defaultOutput
-
-namespace defaultOracle
-
-variable [FiniteRange spec]
-
-@[simp]
-lemma apply_eq (q : OracleQuery spec α) :
-    defaultOracle.impl q = return q.defaultOutput := rfl
-
-@[simp]
-lemma simulateQ_eq (oa : OracleComp spec α) :
-    simulateQ defaultOracle oa = oa.defaultResult.getM := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp [defaultResult, Option.getM]
-  | query_bind i t oa hoa => simp [hoa]; rfl
-  | failure => simp [defaultResult, Option.getM]
-
-end defaultOracle

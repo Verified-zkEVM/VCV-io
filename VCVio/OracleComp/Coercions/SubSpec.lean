@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.SimSemantics.Simulate
+import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.Constructions.UniformSelect
 
 /-!
@@ -20,7 +20,7 @@ where the non-inclusive subset symbol reflects that we avoid defining this insta
 
 open OracleSpec OracleComp BigOperators ENNReal
 
-universe u v w
+universe u v w w'
 
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α β γ : Type w}
@@ -32,9 +32,9 @@ doesn't affect the underlying probability distribution of the computation.
 Informally, `spec ⊂ₒ superSpec` means that for any query to an oracle of `sub_spec`,
 it can be perfectly simulated by a computation using the oracles of `superSpec`.
 
-We avoid implementing this via the built-in subset type as we care about the actual data
+We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
-class SubSpec (spec : OracleSpec ι) (superSpec : OracleSpec τ)
+class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec τ)
   extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
 
 infix : 50 " ⊂ₒ " => SubSpec
@@ -45,42 +45,38 @@ variable [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 -- TODO: this may be a good simp lemma for normalization in general?
 -- Guessing the rhs is almost always easier to prove things about
-@[simp]
-lemma liftM_query_eq_liftM_liftM (q : OracleQuery spec α) :
+@[simp] lemma liftM_query_eq_liftM_liftM (q : OracleQuery spec α) :
     (q : OracleComp superSpec α) = ((q : OracleQuery superSpec α) : OracleComp superSpec α) := rfl
 
--- TODO: this version of the lemmas is probably(??) better most of the time
+-- TODO: Nameing
 lemma evalDist_lift_query [superSpec.FiniteRange] [Fintype α] [Nonempty α]
     (q : OracleQuery spec α) :
     evalDist ((q : OracleQuery superSpec α) : OracleComp superSpec α) =
       OptionT.lift (PMF.uniformOfFintype α) := by
   rw [evalDist_liftM]
 
-@[simp]
-lemma evalDist_liftM [superSpec.FiniteRange] [Fintype α] [Nonempty α]
+@[simp] lemma evalDist_liftM [superSpec.FiniteRange] [Fintype α] [Nonempty α]
     (q : OracleQuery spec α) :
     evalDist (q : OracleComp superSpec α) =
       OptionT.lift (PMF.uniformOfFintype α) := by
   rw [liftM_query_eq_liftM_liftM, OracleComp.evalDist_liftM]
 
-@[simp]
-lemma evalDist_monadLift [superSpec.FiniteRange] [Fintype α] [Nonempty α]
-    (q : OracleQuery spec α) :
-    evalDist (h.monadLift q : OracleComp superSpec α) =
-      OptionT.lift (PMF.uniformOfFintype α) := by
-  apply evalDist_liftM
-
+@[simp] lemma supportWhen_monadLift (q : OracleQuery spec α)
+    (poss : {α : Type w} → OracleQuery superSpec α → Set α) :
+    supportWhen (q : OracleComp superSpec α) poss = poss q := by
+  rw [liftM_query_eq_liftM_liftM]
+  simp only [supportWhen_query]
 
 @[simp]
 lemma support_toFun (q : OracleQuery spec α) :
     support (h.monadLift q : OracleComp superSpec α) = Set.univ := by
-  rw [support_liftM]
+  rw [support_query]
 
 @[simp]
 lemma finSupport_toFun [spec.DecidableEq] [superSpec.DecidableEq] [superSpec.FiniteRange]
     [DecidableEq α] [Fintype α] (q : OracleQuery spec α) :
     finSupport (h.monadLift q : OracleComp superSpec α) = Finset.univ := by
-  rw [finSupport_liftM]
+  sorry
 
 @[simp]
 lemma probOutput_toFun [superSpec.FiniteRange] [Fintype α]
@@ -96,11 +92,10 @@ lemma probEvent_toFun [superSpec.FiniteRange] [Fintype α]
       (Finset.univ.filter p).card / Fintype.card α := by
   rw [probEvent_liftM_eq_div]
 
-
-/-- The empty set of oracles is a subspec of any other oracle set.
-We require `ι` to be inhabited to prevent the reflexive case.  -/
-instance [Inhabited ι] : []ₒ ⊂ₒ spec where
-  monadLift | query i _ => i.elim
+-- /-- The empty set of oracles is a subspec of any other oracle set.
+-- We require `ι` to be inhabited to prevent the reflexive case.  -/
+-- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
+--   monadLift | query i _ => i.elim
 
 end SubSpec
 
@@ -133,7 +128,7 @@ lemma liftComp_query (q : OracleQuery spec α) :
 lemma liftComp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     liftComp (oa >>= ob) superSpec =
       liftComp oa superSpec >>= λ x ↦ liftComp (ob x) superSpec := by
-  simp [liftComp]
+  simp [liftComp, Function.comp_def]
 
 @[simp]
 lemma liftComp_failure : liftComp (failure : OracleComp spec α) superSpec = failure := rfl
@@ -146,7 +141,7 @@ lemma liftComp_map (oa : OracleComp spec α) (f : α → β) :
 @[simp]
 lemma liftComp_seq (og : OracleComp spec (α → β)) (oa : OracleComp spec α) :
     liftComp (og <*> oa) superSpec = liftComp og superSpec <*> liftComp oa superSpec := by
-  simp [liftComp, seq_eq_bind]
+  simp [liftComp, seq_eq_bind, Function.comp_def]
 
 /-- Lifting a computation to a different set of oracles doesn't change the output distribution,
 since `evalDist` assumes uniformly random queries. -/
@@ -185,6 +180,11 @@ lemma probEvent_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
     [p | liftComp oa superSpec] = [p | oa] := by
   simp only [probEvent_def, evalDist_liftComp]
 
+@[simp] lemma neverFails_lift_comp_iff (oa : OracleComp spec α) :
+    (liftComp oa superSpec).neverFails ↔ oa.neverFails := by
+  simp [liftComp]
+  sorry
+
 end liftComp
 
 /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
@@ -197,13 +197,5 @@ variable [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 @[simp]
 lemma liftM_eq_liftComp (oa : OracleComp spec α) :
     (liftM oa : OracleComp superSpec α) = liftComp oa superSpec := rfl
-
--- NOTE: Should be handled by other things now.
--- /-- View a probabalistic computation as one with a larger set of oracles.
--- We make this a special instance as it's often needed in situations where the
--- type-class instance is not yet available (e.g. defining security experiments). -/
--- instance {ι : Type} (spec : OracleSpec ι) [unifSpec ⊂ₒ spec] (α : Type) :
---     Coe (ProbComp α) (OracleComp spec α) where
---   coe oa := oa
 
 end OracleComp

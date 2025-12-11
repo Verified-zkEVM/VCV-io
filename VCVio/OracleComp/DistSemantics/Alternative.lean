@@ -19,20 +19,36 @@ namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
 
-protected lemma orElse_def {ι : Type u} {spec : OracleSpec ι} {α : Type u}
-    (oa oa' : OracleComp spec α) : (oa <|> oa') = OptionT.mk
-      (do match ← OptionT.run oa with | some a => pure (some a) | _  => OptionT.run oa') := rfl
+@[simp]
+lemma evalDist_orElse [h : spec.FiniteRange] (oa oa' : OracleComp spec α) :
+    evalDist (oa <|> oa') = (evalDist oa <|> evalDist oa') := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp [Option.elimM]; sorry
+  | failure => simp
+  | query_bind i t oa h => {
+    sorry
+  }
+  -- refine OptionT.ext ?_
+  -- rw [OptionT.run_orElse]
+  -- unfold evalDist
+  -- simp [simulateQ, OptionT.run, OptionT.mk, FreeMonad.mapM, OracleComp.orElse_def,
+  --   Option.elimM, bind_assoc, FreeMonad.bind]
+
+  -- sorry
 
 @[simp]
 lemma probFailure_orElse {ι : Type u} {spec : OracleSpec ι} {α : Type u} [h : spec.FiniteRange]
     (oa oa' : OracleComp spec α) : [⊥ | oa <|> oa'] = [⊥ | oa] * [⊥ | oa'] := by
-  rw [OracleComp.orElse_def]
-  sorry
+  rw [probFailure_def, evalDist_orElse, OptionT.run_orElse]
+  simp [Option.elimM]
+  rw [tsum_option _ ENNReal.summable]
+  simp
+  rfl
 
 @[simp]
 lemma support_orElse {ι : Type u} {spec : OracleSpec ι} {α : Type u}
-    (oa oa' : OracleComp spec α) [Decidable oa.noFailure] : (oa <|> oa').support =
-      if oa.noFailure then oa.support else oa.support ∪ oa'.support := by
+    (oa oa' : OracleComp spec α) [Decidable oa.neverFails] : (oa <|> oa').support =
+      if oa.neverFails then oa.support else oa.support ∪ oa'.support := by
   sorry
 
 end OracleComp

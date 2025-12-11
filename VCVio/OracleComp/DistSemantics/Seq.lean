@@ -3,8 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.DistSemantics.EvalDist
-import ToMathlib.General
+import VCVio.OracleComp.DistSemantics.Monad
 
 /-!
 # Lemmas About the Distribution Semantics of Seq

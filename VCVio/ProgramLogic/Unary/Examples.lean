@@ -3,7 +3,7 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import ToMathlib.Control.OrderedMonad
+import ToMathlib.Control.Monad.Ordered
 
 /-!
 # Examples of ordered monads in program verification
@@ -72,15 +72,15 @@ instance : OrderedMonad MonoContProp := inferInstanceAs (OrderedMonad (MonoCont 
 
 -- Definition STCont S := @MonoCont (S -> Prop) (pointwise_relation S SProp_op_order) _.
 
-open scoped OrderedMonad in
-instance {α} : AssertAssume (MonoContProp α) where
-  assert := fun pre m => ⟨fun p => pre ∧ m.1 p, fun p p' hp ⟨q, mp⟩ => ⟨q, m.2 p p' hp mp⟩⟩
-  assume := fun pre m => ⟨fun p => pre → m.1 p, fun p p' hp q hPre => m.2 p p' hp (q hPre)⟩
-  assert_strengthen := fun pre m p p' hp => by simp_all; intro _ mp; exact m.2 p p' hp mp
-  assume_weaken := fun pre m p p' hp => by simp_all; intro mp _; exact m.2 p p' hp mp
-  assert_assume_iff := fun p m m' => ⟨
-    fun h => by simp_all; sorry,
-    fun h => by simp_all; sorry⟩
+-- open scoped OrderedMonad in
+-- instance {α} : AssertAssume (MonoContProp α) where
+--   assert := fun pre m => ⟨fun p => pre ∧ m.1 p, fun p p' hp ⟨q, mp⟩ => ⟨q, m.2 p p' hp mp⟩⟩
+--   assume := fun pre m => ⟨fun p => pre → m.1 p, fun p p' hp q hPre => m.2 p p' hp (q hPre)⟩
+--   assert_strengthen := fun pre m p p' hp => by simp_all; intro _ mp; exact m.2 p p' hp mp
+--   assume_weaken := fun pre m p p' hp => by simp_all; intro mp _; exact m.2 p p' hp mp
+--   assert_assume_iff := fun p m m' => ⟨
+--     fun h => by simp_all; sorry,
+--     fun h => by simp_all; sorry⟩
 
 /-- The quotient of the state monad, where the preorder on `σ → Prop` is given pointwise,
 induced by the preorder `(p ≤ q) ↔ (p → q)` on `Prop`. -/

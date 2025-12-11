@@ -3,8 +3,8 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.NoFailure
-import VCVio.OracleComp.SimSemantics.Simulate
+import VCVio.OracleComp.Traversal
+import VCVio.OracleComp.SimSemantics.SimulateQ
 import Mathlib.Probability.Distributions.Uniform
 import ToMathlib.General
 
@@ -41,11 +41,17 @@ variable {ι : Type u} {spec : OracleSpec ι} {ι' : Type v} {spec' : OracleSpec
 
 section evalDist
 
+noncomputable def evalDistWhen (oa : OracleComp spec α)
+    (query_dist : {α : Type _} →
+      OracleQuery spec α → OptionT PMF α) :
+    OptionT PMF α :=
+  oa.simulateQ ⟨query_dist⟩
+
 /-- Associate a probability mass function to a computation, where the probability is the odds of
 getting a given output assuming all oracles responded uniformly at random.
 Implemented by simulating queries in the `PMF` monad. -/
-noncomputable def evalDist {α : Type w} (oa : OracleComp spec α) : OptionT PMF α :=
-  simulateQ ⟨fun (query i _) => PMF.uniformOfFintype (spec.range i)⟩ oa
+noncomputable def evalDist (oa : OracleComp spec α) : OptionT PMF α :=
+  oa.simulateQ ⟨fun (query i _) => PMF.uniformOfFintype (spec.range i)⟩
 
 @[simp]
 lemma evalDist_pure (x : α) : evalDist (pure x : OracleComp spec α) = pure x := simulateQ_pure _ _
@@ -59,16 +65,16 @@ lemma evalDist_liftM [Nonempty α] [Fintype α] (q : OracleQuery spec α) :
   refine congr_arg Finset.card (Finset.ext λ _ ↦ by simp)
 
 @[simp]
-lemma evalDist_query (i : ι) (t : spec.domain i) :
-    evalDist (query i t : OracleComp spec _) = OptionT.lift (PMF.uniformOfFintype (spec.range i)) :=
-  simulateQ_query _ _
+lemma evalDist_query (i : ι) (t : spec.domain i) : evalDist (query i t : OracleComp spec _) =
+    OptionT.lift (PMF.uniformOfFintype (spec.range i)) := simulateQ_query _ _
 
 @[simp]
 lemma evalDist_failure : evalDist (failure : OracleComp spec α) = failure := simulateQ_failure _
 
 @[simp]
 lemma evalDist_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
-    evalDist (oa >>= ob) = (evalDist oa) >>= (evalDist ∘ ob) := by simp [evalDist, Function.comp_def]
+    evalDist (oa >>= ob) = (evalDist oa) >>= (evalDist ∘ ob) := by
+  simp [evalDist, Function.comp_def]
 
 lemma evalDist_query_bind (i : ι) (t : spec.domain i) (ou : spec.range i → OracleComp spec α) :
     evalDist ((query i t : OracleComp spec _) >>= ou) =
@@ -206,28 +212,28 @@ variable {oa : OracleComp spec α} {x : α} {p : α → Prop}
 end bounds
 
 lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
-    ∑' x, [= x | oa] = 1 - [⊥ | oa] := by
+    ∑' x : α, [= x | oa] = 1 - [⊥ | oa] := by
   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure oa)
 
 lemma sum_probOutput_eq_sub [Fintype α] (oa : OracleComp spec α) :
-    ∑ x, [= x | oa] = 1 - [⊥ | oa] := by
+    ∑ x : α, [= x | oa] = 1 - [⊥ | oa] := by
   rw [← tsum_fintype, tsum_probOutput_eq_sub]
 
 lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
-    [⊥ | oa] = 1 - ∑' x, [= x | oa] := by
+    [⊥ | oa] = 1 - ∑' x : α, [= x | oa] := by
   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
     (probFailure_add_tsum_probOutput oa)
 
 lemma probFailure_eq_sub_sum [Fintype α] (oa : OracleComp spec α) :
-    [⊥ | oa] = 1 - ∑ x, [= x | oa] := by
+    [⊥ | oa] = 1 - ∑ x : α, [= x | oa] := by
   rw [← tsum_fintype, probFailure_eq_sub_tsum]
 
 lemma tsum_probOutput_eq_one (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
-    ∑' x, [= x | oa] = 1 := by
+    ∑' x : α, [= x | oa] = 1 := by
   rw [tsum_probOutput_eq_sub, h, tsub_zero]
 
 lemma sum_probOutput_eq_one [Fintype α] (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
-    ∑ x, [= x | oa] = 1 := by
+    ∑ x : α, [= x | oa] = 1 := by
   rw [sum_probOutput_eq_sub, h, tsub_zero]
 
 section support
@@ -241,7 +247,7 @@ lemma mem_support_evalDist_iff (oa : OracleComp spec α) (x : α) :
     some x ∈ (evalDist oa).run.support ↔ x ∈ oa.support := by
   induction oa using OracleComp.inductionOn with
   | pure => simp
-  | query_bind i t oa hoa => simp [hoa, OptionT.lift]
+  | query_bind i t oa hoa => simp [hoa, OptionT.lift, elimM]
   | failure => simp
 alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
 
@@ -615,16 +621,16 @@ variable (oa : OracleComp spec α) (ob : α → OracleComp spec β)
 
 lemma probOutput_bind_eq_tsum (y : β) :
     [= y | oa >>= ob] = ∑' x : α, [= x | oa] * [= y | ob x] := by
-  simp [probOutput, evalDist_bind, tsum_option _ ENNReal.summable]
+  simp [probOutput, evalDist_bind, tsum_option _ ENNReal.summable, elimM]
 
 lemma probFailure_bind_eq_tsum :
     [⊥ | oa >>= ob] = [⊥ | oa] + ∑' x : α, [= x | oa] * [⊥ | ob x] := by
-  simp [probFailure, evalDist_bind, tsum_option _ ENNReal.summable, ← probOutput_def]
+  simp [probFailure, evalDist_bind, tsum_option _ ENNReal.summable, ← probOutput_def, elimM]
 
 lemma probEvent_bind_eq_tsum (q : β → Prop) :
     [q | oa >>= ob] = ∑' x : α, [= x | oa] * [q | ob x] := by
   simp [probEvent_def, evalDist_bind, PMF.toOuterMeasure_bind_apply,
-    tsum_option _ ENNReal.summable, evalDist_apply_some]
+    tsum_option _ ENNReal.summable, evalDist_apply_some, elimM]
 
 /-- Version of `probOutput_bind_eq_tsum` that sums only over the subtype given by the support
 of the first computation. This can be useful to avoid looking at edge cases that can't actually
@@ -708,6 +714,26 @@ lemma probFailure_bind_eq_sub_mul {oa : OracleComp spec α} {ob : α → OracleC
     _ = 1 - ∑' x : α, [= x | oa] * (1 - r) := by
       refine congr_arg (1 - ·) (tsum_congr λ x ↦ ?_)
       rw [ENNReal.mul_sub (λ _ _ ↦ probOutput_ne_top), mul_one, ← h x]
+
+lemma probFailure_bind_le_of_forall {oa : OracleComp spec α} {s : ℝ≥0∞}
+    -- TODO: this should be a general type of `uniformOutput` computations
+    (h' : [⊥ | oa] = s) (ob : α → OracleComp spec β) {r : ℝ≥0∞}
+    (hr : ∀ x ∈ oa.support, [⊥ | ob x] ≤ r) : [⊥ | oa >>= ob] ≤ s + (1 - s) * r := sorry
+
+/-- Version of `probFailure_bind_le_of_forall` with the `1 - s` factor ommited for convenience. -/
+lemma probFailure_bind_le_of_forall' {oa : OracleComp spec α} {s : ℝ≥0∞}
+    -- TODO: this should be a general type of `uniformOutput` computations
+    (h' : [⊥ | oa] = s) (ob : α → OracleComp spec β) {r : ℝ≥0∞}
+    (hr : ∀ x ∈ oa.support, [⊥ | ob x] ≤ r) : [⊥ | oa >>= ob] ≤ s + r := sorry
+
+/-- Version of `probFailure_bind_le_of_forall` when `oa` never fails. -/
+lemma probFailure_bind_le_of_le_of_neverFails {oa : OracleComp spec α}
+    (h' : oa.neverFails) {ob : α → OracleComp spec β} {r : ℝ≥0∞}
+    (hr : ∀ x ∈ oa.support, [⊥ | ob x] ≤ r) : [⊥ | oa >>= ob] ≤ r := sorry
+
+lemma probFailure_bind_of_neverFails {oa : OracleComp spec α}
+    (h : neverFails oa) (ob : α → OracleComp spec β) :
+    [⊥ | oa >>= ob] = ∑' x : α, [= x | oa] * [⊥ | ob x] := sorry
 
 end bind
 
@@ -891,22 +917,73 @@ lemma probOutput_map_eq_probOutput_inverse (f : α → β) (g : β → α)
     exact (λ h ↦ hx ((congr_arg g h).trans (hr x)).symm)
   · simp [hl y]
 
+lemma probFailure_eq_sub_sum_probOutput_map [Fintype β] (oa : OracleComp spec α) (f : α → β) :
+    [⊥ | oa] = 1 - ∑ y : β, [= y | f <$> oa] := by
+  rw [← probFailure_map (f := f), probFailure_eq_sub_tsum, tsum_fintype]
+
 end map
 
-section noFailure
+section neverFails
+
+-- TODO: expand api and include `mayFail` versions for `probFailure_pos`.
 
 @[simp]
-lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : [⊥ | oa] = 0 ↔ oa.noFailure := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | failure => simp
-  | query_bind i t oa h => simp [probFailure_bind_eq_tsum, h]
+lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : [⊥ | oa] = 0 ↔ oa.neverFails := by
+  sorry
+  -- induction oa using OracleComp.inductionOn with
+  -- | pure x => simp
+  -- | failure => simp
+  -- | query_bind i t oa h => simp [probFailure_bind_eq_tsum, h]
 
 @[simp]
-lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < [⊥ | oa] ↔ ¬ oa.noFailure := by
-  rw [pos_iff_ne_zero, ne_eq, probFailure_eq_zero_iff]
+lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < [⊥ | oa] ↔ ¬ oa.neverFails := by
+  sorry --rw [pos_iff_ne_zero, ne_eq, probFailure_eq_zero_iff]
 
-end noFailure
+lemma noFailure_of_probFailure_eq_zero {oa : OracleComp spec α} (h : [⊥ | oa] = 0) :
+    neverFails oa := by rwa [← probFailure_eq_zero_iff]
+
+lemma not_noFailure_of_probFailure_pos {oa : OracleComp spec α} (h : 0 < [⊥ | oa]) :
+    ¬ neverFails oa := by rwa [← probFailure_pos_iff]
+
+end neverFails
+
+section unit
+
+@[simp]
+lemma probOutput_guard {p : Prop} [Decidable p] :
+    [= () | (guard p : OracleComp spec _)] = if p then 1 else 0 := by
+  by_cases h : p <;> simp [h]
+
+@[simp]
+lemma probFailure_guard {p : Prop} [Decidable p] :
+    [⊥ | (guard p : OracleComp spec _)] = if p then 0 else 1 := by
+  by_cases h : p <;> simp [h]
+
+lemma probOutput_eq_sub_probFailure_of_unit {oa : OracleComp spec PUnit} :
+    [= () | oa] = 1 - [⊥ | oa] := by
+  rw [probFailure_eq_sub_sum, Finset.univ_unique, PUnit.default_eq_unit, Finset.sum_singleton]
+  rw [ENNReal.sub_sub_cancel (by simp) (by simp)]
+
+lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp spec α}
+    (h : oa.neverFails) {p : α → Prop} [DecidablePred p] :
+    [= () | do let a ← oa; guard (p a)] = 1 - [= () | do let a ← oa; guard (¬ p a)] := by
+  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  simp
+  sorry
+
+end unit
+
+section bool
+
+lemma probOutput_true_eq_probOutput_false_not {ob : OracleComp spec Bool} :
+    [= true | ob] = [= false | do let b ← ob; return !b] := by
+  simp [probOutput_map_eq_sum_fintype_ite]
+
+lemma probOutput_false_eq_probOutput_true_not {ob : OracleComp spec Bool} :
+    [= false | ob] = [= true | do let b ← ob; return !b] := by
+  simp [probOutput_true_eq_probOutput_false_not]
+
+end bool
 
 section eqRec
 
@@ -993,7 +1070,7 @@ end uniformFin
 /-- Example of brute forcing a probability computation by expanding terms and using `ring_nf`. -/
 example : [⊥ | do
     let x ←$[0..5]; let y ←$[0..3]
-    guard (x = 0); guard (y ≠ x); return ()] = 21 / 24 := by
+    guard (x = 0); guard (y.val ≠ x.val); return ()] = 21 / 24 := by
   -- would be nice not to need arithmetic facts
   have : (6 : ℝ≥0∞)⁻¹ * (4 : ℝ≥0∞)⁻¹ = (24 : ℝ≥0∞)⁻¹ :=
     by rw [← ENNReal.mul_inv (by tauto) (by tauto)]; ring_nf

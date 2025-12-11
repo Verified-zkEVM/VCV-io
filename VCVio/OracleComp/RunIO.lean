@@ -29,7 +29,8 @@ NOTE: `OracleComp` as currently defined doesn't allow specialized error messagin
 Changing this would just require adding a `String` to the `failure` constructor -/
 protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
   oa.mapM (fail := throw (IO.userError "Computation failed during execution"))
-    (query_map := λ (query i _) ↦ IO.rand 0 i) -- Queries become random selection
+    -- Problem with bump to v4.22.0-rc2: `IO.rand` returns `Nat` instead of `Fin`
+    (query_map := λ ⟨i, _⟩ ↦ (Fin.ofNat (i + 1)) <$> IO.rand 0 i) -- Queries become random selection
 
 -- protected def runIO' {α : Type} (oa : OracleComp probSpec α) : IO α :=
 --   oa.mapM (fail := throw (IO.userError "Computation failed during execution"))
@@ -38,6 +39,15 @@ protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
 /-- Automatic lifting of probabalistic computations into `IO`. -/
 instance : MonadLift ProbComp IO where
   monadLift := OracleComp.runIO
+
+def test : IO (ℕ × ℕ) := do
+  let x ← IO.rand 0 1618
+  let y ← IO.rand 0 3141
+  let z := x + y
+  IO.println z
+  return (x, y)
+
+#print test
 
 -- #eval Nat.add <$> $[0..10] <*> $[0..10]
 

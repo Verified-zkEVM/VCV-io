@@ -53,28 +53,28 @@ lemma append_apply_inl (i : ι₁) (t : spec₁.domain i) :
 lemma append_apply_inr (i : ι₂) (t : spec₂.domain i) :
     (so ++ₛₒ so' : QueryImpl _ n).impl (query (inr i) t) = so'.impl (query i t) := rfl
 
-variable [AlternativeMonad n] [LawfulAlternative n]
+variable [AlternativeMonad n] [LawfulAlternative n] [LawfulMonad n]
 
 @[simp]
-lemma simulate_coe_append_left [AlternativeMonad m₁] [LawfulAlternative m₁]
-    [LawfulAlternativeLift m₁ n] (oa : OracleComp spec₁ α) :
+lemma simulate_coe_append_left [AlternativeMonad m₁] [LawfulMonad m₁] [LawfulAlternative m₁]
+    [LawfulMonadLift m₁ n] [LawfulAlternativeLift m₁ n] (oa : OracleComp spec₁ α) :
     simulateQ (so ++ₛₒ so') (liftM oa) = (liftM (simulateQ so oa) : n α) := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind i t oa hoa =>
       simp at hoa
-      simp [hoa, append_apply_inl so so']
+      simp [hoa, append_apply_inl so so', Function.comp_def]
   | failure => simp
 
 @[simp]
-lemma simulate_coe_append_right [AlternativeMonad m₂] [LawfulAlternative m₂]
-    [LawfulAlternativeLift m₂ n] (oa : OracleComp spec₂ α) :
+lemma simulate_coe_append_right [AlternativeMonad m₂] [LawfulMonad m₂] [LawfulAlternative m₂]
+    [LawfulMonadLift m₂ n] [LawfulAlternativeLift m₂ n] (oa : OracleComp spec₂ α) :
     simulateQ (so ++ₛₒ so') (liftM oa) = (liftM (simulateQ so' oa) : n α) := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind i t oa hoa =>
       simp at hoa
-      simp [hoa, append_apply_inr so so']
+      simp [hoa, append_apply_inr so so', Function.comp_def]
   | failure => simp
 
 end SimOracle
