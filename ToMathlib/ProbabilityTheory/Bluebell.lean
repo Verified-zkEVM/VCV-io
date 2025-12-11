@@ -608,8 +608,6 @@ namespace PSpPm
 def liftProb (volume : MeasureOnSpace (α → V)) : PSpPm α V :=
   ⟨⟨volume, 1⟩, by sorry⟩
 
-#synth One (Permission _)
-
 @[simp]
 instance [Nonempty V] : One (PSpPm α V) where
   one :=
@@ -986,9 +984,19 @@ section ProgramLogic
 -- TODO: we also need to state the regular rules of separation logic, so stuff like
 theorem and_comm {P Q : HyperAssertion I α V} : P ∧ Q ⊣⊢ Q ∧ P := sorry
 
+-- variable {Ω : Type} [MeasurableSpace Ω] [AddMonoid Ω] (μ₁ μ₂ : Measure Ω)
+-- #check μ₁ ∗ μ₂
+
+-- #synth AddMonoid (HyperAssertion I α V)
+-- attribute [local instance] AddMonoid (HyperAssertion I α V)
+
+syntax:35 (priority := high) term:36 " ∗ " term:35 : term
+syntax (name := somename) "⌜" term "⌝" : term
+macro_rules | `($x ∗ $y) => `(sep $x $y)
+macro_rules (kind := somename) | `(⌜$x⌝) => `(pure $x)
 /-- If `P` and `Q` affect disjoint sets of indices, then `P ∧ Q` entails `P ∗ Q` -/
 theorem sep_of_and [DecidableEq I] [Fintype I] {P Q : HyperAssertion I α V}
-    (h : relevantIndices P ∩ relevantIndices Q = ∅) : (P ∧ Q) ⊢ (P ∗ Q) := by
+    (h : relevantIndices P ∩ relevantIndices Q = ∅) : (P ∧ Q) ⊢ P ∗ Q := by
   sorry
 
 /-- If `E⟨i⟩` is sampled from both `μ` and `μ'`, then `⌜ μ = μ' ⌝` holds as a proposition -/
