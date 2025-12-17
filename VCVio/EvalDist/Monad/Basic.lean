@@ -38,8 +38,8 @@ lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
 lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
-lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
-    evalDist (pure x : m α) = pure x := by aesop
+@[simp] lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
+    evalDist (pure x : m α) = pure x := by simp [evalDist]
 
 @[simp] lemma evalDist_comp_pure [HasEvalSPMF m] :
     evalDist ∘ (pure : α → m α) = pure := by aesop
@@ -116,24 +116,7 @@ lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     ext
     rw [probOutput_bind_eq_tsum]
   simp only [probFailure_eq_sub_tsum]
-
-  simp
-  simp [ENNReal.mul_sub]
-
-
-  -- rw [probFailure_def, SPMF.run_none_eq_one_sub]
-  stop
-  simp only [MonadHomClass.mmap_bind]
-
-  simp only [OptionT.run_bind, PMF.monad_pure_eq_pure]
-
-  simp [probFailure_eq_sub_tsum, probOutput_bind_eq_tsum]
-
-
   sorry
-  -- simp[probFailure_def, OptionT.run]
-
-  -- sorry
 
 @[simp]
 lemma probFailure_bind_eq_zero_iff [HasEvalSPMF m] (mx : m α) (my : α → m β) :
@@ -258,7 +241,7 @@ section map
     support (f <$> mx) = f '' support mx := by aesop (rule_sets := [UnfoldEvalDist])
 
 @[simp] lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
-    evalDist (f <$> mx) = f <$> (evalDist mx) := by aesop
+    evalDist (f <$> mx) = f <$> (evalDist mx) := by simp [map_eq_bind_pure_comp]
 
 @[simp] lemma evalDist_comp_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) :
     evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> evalDist mx := by aesop

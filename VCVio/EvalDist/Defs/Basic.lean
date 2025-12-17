@@ -8,8 +8,11 @@ import VCVio.EvalDist.Defs.Support
 /-!
 # Typeclasses for Denotational Monad Semantics
 
-dt: should evaluate if making the definitions `reducible` is a good idea.
-Depends how well `MonadHomClass` works to be fair.
+This file defines typeclasses `HasEvalSPMF` and `HasEvalPMF` for assigning denotational
+probability semantics to monadic computations. We also introduce functions
+`probOutput`, `probEvent`, and `probFailrue` with associated notation.
+
+-- dtumad: document various probability notation definitions here
 -/
 
 open ENNReal
@@ -23,18 +26,24 @@ Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
 class HasEvalSPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSet m where
   toSPMF : m →ᵐ SPMF
+  support_eq {α : Type u} (mx : m α) :
+    support mx = (toSPMF mx).support
+  toSet := MonadHom.comp SPMF.support toSPMF
 
 /-- The monad `m` can be evaluated to get a distribution of outputs. -/
 class HasEvalPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSPMF m where
   toPMF : m →ᵐ PMF
+  toSPMF_eq {α : Type u} (mx : m α) :
+    toSPMF mx = OptionT.lift (toPMF mx)
+  toSPMF := MonadHom.comp PMF.toSPMF' toPMF
 
 /-- The resulting distribution of running the monadic computation `mx`. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
 
-instance [HasEvalSPMF m] : MonadHomClass m SPMF (@evalDist m _ _) :=
-  inferInstanceAs (MonadHomClass m SPMF @HasEvalSPMF.toSPMF.toFun)
+-- instance [HasEvalSPMF m] : MonadHomClass m SPMF (@evalDist m _ _) :=
+--   inferInstanceAs (MonadHomClass m SPMF @HasEvalSPMF.toSPMF.toFun)
 
 section probability_notation
 
@@ -64,7 +73,7 @@ section probOutput
 -- dtumad: I think maybe we want to simp in the `←` direction here?
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma probOutput_def [HasEvalSPMF m] (mx : m α) (x : α) :
-    Pr[= x | mx] = (evalDist mx).run (some x) := rfl
+    Pr[= x | mx] = (evalDist mx) x := rfl
 
 end probOutput
 
@@ -77,7 +86,8 @@ lemma probEvent_def [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
 lemma probEvent_eq_tsum_indicator [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
     Pr[p | mx] = ∑' x : α, {x | p x}.indicator (Pr[= · | mx]) x := by
   simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable,
-    Set.indicator_image (Option.some_injective _), Function.comp_def, probOutput_def]
+    Set.indicator_image (Option.some_injective _), Function.comp_def, probOutput_def,
+    SPMF.apply_eq_run_some]
 
 lemma probEvent_eq_sum_fintype_indicator [HasEvalSPMF m] [Fintype α]
     (mx : m α) (p : α → Prop) : Pr[p | mx] = ∑ x : α, {x | p x}.indicator (Pr[= · | mx]) x :=
@@ -86,7 +96,7 @@ lemma probEvent_eq_sum_fintype_indicator [HasEvalSPMF m] [Fintype α]
 lemma probEvent_eq_tsum_ite [HasEvalSPMF m] (mx : m α) (p : α → Prop) [DecidablePred p] :
     Pr[p | mx] = ∑' x : α, if p x then Pr[= x | mx] else 0 := by
   simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable, Set.indicator,
-    probOutput_def]
+    probOutput_def, SPMF.apply_eq_run_some]
 
 lemma probEvent_eq_sum_fintype_ite [HasEvalSPMF m] [Fintype α]
     (mx : m α) (p : α → Prop) [DecidablePred p] : Pr[p | mx] = ∑ x : α, if p x then Pr[= x | mx] else 0 :=
@@ -187,8 +197,7 @@ section sums
 /-- Connection between the two different probability notations. -/
 lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalSPMF m]
     (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
-  rw [probEvent_eq_tsum_indicator, probOutput_def]
-  simp [PMF.monad_map_eq_map, tsum_option]
+  simp [probEvent_eq_tsum_indicator, probOutput_def, evalDist, map_eq_bind_pure_comp]
   refine tsum_congr fun α => by aesop
 
 @[simp] lemma tsum_probOutput_add_probFailure [HasEvalSPMF m] (mx : m α) :

@@ -156,11 +156,13 @@ protected def mapM [Pure m] [Bind m] (s : (a : P.A) → m (P.B a)) : FreeM P α 
 variable [Monad m] (s : (a : P.A) → m (P.B a))
 
 @[simp]
-lemma mapM_pure (x : α) : (FreeM.pure x : FreeM P α).mapM s = Pure.pure x := rfl
+lemma mapM_pure' (x : α) : (FreeM.pure x : FreeM P α).mapM s = Pure.pure x := rfl
 
 @[simp]
 lemma mapM_roll (x : P.A) (r : P.B x → FreeM P α) :
     (FreeM.roll x r).mapM s = s x >>= fun u => (r u).mapM s := rfl
+
+@[simp] lemma mapM_pure (x : α) : (Pure.pure x : FreeM P α).mapM s = Pure.pure x := rfl
 
 variable [LawfulMonad m]
 
@@ -179,7 +181,7 @@ lemma mapM_bind' {α β} (x : FreeM P α) (y : α → FreeM P β) :
 @[simp]
 lemma mapM_map {α β} (x : FreeM P α) (f : α → β) :
     FreeM.mapM s (f <$> x) = f <$> FreeM.mapM s x := by
-  simp [← bind_pure_comp]; rfl
+  simp [← bind_pure_comp]
 
 @[simp]
 lemma mapM_seq {α β}
@@ -198,29 +200,25 @@ lemma mapM_liftA (s : (a : P.A) → m (P.B a)) (x : P.A) :
 
 /-- `FreeM.mapM` as a monad homomorphism. -/
 protected def mapMHom (s : (a : P.A) → m (P.B a)) : FreeM P →ᵐ m where
-  toFun := FreeM.mapM s
+  toFun _ := FreeM.mapM s
   toFun_pure' x := rfl
   toFun_bind' x y := by
     induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
 
 @[simp] lemma mapMHom_toFun_eq (s : (a : P.A) → m (P.B a)) :
-    ((FreeM.mapMHom s).toFun : FreeM P α → m α) = FreeM.mapM s := rfl
+    ((FreeM.mapMHom s).toFun α) = FreeM.mapM s := rfl
 
 protected def mapMHom' (s : NatHom P.Obj m) : FreeM P →ᵐ m where
-  toFun := FreeM.mapM (fun t => s ⟨t, id⟩)
-  toFun_pure' x := rfl
+  toFun _ := FreeM.mapM (fun t => s ⟨t, id⟩)
+  toFun_pure' x := by simp --[FreeM.mapM]
   toFun_bind' x y := by
     induction x using FreeM.inductionOn <;> simp [FreeM.mapM, FreeM.monad_bind_def]
 
 @[simp] lemma mapMHom'_toFun_eq (s : NatHom P.Obj m) :
-    ((FreeM.mapMHom' s).toFun : FreeM P α → m α) = FreeM.mapM (fun t => s ⟨t, id⟩) := rfl
-
--- TODO: other monad operations
+    (FreeM.mapMHom' s).toFun α = FreeM.mapM (fun t => s ⟨t, id⟩) := rfl
 
 end mapM
 
 end FreeM
 
 end PFunctor
-
--- TODO: how is the free monad itself a PFunctor?

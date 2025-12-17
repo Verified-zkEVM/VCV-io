@@ -48,6 +48,8 @@ noncomputable def evalDistWhen (d : QueryImpl spec SPMF) (mx : OracleComp spec Î
 
 noncomputable instance [spec.Fintype] [spec.Inhabited] : HasEvalPMF (OracleComp spec) where
   toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.Range t)
+  support_eq := sorry
+  toSPMF_eq := sorry
 
 lemma evalDist_eq_simulateQ [spec.Fintype] [spec.Inhabited] (mx : OracleComp spec Î±) :
     evalDist mx = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl

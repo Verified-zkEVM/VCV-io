@@ -28,16 +28,16 @@ class HasEvalSet (m : Type u → Type v) [Monad m] where
 
 /-- The set of possible outputs of running the monadic computation `mx`. -/
 def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
-  HasEvalSet.toSet.toFun mx
+  HasEvalSet.toSet.toFun _ mx
 
 -- dtumad: not sure if this should actually be in the ruleset?
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
-    support mx = HasEvalSet.toSet.toFun mx := rfl
+    support mx = HasEvalSet.toSet.toFun _ mx := rfl
 
-/-- `support` is an (implicit) monad morphism. -/
-instance [HasEvalSet m] : MonadHomClass m SetM (@support m _ _) :=
-  inferInstanceAs (MonadHomClass m SetM @HasEvalSet.toSet.toFun)
+-- /-- `support` is an (implicit) monad morphism. -/
+-- instance [HasEvalSet m] : MonadHomClass m SetM (@support m _ _) :=
+--   inferInstanceAs (MonadHomClass m SetM @HasEvalSet.toSet.toFun)
 
 /-- The support of a `SetM` computation is the resulting set. -/
 instance : HasEvalSet SetM where toSet := MonadHom.id SetM
@@ -45,7 +45,8 @@ instance : HasEvalSet SetM where toSet := MonadHom.id SetM
 @[simp] lemma SetM.support_eq (x : SetM α) : support x = x.run := rfl
 
 /-- The monad `m` can be evaluated to get a finite set of possible outputs.
-We restrict to the case of decidable equality of the output type, so `Finset.biUnion` exists. -/
+We restrict to the case of decidable equality of the output type, so `Finset.biUnion` exists.
+Note: we can't use `MonadHomClass` since `Finset` has no `Monad` instance. -/
 class HasEvalFinset (m : Type u → Type v) [Monad m] [HasEvalSet m] where
   finSupport {α : Type u} [DecidableEq α] (mx : m α) : Finset α
   coe_finSupport {α : Type u} [DecidableEq α] (mx : m α) :

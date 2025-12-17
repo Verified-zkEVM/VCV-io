@@ -51,23 +51,23 @@ protected def mapM {m : Type u → Type v} {n : Type u → Type w}
     {α : Type u} (x : OptionT m α) : n α :=
   do (← f x.run).getM
 
-instance {m : Type u → Type v} {n : Type u → Type w}
-    [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
-    (f : {α : Type u} → m α → n α)
-    [MonadHomClass m n @f] :
-    MonadHomClass (OptionT m) n (@OptionT.mapM m n _ f) where
-  map_pure {α} x := by simp [OptionT.mapM]
-  map_bind {α β} mx my := by
-    simp [OptionT.mapM, Function.comp_def, Option.elimM]
-    refine congr_arg (f mx.run >>= ·) (funext fun x => ?_)
-    cases x <;> simp
+-- instance {m : Type u → Type v} {n : Type u → Type w}
+--     [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
+--     (f : {α : Type u} → m α → n α)
+--     [MonadHomClass m n @f] :
+--     MonadHomClass (OptionT m) n (@OptionT.mapM m n _ f) where
+--   map_pure {α} x := by simp [OptionT.mapM]
+--   map_bind {α β} mx my := by
+--     simp [OptionT.mapM, Function.comp_def, Option.elimM]
+--     refine congr_arg (f mx.run >>= ·) (funext fun x => ?_)
+--     cases x <;> simp
 
 /-- Bundled version of `mapM`.
 dtumad: we should probably just pick one of these (probably the hom class non-bundled approach)-/
 protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
     [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
     (f : m →ᵐ n) : OptionT m →ᵐ n where
-  toFun x := do match (← f x.run) with
+  toFun _ x := do match (← f x.run) with
     | some x => return x
     | none => failure
   toFun_pure' x := by
