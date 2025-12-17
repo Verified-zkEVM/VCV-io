@@ -352,6 +352,12 @@ instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
   probFailure_selectElem := by sorry-- simp
 
+instance (n : ℕ) : SampleableType (ZMod (n + 1)) where
+  selectElem := $[0..n]
+  mem_support_selectElem := by sorry
+  probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
+  probFailure_selectElem := by sorry-- simp
+
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
 instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
   selectElem := congr_arg Fin (Nat.succ_pred (NeZero.ne n)).symm ▸ $ᵗ (Fin (n - 1 + 1))

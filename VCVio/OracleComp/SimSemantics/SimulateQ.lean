@@ -34,7 +34,7 @@ class HasSimulateQ {ι} (spec : OracleSpec ι) (r : Type u → Type*)
   simulateQ (impl : QueryImpl spec r) : m →ᵐ n
   /-- Simulating a query is the same as applying the implementation to the query input. -/
   simulateQ_liftM (impl : QueryImpl spec r) {α : Type u} (q : OracleQuery spec α) :
-    (simulateQ impl).toFun (liftM q : m α) = q.cont <$> liftM (impl q.input)
+    (simulateQ impl) (liftM q : m α) = q.cont <$> liftM (impl q.input)
 
 export HasSimulateQ (simulateQ simulateQ_liftM)
 

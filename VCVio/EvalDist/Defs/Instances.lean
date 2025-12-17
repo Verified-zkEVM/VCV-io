@@ -4,36 +4,96 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.Basic
+import VCVio.EvalDist.Defs.Support
 
 /-!
-# Instances Connecting Different Evaluation Semantics
+# Monad Evaluation Semantics Instances
 
+This file defines various instances of evaluation semantics for different monads
 -/
 
 universe u v w
 
 namespace SPMF
 
-variable {α β γ}
+variable {α}
 
 /-- Evaluate a `SPMF` to itself via identity. Mostly exists to give notation access. -/
-instance : HasEvalSPMF SPMF where toSPMF := MonadHom.id SPMF
+instance : HasEvalSPMF SPMF where
+  toSet := SPMF.support
+  toSPMF := MonadHom.id SPMF
+  support_eq _ := rfl
 
-@[simp] lemma evalDist_eq (p : SPMF α) : evalDist p = p := rfl
+protected lemma evalDist_def (p : SPMF α) : evalDist p = p := rfl
+
+protected lemma support_def (p : SPMF α) : support p = SPMF.support p := rfl
 
 @[simp] lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
-lemma evalDist_eq_iff {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α : Type u}
-    (mx : m α) (p : SPMF α) : evalDist mx = p ↔ ∀ x, Pr[= x | mx] = Pr[= x | p] := by
-  rw [SPMF.ext_iff]
-  rfl
+lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
+    evalDist mx = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
 
 end SPMF
+
+namespace PMF
+
+/-- We define this seperately -/
+instance hasEvalSet : HasEvalSet PMF where
+  toSet := {
+    toFun _ := PMF.support
+    toFun_pure' := by simp
+    toFun_bind' := by simp
+  }
+
+lemma support_def {α} (p : PMF α) : _root_.support p = p.support := rfl
+
+/-- Evaluate a `PMF` to itself via identity. Mostly exists to give notation access.
+Note: this requires `SPMF` to avoid circular type-class search. -/
+noncomputable instance : HasEvalPMF PMF where
+  toSPMF := PMF.toSPMF'
+  toPMF := MonadHom.id PMF
+  support_eq _ := sorry
+  toSPMF_eq := sorry
+
+end PMF
+
+namespace Id
+
+variable {α}
+
+/-- The support of a computation in `Id` is the result being returned. -/
+noncomputable instance : HasEvalPMF Id where
+  toSet := MonadHom.pure SetM
+  toSPMF := MonadHom.pure SPMF
+  toPMF := MonadHom.pure PMF
+  support_eq mx := by
+    simp [support]
+  toSPMF_eq mx := by
+    simp
+
+    sorry
+
+-- @[simp] lemma support_eq (x : Id α) : support x = {x.run} := rfl
+
+instance : HasEvalFinset Id where
+  finSupport x := {x}
+  coe_finSupport x := by simp; sorry
+
+end Id
+
+namespace OptionT
+
+
+end OptionT
 
 section hasEvalSet_of_hasEvalSPMF
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
   [HasEvalSPMF m] (mx : m α) (x : α)
+
+lemma support_eq_comp {m : Type u → Type v} [Monad m] [HasEvalSPMF m]
+    (mx : m α) : support mx = MonadHom.comp SPMF.support HasEvalSPMF.toSPMF mx := by
+  simp [HasEvalSPMF.support_eq]
 
 /-- Given a `SPMF` evaluation instance, set the support to values of `non-zero` probability.-/
 instance hasEvalSet_of_hasEvalSPMF {m : Type u → Type v} [Monad m]
@@ -46,6 +106,11 @@ lemma support_of_hasEvalSPMF_def  (mx : m α) :
 
 -- instance [HasEvalSet.Decidable m] (mx : m α) :
 --     DecidablePred (Pr[= · | mx] = 0) := sorry
+
+
+instance decidablePred_probOutput_eq_zero [HasEvalSet.Decidable m] :
+    DecidablePred (Pr[= · | mx] = 0) := by
+  sorry
 
 lemma mem_support_iff (mx : m α) (x : α) :
     x ∈ support mx ↔ Pr[= x | mx] ≠ 0 := by rfl
@@ -127,16 +192,6 @@ lemma probEvent_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α]
 
 end hasEvalSet_of_hasEvalSPMF
 
-namespace PMF
-
-variable {α β γ}
-
-/-- Evaluate a `PMF` to itself via identity. Mostly exists to give notation access.
-Note: this requires `SPMF` to avoid circular type-class search. -/
-instance : HasEvalPMF PMF where toPMF := MonadHom.id PMF
-
-end PMF
-
 section hasEvalSPMF_of_hasEvalPMF
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
@@ -145,7 +200,8 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 /-- Given a `PMF` evaluation instance, get a `SPMF` evaluation by the natural lifting. -/
 noncomputable instance hasEvalSPMF_of_hasEvalPMF {m : Type u → Type v} [Monad m]
     [HasEvalPMF m] : HasEvalSPMF m where
-  toSPMF := MonadHom.comp PMF.toSPMF HasEvalPMF.toPMF
+  toSPMF := MonadHom.comp PMF.toSPMF' HasEvalPMF.toPMF
+  support_eq := sorry
 
 lemma evalDist_of_hasEvalPMF_def (mx : m α) :
     evalDist mx = PMF.toSPMF (HasEvalPMF.toPMF mx) := by aesop
@@ -171,6 +227,7 @@ lemma evalDist_of_hasEvalPMF_def (mx : m α) :
 @[simp] lemma probFailure_eq_zero (mx : m α) :
     Pr[⊥ | mx] = 0 := by
   simp [probFailure_def, evalDist_of_hasEvalPMF_def]
+  sorry
 
 @[simp] lemma tsum_probOutput_eq_one (mx : m α) :
     ∑' x, Pr[= x | mx] = 1 := by

@@ -82,13 +82,15 @@ variable [HasEvalSPMF m] (ρ0 : ρ)
 /-- Evaluating `pure x` at any environment gives the same result as `pure x` in the base monad. -/
 @[simp] lemma evalSPMF_pure (x : α) :
     HasEvalSPMF.readerAt ρ0 (pure x : ReaderT ρ m α) = HasEvalSPMF.toSPMF (pure x : m α) := by
-  simp [HasEvalSPMF.readerAt]
+  simp only [HasEvalSPMF.readerAt, MonadHom.comp_apply, evalAt_apply, MonadHom.toFun_pure']
+  apply MonadHom.toFun_pure'
 
 /-- Evaluating a bind distributes through the monad homomorphism. -/
 @[simp] lemma evalSPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
     HasEvalSPMF.readerAt ρ0 (mx >>= f) =
       HasEvalSPMF.readerAt ρ0 mx >>= fun x => HasEvalSPMF.readerAt ρ0 (f x) := by
   simp [HasEvalSPMF.readerAt, MonadHom.comp_apply]
+  apply MonadHom.toFun_bind'
 
 end evalDist_lemmas
 
@@ -99,11 +101,13 @@ variable [HasEvalPMF m] (ρ0 : ρ)
 @[simp] lemma evalPMF_pure (x : α) :
     HasEvalPMF.readerAt ρ0 (pure x : ReaderT ρ m α) = HasEvalPMF.toPMF (pure x : m α) := by
   simp [HasEvalPMF.readerAt]
+  apply MonadHom.toFun_pure'
 
 @[simp] lemma evalPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
     HasEvalPMF.readerAt ρ0 (mx >>= f) =
       HasEvalPMF.readerAt ρ0 mx >>= fun x => HasEvalPMF.readerAt ρ0 (f x) := by
   simp [HasEvalPMF.readerAt, MonadHom.comp_apply]
+  apply MonadHom.toFun_bind'
 
 end evalPMF_lemmas
 

@@ -17,6 +17,31 @@ universe u v w
 
 open OracleSpec
 
+namespace QueryImpl
+
+/-- Given implementations for oracles in `spec₁` and `spec₂` in terms of state monads for
+two different contexts `σ₁` and `σ₂`, implement the combined set `spec₁ + spec₂` in terms
+of a combined `σ₁ × σ₂` state. -/
+def QueryImpl.prodStateT {ι₁ ι₂ : Type _}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    {m : Type _ → Type _} [Functor m] {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec₁ (StateT σ₁ m))
+    (impl₂ : QueryImpl spec₂ (StateT σ₂ m)) :
+    QueryImpl (spec₁ + spec₂) (StateT (σ₁ × σ₂) m)
+  | .inl t => StateT.mk fun | (s₁, s₂) => Prod.map id (·, s₂) <$> (impl₁ t).run s₁
+  | .inr t => StateT.mk fun | (s₁, s₂) => Prod.map id (s₁, ·) <$> (impl₂ t).run s₂
+
+/-- Indexed version of `QueryImpl.prodStateT`. Note that `m` cannot vary with `t`.
+dtumad: The `Function.update` thing is nice but forces `DecidableEq`. -/
+def QueryImpl.piStateT {τ : Type} [DecidableEq τ] {ι : τ → Type _}
+    {spec : (t : τ) → OracleSpec (ι t)}
+    {m : Type _ → Type _} [Monad m] {σ : τ → Type _}
+    (impl : (t : τ) → QueryImpl (spec t) (StateT (σ t) m)) :
+    QueryImpl (OracleSpec.sigma spec) (StateT ((t : τ) → σ t) m)
+  | ⟨t, q⟩ => StateT.mk fun s => Prod.map id (Function.update s t) <$> (impl t q).run (s t)
+
+end QueryImpl
+
 namespace OracleComp
 
 variable {ι : Type*} {spec : OracleSpec ι} {m : Type u → Type v} [Monad m] [LawfulMonad m]

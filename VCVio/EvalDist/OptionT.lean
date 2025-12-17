@@ -50,6 +50,7 @@ variable (m : Type u → Type v) [Monad m] {α β γ : Type u}
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
+  support_eq := sorry
 
 @[simp] lemma evalDist_eq [HasEvalPMF m] (mx : OptionT m α) :
     evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
