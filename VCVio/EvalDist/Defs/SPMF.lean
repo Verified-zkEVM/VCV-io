@@ -50,10 +50,10 @@ namespace SPMF
 /-- Expose the induced monad instance on `SPMF`. -/
 noncomputable instance : AlternativeMonad SPMF := OptionT.instAlternativeMonadOfMonad PMF
 noncomputable instance : LawfulAlternative SPMF := OptionT.instLawfulAlternativeOfLawfulMonad PMF
-noncomputable instance : LawfulMonad SPMF := OptionT.instLawfulMonad_batteries PMF
+noncomputable instance : LawfulMonad SPMF := OptionT.instLawfulMonad
 
+/-- Expose the lifting operations from `PMF` to `SPMF` given by `OptionT.lift`-/
 noncomputable instance : MonadLift PMF SPMF where monadLift := PMF.toSPMF
-
 instance : LawfulMonadLift PMF SPMF := OptionT.instLawfulMonadLift
 
 /-- Apply an `SPMF α` to an element of `α`. -/

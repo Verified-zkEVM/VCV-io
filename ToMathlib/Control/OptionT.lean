@@ -20,24 +20,11 @@ namespace OptionT
 variable {m : Type u → Type v} {n : Type u → Type w}
   (f : {α : Type u} →  m α → n α) {α β γ : Type u}
 
-@[simp] lemma run_lift {m : Type u → Type v} [Monad m]
-    {α : Type u} (x : m α) : (OptionT.lift x).run = x := rfl
-
--- @[simp]
 lemma monad_pure_eq_pure [Monad m] (x : α) :
     (pure x : OptionT m α) = OptionT.pure x := rfl
 
--- @[simp]
 lemma monad_bind_eq_bind [Monad m] (x : OptionT m α) (y : α → OptionT m β) :
     x >>= y = OptionT.bind x y := rfl
-
--- lemma run_seq {α β : Type u} {m : Type u → Type v} [Monad m] [LawfulMonad m]
---     (f : OptionT m (α → β)) (x : OptionT m α) :
---     (f <*> x).run = (do let g ← f.run; match g with
---       | some g => Option.map g <$> x.run
---       | none => pure none) := by
---   simp only [seq_eq_bind_map, run_bind, run_map]
---   exact bind_congr fun | some x => rfl | none => rfl
 
 lemma liftM_def {m : Type u → Type v} [Monad m] {α : Type u}
     (x : m α) : (x : OptionT m α) = OptionT.lift x := rfl

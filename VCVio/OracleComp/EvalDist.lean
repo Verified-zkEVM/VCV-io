@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.EvalDist.Defs.NeverFails
-import VCVio.EvalDist.OptionT
+import VCVio.EvalDist.Instances.OptionT
 import VCVio.OracleComp.SimSemantics.SimulateQ
 
 /-!

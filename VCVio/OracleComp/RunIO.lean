@@ -4,24 +4,22 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import Batteries.Lean.LawfulMonad
 
 /-!
 # Executing Computations
 
-This file defines a function `runIO` for executing a computation via the `IO` monad.
-The semantics mirror `evalDist` in that the oracle will respond uniformly at random,
-however we need to limit the oracle set to `unifSpec` to get computability of the function.
+This file defines a function `runIO` for executing a `ProbComp` in the `IO` monad.
+We add this embedding as a `MonadLift` instance, so `#eval` notation works.
 -/
 
 open OracleSpec
 
 namespace OracleComp
 
-/-- Represent an `OracleComp` via the `IO` monad, allowing actual execution.
-NOTE: `OracleComp` as currently defined doesn't allow specialized error messaging.
-Changing this would just require adding a `String` to the `failure` constructor -/
+/-- Represent a `ProbComp` via the `IO` monad, allowing actual execution. -/
 protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
-  simulateQ (fun n => Fin.ofNat (n + 1) <$> (IO.rand 0 n).toIO) oa
+  simulateQ (spec := unifSpec) (fun n => Fin.ofNat (n + 1) <$> (IO.rand 0 n).toIO) oa
 
 /-- Automatic lifting of probabalistic computations into `IO`. -/
 instance : MonadLift ProbComp IO where monadLift := OracleComp.runIO

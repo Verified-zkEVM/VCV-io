@@ -17,6 +17,11 @@ universe u v w
 
 variable {α β γ : Type u}
 
+-- class HasSimulateQuery {ι} (spec : OracleSpec ι) (r : Type u → Type _)
+--     (m : outParam (Type u → Type v)) [Monad m] [MonadLiftT (OracleQuery spec) m]
+--     (n : outParam (Type u → Type w)) [Monad n] [MonadLiftT r n] where
+--   simulateQ (impl : QueryImpl spec r) {α : Type u}
+
 /-- `HasSimulateQ spec r m n` means that an implementation of `OracleQuery spec` in terms of
 a computation in `r` results in a implementation of computations in `m` in terms of `n`.
 This implementation is given by a bundled monad hom `simulateQ`. We also require that queries
