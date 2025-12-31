@@ -10,6 +10,7 @@ import VCVio.EvalDist.Defs.Instances
 
 File for lemmas about `evalDist` and `support` involving the monadic `pure` and `bind`.
 -/
+
 universe u v w
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
@@ -25,10 +26,6 @@ lemma mem_support_pure_iff [HasEvalSet m] (x y : α) :
     x ∈ support (pure y : m α) ↔ x = y := by aesop
 lemma mem_support_pure_iff' [HasEvalSet m] (x y : α) :
     x ∈ support (pure y : m α) ↔ y = x := by aesop
-
-instance [HasEvalSet m] (x : α) : Fintype (support (pure x : m α)) := by
-  rw [support_pure]
-  infer_instance
 
 @[simp] lemma finSupport_pure [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (x : α) : finSupport (pure x : m α) = {x} := by aesop
@@ -140,21 +137,6 @@ lemma probEvent_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m 
   refine tsum_congr (fun x ↦ ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
-lemma probOutput_bind_eq_sum_fintype [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) [Fintype α] (y : β) :
-    Pr[= y | mx >>= my] = ∑ x : α, Pr[= x | mx] * Pr[= y | my x] :=
-  (probOutput_bind_eq_tsum mx my y).trans (tsum_fintype _)
-
-lemma probFailure_bind_eq_sum_fintype [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) [Fintype α] :
-    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑ x : α, Pr[= x | mx] * Pr[⊥ | my x] :=
-  (probFailure_bind_eq_tsum mx my).trans (congr_arg (Pr[⊥ | mx] + ·) <| tsum_fintype _)
-
-lemma probEvent_bind_eq_sum_fintype [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) [Fintype α] (q : β → Prop) :
-    Pr[q | mx >>= my] = ∑ x : α, Pr[= x | mx] * Pr[q | my x] :=
-  (probEvent_bind_eq_tsum mx my q).trans (tsum_fintype _)
-
 lemma probOutput_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (y : β) :
     Pr[= y | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[= y | my x] :=
@@ -235,6 +217,42 @@ lemma probFailure_bind_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
 
 end bind
 
+
+-- section bind
+
+-- variable (oa : OracleComp spec α) (ob : α → OracleComp spec β)
+
+-- end bind
+
+-- section mul_le_probEvent_bind
+
+-- lemma mul_le_probEvent_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+--     {p : α → Prop} {q : β → Prop} {r r' : ℝ≥0∞}
+--     (h : r ≤ [p | oa]) (h' : ∀ x ∈ oa.support, p x → r' ≤ [q | ob x]) :
+--     r * r' ≤ [q | oa >>= ob] := by
+--   rw [probEvent_bind_eq_tsum]
+--   refine (mul_le_mul_right' h r').trans ?_
+--   rw [probEvent_eq_tsum_indicator, ← ENNReal.tsum_mul_right]
+--   refine ENNReal.tsum_le_tsum fun x => ?_
+--   rw [← Set.indicator_mul_const]
+--   by_cases hx : x ∈ oa.support
+--   · refine Set.indicator_apply_le' (fun h => ?_) (fun _ => zero_le')
+--     exact (ENNReal.mul_le_mul_left (probOutput_ne_zero _ _ hx) probOutput_ne_top).mpr (h' x hx h)
+--   · simp [probOutput_eq_zero _ _ hx]
+
+-- end mul_le_probEvent_bind
+
+-- section bind_const
+
+-- variable (oa : OracleComp spec α) (ob : OracleComp spec β)
+
+-- -- lemma probFailure_bind_const :
+-- --   [⊥ | do oa; ob] = [⊥ | oa] + [⊥ | ob] - [⊥ | oa] * [⊥ | ob]
+
+
+-- end bind_const
+
+
 section map
 
 @[simp] lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
@@ -278,8 +296,6 @@ open Classical in
 end seqRight
 
 section bind_congr -- TODO: we should have tactics for this kind of thing
-
--- variable {ι : Type v} {spec : OracleSpec ι} {α β γ δ : Type u} [spec.Fintype]
 
 -- lemma probFailure_bind_congr (mx : OracleComp spec α)
 --     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}
