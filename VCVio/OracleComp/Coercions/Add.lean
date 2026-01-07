@@ -20,11 +20,15 @@ namespace OracleQuery
 
 universe u v w
 
-variable {ι₁ ι₂ ι₃ ι₄}
+variable {ι₁} {ι₂} {ι₃} {ι₄}
   {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
   {spec₃ : OracleSpec ι₃} {spec₄ : OracleSpec ι₄} {α β γ : Type u}
 
 section instances
+
+/-- We need `Inhabited` to prevent infinite type-class searching. -/
+instance {τ : Type u} [Inhabited τ] {spec : OracleSpec τ} : OracleSpec.emptySpec ⊂ₒ spec where
+  monadLift | q => PEmpty.elim q.input
 
 section add_left
 

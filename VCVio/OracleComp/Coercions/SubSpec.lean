@@ -34,13 +34,10 @@ it can be perfectly simulated by a computation using the oracles of `superSpec`.
 
 We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
-class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec τ)
+class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec.{v,w} τ)
   extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
 
 infix : 50 " ⊂ₒ " => SubSpec
-
-instance {τ} {spec : OracleSpec τ} : []ₒ ⊂ₒ spec where
-  monadLift := fun q => PEmpty.elim q.input
 
 namespace SubSpec
 
