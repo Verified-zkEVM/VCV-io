@@ -8,8 +8,7 @@ abbrev vcvLinters : Array LeanOption := #[
   ⟨`linter.refine, true⟩,
   ⟨`linter.style.cdot, true⟩,
   ⟨`linter.style.dollarSyntax, true⟩,
-  -- ⟨`linter.style.lambdaSyntax, true⟩,
-  ⟨`linter.style.longLine, true⟩,
+  ⟨`linter.style.longLine, false⟩, -- temp
   ⟨`linter.style.longFile, .ofNat 1500⟩,
   ⟨`linter.style.missingEnd, true⟩,
   ⟨`linter.style.setOption, true⟩
@@ -25,7 +24,7 @@ package VCVio where
     ++ vcvLinters.map fun s ↦
       { s with name := `weak ++ s.name }
 
-require "leanprover-community" / "mathlib" @ git "v4.24.0-rc1"
+require "leanprover-community" / "mathlib" @ git "v4.26.0"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

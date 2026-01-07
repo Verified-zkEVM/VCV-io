@@ -16,6 +16,61 @@ in general mathlib than in the project itself.
 
 universe u v w
 
+section sum_thing
+
+open Filter Finset Function Topology SummationFilter
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq' {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (b = ·)] (a : α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b = b' then a else 1) = a := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb', @eq_comm _ b]
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq_apply {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (· = b)] (f : β → α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b' = b then f b' else 1) = f b := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb']
+
+@[to_additive (attr := simp)]
+theorem tprod_ite_eq_apply' {α β} [CommMonoid α] [TopologicalSpace α]
+    (b : β) [DecidablePred (b = ·)] (f : β → α)
+    (L := unconditional β) [L.LeAtTop] :
+    ∏'[L] b', (if b = b' then f b' else 1) = f b := by
+  rw [tprod_eq_mulSingle b]
+  · simp
+  · intro b' hb'; simp [hb', @eq_comm _ b]
+
+end sum_thing
+
+lemma PMF.apply_eq_one_sub_tsum_ite {α} [DecidableEq α] (p : PMF α) (x : α) :
+    p x = 1 - (∑' y, if y = x then 0 else p y) := by
+  rw [← p.tsum_coe]
+  rw [Summable.tsum_eq_add_tsum_ite' x ENNReal.summable]
+  refine ENNReal.eq_sub_of_add_eq' ?_ rfl
+  simp [ne_eq, ENNReal.add_eq_top, apply_ne_top, false_or]
+  refine ne_top_of_le_ne_top ENNReal.one_ne_top ?_
+  refine le_trans ?_ (le_of_eq p.tsum_coe)
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  aesop
+
+open Classical in
+/-- Two `PMF` that agree on all but one point are actually equal. -/
+lemma PMF.ext_forall_ne {α} {p q : PMF α} (x : α)
+    (h : ∀ y ≠ x, p y = q y) : p = q := by
+  refine PMF.ext fun y => ?_
+  by_cases hy : y = x
+  · rw [p.apply_eq_one_sub_tsum_ite, q.apply_eq_one_sub_tsum_ite]
+    subst hy
+    simp_all only [ne_eq, not_false_eq_true]
+  · refine h y hy
+
 section abs
 
 variable {G : Type*} [CommRing G] [LinearOrder G] [IsStrictOrderedRing G] {a b : G}
@@ -235,7 +290,7 @@ lemma tsum_option {α β : Type*} [AddCommMonoid α] [TopologicalSpace α]
     [ContinuousAdd α] [T2Space α]
     (f : Option β → α) (hf : Summable (Function.update f none 0)) :
     ∑' x : Option β, f x = f none + ∑' x : β, f (some x) := by
-  refine (tsum_eq_add_tsum_ite' none hf).trans ?_
+  refine (Summable.tsum_eq_add_tsum_ite' none hf).trans ?_
   refine congr_arg (f none + ·) ?_
   refine tsum_eq_tsum_of_ne_zero_bij (λ x ↦ some x.1) ?_ ?_ ?_
   · intro x y
@@ -272,6 +327,10 @@ theorem PMF.uniformOfFintype_cast (α β : Type _) [ha : Fintype α] [Nonempty �
   ext x
   simp only [cast_eq, uniformOfFintype_apply, inv_inj, Nat.cast_inj]
   exact @Fintype.card_congr α α ha hb (Equiv.refl α)
+
+/-- This doesn't get applied properly without `Classical` so add with high priority. -/
+@[simp high] lemma PMF.some_map_apply_some {α} (p : PMF α) (x : α) :
+    (p.map Option.some) (some x) = p x := by simp
 
 theorem tsum_cast {α β : Type u} {f : α → ENNReal} {g : β → ENNReal}
     (h : α = β) (h' : ∀ a, f a = g (cast h a)) :

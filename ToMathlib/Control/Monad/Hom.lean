@@ -5,142 +5,197 @@ Authors: Devon Tuma
 -/
 import Mathlib.Probability.ProbabilityMassFunction.Monad
 import ToMathlib.Control.Monad.Algebra
+import Mathlib.CategoryTheory.Monad.Types
 
 /-!
 # Morphisms Between Monads
 
-TODO: extends the hierarchy with type classes such as `{Nat/Pure/Bind/Monad}HomClass`
+Basic definitions of maps between monads parameterized over any possible output type.
+This is implemented with more constrained universes as `m ⟶ n` in mathlib category theory,
+but this gives definitions more standardized to a cs context.
+
+TODO: Evaluate more fine-grained `PureHom`/`BintHom`/etc, with `Class` versions as well.
+Probably should be in the context of upstreaming things.
 -/
 
-universe u v w z
-
-/-- A natural morphism / transformation between two type-level functions (endofunctors).
-
-This represents a family of functions `m α → n α` that is natural in `α`, meaning it commutes
-with functions between types. -/
-structure NatHom (m : Type u → Type v) (n : Type u → Type w) where
-  toFun : {α : Type u} → m α → n α
-
-namespace NatHom
+universe u v w x y z
 
 variable {m : Type u → Type v} {n : Type u → Type w}
 
-instance : CoeFun (NatHom m n) (λ _ ↦ {α : Type u} → m α → n α) where
-  coe f {_} x := f.toFun x
+/-- A `NatHom m n` for two functors `m` and `n` is a map `m α → n α` for each possible type `α`.
+This is exactly an element of the category `m ⟶ n`, but that has more restricted universes -/
+structure NatHom (m : Type u → Type v) (n : Type u → Type w) where
+  toFun : (α : Type u) → m α → n α
 
-end NatHom
+/-- `f mx` notation for `NatHom m n` applied to an element of `m α`, with implicit `α` inferred. -/
+instance : CoeFun (NatHom m n) (fun _f => {α : Type u} → m α → n α) where
+  coe f {α} x := f.toFun α x
 
-/-- A natural morphism / transformation that preserves the `pure` operation. -/
-structure PureHom (m : Type u → Type v) [Pure m] (n : Type u → Type w) [Pure n]
-    extends NatHom m n where
-  toFun_pure' {α : Type u} (x : α) : toFun (pure x) = (pure x : n α)
+-- /-- A natural morphism / transformation that preserves the `pure` operation. -/
+-- structure PureHom (m : Type u → Type v) [Pure m] (n : Type u → Type w) [Pure n]
+--     extends NatHom m n where
+--   toFun_pure' {α : Type u} (x : α) : toFun (pure x) = (pure x : n α)
 
-namespace PureHom
+-- /-- A natural morphism / transformation that preserves the `bind` operation. -/
+-- structure BindHom (m : Type u → Type v) [Bind m] (n : Type u → Type w) [Bind n]
+--     extends NatHom m n where
+--   toFun_bind' {α β : Type u} (x : m α) (y : α → m β) :
+--     toFun β (x >>= y) = toFun α x >>= toFun β ∘ y
 
-variable {m : Type u → Type v} [Pure m] {n : Type u → Type w} [Pure n]
+/-- A `MonadHom m n` bundles a monad map `m ⟶ n` (represented as a `NatHom`) with proofs that
+it respects the `bind` and `pure` operations in the underlying monad. -/
+@[ext] structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
+    (n : Type u → Type w) [Pure n] [Bind n] extends NatHom m n where --, PureHom m n, BindHom m n
+  toFun_pure' {α} (x : α) : toFun α (pure x) = pure x
+  toFun_bind' {α β} (x : m α) (y : α → m β) :
+    toFun β (x >>= y) = toFun α x >>= fun x => toFun β (y x)
 
-instance : Coe (PureHom m n) (NatHom m n) where
-  coe f := f.toNatHom
+@[inherit_doc] infixr:25 " →ᵐ " => MonadHom
 
-end PureHom
+attribute [simp, grind =] MonadHom.toFun_pure' MonadHom.toFun_bind'
 
-/-- A natural morphism / transformation that preserves the `bind` operation. -/
-structure BindHom (m : Type u → Type v) [Bind m] (n : Type u → Type w) [Bind n]
-    extends NatHom m n where
-  toFun_bind' {α β : Type u} (x : m α) (y : α → m β) :
-    toFun (x >>= y) = toFun x >>= (fun a => toFun (y a))
+/-- `f mx` notation for `NatHom m n` applied to an element of `m α`, with implicit `α` inferred. -/
+instance {m : Type u → Type v} [Pure m] [Bind m] {n : Type u → Type w} [Pure n] [Bind n] :
+    CoeFun (m →ᵐ n) (fun _f => {α : Type u} → m α → n α) where
+  coe f {α} x := f.toFun α x
 
-namespace BindHom
+/-- Similar to `AddHomClass` but for `MonadHom`. This becomes more important if we start defining
+a hierarchy of these types (e.g. for `AlternativeMonad`s).
+Note that getting `FunLike` to work has some `outParam` challenges, may not be workable. -/
+class MonadHomClass (F : Type _)
+    (m : outParam (Type u → Type v)) [Monad m]
+    (n : outParam (Type u → Type w)) [Monad n]
+    [hf : (α : Type u) → FunLike F (m α) (n α)] where
+  map_pure {α} (x : α) (f : F) : (f : m α → n α) (pure x : m α) = pure x
+  map_bind {α β} (x : m α) (y : α → m β) (f : F) :
+    (f : m β → n β) (x >>= y) = (f : m α → n α) x >>= f ∘ y
 
-variable {m : Type u → Type v} [Bind m] {n : Type u → Type w} [Bind n]
+-- namespace MonadHomClass
 
-instance : Coe (BindHom m n) (NatHom m n) where
-  coe f := f.toNatHom
+-- variable {F : Type _}
+--   {m : outParam (Type u → Type v)} [Monad m]
+--   {n : outParam (Type u → Type w)} [Monad n]
+--   [hf : (α : Type u) → FunLike F (m α) (n α)]
 
-end BindHom
+-- @[simp] lemma mmap_pure [hf : (α : Type u) → FunLike F (m α) (n α)]
+--     (f : F) [@MonadHomClass F m _ n _ hf]
+--     (x : α) : F α (pure x) = pure x :=
+--   MonadHomClass.map_pure x
 
-/-- A monad homomorphism is a natural morphism / transformation that preserves both `pure` and
-`bind` operations.
+-- -- dt: should we be using `F ∘ my`?
+-- @[simp] lemma mmap_bind (F : (α : Type u) → m α → n α) [MonadHomClass m n F]
+--     (mx : m α) (my : α → m β) : F β (mx >>= my) = F α mx >>= fun x => F β (my x) :=
+--   MonadHomClass.map_bind mx my
 
-This is similar to `MonadLift` but isn't a type-class but rather an explicit object. This is useful
-for non-canonical mappings that shouldn't be applied automatically in general. The laws enforced are
-similar to those of `LawfulMonadLift`. -/
-structure MonadHom (m : Type u → Type v) [Pure m] [Bind m]
-    (n : Type u → Type w) [Pure n] [Bind n] extends NatHom m n, PureHom m n, BindHom m n
+-- @[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+--     [MonadHomClass m n F] (x : m α) (g : α → β) : F β (g <$> x) = g <$> F α x := by
+--   simp [map_eq_bind_pure_comp]
 
-@[inherit_doc]
-infixr:25 " →ᵐ " => MonadHom
+-- @[simp] lemma mmap_seq [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+--     [MonadHomClass m n F] (x : m (α → β)) (y : m α) : F β (x <*> y) = F _ x <*> F α y := by
+--   simp [seq_eq_bind_map]
 
-/-- A natural transformation `f` between two monads `m` and `n` is a monad morphism if it
-preserves the monad structure, i.e. `f (pure x) = pure x` and `f (x >>= y) = f x >>= f ∘ y`. -/
-class IsMonadHom (m : Type u → Type v) [Pure m] [Bind m]
-    (n : Type u → Type w) [Pure n] [Bind n]
-    (f : {α : Type u} → m α → n α) where
-  map_pure {α} (x : α) : f (pure x) = pure x
-  map_bind {α β} (x : m α) (y : α → m β) : f (x >>= y) = f x >>= f ∘ y
+-- @[simp] lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+--     [MonadHomClass m n F] (x : m α) (y : m β) : F α (x <* y) = F α x <* F β y := by
+--   simp [seqLeft_eq]
 
-instance (m : Type u → Type v) [Pure m] [Bind m]
-    (n : Type u → Type w) [Pure n] [Bind n] (F : m →ᵐ n) :
-    IsMonadHom m n F.toFun where
-  map_pure := F.toFun_pure'
-  map_bind := F.toFun_bind'
+-- @[simp] lemma mmap_seqRight [LawfulMonad m] [LawfulMonad n] (F : (α : Type u) → m α → n α)
+--     [MonadHomClass m n F] (x : m α) (y : m β) : F β (x *> y) = F α x *> F β y := by
+--   simp [seqRight_eq]
 
-/-- View a monad map as a function between computations. Note we can't have a full
-`FunLike` instance because the type parameter `α` isn't constrained by the types. -/
-instance (m : Type u → Type v) [Pure m] [Bind m] (n : Type u → Type w) [Pure n] [Bind n] :
-    CoeFun (m →ᵐ n) (λ _ ↦ {α : Type u} → m α → n α) where
-  coe f {_} x := f.toFun x
+-- instance ofLawfulMonadLiftT {m n : Type u → Type _} [Monad m] [Monad n]
+--     [MonadLiftT m n] [LawfulMonadLiftT m n] : MonadHomClass m n (@liftM m n _) where
+--   map_pure := by aesop
+--   map_bind := by aesop
+
+-- instance {m : Type u → Type _} [Monad m] : MonadHomClass m m (fun _ => id) where
+--   map_pure := by aesop
+--   map_bind := by aesop
+
+-- instance {m n n' : Type u → Type _} [Monad m] [Monad n] [Monad n']
+--     (f : (α : Type u) → m α → n α) (g : (α : Type u) → n α → n' α)
+--     [MonadHomClass m n f] [MonadHomClass n n' g] : MonadHomClass m n' (fun α => g α ∘ f α) where
+--   map_pure := by aesop
+--   map_bind := by aesop
+
+-- end MonadHomClass
 
 namespace MonadHom
 
-variable {m : Type u → Type v} [Monad m] {n : Type u → Type w} [Monad n] {α β γ : Type u}
+variable {m : Type u → Type v} [Monad m]
+  {n : Type u → Type w} [Monad n]
+  {n' : Type u → Type x} [Monad n']
+  {n'' : Type u → Type y} [Monad n'']
+  {α β γ : Type u}
 
--- Note some potential confusion between `mmap` in applying Hom sense and `Seq.map`
--- This slightly differs from naming conventions of e.g. `map_mul` for `MulHomClass`.
--- Quang: should we change `mmap` to `toFun`?
+@[ext] protected def ext' {F G : m →ᵐ n}
+    (h : ∀ α (x : m α), F x = G x) : F = G := by aesop
 
-@[simp]
-lemma mmap_pure (F : m →ᵐ n) (x : α) :
-    F (pure x) = pure x := MonadHom.toFun_pure' F x
+@[simp] lemma mmap_pure (F : m →ᵐ n) (x : α) : F (pure x) = pure x := by grind
 
-@[simp]
-lemma mmap_bind (F : m →ᵐ n) (x : m α) (y : α → m β) :
-    F (x >>= y) = F x >>= fun x => F (y x) := MonadHom.toFun_bind' F x y
+-- dt: should we be using `F ∘ my`?
+@[simp] lemma mmap_bind (F : m →ᵐ n) (mx : m α) (my : α → m β) :
+    F (mx >>= my) = F mx >>= fun x => F (my x) := by grind
 
-@[simp] -- This doesn't hold without lawful monad
-lemma mmap_map [LawfulMonad m] [LawfulMonad n]
-    (F : m →ᵐ n) (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by
+@[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
+    (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by
   simp [map_eq_bind_pure_comp]
 
-@[simp]
-lemma mmap_seq [LawfulMonad m] [LawfulMonad n]
-    (F : m →ᵐ n) (x : m (α → β)) (y : m α) : F (x <*> y) = F x <*> F y := by
+@[simp] lemma mmap_seq [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
+    (x : m (α → β)) (y : m α) : F (x <*> y) = F x <*> F y := by
   simp [seq_eq_bind_map]
 
-@[simp]
-lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n]
-    (F : m →ᵐ n) (x : m α) (y : m β) : F (x <* y) = F x <* F y := by
+@[simp] lemma mmap_seqLeft [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
+    (x : m α) (y : m β) : F (x <* y) = F x <* F y := by
   simp [seqLeft_eq]
 
-@[simp]
-lemma mmap_seqRight [LawfulMonad m] [LawfulMonad n]
-    (F : m →ᵐ n) (x : m α) (y : m β) : F (x *> y) = F x *> F y := by
+@[simp] lemma mmap_seqRight [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
+    (x : m α) (y : m β) : F (x *> y) = F x *> F y := by
   simp [seqRight_eq]
 
-section ofLift
-
 /-- Construct a `MonadHom` from a lawful monad lift. -/
-def ofLift (m : Type u → Type v) (n : Type u → Type v) [Monad m] [Monad n]
-    [MonadLift m n] [LawfulMonadLift m n] : m →ᵐ n where
-  toFun := liftM
-  toFun_pure' := liftM_pure
-  toFun_bind' := liftM_bind
+def ofLift (m : Type u → Type v) (n : Type u → Type w) [Monad m] [Monad n]
+    [MonadLiftT m n] [LawfulMonadLiftT m n] : m →ᵐ n where
+  toFun _ mx := liftM mx
+  toFun_pure' := by simp
+  toFun_bind' := by simp
 
-@[simp]
-lemma mmap_ofLift (m : Type u → Type v) (n : Type u → Type v) [Monad m] [Monad n]
-    [MonadLift m n] [LawfulMonadLift m n] {α : Type u}
-    (x : m α) : ofLift m n x = liftM x := rfl
+@[simp] lemma ofLift_apply [MonadLiftT m n] [LawfulMonadLiftT m n] {α : Type u} (x : m α) :
+    ofLift m n x = liftM x := rfl
 
-end ofLift
+/-- The identity morphism between a monad and itself. -/
+def id (m : Type u → Type v) [Monad m] : m →ᵐ m where
+  toFun _ mx := mx
+  toFun_pure' _ := by simp
+  toFun_bind' _ _ := by simp
+
+@[simp] lemma id_apply (mx : m α) : MonadHom.id m mx = mx := rfl
+
+/-- Compose two `MonadHom`s together by applying them in sequence. -/
+protected def comp (G : n →ᵐ n') (F : m →ᵐ n) : m →ᵐ n' where
+  toFun _ := G.toFun _ ∘ F.toFun _
+  toFun_pure' := by simp
+  toFun_bind' := by simp
+
+infixr:90 " ∘ₘ "  => MonadHom.comp
+
+@[simp] lemma comp_apply (G : n →ᵐ n') (F : m →ᵐ n) (x : m α) :
+    (G ∘ₘ F) x = G (F x) := rfl
+
+@[simp] lemma comp_id (F : m →ᵐ n) : F.comp (MonadHom.id m) = F := by aesop
+
+@[simp] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by aesop
+
+lemma comp_assoc (H : n' →ᵐ n'') (G : n →ᵐ n') (F : m →ᵐ n) :
+    (H ∘ₘ G) ∘ₘ F = H ∘ₘ (G ∘ₘ F) := by aesop
+
+/-- `pure`/`return` lawfully embed the `Id` monad into any lawful monad. -/
+protected def pure (m) [Monad m] [LawfulMonad m] : Id →ᵐ m where
+  toFun _ mx := pure mx.run
+  toFun_pure' x := by simp
+  toFun_bind' mx my := by simp
+
+@[simp] lemma pure_apply (m) [Monad m] [LawfulMonad m] (x : Id α) :
+    MonadHom.pure m x = pure x.run := rfl
 
 end MonadHom

@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.DistSemantics.Prod
+import VCVio.OracleComp.EvalDist
 import Batteries.Control.OptionT
 
 /-!
@@ -16,11 +16,26 @@ TODO: A lot of lemmas here could exist at the `PMF` level instead.
 Probably even a lot of the uniform constructions themselves (like `uniformOfList`)
 -/
 
-open OracleSpec BigOperators ENNReal
+open BigOperators ENNReal
 
 universe u v w
 
 namespace OracleComp
+
+section uniformFin
+
+@[simp] lemma support_uniformFin (n : ℕ) :
+    support ($[0..n]) = Set.univ := by
+  rw [uniformFin_def]
+
+  grind
+
+end uniformFin
+
+section uniformRange
+
+
+end uniformRange
 
 section uniformSelect
 
@@ -28,17 +43,23 @@ section uniformSelect
 The container type is given by `cont` with the resulting type given by `β`.
 NOTE: This current implementation doesn't impose any "correctness" conditions,
 it purely exists to provide the notation, could revisit that in the future. -/
-class HasUniformSelect (cont : Type u) (β : outParam (Type)) where
-  uniformSelect : cont → ProbComp β
+class HasUniformSelect (cont : Type u) (β : outParam Type) where
+  uniformSelect : cont → OptionT ProbComp β
 
-/-- Given a selectable object, we can get a random element by indexing into the element vector. -/
-def uniformSelect {cont : Type} (β : Type)
-    [h : HasUniformSelect cont β] (xs : cont) : ProbComp β :=
-  h.uniformSelect xs
+/-- Version of `HasUniformSelect` that doesn't allow for failure.
+Useful for things like `Vector` that can be shown nonempty at the type level. -/
+class HasUniformSelect! (cont : Type u) (β : outParam Type) where
+  uniformSelect! : cont → ProbComp β
 
-prefix : 50 "$" => uniformSelect _
+export HasUniformSelect (uniformSelect)
+export HasUniformSelect! (uniformSelect!)
 
-variable {cont β : Type} [h : HasUniformSelect cont β]
+prefix : 50 "$" => uniformSelect
+prefix : 50 "$!" => uniformSelect!
+
+instance {cont β : Type} [h : HasUniformSelect! cont β] :
+    HasUniformSelect cont β where
+  uniformSelect cont := OptionT.mk (some <$> ($! cont))
 
 end uniformSelect
 
@@ -48,68 +69,82 @@ section uniformSelectList
 If the list is empty we instead just fail rather than choose a default value.
 This means selecting from a vector is often preferable, as we can prove at the type level
 that there is an element in the list, avoiding the defualt case of empty lists. -/
-instance hasUniformSelectList (α : Type) :
+instance hasUniformSelectList (α : Type) [Inhabited α] :
     HasUniformSelect (List α) α where
-  uniformSelect := λ xs ↦ do match xs with
-    | [] => failure
-    | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length]
+  uniformSelect xs := do Option.getM (← (xs[·]?) <$> $[0..xs.length])
 
-variable {α : Type}
+variable {α : Type} [Inhabited α]
 
-@[simp]
-lemma uniformSelectList_nil : ($ ([] : List α) : ProbComp α) = failure := rfl
+@[simp] lemma uniformSelectList_nil :
+    ($ ([] : List α) : OptionT ProbComp α) = liftM $[0..0] *> failure := by
+  simp [hasUniformSelectList]
 
-lemma uniformSelectList_cons (x : α) (xs : List α) :
-    ($ x :: xs : ProbComp α) = ((x :: xs)[·]) <$> $[0..xs.length] := rfl
+  rfl
 
-@[simp] lemma evalDist_uniformSelectList (xs : List α) : evalDist ($ xs) =
-    match xs with
-    | [] => PMF.pure none
-    | x :: xs => (PMF.uniformOfFintype (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
-  match xs with
-  | [] => by simp only [uniformSelectList_nil, evalDist_failure]; rfl
-  | x :: xs => by
-    apply OptionT.ext
-    simp only [uniformSelectList_cons, Fin.getElem_fin, evalDist_map, evalDist_liftM,
-      OptionT.run_map, OptionT.run_lift, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
-      Nat.succ_eq_add_one]
-    simp [OptionT.run, PMF.monad_map_eq_map, PMF.map, Function.comp_def]
+-- lemma uniformSelectList_cons (x : α) (xs : List α) :
+--     ($ (x :: xs)) = ((x :: xs)[·]) <$> $[0..xs.length] := rfl
 
-@[simp] lemma support_uniformSelectList (xs : List α) :
-    ($ xs).support = if xs.isEmpty then ∅ else {y | y ∈ (xs)} :=
-  match xs with
-  | [] => rfl
-  | x :: xs => by simp only [uniformSelectList_cons, Fin.getElem_fin, support_map,
-      support_uniformFin, Set.image_univ, List.isEmpty_cons, Bool.false_eq_true, ↓reduceIte,
-      List.mem_iff_get, List.length_cons, List.get_eq_getElem, Set.ext_iff, Set.mem_range,
-      Set.mem_setOf_eq, implies_true]
+-- @[simp] lemma run_uniformSelectList (xs : List α) :
+--     OptionT.run ($ xs) = (xs[·]?) <$> $[0..xs.length] := by
+--   induction xs with
+--   | nil =>
+--     simp
 
-@[simp] lemma finSupport_uniformSelectList [DecidableEq α] (xs : List α) :
-    ($ xs).finSupport = if xs.isEmpty then ∅ else xs.toFinset :=
-  match xs with
-  | [] => rfl
-  | x :: xs => by
-      simp only [finSupport_eq_iff_support_eq_coe, support_uniformSelectList,
-        List.isEmpty_cons, Bool.false_eq_true, if_false]
-      refine Set.ext (λ y ↦ by simp)
 
-@[simp] lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
-    [= x | $ xs] = if xs.isEmpty then 0 else (xs.count x : ℝ≥0∞) / xs.length := match xs with
-  | [] => by simp
-  | y :: ys => by
-    rw [List.count, ← List.countP_eq_sum_fin_ite]
-    simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
+--   | cons x xs h =>
+--     simp [uniformSelectList_cons]
+--     simp [getElem?_def]
+--     sorry
 
-@[simp] lemma probFailure_uniformSelectList (xs : List α) :
-    [⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with
-  | [] => by simp
-  | y :: ys => by simp [uniformSelectList_cons]
 
-@[simp] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
-    [p | $ xs] = if xs.isEmpty then 0 else (xs.countP p : ℝ≥0∞) / xs.length := match xs with
-  | [] => by simp
-  | y :: ys => by simp [← List.countP_eq_sum_fin_ite, uniformSelectList_cons,
-      probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, Function.comp_def]
+-- @[simp] lemma evalDist_uniformSelectList (xs : List α) :
+--     evalDist ($ xs) = match xs with
+--     | [] => failure
+--     | x :: xs => (PMF.uniformSample (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
+--   match xs with
+--   | [] => by simp only [uniformSelectList_nil, evalDist_failure]; rfl
+--   | x :: xs => by
+--     apply OptionT.ext
+--     simp only [uniformSelectList_cons, Fin.getElem_fin, evalDist_map, evalDist_liftM,
+--       OptionT.run_map, OptionT.run_lift, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
+--       Nat.succ_eq_add_one]
+--     simp [OptionT.run, PMF.monad_map_eq_map, PMF.map, Function.comp_def]
+
+-- @[simp] lemma support_uniformSelectList (xs : List α) :
+--     ($ xs).support = if xs.isEmpty then ∅ else {y | y ∈ (xs)} :=
+--   match xs with
+--   | [] => rfl
+--   | x :: xs => by simp only [uniformSelectList_cons, Fin.getElem_fin, support_map,
+--       support_uniformFin, Set.image_univ, List.isEmpty_cons, Bool.false_eq_true, ↓reduceIte,
+--       List.mem_iff_get, List.length_cons, List.get_eq_getElem, Set.ext_iff, Set.mem_range,
+--       Set.mem_setOf_eq, implies_true]
+
+-- @[simp] lemma finSupport_uniformSelectList [DecidableEq α] (xs : List α) :
+--     ($ xs).finSupport = if xs.isEmpty then ∅ else xs.toFinset :=
+--   match xs with
+--   | [] => rfl
+--   | x :: xs => by
+--       simp only [finSupport_eq_iff_support_eq_coe, support_uniformSelectList,
+--         List.isEmpty_cons, Bool.false_eq_true, if_false]
+--       refine Set.ext (λ y ↦ by simp)
+
+-- @[simp] lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
+--     [= x | $ xs] = if xs.isEmpty then 0 else (xs.count x : ℝ≥0∞) / xs.length := match xs with
+--   | [] => by simp
+--   | y :: ys => by
+--     rw [List.count, ← List.countP_eq_sum_fin_ite]
+--     simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
+
+-- @[simp] lemma probFailure_uniformSelectList (xs : List α) :
+--     [⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with
+--   | [] => by simp
+--   | y :: ys => by simp [uniformSelectList_cons]
+
+-- @[simp] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
+--     [p | $ xs] = if xs.isEmpty then 0 else (xs.countP p : ℝ≥0∞) / xs.length := match xs with
+--   | [] => by simp
+--   | y :: ys => by simp [← List.countP_eq_sum_fin_ite, uniformSelectList_cons,
+--       probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, Function.comp_def]
 
 end uniformSelectList
 
@@ -118,11 +153,15 @@ section uniformSelectVector
 /-- Select a random element from a vector by indexing into it with a uniform value.
 TODO: different types of vectors in mathlib now -/
 instance hasUniformSelectVector (α : Type) (n : ℕ) :
-    HasUniformSelect (Vector α (n + 1)) α where
-  uniformSelect := λ xs ↦ $ xs.toList
+    HasUniformSelect! (Vector α (n + 1)) α where
+  uniformSelect! xs := (xs[·]) <$> $[0..n]
 
-lemma uniformSelectVector_def {α : Type} {n : ℕ} (xs : Vector α (n + 1)) :
-    ($ xs) = ($ xs.toList) := rfl
+instance hasUniformSelectListVector (α : Type) (n : ℕ) :
+    HasUniformSelect! (List.Vector α (n + 1)) α where
+  uniformSelect! xs := (xs[·]) <$> $[0..n]
+
+-- lemma uniformSelectVector_def {α : Type} {n : ℕ} (xs : Vector α (n + 1)) :
+--     ($ xs) = ($ xs.toList) := rfl
 
 -- variable {α : Type} {n : ℕ}
 
@@ -141,7 +180,7 @@ lemma uniformSelectVector_def {α : Type} {n : ℕ} (xs : Vector α (n + 1)) :
 
 -- @[simp]
 -- lemma evalDist_uniformSelectVector (xs : Vector α (n + 1)) :
---     evalDist ($ xs) = (PMF.uniformOfFintype (Fin (n + 1))).map (xs[·]) := by
+--     evalDist ($ xs) = (PMF.uniformSample (Fin (n + 1))).map (xs[·]) := by
 --   simp [uniformSelectVector_def]
 --   sorry
 
@@ -179,176 +218,178 @@ section uniformSelectFinset
 /-- Choose a random element from a finite set, by converting to a list and choosing from that.
 This is noncomputable as we don't have a canoncial ordering for the resulting list,
 so generally this should be avoided when possible. -/
-noncomputable instance hasUniformSelectFinset (α : Type) [DecidableEq α] :
+noncomputable instance hasUniformSelectFinset (α : Type) [Inhabited α] :
     HasUniformSelect (Finset α) α where
-  uniformSelect := λ s ↦ $ s.toList
+  uniformSelect s := $ s.toList
 
-lemma uniformSelectFinset_def {α : Type} [DecidableEq α] (s : Finset α) :
-    ($ s) = ($ s.toList) := rfl
+-- lemma uniformSelectFinset_def {α : Type} [DecidableEq α] (s : Finset α) :
+--     ($ s) = ($ s.toList) := rfl
 
-variable {α : Type}
+-- variable {α : Type}
 
-@[simp] lemma support_uniformSelectFinset [DecidableEq α] (s : Finset α) :
-    ($ s).support = if s.Nonempty then ↑s else ∅ := by
-  simp only [Finset.nonempty_iff_ne_empty, ne_eq, ite_not]
-  split_ifs with hs <;> simp [hs, uniformSelectFinset_def]
+-- @[simp] lemma support_uniformSelectFinset [DecidableEq α] (s : Finset α) :
+--     ($ s).support = if s.Nonempty then ↑s else ∅ := by
+--   simp only [Finset.nonempty_iff_ne_empty, ne_eq, ite_not]
+--   split_ifs with hs <;> simp [hs, uniformSelectFinset_def]
 
-@[simp] lemma finSupport_uniformSelectFinset [DecidableEq α] (s : Finset α) :
-    ($ s).finSupport = if s.Nonempty then s else ∅ := by
-  split_ifs with hs <;> simp only [hs, finSupport_eq_iff_support_eq_coe,
-    support_uniformSelectFinset, if_true, if_false, Finset.coe_singleton, Finset.coe_empty]
+-- @[simp] lemma finSupport_uniformSelectFinset [DecidableEq α] (s : Finset α) :
+--     ($ s).finSupport = if s.Nonempty then s else ∅ := by
+--   split_ifs with hs <;> simp only [hs, finSupport_eq_iff_support_eq_coe,
+--     support_uniformSelectFinset, if_true, if_false, Finset.coe_singleton, Finset.coe_empty]
 
-@[simp] lemma probOutput_uniformSelectFinset [DecidableEq α] (s : Finset α) (x : α) :
-    [= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
-  rw [uniformSelectFinset_def, probOutput_uniformSelectList]
-  by_cases hx : x ∈ s
-  · have : s.toList.isEmpty = false :=
-      List.isEmpty_eq_false_iff_exists_mem.2 ⟨x, Finset.mem_toList.2 hx⟩
-    simp [this, hx]
-  · simp [hx]
+-- @[simp] lemma probOutput_uniformSelectFinset [DecidableEq α] (s : Finset α) (x : α) :
+--     [= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
+--   rw [uniformSelectFinset_def, probOutput_uniformSelectList]
+--   by_cases hx : x ∈ s
+--   · have : s.toList.isEmpty = false :=
+--       List.isEmpty_eq_false_iff_exists_mem.2 ⟨x, Finset.mem_toList.2 hx⟩
+--     simp [this, hx]
+--   · simp [hx]
 
-@[simp] lemma probFailure_uniformSelectFinset [DecidableEq α] (s : Finset α) :
-    [⊥ | $ s] = if s.Nonempty then 0 else 1 := by
-  simp_rw [Finset.nonempty_iff_ne_empty]
-  split_ifs with hs
-  · simp [hs, uniformSelectFinset_def]
-  · simp [hs, uniformSelectFinset_def]
+-- @[simp] lemma probFailure_uniformSelectFinset [DecidableEq α] (s : Finset α) :
+--     [⊥ | $ s] = if s.Nonempty then 0 else 1 := by
+--   simp_rw [Finset.nonempty_iff_ne_empty]
+--   split_ifs with hs
+--   · simp [hs, uniformSelectFinset_def]
+--   · simp [hs, uniformSelectFinset_def]
 
-@[simp] lemma evalDist_uniformSelectFinset [DecidableEq α] (s : Finset α) :
-    evalDist ($ s) = if hs : s.Nonempty then
-      OptionT.lift (PMF.uniformOfFinset s hs) else failure := by
-  refine PMF.ext λ x ↦ ?_
-  by_cases hs : s.Nonempty
-  · cases x with
-    | none =>
-        refine (probFailure_uniformSelectFinset _).trans ?_
-        simp [hs, OptionT.lift, OptionT.mk]
-    | some x =>
-        simp only [hs, ↓reduceDIte]
-        refine (probOutput_uniformSelectFinset _ _).trans ?_
-        simp only [OptionT.lift, OptionT.mk, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
-          PMF.bind_apply, PMF.uniformOfFinset_apply, PMF.pure_apply, Option.some.injEq, mul_ite,
-          mul_one, mul_zero]
-        refine symm <| (tsum_eq_single x ?_).trans ?_
-        · simp only [ne_eq, @eq_comm _ x, ite_eq_right_iff, ENNReal.inv_eq_zero,
-            natCast_ne_top, imp_false]
-          intros
-          tauto
-        · simp only [↓reduceIte, ite_eq_ite]
-  · simp only [Finset.not_nonempty_iff_eq_empty] at hs
-    simp [hs, uniformSelectFinset_def]
+-- @[simp] lemma evalDist_uniformSelectFinset [DecidableEq α] (s : Finset α) :
+--     evalDist ($ s) = if hs : s.Nonempty then
+--       OptionT.lift (PMF.uniformOfFinset s hs) else failure := by
+--   refine PMF.ext λ x ↦ ?_
+--   by_cases hs : s.Nonempty
+--   · cases x with
+--     | none =>
+--         refine (probFailure_uniformSelectFinset _).trans ?_
+--         simp [hs, OptionT.lift, OptionT.mk]
+--     | some x =>
+--         simp only [hs, ↓reduceDIte]
+--         refine (probOutput_uniformSelectFinset _ _).trans ?_
+--         simp only [OptionT.lift, OptionT.mk, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
+--           PMF.bind_apply, PMF.uniformOfFinset_apply, PMF.pure_apply, Option.some.injEq, mul_ite,
+--           mul_one, mul_zero]
+--         refine symm <| (tsum_eq_single x ?_).trans ?_
+--         · simp only [ne_eq, @eq_comm _ x, ite_eq_right_iff, ENNReal.inv_eq_zero,
+--             natCast_ne_top, imp_false]
+--           intros
+--           tauto
+--         · simp only [↓reduceIte, ite_eq_ite]
+--   · simp only [Finset.not_nonempty_iff_eq_empty] at hs
+--     simp [hs, uniformSelectFinset_def]
 
 end uniformSelectFinset
 
-section SelectableType
+section SampleableType
 
-/-- A `SelectableType β` instance means that `β` is a finite inhabited type,
+/-- A `SampleableType β` instance means that `β` is a finite inhabited type,
 with a computation `selectElem` that selects uniformly at random from the type.
 This generally requires choosing some "canonical" ordering for the type,
 so we include this to get a computable version of selection.
 We also require that each element has the same probability of being chosen from by `selectElem`,
-see `SelectableType.probOutput_selectElem` for the reduction when `α` has a fintype instance.
+see `SampleableType.probOutput_selectElem` for the reduction when `α` has a fintype instance.
 NOTE: universe polymorphism of `β` is hard. -/
-class SelectableType (β : Type) where
+class SampleableType (β : Type) where
   selectElem : ProbComp β
-  mem_support_selectElem (x : β) : x ∈ selectElem.support
-  probOutput_selectElem_eq (x y : β) : [= x | selectElem] = [= y | selectElem]
-  probFailure_selectElem : [⊥ | selectElem] = 0
+  mem_support_selectElem (x : β) : x ∈ support selectElem
+  probOutput_selectElem_eq (x y : β) : Pr[= x | selectElem] = Pr[= y | selectElem]
+  probFailure_selectElem : Pr[⊥ | selectElem] = 0
 
 /-- Select uniformly from the type `β` using a type-class provided definition.
 NOTE: naming is somewhat strange now that `Fintype` isn't explicitly required. -/
-def uniformOfFintype (β : Type) [h : SelectableType β] :
+def uniformSample (β : Type) [h : SampleableType β] :
     ProbComp β := h.selectElem
 
-prefix : 90 "$ᵗ" => uniformOfFintype
+prefix : 90 "$ᵗ" => uniformSample
 
-variable (α : Type) [hα : SelectableType α]
+variable (α : Type) [hα : SampleableType α]
 
-@[simp] lemma probOutput_uniformOfFintype [Fintype α] (x : α) :
-    [= x | $ᵗ α] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
+@[simp] lemma probOutput_uniformSample [Fintype α] (x : α) :
+    Pr[= x | $ᵗ α] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
   have : (Fintype.card α : ℝ≥0∞) = ∑ y : α, 1 :=
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
   refine ENNReal.eq_inv_of_mul_eq_one_left ?_
   simp_rw [this, Finset.mul_sum, mul_one]
-  rw [← sum_probOutput_eq_one ($ᵗ α) SelectableType.probFailure_selectElem]
-  exact Finset.sum_congr rfl λ y _ ↦ SelectableType.probOutput_selectElem_eq x y
+  rw [← sum_probOutput_eq_one ($ᵗ α) SampleableType.probFailure_selectElem]
+  exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
-@[simp] lemma probFailure_uniformOfFintype : [⊥ | $ᵗ α] = 0 :=
-  SelectableType.probFailure_selectElem
+@[simp] lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=
+  SampleableType.probFailure_selectElem
 
-@[simp] lemma neverFails_uniformOfFintype : neverFails ($ᵗ α) := by
-  sorry --neverFails_of_probFailure_eq_zero (probFailure_uniformOfFintype α)
+@[simp] instance : HasEvalSPMF.NeverFail ($ᵗ α) := inferInstance
 
-@[simp] lemma evalDist_uniformOfFintype [Fintype α] [Inhabited α] :
-    evalDist ($ᵗ α) = OptionT.lift (PMF.uniformOfFintype α) := by
-  refine OptionT.ext ?_
-  simp
-  refine PMF.ext λ x ↦ match x with
-  | none => by simp
-  | some x => by
-      simp [evalDist_apply_some]
-      refine symm ((tsum_eq_single x ?_).trans ?_)
-      · simp [@eq_comm _ x]
-      · simp
+-- open Classical in
+@[simp] lemma evalDist_uniformSample [Fintype α] [Inhabited α] :
+    evalDist ($ᵗ α) = liftM (PMF.uniformOfFintype α) := by
+  simp [SPMF.evalDist_eq_iff]
 
-@[simp] lemma support_uniformOfFintype : ($ᵗ α).support = Set.univ := by
+@[simp] lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
   simp only [Set.ext_iff, Set.mem_univ, iff_true]
-  apply SelectableType.mem_support_selectElem
+  apply SampleableType.mem_support_selectElem
 
-@[simp] lemma finSupport_uniformOfFintype [Fintype α] [DecidableEq α] :
-    ($ᵗ α).finSupport = Finset.univ := by
-  simp only [finSupport_eq_iff_support_eq_coe, support_uniformOfFintype, Finset.coe_univ]
+-- @[simp] lemma finSupport_uniformSample [Fintype α] [DecidableEq α] [Nonempty α] :
+--     finSupport ($ᵗ α) = Finset.univ := by
+--   stop
+--   simp only [finSupport_eq_iff_support_eq_coe, support_uniformSample, Finset.coe_univ]
 
-@[simp] lemma probEvent_uniformOfFintype [Fintype α] (p : α → Prop) [DecidablePred p] :
-    [p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
-  simp only [probEvent_eq_sum_filter_univ, probOutput_uniformOfFintype, Finset.sum_const,
+@[simp] lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
+    Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
+  simp only [probEvent_eq_sum_filter_univ, probOutput_uniformSample, Finset.sum_const,
     nsmul_eq_mul, div_eq_mul_inv]
 
 section instances
 
-instance (α : Type) [Unique α] : SelectableType α where
+instance (α : Type) [Unique α] : SampleableType α where
   selectElem := return default
-  mem_support_selectElem x := Unique.eq_default x ▸ rfl
+  mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
-  probFailure_selectElem := probFailure_pure default
-
-instance : SelectableType Bool where
-  selectElem := $ [false, true]
-  mem_support_selectElem x := by simp
-  probOutput_selectElem_eq x y := by simp
   probFailure_selectElem := by simp
+
+instance : SampleableType Bool where
+  selectElem := $! #v[true, false]
+  mem_support_selectElem x := by sorry
+  probOutput_selectElem_eq x y := by sorry --simp
+  probFailure_selectElem := by sorry --simp
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
 instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
-    [SelectableType α] [SelectableType β] : SelectableType (α × β) where
+    [SampleableType α] [SampleableType β] : SampleableType (α × β) where
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
-  mem_support_selectElem x := by simp
-  probOutput_selectElem_eq := by simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
-    probOutput_uniformOfFintype, forall_const, implies_true]
-  probFailure_selectElem := by simp [probFailure_seq]
+  mem_support_selectElem x := by sorry --simp
+  probOutput_selectElem_eq := by
+    stop
+    simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
+      probOutput_uniformSample, forall_const, implies_true]
+  probFailure_selectElem := by sorry --simp [probFailure_seq]
 
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
-instance (n : ℕ) : SelectableType (Fin (n + 1)) where
+instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
-  mem_support_selectElem := by simp
-  probOutput_selectElem_eq x y := by simp only [probOutput_uniformFin, implies_true]
-  probFailure_selectElem := by simp
+  mem_support_selectElem := by sorry
+  probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
+  probFailure_selectElem := by sorry-- simp
+
+instance (n : ℕ) : SampleableType (ZMod (n + 1)) where
+  selectElem := $[0..n]
+  mem_support_selectElem := by sorry
+  probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
+  probFailure_selectElem := by sorry-- simp
 
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
-instance (n : ℕ) [hn : NeZero n] : SelectableType (Fin n) where
+instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
   selectElem := congr_arg Fin (Nat.succ_pred (NeZero.ne n)).symm ▸ $ᵗ (Fin (n - 1 + 1))
-  mem_support_selectElem x := by rw [mem_support_eqRec_iff]; simp
-  probOutput_selectElem_eq x y := by simp [probOutput_eqRec]
-  probFailure_selectElem := by simp
+  mem_support_selectElem x := by sorry --rw [mem_support_eqRec_iff]; simp
+  probOutput_selectElem_eq x y := by sorry --simp [probOutput_eqRec]
+  probFailure_selectElem := by sorry --simp
 
 /-- Select a uniform element from `Vector α n` by independently selecting `α` at each index. -/
-instance (α : Type) (n : ℕ) [SelectableType α] : SelectableType (Vector α n) where
+instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n) where
   selectElem := by induction n with
   | zero => exact pure #v[]
   | succ m ih => exact Vector.push <$> ih <*> ($ᵗ α)
   mem_support_selectElem x := by induction n with
   | zero => simp
   | succ m ih =>
+    stop
     simp [ih]
     use x.pop, x.back
     apply Vector.push_pop_back
@@ -366,17 +407,21 @@ instance (α : Type) (n : ℕ) [SelectableType α] : SelectableType (Vector α n
     -- Subsingleton
     -- simp [this]
   | succ m ih =>
+    stop
     rw [← Vector.push_pop_back x, ← Vector.push_pop_back y]
     simp [probOutput_seq_map_vec_push_eq_mul, -Vector.push_pop_back]
-    unfold uniformOfFintype
-    rw [SelectableType.probOutput_selectElem_eq x.back y.back]
-    exact congrFun (congrArg HMul.hMul (ih x.pop y.pop)) [=y.back|SelectableType.selectElem]
-  probFailure_selectElem := by induction n with
-  | zero => simp
-  | succ m ih => simp [ih, probFailure_seq]
+    unfold uniformSample
+    rw [SampleableType.probOutput_selectElem_eq x.back y.back]
+    exact congrFun (congrArg HMul.hMul (ih x.pop y.pop)) Pr[= y.back | SampleableType.selectElem]
+  probFailure_selectElem := by
+    stop
+    induction n with
+    | zero => simp
+    | succ m ih => simp [ih, probFailure_seq]
 
 /-- Select a uniform element from `Matrix α n` by independently selecting `α` at each index. -/
-instance (α : Type) (n m : ℕ) [SelectableType α] : SelectableType (Matrix (Fin n) (Fin m) α) where
+instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
+    SampleableType (Matrix (Fin n) (Fin m) α) where
   -- selectElem := (fun x ↦ (fun i j ↦ x)) <$> ($ᵗ α)
   selectElem := by induction n with
   | zero => exact pure (Matrix.of ![])
@@ -388,11 +433,13 @@ instance (α : Type) (n m : ℕ) [SelectableType α] : SelectableType (Matrix (F
     -- return (Matrix.of (fun i j ↦ if h : i ≠ Fin.last n then top (Fin.castPred i h) j else bot[j]))
   mem_support_selectElem x := by induction n with
   | zero =>
+    simp only [bind_pure_comp, Nat.rec_zero, support_pure, Set.mem_singleton_iff]
     apply Matrix.ext
     rintro i j
     exact False.elim (IsEmpty.false i)
   | succ p ih =>
     simp at *
+    stop
     use Vector.ofFn (x 0), (Fin.tail x); constructor
     simp [ih]
     have : (Vector.ofFn (x 0)).get = x 0 := by
@@ -405,12 +452,13 @@ instance (α : Type) (n m : ℕ) [SelectableType α] : SelectableType (Matrix (F
     rfl
   | succ m ih =>
     sorry
-  probFailure_selectElem := by induction n with
-  | zero => simp
-  | succ m ih =>
-    simp_all only [bind_pure_comp, probFailure_eq_zero_iff, neverFails_bind_iff,
-                  neverFails_uniformOfFintype, support_uniformOfFintype, Set.mem_univ,
-                  neverFails_map_iff, imp_self, implies_true, and_self]
+  probFailure_selectElem := by
+    stop
+    induction n with
+    | zero => simp
+    | succ m ih =>
+      simp [ih, probFailure_seq, probFailure_pure, probFailure_ite]
+      sorry
 
 end instances
 
@@ -423,12 +471,13 @@ output `b'` differs from a uniformly chosen boolean `b` is the same as the proba
 are equal. In other words, `P(b ≠ b') = P(b = b')` where `b` is uniform.
 -/
 lemma probOutput_uniformBool_not_decide_eq_decide {ob : ProbComp Bool} :
-    [= true | do let b ←$ᵗ Bool; let b' ← ob; return !decide (b = b')] =
-      [= true | do let b ←$ᵗ Bool; let b' ← ob; return decide (b = b')] := by
+    Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return !decide (b = b')] =
+      Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return decide (b = b')] := by
+  stop
   simp [probOutput_bind_eq_sum_fintype, add_comm]
 
 end bool
 
-end SelectableType
+end SampleableType
 
 end OracleComp

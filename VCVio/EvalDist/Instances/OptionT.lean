@@ -1,0 +1,85 @@
+/-
+Copyright (c) 2025 Devon Tuma. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Devon Tuma
+-/
+import VCVio.EvalDist.Option
+import ToMathlib.Control.OptionT
+
+/-!
+# Probability Distributions on Potentially Failing Computations
+
+This file gives an instance to extend a `evalDist` instance on a monad to one transformed by
+the `OptionT` monad transformer.
+
+dt: should add more instances and connecting lemmas
+-/
+
+universe u v w
+
+variable (m : Type u → Type v) [Monad m] {α β γ : Type u}
+
+-- namespace OptionT
+
+-- instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
+--     HasEvalSet (OptionT m) where
+--   toFun mx := {x | some x ∈ support mx.run}
+--   toFun_pure' := by simp
+--   toFun_bind' x y := by
+--     refine Set.ext fun z => ?_
+--     simp [Function.comp_def, Option.elimM]
+--     refine ⟨fun h => ?_, fun h => ?_⟩
+--     · obtain ⟨i, hi⟩ := h
+--       cases i with
+--       | none => simp at hi
+--       | some j => use j; simp at hi; simp [hi]
+--     · obtain ⟨i, hi⟩ := h
+--       use some i
+--       simp [hi]
+
+-- @[simp] lemma support_eq [HasEvalSet m] (mx : OptionT m α) :
+--     support mx = {x | some x ∈ support mx.run} := rfl
+
+-- @[simp] lemma support_failure [HasEvalSet m] :
+--     support (failure : OptionT m α) = ∅ := by
+--   simp [support_eq]
+
+-- /-- If we have a `HasEvalPMF m` instance, we can lift it to `HasEvalSPMF (OptionT m)`
+
+-- NOTE: we do _not_ want to lift `HasEvalSPMF` to itself (wrapped in `OptionT`). This means we only support one layer of failure (i.e. `OracleComp` satisfies `HasEvalPMF`, and so `OptionT OracleComp` satisfies `HasEvalSPMF`). This suffices for all known purposes. -/
+noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
+    HasEvalSPMF (OptionT m) where
+  toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
+  support_eq := sorry
+
+@[simp] lemma evalDist_eq [HasEvalPMF m] (mx : OptionT m α) :
+    evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
+
+-- @[simp]
+-- lemma probOutput_eq [HasEvalPMF m] (mx : OptionT m α) (x : α) :
+--     Pr[= x | mx] = Pr[= some x | mx.run] := by
+--   simp [probOutput_def, OptionT.mapM', run]
+--   sorry
+
+-- lemma probEvent_eq [HasEvalPMF m] (mx : OptionT m α) (p : α → Prop) :
+--     Pr[p | mx] = Pr[Option.rec false p | mx.run] := by
+--   simp [probEvent_def, run]
+--   sorry
+
+-- lemma probFailure_eq [HasEvalPMF m] (mx : OptionT m α) :
+--     Pr[⊥ | mx] = Pr[= none | mx.run] := by
+--   sorry
+
+-- @[simp] lemma probOutput_lift [HasEvalPMF m] [LawfulMonad m] (mx : m α) (x : α) :
+--     Pr[= x | OptionT.lift mx] = Pr[= x | mx] := by
+--   simp [probOutput_eq]
+
+-- @[simp] lemma probEvent_lift [HasEvalPMF m] [LawfulMonad m] (mx : m α) (p : α → Prop) :
+--     Pr[p | OptionT.lift mx] = Pr[p | mx] := by
+--   simp [probEvent_def]
+
+-- instance (m : Type u → Type v) [Monad m] [HasEvalPMF m] :
+--     LawfulProbFailure (OptionT m) where
+--     probFailure_failure := by simp [probFailure_eq]
+
+-- end OptionT

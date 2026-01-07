@@ -129,26 +129,26 @@ instance instMonadSigma {w d} [Monad w] [DijkstraMonad w d] :
   pure x := ⟨pure x, dPure x⟩
   bind x f := ⟨x.1 >>= (fun a => (f a).1), x.2 >>=ᵈ (fun a => (f a).2)⟩
 
-/-- A lawful Dijkstra monad `d` on a lawful monad `w` can be seen
-  as a lawful monad on the dependent pair `(w, d)`. -/
-instance {w d} [Monad w] [DijkstraMonad w d] [h : LawfulMonad w] [LawfulDijkstraMonad w d] :
-    LawfulMonad (fun α => (w : w α) × d w) :=
-  LawfulMonad.mk' _
-    (by
-      intro α ⟨x, y⟩; simp [instMonadSigma]; sorry)
-      -- constructor
-      -- · show x >>= (fun a => pure a) = x; simp only [bind_pure]
-      -- · rw (occs := .pos [2]) [← dBind_dPure y]
-      --   symm; exact eqRec_heq (bind_pure x) (y >>=ᵈ dPure))
-    (by
-      intro α β x f; simp [instMonadSigma]; congr
-      · simp only [pure_bind]
-      · rw [← dPure_dBind x (fun a => (f a).2)]
-        exact HEq.symm (eqRec_heq _ _))
-    (fun x f g => by
-      simp [instMonadSigma]
-      rw [← dBind_assoc x.2 _ _]
-      exact HEq.symm (eqRec_heq _ _))
+-- /-- A lawful Dijkstra monad `d` on a lawful monad `w` can be seen
+--   as a lawful monad on the dependent pair `(w, d)`. -/
+-- instance {w d} [Monad w] [DijkstraMonad w d] [h : LawfulMonad w] [LawfulDijkstraMonad w d] :
+--     LawfulMonad (fun α => (w : w α) × d w) :=
+--   LawfulMonad.mk' _
+--     (by
+--       intro α ⟨x, y⟩; simp [instMonadSigma]; sorry)
+--       -- constructor
+--       -- · show x >>= (fun a => pure a) = x; simp only [bind_pure]
+--       -- · rw (occs := .pos [2]) [← dBind_dPure y]
+--       --   symm; exact eqRec_heq (bind_pure x) (y >>=ᵈ dPure))
+--     (by
+--       intro α β x f; simp [instMonadSigma]; congr
+--       · simp only [pure_bind]
+--       · rw [← dPure_dBind x (fun a => (f a).2)]
+--         exact HEq.symm (eqRec_heq _ _))
+--     (fun x f g => by
+--       simp [instMonadSigma]
+--       rw [← dBind_assoc x.2 _ _]
+--       exact HEq.symm (eqRec_heq _ _))
 
 instance {w d} [Monad w] [DijkstraMonad w d] : MonadLiftT (fun α => (w : w α) × d w) w where
   monadLift x := x.1

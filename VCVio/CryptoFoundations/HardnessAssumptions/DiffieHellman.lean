@@ -64,7 +64,7 @@ We represent this as hardness assumptions on the corresponding hard homogenous s
 --   fintype_G := sorry
 --   fintype_P := sorry
 --   -- Using `⊤` won't work for computability
---   selectableType_G := sorry
---   selectableType_P := sorry
+--   SampleableType_G := sorry
+--   SampleableType_P := sorry
 
 -- end DiffieHellman

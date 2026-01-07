@@ -29,60 +29,60 @@ structure SignatureAlg (m : Type → Type v) (M PK SK S : Type)
   sign (pk : PK) (sk : SK) (msg : M) : m S
   verify (pk : PK) (msg : M) (σ : S) : m Bool
 
-namespace SignatureAlg
+-- namespace SignatureAlg
 
-section signingOracle
+-- section signingOracle
 
-variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
+-- variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
 
-def signingOracle (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) :
-    QueryImpl (M →ₒ S) (WriterT (QueryLog (M →ₒ S)) m) :=
-  QueryImpl.withLogging ⟨fun | query () msg => sigAlg.sign pk sk msg⟩
+-- def signingOracle (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) :
+--     QueryImpl (M →ₒ S) (WriterT (QueryLog (M →ₒ S)) m) :=
+--   QueryImpl.withLogging ⟨fun | query () msg => sigAlg.sign pk sk msg⟩
 
-end signingOracle
+-- end signingOracle
 
-section sound
+-- section sound
 
-variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
+-- variable {m : Type → Type v} [Monad m] {σ M PK SK S : Type}
 
-/-- a `SignatureAlg` is perfectly complete if honest signatures are always verified. -/
-def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
-  ∀ msg : M, [= true | sigAlg.exec do
-    let (pk, sk) ← sigAlg.keygen
-    let sig ← sigAlg.sign pk sk msg
-    sigAlg.verify pk msg sig] = 1
+-- /-- a `SignatureAlg` is perfectly complete if honest signatures are always verified. -/
+-- def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
+--   ∀ msg : M, [= true | sigAlg.exec do
+--     let (pk, sk) ← sigAlg.keygen
+--     let sig ← sigAlg.sign pk sk msg
+--     sigAlg.verify pk msg sig] = 1
 
-end sound
+-- end sound
 
-section unforgeable
+-- section unforgeable
 
-variable {ι : Type u} {spec : OracleSpec ι} {σ M PK SK S : Type}
-  [DecidableEq M] [DecidableEq S]
+-- variable {ι : Type u} {spec : OracleSpec ι} {σ M PK SK S : Type}
+--   [DecidableEq M] [DecidableEq S]
 
-/-- Adversary for testing the unforgeability of a signature scheme.
-We only define this if the monad for the protocol is `OracleComp spec`,
-as we need to be able to give the adversary access to a signing oracle. -/
-structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
-  main (pk : PK) : OracleComp (spec ++ₒ (M →ₒ S)) (M × S)
+-- /-- Adversary for testing the unforgeability of a signature scheme.
+-- We only define this if the monad for the protocol is `OracleComp spec`,
+-- as we need to be able to give the adversary access to a signing oracle. -/
+-- structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
+--   main (pk : PK) : OracleComp (spec ++ₒ (M →ₒ S)) (M × S)
 
-/-- Unforgeability expiriment for a signature algorithm runs the adversary and checks returns
-whether or not the adversary successfully forged a signature-/
-def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (adv : unforgeableAdv sigAlg) : ProbComp Bool :=
-  sigAlg.exec do
-    let (pk, sk) ← sigAlg.keygen
-    -- Simulate the adversary's signing oracle with the public / secret keys
-    let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
-      simulateQ (idOracle ++ₛₒ sigAlg.signingOracle pk sk) (adv.main pk)
-    -- Run the adversary and check that they successfully forged a signature
-    let ((m, σ), log) ← sim_adv.run
-    return !(log.wasQueried () m) && (← sigAlg.verify pk m σ)
+-- /-- Unforgeability expiriment for a signature algorithm runs the adversary and checks returns
+-- whether or not the adversary successfully forged a signature-/
+-- def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+--     (adv : unforgeableAdv sigAlg) : ProbComp Bool :=
+--   sigAlg.exec do
+--     let (pk, sk) ← sigAlg.keygen
+--     -- Simulate the adversary's signing oracle with the public / secret keys
+--     let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+--       simulateQ (idOracle ++ₛₒ sigAlg.signingOracle pk sk) (adv.main pk)
+--     -- Run the adversary and check that they successfully forged a signature
+--     let ((m, σ), log) ← sim_adv.run
+--     return !(log.wasQueried () m) && (← sigAlg.verify pk m σ)
 
-/-- Advantage -/
-noncomputable def unforgeableAdv.advantage
-    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := [= true | unforgeableExp adv]
+-- /-- Advantage -/
+-- noncomputable def unforgeableAdv.advantage
+--     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+--     (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := [= true | unforgeableExp adv]
 
-end unforgeable
+-- end unforgeable
 
-end SignatureAlg
+-- end SignatureAlg

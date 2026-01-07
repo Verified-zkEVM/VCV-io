@@ -35,7 +35,7 @@ open OracleSpec OracleComp
 
 -- end commits
 
--- def HHS_signature (G P M : Type) [DecidableEq M] [SelectableType P] [SelectableType G]
+-- def HHS_signature (G P M : Type) [DecidableEq M] [SampleableType P] [SampleableType G]
 --     [AddCommGroup G] [AddTorsor G P] (n : ℕ) :
 --     SignatureAlg
 --       (unifSpec ++ₒ ((Vector P n × M) →ₒ Vector Bool n))
@@ -75,7 +75,7 @@ open OracleSpec OracleComp
 --     [AddCommGroup G] [HomogeneousSpace G P] {n : ℕ}
 
 -- variable [(j : (unifSpec ++ (Unit →ₒ Vector Bool n)).ι) →
---   SelectableType ((unifSpec ++ (Unit →ₒ Vector Bool n)).range j)]
+--   SampleableType ((unifSpec ++ (Unit →ₒ Vector Bool n)).Range j)]
 
 -- def mockSignOracle  (x₀ pk : P) :
 --     let randSpec := (Vector P n × M) →ₒ Vector Bool n

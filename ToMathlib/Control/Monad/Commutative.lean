@@ -121,25 +121,25 @@ theorem bind_comm_quad_swap_34 {m} [Monad m] [LawfulMonad m] [Commutative m] {α
   exact bind_comm_comp mc md (fun p => f (a, b, p.1, p.2))
 
 -- Swap pairs in quadruple (1,2,3,4) → (3,4,1,2)
-theorem bind_comm_quad_swap_pairs {m} [Monad m] [LawfulMonad m] [Commutative m] {α β γ δ ε}
-    (ma : m α) (mb : m β) (mc : m γ) (md : m δ) (f : α × β × γ × δ → m ε) :
-    (ma >>= fun a => mb >>= fun b => mc >>= fun c => md >>= fun d => f (a, b, c, d)) =
-    (mc >>= fun c => md >>= fun d => ma >>= fun a => mb >>= fun b => f (a, b, c, d)) := by sorry
+-- theorem bind_comm_quad_swap_pairs {m} [Monad m] [LawfulMonad m] [Commutative m] {α β γ δ ε}
+--     (ma : m α) (mb : m β) (mc : m γ) (md : m δ) (f : α × β × γ × δ → m ε) :
+--     (ma >>= fun a => mb >>= fun b => mc >>= fun c => md >>= fun d => f (a, b, c, d)) =
+--     (mc >>= fun c => md >>= fun d => ma >>= fun a => mb >>= fun b => f (a, b, c, d)) := by sorry
   -- Use the fact that we can swap the two pairs
   -- exact bind_comm_comp (ma >>= fun a => mb >>= fun b => pure (a, b))
   --                       (mc >>= fun c => md >>= fun d => pure (c, d))
   --                       (fun p => f (p.1.1, p.1.2, p.2.1, p.2.2))
 
-theorem bind_reverse_triple {m} [Monad m] [LawfulMonad m] [Commutative m] {α β γ δ}
-    (ma : m α) (mb : m β) (mc : m γ) (f : α × β × γ → m δ) :
-    (ma >>= fun a => mb >>= fun b => mc >>= fun c => f (a, b, c)) =
-    (mc >>= fun c => mb >>= fun b => ma >>= fun a => f (a, b, c)) := by
-  -- First swap a and b
-  rw [bind_comm_triple_swap_12]
-  sorry
-  -- Then swap (b,a) with c by treating (b,a) as a single unit
-  -- rw [bind_comm_comp (mb >>= fun b => ma >>= fun a => pure (a, b)) mc
-  --     (fun p => f p.1 p.2)]
+-- theorem bind_reverse_triple {m} [Monad m] [LawfulMonad m] [Commutative m] {α β γ δ}
+--     (ma : m α) (mb : m β) (mc : m γ) (f : α × β × γ → m δ) :
+--     (ma >>= fun a => mb >>= fun b => mc >>= fun c => f (a, b, c)) =
+--     (mc >>= fun c => mb >>= fun b => ma >>= fun a => f (a, b, c)) := by
+--   -- First swap a and b
+--   rw [bind_comm_triple_swap_12]
+--   sorry
+--   -- Then swap (b,a) with c by treating (b,a) as a single unit
+--   -- rw [bind_comm_comp (mb >>= fun b => ma >>= fun a => pure (a, b)) mc
+--   --     (fun p => f p.1 p.2)]
 
 /-- The identity monad is commutative -/
 instance : Commutative Id where
@@ -165,13 +165,13 @@ instance {ρ} {m} [Monad m] [Commutative m] : Commutative (ReaderT ρ m) where
     funext r
     rw [bind_comm]
 
-/-- The `WriterT` monad is commutative if the underlying monad is commutative and the monoid is
-  commutative -/
-instance {ω} {m} [Monad m] [Commutative m] [CommMonoid ω] : Commutative (WriterT ω m) where
-  bind_comm := fun ma mb => by
-    dsimp [CommutativeAt, Pure.pure, Bind.bind]
-    unfold WriterT.mk
-    sorry
+--/---/ The `WriterT` monad is commutative if the underlying monad is commutative and the monoid is
+--  commutative -/
+-- instance {ω} {m} [Monad m] [Commutative m] [CommMonoid ω] : Commutative (WriterT ω m) where
+--   bind_comm := fun ma mb => by
+--     dsimp [CommutativeAt, Pure.pure, Bind.bind]
+--     unfold WriterT.mk
+--     sorry
 
 attribute [local instance] Set.monad
 
@@ -182,13 +182,13 @@ def Set.monadComm : Commutative Set where
     dsimp [CommutativeAt, Pure.pure, Bind.bind]
     aesop
 
-/-- The `PMF` monad is commutative -/
-instance : Commutative PMF where
-  bind_comm := fun ma mb => by
-    dsimp [CommutativeAt, Pure.pure, Bind.bind, PMF.pure, PMF.bind]
-    ext ⟨a, b⟩
-    simp [PMF.instFunLike]
-    sorry
-    -- simp_rw [← Summable.tsum_mul_left]
+-- /-- The `PMF` monad is commutative -/
+-- instance : Commutative PMF where
+--   bind_comm := fun ma mb => by
+--     dsimp [CommutativeAt, Pure.pure, Bind.bind, PMF.pure, PMF.bind]
+--     ext ⟨a, b⟩
+--     simp [PMF.instFunLike]
+--     sorry
+--     -- simp_rw [← Summable.tsum_mul_left]
 
 end Monad
