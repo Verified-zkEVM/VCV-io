@@ -151,7 +151,7 @@ lemma eq_liftM_iff_forall (p : SPMF α) (q : PMF α) :
   rfl
 
 protected def support : SPMF →ᵐ SetM where
-  toFun _ x := Function.support x
+  toFun α x := Function.support (x : α → ℝ≥0∞)
   toFun_pure' x := by
     refine Set.ext fun y => ?_
     simp [SPMF.apply_eq_run_some]
@@ -159,7 +159,14 @@ protected def support : SPMF →ᵐ SetM where
     refine Set.ext fun y => ?_
     simp
 
+@[simp] lemma support_apply (p : SPMF α) :
+    SPMF.support p = Function.support p := rfl
+
 @[simp] lemma support_toSPMF (p : PMF α) : (PMF.toSPMF p).support = p.support := by
+  sorry
+
+@[simp] lemma map_mk (p : PMF (Option α)) (f : α → β) :
+    f <$> SPMF.mk p = SPMF.mk (Option.map f <$> p) := by
   sorry
 
 end SPMF

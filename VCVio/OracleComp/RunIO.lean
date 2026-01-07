@@ -32,16 +32,20 @@ def test1 : ProbComp (ℕ × ℕ × ℕ) := do
 def test2 (n : ℕ) : ProbComp (List ℕ) := do
   match n with
   | 0 => return []
-  | n + 1 => return (← $[0..10]) :: (← test2 n)
+  | n + 1 => return (← $[0..100]) :: (← test2 n)
 
 def test3 (n : ℕ) : ProbComp (List ℕ) := do
   let mut xs := []
   for _ in List.range n do
-    xs := (← $[0..10]) :: xs
+    xs := (← $[0..100]) :: xs
   return xs
+
+def test4 (n : ℕ) : ProbComp (List ℕ) := do
+  (List.replicate n ()).mapM (fun () => Fin.val <$> ($[0..100]))
 
 -- #eval test1
 -- #eval test2 100
 -- #eval test3 100
+-- #eval test4 100
 
 end OracleComp

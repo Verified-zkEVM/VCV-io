@@ -26,24 +26,19 @@ Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
 class HasEvalSPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSet m where
   toSPMF : m →ᵐ SPMF
-  support_eq {α : Type u} (mx : m α) :
-    support mx = (toSPMF mx).support
+  support_eq {α : Type u} (mx : m α) : support mx = (toSPMF mx).support
   toSet := MonadHom.comp SPMF.support toSPMF
 
 /-- The monad `m` can be evaluated to get a distribution of outputs. -/
 class HasEvalPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSPMF m where
   toPMF : m →ᵐ PMF
-  toSPMF_eq {α : Type u} (mx : m α) :
-    toSPMF mx = OptionT.lift (toPMF mx)
+  toSPMF_eq {α : Type u} (mx : m α) : toSPMF mx = OptionT.lift (toPMF mx)
   toSPMF := MonadHom.comp PMF.toSPMF' toPMF
 
 /-- The resulting distribution of running the monadic computation `mx`. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
-
--- instance [HasEvalSPMF m] : MonadHomClass m SPMF (@evalDist m _ _) :=
---   inferInstanceAs (MonadHomClass m SPMF @HasEvalSPMF.toSPMF.toFun)
 
 section probability_notation
 
@@ -83,24 +78,27 @@ section probEvent
 lemma probEvent_def [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
     Pr[p | mx] = (evalDist mx).run.toOuterMeasure (some '' {x | p x}) := rfl
 
+@[grind =]
 lemma probEvent_eq_tsum_indicator [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
     Pr[p | mx] = ∑' x : α, {x | p x}.indicator (Pr[= · | mx]) x := by
   simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable,
     Set.indicator_image (Option.some_injective _), Function.comp_def, probOutput_def,
     SPMF.apply_eq_run_some]
 
+@[grind =]
 lemma probEvent_eq_sum_fintype_indicator [HasEvalSPMF m] [Fintype α]
     (mx : m α) (p : α → Prop) : Pr[p | mx] = ∑ x : α, {x | p x}.indicator (Pr[= · | mx]) x :=
   (probEvent_eq_tsum_indicator mx p).trans (tsum_fintype _)
 
+@[grind =]
 lemma probEvent_eq_tsum_ite [HasEvalSPMF m] (mx : m α) (p : α → Prop) [DecidablePred p] :
     Pr[p | mx] = ∑' x : α, if p x then Pr[= x | mx] else 0 := by
-  simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable, Set.indicator,
-    probOutput_def, SPMF.apply_eq_run_some]
+  grind [Set.indicator]
 
-lemma probEvent_eq_sum_fintype_ite [HasEvalSPMF m] [Fintype α]
-    (mx : m α) (p : α → Prop) [DecidablePred p] : Pr[p | mx] = ∑ x : α, if p x then Pr[= x | mx] else 0 :=
-  (probEvent_eq_tsum_ite mx p).trans (tsum_fintype _)
+@[grind =]
+lemma probEvent_eq_sum_fintype_ite [HasEvalSPMF m] [Fintype α] (mx : m α)
+    (p : α → Prop) [DecidablePred p] : Pr[p | mx] = ∑ x : α, if p x then Pr[= x | mx] else 0 := by
+  grind [Set.indicator]
 
 lemma probEvent_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
     Pr[p | mx] = ∑' x : {x | p x}, Pr[= x | mx] := by
@@ -115,7 +113,7 @@ end probEvent
 
 section probFailure
 
-@[aesop norm (rule_sets := [UnfoldEvalDist])]
+@[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma probFailure_def [HasEvalSPMF m] (mx : m α) :
     Pr[⊥ | mx] = (evalDist mx).run none := rfl
 
@@ -163,13 +161,13 @@ section ite
 variable (p : Prop) [Decidable p]
 
 @[simp] lemma evalDist_ite [HasEvalSPMF m] (mx mx' : m α) :
-    evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by aesop
+    evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by grind
 
 @[simp] lemma probOutput_ite [HasEvalSPMF m] (x : α) (mx mx' : m α) :
     Pr[= x | if p then mx else mx'] = if p then Pr[= x | mx] else Pr[= x | mx'] := by aesop
 
 @[simp] lemma probFailure_ite [HasEvalSPMF m] (mx mx' : m α) :
-    Pr[⊥ | if p then mx else mx'] = if p then Pr[⊥ | mx] else Pr[⊥ | mx'] := by aesop
+    Pr[⊥ | if p then mx else mx'] = if p then Pr[⊥ | mx] else Pr[⊥ | mx'] := by grind
 
 @[simp] lemma probEvent_ite [HasEvalSPMF m] (mx mx' : m α) (q : α → Prop) :
     Pr[q | if p then mx else mx'] = if p then Pr[q | mx] else Pr[q | mx'] := by aesop
@@ -179,13 +177,13 @@ end ite
 section eqRec
 
 lemma evalDist_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) :
-    evalDist (h ▸ mx : m β) = h ▸ evalDist mx := by induction h; rfl
+    evalDist (h ▸ mx : m β) = h ▸ evalDist mx := by grind
 
 lemma probOutput_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) (y : β) :
-    Pr[= y | h ▸ mx] = Pr[= h ▸ y | mx] := by induction h; rfl
+    Pr[= y | h ▸ mx] = Pr[= h ▸ y | mx] := by grind
 
 @[simp] lemma probFailure_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) :
-    Pr[⊥ | h ▸ mx] = Pr[⊥ | mx] := by induction h; rfl
+    Pr[⊥ | h ▸ mx] = Pr[⊥ | mx] := by grind
 
 lemma probEvent_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) (q : β → Prop) :
     Pr[q | h ▸ mx] = Pr[fun x ↦ q (h ▸ x) | mx] := by induction h; rfl
@@ -198,7 +196,7 @@ section sums
 lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalSPMF m]
     (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
   simp [probEvent_eq_tsum_indicator, probOutput_def, evalDist, map_eq_bind_pure_comp]
-  refine tsum_congr fun α => by aesop
+  congr 1; aesop
 
 @[simp] lemma tsum_probOutput_add_probFailure [HasEvalSPMF m] (mx : m α) :
     (∑' x, Pr[= x | mx]) + Pr[⊥ | mx] = 1 := by

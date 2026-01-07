@@ -52,7 +52,7 @@ it respects the `bind` and `pure` operations in the underlying monad. -/
 
 @[inherit_doc] infixr:25 " →ᵐ " => MonadHom
 
-attribute [simp] MonadHom.toFun_pure' MonadHom.toFun_bind'
+attribute [simp, grind =] MonadHom.toFun_pure' MonadHom.toFun_bind'
 
 /-- `f mx` notation for `NatHom m n` applied to an element of `m α`, with implicit `α` inferred. -/
 instance {m : Type u → Type v} [Pure m] [Bind m] {n : Type u → Type w} [Pure n] [Bind n] :
@@ -131,13 +131,11 @@ variable {m : Type u → Type v} [Monad m]
 @[ext] protected def ext' {F G : m →ᵐ n}
     (h : ∀ α (x : m α), F x = G x) : F = G := by aesop
 
-@[simp] lemma mmap_pure (F : m →ᵐ n) (x : α) : F (pure x) = pure x :=
-  MonadHom.toFun_pure' F x
+@[simp] lemma mmap_pure (F : m →ᵐ n) (x : α) : F (pure x) = pure x := by grind
 
 -- dt: should we be using `F ∘ my`?
 @[simp] lemma mmap_bind (F : m →ᵐ n) (mx : m α) (my : α → m β) :
-    F (mx >>= my) = F mx >>= fun x => F (my x) :=
-  MonadHom.toFun_bind' F mx my
+    F (mx >>= my) = F mx >>= fun x => F (my x) := by grind
 
 @[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
     (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by

@@ -3,14 +3,59 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Monad.Basic
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Evaluation Distributions of Computations with `seq`
 
-File for lemmas about `evalDist` and `support` involving the monadic `seq`.
+File for lemmas about `evalDist` and `support` involving the monadic `seq`, `seqLeft`,
+and `seqRight` operations.
+
+TODO: many lemmas should probably have mirrored versions for `bind_map`.
 -/
 
+universe u v w
+
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
+
+open ENNReal
+
+section seq
+
+@[simp] lemma support_seq [HasEvalSet m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+    support (mf <*> mx) = ⋃ f ∈ support mf, f '' support mx := by
+  simp [seq_eq_bind_map]
+
+@[simp] lemma finSupport_seq [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
+    [DecidableEq (α → β)] [DecidableEq α] [DecidableEq β]
+    (mf : m (α → β)) (mx : m α) :
+    finSupport (mf <*> mx) = (finSupport mf).biUnion fun f => (finSupport mx).image f := by
+  simp [seq_eq_bind_map]
+
+@[simp] lemma evalDist_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+    evalDist (mf <*> mx) = evalDist mf <*> evalDist mx := by simp [seq_eq_bind_map]
+
+-- @[simp] lemma
+
+end seq
+
+section seqLeft
+
+@[simp] lemma support_seqLeft [HasEvalSet m] [LawfulMonad m]
+    (mx : m α) (my : m β) [Decidable (support my).Nonempty] :
+    support (mx <* my) = if (support my).Nonempty then support mx else ∅ := by
+  rw [seqLeft_eq, Set.ext_iff]; aesop
+
+end seqLeft
+
+section seqRight
+
+@[simp] lemma support_seqRight [HasEvalSet m] [LawfulMonad m]
+    (mx : m α) (my : m β) [Decidable (support mx).Nonempty] :
+    support (mx *> my) = if (support mx).Nonempty then support my else ∅ := by
+  rw [seqRight_eq, Set.ext_iff]; aesop
+
+end seqRight
 
 -- universe u v w
 

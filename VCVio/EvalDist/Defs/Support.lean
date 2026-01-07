@@ -31,7 +31,7 @@ def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
   HasEvalSet.toSet.toFun _ mx
 
 -- dtumad: not sure if this should actually be in the ruleset?
-@[aesop norm (rule_sets := [UnfoldEvalDist])]
+@[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
     support mx = HasEvalSet.toSet.toFun _ mx := rfl
 
@@ -42,7 +42,7 @@ lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
 /-- The support of a `SetM` computation is the resulting set. -/
 instance : HasEvalSet SetM where toSet := MonadHom.id SetM
 
-@[simp] lemma SetM.support_eq (x : SetM α) : support x = x.run := rfl
+@[simp, grind =] lemma SetM.support_eq (x : SetM α) : support x = x.run := rfl
 
 /-- The monad `m` can be evaluated to get a finite set of possible outputs.
 We restrict to the case of decidable equality of the output type, so `Finset.biUnion` exists.
@@ -54,38 +54,33 @@ class HasEvalFinset (m : Type u → Type v) [Monad m] [HasEvalSet m] where
 
 export HasEvalFinset (finSupport coe_finSupport)
 
-attribute [simp] coe_finSupport
+attribute [simp, grind =] coe_finSupport
 
+@[grind =]
 lemma mem_finSupport_iff_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (x : α) : x ∈ finSupport mx ↔ x ∈ support mx := by
   rw [← Finset.mem_coe, coe_finSupport]
 
 lemma finSupport_eq_iff_support_eq_coe [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    (mx : m α) (s : Finset α) : finSupport mx = s ↔ support mx = ↑s := by
-  rw [← Finset.coe_inj, coe_finSupport]
+    (mx : m α) (s : Finset α) : finSupport mx = s ↔ support mx = ↑s := by grind
 
 @[aesop unsafe 60% apply]
 lemma finSupport_eq_of_support_eq_coe [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {s : Finset α} (h : support mx = ↑s) : finSupport mx = s := by
-  rwa [finSupport_eq_iff_support_eq_coe]
+    {mx : m α} {s : Finset α} (h : support mx = ↑s) : finSupport mx = s := by grind
 
 @[aesop unsafe 85% apply]
 lemma mem_finSupport_of_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {x : α} (h : x ∈ support mx) : x ∈ finSupport mx := by
-  rwa [← Finset.mem_coe, coe_finSupport]
+    {mx : m α} {x : α} (h : x ∈ support mx) : x ∈ finSupport mx := by grind
 
 lemma mem_support_of_mem_finSupport [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {x : α} (h : x ∈ finSupport mx) : x ∈ support mx := by
-  rwa [← Finset.mem_coe, coe_finSupport] at h
+    {mx : m α} {x : α} (h : x ∈ finSupport mx) : x ∈ support mx := by grind
 
 @[aesop unsafe 85% apply]
 lemma not_mem_finSupport_of_not_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {x : α} (h : x ∉ support mx) : x ∉ finSupport mx := by
-  rwa [← Finset.mem_coe, coe_finSupport]
+    {mx : m α} {x : α} (h : x ∉ support mx) : x ∉ finSupport mx := by grind
 
 lemma not_mem_support_of_not_mem_finSupport [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
-    {mx : m α} {x : α} (h : x ∉ finSupport mx) : x ∉ support mx := by
-  rwa [← Finset.mem_coe, coe_finSupport] at h
+    {mx : m α} {x : α} (h : x ∉ finSupport mx) : x ∉ support mx := by grind
 
 end support
 
@@ -98,14 +93,13 @@ variable (p : Prop) [Decidable p]
     finSupport (if p then mx else mx') = if p then finSupport mx else finSupport mx' := by aesop
 
 lemma support_eqRec [HasEvalSet m] (h : α = β) (mx : m α) :
-    support (h ▸ mx : m β) = h ▸ support mx := by induction h; rfl
+    support (h ▸ mx : m β) = h ▸ support mx := by grind
 
 -- dtumad: this is not really useful in this form very often...
 lemma finSupport_eqRec {m} [hm : Monad m] [hms : HasEvalSet m] [hmfs : HasEvalFinset m]
     [hα : DecidableEq α] (h : α = β) (mx : m α) :
     (@finSupport m hm hms hmfs β (h ▸ hα) (h ▸ mx : m β) : Finset β) =
-      (h ▸ (@finSupport m hm hms hmfs α hα mx : Finset α) : Finset β) := by
-  induction h; rfl
+      (h ▸ (@finSupport m hm hms hmfs α hα mx : Finset α) : Finset β) := by grind
 
 section decidable
 

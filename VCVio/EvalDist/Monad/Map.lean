@@ -12,10 +12,30 @@ File for lemmas about `evalDist` and `support` involving the monadic `map`.
 
 Note: we focus on lemmas that don't hold naively when reducing `<$>` to `>>=` using monad laws,
 since `map_eq_bind_pure_comp` can be applied to use `bind` lemmas fairly easily.
-In particular we focus on the case of `f <$> mx` for injective `f`, which is the most common case.
+Instead we focus on the cases like `f <$> mx` for injective `f`, which allow stronger statements.
 
-Most lemmas that exist here should probably be mirrored elsewhere.
+TODO: many lemmas should probably have mirrored `bind_pure` versions.
 -/
+
+universe u v w
+
+variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
+
+open ENNReal
+
+@[simp] lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
+    support (f <$> mx) = f '' support mx := by aesop (rule_sets := [UnfoldEvalDist])
+
+@[simp] lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
+    [DecidableEq α] [DecidableEq β]
+    (f : α → β) (mx : m α) : finSupport (f <$> mx) = (finSupport mx).image f := by
+  grind [map_eq_bind_pure_comp]
+
+@[simp] lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
+    evalDist (f <$> mx) = f <$> (evalDist mx) := by simp [map_eq_bind_pure_comp]
+
+@[simp] lemma evalDist_comp_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) :
+    evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> evalDist mx := by aesop
 
 
 -- variable (oa : OracleComp spec α) (f : α → β)

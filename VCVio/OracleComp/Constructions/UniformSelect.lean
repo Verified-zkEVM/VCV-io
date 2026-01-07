@@ -22,6 +22,21 @@ universe u v w
 
 namespace OracleComp
 
+section uniformFin
+
+@[simp] lemma support_uniformFin (n : ℕ) :
+    support ($[0..n]) = Set.univ := by
+  rw [uniformFin_def]
+
+  grind
+
+end uniformFin
+
+section uniformRange
+
+
+end uniformRange
+
 section uniformSelect
 
 /-- Typeclass to implement the notation `$ xs` for selecting an object uniformly from a collection.
@@ -63,6 +78,7 @@ variable {α : Type} [Inhabited α]
 @[simp] lemma uniformSelectList_nil :
     ($ ([] : List α) : OptionT ProbComp α) = liftM $[0..0] *> failure := by
   simp [hasUniformSelectList]
+
   rfl
 
 -- lemma uniformSelectList_cons (x : α) (xs : List α) :
@@ -423,6 +439,7 @@ instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
     exact False.elim (IsEmpty.false i)
   | succ p ih =>
     simp at *
+    stop
     use Vector.ofFn (x 0), (Fin.tail x); constructor
     simp [ih]
     have : (Vector.ofFn (x 0)).get = x 0 := by

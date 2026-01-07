@@ -14,11 +14,19 @@ This file defines various instances of evaluation semantics for different monads
 
 universe u v w
 
+variable {α β γ : Type u}
+
+namespace SetM
+
+/-- Enable `support` notation for `SetM`. -/
+instance : HasEvalSet SetM where
+  toSet := MonadHom.id SetM
+
+end SetM
+
 namespace SPMF
 
-variable {α}
-
-/-- Evaluate a `SPMF` to itself via identity. Mostly exists to give notation access. -/
+/-- Enable probability notation for `SPMF`, using identity as the `SPMF` embedding. -/
 instance : HasEvalSPMF SPMF where
   toSet := SPMF.support
   toSPMF := MonadHom.id SPMF
@@ -28,7 +36,7 @@ protected lemma evalDist_def (p : SPMF α) : evalDist p = p := rfl
 
 protected lemma support_def (p : SPMF α) : support p = SPMF.support p := rfl
 
-@[simp] lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
+lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
 lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
     evalDist mx = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
@@ -37,18 +45,7 @@ end SPMF
 
 namespace PMF
 
-/-- We define this seperately -/
-instance hasEvalSet : HasEvalSet PMF where
-  toSet := {
-    toFun _ := PMF.support
-    toFun_pure' := by simp
-    toFun_bind' := by simp
-  }
-
-lemma support_def {α} (p : PMF α) : _root_.support p = p.support := rfl
-
-/-- Evaluate a `PMF` to itself via identity. Mostly exists to give notation access.
-Note: this requires `SPMF` to avoid circular type-class search. -/
+/-- Enable probability notation for `PMF`, using lift as the `SPMF` embedding. -/
 noncomputable instance : HasEvalPMF PMF where
   toSPMF := PMF.toSPMF'
   toPMF := MonadHom.id PMF
@@ -59,32 +56,20 @@ end PMF
 
 namespace Id
 
-variable {α}
-
 /-- The support of a computation in `Id` is the result being returned. -/
 noncomputable instance : HasEvalPMF Id where
   toSet := MonadHom.pure SetM
   toSPMF := MonadHom.pure SPMF
   toPMF := MonadHom.pure PMF
   support_eq mx := by
-    simp [support]
-  toSPMF_eq mx := by
-    simp
-
-    sorry
-
--- @[simp] lemma support_eq (x : Id α) : support x = {x.run} := rfl
+    simp [Set.ext_iff, support, SPMF.apply_eq_run_some]
+  toSPMF_eq mx := sorry
 
 instance : HasEvalFinset Id where
   finSupport x := {x}
   coe_finSupport x := by simp; sorry
 
 end Id
-
-namespace OptionT
-
-
-end OptionT
 
 section hasEvalSet_of_hasEvalSPMF
 
@@ -103,10 +88,6 @@ instance hasEvalSet_of_hasEvalSPMF {m : Type u → Type v} [Monad m]
 lemma support_of_hasEvalSPMF_def  (mx : m α) :
     support mx = SPMF.support (HasEvalSPMF.toSPMF mx) := by
   simp [support, hasEvalSet_of_hasEvalSPMF]
-
--- instance [HasEvalSet.Decidable m] (mx : m α) :
---     DecidablePred (Pr[= · | mx] = 0) := sorry
-
 
 instance decidablePred_probOutput_eq_zero [HasEvalSet.Decidable m] :
     DecidablePred (Pr[= · | mx] = 0) := by
