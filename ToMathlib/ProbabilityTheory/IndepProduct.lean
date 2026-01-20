@@ -35,6 +35,7 @@ class ProbabilitySpace (Ω : Type*) extends MeasureSpace Ω where
 
 def ProbabilitySpace.σAlg [P : ProbabilitySpace Ω] : MeasurableSpace Ω :=
   ProbabilitySpace.toMeasureSpace.toMeasurableSpace
+  
 def ProbabilitySpace.μ [P : ProbabilitySpace Ω] : Measure[P.σAlg] Ω :=
   ProbabilitySpace.toMeasureSpace.volume
 

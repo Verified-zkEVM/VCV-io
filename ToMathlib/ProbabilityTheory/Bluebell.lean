@@ -251,218 +251,132 @@ noncomputable section
 
 section
 
-open ProbabilityTheory MeasureTheory
+open ProbabilityTheory MeasureTheory Function
 
-#check IsProbabilityMeasure
+universe u
 
-open Function in
-@[ext]structure MeasureOnSpace (α : Type*) extends OuterMeasure α where
-  measurableSpace : MeasurableSpace α
-  m_iUnion ⦃f : ℕ → Set α⦄ :
-    (∀ i, MeasurableSet (f i)) →
-    Pairwise (Disjoint on f) →
-    toOuterMeasure (⋃ i, f i) = ∑' i, toOuterMeasure (f i)
-  trim_le : toOuterMeasure.trim ≤ toOuterMeasure
+variable {Ω : Type u}
+         {ms₁ ms₂ : MeasurableSpace Ω}
+         {μ₁ : Measure[ms₁] Ω} {μ₂ : Measure[ms₂] Ω}
 
-def MeasureOnSpace.toMeasure (ms' : MeasureOnSpace Ω) : (@Measure Ω ms'.measurableSpace) :=
-  let _ := ms'.measurableSpace
-  ⟨ms'.toOuterMeasure, ms'.m_iUnion, ms'.trim_le⟩
+namespace MeasureTheory
 
-def ofMeasure [ms : MeasurableSpace Ω] (μ : Measure Ω) : MeasureOnSpace Ω :=
-  ⟨μ.toOuterMeasure, ms, μ.m_iUnion, μ.trim_le⟩
-
-def MeasureOnSpace.σAlg (M : MeasureOnSpace Ω) : MeasurableSpace Ω := M.measurableSpace
-def MeasureOnSpace.μ (M : MeasureOnSpace Ω) : Measure[M.σAlg] Ω := M.toMeasure
-
-#check MeasureSpace.indepProduct
-open Classical in
-/-- The partial operation of independent product on `MeasureSpace`s, when it exists -/
-def MeasureOnSpace.indepProduct (m₁ m₂ : MeasureOnSpace Ω) :
-  Option (MeasureOnSpace Ω)
-:=
-  if h :
-    ∃ μ : Measure[MeasurableSpace.sum m₁.measurableSpace m₂.measurableSpace] Ω,
-      ∀ (X Y : Set Ω)
-        (_ : MeasurableSet[m₁.measurableSpace] X)
-        (_ : MeasurableSet[m₂.measurableSpace] Y),
-          μ (X ∩ Y) = m₁.toMeasure X * m₂.toMeasure Y
-  then some (@ofMeasure Ω (m₁.σAlg.sum m₂.σAlg) (Classical.choose h))
-  else none
-
-noncomputable def MeasureOnSpace.ofPMF [MeasurableSpace Ω] (pmf : PMF Ω) : MeasureOnSpace Ω :=
-  ofMeasure pmf.toMeasure
-
-def MeasureOnSpace.map (f : α → β) (M : MeasureOnSpace α) : MeasureOnSpace β :=
-  let _ := M.σAlg
-  let _ := M.σAlg.map f
-  let m := M.toMeasure.map f
-  ofMeasure m
-
-instance [inst : Nonempty Ω] : One (MeasureOnSpace Ω) where
-  one :=
-    let _ : MeasurableSpace Ω := ⊥
-    let measure := Measure.dirac (Classical.choice inst)
-    ofMeasure measure
-
-instance (Ω : Type*) : Preorder (MeasureOnSpace Ω) where
-  -- Stolen from instPreorderProbabilitySpace
-  le m₁ m₂ := (m₁.σAlg ≤ m₂.σAlg) ∧ m₁.μ = (@Measure.map _ _ m₂.σAlg m₁.σAlg id m₂.μ)
-  le_refl := by simp only [LE.le, imp_self, implies_true, Measure.map_id, and_self]
-  le_trans := by
-    rintro ⟨ℱ₁, μ₁, _⟩ ⟨ℱ₂, μ₂, _⟩ ⟨ℱ₃, μ₃, _⟩ ⟨hℱ₁₂, hμ₁₂⟩ ⟨hℱ₂₃, hμ₂₃⟩
-    simp_all
-    refine ⟨le_trans hℱ₁₂ hℱ₂₃, ?_⟩
-    · rw [Measure.map_map] <;> aesop
-
-example [inst : Nonempty Ω] :
-  (1 : MeasureOnSpace Ω).indepProduct 1 = (1 : MeasureOnSpace Ω)
-:= by
-  unfold_projs
-  unfold MeasureOnSpace.indepProduct
-  split
-  next h =>
-    congr 1
-    simp only [bot_eq_false] at h ⊢
-    simp only [Measure.dirac, OuterMeasure.dirac, ofMeasure, toMeasure_toOuterMeasure,
-      MeasureOnSpace.σAlg, MeasureOnSpace.mk.injEq] at h ⊢
-    constructor
-    · simp [
-        MeasureOnSpace.μ,
-        ofMeasure,
-        MeasureOnSpace.toMeasure,
-        MeasurableSpace.sum,
-        MeasurableSpace.generateFrom,
-        Measure.toOuterMeasure
-        ] at h ⊢
-      let μ' := Classical.choose h
-      let h' := Classical.choose_spec h
-      ext X
-      unfold OuterMeasure.trim
-      by_cases h₀ : @MeasurableSet Ω ⊥ X
-      · specialize h' X Set.univ h₀ (by simp)
-        have : X ∩ Set.univ = X := by simp
-        rw [this] at h'
-        simp only [Measure.coe_toOuterMeasure]
-        rw [h']
-        rw [@measure_eq_inducedOuterMeasure]
-        unfold inducedOuterMeasure OuterMeasure.ofFunction
-        simp
-        -- have := @OuterMeasure.map_apply
-        unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal Measure.instFunLike
-        unfold_projs
-        simp
-        split
-        · expose_names
-          unfold DFunLike.coe OuterMeasure.instFunLikeSetENNReal at heq
-          simp only at heq
-          sorry
-        · sorry
-        · sorry
-        · sorry
-      · sorry
-    · simp [MeasurableSpace.sum]
-      unfold MeasurableSet
-      unfold_projs
-      nth_rw 1 [Bot.bot, OrderBot.toBot, GaloisConnection.liftOrderBot]
-      dsimp
-      unfold MeasurableSpace.generateFrom
-      dsimp
-      sorry
-      -- simp [MeasurableSpace.measurableSet_bot_iff]
-      -- rw [MeasurableSpace.generateFrom_empty]
-    -- simp [Measure.dirac, OuterMeasure.dirac]
-    -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
-    -- simp only [Set.bot_eq_empty]
-    -- simp
-    -- rw [←Set.empty_def]
-    -- simp only [MeasurableSpace.generateFrom_empty]
-    -- -- simp [OrderBot.mk]
-    -- constructor
-    -- · unfold MeasurableSet
-    --   simp [Set.union]
-    --   -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
-    --   -- simp only [bot_eq_false]
-    --   -- simp only [MeasurableSpace.generateFrom]
-    -- · sorry
-    --   grind
-    -- congr
-    -- unfold MeasurableSet
-    -- unfold_projs
-    -- -- unfold Bot.bot OrderBot.toBot GaloisConnection.liftOrderBot
-    -- unfold_projs
-    -- -- simp only [MeasurableSpace.MeasurableSet']
-    -- -- simp only [MeasurableSpace.generateFrom]
-    -- simp at h
-
-    -- done
-  next h => sorry
-
-#check MeasurableSpace.MeasurableSet'
-
-abbrev PSp (Ω : Type*) := WithTop (MeasureOnSpace Ω)
-
-instance [inst : Nonempty Ω] : One (PSp Ω) where
-  one := some One.one
+structure Measure.IndependentProduct
+  (μ₁ : Measure[ms₁] Ω) (μ₂ : Measure[ms₂] Ω) : Type u where
+  μ : Measure[MeasurableSpace.sum ms₁ ms₂] Ω
+  inter_eq_prod {X Y} (hX : MeasurableSet[ms₁] X) (hY : MeasurableSet[ms₂] Y) :
+    μ (X ∩ Y) = μ₁ X * μ₂ Y
 
 @[simp]
-instance : Valid (PSp Ω) where
-  valid := fun x => match x with | some _ => True | none => False
+lemma Measure.nonempty_IndependentProduct_of_nonempty [Nonempty Ω] :
+  Nonempty (μ₁.IndependentProduct μ₂) := sorry
 
-#check ProbabilitySpace.indepProduct
-variable [MeasurableSpace Ω]
-#synth Max (Measure Ω)
+def MeasurableSpace.independentProduct (ms₁ ms₂ : MeasurableSpace Ω) : MeasurableSpace Ω :=
+  MeasurableSpace.generateFrom (MeasurableSet[ms₁] ∪ MeasurableSet[ms₂])
 
-#check Measure.prod_prod
-#check MeasurableSpace.prod
-#check Measure.IndependentProduct.inter_eq_prod
--- #synth HMul (ProbabilitySpace Ω)
+end MeasureTheory
+
+structure MeasureOnSpace (Ω : Type u) where
+  ms : MeasurableSpace Ω
+  μ : Measure[ms] Ω
+
+def MeasureOnSpace.isPSpace (mos : MeasureOnSpace Ω) := IsProbabilityMeasure mos.μ
+
+instance : Decidable (Nonempty (μ₁.IndependentProduct μ₂)) := Classical.propDecidable _
+
+def MeasureTheory.Measure.independentProduct
+  (μ₁ : Measure[ms₁] Ω) (μ₂ : Measure[ms₂] Ω) : Option (MeasureOnSpace Ω) :=
+  if h : Nonempty (μ₁.IndependentProduct μ₂)
+  then .some ⟨ms₁.independentProduct ms₂, h.some.μ⟩
+  else .none
+
+def MeasureOnSpace.independentProduct {Ω : Type u}
+  (ms₁ ms₂ : MeasureOnSpace Ω) : Option (MeasureOnSpace Ω) := ms₁.μ.independentProduct ms₂.μ
+
+def PSpace (Ω : Type u) := {mos : MeasureOnSpace Ω // mos.isPSpace}
+
+@[simp]
+lemma PSpace.isPMeasure_measure {Ω : Type u} {ps : PSpace Ω} : IsProbabilityMeasure ps.1.μ := ps.2
+
+lemma isPMeasure_iProd_of_isPMesure_nonempty
+  {mos₁ mos₂ : MeasureOnSpace Ω}
+  (h₁ : IsProbabilityMeasure mos₁.μ) (h₂ : IsProbabilityMeasure mos₂.μ) :
+  (mos₁.independentProduct mos₂).elim True MeasureOnSpace.isPSpace := sorry
+
+def PSpace.independentProduct (ps₁ ps₂ : PSpace Ω) : Option (PSpace Ω) :=
+  (ps₁.1.independentProduct ps₂.1).attach.map fun ⟨mos, hmos⟩ ↦ by
+  have := hmos ▸ isPMeasure_iProd_of_isPMesure_nonempty (by simp) (by simp)
+  exact ⟨mos, this⟩
 
 end
 
+instance [ne : Nonempty Ω] : One (PSpace Ω) where
+  one := haveI : MeasurableSpace Ω := ⊥
+         letI measure := MeasureTheory.Measure.dirac ne.some
+         ⟨⟨this, measure⟩, MeasureTheory.Measure.dirac.isProbabilityMeasure⟩
+
+section Wheels
+
+namespace MeasureTheory
+
+@[simp]
+abbrev Measure.map! (ms₁ : MeasurableSpace α) (ms₂ : MeasurableSpace β)
+                    (f : α → β) (μ : Measure α) : Measure β := @μ.map _ _ ms₁ ms₂ f
+
+@[simp]
+abbrev Measure.cast {β : Type u} {ms₁ : MeasurableSpace β}
+  (μ : Measure β) (ms₂ : MeasurableSpace β) := μ.map! ms₁ ms₂ id
+
+scoped notation "Measure[" mα "] " α:arg => @Measure α mα
+
+end MeasureTheory
+
+end Wheels
+
+instance (Ω : Type*) : Preorder (PSpace Ω) where
+  le (ps₁ ps₂) := (ps₁.1.ms ≤ ps₂.1.ms) ∧ ps₁.1.μ = ps₂.1.μ.cast _
+  le_refl := by simp
+  le_trans {a b c} (h₁ h₂) := by
+    aesop (add safe forward le_trans) (add safe (by rw [MeasureTheory.Measure.map_map]))
+
+abbrev PSp (Ω : Type u) := WithTop (PSpace Ω)
+
+instance : Valid (PSp Ω) where
+  valid {ms?} := ms?.isSome
+
 instance : Mul (PSp Ω) where
-  mul := fun x y => match x, y with
-    | some x, some y => x.indepProduct y
-    | _, _ => none
+  mul {x y} := 
+  match x, y with
+  | .some x, .some y => x.independentProduct y
+  | .none, .some _ | .some _, .none | .none, .none => .none
 
-open Mathlib in
-instance [inst : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
-  one_mul p := by
+open MeasureTheory MeasurableSpace in
+instance [ne : Nonempty Ω] : OrderedUnitalResourceAlgebra (PSp Ω) where
+  one_mul (p) := by
     unfold_projs
-    simp
-    split
-    · expose_names
-      injection heq with heq
-      subst heq
-      -- rcases y_1 with ⟨om, ms, h₁, h₂⟩
-      unfold MeasureOnSpace.indepProduct
-      split
-      · expose_names
-        congr
-        ext
-        next z =>
-          skip
-          unfold ofMeasure
-          -- unfold MeasureOnSpace.μ MeasureOnSpace.toMeasure
-          simp
-          -- simp [Measure.IndependentProduct.inter_eq_prod]
-
-          -- unfold Measure.dirac OuterMeasure.dirac
-          -- rw [dirac_apply]
-          -- rw [← @OuterMeasure.measureOf_eq_coe]
-          sorry
-          done
-        · sorry
-      · sorry
-    · sorry
+    rcases p with _ | ⟨⟨ms, μ⟩, hp⟩
+    · simp
+    · simp only [
+        PSpace.independentProduct,
+        MeasureOnSpace.independentProduct,
+        MeasureTheory.Measure.independentProduct
+      ]
+      rw! [dif_pos (by simp)]
+      simp only [Option.attach_some, Option.map_some]
+      rw [Option.some_inj]
+      generalize_proofs _ _ _ _ bot ne
+      rcases ne with ⟨h₁, h₂⟩
+      congr
+      · ext elem
+        unfold independentProduct MeasurableSet MeasurableSet' -- Ugly.
+        rw [←MeasurableSpace.generateFrom_sup_generateFrom, sup_of_le_right sorry]
+        sorry
+      · sorry 
   valid := valid
   elim := sorry
-  valid_one := by simp
-  valid_mono := by
-    intro a b h h'; cases a <;> cases b <;> simp_all
-    have h' : (⊤ : PSp Ω) ≤ WithTop.some _ := h
-    contrapose! h'
-    simp
-  valid_mul := by intro a b hab; cases a <;> cases b <;> simp_all
+  valid_one := rfl
+  valid_mono := by sorry
+  valid_mul := by intro a b hab; cases a <;> cases b <;> sorry
 
 -- open ENNReal in
 -- def PMF.prod {Ω₁ Ω₂ : Type u}
@@ -494,13 +408,7 @@ lemma ProbabilitySpace.event_space_nonepmty {Ω : Type*} [instMeasurable : Measu
   (volume : Measure Ω)
   (is_prob : IsProbabilityMeasure volume) :
   Nonempty Ω
-:= by
-  have measure_univ := is_prob.1
-  simp only [DFunLike.coe] at measure_univ
-  have measure_ne_zero := ne_zero_of_eq_one measure_univ
-  have univ_nonempty := nonempty_of_measure_ne_zero measure_ne_zero
-  rcases univ_nonempty with ⟨x, _⟩
-  exact Nonempty.intro x
+:= Exists.nonempty (nonempty_of_measure_ne_zero (show volume.measureOf Set.univ ≠ 0 by aesop))
 
 -- lemma one_prod_one {Ω₁ Ω₂} [Nonempty Ω₁] [Nonempty Ω₂] :
 --   (1 : ProbabilitySpace Ω₁).prod (1 : ProbabilitySpace Ω₂) = (1 : ProbabilitySpace (Ω₁ × Ω₂))
