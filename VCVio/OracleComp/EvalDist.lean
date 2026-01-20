@@ -98,7 +98,7 @@ noncomputable instance : HasEvalPMF (OracleComp spec) where
 lemma evalDist_eq_simulateQ (mx : OracleComp spec α) :
     evalDist mx = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
 
-@[simp, grind =]
+@[simp low, grind =]
 lemma evalDist_liftM (q : OracleQuery spec α) :
     evalDist (liftM q : OracleComp spec α) =
       (PMF.uniformOfFintype (spec.Range q.input)).map q.cont := by
@@ -109,7 +109,7 @@ lemma evalDist_query (t : spec.Domain) :
     evalDist (liftM (query t) : OracleComp spec _) = PMF.uniformOfFintype (spec.Range t) := by
   simp [PMF.map_id]
 
-@[simp, grind =]
+@[simp low, grind =]
 lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
     Pr[= x | (liftM q : OracleComp spec α)] =
       (∑' u : spec.Range q.input, Pr[= x | (return q.cont u : OracleComp spec α)])
@@ -117,6 +117,7 @@ lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
   have : DecidableEq α := Classical.decEq α
   simp [probOutput_def, div_eq_mul_inv]
 
+@[grind =]
 lemma probEvent_liftM_eq_div (q : OracleQuery spec α) (p : α → Prop) :
     Pr[p | (liftM q : OracleComp spec α)] =
       (∑' u : spec.Range q.input, Pr[p | (return q.cont u : OracleComp spec α)])
@@ -133,6 +134,12 @@ lemma probOutput_query (t : spec.Domain) (u : spec.Range t) :
 @[grind =]
 lemma probOutput_query_eq_div (t : spec.Domain) (u : spec.Range t) :
     Pr[= u | (query t : OracleComp spec _)] = 1 / Fintype.card (spec.Range t) := by simp
+
+@[simp, grind =]
+lemma probEvent_query (t : spec.Domain) (p : spec.Range t → Prop) [DecidablePred p] :
+    Pr[p | (query t : OracleComp spec _)] =
+      Finset.card {x | p x} / Fintype.card (spec.Range t) := by
+  simp [probEvent_liftM_eq_div]
 
 end evalDist
 

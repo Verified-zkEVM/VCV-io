@@ -23,7 +23,7 @@ namespace QueryImpl
 two different contexts `ρ₁` and `ρ₂`, implement the combined set `spec₁ + spec₂` in terms
 of a combined `ρ₁ × ρ₂` state.
 dtumad: should we call this an addition or multiplication operation? -/
-def QueryImpl.addReaderT {ι₁ ι₂ : Type _}
+def addReaderT {ι₁ ι₂ : Type _}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {m : Type _ → Type _} {ρ₁ ρ₂ : Type _}
     (impl₁ : QueryImpl spec₁ (ReaderT ρ₁ m))
@@ -33,7 +33,7 @@ def QueryImpl.addReaderT {ι₁ ι₂ : Type _}
   | .inr t => ReaderT.mk fun s => (impl₂ t).run s.2
 
 /-- Indexed version of `QueryImpl.prodReader`. Note that `m` cannot vary with `t`. -/
-def QueryImpl.sigmaReaderT {τ : Type} {ι : τ → Type _}
+def sigmaReaderT {τ : Type} {ι : τ → Type _}
     {spec : (t : τ) → OracleSpec (ι t)}
     {m : Type _ → Type _} {ρ : τ → Type _}
     (impl : (t : τ) → QueryImpl (spec t) (ReaderT (ρ t) m)) :

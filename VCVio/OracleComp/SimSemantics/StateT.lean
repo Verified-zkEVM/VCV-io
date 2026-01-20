@@ -22,7 +22,7 @@ namespace QueryImpl
 /-- Given implementations for oracles in `spec₁` and `spec₂` in terms of state monads for
 two different contexts `σ₁` and `σ₂`, implement the combined set `spec₁ + spec₂` in terms
 of a combined `σ₁ × σ₂` state. -/
-def QueryImpl.prodStateT {ι₁ ι₂ : Type _}
+def prodStateT {ι₁ ι₂ : Type _}
     {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
     {m : Type _ → Type _} [Functor m] {σ₁ σ₂ : Type _}
     (impl₁ : QueryImpl spec₁ (StateT σ₁ m))
@@ -33,7 +33,7 @@ def QueryImpl.prodStateT {ι₁ ι₂ : Type _}
 
 /-- Indexed version of `QueryImpl.prodStateT`. Note that `m` cannot vary with `t`.
 dtumad: The `Function.update` thing is nice but forces `DecidableEq`. -/
-def QueryImpl.piStateT {τ : Type} [DecidableEq τ] {ι : τ → Type _}
+def piStateT {τ : Type} [DecidableEq τ] {ι : τ → Type _}
     {spec : (t : τ) → OracleSpec (ι t)}
     {m : Type _ → Type _} [Monad m] {σ : τ → Type _}
     (impl : (t : τ) → QueryImpl (spec t) (StateT (σ t) m)) :

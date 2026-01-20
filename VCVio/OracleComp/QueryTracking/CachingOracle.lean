@@ -43,7 +43,7 @@ def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache
 end QueryImpl
 
 @[inline, reducible] def randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
-    [∀ t : spec.Domain, SampleableType (spec.Range t)] :
+    [∀ t : spec.Domain, ProbComp.SampleableType (spec.Range t)] :
     QueryImpl spec (StateT spec.QueryCache ProbComp) :=
   uniformSampleImpl.withCaching
 

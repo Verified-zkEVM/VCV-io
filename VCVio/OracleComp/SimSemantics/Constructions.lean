@@ -4,8 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import VCVio.OracleComp.Constructions.UniformSelect
-import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Basic Constructions of Simulation Oracles
@@ -96,7 +95,7 @@ variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 /-- Simulation oracle for replacing queries with uniform random selection, using `unifSpec`.
 The resulting computation is still identical under `evalDist`.
 The relevant `OracleSpec` can usually be inferred automatically, so we leave it implicit. -/
-def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
+def uniformSampleImpl [∀ i, ProbComp.SampleableType (spec.Range i)] :
     QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
 
 -- namespace unifOracle

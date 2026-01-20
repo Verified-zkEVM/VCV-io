@@ -131,13 +131,13 @@ variable {m : Type u → Type v} [Monad m]
 @[ext] protected def ext' {F G : m →ᵐ n}
     (h : ∀ α (x : m α), F x = G x) : F = G := by aesop
 
-@[simp] lemma mmap_pure (F : m →ᵐ n) (x : α) : F (pure x) = pure x := by grind
+@[simp, grind =] lemma mmap_pure (F : m →ᵐ n) (x : α) : F (pure x) = pure x := by grind
 
 -- dt: should we be using `F ∘ my`?
-@[simp] lemma mmap_bind (F : m →ᵐ n) (mx : m α) (my : α → m β) :
+@[simp, grind =] lemma mmap_bind (F : m →ᵐ n) (mx : m α) (my : α → m β) :
     F (mx >>= my) = F mx >>= fun x => F (my x) := by grind
 
-@[simp] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
+@[simp, grind =] lemma mmap_map [LawfulMonad m] [LawfulMonad n] (F : m →ᵐ n)
     (x : m α) (g : α → β) : F (g <$> x) = g <$> F x := by
   simp [map_eq_bind_pure_comp]
 
@@ -160,7 +160,7 @@ def ofLift (m : Type u → Type v) (n : Type u → Type w) [Monad m] [Monad n]
   toFun_pure' := by simp
   toFun_bind' := by simp
 
-@[simp] lemma ofLift_apply [MonadLiftT m n] [LawfulMonadLiftT m n] {α : Type u} (x : m α) :
+@[simp, grind =] lemma ofLift_apply [MonadLiftT m n] [LawfulMonadLiftT m n] {α : Type u} (x : m α) :
     ofLift m n x = liftM x := rfl
 
 /-- The identity morphism between a monad and itself. -/
@@ -169,7 +169,7 @@ def id (m : Type u → Type v) [Monad m] : m →ᵐ m where
   toFun_pure' _ := by simp
   toFun_bind' _ _ := by simp
 
-@[simp] lemma id_apply (mx : m α) : MonadHom.id m mx = mx := rfl
+@[simp, grind =] lemma id_apply (mx : m α) : MonadHom.id m mx = mx := rfl
 
 /-- Compose two `MonadHom`s together by applying them in sequence. -/
 protected def comp (G : n →ᵐ n') (F : m →ᵐ n) : m →ᵐ n' where
@@ -179,13 +179,14 @@ protected def comp (G : n →ᵐ n') (F : m →ᵐ n) : m →ᵐ n' where
 
 infixr:90 " ∘ₘ "  => MonadHom.comp
 
-@[simp] lemma comp_apply (G : n →ᵐ n') (F : m →ᵐ n) (x : m α) :
+@[simp, grind =] lemma comp_apply (G : n →ᵐ n') (F : m →ᵐ n) (x : m α) :
     (G ∘ₘ F) x = G (F x) := rfl
 
-@[simp] lemma comp_id (F : m →ᵐ n) : F.comp (MonadHom.id m) = F := by aesop
+@[simp, grind =] lemma comp_id (F : m →ᵐ n) : F.comp (MonadHom.id m) = F := by aesop
 
-@[simp] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by aesop
+@[simp, grind =] lemma id_comp (F : m →ᵐ n) : (MonadHom.id n).comp F = F := by aesop
 
+@[grind =]
 lemma comp_assoc (H : n' →ᵐ n'') (G : n →ᵐ n') (F : m →ᵐ n) :
     (H ∘ₘ G) ∘ₘ F = H ∘ₘ (G ∘ₘ F) := by aesop
 
@@ -195,7 +196,7 @@ protected def pure (m) [Monad m] [LawfulMonad m] : Id →ᵐ m where
   toFun_pure' x := by simp
   toFun_bind' mx my := by simp
 
-@[simp] lemma pure_apply (m) [Monad m] [LawfulMonad m] (x : Id α) :
+@[simp, grind =] lemma pure_apply (m) [Monad m] [LawfulMonad m] (x : Id α) :
     MonadHom.pure m x = pure x.run := rfl
 
 end MonadHom

@@ -20,10 +20,6 @@ def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) :
     Type w → Type (max u v w) :=
   PFunctor.FreeM spec.toPFunctor
 
-/-- Simplified notation for computations with no oracles besides random inputs.
-This specific case can be used with `#eval` to run a random program, see `OracleComp.runIO`. -/
-abbrev ProbComp : Type → Type := OracleComp unifSpec
-
 variable {α β γ : Type v} {ι} {spec : OracleSpec.{u,v} ι}
 
 namespace OracleComp
@@ -55,35 +51,6 @@ protected lemma liftM_def (q : OracleQuery spec α) :
   query (spec := coinSpec) ()
 
 lemma coin_def : coin = query (spec := coinSpec) () := rfl
-
-/-- `$[0..n]` is the computation choosing a random value in the given range, inclusively.
-By making this range inclusive we avoid the case of choosing from the empty range. -/
-@[reducible, inline] def uniformFin (n : ℕ) : ProbComp (Fin (n + 1)) :=
-  query (spec := unifSpec) n
-
-notation "$[0.." n "]" => uniformFin n
-
-lemma uniformFin_def (n : ℕ) : $[0..n] = query (spec := unifSpec) n := rfl
-
-/-- Select uniformly from a non-empty range. The notation attempts to derive `h` automatically. -/
-@[reducible, inline] def uniformRange (n m : ℕ) (h : n < m) :
-    ProbComp (Fin (m + 1)) :=
-  (fun ⟨x, hx⟩ => ⟨x + n, by omega⟩) <$> $[0..(m - n)]
-
-/-- Tactic to attempt to prove `uniformRange` decreasing bound, similar to array indexing. -/
-syntax "uniform_range_tactic" : tactic
-macro "uniform_range_tactic" : tactic => `(tactic | trivial)
-macro "uniform_range_tactic" : tactic => `(tactic | get_elem_tactic)
-
-/-- Select uniformly from a range of numbers. Attempts to use `get-/
-notation "$[" n "⋯" m "]" => uniformRange n m (by uniform_range_tactic)
-
-lemma uniformRange_def (n m : ℕ) (h : n < m) : $[n⋯m] = uniformRange n m h := rfl
-
-example {m n : ℕ} (h : m < n) : ProbComp ℕ := do
-  let x ← $[314⋯31415]; let y ← $[0⋯10] -- Prove by trivial reduction
-  let z ← $[m⋯n] -- Use value from hypothesis
-  return x + 2 * y
 
 protected lemma pure_def (x : α) :
     (pure x : OracleComp spec α) = PFunctor.FreeM.pure x := rfl

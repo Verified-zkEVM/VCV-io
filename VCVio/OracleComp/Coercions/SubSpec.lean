@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Coercions Between Computations With Additional Oracles

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.ExecutionMethod
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
 
 /-!

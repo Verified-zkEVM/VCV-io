@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.AlternativeMonad
-import VCVio.EvalDist.Monad.Basic
+import VCVio.EvalDist.Monad.Seq
 
 /-!
 # Computations that Never Fail
@@ -14,28 +14,18 @@ This file defines a predicate-as-typeclass stating that a probabilistic computat
 produces failure mass, together with lemmas for how the property behaves under common
 monadic combinators.
 
-Definitions are given relative to a canonical embedding `evalDist : m →ᵐ SPMF` provided by
-`[HasEvalSPMF m]`. We write
+Given a `HasEvalSPMF m` instance and a computation `mx : m α` in that monad, `NeverFail mx` means
+that `Pr[⊥ | mx] = 0`, i.e. that the computation never fails.
 
-  `Pr[⊥ | mx] := (evalDist mx).run none`
+Defined as a typeclass to allow it to be synthesized automatically in certain cases.
+However we don't include any instances for `bind` as this blows up the search space.
+Instances involving `bind` should be added manually as needed.
 
-so “never fails” means exactly `Pr[⊥ | mx] = 0`.
-
-Design notes
-- We keep a thin `NeverFail` typeclass so that trivial cases synthesize automatically
-  (e.g. `pure`, `map`).
-- We do not register a `bind` instance. Instead, we provide two lemmas:
-  1) `bind_of_mem_support`: precise and recommended. It needs `neverFail (my x)` only for
-     `x ∈ support mx`.
-  2) `bind_of_forall`: stronger sufficient condition obtained by instantiating (1) with
-     a trivial restriction.
-- This avoids encoding term-dependent assumptions into typeclass search, while keeping
-  ergonomic instances for the easy cases.
+The existence of a `HasEvalPMF m` instance implies that `NeverFail mx` holds for any computaiton
+in the monad, since the `PMF` doesn't allow any probability of failing.
 -/
 
 universe u v w
-
-namespace HasEvalSPMF
 
 variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
@@ -58,19 +48,56 @@ class NeverFail {α : Type u} {m : Type u → Type v} [Monad m]
 export NeverFail (probFailure_eq_zero)
 
 attribute [simp] probFailure_eq_zero
+attribute [aesop safe apply] NeverFail.mk
 
-@[aesop safe forward]
+/-- Version of `probFailure_eq_zero` that avoids typeclass search. -/
 lemma probFailure_eq_zero' [HasEvalSPMF m]
     {mx : m α} (h : NeverFail mx) : Pr[⊥ | mx] = 0 :=
   NeverFail.probFailure_eq_zero
 
-lemma neverFail_iff {α : Type u} {m : Type u → Type v} [Monad m]
-    [HasEvalSPMF m] (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
+namespace HasEvalPMF
+
+/-- A computation in a monad with `HasEvalPMF` can't fail as outputs sum to probability `1`.  -/
+instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
+  probFailure_eq_zero := probFailure_eq_zero mx
+
+end HasEvalPMF
+
+namespace HasEvalSPMF
+
+variable [HasEvalSPMF m]
+
+@[grind =]
+lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
   ⟨by aesop, NeverFail.mk⟩
 
-namespace NeverFail
+@[simp]
+instance neverFail_pure (x : α) : NeverFail (pure x : m α) := by grind
 
-section spmf
+@[simp, grind =]
+lemma neverFail_bind_iff (mx : m α) (my : α → m β) :
+    NeverFail (mx >>= my) ↔ NeverFail mx ∧ ∀ x ∈ support mx, NeverFail (my x) := by
+  simp [neverFail_iff, probFailure_bind_eq_tsum, add_eq_zero]
+  grind
+
+@[simp, grind =]
+lemma neverFail_map_iff [LawfulMonad m] (mx : m α) (f : α → β) :
+    NeverFail (f <$> mx) ↔ NeverFail mx := by
+  grind [= map_eq_bind_pure_comp]
+
+end HasEvalSPMF
+
+namespace HasEvalSet
+
+@[simp]
+lemma not_neverFail_failure {m : Type u → Type v} [AlternativeMonad m]
+    [HasEvalSPMF m] [HasEvalSet.LawfulFailure m] :
+    ¬ NeverFail (failure : m α) := by
+  simp [HasEvalSPMF.neverFail_iff]
+
+end HasEvalSet
+
+namespace NeverFail
 
 variable [HasEvalSPMF m]
 
@@ -81,12 +108,10 @@ lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :
 If `mx` is a pure return, it never fails.
 This follows since `evalDist (pure x)` is the Dirac distribution on `some x`.
 -/
-@[simp]
+@[simp, grind .]
 instance instPure {x} : NeverFail (pure x : m α) where
   probFailure_eq_zero := by simp [probFailure]
 
--- set_option diagnostics true
--- set_option maxHeartbeats 1000000 in
 /--
 Precise bind lemma: if `mx` never fails and for all `x` in the support of `mx` the continuation
 `my x` never fails, then the whole bind never fails.
@@ -104,7 +129,7 @@ lemma bind_of_mem_support {mx : m α} {my : α → m β}
     NeverFail (mx >>= my) where
   probFailure_eq_zero := by
     simp [probFailure_bind_eq_tsum]
-    simp [neverFail_iff] at hy
+    simp [HasEvalSPMF.neverFail_iff] at hy
     tauto
 
 /--
@@ -121,41 +146,41 @@ lemma bind_of_forall {mx : m α} {my : α → m β}
 /--
 Mapping a value through a total function preserves `NeverFail`.
 -/
-@[simp]
+@[simp, grind .]
 instance instMap [LawfulMonad m] {mx : m α} [h : NeverFail mx] (f : α → β) :
     NeverFail (f <$> mx) := by
-  simp [map_eq_bind_pure_comp, bind_of_forall]
+  simp only [map_eq_bind_pure_comp, bind_of_forall, Function.comp_def]
+
+
 
 /-- If both the function computation and the argument computation never fail,
 then their applicative sequencing also never fails. -/
-@[simp]
+@[simp, grind .]
 instance instSeq [LawfulMonad m] {mf : m (α → β)} {mx : m α}
     [hf : NeverFail mf] [hx : NeverFail mx] :
     NeverFail (mf <*> mx) := by
   -- `mf <*> mx = mf >>= fun f => f <$> mx`, and mapping preserves `NeverFail` given `hx`.
   simpa [seq_eq_bind_map] using
     (bind_of_forall (mx := mf) (my := fun f => f <$> mx)
-      (hx := hf) (hy := fun f => by simp))
+      (hx := hf) (hy := fun f => by simpa))
 
 /-- If `mx` and `my` never fail, then `mx <* my` never fails. -/
-@[simp]
+@[simp, grind .]
 instance instSeqLeft [LawfulMonad m] {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by
   simp [seqLeft_eq]
 
 /-- If `mx` and `my` never fail, then `mx *> my` never fails. -/
-@[simp]
+@[simp, grind .]
 instance instSeqRight [LawfulMonad m] {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by
   simp [seqRight_eq]
 
-end spmf
 
-/-- A computation in a monad with `HasEvalPMF` that naturally embeds into `HasEvalSPMF`
-would never fails -/
-instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
-  probFailure_eq_zero := by simp -- simp [probFailure, HasEvalPMF.instHasEvalSPMF, OptionT.run, evalDist, OptionT.mk]
+example [LawfulMonad m] (mx : m α) [h : NeverFail mx] : NeverFail (do
+    let x ← mx
+    let y ← mx
+    return (x, y)) := by
+  grind
 
 end NeverFail
-
-end HasEvalSPMF

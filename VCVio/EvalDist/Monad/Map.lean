@@ -37,77 +37,101 @@ open ENNReal
 @[simp] lemma evalDist_comp_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) :
     evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> evalDist mx := by aesop
 
+variable [HasEvalSPMF m] (mx : m α) (f : α → β)
 
--- variable (oa : OracleComp spec α) (f : α → β)
+@[simp, grind =]
+lemma probEvent_bind_pure_comp (q : β → Prop) :
+    Pr[q | mx >>= pure ∘ f] = Pr[q ∘ f | mx] := by
+  have := Classical.decPred q
+  rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
+  simp
 
--- /-- Write the probability of an output after mapping the result of a computation as a sum
--- over all outputs such that they map to the correct final output, using subtypes.
--- This lemma notably doesn't require decidable equality on the final type, unlike most
--- lemmas about probability when mapping a computation. -/
--- lemma probOutput_map_eq_tsum_subtype (y : β) :
---     [= y | f <$> oa] = ∑' x : {x ∈ oa.support | y = f x}, [= x | oa] := by
---   simp only [map_eq_bind_pure_comp, tsum_subtype _ (λ x ↦ [= x | oa]), probOutput_bind_eq_tsum,
---     Function.comp_apply, probOutput_pure, mul_ite, mul_one, mul_zero,
---     Set.indicator, Set.mem_setOf_eq]
---   refine (tsum_congr (λ x ↦ ?_))
---   by_cases hy : y = f x <;> by_cases hx : x ∈ oa.support <;> simp [hy, hx]
+variable [LawfulMonad m]
 
--- lemma probOutput_map_eq_tsum (y : β) :
---     [= y | f <$> oa] = ∑' x, [= x | oa] * [= y | (pure (f x) : OracleComp spec β)] := by
---   simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply]
+/-- Write the probability of an output after mapping the result of a computation as a sum
+over all outputs such that they map to the correct final output, using subtypes.
+This lemma notably doesn't require decidable equality on the final type, unlike most
+lemmas about probability when mapping a computation. -/
+lemma probOutput_map_eq_tsum_subtype (y : β) :
+    Pr[= y | f <$> mx] = ∑' x : {x ∈ support mx | y = f x}, Pr[= x | mx] := by
+  simp only [map_eq_bind_pure_comp, tsum_subtype _, probOutput_bind_eq_tsum, Function.comp_apply,
+    Set.indicator, Set.mem_setOf_eq]
+  refine (tsum_congr (λ x ↦ ?_))
+  by_cases hy : y = f x <;> by_cases hx : x ∈ support mx <;> simp [hy, hx]
 
--- lemma probOutput_map_eq_tsum_subtype_ite [DecidableEq β] (y : β) :
---     [= y | f <$> oa] = ∑' x : oa.support, if y = f x then [= x | oa] else 0 := by
---   simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum_subtype, Function.comp_apply,
---     probOutput_pure, mul_ite, mul_one, mul_zero]
+lemma probOutput_map_eq_tsum (y : β) :
+    Pr[= y | f <$> mx] = ∑' x, Pr[= x | mx] * Pr[= y | (pure (f x) : m β)] := by
+  simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply]
 
--- lemma probOutput_map_eq_tsum_ite [DecidableEq β] (y : β) :
---     [= y | f <$> oa] = ∑' x : α, if y = f x then [= x | oa] else 0 := by
---   simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply, probOutput_pure,
---     mul_ite, mul_one, mul_zero]
+lemma probOutput_map_eq_tsum_subtype_ite [DecidableEq β] (y : β) :
+    Pr[= y | f <$> mx] = ∑' x : support mx, if y = f x then Pr[= x | mx] else 0 := by
+  simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum_subtype, Function.comp_apply,
+    probOutput_pure, mul_ite, mul_one, mul_zero]
 
--- lemma probOutput_map_eq_sum_fintype_ite [Fintype α] [DecidableEq β] (y : β) :
---     [= y | f <$> oa] = ∑ x : α, if y = f x then [= x | oa] else 0 :=
---   (probOutput_map_eq_tsum_ite oa f y).trans (tsum_eq_sum' <|
---     by simp only [Finset.coe_univ, Set.subset_univ])
+lemma probOutput_map_eq_tsum_ite [DecidableEq β] (y : β) :
+    Pr[= y | f <$> mx] = ∑' x : α, if y = f x then Pr[= x | mx] else 0 := by
+  simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply, probOutput_pure,
+    mul_ite, mul_one, mul_zero]
 
--- lemma probOutput_map_eq_sum_finSupport_ite [spec.DecidableEq] [DecidableEq α] [DecidableEq β]
---     (y : β) : [= y | f <$> oa] = ∑ x ∈ oa.finSupport, if y = f x then [= x | oa] else 0 :=
---   (probOutput_map_eq_tsum_ite oa f y).trans (tsum_eq_sum' <|
---     by simp only [coe_finSupport, Function.support_subset_iff, ne_eq, ite_eq_right_iff,
---       probOutput_eq_zero_iff', mem_finSupport_iff_mem_support, Classical.not_imp, not_not, and_imp,
---       imp_self, implies_true])
+@[grind =]
+lemma probOutput_map_eq_sum_fintype_ite [Fintype α] [DecidableEq β] (y : β) :
+    Pr[= y | f <$> mx] = ∑ x : α, if y = f x then Pr[= x | mx] else 0 :=
+  (probOutput_map_eq_tsum_ite mx f y).trans (tsum_eq_sum' <|
+    by simp only [Finset.coe_univ, Set.subset_univ])
 
--- lemma probOutput_map_eq_sum_filter_finSupport [spec.DecidableEq] [DecidableEq α] [DecidableEq β]
---     (y : β) : [= y | f <$> oa] = ∑ x ∈ oa.finSupport.filter (y = f ·), [= x | oa] := by
---   rw [Finset.sum_filter, probOutput_map_eq_sum_finSupport_ite]
+@[grind =]
+lemma probOutput_map_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
+    (y : β) : Pr[= y | f <$> mx] = ∑ x ∈ finSupport mx, if y = f x then Pr[= x | mx] else 0 :=
+  (probOutput_map_eq_tsum_ite mx f y).trans (tsum_eq_sum' <|
+    by simp only [coe_finSupport, Function.support_subset_iff, ne_eq, ite_eq_right_iff,
+      probOutput_eq_zero_iff', mem_finSupport_iff_mem_support, Classical.not_imp, not_not, and_imp,
+      imp_self, implies_true])
 
--- @[simp]
--- lemma probFailure_map : [⊥ | f <$> oa] = [⊥ | oa] := by
---   simp [probFailure, evalDist_map, PMF.map_apply, PMF.monad_map_eq_map]
---   refine (tsum_eq_single none λ x ↦ ?_).trans (if_pos rfl)
---   cases x <;> simp
+@[simp, grind =]
+lemma probOutput_map_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
+    (y : β) : Pr[= y | f <$> mx] = ∑ x ∈ (finSupport mx).filter (y = f ·), Pr[= x | mx] := by
+  rw [Finset.sum_filter, probOutput_map_eq_sum_finSupport_ite]
 
--- @[simp]
--- lemma probEvent_map (q : β → Prop) : [q | f <$> oa] = [q ∘ f | oa] := by
---   simp only [probEvent, evalDist_map, PMF.toOuterMeasure_map_apply, Function.comp_apply]
---   simp [PMF.monad_map_eq_map]
---   refine congr_arg (oa.evalDist.toOuterMeasure) ?_
---   simp only [Set.preimage, Set.mem_image, Set.mem_setOf_eq, Set.ext_iff]
---   intro x
---   cases x <;> simp
--- lemma probEvent_comp (q : β → Prop) : [q ∘ f | oa] = [q | f <$> oa] :=
---   symm <| probEvent_map oa f q
+@[simp, grind =]
+lemma probFailure_map : Pr[⊥ | f <$> mx] = Pr[⊥ | mx] := by
+  simp [map_eq_bind_pure_comp, probFailure_bind_eq_tsum]
 
--- lemma probOutput_map_eq_probOutput_inverse (f : α → β) (g : β → α)
---     (hl : Function.LeftInverse f g) (hr : Function.RightInverse f g)
---     (y : β) : [= y | f <$> oa] = [= g y | oa] := by
---   rw [probOutput_map_eq_tsum]
---   refine (tsum_eq_single (g y) (λ x hx ↦ ?_)).trans ?_
---   · suffices y ≠ f x by simp [this]
---     exact (λ h ↦ hx ((congr_arg g h).trans (hr x)).symm)
---   · simp [hl y]
+@[simp, grind =]
+lemma probEvent_map (q : β → Prop) : Pr[q | f <$> mx] = Pr[q ∘ f | mx] := by
+  grind [= map_eq_bind_pure_comp]
 
--- lemma probFailure_eq_sub_sum_probOutput_map [Fintype β] (oa : OracleComp spec α) (f : α → β) :
---     [⊥ | oa] = 1 - ∑ y : β, [= y | f <$> oa] := by
---   rw [← probFailure_map (f := f), probFailure_eq_sub_tsum, tsum_fintype]
+lemma probEvent_comp (q : β → Prop) : Pr[q ∘ f | mx] = Pr[q | f <$> mx] :=
+  symm <| probEvent_map mx f q
+
+lemma probOutput_map_eq_probOutput_inverse (f : α → β) (g : β → α)
+    (hl : Function.LeftInverse f g) (hr : Function.RightInverse f g)
+    (y : β) : Pr[= y | f <$> mx] = Pr[= g y | mx] := by
+  rw [probOutput_map_eq_tsum]
+  refine (tsum_eq_single (g y) (λ x hx ↦ ?_)).trans ?_
+  · suffices y ≠ f x by simp [this]
+    exact (λ h ↦ hx ((congr_arg g h).trans (hr x)).symm)
+  · simp [hl y]
+
+lemma probFailure_eq_sub_sum_probOutput_map [Fintype β] (mx : m α) (f : α → β) :
+    Pr[⊥ | mx] = 1 - ∑ y : β, Pr[= y | f <$> mx] := by
+  rw [← probFailure_map (f := f), probFailure_eq_sub_tsum, tsum_fintype]
+
+lemma probOutput_map_eq_single {mx : m α} {f : α → β} {y : β}
+    (x : α) (h : ∀ x' ∈ support mx, y = f x' → x = x') (h' : f x = y) :
+    Pr[= y | f <$> mx] = Pr[= x | mx] := by
+  -- simp [probOutput_map_eq_tsum_sub ]
+  rw [probOutput_map_eq_tsum]
+  refine (tsum_eq_single x (λ x' hx' ↦ ?_)).trans (by rw [h', probOutput_pure_self, mul_one])
+  specialize h x'
+  simp only [mul_eq_zero, probOutput_eq_zero_iff, support_pure, Set.mem_singleton_iff]
+  tauto
+
+section injective
+
+@[grind ., aesop safe forward]
+lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
+    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
+  rw [probOutput_map_eq_single x _ rfl]
+  grind
+
+end injective

@@ -36,13 +36,14 @@ import VCVio.OracleComp.Coercions.SimOracle
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
+import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle

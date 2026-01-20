@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
 import Init.Data.Vector.Lemmas
 
@@ -42,7 +42,7 @@ lemma replicateTR_zero : replicate 0 oa = return [] := rfl
 
 @[simp]
 lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
-  rw [replicate, List.replicate_succ, List.mapM_cons, seq_eq_bind, bind_map_left]; rfl
+  rw [replicate, List.replicate_succ, List.mapM_cons, seq_eq_bind_map, bind_map_left]; rfl
 
 @[simp]
 lemma replicate_pure (x : α) :

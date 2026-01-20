@@ -3,7 +3,7 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.EvalDist.Defs.Instances
+import VCVio.EvalDist.Defs.Basic
 
 /-!
 # Evaluation Distributions of Computations with `Bind`
@@ -35,37 +35,48 @@ lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
 lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
-@[simp] lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
+@[simp, grind =]
+lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
     evalDist (pure x : m α) = pure x := by simp [evalDist]
 
-@[simp] lemma evalDist_comp_pure [HasEvalSPMF m] :
+@[simp]
+lemma evalDist_comp_pure [HasEvalSPMF m] :
     evalDist ∘ (pure : α → m α) = pure := by aesop
 
-@[simp] lemma evalDist_comp_pure' [HasEvalSPMF m] (f : α → β) :
-    evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by aesop
+@[simp]
+lemma evalDist_comp_pure' [HasEvalSPMF m] (f : α → β) :
+    evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by grind
 
-@[simp, grind =] lemma probOutput_pure [HasEvalSPMF m] [DecidableEq α] (x y : α) :
-    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by aesop (rule_sets := [UnfoldEvalDist])
+@[simp, grind =]
+lemma probOutput_pure [HasEvalSPMF m] [DecidableEq α] (x y : α) :
+    Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by
+  aesop (rule_sets := [UnfoldEvalDist])
 
-@[simp, grind =] lemma probOutput_pure_self [HasEvalSPMF m] (x : α) :
-    Pr[= x | (pure x : m α)] = 1 := by aesop (rule_sets := [UnfoldEvalDist])
-
-@[simp, grind =] lemma probFailure_pure [HasEvalSPMF m] (x : α) :
-    Pr[⊥ | (pure x : m α)] = 0 := by aesop (rule_sets := [UnfoldEvalDist])
+@[simp, grind =]
+lemma probOutput_pure_self [HasEvalSPMF m] (x : α) :
+    Pr[= x | (pure x : m α)] = 1 := by
+  aesop (rule_sets := [UnfoldEvalDist])
 
 /-- Fallback when we don't have decidable equality. -/
+@[grind =]
 lemma probOutput_pure_eq_indicator [HasEvalSPMF m] (x y : α) :
     Pr[= x | (pure y : m α)] = Set.indicator {y} (Function.const α 1) x := by
   aesop (rule_sets := [UnfoldEvalDist])
 
-@[simp] lemma probEvent_pure [HasEvalSPMF m] (x : α) (p : α → Prop) [DecidablePred p] :
+@[simp, grind =]
+lemma probEvent_pure [HasEvalSPMF m] (x : α) (p : α → Prop) [DecidablePred p] :
     Pr[p | (pure x : m α)] = if p x then 1 else 0 := by
   aesop (rule_sets := [UnfoldEvalDist])
 
 /-- Fallback when we don't have decidable equality. -/
+@[grind =]
 lemma probEvent_pure_eq_indicator [HasEvalSPMF m] (x : α) (p : α → Prop) :
     Pr[p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by
   aesop (rule_sets := [UnfoldEvalDist])
+
+@[simp, grind =]
+lemma probFailure_pure [HasEvalSPMF m] (x : α) :
+    Pr[⊥ | (pure x : m α)] = 0 := by aesop (rule_sets := [UnfoldEvalDist])
 
 @[simp]
 lemma tsum_probOutput_pure [HasEvalSPMF m] (x : α) :
@@ -91,7 +102,8 @@ end pure
 
 section bind
 
-@[simp, grind =] lemma support_bind [HasEvalSet m] (mx : m α) (my : α → m β) :
+@[simp, grind =]
+lemma support_bind [HasEvalSet m] (mx : m α) (my : α → m β) :
     support (mx >>= my) = ⋃ x ∈ support mx, support (my x) := by
   aesop (rule_sets := [UnfoldEvalDist])
 
@@ -100,7 +112,8 @@ lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β
     y ∈ support (mx >>= my) ↔ ∃ x ∈ support mx, y ∈ support (my x) := by simp
 
 -- dt: do we need global assumptions about `decidable_eq` for the `finSupport` definition?
-@[simp, grind =] lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
+@[simp, grind =]
+lemma finSupport_bind [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     [DecidableEq β] (mx : m α) (my : α → m β) : finSupport (mx >>= my) =
       Finset.biUnion (finSupport mx) fun x => finSupport (my x) := by aesop
 
@@ -109,7 +122,8 @@ lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
-@[simp, grind =] lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
+@[simp, grind =]
+lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
   MonadHom.toFun_bind' _ mx my
 
@@ -140,7 +154,7 @@ lemma probFailure_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) :
 
   sorry
 
-@[simp]
+@[simp, grind =]
 lemma probFailure_bind_eq_zero_iff [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by
   simp [probFailure_bind_eq_tsum]
@@ -165,12 +179,12 @@ lemma probEvent_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m 
 lemma probOutput_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (y : β) :
     Pr[= y | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[= y | my x] :=
-  (probOutput_bind_eq_tsum mx my y).trans (tsum_eq_sum' <| by sorry)
+  (probOutput_bind_eq_tsum mx my y).trans (tsum_eq_sum' <| by simp)
 
 lemma probEvent_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (q : β → Prop) :
     Pr[q | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[q | my x] :=
-  (probEvent_bind_eq_tsum mx my q).trans (tsum_eq_sum' <| by sorry)
+  (probEvent_bind_eq_tsum mx my q).trans (tsum_eq_sum' <| by simp)
 
 lemma probOutput_bind_of_const [HasEvalSPMF m] (mx : m α) (my : α → m β)
     (y : β) (r : ℝ≥0∞) (h : ∀ x, Pr[= y | my x] = r) :

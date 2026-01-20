@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Symmetric Encryption Schemes.
@@ -14,9 +14,12 @@ for symmetric encryption using oracles in `spec`, with message space `M`,
 secret keys of type `K`, and ciphertext space `C`.
 -/
 
--- universe u v w
+universe u v w
 
--- open OracleSpec OracleComp
+open OracleSpec OracleComp
+
+structure SymmEncAlg (m : Type u → Type v)
+    (M K C : Type u)
 
 -- /-- Symmetric encryption algorithm with access to oracles in `spec` (simulated with state `σ`),
 -- where `M` is the space of messages, `K` is the key space, and `C` is the ciphertext space. -/

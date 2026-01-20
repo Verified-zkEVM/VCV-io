@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 -- import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.Constructions.Replicate
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 import Mathlib.Data.List.Basic
 import VCVio.OracleComp.QueryTracking.Structures
 

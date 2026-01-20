@@ -1,6 +1,8 @@
 import Lake
 open Lake DSL
 
+-- TODO: update linters and remove all errors in library
+-- should probably adopt conventions similar to `Batteries`.
 abbrev vcvLinters : Array LeanOption := #[
   -- ⟨`linter.docPrime, true⟩,
   ⟨`linter.hashCommand, true⟩,
@@ -45,12 +47,12 @@ lean_exe test where root := `Test
 --    precompileModules := true
 
 -- Compiling extenal C++ files
-target libsodium.o pkg : System.FilePath := do
-  let oFile := pkg.buildDir / "c" / "libsodium.o"
-  let srcJob ← inputTextFile <| pkg.dir / "LibSodium" / "c" / "libsodium.cpp"
-  let weakArgs := #["-I", (← getLeanIncludeDir).toString]
-  buildO oFile srcJob weakArgs #["-fPIC"] "c++" getLeanTrace
-extern_lib libleanffi pkg := do
-  let ffiO ← libsodium.o.fetch
-  let name := nameToStaticLib "leanlibsodium"
-  buildStaticLib (pkg.sharedLibDir / name) #[ffiO]
+-- target libsodium.o pkg : System.FilePath := do
+--   let oFile := pkg.buildDir / "c" / "libsodium.o"
+--   let srcJob ← inputTextFile <| pkg.dir / "LibSodium" / "c" / "libsodium.cpp"
+--   let weakArgs := #["-I", (← getLeanIncludeDir).toString]
+--   buildO oFile srcJob weakArgs #["-fPIC"] "c++" getLeanTrace
+-- extern_lib libleanffi pkg := do
+--   let ffiO ← libsodium.o.fetch
+--   let name := nameToStaticLib "leanlibsodium"
+--   buildStaticLib (pkg.sharedLibDir / name) #[ffiO]

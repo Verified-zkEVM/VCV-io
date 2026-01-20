@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append
 

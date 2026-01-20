@@ -291,14 +291,5 @@ end seqRight
 
 -- end seq_map
 
--- -- TODO: should have a map lemmas file probably
--- lemma probOutput_map_eq_single [spec.FiniteRange] {oa : OracleComp spec α} {f : α → β} {y : β}
---     (x : α) (h : ∀ x' ∈ oa.support, y = f x' → x = x') (h' : f x = y) :
---     [= y | f <$> oa] = [= x | oa] := by
---   rw [probOutput_map_eq_tsum]
---   refine (tsum_eq_single x (λ x' hx' ↦ ?_)).trans (by rw [h', probOutput_pure_self, mul_one])
---   specialize h x'
---   simp only [mul_eq_zero, probOutput_eq_zero_iff, support_pure, Set.mem_singleton_iff]
---   tauto
 
 -- end OracleComp

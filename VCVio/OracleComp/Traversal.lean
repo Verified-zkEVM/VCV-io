@@ -153,9 +153,6 @@ end When
 --   rfl
 
 -- @[simp]
--- lemma NeverFail_pure (x : α) : NeverFail (pure x : OracleComp spec α) := trivial
-
--- @[simp]
 -- lemma NeverFail_query (q : OracleQuery spec α) : NeverFail (q : OracleComp spec α) := by
 --   simp [NeverFail, NeverFailWhen, allWhen]
 

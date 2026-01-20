@@ -26,6 +26,7 @@ lemma monad_pure_eq_pure [Monad m] (x : α) :
 lemma monad_bind_eq_bind [Monad m] (x : OptionT m α) (y : α → OptionT m β) :
     x >>= y = OptionT.bind x y := rfl
 
+@[grind =]
 lemma liftM_def {m : Type u → Type v} [Monad m] {α : Type u}
     (x : m α) : (x : OptionT m α) = OptionT.lift x := rfl
 

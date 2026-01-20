@@ -6,46 +6,51 @@ Authors: Devon Tuma
 import VCVio.EvalDist.Defs.Basic
 
 /-!
-# Typeclasses for Denotational Semantics With Failure
+# Denotational Semantics Over `AlternativeMonad`.
 
-Additional denotational type-classes for `AlternativeMonad` instances.
+This file defines a type-class for `HasEvalSet` when given an `AlternativeMonad` instance
+on the base monad, enforcing that `failure` maps to the empty sub-distribution.
 
+Compatibility conditions then force the correct semantics for `evalDist`, see _.
 -/
 
-open ENNReal
+open ENNReal HasEvalSet
 
 universe u v w
 
 variable {m : Type u → Type v} [AlternativeMonad m] {α β γ : Type u}
 
-section alternative
-
--- dt: for now I'm trying to stick with mixin type-classes for this type of thing.
--- /-- Extension of `HasEvalSPMF` that are lawful to an `AlternativeMonad` structure. -/
--- class HasAlternativeEvalSPMF (m : Type u → Type v) [AlternativeMonad m]
---     extends HasEvalSPMF m where
---   toSPMF_failure {α : Type u} : toSPMF (failure : m α) = 0
-
-/-- Type-class for `hasEvalSPMF` when given an `AlternativeMonad` instance instead,
-enforcing that `failure` maps to the empty sub-distribution. -/
-protected class HasEvalSPMF.LawfulFailure (m : Type u → Type v)
-    [AlternativeMonad m] [HasEvalSPMF m] : Prop where
-  toSPMF_failure {α : Type u} : HasEvalSPMF.toSPMF (failure : m α) = 0
-
-@[simp] lemma evalDist_failure [HasEvalSPMF m] [HasEvalSPMF.LawfulFailure m] :
-    evalDist (failure : m α) = 0 := HasEvalSPMF.LawfulFailure.toSPMF_failure
-
-/-- Type-class for `hasEvalSet` when given an `AlternativeMonad` instance instead,
-enforcing that `failure` maps to the empty sub-distribution. -/
+/-- Type-class for `HasEvalSet` when given an `AlternativeMonad` instance on the base monad,
+enforcing that `failure` maps to the empty sub-distribution.
+Compatibility conditions then force the correct semantics for `evalDist`, see below. -/
 protected class HasEvalSet.LawfulFailure (m : Type u → Type v)
     [AlternativeMonad m] [HasEvalSet m] : Prop where
   support_failure' {α : Type u} : support (failure : m α) = ∅
 
-@[simp] lemma support_failure [HasEvalSet m] [HasEvalSet.LawfulFailure m] :
-    support (failure : m α) = ∅ := HasEvalSet.LawfulFailure.support_failure'
+open HasEvalSet (LawfulFailure)
 
-@[simp] lemma finSupport_failure [HasEvalSet m] [HasEvalSet.LawfulFailure m]
-    [HasEvalFinset m] [DecidableEq α] : finSupport (failure : m α) = ∅ := by
-  simp [finSupport_eq_iff_support_eq_coe]
+@[simp, grind =]
+lemma support_failure [HasEvalSet m] [LawfulFailure m] :
+    support (failure : m α) = ∅ :=
+  HasEvalSet.LawfulFailure.support_failure'
 
-end alternative
+@[simp, grind =]
+lemma finSupport_failure [HasEvalSet m] [LawfulFailure m] [HasEvalFinset m]
+    [DecidableEq α] : finSupport (failure : m α) = ∅ := by grind
+
+@[simp, grind =]
+lemma probOutput_failure [HasEvalSPMF m] [LawfulFailure m]
+    (x : α) : Pr[= x | (failure : m α)] = 0 := by simp only [probOutput_eq_zero_iff,
+      support_failure, Set.mem_empty_iff_false, not_false_eq_true]
+
+@[simp, grind =]
+lemma probEvent_failure [HasEvalSPMF m] [LawfulFailure m]
+    (p : α → Prop) : Pr[p | (failure : m α)] = 0 := by aesop
+
+@[simp, grind =]
+lemma probFailure_failure [HasEvalSPMF m] [LawfulFailure m] :
+    Pr[⊥ | (failure : m α)] = 1 := by simp
+
+@[simp, grind =]
+lemma evalDist_failure [HasEvalSPMF m] [LawfulFailure m] :
+    evalDist (failure : m α) = SPMF.mk (PMF.pure none) := by simp
