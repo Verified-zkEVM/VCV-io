@@ -59,6 +59,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
+import VCVio.Prelude
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
