@@ -19,8 +19,6 @@ universe u v w
 
 open ENNReal
 
-namespace ProbComp
-
 /-- A `SampleableType β` instance means that `β` is a finite inhabited type,
 with a computation `selectElem` that selects uniformly at random from the type.
 This generally requires choosing some "canonical" ordering for the type,
@@ -200,6 +198,50 @@ instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
       simp [ih, probFailure_seq, probFailure_pure, probFailure_ite]
       sorry
 
+/-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
+def SampleableType.ofEquiv {α β : Type} [DecidableEq α] [DecidableEq β] [SampleableType α]
+    (e : α ≃ β) : SampleableType β where
+  selectElem := e <$> ($ᵗ α)
+  mem_support_selectElem := fun x => by
+    stop
+    -- support (e <$> selectElem) = e '' support selectElem
+    simp only [OracleComp.support_map]
+    -- Since e is an equivalence, x ∈ e '' S ↔ e.symm x ∈ S
+    rw [Set.mem_image_equiv]
+    exact SampleableType.mem_support_selectElem (e.symm x)
+  probOutput_selectElem_eq := fun x y => by
+    stop
+    simp only [probOutput_map_eq_tsum, OracleComp.probOutput_pure, mul_ite, mul_one, mul_zero]
+    let reduce_sum (z : β) :
+      (∑' a, if z = e a then Pr[= a | SampleableType.selectElem (β := α)] else 0)
+      = Pr[= e.symm z | SampleableType.selectElem (β := α)] := by
+      convert tsum_eq_single (e.symm z) _
+      · simp only [Equiv.apply_symm_apply, ↓reduceIte]
+      · intro b hb
+        split_ifs with h
+        · have h_eq: e.symm z = b := by rw [h, Equiv.symm_apply_apply]
+          rw [←h_eq]; simp only [probOutput_eq_zero_iff']
+          exact fun a ↦ hb (id (Eq.symm h_eq))
+        · rfl
+    rw [reduce_sum x, reduce_sum y]
+    apply SampleableType.probOutput_selectElem_eq
+  probFailure_selectElem := by simp
+
+/-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
+instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [DecidableEq α] :
+    SampleableType (Fin n → α) := by
+  letI instVectorFinFuncEquiv: (_root_.Vector α n) ≃ (Fin n → α) :=
+    { toFun := fun v i => v.get i
+      invFun := _root_.Vector.ofFn
+      left_inv := fun v => by
+        ext i
+        simp only [Vector.ofFn, Vector.get, Fin.coe_cast, Vector.getElem_toArray, Vector.getElem_mk,
+          Array.getElem_ofFn]
+      right_inv := fun f => by
+        funext i
+        simp only [Vector.get, Vector.ofFn, Fin.coe_cast, Array.getElem_ofFn, Fin.eta] }
+  exact SampleableType.ofEquiv (instVectorFinFuncEquiv)
+
 end instances
 
 -- TODO: generalize this lemma
@@ -213,5 +255,3 @@ lemma probOutput_uniformBool_not_decide_eq_decide {ob : ProbComp Bool} :
       Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return decide (b = b')] := by
   stop
   simp [probOutput_bind_eq_sum_fintype, add_comm]
-
-end ProbComp
