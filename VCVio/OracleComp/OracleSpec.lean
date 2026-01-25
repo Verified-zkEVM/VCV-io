@@ -105,6 +105,19 @@ lemma add_def {ι ι'} (spec : OracleSpec ι) (spec' : OracleSpec ι') :
 @[simp] lemma ofPFunctor_add (P P' : PFunctor) :
     OracleSpec.ofPFunctor (P + P') = OracleSpec.ofPFunctor P + OracleSpec.ofPFunctor P' := rfl
 
+instance {ι ι'} (spec : OracleSpec ι) (spec' : OracleSpec ι')
+    [h : spec.Fintype] [h' : spec'.Fintype] : (spec + spec').Fintype where
+  fintype_B | .inl i => h.fintype_B i | .inr i => h'.fintype_B i
+
+instance {ι ι'} (spec : OracleSpec ι) (spec' : OracleSpec ι')
+    [h : spec.DecidableEq] [h' : spec'.DecidableEq] : (spec + spec').DecidableEq where
+  decidableEq_A := inferInstanceAs (DecidableEq (ι ⊕ ι'))
+  decidableEq_B | .inl i => h.decidableEq_B i | .inr i => h'.decidableEq_B i
+
+instance {ι ι'} (spec : OracleSpec ι) (spec' : OracleSpec ι')
+    [h : spec.Inhabited] [h' : spec'.Inhabited] : (spec + spec').Inhabited where
+  inhabited_B | .inl i => h.inhabited_B i | .inr i => h'.inhabited_B i
+
 end add
 
 section sigma
