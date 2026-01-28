@@ -97,8 +97,8 @@ noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
   [= () | IND_CPA_experiment adversary] - 1 / 2
 
-/-- The probability of the IND-CPA experiment is the average of the probability of the experiment
-with the challenge being true and the probability of the experiment with the challenge being false. -/
+/-- The probability of the IND-CPA experiment is the average of the probability of the
+experiment with the challenge being true and the probability with the challenge being false. -/
 lemma probOutput_IND_CPA_experiment_eq_add {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) :
     [= () | IND_CPA_experiment adversary] =

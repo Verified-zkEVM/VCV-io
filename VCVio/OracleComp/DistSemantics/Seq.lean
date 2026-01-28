@@ -139,7 +139,7 @@ lemma probEvent_seq_map_eq_probEvent_comp_uncurry [spec.FiniteRange]
   refine probEvent_congr' ?_ (congr_arg evalDist ?_)
   · simp only [support_seq_map_eq_image2, Set.mem_image2, support_map, Set.image2_mk_eq_prod,
       Set.image_uncurry_prod, implies_true]
-  · simp only [map_seq, Function.comp, Functor.map_map, Function.uncurry_apply_pair]
+  · simp only [map_seq, Functor.map_map]
     rfl
 
 

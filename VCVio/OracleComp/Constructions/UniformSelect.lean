@@ -109,7 +109,7 @@ lemma uniformSelectList_cons (x : α) (xs : List α) :
     [p | $ xs] = if xs.isEmpty then 0 else (xs.countP p : ℝ≥0∞) / xs.length := match xs with
   | [] => by simp
   | y :: ys => by simp [← List.countP_eq_sum_fin_ite, uniformSelectList_cons,
-      probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, Function.comp_def]
+      div_eq_mul_inv, Function.comp_def]
 
 end uniformSelectList
 
@@ -196,7 +196,7 @@ variable {α : Type}
 @[simp] lemma finSupport_uniformSelectFinset [DecidableEq α] (s : Finset α) :
     ($ s).finSupport = if s.Nonempty then s else ∅ := by
   split_ifs with hs <;> simp only [hs, finSupport_eq_iff_support_eq_coe,
-    support_uniformSelectFinset, if_true, if_false, Finset.coe_singleton, Finset.coe_empty]
+    support_uniformSelectFinset, if_true, if_false, Finset.coe_empty]
 
 @[simp] lemma probOutput_uniformSelectFinset [DecidableEq α] (s : Finset α) (x : α) :
     [= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
@@ -324,14 +324,14 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
   mem_support_selectElem x := by simp
   probOutput_selectElem_eq := by simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
-    probOutput_uniformOfFintype, forall_const, implies_true]
+    probOutput_uniformOfFintype, forall_const]
   probFailure_selectElem := by simp [probFailure_seq]
 
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
 instance (n : ℕ) : SelectableType (Fin (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by simp
-  probOutput_selectElem_eq x y := by simp only [probOutput_uniformFin, implies_true]
+  probOutput_selectElem_eq x y := by simp only [probOutput_uniformFin]
   probFailure_selectElem := by simp
 
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
@@ -385,7 +385,8 @@ instance (α : Type) (n m : ℕ) [SelectableType α] : SelectableType (Matrix (F
     let bot ← ihn
     -- return Matrix.of (Fin.snoc top bot.get)
     return Fin.cons top.get bot
-    -- return (Matrix.of (fun i j ↦ if h : i ≠ Fin.last n then top (Fin.castPred i h) j else bot[j]))
+    -- return (Matrix.of (fun i j ↦
+    --   if h : i ≠ Fin.last n then top (Fin.castPred i h) j else bot[j]))
   mem_support_selectElem x := by induction n with
   | zero =>
     apply Matrix.ext

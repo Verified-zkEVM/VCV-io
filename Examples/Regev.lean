@@ -339,7 +339,7 @@ theorem isCorrect_of_uniformErrSamp [hm : NeZero m] (χ : ℕ) (he: p > 4*(χ*m 
       have : err.get i = err[i.1] := by aesop
       rw [this]
       have := h' i
-      simp [mem_support_map] at this
+      simp at this
       obtain ⟨y, hy⟩ := this
       rw [← hy]
       stop
@@ -400,14 +400,17 @@ example : Hybrid_0 adv = IND_CPA_OneTime_Game adv := by
 --   let x_1 ← $ᵗVector (Fin p) n
 --   let a ← $ᵗVector (Fin (2 * χ + 1)) m
 --   let __discr ←
---     adv.chooseMessages (x, Vector.ofFn (Matrix.vecMul x_1.get x) + Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a)
+--     adv.chooseMessages (x, Vector.ofFn (Matrix.vecMul x_1.get x) +
+--       Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a)
 --   let a_1 ← $ᵗVector (Fin 2) m
 --   let b' ←
 --     adv.distinguish __discr.2.2
 --         (Vector.ofFn (x.mulVec (Vector.map (Fin.castLE hp2) a_1).get),
 --           Matrix.vecMul x_1.get x ⬝ᵥ (Vector.map (Fin.castLE hp2) a_1).get +
---               (Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a).get ⬝ᵥ (Vector.map (Fin.castLE hp2) a_1).get +
---             if if b = true then __discr.1 = true else __discr.2.1 = true then 0 else ↑(p / 2))
+--               (Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a).get ⬝ᵥ
+--                 (Vector.map (Fin.castLE hp2) a_1).get +
+--             if if b = true then __discr.1 = true else __discr.2.1 = true
+--               then 0 else ↑(p / 2))
 --   if b = b' then pure () else failure
 
 -- In Hybrid 1, we sample u = A s + e randomly instead
@@ -454,7 +457,8 @@ def Hybrid_2 : ProbComp Bool := do
 
 -- Hybrid 1 and Hybrid 2 are indistinguishable due to the leftover hash lemma (or LWE itself)
 
--- In other words, we will reduce to the fact that `(A.mulVec x, dotProd u x)` is statistically indistinguishable from random
+-- In other words, we will reduce to the fact that `(A.mulVec x, dotProd u x)` is
+-- statistically indistinguishable from random
 
 section LHL
 
@@ -502,7 +506,8 @@ theorem Hybrid_1_ind_Hybrid_2 :
   -- Still a mess...
   sorry
 
--- Finally, Hybrid 2's advantage is zero, since `b` is uniform and have nothing to do with other variables
+-- Finally, Hybrid 2's advantage is zero, since `b` is uniform and have nothing to do with
+-- other variables
 theorem Hybrid_2_advantage_zero : (Hybrid_2 adv).advantage' = 0 := by
   unfold ProbComp.advantage' Hybrid_2
   simp [sub_eq_zero, probOutput_false_eq_probOutput_true_not, probOutput_bind_eq_sum_fintype]
@@ -523,7 +528,8 @@ theorem IND_CPA_advantage_le :
         Hybrid_0_ind_Hybrid_1 adv
     _ ≤ (Hybrid_2 adv).advantage' +
           (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) +
-          (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) := by
+          (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he))
+            (Hybrid_01_Reduction adv)) := by
         gcongr
         exact Hybrid_1_ind_Hybrid_2 adv
     _ = _ := by

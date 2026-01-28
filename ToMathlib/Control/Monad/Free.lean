@@ -209,7 +209,8 @@ noncomputable def depthBindAux {f : Type u → Type v} {α β : Type u} :
   | .pure x, g => depth (g x)
   | .roll _ r, g => 1 + iSup (λ u ↦ depthBindAux (r u) g)
 
-/-- The depth of a bind computation can be defined _exactly_ using the definition of bind (but might not be very revealing) -/
+/-- The depth of a bind computation can be defined _exactly_ using the definition of bind
+(but might not be very revealing). -/
 lemma depth_bind_eq {x : FreeMonad f α} {g : α → FreeMonad f β} :
     depth (x >>= g) = depthBindAux x g := by
   induction x using FreeMonad.inductionOn with

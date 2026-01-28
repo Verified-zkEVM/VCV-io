@@ -99,7 +99,7 @@ lemma probOutput_bind_ite_failure_eq_tsum [spec.FiniteRange] [DecidableEq β]
     [= y | oa >>= fun x => if p x then pure (f x) else failure] =
       ∑' x : α, if p x ∧ y = f x then [= x | oa] else 0 := by
   rw [probOutput_bind_eq_tsum]
-  simp [probEvent_eq_tsum_ite, ite_and]
+  simp [ite_and]
 
 -- lemma probOutput_eq
 
@@ -284,13 +284,14 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
           · simp [h]
       }
     _ = ∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-          ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ * [= (s, s) | do
+          ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ *
+            [= (s, s) | do
             let x₁ ← (simulateQ seededOracle main).run seed
             let x₂ ← (simulateQ seededOracle main).run seed
             return (cf x₁, cf x₂)] - [= s | cf <$> main] / h := by {
         congr 1
         · rw [probOutput_bind_eq_sum_finSupport]
-          simp only [liftM_eq_liftComp, finSupport_liftComp, probOutput_liftComp, bind_pure_comp, h]
+          simp only [liftM_eq_liftComp, finSupport_liftComp, probOutput_liftComp, bind_pure_comp]
           refine Finset.sum_congr rfl fun seed hseed => ?_
           congr 1
           apply probOutput_generateSeed'
@@ -301,21 +302,24 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
       }
     _ = ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ *
           ∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-            [= s | cf <$> (simulateQ seededOracle main).run seed] ^ 2 - [= s | cf <$> main] / h := by {
+            [= s | cf <$> (simulateQ seededOracle main).run seed] ^ 2 -
+              [= s | cf <$> main] / h := by {
         rw [Finset.mul_sum]
         congr 2
         simp only [probOutput_bind_bind_prod_mk_eq_mul', pow_two]
       }
     _ ≥ ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ ^ 2 *
           (∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-            [= s | cf <$> (simulateQ seededOracle main).run seed]) ^ 2 - [= s | cf <$> main] / h := by {
+            [= s | cf <$> (simulateQ seededOracle main).run seed]) ^ 2 -
+              [= s | cf <$> main] / h := by {
         refine tsub_le_tsub ?_ le_rfl
         have := ENNReal.rpow_sum_le_const_mul_sum_rpow
           ((generateSeed spec (Function.update qb i s) js).finSupport)
           (fun seed => [= s | cf <$> (simulateQ seededOracle main).run seed])
           (one_le_two)
         simp only [] at this
-        have hc : ((finSupport (generateSeed spec (update qb i ↑s) js)).card : ℝ≥0∞)⁻¹ ^ 2 ≠ 0 := by {
+        have hc : ((finSupport (generateSeed spec (update qb i ↑s) js)).card : ℝ≥0∞)⁻¹ ^ 2 ≠ 0 :=
+          by {
           simp
         }
         have := ((ENNReal.mul_le_mul_left hc (by simp)).2 this)

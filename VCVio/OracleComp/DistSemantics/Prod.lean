@@ -82,7 +82,8 @@ lemma probOutput_seq_map_prod_mk_eq_mul' :
     [= (x, y) | (λ x y ↦ (y, x) : β → α → α × β) <$> ob <*> oa] = [= x | oa] * [= y | ob] :=
   by rw [probOutput_seq_map_swap, probOutput_seq_map_prod_mk_eq_mul]
 
-lemma probOutput_seq_map_vec_push_eq_mul {n : ℕ} {ova : OracleComp spec (Vector α n)} {va : Vector α n} :
+lemma probOutput_seq_map_vec_push_eq_mul {n : ℕ} {ova : OracleComp spec (Vector α n)}
+    {va : Vector α n} :
     [= (va.push x) | Vector.push <$> ova <*> oa] = [= va | ova] * [= x | oa] := by
     apply probOutput_seq_map_eq_mul_of_injective2 ova oa
     rintro vp vq p q h

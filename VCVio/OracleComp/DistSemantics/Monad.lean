@@ -99,3 +99,5 @@ lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
   sorry
 
 end bind_congr
+
+end scratch

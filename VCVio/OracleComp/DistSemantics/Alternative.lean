@@ -23,7 +23,7 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
 lemma evalDist_orElse [h : spec.FiniteRange] (oa oa' : OracleComp spec α) :
     evalDist (oa <|> oa') = (evalDist oa <|> evalDist oa') := by
   induction oa using OracleComp.inductionOn with
-  | pure x => simp [Option.elimM]; sorry
+  | pure x => simp; sorry
   | failure => simp
   | query_bind i t oa h => {
     sorry

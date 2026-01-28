@@ -35,7 +35,7 @@ lemma mem_support_seq_map_cons_iff (xs : List α) (h : xs ≠ []) :
     xs ∈ (List.cons <$> oa <*> ob).support ↔
       xs.head h ∈ oa.support ∧ xs.tail ∈ ob.support := by
   obtain ⟨x, xs, rfl⟩ := List.exists_cons_of_ne_nil h
-  simp [h]
+  simp
 
 lemma cons_mem_support_seq_map_cons_iff (x : α) (xs : List α) :
     x :: xs ∈ (cons <$> oa <*> ob).support ↔ x ∈ oa.support ∧ xs ∈ ob.support := by
@@ -106,11 +106,13 @@ section mapM
 
 -- @[simp]
 -- lemma mem_support_list_mapM {f : α → OracleComp spec β} {as : List α}
---     (x : List β) : x ∈ (List.mapM f as).support ↔ ∀ i : Fin x.length, x[i] ∈ (f (as[i]'(by simp))).support := by
+--     (x : List β) : x ∈ (List.mapM f as).support ↔
+--       ∀ i : Fin x.length, x[i] ∈ (f (as[i]'(by simp))).support := by
 --   induction as with
 --   | nil => simp [neverFails_pure]
 --   | cons a as ih =>
---     simp [List.mapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
+--     simp [List.mapM_cons, bind_pure_comp, neverFails_bind_iff,
+--       neverFails_map_iff, Vector.insertIdx]
 
 @[simp]
 lemma probFailure_list_mapM_loop {α β : Type*} [spec.FiniteRange]
@@ -172,7 +174,7 @@ lemma probOutput_list_mapM_loop {α β : Type*} [DecidableEq β] [spec.FiniteRan
       | nil => {
         suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length
         by simp [mapM.loop, this]
-        refine LE.le.le_iff_eq ?_
+        refine LE.le.ge_iff_eq' ?_
         simpa using congr_arg length h
       }
       | cons x xs => {
@@ -221,7 +223,7 @@ section neverFails
   induction as with
   | nil => simp only [filterMapM_nil, neverFails_pure]
   | cons a as ih =>
-    simp only [filterMapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
+    simp only [filterMapM_cons, bind_pure_comp, neverFails_bind_iff]
     refine ⟨h a (by simp), fun y hy => ?_⟩
     rcases y with _ | y <;> simp <;> exact ih (fun x hx => h x (by simp [hx]))
 
@@ -230,7 +232,7 @@ variable {s : Type v}
 @[simp] lemma neverFails_list_foldlM {f : s → α → OracleComp spec s} {init : s} {as : List α}
     (h : ∀ i, ∀ x ∈ as, neverFails (f i x)) : neverFails (foldlM f init as) := by
   induction as generalizing init with
-  | nil => simp only [foldlM, reverse_nil, neverFails_pure]
+  | nil => simp only [foldlM, neverFails_pure]
   | cons b bs ih =>
       simp only [foldlM_cons, neverFails_bind_iff, mem_cons, true_or, h, true_and]
       exact fun _ _ => ih (fun i x hx' => h i x (by simp [hx']))
@@ -255,7 +257,7 @@ variable {n : ℕ} (oa : OracleComp spec α) (ob : OracleComp spec (List.Vector 
 lemma support_seq_map_vector_cons : ((· ::ᵥ ·) <$> oa <*> ob).support =
     {xs | xs.head ∈ oa.support ∧ xs.tail ∈ ob.support} := by
   refine Set.ext (λ xs ↦ ?_)
-  simp [Set.ext_iff, @eq_comm _ _ xs, List.Vector.eq_cons_iff]
+  simp [@eq_comm _ _ xs, List.Vector.eq_cons_iff]
 
 @[simp]
 lemma probOutput_seq_map_vector_cons_eq_mul [spec.FiniteRange] [spec.DecidableEq]
@@ -321,9 +323,9 @@ section Vector -- TODO: seperate file for vectors
 lemma mem_support_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n} {x : Vector β n} :
     x ∈ (Vector.mapM f as).support ↔ ∀ i : Fin n, x[i] ∈ (f as[i]).support := by
   induction as using Vector.induction with
-  | v_empty => simp [neverFails_pure]
+  | v_empty => simp
   | v_insert hd tl ih =>
-    simp [Vector.mapM_append, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
+    simp [Vector.insertIdx]
     sorry
 
 @[simp] lemma neverFails_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n}
@@ -331,7 +333,7 @@ lemma mem_support_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector �
   induction as using Vector.induction with
   | v_empty => simp [neverFails_pure]
   | v_insert hd tl ih =>
-    simp_all [Vector.mapM_append, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
+    simp_all [Vector.insertIdx]
     suffices hnew : (Vector.mapM f (#v[hd] ++ tl)).neverFails by
       simp only [HAppend.hAppend, Append.append, Vector.append] at hnew
       convert hnew using 2

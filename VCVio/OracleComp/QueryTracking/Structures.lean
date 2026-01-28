@@ -161,7 +161,7 @@ lemma getQ_append (log log' : QueryLog spec) (i : ι) :
     | nil => simp [getQ]
     | cons hd' tl' ih' =>
       simp
-      split_ifs with hi₁ <;> simp [ih, ih', hi₁]
+      split_ifs with hi₁ <;> simp [ih]
       · split_ifs; simp
       · simpa
       · split_ifs; simp
@@ -303,8 +303,8 @@ lemma takeAtIndex_addValues (seed : QuerySeed spec) {i : ι} (n : ℕ) (xs : Lis
     · simp [hn]
     · suffices List.take n (seed j ++ xs) = seed j ++ List.take (n - (seed j).length) xs
       by simpa using this
-      rw [List.take_append_eq_append_take]
-      simpa using le_of_not_le hn
+      rw [List.take_append]
+      simpa using le_of_not_ge hn
   · split_ifs with _ <;> simp [hj]
 
 -- @[simp]
