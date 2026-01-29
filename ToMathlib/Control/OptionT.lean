@@ -82,4 +82,19 @@ lemma mapM'_failure {m : Type u → Type v} {n : Type u → Type w}
 
 end mapM
 
+@[simp]
+lemma mk_bind {α β} (m : Type u → Type v) [Monad m] [LawfulMonad m]
+    (mx : m α) (my : α → m (Option β)) :
+    OptionT.mk (mx >>= my) = liftM mx >>= fun x => OptionT.mk (my x) := by
+  simp [OptionT.ext_iff]
+
+@[simp, grind =]
+lemma liftM_elimM {m} [Monad m] {α β}
+    (x : m (Option α)) (y : m β) (z : α → m β)
+    {n} [Monad n] [MonadLiftT m n] [LawfulMonadLiftT m n] :
+    (liftM (Option.elimM x y z) : n β) =
+      Option.elimM (liftM x : n (Option α)) (liftM y) (fun x => liftM (z x)) := by
+  simp [Option.elimM]
+  refine bind_congr fun x => by cases x <;> simp
+
 end OptionT

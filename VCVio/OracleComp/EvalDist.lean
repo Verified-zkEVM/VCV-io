@@ -30,7 +30,7 @@ def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
 
 /-- The support of a computation assuming any possible return value of queries. -/
 instance : HasEvalSet (OracleComp spec) where
-  toSet := simulateQ (r := SetM) fun _ : spec.Domain => Set.univ
+  toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
 
 lemma support_eq_simulateQ (mx : OracleComp spec α) :
     support mx = simulateQ (r := SetM) (fun _ : spec.Domain => Set.univ) mx := rfl
@@ -91,7 +91,7 @@ variable [spec.Fintype] [spec.Inhabited]
 
 /-- Embed `OracleComp` into `SPMF` by mapping queries to uniform distributions over their range. -/
 noncomputable instance : HasEvalPMF (OracleComp spec) where
-  toPMF := simulateQ fun t => PMF.uniformOfFintype (spec.Range t)
+  toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
   support_eq mx := sorry
   toSPMF_eq := sorry
 

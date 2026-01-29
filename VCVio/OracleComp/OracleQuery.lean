@@ -33,7 +33,8 @@ instance {spec : OracleSpec ι} : LawfulFunctor (OracleQuery spec) :=
   inferInstanceAs (LawfulFunctor (PFunctor.Obj spec.toPFunctor))
 
 /-- The oracle input used in an oracle query. -/
-@[inline] def input {α} (q : OracleQuery spec α) : spec.Domain := q.1
+@[inline, reducible]
+def input {α} (q : OracleQuery spec α) : spec.Domain := q.1
 
 @[simp] lemma input_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
     input ⟨t, f⟩ = t := rfl
@@ -45,7 +46,8 @@ instance {spec : OracleSpec ι} : LawfulFunctor (OracleQuery spec) :=
     OracleQuery.input (PFunctor.map spec.toPFunctor f q) = q.input := rfl
 
 /-- The continutation used for the result of an oracle query. -/
-@[inline] def cont {α} (q : OracleQuery spec α) (f : spec.Range q.input) : α := q.2 f
+@[inline, reducible]
+def cont {α} (q : OracleQuery spec α) (f : spec.Range q.input) : α := q.2 f
 
 @[simp] lemma cont_apply {α} (t : spec.Domain) (f : spec.Range t → α) :
     cont ⟨t, f⟩ = f := rfl

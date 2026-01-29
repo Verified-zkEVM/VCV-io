@@ -85,7 +85,7 @@ lemma mem_finSupport_iff [DecidableEq α] [HasEvalFinset m] (mx : m α) (x : α)
 lemma probOutput_ne_zero_of_mem_support {mx : m α} {x : α}
    (h : x ∈ support mx) : Pr[= x | mx] ≠ 0 := by rwa [mem_support_iff] at h
 
-@[aesop unsafe 50% apply]
+@[aesop safe norm, grind =]
 lemma probOutput_eq_zero_of_not_mem_support {mx : m α} {x : α}
     (h : x ∉ support mx) : Pr[= x | mx] = 0 := by rwa [mem_support_iff, not_not] at h
 
@@ -114,8 +114,10 @@ instance decidablePred_probOutput_eq_zero [HasEvalSPMF m]
   simp only [probOutput_eq_zero_iff]
   infer_instance
 
+@[aesop unsafe apply]
 lemma probOutput_ne_zero (h : x ∈ support mx) : Pr[= x | mx] ≠ 0 := by simp [h]
 
+@[aesop unsafe apply]
 lemma probOutput_ne_zero' [HasEvalFinset m] [DecidableEq α]
     (h : x ∈ finSupport mx) : Pr[= x | mx] ≠ 0 := by
   exact probOutput_ne_zero mx x (mem_support_of_mem_finSupport h)
@@ -164,6 +166,7 @@ lemma probEvent_eq_sum_filter_univ [HasEvalSPMF m] [Fintype α]
   rw [probEvent_eq_sum_fintype_ite, Finset.sum_filter]
 
 variable [HasEvalSPMF m]
+
 
 @[simp, grind =] lemma probEvent_eq_zero_iff (mx : m α) (p : α → Prop) :
     Pr[p | mx] = 0 ↔ ∀ x ∈ support mx, ¬ p x := by
@@ -443,6 +446,11 @@ lemma probFailure_eq_one_iff_probEvent_true (mx : m α) :
 lemma probFailure_eq_one_iff (mx : m α) :
     Pr[⊥ | mx] = 1 ↔ support mx = ∅ := by
   simp [probFailure_eq_one_iff_probEvent_true, probEvent_eq_tsum_subtype_mem_support, Set.ext_iff]
+
+@[simp, aesop norm]
+lemma probEvent_const (mx : m α) (p : Prop) [Decidable p] :
+    Pr[fun _ => p | mx] = if p then (1 - Pr[⊥ | mx]) else 0 := by
+  aesop
 
 end bool
 

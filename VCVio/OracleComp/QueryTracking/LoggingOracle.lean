@@ -36,7 +36,8 @@ end QueryImpl
 /-- Simulation oracle for tracking the quries in a `QueryLog`, without modifying the actual
 behavior of the oracle. Requires decidable equality of the indexing set to determine
 which list to update when queries come in. -/
-def loggingOracle {spec : OracleSpec ι} : QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
+def loggingOracle (spec : OracleSpec ι) :
+    QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
 namespace loggingOracle
@@ -45,7 +46,9 @@ namespace loggingOracle
 lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
-    Pr[⊥ | ((simulateQ loggingOracle oa).run : OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
+    Pr[⊥ | (WriterT.run
+        (simulateQ (loggingOracle (spec := spec)) oa : WriterT (QueryLog spec) (OracleComp spec) α) :
+          OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
   induction oa using OracleComp.induction with
   | pure a => simp
   | query_bind t oa ih => simp

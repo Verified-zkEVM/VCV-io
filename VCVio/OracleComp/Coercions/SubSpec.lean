@@ -20,7 +20,7 @@ where the non-inclusive subset symbol reflects that we avoid defining this insta
 
 open OracleSpec OracleComp BigOperators ENNReal
 
-universe u v w w'
+universe u u' v v' w w'
 
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α β γ : Type w}
@@ -109,16 +109,16 @@ section liftComp
 
 /-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries.
 Usually `liftM` should be preferred but this can allow more explicit annotation. -/
-def liftComp (oa : OracleComp spec α) (superSpec : OracleSpec τ)
+def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
       [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
       OracleComp superSpec α :=
-    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa
+    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query (spec := spec) t)) mx
 
 variable (superSpec : OracleSpec τ) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 @[grind =, aesop unsafe norm]
-lemma liftComp_def (oa : OracleComp spec α) : liftComp oa superSpec =
-    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query t)) oa := rfl
+lemma liftComp_def (mx : OracleComp spec α) : liftComp mx superSpec =
+    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query (spec := spec) t)) mx := rfl
 
 @[simp]
 lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec = pure x := rfl
@@ -129,63 +129,63 @@ lemma liftComp_query (q : OracleQuery spec α) :
   sorry
 
 @[simp]
-lemma liftComp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
-    liftComp (oa >>= ob) superSpec =
-      liftComp oa superSpec >>= λ x ↦ liftComp (ob x) superSpec := by
+lemma liftComp_bind (mx : OracleComp spec α) (ob : α → OracleComp spec β) :
+    liftComp (mx >>= ob) superSpec =
+      liftComp mx superSpec >>= λ x ↦ liftComp (ob x) superSpec := by
   grind
 
 -- @[simp]
 -- lemma liftComp_failure : liftComp (failure : OracleComp spec α) superSpec = failure := rfl
 
 @[simp]
-lemma liftComp_map (oa : OracleComp spec α) (f : α → β) :
-    liftComp (f <$> oa) superSpec = f <$> liftComp oa superSpec := by
+lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
+    liftComp (f <$> mx) superSpec = f <$> liftComp mx superSpec := by
   simp [liftComp]
 
 @[simp]
-lemma liftComp_seq (og : OracleComp spec (α → β)) (oa : OracleComp spec α) :
-    liftComp (og <*> oa) superSpec = liftComp og superSpec <*> liftComp oa superSpec := by
+lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
+    liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
   simp [liftComp, seq_eq_bind, Function.comp_def]
 
 -- /-- Lifting a computation to a different set of oracles doesn't change the output distribution,
 -- since `evalDist` assumes uniformly random queries. -/
 -- @[simp]
 -- lemma evalDist_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (oa : OracleComp spec α) : evalDist (liftComp oa superSpec) = evalDist oa := by
---   induction oa using OracleComp.inductionOn with
+--     (mx : OracleComp spec α) : evalDist (liftComp mx superSpec) = evalDist mx := by
+--   induction mx using OracleComp.inductionOn with
 --   | pure x => simp [liftComp_pure]
---   | query_bind i t oa hoa =>
+--   | query_bind i t mx hmx =>
 --       simp only [liftComp, simulateQ_bind, simulateQ_query, StateT.run'_eq, StateT.run_bind,
 --         StateT.run_monadLift, SubSpec.liftM_query_eq_liftM_liftM, bind_pure_comp,
 --         Function.comp_apply, bind_map_left, map_bind, evalDist_bind, OracleComp.evalDist_liftM]
 --       refine congr_arg (_ >>= ·) (funext λ u ↦ ?_)
---       simpa [StateT.run, liftComp] using hoa u
+--       simpa [StateT.run, liftComp] using hmx u
 --   | failure => simp
 
 -- @[simp] -- NOTE: shouldn't actually need finiteness here.
 -- lemma support_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (oa : OracleComp spec α) : (liftComp oa superSpec).support = oa.support :=
---   Set.ext (mem_support_iff_of_evalDist_eq <| evalDist_liftComp _ oa)
+--     (mx : OracleComp spec α) : (liftComp mx superSpec).support = mx.support :=
+--   Set.ext (mem_support_iff_of_evalDist_eq <| evalDist_liftComp _ mx)
 
 -- @[simp]
 -- lemma finSupport_liftComp [spec.DecidableEq] [superSpec.DecidableEq] [DecidableEq α]
 --     [spec.FiniteRange] [superSpec.FiniteRange]
---     (oa : OracleComp spec α) : (liftComp oa superSpec).finSupport = oa.finSupport :=
---   Finset.ext (mem_finSupport_iff_of_evalDist_eq <| evalDist_liftComp _ oa)
+--     (mx : OracleComp spec α) : (liftComp mx superSpec).finSupport = mx.finSupport :=
+--   Finset.ext (mem_finSupport_iff_of_evalDist_eq <| evalDist_liftComp _ mx)
 
 -- @[simp]
 -- lemma probOutput_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (oa : OracleComp spec α) (x : α) : [= x | liftComp oa superSpec] = [= x | oa] := by
+--     (mx : OracleComp spec α) (x : α) : [= x | liftComp mx superSpec] = [= x | mx] := by
 --   simp only [probOutput_def, evalDist_liftComp]
 
 -- @[simp]
 -- lemma probEvent_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
---     [p | liftComp oa superSpec] = [p | oa] := by
+--     (mx : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
+--     [p | liftComp mx superSpec] = [p | mx] := by
 --   simp only [probEvent_def, evalDist_liftComp]
 
--- @[simp] lemma NeverFail_lift_comp_iff (oa : OracleComp spec α) :
---     (liftComp oa superSpec).NeverFail ↔ oa.NeverFail := by
+-- @[simp] lemma NeverFail_lift_comp_iff (mx : OracleComp spec α) :
+--     (liftComp mx superSpec).NeverFail ↔ mx.NeverFail := by
 --   simp [liftComp]
 --   sorry
 
@@ -194,12 +194,48 @@ end liftComp
 /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     MonadLift (OracleComp spec) (OracleComp superSpec) where
-  monadLift oa := liftComp oa superSpec
+  monadLift mx := liftComp mx superSpec
 
-variable [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+/-- We choose to actively rewrite `liftComp` as `liftM` to enable `LawfulMonadLift` lemmas. -/
+@[simp, aesop safe norm]
+lemma liftComp_eq_liftM [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+    (mx : OracleComp spec α) : liftComp mx superSpec = (liftM mx : OracleComp superSpec α) := rfl
+
+instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    LawfulMonadLift (OracleComp spec) (OracleComp superSpec) where
+  monadLift_pure x := liftComp_pure superSpec x
+  monadLift_bind mx my := liftComp_bind superSpec mx my
+
+-- NOTE: With constant universal levels it is fairly easy to abstract the below in a class
+-- Getting a similar level of generality as the manual instances below would be useful,
+--    might require some more general framework about monad transformers.
+
+instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where
+  monadLift mx := by
+    let impl : QueryImpl spec (OracleQuery superSpec) := fun t => liftM (query t)
+    let := simulateQ (m := OptionT (OracleComp spec)) impl mx
+    exact this
+    -- OptionT.mk (liftComp mx.run superSpec)
 
 @[simp]
-lemma liftM_eq_liftComp (oa : OracleComp spec α) :
-    (liftM oa : OracleComp superSpec α) = liftComp oa superSpec := rfl
+lemma liftM_OptionT_eq [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+    (mx : OptionT (OracleComp spec) α) : (liftM mx : OptionT (OracleComp superSpec) α) =
+      let impl : QueryImpl spec (OracleQuery superSpec) := fun t => liftM (query t)
+      simulateQ impl mx := rfl
+
+instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    LawfulMonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where
+  monadLift_pure _ := by simp [MonadLift.monadLift]
+  monadLift_bind mx my := by simp [MonadLift.monadLift]
+
+instance {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLift (StateT σ (OracleComp spec)) (StateT σ (OracleComp superSpec)) where
+  monadLift mx := StateT.mk fun s => liftComp (StateT.run mx s) superSpec
+
+@[simp]
+lemma liftM_StateT_eq {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+    (mx : StateT σ (OracleComp spec) α) : (liftM mx : StateT σ (OracleComp superSpec) α) =
+      StateT.mk fun s => liftM (StateT.run mx s) := by rfl
 
 end OracleComp

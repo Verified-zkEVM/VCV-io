@@ -13,6 +13,7 @@ File for lemmas about `evalDist` and `support` involving the monadic `map`.
 Note: we focus on lemmas that don't hold naively when reducing `<$>` to `>>=` using monad laws,
 since `map_eq_bind_pure_comp` can be applied to use `bind` lemmas fairly easily.
 Instead we focus on the cases like `f <$> mx` for injective `f`, which allow stronger statements.
+More generally we can consier `f` with `InjOn f (support mx)` and get good lemmas.
 
 TODO: many lemmas should probably have mirrored `bind_pure` versions.
 -/
@@ -23,15 +24,18 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
 
 open ENNReal
 
-@[simp] lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
+@[simp, grind =]
+lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
     support (f <$> mx) = f '' support mx := by aesop (rule_sets := [UnfoldEvalDist])
 
-@[simp] lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
+@[simp, grind =]
+lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
     [DecidableEq α] [DecidableEq β]
     (f : α → β) (mx : m α) : finSupport (f <$> mx) = (finSupport mx).image f := by
   grind [map_eq_bind_pure_comp]
 
-@[simp] lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
+@[simp, grind =]
+lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
     evalDist (f <$> mx) = f <$> (evalDist mx) := by simp [map_eq_bind_pure_comp]
 
 @[simp] lemma evalDist_comp_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) :
@@ -87,7 +91,7 @@ lemma probOutput_map_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α] [D
       probOutput_eq_zero_iff', mem_finSupport_iff_mem_support, Classical.not_imp, not_not, and_imp,
       imp_self, implies_true])
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_map_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
     (y : β) : Pr[= y | f <$> mx] = ∑ x ∈ (finSupport mx).filter (y = f ·), Pr[= x | mx] := by
   rw [Finset.sum_filter, probOutput_map_eq_sum_finSupport_ite]
@@ -103,19 +107,12 @@ lemma probEvent_map (q : β → Prop) : Pr[q | f <$> mx] = Pr[q ∘ f | mx] := b
 lemma probEvent_comp (q : β → Prop) : Pr[q ∘ f | mx] = Pr[q | f <$> mx] :=
   symm <| probEvent_map mx f q
 
-lemma probOutput_map_eq_probOutput_inverse (f : α → β) (g : β → α)
-    (hl : Function.LeftInverse f g) (hr : Function.RightInverse f g)
-    (y : β) : Pr[= y | f <$> mx] = Pr[= g y | mx] := by
-  rw [probOutput_map_eq_tsum]
-  refine (tsum_eq_single (g y) (λ x hx ↦ ?_)).trans ?_
-  · suffices y ≠ f x by simp [this]
-    exact (λ h ↦ hx ((congr_arg g h).trans (hr x)).symm)
-  · simp [hl y]
 
 lemma probFailure_eq_sub_sum_probOutput_map [Fintype β] (mx : m α) (f : α → β) :
     Pr[⊥ | mx] = 1 - ∑ y : β, Pr[= y | f <$> mx] := by
   rw [← probFailure_map (f := f), probFailure_eq_sub_tsum, tsum_fintype]
 
+@[aesop unsafe apply]
 lemma probOutput_map_eq_single {mx : m α} {f : α → β} {y : β}
     (x : α) (h : ∀ x' ∈ support mx, y = f x' → x = x') (h' : f x = y) :
     Pr[= y | f <$> mx] = Pr[= x | mx] := by
@@ -126,12 +123,103 @@ lemma probOutput_map_eq_single {mx : m α} {f : α → β} {y : β}
   simp only [mul_eq_zero, probOutput_eq_zero_iff, support_pure, Set.mem_singleton_iff]
   tauto
 
-section injective
+section const
 
-@[grind ., aesop safe forward]
-lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
-    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
-  rw [probOutput_map_eq_single x _ rfl]
+variable (mx : m α) (y : β)
+
+@[aesop safe norm, grind .]
+lemma support_map_const (hx : (support mx).Nonempty) :
+    support ((fun _ => y) <$> mx) = {y} := by
+  aesop
+
+@[simp, grind .]
+lemma finSupport_map_const [DecidableEq α] [DecidableEq β] [HasEvalFinset m]
+    (hx : (finSupport mx).Nonempty) : finSupport ((fun _ => y) <$> mx) =
+      if (finSupport mx).Nonempty then {y} else ∅ := by
   grind
 
+@[simp, aesop safe norm, grind =_]
+lemma probOutput_map_const (y' : β) :
+    Pr[= y' | (fun _ => y) <$> mx] =
+      (1 - Pr[⊥ | mx]) * Pr[= y' | (pure y : m β)] := by
+  rw [map_eq_bind_pure_comp, Function.comp_def, probOutput_bind_const]
+
+@[simp, aesop safe norm, grind =_]
+lemma probEvent_map_const (p : β → Prop) :
+    Pr[p | (fun _ => y) <$> mx] =
+      (1 - Pr[⊥ | mx]) * Pr[p | (pure y : m β)] := by
+  rw [map_eq_bind_pure_comp, Function.comp_def, probEvent_bind_const]
+
+@[simp, aesop safe norm]
+lemma probEvent_map_const' (p : β → Prop) [DecidablePred p] :
+    Pr[p | (fun _ => y) <$> mx] =
+      if p y then (1 - Pr[⊥ | mx]) else 0 := by
+  simp [Function.comp_def]
+
+end const
+
+section inverse
+
+variable {f : α → β} {g : β → α} {y : β}
+
+@[aesop unsafe norm]
+lemma probOutput_map_eq_probOutput_of_leftInvOn
+    (hr : Set.LeftInvOn g f (support mx)) (hy : f (g y) = y) :
+    Pr[= y | f <$> mx] = Pr[= g y | mx] := by
+  rw [probOutput_map_eq_tsum]
+  refine (tsum_eq_single (g y) fun x hx => ?_).trans (by aesop)
+  by_cases hx : x ∈ support mx
+  · specialize hr hx
+    aesop
+  · aesop
+
+lemma probOutput_map_eq_probOutput_inverse
+    (hl : Function.LeftInverse g f) (hy : f (g y) = y) :
+    Pr[= y | f <$> mx] = Pr[= g y | mx] := by aesop
+
+lemma probOutput_map_eq_probOutput_apply
+    (hl : f (g y) = y) (hr : ∀ y, g (f y) = y) :
+    Pr[= y | f <$> mx] = Pr[= g y | mx] := by aesop
+
+end inverse
+
+section injective
+
+@[aesop unsafe norm]
+lemma probOutput_map_eq_probOutput_invFunOn [Nonempty α]
+    (mx : m α) {f : α → β} (hf : Set.InjOn f (support mx))
+    (y : β) (hy : ∃ x ∈ support mx, f x = y) :
+    Pr[= y | f <$> mx] = Pr[= Function.invFunOn f (support mx) y | mx] := by
+  rw [probOutput_map_eq_probOutput_of_leftInvOn]
+  · intro x hx
+    have h : ∃ y ∈ support mx, f y = f x := ⟨x, hx, rfl⟩
+    specialize hf (Classical.choose_spec h).1 hx (Classical.choose_spec h).2
+    rw [Function.invFunOn]
+    aesop
+  rw [Function.invFunOn]
+  rw [dif_pos hy]
+  rw [(Classical.choose_spec hy).2]
+
+lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
+    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
+  aesop
+
+lemma probOutput_map_eq_probOutput (mx : m α)
+    {f : α → β} (hf : ∀ x x', f x = f x' → x = x') (x : α) :
+    Pr[= f x | f <$> mx] = Pr[= x | mx] := by
+  aesop
+
 end injective
+
+-- section invFun
+
+-- lemma probOutput_map_eq_probOutput_invFun [Nonempty α] (mx : m α) {f : α → β}
+--     (hf : f.Injective) (hf' : f.Surjective)
+--     (y : β) : Pr[= y | f <$> mx] = Pr[= Function.invFun f y | mx] := by
+--   rw [probOutput_map_eq_probOutput_inverse]
+--   simp [Function.invFun]
+--   simp [Function.invFun]
+--   stop
+--   sorry
+
+-- end invFun

@@ -25,19 +25,20 @@ structure OracleContext (ι : Type u) (m : Type v → Type w) :
   spec : OracleSpec.{u,v} ι
   impl : QueryImpl spec m
 
+/-- Convert an `OracleSpec` into an `OracleContext` with `OracleComp` as the implementation monad,
+using the identity implementation for queries. -/
+@[reducible]
+def OracleSpec.defaultContext {ι : Type u} (spec : OracleSpec ι) :
+    OracleContext spec.Domain (OracleComp spec) where
+  spec := spec
+  impl := QueryImpl.id' spec
+
 namespace OracleContext
 
 instance {ι} {m : Type u → Type v} [Pure m] : Inhabited (OracleContext ι m) :=
   ⟨{ spec := ι →ₒ PUnit, impl _ := pure PUnit.unit }⟩
 
 variable {ι ι'} {spec : OracleSpec ι} {m : Type u → Type v}
-
-/-- Convert an `OracleSpec` into an `OracleContext` with `OracleComp` as the implementation monad,
-using the identity implementation for queries. -/
-@[reducible] def defaultContext (spec : OracleSpec ι) :
-    OracleContext spec.Domain (OracleComp spec) where
-  spec := spec
-  impl := QueryImpl.id' spec
 
 /-- Convert a `QueryImpl` into an `OracleContext` by bundling the `OracleSpec` corresponding
 to the particular implementation. -/

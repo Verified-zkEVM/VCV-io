@@ -92,4 +92,9 @@ lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
   simp [probEvent_def]
   sorry
 
+@[simp, grind =]
+lemma probFailure_liftM [LawfulMonad m] (mx : m α) :
+    Pr[⊥ | liftM (n := OptionT m) mx] = 0 := by
+  grind
+
 end OptionT

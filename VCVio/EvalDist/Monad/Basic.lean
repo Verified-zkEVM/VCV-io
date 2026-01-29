@@ -186,13 +186,51 @@ lemma probEvent_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
     Pr[q | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[q | my x] :=
   (probEvent_bind_eq_tsum mx my q).trans (tsum_eq_sum' <| by simp)
 
-lemma probOutput_bind_of_const [HasEvalSPMF m] (mx : m α) (my : α → m β)
-    (y : β) (r : ℝ≥0∞) (h : ∀ x, Pr[= y | my x] = r) :
-    Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
-  simp [probOutput_bind_eq_tsum, h, ENNReal.tsum_mul_right, tsum_probOutput_eq_sub]
+section const
 
+@[simp]
+lemma support_bind_const [HasEvalSet m] (mx : m α) (my : m β) :
+    support (mx >>= fun _ => my) = {y ∈ support my | (support mx).Nonempty} := by
+  grind [= Set.Nonempty]
+
+@[simp]
+lemma finSupport_bind_const [HasEvalSet m] [HasEvalFinset m]
+    [DecidableEq β] [DecidableEq α] (mx : m α) (my : m β) :
+    finSupport (mx >>= fun _ => my) = if (finSupport mx).Nonempty then finSupport my else ∅ := by
+  aesop
+
+lemma probOutput_bind_of_const [HasEvalSPMF m] (mx : m α)
+    {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
+    Pr[= y | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
+  rw [probOutput_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · aesop
+  · aesop
+
+@[simp, grind =_]
+lemma probOutput_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) (y : β) :
+    Pr[= y | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
+  rw [probOutput_bind_of_const mx fun _ _ => rfl]
+
+lemma probEvent_bind_of_const [HasEvalSPMF m] (mx : m α)
+    {my : α → m β} {p : β → Prop} {r : ℝ≥0∞}
+    (h : ∀ x ∈ support mx, Pr[p | my x] = r) :
+    Pr[p | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
+  rw [probEvent_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · aesop
+  · aesop
+
+@[simp, grind =_]
+lemma probEvent_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) (p : β → Prop) :
+    Pr[p | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
+  rw [probEvent_bind_of_const mx fun _ _ => rfl]
+
+-- TODO: `h` should only require `∀ x ∈ support mx`.
 lemma probFailure_bind_of_const [Nonempty α] [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) (r : ℝ≥0∞) (h : ∀ x, Pr[⊥ | my x] = r) :
+    (mx : m α) {my : α → m β} {r : ℝ≥0∞} (h : ∀ x, Pr[⊥ | my x] = r) :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r - Pr[⊥ | mx] * r := by
   have : r ≠ ⊤ := λ hr ↦ probFailure_ne_top ((h (Classical.arbitrary α)).trans hr)
   simp [probFailure_bind_eq_tsum, h, ENNReal.tsum_mul_right, tsum_probOutput_eq_sub]
@@ -203,6 +241,11 @@ lemma probFailure_bind_of_const [Nonempty α] [HasEvalSPMF m]
     · simp only [hr, mul_zero, le_refl]
     refine mul_le_of_le_div (le_of_le_of_eq probFailure_le_one ?_)
     refine symm (ENNReal.div_self hr this)
+
+@[simp, grind =_]
+lemma probFailure_bind_const [Nonempty α] [HasEvalSPMF m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx >>= fun _ => my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [probFailure_bind_of_const mx fun _ => rfl]
 
 lemma probFailure_bind_eq_sub_mul [HasEvalSPMF m]
     (mx : m α) (my : α → m β) (r : ℝ≥0∞) (h : ∀ x, Pr[⊥ | my x] = r) :
@@ -231,6 +274,8 @@ lemma probFailure_bind_eq_sub_mul [HasEvalSPMF m]
   --   _ = 1 - ∑' x : α, [= x | mx] * (1 - r) := by
   --     refine congr_arg (1 - ·) (tsum_congr λ x ↦ ?_)
   --     rw [ENNReal.mul_sub (λ _ _ ↦ probOutput_ne_top), mul_one, ← h x]
+
+end const
 
 lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
     {s : ℝ≥0∞} (h' : Pr[⊥ | mx] = s) (my : α → m β) {r : ℝ≥0∞}
@@ -282,15 +327,13 @@ end bind
 
 -- end mul_le_probEvent_bind
 
--- section bind_const
+section bind_const
 
--- variable (oa : OracleComp spec α) (ob : OracleComp spec β)
-
--- -- lemma probFailure_bind_const :
--- --   [⊥ | do oa; ob] = [⊥ | oa] + [⊥ | ob] - [⊥ | oa] * [⊥ | ob]
+variable (mx : m α) (my : m β)
 
 
--- end bind_const
+
+end bind_const
 
 -- lemma probFailure_bind_congr (mx : OracleComp spec α)
 --     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}

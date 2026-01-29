@@ -41,7 +41,8 @@ prefix : 90 "$ᵗ" => uniformSample
 
 variable (α : Type) [hα : SampleableType α]
 
-@[simp] lemma probOutput_uniformSample [Fintype α] (x : α) :
+@[simp, grind =]
+lemma probOutput_uniformSample [Fintype α] (x : α) :
     Pr[= x | $ᵗ α] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
   have : (Fintype.card α : ℝ≥0∞) = ∑ y : α, 1 :=
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
@@ -50,26 +51,28 @@ variable (α : Type) [hα : SampleableType α]
   rw [← sum_probOutput_eq_one ($ᵗ α) SampleableType.probFailure_selectElem]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
-@[simp] lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=
+lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=
   SampleableType.probFailure_selectElem
 
 @[simp] instance : NeverFail ($ᵗ α) := inferInstance
 
--- open Classical in
-@[simp] lemma evalDist_uniformSample [Fintype α] [Inhabited α] :
-    evalDist ($ᵗ α) = liftM (PMF.uniformOfFintype α) := by
-  simp [evalDist_eq_liftM_iff]
+@[simp, grind =]
+lemma evalDist_uniformSample [Fintype α] [Nonempty α] :
+    evalDist ($ᵗ α) = liftM (PMF.uniformOfFintype α) := by aesop
 
-@[simp] lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
+@[simp, grind =]
+lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
   simp only [Set.ext_iff, Set.mem_univ, iff_true]
   apply SampleableType.mem_support_selectElem
 
--- @[simp] lemma finSupport_uniformSample [Fintype α] [DecidableEq α] [Nonempty α] :
---     finSupport ($ᵗ α) = Finset.univ := by
---   stop
---   simp only [finSupport_eq_iff_support_eq_coe, support_uniformSample, Finset.coe_univ]
+lemma mem_support_uniformSample {x : α} : x ∈ support ($ᵗ α) := by grind
 
-@[simp] lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
+@[simp, grind =]
+lemma finSupport_uniformSample [Fintype α] [DecidableEq α] :
+    finSupport ($ᵗ α) = Finset.univ := by aesop
+
+@[simp, grind =]
+lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
     Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
   simp only [probEvent_eq_sum_filter_univ, probOutput_uniformSample, Finset.sum_const,
     nsmul_eq_mul, div_eq_mul_inv]

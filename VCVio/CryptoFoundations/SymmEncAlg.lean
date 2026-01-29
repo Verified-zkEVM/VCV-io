@@ -19,21 +19,24 @@ universe u v w
 
 open OracleSpec OracleComp
 
-structure SymmEncAlg (ι : Type _)
-    (M K C : ℕ → Type) extends OracleContext ι ProbComp where
+structure SymmEncAlg (M K C : ℕ → Type)
+    (Q : Type v) extends OracleContext Q ProbComp where
   keygen (sp : ℕ) : OracleComp spec (K sp)
   encrypt {sp : ℕ} (k : K sp) (msg : M sp) : OracleComp spec (C sp)
   decrypt {sp : ℕ} (k : K sp) (c : C sp) : OptionT (OracleComp spec) (M sp)
 
-variable {ι : Type _} {M K C : ℕ → Type}
+namespace SymmEncAlg
 
-def Complete (encAlg : SymmEncAlg ι M K C) : Prop :=
-  ∀ sp : ℕ, ∀ m : M sp,
-    Pr[= m | simulateQ encAlg.impl (do
-      let k ← encAlg.keygen sp
-      let σ ← encAlg.encrypt k m
-      (encAlg.decrypt k σ).run)] = 1
+variable {M K C : ℕ → Type} {Q : Type v}
 
+def CompleteExp (encAlg : SymmEncAlg M K C Q) {sp : ℕ} (m : M sp) :
+    OptionT (OracleComp encAlg.spec) (M sp) := do
+  let k ← liftM (encAlg.keygen sp)
+  let σ ← liftM (encAlg.encrypt k m)
+  encAlg.decrypt k σ
+
+def Complete (encAlg : SymmEncAlg M K C Q) : Prop := ∀ sp, ∀ m : M sp,
+  Pr[= m | simulateQ encAlg.impl (CompleteExp encAlg m)] = 1
 
 -- end complete
 
@@ -59,4 +62,4 @@ def Complete (encAlg : SymmEncAlg ι M K C) : Prop :=
 
 -- end perfectSecrecy
 
--- end SymmEncAlg
+end SymmEncAlg

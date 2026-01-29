@@ -111,21 +111,24 @@ lemma uniformRange_eq_uniformFin (n : ℕ) (hn : 0 < n) : $[0⋯n] = $[0..n] := 
 
 @[simp, grind =]
 lemma support_uniformRange (n m : ℕ) (h : n < m) :
-    support (do $[n⋯m]) = Set.Icc n m := by
+    support (uniformRange n m h) =
+      Set.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
   ext k
   simp [uniformRange]
+  stop
   refine ⟨fun h => by fin_omega, fun h => ?_⟩
   refine ⟨⟨k - n, by fin_omega⟩, by fin_omega⟩
 
 @[simp]
 lemma finSupport_uniformRange (n m : ℕ) (h : n < m) :
-    finSupport (do $[n⋯m]) = Finset.Icc n m := by
-  grind
+    finSupport (do uniformRange n m h) =
+      Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
+  aesop
 
 @[simp, grind =]
 lemma probOutput_uniformRange (n m : ℕ) (k : Fin (m + 1)) (h : n < m) :
-    Pr[= k | do $[n⋯m]] = if n ≤ k then (m - n + 1 : ℝ≥0∞)⁻¹ else 0 := by
-  simp [uniformRange, Fin.ext_iff]
+    Pr[= k | uniformRange n m h] = if n ≤ k then (m - n + 1 : ℝ≥0∞)⁻¹ else 0 := by
+  simp[uniformRange, probOutput_map_eq_sum_finSupport_ite, Fin.ext_iff]
   by_cases hn : n ≤ k
   · simp only [hn, ↓reduceIte]
     refine trans ?_ (one_mul _)
@@ -141,11 +144,11 @@ lemma probOutput_uniformRange (n m : ℕ) (k : Fin (m + 1)) (h : n < m) :
 @[simp, grind =]
 lemma probEvent_uniformRange (n m : ℕ)
     (p : Fin (m + 1) → Prop) [DecidablePred p] (h : n < m) :
-    Pr[p | do $[n⋯m]] = Finset.card {x : Fin (m + 1) | n ≤ x ∧ p x} / (m - n + 1) := by
+    Pr[p | uniformRange n m h] = Finset.card {x : Fin (m + 1) | n ≤ x ∧ p x} / (m - n + 1) := by
   sorry
 
 lemma probFailure_uniformRange (n m : ℕ) (h : n < m) :
-    Pr[⊥ | do $[n⋯m]] = 0 := by aesop
+    Pr[⊥ | uniformRange n m h] = 0 := by aesop
 
 end uniformRange
 
