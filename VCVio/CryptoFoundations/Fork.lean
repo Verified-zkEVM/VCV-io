@@ -23,43 +23,54 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β γ δ : Type v}
 
 lemma probOutput_prod_mk_seq_map_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (z : α × β) :
-    [= z | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= z.1 | oa] * [= z.2 | ob] := by
-    obtain ⟨fst, snd⟩ := z
-    simp_all only [probOutput_seq_map_prod_mk_eq_mul]
+    [= z | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= z.1 | oa] * [= z.2 | ob] :=
+  probOutput_seq_map_prod_mk_eq_mul oa ob z.1 z.2
 
 lemma probOutput_prod_mk_seq_map_eq_mul' [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (x : α) (y : β) :
-    [= (x, y) | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= x | oa] * [= y | ob] := by
-    simp_all only [probOutput_seq_map_prod_mk_eq_mul]
+    [= (x, y) | ((·, ·) <$> oa <*> ob : OracleComp spec (α × β))] = [= x | oa] * [= y | ob] :=
+  probOutput_seq_map_prod_mk_eq_mul oa ob x y
 
 lemma probOutput_prod_mk_apply_seq_map_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β)
     (f : α → γ) (g : β → δ) (z : γ × δ) :
     [= z | (f ·, g ·) <$> oa <*> ob] = [= z.1 | f <$> oa] * [= z.2 | g <$> ob] := by
-  sorry
+  convert probOutput_prod_mk_seq_map_eq_mul' ( f <$> oa ) ( g <$> ob ) z.1 z.2 using 1;
+  simp only [probOutput, evalDist_seq, evalDist_map, OptionT.run_seq, OptionT.run_map,
+    elimM_map, Functor.map_map]
+  congr! 3
+  cases ‹Option α› <;> simp [Function.comp_def]
 
 lemma probOutput_prod_mk_apply_seq_map_eq_mul' [spec.FiniteRange] (oa : OracleComp spec α)
-    (ob : OracleComp spec β)
-    (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
-    [= (x, y) | (f ·, g ·) <$> oa <*> ob] = [= x | f <$> oa] * [= y | g <$> ob] := by
-    rw [@probOutput_prod_mk_apply_seq_map_eq_mul]
+    (ob : OracleComp spec β) (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
+    [= (x, y) | (f ·, g ·) <$> oa <*> ob] = [= x | f <$> oa] * [= y | g <$> ob] :=
+  probOutput_prod_mk_apply_seq_map_eq_mul ..
+
+lemma bind_bind_prod_mk_eq_seq_map {ι : Type u} {spec : OracleSpec ι} {α β γ δ : Type v}
+    (oa : OracleComp spec α) (ob : OracleComp spec β) (f : α → γ) (g : β → δ) :
+    (do let x ← oa; let y ← ob; return (f x, g y)) = ((f ·, g ·) <$> oa <*> ob) := by
+  simp only [Seq.seq, bind, OptionT.bind, FreeMonad.monad_pure_def, comp_apply]
+  congr! 2
+  induction oa using FreeMonad.recOn with
+  | pure a => simp only [FreeMonad.bind_pure]; cases a <;> rfl
+  | roll i t r => simp only [FreeMonad.bind_roll, r]; rfl
 
 lemma probOutput_bind_bind_prod_mk_eq_mul [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     [= z | do let x ← oa; let y ← ob; return (f x, g y)] =
       [= z.1 | f <$> oa] * [= z.2 | g <$> ob] := by
-  sorry
+  simp only [bind_bind_prod_mk_eq_seq_map, probOutput_prod_mk_apply_seq_map_eq_mul]
 
 @[simp]
 lemma probOutput_bind_bind_prod_mk_eq_mul' [spec.FiniteRange] (oa : OracleComp spec α)
     (ob : OracleComp spec β) (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
     [= (x, y) | do let x ← oa; let y ← ob; return (f x, g y)] =
-      [= x | f <$> oa] * [= y | g <$> ob] := by
-      rw [@probOutput_bind_bind_prod_mk_eq_mul]
+      [= x | f <$> oa] * [= y | g <$> ob] :=
+  probOutput_bind_bind_prod_mk_eq_mul ..
 
 lemma map_ite (oa₁ oa₂ : OracleComp spec α) (f : α → β) (p : Prop) [Decidable p] :
-    f <$> (if p then oa₁ else oa₂) = if p then (f <$> oa₁) else (f <$> oa₂) := by
-    rw [← @apply_ite]
+    f <$> (if p then oa₁ else oa₂) = if p then (f <$> oa₁) else (f <$> oa₂) :=
+  apply_ite ..
 
 lemma probFailure_bind_eq_sum_probFailure [spec.FiniteRange] (oa : OracleComp spec α)
     {ob : α → OracleComp spec β} {σ : Type u} {s : Finset σ}
@@ -67,39 +78,47 @@ lemma probFailure_bind_eq_sum_probFailure [spec.FiniteRange] (oa : OracleComp sp
     [⊥ | oa >>= ob] = ∑ x ∈ s, [⊥ | oa >>= oc x] := by
   sorry
 
-lemma probOutput_map_eq_probEvent [spec.FiniteRange]
-    (oa : OracleComp spec α) (f : α → β) (y : β) :
-    [= y | f <$> oa] = [fun x => f x = y | oa] := by
-  rw [← probEvent_eq_eq_probOutput, probEvent_map, Function.comp_def]
+lemma probOutput_map_eq_probEvent [spec.FiniteRange] (oa : OracleComp spec α) (f : α → β) (y : β) :
+    [= y | f <$> oa] = [fun x ↦ f x = y | oa] := by
+  rw [← probEvent_eq_eq_probOutput, probEvent_map, comp_def]
 
 @[simp]
 lemma probOutput_prod_mk_fst_map [spec.FiniteRange] (oa : OracleComp spec α) (y : β) (z : α × β) :
     [= z | (·, y) <$> oa] = [= z.1 | oa] * [= z.2 | (pure y : OracleComp spec β)] := by
-  sorry
+  simp only [probOutput, evalDist_map, OptionT.run_map, evalDist_pure, OptionT.run_pure,
+    PMF.monad_pure_eq_pure, PMF.pure_apply, some.injEq, mul_ite, mul_one, mul_zero]
+  simp only [Functor.map, PMF.bind_apply, comp_apply, PMF.pure_apply, mul_ite, mul_one, mul_zero,
+    some.injEq]
+  split_ifs with h
+  · have : ∀ a, some z = Option.map (fun x ↦ (x, y)) a ↔ a = some z.1 := fun a ↦ by
+      cases a <;> grind
+    rw [tsum_eq_single (some z.1)] <;> grind
+  · simp only [show ∀ a, ¬some z = Option.map (fun x ↦ (x, y)) a from fun a ↦ by cases a <;> grind,
+      ↓reduceIte, tsum_zero]
 
 @[simp]
 lemma probOutput_prod_mk_snd_map [spec.FiniteRange] (ob : OracleComp spec β) (x : α) (z : α × β) :
     [= z | (x, ·) <$> ob] = [= z.1 | (pure x : OracleComp spec α)] * [= z.2 | ob] := by
-  sorry
+  convert probOutput_prod_mk_apply_seq_map_eq_mul' (pure x) ob (fun _ ↦ x) id z.1 z.2 using 1
+  simp
 
 @[simp]
 lemma probOutput_prod_mk_fst_map' [spec.FiniteRange] (oa : OracleComp spec α)
     (f : α → γ) (y : β) (z : γ × β) :
     [= z | (f ·, y) <$> oa] = [= z.1 | f <$> oa] * [= z.2 | (pure y : OracleComp spec β)] := by
-  sorry
+  simp only [← Functor.map_map f (·, y), probOutput_prod_mk_fst_map]
 
 @[simp]
 lemma probOutput_prod_mk_snd_map' [spec.FiniteRange] (ob : OracleComp spec β)
     (f : β → γ) (x : α) (z : α × γ) :
     [= z | (x, f ·) <$> ob] = [= z.1 | (pure x : OracleComp spec α)] * [= z.2 | f <$> ob] := by
-  sorry
+  simp only [← Functor.map_map, probOutput_prod_mk_snd_map]
 
 lemma probOutput_bind_ite_failure_eq_tsum [spec.FiniteRange] [DecidableEq β]
     (oa : OracleComp spec α) (f : α → β) (p : α → Prop) [DecidablePred p] (y : β) :
-    [= y | oa >>= fun x => if p x then pure (f x) else failure] =
+    [= y | oa >>= fun x ↦ if p x then pure (f x) else failure] =
       ∑' x : α, if p x ∧ y = f x then [= x | oa] else 0 := by
-  rw [probOutput_bind_eq_tsum]
-  simp [probEvent_eq_tsum_ite, ite_and]
+  simp [probOutput_bind_eq_tsum, ite_and]
 
 -- lemma probOutput_eq
 
@@ -142,21 +161,44 @@ variable (main : OracleComp spec α) (qb : ι → ℕ)
     (fun s => (s, s)) '' (cf <$> main).support := by
   sorry
 
+-- /- Counterexample to support_map_prod_map_fork -/
+-- example : False := by
+--   have := @support_map_prod_map_fork
+--   contrapose! this
+--   use ℕ, by infer_instance, unifSpec, by infer_instance, by infer_instance,
+--     { monadLift := id }, ℕ, pure 0, fun _ ↦ 0, [], 0, fun _ ↦ none, by infer_instance
+--   simp [support, fork, Set.ext_iff] at *
+
 @[simp] lemma finSupport_map_prod_map_fork : (Prod.map cf cf <$> main.fork qb js i cf).finSupport =
     (cf <$> main).finSupport.image fun s => (s, s) := by
   sorry
 
 lemma apply_eq_apply_of_mem_support_fork (x₁ x₂ : α)
     (h : (x₁, x₂) ∈ (fork main qb js i cf).support) : cf x₁ = cf x₂ := by
-  sorry
+  simp only [fork, liftM_eq_liftComp, Fin.getElem?_fin, ne_eq, guard_eq, ite_not, bind_pure_comp,
+    support_bind, support_liftComp, support_generateSeed, Set.mem_setOf_eq,
+    support_uniformOfFintype, Set.mem_univ, support_ite, support_failure, support_pure,
+    Set.mem_ite_empty_left, Set.mem_singleton_iff, and_true, support_map, Set.iUnion_true,
+    Set.mem_iUnion, Set.mem_image, Set.mem_ite_empty_right, Prod.mk.injEq, exists_const,
+    exists_and_left, exists_prop, existsAndEq] at h
+  cases h2 : cf x₁ <;> (obtain ⟨_, _, _, _, _, _, rfl, _⟩ := h; simp_all)
 
 @[simp] lemma probOutput_none_map_fork_left (s : Option (Fin (qb i + 1))) :
     [= (none, s) | Prod.map cf cf <$> main.fork qb js i cf] = 0 := by
-  sorry
+  have hne : ∀ x ∈ (Prod.map cf cf <$> main.fork qb js i cf).support, x.1 ≠ none := by
+    intro x hx
+    simp only [support_map, Set.mem_image, Prod.exists, Prod.map_apply] at hx
+    obtain ⟨a, b, hab, rfl⟩ := hx
+    have hcf := apply_eq_apply_of_mem_support_fork main qb js i cf a b hab
+    simp only [ne_eq, hcf]
+    intro h
+    simp [h, fork] at hab
+  rw [probOutput_eq_zero_iff]
+  exact fun h ↦ hne _ h rfl
 
 @[simp] lemma probOutput_none_map_fork_right (s : Option (Fin (qb i + 1))) :
     [= (s, none) | Prod.map cf cf <$> main.fork qb js i cf] = 0 := by
-  sorry
+  cases s <;> simp [probOutput_eq_zero_iff']
 
 theorem exists_log_of_mem_support_fork (x₁ x₂ : α)
     (h : (x₁, x₂) ∈ (fork main qb js i cf).support) :
@@ -284,13 +326,14 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
           · simp [h]
       }
     _ = ∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-          ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ * [= (s, s) | do
+          ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ *
+              [= (s, s) | do
             let x₁ ← (simulateQ seededOracle main).run seed
             let x₂ ← (simulateQ seededOracle main).run seed
             return (cf x₁, cf x₂)] - [= s | cf <$> main] / h := by {
         congr 1
         · rw [probOutput_bind_eq_sum_finSupport]
-          simp only [liftM_eq_liftComp, finSupport_liftComp, probOutput_liftComp, bind_pure_comp, h]
+          simp only [liftM_eq_liftComp, finSupport_liftComp, probOutput_liftComp, bind_pure_comp]
           refine Finset.sum_congr rfl fun seed hseed => ?_
           congr 1
           apply probOutput_generateSeed'
@@ -301,23 +344,23 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
       }
     _ = ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ *
           ∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-            [= s | cf <$> (simulateQ seededOracle main).run seed] ^ 2 - [= s | cf <$> main] / h := by {
+            [= s | cf <$> (simulateQ seededOracle main).run seed] ^ 2 -
+              [= s | cf <$> main] / h := by
         rw [Finset.mul_sum]
         congr 2
         simp only [probOutput_bind_bind_prod_mk_eq_mul', pow_two]
-      }
     _ ≥ ((generateSeed spec (Function.update qb i s) js).finSupport.card : ℝ≥0∞)⁻¹ ^ 2 *
           (∑ seed ∈ (generateSeed spec (Function.update qb i s) js).finSupport,
-            [= s | cf <$> (simulateQ seededOracle main).run seed]) ^ 2 - [= s | cf <$> main] / h := by {
+            [= s | cf <$> (simulateQ seededOracle main).run seed]) ^ 2 -
+              [= s | cf <$> main] / h := by
         refine tsub_le_tsub ?_ le_rfl
         have := ENNReal.rpow_sum_le_const_mul_sum_rpow
           ((generateSeed spec (Function.update qb i s) js).finSupport)
           (fun seed => [= s | cf <$> (simulateQ seededOracle main).run seed])
           (one_le_two)
         simp only [] at this
-        have hc : ((finSupport (generateSeed spec (update qb i ↑s) js)).card : ℝ≥0∞)⁻¹ ^ 2 ≠ 0 := by {
+        have hc : ((finSupport (generateSeed spec (update qb i ↑s) js)).card : ℝ≥0∞)⁻¹ ^ 2 ≠ 0 := by
           simp
-        }
         have := ((ENNReal.mul_le_mul_left hc (by simp)).2 this)
         simp only [rpow_two] at this
         refine le_trans this ?_
@@ -328,7 +371,6 @@ lemma le_probOutput_fork (s : Fin (qb i + 1)) :
         rw [pow_two, mul_assoc, ENNReal.inv_mul_cancel, mul_one]
         · simp
         · simp
-      }
     _ = [= s | do
           let seed ← liftM (generateSeed spec ((Function.update qb i s)) js)
           cf <$> (simulateQ seededOracle main).run seed] ^ 2 - [= s | cf <$> main] / h := by {
@@ -396,6 +438,5 @@ theorem probFailure_fork_le :
         ring_nf
         sorry -- Hypothesis that `h` is sufficiently large
       · simp [acc]
-
 
 end OracleComp
