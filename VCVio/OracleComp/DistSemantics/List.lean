@@ -142,45 +142,73 @@ lemma probFailure_list_mapM {α β : Type*} [spec.FiniteRange] (xs : List α)
 --     (xs : List α) (f : α → OracleComp spec β) (ys : List β)
 --     (zs : List β) : [= zs | List.mapM.loop f xs ys] =
 
+lemma probOutput_list_mapM_loop_nil {α β : Type*} [DecidableEq β] [spec.FiniteRange]
+    (xs : List α) (f : α → OracleComp spec β) (zs : List β) :
+    [= zs | List.mapM.loop f xs []] =
+      if zs.length = xs.length then (List.zipWith (fun x z ↦ [= z | f x]) xs zs).prod else 0 := by
+  induction xs generalizing zs with
+  | nil => cases zs <;> simp [List.mapM.loop]
+  | cons x xs ih =>
+    convert probOutput_seq_map_eq_mul (f x) (List.mapM.loop f xs [])
+        (fun y z ↦ y :: z) using 1
+    constructor <;> intro h
+    · exact fun x_2 y z h ↦
+        probOutput_seq_map_eq_mul (f x) (mapM.loop f xs []) (fun y z ↦ y :: z) x_2 y z h
+    · rcases zs with (_ | ⟨z, zs⟩)
+      · simp_all +decide only [List.length_nil, List.length_cons, List.mapM.loop,
+          Nat.right_eq_add, Nat.add_eq_zero, List.length_eq_zero_iff, and_false, ↓reduceIte,
+          probOutput_eq_zero_iff, support_bind, Set.mem_iUnion, exists_prop, not_exists, not_and]
+        intro y hy
+        have h_len : ∀ (xs : List α) (ys : List β), ys.length > 0 →
+            ∀ (zs : List β), zs ∈ (List.mapM.loop f xs ys).support → zs.length > 0 := by
+          intro xs ys hy zs hzs
+          induction xs generalizing ys zs with
+          | nil => simp_all [List.mapM.loop]
+          | cons x xs ih =>
+            simp_all only [List.mapM.loop, mul_ite, mul_zero, gt_iff_lt, support_bind,
+              Set.mem_iUnion, exists_prop]
+            exact ih _ (by grind) _ hzs.choose_spec.2
+        exact fun h ↦ (h_len xs [y] (by grind) _ h).ne' rfl
+      · simp_all only [mul_ite, mul_zero,
+          List.length, Nat.add_right_cancel_iff, List.zipWith_cons_cons, List.prod_cons]
+        convert h z zs (z :: zs) _ using 1
+        · rw [List.mapM.loop,
+            probOutput_bind_congr' (ob₂ := fun y ↦ (y :: ·) <$> List.mapM.loop f xs [])]
+          · simp [seq_eq_bind_map]
+          · intro x; rw [list_mapM_loop_eq]; grind
+        · grind
+
 @[simp]
 lemma probOutput_list_mapM_loop {α β : Type*} [DecidableEq β] [spec.FiniteRange]
     (xs : List α) (f : α → OracleComp spec β) (ys : List β)
     (zs : List β) : [= zs | List.mapM.loop f xs ys] =
       if zs.length = xs.length + ys.length ∧ zs.take ys.length = ys.reverse
-      then (List.zipWith (λ x z ↦ [= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
-  rw [list_mapM_loop_eq]
-  rw [probOutput_map_append_left]
+      then (zipWith (fun x z ↦ [= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
+  rw [list_mapM_loop_eq, probOutput_map_append_left]
   by_cases h : take ys.length zs = ys.reverse
   · simp only [length_reverse, h, ↓reduceIte, and_true]
-    induction zs using List.reverseRecOn with
-    | nil => {
+    induction zs using reverseRecOn with
+    | nil =>
       simp at h
-      simp [h]
+      simp only [h, drop_zero, length_nil, zipWith_nil_right, prod_nil, Nat.add_zero]
       cases xs with
-      | nil => {
-        simp [mapM.loop]
-      }
-      | cons x xs => {
-        simp [mapM.loop]
+      | nil => simp only [length_nil, ↓reduceIte, mapM.loop, probOutput_pure, reverse_nil]
+      | cons x xs =>
+        simp only [length_cons, Ne.symm (Nat.add_one_ne_zero xs.length), ↓reduceIte, mapM.loop,
+          probOutput_eq_zero_iff, mem_support_bind_iff, not_exists, not_and]
         intro _ _
         rw [list_mapM_loop_eq]
         simp
-      }
-    }
-    | append_singleton zs z hzs => {
+    | append_singleton zs z hzs =>
       cases xs with
-      | nil => {
-        suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length
-        by simp [mapM.loop, this]
-        refine LE.le.le_iff_eq ?_
-        simpa using congr_arg length h
-      }
-      | cons x xs => {
-        simp [Nat.succ_add, mapM.loop]
-        sorry
-      }
-    }
-  · simp [h]
+      | nil =>
+        suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length by simp [mapM.loop, this]
+        exact LE.le.ge_iff_eq' <| by simpa using congr_arg length h
+      | cons x xs =>
+        simp only [Nat.succ_add, length_append, length_cons, mapM.loop]
+        convert probOutput_list_mapM_loop_nil (x :: xs) f (drop ys.length (zs ++ [z])) using 1
+        grind
+  · grind
 
 @[simp]
 lemma probOutput_list_mapM {α β : Type*} [spec.FiniteRange] (xs : List α)
@@ -303,16 +331,8 @@ open Array
 
 @[simp] lemma neverFails_array_mapM {f : α → OracleComp spec β} {as : Array α}
     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM f as) := by
-  induction ha : as.toList generalizing as with
-  | nil =>
-    simp_all only [toList_eq_nil_iff, List.mapM_toArray, List.mapM_nil, map_pure, neverFails_pure]
-  | cons x xs ih =>
-    rw [mapM_eq_mapM_toList, neverFails_map_iff]
-    simp_rw [mapM_eq_mapM_toList, ha] at ih ⊢
-    simp at ih ⊢
-    specialize ih h
-    -- boring case analysis
-    sorry
+  rw [mapM_eq_mapM_toList, neverFails_map_iff]
+  exact neverFails_list_mapM fun x hx ↦ h x (Array.mem_toList_iff.mp hx)
 
 end Array
 
@@ -328,20 +348,8 @@ lemma mem_support_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector �
 
 @[simp] lemma neverFails_vector_mapM {n} {f : α → OracleComp spec β} {as : Vector α n}
     (h : ∀ x ∈ as.toList, neverFails (f x)) : neverFails (Vector.mapM f as) := by
-  induction as using Vector.induction with
-  | v_empty => simp [neverFails_pure]
-  | v_insert hd tl ih =>
-    simp_all [Vector.mapM_append, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
-    suffices hnew : (Vector.mapM f (#v[hd] ++ tl)).neverFails by
-      simp only [HAppend.hAppend, Append.append, Vector.append] at hnew
-      convert hnew using 2
-      · exact Nat.add_comm _ _
-      · exact Nat.add_comm _ _
-      · rename_i h1 h2; exact Vector.heq_of_toArray_eq_of_size_eq rfl (Nat.add_comm _ _)
-    rw [Vector.mapM_append]
-    simp
-    sorry
-    -- exact ⟨by simpa [Vector.mapM, Vector.mapM.go] using h.1, fun _ _ => ih⟩
+  rw [← neverFails_map_iff, Vector.toArray_mapM]
+  exact neverFails_array_mapM fun x hx ↦ h x <| by grind
 
 end Vector
 
