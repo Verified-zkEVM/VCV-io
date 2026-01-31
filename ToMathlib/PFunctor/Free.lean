@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
+import Mathlib.Tactic.Cases
 import ToMathlib.Control.Monad.Hom
 import ToMathlib.PFunctor.Basic
 
