@@ -90,14 +90,13 @@ instance [Monoid ω] : AlternativeMonad (WriterT ω m) where
 @[simp]
 lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = failure := rfl
 
-instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] :
-    LawfulAlternative (WriterT ω m) := sorry
-  -- map_failure f := sorry
-  -- failure_seq f := sorry
-  -- orElse_failure f := sorry
-  -- failure_orElse f := sorry
-  -- orElse_assoc x y z := sorry
-  -- map_orElse f := sorry
+instance [Monoid ω] [LawfulMonad m] [LawfulAlternative m] : LawfulAlternative (WriterT ω m) where
+  map_failure f := congrArg WriterT.mk <| map_failure <| Prod.map f id
+  failure_seq _ := congrArg WriterT.mk <| failure_bind _
+  orElse_failure x := congrArg WriterT.mk <| orElse_failure x.run
+  failure_orElse y := congrArg WriterT.mk <| failure_orElse y.run
+  orElse_assoc x y z := congrArg WriterT.mk <| orElse_assoc x.run y.run z.run
+  map_orElse x y f := congrArg WriterT.mk <| map_orElse x.run y.run <| Prod.map f id
 
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x
