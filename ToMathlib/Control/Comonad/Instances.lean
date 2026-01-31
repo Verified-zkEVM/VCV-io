@@ -312,9 +312,9 @@ instance : Comonad Zipper where
 -- Lawfulness Proofs (Sketch - Require Zipper API and proofs)
 
 instance : LawfulFunctor Zipper where
-  id_map    := sorry
-  comp_map  := sorry
-  map_const := sorry
+  id_map    := by simp [Functor.map]
+  comp_map  := by simp [Functor.map]
+  map_const := rfl
 
 instance : LawfulCoapplicative Zipper where
   coseqLeft_eq := fun _ _ ↦ rfl
