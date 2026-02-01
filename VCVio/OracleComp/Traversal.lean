@@ -114,7 +114,8 @@ lemma neverFailsWhen_simulate {ι' : Type*} {spec' : OracleSpec ι'}
     (h' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).support ⊆ possible_outputs q)
     (hso : ∀ {α}, ∀ q : OracleQuery spec α, neverFails (so.impl q)) :
     neverFails (simulateQ so oa) := by
-    sorry
+    simp only [neverFailsWhen, neverFails] at *
+    induction oa using OracleComp.inductionOn <;> aesop
 
 lemma neverFails_eq_oracleComp_construct (oa : OracleComp spec α) :
     oa.neverFails = OracleComp.construct

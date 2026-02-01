@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
+import Mathlib.Init
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import ToMathlib.Control.MonadTransformer
+import ToMathlib.Control.Monad.Transformer
 import Batteries.Control.AlternativeMonad
 
 /-!
@@ -58,15 +59,14 @@ theorem pure_eq_pmf_pure {a : α} : (pure a : SPMF α) = PMF.pure a := by
 
 theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
     (p >>= f) = PMF.bind p (fun a => match a with | some a' => f a' | none => PMF.pure none) := by
-  simp [bind, liftM, OptionT.bind, monadLift, MonadLift.monadLift, OptionT.lift,
-    PMF.instMonad, OptionT.mk]
+  simp only [bind, OptionT.bind, OptionT.mk, PMF.instMonad, PMF.bind_const, PMF.bind_pure]
   rfl
 
 @[simp] lemma map_some_apply_some (p : PMF α) (x : α) : p.map some (some x) = p x := by
-  sorry
+  rw [PMF.map_apply, tsum_eq_single x] <;> grind
 
-@[simp] lemma PMF.map_some_apply_some (p : PMF α) (x : α) : (some <$> p) (some x) = p x := by
-  sorry
+@[simp] lemma PMF.map_some_apply_some (p : PMF α) (x : α) : (some <$> p) (some x) = p x :=
+  SPMF.map_some_apply_some p x
 
 @[ext]
 class IsCoupling (c : SPMF (α × β)) (p : SPMF α) (q : SPMF β) : Prop where
@@ -78,25 +78,90 @@ def Coupling (p : SPMF α) (q : SPMF β) :=
 
 -- Interaction between `Coupling` and `pure` / `bind`
 
-example (f g : α → β) (h : f = g) : ∀ x, f x = g x := by exact fun x ↦ congrFun h x
+example (f g : α → β) (h : f = g) : ∀ x, f x = g x := congrFun h
 
-/-- The coupling of two pure values must be the pure pair of those values -/
+/-- Helper lemma: `p.map f = pure y` iff `f` maps every element in `p`'s support to `y`. -/
+theorem PMF.map_eq_pure_iff {α β : Type*} (p : PMF α) (f : α → β) (y : β) :
+    p.map f = pure y ↔ ∀ x ∈ p.support, f x = y := by
+  simp only [PMF.ext_iff, PMF.map_apply, PMF.support]
+  constructor
+  · intro h x hx
+    by_contra hne
+    have hfx := h (f x)
+    simp only [PMF.pure_apply, hne, ↓reduceIte, Pure.pure] at hfx
+    exact hx (by simpa using ENNReal.tsum_eq_zero.mp hfx x)
+  · intro hf x
+    by_cases hx : x = y
+    all_goals simp only [Function.mem_support, ne_eq, Pure.pure, PMF.pure_apply, ↓reduceIte, *] at *
+    · exact (tsum_congr fun a ↦ by grind).trans p.tsum_coe
+    · simp only [ENNReal.tsum_eq_zero, ite_eq_right_iff]
+      grind
+
+/-
+Helper lemma: `p` is `pure x` iff its support is contained in `{x}`.
+-/
+theorem PMF.support_subset_singleton {α : Type*} (p : PMF α) (x : α) :
+    p.support ⊆ {x} ↔ p = pure x := by
+  constructor
+  · intro hsupport
+    have heq := p.support_nonempty.subset_singleton_iff.mp hsupport
+    ext y
+    simp only [Pure.pure, PMF.pure_apply]
+    split_ifs with hy
+    · exact hy ▸ (PMF.apply_eq_one_iff p x).mpr heq
+    · exact (PMF.apply_eq_zero_iff p y).mpr (heq ▸ hy)
+  · intro rfl
+    exact (PMF.support_pure x).subset
+
+/-- Helper lemma: `Option.map f x = some y` iff `x = some a` and `f a = y`. -/
+theorem Option.map_eq_some_iff {α β : Type*} (f : α → β) (x : Option α) (y : β) :
+    x.map f = some y ↔ ∃ a, x = some a ∧ f a = y :=
+  _root_.Option.map_eq_some_iff
+
+theorem pure_eq_pure_some {α : Type*} (a : α) : (pure a : SPMF α) = PMF.pure (some a) := rfl
+
+/-- Helper lemma: `f <$> p = pure y` in `SPMF` iff for all `x` in `p`'s support, `x` is `some a`
+with `f a = y`. -/
+theorem map_eq_pure_iff {α β : Type u} (p : SPMF α) (f : α → β) (y : β) :
+    f <$> p = pure y ↔ ∀ x ∈ p.support, ∃ a, x = some a ∧ f a = y := by
+  rw [pure_eq_pure_some]
+  have fmap_eq : f <$> p = PMF.map (Option.map f) p := by ext x; simp only [OptionT.run_map]; rfl
+  rw [fmap_eq]
+  change PMF.map (Option.map f) p = pure (some y) ↔ _
+  simp only [PMF.map_eq_pure_iff, Option.map_eq_some_iff]
+
+/- The coupling of two pure values must be the pure pair of those values -/
 theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × β)} :
     IsCoupling c (pure a) (pure b) ↔ c = pure (a, b) := by
   constructor
   · intro ⟨h1, h2⟩
-    simp [pure_eq_pmf_pure, liftM, monadLift, OptionT.instMonadLift, OptionT.lift, OptionT.mk] at h1 h2
-    have : (x : Option α) → (Prod.fst <$> c) x = (some <$> PMF.pure a) x := by
-      rw [h1]; exact fun x => rfl
-    sorry
-  · intro h; constructor <;> simp [h, ← liftM_map]
+    apply (PMF.support_subset_singleton ..).mp
+    intro x hx
+    rw [map_eq_pure_iff] at h1 h2
+    obtain ⟨z, rfl, hz⟩ := h1 x hx
+    obtain ⟨z', hz', hz''⟩ := h2 _ hx
+    grind
+  · rintro rfl; constructor <;> simp
 
 theorem IsCoupling.none_iff {α β : Type u} {c : SPMF (α × β)} :
     IsCoupling c (failure : SPMF α) (failure : SPMF β) ↔ c = failure := by
-  simp [failure]
   constructor
-  · intro h; sorry
-  · intro h; constructor <;> simp [h] <;> sorry
+  · rintro ⟨h₁, h₂⟩
+    have h_support : ∀ x ∈ c.support, x = none := by
+      intro x hx
+      replace h₁ := congr_arg PMF.support h₁
+      replace h₂ := congr_arg PMF.support h₂
+      simp_all [PMF.support, Function.support, Set.ext_iff]
+      cases x <;> simp_all
+      specialize h₁ (Option.some (‹α × β›.1))
+      specialize h₂ (Option.some (‹α × β›.2))
+      simp_all [Alternative.failure, OptionT.fail, OptionT.mk, Pure.pure, Functor.map,
+        OptionT.bind, OptionT.pure]
+      simp_all [Bind.bind]
+      cases h₁ (Option.some ‹_›) <;> cases h₂ (Option.some ‹_›) <;> simp_all
+    exact (PMF.support_subset_singleton c none).mp fun x hx ↦ h_support x hx
+  · rintro rfl
+    exact ⟨map_failure _, map_failure _⟩
 
 /-- Main theorem about coupling and bind operations -/
 theorem IsCoupling.bind {α₁ α₂ β₁ β₂ : Type u}
@@ -115,11 +180,9 @@ theorem IsCoupling.exists_bind {α₁ α₂ β₁ β₂ : Type u}
     (c : Coupling p q)
     (h : ∀ (a₁ : α₁) (a₂ : α₂), ∃ (d : SPMF (β₁ × β₂)), IsCoupling d (f a₁) (g a₂)) :
     ∃ (d : SPMF (β₁ × β₂)), IsCoupling d (p >>= f) (q >>= g) :=
-  let d : (a₁ : α₁) → (a₂ : α₂) → SPMF (β₁ × β₂) :=
-    fun a₁ a₂ => Classical.choose (h a₁ a₂)
-  let hd : ∀ (a₁ : α₁) (a₂ : α₂), c.1.1 (some (a₁, a₂)) ≠ 0 → IsCoupling (d a₁ a₂) (f a₁) (g a₂) :=
-    fun a₁ a₂ _ => Classical.choose_spec (h a₁ a₂)
-  ⟨c.1 >>= λ (p : α₁ × α₂) => d p.1 p.2, IsCoupling.bind c d hd⟩
+  let d := fun a₁ a₂ ↦ (h a₁ a₂).choose
+  let hd := fun a₁ a₂ _ ↦ (h a₁ a₂).choose_spec
+  ⟨c.1 >>= fun (a, b) ↦ d a b, .bind c d hd⟩
 
 end SPMF
 

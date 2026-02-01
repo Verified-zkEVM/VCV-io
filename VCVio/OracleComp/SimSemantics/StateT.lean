@@ -27,13 +27,18 @@ variable {ι : Type*} {spec : OracleSpec ι} {m : Type u → Type v} [Alternativ
 adding back any state at the end of the computation. -/
 lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} (oa : OracleComp spec α) (s s' : σ) :
     (simulateQ so oa).run s = (·, s') <$> (simulateQ so oa).run' s := by
-  have : (λ x : α × σ ↦ (x.1, s')) = id :=
-    funext λ (x, s) ↦ Prod.eq_iff_fst_eq_snd_eq.2 ⟨rfl, Subsingleton.elim _ _⟩
+  have : (fun x : α × σ ↦ (x.1, s')) = id := funext fun x ↦ Prod.ext rfl (Subsingleton.elim ..)
   simp [this]
 
 lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ α (q : OracleQuery spec α) s, (so.impl q).run' s = q)
     (oa : OracleComp spec α) (s : σ) : (simulateQ so oa).run' s = oa := by
-  sorry
+  induction' oa using OracleComp.inductionOn with x q oa ihx ihq
+  · rfl
+  · convert congr_arg (fun x ↦ x >>= ihx) (h (spec.range q) (.query q oa) s) using 1
+    simp only [simulateQ_bind, simulateQ_query, StateT.run'_eq, StateT.run_bind,
+      Function.comp_apply, map_bind, bind_map_left]
+    simp [Subsingleton.elim _ s, ← StateT.run'_eq, ihq]
+  · rfl
 
 end OracleComp

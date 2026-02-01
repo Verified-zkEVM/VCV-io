@@ -66,7 +66,7 @@ lemma probFailure_run_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) :
 @[simp]
 lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
     neverFails (simulateQ countingOracle oa).run ↔ neverFails oa :=
-  neverFails_writerT_run_simulateQ_iff (by simp) (by sorry) oa
+  neverFails_writerT_run_simulateQ_iff (by simp) (by simp) oa
 
 alias ⟨_, neverFails_simulateQ⟩ := neverFails_run_simulateQ_iff
 

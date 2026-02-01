@@ -81,7 +81,7 @@ lemma probOutput_generateSeed_bind_map_simulateQ {ι : Type _} {spec : OracleSpe
     (oa : OracleComp spec α) (f : α → β) (y : β) :
     [= y | do
       let seed ← liftComp (generateSeed spec qc js) spec
-      f <$> (simulateQ seededOracle oa).run seed] = [= y | f <$> oa] := by
-  sorry
+      f <$> (simulateQ seededOracle oa).run seed] = [= y | f <$> oa] :=
+  probOutput_generateSeed_bind_simulateQ_bind ..
 
 end seededOracle
