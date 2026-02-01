@@ -36,20 +36,17 @@ def CompleteExp (encAlg : SymmEncAlg M K C Q) {sp : ℕ} (m : M sp) :
   encAlg.decrypt k σ
 
 def Complete (encAlg : SymmEncAlg M K C Q) : Prop := ∀ sp, ∀ m : M sp,
-  Pr[= m | simulateQ encAlg.impl (CompleteExp encAlg m)] = 1
+  Pr[= m | simulateQ encAlg.impl (CompleteExp encAlg m).run] = 1
 
--- end complete
+section perfectSecrecy
 
--- section perfectSecrecy
-
--- open ENNReal
-
--- def perfectSecrecy (encAlg : SymmEncAlg m M K C) : Prop :=
---   ∀ mgen : ProbComp M, ∀ msg : M, ∀ σ : C,
---     [= (msg, σ) | encAlg.exec do
---       let msg' ← encAlg.lift_probComp mgen
---       (msg', ·) <$> encAlg.encrypt (← encAlg.keygen) msg'] =
---     [= msg | mgen]
+def perfectSecrecy (encAlg : SymmEncAlg M K C Q) : Prop :=
+  ∀ sp, ∀ mgen : OracleComp encAlg.spec (M sp), ∀ msg : M sp, ∀ σ : C sp,
+    Pr[= (msg, σ) | simulateQ encAlg.impl do
+      let msg' ← mgen
+      let k ← encAlg.keygen sp
+      return (msg', ← encAlg.encrypt k msg')] =
+    Pr[= msg | simulateQ encAlg.impl mgen]
 
 -- /-- Shanon's theorem on perfect secrecy, showing that encryption and decryption must be determined
 -- bijections between message and cipher-text space, and that keys must be chosen uniformly. -/
@@ -60,6 +57,6 @@ def Complete (encAlg : SymmEncAlg M K C Q) : Prop := ∀ sp, ∀ m : M sp,
 --       (∀ m c, ∃! k, k ∈ (encAlg.exec encAlg.keygen).support ∧ encAlg.encrypt k m = c) :=
 --   sorry
 
--- end perfectSecrecy
+end perfectSecrecy
 
 end SymmEncAlg

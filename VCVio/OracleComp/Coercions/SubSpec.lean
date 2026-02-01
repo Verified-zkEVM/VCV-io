@@ -112,13 +112,13 @@ Usually `liftM` should be preferred but this can allow more explicit annotation.
 def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
       [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
       OracleComp superSpec α :=
-    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query (spec := spec) t)) mx
+    simulateQ (fun t => liftM (query (spec := spec) t)) mx
 
 variable (superSpec : OracleSpec τ) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 @[grind =, aesop unsafe norm]
 lemma liftComp_def (mx : OracleComp spec α) : liftComp mx superSpec =
-    simulateQ (r := OracleQuery superSpec) (fun t => liftM (query (spec := spec) t)) mx := rfl
+    simulateQ (fun t => liftM (query (spec := spec) t)) mx := rfl
 
 @[simp]
 lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec = pure x := rfl
@@ -212,22 +212,22 @@ instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
 
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     MonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where
-  monadLift mx := by
-    let impl : QueryImpl spec (OracleQuery superSpec) := fun t => liftM (query t)
-    let := simulateQ (m := OptionT (OracleComp spec)) impl mx
-    exact this
-    -- OptionT.mk (liftComp mx.run superSpec)
+  monadLift mx := OptionT.mk (simulateQ (fun t => liftM (query t)) (OptionT.run mx))
 
 @[simp]
 lemma liftM_OptionT_eq [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : OptionT (OracleComp spec) α) : (liftM mx : OptionT (OracleComp superSpec) α) =
-      let impl : QueryImpl spec (OracleQuery superSpec) := fun t => liftM (query t)
+      let impl : QueryImpl spec (OracleComp superSpec) := fun t => liftM (query t)
       simulateQ impl mx := rfl
 
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     LawfulMonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where
-  monadLift_pure _ := by simp [MonadLift.monadLift]
-  monadLift_bind mx my := by simp [MonadLift.monadLift]
+  monadLift_pure _ := by
+    simp [MonadLift.monadLift]
+    rfl
+  monadLift_bind mx my := by
+    simp [MonadLift.monadLift]
+    sorry
 
 instance {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     MonadLift (StateT σ (OracleComp spec)) (StateT σ (OracleComp superSpec)) where
