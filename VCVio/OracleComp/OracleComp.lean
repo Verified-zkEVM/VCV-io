@@ -35,6 +35,10 @@ instance (spec : OracleSpec ι) : LawfulMonad (OracleComp spec) :=
 instance : MonadLift (OracleQuery spec) (OracleComp spec) :=
   inferInstanceAs (MonadLift (PFunctor.Obj spec.toPFunctor) (PFunctor.FreeM spec.toPFunctor))
 
+/-- Manually lift an `OracleQuery` to an `OracleComp`. -/
+protected def lift {ι} {spec : OracleSpec ι} {α} (q : OracleQuery spec α) :
+    OracleComp spec α := liftM q
+
 protected lemma liftM_def (q : OracleQuery spec α) :
     (q : OracleComp spec α) = PFunctor.FreeM.lift q := rfl
 

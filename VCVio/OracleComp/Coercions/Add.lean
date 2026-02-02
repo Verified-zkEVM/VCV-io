@@ -34,7 +34,7 @@ instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v}
 section add_left
 
 /-- Add additional oracles to the right side of the existing ones. -/
-instance (priority := high) subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
+instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
   monadLift | q => .mk (.inl q.input) q.cont
 
 @[simp] lemma liftM_add_left_def (q : OracleQuery spec₁ α) :
@@ -48,7 +48,7 @@ end add_left
 section add_right
 
 /-- Add additional oracles to the left side of the exiting ones-/
-instance (priority := high) subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
+instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
   monadLift | q => .mk (.inr q.input) q.cont
 
 @[simp] lemma liftM_add_right_def (q : OracleQuery spec₂ α) :

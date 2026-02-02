@@ -27,6 +27,12 @@ noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (OptionT m) where
   toSet := OptionT.mapM' HasEvalSet.toSet
 
+@[simp]
+lemma support_liftM (m : Type u → Type v) [Monad m] [HasEvalSet m]
+    (mx : m α) : support (liftM mx : OptionT m α) = support mx := by
+  simp [support_def, HasEvalSet.toSet, OptionT.mapM']
+  sorry
+
 /-- If we have a `HasEvalPMF m` instance, we can lift it to `HasEvalSPMF (OptionT m)`. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
