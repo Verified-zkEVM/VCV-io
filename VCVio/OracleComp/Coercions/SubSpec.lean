@@ -110,7 +110,7 @@ section liftComp
 /-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries.
 Usually `liftM` should be preferred but this can allow more explicit annotation. -/
 def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
-      [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+      [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
       OracleComp superSpec α :=
     simulateQ (fun t => liftM (query (spec := spec) t)) mx
 

@@ -171,7 +171,21 @@ variable (α : Type)
   (coeSpec : OracleSpec ι) (coeSuperSpec : OracleSpec ι')
   [coeSpec ⊂ₒ coeSuperSpec]
 
--- coerce a single `coin_spec` and then add extra oracles
+-- coerce a single oracle and then add extra oracles
+example (oa : OracleComp spec₁ α) :
+  OracleComp ((spec₁ + spec₂) + spec₃) α := oa
+example (oa : OracleComp spec₂ α) :
+  OracleComp ((spec₁ + spec₂) + spec₂) α := oa
+example (oa : OracleComp spec₃ α) :
+  OracleComp ((spec₁ + spec₂) + spec₃) α := oa
+example (oa : OracleComp spec₁ α) :
+  OracleComp (spec₁ + (spec₂ + spec₃)) α := oa
+example (oa : OracleComp spec₂ α) :
+  OracleComp (spec₁ + (spec₂ + spec₂)) α := oa
+example (oa : OracleComp spec₃ α) :
+  OracleComp (spec₁ + (spec₂ + spec₃)) α := oa
+
+-- coerce a single oracle and then add extra oracles
 example (oa : OracleComp coeSpec α) :
   OracleComp (coeSuperSpec + spec₂ + spec₃) α := oa
 example (oa : OracleComp coeSpec α) :
