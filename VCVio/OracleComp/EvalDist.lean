@@ -29,7 +29,7 @@ def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
   simulateQ (r := SetM) o mx
 
 /-- The support of a computation assuming any possible return value of queries. -/
-instance : HasEvalSet (OracleComp spec) where
+instance hasEvalSet : HasEvalSet (OracleComp spec) where
   toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
 
 lemma support_eq_simulateQ (mx : OracleComp spec α) :

@@ -254,6 +254,12 @@ example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
 
 end probability_notation
 
+@[simp] -- TODO: versions for other constructions?
+lemma evalDist_cast {m} [Monad m] [HasEvalSPMF m] (h : α = β) (mx : m α):
+    evalDist (cast (congrArg m h) mx) =
+      cast (congrArg SPMF h) (evalDist mx) := by
+  induction h; rfl
+
 lemma evalDist_ext {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
     {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : evalDist mx = evalDist mx' :=
   SPMF.ext h

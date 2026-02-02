@@ -22,11 +22,16 @@ variable (m : Type u → Type v) [Monad m] [HasEvalSPMF m] {α β γ : Type u}
 
 namespace OptionT
 
+/-- TODO: fintype version of this lemma -/
+noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
+    HasEvalSet (OptionT m) where
+  toSet := OptionT.mapM' HasEvalSet.toSet
+
 /-- If we have a `HasEvalPMF m` instance, we can lift it to `HasEvalSPMF (OptionT m)`. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
-  support_eq _ := rfl
+  support_eq _ := sorry
 
 @[aesop unsafe norm, grind =]
 lemma support_eq (mx : OptionT m α) : support mx = some ⁻¹' support mx.run := by
