@@ -145,7 +145,7 @@ lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
 @[simp]
 lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
-  simp [liftComp, seq_eq_bind, Function.comp_def]
+  simp [liftComp, seq_eq_bind_map]
 
 -- /-- Lifting a computation to a different set of oracles doesn't change the output distribution,
 -- since `evalDist` assumes uniformly random queries. -/

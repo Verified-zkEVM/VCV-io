@@ -114,7 +114,6 @@ public/secret keys `PK` and `SK`, and ciphertext space `C`.
 --   rw [probOutput_bind_eq_sum_finSupport]
 --   have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by field_simp; rw [mul_comm, mul_div, mul_one]
 --   simp [this]
-  -- /-- T
 
 -- end IND_CPA
 

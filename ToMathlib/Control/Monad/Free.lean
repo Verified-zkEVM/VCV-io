@@ -143,7 +143,7 @@ protected def mapM_aux [Pure m] [Bind m] (s : {α : Type u} → f α → m α) :
 
 protected def mapM' (m : Type u → Type w) [Monad m] [LawfulMonad m]
     (s : {α : Type u} → f α → m α) : FreeMonad f →ᵐ m where
-  toFun := FreeMonad.mapM_aux s
+  toFun α f := FreeMonad.mapM_aux s f
   toFun_pure' x := rfl
   toFun_bind' x y := by
     induction x using FreeMonad.inductionOn with
