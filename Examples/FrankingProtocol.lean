@@ -285,6 +285,5 @@ lemma probFailure_verify_message_valid_message (facebook_key : BitVec 256)
       }
       verify_message_package package] = 0 := by
   simp [generate_franking_tag, prepare_encrypted_message,
-    generate_reporting_tag, verify_message_package,
-    validate_abuse_report, decrypt_message, generate_nonce]
+    verify_message_package, decrypt_message, generate_nonce]
   sorry

@@ -63,8 +63,9 @@ lemma neverFails_writerT_run_simulateQ_iff
   -- | pure x => simp
   -- | failure => simp
   -- | query_bind i t oa h =>
-  --     simp only [simulateQ_bind, simulateQ_query, WriterT.run_bind, noFailure_bind_iff, hso',
-  --       noFailure_map_iff, h, Prod.forall, true_and, noFailure_query, support_liftM, Set.mem_univ,
+  --     simp only [simulateQ_bind, simulateQ_query, WriterT.run_bind,
+  --       noFailure_bind_iff, hso', noFailure_map_iff, h, Prod.forall,
+  --       true_and, noFailure_query, support_liftM, Set.mem_univ,
   --       forall_const, Function.comp_def]
   --     refine ⟨fun h' x  => ?_, fun h' x w hw => h' x⟩
   --     have := congr_arg (x ∈ ·) (hso (query i t))

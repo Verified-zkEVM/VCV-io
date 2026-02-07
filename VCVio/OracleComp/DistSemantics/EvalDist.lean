@@ -382,7 +382,7 @@ lemma probEvent_eq_one_iff : [p | oa] = 1 ↔ [⊥ | oa] = 0 ∧ ∀ x ∈ oa.su
   rw [probEvent, PMF.toOuterMeasure_apply_eq_one_iff]
   simp [support_evalDist]
   split_ifs with hoa
-  · simp [hoa, Set.preimage_image_eq _ (some_injective α), Set.subset_def]
+  · simp [hoa, Set.subset_def]
   · simp [hoa]
     intro h
     specialize h (Set.mem_insert none _)
@@ -435,7 +435,7 @@ lemma probEvent_mono' [spec.DecidableEq] [DecidableEq α]
 -- NOTE: should allow `p` and `q` to differ outside the shared support.
 lemma probEvent_congr {oa : OracleComp spec α} {oa' : OracleComp spec' α}
     (h1 : ∀ x, p x ↔ q x) (h2 : evalDist oa = evalDist oa') : [p | oa] = [q | oa'] := by
-  simp only [probEvent, probOutput, h1, h2]
+  simp only [probEvent, h1, h2]
 
 lemma probEvent_ext (h : ∀ x ∈ oa.support, p x ↔ q x) : [p | oa] = [q | oa] :=
   le_antisymm (probEvent_mono <| λ x hx hp ↦ (h x hx).1 hp)
@@ -543,7 +543,7 @@ lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : Orac
   by_cases hp : p x
   · by_cases hq : q x
     · simp [hp, hq]
-    · simp [hp, hq, h]
+    · simp [hp, hq]
       refine λ hoa ↦ hq ?_
       refine (h1 _ ?_ hoa).1 hp
       refine (h _).2 hoa
@@ -559,7 +559,7 @@ lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : Orac
 @[simp] lemma probEvent_const (oa : OracleComp spec α) (p : Prop) [Decidable p] :
     [λ _ ↦ p | oa] = if p then 1 - [⊥ | oa] else 0 := by
   rw [probEvent_eq_tsum_ite]
-  split_ifs with hp <;> simp [hp, tsum_probOutput_eq_sub]
+  split_ifs with hp <;> simp [tsum_probOutput_eq_sub]
 
 lemma probEvent_true (oa : OracleComp spec α) : [λ _ ↦ true | oa] = 1 - [⊥ | oa] := by simp
 lemma probEvent_false (oa : OracleComp spec α) : [λ _ ↦ false | oa] = 0 := by simp
@@ -642,7 +642,7 @@ lemma probOutput_bind_eq_tsum_subtype (y : β) :
   refine tsum_congr (λ x ↦ ?_)
   by_cases hx : x ∈ oa.support
   · rw [Set.indicator_of_mem hx]
-  · rw [Set.indicator_of_not_mem hx, probOutput_eq_zero _ _ hx, zero_mul]
+  · rw [Set.indicator_of_notMem hx, probOutput_eq_zero _ _ hx, zero_mul]
 
 lemma probEvent_bind_eq_tsum_subtype (q : β → Prop) :
     [q | oa >>= ob] = ∑' x : oa.support, [= x | oa] * [q | ob x] := by
@@ -650,7 +650,7 @@ lemma probEvent_bind_eq_tsum_subtype (q : β → Prop) :
   refine tsum_congr (λ x ↦ ?_)
   by_cases hx : x ∈ oa.support
   · rw [Set.indicator_of_mem hx]
-  · rw [Set.indicator_of_not_mem hx, probOutput_eq_zero _ _ hx, zero_mul]
+  · rw [Set.indicator_of_notMem hx, probOutput_eq_zero _ _ hx, zero_mul]
 
 lemma probOutput_bind_eq_sum_fintype [Fintype α] (y : β) :
     [= y | oa >>= ob] = ∑ x : α, [= x | oa] * [= y | ob x] :=
@@ -773,10 +773,10 @@ variable (i : ι) (t : spec.domain i)
 lemma probOutput_liftM [Fintype α] (q : OracleQuery spec α) (u : α) :
     [= u | (q : OracleComp spec α)] = (Fintype.card α : ℝ≥0∞)⁻¹ := by
   have : Inhabited α := q.rangeInhabited
-  simp [probOutput, PMF.monad_map_eq_map, OptionT.lift]
+  simp [probOutput, OptionT.lift]
   refine (tsum_eq_single u ?_).trans ?_
   · simp [not_imp_not]
-  · simp only [↓reduceIte, inv_inj, Nat.cast_inj]
+  · simp only [↓reduceIte]
 
 lemma probOutput_query (u : spec.range i) :
     [= u | (query i t : OracleComp spec _)] = (Fintype.card (spec.range i) : ℝ≥0∞)⁻¹ := by
@@ -856,8 +856,7 @@ lemmas about probability when mapping a computation. -/
 lemma probOutput_map_eq_tsum_subtype (y : β) :
     [= y | f <$> oa] = ∑' x : {x ∈ oa.support | y = f x}, [= x | oa] := by
   simp only [map_eq_bind_pure_comp, tsum_subtype _ (λ x ↦ [= x | oa]), probOutput_bind_eq_tsum,
-    Function.comp_apply, probOutput_pure, mul_ite, mul_one, mul_zero,
-    Set.indicator, Set.mem_setOf_eq]
+    Function.comp_apply, Set.indicator, Set.mem_setOf_eq]
   refine (tsum_congr (λ x ↦ ?_))
   by_cases hy : y = f x <;> by_cases hx : x ∈ oa.support <;> simp [hy, hx]
 
@@ -899,7 +898,7 @@ lemma probFailure_map : [⊥ | f <$> oa] = [⊥ | oa] := by
 
 @[simp]
 lemma probEvent_map (q : β → Prop) : [q | f <$> oa] = [q ∘ f | oa] := by
-  simp only [probEvent, evalDist_map, PMF.toOuterMeasure_map_apply, Function.comp_apply]
+  simp only [probEvent, evalDist_map, Function.comp_apply]
   simp [PMF.monad_map_eq_map]
   refine congr_arg (oa.evalDist.toOuterMeasure) ?_
   simp only [Set.preimage, Set.mem_image, Set.mem_setOf_eq, Set.ext_iff]
@@ -1033,11 +1032,11 @@ lemma probEvent_coin_eq_sum_subtype (p : Bool → Prop) :
 lemma probEvent_coin (p : Bool → Prop) [DecidablePred p] : [p | coin] =
     if p true then (if p false then 1 else 2⁻¹) else (if p false then 2⁻¹ else 0) := by
   by_cases hpt : p true <;> by_cases hpf : p false <;>
-    simp [probEvent, tsum_bool, hpt, hpf, inv_two_add_inv_two, PMF.monad_map_eq_map, OptionT.lift]
+    simp [probEvent, hpt, hpf, inv_two_add_inv_two, OptionT.lift]
 
 lemma probEvent_coin_eq_add (p : Bool → Prop) [DecidablePred p] :
     [p | coin] = (if p true then 2⁻¹ else 0) + (if p false then 2⁻¹ else 0) := by
-  rw [probEvent_coin]; split_ifs <;> simp [inv_two_add_inv_two, PMF.monad_map_eq_map]
+  rw [probEvent_coin]; split_ifs <;> simp [inv_two_add_inv_two]
 
 -- /-- The xor of two coin flips looks like flipping a single coin -/
 -- example (x : Bool) : [= x | do let b ← coin; let b' ← coin; return xor b b'] = [= x | coin] := by

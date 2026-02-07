@@ -167,7 +167,8 @@ instance {ρ} {m} [Monad m] [Commutative m] : Commutative (ReaderT ρ m) where
 
 /-- The `WriterT` monad is commutative if the underlying monad is commutative and the monoid is
   commutative -/
-instance {ω} {m} [Monad m] [Commutative m] [CommMonoid ω] : Commutative (WriterT ω m) where
+instance {ω} {m} [Monad m] [LawfulMonad m] [Commutative m] [CommMonoid ω] :
+    Commutative (WriterT ω m) where
   bind_comm := fun ma mb => by
     dsimp [CommutativeAt, Pure.pure, Bind.bind]
     unfold WriterT.mk

@@ -56,7 +56,8 @@ def LWE_Uniform_Distr : ProbComp (Matrix (Fin n) (Fin m) (Fin p) × Vector (Fin 
 /-- An adversary for the decisional LWE problem. Takes in a pair `(A, u)` and outputs a boolean. -/
 def LWE_Adversary := Matrix (Fin n) (Fin m) (Fin p) × Vector (Fin p) m → ProbComp Bool
 
-/-- The decisional LWE experiment. If `b = true`, the distribution is LWE, otherwise it is uniform. -/
+/-- The decisional LWE experiment. If `b = true`, the distribution is LWE,
+otherwise it is uniform. -/
 def LWE_Experiment (adv : LWE_Adversary n m p) : ProbComp Bool := do
   let b ←$ᵗ Bool
   let distr ← if b then LWE_Distr n m p errSamp else LWE_Uniform_Distr n m p

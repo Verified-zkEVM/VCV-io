@@ -128,7 +128,7 @@ lemma support_simulateQ (oa : OracleComp spec α) :
 @[simp]
 lemma finSupport_simulateQ [spec.FiniteRange] [spec.DecidableEq] [DecidableEq α]
     (oa : OracleComp spec α) : (simulateQ unifOracle oa).finSupport = oa.finSupport := by
-  simp [finSupport_eq_iff_support_eq_coe, Set.ext_iff]
+  simp [finSupport_eq_iff_support_eq_coe]
 
 @[simp]
 lemma probOutput_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) (x : α) :

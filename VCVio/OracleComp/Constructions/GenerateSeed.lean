@@ -72,8 +72,7 @@ lemma generateSeed_nil : generateSeed spec qc [] = return ∅ := rfl
 lemma generateSeed_cons : generateSeed spec qc (j :: js) =
     ($ᵗ (spec.range j)).replicate (qc j) >>= λ xs ↦
       generateSeed spec qc js := by
-  simp [generateSeed, map_eq_bind_pure_comp,
-    seq_eq_bind, bind_assoc]
+  simp [generateSeed, map_eq_bind_pure_comp, bind_assoc]
   sorry
 
 @[simp]
