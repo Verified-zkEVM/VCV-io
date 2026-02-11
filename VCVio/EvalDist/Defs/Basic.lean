@@ -482,23 +482,68 @@ alias ⟨_, one_eq_probOutput'⟩ := one_eq_probOutput_iff'
 
 end bounds
 
-lemma tsum_probOutput_eq_sub [HasEvalSPMF m] (mx : m α) :
+section mono_le
+
+variable [HasEvalSPMF m] (mx : m α) (r : ℝ≥0∞)
+
+@[simp]  lemma probFailure_mul_le : Pr[⊥ | mx] * r ≤ r :=
+  mul_le_of_le_one_left' <| by simp
+
+@[simp]  lemma mul_probFailure_le : r * Pr[⊥ | mx] ≤ r :=
+  mul_le_of_le_one_right' <| by simp
+
+@[simp] lemma probOutput_mul_le (x : α) : Pr[= x | mx] * r ≤ r :=
+  mul_le_of_le_one_left' <| by simp
+
+@[simp] lemma mul_probOutput_le (x : α) : r * Pr[= x | mx] ≤ r :=
+  mul_le_of_le_one_right' <| by simp
+
+@[simp] lemma probEvent_mul_le (p : α → Prop) : Pr[p | mx] * r ≤ r :=
+  mul_le_of_le_one_left' <| by simp
+
+@[simp] lemma mul_probEvent_le (p : α → Prop) : r * Pr[p | mx] ≤ r :=
+  mul_le_of_le_one_right' <| by simp
+
+end mono_le
+
+section sum_probOutput
+
+variable [HasEvalSPMF m]
+
+@[simp]
+lemma tsum_probOutput_eq_sub (mx : m α) :
     ∑' x : α, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
   refine ENNReal.eq_sub_of_add_eq probFailure_ne_top (tsum_probOutput_add_probFailure mx)
 
-@[aesop safe apply]
-lemma tsum_probOutput_eq_one' [HasEvalSPMF m] (mx : m α) (h : Pr[⊥ | mx] = 0) :
-    ∑' x : α, Pr[= x | mx] = 1 := by
-  rw [tsum_probOutput_eq_sub, h, tsub_zero]
+lemma tsum_probOutput_eq_one' {mx : m α} (h : Pr[⊥ | mx] = 0) :
+    ∑' x : α, Pr[= x | mx] = 1 := by simp [h]
 
-lemma sum_probOutput_eq_sub [HasEvalSPMF m] [Fintype α] (mx : m α) :
+@[simp]
+lemma tsum_support_probOutput_eq_sub (mx : m α) :
+    ∑' x : support mx, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
+  rw [tsum_subtype_eq_of_support_subset] <;> simp
+
+lemma tsum_support_probOutput_eq_one' {mx : m α} (h : Pr[⊥ | mx] = 0) :
+    ∑' x : support mx, Pr[= x | mx] = 1 := by simp [h]
+
+@[simp]
+lemma sum_probOutput_eq_sub [Fintype α] (mx : m α) :
     ∑ x : α, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
   rw [← tsum_fintype (L := .unconditional _), tsum_probOutput_eq_sub]
 
-@[aesop safe apply]
-lemma sum_probOutput_eq_one [HasEvalSPMF m] [Fintype α] (mx : m α) (h : Pr[⊥ | mx] = 0) :
-    ∑ x : α, Pr[= x | mx] = 1 := by
-  rw [sum_probOutput_eq_sub, h, tsub_zero]
+lemma sum_probOutput_eq_one [Fintype α] {mx : m α} (h : Pr[⊥ | mx] = 0) :
+    ∑ x : α, Pr[= x | mx] = 1 := by simp [h]
+
+@[simp]
+lemma sum_finSupport_probOutput_eq_sub [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+    ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 - Pr[⊥ | mx] := by
+  rw [← tsum_probOutput_eq_sub, tsum_eq_sum]
+  simp
+
+lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} (h : Pr[⊥ | mx] = 0) : ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 := by simp [h]
+
+end sum_probOutput
 
 lemma probFailure_eq_sub_tsum [HasEvalSPMF m] (mx : m α) :
     Pr[⊥ | mx] = 1 - ∑' x : α, Pr[= x | mx] := by
@@ -523,8 +568,7 @@ lemma probEvent_false (mx : m α) :
 @[simp, grind =]
 lemma probEvent_True_eq_sub (mx : m α) :
     Pr[fun _ => True | mx] = 1 - Pr[⊥ | mx] := by
-  simp [probEvent_eq_tsum_indicator, probFailure_eq_sub_tsum]
-  rw [sub_sub_cancel] <;> aesop
+  simp [probEvent_eq_tsum_indicator]
 
 lemma probEvent_true_eq_sub (mx : m α) :
     Pr[fun _ => true | mx] = 1 - Pr[⊥ | mx] := by grind
@@ -541,8 +585,7 @@ lemma probFailure_eq_one_iff_probEvent_true (mx : m α) :
   simp [tsub_eq_zero_iff_le, ENNReal.toReal_eq_one_iff]
 
 @[simp, grind =]
-lemma probFailure_eq_one_iff (mx : m α) :
-    Pr[⊥ | mx] = 1 ↔ support mx = ∅ := by
+lemma probFailure_eq_one_iff (mx : m α) : Pr[⊥ | mx] = 1 ↔ support mx = ∅ := by
   simp [probFailure_eq_one_iff_probEvent_true, probEvent_eq_tsum_subtype_mem_support, Set.ext_iff]
 
 @[aesop unsafe forward]
@@ -578,13 +621,16 @@ lemma evalDist_of_hasEvalPMF_def (mx : m α) :
 lemma probFailure_eq_zero (mx : m α) : Pr[⊥ | mx] = 0 := by
   simp [probFailure_def, evalDist_of_hasEvalPMF_def]
 
-@[simp]
 lemma tsum_probOutput_eq_one (mx : m α) :
-    ∑' x, Pr[= x | mx] = 1 := by
-  simp only [probOutput_def, evalDist_of_hasEvalPMF_def, SPMF.apply_eq_toPMF_some]
-  refine trans ?_ (PMF.tsum_coe (HasEvalPMF.toPMF mx))
-  refine tsum_congr fun x => ?_
-  refine (tsum_eq_single x (by aesop)).trans (by aesop)
+    ∑' x, Pr[= x | mx] = 1 := by simp
+
+lemma tsum_support_probOutput_eq_one (mx : m α) :
+    ∑' x : support mx, Pr[= x | mx] = 1 := by simp
+
+lemma sum_probOutput_eq_one [Fintype α] (mx : m α) : ∑ x : α, Pr[= x | mx] = 1 := by simp
+
+lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+    ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 := by simp
 
 end HasEvalPMF
 

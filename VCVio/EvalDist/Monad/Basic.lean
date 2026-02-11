@@ -127,6 +127,10 @@ lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
   MonadHom.toFun_bind' _ mx my
 
+lemma evalDist_bind_of_support_eq_empty [HasEvalSPMF m] (mx : m α) (my : α → m β)
+    (h : support mx = ∅) : evalDist (mx >>= my) = failure := by
+  simp [SPMF.ext_iff, ← probOutput_def, h]
+
 @[grind =]
 lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
@@ -146,13 +150,21 @@ lemma probFailure_bind_eq_add_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β
   simp [probFailure_def, Option.elimM, tsum_option, probOutput_def,
     SPMF.apply_eq_toPMF_some]
 
-@[simp]
+@[grind =]
+lemma probFailure_bind_eq_add_tsum_support [HasEvalSPMF m] (mx : m α) (my : α → m β) :
+    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * Pr[⊥ | my x] := by
+  rw [probFailure_bind_eq_add_tsum]
+  congr 1
+  rw [tsum_subtype (support mx) (fun x => Pr[= x | mx] * Pr[⊥ | my x])]
+  refine tsum_congr fun x => ?_
+  unfold Set.indicator
+  aesop
+
+@[simp, grind =]
 lemma probFailure_bind_eq_zero_iff [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     Pr[⊥ | mx >>= my] = 0 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, Pr[⊥ | my x] = 0 := by
   simp [probFailure_bind_eq_add_tsum]
   grind
-
--- lemma probFailure_bind_eq_zero [HasEvalSPMF m] {mx : m α} {my : α → m β}
 
 /-- Version of `probOutput_bind_eq_tsum` that sums only over the subtype given by the support
 of the first computation. This can be useful to avoid looking at edge cases that can't actually
@@ -160,8 +172,8 @@ happen in practice after the first computation. A common example is if the first
 does some error handling to avoids returning malformed outputs. -/
 lemma probOutput_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : support mx, Pr[= x | mx] * Pr[= y | my x] := by
-  rw [tsum_subtype _ (fun x ↦ Pr[= x | mx] * Pr[= y | my x]), probOutput_bind_eq_tsum]
-  refine tsum_congr (fun x ↦ ?_)
+  rw [tsum_subtype _ (fun x => Pr[= x | mx] * Pr[= y | my x]), probOutput_bind_eq_tsum]
+  refine tsum_congr (fun x => ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
 lemma probEvent_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
@@ -191,7 +203,10 @@ lemma support_bind_const [HasEvalSet m] (mx : m α) (my : m β) :
 lemma finSupport_bind_const [HasEvalSet m] [HasEvalFinset m]
     [DecidableEq β] [DecidableEq α] (mx : m α) (my : m β) :
     finSupport (mx >>= fun _ => my) = if (finSupport mx).Nonempty then finSupport my else ∅ := by
-  aesop
+  split_ifs with h
+  · obtain ⟨x, hx⟩ := h
+    aesop
+  · aesop
 
 lemma probOutput_bind_of_const [HasEvalSPMF m] (mx : m α)
     {my : α → m β} {y : β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[= y | my x] = r) :
@@ -222,102 +237,42 @@ lemma probEvent_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) (p : β → P
     Pr[p | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
   rw [probEvent_bind_of_const mx fun _ _ => rfl]
 
-lemma probFailure_bind_of_const' [HasEvalSPMF m]
-    (mx : m α) {my : α → m β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
-    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r - Pr[⊥ | mx] * r := by
-  -- have hr : r ≤ 1
-  rw [probFailure_bind_eq_add_tsum]
-
-  sorry
-
--- TODO: `h` should only require `∀ x ∈ support mx`.
-lemma probFailure_bind_of_const [Nonempty α] [HasEvalSPMF m]
-    (mx : m α) {my : α → m β} {r : ℝ≥0∞} (h : ∀ x, Pr[⊥ | my x] = r) :
-    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r - Pr[⊥ | mx] * r := by
-  have : r ≠ ⊤ := λ hr ↦ probFailure_ne_top ((h (Classical.arbitrary α)).trans hr)
-  simp [probFailure_bind_eq_add_tsum, h, ENNReal.tsum_mul_right, tsum_probOutput_eq_sub]
-  rw [ENNReal.sub_mul λ _ _ ↦ this, one_mul]
-  refine symm (AddLECancellable.add_tsub_assoc_of_le ?_ ?_ _)
-  · refine ENNReal.addLECancellable_iff_ne.2 (ENNReal.mul_ne_top probFailure_ne_top this)
-  · by_cases hr : r = 0
-    · simp only [hr, mul_zero, le_refl]
-    refine mul_le_of_le_div (le_of_le_of_eq probFailure_le_one ?_)
-    refine symm (ENNReal.div_self hr this)
-
-@[simp, grind =_]
-lemma probFailure_bind_const [Nonempty α] [HasEvalSPMF m] (mx : m α) (my : m β) :
-    Pr[⊥ | mx >>= fun _ => my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
-  rw [probFailure_bind_of_const mx fun _ => rfl]
-
 /-- Write the probability of `mx >>= my` failing given that `my` has constant failure chance over
 the possible outputs in `support mx` as a fixed expression without any sums. -/
-lemma probFailure_bind_eq_sub_mul' [Nonempty α] [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) (r : ℝ≥0∞) (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
+lemma probFailure_bind_of_const [HasEvalSPMF m]
+    {mx : m α} {my : α → m β} {r : ℝ≥0∞} (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
+    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r * (1 - Pr[⊥ | mx]) := by
+  calc Pr[⊥ | mx >>= my]
+    _ = Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * Pr[⊥ | my x] := by grind
+    _ = Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * r := by grind
+    _ = Pr[⊥ | mx] + r * (1 - Pr[⊥ | mx]) := by
+      rw [ENNReal.tsum_mul_right, mul_comm, tsum_support_probOutput_eq_sub]
+
+lemma probFailure_bind_of_const' [HasEvalSPMF m]
+    {mx : m α} {my : α → m β} {r : ℝ≥0∞} (hr : r ≠ ⊤) (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
+    Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + r - Pr[⊥ | mx] * r := by
+  rw [probFailure_bind_of_const h, ENNReal.mul_sub, AddLECancellable.add_tsub_assoc_of_le,
+    mul_comm Pr[⊥ | mx] r, mul_one] <;> simp [hr, ENNReal.mul_eq_top]
+
+@[simp, grind =_]
+lemma probFailure_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx >>= fun _ => my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [probFailure_bind_of_const' (by simp) fun _ _ => rfl]
+
+lemma probFailure_bind_eq_sub_mul [HasEvalSPMF m]
+    (mx : m α) (my : α → m β) (r : ℝ≥0∞) (hr : r ≠ ⊤) (h : ∀ x ∈ support mx, Pr[⊥ | my x] = r) :
     Pr[⊥ | mx >>= my] = 1 - (1 - Pr[⊥ | mx]) * (1 - r) := by
-  by_cases hmx : ∃ x, x ∈ (support mx)
-  · have hr : r ≤ 1 := by
-      obtain ⟨x, hx⟩ := hmx
-      specialize h x hx
-      aesop
-    rw [← ENNReal.toReal_eq_toReal_iff']
-    · rw [probFailure_bind_eq_add_tsum]
-
-      sorry
-
-    simp
-
-    simp
-  · rw [probFailure_eq_one]
-    rw [probFailure_eq_one]
-    simp
+  by_cases h' : (support mx).Nonempty
+  · obtain ⟨x, hx⟩ := h'
+    have : Pr[⊥ | my x] = r := h x hx
+    have hr : r ≠ ⊤ := by aesop
+    rw [probFailure_bind_of_const' hr h, ENNReal.one_sub_one_sub_mul_one_sub (by simp)]
     aesop
-    aesop
-
--- TODO: this is a really gross way to prove this.
--- Should be a better way to move to real
-lemma probFailure_bind_eq_sub_mul [Nonempty α] [HasEvalSPMF m]
-    (mx : m α) (my : α → m β) (r : ℝ≥0∞) (h : ∀ x, Pr[⊥ | my x] = r) :
-    Pr[⊥ | mx >>= my] = 1 - (1 - Pr[⊥ | mx]) * (1 - r) := by
-  have hr : r ≤ 1 := by
-    specialize h (Classical.arbitrary α)
-    rw [← h]
-    aesop
-  rw [probFailure_bind_of_const mx h]
-
-  rw [← ENNReal.toReal_eq_toReal_iff']
-
-  · rw [ENNReal.toReal_sub_of_le]
-    rw [ENNReal.toReal_add]
-    rw [ENNReal.toReal_sub_of_le]
-    rw [ENNReal.toReal_mul]
-    simp only [toReal_one, toReal_mul, probFailure_le_one, ne_eq, one_ne_top, not_false_eq_true,
-      toReal_sub_of_le]
-    rw [ENNReal.toReal_sub_of_le]
-    simp
-    set x := Pr[⊥ | mx].toReal
-    set v := r.toReal
-
-    ring
-    · simp [hr]
-    simp
-    apply mul_le_one'
-    simp
-    simp
-    simp
-    simp
-    aesop
-    refine le_add_left ?_
-    by_cases hr : r = 0
-    simp [hr]
-    refine ENNReal.mul_le_of_le_div ?_
-    rw [ENNReal.div_self]
-    aesop
-    aesop
-    aesop
-    aesop
-  · aesop
-  · simp
-
+  · rw [Set.nonempty_iff_ne_empty, not_not] at h'
+    have := evalDist_bind_of_support_eq_empty mx my h'
+    have hmx : Pr[⊥ | mx] = 1 := by aesop
+    rw [probFailure_def, this]
+    simp [hmx]
 
 end const
 
@@ -325,7 +280,6 @@ lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
     {s : ℝ≥0∞} (h' : Pr[⊥ | mx] ≤ s) (my : α → m β) {r : ℝ≥0∞}
     (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) :
     Pr[⊥ | mx >>= my] ≤ s + (1 - s) * r := by
-
   sorry
 
 /-- Version of `probFailure_bind_le_of_forall` with the `1 - s` factor ommited for convenience. -/
