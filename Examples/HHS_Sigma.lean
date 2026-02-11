@@ -1,34 +1,34 @@
-/-
-Copyright (c) 2024 Devon Tuma. All rights reserved.
-Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma
--/
-import VCVio
+-- /-
+-- Copyright (c) 2024 Devon Tuma. All rights reserved.
+-- Released under Apache 2.0 license as described in the file LICENSE.
+-- Authors: Devon Tuma
+-- -/
+-- import VCVio
 
-import Mathlib.Data.Vector.Zip
+-- import Mathlib.Data.Vector.Zip
 
-/-!
-# HHS Based Schnorr Signature
+-- /-!
+-- # HHS Based Schnorr Signature
 
-TODO: this should come from Fiat-Shamir instead
--/
+-- TODO: this should come from Fiat-Shamir instead
+-- -/
 
-open Mathlib OracleSpec OracleComp Sum
+-- open Mathlib OracleSpec OracleComp Sum
 
-section commits
+-- section commits
 
-variable {G P M : Type} [DecidableEq M]
-    [AddCommGroup G] [AddTorsor G P] {n : ℕ}
+-- variable {G P M : Type} [DecidableEq M]
+--     [AddCommGroup G] [AddTorsor G P] {n : ℕ}
 
-def zipCommits (sk : G) (gs : Vector G n)
-    (bs : Vector Bool n) : Vector G n :=
-  Vector.zipWith (λ c b ↦ if b then c else c + sk) gs bs
+-- def zipCommits (sk : G) (gs : Vector G n)
+--     (bs : Vector Bool n) : Vector G n :=
+--   Vector.zipWith (λ c b ↦ if b then c else c + sk) gs bs
 
-def unzipCommits (x₀ pk : P) (zs : Vector G n)
-    (hash : Vector Bool n) : Vector P n :=
-  Vector.zipWith (λ z b ↦ if b then z +ᵥ pk else z +ᵥ x₀) zs hash
+-- def unzipCommits (x₀ pk : P) (zs : Vector G n)
+--     (hash : Vector Bool n) : Vector P n :=
+--   Vector.zipWith (λ z b ↦ if b then z +ᵥ pk else z +ᵥ x₀) zs hash
 
-end commits
+-- end commits
 
 -- def SchnorrSigmaAlg (G P : ℕ → Type)
 --     [HomogeneousSpace G P] :

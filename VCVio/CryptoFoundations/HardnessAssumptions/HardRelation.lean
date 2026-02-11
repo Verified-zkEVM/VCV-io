@@ -5,7 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.Asymptotics.Negligible
-import VCVio.OracleComp.Coercions.Append
+import VCVio.OracleComp.Coercions.Add
 
 /-!
 # Hard Relations
@@ -24,8 +24,8 @@ In the actual implementation all of these are indexed by some security parameter
 -- because we can choose the exponent first (see `HardHomogeneousSpace`). -/
 -- structure GenerableRelation {ι : Type} (spec : ℕ → OracleSpec ι)
 --     (X W : ℕ → Type) (r : {n : ℕ} → X n → W n → Bool)
---     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SelectableType (X n)]
---     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SelectableType (W n)]
+--     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
+--     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
 --     extends OracleAlg spec where
 --   gen (n : ℕ) : OracleComp (spec n) (X n × W n)
 --   gen_sound (n : ℕ) (x : X n) (w : W n) :
@@ -37,8 +37,8 @@ In the actual implementation all of these are indexed by some security parameter
 -- given a random `x : X n`, such that `r x w` holds. For example the discrete log assumption says
 -- that this is hard for the relation "is the discrete log of". -/
 -- def hardRelationExp {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι}
---     {X W : ℕ → Type} [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SelectableType (X n)]
---     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SelectableType (W n)]
+--     {X W : ℕ → Type} [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
+--     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
 --     {r : {n : ℕ} → X n → W n → Bool} (gr : GenerableRelation spec X W r)
 --     (adv : SecAdv spec X W) : SecExp spec where
 --   main := λ n ↦ do
@@ -51,8 +51,8 @@ In the actual implementation all of these are indexed by some security parameter
 -- with `r x w` holding, but given `x` it is hard to find `w` where `r` holds. -/
 -- structure HardRelation {ι : Type} [DecidableEq ι] (spec : ℕ → OracleSpec ι)
 --     (X W : ℕ → Type) [Π n, Fintype (X n)]
---     [Π n, Inhabited (X n)] [Π n, SelectableType (X n)]
---     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SelectableType (W n)]
+--     [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
+--     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
 --     (r : {n : ℕ} → X n → W n → Bool)
 --     extends GenerableRelation spec X W r where
 --   relation_hard : ∀ (adv : SecAdv spec X W),

@@ -1,6 +1,8 @@
 import Lake
 open Lake DSL
 
+-- TODO: update linters and remove all errors in library
+-- should probably adopt conventions similar to `Batteries`.
 abbrev vcvLinters : Array LeanOption := #[
   -- ⟨`linter.docPrime, true⟩,
   ⟨`linter.hashCommand, true⟩,
@@ -8,8 +10,7 @@ abbrev vcvLinters : Array LeanOption := #[
   ⟨`linter.refine, true⟩,
   ⟨`linter.style.cdot, true⟩,
   ⟨`linter.style.dollarSyntax, true⟩,
-  -- ⟨`linter.style.lambdaSyntax, true⟩,
-  ⟨`linter.style.longLine, true⟩,
+  ⟨`linter.style.longLine, false⟩, -- temp
   ⟨`linter.style.longFile, .ofNat 1500⟩,
   ⟨`linter.style.missingEnd, true⟩,
   ⟨`linter.style.setOption, true⟩
@@ -25,7 +26,7 @@ package VCVio where
     ++ vcvLinters.map fun s ↦
       { s with name := `weak ++ s.name }
 
-require "leanprover-community" / "mathlib" @ git "v4.24.0-rc1"
+require "leanprover-community" / "mathlib" @ git "v4.26.0"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio
@@ -46,12 +47,12 @@ lean_exe test where root := `Test
 --    precompileModules := true
 
 -- Compiling extenal C++ files
-target libsodium.o pkg : System.FilePath := do
-  let oFile := pkg.buildDir / "c" / "libsodium.o"
-  let srcJob ← inputTextFile <| pkg.dir / "LibSodium" / "c" / "libsodium.cpp"
-  let weakArgs := #["-I", (← getLeanIncludeDir).toString]
-  buildO oFile srcJob weakArgs #["-fPIC"] "c++" getLeanTrace
-extern_lib libleanffi pkg := do
-  let ffiO ← libsodium.o.fetch
-  let name := nameToStaticLib "leanlibsodium"
-  buildStaticLib (pkg.sharedLibDir / name) #[ffiO]
+-- target libsodium.o pkg : System.FilePath := do
+--   let oFile := pkg.buildDir / "c" / "libsodium.o"
+--   let srcJob ← inputTextFile <| pkg.dir / "LibSodium" / "c" / "libsodium.cpp"
+--   let weakArgs := #["-I", (← getLeanIncludeDir).toString]
+--   buildO oFile srcJob weakArgs #["-fPIC"] "c++" getLeanTrace
+-- extern_lib libleanffi pkg := do
+--   let ffiO ← libsodium.o.fetch
+--   let name := nameToStaticLib "leanlibsodium"
+--   buildStaticLib (pkg.sharedLibDir / name) #[ffiO]

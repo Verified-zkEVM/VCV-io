@@ -143,7 +143,7 @@ protected def mapM_aux [Pure m] [Bind m] (s : {α : Type u} → f α → m α) :
 
 protected def mapM' (m : Type u → Type w) [Monad m] [LawfulMonad m]
     (s : {α : Type u} → f α → m α) : FreeMonad f →ᵐ m where
-  toFun := FreeMonad.mapM_aux s
+  toFun α f := FreeMonad.mapM_aux s f
   toFun_pure' x := rfl
   toFun_bind' x y := by
     induction x using FreeMonad.inductionOn with
@@ -209,8 +209,8 @@ noncomputable def depthBindAux {f : Type u → Type v} {α β : Type u} :
   | .pure x, g => depth (g x)
   | .roll _ r, g => 1 + iSup (λ u ↦ depthBindAux (r u) g)
 
-/-- The depth of a bind computation can be defined _exactly_ using the definition of bind
-(but might not be very revealing). -/
+/-- The depth of a bind computation can be defined _exactly_
+  using the definition of bind (but might not be very revealing) -/
 lemma depth_bind_eq {x : FreeMonad f α} {g : α → FreeMonad f β} :
     depth (x >>= g) = depthBindAux x g := by
   induction x using FreeMonad.inductionOn with

@@ -19,62 +19,67 @@ open OracleComp OracleSpec
 
 universe u v w
 
-variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
+variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
 
 namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
 /-- Modify a query implementation to cache previous call and return that output in the future. -/
-def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache m) where
-  impl | query i t => do match (← get) i t with
+def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache m) :=
+  fun t => do match (← get) t with
     | Option.some u => return u
     | Option.none =>
-        let u ← so.impl (query i t)
-        modifyGet fun cache => (u, cache.cacheQuery i t u)
+        let u ← so t
+        modifyGet fun cache => (u, cache.cacheQuery t u)
 
-@[simp] lemma withCaching_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
-    so.withCaching.impl q = match q with | query i t => (do match (← get) i t with
-      | Option.some u => return u
-      | Option.none =>
-          let u ← so.impl (query i t)
-          modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
+@[simp] lemma withCaching_apply (so : QueryImpl spec m) (t : spec.Domain) :
+    so.withCaching t = (do match (← get) t with
+    | Option.some u => return u
+    | Option.none =>
+        let u ← so t
+        modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
 end QueryImpl
+
+@[inline, reducible] def randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
+    [∀ t : spec.Domain, SampleableType (spec.Range t)] :
+    QueryImpl spec (StateT spec.QueryCache ProbComp) :=
+  uniformSampleImpl.withCaching
 
 /-- Oracle for caching queries to the oracles in `spec`, querying fresh values if needed. -/
 @[inline, reducible] def cachingOracle :
     QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-  idOracle.withCaching
+  (QueryImpl.ofLift spec (OracleComp spec)).withCaching
 
 namespace cachingOracle
 
-lemma apply_eq {α} (q : OracleQuery spec α) : cachingOracle.impl q =
-  match q with | query i t => (do match (← get) i t with
+lemma apply_eq (t : spec.Domain) : cachingOracle t =
+  (do match (← get) t with
     | Option.some u => return u
     | Option.none =>
-        let u ← query i t
-        modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
+        let u ← query t
+        modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
 end cachingOracle
 
--- NOTE: need to change universe levels b/c `unifSpec` doesn't use `pNat`.
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
+-- -- NOTE: need to change universe levels b/c `unifSpec` doesn't use `pNat`.
+-- variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
 
-/-- Random Oracle implemented as a uniform selection oracle with caching -/
-@[inline, reducible] def randomOracle [(i : ι) → SelectableType (spec.range i)] :
-    QueryImpl spec (StateT spec.QueryCache (OracleComp unifSpec)) :=
-  unifOracle.withCaching
+-- /-- Random Oracle implemented as a uniform selection oracle with caching -/
+-- @[inline, reducible] def randomOracle [(i : spec.Domain) → SampleableType (spec.Range i)] :
+--     QueryImpl spec (StateT spec.QueryCache (OracleComp unifSpec)) :=
+--   unifOracle.withCaching
 
-namespace randOracle
+-- namespace randOracle
 
-variable [(i : ι) → SelectableType (spec.range i)]
+-- variable [(i : ι) → SampleableType (spec.Range i)]
 
-lemma apply_eq {α} (q : OracleQuery spec α) : randomOracle.impl q =
-    match q with | query i t => (do match (← get) i t with
-      | Option.some u => return u
-      | Option.none =>
-          let u ←$ᵗ (spec.range i)
-          modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
+-- lemma apply_eq {α} (q : OracleQuery spec α) : randomOracle.impl q =
+--     match q with | query i t => (do match (← get) i t with
+--       | Option.some u => return u
+--       | Option.none =>
+--           let u ←$ᵗ (spec.Range i)
+--           modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
 
-end randOracle
+-- end randOracle

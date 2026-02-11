@@ -3,52 +3,49 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.OracleComp
--- import VCVio.OracleComp.Constructions.Replicate
--- import VCVio.OracleComp.Constructions.UniformSelect
+import VCVio.OracleComp.ProbComp
+import Batteries.Lean.LawfulMonad
 
 /-!
 # Executing Computations
 
-This file defines a function `runIO` for executing a computation via the `IO` monad.
-
-The semantics mirror `evalDist` in that the oracle will respond uniformly at random,
-however we need to limit the oracle set to `unifSpec` to get computability of the function.
-In particular we can't choose randomly from arbitrary types.
-Usually it's possible to reduce to this anyway using `SelectableType` instances (see `unifOracle`).
-
-NOTE: `OracleComp.failure` could instead be an error to allow error msg propogation.
+This file defines a function `runIO` for executing a `ProbComp` in the `IO` monad.
+We add this embedding as a `MonadLift` instance, so `#eval` notation works.
 -/
 
 open OracleSpec
 
 namespace OracleComp
 
-/-- Represent an `OracleComp` via the `IO` monad, allowing actual execution.
-NOTE: `OracleComp` as currently defined doesn't allow specialized error messaging.
-Changing this would just require adding a `String` to the `failure` constructor -/
+/-- Represent a `ProbComp` via the `IO` monad, allowing actual execution. -/
 protected def runIO {α : Type} (oa : ProbComp α) : IO α :=
-  oa.mapM (fail := throw (IO.userError "Computation failed during execution"))
-    -- Problem with bump to v4.22.0-rc2: `IO.rand` returns `Nat` instead of `Fin`
-    (query_map := λ ⟨i, _⟩ ↦ (Fin.ofNat (i + 1)) <$> IO.rand 0 i) -- Queries become random selection
-
--- protected def runIO' {α : Type} (oa : OracleComp probSpec α) : IO α :=
---   oa.mapM (fail := throw (IO.userError "Computation failed during execution"))
---     (query_map := fun (query m n) => IO.rand n m) -- Queries become random selection
+  simulateQ (spec := unifSpec) (fun n => Fin.ofNat (n + 1) <$> (IO.rand 0 n).toIO) oa
 
 /-- Automatic lifting of probabalistic computations into `IO`. -/
-instance : MonadLift ProbComp IO where
-  monadLift := OracleComp.runIO
+instance : MonadLift ProbComp IO where monadLift := OracleComp.runIO
 
-def test : IO (ℕ × ℕ) := do
-  let x ← IO.rand 0 1618
-  let y ← IO.rand 0 3141
-  let z := x + y
-  IO.println z
-  return (x, y)
+def test1 : ProbComp (ℕ × ℕ × ℕ) := do
+  let x ← $[0..1618]
+  let y ← $[0..3141]
+  return (x, y, x + y)
 
-#print test
+def test2 (n : ℕ) : ProbComp (List ℕ) := do
+  match n with
+  | 0 => return []
+  | n + 1 => return (← $[0..100]) :: (← test2 n)
 
--- #eval Nat.add <$> $[0..10] <*> $[0..10]
+def test3 (n : ℕ) : ProbComp (List ℕ) := do
+  let mut xs := []
+  for _ in List.range n do
+    xs := (← $[0..100]) :: xs
+  return xs
+
+def test4 (n : ℕ) : ProbComp (List ℕ) := do
+  (List.replicate n ()).mapM (fun () => Fin.val <$> ($[0..100]))
+
+-- #eval test1
+-- #eval test2 100
+-- #eval test3 100
+-- #eval test4 100
 
 end OracleComp
