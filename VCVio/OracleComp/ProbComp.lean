@@ -66,13 +66,13 @@ lemma support_uniformFin (n : ℕ) :
 lemma finSupport_uniformFin (n : ℕ) :
     finSupport (do $[0..n]) = Finset.univ := by grind
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_uniformFin_eq_div (n : ℕ) (m : Fin (n + 1)) :
     Pr[= m | do $[0..n]] = 1 / (n + 1) := by simp [uniformFin_def]
 
 @[simp, grind =]
 lemma probOutput_uniformFin (n : ℕ) (m : Fin (n + 1)) :
-    Pr[= m | do $[0..n]] = (n + 1 : ℝ≥0∞)⁻¹ := by simp
+    Pr[= m | do $[0..n]] = (n + 1 : ℝ≥0∞)⁻¹ := by simp [uniformFin_def]
 
 @[simp, grind =]
 lemma probEvent_uniformFin (n : ℕ) (p : Fin (n + 1) → Prop) [DecidablePred p] :
@@ -122,8 +122,7 @@ lemma support_uniformRange (n m : ℕ) (h : n < m) :
 @[simp]
 lemma finSupport_uniformRange (n m : ℕ) (h : n < m) :
     finSupport (do uniformRange n m h) =
-      Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
-  aesop
+      Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by aesop
 
 @[simp, grind =]
 lemma probOutput_uniformRange (n m : ℕ) (k : Fin (m + 1)) (h : n < m) :
@@ -197,86 +196,62 @@ section uniformSelectList
 If the list is empty we instead just fail rather than choose a default value.
 This means selecting from a vector is often preferable, as we can prove at the type level
 that there is an element in the list, avoiding the defualt case of empty lists. -/
-instance hasUniformSelectList (α : Type) [Inhabited α] :
+instance hasUniformSelectList (α : Type) :
     HasUniformSelect (List α) α where
-  uniformSelect xs := do Option.getM (← (xs[·]?) <$> $[0..xs.length])
+  uniformSelect
+    | [] => failure
+    | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length]
 
-variable {α : Type} [Inhabited α]
+variable {α : Type}
 
 lemma uniformSelectList_def (xs : List α) :
-    $ xs = (do Option.getM (← (xs[·]?) <$> $[0..xs.length])) := rfl
+    $ xs = match xs with
+      | [] => failure
+      | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length] := rfl
 
-@[simp] lemma uniformSelectList_nil :
-    $ ([] : List α) = liftM $[0..0] *> failure := by
-  simp [hasUniformSelectList, seqRight_eq_bind]
+@[simp, grind =]
+lemma uniformSelectList_nil : $ ([] : List α) = failure := rfl
 
+@[grind =]
 lemma uniformSelectList_cons (x : α) (xs : List α) :
-    $ (x :: xs) = ((x :: xs)[·]) <$> $[0..xs.length] := by
-  simp [hasUniformSelectList]
-  simp [map_eq_bind_pure_comp]
-  sorry
+    $ (x :: xs) = ((x :: xs)[·]) <$> $[0..xs.length] := rfl
 
--- @[simp] lemma run_uniformSelectList (xs : List α) :
---     OptionT.run ($ xs) = (xs[·]?) <$> $[0..xs.length] := by
---   induction xs with
---   | nil =>
---     simp
+@[simp, grind =]
+lemma support_uniformSelectList (xs : List α) :
+    support ($ xs) = {x | x ∈ xs} := match xs with
+  | [] => by simp
+  | x :: xs => by simp [uniformSelectList_cons, Set.ext_iff, Fin.exists_iff,
+      - List.mem_cons, List.mem_iff_getElem]
 
+@[simp, grind =]
+lemma finSupport_uniformSelectList [DecidableEq α] (xs : List α) :
+    finSupport ($ xs) = xs.toFinset := match xs with
+  | [] => by simp
+  | x :: xs => by
+      apply finSupport_eq_of_support_eq_coe
+      simp [Set.ext_iff]
 
---   | cons x xs h =>
---     simp [uniformSelectList_cons]
---     simp [getElem?_def]
---     sorry
+@[simp, grind =]
+lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
+    Pr[= x | $ xs] = (xs.count x : ℝ≥0∞) / xs.length := match xs with
+  | [] => by simp
+  | y :: ys => by
+    rw [List.count, ← List.countP_eq_sum_fin_ite]
+    simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
 
+@[simp] lemma probFailure_uniformSelectList (xs : List α) :
+    Pr[⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with
+  | [] => by simp
+  | y :: ys => by simp [uniformSelectList_cons]
 
--- @[simp] lemma evalDist_uniformSelectList (xs : List α) :
---     evalDist ($ xs) = match xs with
---     | [] => failure
---     | x :: xs => (PMF.uniformSample (Fin xs.length.succ)).map (some (x :: xs)[·]) :=
---   match xs with
---   | [] => by simp only [uniformSelectList_nil, evalDist_failure]; rfl
---   | x :: xs => by
---     apply OptionT.ext
---     simp only [uniformSelectList_cons, Fin.getElem_fin, evalDist_map, evalDist_liftM,
---       OptionT.run_map, OptionT.run_lift, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
---       Nat.succ_eq_add_one]
---     simp [OptionT.run, PMF.monad_map_eq_map, PMF.map, Function.comp_def]
-
--- @[simp] lemma support_uniformSelectList (xs : List α) :
---     ($ xs).support = if xs.isEmpty then ∅ else {y | y ∈ (xs)} :=
---   match xs with
---   | [] => rfl
---   | x :: xs => by simp only [uniformSelectList_cons, Fin.getElem_fin, support_map,
---       support_uniformFin, Set.image_univ, List.isEmpty_cons, Bool.false_eq_true, ↓reduceIte,
---       List.mem_iff_get, List.length_cons, List.get_eq_getElem, Set.ext_iff, Set.mem_range,
---       Set.mem_setOf_eq, implies_true]
-
--- @[simp] lemma finSupport_uniformSelectList [DecidableEq α] (xs : List α) :
---     ($ xs).finSupport = if xs.isEmpty then ∅ else xs.toFinset :=
---   match xs with
---   | [] => rfl
---   | x :: xs => by
---       simp only [finSupport_eq_iff_support_eq_coe, support_uniformSelectList,
---         List.isEmpty_cons, Bool.false_eq_true, if_false]
---       refine Set.ext (λ y ↦ by simp)
-
--- @[simp] lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
---     [= x | $ xs] = if xs.isEmpty then 0 else (xs.count x : ℝ≥0∞) / xs.length := match xs with
---   | [] => by simp
---   | y :: ys => by
---     rw [List.count, ← List.countP_eq_sum_fin_ite]
---     simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
-
--- @[simp] lemma probFailure_uniformSelectList (xs : List α) :
---     [⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with
---   | [] => by simp
---   | y :: ys => by simp [uniformSelectList_cons]
-
--- @[simp] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
---     [p | $ xs] = if xs.isEmpty then 0 else (xs.countP p : ℝ≥0∞) / xs.length := match xs with
---   | [] => by simp
---   | y :: ys => by simp [← List.countP_eq_sum_fin_ite, uniformSelectList_cons,
---       probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, Function.comp_def]
+@[simp] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
+    Pr[p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
+  | [] => by simp
+  | y :: ys => by
+    simp [uniformSelectList_cons]
+    congr 2
+    simp [← List.countP_eq_sum_fin_ite]
+    sorry
 
 end uniformSelectList
 
@@ -350,7 +325,7 @@ section uniformSelectFinset
 /-- Choose a random element from a finite set, by converting to a list and choosing from that.
 This is noncomputable as we don't have a canoncial ordering for the resulting list,
 so generally this should be avoided when possible. -/
-noncomputable instance hasUniformSelectFinset (α : Type) [Inhabited α] :
+noncomputable instance hasUniformSelectFinset (α : Type) :
     HasUniformSelect (Finset α) α where
   uniformSelect s := $ s.toList
 
@@ -410,5 +385,14 @@ noncomputable instance hasUniformSelectFinset (α : Type) [Inhabited α] :
 --     simp [hs, uniformSelectFinset_def]
 
 end uniformSelectFinset
+
+section uniformSelectArray
+
+instance {α : Type _} : HasUniformSelect (Array α) α where
+  uniformSelect xs := do (xs[← $[0..xs.size]]?).getM
+
+end uniformSelectArray
+
+
 
 end ProbComp

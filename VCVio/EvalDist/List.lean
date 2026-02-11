@@ -136,14 +136,7 @@ lemma probOutput_list_mapM_loop [DecidableEq β]
     (zs : List β) : Pr[= zs | List.mapM.loop f xs ys] =
       if zs.length = xs.length + ys.length ∧ zs.take ys.length = ys.reverse
       then (List.zipWith (fun x z => Pr[= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
-  split_ifs with h
-  ·
-    sorry
-  · simp
-    sorry
-
   stop
-
   rw [list_mapM_loop_eq]
   rw [probOutput_map_append_left]
   by_cases h : take ys.length zs = ys.reverse
@@ -394,4 +387,4 @@ end mapM
 
 -- end Vector
 
--- end OracleComp
+end OracleComp
