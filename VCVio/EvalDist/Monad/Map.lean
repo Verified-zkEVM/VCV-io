@@ -98,7 +98,7 @@ lemma probOutput_map_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
 
 @[simp, grind =]
 lemma probFailure_map : Pr[⊥ | f <$> mx] = Pr[⊥ | mx] := by
-  simp [map_eq_bind_pure_comp, probFailure_bind_eq_tsum]
+  simp [map_eq_bind_pure_comp, probFailure_bind_eq_add_tsum]
 
 @[simp, grind =]
 lemma probEvent_map (q : β → Prop) : Pr[q | f <$> mx] = Pr[q ∘ f | mx] := by
