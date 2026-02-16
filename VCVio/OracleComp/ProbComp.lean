@@ -389,7 +389,9 @@ end uniformSelectFinset
 section uniformSelectArray
 
 instance {α : Type _} : HasUniformSelect (Array α) α where
-  uniformSelect xs := do (xs[← $[0..xs.size]]?).getM
+  uniformSelect xs := if h : xs.size = 0 then failure else do
+    let u ← $[0..xs.size-1]
+    return xs[u] -- Note the in-index bound here relies on `h`.
 
 end uniformSelectArray
 
