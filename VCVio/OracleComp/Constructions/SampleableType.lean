@@ -24,13 +24,12 @@ with a computation `selectElem` that selects uniformly at random from the type.
 This generally requires choosing some "canonical" ordering for the type,
 so we include this to get a computable version of selection.
 We also require that each element has the same probability of being chosen from by `selectElem`,
-see `SampleableType.probOutput_selectElem` for the reduction when `α` has a fintype instance.
-NOTE: universe polymorphism of `β` is hard. -/
+see `SampleableType.probOutput_uniformSample` for the reduction when `α` has a fintype instance
+involving the explicit cardinality of the type. -/
 class SampleableType (β : Type) where
   selectElem : ProbComp β
   mem_support_selectElem (x : β) : x ∈ support selectElem
   probOutput_selectElem_eq (x y : β) : Pr[= x | selectElem] = Pr[= y | selectElem]
-  probFailure_selectElem : Pr[⊥ | selectElem] = 0
 
 /-- Select uniformly from the type `β` using a type-class provided definition.
 NOTE: naming is somewhat strange now that `Fintype` isn't explicitly required. -/
@@ -48,11 +47,10 @@ lemma probOutput_uniformSample [Fintype α] (x : α) :
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
   refine ENNReal.eq_inv_of_mul_eq_one_left ?_
   simp_rw [this, Finset.mul_sum, mul_one]
-  rw [← sum_probOutput_eq_one (mx := $ᵗ α) SampleableType.probFailure_selectElem]
+  rw [← sum_probOutput_eq_one (mx := $ᵗ α) (by aesop)]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
-lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=
-  SampleableType.probFailure_selectElem
+lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 := by aesop
 
 @[simp] instance : NeverFail ($ᵗ α) := inferInstance
 
@@ -83,13 +81,11 @@ instance (α : Type) [Unique α] : SampleableType α where
   selectElem := return default
   mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
   probOutput_selectElem_eq x y := by rw [Unique.eq_default x, Unique.eq_default y]
-  probFailure_selectElem := by simp
 
 instance : SampleableType Bool where
   selectElem := $! #v[true, false]
   mem_support_selectElem x := by sorry
   probOutput_selectElem_eq x y := by sorry --simp
-  probFailure_selectElem := by sorry --simp
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
 instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
@@ -100,27 +96,23 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
     stop
     simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
       probOutput_uniformSample, forall_const, implies_true]
-  probFailure_selectElem := by sorry --simp [probFailure_seq]
 
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
 instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by sorry
   probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
-  probFailure_selectElem := by sorry-- simp
 
 instance (n : ℕ) : SampleableType (ZMod (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by sorry
   probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
-  probFailure_selectElem := by sorry-- simp
 
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
 instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
   selectElem := congr_arg Fin (Nat.succ_pred (NeZero.ne n)).symm ▸ $ᵗ (Fin (n - 1 + 1))
   mem_support_selectElem x := by sorry --rw [mem_support_eqRec_iff]; simp
   probOutput_selectElem_eq x y := by sorry --simp [probOutput_eqRec]
-  probFailure_selectElem := by sorry --simp
 
 /-- Select a uniform element from `Vector α n` by independently selecting `α` at each index. -/
 instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n) where
@@ -154,11 +146,6 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
     unfold uniformSample
     rw [SampleableType.probOutput_selectElem_eq x.back y.back]
     exact congrFun (congrArg HMul.hMul (ih x.pop y.pop)) Pr[= y.back | SampleableType.selectElem]
-  probFailure_selectElem := by
-    stop
-    induction n with
-    | zero => simp
-    | succ m ih => simp [ih, probFailure_seq]
 
 /-- Select a uniform element from `Matrix α n` by independently selecting `α` at each index. -/
 instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
@@ -193,13 +180,6 @@ instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
     rfl
   | succ m ih =>
     sorry
-  probFailure_selectElem := by
-    stop
-    induction n with
-    | zero => simp
-    | succ m ih =>
-      simp [ih, probFailure_seq, probFailure_pure, probFailure_ite]
-      sorry
 
 /-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
 def SampleableType.ofEquiv {α β : Type} [DecidableEq α] [DecidableEq β] [SampleableType α]
@@ -228,7 +208,6 @@ def SampleableType.ofEquiv {α β : Type} [DecidableEq α] [DecidableEq β] [Sam
         · rfl
     rw [reduce_sum x, reduce_sum y]
     apply SampleableType.probOutput_selectElem_eq
-  probFailure_selectElem := by simp
 
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [DecidableEq α] :
@@ -238,11 +217,11 @@ instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [De
       invFun := _root_.Vector.ofFn
       left_inv := fun v => by
         ext i
-        simp only [Vector.ofFn, Vector.get, Fin.coe_cast, Vector.getElem_toArray, Vector.getElem_mk,
+        simp only [Vector.ofFn, Vector.get, Fin.val_cast, Vector.getElem_toArray, Vector.getElem_mk,
           Array.getElem_ofFn]
       right_inv := fun f => by
         funext i
-        simp only [Vector.get, Vector.ofFn, Fin.coe_cast, Array.getElem_ofFn, Fin.eta] }
+        simp only [Vector.get, Vector.ofFn, Fin.val_cast, Array.getElem_ofFn, Fin.eta] }
   exact SampleableType.ofEquiv (instVectorFinFuncEquiv)
 
 end instances
