@@ -56,7 +56,7 @@ export HasEvalFinset (finSupport coe_finSupport)
 
 attribute [simp, grind =] coe_finSupport
 
-@[grind =]
+@[grind =, aesop unsafe norm]
 lemma mem_finSupport_iff_mem_support [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (x : α) : x ∈ finSupport mx ↔ x ∈ support mx := by
   rw [← Finset.mem_coe, coe_finSupport]

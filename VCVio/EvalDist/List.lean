@@ -13,17 +13,16 @@ This file contains lemmas for `probEvent` and `probOutput` of computations invol
 We also include `Vector` as a related case.
 -/
 
--- open OracleSpec OracleComp
+open OracleSpec OracleComp
 
--- universe u v w
+universe u v w
 
--- namespace OracleComp
+namespace OracleComp
 
--- variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
+variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
+    {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
 
--- section List
-
--- open List
+open List
 
 -- variable (oa : OracleComp spec α) (ob : OracleComp spec (List α))
 
@@ -102,94 +101,137 @@ We also include `Vector` as a related case.
 
 -- end append
 
--- section mapM
+section mapM
 
--- -- @[simp]
--- -- lemma mem_support_list_mapM {f : α → OracleComp spec β} {as : List α}
--- --     (x : List β) : x ∈ (List.mapM f as).support ↔ ∀ i : Fin x.length, x[i] ∈ (f (as[i]'(by simp))).support := by
--- --   induction as with
--- --   | nil => simp [neverFails_pure]
--- --   | cons a as ih =>
--- --     simp [List.mapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff, Vector.insertIdx]
+lemma probFailure_list_mapM_loop (xs : List α) (f : α → m β) (ys : List β) :
+    Pr[⊥ | List.mapM.loop f xs ys] = 1 - (xs.map (1 - Pr[⊥ | f ·])).prod := by
+  revert ys
+  induction xs with
+  | nil => simp [List.mapM.loop]
+  | cons x xs h =>
+      intros ys
+      simp only [List.mapM.loop, List.map_cons, List.prod_cons]
+      rw [probFailure_bind_eq_sub_mul _ _ (1 - (List.map (fun x ↦ 1 - Pr[⊥|f x]) xs).prod)]
+      · congr 2
+        rw [AddLECancellable.tsub_tsub_cancel_of_le]
+        simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.sub_eq_top_iff,
+          ENNReal.one_ne_top, false_and, not_false_eq_true]
+        refine (List.prod_le_pow_card _ 1 <| by simp).trans (le_of_eq <| one_pow _)
+      · simp
+      · simp [h]
 
--- @[simp]
--- lemma probFailure_list_mapM_loop {α β : Type*} [spec.FiniteRange]
---     (xs : List α) (f : α → OracleComp spec β) (ys : List β) :
---     [⊥ | List.mapM.loop f xs ys] = 1 - (xs.map (1 - [⊥ | f ·])).prod := by
---   revert ys
---   induction xs with
---   | nil => {
---     simp [List.mapM.loop]
---   }
---   | cons x xs h => {
---     intros ys
---     simp only [List.mapM.loop, List.map_cons, List.prod_cons]
---     rw [probFailure_bind_eq_sub_mul (1 - (List.map (fun x ↦ 1 - [⊥|f x]) xs).prod)]
---     · congr 2
---       refine ENNReal.sub_sub_cancel ENNReal.one_ne_top ?_
---       refine le_of_le_of_eq ?_ (one_pow (List.map (fun x ↦ 1 - [⊥|f x]) xs).length)
---       exact List.prod_le_pow_card _ _ (by simp)
---     · simp [h]
---   }
-
--- @[simp]
--- lemma probFailure_list_mapM {α β : Type*} [spec.FiniteRange] (xs : List α)
---     (f : α → OracleComp spec β) : [⊥ | xs.mapM f] = 1 - (xs.map (1 - [⊥ | f ·])).prod := by
---   rw [mapM, probFailure_list_mapM_loop]
+@[simp, grind =]
+lemma probFailure_list_mapM (xs : List α) (f : α → m β) :
+    Pr[⊥ | xs.mapM f] = 1 - (xs.map (1 - Pr[⊥ | f ·])).prod := by
+  rw [mapM, probFailure_list_mapM_loop]
 
 -- -- @[simp]
 -- -- lemma probOutput_list_mapM_loop' {α β : Type*} [DecidableEq β] [spec.FiniteRange]
 -- --     (xs : List α) (f : α → OracleComp spec β) (ys : List β)
 -- --     (zs : List β) : [= zs | List.mapM.loop f xs ys] =
 
--- @[simp]
--- lemma probOutput_list_mapM_loop {α β : Type*} [DecidableEq β] [spec.FiniteRange]
---     (xs : List α) (f : α → OracleComp spec β) (ys : List β)
---     (zs : List β) : [= zs | List.mapM.loop f xs ys] =
---       if zs.length = xs.length + ys.length ∧ zs.take ys.length = ys.reverse
---       then (List.zipWith (λ x z ↦ [= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
---   rw [list_mapM_loop_eq]
---   rw [probOutput_map_append_left]
---   by_cases h : take ys.length zs = ys.reverse
---   · simp only [length_reverse, h, ↓reduceIte, and_true]
---     induction zs using List.reverseRecOn with
---     | nil => {
---       simp at h
---       simp [h]
---       cases xs with
---       | nil => {
---         simp [mapM.loop]
---       }
---       | cons x xs => {
---         simp [mapM.loop]
---         intro _ _
---         rw [list_mapM_loop_eq]
---         simp
---       }
---     }
---     | append_singleton zs z hzs => {
---       cases xs with
---       | nil => {
---         suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length
---         by simp [mapM.loop, this]
---         refine LE.le.le_iff_eq ?_
---         simpa using congr_arg length h
---       }
---       | cons x xs => {
---         simp [Nat.succ_add, mapM.loop]
---         sorry
---       }
---     }
---   · simp [h]
+@[simp]
+lemma probOutput_list_mapM_loop [DecidableEq β]
+    (xs : List α) (f : α → m β) (ys : List β)
+    (zs : List β) : Pr[= zs | List.mapM.loop f xs ys] =
+      if zs.length = xs.length + ys.length ∧ zs.take ys.length = ys.reverse
+      then (List.zipWith (fun x z => Pr[= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
+  stop
+  rw [list_mapM_loop_eq]
+  rw [probOutput_map_append_left]
+  by_cases h : take ys.length zs = ys.reverse
+  · simp only [length_reverse, h, ↓reduceIte, and_true]
+    induction zs using List.reverseRecOn with
+    | nil => {
+      simp at h
+      simp [h]
+      cases xs with
+      | nil => {
+        simp [mapM.loop]
+      }
+      | cons x xs => {
+        simp [mapM.loop]
+        intro _ _
+        rw [list_mapM_loop_eq]
+        simp
+      }
+    }
+    | append_singleton zs z hzs => {
+      cases xs with
+      | nil => {
+        suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length
+        by simp [mapM.loop, this]
+        refine LE.le.le_iff_eq ?_
+        simpa using congr_arg length h
+      }
+      | cons x xs => {
+        simp [Nat.succ_add, mapM.loop]
 
--- @[simp]
--- lemma probOutput_list_mapM {α β : Type*} [spec.FiniteRange] (xs : List α)
---     (f : α → OracleComp spec β) (ys : List β) : [= ys | xs.mapM f] = if ys.length = xs.length
---       then (List.zipWith (fun x y => [= y | f x]) xs ys).prod else 0 := by
---   have : DecidableEq β := Classical.decEq β
---   simp [List.mapM]
 
--- end mapM
+      }
+    }
+  · simp [h]
+
+lemma probOutput_bind_eq_mul {mx : m α} {my : α → m β} {y : β} (x : α)
+    (h : ∀ x' ∈ support mx, y ∈ support (my x') → x' = x) :
+    Pr[= y | mx >>= my] = Pr[= x | mx] * Pr[= y | my x] := by
+  rw [probOutput_bind_eq_tsum]
+  refine (tsum_eq_single x ?_)
+  grind [= mul_eq_zero]
+
+@[simp]
+lemma probOutput_cons_map [DecidableEq α] (mx : m (List α)) (x : α) (xs : List α) :
+    Pr[= xs | cons x <$> mx] =
+      if hxs : xs = [] then 0 else Pr[= xs.head hxs | (pure x : m α)] * Pr[= xs.tail | mx] := by
+  sorry
+
+@[simp]
+lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys : List β) :
+    Pr[= ys | xs.mapM f] = if ys.length = xs.length
+      then (List.zipWith (Pr[= · | f ·]) ys xs).prod else 0 := by
+  have : DecidableEq β := Classical.decEq β
+  revert ys
+  induction xs with
+  | nil => simp
+  | cons x xs h =>
+      intro ys
+      split_ifs with hys
+      · simp at hys
+        obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
+        simp
+        rw [probOutput_bind_eq_mul y]
+        simp [h]
+        clear *- hys
+        aesop
+        simp
+      · simp
+        sorry
+
+@[simp]
+lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys : List β) :
+    Pr[= ys | xs.mapM' f] = if ys.length = xs.length
+      then (List.zipWith (Pr[= · | f ·]) ys xs).prod else 0 := by
+  have : DecidableEq β := Classical.decEq β
+  revert ys
+  induction xs with
+  | nil => simp
+  | cons x xs h =>
+      intro ys
+      split_ifs with hys
+      · simp at hys
+        obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
+        simp
+        rw [probOutput_bind_eq_mul y]
+        simp [h]
+        clear *- hys
+        aesop
+        simp
+      · simp
+        sorry
+
+
+
+end mapM
 
 -- section neverFails
 
@@ -345,4 +387,4 @@ We also include `Vector` as a related case.
 
 -- end Vector
 
--- end OracleComp
+end OracleComp

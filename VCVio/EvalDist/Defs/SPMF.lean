@@ -57,7 +57,7 @@ instance : FunLike (SPMF α) α ENNReal where
   coe p x := OptionT.run p (some x)
   coe_injective' _ _ h := OptionT.ext (PMF.ext_forall_ne none fun | some x, _ => congr_fun h x)
 
-@[aesop norm 100, grind =] -- TODO: decide if this should be a simp
+@[aesop unsafe norm, grind =] -- TODO: decide if this should be a simp
 lemma apply_eq_toPMF_some (p : SPMF α) (x : α) : p x = p.toPMF (some x) := rfl
 
 @[grind =]
@@ -131,19 +131,19 @@ lemma run_none_eq_one_sub (p : SPMF α) :
   simp only [ne_eq, tsum_run_some_ne_top, not_false_eq_true]
 
 @[ext]
-lemma ext {p q : SPMF α} (h : ∀ x : α, p.toPMF (some x) = q.toPMF (some x)) : p = q :=
-  PMF.ext fun
+lemma ext {p q : SPMF α} (h : ∀ x : α, p x = q x) : p = q := by
+  simp [SPMF.apply_eq_toPMF_some] at h
+  refine PMF.ext fun
     | some x => h x
     | none =>  calc p.toPMF none
         _ = 1 - ∑' x, p.toPMF (some x) := by rw [run_none_eq_one_sub]
-        _ = 1 - ∑' x, q.toPMF (some x) := by simp only [h]
+        _ = 1 - ∑' x, q.toPMF (some x) := by simp [h]
         _ = q.toPMF none := by rw [run_none_eq_one_sub]
 
 open Classical in
 lemma eq_liftM_iff_forall (p : SPMF α) (q : PMF α) :
     p = liftM q ↔ ∀ x, p x = q x := by
   simp [SPMF.ext_iff]
-  grind
 
 @[simp] lemma pure_apply [DecidableEq α] (x y : α) :
     (pure x : SPMF α) y = if y = x then 1 else 0 := by aesop
@@ -197,6 +197,7 @@ dtumad: this should probably be a bare function with a hom-class instance.  -/
     refine (tsum_eq_single x ?_).trans ?_ <;> aesop
   toFun_bind' p q := by
     ext y
+    simp only [SPMF.apply_eq_toPMF_some]
     simp [← SPMF.run_eq_toPMF]
     simp [PMF.map, Option.elimM]
     refine tsum_congr fun x => congr_arg (_ * ·) ?_

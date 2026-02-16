@@ -29,7 +29,7 @@ lemma probOutput_bind_eq_sum_fintype [HasEvalSPMF m]
 lemma probFailure_bind_eq_sum_fintype [HasEvalSPMF m]
     (mx : m α) (my : α → m β) [Fintype α] :
     Pr[⊥ | mx >>= my] = Pr[⊥ | mx] + ∑ x : α, Pr[= x | mx] * Pr[⊥ | my x] :=
-  (probFailure_bind_eq_tsum mx my).trans (congr_arg (Pr[⊥ | mx] + ·) <| tsum_fintype _)
+  (probFailure_bind_eq_add_tsum mx my).trans (congr_arg (Pr[⊥ | mx] + ·) <| tsum_fintype _)
 
 lemma probEvent_bind_eq_sum_fintype [HasEvalSPMF m]
     (mx : m α) (my : α → m β) [Fintype α] (q : β → Prop) :

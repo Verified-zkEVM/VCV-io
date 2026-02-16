@@ -94,7 +94,7 @@ end seqRight
 
 -- lemma probFailure_seq [spec.FiniteRange] :
 --     [⊥ | og <*> oa] = [⊥ | og] + [⊥ | oa] - [⊥ | og] * [⊥ | oa] := by
---   rw [seq_eq_bind_map, probFailure_bind_eq_tsum]
+--   rw [seq_eq_bind_map, probFailure_bind_eq_add_tsum]
 --   rw [AddLECancellable.add_tsub_assoc_of_le]
 --   · refine congr_arg ([⊥ | og] + ·) ?_
 --     simp [ENNReal.tsum_mul_right]
