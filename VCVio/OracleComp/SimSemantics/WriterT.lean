@@ -42,7 +42,7 @@ variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoi
 --   induction oa using OracleComp.inductionOn with
 --   | pure x => simp
 --   | query_bind i t oa h =>
---       simp [probFailure_bind_eq_tsum, h, hso']
+--       simp [probFailure_bind_eq_add_tsum, h, hso']
 --       rw [ENNReal.tsum_prod']
 --       refine tsum_congr fun x => ?_
 --       simp [ENNReal.tsum_mul_right]

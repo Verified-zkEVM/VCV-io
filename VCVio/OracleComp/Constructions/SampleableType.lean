@@ -48,7 +48,7 @@ lemma probOutput_uniformSample [Fintype α] (x : α) :
     by simp only [Finset.sum_const, Finset.card_univ, nsmul_eq_mul, mul_one]
   refine ENNReal.eq_inv_of_mul_eq_one_left ?_
   simp_rw [this, Finset.mul_sum, mul_one]
-  rw [← sum_probOutput_eq_one ($ᵗ α) SampleableType.probFailure_selectElem]
+  rw [← sum_probOutput_eq_one (mx := $ᵗ α) SampleableType.probFailure_selectElem]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
 lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 :=

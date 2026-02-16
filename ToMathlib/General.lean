@@ -16,6 +16,21 @@ in general mathlib than in the project itself.
 
 universe u v w
 
+namespace ENNReal
+
+lemma one_sub_one_sub_mul_one_sub {x y : ℝ≥0∞} (hx : x ≤ 1) (hy : y ≤ 1) :
+    1 - (1 - x) * (1 - y) = x + y - x * y := by
+  have hxy : x * y ≤ x + y := by sorry
+  have hxy' : (1 - x) * (1 - y) ≤ 1 := by sorry
+  rw [← ENNReal.toReal_eq_toReal_iff']
+  rw [ENNReal.toReal_sub_of_le, ENNReal.toReal_mul, ENNReal.toReal_sub_of_le,
+    ENNReal.toReal_sub_of_le, ENNReal.toReal_sub_of_le, ENNReal.toReal_add, ENNReal.toReal_mul]
+  simp
+  linarith
+  all_goals try aesop
+
+end ENNReal
+
 section sum_thing
 
 open Filter Finset Function Topology SummationFilter

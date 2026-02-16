@@ -77,7 +77,7 @@ instance neverFail_pure (x : α) : NeverFail (pure x : m α) := by grind
 @[simp, grind =]
 lemma neverFail_bind_iff (mx : m α) (my : α → m β) :
     NeverFail (mx >>= my) ↔ NeverFail mx ∧ ∀ x ∈ support mx, NeverFail (my x) := by
-  simp [neverFail_iff, probFailure_bind_eq_tsum, add_eq_zero]
+  simp [neverFail_iff, probFailure_bind_eq_add_tsum, add_eq_zero]
   grind
 
 @[simp, grind =]
@@ -128,7 +128,7 @@ lemma bind_of_mem_support {mx : m α} {my : α → m β}
     [hx : NeverFail mx] (hy : ∀ x ∈ support mx, NeverFail (my x)) :
     NeverFail (mx >>= my) where
   probFailure_eq_zero := by
-    simp [probFailure_bind_eq_tsum]
+    simp [probFailure_bind_eq_add_tsum]
     simp [HasEvalSPMF.neverFail_iff] at hy
     tauto
 
