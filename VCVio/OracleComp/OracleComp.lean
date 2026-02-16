@@ -65,7 +65,9 @@ protected lemma bind_def (oa : OracleComp spec α) (ob : α → OracleComp spec 
 protected lemma failure_def : (failure : OptionT (OracleComp spec) α) = OptionT.fail := rfl
 
 protected lemma orElse_def (oa oa' : OptionT (OracleComp spec) α) : (oa <|> oa') = OptionT.mk
-      (do match ← OptionT.run oa with | some a => pure (some a) | _  => OptionT.run oa') := rfl
+    (do match ← OptionT.run oa with | some a => pure (some a) | _  => OptionT.run oa') := by
+  simp [HOrElse.hOrElse, OrElse.orElse, Alternative.orElse, OptionT.orElse]
+  refine congr_arg OptionT.mk <| bind_congr fun x => by aesop
 
 protected lemma bind_congr' {oa oa' : OracleComp spec α} {ob ob' : α → OracleComp spec β}
     (h : oa = oa') (h' : ∀ x, ob x = ob' x) : oa >>= ob = oa' >>= ob' := h ▸ bind_congr h'
