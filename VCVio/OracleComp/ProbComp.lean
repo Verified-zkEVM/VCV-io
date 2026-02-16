@@ -180,7 +180,8 @@ instance hasUniformSelect_of_hasUniformSelect!
     [h : HasUniformSelect! cont β] : HasUniformSelect cont β where
   uniformSelect cont := OptionT.lift ($! cont)
 
-/-- Compatibility of the `$! xs` operation with `$ xs` given the inferred instance. -/
+/-- Compatibility of the `$! xs` operation with `$ xs` given the inferred instance.
+TODO: I think we probably want to `simp` in the other direction when possible? -/
 @[simp, grind =] lemma liftM_uniformSelect! [HasUniformSelect! cont β]
     (xs : cont) : (liftM ($! xs) : OptionT ProbComp β) = $ xs := by
   simp [hasUniformSelect_of_hasUniformSelect!, OptionT.liftM_def]
@@ -202,12 +203,11 @@ instance hasUniformSelectList (α : Type) :
     | [] => failure
     | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length]
 
-variable {α : Type}
+variable {α : Type} (xs : List α)
 
-lemma uniformSelectList_def (xs : List α) :
-    $ xs = match xs with
-      | [] => failure
-      | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length] := rfl
+lemma uniformSelectList_def : $ xs = match xs with
+  | [] => failure
+  | x :: xs => ((x :: xs)[·]) <$> $[0..xs.length] := rfl
 
 @[simp, grind =]
 lemma uniformSelectList_nil : $ ([] : List α) = failure := rfl
@@ -239,12 +239,12 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
     rw [List.count, ← List.countP_eq_sum_fin_ite]
     simp [uniformSelectList_cons, probOutput_map_eq_sum_fintype_ite, div_eq_mul_inv, @eq_comm _ x]
 
-@[simp] lemma probFailure_uniformSelectList (xs : List α) :
+@[simp, grind =] lemma probFailure_uniformSelectList (xs : List α) :
     Pr[⊥ | $ xs] = if xs.isEmpty then 1 else 0 := match xs with
   | [] => by simp
   | y :: ys => by simp [uniformSelectList_cons]
 
-@[simp] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
+@[simp, grind =] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
     Pr[p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
   | [] => by simp
   | y :: ys => by
@@ -263,62 +263,56 @@ instance hasUniformSelectVector (α : Type) (n : ℕ) :
     HasUniformSelect! (Vector α (n + 1)) α where
   uniformSelect! xs := (xs[·]) <$> $[0..n]
 
+variable {α : Type} {n : ℕ} (xs : Vector α (n + 1))
+
+lemma uniformSelectVector_def : $! xs = (xs[·]) <$> $[0..n] := rfl
+
+@[simp, grind =]
+lemma support_uniformSelectVector : support ($! xs) = {x | x ∈ xs.toList} := by
+  sorry
+
+@[simp, grind =]
+lemma finSupport_uniformSelectVector [DecidableEq α] :
+    finSupport ($ xs) = xs.toList.toFinset := by
+  sorry
+
+@[simp, grind =]
+lemma probOutput_uniformSelectVector [DecidableEq α] (x : α) :
+    Pr[= x | $! xs] = xs.count x / (n + 1) := by
+  simp [uniformSelectVector_def]
+  rw [probOutput_map_eq_sum_finSupport_ite]
+  simp [div_eq_mul_inv]
+  congr 2
+  sorry
+
+@[simp, grind =]
+lemma probEvent_uniformSelectVector (p : α → Prop) [DecidablePred p] :
+    Pr[p | $ xs] = xs.toList.countP p / (n + 1) := by
+  sorry
+
+end uniformSelectVector
+
+section uniformSelectListVector
+
 instance hasUniformSelectListVector (α : Type) (n : ℕ) :
     HasUniformSelect! (List.Vector α (n + 1)) α where
   uniformSelect! xs := (xs[·]) <$> $[0..n]
 
--- lemma uniformSelectVector_def {α : Type} {n : ℕ} (xs : Vector α (n + 1)) :
---     ($ xs) = ($ xs.toList) := rfl
+variable {α : Type} {n : ℕ} (xs : List.Vector α (n + 1))
 
--- variable {α : Type} {n : ℕ}
+lemma uniformSelectListVector_def : $! xs = (xs[·]) <$> $[0..n] := rfl
 
--- -- /-- Uniform selection from a vector is as uniform selection from the underlying list,
--- -- given some `Inhabited` instance on the output type. -/
--- -- lemma uniformSelectVector_eq_uniformSelectList (xs : Mathlib.Vector α (n + 1)) :
--- --     ($ xs) = ($ xs.toList : ProbComp α) :=
--- --   match xs with
--- --   | ⟨x :: xs, h⟩ => by
--- --     have hxs : n = List.length xs := by simpa using symm h
--- --     cases hxs
--- --     simp only [uniformSelectVector_def, Fin.getElem_fin, Vector.getElem_eq_get, Vector.get,
--- --       List.length_cons, Fin.eta, Fin.cast_eq_self, List.get_eq_getElem, map_eq_bind_pure_comp,
--- --       Function.comp, Vector.toList_mk, uniformSelectList_cons]
--- --     sorry
+@[simp, grind =]
+lemma probOutput_uniformSelectListVector [DecidableEq α] (x : α) :
+    Pr[= x | $! xs] = xs.toList.count x / (n + 1) := by
+  sorry
 
--- @[simp]
--- lemma evalDist_uniformSelectVector (xs : Vector α (n + 1)) :
---     evalDist ($ xs) = (PMF.uniformSample (Fin (n + 1))).map (xs[·]) := by
---   simp [uniformSelectVector_def]
---   sorry
+@[simp, grind =]
+lemma probEvent_uniformSelectListVector (p : α → Prop) [DecidablePred p] :
+    Pr[p | $! xs] = xs.toList.countP p / (n + 1) := by
+  sorry
 
--- @[simp]
--- lemma support_uniformSelectVector (xs : Vector α (n + 1)) :
---     ($ xs).support = {x | x ∈ xs.toList} := by sorry
---   -- simp only [uniformSelectVector_eq_uniformSelectList, support_uniformSelectList,
---   --   Vector.empty_toList_eq_ff, Bool.false_eq_true, ↓reduceIte]
-
--- @[simp]
--- lemma finSupport_uniformSelectVector [DecidableEq α] (xs : Vector α (n + 1)) :
---     ($ xs).finSupport = xs.toList.toFinset := by sorry
---   -- simp only [uniformSelectVector_eq_uniformSelectList, finSupport_uniformSelectList,
---   --   Vector.empty_toList_eq_ff, Bool.false_eq_true, ↓reduceIte]
-
--- @[simp]
--- lemma probOutput_uniformSelectVector [DecidableEq α] (xs : Vector α (n + 1)) (x : α) :
---     [= x | $ xs] = xs.toList.count x / (n + 1) := by sorry
---   -- simp only [uniformSelectVector_eq_uniformSelectList, probOutput_uniformSelectList,
---   --   Vector.empty_toList_eq_ff, Bool.false_eq_true, ↓reduceIte, Vector.toList_length,
-    --Nat.cast_add, --   Nat.cast_one]
-
--- @[simp]
--- lemma probEvent_uniformSelectVector (xs : Vector α (n + 1)) (p : α → Prop)
---     [DecidablePred p] : [p | $ xs] = xs.toList.countP p / (n + 1) := by sorry
---   -- simp only [uniformSelectVector_eq_uniformSelectList, probEvent_uniformSelectList,
---   --   Vector.empty_toList_eq_ff, Bool.false_eq_true, ↓reduceIte, Vector.toList_length,
-      -- Nat.cast_add,
---   --   Nat.cast_one]
-
-end uniformSelectVector
+end uniformSelectListVector
 
 section uniformSelectFinset
 
@@ -329,60 +323,36 @@ noncomputable instance hasUniformSelectFinset (α : Type) :
     HasUniformSelect (Finset α) α where
   uniformSelect s := $ s.toList
 
--- lemma uniformSelectFinset_def {α : Type} [DecidableEq α] (s : Finset α) :
---     ($ s) = ($ s.toList) := rfl
+variable {α : Type} (s : Finset α)
 
--- variable {α : Type}
+lemma uniformSelectFinset_def : $ s = $ s.toList := rfl
 
--- @[simp] lemma support_uniformSelectFinset [DecidableEq α] (s : Finset α) :
---     ($ s).support = if s.Nonempty then ↑s else ∅ := by
---   simp only [Finset.nonempty_iff_ne_empty, ne_eq, ite_not]
---   split_ifs with hs <;> simp [hs, uniformSelectFinset_def]
+@[simp, grind =]
+lemma support_uniformSelectFinset [DecidableEq α] :
+    support ($ s) = if s.Nonempty then ↑s else ∅ := by
+  aesop (add norm uniformSelectFinset_def)
 
--- @[simp] lemma finSupport_uniformSelectFinset [DecidableEq α] (s : Finset α) :
---     ($ s).finSupport = if s.Nonempty then s else ∅ := by
---   split_ifs with hs <;> simp only [hs, finSupport_eq_iff_support_eq_coe,
---     support_uniformSelectFinset, if_true, if_false, Finset.coe_singleton, Finset.coe_empty]
+@[simp, grind =]
+lemma finSupport_uniformSelectFinset [DecidableEq α] :
+    finSupport ($ s) = if s.Nonempty then s else ∅ := by
+  aesop (add norm uniformSelectFinset_def)
 
--- @[simp] lemma probOutput_uniformSelectFinset [DecidableEq α] (s : Finset α) (x : α) :
---     [= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
---   rw [uniformSelectFinset_def, probOutput_uniformSelectList]
---   by_cases hx : x ∈ s
---   · have : s.toList.isEmpty = false :=
---       List.isEmpty_eq_false_iff_exists_mem.2 ⟨x, Finset.mem_toList.2 hx⟩
---     simp [this, hx]
---   · simp [hx]
+@[simp, grind =]
+lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
+    Pr[= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
+  aesop (add norm uniformSelectFinset_def)
 
--- @[simp] lemma probFailure_uniformSelectFinset [DecidableEq α] (s : Finset α) :
---     [⊥ | $ s] = if s.Nonempty then 0 else 1 := by
---   simp_rw [Finset.nonempty_iff_ne_empty]
---   split_ifs with hs
---   · simp [hs, uniformSelectFinset_def]
---   · simp [hs, uniformSelectFinset_def]
+@[simp, grind =]
+lemma probEvent_uniformSelectFinset [DecidableEq α] (p : α → Prop) [DecidablePred p] :
+    Pr[p | $ s] = {x ∈ s | p x}.card / s.card := by
+  simp [uniformSelectFinset_def]
+  congr 2
+  sorry
 
--- @[simp] lemma evalDist_uniformSelectFinset [DecidableEq α] (s : Finset α) :
---     evalDist ($ s) = if hs : s.Nonempty then
---       OptionT.lift (PMF.uniformOfFinset s hs) else failure := by
---   refine PMF.ext λ x ↦ ?_
---   by_cases hs : s.Nonempty
---   · cases x with
---     | none =>
---         refine (probFailure_uniformSelectFinset _).trans ?_
---         simp [hs, OptionT.lift, OptionT.mk]
---     | some x =>
---         simp only [hs, ↓reduceDIte]
---         refine (probOutput_uniformSelectFinset _ _).trans ?_
---         simp only [OptionT.lift, OptionT.mk, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
---           PMF.bind_apply, PMF.uniformOfFinset_apply, PMF.pure_apply, Option.some.injEq, mul_ite,
---           mul_one, mul_zero]
---         refine symm <| (tsum_eq_single x ?_).trans ?_
---         · simp only [ne_eq, @eq_comm _ x, ite_eq_right_iff, ENNReal.inv_eq_zero,
---             natCast_ne_top, imp_false]
---           intros
---           tauto
---         · simp only [↓reduceIte, ite_eq_ite]
---   · simp only [Finset.not_nonempty_iff_eq_empty] at hs
---     simp [hs, uniformSelectFinset_def]
+@[simp, grind =]
+lemma probFailure_uniformSelectFinset :
+    Pr[⊥ | $ s] = if s.Nonempty then 0 else 1 := by
+  aesop (add norm uniformSelectFinset_def)
 
 end uniformSelectFinset
 
@@ -393,8 +363,8 @@ instance {α : Type _} : HasUniformSelect (Array α) α where
     let u ← $[0..xs.size-1]
     return xs[u] -- Note the in-index bound here relies on `h`.
 
+-- TODO: full API for this
+
 end uniformSelectArray
-
-
 
 end ProbComp

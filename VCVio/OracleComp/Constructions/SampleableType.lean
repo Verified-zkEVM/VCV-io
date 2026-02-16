@@ -84,14 +84,14 @@ instance (α : Type) [Unique α] : SampleableType α where
 
 instance : SampleableType Bool where
   selectElem := $! #v[true, false]
-  mem_support_selectElem x := by sorry
-  probOutput_selectElem_eq x y := by sorry --simp
+  mem_support_selectElem x := by simp
+  probOutput_selectElem_eq x y := by simp
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
 instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
     [SampleableType α] [SampleableType β] : SampleableType (α × β) where
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
-  mem_support_selectElem x := by sorry --simp
+  mem_support_selectElem x := by simp
   probOutput_selectElem_eq := by
     stop
     simp only [Prod.forall, probOutput_seq_map_prod_mk_eq_mul,
@@ -100,13 +100,13 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
 /-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
 instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
-  mem_support_selectElem := by sorry
-  probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
+  mem_support_selectElem := by simp
+  probOutput_selectElem_eq x y := by simp
 
 instance (n : ℕ) : SampleableType (ZMod (n + 1)) where
   selectElem := $[0..n]
-  mem_support_selectElem := by sorry
-  probOutput_selectElem_eq x y := by sorry --simp only [probOutput_uniformFin, implies_true]
+  mem_support_selectElem := by grind
+  probOutput_selectElem_eq x y := by grind
 
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
 instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
