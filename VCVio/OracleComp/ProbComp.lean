@@ -368,3 +368,30 @@ instance {α : Type _} : HasUniformSelect (Array α) α where
 end uniformSelectArray
 
 end ProbComp
+
+section coinSpec
+-- NOTE: This treats `coin` as essentially part of `ProbComp`, but it is more general.
+-- In particular we can have a seperate theory of bounded uniform selection using only coins.
+
+@[simp, grind =]
+lemma support_coin : support coin = {true, false} := by aesop
+
+@[simp, grind =]
+lemma finSupport_coin : finSupport coin = {true, false} := by aesop
+
+@[simp, grind =]
+lemma probOutput_coin (b : Bool) : Pr[= b | coin] = 2⁻¹ := by aesop
+
+@[simp, grind =]
+lemma probEvent_coin (p : Bool → Prop) [DecidablePred p] :
+    Pr[p | coin] = if p true then
+      (if p false then 1 else 2⁻¹) else
+      (if p false then 2⁻¹ else 0) := by
+  have : (2 : ℝ≥0∞)⁻¹ + 2⁻¹ = 1 := by simp [← one_div]
+  rw [probEvent_eq_sum_fintype_ite, Fintype.sum_bool]
+  aesop
+
+@[simp, grind =]
+lemma probFailure_coin : Pr[⊥ | coin] = 0 := by grind
+
+end coinSpec

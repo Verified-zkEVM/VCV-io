@@ -51,9 +51,10 @@ protected lemma liftM_def (q : OracleQuery spec α) :
   PFunctor.FreeM.pure_ne_lift q x
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
-@[reducible, inline] def coin : OracleComp coinSpec Bool :=
-  query (spec := coinSpec) ()
+@[inline]
+def coin : OracleComp coinSpec Bool := query (spec := coinSpec) ()
 
+@[grind =, aesop unsafe norm]
 lemma coin_def : coin = query (spec := coinSpec) () := rfl
 
 protected lemma pure_def (x : α) :
@@ -69,6 +70,7 @@ protected lemma orElse_def (oa oa' : OptionT (OracleComp spec) α) : (oa <|> oa'
   simp [HOrElse.hOrElse, OrElse.orElse, Alternative.orElse, OptionT.orElse]
   refine congr_arg OptionT.mk <| bind_congr fun x => by aesop
 
+@[aesop unsafe apply, grind =>]
 protected lemma bind_congr' {oa oa' : OracleComp spec α} {ob ob' : α → OracleComp spec β}
     (h : oa = oa') (h' : ∀ x, ob x = ob' x) : oa >>= ob = oa' >>= ob' := h ▸ bind_congr h'
 
