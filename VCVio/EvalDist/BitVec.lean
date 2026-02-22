@@ -29,4 +29,3 @@ instance (n : ℕ) : SampleableType (BitVec n) where
   selectElem := ofFin <$> ($ᵗ Fin (2 ^ n))
   mem_support_selectElem x := by aesop
   probOutput_selectElem_eq x y := by grind
-  probFailure_selectElem := by simp

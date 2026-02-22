@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import ToMathlib.Control.WriterT
 
 /-!
 # Structures For Tracking a Computation's Oracle Queries
@@ -82,21 +83,6 @@ keep track of query ordering between different oracles. -/
   List ((t : spec.Domain) × spec.Range t)
 
 namespace QueryLog
-
-/-- Dummy `Monoid` instance to be used with `WriterT`, actual calls should use `append`. -/
-instance : Monoid (QueryLog spec) where
-  mul := List.append
-  mul_assoc := List.append_assoc
-  one := List.nil
-  one_mul := List.nil_append
-  mul_one := List.append_nil
-
-@[simp] -- Automatically reduce "multiplication" of query logs to `List.append`
-lemma monoid_mul_def (qc qc' : QueryLog spec) :
-  (@HMul.hMul _ _ _ (@instHMul _ (Monoid.toMulOneClass.toMul)) qc qc')
-     = (qc : List _) ++ (qc' : List _) := rfl
-
-@[simp] lemma monoid_one_def : (1 : QueryLog spec) = List.nil := rfl
 
 /-- Query log with a single entry. -/
 def singleton (t : spec.Domain) (u : spec.Range t) : QueryLog spec := [⟨t, u⟩]

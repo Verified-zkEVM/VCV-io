@@ -22,14 +22,22 @@ namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
-def withLogging (so : QueryImpl spec m) :
-    QueryImpl spec (WriterT (QueryLog spec) m) := fun t => do
-  let u ← so t
-  tell (QueryLog.singleton t u)
-  return u
+/-- Given that `so` implements the oracles in `spec` using the monad `m`,
+`withLogging so` gives the same implementation in the extension `WriterT (QueryLog spec) m`,
+by logging all the queries to the writer monad before forwarding the response. -/
+def withLogging (so : QueryImpl spec m) : QueryImpl spec (WriterT (QueryLog spec) m) :=
+  fun t : spec.Domain => do let u ← so t; tell [⟨t, u⟩]; return u
 
-@[simp] lemma withLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
-    so.withLogging t = do let x ← liftM (so t); tell (QueryLog.singleton t x); return x := rfl
+@[simp, grind =]
+lemma withLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
+    so.withLogging t = do let u ← so t; tell [⟨t, u⟩]; return u := rfl
+
+lemma fst_map_run_withLogging [LawfulMonad m] (so : QueryImpl spec m) (mx : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (so.withLogging) mx).run =
+    simulateQ so mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa h => simp [h]
 
 end QueryImpl
 
@@ -49,9 +57,7 @@ lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
     Pr[⊥ | (WriterT.run
         (simulateQ (loggingOracle (spec := spec)) oa) :
           OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
-  induction oa using OracleComp.induction with
-  | pure a => simp
-  | query_bind t oa ih => simp
+  simp only [HasEvalPMF.probFailure_eq_zero]
 
 -- variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 
