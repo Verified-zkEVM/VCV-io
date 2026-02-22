@@ -104,17 +104,22 @@ def mayFailWhen (oa : OracleComp spec α)
 @[reducible, inline] def mayFail (oa : OracleComp spec α) : Prop :=
   mayFailWhen oa fun _ => Set.univ
 
--- TOOD: generalize when `hso` is `neverFailsWhen` for some other `poss`.
+/- TOOD: generalize when `hso` is `neverFailsWhen` for some other `poss`. -/
 lemma neverFailsWhen_simulate {ι' : Type*} {spec' : OracleSpec ι'}
     (oa : OracleComp spec α)
     (possible_outputs : {α : Type v} → OracleQuery spec α → Set α)
     (h : neverFailsWhen oa possible_outputs)
-    -- {m : Type v → Type _} [Monad m]
     (so : QueryImpl spec (OracleComp spec'))
     (h' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).support ⊆ possible_outputs q)
     (hso : ∀ {α}, ∀ q : OracleQuery spec α, neverFails (so.impl q)) :
     neverFails (simulateQ so oa) := by
-    sorry
+    induction' oa using OracleComp.inductionOn with α oa ih generalizing possible_outputs
+    · simp +decide [simulateQ, neverFailsWhen]
+    · unfold neverFailsWhen at *
+      unfold neverFails at *
+      unfold allWhen at *
+      unfold OracleComp.neverFailsWhen at *; aesop
+    · exact h
 
 lemma neverFails_eq_oracleComp_construct (oa : OracleComp spec α) :
     oa.neverFails = OracleComp.construct
