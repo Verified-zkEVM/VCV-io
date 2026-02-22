@@ -34,6 +34,11 @@ lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} (oa : OracleComp spec α) 
 lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ α (q : OracleQuery spec α) s, (so.impl q).run' s = q)
     (oa : OracleComp spec α) (s : σ) : (simulateQ so oa).run' s = oa := by
-  sorry
+  induction' oa using OracleComp.inductionOn with α f ih ob hob generalizing s
+  · simp [simulateQ]
+  · simp_all +decide [simulateQ]
+    rw [← h]
+    exact (bind_map_left (fun x ↦ x.1) ((so.impl (query f ih)).run s) ob).symm
+  · simp [simulateQ]
 
 end OracleComp
