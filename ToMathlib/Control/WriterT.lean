@@ -12,6 +12,36 @@ import Batteries.Control.AlternativeMonad
 
 universe u v w
 
+/-- Typeclass for instances where `∅` is an identity for `++`. -/
+class LawfulAppend (α : Type u)
+    [EmptyCollection α] [Append α] where
+  empty_append (x : α) : ∅ ++ x = x
+  append_empty (x : α) : x ++ ∅ = x
+  append_assoc (x y z : α) : x ++ (y ++ z) = x ++ y ++ z
+
+namespace LawfulAppend
+
+attribute [simp] LawfulAppend.empty_append LawfulAppend.append_empty
+
+attribute [grind =] LawfulAppend.empty_append
+  LawfulAppend.append_empty LawfulAppend.append_assoc
+
+instance {M : Type u → Type v} {ω : Type u} [Monad M]
+    [EmptyCollection ω] [Append ω] [LawfulAppend ω] [LawfulMonad M] :
+    LawfulMonad (WriterT ω M) := LawfulMonad.mk'
+  (bind_pure_comp := by simp only [bind, WriterT.mk, pure, map_pure, LawfulAppend.append_empty,
+    bind_pure_comp, Functor.map, implies_true])
+  (id_map := by simp [Functor.map, WriterT.mk])
+  (pure_bind := by simp [Bind.bind, Pure.pure, WriterT.mk])
+  (bind_assoc := by simp [Bind.bind, WriterT.mk, LawfulAppend.append_assoc])
+
+instance (α : Type u) : LawfulAppend (List α) where
+  empty_append := by simp
+  append_empty := by simp
+  append_assoc := by grind
+
+end LawfulAppend
+
 namespace WriterT
 
 section basic
@@ -24,6 +54,8 @@ lemma run_mk {ω : Type u} [LawfulMonad m] (x : m (α × ω)) :
 
 @[simp]
 lemma run_tell (w : ω) : (tell w : WriterT ω m PUnit).run = pure (⟨⟩, w) := rfl
+
+section monoid
 
 variable [Monoid ω]
 
@@ -55,6 +87,45 @@ lemma run_seqLeft {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {�
 
 @[simp]
 lemma run_map (x : WriterT ω m α) (f : α → β) : (f <$> x).run = Prod.map f id <$> x.run := rfl
+
+end monoid
+
+section append
+
+variable [EmptyCollection ω]
+
+@[simp]
+lemma run_monadLift' (x : m α) : (monadLift x : WriterT ω m α).run = (·, ∅) <$> x := rfl
+
+lemma liftM_def' (x : m α) :
+    (liftM x : WriterT ω m α) = WriterT.mk ((·, ∅) <$> x) := rfl
+
+lemma monadLift_def' (x : m α) :
+    (MonadLift.monadLift x : WriterT ω m α) = WriterT.mk ((·, ∅) <$> x) := rfl
+
+variable [Append ω]
+
+lemma bind_def' (x : WriterT ω m α) (f : α → WriterT ω m β) :
+    x >>= f = WriterT.mk (x.run >>= fun (a, w₁) ↦
+      (Prod.map id (w₁ ++ ·)) <$> (f a)) := rfl
+
+@[simp]
+lemma run_pure' [LawfulMonad m] (x : α) :
+    (pure x : WriterT ω m α).run = pure (x, ∅) := rfl
+
+@[simp]
+lemma run_bind' [LawfulMonad m] (x : WriterT ω m α) (f : α → WriterT ω m β) :
+    (x >>= f).run = x.run >>= fun (a, w₁) => Prod.map id (w₁ ++ ·) <$> (f a).run := rfl
+
+@[simp]
+lemma run_seqLeft' {m : Type u → Type v} [Monad m] {ω : Type u} [Monoid ω] {α β : Type u}
+    (x : WriterT ω m α) (y : WriterT ω m β) :
+    (x *> y).run = x.run >>= fun z => Prod.map id (z.2 * ·) <$> y.run := rfl
+
+@[simp]
+lemma run_map' (x : WriterT ω m α) (f : α → β) : (f <$> x).run = Prod.map f id <$> x.run := rfl
+
+end append
 
 end basic
 
