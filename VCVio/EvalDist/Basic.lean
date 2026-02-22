@@ -267,7 +267,9 @@ namespace PMF
 noncomputable instance hasEvalDist : HasEvalDist PMF where
   evalDist p := OptionT.mk p
   evalDist_pure _ := by simp; rfl
-  evalDist_bind x y := sorry
+  evalDist_bind x y := by
+    simp [OptionT.mk, Bind.bind]
+    simp [OptionT.bind, OptionT.mk]
 
 variable (p : PMF α) (x : α)
 
