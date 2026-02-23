@@ -191,63 +191,157 @@ def emptySigma [inst : IsEmpty I] : sigma F ≃ₚ 0 where
 
 def uniqueSigma [Unique I] : sigma F ≃ₚ F default where
   equivA := _root_.Equiv.uniqueSigma _
-  equivB := fun a => by simp [sigma] at a ⊢; sorry
+  equivB := fun ⟨i, a⟩ => by
+    have hi := Unique.eq_default i
+    subst hi
+    exact _root_.Equiv.refl _
 
 /-- Sigma of a `PUnit`-indexed family is equivalent to the functor itself. -/
 def punitSigma {F : PUnit → PFunctor.{uA, uB}} : sigma F ≃ₚ F PUnit.unit where
   equivA := _root_.Equiv.uniqueSigma _
-  equivB := sorry
-
-#check Equiv.sigmaSumDistrib
-
-#check Equiv.sumSigmaDistrib
-
-#check Equiv.prodSumDistrib
+  equivB := fun ⟨i, a⟩ => by cases i; exact _root_.Equiv.refl _
 
 /-- Left distributivity of sum over sigma. -/
-def sumSigmaDistrib (F : I → PFunctor.{uA₂, uB₁}) :
+def sumSigmaDistrib (F : I → PFunctor.{uA₂, uB₁}) [Unique I] :
     (P + sigma F : PFunctor.{max uA₁ uA₂ v, uB₁}) ≃ₚ
     sigma (fun i => (P + F i : PFunctor.{max uA₁ uA₂, uB₁})) where
-  equivA := by simp [sigma, HAdd.hAdd, sum]; sorry
-  equivB := fun a => sorry
+  equivA := {
+    toFun := fun
+      | Sum.inl pa => ⟨default, Sum.inl pa⟩
+      | Sum.inr ⟨i, fa⟩ => ⟨i, Sum.inr fa⟩
+    invFun := fun
+      | ⟨_, Sum.inl pa⟩ => Sum.inl pa
+      | ⟨i, Sum.inr fa⟩ => Sum.inr ⟨i, fa⟩
+    left_inv := by
+      intro a
+      rcases a with pa | ⟨i, fa⟩
+      · rfl
+      · rfl
+    right_inv := by
+      intro a
+      rcases a with ⟨i, pa | fa⟩
+      · cases (Unique.eq_default i)
+        rfl
+      · rfl
+  }
+  equivB := fun a => by
+    rcases a with pa | ⟨i, fa⟩
+    · exact _root_.Equiv.refl _
+    · exact _root_.Equiv.refl _
 
 /-- Right distributivity of sum over sigma. -/
-def sigmaSumDistrib (F : I → PFunctor.{uA₂, uB₁}) :
+def sigmaSumDistrib (F : I → PFunctor.{uA₂, uB₁}) [Unique I] :
     (sigma F + P : PFunctor.{max uA₁ uA₂ v, uB₁}) ≃ₚ
     sigma (fun i => (F i + P : PFunctor.{max uA₁ uA₂, uB₁})) where
-  equivA := by simp [sigma, HAdd.hAdd, sum]; sorry
+  equivA := {
+    toFun := fun
+      | Sum.inl ⟨i, fa⟩ => ⟨i, Sum.inl fa⟩
+      | Sum.inr pa => ⟨default, Sum.inr pa⟩
+    invFun := fun
+      | ⟨i, Sum.inl fa⟩ => Sum.inl ⟨i, fa⟩
+      | ⟨_, Sum.inr pa⟩ => Sum.inr pa
+    left_inv := by
+      intro a
+      rcases a with ⟨i, fa⟩ | pa
+      · rfl
+      · rfl
+    right_inv := by
+      intro a
+      rcases a with ⟨i, fa | pa⟩
+      · rfl
+      · cases (Unique.eq_default i)
+        rfl
+  }
   -- exact (_root_.Equiv.sumSigmaDistrib _).symm
-  equivB := fun a => sorry
+  equivB := fun a => by
+    rcases a with ⟨i, fa⟩ | pa
+    · exact _root_.Equiv.refl _
+    · exact _root_.Equiv.refl _
 
 /-- Left distributivity of product over sigma. -/
 def prodSigmaDistrib : (P * sigma F : PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) ≃ₚ
     sigma (fun i => (P * F i : PFunctor.{max uA₁ uA₂, max uB₁ uB₂})) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun ⟨pa, ⟨i, fa⟩⟩ => ⟨i, ⟨pa, fa⟩⟩
+    invFun := fun ⟨i, ⟨pa, fa⟩⟩ => ⟨pa, ⟨i, fa⟩⟩
+    left_inv := by
+      rintro ⟨pa, ⟨i, fa⟩⟩
+      rfl
+    right_inv := by
+      rintro ⟨i, ⟨pa, fa⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨pa, ⟨i, fa⟩⟩
+    exact _root_.Equiv.refl _
 
 /-- Right distributivity of product over sigma. -/
 def sigmaProdDistrib : (sigma F * P : PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) ≃ₚ
     sigma (fun i => (F i * P : PFunctor.{max uA₁ uA₂, max uB₁ uB₂})) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun ⟨⟨i, fa⟩, pa⟩ => ⟨i, ⟨fa, pa⟩⟩
+    invFun := fun ⟨i, ⟨fa, pa⟩⟩ => ⟨⟨i, fa⟩, pa⟩
+    left_inv := by
+      rintro ⟨⟨i, fa⟩, pa⟩
+      rfl
+    right_inv := by
+      rintro ⟨i, ⟨fa, pa⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨⟨i, fa⟩, pa⟩
+    exact _root_.Equiv.refl _
 
 /-- Left distributivity of tensor product over sigma. -/
 def tensorSigmaDistrib :
     P ⊗ sigma F ≃ₚ sigma (fun i => P ⊗ F i) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun ⟨pa, ⟨i, fa⟩⟩ => ⟨i, ⟨pa, fa⟩⟩
+    invFun := fun ⟨i, ⟨pa, fa⟩⟩ => ⟨pa, ⟨i, fa⟩⟩
+    left_inv := by
+      rintro ⟨pa, ⟨i, fa⟩⟩
+      rfl
+    right_inv := by
+      rintro ⟨i, ⟨pa, fa⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨pa, ⟨i, fa⟩⟩
+    exact _root_.Equiv.refl _
 
 /-- Right distributivity of tensor product over sigma. -/
 def sigmaTensorDistrib {I : Type v} (F : I → PFunctor.{uA₁, uB₁}) (P : PFunctor.{uA₂, uB₂}) :
     sigma F ⊗ P ≃ₚ sigma (fun i => F i ⊗ P) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun ⟨⟨i, fa⟩, pa⟩ => ⟨i, ⟨fa, pa⟩⟩
+    invFun := fun ⟨i, ⟨fa, pa⟩⟩ => ⟨⟨i, fa⟩, pa⟩
+    left_inv := by
+      rintro ⟨⟨i, fa⟩, pa⟩
+      rfl
+    right_inv := by
+      rintro ⟨i, ⟨fa, pa⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨⟨i, fa⟩, pa⟩
+    exact _root_.Equiv.refl _
 
 /-- Right distributivity of composition over sigma. -/
 def sigmaCompDistrib {I : Type v} (F : I → PFunctor.{uA₁, uB₁}) (P : PFunctor.{uA₂, uB₂}) :
     sigma F ◃ P ≃ₚ sigma (fun i => F i ◃ P) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun ⟨⟨i, fa⟩, pf⟩ => ⟨i, ⟨fa, pf⟩⟩
+    invFun := fun ⟨i, ⟨fa, pf⟩⟩ => ⟨⟨i, fa⟩, pf⟩
+    left_inv := by
+      rintro ⟨⟨i, fa⟩, pf⟩
+      rfl
+    right_inv := by
+      rintro ⟨i, ⟨fa, pf⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨⟨i, fa⟩, pf⟩
+    exact _root_.Equiv.refl _
 
 end Sigma
 
@@ -256,8 +350,9 @@ section Pi
 /-- Pi over a `PUnit`-indexed family is equivalent to the functor itself. -/
 def piPUnit (P : PFunctor.{uA, uB}) :
     pi (fun (_ : PUnit) => P) ≃ₚ P where
-  equivA := sorry
-  equivB := sorry
+  equivA := _root_.Equiv.punitArrowEquiv P.A
+  equivB := fun f => by
+    simpa using (_root_.Equiv.uniqueSigma (fun i : PUnit => P.B (f i)))
 
 end Pi
 
@@ -267,11 +362,37 @@ variable (P : PFunctor.{uA₁, uB₁})
 
 /-- Equivalence between a polynomial functor and its universe-lifted version -/
 def uliftEquiv : P ≃ₚ (P.ulift : PFunctor.{max uA₁ u, max uB₁ v}) :=
-  sorry
+  {
+    equivA := {
+      toFun := ULift.up
+      invFun := ULift.down
+      left_inv := by intro a; rfl
+      right_inv := by intro a; cases a; rfl
+    }
+    equivB := fun _ => {
+      toFun := ULift.up
+      invFun := ULift.down
+      left_inv := by intro b; rfl
+      right_inv := by intro b; cases b; rfl
+    }
+  }
 
 /-- Universe lifting is idempotent up to equivalence -/
 def uliftUliftEquiv : P.ulift.ulift ≃ₚ P.ulift :=
-  sorry
+  {
+    equivA := {
+      toFun := ULift.down
+      invFun := ULift.up
+      left_inv := by intro a; cases a; rfl
+      right_inv := by intro a; rfl
+    }
+    equivB := fun _ => {
+      toFun := ULift.down
+      invFun := ULift.up
+      left_inv := by intro b; cases b; rfl
+      right_inv := by intro b; rfl
+    }
+  }
 
 -- TODO: find better ways to annotate universe levels
 
@@ -280,7 +401,42 @@ def uliftSumEquiv (Q : PFunctor.{uA₂, uB₁}) :
     (PFunctor.ulift.{_, _, u, v} (P + Q : PFunctor.{max uA₁ uA₂, uB₁})) ≃ₚ
     ((PFunctor.ulift.{_, _, uA, uB} P : PFunctor.{max uA₁ uA, max uB₁ uB}) +
       (Q.ulift : PFunctor.{max uA₂ uA', max uB₁ uB}) : PFunctor.{max uA₁ uA uA₂ uA', max uB₁ uB}) :=
-  sorry
+  {
+    equivA := {
+      toFun := fun a =>
+        match ULift.down a with
+        | Sum.inl pa => Sum.inl (ULift.up pa)
+        | Sum.inr qa => Sum.inr (ULift.up qa)
+      invFun := fun a =>
+        ULift.up <| match a with
+          | Sum.inl pa => Sum.inl (ULift.down pa)
+          | Sum.inr qa => Sum.inr (ULift.down qa)
+      left_inv := by
+        intro a
+        cases a with
+        | up s =>
+          cases s <;> rfl
+      right_inv := by
+        intro a
+        cases a <;> rfl
+    }
+    equivB := fun a => by
+      cases a with
+      | up s =>
+        cases s
+        · exact {
+            toFun := fun b => ULift.up (ULift.down b)
+            invFun := fun b => ULift.up (ULift.down b)
+            left_inv := by intro b; cases b; rfl
+            right_inv := by intro b; cases b; rfl
+          }
+        · exact {
+            toFun := fun b => ULift.up (ULift.down b)
+            invFun := fun b => ULift.up (ULift.down b)
+            left_inv := by intro b; cases b; rfl
+            right_inv := by intro b; cases b; rfl
+          }
+  }
 
 -- /-- Universe lifting commutes with product -/
 -- def uliftProdEquiv (Q : PFunctor.{uA₂, uB₂}) :
@@ -409,8 +565,6 @@ def oneComp : (1 : PFunctor.{uA, uB}) ◃ P ≃ₚ 1 where
     (instUniqueAOfNat_toMathlib.{uA, uB})).trans (Equiv.pemptyArrowEquivPUnit _)
   equivB := fun _ => Equiv.equivPEmpty _
 
-#check Equiv.sigmaAssocProd
-
 /-- Associativity of composition -/
 def compAssoc : (P ◃ Q) ◃ R ≃ₚ P ◃ (Q ◃ R) where
   equivA := {
@@ -422,7 +576,8 @@ def compAssoc : (P ◃ Q) ◃ R ≃ₚ P ◃ (Q ◃ R) where
     right_inv := by
       rintro ⟨pa, g⟩; simp [comp]
   }
-  equivB := fun ⟨⟨pa, qf⟩, rf⟩ => sorry
+  equivB := fun ⟨⟨pa, qf⟩, rf⟩ =>
+    _root_.Equiv.sigmaAssoc (fun pb qb => R.B (rf ⟨pb, qb⟩))
   -- Equiv.sigmaProdDistrib _ _
 
 /-- Composition with `X` is identity (right) -/
@@ -439,8 +594,23 @@ def XComp : X ◃ P ≃ₚ P where
 def sumCompDistrib (Q : PFunctor.{uA₂, uB₁}) :
     (P + Q : PFunctor.{max uA₁ uA₂, uB₁}) ◃ R ≃ₚ
     ((P ◃ R) + (Q ◃ R) : PFunctor.{max uA₁ uA₂ uA₃ uB₁, max uB₁ uB₃}) where
-  equivA := sorry
-  equivB := sorry
+  equivA := {
+    toFun := fun
+      | ⟨Sum.inl pa, pf⟩ => Sum.inl ⟨pa, pf⟩
+      | ⟨Sum.inr qa, pf⟩ => Sum.inr ⟨qa, pf⟩
+    invFun := fun
+      | Sum.inl ⟨pa, pf⟩ => ⟨Sum.inl pa, pf⟩
+      | Sum.inr ⟨qa, pf⟩ => ⟨Sum.inr qa, pf⟩
+    left_inv := by
+      rintro ⟨a, pf⟩
+      cases a <;> rfl
+    right_inv := by
+      intro a
+      cases a <;> rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨a, pf⟩
+    cases a <;> exact _root_.Equiv.refl _
 
 -- def prodCompDistrib (Q : PFunctor.{uA₂, uB₂}) (R : PFunctor.{uA₃, uB₃}) :
 --     (P * Q : PFunctor.{max uA₁ uA₂, max uB₁ uB₂}) ◃ R ≃ₚ
