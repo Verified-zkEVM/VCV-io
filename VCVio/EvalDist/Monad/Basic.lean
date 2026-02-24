@@ -290,6 +290,20 @@ lemma probFailure_bind_le_add_of_forall [HasEvalSPMF m] {mx : m α}
       exact ENNReal.tsum_le_tsum fun x => mul_le_mul' le_rfl (hr x.1 x.2)
     _ ≤ Pr[⊥ | mx] + (1 - Pr[⊥ | mx]) * r := by simp [ENNReal.tsum_mul_right]
 
+/-- Version of `probFailure_bind_le_of_forall` with that allows a manual `Pr[⊥ | mx]` value. -/
+lemma probFailure_bind_le_of_forall' [HasEvalSPMF m] {mx : m α}
+    {s : ℝ≥0∞} (h' : Pr[⊥ | mx] = s) (my : α → m β) {r : ℝ≥0∞}
+    (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) : Pr[⊥ | mx >>= my] ≤ s + r := by
+  rw [probFailure_bind_eq_add_tsum_support]
+  refine add_le_add (le_of_eq h') ?_
+  calc ∑' x : support mx, Pr[= x | mx] * Pr[⊥ | my x]
+    _ ≤ ∑' x : support mx, Pr[= x | mx] * r :=
+        ENNReal.tsum_le_tsum fun ⟨x, hx⟩ => mul_le_mul' le_rfl (hr x hx)
+    _ = (1 - Pr[⊥ | mx]) * r := by rw [ENNReal.tsum_mul_right, tsum_support_probOutput_eq_sub]
+    _ = (1 - s) * r := by rw [h']
+    _ ≤ 1 * r := mul_le_mul' tsub_le_self le_rfl
+    _ = r := one_mul r
+
 /-- Version of `probFailure_bind_le_of_forall` when `mx` never fails. -/
 lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
     (h' : Pr[⊥ | mx] = 0) {my : α → m β} {r : ℝ≥0∞}
@@ -297,6 +311,11 @@ lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
   refine (probFailure_bind_le_add_of_forall hr).trans (by simp [h'])
 
 end mono
+
+lemma probFailure_bind_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
+    (h' : Pr[⊥ | mx] = 0) {my : α → m β} :
+    Pr[⊥ | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
+  rw [probFailure_bind_eq_add_tsum, h', zero_add]
 
 end bind
 
@@ -325,13 +344,6 @@ end bind
 
 -- end mul_le_probEvent_bind
 
-section bind_const
-
-variable (mx : m α) (my : m β)
-
-
-
-end bind_const
 
 -- lemma probFailure_bind_congr (mx : OracleComp spec α)
 --     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}

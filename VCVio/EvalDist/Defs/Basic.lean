@@ -10,7 +10,7 @@ import VCVio.EvalDist.Defs.Support
 
 This file defines typeclasses `HasEvalSPMF` and `HasEvalPMF` for assigning denotational
 probability semantics to monadic computations. We also introduce functions
-`probOutput`, `probEvent`, and `probFailrue` with associated notation.
+`probOutput`, `probEvent`, and `probFailure` with associated notation.
 
 -- dtumad: document various probability notation definitions here
 -/
@@ -105,7 +105,7 @@ alias ⟨_, zero_eq_probOutput⟩ := zero_eq_probOutput_iff
 
 @[simp] lemma probOutput_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[= x | mx] = 0 ↔ x ∉ finSupport mx := by rw [mem_finSupport_iff_mem_support]; aesop
-alias ⟨not_mem_fin_support_of_probOutput_eq_zero, probOutput_eq_zero'⟩ := probOutput_eq_zero_iff
+alias ⟨not_mem_fin_support_of_probOutput_eq_zero, probOutput_eq_zero'⟩ := probOutput_eq_zero_iff'
 
 @[simp] lemma zero_eq_probOutput_iff' [HasEvalFinset m] [DecidableEq α] :
     0 = Pr[= x | mx] ↔ x ∉ finSupport mx := by rw [eq_comm, probOutput_eq_zero_iff']
@@ -562,6 +562,7 @@ variable [HasEvalSPMF m]
 lemma probEvent_False (mx : m α) :
     Pr[fun _ => False | mx] = 0 := by grind
 
+@[simp]
 lemma probEvent_false (mx : m α) :
     Pr[fun _ => false | mx] = 0 := by aesop
 

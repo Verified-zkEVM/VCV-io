@@ -71,9 +71,6 @@ variable [HasEvalSPMF m]
 lemma neverFail_iff (mx : m α) : NeverFail mx ↔ Pr[⊥ | mx] = 0 :=
   ⟨by aesop, NeverFail.mk⟩
 
-@[simp]
-instance neverFail_pure (x : α) : NeverFail (pure x : m α) := by grind
-
 @[simp, grind =]
 lemma neverFail_bind_iff (mx : m α) (my : α → m β) :
     NeverFail (mx >>= my) ↔ NeverFail mx ∧ ∀ x ∈ support mx, NeverFail (my x) := by
