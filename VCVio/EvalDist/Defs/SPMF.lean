@@ -185,22 +185,3 @@ lemma support_pure (x : α) : (pure x : SPMF α).support = {x} := by aesop
 
 
 end SPMF
-
-namespace PMF
-
-/-- Convert a `PMF` to an `SPMF` in the canonical way.
-dtumad: this should probably be a bare function with a hom-class instance.  -/
-@[reducible] noncomputable def toSPMF' : PMF →ᵐ SPMF where
-  toFun _ := fun p ↦ OptionT.mk (p.map some)
-  toFun_pure' x := by
-    ext y
-    refine (tsum_eq_single x ?_).trans ?_ <;> aesop
-  toFun_bind' p q := by
-    ext y
-    simp only [SPMF.apply_eq_toPMF_some]
-    simp [← SPMF.run_eq_toPMF]
-    simp [PMF.map, Option.elimM]
-    refine tsum_congr fun x => congr_arg (_ * ·) ?_
-    refine symm ((tsum_eq_single y ?_).trans ?_) <;> aesop
-
-end PMF

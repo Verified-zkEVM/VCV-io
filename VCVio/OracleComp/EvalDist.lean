@@ -25,8 +25,7 @@ section support
 
 /-- The possible outputs of `mx` when queries can output values in the specified sets.
 NOTE: currently proofs using this should reduce to `simulateQ`. A full API would be better -/
-def supportWhen (o : QueryImpl spec Set)
-    (mx : OracleComp spec α) : Set α :=
+def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
   simulateQ (r := SetM) o mx
 
 /-- The `support` instance for `OracleComp`, defined as  -/
@@ -94,8 +93,11 @@ variable [spec.Fintype] [spec.Inhabited]
 /-- Embed `OracleComp` into `SPMF` by mapping queries to uniform distributions over their range. -/
 noncomputable instance : HasEvalPMF (OracleComp spec) where
   toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
-  support_eq mx := sorry
-  toSPMF_eq := sorry
+  support_eq mx := by induction mx using OracleComp.inductionOn with
+    | pure x => simp
+    | query_bind t mx ht => simp [ht]
+  toSPMF_eq mx := rfl
+  __ := OracleComp.hasEvalSet (spec := spec)
 
 lemma evalDist_eq_simulateQ (mx : OracleComp spec α) :
     evalDist mx = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
@@ -119,19 +121,21 @@ lemma probOutput_liftM_eq_div (q : OracleQuery spec α) (x : α) :
   have : DecidableEq α := Classical.decEq α
   simp [probOutput_def, div_eq_mul_inv]
 
+@[simp, grind =]
+lemma probOutput_query (t : spec.Domain) (u : spec.Range t) :
+    Pr[= u | (query t : OracleComp spec _)] = (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by simp
+
 @[grind =]
 lemma probEvent_liftM_eq_div (q : OracleQuery spec α) (p : α → Prop) :
     Pr[p | (liftM q : OracleComp spec α)] =
       (∑' u : spec.Range q.input, Pr[p | (return q.cont u : OracleComp spec α)])
         / Fintype.card (spec.Range q.input) := by
-  have : DecidableEq α := Classical.decEq α
-  have : DecidablePred p := sorry
-  simp [probEvent_eq_tsum_ite, div_eq_mul_inv]
-  sorry
-
-@[simp, grind =]
-lemma probOutput_query (t : spec.Domain) (u : spec.Range t) :
-    Pr[= u | (query t : OracleComp spec _)] = (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by simp
+  have : DecidablePred p := Classical.decPred p
+  simp only [probEvent_eq_tsum_ite, probOutput_liftM_eq_div, tsum_fintype, div_eq_mul_inv]
+  rw [sum_eq_tsum_indicator]
+  simp only [Finset.coe_univ, Set.mem_univ, Set.indicator_of_mem]
+  rw [ENNReal.tsum_comm, ← ENNReal.tsum_mul_right]
+  refine tsum_congr fun x => by aesop
 
 @[grind =]
 lemma probOutput_query_eq_div (t : spec.Domain) (u : spec.Range t) :

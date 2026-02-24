@@ -276,28 +276,27 @@ lemma probFailure_bind_eq_sub_mul [HasEvalSPMF m]
 
 end const
 
-lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
-    {s : ℝ≥0∞} (h' : Pr[⊥ | mx] ≤ s) (my : α → m β) {r : ℝ≥0∞}
-    (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) :
-    Pr[⊥ | mx >>= my] ≤ s + (1 - s) * r := by
-  sorry
+section mono
 
-/-- Version of `probFailure_bind_le_of_forall` with the `1 - s` factor ommited for convenience. -/
-lemma probFailure_bind_le_of_forall' [HasEvalSPMF m] {mx : m α}
-    {s : ℝ≥0∞} (h' : Pr[⊥ | mx] = s) (my : α → m β) {r : ℝ≥0∞}
-    (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) : Pr[⊥ | mx >>= my] ≤ s + r := by
-  sorry
+lemma probFailure_bind_le_add_of_forall [HasEvalSPMF m] {mx : m α}
+    {my : α → m β} {r : ℝ≥0∞}
+    (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) :
+    Pr[⊥ | mx >>= my] ≤ Pr[⊥ | mx] + (1 - Pr[⊥ | mx]) * r := by
+  calc Pr[⊥ | mx >>= my]
+    _ = Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * Pr[⊥ | my x] := by
+      rw [probFailure_bind_eq_add_tsum_support]
+    _ ≤ Pr[⊥ | mx] + ∑' x : support mx, Pr[= x | mx] * r := by
+      refine add_le_add le_rfl ?_
+      exact ENNReal.tsum_le_tsum fun x => mul_le_mul' le_rfl (hr x.1 x.2)
+    _ ≤ Pr[⊥ | mx] + (1 - Pr[⊥ | mx]) * r := by simp [ENNReal.tsum_mul_right]
 
 /-- Version of `probFailure_bind_le_of_forall` when `mx` never fails. -/
-lemma probFailure_bind_le_of_le_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
+lemma probFailure_bind_le_of_forall [HasEvalSPMF m] {mx : m α}
     (h' : Pr[⊥ | mx] = 0) {my : α → m β} {r : ℝ≥0∞}
     (hr : ∀ x ∈ support mx, Pr[⊥ | my x] ≤ r) : Pr[⊥ | mx >>= my] ≤ r := by
-  sorry
+  refine (probFailure_bind_le_add_of_forall hr).trans (by simp [h'])
 
-lemma probFailure_bind_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
-    (h' : Pr[⊥ | mx] = 0) {my : α → m β} :
-    Pr[⊥ | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[⊥ | my x] := by
-  sorry
+end mono
 
 end bind
 
