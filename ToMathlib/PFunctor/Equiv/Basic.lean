@@ -438,16 +438,48 @@ def uliftSumEquiv (Q : PFunctor.{uA₂, uB₁}) :
           }
   }
 
--- /-- Universe lifting commutes with product -/
--- def uliftProdEquiv (Q : PFunctor.{uA₂, uB₂}) :
---     Equiv.{max uA₁ uA₂ u, max uB₁ v, max uA₁ uA uA₂ uA', max uB₁ uB}
---     (PFunctor.ulift.{_, _, u, v} (sum.{uB₁, uA₁, uA₂} P Q))
---     (sum.{max uB₁ uB, max uA₁ uA, max uA₂ uA'} (P.ulift : PFunctor.{max uA₁ uA, max uB₁ uB})
---       (Q.ulift : PFunctor.{max uA₂ uA', max uB₁ uB}) : PFunctor.{max uA₁ uA uA₂ uA', max uB₁ uB})
---     (P * Q).ulift ≃ₚ (P.ulift * Q.ulift) :=
---   sorry
-
--- same for tensor product & composition
+/-- Universe lifting commutes with product. -/
+def uliftProdEquiv (Q : PFunctor.{uA₂, uB₂}) :
+    (PFunctor.ulift.{_, _, u, v} (P * Q : PFunctor.{max uA₁ uA₂, max uB₁ uB₂})) ≃ₚ
+      ((PFunctor.ulift.{_, _, uA, uB} P : PFunctor.{max uA₁ uA, max uB₁ uB}) *
+        (PFunctor.ulift.{_, _, uA', uB'} Q : PFunctor.{max uA₂ uA', max uB₂ uB'}) :
+          PFunctor.{max uA₁ uA₂ uA uA', max uB₁ uB₂ uB uB'}) :=
+  {
+    equivA := {
+      toFun := fun a => (ULift.up (ULift.down a).1, ULift.up (ULift.down a).2)
+      invFun := fun a => ULift.up (ULift.down a.1, ULift.down a.2)
+      left_inv := by
+        intro a
+        cases a
+        rfl
+      right_inv := by
+        intro a
+        rcases a with ⟨pa, qa⟩
+        cases pa
+        cases qa
+        rfl
+    }
+    equivB := fun a => by
+      cases a with
+      | up s =>
+        rcases s with ⟨pa, qa⟩
+        exact {
+          toFun := fun b => match ULift.down b with
+            | Sum.inl pb => Sum.inl (ULift.up pb)
+            | Sum.inr qb => Sum.inr (ULift.up qb)
+          invFun := fun b => ULift.up <| match b with
+            | Sum.inl pb => Sum.inl (ULift.down pb)
+            | Sum.inr qb => Sum.inr (ULift.down qb)
+          left_inv := by
+            intro b
+            cases b with
+            | up s =>
+              cases s <;> rfl
+          right_inv := by
+            intro b
+            cases b <;> rfl
+        }
+  }
 
 end ULift
 
@@ -612,16 +644,43 @@ def sumCompDistrib (Q : PFunctor.{uA₂, uB₁}) :
     rcases a with ⟨a, pf⟩
     cases a <;> exact _root_.Equiv.refl _
 
--- def prodCompDistrib (Q : PFunctor.{uA₂, uB₂}) (R : PFunctor.{uA₃, uB₃}) :
---     (P * Q : PFunctor.{max uA₁ uA₂, max uB₁ uB₂}) ◃ R ≃ₚ
---     ((P ◃ R) * (Q ◃ R) : PFunctor.{max uA₁ uA₂ uA₃, max uB₁ uB₂ uB₃}) where
---   equivA := sorry
---   equivB := sorry
-
--- sigmaCompDistrib
--- piCompDistrib
-
--- sigma / pi / tensor and comp?
+/-- Composition distributes over product on the left. -/
+def prodCompDistrib :
+    (P * Q : PFunctor.{max uA₁ uA₂, max uB₁ uB₂}) ◃ R ≃ₚ
+      ((P ◃ R) * (Q ◃ R) : PFunctor.{max uA₁ uA₂ uA₃ uB₁ uB₂, max uB₁ uB₂ uB₃}) where
+  equivA := {
+    toFun := fun ⟨⟨pa, qa⟩, f⟩ =>
+      (⟨pa, fun pb => f (Sum.inl pb)⟩, ⟨qa, fun qb => f (Sum.inr qb)⟩)
+    invFun := fun ⟨⟨pa, fp⟩, ⟨qa, fq⟩⟩ =>
+      ⟨⟨pa, qa⟩, Sum.elim fp fq⟩
+    left_inv := by
+      rintro ⟨⟨pa, qa⟩, f⟩
+      apply Sigma.ext
+      · rfl
+      exact heq_of_eq (show Sum.elim (fun pb => f (Sum.inl pb)) (fun qb => f (Sum.inr qb)) = f from by
+        funext b
+        cases b <;> rfl)
+    right_inv := by
+      rintro ⟨⟨pa, fp⟩, ⟨qa, fq⟩⟩
+      rfl
+  }
+  equivB := fun a => by
+    rcases a with ⟨⟨pa, qa⟩, f⟩
+    exact {
+      toFun := fun s => match s with
+        | ⟨Sum.inl pb, rb⟩ => Sum.inl ⟨pb, rb⟩
+        | ⟨Sum.inr qb, rb⟩ => Sum.inr ⟨qb, rb⟩
+      invFun := fun s => match s with
+        | Sum.inl ⟨pb, rb⟩ => ⟨Sum.inl pb, rb⟩
+        | Sum.inr ⟨qb, rb⟩ => ⟨Sum.inr qb, rb⟩
+      left_inv := by
+        intro s
+        rcases s with ⟨b, rb⟩
+        cases b <;> rfl
+      right_inv := by
+        intro s
+        cases s <;> rfl
+    }
 
 end Comp
 
