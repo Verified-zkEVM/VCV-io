@@ -289,59 +289,6 @@ lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys
 
 end mapM
 
--- section neverFails
-
--- /-- If each element of a list is mapped to a computation that never fails, then the computation
---   obtained by monadic mapping over the list also never fails. -/
--- @[simp] lemma neverFails_list_mapM {f : α → OracleComp spec β} {as : List α}
---     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM f as) := by
---   induction as with
---   | nil => simp only [mapM, mapM.loop, reverse_nil, neverFails_pure]
---   | cons a as ih =>
---     simp [mapM_cons, h]
---     exact fun _ _ => ih (by simp at h; exact h.2)
-
--- @[simp] lemma neverFails_list_mapM' {f : α → OracleComp spec β} {as : List α}
---     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (mapM' f as) := by
---   rw [mapM'_eq_mapM]
---   exact neverFails_list_mapM h
-
--- @[simp] lemma neverFails_list_flatMapM {f : α → OracleComp spec (List β)} {as : List α}
---     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (flatMapM f as) := by
---   induction as with
---   | nil => simp only [flatMapM_nil, neverFails_pure]
---   | cons a as ih =>
---     simp only [flatMapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
---     exact ⟨h a (by simp), fun y hy => ih (fun x hx => h x (by simp [hx]))⟩
-
--- @[simp] lemma neverFails_list_filterMapM {f : α → OracleComp spec (Option β)} {as : List α}
---     (h : ∀ x ∈ as, neverFails (f x)) : neverFails (filterMapM f as) := by
---   induction as with
---   | nil => simp only [filterMapM_nil, neverFails_pure]
---   | cons a as ih =>
---     simp only [filterMapM_cons, bind_pure_comp, neverFails_bind_iff, neverFails_map_iff]
---     refine ⟨h a (by simp), fun y hy => ?_⟩
---     rcases y with _ | y <;> simp <;> exact ih (fun x hx => h x (by simp [hx]))
-
--- variable {s : Type v}
-
--- @[simp] lemma neverFails_list_foldlM {f : s → α → OracleComp spec s} {init : s} {as : List α}
---     (h : ∀ i, ∀ x ∈ as, neverFails (f i x)) : neverFails (foldlM f init as) := by
---   induction as generalizing init with
---   | nil => simp only [foldlM, reverse_nil, neverFails_pure]
---   | cons b bs ih =>
---       simp only [foldlM_cons, neverFails_bind_iff, mem_cons, true_or, h, true_and]
---       exact fun _ _ => ih (fun i x hx' => h i x (by simp [hx']))
-
--- @[simp] lemma neverFails_list_foldrM {f : α → s → OracleComp spec s} {init : s} {as : List α}
---     (h : ∀ i, ∀ x ∈ as, neverFails (f x i)) : neverFails (foldrM f init as) := by
---   induction as generalizing init with
---   | nil => simp only [foldrM, reverse_nil, foldlM_nil, neverFails_pure]
---   | cons b bs ih =>
---       simp only [foldrM_cons, neverFails_bind_iff]
---       exact ⟨ih (fun i x hx => h i x (by simp [hx])), fun y _ => h y b (by simp)⟩
-
--- end neverFails
 
 -- end List
 
@@ -444,3 +391,81 @@ end mapM
 -- end Vector
 
 end OracleComp
+
+/-! ## NeverFail lemmas for list monadic operations
+
+These lemmas are generic over any monad `m` with `[HasEvalSPMF m]`.
+-/
+
+section NeverFail
+
+variable {α β : Type*} {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
+
+@[simp]
+lemma neverFail_list_mapM {f : α → m β} {as : List α}
+    (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.mapM f) := by
+  induction as with
+  | nil => rw [List.mapM_nil]; infer_instance
+  | cons a as ih =>
+    simp only [List.mapM_cons, HasEvalSPMF.neverFail_bind_iff]
+    exact ⟨h a (.head ..), fun _ _ =>
+      ⟨ih (fun x hx => h x (.tail _ hx)), fun _ _ => inferInstance⟩⟩
+
+omit [LawfulMonad m] in
+@[simp]
+lemma neverFail_list_mapM' {f : α → m β} {as : List α}
+    (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.mapM' f) := by
+  induction as with
+  | nil => rw [List.mapM'_nil]; infer_instance
+  | cons a as ih =>
+    simp only [List.mapM'_cons, HasEvalSPMF.neverFail_bind_iff]
+    exact ⟨h a (.head ..), fun _ _ =>
+      ⟨ih (fun x hx => h x (.tail _ hx)), fun _ _ => inferInstance⟩⟩
+
+@[simp]
+lemma neverFail_list_flatMapM {f : α → m (List β)} {as : List α}
+    (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.flatMapM f) := by
+  induction as with
+  | nil => simp only [List.flatMapM_nil]; infer_instance
+  | cons a as ih =>
+    simp only [List.flatMapM_cons, bind_pure_comp,
+      HasEvalSPMF.neverFail_bind_iff, HasEvalSPMF.neverFail_map_iff]
+    exact ⟨h a (.head ..), fun _ _ => ih (fun x hx => h x (.tail _ hx))⟩
+
+@[simp]
+lemma neverFail_list_filterMapM {f : α → m (Option β)} {as : List α}
+    (h : ∀ x ∈ as, NeverFail (f x)) : NeverFail (as.filterMapM f) := by
+  induction as with
+  | nil => simp only [List.filterMapM_nil]; infer_instance
+  | cons a as ih =>
+    simp only [List.filterMapM_cons, HasEvalSPMF.neverFail_bind_iff]
+    refine ⟨h a (.head ..), fun y _ => ?_⟩
+    have h_tail := ih (fun x hx => h x (.tail _ hx))
+    cases y with
+    | none => exact h_tail
+    | some b =>
+      simp only [HasEvalSPMF.neverFail_bind_iff]
+      exact ⟨h_tail, fun _ _ => inferInstance⟩
+
+variable {s : Type*}
+
+omit [LawfulMonad m] in
+@[simp]
+lemma neverFail_list_foldlM {f : s → α → m s} {init : s} {as : List α}
+    (h : ∀ i, ∀ x ∈ as, NeverFail (f i x)) : NeverFail (as.foldlM f init) := by
+  induction as generalizing init with
+  | nil => rw [List.foldlM_nil]; infer_instance
+  | cons b bs ih =>
+    simp only [List.foldlM_cons, HasEvalSPMF.neverFail_bind_iff]
+    exact ⟨h init b (.head ..), fun _ _ => ih (fun i x hx => h i x (.tail _ hx))⟩
+
+@[simp]
+lemma neverFail_list_foldrM {f : α → s → m s} {init : s} {as : List α}
+    (h : ∀ i, ∀ x ∈ as, NeverFail (f x i)) : NeverFail (as.foldrM f init) := by
+  induction as generalizing init with
+  | nil => rw [List.foldrM_nil]; infer_instance
+  | cons b bs ih =>
+    simp only [List.foldrM_cons, HasEvalSPMF.neverFail_bind_iff]
+    exact ⟨ih (fun i x hx => h i x (.tail _ hx)), fun y _ => h y b (.head ..)⟩
+
+end NeverFail

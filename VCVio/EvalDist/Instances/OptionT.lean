@@ -72,7 +72,8 @@ lemma finSupport_def [DecidableEq α] (mx : OptionT m α) :
 
 @[simp low]
 lemma mem_finSupport_iff [DecidableEq α] (mx : OptionT m α) (x : α) :
-    x ∈ finSupport mx ↔ ∃ y ∈ finSupport mx.run, x = some y := by grind
+    x ∈ finSupport mx ↔ some x ∈ finSupport mx.run := by
+  simp [finSupport_def, Finset.mem_preimage]
 
 @[simp]
 lemma finSupport_liftM [DecidableEq α] (mx : m α) :

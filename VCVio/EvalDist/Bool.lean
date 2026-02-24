@@ -16,8 +16,8 @@ variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α : Type _}
 @[simp]
 lemma probOutput_true_add_false (mx : m Bool) :
     Pr[= true | mx] + Pr[= false | mx] = 1 - Pr[⊥ | mx] := by
-  have h := @tsum_probOutput_eq_sub _ _ _ _ _ mx
-  rwa [tsum_fintype, Fintype.sum_bool] at h
+  have h := tsum_probOutput_eq_sub mx
+  rwa [tsum_fintype (L := .unconditional _), Fintype.sum_bool] at h
 
 @[simp]
 lemma probOutput_false_add_true (mx : m Bool) :
@@ -37,9 +37,9 @@ lemma probOutput_false_eq_sub (mx : m Bool) :
 @[simp]
 lemma probOutput_not_map [LawfulMonad m] (mx : m Bool) :
     Pr[= true | (! ·) <$> mx] = Pr[= false | mx] :=
-  probOutput_map_injective mx Bool.not_injective false
+  probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) false
 
 @[simp]
 lemma probOutput_not_map' [LawfulMonad m] (mx : m Bool) :
     Pr[= false | (! ·) <$> mx] = Pr[= true | mx] :=
-  probOutput_map_injective mx Bool.not_injective true
+  probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) true
