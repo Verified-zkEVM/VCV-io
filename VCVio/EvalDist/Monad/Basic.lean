@@ -342,13 +342,6 @@ end bind
 
 -- end mul_le_probEvent_bind
 
-section bind_const
-
-variable (mx : m α) (my : m β)
-
-
-
-end bind_const
 
 -- lemma probFailure_bind_congr (mx : OracleComp spec α)
 --     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}

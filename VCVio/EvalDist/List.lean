@@ -193,19 +193,28 @@ lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys 
   revert ys
   induction xs with
   | nil => simp
-  | cons x xs h =>
+  | cons x xs ih =>
       intro ys
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp
         rw [probOutput_bind_eq_mul y]
-        simp [h]
+        simp [ih]
         clear *- hys
         aesop
         simp
-      · simp
-        sorry
+      · refine probOutput_eq_zero_of_not_mem_support ?_
+        simp only [mapM_cons, support_bind, Set.mem_iUnion, not_exists]
+        intro y _ zs hzs
+        rw [support_pure, Set.mem_singleton_iff]
+        intro heq; subst heq
+        have : zs.length = xs.length := by
+          by_contra h
+          have h1 := ih zs
+          rw [if_neg h] at h1
+          exact absurd h1 (probOutput_ne_zero_of_mem_support hzs)
+        simp_all
 
 @[simp]
 lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys : List β) :
@@ -215,19 +224,28 @@ lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys
   revert ys
   induction xs with
   | nil => simp
-  | cons x xs h =>
+  | cons x xs ih =>
       intro ys
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp
         rw [probOutput_bind_eq_mul y]
-        simp [h]
+        simp [ih]
         clear *- hys
         aesop
         simp
-      · simp
-        sorry
+      · refine probOutput_eq_zero_of_not_mem_support ?_
+        simp only [List.mapM'_cons, support_bind, Set.mem_iUnion, not_exists]
+        intro y _ zs hzs
+        rw [support_pure, Set.mem_singleton_iff]
+        intro heq; subst heq
+        have : zs.length = xs.length := by
+          by_contra h
+          have h1 := ih zs
+          rw [if_neg h] at h1
+          exact absurd h1 (probOutput_ne_zero_of_mem_support hzs)
+        simp_all
 
 
 
