@@ -136,41 +136,64 @@ lemma probOutput_list_mapM_loop [DecidableEq β]
     (zs : List β) : Pr[= zs | List.mapM.loop f xs ys] =
       if zs.length = xs.length + ys.length ∧ zs.take ys.length = ys.reverse
       then (List.zipWith (fun x z => Pr[= z | f x]) xs (zs.drop ys.length)).prod else 0 := by
-  stop
-  rw [list_mapM_loop_eq]
-  rw [probOutput_map_append_left]
-  by_cases h : take ys.length zs = ys.reverse
-  · simp only [length_reverse, h, ↓reduceIte, and_true]
-    induction zs using List.reverseRecOn with
-    | nil => {
-      simp at h
-      simp [h]
-      cases xs with
-      | nil => {
-        simp [mapM.loop]
-      }
-      | cons x xs => {
-        simp [mapM.loop]
-        intro _ _
-        rw [list_mapM_loop_eq]
-        simp
-      }
-    }
-    | append_singleton zs z hzs => {
-      cases xs with
-      | nil => {
-        suffices zs.length + 1 ≤ ys.length ↔ zs.length + 1 = ys.length
-        by simp [mapM.loop, this]
-        refine LE.le.le_iff_eq ?_
-        simpa using congr_arg length h
-      }
-      | cons x xs => {
-        simp [Nat.succ_add, mapM.loop]
-
-
-      }
-    }
-  · simp [h]
+  revert ys zs
+  induction xs with
+  | nil =>
+    intro ys zs
+    simp only [List.mapM.loop, List.length_nil, Nat.zero_add,
+      List.zipWith_nil_left, List.prod_nil]
+    by_cases h : zs.length = ys.length ∧ zs.take ys.length = ys.reverse
+    · rw [if_pos h]
+      obtain ⟨hlen, htake⟩ := h
+      have : zs = ys.reverse := by
+        rwa [show ys.length = zs.length from hlen.symm, List.take_length] at htake
+      subst this; simp
+    · rw [if_neg h, probOutput_pure, if_neg]
+      rintro rfl; exact h ⟨by simp, by simp⟩
+  | cons x xs ih =>
+    intro ys zs
+    simp only [List.mapM.loop]
+    rw [probOutput_bind_eq_tsum]
+    simp_rw [ih, List.length_cons, List.reverse_cons]
+    have take_mono : ∀ y, zs.take (ys.length + 1) = ys.reverse ++ [y] →
+        zs.take ys.length = ys.reverse := by
+      intro y htk
+      have h1 : zs.take ys.length = (zs.take (ys.length + 1)).take ys.length := by
+        rw [List.take_take]; congr 1; omega
+      rw [h1, htk, List.take_append_of_le_length (by simp)]
+      simp [List.length_reverse]
+    by_cases hcond : zs.length = xs.length + 1 + ys.length ∧ zs.take ys.length = ys.reverse
+    · rw [if_pos hcond]
+      obtain ⟨hlen, htake⟩ := hcond
+      have hlt : ys.length < zs.length := by omega
+      have hdrop_ne : (zs.drop ys.length) ≠ [] := by
+        intro hd; exact absurd (List.drop_eq_nil_iff.mp hd) (by omega)
+      set z₀ := (zs.drop ys.length).head hdrop_ne
+      have hdrop_eq : zs.drop ys.length = z₀ :: zs.drop (ys.length + 1) := by
+        conv_lhs => rw [← List.cons_head_tail hdrop_ne]
+        rw [List.tail_drop]
+      have htake_succ : zs.take (ys.length + 1) = ys.reverse ++ [z₀] := by
+        conv_lhs => rw [← List.take_append_drop ys.length zs]
+        rw [htake, hdrop_eq, List.take_append]
+        simp [List.length_reverse]
+      have hinner : ∀ y, (zs.length = xs.length + (ys.length + 1) ∧
+          zs.take (ys.length + 1) = ys.reverse ++ [y]) ↔ y = z₀ := by
+        intro y
+        refine ⟨fun ⟨_, h⟩ => ?_, fun h => ⟨by omega, h ▸ htake_succ⟩⟩
+        have := List.append_cancel_left (htake_succ.symm.trans h)
+        simpa using this.symm
+      simp_rw [hinner]
+      rw [tsum_eq_single z₀ (by intro y hy; simp [hy]), if_pos rfl,
+        hdrop_eq, List.zipWith_cons_cons, List.prod_cons]
+    · rw [if_neg hcond]
+      suffices hzero : ∀ y, Pr[= y | f x] *
+          (if zs.length = xs.length + (ys.length + 1) ∧
+              zs.take (ys.length + 1) = ys.reverse ++ [y]
+            then (List.zipWith (fun a z => Pr[= z | f a]) xs (zs.drop (ys.length + 1))).prod
+            else 0) = 0 by
+        simp_rw [hzero]; exact tsum_zero
+      intro y
+      rw [if_neg (fun ⟨hl, ht⟩ => hcond ⟨by omega, take_mono y ht⟩), mul_zero]
 
 lemma probOutput_bind_eq_mul {mx : m α} {my : α → m β} {y : β} (x : α)
     (h : ∀ x' ∈ support mx, y ∈ support (my x') → x' = x) :
@@ -180,10 +203,25 @@ lemma probOutput_bind_eq_mul {mx : m α} {my : α → m β} {y : β} (x : α)
   grind [= mul_eq_zero]
 
 @[simp]
-lemma probOutput_cons_map [DecidableEq α] (mx : m (List α)) (x : α) (xs : List α) :
+lemma probOutput_cons_map [LawfulMonad m] [DecidableEq α]
+    (mx : m (List α)) (x : α) (xs : List α) :
     Pr[= xs | cons x <$> mx] =
       if hxs : xs = [] then 0 else Pr[= xs.head hxs | (pure x : m α)] * Pr[= xs.tail | mx] := by
-  sorry
+  split
+  case isTrue h =>
+    subst h
+    apply probOutput_eq_zero_of_not_mem_support
+    simp [support_map]
+  case isFalse h =>
+    obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_ne_nil h
+    simp only [List.head_cons, List.tail_cons]
+    by_cases hyx : y = x
+    · subst hyx
+      rw [probOutput_map_injective mx (List.cons_injective (a := y)), probOutput_pure_self, one_mul]
+    · simp only [hyx, probOutput_pure, ↓reduceIte, zero_mul]
+      apply probOutput_eq_zero_of_not_mem_support
+      simp only [support_map, Set.mem_image, not_exists, not_and]
+      exact fun _ _ h' => hyx (List.cons.inj h').1.symm
 
 @[simp]
 lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys : List β) :
@@ -193,19 +231,28 @@ lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys 
   revert ys
   induction xs with
   | nil => simp
-  | cons x xs h =>
+  | cons x xs ih =>
       intro ys
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp
         rw [probOutput_bind_eq_mul y]
-        simp [h]
+        simp [ih]
         clear *- hys
         aesop
         simp
-      · simp
-        sorry
+      · refine probOutput_eq_zero_of_not_mem_support ?_
+        simp only [mapM_cons, support_bind, Set.mem_iUnion, not_exists]
+        intro y _ zs hzs
+        rw [support_pure, Set.mem_singleton_iff]
+        intro heq; subst heq
+        have : zs.length = xs.length := by
+          by_contra h
+          have h1 := ih zs
+          rw [if_neg h] at h1
+          exact absurd h1 (probOutput_ne_zero_of_mem_support hzs)
+        simp_all
 
 @[simp]
 lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys : List β) :
@@ -215,19 +262,28 @@ lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys
   revert ys
   induction xs with
   | nil => simp
-  | cons x xs h =>
+  | cons x xs ih =>
       intro ys
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp
         rw [probOutput_bind_eq_mul y]
-        simp [h]
+        simp [ih]
         clear *- hys
         aesop
         simp
-      · simp
-        sorry
+      · refine probOutput_eq_zero_of_not_mem_support ?_
+        simp only [List.mapM'_cons, support_bind, Set.mem_iUnion, not_exists]
+        intro y _ zs hzs
+        rw [support_pure, Set.mem_singleton_iff]
+        intro heq; subst heq
+        have : zs.length = xs.length := by
+          by_contra h
+          have h1 := ih zs
+          rw [if_neg h] at h1
+          exact absurd h1 (probOutput_ne_zero_of_mem_support hzs)
+        simp_all
 
 
 

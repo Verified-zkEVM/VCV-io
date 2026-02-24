@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import ToMathlib.PFunctor.Basic
+import ToMathlib.PFunctor.Equiv.Basic
 
 /-!
 # More properties about lenses between polynomial functors
@@ -139,8 +140,19 @@ def sumMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₁}} {R : PFun
       | Sum.inl pa => l₁.toFunB pa
       | Sum.inr qa => l₂.toFunB qa)
 
--- def sigmaExists
--- def sigmaMap
+/-- Dependent copairing of lenses over `sigma`: `Σ i, F i → R`. -/
+def sigmaExists {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {R : PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) R) :
+    Lens (sigma F) R :=
+  (fun ⟨i, fa⟩ => (l i).toFunA fa) ⇆
+    (fun ⟨i, fa⟩ => (l i).toFunB fa)
+
+/-- Pointwise mapping of lenses over `sigma`. -/
+def sigmaMap {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {G : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) (G i)) :
+    Lens (sigma F) (sigma G) :=
+  (fun ⟨i, fa⟩ => ⟨i, (l i).toFunA fa⟩) ⇆
+    (fun ⟨i, fa⟩ => (l i).toFunB fa)
 
 /-- Projection lens `fst : P * Q → P` -/
 def fst {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} :
@@ -166,8 +178,19 @@ def prodMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} {R : PFu
   (fun pq => (l₁.toFunA pq.1, l₂.toFunA pq.2)) ⇆
     (fun pq => Sum.elim (Sum.inl ∘ l₁.toFunB pq.1) (Sum.inr ∘ l₂.toFunB pq.2))
 
--- def piForall
--- def piMap
+/-- Dependent pairing of lenses into a `pi`: `P → ∀ i, F i`. -/
+def piForall {I : Type v} {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens P (F i)) :
+    Lens P (pi F) :=
+  (fun pa i => (l i).toFunA pa) ⇆
+    (fun pa ⟨i, fb⟩ => (l i).toFunB pa fb)
+
+/-- Pointwise mapping of lenses over `pi`. -/
+def piMap {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {G : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) (G i)) :
+    Lens (pi F) (pi G) :=
+  (fun fa i => (l i).toFunA (fa i)) ⇆
+    (fun fa ⟨i, gb⟩ => ⟨i, (l i).toFunB (fa i) gb⟩)
 
 /-- Apply lenses to both sides of a composition: `l₁ ◃ₗ l₂ : (P ◃ Q ⇆ R ◃ W)` -/
 def compMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} {R : PFunctor.{uA₃, uB₃}}
@@ -692,6 +715,50 @@ end Equiv
 
 end Tensor
 
+end Lens
+
+namespace Equiv
+
+variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
+
+/-- Convert an equivalence between two polynomial functors `P` and `Q` to a lens. -/
+def toLensEquiv (e : P ≃ₚ Q) : P ≃ₗ Q where
+  toLens := e.equivA ⇆ (fun a => (e.equivB a).symm)
+  invLens := e.symm.equivA ⇆ (fun a => (e.symm.equivB a).symm)
+  left_inv := by
+    simp only [Lens.comp, Lens.id]
+    ext a b
+    · simp [PFunctor.Equiv.symm]
+    · simp [PFunctor.Equiv.symm]
+      have hb :
+          (e.equivB a).symm ((_root_.Equiv.cast
+            (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm
+            ((e.equivB (e.equivA.symm (e.equivA a))) b)) =
+            _root_.cast (congrArg P.B (e.equivA.symm_apply_apply a)) b := by
+        simpa [PFunctor.Equiv.symm] using
+          (equivB_symm_apply (e := e) (a := a) (b := b))
+      have h0 : a = e.equivA.symm (e.equivA a) := (e.equivA.symm_apply_apply a).symm
+      have hr := eqRec_id_apply (β := P.B) (h := h0) (x := b)
+      exact hb.trans (by simpa [h0] using hr.symm)
+  right_inv := by
+    simp only [Lens.comp, Lens.id]
+    ext a b
+    · simp [PFunctor.Equiv.symm]
+    · simp [PFunctor.Equiv.symm]
+      have hb :
+          (_root_.Equiv.cast (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm b =
+            _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b := by
+        simpa [PFunctor.Equiv.symm] using
+          (symm_equivB_symm_apply (e := e) (a := a) (b := b))
+      have h0 : a = e.equivA (e.equivA.symm a) :=
+        (_root_.Equiv.symm_apply_eq e.equivA).mp rfl
+      have hr := eqRec_id_apply (β := Q.B) (h := h0) (x := b)
+      exact hb.trans (by simpa [h0] using hr.symm)
+
+end Equiv
+
+namespace Lens
+
 section Sigma
 
 variable {I : Type v}
@@ -701,104 +768,52 @@ instance [IsEmpty I] {F : I → PFunctor.{u}} : IsEmpty (sigma F).A := by
 instance [IsEmpty I] {F : I → PFunctor.{u}} {a : (sigma F).A} : IsEmpty ((sigma F).B a) :=
   isEmptyElim a
 
--- /-- Sigma of an empty family is the zero functor. -/
--- def sigmaEmpty [IsEmpty I] {F : I → PFunctor.{u}} : sigma F ≃ₗ 0 where
---   toLens := isEmptyElim ⇆ (fun a _ => isEmptyElim a)
---   invLens := isEmptyElim ⇆ (fun a _ => isEmptyElim a)
---   left_inv := by ext a <;> exact isEmptyElim a
---   right_inv := by ext a <;> exact isEmptyElim a
+/-- Sigma of an empty family is the zero functor. -/
+def sigmaEmpty [IsEmpty I] {F : I → PFunctor.{uA, uB}} : sigma F ≃ₗ 0 :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.emptySigma (F := F))
 
--- /-- Sigma of a `PUnit`-indexed family is equivalent to the functor itself. -/
--- def sigmaUnit {F : PUnit → PFunctor.{u}} : sigma F ≃ₗ (F PUnit.unit).ulift where
---   toLens := (fun ⟨_, a⟩ => ULift.up a) ⇆ (fun _ b => b)
---   invLens := (fun a => ⟨PUnit.unit, ULift.down a⟩) ⇆ (fun _ b => b)
---   left_inv := rfl
---   right_inv := rfl
+/-- Sigma of a `PUnit`-indexed family is equivalent to the functor itself (up to `ulift`). -/
+def sigmaUnit {F : PUnit → PFunctor.{uA, uB}} : sigma F ≃ₗ (F PUnit.unit).ulift :=
+  PFunctor.Equiv.toLensEquiv
+    (PFunctor.Equiv.trans
+      (PFunctor.Equiv.punitSigma (F := F))
+      (PFunctor.Equiv.uliftEquiv (P := F PUnit.unit)))
 
--- /-- Sigma of an `I`-indexed family, where `I` is unique, is equivalent to the functor itself. -/
--- def sigmaOfUnique [Unique I] {F : I → PFunctor.{u}} : sigma F ≃ₗ (F default).ulift where
---   toLens := (fun ⟨_, a⟩ => (Unique.uniq _ _) ▸ ULift.up a) ⇆
---             (fun ⟨i, a⟩ b => (Unique.uniq _ i) ▸ b)
---   invLens := (fun a => ⟨default, ULift.down a⟩) ⇆ (fun _ b => b)
---   left_inv := by
---     ext ⟨i, a⟩ b <;> simp [sigma, Lens.id, comp]
---     · generalize_proofs h; subst h; simp
---     · generalize_proofs _ h; subst h; simp
---   right_inv := rfl
+/-- Sigma of a unique-indexed family is equivalent to the default fiber (up to `ulift`). -/
+def sigmaOfUnique [Unique I] {F : I → PFunctor.{uA, uB}} : sigma F ≃ₗ (F default).ulift :=
+  PFunctor.Equiv.toLensEquiv
+    (PFunctor.Equiv.trans
+      (PFunctor.Equiv.uniqueSigma (F := F))
+      (PFunctor.Equiv.uliftEquiv (P := F default)))
 
--- /-- Left distributivity of product over sigma. -/
--- def prodSigmaDistrib {P : PFunctor.{u}} {I : Type u} {F : I → PFunctor.{u}} :
---     P * sigma F ≃ₗ sigma (fun i => P * F i) where
---   toLens := (fun ⟨pa, ⟨i, fia⟩⟩ => ⟨i, ⟨pa, fia⟩⟩) ⇆
---             (fun _ b => match ULift.down b with
---               | Sum.inl p => Sum.inl p
---               | Sum.inr q => Sum.inr (ULift.up q))
---   invLens := (fun ⟨i, ⟨pa, fia⟩⟩ => ⟨pa, ⟨i, fia⟩⟩) ⇆
---              (fun _ b => match b with
---               | Sum.inl p => ULift.up (Sum.inl p)
---               | Sum.inr q => ULift.up (Sum.inr (ULift.down q)))
---   left_inv := by
---     ext ⟨pa, ⟨i, fia⟩⟩ b
---     · rfl
---     · rcases b with _ | _ <;> rfl
---   right_inv := by
---     ext ⟨i, ⟨pa, fia⟩⟩ b
---     · rfl
---     · rcases b with _ | _ <;> rfl
+/-- Left distributivity of product over sigma. -/
+def prodSigmaDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    (P * sigma F : PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) ≃ₗ
+      (sigma (fun i => (P * F i : PFunctor.{max uA₁ uA₂, max uB₁ uB₂})) :
+        PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.prodSigmaDistrib (P := P) (F := F))
 
--- /-- Right distributivity of product over sigma. -/
--- def sigmaProdDistrib {P : PFunctor.{u}} {I : Type u} {F : I → PFunctor.{u}} :
---     sigma F * P ≃ₗ sigma (fun i => F i * P) where
---   toLens := (fun ⟨⟨i, fia⟩, pa⟩ => ⟨i, ⟨fia, pa⟩⟩) ⇆
---             (fun _ b => match ULift.down b with
---               | Sum.inl p => Sum.inl (ULift.up p)
---               | Sum.inr q => Sum.inr q)
---   invLens := (fun ⟨i, ⟨fia, pa⟩⟩ => ⟨⟨i, fia⟩, pa⟩) ⇆
---              (fun _ b => match b with
---               | Sum.inl p => ULift.up (Sum.inl (ULift.down p))
---               | Sum.inr q => ULift.up (Sum.inr q))
---   left_inv := by
---     ext ⟨⟨i, fia⟩, pa⟩ b
---     · rfl
---     · rcases b with _ | _ <;> rfl
---   right_inv := by
---     ext ⟨i, ⟨fia, pa⟩⟩ b
---     · rfl
---     · rcases b with _ | _ <;> rfl
+/-- Right distributivity of product over sigma. -/
+def sigmaProdDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    (sigma F * P : PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) ≃ₗ
+      (sigma (fun i => (F i * P : PFunctor.{max uA₁ uA₂, max uB₁ uB₂})) :
+        PFunctor.{max uA₁ uA₂ v, max uB₁ uB₂}) :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.sigmaProdDistrib (P := P) (F := F))
 
--- /-- Left distributivity of tensor product over sigma. -/
--- def tensorSigmaDistrib {P : PFunctor.{u}} {I : Type u} {F : I → PFunctor.{u}} :
---     P ⊗ sigma F ≃ₗ sigma (fun i => P ⊗ F i) where
---   toLens := (fun ⟨pa, ⟨i, fia⟩⟩ => ⟨i, ⟨pa, fia⟩⟩) ⇆
---             (fun _ ⟨pb, fib⟩ => ⟨pb, ULift.up fib⟩)
---   invLens := (fun ⟨i, ⟨pa, fia⟩⟩ => ⟨pa, ⟨i, fia⟩⟩) ⇆
---              (fun _ ⟨pb, fib⟩ => ⟨pb, ULift.down fib⟩)
---   left_inv := rfl
---   right_inv := rfl
+/-- Left distributivity of tensor product over sigma. -/
+def tensorSigmaDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    P ⊗ sigma F ≃ₗ sigma (fun i => P ⊗ F i) :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.tensorSigmaDistrib (P := P) (F := F))
 
--- /-- Right distributivity of tensor product over sigma. -/
--- def sigmaTensorDistrib {P : PFunctor.{u}} {I : Type u} {F : I → PFunctor.{u}} :
---     sigma F ⊗ P ≃ₗ sigma (fun i => F i ⊗ P) where
---   toLens := (fun ⟨⟨i, fia⟩, pa⟩ => ⟨i, ⟨fia, pa⟩⟩) ⇆
---             (fun _ ⟨fib, pb⟩ => ⟨ULift.up fib, pb⟩)
---   invLens := (fun ⟨i, ⟨fia, pa⟩⟩ => ⟨⟨i, fia⟩, pa⟩) ⇆
---              (fun _ ⟨fib, pb⟩ => ⟨ULift.down fib, pb⟩)
---   left_inv := rfl
---   right_inv := rfl
+/-- Right distributivity of tensor product over sigma. -/
+def sigmaTensorDistrib {P : PFunctor.{uA₂, uB₂}} {F : I → PFunctor.{uA₁, uB₁}} :
+    sigma F ⊗ P ≃ₗ sigma (fun i => F i ⊗ P) :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.sigmaTensorDistrib (F := F) (P := P))
 
--- /-- Right distributivity of composition over sigma. -/
--- def sigmaCompDistrib {P : PFunctor.{u}} {I : Type u} {F : I → PFunctor.{u}} :
---     (sigma F) ◃ P ≃ₗ sigma (fun i => F i ◃ P) where
---   toLens := (fun ⟨⟨i, fia⟩, pf⟩ => ⟨i, ⟨fia, pf⟩⟩) ⇆
---             (fun _ b => match ULift.down b with
---               | Sum.inl p => Sum.inl (ULift.up p)
---               | Sum.inr q => Sum.inr q)
---   invLens := (fun ⟨i, ⟨fia, pf⟩⟩ => ⟨⟨i, fia⟩, pf⟩) ⇆
---              (fun _ b => match b with
---               | Sum.inl p => ULift.up (Sum.inl (ULift.down p))
---               | Sum.inr q => ULift.up (Sum.inr q))
---   left_inv := rfl
---   right_inv := rfl
+/-- Right distributivity of composition over sigma. -/
+def sigmaCompDistrib {P : PFunctor.{uA₂, uB₂}} {F : I → PFunctor.{uA₁, uB₁}} :
+    sigma F ◃ P ≃ₗ sigma (fun i => F i ◃ P) :=
+  PFunctor.Equiv.toLensEquiv (PFunctor.Equiv.sigmaCompDistrib (F := F) (P := P))
 
 end Sigma
 
@@ -813,16 +828,21 @@ def piUnit {P : PFunctor.{u}} : pi (fun (_ : PUnit) => P) ≃ₗ P where
   left_inv := rfl
   right_inv := rfl
 
--- /-- Pi of a family of zero functors over an inhabited type is the zero functor. -/
--- def piZero (F_zero : ∀ i, F i = 0) :
---     pi (F : I → PFunctor.{u}) ≃ₗ 0 where
---   toLens := (fun a => PEmpty.elim
--- (Classical.choice (Function.funext_iff.mp F_zero (Classical.choice Classical.propDecidable))))
--- ⇆ -- Requires some work to construct the PEmpty element
---             (fun _ => PEmpty.elim)
---   invLens := PEmpty.elim ⇆ (fun a => PEmpty.elim a)
---   left_inv := sorry -- Proof depends on constructing the PEmpty term above
---   right_inv := by ext a <;> exact PEmpty.elim a
+/-- Pi of a family of zero functors over an inhabited type is the zero functor. -/
+def piZero [Inhabited I] {F : I → PFunctor.{uA, uB}} (F_zero : ∀ i, F i = 0) :
+    pi F ≃ₗ 0 := by
+  letI : IsEmpty (pi F).A := by
+    refine ⟨fun f => ?_⟩
+    have : PEmpty := by
+      simpa [F_zero (default : I)] using (f default)
+    exact this.elim
+  refine
+    { toLens := isEmptyElim ⇆ (fun a _ => isEmptyElim a)
+      invLens := PEmpty.elim ⇆ (fun a => PEmpty.elim a)
+      left_inv := by
+        ext a <;> exact isEmptyElim a
+      right_inv := by
+        ext a <;> exact PEmpty.elim a }
 
 end Pi
 
@@ -838,20 +858,5 @@ def ulift {P : PFunctor.{uA, uB}} : P.ulift ≃ₗ P where
 end Equiv
 
 end Lens
-
-namespace Equiv
-
-variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
-
-/-- Convert an equivalence between two polynomial functors `P` and `Q` to a lens. -/
-def toLensEquiv (e : P ≃ₚ Q) : P ≃ₗ Q where
-  toLens := e.equivA ⇆ (fun a => (e.equivB a).symm)
-  invLens := e.symm.equivA ⇆ (fun a => (e.symm.equivB a).symm)
-  left_inv := by
-    simp only [Lens.comp, Lens.id]
-    ext a b <;> simp [Equiv.symm]; sorry
-  right_inv := by sorry
-
-end Equiv
 
 end PFunctor
