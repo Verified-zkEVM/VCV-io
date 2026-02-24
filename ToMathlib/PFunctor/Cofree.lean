@@ -44,7 +44,7 @@ variable {F : PFunctor.{uA, uB}} {α : Type u}
 
 /-- Head (label) of a cofree tree. -/
 def head (t : CofreeC F α) : α :=
-  (M.head t).1
+  (M.dest t).1.1
 
 /-- Tail of a cofree tree (an `F`-structured family of sub-trees). -/
 def tail (t : CofreeC F α) : F (CofreeC F α) :=
@@ -54,15 +54,117 @@ def tail (t : CofreeC F α) : F (CofreeC F α) :=
 def extract (t : CofreeC F α) : α :=
   head t
 
-def extend (f : CofreeC F α → α) (t : CofreeC F α) : α :=
-  f t
+def extendF {β : Type u} (f : CofreeC F α → β) (t : CofreeC F α) :
+    constProd F β (CofreeC F α) :=
+  let d := M.dest t
+  ⟨(f t, d.1.2), d.2⟩
+
+def extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) : CofreeC F β :=
+  M.corec (extendF f) t
+
+@[simp] theorem extendF_extract (t : CofreeC F α) : extendF extract t = M.dest t := by
+  induction t using PFunctor.M.casesOn' with
+  | _ a g =>
+      cases a
+      simp [extendF, extract, head]
+
+@[simp] theorem dest_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
+    M.dest (extend t f) = (constProd F β).map (fun x => extend x f) (extendF f t) := by
+  simpa [extend] using (M.dest_corec (P := constProd F β) (g := extendF f) t)
+
+@[simp] theorem dest_extend_eq {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
+    M.dest (extend t f) = ⟨(f t, (M.dest t).1.2), (fun x => extend x f) ∘ (M.dest t).2⟩ := by
+  simp [extendF, PFunctor.map_eq]
+
+@[simp] theorem head_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
+    head (extend t f) = f t := by
+  simp [head, extendF, PFunctor.map_eq]
+
+@[simp] theorem tail_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
+    tail (extend t f) = F.map (fun x => extend x f) (tail t) := by
+  unfold tail
+  rw [dest_extend]
+  simp [extendF, PFunctor.map_eq]
 
 instance : Comonad (CofreeC F) where
   extract := extract
-  extend := sorry
-  coseq := sorry
+  extend := extend
 
-instance : LawfulComonad (CofreeC F) := sorry
+@[simp] theorem extend_extract (t : CofreeC F α) : extend t extract = t := by
+  let h : CofreeC F α → CofreeC F α := fun x => extend x extract
+  have h_corec : h = M.corec (F := constProd F α) M.dest := by
+    apply (M.corec_unique (P := constProd F α) (g := M.dest) (f := h))
+    intro x
+    simp [h, dest_extend (t := x) (f := extract)]
+  have hid_corec : (id : CofreeC F α → CofreeC F α) = M.corec (F := constProd F α) M.dest := by
+    apply (M.corec_unique (P := constProd F α) (g := M.dest) (f := id))
+    intro x
+    simp [PFunctor.id_map (P := constProd F α) (x := M.dest x)]
+  have h_eq_id : h = id := by rw [h_corec, hid_corec]
+  simpa [h] using congrArg (fun k => k t) h_eq_id
+
+@[simp] theorem extract_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
+    extract (extend t f) = f t := by
+  simp [extract]
+
+@[simp] theorem extend_assoc {β γ : Type u} (t : CofreeC F α) (f : CofreeC F α → β)
+    (g : CofreeC F β → γ) :
+    extend (extend t f) g = extend t (fun x => g (extend x f)) := by
+  let l : CofreeC F α → CofreeC F γ := fun x => extend (extend x f) g
+  let r : CofreeC F α → CofreeC F γ := fun x => extend x (fun y => g (extend y f))
+  have hr_corec : r = M.corec (F := constProd F γ) (extendF (fun y => g (extend y f))) := by
+    rfl
+  have hl_corec : l = M.corec (F := constProd F γ) (extendF (fun y => g (extend y f))) := by
+    apply (M.corec_unique (P := constProd F γ)
+      (g := extendF (fun y => g (extend y f))) (f := l))
+    intro x
+    change M.dest (extend (extend x f) g) =
+      (constProd F γ).map l (extendF (fun y => g (extend y f)) x)
+    rw [dest_extend_eq]
+    have hdest : M.dest (extend x f) =
+        ⟨(f x, (M.dest x).1.2), (fun y => extend y f) ∘ (M.dest x).2⟩ := dest_extend_eq x f
+    rw [hdest]
+    have hfun :
+        (fun x => extend x g) ∘ (fun y => extend y f) ∘ (M.dest x).2 =
+          (fun x => extend (extend x f) g) ∘ (M.dest x).2 := by
+      funext i
+      rfl
+    cases hfun
+    rfl
+  have hl_eq_r : l = r := by rw [hl_corec, hr_corec]
+  simpa [l, r] using congrArg (fun k => k t) hl_eq_r
+
+instance : LawfulComonad (CofreeC F) where
+  map_const := rfl
+  id_map := by
+    intro α t
+    simp [Functor.map]
+  comp_map := by
+    intro α β γ f g t
+    change extend t ((g ∘ f) ∘ extract) = extend (extend t (f ∘ extract)) (g ∘ extract)
+    rw [extend_assoc]
+    congr 1
+  coseqLeft_eq := by
+    intro α β wa wb
+    rfl
+  coseqRight_eq := by
+    intro α β wa wb
+    rfl
+  coseq_assoc := by
+    intro α β γ wa wb wc
+    simp [coseq, Functor.map, Function.comp, extend_assoc]
+  map_eq_extend_extract := by
+    intro α β f t
+    rfl
+  extend_extract := by
+    intro α t
+    exact CofreeC.extend_extract t
+  extract_extend := by
+    intro α β t f
+    exact CofreeC.extract_extend t f
+  extend_assoc := by
+    intro α β γ t f g
+    exact CofreeC.extend_assoc t f g
 --  'map_const', 'id_map', 'comp_map', 'coseqLeft_eq', 'coseqRight_eq', 'coseq_assoc',
 --  'map_eq_extend_extract', 'extend_extract', 'extract_extend', 'extend_assoc'
 
