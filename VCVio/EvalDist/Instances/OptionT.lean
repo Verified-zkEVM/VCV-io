@@ -22,7 +22,14 @@ variable (m : Type u → Type v) [Monad m] [HasEvalSPMF m] {α β γ : Type u}
 
 namespace OptionT
 
-/-- TODO: fintype version of this lemma -/
+/-- Standalone `HasEvalSet (OptionT m)` instance under the weaker `[HasEvalSet m]` assumption.
+
+This is deliberately kept separate from the `HasEvalSPMF (OptionT m)` instance below, which
+re-exports the same `toSet` to make the resulting typeclass diamond definitionally equal.
+Keeping this standalone instance means `support` on `OptionT m` works without requiring a
+full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM`).
+
+TODO: fintype version (`HasEvalFinset (OptionT m)` under `[HasEvalSet m] [HasEvalFinset m]`). -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (OptionT m) where
   toSet := OptionT.mapM' HasEvalSet.toSet
@@ -32,11 +39,34 @@ lemma support_liftM (m : Type u → Type v) [Monad m] [HasEvalSet m]
     (mx : m α) : support (liftM mx : OptionT m α) = support mx := by
   exact mapM'_lift HasEvalSet.toSet mx
 
-/-- If we have a `HasEvalPMF m` instance, we can lift it to `HasEvalSPMF (OptionT m)`. -/
+/-- Lift a `HasEvalSPMF m` instance to `HasEvalSPMF (OptionT m)`.
+Note: a more specific `HasEvalPMF m → HasEvalSPMF (OptionT m)` path would make explicit
+that failure comes solely from `OptionT`, but this general instance subsumes it.
+
+We explicitly provide `toSet` to match the standalone `HasEvalSet (OptionT m)` instance above,
+ensuring the diamond is definitionally equal (per Mathlib convention). The `support_eq` field
+then serves as the coherence proof between the set-path and distribution-path. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
+  toSet := OptionT.mapM' HasEvalSet.toSet
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
-  support_eq _ := sorry
+  support_eq mx := by
+    ext x
+    simp [support_def, OptionT.mapM', SPMF.mem_support_iff, SPMF.bind_apply_eq_tsum]
+    constructor
+    · intro ⟨y, hy, hx⟩
+      refine ⟨y, ?_, ?_⟩
+      · rwa [← ne_eq, ← SPMF.mem_support_iff, ← HasEvalSPMF.support_eq]
+      · cases y with
+        | none => simp at hx
+        | some a => simpa using hx
+    · intro ⟨y, hy, hx⟩
+      refine ⟨y, ?_, ?_⟩
+      · change y ∈ support mx.run
+        rw [HasEvalSPMF.support_eq, SPMF.mem_support_iff]; exact hy
+      · cases y with
+        | none => simp at hx
+        | some a => simpa using hx
 
 lemma evalDist_eq (mx : OptionT m α) :
     evalDist mx = OptionT.mapM' HasEvalSPMF.toSPMF mx := rfl
