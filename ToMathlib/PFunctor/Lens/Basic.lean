@@ -140,8 +140,19 @@ def sumMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₁}} {R : PFun
       | Sum.inl pa => l₁.toFunB pa
       | Sum.inr qa => l₂.toFunB qa)
 
--- def sigmaExists
--- def sigmaMap
+/-- Dependent copairing of lenses over `sigma`: `Σ i, F i → R`. -/
+def sigmaExists {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {R : PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) R) :
+    Lens (sigma F) R :=
+  (fun ⟨i, fa⟩ => (l i).toFunA fa) ⇆
+    (fun ⟨i, fa⟩ => (l i).toFunB fa)
+
+/-- Pointwise mapping of lenses over `sigma`. -/
+def sigmaMap {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {G : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) (G i)) :
+    Lens (sigma F) (sigma G) :=
+  (fun ⟨i, fa⟩ => ⟨i, (l i).toFunA fa⟩) ⇆
+    (fun ⟨i, fa⟩ => (l i).toFunB fa)
 
 /-- Projection lens `fst : P * Q → P` -/
 def fst {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} :
@@ -167,8 +178,19 @@ def prodMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} {R : PFu
   (fun pq => (l₁.toFunA pq.1, l₂.toFunA pq.2)) ⇆
     (fun pq => Sum.elim (Sum.inl ∘ l₁.toFunB pq.1) (Sum.inr ∘ l₂.toFunB pq.2))
 
--- def piForall
--- def piMap
+/-- Dependent pairing of lenses into a `pi`: `P → ∀ i, F i`. -/
+def piForall {I : Type v} {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens P (F i)) :
+    Lens P (pi F) :=
+  (fun pa i => (l i).toFunA pa) ⇆
+    (fun pa ⟨i, fb⟩ => (l i).toFunB pa fb)
+
+/-- Pointwise mapping of lenses over `pi`. -/
+def piMap {I : Type v} {F : I → PFunctor.{uA₁, uB₁}} {G : I → PFunctor.{uA₂, uB₂}}
+    (l : ∀ i, Lens (F i) (G i)) :
+    Lens (pi F) (pi G) :=
+  (fun fa i => (l i).toFunA (fa i)) ⇆
+    (fun fa ⟨i, gb⟩ => ⟨i, (l i).toFunB (fa i) gb⟩)
 
 /-- Apply lenses to both sides of a composition: `l₁ ◃ₗ l₂ : (P ◃ Q ⇆ R ◃ W)` -/
 def compMap {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} {R : PFunctor.{uA₃, uB₃}}
