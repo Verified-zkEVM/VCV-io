@@ -36,19 +36,24 @@ instance : MonadLift (OracleQuery spec) (OracleComp spec) :=
   inferInstanceAs (MonadLift (PFunctor.Obj spec.toPFunctor) (PFunctor.FreeM spec.toPFunctor))
 
 /-- Manually lift an `OracleQuery` to an `OracleComp`. -/
+@[reducible]
 protected def lift {ι} {spec : OracleSpec ι} {α} (q : OracleQuery spec α) :
     OracleComp spec α := liftM q
 
 protected lemma liftM_def (q : OracleQuery spec α) :
-    (q : OracleComp spec α) = PFunctor.FreeM.lift q := rfl
+    liftM (n := OracleComp spec) q = PFunctor.FreeM.lift q := rfl
 
-@[simp] lemma liftM_ne_pure (q : OracleQuery spec α) (x : α) :
-    (liftM q : OracleComp spec α) ≠ pure x :=
-  PFunctor.FreeM.lift_ne_pure q x
+@[simp, grind .]
+lemma liftM_ne_pure (q : OracleQuery spec α) (x : α) :
+    liftM (n := OracleComp spec) q ≠ pure x := by aesop
 
-@[simp] lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
-    pure x ≠ (liftM q : OracleComp spec α) :=
-  PFunctor.FreeM.pure_ne_lift q x
+@[simp, grind .]
+lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
+    pure x ≠ liftM (n := OracleComp spec) q := by aesop
+
+@[simp, grind =]
+protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
+    liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := by rfl
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[inline]

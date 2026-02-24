@@ -35,13 +35,15 @@ it can be perfectly simulated by a computation using the oracles of `superSpec`.
 We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
 class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec.{v,w} τ)
-  extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
+    extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
+  liftM_map {α β : Type _} (q : OracleQuery spec α) (f : α → β) :
+      liftM (n := OracleQuery superSpec) (f <$> q) = f <$> liftM q
 
 infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
-variable [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+-- variable [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 -- -- TODO: this may be a good simp lemma for normalization in general?
 -- -- Guessing the rhs is almost always easier to prove things about
@@ -114,7 +116,8 @@ def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
       OracleComp superSpec α :=
     simulateQ (fun t => liftM (query (spec := spec) t)) mx
 
-variable (superSpec : OracleSpec τ) [h : MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+variable (superSpec : OracleSpec τ)
+    [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)]
 
 @[grind =, aesop unsafe norm]
 lemma liftComp_def (mx : OracleComp spec α) : liftComp mx superSpec =
@@ -192,8 +195,8 @@ lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) 
 end liftComp
 
 /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
-instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
-    MonadLift (OracleComp spec) (OracleComp superSpec) where
+instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLiftT (OracleComp spec) (OracleComp superSpec) where
   monadLift mx := liftComp mx superSpec
 
 /-- We choose to actively rewrite `liftComp` as `liftM` to enable `LawfulMonadLift` lemmas. -/
@@ -201,14 +204,16 @@ instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
 lemma liftComp_eq_liftM [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : OracleComp spec α) : liftComp mx superSpec = (liftM mx : OracleComp superSpec α) := rfl
 
-instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
-    LawfulMonadLift (OracleComp spec) (OracleComp superSpec) where
+instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
+    LawfulMonadLiftT (OracleComp spec) (OracleComp superSpec) where
   monadLift_pure x := liftComp_pure superSpec x
   monadLift_bind mx my := liftComp_bind superSpec mx my
 
 -- NOTE: With constant universal levels it is fairly easy to abstract the below in a class
 -- Getting a similar level of generality as the manual instances below would be useful,
 --    might require some more general framework about monad transformers.
+
+section OptionT
 
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     MonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where
@@ -229,6 +234,10 @@ instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     simp [MonadLift.monadLift]
     sorry
 
+end OptionT
+
+section StateT
+
 instance {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     MonadLift (StateT σ (OracleComp spec)) (StateT σ (OracleComp superSpec)) where
   monadLift mx := StateT.mk fun s => liftComp (StateT.run mx s) superSpec
@@ -237,5 +246,7 @@ instance {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
 lemma liftM_StateT_eq {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : StateT σ (OracleComp spec) α) : (liftM mx : StateT σ (OracleComp superSpec) α) =
       StateT.mk fun s => liftM (StateT.run mx s) := by rfl
+
+end StateT
 
 end OracleComp

@@ -26,11 +26,11 @@ Should not be implemented manually if a `HasEvalPMF` instance already exists. -/
 class HasEvalSPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSet m where
   toSPMF : m →ᵐ SPMF
-  support_eq {α : Type u} (mx : m α) : support mx = (toSPMF mx).support
+  support_eq {α : Type u} (mx : m α) : support mx = SPMF.support (toSPMF mx)
   toSet := MonadHom.comp {
     toFun := @SPMF.support
-    toFun_pure' x := Set.ext fun y => by simp
-    toFun_bind' p q :=  Set.ext fun y => by simp
+    toFun_pure' x := Set.ext fun _ => by simp
+    toFun_bind' p q := Set.ext fun _ => by simp
    } toSPMF
 
 /-- The resulting distribution of running the monadic computation `mx`.
@@ -603,7 +603,7 @@ end bool
 class HasEvalPMF (m : Type u → Type v) [Monad m]
     extends HasEvalSPMF m where
   toPMF : m →ᵐ PMF
-  toSPMF := MonadHom.comp PMF.toSPMF' toPMF
+  toSPMF := MonadHom.comp (MonadHom.ofLift PMF SPMF) toPMF
   toSPMF_eq {α : Type u} (mx : m α) : toSPMF mx = liftM (toPMF mx) := by rfl
 
 attribute [grind =] HasEvalPMF.toSPMF_eq
