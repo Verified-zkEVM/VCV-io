@@ -45,7 +45,6 @@ instance : IsEmpty (A 0) := inferInstanceAs (IsEmpty PEmpty)
 instance : Unique (A 1) := inferInstanceAs (Unique PUnit)
 instance : Unique y.A := inferInstanceAs (Unique PUnit)
 
--- /-- The monomial functor `P(y) = A y^B` -/
 /-- The monomial functor, also written `P(X) = A X^ B`, has `A` as its head type and the constant
   family `B_a = B` as the child type for each each shape `a : A` . -/
 def monomial (A : Type uA) (B : Type uB) : PFunctor.{uA, uB} :=
