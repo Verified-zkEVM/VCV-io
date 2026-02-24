@@ -37,7 +37,7 @@ section add_left
 /-- Add additional oracles to the right side of the existing ones. -/
 instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
   monadLift | q => .mk (.inl q.input) q.cont
-  liftM_map | q => by sorry
+  liftM_map | q => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_add_left_def (q : OracleQuery spec₁ α) :
     (liftM q : OracleQuery (spec₁ + spec₂) α) = .mk (.inl q.input) q.cont := rfl
@@ -52,7 +52,7 @@ section add_right
 /-- Add additional oracles to the left side of the exiting ones-/
 instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
   monadLift | q => .mk (.inr q.input) q.cont
-  liftM_map | q => by sorry
+  liftM_map | ⟨t, g⟩ => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_add_right_def (q : OracleQuery spec₂ α) :
     (liftM q : OracleQuery (spec₁ + spec₂) α) = .mk (.inr q.input) q.cont := rfl
@@ -69,7 +69,9 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
   monadLift
     | .mk (.inl q) f => liftM (OracleQuery.mk q f)
     | .mk (.inr q) f => .mk (.inr q) f
-  liftM_map q := sorry
+  liftM_map
+    | .mk (.inl q) f => by sorry
+    | .mk (.inr q) f => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_left_add_left_add_def
     [h : spec₁ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :
@@ -93,7 +95,9 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
   monadLift
     | .mk (.inl q) f => .mk (.inl q) f
     | .mk (.inr q) f => liftM (OracleQuery.mk q f)
-  liftM_map := sorry
+  liftM_map
+    | .mk (.inl q) f => by simp [liftM, monadLift]
+    | .mk (.inr q) f => by simp [liftM, monadLift]; sorry
 
 @[simp] lemma liftM_right_add_right_add_def
     [h : spec₂ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :
@@ -117,7 +121,10 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
     | ⟨.inl t, f⟩ => ⟨.inl (.inl t), f⟩
     | ⟨.inr (.inl t), f⟩ => ⟨.inl (.inr t), f⟩
     | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩
-  liftM_map := sorry
+  liftM_map
+    | ⟨.inl t, f⟩ => by simp [liftM, monadLift]
+    | ⟨.inr (.inl t), f⟩ => by simp [liftM, monadLift]
+    | ⟨.inr (.inr t), f⟩ => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_add_assoc_def (q : OracleQuery (spec₁ + (spec₂ + spec₃)) α) :
     (liftM q : OracleQuery (spec₁ + spec₂ + spec₃) α) =
@@ -145,7 +152,7 @@ variable {σ ι} (specs : σ → OracleSpec ι)
 instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
     specs j ⊂ₒ OracleSpec.sigma specs where
   monadLift | .mk t f => .mk ⟨j, t⟩ f
-  liftM_map := sorry
+  liftM_map | .mk t f => by simp [liftM, monadLift]
 
 @[simp low] lemma liftM_sigma_def (j : σ) (q : OracleQuery (specs j) α) :
     (liftM q : OracleQuery (OracleSpec.sigma specs) _) = .mk ⟨j, q.input⟩ q.cont := rfl
