@@ -332,6 +332,8 @@ protected structure Equiv (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB
 
 namespace Equiv
 
+variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
+
 /-- The identity equivalence between a polynomial functor `P` and itself. -/
 def refl (P : PFunctor.{uA, uB}) : P ≃ₚ P where
   equivA := _root_.Equiv.refl P.A
@@ -360,6 +362,51 @@ def cast {P Q : PFunctor.{uA, uB}} (hA : P.A = Q.A) (hB : ∀ a, P.B a = Q.B (ca
 theorem symm_comp_self {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (e : P ≃ₚ Q) :
     e.symm.equivA ∘ e.equivA = id := by
   simp [Equiv.symm]
+
+/-- Rewrite a dependent `Eq.rec` with identity to a cast on the argument. -/
+lemma eqRec_id_apply {α : Sort u} {β : α → Sort v}
+    {a1 a0 : α} (h : a1 = a0) (x : β a0) :
+    Eq.rec (motive := fun y _ => β y → β a1) id h x = _root_.cast (congrArg β h).symm x := by
+  cases h
+  rfl
+
+/-- Cast-normalization helper for `equivB` under equal `equivA` images. -/
+lemma equivB_symm_apply_of_eq (e : P ≃ₚ Q) {a a' : P.A} (ha : e.equivA a = e.equivA a')
+    (b : P.B a') :
+    (e.equivB a).symm ((_root_.Equiv.cast (congrArg Q.B ha)).symm ((e.equivB a') b)) =
+      _root_.cast (congrArg P.B (e.equivA.injective ha).symm) b := by
+  have ha' : a = a' := e.equivA.injective ha
+  cases ha'
+  simp
+
+/-- Cast-normalization helper for `symm.equivB` under equal `symm.equivA` images. -/
+lemma symm_equivB_symm_apply_of_eq (e : P ≃ₚ Q) {a a' : Q.A}
+    (ha : e.symm.equivA a = e.symm.equivA a') (b : Q.B a') :
+    (e.symm.equivB a).symm ((_root_.Equiv.cast (congrArg P.B ha)).symm ((e.symm.equivB a') b)) =
+      _root_.cast (congrArg Q.B (e.symm.equivA.injective ha).symm) b := by
+  simpa using equivB_symm_apply_of_eq (e := e.symm) (a := a) (a' := a') (ha := ha) (b := b)
+
+/-- Specialized cast-normalization for `e` followed by `e.symm`. -/
+lemma equivB_symm_apply (e : P ≃ₚ Q) (a : P.A) (b : P.B (e.equivA.symm (e.equivA a))) :
+    (e.equivB a).symm ((e.symm.equivB (e.equivA a)).symm b) =
+      _root_.cast (congrArg P.B (e.equivA.symm_apply_apply a)) b := by
+  have hEqA : e.equivA a = e.equivA (e.equivA.symm (e.equivA a)) := by
+    simp
+  simpa [PFunctor.Equiv.symm, hEqA] using
+    (equivB_symm_apply_of_eq (e := e)
+      (a := a) (a' := e.equivA.symm (e.equivA a))
+      (ha := hEqA) (b := b))
+
+/-- Specialized cast-normalization for `e.symm` followed by `e`. -/
+lemma symm_equivB_symm_apply (e : P ≃ₚ Q) (a : Q.A) (b : Q.B (e.equivA (e.equivA.symm a))) :
+    (e.symm.equivB a).symm ((e.equivB (e.equivA.symm a)).symm b) =
+      _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b := by
+  change ((_root_.Equiv.cast (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm
+      ((e.equivB (e.equivA.symm a)) ((e.equivB (e.equivA.symm a)).symm b))) = _
+  rw [_root_.Equiv.apply_symm_apply (e.equivB (e.equivA.symm a)) b]
+  change _root_.cast (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl)).symm b =
+    _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b
+  simp
 
 end Equiv
 

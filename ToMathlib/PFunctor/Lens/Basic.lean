@@ -849,8 +849,33 @@ def toLensEquiv (e : P ≃ₚ Q) : P ≃ₗ Q where
   invLens := e.symm.equivA ⇆ (fun a => (e.symm.equivB a).symm)
   left_inv := by
     simp only [Lens.comp, Lens.id]
-    ext a b <;> simp [Equiv.symm]; sorry
-  right_inv := by sorry
+    ext a b
+    · simp [PFunctor.Equiv.symm]
+    · simp [PFunctor.Equiv.symm]
+      have hb :
+          (e.equivB a).symm ((_root_.Equiv.cast
+            (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm
+            ((e.equivB (e.equivA.symm (e.equivA a))) b)) =
+            _root_.cast (congrArg P.B (e.equivA.symm_apply_apply a)) b := by
+        simpa [PFunctor.Equiv.symm] using
+          (equivB_symm_apply (e := e) (a := a) (b := b))
+      have h0 : a = e.equivA.symm (e.equivA a) := (e.equivA.symm_apply_apply a).symm
+      have hr := eqRec_id_apply (β := P.B) (h := h0) (x := b)
+      exact hb.trans (by simpa [h0] using hr.symm)
+  right_inv := by
+    simp only [Lens.comp, Lens.id]
+    ext a b
+    · simp [PFunctor.Equiv.symm]
+    · simp [PFunctor.Equiv.symm]
+      have hb :
+          (_root_.Equiv.cast (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm b =
+            _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b := by
+        simpa [PFunctor.Equiv.symm] using
+          (symm_equivB_symm_apply (e := e) (a := a) (b := b))
+      have h0 : a = e.equivA (e.equivA.symm a) :=
+        (_root_.Equiv.symm_apply_eq e.equivA).mp rfl
+      have hr := eqRec_id_apply (β := Q.B) (h := h0) (x := b)
+      exact hb.trans (by simpa [h0] using hr.symm)
 
 end Equiv
 
