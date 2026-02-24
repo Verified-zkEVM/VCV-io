@@ -175,6 +175,10 @@ lemma probFailure_liftM [LawfulMonad m] (mx : m α) :
     Pr[⊥ | (liftM mx : ExceptT ε m α)] = Pr[⊥ | mx] := by
   simp only [probFailure_def, evalDist_liftM]
 
+lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
+    Pr[p | (liftM mx : ExceptT ε m α)] = Pr[p | mx] := by
+  simp only [probEvent_def, evalDist_liftM]
+
 end HasEvalSPMF
 
 end ExceptT

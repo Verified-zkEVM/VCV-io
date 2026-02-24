@@ -716,4 +716,20 @@ lemma one_eq_probEvent_iff' [HasEvalFinset m] [DecidableEq α] :
 
 alias ⟨_, one_eq_probEvent'⟩ := one_eq_probEvent_iff'
 
+@[simp]
+lemma function_support_probOutput :
+    Function.support (Pr[= · | mx]) = support mx := by
+  simp only [Function.support, ne_eq, probOutput_eq_zero_iff, not_not, Set.setOf_mem_eq]
+
+lemma mem_support_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    x ∈ support mx ↔ x ∈ support mx' := by
+  simp only [mem_support_iff, probOutput_def, h]
+
+lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    [HasEvalFinset m] [HasEvalFinset n] [DecidableEq α]
+    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    x ∈ finSupport mx ↔ x ∈ finSupport mx' := by
+  simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
+
 end probEvent_mono_compl
