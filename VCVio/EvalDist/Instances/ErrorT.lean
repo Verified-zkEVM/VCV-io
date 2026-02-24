@@ -91,6 +91,44 @@ lemma support_liftM [LawfulMonad m] (mx : m α) :
 
 end HasEvalSet
 
+section HasEvalFinset
+
+private instance instDecidableEqExcept [DecidableEq ε] [DecidableEq α] :
+    DecidableEq (Except ε α) := fun a b => match a, b with
+  | .ok a, .ok b => if h : a = b then isTrue (h ▸ rfl) else
+      isFalse (by intro h'; cases h'; exact h rfl)
+  | .error a, .error b => if h : a = b then isTrue (h ▸ rfl) else
+      isFalse (by intro h'; cases h'; exact h rfl)
+  | .ok _, .error _ => isFalse (by intro h; cases h)
+  | .error _, .ok _ => isFalse (by intro h; cases h)
+
+noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m]
+    [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m] :
+    HasEvalFinset (ExceptT ε m) where
+  finSupport mx := (finSupport mx.run).preimage Except.ok
+    (by intro a b; simp [Except.ok.injEq])
+  coe_finSupport mx := by
+    ext x; simp
+
+variable [DecidableEq ε] [HasEvalSet m] [HasEvalFinset m]
+
+@[aesop unsafe norm, grind =]
+lemma finSupport_def [DecidableEq α] (mx : ExceptT ε m α) :
+    finSupport mx = (finSupport mx.run).preimage Except.ok
+      (fun a _ => by simp [Except.ok.injEq]) := rfl
+
+@[simp low]
+lemma mem_finSupport_iff' [DecidableEq α] (mx : ExceptT ε m α) (x : α) :
+    x ∈ finSupport mx ↔ Except.ok x ∈ finSupport mx.run := by
+  simp [finSupport_def, Finset.mem_preimage]
+
+@[simp]
+lemma finSupport_liftM [LawfulMonad m] [DecidableEq α] (mx : m α) :
+    finSupport (liftM mx : ExceptT ε m α) = finSupport mx := by
+  ext x; simp [mem_finSupport_iff']
+
+end HasEvalFinset
+
 section HasEvalSPMF
 
 /-- Monad homomorphism from `ExceptT ε m` to `SPMF`, treating errors as failure mass.
@@ -161,6 +199,7 @@ lemma probFailure_eq (mx : ExceptT ε m α) :
     SPMF.apply_eq_toPMF_some, evalDist_def]
   refine tsum_congr fun r => ?_
   cases r <;> simp [SPMF.toPMF_failure, SPMF.toPMF_pure]
+
 
 lemma probOutput_liftM [LawfulMonad m] (mx : m α) (x : α) :
     Pr[= x | (liftM mx : ExceptT ε m α)] = Pr[= x | mx] := by

@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.EvalDist.Monad.Map
+import VCVio.EvalDist.Defs.NeverFails
 
 /-!
 # Evaluation Distributions on Boolean-Valued Computations
@@ -43,3 +44,15 @@ lemma probOutput_not_map [LawfulMonad m] (mx : m Bool) :
 lemma probOutput_not_map' [LawfulMonad m] (mx : m Bool) :
     Pr[= false | (! ·) <$> mx] = Pr[= true | mx] :=
   probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) true
+
+@[simp]
+lemma probOutput_true_add_false_of_neverFail {mx : m Bool} [NeverFail mx] :
+    Pr[= true | mx] + Pr[= false | mx] = 1 := by simp
+
+@[simp]
+lemma probEvent_true_eq_probOutput (mx : m Bool) :
+    Pr[(· = true) | mx] = Pr[= true | mx] := probEvent_eq_eq_probOutput mx true
+
+@[simp]
+lemma probEvent_not_eq_probOutput (mx : m Bool) :
+    Pr[(· = false) | mx] = Pr[= false | mx] := probEvent_eq_eq_probOutput mx false

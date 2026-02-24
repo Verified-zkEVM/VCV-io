@@ -383,6 +383,29 @@ lemma probOutput_bind_mono {mx : m α}
   · exact mul_le_mul' le_rfl (h x hx)
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
+lemma probEvent_bind_congr {mx : m α} {ob₁ ob₂ : α → m β} {q : β → Prop}
+    (h : ∀ x ∈ support mx, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
+    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] := by
+  simp only [probEvent_bind_eq_tsum]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
+lemma probEvent_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β} (q : β → Prop)
+    (h : ∀ x, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
+    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] :=
+  probEvent_bind_congr fun x _ => h x
+
+lemma probEvent_bind_mono {mx : m α} {my oc : α → m β} {q : β → Prop}
+    (h : ∀ x ∈ support mx, Pr[q | my x] ≤ Pr[q | oc x]) :
+    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] := by
+  simp only [probEvent_bind_eq_tsum]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · exact mul_le_mul' le_rfl (h x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
+
 lemma probOutput_bind_congr_div_const {mx : m α}
     {ob₁ ob₂ : α → m β} {y : β} {r : ℝ≥0∞}
     (h : ∀ x ∈ support mx, Pr[= y | ob₁ x] = Pr[= y | ob₂ x] / r) :

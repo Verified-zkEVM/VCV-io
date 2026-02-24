@@ -76,6 +76,33 @@ section seqLeft
     support (mx <* my) = if (support my).Nonempty then support mx else ∅ := by
   rw [seqLeft_eq, Set.ext_iff]; aesop
 
+@[simp] lemma evalDist_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    evalDist (mx <* my) = evalDist mx <* evalDist my := by
+  simp [seqLeft_eq]
+
+@[simp] lemma probOutput_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (x : α) :
+    Pr[= x | mx <* my] = (1 - Pr[⊥ | my]) * Pr[= x | mx] := by
+  rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, probOutput_bind_eq_tsum]
+  simp_rw [show ∀ a : α, Pr[= x | (Function.const β a <$> my : m α)] =
+    (1 - Pr[⊥ | my]) * Pr[= x | (pure a : m α)] from fun a => probOutput_map_const my a x,
+    mul_left_comm _ (1 - Pr[⊥ | my])]
+  rw [ENNReal.tsum_mul_left, ← probOutput_bind_eq_tsum, bind_pure]
+
+@[simp] lemma probFailure_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx <* my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [seqLeft_eq, probFailure_seq, probFailure_map]
+
+@[simp] lemma probEvent_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+    (p : α → Prop) :
+    Pr[p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[p | mx] := by
+  rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, probEvent_bind_eq_tsum]
+  simp_rw [show ∀ a : α, Pr[p | (Function.const β a <$> my : m α)] =
+    (1 - Pr[⊥ | my]) * Pr[p | (pure a : m α)] from fun a => probEvent_map_const my a p,
+    mul_left_comm _ (1 - Pr[⊥ | my])]
+  rw [ENNReal.tsum_mul_left, ← probEvent_bind_eq_tsum, bind_pure]
+
 end seqLeft
 
 section seqRight
@@ -84,6 +111,25 @@ section seqRight
     (mx : m α) (my : m β) [Decidable (support mx).Nonempty] :
     support (mx *> my) = if (support mx).Nonempty then support my else ∅ := by
   rw [seqRight_eq, Set.ext_iff]; aesop
+
+@[simp] lemma evalDist_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    evalDist (mx *> my) = evalDist mx *> evalDist my := by
+  simp [seqRight_eq]
+
+@[simp] lemma probOutput_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (y : β) :
+    Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
+  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
+  rw [h, probOutput_bind_const]
+
+@[simp] lemma probFailure_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx *> my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [seqRight_eq, probFailure_seq, probFailure_map]
+
+@[simp] lemma probEvent_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+    (p : β → Prop) :
+    Pr[p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
+  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
+  rw [h, probEvent_bind_const]
 
 end seqRight
 
