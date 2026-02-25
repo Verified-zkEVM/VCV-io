@@ -2,6 +2,11 @@ name: PR Summary
 
 on:
   pull_request_target:
+    types: [opened, ready_for_review]
+
+concurrency:
+  group: pr-summary-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 permissions:
   pull-requests: write
@@ -9,6 +14,7 @@ permissions:
 
 jobs:
   summarize:
+    if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR Code
