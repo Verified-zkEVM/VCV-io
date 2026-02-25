@@ -254,38 +254,76 @@ lemma addValues_nil (seed : QuerySeed spec) (i : ι) :
     seed.addValues (i := i) ([] : List (spec.Range i)) = seed := by
   simp [addValues]
 
--- TODO: the following QuerySeed operations were removed during remediation.
--- Restore if needed for seed-manipulation proofs (e.g. seeded oracle, generateSeed support).
+/-- Prepend a list of values to the seed at index `i`. -/
+def prependValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : QuerySeed spec :=
+  Function.update seed i (us ++ seed i)
 
--- abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
---     QuerySeed spec :=
---   seed.addValues [u]
+@[simp]
+lemma prependValues_self (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) :
+    seed.prependValues us i = us ++ seed i := by
+  simp [prependValues]
 
--- /-- Take only the first `n` values of the seed at index `i`. -/
--- def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
---   Function.update seed i ((seed i).take n)
+@[simp]
+lemma prependValues_of_ne (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i))
+    {j : ι} (hj : j ≠ i) : seed.prependValues us j = seed j := by
+  simp [prependValues, Function.update_of_ne hj]
 
--- @[simp] lemma takeAtIndex_apply (seed : QuerySeed spec) (i : ι) (n : ℕ) (j : ι) :
---     seed.takeAtIndex i n j = (Function.update seed i ((seed i).take n) j) := rfl
+@[simp]
+lemma prependValues_nil (seed : QuerySeed spec) (i : ι) :
+    seed.prependValues (i := i) ([] : List (spec.Range i)) = seed := by
+  simp [prependValues]
 
--- @[simp] lemma takeAtIndex_length (seed : QuerySeed spec) (i : ι) :
---     seed.takeAtIndex i (seed i).length = seed := funext (λ j ↦ by simp)
+abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
+    QuerySeed spec :=
+  seed.addValues [u]
 
--- /-- Construct a query seed from a list at a single index. -/
--- def ofList {i : ι} (xs : List (spec.Range i)) : QuerySeed spec :=
---   fun j => if h : i = j then h ▸ xs else []
+/-- Take only the first `n` values of the seed at index `i`. -/
+def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
+  Function.update seed i ((seed i).take n)
 
--- lemma eq_addValues_iff (seed seed' : QuerySeed spec)
---     {i : ι} (xs : List (spec.Range i)) :
---     seed = seed'.addValues xs ↔ seed' = seed.takeAtIndex i (seed' i).length ∧
---       xs = (seed i).drop (seed' i).length := by
---   sorry
+@[simp] lemma takeAtIndex_apply_self (seed : QuerySeed spec) (i : ι) (n : ℕ) :
+    seed.takeAtIndex i n i = (seed i).take n := by
+  simp [takeAtIndex]
 
--- lemma addValues_eq_iff (seed seed' : QuerySeed spec)
---     {i : ι} (xs : List (spec.Range i)) :
---     seed.addValues xs = seed' ↔ seed = seed'.takeAtIndex i (seed i).length ∧
---       xs = (seed' i).drop (seed i).length :=
---   eq_comm.trans (eq_addValues_iff seed' seed xs)
+@[simp] lemma takeAtIndex_apply_of_ne (seed : QuerySeed spec) (i : ι) (n : ℕ) (j : ι)
+    (hj : j ≠ i) : seed.takeAtIndex i n j = seed j := by
+  simp [takeAtIndex, Function.update_of_ne hj]
+
+@[simp] lemma takeAtIndex_length (seed : QuerySeed spec) (i : ι) :
+    seed.takeAtIndex i (seed i).length = seed :=
+  funext fun j => by
+    by_cases hj : j = i
+    · subst hj; simp [takeAtIndex]
+    · simp [takeAtIndex, Function.update_of_ne hj]
+
+/-- Construct a query seed from a list at a single index. -/
+def ofList {i : ι} (xs : List (spec.Range i)) : QuerySeed spec :=
+  fun j => if h : i = j then h ▸ xs else []
+
+@[simp] lemma ofList_apply_self {i : ι} (xs : List (spec.Range i)) :
+    (ofList xs : QuerySeed spec) i = xs := by simp [ofList]
+
+@[simp] lemma ofList_apply_of_ne {i j : ι} (xs : List (spec.Range i)) (hj : j ≠ i) :
+    (ofList xs : QuerySeed spec) j = [] := by simp [ofList, Ne.symm hj]
+
+lemma eq_addValues_iff (seed seed' : QuerySeed spec)
+    {i : ι} (xs : List (spec.Range i)) :
+    seed = seed'.addValues xs ↔ seed' i ++ xs = seed i ∧
+      ∀ j, j ≠ i → seed' j = seed j := by
+  constructor
+  · rintro rfl
+    exact ⟨by simp, fun j hj => by simp [addValues, Function.update_of_ne hj]⟩
+  · rintro ⟨happ, hother⟩
+    apply funext; intro j
+    by_cases hj : j = i
+    · subst hj; rw [addValues_self]; exact happ.symm
+    · rw [addValues_of_ne _ _ hj, hother j hj]
+
+lemma addValues_eq_iff (seed seed' : QuerySeed spec)
+    {i : ι} (xs : List (spec.Range i)) :
+    seed.addValues xs = seed' ↔ seed i ++ xs = seed' i ∧
+      ∀ j, j ≠ i → seed j = seed' j :=
+  eq_comm.trans (eq_addValues_iff seed' seed xs)
 
 end QuerySeed
 

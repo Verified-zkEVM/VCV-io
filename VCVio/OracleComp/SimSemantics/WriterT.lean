@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.Prod
 import ToMathlib.Control.WriterT
 
 /-!
@@ -22,13 +23,24 @@ namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoid ω]
 
--- TODO: prove fst_map_writerT_run_simulateQ (query_bind case needs WriterT.run_bind reasoning)
--- Needed by LoggingOracle and CountingOracle.
--- lemma fst_map_writerT_run_simulateQ
---     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
---     (hso : ∀ {α}, ∀ q : OracleQuery spec α, fst <$> (so.impl q).run = q)
---     (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
---   sorry
+/-- Taking the first component of the WriterT output recovers the original computation,
+when the query implementation preserves the underlying oracle behavior (hso). -/
+lemma fst_map_writerT_run_simulateQ
+    {so : QueryImpl spec (WriterT ω (OracleComp spec))}
+    (hso : ∀ t, fst <$> (so t).run = liftM (query t))
+    (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp [WriterT.run_pure]
+  | query_bind t oa ih =>
+    rw [simulateQ_bind, simulateQ_query, WriterT.run_bind, map_bind]
+    have heq : ((query t).cont <$> so (query t).input) = so t := by
+      rw [OracleQuery.cont_query t, id_map]
+      simp only [OracleQuery.input_query]
+    rw [heq]
+    refine (bind_congr fun x => ?_).trans (by rw [← bind_map_left, hso t])
+    rw [fst_map_prod_map]
+    simp only [Function.id_comp]
+    exact ih x.1
 
 lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}

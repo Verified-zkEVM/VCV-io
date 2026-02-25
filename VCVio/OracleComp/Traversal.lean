@@ -40,42 +40,34 @@ def someWhen (Q : spec.Domain → Prop) (P : {α : Type v} → α → Prop)
   | pure x => exact P x
   | query_bind q _ r => exact Q q ∨ ∃ x ∈ possible_outputs q, r x
 
--- TODO: the following `allWhen`/`someWhen` lemmas were removed during remediation.
--- They may be useful once a full `supportWhen` API exists.
+variable {Q : spec.Domain → Prop} {P : {α : Type v} → α → Prop}
+  {possible_outputs : (x : spec.Domain) → Set (spec.Range x)}
 
--- @[simp] lemma allWhen_pure (x : α) :
---     (pure x : OracleComp spec α).allWhen Q F possible_outputs := True.intro
+@[simp] lemma allWhen_pure (x : α) (Q : spec.Domain → Prop) (P : {α : Type v} → α → Prop)
+    (possible_outputs : (x : spec.Domain) → Set (spec.Range x)) :
+    (pure x : OracleComp spec α).allWhen Q P possible_outputs = P x := rfl
 
--- @[simp] lemma someWhen_pure (x : α) :
---     (pure x : OracleComp spec α).someWhen Q F possible_outputs := True.intro
+@[simp] lemma someWhen_pure (x : α) (Q : spec.Domain → Prop) (P : {α : Type v} → α → Prop)
+    (possible_outputs : (x : spec.Domain) → Set (spec.Range x)) :
+    (pure x : OracleComp spec α).someWhen Q P possible_outputs = P x := rfl
 
--- @[simp] lemma allWhen_query_iff (q : OracleQuery spec α) :
---     (q : OracleComp spec α).allWhen Q F possible_outputs ↔ Q q := by simp [allWhen]
+@[simp] lemma allWhen_query_bind (q : spec.Domain)
+    (oa : spec.Range q → OracleComp spec α) :
+    ((query q : OracleComp spec _) >>= oa).allWhen Q P possible_outputs ↔
+      Q q ∧ ∀ x ∈ possible_outputs q, (oa x).allWhen Q P possible_outputs := by rfl
 
--- @[simp] lemma allWhen_query_bind (q : OracleQuery spec α) (oa : α → OracleComp spec β) :
---     ((q : OracleComp spec α) >>= oa).allWhen Q F possible_outputs ↔
---       Q q ∧ ∀ x ∈ possible_outputs q, (oa x).allWhen Q F possible_outputs := by rfl
-
+-- TODO: `allWhen_bind_iff` statement is INCORRECT for the `pure` case.
+-- When `oa = pure x`:
+--   LHS = `(ob x).allWhen Q P s`
+--   RHS = `P x ∧ (ob x).allWhen Q P s`
+-- The RHS imposes an extra `P x` constraint on intermediate values that the LHS does not.
+-- A correct formulation might either:
+--   (a) use a separate predicate for intermediate vs. final values, or
+--   (b) only state the `⟸` direction (which is valid), or
+--   (c) weaken the `pure` case in `allWhen` to `True` when used inside a bind.
 -- @[simp] lemma allWhen_bind_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
---     (oa >>= ob).allWhen Q F possible_outputs ↔ oa.allWhen Q F possible_outputs ∧
---       ∀ x ∈ oa.supportWhen possible_outputs, (ob x).allWhen Q F possible_outputs := by
+--     (oa >>= ob).allWhen Q P possible_outputs ↔ oa.allWhen Q P possible_outputs ∧
+--       ∀ x ∈ oa.supportWhen possible_outputs, (ob x).allWhen Q P possible_outputs := by
 --   sorry
-
--- TODO: the following `NeverFail` lemmas used the old traversal-based `NeverFail` definition.
--- `NeverFail` is now a typeclass in `EvalDist/Defs/NeverFails.lean`.
--- Some of these (bind_iff, map_iff, etc.) are already covered by the new typeclass.
--- The ones below have no direct analog in the new design.
-
--- @[simp] instance [spec.FiniteRange] : DecidablePred (@OracleComp.NeverFail _ spec α) :=
---   fun oa => by induction oa using OracleComp.construct' with
---   | pure x => exact Decidable.isTrue (NeverFail_pure x)
---   | failure => exact Decidable.isFalse not_NeverFail_failure
---   | query_bind i t _ r =>
---       simpa only [Function.const_apply, NeverFail_bind_iff, NeverFail_query, support_query,
---         Set.mem_univ, forall_const, true_and] using Fintype.decidableForallFintype
-
--- @[simp] lemma NeverFail_guard (p : Prop) [Decidable p] (oa : OracleComp spec α) (h: oa.NeverFail) :
---     NeverFail (if p then oa else failure) ↔ p := by
---   split <;> simp [h] <;> trivial
 
 end OracleComp

@@ -193,68 +193,124 @@ lemma not_noFailure_of_probFailure_pos {oa : OracleComp spec α} (h : 0 < probFa
 
 end NeverFail
 
--- TODO: the following lemmas were removed during remediation.
--- Some may now be provable via the generic `HasEvalSPMF` infrastructure.
+section evalDistConvenience
 
--- section evalDistConvenience
+variable [spec.Fintype] [spec.Inhabited]
 
--- lemma evalDist_query_bind [spec.Fintype] [spec.Inhabited]
---     (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
---     evalDist ((query t : OracleComp spec _) >>= ou) =
---       (OptionT.lift (PMF.uniformOfFintype (spec.Range t))) >>= (evalDist ∘ ou) := by
---   rw [evalDist_bind, evalDist_query]; rfl
+lemma evalDist_query_bind
+    (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
+    evalDist ((query t : OracleComp spec _) >>= ou) =
+      (OptionT.lift (PMF.uniformOfFintype (spec.Range t))) >>= (evalDist ∘ ou) := by
+  rw [evalDist_bind, evalDist_query]; rfl
 
--- lemma probOutput_congr {x y : α} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
---     (h1 : x = y) (h2 : evalDist oa = evalDist oa') : [= x | oa] = [= y | oa'] := by
---   simp_rw [probOutput, h1, h2]
+lemma probOutput_congr {x y : α} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
+    [spec'.Fintype] [spec'.Inhabited]
+    (h1 : x = y) (h2 : evalDist oa = evalDist oa') : Pr[= x | oa] = Pr[= y | oa'] := by
+  simp_rw [probOutput_def, h1, h2]
 
--- lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
---     (h1 : ∀ x, x ∈ oa.support → x ∈ oa'.support → (p x ↔ q x))
---     (h2 : evalDist oa = evalDist oa') : [p | oa] = [q | oa'] := by
---   sorry
+lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
+    [spec'.Fintype] [spec'.Inhabited]
+    (h1 : ∀ x, x ∈ support oa → (p x ↔ q x))
+    (h2 : evalDist oa = evalDist oa') : Pr[p | oa] = Pr[q | oa'] := by
+  simp only [probEvent_eq_tsum_indicator, probOutput_def, h2]
+  congr 1; ext x
+  by_cases hx : x ∈ support oa
+  · unfold Set.indicator
+    split_ifs with hp hq hq
+    · rfl
+    · exact absurd ((h1 x hx).mp hp) hq
+    · exact absurd ((h1 x hx).mpr hq) hp
+    · rfl
+  · unfold Set.indicator
+    have : (evalDist oa) x = 0 := by
+      rwa [← probOutput_def, probOutput_eq_zero_iff]
+    rw [h2] at this
+    split_ifs <;> simp [this]
 
--- lemma evalDist_ext_probEvent {oa : OracleComp spec α} {oa' : OracleComp spec' α}
---     (h : ∀ x, [= x | oa] = [= x | oa']) : (evalDist oa).run = (evalDist oa').run := by
---   sorry
+lemma evalDist_ext_probEvent {oa : OracleComp spec α} {oa' : OracleComp spec' α}
+    [spec'.Fintype] [spec'.Inhabited]
+    (h : ∀ x, Pr[= x | oa] = Pr[= x | oa']) : (evalDist oa).run = (evalDist oa').run := by
+  have heval : evalDist oa = evalDist oa' := evalDist_ext h
+  simp [heval]
 
--- lemma probFailure_eq_sub_probEvent (oa : OracleComp spec α) :
---     [⊥ | oa] = 1 - [λ _ ↦ true | oa] := by
---   sorry
+lemma probFailure_eq_sub_probEvent' (oa : OracleComp spec α) :
+    Pr[⊥ | oa] = 1 - Pr[fun _ => True | oa] :=
+  _root_.probFailure_eq_sub_probEvent oa
 
--- end evalDistConvenience
+end evalDistConvenience
 
--- section guard
+section guard
 
--- @[simp] lemma probOutput_guard {p : Prop} [Decidable p] :
---     [= () | (guard p : OracleComp spec _)] = if p then 1 else 0 := by
---   by_cases h : p <;> simp [h]
+variable [spec.Fintype] [spec.Inhabited]
 
--- @[simp] lemma probFailure_guard {p : Prop} [Decidable p] :
---     [⊥ | (guard p : OracleComp spec _)] = if p then 0 else 1 := by
---   by_cases h : p <;> simp [h]
+@[simp] lemma probOutput_guard {p : Prop} [Decidable p] :
+    Pr[= () | (guard p : OptionT (OracleComp spec) Unit)] = if p then 1 else 0 := by
+  rw [OracleComp.guard_eq]
+  split_ifs with h
+  · exact probOutput_pure_self ()
+  · exact probOutput_failure ()
 
--- lemma probOutput_eq_sub_probFailure_of_unit {oa : OracleComp spec PUnit} :
---     [= () | oa] = 1 - [⊥ | oa] := by
---   sorry
+@[simp] lemma probFailure_guard {p : Prop} [Decidable p] :
+    Pr[⊥ | (guard p : OptionT (OracleComp spec) Unit)] = if p then 0 else 1 := by
+  rw [OracleComp.guard_eq]
+  split_ifs with h
+  · exact probFailure_pure ()
+  · exact probFailure_failure
 
--- lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp spec α}
---     (h : oa.NeverFail) {p : α → Prop} [DecidablePred p] :
---     [= () | do let a ← oa; guard (p a)] = 1 - [= () | do let a ← oa; guard (¬ p a)] := by
---   sorry
+lemma probOutput_eq_sub_probFailure_of_unit {oa : OracleComp spec PUnit} :
+    Pr[= () | oa] = 1 - Pr[⊥ | oa] := by
+  have h := tsum_probOutput_add_probFailure oa
+  have hunit : ∑' x : PUnit, Pr[= x | oa] = Pr[= () | oa] :=
+    tsum_eq_single () (fun x hx => absurd (Subsingleton.elim x ()) hx)
+  rw [hunit] at h
+  exact ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top probFailure_le_one) h
 
--- end guard
+private lemma probOutput_bind_guard_eq_probEvent {α : Type} (oa : OracleComp spec α)
+    (p : α → Prop) [DecidablePred p] :
+    Pr[= () | (do let a ← oa; guard (p a) : OptionT (OracleComp spec) Unit)] = Pr[p | oa] := by
+  rw [probOutput_bind_eq_tsum]
+  simp only [OptionT.probOutput_liftM, probOutput_guard]
+  rw [probEvent_eq_tsum_ite]
+  congr 1; ext a
+  split_ifs <;> simp
 
--- section simulate
+lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp spec α}
+    [NeverFail oa] {p : α → Prop} [DecidablePred p] :
+    Pr[= () | (do let a ← oa; guard (p a) : OptionT (OracleComp spec) Unit)] =
+      1 - Pr[= () | (do let a ← oa; guard (¬ p a) : OptionT (OracleComp spec) Unit)] := by
+  rw [probOutput_bind_guard_eq_probEvent, probOutput_bind_guard_eq_probEvent]
+  have h := probEvent_compl oa p
+  simp at h
+  exact ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top probEvent_le_one) h
 
--- /-- If `fst <$> so i (t, s)` has the same distribution as `query i t` for any state `s`,
--- Then `simulate' so` doesn't change the output distribution. -/
--- lemma evalDist_simulate'_eq_evalDist {σ α : Type u}
---     (so : QueryImpl spec (StateT σ (OracleComp spec)))
---     (h : ∀ i t s, (evalDist ((so.impl (query i t)).run' s)) =
---       OptionT.lift (PMF.uniformOfFintype (spec.Range i)))
---     (s : σ) (oa : OracleComp spec α) : evalDist ((simulateQ so oa).run' s) = evalDist oa := by
---   sorry
+end guard
 
--- end simulate
+-- TODO: `evalDist_simulateQ_run'_eq_evalDist` (distributional version)
+--
+-- Updated statement for current API:
+--   lemma evalDist_simulateQ_run'_eq_evalDist {σ α : Type u}
+--       (so : QueryImpl spec (StateT σ (OracleComp spec)))
+--       (h : ∀ (t : spec.Domain) (s : σ),
+--         evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+--       (s : σ) (oa : OracleComp spec α) :
+--       evalDist ((simulateQ so oa).run' s) = evalDist oa
+--
+-- Proof sketch (by induction on `oa`, quantifying over all `s`):
+--   pure: `(pure x).run' s = pure x` definitionally, so `evalDist` agrees.
+--   query_bind t mx ih:
+--     1. Unwrap `StateT.run'` of bind:
+--        `(simulateQ so (query t >>= mx)).run' s`
+--        `= fst <$> ((so t).run s >>= fun (u, s') => (simulateQ so (mx u)).run s')`
+--     2. Apply `evalDist_map`, `evalDist_bind`, then `map_bind`.
+--     3. Apply IH (∀ u s', fst <$> evalDist ((simulateQ so (mx u)).run s') = evalDist (mx u))
+--        to simplify the continuation.
+--     4. Since the continuation `fun (u, s') => evalDist (mx u)` ignores `s'`,
+--        apply `bind_map_left` to factor: `μ >>= (g ∘ fst) = (fst <$> μ) >>= g`.
+--     5. Apply hypothesis: `fst <$> evalDist ((so t).run s) = OptionT.lift (unif)`.
+--     6. Reassemble with `evalDist_query_bind`.
+--
+-- Step 4 is the bottleneck: it requires a SPMF marginalisation lemma that is not
+-- currently in the library. The computational version `StateT_run'_simulateQ_eq_self`
+-- in `SimSemantics/StateT.lean` provides this at the OracleComp level (stronger hypothesis).
 
 end OracleComp

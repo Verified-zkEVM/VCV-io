@@ -44,26 +44,25 @@ infix : 50 " ⊂ₒ " => SubSpec
 namespace SubSpec
 
 -- TODO: the following SubSpec convenience lemmas were removed during remediation.
--- They restate generic query lemmas for the SubSpec monad lift. Restore when SubSpec API stabilises.
-
+-- `support_toFun` and the prob lemmas require that the MonadLift on OracleQuery
+-- preserves distribution properties (bijective cont), which `SubSpec` does not enforce.
+-- See the `evalDist_liftComp` TODO below for details.
+--
+-- The empty subspec instance requires `[]ₒ` to have `PEmpty` as its domain type,
+-- so the `query` constructor is eliminated. However, this depends on how `[]ₒ` is
+-- defined and whether the `liftM_map` axiom can be discharged vacuously.
+--
 -- @[simp] lemma support_toFun (q : OracleQuery spec α) :
 --     support (h.monadLift q : OracleComp superSpec α) = Set.univ := by
---   rw [support_query]
+--   sorry
 
 -- @[simp] lemma probOutput_toFun [superSpec.FiniteRange] [Fintype α]
 --     (q : OracleQuery spec α) (u : α) :
 --     [= u | (h.monadLift q : OracleComp superSpec α)] =
 --       (↑(Fintype.card α) : ℝ≥0∞)⁻¹ := by
---   rw [probOutput_liftM]
+--   sorry
 
--- @[simp] lemma probEvent_toFun [superSpec.FiniteRange] [Fintype α]
---     (q : OracleQuery spec α) (p : α → Prop) [DecidablePred p] :
---     [p | (h.monadLift q : OracleComp superSpec α)] =
---       (Finset.univ.filter p).card / Fintype.card α := by
---   rw [probEvent_liftM_eq_div]
-
--- /-- The empty set of oracles is a subspec of any other oracle set.
--- We require `ι` to be inhabited to prevent the reflexive case. -/
+-- /-- The empty set of oracles is a subspec of any other oracle set. -/
 -- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
 --   monadLift | query i _ => i.elim
 
@@ -115,15 +114,26 @@ lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) 
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
   simp [liftComp, seq_eq_bind_map]
 
--- TODO: the following liftComp lemmas were removed during remediation.
--- They show that `liftComp` preserves distributions and related properties.
--- Needed by `CryptoFoundations/Fork.lean`. Restore when `evalDist_liftComp` is proved.
+-- NOTE: `liftComp_failure` cannot be stated for `OracleComp spec` because `failure` only exists
+-- in `OptionT (OracleComp spec)`, not in `OracleComp spec` itself. `OracleComp` is
+-- `PFunctor.FreeM` which has no `Alternative` instance. Use `liftM_failure` in the OptionT
+-- section below for the analogous result.
 
--- @[simp] lemma liftComp_failure :
---     liftComp (failure : OracleComp spec α) superSpec = failure := rfl
-
--- /-- Lifting a computation to a different set of oracles doesn't change the output distribution,
--- since `evalDist` assumes uniformly random queries. -/
+-- TODO: the following liftComp lemmas require `evalDist_liftComp`, which is NOT provable from
+-- the current `SubSpec` definition alone.
+--
+-- The inductive proof reduces to showing that the MonadLift on OracleQuery preserves
+-- distributions: for each `t : spec.Domain`, the lifted query
+--   `liftM (query t : OracleQuery spec _) : OracleQuery superSpec (spec.Range t)`
+-- must produce the same output distribution under `evalDist` as the original query.
+-- Concretely, if `q' = liftM (query t)`, we need:
+--   `(PMF.uniformOfFintype (superSpec.Range q'.input)).map q'.cont
+--      = PMF.uniformOfFintype (spec.Range t)`
+-- which requires `q'.cont` to be a bijection — a condition `SubSpec` does not enforce.
+--
+-- FIX: add a `LawfulSubSpec` class (or `evalDist_liftM_query` axiom to `SubSpec`) that
+-- ensures distribution preservation. Needed by `CryptoFoundations/Fork.lean`.
+--
 -- @[simp] lemma evalDist_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
 --     (mx : OracleComp spec α) : evalDist (liftComp mx superSpec) = evalDist mx := by
 --   sorry
@@ -182,6 +192,13 @@ lemma liftM_OptionT_eq [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : OptionT (OracleComp spec) α) : (liftM mx : OptionT (OracleComp superSpec) α) =
       let impl : QueryImpl spec (OracleComp superSpec) := fun t => liftM (query t)
       simulateQ impl mx := rfl
+
+@[simp]
+lemma liftM_failure [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    (liftM (failure : OptionT (OracleComp spec) α) : OptionT (OracleComp superSpec) α) = failure := by
+  rw [OracleComp.failure_def, liftM_OptionT_eq, OptionT.fail]
+  simp only [OptionT.mk, simulateQ_pure]
+  rfl
 
 instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     LawfulMonadLift (OptionT (OracleComp spec)) (OptionT (OracleComp superSpec)) where

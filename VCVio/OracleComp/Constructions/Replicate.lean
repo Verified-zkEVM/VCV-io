@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.List
 import Init.Data.Vector.Lemmas
 
 /-!
@@ -51,72 +52,66 @@ lemma replicate_pure (x : α) :
   | zero => rfl
   | succ n hn => simp [hn, List.replicate]
 
--- @[simp]
--- lemma probFailure_replicate [spec.FiniteRange] :
---     [⊥ | oa.replicate n] = 1 - (1 - [⊥ | oa]) ^ n := by
---   rw [replicate, probFailure_list_mapM, List.map_replicate, List.prod_replicate]
+variable [spec.Fintype] [spec.Inhabited]
 
--- /-- The probability of getting a vector from `replicate` is the product of the chances of
--- getting each of the individual elements. -/
--- @[simp]
--- lemma probOutput_replicate [spec.FiniteRange] (xs : List α) :
---     [= xs | oa.replicate n] = if xs.length = n then (xs.map ([= · | oa])).prod else 0 := by
---   rw [replicate, probOutput_list_mapM, List.length_replicate]
---   split_ifs with hxs
---   · exact congr_arg List.prod <| List.ext_getElem (by simp [hxs]) (by simp)
---   · rfl
+lemma probFailure_replicate :
+    Pr[⊥ | oa.replicate n] = 1 - (1 - Pr[⊥ | oa]) ^ n := by
+  induction n with
+  | zero => simp
+  | succ n ih => simp [replicate_succ]
 
--- lemma probEvent_replicate_of_probEvent_cons [spec.FiniteRange]
+/-- The probability of getting a list from `replicate` is the product of the chances of
+getting each of the individual elements. -/
+@[simp]
+lemma probOutput_replicate (xs : List α) :
+    Pr[= xs | oa.replicate n] = if xs.length = n then (xs.map (Pr[= · | oa])).prod else 0 := by
+  have : DecidableEq α := Classical.decEq α
+  induction n generalizing xs with
+  | zero =>
+    simp only [replicate_zero]
+    by_cases hxs : xs = []
+    · subst hxs; simp
+    · have : xs.length ≠ 0 := fun h => hxs (List.eq_nil_of_length_eq_zero h)
+      simp [this, probOutput_eq_zero_of_not_mem_support, hxs]
+  | succ n ih =>
+    rw [replicate_succ]
+    by_cases hxs : xs = []
+    · subst hxs; simp
+    · obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_ne_nil hxs
+      simp only [List.length_cons, Nat.add_right_cancel_iff, List.map_cons, List.prod_cons]
+      rw [probOutput_cons_seq_map_cons_eq_mul oa (replicate n oa) y ys, ih]
+      simp
+
+-- TODO: restore when `probEvent_seq_map` infrastructure is available
+-- lemma probEvent_replicate_of_probEvent_cons
 --     (p : List α → Prop) (hp : p []) (q : α → Prop) (hq : ∀ x xs, p (x :: xs) ↔ q x ∧ p xs) :
---     [p | oa.replicate n] = [q | oa] ^ n := by
---   induction n with
---   | zero => simpa using hp
---   | succ n hn =>
---       simp_rw [replicate_succ, probEvent_seq_map_eq_probEvent, hq, pow_succ, ← hn,
---         probEvent_seq_map_prod_mk_eq_mul, mul_comm [q | oa]]
+--     Pr[p | oa.replicate n] = Pr[q | oa] ^ n := by
+--   sorry
 
--- @[simp]
--- lemma probEvent_all_replicate [spec.FiniteRange] (oa : OracleComp spec α) (n : ℕ) (p : α → Bool) :
---     [λ xs ↦ List.all xs p | oa.replicate n] = [λ x ↦ p x | oa] ^ n := by
---   apply probEvent_replicate_of_probEvent_cons
---   · rfl
---   · simp only [List.all_cons, Bool.and_eq_true, List.all_eq_true, implies_true]
+/-- Possible outputs of `replicate n oa` are lists of length `n` where
+each element in the list is a possible output of `oa`. -/
+@[simp]
+lemma support_replicate :
+    support (oa.replicate n) = {xs | xs.length = n ∧ ∀ x ∈ xs, x ∈ support oa} := by
+  apply Set.ext; intro xs
+  simp only [Set.mem_setOf_eq, mem_support_iff, probOutput_replicate, ne_eq]
+  constructor
+  · intro h
+    split_ifs at h with hlen
+    · refine ⟨hlen, fun x hx hzero => ?_⟩
+      exact h (List.prod_eq_zero (List.mem_map.mpr ⟨x, hx, hzero⟩))
+    · exact absurd rfl h
+  · intro ⟨hlen, hmem⟩
+    rw [if_pos hlen]
+    refine List.prod_ne_zero ?_
+    intro hzero
+    rw [List.mem_map] at hzero
+    exact hzero.elim fun x ⟨hx, hxa⟩ => hmem x hx hxa
 
--- lemma support_eq_setOf_probOutput_eq_zero [spec.FiniteRange] (oa : OracleComp spec α) :
---     oa.support = {x | [= x | oa] ≠ 0} := by
---   simp only [ne_eq, probOutput_eq_zero_iff, not_not, Set.setOf_mem_eq]
-
--- /-- Possible ouptuts of `replicate n oa` are lists of length `n` where
--- ecah element in the list is a possible output of `oa`. -/
--- @[simp]
--- lemma support_replicate [spec.FiniteRange] (oa : OracleComp spec α) (n : ℕ) :
---     (oa.replicate n).support = {xs | xs.length = n ∧ ∀ x ∈ xs, x ∈ oa.support} := by
---   rw [support_eq_setOf_probOutput_eq_zero]; simp
-
--- /-- Version of `support_replicate` using `List.all` instead of quantifiers.
--- Requires decidable equality on the output type of the computation. -/
--- lemma support_replicate' [spec.FiniteRange] [DecidableEq α] (oa : OracleComp spec α) (n : ℕ) :
---     (oa.replicate n).support = {xs | xs.length = n ∧ xs.all (· ∈ oa.support)} := by
---   simp only [support_replicate, List.all_eq_true, decide_eq_true_eq]
-
--- @[simp]
--- lemma mem_finSupport_replicate [spec.FiniteRange] [spec.DecidableEq] [DecidableEq α]
---     (oa : OracleComp spec α) (n : ℕ)
---     (xs : List α) : xs ∈ (oa.replicate n).finSupport ↔
---       xs.length = n ∧ xs.all (· ∈ oa.finSupport) := by
---   simp [mem_finSupport_iff_mem_support]
-
--- section SampleableTypeVector
-
--- /-- Vectors can be selected uniformly if the underlying type can be.
--- Note: this isn't very efficient as an actual implementation in practice. -/
--- instance (α : Type) [SampleableType α] (n : ℕ) :
---     SampleableType (Vector α n) where
---   selectElem := ($ᵗ α).replicate n
---   mem_support_selectElem xs := by simp
---   probOutput_selectElem_eq xs ys := by simp
---   probFailure_selectElem := by simp
-
--- end SampleableTypeVector
+@[simp]
+lemma mem_finSupport_replicate [spec.DecidableEq] [DecidableEq α]
+    (xs : List α) : xs ∈ finSupport (oa.replicate n) ↔
+      xs.length = n ∧ ∀ x ∈ xs, x ∈ finSupport oa := by
+  simp [mem_finSupport_iff_mem_support]
 
 end OracleComp

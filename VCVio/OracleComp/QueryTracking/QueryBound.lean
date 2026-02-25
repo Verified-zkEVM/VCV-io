@@ -3,6 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
+import Mathlib.Algebra.Polynomial.Eval.Defs
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
 
@@ -119,6 +120,16 @@ lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι �
   isQueryBound_map_aux oa f
 
 -- TODO: the following were removed during remediation.
+-- The support-based variant `isQueryBound_bind'` is difficult: `support` requires
+-- `[spec.Fintype] [spec.Inhabited]` for `mem_support_iff`, while `IsQueryBound` is purely
+-- structural. Proving by induction would need to carry support constraints through the
+-- structure, which is non-trivial.
+--
+-- A strengthened variant with `∀ u` (not just `u ∈ oa.support`) avoids support but still
+-- requires proof: use `qb₂' := fun i => (qb i).sub (qb₁ i)` as the uniform bound, then
+-- `isQueryBound_bind` + `mono`. The Nat arithmetic (qb₂ u ≤ qb₂' and qb₁ + qb₂' ≤ qb)
+-- requires careful handling of `Nat.sub` and `Nat.le_sub_iff_add_le`; omega fails due to
+-- coercion issues.
 
 -- /-- Version of `isQueryBound_bind` that allows the second query bound to vary based on the
 -- output of the first computation, assuming it remains below the final desired bound. -/
@@ -131,17 +142,15 @@ lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι �
 
 end IsQueryBound
 
--- TODO: `PolyQueries` was removed during remediation. Restore when `IsQueryBound` API is complete.
-
--- /-- If `oa` is a computation indexed by a security parameter, then `PolyQueries oa`
--- means that for each oracle index there is a polynomial function `qb` of the security parameter,
--- such that the number of queries to that oracle is bounded by the corresponding polynomial. -/
--- structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι}
---   {α β : ℕ → Type} (oa : (n : ℕ) → α n → OracleComp (spec n) (β n)) where
---   /-- `qb i` is a polynomial bound on the queries made to oracle `i`. -/
---   qb : ι → Polynomial ℕ
---   /-- The bound is actually a bound on the number of queries made. -/
---   qb_isQueryBound (n : ℕ) (x : α n) :
---     IsQueryBound (oa n x) (λ i ↦ (qb i).eval n)
+/-- If `oa` is a computation indexed by a security parameter, then `PolyQueries oa`
+means that for each oracle index there is a polynomial function `qb` of the security parameter,
+such that the number of queries to that oracle is bounded by the corresponding polynomial. -/
+structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι}
+    {α β : ℕ → Type} (oa : (n : ℕ) → α n → OracleComp (spec n) (β n)) where
+  /-- `qb i` is a polynomial bound on the queries made to oracle `i`. -/
+  qb : ι → Polynomial ℕ
+  /-- The bound is actually a bound on the number of queries made. -/
+  qb_isQueryBound (n : ℕ) (x : α n) :
+    IsQueryBound (oa n x) (fun i => (qb i).eval n)
 
 end OracleComp
