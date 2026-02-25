@@ -23,6 +23,12 @@ namespace OracleComp
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoid ω]
 
 -- TODO: prove fst_map_writerT_run_simulateQ (query_bind case needs WriterT.run_bind reasoning)
+-- Needed by LoggingOracle and CountingOracle.
+-- lemma fst_map_writerT_run_simulateQ
+--     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
+--     (hso : ∀ {α}, ∀ q : OracleQuery spec α, fst <$> (so.impl q).run = q)
+--     (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
+--   sorry
 
 lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}

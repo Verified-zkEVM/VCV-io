@@ -53,6 +53,29 @@ lemma generateSeed_zero :
   | nil => rfl
   | cons j js ih => simp [generateSeed, ih]
 
+-- TODO: the following lemmas were removed during remediation.
+-- They characterise the support and output probabilities of `generateSeed`.
+-- Needed for seeded-oracle proofs (e.g. `Fork.lean`).
+
+-- @[simp] lemma support_generateSeed : (generateSeed spec qc js).support =
+--     {seed | ∀ i, (seed i).length = qc i * js.count i} := by
+--   sorry
+
+-- @[simp] lemma finSupport_generateSeed_ne_empty [DecidableEq spec.QuerySeed] :
+--     (generateSeed spec qc js).finSupport ≠ ∅ := by
+--   sorry
+
+-- lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
+--     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
+--     1 / (js.map (λ j ↦ (Fintype.card (spec.Range j)) ^ qc j)).prod := by
+--   sorry
+
+-- lemma probOutput_generateSeed' [spec.FiniteRange]
+--     [DecidableEq spec.QuerySeed] (seed : QuerySeed spec)
+--     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
+--     ((generateSeed spec qc js).finSupport.card : ℝ≥0∞)⁻¹ := by
+--   sorry
+
 end lemmas
 
 end OracleComp

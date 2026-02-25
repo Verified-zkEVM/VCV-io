@@ -43,6 +43,30 @@ infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
+-- TODO: the following SubSpec convenience lemmas were removed during remediation.
+-- They restate generic query lemmas for the SubSpec monad lift. Restore when SubSpec API stabilises.
+
+-- @[simp] lemma support_toFun (q : OracleQuery spec α) :
+--     support (h.monadLift q : OracleComp superSpec α) = Set.univ := by
+--   rw [support_query]
+
+-- @[simp] lemma probOutput_toFun [superSpec.FiniteRange] [Fintype α]
+--     (q : OracleQuery spec α) (u : α) :
+--     [= u | (h.monadLift q : OracleComp superSpec α)] =
+--       (↑(Fintype.card α) : ℝ≥0∞)⁻¹ := by
+--   rw [probOutput_liftM]
+
+-- @[simp] lemma probEvent_toFun [superSpec.FiniteRange] [Fintype α]
+--     (q : OracleQuery spec α) (p : α → Prop) [DecidablePred p] :
+--     [p | (h.monadLift q : OracleComp superSpec α)] =
+--       (Finset.univ.filter p).card / Fintype.card α := by
+--   rw [probEvent_liftM_eq_div]
+
+-- /-- The empty set of oracles is a subspec of any other oracle set.
+-- We require `ι` to be inhabited to prevent the reflexive case. -/
+-- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
+--   monadLift | query i _ => i.elim
+
 end SubSpec
 
 end OracleSpec
@@ -90,6 +114,41 @@ lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
 lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) :
     liftComp (og <*> mx) superSpec = liftComp og superSpec <*> liftComp mx superSpec := by
   simp [liftComp, seq_eq_bind_map]
+
+-- TODO: the following liftComp lemmas were removed during remediation.
+-- They show that `liftComp` preserves distributions and related properties.
+-- Needed by `CryptoFoundations/Fork.lean`. Restore when `evalDist_liftComp` is proved.
+
+-- @[simp] lemma liftComp_failure :
+--     liftComp (failure : OracleComp spec α) superSpec = failure := rfl
+
+-- /-- Lifting a computation to a different set of oracles doesn't change the output distribution,
+-- since `evalDist` assumes uniformly random queries. -/
+-- @[simp] lemma evalDist_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
+--     (mx : OracleComp spec α) : evalDist (liftComp mx superSpec) = evalDist mx := by
+--   sorry
+
+-- @[simp] lemma support_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
+--     (mx : OracleComp spec α) : (liftComp mx superSpec).support = mx.support := by
+--   sorry
+
+-- @[simp] lemma finSupport_liftComp [spec.DecidableEq] [superSpec.DecidableEq] [DecidableEq α]
+--     [spec.FiniteRange] [superSpec.FiniteRange]
+--     (mx : OracleComp spec α) : (liftComp mx superSpec).finSupport = mx.finSupport := by
+--   sorry
+
+-- @[simp] lemma probOutput_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
+--     (mx : OracleComp spec α) (x : α) : [= x | liftComp mx superSpec] = [= x | mx] := by
+--   sorry
+
+-- @[simp] lemma probEvent_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
+--     (mx : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
+--     [p | liftComp mx superSpec] = [p | mx] := by
+--   sorry
+
+-- @[simp] lemma NeverFail_lift_comp_iff (mx : OracleComp spec α) :
+--     (liftComp mx superSpec).NeverFail ↔ mx.NeverFail := by
+--   sorry
 
 end liftComp
 

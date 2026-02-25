@@ -254,6 +254,39 @@ lemma addValues_nil (seed : QuerySeed spec) (i : ι) :
     seed.addValues (i := i) ([] : List (spec.Range i)) = seed := by
   simp [addValues]
 
+-- TODO: the following QuerySeed operations were removed during remediation.
+-- Restore if needed for seed-manipulation proofs (e.g. seeded oracle, generateSeed support).
+
+-- abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
+--     QuerySeed spec :=
+--   seed.addValues [u]
+
+-- /-- Take only the first `n` values of the seed at index `i`. -/
+-- def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
+--   Function.update seed i ((seed i).take n)
+
+-- @[simp] lemma takeAtIndex_apply (seed : QuerySeed spec) (i : ι) (n : ℕ) (j : ι) :
+--     seed.takeAtIndex i n j = (Function.update seed i ((seed i).take n) j) := rfl
+
+-- @[simp] lemma takeAtIndex_length (seed : QuerySeed spec) (i : ι) :
+--     seed.takeAtIndex i (seed i).length = seed := funext (λ j ↦ by simp)
+
+-- /-- Construct a query seed from a list at a single index. -/
+-- def ofList {i : ι} (xs : List (spec.Range i)) : QuerySeed spec :=
+--   fun j => if h : i = j then h ▸ xs else []
+
+-- lemma eq_addValues_iff (seed seed' : QuerySeed spec)
+--     {i : ι} (xs : List (spec.Range i)) :
+--     seed = seed'.addValues xs ↔ seed' = seed.takeAtIndex i (seed' i).length ∧
+--       xs = (seed i).drop (seed' i).length := by
+--   sorry
+
+-- lemma addValues_eq_iff (seed seed' : QuerySeed spec)
+--     {i : ι} (xs : List (spec.Range i)) :
+--     seed.addValues xs = seed' ↔ seed = seed'.takeAtIndex i (seed i).length ∧
+--       xs = (seed' i).drop (seed i).length :=
+--   eq_comm.trans (eq_addValues_iff seed' seed xs)
+
 end QuerySeed
 
 end OracleSpec
