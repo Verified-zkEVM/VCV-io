@@ -469,6 +469,15 @@ theorem PMF.uniformOfFintype_cast (α β : Type _) [ha : Fintype α] [Nonempty �
   simp only [cast_eq, uniformOfFintype_apply, inv_inj, Nat.cast_inj]
   exact @Fintype.card_congr α α ha hb (Equiv.refl α)
 
+open Classical in
+lemma PMF.uniformOfFintype_map_of_bijective {α β : Type*} [Fintype α] [Fintype β]
+    [Nonempty α] [Nonempty β] (f : α → β) (hf : Function.Bijective f) :
+    (PMF.uniformOfFintype α).map f = PMF.uniformOfFintype β := by
+  have heq := Fintype.card_congr (Equiv.ofBijective f hf)
+  ext x; obtain ⟨a, rfl⟩ := hf.2 x
+  simp only [PMF.map_apply, PMF.uniformOfFintype_apply, heq, hf.1.eq_iff, eq_comm (a := a)]
+  convert tsum_ite_eq a (fun _ : α => ((Fintype.card β : ENNReal)⁻¹))
+
 /-- This doesn't get applied properly without `Classical` so add with high priority. -/
 @[simp high] lemma PMF.some_map_apply_some {α} (p : PMF α) (x : α) :
     (p.map Option.some) (some x) = p x := by simp

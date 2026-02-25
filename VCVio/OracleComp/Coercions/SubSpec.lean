@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.EvalDist
+import ToMathlib.General
 
 /-!
 # Coercions Between Computations With Additional Oracles
@@ -43,30 +44,31 @@ infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
--- TODO: the following SubSpec convenience lemmas were removed during remediation.
--- `support_toFun` and the prob lemmas require that the MonadLift on OracleQuery
--- preserves distribution properties (bijective cont), which `SubSpec` does not enforce.
--- See the `evalDist_liftComp` TODO below for details.
---
--- The empty subspec instance requires `[]ₒ` to have `PEmpty` as its domain type,
--- so the `query` constructor is eliminated. However, this depends on how `[]ₒ` is
--- defined and whether the `liftM_map` axiom can be discharged vacuously.
---
--- @[simp] lemma support_toFun (q : OracleQuery spec α) :
---     support (h.monadLift q : OracleComp superSpec α) = Set.univ := by
---   sorry
-
--- @[simp] lemma probOutput_toFun [superSpec.FiniteRange] [Fintype α]
---     (q : OracleQuery spec α) (u : α) :
---     [= u | (h.monadLift q : OracleComp superSpec α)] =
---       (↑(Fintype.card α) : ℝ≥0∞)⁻¹ := by
---   sorry
-
--- /-- The empty set of oracles is a subspec of any other oracle set. -/
--- instance [Inhabited ι] : []ₒ ⊂ₒ spec where
---   monadLift | query i _ => i.elim
-
 end SubSpec
+
+/-- `LawfulSubSpec` extends `SubSpec` with the requirement that lifting preserves
+distributions. The axiom requires that the continuation of each lifted query is a
+bijection from the super-range to the sub-range, which guarantees that the uniform
+distribution is preserved under the mapping. -/
+class LawfulSubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec.{v,w} τ)
+    [h : SubSpec spec superSpec] : Prop where
+  cont_bijective (t : spec.Domain) :
+    Function.Bijective (h.toMonadLift.monadLift (query (spec := spec) t)).snd
+
+namespace LawfulSubSpec
+
+variable {ι : Type u} {τ : Type v} {spec : OracleSpec ι} {superSpec : OracleSpec τ}
+    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+
+lemma evalDist_liftM_query [superSpec.Fintype] [superSpec.Inhabited]
+    [spec.Fintype] [spec.Inhabited] (t : spec.Domain) :
+    (PMF.uniformOfFintype (superSpec.Range
+      (h.toMonadLift.monadLift (query (spec := spec) t)).fst)).map
+      (h.toMonadLift.monadLift (query (spec := spec) t)).snd =
+      PMF.uniformOfFintype (spec.Range t) :=
+  PMF.uniformOfFintype_map_of_bijective _ (cont_bijective t)
+
+end LawfulSubSpec
 
 end OracleSpec
 
@@ -119,48 +121,42 @@ lemma liftComp_seq (og : OracleComp spec (α → β)) (mx : OracleComp spec α) 
 -- `PFunctor.FreeM` which has no `Alternative` instance. Use `liftM_failure` in the OptionT
 -- section below for the analogous result.
 
--- TODO: the following liftComp lemmas require `evalDist_liftComp`, which is NOT provable from
--- the current `SubSpec` definition alone.
---
--- The inductive proof reduces to showing that the MonadLift on OracleQuery preserves
--- distributions: for each `t : spec.Domain`, the lifted query
---   `liftM (query t : OracleQuery spec _) : OracleQuery superSpec (spec.Range t)`
--- must produce the same output distribution under `evalDist` as the original query.
--- Concretely, if `q' = liftM (query t)`, we need:
---   `(PMF.uniformOfFintype (superSpec.Range q'.input)).map q'.cont
---      = PMF.uniformOfFintype (spec.Range t)`
--- which requires `q'.cont` to be a bijection — a condition `SubSpec` does not enforce.
---
--- FIX: add a `LawfulSubSpec` class (or `evalDist_liftM_query` axiom to `SubSpec`) that
--- ensures distribution preservation. Needed by `CryptoFoundations/Fork.lean`.
---
--- @[simp] lemma evalDist_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (mx : OracleComp spec α) : evalDist (liftComp mx superSpec) = evalDist mx := by
---   sorry
-
--- @[simp] lemma support_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (mx : OracleComp spec α) : (liftComp mx superSpec).support = mx.support := by
---   sorry
-
--- @[simp] lemma finSupport_liftComp [spec.DecidableEq] [superSpec.DecidableEq] [DecidableEq α]
---     [spec.FiniteRange] [superSpec.FiniteRange]
---     (mx : OracleComp spec α) : (liftComp mx superSpec).finSupport = mx.finSupport := by
---   sorry
-
--- @[simp] lemma probOutput_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (mx : OracleComp spec α) (x : α) : [= x | liftComp mx superSpec] = [= x | mx] := by
---   sorry
-
--- @[simp] lemma probEvent_liftComp [spec.FiniteRange] [superSpec.FiniteRange]
---     (mx : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
---     [p | liftComp mx superSpec] = [p | mx] := by
---   sorry
-
--- @[simp] lemma NeverFail_lift_comp_iff (mx : OracleComp spec α) :
---     (liftComp mx superSpec).NeverFail ↔ mx.NeverFail := by
---   sorry
-
 end liftComp
+
+section liftComp_evalDist
+
+variable {ι : Type u} {τ : Type v}
+  {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α : Type w}
+variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabited]
+    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+
+@[simp] lemma evalDist_liftComp (mx : OracleComp spec α) :
+    evalDist (liftComp mx superSpec) = evalDist mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx ih =>
+    simp only [liftComp_bind, liftComp_query, OracleQuery.cont_query, id_map,
+      OracleQuery.input_query]
+    rw [evalDist_bind, evalDist_bind]; simp_rw [ih]
+    congr 1
+    simp only [evalDist_eq_simulateQ (spec := superSpec), evalDist_eq_simulateQ (spec := spec),
+      simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query, id_map]
+    congr 1
+    simp only [simulateQ, PFunctor.FreeM.mapM.eq_def, bind_pure_comp, PMF.monad_map_eq_map]
+    exact PMF.uniformOfFintype_map_of_bijective _
+      (LawfulSubSpec.cont_bijective (spec := spec) (superSpec := superSpec) t)
+
+@[simp] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
+    Pr[= x | liftComp mx superSpec] = Pr[= x | mx] :=
+  congrFun (congrArg DFunLike.coe (evalDist_liftComp mx)) x
+
+@[simp] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
+    Pr[p | liftComp mx superSpec] = Pr[p | mx] := by
+  simp only [probEvent_eq_tsum_indicator]
+  congr 1; funext x
+  simp only [probOutput_liftComp]
+
+end liftComp_evalDist
 
 /-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
 instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :

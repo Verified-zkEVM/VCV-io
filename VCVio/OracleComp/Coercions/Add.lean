@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Coercing Computations to Larger Oracle Sets
@@ -32,6 +33,10 @@ instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v}
   monadLift | q => PEmpty.elim q.input
   liftM_map q := PEmpty.elim q.input
 
+instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v} τ} :
+    OracleSpec.LawfulSubSpec OracleSpec.emptySpec spec where
+  cont_bijective t := PEmpty.elim t
+
 section add_left
 
 /-- Add additional oracles to the right side of the existing ones. -/
@@ -44,6 +49,9 @@ instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
 
 @[simp high] lemma liftM_add_left_query (t : spec₁.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₁.Range t)) = query (Sum.inl t) := rfl
+
+instance lawfulSubSpec_add_left : OracleSpec.LawfulSubSpec spec₁ (spec₁ + spec₂) where
+  cont_bijective _ := Function.bijective_id
 
 end add_left
 
@@ -59,6 +67,9 @@ instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
 
 @[simp high] lemma liftM_add_right_query (t : spec₂.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₂.Range t)) = query (Sum.inr t) := rfl
+
+instance lawfulSubSpec_add_right : OracleSpec.LawfulSubSpec spec₂ (spec₁ + spec₂) where
+  cont_bijective _ := Function.bijective_id
 
 end add_right
 
@@ -101,6 +112,14 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
         | .inl t => liftM (liftM (query t)  : OracleQuery spec₃ _)
         | .inr t => query (Sum.inr t) := by aesop
 
+instance lawfulSubSpec_left_add_left_add [spec₁ ⊂ₒ spec₃]
+    [OracleSpec.LawfulSubSpec spec₁ spec₃] :
+    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₃ + spec₂) where
+  cont_bijective t := by
+    match t with
+    | .inl t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₁) (superSpec := spec₃) t
+    | .inr _ => exact Function.bijective_id
+
 end left_add_left_add
 
 section right_add_right_add
@@ -142,6 +161,14 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
         | .inl t => query (Sum.inl t)
         | .inr t => liftM (liftM (query t) : OracleQuery spec₃ _) := by aesop
 
+instance lawfulSubSpec_right_add_right_add [spec₂ ⊂ₒ spec₃]
+    [OracleSpec.LawfulSubSpec spec₂ spec₃] :
+    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₁ + spec₃) where
+  cont_bijective t := by
+    match t with
+    | .inl _ => exact Function.bijective_id
+    | .inr t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₂) (superSpec := spec₃) t
+
 end right_add_right_add
 
 section add_assoc
@@ -171,6 +198,11 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
         | .inr (.inr t) => query (Sum.inr t) := by
   rcases t with t | t | t <;> simp [query_def]
 
+instance lawfulSubSpec_add_assoc :
+    OracleSpec.LawfulSubSpec (spec₁ + (spec₂ + spec₃)) (spec₁ + spec₂ + spec₃) where
+  cont_bijective t := by
+    rcases t with t | t | t <;> exact Function.bijective_id
+
 end add_assoc
 
 section sigma
@@ -190,6 +222,10 @@ instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
 @[simp] lemma liftM_sigma_query (j : σ) (t : (specs j).Domain) :
     (liftM (query t) : OracleQuery (OracleSpec.sigma specs) ((specs j).Range t)) =
       query (spec := OracleSpec.sigma specs) ⟨j, t⟩ := rfl
+
+instance lawfulSubSpec_sigma (j : σ) :
+    OracleSpec.LawfulSubSpec (specs j) (OracleSpec.sigma specs) where
+  cont_bijective _ := Function.bijective_id
 
 end sigma
 
@@ -295,10 +331,11 @@ example (oa : OracleComp ((spec₁ + coeSpec) + (spec₃ + spec₄)) α) :
 example (oa : OracleComp ((spec₁ + spec₂) + (spec₃ + coeSuperSpec)) α) :
   OracleComp (spec₁ + spec₂ + spec₃ + coeSuperSpec) α := oa
 
-/-- coercion makes it possible to mix computations on individual oracles -/
+-- coercion makes it possible to mix computations on individual oracles
+open ProbComp in
 example : OracleComp (unifSpec + spec₁) Bool := do
-  let n : Fin 315 ←$[0..314]; let m : Fin 315 ←$[0..314]
-  if n = m then return true else $! #v[true, false]
+  let n ← uniformFin 314; let m ← uniformFin 314
+  if n = m then return true else uniformSelect! #v[true, false]
 
 -- Testing that simp pathways work well different lifting orders
 example (q : OracleQuery spec₁ α) :
