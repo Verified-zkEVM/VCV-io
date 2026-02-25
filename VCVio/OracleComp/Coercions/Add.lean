@@ -331,11 +331,10 @@ example (oa : OracleComp ((spec₁ + coeSpec) + (spec₃ + spec₄)) α) :
 example (oa : OracleComp ((spec₁ + spec₂) + (spec₃ + coeSuperSpec)) α) :
   OracleComp (spec₁ + spec₂ + spec₃ + coeSuperSpec) α := oa
 
--- coercion makes it possible to mix computations on individual oracles
-open ProbComp in
+/-- coercion makes it possible to mix computations on individual oracles -/
 example : OracleComp (unifSpec + spec₁) Bool := do
-  let n ← uniformFin 314; let m ← uniformFin 314
-  if n = m then return true else uniformSelect! #v[true, false]
+  let n : Fin 315 ←$[0..314]; let m : Fin 315 ←$[0..314]
+  if n = m then return true else $! #v[true, false]
 
 -- Testing that simp pathways work well different lifting orders
 example (q : OracleQuery spec₁ α) :
