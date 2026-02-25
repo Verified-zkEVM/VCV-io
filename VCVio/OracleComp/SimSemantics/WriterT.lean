@@ -22,13 +22,7 @@ namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoid ω]
 
-lemma fst_map_writerT_run_simulateQ
-    {so : QueryImpl spec (WriterT ω (OracleComp spec))}
-    (hso : ∀ t, fst <$> (so t).run = liftM (query t))
-    (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => sorry
+-- TODO: prove fst_map_writerT_run_simulateQ (query_bind case needs WriterT.run_bind reasoning)
 
 lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
