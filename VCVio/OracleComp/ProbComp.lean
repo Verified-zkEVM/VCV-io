@@ -35,110 +35,6 @@ open OracleComp BigOperators ENNReal
 
 universe u v w
 
-private lemma ofNat_Icc_iff {n m : ℕ} (h : n < m) (x : Fin (m + 1)) :
-    (Fin.ofNat (m + 1) n ≤ x ∧ x ≤ Fin.ofNat (m + 1) m) ↔ n ≤ x.val := by
-  constructor
-  · intro ⟨h1, _⟩
-    have h1' : (Fin.ofNat (m + 1) n).val ≤ x.val := h1
-    simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show n < m + 1 by omega)] at h1'
-    exact h1'
-  · intro hx
-    exact ⟨show (Fin.ofNat (m + 1) n).val ≤ x.val by
-              simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show n < m + 1 by omega)]; exact hx,
-           show x.val ≤ (Fin.ofNat (m + 1) m).val by
-              simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show m < m + 1 by omega)]; omega⟩
-
-private lemma countP_finRange_getElem {α : Type} (l : List α) (p : α → Bool) :
-    (List.finRange l.length).countP (fun i => p l[↑i]) = l.countP p := by
-  conv_rhs => rw [← List.map_getElem_finRange l]
-  rw [List.countP_map]; rfl
-
-lemma Fin.card_eq_countP_mem {n : ℕ} (s : Finset (Fin n)) :
-    s.card = Fin.countP (· ∈ s) := by
-  rw [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter]
-  symm
-  rw [← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
-  congr
-  ext x
-  simp
-
-private lemma array_card_eq_countP {α : Type} (as : Array α)
-    (p : α → Prop) [DecidablePred p] :
-    ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size)).card =
-      as.countP (fun a => decide (p a)) := by
-  rw [← Array.countP_toList]
-  rw [← List.map_getElem_finRange as.toList, List.countP_map]
-  have hcard := Fin.card_eq_countP_mem ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size))
-  rw [Fin.countP_eq_countP_map_finRange] at hcard
-  simpa [Function.comp, Array.length_toList] using hcard
-
-private lemma vector_card_eq_countP {α : Type} {n : ℕ}
-    (xs : Vector α n) (p : α → Prop) [DecidablePred p] :
-    ({i : Fin n | p xs[↑i]} : Finset (Fin n)).card =
-      xs.countP (fun a => decide (p a)) := by
-  rcases xs with ⟨as, hs⟩
-  calc
-    ({i : Fin n | p as[↑i]} : Finset (Fin n)).card =
-        ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size)).card := by
-          refine Finset.card_nbij (i := Fin.cast hs.symm) ?hi ?hinj ?hsurj
-          · intro i hi
-            simp at hi ⊢
-            simpa [Fin.cast_val_eq_self] using hi
-          · intro i hi j hj hij
-            exact Fin.cast_injective hs.symm hij
-          · intro j hj
-            refine ⟨Fin.cast hs j, ?_, ?_⟩
-            · simp at hj ⊢
-              simpa [Fin.cast_cast] using hj
-            · simp
-    _ = as.countP (fun a => decide (p a)) := array_card_eq_countP as p
-    _ = (Vector.mk as hs).countP (fun a => decide (p a)) := by simp [Vector.countP_mk]
-
-private lemma vector_card_eq_count {α : Type} [DecidableEq α] {n : ℕ}
-    (xs : Vector α n) (x : α) :
-    ({i : Fin n | x = xs[↑i]} : Finset (Fin n)).card = xs.count x := by
-  rw [Vector.count_eq_countP]
-  have hbeq : (fun y : α => y == x) = fun y => decide (x = y) := by
-    funext y
-    simp [beq_eq_decide, eq_comm]
-  rw [hbeq]
-  simpa using (vector_card_eq_countP xs (p := fun y => x = y))
-
-private lemma listVector_toList_eq_ofFn_get {α : Type} {n : ℕ}
-    (xs : List.Vector α n) : xs.toList = List.ofFn xs.get := by
-  apply List.ext_getElem
-  · simp [List.Vector.toList_length]
-  · intro i hi1 hi2
-    rw [show xs.toList[i] = xs.get ⟨i, by simpa [List.Vector.toList_length] using hi1⟩ by
-        simpa using (List.Vector.get_eq_get_toList xs
-          ⟨i, by simpa [List.Vector.toList_length] using hi1⟩).symm]
-    simp [List.getElem_ofFn (f := xs.get) (i := i) hi2]
-
-private lemma listVector_card_eq_countP {α : Type} {n : ℕ}
-    (xs : List.Vector α n) (p : α → Prop) [DecidablePred p] :
-    ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
-      xs.toList.countP (fun a => decide (p a)) := by
-  let ys : Vector α n := Vector.ofFn xs.get
-  have hcard : ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
-      ({i : Fin n | p ys[↑i]} : Finset (Fin n)).card := by
-    simp [ys, Vector.getElem_ofFn]
-  have hcount : ys.countP (fun a => decide (p a)) = xs.toList.countP (fun a => decide (p a)) := by
-    rw [← Vector.countP_toList]
-    simp [ys, Vector.toList_ofFn, listVector_toList_eq_ofFn_get]
-  calc
-    ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
-        ({i : Fin n | p ys[↑i]} : Finset (Fin n)).card := hcard
-    _ = ys.countP (fun a => decide (p a)) := vector_card_eq_countP ys p
-    _ = xs.toList.countP (fun a => decide (p a)) := hcount
-
-private lemma listVector_card_eq_count {α : Type} [DecidableEq α] {n : ℕ}
-    (xs : List.Vector α n) (x : α) :
-    ({i : Fin n | x = xs.get i} : Finset (Fin n)).card = xs.toList.count x := by
-  have h := listVector_card_eq_countP xs (p := fun a => x = a)
-  have hcount : xs.toList.count x = xs.toList.countP (fun a => decide (x = a)) := by
-    simp [List.count_eq_countP, beq_eq_decide, eq_comm]
-  exact h.trans hcount.symm
-
 /-- Simplified notation for computations with no oracles besides random inputs.
 This specific case can be used with `#eval` to run a random program, see `OracleComp.runIO`.
 NOTE: Need to decide if this should be more opaque than `abbrev`, seems like no as of now.. -/
@@ -230,7 +126,7 @@ lemma support_uniformRange (n m : ℕ) (h : n < m) :
     support (uniformRange n m h) =
       Set.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
   ext k
-  rw [mem_support_iff, probOutput_uniformRange, Set.mem_Icc, ofNat_Icc_iff h]
+  rw [mem_support_iff, probOutput_uniformRange, Set.mem_Icc, Fin.ofNat_Icc_iff h]
   constructor
   · intro hne
     by_cases hk : n ≤ ↑k
@@ -264,12 +160,12 @@ lemma probEvent_uniformRange (n m : ℕ)
     intro x hx
     have hx' : n ≤ ↑x := by
       have := (Finset.mem_filter.mp hx).1
-      rw [Finset.mem_Icc, ofNat_Icc_iff h] at this; exact this
+      rw [Finset.mem_Icc, Fin.ofNat_Icc_iff h] at this; exact this
     simp [hx']
   rw [hsum, Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv]
   congr 1; norm_cast; congr 1
   ext x
-  simp only [Finset.mem_filter, Finset.mem_Icc, ofNat_Icc_iff h,
+  simp only [Finset.mem_filter, Finset.mem_Icc, Fin.ofNat_Icc_iff h,
     Finset.mem_univ, true_and]
 
 lemma probFailure_uniformRange (n m : ℕ) (h : n < m) :
@@ -376,7 +272,7 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
   | y :: ys => by
     simp [uniformSelectList_cons]
     congr 2
-    exact countP_finRange_getElem (y :: ys) (fun b => decide (p b))
+    exact List.countP_finRange_getElem (y :: ys) (fun b => decide (p b))
 
 end uniformSelectList
 
@@ -414,7 +310,7 @@ lemma probOutput_uniformSelectVector [DecidableEq α] (x : α) :
   rw [probOutput_map_eq_sum_finSupport_ite]
   simp [div_eq_mul_inv]
   congr 2
-  simpa [eq_comm] using (vector_card_eq_count xs x)
+  simpa [eq_comm] using (Vector.card_eq_count xs x)
 
 @[simp, grind =]
 lemma probEvent_uniformSelectVector (p : α → Prop) [DecidablePred p] :
@@ -423,7 +319,7 @@ lemma probEvent_uniformSelectVector (p : α → Prop) [DecidablePred p] :
   simp [uniformSelectVector_def, probEvent_eq_sum_fintype_ite]
   rw [div_eq_mul_inv]
   congr 1
-  simpa [eq_comm] using (vector_card_eq_countP xs p)
+  simpa [eq_comm] using (Vector.card_eq_countP xs p)
 
 end uniformSelectVector
 
@@ -444,7 +340,7 @@ lemma probOutput_uniformSelectListVector [DecidableEq α] (x : α) :
   rw [probOutput_map_eq_sum_finSupport_ite]
   simp [div_eq_mul_inv]
   congr 2
-  simpa [eq_comm] using (listVector_card_eq_count xs x)
+  simpa [eq_comm] using (List.Vector.card_eq_count xs x)
 
 @[simp, grind =]
 lemma probEvent_uniformSelectListVector (p : α → Prop) [DecidablePred p] :
@@ -452,7 +348,7 @@ lemma probEvent_uniformSelectListVector (p : α → Prop) [DecidablePred p] :
   simp [uniformSelectListVector_def, probEvent_eq_sum_fintype_ite]
   rw [div_eq_mul_inv]
   congr 1
-  simpa [eq_comm] using (listVector_card_eq_countP xs p)
+  simpa [eq_comm] using (List.Vector.card_eq_countP xs p)
 
 end uniformSelectListVector
 
