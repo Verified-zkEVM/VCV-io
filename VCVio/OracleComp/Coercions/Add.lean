@@ -70,7 +70,22 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
     | .mk (.inl q) f => liftM (OracleQuery.mk q f)
     | .mk (.inr q) f => .mk (.inr q) f
   liftM_map
-    | .mk (.inl q) f => by sorry
+    | .mk (.inl q) f => by
+      intro g
+      calc
+        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
+            OracleQuery (spec₃ + spec₂) _) =
+            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
+              OracleQuery (spec₃ + spec₂) _) := by
+              simpa [liftM, monadLift] using
+                congrArg (fun z => (liftM z : OracleQuery (spec₃ + spec₂) _))
+                  (OracleSpec.SubSpec.liftM_map (spec := spec₁) (superSpec := spec₃)
+                    (q := OracleQuery.mk q f) (f := g))
+        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
+            OracleQuery (spec₃ + spec₂) _) := by
+              simpa [liftM, monadLift] using
+                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₃ + spec₂)
+                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
     | .mk (.inr q) f => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_left_add_left_add_def
@@ -97,7 +112,22 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
     | .mk (.inr q) f => liftM (OracleQuery.mk q f)
   liftM_map
     | .mk (.inl q) f => by simp [liftM, monadLift]
-    | .mk (.inr q) f => by simp [liftM, monadLift]; sorry
+    | .mk (.inr q) f => by
+      intro g
+      calc
+        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
+            OracleQuery (spec₁ + spec₃) _) =
+            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
+              OracleQuery (spec₁ + spec₃) _) := by
+              simpa [liftM, monadLift] using
+                congrArg (fun z => (liftM z : OracleQuery (spec₁ + spec₃) _))
+                  (OracleSpec.SubSpec.liftM_map (spec := spec₂) (superSpec := spec₃)
+                    (q := OracleQuery.mk q f) (f := g))
+        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
+            OracleQuery (spec₁ + spec₃) _) := by
+              simpa [liftM, monadLift] using
+                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₁ + spec₃)
+                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
 
 @[simp] lemma liftM_right_add_right_add_def
     [h : spec₂ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :

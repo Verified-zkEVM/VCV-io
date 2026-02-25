@@ -269,6 +269,56 @@ section support
 
 end support
 
+namespace OracleComp
+
+variable {ι : Type _} {spec : OracleSpec ι} {α : Type _}
+
+section supportEvalDist
+
+variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α)
+
+/-- An output has non-zero probability in `evalDist` iff it is in computation support. -/
+@[simp]
+lemma mem_support_evalDist_iff :
+    some x ∈ (evalDist oa).run.support ↔ x ∈ support oa := by
+  rw [PMF.mem_support_iff]
+  simpa [probOutput_def, SPMF.apply_eq_toPMF_some] using
+    (mem_support_iff (mx := oa) (x := x)).symm
+
+alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_support_evalDist_iff
+
+/-- Finite-support variant of `mem_support_evalDist_iff`. -/
+@[simp]
+lemma mem_support_evalDist_iff' [DecidableEq α] :
+    some x ∈ (evalDist oa).run.support ↔ x ∈ finSupport oa := by
+  rw [mem_support_evalDist_iff (oa := oa) (x := x), mem_finSupport_iff_mem_support]
+
+alias ⟨mem_finSupport_of_mem_support_evalDist, mem_support_evalDist'⟩ := mem_support_evalDist_iff'
+
+end supportEvalDist
+
+section NeverFail
+
+variable [spec.Fintype] [spec.Inhabited]
+
+@[simp]
+lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : probFailure oa = 0 ↔ NeverFail oa := by
+  simp [HasEvalSPMF.neverFail_iff]
+
+@[simp]
+lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < probFailure oa ↔ ¬ NeverFail oa := by
+  simp [HasEvalSPMF.neverFail_iff]
+
+lemma noFailure_of_probFailure_eq_zero {oa : OracleComp spec α} (h : probFailure oa = 0) :
+    NeverFail oa := by rwa [← probFailure_eq_zero_iff]
+
+lemma not_noFailure_of_probFailure_pos {oa : OracleComp spec α} (h : 0 < probFailure oa) :
+    ¬ NeverFail oa := by rwa [← probFailure_pos_iff]
+
+end NeverFail
+
+end OracleComp
+
 -- section sums
 
 -- variable (oa : OracleComp spec α) (p : α → Prop)
