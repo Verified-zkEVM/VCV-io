@@ -389,31 +389,6 @@ end OracleComp
 
 -- end failure
 
-
--- section NeverFail
-
--- -- TODO: expand api and include `mayFail` versions for `probFailure_pos`.
-
--- @[simp]
--- lemma probFailure_eq_zero_iff (oa : OracleComp spec α) : [⊥ | oa] = 0 ↔ oa.NeverFail := by
---   sorry
---   -- induction oa using OracleComp.inductionOn with
---   -- | pure x => simp
---   -- | failure => simp
---   -- | query_bind i t oa h => simp [probFailure_bind_eq_add_tsum, h]
-
--- @[simp]
--- lemma probFailure_pos_iff (oa : OracleComp spec α) : 0 < [⊥ | oa] ↔ ¬ oa.NeverFail := by
---   sorry --rw [pos_iff_ne_zero, ne_eq, probFailure_eq_zero_iff]
-
--- lemma noFailure_of_probFailure_eq_zero {oa : OracleComp spec α} (h : [⊥ | oa] = 0) :
---     NeverFail oa := by rwa [← probFailure_eq_zero_iff]
-
--- lemma not_noFailure_of_probFailure_pos {oa : OracleComp spec α} (h : 0 < [⊥ | oa]) :
---     ¬ NeverFail oa := by rwa [← probFailure_pos_iff]
-
--- end NeverFail
-
 -- section unit
 
 -- @[simp]
