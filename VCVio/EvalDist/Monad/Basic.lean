@@ -488,4 +488,53 @@ lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
     exact mul_le_mul' le_rfl (tsub_le_iff_right.mp (h x hx))
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
+/-- Union bound for bind: if `Pr[¬p | mx] ≤ ε₁` and `Pr[¬q | my x] ≤ ε₂` for all `x` satisfying
+`p`, then `Pr[¬q | mx >>= my] ≤ ε₁ + ε₂`. Useful for sequential composition of error bounds. -/
+lemma probEvent_bind_le_add {mx : m α} {my : α → m β}
+    {p : α → Prop} {q : β → Prop} {ε₁ ε₂ : ℝ≥0∞}
+    (h₁ : Pr[fun x => ¬p x | mx] ≤ ε₁)
+    (h₂ : ∀ x ∈ support mx, p x → Pr[fun y => ¬q y | my x] ≤ ε₂) :
+    Pr[fun y => ¬q y | mx >>= my] ≤ ε₁ + ε₂ := by
+  have := Classical.decPred p; have := Classical.decPred q
+  rw [probEvent_bind_eq_tsum]
+  calc ∑' x, Pr[= x | mx] * Pr[fun y => ¬q y | my x]
+      = ∑' x, Pr[= x | mx] * Pr[fun y => ¬q y | my x] := rfl
+    _ ≤ ∑' x, (Pr[= x | mx] * if p x then ε₂ else 1) := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        by_cases hx : x ∈ support mx
+        · by_cases hp : p x
+          · simp only [if_pos hp]; exact mul_le_mul' le_rfl (h₂ x hx hp)
+          · simp only [if_neg hp]; exact mul_le_mul' le_rfl probEvent_le_one
+        · simp [probOutput_eq_zero_of_not_mem_support hx]
+    _ = ∑' x, (if p x then Pr[= x | mx] * ε₂ else Pr[= x | mx]) := by
+        refine tsum_congr fun x => ?_; split_ifs <;> ring
+    _ ≤ ∑' x, (Pr[= x | mx] * ε₂ + (if ¬p x then Pr[= x | mx] else 0)) := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        split_ifs <;> simp
+    _ = (∑' x, Pr[= x | mx]) * ε₂ + Pr[fun x => ¬p x | mx] := by
+        rw [ENNReal.tsum_add, ENNReal.tsum_mul_right, probEvent_eq_tsum_ite]
+    _ ≤ 1 * ε₂ + ε₁ := by
+        exact add_le_add (mul_le_mul' tsum_probOutput_le_one le_rfl) h₁
+    _ = ε₁ + ε₂ := by ring
+
+/-- `probEvent` version of `probEvent_bind_mono` with additive error bound. -/
+lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
+    {q : β → Prop} {ε : ℝ≥0∞}
+    (h : ∀ x ∈ support mx, Pr[q | my x] ≤ Pr[q | oc x] + ε) :
+    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + ε := by
+  simp only [probEvent_bind_eq_tsum]
+  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
+      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x] + Pr[= x | mx] * ε) := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        by_cases hx : x ∈ support mx
+        · calc Pr[= x | mx] * Pr[q | my x]
+            _ ≤ Pr[= x | mx] * (Pr[q | oc x] + ε) := mul_le_mul' le_rfl (h x hx)
+            _ = Pr[= x | mx] * Pr[q | oc x] + Pr[= x | mx] * ε := left_distrib ..
+        · simp [probOutput_eq_zero_of_not_mem_support hx]
+    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x]) + ∑' x, Pr[= x | mx] * ε := ENNReal.tsum_add
+    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x]) + (∑' x, Pr[= x | mx]) * ε := by
+        rw [ENNReal.tsum_mul_right]
+    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x]) + ε := by
+        exact add_le_add le_rfl (mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one)
+
 end congr_mono

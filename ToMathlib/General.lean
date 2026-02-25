@@ -72,6 +72,19 @@ theorem tprod_ite_eq_apply' {α β} [CommMonoid α] [TopologicalSpace α]
 
 end sum_thing
 
+lemma Fin.ofNat_Icc_iff {n m : ℕ} (h : n < m) (x : Fin (m + 1)) :
+    (Fin.ofNat (m + 1) n ≤ x ∧ x ≤ Fin.ofNat (m + 1) m) ↔ n ≤ x.val := by
+  constructor
+  · intro ⟨h1, _⟩
+    have h1' : (Fin.ofNat (m + 1) n).val ≤ x.val := h1
+    simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show n < m + 1 by omega)] at h1'
+    exact h1'
+  · intro hx
+    exact ⟨show (Fin.ofNat (m + 1) n).val ≤ x.val by
+              simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show n < m + 1 by omega)]; exact hx,
+           show x.val ≤ (Fin.ofNat (m + 1) m).val by
+              simp only [Fin.val_ofNat, Nat.mod_eq_of_lt (show m < m + 1 by omega)]; omega⟩
+
 lemma PMF.apply_eq_one_sub_tsum_ite {α} [DecidableEq α] (p : PMF α) (x : α) :
     p x = 1 - (∑' y, if y = x then 0 else p y) := by
   rw [← p.tsum_coe]
@@ -142,6 +155,16 @@ lemma Vector.injective2_cons {α : Type*} {n : ℕ} :
 lemma Vector.getElem_eq_get {α n} (xs : List.Vector α n) (i : ℕ) (h : i < n) :
   xs[i]'h = xs.get ⟨i, h⟩ := rfl
 
+lemma List.Vector.toList_eq_ofFn_get {α : Type} {n : ℕ}
+    (xs : List.Vector α n) : xs.toList = List.ofFn xs.get := by
+  apply List.ext_getElem
+  · simp [List.Vector.toList_length]
+  · intro i hi1 hi2
+    rw [show xs.toList[i] = xs.get ⟨i, by simpa [List.Vector.toList_length] using hi1⟩ by
+        simpa using (List.Vector.get_eq_get_toList xs
+          ⟨i, by simpa [List.Vector.toList_length] using hi1⟩).symm]
+    simp [List.getElem_ofFn (f := xs.get) (i := i) hi2]
+
 end List.Vector
 
 lemma Prod.mk.injective2 {α β : Type*} :
@@ -176,6 +199,101 @@ lemma List.card_filter_getElem_eq {α : Type*} [DecidableEq α]
       xs.count x := by
   rw [List.count, ← List.countP_eq_sum_fin_ite]
   simp only [Fin.getElem_fin, beq_iff_eq, Finset.sum_boole, Nat.cast_id]
+
+lemma List.countP_finRange_getElem {α : Type} (l : List α) (p : α → Bool) :
+    (List.finRange l.length).countP (fun i => p l[↑i]) = l.countP p := by
+  conv_rhs => rw [← List.map_getElem_finRange l]
+  rw [List.countP_map]; rfl
+
+lemma Fin.card_eq_countP_mem {n : ℕ} (s : Finset (Fin n)) :
+    s.card = Fin.countP (· ∈ s) := by
+  rw [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter]
+  symm
+  rw [← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
+  congr
+  ext x
+  simp
+
+lemma Array.card_eq_countP {α : Type} (as : Array α)
+    (p : α → Prop) [DecidablePred p] :
+    ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size)).card =
+      as.countP (fun a => decide (p a)) := by
+  rw [← Array.countP_toList]
+  rw [← List.map_getElem_finRange as.toList, List.countP_map]
+  have hcard := Fin.card_eq_countP_mem ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size))
+  rw [Fin.countP_eq_countP_map_finRange] at hcard
+  simpa [Function.comp, Array.length_toList] using hcard
+
+section VectorCounting
+
+variable {α : Type}
+
+lemma _root_.Vector.card_eq_countP {n : ℕ}
+    (xs : Vector α n) (p : α → Prop) [DecidablePred p] :
+    ({i : Fin n | p xs[↑i]} : Finset (Fin n)).card =
+      xs.countP (fun a => decide (p a)) := by
+  rcases xs with ⟨as, hs⟩
+  calc
+    ({i : Fin n | p as[↑i]} : Finset (Fin n)).card =
+        ({i : Fin as.size | p as[↑i]} : Finset (Fin as.size)).card := by
+          refine Finset.card_nbij (i := Fin.cast hs.symm) ?hi ?hinj ?hsurj
+          · intro i hi
+            simp at hi ⊢
+            simpa [Fin.cast_val_eq_self] using hi
+          · intro i hi j hj hij
+            exact Fin.cast_injective hs.symm hij
+          · intro j hj
+            refine ⟨Fin.cast hs j, ?_, ?_⟩
+            · simp at hj ⊢
+              simpa [Fin.cast_cast] using hj
+            · simp
+    _ = as.countP (fun a => decide (p a)) := Array.card_eq_countP as p
+    _ = (Vector.mk as hs).countP (fun a => decide (p a)) := by simp [Vector.countP_mk]
+
+lemma _root_.Vector.card_eq_count [DecidableEq α] {n : ℕ}
+    (xs : Vector α n) (x : α) :
+    ({i : Fin n | x = xs[↑i]} : Finset (Fin n)).card = xs.count x := by
+  rw [Vector.count_eq_countP]
+  have hbeq : (fun y : α => y == x) = fun y => decide (x = y) := by
+    funext y
+    simp [beq_eq_decide, eq_comm]
+  rw [hbeq]
+  simpa using (Vector.card_eq_countP xs (p := fun y => x = y))
+
+end VectorCounting
+
+section ListVectorCounting
+
+lemma List.Vector.card_eq_countP {α : Type} {n : ℕ}
+    (xs : List.Vector α n) (p : α → Prop) [DecidablePred p] :
+    ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
+      xs.toList.countP (fun a => decide (p a)) := by
+  let ys : _root_.Vector α n := _root_.Vector.ofFn xs.get
+  have hcard : ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
+      ({i : Fin n | p ys[↑i]} : Finset (Fin n)).card := by
+    simp [ys, _root_.Vector.getElem_ofFn]
+  have hcount : ys.countP (fun a => decide (p a)) =
+      xs.toList.countP (fun a => decide (p a)) := by
+    rw [← _root_.Vector.countP_toList]
+    simp [ys, _root_.Vector.toList_ofFn, List.Vector.toList_eq_ofFn_get]
+  calc
+    ({i : Fin n | p (xs.get i)} : Finset (Fin n)).card =
+        ({i : Fin n | p ys[↑i]} : Finset (Fin n)).card := hcard
+    _ = ys.countP (fun a => decide (p a)) := _root_.Vector.card_eq_countP ys p
+    _ = xs.toList.countP (fun a => decide (p a)) := hcount
+
+lemma List.Vector.card_eq_count {α : Type} [DecidableEq α] {n : ℕ}
+    (xs : List.Vector α n) (x : α) :
+    ({i : Fin n | x = xs.get i} : Finset (Fin n)).card = xs.toList.count x := by
+  have h := List.Vector.card_eq_countP xs (p := fun a => x = a)
+  have hcount : xs.toList.count x = xs.toList.countP (fun a => decide (x = a)) := by
+    rw [List.count_eq_countP]
+    congr 1
+    funext y
+    simp [BEq.beq, eq_comm]
+  exact h.trans hcount.symm
+
+end ListVectorCounting
 
 @[simp] lemma Finset.sum_boole' {ι β : Type*} [AddCommMonoid β] (r : β)
     (p) [DecidablePred p] (s : Finset ι) :
@@ -350,6 +468,15 @@ theorem PMF.uniformOfFintype_cast (α β : Type _) [ha : Fintype α] [Nonempty �
   ext x
   simp only [cast_eq, uniformOfFintype_apply, inv_inj, Nat.cast_inj]
   exact @Fintype.card_congr α α ha hb (Equiv.refl α)
+
+open Classical in
+lemma PMF.uniformOfFintype_map_of_bijective {α β : Type*} [Fintype α] [Fintype β]
+    [Nonempty α] [Nonempty β] (f : α → β) (hf : Function.Bijective f) :
+    (PMF.uniformOfFintype α).map f = PMF.uniformOfFintype β := by
+  have heq := Fintype.card_congr (Equiv.ofBijective f hf)
+  ext x; obtain ⟨a, rfl⟩ := hf.2 x
+  simp only [PMF.map_apply, PMF.uniformOfFintype_apply, heq, hf.1.eq_iff, eq_comm (a := a)]
+  convert tsum_ite_eq a (fun _ : α => ((Fintype.card β : ENNReal)⁻¹))
 
 /-- This doesn't get applied properly without `Classical` so add with high priority. -/
 @[simp high] lemma PMF.some_map_apply_some {α} (p : PMF α) (x : α) :

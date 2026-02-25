@@ -663,6 +663,14 @@ lemma probEvent_compl (mx : m α) (p : α → Prop) :
   refine tsum_congr fun x => ?_
   split_ifs <;> simp_all
 
+/-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
+lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
+    Pr[fun x => p x ∨ q x | mx] ≤ Pr[p | mx] + Pr[q | mx] := by
+  have := Classical.decPred p; have := Classical.decPred q
+  simp only [probEvent_eq_tsum_ite, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hp : p x <;> by_cases hq : q x <;> simp [hp, hq]
+
 @[simp low, grind =]
 lemma probEvent_eq_one_iff :
     Pr[p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by

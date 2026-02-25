@@ -3,185 +3,142 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
--- import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.Constructions.Replicate
-import VCVio.OracleComp.ProbComp
-import Mathlib.Data.List.Basic
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.QueryTracking.Structures
 
 /-!
-# Counting Queries Made by a Computation
+# Generating Random Seeds for Oracle Queries
 
-This file defines a simulation oracle `countingOracle spec` for counting the number of queries made
-while running the computation. The count is represented by a type `queryCount spec`,
-which
+This file defines `generateSeed spec qc js`, which produces a random `QuerySeed` for
+oracle specification `spec`, seeding `qc j` values for each oracle `j ∈ js`.
 
+The definition is recursive on the list `js`, making it easy to prove properties by induction.
 -/
 
--- open OracleSpec BigOperators ENNReal
+open OracleSpec OracleComp
 
--- namespace OracleComp
+namespace OracleComp
 
--- variable {ι : Type} [DecidableEq ι]
+/-- Generate a `QuerySeed` uniformly at random. For each oracle `j ∈ js`, generates `qc j`
+uniform random values of type `spec.Range j` using `SampleableType`. -/
+def generateSeed {ι} [DecidableEq ι] (spec : OracleSpec ι)
+    [∀ t : spec.Domain, SampleableType (spec.Range t)]
+    (qc : ι → ℕ) : List ι → ProbComp (OracleSpec.QuerySeed spec)
+  | [] => return ∅
+  | j :: js => do
+    let xs ← replicate (qc j) ($ᵗ spec.Range j)
+    let rest ← generateSeed spec qc js
+    return rest.prependValues xs
 
--- def generateSeedT (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
---     (qc : ι → ℕ) (activeOracles : List ι) :
---     StateT (QuerySeed spec) ProbComp Unit :=
---   for j in activeOracles do
---     modify (QuerySeed.addValues (← ($ᵗ spec.Range j).replicate (qc j)))
+section lemmas
 
--- /-- Generate a `QuerySeed` uniformly at random for some set of oracles `spec : OracleSpec ι`,
--- with `qc i : ℕ` values seeded for each index `i ∈ js`. Note that `js` is allowed
--- to contain duplicates, but usually wouldn't in practice. -/
--- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
---     (qc : ι → ℕ) (js : List ι) : ProbComp (QuerySeed spec) := do
---   let mut seed : QuerySeed spec := ∅
---   for j in js do
---     seed := seed.addValues (← ($ᵗ spec.Range j).replicate (qc j))
---   return seed
+variable {ι} [DecidableEq ι] (spec : OracleSpec ι)
+  [∀ t : spec.Domain, SampleableType (spec.Range t)]
+  (qc : ι → ℕ) (j : ι) (js : List ι)
 
--- def generateSingleSeed (spec : OracleSpec ι) (i : ι) [SampleableType (spec.Range i)]
---     (n : ℕ) : ProbComp (QuerySeed spec) :=
---   QuerySeed.ofList <$> ($ᵗ spec.Range i).replicate n
+@[simp]
+lemma generateSeed_nil : generateSeed spec qc [] = return ∅ := rfl
 
---   -- Prod.snd <$> (generateSeedT spec qc activeOracles).run ∅
--- -- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
--- --   (qc : ι → ℕ) (j : ι) (js : List ι)
+@[simp]
+lemma generateSeed_cons : generateSeed spec qc (j :: js) = do
+    let xs ← replicate (qc j) ($ᵗ spec.Range j)
+    let rest ← generateSeed spec qc js
+    return rest.prependValues xs := rfl
 
--- -- lemma probOutput_generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
--- --     (qc : ι → ℕ) (js : List ι) (seed : QuerySeed spec)
--- --     (h : seed ∈ (generateSeed spec qc js).support) :
--- --     [= seed | generateSeed spec qc js] =
--- --       1 / (js.map (λ j ↦ (Fintype.card (spec.Range j)) ^ qc j)).prod :=
--- --   sorry
+@[simp]
+lemma generateSeed_zero :
+    generateSeed spec 0 js = (return ∅ : ProbComp (OracleSpec.QuerySeed spec)) := by
+  induction js with
+  | nil => rfl
+  | cons j js ih => simp [generateSeed, ih]
 
--- -- def generateSeed (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
--- --     (qc : ι → ℕ) (activeOracles : List ι) : ProbComp (QuerySeed spec) :=
--- --   match activeOracles with
--- --   | [] => return ∅
--- --   | j :: js => QuerySeed.addValues <$> generateSeed spec qc js <*>
--- --       (Array.toList <$> Vector.toArray <$> replicate ($ᵗ (spec.Range j)) (qc j))
+@[simp] lemma support_generateSeed : support (generateSeed spec qc js) =
+    {seed : QuerySeed spec | ∀ i, (seed i).length = qc i * js.count i} := by
+  induction js with
+  | nil =>
+    simp; ext seed; simp
+    constructor
+    · intro h; rw [h]; simp
+    · intro h; funext i; have := h i; simp at this; exact this
+  | cons j js ih =>
+    ext seed
+    simp only [generateSeed_cons, Set.mem_setOf_eq]
+    rw [mem_support_bind_iff]
+    constructor
+    · rintro ⟨xs, hxs, hrest⟩
+      rw [mem_support_bind_iff] at hrest
+      obtain ⟨rest, hrest_mem, hpure⟩ := hrest
+      rw [support_pure, Set.mem_singleton_iff] at hpure; subst hpure
+      rw [ih, Set.mem_setOf_eq] at hrest_mem
+      rw [support_replicate] at hxs
+      obtain ⟨hlen, _⟩ := hxs
+      intro i
+      by_cases hi : i = j
+      · subst hi
+        rw [QuerySeed.prependValues_self, List.length_append, hlen, hrest_mem i,
+          List.count_cons_self, Nat.mul_add, Nat.mul_one, Nat.add_comm]
+      · rw [QuerySeed.prependValues_of_ne _ _ hi, List.count_cons_of_ne (Ne.symm hi)]
+        exact hrest_mem i
+    · intro h
+      let xs : List (spec.Range j) := (seed j).take (qc j)
+      let rest : QuerySeed spec := Function.update seed j ((seed j).drop (qc j))
+      have hlen_j : (seed j).length = qc j * (List.count j js + 1) := by
+        rw [h j, List.count_cons_self]
+      have hxs_len : xs.length = qc j := by
+        simp only [xs, List.length_take, hlen_j, Nat.mul_add, Nat.mul_one]
+        exact Nat.min_eq_left (Nat.le_add_left _ _)
+      have hrest_len : ∀ i, (rest i).length = qc i * List.count i js := by
+        intro i
+        by_cases hi : i = j
+        · subst hi
+          simp only [rest, Function.update_self, List.length_drop, hlen_j,
+            Nat.mul_add, Nat.mul_one, Nat.add_sub_cancel]
+        · simp only [rest, Function.update_of_ne hi, h i, List.count_cons_of_ne (Ne.symm hi)]
+      refine ⟨xs, ?_, ?_⟩
+      · rw [support_replicate]
+        exact ⟨hxs_len, fun x _ => by simp [support_uniformSample]⟩
+      · rw [mem_support_bind_iff]
+        refine ⟨rest, ?_, ?_⟩
+        · rw [ih, Set.mem_setOf_eq]; exact hrest_len
+        · rw [support_pure, Set.mem_singleton_iff]
+          ext i
+          by_cases hi : i = j
+          · subst hi; simp [QuerySeed.prependValues_self, xs, rest, List.take_append_drop]
+          · rw [QuerySeed.prependValues_of_ne _ _ hi]; simp [rest, Function.update_of_ne hi]
 
--- variable (spec : OracleSpec ι) [∀ i, SampleableType (spec.Range i)]
---   (qc : ι → ℕ) (j : ι) (js : List ι)
+@[simp] lemma finSupport_generateSeed_ne_empty [DecidableEq (QuerySeed spec)] :
+    finSupport (generateSeed spec qc js) ≠ ∅ := by
+  intro h
+  have hf : Pr[⊥ | generateSeed spec qc js] = 1 := by
+    rw [probFailure_eq_one_iff]
+    have := coe_finSupport (mx := generateSeed spec qc js)
+    rw [h, Finset.coe_empty] at this
+    exact this.symm
+  exact zero_ne_one (probFailure_eq_zero (mx := generateSeed spec qc js) ▸ hf)
 
--- @[simp]
--- lemma generateSeed_nil : generateSeed spec qc [] = return ∅ := rfl
-
--- @[simp]
--- lemma generateSeed_cons : generateSeed spec qc (j :: js) =
---     ($ᵗ (spec.Range j)).replicate (qc j) >>= λ xs ↦
---       generateSeed spec qc js := by
---   simp [generateSeed, map_eq_bind_pure_comp,
---     seq_eq_bind, bind_assoc]
---   sorry
-
--- @[simp]
--- lemma generateSeed_zero : generateSeed spec 0 js = return ∅ := by
---   induction js with | nil => rfl | cons j js h => simp [h]
-
--- @[simp]
--- lemma support_generateSeed : (generateSeed spec qc js).support =
---     {seed | ∀ i, (seed i).length = qc i * js.count i} := by
---   sorry
--- --   induction js with
--- --   | nil => {
--- --     simp [Set.ext_iff, DFunLike.ext_iff]
--- --     intro x
--- --     rfl
--- --   }
--- --   | cons j js h => {
--- --     simp [h, Set.ext_iff]
--- --     intro seed
--- --     refine ⟨λ h i ↦ ?_, λ h ↦ ?_⟩
--- --     · obtain ⟨seed', ⟨h1, ⟨xs, hxs⟩⟩⟩ := h
--- --       by_cases hj : i = j
--- --       · induction hj
--- --         simp [← hxs, h1, mul_add_one]
--- --       · simp [← hxs, h1, hj]
--- --     · refine ⟨seed.takeAtIndex j (qc j * js.count j), λ i ↦ ?_, ?_⟩
--- --       · by_cases hi : i = j
--- --         · induction hi
--- --           simp [h, mul_add_one]
--- --         · simp [hi, h]
--- --       · refine ⟨⟨(seed j).drop (qc j * js.count j), ?_⟩, ?_⟩
--- --         · simp [h, mul_add_one]
--- --         · simp [h]
--- --           rw [QuerySeed.addValues_eq_iff]
--- --           simp [h, mul_add_one]
--- --   }
-
--- @[simp]
--- lemma finSupport_generateSeed_ne_empty [DecidableEq spec.QuerySeed] :
---     (generateSeed spec qc js).finSupport ≠ ∅ := by
---   sorry
-
+-- TODO: probOutput_generateSeed requires collapsing the bind tsums using decomposition
+-- uniqueness: for each `seed` satisfying the support condition, there is exactly one
+-- `(xs, rest)` pair with `xs = (seed j).take (qc j)` and
+-- `rest = Function.update seed j ((seed j).drop (qc j))` such that
+-- `seed = rest.prependValues xs`. The probability then factors as:
+--   Pr[= xs | replicate (qc j) ($ᵗ spec.Range j)] * Pr[= rest | generateSeed spec qc js]
+-- = ((Fintype.card (spec.Range j))⁻¹) ^ (qc j) * (IH)
+-- yielding the claimed formula by induction.
+--
 -- lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
---     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
---     1 / (js.map (λ j ↦ (Fintype.card (spec.Range j)) ^ qc j)).prod := by
---   revert seed
---   induction js using List.reverseRecOn with
---   | nil => {
---     -- simp at h
---     simp
-
---   }
---   | append_singleton j js hjs => {
---     intro seed hs
---     simp [generateSeed, List.forIn_eq_foldlM]
-
---     -- rw [Array.forIn_toList]
---     sorry
---   }
+--     (h : seed ∈ support (generateSeed spec qc js)) :
+--     Pr[= seed | generateSeed spec qc js] =
+--       1 / (js.map (fun j => (Fintype.card (spec.Range j)) ^ qc j)).prod := by
+--   sorry
 
 -- lemma probOutput_generateSeed' [spec.FiniteRange]
---     [DecidableEq spec.QuerySeed] (seed : QuerySeed spec)
---     (h : seed ∈ (generateSeed spec qc js).support) : [= seed | generateSeed spec qc js] =
---     ((generateSeed spec qc js).finSupport.card : ℝ≥0∞)⁻¹ := by
+--     [DecidableEq (QuerySeed spec)] (seed : QuerySeed spec)
+--     (h : seed ∈ support (generateSeed spec qc js)) :
+--     Pr[= seed | generateSeed spec qc js] =
+--       (finSupport (generateSeed spec qc js)).card⁻¹ := by
 --   sorry
 
---   -- sorry
--- --   revert seed
--- --   induction js with
--- --   | nil => {
--- --     intro seed h
--- --     simp at h
--- --     simp [h]
--- --   }
--- --   | cons j js hjs => {
--- --     intro seed h
--- --     let rec_seed : QuerySeed spec := seed.takeAtIndex j (qc j * js.count j)
--- --     specialize hjs rec_seed _
--- --     · simp [rec_seed]
--- --       rw [support_generateSeed, Set.mem_setOf] at h
--- --       intro k
--- --       by_cases hk : k = j
--- --       · induction hk
--- --         let hk := h k
--- --         rw [List.count_cons_self, mul_add_one] at hk
--- --         simp [rec_seed, QuerySeed.takeAtIndex, hk]
--- --       · simp [rec_seed, QuerySeed.takeAtIndex, hk, h k]
--- --     · rw [generateSeed_cons]
--- --       have : seed = QuerySeed.addValues rec_seed ((seed j).drop <| qc j * js.count j) :=
--- --         funext (λ k ↦ by simp [rec_seed, QuerySeed.takeAtIndex, QuerySeed.addValues])
--- --       refine (probOutput_seq_map_eq_mul _ _ QuerySeed.addValues rec_seed
--- --         (((seed j).drop <| qc j * js.count j)) _ ?_).trans ?_
--- --       · simp
--- --         intro seed' hs' xs
--- --         simp [rec_seed]
--- --         rw [QuerySeed.eq_addValues_iff]
--- --         simp [hs']
--- --       · rw [hjs]
--- --         rw [support_generateSeed, Set.mem_setOf] at h
--- --         specialize h j
--- --         simp only [List.count_cons_self] at h
--- --         simp only [Nat.cast_list_prod, List.map_map, one_div, probOutput_vector_toList,
--- --           List.length_drop, h, mul_add_one, add_tsub_cancel_left, ↓reduceDIte,
---               -- probOutput_replicate,
--- --           probOutput_uniformOfFintype, Vector.toList_mk, List.map_drop, List.map_const',
--- --           List.drop_replicate, List.prod_replicate, List.map_cons, List.prod_cons, Nat.cast_mul,
--- --           Nat.cast_pow]
--- --         rw [mul_comm, ← ENNReal.inv_pow, ENNReal.mul_inv] <;> simp
--- --   }
+end lemmas
 
--- end OracleComp
+end OracleComp

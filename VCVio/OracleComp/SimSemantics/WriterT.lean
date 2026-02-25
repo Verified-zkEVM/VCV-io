@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.Prod
 import ToMathlib.Control.WriterT
 
 /-!
@@ -22,56 +23,38 @@ namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u} {ω : Type u} [Monoid ω]
 
--- lemma fst_map_writerT_run_simulateQ
---     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
---     (hso : ∀ {α}, ∀ q : OracleQuery spec α, fst <$> (so.impl q).run = q)
---     (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
---   induction oa using OracleComp.inductionOn with
---   | pure x => simp
---   | query_bind i t oa h =>
---       simp_rw [simulateQ_bind, Function.comp_def, simulateQ_query, WriterT.run_bind, map_bind,
---         Functor.map_map, map_fst, id_eq, h, ← (congr_arg (· >>= oa) (hso (query i t))),
---         bind_map_left]
---   | failure => simp
+/-- Taking the first component of the WriterT output recovers the original computation,
+when the query implementation preserves the underlying oracle behavior (hso). -/
+lemma fst_map_writerT_run_simulateQ
+    {so : QueryImpl spec (WriterT ω (OracleComp spec))}
+    (hso : ∀ t, fst <$> (so t).run = liftM (query t))
+    (oa : OracleComp spec α) : fst <$> (simulateQ so oa).run = oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp [WriterT.run_pure]
+  | query_bind t oa ih =>
+    rw [simulateQ_bind, simulateQ_query, WriterT.run_bind, map_bind]
+    have heq : ((query t).cont <$> so (query t).input) = so t := by
+      rw [OracleQuery.cont_query t, id_map]
+      simp only [OracleQuery.input_query]
+    rw [heq]
+    refine (bind_congr fun x => ?_).trans (by rw [← bind_map_left, hso t])
+    rw [fst_map_prod_map]
+    simp only [Function.id_comp]
+    exact ih x.1
 
--- lemma probFailure_writerT_run_simulateQ [spec.FiniteRange]
---     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
---     (hso : ∀ {α}, ∀ q : OracleQuery spec α, fst <$> (so.impl q).run = q)
---     (hso' : ∀ {α}, ∀ q : OracleQuery spec α, [⊥ | (so.impl q).run] = 0)
---     (oa : OracleComp spec α) : [⊥ | (simulateQ so oa).run] = [⊥ | oa] := by
---   induction oa using OracleComp.inductionOn with
---   | pure x => simp
---   | query_bind i t oa h =>
---       simp [probFailure_bind_eq_add_tsum, h, hso']
---       rw [ENNReal.tsum_prod']
---       refine tsum_congr fun x => ?_
---       simp [ENNReal.tsum_mul_right]
---       congr 1
---       calc ∑' (w : ω), [=(x, w) | (so.impl (query i t)).run]
---         _ = [= x | fst <$> (so.impl (query i t)).run] := by rw [probOutput_fst_map_eq_tsum]
---         _ = (↑(Fintype.card (spec.Range i)))⁻¹ := by rw [hso, probOutput_query]
---   | failure => simp
+lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    {so : QueryImpl spec (WriterT ω (OracleComp spec))}
+    (oa : OracleComp spec α) : Pr[⊥ | (simulateQ so oa).run] = Pr[⊥ | oa] := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa h => simp
 
--- -- TODO: less general version with `NeverFailWhen`
--- lemma NeverFail_writerT_run_simulateQ_iff
---     {so : QueryImpl spec (WriterT ω (OracleComp spec))}
---     (hso : ∀ {α}, ∀ q : OracleQuery spec α, (fst <$> (so.impl q).run).support = ⊤)
---     (hso' : ∀ {α}, ∀ q : OracleQuery spec α, (so.impl q).run.NeverFail)
---     (oa : OracleComp spec α) : (simulateQ so oa).run.NeverFail ↔ oa.NeverFail := by
---   sorry
-  -- induction oa using OracleComp.inductionOn with
-  -- | pure x => simp
-  -- | failure => simp
-  -- | query_bind i t oa h =>
-  --     simp only [simulateQ_bind, simulateQ_query, WriterT.run_bind,
-  --       noFailure_bind_iff, hso', noFailure_map_iff, h, Prod.forall,
-  --       true_and, noFailure_query, support_liftM, Set.mem_univ,
-  --       forall_const, Function.comp_def]
-  --     refine ⟨fun h' x  => ?_, fun h' x w hw => h' x⟩
-  --     have := congr_arg (x ∈ ·) (hso (query i t))
-  --     simp only [support_map, Set.mem_image, Prod.exists, exists_and_right, exists_eq_right,
-  --       Set.top_eq_univ, Set.mem_univ, eq_iff_iff, iff_true] at this
-  --     obtain ⟨w, hw⟩ := this
-  --     exact h' x w hw
+lemma NeverFail_writerT_run_simulateQ_iff [spec.Fintype] [spec.Inhabited]
+    {so : QueryImpl spec (WriterT ω (OracleComp spec))}
+    (oa : OracleComp spec α) :
+    NeverFail ((simulateQ so oa).run : OracleComp spec _) ↔
+      NeverFail (oa : OracleComp spec α) := by
+  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
+    probFailure_writerT_run_simulateQ oa]
 
 end OracleComp

@@ -35,10 +35,6 @@ open OracleComp BigOperators ENNReal
 
 universe u v w
 
-lemma Fin.card_eq_countP_mem {n : ℕ} (s : Finset (Fin n)) :
-    s.card = Fin.countP (· ∈ s) := by
-  sorry
-
 /-- Simplified notation for computations with no oracles besides random inputs.
 This specific case can be used with `#eval` to run a random program, see `OracleComp.runIO`.
 NOTE: Need to decide if this should be more opaque than `abbrev`, seems like no as of now.. -/
@@ -110,21 +106,6 @@ example {m n : ℕ} (h : m < n) : ProbComp ℕ := do
 lemma uniformRange_eq_uniformFin (n : ℕ) (hn : 0 < n) : $[0⋯n] = $[0..n] := rfl
 
 @[simp, grind =]
-lemma support_uniformRange (n m : ℕ) (h : n < m) :
-    support (uniformRange n m h) =
-      Set.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
-  ext k
-  simp [uniformRange]
-  stop
-  refine ⟨fun h => by fin_omega, fun h => ?_⟩
-  refine ⟨⟨k - n, by fin_omega⟩, by fin_omega⟩
-
-@[simp]
-lemma finSupport_uniformRange (n m : ℕ) (h : n < m) :
-    finSupport (do uniformRange n m h) =
-      Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by aesop
-
-@[simp, grind =]
 lemma probOutput_uniformRange (n m : ℕ) (k : Fin (m + 1)) (h : n < m) :
     Pr[= k | uniformRange n m h] = if n ≤ k then (m - n + 1 : ℝ≥0∞)⁻¹ else 0 := by
   simp[uniformRange, probOutput_map_eq_sum_finSupport_ite, Fin.ext_iff]
@@ -141,10 +122,51 @@ lemma probOutput_uniformRange (n m : ℕ) (k : Fin (m + 1)) (h : n < m) :
     fin_omega
 
 @[simp, grind =]
+lemma support_uniformRange (n m : ℕ) (h : n < m) :
+    support (uniformRange n m h) =
+      Set.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
+  ext k
+  rw [mem_support_iff, probOutput_uniformRange, Set.mem_Icc, Fin.ofNat_Icc_iff h]
+  constructor
+  · intro hne
+    by_cases hk : n ≤ ↑k
+    · exact hk
+    · simp [hk] at hne
+  · intro hk
+    simp only [hk, ↓reduceIte]
+    exact ENNReal.inv_ne_zero.mpr (ne_top_of_le_ne_top
+      (ENNReal.add_ne_top.mpr ⟨ENNReal.natCast_ne_top m, one_ne_top⟩)
+      (by gcongr; exact tsub_le_self))
+
+@[simp]
+lemma finSupport_uniformRange (n m : ℕ) (h : n < m) :
+    finSupport (do uniformRange n m h) =
+      Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m) := by
+  apply finSupport_eq_of_support_eq_coe
+  simp [support_uniformRange n m h]
+
+@[simp, grind =]
 lemma probEvent_uniformRange (n m : ℕ)
     (p : Fin (m + 1) → Prop) [DecidablePred p] (h : n < m) :
     Pr[p | uniformRange n m h] = Finset.card {x : Fin (m + 1) | n ≤ x ∧ p x} / (m - n + 1) := by
-  sorry
+  rw [probEvent_eq_sum_filter_finSupport, finSupport_uniformRange]
+  simp_rw [probOutput_uniformRange]
+  have hsum :
+      (∑ x ∈ Finset.filter p (Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m)),
+          if n ≤ ↑x then (m - n + 1 : ℝ≥0∞)⁻¹ else 0) =
+      (∑ x ∈ Finset.filter p (Finset.Icc (Fin.ofNat (m + 1) n) (Fin.ofNat (m + 1) m)),
+          (m - n + 1 : ℝ≥0∞)⁻¹) := by
+    refine Finset.sum_congr rfl ?_
+    intro x hx
+    have hx' : n ≤ ↑x := by
+      have := (Finset.mem_filter.mp hx).1
+      rw [Finset.mem_Icc, Fin.ofNat_Icc_iff h] at this; exact this
+    simp [hx']
+  rw [hsum, Finset.sum_const, nsmul_eq_mul, div_eq_mul_inv]
+  congr 1; norm_cast; congr 1
+  ext x
+  simp only [Finset.mem_filter, Finset.mem_Icc, Fin.ofNat_Icc_iff h,
+    Finset.mem_univ, true_and]
 
 lemma probFailure_uniformRange (n m : ℕ) (h : n < m) :
     Pr[⊥ | uniformRange n m h] = 0 := by aesop
@@ -250,8 +272,7 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
   | y :: ys => by
     simp [uniformSelectList_cons]
     congr 2
-    simp [← List.countP_eq_sum_fin_ite]
-    sorry
+    exact List.countP_finRange_getElem (y :: ys) (fun b => decide (p b))
 
 end uniformSelectList
 
@@ -269,12 +290,18 @@ lemma uniformSelectVector_def : $! xs = (xs[·]) <$> $[0..n] := rfl
 
 @[simp, grind =]
 lemma support_uniformSelectVector : support ($! xs) = {x | x ∈ xs.toList} := by
-  sorry
+  ext x
+  simp [uniformSelectVector_def, support_map]
+  rw [← Vector.mem_toList_iff]
+  simpa [Fin.exists_iff, Vector.getElem_toList] using
+    (List.mem_iff_getElem (a := x) (l := xs.toList)).symm
 
 @[simp, grind =]
 lemma finSupport_uniformSelectVector [DecidableEq α] :
     finSupport ($ xs) = xs.toList.toFinset := by
-  sorry
+  rw [uniformSelect_eq_liftM_uniformSelect!, OptionT.finSupport_liftM]
+  apply finSupport_eq_of_support_eq_coe
+  simp [support_uniformSelectVector]
 
 @[simp, grind =]
 lemma probOutput_uniformSelectVector [DecidableEq α] (x : α) :
@@ -283,12 +310,16 @@ lemma probOutput_uniformSelectVector [DecidableEq α] (x : α) :
   rw [probOutput_map_eq_sum_finSupport_ite]
   simp [div_eq_mul_inv]
   congr 2
-  sorry
+  simpa [eq_comm] using (Vector.card_eq_count xs x)
 
 @[simp, grind =]
 lemma probEvent_uniformSelectVector (p : α → Prop) [DecidablePred p] :
     Pr[p | $ xs] = xs.toList.countP p / (n + 1) := by
-  sorry
+  rw [uniformSelect_eq_liftM_uniformSelect!]
+  simp [uniformSelectVector_def, probEvent_eq_sum_fintype_ite]
+  rw [div_eq_mul_inv]
+  congr 1
+  simpa [eq_comm] using (Vector.card_eq_countP xs p)
 
 end uniformSelectVector
 
@@ -305,12 +336,19 @@ lemma uniformSelectListVector_def : $! xs = (xs[·]) <$> $[0..n] := rfl
 @[simp, grind =]
 lemma probOutput_uniformSelectListVector [DecidableEq α] (x : α) :
     Pr[= x | $! xs] = xs.toList.count x / (n + 1) := by
-  sorry
+  simp [uniformSelectListVector_def]
+  rw [probOutput_map_eq_sum_finSupport_ite]
+  simp [div_eq_mul_inv]
+  congr 2
+  simpa [eq_comm] using (List.Vector.card_eq_count xs x)
 
 @[simp, grind =]
 lemma probEvent_uniformSelectListVector (p : α → Prop) [DecidablePred p] :
     Pr[p | $! xs] = xs.toList.countP p / (n + 1) := by
-  sorry
+  simp [uniformSelectListVector_def, probEvent_eq_sum_fintype_ite]
+  rw [div_eq_mul_inv]
+  congr 1
+  simpa [eq_comm] using (List.Vector.card_eq_countP xs p)
 
 end uniformSelectListVector
 
@@ -345,9 +383,11 @@ lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
 @[simp, grind =]
 lemma probEvent_uniformSelectFinset [DecidableEq α] (p : α → Prop) [DecidablePred p] :
     Pr[p | $ s] = {x ∈ s | p x}.card / s.card := by
-  simp [uniformSelectFinset_def]
+  simp [uniformSelectFinset_def, List.countP_eq_length_filter]
   congr 2
-  sorry
+  rw [← List.toFinset_card_of_nodup (l := s.toList.filter fun x => decide (p x))]
+  · simp [List.toFinset_filter]
+  · exact s.nodup_toList.filter _
 
 @[simp, grind =]
 lemma probFailure_uniformSelectFinset :

@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Coercing Computations to Larger Oracle Sets
@@ -32,6 +33,10 @@ instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v}
   monadLift | q => PEmpty.elim q.input
   liftM_map q := PEmpty.elim q.input
 
+instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v} τ} :
+    OracleSpec.LawfulSubSpec OracleSpec.emptySpec spec where
+  cont_bijective t := PEmpty.elim t
+
 section add_left
 
 /-- Add additional oracles to the right side of the existing ones. -/
@@ -44,6 +49,9 @@ instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
 
 @[simp high] lemma liftM_add_left_query (t : spec₁.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₁.Range t)) = query (Sum.inl t) := rfl
+
+instance lawfulSubSpec_add_left : OracleSpec.LawfulSubSpec spec₁ (spec₁ + spec₂) where
+  cont_bijective _ := Function.bijective_id
 
 end add_left
 
@@ -60,6 +68,9 @@ instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
 @[simp high] lemma liftM_add_right_query (t : spec₂.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₂.Range t)) = query (Sum.inr t) := rfl
 
+instance lawfulSubSpec_add_right : OracleSpec.LawfulSubSpec spec₂ (spec₁ + spec₂) where
+  cont_bijective _ := Function.bijective_id
+
 end add_right
 
 section left_add_left_add
@@ -70,7 +81,22 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
     | .mk (.inl q) f => liftM (OracleQuery.mk q f)
     | .mk (.inr q) f => .mk (.inr q) f
   liftM_map
-    | .mk (.inl q) f => by sorry
+    | .mk (.inl q) f => by
+      intro g
+      calc
+        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
+            OracleQuery (spec₃ + spec₂) _) =
+            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
+              OracleQuery (spec₃ + spec₂) _) := by
+              simpa [liftM, monadLift] using
+                congrArg (fun z => (liftM z : OracleQuery (spec₃ + spec₂) _))
+                  (OracleSpec.SubSpec.liftM_map (spec := spec₁) (superSpec := spec₃)
+                    (q := OracleQuery.mk q f) (f := g))
+        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
+            OracleQuery (spec₃ + spec₂) _) := by
+              simpa [liftM, monadLift] using
+                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₃ + spec₂)
+                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
     | .mk (.inr q) f => by simp [liftM, monadLift]
 
 @[simp] lemma liftM_left_add_left_add_def
@@ -86,6 +112,14 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
         | .inl t => liftM (liftM (query t)  : OracleQuery spec₃ _)
         | .inr t => query (Sum.inr t) := by aesop
 
+instance lawfulSubSpec_left_add_left_add [spec₁ ⊂ₒ spec₃]
+    [OracleSpec.LawfulSubSpec spec₁ spec₃] :
+    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₃ + spec₂) where
+  cont_bijective t := by
+    match t with
+    | .inl t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₁) (superSpec := spec₃) t
+    | .inr _ => exact Function.bijective_id
+
 end left_add_left_add
 
 section right_add_right_add
@@ -97,7 +131,22 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
     | .mk (.inr q) f => liftM (OracleQuery.mk q f)
   liftM_map
     | .mk (.inl q) f => by simp [liftM, monadLift]
-    | .mk (.inr q) f => by simp [liftM, monadLift]; sorry
+    | .mk (.inr q) f => by
+      intro g
+      calc
+        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
+            OracleQuery (spec₁ + spec₃) _) =
+            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
+              OracleQuery (spec₁ + spec₃) _) := by
+              simpa [liftM, monadLift] using
+                congrArg (fun z => (liftM z : OracleQuery (spec₁ + spec₃) _))
+                  (OracleSpec.SubSpec.liftM_map (spec := spec₂) (superSpec := spec₃)
+                    (q := OracleQuery.mk q f) (f := g))
+        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
+            OracleQuery (spec₁ + spec₃) _) := by
+              simpa [liftM, monadLift] using
+                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₁ + spec₃)
+                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
 
 @[simp] lemma liftM_right_add_right_add_def
     [h : spec₂ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :
@@ -111,6 +160,14 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
       match t with
         | .inl t => query (Sum.inl t)
         | .inr t => liftM (liftM (query t) : OracleQuery spec₃ _) := by aesop
+
+instance lawfulSubSpec_right_add_right_add [spec₂ ⊂ₒ spec₃]
+    [OracleSpec.LawfulSubSpec spec₂ spec₃] :
+    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₁ + spec₃) where
+  cont_bijective t := by
+    match t with
+    | .inl _ => exact Function.bijective_id
+    | .inr t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₂) (superSpec := spec₃) t
 
 end right_add_right_add
 
@@ -141,6 +198,11 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
         | .inr (.inr t) => query (Sum.inr t) := by
   rcases t with t | t | t <;> simp [query_def]
 
+instance lawfulSubSpec_add_assoc :
+    OracleSpec.LawfulSubSpec (spec₁ + (spec₂ + spec₃)) (spec₁ + spec₂ + spec₃) where
+  cont_bijective t := by
+    rcases t with t | t | t <;> exact Function.bijective_id
+
 end add_assoc
 
 section sigma
@@ -160,6 +222,10 @@ instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
 @[simp] lemma liftM_sigma_query (j : σ) (t : (specs j).Domain) :
     (liftM (query t) : OracleQuery (OracleSpec.sigma specs) ((specs j).Range t)) =
       query (spec := OracleSpec.sigma specs) ⟨j, t⟩ := rfl
+
+instance lawfulSubSpec_sigma (j : σ) :
+    OracleSpec.LawfulSubSpec (specs j) (OracleSpec.sigma specs) where
+  cont_bijective _ := Function.bijective_id
 
 end sigma
 
