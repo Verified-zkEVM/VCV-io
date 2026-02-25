@@ -6,6 +6,7 @@ Authors: Devon Tuma
 import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Instances.OptionT
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import VCVio.OracleComp.SimSemantics.StateT
 
 /-!
 # Output Distribution of Computations
@@ -285,32 +286,70 @@ lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp 
 
 end guard
 
--- TODO: `evalDist_simulateQ_run'_eq_evalDist` (distributional version)
---
--- Updated statement for current API:
---   lemma evalDist_simulateQ_run'_eq_evalDist {σ α : Type u}
---       (so : QueryImpl spec (StateT σ (OracleComp spec)))
---       (h : ∀ (t : spec.Domain) (s : σ),
---         evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
---       (s : σ) (oa : OracleComp spec α) :
---       evalDist ((simulateQ so oa).run' s) = evalDist oa
---
--- Proof sketch (by induction on `oa`, quantifying over all `s`):
---   pure: `(pure x).run' s = pure x` definitionally, so `evalDist` agrees.
---   query_bind t mx ih:
---     1. Unwrap `StateT.run'` of bind:
---        `(simulateQ so (query t >>= mx)).run' s`
---        `= fst <$> ((so t).run s >>= fun (u, s') => (simulateQ so (mx u)).run s')`
---     2. Apply `evalDist_map`, `evalDist_bind`, then `map_bind`.
---     3. Apply IH (∀ u s', fst <$> evalDist ((simulateQ so (mx u)).run s') = evalDist (mx u))
---        to simplify the continuation.
---     4. Since the continuation `fun (u, s') => evalDist (mx u)` ignores `s'`,
---        apply `bind_map_left` to factor: `μ >>= (g ∘ fst) = (fst <$> μ) >>= g`.
---     5. Apply hypothesis: `fst <$> evalDist ((so t).run s) = OptionT.lift (unif)`.
---     6. Reassemble with `evalDist_query_bind`.
---
--- Step 4 is the bottleneck: it requires a SPMF marginalisation lemma that is not
--- currently in the library. The computational version `StateT_run'_simulateQ_eq_self`
--- in `SimSemantics/StateT.lean` provides this at the OracleComp level (stronger hypothesis).
+section simulateQ_evalDist
+
+variable [spec.Fintype] [spec.Inhabited]
+
+/-- If a `StateT` oracle implementation preserves distributions (each oracle query produces a
+uniform distribution after discarding state), then `simulateQ` followed by `run'` preserves
+`evalDist`. This is the key lemma for security proofs: it shows that stateful oracle
+implementations (e.g. counting/logging oracles) don't change outcome probabilities. -/
+lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
+    (so : QueryImpl spec (StateT σ (OracleComp spec)))
+    (h : ∀ (t : spec.Domain) (s : σ),
+      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+    (s : σ) (oa : OracleComp spec τ) :
+    evalDist ((simulateQ so oa).run' s) = evalDist oa := by
+  revert s
+  induction oa using OracleComp.inductionOn with
+  | pure x => intro s; simp
+  | query_bind t mx ih =>
+    intro s
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
+      OracleQuery.input_query]
+    show evalDist (Prod.fst <$> ((so t).run s >>= fun p =>
+      (simulateQ so (mx p.1)).run p.2)) = _
+    rw [@map_bind (OracleComp spec), show (fun p : spec.Range t × σ =>
+        Prod.fst <$> (simulateQ so (mx p.1)).run p.2) =
+      (fun p => (simulateQ so (mx p.1)).run' p.2) from rfl]
+    rw [evalDist_bind]; simp_rw [ih]
+    rw [← evalDist_bind]
+    rw [show ((so t).run s >>= fun p : spec.Range t × σ => mx p.1) =
+      ((so t).run' s >>= mx) from
+      (bind_map_left (m := OracleComp spec) Prod.fst ((so t).run s) mx).symm]
+    rw [evalDist_bind, h t s]
+    show OptionT.lift (PMF.uniformOfFintype (spec.Range t)) >>= (fun u => evalDist (mx u)) = _
+    rw [show (fun u => evalDist (mx u)) = evalDist ∘ mx from rfl, ← evalDist_query_bind]
+
+/-- Stronger version with computational hypothesis: if the implementation passes through
+queries exactly, then `simulateQ` preserves `evalDist`. -/
+lemma evalDist_simulateQ_run'_of_run'_eq_query {σ τ : Type u}
+    (so : QueryImpl spec (StateT σ (OracleComp spec)))
+    (h : ∀ t s, (so t).run' s = query t)
+    (s : σ) (oa : OracleComp spec τ) :
+    evalDist ((simulateQ so oa).run' s) = evalDist oa := by
+  rw [StateT_run'_simulateQ_eq_self so h]
+
+/-- Corollary for `probOutput`: stateful simulation preserves output probabilities. -/
+lemma probOutput_simulateQ_run'_eq {σ τ : Type u}
+    (so : QueryImpl spec (StateT σ (OracleComp spec)))
+    (h : ∀ (t : spec.Domain) (s : σ),
+      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+    (s : σ) (oa : OracleComp spec τ) (x : τ) :
+    Pr[= x | (simulateQ so oa).run' s] = Pr[= x | oa] :=
+  congrFun (congrArg DFunLike.coe (evalDist_simulateQ_run'_eq_evalDist so h s oa)) x
+
+/-- Corollary for `probEvent`: stateful simulation preserves event probabilities. -/
+lemma probEvent_simulateQ_run'_eq {σ τ : Type u}
+    (so : QueryImpl spec (StateT σ (OracleComp spec)))
+    (h : ∀ (t : spec.Domain) (s : σ),
+      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+    (s : σ) (oa : OracleComp spec τ) (p : τ → Prop) :
+    Pr[p | (simulateQ so oa).run' s] = Pr[p | oa] := by
+  simp only [probEvent_eq_tsum_indicator]
+  congr 1; funext x
+  simp only [probOutput_simulateQ_run'_eq so h s oa]
+
+end simulateQ_evalDist
 
 end OracleComp
