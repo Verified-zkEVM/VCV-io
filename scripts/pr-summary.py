@@ -68,7 +68,15 @@ if __name__ == "__main__":
 
     genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
-    diff = os.environ["PR_DIFF"]
+    diff_path = os.environ.get("PR_DIFF_FILE", "pr.diff")
+    if "PR_DIFF" in os.environ:
+        diff = os.environ["PR_DIFF"]
+    elif os.path.isfile(diff_path):
+        with open(diff_path, "r") as f:
+            diff = f.read()
+    else:
+        print(f"Error: neither PR_DIFF env var nor {diff_path} file found.")
+        sys.exit(1)
     summary = generate_summary(diff)
     sorries = count_sorries(diff)
 

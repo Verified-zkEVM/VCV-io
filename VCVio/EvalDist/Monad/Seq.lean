@@ -35,7 +35,37 @@ section seq
 @[simp] lemma evalDist_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
     evalDist (mf <*> mx) = evalDist mf <*> evalDist mx := by simp [seq_eq_bind_map]
 
--- @[simp] lemma
+lemma probOutput_seq_eq_tsum [HasEvalSPMF m] [LawfulMonad m]
+    (mf : m (α → β)) (mx : m α) (y : β) :
+    Pr[= y | mf <*> mx] =
+      ∑' f, ∑' x, Pr[= f | mf] * Pr[= x | mx] * Pr[= y | (pure (f x) : m β)] := by
+  simp [seq_eq_bind_map, probOutput_bind_eq_tsum, probOutput_map_eq_tsum,
+    ← ENNReal.tsum_mul_left, mul_assoc]
+
+lemma probOutput_seq_eq_tsum_ite [HasEvalSPMF m] [LawfulMonad m] [DecidableEq β]
+    (mf : m (α → β)) (mx : m α) (y : β) :
+    Pr[= y | mf <*> mx] =
+      ∑' f, ∑' x, if y = f x then Pr[= f | mf] * Pr[= x | mx] else 0 := by
+  simp [seq_eq_bind_map, probOutput_bind_eq_tsum,
+    probOutput_map_eq_tsum_ite, ← ENNReal.tsum_mul_left]
+
+@[simp]
+lemma probFailure_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+    Pr[⊥ | mf <*> mx] = Pr[⊥ | mf] + Pr[⊥ | mx] - Pr[⊥ | mf] * Pr[⊥ | mx] := by
+  rw [seq_eq_bind_map]
+  exact probFailure_bind_of_const' probFailure_ne_top (fun g _ => probFailure_map mx g)
+
+lemma probEvent_seq_eq_tsum [HasEvalSPMF m] [LawfulMonad m]
+    (mf : m (α → β)) (mx : m α) (p : β → Prop) :
+    Pr[p | mf <*> mx] = ∑' f, Pr[= f | mf] * Pr[p ∘ f | mx] := by
+  simp only [seq_eq_bind_map, probEvent_bind_eq_tsum, probEvent_map]
+
+lemma probEvent_seq_eq_tsum_ite [HasEvalSPMF m] [LawfulMonad m]
+    (mf : m (α → β)) (mx : m α) (p : β → Prop) [DecidablePred p] :
+    Pr[p | mf <*> mx] = ∑' (f : α → β) (x : α),
+      if p (f x) then Pr[= f | mf] * Pr[= x | mx] else 0 := by
+  simp_rw [probEvent_seq_eq_tsum, probEvent_eq_tsum_ite, ← ENNReal.tsum_mul_left,
+    Function.comp_apply, mul_ite, mul_zero]
 
 end seq
 
@@ -46,6 +76,33 @@ section seqLeft
     support (mx <* my) = if (support my).Nonempty then support mx else ∅ := by
   rw [seqLeft_eq, Set.ext_iff]; aesop
 
+@[simp] lemma evalDist_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    evalDist (mx <* my) = evalDist mx <* evalDist my := by
+  simp [seqLeft_eq]
+
+@[simp] lemma probOutput_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (x : α) :
+    Pr[= x | mx <* my] = (1 - Pr[⊥ | my]) * Pr[= x | mx] := by
+  rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, probOutput_bind_eq_tsum]
+  simp_rw [show ∀ a : α, Pr[= x | (Function.const β a <$> my : m α)] =
+    (1 - Pr[⊥ | my]) * Pr[= x | (pure a : m α)] from fun a => probOutput_map_const my a x,
+    mul_left_comm _ (1 - Pr[⊥ | my])]
+  rw [ENNReal.tsum_mul_left, ← probOutput_bind_eq_tsum, bind_pure]
+
+@[simp] lemma probFailure_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx <* my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [seqLeft_eq, probFailure_seq, probFailure_map]
+
+@[simp] lemma probEvent_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+    (p : α → Prop) :
+    Pr[p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[p | mx] := by
+  rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp_apply, pure_bind, probEvent_bind_eq_tsum]
+  simp_rw [show ∀ a : α, Pr[p | (Function.const β a <$> my : m α)] =
+    (1 - Pr[⊥ | my]) * Pr[p | (pure a : m α)] from fun a => probEvent_map_const my a p,
+    mul_left_comm _ (1 - Pr[⊥ | my])]
+  rw [ENNReal.tsum_mul_left, ← probEvent_bind_eq_tsum, bind_pure]
+
 end seqLeft
 
 section seqRight
@@ -55,7 +112,116 @@ section seqRight
     support (mx *> my) = if (support mx).Nonempty then support my else ∅ := by
   rw [seqRight_eq, Set.ext_iff]; aesop
 
+@[simp] lemma evalDist_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    evalDist (mx *> my) = evalDist mx *> evalDist my := by
+  simp [seqRight_eq]
+
+@[simp] lemma probOutput_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (y : β) :
+    Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
+  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
+  rw [h, probOutput_bind_const]
+
+@[simp] lemma probFailure_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+    Pr[⊥ | mx *> my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
+  rw [seqRight_eq, probFailure_seq, probFailure_map]
+
+@[simp] lemma probEvent_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+    (p : β → Prop) :
+    Pr[p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
+  have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
+  rw [h, probEvent_bind_const]
+
 end seqRight
+
+section seq_map
+
+variable [LawfulMonad m] (mx : m α) (my : m β) (f : α → β → γ)
+
+@[simp low + 1]
+lemma support_seq_map_eq_image2 [HasEvalSet m] :
+    support (f <$> mx <*> my) = Set.image2 f (support mx) (support my) := by
+  ext z; simp [seq_eq_bind_map, Set.mem_image2]
+
+@[simp low + 1]
+lemma finSupport_seq_map_eq_image2 [HasEvalSet m] [HasEvalFinset m]
+    [DecidableEq α] [DecidableEq β] [DecidableEq γ] :
+    finSupport (f <$> mx <*> my) = Finset.image₂ f (finSupport mx) (finSupport my) := by
+  ext z; simp [seq_eq_bind_map, Finset.mem_image₂]
+
+lemma evalDist_seq_map [HasEvalSPMF m] :
+    evalDist (f <$> mx <*> my) = f <$> evalDist mx <*> evalDist my := by
+  rw [evalDist_seq, evalDist_map]
+
+lemma probOutput_seq_map_eq_tsum [HasEvalSPMF m]
+    (z : γ) : Pr[= z | f <$> mx <*> my] = ∑' (x : α) (y : β),
+      Pr[= x | mx] * Pr[= y | my] * Pr[= z | (pure (f x y) : m γ)] := by
+  simp only [map_eq_bind_pure_comp, Function.comp, seq_eq_bind_map, bind_assoc, pure_bind,
+    probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left, mul_assoc]
+
+lemma probOutput_seq_map_eq_tsum_ite [HasEvalSPMF m] [DecidableEq γ]
+    (z : γ) : Pr[= z | f <$> mx <*> my] =
+      ∑' (x : α) (y : β), if z = f x y then Pr[= x | mx] * Pr[= y | my] else 0 := by
+  simp only [probOutput_seq_map_eq_tsum, probOutput_pure, mul_ite, mul_one, mul_zero]
+
+section injective2
+
+lemma probOutput_seq_map_eq_mul_of_injective2 [HasEvalSPMF m] [DecidableEq γ]
+    (hf : f.Injective2) (x : α) (y : β) :
+    Pr[= f x y | f <$> mx <*> my] = Pr[= x | mx] * Pr[= y | my] := by
+  rw [probOutput_seq_map_eq_tsum]
+  simp only [probOutput_pure, mul_ite, mul_one, mul_zero]
+  refine (tsum_eq_single x fun x' hx' => ?_).trans ?_
+  · exact ENNReal.tsum_eq_zero.mpr fun b =>
+      if_neg (show f x y ≠ f x' b from fun h' => hx' (hf h').1.symm)
+  · refine (tsum_eq_single y fun y' hy' => ?_).trans ?_
+    · exact if_neg (show f x y ≠ f x y' from fun h' => hy' (hf h').2.symm)
+    · simp
+
+end injective2
+
+section swap
+
+@[simp]
+lemma probOutput_seq_map_swap [HasEvalSPMF m] [DecidableEq γ] (z : γ) :
+    Pr[= z | Function.swap f <$> my <*> mx] = Pr[= z | f <$> mx <*> my] := by
+  simp only [probOutput_seq_map_eq_tsum_ite, Function.swap]
+  rw [ENNReal.tsum_comm]
+  refine tsum_congr fun x' => tsum_congr fun y' => ?_
+  rw [mul_comm (Pr[= y' | my])]
+
+@[simp]
+lemma evalDist_seq_map_swap [HasEvalSPMF m] :
+    evalDist (Function.swap f <$> my <*> mx) = evalDist (f <$> mx <*> my) := by
+  have : DecidableEq γ := Classical.decEq γ
+  exact evalDist_ext (probOutput_seq_map_swap mx my f)
+
+end swap
+
+lemma probOutput_seq_map_eq_mul [HasEvalSPMF m] (x : α) (y : β) (z : γ)
+    (h : ∀ x' ∈ support mx, ∀ y' ∈ support my, z = f x' y' ↔ x' = x ∧ y' = y) :
+    Pr[= z | f <$> mx <*> my] = Pr[= x | mx] * Pr[= y | my] := by
+  have : DecidableEq γ := Classical.decEq γ
+  rw [probOutput_seq_map_eq_tsum_ite]
+  refine (tsum_eq_single x fun x' hx' => ?_).trans ?_
+  · refine ENNReal.tsum_eq_zero.mpr fun y' => ?_
+    by_cases hx's : x' ∈ support mx
+    · by_cases hy's : y' ∈ support my
+      · exact if_neg fun heq => hx' ((h x' hx's y' hy's).mp heq).1
+      · simp [probOutput_eq_zero_of_not_mem_support hy's]
+    · simp [probOutput_eq_zero_of_not_mem_support hx's]
+  · refine (tsum_eq_single y fun y' hy' => ?_).trans ?_
+    · by_cases hxs : x ∈ support mx
+      · by_cases hy's : y' ∈ support my
+        · exact if_neg fun heq => hy' ((h x hxs y' hy's).mp heq).2
+        · simp [probOutput_eq_zero_of_not_mem_support hy's]
+      · simp [probOutput_eq_zero_of_not_mem_support hxs]
+    · by_cases hxs : x ∈ support mx
+      · by_cases hys : y ∈ support my
+        · simp [(h x hxs y hys).mpr ⟨rfl, rfl⟩]
+        · simp [probOutput_eq_zero_of_not_mem_support hys]
+      · simp [probOutput_eq_zero_of_not_mem_support hxs]
+
+end seq_map
 
 -- universe u v w
 

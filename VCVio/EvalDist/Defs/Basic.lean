@@ -635,70 +635,101 @@ lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α] (mx : 
 
 end HasEvalPMF
 
--- @[simp low]
--- lemma probEvent_eq_one_iff : [p | oa] = 1 ↔ [⊥ | oa] = 0 ∧ ∀ x ∈ oa.support, p x := by
---   rw [probEvent, PMF.toOuterMeasure_apply_eq_one_iff]
---   simp [support_evalDist]
---   split_ifs with hoa
---   · simp [hoa, Set.preimage_image_eq _ (some_injective α), Set.subset_def]
---   · simp [hoa]
---     intro h
---     specialize h (Set.mem_insert none _)
---     simp at h
--- alias ⟨_, probEvent_eq_one⟩ := probEvent_eq_one_iff
--- @[simp low]
--- lemma one_eq_probEvent_iff : 1 = [p | oa] ↔ [⊥ | oa] = 0 ∧ ∀ x ∈ oa.support, p x := by
---   rw [eq_comm, probEvent_eq_one_iff]
--- alias ⟨_, one_eq_probEvent⟩ := probEvent_eq_one_iff
+section probEvent_mono_compl
 
--- @[simp]
--- lemma probEvent_eq_one_iff' [spec.DecidableEq] [DecidableEq α] :
---     [p | oa] = 1 ↔ [⊥ | oa] = 0 ∧ ∀ x ∈ oa.finSupport, p x := by
---   simp_rw [probEvent_eq_one_iff, mem_finSupport_iff_mem_support]
--- alias ⟨_, probEvent_eq_one'⟩ := probEvent_eq_one_iff'
--- @[simp]
--- lemma one_eq_probEvent_iff' [spec.DecidableEq] [DecidableEq α] :
---     1 = [p | oa] ↔ [⊥ | oa] = 0 ∧ ∀ x ∈ oa.finSupport, p x := by
---   rw [eq_comm, probEvent_eq_one_iff']
--- alias ⟨_, one_eq_probEvent'⟩ := one_eq_probEvent_iff'
+variable [HasEvalSPMF m] {mx : m α} {p q : α → Prop}
 
--- lemma mem_support_iff_probOutput_ne_zero : x ∈ oa.support ↔ [= x | oa] ≠ 0 := by
---   simp only [ne_eq, probOutput_eq_zero_iff, not_not]
--- lemma mem_finSupport_iff_probOutput_ne_zero [spec.DecidableEq] [DecidableEq α] :
---     x ∈ oa.finSupport ↔ [= x | oa] ≠ 0 := by
---   rw [mem_finSupport_iff_mem_support, mem_support_iff_probOutput_ne_zero]
+/-- If `p` implies `q` on the `support` of a computation then it is more likely to happen. -/
+lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[p | mx] ≤ Pr[q | mx] := by
+  have := Classical.decPred p; have := Classical.decPred q
+  simp only [probEvent_eq_tsum_ite]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  split_ifs with hp hq
+  · exact le_rfl
+  · exact le_of_eq (probOutput_eq_zero_of_not_mem_support (fun hx => hq (h x hx hp)))
+  · exact zero_le _
+  · exact le_rfl
 
--- lemma mem_support_iff_probOutput_pos : x ∈ oa.support ↔ 0 < [= x | oa] := by
---   simp only [probOutput_pos_iff]
+/-- If `p` implies `q` on the `finSupport` of a computation then it is more likely to happen. -/
+lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
+    (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[p | mx] ≤ Pr[q | mx] :=
+  probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
 
--- lemma not_mem_support_iff_probOutput_eq_zero : x ∉ oa.support ↔ [= x | oa] = 0 := by
---   simp only [probOutput_eq_zero_iff]
+lemma probEvent_compl (mx : m α) (p : α → Prop) :
+    Pr[p | mx] + Pr[fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
+  have := Classical.decPred p
+  rw [probEvent_eq_tsum_ite mx p, probEvent_eq_tsum_ite mx (fun x => ¬p x)]
+  rw [← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
+  refine tsum_congr fun x => ?_
+  split_ifs <;> simp_all
 
--- variable {oa x p q}
+@[simp low, grind =]
+lemma probEvent_eq_one_iff :
+    Pr[p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
+  constructor
+  · intro h
+    have hcompl := probEvent_compl mx p
+    rw [h] at hcompl
+    have hfail : Pr[⊥ | mx] = 0 := by
+      by_contra hne
+      have h1 : 1 - Pr[⊥ | mx] < 1 :=
+        ENNReal.sub_lt_self one_ne_top one_ne_zero hne
+      exact not_lt.mpr (hcompl ▸ le_add_right le_rfl) h1
+    refine ⟨hfail, fun x hx => ?_⟩
+    rw [hfail, tsub_zero] at hcompl
+    have h3 : Pr[fun x => ¬p x | mx] = 0 := by
+      have hcancel : AddLECancellable (1 : ℝ≥0∞) :=
+        WithTop.addLECancellable_iff_ne_top.mpr one_ne_top
+      exact le_antisymm (hcancel (by rw [add_zero]; exact hcompl.le)) (zero_le _)
+    rw [probEvent_eq_zero_iff] at h3
+    exact by_contra (h3 x hx)
+  · intro ⟨hf, hp⟩
+    have := Classical.decPred p
+    rw [probEvent_eq_tsum_ite]
+    conv_rhs => rw [show (1 : ℝ≥0∞) = 1 - Pr[⊥ | mx] from by simp [hf]]
+    rw [← tsum_probOutput_eq_sub]
+    refine tsum_congr fun x => ?_
+    split_ifs with hpx
+    · rfl
+    · exact (probOutput_eq_zero_of_not_mem_support (fun hx' => hpx (hp x hx'))).symm
 
--- /-- If `p` implies `q` on the `support` of a computation then it is more likely to happen. -/
--- lemma probEvent_mono (h : ∀ x ∈ oa.support, p x → q x) : [p | oa] ≤ [q | oa] := by
---   refine PMF.toOuterMeasure_mono _ λ x hx ↦ match x with
---   | none => by simp at hx
---   | some x => by
---       simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_setOf_eq, some.injEq, exists_eq_right,
---         PMF.mem_support_iff, ne_eq, evalDist_apply_eq_zero_iff, not_not] at hx
---       exact ⟨x, h x hx.2 hx.1, rfl⟩
+alias ⟨_, probEvent_eq_one⟩ := probEvent_eq_one_iff
 
--- /-- If `p` implies `q` on the `finSupport` of a computation then it is more likely to happen. -/
--- lemma probEvent_mono' [spec.DecidableEq] [DecidableEq α]
---     (h : ∀ x ∈ oa.finSupport, p x → q x) : [p | oa] ≤ [q | oa] :=
---   probEvent_mono (λ x hx hpx ↦ h x (mem_finSupport_of_mem_support oa hx) hpx)
+@[simp low]
+lemma one_eq_probEvent_iff :
+    1 = Pr[p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
+  rw [eq_comm, probEvent_eq_one_iff]
 
--- @[simp]
--- lemma function_support_probOutput : Function.support ([= · | oa]) = oa.support := by
---   simp only [Function.support, ne_eq, probOutput_eq_zero_iff, not_not, Set.setOf_mem_eq]
+alias ⟨_, one_eq_probEvent⟩ := one_eq_probEvent_iff
 
--- lemma mem_support_iff_of_evalDist_eq {oa : OracleComp spec α} {oa' : OracleComp spec' α}
---     (h : evalDist oa = evalDist oa') (x : α) : x ∈ oa.support ↔ x ∈ oa'.support := by
---   simp only [mem_support_iff_probOutput_ne_zero, probOutput_def, h]
+@[simp]
+lemma probEvent_eq_one_iff' [HasEvalFinset m] [DecidableEq α] :
+    Pr[p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
+  simp_rw [probEvent_eq_one_iff, mem_finSupport_iff_mem_support]
 
--- lemma mem_finSupport_iff_of_evalDist_eq [spec.DecidableEq] [spec'.DecidableEq]
---     [DecidableEq α] {oa : OracleComp spec α} {oa' : OracleComp spec' α}
---     (h : evalDist oa = evalDist oa') (x : α) : x ∈ oa.finSupport ↔ x ∈ oa'.finSupport := by
---   simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
+alias ⟨_, probEvent_eq_one'⟩ := probEvent_eq_one_iff'
+
+@[simp]
+lemma one_eq_probEvent_iff' [HasEvalFinset m] [DecidableEq α] :
+    1 = Pr[p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
+  rw [eq_comm, probEvent_eq_one_iff']
+
+alias ⟨_, one_eq_probEvent'⟩ := one_eq_probEvent_iff'
+
+@[simp]
+lemma function_support_probOutput :
+    Function.support (Pr[= · | mx]) = support mx := by
+  simp only [Function.support, ne_eq, probOutput_eq_zero_iff, not_not, Set.setOf_mem_eq]
+
+lemma mem_support_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    x ∈ support mx ↔ x ∈ support mx' := by
+  simp only [mem_support_iff, probOutput_def, h]
+
+lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
+    [HasEvalFinset m] [HasEvalFinset n] [DecidableEq α]
+    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    x ∈ finSupport mx ↔ x ∈ finSupport mx' := by
+  simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
+
+end probEvent_mono_compl

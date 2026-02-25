@@ -82,6 +82,18 @@ lemma neverFail_map_iff [LawfulMonad m] (mx : m α) (f : α → β) :
     NeverFail (f <$> mx) ↔ NeverFail mx := by
   grind [= map_eq_bind_pure_comp]
 
+@[simp]
+lemma neverFail_seq_iff [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
+    NeverFail (mf <*> mx) ↔ NeverFail mf ∧ NeverFail mx := by
+  simp only [seq_eq_bind_map, neverFail_bind_iff, neverFail_map_iff]
+  constructor
+  · rintro ⟨hf, h⟩
+    refine ⟨hf, ?_⟩
+    have hne : (support mf).Nonempty := by
+      rw [Set.nonempty_iff_ne_empty, ne_eq, ← probFailure_eq_one_iff]; simp
+    exact h _ hne.choose_spec
+  · exact fun ⟨hf, hx⟩ => ⟨hf, fun _ _ => hx⟩
+
 end HasEvalSPMF
 
 namespace HasEvalSet
@@ -165,13 +177,13 @@ instance instSeq [LawfulMonad m] {mf : m (α → β)} {mx : m α}
 @[simp, grind .]
 instance instSeqLeft [LawfulMonad m] {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by
-  simp [seqLeft_eq]
+  simp [seqLeft_eq]; exact ⟨inferInstance, inferInstance⟩
 
 /-- If `mx` and `my` never fail, then `mx *> my` never fails. -/
 @[simp, grind .]
 instance instSeqRight [LawfulMonad m] {mx : m α} {my : m β}
     [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by
-  simp [seqRight_eq]
+  simp [seqRight_eq]; exact ⟨inferInstance, inferInstance⟩
 
 
 example [LawfulMonad m] (mx : m α) [h : NeverFail mx] : NeverFail (do

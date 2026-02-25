@@ -320,103 +320,172 @@ lemma probFailure_bind_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
 end bind
 
 
--- section bind
+section congr_mono
 
--- variable (oa : OracleComp spec α) (ob : α → OracleComp spec β)
+variable [HasEvalSPMF m]
 
--- end bind
+lemma mul_le_probEvent_bind {mx : m α} {my : α → m β}
+    {p : α → Prop} {q : β → Prop} {r r' : ℝ≥0∞}
+    (h : r ≤ Pr[p | mx]) (h' : ∀ x ∈ support mx, p x → r' ≤ Pr[q | my x]) :
+    r * r' ≤ Pr[q | mx >>= my] := by
+  have := Classical.decPred p
+  rw [probEvent_bind_eq_tsum]
+  calc r * r'
+    _ ≤ Pr[p | mx] * r' := (mul_le_mul_left h) r'
+    _ = (∑' x, if p x then Pr[= x | mx] else 0) * r' := by rw [probEvent_eq_tsum_ite]
+    _ = ∑' x, (if p x then Pr[= x | mx] else 0) * r' := ENNReal.tsum_mul_right.symm
+    _ ≤ ∑' x, Pr[= x | mx] * Pr[q | my x] := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        split_ifs with hp
+        · by_cases hx : x ∈ support mx
+          · exact mul_le_mul' le_rfl (h' x hx hp)
+          · simp [probOutput_eq_zero_of_not_mem_support hx]
+        · simp [zero_mul]
 
--- section mul_le_probEvent_bind
+lemma probFailure_bind_congr (mx : m α)
+    {my : α → m β} {oc : α → m γ}
+    (h : ∀ x ∈ support mx, Pr[⊥ | my x] = Pr[⊥ | oc x]) :
+    Pr[⊥ | mx >>= my] = Pr[⊥ | mx >>= oc] := by
+  simp only [probFailure_bind_eq_add_tsum]
+  congr 1
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma mul_le_probEvent_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
---     {p : α → Prop} {q : β → Prop} {r r' : ℝ≥0∞}
---     (h : r ≤ [p | oa]) (h' : ∀ x ∈ oa.support, p x → r' ≤ [q | ob x]) :
---     r * r' ≤ [q | oa >>= ob] := by
---   rw [probEvent_bind_eq_tsum]
---   refine (mul_le_mul_right' h r').trans ?_
---   rw [probEvent_eq_tsum_indicator, ← ENNReal.tsum_mul_right]
---   refine ENNReal.tsum_le_tsum fun x => ?_
---   rw [← Set.indicator_mul_const]
---   by_cases hx : x ∈ oa.support
---   · refine Set.indicator_apply_le' (fun h => ?_) (fun _ => zero_le')
---     exact (ENNReal.mul_le_mul_left (probOutput_ne_zero _ _ hx) probOutput_ne_top).mpr (h' x hx h)
---   · simp [probOutput_eq_zero _ _ hx]
+lemma probFailure_bind_congr' (mx : m α)
+    {my : α → m β} {oc : α → m γ}
+    (h : ∀ x, Pr[⊥ | my x] = Pr[⊥ | oc x]) :
+    Pr[⊥ | mx >>= my] = Pr[⊥ | mx >>= oc] :=
+  probFailure_bind_congr mx fun x _ => h x
 
--- end mul_le_probEvent_bind
+lemma probOutput_bind_congr {mx : m α} {ob₁ ob₂ : α → m β} {y : β}
+    (h : ∀ x ∈ support mx, Pr[= y | ob₁ x] = Pr[= y | ob₂ x]) :
+    Pr[= y | mx >>= ob₁] = Pr[= y | mx >>= ob₂] := by
+  simp only [probOutput_bind_eq_tsum]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
+lemma probOutput_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β} (y : β)
+    (h : ∀ x, Pr[= y | ob₁ x] = Pr[= y | ob₂ x]) :
+    Pr[= y | mx >>= ob₁] = Pr[= y | mx >>= ob₂] :=
+  probOutput_bind_congr fun x _ => h x
 
--- lemma probFailure_bind_congr (mx : OracleComp spec α)
---     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}
---     (h : ∀ x ∈ mx.support, [⊥ | my x] = [⊥ | oc x]) : [⊥ | mx >>= my] = [⊥ | mx >>= oc] := by
---   sorry
+lemma probOutput_bind_mono {mx : m α}
+    {my : α → m β} {oc : α → m γ} {y : β} {z : γ}
+    (h : ∀ x ∈ support mx, Pr[= y | my x] ≤ Pr[= z | oc x]) :
+    Pr[= y | mx >>= my] ≤ Pr[= z | mx >>= oc] := by
+  simp only [probOutput_bind_eq_tsum]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · exact mul_le_mul' le_rfl (h x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probFailure_bind_congr' (mx : OracleComp spec α)
---     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ}
---     (h : ∀ x, [⊥ | my x] = [⊥ | oc x]) : [⊥ | mx >>= my] = [⊥ | mx >>= oc] := by
---   sorry
+lemma probEvent_bind_congr {mx : m α} {ob₁ ob₂ : α → m β} {q : β → Prop}
+    (h : ∀ x ∈ support mx, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
+    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] := by
+  simp only [probEvent_bind_eq_tsum]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr {mx : OracleComp spec α} {ob₁ ob₂ : α → OracleComp spec β} {y : β}
---     (h : ∀ x ∈ mx.support, [= y | ob₁ x] = [= y | ob₂ x]) :
---     [= y | mx >>= ob₁] = [= y | mx >>= ob₂] := by
---   sorry
+lemma probEvent_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β} (q : β → Prop)
+    (h : ∀ x, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
+    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] :=
+  probEvent_bind_congr fun x _ => h x
 
--- lemma probOutput_bind_congr' (mx : OracleComp spec α) {ob₁ ob₂ : α → OracleComp spec β} (y : β)
---     (h : ∀ x, [= y | ob₁ x] = [= y | ob₂ x]) :
---     [= y | mx >>= ob₁] = [= y | mx >>= ob₂] := by
---   sorry
+lemma probEvent_bind_mono {mx : m α} {my oc : α → m β} {q : β → Prop}
+    (h : ∀ x ∈ support mx, Pr[q | my x] ≤ Pr[q | oc x]) :
+    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] := by
+  simp only [probEvent_bind_eq_tsum]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · exact mul_le_mul' le_rfl (h x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_mono {mx : OracleComp spec α}
---     {my : α → OracleComp spec β} {oc : α → OracleComp spec γ} {y : β} {z : γ}
---     (h : ∀ x ∈ mx.support, [= y | my x] ≤ [= z | oc x]) :
---     [= y | mx >>= my] ≤ [= z | mx >>= oc] := by
---   sorry
+lemma probOutput_bind_congr_div_const {mx : m α}
+    {ob₁ ob₂ : α → m β} {y : β} {r : ℝ≥0∞}
+    (h : ∀ x ∈ support mx, Pr[= y | ob₁ x] = Pr[= y | ob₂ x] / r) :
+    Pr[= y | mx >>= ob₁] = Pr[= y | mx >>= ob₂] / r := by
+  simp only [probOutput_bind_eq_tsum, div_eq_mul_inv]
+  rw [← ENNReal.tsum_mul_right]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx, div_eq_mul_inv, mul_assoc]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr_div_const {mx : OracleComp spec α}
---     {ob₁ ob₂ : α → OracleComp spec β} {y : β} {r : ℝ≥0∞}
---     (h : ∀ x ∈ mx.support, [= y | ob₁ x] = [= y | ob₂ x] / r) :
---     [= y | mx >>= ob₁] = [= y | mx >>= ob₂] / r := by
---   sorry
+lemma probOutput_bind_congr_eq_add {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {y : β} {z₁ : γ₁} {z₂ : γ₂}
+    (h : ∀ x ∈ support mx, Pr[= y | my x] = Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x]) :
+    Pr[= y | mx >>= my] = Pr[= z₁ | mx >>= oc₁] + Pr[= z₂ | mx >>= oc₂] := by
+  simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
+  refine tsum_congr fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [h x hx, left_distrib]
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr_eq_add {γ₁ γ₂ : Type u}
---     {mx : OracleComp spec α} {my : α → OracleComp spec β}
---       {oc₁ : α → OracleComp spec γ₁} {oc₂ : α → OracleComp spec γ₂}
---     {y : β} {z₁ : γ₁} {z₂ : γ₂}
---     (h : ∀ x ∈ mx.support, [= y | my x] = [= z₁ | oc₁ x] + [= z₂ | oc₂ x]) :
---     [= y | mx >>= my] = [= z₁ | mx >>= oc₁] + [= z₂ | mx >>= oc₂] := by
---   simp [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
---   refine tsum_congr fun x => ?_
---   by_cases hx : x ∈ mx.support
---   · simp [h x hx, left_distrib]
---   · simp [probOutput_eq_zero _ _ hx]
+lemma probOutput_bind_congr_le_add {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {y : β} {z₁ : γ₁} {z₂ : γ₂}
+    (h : ∀ x ∈ support mx, Pr[= y | my x] ≤ Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x]) :
+    Pr[= y | mx >>= my] ≤ Pr[= z₁ | mx >>= oc₁] + Pr[= z₂ | mx >>= oc₂] := by
+  simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · calc Pr[= x | mx] * Pr[= y | my x]
+      _ ≤ Pr[= x | mx] * (Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x]) := mul_le_mul' le_rfl (h x hx)
+      _ = Pr[= x | mx] * Pr[= z₁ | oc₁ x] + Pr[= x | mx] * Pr[= z₂ | oc₂ x] := left_distrib ..
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr_le_add {γ₁ γ₂ : Type u}
---     {mx : OracleComp spec α} {my : α → OracleComp spec β}
---       {oc₁ : α → OracleComp spec γ₁} {oc₂ : α → OracleComp spec γ₂}
---     {y : β} {z₁ : γ₁} {z₂ : γ₂}
---     (h : ∀ x ∈ mx.support, [= y | my x] ≤ [= z₁ | oc₁ x] + [= z₂ | oc₂ x]) :
---     [= y | mx >>= my] ≤ [= z₁ | mx >>= oc₁] + [= z₂ | mx >>= oc₂] := by
---   sorry
+lemma probOutput_bind_congr_add_le {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {y : β} {z₁ : γ₁} {z₂ : γ₂}
+    (h : ∀ x ∈ support mx, Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x] ≤ Pr[= y | my x]) :
+    Pr[= z₁ | mx >>= oc₁] + Pr[= z₂ | mx >>= oc₂] ≤ Pr[= y | mx >>= my] := by
+  simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · calc Pr[= x | mx] * Pr[= z₁ | oc₁ x] + Pr[= x | mx] * Pr[= z₂ | oc₂ x]
+      _ = Pr[= x | mx] * (Pr[= z₁ | oc₁ x] + Pr[= z₂ | oc₂ x]) := (left_distrib ..).symm
+      _ ≤ Pr[= x | mx] * Pr[= y | my x] := mul_le_mul' le_rfl (h x hx)
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr_add_le {γ₁ γ₂ : Type u}
---     {mx : OracleComp spec α} {my : α → OracleComp spec β}
---       {oc₁ : α → OracleComp spec γ₁} {oc₂ : α → OracleComp spec γ₂}
---     {y : β} {z₁ : γ₁} {z₂ : γ₂}
---     (h : ∀ x ∈ mx.support, [= z₁ | oc₁ x] + [= z₂ | oc₂ x] ≤ [= y | my x]) :
---     [= z₁ | mx >>= oc₁] + [= z₂ | mx >>= oc₂] ≤ [= y | mx >>= my] := by
---   sorry
+lemma probOutput_bind_congr_le_sub {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {y : β} {z₁ : γ₁} {z₂ : γ₂}
+    (h : ∀ x ∈ support mx, Pr[= y | my x] ≤ Pr[= z₁ | oc₁ x] - Pr[= z₂ | oc₂ x])
+    (h' : ∀ x ∈ support mx, Pr[= z₂ | oc₂ x] ≤ Pr[= z₁ | oc₁ x]) :
+    Pr[= y | mx >>= my] ≤ Pr[= z₁ | mx >>= oc₁] - Pr[= z₂ | mx >>= oc₂] := by
+  have hadd : Pr[= y | mx >>= my] + Pr[= z₂ | mx >>= oc₂] ≤ Pr[= z₁ | mx >>= oc₁] := by
+    simp only [probOutput_bind_eq_tsum, ← ENNReal.tsum_add]
+    refine ENNReal.tsum_le_tsum fun x => ?_
+    by_cases hx : x ∈ support mx
+    · rw [← left_distrib]
+      exact mul_le_mul' le_rfl
+        ((add_le_add (h x hx) le_rfl).trans_eq (tsub_add_cancel_of_le (h' x hx)))
+    · simp [probOutput_eq_zero_of_not_mem_support hx]
+  exact (ENNReal.cancel_of_ne probOutput_ne_top).le_tsub_of_add_le_right hadd
 
--- lemma probOutput_bind_congr_le_sub {γ₁ γ₂ : Type u}
---     {mx : OracleComp spec α} {my : α → OracleComp spec β}
---       {oc₁ : α → OracleComp spec γ₁} {oc₂ : α → OracleComp spec γ₂}
---     {y : β} {z₁ : γ₁} {z₂ : γ₂}
---     (h : ∀ x ∈ mx.support, [= y | my x] ≤ [= z₁ | oc₁ x] - [= z₂ | oc₂ x]) :
---     [= y | mx >>= my] ≤ [= z₁ | mx >>= oc₁] - [= z₂ | mx >>= oc₂] := by
---   sorry
+lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
+    {mx : m α} {my : α → m β}
+      {oc₁ : α → m γ₁} {oc₂ : α → m γ₂}
+    {y : β} {z₁ : γ₁} {z₂ : γ₂}
+    (h : ∀ x ∈ support mx, Pr[= z₁ | oc₁ x] - Pr[= z₂ | oc₂ x] ≤ Pr[= y | my x]) :
+    Pr[= z₁ | mx >>= oc₁] - Pr[= z₂ | mx >>= oc₂] ≤ Pr[= y | mx >>= my] := by
+  simp only [probOutput_bind_eq_tsum]
+  rw [tsub_le_iff_right, ← ENNReal.tsum_add]
+  refine ENNReal.tsum_le_tsum fun x => ?_
+  by_cases hx : x ∈ support mx
+  · rw [← left_distrib]
+    exact mul_le_mul' le_rfl (tsub_le_iff_right.mp (h x hx))
+  · simp [probOutput_eq_zero_of_not_mem_support hx]
 
--- lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
---     {mx : OracleComp spec α} {my : α → OracleComp spec β}
---       {oc₁ : α → OracleComp spec γ₁} {oc₂ : α → OracleComp spec γ₂}
---     {y : β} {z₁ : γ₁} {z₂ : γ₂}
---     (h : ∀ x ∈ mx.support, [= z₁ | oc₁ x] - [= z₂ | oc₂ x] ≤ [= y | my x]) :
---     [= z₁ | mx >>= oc₁] - [= z₂ | mx >>= oc₂] ≤ [= y | mx >>= my] := by
---   sorry
+end congr_mono

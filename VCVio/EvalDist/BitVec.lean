@@ -24,7 +24,14 @@ lemma probOutput_ofFin_map {n : ℕ} (mx : m (Fin (2 ^ n))) (x : BitVec n) :
 lemma probOutput_bitVec_toFin_map {n : ℕ} (mx : m (BitVec n)) (x : Fin (2 ^ n)) :
     Pr[= x | toFin <$> mx] = Pr[= ofFin x | mx] := by aesop
 
--- /-- Choose a random bit-vector by converting a random number in number between `0` and `2 ^ n`-/
+lemma probOutput_xor_map {n : ℕ} (mx : m (BitVec n)) (x y : BitVec n) :
+    Pr[= y | (x ^^^ ·) <$> mx] = Pr[= x ^^^ y | mx] := by
+  have hinj : Function.Injective (x ^^^ ·) := fun a b h => by
+    have := congrArg (x ^^^ ·) h; simp at this; exact this
+  conv_lhs => rw [show y = x ^^^ (x ^^^ y) by simp]
+  exact probOutput_map_injective mx hinj (x ^^^ y)
+
+/-- Choose a random bit-vector by converting a random number in number between `0` and `2 ^ n`-/
 instance (n : ℕ) : SampleableType (BitVec n) where
   selectElem := ofFin <$> ($ᵗ Fin (2 ^ n))
   mem_support_selectElem x := by aesop
