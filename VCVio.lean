@@ -56,6 +56,7 @@ import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.ReaderT
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.PreservesInv
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
