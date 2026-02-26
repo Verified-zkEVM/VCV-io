@@ -37,7 +37,22 @@ lemma one_sub_one_sub_mul_one_sub {x y : ℝ≥0∞} (hx : x ≤ 1) (hy : y ≤ 
   linarith
   all_goals try aesop
 
+lemma list_prod_natCast_ne_top {ι : Type*} (f : ι → ℕ) (js : List ι) :
+    (js.map (fun j => (f j : ℝ≥0∞))).prod ≠ ⊤ := by
+  have h : (js.map (fun j => (f j : ℝ≥0∞))).prod = ↑((js.map f).prod) := by
+    induction js with
+    | nil => simp
+    | cons j js ih => simp [ih, Nat.cast_mul]
+  rw [h]; exact natCast_ne_top _
+
 end ENNReal
+
+@[simp]
+lemma List.prod_map_const {α M : Type*} [CommMonoid M] (xs : List α) (c : M) :
+    (xs.map (fun _ => c)).prod = c ^ xs.length := by
+  induction xs with
+  | nil => simp
+  | cons _ _ ih => simp only [List.map_cons, List.prod_cons, ih, List.length_cons, pow_succ, mul_comm]
 
 section sum_thing
 

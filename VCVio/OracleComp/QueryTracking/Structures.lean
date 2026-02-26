@@ -244,6 +244,34 @@ lemma prependValues_nil (seed : QuerySeed spec) (i : ι) :
     seed.prependValues (i := i) ([] : List (spec.Range i)) = seed := by
   simp [prependValues]
 
+lemma prependValues_take_drop (seed : QuerySeed spec) (i : ι) (n : ℕ) :
+    QuerySeed.prependValues (Function.update seed i ((seed i).drop n))
+      ((seed i).take n : List (spec.Range i)) = seed := by
+  ext j
+  by_cases hj : j = i
+  · subst hj; simp [prependValues, List.take_append_drop]
+  · simp [prependValues, Function.update_of_ne hj]
+
+lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
+    {i : ι} (xs : List (spec.Range i)) {n : ℕ} (hlen : xs.length = n)
+    (h : rest.prependValues xs = seed) :
+    xs = (seed i).take n ∧ rest = Function.update seed i ((seed i).drop n) := by
+  have hi : xs ++ rest i = seed i := by
+    have := congrArg (· i) h; simp [prependValues] at this; exact this
+  constructor
+  · calc xs = (xs ++ rest i).take xs.length := by simp
+      _ = (seed i).take n := by rw [hi, hlen]
+  · funext j
+    by_cases hj : j = i
+    · cases hj
+      simp only [Function.update_self]
+      have : rest i = (xs ++ rest i).drop xs.length := by simp
+      rw [this, hi, hlen]
+    · have hj' : rest j = seed j := by
+        have := congrArg (· j) h; simp [prependValues, Function.update_of_ne hj] at this
+        exact this
+      simp [Function.update_of_ne hj, hj']
+
 abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
     QuerySeed spec :=
   seed.addValues [u]

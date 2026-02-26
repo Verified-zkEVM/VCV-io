@@ -633,6 +633,20 @@ lemma sum_probOutput_eq_one [Fintype α] (mx : m α) : ∑ x : α, Pr[= x | mx] 
 lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α] (mx : m α) :
     ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 := by simp
 
+lemma probOutput_eq_inv_finSupport_card [HasEvalFinset m] [DecidableEq α]
+    {mx : m α} {c : ENNReal}
+    (hconst : ∀ x ∈ support mx, Pr[= x | mx] = c) :
+    c = 1 / (finSupport mx).card := by
+  have hconst' : ∀ x ∈ finSupport mx, Pr[= x | mx] = c :=
+    fun x hx => hconst x (mem_support_of_mem_finSupport hx)
+  have hcard_mul : ((finSupport mx).card : ENNReal) * c = 1 := by
+    have h := sum_finSupport_probOutput_eq_one mx
+    rwa [show ∑ x ∈ finSupport mx, Pr[= x | mx] = ∑ x ∈ finSupport mx, c from
+      Finset.sum_congr rfl fun x hx => hconst' x hx, Finset.sum_const, nsmul_eq_mul] at h
+  have : c * ((finSupport mx).card : ENNReal) = 1 := by rwa [mul_comm] at hcard_mul
+  calc c = ((finSupport mx).card : ENNReal)⁻¹ := ENNReal.eq_inv_of_mul_eq_one_left this
+    _ = 1 / (finSupport mx).card := by rw [one_div]
+
 end HasEvalPMF
 
 section probEvent_mono_compl

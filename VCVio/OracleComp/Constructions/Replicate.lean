@@ -6,6 +6,7 @@ Authors: Devon Tuma
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
 import VCVio.EvalDist.List
+import VCVio.OracleComp.Constructions.SampleableType
 import Init.Data.Vector.Lemmas
 
 /-!
@@ -118,5 +119,13 @@ lemma mem_finSupport_replicate [spec.DecidableEq] [DecidableEq α]
     (xs : List α) : xs ∈ finSupport (oa.replicate n) ↔
       xs.length = n ∧ ∀ x ∈ xs, x ∈ finSupport oa := by
   simp [mem_finSupport_iff_mem_support]
+
+lemma probOutput_replicate_uniformSample {α : Type} [Fintype α] [SampleableType α]
+    {n : ℕ} {xs : List α} (hlen : xs.length = n) :
+    Pr[= xs | replicate n ($ᵗ α)] = (↑(Fintype.card α ^ n) : ENNReal)⁻¹ := by
+  simp only [probOutput_replicate, hlen, ite_true, probOutput_uniformSample]
+  rw [List.prod_map_const, hlen]
+  simpa [Nat.cast_pow] using
+    (ENNReal.inv_pow (a := (Fintype.card α : ENNReal)) (n := n)).symm
 
 end OracleComp
