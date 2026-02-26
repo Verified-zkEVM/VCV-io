@@ -36,6 +36,23 @@ def PreservesInv {ι : Type} {spec : OracleSpec ι} {σ : Type}
     (impl : QueryImpl spec (StateT σ ProbComp)) (Inv : σ → Prop) : Prop :=
   ∀ t σ0, Inv σ0 → ∀ z ∈ support ((impl t).run σ0), Inv z.2
 
+lemma PreservesInv.trivial {ι : Type} {spec : OracleSpec ι} {σ : Type}
+    (impl : QueryImpl spec (StateT σ ProbComp)) :
+    PreservesInv impl (fun _ => True) :=
+  fun _ _ _ _ _ => True.intro
+
+lemma PreservesInv.and {ι : Type} {spec : OracleSpec ι} {σ : Type}
+    {impl : QueryImpl spec (StateT σ ProbComp)} {P Q : σ → Prop}
+    (hP : PreservesInv impl P) (hQ : PreservesInv impl Q) :
+    PreservesInv impl (fun s => P s ∧ Q s) :=
+  fun t σ0 ⟨hp, hq⟩ z hz => ⟨hP t σ0 hp z hz, hQ t σ0 hq z hz⟩
+
+lemma PreservesInv.of_forall {ι : Type} {spec : OracleSpec ι} {σ : Type}
+    {impl : QueryImpl spec (StateT σ ProbComp)} {Inv : σ → Prop}
+    (h : ∀ t σ0 z, z ∈ support ((impl t).run σ0) → Inv z.2) :
+    PreservesInv impl Inv :=
+  fun t σ0 _ z hz => h t σ0 z hz
+
 end QueryImpl
 
 namespace OracleComp

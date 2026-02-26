@@ -30,11 +30,26 @@ namespace QueryCache
 
 instance : EmptyCollection (QueryCache spec) := ⟨fun _ => none⟩
 
+@[simp]
+lemma empty_apply (t : spec.Domain) : (∅ : QueryCache spec) t = none := rfl
+
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
 /-- Add a index + input pair to the cache by updating the function (wrapper around `Function.update`) -/
 def cacheQuery (t : spec.Domain) (u : spec.Range t) : QueryCache spec :=
   Function.update cache t u
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma cacheQuery_self (t : spec.Domain) (u : spec.Range t) :
+    (cache.cacheQuery t u) t = some u := by
+  simp [cacheQuery]
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
+    (cache.cacheQuery t u) t' = cache t' := by
+  simp [cacheQuery, h]
 
 end QueryCache
 

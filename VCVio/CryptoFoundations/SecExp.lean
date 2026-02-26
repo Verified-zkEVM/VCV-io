@@ -81,6 +81,27 @@ lemma ProbComp.advantage₂_eq_abs_sub_probFailure (p q : ProbComp Unit) :
     -((Pr[⊥ | p]).toReal - (Pr[⊥ | q]).toReal) from by ring]
   exact abs_neg _
 
+lemma ProbComp.advantage₂_nonneg (p q : ProbComp Unit) : 0 ≤ p.advantage₂ q :=
+  abs_nonneg _
+
+lemma ProbComp.advantage₂_triangle (p q r : ProbComp Unit) :
+    p.advantage₂ r ≤ p.advantage₂ q + q.advantage₂ r := by
+  unfold advantage₂; exact abs_sub_le _ _ _
+
+lemma ProbComp.advantage₂_le_sum_range {n : ℕ} (games : ℕ → ProbComp Unit) :
+    (games 0).advantage₂ (games n) ≤
+      ∑ i ∈ Finset.range n, (games i).advantage₂ (games (i + 1)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    calc (games 0).advantage₂ (games (n + 1))
+      _ ≤ (games 0).advantage₂ (games n) + (games n).advantage₂ (games (n + 1)) :=
+          advantage₂_triangle _ _ _
+      _ ≤ (∑ i ∈ Finset.range n, (games i).advantage₂ (games (i + 1))) +
+          (games n).advantage₂ (games (n + 1)) := by gcongr
+      _ = ∑ i ∈ Finset.range (n + 1), (games i).advantage₂ (games (i + 1)) := by
+          rw [Finset.sum_range_succ]
+
 /-- A security adversary bundling a computation with a bound on the number of queries it makes,
 where the bound must be shown to satisfy `IsQueryBound`.
 We also require an explicit list of all oracles used in the computation,
