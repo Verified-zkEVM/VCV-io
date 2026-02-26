@@ -138,11 +138,10 @@ section decryptionOracle
 variable [Monad m]
 
 /-- Oracle that uses a secret key to respond to decryption requests.
-Returns `Option M` directly (the old version used `Option.getM` requiring `Alternative`).
-
-The oracle spec is `C →ₒ Option M` rather than `C →ₒ M` to avoid needing `Alternative`. -/
-def decryptionOracle (sk : SK) : QueryImpl (C →ₒ Option M) m :=
-  fun c => return encAlg.decrypt sk c
+Invalid ciphertexts cause oracle failure in `OptionT`, matching the old
+`Option.getM` behavior but without requiring `AlternativeMonad` on `m`. -/
+def decryptionOracle (sk : SK) : QueryImpl (C →ₒ M) (OptionT m) :=
+  fun c => OptionT.mk (pure (encAlg.decrypt sk c))
 
 end decryptionOracle
 
@@ -164,7 +163,11 @@ structure IND_CCA_Adversary (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) w
 The decryption oracle refuses to decrypt the challenge ciphertext.
 
 Uses `OptionT` to handle failure (the old version used `guard` + `AlternativeMonad`).
-When an oracle check fails, the `OptionT` layer produces `none`. -/
+When an oracle check fails, the `OptionT` layer produces `none`.
+
+Important semantic split:
+- forbidden query (decrypt challenge / request second challenge) => oracle failure (`none`)
+- normal decryption miss (`encAlg.decrypt sk c = none`) => successful oracle response `some none` -/
 def IND_CCA_oracleImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
     (pk : PK) (sk : SK) (b : Bool) : QueryImpl (IND_CCA_oracleSpec encAlg)
       (OptionT (StateT (Option C) (OracleComp spec))) := fun

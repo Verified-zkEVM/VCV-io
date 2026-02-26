@@ -8,92 +8,89 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardHomogeneousSpace
 /-!
 # Diffie-Hellman Assumptions
 
-This file defines the discrete log (DLog), computational Diffie-Hellman (CDH), and
-decisional Diffie-Hellman (DDH) problems over an abstract finite commutative group.
+This file defines DLog/CDH/DDH *via* the `HardHomogeneousSpace` experiments:
+- DLog = vectorization
+- CDH = parallelization
+- DDH = parallel testing
 
-The group is parameterized by a type `G` with `CommGroup`, `Fintype`, `DecidableEq`, and
-`SampleableType` instances, together with a distinguished generator `g`.
+This enforces the intended modeling choice directly at the definition level.
 
-Exponents are sampled uniformly from `Fin (Fintype.card G)`.
-
-## Connection to Hard Homogeneous Spaces
-
-These are concrete instantiations of the abstract experiments in `HardHomogeneousSpace.lean`:
-- DLog ≈ vectorization (find the "vector" between two points)
-- CDH ≈ parallelization (complete a parallelogram)
-- DDH ≈ parallel testing (distinguish real from random fourth point)
-
-TODO: formalize the `AddTorsor` instance making this reduction explicit.
+For cyclic-group instantiations, we also define an explicit
+`NondegenerateGenerator` condition to rule out degenerate choices of base element.
 -/
 
 open OracleComp OracleSpec ENNReal
 
 namespace DiffieHellman
 
-variable {G : Type} [CommGroup G] [Fintype G] [DecidableEq G] [SampleableType G]
+section HardHomogeneousModel
 
-section DLog
+variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
+  [SampleableType V] [SampleableType P]
 
-/-- A discrete log adversary: given `g` and `g^a`, outputs a candidate exponent. -/
-def DLogAdversary (G : Type) := G → G → ProbComp ℕ
+/-- DLog adversary, modeled as vectorization on a hard homogeneous space. -/
+abbrev DLogAdversary (V P : Type) := vectorizationAdversary V P
 
-/-- Discrete log experiment: the adversary wins if it recovers the exponent `a`
-from `(g, g^a)`. -/
-def dlogExp (g : G) (adversary : DLogAdversary G) : ProbComp Bool := do
-  let a ← $ᵗ Fin (Fintype.card G)
-  let h := g ^ a.val
-  let a' ← adversary g h
-  return decide (g ^ a' = h)
+/-- DLog experiment, defined as `HardHomogeneousSpace.vectorizationExp`. -/
+abbrev dlogExp [DecidableEq V] (adversary : DLogAdversary V P) : ProbComp Bool :=
+  vectorizationExp (G := V) (P := P) adversary
 
-end DLog
+/-- CDH adversary, modeled as parallelization on a hard homogeneous space. -/
+abbrev CDHAdversary (V P : Type) := parallelizationAdversary V P
 
-section CDH
+/-- CDH experiment, defined as `HardHomogeneousSpace.parallelizationExp`. -/
+abbrev cdhExp [DecidableEq P] (adversary : CDHAdversary V P) : ProbComp Bool :=
+  parallelizationExp (G := V) (P := P) adversary
 
-/-- A CDH adversary: given `(g, g^a, g^b)`, outputs a candidate for `g^(a*b)`. -/
-def CDHAdversary (G : Type) := G → G → G → ProbComp G
+/-- DDH adversary, modeled as parallel testing on a hard homogeneous space. -/
+abbrev DDHAdversary (V P : Type) := parallelTestingAdversary V P
 
-/-- CDH experiment: the adversary wins if it computes `g^(a*b)` from `(g, g^a, g^b)`. -/
-def cdhExp (g : G) (adversary : CDHAdversary G) : ProbComp Bool := do
-  let a ← $ᵗ Fin (Fintype.card G)
-  let b ← $ᵗ Fin (Fintype.card G)
-  let result ← adversary g (g ^ a.val) (g ^ b.val)
-  return decide (result = g ^ (a.val * b.val))
+/-- DDH experiment, defined as `HardHomogeneousSpace.parallelTesting_experiment`. -/
+abbrev ddhExp [DecidableEq V] (adversary : DDHAdversary V P) : ProbComp Bool :=
+  parallelTesting_experiment (G := V) (P := P) adversary
 
-end CDH
+/-- DDH advantage from the hard-homogeneous-space parallel-testing experiment. -/
+noncomputable abbrev ddhAdvantage [DecidableEq V]
+    (adversary : DDHAdversary V P) : ℝ≥0∞ :=
+  parallelTestingAdvantage (G := V) (P := P) adversary
 
-section DDH
+end HardHomogeneousModel
 
-/-- A DDH adversary: given `(g, g^a, g^b, h)`, guesses whether `h = g^(a*b)`. -/
-def DDHAdversary (G : Type) := G → G → G → G → ProbComp Bool
+section NondegenerateBase
 
-/-- DDH experiment: the adversary must distinguish `(g, g^a, g^b, g^(ab))` from
-`(g, g^a, g^b, g^c)` where `c` is uniformly random. -/
-def ddhExp (g : G) (adversary : DDHAdversary G) : ProbComp Bool := do
-  let a ← $ᵗ Fin (Fintype.card G)
-  let b ← $ᵗ Fin (Fintype.card G)
-  let bit ← $ᵗ Bool
-  let h ← if bit then
-    pure (g ^ (a.val * b.val))
-  else
-    (fun c => g ^ c.val) <$> ($ᵗ Fin (Fintype.card G))
-  let b' ← adversary g (g ^ a.val) (g ^ b.val) h
-  return (bit == b')
+variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
 
-noncomputable def ddhAdvantage (g : G) (adversary : DDHAdversary G) : ℝ≥0∞ :=
-  Pr[= true | ddhExp g adversary] - 1 / 2
+/-- A base point is nondegenerate when translating vectors from it is bijective. -/
+def NondegenerateBase (base : P) : Prop :=
+  Function.Bijective fun v : V => v +ᵥ base
 
-end DDH
+/-- In any additive torsor, every base point is nondegenerate. -/
+lemma nondegenerateBase (base : P) : NondegenerateBase (V := V) base := by
+  constructor
+  · intro v₁ v₂ h
+    simpa using congrArg (fun p => p -ᵥ base) h
+  · intro p
+    refine ⟨p -ᵥ base, ?_⟩
+    simp
+
+end NondegenerateBase
+
+section CyclicInstantiation
+
+variable {G : Type} [CommGroup G] [Fintype G]
+
+/-- In a cyclic-group style instantiation, this rules out degenerate base choices. -/
+def NondegenerateGenerator (g : G) : Prop :=
+  Function.Surjective fun a : Fin (Fintype.card G) => g ^ a.1
+
+lemma NondegenerateGenerator.ne_one [Nontrivial G] {g : G}
+    (hg : NondegenerateGenerator (G := G) g) : g ≠ 1 := by
+  intro hg1
+  rcases exists_ne (1 : G) with ⟨x, hx⟩
+  rcases hg x with ⟨a, ha⟩
+  have h1x : (1 : G) = x := by simpa [hg1] using ha
+  exact hx h1x.symm
+
+end CyclicInstantiation
 
 end DiffieHellman
-
-/-! ## Old commented code (for reference)
-
--- namespace DiffieHellman
---
--- def DHVec (p : ℕ) [Fact (Nat.Prime (p + 1))] : Type := { x : ZMod (p + 1) // x ≠ 0 }
--- ...
--- (the old approach tried to build AddGroup/HomogenousSpace instances on ZMod units
--- directly, but was mathematically incomplete with many sorry's)
---
--- end DiffieHellman
--/

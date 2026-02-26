@@ -84,13 +84,19 @@ lemma probOutput_seq_map_prod_map_eq_mul [DecidableEq γ] [DecidableEq δ]
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     Pr[= z | (fun a b => (f a, g b)) <$> mx <*> my] =
       Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  sorry
+  rcases z with ⟨x, y⟩
+  have hseq : (fun a b => (f a, g b)) <$> mx <*> my =
+      Prod.mk <$> (f <$> mx) <*> (g <$> my) := by
+    simp [seq_eq_bind_map, Functor.map_map]
+  rw [hseq]
+  exact probOutput_seq_map_prod_mk_eq_mul (f <$> mx) (g <$> my) x y
 
 lemma probOutput_bind_bind_prod_mk_eq_mul [DecidableEq γ] [DecidableEq δ]
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     Pr[= z | do let x ← mx; let y ← my; return (f x, g y)] =
       Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
-  sorry
+  simpa [seq_eq_bind_map] using
+    probOutput_seq_map_prod_map_eq_mul mx my f g z
 
 @[simp]
 lemma probOutput_bind_bind_prod_mk_eq_mul' [DecidableEq γ] [DecidableEq δ]
