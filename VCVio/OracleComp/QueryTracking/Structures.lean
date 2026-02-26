@@ -33,9 +33,72 @@ instance : EmptyCollection (QueryCache spec) := ⟨fun _ => none⟩
 @[simp]
 lemma empty_apply (t : spec.Domain) : (∅ : QueryCache spec) t = none := rfl
 
+@[ext]
+protected lemma ext {c₁ c₂ : QueryCache spec} (h : ∀ t, c₁ t = c₂ t) : c₁ = c₂ :=
+  funext h
+
+/-! ### Partial Order
+
+A `QueryCache` carries a natural partial order where `c₁ ≤ c₂` means every cached entry
+in `c₁` also appears (with the same value) in `c₂`. The empty cache is the bottom element. -/
+
+instance : PartialOrder (QueryCache spec) where
+  le c₁ c₂ := ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u
+  le_refl _ _ _ h := h
+  le_trans _ _ _ h₁₂ h₂₃ _ _ h := h₂₃ (h₁₂ h)
+  le_antisymm a b hab hba := by
+    funext t
+    cases ha : a t with
+    | none =>
+      cases hb : b t with
+      | none => rfl
+      | some u => exact absurd (hba hb) (by simp [ha])
+    | some u => exact (hab ha).symm
+
+instance : OrderBot (QueryCache spec) where
+  bot := ∅
+  bot_le _ := by intro _ _ h; simp at h
+
+@[simp]
+lemma bot_eq_empty : (⊥ : QueryCache spec) = ∅ := rfl
+
+lemma le_def {c₁ c₂ : QueryCache spec} :
+    c₁ ≤ c₂ ↔ ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u :=
+  ⟨fun h => h, fun h => h⟩
+
+/-! ### Query membership -/
+
+/-- Check whether a query `t` has a cached response. -/
+def isCached (cache : QueryCache spec) (t : spec.Domain) : Bool :=
+  (cache t).isSome
+
+@[simp]
+lemma isCached_empty (t : spec.Domain) : isCached (∅ : QueryCache spec) t = false := rfl
+
+/-! ### Conversion to a set of query-response pairs -/
+
+/-- The set of all `(query, response)` pairs stored in the cache. -/
+def toSet (cache : QueryCache spec) : Set ((t : spec.Domain) × spec.Range t) :=
+  fun ⟨t, r⟩ => cache t = some r
+
+@[simp]
+lemma mem_toSet {cache : QueryCache spec} {t : spec.Domain} {r : spec.Range t} :
+    ⟨t, r⟩ ∈ cache.toSet ↔ cache t = some r :=
+  Iff.rfl
+
+@[simp]
+lemma toSet_empty : (∅ : QueryCache spec).toSet = ∅ := by
+  ext ⟨t, r⟩; simp
+
+lemma toSet_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) : c₁.toSet ⊆ c₂.toSet :=
+  fun ⟨_, _⟩ hx => h hx
+
+/-! ### Cache update -/
+
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
-/-- Add a index + input pair to the cache by updating the function (wrapper around `Function.update`) -/
+/-- Add an index + input pair to the cache by updating the function
+(wrapper around `Function.update`). -/
 def cacheQuery (t : spec.Domain) (u : spec.Range t) : QueryCache spec :=
   Function.update cache t u
 
@@ -50,6 +113,99 @@ omit [spec.DecidableEq] in
 lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u) t' = cache t' := by
   simp [cacheQuery, h]
+
+omit [spec.DecidableEq] in
+lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :
+    cache ≤ cache.cacheQuery t u := by
+  intro t' u' ht'
+  by_cases heq : t' = t
+  · subst heq; simp [h] at ht'
+  · rwa [cacheQuery_of_ne cache u heq]
+
+omit [spec.DecidableEq] in
+lemma cacheQuery_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) (t : spec.Domain)
+    (u : spec.Range t) : c₁.cacheQuery t u ≤ c₂.cacheQuery t u := by
+  intro t' u' ht'
+  by_cases heq : t' = t
+  · subst heq; simp only [cacheQuery_self] at ht' ⊢; exact ht'
+  · have h₁ := cacheQuery_of_ne c₁ u heq
+    have h₂ := cacheQuery_of_ne c₂ u heq
+    rw [h₁] at ht'; rw [h₂]; exact h ht'
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma isCached_cacheQuery_self (t : spec.Domain) (u : spec.Range t) :
+    (cache.cacheQuery t u).isCached t = true := by
+  simp [isCached]
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma isCached_cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
+    (cache.cacheQuery t u).isCached t' = cache.isCached t' := by
+  simp [isCached, cacheQuery_of_ne cache u h]
+
+/-! ### Sum spec projections -/
+
+section sum
+
+variable {ι₁ ι₂ : Type*} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+
+/-- Project a cache for `spec₁ + spec₂` onto `spec₁`. -/
+protected def fst (cache : QueryCache (spec₁ + spec₂)) : QueryCache spec₁ :=
+  fun t => cache (.inl t)
+
+/-- Project a cache for `spec₁ + spec₂` onto `spec₂`. -/
+protected def snd (cache : QueryCache (spec₁ + spec₂)) : QueryCache spec₂ :=
+  fun t => cache (.inr t)
+
+/-- Embed a cache for `spec₁` into one for `spec₁ + spec₂`. -/
+protected def inl (cache : QueryCache spec₁) : QueryCache (spec₁ + spec₂) :=
+  fun | .inl t => cache t | .inr _ => none
+
+/-- Embed a cache for `spec₂` into one for `spec₁ + spec₂`. -/
+protected def inr (cache : QueryCache spec₂) : QueryCache (spec₁ + spec₂) :=
+  fun | .inl _ => none | .inr t => cache t
+
+@[simp] lemma fst_apply (cache : QueryCache (spec₁ + spec₂)) (t : ι₁) :
+    cache.fst t = cache (.inl t) := rfl
+
+@[simp] lemma snd_apply (cache : QueryCache (spec₁ + spec₂)) (t : ι₂) :
+    cache.snd t = cache (.inr t) := rfl
+
+@[simp] lemma inl_apply_inl (cache : QueryCache spec₁) (t : ι₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)) (.inl t) = cache t := rfl
+
+@[simp] lemma inl_apply_inr (cache : QueryCache spec₁) (t : ι₂) :
+    (cache.inl : QueryCache (spec₁ + spec₂)) (.inr t) = none := rfl
+
+@[simp] lemma inr_apply_inl (cache : QueryCache spec₂) (t : ι₁) :
+    (cache.inr : QueryCache (spec₁ + spec₂)) (.inl t) = none := rfl
+
+@[simp] lemma inr_apply_inr (cache : QueryCache spec₂) (t : ι₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)) (.inr t) = cache t := rfl
+
+@[simp] lemma fst_inl (cache : QueryCache spec₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)).fst = cache := rfl
+
+@[simp] lemma snd_inr (cache : QueryCache spec₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)).snd = cache := rfl
+
+@[simp] lemma fst_inr (cache : QueryCache spec₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)).fst = ∅ := rfl
+
+@[simp] lemma snd_inl (cache : QueryCache spec₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)).snd = ∅ := rfl
+
+@[simp] lemma fst_empty :
+    (∅ : QueryCache (spec₁ + spec₂)).fst = (∅ : QueryCache spec₁) := rfl
+
+@[simp] lemma snd_empty :
+    (∅ : QueryCache (spec₁ + spec₂)).snd = (∅ : QueryCache spec₂) := rfl
+
+instance : Coe (QueryCache spec₁) (QueryCache (spec₁ + spec₂)) := ⟨QueryCache.inl⟩
+instance : Coe (QueryCache spec₂) (QueryCache (spec₁ + spec₂)) := ⟨QueryCache.inr⟩
+
+end sum
 
 end QueryCache
 
