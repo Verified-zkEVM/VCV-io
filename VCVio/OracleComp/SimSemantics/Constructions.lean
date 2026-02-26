@@ -32,6 +32,7 @@ def compose (so' : QueryImpl spec' m) (so : QueryImpl spec (OracleComp spec')) :
 
 infixl : 65 " ∘ₛ " => QueryImpl.compose
 
+omit [LawfulMonad m] in
 @[simp]
 lemma apply_compose (so' : QueryImpl spec' m) (so : QueryImpl spec (OracleComp spec'))
     (t : spec.Domain) : (so' ∘ₛ so) t = simulateQ so' (so t) := rfl
