@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.CryptoFoundations.SigmaAlg
 import VCVio.CryptoFoundations.SignatureAlg
+import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.Coercions.Add
 
@@ -15,33 +16,60 @@ This file defines a basic version of the Fiat-Shamir transform on sigma protocol
 For simplicity we construct signature schemes rather than general proofs of knowledge.
 -/
 
--- universe u v
+universe u v
 
--- -- TODO
--- open OracleComp OracleSpec
+open OracleComp OracleSpec
 
--- -- variable {ι : Type} (spec : ℕ → OracleSpec ι)
--- --     (X W : ℕ → Type) (p : {n : ℕ} → X n → W n → Bool)
--- --     (PC SC Ω P M : ℕ → Type)
--- --     [Π n, Inhabited (Ω n)] [Π n, DecidableEq (Ω n)]
--- --     [Π n, Fintype (Ω n)] [Π n, SampleableType (Ω n)]
--- --     [Π n, DecidableEq (PC n)] [Π n, DecidableEq (M n)]
--- --     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
--- --     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
+variable {X W PC SC Ω P : Type}
+    {p : X → W → Bool} [SampleableType X] [SampleableType W]
+    [DecidableEq PC] [DecidableEq Ω] [SampleableType Ω]
 
+/-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
+signature scheme. The signing algorithm commits, queries the random oracle on (message,
+commitment), and then responds to the challenge.
 
--- section genrel
+API changes from old version:
+- `unifSpec ++ₒ` → `unifSpec +`
+- `query (spec := ...) () (m, c)` → `query (spec := ...) (Sum.inr (m, c))`
+- `idOracle ++ₛₒ randomOracle` → explicit `QueryImpl.ofLift ... .liftTarget ... + randomOracle` -/
+def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
+    (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
+    SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
+      (M := M) (PK := X) (SK := W) (S := PC × P) where
+  keygen := hr.gen
+  sign := fun pk sk m => do
+    let (c, e) ← sigmaAlg.commit pk sk
+    let r ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
+    let s ← sigmaAlg.respond pk sk e r
+    return (c, s)
+  verify := fun pk m (c, s) => do
+    let r' ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
+    return sigmaAlg.verify pk c r' s
+  exec comp :=
+    let ro : QueryImpl (M × PC →ₒ Ω)
+      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
+    StateT.run' (simulateQ (idImpl + ro) comp) ∅
+  lift_probComp := monadLift
+  exec_lift_probComp c := by sorry
 
--- variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type v} {σ X W : Type}
---     {p : X → W → Bool} {PC SC Ω P : Type} [Monad m]
---     [SampleableType X] [SampleableType W] (M : Type)
+namespace FiatShamir
 
+-- TODO: prove properties of the Fiat-Shamir transform
 
--- -- /-- Given a Σ-protocol we get a signature algorithm by using a random oracle to generate
--- -- challenge values for the Σ-protocol, including the message in the hash input. -/
--- -- def FiatShamirTransform (sigmaAlg : SigmaAlg spec σ X W p PC SC Ω P)
--- --     (M : Type) :
--- --     SignatureAlg spec σ M X W (PC × P) := sorry
+end FiatShamir
+
+/-! ## Old commented code (for reference)
+
+-- variable {ι : Type} (spec : ℕ → OracleSpec ι)
+--     (X W : ℕ → Type) (p : {n : ℕ} → X n → W n → Bool)
+--     (PC SC Ω P M : ℕ → Type)
+--     [Π n, Inhabited (Ω n)] [Π n, DecidableEq (Ω n)]
+--     [Π n, Fintype (Ω n)] [Π n, SampleableType (Ω n)]
+--     [Π n, DecidableEq (PC n)] [Π n, DecidableEq (M n)]
+--     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
+--     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
 
 -- structure GenerableRelation
 --     (X W : Type) (r : X → W → Bool)
@@ -50,36 +78,4 @@ For simplicity we construct signature schemes rather than general proofs of know
 --   gen_sound (x : X) (w : W) : (x, w) ∈ gen.support → r x w
 --   gen_uniform_right (x : X) : [= x | Prod.fst <$> gen] = [= x | $ᵗ X]
 --   gen_uniform_left (w : W) : [= w | Prod.snd <$> gen] = [= w | $ᵗ W]
-
--- end genrel
-
--- variable {ι : Type} {spec : OracleSpec ι} {σ X W PC SC Ω P : Type}
---     {p : X → W → Bool} [SampleableType X] [SampleableType W]
---     [DecidableEq PC] [DecidableEq Ω] [SampleableType Ω]
-
--- def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
---     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
---     SignatureAlg (OracleComp (unifSpec ++ₒ (M × PC →ₒ Ω)))
---       (M := M) (PK := X) (SK := W) (S := PC × P) where
---   keygen := hr.gen
---   sign := fun pk sk m => do
---     let (c, e) ← sigmaAlg.commit pk sk
---     let r ← query (spec := (M × PC →ₒ Ω)) () (m, c)
---     let s ← sigmaAlg.respond pk sk e r
---     return (c, s)
---   verify := fun pk m (c, s) => do
---     let r' ← query (spec := (M × PC →ₒ Ω)) () (m, c)
---     return sigmaAlg.verify pk c r' s
---   exec comp :=
---     let so : QueryImpl (unifSpec ++ₒ (M × PC →ₒ Ω))
---       (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) :=
---       idOracle ++ₛₒ randomOracle
---     StateT.run' (simulateQ so comp) ∅
---   lift_probComp := monadLift
---   exec_lift_probComp c := by sorry --simp
-
--- namespace FiatShamir
-
--- -- TODO
-
--- end FiatShamir
+-/
