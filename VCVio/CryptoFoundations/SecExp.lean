@@ -6,6 +6,7 @@ Authors: Devon Tuma
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
+import VCVio.EvalDist.TVDist
 
 /-!
 # Security Experiments
@@ -101,6 +102,11 @@ lemma ProbComp.advantage₂_le_sum_range {n : ℕ} (games : ℕ → ProbComp Uni
           (games n).advantage₂ (games (n + 1)) := by gcongr
       _ = ∑ i ∈ Finset.range (n + 1), (games i).advantage₂ (games (i + 1)) := by
           rw [Finset.sum_range_succ]
+
+lemma ProbComp.advantage₂_eq_tvDist (p q : ProbComp Unit) :
+    p.advantage₂ q = tvDist p q := by
+  simp only [advantage₂, tvDist, SPMF.tvDist, PMF.tvDist_option_punit]
+  rfl
 
 /-- A security adversary bundling a computation with a bound on the number of queries it makes,
 where the bound must be shown to satisfy `IsQueryBound`.

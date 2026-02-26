@@ -31,3 +31,4 @@ import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.FinRatPMF
+import ToMathlib.ProbabilityTheory.TotalVariation
