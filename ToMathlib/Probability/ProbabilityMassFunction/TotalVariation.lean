@@ -3,7 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Probability.ProbabilityMassFunction.Basic
+import Mathlib.Probability.ProbabilityMassFunction.Monad
+import ToMathlib.Data.ENNReal.AbsDiff
 
 /-!
 # Total Variation Distance for PMFs
@@ -16,7 +17,6 @@ an `ℝ`-valued version (`tvDist`), connected by `tvDist = etvDist.toReal`.
 
 ## Main definitions
 
-- `ENNReal.absDiff a b` — symmetric absolute difference in `ℝ≥0∞`
 - `PMF.etvDist p q : ℝ≥0∞` — extended TV distance on PMFs
 - `PMF.tvDist p q : ℝ` — TV distance on PMFs
 - `PMF.instMetricSpace` — `MetricSpace` instance on `PMF α` via TV distance
@@ -28,78 +28,14 @@ an `ℝ`-valued version (`tvDist`), connected by `tvDist = etvDist.toReal`.
 - `PMF.tvDist_le_one` — TV distance is bounded by 1
 - `PMF.tvDist_eq_zero_iff` — TV distance is zero iff the PMFs are equal
 - `PMF.etvDist_option_punit` — closed form for binary distributions
+- `PMF.etvDist_map_le` / `PMF.tvDist_map_le` — data processing inequality for deterministic maps
+- `PMF.etvDist_bind_right_le` / `PMF.tvDist_bind_right_le` — data processing inequality for
+  Markov kernels (post-processing)
 -/
 
 noncomputable section
 
 open ENNReal
-
-namespace ENNReal
-
-/-- Symmetric absolute difference in `ℝ≥0∞`, defined via truncating subtraction.
-Satisfies `absDiff a b = |a.toReal - b.toReal|` when both are finite. -/
-protected def absDiff (a b : ℝ≥0∞) : ℝ≥0∞ := (a - b) + (b - a)
-
-@[simp] lemma absDiff_self (a : ℝ≥0∞) : ENNReal.absDiff a a = 0 := by
-  simp [ENNReal.absDiff]
-
-lemma absDiff_comm (a b : ℝ≥0∞) : ENNReal.absDiff a b = ENNReal.absDiff b a := by
-  simp [ENNReal.absDiff, add_comm]
-
-lemma absDiff_le_add (a b : ℝ≥0∞) : ENNReal.absDiff a b ≤ a + b :=
-  add_le_add tsub_le_self tsub_le_self
-
-private lemma tsub_le_tsub_add_tsub (a b c : ℝ≥0∞) : a - c ≤ (a - b) + (b - c) := by
-  rw [tsub_le_iff_right]
-  calc a ≤ (a - b) + b := le_tsub_add
-    _ ≤ (a - b) + ((b - c) + c) := by gcongr; exact le_tsub_add
-    _ = ((a - b) + (b - c)) + c := (add_assoc _ _ _).symm
-
-lemma absDiff_triangle (a b c : ℝ≥0∞) :
-    ENNReal.absDiff a c ≤ ENNReal.absDiff a b + ENNReal.absDiff b c := by
-  unfold ENNReal.absDiff
-  calc (a - c) + (c - a)
-      ≤ ((a - b) + (b - c)) + ((c - b) + (b - a)) :=
-        add_le_add (tsub_le_tsub_add_tsub a b c) (tsub_le_tsub_add_tsub c b a)
-    _ = ((a - b) + (b - a)) + ((b - c) + (c - b)) := by ring
-
-lemma absDiff_toReal {a b : ℝ≥0∞} (ha : a ≠ ⊤) (hb : b ≠ ⊤) :
-    (ENNReal.absDiff a b).toReal = |a.toReal - b.toReal| := by
-  rcases le_total a b with hab | hab
-  · have h1 : a - b = 0 := tsub_eq_zero_of_le hab
-    have h2 : a.toReal ≤ b.toReal := (toReal_le_toReal ha hb).mpr hab
-    simp only [ENNReal.absDiff, h1, zero_add, abs_of_nonpos (sub_nonpos.mpr h2), neg_sub]
-    exact toReal_sub_of_le hab hb
-  · have h1 : b - a = 0 := tsub_eq_zero_of_le hab
-    have h2 : b.toReal ≤ a.toReal := (toReal_le_toReal hb ha).mpr hab
-    simp only [ENNReal.absDiff, h1, add_zero, abs_of_nonneg (sub_nonneg.mpr h2)]
-    exact toReal_sub_of_le hab ha
-
-lemma absDiff_tsub_tsub {a b c : ℝ≥0∞} (ha : a ≤ c) (hb : b ≤ c) (hc : c ≠ ⊤) :
-    ENNReal.absDiff (c - a) (c - b) = ENNReal.absDiff a b := by
-  have hca_ne : c - a ≠ ⊤ := ne_top_of_le_ne_top hc tsub_le_self
-  have hcb_ne : c - b ≠ ⊤ := ne_top_of_le_ne_top hc tsub_le_self
-  rcases le_total a b with hab | hab
-  · have hcb_le_ca : c - b ≤ c - a := tsub_le_tsub_left hab c
-    simp only [ENNReal.absDiff, tsub_eq_zero_of_le hab, tsub_eq_zero_of_le hcb_le_ca, add_zero,
-      zero_add]
-    rw [show c - a = (c - b) + (b - a) from (tsub_add_tsub_cancel hb hab).symm]
-    exact ENNReal.add_sub_cancel_left hcb_ne
-  · have hca_le_cb : c - a ≤ c - b := tsub_le_tsub_left hab c
-    simp only [ENNReal.absDiff, tsub_eq_zero_of_le hab, tsub_eq_zero_of_le hca_le_cb, add_zero,
-      zero_add]
-    rw [show c - b = (c - a) + (a - b) from (tsub_add_tsub_cancel ha hab).symm]
-    exact ENNReal.add_sub_cancel_left hca_ne
-
-@[simp] lemma absDiff_eq_zero {a b : ℝ≥0∞} : ENNReal.absDiff a b = 0 ↔ a = b := by
-  constructor
-  · intro h
-    have h1 : a - b = 0 := by exact_mod_cast (add_eq_zero.mp h).1
-    have h2 : b - a = 0 := by exact_mod_cast (add_eq_zero.mp h).2
-    exact le_antisymm (tsub_eq_zero_iff_le.mp h1) (tsub_eq_zero_iff_le.mp h2)
-  · rintro rfl; exact absDiff_self _
-
-end ENNReal
 
 namespace PMF
 
@@ -174,6 +110,61 @@ lemma tvDist_le_one (p q : PMF α) : p.tvDist q ≤ 1 := by
 @[simp] lemma tvDist_eq_zero_iff {p q : PMF α} : p.tvDist q = 0 ↔ p = q := by
   rw [PMF.tvDist, ENNReal.toReal_eq_zero_iff, etvDist_eq_zero_iff]
   simp [etvDist_ne_top]
+
+/-! #### Data processing inequality -/
+
+section DataProcessing
+
+universe u₀
+variable {α' : Type u₀} {β : Type u₀}
+
+lemma map_apply_eq [DecidableEq β] (f : α' → β) (p : PMF α') (y : β) :
+    (f <$> p) y = ∑' x, if f x = y then p x else 0 := by
+  simp only [Functor.map, PMF.bind_apply]
+  congr 1; ext x; split <;> simp_all [eq_comm]
+
+lemma etvDist_map_le [DecidableEq β] (f : α' → β) (p q : PMF α') :
+    (f <$> p).etvDist (f <$> q) ≤ p.etvDist q := by
+  simp only [PMF.etvDist]
+  apply ENNReal.div_le_div_right
+  calc ∑' y, ENNReal.absDiff ((f <$> p) y) ((f <$> q) y)
+      = ∑' y, ENNReal.absDiff (∑' x, if f x = y then p x else 0)
+                               (∑' x, if f x = y then q x else 0) := by
+          congr 1; ext y; rw [map_apply_eq, map_apply_eq]
+    _ ≤ ∑' y, ∑' x, ENNReal.absDiff (if f x = y then p x else 0)
+                                      (if f x = y then q x else 0) :=
+          ENNReal.tsum_le_tsum fun y => ENNReal.absDiff_tsum_le _ _
+    _ = ∑' y, ∑' x, if f x = y then ENNReal.absDiff (p x) (q x) else 0 := by
+          congr 1; ext y; congr 1; ext x; split <;> simp
+    _ = ∑' x, ENNReal.absDiff (p x) (q x) := ENNReal.tsum_fiber f _
+
+lemma tvDist_map_le [DecidableEq β] (f : α' → β) (p q : PMF α') :
+    (f <$> p).tvDist (f <$> q) ≤ p.tvDist q := by
+  simp only [PMF.tvDist]
+  exact ENNReal.toReal_mono (etvDist_ne_top p q) (etvDist_map_le f p q)
+
+lemma etvDist_bind_right_le (f : α' → PMF β) (p q : PMF α') :
+    (p.bind f).etvDist (q.bind f) ≤ p.etvDist q := by
+  simp only [PMF.etvDist, PMF.bind_apply]
+  apply ENNReal.div_le_div_right
+  calc ∑' y, ENNReal.absDiff (∑' x, p x * (f x) y) (∑' x, q x * (f x) y)
+      ≤ ∑' y, ∑' x, ENNReal.absDiff (p x * (f x) y) (q x * (f x) y) :=
+        ENNReal.tsum_le_tsum fun y => ENNReal.absDiff_tsum_le _ _
+    _ ≤ ∑' y, ∑' x, ENNReal.absDiff (p x) (q x) * (f x) y :=
+        ENNReal.tsum_le_tsum fun y => ENNReal.tsum_le_tsum fun x =>
+          ENNReal.absDiff_mul_right_le _ _ _
+    _ = ∑' x, ∑' y, ENNReal.absDiff (p x) (q x) * (f x) y := ENNReal.tsum_comm
+    _ = ∑' x, ENNReal.absDiff (p x) (q x) * ∑' y, (f x) y := by
+        congr 1; ext x; rw [ENNReal.tsum_mul_left]
+    _ = ∑' x, ENNReal.absDiff (p x) (q x) := by
+        congr 1; ext x; rw [(f x).tsum_coe, mul_one]
+
+lemma tvDist_bind_right_le (f : α' → PMF β) (p q : PMF α') :
+    (p.bind f).tvDist (q.bind f) ≤ p.tvDist q := by
+  simp only [PMF.tvDist]
+  exact ENNReal.toReal_mono (etvDist_ne_top p q) (etvDist_bind_right_le f p q)
+
+end DataProcessing
 
 noncomputable instance instMetricSpace : MetricSpace (PMF α) where
   dist := PMF.tvDist

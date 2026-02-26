@@ -3,7 +3,7 @@ Copyright (c) 2026 VCVio Contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import ToMathlib.ProbabilityTheory.TotalVariation
+import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
 import VCVio.EvalDist.Defs.Basic
 
 /-!
@@ -41,6 +41,20 @@ lemma tvDist_le_one (p q : SPMF α) : p.tvDist q ≤ 1 := PMF.tvDist_le_one _ _
 @[simp] lemma tvDist_eq_zero_iff {p q : SPMF α} : p.tvDist q = 0 ↔ p.toPMF = q.toPMF :=
   PMF.tvDist_eq_zero_iff
 
+universe w in
+lemma tvDist_map_le {α' : Type w} {β : Type w} [DecidableEq β] (f : α' → β)
+    (p q : SPMF α') : SPMF.tvDist (f <$> p) (f <$> q) ≤ SPMF.tvDist p q := by
+  unfold SPMF.tvDist
+  rw [SPMF.toPMF_map, SPMF.toPMF_map]
+  exact PMF.tvDist_map_le (Option.map f) p.toPMF q.toPMF
+
+universe w in
+lemma tvDist_bind_right_le {α' : Type w} {β : Type w} (f : α' → SPMF β)
+    (p q : SPMF α') : SPMF.tvDist (p >>= f) (q >>= f) ≤ SPMF.tvDist p q := by
+  unfold SPMF.tvDist
+  rw [SPMF.toPMF_bind, SPMF.toPMF_bind]
+  exact PMF.tvDist_bind_right_le _ p.toPMF q.toPMF
+
 end SPMF
 
 /-! ### Monadic tvDist -/
@@ -66,6 +80,16 @@ lemma tvDist_triangle (mx my mz : m α) :
   SPMF.tvDist_triangle _ _ _
 
 lemma tvDist_le_one (mx my : m α) : tvDist mx my ≤ 1 := SPMF.tvDist_le_one _ _
+
+lemma tvDist_map_le [LawfulMonad m] {β : Type u} [DecidableEq β] (f : α → β) (mx my : m α) :
+    tvDist (f <$> mx) (f <$> my) ≤ tvDist mx my := by
+  simp only [tvDist, evalDist_def, MonadHom.mmap_map]
+  exact SPMF.tvDist_map_le f _ _
+
+lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx my : m α) :
+    tvDist (mx >>= f) (my >>= f) ≤ tvDist mx my := by
+  simp only [tvDist, evalDist_def, MonadHom.mmap_bind]
+  exact SPMF.tvDist_bind_right_le _ _ _
 
 end monadic
 

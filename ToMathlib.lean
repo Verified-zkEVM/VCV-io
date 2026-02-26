@@ -29,6 +29,7 @@ import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
+import ToMathlib.Data.ENNReal.AbsDiff
+import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.FinRatPMF
-import ToMathlib.ProbabilityTheory.TotalVariation
