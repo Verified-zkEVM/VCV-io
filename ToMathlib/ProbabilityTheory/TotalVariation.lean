@@ -34,8 +34,6 @@ noncomputable section
 
 open ENNReal
 
-/-! ## ENNReal.absDiff -/
-
 namespace ENNReal
 
 /-- Symmetric absolute difference in `ℝ≥0∞`, defined via truncating subtraction.
@@ -103,8 +101,6 @@ lemma absDiff_tsub_tsub {a b c : ℝ≥0∞} (ha : a ≤ c) (hb : b ≤ c) (hc :
 
 end ENNReal
 
-/-! ## PMF.tvDist -/
-
 namespace PMF
 
 variable {α : Type*}
@@ -118,8 +114,6 @@ protected def etvDist (p q : PMF α) : ℝ≥0∞ :=
 protected def tvDist (p q : PMF α) : ℝ := (p.etvDist q).toReal
 
 lemma tvDist_def (p q : PMF α) : p.tvDist q = (p.etvDist q).toReal := rfl
-
-/-! ### Properties of etvDist -/
 
 @[simp] lemma etvDist_self (p : PMF α) : p.etvDist p = 0 := by
   simp [PMF.etvDist]
@@ -156,8 +150,6 @@ lemma etvDist_ne_top (p q : PMF α) : p.etvDist q ≠ ⊤ :=
   exact ⟨fun h => PMF.ext fun x => (ENNReal.absDiff_eq_zero.mp (h x)),
     fun h => by subst h; simp⟩
 
-/-! ### Properties of tvDist -/
-
 @[simp] lemma tvDist_self (p : PMF α) : p.tvDist p = 0 := by
   simp [PMF.tvDist]
 
@@ -183,8 +175,6 @@ lemma tvDist_le_one (p q : PMF α) : p.tvDist q ≤ 1 := by
   rw [PMF.tvDist, ENNReal.toReal_eq_zero_iff, etvDist_eq_zero_iff]
   simp [etvDist_ne_top]
 
-/-! ### MetricSpace instance -/
-
 noncomputable instance instMetricSpace : MetricSpace (PMF α) where
   dist := PMF.tvDist
   edist := PMF.etvDist
@@ -197,8 +187,6 @@ noncomputable instance instMetricSpace : MetricSpace (PMF α) where
 @[simp] lemma dist_eq_tvDist (p q : PMF α) : dist p q = p.tvDist q := rfl
 
 @[simp] lemma edist_eq_etvDist (p q : PMF α) : edist p q = p.etvDist q := rfl
-
-/-! ### Specialization to `Option PUnit` (binary distributions) -/
 
 section OptionPUnit
 
