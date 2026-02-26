@@ -14,6 +14,7 @@ import VCVio.OracleComp.Coercions.SubSpec
 
 This file defines a function `QueryImpl.withPregen` that modifies a query implementation
 to take in a list of pre-chosen outputs to use when answering queries.
+Uses `StateT` so that consumed seed values are threaded to subsequent queries.
 
 Note that ordering is subtle, for example `so.withCaching.withPregen` will first check for seeds
 and not cache the result if one is found, while `so.withPregen.withCaching` checks the cache first,
@@ -31,42 +32,40 @@ namespace QueryImpl
 variable {m : Type u → Type v} [Monad m]
 
 /-- Modify a `QueryImpl` to check for pregenerated responses for oracle queries first.
-If a seed value is available for the query, it is used instead of calling the oracle. -/
+If a seed value is available for the query, it is used and the seed is consumed (the tail
+replaces the head). When no seed remains, falls back to the underlying implementation. -/
 def withPregen (so : QueryImpl spec m) :
-    QueryImpl spec (ReaderT (QuerySeed spec) m) :=
-  fun t => do
-    let seed ← read
+    QueryImpl spec (StateT (QuerySeed spec) m) :=
+  fun t => StateT.mk fun seed =>
     match seed t with
-    | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
-    | [] => so t
+    | u :: us => pure (u, Function.update seed t us)
+    | [] => (·, seed) <$> so t
 
 @[simp, grind =]
 lemma withPregen_apply (so : QueryImpl spec m) (t : spec.Domain) :
-    so.withPregen t = (do
-      let seed ← read
+    so.withPregen t = StateT.mk fun seed =>
       match seed t with
-      | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
-      | [] => so t) := rfl
+      | u :: us => pure (u, Function.update seed t us)
+      | [] => (·, seed) <$> so t := rfl
 
 end QueryImpl
 
 /-- Use pregenerated oracle responses for queries, falling back to the real oracle
-when the seed is exhausted. -/
+when the seed is exhausted. Seed consumption is tracked via `StateT`. -/
 def seededOracle :
-    QueryImpl spec (ReaderT (QuerySeed spec) (OracleComp spec)) :=
+    QueryImpl spec (StateT (QuerySeed spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 
 namespace seededOracle
 
 @[simp]
 lemma apply_eq (t : spec.Domain) :
-    seededOracle t = (do
-      let seed ← read
+    seededOracle t = StateT.mk fun seed =>
       match seed t with
-      | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
-      | [] => query t) := rfl
+      | u :: us => pure (u, Function.update seed t us)
+      | [] => (·, seed) <$> OracleComp.query t := rfl
 
-@[simp]
+-- @[simp] -- proof deferred; removing simp to avoid unsound rewriting
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
@@ -75,11 +74,11 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
     {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
     Pr[= y | do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      let x ← (simulateQ seededOracle oa).run seed
+      let x ← Prod.fst <$> (simulateQ seededOracle oa).run seed
       ob x] = Pr[= y | oa >>= ob] := by
   sorry
 
-@[simp]
+-- @[simp] -- proof deferred; removing simp to avoid unsound rewriting
 lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
@@ -88,8 +87,11 @@ lemma probOutput_generateSeed_bind_map_simulateQ
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
     Pr[= y | (do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      f <$> (simulateQ seededOracle oa).run seed : OracleComp spec₀ β)] =
+      f <$> Prod.fst <$> (simulateQ seededOracle oa).run seed : OracleComp spec₀ β)] =
       Pr[= y | f <$> oa] := by
-  sorry
+  -- Reduce `map` to `bind` + `pure`, then apply the `bind` lemma.
+  simpa [map_eq_bind_pure_comp, Function.comp] using
+    (probOutput_generateSeed_bind_simulateQ_bind (qc := qc) (js := js)
+      (oa := oa) (ob := fun x => pure (f x)) (y := y))
 
 end seededOracle

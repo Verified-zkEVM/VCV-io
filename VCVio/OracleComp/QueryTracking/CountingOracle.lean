@@ -28,14 +28,15 @@ namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
-/-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer. -/
+/-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer.
+Counting happens before the implementation runs, so failed queries are still counted. -/
 def withCounting [DecidableEq ι] (so : QueryImpl spec m) :
     QueryImpl spec (WriterT (QueryCount ι) m) :=
-  fun t => do let u ← so t; tell (QueryCount.single t); return u
+  fun t => do tell (QueryCount.single t); so t
 
 @[simp, grind =]
 lemma withCounting_apply [DecidableEq ι] (so : QueryImpl spec m) (t : spec.Domain) :
-    so.withCounting t = do let u ← so t; tell (QueryCount.single t); return u := rfl
+    so.withCounting t = (do tell (QueryCount.single t); so t) := rfl
 
 lemma fst_map_run_withCounting [DecidableEq ι] [LawfulMonad m]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
