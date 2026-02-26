@@ -117,27 +117,18 @@ lemma generateSeed_zero :
     exact this.symm
   exact zero_ne_one (probFailure_eq_zero (mx := generateSeed spec qc js) ▸ hf)
 
--- TODO: probOutput_generateSeed requires collapsing the bind tsums using decomposition
--- uniqueness: for each `seed` satisfying the support condition, there is exactly one
--- `(xs, rest)` pair with `xs = (seed j).take (qc j)` and
--- `rest = Function.update seed j ((seed j).drop (qc j))` such that
--- `seed = rest.prependValues xs`. The probability then factors as:
---   Pr[= xs | replicate (qc j) ($ᵗ spec.Range j)] * Pr[= rest | generateSeed spec qc js]
--- = ((Fintype.card (spec.Range j))⁻¹) ^ (qc j) * (IH)
--- yielding the claimed formula by induction.
---
--- lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
---     (h : seed ∈ support (generateSeed spec qc js)) :
---     Pr[= seed | generateSeed spec qc js] =
---       1 / (js.map (fun j => (Fintype.card (spec.Range j)) ^ qc j)).prod := by
---   sorry
+lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
+    (h : seed ∈ support (generateSeed spec qc js)) :
+    Pr[= seed | generateSeed spec qc js] =
+      (↑(js.map (fun j => (Fintype.card (spec.Range j)) ^ qc j)).prod)⁻¹ := by
+  sorry
 
--- lemma probOutput_generateSeed' [spec.FiniteRange]
---     [DecidableEq (QuerySeed spec)] (seed : QuerySeed spec)
---     (h : seed ∈ support (generateSeed spec qc js)) :
---     Pr[= seed | generateSeed spec qc js] =
---       (finSupport (generateSeed spec qc js)).card⁻¹ := by
---   sorry
+lemma probOutput_generateSeed' [spec.Fintype]
+    [DecidableEq (QuerySeed spec)] (seed : QuerySeed spec)
+    (h : seed ∈ support (generateSeed spec qc js)) :
+    Pr[= seed | generateSeed spec qc js] =
+      1 / (finSupport (generateSeed spec qc js)).card := by
+  sorry
 
 end lemmas
 

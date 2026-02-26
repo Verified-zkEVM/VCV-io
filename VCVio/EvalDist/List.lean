@@ -94,11 +94,6 @@ lemma probFailure_list_mapM (xs : List α) (f : α → m β) :
     Pr[⊥ | xs.mapM f] = 1 - (xs.map (1 - Pr[⊥ | f ·])).prod := by
   rw [mapM, probFailure_list_mapM_loop]
 
--- -- @[simp]
--- -- lemma probOutput_list_mapM_loop' {α β : Type*} [DecidableEq β] [spec.FiniteRange]
--- --     (xs : List α) (f : α → OracleComp spec β) (ys : List β)
--- --     (zs : List β) : [= zs | List.mapM.loop f xs ys] =
-
 @[simp]
 lemma probOutput_list_mapM_loop [DecidableEq β]
     (xs : List α) (f : α → m β) (ys : List β)

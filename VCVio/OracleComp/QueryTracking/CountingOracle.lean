@@ -28,50 +28,57 @@ namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
--- /-- Count the queries made by the computation using `idx` to categorize them. -/
--- def withCounting (so : QueryImpl spec m) {χ} (idx : spec.Domain → χ) :
---     QueryImpl spec (WriterT (QueryCount ι) m) :=
---   fun t => tell (QueryCount.single (idx t)) *> so t
+/-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer. -/
+def withCounting [DecidableEq ι] (so : QueryImpl spec m) :
+    QueryImpl spec (WriterT (QueryCount ι) m) :=
+  fun t => do let u ← so t; tell (QueryCount.single t); return u
 
--- @[simp] lemma withCounting_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
---     so.withCounting.impl q = tell (QueryCount.single q.index) *> ↑(so.impl q) := rfl
+@[simp, grind =]
+lemma withCounting_apply [DecidableEq ι] (so : QueryImpl spec m) (t : spec.Domain) :
+    so.withCounting t = do let u ← so t; tell (QueryCount.single t); return u := rfl
+
+lemma fst_map_run_withCounting [DecidableEq ι] [LawfulMonad m]
+    (so : QueryImpl spec m) (mx : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (so.withCounting) mx).run = simulateQ so mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa h => simp [h]
 
 end QueryImpl
 
--- /-- Oracle for counting the number of queries made by a computation. The count is stored as a
--- function from oracle indices to counts, to give finer grained information about the count. -/
--- def countingOracle (idx : spec.Domain → ι) :
---     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
---   (QueryImpl.ofLift spec (OracleComp spec)).withCounting idx
+/-- Oracle for counting the number of queries made by a computation. The count is stored as a
+function from oracle indices to counts, to give finer grained information about the count. -/
+def countingOracle [DecidableEq ι] :
+    QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
+  (QueryImpl.ofLift spec (OracleComp spec)).withCounting
 
 namespace countingOracle
 
--- @[simp]
--- protected lemma impl_apply_eq (q : OracleQuery spec α) :
---     countingOracle.impl q = (tell (QueryCount.single q.index) *> liftM q) := rfl
+variable [DecidableEq ι]
 
--- /-- `countingOracle` has no effect on the behavior of the computation itself. -/
--- @[simp]
--- lemma fst_map_run_simulateQ (oa : OracleComp spec α) :
---     Prod.fst <$> (simulateQ countingOracle oa).run = oa :=
---   fst_map_writerT_run_simulateQ (by simp) oa
+@[simp]
+lemma fst_map_run_simulateQ (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ countingOracle oa).run = oa := by
+  rw [countingOracle, QueryImpl.fst_map_run_withCounting, simulateQ_ofLift_eq_self]
 
--- @[simp]
--- lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
---     ((simulateQ countingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
---   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
+@[simp]
+lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    ((simulateQ countingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
+  rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
--- @[simp]
--- lemma probFailure_run_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) :
---     [⊥ | (simulateQ countingOracle oa).run] = [⊥ | oa] :=
---   probFailure_writerT_run_simulateQ (by simp) (by simp) oa
+@[simp]
+lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type} (oa : OracleComp spec₀ α) :
+    Pr[⊥ | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[⊥ | oa] := by
+  simp only [HasEvalPMF.probFailure_eq_zero]
 
--- @[simp]
--- lemma NeverFail_run_simulateQ_iff (oa : OracleComp spec α) :
---     NeverFail (simulateQ countingOracle oa).run ↔ NeverFail oa :=
---   NeverFail_writerT_run_simulateQ_iff (by simp) (by sorry) oa
-
--- alias ⟨_, NeverFail_simulateQ⟩ := NeverFail_run_simulateQ_iff
+@[simp]
+lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) :
+    NeverFail (simulateQ (countingOracle (spec := spec₀)) oa).run ↔ NeverFail oa := by
+  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
+    HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 -- -- lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : ι → ℕ) :
 -- --     (simulateT countingOracle oa).run qc =

@@ -24,68 +24,72 @@ open OracleComp OracleSpec
 
 universe u v w
 
-variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι] --[HasIndexing spec ι]
+variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι]
 
--- namespace QueryImpl
+namespace QueryImpl
 
--- variable {m : Type u → Type v} [Monad m]
+variable {m : Type u → Type v} [Monad m]
 
--- /-- Modify a `QueryImpl` to check for pregenerated responses for oracle queries first -/
--- def withPregen (so : QueryImpl spec m) :
---     QueryImpl spec (ReaderT (spec.QuerySeed ι) m) :=
---   fun t => do
---     let seed ← read
---     let i := HasIndexing.idx t
---     do match seed i with
---       | u :: us =>
---         let u' : spec.Range t := HasIndexing.range_idx (ι := ι) t ▸ u
---         ReaderT.adapt (fun seed => Function.update seed i us) (return u')
---       | [] => so t
+/-- Modify a `QueryImpl` to check for pregenerated responses for oracle queries first.
+If a seed value is available for the query, it is used instead of calling the oracle. -/
+def withPregen (so : QueryImpl spec m) :
+    QueryImpl spec (ReaderT (QuerySeed spec) m) :=
+  fun t => do
+    let seed ← read
+    match seed t with
+    | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
+    | [] => so t
 
--- -- @[simp] lemma withPregen_apply {α} (so : QueryImpl spec m) (q : OracleQuery spec α) :
--- --     so.withPregen.impl q = match q with | query i t => (do
--- --     let seed ← read
--- --     do match seed i with
--- --       | u :: us => ReaderT.adapt (fun seed => seed.update i us) (return u)
--- --       | [] => so.impl (query i t)) := rfl
+@[simp, grind =]
+lemma withPregen_apply (so : QueryImpl spec m) (t : spec.Domain) :
+    so.withPregen t = (do
+      let seed ← read
+      match seed t with
+      | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
+      | [] => so t) := rfl
 
--- end QueryImpl
+end QueryImpl
 
--- /-- Use pregenerated oracle responses for queries. -/
--- @[inline, reducible] def seededOracle [DecidableEq ι] :
---     QueryImpl spec (ReaderT (QuerySeed spec ι) (OracleComp spec)) :=
---   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
+/-- Use pregenerated oracle responses for queries, falling back to the real oracle
+when the seed is exhausted. -/
+def seededOracle :
+    QueryImpl spec (ReaderT (QuerySeed spec) (OracleComp spec)) :=
+  (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 
--- namespace seededOracle
+namespace seededOracle
 
--- lemma apply_eq {α} (q : OracleQuery spec α) :
---     seededOracle.impl q = match q with | query i t => (do
---       let seed ← read
---       do match seed i with
---         | u :: us => ReaderT.adapt (fun seed => seed.update i us) (return u)
---         | [] => query i t) := rfl
+@[simp]
+lemma apply_eq (t : spec.Domain) :
+    seededOracle t = (do
+      let seed ← read
+      match seed t with
+      | u :: us => ReaderT.adapt (fun seed => Function.update seed t us) (return u)
+      | [] => query t) := rfl
 
--- @[simp]
--- lemma probOutput_generateSeed_bind_simulateQ_bind {ι : Type _} {spec : OracleSpec ι}
---     {α β : Type _} [DecidableEq ι]
---     [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
---     (qc : ι → ℕ) (js : List ι)
---     (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
---     [= y | do
---       let seed ← liftComp (generateSeed spec qc js) spec
---       let x ← (simulateQ seededOracle oa).run seed
---       ob x] = [= y | oa >>= ob] := by
---   sorry
+@[simp]
+lemma probOutput_generateSeed_bind_simulateQ_bind
+    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
+    [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
+    [spec₀.Fintype] [spec₀.Inhabited]
+    (qc : ι₀ → ℕ) (js : List ι₀)
+    {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
+    Pr[= y | do
+      let seed ← liftComp (generateSeed spec₀ qc js) spec₀
+      let x ← (simulateQ seededOracle oa).run seed
+      ob x] = Pr[= y | oa >>= ob] := by
+  sorry
 
--- @[simp]
--- lemma probOutput_generateSeed_bind_map_simulateQ {ι : Type _} {spec : OracleSpec ι}
---     {α β : Type _} [DecidableEq ι]
---     [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] [spec.FiniteRange]
---     (qc : ι → ℕ) (js : List ι)
---     (oa : OracleComp spec α) (f : α → β) (y : β) :
---     [= y | do
---       let seed ← liftComp (generateSeed spec qc js) spec
---       f <$> (simulateQ seededOracle oa).run seed] = [= y | f <$> oa] := by
---   sorry
+@[simp]
+lemma probOutput_generateSeed_bind_map_simulateQ
+    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
+    [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
+    [spec₀.Fintype] [spec₀.Inhabited]
+    (qc : ι₀ → ℕ) (js : List ι₀)
+    {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
+    Pr[= y | (do
+      let seed ← liftComp (generateSeed spec₀ qc js) spec₀
+      f <$> (simulateQ seededOracle oa).run seed : OracleComp spec₀ β)] =
+      Pr[= y | f <$> oa] := by
+  sorry
 
--- end seededOracle
+end seededOracle
