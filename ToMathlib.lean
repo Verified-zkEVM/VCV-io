@@ -20,6 +20,7 @@ import ToMathlib.Control.Monad.Transformer
 import ToMathlib.Control.OptionT
 import ToMathlib.Control.StateT
 import ToMathlib.Control.WriterT
+import ToMathlib.Data.ENNReal.AbsDiff
 import ToMathlib.General
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic
@@ -29,7 +30,6 @@ import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
-import ToMathlib.Data.ENNReal.AbsDiff
 import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.FinRatPMF
