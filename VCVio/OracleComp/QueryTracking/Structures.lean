@@ -104,48 +104,27 @@ def getQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
     List ((t : spec.Domain) × spec.Range t) :=
   List.foldr (fun ⟨t, u⟩ xs => if p t then ⟨t, u⟩ :: xs else xs) [] log
 
--- -- NOTE: should this simp? feels bad to simp with ▸ and pattern matching in target
--- lemma getQ_singleton {α} (q : OracleQuery spec α) (u : α)
---     (p : spec.Domain → Prop) [DecidablePred p] :
---     getQ (singleton q u) p = match q with
---       | query j t => if h : j = i then [h ▸ (t, u)] else [] := by
---   cases q with | query i t => ?_
---   simp [getQ, singleton]
+@[simp]
+lemma getQ_nil (p : spec.Domain → Prop) [DecidablePred p] :
+    getQ ([] : QueryLog spec) p = [] := rfl
 
--- @[simp]
--- lemma getQ_singleton_self (i : ι) (t : spec.Domain i) (u : spec.Range i) :
---     getQ (singleton (query i t) u) i = [(t, u)] := by simp [getQ_singleton]
+@[simp]
+lemma getQ_cons (entry : (t : spec.Domain) × spec.Range t) (log : QueryLog spec)
+    (p : spec.Domain → Prop) [DecidablePred p] :
+    getQ (entry :: log) p = if p entry.1 then entry :: getQ log p else getQ log p := rfl
 
--- lemma getQ_singleton_of_ne {α} {q : OracleQuery spec α} {u : α} {i : ι}
---     (h : q.index ≠ i) : getQ (singleton q u) i = [] := by
---   cases q with | query i t => simpa [getQ_singleton] using h
+@[simp]
+lemma getQ_singleton (t : spec.Domain) (u : spec.Range t)
+    (p : spec.Domain → Prop) [DecidablePred p] :
+    getQ (singleton t u) p = if p t then [⟨t, u⟩] else [] := by
+  simp [singleton, getQ]
 
--- @[simp]
--- lemma getQ_cons (log : QueryLog spec) (q : (i : ι) × spec.Domain i × spec.Range i) (i : ι) :
---     getQ (q :: log) i =
---       if h : q.1 = i then h ▸ (q.2.1, q.2.2) :: getQ log i else getQ log i := by
---   simp [getQ]
-
--- @[simp]
--- lemma getQ_append (log log' : QueryLog spec) (i : ι) :
---     (log ++ log').getQ i = log.getQ i ++ log'.getQ i := by
---   induction log with
---   | nil => rfl
---   | cons hd tl ih =>
---     induction log' with
---     | nil => simp [getQ]
---     | cons hd' tl' ih' =>
---       simp
---       split_ifs with hi₁ <;> simp [ih, ih', hi₁]
---       · split_ifs; simp
---       · simpa
---       · split_ifs; simp
---       · simpa
-
--- @[simp]
--- lemma getQ_logQuery {α} (log : QueryLog spec) (q : OracleQuery spec α) (u : α)
---     (i : ι) : (log.logQuery q u).getQ i = log.getQ i ++ (singleton q u).getQ i := by
---   rw [logQuery, getQ_append]
+@[simp]
+lemma getQ_append (log log' : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
+    (log ++ log').getQ p = log.getQ p ++ log'.getQ p := by
+  induction log with
+  | nil => rfl
+  | cons hd tl ih => simp [ih]; split_ifs <;> simp
 
 end getQ
 
@@ -157,24 +136,16 @@ section countQ
 def countQ (log : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] : ℕ :=
   (log.getQ p).length
 
--- @[simp]
--- lemma countQ_singleton {α} (q : OracleQuery spec α) (u : α) (i : ι) :
---     countQ (singleton q u) i = if q.index = i then 1 else 0 := by
---   cases q with | query i t => ?_
---   simp only [countQ, getQ_singleton, OracleQuery.index_query]
---   split_ifs with hi <;> rfl
+@[simp]
+lemma countQ_singleton (t : spec.Domain) (u : spec.Range t)
+    (p : spec.Domain → Prop) [DecidablePred p] :
+    countQ (singleton t u) p = if p t then 1 else 0 := by
+  simp [countQ]; split_ifs <;> rfl
 
--- lemma countQ_singleton_self (i : ι) (t : spec.Domain i) (u : spec.Range i) :
---     countQ (singleton (query i t) u) i = 1 := by simp
-
--- @[simp]
--- lemma countQ_append (log log' : QueryLog spec) (i : ι) :
---     (log ++ log').countQ i = log.countQ i + log'.countQ i := by simp [countQ]
-
--- @[simp]
--- lemma countQ_logQuery {α} (log : QueryLog spec) (q : OracleQuery spec α) (u : α)
---     (i : ι) : (log.logQuery q u).countQ i = log.countQ i + if q.index = i then 1 else 0 := by
---   rw [logQuery, countQ_append, countQ_singleton]
+@[simp]
+lemma countQ_append (log log' : QueryLog spec) (p : spec.Domain → Prop) [DecidablePred p] :
+    (log ++ log').countQ p = log.countQ p + log'.countQ p := by
+  simp [countQ, List.length_append]
 
 end countQ
 
@@ -272,6 +243,34 @@ lemma prependValues_of_ne (seed : QuerySeed spec) {i : ι} (us : List (spec.Rang
 lemma prependValues_nil (seed : QuerySeed spec) (i : ι) :
     seed.prependValues (i := i) ([] : List (spec.Range i)) = seed := by
   simp [prependValues]
+
+lemma prependValues_take_drop (seed : QuerySeed spec) (i : ι) (n : ℕ) :
+    QuerySeed.prependValues (Function.update seed i ((seed i).drop n))
+      ((seed i).take n : List (spec.Range i)) = seed := by
+  ext j
+  by_cases hj : j = i
+  · subst hj; simp [prependValues, List.take_append_drop]
+  · simp [prependValues, Function.update_of_ne hj]
+
+lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
+    {i : ι} (xs : List (spec.Range i)) {n : ℕ} (hlen : xs.length = n)
+    (h : rest.prependValues xs = seed) :
+    xs = (seed i).take n ∧ rest = Function.update seed i ((seed i).drop n) := by
+  have hi : xs ++ rest i = seed i := by
+    have := congrArg (· i) h; simp [prependValues] at this; exact this
+  constructor
+  · calc xs = (xs ++ rest i).take xs.length := by simp
+      _ = (seed i).take n := by rw [hi, hlen]
+  · funext j
+    by_cases hj : j = i
+    · cases hj
+      simp only [Function.update_self]
+      have : rest i = (xs ++ rest i).drop xs.length := by simp
+      rw [this, hi, hlen]
+    · have hj' : rest j = seed j := by
+        have := congrArg (· j) h; simp [prependValues, Function.update_of_ne hj] at this
+        exact this
+      simp [Function.update_of_ne hj, hj']
 
 abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
     QuerySeed spec :=

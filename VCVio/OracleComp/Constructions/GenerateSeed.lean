@@ -117,27 +117,111 @@ lemma generateSeed_zero :
     exact this.symm
   exact zero_ne_one (probFailure_eq_zero (mx := generateSeed spec qc js) ▸ hf)
 
--- TODO: probOutput_generateSeed requires collapsing the bind tsums using decomposition
--- uniqueness: for each `seed` satisfying the support condition, there is exactly one
--- `(xs, rest)` pair with `xs = (seed j).take (qc j)` and
--- `rest = Function.update seed j ((seed j).drop (qc j))` such that
--- `seed = rest.prependValues xs`. The probability then factors as:
---   Pr[= xs | replicate (qc j) ($ᵗ spec.Range j)] * Pr[= rest | generateSeed spec qc js]
--- = ((Fintype.card (spec.Range j))⁻¹) ^ (qc j) * (IH)
--- yielding the claimed formula by induction.
---
--- lemma probOutput_generateSeed [spec.FiniteRange] (seed : QuerySeed spec)
---     (h : seed ∈ support (generateSeed spec qc js)) :
---     Pr[= seed | generateSeed spec qc js] =
---       1 / (js.map (fun j => (Fintype.card (spec.Range j)) ^ qc j)).prod := by
---   sorry
+lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
+    (h : seed ∈ support (generateSeed spec qc js)) :
+    Pr[= seed | generateSeed spec qc js] =
+      (↑(js.map (fun j => (Fintype.card (spec.Range j)) ^ qc j)).prod)⁻¹ := by
+  classical
+  induction js generalizing seed with
+  | nil =>
+    have hseed : seed = (∅ : QuerySeed spec) := by simpa using h
+    subst hseed; simp
+  | cons j js ih =>
+    have hlen : ∀ i, (seed i).length = qc i * List.count i (j :: js) := by
+      have h' := h
+      rw [support_generateSeed (spec := spec) (qc := qc) (js := (j :: js))] at h'
+      simpa [Set.mem_setOf_eq] using h'
+    let xs : List (spec.Range j) := (seed j).take (qc j)
+    let rest : QuerySeed spec := Function.update seed j ((seed j).drop (qc j))
+    have hxs_len : xs.length = qc j := by
+      have hlen_j : (seed j).length = qc j * (List.count j js + 1) := by
+        simpa [List.count_cons_self] using hlen j
+      have hqc_le : qc j ≤ (seed j).length := by
+        rw [hlen_j]; exact Nat.le_mul_of_pos_right _ (Nat.succ_pos _)
+      simp [xs, List.length_take, Nat.min_eq_left hqc_le]
+    have hrest_len : ∀ i, (rest i).length = qc i * List.count i js := by
+      intro i
+      by_cases hi : i = j
+      · cases hi
+        have hlen_j : (seed j).length = qc j * (List.count j js + 1) := by
+          simpa [List.count_cons_self] using hlen j
+        simp [rest, List.length_drop, hlen_j, Nat.mul_add]
+      · have := hlen i
+        simpa [rest, Function.update_of_ne hi, List.count_cons_of_ne (Ne.symm hi)] using this
+    have hrest_mem : rest ∈ support (generateSeed spec qc js) := by
+      simpa [support_generateSeed (spec := spec) (qc := qc) (js := js)] using hrest_len
+    have hseed_eq : rest.prependValues xs = seed :=
+      QuerySeed.prependValues_take_drop seed j (qc j)
+    -- Uniqueness: any (xs', rest') satisfying rest'.prependValues xs' = seed must equal (xs, rest)
+    have hxs_unique :
+        ∀ xs' ∈ support (replicate (qc j) ($ᵗ spec.Range j)),
+          seed ∈ support (do
+            let rest' ← generateSeed spec qc js
+            return rest'.prependValues xs') → xs' = xs := by
+      intro xs' hxs' hseed'
+      rw [mem_support_bind_iff] at hseed'
+      obtain ⟨rest', _, hpure⟩ := hseed'
+      have hEq : rest'.prependValues xs' = seed := by
+        simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
+      have hlen_xs' : xs'.length = qc j := by
+        rw [support_replicate] at hxs'; exact hxs'.1
+      exact (QuerySeed.eq_of_prependValues_eq seed rest' xs' hlen_xs' hEq).1 ▸ rfl
+    have hrest_unique :
+        ∀ rest' ∈ support (generateSeed spec qc js),
+          seed ∈ support (return rest'.prependValues xs : ProbComp (QuerySeed spec)) → rest' = rest := by
+      intro rest' _ hseed'
+      have hEq : rest'.prependValues xs = seed := by
+        simpa [support_pure, Set.mem_singleton_iff] using hseed'.symm
+      exact (QuerySeed.eq_of_prependValues_eq seed rest' xs hxs_len hEq).2
+    -- Factor probability via probOutput_bind_eq_mul
+    have houter :
+        Pr[= seed | generateSeed spec qc (j :: js)] =
+          Pr[= xs | replicate (qc j) ($ᵗ spec.Range j)] *
+            Pr[= seed | (do
+              let rest' ← generateSeed spec qc js
+              return rest'.prependValues xs)] := by
+      simpa [generateSeed_cons] using
+        probOutput_bind_eq_mul (mx := replicate (qc j) ($ᵗ spec.Range j))
+          (my := fun xs' => do let rest' ← generateSeed spec qc js; return rest'.prependValues xs')
+          (y := seed) xs hxs_unique
+    have hinner :
+        Pr[= seed | (do
+          let rest' ← generateSeed spec qc js
+          return rest'.prependValues xs)] =
+        Pr[= rest | generateSeed spec qc js] := by
+      have := probOutput_bind_eq_mul
+        (mx := generateSeed spec qc js)
+        (my := fun rest' => (return rest'.prependValues xs : ProbComp (QuerySeed spec)))
+        (y := seed) rest hrest_unique
+      simpa [hseed_eq, mul_one] using this
+    -- Assemble final result
+    calc
+      Pr[= seed | generateSeed spec qc (j :: js)]
+          = Pr[= xs | replicate (qc j) ($ᵗ spec.Range j)] *
+              Pr[= rest | generateSeed spec qc js] := by rw [houter, hinner]
+      _ = (↑(Fintype.card (spec.Range j) ^ qc j) : ENNReal)⁻¹ *
+            (↑(js.map (fun j => Fintype.card (spec.Range j) ^ qc j)).prod)⁻¹ := by
+            rw [probOutput_replicate_uniformSample hxs_len, ih rest hrest_mem]
+      _ = (↑((j :: js).map (fun j => Fintype.card (spec.Range j) ^ qc j)).prod)⁻¹ := by
+            simp only [List.map, List.prod_cons, Nat.cast_mul]
+            have ha : ((↑(Fintype.card (spec.Range j)) : ENNReal) ^ qc j) ≠ ⊤ :=
+              ENNReal.pow_ne_top (ENNReal.natCast_ne_top _)
+            have hb : (List.map (Nat.cast ∘ fun j => Fintype.card (spec.Range j) ^ qc j) js).prod ≠ ⊤ :=
+              ENNReal.list_prod_natCast_ne_top _ js
+            simpa [mul_assoc, mul_comm, mul_left_comm] using
+              (ENNReal.mul_inv (a := (↑(Fintype.card (spec.Range j)) : ENNReal) ^ qc j)
+                (b := (List.map (Nat.cast ∘ fun j => Fintype.card (spec.Range j) ^ qc j) js).prod)
+                (ha := Or.inr hb) (hb := Or.inl ha)).symm
 
--- lemma probOutput_generateSeed' [spec.FiniteRange]
---     [DecidableEq (QuerySeed spec)] (seed : QuerySeed spec)
---     (h : seed ∈ support (generateSeed spec qc js)) :
---     Pr[= seed | generateSeed spec qc js] =
---       (finSupport (generateSeed spec qc js)).card⁻¹ := by
---   sorry
+lemma probOutput_generateSeed' [spec.Fintype]
+    [DecidableEq (QuerySeed spec)] (seed : QuerySeed spec)
+    (h : seed ∈ support (generateSeed spec qc js)) :
+    Pr[= seed | generateSeed spec qc js] =
+      1 / (finSupport (generateSeed spec qc js)).card := by
+  classical
+  rw [probOutput_generateSeed spec qc js seed h]
+  exact HasEvalPMF.probOutput_eq_inv_finSupport_card fun s hs =>
+    probOutput_generateSeed spec qc js s hs
 
 end lemmas
 

@@ -50,7 +50,8 @@ def loggingOracle {spec : OracleSpec ι} :
 
 namespace loggingOracle
 
-@[simp] -- TODO: more general version/class for query impls that never have failures
+
+@[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
@@ -59,41 +60,25 @@ lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
           OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
--- variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+@[simp]
+lemma fst_map_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
+    (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (loggingOracle (spec := spec)) oa).run = oa := by
+  rw [loggingOracle, QueryImpl.fst_map_run_withLogging, simulateQ_ofLift_eq_self]
 
--- @[simp] lemma apply_eq (q : OracleQuery spec α) : loggingOracle.impl q =
---     do let u ← q; tell (QueryLog.singleton q u); return u := rfl
+@[simp]
+lemma run_simulateQ_bind_fst {spec : OracleSpec.{0,0} ι} {α β : Type}
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    ((simulateQ (loggingOracle (spec := spec)) oa).run >>= fun x => ob x.1) = oa >>= ob := by
+  rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
--- /-- Taking only the main output after logging queries is the original compuation. -/
--- @[simp]
--- lemma fst_map_run_simulateQ (oa : OracleComp spec α) :
---     (Prod.fst <$> (simulateQ loggingOracle oa).run) = oa :=
---   fst_map_writerT_run_simulateQ (by simp) oa
-
--- /-- Throwing away the query log after simulation looks like running the original computation. -/
--- @[simp]
--- lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
---     ((simulateQ loggingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
---   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
-
--- @[simp]
--- lemma probFailure_run_simulateQ [spec.FiniteRange] (oa : OracleComp spec α) :
---     [⊥ | (simulateQ loggingOracle oa).run] = [⊥ | oa] :=
---   probFailure_writerT_run_simulateQ (by simp) (by simp) oa
-
--- @[simp]
--- lemma NeverFail_run_simulateQ_iff (oa : OracleComp spec α) :
---     NeverFail (simulateQ loggingOracle oa).run ↔ NeverFail oa :=
---   NeverFail_writerT_run_simulateQ_iff (by simp) (by sorry) oa
--- @[simp]
--- lemma neverFails_run_simulateQ_iff (oa : OracleComp spec α) :
---     neverFails (simulateQ loggingOracle oa).run ↔ neverFails oa :=
---   neverFails_writerT_run_simulateQ_iff (by simp) (by simp only [apply_eq, liftM_query_writerT,
---     bind_pure_comp, WriterT.run_bind, WriterT.run_monadLift, QueryLog.monoid_one_def,
---     QueryLog.monoid_mul_def, WriterT.run_map, WriterT.run_tell, map_pure, Prod.map_apply, id_eq,
---     Functor.map_map, List.nil_append, neverFails_map_iff, neverFails_query, implies_true]) oa
-
--- alias ⟨_, NeverFail_simulateQ⟩ := NeverFail_run_simulateQ_iff
+@[simp]
+lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0,0} ι} {α : Type}
+    [spec.Fintype] [spec.Inhabited]
+    (oa : OracleComp spec α) :
+    NeverFail (simulateQ (loggingOracle (spec := spec)) oa).run ↔ NeverFail oa := by
+  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
+    HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 end loggingOracle
 

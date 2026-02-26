@@ -6,6 +6,7 @@ Authors: Devon Tuma
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
 import VCVio.EvalDist.List
+import VCVio.OracleComp.Constructions.SampleableType
 import Init.Data.Vector.Lemmas
 
 /-!
@@ -82,11 +83,16 @@ lemma probOutput_replicate (xs : List α) :
       rw [probOutput_cons_seq_map_cons_eq_mul oa (replicate n oa) y ys, ih]
       simp
 
--- TODO: restore when `probEvent_seq_map` infrastructure is available
--- lemma probEvent_replicate_of_probEvent_cons
---     (p : List α → Prop) (hp : p []) (q : α → Prop) (hq : ∀ x xs, p (x :: xs) ↔ q x ∧ p xs) :
---     Pr[p | oa.replicate n] = Pr[q | oa] ^ n := by
---   sorry
+lemma probEvent_replicate_of_probEvent_cons
+    (p : List α → Prop) (hp : p []) (q : α → Prop) (hq : ∀ x xs, p (x :: xs) ↔ q x ∧ p xs) :
+    Pr[p | oa.replicate n] = Pr[q | oa] ^ n := by
+  induction n with
+  | zero => simp [hp]
+  | succ n ih =>
+    rw [replicate_succ,
+      probEvent_seq_map_eq_mul oa (replicate n oa) List.cons p q p
+        (fun x _ xs _ => hq x xs),
+      ih, pow_succ, mul_comm]
 
 /-- Possible outputs of `replicate n oa` are lists of length `n` where
 each element in the list is a possible output of `oa`. -/
@@ -113,5 +119,13 @@ lemma mem_finSupport_replicate [spec.DecidableEq] [DecidableEq α]
     (xs : List α) : xs ∈ finSupport (oa.replicate n) ↔
       xs.length = n ∧ ∀ x ∈ xs, x ∈ finSupport oa := by
   simp [mem_finSupport_iff_mem_support]
+
+lemma probOutput_replicate_uniformSample {α : Type} [Fintype α] [SampleableType α]
+    {n : ℕ} {xs : List α} (hlen : xs.length = n) :
+    Pr[= xs | replicate n ($ᵗ α)] = (↑(Fintype.card α ^ n) : ENNReal)⁻¹ := by
+  simp only [probOutput_replicate, hlen, ite_true, probOutput_uniformSample]
+  rw [List.prod_map_const, hlen]
+  simpa [Nat.cast_pow] using
+    (ENNReal.inv_pow (a := (Fintype.card α : ENNReal)) (n := n)).symm
 
 end OracleComp

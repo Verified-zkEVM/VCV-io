@@ -17,86 +17,102 @@ for asymmetric encryption using oracles in `spec`, with message space `M`,
 public/secret keys `PK` and `SK`, and ciphertext space `C`.
 -/
 
--- open OracleSpec OracleComp ENNReal
+open OracleSpec OracleComp ENNReal
 
--- universe u v w
+universe u v w
 
--- /-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
--- `spec` is the available oracle set and `m` is the monad used to execute the oracle calls.
--- Extends `ExecutionMethod spec m`, in most cases will be `ExecutionMethod.default`. -/
--- structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
---     extends ExecutionMethod m where
---   keygen : m (PK × SK)
---   encrypt : (pk : PK) → (msg : M) →  m C
---   decrypt : (sk : SK) → (c : C) → Option M
+/-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
+`spec` is the available oracle set and `m` is the monad used to execute the oracle calls.
+Extends `ExecutionMethod spec m`, in most cases will be `ExecutionMethod.default`. -/
+structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
+    extends ExecutionMethod m where
+  keygen : m (PK × SK)
+  encrypt : (pk : PK) → (msg : M) →  m C
+  decrypt : (sk : SK) → (c : C) → Option M
 
--- alias PKE_Alg := AsymmEncAlg
+alias PKE_Alg := AsymmEncAlg
 
--- namespace AsymmEncAlg
+namespace AsymmEncAlg
 
--- variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type v} {M PK SK C : Type}
---   (encAlg : AsymmEncAlg m M PK SK C) {α β γ : Type}
+variable {m : Type → Type v} {M PK SK C : Type}
+  (encAlg : AsymmEncAlg m M PK SK C)
 
--- section Correct
+section Correct
 
--- variable [DecidableEq M] [AlternativeMonad m]
+variable [DecidableEq M] [Monad m]
 
--- /-- A `SymmEncAlg` is complete if decrypting an encrypted message always returns that original
--- message, captured here by a `guard` statement. -/
+/-- Correctness experiment: returns `true` iff decrypting the ciphertext recovers the message.
+
+The old version used `guard` (requiring `AlternativeMonad`); we return `Bool` instead since
+`guard` now requires `OptionT` in the current API. -/
+def CorrectExp (msg : M) : m Bool := do
+  let (pk, sk) ← encAlg.keygen
+  let c ← encAlg.encrypt pk msg
+  return decide (encAlg.decrypt sk c = some msg)
+
+def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
+  ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
+
+-- Old definitions (used `guard` + `AlternativeMonad`, which is now `OptionT`):
 -- @[reducible, inline]
 -- def CorrectExp (encAlg : AsymmEncAlg m M PK SK C) (msg : M) :
 --     ProbComp Unit := encAlg.exec do
 --   let (pk, sk) ← encAlg.keygen
 --   guard (encAlg.decrypt sk (← encAlg.encrypt pk msg) = msg)
-
+--
 -- def PerfectlyCorrect (encAlg : AsymmEncAlg m M PK SK C) : Prop :=
 --   ∀ (msg : M), [⊥ | CorrectExp encAlg msg] = 0
 
--- @[simp] lemma PerfectlyCorrect_iff (encAlg : AsymmEncAlg m M PK SK C) :
---     PerfectlyCorrect encAlg ↔ ∀ (msg : M),
---       [⊥ | CorrectExp encAlg msg] = 0 := Iff.rfl
+end Correct
 
--- end Correct
+section IND_CPA_Oracle
 
--- section IND_CPA
+variable [DecidableEq M] [DecidableEq C]
 
--- variable [DecidableEq M] [DecidableEq C]
+/-- Oracle-based multi-query IND-CPA game. The adversary gets oracle access to an encryption
+oracle that encrypts one of two challenge messages depending on a hidden bit.
 
--- -- Simplifying assumption: The algorithm is defined over `ProbComp`
+API changes from old version:
+- `unifSpec ++ₒ` → `unifSpec +`
+- `⟨fun (query () (m₁, m₂)) => ...⟩` → `fun (m₁, m₂) => ...`
+- `idOracle ++ₛₒ` → `QueryImpl.ofLift ... .liftTarget ... +`
+- `guard (b = b')` → `return (b == b')` (Bool-valued experiment) -/
 
--- def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
---   unifSpec ++ₒ (M × M →ₒ C) -- Second oracle for adversary to request challenge
+def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
+  unifSpec + (M × M →ₒ C)
 
--- def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
---   PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
---   -- with poly functors: `ProbComp ((M × M) × (C → ProbComp Bool))`
+def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
+  PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
 
--- /-- Can be shown this is equivalent to below definition for asymptotic security. -/
--- def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
---     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
---       (StateT (M × M →ₒ C).QueryCache ProbComp) :=
---   have so : QueryImpl (M × M →ₒ C) ProbComp := ⟨fun (query () (m₁, m₂)) =>
---     encAlg.encrypt pk (if b then m₁ else m₂)⟩
---   idOracle ++ₛₒ so.withCaching
+def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
+    (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
+      (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
+  have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
+    encAlg.encrypt pk (if b then m₁ else m₂)
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT ((M × M →ₒ C).QueryCache) ProbComp) + so.withCaching
 
--- def IND_CPA_queryImpl (encAlg : AsymmEncAlg ProbComp M PK SK C)
---     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
---       (StateT (M × M →ₒ C).QueryCache ProbComp) :=
---   have so : QueryImpl (M × M →ₒ C) ProbComp := ⟨fun (query () (m₁, m₂)) =>
---     encAlg.encrypt pk (if b then m₁ else m₂)⟩
---   idOracle ++ₛₒ so
+def IND_CPA_queryImpl (encAlg : AsymmEncAlg ProbComp M PK SK C)
+    (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
+      (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
+  have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
+    encAlg.encrypt pk (if b then m₁ else m₂)
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT ((M × M →ₒ C).QueryCache) ProbComp) +
+    so.liftTarget (StateT ((M × M →ₒ C).QueryCache) ProbComp)
 
--- def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
---     (adversary : encAlg.IND_CPA_adversary) : ProbComp Unit := do
---   let b ← $ᵗ Bool
---   let (pk, _sk) ← encAlg.keygen
---   let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
---   guard (b = b')
+def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) : ProbComp Bool := do
+  let b ← $ᵗ Bool
+  let (pk, _sk) ← encAlg.keygen
+  let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
+  return (b == b')
 
--- noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
---     (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
---   [= () | IND_CPA_experiment adversary] - 1 / 2
+noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
+  Pr[= true | IND_CPA_experiment adversary] - 1 / 2
 
+-- Old lemma (uses guard-based experiment, needs rework for Bool-valued version):
 -- /-- The probability of the IND-CPA experiment is the average of the probability of the experiment
 -- with the challenge being true and the probability of the experiment with the challenge being false. -/
 -- lemma probOutput_IND_CPA_experiment_eq_add {encAlg : AsymmEncAlg ProbComp M PK SK C}
@@ -115,7 +131,7 @@ public/secret keys `PK` and `SK`, and ciphertext space `C`.
 --   have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by field_simp; rw [mul_comm, mul_div, mul_one]
 --   simp [this]
 
--- end IND_CPA
+end IND_CPA_Oracle
 
 -- section decryptionOracle
 
@@ -170,55 +186,47 @@ public/secret keys `PK` and `SK`, and ciphertext space `C`.
 
 -- end IND_CCA
 
--- section IND_CPA
+section IND_CPA_TwoPhase
 
--- variable [DecidableEq ι]
+variable {ι : Type} {spec : OracleSpec ι} [DecidableEq M] [DecidableEq C]
 
--- variable [AlternativeMonad m] [LawfulAlternative m] [DecidableEq ι]
+/-- Two-phase adversary for IND-CPA security.
+Removed `AlternativeMonad`/`LawfulAlternative` requirements (not available in current API). -/
+structure IND_CPA_Adv (encAlg : AsymmEncAlg m M PK SK C) where
+  State : Type
+  chooseMessages : PK → m (M × M × State)
+  distinguish : State → C → m Bool
 
--- /--
--- `IND_CPA_adv M PK C` is an adversary for IND-CPA security game on an
--- asymmetric encryption with public keys in `PK`, messages in `M`, and ciphertexts in `C`.
--- The adversary consists of two functions:
--- * `chooseMessages`: given a public key, returns a pair of messages that it thinks
--- it can distinguish the encryption of, and a private state.
--- * `distinguish`: given a private state and an encryption, returns whether it is an encryption of
--- the first message or the second message -/
--- structure IND_CPA_Adv (encAlg : AsymmEncAlg m M PK SK C) where
---   State : Type
---   chooseMessages : PK → m (M × M × State)
---   distinguish : State → C → m Bool
+variable {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
+  (adv : IND_CPA_Adv encAlg)
 
--- variable {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
---   (adv : IND_CPA_Adv encAlg)
+/--
+Experiment for *one-time* IND-CPA security of an asymmetric encryption algorithm:
+1. Run `keygen` to get a public key and a private key.
+2. Run `adv.chooseMessages` on `pk` to get a pair of messages and a private state.
+3. The challenger then tosses a coin and encrypts one of the messages, returning the ciphertext `c`.
+4. Run `adv.distinguish` on the private state and the ciphertext to get a boolean.
+5. Return a Boolean indicating whether the adversary's guess is correct.
 
--- /--
--- Experiment for *one-time* IND-CPA security of an asymmetric encryption algorithm:
--- 1. Run `keygen` to get a public key and a private key.
--- 2. Run `adv.chooseMessages` on `pk` to get a pair of messages and a private state.
--- 3. The challenger then tosses a coin and encrypts one of the messages, returning the ciphertext `c`.
--- 4. Run `adv.distinguish` on the private state and the ciphertext to get a boolean.
--- 5. Return a Boolean indicating whether the adversary's guess is correct.
+Note: we do _not_ want to end with a `guard` statement, as this can be biased by the adversary
+potentially always failing.
+-/
+def IND_CPA_OneTime_Game : ProbComp Bool :=
+  encAlg.exec do
+    let b : Bool ← encAlg.lift_probComp ($ᵗ Bool)
+    let (pk, _) ← encAlg.keygen
+    let (m₁, m₂, state) ← adv.chooseMessages pk
+    let msg := if b then m₁ else m₂
+    let c ← encAlg.encrypt pk msg
+    let b' ← adv.distinguish state c
+    return (b == b')
 
--- Note: we do _not_ want to end with a `guard` statement, as this can be biased by the adversary
--- potentially always failing.
--- -/
--- def IND_CPA_OneTime_Game : ProbComp Bool :=
---   encAlg.exec do
---     let b : Bool ← encAlg.lift_probComp ($ᵗ Bool)
---     let (pk, _) ← encAlg.keygen
---     let (m₁, m₂, state) ← adv.chooseMessages pk
---     let m := if b then m₁ else m₂
---     let c ← encAlg.encrypt pk m
---     let b' ← adv.distinguish state c
---     return b = b'
+noncomputable def IND_CPA_OneTime_Advantage (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
+    (adv : IND_CPA_Adv encAlg) : ℝ :=
+  (IND_CPA_OneTime_Game (encAlg := encAlg) adv).advantage'
 
--- noncomputable def IND_CPA_OneTime_Advantage (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
---     (adv : IND_CPA_Adv encAlg) : ℝ :=
---   (IND_CPA_OneTime_Game (encAlg := encAlg) adv).advantage'
+-- TODO: prove one-time security implies general IND-CPA security
 
--- -- TODO: prove one-time security implies general IND-CPA security
+end IND_CPA_TwoPhase
 
--- end IND_CPA
-
--- end AsymmEncAlg
+end AsymmEncAlg

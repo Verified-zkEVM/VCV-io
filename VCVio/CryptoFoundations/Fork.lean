@@ -11,7 +11,90 @@ import VCVio.OracleComp.Coercions.Add
 /-!
 # Forking Lemma
 
+The forking lemma is a key tool in provable security. Given an adversary that succeeds with
+some probability, the "fork" runs it twice with shared randomness up to a chosen query index,
+then re-samples one oracle response, bounding the probability that both runs succeed.
+
+## API changes from old version
+
+- `OracleComp` no longer has `Alternative`, so `guard`/`getM` are unavailable.
+  `fork` now returns `OracleComp spec (Option (α × α))` with explicit matching.
+- `seededOracle` uses `StateT` (not `ReaderT`), so `.run' seed` discards the final state.
+- Old probability notation `[= x | ...]` → `Pr[= x | ...]`, `[⊥ | ...]` → `Pr[= none | ...]`.
+- `generateSeed` returns `ProbComp`, lifted via `liftComp`.
 -/
+
+open OracleSpec OracleComp ENNReal Function
+
+namespace OracleComp
+
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
+  [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
+  {α β γ : Type}
+
+/-- Bundles the inputs to the forking lemma. -/
+structure forkInput (spec : OracleSpec ι) (α : Type) where
+  main : OracleComp spec α
+  queryBound : ι → ℕ
+  js : List ι
+
+/-- The forking operation: run `main` with a random seed, then re-run it with the seed modified
+at the `s`-th query to oracle `i` (where `s = cf x₁`), checking that both runs agree on `cf`.
+
+Returns `none` (failure) when:
+- `cf x₁ = none` (adversary did not choose a fork point)
+- the re-sampled oracle response equals the original (no useful fork)
+- `cf x₂ ≠ cf x₁` (the second run chose a different fork point) -/
+def fork (main : OracleComp spec α)
+    (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1))) :
+    OracleComp spec (Option (α × α)) := do
+  let seed ← liftComp (generateSeed spec qb js) spec
+  let x₁ ← (simulateQ seededOracle main).run' seed
+  match cf x₁ with
+  | none => return none
+  | some s =>
+    let u ← liftComp ($ᵗ spec.Range i) spec
+    if (seed i)[↑s + 1]? = some u then
+      return none
+    else
+      let seed' := (seed.takeAtIndex i ↑s).addValue i u
+      let x₂ ← (simulateQ seededOracle main).run' seed'
+      if cf x₂ = some s then
+        return some (x₁, x₂)
+      else
+        return none
+
+variable (main : OracleComp spec α) (qb : ι → ℕ)
+    (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
+    [spec.Fintype] [spec.Inhabited]
+
+/-- If `fork` succeeds (returns `some`), both runs agree on the fork index. -/
+theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
+    (h : some (x₁, x₂) ∈ support (fork main qb js i cf)) :
+      ∃ s, cf x₁ = some s ∧ cf x₂ = some s := by
+  sorry
+
+/-- Key bound of the forking lemma: the probability that both runs succeed with fork point `s`
+is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/
+theorem le_probOutput_fork (s : Fin (qb i + 1)) :
+    let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
+    Pr[= s | cf <$> main] ^ 2 - Pr[= s | cf <$> main] / h
+      ≤ Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) |
+            fork main qb js i cf] := by
+  sorry
+
+/-- Main forking lemma: the failure probability is bounded by `1 - acc * (acc / q - 1/h)`. -/
+theorem probOutput_none_fork_le :
+    let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+    let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+    let q := qb i + 1
+    Pr[= none | fork main qb js i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
+  sorry
+
+end OracleComp
+
+/-! ## Old commented code (for reference)
 
 -- open OracleSpec OracleComp Option ENNReal Function
 
@@ -399,3 +482,4 @@ import VCVio.OracleComp.Coercions.Add
 
 
 -- end OracleComp
+-/

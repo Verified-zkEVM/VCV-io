@@ -210,16 +210,3 @@ lemma probOutput_map_eq_probOutput (mx : m α)
   aesop
 
 end injective
-
--- section invFun
-
--- lemma probOutput_map_eq_probOutput_invFun [Nonempty α] (mx : m α) {f : α → β}
---     (hf : f.Injective) (hf' : f.Surjective)
---     (y : β) : Pr[= y | f <$> mx] = Pr[= Function.invFun f y | mx] := by
---   rw [probOutput_map_eq_probOutput_inverse]
---   simp [Function.invFun]
---   simp [Function.invFun]
---   stop
---   sorry
-
--- end invFun
