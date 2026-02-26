@@ -79,3 +79,50 @@ lemma probOutput_seq_map_prod_mk_eq_mul [DecidableEq α] [DecidableEq β]
     (mx : m α) (my : m β) (x : α) (y : β) :
     Pr[= (x, y) | Prod.mk <$> mx <*> my] = Pr[= x | mx] * Pr[= y | my] :=
   probOutput_seq_map_eq_mul_of_injective2 mx my Prod.mk Prod.mk.injective2 x y
+
+lemma probOutput_seq_map_prod_map_eq_mul [DecidableEq γ] [DecidableEq δ]
+    (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
+    Pr[= z | (fun a b => (f a, g b)) <$> mx <*> my] =
+      Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
+  sorry
+
+lemma probOutput_bind_bind_prod_mk_eq_mul [DecidableEq γ] [DecidableEq δ]
+    (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
+    Pr[= z | do let x ← mx; let y ← my; return (f x, g y)] =
+      Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by
+  sorry
+
+@[simp]
+lemma probOutput_bind_bind_prod_mk_eq_mul' [DecidableEq γ] [DecidableEq δ]
+    (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
+    Pr[= (x, y) | do let a ← mx; let b ← my; return (f a, g b)] =
+      Pr[= x | f <$> mx] * Pr[= y | g <$> my] :=
+  probOutput_bind_bind_prod_mk_eq_mul mx my f g (x, y)
+
+@[simp]
+lemma probOutput_prod_mk_fst_map [DecidableEq α] [DecidableEq β]
+    (mx : m α) (y : β) (z : α × β) :
+    Pr[= z | (·, y) <$> mx] = if z.2 = y then Pr[= z.1 | mx] else 0 := by
+  split
+  · next h =>
+    subst h
+    exact probOutput_map_injective mx (fun _ _ hab => (Prod.mk.inj hab).1) z.1
+  · next h =>
+    rw [probOutput_eq_zero_iff]
+    intro hmem
+    simp [support_map] at hmem
+    exact h (by obtain ⟨_, _, ha⟩ := hmem; exact ha ▸ rfl)
+
+@[simp]
+lemma probOutput_prod_mk_snd_map [DecidableEq α] [DecidableEq β]
+    (my : m β) (x : α) (z : α × β) :
+    Pr[= z | (x, ·) <$> my] = if z.1 = x then Pr[= z.2 | my] else 0 := by
+  split
+  · next h =>
+    subst h
+    exact probOutput_map_injective my (fun _ _ hab => (Prod.mk.inj hab).2) z.2
+  · next h =>
+    rw [probOutput_eq_zero_iff]
+    intro hmem
+    simp [support_map] at hmem
+    exact h (by obtain ⟨_, _, ha⟩ := hmem; exact ha ▸ rfl)
