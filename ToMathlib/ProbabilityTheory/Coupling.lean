@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import ToMathlib.Control.MonadTransformer
+import ToMathlib.Control.Monad.Transformer
 import Batteries.Control.AlternativeMonad
 
 /-!
@@ -58,15 +58,53 @@ theorem pure_eq_pmf_pure {a : α} : (pure a : SPMF α) = PMF.pure a := by
 
 theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
     (p >>= f) = PMF.bind p (fun a => match a with | some a' => f a' | none => PMF.pure none) := by
-  simp [bind, liftM, OptionT.bind, monadLift, MonadLift.monadLift, OptionT.lift,
-    PMF.instMonad, OptionT.mk]
+  simp [bind, OptionT.bind, PMF.instMonad, OptionT.mk]
   rfl
 
 @[simp] lemma map_some_apply_some (p : PMF α) (x : α) : p.map some (some x) = p x := by
-  sorry
+  simp [PMF.map_apply]
+  rw [tsum_eq_single x (by intro b hb; simp [Ne.symm hb])]
+  simp
 
 @[simp] lemma PMF.map_some_apply_some (p : PMF α) (x : α) : (some <$> p) (some x) = p x := by
-  sorry
+  change p.map some (some x) = p x
+  simp [PMF.map_apply]
+  rw [tsum_eq_single x (by intro b hb; simp [Ne.symm hb])]
+  simp
+
+/-- `pure a` in SPMF equals `PMF.pure (some a)` as a PMF on `Option α`. -/
+private lemma spmf_pure_eq (a : α) : (pure a : SPMF α) = PMF.pure (some a) := by
+  have : (pure a : SPMF α) = liftM (PMF.pure a) := by
+    simp [pure, liftM, OptionT.pure, monadLift, MonadLift.monadLift, OptionT.lift, PMF.instMonad]
+  rw [this]; change (PMF.pure a).bind (fun x => PMF.pure (some x)) = _; rw [PMF.pure_bind]
+
+/-- The functor map for SPMF equals `PMF.map (Option.map f)`. -/
+private lemma spmf_fmap_eq_map (f : α → β) (c : SPMF α) :
+    (f <$> c : SPMF β) = PMF.map (Option.map f) c := by
+  have : (f <$> c : SPMF β) =
+    PMF.bind c (fun a => match a with
+      | some a' => (pure (f a') : SPMF β) | none => PMF.pure none) := by
+    show (c >>= (pure ∘ f)) = _; exact bind_eq_pmf_bind
+  rw [this]; apply PMF.ext; intro x
+  simp only [PMF.bind_apply, PMF.map_apply]
+  congr 1; ext y; cases y with
+  | none => cases x <;> simp [PMF.pure_apply]
+  | some a => simp only [spmf_pure_eq, PMF.pure_apply]; cases x <;> simp
+
+/-- If `PMF.map f c = PMF.pure b` and `f a ≠ b`, then `c a = 0`. -/
+private lemma pmf_map_eq_pure_zero {γ δ : Type*} (f : γ → δ) (c : PMF γ) (b : δ)
+    (h : PMF.map f c = PMF.pure b) (a : γ) (ha : f a ≠ b) : c a = 0 := by
+  have key := congr_fun (congrArg DFunLike.coe h) (f a)
+  simp [PMF.map_apply, PMF.pure_apply, ha] at key
+  exact key a rfl
+
+/-- A PMF that is zero at all points except `a` equals `PMF.pure a`. -/
+private lemma pmf_eq_pure_of_forall_ne_eq_zero {γ : Type*} (p : PMF γ) (a : γ)
+    (h : ∀ x, x ≠ a → p x = 0) : p = PMF.pure a := by
+  ext x; by_cases hx : x = a
+  · subst hx; simp only [PMF.pure_apply, if_true]
+    rw [← p.tsum_coe]; exact (tsum_eq_single x (fun b hb => h b hb)).symm
+  · simp [PMF.pure_apply, hx, h x hx]
 
 @[ext]
 class IsCoupling (c : SPMF (α × β)) (p : SPMF α) (q : SPMF β) : Prop where
@@ -85,18 +123,49 @@ theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × 
     IsCoupling c (pure a) (pure b) ↔ c = pure (a, b) := by
   constructor
   · intro ⟨h1, h2⟩
-    simp [pure_eq_pmf_pure, liftM, monadLift, OptionT.instMonadLift, OptionT.lift, OptionT.mk] at h1 h2
-    have : (x : Option α) → (Prod.fst <$> c) x = (some <$> PMF.pure a) x := by
-      rw [h1]; exact fun x => rfl
-    sorry
-  · intro h; constructor <;> simp [h, ← liftM_map]
+    simp [pure_eq_pmf_pure, liftM, monadLift, OptionT.instMonadLift, OptionT.lift,
+      OptionT.mk] at h1 h2
+    rw [spmf_fmap_eq_map] at h1 h2
+    change PMF.map (Option.map Prod.fst) c = PMF.map some (PMF.pure a) at h1
+    change PMF.map (Option.map Prod.snd) c = PMF.map some (PMF.pure b) at h2
+    rw [PMF.pure_map] at h1 h2
+    rw [show (pure (a, b) : SPMF (α × β)) = PMF.pure (some (a, b)) from spmf_pure_eq (a, b)]
+    exact pmf_eq_pure_of_forall_ne_eq_zero c (some (a, b)) fun x hx => by
+      cases x with
+      | none => exact pmf_map_eq_pure_zero _ c _ h1 none (by simp)
+      | some p =>
+        obtain ⟨x, y⟩ := p
+        have hne : x ≠ a ∨ y ≠ b := by
+          by_contra h; push_neg at h; exact hx (by rw [h.1, h.2])
+        cases hne with
+        | inl hx => exact pmf_map_eq_pure_zero _ c _ h1 (some (x, y)) (by simp [hx])
+        | inr hy => exact pmf_map_eq_pure_zero _ c _ h2 (some (x, y)) (by simp [hy])
+  · intro h; constructor <;> simp [h, - liftM_map]
 
 theorem IsCoupling.none_iff {α β : Type u} {c : SPMF (α × β)} :
     IsCoupling c (failure : SPMF α) (failure : SPMF β) ↔ c = failure := by
   simp [failure]
   constructor
-  · intro h; sorry
-  · intro h; constructor <;> simp [h] <;> sorry
+  · intro ⟨h1, h2⟩
+    rw [spmf_fmap_eq_map] at h1
+    change PMF.map (Option.map Prod.fst) c = PMF.pure none at h1
+    exact pmf_eq_pure_of_forall_ne_eq_zero c none fun x hx => by
+      cases x with
+      | none => exact absurd rfl hx
+      | some p =>
+        exact pmf_map_eq_pure_zero _ c _ h1 (some p) (by simp)
+  · intro h
+    constructor
+    · subst h; rw [spmf_fmap_eq_map]
+      change PMF.map _ (PMF.pure none) = PMF.pure none; simp [PMF.pure_map]
+    · subst h; rw [spmf_fmap_eq_map]
+      change PMF.map _ (PMF.pure none) = PMF.pure none; simp [PMF.pure_map]
+
+/-- `PMF.bind` respects equality on the support. -/
+private lemma pmf_bind_congr {γ δ : Type*} (p : PMF γ) (f g : γ → PMF δ)
+    (h : ∀ x, p x ≠ 0 → f x = g x) : p.bind f = p.bind g := by
+  ext y; simp only [PMF.bind_apply]; congr 1; ext x
+  by_cases hx : p x = 0 <;> simp [hx, h x]
 
 /-- Main theorem about coupling and bind operations -/
 theorem IsCoupling.bind {α₁ α₂ β₁ β₂ : Type u}
@@ -106,8 +175,26 @@ theorem IsCoupling.bind {α₁ α₂ β₁ β₂ : Type u}
     IsCoupling (c.1 >>= λ (p : α₁ × α₂) => d p.1 p.2) (p >>= f) (q >>= g) := by
   obtain ⟨hc₁, hc₂⟩ := c.2
   constructor
-  · simp [← hc₁]; congr; funext ⟨a₁, a₂⟩; have := h a₁ a₂; sorry
-  · simp [← hc₂]; sorry
+  · rw [spmf_fmap_eq_map, bind_eq_pmf_bind, PMF.map_bind]
+    conv_rhs => rw [← hc₁, spmf_fmap_eq_map, bind_eq_pmf_bind, PMF.bind_map]
+    apply pmf_bind_congr; intro o ho
+    cases o with
+    | none => simp [PMF.pure_map]
+    | some ab =>
+      obtain ⟨a₁, a₂⟩ := ab
+      simp only [Function.comp, Option.map]
+      rw [← spmf_fmap_eq_map]
+      exact (h a₁ a₂ ho).map_fst
+  · rw [spmf_fmap_eq_map, bind_eq_pmf_bind, PMF.map_bind]
+    conv_rhs => rw [← hc₂, spmf_fmap_eq_map, bind_eq_pmf_bind, PMF.bind_map]
+    apply pmf_bind_congr; intro o ho
+    cases o with
+    | none => simp [PMF.pure_map]
+    | some ab =>
+      obtain ⟨a₁, a₂⟩ := ab
+      simp only [Function.comp, Option.map]
+      rw [← spmf_fmap_eq_map]
+      exact (h a₁ a₂ ho).map_snd
 
 /-- Existential version of `IsCoupling.bind` -/
 theorem IsCoupling.exists_bind {α₁ α₂ β₁ β₂ : Type u}
