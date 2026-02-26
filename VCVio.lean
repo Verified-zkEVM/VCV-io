@@ -31,6 +31,7 @@ import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
+import VCVio.EvalDist.TVDist
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.GenerateSeed
@@ -52,6 +53,7 @@ import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.SimSemantics.PreservesInv
 import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.ReaderT
 import VCVio.OracleComp.SimSemantics.SimulateQ

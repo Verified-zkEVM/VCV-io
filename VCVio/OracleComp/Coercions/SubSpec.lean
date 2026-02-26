@@ -44,6 +44,21 @@ infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
+variable {κ : Type w'} {spec₃ : OracleSpec κ}
+
+/-- Transitivity for `SubSpec`: if `spec₁ ⊂ₒ spec₂` and `spec₂ ⊂ₒ spec₃`,
+then `spec₁ ⊂ₒ spec₃`. -/
+def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
+  monadLift q := h₂.monadLift (h₁.monadLift q)
+  liftM_map q f := by
+    have h₁map := h₁.liftM_map (q := q) (f := f)
+    have h₁map' := congrArg h₂.monadLift h₁map
+    calc
+      h₂.monadLift (h₁.monadLift (f <$> q))
+          = h₂.monadLift (f <$> h₁.monadLift q) := h₁map'
+      _ = f <$> h₂.monadLift (h₁.monadLift q) := by
+          simpa using (h₂.liftM_map (q := h₁.monadLift q) (f := f))
+
 end SubSpec
 
 /-- `LawfulSubSpec` extends `SubSpec` with the requirement that lifting preserves

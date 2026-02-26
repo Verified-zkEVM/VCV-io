@@ -81,6 +81,22 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι�
   rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
+@[simp]
+lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (p : α → Prop) :
+    Pr[fun z => p z.1 | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[p | oa] := by
+  rw [show (fun z : α × QueryCount ι₀ => p z.1) = p ∘ Prod.fst from rfl,
+    ← probEvent_map, fst_map_run_simulateQ]
+
+@[simp]
+lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (x : α) :
+    Pr[= x | Prod.fst <$> (simulateQ (countingOracle (spec := spec₀)) oa).run] =
+      Pr[= x | oa] := by
+  rw [fst_map_run_simulateQ]
+
 -- -- lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : ι → ℕ) :
 -- --     (simulateT countingOracle oa).run qc =
 -- --       map id (qc + ·) <$> (simulateT countingOracle oa).run 0 := by

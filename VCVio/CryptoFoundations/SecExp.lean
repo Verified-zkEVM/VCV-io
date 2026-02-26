@@ -6,6 +6,7 @@ Authors: Devon Tuma
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
+import VCVio.EvalDist.TVDist
 
 /-!
 # Security Experiments
@@ -80,6 +81,32 @@ lemma ProbComp.advantage₂_eq_abs_sub_probFailure (p q : ProbComp Unit) :
   rw [show (1 - (Pr[⊥ | p]).toReal) - (1 - (Pr[⊥ | q]).toReal) =
     -((Pr[⊥ | p]).toReal - (Pr[⊥ | q]).toReal) from by ring]
   exact abs_neg _
+
+lemma ProbComp.advantage₂_nonneg (p q : ProbComp Unit) : 0 ≤ p.advantage₂ q :=
+  abs_nonneg _
+
+lemma ProbComp.advantage₂_triangle (p q r : ProbComp Unit) :
+    p.advantage₂ r ≤ p.advantage₂ q + q.advantage₂ r := by
+  unfold advantage₂; exact abs_sub_le _ _ _
+
+lemma ProbComp.advantage₂_le_sum_range {n : ℕ} (games : ℕ → ProbComp Unit) :
+    (games 0).advantage₂ (games n) ≤
+      ∑ i ∈ Finset.range n, (games i).advantage₂ (games (i + 1)) := by
+  induction n with
+  | zero => simp
+  | succ n ih =>
+    calc (games 0).advantage₂ (games (n + 1))
+      _ ≤ (games 0).advantage₂ (games n) + (games n).advantage₂ (games (n + 1)) :=
+          advantage₂_triangle _ _ _
+      _ ≤ (∑ i ∈ Finset.range n, (games i).advantage₂ (games (i + 1))) +
+          (games n).advantage₂ (games (n + 1)) := by gcongr
+      _ = ∑ i ∈ Finset.range (n + 1), (games i).advantage₂ (games (i + 1)) := by
+          rw [Finset.sum_range_succ]
+
+lemma ProbComp.advantage₂_eq_tvDist (p q : ProbComp Unit) :
+    p.advantage₂ q = tvDist p q := by
+  simp only [advantage₂, tvDist, SPMF.tvDist, PMF.tvDist_option_punit]
+  rfl
 
 /-- A security adversary bundling a computation with a bound on the number of queries it makes,
 where the bound must be shown to satisfy `IsQueryBound`.

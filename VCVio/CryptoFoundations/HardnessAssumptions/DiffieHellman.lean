@@ -6,65 +6,91 @@ Authors: Devon Tuma
 import VCVio.CryptoFoundations.HardnessAssumptions.HardHomogeneousSpace
 
 /-!
-# Diffie Hellman Assumptions
+# Diffie-Hellman Assumptions
 
-This file gives a way to represent assumptions such as discrete log or Diffie Hellman.
-We represent this as hardness assumptions on the corresponding hard homogenous space.
+This file defines DLog/CDH/DDH *via* the `HardHomogeneousSpace` experiments:
+- DLog = vectorization
+- CDH = parallelization
+- DDH = parallel testing
+
+This enforces the intended modeling choice directly at the definition level.
+
+For cyclic-group instantiations, we also define an explicit
+`NondegenerateGenerator` condition to rule out degenerate choices of base element.
 -/
 
--- namespace DiffieHellman
+open OracleComp OracleSpec ENNReal
 
--- def DHVec (p : ℕ) [Fact (Nat.Prime (p + 1))] : Type := { x : ZMod (p + 1) // x ≠ 0 }
+namespace DiffieHellman
 
--- -- Having `NeZero p` is reduntant but simplifies things
--- variable (p : ℕ) [hp : Fact (Nat.Prime (p + 1))] [hp0 : NeZero p]
+section HardHomogeneousModel
 
--- /-- "Fake" addition for the homogenous space, corresponding to multiplication in reality. -/
--- instance : Add (DHVec p) where
---   add | ⟨x, hx⟩, ⟨y, hy⟩ => ⟨x * y, mul_ne_zero hx hy⟩
+variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
+  [SampleableType V] [SampleableType P]
 
--- /-- The "zero" for this addition is the multiplicative identity. -/
--- instance : Zero (DHVec p) where
---   zero := ⟨1, one_ne_zero⟩
+/-- DLog adversary, modeled as vectorization on a hard homogeneous space. -/
+abbrev DLogAdversary (V P : Type) := vectorizationAdversary V P
 
--- /-- The "negation" for this addition is the multiplicative inverse. -/
--- instance : Neg (DHVec p) where
---   neg | ⟨x, hx⟩ => ⟨x⁻¹, inv_ne_zero hx⟩
+/-- DLog experiment, defined as `HardHomogeneousSpace.vectorizationExp`. -/
+abbrev dlogExp [DecidableEq V] (adversary : DLogAdversary V P) : ProbComp Bool :=
+  vectorizationExp (G := V) (P := P) adversary
 
--- instance : AddGroup (DHVec p) where
---   nsmul := nsmulRec
---   zsmul := zsmulRec
---   add_assoc | ⟨x, hx⟩, ⟨y, hy⟩, ⟨z, hz⟩ => Subtype.ext (mul_assoc x y z)
---   zero_add | ⟨x, hx⟩ => Subtype.ext (one_mul x)
---   add_zero | ⟨x, hx⟩ => Subtype.ext (mul_one x)
---   add_left_neg | ⟨x, hx⟩ => Subtype.ext (inv_mul_cancel hx)
+/-- CDH adversary, modeled as parallelization on a hard homogeneous space. -/
+abbrev CDHAdversary (V P : Type) := parallelizationAdversary V P
 
--- @[inline, reducible]
--- def DHPoint (p : ℕ) [Fact (Nat.Prime (p + 1))] : Type := DHVec p
+/-- CDH experiment, defined as `HardHomogeneousSpace.parallelizationExp`. -/
+abbrev cdhExp [DecidableEq P] (adversary : CDHAdversary V P) : ProbComp Bool :=
+  parallelizationExp (G := V) (P := P) adversary
 
--- /-- Homogenous space corresponding to discrete log problem in a finite field. -/
--- def DHHomogenousSpace : HomogeneousSpace (DHVec p) (DHPoint p) where
---   vadd | ⟨x, hx⟩, ⟨y, hy⟩ => ⟨y ^ (x.1 : ℕ), by simp [hy]⟩
---   vsub | ⟨⟨x, _⟩, hx⟩, ⟨⟨y, _⟩, hy⟩ => ⟨Nat.log x y, sorry⟩
---   zero_vadd | ⟨x, hx⟩ => Subtype.ext (by show x ^ _ = x; simp [Nat.mod_eq, hp0.1])
---   add_vadd | ⟨⟨x, _⟩, hx⟩, ⟨⟨y, _⟩, hy⟩, ⟨z, hz⟩ => Subtype.ext (by
---     -- Must be something in mathlib already right?
---     suffices z ^ (p + 1) = 1 by
---       show z ^ _ = (z ^ _) ^ _
---       simp only [Nat.add_eq, Nat.add_zero, ← pow_mul, mul_comm y x]
---       exact (pow_eq_pow_mod (x * y) (this)).symm
---     sorry
---   )
---   vsub_vadd' | ⟨x, hx⟩, ⟨y, hy⟩ => sorry
---   vadd_vsub' | ⟨x, hx⟩, ⟨y, hy⟩ => sorry
---   decidableEq_G := Subtype.instDecidableEqSubtype
---   decidableEq_P := Subtype.instDecidableEqSubtype
---   inhabited_G := sorry
---   inhabited_P := sorry
---   fintype_G := sorry
---   fintype_P := sorry
---   -- Using `⊤` won't work for computability
---   SampleableType_G := sorry
---   SampleableType_P := sorry
+/-- DDH adversary, modeled as parallel testing on a hard homogeneous space. -/
+abbrev DDHAdversary (V P : Type) := parallelTestingAdversary V P
 
--- end DiffieHellman
+/-- DDH experiment, defined as `HardHomogeneousSpace.parallelTesting_experiment`. -/
+abbrev ddhExp [DecidableEq V] (adversary : DDHAdversary V P) : ProbComp Bool :=
+  parallelTesting_experiment (G := V) (P := P) adversary
+
+/-- DDH advantage from the hard-homogeneous-space parallel-testing experiment. -/
+noncomputable abbrev ddhAdvantage [DecidableEq V]
+    (adversary : DDHAdversary V P) : ℝ≥0∞ :=
+  parallelTestingAdvantage (G := V) (P := P) adversary
+
+end HardHomogeneousModel
+
+section NondegenerateBase
+
+variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
+
+/-- A base point is nondegenerate when translating vectors from it is bijective. -/
+def NondegenerateBase (base : P) : Prop :=
+  Function.Bijective fun v : V => v +ᵥ base
+
+/-- In any additive torsor, every base point is nondegenerate. -/
+lemma nondegenerateBase (base : P) : NondegenerateBase (V := V) base := by
+  constructor
+  · intro v₁ v₂ h
+    simpa using congrArg (fun p => p -ᵥ base) h
+  · intro p
+    refine ⟨p -ᵥ base, ?_⟩
+    simp
+
+end NondegenerateBase
+
+section CyclicInstantiation
+
+variable {G : Type} [CommGroup G] [Fintype G]
+
+/-- In a cyclic-group style instantiation, this rules out degenerate base choices. -/
+def NondegenerateGenerator (g : G) : Prop :=
+  Function.Surjective fun a : Fin (Fintype.card G) => g ^ a.1
+
+lemma NondegenerateGenerator.ne_one [Nontrivial G] {g : G}
+    (hg : NondegenerateGenerator (G := G) g) : g ≠ 1 := by
+  intro hg1
+  rcases exists_ne (1 : G) with ⟨x, hx⟩
+  rcases hg x with ⟨a, ha⟩
+  have h1x : (1 : G) = x := by simpa [hg1] using ha
+  exact hx h1x.symm
+
+end CyclicInstantiation
+
+end DiffieHellman

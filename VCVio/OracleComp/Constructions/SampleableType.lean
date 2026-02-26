@@ -108,11 +108,6 @@ instance (n : ℕ) : SampleableType (Fin (n + 1)) where
   mem_support_selectElem := by simp
   probOutput_selectElem_eq x y := by simp
 
-instance (n : ℕ) : SampleableType (ZMod (n + 1)) where
-  selectElem := $[0..n]
-  mem_support_selectElem := by grind
-  probOutput_selectElem_eq x y := by grind
-
 /-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
 instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
   selectElem :=
@@ -169,6 +164,28 @@ instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
               (Nat.succ_pred (NeZero.ne n)).symm) y))
     rw [hx, hy]
     exact SampleableType.probOutput_selectElem_eq _ _
+
+/-- Version of `ZMod` selection using the `NeZero` typeclass, matching `Fin n`. -/
+instance (n : ℕ) [hn : NeZero n] : SampleableType (ZMod n) where
+  selectElem := (ZMod.finEquiv n) <$> ($ᵗ Fin n)
+  mem_support_selectElem x := by
+    rw [support_map]
+    refine ⟨(ZMod.finEquiv n).symm x, ?_, by simp⟩
+    simp
+  probOutput_selectElem_eq x y := by
+    calc
+      Pr[= x | (ZMod.finEquiv n) <$> ($ᵗ Fin n)] =
+          Pr[= (ZMod.finEquiv n).symm x | $ᵗ Fin n] := by
+            simpa using
+              (probOutput_map_injective ($ᵗ Fin n) (ZMod.finEquiv n).injective
+                ((ZMod.finEquiv n).symm x))
+      _ = Pr[= (ZMod.finEquiv n).symm y | $ᵗ Fin n] := by
+            exact SampleableType.probOutput_selectElem_eq _ _
+      _ = Pr[= y | (ZMod.finEquiv n) <$> ($ᵗ Fin n)] := by
+            symm
+            simpa using
+              (probOutput_map_injective ($ᵗ Fin n) (ZMod.finEquiv n).injective
+                ((ZMod.finEquiv n).symm y))
 
 /-- Select a uniform element from `Vector α n` by independently selecting `α` at each index. -/
 instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n) where

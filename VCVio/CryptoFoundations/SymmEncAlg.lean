@@ -17,7 +17,7 @@ secret keys of type `K`, and ciphertext space `C`.
 
 universe u v w
 
-open OracleSpec OracleComp
+open OracleSpec OracleComp ENNReal
 
 structure SymmEncAlg (M K C : ℕ → Type)
     (Q : Type v) extends OracleContext Q ProbComp where
@@ -48,14 +48,35 @@ def perfectSecrecy (encAlg : SymmEncAlg M K C Q) : Prop :=
       return (msg', ← encAlg.encrypt k msg')] =
     Pr[= msg | simulateQ encAlg.impl mgen]
 
--- /-- Shanon's theorem on perfect secrecy, showing that encryption and decryption must be determined
--- bijections between message and cipher-text space, and that keys must be chosen uniformly. -/
--- theorem perfectSecrecy_iff_of_card_eq [Fintype M] [Fintype K] [Fintype C]
---     (encAlg : SymmEncAlg m M K C) [encAlg.Complete] (h1 : Fintype.card M = Fintype.card K)
---     (h2 : Fintype.card K = Fintype.card C) : encAlg.perfectSecrecy ↔
---       (∀ k, [= k | encAlg.exec encAlg.keygen] = (Fintype.card K : ℝ≥0∞)⁻¹) ∧
---       (∀ m c, ∃! k, k ∈ (encAlg.exec encAlg.keygen).support ∧ encAlg.encrypt k m = c) :=
---   sorry
+/-- Shannon's theorem on perfect secrecy at a fixed security parameter: if the message space,
+key space, and ciphertext space have the same cardinality, then perfect secrecy holds iff
+keys are chosen uniformly and for each (message, ciphertext) pair there is a unique key
+that encrypts the message to that ciphertext.
+
+The old version used non-asymptotic `SymmEncAlg m M K C`; here we fix `sp : ℕ` and work
+at that security parameter.
+
+`deterministicEnc` asserts that encryption is deterministic (support is a singleton),
+which is required for the classical statement. -/
+theorem perfectSecrecy_iff_of_card_eq (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
+    [Fintype (M sp)] [Fintype (K sp)] [Fintype (C sp)]
+    (hComplete : encAlg.Complete)
+    (h1 : Fintype.card (M sp) = Fintype.card (K sp))
+    (h2 : Fintype.card (K sp) = Fintype.card (C sp))
+    (deterministicEnc : ∀ (k : K sp) (msg : M sp),
+      ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c}) :
+    (∀ mgen : OracleComp encAlg.spec (M sp), ∀ msg : M sp, ∀ σ : C sp,
+      Pr[= (msg, σ) | simulateQ encAlg.impl do
+        let msg' ← mgen
+        let k ← encAlg.keygen sp
+        return (msg', ← encAlg.encrypt k msg')] =
+      Pr[= msg | simulateQ encAlg.impl mgen]) ↔
+    ((∀ k : K sp, Pr[= k | simulateQ encAlg.impl (encAlg.keygen sp)] =
+        (Fintype.card (K sp) : ℝ≥0∞)⁻¹) ∧
+    (∀ msg : M sp, ∀ c : C sp, ∃! k : K sp,
+        k ∈ support (simulateQ encAlg.impl (encAlg.keygen sp)) ∧
+        c ∈ support (simulateQ encAlg.impl (encAlg.encrypt k msg)))) :=
+  sorry
 
 end perfectSecrecy
 

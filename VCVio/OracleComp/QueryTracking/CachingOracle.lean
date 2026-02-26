@@ -61,6 +61,21 @@ lemma apply_eq (t : spec.Domain) : cachingOracle t =
         let u ← query t
         modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
+@[simp]
+lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
+    Pr[⊥ | (simulateQ (cachingOracle (spec := spec₀)) oa).run cache] = Pr[⊥ | oa] := by
+  simp only [HasEvalPMF.probFailure_eq_zero]
+
+@[simp]
+lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+    [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
+    (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
+    NeverFail ((simulateQ (cachingOracle (spec := spec₀)) oa).run cache) ↔ NeverFail oa := by
+  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
+    HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
+
 end cachingOracle
 
 -- -- NOTE: need to change universe levels b/c `unifSpec` doesn't use `pNat`.
