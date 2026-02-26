@@ -98,14 +98,14 @@ def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.Query
         have hseed_i : seed i = xs := by
           have := congrArg (fun s => s i) hEq
           simpa using this.symm
-        simpa [hseed_i, List.mem_cons, hlen_xs]
+        simp [hseed_i, List.mem_cons, hlen_xs]
       · have hseed_j : seed j = rest j := by
           have := congrArg (fun s => s j) hEq
           simpa [Function.update_of_ne hj] using this.symm
         have hlen_seed_j : (seed j).length = if j ∈ is then n j else 0 := by
           simpa [hseed_j] using hrest_len j
         -- membership in `i :: is` with `j ≠ i`
-        simpa [List.mem_cons, hj, hlen_seed_j]
+        simp [List.mem_cons, hj, hlen_seed_j]
     · intro h
       let xs : List (spec.Range i) := seed i
       let rest : QuerySeed spec :=
@@ -136,8 +136,8 @@ def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.Query
             have : (seed j).length = if j ∈ is then n j else 0 := by
               simpa [List.mem_cons, hj] using this
             by_cases hi : i ∈ is
-            · simpa [rest, hi, this]
-            · simpa [rest, hi, Function.update_of_ne hj, this]
+            · simp [rest, hi, this]
+            · simp [rest, hi, Function.update_of_ne hj, this]
         · -- and the pure update reconstructs `seed`
           rw [support_pure, Set.mem_singleton_iff]
           ext j
@@ -147,99 +147,6 @@ def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.Query
           · by_cases hi : i ∈ is
             · simp [rest, hi, Function.update_of_ne hj]
             · simp [rest, hi, Function.update_of_ne hj]
-
-lemma probOutput_generateSeedCounts [spec.Fintype]
-    (n : ι → ℕ) (is : List ι) (his : is.Nodup)
-    (seed : QuerySeed spec) :
-    Pr[= seed | generateSeedCounts (spec := spec) n is] =
-      if h : seed ∈ support (generateSeedCounts (spec := spec) n is)
-      then 1 / ((is.map (fun i => (Fintype.card (spec.Range i) : ENNReal) ^ (n i))).prod)
-      else 0 := by
-  classical
-  induction is with
-  | nil =>
-    simp [OracleComp.generateSeedCounts, support_pure]
-  | cons i is ih =>
-    have his' : is.Nodup := by simpa using his.tail
-    have hni : i ∉ is := by simpa using his.not_mem
-    by_cases hseed : seed ∈ support (generateSeedCounts (spec := spec) n (i :: is))
-    · have hseed_len :
-        ∀ j, (seed j).length = if j ∈ (i :: is) then n j else 0 := by
-        simpa [support_generateSeedCounts (spec := spec) n (i :: is), Set.mem_setOf_eq] using hseed
-      let xs : List (spec.Range i) := seed i
-      let rest : QuerySeed spec := Function.update seed i ([] : List (spec.Range i))
-      have hxs_len : xs.length = n i := by
-        simpa [xs, List.mem_cons] using hseed_len i
-      have hrest_mem : rest ∈ support (generateSeedCounts (spec := spec) n is) := by
-        rw [support_generateSeedCounts (spec := spec) n is, Set.mem_setOf_eq]
-        intro j
-        by_cases hj : j = i
-        · subst hj
-          simp [rest, hni]
-        · have := hseed_len j
-          have hlen : (seed j).length = if j ∈ is then n j else 0 := by
-            simpa [List.mem_cons, hj] using this
-          simpa [rest, Function.update_of_ne hj, hlen]
-      -- unfold the head step and collapse the two binds to the unique decomposition
-      simp only [OracleComp.generateSeedCounts_cons]
-      -- pick out the unique `xs = seed i`
-      have huniq_xs :
-          ∀ xs' ∈ support (replicate (n i) ($ᵗ spec.Range i)),
-            seed ∈ support (do
-              let rest' ← generateSeedCounts (spec := spec) n is
-              return Function.update rest' i xs') → xs' = xs := by
-        intro xs' _ hmem
-        rcases (mem_support_bind_iff.mp hmem) with ⟨rest', _, hpure⟩
-        have hEq : Function.update rest' i xs' = seed := by
-          simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
-        have : seed i = xs' := by
-          have := congrArg (fun s => s i) hEq
-          simpa using this
-        simpa [xs, this]
-      rw [probOutput_bind_eq_mul (mx := replicate (n i) ($ᵗ spec.Range i))
-        (my := fun xs' => do
-          let rest' ← generateSeedCounts (spec := spec) n is
-          return Function.update rest' i xs') (y := seed) xs huniq_xs]
-      -- now pick out the unique `rest = update seed i []` (since `i ∉ is`)
-      have huniq_rest :
-          ∀ rest' ∈ support (generateSeedCounts (spec := spec) n is),
-            seed ∈ support (pure (Function.update rest' i xs)) → rest' = rest := by
-        intro rest' hrest' hpure
-        have hEq : Function.update rest' i xs = seed := by
-          simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
-        funext j
-        by_cases hj : j = i
-        · subst hj
-          -- `rest' i = []` since `i ∉ is`
-          have hlen0 : (rest' i).length = 0 := by
-            have hlen :
-                ∀ k, (rest' k).length = if k ∈ is then n k else 0 := by
-              simpa [support_generateSeedCounts (spec := spec) n is, Set.mem_setOf_eq] using hrest'
-            simpa [hni] using (hlen i)
-          have : rest' i = ([] : List (spec.Range i)) := List.eq_nil_of_length_eq_zero hlen0
-          simp [rest, Function.update_self, this]
-        · have : rest' j = seed j := by
-            have := congrArg (fun s => s j) hEq
-            simpa [Function.update_of_ne hj] using this
-          simp [rest, Function.update_of_ne hj, this]
-      rw [probOutput_bind_eq_mul (mx := generateSeedCounts (spec := spec) n is)
-        (my := fun rest' => pure (Function.update rest' i xs)) (y := seed) rest huniq_rest]
-      -- compute the factors
-      have hrep :
-          Pr[= xs | replicate (n i) ($ᵗ spec.Range i)] =
-            1 / ((Fintype.card (spec.Range i) : ENNReal) ^ (n i)) := by
-        simpa [hxs_len, xs] using
-          (probOutput_replicate_uniformSample (α := spec.Range i) (xs := xs) (n := n i))
-      have hih :
-          Pr[= rest | generateSeedCounts (spec := spec) n is] =
-            1 / ((is.map (fun j => (Fintype.card (spec.Range j) : ENNReal) ^ (n j))).prod) := by
-        have : rest ∈ support (generateSeedCounts (spec := spec) n is) := hrest_mem
-        simpa [ih (his := his') rest, this] using (ih (his := his') rest)
-      have hpure :
-          Pr[= seed | pure (Function.update rest i xs)] = 1 := by
-        simp [xs, rest, Function.update_update, Function.update_self]
-      simp [hseed, hrest_mem, hrep, hih, hpure, xs, rest, List.prod_cons]
-    · simp [hseed, probOutput_eq_zero_of_not_mem_support hseed]
 
 end generateSeedCounts
 
@@ -295,21 +202,27 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
       let x ← Prod.fst <$> (simulateQ seededOracle oa).run seed
       ob x] = Pr[= y | oa >>= ob] := by
   classical
-  -- Main proof is by structural induction on `oa`.
-  revert y
+  -- Main proof is by structural induction on `oa`, with `qc`/`js` generalized
+  -- so we can update the seed-generation parameters after consuming a value.
+  revert qc js y
   induction oa using OracleComp.inductionOn with
   | pure x =>
-    intro y
+    intro qc js y
     -- Seed generation is independent of `pure`.
     simp
   | query_bind t mx ih =>
-    intro y
+    intro qc js y
     -- Expand the simulated computation at the first query.
     -- (Further steps will use the distributional equivalence of using a pre-generated
     -- uniform head vs. querying the real oracle, threading the remaining seed.)
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map, seededOracle.apply_eq, StateT.run]
-    -- TODO: finish (requires a “head/tail independence” lemma for `generateSeed` at index `t`).
+    -- At this point, the goal splits into:
+    -- - the **seed-empty** branch at index `t` (falls back to `query t`), and
+    -- - the **seed-nonempty** branch (uses the head and updates the seed).
+    --
+    -- The missing ingredient is a lemma describing the joint distribution of
+    -- `seed t`'s head and the updated seed when `seed ← generateSeed spec₀ qc js`.
     sorry
 
 @[simp]

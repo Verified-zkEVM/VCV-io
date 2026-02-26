@@ -65,45 +65,54 @@ def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
 
 end Correct
 
--- section IND_CPA
+section IND_CPA_Oracle
 
--- variable [DecidableEq M] [DecidableEq C]
+variable [DecidableEq M] [DecidableEq C]
 
--- -- Simplifying assumption: The algorithm is defined over `ProbComp`
+/-- Oracle-based multi-query IND-CPA game. The adversary gets oracle access to an encryption
+oracle that encrypts one of two challenge messages depending on a hidden bit.
 
--- def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
---   unifSpec ++ₒ (M × M →ₒ C) -- Second oracle for adversary to request challenge
+API changes from old version:
+- `unifSpec ++ₒ` → `unifSpec +`
+- `⟨fun (query () (m₁, m₂)) => ...⟩` → `fun (m₁, m₂) => ...`
+- `idOracle ++ₛₒ` → `QueryImpl.ofLift ... .liftTarget ... +`
+- `guard (b = b')` → `return (b == b')` (Bool-valued experiment) -/
 
--- def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
---   PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
---   -- with poly functors: `ProbComp ((M × M) × (C → ProbComp Bool))`
+def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
+  unifSpec + (M × M →ₒ C)
 
--- /-- Can be shown this is equivalent to below definition for asymptotic security. -/
--- def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
---     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
---       (StateT (M × M →ₒ C).QueryCache ProbComp) :=
---   have so : QueryImpl (M × M →ₒ C) ProbComp := ⟨fun (query () (m₁, m₂)) =>
---     encAlg.encrypt pk (if b then m₁ else m₂)⟩
---   idOracle ++ₛₒ so.withCaching
+def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
+  PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
 
--- def IND_CPA_queryImpl (encAlg : AsymmEncAlg ProbComp M PK SK C)
---     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
---       (StateT (M × M →ₒ C).QueryCache ProbComp) :=
---   have so : QueryImpl (M × M →ₒ C) ProbComp := ⟨fun (query () (m₁, m₂)) =>
---     encAlg.encrypt pk (if b then m₁ else m₂)⟩
---   idOracle ++ₛₒ so
+def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
+    (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
+      (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
+  have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
+    encAlg.encrypt pk (if b then m₁ else m₂)
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT ((M × M →ₒ C).QueryCache) ProbComp) + so.withCaching
 
--- def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
---     (adversary : encAlg.IND_CPA_adversary) : ProbComp Unit := do
---   let b ← $ᵗ Bool
---   let (pk, _sk) ← encAlg.keygen
---   let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
---   guard (b = b')
+def IND_CPA_queryImpl (encAlg : AsymmEncAlg ProbComp M PK SK C)
+    (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
+      (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
+  have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
+    encAlg.encrypt pk (if b then m₁ else m₂)
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT ((M × M →ₒ C).QueryCache) ProbComp) +
+    so.liftTarget (StateT ((M × M →ₒ C).QueryCache) ProbComp)
 
--- noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
---     (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
---   [= () | IND_CPA_experiment adversary] - 1 / 2
+def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) : ProbComp Bool := do
+  let b ← $ᵗ Bool
+  let (pk, _sk) ← encAlg.keygen
+  let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
+  return (b == b')
 
+noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
+  Pr[= true | IND_CPA_experiment adversary] - 1 / 2
+
+-- Old lemma (uses guard-based experiment, needs rework for Bool-valued version):
 -- /-- The probability of the IND-CPA experiment is the average of the probability of the experiment
 -- with the challenge being true and the probability of the experiment with the challenge being false. -/
 -- lemma probOutput_IND_CPA_experiment_eq_add {encAlg : AsymmEncAlg ProbComp M PK SK C}
@@ -122,7 +131,7 @@ end Correct
 --   have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by field_simp; rw [mul_comm, mul_div, mul_one]
 --   simp [this]
 
--- end IND_CPA
+end IND_CPA_Oracle
 
 -- section decryptionOracle
 
