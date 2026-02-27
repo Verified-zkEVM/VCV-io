@@ -7,7 +7,7 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 If you are new to this repo, do this first:
 
 1. Run `lake exe cache get && lake build`.
-2. Read `Examples/OneTimePad.lean` for a complete, modern proof pattern.
+2. Read `Examples/OneTimePad.lean` for a compact modern proof (correctness and privacy).
 3. Keep `VCVio/` as your default work area.
 4. If probability lemmas fail unexpectedly, first check for `[spec.Fintype]` and `[spec.Inhabited]`.
 
@@ -187,7 +187,7 @@ Use UpperCamelCase: `ForkInput`, `QueryImpl`, `SecExp`, `SymmEncAlg`.
 
 ## Canonical Examples By Task
 
-- Need a complete modern crypto proof flow: start with `Examples/OneTimePad.lean`.
+- Need a compact modern crypto proof flow (correctness + privacy): start with `Examples/OneTimePad.lean`.
 - Working on oracle computation core behavior: read `VCVio/OracleComp/OracleComp.lean`.
 - Working on probability/evaluation lemmas: read `VCVio/EvalDist/Monad/Basic.lean`.
 - Working on subspec coercions/lifting issues: read `VCVio/OracleComp/Coercions/SubSpec.lean`.
