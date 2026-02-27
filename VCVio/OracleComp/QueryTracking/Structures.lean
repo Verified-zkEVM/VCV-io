@@ -377,6 +377,17 @@ variable [DecidableEq ι]
 def update (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i)) : QuerySeed spec :=
   Function.update seed i xs
 
+@[simp]
+lemma update_self (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i)) :
+    seed.update i xs i = xs := by
+  simp [update]
+
+@[simp]
+lemma update_of_ne (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i))
+    (j : ι) (hj : j ≠ i) :
+    seed.update i xs j = seed j := by
+  simp [update, Function.update_of_ne hj]
+
 /-- Append a list of values to the seed at index `i`. -/
 def addValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : QuerySeed spec :=
   Function.update seed i (seed i ++ us)
@@ -403,6 +414,11 @@ def prependValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : 
 @[simp]
 lemma prependValues_self (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) :
     seed.prependValues us i = us ++ seed i := by
+  simp [prependValues]
+
+@[simp]
+lemma prependValues_singleton (seed : QuerySeed spec) {i : ι} (u : spec.Range i) :
+    seed.prependValues [u] i = u :: seed i := by
   simp [prependValues]
 
 @[simp]
@@ -443,6 +459,20 @@ lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
         exact this
       simp [Function.update_of_ne hj, hj']
 
+lemma eq_of_prependValues_singleton_eq (seed rest : QuerySeed spec)
+    {i : ι} (u : spec.Range i) (h : rest.prependValues [u] = seed) :
+    u :: rest i = seed i ∧ rest = Function.update seed i ((seed i).tail) := by
+  have hEq :
+      [u] = (seed i).take 1 ∧ rest = Function.update seed i ((seed i).drop 1) :=
+    eq_of_prependValues_eq (seed := seed) (rest := rest) (i := i)
+      (xs := [u]) (n := 1) (by simp) h
+  refine ⟨?_, ?_⟩
+  · have hi : [u] ++ rest i = seed i := by
+      have := congrArg (fun s => s i) h
+      simpa [prependValues] using this
+    simpa using hi
+  · simpa using hEq.2
+
 abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
     QuerySeed spec :=
   seed.addValues [u]
@@ -465,6 +495,54 @@ def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
     by_cases hj : j = i
     · subst hj; simp [takeAtIndex]
     · simp [takeAtIndex, Function.update_of_ne hj]
+
+/-- Pop one value from index `i`, returning the consumed value and updated seed when nonempty. -/
+def pop (seed : QuerySeed spec) (i : ι) : Option (spec.Range i × QuerySeed spec) :=
+  match seed i with
+  | [] => none
+  | u :: us => some (u, Function.update seed i us)
+
+@[simp]
+lemma pop_eq_none_iff (seed : QuerySeed spec) (i : ι) :
+    seed.pop i = none ↔ seed i = [] := by
+  unfold pop
+  cases hsi : seed i <;> simp
+
+@[simp]
+lemma pop_eq_some_of_cons (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (us : List (spec.Range i))
+    (h : seed i = u :: us) :
+    seed.pop i = some (u, Function.update seed i us) := by
+  unfold pop
+  simp [h]
+
+lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (rest : QuerySeed spec)
+    (h : seed.pop i = some (u, rest)) :
+    u :: rest i = seed i := by
+  unfold pop at h
+  cases hsi : seed i with
+  | nil =>
+    simp [hsi] at h
+  | cons u0 us =>
+    simp [hsi] at h
+    rcases h with ⟨hu, hrest⟩
+    subst hu hrest
+    simp
+
+lemma rest_eq_update_tail_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (rest : QuerySeed spec)
+    (h : seed.pop i = some (u, rest)) :
+    rest = Function.update seed i ((seed i).tail) := by
+  unfold pop at h
+  cases hsi : seed i with
+  | nil =>
+    simp [hsi] at h
+  | cons u0 us =>
+    simp [hsi] at h
+    rcases h with ⟨hu, hrest⟩
+    subst hu hrest
+    simp
 
 /-- Construct a query seed from a list at a single index. -/
 def ofList {i : ι} (xs : List (spec.Range i)) : QuerySeed spec :=
@@ -494,6 +572,34 @@ lemma addValues_eq_iff (seed seed' : QuerySeed spec)
     seed.addValues xs = seed' ↔ seed i ++ xs = seed' i ∧
       ∀ j, j ≠ i → seed j = seed' j :=
   eq_comm.trans (eq_addValues_iff seed' seed xs)
+
+@[simp]
+lemma pop_prependValues_singleton (s' : QuerySeed spec) (i : ι) (u : spec.Range i) :
+    (s'.prependValues [u]).pop i = some (u, s') := by
+  simp only [pop, prependValues, Function.update_self, List.singleton_append,
+    Function.update_idem, Function.update_eq_self]
+
+lemma prependValues_singleton_injective (i : ι) :
+    Function.Injective (fun (p : spec.Range i × QuerySeed spec) => p.2.prependValues [p.1]) := by
+  intro ⟨u₁, s₁⟩ ⟨u₂, s₂⟩ h
+  have ht := congr_fun h i
+  simp only [prependValues_singleton] at ht
+  obtain ⟨hu, hst⟩ := List.cons_eq_cons.mp ht
+  refine Prod.ext hu (funext fun j => ?_)
+  by_cases hj : j = i
+  · exact hj ▸ hst
+  · have := congr_fun h j; simp only [prependValues_of_ne _ _ hj] at this; exact this
+
+lemma eq_prependValues_of_pop_eq_some {seed : QuerySeed spec} {i : ι}
+    {u : spec.Range i} {rest : QuerySeed spec} (h : seed.pop i = some (u, rest)) :
+    rest.prependValues [u] = seed := by
+  have hcons := cons_of_pop_eq_some seed i u rest h
+  have hrest := rest_eq_update_tail_of_pop_eq_some seed i u rest h
+  subst hrest; funext j
+  by_cases hj : j = i
+  · subst hj; simp only [prependValues_singleton, Function.update_self]
+    simpa [Function.update_self] using hcons
+  · simp only [prependValues_of_ne _ _ hj, Function.update_of_ne hj]
 
 end QuerySeed
 
