@@ -3,17 +3,20 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.EvalDist.Monad.Map
 
 /-!
 # Evaluation Distributions of Computations with `BitVec`
 
-File for lemmas about `evalDist` and `support` involving `BitVec`.
+Lemmas about `probOutput` involving `BitVec`, generic over any monad `m` with `[HasEvalSPMF m]`.
+
+The `SampleableType (BitVec n)` instance is defined in
+`VCVio.OracleComp.Constructions.SampleableType`.
 -/
 
-open BitVec OracleSpec OracleComp
+open BitVec
 
-variable {ι : Type _} {spec : OracleSpec ι} {α β γ : Type _}
+variable {α β γ : Type _}
     {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasEvalSPMF m]
 
 @[simp, grind =]
@@ -30,9 +33,3 @@ lemma probOutput_xor_map {n : ℕ} (mx : m (BitVec n)) (x y : BitVec n) :
     have := congrArg (x ^^^ ·) h; simp at this; exact this
   conv_lhs => rw [show y = x ^^^ (x ^^^ y) by simp]
   exact probOutput_map_injective mx hinj (x ^^^ y)
-
-/-- Choose a random bit-vector by converting a random number in number between `0` and `2 ^ n`-/
-instance (n : ℕ) : SampleableType (BitVec n) where
-  selectElem := ofFin <$> ($ᵗ Fin (2 ^ n))
-  mem_support_selectElem x := by aesop
-  probOutput_selectElem_eq x y := by grind
