@@ -24,7 +24,46 @@ then re-samples one oracle response, bounding the probability that both runs suc
 - `generateSeed` returns `ProbComp`, lifted via `liftComp`.
 -/
 
-open OracleSpec OracleComp ENNReal Function
+open OracleSpec OracleComp ENNReal Function Finset
+
+/-! ### ENNReal Cauchy-Schwarz inequality -/
+
+private lemma ENNReal.two_mul_le_add_sq (a b : ℝ≥0∞) :
+    2 * a * b ≤ a ^ 2 + b ^ 2 := by
+  rcases eq_or_ne a ⊤ with rfl | ha
+  · simp [top_pow, top_add, le_top]
+  rcases eq_or_ne b ⊤ with rfl | hb
+  · simp [top_pow, add_top, le_top]
+  rw [← ENNReal.coe_toNNReal ha, ← ENNReal.coe_toNNReal hb]
+  exact_mod_cast _root_.two_mul_le_add_sq a.toNNReal b.toNNReal
+
+private lemma ENNReal.sq_sum_le_card_mul_sum_sq {ι' : Type*}
+    (s : Finset ι') (f : ι' → ℝ≥0∞) :
+    (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, f i ^ 2 := by
+  rw [sq, Finset.sum_mul_sum]
+  suffices h : 2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j ≤ 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) by
+    have h2 : (2 : ℝ≥0∞) ≠ 0 := by norm_num
+    have h2' : (2 : ℝ≥0∞) ≠ ⊤ := by norm_num
+    calc ∑ i ∈ s, ∑ j ∈ s, f i * f j
+      _ = 2⁻¹ * (2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j) := by
+          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
+      _ ≤ 2⁻¹ * (2 * (↑s.card * ∑ i ∈ s, f i ^ 2)) := by gcongr
+      _ = ↑s.card * ∑ i ∈ s, f i ^ 2 := by
+          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
+  calc 2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j
+    _ = ∑ i ∈ s, ∑ j ∈ s, 2 * (f i * f j) := by
+        rw [Finset.mul_sum]; congr 1; ext i; rw [Finset.mul_sum]
+    _ ≤ ∑ i ∈ s, ∑ j ∈ s, (f i ^ 2 + f j ^ 2) := by
+        gcongr with i _ j _
+        calc 2 * (f i * f j) = 2 * f i * f j := (mul_assoc ..).symm
+          _ ≤ f i ^ 2 + f j ^ 2 := ENNReal.two_mul_le_add_sq (f i) (f j)
+    _ = ∑ i ∈ s, (↑s.card * f i ^ 2 + ∑ j ∈ s, f j ^ 2) := by
+        congr 1; ext i
+        rw [Finset.sum_add_distrib, Finset.sum_const, nsmul_eq_mul]
+    _ = ↑s.card * ∑ i ∈ s, f i ^ 2 + ↑s.card * ∑ i ∈ s, f i ^ 2 := by
+        rw [Finset.sum_add_distrib, Finset.mul_sum, Finset.sum_const, nsmul_eq_mul,
+          Finset.mul_sum]
+    _ = 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) := by rw [← two_mul]
 
 namespace OracleComp
 
@@ -55,7 +94,9 @@ def fork (main : OracleComp spec α)
   | none => return none
   | some s =>
     let u ← liftComp ($ᵗ spec.Range i) spec
-    if (seed i)[↑s + 1]? = some u then
+    -- `seed' := take s ++ [u]` replaces the value at index `s` (0-based) when present.
+    -- The collision guard must compare against that same index.
+    if (seed i)[↑s]? = some u then
       return none
     else
       let seed' := (seed.takeAtIndex i ↑s).addValue i u
@@ -67,13 +108,43 @@ def fork (main : OracleComp spec α)
 
 variable (main : OracleComp spec α) (qb : ι → ℕ)
     (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
-    [spec.Fintype] [spec.Inhabited]
+    [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec]
 
+omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- If `fork` succeeds (returns `some`), both runs agree on the fork index. -/
 theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
     (h : some (x₁, x₂) ∈ support (fork main qb js i cf)) :
       ∃ s, cf x₁ = some s ∧ cf x₂ = some s := by
-  sorry
+  simp only [fork] at h
+  rw [mem_support_bind_iff] at h; obtain ⟨seed, -, h⟩ := h
+  rw [mem_support_bind_iff] at h; obtain ⟨y₁, -, h⟩ := h
+  rcases hcf : cf y₁ with _ | s
+  · simp_all
+  · simp only [hcf] at h
+    rw [mem_support_bind_iff] at h; obtain ⟨u, -, h⟩ := h
+    split_ifs at h with heq
+    · simp_all
+    · rw [mem_support_bind_iff] at h; obtain ⟨y₂, -, h⟩ := h
+      split_ifs at h with hcf₂
+      · rw [mem_support_pure_iff] at h
+        obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj h)
+        exact ⟨s, hcf, hcf₂⟩
+      · simp_all
+
+omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- On `fork` support, first-projection success equals old pair-style success event. -/
+private lemma probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
+    Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf] =
+      Pr[fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] := by
+  refine probEvent_ext ?_
+  intro r hr
+  rcases r with _ | ⟨x₁, x₂⟩
+  · simp
+  · have hmem : some (x₁, x₂) ∈ support (fork main qb js i cf) := by
+      simpa using hr
+    rcases cf_eq_of_mem_support_fork (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
+      x₁ x₂ hmem with ⟨t, h₁, h₂⟩
+    simp [h₁, h₂]
 
 /-- Key bound of the forking lemma: the probability that both runs succeed with fork point `s`
 is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/
@@ -84,13 +155,102 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
             fork main qb js i cf] := by
   sorry
 
+omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- Sum of disjoint fork-success events is at most the total `some` probability. -/
+private lemma sum_probEvent_fork_le_tsum_some :
+    ∑ s : Fin (qb i + 1),
+      Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf]
+    ≤ ∑' (p : α × α), Pr[= some p | fork main qb js i cf] := by
+  classical
+  simp_rw [probEvent_eq_tsum_ite]
+  have hsplit : ∀ s : Fin (qb i + 1),
+      (∑' (r : Option (α × α)),
+        if r.map (cf ∘ Prod.fst) = some (some s) then Pr[= r | fork main qb js i cf] else 0)
+      = ∑' (p : α × α), if cf p.1 = some s then
+          Pr[= some p | fork main qb js i cf] else 0 := by
+    intro s
+    have h := tsum_option (fun r : Option (α × α) =>
+      if r.map (cf ∘ Prod.fst) = some (some s) then
+        Pr[= r | fork main qb js i cf] else 0) ENNReal.summable
+    simp only [Option.map, comp_apply, reduceCtorEq, ite_false, zero_add,
+      Option.some.injEq] at h
+    exact h
+  simp_rw [hsplit]
+  rw [← tsum_fintype (L := .unconditional _), ENNReal.tsum_comm]
+  refine ENNReal.tsum_le_tsum fun p => ?_
+  rw [tsum_fintype (L := .unconditional _)]
+  rcases hcf : cf p.1 with _ | s₀
+  · simp
+  · rw [Finset.sum_eq_single s₀ (by intro b _ hb; simp [Ne.symm hb]) (by simp)]
+    simp
+
+omit [DecidableEq ι] [(i : ι) → SampleableType (spec.Range i)]
+  [spec.DecidableEq] [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- The acceptance probability `∑ Pr[cf(main) = some s]` is at most 1. -/
+private lemma sum_probOutput_cf_le_one :
+    ∑ s : Fin (qb i + 1), Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] ≤ 1 := by
+  calc ∑ s, Pr[= (some s : Option _) | cf <$> main]
+    _ ≤ ∑' (x : Option (Fin (qb i + 1))), Pr[= x | cf <$> main] := by
+        rw [← tsum_fintype (L := .unconditional _)]
+        have h := tsum_option (fun x : Option (Fin (qb i + 1)) =>
+          Pr[= x | cf <$> main]) ENNReal.summable
+        rw [h]; exact le_add_self
+    _ ≤ 1 := tsum_probOutput_le_one
+
 /-- Main forking lemma: the failure probability is bounded by `1 - acc * (acc / q - 1/h)`. -/
 theorem probOutput_none_fork_le :
     let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
     let q := qb i + 1
     Pr[= none | fork main qb js i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
-  sorry
+  simp only
+  set ps : Fin (qb i + 1) → ℝ≥0∞ := fun s => Pr[= (some s : Option _) | cf <$> main]
+  set acc := ∑ s, ps s
+  set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
+  have hacc_ne_top : acc ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top (sum_probOutput_cf_le_one main qb i cf)
+  have htotal := probOutput_none_add_tsum_some (mx := fork main qb js i cf)
+  rw [HasEvalPMF.probFailure_eq_zero, tsub_zero] at htotal
+  have hne_top : (∑' p, Pr[= some p | fork main qb js i cf]) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top (htotal ▸ le_add_self)
+  have hPr_eq : Pr[= none | fork main qb js i cf] =
+      1 - ∑' p, Pr[= some p | fork main qb js i cf] :=
+    ENNReal.eq_sub_of_add_eq hne_top htotal
+  calc Pr[= none | fork main qb js i cf]
+    _ = 1 - ∑' p, Pr[= some p | fork main qb js i cf] := hPr_eq
+    _ ≤ 1 - ∑ s, Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) |
+            fork main qb js i cf] :=
+        tsub_le_tsub_left (sum_probEvent_fork_le_tsum_some main qb js i cf) 1
+    _ ≤ 1 - ∑ s, (ps s ^ 2 - ps s / h) :=
+        tsub_le_tsub_left (Finset.sum_le_sum fun s _ =>
+          le_probOutput_fork main qb js i cf s) 1
+    _ ≤ 1 - acc * (acc / ↑(qb i + 1) - h⁻¹) := by
+        apply tsub_le_tsub_left _ 1
+        have hcs := ENNReal.sq_sum_le_card_mul_sum_sq
+          (Finset.univ : Finset (Fin (qb i + 1))) ps
+        simp only [Finset.card_univ, Fintype.card_fin] at hcs
+        calc acc * (acc / ↑(qb i + 1) - h⁻¹)
+          _ = acc * (acc / ↑(qb i + 1)) - acc * h⁻¹ :=
+              ENNReal.mul_sub (fun _ _ => hacc_ne_top)
+          _ = acc ^ 2 / ↑(qb i + 1) - acc / h := by
+              rw [div_eq_mul_inv, div_eq_mul_inv, ← mul_assoc, sq, div_eq_mul_inv]
+          _ ≤ (∑ s, ps s ^ 2) - acc / h := by
+              gcongr; rw [div_eq_mul_inv]
+              have hn : ((qb i + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by simp
+              calc acc ^ 2 * (↑(qb i + 1))⁻¹
+                  _ ≤ (↑(qb i + 1) * ∑ s, ps s ^ 2) * (↑(qb i + 1))⁻¹ := by gcongr
+                  _ = ∑ s, ps s ^ 2 := by
+                      rw [mul_assoc, mul_comm (∑ s, ps s ^ 2) _, ← mul_assoc,
+                        ENNReal.mul_inv_cancel hn (by simp), one_mul]
+          _ ≤ (∑ s, ps s ^ 2) - ∑ s, ps s / h := by
+              gcongr; simp_rw [div_eq_mul_inv]; rw [← Finset.sum_mul]
+          _ ≤ ∑ s, (ps s ^ 2 - ps s / h) := by
+              rw [tsub_le_iff_right]
+              calc ∑ s, ps s ^ 2
+                ≤ ∑ s, ((ps s ^ 2 - ps s / h) + ps s / h) :=
+                    Finset.sum_le_sum fun s _ => le_tsub_add
+                _ = ∑ s, (ps s ^ 2 - ps s / h) + ∑ s, ps s / h :=
+                    Finset.sum_add_distrib
 
 end OracleComp
 
