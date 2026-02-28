@@ -345,24 +345,151 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
       (mx := (liftComp (generateSeed spec qb js) spec : OracleComp spec (QuerySeed spec)))
       (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
     intro seed hseed
-    stop
     refine (probOutput_bind_congr_le_add
-      (mx := (simulateQ seededOracle main).run' seed)
+      (mx := ((simulateQ seededOracle main).run seed :
+        OracleComp spec (α × QuerySeed spec)))
       (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
-    intro x₁ hx₁
-    by_cases hcfx₁ : cf x₁ = some s
-    · simp [hcfx₁]
-      refine (probOutput_bind_congr_le_add
-        (mx := (liftComp ($ᵗ spec.Range i) spec : OracleComp spec (spec.Range i)))
-        (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
-      intro u hu
-      by_cases hu' : (seed i)[↑s]? = some u
-      · simp [hu']
-        exact probOutput_le_one
-      · simp [hu']
-    · have hcfx₁' : (some s : Option (Fin (qb i + 1))) ≠ cf x₁ := by
-        simpa [eq_comm] using hcfx₁
-      simp [hcfx₁, hcfx₁']
+    intro a ha
+    cases hca : cf a.1 with
+    | none =>
+        have hL :
+            Pr[= z | do
+              let u ← liftM ($ᵗ spec.Range i)
+              (fun a₂ : α × QuerySeed spec ↦ some (none, cf a₂.1)) <$>
+                (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
+          rw [probOutput_eq_zero_iff]
+          simp [support_bind, support_map, z]
+        rw [hL]
+        simp [z]
+    | some t =>
+        by_cases hts : t = s
+        · cases hts
+          simp [z]
+          refine (probOutput_bind_congr_le_add
+            (mx := (liftComp ($ᵗ spec.Range i) spec : OracleComp spec (spec.Range i)))
+            (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
+          intro u hu
+          by_cases hu' : (seed i)[↑s]? = some u
+          · have h1 :
+                Pr[= z | (fun a ↦ some (some s, cf a.1)) <$>
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] ≤ 1 :=
+                probOutput_le_one
+            have h2 :
+                (1 : ℝ≥0∞) ≤
+                  Pr[= z |
+                      (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                        if (seed i)[↑s]? = some u then pure none
+                        else do
+                          let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                          if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] +
+                    Pr[= (some s : Option (Fin (qb i + 1))) |
+                      if (seed i)[↑s]? = some u then
+                        (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
+                      else pure none] := by
+              have hnonneg :
+                  0 ≤ Pr[= z |
+                      (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                        if (seed i)[↑s]? = some u then pure none
+                        else do
+                          let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                          if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] := zero_le _
+              have haux :
+                  (1 : ℝ≥0∞) ≤
+                    Pr[= z |
+                        (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                          if (seed i)[↑s]? = some u then pure none
+                          else do
+                            let a_1 ← (simulateQ seededOracle main).run
+                              ((seed.takeAtIndex i ↑s).addValue i u)
+                            if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] + 1 := by
+                simpa using (add_le_add_right hnonneg (1 : ℝ≥0∞))
+              simpa [hu'] using haux
+            exact le_trans h1 h2
+          · have hmono :
+                Pr[= z |
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u) >>=
+                    (fun x => pure (some (some s, cf x.1)))] ≤
+                Pr[= z |
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u) >>=
+                    (fun x =>
+                      (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                        (if cf x.1 = some s then pure (some (a.1, x.1)) else pure none))] := by
+              refine probOutput_bind_mono ?_
+              intro x hx
+              by_cases hxs : cf x.1 = some s
+              · simpa [hxs, hca, z]
+              · have hrhs_nonneg :
+                    0 ≤ Pr[= z |
+                      (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                        (if cf x.1 = some s then
+                          (pure (some (a.1, x.1)) : OracleComp spec (Option (α × α)))
+                         else pure none)] := zero_le _
+                have hxs' : (some s : Option (Fin (qb i + 1))) ≠ cf x.1 := by
+                  simpa [eq_comm] using hxs
+                simpa [hxs, hxs', z] using hrhs_nonneg
+            have hu'' : (seed i)[↑s]? ≠ some u := by simpa using hu'
+            have hif :
+                (if (seed i)[↑s]? = some u then
+                    (pure none : OracleComp spec (Option (α × α)))
+                 else
+                    do
+                      let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                      if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none) =
+                (do
+                  let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                  if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none) := by
+              exact if_neg hu''
+            have hmono' :
+                Pr[= z |
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u) >>=
+                    (fun x => pure (some (some s, cf x.1)))] ≤
+                Pr[= z |
+                  (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                    (if (seed i)[↑s]? = some u then
+                       (pure none : OracleComp spec (Option (α × α)))
+                     else do
+                       let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                       if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] := by
+              rw [hif]
+              simpa [map_eq_bind_pure_comp] using hmono
+            have hadd :
+                Pr[= z |
+                  (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                    (if (seed i)[↑s]? = some u then
+                       (pure none : OracleComp spec (Option (α × α)))
+                     else do
+                       let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                       if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] ≤
+                  Pr[= z |
+                    (fun r ↦ Option.map (Prod.map cf cf) r) <$>
+                      (if (seed i)[↑s]? = some u then
+                         (pure none : OracleComp spec (Option (α × α)))
+                       else do
+                         let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
+                         if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] +
+                    Pr[= (some s : Option (Fin (qb i + 1))) |
+                      if (seed i)[↑s]? = some u then
+                        (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
+                      else pure none] := by
+              exact le_add_of_nonneg_right (zero_le _)
+            exact le_trans hmono' hadd
+        · have hts' : (some t : Option (Fin (qb i + 1))) ≠ some s := by
+            simpa using hts
+          have hzero :
+              Pr[= z | do
+                let u ← liftM ($ᵗ spec.Range i)
+                (fun a₂ : α × QuerySeed spec ↦ some (some t, cf a₂.1)) <$>
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
+            rw [probOutput_eq_zero_iff]
+            simp [support_bind, support_map, z, hts']
+          have hzero' :
+              Pr[= z | do
+                let u ← liftM ($ᵗ spec.Range i)
+                (fun a₂ : α × QuerySeed spec ↦ some (some t, cf a₂.1)) <$>
+                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
+            simpa using hzero
+          rw [hzero']
+          exact zero_le _
   have hNoGuardMinusLeRhs :
       Pr[= z | noGuardComp] - Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] ≤
         Pr[= z | f <$> fork main qb js i cf] := by

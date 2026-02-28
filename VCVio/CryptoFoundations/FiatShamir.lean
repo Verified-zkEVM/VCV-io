@@ -52,7 +52,21 @@ def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
       (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
     StateT.run' (simulateQ (idImpl + ro) comp) ∅
   lift_probComp := monadLift
-  exec_lift_probComp c := by sorry
+  exec_lift_probComp c := by
+    let ro : QueryImpl (M × PC →ₒ Ω)
+      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
+    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
+    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
+      simpa [MonadLift.monadLift] using
+        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
+    have hid : ∀ t s, (idImpl t).run' s = query t := by
+      intro t s
+      rfl
+    simpa using
+      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
+        (s := (∅ : (M × PC →ₒ Ω).QueryCache)))
 
 namespace FiatShamir
 
