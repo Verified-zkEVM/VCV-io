@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.ProbComp
+import VCVio.EvalDist.BitVec
 
 /-!
 # Uniform Selection Over a Type
@@ -186,6 +187,12 @@ instance (n : ℕ) [hn : NeZero n] : SampleableType (ZMod n) where
             simpa using
               (probOutput_map_injective ($ᵗ Fin n) (ZMod.finEquiv n).injective
                 ((ZMod.finEquiv n).symm y))
+
+/-- Choose a random bit-vector by converting a random number between `0` and `2 ^ n`. -/
+instance (n : ℕ) : SampleableType (BitVec n) where
+  selectElem := BitVec.ofFin <$> ($ᵗ Fin (2 ^ n))
+  mem_support_selectElem x := by aesop
+  probOutput_selectElem_eq x y := by grind
 
 /-- Select a uniform element from `Vector α n` by independently selecting `α` at each index. -/
 instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n) where

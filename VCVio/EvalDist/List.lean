@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.Defs.NeverFails
 import ToMathlib.General
 
 /-!
@@ -11,15 +11,13 @@ import ToMathlib.General
 
 This file contains lemmas for `probEvent` and `probOutput` of computations involving `List`.
 We also include `Vector` as a related case.
--/
 
-open OracleSpec OracleComp
+All lemmas are generic over any monad `m` with `[HasEvalSPMF m]`.
+-/
 
 universe u v w
 
-namespace OracleComp
-
-variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}
+variable {α β γ : Type v}
     {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
 
 open List
@@ -323,12 +321,7 @@ end ListVectorMmap
 -- Vector.mapM (Std/Batteries) uses MonadSatisfying internally and doesn't
 -- reduce cleanly for generic HasEvalSPMF monads.
 
-end OracleComp
-
-/-! ## NeverFail lemmas for list monadic operations
-
-These lemmas are generic over any monad `m` with `[HasEvalSPMF m]`.
--/
+/-! ## NeverFail lemmas for list monadic operations -/
 
 section NeverFail
 

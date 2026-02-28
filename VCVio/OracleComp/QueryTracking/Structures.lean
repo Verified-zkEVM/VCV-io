@@ -33,9 +33,72 @@ instance : EmptyCollection (QueryCache spec) := ⟨fun _ => none⟩
 @[simp]
 lemma empty_apply (t : spec.Domain) : (∅ : QueryCache spec) t = none := rfl
 
+@[ext]
+protected lemma ext {c₁ c₂ : QueryCache spec} (h : ∀ t, c₁ t = c₂ t) : c₁ = c₂ :=
+  funext h
+
+/-! ### Partial Order
+
+A `QueryCache` carries a natural partial order where `c₁ ≤ c₂` means every cached entry
+in `c₁` also appears (with the same value) in `c₂`. The empty cache is the bottom element. -/
+
+instance : PartialOrder (QueryCache spec) where
+  le c₁ c₂ := ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u
+  le_refl _ _ _ h := h
+  le_trans _ _ _ h₁₂ h₂₃ _ _ h := h₂₃ (h₁₂ h)
+  le_antisymm a b hab hba := by
+    funext t
+    cases ha : a t with
+    | none =>
+      cases hb : b t with
+      | none => rfl
+      | some u => exact absurd (hba hb) (by simp [ha])
+    | some u => exact (hab ha).symm
+
+instance : OrderBot (QueryCache spec) where
+  bot := ∅
+  bot_le _ := by intro _ _ h; simp at h
+
+@[simp]
+lemma bot_eq_empty : (⊥ : QueryCache spec) = ∅ := rfl
+
+lemma le_def {c₁ c₂ : QueryCache spec} :
+    c₁ ≤ c₂ ↔ ∀ ⦃t⦄ ⦃u : spec.Range t⦄, c₁ t = some u → c₂ t = some u :=
+  ⟨fun h => h, fun h => h⟩
+
+/-! ### Query membership -/
+
+/-- Check whether a query `t` has a cached response. -/
+def isCached (cache : QueryCache spec) (t : spec.Domain) : Bool :=
+  (cache t).isSome
+
+@[simp]
+lemma isCached_empty (t : spec.Domain) : isCached (∅ : QueryCache spec) t = false := rfl
+
+/-! ### Conversion to a set of query-response pairs -/
+
+/-- The set of all `(query, response)` pairs stored in the cache. -/
+def toSet (cache : QueryCache spec) : Set ((t : spec.Domain) × spec.Range t) :=
+  fun ⟨t, r⟩ => cache t = some r
+
+@[simp]
+lemma mem_toSet {cache : QueryCache spec} {t : spec.Domain} {r : spec.Range t} :
+    ⟨t, r⟩ ∈ cache.toSet ↔ cache t = some r :=
+  Iff.rfl
+
+@[simp]
+lemma toSet_empty : (∅ : QueryCache spec).toSet = ∅ := by
+  ext ⟨t, r⟩; simp
+
+lemma toSet_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) : c₁.toSet ⊆ c₂.toSet :=
+  fun ⟨_, _⟩ hx => h hx
+
+/-! ### Cache update -/
+
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
 
-/-- Add a index + input pair to the cache by updating the function (wrapper around `Function.update`) -/
+/-- Add an index + input pair to the cache by updating the function
+(wrapper around `Function.update`). -/
 def cacheQuery (t : spec.Domain) (u : spec.Range t) : QueryCache spec :=
   Function.update cache t u
 
@@ -50,6 +113,99 @@ omit [spec.DecidableEq] in
 lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u) t' = cache t' := by
   simp [cacheQuery, h]
+
+omit [spec.DecidableEq] in
+lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :
+    cache ≤ cache.cacheQuery t u := by
+  intro t' u' ht'
+  by_cases heq : t' = t
+  · subst heq; simp [h] at ht'
+  · rwa [cacheQuery_of_ne cache u heq]
+
+omit [spec.DecidableEq] in
+lemma cacheQuery_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) (t : spec.Domain)
+    (u : spec.Range t) : c₁.cacheQuery t u ≤ c₂.cacheQuery t u := by
+  intro t' u' ht'
+  by_cases heq : t' = t
+  · subst heq; simp only [cacheQuery_self] at ht' ⊢; exact ht'
+  · have h₁ := cacheQuery_of_ne c₁ u heq
+    have h₂ := cacheQuery_of_ne c₂ u heq
+    rw [h₁] at ht'; rw [h₂]; exact h ht'
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma isCached_cacheQuery_self (t : spec.Domain) (u : spec.Range t) :
+    (cache.cacheQuery t u).isCached t = true := by
+  simp [isCached]
+
+omit [spec.DecidableEq] in
+@[simp]
+lemma isCached_cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
+    (cache.cacheQuery t u).isCached t' = cache.isCached t' := by
+  simp [isCached, cacheQuery_of_ne cache u h]
+
+/-! ### Sum spec projections -/
+
+section sum
+
+variable {ι₁ ι₂ : Type*} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+
+/-- Project a cache for `spec₁ + spec₂` onto `spec₁`. -/
+protected def fst (cache : QueryCache (spec₁ + spec₂)) : QueryCache spec₁ :=
+  fun t => cache (.inl t)
+
+/-- Project a cache for `spec₁ + spec₂` onto `spec₂`. -/
+protected def snd (cache : QueryCache (spec₁ + spec₂)) : QueryCache spec₂ :=
+  fun t => cache (.inr t)
+
+/-- Embed a cache for `spec₁` into one for `spec₁ + spec₂`. -/
+protected def inl (cache : QueryCache spec₁) : QueryCache (spec₁ + spec₂) :=
+  fun | .inl t => cache t | .inr _ => none
+
+/-- Embed a cache for `spec₂` into one for `spec₁ + spec₂`. -/
+protected def inr (cache : QueryCache spec₂) : QueryCache (spec₁ + spec₂) :=
+  fun | .inl _ => none | .inr t => cache t
+
+@[simp] lemma fst_apply (cache : QueryCache (spec₁ + spec₂)) (t : ι₁) :
+    cache.fst t = cache (.inl t) := rfl
+
+@[simp] lemma snd_apply (cache : QueryCache (spec₁ + spec₂)) (t : ι₂) :
+    cache.snd t = cache (.inr t) := rfl
+
+@[simp] lemma inl_apply_inl (cache : QueryCache spec₁) (t : ι₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)) (.inl t) = cache t := rfl
+
+@[simp] lemma inl_apply_inr (cache : QueryCache spec₁) (t : ι₂) :
+    (cache.inl : QueryCache (spec₁ + spec₂)) (.inr t) = none := rfl
+
+@[simp] lemma inr_apply_inl (cache : QueryCache spec₂) (t : ι₁) :
+    (cache.inr : QueryCache (spec₁ + spec₂)) (.inl t) = none := rfl
+
+@[simp] lemma inr_apply_inr (cache : QueryCache spec₂) (t : ι₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)) (.inr t) = cache t := rfl
+
+@[simp] lemma fst_inl (cache : QueryCache spec₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)).fst = cache := rfl
+
+@[simp] lemma snd_inr (cache : QueryCache spec₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)).snd = cache := rfl
+
+@[simp] lemma fst_inr (cache : QueryCache spec₂) :
+    (cache.inr : QueryCache (spec₁ + spec₂)).fst = ∅ := rfl
+
+@[simp] lemma snd_inl (cache : QueryCache spec₁) :
+    (cache.inl : QueryCache (spec₁ + spec₂)).snd = ∅ := rfl
+
+@[simp] lemma fst_empty :
+    (∅ : QueryCache (spec₁ + spec₂)).fst = (∅ : QueryCache spec₁) := rfl
+
+@[simp] lemma snd_empty :
+    (∅ : QueryCache (spec₁ + spec₂)).snd = (∅ : QueryCache spec₂) := rfl
+
+instance : Coe (QueryCache spec₁) (QueryCache (spec₁ + spec₂)) := ⟨QueryCache.inl⟩
+instance : Coe (QueryCache spec₂) (QueryCache (spec₁ + spec₂)) := ⟨QueryCache.inr⟩
+
+end sum
 
 end QueryCache
 
@@ -221,6 +377,17 @@ variable [DecidableEq ι]
 def update (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i)) : QuerySeed spec :=
   Function.update seed i xs
 
+@[simp]
+lemma update_self (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i)) :
+    seed.update i xs i = xs := by
+  simp [update]
+
+@[simp]
+lemma update_of_ne (seed : QuerySeed spec) (i : ι) (xs : List (spec.Range i))
+    (j : ι) (hj : j ≠ i) :
+    seed.update i xs j = seed j := by
+  simp [update, Function.update_of_ne hj]
+
 /-- Append a list of values to the seed at index `i`. -/
 def addValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : QuerySeed spec :=
   Function.update seed i (seed i ++ us)
@@ -247,6 +414,11 @@ def prependValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : 
 @[simp]
 lemma prependValues_self (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) :
     seed.prependValues us i = us ++ seed i := by
+  simp [prependValues]
+
+@[simp]
+lemma prependValues_singleton (seed : QuerySeed spec) {i : ι} (u : spec.Range i) :
+    seed.prependValues [u] i = u :: seed i := by
   simp [prependValues]
 
 @[simp]
@@ -287,6 +459,20 @@ lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
         exact this
       simp [Function.update_of_ne hj, hj']
 
+lemma eq_of_prependValues_singleton_eq (seed rest : QuerySeed spec)
+    {i : ι} (u : spec.Range i) (h : rest.prependValues [u] = seed) :
+    u :: rest i = seed i ∧ rest = Function.update seed i ((seed i).tail) := by
+  have hEq :
+      [u] = (seed i).take 1 ∧ rest = Function.update seed i ((seed i).drop 1) :=
+    eq_of_prependValues_eq (seed := seed) (rest := rest) (i := i)
+      (xs := [u]) (n := 1) (by simp) h
+  refine ⟨?_, ?_⟩
+  · have hi : [u] ++ rest i = seed i := by
+      have := congrArg (fun s => s i) h
+      simpa [prependValues] using this
+    simpa using hi
+  · simpa using hEq.2
+
 abbrev addValue (seed : QuerySeed spec) (i : ι) (u : spec.Range i) :
     QuerySeed spec :=
   seed.addValues [u]
@@ -309,6 +495,54 @@ def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
     by_cases hj : j = i
     · subst hj; simp [takeAtIndex]
     · simp [takeAtIndex, Function.update_of_ne hj]
+
+/-- Pop one value from index `i`, returning the consumed value and updated seed when nonempty. -/
+def pop (seed : QuerySeed spec) (i : ι) : Option (spec.Range i × QuerySeed spec) :=
+  match seed i with
+  | [] => none
+  | u :: us => some (u, Function.update seed i us)
+
+@[simp]
+lemma pop_eq_none_iff (seed : QuerySeed spec) (i : ι) :
+    seed.pop i = none ↔ seed i = [] := by
+  unfold pop
+  cases hsi : seed i <;> simp
+
+@[simp]
+lemma pop_eq_some_of_cons (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (us : List (spec.Range i))
+    (h : seed i = u :: us) :
+    seed.pop i = some (u, Function.update seed i us) := by
+  unfold pop
+  simp [h]
+
+lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (rest : QuerySeed spec)
+    (h : seed.pop i = some (u, rest)) :
+    u :: rest i = seed i := by
+  unfold pop at h
+  cases hsi : seed i with
+  | nil =>
+    simp [hsi] at h
+  | cons u0 us =>
+    simp [hsi] at h
+    rcases h with ⟨hu, hrest⟩
+    subst hu hrest
+    simp
+
+lemma rest_eq_update_tail_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
+    (u : spec.Range i) (rest : QuerySeed spec)
+    (h : seed.pop i = some (u, rest)) :
+    rest = Function.update seed i ((seed i).tail) := by
+  unfold pop at h
+  cases hsi : seed i with
+  | nil =>
+    simp [hsi] at h
+  | cons u0 us =>
+    simp [hsi] at h
+    rcases h with ⟨hu, hrest⟩
+    subst hu hrest
+    simp
 
 /-- Construct a query seed from a list at a single index. -/
 def ofList {i : ι} (xs : List (spec.Range i)) : QuerySeed spec :=
@@ -338,6 +572,34 @@ lemma addValues_eq_iff (seed seed' : QuerySeed spec)
     seed.addValues xs = seed' ↔ seed i ++ xs = seed' i ∧
       ∀ j, j ≠ i → seed j = seed' j :=
   eq_comm.trans (eq_addValues_iff seed' seed xs)
+
+@[simp]
+lemma pop_prependValues_singleton (s' : QuerySeed spec) (i : ι) (u : spec.Range i) :
+    (s'.prependValues [u]).pop i = some (u, s') := by
+  simp only [pop, prependValues, Function.update_self, List.singleton_append,
+    Function.update_idem, Function.update_eq_self]
+
+lemma prependValues_singleton_injective (i : ι) :
+    Function.Injective (fun (p : spec.Range i × QuerySeed spec) => p.2.prependValues [p.1]) := by
+  intro ⟨u₁, s₁⟩ ⟨u₂, s₂⟩ h
+  have ht := congr_fun h i
+  simp only [prependValues_singleton] at ht
+  obtain ⟨hu, hst⟩ := List.cons_eq_cons.mp ht
+  refine Prod.ext hu (funext fun j => ?_)
+  by_cases hj : j = i
+  · exact hj ▸ hst
+  · have := congr_fun h j; simp only [prependValues_of_ne _ _ hj] at this; exact this
+
+lemma eq_prependValues_of_pop_eq_some {seed : QuerySeed spec} {i : ι}
+    {u : spec.Range i} {rest : QuerySeed spec} (h : seed.pop i = some (u, rest)) :
+    rest.prependValues [u] = seed := by
+  have hcons := cons_of_pop_eq_some seed i u rest h
+  have hrest := rest_eq_update_tail_of_pop_eq_some seed i u rest h
+  subst hrest; funext j
+  by_cases hj : j = i
+  · subst hj; simp only [prependValues_singleton, Function.update_self]
+    simpa [Function.update_self] using hcons
+  · simp only [prependValues_of_ne _ _ hj, Function.update_of_ne hj]
 
 end QuerySeed
 

@@ -183,6 +183,33 @@ def seededOracle :
 
 namespace seededOracle
 
+/-- The probability that a lifted uniform sample equals a fixed value is `(card α)⁻¹`. -/
+lemma probEvent_liftComp_uniformSample_eq_of_eq
+    {ι : Type} {spec : OracleSpec ι} [DecidableEq ι]
+    [(i : ι) → SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec]
+    [spec.Fintype] [spec.Inhabited]
+    {i : ι} (u₀ : spec.Range i) :
+    probEvent (liftComp (uniformSample (spec.Range i)) spec)
+      (fun u => u₀ = u) =
+      (↑(Fintype.card (spec.Range i)) : ENNReal)⁻¹ := by
+  rw [probEvent_eq_eq_probOutput', probOutput_liftComp, probOutput_uniformSample]
+
+private lemma evalDist_generateSeed_eq_canonical
+    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
+    [∀ i, SampleableType (spec₀.Range i)] [spec₀.Fintype] [spec₀.Inhabited]
+    (qc : ι₀ → ℕ) (js : List ι₀) :
+    evalDist (generateSeed spec₀ qc js) =
+      evalDist (generateSeed spec₀ (fun i => qc i * js.count i) js.dedup) := by
+  refine OracleComp.evalDist_generateSeed_eq_of_countEq (spec := spec₀)
+    (qc := qc) (js := js)
+    (qc' := fun i => qc i * js.count i)
+    (js' := js.dedup) ?_
+  intro i
+  by_cases hi : i ∈ js
+  · simp [List.count_dedup, hi]
+  · simp [hi, List.count_eq_zero_of_not_mem]
+
 @[simp]
 lemma apply_eq (t : spec.Domain) :
     seededOracle t = StateT.mk fun seed =>
@@ -190,10 +217,184 @@ lemma apply_eq (t : spec.Domain) :
       | u :: us => pure (u, Function.update seed t us)
       | [] => (·, seed) <$> OracleComp.query t := rfl
 
+lemma run_bind_query_eq_pop {α : Type u}
+    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :
+    (((seededOracle t) >>= fun u => simulateQ seededOracle (mx u)).run seed) =
+      match seed.pop t with
+      | none => do
+          let u ← liftM (query t)
+          (simulateQ seededOracle (mx u)).run seed
+      | some (u, seed') =>
+          (simulateQ seededOracle (mx u)).run seed' := by
+  cases hst : seed t with
+  | nil =>
+    simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
+  | cons u us =>
+    simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
+
+lemma run_bind_query_eq_pop_bindform {α : Type u}
+    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :
+    (((StateT.mk fun seed =>
+        match seed t with
+        | u :: us => pure (u, Function.update seed t us)
+        | [] => liftM (query t) >>= pure ∘ fun x => (x, seed)) >>=
+      fun x => simulateQ seededOracle (mx x)) seed) =
+      match seed.pop t with
+      | none => do
+          let u ← liftM (query t)
+          (simulateQ seededOracle (mx u)).run seed
+      | some (u, seed') =>
+          (simulateQ seededOracle (mx u)).run seed' := by
+  simpa [map_eq_bind_pure_comp] using
+    (run_bind_query_eq_pop (spec := spec) (t := t) (mx := mx) seed)
+
+private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
+    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
+    [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
+    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [spec₀.Fintype] [spec₀.Inhabited]
+    (qc : ι₀ → ℕ) (js : List ι₀)
+    {α : Type} (oa : OracleComp spec₀ α) :
+    evalDist (do
+      let seed ← liftComp (generateSeed spec₀ qc js) spec₀
+      (simulateQ seededOracle oa).run' seed : OracleComp spec₀ α) =
+    evalDist oa := by
+  classical
+  revert qc js
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+    intro qc js
+    apply evalDist_ext; intro a
+    simp
+  | query_bind t mx ih =>
+    intro qc js
+    -- Prove at the evalDist level, not pointwise
+    -- First establish the run' decomposition
+    have hrun' : ∀ s : QuerySeed spec₀,
+        (do let u ← seededOracle t; simulateQ seededOracle (mx u) :
+          StateT _ (OracleComp spec₀) α).run' s =
+        match s.pop t with
+        | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
+        | some (u, s') => (simulateQ seededOracle (mx u)).run' s' := by
+      intro s
+      show Prod.fst <$>
+        (seededOracle t >>= fun u => simulateQ seededOracle (mx u)).run s = _
+      rw [run_bind_query_eq_pop]
+      cases s.pop t with
+      | none => simp [map_bind]
+      | some p => rfl
+    -- Use the decomposition to prove evalDist equality
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
+      id_map]
+    apply evalDist_ext; intro x
+    simp_rw [hrun']
+    rw [probOutput_bind_eq_tsum]
+    simp_rw [probOutput_liftComp]
+    by_cases hcount : qc t * js.count t = 0
+    · -- All seeds have s t = [], pop = none.
+      have hpop : ∀ s ∈ support (generateSeed spec₀ qc js), s.pop t = none := by
+        intro s hs; rw [QuerySeed.pop_eq_none_iff]
+        rw [support_generateSeed (spec := spec₀)] at hs
+        have hlen : (s t).length = qc t * js.count t := hs t
+        exact List.eq_nil_of_length_eq_zero (hlen.trans hcount)
+      -- Replace match with none branch (zero terms vanish)
+      have step1 : ∀ s,
+          Pr[= s | generateSeed spec₀ qc js] *
+            Pr[= x | match s.pop t with
+              | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
+              | some (u, s') => (simulateQ seededOracle (mx u)).run' s'] =
+          Pr[= s | generateSeed spec₀ qc js] *
+            Pr[= x | liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s] := by
+        intro s
+        by_cases hs : s ∈ support (generateSeed spec₀ qc js)
+        · simp [hpop s hs]
+        · have h0 : Pr[= s | generateSeed spec₀ qc js] = 0 :=
+            (probOutput_eq_zero_iff _ _).2 hs
+          simp [h0]
+      simp_rw [step1, probOutput_bind_eq_tsum (liftM (query t))]
+      -- ∑' s, Pr[=s|gen] * ∑' u, Pr[=u|query t] * Pr[=x|run'(mx u) s]
+      -- Distribute and swap
+      simp_rw [← ENNReal.tsum_mul_left, mul_left_comm]
+      rw [ENNReal.tsum_comm]
+      simp_rw [ENNReal.tsum_mul_left]
+      congr 1; ext u; congr 1
+      have hih : Pr[= x | (liftComp (generateSeed spec₀ qc js) spec₀ >>= fun seed =>
+          (simulateQ seededOracle (mx u)).run' seed)] = Pr[= x | mx u] :=
+        congrFun (congrArg DFunLike.coe (ih u qc js)) x
+      rw [show Pr[= x | liftComp (generateSeed spec₀ qc js) spec₀ >>= fun seed =>
+          (simulateQ seededOracle (mx u)).run' seed] =
+        ∑' s, Pr[= s | generateSeed spec₀ qc js] *
+          Pr[= x | (simulateQ seededOracle (mx u)).run' s] from by
+        rw [probOutput_bind_eq_tsum]; simp_rw [probOutput_liftComp]] at hih
+      exact hih
+    · push_neg at hcount
+      -- All seeds in support have s t ≠ [], so pop = some.
+      have hpop_some : ∀ s ∈ support (generateSeed spec₀ qc js),
+          ∃ u s', s.pop t = some (u, s') := by
+        intro s hs
+        have hne : s t ≠ [] :=
+          ne_nil_of_mem_support_generateSeed (spec := spec₀) (qc := qc) (js := js) s t hs
+            (Nat.pos_of_ne_zero (by omega))
+        obtain ⟨u, us, hcons⟩ := List.exists_cons_of_ne_nil hne
+        exact ⟨u, Function.update s t us, QuerySeed.pop_eq_some_of_cons s t u us hcons⟩
+      -- Replace match with some branch for seeds in support (others are 0)
+      have step1 : ∀ s,
+          Pr[= s | generateSeed spec₀ qc js] *
+            Pr[= x | match s.pop t with
+              | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
+              | some (u, s') => (simulateQ seededOracle (mx u)).run' s'] =
+          Pr[= s | generateSeed spec₀ qc js] *
+            (match s.pop t with
+              | none => 0
+              | some (u, s') =>
+                  Pr[= x | (simulateQ seededOracle (mx u)).run' s']) := by
+        intro s
+        by_cases hs : s ∈ support (generateSeed spec₀ qc js)
+        · obtain ⟨u, s', hpop⟩ := hpop_some s hs; simp [hpop]
+        · simp [(probOutput_eq_zero_iff _ _).2 hs]
+      simp_rw [step1]
+      -- Reparametrize: ∑' s, f(s) = ∑' (u,s'), f(s'.prependValues [u])
+      -- using injectivity of prependValues and support ⊆ range
+      have h_supp : Function.support (fun s =>
+          Pr[=s | generateSeed spec₀ qc js] *
+            match s.pop t with
+            | none => 0
+            | some (u, s') => Pr[=x | (simulateQ seededOracle (mx u)).run' s']) ⊆
+          Set.range (fun (p : spec₀.Range t × QuerySeed spec₀) =>
+            p.2.prependValues [p.1]) := by
+        intro s hs
+        simp only [Function.mem_support] at hs
+        have hmem : s ∈ support (generateSeed spec₀ qc js) := by
+          by_contra h; exact hs (by simp [(probOutput_eq_zero_iff _ _).2 h])
+        obtain ⟨u, s', hpop⟩ := hpop_some s hmem
+        exact ⟨(u, s'), QuerySeed.eq_prependValues_of_pop_eq_some hpop⟩
+      rw [← (QuerySeed.prependValues_singleton_injective t).tsum_eq h_supp]
+      simp only [QuerySeed.pop_prependValues_singleton]
+      rw [ENNReal.tsum_prod', probOutput_bind_eq_tsum]
+      congr 1; ext u
+      -- Goal: ∑' s', Pr[=s'.prependValues [u]|gen] * Pr[=x|run'(mx u) s']
+      --     = Pr[=u|liftM (query t)] * Pr[=x|mx u]
+      have hpos : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
+      have hfact := fun s' => probOutput_generateSeed_prependValues spec₀ qc js u s' hpos
+      simp_rw [hfact, mul_assoc]
+      rw [ENNReal.tsum_mul_left]
+      congr 1
+      · exact (probOutput_query t u).symm
+      · suffices h : Pr[= x | (do
+            let seed ← liftComp (generateSeed spec₀
+                (Function.update (fun i => qc i * js.count i) t (qc t * js.count t - 1))
+                js.dedup) spec₀
+            (simulateQ seededOracle (mx u)).run' seed)] = Pr[= x | mx u] by
+          rw [probOutput_bind_eq_tsum] at h
+          simp_rw [probOutput_liftComp] at h
+          exact h
+        exact congrFun (congrArg DFunLike.coe (ih u _ js.dedup)) x
+
 -- @[simp] -- proof deferred; removing simp to avoid unsound rewriting
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
+    [OracleSpec.LawfulSubSpec unifSpec spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
@@ -201,34 +402,23 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
       let x ← Prod.fst <$> (simulateQ seededOracle oa).run seed
       ob x] = Pr[= y | oa >>= ob] := by
-  classical
-  -- Main proof is by structural induction on `oa`, with `qc`/`js` generalized
-  -- so we can update the seed-generation parameters after consuming a value.
-  revert qc js y
-  induction oa using OracleComp.inductionOn with
-  | pure x =>
-    intro qc js y
-    -- Seed generation is independent of `pure`.
-    simp
-  | query_bind t mx ih =>
-    intro qc js y
-    -- Expand the simulated computation at the first query.
-    -- (Further steps will use the distributional equivalence of using a pre-generated
-    -- uniform head vs. querying the real oracle, threading the remaining seed.)
-    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
-      id_map, seededOracle.apply_eq, StateT.run]
-    -- At this point, the goal splits into:
-    -- - the **seed-empty** branch at index `t` (falls back to `query t`), and
-    -- - the **seed-nonempty** branch (uses the head and updates the seed).
-    --
-    -- The missing ingredient is a lemma describing the joint distribution of
-    -- `seed t`'s head and the updated seed when `seed ← generateSeed spec₀ qc js`.
-    sorry
+  have h := evalDist_liftComp_generateSeed_bind_simulateQ_run' qc js oa
+  rw [show (do
+    let seed ← liftComp (generateSeed spec₀ qc js) spec₀
+    let x ← Prod.fst <$> (simulateQ seededOracle oa).run seed
+    ob x) = ((do
+    let seed ← liftComp (generateSeed spec₀ qc js) spec₀
+    (simulateQ seededOracle oa).run' seed) >>= ob) from by simp [bind_assoc]]
+  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  congr 1; ext x
+  congr 1
+  exact congrFun (congrArg DFunLike.coe h) x
 
 @[simp]
 lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
+    [OracleSpec.LawfulSubSpec unifSpec spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :

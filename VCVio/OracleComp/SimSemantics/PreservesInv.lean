@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.EvalDist.Monad.Basic
 
 /-!
@@ -107,6 +108,20 @@ theorem simulateQ_run_preservesInv
 
 end OracleComp
 
+namespace QueryImpl
+
+/-- If `so'` preserves `Inv`, then `so' ∘ₛ so` also preserves `Inv` for any `so`. -/
+lemma PreservesInv.compose {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ : Type} {so' : QueryImpl spec' (StateT σ ProbComp)}
+    {so : QueryImpl spec (OracleComp spec')} {Inv : σ → Prop}
+    (h : PreservesInv so' Inv) :
+    PreservesInv (so' ∘ₛ so) Inv :=
+  fun t σ0 hσ0 z hz =>
+    OracleComp.simulateQ_run_preservesInv so' Inv h (so t) σ0 hσ0 z
+      (by simpa [apply_compose] using hz)
+
+end QueryImpl
+
 /-- `InitSatisfiesInv init Inv` means every possible initial state sampled by `init`
 satisfies `Inv` (support-based). -/
 def InitSatisfiesInv {σ : Type} (init : ProbComp σ) (Inv : σ → Prop) : Prop :=
@@ -174,6 +189,17 @@ lemma preservesInv_of_statePreserving {σ α : Type}
     PreservesInv mx Inv := by
   intro σ0 hσ0 z hz
   simp [h σ0 z hz, hσ0]
+
+lemma preservesInv_bind {σ α β : Type}
+    (mx : StateT σ ProbComp α) (my : α → StateT σ ProbComp β)
+    (Inv : σ → Prop) (h₁ : PreservesInv mx Inv) (h₂ : ∀ a, PreservesInv (my a) Inv) :
+    PreservesInv (mx >>= my) Inv := by
+  intro σ0 hσ0 z hz
+  have hz' :
+      z ∈ support ((mx.run σ0) >>= fun us => (my us.1).run us.2) := by
+    simpa [StateT.run_bind] using hz
+  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hcont⟩
+  exact h₂ us.1 us.2 (h₁ σ0 hσ0 us hus) z hcont
 
 /-- If `mx` is output-independent on `Inv`, and `my` preserves `Inv` and never fails, then the
 output distribution of `mx` is unchanged by running `my` first and then running `mx` on the
