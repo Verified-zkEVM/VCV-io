@@ -129,10 +129,9 @@ lemma probOutput_PerfectSecrecyCipherExp_eq_tsum
 
 private lemma eq_of_inv_mul_eq_inv_mul {a b n : ℝ≥0∞}
     (hn0 : n ≠ 0) (hnTop : n ≠ ⊤) (h : n⁻¹ * a = n⁻¹ * b) : a = b := by
-  have h' := congrArg (fun t => n * t) h
-  have h'' : (n * n⁻¹) * a = (n * n⁻¹) * b := by
-    simpa [mul_assoc] using h'
-  simpa [ENNReal.mul_inv_cancel hn0 hnTop, one_mul] using h''
+  have h1 : n * (n⁻¹ * a) = a := by rw [← mul_assoc, ENNReal.mul_inv_cancel hn0 hnTop, one_mul]
+  have h2 : n * (n⁻¹ * b) = b := by rw [← mul_assoc, ENNReal.mul_inv_cancel hn0 hnTop, one_mul]
+  rw [← h1, ← h2, h]
 
 /-- Strong perfect secrecy at a fixed security parameter: ciphertexts are independent of messages
 for every prior distribution on messages (PMF-level quantification). -/
@@ -255,29 +254,75 @@ lemma perfectSecrecy_iff_jointFactorization (encAlg : SymmEncAlg M K C Q) :
   · exact (encAlg.perfectSecrecyAt_iff_jointFactorizationAt sp).1 (h sp)
   · exact (encAlg.perfectSecrecyAt_iff_jointFactorizationAt sp).2 (h sp)
 
-/-- Strict equivalence of all supported one-parameter perfect-secrecy definitions. -/
-lemma perfectSecrecyAt_iff_allDefs (encAlg : SymmEncAlg M K C Q) (sp : ℕ) :
-    encAlg.perfectSecrecyAt sp ↔
-      encAlg.perfectSecrecyPosteriorEqPriorAt sp ∧
-      encAlg.perfectSecrecyJointFactorizationAt sp := by
-  constructor
-  · intro h
-    exact ⟨(encAlg.perfectSecrecyAt_iff_posteriorEqPriorAt sp).1 h,
-      (encAlg.perfectSecrecyAt_iff_jointFactorizationAt sp).1 h⟩
-  · rintro ⟨hPost, _hJoint⟩
-    exact (encAlg.perfectSecrecyAt_iff_posteriorEqPriorAt sp).2 hPost
+/-- Core uniformity lemma: uniform keygen plus unique key per (message, ciphertext) pair
+implies every (message, ciphertext) conditional has probability `(card K)⁻¹`.
+Both Shannon theorems follow from this. -/
+theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
+    [Fintype (K sp)]
+    (deterministicEnc : ∀ (k : K sp) (msg : M sp),
+      ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c})
+    (hKeyUniform : ∀ k : K sp, Pr[= k | simulateQ encAlg.impl (encAlg.keygen sp)] =
+        (Fintype.card (K sp) : ℝ≥0∞)⁻¹)
+    (hUniqueKey : ∀ msg : M sp, ∀ c : C sp, ∃! k : K sp,
+        k ∈ support (simulateQ encAlg.impl (encAlg.keygen sp)) ∧
+        c ∈ support (simulateQ encAlg.impl (encAlg.encrypt k msg)))
+    (msg : M sp) (σ : C sp) :
+    Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg] =
+      (Fintype.card (K sp) : ℝ≥0∞)⁻¹ := by
+  let invK : ℝ≥0∞ := (Fintype.card (K sp) : ℝ≥0∞)⁻¹
+  let keyExp : ProbComp (K sp) := simulateQ encAlg.impl (encAlg.keygen sp)
+  let encExp : K sp → ProbComp (C sp) := fun k => simulateQ encAlg.impl (encAlg.encrypt k msg)
+  obtain ⟨k0, hk0, hk0uniq⟩ := hUniqueKey msg σ
+  have henc_one :
+      Pr[= σ | encExp k0] = 1 := by
+    rcases deterministicEnc k0 msg with ⟨c0, hc0⟩
+    have hσ_mem : σ ∈ support (simulateQ encAlg.impl (encAlg.encrypt k0 msg)) := by
+      simpa [encExp] using hk0.2
+    have hσ_mem_singleton : σ ∈ ({c0} : Set (C sp)) := by
+      simpa [hc0] using hσ_mem
+    have hσ_eq_c0 : σ = c0 := by
+      simpa using hσ_mem_singleton
+    have hpf0 : Pr[⊥ | encExp k0] = 0 := by
+      simp [encExp]
+    have hsuppσ : support (encExp k0) = ({σ} : Set (C sp)) := by
+      simpa [encExp, hσ_eq_c0] using hc0
+    rw [probOutput_eq_one_iff]
+    exact ⟨hpf0, hsuppσ⟩
+  rw [PerfectSecrecyCipherGivenMsgExp, simulateQ_bind, probOutput_bind_eq_tsum]
+  calc
+    ∑' k : K sp, Pr[= k | keyExp] * Pr[= σ | encExp k] =
+        Pr[= k0 | keyExp] * Pr[= σ | encExp k0] := by
+          refine (tsum_eq_single k0 ?_).trans ?_
+          · intro k hkne
+            by_cases hkKey : k ∈ support keyExp
+            · have hkEnc : σ ∉ support (encExp k) := by
+                intro hkEnc'
+                exact hkne (hk0uniq k ⟨by simpa [keyExp] using hkKey, by simpa [encExp] using hkEnc'⟩)
+              simp [probOutput_eq_zero_of_not_mem_support hkEnc]
+            · simp [probOutput_eq_zero_of_not_mem_support hkKey]
+          · simp
+    _ = invK := by
+        have hk0_uniform : Pr[= k0 | keyExp] = invK := by
+          simpa [keyExp, invK] using hKeyUniform k0
+        simp [hk0_uniform, henc_one]
 
-/-- Strict equivalence of all supported asymptotic perfect-secrecy definitions. -/
-lemma perfectSecrecy_iff_allDefs (encAlg : SymmEncAlg M K C Q) :
-    encAlg.perfectSecrecy ↔
-      encAlg.perfectSecrecyPosteriorEqPrior ∧
-      encAlg.perfectSecrecyJointFactorization := by
-  constructor
-  · intro h
-    exact ⟨(encAlg.perfectSecrecy_iff_posteriorEqPrior).1 h,
-      (encAlg.perfectSecrecy_iff_jointFactorization).1 h⟩
-  · rintro ⟨hPost, _hJoint⟩
-    exact (encAlg.perfectSecrecy_iff_posteriorEqPrior).2 hPost
+theorem ciphertextRowsEqualAt_of_uniformKey_of_uniqueKey
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
+    [Fintype (K sp)]
+    (deterministicEnc : ∀ (k : K sp) (msg : M sp),
+      ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c})
+    (hKeyUniform : ∀ k : K sp, Pr[= k | simulateQ encAlg.impl (encAlg.keygen sp)] =
+        (Fintype.card (K sp) : ℝ≥0∞)⁻¹)
+    (hUniqueKey : ∀ msg : M sp, ∀ c : C sp, ∃! k : K sp,
+        k ∈ support (simulateQ encAlg.impl (encAlg.keygen sp)) ∧
+        c ∈ support (simulateQ encAlg.impl (encAlg.encrypt k msg))) :
+    encAlg.ciphertextRowsEqualAt sp := by
+  intro msg₀ msg₁ σ
+  rw [encAlg.cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey sp deterministicEnc
+        hKeyUniform hUniqueKey msg₀ σ,
+      encAlg.cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey sp deterministicEnc
+        hKeyUniform hUniqueKey msg₁ σ]
 
 /-- Constructive Shannon direction at fixed security parameter:
 if keygen is uniform and each `(message, ciphertext)` pair is realized by a unique
@@ -299,55 +344,14 @@ theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey
         k ∈ support (simulateQ encAlg.impl (encAlg.keygen sp)) ∧
         c ∈ support (simulateQ encAlg.impl (encAlg.encrypt k msg)))) →
     encAlg.perfectSecrecyAt sp := by
-  intro hAssump
-  rcases hAssump with ⟨hKeyUniform, hUniqueKey⟩
+  intro ⟨hKeyUniform, hUniqueKey⟩
   let invK : ℝ≥0∞ := (Fintype.card (K sp) : ℝ≥0∞)⁻¹
-  have hCipherGiven_uniform :
-      ∀ msg : M sp, ∀ σ : C sp,
-        Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg] = invK := by
-    intro msg σ
-    let keyExp : ProbComp (K sp) := simulateQ encAlg.impl (encAlg.keygen sp)
-    let encExp : K sp → ProbComp (C sp) := fun k => simulateQ encAlg.impl (encAlg.encrypt k msg)
-    obtain ⟨k0, hk0, hk0uniq⟩ := hUniqueKey msg σ
-    have henc_one :
-        Pr[= σ | encExp k0] = 1 := by
-      rcases deterministicEnc k0 msg with ⟨c0, hc0⟩
-      have hσ_mem : σ ∈ support (simulateQ encAlg.impl (encAlg.encrypt k0 msg)) := by
-        simpa [encExp] using hk0.2
-      have hσ_mem_singleton : σ ∈ ({c0} : Set (C sp)) := by
-        simpa [hc0] using hσ_mem
-      have hσ_eq_c0 : σ = c0 := by
-        simpa using hσ_mem_singleton
-      have hpf0 : Pr[⊥ | encExp k0] = 0 := by
-        simp [encExp]
-      have hsuppσ : support (encExp k0) = ({σ} : Set (C sp)) := by
-        simpa [encExp, hσ_eq_c0] using hc0
-      rw [probOutput_eq_one_iff]
-      exact ⟨hpf0, hsuppσ⟩
-    rw [PerfectSecrecyCipherGivenMsgExp, simulateQ_bind, probOutput_bind_eq_tsum]
-    calc
-      ∑' k : K sp, Pr[= k | keyExp] * Pr[= σ | encExp k] =
-          Pr[= k0 | keyExp] * Pr[= σ | encExp k0] := by
-            refine (tsum_eq_single k0 ?_).trans ?_
-            · intro k hkne
-              by_cases hkKey : k ∈ support keyExp
-              · have hkEnc : σ ∉ support (encExp k) := by
-                  intro hkEnc'
-                  exact hkne (hk0uniq k ⟨by simpa [keyExp] using hkKey, by simpa [encExp] using hkEnc'⟩)
-                simp [probOutput_eq_zero_of_not_mem_support hkEnc]
-              · simp [probOutput_eq_zero_of_not_mem_support hkKey]
-            · simp
-      _ = invK := by
-          have hk0_uniform : Pr[= k0 | keyExp] = invK := by
-            simpa [keyExp, invK] using hKeyUniform k0
-          simp [hk0_uniform, henc_one]
+  have hCipherGiven_uniform := encAlg.cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey sp
+    deterministicEnc hKeyUniform hUniqueKey
   have hCipher_uniform :
       ∀ (mgen : OracleComp encAlg.spec (M sp)) (σ : C sp),
         Pr[= σ | encAlg.PerfectSecrecyCipherExp sp mgen] = invK := by
     intro mgen σ
-    have hPrior_sum :
-        (∑' msg : M sp, Pr[= msg | encAlg.PerfectSecrecyPriorExp sp mgen]) = 1 := by
-      exact HasEvalPMF.tsum_probOutput_eq_one (encAlg.PerfectSecrecyPriorExp sp mgen)
     calc
       Pr[= σ | encAlg.PerfectSecrecyCipherExp sp mgen] =
           ∑' msg : M sp,
@@ -359,7 +363,8 @@ theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey
             rw [hCipherGiven_uniform msg σ]
       _ = (∑' msg : M sp, Pr[= msg | encAlg.PerfectSecrecyPriorExp sp mgen]) * invK := by
             rw [ENNReal.tsum_mul_right]
-      _ = invK := by rw [hPrior_sum, one_mul]
+      _ = invK := by
+            rw [HasEvalPMF.tsum_probOutput_eq_one (encAlg.PerfectSecrecyPriorExp sp mgen), one_mul]
   intro mgen msg σ
   calc
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp sp mgen] =
@@ -388,52 +393,10 @@ theorem perfectSecrecyAtAllPriors_of_card_eq_of_uniform_unique
         k ∈ support (simulateQ encAlg.impl (encAlg.keygen sp)) ∧
         c ∈ support (simulateQ encAlg.impl (encAlg.encrypt k msg)))) →
     encAlg.perfectSecrecyAtAllPriors sp := by
-  intro hAssump
-  rcases hAssump with ⟨hKeyUniform, hUniqueKey⟩
-  let invK : ℝ≥0∞ := (Fintype.card (K sp) : ℝ≥0∞)⁻¹
-  have hCipherGiven_uniform :
-      ∀ msg : M sp, ∀ σ : C sp,
-        Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg] = invK := by
-    intro msg σ
-    let keyExp : ProbComp (K sp) := simulateQ encAlg.impl (encAlg.keygen sp)
-    let encExp : K sp → ProbComp (C sp) := fun k => simulateQ encAlg.impl (encAlg.encrypt k msg)
-    obtain ⟨k0, hk0, hk0uniq⟩ := hUniqueKey msg σ
-    have henc_one :
-        Pr[= σ | encExp k0] = 1 := by
-      rcases deterministicEnc k0 msg with ⟨c0, hc0⟩
-      have hσ_mem : σ ∈ support (simulateQ encAlg.impl (encAlg.encrypt k0 msg)) := by
-        simpa [encExp] using hk0.2
-      have hσ_mem_singleton : σ ∈ ({c0} : Set (C sp)) := by
-        simpa [hc0] using hσ_mem
-      have hσ_eq_c0 : σ = c0 := by
-        simpa using hσ_mem_singleton
-      have hpf0 : Pr[⊥ | encExp k0] = 0 := by
-        simp [encExp]
-      have hsuppσ : support (encExp k0) = ({σ} : Set (C sp)) := by
-        simpa [encExp, hσ_eq_c0] using hc0
-      rw [probOutput_eq_one_iff]
-      exact ⟨hpf0, hsuppσ⟩
-    rw [PerfectSecrecyCipherGivenMsgExp, simulateQ_bind, probOutput_bind_eq_tsum]
-    calc
-      ∑' k : K sp, Pr[= k | keyExp] * Pr[= σ | encExp k] =
-          Pr[= k0 | keyExp] * Pr[= σ | encExp k0] := by
-            refine (tsum_eq_single k0 ?_).trans ?_
-            · intro k hkne
-              by_cases hkKey : k ∈ support keyExp
-              · have hkEnc : σ ∉ support (encExp k) := by
-                  intro hkEnc'
-                  exact hkne (hk0uniq k ⟨by simpa [keyExp] using hkKey, by simpa [encExp] using hkEnc'⟩)
-                simp [probOutput_eq_zero_of_not_mem_support hkEnc]
-              · simp [probOutput_eq_zero_of_not_mem_support hkKey]
-            · simp
-      _ = invK := by
-          have hk0_uniform : Pr[= k0 | keyExp] = invK := by
-            simpa [keyExp, invK] using hKeyUniform k0
-          simp [hk0_uniform, henc_one]
-  have hRows : encAlg.ciphertextRowsEqualAt sp := by
-    intro msg₀ msg₁ σ
-    rw [hCipherGiven_uniform msg₀ σ, hCipherGiven_uniform msg₁ σ]
-  exact (encAlg.perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt sp).2 hRows
+  intro ⟨hKeyUniform, hUniqueKey⟩
+  exact (encAlg.perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt sp).2
+    (encAlg.ciphertextRowsEqualAt_of_uniformKey_of_uniqueKey sp
+      deterministicEnc hKeyUniform hUniqueKey)
 
 end perfectSecrecy
 

@@ -183,6 +183,18 @@ def seededOracle :
 
 namespace seededOracle
 
+/-- The probability that a lifted uniform sample equals a fixed value is `(card α)⁻¹`. -/
+lemma probEvent_liftComp_uniformSample_eq_of_eq
+    {ι : Type} {spec : OracleSpec ι} [DecidableEq ι]
+    [(i : ι) → SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec]
+    [spec.Fintype] [spec.Inhabited]
+    {i : ι} (u₀ : spec.Range i) :
+    probEvent (liftComp (uniformSample (spec.Range i)) spec)
+      (fun u => u₀ = u) =
+      (↑(Fintype.card (spec.Range i)) : ENNReal)⁻¹ := by
+  rw [probEvent_eq_eq_probOutput', probOutput_liftComp, probOutput_uniformSample]
+
 private lemma evalDist_generateSeed_eq_canonical
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [spec₀.Fintype] [spec₀.Inhabited]

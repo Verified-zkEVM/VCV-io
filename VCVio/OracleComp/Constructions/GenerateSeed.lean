@@ -107,15 +107,21 @@ lemma generateSeed_zero :
           · subst hi; simp [QuerySeed.prependValues_self, xs, rest, List.take_append_drop]
           · rw [QuerySeed.prependValues_of_ne _ _ hi]; simp [rest, Function.update_of_ne hi]
 
+lemma length_eq_of_mem_support_generateSeed
+    (seed : QuerySeed spec) (i : ι)
+    (hseed : seed ∈ support (generateSeed spec qc js)) :
+    (seed i).length = qc i * js.count i := by
+  have := (support_generateSeed (spec := spec) (qc := qc) (js := js)).symm ▸ hseed
+  simpa [Set.mem_setOf_eq] using (this i)
+
 lemma eq_nil_of_mem_support_generateSeed
     (seed : QuerySeed spec) (i : ι)
     (hseed : seed ∈ support (generateSeed spec qc js))
     (hlen0 : qc i * js.count i = 0) :
-    seed i = [] := by
-  have hsupport : ∀ j, (seed j).length = qc j * js.count j := by
-    simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc) (js := js)] using hseed
-  have hlen : (seed i).length = qc i * js.count i := hsupport i
-  exact List.eq_nil_of_length_eq_zero (hlen.trans hlen0)
+    seed i = [] :=
+  List.eq_nil_of_length_eq_zero
+    ((length_eq_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
+      seed i hseed).trans hlen0)
 
 lemma ne_nil_of_mem_support_generateSeed
     (seed : QuerySeed spec) (i : ι)
@@ -123,19 +129,17 @@ lemma ne_nil_of_mem_support_generateSeed
     (hlenPos : 0 < qc i * js.count i) :
     seed i ≠ [] := by
   intro hnil
-  have hlen : (seed i).length = qc i * js.count i := by
-    have hsupport : ∀ j, (seed j).length = qc j * js.count j := by
-      simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc) (js := js)] using hseed
-    exact hsupport i
-  have : (seed i).length = 0 := by simp [hnil]
-  omega
+  have hlen := length_eq_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
+    seed i hseed
+  rw [hnil, List.length_nil] at hlen
+  exact absurd hlen.symm (ne_of_gt hlenPos)
 
 lemma exists_cons_of_mem_support_generateSeed
     (seed : QuerySeed spec) (i : ι)
     (hseed : seed ∈ support (generateSeed spec qc js))
     (hlenPos : 0 < qc i * js.count i) :
-    ∃ u us, seed i = u :: us := by
-  exact List.exists_cons_of_ne_nil
+    ∃ u us, seed i = u :: us :=
+  List.exists_cons_of_ne_nil
     (ne_nil_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
       seed i hseed hlenPos)
 
@@ -144,18 +148,11 @@ lemma tail_length_of_mem_support_generateSeed
     (hseed : seed ∈ support (generateSeed spec qc js))
     (hlenPos : 0 < qc i * js.count i) :
     (seed i).tail.length = qc i * js.count i - 1 := by
-  have hlen : (seed i).length = qc i * js.count i := by
-    have hsupport : ∀ j, (seed j).length = qc j * js.count j := by
-      simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc) (js := js)] using hseed
-    exact hsupport i
+  have hlen := length_eq_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
+    seed i hseed
   rcases exists_cons_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
       seed i hseed hlenPos with ⟨u, us, hus⟩
-  rw [hus] at hlen ⊢
-  simp at hlen ⊢
-  have hlen' : qc i * js.count i = us.length + 1 := by omega
-  calc
-    us.length = (us.length + 1) - 1 := by omega
-    _ = qc i * js.count i - 1 := by rw [hlen']
+  rw [hus] at hlen ⊢; simp at hlen ⊢; omega
 
 lemma probOutput_pop_none_eq_zero_of_count_pos [spec.Fintype] [spec.Inhabited]
     (i : ι) (hpos : 0 < qc i * js.count i) :

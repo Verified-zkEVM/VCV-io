@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.Coercions.Add
+import ToMathlib.Data.ENNReal.SumSquares
 
 /-!
 # Forking Lemma
@@ -25,45 +26,6 @@ then re-samples one oracle response, bounding the probability that both runs suc
 -/
 
 open OracleSpec OracleComp ENNReal Function Finset
-
-/-! ### ENNReal Cauchy-Schwarz inequality -/
-
-private lemma ENNReal.two_mul_le_add_sq (a b : ℝ≥0∞) :
-    2 * a * b ≤ a ^ 2 + b ^ 2 := by
-  rcases eq_or_ne a ⊤ with rfl | ha
-  · simp [top_pow, top_add, le_top]
-  rcases eq_or_ne b ⊤ with rfl | hb
-  · simp [top_pow, add_top, le_top]
-  rw [← ENNReal.coe_toNNReal ha, ← ENNReal.coe_toNNReal hb]
-  exact_mod_cast _root_.two_mul_le_add_sq a.toNNReal b.toNNReal
-
-private lemma ENNReal.sq_sum_le_card_mul_sum_sq {ι' : Type*}
-    (s : Finset ι') (f : ι' → ℝ≥0∞) :
-    (∑ i ∈ s, f i) ^ 2 ≤ s.card * ∑ i ∈ s, f i ^ 2 := by
-  rw [sq, Finset.sum_mul_sum]
-  suffices h : 2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j ≤ 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) by
-    have h2 : (2 : ℝ≥0∞) ≠ 0 := by norm_num
-    have h2' : (2 : ℝ≥0∞) ≠ ⊤ := by norm_num
-    calc ∑ i ∈ s, ∑ j ∈ s, f i * f j
-      _ = 2⁻¹ * (2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j) := by
-          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
-      _ ≤ 2⁻¹ * (2 * (↑s.card * ∑ i ∈ s, f i ^ 2)) := by gcongr
-      _ = ↑s.card * ∑ i ∈ s, f i ^ 2 := by
-          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
-  calc 2 * ∑ i ∈ s, ∑ j ∈ s, f i * f j
-    _ = ∑ i ∈ s, ∑ j ∈ s, 2 * (f i * f j) := by
-        rw [Finset.mul_sum]; congr 1; ext i; rw [Finset.mul_sum]
-    _ ≤ ∑ i ∈ s, ∑ j ∈ s, (f i ^ 2 + f j ^ 2) := by
-        gcongr with i _ j _
-        calc 2 * (f i * f j) = 2 * f i * f j := (mul_assoc ..).symm
-          _ ≤ f i ^ 2 + f j ^ 2 := ENNReal.two_mul_le_add_sq (f i) (f j)
-    _ = ∑ i ∈ s, (↑s.card * f i ^ 2 + ∑ j ∈ s, f j ^ 2) := by
-        congr 1; ext i
-        rw [Finset.sum_add_distrib, Finset.sum_const, nsmul_eq_mul]
-    _ = ↑s.card * ∑ i ∈ s, f i ^ 2 + ↑s.card * ∑ i ∈ s, f i ^ 2 := by
-        rw [Finset.sum_add_distrib, Finset.mul_sum, Finset.sum_const, nsmul_eq_mul,
-          Finset.mul_sum]
-    _ = 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) := by rw [← two_mul]
 
 namespace OracleComp
 
@@ -146,7 +108,7 @@ private lemma probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
       x₁ x₂ hmem with ⟨t, h₁, h₂⟩
     simp [h₁, h₂]
 
-omit [DecidableEq ι] [spec.DecidableEq] in
+omit [spec.DecidableEq] in
 private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
     (seed : QuerySeed spec) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
@@ -156,23 +118,14 @@ private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
   · simp [hnone]
   · rcases Option.ne_none_iff_exists'.mp hnone with ⟨u₀, hu₀⟩
     rw [hu₀]
-    calc
-      Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
-            liftComp ($ᵗ spec.Range i) spec]
-        = Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by simp
-      _ = (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹ := by
-            rw [probEvent_eq_eq_probOutput']
-            have hLift :
-                Pr[= u₀ | liftComp (($ᵗ spec.Range i : ProbComp (spec.Range i))) spec] =
-                  Pr[= u₀ | ($ᵗ spec.Range i : ProbComp (spec.Range i))] := by
-              simpa using
-                (probOutput_liftComp (spec := unifSpec) (superSpec := spec)
-                  (mx := ($ᵗ spec.Range i : ProbComp (spec.Range i))) (x := u₀))
-            rw [hLift]
-            simp [probOutput_uniformSample]
-      _ ≤ (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹ := le_rfl
+    have : Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
+          liftComp ($ᵗ spec.Range i) spec] =
+        Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
+      congr 1; ext; simp
+    rw [this]
+    exact le_of_eq (seededOracle.probEvent_liftComp_uniformSample_eq_of_eq u₀)
 
-omit [DecidableEq ι] [spec.DecidableEq] in
+omit [spec.DecidableEq] in
 private lemma probEvent_uniform_eq_seedSlot_eq_inv_of_get (s : Fin (qb i + 1))
     (seed : QuerySeed spec) {u₀ : spec.Range i}
     (hu₀ : (seed i)[↑s]? = some u₀) :
@@ -180,20 +133,12 @@ private lemma probEvent_uniform_eq_seedSlot_eq_inv_of_get (s : Fin (qb i + 1))
     Pr[fun u : spec.Range i => (seed i)[↑s]? = some u | liftComp ($ᵗ spec.Range i) spec] = h⁻¹ := by
   simp only
   rw [hu₀]
-  calc
-    Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
-          liftComp ($ᵗ spec.Range i) spec]
-      = Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by simp
-    _ = (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹ := by
-          rw [probEvent_eq_eq_probOutput']
-          have hLift :
-              Pr[= u₀ | liftComp (($ᵗ spec.Range i : ProbComp (spec.Range i))) spec] =
-                Pr[= u₀ | ($ᵗ spec.Range i : ProbComp (spec.Range i))] := by
-            simpa using
-              (probOutput_liftComp (spec := unifSpec) (superSpec := spec)
-                (mx := ($ᵗ spec.Range i : ProbComp (spec.Range i))) (x := u₀))
-          rw [hLift]
-          simp [probOutput_uniformSample]
+  have : Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
+        liftComp ($ᵗ spec.Range i) spec] =
+      Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
+    congr 1; ext; simp
+  rw [this]
+  exact seededOracle.probEvent_liftComp_uniformSample_eq_of_eq u₀
 
 private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
     (seed : QuerySeed spec) :
