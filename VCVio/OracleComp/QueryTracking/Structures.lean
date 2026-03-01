@@ -1,7 +1,7 @@
 /-
 Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: Devon Tuma
+Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import ToMathlib.Control.WriterT
@@ -407,6 +407,13 @@ lemma addValues_nil (seed : QuerySeed spec) (i : ι) :
     seed.addValues (i := i) ([] : List (spec.Range i)) = seed := by
   simp [addValues]
 
+lemma addValues_cons (seed : QuerySeed spec) {i : ι} (u : spec.Range i)
+    (us : List (spec.Range i)) :
+    seed.addValues (u :: us) = (seed.addValues [u]).addValues us := by
+  ext j; by_cases hj : j = i
+  · subst hj; simp [addValues]
+  · simp [addValues, Function.update_of_ne hj]
+
 /-- Prepend a list of values to the seed at index `i`. -/
 def prependValues (seed : QuerySeed spec) {i : ι} (us : List (spec.Range i)) : QuerySeed spec :=
   Function.update seed i (us ++ seed i)
@@ -495,6 +502,12 @@ def takeAtIndex (seed : QuerySeed spec) (i : ι) (n : ℕ) : QuerySeed spec :=
     by_cases hj : j = i
     · subst hj; simp [takeAtIndex]
     · simp [takeAtIndex, Function.update_of_ne hj]
+
+lemma takeAtIndex_addValues_drop (seed : QuerySeed spec) (i : ι) (n : ℕ) :
+    (seed.takeAtIndex i n).addValues ((seed i).drop n) = seed := by
+  ext j; by_cases hj : j = i
+  · subst hj; simp [takeAtIndex, addValues, List.take_append_drop]
+  · simp [takeAtIndex, addValues, Function.update_of_ne hj]
 
 /-- Pop one value from index `i`, returning the consumed value and updated seed when nonempty. -/
 def pop (seed : QuerySeed spec) (i : ι) : Option (spec.Range i × QuerySeed spec) :=
@@ -600,6 +613,45 @@ lemma eq_prependValues_of_pop_eq_some {seed : QuerySeed spec} {i : ι}
   · subst hj; simp only [prependValues_singleton, Function.update_self]
     simpa [Function.update_self] using hcons
   · simp only [prependValues_of_ne _ _ hj, Function.update_of_ne hj]
+
+lemma pop_takeAtIndex_prependValues_of_ne (s' : QuerySeed spec) (i₀ : ι) (k : ℕ)
+    {t : ι} (u₀ : spec.Range t) (hti : t ≠ i₀) :
+    ((s'.prependValues [u₀]).takeAtIndex i₀ k).pop t =
+      some (u₀, s'.takeAtIndex i₀ k) := by
+  have h1 : ((s'.prependValues [u₀]).takeAtIndex i₀ k) t = u₀ :: s' t := by
+    rw [takeAtIndex_apply_of_ne _ _ _ _ hti, prependValues_singleton]
+  rw [pop_eq_some_of_cons _ _ u₀ (s' t) h1]
+  congr 1
+  suffices Function.update ((s'.prependValues [u₀]).takeAtIndex i₀ k) t (s' t) =
+      s'.takeAtIndex i₀ k from Prod.ext rfl this
+  funext j
+  by_cases hj : j = t
+  · subst hj; simp [Function.update_self, takeAtIndex_apply_of_ne _ _ _ _ hti]
+  · rw [Function.update_of_ne hj]
+    by_cases hji : j = i₀
+    · subst hji
+      simp [takeAtIndex_apply_self, prependValues_of_ne _ _ (Ne.symm hti)]
+    · simp [takeAtIndex_apply_of_ne _ _ _ _ hji, prependValues_of_ne _ _ hj]
+
+lemma pop_takeAtIndex_prependValues_self (s' : QuerySeed spec) (i₀ : ι)
+    (u₀ : spec.Range i₀) {k : ℕ} (hk : 0 < k) :
+    ((s'.prependValues [u₀]).takeAtIndex i₀ k).pop i₀ =
+      some (u₀, s'.takeAtIndex i₀ (k - 1)) := by
+  have h1 : ((s'.prependValues [u₀]).takeAtIndex i₀ k) i₀ =
+      u₀ :: (s' i₀).take (k - 1) := by
+    simp only [takeAtIndex_apply_self, prependValues_singleton]
+    obtain ⟨k', rfl⟩ := Nat.exists_eq_succ_of_ne_zero (Nat.pos_iff_ne_zero.mp hk)
+    simp [List.take_succ_cons]
+  rw [pop_eq_some_of_cons _ _ u₀ ((s' i₀).take (k - 1)) h1]
+  congr 1
+  suffices Function.update ((s'.prependValues [u₀]).takeAtIndex i₀ k) i₀
+      ((s' i₀).take (k - 1)) = s'.takeAtIndex i₀ (k - 1) by
+    exact Prod.ext rfl this
+  funext j
+  by_cases hj : j = i₀
+  · subst hj; simp [Function.update_self, takeAtIndex_apply_self]
+  · rw [Function.update_of_ne hj, takeAtIndex_apply_of_ne _ _ _ _ hj,
+      takeAtIndex_apply_of_ne _ _ _ _ hj, prependValues_of_ne _ _ hj]
 
 end QuerySeed
 

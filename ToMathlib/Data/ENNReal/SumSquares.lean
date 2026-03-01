@@ -53,4 +53,48 @@ lemma sq_sum_le_card_mul_sum_sq {ι' : Type*}
           Finset.mul_sum]
     _ = 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) := by rw [← two_mul]
 
+private lemma tsum_mul_tsum_eq {α : Type*} (g h : α → ℝ≥0∞) :
+    (∑' a, g a) * (∑' b, h b) = ∑' a, ∑' b, g a * h b := by
+  rw [← ENNReal.tsum_mul_right]; congr 1; ext a
+  exact ENNReal.tsum_mul_left.symm
+
+lemma sq_tsum_le_tsum_mul_tsum {α : Type*} (w f : α → ℝ≥0∞) :
+    (∑' a, w a * f a) ^ 2 ≤ (∑' a, w a) * ∑' a, w a * f a ^ 2 := by
+  rw [sq, tsum_mul_tsum_eq, tsum_mul_tsum_eq]
+  have h2 : (2 : ℝ≥0∞) ≠ 0 := two_ne_zero
+  have h2' : (2 : ℝ≥0∞) ≠ ⊤ := by norm_num
+  suffices h : 2 * ∑' a, ∑' b, (w a * f a) * (w b * f b) ≤
+      2 * ∑' a, ∑' b, w a * (w b * f b ^ 2) by
+    calc ∑' a, ∑' b, (w a * f a) * (w b * f b)
+      _ = 2⁻¹ * (2 * ∑' a, ∑' b, (w a * f a) * (w b * f b)) := by
+          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
+      _ ≤ 2⁻¹ * (2 * ∑' a, ∑' b, w a * (w b * f b ^ 2)) := by gcongr
+      _ = ∑' a, ∑' b, w a * (w b * f b ^ 2) := by
+          rw [← mul_assoc, ENNReal.inv_mul_cancel h2 h2', one_mul]
+  calc 2 * ∑' a, ∑' b, (w a * f a) * (w b * f b)
+    _ = ∑' a, ∑' b, 2 * ((w a * f a) * (w b * f b)) := by
+        rw [← ENNReal.tsum_mul_left]; congr 1; ext
+        rw [← ENNReal.tsum_mul_left]
+    _ ≤ ∑' a, ∑' b, (w a * (w b * f b ^ 2) + w b * (w a * f a ^ 2)) := by
+        gcongr with a b
+        calc 2 * ((w a * f a) * (w b * f b))
+          _ = w a * w b * (2 * f a * f b) := by ring
+          _ ≤ w a * w b * (f a ^ 2 + f b ^ 2) := by
+              gcongr; exact two_mul_le_add_sq (f a) (f b)
+          _ = w a * (w b * f b ^ 2) + w b * (w a * f a ^ 2) := by ring
+    _ = (∑' a, ∑' b, w a * (w b * f b ^ 2)) +
+          ∑' a, ∑' b, w b * (w a * f a ^ 2) := by
+        simp_rw [← ENNReal.tsum_add]
+    _ = (∑' a, ∑' b, w a * (w b * f b ^ 2)) +
+          ∑' b, ∑' a, w b * (w a * f a ^ 2) := by
+        congr 1; exact ENNReal.tsum_comm
+    _ = 2 * ∑' a, ∑' b, w a * (w b * f b ^ 2) := by rw [two_mul]
+
+lemma sq_tsum_le_tsum_sq {α : Type*} (w f : α → ℝ≥0∞) (hw : ∑' a, w a ≤ 1) :
+    (∑' a, w a * f a) ^ 2 ≤ ∑' a, w a * f a ^ 2 :=
+  calc (∑' a, w a * f a) ^ 2
+    _ ≤ (∑' a, w a) * ∑' a, w a * f a ^ 2 := sq_tsum_le_tsum_mul_tsum w f
+    _ ≤ 1 * ∑' a, w a * f a ^ 2 := by gcongr
+    _ = ∑' a, w a * f a ^ 2 := one_mul _
+
 end ENNReal
