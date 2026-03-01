@@ -137,4 +137,51 @@ lemma probOutput_eq_wp_indicator (oa : OracleComp spec α) [DecidableEq α] (x :
   simpa [probEvent_eq_eq_probOutput] using
     (probEvent_eq_wp_indicator (oa := oa) (p := fun y => y = x))
 
+/-- `liftM` query form of `wp_query`. -/
+theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    wp (spec := spec) (liftM (query t) : OracleComp spec (spec.Range t)) post =
+      ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
+  rw [wp, MAlgOrdered.wp]
+  calc
+    μ (do let a ← liftM (query t); pure (post a))
+        = ∑' u : spec.Range t,
+            Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] *
+              μ (pure (post u) : OracleComp spec ℝ≥0∞) := by
+            simpa using
+              (μ_bind_eq_tsum
+                (oa := (liftM (query t) : OracleComp spec (spec.Range t)))
+                (ob := fun a => pure (post a)))
+    _ = ∑' u : spec.Range t,
+          (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
+            refine tsum_congr ?_
+            intro u
+            have hμ :
+                μ (pure (post u) : OracleComp spec ℝ≥0∞) = post u := by
+              let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
+              simp [μ, probOutput_pure]
+            have hprob :
+                Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] =
+                  (1 / Fintype.card (spec.Range t) : ℝ≥0∞) := by
+              exact (probOutput_query_eq_div (spec := spec) t u)
+            rw [hμ]
+            simp [hprob]
+
+/-- Quantitative WP rule for a uniform oracle query. -/
+theorem wp_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
+      ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
+  simpa using wp_liftM_query (spec := spec) t post
+
+/-- Indicator-event probability as an exact quantitative triple. -/
+theorem triple_probEvent_indicator (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
+    Triple (spec := spec) (Pr[p | oa]) oa (fun x => if p x then 1 else 0) := by
+  unfold Triple MAlgOrdered.Triple
+  simp [probEvent_eq_wp_indicator]
+
+/-- Singleton-output probability as an exact quantitative triple. -/
+theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (x : α) :
+    Triple (spec := spec) (Pr[= x | oa]) oa (fun y => if y = x then 1 else 0) := by
+  unfold Triple MAlgOrdered.Triple
+  simp [probOutput_eq_wp_indicator]
+
 end OracleComp.ProgramLogic

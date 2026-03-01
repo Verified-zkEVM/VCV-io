@@ -7,6 +7,7 @@ import Mathlib.Probability.ProbabilityMassFunction.Monad
 import VCVio.Prelude
 import Batteries.Control.AlternativeMonad
 import ToMathlib.Control.Monad.Hom
+import ToMathlib.ProbabilityTheory.Coupling
 
 /-!
 # Sub-Probability Distributions
@@ -182,6 +183,39 @@ lemma support_pure (x : α) : (pure x : SPMF α).support = {x} := by aesop
 
 @[simp] lemma map_mk (p : PMF (Option α)) (f : α → β) :
     f <$> SPMF.mk p = SPMF.mk (Option.map f <$> p) := by aesop
+
+/-- Couplings specialized to VCVio's canonical `SPMF`. -/
+abbrev IsCoupling (c : SPMF (α × β)) (p : SPMF α) (q : SPMF β) : Prop :=
+  SubPMF.IsCoupling c p q
+
+/-- Coupling witness type specialized to VCVio's canonical `SPMF`. -/
+def Coupling (p : SPMF α) (q : SPMF β) :=
+  { c : SPMF (α × β) // IsCoupling c p q }
+
+/-- Bind rule for `SPMF` couplings. -/
+theorem IsCoupling.bind {α₁ α₂ β₁ β₂ : Type u}
+    {p : SPMF α₁} {q : SPMF α₂} {f : α₁ → SPMF β₁} {g : α₂ → SPMF β₂}
+    (c : Coupling p q) (d : (a₁ : α₁) → (a₂ : α₂) → SPMF (β₁ × β₂))
+    (h : ∀ (a₁ : α₁) (a₂ : α₂), c.1.1 (some (a₁, a₂)) ≠ 0 → IsCoupling (d a₁ a₂) (f a₁) (g a₂)) :
+    IsCoupling (c.1 >>= λ (p : α₁ × α₂) => d p.1 p.2) (p >>= f) (q >>= g) :=
+  SubPMF.IsCoupling.bind ⟨c.1, c.2⟩ d h
+
+/-- Existential bind rule for `SPMF` couplings. -/
+theorem IsCoupling.exists_bind {α₁ α₂ β₁ β₂ : Type u}
+    {p : SPMF α₁} {q : SPMF α₂} {f : α₁ → SPMF β₁} {g : α₂ → SPMF β₂}
+    (c : Coupling p q)
+    (h : ∀ (a₁ : α₁) (a₂ : α₂), ∃ (d : SPMF (β₁ × β₂)), IsCoupling d (f a₁) (g a₂)) :
+    ∃ (d : SPMF (β₁ × β₂)), IsCoupling d (p >>= f) (q >>= g) :=
+  SubPMF.IsCoupling.exists_bind ⟨c.1, c.2⟩ h
+
+/-- Diagonal self-coupling proof. -/
+theorem IsCoupling.refl (p : SPMF α) :
+    IsCoupling (p >>= fun a => pure (a, a)) p p :=
+  SubPMF.IsCoupling.refl p
+
+/-- Diagonal self-coupling witness. -/
+noncomputable def Coupling.refl (p : SPMF α) : Coupling p p :=
+  ⟨p >>= fun a => pure (a, a), IsCoupling.refl p⟩
 
 
 end SPMF

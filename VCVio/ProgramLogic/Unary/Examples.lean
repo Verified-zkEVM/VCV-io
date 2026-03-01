@@ -20,6 +20,8 @@ variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
 variable {α β : Type}
 
+/-! ## OracleComp-focused API examples -/
+
 example (x : α) (post : α → ℝ≥0∞) :
     wp (spec := spec) (pure x) post = post x :=
   wp_pure (spec := spec) x post
@@ -31,9 +33,10 @@ example (pre : ℝ≥0∞) (oa : OracleComp spec α) (ob : α → OracleComp spe
     Triple pre (oa >>= ob) post :=
   triple_bind (spec := spec) hoa hob
 
-example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | oa] = wp oa (fun x => if p x then 1 else 0) :=
-  probEvent_eq_wp_indicator (spec := spec) oa p
+example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
+      ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u :=
+  wp_query (spec := spec) t post
 
 end OracleComp.ProgramLogic
 
@@ -64,5 +67,11 @@ example (x : ExceptT ε m α) (f : α → ExceptT ε m β) (post : β → L) :
       MAlgOrdered.wp (m := ExceptT ε m) (l := L) x
         (fun a => MAlgOrdered.wp (m := ExceptT ε m) (l := L) (f a) post) := by
   simpa using (MAlgOrdered.wp_bind (m := ExceptT ε m) (l := L) x f post)
+
+example [MAlgOrdered (OptionT m) L] (x : OptionT m α) (f : α → OptionT m β) (post : β → L) :
+    MAlgOrdered.wp (m := OptionT m) (l := L) (x >>= f) post =
+      MAlgOrdered.wp (m := OptionT m) (l := L) x
+        (fun a => MAlgOrdered.wp (m := OptionT m) (l := L) (f a) post) := by
+  exact (MAlgOrdered.wp_bind (m := OptionT m) (l := L) x f post)
 
 end MAlgOrdered

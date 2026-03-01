@@ -99,11 +99,49 @@ theorem wp_mono (x : m α) {post post' : α → l} (h : ∀ a, post a ≤ post' 
     (fun a => by simpa [MAlgOrdered.μ_pure] using h a)
     x
 
+/-- `wp` is functorial in the program return value. -/
+theorem wp_map [LawfulMonad m] (f : α → β) (x : m α) (post : β → l) :
+    wp (f <$> x) post = wp x (fun a => post (f a)) := by
+  simpa [Functor.map, bind_pure_comp] using
+    (wp_bind (m := m) (l := l) x (fun a => pure (f a)) post)
+
+/-- `wp` preserves applicative sequencing. -/
+theorem wp_seq [LawfulMonad m] (f : m (α → β)) (x : m α) (post : β → l) :
+    wp (f <*> x) post = wp f (fun g => wp x (fun a => post (g a))) := by
+  rw [seq_eq_bind_map, wp_bind]
+  congr
+  funext g
+  simp [wp_map]
+
 theorem triple_conseq {pre pre' : l} {x : m α} {post post' : α → l}
     (hpre : pre' ≤ pre) (hpost : ∀ a, post a ≤ post' a) :
     Triple pre x post → Triple pre' x post' := by
   intro h
   exact le_trans hpre (le_trans h (wp_mono x hpost))
+
+/-- Rule for `pure` computations in `Triple`. -/
+theorem triple_pure [LawfulMonad m] {pre : l} {x : α} {post : α → l}
+    (h : pre ≤ post x) :
+    Triple pre (pure x : m α) post := by
+  simpa [Triple, wp_pure] using h
+
+/-- Rule for `map` in `Triple`. -/
+theorem triple_map [LawfulMonad m] {pre : l} {x : m α} {f : α → β} {post : β → l}
+    (h : Triple pre x (fun a => post (f a))) :
+    Triple pre (f <$> x) post := by
+  simpa [Triple, wp_map] using h
+
+/-- Monotonicity of `Triple` in its postcondition. -/
+theorem triple_mono_post {pre : l} {x : m α} {post post' : α → l}
+    (h : Triple pre x post) (hpost : ∀ a, post a ≤ post' a) :
+    Triple pre x post' :=
+  triple_conseq (m := m) (l := l) (le_rfl : pre ≤ pre) hpost h
+
+/-- Monotonicity of `Triple` in its precondition. -/
+theorem triple_mono_pre {pre pre' : l} {x : m α} {post : α → l}
+    (h : Triple pre x post) (hpre : pre' ≤ pre) :
+    Triple pre' x post :=
+  triple_conseq (m := m) (l := l) hpre (fun _ => le_rfl) h
 
 theorem triple_bind [LawfulMonad m] {pre : l} {x : m α} {cut : α → l}
     {f : α → m β} {post : β → l}
@@ -192,5 +230,34 @@ noncomputable def instExceptT (ε : Type u) :
         x.run)
 
 attribute [instance] instExceptT
+
+/-- Lift an ordered monad algebra through `OptionT` by interpreting `none` as `⊥`. -/
+noncomputable def instOptionT :
+    MAlgOrdered (OptionT m) l where
+  μ x := MAlgOrdered.μ <| (fun y : Option l =>
+    match y with
+    | some z => z
+    | none => ⊥) <$> x.run
+  μ_pure x := by
+    simp [MAlgOrdered.μ_pure]
+  μ_bind_mono f g hfg x := by
+    let collapse : Option l → l := fun y =>
+      match y with
+      | some z => z
+      | none => ⊥
+    simpa [OptionT.run_bind, Option.elimM, collapse] using
+      (MAlgOrdered.μ_bind_mono
+        (f := fun y => collapse <$> y.elim (pure none) (fun a => (f a).run))
+        (g := fun y => collapse <$> y.elim (pure none) (fun a => (g a).run))
+        (by
+          intro y
+          cases y with
+          | none =>
+              simp [collapse, MAlgOrdered.μ_pure]
+          | some a =>
+              simpa [collapse] using hfg a)
+        x.run)
+
+attribute [instance] instOptionT
 
 end MAlgOrdered
