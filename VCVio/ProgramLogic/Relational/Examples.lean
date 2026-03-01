@@ -22,13 +22,13 @@ variable {α β γ δ : Type}
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
     {R : RelPost α β} {S : RelPost γ δ}
-    (hxy : RelTripleC oa ob R)
-    (hfg : ∀ a b, R a b → RelTripleC (fa a) (fb b) S) :
-    RelTripleC (oa >>= fa) (ob >>= fb) S :=
-  relTripleC_bind hxy hfg
+    (hxy : RelTriple oa ob R)
+    (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
+    RelTriple (oa >>= fa) (ob >>= fb) S :=
+  relTriple_bind hxy hfg
 
 example (oa : OracleComp spec₁ α) :
-    RelTripleC (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
-  relTripleC_refl (spec₁ := spec₁) oa
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
+  relTriple_refl (spec₁ := spec₁) oa
 
 end OracleComp.ProgramLogic.Relational

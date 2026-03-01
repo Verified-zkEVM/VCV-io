@@ -6,8 +6,8 @@ import VCVio.OracleComp.EvalDist
 /-!
 # Relational program-logic baseline
 
-This file provides a coupling-centered baseline (`RelTripleC`) for compositional
-relational reasoning, while keeping the older pointwise layer as compatibility helpers.
+This file provides a coupling-centered baseline (`RelTriple`) for compositional
+relational reasoning.
 -/
 
 open ENNReal
@@ -32,20 +32,20 @@ def HasCoupling (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) : Prop
   Nonempty (_root_.SPMF.Coupling (evalDist oa) (evalDist ob))
 
 /-- Coupling-based relational triple with support-level relational guarantee. -/
-def RelTripleC (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+def RelTriple (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
   ∃ c : _root_.SPMF.Coupling (evalDist oa) (evalDist ob),
     ∀ z ∈ support c.1, R z.1 z.2
 
 /-- Any coupling-based relational triple yields a coupling witness. -/
-lemma hasCoupling_of_relTripleC {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {R : RelPost α β} (h : RelTripleC oa ob R) : HasCoupling oa ob := by
+lemma hasCoupling_of_relTriple {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (h : RelTriple oa ob R) : HasCoupling oa ob := by
   rcases h with ⟨c, _⟩
   exact ⟨c⟩
 
 /-- Reflexivity rule for coupling-based relational triples. -/
-lemma relTripleC_refl (oa : OracleComp spec₁ α) :
-    RelTripleC (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
+lemma relTriple_refl (oa : OracleComp spec₁ α) :
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
   refine ⟨_root_.SPMF.Coupling.refl (evalDist oa), ?_⟩
   intro z hz
   rcases (mem_support_bind_iff (evalDist oa) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with
@@ -55,22 +55,22 @@ lemma relTripleC_refl (oa : OracleComp spec₁ α) :
   simp [EqRel, hzEq]
 
 /-- Postcondition monotonicity for coupling-based relational triples. -/
-lemma relTripleC_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+lemma relTriple_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {R R' : RelPost α β}
-    (h : RelTripleC oa ob R)
+    (h : RelTriple oa ob R)
     (hpost : ∀ ⦃x y⦄, R x y → R' x y) :
-    RelTripleC oa ob R' := by
+    RelTriple oa ob R' := by
   rcases h with ⟨c, hc⟩
   exact ⟨c, fun z hz => hpost (hc z hz)⟩
 
 /-- Bind composition rule for coupling-based relational triples. -/
-lemma relTripleC_bind
+lemma relTriple_bind
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
     {R : RelPost α β} {S : RelPost γ δ}
-    (hxy : RelTripleC oa ob R)
-    (hfg : ∀ a b, R a b → RelTripleC (fa a) (fb b) S) :
-    RelTripleC (oa >>= fa) (ob >>= fb) S := by
+    (hxy : RelTriple oa ob R)
+    (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
+    RelTriple (oa >>= fa) (ob >>= fb) S := by
   rcases hxy with ⟨c, hcR⟩
   classical
   let d : α → β → SPMF (γ × δ) := fun a b =>
@@ -95,44 +95,7 @@ lemma relTripleC_bind
   · intro z hz
     rcases (mem_support_bind_iff c.1 (fun p => d p.1 p.2) z).1 hz with ⟨ab, hab, hz'⟩
     have hR : R ab.1 ab.2 := hcR ab hab
-    have hsub : RelTripleC (fa ab.1) (fb ab.2) S := hfg ab.1 ab.2 hR
+    have hsub : RelTriple (fa ab.1) (fb ab.2) S := hfg ab.1 ab.2 hR
     exact Classical.choose_spec hsub z (by simpa [d, hR] using hz')
-
-/-! ## Compatibility (legacy / weaker layer) -/
-
-/-- A weaker pointwise comparison retained for compatibility. -/
-def PointwiseDom (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (R : RelPost α β) : Prop :=
-  ∀ ⦃x y⦄, R x y → Pr[= x | oa] ≤ Pr[= y | ob]
-
-/-- Legacy relational triple alias retained for compatibility. -/
-def RelTriple (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (post : RelPost α β) : Prop :=
-  PointwiseDom oa ob post
-
-@[simp]
-lemma pointwiseDom_refl (oa : OracleComp spec₁ α) :
-    PointwiseDom (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
-  intro x y hxy
-  subst hxy
-  exact le_rfl
-
-@[simp]
-lemma relTriple_refl (oa : OracleComp spec₁ α) :
-    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
-  pointwiseDom_refl (spec₁ := spec₁) oa
-
-lemma pointwiseDom_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {post post' : RelPost α β}
-    (h : PointwiseDom oa ob post) (hpost : ∀ ⦃x y⦄, post' x y → post x y) :
-    PointwiseDom oa ob post' := by
-  intro x y hxy
-  exact h (hpost hxy)
-
-lemma relTriple_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {post post' : RelPost α β}
-    (h : RelTriple oa ob post) (hpost : ∀ ⦃x y⦄, post' x y → post x y) :
-    RelTriple oa ob post' :=
-  pointwiseDom_post_mono h hpost
 
 end OracleComp.ProgramLogic.Relational
