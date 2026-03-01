@@ -8,9 +8,46 @@ import VCVio.ProgramLogic.Relational.Basic
 
 /-!
 # Relational program-logic examples
+
+This file gives small compositionality examples for:
+- heterogeneous transformer stacks (`StateT` vs `OptionT`/`ExceptT`), and
+- the `OracleComp` relational API (`RelTriple`).
 -/
 
-universe u
+universe u v₁ v₂
+
+section MixedStacks
+
+variable {m₁ : Type u → Type v₁} {m₂ : Type u → Type v₂} {l : Type u}
+variable [Monad m₁] [Monad m₂] [LawfulMonad m₁] [LawfulMonad m₂]
+variable [Preorder l] [OrderBot l] [MAlgRelOrdered m₁ m₂ l]
+
+variable {σ : Type u} {ε : Type u}
+variable {α β γ δ : Type u}
+
+example
+    {pre : σ → l}
+    {x : StateT σ m₁ α} {y : OptionT m₂ β}
+    {cut : α → β → σ → l}
+    {f : α → StateT σ m₁ γ} {g : β → OptionT m₂ δ}
+    {post : γ → δ → σ → l}
+    (hxy : MAlgRelOrdered.Triple pre x y cut)
+    (hfg : ∀ a b, MAlgRelOrdered.Triple (cut a b) (f a) (g b) post) :
+    MAlgRelOrdered.Triple pre (x >>= f) (y >>= g) post :=
+  MAlgRelOrdered.triple_bind hxy hfg
+
+example
+    {pre : σ → l}
+    {x : StateT σ m₁ α} {y : ExceptT ε m₂ β}
+    {cut : α → β → σ → l}
+    {f : α → StateT σ m₁ γ} {g : β → ExceptT ε m₂ δ}
+    {post : γ → δ → σ → l}
+    (hxy : MAlgRelOrdered.Triple pre x y cut)
+    (hfg : ∀ a b, MAlgRelOrdered.Triple (cut a b) (f a) (g b) post) :
+    MAlgRelOrdered.Triple pre (x >>= f) (y >>= g) post :=
+  MAlgRelOrdered.triple_bind hxy hfg
+
+end MixedStacks
 
 namespace OracleComp.ProgramLogic.Relational
 
