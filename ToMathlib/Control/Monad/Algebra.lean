@@ -114,3 +114,83 @@ theorem triple_bind [LawfulMonad m] {pre : l} {x : m α} {cut : α → l}
   exact le_trans hx (wp_mono x hf)
 
 end MAlgOrdered
+
+/-! ## Transformer lifting instances -/
+
+namespace MAlgOrdered
+
+variable {m : Type u → Type v} {l : Type u}
+variable [Monad m] [LawfulMonad m] [CompleteLattice l] [MAlgOrdered m l]
+
+/-- Lift an ordered monad algebra through `StateT`. -/
+noncomputable def instStateT (σ : Type u) :
+    MAlgOrdered (StateT σ m) (σ → l) where
+  μ x := fun s => MAlgOrdered.μ (x.run s >>= fun y => pure (y.1 y.2))
+  μ_pure x := by
+    funext s
+    simp [StateT.run_pure, MAlgOrdered.μ_pure]
+  μ_bind_mono f g hfg x := by
+    intro s
+    simp only [StateT.run_bind, bind_assoc]
+    exact MAlgOrdered.μ_bind_mono
+      (f := fun y => (f y.1).run y.2 >>= fun z => pure (z.1 z.2))
+      (g := fun y => (g y.1).run y.2 >>= fun z => pure (z.1 z.2))
+      (fun y => (hfg y.1) y.2)
+      (x.run s)
+
+attribute [instance] instStateT
+
+/-- Lift an ordered monad algebra through `ReaderT`. -/
+noncomputable def instReaderT (ρ : Type u) :
+    MAlgOrdered (ReaderT ρ m) (ρ → l) where
+  μ x := fun r => MAlgOrdered.μ (x.run r >>= fun q => pure (q r))
+  μ_pure x := by
+    funext r
+    simp [ReaderT.run_pure, MAlgOrdered.μ_pure]
+  μ_bind_mono f g hfg x := by
+    intro r
+    simp only [ReaderT.run_bind, bind_assoc]
+    exact MAlgOrdered.μ_bind_mono
+      (f := fun a => (f a).run r >>= fun q => pure (q r))
+      (g := fun a => (g a).run r >>= fun q => pure (q r))
+      (fun a => (hfg a) r)
+      (x.run r)
+
+attribute [instance] instReaderT
+
+/-- Lift an ordered monad algebra through `ExceptT` by interpreting exceptions as `⊥`. -/
+noncomputable def instExceptT (ε : Type u) :
+    MAlgOrdered (ExceptT ε m) l where
+  μ x := MAlgOrdered.μ <| (fun y : Except ε l =>
+    match y with
+    | Except.ok z => z
+    | Except.error _ => ⊥) <$> x.run
+  μ_pure x := by
+    simp [MAlgOrdered.μ_pure]
+  μ_bind_mono f g hfg x := by
+    let collapse : Except ε l → l := fun y =>
+      match y with
+      | Except.ok z => z
+      | Except.error _ => ⊥
+    simpa [ExceptT.run_bind, collapse] using
+      (MAlgOrdered.μ_bind_mono
+        (f := fun y => collapse <$>
+          (match y with
+          | Except.ok a => (f a).run
+          | Except.error e => pure (Except.error e)))
+        (g := fun y => collapse <$>
+          (match y with
+          | Except.ok a => (g a).run
+          | Except.error e => pure (Except.error e)))
+        (by
+          intro y
+          cases y with
+          | error e =>
+              simp [collapse, MAlgOrdered.μ_pure]
+          | ok a =>
+              simpa [collapse] using hfg a)
+        x.run)
+
+attribute [instance] instExceptT
+
+end MAlgOrdered

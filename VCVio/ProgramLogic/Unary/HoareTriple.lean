@@ -25,6 +25,13 @@ variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
 variable {α β : Type}
 
+/-! ## API contract
+
+- This unary quantitative interface is instantiated for `OracleComp spec`.
+- Probability/evaluation assumptions are `[spec.Fintype]` and `[spec.Inhabited]`.
+- The quantitative codomain is fixed to `ℝ≥0∞`.
+-/
+
 /-- Expectation-style algebra for oracle computations returning `ℝ≥0∞`. -/
 noncomputable def μ (oa : OracleComp spec ℝ≥0∞) : ℝ≥0∞ :=
   ∑' x, Pr[= x | oa] * x
