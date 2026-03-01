@@ -53,16 +53,6 @@ def CorrectExp (msg : M) : m Bool := do
 def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
   ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
 
--- Old definitions (used `guard` + `AlternativeMonad`, which is now `OptionT`):
--- @[reducible, inline]
--- def CorrectExp (encAlg : AsymmEncAlg m M PK SK C) (msg : M) :
---     ProbComp Unit := encAlg.exec do
---   let (pk, sk) ← encAlg.keygen
---   guard (encAlg.decrypt sk (← encAlg.encrypt pk msg) = msg)
---
--- def PerfectlyCorrect (encAlg : AsymmEncAlg m M PK SK C) : Prop :=
---   ∀ (msg : M), [⊥ | CorrectExp encAlg msg] = 0
-
 end Correct
 
 section IND_CPA_Oracle
@@ -111,25 +101,6 @@ def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
 noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
   Pr[= true | IND_CPA_experiment adversary] - 1 / 2
-
--- Old lemma (uses guard-based experiment, needs rework for Bool-valued version):
--- /-- The probability of the IND-CPA experiment is the average of the probability of the experiment
--- with the challenge being true and the probability of the experiment with the challenge being false. -/
--- lemma probOutput_IND_CPA_experiment_eq_add {encAlg : AsymmEncAlg ProbComp M PK SK C}
---     (adversary : encAlg.IND_CPA_adversary) :
---     [= () | IND_CPA_experiment adversary] =
---       [= () | do
---         let (pk, _sk) ← encAlg.keygen
---         let b ← (simulateQ (encAlg.IND_CPA_queryImpl' pk true) (adversary pk)).run' ∅
---         guard b] / 2 +
---       [= () | do
---         let (pk, _sk) ← encAlg.keygen
---         let b ← (simulateQ (encAlg.IND_CPA_queryImpl' pk false) (adversary pk)).run' ∅
---         guard ¬b] / 2 := by
---   unfold IND_CPA_experiment
---   rw [probOutput_bind_eq_sum_finSupport]
---   have {x : ℝ≥0∞} : 2⁻¹ * x = x / 2 := by field_simp; rw [mul_comm, mul_div, mul_one]
---   simp [this]
 
 end IND_CPA_Oracle
 

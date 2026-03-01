@@ -97,252 +97,289 @@ lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
--- -- lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : ι → ℕ) :
--- --     (simulateT countingOracle oa).run qc =
--- --       map id (qc + ·) <$> (simulateT countingOracle oa).run 0 := by
--- --   revert qc
--- --   induction oa using OracleComp.inductionOn with
--- --   | pure x => simp
--- --   | query_bind i t oa h =>
--- --       intro qc
--- --       simp [h _ (update qc i (qc i + 1)), h _ (update 0 i 1)]
--- --       refine funext λ y ↦ congr_arg (· <$> _) (funext λ x ↦ ?_)
--- --       simp only [eq_iff_fst_eq_snd_eq, map_fst, id_eq, map_snd, true_and]
--- --       cases x
--- --       ext j
--- --       by_cases hj : j = i
--- --       · induction hj
--- --         simp [add_assoc]
--- --       · simp [hj]
--- --   | failure => simp [StateT.monad_failure_def]
+section support
 
--- -- section support
+/-- Compatibility helper matching old state-style counting semantics:
+simulate with zero initial count, then offset by `qc`. -/
+def simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
+    OracleComp spec (α × QueryCount ι) :=
+  Prod.map id (qc + ·) <$> (simulateQ countingOracle oa).run
 
--- -- /-- We can always reduce the initial state of simulation with a counting oracle to start with a
--- -- count of zero, and add the initial count back on at the end. -/
--- -- lemma support_simulate (oa : OracleComp spec α) (qc : ι → ℕ) :
--- --     (simulate countingOracle qc oa).support =
--- --       Prod.map id (qc + ·) '' (simulate countingOracle 0 oa).support := by
--- --   revert qc
--- --   induction oa using OracleComp.inductionOn with
--- --   | pure a => simp only [simulate_pure, support_pure, Set.image_singleton, Prod.map_apply,
---   -- id_eq,
--- --       add_zero, implies_true]
--- --   | query_bind i t oa hoa =>
--- --       refine λ qc ↦ ?_
--- --       -- simp
--- --       sorry -- refine λ qc ↦ ?_
--- --       -- simp only [simulate_bind, simulate_query,countingOracle.apply_eq,
--- -- support_bind,support_map,
--- --       --   support_query, Set.image_univ, Set.mem_range, Set.iUnion_exists,
--- -- Set.iUnion_iUnion_eq',
--- --       --   Prod.map_apply, id_eq, Pi.zero_apply, zero_add, Set.image_iUnion]
--- --       -- refine Set.iUnion_congr (λ u ↦ ?_)
--- --       -- simp only [hoa u (update qc i (qc i + 1)), hoa u (update 0 i 1),
--- --       --   ← Set.image_comp, Function.comp, Prod.map_apply, id_eq, ← add_assoc]
--- --       -- refine Set.image_congr' (λ z ↦ Prod.eq_iff_fst_eq_snd_eq.2 ⟨rfl, funext (λ j ↦ ?_)⟩)
--- --       -- by_cases hij : j = i <;> simp [hij, add_assoc]
--- --   | failure => simp only [simulate_failure, support_failure, Set.image_empty, implies_true]
+lemma run_simulateT_eq_run_simulateT_zero (oa : OracleComp spec α) (qc : QueryCount ι) :
+    simulate oa qc = Prod.map id (qc + ·) <$> simulate oa 0 := by
+  unfold simulate
+  rw [Functor.map_map]
+  congr 1
+  funext a
+  rcases a with ⟨x, q⟩
+  simp
 
--- -- /-- Reduce membership in the support of simulation with counting to membership in simulation
--- -- starting with the count at `0`.
--- -- TODO: lemmas like this suggest maybe support shouldn't auto reduce on the computation type?
--- -- TODO: implicit parameters, and add extra helper lemmas -/
--- -- lemma mem_support_simulate_iff (oa : OracleComp spec α) (qc : ι → ℕ) (z : α × (ι → ℕ)) :
--- --     z ∈ (simulate countingOracle qc oa).support ↔
--- --       ∃ qc', (z.1, qc') ∈ (simulate countingOracle 0 oa).support ∧ qc + qc' = z.2 := by
--- --   rw [support_simulate]
--- --   simp only [Prod.map_apply, id_eq, Set.mem_image, Prod.eq_iff_fst_eq_snd_eq, Prod.exists]
--- --   exact ⟨λ h ↦ let ⟨x, qc', h, hx, hqc'⟩ := h; ⟨qc', hx ▸ ⟨h, hqc'⟩⟩,
--- --     λ h ↦ let ⟨qc', h, hqc'⟩ := h; ⟨z.1, qc', h, rfl, hqc'⟩⟩
+/-- We can always reduce simulation with counting to start with `0`,
+and add the initial count back at the end. -/
+lemma support_simulate (oa : OracleComp spec α) (qc : QueryCount ι) :
+    support (simulate oa qc) = Prod.map id (qc + ·) '' support (simulate oa 0) := by
+  rw [run_simulateT_eq_run_simulateT_zero]
+  simp [support_map]
 
--- -- lemma mem_support_simulate_iff_of_le (oa : OracleComp spec α) (qc : ι → ℕ) (z : α × (ι → ℕ))
--- --     (hz : qc ≤ z.2) : z ∈ (simulate countingOracle qc oa).support ↔
--- --       (z.1, z.2 - qc) ∈ (simulate countingOracle 0 oa).support := by
--- --   rw [mem_support_simulate_iff oa 0]
--- --   simp only [mem_support_simulate_iff oa qc z, zero_add, exists_eq_right]
--- --   refine ⟨λ ⟨qc', h, hqc'⟩ ↦ ?_, λ h ↦ ?_⟩
--- --   · convert h
--- --     refine funext (λ x ↦ ?_)
--- --     rw [Pi.sub_apply, Nat.sub_eq_iff_eq_add' (hz x)]
--- --     exact symm (congr_fun hqc' x)
--- --   · refine ⟨z.2 - qc, h, ?_⟩
--- --     refine funext (λ x ↦ ?_)
--- --     refine Nat.add_sub_cancel' (hz x)
+/-- Reduce membership in support of simulation with counting to simulation starting from `0`. -/
+lemma mem_support_simulate_iff (oa : OracleComp spec α) (qc : QueryCount ι)
+    (z : α × QueryCount ι) :
+    z ∈ support (simulate oa qc) ↔
+      ∃ qc', (z.1, qc') ∈ support (simulate oa 0) ∧ qc + qc' = z.2 := by
+  rw [support_simulate]
+  simp only [Set.mem_image]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨⟨x, qc'⟩, hmem, hz⟩
+    have hx : x = z.1 := by simpa using congrArg Prod.fst hz
+    subst hx
+    refine ⟨qc', ?_, ?_⟩
+    · simpa using hmem
+    · simpa using congrArg Prod.snd hz
+  · rintro ⟨qc', hmem, hq⟩
+    refine ⟨(z.1, qc'), ?_, ?_⟩
+    · simpa using hmem
+    · apply Prod.ext
+      · simp
+      · simpa using hq
 
--- -- lemma le_of_mem_support_simulate {oa : OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
--- --     (h : z ∈ (simulate countingOracle qc oa).support) : qc ≤ z.2 := by
--- --   rw [mem_support_simulate_iff] at h
--- --   obtain ⟨qc'', _, h⟩ := h
--- --   exact le_of_le_of_eq le_self_add h
+lemma mem_support_simulate_iff_of_le (oa : OracleComp spec α) (qc : QueryCount ι)
+    (z : α × QueryCount ι) (hz : qc ≤ z.2) :
+    z ∈ support (simulate oa qc) ↔ (z.1, z.2 - qc) ∈ support (simulate oa 0) := by
+  rw [mem_support_simulate_iff oa qc z]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨qc', hmem, hq⟩
+    convert hmem using 2
+    funext i
+    have hqi : qc i + qc' i = z.2 i := congrFun hq i
+    simpa [Pi.sub_apply, hqi] using (Nat.add_sub_cancel_left (qc i) (qc' i))
+  · intro hmem
+    refine ⟨z.2 - qc, hmem, ?_⟩
+    funext i
+    simp [Pi.add_apply, Pi.sub_apply, Nat.add_sub_of_le (hz i)]
 
--- -- section snd_map
+lemma le_of_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
+    {z : α × QueryCount ι} (h : z ∈ support (simulate oa qc)) : qc ≤ z.2 := by
+  rcases (mem_support_simulate_iff oa qc z).1 h with ⟨qc', _, hq⟩
+  intro i
+  exact le_of_le_of_eq (Nat.le_add_right _ _) (congrFun hq i)
 
--- -- lemma mem_support_snd_map_simulate_iff {α ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
--- --     (oa : OracleComp spec α) (qc qc' : ι → ℕ) :
--- --     qc' ∈ (@snd α _ <$> simulate countingOracle qc oa).support ↔
--- --       ∃ qc'', ∃ x, (x, qc'') ∈ (simulate countingOracle 0 oa).support ∧ qc + qc'' = qc' := by
--- --   simp only [support_map, Set.mem_image, Prod.exists, exists_eq_right]
--- --   refine ⟨λ h ↦ ?_, λ h ↦ ?_⟩
--- --   · obtain ⟨x, hx⟩ := h
--- --     rw [mem_support_simulate_iff] at hx
--- --     obtain ⟨qc'', h, hqc''⟩ := hx
--- --     refine ⟨qc'', x, h, hqc''⟩
--- --   · obtain ⟨qc'', x, h, hqc''⟩ := h
--- --     refine ⟨x, ?_⟩
--- --     rw [mem_support_simulate_iff]
--- --     refine ⟨qc'', h, hqc''⟩
+section snd_map
 
--- -- lemma mem_support_snd_map_simulate_iff_of_le (oa : OracleComp spec α) {qc qc' : ι → ℕ}
--- --     (hqc : qc ≤ qc') : qc' ∈ (@snd α _ <$> simulate countingOracle qc oa).support ↔
--- --       qc' - qc ∈ (@snd α _ <$> simulate countingOracle 0 oa).support := by
--- --   simp only [mem_support_snd_map_simulate_iff, zero_add]
--- --   refine exists_congr (λ qc'' ↦ exists_congr (λ x ↦ ?_))
--- --   refine and_congr_right' ⟨λ h ↦ funext (λ x ↦ ?_), λ h ↦ funext (λ x ↦ ?_)⟩
--- --   · simp only [← h, Pi.sub_apply, Pi.add_apply, add_tsub_cancel_left]
--- --   · simp [h, Nat.add_sub_cancel' (hqc x)]
+lemma mem_support_snd_map_simulate_iff (oa : OracleComp spec α)
+    (qc qc' : QueryCount ι) :
+    qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
+      OracleComp spec (QueryCount ι)) ↔
+      ∃ qc'', ∃ x, (x, qc'') ∈ support (simulate oa 0) ∧ qc + qc'' = qc' := by
+  simp only [support_map, Set.mem_image, Prod.exists, exists_eq_right]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨x, hx⟩
+    rcases (mem_support_simulate_iff oa qc (x, qc')).1 hx with ⟨qc'', hmem, hq⟩
+    exact ⟨qc'', x, hmem, hq⟩
+  · rintro ⟨qc'', x, hmem, hq⟩
+    refine ⟨x, (mem_support_simulate_iff oa qc (x, qc')).2 ?_⟩
+    exact ⟨qc'', hmem, hq⟩
 
--- -- lemma le_of_mem_support_snd_map_simulate {oa : OracleComp spec α} {qc qc' : ι → ℕ}
--- --     (h : qc' ∈ (@snd α _ <$> simulate countingOracle qc oa).support) : qc ≤ qc' := by
--- --   simp only [support_map, Set.mem_image, Prod.exists, exists_eq_right] at h
--- --   obtain ⟨y, hy⟩ := h
--- --   exact le_of_mem_support_simulate hy
+lemma mem_support_snd_map_simulate_iff_of_le (oa : OracleComp spec α)
+    {qc qc' : QueryCount ι} (hqc : qc ≤ qc') :
+    qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
+      OracleComp spec (QueryCount ι)) ↔
+      qc' - qc ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa 0) :
+        OracleComp spec (QueryCount ι)) := by
+  rw [mem_support_snd_map_simulate_iff]
+  simp only [support_map, Set.mem_image, Prod.exists, exists_eq_right]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨qc'', x, hmem, hq⟩
+    refine ⟨x, ?_⟩
+    convert hmem using 2
+    funext i
+    have hqi : qc i + qc'' i = qc' i := congrFun hq i
+    simpa [Pi.sub_apply, hqi] using (Nat.add_sub_cancel_left (qc i) (qc'' i))
+  · rintro ⟨x, hx⟩
+    refine ⟨qc' - qc, x, hx, ?_⟩
+    funext i
+    simp [Pi.add_apply, Pi.sub_apply, Nat.add_sub_of_le (hqc i)]
 
--- -- lemma sub_mem_support_snd_map_simulate {oa : OracleComp spec α} {qc qc' : ι → ℕ}
--- --     (h : qc' ∈ (@snd α _ <$> simulate countingOracle qc oa).support) :
--- --     qc' - qc ∈ (@snd α _ <$> simulate countingOracle 0 oa).support := by
--- --   rwa [mem_support_snd_map_simulate_iff_of_le] at h
--- --   convert le_of_mem_support_snd_map_simulate h
+lemma le_of_mem_support_snd_map_simulate {oa : OracleComp spec α}
+    {qc qc' : QueryCount ι}
+    (h : qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
+      OracleComp spec (QueryCount ι))) : qc ≤ qc' := by
+  rcases (mem_support_snd_map_simulate_iff oa qc qc').1 h with ⟨qc'', _, _, hq⟩
+  intro i
+  exact le_of_le_of_eq (Nat.le_add_right _ _) (congrFun hq i)
 
--- -- end snd_map
+lemma sub_mem_support_snd_map_simulate {oa : OracleComp spec α}
+    {qc qc' : QueryCount ι}
+    (h : qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
+      OracleComp spec (QueryCount ι))) :
+    qc' - qc ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa 0) :
+      OracleComp spec (QueryCount ι)) := by
+  exact (mem_support_snd_map_simulate_iff_of_le (oa := oa)
+    (hqc := le_of_mem_support_snd_map_simulate h)).1 h
 
--- -- lemma add_mem_support_simulate {oa : OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
--- --     (hz : z ∈ (simulate countingOracle qc oa).support) (qc' : ι → ℕ) :
--- --     (z.1, z.2 + qc') ∈ (simulate countingOracle (qc + qc') oa).support := by
--- --   obtain ⟨qc1, hqc', h⟩ := (mem_support_simulate_iff _ _ _).1 hz
--- --   exact (mem_support_simulate_iff _ _ _).2 ⟨qc1, hqc', h ▸ by ring⟩
+end snd_map
 
--- -- @[simp]
--- -- lemma add_right_mem_support_simulate_iff (oa : OracleComp spec α) (qc qc' : ι → ℕ) (x : α) :
--- --     (x, qc + qc') ∈ (simulate countingOracle qc oa).support ↔
--- --       (x, qc') ∈ (simulate countingOracle 0 oa).support := by
--- --   rw [support_simulate, Set.mem_image]
--- --   simp only [Prod.exists, Prod.map_apply, id_eq, Prod.mk.injEq, add_right_inj,
--- --     exists_eq_right_right, exists_eq_right]
+lemma add_mem_support_simulate {oa : OracleComp spec α} {qc : QueryCount ι}
+    {z : α × QueryCount ι} (hz : z ∈ support (simulate oa qc)) (qc' : QueryCount ι) :
+    (z.1, z.2 + qc') ∈ support (simulate oa (qc + qc')) := by
+  rcases (mem_support_simulate_iff oa qc z).1 hz with ⟨qc1, hmem, hq⟩
+  refine (mem_support_simulate_iff oa (qc + qc') (z.1, z.2 + qc')).2 ?_
+  refine ⟨qc1, hmem, ?_⟩
+  funext i
+  have hi : qc i + qc1 i = z.2 i := by simpa [Pi.add_apply] using congrFun hq i
+  calc
+    ((qc + qc') + qc1) i = (qc i + qc1 i) + qc' i := by
+      simp [Pi.add_apply, add_left_comm, add_comm]
+    _ = z.2 i + qc' i := by simp [hi]
+    _ = (z.2 + qc') i := by simp [Pi.add_apply]
 
--- -- @[simp]
--- -- lemma add_left_mem_support_simulate_iff (oa : OracleComp spec α) (qc qc' : ι → ℕ) (x : α) :
--- --     (x, qc' + qc) ∈ (simulate countingOracle qc oa).support ↔
--- --       (x, qc') ∈ (simulate countingOracle 0 oa).support := by
--- --   rw [add_comm qc' qc, add_right_mem_support_simulate_iff]
+@[simp]
+lemma add_right_mem_support_simulate_iff (oa : OracleComp spec α)
+    (qc qc' : QueryCount ι) (x : α) :
+    (x, qc + qc') ∈ support (simulate oa qc) ↔ (x, qc') ∈ support (simulate oa 0) := by
+  rw [mem_support_simulate_iff]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨qc1, hmem, hq⟩
+    convert hmem using 2
+    funext i
+    exact (Nat.add_left_cancel (congrFun hq i)).symm
+  · intro hmem
+    exact ⟨qc', hmem, by rfl⟩
 
--- -- lemma mem_support_simulate_pure_iff (x : α) (qc : ι → ℕ) (z : α × (ι → ℕ)) :
--- --     z ∈ (simulate countingOracle qc (pure x : OracleComp spec α)).support ↔ z = (x, qc) := by
--- --   simp only [simulate_pure, support_pure, Set.mem_singleton_iff]
+@[simp]
+lemma add_left_mem_support_simulate_iff (oa : OracleComp spec α)
+    (qc qc' : QueryCount ι) (x : α) :
+    (x, qc' + qc) ∈ support (simulate oa qc) ↔ (x, qc') ∈ support (simulate oa 0) := by
+  rw [add_comm qc' qc]
+  exact add_right_mem_support_simulate_iff oa qc qc' x
 
--- -- lemma apply_ne_zero_of_mem_support_simulate_queryBind {i : ι} {t : spec.Domain i}
--- --     {oa : spec.Range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
--- --     (hz : z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support) :
--- --       z.2 i ≠ 0 := by
--- --   rw [mem_support_simulate_iff, simulate_query_bind] at hz
--- --   rw [support_bind] at hz
--- --   simp at hz
--- --   obtain ⟨qc', ⟨⟨u, hu⟩, hqc⟩⟩ := hz
--- --   sorry
--- --   -- have := le_of_mem_support_simulate hu i
--- --   -- simp at this
--- --   -- refine Nat.pos_iff_ne_zero.1 ?_
--- --   -- rw [← hqc, Pi.add_apply]
--- --   -- refine Nat.add_pos_right ?_ ?_
--- --   -- refine Nat.lt_of_succ_le this
+lemma mem_support_simulate_pure_iff (x : α) (qc : QueryCount ι)
+    (z : α × QueryCount ι) :
+    z ∈ support (simulate (pure x : OracleComp spec α) qc) ↔ z = (x, qc) := by
+  simp [simulate]
 
--- -- lemma exists_mem_support_of_mem_support_simulate_queryBind {i : ι} {t : spec.Domain i}
--- --     {oa : spec.Range i → OracleComp spec α} {qc : ι → ℕ} {z : α × (ι → ℕ)}
--- --     (hz : z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support) :
--- --     ∃ u, (z.1, Function.update z.2 i (z.2 i - 1)) ∈
--- --       (simulate countingOracle qc (oa u)).support := by
--- --   rw [mem_support_simulate_iff, simulate_query_bind, support_bind] at hz
--- --   simp at hz
--- --   obtain ⟨qc', ⟨⟨u, hu⟩, hqc⟩⟩ := hz
--- --   refine ⟨u, ?_⟩
--- --   simp [← hqc]
--- --   have hqc' : qc' i ≠ 0 := by {
--- --     sorry
--- --     -- have := le_of_mem_support_simulate hu i
--- --     -- refine Nat.pos_iff_ne_zero.1 ?_
--- --     -- refine lt_of_lt_of_le ?_ this
--- --     -- simp only [update_same, zero_lt_one]
--- --   }
--- --   rw [mem_support_simulate_iff_of_le]
--- --   · simp
--- --     sorry
--- --     -- rw [mem_support_simulate_iff_of_le] at hu
--- --     -- · simp at hu
--- --     --   convert hu using 2
--- --     --   refine funext (λ j ↦ ?_)
--- --     --   by_cases hj : j = i
--- --     --   · simp [hj]
--- --     --     refine Nat.sub_eq_of_eq_add ?_
--- --     --     rw [add_comm _ (qc i)]
--- --     --     rw [Nat.add_sub_assoc]
--- --     --     rw [Nat.one_le_iff_ne_zero]
+lemma apply_ne_zero_of_mem_support_simulate_queryBind {t : spec.Domain}
+    {oa : spec.Range t → OracleComp spec α} {qc : QueryCount ι} {z : α × QueryCount ι}
+    (hz : z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc)) :
+    z.2 t ≠ 0 := by
+  rcases (mem_support_simulate_iff (oa := ((query t : OracleComp spec _) >>= oa)) qc z).1 hz with
+    ⟨q0, hq0mem, hqsum⟩
+  rcases (by
+      simpa [simulate, countingOracle, QueryImpl.withCounting_apply] using hq0mem) with
+    ⟨u, b, _hb, hq0⟩
+  have hqt : qc t + q0 t = z.2 t := congrFun hqsum t
+  have hq0t : q0 t = QueryCount.single t t + b t := by
+    simpa [Pi.add_apply] using (congrFun hq0 t).symm
+  have hpos : 0 < z.2 t := by
+    rw [← hqt, hq0t]
+    have hsingle : 0 < QueryCount.single t t + b t := by
+      simp [QueryCount.single]
+    exact lt_of_lt_of_le hsingle (Nat.le_add_left _ _)
+  exact Nat.ne_of_gt hpos
 
--- --     --     exact hqc'
--- --     --   · simp [hj]
--- --     -- · intro j
--- --     --   by_cases hj : j = i
--- --     --   · induction hj
--- --     --     simp only [update_same]
--- --     --     have := le_of_mem_support_simulate hu j
--- --     --     refine le_trans ?_ this
--- --     --     simp
--- --     --   · simp [hj]
--- --   · intro j
--- --     by_cases hj : j = i
--- --     · induction hj
--- --       simp only [update_self]
--- --       rw [Nat.le_sub_one_iff_lt]
--- --       · refine Nat.lt_add_of_pos_right ?_
--- --         rw [pos_iff_ne_zero]
--- --         assumption
--- --       · refine Nat.add_pos_right _ ?_
--- --         rwa [pos_iff_ne_zero]
--- --     · simp [hj]
+lemma exists_mem_support_of_mem_support_simulate_queryBind {t : spec.Domain}
+    {oa : spec.Range t → OracleComp spec α} {qc : QueryCount ι} {z : α × QueryCount ι}
+    (hz : z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc)) :
+    ∃ u, (z.1, Function.update z.2 t (z.2 t - 1)) ∈ support (simulate (oa u) qc) := by
+  rcases (mem_support_simulate_iff (oa := ((query t : OracleComp spec _) >>= oa)) qc z).1 hz with
+    ⟨q0, hq0mem, hqsum⟩
+  rcases (by
+      simpa [simulate, countingOracle, QueryImpl.withCounting_apply] using hq0mem) with
+    ⟨u, b, hb, hq0⟩
+  have hb0 : (z.1, b) ∈ support (simulate (oa u) 0) := by
+    simpa [simulate] using hb
+  refine ⟨u, ?_⟩
+  refine (mem_support_simulate_iff (oa := oa u) qc
+    (z := (z.1, Function.update z.2 t (z.2 t - 1)))).2 ?_
+  refine ⟨b, hb0, ?_⟩
+  funext j
+  by_cases hj : j = t
+  · subst j
+    have hqj : qc t + q0 t = z.2 t := congrFun hqsum t
+    have hq0j : q0 t = QueryCount.single t t + b t := by
+      simpa [Pi.add_apply] using (congrFun hq0 t).symm
+    have hcalc : qc t + b t = z.2 t - 1 := by
+      rw [hq0j] at hqj
+      have hsingle : QueryCount.single t t = 1 := by simp [QueryCount.single]
+      rw [hsingle] at hqj
+      omega
+    simp [Function.update, hcalc]
+  · have hqj : qc j + q0 j = z.2 j := congrFun hqsum j
+    have hq0j : q0 j = QueryCount.single t j + b j := by
+      simpa [Pi.add_apply] using (congrFun hq0 j).symm
+    have hsingle : QueryCount.single t j = 0 := by simp [QueryCount.single, hj]
+    have hcalc : qc j + b j = z.2 j := by
+      rw [hq0j, hsingle] at hqj
+      simpa [zero_add] using hqj
+    simp [Function.update, hj, hcalc]
 
--- -- lemma mem_support_simulate_queryBind_iff (i : ι) (t : spec.Domain i)
--- --     (oa : spec.Range i → OracleComp spec α) (qc : ι → ℕ) (z : α × (ι → ℕ)) :
--- --     z ∈ (simulate countingOracle qc ((query i t : OracleComp spec _) >>= oa)).support ↔
--- --       z.2 i ≠ 0 ∧ ∃ u, (z.1, Function.update z.2 i (z.2 i - 1)) ∈
--- --         (simulate countingOracle qc (oa u)).support := by
--- --   refine ⟨λ h ↦ ⟨?_, ?_⟩, λ h ↦ ?_⟩
--- --   · refine apply_ne_zero_of_mem_support_simulate_queryBind h
--- --   · refine exists_mem_support_of_mem_support_simulate_queryBind h
--- --   · obtain ⟨hz0, ⟨u, hu⟩⟩ := h
--- --     simp only [simulate_bind, simulate_query, countingOracle.apply_eq, support_bind,
--- --       support_query, Set.image_univ, Set.mem_range, Set.iUnion_exists,
--- --       Set.iUnion_iUnion_eq', Set.mem_iUnion]
--- --     sorry
--- --     -- refine ⟨u, ?_⟩
--- --     -- have := add_mem_support_simulate hu (update 0 i 1)
--- --     -- convert this
--- --     -- · refine funext (λ j ↦ symm ?_)
--- --     --   by_cases hij : j = i
--- --     --   · simp [Function.update_apply, hij]
--- --     --   · simp [hij]
--- --     -- ·
--- --     --   refine funext (λ j ↦ ?_)
--- --     --   by_cases hij : j = i
--- --     --   · induction hij
--- --     --     simpa using (Nat.succ_pred_eq_of_ne_zero hz0).symm
--- --     --   · simp [hij]
+lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
+    (oa : spec.Range t → OracleComp spec α) (qc : QueryCount ι) (z : α × QueryCount ι) :
+    z ∈ support (simulate ((query t : OracleComp spec _) >>= oa) qc) ↔
+      z.2 t ≠ 0 ∧
+      ∃ u, (z.1, Function.update z.2 t (z.2 t - 1)) ∈ support (simulate (oa u) qc) := by
+  refine ⟨?_, ?_⟩
+  · intro hz
+    exact ⟨apply_ne_zero_of_mem_support_simulate_queryBind hz,
+      exists_mem_support_of_mem_support_simulate_queryBind hz⟩
+  · rintro ⟨hz0, hu⟩
+    rcases hu with ⟨u, hu⟩
+    rcases (mem_support_simulate_iff (oa := oa u) qc
+      (z := (z.1, Function.update z.2 t (z.2 t - 1)))).1 hu with ⟨b, hb0, hbEq⟩
+    have hbRun : (z.1, b) ∈ support ((simulateQ countingOracle (oa u)).run) := by
+      simpa [simulate] using hb0
+    have hbRun' : (z.1, b) ∈ support ((simulateQ (QueryImpl.id' spec).withCounting (oa u)).run) := by
+      simpa [countingOracle] using hbRun
+    let q0 : QueryCount ι := QueryCount.single t + b
+    have hq0mem : (z.1, q0) ∈ support (simulate ((query t : OracleComp spec _) >>= oa) 0) := by
+      have hex :
+          ∃ i a b', (a, b') ∈ support (simulateQ (QueryImpl.id' spec).withCounting (oa i)).run ∧
+            (a, QueryCount.single t + b') = (z.1, q0) :=
+        ⟨u, z.1, b, hbRun', by simp [q0]⟩
+      simpa [simulate, countingOracle, QueryImpl.withCounting_apply] using hex
+    have hqsum : qc + q0 = z.2 := by
+      funext j
+      by_cases hj : j = t
+      · subst j
+        have hbEqj : qc t + b t = (Function.update z.2 t (z.2 t - 1)) t := by
+          simpa [Pi.add_apply] using congrFun hbEq t
+        have hbEqj' : qc t + b t = z.2 t - 1 := by
+          simpa [Function.update] using hbEqj
+        have hzpos : 0 < z.2 t := Nat.pos_iff_ne_zero.mpr hz0
+        have hsingle : QueryCount.single t t = 1 := by simp [QueryCount.single]
+        calc
+          (qc + q0) t = qc t + (QueryCount.single t t + b t) := by
+            simp [q0, Pi.add_apply]
+          _ = qc t + b t + 1 := by
+            simp [hsingle, add_comm, add_assoc]
+          _ = z.2 t := by
+            omega
+      · have hbEqj : qc j + b j = (Function.update z.2 t (z.2 t - 1)) j := by
+          simpa [Pi.add_apply] using congrFun hbEq j
+        have hbEqj' : qc j + b j = z.2 j := by
+          simpa [Function.update, hj] using hbEqj
+        calc
+          (qc + q0) j = qc j + (QueryCount.single t j + b j) := by
+            simp [q0, Pi.add_apply]
+          _ = qc j + b j := by simp [QueryCount.single, hj]
+          _ = z.2 j := hbEqj'
+    exact (mem_support_simulate_iff (oa := ((query t : OracleComp spec _) >>= oa))
+      qc z).2 ⟨q0, hq0mem, hqsum⟩
 
--- -- lemma exists_mem_support_of_mem_support {oa : OracleComp spec α} {x : α} (hx : x ∈ oa.support)
--- --     (qc : ι → ℕ) : ∃ qc', (x, qc') ∈ (simulate countingOracle qc oa).support := by
--- --   rw [← SimOracle.IsTracking.run'_simulateT_eq_self countingOracle oa] at hx
--- --   sorry; sorry
--- --   -- simp at hx
--- --   -- exact hx
+lemma exists_mem_support_of_mem_support {oa : OracleComp spec α} {x : α} (hx : x ∈ support oa)
+    (qc : QueryCount ι) : ∃ qc', (x, qc') ∈ support (simulate oa qc) := by
+  have hx' : x ∈ support (Prod.fst <$> (simulateQ countingOracle oa).run) := by
+    simpa [fst_map_run_simulateQ] using hx
+  rw [support_map] at hx'
+  rcases hx' with ⟨z, hz, hzfst⟩
+  have hz0 : (x, z.2) ∈ support (simulate oa 0) := by
+    rw [simulate, support_map]
+    refine ⟨z, hz, ?_⟩
+    rcases z with ⟨x', q⟩
+    simpa using hzfst
+  refine ⟨qc + z.2, ?_⟩
+  exact (mem_support_simulate_iff (oa := oa) qc (z := (x, qc + z.2))).2
+    ⟨z.2, hz0, by rfl⟩
 
--- -- end support
+end support
 
 end countingOracle
