@@ -1,16 +1,39 @@
-import ToMathlib.Control.Monad.Commutative
+import VCVio.OracleComp.EvalDist
 
 /-!
-# Relational program logic
+# Relational program-logic baseline
 
-This is a formalization of the paper
-[The next 700 relational program logics](https://dl.acm.org/doi/pdf/10.1145/3371072).
-
-We follow the paper as well as the Coq formalization in [SSProve](https://github.com/ssprove/ssprove).
+Relational reasoning is intentionally kept lightweight for now while the unary quantitative
+WP/triple API stabilizes.
 -/
 
-namespace Relational
+open ENNReal
 
+universe u
 
+namespace OracleComp.ProgramLogic.Relational
 
-end Relational
+variable {ι₁ : Type u} {ι₂ : Type u}
+variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable {α β : Type}
+
+/-- Relational postconditions over two output spaces. -/
+abbrev RelPost (α : Type) (β : Type) := α → β → Prop
+
+/-- A minimal relational comparison: every related pair has pointwise probability domination. -/
+def PointwiseDom (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+    (R : RelPost α β) : Prop :=
+  ∀ ⦃x y⦄, R x y → Pr[= x | oa] ≤ Pr[= y | ob]
+
+/-- Equality relation helper for same-type outputs. -/
+def EqRel (α : Type) : RelPost α α := fun x y => x = y
+
+@[simp]
+lemma pointwiseDom_refl (oa : OracleComp spec₁ α) :
+    PointwiseDom (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
+  intro x y hxy
+  subst hxy
+  exact le_rfl
+
+end OracleComp.ProgramLogic.Relational
