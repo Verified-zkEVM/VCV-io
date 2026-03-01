@@ -195,11 +195,6 @@ def isPure {α : Type _} : OracleComp spec α → Bool
 @[simp] lemma pure_ne_query : (pure u : OracleComp spec _) ≠ query t := by simp [query_def]
 @[simp] lemma query_ne_pure : (query t : OracleComp spec _) ≠ pure u := by simp [query_def]
 
--- @[simp] lemma pure_ne_query_bind : pure x ≠ (query t : OracleComp spec _) >>= ou := fun h => by
---   simp [query_def, OracleComp.bind_def] at h
--- @[simp] lemma query_bind_ne_pure : (query t : OracleComp spec _) >>= ou ≠ pure x := fun h => by
---   simp [query_def, OracleComp.bind_def] at h
-
 lemma pure_eq_query_iff_false : pure u = (query t : OracleComp spec _) ↔ False := by simp
 lemma query_eq_pure_iff_false : (query t : OracleComp spec _) = pure u ↔ False := by simp
 
@@ -224,14 +219,6 @@ section inj
 @[simp] lemma pure_inj (x y : α) : pure (f := OracleComp spec) x = pure y ↔ x = y :=
   PFunctor.FreeM.pure_inj x y
 
--- /-- Doing something with a query result is equal iff they query the same oracle
--- and perform identical computations on the output. -/
--- @[simp] lemma queryBind_inj (t t' : spec.Domain) (ob : spec.Range t → OracleComp spec β)
---     (ob' : spec.Range t' → OracleComp spec β) :
---     (query t : OracleComp spec _) >>= ob = (query t' : OracleComp spec _) >>= ob' ↔
---       ∃ h : t = t', h ▸ ob = ob' := by
---   convert PFunctor.FreeM.roll_inj t t' ob ob'
-
 /-- Binding two computations gives a pure operation iff the first computation is pure
 and the second computation does something pure with the result. -/
 @[simp] lemma bind_eq_pure_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
@@ -251,35 +238,5 @@ alias ⟨_, bind_eq_pure⟩ := bind_eq_pure_iff
 alias ⟨_, pure_eq_bind⟩ := pure_eq_bind_iff
 
 end inj
-
--- /-- If the oracle indexing-type `ι`, output type `α`, and domains of all oracles have
--- `DecidableEq` then `OracleComp spec α` also has `DecidableEq`. -/
--- protected instance instDecidableEq [spec.Fintype] [hd : DecidableEq (spec.Domain)]
---     [hι : DecidableEq ι] [h : DecidableEq α] : DecidableEq (OracleComp spec α) := fun
---   | _ => sorry
-  -- | FreeMonad.pure (Option.some x), FreeMonad.pure (Option.some y) =>
-  --   match h x y with
-  --   | isTrue rfl => isTrue rfl
-  --   | isFalse h => isFalse λ h' ↦ h (by rwa [FreeMonad.pure.injEq, Option.some_inj] at h')
-  -- | FreeMonad.pure Option.none, FreeMonad.pure (Option.some y) => isFalse λ h ↦
-  --     Option.some_ne_none y (by rwa [FreeMonad.pure.injEq, eq_comm] at h)
-  -- | FreeMonad.pure (Option.some x), FreeMonad.pure Option.none => isFalse λ h ↦
-  --     Option.some_ne_none x (by rwa [FreeMonad.pure.injEq] at h)
-  -- | FreeMonad.pure Option.none, FreeMonad.pure Option.none => isTrue rfl
-  -- | FreeMonad.pure x, FreeMonad.roll q r => isFalse <| by simp
-  -- | FreeMonad.roll q r, FreeMonad.pure x => isFalse <| by simp
-  -- | FreeMonad.roll (OracleQuery.query i t) r, FreeMonad.roll (OracleQuery.query i' t') s =>
-  --   match hι i i' with
-  --   | isTrue h => by
-  --       induction h
-  --    rw [FreeMonad.roll.injEq, heq_eq_eq, OracleQuery.query.injEq, eq_self, true_and, heq_eq_eq]
-  --       refine @instDecidableAnd _ _ (hd i t t') ?_
-  --       suffices Decidable (∀ u, r u = s u) from decidable_of_iff' _ funext_iff
-  --       suffices ∀ u, Decidable (r u = s u) from Fintype.decidableForallFintype
-  --       exact λ u ↦ OracleComp.instDecidableEq (r u) (s u)
-  --   | isFalse h => isFalse λ h' ↦ h <|
-  --       match FreeMonad.roll.inj h' with
-  --       | ⟨h1, h2, _⟩ => @congr_heq _ _ ι OracleQuery.index OracleQuery.index
-  --           (query i t) (query i' t') (h1 ▸ HEq.rfl) h2
 
 end OracleComp

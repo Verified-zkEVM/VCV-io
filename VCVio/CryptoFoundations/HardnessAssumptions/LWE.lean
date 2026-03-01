@@ -92,17 +92,3 @@ noncomputable def SearchAdvantage (n m p : ℕ) [NeZero p] (errSamp : ProbComp (
   (SearchExperiment n m p errSamp adv).advantage'
 
 end LWE
-
-/-! ## Old commented code (for reference)
-
--- variable (n m p : ℕ) [NeZero p] (errSamp : ProbComp (Fin p))
-
--- def LWE_Distr : ProbComp (Matrix (Fin n) (Fin m) (Fin p) × Vector (Fin p) m) := do
---   let A ←$ᵗ Matrix (Fin n) (Fin m) (Fin p)
---   let s ←$ᵗ Vector (Fin p) n
---   let e ← (Vector.Range m).mapM (fun _ ↦ errSamp)
---   let u := A.vecMul s.get + e.get
---   return (A, Vector.ofFn u)
-
--- (... rest of old LWE code preserved in git history ...)
--/
