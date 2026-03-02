@@ -182,6 +182,30 @@ lemma relTriple_eqRel_of_eq {oa ob : OracleComp spec₁ α}
   subst h
   exact relTriple_refl (spec₁ := spec₁) (oa := oa)
 
+/-- Equality of evaluation distributions gives an equality-relation relational triple. -/
+lemma relTriple_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (h : evalDist oa = evalDist ob) :
+    RelTriple oa ob (EqRel α) := by
+  apply (relTriple_iff_relWP (oa := oa) (ob := ob) (R := EqRel α)).2
+  let cdiag := _root_.SPMF.Coupling.refl (evalDist oa)
+  refine ⟨⟨cdiag.1, ?_⟩, ?_⟩
+  · constructor
+    · exact cdiag.2.map_fst
+    · simpa [h] using cdiag.2.map_snd
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist oa) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with ⟨a, _, hz'⟩
+    have hzEq : z = (a, a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simp [EqRel, hzEq]
+
+/-- Pointwise output-probability equality gives an equality-relation relational triple. -/
+lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (h : ∀ x : α, Pr[= x | oa] = Pr[= x | ob]) :
+    RelTriple oa ob (EqRel α) :=
+  relTriple_eqRel_of_evalDist_eq (spec₁ := spec₁) (spec₂ := spec₂) (oa := oa) (ob := ob)
+    (evalDist_ext h)
+
 /-- Equality-relation relational triples imply equality of point output probabilities. -/
 lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple oa ob (EqRel α)) (x : α) :
@@ -223,6 +247,12 @@ lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : Oracle
     _ = Pr[(fun z : α × α => z.2 = x) | c.1] := hevent
     _ = Pr[= x | Prod.snd <$> c.1] := hmap_snd
     _ = Pr[= x | ob] := hsnd
+
+/-- Equality-relation relational triples imply equality of evaluation distributions. -/
+lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (h : RelTriple oa ob (EqRel α)) :
+    evalDist oa = evalDist ob :=
+  evalDist_ext (fun x => probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h x)
 
 /-- Bool-specialized bridge from relational triples to game success equality. -/
 lemma probOutput_true_eq_of_relTriple_eqRel

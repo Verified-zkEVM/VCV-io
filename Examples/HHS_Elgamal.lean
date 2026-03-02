@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import VCVio.ProgramLogic.Relational.Basic
 
 /-!
 # ElGamal over Hard Homogeneous Spaces: Multi-query IND-CPA via DDH
@@ -32,6 +33,7 @@ oracle queries, but is not provable universally.
 -/
 
 open OracleSpec OracleComp ENNReal
+open OracleComp.ProgramLogic.Relational
 
 variable {G P : Type} [SampleableType G] [SampleableType P]
     [AddCommGroup G] [Group P] [AddTorsor G P]
@@ -332,6 +334,75 @@ lemma randomMaskedCipher_dist_eq (pk : P × P) (m m' : P) :
   exact probOutput_bind_mul_left_uniform (P := P) msg
     (fun y : P => (pure (g +ᵥ pk.1, y) : ProbComp (P × P))) c
 
+/-- Random masking remains message-independent after embedding into the hybrid cache/state output. -/
+private lemma randomMaskedCipher_state_dist_eq
+    (pk : P × P) (mm : P × P) (st : IND_CPA_HybridState (P := P))
+    (z : (P × P) × IND_CPA_HybridState (P := P)) :
+    Pr[= z | (do
+      let c ← randomMaskedCipher (G := G) (P := P) pk mm.1
+      pure (c, (st.1.cacheQuery mm c, st.2 + 1)))] =
+    Pr[= z | (do
+      let c ← randomMaskedCipher (G := G) (P := P) pk mm.2
+      pure (c, (st.1.cacheQuery mm c, st.2 + 1)))] := by
+  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  refine tsum_congr fun c => ?_
+  rw [randomMaskedCipher_dist_eq (G := G) (P := P) pk mm.1 mm.2 c]
+
+/-- In `ProbComp`, the active `monadLift` coercion is extensionally identity. -/
+private lemma monadLift_probComp_eq {α : Type} (x : ProbComp α) :
+    (monadLift x : ProbComp α) = x := by
+  change OracleComp.liftComp x unifSpec = x
+  change simulateQ (fun t => liftM (OracleQuery.query (spec := unifSpec) t)) x = x
+  change simulateQ (QueryImpl.ofLift unifSpec (OracleComp unifSpec)) x = x
+  exact simulateQ_ofLift_eq_self (spec := unifSpec) (mx := x)
+
+/-- Relational form of `simulateQ_hybrid0_bdistrib_eq`, used to compose via `relTriple_bind`. -/
+private lemma simulateQ_hybrid0_relTriple
+    (pk : P × P) :
+    ∀ {α : Type} (a : OracleComp (elgamalAsymmEnc G P).IND_CPA_oracleSpec α)
+      (st : IND_CPA_HybridState (P := P)),
+    RelTriple
+      ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run st)
+      ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run st)
+      (EqRel (α × IND_CPA_HybridState (P := P))) := by
+  intro α a
+  induction a using OracleComp.inductionOn with
+  | pure x =>
+      intro st
+      apply relTriple_eqRel_of_eq
+      simp
+  | query_bind t oa ih =>
+      intro st
+      simp only [simulateQ_bind, StateT.run_bind]
+      refine (relTriple_bind
+        (R := EqRel (((elgamalAsymmEnc G P).IND_CPA_oracleSpec.Range t) ×
+          IND_CPA_HybridState (P := P)))
+        (S := EqRel (α × IND_CPA_HybridState (P := P))) ?_ ?_)
+      · cases t with
+        | inl tu =>
+            apply relTriple_eqRel_of_eq
+            simp [IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle]
+        | inr mm =>
+            cases hcache : st.1 mm with
+            | some c =>
+                apply relTriple_eqRel_of_eq
+                simp [IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache]
+            | none =>
+                apply relTriple_eqRel_of_probOutput_eq
+                intro z
+                simp only [IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache,
+                  simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
+                  map_eq_bind_pure_comp, StateT.run_bind]
+                rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+                refine tsum_congr fun p => ?_
+                congr 1
+                rcases p with ⟨c, st'⟩
+                simpa [IND_CPA_hybridChallengeOracle, hcache, monadLift_probComp_eq] using
+                  (randomMaskedCipher_state_dist_eq (G := G) (P := P) pk mm st (c, st'))
+      · intro us vs hEq
+        rcases hEq with rfl
+        simpa using ih us.1 us.2
+
 /-- Key b-independence lemma: in hybrid 0 (all-random masking), the oracle simulation has
     the same output distribution whether the hidden bit is `true` or `false`.
 
@@ -351,14 +422,57 @@ lemma simulateQ_hybrid0_bdistrib_eq
     ∀ t : α × IND_CPA_HybridState (P := P),
     Pr[= t | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run st] =
     Pr[= t | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run st] := by
-  sorry
-  -- Proof by induction on `a` using `OracleComp.inductionOn`.
-  -- Base (pure x): simp [simulateQ_pure, StateT.run_pure].
-  -- Step (query_bind t oa ih): case split on t ∈ unifSpec vs t ∈ LR-oracle.
-  --   unifSpec: oracle returns uniform sample, same for b=true and b=false.
-  --   LR-oracle (m₁, m₂): use randomMaskedCipher_dist_eq for cache-miss case;
-  --     cache-hit case is identical for both b values.
-  --   Apply ih to conclude distribution equality for the continuation.
+  intro α a st t
+  exact probOutput_eq_of_relTriple_eqRel
+    (simulateQ_hybrid0_relTriple (G := G) (P := P) pk a st) t
+
+/-- Output distribution of `run'` in hybrid 0 is independent of the hidden bit. -/
+private lemma probOutput_run'_hybrid0_eq
+    (pk : P × P)
+    {α : Type}
+    (a : OracleComp (elgamalAsymmEnc G P).IND_CPA_oracleSpec α)
+    (st : IND_CPA_HybridState (P := P))
+    (x : α) :
+    Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run' st] =
+    Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run' st] := by
+  let runTrue := (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run st
+  let runFalse := (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run st
+  have hRun :
+      ∀ z : α × IND_CPA_HybridState (P := P), Pr[= z | runTrue] = Pr[= z | runFalse] := by
+    intro z
+    simpa [runTrue, runFalse] using
+      (simulateQ_hybrid0_bdistrib_eq (G := G) (P := P) pk a st z)
+  have hMapTrue :
+      Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run' st] =
+        Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runTrue] := by
+    calc
+      Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run' st]
+          = Pr[= x | Prod.fst <$> runTrue] := by rfl
+      _ = Pr[(fun y : α => y = x) | Prod.fst <$> runTrue] := by simp
+      _ = Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runTrue] := by
+            simpa [Function.comp] using
+              (probEvent_map (mx := runTrue) (f := Prod.fst) (q := fun y : α => y = x))
+  have hMapFalse :
+      Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runFalse] =
+        Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run' st] := by
+    calc
+      Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runFalse]
+          = Pr[(fun y : α => y = x) | Prod.fst <$> runFalse] := by
+              simpa [Function.comp] using
+                (probEvent_map (mx := runFalse) (f := Prod.fst) (q := fun y : α => y = x)).symm
+      _ = Pr[= x | Prod.fst <$> runFalse] := by simp
+      _ = Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run' st] :=
+            by rfl
+  have hEvent :
+      Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runTrue] =
+        Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runFalse] := by
+    simp only [probEvent_eq_tsum_indicator, hRun]
+  calc
+    Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) a).run' st]
+        = Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runTrue] := hMapTrue
+    _ = Pr[(fun z : α × IND_CPA_HybridState (P := P) => z.1 = x) | runFalse] := hEvent
+    _ = Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) a).run' st] :=
+      hMapFalse
 
 /-- The all-random hybrid game has success probability exactly 1/2.
     The adversary's view (via `simulateQ_hybrid0_bdistrib_eq`) is independent of the hidden
@@ -366,15 +480,62 @@ lemma simulateQ_hybrid0_bdistrib_eq
 theorem IND_CPA_allRandomHalf
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) :
     Pr[= true | IND_CPA_HybridGame (G := G) (P := P) adversary 0] = 1 / 2 := by
-  -- The adversary's view in hybrid 0 is independent of the hidden bit `b`
-  -- (by `simulateQ_hybrid0_bdistrib_eq` + `randomMaskedCipher_dist_eq`),
-  -- so guessing `b` correctly happens with probability exactly 1/2.
-  -- Full proof: induction on the adversary's computation, using:
-  --   1. simulateQ_hybrid0_bdistrib_eq to establish b-independence of the view
-  --   2. probOutput_bind_uniformBool to average over b ← $ᵗ Bool
-  --   3. probOutput_true_eq_true_map / probOutput_true_eq_falseMap to simplify beq
-  --   4. Sum-to-1 of probabilities: Pr[true | view] + Pr[false | view] = 1
-  sorry
+  let view : Bool → ProbComp Bool := fun b => do
+    let (pk, _sk) ← (elgamalAsymmEnc G P).keygen
+    (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk b 0) (adversary pk)).run' (∅, 0)
+  have hviewEq : ∀ x : Bool, Pr[= x | view true] = Pr[= x | view false] := by
+    intro x
+    rw [show view true = (do
+      let (pk, _sk) ← (elgamalAsymmEnc G P).keygen
+      (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0) (adversary pk)).run' (∅, 0))
+        from rfl]
+    rw [show view false = (do
+      let (pk, _sk) ← (elgamalAsymmEnc G P).keygen
+      (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0) (adversary pk)).run' (∅, 0))
+        from rfl]
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun ks => ?_
+    rcases ks with ⟨pk, sk⟩
+    change
+      Pr[= ((pk, sk) : (P × P) × G) | (elgamalAsymmEnc G P).keygen] *
+        Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0)
+          (adversary pk)).run' (∅, 0)] =
+      Pr[= ((pk, sk) : (P × P) × G) | (elgamalAsymmEnc G P).keygen] *
+        Pr[= x | (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
+          (adversary pk)).run' (∅, 0)]
+    rw [probOutput_run'_hybrid0_eq (G := G) (P := P) (pk := pk) (a := adversary pk)
+      (st := (∅, 0)) (x := x)]
+  have hrepr :
+      Pr[= true | IND_CPA_HybridGame (G := G) (P := P) adversary 0] =
+      Pr[= true | do
+        let b ← $ᵗ Bool
+        if b then (BEq.beq true <$> view true) else (BEq.beq false <$> view false)] := by
+    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+    intro b
+    cases b <;> simp [IND_CPA_HybridGame, view, bind_assoc]
+  have hmix :
+      Pr[= true | do
+        let b ← $ᵗ Bool
+        if b then (BEq.beq true <$> view true) else (BEq.beq false <$> view false)] =
+      (Pr[= true | (BEq.beq true <$> view true)] +
+        Pr[= true | (BEq.beq false <$> view false)]) / 2 :=
+    probOutput_bind_uniformBool
+      (f := fun b => if b then (BEq.beq true <$> view true) else (BEq.beq false <$> view false))
+      (x := true)
+  have hsum : Pr[= true | view true] + Pr[= false | view true] = 1 := by
+    have hsumAll : ∑ b : Bool, Pr[= b | view true] = 1 :=
+      HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := view true)
+    simpa [Fintype.sum_bool] using hsumAll
+  calc
+    Pr[= true | IND_CPA_HybridGame (G := G) (P := P) adversary 0]
+        = (Pr[= true | (BEq.beq true <$> view true)] +
+            Pr[= true | (BEq.beq false <$> view false)]) / 2 := by
+              rw [hrepr, hmix]
+    _ = (Pr[= true | view true] + Pr[= false | view false]) / 2 := by
+          rw [probOutput_true_eq_true_map, probOutput_true_eq_falseMap]
+    _ = (Pr[= true | view true] + Pr[= false | view true]) / 2 := by
+          rw [hviewEq false]
+    _ = 1 / 2 := by rw [hsum]
 
 /-! ## 5. Per-hop DDH reduction -/
 
@@ -392,35 +553,274 @@ theorem IND_CPA_allRandomHalf
     - Repeated (cached) queries: serve from cache.
     This means: `Pr[step reduction wins | DDH real] = Pr[hybrid k+1 wins]`
                 `Pr[step reduction wins | DDH random] = Pr[hybrid k wins]` -/
+private def IND_CPA_stepDDHOracle
+    (pk : P × P) (b : Bool) (k : ℕ) (x₂ x₃ : P) :
+    QueryImpl (P × P →ₒ P × P)
+      (StateT (IND_CPA_HybridState (P := P)) ProbComp) := fun (m₁, m₂) => do
+  let st ← get
+  match st.1 (m₁, m₂) with
+  | some c => return c
+  | none =>
+      let msg : P := if b then m₁ else m₂
+      let c ←
+        if st.2 < k then
+          (elgamalAsymmEnc G P).encrypt pk msg
+        else if st.2 = k then
+          pure (x₂, msg * x₃)
+        else
+          randomMaskedCipher (G := G) (P := P) pk msg
+      let cache' := st.1.cacheQuery (m₁, m₂) c
+      set (cache', st.2 + 1)
+      return c
+
+private def IND_CPA_stepDDHQueryImpl
+    (pk : P × P) (b : Bool) (k : ℕ) (x₂ x₃ : P) :
+    QueryImpl (elgamalAsymmEnc G P).IND_CPA_oracleSpec
+      (StateT (IND_CPA_HybridState (P := P)) ProbComp) :=
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT (IND_CPA_HybridState (P := P)) ProbComp) +
+    IND_CPA_stepDDHOracle (G := G) (P := P) pk b k x₂ x₃
+
 def IND_CPA_stepDDHReduction [DecidableEq G]
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
     (k : ℕ) : DiffieHellman.DDHAdversary G P :=
   fun x x₁ x₂ x₃ => do
     let b ← $ᵗ Bool
     let pk : P × P := (x, x₁)
-    let so : QueryImpl (P × P →ₒ P × P)
-        (StateT (IND_CPA_HybridState (P := P)) ProbComp) := fun (m₁, m₂) => do
-      let st ← get
-      match st.1 (m₁, m₂) with
-      | some c => return c
-      | none =>
-          let msg : P := if b then m₁ else m₂
-          let c ←
-            if st.2 < k then
-              (elgamalAsymmEnc G P).encrypt pk msg
-            else if st.2 = k then
-              pure (x₂, msg * x₃)
-            else
-              randomMaskedCipher (G := G) (P := P) pk msg
-          let cache' := st.1.cacheQuery (m₁, m₂) c
-          set (cache', st.2 + 1)
-          return c
-    let oracleImpl : QueryImpl (elgamalAsymmEnc G P).IND_CPA_oracleSpec
-        (StateT (IND_CPA_HybridState (P := P)) ProbComp) :=
-      (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-        (StateT (IND_CPA_HybridState (P := P)) ProbComp) + so
-    let b' ← (simulateQ oracleImpl (adversary pk)).run' (∅, 0)
+    let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
+      (adversary pk)).run' (∅, 0)
     return (b == b')
+
+private def stepDDH_realBranchCore [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
+    (k : ℕ) (x : P) (g₁ g₂ : G) : ProbComp Bool := do
+  let b ← $ᵗ Bool
+  let pk : P × P := (x, g₁ +ᵥ x)
+  let x₂ : P := g₂ +ᵥ x
+  let x₃ : P := g₂ +ᵥ g₁ +ᵥ x
+  let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
+    (adversary pk)).run' (∅, 0)
+  return (b == b')
+
+private def stepDDH_randBranchCore [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
+    (k : ℕ) (x : P) (g₁ g₂ : G) : ProbComp Bool := do
+  let y ← $ᵗ P
+  let b ← $ᵗ Bool
+  let pk : P × P := (x, g₁ +ᵥ x)
+  let x₂ : P := g₂ +ᵥ x
+  let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
+    (adversary pk)).run' (∅, 0)
+  return (b == b')
+
+private def stepDDH_realBranchGame [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
+    (k : ℕ) : ProbComp Bool := do
+  let x ← $ᵗ P
+  let g₁ ← $ᵗ G
+  let g₂ ← $ᵗ G
+  stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+
+private def stepDDH_randBranchGame [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
+    (k : ℕ) : ProbComp Bool := do
+  let x ← $ᵗ P
+  let g₁ ← $ᵗ G
+  let g₂ ← $ᵗ G
+  stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+
+private lemma ddhExp_stepDDHReduction_decomp [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary)
+    (k : ℕ) :
+    Pr[= true | DiffieHellman.ddhExp (IND_CPA_stepDDHReduction (G := G) (P := P) adversary k)] -
+      1 / 2 =
+    (Pr[= true | stepDDH_realBranchGame (G := G) (P := P) adversary k] -
+      Pr[= true | stepDDH_randBranchGame (G := G) (P := P) adversary k]) / 2 := by
+  let mixedCore : ProbComp Bool := do
+    let x ← $ᵗ P
+    let g₁ ← $ᵗ G
+    let g₂ ← $ᵗ G
+    let d ← $ᵗ Bool
+    let z ← if d then
+      stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+    else
+      stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+    pure (d == z)
+  have hrepr :
+      Pr[= true | DiffieHellman.ddhExp (IND_CPA_stepDDHReduction (G := G) (P := P) adversary k)] =
+      Pr[= true | mixedCore] := by
+    simp [mixedCore, DiffieHellman.ddhExp, parallelTesting_experiment,
+      IND_CPA_stepDDHReduction, stepDDH_realBranchCore, stepDDH_randBranchCore,
+      bind_assoc]
+  have hswap₁ :
+      Pr[= true | mixedCore] =
+      Pr[= true | do
+        let x ← $ᵗ P
+        let g₁ ← $ᵗ G
+        let d ← $ᵗ Bool
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] := by
+    unfold mixedCore
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun x => ?_
+    congr 1
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun g₁ => ?_
+    congr 1
+    simpa [bind_assoc] using
+      (probEvent_bind_bind_swap
+        (mx := ($ᵗ G : ProbComp G))
+        (my := ($ᵗ Bool : ProbComp Bool))
+        (f := fun g₂ d => do
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z))
+        (q := fun t : Bool => t = true))
+  have hswap₂ :
+      Pr[= true | do
+        let x ← $ᵗ P
+        let g₁ ← $ᵗ G
+        let d ← $ᵗ Bool
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] =
+      Pr[= true | do
+        let x ← $ᵗ P
+        let d ← $ᵗ Bool
+        let g₁ ← $ᵗ G
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] := by
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun x => ?_
+    congr 1
+    simpa [bind_assoc] using
+      (probEvent_bind_bind_swap
+        (mx := ($ᵗ G : ProbComp G))
+        (my := ($ᵗ Bool : ProbComp Bool))
+        (f := fun g₁ d => do
+          let g₂ ← $ᵗ G
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z))
+        (q := fun t : Bool => t = true))
+  have hswap₃ :
+      Pr[= true | do
+        let x ← $ᵗ P
+        let d ← $ᵗ Bool
+        let g₁ ← $ᵗ G
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] =
+      Pr[= true | do
+        let d ← $ᵗ Bool
+        let x ← $ᵗ P
+        let g₁ ← $ᵗ G
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] := by
+    simpa [bind_assoc] using
+      (probEvent_bind_bind_swap
+        (mx := ($ᵗ P : ProbComp P))
+        (my := ($ᵗ Bool : ProbComp Bool))
+        (f := fun x d => do
+          let g₁ ← $ᵗ G
+          let g₂ ← $ᵗ G
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z))
+        (q := fun t : Bool => t = true))
+  have hmix :
+      Pr[= true | do
+        let d ← $ᵗ Bool
+        let z ← if d then
+          stepDDH_realBranchGame (G := G) (P := P) adversary k
+        else
+          stepDDH_randBranchGame (G := G) (P := P) adversary k
+        pure (d == z)] =
+      Pr[= true | do
+        let d ← $ᵗ Bool
+        let x ← $ᵗ P
+        let g₁ ← $ᵗ G
+        let g₂ ← $ᵗ G
+        let z ← if d then
+          stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        else
+          stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+        pure (d == z)] := by
+    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+    intro d
+    cases d <;>
+      simp [stepDDH_realBranchGame, stepDDH_randBranchGame,
+        map_eq_bind_pure_comp, bind_assoc]
+  calc
+    Pr[= true | DiffieHellman.ddhExp (IND_CPA_stepDDHReduction (G := G) (P := P) adversary k)] -
+        1 / 2
+      = Pr[= true | mixedCore] - 1 / 2 := by rw [hrepr]
+    _ = Pr[= true | do
+          let x ← $ᵗ P
+          let g₁ ← $ᵗ G
+          let d ← $ᵗ Bool
+          let g₂ ← $ᵗ G
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z)] - 1 / 2 := by rw [hswap₁]
+    _ = Pr[= true | do
+          let x ← $ᵗ P
+          let d ← $ᵗ Bool
+          let g₁ ← $ᵗ G
+          let g₂ ← $ᵗ G
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z)] - 1 / 2 := by rw [hswap₂]
+    _ = Pr[= true | do
+          let d ← $ᵗ Bool
+          let x ← $ᵗ P
+          let g₁ ← $ᵗ G
+          let g₂ ← $ᵗ G
+          let z ← if d then
+            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          else
+            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
+          pure (d == z)] - 1 / 2 := by rw [hswap₃]
+    _ = Pr[= true | do
+          let d ← $ᵗ Bool
+          let z ← if d then
+            stepDDH_realBranchGame (G := G) (P := P) adversary k
+          else
+            stepDDH_randBranchGame (G := G) (P := P) adversary k
+          pure (d == z)] - 1 / 2 := by rw [hmix]
+    _ = (Pr[= true | stepDDH_realBranchGame (G := G) (P := P) adversary k] -
+          Pr[= true | stepDDH_randBranchGame (G := G) (P := P) adversary k]) / 2 :=
+        ddh_decomp_two_games
+          (real := stepDDH_realBranchGame (G := G) (P := P) adversary k)
+          (rand := stepDDH_randBranchGame (G := G) (P := P) adversary k)
 
 /-! ## 6. Per-hop bound -/
 
