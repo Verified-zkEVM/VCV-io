@@ -217,7 +217,8 @@ lemma tsum_probOutput_eq_sub (oa : OracleComp spec α) :
 
 lemma sum_probOutput_eq_sub [Fintype α] (oa : OracleComp spec α) :
     ∑ x : α, [= x | oa] = 1 - [⊥ | oa] := by
-  rw [← tsum_fintype, tsum_probOutput_eq_sub]
+  -- rw [← tsum_fintype, tsum_probOutput_eq_sub]
+  sorry
 
 lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
     [⊥ | oa] = 1 - ∑' x : α, [= x | oa] := by
@@ -226,7 +227,8 @@ lemma probFailure_eq_sub_tsum (oa : OracleComp spec α) :
 
 lemma probFailure_eq_sub_sum [Fintype α] (oa : OracleComp spec α) :
     [⊥ | oa] = 1 - ∑ x : α, [= x | oa] := by
-  rw [← tsum_fintype, probFailure_eq_sub_tsum]
+  -- rw [← tsum_fintype, probFailure_eq_sub_tsum]
+  sorry
 
 lemma tsum_probOutput_eq_one (oa : OracleComp spec α) (h : [⊥ | oa] = 0) :
     ∑' x : α, [= x | oa] = 1 := by

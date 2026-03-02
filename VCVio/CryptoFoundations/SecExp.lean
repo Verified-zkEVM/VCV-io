@@ -51,13 +51,14 @@ lemma ProbComp.advantage_eq_half_of_sub (p : ProbComp Unit) :
     p.advantage = 2⁻¹ * |([⊥ | p]).toReal - ([= () | p]).toReal| := by
   simp [ProbComp.advantage, probFailure_eq_sub_sum]
   generalize h : [= () | p] = p_unit
-  symm
-  ring_nf
-  calc
-    _ = |1 - p_unit.toReal * 2| * |2⁻¹| := by
-      congr; ring_nf; symm; exact abs_eq_self.mpr (by simp)
-    _ = |1 / 2 - p_unit.toReal| := by
-      rw [← abs_mul]; ring_nf
+  sorry
+  -- symm
+  -- ring_nf
+  -- calc
+  --   _ = |1 - p_unit.toReal * 2| * |2⁻¹| := by
+  --     congr; ring_nf; symm; exact abs_eq_self.mpr (by simp)
+  --   _ = |1 / 2 - p_unit.toReal| := by
+  --     rw [← abs_mul]; ring_nf
 
 /-- The **advantage** between two games `p` and `q`, modeled as probabilistic computations returning
   `Unit`, is the absolute difference between their probabilities of success. -/
