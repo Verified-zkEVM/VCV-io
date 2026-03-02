@@ -214,7 +214,186 @@ noncomputable def IND_CPA_OneTime_Advantage (encAlg : AsymmEncAlg (OracleComp sp
     (adv : IND_CPA_Adv encAlg) : ℝ :=
   (IND_CPA_OneTime_Game (encAlg := encAlg) adv).advantage'
 
--- TODO: prove one-time security implies general IND-CPA security
+section OracleLift
+
+variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
+
+/-- One-time IND-CPA game specialized to `ProbComp` execution (no extra `exec` wrapper). This is
+the canonical target for generic one-query lifts into the oracle IND-CPA interface. -/
+def IND_CPA_OneTime_Game_ProbComp (adv : IND_CPA_Adv encAlg') : ProbComp Bool := do
+  let b ← $ᵗ Bool
+  let (pk, _) ← encAlg'.keygen
+  let (m₁, m₂, state) ← adv.chooseMessages pk
+  let msg := if b then m₁ else m₂
+  let c ← encAlg'.encrypt pk msg
+  let b' ← adv.distinguish state c
+  return (b == b')
+
+/-- Embed a two-phase one-time adversary into the oracle IND-CPA interface by issuing exactly
+one challenge query. This construction is scheme-agnostic. -/
+def IND_CPA_adversary_of_OneTime_raw (adv : IND_CPA_Adv encAlg') :
+    PK → OracleComp (unifSpec + (M × M →ₒ C)) Bool := fun pk => do
+  let (m₁, m₂, st) ←
+    (OracleComp.liftComp (spec := unifSpec)
+      (superSpec := unifSpec + (M × M →ₒ C))
+      (adv.chooseMessages pk))
+  let c ← query (spec := unifSpec + (M × M →ₒ C)) (Sum.inr (m₁, m₂))
+  OracleComp.liftComp (spec := unifSpec)
+    (superSpec := unifSpec + (M × M →ₒ C))
+    (adv.distinguish st c)
+
+/-- Embed a two-phase one-time adversary into the oracle IND-CPA interface by issuing exactly
+one challenge query. This construction is scheme-agnostic. -/
+def IND_CPA_adversary_of_OneTime (adv : IND_CPA_Adv encAlg') :
+    encAlg'.IND_CPA_adversary := by
+  simpa [IND_CPA_adversary, IND_CPA_oracleSpec] using
+    (IND_CPA_adversary_of_OneTime_raw (encAlg' := encAlg') adv)
+
+/-- Main proof obligation for a one-query lift: the oracle IND-CPA game with the embedded
+one-time adversary is equal to the direct one-time ProbComp game. -/
+abbrev IND_CPA_experiment_adversary_of_OneTime_eq_oneTimeGameObligation
+    [DecidableEq M] [DecidableEq C] (adv : IND_CPA_Adv encAlg') : Prop :=
+  IND_CPA_experiment (encAlg := encAlg') (IND_CPA_adversary_of_OneTime (encAlg' := encAlg') adv) =
+    IND_CPA_OneTime_Game_ProbComp (encAlg' := encAlg') adv
+
+/-- `ℝ≥0∞` one-time signed IND-CPA advantage, aligned with `IND_CPA_advantage`. -/
+noncomputable def IND_CPA_OneTime_AdvantageENN (encAlg : AsymmEncAlg ProbComp M PK SK C)
+    (adv : IND_CPA_Adv encAlg) : ℝ≥0∞ :=
+  Pr[= true | IND_CPA_OneTime_Game_ProbComp (encAlg' := encAlg) adv] - 1 / 2
+
+omit [DecidableEq M] [DecidableEq C] in
+/-- Generic advantage equality for adversaries obtained from the one-query embedding,
+once the game-equivalence obligation is discharged. -/
+theorem IND_CPA_advantage_adversary_of_OneTime_eq_oneTimeAdvantageENN_of_obligation
+    [DecidableEq M] [DecidableEq C]
+    (adv : IND_CPA_Adv encAlg') :
+    IND_CPA_experiment_adversary_of_OneTime_eq_oneTimeGameObligation
+      (encAlg' := encAlg') adv →
+    IND_CPA_advantage (encAlg := encAlg') (IND_CPA_adversary_of_OneTime (encAlg' := encAlg') adv) =
+      IND_CPA_OneTime_AdvantageENN (encAlg := encAlg') adv := by
+  intro hgame
+  unfold IND_CPA_advantage IND_CPA_OneTime_AdvantageENN
+  simpa using congrArg (fun p : ℝ≥0∞ => p - 1 / 2)
+    (congrArg (fun g : ProbComp Bool => Pr[= true | g])
+      hgame)
+
+/-- Obligation form for reducing an arbitrary oracle IND-CPA adversary to a one-query
+two-phase adversary. -/
+abbrev IND_CPA_oneQueryFactorizationObligation [DecidableEq M] [DecidableEq C]
+    (adversary : encAlg'.IND_CPA_adversary) : Prop :=
+  ∃ adv : IND_CPA_Adv encAlg',
+    adversary = IND_CPA_adversary_of_OneTime (encAlg' := encAlg') adv ∧
+      IND_CPA_experiment_adversary_of_OneTime_eq_oneTimeGameObligation
+        (encAlg' := encAlg') adv
+
+omit [DecidableEq M] [DecidableEq C] in
+/-- Generic one-query lift: if a multi-query oracle adversary factors through a one-query
+two-phase adversary, its IND-CPA advantage is exactly the one-time advantage. -/
+theorem IND_CPA_advantage_eq_oneTimeAdvantageENN_of_oneQueryFactorization
+    [DecidableEq M] [DecidableEq C]
+    (adversary : encAlg'.IND_CPA_adversary)
+    (hfactor : IND_CPA_oneQueryFactorizationObligation (encAlg' := encAlg') adversary) :
+    ∃ adv : IND_CPA_Adv encAlg',
+      IND_CPA_advantage (encAlg := encAlg') adversary =
+        IND_CPA_OneTime_AdvantageENN (encAlg := encAlg') adv := by
+  rcases hfactor with ⟨adv, rfl, hgame⟩
+  exact ⟨adv, IND_CPA_advantage_adversary_of_OneTime_eq_oneTimeAdvantageENN_of_obligation
+    (encAlg' := encAlg') adv hgame⟩
+
+end OracleLift
+
+section MultiQueryHybridLift
+
+variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
+
+/-- Real-valued success probability of outputting `true` for a `ProbComp Bool` game. -/
+noncomputable abbrev trueProbReal (g : ProbComp Bool) : ℝ :=
+  (Pr[= true | g]).toReal
+
+/-- Signed real IND-CPA advantage (`Pr[win]-1/2`) for the oracle IND-CPA experiment. -/
+noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
+  trueProbReal (IND_CPA_experiment (encAlg := encAlg') adversary) - 1 / 2
+
+lemma sum_hybridDiff_eq_trueProb_sub (games : ℕ → ProbComp Bool) (q : ℕ) :
+    Finset.sum (Finset.range q) (fun i => trueProbReal (games i) - trueProbReal (games (i + 1))) =
+      trueProbReal (games 0) - trueProbReal (games q) := by
+  let f : ℕ → ℝ := fun i => trueProbReal (games i)
+  have hsub : Finset.sum (Finset.range q) (fun i => f (i + 1)) -
+      Finset.sum (Finset.range q) (fun i => f i) = f q - f 0 := by
+    simpa [f] using (Finset.sum_range_sub (f := f) q)
+  have hneg := congrArg Neg.neg hsub
+  calc
+    Finset.sum (Finset.range q) (fun i => f i - f (i + 1))
+        = -(Finset.sum (Finset.range q) (fun i => f (i + 1)) -
+            Finset.sum (Finset.range q) (fun i => f i)) := by
+              simp [Finset.sum_sub_distrib]
+    _ = -(f q - f 0) := by simpa using hneg
+    _ = f 0 - f q := by ring
+    _ = trueProbReal (games 0) - trueProbReal (games q) := by simp [f]
+
+omit [DecidableEq C] in
+/-- Generic telescoping identity for multi-query game-hopping:
+if `games 0` is the target IND-CPA experiment and `games q` has success probability `1/2`,
+then IND-CPA advantage is the sum of adjacent hybrid differences. -/
+theorem IND_CPA_advantage'_eq_sum_hybridDiff
+    (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (games : ℕ → ProbComp Bool)
+    (h0 : games 0 = IND_CPA_experiment (encAlg := encAlg') adversary)
+    (hq : trueProbReal (games q) = (1 / 2 : ℝ)) :
+    IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary =
+      Finset.sum (Finset.range q) (fun i =>
+        trueProbReal (games i) - trueProbReal (games (i + 1))) := by
+  unfold IND_CPA_signedAdvantageReal
+  calc
+    (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
+        = trueProbReal (games 0) - trueProbReal (games q) := by
+            simp [h0, hq, trueProbReal]
+    _ = Finset.sum (Finset.range q)
+          (fun i => trueProbReal (games i) - trueProbReal (games (i + 1))) := by
+          simpa using (sum_hybridDiff_eq_trueProb_sub (games := games) q).symm
+
+omit [DecidableEq C] in
+/-- Generic multi-query bound: absolute IND-CPA advantage is at most the sum of absolute
+adjacent hybrid gaps. -/
+theorem IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
+    (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (games : ℕ → ProbComp Bool)
+    (h0 : games 0 = IND_CPA_experiment (encAlg := encAlg') adversary)
+    (hq : trueProbReal (games q) = (1 / 2 : ℝ)) :
+    |IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary| ≤
+      Finset.sum (Finset.range q) (fun i =>
+        |trueProbReal (games i) - trueProbReal (games (i + 1))|) := by
+  rw [IND_CPA_advantage'_eq_sum_hybridDiff (encAlg' := encAlg') adversary q games h0 hq]
+  simpa using
+    (Finset.abs_sum_le_sum_abs
+      (s := Finset.range q)
+      (f := fun i => trueProbReal (games i) - trueProbReal (games (i + 1))))
+
+/-- Real bridge for truncated ENNReal subtraction: `(a - b).toReal` is bounded by
+`|a.toReal - b.toReal|`. -/
+lemma toReal_tsub_le_abs_toReal_sub (a b : ℝ≥0∞) (ha : a ≠ ∞) :
+    (a - b).toReal ≤ |a.toReal - b.toReal| := by
+  by_cases h : b ≤ a
+  · rw [ENNReal.toReal_sub_of_le h ha]
+    exact le_abs_self _
+  · have h' : a ≤ b := le_of_not_ge h
+    rw [tsub_eq_zero_of_le h']
+    exact abs_nonneg _
+
+omit [DecidableEq C] in
+/-- Compatibility bridge to the existing `IND_CPA_advantage` API:
+the `toReal` of ENNReal signed advantage is bounded by absolute signed real advantage. -/
+theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
+    [DecidableEq C]
+    (adversary : encAlg'.IND_CPA_adversary) :
+    (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤
+      |IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary| := by
+  unfold IND_CPA_advantage IND_CPA_signedAdvantageReal
+  simpa using
+    (toReal_tsub_le_abs_toReal_sub
+      (a := Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary])
+      (b := (1 / 2 : ℝ≥0∞))
+      (ha := probOutput_ne_top))
+
+end MultiQueryHybridLift
 
 end IND_CPA_TwoPhase
 

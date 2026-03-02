@@ -612,3 +612,66 @@ lemma probEvent_ge_of_compl_le
   exact tsub_le_tsub_left h _
 
 end swap_compl
+
+section union_bound
+
+variable [HasEvalSPMF m]
+
+/-- Union bound for finset-indexed events: the probability that *some* event in `s` holds
+is at most the sum of the individual event probabilities. -/
+lemma probEvent_exists_finset_le_sum
+    {ι : Type*} (s : Finset ι) (mx : m α) (E : ι → α → Prop) :
+    Pr[(fun x => ∃ i ∈ s, E i x) | mx] ≤ Finset.sum s (fun i => Pr[E i | mx]) := by
+  classical
+  refine Finset.induction_on s ?base ?step
+  · simp
+  · intro a s ha ih
+    have hE :
+        (fun x => ∃ i ∈ insert a s, E i x) = fun x => E a x ∨ ∃ i ∈ s, E i x := by
+      funext x
+      apply propext
+      constructor
+      · rintro ⟨i, hi, hix⟩
+        rcases Finset.mem_insert.mp hi with rfl | hi'
+        · exact Or.inl hix
+        · exact Or.inr ⟨i, hi', hix⟩
+      · intro hx
+        cases hx with
+        | inl hax => exact ⟨a, Finset.mem_insert_self _ _, hax⟩
+        | inr hx' =>
+            rcases hx' with ⟨i, hi, hix⟩
+            exact ⟨i, Finset.mem_insert_of_mem hi, hix⟩
+    have hor :
+        Pr[(fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[E a | mx] + Pr[(fun x => ∃ i ∈ s, E i x) | mx] := by
+      rw [probEvent_eq_tsum_ite (mx := mx) (p := fun x => E a x ∨ ∃ i ∈ s, E i x)]
+      rw [probEvent_eq_tsum_ite (mx := mx) (p := E a)]
+      rw [probEvent_eq_tsum_ite (mx := mx) (p := fun x => ∃ i ∈ s, E i x)]
+      have hle :
+          (∑' y : α, if (E a y ∨ ∃ i ∈ s, E i y) then Pr[= y | mx] else 0)
+            ≤ (∑' y : α, ((if E a y then Pr[= y | mx] else 0)
+                + (if (∃ i ∈ s, E i y) then Pr[= y | mx] else 0))) := by
+        refine ENNReal.tsum_le_tsum fun y => ?_
+        by_cases ha' : E a y <;> by_cases hs' : (∃ i ∈ s, E i y) <;>
+          simp [ha', hs']
+      have hspl :
+          (∑' y : α, ((if E a y then Pr[= y | mx] else 0)
+              + (if (∃ i ∈ s, E i y) then Pr[= y | mx] else 0)))
+            =
+          (∑' y : α, (if E a y then Pr[= y | mx] else 0))
+            + (∑' y : α, (if (∃ i ∈ s, E i y) then Pr[= y | mx] else 0)) := by
+        simpa using (ENNReal.tsum_add
+          (f := fun y : α => (if E a y then Pr[= y | mx] else 0))
+          (g := fun y : α => (if (∃ i ∈ s, E i y) then Pr[= y | mx] else 0)))
+      exact le_trans hle (le_of_eq hspl)
+    have hsum :
+        Pr[E a | mx] + Pr[(fun x => ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[E a | mx] + Finset.sum s (fun i => Pr[E i | mx]) := by
+      simpa [add_comm, add_left_comm, add_assoc] using add_le_add_left ih (Pr[E a | mx])
+    have :
+        Pr[(fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[E a | mx] + Finset.sum s (fun i => Pr[E i | mx]) :=
+      le_trans hor hsum
+    simpa [hE, Finset.sum_insert ha, add_assoc, add_left_comm, add_comm] using this
+
+end union_bound
