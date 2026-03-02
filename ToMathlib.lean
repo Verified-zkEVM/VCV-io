@@ -14,8 +14,8 @@ import ToMathlib.Control.Monad.Free
 import ToMathlib.Control.Monad.FreeCont
 import ToMathlib.Control.Monad.Hom
 import ToMathlib.Control.Monad.Ordered
-import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.Control.Monad.Relation
+import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.Control.Monad.Relative
 import ToMathlib.Control.Monad.Transformer
 import ToMathlib.Control.OptionT
