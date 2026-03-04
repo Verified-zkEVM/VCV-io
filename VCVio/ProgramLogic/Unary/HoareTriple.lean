@@ -86,6 +86,12 @@ noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post :
     wp (spec := spec) (pure x) post = post x := by
   simp [wp, MAlgOrdered.wp_pure]
 
+@[simp] theorem wp_ite (c : Prop) [Decidable c]
+    (oa ob : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp (spec := spec) (if c then oa else ob) post =
+      if c then wp oa post else wp ob post := by
+  split_ifs <;> rfl
+
 theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (post : β → ℝ≥0∞) :
     wp (spec := spec) (oa >>= ob) post =

@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import VCVio.ProgramLogic.Notation
 
 /-!
 # ElGamal over Hard Homogeneous Spaces: Multi-query IND-CPA via DDH
@@ -160,6 +161,29 @@ abbrev IND_CPA_game
 
 /-! ## 3. All-random hybrid has probability 1/2 -/
 
+open OracleComp.ProgramLogic OracleComp.ProgramLogic.Relational
+
+/-- `randomMaskedCipher` has the same distribution regardless of `msg`:
+left-multiplication by a fixed element is a bijection on `P`, so `msg * y`
+with `y ~ U(P)` is uniform in `P`. -/
+lemma randomMaskedCipher_dist_indep (pk : P × P) (m₁ m₂ : P) :
+    evalDist (randomMaskedCipher (G := G) (P := P) pk m₁) =
+    evalDist (randomMaskedCipher (G := G) (P := P) pk m₂) := by
+  sorry
+
+/-- The oracle simulation's output is independent of `b` in the all-random hybrid.
+This is expressed as a relational triple: running with `b = true` vs `b = false`
+produces equal distributions. -/
+lemma IND_CPA_hybridOracle_allRandom_eqDist
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (pk : P × P) :
+    RelTriple
+      ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true 0)
+        (adversary pk)).run' (∅, 0))
+      ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
+        (adversary pk)).run' (∅, 0))
+      (EqRel _) := by
+  sorry
+
 /-- The all-random hybrid game has success probability exactly 1/2.
 
     **Proof strategy** (see backup branch `quang/elgamal-backup` for full proof):
@@ -221,6 +245,33 @@ def IND_CPA_stepDDHReduction [DecidableEq G]
     return (b == b')
 
 /-! ## 5. Per-hop bound -/
+
+/-- When `x₃ = g₂ +ᵥ (g₁ +ᵥ x)` (the DDH-real case), the step reduction's oracle
+simulation produces the same distribution as `IND_CPA_HybridGame adversary (k+1)`. -/
+lemma IND_CPA_stepDDH_real_branch_eq [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (k : ℕ)
+    (x : P) (g₁ g₂ : G) :
+    let pk : P × P := (x, g₁ +ᵥ x)
+    let x₂ := g₂ +ᵥ x
+    let x₃ := g₂ +ᵥ (g₁ +ᵥ x)
+    evalDist ((simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk true k x₂ x₃)
+      (adversary pk)).run' (∅, 0)) =
+    evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true (k + 1))
+      (adversary pk)).run' (∅, 0)) := by
+  sorry
+
+/-- When `x₃ ~ U(P)` (the DDH-random case), the step reduction's oracle
+simulation produces the same distribution as `IND_CPA_HybridGame adversary k`. -/
+lemma IND_CPA_stepDDH_random_branch_eq [DecidableEq G]
+    (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (k : ℕ)
+    (x : P) (g₁ g₂ : G) (y : P) :
+    let pk : P × P := (x, g₁ +ᵥ x)
+    let x₂ := g₂ +ᵥ x
+    evalDist ((simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk true k x₂ y)
+      (adversary pk)).run' (∅, 0)) =
+    evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk true k)
+      (adversary pk)).run' (∅, 0)) := by
+  sorry
 
 /-- The per-hop DDH bound: the absolute difference between consecutive hybrid winning
     probabilities is at most twice the DDH advantage of `IND_CPA_stepDDHReduction`.

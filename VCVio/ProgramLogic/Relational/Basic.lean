@@ -261,4 +261,27 @@ lemma probOutput_true_eq_of_relTriple_eqRel
     Pr[= true | oa] = Pr[= true | ob] :=
   probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h true
 
+/-! ## Oracle query coupling rules (pRHL level) -/
+
+/-- Same-type identity coupling: querying the same oracle on both sides yields equal outputs. -/
+lemma relTriple_query (t : spec₁.Domain) :
+    RelTriple
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (EqRel (spec₁.Range t)) := by
+  sorry
+
+/-- Bijection coupling (the "rnd" rule from EasyCrypt):
+querying the same oracle on both sides, related by a bijection `f`. -/
+lemma relTriple_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f) :
+    RelTriple
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (fun a b => f a = b) := by
+  sorry
+
 end OracleComp.ProgramLogic.Relational

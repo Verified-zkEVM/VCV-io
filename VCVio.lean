@@ -62,9 +62,13 @@ import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
+import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
+import VCVio.ProgramLogic.Relational.Quantitative
+import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.StdDoExamples

@@ -154,6 +154,28 @@ noncomputable instance instStateTRight (σ : Type u) :
         (f := f) (g := fun ys => (g ys.1).run ys.2)
         (post := fun c td => post c td.1 td.2))
 
+/-- Two-sided `StateT` instance: both sides carry their own state.
+The postcondition takes both output values and both final states. -/
+noncomputable instance instStateTBoth (σ₁ σ₂ : Type u) :
+    MAlgRelOrdered (StateT σ₁ m₁) (StateT σ₂ m₂) (σ₁ → σ₂ → l) where
+  rwp x y post := fun s₁ s₂ =>
+    MAlgRelOrdered.rwp (x.run s₁) (y.run s₂)
+      (fun p₁ p₂ => post p₁.1 p₂.1 p₁.2 p₂.2)
+  rwp_pure a b post := by
+    funext s₁ s₂
+    simp [StateT.run_pure]
+  rwp_mono hpost := by
+    intro s₁ s₂
+    exact MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l)
+      (fun p₁ p₂ => hpost p₁.1 p₂.1 p₁.2 p₂.2)
+  rwp_bind_le x y f g post := by
+    intro s₁ s₂
+    simpa [StateT.run_bind] using
+      (MAlgRelOrdered.rwp_bind_le (m₁ := m₁) (m₂ := m₂) (l := l)
+        (x := x.run s₁) (y := y.run s₂)
+        (f := fun p₁ => (f p₁.1).run p₁.2) (g := fun p₂ => (g p₂.1).run p₂.2)
+        (post := fun p₁ p₂ => post p₁.1 p₂.1 p₁.2 p₂.2))
+
 end Instances
 
 section FailureInstances
