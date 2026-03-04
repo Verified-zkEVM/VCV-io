@@ -270,7 +270,9 @@ lemma relTriple_query (t : spec₁.Domain) :
       (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
       (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
       (EqRel (spec₁.Range t)) := by
-  sorry
+  simpa using
+    (relTriple_refl (spec₁ := spec₁)
+      (oa := (liftM (query t) : OracleComp spec₁ (spec₁.Range t))))
 
 /-- Bijection coupling (the "rnd" rule from EasyCrypt):
 querying the same oracle on both sides, related by a bijection `f`. -/
@@ -282,6 +284,28 @@ lemma relTriple_query_bij (t : spec₁.Domain)
       (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
       (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
       (fun a b => f a = b) := by
-  sorry
+  apply (relTriple_iff_relWP
+    (oa := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+    (ob := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+    (R := fun a b => f a = b)).2
+  refine ⟨⟨evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fun a =>
+      pure (a, f a), ?_⟩, ?_⟩
+  · constructor
+    · simp
+    · simp only [map_bind, map_pure, evalDist_query]
+      show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _)
+      rw [show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (f <$> PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) from by simp]
+      congr 1
+      exact PMF.uniformOfFintype_map_of_bijective f hf
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+      (fun a => (pure (a, f a) : SPMF ((spec₁.Range t) × (spec₁.Range t)))) z).1 hz with
+      ⟨a, _, hz'⟩
+    have hzEq : z = (a, f a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simp [hzEq]
 
 end OracleComp.ProgramLogic.Relational
