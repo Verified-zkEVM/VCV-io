@@ -169,11 +169,67 @@ with `y ~ U(P)` is uniform in `P`. -/
 lemma randomMaskedCipher_dist_indep (pk : P × P) (m₁ m₂ : P) :
     evalDist (randomMaskedCipher (G := G) (P := P) pk m₁) =
     evalDist (randomMaskedCipher (G := G) (P := P) pk m₂) := by
-  sorry
+  apply evalDist_ext; intro ⟨c₁, c₂⟩
+  simp only [randomMaskedCipher, probOutput_bind_eq_tsum, probOutput_pure, Prod.mk.injEq]
+  congr 1; funext g; congr 1
+  by_cases h : c₁ = g +ᵥ pk.1
+  · simp only [h, true_and]
+    have hsum : ∀ msg : P,
+        (∑' y, Pr[= y | $ᵗ P] * if c₂ = msg * y then 1 else 0) =
+          Pr[= msg⁻¹ * c₂ | $ᵗ P] := by
+      intro msg
+      rw [tsum_eq_single (msg⁻¹ * c₂)]
+      · have : msg * (msg⁻¹ * c₂) = c₂ := by group
+        simp [this]
+      · intro y hy
+        have : c₂ ≠ msg * y := fun heq => hy (show y = msg⁻¹ * c₂ by rw [heq]; group)
+        simp [this]
+    rw [hsum, hsum]
+    exact SampleableType.probOutput_selectElem_eq _ _
+  · simp [h]
 
 /-- The oracle simulation's output is independent of `b` in the all-random hybrid.
 This is expressed as a relational triple: running with `b = true` vs `b = false`
 produces equal distributions. -/
+-- TODO: move to SimSemantics or EvalDist
+private lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
+    {ι' : Type} {spec' : OracleSpec ι'}
+    {σ α : Type}
+    (impl₁ impl₂ : QueryImpl spec' (StateT σ ProbComp))
+    (h : ∀ (t : spec'.Domain) (s : σ),
+      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+    (comp : OracleComp spec' α) (s : σ) :
+    evalDist ((simulateQ impl₁ comp).run s) =
+      evalDist ((simulateQ impl₂ comp).run s) := by
+  revert s
+  induction comp using OracleComp.inductionOn with
+  | pure _ => intro _; rfl
+  | query_bind t oa ih =>
+    intro s
+    simp only [simulateQ_query_bind, StateT.run_bind]
+    rw [evalDist_bind, evalDist_bind]
+    congr 1
+    · exact h t s
+    · funext ⟨u, s'⟩; exact ih u s'
+
+-- TODO: move to EvalDist or HHS_Elgamal helpers
+private lemma hybridChallengeOracle_allRandom_evalDist_eq
+    (pk : P × P) (mm : P × P) (s : IND_CPA_HybridState (P := P)) :
+    evalDist ((IND_CPA_hybridChallengeOracle (G := G) (P := P) pk true 0 mm).run s) =
+    evalDist ((IND_CPA_hybridChallengeOracle (G := G) (P := P) pk false 0 mm).run s) := by
+  simp only [IND_CPA_hybridChallengeOracle, StateT.run_bind, StateT.run_get, pure_bind,
+    Nat.not_lt_zero, ite_false]
+  cases hs : s.1 mm with
+  | some _ => rfl
+  | none =>
+    simp only [Bool.false_eq_true, ↓reduceIte,
+      StateT.run_bind, StateT.run_monadLift, pure_bind, StateT.run_set, StateT.run_pure,
+      bind_assoc]
+    rw [evalDist_bind, evalDist_bind]
+    congr 1
+    · simp only [evalDist_liftComp]
+      exact randomMaskedCipher_dist_indep pk mm.1 mm.2
+
 lemma IND_CPA_hybridOracle_allRandom_eqDist
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (pk : P × P) :
     RelTriple
@@ -182,7 +238,16 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
       ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
         (adversary pk)).run' (∅, 0))
       (EqRel _) := by
-  sorry
+  apply relTriple_eqRel_of_evalDist_eq
+  simp only [StateT.run']
+  rw [evalDist_map, evalDist_map]
+  congr 1
+  exact evalDist_simulateQ_run_eq_of_impl_evalDist_eq _ _
+    (fun t s => by
+      cases t with
+      | inl _ => rfl
+      | inr mm => exact hybridChallengeOracle_allRandom_evalDist_eq pk mm s)
+    (adversary pk) (∅, 0)
 
 /-- The all-random hybrid game has success probability exactly 1/2.
 
@@ -196,7 +261,24 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
 theorem IND_CPA_allRandomHalf
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) :
     Pr[= true | IND_CPA_HybridGame (G := G) (P := P) adversary 0] = 1 / 2 := by
-  sorry
+  simp only [IND_CPA_HybridGame,
+    show ∀ (a b : Bool), (a == b) = decide (a = b) from by decide]
+  have hassoc : ∀ b : Bool,
+      ((elgamalAsymmEnc G P).keygen >>= fun x =>
+        (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) x.1 b 0)
+          (adversary x.1)).run' (∅, 0) >>= fun b' =>
+          pure (decide (b = b'))) =
+      ((elgamalAsymmEnc G P).keygen >>= fun x =>
+        (simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) x.1 b 0)
+          (adversary x.1)).run' (∅, 0)) >>= fun b' =>
+        pure (decide (b = b')) :=
+    fun _ => (bind_assoc _ _ _).symm
+  simp_rw [hassoc]
+  exact probOutput_decide_eq_uniformBool_half _ (by
+    simp only [evalDist_bind]
+    congr 1; funext ⟨pk, _⟩
+    exact evalDist_eq_of_relTriple_eqRel
+      (IND_CPA_hybridOracle_allRandom_eqDist adversary pk))
 
 /-! ## 4. Per-hop DDH reduction -/
 
