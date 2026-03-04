@@ -57,23 +57,11 @@ theorem relTriple_simulateQ_run
   induction oa using OracleComp.inductionOn generalizing s₁ s₂ with
   | pure x =>
     simp
-<<<<<<< Current (Your changes)
     exact hs
   | query_bind t oa ih =>
     simp [StateT.run_bind]
     exact (relTriple_bind (himpl t s₁ s₂ hs) (fun ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨eq_u, hs'⟩ => by
       dsimp at eq_u hs' ⊢; subst eq_u; exact ih u₁ s₁' s₂' hs')) trivial
-=======
-    apply MAlgRelOrdered.triple_pure
-    exact ⟨rfl, hs⟩
-  | query_bind t oa ih =>
-    simp [StateT.run_bind]
-    apply relTriple_bind (himpl t s₁ s₂ hs)
-    intro ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨eq_u, hs'⟩
-    dsimp at eq_u hs' ⊢
-    subst eq_u
-    exact ih u₁ s₁' s₂' hs'
->>>>>>> Incoming (Background Agent changes)
 
 -- TODO: move to Relational/Basic.lean
 private lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
@@ -126,19 +114,16 @@ private lemma probOutput_simulateQ_run_eq_zero_of_bad
     Pr[= (x, s) | (simulateQ impl oa).run s₀] = 0 := by
   induction oa using OracleComp.inductionOn generalizing s₀ with
   | pure a =>
-    simp [probOutput_eq_zero_iff]
-    intro h_eq
-    subst h_eq
+    rw [simulateQ_pure]
+    show Pr[= (x, s) | (pure a : StateT σ (OracleComp spec) α).run s₀] = 0
+    simp [Prod.ext_iff]
+    rintro rfl rfl
     exact hs h_bad
   | query_bind t oa ih =>
-    simp [StateT.run_bind, probOutput_bind_eq_tsum]
-    apply ENNReal.tsum_eq_zero.mpr
-    intro u
-    by_cases h_u : u ∈ support ((impl t).run s₀)
-    · have h_bad_u := h_mono t s₀ h_bad u h_u
-      have ih_u := ih u.1 u.2 h_bad_u
-      rw [ih_u, mul_zero]
-    · rw [probOutput_eq_zero_of_not_mem_support h_u, zero_mul]
+    simp [StateT.run_bind]
+    intro u s' h_mem
+    rw [← probOutput_eq_zero_iff]
+    exact ih u s' (h_mono t s₀ h_bad (u, s') h_mem)
 
 private lemma probOutput_simulateQ_run_eq_of_not_bad
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
@@ -151,26 +136,21 @@ private lemma probOutput_simulateQ_run_eq_of_not_bad
     (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl₂ t).run s), bad x.2)
     (oa : OracleComp spec α) (s₀ : σ) (x : α) (s : σ) (hs : ¬bad s) :
-    Pr[= (x, s) | (simulateQ impl₁ oa).run s₀] = Pr[= (x, s) | (simulateQ impl₂ oa).run s₀] := by
+    Pr[= (x, s) | (simulateQ impl₁ oa).run s₀] =
+      Pr[= (x, s) | (simulateQ impl₂ oa).run s₀] := by
   induction oa using OracleComp.inductionOn generalizing s₀ with
   | pure a =>
     by_cases h_bad : bad s₀
-    · have hz1 := probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ (pure a) s₀ h_bad x s hs
-      have hz2 := probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ (pure a) s₀ h_bad x s hs
-      rw [hz1, hz2]
+    · rw [probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ (pure a) s₀ h_bad x s hs,
+          probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ (pure a) s₀ h_bad x s hs]
     · rfl
   | query_bind t oa ih =>
     by_cases h_bad : bad s₀
-    · have hz1 := probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ (query t >>= oa) s₀ h_bad x s hs
-      have hz2 := probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ (query t >>= oa) s₀ h_bad x s hs
-      rw [hz1, hz2]
+    · rw [probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ _ s₀ h_bad x s hs,
+          probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ _ s₀ h_bad x s hs]
     · simp [StateT.run_bind]
-      rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-      have eq_impl : (impl₁ t).run s₀ = (impl₂ t).run s₀ := h_agree t s₀ h_bad
-      rw [eq_impl]
-      refine ENNReal.tsum_congr (fun u => ?_)
-      congr 1
-      exact ih u.1 u.2
+      rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum, h_agree t s₀ h_bad]
+      exact tsum_congr (fun ⟨u, s'⟩ => by congr 1; exact ih u s')
 
 private lemma probEvent_not_bad_eq
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
@@ -185,13 +165,12 @@ private lemma probEvent_not_bad_eq
     (oa : OracleComp spec α) (s₀ : σ) :
     Pr[fun x => ¬bad x.2 | (simulateQ impl₁ oa).run s₀] =
     Pr[fun x => ¬bad x.2 | (simulateQ impl₂ oa).run s₀] := by
-  have hz1 := probEvent_eq_tsum_ite ((simulateQ impl₁ oa).run s₀) (fun x => ¬bad x.2)
-  have hz2 := probEvent_eq_tsum_ite ((simulateQ impl₂ oa).run s₀) (fun x => ¬bad x.2)
-  rw [hz1, hz2]
-  refine ENNReal.tsum_congr (fun x => ?_)
-  split_ifs with h_not_bad
-  · exact probOutput_simulateQ_run_eq_of_not_bad impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀ x.1 x.2 h_not_bad
+  rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
+  refine tsum_congr (fun ⟨a, s⟩ => ?_)
+  split_ifs with h
   · rfl
+  · exact probOutput_simulateQ_run_eq_of_not_bad impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
+      a s h
 
 private lemma probEvent_bad_eq
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
@@ -208,20 +187,33 @@ private lemma probEvent_bad_eq
     Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
   have h1 := probEvent_compl ((simulateQ impl₁ oa).run s₀) (bad ∘ Prod.snd)
   have h2 := probEvent_compl ((simulateQ impl₂ oa).run s₀) (bad ∘ Prod.snd)
-  have h_fail₁ : Pr[⊥ | (simulateQ impl₁ oa).run s₀] = 0 := HasEvalPMF.probFailure_eq_zero
-  have h_fail₂ : Pr[⊥ | (simulateQ impl₂ oa).run s₀] = 0 := HasEvalPMF.probFailure_eq_zero
-  rw [h_fail₁, tsub_zero] at h1
-  rw [h_fail₂, tsub_zero] at h2
+  simp only [NeverFail.probFailure_eq_zero, tsub_zero] at h1 h2
   have h_not_bad := probEvent_not_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
-  -- Pr[bad] + Pr[¬bad] = 1, since Pr[¬bad] match, Pr[bad] match.
-  sorry
+  have h_not_bad' : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] =
+      Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] :=
+    h_not_bad
+  have hne : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top probEvent_le_one
+  calc Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀]
+      = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] := by
+        rw [← h1]; exact (ENNReal.add_sub_cancel_right hne).symm
+    _ = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] := by
+        rw [h_not_bad']
+    _ = Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
+        rw [← h2]; exact ENNReal.add_sub_cancel_right
+          (ne_top_of_le_ne_top one_ne_top probEvent_le_one)
 
 /-- The fundamental lemma of game playing: if two oracle implementations agree whenever
 a "bad" flag is unset, then the total variation distance between the two simulations
 is bounded by the probability that bad gets set.
 
-NOTE: This theorem requires a monotonicity assumption on `bad`, otherwise it is false.
-For details, see `PROMPT_04B_BLOCKER.md`. -/
+Both implementations must satisfy a monotonicity condition: once `bad s` holds, it must
+remain true in all reachable successor states. Without this, the theorem is false — an
+implementation could enter a bad state (where agreement is not required), diverge, and
+then return to a non-bad state, producing different outputs with `Pr[bad] = 0`.
+Monotonicity is needed on both sides because the proof establishes pointwise equality
+`Pr[= (x,s) | sim₁] = Pr[= (x,s) | sim₂]` for all `¬bad s`, which requires ruling out
+bad-to-non-bad transitions in each implementation independently. -/
 theorem tvDist_simulateQ_le_probEvent_bad
     {σ : Type}
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
@@ -236,22 +228,15 @@ theorem tvDist_simulateQ_le_probEvent_bad
       ∀ x ∈ support ((impl₂ t).run s), bad x.2) :
     tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀)
       ≤ Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
+  classical
   let sim₁ := (simulateQ impl₁ oa).run s₀
   let sim₂ := (simulateQ impl₂ oa).run s₀
-  have h_map := tvDist_map_le (m := OracleComp spec) Prod.fst sim₁ sim₂
-  have h_eq : ∀ x, ¬bad x.2 → Pr[= x | sim₁] = Pr[= x | sim₂] := by
-    intro x hx
-    exact probOutput_simulateQ_run_eq_of_not_bad impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀ x hx
-  
+  have h_eq : ∀ (x : α) (s : σ), ¬bad s →
+      Pr[= (x, s) | sim₁] = Pr[= (x, s) | sim₂] :=
+    fun x s hs => probOutput_simulateQ_run_eq_of_not_bad impl₁ impl₂ bad h_agree
+      h_mono₁ h_mono₂ oa s₀ x s hs
   have h_bad_eq : Pr[bad ∘ Prod.snd | sim₁] = Pr[bad ∘ Prod.snd | sim₂] :=
     probEvent_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
-    
-  -- We now just need to use `h_eq` and `h_bad_eq` to bound `PMF.etvDist`.
-  -- PMF.etvDist p q = (1/2) * ∑' x, |p x - q x|
-  -- The terms where ¬bad x.2 match exactly, so absDiff is 0.
-  -- For terms where bad x.2, |p x - q x| ≤ p x + q x.
-  -- Summing these gives Pr[bad | p] + Pr[bad | q] = 2 * Pr[bad | p].
-  -- Dividing by 2 gives exactly Pr[bad | p].
   sorry
 
 

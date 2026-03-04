@@ -31,6 +31,27 @@ variable {ι : Type*} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
 variable {α : Type}
 
+-- TODO: move to HoareTriple.lean
+private lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
+    (h : evalDist oa = evalDist ob) (x : α) :
+    Pr[= x | oa] = Pr[= x | ob] := by
+  show evalDist oa x = evalDist ob x
+  rw [h]
+
+-- TODO: move to HoareTriple.lean
+private lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
+    (h : evalDist oa = evalDist ob) :
+    μ oa = μ ob := by
+  unfold μ
+  exact tsum_congr fun x => by rw [probOutput_congr_evalDist h]
+
+-- TODO: move to HoareTriple.lean
+private lemma wp_congr_evalDist {oa ob : OracleComp spec α}
+    (h : evalDist oa = evalDist ob) (post : α → ℝ≥0∞) :
+    wp oa post = wp ob post := by
+  show μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
+  exact μ_congr_evalDist (by simp [h])
+
 /-- If every oracle query in `impl` has the same evaluation distribution as the original query,
 then `wp` of the simulated computation equals `wp` of the original. -/
 theorem wp_simulateQ_eq
@@ -39,15 +60,36 @@ theorem wp_simulateQ_eq
       evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (simulateQ impl oa) post = wp oa post := by
-  sorry
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
+      OracleQuery.input_query]
+    rw [wp_bind, wp_bind]
+    simp_rw [ih]
+    exact wp_congr_evalDist (hImpl t) _
+
+-- TODO: move to HoareTriple.lean
+private lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
+    [spec'.Fintype] [spec'.Inhabited]
+    {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
+    (h : evalDist oa = evalDist ob) :
+    @μ _ spec' _ _ oa = μ ob := by
+  simp only [μ]
+  exact tsum_congr fun x => by
+    show evalDist oa x * x = evalDist ob x * x
+    rw [h]
 
 /-- Lifting a computation to a larger oracle spec via `liftComp` preserves `wp`. -/
 theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}
     [superSpec.Fintype] [superSpec.Inhabited]
-    [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)]
+    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
     (mx : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (liftComp mx superSpec) post = wp mx post := by
-  sorry
+  show @μ _ superSpec _ _ (liftComp mx superSpec >>= fun a => pure (post a)) =
+       μ (mx >>= fun a => pure (post a))
+  exact μ_cross_congr_evalDist
+    (by simp only [evalDist_bind, evalDist_liftComp, evalDist_pure])
 
 /-- If a stateful oracle implementation preserves distributions (each query produces a uniform
 distribution after discarding state), then `wp` of `simulateQ ... run'` equals `wp` of the
@@ -58,7 +100,7 @@ theorem wp_simulateQ_run'_eq {σ : Type}
       evalDist ((impl t).run' s) =
         OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (oa : OracleComp spec α) (s : σ) (post : α → ℝ≥0∞) :
-    wp ((simulateQ impl oa).run' s) post = wp oa post := by
-  sorry
+    wp ((simulateQ impl oa).run' s) post = wp oa post :=
+  wp_congr_evalDist (evalDist_simulateQ_run'_eq_evalDist impl hImpl s oa) post
 
 end OracleComp.ProgramLogic
