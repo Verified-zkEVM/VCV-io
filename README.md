@@ -26,6 +26,18 @@ The `VCVio` directory provides all of the foundations and framework definitions 
 `Examples` contains example constructions of standard cryptographic algorithms.
 `ToMathlib` contains constructions that eventually should be moved to another project.
 
+## Acknowledgments
+
+Parts of the current program-logic refactor use an ordered monad-algebra perspective adapted from
+the [Loom](https://github.com/verse-lab/loom) project.
+
+- Project repository: https://github.com/verse-lab/loom
+- Paper: Vladimir Gladshtein, George Pîrlea, Qiyuan Zhao, Vitaly Kurin, and Ilya Sergey,
+  "Foundational Multi-Modal Program Verifiers"
+  (POPL 2026), DOI: https://doi.org/10.1145/3776719
+
+## Contributions
+
 Contributions to the library are welcome via PR.
 See [here](https://github.com/dtumad/lean-crypto-formalization) for an outdated version of the library in Lean 3.
 
