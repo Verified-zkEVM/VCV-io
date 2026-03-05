@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.SigmaAlg
+import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.CachingOracle
@@ -32,7 +32,7 @@ API changes from old version:
 - `unifSpec ++ₒ` → `unifSpec +`
 - `query (spec := ...) () (m, c)` → `query (spec := ...) (Sum.inr (m, c))`
 - `idOracle ++ₛₒ randomOracle` → explicit `QueryImpl.ofLift ... .liftTarget ... + randomOracle` -/
-def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
+def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
       (M := M) (PK := X) (SK := W) (S := PC × P) where
@@ -70,7 +70,28 @@ def FiatShamir (sigmaAlg : SigmaAlg X W PC SC Ω P p)
 
 namespace FiatShamir
 
--- TODO: prove properties of the Fiat-Shamir transform
+variable {X W PC SC Ω P : Type} {p : X → W → Bool}
+  [SampleableType X] [SampleableType W]
+  [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω]
+
+variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
+  (M : Type) [DecidableEq M]
+
+/-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
+underlying Σ-protocol. -/
+theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
+    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) := by
+  sorry
+
+/-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then
+forgery probability is bounded by the forking lemma probability. -/
+theorem euf_cma_bound
+    (hss : σ.SpeciallySound)
+    (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
+    (qBound : ℕ) :
+    adv.advantage ≤
+      sorry := by
+  sorry
 
 end FiatShamir
 

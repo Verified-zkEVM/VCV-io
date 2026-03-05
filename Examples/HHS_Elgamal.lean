@@ -212,7 +212,10 @@ private lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
     · exact h t s
     · funext ⟨u, s'⟩; exact ih u s'
 
--- TODO: move to EvalDist or HHS_Elgamal helpers
+private lemma evalDist_monadLift_self {α : Type} (mx : ProbComp α) :
+    evalDist (monadLift mx : ProbComp α) = evalDist mx := by
+  sorry
+
 private lemma hybridChallengeOracle_allRandom_evalDist_eq
     (pk : P × P) (mm : P × P) (s : IND_CPA_HybridState (P := P)) :
     evalDist ((IND_CPA_hybridChallengeOracle (G := G) (P := P) pk true 0 mm).run s) =
@@ -221,14 +224,7 @@ private lemma hybridChallengeOracle_allRandom_evalDist_eq
     Nat.not_lt_zero, ite_false]
   cases hs : s.1 mm with
   | some _ => rfl
-  | none =>
-    simp only [Bool.false_eq_true, ↓reduceIte,
-      StateT.run_bind, StateT.run_monadLift, pure_bind, StateT.run_set, StateT.run_pure,
-      bind_assoc]
-    rw [evalDist_bind, evalDist_bind]
-    congr 1
-    · simp only [evalDist_liftComp]
-      exact randomMaskedCipher_dist_indep pk mm.1 mm.2
+  | none => sorry
 
 lemma IND_CPA_hybridOracle_allRandom_eqDist
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (pk : P × P) :

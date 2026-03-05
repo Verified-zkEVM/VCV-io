@@ -7,6 +7,7 @@ Authors: Quang Dao
 import ToMathlib.Control.Monad.Algebra
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Quantitative Hoare triples for `OracleComp`
@@ -82,17 +83,17 @@ noncomputable abbrev wp (oa : OracleComp spec α) (post : α → ℝ≥0∞) : �
 noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post : α → ℝ≥0∞) : Prop :=
   MAlgOrdered.Triple (m := OracleComp spec) (l := ℝ≥0∞) pre oa post
 
-@[simp] theorem wp_pure (x : α) (post : α → ℝ≥0∞) :
+@[simp, game_rule] theorem wp_pure (x : α) (post : α → ℝ≥0∞) :
     wp (spec := spec) (pure x) post = post x := by
   simp [wp, MAlgOrdered.wp_pure]
 
-@[simp] theorem wp_ite (c : Prop) [Decidable c]
+@[simp, game_rule] theorem wp_ite (c : Prop) [Decidable c]
     (oa ob : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (spec := spec) (if c then oa else ob) post =
       if c then wp oa post else wp ob post := by
   split_ifs <;> rfl
 
-theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
+@[game_rule] theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (post : β → ℝ≥0∞) :
     wp (spec := spec) (oa >>= ob) post =
       wp oa (fun x => wp (ob x) post) := by
@@ -173,7 +174,7 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
             simp [hprob]
 
 /-- Quantitative WP rule for a uniform oracle query. -/
-theorem wp_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+@[game_rule] theorem wp_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
     wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
   simpa using wp_liftM_query (spec := spec) t post
@@ -191,3 +192,15 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
   simp [probOutput_eq_wp_indicator]
 
 end OracleComp.ProgramLogic
+
+section Sampling
+
+open OracleComp.ProgramLogic
+
+variable {α : Type} [SampleableType α]
+
+@[game_rule] theorem OracleComp.ProgramLogic.wp_uniformSample (post : α → ℝ≥0∞) :
+    wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+  sorry
+
+end Sampling

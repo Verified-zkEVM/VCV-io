@@ -66,6 +66,25 @@ theorem GameEquiv.of_approxRelTriple_zero
     GameEquiv g₁ g₂ :=
   GameEquiv.of_relTriple' ((Relational.relTriple'_eq_approxRelTriple_zero).mpr h)
 
+-- TODO: move to EvalDist/TVDist.lean
+/-- For any `Bool` game, the difference of `Pr[= true]` values is bounded by TV distance. -/
+private lemma abs_probOutput_toReal_sub_le_tvDist
+    (game₁ game₂ : OracleComp spec₁ Bool) :
+    |Pr[= true | game₁].toReal - Pr[= true | game₂].toReal| ≤ tvDist game₁ game₂ := by
+  simp only [probOutput_def, SPMF.apply_eq_toPMF_some, _root_.tvDist, SPMF.tvDist, PMF.tvDist]
+  -- h maps `some true` to `some ()` and everything else to `none`
+  -- Evaluating (h <$> p) at (some ()) recovers p (some true)
+  have happ : ∀ (p : PMF (Option Bool)),
+      ((fun x : Option Bool => if x = some true then some () else none) <$> p) (some ()) =
+        p (some true) := fun p => by
+    simp [PMF.map_apply_eq, tsum_fintype]
+  rw [← ENNReal.absDiff_toReal (PMF.apply_ne_top _ _) (PMF.apply_ne_top _ _)]
+  apply ENNReal.toReal_mono (PMF.etvDist_ne_top _ _)
+  rw [← happ (evalDist game₁).toPMF, ← happ (evalDist game₂).toPMF,
+      ← PMF.etvDist_option_punit]
+  exact PMF.etvDist_map_le (fun x : Option Bool => if x = some true then some () else none)
+    (evalDist game₁).toPMF (evalDist game₂).toPMF
+
 /-- Advantage bound via TV distance. -/
 theorem AdvBound.of_tvDist
     {game₁ game₂ : OracleComp spec₁ Bool}
@@ -73,7 +92,12 @@ theorem AdvBound.of_tvDist
     (hbound : AdvBound game₁ ε₁)
     (htv : tvDist game₁ game₂ ≤ ε₂) :
     AdvBound game₂ (ε₁ + ε₂) := by
-  sorry
+  unfold AdvBound at *
+  have hdiff := abs_probOutput_toReal_sub_le_tvDist game₁ game₂
+  rw [abs_le] at hbound hdiff ⊢
+  obtain ⟨hd1, hd2⟩ := hdiff
+  obtain ⟨hb1, hb2⟩ := hbound
+  constructor <;> linarith
 
 /-! ## Tactic macros -/
 
@@ -81,7 +105,8 @@ theorem AdvBound.of_tvDist
 macro "game_wp" : tactic =>
   `(tactic| (
     simp only [game_rule]
-    repeat (first | rw [wp_bind] | rw [wp_query] | rw [wp_pure] | rw [wp_ite])
+    repeat (first | rw [wp_bind] | rw [wp_query] | rw [wp_pure] | rw [wp_ite]
+                  | rw [wp_uniformSample])
     try simp [game_rule]
   ))
 
@@ -91,8 +116,32 @@ macro "game_rel" : tactic =>
     repeat (first
       | exact Relational.relTriple_refl _
       | apply Relational.relTriple_bind _ (fun _ _ _ => _)
-      | apply Relational.relTriple_eqRel_of_eq rfl)
+      | apply Relational.relTriple_eqRel_of_evalDist_eq; try rfl
+      | apply Relational.relTriple_eqRel_of_eq rfl
+      | apply Relational.relTriple_query
+      | apply Relational.relTriple_query_bij)
     all_goals try simp [game_rule]
+  ))
+
+/-- `coupling` decomposes `RelTriple` goals through bind/query structure. -/
+macro "coupling" : tactic =>
+  `(tactic| (
+    repeat (first
+      | exact Relational.relTriple_refl _
+      | apply Relational.relTriple_bind _ (fun _ _ _ => _)
+      | apply Relational.relTriple_eqRel_of_evalDist_eq; try rfl
+      | apply Relational.relTriple_eqRel_of_eq rfl
+      | apply Relational.relTriple_query
+      | apply Relational.relTriple_query_bij)
+    all_goals try simp [game_rule]
+  ))
+
+/-- `game_hop` tries to close a game-hopping step via coupling or TV distance bound. -/
+macro "game_hop" : tactic =>
+  `(tactic| (
+    first
+      | (apply GameEquiv.of_relTriple'; coupling)
+      | (apply AdvBound.of_tvDist <;> [skip; try simp [game_rule]])
   ))
 
 end OracleComp.ProgramLogic

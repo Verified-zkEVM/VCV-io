@@ -8,6 +8,7 @@ import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.ProbabilityTheory.Coupling
 import VCVio.EvalDist.Defs.Instances
 import VCVio.EvalDist.Monad.Basic
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.Monad.Map
 import VCVio.OracleComp.EvalDist
 
@@ -309,3 +310,20 @@ lemma relTriple_query_bij (t : spec₁.Domain)
     simp [hzEq]
 
 end OracleComp.ProgramLogic.Relational
+
+section Sampling
+
+open OracleComp.ProgramLogic.Relational
+
+variable {α : Type} [SampleableType α]
+
+/-- Relational coupling for uniform sampling via bijection.
+Given a bijection `f : α → α` such that `R x (f x)` for all `x`,
+the two uniform samples are related by `R`. -/
+lemma OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+    {f : α → α} (hf : Function.Bijective f) (R : RelPost α α)
+    (hR : ∀ x, R x (f x)) :
+    RelTriple ($ᵗ α) ($ᵗ α) R := by
+  sorry
+
+end Sampling

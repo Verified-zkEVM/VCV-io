@@ -9,7 +9,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.LWE
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.SecExp
-import VCVio.CryptoFoundations.SigmaAlg
+import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.EvalDist.BitVec
