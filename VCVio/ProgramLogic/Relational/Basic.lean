@@ -324,6 +324,36 @@ lemma OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
     {f : α → α} (hf : Function.Bijective f) (R : RelPost α α)
     (hR : ∀ x, R x (f x)) :
     RelTriple ($ᵗ α) ($ᵗ α) R := by
-  sorry
+  apply (relTriple_iff_relWP
+    (oa := ($ᵗ α : ProbComp α))
+    (ob := ($ᵗ α : ProbComp α))
+    (R := R)).2
+  refine ⟨⟨evalDist ($ᵗ α : ProbComp α) >>= fun a =>
+      pure (a, f a), ?_⟩, ?_⟩
+  · constructor
+    · simp
+    · simp only [map_bind, map_pure]
+      calc
+        (do
+            let a ← evalDist ($ᵗ α : ProbComp α)
+            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := by
+              rfl
+        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) := by
+          exact (evalDist_map ($ᵗ α : ProbComp α) f).symm
+        _ = evalDist ($ᵗ α : ProbComp α) := by
+          apply evalDist_ext
+          intro x
+          obtain ⟨x', rfl⟩ := hf.surjective x
+          rw [probOutput_map_injective ($ᵗ α) hf.injective x']
+          simpa [uniformSample] using
+            SampleableType.probOutput_selectElem_eq (β := α) x' (f x')
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist ($ᵗ α : ProbComp α))
+      (fun a => (pure (a, f a) : SPMF (α × α))) z).1 hz with
+      ⟨a, _, hz'⟩
+    have hzEq : z = (a, f a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simpa [hzEq] using hR a
 
 end Sampling

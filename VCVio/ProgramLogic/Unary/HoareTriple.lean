@@ -201,6 +201,18 @@ variable {α : Type} [SampleableType α]
 
 @[game_rule] theorem OracleComp.ProgramLogic.wp_uniformSample (post : α → ℝ≥0∞) :
     wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
-  sorry
+  rw [wp, MAlgOrdered.wp]
+  calc
+    μ (do let a ← $ᵗ α; pure (post a))
+        = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
+          simpa using
+            (μ_bind_eq_tsum (oa := ($ᵗ α : ProbComp α)) (ob := fun a => pure (post a)))
+    _ = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+          refine tsum_congr ?_
+          intro x
+          have hμ : μ (pure (post x) : ProbComp ℝ≥0∞) = post x := by
+            let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
+            simp [μ, probOutput_pure]
+          rw [hμ]
 
 end Sampling
