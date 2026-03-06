@@ -57,11 +57,70 @@ private lemma spmf_fmap_eq_map (f : α → β) (c : SubPMF α) :
 
 lemma map_fst_eval (c : SubPMF (α × β)) (a : α) :
     (Prod.fst <$> c) (some a) = ∑ b, c (some (a, b)) := by
-  sorry
+  classical
+  rw [spmf_fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
+  have hsimp :
+      ((if some a = Option.map Prod.fst (none : Option (α × β)) then c none else 0) +
+          ∑ x : α × β, if some a = Option.map Prod.fst (some x : Option (α × β)) then c (some x) else 0) =
+        ∑ x : α × β, if a = x.1 then c (some x) else 0 := by
+    simp
+  have hprod :
+      (∑ x : α × β, if a = x.1 then c (some x) else (0 : ℝ≥0∞)) =
+        ∑ a', ∑ b : β, if a = a' then c (some (a', b)) else (0 : ℝ≥0∞) := by
+    simpa using
+      (Fintype.sum_prod_type' (f := fun a' b => if a = a' then c (some (a', b)) else (0 : ℝ≥0∞)))
+  have hmain : (∑ x : α × β, if a = x.1 then c (some x) else (0 : ℝ≥0∞)) =
+      ∑ b : β, c (some (a, b)) := by
+    rw [hprod, Finset.sum_eq_single_of_mem a (by simp)]
+    · simp
+    · intro a' _ ha'
+      have ha'' : a ≠ a' := by simpa [eq_comm] using ha'
+      simp [ha'']
+  simpa [hsimp] using hmain
 
 lemma map_snd_eval (c : SubPMF (α × β)) (b : β) :
     (Prod.snd <$> c) (some b) = ∑ a, c (some (a, b)) := by
-  sorry
+  classical
+  rw [spmf_fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
+  have hsimp :
+      ((if some b = Option.map Prod.snd (none : Option (α × β)) then c none else 0) +
+          ∑ x : α × β, if some b = Option.map Prod.snd (some x : Option (α × β)) then c (some x) else 0) =
+        ∑ x : α × β, if b = x.2 then c (some x) else 0 := by
+    simp
+  have hprod :
+      (∑ x : α × β, if b = x.2 then c (some x) else (0 : ℝ≥0∞)) =
+        ∑ a : α, ∑ b', if b = b' then c (some (a, b')) else (0 : ℝ≥0∞) := by
+    simpa using
+      (Fintype.sum_prod_type' (f := fun a b' => if b = b' then c (some (a, b')) else (0 : ℝ≥0∞)))
+  have hmain : (∑ x : α × β, if b = x.2 then c (some x) else (0 : ℝ≥0∞)) =
+      ∑ a : α, c (some (a, b)) := by
+    rw [hprod]
+    refine Finset.sum_congr rfl ?_
+    intro a ha
+    rw [Finset.sum_eq_single_of_mem b (by simp)]
+    · simp
+    · intro b' _ hb'
+      have hb'' : b ≠ b' := by simpa [eq_comm] using hb'
+      simp [hb'']
+  simpa [hsimp] using hmain
+
+omit [Fintype α] [Fintype β] in
+private lemma pmf_none_eq {γ : Type u} [Fintype γ] (p : PMF (Option γ)) :
+    p none = 1 - ∑ x, p (some x) := by
+  have h := p.tsum_coe
+  rw [tsum_fintype, Fintype.sum_option] at h
+  exact ENNReal.eq_sub_of_add_eq' one_ne_top h
+
+omit [Fintype α] [Fintype β] in
+private lemma spmf_ext {γ : Type u} [Fintype γ] {p q : SubPMF γ}
+    (h : ∀ x, p (some x) = q (some x)) : p = q := by
+  refine PMF.ext fun x => ?_
+  cases x with
+  | none =>
+      rw [pmf_none_eq, pmf_none_eq]
+      congr with y
+      exact h y
+  | some x => exact h x
 
 def couplings_set (p : SubPMF α) (q : SubPMF β) : Set (Option (α × β) → ℝ) :=
   { c | (∀ z, 0 ≤ c z) ∧
@@ -151,8 +210,122 @@ lemma mem_couplings_set_of_isCoupling {p : SubPMF α} {q : SubPMF β} (c : SubPM
       exact PMF.apply_ne_top c _
     rw [h_sum_toReal] at h_toReal
     exact h_toReal
-  · have h_sum : (c none).toReal = 1 - ∑ z, (c (some z)).toReal := sorry
+  · have h_total : c none + ∑ z, c (some z) = 1 := by
+      simpa [tsum_fintype, Fintype.sum_option] using c.tsum_coe
+    have h_some_le_one : ∑ z, c (some z) ≤ 1 := by
+      calc
+        ∑ z, c (some z) ≤ c none + ∑ z, c (some z) := by
+          exact le_add_of_nonneg_left bot_le
+        _ = 1 := h_total
+    have h_sum : (c none).toReal = 1 - ∑ z, (c (some z)).toReal := by
+      rw [pmf_none_eq, ENNReal.toReal_sub_of_le h_some_le_one one_ne_top, ENNReal.toReal_sum]
+      · simp
+      · intro z _
+        exact PMF.apply_ne_top c _
     exact h_sum
+
+omit [Fintype α] [Fintype β] in
+private lemma sum_option_eq_one_of_none_eq_sub {γ : Type u} [Fintype γ]
+    {c : Option γ → ℝ} (h_nonneg : ∀ z, 0 ≤ c z)
+    (h_none : c none = 1 - ∑ z, c (some z)) :
+    ∑ z : Option γ, c z = 1 := by
+  rw [Fintype.sum_option, h_none]
+  have h_some_le_one : ∑ z, c (some z) ≤ 1 := by
+    have hnone_nonneg : 0 ≤ c none := h_nonneg none
+    rw [h_none] at hnone_nonneg
+    linarith
+  linarith
+
+private lemma exists_coupling_of_mem_couplings_set {p : SubPMF α} {q : SubPMF β}
+    {c : Option (α × β) → ℝ} (hc : c ∈ couplings_set p q) :
+    ∃ c' : SubPMF.Coupling p q, ∀ z, (c'.1.1 z).toReal = c z := by
+  rcases hc with ⟨h_nonneg, _, h_row, h_col, h_none⟩
+  have h_total_real : ∑ z : Option (α × β), c z = 1 := by
+    exact sum_option_eq_one_of_none_eq_sub h_nonneg h_none
+  have h_total :
+      ∑ z : Option (α × β), ENNReal.ofReal (c z) = 1 := by
+    calc
+      ∑ z : Option (α × β), ENNReal.ofReal (c z)
+          = ENNReal.ofReal (∑ z : Option (α × β), c z) := by
+              symm
+              simpa using
+                (ENNReal.ofReal_sum_of_nonneg
+                  (s := (Finset.univ : Finset (Option (α × β))))
+                  (f := c)
+                  (fun z _ => h_nonneg z))
+      _ = 1 := by rw [h_total_real, ENNReal.ofReal_one]
+  let c_pmf : PMF (Option (α × β)) := PMF.ofFintype (fun z => ENNReal.ofReal (c z)) h_total
+  let c_spmf : SubPMF (α × β) := c_pmf
+  have h_row_ennreal : ∀ a, ∑ b : β, c_spmf.1 (some (a, b)) = p (some a) := by
+    intro a
+    calc
+      ∑ b : β, c_spmf.1 (some (a, b))
+          = ∑ b : β, ENNReal.ofReal (c (some (a, b))) := by
+              refine Finset.sum_congr rfl ?_
+              intro b hb
+              change (PMF.ofFintype (fun z => ENNReal.ofReal (c z)) h_total) (some (a, b)) =
+                ENNReal.ofReal (c (some (a, b)))
+              rfl
+      _ = ENNReal.ofReal (∑ b : β, c (some (a, b))) := by
+            symm
+            simpa using
+              (ENNReal.ofReal_sum_of_nonneg
+                (s := (Finset.univ : Finset β))
+                (f := fun b => c (some (a, b)))
+                (fun b _ => h_nonneg (some (a, b))))
+      _ = ENNReal.ofReal ((p (some a)).toReal) := by rw [h_row a]
+      _ = p (some a) := by rw [ENNReal.ofReal_toReal (PMF.apply_ne_top p _)]
+  have h_col_ennreal : ∀ b, ∑ a : α, c_spmf.1 (some (a, b)) = q (some b) := by
+    intro b
+    calc
+      ∑ a : α, c_spmf.1 (some (a, b))
+          = ∑ a : α, ENNReal.ofReal (c (some (a, b))) := by
+              refine Finset.sum_congr rfl ?_
+              intro a ha
+              change (PMF.ofFintype (fun z => ENNReal.ofReal (c z)) h_total) (some (a, b)) =
+                ENNReal.ofReal (c (some (a, b)))
+              rfl
+      _ = ENNReal.ofReal (∑ a : α, c (some (a, b))) := by
+            symm
+            simpa using
+              (ENNReal.ofReal_sum_of_nonneg
+                (s := (Finset.univ : Finset α))
+                (f := fun a => c (some (a, b)))
+                (fun a _ => h_nonneg (some (a, b))))
+      _ = ENNReal.ofReal ((q (some b)).toReal) := by rw [h_col b]
+      _ = q (some b) := by rw [ENNReal.ofReal_toReal (PMF.apply_ne_top q _)]
+  have hfst_some : ∀ a, (Prod.fst <$> c_spmf) (some a) = p (some a) := by
+    intro a
+    rw [map_fst_eval]
+    exact h_row_ennreal a
+  have hsnd_some : ∀ b, (Prod.snd <$> c_spmf) (some b) = q (some b) := by
+    intro b
+    rw [map_snd_eval]
+    exact h_col_ennreal b
+  have hcpl : SubPMF.IsCoupling c_spmf p q := ⟨spmf_ext hfst_some, spmf_ext hsnd_some⟩
+  refine ⟨⟨c_spmf, hcpl⟩, ?_⟩
+  intro z
+  change (ENNReal.ofReal (c z)).toReal = c z
+  exact ENNReal.toReal_ofReal (h_nonneg z)
+
+private lemma objective_eq_ofReal (c : SubPMF (α × β))
+    (f : Option (α × β) → ℝ≥0∞) (hf : ∀ z, f z ≠ ⊤) :
+    (∑' z, c.1 z * f z) = ENNReal.ofReal (∑ z, (c.1 z).toReal * (f z).toReal) := by
+  rw [tsum_fintype]
+  calc
+    ∑ z : Option (α × β), c.1 z * f z
+        = ∑ z : Option (α × β), ENNReal.ofReal ((c.1 z).toReal * (f z).toReal) := by
+            refine Finset.sum_congr rfl ?_
+            intro z hz
+            rw [← ENNReal.toReal_mul, ENNReal.ofReal_toReal]
+            exact ENNReal.mul_ne_top (PMF.apply_ne_top c z) (hf z)
+    _ = ENNReal.ofReal (∑ z : Option (α × β), (c.1 z).toReal * (f z).toReal) := by
+          symm
+          simpa using
+            (ENNReal.ofReal_sum_of_nonneg
+              (s := (Finset.univ : Finset (Option (α × β))))
+              (f := fun z => (c.1 z).toReal * (f z).toReal)
+              (fun z _ => mul_nonneg ENNReal.toReal_nonneg ENNReal.toReal_nonneg))
 
 -- 3. Attaining supremum
 lemma SubPMF.exists_max_coupling {p : SubPMF α} {q : SubPMF β}
@@ -173,18 +346,23 @@ lemma SubPMF.exists_max_coupling {p : SubPMF α} {q : SubPMF β}
   -- Using compact max theorem
   have h_exists := h_comp.exists_isMaxOn h_nonempty_set hF_cont.continuousOn
   obtain ⟨c_max, hc_max_in, hc_max_prop⟩ := h_exists
-
-  -- c_max is a function Option (α × β) → ℝ
-  -- We need to build a Coupling out of it.
-  have h_c_max_nonneg : ∀ z, 0 ≤ c_max z := hc_max_in.1
-  have h_c_max_sum : HasSum c_max 1 := sorry
-
-  let c_max_pmf : PMF (Option (α × β)) := ⟨fun z => ENNReal.ofReal (c_max z), sorry⟩
-  let c_max_spmf : SubPMF (α × β) := c_max_pmf
-  have hc_max_isCoupling : SubPMF.IsCoupling c_max_spmf p q := sorry
-  use ⟨c_max_spmf, hc_max_isCoupling⟩
-
-  -- Now show that this c_max_spmf achieves the supremum
-  sorry
+  obtain ⟨c_max_cpl, hc_max_eq⟩ := exists_coupling_of_mem_couplings_set hc_max_in
+  use c_max_cpl
+  apply le_antisymm
+  · refine iSup_le ?_
+    intro c'
+    have hc'_in : (fun z => (c'.1.1 z).toReal) ∈ couplings_set p q := by
+      exact mem_couplings_set_of_isCoupling c'.1 c'.2
+    have hmax_real : F (fun z => (c'.1.1 z).toReal) ≤ F c_max := by
+      exact (isMaxOn_iff.mp hc_max_prop) _ hc'_in
+    have h_obj_left :
+        (∑' z, c'.1.1 z * f z) = ENNReal.ofReal (F (fun z => (c'.1.1 z).toReal)) := by
+      simpa [F] using (objective_eq_ofReal c'.1 f hf)
+    have h_obj_right :
+        (∑' z, c_max_cpl.1.1 z * f z) = ENNReal.ofReal (F c_max) := by
+      simpa [F, hc_max_eq] using (objective_eq_ofReal c_max_cpl.1 f hf)
+    rw [h_obj_left, h_obj_right]
+    exact ENNReal.ofReal_le_ofReal hmax_real
+  · exact le_iSup (f := fun c' : SubPMF.Coupling p q => ∑' z, c'.1.1 z * f z) c_max_cpl
 
 end Topology
