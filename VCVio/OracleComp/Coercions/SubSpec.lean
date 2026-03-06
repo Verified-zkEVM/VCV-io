@@ -16,8 +16,7 @@ The definition consists is a thin wrapper around a `MonadLift` instance on `Orac
 which extends to a lifting operation on `OracleComp`.
 
 We use the notation `spec ⊂ₒ spec'` to represent that one set of oracles is a subset of another,
-where the non-inclusive subset symbol reflects that the relation is not defined
-to be reflexive by default (a reflexive instance is provided separately).
+where the non-inclusive subset symbol reflects that we avoid defining this instance reflexively.
 -/
 
 open OracleSpec OracleComp BigOperators ENNReal

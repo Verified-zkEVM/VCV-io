@@ -213,8 +213,8 @@ private lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
     · funext ⟨u, s'⟩; exact ih u s'
 
 private lemma evalDist_monadLift_self {α : Type} (mx : ProbComp α) :
-    evalDist (monadLift mx : ProbComp α) = evalDist mx := by
-  sorry
+    evalDist (monadLift mx : ProbComp α) = evalDist mx :=
+  congrArg evalDist (simulateQ_id' mx)
 
 private lemma hybridChallengeOracle_allRandom_evalDist_eq
     (pk : P × P) (mm : P × P) (s : IND_CPA_HybridState (P := P)) :
@@ -224,7 +224,24 @@ private lemma hybridChallengeOracle_allRandom_evalDist_eq
     Nat.not_lt_zero, ite_false]
   cases hs : s.1 mm with
   | some _ => rfl
-  | none => sorry
+  | none =>
+    simp only [show ∀ (a b : P), (if (false : Bool) = true then a else b) = b
+        from fun _ _ => if_neg Bool.noConfusion, ite_true]
+    have hlift : ∀ (x : ProbComp (P × P)) (s' : IND_CPA_HybridState (P := P)),
+        (liftM x : StateT (IND_CPA_HybridState (P := P)) ProbComp _) s' =
+        (x >>= fun a => pure (a, s')) := by
+      intro x s'
+      simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift, StateT.lift]
+      have hx : liftComp x unifSpec = x := simulateQ_id' x
+      rw [hx]
+    simp only [StateT.run_bind, StateT.run_set, StateT.run_pure, pure_bind]
+    simp only [show ∀ (x : ProbComp (P × P)) (s' : IND_CPA_HybridState (P := P)),
+        (liftM x : StateT (IND_CPA_HybridState (P := P)) ProbComp _).run s' =
+        (x >>= fun a => pure (a, s')) from hlift,
+      bind_assoc, pure_bind]
+    rw [evalDist_bind, evalDist_bind]
+    congr 1
+    · exact randomMaskedCipher_dist_indep pk mm.1 mm.2
 
 lemma IND_CPA_hybridOracle_allRandom_eqDist
     (adversary : (elgamalAsymmEnc G P).IND_CPA_adversary) (pk : P × P) :

@@ -62,6 +62,7 @@ import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
+import VCVio.ProgramLogic.Fork
 import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
