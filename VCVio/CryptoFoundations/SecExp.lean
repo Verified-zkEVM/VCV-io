@@ -116,7 +116,7 @@ structure SecAdv {ι : Type u} [DecidableEq ι]
     (spec : OracleSpec ι) (α β : Type u) where
   run : α → OracleComp spec β
   qb : ι → ℕ
-  qb_isQueryBound (x : α) : IsQueryBound (run x) (qb)
+  qb_isQueryBound (x : α) : IsPerIndexQueryBound (run x) (qb)
   activeOracles : List ι
   mem_activeOracles_iff (i : ι) : i ∈ activeOracles ↔ qb i ≠ 0
 

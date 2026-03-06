@@ -47,6 +47,25 @@ variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
 variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {α β γ δ : Type}
 
+/-! ## Helpers for coupling mass -/
+
+private lemma coupling_probFailure_eq_zero
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (c : SPMF.Coupling (evalDist oa) (evalDist ob)) :
+    Pr[⊥ | c.1] = 0 := by
+  have h1 : Pr[⊥ | Prod.fst <$> c.1] = Pr[⊥ | c.1] :=
+    probFailure_map (f := Prod.fst) (mx := c.1)
+  rw [c.2.map_fst] at h1
+  rw [← h1]
+  change (evalDist oa).toPMF none = 0
+  exact probFailure_eq_zero (mx := oa)
+
+private lemma coupling_tsum_probOutput_eq_one
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (c : SPMF.Coupling (evalDist oa) (evalDist ob)) :
+    ∑' z : α × β, Pr[= z | c.1] = 1 := by
+  rw [tsum_probOutput_eq_sub, coupling_probFailure_eq_zero c, tsub_zero]
+
 /-! ## Core eRHL definitions -/
 
 /-- eRHL-style quantitative relational WP for `OracleComp`.
@@ -76,11 +95,34 @@ def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
   eRelTriple 1 oa ob (RelPost.indicator R)
 
-/-- Bridge: the eRHL-based definition agrees with the existing coupling-based one. -/
+/-- Bridge: the eRHL-based definition agrees with the existing coupling-based one.
+
+**Forward direction blocker**: `RelTriple' → CouplingPost` requires extracting a coupling `c`
+with `f(c) = 1` from `1 ≤ ⨆ c, f(c)`. Although the coupling polytope is compact and `f` is
+linear (so the max IS attained in standard math), formalizing this in Lean requires proving
+compactness of the coupling space, which needs topology infrastructure not yet available here. -/
 theorem relTriple'_iff_couplingPost
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β} {R : RelPost α β} :
     RelTriple' oa ob R ↔ CouplingPost oa ob R := by
-  sorry
+  constructor
+  · intro h
+    -- Forward: RelTriple' → CouplingPost
+    -- 1 ≤ ⨆ c, ∑' z, Pr[= z | c.1] * indicator R z.1 z.2 → ∃ c, ∀ z ∈ support c.1, R z.1 z.2
+    -- Requires extracting a maximizer from the iSup (coupling compactness).
+    sorry
+  · intro ⟨c, hc⟩
+    -- Backward: CouplingPost → RelTriple'
+    unfold RelTriple' eRelTriple eRelWP
+    apply le_iSup_of_le c
+    suffices h : ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2 = 1 by rw [h]
+    have heq : ∀ z : α × β,
+        Pr[= z | c.1] * RelPost.indicator R z.1 z.2 = Pr[= z | c.1] := by
+      intro z
+      by_cases hz : z ∈ support c.1
+      · simp [RelPost.indicator, hc z hz, mul_one]
+      · simp [probOutput_eq_zero_of_not_mem_support hz]
+    simp_rw [heq]
+    exact coupling_tsum_probOutput_eq_one c
 
 /-- Bridge: `RelTriple'` agrees with the existing `RelTriple`. -/
 theorem relTriple'_iff_relTriple
@@ -107,7 +149,19 @@ theorem relTriple'_eq_approxRelTriple_zero
 /-- Pure rule for eRHL. -/
 theorem eRelTriple_pure (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     eRelTriple (post a b) (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) post := by
-  sorry
+  unfold eRelTriple eRelWP
+  have hc : SPMF.IsCoupling (pure (a, b) : SPMF (α × β))
+      (evalDist (pure a : OracleComp spec₁ α)) (evalDist (pure b : OracleComp spec₂ β)) := by
+    simp [evalDist_pure]; exact SubPMF.IsCoupling.pure_iff.mpr rfl
+  apply le_iSup_of_le ⟨pure (a, b), hc⟩
+  have key : ∑' z, Pr[= z | (pure (a, b) : SPMF (α × β))] * post z.1 z.2 = post a b := by
+    rw [tsum_eq_single (a, b)]
+    · simp [SPMF.probOutput_eq_apply]
+    · intro z hz
+      have : Pr[= z | (pure (a, b) : SPMF (α × β))] = 0 := by
+        rw [SPMF.probOutput_eq_apply]; simp [hz]
+      simp [this]
+  exact key ▸ le_refl _
 
 /-- Monotonicity/consequence rule for eRHL. -/
 theorem eRelTriple_conseq {pre pre' : ℝ≥0∞}
@@ -156,7 +210,8 @@ lemma relTriple'_bind
     (hxy : RelTriple' oa ob R)
     (hfg : ∀ a b, R a b → RelTriple' (fa a) (fb b) S) :
     RelTriple' (oa >>= fa) (ob >>= fb) S := by
-  sorry
+  rw [relTriple'_iff_relTriple] at hxy ⊢
+  exact relTriple_bind hxy (fun a b hab => relTriple'_iff_relTriple.mp (hfg a b hab))
 
 /-- Game equivalence from pRHL equality coupling. -/
 theorem gameEquiv_of_relTriple'_eqRel

@@ -32,7 +32,6 @@ open OracleSpec OracleComp SigmaProtocol
 variable (G P : Type)
   [AddCommGroup G] [AddTorsor G P]
   [SampleableType G] [SampleableType P] [DecidableEq P]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- Schnorr-like Σ-protocol over an HHS (additive torsor). Challenge space is `Bool`. -/
 def schnorrSigma : SigmaProtocol (P × P) G P G Bool G
@@ -43,17 +42,49 @@ def schnorrSigma : SigmaProtocol (P × P) G P G Bool G
   respond _stmt sk sc b := pure (if b then sc else sc + sk)
   verify stmt pc b z := if b then decide (z +ᵥ stmt.2 = pc) else decide (z +ᵥ stmt.1 = pc)
   sim _stmt := $ᵗ P
-  extract b₁ z₁ b₂ z₂ := pure (if b₁ then z₂ - z₁ else z₁ - z₂)
+  extract b₁ z₁ _b₂ z₂ := pure (if b₁ then z₂ - z₁ else z₁ - z₂)
 
 /-! ## Security properties -/
 
+/-- Completeness: an honest prover with witness `sk` always produces an accepting transcript. -/
 theorem schnorrSigma_complete :
     PerfectlyComplete (schnorrSigma G P) := by
-  sorry
+  intro (x₀, pk) sk h
+  have h_eq : sk +ᵥ x₀ = pk := of_decide_eq_true h
+  dsimp [PerfectlyComplete, schnorrSigma]
+  rw [probOutput_eq_one_iff]
+  constructor
+  · simp
+  · simp [support_bind, h_eq, add_vadd]
+    ext x
+    simp
 
+/-- Special soundness: from two accepting transcripts with different challenges, subtract the
+responses to recover a witness sending `x₀` to `pk`. -/
 theorem schnorrSigma_speciallySound :
     SpeciallySound (schnorrSigma G P) := by
-  sorry
+  intro (x₀, pk) pc b₁ b₂ z₁ z₂ h_b h_v1 h_v2 w h_w
+  dsimp [schnorrSigma] at *
+  simp only [support_pure, Set.mem_singleton_iff] at h_w
+  subst h_w
+  revert h_b h_v1 h_v2
+  cases b₁ <;> cases b₂ <;> simp <;> intro h1 h2
+  · calc (z₁ - z₂) +ᵥ x₀
+      _ = (-z₂ + z₁) +ᵥ x₀ := by rw [sub_eq_add_neg, add_comm]
+      _ = -z₂ +ᵥ (z₁ +ᵥ x₀) := by rw [add_vadd]
+      _ = -z₂ +ᵥ pc := by rw [h1]
+      _ = -z₂ +ᵥ (z₂ +ᵥ pk) := by rw [← h2]
+      _ = (-z₂ + z₂) +ᵥ pk := by rw [← add_vadd]
+      _ = (0 : G) +ᵥ pk := by rw [neg_add_cancel]
+      _ = pk := by rw [zero_vadd]
+  · calc (z₂ - z₁) +ᵥ x₀
+      _ = (-z₁ + z₂) +ᵥ x₀ := by rw [sub_eq_add_neg, add_comm]
+      _ = -z₁ +ᵥ (z₂ +ᵥ x₀) := by rw [add_vadd]
+      _ = -z₁ +ᵥ pc := by rw [h2]
+      _ = -z₁ +ᵥ (z₁ +ᵥ pk) := by rw [← h1]
+      _ = (-z₁ + z₁) +ᵥ pk := by rw [← add_vadd]
+      _ = (0 : G) +ᵥ pk := by rw [neg_add_cancel]
+      _ = pk := by rw [zero_vadd]
 
 /-- Full transcript simulator: pick `b`, pick `z`, compute commitment from verification eq. -/
 noncomputable def schnorrSimTranscript (stmt : P × P) : ProbComp (P × Bool × G) := do
@@ -62,6 +93,55 @@ noncomputable def schnorrSimTranscript (stmt : P × P) : ProbComp (P × Bool × 
   let pc := if b then z +ᵥ stmt.2 else z +ᵥ stmt.1
   return (pc, b, z)
 
+/-- Honest-verifier zero-knowledge: after swapping the sampling order, match the real and
+simulated transcript distributions pointwise, using uniformity to reindex the `false` branch. -/
 theorem schnorrSigma_hvzk :
     HVZK (schnorrSigma G P) (schnorrSimTranscript G P) := by
-  sorry
+  intro (x₀, pk) sk h_sk
+  have h_eq : sk +ᵥ x₀ = pk := of_decide_eq_true h_sk
+  simp only [schnorrSigma, schnorrSimTranscript, bind_assoc, pure_bind]
+  apply evalDist_ext; intro t
+  have hswap :
+      Pr[= t | (do
+        let r ← ($ᵗ G : ProbComp G)
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        pure (r +ᵥ pk, b, if b then r else r + sk))] =
+      Pr[= t | (do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        let r ← ($ᵗ G : ProbComp G)
+        pure (r +ᵥ pk, b, if b then r else r + sk))] := by
+    rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+    exact probEvent_bind_bind_swap _ _ _ _
+  rw [hswap]
+  refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) t ?_
+  intro b; cases b
+  case false =>
+    simp only [ite_false, Bool.false_eq_true]
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    simp only [show ∀ r : G,
+        (r +ᵥ pk, false, r + sk) = ((r + sk) +ᵥ x₀, false, r + sk) from
+      fun r => by rw [← h_eq, add_vadd]]
+    calc
+      ∑' r : G,
+          Pr[= r | ($ᵗ G : ProbComp G)] *
+            Pr[= t | (pure (((r + sk) +ᵥ x₀, false, r + sk) : P × Bool × G) : ProbComp _)] =
+        ∑' r : G,
+          Pr[= r + sk | ($ᵗ G : ProbComp G)] *
+            Pr[= t | (pure (((r + sk) +ᵥ x₀, false, r + sk) : P × Bool × G) : ProbComp _)] := by
+          refine tsum_congr fun r => ?_
+          congr 1
+          change
+            Pr[= r | (SampleableType.selectElem : ProbComp G)] =
+              Pr[= r + sk | (SampleableType.selectElem : ProbComp G)]
+          exact (inferInstance : SampleableType G).probOutput_selectElem_eq r (r + sk)
+      _ =
+        ∑' z : G,
+          Pr[= z | ($ᵗ G : ProbComp G)] *
+            Pr[= t | (pure ((z +ᵥ x₀, false, z) : P × Bool × G) : ProbComp _)] := by
+          simpa [add_vadd] using
+            (Equiv.tsum_eq (Equiv.addRight sk)
+              (fun z : G =>
+                Pr[= z | ($ᵗ G : ProbComp G)] *
+                  Pr[= t | (pure ((z +ᵥ x₀, false, z) : P × Bool × G) : ProbComp _)]))
+  case true =>
+    simp only [ite_true]

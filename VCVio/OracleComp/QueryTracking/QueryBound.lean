@@ -10,12 +10,18 @@ import VCVio.OracleComp.EvalDist
 /-!
 # Bounding Queries Made by a Computation
 
-This file defines a predicate `IsQueryBound oa qb` stating that `oa` makes at most `qb t`
-queries to oracle `t` along any execution path.
+This file defines a predicate `IsQueryBound oa budget canQuery cost` parameterized by:
+- `B` — the budget type
+- `budget : B` — the initial budget
+- `canQuery : ι → B → Prop` — whether a query to oracle `t` is allowed under budget `b`
+- `cost : ι → B → B` — how the budget is updated after a query to oracle `t`
 
 The definition is structural via `OracleComp.construct`: `pure` satisfies any bound, and
-`query t >>= mx` satisfies `qb` when `qb t > 0` and each continuation satisfies the
-decremented bound `Function.update qb t (qb t - 1)`.
+`query t >>= mx` satisfies the bound when `canQuery t b` holds and each continuation
+satisfies the bound with the updated budget `cost t b`.
+
+The classical per-index bound (`qb : ι → ℕ`, decrement the queried index) is recovered by
+`IsPerIndexQueryBound`.
 -/
 
 open OracleSpec
@@ -24,31 +30,85 @@ universe u
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι] {α β : Type u}
+variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 
 section IsQueryBound
 
-/-- `IsQueryBound oa qb` means that `oa` makes at most `qb t` queries to oracle `t`
-along any execution path. -/
-def IsQueryBound (oa : OracleComp spec α) (qb : ι → ℕ) : Prop :=
+variable {B : Type*}
+
+/-- Generalized query bound parameterized by a budget type, a validity check, and a cost
+function. `pure` satisfies any bound; `query t >>= mx` satisfies the bound when
+`canQuery t b` and every continuation satisfies the bound at `cost t b`. -/
+def IsQueryBound (oa : OracleComp spec α) (budget : B)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) : Prop :=
   OracleComp.construct
-    (C := fun _ => (ι → ℕ) → Prop)
+    (C := fun _ => B → Prop)
     (fun _ _ => True)
-    (fun t _mx ih qb => 0 < qb t ∧ ∀ u, ih u (Function.update qb t (qb t - 1)))
-    oa qb
+    (fun t _mx ih b => canQuery t b ∧ ∀ u, ih u (cost t b))
+    oa budget
 
 @[simp]
-lemma isQueryBound_pure (x : α) (qb : ι → ℕ) :
-    IsQueryBound (pure x : OracleComp spec α) qb := trivial
+lemma isQueryBound_pure (x : α) (b : B)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    IsQueryBound (pure x : OracleComp spec α) b canQuery cost := trivial
 
-lemma isQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α) (qb : ι → ℕ) :
-    IsQueryBound (liftM (query (spec := spec) t) >>= mx) qb ↔
-      0 < qb t ∧ ∀ u, IsQueryBound (mx u) (Function.update qb t (qb t - 1)) :=
+lemma isQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
+    (b : B) (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    IsQueryBound (liftM (query (spec := spec) t) >>= mx) b canQuery cost ↔
+      canQuery t b ∧ ∀ u, IsQueryBound (mx u) (cost t b) canQuery cost :=
   Iff.rfl
 
 @[simp]
-lemma isQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
-    IsQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) qb ↔ 0 < qb t := by
+lemma isQueryBound_query_iff (t : ι) (b : B)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    IsQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) b canQuery cost ↔
+    canQuery t b := by
+  show (canQuery t b ∧ ∀ _ : spec t, True) ↔ _
+  simp
+
+private lemma isQueryBound_map_aux (oa : OracleComp spec α) (f : α → β)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    ∀ {b : B}, (f <$> oa).IsQueryBound b canQuery cost ↔
+      oa.IsQueryBound b canQuery cost := by
+  induction oa using OracleComp.inductionOn with
+  | pure _ => simp
+  | query_bind t mx ih =>
+    intro b
+    simp only [map_eq_bind_pure_comp, Function.comp_def, bind_assoc]
+    rw [isQueryBound_query_bind_iff, isQueryBound_query_bind_iff]
+    exact and_congr_right fun _ => forall_congr' fun u => ih u
+
+@[simp]
+lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (b : B)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    IsQueryBound (f <$> oa) b canQuery cost ↔ IsQueryBound oa b canQuery cost :=
+  isQueryBound_map_aux oa f canQuery cost
+
+end IsQueryBound
+
+section IsPerIndexQueryBound
+
+variable [DecidableEq ι]
+
+/-- Per-index query bound: `qb t` gives the maximum number of queries to oracle `t`.
+Each query to `t` decrements `qb t` by one. Recovers the classical notion. -/
+abbrev IsPerIndexQueryBound (oa : OracleComp spec α) (qb : ι → ℕ) : Prop :=
+  IsQueryBound oa qb (fun t qb => 0 < qb t) (fun t qb => Function.update qb t (qb t - 1))
+
+@[simp]
+lemma isPerIndexQueryBound_pure (x : α) (qb : ι → ℕ) :
+    IsPerIndexQueryBound (pure x : OracleComp spec α) qb := trivial
+
+lemma isPerIndexQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
+    (qb : ι → ℕ) :
+    IsPerIndexQueryBound (liftM (query (spec := spec) t) >>= mx) qb ↔
+      0 < qb t ∧ ∀ u, IsPerIndexQueryBound (mx u) (Function.update qb t (qb t - 1)) :=
+  Iff.rfl
+
+@[simp]
+lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
+    IsPerIndexQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) qb ↔
+    0 < qb t := by
   show (0 < qb t ∧ ∀ _ : spec t, True) ↔ _
   simp
 
@@ -61,18 +121,19 @@ private lemma update_le_update {qb qb' : ι → ℕ} {t : ι} (hle : qb ≤ qb')
   · rw [Function.update_of_ne hj, Function.update_of_ne hj]
     exact hle j
 
-private lemma isQueryBound_mono_aux (oa : OracleComp spec α) :
-    ∀ {qb qb' : ι → ℕ}, qb ≤ qb' → oa.IsQueryBound qb → oa.IsQueryBound qb' := by
+private lemma isPerIndexQueryBound_mono_aux (oa : OracleComp spec α) :
+    ∀ {qb qb' : ι → ℕ}, qb ≤ qb' →
+      oa.IsPerIndexQueryBound qb → oa.IsPerIndexQueryBound qb' := by
   induction oa using OracleComp.inductionOn with
   | pure _ => intros; trivial
   | query_bind t mx ih =>
     intro qb qb' hle h
-    rw [isQueryBound_query_bind_iff] at h ⊢
+    rw [isPerIndexQueryBound_query_bind_iff] at h ⊢
     exact ⟨Nat.lt_of_lt_of_le h.1 (hle t), fun u => ih u (update_le_update hle) (h.2 u)⟩
 
-lemma IsQueryBound.mono {oa : OracleComp spec α} {qb qb' : ι → ℕ}
-    (h : IsQueryBound oa qb) (hle : qb ≤ qb') : IsQueryBound oa qb' :=
-  isQueryBound_mono_aux oa hle h
+lemma IsPerIndexQueryBound.mono {oa : OracleComp spec α} {qb qb' : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb) (hle : qb ≤ qb') : IsPerIndexQueryBound oa qb' :=
+  isPerIndexQueryBound_mono_aux oa hle h
 
 private lemma update_add_eq_update_add {qb₁ qb₂ : ι → ℕ} {t : ι} (ht : 0 < qb₁ t) :
     Function.update qb₁ t (qb₁ t - 1) + qb₂ =
@@ -82,9 +143,11 @@ private lemma update_add_eq_update_add {qb₁ qb₂ : ι → ℕ} {t : ι} (ht :
   · rw [hj, Pi.add_apply, Function.update_self, Pi.add_apply, Function.update_self]; omega
   · simp only [Pi.add_apply, Function.update_of_ne hj]
 
-private lemma isQueryBound_bind_aux (oa : OracleComp spec α) (ob : α → OracleComp spec β)
-    (qb₂ : ι → ℕ) (h2 : ∀ x, IsQueryBound (ob x) qb₂) :
-    ∀ {qb₁}, oa.IsQueryBound qb₁ → (oa >>= ob).IsQueryBound (qb₁ + qb₂) := by
+private lemma isPerIndexQueryBound_bind_aux (oa : OracleComp spec α)
+    (ob : α → OracleComp spec β) (qb₂ : ι → ℕ)
+    (h2 : ∀ x, IsPerIndexQueryBound (ob x) qb₂) :
+    ∀ {qb₁}, oa.IsPerIndexQueryBound qb₁ →
+      (oa >>= ob).IsPerIndexQueryBound (qb₁ + qb₂) := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
     intro qb₁ _
@@ -92,55 +155,24 @@ private lemma isQueryBound_bind_aux (oa : OracleComp spec α) (ob : α → Oracl
     exact (h2 x).mono le_add_self
   | query_bind t mx ih =>
     intro qb₁ h1
-    rw [isQueryBound_query_bind_iff] at h1
-    rw [bind_assoc, isQueryBound_query_bind_iff]
+    rw [isPerIndexQueryBound_query_bind_iff] at h1
+    rw [bind_assoc, isPerIndexQueryBound_query_bind_iff]
     refine ⟨Nat.add_pos_left h1.1 _, fun u => ?_⟩
     rw [← update_add_eq_update_add h1.1]
     exact ih u (h1.2 u)
 
-lemma isQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+lemma isPerIndexQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {qb₁ qb₂ : ι → ℕ}
-    (h1 : IsQueryBound oa qb₁) (h2 : ∀ x, IsQueryBound (ob x) qb₂) :
-    IsQueryBound (oa >>= ob) (qb₁ + qb₂) :=
-  isQueryBound_bind_aux oa ob qb₂ h2 h1
-
-private lemma isQueryBound_map_aux (oa : OracleComp spec α) (f : α → β) :
-    ∀ {qb : ι → ℕ}, (f <$> oa).IsQueryBound qb ↔ oa.IsQueryBound qb := by
-  induction oa using OracleComp.inductionOn with
-  | pure _ => simp
-  | query_bind t mx ih =>
-    intro qb
-    simp only [map_eq_bind_pure_comp, Function.comp_def, bind_assoc]
-    rw [isQueryBound_query_bind_iff, isQueryBound_query_bind_iff]
-    exact and_congr_right fun _ => forall_congr' fun u => ih u
+    (h1 : IsPerIndexQueryBound oa qb₁) (h2 : ∀ x, IsPerIndexQueryBound (ob x) qb₂) :
+    IsPerIndexQueryBound (oa >>= ob) (qb₁ + qb₂) :=
+  isPerIndexQueryBound_bind_aux oa ob qb₂ h2 h1
 
 @[simp]
-lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι → ℕ) :
-    IsQueryBound (f <$> oa) qb ↔ IsQueryBound oa qb :=
-  isQueryBound_map_aux oa f
+lemma isPerIndexQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι → ℕ) :
+    IsPerIndexQueryBound (f <$> oa) qb ↔ IsPerIndexQueryBound oa qb :=
+  isQueryBound_map_aux oa f _ _
 
--- TODO: the following were removed during remediation.
--- The support-based variant `isQueryBound_bind'` is difficult: `support` requires
--- `[spec.Fintype] [spec.Inhabited]` for `mem_support_iff`, while `IsQueryBound` is purely
--- structural. Proving by induction would need to carry support constraints through the
--- structure, which is non-trivial.
---
--- A strengthened variant with `∀ u` (not just `u ∈ oa.support`) avoids support but still
--- requires proof: use `qb₂' := fun i => (qb i).sub (qb₁ i)` as the uniform bound, then
--- `isQueryBound_bind` + `mono`. The Nat arithmetic (qb₂ u ≤ qb₂' and qb₁ + qb₂' ≤ qb)
--- requires careful handling of `Nat.sub` and `Nat.le_sub_iff_add_le`; omega fails due to
--- coercion issues.
-
--- /-- Version of `isQueryBound_bind` that allows the second query bound to vary based on the
--- output of the first computation, assuming it remains below the final desired bound. -/
--- lemma isQueryBound_bind' {oa : OracleComp spec α} {ob : α → OracleComp spec β} {qb : ι → ℕ}
---     (qb₁ : ι → ℕ) (qb₂ : α → ι → ℕ)
---     (hqb₁ : IsQueryBound oa qb₁) (hqb₂ : ∀ u ∈ oa.support, IsQueryBound (ob u) (qb₂ u))
---         (h : ∀ u ∈ oa.support, qb₁ + qb₂ u ≤ qb) :
---     IsQueryBound (oa >>= ob) qb := by
---   sorry
-
-end IsQueryBound
+end IsPerIndexQueryBound
 
 /-- If `oa` is a computation indexed by a security parameter, then `PolyQueries oa`
 means that for each oracle index there is a polynomial function `qb` of the security parameter,
@@ -151,6 +183,6 @@ structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι
   qb : ι → Polynomial ℕ
   /-- The bound is actually a bound on the number of queries made. -/
   qb_isQueryBound (n : ℕ) (x : α n) :
-    IsQueryBound (oa n x) (fun i => (qb i).eval n)
+    IsPerIndexQueryBound (oa n x) (fun i => (qb i).eval n)
 
 end OracleComp
