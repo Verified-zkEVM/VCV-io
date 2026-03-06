@@ -296,7 +296,6 @@ theorem tvDist_simulateQ_le_probEvent_bad
         rcases xs with ⟨x, s⟩
         simpa using h_eq x s hxs)
       h_bad_eq
-  have : DecidableEq α := Classical.decEq _
   have h_map :
       tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀) ≤ tvDist sim₁ sim₂ := by
     simpa [sim₁, sim₂, StateT.run'] using

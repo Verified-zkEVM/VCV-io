@@ -42,7 +42,7 @@ lemma tvDist_le_one (p q : SPMF α) : p.tvDist q ≤ 1 := PMF.tvDist_le_one _ _
   PMF.tvDist_eq_zero_iff
 
 universe w in
-lemma tvDist_map_le {α' : Type w} {β : Type w} [DecidableEq β] (f : α' → β)
+lemma tvDist_map_le {α' : Type w} {β : Type w} (f : α' → β)
     (p q : SPMF α') : SPMF.tvDist (f <$> p) (f <$> q) ≤ SPMF.tvDist p q := by
   unfold SPMF.tvDist
   rw [SPMF.toPMF_map, SPMF.toPMF_map]
@@ -81,7 +81,7 @@ lemma tvDist_triangle (mx my mz : m α) :
 
 lemma tvDist_le_one (mx my : m α) : tvDist mx my ≤ 1 := SPMF.tvDist_le_one _ _
 
-lemma tvDist_map_le [LawfulMonad m] {β : Type u} [DecidableEq β] (f : α → β) (mx my : m α) :
+lemma tvDist_map_le [LawfulMonad m] {β : Type u} (f : α → β) (mx my : m α) :
     tvDist (f <$> mx) (f <$> my) ≤ tvDist mx my := by
   simp only [tvDist, evalDist_def, MonadHom.mmap_map]
   exact SPMF.tvDist_map_le f _ _

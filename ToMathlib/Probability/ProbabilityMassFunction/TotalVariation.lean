@@ -123,8 +123,9 @@ lemma map_apply_eq [DecidableEq β] (f : α' → β) (p : PMF α') (y : β) :
   simp only [Functor.map, PMF.bind_apply]
   congr 1; ext x; split <;> simp_all [eq_comm]
 
-lemma etvDist_map_le [DecidableEq β] (f : α' → β) (p q : PMF α') :
+lemma etvDist_map_le (f : α' → β) (p q : PMF α') :
     (f <$> p).etvDist (f <$> q) ≤ p.etvDist q := by
+  classical
   simp only [PMF.etvDist]
   apply ENNReal.div_le_div_right
   calc ∑' y, ENNReal.absDiff ((f <$> p) y) ((f <$> q) y)
@@ -138,8 +139,9 @@ lemma etvDist_map_le [DecidableEq β] (f : α' → β) (p q : PMF α') :
           congr 1; ext y; congr 1; ext x; split <;> simp
     _ = ∑' x, ENNReal.absDiff (p x) (q x) := ENNReal.tsum_fiber f _
 
-lemma tvDist_map_le [DecidableEq β] (f : α' → β) (p q : PMF α') :
+lemma tvDist_map_le (f : α' → β) (p q : PMF α') :
     (f <$> p).tvDist (f <$> q) ≤ p.tvDist q := by
+  classical
   simp only [PMF.tvDist]
   exact ENNReal.toReal_mono (etvDist_ne_top p q) (etvDist_map_le f p q)
 
