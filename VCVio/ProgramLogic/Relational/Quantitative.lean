@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.EvalDist.TVDist
+import ToMathlib.ProbabilityTheory.OptimalCoupling
 
 /-!
 # Quantitative Relational Program Logic (eRHL)
@@ -66,6 +67,38 @@ private lemma coupling_tsum_probOutput_eq_one
     ∑' z : α × β, Pr[= z | c.1] = 1 := by
   rw [tsum_probOutput_eq_sub, coupling_probFailure_eq_zero c, tsub_zero]
 
+-- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
+private lemma finSupport_nonempty [DecidableEq α] (mx : OracleComp spec₁ α) :
+    (finSupport mx).Nonempty := by
+  by_contra h
+  have hsum := sum_finSupport_probOutput_eq_one (mx := mx) (h := probFailure_eq_zero (mx := mx))
+  rw [Finset.not_nonempty_iff_eq_empty.mp h, Finset.sum_empty] at hsum
+  exact zero_ne_one hsum
+
+-- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
+private lemma indicator_objective_eq_probEvent {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
+    (mx : m (α × β)) (R : RelPost α β) :
+    (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[fun z => R z.1 z.2 | mx] := by
+  classical
+  rw [probEvent_eq_tsum_ite]
+  refine tsum_congr fun z => ?_
+  by_cases hR : R z.1 z.2 <;> simp [hR]
+
+-- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
+private lemma probOutput_subpmf_eq_spmf (p : SPMF α) (x : α) :
+    @probOutput SubPMF OptionT.instMonad α (OptionT.instHasEvalSPMF PMF) (p : SubPMF α) x =
+      @probOutput SPMF SPMF.instAlternativeMonad.toMonad α SPMF.instHasEvalSPMF p x := by
+  rw [OptionT.probOutput_eq, PMF.probOutput_eq_apply, SPMF.probOutput_eq_apply]
+  rfl
+
+-- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
+private lemma probEvent_subpmf_eq_spmf (p : SPMF α) (q : α → Prop) :
+    @probEvent SubPMF OptionT.instMonad α (OptionT.instHasEvalSPMF PMF) (p : SubPMF α) q =
+      @probEvent SPMF SPMF.instAlternativeMonad.toMonad α SPMF.instHasEvalSPMF p q := by
+  rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
+  refine tsum_congr fun x => ?_
+  by_cases hq : q x <;> simp [hq, probOutput_subpmf_eq_spmf]
+
 /-! ## Core eRHL definitions -/
 
 /-- eRHL-style quantitative relational WP for `OracleComp`.
@@ -106,10 +139,220 @@ theorem relTriple'_iff_couplingPost
     RelTriple' oa ob R ↔ CouplingPost oa ob R := by
   constructor
   · intro h
-    -- Forward: RelTriple' → CouplingPost
-    -- 1 ≤ ⨆ c, ∑' z, Pr[= z | c.1] * indicator R z.1 z.2 → ∃ c, ∀ z ∈ support c.1, R z.1 z.2
-    -- Requires extracting a maximizer from the iSup (coupling compactness).
-    sorry
+    classical
+    letI : DecidableEq α := Classical.decEq α
+    letI : DecidableEq β := Classical.decEq β
+    unfold RelTriple' eRelTriple at h
+    by_cases hne : Nonempty (SPMF.Coupling (evalDist oa) (evalDist ob))
+    · let A := {a // a ∈ finSupport oa}
+      let B := {b // b ∈ finSupport ob}
+      letI : DecidableEq A := Classical.decEq A
+      letI : DecidableEq B := Classical.decEq B
+      letI : Fintype A := inferInstance
+      letI : Fintype B := inferInstance
+      have hA_nonempty : (finSupport oa).Nonempty := finSupport_nonempty (mx := oa)
+      have hB_nonempty : (finSupport ob).Nonempty := finSupport_nonempty (mx := ob)
+      let a₀ : A := ⟨hA_nonempty.choose, hA_nonempty.choose_spec⟩
+      let b₀ : B := ⟨hB_nonempty.choose, hB_nonempty.choose_spec⟩
+      let packA : α → A := fun a => if ha : a ∈ finSupport oa then ⟨a, ha⟩ else a₀
+      let packB : β → B := fun b => if hb : b ∈ finSupport ob then ⟨b, hb⟩ else b₀
+      let packPair : α × β → A × B := fun z => (packA z.1, packB z.2)
+      let valPair : A × B → α × β := fun z => (z.1.1, z.2.1)
+      let pa : SPMF A := packA <$> evalDist oa
+      let pb : SPMF B := packB <$> evalDist ob
+      have hvalA : Subtype.val <$> pa = evalDist oa := by
+        apply SPMF.ext
+        intro x
+        change Pr[= x | Subtype.val <$> pa] = Pr[= x | evalDist oa]
+        calc
+          Pr[= x | Subtype.val <$> pa] = Pr[fun a : A => a.1 = x | pa] := by
+            simpa using
+              (probEvent_map (mx := pa) (f := Subtype.val) (q := fun y : α => y = x))
+          _ = Pr[((fun a : A => a.1 = x) ∘ packA) | evalDist oa] := by
+                rw [show pa = packA <$> evalDist oa by rfl]
+                exact probEvent_map (mx := evalDist oa) (f := packA) (q := fun a : A => a.1 = x)
+          _ = Pr[fun y : α => (packA y).1 = x | evalDist oa] := rfl
+          _ = Pr[fun y : α => y = x | evalDist oa] := by
+                apply probEvent_ext
+                intro y hy
+                have hyfin : y ∈ finSupport oa := by
+                  exact mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy
+                simp [packA, hyfin]
+          _ = Pr[= x | evalDist oa] := by simp
+      have hvalB : Subtype.val <$> pb = evalDist ob := by
+        apply SPMF.ext
+        intro y
+        change Pr[= y | Subtype.val <$> pb] = Pr[= y | evalDist ob]
+        calc
+          Pr[= y | Subtype.val <$> pb] = Pr[fun b : B => b.1 = y | pb] := by
+            simpa using
+              (probEvent_map (mx := pb) (f := Subtype.val) (q := fun x : β => x = y))
+          _ = Pr[((fun b : B => b.1 = y) ∘ packB) | evalDist ob] := by
+                rw [show pb = packB <$> evalDist ob by rfl]
+                exact probEvent_map (mx := evalDist ob) (f := packB) (q := fun b : B => b.1 = y)
+          _ = Pr[fun x : β => (packB x).1 = y | evalDist ob] := rfl
+          _ = Pr[fun x : β => x = y | evalDist ob] := by
+                apply probEvent_ext
+                intro x hx
+                have hxfin : x ∈ finSupport ob := by
+                  exact mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx
+                simp [packB, hxfin]
+          _ = Pr[= y | evalDist ob] := by simp
+      have hsub_nonempty : Nonempty (SubPMF.Coupling pa pb) := by
+        rcases hne with ⟨c₀⟩
+        refine ⟨⟨packPair <$> c₀.1, ?_⟩⟩
+        constructor
+        · calc
+            Prod.fst <$> (packPair <$> c₀.1) = packA <$> (Prod.fst <$> c₀.1) := by
+              simp [packPair]
+            _ = packA <$> evalDist oa := by rw [c₀.2.map_fst]
+            _ = pa := rfl
+        · calc
+            Prod.snd <$> (packPair <$> c₀.1) = packB <$> (Prod.snd <$> c₀.1) := by
+              simp [packPair]
+            _ = packB <$> evalDist ob := by rw [c₀.2.map_snd]
+            _ = pb := rfl
+      let fSub : Option (A × B) → ℝ≥0∞
+        | none => 0
+        | some z => RelPost.indicator R z.1.1 z.2.1
+      have hfSub : ∀ z, fSub z ≠ ⊤ := by
+        intro z
+        cases z with
+        | none => simp [fSub]
+        | some z =>
+            by_cases hR : R z.1.1 z.2.1 <;> simp [fSub, RelPost.indicator, hR]
+      obtain ⟨cMaxSub, hMaxSub⟩ := SubPMF.exists_max_coupling
+        (p := pa) (q := pb) fSub hfSub hsub_nonempty
+      have hsub_obj :
+          ∀ c : SubPMF.Coupling pa pb,
+            (∑' z : Option (A × B), c.1.1 z * fSub z) =
+              Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SubPMF (A × B))] := by
+        intro c
+        rw [probEvent_eq_tsum_ite, tsum_option _ ENNReal.summable]
+        simp [fSub, RelPost.indicator]
+        refine Finset.sum_congr rfl ?_
+        intro x hx
+        by_cases hR : R x.1.1 x.2.1
+        · simp [hR, OptionT.probOutput_eq, PMF.probOutput_eq_apply]
+          rfl
+        · simp [hR]
+      have hlift_obj :
+          ∀ c : SPMF.Coupling (evalDist oa) (evalDist ob),
+            Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] =
+              Pr[fun z : α × β => R z.1 z.2 | c.1] := by
+        intro c
+        rw [probEvent_map]
+        apply probEvent_ext
+        intro z hz
+        have hzfst : z.1 ∈ support (Prod.fst <$> c.1) := by
+          rw [support_map]
+          exact ⟨z, hz, rfl⟩
+        have hzsnd : z.2 ∈ support (Prod.snd <$> c.1) := by
+          rw [support_map]
+          exact ⟨z, hz, rfl⟩
+        have hzfst' : z.1 ∈ finSupport oa := by
+          rw [c.2.map_fst] at hzfst
+          exact mem_finSupport_of_mem_support_evalDist (oa := oa) (x := z.1) hzfst
+        have hzsnd' : z.2 ∈ finSupport ob := by
+          rw [c.2.map_snd] at hzsnd
+          exact mem_finSupport_of_mem_support_evalDist (oa := ob) (x := z.2) hzsnd
+        simp [packPair, packA, packB, hzfst', hzsnd']
+      have hpush :
+          SPMF.IsCoupling (valPair <$> cMaxSub.1) (evalDist oa) (evalDist ob) := by
+        constructor
+        · simpa [valPair] using
+            (congrArg (fun p : SPMF A => Subtype.val <$> p) cMaxSub.2.map_fst).trans hvalA
+        · simpa [valPair] using
+            (congrArg (fun p : SPMF B => Subtype.val <$> p) cMaxSub.2.map_snd).trans hvalB
+      let cMaxSub' : SPMF.Coupling pa pb := ⟨cMaxSub.1, cMaxSub.2⟩
+      let cMax : SPMF.Coupling (evalDist oa) (evalDist ob) := ⟨valPair <$> cMaxSub.1, hpush⟩
+      have hpush_obj :
+          Pr[fun z : α × β => R z.1 z.2 | cMax.1] =
+            Pr[fun z : A × B => R z.1.1 z.2.1 | cMaxSub'.1] := by
+        change Pr[fun z : α × β => R z.1 z.2 | valPair <$> cMaxSub'.1] =
+          Pr[((fun z : α × β => R z.1 z.2) ∘ valPair) | cMaxSub'.1]
+        exact probEvent_map (mx := cMaxSub'.1) (f := valPair)
+          (q := fun z : α × β => R z.1 z.2)
+      have hpush_obj' :
+          Pr[fun z : α × β => R z.1 z.2 | cMax.1] =
+            Pr[fun z : A × B => R z.1.1 z.2.1 | (cMaxSub.1 : SubPMF (A × B))] := by
+        change
+          @probEvent SPMF SPMF.instAlternativeMonad.toMonad (α × β) SPMF.instHasEvalSPMF
+              cMax.1 (fun z : α × β => R z.1 z.2) =
+            @probEvent SubPMF OptionT.instMonad (A × B) (OptionT.instHasEvalSPMF PMF)
+              (cMaxSub.1 : SubPMF (A × B))
+              (fun z : A × B => R z.1.1 z.2.1)
+        calc
+          @probEvent SPMF SPMF.instAlternativeMonad.toMonad (α × β) SPMF.instHasEvalSPMF
+              cMax.1 (fun z : α × β => R z.1 z.2)
+              =
+            @probEvent SPMF SPMF.instAlternativeMonad.toMonad (A × B) SPMF.instHasEvalSPMF
+              cMaxSub'.1 (fun z : A × B => R z.1.1 z.2.1) :=
+                hpush_obj
+          _ =
+            @probEvent SPMF SPMF.instAlternativeMonad.toMonad (A × B) SPMF.instHasEvalSPMF
+              cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1) := by
+                rfl
+          _ =
+            @probEvent SubPMF OptionT.instMonad (A × B) (OptionT.instHasEvalSPMF PMF)
+              (cMaxSub.1 : SubPMF (A × B))
+              (fun z : A × B => R z.1.1 z.2.1) :=
+                (probEvent_subpmf_eq_spmf cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1)).symm
+      have hsub_le_max :
+          ∀ c : SubPMF.Coupling pa pb,
+            Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SubPMF (A × B))] ≤
+              Pr[fun z : A × B => R z.1.1 z.2.1 | (cMaxSub.1 : SubPMF (A × B))] := by
+        intro c
+        have hle :
+            (∑' z : Option (A × B), c.1.1 z * fSub z) ≤
+              (∑' z : Option (A × B), cMaxSub.1.1 z * fSub z) := by
+          calc
+            (∑' z : Option (A × B), c.1.1 z * fSub z)
+                ≤ (⨆ c' : SubPMF.Coupling pa pb, ∑' z : Option (A × B), c'.1.1 z * fSub z) :=
+                  le_iSup (f := fun c' : SubPMF.Coupling pa pb =>
+                    ∑' z : Option (A × B), c'.1.1 z * fSub z) c
+            _ = (∑' z : Option (A × B), cMaxSub.1.1 z * fSub z) := hMaxSub
+        rw [hsub_obj c, hsub_obj cMaxSub] at hle
+        exact hle
+      have hupper :
+          eRelWP oa ob (RelPost.indicator R) ≤
+            Pr[fun z : α × β => R z.1 z.2 | cMax.1] := by
+        unfold eRelWP
+        refine iSup_le ?_
+        intro c
+        let cLift : SubPMF.Coupling pa pb := ⟨packPair <$> c.1, by
+          constructor
+          · calc
+              Prod.fst <$> (packPair <$> c.1) = packA <$> (Prod.fst <$> c.1) := by
+                simp [packPair]
+              _ = packA <$> evalDist oa := by rw [c.2.map_fst]
+              _ = pa := rfl
+          · calc
+              Prod.snd <$> (packPair <$> c.1) = packB <$> (Prod.snd <$> c.1) := by
+                simp [packPair]
+              _ = packB <$> evalDist ob := by rw [c.2.map_snd]
+              _ = pb := rfl⟩
+        calc
+          ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
+              = Pr[fun z : α × β => R z.1 z.2 | c.1] := by
+                  simpa [RelPost.indicator] using indicator_objective_eq_probEvent (mx := c.1) (R := R)
+          _ = Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
+                exact (hlift_obj c).symm
+          _ = Pr[fun z : A × B => R z.1.1 z.2.1 | (packPair <$> c.1 : SubPMF (A × B))] := by
+                exact (probEvent_subpmf_eq_spmf (packPair <$> c.1)
+                  (fun z : A × B => R z.1.1 z.2.1)).symm
+          _ = Pr[fun z : A × B => R z.1.1 z.2.1 | (cLift.1 : SubPMF (A × B))] := by
+                rfl
+          _ ≤ Pr[fun z : A × B => R z.1.1 z.2.1 | cMaxSub.1] := hsub_le_max cLift
+          _ = Pr[fun z : α × β => R z.1 z.2 | cMax.1] := hpush_obj'.symm
+      have hmax_ge : 1 ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := le_trans h hupper
+      have hmax_eq : Pr[fun z : α × β => R z.1 z.2 | cMax.1] = 1 :=
+        le_antisymm probEvent_le_one hmax_ge
+      exact ⟨cMax, (probEvent_eq_one_iff (mx := cMax.1) (p := fun z : α × β => R z.1 z.2)).1 hmax_eq |>.2⟩
+    · exfalso
+      haveI : IsEmpty (SPMF.Coupling (evalDist oa) (evalDist ob)) := not_nonempty_iff.mp hne
+      rw [eRelWP, iSup_of_empty] at h
+      exact not_le_of_gt zero_lt_one h
   · intro ⟨c, hc⟩
     -- Backward: CouplingPost → RelTriple'
     unfold RelTriple' eRelTriple eRelWP
