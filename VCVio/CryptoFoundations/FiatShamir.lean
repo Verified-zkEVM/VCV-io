@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.ProgramLogic.Tactics
 
 /-!
 # Fiat-Shamir Transform
@@ -72,6 +73,7 @@ variable {X W PC SC Ω P : Type} {p : X → W → Bool}
 variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
 
+omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
@@ -223,7 +225,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         Pr[= true | (do
           let _x ← hr.gen
           pure true : ProbComp Bool)] := by
-            exact probOutput_bind_congr hinner
+            prob_congr; exact hinner
     _ = 1 := by simp
 
 /-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then

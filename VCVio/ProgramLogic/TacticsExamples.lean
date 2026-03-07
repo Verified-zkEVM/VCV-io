@@ -356,3 +356,57 @@ example [SampleableType α]
   · exact GameEquiv.symm (GameEquiv.map_uniformSample_bij h₂)
 
 end MiniOTP
+
+/-! ## `rel_dist` examples -/
+
+section RelDist
+
+variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {α : Type}
+
+/-- `rel_dist` reduces a `RelTriple` goal to `evalDist` equality. -/
+example {oa ob : OracleComp spec α}
+    (h : evalDist oa = evalDist ob) :
+    ⟪oa ~ ob | EqRel α⟫ := by
+  rel_dist
+  exact h
+
+end RelDist
+
+/-! ## `prob_congr` examples -/
+
+section ProbCongr
+
+variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {α β : Type}
+
+/-- `prob_congr` decomposes a bind congruence into a pointwise subgoal. -/
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
+    (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
+    Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
+  prob_congr
+  exact h
+
+/-- `prob_congr'` variant without support restriction. -/
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
+    (h : ∀ x, Pr[= y | f x] = Pr[= y | g x]) :
+    Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
+  prob_congr'
+  exact h
+
+end ProbCongr
+
+/-! ## `prob_swap_rw` examples -/
+
+section ProbSwapRw
+
+variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+
+/-- `prob_swap_rw` rewrites the swap and leaves the goal open for further work. -/
+example {α β γ : Type} {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {y : γ} :
+    Pr[= y | mx >>= fun a => my >>= fun b => f a b] =
+    Pr[= y | my >>= fun b => mx >>= fun a => f a b] := by
+  prob_swap_rw
+
+end ProbSwapRw

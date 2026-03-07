@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.ProgramLogic.Relational.Basic
+import VCVio.ProgramLogic.Tactics
 
 /-!
 # Relational program-logic examples
@@ -56,6 +56,8 @@ variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
 variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {α β γ δ : Type}
 
+/-! ### Term-mode examples (direct lemma application) -/
+
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
     {R : RelPost α β} {S : RelPost γ δ}
@@ -67,5 +69,21 @@ example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
 example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
   relTriple_refl (spec₁ := spec₁) oa
+
+/-! ### Tactic-mode examples (using `rel_step`, `rel_skip`, etc.) -/
+
+example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
+    {R : RelPost α β} {S : RelPost γ δ}
+    (hxy : RelTriple oa ob R)
+    (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
+    RelTriple (oa >>= fa) (ob >>= fb) S := by
+  rel_step using R
+  · exact hxy
+  · exact hfg
+
+example (oa : OracleComp spec₁ α) :
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
+  rel_skip
 
 end OracleComp.ProgramLogic.Relational

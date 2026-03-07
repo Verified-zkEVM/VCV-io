@@ -28,14 +28,17 @@ EasyCrypt's `proc`, `wp`, `rnd`, `skip`, `swap`, and `seq`.
 - `rel_inline`: Unfold a definition and retry
 - `rel_sim`: Apply relational simulation rule
 
-### Proof mode entry
+### Proof mode entry / exit
 - `by_equiv`: Transform a `GameEquiv` or `evalDist` equality into a `RelTriple`
+- `rel_dist`: Transform a `RelTriple` goal into an `evalDist` equality (reverse of `by_equiv`)
 - `game_trans`: Introduce an intermediate game for transitivity
 - `by_dist`: Transform an advantage bound into a TV distance / relational goal
 - `by_hoare`: Transform a probability goal into a quantitative WP goal
 
-### Bind reordering
-- `prob_swap`: Swap two independent sampling operations in a `Pr[...]` goal
+### Bind reordering and congruence
+- `prob_swap`: Swap two independent sampling operations in a `Pr[...]` goal (closes goal)
+- `prob_swap_rw`: Rewrite variant of `prob_swap` for use inside larger proofs
+- `prob_congr`: Pointwise congruence under a shared outer bind
 -/
 
 /-! ## Unary WP tactics -/
@@ -207,6 +210,17 @@ macro "by_equiv" : tactic =>
       | (change OracleComp.ProgramLogic.Relational.RelTriple _ _ _)
       | (apply OracleComp.ProgramLogic.Relational.evalDist_eq_of_relTriple_eqRel))
 
+/-- `rel_dist` reduces a `RelTriple oa ob (EqRel α)` goal to `evalDist oa = evalDist ob`.
+
+This is the reverse direction of `by_equiv`: while `by_equiv` enters relational mode from a
+distributional equality, `rel_dist` exits relational mode back to distributional reasoning.
+
+Useful when both sides are equal in distribution but not syntactically identical, and the
+equality is easier to prove at the `evalDist` level than via stepwise coupling. -/
+macro "rel_dist" : tactic =>
+  `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_evalDist_eq)
+
 /-- `game_trans` introduces an intermediate game for transitivity of `GameEquiv`.
 
 Given a goal `g₁ ≡ₚ g₃`, `game_trans g₂` produces two subgoals:
@@ -281,6 +295,43 @@ macro "prob_swap" : tactic =>
 /-- `prob_swap_at n` repeatedly applies `prob_swap` up to `n` times. -/
 macro "prob_swap_at" n:num : tactic =>
   `(tactic| (iterate $n prob_swap))
+
+/-- `prob_swap_rw` rewrites one bind-swap and continues (does NOT close the goal).
+
+Unlike `prob_swap` which proves an equality goal, `prob_swap_rw` performs a rewrite
+and leaves the modified goal for further work. Useful when the swap is one step in a
+larger proof.
+
+Handles both `probOutput` (`Pr[= x | ...]`) and `probEvent` (`Pr[p | ...]`) goals. -/
+macro "prob_swap_rw" : tactic =>
+  `(tactic| (
+    first
+      | (simp only [← probEvent_eq_eq_probOutput]
+         rw [probEvent_bind_bind_swap]
+         try simp only [probEvent_eq_eq_probOutput])
+      | rw [probEvent_bind_bind_swap]))
+
+/-! ## Bind congruence tactics -/
+
+/-- `prob_congr` reduces a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal to a
+pointwise equality of the continuations.
+
+Applies `probOutput_bind_congr` or `probEvent_bind_congr`, producing a subgoal
+`∀ x ∈ support mx, Pr[... | f₁ x] = Pr[... | f₂ x]`.
+
+Use `prob_congr'` for the stronger variant without the support restriction. -/
+macro "prob_congr" : tactic =>
+  `(tactic|
+    first
+      | (apply probOutput_bind_congr)
+      | (apply probEvent_bind_congr))
+
+/-- `prob_congr'` is like `prob_congr` but produces `∀ x, ...` without a support restriction. -/
+macro "prob_congr'" : tactic =>
+  `(tactic|
+    first
+      | (apply probOutput_bind_congr')
+      | (apply probEvent_bind_congr'))
 
 /-! ## Enhanced exhaustive tactics -/
 

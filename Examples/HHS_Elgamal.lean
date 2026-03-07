@@ -231,7 +231,7 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
       ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
         (adversary pk)).run' (∅, 0))
       (EqRel _) := by
-  apply relTriple_eqRel_of_evalDist_eq
+  rel_dist
   simp only [StateT.run']
   rw [evalDist_map, evalDist_map]
   congr 1
@@ -270,8 +270,8 @@ theorem IND_CPA_allRandomHalf
   exact probOutput_decide_eq_uniformBool_half _ (by
     simp only [evalDist_bind]
     congr 1; funext ⟨pk, _⟩
-    exact evalDist_eq_of_relTriple_eqRel
-      (IND_CPA_hybridOracle_allRandom_eqDist adversary pk))
+    by_equiv
+    exact IND_CPA_hybridOracle_allRandom_eqDist adversary pk)
 
 /-! ## 3a. DDH helper lemmas -/
 
@@ -603,10 +603,7 @@ private lemma stepDDH_real_simulation_deferred
                 (g₂ +ᵥ pk.1) (g₂ +ᵥ pk.2) (Sum.inl tu) =
               IND_CPA_queryImpl_hybrid (G := G) (P := P) pk b (k + 1)
                 (Sum.inl tu) from fun _ => rfl]
-          simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-            (P := P)) (m := ProbComp)]
-          rw [probEvent_bind_bind_swap]
-          simp only [probEvent_eq_eq_probOutput]
+          prob_swap_rw
           refine probOutput_bind_congr fun p hp => ?_
           have hst : p.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
@@ -637,10 +634,7 @@ private lemma stepDDH_real_simulation_deferred
               · simp only [if_pos hlt, if_pos (show st.2 < k + 1 by omega)]
               · simp only [StateT.run_pure]
             simp_rw [hq]
-            simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-              (P := P)) (m := ProbComp)]
-            rw [probEvent_bind_bind_swap]
-            simp only [probEvent_eq_eq_probOutput]
+            prob_swap_rw
             refine probOutput_bind_congr fun p hp => ?_
             have hle' : p.2.2 ≤ k := by
               change p ∈ support ((IND_CPA_hybridChallengeOracle (G := G)
@@ -821,10 +815,7 @@ private lemma stepDDH_rand_simulation_deferred
             intro g₂
             exact hswapY g₂
           rw [hswapGY]
-          simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-            (P := P)) (m := ProbComp)]
-          rw [probEvent_bind_bind_swap]
-          simp only [probEvent_eq_eq_probOutput]
+          prob_swap_rw
           refine probOutput_bind_congr fun p hp => ?_
           have hst : p.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
@@ -889,10 +880,7 @@ private lemma stepDDH_rand_simulation_deferred
               intro g₂
               exact hswapY g₂
             rw [hswapGY]
-            simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-              (P := P)) (m := ProbComp)]
-            rw [probEvent_bind_bind_swap]
-            simp only [probEvent_eq_eq_probOutput]
+            prob_swap_rw
             refine probOutput_bind_congr fun p hp => ?_
             have hle' : p.2.2 ≤ k := by
               change p ∈ support ((IND_CPA_hybridChallengeOracle (G := G)
