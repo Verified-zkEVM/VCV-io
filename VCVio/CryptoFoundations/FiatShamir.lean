@@ -26,12 +26,7 @@ variable {X W PC SC Ω P : Type}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
-commitment), and then responds to the challenge.
-
-API changes from old version:
-- `unifSpec ++ₒ` → `unifSpec +`
-- `query (spec := ...) () (m, c)` → `query (spec := ...) (Sum.inr (m, c))`
-- `idOracle ++ₛₒ randomOracle` → explicit `QueryImpl.ofLift ... .liftTarget ... + randomOracle` -/
+commitment), and then responds to the challenge. -/
 def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
