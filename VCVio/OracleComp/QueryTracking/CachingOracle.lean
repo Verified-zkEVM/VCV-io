@@ -13,7 +13,8 @@ import VCVio.OracleComp.SimSemantics.PreservesInv
 This file defines a modifier `QueryImpl.withCaching` that modifies a query implementation to
 cache results to return to the same query in the future.
 
-We also define a plain caching oracle and random oracles as special cases of this.
+We also define `cachingOracle`, which caches queries to the oracles in `spec`,
+querying fresh values from `spec` if no cached value exists.
 -/
 
 open OracleComp OracleSpec
@@ -90,11 +91,6 @@ end CacheMonotonicity
 
 end QueryImpl
 
-@[inline, reducible] def randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
-    [∀ t : spec.Domain, SampleableType (spec.Range t)] :
-    QueryImpl spec (StateT spec.QueryCache ProbComp) :=
-  uniformSampleImpl.withCaching
-
 /-- Oracle for caching queries to the oracles in `spec`, querying fresh values if needed. -/
 @[inline, reducible] def cachingOracle :
     QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
@@ -125,24 +121,3 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι�
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 end cachingOracle
-
--- -- NOTE: need to change universe levels b/c `unifSpec` doesn't use `pNat`.
--- variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} [spec.DecidableEq]
-
--- /-- Random Oracle implemented as a uniform selection oracle with caching -/
--- @[inline, reducible] def randomOracle [(i : spec.Domain) → SampleableType (spec.Range i)] :
---     QueryImpl spec (StateT spec.QueryCache (OracleComp unifSpec)) :=
---   unifOracle.withCaching
-
--- namespace randOracle
-
--- variable [(i : ι) → SampleableType (spec.Range i)]
-
--- lemma apply_eq {α} (q : OracleQuery spec α) : randomOracle.impl q =
---     match q with | query i t => (do match (← get) i t with
---       | Option.some u => return u
---       | Option.none =>
---           let u ←$ᵗ (spec.Range i)
---           modifyGet fun cache => (u, cache.cacheQuery i t u)) := rfl
-
--- end randOracle

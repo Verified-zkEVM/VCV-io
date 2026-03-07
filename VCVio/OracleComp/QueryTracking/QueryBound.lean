@@ -227,7 +227,7 @@ def QueryUpperBound [DecidableEq ι] (f : α → OracleComp spec β) (size : α 
 with `size x ≤ n`, the computation `f x` makes at most `k * bound n` total queries.
 Uses the structural `IsQueryBound` to avoid dependence on oracle responses. -/
 def TotalQueryUpperBound (f : α → OracleComp spec β) (size : α → ℕ) (bound : ℕ → ℕ) : Prop :=
-  ∃ k, ∀ n x, size x ≤ n → IsQueryBound (f x) (k * bound n)
+  ∃ k : ℕ, ∀ n x, size x ≤ n → IsQueryBound (f x) (k * bound n)
     (fun _ b => 0 < b) (fun _ b => b - 1)
 
 /-- `PolyQueryUpperBound` says the per-index query count is polynomially bounded
