@@ -12,7 +12,9 @@ import ToMathlib.Control.Monad.Dijkstra
 import ToMathlib.Control.Monad.Equiv
 import ToMathlib.Control.Monad.Free
 import ToMathlib.Control.Monad.FreeCont
+import ToMathlib.Control.Monad.Graded
 import ToMathlib.Control.Monad.Hom
+import ToMathlib.Control.Monad.Indexed
 import ToMathlib.Control.Monad.Ordered
 import ToMathlib.Control.Monad.Relation
 import ToMathlib.Control.Monad.RelationalAlgebra
