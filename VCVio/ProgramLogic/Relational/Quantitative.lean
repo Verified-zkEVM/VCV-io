@@ -67,37 +67,7 @@ private lemma coupling_tsum_probOutput_eq_one
     ∑' z : α × β, Pr[= z | c.1] = 1 := by
   rw [tsum_probOutput_eq_sub, coupling_probFailure_eq_zero c, tsub_zero]
 
--- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
-private lemma finSupport_nonempty [DecidableEq α] (mx : OracleComp spec₁ α) :
-    (finSupport mx).Nonempty := by
-  by_contra h
-  have hsum := sum_finSupport_probOutput_eq_one (mx := mx) (h := probFailure_eq_zero (mx := mx))
-  rw [Finset.not_nonempty_iff_eq_empty.mp h, Finset.sum_empty] at hsum
-  exact zero_ne_one hsum
 
--- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
-private lemma indicator_objective_eq_probEvent {m : Type _ → Type _} [Monad m] [HasEvalSPMF m]
-    (mx : m (α × β)) (R : RelPost α β) :
-    (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[fun z => R z.1 z.2 | mx] := by
-  classical
-  rw [probEvent_eq_tsum_ite]
-  refine tsum_congr fun z => ?_
-  by_cases hR : R z.1 z.2 <;> simp [hR]
-
--- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
-private lemma probOutput_subpmf_eq_spmf (p : SPMF α) (x : α) :
-    @probOutput SubPMF OptionT.instMonad α (OptionT.instHasEvalSPMF PMF) (p : SubPMF α) x =
-      @probOutput SPMF SPMF.instAlternativeMonad.toMonad α SPMF.instHasEvalSPMF p x := by
-  rw [OptionT.probOutput_eq, PMF.probOutput_eq_apply, SPMF.probOutput_eq_apply]
-  rfl
-
--- TODO: move to `VCVio/EvalDist/Defs/Basic.lean`
-private lemma probEvent_subpmf_eq_spmf (p : SPMF α) (q : α → Prop) :
-    @probEvent SubPMF OptionT.instMonad α (OptionT.instHasEvalSPMF PMF) (p : SubPMF α) q =
-      @probEvent SPMF SPMF.instAlternativeMonad.toMonad α SPMF.instHasEvalSPMF p q := by
-  rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
-  refine tsum_congr fun x => ?_
-  by_cases hq : q x <;> simp [hq, probOutput_subpmf_eq_spmf]
 
 /-! ## Core eRHL definitions -/
 
@@ -150,8 +120,8 @@ theorem relTriple'_iff_couplingPost
       letI : DecidableEq B := Classical.decEq B
       letI : Fintype A := inferInstance
       letI : Fintype B := inferInstance
-      have hA_nonempty : (finSupport oa).Nonempty := finSupport_nonempty (mx := oa)
-      have hB_nonempty : (finSupport ob).Nonempty := finSupport_nonempty (mx := ob)
+      have hA_nonempty : (finSupport oa).Nonempty := HasEvalPMF.finSupport_nonempty oa
+      have hB_nonempty : (finSupport ob).Nonempty := HasEvalPMF.finSupport_nonempty ob
       let a₀ : A := ⟨hA_nonempty.choose, hA_nonempty.choose_spec⟩
       let b₀ : B := ⟨hB_nonempty.choose, hB_nonempty.choose_spec⟩
       let packA : α → A := fun a => if ha : a ∈ finSupport oa then ⟨a, ha⟩ else a₀
@@ -297,7 +267,7 @@ theorem relTriple'_iff_couplingPost
             @probEvent SubPMF OptionT.instMonad (A × B) (OptionT.instHasEvalSPMF PMF)
               (cMaxSub.1 : SubPMF (A × B))
               (fun z : A × B => R z.1.1 z.2.1) :=
-                (probEvent_subpmf_eq_spmf cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1)).symm
+                (OptionT.probEvent_subpmf_eq_spmf cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1)).symm
       have hsub_le_max :
           ∀ c : SubPMF.Coupling pa pb,
             Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SubPMF (A × B))] ≤
@@ -339,7 +309,7 @@ theorem relTriple'_iff_couplingPost
           _ = Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
                 exact (hlift_obj c).symm
           _ = Pr[fun z : A × B => R z.1.1 z.2.1 | (packPair <$> c.1 : SubPMF (A × B))] := by
-                exact (probEvent_subpmf_eq_spmf (packPair <$> c.1)
+                exact (OptionT.probEvent_subpmf_eq_spmf (packPair <$> c.1)
                   (fun z : A × B => R z.1.1 z.2.1)).symm
           _ = Pr[fun z : A × B => R z.1.1 z.2.1 | (cLift.1 : SubPMF (A × B))] := by
                 rfl
@@ -413,7 +383,14 @@ theorem eRelTriple_conseq {pre pre' : ℝ≥0∞}
     (hpre : pre' ≤ pre) (hpost : ∀ a b, post a b ≤ post' a b)
     (h : eRelTriple pre oa ob post) :
     eRelTriple pre' oa ob post' := by
-  sorry
+  unfold eRelTriple at h ⊢
+  refine le_trans hpre (le_trans h ?_)
+  unfold eRelWP
+  refine iSup_le fun c => ?_
+  exact le_trans
+    (ENNReal.tsum_le_tsum fun z : α × β => mul_le_mul' le_rfl (hpost z.1 z.2))
+    (le_iSup (f := fun c' : SPMF.Coupling (evalDist oa) (evalDist ob) =>
+      ∑' z : α × β, Pr[= z | c'.1] * post' z.1 z.2) c)
 
 /-- Bind/sequential composition rule for eRHL. -/
 theorem eRelTriple_bind
@@ -424,6 +401,15 @@ theorem eRelTriple_bind
     (hxy : eRelTriple pre oa ob cut)
     (hfg : ∀ a b, eRelTriple (cut a b) (fa a) (fb b) post) :
     eRelTriple pre (oa >>= fa) (ob >>= fb) post := by
+  -- Blocked: the natural gluing proof uses `_root_.SPMF.IsCoupling.bind`, but to
+  -- commute the outer weighted sum with the inner `iSup` we need a finite
+  -- enumeration of the outer coupling support. `OracleComp` exposes `finSupport`,
+  -- but generic `SPMF` couplings do not currently expose `HasEvalFinset`, so the
+  -- straightforward `probOutput_bind_eq_sum_finSupport` route is unavailable here.
+  -- A complete proof seems to require either:
+  -- 1. a finite-support API for `SPMF` couplings whose marginals are finitely supported, or
+  -- 2. redoing the bridge theorem's packing argument to reduce the outer coupling to
+  --    a finite subtype before commuting the finite sum with the inner `iSup`.
   sorry
 
 /-! ## Statistical distance via eRHL -/
@@ -434,6 +420,11 @@ theorem spmf_tvDist_eq_one_sub_eRelWP_eqRel
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :
     SPMF.tvDist (evalDist oa) (evalDist ob) =
       (1 - eRelWP oa ob (RelPost.indicator (EqRel α))).toReal := by
+  -- Blocked: this needs a theorem identifying `SPMF.tvDist` with
+  -- `1 - sup_c Pr[z.1 = z.2 | c]` over couplings `c`.
+  -- `ToMathlib/ProbabilityTheory/OptimalCoupling.lean` gives maximizers for bounded
+  -- coupling objectives, but the repo does not yet provide the TV/coupling
+  -- identification theorem itself.
   sorry
 
 /-- Same-spec version using the `tvDist` notation. -/
@@ -441,7 +432,9 @@ theorem tvDist_eq_one_sub_eRelWP_eqRel
     {oa ob : OracleComp spec₁ α} :
     tvDist oa ob = (1 - eRelWP (spec₂ := spec₁) oa ob
       (RelPost.indicator (EqRel α))).toReal := by
-  sorry
+  simpa [tvDist] using
+    (spmf_tvDist_eq_one_sub_eRelWP_eqRel
+      (spec₁ := spec₁) (spec₂ := spec₁) (oa := oa) (ob := ob))
 
 /-! ## pRHL convenience rules (Prop-level, no ℝ≥0∞ visible) -/
 

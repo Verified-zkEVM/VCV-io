@@ -633,6 +633,13 @@ lemma sum_probOutput_eq_one [Fintype α] (mx : m α) : ∑ x : α, Pr[= x | mx] 
 lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α] (mx : m α) :
     ∑ x ∈ finSupport mx, Pr[= x | mx] = 1 := by simp
 
+lemma finSupport_nonempty [HasEvalFinset m] [DecidableEq α] (mx : m α) :
+    (finSupport mx).Nonempty := by
+  by_contra h
+  have hsum := sum_finSupport_probOutput_eq_one mx
+  rw [Finset.not_nonempty_iff_eq_empty.mp h, Finset.sum_empty] at hsum
+  exact zero_ne_one hsum
+
 lemma probOutput_eq_inv_finSupport_card [HasEvalFinset m] [DecidableEq α]
     {mx : m α} {c : ENNReal}
     (hconst : ∀ x ∈ support mx, Pr[= x | mx] = c) :
@@ -753,5 +760,12 @@ lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n
     {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
     x ∈ finSupport mx ↔ x ∈ finSupport mx' := by
   simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
+
+open Classical in
+lemma indicator_objective_eq_probEvent (mx : m (α × β)) (R : α → β → Prop) :
+    (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[fun z => R z.1 z.2 | mx] := by
+  rw [probEvent_eq_tsum_ite]
+  refine tsum_congr fun z => ?_
+  by_cases hR : R z.1 z.2 <;> simp [hR]
 
 end probEvent_mono_compl

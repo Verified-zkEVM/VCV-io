@@ -350,6 +350,26 @@ lemma probEvent_simulateQ_run'_eq {σ τ : Type u}
   congr 1; funext x
   simp only [probOutput_simulateQ_run'_eq so h s oa]
 
+lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
+    {ι' : Type} {spec' : OracleSpec ι'}
+    {σ α : Type}
+    (impl₁ impl₂ : QueryImpl spec' (StateT σ (OracleComp spec)))
+    (h : ∀ (t : spec'.Domain) (s : σ),
+      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+    (comp : OracleComp spec' α) (s : σ) :
+    evalDist ((simulateQ impl₁ comp).run s) =
+      evalDist ((simulateQ impl₂ comp).run s) := by
+  revert s
+  induction comp using OracleComp.inductionOn with
+  | pure _ => intro _; rfl
+  | query_bind t oa ih =>
+    intro s
+    simp only [simulateQ_query_bind, StateT.run_bind]
+    rw [evalDist_bind, evalDist_bind]
+    congr 1
+    · exact h t s
+    · funext ⟨u, s'⟩; exact ih u s'
+
 end simulateQ_evalDist
 
 end OracleComp

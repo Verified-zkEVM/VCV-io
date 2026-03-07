@@ -188,6 +188,11 @@ instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
   monadLift_pure x := liftComp_pure superSpec x
   monadLift_bind mx my := liftComp_bind superSpec mx my
 
+@[simp]
+lemma monadLift_eq_self {α} (mx : OracleComp spec α) :
+    (monadLift mx : OracleComp spec α) = mx :=
+  simulateQ_ofLift_eq_self mx
+
 -- NOTE: With constant universal levels it is fairly easy to abstract the below in a class
 -- Getting a similar level of generality as the manual instances below would be useful,
 --    might require some more general framework about monad transformers.

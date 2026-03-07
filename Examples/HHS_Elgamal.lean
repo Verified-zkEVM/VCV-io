@@ -5,9 +5,10 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Notation
 
-set_option linter.style.longFile 2300
+set_option linter.style.longFile 2200
 
 /-!
 # ElGamal over Hard Homogeneous Spaces: Multi-query IND-CPA via DDH
@@ -193,30 +194,7 @@ lemma randomMaskedCipher_dist_indep (pk : P × P) (m₁ m₂ : P) :
 /-- The oracle simulation's output is independent of `b` in the all-random hybrid.
 This is expressed as a relational triple: running with `b = true` vs `b = false`
 produces equal distributions. -/
--- TODO: move to SimSemantics or EvalDist
-private lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
-    {ι' : Type} {spec' : OracleSpec ι'}
-    {σ α : Type}
-    (impl₁ impl₂ : QueryImpl spec' (StateT σ ProbComp))
-    (h : ∀ (t : spec'.Domain) (s : σ),
-      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
-    (comp : OracleComp spec' α) (s : σ) :
-    evalDist ((simulateQ impl₁ comp).run s) =
-      evalDist ((simulateQ impl₂ comp).run s) := by
-  revert s
-  induction comp using OracleComp.inductionOn with
-  | pure _ => intro _; rfl
-  | query_bind t oa ih =>
-    intro s
-    simp only [simulateQ_query_bind, StateT.run_bind]
-    rw [evalDist_bind, evalDist_bind]
-    congr 1
-    · exact h t s
-    · funext ⟨u, s'⟩; exact ih u s'
 
-private lemma evalDist_monadLift_self {α : Type} (mx : ProbComp α) :
-    evalDist (monadLift mx : ProbComp α) = evalDist mx :=
-  congrArg evalDist (simulateQ_id' mx)
 
 private lemma hybridChallengeOracle_allRandom_evalDist_eq
     (pk : P × P) (mm : P × P) (s : IND_CPA_HybridState (P := P)) :
@@ -297,39 +275,7 @@ theorem IND_CPA_allRandomHalf
 
 /-! ## 3a. DDH helper lemmas -/
 
-/-- Conditioning on a uniform boolean averages the two branch probabilities. -/
-lemma probOutput_bind_uniformBool {α : Type}
-    (f : Bool → ProbComp α) (x : α) :
-    Pr[= x | (do let b ← $ᵗ Bool; f b)] =
-      (Pr[= x | f true] + Pr[= x | f false]) / 2 := by
-  rw [probOutput_bind_eq_tsum]
-  rw [tsum_fintype (L := .unconditional _), Fintype.sum_bool]
-  simp [probOutput_uniformSample, div_eq_mul_inv, add_comm]
-  rw [← left_distrib, mul_comm]
 
-/-- Boolean-map simplification for `BEq.beq true`. -/
-private lemma probOutput_true_eq_true_map (mx : ProbComp Bool) :
-    Pr[= true | (BEq.beq true <$> mx)] = Pr[= true | mx] := by
-  have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
-    funext b
-    cases b <;> rfl
-  rw [hbeqTrue]
-  exact probOutput_map_injective (mx := mx) (f := id) (hf := Function.injective_id) (x := true)
-
-/-- Boolean-map simplification for `BEq.beq false`. -/
-private lemma probOutput_true_eq_falseMap (mx : ProbComp Bool) :
-    Pr[= true | (BEq.beq false <$> mx)] = Pr[= false | mx] := by
-  have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
-    funext b
-    cases b <;> rfl
-  rw [hbeqFalse]
-  simpa using
-    (probOutput_map_injective (mx := mx) (f := Bool.not)
-      (hf := by
-        intro a b hab
-        have h : Bool.not (Bool.not a) = Bool.not (Bool.not b) := congrArg Bool.not hab
-        simpa using h)
-      (x := false))
 
 omit [DecidableEq P] in
 /-- Left-multiplying a uniform sample by a fixed group element preserves the distribution. -/
@@ -405,11 +351,14 @@ lemma ddh_decomp_two_games_toReal (real rand : ProbComp Bool) :
       let z ← if b then real else rand
       pure (b == z)] =
     (Pr[= true | real] + Pr[= false | rand]) / 2 := by
-    rw [hgameRepr, hmix, probOutput_true_eq_true_map, probOutput_true_eq_falseMap]
+    rw [hgameRepr, hmix,
+      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
+      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
+      probOutput_not_map]
   have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
     have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by
       have := HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := rand)
-      simpa [Fintype.sum_bool] using this
+      simp
     rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
   rw [hformula, ENNReal.toReal_div,
     ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
@@ -417,10 +366,6 @@ lemma ddh_decomp_two_games_toReal (real rand : ProbComp Bool) :
   simp [ENNReal.toReal_ofNat]
   ring
 
-private lemma monadLift_probComp_eq {α : Type} (x : ProbComp α) :
-    (monadLift x : ProbComp α) = x := by
-  change OracleComp.liftComp x unifSpec = x
-  exact simulateQ_ofLift_eq_self x
 
 /-! ## 4. Per-hop DDH reduction -/
 
@@ -585,7 +530,7 @@ private lemma hybridQueryImpl_counter_mono
           simp only [liftM, MonadLiftT.monadLift,
             show ∀ (x : ProbComp (P × P)),
                 OracleComp.liftComp x unifSpec = x from
-              fun x => monadLift_probComp_eq x,
+              fun x => monadLift_eq_self x,
             MonadLift.monadLift, StateT.run_lift]
         split_ifs at hp with h
         all_goals
@@ -714,7 +659,7 @@ private lemma stepDDH_real_simulation_deferred
                   simp only [liftM, MonadLiftT.monadLift,
                     show ∀ (x : ProbComp (P × P)),
                         OracleComp.liftComp x unifSpec = x from
-                      fun x => monadLift_probComp_eq x,
+                      fun x => monadLift_eq_self x,
                     MonadLift.monadLift, StateT.run_lift]
                 split_ifs at hp
                 all_goals
@@ -781,7 +726,7 @@ private lemma stepDDH_real_simulation_deferred
                   simp only [liftM, MonadLiftT.monadLift,
                     show ∀ (x : ProbComp (P × P)),
                         OracleComp.liftComp x unifSpec = x from
-                      fun x => monadLift_probComp_eq x,
+                      fun x => monadLift_eq_self x,
                     MonadLift.monadLift, StateT.run_lift]
                 simp only [hlift, bind_assoc,
                   StateT.run_pure, pure_bind, hset]
@@ -986,7 +931,7 @@ private lemma stepDDH_rand_simulation_deferred
                   simp only [liftM, MonadLiftT.monadLift,
                     show ∀ (x : ProbComp (P × P)),
                         OracleComp.liftComp x unifSpec = x from
-                      fun x => monadLift_probComp_eq x,
+                      fun x => monadLift_eq_self x,
                     MonadLift.monadLift, StateT.run_lift]
                 split_ifs at hp
                 all_goals
@@ -1054,7 +999,7 @@ private lemma stepDDH_rand_simulation_deferred
                   simp only [liftM, MonadLiftT.monadLift,
                     show ∀ (x : ProbComp (P × P)),
                         OracleComp.liftComp x unifSpec = x from
-                      fun x => monadLift_probComp_eq x,
+                      fun x => monadLift_eq_self x,
                     MonadLift.monadLift, StateT.run_lift]
                 simp only [hlift, bind_assoc,
                   StateT.run_pure, pure_bind, hset]
@@ -1814,7 +1759,7 @@ private lemma allReal_counter_le_succ
           simp only [liftM, MonadLiftT.monadLift,
             show ∀ (x : ProbComp (P × P)),
                 OracleComp.liftComp x unifSpec = x from
-              fun x => monadLift_probComp_eq x,
+              fun x => monadLift_eq_self x,
             MonadLift.monadLift, StateT.run_lift]
         simp only [StateT.run_pure, pure_bind, hlift, bind_assoc,
           support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff] at hp
@@ -1940,7 +1885,7 @@ private lemma allReal_queryImpl_proj_eq_real
           simp only [liftM, MonadLiftT.monadLift,
             show ∀ (x : ProbComp (P × P)),
                 OracleComp.liftComp x unifSpec = x from
-              fun x => monadLift_probComp_eq x,
+              fun x => monadLift_eq_self x,
             MonadLift.monadLift, StateT.run_lift]
         have hallReal :
             Prod.map id Prod.fst <$>

@@ -81,7 +81,88 @@ variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) := by
-  sorry
+  intro msg
+  let ro : QueryImpl (M × PC →ₒ Ω)
+      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
+  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
+  have hleft :
+      ∀ {α : Type} (oa : ProbComp α),
+        simulateQ (idImpl + ro) (OracleComp.liftComp oa (unifSpec + (M × PC →ₒ Ω))) =
+          simulateQ idImpl oa := by
+    intro α oa
+    simpa using
+      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) oa)
+  have hrun :
+      ∀ {α : Type} (oa : ProbComp α) (s : (M × PC →ₒ Ω).QueryCache),
+        (simulateQ idImpl oa).run s = (fun x => (x, s)) <$> oa := by
+    intro α oa
+    induction oa using OracleComp.inductionOn with
+    | pure x =>
+        intro s
+        simp
+    | query_bind t oa ih =>
+        intro s
+        change
+          (do
+            let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
+            (simulateQ idImpl (oa a)).run s) =
+            (do
+              let a ← liftM (query t)
+              (fun x => (x, s)) <$> oa a)
+        have hfun :
+            (fun a => (simulateQ idImpl (oa a)).run s) =
+              (fun a => (fun x => (x, s)) <$> oa a) := by
+          funext a
+          exact ih a s
+        simp [hfun]
+  have hrunLift :
+      ∀ {α : Type} (oa : ProbComp α) (s : (M × PC →ₒ Ω).QueryCache),
+        (simulateQ (idImpl + ro) (liftM oa)).run s = (fun x => (x, s)) <$> oa := by
+    intro α oa s
+    rw [show simulateQ (idImpl + ro) (liftM oa) = simulateQ idImpl oa by
+      simpa using hleft oa]
+    simpa using hrun oa s
+  change
+    Pr[= true | (FiatShamir σ hr M).exec (do
+      let (pk, sk) ← (FiatShamir σ hr M).keygen
+      let sig ← (FiatShamir σ hr M).sign pk sk msg
+      (FiatShamir σ hr M).verify pk msg sig)] = 1
+  rw [show (FiatShamir σ hr M).exec (do
+      let (pk, sk) ← (FiatShamir σ hr M).keygen
+      let sig ← (FiatShamir σ hr M).sign pk sk msg
+      (FiatShamir σ hr M).verify pk msg sig) =
+        (do
+          let (pk, sk) ← hr.gen
+          let (c, e) ← σ.commit pk sk
+          let r ← $ᵗ Ω
+          let s ← σ.respond pk sk e r
+          pure (σ.verify pk c r s)) by
+    sorry /- was: simp; simp_rw [hrunLift]; simp — broken by @[simp] monadLift_eq_self -/]
+  have hinner :
+      ∀ x ∈ support hr.gen,
+        Pr[= true | (do
+          let (c, e) ← σ.commit x.1 x.2
+          let r ← $ᵗ Ω
+          let s ← σ.respond x.1 x.2 e r
+          pure (σ.verify x.1 c r s))] =
+          Pr[= true | (pure true : ProbComp Bool)] := by
+    intro x hx
+    rcases x with ⟨pk, sk⟩
+    have hrel : p pk sk = true := hr.gen_sound pk sk hx
+    simpa using hc pk sk hrel
+  calc
+    Pr[= true | (do
+      let (pk, sk) ← hr.gen
+      let (c, e) ← σ.commit pk sk
+      let r ← $ᵗ Ω
+      let s ← σ.respond pk sk e r
+      pure (σ.verify pk c r s))] =
+        Pr[= true | (do
+          let _x ← hr.gen
+          pure true : ProbComp Bool)] := by
+            exact probOutput_bind_congr hinner
+    _ = 1 := by simp
 
 /-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then
 forgery probability is bounded by the forking lemma probability. -/

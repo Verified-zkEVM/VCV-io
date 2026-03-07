@@ -31,26 +31,6 @@ variable {ι : Type*} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
 variable {α : Type}
 
--- TODO: move to HoareTriple.lean
-private lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
-    (h : evalDist oa = evalDist ob) (x : α) :
-    Pr[= x | oa] = Pr[= x | ob] := by
-  show evalDist oa x = evalDist ob x
-  rw [h]
-
--- TODO: move to HoareTriple.lean
-private lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
-    (h : evalDist oa = evalDist ob) :
-    μ oa = μ ob := by
-  unfold μ
-  exact tsum_congr fun x => by rw [probOutput_congr_evalDist h]
-
--- TODO: move to HoareTriple.lean
-private lemma wp_congr_evalDist {oa ob : OracleComp spec α}
-    (h : evalDist oa = evalDist ob) (post : α → ℝ≥0∞) :
-    wp oa post = wp ob post := by
-  show μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
-  exact μ_congr_evalDist (by simp [h])
 
 /-- If every oracle query in `impl` has the same evaluation distribution as the original query,
 then `wp` of the simulated computation equals `wp` of the original. -/
@@ -69,16 +49,6 @@ theorem wp_simulateQ_eq
     simp_rw [ih]
     exact wp_congr_evalDist (hImpl t) _
 
--- TODO: move to HoareTriple.lean
-private lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
-    [spec'.Fintype] [spec'.Inhabited]
-    {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
-    (h : evalDist oa = evalDist ob) :
-    @μ _ spec' _ _ oa = μ ob := by
-  simp only [μ]
-  exact tsum_congr fun x => by
-    show evalDist oa x * x = evalDist ob x * x
-    rw [h]
 
 /-- Lifting a computation to a larger oracle spec via `liftComp` preserves `wp`. -/
 theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}

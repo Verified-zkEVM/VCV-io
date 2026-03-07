@@ -309,6 +309,19 @@ lemma relTriple_query_bij (t : spec₁.Domain)
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [hzEq]
 
+lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    {α β γ δ : Type} {R : RelPost γ δ}
+    {f : α → γ} {g : β → δ}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (h : RelTriple oa ob (fun a b => R (f a) (g b))) :
+    RelTriple (f <$> oa) (g <$> ob) R := by
+  have h1 : RelWP oa ob (fun a b => R (f a) (g b)) ≤ RelWP oa (g <$> ob) (fun a d => R (f a) d) :=
+    MAlgRelOrdered.relWP_map_right g oa ob _
+  have h2 : RelWP oa (g <$> ob) (fun a d => R (f a) d) ≤ RelWP (f <$> oa) (g <$> ob) R :=
+    MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
+  exact le_trans h (le_trans h1 h2)
+
 end OracleComp.ProgramLogic.Relational
 
 section Sampling

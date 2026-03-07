@@ -66,25 +66,6 @@ theorem GameEquiv.of_approxRelTriple_zero
     GameEquiv g₁ g₂ :=
   GameEquiv.of_relTriple' ((Relational.relTriple'_eq_approxRelTriple_zero).mpr h)
 
--- TODO: move to EvalDist/TVDist.lean
-/-- For any `Bool` game, the difference of `Pr[= true]` values is bounded by TV distance. -/
-private lemma abs_probOutput_toReal_sub_le_tvDist
-    (game₁ game₂ : OracleComp spec₁ Bool) :
-    |Pr[= true | game₁].toReal - Pr[= true | game₂].toReal| ≤ tvDist game₁ game₂ := by
-  simp only [probOutput_def, SPMF.apply_eq_toPMF_some, _root_.tvDist, SPMF.tvDist, PMF.tvDist]
-  -- h maps `some true` to `some ()` and everything else to `none`
-  -- Evaluating (h <$> p) at (some ()) recovers p (some true)
-  have happ : ∀ (p : PMF (Option Bool)),
-      ((fun x : Option Bool => if x = some true then some () else none) <$> p) (some ()) =
-        p (some true) := fun p => by
-    simp [PMF.map_apply_eq, tsum_fintype]
-  rw [← ENNReal.absDiff_toReal (PMF.apply_ne_top _ _) (PMF.apply_ne_top _ _)]
-  apply ENNReal.toReal_mono (PMF.etvDist_ne_top _ _)
-  rw [← happ (evalDist game₁).toPMF, ← happ (evalDist game₂).toPMF,
-      ← PMF.etvDist_option_punit]
-  exact PMF.etvDist_map_le (fun x : Option Bool => if x = some true then some () else none)
-    (evalDist game₁).toPMF (evalDist game₂).toPMF
-
 /-- Advantage bound via TV distance. -/
 theorem AdvBound.of_tvDist
     {game₁ game₂ : OracleComp spec₁ Bool}

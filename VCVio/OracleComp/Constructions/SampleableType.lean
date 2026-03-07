@@ -290,6 +290,16 @@ lemma probOutput_uniformBool_not_decide_eq_decide {ob : ProbComp Bool} :
       Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return decide (b = b')] := by
   simp [probOutput_bind_eq_tsum, add_comm]
 
+/-- Conditioning on a uniform boolean averages the two branch probabilities. -/
+lemma probOutput_bind_uniformBool {α : Type}
+    (f : Bool → ProbComp α) (x : α) :
+    Pr[= x | (do let b ← $ᵗ Bool; f b)] =
+      (Pr[= x | f true] + Pr[= x | f false]) / 2 := by
+  rw [probOutput_bind_eq_tsum]
+  rw [tsum_fintype (L := .unconditional _), Fintype.sum_bool]
+  simp [probOutput_uniformSample, div_eq_mul_inv, add_comm]
+  rw [← left_distrib, mul_comm]
+
 /-- If the distribution of `f b` is independent of `b`, then guessing a uniformly random
 bit by running `f` has success probability exactly 1/2.
 This is the core lemma behind "all-random hybrid has probability 1/2" arguments. -/

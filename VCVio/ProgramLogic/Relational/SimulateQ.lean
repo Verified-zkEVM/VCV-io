@@ -63,20 +63,6 @@ theorem relTriple_simulateQ_run
     exact (relTriple_bind (himpl t s₁ s₂ hs) (fun ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨eq_u, hs'⟩ => by
       dsimp at eq_u hs' ⊢; subst eq_u; exact ih u₁ s₁' s₂' hs')) trivial
 
--- TODO: move to Relational/Basic.lean
-private lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
-    {α β γ δ : Type} {R : RelPost γ δ}
-    {f : α → γ} {g : β → δ}
-    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    (h : RelTriple oa ob (fun a b => R (f a) (g b))) :
-    RelTriple (f <$> oa) (g <$> ob) R := by
-  have h1 : RelWP oa ob (fun a b => R (f a) (g b)) ≤ RelWP oa (g <$> ob) (fun a d => R (f a) d) :=
-    MAlgRelOrdered.relWP_map_right g oa ob _
-  have h2 : RelWP oa (g <$> ob) (fun a d => R (f a) d) ≤ RelWP (f <$> oa) (g <$> ob) R :=
-    MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
-  exact le_trans h (le_trans h1 h2)
-
 /-- Projection: relational `simulateQ` preserving only output equality. -/
 theorem relTriple_simulateQ_run'
     {σ₁ σ₂ : Type}
@@ -203,58 +189,6 @@ private lemma probEvent_bad_eq
         rw [← h2]; exact ENNReal.add_sub_cancel_right
           (ne_top_of_le_ne_top one_ne_top probEvent_le_one)
 
-/-- TODO: move to `EvalDist/TVDist.lean` -/
-private lemma tvDist_le_probEvent_of_probOutput_eq_of_not
-    {β : Type}
-    (mx my : OracleComp spec β)
-    (p : β → Prop) [DecidablePred p]
-    (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
-    (h_event_eq : Pr[p | mx] = Pr[p | my]) :
-    tvDist mx my ≤ Pr[p | mx].toReal := by
-  rw [tvDist, SPMF.tvDist, PMF.tvDist]
-  refine ENNReal.toReal_mono probEvent_ne_top ?_
-  rw [PMF.etvDist, tsum_option _ ENNReal.summable]
-  have hprobfailx : Pr[⊥ | mx] = 0 := probFailure_eq_zero' (mx := mx) (h := inferInstance)
-  have hprobfaily : Pr[⊥ | my] = 0 := probFailure_eq_zero' (mx := my) (h := inferInstance)
-  have hfailx : (evalDist mx).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := evalDist mx), ← probFailure_def (mx := mx)]
-    exact hprobfailx
-  have hfaily : (evalDist my).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := evalDist my), ← probFailure_def (mx := my)]
-    exact hprobfaily
-  have hsum :
-      (∑' x, ENNReal.absDiff ((evalDist mx).toPMF (some x)) ((evalDist my).toPMF (some x))) =
-        ∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my]) := by
-    refine tsum_congr fun x => ?_
-    simp [probOutput_def, SPMF.apply_eq_toPMF_some]
-  rw [hfailx, hfaily, ENNReal.absDiff_self, zero_add]
-  rw [hsum]
-  calc
-    (∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my])) / 2
-      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 := by
-          exact ENNReal.div_le_div_right
-            (ENNReal.tsum_le_tsum fun x => by
-              by_cases hx : p x
-              · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
-              · simp [hx, h_eq x hx, ENNReal.absDiff_self]) _
-    _ = (Pr[p | mx] + Pr[p | my]) / 2 := by
-        rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
-        congr 1
-        calc
-          (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0)
-              = (∑' x, ((if p x then Pr[= x | mx] else 0) +
-                  (if p x then Pr[= x | my] else 0))) := by
-                  refine tsum_congr fun x => ?_
-                  by_cases hx : p x <;> simp [hx]
-          _ = (∑' x, if p x then Pr[= x | mx] else 0) +
-              (∑' x, if p x then Pr[= x | my] else 0) := by
-                rw [ENNReal.tsum_add]
-    _ = (Pr[p | mx] + Pr[p | mx]) / 2 := by
-        rw [← h_event_eq]
-    _ = Pr[p | mx] := by
-        rw [← two_mul, div_eq_mul_inv, mul_comm (2 : ℝ≥0∞) (Pr[p | mx]), mul_assoc,
-          ENNReal.mul_inv_cancel two_ne_zero ofNat_ne_top, mul_one]
-
 /-- The fundamental lemma of game playing: if two oracle implementations agree whenever
 a "bad" flag is unset, then the total variation distance between the two simulations
 is bounded by the probability that bad gets set.
@@ -291,7 +225,7 @@ theorem tvDist_simulateQ_le_probEvent_bad
   have h_bad_eq : Pr[bad ∘ Prod.snd | sim₁] = Pr[bad ∘ Prod.snd | sim₂] :=
     probEvent_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
   have h_tv_joint : tvDist sim₁ sim₂ ≤ Pr[bad ∘ Prod.snd | sim₁].toReal :=
-    tvDist_le_probEvent_of_probOutput_eq_of_not sim₁ sim₂ (bad ∘ Prod.snd)
+    tvDist_le_probEvent_of_probOutput_eq_of_not (mx := sim₁) (my := sim₂) (bad ∘ Prod.snd)
       (fun xs hxs => by
         rcases xs with ⟨x, s⟩
         simpa using h_eq x s hxs)
