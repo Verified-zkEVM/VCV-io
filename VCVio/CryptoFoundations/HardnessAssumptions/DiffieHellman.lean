@@ -46,11 +46,11 @@ abbrev cdhExp [DecidableEq P] (adversary : CDHAdversary V P) : ProbComp Bool :=
 abbrev DDHAdversary (V P : Type) := parallelTestingAdversary V P
 
 /-- DDH experiment, defined as `HardHomogeneousSpace.parallelTesting_experiment`. -/
-abbrev ddhExp [DecidableEq V] (adversary : DDHAdversary V P) : ProbComp Bool :=
+abbrev ddhExp (adversary : DDHAdversary V P) : ProbComp Bool :=
   parallelTesting_experiment (G := V) (P := P) adversary
 
 /-- DDH advantage from the hard-homogeneous-space parallel-testing experiment. -/
-noncomputable abbrev ddhAdvantage [DecidableEq V]
+noncomputable abbrev ddhAdvantage
     (adversary : DDHAdversary V P) : ℝ≥0∞ :=
   parallelTestingAdvantage (G := V) (P := P) adversary
 

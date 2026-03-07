@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.QueryImpl
+import VCVio.Prelude
 import ToMathlib.Control.OptionT
 
 /-!
@@ -28,11 +29,11 @@ def simulateQ {ι} {spec : OracleSpec ι} {r : Type u → Type _} [Monad r]
 variable {ι} {spec : OracleSpec ι} {r m n : Type u → Type*}
     [Monad r] (impl : QueryImpl spec r)
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma simulateQ_pure (x : α) :
     simulateQ impl (pure x : OracleComp spec α) = pure x := rfl
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma simulateQ_bind [LawfulMonad r] (mx : OracleComp spec α) (my : α → OracleComp spec β) :
     simulateQ impl (mx >>= my) = simulateQ impl mx >>= fun x => simulateQ impl (my x) := by
   simp [simulateQ]
@@ -44,7 +45,7 @@ def simulateQ' [LawfulMonad r] (impl : QueryImpl spec r) : OracleComp spec →�
   toFun_pure' _ := simulateQ_pure _ _
   toFun_bind' _ _ := simulateQ_bind _ _ _
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma simulateQ_query [LawfulMonad r] (q : OracleQuery spec α) :
     simulateQ impl (liftM q) = q.cont <$> (impl q.input) := by
   simp [simulateQ, PFunctor.FreeM.mapM.eq_def]

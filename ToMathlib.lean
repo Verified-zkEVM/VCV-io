@@ -35,3 +35,4 @@ import ToMathlib.PFunctor.Lens.Basic
 import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
 import ToMathlib.ProbabilityTheory.Coupling
 import ToMathlib.ProbabilityTheory.FinRatPMF
+import ToMathlib.ProbabilityTheory.OptimalCoupling

@@ -27,6 +27,10 @@ lemma liftM_of_liftM_eq [MonadLift m m'] (x : StateT σ m α) :
 
 lemma liftM_def [Monad m] (x : m α) : (liftM x : StateT σ m α) = StateT.lift x := rfl
 
+@[simp]
+lemma run_liftM [Monad m] (x : m α) (s : σ) :
+    (liftM x : StateT σ m α).run s = x >>= fun a => pure (a, s) := rfl
+
 -- TODO: should this be simp?
 lemma monad_pure_def [Monad m] (x : α) :
     (pure x : StateT σ m α) = StateT.pure x := rfl

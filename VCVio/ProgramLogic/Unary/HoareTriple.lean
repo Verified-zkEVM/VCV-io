@@ -7,6 +7,7 @@ Authors: Quang Dao
 import ToMathlib.Control.Monad.Algebra
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Quantitative Hoare triples for `OracleComp`
@@ -82,11 +83,17 @@ noncomputable abbrev wp (oa : OracleComp spec α) (post : α → ℝ≥0∞) : �
 noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post : α → ℝ≥0∞) : Prop :=
   MAlgOrdered.Triple (m := OracleComp spec) (l := ℝ≥0∞) pre oa post
 
-@[simp] theorem wp_pure (x : α) (post : α → ℝ≥0∞) :
+@[simp, game_rule] theorem wp_pure (x : α) (post : α → ℝ≥0∞) :
     wp (spec := spec) (pure x) post = post x := by
   simp [wp, MAlgOrdered.wp_pure]
 
-theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
+@[simp, game_rule] theorem wp_ite (c : Prop) [Decidable c]
+    (oa ob : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp (spec := spec) (if c then oa else ob) post =
+      if c then wp oa post else wp ob post := by
+  split_ifs <;> rfl
+
+@[game_rule] theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (post : β → ℝ≥0∞) :
     wp (spec := spec) (oa >>= ob) post =
       wp oa (fun x => wp (ob x) post) := by
@@ -167,7 +174,7 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
             simp [hprob]
 
 /-- Quantitative WP rule for a uniform oracle query. -/
-theorem wp_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+@[game_rule] theorem wp_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
     wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
   simpa using wp_liftM_query (spec := spec) t post
@@ -184,4 +191,58 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
   unfold Triple MAlgOrdered.Triple
   simp [probOutput_eq_wp_indicator]
 
+/-! ## Congruence under evalDist equality -/
+
+lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
+    (h : evalDist oa = evalDist ob) (x : α) :
+    Pr[= x | oa] = Pr[= x | ob] := by
+  show evalDist oa x = evalDist ob x
+  rw [h]
+
+lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
+    (h : evalDist oa = evalDist ob) :
+    μ oa = μ ob := by
+  unfold μ
+  exact tsum_congr fun x => by rw [probOutput_congr_evalDist h]
+
+lemma wp_congr_evalDist {oa ob : OracleComp spec α}
+    (h : evalDist oa = evalDist ob) (post : α → ℝ≥0∞) :
+    wp oa post = wp ob post := by
+  show μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
+  exact μ_congr_evalDist (by simp [h])
+
+lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
+    [spec'.Fintype] [spec'.Inhabited]
+    {oa : OracleComp spec' ℝ≥0∞} {ob : OracleComp spec ℝ≥0∞}
+    (h : evalDist oa = evalDist ob) :
+    @μ _ spec' _ _ oa = μ ob := by
+  simp only [μ]
+  exact tsum_congr fun x => by
+    show evalDist oa x * x = evalDist ob x * x
+    rw [h]
+
 end OracleComp.ProgramLogic
+
+section Sampling
+
+open OracleComp.ProgramLogic
+
+variable {α : Type} [SampleableType α]
+
+@[game_rule] theorem OracleComp.ProgramLogic.wp_uniformSample (post : α → ℝ≥0∞) :
+    wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+  rw [wp, MAlgOrdered.wp]
+  calc
+    μ (do let a ← $ᵗ α; pure (post a))
+        = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
+          simpa using
+            (μ_bind_eq_tsum (oa := ($ᵗ α : ProbComp α)) (ob := fun a => pure (post a)))
+    _ = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+          refine tsum_congr ?_
+          intro x
+          have hμ : μ (pure (post x) : ProbComp ℝ≥0∞) = post x := by
+            let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
+            simp [μ, probOutput_pure]
+          rw [hμ]
+
+end Sampling

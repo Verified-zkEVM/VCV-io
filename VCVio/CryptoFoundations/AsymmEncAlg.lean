@@ -74,6 +74,15 @@ def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
 def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
 
+/-- An IND-CPA adversary `MakesAtMostQueries q` when it issues at most `q` total queries
+to the challenge (encryption) oracle, regardless of public key.
+Uniform-sampling queries are unrestricted. -/
+def IND_CPA_adversary.MakesAtMostQueries {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) (q : ℕ) : Prop :=
+  ∀ pk, (adversary pk).IsQueryBound q
+    (fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
+    (fun t n => match t with | .inl _ => n | .inr _ => n - 1)
+
 def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
       (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
@@ -306,18 +315,15 @@ section MultiQueryHybridLift
 
 variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
-/-- Real-valued success probability of outputting `true` for a `ProbComp Bool` game. -/
-noncomputable abbrev trueProbReal (g : ProbComp Bool) : ℝ :=
-  (Pr[= true | g]).toReal
-
 /-- Signed real IND-CPA advantage (`Pr[win]-1/2`) for the oracle IND-CPA experiment. -/
 noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
-  trueProbReal (IND_CPA_experiment (encAlg := encAlg') adversary) - 1 / 2
+  (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
 
 lemma sum_hybridDiff_eq_trueProb_sub (games : ℕ → ProbComp Bool) (q : ℕ) :
-    Finset.sum (Finset.range q) (fun i => trueProbReal (games i) - trueProbReal (games (i + 1))) =
-      trueProbReal (games 0) - trueProbReal (games q) := by
-  let f : ℕ → ℝ := fun i => trueProbReal (games i)
+    Finset.sum (Finset.range q)
+      (fun i => (Pr[= true | games i]).toReal - (Pr[= true | games (i + 1)]).toReal) =
+      (Pr[= true | games 0]).toReal - (Pr[= true | games q]).toReal := by
+  let f : ℕ → ℝ := fun i => (Pr[= true | games i]).toReal
   have hsub : Finset.sum (Finset.range q) (fun i => f (i + 1)) -
       Finset.sum (Finset.range q) (fun i => f i) = f q - f 0 := by
     simpa [f] using (Finset.sum_range_sub (f := f) q)
@@ -329,7 +335,6 @@ lemma sum_hybridDiff_eq_trueProb_sub (games : ℕ → ProbComp Bool) (q : ℕ) :
               simp [Finset.sum_sub_distrib]
     _ = -(f q - f 0) := by simpa using hneg
     _ = f 0 - f q := by ring
-    _ = trueProbReal (games 0) - trueProbReal (games q) := by simp [f]
 
 omit [DecidableEq C] in
 /-- Generic telescoping identity for multi-query game-hopping:
@@ -337,18 +342,19 @@ if `games 0` is the target IND-CPA experiment and `games q` has success probabil
 then IND-CPA advantage is the sum of adjacent hybrid differences. -/
 theorem IND_CPA_advantage'_eq_sum_hybridDiff
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (games : ℕ → ProbComp Bool)
-    (h0 : games 0 = IND_CPA_experiment (encAlg := encAlg') adversary)
-    (hq : trueProbReal (games q) = (1 / 2 : ℝ)) :
+    (h0 : (Pr[= true | games 0]).toReal =
+      (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal)
+    (hq : (Pr[= true | games q]).toReal = (1 / 2 : ℝ)) :
     IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary =
       Finset.sum (Finset.range q) (fun i =>
-        trueProbReal (games i) - trueProbReal (games (i + 1))) := by
+        (Pr[= true | games i]).toReal - (Pr[= true | games (i + 1)]).toReal) := by
   unfold IND_CPA_signedAdvantageReal
   calc
     (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
-        = trueProbReal (games 0) - trueProbReal (games q) := by
-            simp [h0, hq, trueProbReal]
+        = (Pr[= true | games 0]).toReal - (Pr[= true | games q]).toReal := by linarith
     _ = Finset.sum (Finset.range q)
-          (fun i => trueProbReal (games i) - trueProbReal (games (i + 1))) := by
+          (fun i => (Pr[= true | games i]).toReal -
+            (Pr[= true | games (i + 1)]).toReal) := by
           simpa using (sum_hybridDiff_eq_trueProb_sub (games := games) q).symm
 
 omit [DecidableEq C] in
@@ -356,16 +362,18 @@ omit [DecidableEq C] in
 adjacent hybrid gaps. -/
 theorem IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (games : ℕ → ProbComp Bool)
-    (h0 : games 0 = IND_CPA_experiment (encAlg := encAlg') adversary)
-    (hq : trueProbReal (games q) = (1 / 2 : ℝ)) :
+    (h0 : (Pr[= true | games 0]).toReal =
+      (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal)
+    (hq : (Pr[= true | games q]).toReal = (1 / 2 : ℝ)) :
     |IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary| ≤
       Finset.sum (Finset.range q) (fun i =>
-        |trueProbReal (games i) - trueProbReal (games (i + 1))|) := by
+        |(Pr[= true | games i]).toReal - (Pr[= true | games (i + 1)]).toReal|) := by
   rw [IND_CPA_advantage'_eq_sum_hybridDiff (encAlg' := encAlg') adversary q games h0 hq]
   simpa using
     (Finset.abs_sum_le_sum_abs
       (s := Finset.range q)
-      (f := fun i => trueProbReal (games i) - trueProbReal (games (i + 1))))
+      (f := fun i => (Pr[= true | games i]).toReal -
+        (Pr[= true | games (i + 1)]).toReal))
 
 /-- Real bridge for truncated ENNReal subtraction: `(a - b).toReal` is bounded by
 `|a.toReal - b.toReal|`. -/

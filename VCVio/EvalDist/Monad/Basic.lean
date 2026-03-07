@@ -35,7 +35,7 @@ lemma mem_finSupport_pure_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
 lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     (x y : α) : x ∈ finSupport (pure y : m α) ↔ y = x := by aesop
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
     evalDist (pure x : m α) = pure x := by simp [evalDist]
 
@@ -47,7 +47,7 @@ lemma evalDist_comp_pure [HasEvalSPMF m] :
 lemma evalDist_comp_pure' [HasEvalSPMF m] (f : α → β) :
     evalDist ∘ (pure : β → m β) ∘ f = pure ∘ f := by grind
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma probOutput_pure [HasEvalSPMF m] [DecidableEq α] (x y : α) :
     Pr[= x | (pure y : m α)] = if x = y then 1 else 0 := by
   aesop (rule_sets := [UnfoldEvalDist])
@@ -122,7 +122,7 @@ lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
     [DecidableEq β] (mx : m α) (my : α → m β) (y : β) : y ∈ finSupport (mx >>= my) ↔
       ∃ x ∈ finSupport mx, y ∈ finSupport (my x) := by aesop
 
-@[simp, grind =]
+@[simp, grind =, game_rule]
 lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
     evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
   MonadHom.toFun_bind' _ mx my
@@ -131,7 +131,7 @@ lemma evalDist_bind_of_support_eq_empty [HasEvalSPMF m] (mx : m α) (my : α →
     (h : support mx = ∅) : evalDist (mx >>= my) = failure := by
   simp [SPMF.ext_iff, ← probOutput_def, h]
 
-@[grind =]
+@[grind =, game_rule]
 lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y : β) :
     Pr[= y | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[= y | my x] := by
   simp [probOutput_def]

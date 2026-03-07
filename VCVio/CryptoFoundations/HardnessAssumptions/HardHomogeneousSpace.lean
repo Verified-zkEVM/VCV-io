@@ -53,7 +53,7 @@ def parallelTestingAdversary (_G P : Type) := P → P → P → P → ProbComp B
 
 /-- Adversary tries to tell if a set of points form a parallelogram in point space.
 Analogue of the decisional Diffie-Hellman problem. -/
-def parallelTesting_experiment [DecidableEq G]
+def parallelTesting_experiment
     (adversary : parallelTestingAdversary G P) : ProbComp Bool := do
   let x ← $ᵗ P; let g₁ ← $ᵗ G; let g₂ ← $ᵗ G
   let x₁ := g₁ +ᵥ x
@@ -63,6 +63,6 @@ def parallelTesting_experiment [DecidableEq G]
   let b' ← adversary x x₁ x₂ x₃
   return (b == b')
 
-noncomputable def parallelTestingAdvantage [SampleableType P] [SampleableType G] [DecidableEq G]
+noncomputable def parallelTestingAdvantage [SampleableType P] [SampleableType G]
     (adversary : parallelTestingAdversary G P) : ℝ≥0∞ :=
   Pr[= true | parallelTesting_experiment adversary] - 1 / 2

@@ -51,6 +51,13 @@ lemma probOutput_uniformSample [Fintype α] (x : α) :
   rw [← sum_probOutput_eq_one (mx := $ᵗ α) (by aesop)]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
+lemma probOutput_map_bijective_uniformSample [Fintype α]
+    {f : α → α} (hf : Function.Bijective f) (x : α) :
+    Pr[= x | f <$> ($ᵗ α)] = Pr[= x | $ᵗ α] := by
+  obtain ⟨x', rfl⟩ := hf.surjective x
+  rw [probOutput_map_injective ($ᵗ α) hf.injective x']
+  exact SampleableType.probOutput_selectElem_eq _ _
+
 lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 := by aesop
 
 @[simp] instance : NeverFail ($ᵗ α) := inferInstance
@@ -282,3 +289,36 @@ lemma probOutput_uniformBool_not_decide_eq_decide {ob : ProbComp Bool} :
     Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return !decide (b = b')] =
       Pr[= true | do let b ←$ᵗ Bool; let b' ← ob; return decide (b = b')] := by
   simp [probOutput_bind_eq_tsum, add_comm]
+
+/-- Conditioning on a uniform boolean averages the two branch probabilities. -/
+lemma probOutput_bind_uniformBool {α : Type}
+    (f : Bool → ProbComp α) (x : α) :
+    Pr[= x | (do let b ← $ᵗ Bool; f b)] =
+      (Pr[= x | f true] + Pr[= x | f false]) / 2 := by
+  rw [probOutput_bind_eq_tsum]
+  rw [tsum_fintype (L := .unconditional _), Fintype.sum_bool]
+  simp [probOutput_uniformSample, div_eq_mul_inv, add_comm]
+  rw [← left_distrib, mul_comm]
+
+/-- If the distribution of `f b` is independent of `b`, then guessing a uniformly random
+bit by running `f` has success probability exactly 1/2.
+This is the core lemma behind "all-random hybrid has probability 1/2" arguments. -/
+lemma probOutput_decide_eq_uniformBool_half
+    (f : Bool → ProbComp Bool)
+    (heq : evalDist (f true) = evalDist (f false)) :
+    Pr[= true | do let b ← $ᵗ Bool; let b' ← f b; return decide (b = b')] = 1 / 2 := by
+  have h := evalDist_ext_iff.mp heq
+  rw [probOutput_bind_eq_tsum]
+  simp only [tsum_fintype (L := .unconditional _), Fintype.sum_bool,
+    probOutput_uniformSample, Fintype.card_bool]
+  have htrue : Pr[= true | f true >>= fun b' => pure (decide (true = b'))] =
+      Pr[= true | f true] := by
+    rw [probOutput_bind_eq_tsum]; simp
+  have hfalse : Pr[= true | f false >>= fun b' => pure (decide (false = b'))] =
+      Pr[= false | f false] := by
+    rw [probOutput_bind_eq_tsum]; simp
+  have hsum : Pr[=true | f false] + Pr[=false | f false] = 1 := by
+    have := HasEvalPMF.sum_probOutput_eq_one (f false)
+    rwa [Fintype.sum_bool] at this
+  rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]
+  simp [one_div]

@@ -8,6 +8,7 @@ import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.ProbabilityTheory.Coupling
 import VCVio.EvalDist.Defs.Instances
 import VCVio.EvalDist.Monad.Basic
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.Monad.Map
 import VCVio.OracleComp.EvalDist
 
@@ -261,4 +262,111 @@ lemma probOutput_true_eq_of_relTriple_eqRel
     Pr[= true | oa] = Pr[= true | ob] :=
   probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h true
 
+/-! ## Oracle query coupling rules (pRHL level) -/
+
+/-- Same-type identity coupling: querying the same oracle on both sides yields equal outputs. -/
+lemma relTriple_query (t : spec₁.Domain) :
+    RelTriple
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (EqRel (spec₁.Range t)) := by
+  simpa using
+    (relTriple_refl (spec₁ := spec₁)
+      (oa := (liftM (query t) : OracleComp spec₁ (spec₁.Range t))))
+
+/-- Bijection coupling (the "rnd" rule from EasyCrypt):
+querying the same oracle on both sides, related by a bijection `f`. -/
+lemma relTriple_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f) :
+    RelTriple
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (fun a b => f a = b) := by
+  apply (relTriple_iff_relWP
+    (oa := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+    (ob := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+    (R := fun a b => f a = b)).2
+  refine ⟨⟨evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fun a =>
+      pure (a, f a), ?_⟩, ?_⟩
+  · constructor
+    · simp
+    · simp only [map_bind, map_pure, evalDist_query]
+      show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _)
+      rw [show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (f <$> PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) from by simp]
+      congr 1
+      exact PMF.uniformOfFintype_map_of_bijective f hf
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+      (fun a => (pure (a, f a) : SPMF ((spec₁.Range t) × (spec₁.Range t)))) z).1 hz with
+      ⟨a, _, hz'⟩
+    have hzEq : z = (a, f a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simp [hzEq]
+
+lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    {α β γ δ : Type} {R : RelPost γ δ}
+    {f : α → γ} {g : β → δ}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (h : RelTriple oa ob (fun a b => R (f a) (g b))) :
+    RelTriple (f <$> oa) (g <$> ob) R := by
+  have h1 : RelWP oa ob (fun a b => R (f a) (g b)) ≤ RelWP oa (g <$> ob) (fun a d => R (f a) d) :=
+    MAlgRelOrdered.relWP_map_right g oa ob _
+  have h2 : RelWP oa (g <$> ob) (fun a d => R (f a) d) ≤ RelWP (f <$> oa) (g <$> ob) R :=
+    MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
+  exact le_trans h (le_trans h1 h2)
+
 end OracleComp.ProgramLogic.Relational
+
+section Sampling
+
+open OracleComp.ProgramLogic.Relational
+
+variable {α : Type} [SampleableType α]
+
+/-- Relational coupling for uniform sampling via bijection.
+Given a bijection `f : α → α` such that `R x (f x)` for all `x`,
+the two uniform samples are related by `R`. -/
+lemma OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+    {f : α → α} (hf : Function.Bijective f) (R : RelPost α α)
+    (hR : ∀ x, R x (f x)) :
+    RelTriple ($ᵗ α) ($ᵗ α) R := by
+  apply (relTriple_iff_relWP
+    (oa := ($ᵗ α : ProbComp α))
+    (ob := ($ᵗ α : ProbComp α))
+    (R := R)).2
+  refine ⟨⟨evalDist ($ᵗ α : ProbComp α) >>= fun a =>
+      pure (a, f a), ?_⟩, ?_⟩
+  · constructor
+    · simp
+    · simp only [map_bind, map_pure]
+      calc
+        (do
+            let a ← evalDist ($ᵗ α : ProbComp α)
+            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := by
+              rfl
+        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) := by
+          exact (evalDist_map ($ᵗ α : ProbComp α) f).symm
+        _ = evalDist ($ᵗ α : ProbComp α) := by
+          apply evalDist_ext
+          intro x
+          obtain ⟨x', rfl⟩ := hf.surjective x
+          rw [probOutput_map_injective ($ᵗ α) hf.injective x']
+          simpa [uniformSample] using
+            SampleableType.probOutput_selectElem_eq (β := α) x' (f x')
+  · intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist ($ᵗ α : ProbComp α))
+      (fun a => (pure (a, f a) : SPMF (α × α))) z).1 hz with
+      ⟨a, _, hz'⟩
+    have hzEq : z = (a, f a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    simpa [hzEq] using hR a
+
+end Sampling
