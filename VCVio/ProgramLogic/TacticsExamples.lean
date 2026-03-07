@@ -111,16 +111,55 @@ example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp⟦f <$> oa⟧ post = wp⟦oa⟧ (post ∘ f) := by
   wp_step
 
-/-! ## `relTriple_if` example -/
+/-! ## `rel_pure` examples -/
+
+example (a : α) :
+    ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
+  rel_pure
+
+example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
+    ⟪(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) | R⟫ := by
+  rel_pure
+
+/-! ## `rel_cond` examples -/
 
 example {c : Prop} [Decidable c]
     {oa₁ oa₂ ob₁ ob₂ : OracleComp spec α}
     (h1 : ⟪oa₁ ~ ob₁ | EqRel α⟫)
     (h2 : ⟪oa₂ ~ ob₂ | EqRel α⟫) :
     ⟪(if c then oa₁ else oa₂) ~ (if c then ob₁ else ob₂) | EqRel α⟫ := by
-  apply relTriple_if
-  · intro _; exact h1
-  · intro _; exact h2
+  rel_cond
+  · exact h1
+  · exact h2
+
+/-! ## `rel_conseq` examples -/
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
+  rel_conseq
+  · exact h
+  · exact hpost
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
+  rel_conseq with R
+  · exact h
+  · exact hpost
+
+/-! ## `game_trans` examples -/
+
+example {g₁ g₂ g₃ : OracleComp spec α}
+    (h₁ : g₁ ≡ₚ g₂) (h₂ : g₂ ≡ₚ g₃) :
+    g₁ ≡ₚ g₃ := by
+  game_trans g₂
+  · exact h₁
+  · exact h₂
 
 /-! ## Multi-step composed example -/
 
@@ -236,13 +275,16 @@ end GameEquiv
 
 section GameHopping
 
-/-! ### Transitivity of game equivalence
+/-! ### Transitivity of game equivalence via `game_trans`
 
 A chain of game hops: if Game₀ ≡ₚ Game₁ and Game₁ ≡ₚ Game₂, then Game₀ ≡ₚ Game₂.
 This is the fundamental tool for multi-step game-hopping proofs. -/
 example {g₀ g₁ g₂ : OracleComp spec α}
     (h₁ : g₀ ≡ₚ g₁) (h₂ : g₁ ≡ₚ g₂) :
-    g₀ ≡ₚ g₂ := GameEquiv.trans h₁ h₂
+    g₀ ≡ₚ g₂ := by
+  game_trans g₁
+  · exact h₁
+  · exact h₂
 
 /-! ### Relational coupling via `game_rel'`
 
@@ -302,16 +344,15 @@ Uniform: $ᵗ α
 Game(m₂): mask m₂ <$> $ᵗ α
 ```
 
-**Tactics used**: `by_equiv`, `rel_rnd using`, `relTriple_map` -/
+**Tactics used**: `game_trans`, `GameEquiv.map_uniformSample_bij` -/
 example [SampleableType α]
     (mask : α → α → α) (m₁ m₂ : α)
     (h₁ : Function.Bijective (mask m₁))
     (h₂ : Function.Bijective (mask m₂)) :
     (mask m₁ <$> ($ᵗ α : ProbComp α)) ≡ₚ
     (mask m₂ <$> ($ᵗ α : ProbComp α)) := by
-  -- Chain: Game(m₁) →[bij] Uniform →[bij⁻¹] Game(m₂)
-  exact GameEquiv.trans
-    (GameEquiv.map_uniformSample_bij h₁)
-    (GameEquiv.symm (GameEquiv.map_uniformSample_bij h₂))
+  game_trans ($ᵗ α : ProbComp α)
+  · exact GameEquiv.map_uniformSample_bij h₁
+  · exact GameEquiv.symm (GameEquiv.map_uniformSample_bij h₂)
 
 end MiniOTP

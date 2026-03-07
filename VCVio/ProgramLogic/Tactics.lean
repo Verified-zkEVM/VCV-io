@@ -22,19 +22,21 @@ EasyCrypt's `proc`, `wp`, `rnd`, `skip`, `swap`, and `seq`.
 - `rel_step`: Decompose one `>>=` on each side (like EasyCrypt's `seq`/`wp`)
 - `rel_rnd`: Couple random oracle queries or uniform sampling
 - `rel_skip`: Both sides are identical or both pure
+- `rel_pure`: Close a goal where both sides are `pure`
+- `rel_cond`: Decompose a synchronized conditional (like EasyCrypt's `if`/`cond`)
+- `rel_conseq`: Weaken/strengthen the postcondition (like EasyCrypt's `conseq`)
 - `rel_inline`: Unfold a definition and retry
 - `rel_sim`: Apply relational simulation rule
 
 ### Proof mode entry
 - `by_equiv`: Transform a `GameEquiv` or `evalDist` equality into a `RelTriple`
+- `game_trans`: Introduce an intermediate game for transitivity
 - `by_dist`: Transform an advantage bound into a TV distance / relational goal
 - `by_hoare`: Transform a probability goal into a quantitative WP goal
 
 ### Bind reordering
 - `prob_swap`: Swap two independent sampling operations in a `Pr[...]` goal
 -/
-
-open Lean Elab Tactic Meta in
 
 /-! ## Unary WP tactics -/
 
@@ -54,14 +56,28 @@ macro "wp_step" : tactic =>
 
 /-! ## Relational step-through tactics (EasyCrypt-inspired) -/
 
+/-- `rel_pure` closes a `RelTriple` goal where both sides are `pure`.
+
+Tries:
+1. `relTriple_pure_pure` with the relation provable by assumption or `rfl`
+2. `relTriple_refl` if both sides are syntactically the same `pure` value -/
+macro "rel_pure" : tactic =>
+  `(tactic|
+    first
+      | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+      | exact OracleComp.ProgramLogic.Relational.relTriple_refl _)
+
 /-- `rel_step` decomposes one `>>=` on each side of a `RelTriple` goal.
 
 Given a goal `RelTriple (oa >>= fa) (ob >>= fb) S`, applies `relTriple_bind`
 to produce two subgoals:
-1. `RelTriple oa ob ?R` — the intermediate coupling
-2. `∀ a b, ?R a b → RelTriple (fa a) (fb b) S` — the continuation
+1. `RelTriple oa ob R` — the intermediate coupling
+2. `∀ a b, R a b → RelTriple (fa a) (fb b) S` — the continuation
 
-Use `rel_step using R` to specify the intermediate relation explicitly. -/
+When both sides produce the same type, defaults to `R := EqRel _` (equality).
+When the types differ, `R` is left as a metavariable for Lean to infer.
+Use `rel_step using R` to specify a non-equality intermediate relation explicitly. -/
 syntax "rel_step" ("using" term)? : tactic
 
 macro_rules
@@ -121,6 +137,38 @@ macro "rel_skip" : tactic =>
       | (apply OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_evalDist_eq; rfl)
       | (apply OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_evalDist_eq; skip))
 
+/-- `rel_cond` decomposes a `RelTriple` goal where both sides branch on the same condition.
+
+Given a goal `RelTriple (if c then a₁ else a₂) (if c then b₁ else b₂) R`,
+applies `relTriple_if` to produce two subgoals:
+1. `c → RelTriple a₁ b₁ R`
+2. `¬c → RelTriple a₂ b₂ R`
+
+The tactic also tries `simp only [game_rule]` first to expose hidden `if` expressions. -/
+macro "rel_cond" : tactic =>
+  `(tactic|
+    first
+      | (apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _])
+      | (simp only [game_rule]
+         apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _]))
+
+/-- `rel_conseq` weakens or strengthens the postcondition of a `RelTriple` goal.
+
+Given a goal `RelTriple oa ob R'`, applies `relTriple_post_mono` to produce:
+1. `RelTriple oa ob ?R` — the triple with a (possibly easier) postcondition
+2. `∀ x y, ?R x y → R' x y` — the implication between postconditions
+
+Use `rel_conseq with R` to specify the intermediate postcondition explicitly. -/
+syntax "rel_conseq" ("with" term)? : tactic
+
+macro_rules
+  | `(tactic| rel_conseq) =>
+    `(tactic|
+      apply OracleComp.ProgramLogic.Relational.relTriple_post_mono)
+  | `(tactic| rel_conseq with $R) =>
+    `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_post_mono (R := $R) ?_ ?_)
+
 /-- `rel_inline` unfolds definitions and then tries to close or simplify the relational goal.
 Use `rel_inline foo bar` to unfold specific definitions, or just `rel_inline` to simplify. -/
 macro "rel_inline" ids:ident* : tactic =>
@@ -159,6 +207,20 @@ macro "by_equiv" : tactic =>
       | (change OracleComp.ProgramLogic.Relational.RelTriple _ _ _)
       | (apply OracleComp.ProgramLogic.Relational.evalDist_eq_of_relTriple_eqRel))
 
+/-- `game_trans` introduces an intermediate game for transitivity of `GameEquiv`.
+
+Given a goal `g₁ ≡ₚ g₃`, `game_trans g₂` produces two subgoals:
+1. `g₁ ≡ₚ g₂`
+2. `g₂ ≡ₚ g₃`
+
+This is the fundamental tactic for multi-step game-hopping chains. -/
+syntax "game_trans" term : tactic
+
+macro_rules
+  | `(tactic| game_trans $g) =>
+    `(tactic|
+      refine OracleComp.ProgramLogic.GameEquiv.trans (g₂ := $g) ?_ ?_)
+
 /-- `by_dist` transforms a TV distance or advantage bound goal into a subgoal
 suitable for relational or coupling reasoning. -/
 syntax "by_dist" (term)? : tactic
@@ -166,9 +228,7 @@ syntax "by_dist" (term)? : tactic
 macro_rules
   | `(tactic| by_dist) =>
     `(tactic|
-      first
-        | (apply OracleComp.ProgramLogic.AdvBound.of_tvDist)
-        | skip)
+      apply OracleComp.ProgramLogic.AdvBound.of_tvDist)
   | `(tactic| by_dist $eps) =>
     `(tactic|
       (apply OracleComp.ProgramLogic.AdvBound.of_tvDist (ε₂ := $eps)))
@@ -224,8 +284,8 @@ macro "game_rel'" : tactic =>
   `(tactic| (
     repeat (first
       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
-      | (apply OracleComp.ProgramLogic.Relational.relTriple_bind _ (fun _ _ _ => _)
-         <;> [skip; intro _ _ _; skip])
+      | (refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_
+         <;> [skip; intro _ _ _])
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | (apply OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_evalDist_eq; rfl)
       | exact OracleComp.ProgramLogic.Relational.relTriple_query _
