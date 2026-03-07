@@ -150,7 +150,12 @@ noncomputable def RelPost.indicator (R : α → β → Prop) : α → β → ℝ
 /-! ## pRHL as a special case of eRHL -/
 
 /-- pRHL-style exact relational triple, defined via eRHL with indicator postcondition.
-Equivalent to the existing coupling-based `CouplingPost`. -/
+Equivalent to the coupling-based `RelTriple` (see `relTriple'_iff_relTriple`).
+
+**Do not target this in tactics or proofs.** Use `RelTriple` instead — all step-through
+tactics (`rel_step`, `rel_rnd`, `rel_skip`, etc.) and the `⟪c₁ ~ c₂ | R⟫` notation
+operate on `RelTriple`. This definition exists only to witness that pRHL is the
+`ε = 0` special case of eRHL/apRHL (see `relTriple'_eq_approxRelTriple_zero`). -/
 def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
   eRelTriple 1 oa ob (RelPost.indicator R)
@@ -753,19 +758,6 @@ theorem tvDist_eq_one_sub_eRelWP_eqRel
   simpa [tvDist] using
     (spmf_tvDist_eq_one_sub_eRelWP_eqRel
       (spec₁ := spec₁) (spec₂ := spec₁) (oa := oa) (ob := ob))
-
-/-! ## pRHL convenience rules (Prop-level, no ℝ≥0∞ visible) -/
-
-/-- Bind for pRHL exact coupling. -/
-lemma relTriple'_bind
-    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
-    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
-    {R : RelPost α β} {S : RelPost γ δ}
-    (hxy : RelTriple' oa ob R)
-    (hfg : ∀ a b, R a b → RelTriple' (fa a) (fb b) S) :
-    RelTriple' (oa >>= fa) (ob >>= fb) S := by
-  rw [relTriple'_iff_relTriple] at hxy ⊢
-  exact relTriple_bind hxy (fun a b hab => relTriple'_iff_relTriple.mp (hfg a b hab))
 
 /-- Game equivalence from pRHL equality coupling. -/
 theorem gameEquiv_of_relTriple'_eqRel

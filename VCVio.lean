@@ -68,6 +68,8 @@ import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
+import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.TacticsExamples
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.SimulateQ

@@ -106,6 +106,38 @@ theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
   simpa [wp] using
     (MAlgOrdered.wp_mono (m := OracleComp spec) (l := ℝ≥0∞) oa hpost)
 
+@[game_rule] theorem wp_map
+    (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
+    wp (f <$> oa) post = wp oa (post ∘ f) := by
+  show wp (oa >>= fun a => pure (f a)) post = wp oa (post ∘ f)
+  rw [wp_bind]
+  congr 1
+  funext a
+  simp [Function.comp]
+
+/-- General unfolding: `wp` as weighted sum over output probabilities. -/
+theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp oa post = ∑' x, Pr[= x | oa] * post x := by
+  show μ (oa >>= fun a => pure (post a)) = _
+  rw [μ_bind_eq_tsum]
+  refine tsum_congr fun x => ?_
+  have : μ (pure (post x) : OracleComp spec ℝ≥0∞) = post x := by
+    classical
+    simp [μ, probOutput_pure]
+  rw [this]
+
+@[simp] theorem wp_const (oa : OracleComp spec α) (c : ℝ≥0∞) :
+    wp oa (fun _ => c) = c := by
+  rw [wp_eq_tsum, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+
+theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
+    wp oa (fun x => f x + g x) = wp oa f + wp oa g := by
+  simp only [wp_eq_tsum, mul_add, ENNReal.tsum_add]
+
+theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
+    wp oa (fun x => c * f x) = c * wp oa f := by
+  simp only [wp_eq_tsum]; simp_rw [mul_left_comm]; exact ENNReal.tsum_mul_left
+
 theorem triple_conseq {pre pre' : ℝ≥0∞} {oa : OracleComp spec α}
     {post post' : α → ℝ≥0∞}
     (hpre : pre' ≤ pre) (hpost : ∀ x, post x ≤ post' x) :
@@ -120,6 +152,10 @@ theorem triple_bind {pre : ℝ≥0∞} {oa : OracleComp spec α}
     Triple pre (oa >>= ob) post := by
   simpa [Triple, wp] using
     (MAlgOrdered.triple_bind (m := OracleComp spec) (l := ℝ≥0∞) hoa hob)
+
+theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
+    Triple (spec := spec) (post x) (pure x) post := by
+  simp [Triple, MAlgOrdered.Triple]
 
 /-- `probEvent` as a WP of an indicator postcondition. -/
 lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
@@ -179,6 +215,28 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
   simpa using wp_liftM_query (spec := spec) t post
 
+section Sampling
+
+variable [SampleableType α]
+
+@[game_rule] theorem wp_uniformSample (post : α → ℝ≥0∞) :
+    wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+  rw [wp, MAlgOrdered.wp]
+  calc
+    μ (do let a ← $ᵗ α; pure (post a))
+        = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
+          simpa using
+            (μ_bind_eq_tsum (oa := ($ᵗ α : ProbComp α)) (ob := fun a => pure (post a)))
+    _ = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+          refine tsum_congr ?_
+          intro x
+          have hμ : μ (pure (post x) : ProbComp ℝ≥0∞) = post x := by
+            let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
+            simp [μ, probOutput_pure]
+          rw [hμ]
+
+end Sampling
+
 /-- Indicator-event probability as an exact quantitative triple. -/
 theorem triple_probEvent_indicator (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
     Triple (spec := spec) (Pr[p | oa]) oa (fun x => if p x then 1 else 0) := by
@@ -222,27 +280,3 @@ lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
     rw [h]
 
 end OracleComp.ProgramLogic
-
-section Sampling
-
-open OracleComp.ProgramLogic
-
-variable {α : Type} [SampleableType α]
-
-@[game_rule] theorem OracleComp.ProgramLogic.wp_uniformSample (post : α → ℝ≥0∞) :
-    wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
-  rw [wp, MAlgOrdered.wp]
-  calc
-    μ (do let a ← $ᵗ α; pure (post a))
-        = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
-          simpa using
-            (μ_bind_eq_tsum (oa := ($ᵗ α : ProbComp α)) (ob := fun a => pure (post a)))
-    _ = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
-          refine tsum_congr ?_
-          intro x
-          have hμ : μ (pure (post x) : ProbComp ℝ≥0∞) = post x := by
-            let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
-            simp [μ, probOutput_pure]
-          rw [hμ]
-
-end Sampling
