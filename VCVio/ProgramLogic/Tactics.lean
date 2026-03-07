@@ -258,8 +258,10 @@ Currently a best-effort macro; for complex nested cases, manual application of
 `probEvent_bind_bind_swap` may still be needed. -/
 macro "prob_swap" : tactic =>
   `(tactic| (
-    simp only [bind_assoc]
+    try simp only [bind_assoc]
     first
+      | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+         exact probEvent_bind_bind_swap _ _ _ _)
       | (rw [show Pr[_ | _ >>= fun a => _ >>= fun b => _] =
               Pr[_ | _ >>= fun b => _ >>= fun a => _] from
             probEvent_bind_bind_swap _ _ _ _])
@@ -270,8 +272,11 @@ macro "prob_swap" : tactic =>
       | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
          refine tsum_congr fun _ => ?_
          congr 1
-         simp only [bind_assoc]
-         exact probEvent_bind_bind_swap _ _ _ _)))
+         try simp only [bind_assoc]
+         first
+           | exact probEvent_bind_bind_swap _ _ _ _
+           | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+              exact probEvent_bind_bind_swap _ _ _ _))))
 
 /-- `prob_swap_at n` repeatedly applies `prob_swap` up to `n` times. -/
 macro "prob_swap_at" n:num : tactic =>

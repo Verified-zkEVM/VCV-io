@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.FiatShamir
+import VCVio.ProgramLogic.Tactics
 
 /-!
 # Schnorr Sigma Protocol over Hard Homogeneous Spaces
@@ -110,8 +111,7 @@ theorem schnorrSigma_hvzk :
         let b ← ($ᵗ Bool : ProbComp Bool)
         let r ← ($ᵗ G : ProbComp G)
         pure (r +ᵥ pk, b, if b then r else r + sk))] := by
-    rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
-    exact probEvent_bind_bind_swap _ _ _ _
+    prob_swap
   rw [hswap]
   refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) t ?_
   intro b; cases b
