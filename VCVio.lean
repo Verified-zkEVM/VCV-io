@@ -26,7 +26,6 @@ import VCVio.EvalDist.Instances.ErrorT
 import VCVio.EvalDist.Instances.OptionT
 import VCVio.EvalDist.Instances.ReaderT
 import VCVio.EvalDist.List
-import VCVio.EvalDist.Monad.Alternative
 import VCVio.EvalDist.Monad.Basic
 import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
@@ -50,6 +49,7 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
+import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO

@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.Coercions.Add
 import Mathlib.Data.FinEnum
@@ -146,7 +146,20 @@ def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     StateT.run' (simulateQ (idImpl + ro) comp) ∅
   lift_probComp := monadLift
   exec_lift_probComp c := by
-    sorry
+    let roSpec := fischlinROSpec X PC Ω P ρ b M
+    let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT roSpec.QueryCache ProbComp)
+    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
+    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
+      simpa [MonadLift.monadLift] using
+        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
+    have hid : ∀ t s, (idImpl t).run' s = query t := by
+      intro t s
+      rfl
+    simpa using
+      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
+        (s := (∅ : roSpec.QueryCache)))
 
 namespace Fischlin
 
@@ -192,6 +205,14 @@ theorem almostComplete (hc : σ.PerfectlyComplete) (msg : M) :
 
 /-! ### Online Extraction / Knowledge Soundness -/
 
+/-- Structural query bound: the computation makes at most `Q` total hash oracle queries
+(`Sum.inr` queries), with no restriction on `unifSpec` queries (`Sum.inl`). -/
+def ROQueryBound {α : Type} (oa : OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M) α)
+    (Q : ℕ) : Prop :=
+  OracleComp.IsQueryBound oa Q
+    (fun t b => match t with | .inl _ => True | .inr _ => 0 < b)
+    (fun t b => match t with | .inl _ => b | .inr _ => b - 1)
+
 /-- A cheating prover (knowledge soundness adversary) for the Fischlin transform.
 The adversary receives a statement and message, has access to both the random oracle
 and internal randomness (`unifSpec`), and attempts to produce a valid Fischlin proof
@@ -218,8 +239,18 @@ input pair for the Σ-protocol extractor. -/
 noncomputable def onlineExtract
     (x : X) (π : FischlinProof PC Ω P ρ)
     (log : QueryLog (fischlinROSpec X PC Ω P ρ b M)) : ProbComp (Option W) :=
-  let _ := σ.extract
-  sorry
+  let comList := List.ofFn fun i => (π i).1
+  let findWitness : Fin ρ → Option (Ω × P × Ω × P) := fun i =>
+    let (com_i, ω_i, _resp_i) := π i
+    log.findSome? fun ⟨entry, _⟩ =>
+      if entry.stmt == x && entry.comList == comList && entry.rep == i
+          && σ.verify x com_i entry.chal entry.resp
+          && decide (entry.chal ≠ ω_i) then
+        some (ω_i, (π i).2.2, entry.chal, entry.resp)
+      else none
+  match (List.finRange ρ).findSome? findWitness with
+  | some (ω₁, p₁, ω₂, p₂) => some <$> σ.extract ω₁ p₁ ω₂ p₂
+  | none => return none
 
 /-- Soundness error bound for the Fischlin transform (Fischlin 2005, Theorem 2).
 
@@ -246,8 +277,19 @@ noncomputable def knowledgeSoundnessExp
     (prover : X → M →
       OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M) (FischlinProof PC Ω P ρ))
     (x : X) (msg : M) : ProbComp Bool :=
-  let _ := Fischlin σ hr ρ b S M
-  sorry
+  let roSpec := fischlinROSpec X PC Ω P ρ b M
+  let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
+  let loggedRO := ro.withLogging
+  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (WriterT (QueryLog roSpec) (StateT roSpec.QueryCache ProbComp))
+  do
+    let ((π, roLog), cache) ← (simulateQ (idImpl + loggedRO) (prover x msg)).run |>.run ∅
+    let idImpl' := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT roSpec.QueryCache ProbComp)
+    let (verified, _) ←
+      (simulateQ (idImpl' + ro) ((Fischlin σ hr ρ b S M).verify x msg π)).run cache
+    let extracted ← onlineExtract σ ρ b M x π roLog
+    return (verified && extracted.isNone)
 
 /-- Knowledge soundness of the Fischlin transform via online (straight-line) extraction
 (Fischlin 2005, Theorem 2).
@@ -262,7 +304,8 @@ which enables a tight security reduction. -/
 theorem knowledgeSoundness
     (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
     (adv : KnowledgeSoundnessAdv ρ b M)
-    (Q : ℕ) (x : X) (msg : M) :
+    (Q : ℕ) (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q)
+    (x : X) (msg : M) :
     Pr[= true | knowledgeSoundnessExp σ hr ρ b S M adv.run x msg]
       ≤ knowledgeSoundnessError Q ρ b S := by sorry
 
@@ -281,7 +324,14 @@ time is `O(T)` where `T` is the adversary's running time. -/
 theorem euf_cma_tight
     (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
     (adv : SignatureAlg.unforgeableAdv (Fischlin σ hr ρ b S M))
-    (Q : ℕ) :
+    (Q : ℕ)
+    (hQ : ∀ pk, OracleComp.IsQueryBound (adv.main pk) Q
+      (fun t b => match t with
+        | .inl (.inl _) | .inr _ => True
+        | .inl (.inr _) => 0 < b)
+      (fun t b => match t with
+        | .inl (.inl _) | .inr _ => b
+        | .inl (.inr _) => b - 1)) :
     adv.advantage ≤ knowledgeSoundnessError Q ρ b S := by sorry
 
 end Fischlin
