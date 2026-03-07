@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.OracleComp.Constructions.BitVec
+import VCVio.ProgramLogic.Tactics
 import Mathlib.Data.Vector.Zip
 
 /-!
@@ -12,6 +13,13 @@ import Mathlib.Data.Vector.Zip
 
 This file defines the one-time pad scheme, proves correctness, and proves perfect secrecy
 in the canonical independence form used by `SymmEncAlg.perfectSecrecy`.
+
+The file includes two proof styles:
+1. **Direct probability calculations** (`perfectSecrecyAt`): computes joint/marginal
+   probabilities directly using `probOutput_pair_xor_uniform`.
+2. **Relational / game-hopping** (`cipherGivenMsg_equiv`, `ciphertextRowsEqual`):
+   proves that any two messages yield the same ciphertext distribution via a bijection
+   coupling, using the `by_equiv` / `rel_step` / `rel_rnd` tactic workflow.
 -/
 
 open Mathlib OracleSpec OracleComp ENNReal BigOperators
@@ -60,5 +68,39 @@ lemma perfectSecrecyAt (sp : ℕ) : oneTimePad.perfectSecrecyAt sp := by
 lemma perfectSecrecy : oneTimePad.perfectSecrecy := by
   intro sp
   exact perfectSecrecyAt sp
+
+/-! ### Relational proof of ciphertext uniformity
+
+Alternative proof that encrypting any two messages with a random OTP key yields
+the same ciphertext distribution. Uses the bijection coupling `k ↦ k ⊕ m₀ ⊕ m₁`. -/
+
+open OracleComp.ProgramLogic in
+/-- Encrypting any two messages with a random OTP key yields the same distribution,
+proved via a bijection coupling. -/
+lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
+    GameEquiv
+      (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₀)
+      (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₁) := by
+  simp only [SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_id']
+  let c := msg₀ ^^^ msg₁
+  show GameEquiv (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₀))
+    (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))
+  by_equiv
+  rel_step using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
+  · rel_rnd using (· ^^^ c)
+    · exact Function.Involutive.bijective fun x => by
+        rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+    · intro; rfl
+  · intro k₁ k₂ hk
+    subst hk
+    apply Relational.relTriple_pure_pure
+    show k₁ ^^^ msg₀ = k₁ ^^^ c ^^^ msg₁
+    simp only [show c = msg₀ ^^^ msg₁ from rfl,
+      BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+
+/-- The one-time pad has equal ciphertext rows: all messages yield the same
+ciphertext distribution. Derived from the relational `GameEquiv` proof above. -/
+lemma ciphertextRowsEqual (sp : ℕ) : oneTimePad.ciphertextRowsEqualAt sp :=
+  fun msg₀ msg₁ σ => (cipherGivenMsg_equiv sp msg₀ msg₁).probOutput_eq σ
 
 end oneTimePad

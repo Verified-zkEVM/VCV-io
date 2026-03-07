@@ -14,7 +14,7 @@ Assuming Lean 4 and lake are already installed, the project can be built by just
 lake exe cache get && lake build
 ```
 
-Mathematical foundations such as probability theory, computational complexity, and algebraic structures are based on or written to the [Mathlib](https://github.com/leanprover-community/mathlib4) project, making all of that library usable in constructions and proofs.
+Mathematical foundations such as probability theory, computational complexity, and algebraic structures are based on or written to the Mathlib project (see [MATHLIB4](REFERENCES.md#mathlib4)), making all of that library usable in constructions and proofs.
 
 Generally the project aims to enable proof complexity comparable to that found in Mathlib.
 It's most well suited to proving concrete security bounds for reductions, and for establishing the security of individual cryptographic primitives.
@@ -26,20 +26,18 @@ The `VCVio` directory provides all of the foundations and framework definitions 
 `Examples` contains example constructions of standard cryptographic algorithms.
 `ToMathlib` contains constructions that eventually should be moved to another project.
 
+External papers and project references cited in this repo are centralized in
+[`REFERENCES.md`](REFERENCES.md).
+
 ## Acknowledgments
 
 Parts of the current program-logic refactor use an ordered monad-algebra perspective adapted from
-the [Loom](https://github.com/verse-lab/loom) project.
-
-- Project repository: https://github.com/verse-lab/loom
-- Paper: Vladimir Gladshtein, George Pîrlea, Qiyuan Zhao, Vitaly Kurin, and Ilya Sergey,
-  "Foundational Multi-Modal Program Verifiers"
-  (POPL 2026), DOI: https://doi.org/10.1145/3776719
+the Loom project (see [LOOM-REPO](REFERENCES.md#loom-repo) and [LOOM26](REFERENCES.md#loom26)).
 
 ## Contributions
 
 Contributions to the library are welcome via PR.
-See [here](https://github.com/dtumad/lean-crypto-formalization) for an outdated version of the library in Lean 3.
+See [LEANCRYPTO3-REPO](REFERENCES.md#leancrypto3-repo) for an outdated version of the library in Lean 3.
 
 # Framework Overview
 
@@ -100,6 +98,6 @@ Predicates on computations:
 
 ## Trivia
 
-`VCV-io` is inspired by [FCF](https://github.com/adampetcher/fcf), a foundational framework for verified cryptography in Coq. Similar to FCF, we formalize the notion of oracle computations as central to modeling cryptographic games, primitives, and protocols. In contrast to FCF, our handling of oracles is much more refined — we allow for an *indexed* family of oracles via polynomial functors, and build significant infrastructure for combining and simulation of oracles.
+`VCV-io` is inspired by FCF (see [FCF-REPO](REFERENCES.md#fcf-repo) and [FCF14](REFERENCES.md#fcf14)), a foundational framework for verified cryptography in Coq. Similar to FCF, we formalize the notion of oracle computations as central to modeling cryptographic games, primitives, and protocols. In contrast to FCF, our handling of oracles is much more refined — we allow for an *indexed* family of oracles via polynomial functors, and build significant infrastructure for combining and simulation of oracles.
 
 The name `VCV` is reverse of `FCF` under the involution `F <=> V` (same number of characters going from the beginning, versus the end, of the English alphabet). One backronym for the name is "Verified Cryptography via Indexed Oracles".
