@@ -172,7 +172,75 @@ lemma isPerIndexQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb
     IsPerIndexQueryBound (f <$> oa) qb ↔ IsPerIndexQueryBound oa qb :=
   isQueryBound_map_aux oa f _ _
 
+/-! ### Soundness: structural bound implies dynamic count bound -/
+
+/-- The structural query bound `IsPerIndexQueryBound` is sound with respect to the dynamic
+query count produced by `countingOracle`: if a computation satisfies a per-index query bound,
+then every execution path's query count is bounded.
+
+Proof strategy: induction on `OracleComp`, matching the structural `IsQueryBound` decomposition
+with the `mem_support_simulate_queryBind_iff` characterization of counting oracle support. -/
+theorem IsPerIndexQueryBound.counting_bounded {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb)
+    {z : α × QueryCount ι}
+    (hz : z ∈ support (countingOracle.simulate oa 0)) :
+    z.2 ≤ qb := by
+  induction oa using OracleComp.inductionOn generalizing qb z with
+  | pure x =>
+    rw [countingOracle.mem_support_simulate_pure_iff] at hz
+    subst hz
+    intro i; exact Nat.zero_le _
+  | query_bind t mx ih =>
+    rw [isPerIndexQueryBound_query_bind_iff] at h
+    rw [countingOracle.mem_support_simulate_queryBind_iff] at hz
+    obtain ⟨hne, u, hu⟩ := hz
+    have h_snd : Function.update z.2 t (z.2 t - 1) ≤
+        Function.update qb t (qb t - 1) := by
+      change (z.1, Function.update z.2 t (z.2 t - 1)).2 ≤ _
+      exact ih u (h.2 u) hu
+    intro i
+    by_cases hi : i = t
+    · rw [hi]
+      have hle := h_snd t
+      simp only [Function.update_self] at hle
+      have hz_pos : 0 < z.2 t := Nat.pos_of_ne_zero hne
+      have hq_pos := h.1
+      calc z.2 t = (z.2 t - 1) + 1 := (Nat.succ_pred_eq_of_pos hz_pos).symm
+        _ ≤ (qb t - 1) + 1 := Nat.succ_le_succ hle
+        _ = qb t := Nat.succ_pred_eq_of_pos hq_pos
+    · have hle := h_snd i
+      rw [Function.update_of_ne hi, Function.update_of_ne hi] at hle
+      exact hle
+
 end IsPerIndexQueryBound
+
+/-! ### Worst-case query bounds as a function of input size -/
+
+/-- Worst-case per-index query bound as a function of input size:
+for all inputs `x` with `size x ≤ n`, the computation `f x` makes at most `bound n i`
+queries to oracle `i`. -/
+def QueryUpperBound [DecidableEq ι] (f : α → OracleComp spec β) (size : α → ℕ)
+    (bound : ℕ → ι → ℕ) : Prop :=
+  ∀ n x, size x ≤ n → IsPerIndexQueryBound (f x) (bound n)
+
+/-- Total query upper bound: there exists a constant `k` such that for all inputs `x`
+with `size x ≤ n`, the computation `f x` makes at most `k * bound n` total queries.
+Uses the structural `IsQueryBound` to avoid dependence on oracle responses. -/
+def TotalQueryUpperBound (f : α → OracleComp spec β) (size : α → ℕ) (bound : ℕ → ℕ) : Prop :=
+  ∃ k, ∀ n x, size x ≤ n → IsQueryBound (f x) (k * bound n)
+    (fun _ b => 0 < b) (fun _ b => b - 1)
+
+/-- `PolyQueryUpperBound` says the per-index query count is polynomially bounded
+in the input size. This is a non-parameterized version of `PolyQueries`. -/
+def PolyQueryUpperBound [DecidableEq ι] (f : α → OracleComp spec β) (size : α → ℕ) : Prop :=
+  ∃ qb : ι → Polynomial ℕ, QueryUpperBound f size (fun n i => (qb i).eval n)
+
+/-- If `f` has a `QueryUpperBound`, then each `f x` satisfies `IsPerIndexQueryBound`. -/
+lemma QueryUpperBound.apply [DecidableEq ι]
+    {f : α → OracleComp spec β} {size : α → ℕ} {bound : ℕ → ι → ℕ}
+    (h : QueryUpperBound f size bound) (x : α) :
+    IsPerIndexQueryBound (f x) (bound (size x)) :=
+  h (size x) x le_rfl
 
 /-- If `oa` is a computation indexed by a security parameter, then `PolyQueries oa`
 means that for each oracle index there is a polynomial function `qb` of the security parameter,
