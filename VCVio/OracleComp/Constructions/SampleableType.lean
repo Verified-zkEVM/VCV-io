@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.BitVec
+import Mathlib.Data.FinEnum
 
 /-!
 # Uniform Selection Over a Type
@@ -276,6 +277,23 @@ instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [De
 instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
     SampleableType (Matrix (Fin n) (Fin m) α) := by
   simpa [Matrix] using (inferInstance : SampleableType (Fin n → Fin m → α))
+
+/-- If `α` is a finitely enumerable type and `β` has uniform sampling,
+then `α → β` has uniform sampling by choosing a `β` for each `α` -/
+instance (α β : Type _) [h : FinEnum α] [SampleableType β] :
+    SampleableType (α → β) where
+  selectElem := do
+    let ys : Vector β (FinEnum.card α) ← Vector.ofFnM fun _ => $ᵗ β
+    return fun x => ys[h.equiv x]
+  mem_support_selectElem := sorry
+  probOutput_selectElem_eq := sorry
+
+/-- If `α` is a finitely enumberable type then permutation on `α` can be sampled uniformly. -/
+instance (α : Type _) [h : FinEnum α] :
+    SampleableType {f : α → α // f.Bijective} where
+  selectElem := do sorry
+  mem_support_selectElem := sorry
+  probOutput_selectElem_eq := sorry
 
 end instances
 

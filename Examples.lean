@@ -4,5 +4,5 @@ import Examples.HHS_Schnorr
 import Examples.HHS_Sigma
 import Examples.HHS_Signature
 import Examples.OneTimePad
-import Examples.RF_RP_Switching_alt
+import Examples.RF_RP_Switching
 import Examples.Regev
