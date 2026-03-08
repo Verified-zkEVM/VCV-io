@@ -100,4 +100,15 @@ def HVZK (σ : SigmaProtocol S W PC SC Ω P p)
 
 end hvzk
 
+section uniqueResponses
+
+/-- A Σ-protocol has unique responses if for any statement, commitment, and challenge,
+there is at most one valid response. This property is required by the Fischlin transform
+and holds for most common Σ-protocols (Schnorr, Guillou-Quisquater, etc.). -/
+def UniqueResponses (σ : SigmaProtocol S W PC SC Ω P p) : Prop :=
+  ∀ x pc ω p₁ p₂,
+    σ.verify x pc ω p₁ = true → σ.verify x pc ω p₂ = true → p₁ = p₂
+
+end uniqueResponses
+
 end SigmaProtocol

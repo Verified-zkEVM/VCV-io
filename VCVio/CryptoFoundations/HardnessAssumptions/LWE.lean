@@ -24,12 +24,7 @@ open OracleComp OracleSpec ENNReal Matrix
 
 /-- Sample an IID vector: independently sample each coordinate from `samp`. -/
 def sampleIID {α : Type} (k : ℕ) (samp : ProbComp α) : ProbComp (Fin k → α) :=
-  match k with
-  | 0 => return Fin.elim0
-  | k + 1 => do
-    let x ← samp
-    let rest ← sampleIID k samp
-    return Fin.cons x rest
+  Fin.mOfFn k fun _ => samp
 
 namespace LWE
 

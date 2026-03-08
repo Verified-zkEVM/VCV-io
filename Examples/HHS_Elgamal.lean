@@ -6,9 +6,9 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
-import VCVio.ProgramLogic.Notation
+import VCVio.ProgramLogic.Tactics
 
-set_option linter.style.longFile 2200
+set_option linter.style.longFile 2100
 
 /-!
 # ElGamal over Hard Homogeneous Spaces: Multi-query IND-CPA via DDH
@@ -231,7 +231,7 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
       ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
         (adversary pk)).run' (∅, 0))
       (EqRel _) := by
-  apply relTriple_eqRel_of_evalDist_eq
+  rel_dist
   simp only [StateT.run']
   rw [evalDist_map, evalDist_map]
   congr 1
@@ -270,8 +270,8 @@ theorem IND_CPA_allRandomHalf
   exact probOutput_decide_eq_uniformBool_half _ (by
     simp only [evalDist_bind]
     congr 1; funext ⟨pk, _⟩
-    exact evalDist_eq_of_relTriple_eqRel
-      (IND_CPA_hybridOracle_allRandom_eqDist adversary pk))
+    by_equiv
+    exact IND_CPA_hybridOracle_allRandom_eqDist adversary pk)
 
 /-! ## 3a. DDH helper lemmas -/
 
@@ -603,10 +603,7 @@ private lemma stepDDH_real_simulation_deferred
                 (g₂ +ᵥ pk.1) (g₂ +ᵥ pk.2) (Sum.inl tu) =
               IND_CPA_queryImpl_hybrid (G := G) (P := P) pk b (k + 1)
                 (Sum.inl tu) from fun _ => rfl]
-          simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-            (P := P)) (m := ProbComp)]
-          rw [probEvent_bind_bind_swap]
-          simp only [probEvent_eq_eq_probOutput]
+          prob_swap_rw
           refine probOutput_bind_congr fun p hp => ?_
           have hst : p.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
@@ -637,10 +634,7 @@ private lemma stepDDH_real_simulation_deferred
               · simp only [if_pos hlt, if_pos (show st.2 < k + 1 by omega)]
               · simp only [StateT.run_pure]
             simp_rw [hq]
-            simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-              (P := P)) (m := ProbComp)]
-            rw [probEvent_bind_bind_swap]
-            simp only [probEvent_eq_eq_probOutput]
+            prob_swap_rw
             refine probOutput_bind_congr fun p hp => ?_
             have hle' : p.2.2 ≤ k := by
               change p ∈ support ((IND_CPA_hybridChallengeOracle (G := G)
@@ -801,17 +795,7 @@ private lemma stepDDH_rand_simulation_deferred
                 (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k
                   (g₂ +ᵥ pk.1) y) (oa p.1)).run p.2] := by
             intro g₂
-            simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-              (P := P)) (m := ProbComp)]
-            simpa [bind_assoc] using
-              (probEvent_bind_bind_swap
-                (mx := ($ᵗ P : ProbComp P))
-                (my := (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk b k
-                  (Sum.inl tu)).run st)
-                (f := fun y p =>
-                  (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k
-                    (g₂ +ᵥ pk.1) y) (oa p.1)).run p.2)
-                (q := fun t : α × IND_CPA_HybridState (P := P) => t = z))
+            prob_swap
           have hswapGY :
               Pr[= z | do
                 let g₂ ← ($ᵗ G : ProbComp G)
@@ -831,10 +815,7 @@ private lemma stepDDH_rand_simulation_deferred
             intro g₂
             exact hswapY g₂
           rw [hswapGY]
-          simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-            (P := P)) (m := ProbComp)]
-          rw [probEvent_bind_bind_swap]
-          simp only [probEvent_eq_eq_probOutput]
+          prob_swap_rw
           refine probOutput_bind_congr fun p hp => ?_
           have hst : p.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
@@ -879,17 +860,7 @@ private lemma stepDDH_rand_simulation_deferred
                   (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k
                     (g₂ +ᵥ pk.1) y) (oa p.1)).run p.2] := by
               intro g₂
-              simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-                (P := P)) (m := ProbComp)]
-              simpa [bind_assoc] using
-                (probEvent_bind_bind_swap
-                  (mx := ($ᵗ P : ProbComp P))
-                  (my := (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk b k
-                    (Sum.inr (m₁, m₂))).run st)
-                  (f := fun y p =>
-                    (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k
-                      (g₂ +ᵥ pk.1) y) (oa p.1)).run p.2)
-                  (q := fun t : α × IND_CPA_HybridState (P := P) => t = z))
+              prob_swap
             have hswapGY :
                 Pr[= z | do
                   let g₂ ← ($ᵗ G : ProbComp G)
@@ -909,10 +880,7 @@ private lemma stepDDH_rand_simulation_deferred
               intro g₂
               exact hswapY g₂
             rw [hswapGY]
-            simp only [← probEvent_eq_eq_probOutput (α := α × IND_CPA_HybridState
-              (P := P)) (m := ProbComp)]
-            rw [probEvent_bind_bind_swap]
-            simp only [probEvent_eq_eq_probOutput]
+            prob_swap_rw
             refine probOutput_bind_congr fun p hp => ?_
             have hle' : p.2.2 ≤ k := by
               change p ∈ support ((IND_CPA_hybridChallengeOracle (G := G)
@@ -1054,21 +1022,7 @@ private lemma stepDDH_realBranch_probOutput_eq
     rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
     refine tsum_congr fun x => ?_
     congr 1
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun g₁ => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₂ b => do
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let x₃ : P := g₂ +ᵥ g₁ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₂ :
       Pr[= true | do
         let x ← $ᵗ P
@@ -1092,22 +1046,7 @@ private lemma stepDDH_realBranch_probOutput_eq
         let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
           (adversary pk)).run' (∅, 0)
         pure (b == b')] := by
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun x => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₁ b => do
-          let g₂ ← $ᵗ G
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let x₃ : P := g₂ +ᵥ g₁ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₃ :
       Pr[= true | do
         let x ← $ᵗ P
@@ -1131,20 +1070,7 @@ private lemma stepDDH_realBranch_probOutput_eq
         let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
           (adversary pk)).run' (∅, 0)
         pure (b == b')] := by
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ P : ProbComp P))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun x b => do
-          let g₁ ← $ᵗ G
-          let g₂ ← $ᵗ G
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let x₃ : P := g₂ +ᵥ g₁ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ x₃)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hmain :
       Pr[= true | do
         let b ← $ᵗ Bool
@@ -1264,20 +1190,7 @@ private lemma stepDDH_randBranch_probOutput_eq
     rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
     refine tsum_congr fun g₁ => ?_
     congr 1
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun g₂ => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ P : ProbComp P))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun y b => do
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₁ :
       Pr[= true | do
         let x ← $ᵗ P
@@ -1304,21 +1217,7 @@ private lemma stepDDH_randBranch_probOutput_eq
     rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
     refine tsum_congr fun x => ?_
     congr 1
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun g₁ => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₂ b => do
-          let y ← $ᵗ P
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₂ :
       Pr[= true | do
         let x ← $ᵗ P
@@ -1342,22 +1241,7 @@ private lemma stepDDH_randBranch_probOutput_eq
         let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
           (adversary pk)).run' (∅, 0)
         pure (b == b')] := by
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun x => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₁ b => do
-          let g₂ ← $ᵗ G
-          let y ← $ᵗ P
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₃ :
       Pr[= true | do
         let x ← $ᵗ P
@@ -1381,20 +1265,7 @@ private lemma stepDDH_randBranch_probOutput_eq
         let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
           (adversary pk)).run' (∅, 0)
         pure (b == b')] := by
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ P : ProbComp P))
-        (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun x b => do
-          let g₁ ← $ᵗ G
-          let g₂ ← $ᵗ G
-          let y ← $ᵗ P
-          let pk : P × P := (x, g₁ +ᵥ x)
-          let x₂ : P := g₂ +ᵥ x
-          let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (G := G) (P := P) pk b k x₂ y)
-            (adversary pk)).run' (∅, 0)
-          pure (b == b'))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hmain :
       Pr[= true | do
         let b ← $ᵗ Bool
@@ -1544,19 +1415,7 @@ private lemma ddhExp_stepDDH_eq_mixture
     rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
     refine tsum_congr fun x => ?_
     congr 1
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun g₁ => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G)) (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₂ d => do
-          let z ← if d then
-            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          else
-            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          pure (d == z))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₂ :
       Pr[= true | do
         let x ← $ᵗ P; let g₁ ← $ᵗ G; let d ← ($ᵗ Bool : ProbComp Bool)
@@ -1574,20 +1433,7 @@ private lemma ddhExp_stepDDH_eq_mixture
         else
           stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
         pure (d == z)] := by
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun x => ?_
-    congr 1
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ G : ProbComp G)) (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun g₁ d => do
-          let g₂ ← $ᵗ G
-          let z ← if d then
-            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          else
-            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          pure (d == z))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hswap₃ :
       Pr[= true | do
         let x ← $ᵗ P; let d ← ($ᵗ Bool : ProbComp Bool)
@@ -1605,17 +1451,7 @@ private lemma ddhExp_stepDDH_eq_mixture
         else
           stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
         pure (d == z)] := by
-    simpa [bind_assoc] using
-      (probEvent_bind_bind_swap
-        (mx := ($ᵗ P : ProbComp P)) (my := ($ᵗ Bool : ProbComp Bool))
-        (f := fun x d => do
-          let g₁ ← $ᵗ G; let g₂ ← $ᵗ G
-          let z ← if d then
-            stepDDH_realBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          else
-            stepDDH_randBranchCore (G := G) (P := P) adversary k x g₁ g₂
-          pure (d == z))
-        (q := fun t : Bool => t = true))
+    prob_swap
   have hfold :
       Pr[= true | do
         let d ← ($ᵗ Bool : ProbComp Bool)

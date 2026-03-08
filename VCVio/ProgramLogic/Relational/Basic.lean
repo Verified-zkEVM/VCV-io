@@ -139,6 +139,15 @@ lemma hasCoupling_of_relTriple {oa : OracleComp spec₁ α} {ob : OracleComp spe
   rcases (relTriple_iff_relWP (oa := oa) (ob := ob) (R := R)).1 h with ⟨c, _⟩
   exact ⟨c⟩
 
+/-- Pure values on both sides: `R a b` implies the coupling. -/
+lemma relTriple_pure_pure {a : α} {b : β} {R : RelPost α β} (h : R a b) :
+    RelTriple (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R := by
+  rw [relTriple_iff_relWP, relWP_iff_couplingPost]
+  refine ⟨⟨pure (a, b), ?_⟩, fun z hz => ?_⟩
+  · simpa [evalDist_pure] using _root_.SubPMF.IsCoupling.pure_iff.mpr rfl
+  · have : z = (a, b) := by simpa [support_pure] using hz
+    subst this; exact h
+
 /-- Reflexivity rule for relational triples on equality. -/
 lemma relTriple_refl (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
@@ -309,9 +318,7 @@ lemma relTriple_query_bij (t : spec₁.Domain)
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [hzEq]
 
-lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
-    {α β γ δ : Type} {R : RelPost γ δ}
+lemma relTriple_map {R : RelPost γ δ}
     {f : α → γ} {g : β → δ}
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (h : RelTriple oa ob (fun a b => R (f a) (g b))) :
@@ -322,18 +329,44 @@ lemma relTriple_map {ι₁ ι₂ : Type u} {spec₁ : OracleSpec ι₁} {spec₂
     MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
   exact le_trans h (le_trans h1 h2)
 
-end OracleComp.ProgramLogic.Relational
+/-! ## Synchronized branching rule -/
+
+/-- Synchronized conditional: if both sides branch on the same condition, the
+relational triple holds if it holds on both branches. -/
+lemma relTriple_if {c : Prop} [Decidable c]
+    {oa₁ oa₂ : OracleComp spec₁ α} {ob₁ ob₂ : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (htrue : c → RelTriple oa₁ ob₁ R)
+    (hfalse : ¬c → RelTriple oa₂ ob₂ R) :
+    RelTriple (if c then oa₁ else oa₂) (if c then ob₁ else ob₂) R := by
+  split_ifs with h
+  · exact htrue h
+  · exact hfalse h
+
+/-- Pure-left rule: the left side is a pure value, applied via bind decomposition. -/
+lemma relTriple_pure_left {a : α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (h : RelTriple (pure a : OracleComp spec₁ α) ob
+      (fun x y => x = a ∧ R x y))  :
+    RelTriple (pure a : OracleComp spec₁ α) ob R :=
+  relTriple_post_mono h (fun _ _ ⟨_, hr⟩ => hr)
+
+/-- Pure-right rule: the right side is a pure value, applied via bind decomposition. -/
+lemma relTriple_pure_right {oa : OracleComp spec₁ α} {b : β}
+    {R : RelPost α β}
+    (h : RelTriple oa (pure b : OracleComp spec₂ β)
+      (fun x y => y = b ∧ R x y)) :
+    RelTriple oa (pure b : OracleComp spec₂ β) R :=
+  relTriple_post_mono h (fun _ _ ⟨_, hr⟩ => hr)
 
 section Sampling
 
-open OracleComp.ProgramLogic.Relational
-
-variable {α : Type} [SampleableType α]
+variable [SampleableType α]
 
 /-- Relational coupling for uniform sampling via bijection.
 Given a bijection `f : α → α` such that `R x (f x)` for all `x`,
 the two uniform samples are related by `R`. -/
-lemma OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+lemma relTriple_uniformSample_bij
     {f : α → α} (hf : Function.Bijective f) (R : RelPost α α)
     (hR : ∀ x, R x (f x)) :
     RelTriple ($ᵗ α) ($ᵗ α) R := by
@@ -369,4 +402,11 @@ lemma OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simpa [hzEq] using hR a
 
+/-- Identity coupling for uniform sampling. -/
+lemma relTriple_uniformSample_refl :
+    RelTriple ($ᵗ α) ($ᵗ α) (EqRel α) :=
+  relTriple_uniformSample_bij Function.bijective_id (EqRel α) fun _ => rfl
+
 end Sampling
+
+end OracleComp.ProgramLogic.Relational

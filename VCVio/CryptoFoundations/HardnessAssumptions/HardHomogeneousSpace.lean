@@ -7,7 +7,6 @@ import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.QueryTracking.CachingOracle
 /-!
 # Hard Homogeneous Spaces
 

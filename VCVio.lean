@@ -2,6 +2,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.PolyTimeOC
 import VCVio.CryptoFoundations.FiatShamir
+import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.HardHomogeneousSpace
@@ -25,7 +26,6 @@ import VCVio.EvalDist.Instances.ErrorT
 import VCVio.EvalDist.Instances.OptionT
 import VCVio.EvalDist.Instances.ReaderT
 import VCVio.EvalDist.List
-import VCVio.EvalDist.Monad.Alternative
 import VCVio.EvalDist.Monad.Basic
 import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
@@ -49,6 +49,7 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
+import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO
@@ -68,6 +69,8 @@ import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
+import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.TacticsExamples
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.SimulateQ

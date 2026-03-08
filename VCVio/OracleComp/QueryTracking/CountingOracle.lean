@@ -28,30 +28,66 @@ namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
+section withCost
+
+variable {ω : Type u} [Monoid ω]
+
+/-- Wrap an oracle implementation to accumulate cost in a `WriterT ω` layer.
+The cost function `costFn` assigns a cost value to each oracle query.
+Cost is accumulated before the implementation runs, so failed queries are still costed. -/
+def withCost (so : QueryImpl spec m) (costFn : spec.Domain → ω) :
+    QueryImpl spec (WriterT ω m) :=
+  fun t => do tell (costFn t); so t
+
+@[simp, grind =]
+lemma withCost_apply (so : QueryImpl spec m) (costFn : spec.Domain → ω)
+    (t : spec.Domain) :
+    so.withCost costFn t = (do tell (costFn t); so t) := rfl
+
+lemma fst_map_run_withCost [LawfulMonad m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (so.withCost costFn) mx).run = simulateQ so mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa h => simp [h]
+
+end withCost
+
 /-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer.
-Counting happens before the implementation runs, so failed queries are still counted. -/
+Counting happens before the implementation runs, so failed queries are still counted.
+This is a special case of `withCost` where the cost function is `QueryCount.single`. -/
 def withCounting [DecidableEq ι] (so : QueryImpl spec m) :
     QueryImpl spec (WriterT (QueryCount ι) m) :=
-  fun t => do tell (QueryCount.single t); so t
+  so.withCost (QueryCount.single ·)
 
 @[simp, grind =]
 lemma withCounting_apply [DecidableEq ι] (so : QueryImpl spec m) (t : spec.Domain) :
     so.withCounting t = (do tell (QueryCount.single t); so t) := rfl
 
+lemma withCounting_eq_withCost [DecidableEq ι] (so : QueryImpl spec m) :
+    so.withCounting = so.withCost (QueryCount.single ·) := rfl
+
 lemma fst_map_run_withCounting [DecidableEq ι] [LawfulMonad m]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withCounting) mx).run = simulateQ so mx := by
-  induction mx using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => simp [h]
+    Prod.fst <$> (simulateQ (so.withCounting) mx).run = simulateQ so mx :=
+  fst_map_run_withCost so _ mx
 
 end QueryImpl
+
+/-- Oracle with arbitrary cost tracking. The cost is accumulated in a `WriterT ω` layer
+while preserving the original oracle behavior. -/
+def costOracle {ω : Type u} [Monoid ω] (costFn : spec.Domain → ω) :
+    QueryImpl spec (WriterT ω (OracleComp spec)) :=
+  (QueryImpl.ofLift spec (OracleComp spec)).withCost costFn
 
 /-- Oracle for counting the number of queries made by a computation. The count is stored as a
 function from oracle indices to counts, to give finer grained information about the count. -/
 def countingOracle [DecidableEq ι] :
     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withCounting
+
+lemma countingOracle_eq_costOracle [DecidableEq ι] :
+    countingOracle (spec := spec) = costOracle (QueryCount.single ·) := rfl
 
 namespace countingOracle
 

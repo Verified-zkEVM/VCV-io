@@ -6,8 +6,9 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.ProgramLogic.Tactics
 
 /-!
 # Fiat-Shamir Transform
@@ -26,12 +27,7 @@ variable {X W PC SC Ω P : Type}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
-commitment), and then responds to the challenge.
-
-API changes from old version:
-- `unifSpec ++ₒ` → `unifSpec +`
-- `query (spec := ...) () (m, c)` → `query (spec := ...) (Sum.inr (m, c))`
-- `idOracle ++ₛₒ randomOracle` → explicit `QueryImpl.ofLift ... .liftTarget ... + randomOracle` -/
+commitment), and then responds to the challenge. -/
 def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
@@ -77,6 +73,7 @@ variable {X W PC SC Ω P : Type} {p : X → W → Bool}
 variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
 
+omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
@@ -138,7 +135,74 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
           let r ← $ᵗ Ω
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
-    sorry /- was: simp; simp_rw [hrunLift]; simp — broken by @[simp] monadLift_eq_self -/]
+    show StateT.run' (simulateQ (idImpl + ro) (do
+        let (pk, sk) ← (FiatShamir σ hr M).keygen
+        let sig ← (FiatShamir σ hr M).sign pk sk msg
+        (FiatShamir σ hr M).verify pk msg sig)) ∅ = _
+    dsimp only [FiatShamir]
+    simp only [simulateQ_bind, simulateQ_pure, simulateQ_query,
+      QueryImpl.add_apply_inr,
+      OracleQuery.cont_query, OracleQuery.input_query, id_map]
+    have hpeel : ∀ {α β : Type} (oa : ProbComp α)
+        (rest : α → StateT ((M × PC →ₒ Ω).QueryCache) ProbComp β)
+        (s : (M × PC →ₒ Ω).QueryCache),
+        (simulateQ (idImpl + ro) (liftM oa) >>= rest).run' s =
+          oa >>= fun x => (rest x).run' s := by
+      intro α β oa rest s
+      show Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
+        oa >>= fun x => Prod.fst <$> (rest x).run s
+      rw [StateT.run_bind, hrunLift]
+      simp [map_bind]
+    simp_rw [hpeel]
+    have hlift : ∀ {α : Type} (x : ProbComp α) (s : (M × PC →ₒ Ω).QueryCache),
+        (liftM x : StateT _ ProbComp α).run s = x >>= fun a => pure (a, s) := by
+      intro α x s
+      simp only [liftM, MonadLiftT.monadLift,
+        show OracleComp.liftComp x unifSpec = x from monadLift_eq_self x,
+        MonadLift.monadLift, StateT.run_lift]
+    have hmod : ∀ {α : Type}
+        (f : (M × PC →ₒ Ω).QueryCache → α × (M × PC →ₒ Ω).QueryCache)
+        (s : (M × PC →ₒ Ω).QueryCache),
+        (modifyGet f : StateT _ ProbComp α).run s = pure (f s) := by
+      intro α f s
+      simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
+        StateT.modifyGet, StateT.run]
+    have hro_miss : ∀ {β : Type} (q : M × PC)
+        (rest : Ω → StateT ((M × PC →ₒ Ω).QueryCache) ProbComp β),
+        (ro q >>= rest).run' ∅ =
+          $ᵗ Ω >>= fun r =>
+            (rest r).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) := by
+      intro β q rest
+      show Prod.fst <$> ((ro q >>= rest).run ∅) =
+        $ᵗ Ω >>= fun r =>
+          Prod.fst <$> (rest r).run ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)
+      simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
+        StateT.run_get, pure_bind, uniformSampleImpl, bind_assoc, map_bind,
+        liftM, MonadLiftT.monadLift,
+        MonadLift.monadLift, StateT.run_lift, hmod]
+    simp only [bind_assoc, pure_bind]
+    simp_rw [hpeel]
+    simp_rw [hro_miss]
+    simp_rw [hpeel]
+    have hro_hit : ∀ {β : Type} (q : M × PC) (r : Ω)
+        (rest : Ω → StateT ((M × PC →ₒ Ω).QueryCache) ProbComp β),
+        (ro q >>= rest).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) =
+          (rest r).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) := by
+      intro β q r rest
+      show Prod.fst <$> ((ro q >>= rest).run
+          ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)) =
+        Prod.fst <$> (rest r).run
+          ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)
+      rw [StateT.run_bind]
+      simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
+        StateT.run_get, pure_bind, QueryCache.cacheQuery_self, StateT.run_pure]
+    simp_rw [hro_hit]
+    have hpure_run' : ∀ {α : Type} (a : α) (s : (M × PC →ₒ Ω).QueryCache),
+        (pure a : StateT _ ProbComp α).run' s = (pure a : ProbComp α) := by
+      intro α a s
+      change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
+      simp [map_pure]
+    simp_rw [hpure_run']]
   have hinner :
       ∀ x ∈ support hr.gen,
         Pr[= true | (do
@@ -161,7 +225,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         Pr[= true | (do
           let _x ← hr.gen
           pure true : ProbComp Bool)] := by
-            exact probOutput_bind_congr hinner
+            prob_congr; exact hinner
     _ = 1 := by simp
 
 /-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then

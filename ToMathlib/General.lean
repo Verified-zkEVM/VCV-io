@@ -502,6 +502,17 @@ theorem tsum_cast {α β : Type u} {f : α → ENNReal} {g : β → ENNReal}
       (∑' (a : α), f a) = (∑' (b : β), g b) := by
   subst h; simp [h']
 
+/-- Monadic analog of `Fin.ofFn`: given `f : Fin n → m α`, runs each computation
+in order and collects the results as a function `Fin n → α`. This is the
+`Fin n → α` counterpart of Mathlib's `Vector.mOfFn`. -/
+def Fin.mOfFn {m : Type u → Type v} [Monad m] {α : Type u} :
+    (n : ℕ) → (Fin n → m α) → m (Fin n → α)
+  | 0, _ => return Fin.elim0
+  | n + 1, f => do
+    let a ← f 0
+    let rest ← Fin.mOfFn n (fun i => f i.succ)
+    return Fin.cons a rest
+
 @[simp]
 lemma List.foldlM_range {m : Type u → Type v} [Monad m] [LawfulMonad m]
     {s : Type u} (n : ℕ) (f : s → Fin n → m s) (init : s)  :

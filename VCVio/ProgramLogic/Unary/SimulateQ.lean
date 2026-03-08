@@ -34,7 +34,7 @@ variable {α : Type}
 
 /-- If every oracle query in `impl` has the same evaluation distribution as the original query,
 then `wp` of the simulated computation equals `wp` of the original. -/
-theorem wp_simulateQ_eq
+@[game_rule] theorem wp_simulateQ_eq
     (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
       evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
@@ -51,7 +51,7 @@ theorem wp_simulateQ_eq
 
 
 /-- Lifting a computation to a larger oracle spec via `liftComp` preserves `wp`. -/
-theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}
+@[game_rule] theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}
     [superSpec.Fintype] [superSpec.Inhabited]
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
     (mx : OracleComp spec α) (post : α → ℝ≥0∞) :
@@ -64,7 +64,7 @@ theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}
 /-- If a stateful oracle implementation preserves distributions (each query produces a uniform
 distribution after discarding state), then `wp` of `simulateQ ... run'` equals `wp` of the
 original computation. -/
-theorem wp_simulateQ_run'_eq {σ : Type}
+@[game_rule] theorem wp_simulateQ_run'_eq {σ : Type}
     (impl : QueryImpl spec (StateT σ (OracleComp spec)))
     (hImpl : ∀ (t : spec.Domain) (s : σ),
       evalDist ((impl t).run' s) =
