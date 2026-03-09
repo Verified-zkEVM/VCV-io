@@ -1,6 +1,5 @@
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.Asymptotics.Negligible
-import VCVio.CryptoFoundations.Asymptotics.PolyTimeOC
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork

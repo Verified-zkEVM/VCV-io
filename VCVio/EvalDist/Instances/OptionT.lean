@@ -98,12 +98,11 @@ section HasEvalSPMF
 Note: a more specific `HasEvalPMF m → HasEvalSPMF (OptionT m)` path would make explicit
 that failure comes solely from `OptionT`, but this general instance subsumes it.
 
-We explicitly provide `toSet` to match the standalone `HasEvalSet (OptionT m)` instance above,
-ensuring the diamond is definitionally equal (per Mathlib convention). The `support_eq` field
-then serves as the coherence proof between the set-path and distribution-path. -/
+Lean 4 automatically synthesizes `toSet` from the standalone `HasEvalSet (OptionT m)` instance
+above, ensuring the diamond is definitionally equal (per Mathlib convention). The `support_eq`
+field then serves as the coherence proof between the set-path and distribution-path. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
-  -- toSet := OptionT.mapM' HasEvalSet.toSet
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
   support_eq mx := by
     ext x

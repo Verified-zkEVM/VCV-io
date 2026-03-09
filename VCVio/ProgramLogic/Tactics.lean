@@ -263,6 +263,18 @@ private def runHoareStepRule : TacticM Bool := do
       | none => return false
   | none => return false
 
+private def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  match tripleGoalComp? target with
+  | some comp =>
+      let comp ← whnfReducible (← instantiateMVars comp)
+      if isBindExpr comp then
+        tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_bind (cut := $cut)))
+      else
+        return false
+  | none => return false
+
 private def throwHoareStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
@@ -508,10 +520,17 @@ elab "wp_step" : tactic => do
 
 It first tries the structural bind rule, and otherwise unfolds the triple into a
 `pre ≤ wp ...` obligation and delegates to `wp_step`. -/
-elab "hoare_step" : tactic => do
-  if ← runHoareStepRule then
-    return
-  throwHoareStepError
+syntax "hoare_step" ("using" term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| hoare_step) => do
+      if ← runHoareStepRule then
+        return
+      throwHoareStepError
+  | `(tactic| hoare_step using $cut) => do
+      if ← runHoareStepRuleUsing cut then
+        return
+      throwHoareStepError
 
 /-- `wp_seq n` repeatedly applies `wp_step` `n` times. -/
 syntax "wp_seq" num : tactic
@@ -527,8 +546,11 @@ elab_rules : tactic
         else
           throwWpStepError
 
-/-- `hoare_seq n` repeatedly applies `hoare_step` `n` times. -/
-syntax "hoare_seq" num : tactic
+/-- `hoare_seq n` repeatedly applies `hoare_step` `n` times.
+
+`hoare_seq n using cut` uses `hoare_step using cut` on the first layer, then ordinary
+`hoare_step` for the remaining `n - 1` layers. -/
+syntax "hoare_seq" num ("using" term)? : tactic
 
 elab_rules : tactic
   | `(tactic| hoare_seq $n:num) => do
@@ -536,6 +558,19 @@ elab_rules : tactic
       if k = 0 then
         throwError "hoare_seq: expected a positive number of steps."
       for _ in [:k] do
+        if ← runHoareStepRule then
+          pure ()
+        else
+          throwHoareStepError
+  | `(tactic| hoare_seq $n:num using $cut) => do
+      let k := n.getNat
+      if k = 0 then
+        throwError "hoare_seq: expected a positive number of steps."
+      if ← runHoareStepRuleUsing cut then
+        pure ()
+      else
+        throwHoareStepError
+      for _ in [1:k] do
         if ← runHoareStepRule then
           pure ()
         else
