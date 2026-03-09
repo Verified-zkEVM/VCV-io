@@ -91,17 +91,20 @@ structure SecAdv (spec : OracleSpec ι) (α β : Type) where
 
 ## Hardness Assumptions
 
-### Hard Homogeneous Spaces (HHS)
+### Discrete Log Assumptions (DLog / CDH / DDH)
 
-Requires `[AddCommGroup G] [AddTorsor G P] [SampleableType G] [SampleableType P]`.
+Requires `[Field F] [AddCommGroup G] [Module F G] [SampleableType F] [SampleableType G]`
+plus a fixed generator `g : G`.
+
+Uses additive / EC-style notation: `a • g` means scalar multiplication (textbook `g^a`).
 
 | Problem | Adversary type | Experiment |
 |---------|---------------|------------|
-| DLog (vectorization) | `P → P → ProbComp G` | `vectorizationExp` |
-| CDH (parallelization) | `P → P → P → ProbComp P` | `parallelizationExp` |
-| DDH (parallel testing) | `P → P → P → P → ProbComp Bool` | `parallelTesting_experiment` |
+| DLog | `G → G → ProbComp F` | `dlogExp g adversary` |
+| CDH | `G → G → G → ProbComp G` | `cdhExp g adversary` |
+| DDH | `G → G → G → G → ProbComp Bool` | `ddhExp g adversary` |
 
-DDH abbreviations: `ddhExp`, `ddhAdvantage` (in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`).
+Defined in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`.
 
 ### Hard Relations
 
@@ -124,10 +127,9 @@ A reduction proves: if adversary A breaks scheme S, then adversary B breaks assu
 1. **Define the reduction adversary** that takes a challenge from H and embeds it into S:
 
 ```lean
-def myReduction (adversary : ...) : DDHAdversary G P := fun x x₁ x₂ x₃ => do
-  -- embed (x, x₁, x₂, x₃) as scheme parameters
+def myReduction (adversary : ...) : DDHAdversary F G := fun g A B T => do
+  -- embed DDH challenge (g, A = a•g, B = b•g, T) as scheme parameters
   let result ← adversary ...
-  -- convert adversary's output to DDH guess
   return result
 ```
 
@@ -137,7 +139,7 @@ def myReduction (adversary : ...) : DDHAdversary G P := fun x x₁ x₂ x₃ => 
 
 ### Hybrid Argument Pattern
 
-For q-query IND-CPA → DDH (as in `HHS_Elgamal.lean`):
+For q-query IND-CPA → DDH (as in `Examples/ElGamal.lean`):
 
 1. Define `HybridGame adversary k`: first `k` queries use real encryption, rest use random
 2. `HybridGame 0 = IND-CPA random`, `HybridGame q = IND-CPA real`

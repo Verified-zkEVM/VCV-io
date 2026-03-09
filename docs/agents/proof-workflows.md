@@ -85,9 +85,9 @@ def OTP_encrypt (k m : Fin n → Bool) : ProbComp (Fin n → Bool) := pure (k + 
 
 **Key technique**: `probOutput_map_injective` — if the encryption map is injective (which XOR is), the probability is preserved.
 
-## Worked Example: HHS-ElGamal IND-CPA
+## Worked Example: ElGamal IND-CPA
 
-From `Examples/HHS_Elgamal.lean` — multi-query security via DDH.
+From `Examples/ElGamal.lean` — multi-query security via DDH.
 
 **Key patterns used**:
 - Hybrid argument indexed by query count `k`
