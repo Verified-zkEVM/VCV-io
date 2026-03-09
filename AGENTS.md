@@ -50,6 +50,26 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 
+## Program Logic Tactics
+
+For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
+`VCVio.ProgramLogic.Notation` keeps notation plus coarse compatibility macros, but
+`Tactics.lean` is the canonical interactive proof mode.
+
+- **Proof-mode entry**: `by_equiv`, `game_trans`, `by_dist`, `by_upto`, `by_hoare`
+- **Relational stepping**: `rel_step`, `rel_seq`, `rel_rnd`, `rel_skip`, `rel_pure`,
+  `rel_cond`, `rel_conseq`, `rel_inline`, `rel_sim`
+- **Unary stepping**: `wp_step`, `wp_seq`, `hoare_step`, `hoare_seq`
+- **Rewriting / congruence**: `prob_swap`, `prob_swap_rw`, `prob_congr`, `prob_congr'`
+
+Quick usage notes:
+
+- `by_equiv` enters the coupling-based `RelTriple` shell intentionally.
+- `rel_seq n using R` applies `rel_step using R` first, then plain `rel_step`.
+- `rel_rnd` can consume a local `Function.Bijective f` hypothesis, or use `rel_rnd using f`.
+- `rel_sim` chooses `relTriple_simulateQ_run` vs `relTriple_simulateQ_run'` from the goal shape.
+- `by_upto bad` applies the existing identical-until-bad TV-distance bound for `simulateQ`.
+
 ## Building
 
 ```bash
