@@ -103,7 +103,6 @@ ensuring the diamond is definitionally equal (per Mathlib convention). The `supp
 then serves as the coherence proof between the set-path and distribution-path. -/
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
     HasEvalSPMF (OptionT m) where
-  -- toSet := OptionT.mapM' HasEvalSet.toSet
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
   support_eq mx := by
     ext x

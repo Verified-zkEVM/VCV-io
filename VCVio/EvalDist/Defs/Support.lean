@@ -35,10 +35,6 @@ def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
     support mx = HasEvalSet.toSet.toFun _ mx := rfl
 
--- /-- `support` is an (implicit) monad morphism. -/
--- instance [HasEvalSet m] : MonadHomClass m SetM (@support m _ _) :=
---   inferInstanceAs (MonadHomClass m SetM @HasEvalSet.toSet.toFun)
-
 /-- The support of a `SetM` computation is the resulting set. -/
 instance : HasEvalSet SetM where toSet := MonadHom.id SetM
 

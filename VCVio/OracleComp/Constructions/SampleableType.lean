@@ -219,12 +219,6 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
       rintro i hi
       linarith
     simp [this]
-    -- have : Subsingleton (Vector α 0) := by
-    --   apply Vector.ext
-    --   rintro i hi
-    --   linarith
-    -- Subsingleton
-    -- simp [this]
   | succ m ih =>
     classical
     have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by

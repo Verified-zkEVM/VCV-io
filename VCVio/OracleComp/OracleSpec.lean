@@ -181,13 +181,6 @@ protected def pi {ι : Type _} {τ : ι → Type _} (specs : (i : ι) → Oracle
 
 end pi
 
--- /-- An oracle spec has indexing in a type `ι` if the `range` function factors through `ι`.
--- dt: not sure if this is really the right approach for e.g. `pregen`. -/
--- class HasIndexing (spec : OracleSpec) (ι : Type w) where
---   idx : spec.Domain → ι
---   xdi : ι → Type _
---   range_idx (t : spec.Domain) : spec.Range t = xdi (idx t)
-
 section emptySpec
 
 /-- Specifies access to no oracles, using the empty type as the indexing type. -/

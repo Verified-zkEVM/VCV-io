@@ -37,6 +37,11 @@ example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
     ⦃Pr[p | oa]⦄ oa ⦃fun x => if p x then 1 else 0⦄ := by
   exact triple_probEvent_indicator oa p
 
+example (oa : OracleComp spec α) :
+    ⦃1⦄ oa ⦃fun x => ⌜x ∈ support oa⌝⦄ := by
+  classical
+  simpa [propInd_eq_ite] using triple_support oa
+
 -- `⌜P⌝` for Prop → ℝ≥0∞ indicator (like Std.Do's ⌜P⌝ but quantitative)
 example (oa : OracleComp spec α) (p : α → Prop) :
     Pr[p | oa] = wp⟦oa⟧ (fun x => ⌜p x⌝) := by
@@ -122,6 +127,20 @@ example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
     ⦃pre⦄ (x :: xs).foldlM f init ⦃post⦄ := by
   hoare_step
   exact h
+
+example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
+    (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
+    ⦃1⦄ (do
+      let x ← oa
+      f x) ⦃fun y => if y = true then 1 else 0⦄ := by
+  classical
+  hoare_step using (fun x => ⌜x ∈ support oa⌝)
+  · simpa [propInd_eq_ite] using triple_support (oa := oa)
+  · intro x
+    by_cases hx : x ∈ support oa
+    · simpa [propInd, hx] using triple_probOutput_eq_one (oa := f x) (x := true) (h := h x hx)
+    · simpa [propInd, hx] using
+        triple_zero (oa := f x) (post := fun y => if y = true then 1 else 0)
 
 /-! ## `wp_seq` / `hoare_seq` examples -/
 

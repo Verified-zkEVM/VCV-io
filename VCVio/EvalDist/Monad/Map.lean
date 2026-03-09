@@ -116,7 +116,6 @@ lemma probFailure_eq_sub_sum_probOutput_map [Fintype β] (mx : m α) (f : α →
 lemma probOutput_map_eq_single {mx : m α} {f : α → β} {y : β}
     (x : α) (h : ∀ x' ∈ support mx, y = f x' → x = x') (h' : f x = y) :
     Pr[= y | f <$> mx] = Pr[= x | mx] := by
-  -- simp [probOutput_map_eq_tsum_sub ]
   rw [probOutput_map_eq_tsum]
   refine (tsum_eq_single x (λ x' hx' ↦ ?_)).trans (by rw [h', probOutput_pure_self, mul_one])
   specialize h x'

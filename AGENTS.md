@@ -74,6 +74,9 @@ Quick usage notes:
 - `rel_rnd` can consume a local `Function.Bijective f` hypothesis, or use `rel_rnd using f`.
 - `rel_sim` chooses `relTriple_simulateQ_run` vs `relTriple_simulateQ_run'` from the goal shape.
 - `rel_sim_dist` is the exact-distribution `call` variant: it leaves per-query `evalDist` equality and initial-state equality.
+- `hoare_step using cut` is the unary analogue of an explicit relational cut: use it when a bind
+  needs a custom quantitative postcondition for the left subprogram.
+- `triple_support` and `triple_zero` are the main support-sensitive helpers for unary bind proofs.
 - `rel_replicate` lifts a one-step coupling through synchronized `replicate` goals.
 - `rel_mapM` lifts pointwise coupling through finite list traversals; use `rel_mapM using Rin` for non-equality input-list relations.
 - `rel_foldlM` lifts a bounded loop invariant through `List.foldlM`; use `rel_foldlM using Rin` for non-equality input-list relations.
