@@ -43,7 +43,7 @@ Here `F` is the scalar field (e.g. `ZMod p`), `G` is the group of elements
    DDH-random branch equals hybrid k.
 5. Per-hop bound (`IND_CPA_stepDDH_hopBound`): the absolute difference between consecutive
    hybrid winning probabilities is at most twice the DDH advantage of the step-k reduction.
-6. Main theorem (`ElGamal_IND_CPA_le_q_mul_ddh`): IND-CPA advantage ≤ `q * (2ε)` where `ε`
+6. Main theorem (`elGamal_IND_CPA_le_q_mul_ddh`): IND-CPA advantage ≤ `q * (2ε)` where `ε`
    bounds each per-hop DDH advantage.
 
 ## Query-bound hypothesis
@@ -89,7 +89,7 @@ variable {gen : G}
     (elgamalAsymmEnc F G gen).toExecutionMethod = ExecutionMethod.default := rfl
 
 /-- ElGamal decryption perfectly inverts encryption: `Dec(sk, Enc(pk, msg)) = msg`. -/
-theorem Correct [DecidableEq G] : (elgamalAsymmEnc F G gen).PerfectlyCorrect := by
+theorem correct [DecidableEq G] : (elgamalAsymmEnc F G gen).PerfectlyCorrect := by
   have hcancel : ∀ (msg : G) (sk r : F),
       msg + r • (sk • gen) - sk • (r • gen) = msg := by
     intro msg sk r
@@ -216,7 +216,7 @@ private lemma hybridChallengeOracle_allRandom_evalDist_eq
   | some _ => rfl
   | none =>
     simp only [show ∀ (a b : G), (if (false : Bool) = true then a else b) = b
-        from fun _ _ => if_neg Bool.noConfusion, ite_true]
+        from fun _ _ => if_neg (by decide), ite_true]
     have hlift : ∀ (x : ProbComp (G × G)) (s' : IND_CPA_HybridState (G := G)),
         (liftM x : StateT (IND_CPA_HybridState (G := G)) ProbComp _) s' =
         (x >>= fun a => pure (a, s')) := by
@@ -442,6 +442,7 @@ def stepDDH_randBranchGame
   let a ← $ᵗ F
   let b_scalar ← $ᵗ F
   stepDDH_randBranchCore (F := F) (gen := gen) adversary k a b_scalar
+
 
 -- Mechanical StateT bookkeeping: the step DDH oracle agrees with the hybrid oracle
 -- for queries past position k.
@@ -1647,7 +1648,7 @@ theorem IND_CPA_HybridGame_q_eq_game
 
 /-- IND-CPA advantage is bounded by the sum of per-hop DDH advantages. This is the
 "summed" form before collapsing to a single `ε` bound. -/
-theorem ElGamal_IND_CPA_bound_toReal
+theorem elGamal_IND_CPA_bound_toReal
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ)
     (hstart : (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary q]).toReal =
@@ -1697,7 +1698,7 @@ theorem ElGamal_IND_CPA_bound_toReal
 /-- **Main theorem.** For any adversary making at most `q` LR oracle queries, if every
 per-hop DDH reduction has advantage at most `ε`, then the IND-CPA advantage of ElGamal
 is at most `q * (2 * ε)`. -/
-theorem ElGamal_IND_CPA_le_q_mul_ddh
+theorem elGamal_IND_CPA_le_q_mul_ddh
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ) (ε : ℝ)
     (hq : adversary.MakesAtMostQueries q)
@@ -1705,7 +1706,7 @@ theorem ElGamal_IND_CPA_le_q_mul_ddh
       |(Pr[= true | DiffieHellman.ddhExp gen
         (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal - 1 / 2| ≤ ε) :
     ((elgamalAsymmEnc F G gen).IND_CPA_advantage adversary).toReal ≤ q * (2 * ε) := by
-  refine le_trans (ElGamal_IND_CPA_bound_toReal (gen := gen) adversary q
+  refine le_trans (elGamal_IND_CPA_bound_toReal (gen := gen) adversary q
     (IND_CPA_HybridGame_q_eq_game (gen := gen) adversary q hq)) ?_
   calc
     Finset.sum (Finset.range q) (fun k =>
@@ -1719,7 +1720,7 @@ theorem ElGamal_IND_CPA_le_q_mul_ddh
             exact mul_le_mul_of_nonneg_left (hddh k (Finset.mem_range.mp hk)) (by positivity)
     _ = q * (2 * ε) := by simp [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
 
-#print axioms ElGamal_IND_CPA_le_q_mul_ddh
+#print axioms elGamal_IND_CPA_le_q_mul_ddh
 
 end IND_CPA
 

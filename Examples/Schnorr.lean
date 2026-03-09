@@ -89,12 +89,12 @@ theorem schnorrSigma_speciallySound (g : G) :
   calc ((z₁ - z₂) * (c₁ - c₂)⁻¹) • g
       = (c₁ - c₂)⁻¹ • ((z₁ - z₂) • g) := by rw [mul_comm, mul_smul]
     _ = (c₁ - c₂)⁻¹ • ((c₁ - c₂) • pk) := by rw [h_sub]
-    _ = ((c₁ - c₂)⁻¹ * (c₁ - c₂)) • pk := by rw [mul_smul]
+    _ = ((c₁ - c₂)⁻¹ * (c₁ - c₂)) • pk := by rw [← mul_smul]
     _ = (1 : F) • pk := by rw [inv_mul_cancel₀ h_ne']
     _ = pk := one_smul F pk
 
 /-- Full transcript simulator: pick `c, z ← F`, compute commitment from verification equation. -/
-noncomputable def schnorrSimTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
+def schnorrSimTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
   let c ← $ᵗ F
   let z ← $ᵗ F
   return (z • g - c • pk, c, z)
@@ -108,17 +108,7 @@ theorem schnorrSigma_hvzk (g : G) :
   have h_eq : sk • g = pk := of_decide_eq_true h_sk
   simp only [schnorrSigma, schnorrSimTranscript, bind_assoc, pure_bind]
   apply evalDist_ext; intro t
-  have hswap :
-      Pr[= t | (do
-        let r ← ($ᵗ F : ProbComp F)
-        let c ← ($ᵗ F : ProbComp F)
-        pure (r • g, c, r + c * sk))] =
-      Pr[= t | (do
-        let c ← ($ᵗ F : ProbComp F)
-        let r ← ($ᵗ F : ProbComp F)
-        pure (r • g, c, r + c * sk))] := by
-    prob_swap
-  rw [hswap]
+  prob_swap_rw
   refine probOutput_bind_congr' ($ᵗ F : ProbComp F) t ?_
   intro c
   rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]

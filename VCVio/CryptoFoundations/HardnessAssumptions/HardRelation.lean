@@ -48,7 +48,7 @@ def hardRelationExp {X W : Type} [SampleableType X]
 
 -- /-- A reltation `r` is generable if there is an efficient algorithm `gen`
 -- that produces values satisfying the relation. For example "is discrete log of" is generable
--- because we can choose the exponent first (see `HardHomogeneousSpace`). -/
+-- because we can choose the exponent first (see `DiffieHellman`). -/
 -- structure GenerableRelation {ι : Type} (spec : ℕ → OracleSpec ι)
 --     (X W : ℕ → Type) (r : {n : ℕ} → X n → W n → Bool)
 --     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
