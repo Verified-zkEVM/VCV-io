@@ -10,8 +10,13 @@ import VCVio.ProgramLogic.Relational.SimulateQ
 /-!
 # Ergonomic Notation and Convenience Layer for Program Logic
 
-This file provides user-facing notation, convenience predicates, and tactic macros
-for game-hopping proofs. The goal is that standard game-hopping proofs never see `ℝ≥0∞`.
+This file provides user-facing notation, convenience predicates, and a small set of coarse
+compatibility macros for game-hopping proofs. The goal is that standard game-hopping proofs
+never see `ℝ≥0∞`.
+
+The canonical step-through proof mode lives in `VCVio/ProgramLogic/Tactics.lean`. This file
+keeps only the notation surface plus lightweight compatibility automation (`game_wp`,
+`game_rel`, `coupling`, `game_hop`) that remains useful for quick scripts and older proofs.
 
 ## Notation (activate with `open scoped OracleComp.ProgramLogic`)
 
@@ -226,18 +231,34 @@ theorem AdvBound.of_gameEquiv {g₁ g₂ : OracleComp spec₁ Bool} {ε : ℝ}
     AdvBound g₂ ε := by
   unfold AdvBound at *; rwa [← heq.probOutput_eq]
 
-/-! ## Tactic macros -/
+/-! ## Coarse compatibility macros -/
 
-/-- `game_wp` decomposes unary WP goals by repeatedly applying WP rules. -/
+/-- `game_wp` exhaustively decomposes unary WP goals by repeatedly applying WP rules.
+Prefer `wp_step` from `VCVio.ProgramLogic.Tactics` for interactive proofs. -/
 macro "game_wp" : tactic =>
   `(tactic| (
     simp only [game_rule]
-    repeat (first | rw [wp_bind] | rw [wp_query] | rw [wp_pure] | rw [wp_ite]
-                  | rw [wp_uniformSample])
+    repeat (first
+      | rw [wp_bind]
+      | rw [wp_query]
+      | rw [wp_pure]
+      | rw [wp_ite]
+      | rw [wp_uniformSample]
+      | rw [wp_map]
+      | rw [wp_simulateQ_eq]
+      | rw [wp_liftComp]
+      | rw [wp_replicate_zero]
+      | rw [wp_replicate_succ]
+      | rw [wp_list_mapM_nil]
+      | rw [wp_list_mapM_cons]
+      | rw [wp_list_foldlM_nil]
+      | rw [wp_list_foldlM_cons])
     try simp [game_rule]
   ))
 
-/-- `game_rel` decomposes relational coupling goals by stepping through bind structure. -/
+/-- `game_rel` is a coarse relational decomposer for bind/query structure.
+Prefer `by_equiv`, `rel_step`, `rel_rnd`, and friends from `VCVio.ProgramLogic.Tactics`
+for interactive proofs. -/
 macro "game_rel" : tactic =>
   `(tactic| (
     repeat (first
@@ -250,7 +271,8 @@ macro "game_rel" : tactic =>
     all_goals try simp [game_rule]
   ))
 
-/-- `coupling` decomposes `RelTriple` goals through bind/query structure. -/
+/-- `coupling` is a compatibility alias for coarse relational decomposition.
+Prefer the step-through tactics in `VCVio.ProgramLogic.Tactics` for new proofs. -/
 macro "coupling" : tactic =>
   `(tactic| (
     repeat (first
@@ -263,8 +285,9 @@ macro "coupling" : tactic =>
     all_goals try simp [game_rule]
   ))
 
-/-- `game_hop` tries to close a game-hopping step via coupling or TV distance bound.
-Always enters `RelTriple` (not `RelTriple'`) so step-through tactics apply. -/
+/-- `game_hop` tries to close a game-hopping step via coarse coupling or TV-distance entry.
+Always enters `RelTriple` (not `RelTriple'`) so the step-through tactics still compose if the
+macro does not finish the proof. -/
 macro "game_hop" : tactic =>
   `(tactic| (
     first

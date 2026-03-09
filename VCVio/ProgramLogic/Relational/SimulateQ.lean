@@ -31,7 +31,6 @@ universe u
 namespace OracleComp.ProgramLogic.Relational
 
 variable {ι : Type u} {spec : OracleSpec ι}
-variable [spec.Fintype] [spec.Inhabited]
 variable {α : Type}
 
 /-! ## Relational simulateQ rules -/
@@ -40,9 +39,12 @@ variable {α : Type}
 If two oracle implementations produce equal outputs and preserve a state invariant `R_state`,
 then the full simulation also preserves the invariant and output equality. -/
 theorem relTriple_simulateQ_run
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
     {σ₁ σ₂ : Type}
-    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec)))
-    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec)))
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R_state : σ₁ → σ₂ → Prop)
     (oa : OracleComp spec α)
     (himpl : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
@@ -65,9 +67,12 @@ theorem relTriple_simulateQ_run
 
 /-- Projection: relational `simulateQ` preserving only output equality. -/
 theorem relTriple_simulateQ_run'
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
     {σ₁ σ₂ : Type}
-    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec)))
-    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec)))
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec₂)))
     (R_state : σ₁ → σ₂ → Prop)
     (oa : OracleComp spec α)
     (himpl : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
@@ -87,7 +92,35 @@ theorem relTriple_simulateQ_run'
     exact hp.1
   exact relTriple_map h_weak
 
+/-- Exact-distribution specialization of `relTriple_simulateQ_run'`.
+
+If corresponding oracle calls have identical full `(output, state)` distributions whenever the
+states are equal, then the simulated computations have identical output distributions. This
+packages the common pattern "prove per-query `evalDist` equality, then use `Eq` as the state
+invariant" into a single theorem. -/
+theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    {σ : Type}
+    (impl₁ : QueryImpl spec (StateT σ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (StateT σ (OracleComp spec₂)))
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain) (s : σ),
+      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+    (s₁ s₂ : σ) (hs : s₁ = s₂) :
+    RelTriple
+      ((simulateQ impl₁ oa).run' s₁)
+      ((simulateQ impl₂ oa).run' s₂)
+      (EqRel α) := by
+  refine relTriple_simulateQ_run' impl₁ impl₂ Eq oa ?_ s₁ s₂ hs
+  intro t s₁ s₂ hs'
+  cases hs'
+  exact relTriple_of_evalDist_eq (himpl t s₁) (fun _ => ⟨rfl, rfl⟩)
+
 /-! ## "Identical until bad" fundamental lemma -/
+
+variable [spec.Fintype] [spec.Inhabited]
 
 private lemma probOutput_simulateQ_run_eq_zero_of_bad
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]

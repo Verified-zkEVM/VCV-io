@@ -53,12 +53,25 @@ theorem schnorrSigma_complete :
   intro (x₀, pk) sk h
   have h_eq : sk +ᵥ x₀ = pk := of_decide_eq_true h
   dsimp [PerfectlyComplete, schnorrSigma]
-  rw [probOutput_eq_one_iff]
-  constructor
-  · simp
-  · simp [support_bind, h_eq, add_vadd]
-    ext x
+  rw [← one_le_probOutput_iff, OracleComp.ProgramLogic.probOutput_eq_wp_indicator]
+  game_wp
+  simp [h_eq, add_vadd]
+  rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+  have hcard :
+      {x ∈ ({true, false} : Finset Bool) |
+        if x = true then x = true ∨ sk +ᵥ pk = pk else x = false ∨ x₀ = pk}.card = 2 := by
+    have hfilter :
+        {x ∈ ({true, false} : Finset Bool) |
+          if x = true then x = true ∨ sk +ᵥ pk = pk else x = false ∨ x₀ = pk} =
+          ({true, false} : Finset Bool) := by
+      ext x
+      fin_cases x <;> simp
+    rw [hfilter]
     simp
+  rw [hcard]
+  have htwo : (2 : ENNReal) * (2 : ENNReal)⁻¹ = 1 := by
+    exact ENNReal.mul_inv_cancel two_ne_zero ENNReal.ofNat_ne_top
+  simp [htwo]
 
 /-- Special soundness: from two accepting transcripts with different challenges, subtract the
 responses to recover a witness sending `x₀` to `pk`. -/
