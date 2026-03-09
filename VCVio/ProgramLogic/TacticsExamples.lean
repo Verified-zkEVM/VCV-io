@@ -407,6 +407,22 @@ example
   rel_sim
   all_goals first | exact himpl | exact hs
 
+example
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec)))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec)))
+    (R_state : σ₁ → σ₂ → Prop)
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain) (s₁ : σ₁) (s₂ : σ₂),
+      R_state s₁ s₂ →
+      RelTriple ((impl₁ t).run s₁) ((impl₂ t).run s₂)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2))
+    (s₁ : σ₁) (s₂ : σ₂) (hs : R_state s₁ s₂) :
+    ⟪(simulateQ impl₁ oa).run' s₁
+     ~ (simulateQ impl₂ oa).run' s₂
+     | fun x y => x = y⟫ := by
+  rel_sim
+  all_goals first | exact himpl | exact hs
+
 end RelSim
 
 /-! ## `rel_sim_dist` examples -/

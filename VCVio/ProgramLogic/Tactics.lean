@@ -107,8 +107,14 @@ private def tripleGoalComp? (target : Expr) : Option Expr := do
 private def isSimulateQAction (e : Expr) : Bool :=
   (findAppWithHead? ``simulateQ e).isSome
 
+private def hasStateTRunExpr (e : Expr) : Bool :=
+  (findAppWithHead? ``StateT.run e).isSome
+
+private def hasStateTRun'Expr (e : Expr) : Bool :=
+  (findAppWithHead? ``StateT.run' e).isSome
+
 private def hasStateTRunLike (e : Expr) : Bool :=
-  (findAppWithHead? ``StateT.run e).isSome || (findAppWithHead? ``StateT.run' e).isSome
+  hasStateTRunExpr e || hasStateTRun'Expr e
 
 private def hasSimulateQRunLike (e : Expr) : Bool :=
   isSimulateQAction e && hasStateTRunLike e
@@ -392,14 +398,16 @@ private def runByUptoRule (bad : TSyntax `term) : TacticM Bool := do
 private def runRelSimRule : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match relTripleGoalParts? target with
-  | some (oa, ob, R) =>
+  | some (oa, ob, _) =>
       if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
         return false
-      if isEqRelPost R then
+      if hasStateTRun'Expr oa && hasStateTRun'Expr ob then
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := Eq))) <||>
         tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'))
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run')) <||>
+        tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run))
       else
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run))
@@ -408,12 +416,14 @@ private def runRelSimRule : TacticM Bool := withMainContext do
 private def runRelSimRuleUsing (R : TSyntax `term) : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match relTripleGoalParts? target with
-  | some (oa, ob, post) =>
+  | some (oa, ob, _) =>
       if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
         return false
-      if isEqRelPost post then
+      if hasStateTRun'Expr oa && hasStateTRun'Expr ob then
         tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := $R)))
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := $R))) <||>
+        tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run (R_state := $R)))
       else
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run (R_state := $R)))
@@ -442,7 +452,7 @@ private def throwRelSimError : TacticM Unit := withMainContext do
   match relTripleGoalParts? target with
   | none =>
       throwError "rel_sim: expected a `RelTriple` goal; got:{indentExpr target}"
-  | some (oa, ob, R) =>
+  | some (oa, ob, _) =>
       let oa := oa.consumeMData
       let ob := ob.consumeMData
       if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
@@ -451,12 +461,12 @@ private def throwRelSimError : TacticM Unit := withMainContext do
           `(simulateQ ...).run' ...`.\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}"
-      if isEqRelPost R then
+      if hasStateTRun'Expr oa && hasStateTRun'Expr ob then
         throwError
           "rel_sim: recognized an output-only `simulateQ` goal, but \
           `relTriple_simulateQ_run'` did not apply.\n\
-          Expected an `EqRel` postcondition together with the usual per-query simulation and \
-          initial-invariant obligations.\n\
+          Expected an equality-style output postcondition together with the usual per-query \
+          simulation and initial-invariant obligations.\n\
           If your per-query proof goes by exact `evalDist ((impl₁ t).run s) = \
           evalDist ((impl₂ t).run s)` plus state equality, try `rel_sim_dist`."
       throwError
