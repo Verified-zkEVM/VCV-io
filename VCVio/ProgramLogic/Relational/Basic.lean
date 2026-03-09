@@ -8,6 +8,7 @@ import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.ProbabilityTheory.Coupling
 import VCVio.EvalDist.Defs.Instances
 import VCVio.EvalDist.Monad.Basic
+import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.Monad.Map
 import VCVio.OracleComp.EvalDist
@@ -209,6 +210,20 @@ lemma relTriple_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleCo
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [EqRel, hzEq]
 
+/-- If two computations have equal output distributions, any reflexive postcondition holds. -/
+lemma relTriple_of_evalDist_eq
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    {R : RelPost α α}
+    (h : evalDist oa = evalDist ob)
+    (hR : ∀ x, R x x) :
+    RelTriple oa ob R := by
+  refine relTriple_post_mono
+    (h := relTriple_eqRel_of_evalDist_eq (oa := oa) (ob := ob) h) ?_
+  intro x y hxy
+  dsimp [EqRel] at hxy
+  cases hxy
+  exact hR x
+
 /-- Pointwise output-probability equality gives an equality-relation relational triple. -/
 lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : ∀ x : α, Pr[= x | oa] = Pr[= x | ob]) :
@@ -328,6 +343,126 @@ lemma relTriple_map {R : RelPost γ δ}
   have h2 : RelWP oa (g <$> ob) (fun a d => R (f a) d) ≤ RelWP (f <$> oa) (g <$> ob) R :=
     MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
   exact le_trans h (le_trans h1 h2)
+
+private lemma list_eq_of_forall₂_eqRel {xs ys : List α}
+    (hxy : List.Forall₂ (EqRel α) xs ys) : xs = ys := by
+  induction hxy with
+  | nil =>
+      rfl
+  | @cons a b xs ys hab htl ih =>
+      dsimp [EqRel] at hab ⊢
+      cases hab
+      simpa using congrArg (List.cons a) ih
+
+/-- Lift a one-step coupling through bounded iteration. -/
+lemma relTriple_replicate
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (n : ℕ)
+    (hstep : RelTriple oa ob R) :
+    RelTriple (oa.replicate n) (ob.replicate n) (List.Forall₂ R) := by
+  induction n with
+  | zero =>
+      rw [OracleComp.replicate_zero, OracleComp.replicate_zero]
+      exact relTriple_pure_pure (R := List.Forall₂ R) (a := []) (b := []) List.Forall₂.nil
+  | succ n ih =>
+      rw [OracleComp.replicate_succ_bind, OracleComp.replicate_succ_bind]
+      refine relTriple_bind hstep ?_
+      intro a b hab
+      refine relTriple_bind ih ?_
+      intro xs ys hxy
+      exact relTriple_pure_pure (List.Forall₂.cons hab hxy)
+
+/-- Equality coupling version of `relTriple_replicate`. -/
+lemma relTriple_replicate_eqRel
+    {oa ob : OracleComp spec₁ α} (n : ℕ)
+    (hstep : RelTriple oa ob (EqRel α)) :
+    RelTriple (oa.replicate n) (ob.replicate n) (EqRel (List α)) := by
+  refine relTriple_post_mono
+    (h := relTriple_replicate (n := n) (R := EqRel α) hstep) ?_
+  intro xs ys hxy
+  exact list_eq_of_forall₂_eqRel hxy
+
+/-- Lift pointwise relational reasoning through finite list traversals. -/
+lemma relTriple_list_mapM
+    {xs : List α} {ys : List β}
+    {f : α → OracleComp spec₁ γ} {g : β → OracleComp spec₂ δ}
+    {Rin : α → β → Prop} {Rout : γ → δ → Prop}
+    (hxy : List.Forall₂ Rin xs ys)
+    (hfg : ∀ a b, Rin a b → RelTriple (f a) (g b) Rout) :
+    RelTriple (xs.mapM f) (ys.mapM g) (List.Forall₂ Rout) := by
+  induction hxy with
+  | nil =>
+      rw [List.mapM_nil, List.mapM_nil]
+      exact relTriple_pure_pure (R := List.Forall₂ Rout) (a := []) (b := []) List.Forall₂.nil
+  | @cons a b xs ys hab htl ih =>
+      rw [List.mapM_cons, List.mapM_cons]
+      refine relTriple_bind (hfg a b hab) ?_
+      intro x y hxy
+      refine relTriple_bind ih ?_
+      intro xs' ys' hxs
+      exact relTriple_pure_pure (List.Forall₂.cons hxy hxs)
+
+/-- Same-input equality-coupling specialization of `relTriple_list_mapM`. -/
+lemma relTriple_list_mapM_eqRel
+    {xs : List α}
+    {f : α → OracleComp spec₁ β} {g : α → OracleComp spec₂ β}
+    (hfg : ∀ a, RelTriple (f a) (g a) (EqRel β)) :
+    RelTriple (xs.mapM f) (xs.mapM g) (EqRel (List β)) := by
+  refine relTriple_post_mono
+    (h := relTriple_list_mapM
+      (Rin := EqRel α) (Rout := EqRel β)
+      (hxy := by
+        induction xs with
+        | nil => exact List.Forall₂.nil
+        | cons a xs ih => exact List.Forall₂.cons rfl ih)
+      (hfg := by
+        intro a b hab
+        dsimp [EqRel] at hab
+        cases hab
+        simpa using hfg a)) ?_
+  intro xs ys hxy
+  exact list_eq_of_forall₂_eqRel hxy
+
+/-- Loop-invariant rule for bounded left folds over related input lists. -/
+lemma relTriple_list_foldlM
+    {σ₁ σ₂ : Type}
+    {xs : List α} {ys : List β}
+    {f : σ₁ → α → OracleComp spec₁ σ₁}
+    {g : σ₂ → β → OracleComp spec₂ σ₂}
+    {Rin : α → β → Prop} {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hxy : List.Forall₂ Rin xs ys)
+    (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → RelTriple (f t₁ a) (g t₂ b) S) :
+    RelTriple (xs.foldlM f s₁) (ys.foldlM g s₂) S := by
+  induction hxy generalizing s₁ s₂ with
+  | nil =>
+      rw [List.foldlM_nil, List.foldlM_nil]
+      exact relTriple_pure_pure (R := S) (a := s₁) (b := s₂) hs
+  | @cons a b xs ys hab htl ih =>
+      rw [List.foldlM_cons, List.foldlM_cons]
+      refine relTriple_bind (hfg a b hab s₁ s₂ hs) ?_
+      intro t₁ t₂ ht
+      exact ih ht
+
+/-- Same-input specialization of `relTriple_list_foldlM`. -/
+lemma relTriple_list_foldlM_same
+    {σ₁ σ₂ : Type}
+    {xs : List α}
+    {f : σ₁ → α → OracleComp spec₁ σ₁}
+    {g : σ₂ → α → OracleComp spec₂ σ₂}
+    {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hfg : ∀ a t₁ t₂, S t₁ t₂ → RelTriple (f t₁ a) (g t₂ a) S) :
+    RelTriple (xs.foldlM f s₁) (xs.foldlM g s₂) S := by
+  refine relTriple_list_foldlM
+    (Rin := EqRel α) (hs := hs)
+    (hxy := by simp [EqRel]) ?_
+  intro a b hab t₁ t₂ ht
+  dsimp [EqRel] at hab
+  cases hab
+  simpa using hfg a t₁ t₂ ht
 
 /-! ## Synchronized branching rule -/
 
