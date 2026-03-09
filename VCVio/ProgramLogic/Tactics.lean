@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import Lean.Elab.Tactic
+import VCVio.OracleComp.Constructions.Replicate
 import VCVio.ProgramLogic.Notation
 
 /-!
@@ -24,6 +25,8 @@ tactics below as the primary proof mode.
 - `hoare_step`: Apply one quantitative Hoare/VCGen step on a `Triple` goal
 - `wp_seq`: Repeat `wp_step` through several layers
 - `hoare_seq`: Repeat `hoare_step` through several layers
+- `game_hoare`: Exhaustively apply quantitative Hoare/VCGen steps
+- `wp_step` / `hoare_step` also understand bounded iteration via `replicate`, `List.mapM`, and `List.foldlM`
 - `game_wp` (enhanced): Exhaustively apply WP rules
 
 ### Relational (pRHL)
@@ -36,6 +39,10 @@ tactics below as the primary proof mode.
 - `rel_conseq`: Weaken/strengthen the postcondition (like EasyCrypt's `conseq`)
 - `rel_inline`: Unfold a definition and retry
 - `rel_sim`: Apply relational simulation rule
+- `rel_sim_dist`: Apply the exact-distribution `simulateQ` rule
+- `rel_replicate`: Lift a one-step coupling through bounded iteration
+- `rel_mapM`: Lift pointwise coupling through finite list traversals
+- `rel_foldlM`: Lift a loop invariant through bounded left folds
 
 ### Proof mode entry / exit
 - `by_equiv`: Transform a `GameEquiv` or `evalDist` equality into a `RelTriple`
@@ -121,6 +128,15 @@ private def isIfExpr (e : Expr) : Bool :=
 private def isMapExpr (e : Expr) : Bool :=
   e.consumeMData.getAppFn.isConstOf ``Functor.map
 
+private def isReplicateExpr (e : Expr) : Bool :=
+  (findAppWithHead? ``OracleComp.replicate e).isSome
+
+private def isListMapMExpr (e : Expr) : Bool :=
+  (findAppWithHead? ``List.mapM e).isSome
+
+private def isListFoldlMExpr (e : Expr) : Bool :=
+  (findAppWithHead? ``List.foldlM e).isSome
+
 private def isGameEquivGoal (target : Expr) : Bool :=
   target.consumeMData.getAppFn.isConstOf ``OracleComp.ProgramLogic.GameEquiv
 
@@ -132,6 +148,12 @@ private def runWpStepRules : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_bind])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_pure])) <||>
     tryEvalTacticSyntax (← `(tactic| simp only [OracleComp.ProgramLogic.wp_pure])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_zero])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_succ])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_nil])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_cons])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_nil])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_cons])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_query])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_ite])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_uniformSample])) <||>
@@ -149,6 +171,33 @@ private def runRelStepRule : TacticM Bool := do
 private def runRelStepRuleUsing (R : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_))
+
+private def runRelReplicateRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_replicate))
+
+private def runRelMapMRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
+      (Rin := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))
+
+private def runRelMapMRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
+      (Rin := $R) ?_ ?_))
+
+private def runRelFoldlMRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same))
+
+private def runRelFoldlMRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
+      (Rin := $R) ?_ ?_ ?_))
 
 private def runRelRndRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| exact OracleComp.ProgramLogic.Relational.relTriple_query _)) <||>
@@ -186,7 +235,9 @@ private def throwWpStepError : TacticM Unit := withMainContext do
       let comp ← whnfReducible (← instantiateMVars comp)
       throwError
         "wp_step: found a `wp` goal, but none of the current single-step rules apply to:{indentExpr comp}\n\
-        Current rules handle bind, pure, query, `if`, uniform sampling, `map`, `simulateQ`, and `liftComp`."
+        Current rules handle bind, pure, `replicate`, `List.mapM`, `List.foldlM`, query, `if`, \
+        uniform sampling, `map`, \
+        `simulateQ`, and `liftComp`."
 
 private def runHoareStepRule : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
@@ -227,6 +278,26 @@ private def throwRelStepError : TacticM Unit := withMainContext do
   | some (oa, ob, _) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
+      if isReplicateExpr oa || isReplicateExpr ob then
+        throwError
+          "rel_step: the goal is about bounded iteration via `replicate`.\n\
+          Left side:{indentExpr oa}\n\
+          Right side:{indentExpr ob}\n\
+          Use `rel_replicate` to lift the per-iteration coupling, or rewrite `replicate` \
+          manually before stepping."
+      if isListMapMExpr oa || isListMapMExpr ob then
+        throwError
+          "rel_step: the goal is about a finite list traversal via `List.mapM`.\n\
+          Left side:{indentExpr oa}\n\
+          Right side:{indentExpr ob}\n\
+          Use `rel_mapM` to lift the pointwise coupling, or rewrite the list traversal \
+          manually before stepping."
+      if isListFoldlMExpr oa || isListFoldlMExpr ob then
+        throwError
+          "rel_step: the goal is about a bounded left fold via `List.foldlM`.\n\
+          Left side:{indentExpr oa}\n\
+          Right side:{indentExpr ob}\n\
+          Use `rel_foldlM` to lift the loop invariant through the fold."
       if !isBindExpr oa || !isBindExpr ob then
         throwError
           "rel_step: expected both sides of the `RelTriple` to start with `>>=`.\n\
@@ -260,6 +331,59 @@ private def throwRelRndError : TacticM Unit := withMainContext do
         Left side:{indentExpr oa}\n\
         Right side:{indentExpr ob}"
 
+private def throwRelReplicateError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  if isGameEquivGoal target then
+    throwError "rel_replicate: the goal is a `GameEquiv`; use `by_equiv` first to enter relational proof mode."
+  match relTripleGoalParts? target with
+  | none =>
+      throwError "rel_replicate: expected a `RelTriple` goal; got:{indentExpr target}"
+  | some (oa, ob, post) =>
+      let oa ← whnfReducible (← instantiateMVars oa)
+      let ob ← whnfReducible (← instantiateMVars ob)
+      throwError
+        "rel_replicate: expected a goal about synchronized `replicate` on both sides, with \
+        postcondition either `EqRel (List _)` or `List.Forall₂ R`.\n\
+        Left side:{indentExpr oa}\n\
+        Right side:{indentExpr ob}\n\
+        Postcondition:{indentExpr post}"
+
+private def throwRelMapMError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  if isGameEquivGoal target then
+    throwError "rel_mapM: the goal is a `GameEquiv`; use `by_equiv` first to enter relational proof mode."
+  match relTripleGoalParts? target with
+  | none =>
+      throwError "rel_mapM: expected a `RelTriple` goal; got:{indentExpr target}"
+  | some (oa, ob, post) =>
+      let oa ← whnfReducible (← instantiateMVars oa)
+      let ob ← whnfReducible (← instantiateMVars ob)
+      throwError
+        "rel_mapM: expected a goal about `List.mapM` on both sides, with postcondition either \
+        `EqRel (List _)` or `List.Forall₂ R`.\n\
+        Left side:{indentExpr oa}\n\
+        Right side:{indentExpr ob}\n\
+        Postcondition:{indentExpr post}\n\
+        Use `rel_mapM using Rin` when the input lists are related by a non-equality relation."
+
+private def throwRelFoldlMError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  if isGameEquivGoal target then
+    throwError "rel_foldlM: the goal is a `GameEquiv`; use `by_equiv` first to enter relational proof mode."
+  match relTripleGoalParts? target with
+  | none =>
+      throwError "rel_foldlM: expected a `RelTriple` goal; got:{indentExpr target}"
+  | some (oa, ob, post) =>
+      let oa ← whnfReducible (← instantiateMVars oa)
+      let ob ← whnfReducible (← instantiateMVars ob)
+      throwError
+        "rel_foldlM: expected a goal about `List.foldlM` on both sides, where the goal \
+        postcondition itself is the loop invariant.\n\
+        Left side:{indentExpr oa}\n\
+        Right side:{indentExpr ob}\n\
+        Postcondition:{indentExpr post}\n\
+        Use `rel_foldlM using Rin` when the input lists are related by a non-equality relation."
+
 private def runByUptoRule (bad : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.tvDist_simulateQ_le_probEvent_bad
@@ -273,10 +397,36 @@ private def runRelSimRule : TacticM Bool := withMainContext do
         return false
       if isEqRelPost R then
         tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := Eq))) <||>
+        tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'))
       else
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run))
+  | none => return false
+
+private def runRelSimRuleUsing (R : TSyntax `term) : TacticM Bool := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  match relTripleGoalParts? target with
+  | some (oa, ob, post) =>
+      if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
+        return false
+      if isEqRelPost post then
+        tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := $R)))
+      else
+        tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run (R_state := $R)))
+  | none => return false
+
+private def runRelSimDistRule : TacticM Bool := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  match relTripleGoalParts? target with
+  | some (oa, ob, post) =>
+      if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) || !isEqRelPost post then
+        return false
+      tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_impl_evalDist_eq))
   | none => return false
 
 private def throwByUptoError : TacticM Unit := withMainContext do
@@ -306,13 +456,34 @@ private def throwRelSimError : TacticM Unit := withMainContext do
           "rel_sim: recognized an output-only `simulateQ` goal, but \
           `relTriple_simulateQ_run'` did not apply.\n\
           Expected an `EqRel` postcondition together with the usual per-query simulation and \
-          initial-invariant obligations."
+          initial-invariant obligations.\n\
+          If your per-query proof goes by exact `evalDist ((impl₁ t).run s) = \
+          evalDist ((impl₂ t).run s)` plus state equality, try `rel_sim_dist`."
       throwError
         "rel_sim: recognized a state-threading `simulateQ` goal, but \
         `relTriple_simulateQ_run` did not apply.\n\
         Expected a postcondition of the form \
         `fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2`, together with the usual simulation and \
         initial-invariant obligations."
+
+private def throwRelSimDistError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  if isGameEquivGoal target then
+    throwError "rel_sim_dist: the goal is a `GameEquiv`; use `by_equiv` first to enter relational proof mode."
+  match relTripleGoalParts? target with
+  | none =>
+      throwError "rel_sim_dist: expected a `RelTriple` goal; got:{indentExpr target}"
+  | some (oa, ob, post) =>
+      let oa := oa.consumeMData
+      let ob := ob.consumeMData
+      throwError
+        "rel_sim_dist: expected an output-only `simulateQ ... run'` goal with `EqRel` postcondition.\n\
+        This tactic is for the exact-distribution pattern where the per-query obligation is \
+        `evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s)` and the remaining invariant \
+        is just state equality.\n\
+        Left side:{indentExpr oa}\n\
+        Right side:{indentExpr ob}\n\
+        Postcondition:{indentExpr post}"
 
 /-! ## Unary WP tactics -/
 
@@ -359,6 +530,16 @@ elab_rules : tactic
           pure ()
         else
           throwHoareStepError
+
+/-- `game_hoare` exhaustively decomposes a quantitative `Triple` goal.
+
+It repeatedly applies `hoare_step` until no further structural rule matches, then runs
+basic `simp [game_rule]` cleanup on the remaining goals. -/
+elab "game_hoare" : tactic => do
+  while (← runHoareStepRule) do
+    pure ()
+  let _ ← tryEvalTacticSyntax (← `(tactic| all_goals try simp [game_rule]))
+  pure ()
 
 /-! ## Relational step-through tactics (EasyCrypt-inspired) -/
 
@@ -455,6 +636,53 @@ elab_rules : tactic
         else
           throwRelStepError
 
+/-- `rel_replicate` lifts a one-step coupling through synchronized bounded iteration.
+
+It applies `relTriple_replicate_eqRel` when the goal postcondition is list equality,
+and otherwise falls back to `relTriple_replicate` for goals with postcondition
+`List.Forall₂ R`. -/
+syntax "rel_replicate" : tactic
+
+elab_rules : tactic
+  | `(tactic| rel_replicate) => do
+      if ← runRelReplicateRule then
+        return
+      throwRelReplicateError
+
+/-- `rel_mapM` lifts pointwise coupling through finite list traversals.
+
+Without arguments, it targets same-input traversals and tries to derive list equality or
+`List.Forall₂` goals from a per-element coupling. Use `rel_mapM using Rin` when the input
+lists are themselves related by a non-equality relation `Rin`. -/
+syntax "rel_mapM" ("using" term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| rel_mapM) => do
+      if ← runRelMapMRule then
+        return
+      throwRelMapMError
+  | `(tactic| rel_mapM using $R) => do
+      if ← runRelMapMRuleUsing R then
+        return
+      throwRelMapMError
+
+/-- `rel_foldlM` lifts a loop invariant through bounded left folds.
+
+Without arguments, it targets folds over the same input list. Use `rel_foldlM using Rin`
+when the two input lists are related by a non-equality relation `Rin`. The goal
+postcondition itself is used as the fold invariant. -/
+syntax "rel_foldlM" ("using" term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| rel_foldlM) => do
+      if ← runRelFoldlMRule then
+        return
+      throwRelFoldlMError
+  | `(tactic| rel_foldlM using $R) => do
+      if ← runRelFoldlMRuleUsing R then
+        return
+      throwRelFoldlMError
+
 /-- `rel_skip` closes a `RelTriple` goal where both sides are identical or both pure.
 
 Tries:
@@ -517,11 +745,37 @@ macro "rel_inline" ids:ident* : tactic =>
 /-- `rel_sim` applies the relational `simulateQ` rule with a state invariant.
 
 Given a goal about simulated computations, applies `relTriple_simulateQ_run`
-or `relTriple_simulateQ_run'`. -/
-elab "rel_sim" : tactic => do
-  if ← runRelSimRule then
-    return
-  throwRelSimError
+or `relTriple_simulateQ_run'`.
+
+Use `rel_sim_dist` instead when the proof is by exact per-query distribution equality and
+state equality. -/
+syntax "rel_sim" ("using" term)? : tactic
+
+elab_rules : tactic
+  | `(tactic| rel_sim) => do
+      if ← runRelSimRule then
+        return
+      throwRelSimError
+  | `(tactic| rel_sim using $R) => do
+      if ← runRelSimRuleUsing R then
+        return
+      throwRelSimError
+
+/-- `rel_sim_dist` applies the exact-distribution `simulateQ` rule.
+
+It targets `run'` goals with `EqRel` postcondition and leaves:
+1. a per-query `evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s)` obligation
+2. an initial-state equality goal
+
+This is the common "call by exact oracle equivalence" pattern used in exact game-hopping
+arguments. -/
+syntax "rel_sim_dist" : tactic
+
+elab_rules : tactic
+  | `(tactic| rel_sim_dist) => do
+      if ← runRelSimDistRule then
+        return
+      throwRelSimDistError
 
 /-! ## Proof mode entry tactics -/
 

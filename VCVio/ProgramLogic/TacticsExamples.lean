@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Tactics
+import VCVio.OracleComp.Constructions.Replicate
 
 /-!
 # Examples and Tests for VCGen-Style Tactics
@@ -69,6 +70,22 @@ example (c : Prop) [Decidable c] (a b : OracleComp spec α) (post : α → ℝ�
     wp⟦if c then a else b⟧ post = if c then wp⟦a⟧ post else wp⟦b⟧ post := by
   wp_step
 
+example (oa : OracleComp spec α) (n : ℕ) (post : List α → ℝ≥0∞) :
+    wp⟦oa.replicate (n + 1)⟧ post =
+      wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs))) := by
+  wp_step
+
+example (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β → ℝ≥0∞) :
+    wp⟦(x :: xs).mapM f⟧ post =
+      wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys))) := by
+  wp_step
+
+example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
+    (init : β) (post : β → ℝ≥0∞) :
+    wp⟦(x :: xs).foldlM f init⟧ post =
+      wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post) := by
+  wp_step
+
 /-! ## `hoare_step` examples -/
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β}
@@ -83,6 +100,26 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
 example (x : α) (pre : ℝ≥0∞) (post : α → ℝ≥0∞)
     (h : pre ≤ post x) :
     ⦃pre⦄ (pure x : OracleComp spec α) ⦃post⦄ := by
+  hoare_step
+  exact h
+
+example (oa : OracleComp spec α) (n : ℕ) (pre : ℝ≥0∞) (post : List α → ℝ≥0∞)
+    (h : pre ≤ wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs)))) :
+    ⦃pre⦄ oa.replicate (n + 1) ⦃post⦄ := by
+  hoare_step
+  exact h
+
+example (x : α) (xs : List α) (f : α → OracleComp spec β)
+    (pre : ℝ≥0∞) (post : List β → ℝ≥0∞)
+    (h : pre ≤ wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys)))) :
+    ⦃pre⦄ (x :: xs).mapM f ⦃post⦄ := by
+  hoare_step
+  exact h
+
+example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
+    (init : β) (pre : ℝ≥0∞) (post : β → ℝ≥0∞)
+    (h : pre ≤ wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post)) :
+    ⦃pre⦄ (x :: xs).foldlM f init ⦃post⦄ := by
   hoare_step
   exact h
 
@@ -101,6 +138,20 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
     (hog : ∀ b, ⦃cut₂ b⦄ g b ⦃post⦄) :
     ⦃pre⦄ (oa >>= f >>= g) ⦃post⦄ := by
   hoare_seq 2
+  · exact hoa
+  · exact hof
+  · exact hog
+
+/-! ## `game_hoare` example -/
+
+example {oa : OracleComp spec α} {f : α → OracleComp spec β}
+    {g : β → OracleComp spec γ}
+    {pre : ℝ≥0∞} {cut₁ : α → ℝ≥0∞} {cut₂ : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
+    (hoa : ⦃pre⦄ oa ⦃cut₁⦄)
+    (hof : ∀ a, ⦃cut₁ a⦄ f a ⦃cut₂⦄)
+    (hog : ∀ b, ⦃cut₂ b⦄ g b ⦃post⦄) :
+    ⦃pre⦄ (oa >>= f >>= g) ⦃post⦄ := by
+  game_hoare
   · exact hoa
   · exact hof
   · exact hog
@@ -148,6 +199,71 @@ example [SampleableType α]
   · exact hf
   · intro x
     rfl
+
+/-! ## `rel_replicate` examples -/
+
+example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
+    (h : ⟪oa₁ ~ oa₂ | EqRel α⟫) :
+    ⟪oa₁.replicate n ~ oa₂.replicate n | EqRel (List α)⟫ := by
+  rel_replicate
+  exact h
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β} (n : ℕ)
+    {R : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫) :
+    ⟪oa.replicate n ~ ob.replicate n | List.Forall₂ R⟫ := by
+  rel_replicate
+  exact h
+
+/-! ## `rel_mapM` examples -/
+
+example {xs : List α} {f : α → OracleComp spec β} {g : α → OracleComp spec β}
+    (hfg : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
+    ⟪xs.mapM f ~ xs.mapM g | EqRel (List β)⟫ := by
+  rel_mapM
+  exact hfg
+
+example {xs : List α} {ys : List β}
+    {S : α → β → Prop}
+    {f : α → OracleComp spec γ} {g : β → OracleComp spec γ}
+    {R : RelPost γ γ}
+    (hxy : List.Forall₂ S xs ys)
+    (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
+    ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
+  rel_mapM using S
+  · exact hxy
+  · exact hfg
+
+/-! ## `rel_foldlM` examples -/
+
+example {σ₁ σ₂ : Type}
+    {xs : List α}
+    {f : σ₁ → α → OracleComp spec σ₁}
+    {g : σ₂ → α → OracleComp spec σ₂}
+    {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hfg : ∀ a t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ a | S⟫) :
+    ⟪xs.foldlM f s₁ ~ xs.foldlM g s₂ | S⟫ := by
+  rel_foldlM
+  · exact hs
+  · exact hfg
+
+example {σ₁ σ₂ : Type}
+    {xs : List α} {ys : List β}
+    {Rin : α → β → Prop}
+    {f : σ₁ → α → OracleComp spec σ₁}
+    {g : σ₂ → β → OracleComp spec σ₂}
+    {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hxy : List.Forall₂ Rin xs ys)
+    (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ b | S⟫) :
+    ⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ | S⟫ := by
+  rel_foldlM using Rin
+  · exact hs
+  · exact hxy
+  · exact hfg
 
 /-! ## `rel_skip` examples -/
 
@@ -272,7 +388,7 @@ example
     ⟪(simulateQ impl₁ oa).run s₁
      ~ (simulateQ impl₂ oa).run s₂
      | fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2⟫ := by
-  rel_sim
+  rel_sim using R_state
   all_goals first | exact himpl | exact hs
 
 example
@@ -292,6 +408,30 @@ example
   all_goals first | exact himpl | exact hs
 
 end RelSim
+
+/-! ## `rel_sim_dist` examples -/
+
+section RelSimDist
+
+variable {σ : Type} {ι : Type} {spec : OracleSpec ι}
+variable [spec.Fintype] [spec.Inhabited]
+variable {α : Type}
+
+example
+    (impl₁ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain) (s : σ),
+      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+    (s₁ s₂ : σ) (hs : s₁ = s₂) :
+    ⟪(simulateQ impl₁ oa).run' s₁
+     ~ (simulateQ impl₂ oa).run' s₂
+     | EqRel α⟫ := by
+  rel_sim_dist
+  · exact himpl
+  · exact hs
+
+end RelSimDist
 
 /-! ## Multi-step composed example -/
 

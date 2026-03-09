@@ -58,8 +58,13 @@ For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
 
 - **Proof-mode entry**: `by_equiv`, `game_trans`, `by_dist`, `by_upto`, `by_hoare`
 - **Relational stepping**: `rel_step`, `rel_seq`, `rel_rnd`, `rel_skip`, `rel_pure`,
-  `rel_cond`, `rel_conseq`, `rel_inline`, `rel_sim`
+  `rel_cond`, `rel_conseq`, `rel_inline`, `rel_sim`, `rel_sim_dist`,
+  `rel_replicate`, `rel_mapM`,
+  `rel_foldlM`
 - **Unary stepping**: `wp_step`, `wp_seq`, `hoare_step`, `hoare_seq`
+- **Unary exhaustive**: `game_hoare`, plus compatibility `game_wp`
+  (`wp_step` / `hoare_step` also understand bounded iteration via `replicate`, `List.mapM`,
+  and `List.foldlM`)
 - **Rewriting / congruence**: `prob_swap`, `prob_swap_rw`, `prob_congr`, `prob_congr'`
 
 Quick usage notes:
@@ -68,6 +73,11 @@ Quick usage notes:
 - `rel_seq n using R` applies `rel_step using R` first, then plain `rel_step`.
 - `rel_rnd` can consume a local `Function.Bijective f` hypothesis, or use `rel_rnd using f`.
 - `rel_sim` chooses `relTriple_simulateQ_run` vs `relTriple_simulateQ_run'` from the goal shape.
+- `rel_sim_dist` is the exact-distribution `call` variant: it leaves per-query `evalDist` equality and initial-state equality.
+- `rel_replicate` lifts a one-step coupling through synchronized `replicate` goals.
+- `rel_mapM` lifts pointwise coupling through finite list traversals; use `rel_mapM using Rin` for non-equality input-list relations.
+- `rel_foldlM` lifts a bounded loop invariant through `List.foldlM`; use `rel_foldlM using Rin` for non-equality input-list relations.
+- `game_hoare` is the coarse exhaustive quantitative Hoare driver built on top of `hoare_step`.
 - `by_upto bad` applies the existing identical-until-bad TV-distance bound for `simulateQ`.
 
 ## Building

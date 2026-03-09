@@ -37,13 +37,21 @@
 | `rel_conseq` | `⟪oa ~ ob \| R'⟫` | Weakens/strengthens postcondition |
 | `rel_inline foo` | `⟪... ~ ... \| R⟫` | Unfolds definitions, simplifies |
 | `rel_sim` | Simulated computation goals | Chooses `relTriple_simulateQ_run` or `relTriple_simulateQ_run'` |
+| `rel_sim_dist` | Output-only `simulateQ ... run'` goals | Uses exact per-query `evalDist` equality plus state equality |
+| `rel_replicate` | `⟪oa.replicate n ~ ob.replicate n \| ...⟫` | Lifts a one-step coupling through bounded iteration |
+| `rel_mapM` | `⟪xs.mapM f ~ ys.mapM g \| ...⟫` | Lifts pointwise coupling through finite list traversals |
+| `rel_foldlM` | `⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ \| S⟫` | Uses the goal postcondition as a bounded loop invariant |
 
 ### Optional arguments
 
 - `rel_step using R` — provide explicit intermediate relation
 - `rel_seq n using R` — use `rel_step using R` first, then keep stepping with plain `rel_step`
 - `rel_rnd using f` — provide explicit bijection for coupling
+- `rel_sim using R` — provide the state invariant relation for `simulateQ` proofs
+- `rel_sim_dist` — specialize to the exact-distribution `call` pattern with equal states
 - `rel_conseq with R` — provide explicit weaker postcondition
+- `rel_mapM using Rin` — provide the input-list relation for traversals over different lists
+- `rel_foldlM using Rin` — provide the input-list relation for folds over different lists
 
 ### Unary WP
 
@@ -51,8 +59,14 @@
 |--------|--------------|
 | `hoare_step` | One quantitative `Triple` decomposition step, falling back to `wp_step` |
 | `hoare_seq n` | Repeats `hoare_step` for `n` layers |
-| `wp_step` | One WP decomposition (wp_bind, wp_pure, wp_query, wp_ite, wp_uniformSample, wp_map) |
+| `game_hoare` | Exhaustively decomposes a quantitative `Triple` goal, then simplifies |
+| `wp_step` | One WP decomposition (wp_bind, wp_pure, wp_replicate, wp_list_mapM, wp_list_foldlM, wp_query, wp_ite, wp_uniformSample, wp_map) |
 | `wp_seq n` | Repeats `wp_step` for `n` layers |
+
+`wp_step` / `hoare_step` understand `OracleComp.replicate`, `List.mapM`, and `List.foldlM`.
+For `replicate`, split on the loop count (`0` vs `n + 1`) in the surrounding theorem or proof.
+For `List.mapM`, split on the input list (`[]` vs `x :: xs`).
+For `List.foldlM`, split on the input list and treat the goal postcondition as the loop invariant.
 
 ### Bind Reordering
 
@@ -69,7 +83,7 @@
 | Tactic | What it does |
 |--------|--------------|
 | `game_rel'` | Exhaustive relational prover (rel_step + rel_rnd + rel_skip + rel_pure + ...) |
-| `game_wp` | Compatibility macro: repeatedly applies WP rules |
+| `game_wp` | Compatibility macro: repeatedly applies WP rules, including bounded iteration and traversals |
 | `game_rel` / `coupling` | Compatibility macros: coarse relational decomposition through bind/query |
 | `game_hop` | Compatibility macro: tries to close a game-hopping step |
 | `rel_dist` | Turns `RelTriple oa ob (EqRel α)` into `evalDist oa = evalDist ob` |

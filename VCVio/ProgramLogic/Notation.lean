@@ -238,8 +238,21 @@ Prefer `wp_step` from `VCVio.ProgramLogic.Tactics` for interactive proofs. -/
 macro "game_wp" : tactic =>
   `(tactic| (
     simp only [game_rule]
-    repeat (first | rw [wp_bind] | rw [wp_query] | rw [wp_pure] | rw [wp_ite]
-                  | rw [wp_uniformSample])
+    repeat (first
+      | rw [wp_bind]
+      | rw [wp_query]
+      | rw [wp_pure]
+      | rw [wp_ite]
+      | rw [wp_uniformSample]
+      | rw [wp_map]
+      | rw [wp_simulateQ_eq]
+      | rw [wp_liftComp]
+      | rw [wp_replicate_zero]
+      | rw [wp_replicate_succ]
+      | rw [wp_list_mapM_nil]
+      | rw [wp_list_mapM_cons]
+      | rw [wp_list_foldlM_nil]
+      | rw [wp_list_foldlM_cons])
     try simp [game_rule]
   ))
 

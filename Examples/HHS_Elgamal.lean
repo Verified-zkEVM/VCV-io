@@ -231,16 +231,15 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
       ((simulateQ (IND_CPA_queryImpl_hybrid (G := G) (P := P) pk false 0)
         (adversary pk)).run' (∅, 0))
       (EqRel _) := by
-  rel_dist
-  simp only [StateT.run']
-  rw [evalDist_map, evalDist_map]
-  congr 1
-  exact evalDist_simulateQ_run_eq_of_impl_evalDist_eq _ _
-    (fun t s => by
-      cases t with
-      | inl _ => rfl
-      | inr mm => exact hybridChallengeOracle_allRandom_evalDist_eq pk mm s)
-    (adversary pk) (∅, 0)
+  rel_sim_dist
+  · intro t s
+    cases t with
+    | inl _ =>
+        rfl
+    | inr mm =>
+        simpa [IND_CPA_queryImpl_hybrid] using hybridChallengeOracle_allRandom_evalDist_eq
+          (G := G) (P := P) pk mm s
+  · rfl
 
 /-- The all-random hybrid game has success probability exactly 1/2.
 

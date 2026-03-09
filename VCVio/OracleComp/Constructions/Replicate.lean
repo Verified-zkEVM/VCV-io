@@ -46,6 +46,14 @@ lemma replicateTR_zero : replicate 0 oa = return [] := rfl
 lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
   rw [replicate, List.replicate_succ, List.mapM_cons, seq_eq_bind_map, bind_map_left]; rfl
 
+/-- Bind-style unfolding of `replicate`, convenient for program-logic proofs. -/
+lemma replicate_succ_bind :
+    replicate (n + 1) oa = (do
+      let x ← oa
+      let xs ← replicate n oa
+      pure (x :: xs)) := by
+  simp [replicate_succ, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, Function.comp]
+
 @[simp]
 lemma replicate_pure (x : α) :
     (pure x : OracleComp spec α).replicate n = pure (List.replicate n x) := by

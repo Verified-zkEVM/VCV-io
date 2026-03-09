@@ -7,6 +7,7 @@ Authors: Quang Dao
 import ToMathlib.Control.Monad.Algebra
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
@@ -24,7 +25,7 @@ namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
-variable {α β : Type}
+variable {α β σ : Type}
 
 /-! ## API contract
 
@@ -99,6 +100,47 @@ noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post :
       wp oa (fun x => wp (ob x) post) := by
   simpa [wp] using
     (MAlgOrdered.wp_bind (m := OracleComp spec) (l := ℝ≥0∞) oa ob post)
+
+@[game_rule] theorem wp_replicate_zero (oa : OracleComp spec α) (post : List α → ℝ≥0∞) :
+    wp (spec := spec) (oa.replicate 0) post = post [] := by
+  simp [OracleComp.replicate_zero]
+
+@[game_rule] theorem wp_replicate_succ
+    (oa : OracleComp spec α) (n : ℕ) (post : List α → ℝ≥0∞) :
+    wp (spec := spec) (oa.replicate (n + 1)) post =
+      wp oa (fun x => wp (oa.replicate n) (fun xs => post (x :: xs))) := by
+  rw [OracleComp.replicate_succ_bind, wp_bind]
+  congr 1
+  funext x
+  rw [wp_bind]
+  simp
+
+@[game_rule] theorem wp_list_mapM_nil
+    (f : α → OracleComp spec β) (post : List β → ℝ≥0∞) :
+    wp (spec := spec) (([] : List α).mapM f) post = post [] := by
+  simp
+
+@[game_rule] theorem wp_list_mapM_cons
+    (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β → ℝ≥0∞) :
+    wp (spec := spec) ((x :: xs).mapM f) post =
+      wp (f x) (fun y => wp (xs.mapM f) (fun ys => post (y :: ys))) := by
+  rw [List.mapM_cons, wp_bind]
+  congr 1
+  funext y
+  rw [wp_bind]
+  simp
+
+@[game_rule] theorem wp_list_foldlM_nil
+    (f : σ → α → OracleComp spec σ) (init : σ) (post : σ → ℝ≥0∞) :
+    wp (spec := spec) (([] : List α).foldlM f init) post = post init := by
+  simp
+
+@[game_rule] theorem wp_list_foldlM_cons
+    (x : α) (xs : List α) (f : σ → α → OracleComp spec σ)
+    (init : σ) (post : σ → ℝ≥0∞) :
+    wp (spec := spec) ((x :: xs).foldlM f init) post =
+      wp (f init x) (fun s => wp (xs.foldlM f s) post) := by
+  rw [List.foldlM_cons, wp_bind]
 
 theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
     (hpost : ∀ x, post x ≤ post' x) :
