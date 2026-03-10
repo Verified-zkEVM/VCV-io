@@ -3,6 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
+import Mathlib.Algebra.Group.TypeTags.Basic
 import Mathlib.Control.Monad.Writer
 import Batteries.Control.AlternativeMonad
 
@@ -179,3 +180,27 @@ instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
 end fail
 
 end WriterT
+
+/-! ## AddWriterT: Additive Writer Monad Transformer -/
+
+/-- Writer monad transformer with additive cost accumulation.
+Defined as `WriterT (Multiplicative ω) M`, which uses `Monoid (Multiplicative ω)`
+(derived from `AddMonoid ω`) so that `tell` accumulates via `+` with identity `0`.
+
+The types `Multiplicative ω` and `ω` are definitionally equal (`Multiplicative` is a plain
+`def`, not a `structure`), so no runtime wrapping occurs. -/
+abbrev AddWriterT (ω : Type u) (M : Type u → Type v) := WriterT (Multiplicative ω) M
+
+namespace AddWriterT
+
+variable {ω : Type u} {M : Type u → Type v} [Monad M]
+
+/-- Record an additive cost `w` in the writer log. -/
+def addTell [AddMonoid ω] (w : ω) : AddWriterT ω M PUnit :=
+  tell (Multiplicative.ofAdd w)
+
+@[simp]
+lemma run_addTell [AddMonoid ω] (w : ω) :
+    (addTell (M := M) w).run = pure (⟨⟩, Multiplicative.ofAdd w) := rfl
+
+end AddWriterT
