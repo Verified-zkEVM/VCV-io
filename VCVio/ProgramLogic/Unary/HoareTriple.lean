@@ -94,6 +94,12 @@ noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post :
       if c then wp oa post else wp ob post := by
   split_ifs <;> rfl
 
+@[simp, game_rule] theorem wp_dite (c : Prop) [Decidable c]
+    (oa : c → OracleComp spec α) (ob : ¬c → OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp (spec := spec) (dite c oa ob) post =
+      dite c (fun h => wp (oa h) post) (fun h => wp (ob h) post) := by
+  split_ifs <;> rfl
+
 @[game_rule] theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (post : β → ℝ≥0∞) :
     wp (spec := spec) (oa >>= ob) post =
@@ -172,13 +178,17 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp oa (fun _ => c) = c := by
   rw [wp_eq_tsum, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
-theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
+@[game_rule] theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
     wp oa (fun x => f x + g x) = wp oa f + wp oa g := by
   simp only [wp_eq_tsum, mul_add, ENNReal.tsum_add]
 
-theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
+@[game_rule] theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
     wp oa (fun x => c * f x) = c * wp oa f := by
   simp only [wp_eq_tsum]; simp_rw [mul_left_comm]; exact ENNReal.tsum_mul_left
+
+theorem wp_const_mul (oa : OracleComp spec α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
+    wp oa (fun x => f x * c) = wp oa f * c := by
+  simp_rw [mul_comm _ c]; rw [wp_mul_const, mul_comm]
 
 theorem triple_conseq {pre pre' : ℝ≥0∞} {oa : OracleComp spec α}
     {post post' : α → ℝ≥0∞}
@@ -195,6 +205,13 @@ theorem triple_bind {pre : ℝ≥0∞} {oa : OracleComp spec α}
   simpa [Triple, wp] using
     (MAlgOrdered.triple_bind (m := OracleComp spec) (l := ℝ≥0∞) hoa hob)
 
+theorem triple_bind_wp {pre : ℝ≥0∞} {oa : OracleComp spec α}
+    {ob : α → OracleComp spec β} {post : β → ℝ≥0∞}
+    (h : Triple (spec := spec) pre oa (fun x => wp (ob x) post)) :
+    Triple pre (oa >>= ob) post := by
+  show pre ≤ wp (oa >>= ob) post
+  rw [wp_bind]; exact h
+
 theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
     Triple (spec := spec) (post x) (pure x) post := by
   simp [Triple, MAlgOrdered.Triple]
@@ -203,6 +220,24 @@ theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
 theorem triple_zero (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     Triple (spec := spec) 0 oa post := by
   simp [Triple, MAlgOrdered.Triple]
+
+theorem triple_ite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
+    {oa ob : OracleComp spec α} {post : α → ℝ≥0∞}
+    (ht : c → Triple (spec := spec) pre oa post)
+    (hf : ¬c → Triple pre ob post) :
+    Triple pre (if c then oa else ob) post := by
+  split_ifs with h
+  · exact ht h
+  · exact hf h
+
+theorem triple_dite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
+    {oa : c → OracleComp spec α} {ob : ¬c → OracleComp spec α} {post : α → ℝ≥0∞}
+    (ht : ∀ h : c, Triple (spec := spec) pre (oa h) post)
+    (hf : ∀ h : ¬c, Triple pre (ob h) post) :
+    Triple pre (dite c oa ob) post := by
+  split_ifs with h
+  · exact ht h
+  · exact hf h
 
 /-- `probEvent` as a WP of an indicator postcondition. -/
 lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
@@ -323,6 +358,92 @@ theorem triple_support (oa : OracleComp spec α) [DecidablePred fun x => x ∈ s
   simpa using
     triple_probEvent_eq_one (oa := oa) (p := fun x => x ∈ support oa)
       (h := probEvent_mem_support (oa := oa))
+
+/-! ## Loop stepping rules (Triple-level) -/
+
+theorem triple_replicate_succ {pre : ℝ≥0∞} {oa : OracleComp spec α} {n : ℕ}
+    {post : List α → ℝ≥0∞}
+    (h : Triple pre oa (fun x => wp (oa.replicate n) (fun xs => post (x :: xs)))) :
+    Triple pre (oa.replicate (n + 1)) post := by
+  show pre ≤ wp (oa.replicate (n + 1)) post
+  rw [wp_replicate_succ]; exact h
+
+theorem triple_list_mapM_cons {pre : ℝ≥0∞} {x : α} {xs : List α}
+    {f : α → OracleComp spec β} {post : List β → ℝ≥0∞}
+    (h : Triple pre (f x) (fun y => wp (xs.mapM f) (fun ys => post (y :: ys)))) :
+    Triple pre ((x :: xs).mapM f) post := by
+  show pre ≤ wp ((x :: xs).mapM f) post
+  rw [wp_list_mapM_cons]; exact h
+
+theorem triple_list_foldlM_cons {pre : ℝ≥0∞} {x : α} {xs : List α}
+    {f : σ → α → OracleComp spec σ} {init : σ} {post : σ → ℝ≥0∞}
+    (h : Triple pre (f init x) (fun s => wp (xs.foldlM f s) post)) :
+    Triple pre ((x :: xs).foldlM f init) post := by
+  show pre ≤ wp ((x :: xs).foldlM f init) post
+  rw [wp_list_foldlM_cons]; exact h
+
+/-! ## Loop invariant rules -/
+
+/-- Constant invariant through bounded iteration via `replicate`. -/
+theorem triple_replicate_inv {I : ℝ≥0∞} {oa : OracleComp spec α} {n : ℕ}
+    (hstep : Triple I oa (fun _ => I)) :
+    Triple I (oa.replicate n) (fun _ => I) := by
+  induction n with
+  | zero => exact triple_pure [] (fun _ => I)
+  | succ n ih =>
+      rw [OracleComp.replicate_succ_bind]
+      exact triple_bind hstep fun _ => triple_bind ih fun _ => triple_pure _ _
+
+/-- Indexed invariant through `List.foldlM`. -/
+theorem triple_list_foldlM_inv {I : σ → ℝ≥0∞}
+    {f : σ → α → OracleComp spec σ} {l : List α} {s₀ : σ}
+    (hstep : ∀ s x, x ∈ l → Triple (I s) (f s x) I) :
+    Triple (I s₀) (l.foldlM f s₀) I := by
+  induction l generalizing s₀ with
+  | nil => exact triple_pure s₀ I
+  | cons a as ih =>
+      rw [List.foldlM_cons]
+      exact triple_bind (hstep s₀ a (by simp)) fun s =>
+        ih fun s x hx => hstep s x (by simp [hx])
+
+/-- Constant invariant through `List.mapM`. -/
+theorem triple_list_mapM_inv {I : ℝ≥0∞}
+    {f : α → OracleComp spec β} {l : List α}
+    (hstep : ∀ x, x ∈ l → Triple I (f x) (fun _ => I)) :
+    Triple I (l.mapM f) (fun _ => I) := by
+  induction l with
+  | nil => exact triple_pure ([] : List β) (fun _ => I)
+  | cons a as ih =>
+      rw [List.mapM_cons]
+      exact triple_bind (hstep a (by simp)) fun _ =>
+        triple_bind (ih fun x hx => hstep x (by simp [hx])) fun _ =>
+          triple_pure _ _
+
+/-- `replicate` invariant with consequence: bridges arbitrary pre/post to the invariant. -/
+theorem triple_replicate {I pre : ℝ≥0∞} {oa : OracleComp spec α} {n : ℕ}
+    {post : List α → ℝ≥0∞}
+    (hpre : pre ≤ I) (hpost : ∀ xs, I ≤ post xs)
+    (hstep : Triple I oa (fun _ => I)) :
+    Triple pre (oa.replicate n) post :=
+  triple_conseq hpre hpost (triple_replicate_inv hstep)
+
+/-- `List.foldlM` invariant with consequence. -/
+theorem triple_list_foldlM {I : σ → ℝ≥0∞}
+    {f : σ → α → OracleComp spec σ} {l : List α} {s₀ : σ}
+    {pre : ℝ≥0∞} {post : σ → ℝ≥0∞}
+    (hpre : pre ≤ I s₀) (hpost : ∀ s, I s ≤ post s)
+    (hstep : ∀ s x, x ∈ l → Triple (I s) (f s x) I) :
+    Triple pre (l.foldlM f s₀) post :=
+  triple_conseq hpre hpost (triple_list_foldlM_inv hstep)
+
+/-- `List.mapM` invariant with consequence. -/
+theorem triple_list_mapM {I : ℝ≥0∞}
+    {f : α → OracleComp spec β} {l : List α}
+    {pre : ℝ≥0∞} {post : List β → ℝ≥0∞}
+    (hpre : pre ≤ I) (hpost : ∀ ys, I ≤ post ys)
+    (hstep : ∀ x, x ∈ l → Triple I (f x) (fun _ => I)) :
+    Triple pre (l.mapM f) post :=
+  triple_conseq hpre hpost (triple_list_mapM_inv hstep)
 
 /-! ## Congruence under evalDist equality -/
 
