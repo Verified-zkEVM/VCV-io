@@ -12,7 +12,7 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 /-!
 # Asymmetric Encryption Schemes.
 
-This file defines a type `PublicKeyEncAlg spec M PK SK C` to represent an protocol
+This file defines a type `AsymmEncAlg spec M PK SK C` to represent an protocol
 for asymmetric encryption using oracles in `spec`, with message space `M`,
 public/secret keys `PK` and `SK`, and ciphertext space `C`.
 -/
@@ -21,21 +21,21 @@ open OracleSpec OracleComp ENNReal
 
 universe u v w
 
-/-- An `PublicKeyEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
+/-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
 `spec` is the available oracle set and `m` is the monad used to execute the oracle calls.
 Extends `ExecutionMethod spec m`, in most cases will be `ExecutionMethod.default`. -/
-structure PublicKeyEncAlg (m : Type → Type u) (M PK SK C : Type)
+structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
   decrypt : (sk : SK) → (c : C) → Option M
 
-alias PKE_Alg := PublicKeyEncAlg
+alias PKE_Alg := AsymmEncAlg
 
-namespace PublicKeyEncAlg
+namespace AsymmEncAlg
 
 variable {m : Type → Type v} {M PK SK C : Type}
-  (encAlg : PublicKeyEncAlg m M PK SK C)
+  (encAlg : AsymmEncAlg m M PK SK C)
 
 section Correct
 
@@ -68,22 +68,22 @@ API changes from old version:
 - `idOracle ++ₛₒ` → `QueryImpl.ofLift ... .liftTarget ... +`
 - `guard (b = b')` → `return (b == b')` (Bool-valued experiment) -/
 
-def IND_CPA_oracleSpec (_encAlg : PublicKeyEncAlg ProbComp M PK SK C) :=
+def IND_CPA_oracleSpec (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   unifSpec + (M × M →ₒ C)
 
-def IND_CPA_adversary (encAlg : PublicKeyEncAlg ProbComp M PK SK C) :=
+def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
 
 /-- An IND-CPA adversary `MakesAtMostQueries q` when it issues at most `q` total queries
 to the challenge (encryption) oracle, regardless of public key.
 Uniform-sampling queries are unrestricted. -/
-def IND_CPA_adversary.MakesAtMostQueries {encAlg : PublicKeyEncAlg ProbComp M PK SK C}
+def IND_CPA_adversary.MakesAtMostQueries {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) (q : ℕ) : Prop :=
   ∀ pk, (adversary pk).IsQueryBound q
     (fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
     (fun t n => match t with | .inl _ => n | .inr _ => n - 1)
 
-def IND_CPA_queryImpl' (encAlg : PublicKeyEncAlg ProbComp M PK SK C)
+def IND_CPA_queryImpl' (encAlg : AsymmEncAlg ProbComp M PK SK C)
     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
       (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
   have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
@@ -91,7 +91,7 @@ def IND_CPA_queryImpl' (encAlg : PublicKeyEncAlg ProbComp M PK SK C)
   (QueryImpl.ofLift unifSpec ProbComp).liftTarget
     (StateT ((M × M →ₒ C).QueryCache) ProbComp) + so.withCaching
 
-def IND_CPA_queryImpl (encAlg : PublicKeyEncAlg ProbComp M PK SK C)
+def IND_CPA_queryImpl (encAlg : AsymmEncAlg ProbComp M PK SK C)
     (pk : PK) (b : Bool) : QueryImpl encAlg.IND_CPA_oracleSpec
       (StateT ((M × M →ₒ C).QueryCache) ProbComp) :=
   have so : QueryImpl (M × M →ₒ C) ProbComp := fun (m₁, m₂) =>
@@ -100,14 +100,14 @@ def IND_CPA_queryImpl (encAlg : PublicKeyEncAlg ProbComp M PK SK C)
     (StateT ((M × M →ₒ C).QueryCache) ProbComp) +
     so.liftTarget (StateT ((M × M →ₒ C).QueryCache) ProbComp)
 
-def IND_CPA_experiment {encAlg : PublicKeyEncAlg ProbComp M PK SK C}
+def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) : ProbComp Bool := do
   let b ← $ᵗ Bool
   let (pk, _sk) ← encAlg.keygen
   let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
   return (b == b')
 
-noncomputable def IND_CPA_advantage {encAlg : PublicKeyEncAlg ProbComp M PK SK C}
+noncomputable def IND_CPA_advantage {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) : ℝ≥0∞ :=
   Pr[= true | IND_CPA_experiment adversary] - 1 / 2
 
@@ -133,10 +133,10 @@ variable {ι : Type} {spec : OracleSpec ι} [DecidableEq C]
 for getting a challenge from a pair of messages.
 
 API change: `++ₒ` → `+`. -/
-def IND_CCA_oracleSpec (_encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C) :=
+def IND_CCA_oracleSpec (_encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) :=
     (C →ₒ Option M) + ((M × M) →ₒ C)
 
-structure IND_CCA_Adversary (encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C) where
+structure IND_CCA_Adversary (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) where
     main : PK → OracleComp encAlg.IND_CCA_oracleSpec Bool
 
 /-- Implement oracles for IND-CCA security game. A state monad tracks the current challenge.
@@ -148,7 +148,7 @@ When an oracle check fails, the `OptionT` layer produces `none`.
 Important semantic split:
 - forbidden query (decrypt challenge / request second challenge) => oracle failure (`none`)
 - normal decryption miss (`encAlg.decrypt sk c = none`) => successful oracle response `some none` -/
-def IND_CCA_oracleImpl (encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C)
+def IND_CCA_oracleImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
     (pk : PK) (sk : SK) (b : Bool) : QueryImpl (IND_CCA_oracleSpec encAlg)
       (OptionT (StateT (Option C) (OracleComp spec))) := fun
   | Sum.inl c => OptionT.mk do
@@ -167,7 +167,7 @@ def IND_CCA_oracleImpl (encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C)
 the challenge ciphertext), the game returns `false` (adversary loses).
 
 Uses `return (b == b')` instead of the old `guard (b = b')`. -/
-def IND_CCA_Game {encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C}
+def IND_CCA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : encAlg.IND_CCA_Adversary) : ProbComp Bool :=
   encAlg.exec do
     let (pk, sk) ← encAlg.keygen
@@ -178,7 +178,7 @@ def IND_CCA_Game {encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C}
     | some b' => return (b == b')
     | none => return false
 
-noncomputable def IND_CCA_Advantage {encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C}
+noncomputable def IND_CCA_Advantage {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : encAlg.IND_CCA_Adversary) : ℝ :=
   (IND_CCA_Game adversary).boolBiasAdvantage
 
@@ -190,12 +190,12 @@ variable {ι : Type} {spec : OracleSpec ι} [DecidableEq M] [DecidableEq C]
 
 /-- Two-phase adversary for IND-CPA security.
 Removed `AlternativeMonad`/`LawfulAlternative` requirements (not available in current API). -/
-structure IND_CPA_Adv (encAlg : PublicKeyEncAlg m M PK SK C) where
+structure IND_CPA_Adv (encAlg : AsymmEncAlg m M PK SK C) where
   State : Type
   chooseMessages : PK → m (M × M × State)
   distinguish : State → C → m Bool
 
-variable {encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C}
+variable {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
   (adv : IND_CPA_Adv encAlg)
 
 /--
@@ -219,13 +219,13 @@ def IND_CPA_OneTime_Game : ProbComp Bool :=
     let b' ← adv.distinguish state c
     return (b == b')
 
-noncomputable def IND_CPA_OneTime_Advantage (encAlg : PublicKeyEncAlg (OracleComp spec) M PK SK C)
+noncomputable def IND_CPA_OneTime_Advantage (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
     (adv : IND_CPA_Adv encAlg) : ℝ :=
   (IND_CPA_OneTime_Game (encAlg := encAlg) adv).boolBiasAdvantage
 
 section OracleLift
 
-variable {encAlg' : PublicKeyEncAlg ProbComp M PK SK C}
+variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
 /-- One-time IND-CPA game specialized to `ProbComp` execution (no extra `exec` wrapper). This is
 the canonical target for generic one-query lifts into the oracle IND-CPA interface. -/
@@ -266,7 +266,7 @@ abbrev IND_CPA_experiment_adversary_of_OneTime_eq_oneTimeGameObligation
     IND_CPA_OneTime_Game_ProbComp (encAlg' := encAlg') adv
 
 /-- `ℝ≥0∞` one-time signed IND-CPA advantage, aligned with `IND_CPA_advantage`. -/
-noncomputable def IND_CPA_OneTime_AdvantageENN (encAlg : PublicKeyEncAlg ProbComp M PK SK C)
+noncomputable def IND_CPA_OneTime_AdvantageENN (encAlg : AsymmEncAlg ProbComp M PK SK C)
     (adv : IND_CPA_Adv encAlg) : ℝ≥0∞ :=
   Pr[= true | IND_CPA_OneTime_Game_ProbComp (encAlg' := encAlg) adv] - 1 / 2
 
@@ -313,7 +313,7 @@ end OracleLift
 
 section MultiQueryHybridLift
 
-variable {encAlg' : PublicKeyEncAlg ProbComp M PK SK C}
+variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
 /-- Signed real IND-CPA advantage (`Pr[win]-1/2`) for the oracle IND-CPA experiment. -/
 noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
@@ -405,4 +405,4 @@ end MultiQueryHybridLift
 
 end IND_CPA_TwoPhase
 
-end PublicKeyEncAlg
+end AsymmEncAlg

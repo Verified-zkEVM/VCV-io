@@ -40,7 +40,7 @@ For the full list, see `docs/agents/gotchas.md`.
 
 Follow Mathlib convention: `{head_symbol}_{operation}_{rhs_form}`.
 Examples: `probOutput_bind_eq_tsum`, `support_pure`, `simulateQ_map`.
-Structures use UpperCamelCase: `SecExp`, `SecretKeyEncAlg`, `RelTriple`.
+Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 
 ## Canonical Examples
 

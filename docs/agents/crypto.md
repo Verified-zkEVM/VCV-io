@@ -2,20 +2,20 @@
 
 ## Crypto Primitive Structures
 
-### Asymmetric encryption (`PublicKeyEncAlg`)
+### Asymmetric encryption (`AsymmEncAlg`)
 
 ```lean
-structure PublicKeyEncAlg (m : Type → Type) (M PK SK C : Type)
+structure AsymmEncAlg (m : Type → Type) (M PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : PK → M → m C
   decrypt : SK → C → Option M
 ```
 
-### Symmetric encryption (`SecretKeyEncAlg`)
+### Symmetric encryption (`SymmEncAlg`)
 
 ```lean
-structure SecretKeyEncAlg (M K C : ℕ → Type) (Q : Type)
+structure SymmEncAlg (M K C : ℕ → Type) (Q : Type)
     extends OracleContext Q ProbComp where
   keygen (sp : ℕ) : OracleComp spec (K sp)
   encrypt {sp : ℕ} (k : K sp) (msg : M sp) : OracleComp spec (C sp)
@@ -45,20 +45,20 @@ structure SigmaProtocol (S W PC SC Ω P : Type) (p : S → W → Bool) where
 
 ### Key difference: `OracleContext` vs `ExecutionMethod`
 
-- `SecretKeyEncAlg` extends `OracleContext` — operations are `OracleComp spec`, spec comes from context
-- `PublicKeyEncAlg` / `SignatureAlg` extend `ExecutionMethod` — operations are in abstract `m`, converted via `exec`
+- `SymmEncAlg` extends `OracleContext` — operations are `OracleComp spec`, spec comes from context
+- `AsymmEncAlg` / `SignatureAlg` extend `ExecutionMethod` — operations are in abstract `m`, converted via `exec`
 
 ### Instantiation pattern
 
 ```lean
-@[simps!] def myAlg : PublicKeyEncAlg ProbComp M PK SK C where
+@[simps!] def myAlg : AsymmEncAlg ProbComp M PK SK C where
   keygen := do ...
   encrypt pk msg := do ...
   decrypt sk c := ...
   __ := ExecutionMethod.default
 ```
 
-For `SecretKeyEncAlg`, use `__ := unifSpec.defaultContext`.
+For `SymmEncAlg`, use `__ := unifSpec.defaultContext`.
 
 ## Security Experiments
 
@@ -244,7 +244,7 @@ Key results: `fst_map_costDist` (instrumentation is transparent),
 
 1. **Avoid `guard`**: use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
 
-2. **`SecretKeyEncAlg` vs `PublicKeyEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
+2. **`SymmEncAlg` vs `AsymmEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
 

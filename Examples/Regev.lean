@@ -10,7 +10,7 @@
 -- n` via taking modulo `n`. This breaks the proofs. Someone should fix this.
 -- -/
 
--- open Mathlib OracleSpec OracleComp PublicKeyEncAlg
+-- open Mathlib OracleSpec OracleComp AsymmEncAlg
 
 -- /-- The uniform error sampling distribution, from the range `[-χ, χ]` inside `Fin p` -/
 -- def uniformErrSamp {p : ℕ} (χ : ℕ) (hχ : p > 2*χ) : ProbComp (Fin p) := do
@@ -20,7 +20,7 @@
 
 -- /-- General form of the Regev encryption scheme, with a custom error sampling distribution -/
 -- def regevAsymmEnc (n m p : ℕ) [hp2 : p.AtLeastTwo] (errSampKG : ProbComp (Fin p)) :
---     PublicKeyEncAlg ProbComp (M := Bool) (PK := Matrix (Fin n) (Fin m) (Fin p) × Vector (Fin p) m)
+--     AsymmEncAlg ProbComp (M := Bool) (PK := Matrix (Fin n) (Fin m) (Fin p) × Vector (Fin p) m)
 --      (SK := Vector (Fin p) n) (C := Vector (Fin p) n × Fin p) where
 --   keygen := do
 --     let A ←$ᵗ Matrix (Fin n) (Fin m) (Fin p)

@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.SecretKeyEncAlg
+import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.OracleComp.Constructions.BitVec
 import VCVio.ProgramLogic.Tactics
 import Mathlib.Data.Vector.Zip
@@ -12,7 +12,7 @@ import Mathlib.Data.Vector.Zip
 # One Time Pad
 
 This file defines the one-time pad scheme, proves correctness, and proves perfect secrecy
-in the canonical independence form used by `SecretKeyEncAlg.perfectSecrecy`.
+in the canonical independence form used by `SymmEncAlg.perfectSecrecy`.
 
 The file includes two proof styles:
 1. **Direct probability calculations** (`perfectSecrecyAt`): computes joint/marginal
@@ -27,7 +27,7 @@ open Mathlib OracleSpec OracleComp ENNReal BigOperators
 /-- The one-time pad symmetric encryption algorithm, using `BitVec`s as keys and messages.
 Encryption and decryption both just apply `BitVec.xor` with the key.
 The only oracles needed are `unifSpec`, which requires no implementation. -/
-@[simps!] def oneTimePad : SecretKeyEncAlg ℕ
+@[simps!] def oneTimePad : SymmEncAlg ℕ
     (M := BitVec) (K := BitVec) (C := BitVec) where
   keygen n := do $ᵗ BitVec n -- Generate a key by choosing a random bit-vector
   encrypt k m := return k ^^^ m -- encrypt by xor-ing with the key
@@ -38,13 +38,13 @@ namespace oneTimePad
 
 /-- Encryption and decryption are inverses for any OTP key. -/
 lemma complete : (oneTimePad).Complete := by
-  simp [oneTimePad, SecretKeyEncAlg.Complete, SecretKeyEncAlg.CompleteExp]
+  simp [oneTimePad, SymmEncAlg.Complete, SymmEncAlg.CompleteExp]
 
 lemma probOutput_cipher_uniform (sp : ℕ)
     (mgen : OracleComp oneTimePad.spec (BitVec sp)) (σ : BitVec sp) :
     Pr[= σ | oneTimePad.PerfectSecrecyCipherExp sp mgen] =
       (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
-  simpa [SecretKeyEncAlg.PerfectSecrecyCipherExp, SecretKeyEncAlg.PerfectSecrecyExp, oneTimePad] using
+  simpa [SymmEncAlg.PerfectSecrecyCipherExp, SymmEncAlg.PerfectSecrecyExp, oneTimePad] using
     probOutput_cipher_from_pair_uniform sp (mx := simulateQ oneTimePad.impl mgen) σ
 
 /-- The one-time pad is perfectly secret in the canonical independence form. -/
@@ -54,7 +54,7 @@ lemma perfectSecrecyAt (sp : ℕ) : oneTimePad.perfectSecrecyAt sp := by
       Pr[= (msg, σ) | oneTimePad.PerfectSecrecyExp sp mgen] =
         Pr[= msg | oneTimePad.PerfectSecrecyPriorExp sp mgen] *
           (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
-    simpa [SecretKeyEncAlg.PerfectSecrecyExp, SecretKeyEncAlg.PerfectSecrecyPriorExp, oneTimePad] using
+    simpa [SymmEncAlg.PerfectSecrecyExp, SymmEncAlg.PerfectSecrecyPriorExp, oneTimePad] using
       probOutput_pair_xor_uniform sp (mx := simulateQ oneTimePad.impl mgen) msg σ
   calc
     Pr[= (msg, σ) | oneTimePad.PerfectSecrecyExp sp mgen] =
@@ -81,7 +81,7 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     GameEquiv
       (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₀)
       (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₁) := by
-  simp only [SecretKeyEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_id']
+  simp only [SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_id']
   let c := msg₀ ^^^ msg₁
   show GameEquiv (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₀))
     (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))

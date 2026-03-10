@@ -11,7 +11,7 @@ import VCVio.OracleComp.OracleContext
 /-!
 # Symmetric Encryption Schemes.
 
-This file defines a type `SecretKeyEncAlg spec M K C` to represent a protocol
+This file defines a type `SymmEncAlg spec M K C` to represent a protocol
 for symmetric encryption using oracles in `spec`, with message space `M`,
 secret keys of type `K`, and ciphertext space `C`.
 -/
@@ -20,23 +20,23 @@ universe u v w
 
 open OracleSpec OracleComp ENNReal
 
-structure SecretKeyEncAlg (M K C : ℕ → Type)
+structure SymmEncAlg (M K C : ℕ → Type)
     (Q : Type v) extends OracleContext Q ProbComp where
   keygen (sp : ℕ) : OracleComp spec (K sp)
   encrypt {sp : ℕ} (k : K sp) (msg : M sp) : OracleComp spec (C sp)
   decrypt {sp : ℕ} (k : K sp) (c : C sp) : OptionT (OracleComp spec) (M sp)
 
-namespace SecretKeyEncAlg
+namespace SymmEncAlg
 
 variable {M K C : ℕ → Type} {Q : Type v}
 
-def CompleteExp (encAlg : SecretKeyEncAlg M K C Q) {sp : ℕ} (m : M sp) :
+def CompleteExp (encAlg : SymmEncAlg M K C Q) {sp : ℕ} (m : M sp) :
     OptionT (OracleComp encAlg.spec) (M sp) := do
   let k ← liftM (encAlg.keygen sp)
   let σ ← liftM (encAlg.encrypt k m)
   encAlg.decrypt k σ
 
-def Complete (encAlg : SecretKeyEncAlg M K C Q) : Prop := ∀ sp, ∀ m : M sp,
+def Complete (encAlg : SymmEncAlg M K C Q) : Prop := ∀ sp, ∀ m : M sp,
   Pr[= m | simulateQ encAlg.impl (CompleteExp encAlg m).run] = 1
 
 section perfectSecrecy
@@ -51,7 +51,7 @@ We also provide equivalent formulations:
 The `_iff_` lemmas below record equivalence between these forms. -/
 
 /-- Joint message/ciphertext experiment used to express perfect secrecy. -/
-def PerfectSecrecyExp (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+def PerfectSecrecyExp (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) : ProbComp (M sp × C sp) :=
   simulateQ encAlg.impl do
     let msg' ← mgen
@@ -59,23 +59,23 @@ def PerfectSecrecyExp (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
     return (msg', ← encAlg.encrypt k msg')
 
 /-- Ciphertext marginal induced by the perfect-secrecy experiment. -/
-def PerfectSecrecyCipherExp (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+def PerfectSecrecyCipherExp (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) : ProbComp (C sp) :=
   Prod.snd <$> encAlg.PerfectSecrecyExp sp mgen
 
 /-- Message prior induced by the message generator. -/
-def PerfectSecrecyPriorExp (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+def PerfectSecrecyPriorExp (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) : ProbComp (M sp) :=
   simulateQ encAlg.impl mgen
 
 /-- Ciphertext experiment conditioned on a fixed message. -/
-def PerfectSecrecyCipherGivenMsgExp (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+def PerfectSecrecyCipherGivenMsgExp (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (msg : M sp) : ProbComp (C sp) :=
   simulateQ encAlg.impl do
     let k ← encAlg.keygen sp
     encAlg.encrypt k msg
 
-lemma PerfectSecrecyExp_eq_bind (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+lemma PerfectSecrecyExp_eq_bind (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) :
     encAlg.PerfectSecrecyExp sp mgen =
       encAlg.PerfectSecrecyPriorExp sp mgen >>= fun msg =>
@@ -83,7 +83,7 @@ lemma PerfectSecrecyExp_eq_bind (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
   simp [PerfectSecrecyExp, PerfectSecrecyPriorExp, PerfectSecrecyCipherGivenMsgExp,
     simulateQ_bind, map_eq_bind_pure_comp, bind_assoc]
 
-lemma PerfectSecrecyCipherExp_eq_bind (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+lemma PerfectSecrecyCipherExp_eq_bind (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) :
     encAlg.PerfectSecrecyCipherExp sp mgen =
       encAlg.PerfectSecrecyPriorExp sp mgen >>= fun msg =>
@@ -91,7 +91,7 @@ lemma PerfectSecrecyCipherExp_eq_bind (encAlg : SecretKeyEncAlg M K C Q) (sp : �
   simp [PerfectSecrecyCipherExp, PerfectSecrecyExp_eq_bind, map_eq_bind_pure_comp, bind_assoc]
 
 lemma probOutput_PerfectSecrecyExp_eq_mul_cipherGivenMsg
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) (msg : M sp) (σ : C sp) :
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp sp mgen] =
       Pr[= msg | encAlg.PerfectSecrecyPriorExp sp mgen] *
@@ -118,7 +118,7 @@ lemma probOutput_PerfectSecrecyExp_eq_mul_cipherGivenMsg
         · simp
 
 lemma probOutput_PerfectSecrecyCipherExp_eq_tsum
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     (mgen : OracleComp encAlg.spec (M sp)) (σ : C sp) :
     Pr[= σ | encAlg.PerfectSecrecyCipherExp sp mgen] =
       ∑' msg : M sp,
@@ -135,19 +135,19 @@ private lemma eq_of_inv_mul_eq_inv_mul {a b n : ℝ≥0∞}
 
 /-- Strong perfect secrecy at a fixed security parameter: ciphertexts are independent of messages
 for every prior distribution on messages (PMF-level quantification). -/
-def perfectSecrecyAtAllPriors (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) : Prop :=
+def perfectSecrecyAtAllPriors (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
   ∀ (μ : PMF (M sp)) (msg : M sp) (σ : C sp),
     let row := fun m : M sp => Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp m]
     μ msg * row msg = μ msg * (∑' m : M sp, μ m * row m)
 
 /-- Equivalent channel-style formulation: every message induces the same ciphertext distribution. -/
-def ciphertextRowsEqualAt (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) : Prop :=
+def ciphertextRowsEqualAt (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
   ∀ (msg₀ msg₁ : M sp) (σ : C sp),
     Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg₀] =
       Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg₁]
 
 theorem perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) [Fintype (M sp)] :
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ) [Fintype (M sp)] :
     encAlg.perfectSecrecyAtAllPriors sp ↔ encAlg.ciphertextRowsEqualAt sp := by
   constructor
   · intro hAll msg₀ msg₁ σ
@@ -189,19 +189,19 @@ theorem perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt
 
 /-- Standard perfect secrecy at one security parameter, expressed as independence:
 `Pr[(M, C)] = Pr[M] * Pr[C]`. This is the canonical code-level definition. -/
-def perfectSecrecyAt (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) : Prop :=
+def perfectSecrecyAt (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
   ∀ mgen : OracleComp encAlg.spec (M sp), ∀ msg : M sp, ∀ σ : C sp,
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp sp mgen] =
       Pr[= msg | encAlg.PerfectSecrecyPriorExp sp mgen] *
       Pr[= σ | encAlg.PerfectSecrecyCipherExp sp mgen]
 
 /-- Canonical asymptotic perfect secrecy notion. -/
-def perfectSecrecy (encAlg : SecretKeyEncAlg M K C Q) : Prop :=
+def perfectSecrecy (encAlg : SymmEncAlg M K C Q) : Prop :=
   ∀ sp, encAlg.perfectSecrecyAt sp
 
 /-- Posterior-equals-prior form, written in cross-multiplied form to avoid division.
 This is equivalent to `perfectSecrecyAt`. -/
-def perfectSecrecyPosteriorEqPriorAt (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) : Prop :=
+def perfectSecrecyPosteriorEqPriorAt (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
   ∀ mgen : OracleComp encAlg.spec (M sp), ∀ msg : M sp, ∀ σ : C sp,
     Pr[= (msg, σ) | encAlg.PerfectSecrecyExp sp mgen] =
       Pr[= σ | encAlg.PerfectSecrecyCipherExp sp mgen] *
@@ -210,7 +210,7 @@ def perfectSecrecyPosteriorEqPriorAt (encAlg : SecretKeyEncAlg M K C Q) (sp : �
 /-- Joint-factorization form (same mathematical statement as independence, with explicit
 named priors/marginals). This is equivalent to `perfectSecrecyAt`. -/
 def perfectSecrecyJointFactorizationAt
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ) : Prop :=
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
   ∀ mgen : OracleComp encAlg.spec (M sp), ∀ msg : M sp, ∀ σ : C sp,
     let jointExp := encAlg.PerfectSecrecyExp sp mgen
     let priorExp := encAlg.PerfectSecrecyPriorExp sp mgen
@@ -218,20 +218,20 @@ def perfectSecrecyJointFactorizationAt
     Pr[= (msg, σ) | jointExp] =
       Pr[= msg | priorExp] * Pr[= σ | cipherExp]
 
-def perfectSecrecyPosteriorEqPrior (encAlg : SecretKeyEncAlg M K C Q) : Prop :=
+def perfectSecrecyPosteriorEqPrior (encAlg : SymmEncAlg M K C Q) : Prop :=
   ∀ sp, encAlg.perfectSecrecyPosteriorEqPriorAt sp
 
-def perfectSecrecyJointFactorization (encAlg : SecretKeyEncAlg M K C Q) : Prop :=
+def perfectSecrecyJointFactorization (encAlg : SymmEncAlg M K C Q) : Prop :=
   ∀ sp, encAlg.perfectSecrecyJointFactorizationAt sp
 
-lemma perfectSecrecyAt_iff_posteriorEqPriorAt (encAlg : SecretKeyEncAlg M K C Q)
+lemma perfectSecrecyAt_iff_posteriorEqPriorAt (encAlg : SymmEncAlg M K C Q)
     (sp : ℕ) :
     encAlg.perfectSecrecyAt sp ↔ encAlg.perfectSecrecyPosteriorEqPriorAt sp := by
   constructor <;> intro h <;> intro mgen msg σ
   · simpa [perfectSecrecyAt, perfectSecrecyPosteriorEqPriorAt, mul_comm] using h mgen msg σ
   · simpa [perfectSecrecyAt, perfectSecrecyPosteriorEqPriorAt, mul_comm] using h mgen msg σ
 
-lemma perfectSecrecyAt_iff_jointFactorizationAt (encAlg : SecretKeyEncAlg M K C Q)
+lemma perfectSecrecyAt_iff_jointFactorizationAt (encAlg : SymmEncAlg M K C Q)
     (sp : ℕ) :
     encAlg.perfectSecrecyAt sp ↔ encAlg.perfectSecrecyJointFactorizationAt sp := by
   constructor
@@ -242,13 +242,13 @@ lemma perfectSecrecyAt_iff_jointFactorizationAt (encAlg : SecretKeyEncAlg M K C 
     simpa [perfectSecrecyAt, perfectSecrecyJointFactorizationAt]
       using h
 
-lemma perfectSecrecy_iff_posteriorEqPrior (encAlg : SecretKeyEncAlg M K C Q) :
+lemma perfectSecrecy_iff_posteriorEqPrior (encAlg : SymmEncAlg M K C Q) :
     encAlg.perfectSecrecy ↔ encAlg.perfectSecrecyPosteriorEqPrior := by
   constructor <;> intro h sp
   · exact (encAlg.perfectSecrecyAt_iff_posteriorEqPriorAt sp).1 (h sp)
   · exact (encAlg.perfectSecrecyAt_iff_posteriorEqPriorAt sp).2 (h sp)
 
-lemma perfectSecrecy_iff_jointFactorization (encAlg : SecretKeyEncAlg M K C Q) :
+lemma perfectSecrecy_iff_jointFactorization (encAlg : SymmEncAlg M K C Q) :
     encAlg.perfectSecrecy ↔ encAlg.perfectSecrecyJointFactorization := by
   constructor <;> intro h sp
   · exact (encAlg.perfectSecrecyAt_iff_jointFactorizationAt sp).1 (h sp)
@@ -258,7 +258,7 @@ lemma perfectSecrecy_iff_jointFactorization (encAlg : SecretKeyEncAlg M K C Q) :
 implies every (message, ciphertext) conditional has probability `(card K)⁻¹`.
 Both Shannon theorems follow from this. -/
 theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     [Fintype (K sp)]
     (deterministicEnc : ∀ (k : K sp) (msg : M sp),
       ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c})
@@ -308,7 +308,7 @@ theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
         simp [hk0_uniform, henc_one]
 
 theorem ciphertextRowsEqualAt_of_uniformKey_of_uniqueKey
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     [Fintype (K sp)]
     (deterministicEnc : ∀ (k : K sp) (msg : M sp),
       ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c})
@@ -334,7 +334,7 @@ key in support, then perfect secrecy holds (`perfectSecrecyAt`).
 Note: the converse direction requires stronger prior expressivity assumptions than
 `perfectSecrecyAt` currently encodes; see `perfectSecrecyAtAllPriors`. -/
 theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     [Fintype (M sp)] [Fintype (K sp)] [Fintype (C sp)]
     (deterministicEnc : ∀ (k : K sp) (msg : M sp),
       ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c}) :
@@ -380,7 +380,7 @@ theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey
 /-- Strong constructive Shannon direction with cardinality/completeness context:
 uniform keys plus uniqueness imply perfect secrecy for all priors. -/
 theorem perfectSecrecyAtAllPriors_of_card_eq_of_uniform_unique
-    (encAlg : SecretKeyEncAlg M K C Q) (sp : ℕ)
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
     [Fintype (M sp)] [Fintype (K sp)] [Fintype (C sp)]
     (_hComplete : encAlg.Complete)
     (_h1 : Fintype.card (M sp) = Fintype.card (K sp))
@@ -400,4 +400,4 @@ theorem perfectSecrecyAtAllPriors_of_card_eq_of_uniform_unique
 
 end perfectSecrecy
 
-end SecretKeyEncAlg
+end SymmEncAlg

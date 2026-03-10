@@ -11,7 +11,7 @@ import VCVio.OracleComp.SimSemantics.Append
 /-!
 # Asymmetric Encryption Schemes.
 
-This file defines a type `PublicKeyEncAlg spec σ M PK SK C` to represent an protocol
+This file defines a type `AsymmEncAlg spec σ M PK SK C` to represent an protocol
 for asymmetric encryption using oracles in `spec`, with message space `M`,
 public/secret keys `PK` and `SK`, and ciphertext space `C`.
 -/
