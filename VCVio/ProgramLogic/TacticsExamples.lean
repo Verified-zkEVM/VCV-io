@@ -774,4 +774,36 @@ example (P Q : Prop) [Decidable P] [Decidable Q] :
     ⌜P ∧ Q⌝ = ⌜P⌝ * ⌜Q⌝ := by
   simp [propInd_and]
 
+/-! ### Loop invariant examples -/
+
+/-- Auto-detected replicate invariant: `qvcgen` finds the step-preservation
+hypothesis in context and applies `triple_replicate_inv` automatically. -/
+example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
+    (hstep : ⦃I⦄ oa ⦃fun _ => I⦄) :
+    ⦃I⦄ oa.replicate n ⦃fun _ => I⦄ := by
+  qvcgen
+
+/-- Explicit replicate invariant via `qvcgen_step inv`. -/
+example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
+    {pre : ℝ≥0∞} {post : List α → ℝ≥0∞}
+    (hpre : pre ≤ I) (hpost : ∀ xs, I ≤ post xs)
+    (hstep : ⦃I⦄ oa ⦃fun _ => I⦄) :
+    ⦃pre⦄ oa.replicate n ⦃post⦄ := by
+  qvcgen_step inv I
+  · exact hpre
+  · intro xs; exact hpost xs
+  · exact hstep
+
+/-- Auto-detected `List.foldlM` invariant. -/
+example {σ : Type} {f : σ → α → OracleComp spec σ} {l : List α} {s₀ : σ} {I : σ → ℝ≥0∞}
+    (hstep : ∀ s x, x ∈ l → ⦃I s⦄ f s x ⦃I⦄) :
+    ⦃I s₀⦄ l.foldlM f s₀ ⦃I⦄ := by
+  qvcgen
+
+/-- Auto-detected `List.mapM` invariant. -/
+example {f : α → OracleComp spec β} {l : List α} {I : ℝ≥0∞}
+    (hstep : ∀ x, x ∈ l → ⦃I⦄ f x ⦃fun _ => I⦄) :
+    ⦃I⦄ l.mapM f ⦃fun _ => I⦄ := by
+  qvcgen
+
 end QVCGen

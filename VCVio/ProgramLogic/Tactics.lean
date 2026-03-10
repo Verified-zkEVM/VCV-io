@@ -24,9 +24,10 @@ For new proofs, import this file and treat the tactics below as the primary proo
 - `wp_step`: Apply exactly one WP rule (`wp_bind`, `wp_pure`, etc.) on raw `wp` goals
   (also handles `replicate`, `List.mapM`, `List.foldlM`)
 - `qvcgen_step`: Apply one spec-aware VCGen step on a `Triple` goal (bind with auto spec
-  lookup, backward WP fallback, `ite`/`dite`/`match` splitting, WP rule unfolding)
+  lookup, backward WP fallback, `ite`/`dite`/`match` splitting, loop invariant auto-detection,
+  WP rule unfolding). Use `qvcgen_step inv I` for explicit loop invariants.
 - `qvcgen`: Exhaustive `Triple` decomposition across all open goals, with spec-aware stepping,
-  stronger normalization, and bounded local consequence search
+  loop invariant auto-detection, stronger normalization, and bounded local consequence search
 - `exp_norm`: Normalize indicator (`propInd`) and expectation (`wp`) arithmetic
 
 ### Relational (pRHL)
@@ -142,6 +143,15 @@ private def isListMapMExpr (e : Expr) : Bool :=
 
 private def isListFoldlMExpr (e : Expr) : Bool :=
   (findAppWithHead? ``List.foldlM e).isSome
+
+private def isReplicateHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``OracleComp.replicate
+
+private def isListMapMHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``List.mapM
+
+private def isListFoldlMHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``List.foldlM
 
 private def isGameEquivGoal (target : Expr) : Bool :=
   target.consumeMData.getAppFn.isConstOf ``OracleComp.ProgramLogic.GameEquiv
@@ -539,6 +549,80 @@ private def tryMatchDecomp (comp : Expr) : TacticM Bool := do
   let some _ ← Lean.Meta.matchMatcherApp? comp | return false
   tryEvalTacticSyntax (← `(tactic| split))
 
+/-- Check if an expression is a lambda whose body does not use the bound variable
+(i.e. a constant function `fun _ => c`). -/
+private def isConstantLambda (e : Expr) : Bool :=
+  match e.consumeMData with
+  | .lam _ _ body _ => !body.hasLooseBVars
+  | _ => false
+
+/-- Try to apply a loop invariant or stepping rule for loops.
+
+For **invariant** mode (exact shape match): applies `triple_replicate_inv` etc.
+directly if the postcondition is constant and a step-preservation hypothesis
+is available.
+
+For **stepping** mode (fallback): applies `triple_replicate_succ` etc. which
+rewrites `Triple pre (replicate (n+1) oa) post` into
+`Triple pre oa (fun x => wp (replicate n oa) (fun xs => post (x :: xs)))`,
+bypassing the expensive WP fallback path. -/
+private def tryLoopInvariantAuto (comp : Expr) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple target | return false
+  let some args := trailingArgs? app 3 | return false
+  let post := args[2]!
+  if isReplicateHead comp then
+    if isConstantLambda post then
+      match ← observing? do
+        evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_replicate_inv))
+        unless ← tryCloseSpecGoalImmediate do throwError "" with
+      | some _ => return true
+      | none => pure ()
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.triple_replicate_succ)) then
+      return true
+  if isListFoldlMHead comp then
+    match ← observing? do
+      evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_list_foldlM_inv))
+      unless ← tryCloseSpecGoalImmediate do throwError "" with
+    | some _ => return true
+    | none =>
+      if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_list_foldlM_cons)) then
+        return true
+  if isListMapMHead comp then
+    if isConstantLambda post then
+      match ← observing? do
+        evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_list_mapM_inv))
+        unless ← tryCloseSpecGoalImmediate do throwError "" with
+      | some _ => return true
+      | none => pure ()
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.triple_list_mapM_cons)) then
+      return true
+  return false
+
+/-- Apply a loop invariant rule with an explicitly provided invariant.
+Uses the pre-composed `triple_replicate` / `triple_list_foldlM` / `triple_list_mapM`
+which include consequence bridging, leaving pre/post/step subgoals. -/
+private def runLoopInvExplicit (inv : TSyntax `term) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  match tripleGoalComp? target with
+  | none => return false
+  | some comp =>
+    let comp ← whnfReducible (← instantiateMVars comp)
+    if isReplicateHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_replicate (I := $inv) ?_ ?_ ?_))
+    else if isListFoldlMHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_list_foldlM (I := $inv) ?_ ?_ ?_))
+    else if isListMapMHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_list_mapM (I := $inv) ?_ ?_ ?_))
+    else
+      return false
+
 /-- One step of VCGen on a `Triple` goal with the following strategy:
 
 1. `∀`-binder: `intro` and continue
@@ -546,7 +630,8 @@ private def tryMatchDecomp (comp : Expr) : TacticM Bool := do
 3. **Bind** (backward WP): `triple_bind_wp` to get `Triple pre oa (fun x => wp (ob x) post)`
 4. **Conditional** (`ite`/`dite`): split into branch goals with discriminant hypotheses
 5. **Match**: case-split on the discriminant variable
-6. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
+6. **Loop** (auto invariant or step): apply `triple_*_inv` from context or `triple_*_succ`/`_cons`
+7. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
 
 Returns `true` if any progress was made. -/
 private def runVCGenStep : TacticM Bool := do
@@ -576,6 +661,8 @@ private def runVCGenStep : TacticM Bool := do
           apply OracleComp.ProgramLogic.triple_ite <;> intro)) then
           return true
       if ← tryMatchDecomp comp then
+        return true
+      if ← tryLoopInvariantAuto comp then
         return true
       match ← (observing? do
         evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))
@@ -610,9 +697,12 @@ private def runVCGenPass : TacticM Bool := do
 
 Decomposes a bind via `triple_bind` and automatically tries to close the spec subgoal
 using hypotheses in the local context, with backward WP fallback. Also handles
-`ite`/`dite` splitting, `match` case analysis, and WP-rule unfolding.
+`ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection from
+context, and WP-rule unfolding.
 
-Use `qvcgen_step using cut` for an explicit intermediate postcondition. -/
+Variants:
+- `qvcgen_step using cut` for an explicit intermediate postcondition.
+- `qvcgen_step inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal. -/
 syntax "qvcgen_step" ("using" term)? : tactic
 
 elab_rules : tactic
@@ -623,6 +713,15 @@ elab_rules : tactic
       if ← runHoareStepRuleUsing cut then return
       throwQVCGenStepError
 
+syntax "qvcgen_step" &"inv" term : tactic
+
+elab_rules : tactic
+  | `(tactic| qvcgen_step inv $inv) => do
+      if ← runLoopInvExplicit inv then return
+      throwError
+        "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+        or `List.mapM`."
+
 /-- `qvcgen` exhaustively decomposes a quantitative `Triple` goal with spec-aware stepping.
 
 Enhancements over simple structural decomposition:
@@ -630,6 +729,7 @@ Enhancements over simple structural decomposition:
 - Falls back to backward WP (`triple_bind_wp`) when no spec is available
 - Splits `ite`/`dite` conditionals into branch goals with hypotheses
 - Case-splits `match` expressions on their discriminants
+- Auto-detects loop invariants from context for `replicate`/`foldlM`/`mapM`
 - Keeps decomposing across all open goals after branch splits
 - Normalizes remaining `wp` terms and indicator arithmetic via simp
 - Finishes with bounded local consequence search on closed goals

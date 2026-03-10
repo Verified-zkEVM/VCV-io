@@ -24,10 +24,15 @@ universe u v w
 
 namespace OracleComp
 
-/-- Run the computation `oa` repeatedly `n` times to get a vector of `n` results. -/
+/-- Run the computation `oa` repeatedly `n` times to get a list of `n` results. -/
 def replicate {ι} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
-  (List.replicate n ()).mapM fun () => oa
+  match n with
+  | 0 => pure []
+  | n + 1 => do
+      let x ← oa
+      let xs ← replicate n oa
+      pure (x :: xs)
 
 def replicateTR {ι} {spec : OracleSpec ι} {α : Type v}
     (n : ℕ) (oa : OracleComp spec α) : OracleComp spec (List α) :=
@@ -42,17 +47,16 @@ lemma replicate_zero : replicate 0 oa = return [] := rfl
 @[simp]
 lemma replicateTR_zero : replicate 0 oa = return [] := rfl
 
-@[simp]
-lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
-  rw [replicate, List.replicate_succ, List.mapM_cons, seq_eq_bind_map, bind_map_left]; rfl
-
 /-- Bind-style unfolding of `replicate`, convenient for program-logic proofs. -/
+@[simp]
 lemma replicate_succ_bind :
     replicate (n + 1) oa = (do
       let x ← oa
       let xs ← replicate n oa
-      pure (x :: xs)) := by
-  simp [replicate_succ, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, Function.comp]
+      pure (x :: xs)) := rfl
+
+lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
+  simp [replicate_succ_bind, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, Function.comp]
 
 @[simp]
 lemma replicate_pure (x : α) :
@@ -67,7 +71,7 @@ lemma probFailure_replicate :
     Pr[⊥ | oa.replicate n] = 1 - (1 - Pr[⊥ | oa]) ^ n := by
   induction n with
   | zero => simp
-  | succ n ih => simp [replicate_succ]
+  | succ n ih => simp
 
 /-- The probability of getting a list from `replicate` is the product of the chances of
 getting each of the individual elements. -/

@@ -206,7 +206,16 @@ theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
 adversary succeeds with probability exactly `1/2`. -/
 theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     Pr[= true | game2 tdp adv] = 1 / 2 := by
-  sorry
+  let f : Bool → ProbComp Bool := fun _ =>
+    (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
+      let (pk, _sk) ← liftProbComp tdp.keygen
+      let (_m₁, _m₂, st) ← adv.choose pk
+      let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
+      let h ← liftProbComp ($ᵗ M : ProbComp M)
+      let c : Rand × M := (tdp.forward pk r, h)
+      adv.guess st c)).run' ∅
+  simpa [game2, f] using
+    (probOutput_decide_eq_uniformBool_half f (by simp [f]))
 
 /-- The bad event is bounded by the inversion probability of the underlying trapdoor
 permutation. -/
