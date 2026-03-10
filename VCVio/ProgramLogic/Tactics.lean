@@ -23,11 +23,14 @@ For new proofs, import this file and treat the tactics below as the primary proo
 ### Unary
 - `wp_step`: Apply exactly one WP rule (`wp_bind`, `wp_pure`, etc.) on raw `wp` goals
   (also handles `replicate`, `List.mapM`, `List.foldlM`)
-- `qvcgen_step`: Apply one spec-aware VCGen step on a `Triple` goal (bind with auto spec
-  lookup, backward WP fallback, `ite`/`dite`/`match` splitting, loop invariant auto-detection,
-  WP rule unfolding). Use `qvcgen_step inv I` for explicit loop invariants.
-- `qvcgen`: Exhaustive `Triple` decomposition across all open goals, with spec-aware stepping,
-  loop invariant auto-detection, stronger normalization, and bounded local consequence search
+- `qvcgen_step`: Apply one spec-aware VCGen step on a `Triple` or probability goal (auto
+  lowering of `Pr[...] = 1` goals, swap/congr dispatch for `Pr[...] = Pr[...]` goals,
+  bind with auto spec lookup, backward WP fallback, `ite`/`dite`/`match` splitting,
+  loop invariant auto-detection, WP rule unfolding).
+  Use `qvcgen_step inv I` for explicit loop invariants.
+- `qvcgen`: Exhaustive `Triple` / probability goal decomposition across all open goals,
+  with auto lowering, swap/congr dispatch, spec-aware stepping, loop invariant
+  auto-detection, stronger normalization, and bounded local consequence search
 - `exp_norm`: Normalize indicator (`propInd`) and expectation (`wp`) arithmetic
 
 ### Relational (pRHL)
@@ -156,6 +159,20 @@ private def isListFoldlMHead (e : Expr) : Bool :=
 private def isGameEquivGoal (target : Expr) : Bool :=
   target.consumeMData.getAppFn.isConstOf ``OracleComp.ProgramLogic.GameEquiv
 
+/-- Check if a goal is an equality with probability expressions on both sides. -/
+private def isProbEqGoal (target : Expr) : Bool :=
+  let target := target.consumeMData
+  if target.isAppOfArity ``Eq 3 then
+    let lhs := target.getArg! 1
+    let rhs := target.getArg! 2
+    let lhsHasProb := (findAppWithHead? ``probEvent lhs).isSome ||
+                       (findAppWithHead? ``probOutput lhs).isSome
+    let rhsHasProb := (findAppWithHead? ``probEvent rhs).isSome ||
+                       (findAppWithHead? ``probOutput rhs).isSome
+    lhsHasProb && rhsHasProb
+  else
+    false
+
 private def tryEvalTacticSyntax (stx : Syntax) : TacticM Bool := do
   let some _ ← observing? (evalTactic stx) | return false
   return true
@@ -272,12 +289,26 @@ private def throwQVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
   | none =>
-      throwError "qvcgen_step: expected a quantitative `Triple` goal; got:{indentExpr target}"
+      let hasProbGoal := (findAppWithHead? ``probEvent target).isSome ||
+                         (findAppWithHead? ``probOutput target).isSome
+      if hasProbGoal then
+        if isProbEqGoal target then
+          throwError
+            "qvcgen_step: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
+            Goal:{indentExpr target}\n\
+            Try `prob_swap`, `prob_congr`, or manual rewriting with `probEvent_bind_bind_swap`."
+        else
+          throwError
+            "qvcgen_step: found a probability goal but could not lower it to a `Triple` or `wp` goal.\n\
+            Goal:{indentExpr target}\n\
+            Try `rw [probEvent_eq_wp_propInd]`, or manual rewriting."
+      else
+        throwError "qvcgen_step: expected a `Triple` or probability goal; got:{indentExpr target}"
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       throwError
         "qvcgen_step: found a `Triple` goal, but no matching rule applied to:{indentExpr comp}\n\
-        Try `by_hoare`, `wp_step`, or manually unfolding the remaining arithmetic side conditions."
+        Try `wp_step`, or manually unfolding the remaining arithmetic side conditions."
 
 private def throwRelStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -623,20 +654,144 @@ private def runLoopInvExplicit (inv : TSyntax `term) : TacticM Bool := do
     else
       return false
 
+/-- Try to close or rewrite a `Pr[...] = Pr[...]` goal by swapping adjacent independent binds.
+Handles 0–2 layers of tsum peeling. -/
+private def tryProbSwap : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic| (
+    try simp only [bind_assoc]
+    first
+      | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+         exact probEvent_bind_bind_swap _ _ _ _)
+      | (rw [show Pr[_ | _ >>= fun a => _ >>= fun b => _] =
+              Pr[_ | _ >>= fun b => _ >>= fun a => _] from
+            probEvent_bind_bind_swap _ _ _ _])
+      | (conv in (Pr[_ | _]) =>
+          rw [show Pr[_ | _ >>= fun a => _ >>= fun b => _] =
+                Pr[_ | _ >>= fun b => _ >>= fun a => _] from
+              probEvent_bind_bind_swap _ _ _ _])
+      | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+         refine tsum_congr fun _ => ?_
+         congr 1
+         try simp only [bind_assoc]
+         first
+           | exact probEvent_bind_bind_swap _ _ _ _
+           | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+              exact probEvent_bind_bind_swap _ _ _ _))
+      | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+         refine tsum_congr fun _ => ?_
+         congr 1
+         rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+         refine tsum_congr fun _ => ?_
+         congr 1
+         try simp only [bind_assoc]
+         first
+           | exact probEvent_bind_bind_swap _ _ _ _
+           | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+              exact probEvent_bind_bind_swap _ _ _ _)))))
+
+/-- Try to decompose a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal by congruence,
+then auto-intro the bound variable and support hypothesis. -/
+private def tryProbCongr : TacticM Bool := do
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply probOutput_bind_congr; intro _ _)) then
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply probEvent_bind_congr; intro _ _)) then
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply probOutput_bind_congr'; intro _)) then
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply probEvent_bind_congr'; intro _)) then
+    return true
+  return false
+
+/-- Try to rewrite one bind-swap without closing the goal. -/
+private def tryProbSwapRw : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic| (
+    first
+      | (simp only [← probEvent_eq_eq_probOutput]
+         rw [probEvent_bind_bind_swap]
+         try simp only [probEvent_eq_eq_probOutput])
+      | rw [probEvent_bind_bind_swap])))
+
+/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr. -/
+private def tryProbEqGoal : TacticM Bool := do
+  if ← tryProbSwap then return true
+  if ← tryProbCongr then return true
+  if ← (do
+    let saved ← saveState
+    if ← tryProbSwapRw then
+      if ← tryProbCongr then return true
+      saved.restore
+    return false) then return true
+  return false
+
+/-- Try to lower a probability goal into a `Triple`, `wp`, or probability-equality goal.
+
+Recognized shapes:
+- `Pr[p | oa] = 1` or `1 = Pr[p | oa]` → rewrite to `Triple 1 oa (indicator)`
+- `Pr[= x | oa] = 1` or `1 = Pr[= x | oa]` → rewrite to `Triple 1 oa (indicator)`
+- `Pr[... | oa] = Pr[... | ob]` → try swap (bind reorder), congr (shared prefix), or swap+congr
+- `Pr[p | oa] = ...` or `... = Pr[p | oa]` (general) → rewrite `Pr` to `wp`
+- `_ ≤ Pr[p | oa]` or `Pr[p | oa] ≤ _` → rewrite `Pr` to `wp`
+
+Returns `true` if any rewrite fired. -/
+private def tryLowerProbGoal : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let isProbEventGoal := (findAppWithHead? ``probEvent target).isSome
+  let isProbOutputGoal := (findAppWithHead? ``probOutput target).isSome
+  unless isProbEventGoal || isProbOutputGoal do return false
+  if isProbEqGoal target then
+    if ← tryProbEqGoal then return true
+  if isProbEventGoal then
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [← OracleComp.ProgramLogic.triple_propInd_iff_probEvent_eq_one];
+        simp only [OracleComp.ProgramLogic.propInd_true])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [eq_comm (a := 1),
+            ← OracleComp.ProgramLogic.triple_propInd_iff_probEvent_eq_one];
+        simp only [OracleComp.ProgramLogic.propInd_true])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        simp only [OracleComp.ProgramLogic.probEvent_eq_wp_propInd])) then
+      return true
+  if isProbOutputGoal then
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [OracleComp.ProgramLogic.probOutput_eq_one_iff_triple])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [eq_comm, OracleComp.ProgramLogic.probOutput_eq_one_iff_triple])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        simp only [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
+      return true
+  return false
+
 /-- One step of VCGen on a `Triple` goal with the following strategy:
 
-1. `∀`-binder: `intro` and continue
-2. **Bind** (spec-based): `triple_bind` + close spec subgoal from local context
-3. **Bind** (backward WP): `triple_bind_wp` to get `Triple pre oa (fun x => wp (ob x) post)`
-4. **Conditional** (`ite`/`dite`): split into branch goals with discriminant hypotheses
-5. **Match**: case-split on the discriminant variable
-6. **Loop** (auto invariant or step): apply `triple_*_inv` from context or `triple_*_succ`/`_cons`
-7. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
+1. **Probability lowering**: rewrite `Pr[...]` goals into `Triple` or `wp` form
+2. `∀`-binder: `intro` and continue
+3. **Bind** (spec-based): `triple_bind` + close spec subgoal from local context
+4. **Bind** (backward WP): `triple_bind_wp` to get `Triple pre oa (fun x => wp (ob x) post)`
+5. **Conditional** (`ite`/`dite`): split into branch goals with discriminant hypotheses
+6. **Match**: case-split on the discriminant variable
+7. **Loop** (auto invariant or step): apply `triple_*_inv` from context or `triple_*_succ`/`_cons`
+8. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
 
 Returns `true` if any progress was made. -/
 private def runVCGenStep : TacticM Bool := do
   if (← getGoals).isEmpty then return false
   let target ← instantiateMVars (← getMainTarget)
+  if ← tryLowerProbGoal then
+    return true
   if target.isForall then
     if ← tryEvalTacticSyntax (← `(tactic| intro _)) then
       return true
@@ -693,12 +848,18 @@ private def runVCGenPass : TacticM Bool := do
   setGoals newGoals
   return progress
 
-/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple` goal.
+/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple` or probability goal.
 
-Decomposes a bind via `triple_bind` and automatically tries to close the spec subgoal
-using hypotheses in the local context, with backward WP fallback. Also handles
-`ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection from
-context, and WP-rule unfolding.
+For `Triple` goals: decomposes a bind via `triple_bind` and automatically tries to close
+the spec subgoal using hypotheses in the local context, with backward WP fallback.
+Also handles `ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection
+from context, and WP-rule unfolding.
+
+For `Pr[...] = 1` goals: automatically lowers the goal into a `Triple` form.
+
+For `Pr[...] = Pr[...]` goals: tries bind-swap (`probEvent_bind_bind_swap`), bind
+congruence (`probOutput_bind_congr` / `probEvent_bind_congr`), or swap-then-congr.
+Handles up to 2 layers of tsum peeling for nested swaps.
 
 Variants:
 - `qvcgen_step using cut` for an explicit intermediate postcondition.
@@ -722,9 +883,14 @@ elab_rules : tactic
         "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
         or `List.mapM`."
 
-/-- `qvcgen` exhaustively decomposes a quantitative `Triple` goal with spec-aware stepping.
+/-- `qvcgen` exhaustively decomposes a `Triple` or probability goal with spec-aware stepping.
+
+Accepts `Triple` goals, `Pr[...] = 1` goals, and `Pr[...] = Pr[...]` equality goals.
+Probability goals are automatically lowered or dispatched (swap/congr) before structural
+decomposition continues.
 
 Enhancements over simple structural decomposition:
+- Lowers `Pr[...]` goals into `Triple` or `wp` form before decomposition
 - After bind decomposition, tries to close spec subgoals from local context
 - Falls back to backward WP (`triple_bind_wp`) when no spec is available
 - Splits `ite`/`dite` conditionals into branch goals with hypotheses
@@ -757,6 +923,11 @@ elab "qvcgen" : tactic => do
         | assumption
         | exact OracleComp.ProgramLogic.triple_pure _ _
         | exact OracleComp.ProgramLogic.triple_zero _ _
+        | (classical
+           exact OracleComp.ProgramLogic.triple_support _)
+        | (exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption))
+        | (exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption))
+        | (exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption))
         | exact le_refl _
         | (
             repeat intro
@@ -1100,9 +1271,9 @@ simpa [bind_assoc] using (probEvent_bind_bind_swap mx my f q)
 ```
 
 Usage: `prob_swap` tries to find and swap adjacent independent binds.
+Handles 0–2 layers of tsum peeling for nested swaps.
 
-Currently a best-effort macro; for complex nested cases, manual application of
-`probEvent_bind_bind_swap` may still be needed. -/
+Note: `qvcgen_step` also dispatches to this logic on `Pr[...] = Pr[...]` goals. -/
 macro "prob_swap" : tactic =>
   `(tactic| (
     try simp only [bind_assoc]
@@ -1117,6 +1288,17 @@ macro "prob_swap" : tactic =>
                 Pr[_ | _ >>= fun b => _ >>= fun a => _] from
               probEvent_bind_bind_swap _ _ _ _])
       | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+         refine tsum_congr fun _ => ?_
+         congr 1
+         try simp only [bind_assoc]
+         first
+           | exact probEvent_bind_bind_swap _ _ _ _
+           | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+              exact probEvent_bind_bind_swap _ _ _ _))
+      | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+         refine tsum_congr fun _ => ?_
+         congr 1
+         rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
          refine tsum_congr fun _ => ?_
          congr 1
          try simp only [bind_assoc]
@@ -1149,22 +1331,24 @@ macro "prob_swap_rw" : tactic =>
 /-- `prob_congr` reduces a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal to a
 pointwise equality of the continuations.
 
-Applies `probOutput_bind_congr` or `probEvent_bind_congr`, producing a subgoal
-`∀ x ∈ support mx, Pr[... | f₁ x] = Pr[... | f₂ x]`.
+Applies `probOutput_bind_congr` or `probEvent_bind_congr`, then auto-intros the bound
+variable `x` and the support hypothesis `hx : x ∈ support mx`, leaving a goal
+`Pr[... | f₁ x] = Pr[... | f₂ x]`.
 
 Use `prob_congr'` for the stronger variant without the support restriction. -/
 macro "prob_congr" : tactic =>
   `(tactic|
     first
-      | (apply probOutput_bind_congr)
-      | (apply probEvent_bind_congr))
+      | (apply probOutput_bind_congr; intro _ _)
+      | (apply probEvent_bind_congr; intro _ _))
 
-/-- `prob_congr'` is like `prob_congr` but produces `∀ x, ...` without a support restriction. -/
+/-- `prob_congr'` is like `prob_congr` but without a support restriction.
+Auto-intros the bound variable `x`, leaving `Pr[... | f₁ x] = Pr[... | f₂ x]`. -/
 macro "prob_congr'" : tactic =>
   `(tactic|
     first
-      | (apply probOutput_bind_congr')
-      | (apply probEvent_bind_congr'))
+      | (apply probOutput_bind_congr'; intro _)
+      | (apply probEvent_bind_congr'; intro _))
 
 /-! ## Enhanced exhaustive tactics -/
 

@@ -19,7 +19,7 @@
 | `game_trans g₂` | `g₁ ≡ₚ g₃` | Splits into `g₁ ≡ₚ g₂` and `g₂ ≡ₚ g₃` |
 | `by_dist` | `AdvBound game ε` | Enters TV distance reasoning |
 | `by_upto bad` | identical-until-bad TV-distance goals | Applies the `simulateQ` up-to-bad bound |
-| `by_hoare` | `Pr[p \| oa] = ...` | Enters quantitative WP reasoning |
+| `by_hoare` | `Pr[p \| oa] = ...` | Enters quantitative WP reasoning (legacy; prefer `qvcgen_step` which lowers probability goals automatically) |
 
 `by_equiv` enters the coupling-based `RelTriple` shell, not `RelTriple'`, so that
 `rel_step`, `rel_rnd`, `rel_skip`, and the other interactive tactics compose cleanly.
@@ -46,8 +46,6 @@
 
 - `rel_step using R` — provide explicit intermediate relation
 - `rel_seq n using R` — use `rel_step using R` first, then keep stepping with plain `rel_step`
-- `hoare_step using cut` — provide an explicit unary cut function for a bind step
-- `hoare_seq n using cut` — use `hoare_step using cut` first, then keep stepping with plain `hoare_step`
 - `rel_rnd using f` — provide explicit bijection for coupling
 - `rel_sim using R` — provide the state invariant relation for `simulateQ` proofs
 - `rel_sim_dist` — specialize to the exact-distribution `call` pattern with equal states
@@ -55,32 +53,63 @@
 - `rel_mapM using Rin` — provide the input-list relation for traversals over different lists
 - `rel_foldlM using Rin` — provide the input-list relation for folds over different lists
 
-### Unary WP
+### Quantitative VCGen (`qvcgen`)
+
+`qvcgen` is the primary unary tactic for new proofs. It accepts both `Triple` goals and
+probability goals, automatically lowering `Pr[...]` into the quantitative engine.
 
 | Tactic | What it does |
 |--------|--------------|
-| `hoare_step` | One quantitative `Triple` decomposition step, falling back to `wp_step` |
-| `hoare_seq n` | Repeats `hoare_step` for `n` layers |
-| `game_hoare` | Exhaustively decomposes a quantitative `Triple` goal, then simplifies |
+| `qvcgen` | Exhaustively decomposes a `Triple` or probability goal with spec-aware stepping, loop invariant auto-detection, and support/indicator leaf closure |
+| `qvcgen_step` | One step: probability lowering → bind → conditional → match → loop → leaf |
+| `qvcgen_step using cut` | Explicit intermediate postcondition for a bind step |
+| `qvcgen_step inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
+| `exp_norm` | Normalize indicator (`propInd`) and expectation (`wp`) arithmetic |
+
+**Probability-goal handling**: `qvcgen` and `qvcgen_step` automatically handle three
+classes of probability goals:
+
+1. **`Pr[...] = 1` lowering** → rewrites into `Triple` form for structural decomposition:
+   - `Pr[p | oa] = 1` → `Triple 1 oa (fun x => ⌜p x⌝)`
+   - `Pr[= x | oa] = 1` → `Triple 1 oa (fun y => if y = x then 1 else 0)`
+
+2. **`Pr[...] = Pr[...]` equality** → dispatches swap/congr:
+   - Bind swap via `probEvent_bind_bind_swap` (handles 0–2 layers of tsum nesting)
+   - Bind congruence via `probOutput_bind_congr` / `probEvent_bind_congr` with auto-intro
+   - Swap-then-congr composition for non-adjacent reorderings
+
+3. **General `Pr[...]`** → fallback rewrite to raw `wp` form
+
+**Loop invariants**: `qvcgen` auto-detects `replicate`, `List.foldlM`, and `List.mapM`
+in `Triple` goals and applies matching invariant hypotheses from context.
+Use `qvcgen_step inv I` to provide an explicit invariant.
+
+**Support-sensitive leaf closure**: `qvcgen` final pass tries `triple_support`,
+`triple_propInd_of_support`, `triple_probEvent_eq_one`, and `triple_probOutput_eq_one`
+in addition to the standard `triple_pure`, `triple_zero`, and consequence search.
+
+### Raw WP Tactics
+
+These operate on bare `wp` goals (`_ ≤ wp _ _`) without the `Triple` wrapper.
+Use them when working directly at the weakest-precondition level.
+
+| Tactic | What it does |
+|--------|--------------|
 | `wp_step` | One WP decomposition (wp_bind, wp_pure, wp_replicate, wp_list_mapM, wp_list_foldlM, wp_query, wp_ite, wp_uniformSample, wp_map) |
 | `wp_seq n` | Repeats `wp_step` for `n` layers |
 
-`wp_step` / `hoare_step` understand `OracleComp.replicate`, `List.mapM`, and `List.foldlM`.
-For `replicate`, split on the loop count (`0` vs `n + 1`) in the surrounding theorem or proof.
-For `List.mapM`, split on the input list (`[]` vs `x :: xs`).
-For `List.foldlM`, split on the input list and treat the goal postcondition as the loop invariant.
-For support-sensitive binds, `hoare_step using (fun x => if x ∈ support oa then 1 else 0)` is the
-main explicit-cut pattern, paired with `triple_support` and `triple_zero`.
 
-### Bind Reordering
+### Bind Reordering and Congruence
+
+These are also dispatched automatically by `qvcgen_step` on `Pr[...] = Pr[...]` goals.
 
 | Tactic | What it does |
 |--------|--------------|
-| `prob_swap` | Swaps two independent sampling operations in a `Pr[...]` goal |
+| `prob_swap` | Swaps two independent sampling operations in a `Pr[...]` goal (handles 0–2 tsum layers) |
 | `prob_swap_at n` | Applies `prob_swap` up to `n` times |
 | `prob_swap_rw` | Rewrites one bind-swap without closing the goal |
-| `prob_congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to pointwise equality |
-| `prob_congr'` | Same as `prob_congr` but without support restriction |
+| `prob_congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to pointwise equality with auto-intro of `x` and `hx : x ∈ support mx` |
+| `prob_congr'` | Same but without support restriction, auto-intros `x` only |
 
 ### Automation
 

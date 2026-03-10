@@ -109,8 +109,7 @@ theorem schnorrSigma_hvzk (g : G) :
   simp only [schnorrSigma, schnorrSimTranscript, bind_assoc, pure_bind]
   apply evalDist_ext; intro t
   prob_swap_rw
-  refine probOutput_bind_congr' ($ᵗ F : ProbComp F) t ?_
-  intro c
+  prob_congr'; rename_i c
   rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   simp only [show ∀ r : F,
       (r • g, c, r + c * sk) =

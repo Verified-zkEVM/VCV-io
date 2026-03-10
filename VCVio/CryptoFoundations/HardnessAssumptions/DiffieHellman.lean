@@ -136,8 +136,7 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
   rw [probEvent_bind_congr fun a _ => probEvent_bind_bind_swap _ _ _ _,
       probEvent_bind_bind_swap]
   simp only [probEvent_eq_eq_probOutput]
-  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
-  intro bit; cases bit <;> simp [ddhExpReal, ddhExpRand]
+  prob_congr'; rename_i bit; cases bit <;> simp [ddhExpReal, ddhExpRand]
 
 omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/

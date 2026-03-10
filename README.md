@@ -100,7 +100,7 @@ The library includes a program logic (`VCVio.ProgramLogic`) inspired by pRHL and
 
 * **Relational proof mode** (`by_equiv`): Coupling-based reasoning via `RelTriple` for proving game equivalence or bounding advantage between two computations.
 * **Unary proof mode** (`by_hoare`): Quantitative Hoare triples for bounding probabilities of events in a single computation.
-* **Interactive tactics**: `rel_step`, `rel_rnd`, `rel_sim`, `hoare_step`, `game_trans`, `prob_swap`, and many more for stepping through game-based proofs.
+* **Interactive tactics**: `rel_step`, `rel_rnd`, `rel_sim`, `qvcgen_step`, `game_trans`, `prob_swap`, and many more for stepping through game-based proofs.
 
 ## Other Useful Definitions
 

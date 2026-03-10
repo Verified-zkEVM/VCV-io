@@ -526,8 +526,7 @@ example [SampleableType α] [SampleableType β] :
     (do let y ← ($ᵗ β : ProbComp β); let x ← ($ᵗ α : ProbComp α); pure (x, y)) := by
   unfold GameEquiv
   apply evalDist_ext; intro t
-  rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
-  exact probEvent_bind_bind_swap _ _ _ _
+  prob_swap
 
 /-! ### Game hop with conditional branching
 
@@ -653,19 +652,21 @@ section ProbCongr
 variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
 variable {α β : Type}
 
-/-- `prob_congr` decomposes a bind congruence into a pointwise subgoal. -/
+/-- `prob_congr` decomposes a bind congruence into a pointwise subgoal
+with the bound variable and support hypothesis auto-introduced. -/
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
     (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
     Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
   prob_congr
-  exact h
+  exact h _ ‹_›
 
-/-- `prob_congr'` variant without support restriction. -/
+/-- `prob_congr'` variant without support restriction,
+with the bound variable auto-introduced. -/
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
     (h : ∀ x, Pr[= y | f x] = Pr[= y | g x]) :
     Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
   prob_congr'
-  exact h
+  exact h _
 
 end ProbCongr
 
@@ -804,6 +805,56 @@ example {σ : Type} {f : σ → α → OracleComp spec σ} {l : List α} {s₀ :
 example {f : α → OracleComp spec β} {l : List α} {I : ℝ≥0∞}
     (hstep : ∀ x, x ∈ l → ⦃I⦄ f x ⦃fun _ => I⦄) :
     ⦃I⦄ l.mapM f ⦃fun _ => I⦄ := by
+  qvcgen
+
+/-! ### Probability-goal lowering examples -/
+
+/-- `qvcgen_step` lowers `Pr[p | oa] = 1` into a `Triple` goal. -/
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
+    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    Pr[p | oa] = 1 := by
+  qvcgen
+
+/-- `qvcgen_step` lowers `1 = Pr[p | oa]` (symmetric) into a `Triple` goal. -/
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
+    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    1 = Pr[p | oa] := by
+  qvcgen
+
+/-- `qvcgen_step` lowers a `Pr[= x | oa] = 1` goal into a `Triple`. -/
+example {oa : OracleComp spec Bool}
+    (h : ⦃1⦄ oa ⦃fun y => if y = true then 1 else 0⦄) :
+    Pr[= true | oa] = 1 := by
+  qvcgen
+
+/-- `qvcgen` closes a probability goal directly from a matching `Triple` hypothesis. -/
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
+    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    Pr[p | oa] = 1 := by
+  qvcgen
+
+/-! ### Probability-equality dispatch examples -/
+
+/-- `qvcgen_step` on a `Pr[...] = Pr[...]` goal applies bind-swap automatically. -/
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {z : γ} :
+    Pr[= z | mx >>= fun a => my >>= fun b => f a b] =
+    Pr[= z | my >>= fun b => mx >>= fun a => f a b] := by
+  qvcgen_step
+
+/-- `qvcgen_step` on a shared-prefix `Pr[...] = Pr[...]` goal applies congruence
+and auto-intros the bound variable. -/
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
+    (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
+    Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
+  qvcgen_step
+  exact h _ ‹_›
+
+/-- `qvcgen` closes a simple bind-swap equality. -/
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {q : γ → Prop} :
+    Pr[q | mx >>= fun a => my >>= fun b => f a b] =
+    Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
   qvcgen
 
 end QVCGen
