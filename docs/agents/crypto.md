@@ -71,10 +71,10 @@ structure SecExp (m : Type → Type) extends ExecutionMethod m where
 
 Success = non-failure. Advantage: `1 - Pr[⊥ | exp.main]`.
 
-### `SecAdv`
+### `BoundedAdversary`
 
 ```lean
-structure SecAdv {ι : Type u} [DecidableEq ι]
+structure BoundedAdversary {ι : Type u} [DecidableEq ι]
     (spec : OracleSpec ι) (α β : Type u) where
   run : α → OracleComp spec β
   qb : ι → ℕ
@@ -87,10 +87,10 @@ structure SecAdv {ι : Type u} [DecidableEq ι]
 
 | Function | Input | Type | Measures |
 |----------|-------|------|----------|
-| `ProbComp.advantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
-| `ProbComp.advantage'` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
-| `ProbComp.advantage₂` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
-| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
+| `ProbComp.guessAdvantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
+| `ProbComp.boolBiasAdvantage` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
+| `ProbComp.distAdvantage` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
+| `ProbComp.boolDistAdvantage` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
 
 All return `ℝ` via `.toReal` conversion from `ℝ≥0∞`. This is essential since subtraction on `ℝ≥0∞` is truncated.
 
@@ -167,6 +167,79 @@ def myQueryImpl (challenge : ...) :
   ...
 ```
 
+## Asymptotic Security
+
+Defined in `VCVio/CryptoFoundations/Asymptotics/`.
+
+### Negligible functions (`Negligible.lean`)
+
+```lean
+def negligible (f : ℕ → ℝ≥0∞) : Prop := SuperpolynomialDecay atTop (λ x ↦ ↑x) f
+```
+
+Closure properties: `negligible_add`, `negligible_const_mul`, `negligible_sum`,
+`negligible_of_le`, `negligible_pow_mul`, `negligible_polynomial_mul`.
+
+### `SecurityExp` and `SecurityGame` (`Security.lean`)
+
+Both are decoupled from `SecExp` — they store an abstract advantage function (`ℕ → ℝ≥0∞`)
+rather than a family of concrete experiments. This lets the same meta-theorems work for
+failure-based games, distinguishing games, and any other advantage metric.
+
+```lean
+structure SecurityExp where
+  advantage : ℕ → ℝ≥0∞
+
+structure SecurityGame (Adv : Type*) where
+  advantage : Adv → ℕ → ℝ≥0∞
+```
+
+- `SecurityExp.secure`: advantage is `negligible`.
+- `SecurityGame.secureAgainst isPPT`: every adversary satisfying `isPPT` has negligible advantage.
+- The predicate `isPPT` is abstract — specialize to `PolyQueries` or custom efficiency notions.
+
+### Smart constructors
+
+| Constructor | Game style | Advantage metric |
+|-------------|-----------|-----------------|
+| `SecurityGame.ofSecExp` | Failure-based (`SecExp`) | `1 - Pr[⊥]` |
+| `SecurityGame.ofDistGame` | Two-game distinguishing | `\|Pr[game₀] - Pr[game₁]\|` |
+| `SecurityGame.ofGuessGame` | Single-game guessing | `\|1/2 - Pr[success]\|` |
+
+Analogous constructors exist for `SecurityExp`: `ofSecExp`, `ofDistExp`, `ofGuessExp`.
+
+### Key reduction/game-hopping lemmas
+
+| Lemma | Use |
+|-------|-----|
+| `secureAgainst_of_reduction` | Tight reduction: `adv(A) ≤ adv(reduce A)` |
+| `secureAgainst_of_poly_reduction` | Polynomial-loss: `adv(A) ≤ p(n) · adv(reduce A)` |
+| `secureAgainst_of_close` | Game hop: `adv_g₁(A) ≤ adv_g₂(A) + ε(n)` |
+| `secureAgainst_of_hybrid` | Chain of `k` games differing by `ε` each |
+
+## Cost Model
+
+Defined in `VCVio/OracleComp/QueryTracking/CostModel.lean`. Uses `AddWriterT ω` for
+additive cost accumulation through `simulateQ`.
+
+```lean
+structure CostModel (spec : OracleSpec ι) (ω : Type) [AddCommMonoid ω] where
+  queryCost : spec.Domain → ω
+```
+
+| Definition | Purpose |
+|------------|---------|
+| `costDist oa cm` | Joint distribution `(output, totalCost)` |
+| `expectedCost oa cm val` | `E[val(cost)]` via `wp` |
+| `WorstCaseCostBound oa cm bound` | All paths have cost `≤ bound` |
+| `ExpectedCostBound oa cm val bound` | Expected valued cost `≤ bound` |
+| `WorstCasePolyTime family cm val` | Worst-case poly bound over security parameter |
+| `ExpectedPolyTime family cm val` | Expected poly bound over security parameter |
+
+Key results: `fst_map_costDist` (instrumentation is transparent),
+`probEvent_cost_gt_le_expectedCost_div` (Markov's inequality),
+`WorstCasePolyTime.toExpectedPolyTime`.
+
 ## Common Gotchas
 
 1. **Avoid `guard`**: use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
@@ -174,3 +247,5 @@ def myQueryImpl (challenge : ...) :
 2. **`SymmEncAlg` vs `AsymmEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
+
+4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. For distinguishing-style games, use `SecurityGame.ofDistGame` or `SecurityGame.ofGuessGame` instead of `SecurityGame.ofSecExp`.

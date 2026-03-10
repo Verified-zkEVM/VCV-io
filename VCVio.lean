@@ -1,5 +1,6 @@
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.Asymptotics.Negligible
+import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
@@ -44,7 +45,9 @@ import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
+import VCVio.OracleComp.QueryTracking.Enforcement
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.RandomOracle

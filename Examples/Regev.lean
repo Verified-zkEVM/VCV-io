@@ -434,9 +434,9 @@
 -- /-- From an adversary that can distinguish between Hybrid 0 and Hybrid 1, we can construct an
 -- adversary that can distinguish between LWE and the uniform distribution. -/
 -- theorem Hybrid_0_ind_Hybrid_1 :
---     (Hybrid_0 adv).advantage' ≤ (Hybrid_1 adv).advantage'
+--     (Hybrid_0 adv).boolBiasAdvantage ≤ (Hybrid_1 adv).boolBiasAdvantage
 --       + (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) := by
---   unfold LWE_Advantage ProbComp.advantage' Hybrid_0 Hybrid_1 Hybrid_01_Reduction
+--   unfold LWE_Advantage ProbComp.boolBiasAdvantage Hybrid_0 Hybrid_1 Hybrid_01_Reduction
 --     IND_CPA_OneTime_Game LWE_Experiment uniformRegevAsymmEnc
 --   -- An absolute mess, need to refactor games
 --   sorry
@@ -476,7 +476,7 @@
 --   adv (x, y)
 
 -- noncomputable def LHL_Consequence_Advantage (adv : LHL_Consequence_Adv n p) : ℝ :=
---   (LHL_Consequence_Game_0 (m := m) adv).advantage₂' (LHL_Consequence_Game_1 adv)
+--   (LHL_Consequence_Game_0 (m := m) adv).boolDistAdvantage (LHL_Consequence_Game_1 adv)
 
 -- end LHL
 
@@ -489,10 +489,10 @@
 --   return b = b'
 
 -- theorem Hybrid_1_ind_Hybrid_2 :
---     (Hybrid_1 adv).advantage' ≤ (Hybrid_2 adv).advantage'
+--     (Hybrid_1 adv).boolBiasAdvantage ≤ (Hybrid_2 adv).boolBiasAdvantage
 --       + (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) := by
 --   unfold LHL_Consequence_Advantage Hybrid_1 Hybrid_2 Hybrid_12_Reduction
---     LHL_Consequence_Game_0 LHL_Consequence_Game_1 ProbComp.advantage' ProbComp.advantage₂'
+--     LHL_Consequence_Game_0 LHL_Consequence_Game_1 ProbComp.boolBiasAdvantage ProbComp.boolDistAdvantage
 --     uniformRegevAsymmEnc regevAsymmEnc
 --   simp
 --   -- rw [probOutput_false_eq_probOutput_true_not]
@@ -503,8 +503,8 @@
 --   sorry
 
 -- -- Finally, Hybrid 2's advantage is zero, since `b` is uniform and have nothing to do with other variables
--- theorem Hybrid_2_advantage_zero : (Hybrid_2 adv).advantage' = 0 := by
---   unfold ProbComp.advantage' Hybrid_2
+-- theorem Hybrid_2_advantage_zero : (Hybrid_2 adv).boolBiasAdvantage = 0 := by
+--   unfold ProbComp.boolBiasAdvantage Hybrid_2
 --   simp [sub_eq_zero, probOutput_false_eq_probOutput_true_not, probOutput_bind_eq_sum_fintype]
 --   rw [add_comm]
 
@@ -517,11 +517,11 @@
 --     (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv))
 --       + (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) := by
 --   calc
---     _ = (Hybrid_0 adv).advantage' := rfl
---     _ ≤ (Hybrid_1 adv).advantage' +
+--     _ = (Hybrid_0 adv).boolBiasAdvantage := rfl
+--     _ ≤ (Hybrid_1 adv).boolBiasAdvantage +
 --           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) :=
 --         Hybrid_0_ind_Hybrid_1 adv
---     _ ≤ (Hybrid_2 adv).advantage' +
+--     _ ≤ (Hybrid_2 adv).boolBiasAdvantage +
 --           (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) +
 --           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) := by
 --         gcongr

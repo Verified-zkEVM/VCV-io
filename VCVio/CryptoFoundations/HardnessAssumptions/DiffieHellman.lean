@@ -100,7 +100,7 @@ def ddhExp (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
 /-- DDH advantage: absolute distance from random guessing (1/2).
 Uses `ℝ` with absolute value rather than `ℝ≥0∞` subtraction, which would silently
 saturate at zero for adversaries that guess the wrong bit more often than not. -/
-noncomputable def ddhAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+noncomputable def ddhGuessAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
   |(Pr[= true | ddhExp g adversary]).toReal - 1 / 2|
 
 /-! ## DDH: Two-game formulation -/
@@ -214,10 +214,10 @@ lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
 
 omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The two DDH advantage formulations are related by a factor of 2:
-`ddhDistAdvantage = 2 * ddhAdvantage`. -/
-theorem ddhDistAdvantage_eq_two_mul_ddhAdvantage (g : G) (adversary : DDHAdversary F G) :
-    ddhDistAdvantage g adversary = 2 * ddhAdvantage g adversary := by
-  unfold ddhDistAdvantage ddhAdvantage
+`ddhDistAdvantage = 2 * ddhGuessAdvantage`. -/
+theorem ddhDistAdvantage_eq_two_mul_ddhGuessAdvantage (g : G) (adversary : DDHAdversary F G) :
+    ddhDistAdvantage g adversary = 2 * ddhGuessAdvantage g adversary := by
+  unfold ddhDistAdvantage ddhGuessAdvantage
   have h := ddhExp_probOutput_sub_half (F := F) g adversary
   have h2 : (Pr[= true | ddhExpReal g adversary]).toReal -
       (Pr[= true | ddhExpRand g adversary]).toReal =

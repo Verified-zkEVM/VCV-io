@@ -151,6 +151,22 @@ def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
 
 Key simp lemmas: `evalDist_simulateQ`, `probOutput_simulateQ`, `probEvent_simulateQ` (all with `uniformSampleImpl`).
 
+## Enforcement Oracle
+
+Defined in `VCVio/OracleComp/QueryTracking/Enforcement.lean`. Wraps an oracle with a
+per-index query budget tracked via `StateT`. Queries exceeding the budget return `default`.
+
+```lean
+def enforceOracle [DecidableEq ι] [spec.Inhabited] :
+    QueryImpl spec (StateT (ι → ℕ) (OracleComp spec))
+```
+
+Key result: `enforceOracle.fst_map_run_simulateQ` — if a computation satisfies
+`IsPerIndexQueryBound oa qb`, then running under enforcement with budget `qb` produces
+the same output distribution as running without enforcement.
+
+Requires `[DecidableEq ι]` and `[spec.Inhabited]` (for `default` values).
+
 ## Patterns
 
 ### Wiring oracle implementations (stateful)
