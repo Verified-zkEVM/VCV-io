@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Mathlib.Algebra.Polynomial.Eval.Defs
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.ProgramLogic.Unary.HoareTriple
 
@@ -22,12 +23,15 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 - `costDist oa cm`: Joint distribution of `(output, totalCost)`.
 - `expectedCost oa cm val`: Expected total cost `E[val(cost)]`, computed via `wp`.
 - `StrictCostBound`, `ExpectedCostBound`: Cost bound predicates.
+- `StrictPolyTime`, `ExpPolyTime`: Asymptotic polynomial-time predicates for computation
+  families indexed by a security parameter.
 
 ## Key Results
 
 - `fst_map_costDist`: Cost instrumentation doesn't change the output distribution.
 - `expectedCost_pure`: Expected cost of a pure computation is `0`.
 - `probEvent_cost_gt_le_expectedCost_div`: Markov's inequality for cost distributions.
+- `StrictPolyTime.toExpPolyTime`: Strict polynomial time implies expected polynomial time.
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
@@ -156,3 +160,54 @@ theorem probEvent_cost_gt_le_expectedCost_div
     (probEvent_cost_gt_mul_le_expectedCost oa cm val t)
 
 end CostBounds
+
+/-! ## Standard Cost Models -/
+
+namespace CostModel
+
+/-- Unit cost model: every oracle query costs 1.
+Total cost under this model equals total query count. -/
+def unit : CostModel spec ℕ where
+  queryCost _ := 1
+
+end CostModel
+
+/-! ## Polynomial-Time Predicates
+
+Asymptotic polynomial-time predicates for families of computations indexed by a
+security parameter `n : ℕ`. These connect the cost model to asymptotic complexity. -/
+
+section PolyTime
+
+variable [spec.Fintype] [spec.Inhabited]
+
+/-- All execution paths of `family n` have valued cost at most `p(n)` for some polynomial `p`. -/
+def StrictPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
+    (val : ω → ℕ) : Prop :=
+  ∃ p : Polynomial ℕ, ∀ n z, z ∈ support (costDist (family n) cm) → val z.2 ≤ p.eval n
+
+/-- Expected valued cost of `family n` is at most `p(n)` for some polynomial `p`. -/
+def ExpPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
+    (val : ω → ℝ≥0∞) : Prop :=
+  ∃ p : Polynomial ℕ, ∀ n, expectedCost (family n) cm val ≤ ↑(p.eval n)
+
+/-- Strict polynomial time implies expected polynomial time.
+If every execution path's cost is bounded by `p(n)`, then the expected cost is also
+bounded by `p(n)` (since the expectation of a bounded random variable is at most the bound). -/
+theorem StrictPolyTime.toExpPolyTime (family : ℕ → OracleComp spec α)
+    (cm : CostModel spec ω) (val : ω → ℕ)
+    (h : StrictPolyTime family cm val) :
+    ExpPolyTime family cm (fun w => ↑(val w)) := by
+  obtain ⟨p, hp⟩ := h
+  exact ⟨p, fun n => by
+    rw [expectedCost, wp_eq_tsum]
+    calc ∑' z, Pr[= z | costDist (family n) cm] * ↑(val z.2)
+        ≤ ∑' z, Pr[= z | costDist (family n) cm] * ↑(p.eval n) := by
+          apply ENNReal.tsum_le_tsum fun z => ?_
+          by_cases hz : z ∈ support (costDist (family n) cm)
+          · exact mul_le_mul_of_nonneg_left (Nat.cast_le.mpr (hp n z hz)) (zero_le _)
+          · simp [probOutput_eq_zero_of_not_mem_support hz]
+      _ = ↑(p.eval n) := by
+          rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]⟩
+
+end PolyTime
