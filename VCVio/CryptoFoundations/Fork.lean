@@ -212,7 +212,6 @@ private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
           (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹ := by
           rw [mul_assoc]
 
-set_option maxHeartbeats 300000 in
 private lemma probOutput_collision_le_main_div (s : Fin (qb i + 1)) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
     Pr[= (some s : Option (Fin (qb i + 1))) | do
@@ -223,43 +222,67 @@ private lemma probOutput_collision_le_main_div (s : Fin (qb i + 1)) :
     Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] / h := by
   simp only
   rw [probOutput_bind_eq_tsum]
-  calc
-    ∑' seed : QuerySeed spec,
-      Pr[= seed | liftComp (generateSeed spec qb js) spec] *
-        Pr[= (some s : Option (Fin (qb i + 1))) | do
-          let x₁ ← (simulateQ seededOracle main).run' seed
-          let u ← liftComp ($ᵗ spec.Range i) spec
-          if (seed i)[↑s]? = some u then return cf x₁ else return none]
-      ≤ ∑' seed : QuerySeed spec,
-          Pr[= seed | liftComp (generateSeed spec qb js) spec] *
-            (Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run' seed] /
-            ↑(Fintype.card (spec.Range i))) := by
-          refine ENNReal.tsum_le_tsum fun seed => ?_
-          exact mul_le_mul' le_rfl
-            (probOutput_collision_given_seed_le
-              (main := main) (qb := qb) (i := i) (cf := cf) (s := s) (seed := seed))
-    _ = (∑' seed : QuerySeed spec,
-          Pr[= seed | liftComp (generateSeed spec qb js) spec] *
-            Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run' seed]) /
-            ↑(Fintype.card (spec.Range i)) := by
-          simp_rw [div_eq_mul_inv]
-          rw [← ENNReal.tsum_mul_right]
-          refine tsum_congr fun seed => ?_
-          rw [mul_assoc]
-    _ = Pr[= (some s : Option (Fin (qb i + 1))) | do
-          let seed ← liftComp (generateSeed spec qb js) spec
-          cf <$> (simulateQ seededOracle main).run' seed] /
-            ↑(Fintype.card (spec.Range i)) := by
-          rw [probOutput_bind_eq_tsum]
-    _ = Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] /
-            ↑(Fintype.card (spec.Range i)) := by
-          simpa using congrArg
-            (fun p => p / (↑(Fintype.card (spec.Range i)) : ℝ≥0∞))
-            (seededOracle.probOutput_generateSeed_bind_map_simulateQ
-              (qc := qb) (js := js) (oa := main) (f := cf)
-              (y := (some s : Option (Fin (qb i + 1)))))
+  have hStep1 :
+      ∑' seed : QuerySeed spec,
+        Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+          Pr[= (some s : Option (Fin (qb i + 1))) | do
+            let x₁ ← (simulateQ seededOracle main).run' seed
+            let u ← liftComp ($ᵗ spec.Range i) spec
+            if (seed i)[↑s]? = some u then return cf x₁ else return none]
+        ≤ ∑' seed : QuerySeed spec,
+            Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+              (Pr[= (some s : Option (Fin (qb i + 1))) |
+                cf <$> (simulateQ seededOracle main).run' seed] /
+              ↑(Fintype.card (spec.Range i))) := by
+    refine ENNReal.tsum_le_tsum fun seed => ?_
+    exact mul_le_mul' le_rfl
+      (probOutput_collision_given_seed_le
+        (main := main) (qb := qb) (i := i) (cf := cf) (s := s) (seed := seed))
+  have hStep2 :
+      (∑' seed : QuerySeed spec,
+        Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+          (Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' seed] /
+          ↑(Fintype.card (spec.Range i)))) =
+      (∑' seed : QuerySeed spec,
+        Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+          Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' seed]) /
+          ↑(Fintype.card (spec.Range i)) := by
+    simp_rw [div_eq_mul_inv]
+    rw [← ENNReal.tsum_mul_right]
+    refine tsum_congr fun seed => ?_
+    rw [mul_assoc]
+  have hStep3 :
+      (∑' seed : QuerySeed spec,
+        Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+          Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' seed]) /
+          ↑(Fintype.card (spec.Range i)) =
+      Pr[= (some s : Option (Fin (qb i + 1))) | do
+        let seed ← liftComp (generateSeed spec qb js) spec
+        cf <$> (simulateQ seededOracle main).run' seed] /
+          ↑(Fintype.card (spec.Range i)) := by
+    rw [probOutput_bind_eq_tsum]
+  have hSeed :
+      Pr[= (some s : Option (Fin (qb i + 1))) | do
+        let seed ← liftComp (generateSeed spec qb js) spec
+        cf <$> (simulateQ seededOracle main).run' seed] =
+      Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] := by
+    simpa using
+      (seededOracle.probOutput_generateSeed_bind_map_simulateQ
+        (qc := qb) (js := js) (oa := main) (f := cf)
+        (y := (some s : Option (Fin (qb i + 1)))))
+  have hChain :
+      (∑' seed : QuerySeed spec,
+        Pr[= seed | liftComp (generateSeed spec qb js) spec] *
+          (Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' seed] /
+          ↑(Fintype.card (spec.Range i)))) =
+      Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] /
+        ↑(Fintype.card (spec.Range i)) := by
+    exact hStep2.trans <| hStep3.trans <| by rw [hSeed]
+  exact hChain ▸ hStep1
 
 /-- Key bound of the forking lemma: the probability that both runs succeed with fork point `s`
 is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/

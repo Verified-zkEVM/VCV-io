@@ -8,8 +8,6 @@ import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
 
-set_option autoImplicit false
-
 /-!
 # ElGamal Encryption: Multi-query IND-CPA via DDH
 
@@ -308,60 +306,6 @@ lemma probOutput_bind_add_left_uniform {β : Type} (m : G) (f : G → ProbComp �
   rw [hleft, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   refine tsum_congr fun y => ?_
   rw [probOutput_add_left_uniform (G := G) m y]
-
-lemma ddh_decomp_two_games_toReal (real rand : ProbComp Bool) :
-    (Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let z ← if b then real else rand
-      pure (b == z)]).toReal - 1 / 2 =
-    ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
-  have hgameRepr :
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        let z ← if b then real else rand
-        pure (b == z)] =
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
-    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
-    intro b
-    cases b
-    · have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
-        funext t
-        cases t <;> rfl
-      simp [hbeqFalse]
-    · have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
-        funext t
-        cases t <;> rfl
-      simp [hbeqTrue]
-  have hmix :
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
-      (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
-    probOutput_bind_uniformBool
-      (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
-      (x := true)
-  have hformula : Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let z ← if b then real else rand
-      pure (b == z)] =
-    (Pr[= true | real] + Pr[= false | rand]) / 2 := by
-    rw [hgameRepr, hmix,
-      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
-      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
-      probOutput_not_map]
-  have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
-    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by
-      have := HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := rand)
-      simp
-    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
-  rw [hformula, ENNReal.toReal_div,
-    ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
-    hfalseAsSub, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
-  simp [ENNReal.toReal_ofNat]
-  ring
-
 
 /-! ## 4. Per-hop DDH reduction -/
 
@@ -1313,7 +1257,7 @@ private lemma ddhExp_stepDDHReduction_decomp_toReal
     ((Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)]).toReal -
       (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k]).toReal) / 2 := by
   rw [ddhExp_stepDDH_eq_mixture (F := F) (gen := gen) adversary k]
-  rw [ddh_decomp_two_games_toReal]
+  rw [DiffieHellman.probOutput_uniformBool_branch_toReal_sub_half]
   rw [stepDDH_realBranch_probOutput_eq (F := F) (gen := gen) adversary k,
       stepDDH_randBranch_probOutput_eq (F := F) (gen := gen) adversary k]
 

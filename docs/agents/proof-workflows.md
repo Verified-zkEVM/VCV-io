@@ -56,7 +56,7 @@ def hybridGame (adversary : ...) (k : ℕ) : ProbComp Bool := do
 For each hop, build a reduction adversary that embeds the DDH challenge at position k:
 
 ```lean
-def stepReduction (adversary : ...) (k : ℕ) : DDHAdversary G P :=
+def stepReduction (adversary : ...) (k : ℕ) : DDHAdversary F G :=
   fun x x₁ x₂ x₃ => do
     -- use (x, x₁) as public key
     -- at query k, return (x₂, msg * x₃) instead of encrypting

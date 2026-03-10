@@ -8,6 +8,8 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.EvalDist.Bool
+import VCVio.ProgramLogic.Tactics
 
 /-!
 # Discrete Logarithm Assumptions (DLog / CDH / DDH)
@@ -40,7 +42,7 @@ We model a cyclic group as:
 
 set_option autoImplicit false
 
-open OracleComp OracleSpec ENNReal
+open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic
 
 namespace DiffieHellman
 
@@ -62,12 +64,14 @@ def dlogExp (g : G) (adversary : DLogAdversary F G) : ProbComp Bool := do
 
 /-! ## CDH (Computational Diffie-Hellman) -/
 
-/-- A CDH adversary receives `(g, a • g, b • g)` and tries to compute `(a * b) • g`. -/
-def CDHAdversary (G : Type) := G → G → G → ProbComp G
+/-- A CDH adversary receives `(g, a • g, b • g)` and tries to compute `(a * b) • g`.
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `cdhExp`. -/
+def CDHAdversary (_F G : Type) := G → G → G → ProbComp G
 
 /-- CDH experiment: sample random scalars `a, b`, give the adversary `(g, a • g, b • g)`,
 and check whether the adversary's output equals `(a * b) • g`. -/
-def cdhExp (g : G) (adversary : CDHAdversary G) : ProbComp Bool := do
+def cdhExp (g : G) (adversary : CDHAdversary F G) : ProbComp Bool := do
   let a ← $ᵗ F; let b ← $ᵗ F
   let h ← adversary g (a • g) (b • g)
   return decide (h = (a * b) • g)
@@ -75,8 +79,10 @@ def cdhExp (g : G) (adversary : CDHAdversary G) : ProbComp Bool := do
 /-! ## DDH (Decisional Diffie-Hellman) -/
 
 /-- A DDH adversary receives `(g, A, B, T)` and guesses whether `T = (a * b) • g`
-(real) or `T` is a random group element (random). -/
-def DDHAdversary (G : Type) := G → G → G → G → ProbComp Bool
+(real) or `T` is a random group element (random).
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `ddhExp` and related definitions. -/
+def DDHAdversary (_F G : Type) := G → G → G → G → ProbComp Bool
 
 /-- DDH experiment: sample random scalars `a, b` and a bit. If the bit is `true`, set
 `T = (a * b) • g`; otherwise sample `T` uniformly from `G`. The adversary wins by
@@ -88,7 +94,7 @@ guessing the bit correctly.
 Without this, a degenerate instantiation could trivially distinguish by testing
 subgroup membership.  For a span-correct formulation without the surjectivity
 assumption, replace `$ᵗ G` with `(· • g) <$> $ᵗ F`. -/
-def ddhExp (g : G) (adversary : DDHAdversary G) : ProbComp Bool := do
+def ddhExp (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
   let a ← $ᵗ F; let b ← $ᵗ F
   let bit ← $ᵗ Bool
   let T ← if bit then pure ((a * b) • g) else $ᵗ G
@@ -98,8 +104,129 @@ def ddhExp (g : G) (adversary : DDHAdversary G) : ProbComp Bool := do
 /-- DDH advantage: absolute distance from random guessing (1/2).
 Uses `ℝ` with absolute value rather than `ℝ≥0∞` subtraction, which would silently
 saturate at zero for adversaries that guess the wrong bit more often than not. -/
-noncomputable def ddhAdvantage (g : G) (adversary : DDHAdversary G) : ℝ :=
-  |(Pr[= true | ddhExp (F := F) g adversary]).toReal - 1 / 2|
+noncomputable def ddhAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExp g adversary]).toReal - 1 / 2|
+
+/-! ## DDH: Two-game formulation -/
+
+/-- DDH real game: the adversary receives a genuine DH triple `(g, a • g, b • g, (a * b) • g)`. -/
+def ddhExpReal (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  adversary g (a • g) (b • g) ((a * b) • g)
+
+/-- DDH random game: the adversary receives `(g, a • g, b • g, T)` with `T ← $ᵗ G`. -/
+def ddhExpRand (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  let T ← $ᵗ G
+  adversary g (a • g) (b • g) T
+
+/-- Two-game DDH advantage: `|Pr[output 1 | real] - Pr[output 1 | random]|`. -/
+noncomputable def ddhDistAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExpReal g adversary]).toReal -
+    (Pr[= true | ddhExpRand g adversary]).toReal|
+
+/-- Generic identity: for any two `ProbComp Bool` computations, the "guess the
+uniform bit" game decomposes as:
+  `Pr[correct guess] - 1/2 = (Pr[output 1 | real] - Pr[output 1 | rand]) / 2`. -/
+lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) :
+    (Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)]).toReal - 1 / 2 =
+    ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
+  have hgameRepr :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if b then real else rand
+        pure (b == z)] =
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
+    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+    intro b
+    cases b
+    · have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqFalse]
+    · have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqTrue]
+  have hmix :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
+      (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
+    probOutput_bind_uniformBool
+      (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
+      (x := true)
+  have hformula : Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)] =
+    (Pr[= true | real] + Pr[= false | rand]) / 2 := by
+    rw [hgameRepr, hmix,
+      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
+      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
+      probOutput_not_map]
+  have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
+    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by
+      have := HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := rand)
+      simp
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  rw [hformula, ENNReal.toReal_div,
+    ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
+    hfalseAsSub, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  simp [ENNReal.toReal_ofNat]
+  ring
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+/-- The single-game DDH experiment can be decomposed as a uniform-bit branch over
+the real and random DDH games. -/
+private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G) :
+    Pr[= true | ddhExp g adversary] =
+    Pr[= true | do
+      let bit ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if bit then ddhExpReal g adversary
+               else ddhExpRand g adversary
+      pure (bit == z)] := by
+  unfold ddhExp
+  simp only [← probEvent_eq_eq_probOutput]
+  rw [probEvent_bind_congr fun a _ => probEvent_bind_bind_swap _ _ _ _,
+      probEvent_bind_bind_swap]
+  simp only [probEvent_eq_eq_probOutput]
+  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+  intro bit; cases bit <;> simp [ddhExpReal, ddhExpRand]
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+/-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/
+lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
+    (Pr[= true | ddhExp g adversary]).toReal - 1 / 2 =
+    ((Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal) / 2 := by
+  rw [show (Pr[= true | ddhExp g adversary]).toReal =
+      (Pr[= true | do
+        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if bit then ddhExpReal g adversary
+                 else ddhExpRand g adversary
+        pure (bit == z)]).toReal from by
+    congr 1; exact ddhExp_probOutput_eq_branch (F := F) g adversary]
+  exact probOutput_uniformBool_branch_toReal_sub_half
+    (ddhExpReal g adversary)
+    (ddhExpRand g adversary)
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+/-- The two DDH advantage formulations are related by a factor of 2:
+`ddhDistAdvantage = 2 * ddhAdvantage`. -/
+theorem ddhDistAdvantage_eq_two_mul_ddhAdvantage (g : G) (adversary : DDHAdversary F G) :
+    ddhDistAdvantage g adversary = 2 * ddhAdvantage g adversary := by
+  unfold ddhDistAdvantage ddhAdvantage
+  have h := ddhExp_probOutput_sub_half (F := F) g adversary
+  have h2 : (Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal =
+      2 * ((Pr[= true | ddhExp g adversary]).toReal - 1 / 2) := by linarith
+  rw [h2, abs_mul, abs_of_nonneg (by positivity)]
 
 /-! ## Generable relation for discrete log -/
 
