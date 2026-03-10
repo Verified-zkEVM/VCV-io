@@ -28,8 +28,9 @@ The security proof follows the standard three-step outline:
 3. Replace the masked challenge message with a uniform ciphertext component, yielding success
    probability `1/2`.
 
-The bad event is then reduced to inversion of the underlying trapdoor permutation by inspecting
-the adversary's random-oracle queries. The proof bodies remain `sorry` for now.
+The bad event is then reduced to the repo's trapdoor-preimage experiment
+(`tdpAdvantage`) by inspecting the adversary's random-oracle queries. The proof
+bodies remain `sorry` for now.
 -/
 
 set_option autoImplicit false
@@ -217,15 +218,16 @@ theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
   simpa [game2, f] using
     (probOutput_decide_eq_uniformBool_half f (by simp [f]))
 
-/-- The bad event is bounded by the inversion probability of the underlying trapdoor
-permutation. -/
+/-- The bad event is bounded by the trapdoor-preimage advantage of the inverter
+constructed from the adversary's random-oracle transcript. -/
 theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     badEventProb tdp adv ≤
       (tdpAdvantage tdp (inverter tdp adv)).toReal := by
   sorry
 
-/-- Main BR93 bound: one-time IND-CPA distinguishing advantage is bounded by the trapdoor
-permutation inversion advantage via the standard up-to-bad reduction. -/
+/-- Main BR93 bound for this file's custom one-time ROM CPA game: the distinguishing
+bias is bounded by the trapdoor-preimage advantage via the standard up-to-bad
+reduction. -/
 theorem indcpa_bound (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     |(Pr[= true | cpaGame tdp adv]).toReal - 1 / 2| ≤
       (tdpAdvantage tdp (inverter tdp adv)).toReal := by

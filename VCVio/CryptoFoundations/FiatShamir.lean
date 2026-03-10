@@ -73,6 +73,22 @@ variable {X W PC SC Ω P : Type} {p : X → W → Bool}
 variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
 
+/-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
+EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
+def HashQueryBound {S' α : Type}
+    (oa : OracleComp ((unifSpec + (M × PC →ₒ Ω)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
+  OracleComp.IsQueryBound oa Q
+    (fun t b => match t with
+      | .inl (.inl _) | .inr _ => True
+      | .inl (.inr _) => 0 < b)
+    (fun t b => match t with
+      | .inl (.inl _) | .inr _ => b
+      | .inl (.inr _) => b - 1)
+
+/-- Reciprocal of the finite challenge-space size. -/
+noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=
+  (Fintype.card challenge : ENNReal)⁻¹
+
 omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
@@ -237,14 +253,29 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
             pure (σ.verify pk c r s))
           (post := fun y => if y = true then 1 else 0))
 
-/-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then
-forgery probability is bounded by the forking lemma probability. -/
+/-- Pointcheval-Stern style Fiat-Shamir reduction statement.
+
+To obtain a meaningful EUF-CMA theorem we need:
+* special soundness, to extract a witness from a successful fork;
+* an HVZK simulator for the underlying Σ-protocol, to model signing without the witness;
+* a structural bound on hash-oracle queries.
+
+The conclusion is stated as the existence of a witness-finding reduction rather
+than a fully explicit adversary, since the concrete reduction is not yet
+implemented in this file. -/
 theorem euf_cma_bound
     (hss : σ.SpeciallySound)
+    [Fintype Ω]
+    (simTranscript : X → ProbComp (PC × Ω × P))
+    (hhvzk : σ.HVZK simTranscript)
     (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
-    (qBound : ℕ) :
-    adv.advantage ≤
-      sorry := by
+    (qBound : ℕ)
+    (hQ : ∀ pk, HashQueryBound (M := M) (PC := PC) (Ω := Ω)
+      (S' := PC × P) (oa := adv.main pk) qBound) :
+    ∃ reduction : X → ProbComp W,
+      (adv.advantage *
+          (adv.advantage / ((qBound + 1 : ℕ) : ENNReal) - challengeSpaceInv Ω)) ≤
+        Pr[= true | hardRelationExp (r := p) reduction] := by
   sorry
 
 end FiatShamir

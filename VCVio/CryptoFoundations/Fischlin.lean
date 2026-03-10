@@ -185,7 +185,8 @@ hash values exceeds `S`, at least one minimum exceeds `⌊S/ρ⌋`. The probabil
 that the minimum of `t` independent uniform samples from `Fin (2^b)` exceeds `k`
 is `((2^b - k - 1) / 2^b)^t`.
 
-For `S = 0` this simplifies to `ρ · ((2^b - 1) / 2^b)^t`. -/
+For `S = 0` this simplifies to `ρ · ((2^b - 1) / 2^b)^t`.
+The intended regime is `0 < ρ`; theorem statements below make that explicit. -/
 noncomputable def completenessError (ρ b S t : ℕ) : ℝ≥0∞ :=
   (ρ : ℝ≥0∞) * ((↑(2 ^ b - (S / ρ + 1)) : ℝ≥0∞) / ↑(2 ^ b)) ^ t
 
@@ -196,7 +197,7 @@ perfectly complete, then the signature scheme verifies with probability at least
 Unlike the Fiat-Shamir transform (which is perfectly complete), the Fischlin transform
 has a non-zero completeness error because the prover's proof-of-work search may fail
 to find hash values whose sum is at most `S`. -/
-theorem almostComplete (hc : σ.PerfectlyComplete) (msg : M) :
+theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
     Pr[= true | (Fischlin σ hr ρ b S M).exec do
       let (pk, sk) ← (Fischlin σ hr ρ b S M).keygen
       let sig ← (Fischlin σ hr ρ b S M).sign pk sk msg
@@ -257,7 +258,8 @@ noncomputable def onlineExtract
 For `Q` total hash oracle queries, `ρ` repetitions, `b`-bit hashes, and max sum `S`:
 the error is `(Q + 1) · (S + 1) · C(S + ρ - 1, ρ - 1) / 2^(bρ)`.
 
-For `S = 0` this simplifies to `(Q + 1) / 2^(bρ)`. -/
+For `S = 0` this simplifies to `(Q + 1) / 2^(bρ)`.
+The intended regime is `0 < ρ`; theorem statements below make that explicit. -/
 noncomputable def knowledgeSoundnessError (Q ρ b S : ℕ) : ℝ≥0∞ :=
   (↑(Q + 1) : ℝ≥0∞) * ↑((S + 1) * Nat.choose (S + ρ - 1) (ρ - 1)) /
     ((↑(2 ^ b) : ℝ≥0∞) ^ ρ)
@@ -266,10 +268,10 @@ noncomputable def knowledgeSoundnessError (Q ρ b S : ℕ) : ℝ≥0∞ :=
 
 Runs a cheating prover with a logged random oracle, then checks:
 1. Whether the Fischlin verifier accepts the produced proof.
-2. Whether the online extractor successfully recovers a valid witness.
+2. Whether the online extractor returns a witness satisfying the relation.
 
-Returns `true` (the "bad event") when verification succeeds but extraction fails
-to produce a valid witness.
+Returns `true` (the "bad event") when verification succeeds but the extracted
+output is either `none` or an invalid witness.
 
 The `prover` argument is the raw function rather than `KnowledgeSoundnessAdv`
 to keep type inference tractable with `sorry` bodies. -/
@@ -289,7 +291,7 @@ noncomputable def knowledgeSoundnessExp
     let (verified, _) ←
       (simulateQ (idImpl' + ro) ((Fischlin σ hr ρ b S M).verify x msg π)).run cache
     let extracted ← onlineExtract σ ρ b M x π roLog
-    return (verified && extracted.isNone)
+    return (verified && !(match extracted with | some w => p x w | none => false))
 
 /-- Knowledge soundness of the Fischlin transform via online (straight-line) extraction
 (Fischlin 2005, Theorem 2).
@@ -304,34 +306,18 @@ which enables a tight security reduction. -/
 theorem knowledgeSoundness
     (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
     (adv : KnowledgeSoundnessAdv ρ b M)
-    (Q : ℕ) (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q)
+    (Q : ℕ) (hρ : 0 < ρ)
+    (hQ : ∀ x msg, ROQueryBound ρ b M (adv.run x msg) Q)
     (x : X) (msg : M) :
     Pr[= true | knowledgeSoundnessExp σ hr ρ b S M adv.run x msg]
       ≤ knowledgeSoundnessError Q ρ b S := by sorry
 
-/-! ### EUF-CMA Security -/
+/-! ### EUF-CMA Security
 
-/-- EUF-CMA security of the Fischlin signature scheme with a tight reduction
-(Fischlin 2005, Corollary 1).
-
-If the Σ-protocol is specially sound with unique responses, then the advantage of any
-EUF-CMA adversary making at most `Q` hash queries is bounded by the knowledge
-soundness error `(Q + 1) · (S + 1) · C(S + ρ - 1, ρ - 1) / 2^(bρ)`.
-
-This bound is **tight** (no forking-lemma loss), unlike the Fiat-Shamir transform
-where the reduction incurs an `O(Q / |Ω|)` overhead via rewinding. The reduction
-time is `O(T)` where `T` is the adversary's running time. -/
-theorem euf_cma_tight
-    (hss : σ.SpeciallySound) (hur : σ.UniqueResponses)
-    (adv : SignatureAlg.unforgeableAdv (Fischlin σ hr ρ b S M))
-    (Q : ℕ)
-    (hQ : ∀ pk, OracleComp.IsQueryBound (adv.main pk) Q
-      (fun t b => match t with
-        | .inl (.inl _) | .inr _ => True
-        | .inl (.inr _) => 0 < b)
-      (fun t b => match t with
-        | .inl (.inl _) | .inr _ => b
-        | .inl (.inr _) => b - 1)) :
-    adv.advantage ≤ knowledgeSoundnessError Q ρ b S := by sorry
+A tight EUF-CMA corollary for the Fischlin signature scheme requires an explicit
+simulation of signing queries inside a hard-relation experiment. The previous
+placeholder theorem overclaimed by bounding forgery probability solely by the
+knowledge-soundness error, so we intentionally leave that corollary unstated
+until the signing-simulation reduction is formalized. -/
 
 end Fischlin

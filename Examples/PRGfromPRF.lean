@@ -78,7 +78,7 @@ def oracleVisitedStates :
       pure (s ::ᵥ rest)
 
 /-- Stream-style PRG obtained by iterating a PRF `n` times. The seed contains both the
-PRF key and the initial state; later theorems assume the PRF key is sampled uniformly. -/
+PRF key and the initial state; later theorems assume the PRF key distribution is uniform. -/
 @[simps!] def streamPRG (prf : PRFScheme K S (S × O)) (n : ℕ) :
     PRGScheme (K × S) (List.Vector O n) where
   gen ks := streamOutputs (prf.eval ks.1) n ks.2
@@ -113,12 +113,14 @@ def idealCollisionExp (n : ℕ) : ProbComp Bool := do
 noncomputable def collisionProb (n : ℕ) : ℝ :=
   (Pr[= true | idealCollisionExp (S := S) (O := O) n]).toReal
 
-/-- In the real world, the stream PRG experiment is exactly the real PRF experiment
-for the reduction adversary, provided the PRF key generation is uniform. -/
+/-- In the real world, the stream PRG experiment has the same output distribution as
+the real PRF experiment for the reduction adversary, provided the PRF key
+distribution is uniform. -/
 theorem prgRealExp_eq_prfRealExp
-    (hkey : prf.UniformKey) (adv : PRGAdversary (List.Vector O n)) :
-    PRGScheme.prgRealExp (streamPRG prf n) adv =
-      PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv) := by
+    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (adv : PRGAdversary (List.Vector O n)) :
+    evalDist (PRGScheme.prgRealExp (streamPRG prf n) adv) =
+      evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
   sorry
 
 /-- In the ideal world, the reduction adversary only differs from an ideal PRG adversary
@@ -132,7 +134,9 @@ theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
 /-- Security of the stream PRG obtained from a PRF: PRG distinguishing advantage is
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
-theorem security (hkey : prf.UniformKey) (adv : PRGAdversary (List.Vector O n)) :
+theorem security
+    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (adv : PRGAdversary (List.Vector O n)) :
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +
       collisionProb (S := S) (O := O) n := by
