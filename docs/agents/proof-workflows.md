@@ -5,23 +5,25 @@
 **What are you trying to prove?**
 
 1. **Two games have the same distribution** (`g₁ ≡ₚ g₂`):
-   → `by_equiv` to enter relational mode, then use `rel_step` / `rel_rnd` / `rel_skip` / `rel_pure`
-   → For simple cases: `game_rel'` (exhaustive automated prover)
+   → `by_equiv` to enter relational mode, then use `rvcgen_step` / `rvcgen`
+   → Add `using ...` when the current relational step needs an explicit witness
 
 2. **Advantage is bounded** (`advantage ≤ ε`):
    → `by_dist` to enter TV distance reasoning
    → For identical-until-bad: use `tvDist_simulateQ_le_probEvent_bad`
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
-   → Start with `probOutput_bind_eq_tsum` to decompose binds
+   → Start with `qvcgen_step` if the goal should lower or decompose automatically
+   → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
-   → Use `prob_swap` to reorder independent binds
+   → Use `qvcgen_step`, `qvcgen_step rw`, or `qvcgen_step rw congr'` for probability equalities
 
 4. **Multi-hop security proof** (`g₁ ≡ₚ gₙ`):
    → `game_trans g₂` to split into two goals, repeat
 
 5. **Need to swap sampling order**:
-   → `prob_swap` (or `prob_swap_at n` for multiple swaps)
+   → Use `qvcgen_step` if the swap should close the goal
+   → Use `qvcgen_step rw` (or `qvcgen_step rw under n`) if you need to continue after rewriting
 
 ## Game-Hopping Recipe
 
@@ -92,8 +94,8 @@ From `Examples/ElGamal.lean` — multi-query security via DDH.
 **Key patterns used**:
 - Hybrid argument indexed by query count `k`
 - `StateT` for oracle implementations that track query counter + cache
-- `prob_swap` to reorder independent sampling (13 instances)
-- `probOutput_bind_congr` to factor out common prefixes
+- `qvcgen_step` to close common probability-equality swaps
+- `qvcgen_step rw congr'` to expose common random-sampling prefixes without support noise
 - Telescope bound: `IND_CPA_advantage ≤ q * 2ε`
 
 ## Annotated Tactic Usage
@@ -103,22 +105,27 @@ From `Examples/ElGamal.lean` — multi-query security via DDH.
 ```lean
 -- Goal: g₁ ≡ₚ g₂
 by_equiv                    -- now: ⟪g₁ ~ g₂ | EqRel α⟫
-rel_step                    -- decomposes the outermost bind
-· rel_rnd                   -- couples the sampling step
-· intro a b hab             -- hab : a = b (from EqRel)
+rvcgen_step using R         -- if needed, provide the bind cut relation
+· rvcgen_step using f       -- couples the sampling step with a bijection
+  · exact hf
+  · intro x
+    exact hR x
+· intro a b hab
   subst hab
-  rel_step
-  · rel_skip                -- identical sub-computations
-  · intro x y hxy
-    rel_pure                -- both return pure values
+  rvcgen                    -- keep taking obvious relational steps
 ```
 
-### `prob_swap` in context
+### `qvcgen_step` on probability equalities
 
 ```lean
 -- Goal: Pr[= true | do let x ← $ᵗ P; let b ← $ᵗ Bool; f x b]
 --     = Pr[= true | do let b ← $ᵗ Bool; let x ← $ᵗ P; f x b]
-prob_swap                   -- closes the goal automatically
+qvcgen_step                -- closes the goal automatically
+```
+
+```lean
+-- Same shape, but keep going after one rewrite:
+qvcgen_step rw
 ```
 
 ### `by_dist` for advantage bounds

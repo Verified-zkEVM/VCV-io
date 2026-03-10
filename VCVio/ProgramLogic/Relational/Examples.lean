@@ -70,7 +70,7 @@ example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
   relTriple_refl (spec₁ := spec₁) oa
 
-/-! ### Tactic-mode examples (using `rel_step`, `rel_skip`, etc.) -/
+/-! ### Tactic-mode examples (using `rvcgen_step`) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
@@ -78,12 +78,11 @@ example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (hxy : RelTriple oa ob R)
     (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
     RelTriple (oa >>= fa) (ob >>= fb) S := by
-  rel_step using R
-  · exact hxy
-  · exact hfg
+  rvcgen_step using R
+  exact hxy
 
 example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
-  rel_skip
+  rvcgen_step
 
 end OracleComp.ProgramLogic.Relational
