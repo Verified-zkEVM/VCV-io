@@ -70,6 +70,7 @@ For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
 - **Unary exhaustive**: `game_hoare`, plus compatibility `game_wp`
   (`wp_step` / `hoare_step` also understand bounded iteration via `replicate`, `List.mapM`,
   and `List.foldlM`)
+- **Quantitative VCGen (spec-aware)**: `qvcgen_step`, `qvcgen`, `exp_norm`
 - **Rewriting / congruence**: `prob_swap`, `prob_swap_rw`, `prob_congr`, `prob_congr'`
 
 Quick usage notes:
@@ -86,6 +87,11 @@ Quick usage notes:
 - `rel_mapM` lifts pointwise coupling through finite list traversals; use `rel_mapM using Rin` for non-equality input-list relations.
 - `rel_foldlM` lifts a bounded loop invariant through `List.foldlM`; use `rel_foldlM using Rin` for non-equality input-list relations.
 - `game_hoare` is the coarse exhaustive quantitative Hoare driver built on top of `hoare_step`.
+- `qvcgen_step` is `hoare_step` with automatic spec lookup: after `triple_bind`, it tries `assumption`
+  and `solve_by_elim` to close the spec subgoal from local context.
+- `qvcgen` is the exhaustive spec-aware driver: decomposes `Triple` goals, closes spec subgoals from
+  context, then runs `game_rule` simp + `solve_by_elim` cleanup. Bring specs into context with `have`.
+- `exp_norm` normalizes indicator (`propInd`) and expectation (`wp`) arithmetic.
 - `by_upto bad` applies the existing identical-until-bad TV-distance bound for `simulateQ`.
 
 ## Building

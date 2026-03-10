@@ -717,3 +717,38 @@ example {α β γ : Type} {mx : OracleComp spec α} {my : OracleComp spec β}
   prob_swap_rw
 
 end ProbSwapRw
+
+/-! ## Quantitative VCGen examples -/
+
+section QVCGen
+
+variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+
+/-- `qvcgen` closes a trivial `Triple` for `pure`. -/
+example (x : α) (post : α → ℝ≥0∞) :
+    ⦃post x⦄ (pure x : OracleComp spec α) ⦃post⦄ := by
+  qvcgen
+
+/-- `qvcgen` decomposes a two-step bind and closes both subgoals from hypotheses. -/
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
+    (h1 : ⦃1⦄ oa ⦃cut⦄) (h2 : ∀ x, ⦃cut x⦄ ob x ⦃post⦄) :
+    ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
+  qvcgen
+
+/-- `qvcgen` with mixed: one spec from hypothesis, one closed by `triple_pure`. -/
+example {oa : OracleComp spec α} {post : α → ℝ≥0∞}
+    (h : ⦃1⦄ oa ⦃post⦄) :
+    ⦃1⦄ (do let x ← oa; pure x) ⦃post⦄ := by
+  qvcgen
+
+/-- `exp_norm` simplifies `propInd` expressions. -/
+example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
+  exp_norm
+
+/-- `exp_norm` normalizes `propInd_and` into the product form. -/
+example (P Q : Prop) [Decidable P] [Decidable Q] :
+    ⌜P ∧ Q⌝ = ⌜P⌝ * ⌜Q⌝ := by
+  simp [propInd_and]
+
+end QVCGen
