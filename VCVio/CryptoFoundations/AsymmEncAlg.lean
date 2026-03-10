@@ -180,7 +180,7 @@ def IND_CCA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
 
 noncomputable def IND_CCA_Advantage {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : encAlg.IND_CCA_Adversary) : ℝ :=
-  (IND_CCA_Game adversary).advantage'
+  (IND_CCA_Game adversary).boolBiasAdvantage
 
 end IND_CCA
 
@@ -221,7 +221,7 @@ def IND_CPA_OneTime_Game : ProbComp Bool :=
 
 noncomputable def IND_CPA_OneTime_Advantage (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
     (adv : IND_CPA_Adv encAlg) : ℝ :=
-  (IND_CPA_OneTime_Game (encAlg := encAlg) adv).advantage'
+  (IND_CPA_OneTime_Game (encAlg := encAlg) adv).boolBiasAdvantage
 
 section OracleLift
 

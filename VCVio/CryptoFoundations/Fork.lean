@@ -34,7 +34,7 @@ variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
   {α β γ : Type}
 
 /-- Bundles the inputs to the forking lemma. -/
-structure forkInput (spec : OracleSpec ι) (α : Type) where
+structure ForkInput (spec : OracleSpec ι) (α : Type) where
   main : OracleComp spec α
   queryBound : ι → ℕ
   js : List ι
