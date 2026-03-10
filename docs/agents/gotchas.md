@@ -71,7 +71,7 @@ Check the module layering DAG before adding imports:
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
   → {SimSemantics, QueryTracking, Constructions, Coercions, ProbComp}
-  → CryptoFoundations → Examples
+  → {ProgramLogic, CryptoFoundations} → Examples
 ```
 
 ### 13. Preserve partial proof attempts with `stop`
@@ -111,6 +111,6 @@ or URL rather than pointing agents at a repo-local file path.
 For relational program logic, start with
 *A Quantitative Probabilistic Relational Hoare Logic* ([ERHL25](../../REFERENCES.md#erhl25)).
 
-### 21. `prompts/` folder must be committed
+### 21. Agent guidance files must be committed
 
-Agents dispatched to `git worktree` clones need to read prompt files. Do not add `prompts/` to `.gitignore`.
+Agents dispatched to `git worktree` clones need to read `AGENTS.md`, `docs/agents/`, and any other guidance files. Ensure these are committed so all worktrees see them.

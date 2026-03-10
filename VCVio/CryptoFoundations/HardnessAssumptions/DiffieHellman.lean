@@ -85,20 +85,16 @@ at call sites of `ddhExp` and related definitions. -/
 def DDHAdversary (_F G : Type) := G → G → G → G → ProbComp Bool
 
 /-- DDH experiment: sample random scalars `a, b` and a bit. If the bit is `true`, set
-`T = (a * b) • g`; otherwise sample `T` uniformly from `G`. The adversary wins by
-guessing the bit correctly.
+`c = a * b` (the real DH scalar); otherwise sample `c ← $ᵗ F` independently. The adversary
+receives `(g, a • g, b • g, c • g)` and wins by guessing the bit.
 
-**Design assumption**: this definition is well-formed only when `g` generates `G`
-(i.e., `Function.Surjective (· • g : F → G)`), ensuring that the real case
-`(a * b) • g` and the random case `T ← $ᵗ G` are sampled from the same set.
-Without this, a degenerate instantiation could trivially distinguish by testing
-subgroup membership.  For a span-correct formulation without the surjectivity
-assumption, replace `$ᵗ G` with `(· • g) <$> $ᵗ F`. -/
+All sampling is from the scalar field `F`, so the experiment is well-defined for any
+`Module F G` without requiring that `g` generates all of `G`. -/
 def ddhExp (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
   let a ← $ᵗ F; let b ← $ᵗ F
   let bit ← $ᵗ Bool
-  let T ← if bit then pure ((a * b) • g) else $ᵗ G
-  let b' ← adversary g (a • g) (b • g) T
+  let c ← if bit then pure (a * b) else $ᵗ F
+  let b' ← adversary g (a • g) (b • g) (c • g)
   return (bit == b')
 
 /-- DDH advantage: absolute distance from random guessing (1/2).
@@ -114,11 +110,11 @@ def ddhExpReal (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
   let a ← $ᵗ F; let b ← $ᵗ F
   adversary g (a • g) (b • g) ((a * b) • g)
 
-/-- DDH random game: the adversary receives `(g, a • g, b • g, T)` with `T ← $ᵗ G`. -/
+/-- DDH random game: the adversary receives `(g, a • g, b • g, c • g)` with independent
+`c ← $ᵗ F`. -/
 def ddhExpRand (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
-  let a ← $ᵗ F; let b ← $ᵗ F
-  let T ← $ᵗ G
-  adversary g (a • g) (b • g) T
+  let a ← $ᵗ F; let b ← $ᵗ F; let c ← $ᵗ F
+  adversary g (a • g) (b • g) (c • g)
 
 /-- Two-game DDH advantage: `|Pr[output 1 | real] - Pr[output 1 | random]|`. -/
 noncomputable def ddhDistAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
@@ -181,7 +177,7 @@ lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) 
   simp [ENNReal.toReal_ofNat]
   ring
 
-omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The single-game DDH experiment can be decomposed as a uniform-bit branch over
 the real and random DDH games. -/
 private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G) :
@@ -199,7 +195,7 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
   refine probOutput_bind_congr' ($ᵗ Bool) true ?_
   intro bit; cases bit <;> simp [ddhExpReal, ddhExpRand]
 
-omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/
 lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
     (Pr[= true | ddhExp g adversary]).toReal - 1 / 2 =
@@ -216,7 +212,7 @@ lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
     (ddhExpReal g adversary)
     (ddhExpRand g adversary)
 
-omit [Fintype F] [DecidableEq F] [DecidableEq G] in
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The two DDH advantage formulations are related by a factor of 2:
 `ddhDistAdvantage = 2 * ddhAdvantage`. -/
 theorem ddhDistAdvantage_eq_two_mul_ddhAdvantage (g : G) (adversary : DDHAdversary F G) :
@@ -236,7 +232,7 @@ variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
 variable (g : G)
 
-private lemma probOutput_map_bijective_uniform_cross
+lemma probOutput_map_bijective_uniform_cross
     {α β : Type} [SampleableType α] [SampleableType β] [Fintype α] [Fintype β]
     (f : α → β) (hf : Function.Bijective f) (y : β) :
     Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by

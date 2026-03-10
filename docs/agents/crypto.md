@@ -74,49 +74,58 @@ Success = non-failure. Advantage: `1 - Pr[⊥ | exp.main]`.
 ### `SecAdv`
 
 ```lean
-structure SecAdv (spec : OracleSpec ι) (α β : Type) where
+structure SecAdv {ι : Type u} [DecidableEq ι]
+    (spec : OracleSpec ι) (α β : Type u) where
   run : α → OracleComp spec β
-  qb : ι → ℕ                    -- per-index query bound
+  qb : ι → ℕ
+  qb_isQueryBound (x : α) : IsPerIndexQueryBound (run x) (qb)
   activeOracles : List ι
+  mem_activeOracles_iff (i : ι) : i ∈ activeOracles ↔ qb i ≠ 0
 ```
 
 ### Advantage functions
 
-| Function | Input | Measures |
-|----------|-------|----------|
-| `ProbComp.advantage` | `ProbComp Unit` | `|1/2 - Pr[= () \| p]|` |
-| `ProbComp.advantage'` | `ProbComp Bool` | `|Pr[= true \| p] - Pr[= false \| p]|` |
-| `ProbComp.advantage₂` | Two `ProbComp Unit` | `|Pr[= () \| p] - Pr[= () \| q]|` |
-| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `|Pr[= true \| p] - Pr[= true \| q]|` |
+| Function | Input | Type | Measures |
+|----------|-------|------|----------|
+| `ProbComp.advantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
+| `ProbComp.advantage'` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
+| `ProbComp.advantage₂` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
+| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
+
+All return `ℝ` via `.toReal` conversion from `ℝ≥0∞`. This is essential since subtraction on `ℝ≥0∞` is truncated.
 
 ## Hardness Assumptions
 
 ### Discrete Log Assumptions (DLog / CDH / DDH)
 
-Requires `[Field F] [AddCommGroup G] [Module F G] [SampleableType F] [SampleableType G]`
+Requires `[Field F] [Fintype F] [DecidableEq F] [SampleableType F]` and
+`[AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]`
 plus a fixed generator `g : G`.
 
 Uses additive / EC-style notation: `a • g` means scalar multiplication (textbook `g^a`).
 
 | Problem | Adversary type | Experiment |
 |---------|---------------|------------|
-| DLog | `G → G → ProbComp F` | `dlogExp g adversary` |
-| CDH | `G → G → G → ProbComp G` | `cdhExp g adversary` |
-| DDH | `G → G → G → G → ProbComp Bool` | `ddhExp g adversary` |
+| DLog | `DLogAdversary F G` (= `G → G → ProbComp F`) | `dlogExp g adversary` |
+| CDH | `CDHAdversary F G` (= `G → G → G → ProbComp G`) | `cdhExp g adversary` |
+| DDH | `DDHAdversary F G` (= `G → G → G → G → ProbComp Bool`) | `ddhExp g adversary` |
+
+`CDHAdversary` and `DDHAdversary` carry a phantom `_F` parameter so Lean can infer the scalar field at call sites.
 
 Defined in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`.
 
 ### Hard Relations
 
 ```lean
-structure GenerableRelation (X W : Type) (r : X → W → Bool) where
+structure GenerableRelation (X W : Type) (r : X → W → Bool)
+    [SampleableType X] [SampleableType W] where
   gen : ProbComp (X × W)
-  gen_sound : ∀ x w, (x, w) ∈ support gen → r x w
-  gen_uniform_right : ∀ x, Pr[= x | Prod.fst <$> gen] = Pr[= x | $ᵗ X]
-  gen_uniform_left : ∀ w, Pr[= w | Prod.snd <$> gen] = Pr[= w | $ᵗ W]
+  gen_sound (x : X) (w : W) : (x, w) ∈ support gen → r x w
+  gen_uniform_right (x : X) : Pr[= x | Prod.fst <$> gen] = Pr[= x | $ᵗ X]
+  gen_uniform_left (w : W) : Pr[= w | Prod.snd <$> gen] = Pr[= w | $ᵗ W]
 ```
 
-Note: the relation is `r : X → W → Bool` (not `Prop`).
+Note: the relation is `r : X → W → Bool` (not `Prop`), and `[SampleableType]` instances are required for both types.
 
 ## Building a Reduction
 

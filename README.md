@@ -2,11 +2,12 @@
 
 This library aims to provide a foundational framework in Lean for reasoning about cryptographic protocols in the computational model. The core part of the framework provides:
 
-* A monadic syntax for representing computations with oracle access (`OracleComp`), with probabilistic computations (`ProbComp`) as a special case of having uniform selection oracles
+* A monadic syntax for representing computations with oracle access (`OracleComp`), with probabilistic computations (`ProbComp`) as a special case of having uniform selection oracles.
 * A denotational semantics (`evalDist`) for assigning probability distributions to probabilistic computations, and tools for reasoning about the probabilities of particular outputs or events (`probOutput`/`probEvent`/`probFailure`).
 * An operational semantics (`simulateQ`) for implementing/simulating the behavior of a computation's oracles, including implementations of random oracles, query logging, reductions, etc.
+* A program logic with relational (pRHL-style) and unary (Hoare-style) proof modes, with interactive tactics for stepping through game-based proofs.
 
-It also provides definitions for cryptographic primitives such as symmetric/asymmetric encryption, (ring) signatures, $\Sigma$-protocols, hashing algorithms, etc.
+It also provides definitions for cryptographic primitives such as symmetric/asymmetric encryption, signatures, $\Sigma$-protocols, and transforms like Fiat-Shamir and Fischlin.
 
 Assuming Lean 4 and lake are already installed, the project can be built by just running:
 
@@ -23,7 +24,7 @@ Asymptotic reasoning is also supported, but tooling and automation for this is c
 Computational complexity is not considered.
 
 The `VCVio` directory provides all of the foundations and framework definitions / APIs.
-`Examples` contains example constructions of standard cryptographic algorithms.
+`Examples` contains example proofs including OneTimePad (perfect secrecy), ElGamal (IND-CPA via DDH), and Schnorr ($\Sigma$-protocol completeness, soundness, HVZK).
 `ToMathlib` contains constructions that eventually should be moved to another project.
 
 External papers and project references cited in this repo are centralized in
@@ -44,13 +45,15 @@ See [LEANCRYPTO3-REPO](REFERENCES.md#leancrypto3-repo) for an outdated version o
 ## Representing Computations
 
 The main representation of computations with oracle access is a type `OracleComp spec α` where `spec : OracleSpec ι` specifies a set of oracles (indexed by type `ι`) and `α` is the final return type.
-This is defined as a free monad over the polynomial functor `OracleQuery spec α`, which consists of an input `t : spec.Domain` and a continuation `f : spec.Range t → α`.
+`OracleSpec ι` is a function `ι → Type v`: the index type `ι` serves as the domain (query inputs) and `spec t` is the range (response type for query `t`).
+`OracleComp` is defined as a free monad over the polynomial functor associated to `spec`.
 
-This results in a representation with three canonical forms (see `OracleComp.construct` and `OracleComp.inductionOn`):
+This results in a representation with two canonical forms (see `OracleComp.construct` and `OracleComp.inductionOn`):
 
-* `return x` (`pure x`)
-* `failure`
-* `do let x ← comp₁; comp₂ x` (`comp₁ >>= comp₂`)
+* `pure x` — return a value
+* `query t >>= f` — make an oracle query `t : spec.Domain` and continue with `f : spec.Range t → OracleComp spec α`
+
+Failure (via `Alternative`) is available through `OptionT (OracleComp spec)`, with a separate eliminator `OracleComp.inductionOnOptional`.
 
 `ProbComp α` is the special case where `spec` only allows for uniform random selection (`OracleComp unifSpec α`).
 `OracleComp (T →ₒ U) α` has access to a single oracle with input type `T` and output type `U`.
@@ -69,14 +72,17 @@ This provides a mechanism to implement oracle behaviors, but can also be used to
 ## Probabilities of Outputs and Events
 
 Semantics for probability calculations come from using `simulateQ` to interpret the computation in another monad.
-e.g. `support`/`supportWhen` can be used to embed in the `Set` monad to get the possible outputs of a computation.
+`support` can be used to embed in the `Set` monad to get the possible outputs of a computation.
 
-`evalDist`/`evalDistWhen` embed a computation into the `PMF` monad, using uniform distributions or a custom distribution specification respectively (actually `OptionT PMF`, which is essentially a `SPMF` to handle the "missing probability mass" of failure).
-`evalDist` is the "expected" denotation for `ProbComp` and we introduce notation:
+`evalDist` embeds a computation into the `SPMF` monad (`OptionT PMF`) by using uniform distributions for each oracle's range.
+For `ProbComp` (i.e. `OracleComp unifSpec`), `evalDist` is definitionally equal to `simulateQ` with uniform implementations.
+We introduce notation:
 
 * `Pr[= x | comp]` - probability of output `x`
 * `Pr[p | comp]` - probability of event `p`
 * `Pr[⊥ | comp]` - probability of the computation failing
+
+The typeclass `NeverFail mx` asserts that `Pr[⊥ | mx] = 0`, and is used to propagate non-failure guarantees through monadic combinators.
 
 ## Automatic Coercions
 
@@ -88,13 +94,21 @@ We implement two main cases:
 
 The second case includes things like `spec₁ ⊂ₒ (spec₁ + spec₂)` and `spec₂ ⊂ₒ (spec₁ + spec₂)`, as well as many transitive cases. Generally lifting should be automatic if the left set of specs is an (ordered) sub-sequence of the right specs.
 
+## Program Logic
+
+The library includes a program logic (`VCVio.ProgramLogic`) inspired by pRHL and ordered monad-algebra approaches. It provides:
+
+* **Relational proof mode** (`by_equiv`): Coupling-based reasoning via `RelTriple` for proving game equivalence or bounding advantage between two computations.
+* **Unary proof mode** (`by_hoare`): Quantitative Hoare triples for bounding probabilities of events in a single computation.
+* **Interactive tactics**: `rel_step`, `rel_rnd`, `rel_sim`, `hoare_step`, `game_trans`, `prob_swap`, and many more for stepping through game-based proofs.
+
 ## Other Useful Definitions
 
-Predicates on computations:
+Predicates and tools for computations:
 
-* `someWhen`/`allWhen` - recursively check predicates on a computation's syntax tree given some allowed query outputs
-* `neverFailsWhen`/`mayFailWhen` - check if a computation could fail given a set of allowed query outputs
-* `isQueryBound` - bound the number of queries a computation makes
+* `allWhen`/`someWhen` - recursively check predicates on a computation's syntax tree given allowed query outputs
+* `IsQueryBound` - bound the number of queries a computation makes (with per-index variant `IsPerIndexQueryBound`)
+* `QueryImpl.withLogging`/`withCaching`/`withPregen` - modifiers that wrap a query implementation with logging, caching, or pre-generated answers
 
 ## Trivia
 

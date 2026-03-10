@@ -338,8 +338,9 @@ private def IND_CPA_stepDDHQueryImpl
     IND_CPA_stepDDHOracle (F := F) (gen := gen) pk b k x₂ x₃
 
 /-- The per-hop DDH reduction: given a DDH challenge `(gen, pk, x₂, x₃)`, embeds it into
-the `k`-th fresh LR query. When `x₃ = a * b_scalar • gen` (DDH-real), the simulation
-matches hybrid `k+1`; when `x₃` is uniform (DDH-random), it matches hybrid `k`. -/
+the `k`-th fresh LR query. When `x₃ = (a * b_scalar) • gen` (DDH-real), the simulation
+matches hybrid `k+1`; when `x₃ = c • gen` for random `c` (DDH-random), it matches
+hybrid `k` (requires `Function.Bijective (· • gen : F → G)`). -/
 def IND_CPA_stepDDHReduction
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (k : ℕ) : DiffieHellman.DDHAdversary F G :=
@@ -365,11 +366,11 @@ def stepDDH_realBranchCore
 def stepDDH_randBranchCore
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (k : ℕ) (a b_scalar : F) : ProbComp Bool := do
-  let y ← $ᵗ G
+  let c ← $ᵗ F
   let b ← $ᵗ Bool
   let pk : G := a • gen
   let x₂ : G := b_scalar • gen
-  let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ y)
+  let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ (c • gen))
     (adversary pk)).run' (∅, 0)
   return (b == b')
 
@@ -1031,13 +1032,56 @@ private lemma stepDDH_realBranch_probOutput_eq
     _ = _ := hswap₂
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)] := hmain
 
+omit [DecidableEq F] [DecidableEq G] in
+private lemma probOutput_bind_uniform_smul_eq
+    (hg : Function.Bijective (· • gen : F → G))
+    {α : Type} (f : G → ProbComp α) (z : α) :
+    Pr[= z | ($ᵗ F : ProbComp F) >>= fun c => f (c • gen)] =
+    Pr[= z | ($ᵗ G : ProbComp G) >>= fun y => f y] := by
+  haveI : Fintype G := Fintype.ofBijective _ hg
+  have h : (($ᵗ F : ProbComp F) >>= fun c => f (c • gen)) =
+      (((· • gen) <$> ($ᵗ F : ProbComp F)) >>= f) := by
+    simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
+  rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  congr 1; funext y; congr 1
+  exact DiffieHellman.probOutput_map_bijective_uniform_cross (· • gen) hg y
+
 -- The DDH-random branch has the same success probability as hybrid k.
 private lemma stepDDH_randBranch_probOutput_eq
+    (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
     Pr[= true | stepDDH_randBranchGame (F := F) (gen := gen) adversary k] =
     Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k] := by
   have hswap₀ :
       Pr[= true | stepDDH_randBranchGame (F := F) (gen := gen) adversary k] =
+      Pr[= true | do
+        let a ← $ᵗ F
+        let b_scalar ← $ᵗ F
+        let b ← $ᵗ Bool
+        let c ← $ᵗ F
+        let pk : G := a • gen
+        let x₂ : G := b_scalar • gen
+        let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ (c • gen))
+          (adversary pk)).run' (∅, 0)
+        pure (b == b')] := by
+    unfold stepDDH_randBranchGame stepDDH_randBranchCore
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun a => ?_; congr 1
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr fun b_scalar => ?_; congr 1
+    rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
+    exact probEvent_bind_bind_swap _ _ _ _
+  have hbridge :
+      Pr[= true | do
+        let a ← $ᵗ F
+        let b_scalar ← $ᵗ F
+        let b ← $ᵗ Bool
+        let c ← $ᵗ F
+        let pk : G := a • gen
+        let x₂ : G := b_scalar • gen
+        let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ (c • gen))
+          (adversary pk)).run' (∅, 0)
+        pure (b == b')] =
       Pr[= true | do
         let a ← $ᵗ F
         let b_scalar ← $ᵗ F
@@ -1048,13 +1092,17 @@ private lemma stepDDH_randBranch_probOutput_eq
         let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ y)
           (adversary pk)).run' (∅, 0)
         pure (b == b')] := by
-    unfold stepDDH_randBranchGame stepDDH_randBranchCore
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun a => ?_; congr 1
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    refine tsum_congr fun b_scalar => ?_; congr 1
-    rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
-    exact probEvent_bind_bind_swap _ _ _ _
+    refine probOutput_bind_congr' ($ᵗ F : ProbComp F) true fun a => ?_
+    refine probOutput_bind_congr' ($ᵗ F : ProbComp F) true fun b_scalar => ?_
+    refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) true fun b => ?_
+    exact probOutput_bind_uniform_smul_eq (gen := gen) hg
+      (fun y => do
+        let pk : G := a • gen
+        let x₂ : G := b_scalar • gen
+        let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ y)
+          (adversary pk)).run' (∅, 0)
+        pure (b == b'))
+      true
   have hswap₁ :
       Pr[= true | do
         let a ← $ᵗ F
@@ -1159,6 +1207,7 @@ private lemma stepDDH_randBranch_probOutput_eq
   calc
     Pr[= true | stepDDH_randBranchGame (F := F) (gen := gen) adversary k]
       = _ := hswap₀
+    _ = _ := hbridge
     _ = _ := hswap₁
     _ = _ := hswap₂
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k] := hmain
@@ -1249,6 +1298,7 @@ private lemma ddhExp_stepDDH_eq_mixture
   rw [hrepr, hswap₁, hswap₂, hfold]
 
 private lemma ddhExp_stepDDHReduction_decomp_toReal
+    (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
     (Pr[= true |
       DiffieHellman.ddhExp gen
@@ -1259,11 +1309,12 @@ private lemma ddhExp_stepDDHReduction_decomp_toReal
   rw [ddhExp_stepDDH_eq_mixture (F := F) (gen := gen) adversary k]
   rw [DiffieHellman.probOutput_uniformBool_branch_toReal_sub_half]
   rw [stepDDH_realBranch_probOutput_eq (F := F) (gen := gen) adversary k,
-      stepDDH_randBranch_probOutput_eq (F := F) (gen := gen) adversary k]
+      stepDDH_randBranch_probOutput_eq hg adversary k]
 
 /-- Per-hop bound: the absolute difference between consecutive hybrid winning probabilities
 is at most twice the DDH advantage of the step-`k` reduction. -/
 lemma IND_CPA_stepDDH_hopBound
+    (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (k : ℕ) :
     |(Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)]).toReal -
@@ -1271,7 +1322,7 @@ lemma IND_CPA_stepDDH_hopBound
       2 * |(Pr[= true |
           DiffieHellman.ddhExp gen
             (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal - 1 / 2| := by
-  have h := ddhExp_stepDDHReduction_decomp_toReal (F := F) (gen := gen) adversary k
+  have h := ddhExp_stepDDHReduction_decomp_toReal hg adversary k
   have heq : (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)]).toReal -
       (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k]).toReal =
       2 * ((Pr[= true |
@@ -1593,6 +1644,7 @@ theorem IND_CPA_HybridGame_q_eq_game
 /-- IND-CPA advantage is bounded by the sum of per-hop DDH advantages. This is the
 "summed" form before collapsing to a single `ε` bound. -/
 theorem elGamal_IND_CPA_bound_toReal
+    (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ)
     (hstart : (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary q]).toReal =
@@ -1625,7 +1677,7 @@ theorem elGamal_IND_CPA_bound_toReal
             have h1 : q - 1 - i + 1 = q - i := by omega
             have h2 : q - (i + 1) = q - 1 - i := by omega
             rw [h2]
-            have hb := IND_CPA_stepDDH_hopBound (F := F) (gen := gen) adversary (q - 1 - i)
+            have hb := IND_CPA_stepDDH_hopBound hg adversary (q - 1 - i)
             rwa [h1] at hb
     _ = Finset.sum (Finset.range q) (fun i =>
             2 * |(Pr[= true |
@@ -1643,6 +1695,7 @@ theorem elGamal_IND_CPA_bound_toReal
 per-hop DDH reduction has advantage at most `ε`, then the IND-CPA advantage of ElGamal
 is at most `q * (2 * ε)`. -/
 theorem elGamal_IND_CPA_le_q_mul_ddh
+    (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ) (ε : ℝ)
     (hq : adversary.MakesAtMostQueries q)
@@ -1650,7 +1703,7 @@ theorem elGamal_IND_CPA_le_q_mul_ddh
       |(Pr[= true | DiffieHellman.ddhExp gen
         (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal - 1 / 2| ≤ ε) :
     ((elgamalAsymmEnc F G gen).IND_CPA_advantage adversary).toReal ≤ q * (2 * ε) := by
-  refine le_trans (elGamal_IND_CPA_bound_toReal (gen := gen) adversary q
+  refine le_trans (elGamal_IND_CPA_bound_toReal hg adversary q
     (IND_CPA_HybridGame_q_eq_game (gen := gen) adversary q hq)) ?_
   calc
     Finset.sum (Finset.range q) (fun k =>
