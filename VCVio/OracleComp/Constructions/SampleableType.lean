@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.BitVec
+import VCVio.EvalDist.Bool
 
 /-!
 # Uniform Selection Over a Type
@@ -57,6 +58,25 @@ lemma probOutput_map_bijective_uniformSample [Fintype α]
   obtain ⟨x', rfl⟩ := hf.surjective x
   rw [probOutput_map_injective ($ᵗ α) hf.injective x']
   exact SampleableType.probOutput_selectElem_eq _ _
+
+/-- Pushing forward uniform sampling along a bijection preserves output probabilities. -/
+lemma probOutput_map_bijective_uniform_cross
+    {β : Type} [SampleableType β] [Fintype α] [Fintype β]
+    (f : α → β) (hf : Function.Bijective f) (y : β) :
+    Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by
+  obtain ⟨x, rfl⟩ := hf.surjective y
+  rw [probOutput_map_injective ($ᵗ α) hf.injective x,
+      probOutput_uniformSample, probOutput_uniformSample,
+      Fintype.card_of_bijective hf]
+
+/-- Pushing forward uniform sampling along a bijection preserves the full evaluation distribution. -/
+lemma evalDist_map_bijective_uniform_cross
+    {β : Type} [SampleableType β] [Fintype α] [Fintype β]
+    (f : α → β) (hf : Function.Bijective f) :
+    evalDist (f <$> ($ᵗ α : ProbComp α)) = evalDist ($ᵗ β : ProbComp β) := by
+  apply evalDist_ext
+  intro y
+  exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
 
 lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 := by aesop
 
@@ -293,6 +313,59 @@ lemma probOutput_bind_uniformBool {α : Type}
   rw [tsum_fintype (L := .unconditional _), Fintype.sum_bool]
   simp [probOutput_uniformSample, div_eq_mul_inv, add_comm]
   rw [← left_distrib, mul_comm]
+
+/-- Guessing a uniformly random bit after branching between `real` and `rand` decomposes into
+the difference of the branch success probabilities. -/
+lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) :
+    (Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)]).toReal - 1 / 2 =
+    ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
+  have hgameRepr :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if b then real else rand
+        pure (b == z)] =
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
+    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+    intro b
+    cases b
+    · have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqFalse]
+    · have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqTrue]
+  have hmix :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
+      (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
+    probOutput_bind_uniformBool
+      (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
+      (x := true)
+  have hformula : Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)] =
+    (Pr[= true | real] + Pr[= false | rand]) / 2 := by
+    rw [hgameRepr, hmix,
+      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
+      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
+      probOutput_not_map]
+  have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
+    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by simp
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  rw [hformula, ENNReal.toReal_div,
+    ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
+    hfalseAsSub, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  simp [ENNReal.toReal_ofNat]
+  ring
 
 /-- If the distribution of `f b` is independent of `b`, then guessing a uniformly random
 bit by running `f` has success probability exactly 1/2.

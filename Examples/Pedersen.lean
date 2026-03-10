@@ -89,12 +89,6 @@ private lemma commit_fst_eq_map (pp : G) (m : F) :
     (fun d : F => d • g + m • pp) <$> ($ᵗ F : ProbComp F) := by
   simp [pedersenCommit]
 
-private lemma evalDist_map_uniform_bijective (f : F → G)
-    (hf : Function.Bijective f) :
-    evalDist (f <$> ($ᵗ F : ProbComp F)) = evalDist ($ᵗ G : ProbComp G) := by
-  apply evalDist_ext; intro y
-  exact probOutput_map_bijective_uniform_cross f hf y
-
 /-- The Pedersen commitment scheme is perfectly hiding: the commitment distribution
 is independent of the committed message.
 
@@ -105,9 +99,9 @@ theorem perfectlyHiding (hg : Function.Bijective (· • g : F → G)) :
     (pedersenCommit (F := F) g).PerfectlyHiding := by
   intro pp m₁ m₂
   rw [commit_fst_eq_map, commit_fst_eq_map]
-  have h₁ := evalDist_map_uniform_bijective (F := F) (G := G)
+  have h₁ := evalDist_map_bijective_uniform_cross (α := F) (β := G)
     (fun d => d • g + m₁ • pp) (commit_fst_bijective hg pp m₁)
-  have h₂ := evalDist_map_uniform_bijective (F := F) (G := G)
+  have h₂ := evalDist_map_bijective_uniform_cross (α := F) (β := G)
     (fun d => d • g + m₂ • pp) (commit_fst_bijective hg pp m₂)
   exact h₁.trans h₂.symm
 
