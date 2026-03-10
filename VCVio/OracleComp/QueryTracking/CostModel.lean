@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
 import VCVio.OracleComp.QueryTracking.CountingOracle
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.ProgramLogic.Unary.HoareTriple
 
 /-!
@@ -198,6 +199,98 @@ def unit : CostModel spec ℕ where
 
 end CostModel
 
+@[simp]
+private lemma addCostOracle_unit_run_apply (t : spec.Domain) :
+    (addCostOracle CostModel.unit.queryCost t).run =
+      (fun u => (u, Multiplicative.ofAdd 1)) <$>
+        (liftM (query t) : OracleComp spec (spec.Range t)) := by
+  simp [CostModel.unit, addCostOracle, costOracle, QueryImpl.withCost]
+
+section UnitCostBridge
+
+variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
+
+omit [DecidableEq ι] [spec.Fintype] in
+private lemma exists_mem_support (oa : OracleComp spec α) :
+    ∃ x, x ∈ support oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      exact ⟨x, by simp⟩
+  | query_bind t mx ih =>
+      let u : spec.Range t := default
+      rcases ih u with ⟨x, hx⟩
+      refine ⟨x, (mem_support_bind_iff _ _ _).2 ?_⟩
+      exact ⟨u, mem_support_query t u, hx⟩
+
+omit [DecidableEq ι] [spec.Fintype] [spec.Inhabited] in
+private lemma exists_mem_support_costDist_of_mem_support
+    (oa : OracleComp spec α) (cm : CostModel spec ω) {x : α}
+    (hx : x ∈ support oa) :
+    ∃ c, (x, c) ∈ support (costDist oa cm) := by
+  have hx' : x ∈ support (Prod.fst <$> costDist oa cm) := by
+    simpa [fst_map_costDist] using hx
+  rw [support_map] at hx'
+  rcases hx' with ⟨⟨x', c⟩, hz, hfst⟩
+  simp only at hfst
+  subst x'
+  exact ⟨c, hz⟩
+
+omit [DecidableEq ι] [spec.Fintype] [spec.Inhabited] in
+private lemma mem_support_costDist_unit_query_bind_of_mem_support
+    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (u : spec.Range t)
+    {z : α × Multiplicative ℕ} (hz : z ∈ support (costDist (mx u) CostModel.unit)) :
+    (z.1, Multiplicative.ofAdd (Multiplicative.toAdd z.2 + 1)) ∈ support
+      (costDist ((liftM (query t) : OracleComp spec (spec.Range t)) >>= mx) CostModel.unit) := by
+  rw [costDist, simulateQ_bind, simulateQ_query, WriterT.run_bind]
+  refine (mem_support_bind_iff _ _ _).2 ?_
+  refine ⟨(u, (Multiplicative.ofAdd 1 : Multiplicative ℕ)), ?_, ?_⟩
+  · have hq : (u, Multiplicative.ofAdd 1) ∈ support ((addCostOracle CostModel.unit.queryCost t).run) := by
+      rw [addCostOracle_unit_run_apply, support_map]
+      exact ⟨u, mem_support_query t u, by simp⟩
+    simp [OracleQuery.cont_query]
+  · rw [support_map]
+    exact ⟨z, hz, by ext <;> simp [Prod.map, Nat.add_comm]⟩
+
+omit [spec.Fintype] in
+/-- A strict bound under the unit cost model yields a uniform per-index query bound:
+if every execution uses at most `bound` total unit-cost steps, then each oracle index
+is queried at most `bound` times. -/
+theorem StrictCostBound.toIsPerIndexQueryBound_unit
+    {oa : OracleComp spec α} {bound : ℕ}
+    (h : StrictCostBound oa CostModel.unit bound) :
+    IsPerIndexQueryBound oa (fun _ => bound) := by
+  induction oa using OracleComp.inductionOn generalizing bound with
+  | pure x =>
+      exact isPerIndexQueryBound_pure x _
+  | query_bind t mx ih =>
+      rw [isPerIndexQueryBound_query_bind_iff]
+      refine ⟨?_, fun u => ?_⟩
+      · rcases exists_mem_support (mx default) with ⟨x, hx⟩
+        rcases exists_mem_support_costDist_of_mem_support (mx default) CostModel.unit hx with
+          ⟨c, hc⟩
+        have hparent :=
+          mem_support_costDist_unit_query_bind_of_mem_support t mx default hc
+        have hle : Multiplicative.toAdd c + 1 ≤ bound := by
+          simpa using (h _ hparent)
+        omega
+      · have hcont : StrictCostBound (mx u) CostModel.unit (bound - 1) := by
+          intro z hz
+          have hparent :=
+            mem_support_costDist_unit_query_bind_of_mem_support t mx u hz
+          have hle : Multiplicative.toAdd z.2 + 1 ≤ bound := by
+            simpa using (h _ hparent)
+          change Multiplicative.toAdd z.2 ≤ bound - 1
+          omega
+        have hu : IsPerIndexQueryBound (mx u) (fun _ => bound - 1) := ih u hcont
+        refine hu.mono ?_
+        intro i
+        by_cases hi : i = t
+        · subst hi
+          simp
+        · simp [Function.update, hi]
+
+end UnitCostBridge
+
 /-! ## Polynomial-Time Predicates
 
 Asymptotic polynomial-time predicates for families of computations indexed by a
@@ -227,5 +320,21 @@ theorem StrictPolyTime.toExpPolyTime (family : ℕ → OracleComp spec α)
   obtain ⟨p, hp⟩ := h
   exact ⟨p, fun n => expectedCost_le_of_support_bound _ _ _ _ fun z hz =>
     Nat.cast_le.mpr (hp n z hz)⟩
+
+/-- Strict polynomial time under the unit cost model yields polynomial query bounds.
+The resulting per-index bound uses the same polynomial for every oracle index, since
+each individual query count is bounded by the total unit cost. -/
+noncomputable def StrictPolyTime.toPolyQueries_unit [DecidableEq ι]
+    (family : ℕ → OracleComp spec α)
+    (h : StrictPolyTime family CostModel.unit id) :
+    PolyQueries (ι := ι) (spec := fun _ => spec) (α := fun _ => PUnit) (β := fun _ => α)
+      (fun n _ => family n) := by
+  classical
+  let p : Polynomial ℕ := Classical.choose h
+  have hp := Classical.choose_spec h
+  refine ⟨fun _ => p, ?_⟩
+  intro n _
+  exact StrictCostBound.toIsPerIndexQueryBound_unit
+    (oa := family n) (bound := p.eval n) (fun z hz => hp n z hz)
 
 end PolyTime
