@@ -182,17 +182,31 @@ Closure properties: `negligible_add`, `negligible_const_mul`, `negligible_sum`,
 
 ### `AsymSecExp` and `AsymSecGame` (`AsymSecExp.lean`)
 
-```lean
-structure AsymSecExp (m : ℕ → Type → Type*) where
-  exp : (n : ℕ) → SecExp (m n)
+Both are decoupled from `SecExp` — they store an abstract advantage function (`ℕ → ℝ≥0∞`)
+rather than a family of concrete experiments. This lets the same meta-theorems work for
+failure-based games, distinguishing games, and any other advantage metric.
 
-structure AsymSecGame (Adv : Type*) (m : ℕ → Type → Type*) where
-  game : Adv → (n : ℕ) → SecExp (m n)
+```lean
+structure AsymSecExp where
+  advantage : ℕ → ℝ≥0∞
+
+structure AsymSecGame (Adv : Type*) where
+  advantage : Adv → ℕ → ℝ≥0∞
 ```
 
 - `AsymSecExp.secure`: advantage is `negligible`.
 - `AsymSecGame.secureAgainst isPPT`: every adversary satisfying `isPPT` has negligible advantage.
 - The predicate `isPPT` is abstract — specialize to `PolyQueries` or custom efficiency notions.
+
+### Smart constructors
+
+| Constructor | Game style | Advantage metric |
+|-------------|-----------|-----------------|
+| `AsymSecGame.ofSecExp` | Failure-based (`SecExp`) | `1 - Pr[⊥]` |
+| `AsymSecGame.ofDistGame` | Two-game distinguishing | `\|Pr[game₀] - Pr[game₁]\|` |
+| `AsymSecGame.ofGuessGame` | Single-game guessing | `\|1/2 - Pr[success]\|` |
+
+Analogous constructors exist for `AsymSecExp`: `ofSecExp`, `ofDistExp`, `ofGuessExp`.
 
 ### Key reduction/game-hopping lemmas
 
@@ -234,4 +248,4 @@ Key results: `fst_map_costDist` (instrumentation is transparent),
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
 
-4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. Use `ProbComp.advantage` / `ProbComp.advantage₂` for distinguishing-style games.
+4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. For distinguishing-style games, use `AsymSecGame.ofDistGame` or `AsymSecGame.ofGuessGame` instead of `AsymSecGame.ofSecExp`.
