@@ -91,41 +91,40 @@ example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
       wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post) := by
   wp_step
 
-/-! ## `hoare_step` examples -/
+/-! ## `qvcgen_step` examples -/
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β}
     {pre : ℝ≥0∞} {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
     (hoa : ⦃pre⦄ oa ⦃cut⦄)
     (hob : ∀ x, ⦃cut x⦄ f x ⦃post⦄) :
     ⦃pre⦄ (oa >>= f) ⦃post⦄ := by
-  hoare_step
-  · exact hoa
-  · exact hob
+  qvcgen_step
+  exact hob
 
 example (x : α) (pre : ℝ≥0∞) (post : α → ℝ≥0∞)
     (h : pre ≤ post x) :
     ⦃pre⦄ (pure x : OracleComp spec α) ⦃post⦄ := by
-  hoare_step
+  qvcgen_step
   exact h
 
 example (oa : OracleComp spec α) (n : ℕ) (pre : ℝ≥0∞) (post : List α → ℝ≥0∞)
     (h : pre ≤ wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs)))) :
     ⦃pre⦄ oa.replicate (n + 1) ⦃post⦄ := by
-  hoare_step
+  qvcgen_step
   exact h
 
 example (x : α) (xs : List α) (f : α → OracleComp spec β)
     (pre : ℝ≥0∞) (post : List β → ℝ≥0∞)
     (h : pre ≤ wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys)))) :
     ⦃pre⦄ (x :: xs).mapM f ⦃post⦄ := by
-  hoare_step
+  qvcgen_step
   exact h
 
 example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
     (init : β) (pre : ℝ≥0∞) (post : β → ℝ≥0∞)
     (h : pre ≤ wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post)) :
     ⦃pre⦄ (x :: xs).foldlM f init ⦃post⦄ := by
-  hoare_step
+  qvcgen_step
   exact h
 
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
@@ -134,46 +133,13 @@ example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
       let x ← oa
       f x) ⦃fun y => if y = true then 1 else 0⦄ := by
   classical
-  hoare_step using (fun x => ⌜x ∈ support oa⌝)
+  qvcgen_step using (fun x => ⌜x ∈ support oa⌝)
   · simpa [propInd_eq_ite] using triple_support (oa := oa)
   · intro x
     by_cases hx : x ∈ support oa
     · simpa [propInd, hx] using triple_probOutput_eq_one (oa := f x) (x := true) (h := h x hx)
     · simpa [propInd, hx] using
         triple_zero (oa := f x) (post := fun y => if y = true then 1 else 0)
-
-/-! ## `wp_seq` / `hoare_seq` examples -/
-
-example (oa : OracleComp spec α) (f : α → OracleComp spec β)
-    (g : β → OracleComp spec γ) (post : γ → ℝ≥0∞) :
-    wp⟦oa >>= f >>= g⟧ post = wp⟦oa⟧ (fun a => wp⟦f a⟧ (fun b => wp⟦g b⟧ post)) := by
-  wp_seq 2
-
-example {oa : OracleComp spec α} {f : α → OracleComp spec β}
-    {g : β → OracleComp spec γ}
-    {pre : ℝ≥0∞} {cut₁ : α → ℝ≥0∞} {cut₂ : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
-    (hoa : ⦃pre⦄ oa ⦃cut₁⦄)
-    (hof : ∀ a, ⦃cut₁ a⦄ f a ⦃cut₂⦄)
-    (hog : ∀ b, ⦃cut₂ b⦄ g b ⦃post⦄) :
-    ⦃pre⦄ (oa >>= f >>= g) ⦃post⦄ := by
-  hoare_seq 2
-  · exact hoa
-  · exact hof
-  · exact hog
-
-/-! ## `game_hoare` example -/
-
-example {oa : OracleComp spec α} {f : α → OracleComp spec β}
-    {g : β → OracleComp spec γ}
-    {pre : ℝ≥0∞} {cut₁ : α → ℝ≥0∞} {cut₂ : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
-    (hoa : ⦃pre⦄ oa ⦃cut₁⦄)
-    (hof : ∀ a, ⦃cut₁ a⦄ f a ⦃cut₂⦄)
-    (hog : ∀ b, ⦃cut₂ b⦄ g b ⦃post⦄) :
-    ⦃pre⦄ (oa >>= f >>= g) ⦃post⦄ := by
-  game_hoare
-  · exact hoa
-  · exact hof
-  · exact hog
 
 /-! ## `rel_step` examples -/
 
@@ -742,8 +708,7 @@ example {oa : OracleComp spec α} {post : α → ℝ≥0∞}
     ⦃1⦄ (do let x ← oa; pure x) ⦃post⦄ := by
   qvcgen
 
-/-- Backward WP: `qvcgen` handles three-step sequential composition without
-specs by using `triple_bind_wp` to compute the weakest cut automatically. -/
+/-- `qvcgen` handles three-step sequential composition with chained local specs. -/
 example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {oc : β → OracleComp spec γ}
     {cut1 : α → ℝ≥0∞} {cut2 : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
@@ -751,6 +716,18 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     (h2 : ∀ x, ⦃cut1 x⦄ ob x ⦃cut2⦄)
     (h3 : ∀ y, ⦃cut2 y⦄ oc y ⦃post⦄) :
     ⦃1⦄ (do let x ← oa; let y ← ob x; oc y) ⦃post⦄ := by
+  qvcgen
+
+/-- `qvcgen` keeps decomposing all open goals after a branch split. -/
+example (c : Prop) [Decidable c]
+    {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {oc : OracleComp spec α} {od : α → OracleComp spec β}
+    {cut1 cut2 : α → ℝ≥0∞} {post : β → ℝ≥0∞}
+    (h1 : ⦃1⦄ oa ⦃cut1⦄)
+    (h2 : ∀ x, ⦃cut1 x⦄ ob x ⦃post⦄)
+    (h3 : ⦃1⦄ oc ⦃cut2⦄)
+    (h4 : ∀ x, ⦃cut2 x⦄ od x ⦃post⦄) :
+    ⦃1⦄ (if c then oa >>= ob else oc >>= od) ⦃post⦄ := by
   qvcgen
 
 /-- Backward WP: `qvcgen` decomposes a bind with no spec for the prefix,
@@ -766,6 +743,26 @@ example (c : Prop) [Decidable c] {oa ob : OracleComp spec α}
     {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
     (ht : ⦃pre⦄ oa ⦃post⦄) (hf : ⦃pre⦄ ob ⦃post⦄) :
     ⦃pre⦄ (if c then oa else ob) ⦃post⦄ := by
+  qvcgen
+
+/-- Dependent-if splitting: `qvcgen` handles `dite` with proof-dependent branches. -/
+example (n : ℕ) {oa : n > 0 → OracleComp spec α} {ob : ¬(n > 0) → OracleComp spec α}
+    {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (ht : ∀ h, ⦃pre⦄ oa h ⦃post⦄) (hf : ∀ h, ⦃pre⦄ ob h ⦃post⦄) :
+    ⦃pre⦄ (dite (n > 0) oa ob) ⦃post⦄ := by
+  qvcgen
+
+/-- Match decomposition: `qvcgen` case-splits on an `Option` discriminant. -/
+example {f : α → OracleComp spec β} {g : OracleComp spec β}
+    (x : Option α) {pre : ℝ≥0∞} {post : β → ℝ≥0∞}
+    (hsome : ∀ a, ⦃pre⦄ f a ⦃post⦄) (hnone : ⦃pre⦄ g ⦃post⦄) :
+    ⦃pre⦄ (match x with | some a => f a | none => g) ⦃post⦄ := by
+  qvcgen
+
+/-- Let normalization: `qvcgen` handles pure `let` bindings transparently. -/
+example {oa : OracleComp spec ℕ} {post : ℕ → ℝ≥0∞}
+    (h : ⦃1⦄ oa ⦃fun x => post (x + 1)⦄) :
+    ⦃1⦄ (do let x ← oa; let y := x + 1; pure y) ⦃post⦄ := by
   qvcgen
 
 /-- `exp_norm` simplifies `propInd` expressions. -/

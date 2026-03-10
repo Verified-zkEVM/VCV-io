@@ -94,6 +94,12 @@ noncomputable abbrev Triple (pre : ℝ≥0∞) (oa : OracleComp spec α) (post :
       if c then wp oa post else wp ob post := by
   split_ifs <;> rfl
 
+@[simp, game_rule] theorem wp_dite (c : Prop) [Decidable c]
+    (oa : c → OracleComp spec α) (ob : ¬c → OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp (spec := spec) (dite c oa ob) post =
+      dite c (fun h => wp (oa h) post) (fun h => wp (ob h) post) := by
+  split_ifs <;> rfl
+
 @[game_rule] theorem wp_bind (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (post : β → ℝ≥0∞) :
     wp (spec := spec) (oa >>= ob) post =
@@ -220,6 +226,15 @@ theorem triple_ite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
     (ht : c → Triple (spec := spec) pre oa post)
     (hf : ¬c → Triple pre ob post) :
     Triple pre (if c then oa else ob) post := by
+  split_ifs with h
+  · exact ht h
+  · exact hf h
+
+theorem triple_dite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
+    {oa : c → OracleComp spec α} {ob : ¬c → OracleComp spec α} {post : α → ℝ≥0∞}
+    (ht : ∀ h : c, Triple (spec := spec) pre (oa h) post)
+    (hf : ∀ h : ¬c, Triple pre (ob h) post) :
+    Triple pre (dite c oa ob) post := by
   split_ifs with h
   · exact ht h
   · exact hf h
