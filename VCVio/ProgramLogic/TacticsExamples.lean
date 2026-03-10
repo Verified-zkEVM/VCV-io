@@ -742,6 +742,32 @@ example {oa : OracleComp spec α} {post : α → ℝ≥0∞}
     ⦃1⦄ (do let x ← oa; pure x) ⦃post⦄ := by
   qvcgen
 
+/-- Backward WP: `qvcgen` handles three-step sequential composition without
+specs by using `triple_bind_wp` to compute the weakest cut automatically. -/
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {oc : β → OracleComp spec γ}
+    {cut1 : α → ℝ≥0∞} {cut2 : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
+    (h1 : ⦃1⦄ oa ⦃cut1⦄)
+    (h2 : ∀ x, ⦃cut1 x⦄ ob x ⦃cut2⦄)
+    (h3 : ∀ y, ⦃cut2 y⦄ oc y ⦃post⦄) :
+    ⦃1⦄ (do let x ← oa; let y ← ob x; oc y) ⦃post⦄ := by
+  qvcgen
+
+/-- Backward WP: `qvcgen` decomposes a bind with no spec for the prefix,
+computing `fun x => wp (ob x) post` as the intermediate postcondition. -/
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {post : β → ℝ≥0∞}
+    (h : ⦃1⦄ oa ⦃fun x => wp⟦ob x⟧ post⦄) :
+    ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
+  qvcgen
+
+/-- If-splitting: `qvcgen` splits a conditional into two branch goals. -/
+example (c : Prop) [Decidable c] {oa ob : OracleComp spec α}
+    {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (ht : ⦃pre⦄ oa ⦃post⦄) (hf : ⦃pre⦄ ob ⦃post⦄) :
+    ⦃pre⦄ (if c then oa else ob) ⦃post⦄ := by
+  qvcgen
+
 /-- `exp_norm` simplifies `propInd` expressions. -/
 example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
   exp_norm

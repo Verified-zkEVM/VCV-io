@@ -609,11 +609,14 @@ private def tryCloseSpecGoal : TacticM Bool := do
     exact OracleComp.ProgramLogic.triple_zero _ _)) <||>
   tryEvalTacticSyntax (← `(tactic| exact le_refl _))
 
-/-- One step of VCGen on a `Triple` goal: structurally decompose via `triple_bind`,
-then try to close the first subgoal using known specs from the local context.
+/-- One step of VCGen on a `Triple` goal with the following strategy:
 
-Also handles `∀`-quantified `Triple` goals (from bind decomposition) by introducing
-variables. Falls back to WP-rule unfolding when no bind is found.
+1. `∀`-binder: `intro` and continue
+2. **Bind** (spec-based): `triple_bind` + close spec subgoal from local context
+3. **Bind** (backward WP): `triple_bind_wp` to get `Triple pre oa (fun x => wp (ob x) post)`
+4. **Conditional**: `triple_ite` to split into two branch goals
+5. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
+
 Returns `true` if any progress was made. -/
 private def runVCGenStep : TacticM Bool := do
   if (← getGoals).isEmpty then return false
@@ -625,9 +628,17 @@ private def runVCGenStep : TacticM Bool := do
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       if isBindExpr comp then
+        match ← observing? do
+          evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_bind))
+          unless ← tryCloseSpecGoal do throwError "" with
+        | some _ => return true
+        | none =>
+          if ← tryEvalTacticSyntax (← `(tactic|
+            apply OracleComp.ProgramLogic.triple_bind_wp)) then
+            return true
+      if isIfExpr comp then
         if ← tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.triple_bind)) then
-          let _ ← tryCloseSpecGoal
+          apply OracleComp.ProgramLogic.triple_ite <;> intro)) then
           return true
       match ← (observing? do
         evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))

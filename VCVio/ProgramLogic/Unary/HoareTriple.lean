@@ -199,6 +199,13 @@ theorem triple_bind {pre : ℝ≥0∞} {oa : OracleComp spec α}
   simpa [Triple, wp] using
     (MAlgOrdered.triple_bind (m := OracleComp spec) (l := ℝ≥0∞) hoa hob)
 
+theorem triple_bind_wp {pre : ℝ≥0∞} {oa : OracleComp spec α}
+    {ob : α → OracleComp spec β} {post : β → ℝ≥0∞}
+    (h : Triple (spec := spec) pre oa (fun x => wp (ob x) post)) :
+    Triple pre (oa >>= ob) post := by
+  show pre ≤ wp (oa >>= ob) post
+  rw [wp_bind]; exact h
+
 theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
     Triple (spec := spec) (post x) (pure x) post := by
   simp [Triple, MAlgOrdered.Triple]
@@ -207,6 +214,15 @@ theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
 theorem triple_zero (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     Triple (spec := spec) 0 oa post := by
   simp [Triple, MAlgOrdered.Triple]
+
+theorem triple_ite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
+    {oa ob : OracleComp spec α} {post : α → ℝ≥0∞}
+    (ht : c → Triple (spec := spec) pre oa post)
+    (hf : ¬c → Triple pre ob post) :
+    Triple pre (if c then oa else ob) post := by
+  split_ifs with h
+  · exact ht h
+  · exact hf h
 
 /-- `probEvent` as a WP of an indicator postcondition. -/
 lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
