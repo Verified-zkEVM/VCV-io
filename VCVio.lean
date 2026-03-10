@@ -5,6 +5,7 @@ import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.LWE
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay

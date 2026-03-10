@@ -47,7 +47,7 @@ variable {N : ℕ}
 
 /-- PIR query generation: build two index sets `s, s'` whose "symmetric difference"
 is `{i₀}`. Uses `foldlM` over `List.finRange N` with a random coin per index. -/
-def pirQuery (N : ℕ) (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) :=
+def pirQuery {N : ℕ} (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) :=
   (List.finRange N).foldlM (fun (acc : List (Fin N) × List (Fin N)) (j : Fin N) => do
     let b ← $ᵗ Bool
     if j = i₀ then
@@ -67,7 +67,7 @@ def pirResponse (a : Fin N → W) (s : List (Fin N)) : W :=
 
 /-- Full PIR protocol: generate queries, compute responses, XOR (add) them. -/
 def pirMain (a : Fin N → W) (i₀ : Fin N) : ProbComp W := do
-  let (s, s') ← pirQuery N i₀
+  let (s, s') ← pirQuery i₀
   return (pirResponse a s + pirResponse a s')
 
 /-! ## Correctness -/
@@ -79,7 +79,7 @@ entries appearing in both query sets cancel out.
 The proof uses a loop invariant: after processing index `j`, the XOR of entries
 in `s` plus the XOR of entries in `s'` equals the sum of `a[k]` for all
 `k ≤ j` in the symmetric difference of `s` and `s'`, which is `{i₀} ∩ {0..j}`. -/
-theorem pir_correct [SampleableType W] [DecidableEq W] [Fintype W]
+theorem pir_correct [DecidableEq W]
     (hchar : ∀ x : W, x + x = 0)
     (a : Fin N → W) (i₀ : Fin N) :
     Pr[= a i₀ | pirMain a i₀] = 1 := by
@@ -96,6 +96,6 @@ probability 1/2 regardless of whether `j = i₀` or not:
 This is the key information-theoretic privacy guarantee: the query sent to
 each server reveals nothing about the target index. -/
 theorem pir_private (i₁ i₂ : Fin N) :
-    evalDist (Prod.fst <$> pirQuery N i₁) =
-    evalDist (Prod.fst <$> pirQuery N i₂) := by
+    evalDist (Prod.fst <$> pirQuery i₁) =
+    evalDist (Prod.fst <$> pirQuery i₂) := by
   sorry

@@ -17,8 +17,9 @@ properties: correctness, hiding, and binding.
 
 - `CommitmentScheme PP M C D` — a commitment scheme with public parameters `PP`,
   message space `M`, commitment space `C`, and opening (decommitment) space `D`.
-- `CommitmentScheme.PerfectlyCorrect` — honestly generated commitments always verify.
-- `CommitmentScheme.PerfectlyHiding` — commitment distribution is independent of the message.
+- `CommitmentScheme.PerfectlyCorrect` — honestly generated parameters and commitments always verify.
+- `CommitmentScheme.PerfectlyHiding` — under honestly generated parameters, commitment
+  distribution is independent of the message.
 - `CommitmentScheme.hidingExp` — computational hiding experiment (IND-style).
 - `CommitmentScheme.bindingExp` — computational binding experiment.
 - `TrapdoorExtractor PP TD C M` — trapdoor-based message extraction algorithm.
@@ -43,16 +44,19 @@ namespace CommitmentScheme
 
 variable {PP M C D : Type}
 
-/-- A commitment scheme is perfectly correct if every honestly generated
-commitment-opening pair passes verification. -/
+/-- A commitment scheme is perfectly correct if every honestly generated public
+parameter and commitment-opening pair passes verification. -/
 def PerfectlyCorrect (cs : CommitmentScheme PP M C D) : Prop :=
-  ∀ pp m cd, cd ∈ support (cs.commit pp m) → cs.verify pp m cd.1 cd.2 = true
+  ∀ pp, pp ∈ support cs.setup →
+    ∀ m cd, cd ∈ support (cs.commit pp m) → cs.verify pp m cd.1 cd.2 = true
 
-/-- A commitment scheme is perfectly hiding if the commitment (first component)
-has the same distribution regardless of the committed message. -/
+/-- A commitment scheme is perfectly hiding if, for every honestly generated
+public parameter, the commitment (first component) has the same distribution
+regardless of the committed message. -/
 def PerfectlyHiding (cs : CommitmentScheme PP M C D) : Prop :=
-  ∀ pp m₁ m₂, evalDist (Prod.fst <$> cs.commit pp m₁) =
-    evalDist (Prod.fst <$> cs.commit pp m₂)
+  ∀ pp, pp ∈ support cs.setup →
+    ∀ m₁ m₂, evalDist (Prod.fst <$> cs.commit pp m₁) =
+      evalDist (Prod.fst <$> cs.commit pp m₂)
 
 /-! ### Computational hiding -/
 

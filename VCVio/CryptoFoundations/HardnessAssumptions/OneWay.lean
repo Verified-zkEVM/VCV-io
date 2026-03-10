@@ -22,7 +22,7 @@ can find any preimage `x'` with `f(x') = f(x)`.
 
 A trapdoor permutation has a key generation algorithm that produces a public key `pk`
 and a secret key `sk`. The forward direction `f(pk, ·)` is a permutation that is hard to
-invert given only `pk`; the secret key enables efficient inversion via `fi(sk, ·)`.
+invert given only `pk`; the secret key enables efficient inversion via `f⁻¹(sk, ·)`.
 
 ## Main Definitions
 
@@ -78,20 +78,20 @@ def TrapdoorPermutation.Correct (tdp : TrapdoorPermutation PK SK X) : Prop :=
     ∀ x, tdp.inverse sk (tdp.forward pk x) = x
 
 /-- A TDP adversary receives the public key and a challenge `y = f(pk, x)`,
-and tries to find `x`. -/
+and tries to find a valid preimage of `y`. -/
 def TDPAdversary (PK X : Type) := PK → X → ProbComp X
 
 /-- TDP inversion experiment: generate keys, sample `x` uniformly,
-and check whether the adversary can invert `f(pk, x)`. -/
+and check whether the adversary outputs a valid preimage of `f(pk, x)`. -/
 def tdpExp [SampleableType X] [DecidableEq X]
     (tdp : TrapdoorPermutation PK SK X) (adversary : TDPAdversary PK X) :
     ProbComp Bool := do
   let (pk, _) ← tdp.keygen
   let x ← $ᵗ X
   let x' ← adversary pk (tdp.forward pk x)
-  return decide (x' = x)
+  return decide (tdp.forward pk x' = tdp.forward pk x)
 
-/-- TDP advantage: the probability of successfully inverting the permutation
+/-- TDP advantage: the probability of successfully producing a valid preimage
 without the trapdoor. -/
 noncomputable def tdpAdvantage [SampleableType X] [DecidableEq X]
     (tdp : TrapdoorPermutation PK SK X) (adversary : TDPAdversary PK X) : ℝ≥0∞ :=

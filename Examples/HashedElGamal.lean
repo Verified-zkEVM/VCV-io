@@ -81,7 +81,7 @@ variable {g : G} {hash : HK → G → M}
 /-! ## Correctness -/
 
 omit [DecidableEq G] [Fintype M] in
-theorem correct [Fintype G] :
+theorem correct :
     (hashedElGamal F g hash).PerfectlyCorrect := by
   have hcomm : ∀ (a b : F), a • (b • g) = b • (a • g) := by
     intro a b; rw [← mul_smul, mul_comm, mul_smul]

@@ -59,7 +59,7 @@ variable {g : G}
 /-! ## Correctness -/
 
 theorem correct : (pedersenCommit (F := F) g).PerfectlyCorrect := by
-  intro pp m cd hmem
+  intro pp _hpp m cd hmem
   have hmem' : cd ∈ support (do
       let d ← ($ᵗ F : ProbComp F); pure ((d : F) • g + m • pp, d)) := hmem
   simp only [support_bind, support_pure, Set.mem_iUnion,
@@ -70,6 +70,8 @@ theorem correct : (pedersenCommit (F := F) g).PerfectlyCorrect := by
 
 /-! ## Perfect hiding -/
 
+omit [Fintype F] [DecidableEq F] [SampleableType F]
+  [Fintype G] [SampleableType G] [DecidableEq G] in
 private lemma commit_fst_bijective (hg : Function.Bijective (· • g : F → G))
     (pp : G) (m : F) : Function.Bijective (fun d : F => d • g + m • pp) := by
   show Function.Bijective ((· + m • pp) ∘ (· • g : F → G))
@@ -78,12 +80,7 @@ private lemma commit_fst_bijective (hg : Function.Bijective (· • g : F → G)
      fun y => ⟨y - m • pp, sub_add_cancel y (m • pp)⟩⟩
     hg
 
-/-- The Pedersen commitment scheme is perfectly hiding: the commitment distribution
-is independent of the committed message.
-
-The proof uses the same bijection-coupling idea as the one-time pad: composing
-the generator bijection `d ↦ d • g` with translation `· + c` gives a bijection
-`F → G`, so the pushforward of uniform on `F` is uniform on `G` regardless of `c`. -/
+/-- Rewrite the commitment distribution as a mapped uniform sample. -/
 private lemma commit_fst_eq_map (pp : G) (m : F) :
     Prod.fst <$> (pedersenCommit (F := F) g).commit pp m =
     (fun d : F => d • g + m • pp) <$> ($ᵗ F : ProbComp F) := by
@@ -97,7 +94,7 @@ the generator bijection `d ↦ d • g` with translation `· + c` gives a biject
 `F → G`, so the pushforward of uniform on `F` is uniform on `G` regardless of `c`. -/
 theorem perfectlyHiding (hg : Function.Bijective (· • g : F → G)) :
     (pedersenCommit (F := F) g).PerfectlyHiding := by
-  intro pp m₁ m₂
+  intro pp _hpp m₁ m₂
   rw [commit_fst_eq_map, commit_fst_eq_map]
   have h₁ := evalDist_map_bijective_uniform_cross (α := F) (β := G)
     (fun d => d • g + m₁ • pp) (commit_fst_bijective hg pp m₁)
@@ -114,7 +111,7 @@ def dlogReduction (binder : BindingAdv G F G F) : DLogAdversary F G :=
   fun gen h => do
     let (c, m₁, d₁, m₂, d₂) ← binder h
     return if decide (m₁ ≠ m₂ ∧ d₁ • gen + m₁ • h = c ∧ d₂ • gen + m₂ • h = c) then
-      (d₁ - d₂) * (m₂ - m₁)⁻¹
+      (d₁ - d₂) / (m₂ - m₁)
     else 0
 
 /-- Computational binding: a successful Pedersen binding adversary yields a

@@ -47,7 +47,7 @@ def PRFOracleSpec (_D R : Type) := unifSpec + (_D →ₒ R)
 
 /-- A PRF adversary gets oracle access to uniform sampling and a function `D → R`,
 and outputs a boolean guess (`true` = "real PRF", `false` = "random function"). -/
-def PRFAdversary (D R : Type) := OracleComp (PRFOracleSpec D R) Bool
+abbrev PRFAdversary (D R : Type) := OracleComp (PRFOracleSpec D R) Bool
 
 /-- A PRF has uniform key generation when its keygen algorithm is exactly uniform sampling. -/
 def UniformKey [SampleableType K] (prf : PRFScheme K D R) : Prop :=
