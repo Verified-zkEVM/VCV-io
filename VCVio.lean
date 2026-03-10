@@ -47,6 +47,7 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
+import VCVio.OracleComp.QueryTracking.Enforcement
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.RandomOracle

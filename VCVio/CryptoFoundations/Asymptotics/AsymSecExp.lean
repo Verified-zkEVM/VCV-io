@@ -27,8 +27,10 @@ has negligible advantage.
 
 - `AsymSecExp.secure_of_pointwise_bound`: Pointwise ≤ negligible ⟹ secure.
 - `AsymSecGame.secureAgainst_of_reduction`: Basic security reduction (tight).
+- `AsymSecGame.secureAgainst_of_poly_reduction`: Polynomial-loss security reduction.
 - `AsymSecGame.secureAgainst_of_close`: Game-hopping step — transfer security from a
   "close" game, absorbing negligible advantage difference.
+- `AsymSecGame.secureAgainst_of_hybrid`: Hybrid argument over a chain of games.
 -/
 
 open OracleComp OracleSpec ENNReal Filter
@@ -146,5 +148,65 @@ theorem secureAgainst_of_close_reduction {Adv' : Type*} {m' : ℕ → Type → T
     g₁.secureAgainst isPPT := fun A hA =>
   negligible_of_le (hclose A hA)
     (negligible_add (hsecure (reduce A) (hreduce A hA)) hε)
+
+/-! ### Polynomial-loss reductions -/
+
+/-- **Polynomial-loss security reduction**: if there is a reduction `reduce : Adv → Adv'`
+that preserves efficiency and the advantage of `g` is at most `loss(n)` times the
+advantage of `g'` on the reduced adversary, then security of `g'` implies security of `g`.
+
+This handles reductions where the adversary's advantage is amplified by a polynomial factor,
+e.g., from a hybrid argument guessing which of `poly(n)` steps to exploit. -/
+theorem secureAgainst_of_poly_reduction {Adv' : Type*} {m' : ℕ → Type → Type*}
+    [∀ n, Monad (m' n)] [∀ n, HasEvalSPMF (m' n)]
+    {g : AsymSecGame Adv m} {g' : AsymSecGame Adv' m'}
+    {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
+    {reduce : Adv → Adv'}
+    {loss : Polynomial ℕ}
+    (hreduce : ∀ A, isPPT A → isPPT' (reduce A))
+    (hbound : ∀ A n, g.advantage A n ≤ ↑(loss.eval n) * g'.advantage (reduce A) n)
+    (hsecure : g'.secureAgainst isPPT') :
+    g.secureAgainst isPPT := fun A hA =>
+  negligible_of_le (hbound A)
+    (negligible_polynomial_mul (hsecure (reduce A) (hreduce A hA)) loss)
+
+/-- Combined game-hopping step with polynomial advantage loss and reduction. -/
+theorem secureAgainst_of_close_poly_reduction {Adv' : Type*} {m' : ℕ → Type → Type*}
+    [∀ n, Monad (m' n)] [∀ n, HasEvalSPMF (m' n)]
+    {g₁ : AsymSecGame Adv m} {g₂ : AsymSecGame Adv' m'}
+    {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
+    {reduce : Adv → Adv'}
+    {loss : Polynomial ℕ}
+    {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
+    (hreduce : ∀ A, isPPT A → isPPT' (reduce A))
+    (hclose : ∀ A, isPPT A → ∀ n,
+      g₁.advantage A n ≤ ↑(loss.eval n) * g₂.advantage (reduce A) n + ε n)
+    (hsecure : g₂.secureAgainst isPPT') :
+    g₁.secureAgainst isPPT := fun A hA =>
+  negligible_of_le (hclose A hA)
+    (negligible_add (negligible_polynomial_mul (hsecure (reduce A) (hreduce A hA)) loss) hε)
+
+/-! ### Hybrid argument -/
+
+/-- **Hybrid argument**: given `k + 1` games indexed by `0, 1, ..., k`, if consecutive
+games differ by at most `ε(n)` in advantage and the final game is secure, then the
+first game is also secure.
+
+The total advantage loss is at most `k · ε(n)`, which is negligible since `ε` is
+negligible and `k` is constant. -/
+theorem secureAgainst_of_hybrid
+    {games : ℕ → AsymSecGame Adv m}
+    {isPPT : Adv → Prop}
+    {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
+    {k : ℕ}
+    (hconsec : ∀ j < k, ∀ A, isPPT A → ∀ n,
+      (games j).advantage A n ≤ (games (j + 1)).advantage A n + ε n)
+    (hsecure : (games k).secureAgainst isPPT) :
+    (games 0).secureAgainst isPPT := by
+  induction k with
+  | zero => exact hsecure
+  | succ k ih =>
+    exact ih (fun j hj => hconsec j (by omega))
+      (secureAgainst_of_close hε (hconsec k (by omega)) hsecure)
 
 end AsymSecGame

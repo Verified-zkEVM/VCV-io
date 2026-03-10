@@ -69,3 +69,28 @@ theorem negligible_sum {ι : Type*} [DecidableEq ι] {s : Finset ι} {f : ι →
     exact negligible_add
       (h _ (Finset.mem_insert_self _ _))
       (ih fun i hi => h i (Finset.mem_insert_of_mem hi))
+
+/-- If `f` is negligible, then `fun n => (↑n)^d * f n` is negligible for any fixed `d`.
+Absorbs polynomial powers of the parameter into the superpolynomial decay. -/
+theorem negligible_pow_mul {f : ℕ → ℝ≥0∞} (hf : negligible f) (d : ℕ) :
+    negligible (fun n => (↑n : ℝ≥0∞) ^ d * f n) := fun k => by
+  show Tendsto (fun (n : ℕ) => (↑n : ℝ≥0∞) ^ k * ((↑n : ℝ≥0∞) ^ d * f n)) atTop (nhds 0)
+  simp_rw [← mul_assoc, ← pow_add]
+  exact hf (k + d)
+
+/-- If `f` is negligible, then `fun n => ↑(p.eval n) * f n` is negligible for any polynomial `p`.
+This is the key lemma for handling polynomial-loss security reductions. -/
+theorem negligible_polynomial_mul {f : ℕ → ℝ≥0∞} (hf : negligible f)
+    (p : Polynomial ℕ) :
+    negligible (fun n => ↑(p.eval n) * f n) := by
+  have heq : ∀ n, (↑(p.eval n) : ℝ≥0∞) * f n =
+      ∑ i ∈ Finset.range (p.natDegree + 1),
+        ↑(p.coeff i) * ((↑n : ℝ≥0∞) ^ i * f n) := by
+    intro n
+    simp_rw [← mul_assoc, ← Finset.sum_mul]
+    congr 1
+    have h := @Polynomial.eval_eq_sum_range ℕ _ p n
+    rw [h]; push_cast; rfl
+  simp_rw [heq]
+  exact negligible_sum fun i _ =>
+    negligible_const_mul (negligible_pow_mul hf i) (ENNReal.natCast_ne_top _)
