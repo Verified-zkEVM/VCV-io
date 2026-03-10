@@ -3,13 +3,17 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import Mathlib.Algebra.Group.TypeTags.Basic
-import Mathlib.Control.Monad.Writer
-import Batteries.Control.AlternativeMonad
+module
+
+public import Mathlib.Algebra.Group.TypeTags.Basic
+public import Mathlib.Control.Monad.Writer
+public import Batteries.Control.AlternativeMonad
 
 /-!
 # Laws for well behaved monadic `failure` operation
 -/
+
+@[expose] public section
 
 universe u v w
 

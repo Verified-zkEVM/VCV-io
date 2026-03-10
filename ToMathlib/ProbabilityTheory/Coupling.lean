@@ -3,15 +3,18 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import ToMathlib.Control.Monad.Transformer
-import Batteries.Control.AlternativeMonad
+public import Mathlib.Probability.ProbabilityMassFunction.Constructions
+public import ToMathlib.Control.Monad.Transformer
+public import Batteries.Control.AlternativeMonad
 
 /-!
 # Coupling for probability distributions
 
 -/
+
+@[expose] public section
 
 universe u
 

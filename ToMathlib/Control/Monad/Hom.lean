@@ -3,9 +3,11 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import Mathlib.Probability.ProbabilityMassFunction.Monad
-import ToMathlib.Control.Monad.Algebra
-import Mathlib.CategoryTheory.Monad.Types
+module
+
+public import Mathlib.Probability.ProbabilityMassFunction.Monad
+public import ToMathlib.Control.Monad.Algebra
+public import Mathlib.CategoryTheory.Monad.Types
 
 /-!
 # Morphisms Between Monads
@@ -17,6 +19,8 @@ but this gives definitions more standardized to a cs context.
 TODO: Evaluate more fine-grained `PureHom`/`BintHom`/etc, with `Class` versions as well.
 Probably should be in the context of upstreaming things.
 -/
+
+@[expose] public section
 
 universe u v w x y z
 

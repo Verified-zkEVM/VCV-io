@@ -3,6 +3,7 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
 /-!
 # Lawful version of `MonadFunctor`
@@ -11,6 +12,8 @@ This file defines the `LawfulMonadFunctor` class, which adds laws to the `MonadF
 These laws ensure that functor operations behave consistently and preserve monad laws.
 
 -/
+
+@[expose] public section
 
 universe u v w
 

@@ -3,8 +3,9 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Data.PFunctor.Multivariate.Basic
+public import Mathlib.Data.PFunctor.Multivariate.Basic
 
 /-!
   # Polynomial Functors, Lens, and Charts
@@ -14,6 +15,8 @@ import Mathlib.Data.PFunctor.Multivariate.Basic
 
 dt: this file is getting long and should maybe be split up more.
 -/
+
+@[expose] public section
 
 universe u v uA uB uA₁ uB₁ uA₂ uB₂ uA₃ uB₃ uA₄ uB₄ uA₅ uB₅ uA₆ uB₆ vA vB
 

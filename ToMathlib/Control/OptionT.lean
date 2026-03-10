@@ -3,15 +3,19 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
+module
+
 -- import ToMathlib.Control.Monad.Free
-import Batteries.Control.AlternativeMonad
-import Batteries.Control.OptionT
-import ToMathlib.Control.Monad.Hom
-import ToMathlib.General
+public import Batteries.Control.AlternativeMonad
+public import Batteries.Control.OptionT
+public import ToMathlib.Control.Monad.Hom
+public import ToMathlib.General
 
 /-!
 # Lemmas about `OptionT`
 -/
+
+@[expose] public section
 
 universe u v w
 

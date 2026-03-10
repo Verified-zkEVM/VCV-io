@@ -3,11 +3,14 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.Control.Monad.Free
-import ToMathlib.PFunctor.Free
-import Mathlib.Control.Monad.Cont
-import Mathlib
+public import ToMathlib.Control.Monad.Free
+public import ToMathlib.PFunctor.Free
+public import Mathlib.Control.Monad.Cont
+public import Mathlib
+
+@[expose] public section
 
 universe u v w y z
 

@@ -3,13 +3,16 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.Control.Monad.Hom
-import Mathlib
+public import ToMathlib.Control.Monad.Hom
+public import Mathlib
 
 /-!
 # Commutative monads
 -/
+
+@[expose] public section
 
 universe u v
 

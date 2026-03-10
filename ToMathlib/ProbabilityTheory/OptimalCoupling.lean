@@ -3,12 +3,14 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Topology.MetricSpace.Basic
-import Mathlib.Topology.MetricSpace.Bounded
-import Mathlib.Topology.Instances.Discrete
-import Mathlib.Topology.ContinuousMap.Basic
-import Mathlib.Analysis.Convex.Basic
-import ToMathlib.ProbabilityTheory.Coupling
+module
+
+public import Mathlib.Topology.MetricSpace.Basic
+public import Mathlib.Topology.MetricSpace.Bounded
+public import Mathlib.Topology.Instances.Discrete
+public import Mathlib.Topology.ContinuousMap.Basic
+public import Mathlib.Analysis.Convex.Basic
+public import ToMathlib.ProbabilityTheory.Coupling
 
 /-!
 # Optimal Couplings
@@ -17,6 +19,8 @@ This file provides the topological foundation to show that the space of coupling
 between two distributions with finite support is compact, and that continuous
 functions (like expected value) attain their supremum on this space.
 -/
+
+@[expose] public section
 
 noncomputable section
 

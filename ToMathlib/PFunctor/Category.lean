@@ -3,16 +3,19 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.PFunctor.Lens.Basic
-import ToMathlib.PFunctor.Chart.Basic
-import Mathlib.CategoryTheory.Monoidal.Category
+public import ToMathlib.PFunctor.Lens.Basic
+public import ToMathlib.PFunctor.Chart.Basic
+public import Mathlib.CategoryTheory.Monoidal.Category
 
 /-!
 # Categories of Polynomial Functors
 
 We define the various categories of polynomial functors, where morphisms are lenses or charts.
 -/
+
+@[expose] public section
 
 universe u v uA uB
 

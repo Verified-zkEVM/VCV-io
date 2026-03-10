@@ -3,13 +3,16 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.PFunctor.Basic
-import ToMathlib.PFunctor.Equiv.Basic
+public import ToMathlib.PFunctor.Basic
+public import ToMathlib.PFunctor.Equiv.Basic
 
 /-!
 # More properties about lenses between polynomial functors
 -/
+
+@[expose] public section
 
 universe u v uA uB uA₁ uB₁ uA₂ uB₂ uA₃ uB₃ uA₄ uB₄ uA₅ uB₅ uA₆ uB₆
 

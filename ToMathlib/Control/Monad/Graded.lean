@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Algebra.Group.Basic
-import ToMathlib.Control.Monad.Indexed
+module
+
+public import Mathlib.Algebra.Group.Basic
+public import ToMathlib.Control.Monad.Indexed
 
 /-!
 # Graded Monads
@@ -73,6 +75,8 @@ pattern used in `LawfulDijkstraMonad` (see `ToMathlib.Control.Monad.Dijkstra`).
 - Orchard, D., Wadler, P., Eades, H. (2019). *Unifying graded and parameterised monads*.
 - Atkey, R. (2009). *Parameterised notions of computation*. JFP.
 -/
+
+@[expose] public section
 
 universe u v w
 

@@ -3,9 +3,10 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.Control.Monad.Hom
-import ToMathlib.PFunctor.Basic
+public import ToMathlib.Control.Monad.Hom
+public import ToMathlib.PFunctor.Basic
 
 /-!
 # Free Monad of a Polynomial Functor
@@ -13,6 +14,8 @@ import ToMathlib.PFunctor.Basic
 We define the free monad on a **polynomial functor** (`PFunctor`), and prove some basic properties.
 
 -/
+
+@[expose] public section
 
 universe u v uA uB
 
