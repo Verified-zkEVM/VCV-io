@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import Lean.Elab.Tactic
+import Lean.Meta.Match.MatcherApp
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.ProgramLogic.Notation
 
@@ -14,20 +15,20 @@ import VCVio.ProgramLogic.Notation
 This file provides the canonical step-through tactic surface for game-hopping proofs,
 inspired by EasyCrypt's `proc`, `wp`, `rnd`, `skip`, `swap`, and `seq`.
 
-`VCVio/ProgramLogic/Notation.lean` keeps the notation layer, convenience predicates, and a
-small set of coarse compatibility macros. For new proofs, import this file and treat the
-tactics below as the primary proof mode.
+`VCVio/ProgramLogic/Notation.lean` keeps the notation layer and convenience predicates.
+For new proofs, import this file and treat the tactics below as the primary proof mode.
 
 ## Main tactics
 
-### Unary WP
-- `wp_step`: Apply exactly one WP rule (`wp_bind`, `wp_pure`, etc.)
-- `hoare_step`: Apply one quantitative Hoare/VCGen step on a `Triple` goal
-- `wp_seq`: Repeat `wp_step` through several layers
-- `hoare_seq`: Repeat `hoare_step` through several layers
-- `game_hoare`: Exhaustively apply quantitative Hoare/VCGen steps
-- `wp_step` / `hoare_step` also understand bounded iteration via `replicate`, `List.mapM`, and `List.foldlM`
-- `game_wp` (enhanced): Exhaustively apply WP rules
+### Unary
+- `wp_step`: Apply exactly one WP rule (`wp_bind`, `wp_pure`, etc.) on raw `wp` goals
+  (also handles `replicate`, `List.mapM`, `List.foldlM`)
+- `qvcgen_step`: Apply one spec-aware VCGen step on a `Triple` goal (bind with auto spec
+  lookup, backward WP fallback, `ite`/`dite`/`match` splitting, loop invariant auto-detection,
+  WP rule unfolding). Use `qvcgen_step inv I` for explicit loop invariants.
+- `qvcgen`: Exhaustive `Triple` decomposition across all open goals, with spec-aware stepping,
+  loop invariant auto-detection, stronger normalization, and bounded local consequence search
+- `exp_norm`: Normalize indicator (`propInd`) and expectation (`wp`) arithmetic
 
 ### Relational (pRHL)
 - `rel_step`: Decompose one `>>=` on each side (like EasyCrypt's `seq`/`wp`)
@@ -143,6 +144,15 @@ private def isListMapMExpr (e : Expr) : Bool :=
 private def isListFoldlMExpr (e : Expr) : Bool :=
   (findAppWithHead? ``List.foldlM e).isSome
 
+private def isReplicateHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``OracleComp.replicate
+
+private def isListMapMHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``List.mapM
+
+private def isListFoldlMHead (e : Expr) : Bool :=
+  (headConstName? e) == some ``List.foldlM
+
 private def isGameEquivGoal (target : Expr) : Bool :=
   target.consumeMData.getAppFn.isConstOf ``OracleComp.ProgramLogic.GameEquiv
 
@@ -162,6 +172,7 @@ private def runWpStepRules : TacticM Bool := do
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_cons])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_query])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_ite])) <||>
+    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_dite])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_uniformSample])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_map])) <||>
     tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_simulateQ_eq])) <||>
@@ -245,24 +256,6 @@ private def throwWpStepError : TacticM Unit := withMainContext do
         uniform sampling, `map`, \
         `simulateQ`, and `liftComp`."
 
-private def runHoareStepRule : TacticM Bool := do
-  let target ← instantiateMVars (← getMainTarget)
-  match tripleGoalComp? target with
-  | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
-      if isBindExpr comp then
-        if ← tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.triple_bind)) then
-          return true
-      match ← (observing? do
-        evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))
-        evalTactic (← `(tactic| change _ ≤ OracleComp.ProgramLogic.wp _ _))
-        unless ← runWpStepRules do
-          throwError "hoare_step: no matching wp rule after unfolding `Triple`") with
-      | some _ => return true
-      | none => return false
-  | none => return false
-
 private def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
@@ -275,15 +268,15 @@ private def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
         return false
   | none => return false
 
-private def throwHoareStepError : TacticM Unit := withMainContext do
+private def throwQVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
   | none =>
-      throwError "hoare_step: expected a quantitative `Triple` goal; got:{indentExpr target}"
+      throwError "qvcgen_step: expected a quantitative `Triple` goal; got:{indentExpr target}"
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       throwError
-        "hoare_step: found a `Triple` goal, but no single structural rule applied to:{indentExpr comp}\n\
+        "qvcgen_step: found a `Triple` goal, but no matching rule applied to:{indentExpr comp}\n\
         Try `by_hoare`, `wp_step`, or manually unfolding the remaining arithmetic side conditions."
 
 private def throwRelStepError : TacticM Unit := withMainContext do
@@ -510,81 +503,285 @@ private def throwRelSimDistError : TacticM Unit := withMainContext do
 /-! ## Unary WP tactics -/
 
 /-- `wp_step` applies exactly one WP decomposition rule and stops.
-This gives step-by-step control, unlike the exhaustive `game_wp`. -/
+This gives step-by-step control for raw `wp` goals (`_ ≤ wp _ _`). -/
 elab "wp_step" : tactic => do
   if ← runWpStepRules then
     return
   throwWpStepError
 
-/-- `hoare_step` applies one quantitative program-logic step to a `Triple` goal.
+/-! ## Quantitative VCGen: spec-aware stepping for `Triple` goals -/
 
-It first tries the structural bind rule, and otherwise unfolds the triple into a
-`pre ≤ wp ...` obligation and delegates to `wp_step`. -/
-syntax "hoare_step" ("using" term)? : tactic
+/-- Try to close the current goal using only immediate local information.
+This is intentionally cheap: it is used while speculating on `triple_bind`, so it must not
+launch expensive proof search on goals with unresolved cut metavariables. -/
+private def tryCloseSpecGoalImmediate : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic| assumption)) <||>
+  tryEvalTacticSyntax (← `(tactic| solve_by_elim (maxDepth := 2))) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.triple_zero _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic| exact le_refl _))
+
+/-- Try bounded local proof search on a closed goal.
+We only invoke `solve_by_elim` once the target has no unresolved expression metavariables; this
+avoids pathological search on speculative intermediate cuts introduced by `triple_bind`. -/
+private def tryCloseSpecGoalSearch : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  if target.hasExprMVar then
+    return false
+  tryEvalTacticSyntax (← `(tactic| (
+    repeat intro
+    simp only [OracleComp.ProgramLogic.Triple] at *
+    solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans]
+  )))
+
+/-- Try to close the current goal (typically a `Triple` subgoal) using direct hypotheses,
+canonical leaf rules, or bounded local consequence search. -/
+private def tryCloseSpecGoal : TacticM Bool := do
+  tryCloseSpecGoalImmediate <||> tryCloseSpecGoalSearch
+
+/-- Try to decompose a `match` expression in the computation by case-splitting
+on its discriminant(s). Only fires when the computation is a compiled matcher
+(detected via `matchMatcherApp?`). Delegates to `split` which handles the actual
+case analysis. -/
+private def tryMatchDecomp (comp : Expr) : TacticM Bool := do
+  let some _ ← Lean.Meta.matchMatcherApp? comp | return false
+  tryEvalTacticSyntax (← `(tactic| split))
+
+/-- Check if an expression is a lambda whose body does not use the bound variable
+(i.e. a constant function `fun _ => c`). -/
+private def isConstantLambda (e : Expr) : Bool :=
+  match e.consumeMData with
+  | .lam _ _ body _ => !body.hasLooseBVars
+  | _ => false
+
+/-- Try to apply a loop invariant or stepping rule for loops.
+
+For **invariant** mode (exact shape match): applies `triple_replicate_inv` etc.
+directly if the postcondition is constant and a step-preservation hypothesis
+is available.
+
+For **stepping** mode (fallback): applies `triple_replicate_succ` etc. which
+rewrites `Triple pre (replicate (n+1) oa) post` into
+`Triple pre oa (fun x => wp (replicate n oa) (fun xs => post (x :: xs)))`,
+bypassing the expensive WP fallback path. -/
+private def tryLoopInvariantAuto (comp : Expr) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple target | return false
+  let some args := trailingArgs? app 3 | return false
+  let post := args[2]!
+  if isReplicateHead comp then
+    if isConstantLambda post then
+      match ← observing? do
+        evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_replicate_inv))
+        unless ← tryCloseSpecGoalImmediate do throwError "" with
+      | some _ => return true
+      | none => pure ()
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.triple_replicate_succ)) then
+      return true
+  if isListFoldlMHead comp then
+    match ← observing? do
+      evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_list_foldlM_inv))
+      unless ← tryCloseSpecGoalImmediate do throwError "" with
+    | some _ => return true
+    | none =>
+      if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_list_foldlM_cons)) then
+        return true
+  if isListMapMHead comp then
+    if isConstantLambda post then
+      match ← observing? do
+        evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_list_mapM_inv))
+        unless ← tryCloseSpecGoalImmediate do throwError "" with
+      | some _ => return true
+      | none => pure ()
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.triple_list_mapM_cons)) then
+      return true
+  return false
+
+/-- Apply a loop invariant rule with an explicitly provided invariant.
+Uses the pre-composed `triple_replicate` / `triple_list_foldlM` / `triple_list_mapM`
+which include consequence bridging, leaving pre/post/step subgoals. -/
+private def runLoopInvExplicit (inv : TSyntax `term) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  match tripleGoalComp? target with
+  | none => return false
+  | some comp =>
+    let comp ← whnfReducible (← instantiateMVars comp)
+    if isReplicateHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_replicate (I := $inv) ?_ ?_ ?_))
+    else if isListFoldlMHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_list_foldlM (I := $inv) ?_ ?_ ?_))
+    else if isListMapMHead comp then
+      tryEvalTacticSyntax (← `(tactic|
+        refine OracleComp.ProgramLogic.triple_list_mapM (I := $inv) ?_ ?_ ?_))
+    else
+      return false
+
+/-- One step of VCGen on a `Triple` goal with the following strategy:
+
+1. `∀`-binder: `intro` and continue
+2. **Bind** (spec-based): `triple_bind` + close spec subgoal from local context
+3. **Bind** (backward WP): `triple_bind_wp` to get `Triple pre oa (fun x => wp (ob x) post)`
+4. **Conditional** (`ite`/`dite`): split into branch goals with discriminant hypotheses
+5. **Match**: case-split on the discriminant variable
+6. **Loop** (auto invariant or step): apply `triple_*_inv` from context or `triple_*_succ`/`_cons`
+7. **Leaf**: unfold `Triple` and apply WP rules, or try to close directly
+
+Returns `true` if any progress was made. -/
+private def runVCGenStep : TacticM Bool := do
+  if (← getGoals).isEmpty then return false
+  let target ← instantiateMVars (← getMainTarget)
+  if target.isForall then
+    if ← tryEvalTacticSyntax (← `(tactic| intro _)) then
+      return true
+  match tripleGoalComp? target with
+  | some comp =>
+      let comp ← whnfReducible (← instantiateMVars comp)
+      if isBindExpr comp then
+        match ← observing? do
+          evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_bind))
+          unless ← tryCloseSpecGoalImmediate do throwError "" with
+        | some _ => return true
+        | none =>
+          if ← tryEvalTacticSyntax (← `(tactic|
+            apply OracleComp.ProgramLogic.triple_bind_wp)) then
+            return true
+      if isIfExpr comp then
+        if comp.consumeMData.getAppFn.isConstOf ``dite then
+          if ← tryEvalTacticSyntax (← `(tactic|
+            apply OracleComp.ProgramLogic.triple_dite <;> intro)) then
+            return true
+        if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_ite <;> intro)) then
+          return true
+      if ← tryMatchDecomp comp then
+        return true
+      if ← tryLoopInvariantAuto comp then
+        return true
+      match ← (observing? do
+        evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))
+        evalTactic (← `(tactic| change _ ≤ OracleComp.ProgramLogic.wp _ _))
+        unless ← runWpStepRules do
+          throwError "qvcgen_step: no matching wp rule after unfolding `Triple`") with
+      | some _ => return true
+      | none => tryCloseSpecGoal
+  | none => tryCloseSpecGoal
+
+/-- Run one VCGen pass across all current goals.
+
+This is stricter than repeatedly stepping only the main goal: after a split, one branch may be
+ready only for arithmetic cleanup while another still has program structure to decompose. -/
+private def runVCGenPass : TacticM Bool := do
+  let goals ← getGoals
+  if goals.isEmpty then
+    return false
+  let mut progress := false
+  let mut newGoals : List MVarId := []
+  for goal in goals do
+    setGoals [goal]
+    if ← runVCGenStep then
+      progress := true
+      newGoals := newGoals ++ (← getGoals)
+    else
+      newGoals := newGoals ++ [goal]
+  setGoals newGoals
+  return progress
+
+/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple` goal.
+
+Decomposes a bind via `triple_bind` and automatically tries to close the spec subgoal
+using hypotheses in the local context, with backward WP fallback. Also handles
+`ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection from
+context, and WP-rule unfolding.
+
+Variants:
+- `qvcgen_step using cut` for an explicit intermediate postcondition.
+- `qvcgen_step inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal. -/
+syntax "qvcgen_step" ("using" term)? : tactic
 
 elab_rules : tactic
-  | `(tactic| hoare_step) => do
-      if ← runHoareStepRule then
-        return
-      throwHoareStepError
-  | `(tactic| hoare_step using $cut) => do
-      if ← runHoareStepRuleUsing cut then
-        return
-      throwHoareStepError
+  | `(tactic| qvcgen_step) => do
+      if ← runVCGenStep then return
+      throwQVCGenStepError
+  | `(tactic| qvcgen_step using $cut) => do
+      if ← runHoareStepRuleUsing cut then return
+      throwQVCGenStepError
 
-/-- `wp_seq n` repeatedly applies `wp_step` `n` times. -/
-syntax "wp_seq" num : tactic
+syntax "qvcgen_step" &"inv" term : tactic
 
 elab_rules : tactic
-  | `(tactic| wp_seq $n:num) => do
-      let k := n.getNat
-      if k = 0 then
-        throwError "wp_seq: expected a positive number of steps."
-      for _ in [:k] do
-        if ← runWpStepRules then
-          pure ()
-        else
-          throwWpStepError
+  | `(tactic| qvcgen_step inv $inv) => do
+      if ← runLoopInvExplicit inv then return
+      throwError
+        "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+        or `List.mapM`."
 
-/-- `hoare_seq n` repeatedly applies `hoare_step` `n` times.
+/-- `qvcgen` exhaustively decomposes a quantitative `Triple` goal with spec-aware stepping.
 
-`hoare_seq n using cut` uses `hoare_step using cut` on the first layer, then ordinary
-`hoare_step` for the remaining `n - 1` layers. -/
-syntax "hoare_seq" num ("using" term)? : tactic
+Enhancements over simple structural decomposition:
+- After bind decomposition, tries to close spec subgoals from local context
+- Falls back to backward WP (`triple_bind_wp`) when no spec is available
+- Splits `ite`/`dite` conditionals into branch goals with hypotheses
+- Case-splits `match` expressions on their discriminants
+- Auto-detects loop invariants from context for `replicate`/`foldlM`/`mapM`
+- Keeps decomposing across all open goals after branch splits
+- Normalizes remaining `wp` terms and indicator arithmetic via simp
+- Finishes with bounded local consequence search on closed goals
 
-elab_rules : tactic
-  | `(tactic| hoare_seq $n:num) => do
-      let k := n.getNat
-      if k = 0 then
-        throwError "hoare_seq: expected a positive number of steps."
-      for _ in [:k] do
-        if ← runHoareStepRule then
-          pure ()
-        else
-          throwHoareStepError
-  | `(tactic| hoare_seq $n:num using $cut) => do
-      let k := n.getNat
-      if k = 0 then
-        throwError "hoare_seq: expected a positive number of steps."
-      if ← runHoareStepRuleUsing cut then
-        pure ()
-      else
-        throwHoareStepError
-      for _ in [1:k] do
-        if ← runHoareStepRule then
-          pure ()
-        else
-          throwHoareStepError
+Typical usage: bring specs into context with `have` or as function parameters, then
+call `qvcgen` to automatically decompose and apply them. -/
+elab "qvcgen" : tactic => do
+  while (← runVCGenPass) do pure ()
+  unless (← getGoals).isEmpty do
+    let _ ← tryEvalTacticSyntax
+      (← `(tactic| all_goals try simp only [
+        OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind,
+        OracleComp.ProgramLogic.wp_query, OracleComp.ProgramLogic.wp_ite,
+        OracleComp.ProgramLogic.wp_dite, OracleComp.ProgramLogic.wp_map,
+        OracleComp.ProgramLogic.wp_uniformSample,
+        OracleComp.ProgramLogic.wp_const,
+        OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false,
+        OracleComp.ProgramLogic.propInd_eq_ite,
+        ite_true, ite_false, if_true, if_false, dite_true, dite_false,
+        one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero,
+        game_rule]))
+  unless (← getGoals).isEmpty do
+    let _ ← tryEvalTacticSyntax
+      (← `(tactic| all_goals first
+        | assumption
+        | exact OracleComp.ProgramLogic.triple_pure _ _
+        | exact OracleComp.ProgramLogic.triple_zero _ _
+        | exact le_refl _
+        | (
+            repeat intro
+            simp only [OracleComp.ProgramLogic.Triple] at *
+            solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans]
+          )))
 
-/-- `game_hoare` exhaustively decomposes a quantitative `Triple` goal.
+/-- `exp_norm` normalizes expectation / indicator arithmetic in the current goal.
 
-It repeatedly applies `hoare_step` until no further structural rule matches, then runs
-basic `simp [game_rule]` cleanup on the remaining goals. -/
-elab "game_hoare" : tactic => do
-  while (← runHoareStepRule) do
-    pure ()
-  let _ ← tryEvalTacticSyntax (← `(tactic| all_goals try simp [game_rule]))
-  pure ()
+Rewrites using linearity of expectation (`wp_add`, `wp_mul_const`), indicator algebra
+(`propInd_true`, `propInd_false`, `propInd_and`), and standard WP step rules. -/
+macro "exp_norm" : tactic =>
+  `(tactic| simp only [
+    OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false,
+    OracleComp.ProgramLogic.propInd_and, OracleComp.ProgramLogic.propInd_eq_ite,
+    OracleComp.ProgramLogic.propInd_not, OracleComp.ProgramLogic.propInd_le_one,
+    OracleComp.ProgramLogic.propInd,
+    OracleComp.ProgramLogic.wp_add, OracleComp.ProgramLogic.wp_mul_const,
+    OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.wp_eq_tsum,
+    OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind,
+    OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_ite,
+    OracleComp.ProgramLogic.wp_dite,
+    ite_true, ite_false, if_true, if_false, dite_true, dite_false,
+    one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero,
+    game_rule])
 
 /-! ## Relational step-through tactics (EasyCrypt-inspired) -/
 
@@ -971,7 +1168,7 @@ macro "prob_congr'" : tactic =>
 
 /-! ## Enhanced exhaustive tactics -/
 
-/-- Enhanced `game_rel` with more rules and better backtracking. -/
+/-- Exhaustive relational decomposer with comprehensive backtracking. -/
 macro "game_rel'" : tactic =>
   `(tactic| (
     repeat (first

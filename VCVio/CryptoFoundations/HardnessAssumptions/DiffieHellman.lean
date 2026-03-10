@@ -121,62 +121,6 @@ noncomputable def ddhDistAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ 
   |(Pr[= true | ddhExpReal g adversary]).toReal -
     (Pr[= true | ddhExpRand g adversary]).toReal|
 
-/-- Generic identity: for any two `ProbComp Bool` computations, the "guess the
-uniform bit" game decomposes as:
-  `Pr[correct guess] - 1/2 = (Pr[output 1 | real] - Pr[output 1 | rand]) / 2`. -/
-lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) :
-    (Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let z ← if b then real else rand
-      pure (b == z)]).toReal - 1 / 2 =
-    ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
-  have hgameRepr :
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        let z ← if b then real else rand
-        pure (b == z)] =
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
-    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
-    intro b
-    cases b
-    · have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
-        funext t
-        cases t <;> rfl
-      simp [hbeqFalse]
-    · have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
-        funext t
-        cases t <;> rfl
-      simp [hbeqTrue]
-  have hmix :
-      Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
-        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
-      (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
-    probOutput_bind_uniformBool
-      (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
-      (x := true)
-  have hformula : Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let z ← if b then real else rand
-      pure (b == z)] =
-    (Pr[= true | real] + Pr[= false | rand]) / 2 := by
-    rw [hgameRepr, hmix,
-      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
-      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
-      probOutput_not_map]
-  have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
-    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by
-      have := HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := rand)
-      simp
-    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
-  rw [hformula, ENNReal.toReal_div,
-    ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
-    hfalseAsSub, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
-  simp [ENNReal.toReal_ofNat]
-  ring
-
 omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The single-game DDH experiment can be decomposed as a uniform-bit branch over
 the real and random DDH games. -/
@@ -232,15 +176,6 @@ variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
 variable (g : G)
 
-lemma probOutput_map_bijective_uniform_cross
-    {α β : Type} [SampleableType α] [SampleableType β] [Fintype α] [Fintype β]
-    (f : α → β) (hf : Function.Bijective f) (y : β) :
-    Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by
-  obtain ⟨x, rfl⟩ := hf.surjective y
-  rw [probOutput_map_injective ($ᵗ α) hf.injective x,
-      probOutput_uniformSample, probOutput_uniformSample,
-      Fintype.card_of_bijective hf]
-
 /-- The discrete log relation is generable when `· • g` is bijective:
 sample `sk ← $ᵗ F` and return `(sk • g, sk)`. -/
 def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
@@ -253,7 +188,7 @@ def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
     obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
   gen_uniform_right := fun pk => by
     simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]
-    exact probOutput_map_bijective_uniform_cross (· • g) hg pk
+    exact probOutput_map_bijective_uniform_cross (α := F) (β := G) (· • g) hg pk
   gen_uniform_left := fun sk => by
     simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind, bind_pure]
 

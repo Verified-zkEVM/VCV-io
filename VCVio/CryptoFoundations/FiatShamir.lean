@@ -213,7 +213,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       let s ← σ.respond pk sk e r
       pure (σ.verify pk c r s))
     (fun y => if y = true then 1 else 0)
-  hoare_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
+  qvcgen_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
   · simpa [OracleComp.ProgramLogic.propInd] using
       OracleComp.ProgramLogic.triple_support (oa := hr.gen)
   · intro x

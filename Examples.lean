@@ -1,7 +1,12 @@
+import Examples.BR93
 import Examples.ElGamal
 import Examples.FrankingProtocol
+import Examples.HashedElGamal
 import Examples.OneTimePad
+import Examples.PRGfromPRF
+import Examples.Pedersen
 import Examples.RF_RP_Switching_alt
 import Examples.Regev
 import Examples.Schnorr
 import Examples.Signature
+import Examples.SimpleTwoServerPIR

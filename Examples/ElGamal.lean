@@ -1044,7 +1044,7 @@ private lemma probOutput_bind_uniform_smul_eq
     simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
   rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   congr 1; funext y; congr 1
-  exact DiffieHellman.probOutput_map_bijective_uniform_cross (· • gen) hg y
+  exact probOutput_map_bijective_uniform_cross (α := F) (β := G) (· • gen) hg y
 
 -- The DDH-random branch has the same success probability as hybrid k.
 private lemma stepDDH_randBranch_probOutput_eq
@@ -1307,7 +1307,7 @@ private lemma ddhExp_stepDDHReduction_decomp_toReal
     ((Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)]).toReal -
       (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k]).toReal) / 2 := by
   rw [ddhExp_stepDDH_eq_mixture (F := F) (gen := gen) adversary k]
-  rw [DiffieHellman.probOutput_uniformBool_branch_toReal_sub_half]
+  rw [probOutput_uniformBool_branch_toReal_sub_half]
   rw [stepDDH_realBranch_probOutput_eq (F := F) (gen := gen) adversary k,
       stepDDH_randBranch_probOutput_eq hg adversary k]
 

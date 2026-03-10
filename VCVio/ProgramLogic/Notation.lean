@@ -10,13 +10,10 @@ import VCVio.ProgramLogic.Relational.SimulateQ
 /-!
 # Ergonomic Notation and Convenience Layer for Program Logic
 
-This file provides user-facing notation, convenience predicates, and a small set of coarse
-compatibility macros for game-hopping proofs. The goal is that standard game-hopping proofs
-never see `ℝ≥0∞`.
+This file provides user-facing notation and convenience predicates for game-hopping proofs.
+The goal is that standard game-hopping proofs never see `ℝ≥0∞`.
 
-The canonical step-through proof mode lives in `VCVio/ProgramLogic/Tactics.lean`. This file
-keeps only the notation surface plus lightweight compatibility automation (`game_wp`,
-`game_rel`, `coupling`, `game_hop`) that remains useful for quick scripts and older proofs.
+The canonical proof mode lives in `VCVio/ProgramLogic/Tactics.lean`.
 
 ## Notation (activate with `open scoped OracleComp.ProgramLogic`)
 
@@ -89,7 +86,7 @@ lemma propInd_eq_ite {P : Prop} [Decidable P] : propInd P = if P then 1 else 0 :
   simp [propInd]
 
 open scoped Classical in
-lemma propInd_and {P Q : Prop} : propInd (P ∧ Q) = propInd P * propInd Q := by
+@[simp] lemma propInd_and {P Q : Prop} : propInd (P ∧ Q) = propInd P * propInd Q := by
   unfold propInd
   split_ifs with hpq hp hq <;> simp_all
 
@@ -101,6 +98,30 @@ lemma propInd_mono {P Q : Prop} (h : P → Q) : propInd P ≤ propInd Q := by
   · exact absurd (h hp) hq
   · exact zero_le _
   · exact le_refl 0
+
+lemma propInd_le_one (P : Prop) : propInd P ≤ 1 := by
+  unfold propInd; split_ifs <;> simp
+
+open scoped Classical in
+lemma propInd_eq_one_iff {P : Prop} : propInd P = 1 ↔ P := by
+  unfold propInd; constructor
+  · intro h; by_contra hn; simp [hn] at h
+  · intro h; simp [h]
+
+open scoped Classical in
+lemma propInd_eq_zero_iff {P : Prop} : propInd P = 0 ↔ ¬P := by
+  unfold propInd; constructor
+  · intro h; by_contra hn; simp [hn] at h
+  · intro h; simp [h]
+
+open scoped Classical in
+lemma propInd_or_le {P Q : Prop} : propInd (P ∨ Q) ≤ propInd P + propInd Q := by
+  unfold propInd
+  split_ifs <;> simp_all
+
+open scoped Classical in
+lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
+  unfold propInd; by_cases hp : P <;> simp [hp]
 
 /-! ## Notation -/
 
@@ -161,6 +182,54 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
   show ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1
   rw [propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
+
+/-! ## Expectation-level bridge lemmas -/
+
+/-- WP of a disjunction indicator is bounded by the sum of individual WP indicators. -/
+theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p q : α → Prop) :
+    wp oa (fun x => ⌜p x ∨ q x⌝) ≤ wp oa (fun x => ⌜p x⌝) + wp oa (fun x => ⌜q x⌝) := by
+  rw [← wp_add]
+  exact wp_mono oa fun x => propInd_or_le
+
+/-- Union bound: probability of a disjunction is at most the sum. -/
+theorem probEvent_or_le {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p q : α → Prop) :
+    Pr[fun x => p x ∨ q x | oa] ≤ Pr[p | oa] + Pr[q | oa] := by
+  rw [probEvent_eq_wp_propInd oa (fun x => p x ∨ q x),
+      probEvent_eq_wp_propInd oa p, probEvent_eq_wp_propInd oa q]
+  exact wp_propInd_or_le oa p q
+
+/-- Monotonicity of `probEvent` via indicator monotonicity. -/
+theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) {p q : α → Prop} (h : ∀ x, p x → q x) :
+    Pr[p | oa] ≤ Pr[q | oa] := by
+  rw [probEvent_eq_wp_propInd oa p, probEvent_eq_wp_propInd oa q]
+  exact wp_mono oa fun x => propInd_mono (h x)
+
+/-- Markov inequality: if `a ≤ f x` whenever `p x`, then `a * Pr[p | oa] ≤ E[f | oa]`. -/
+theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (f : α → ℝ≥0∞) (a : ℝ≥0∞)
+    (p : α → Prop) (hf : ∀ x, p x → a ≤ f x) :
+    a * Pr[p | oa] ≤ wp oa f := by
+  rw [probEvent_eq_wp_propInd, ← wp_mul_const]
+  exact wp_mono oa fun x => by
+    unfold propInd; split_ifs with hp
+    · simpa using hf x hp
+    · simp
+
+/-- `Triple` with precondition `1` and indicator postcondition when the event is almost sure. -/
+theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p : α → Prop) (h : ∀ x ∈ support oa, p x) :
+    Triple (spec := spec) 1 oa (fun x => ⌜p x⌝) := by
+  rw [show (1 : ℝ≥0∞) = ⌜True⌝ from propInd_true.symm]
+  exact (triple_propInd_iff_probEvent_eq_one oa p).mpr
+    (probEvent_eq_one ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩)
 
 /-! ## Bridge lemmas: game equivalence and advantage -/
 
@@ -230,69 +299,5 @@ theorem AdvBound.of_gameEquiv {g₁ g₂ : OracleComp spec₁ Bool} {ε : ℝ}
     (heq : GameEquiv g₁ g₂) (hbound : AdvBound g₁ ε) :
     AdvBound g₂ ε := by
   unfold AdvBound at *; rwa [← heq.probOutput_eq]
-
-/-! ## Coarse compatibility macros -/
-
-/-- `game_wp` exhaustively decomposes unary WP goals by repeatedly applying WP rules.
-Prefer `wp_step` from `VCVio.ProgramLogic.Tactics` for interactive proofs. -/
-macro "game_wp" : tactic =>
-  `(tactic| (
-    simp only [game_rule]
-    repeat (first
-      | rw [wp_bind]
-      | rw [wp_query]
-      | rw [wp_pure]
-      | rw [wp_ite]
-      | rw [wp_uniformSample]
-      | rw [wp_map]
-      | rw [wp_simulateQ_eq]
-      | rw [wp_liftComp]
-      | rw [wp_replicate_zero]
-      | rw [wp_replicate_succ]
-      | rw [wp_list_mapM_nil]
-      | rw [wp_list_mapM_cons]
-      | rw [wp_list_foldlM_nil]
-      | rw [wp_list_foldlM_cons])
-    try simp [game_rule]
-  ))
-
-/-- `game_rel` is a coarse relational decomposer for bind/query structure.
-Prefer `by_equiv`, `rel_step`, `rel_rnd`, and friends from `VCVio.ProgramLogic.Tactics`
-for interactive proofs. -/
-macro "game_rel" : tactic =>
-  `(tactic| (
-    repeat (first
-      | exact Relational.relTriple_refl _
-      | apply Relational.relTriple_bind _ (fun _ _ _ => _)
-      | apply Relational.relTriple_eqRel_of_evalDist_eq; try rfl
-      | apply Relational.relTriple_eqRel_of_eq rfl
-      | apply Relational.relTriple_query
-      | apply Relational.relTriple_query_bij)
-    all_goals try simp [game_rule]
-  ))
-
-/-- `coupling` is a compatibility alias for coarse relational decomposition.
-Prefer the step-through tactics in `VCVio.ProgramLogic.Tactics` for new proofs. -/
-macro "coupling" : tactic =>
-  `(tactic| (
-    repeat (first
-      | exact Relational.relTriple_refl _
-      | apply Relational.relTriple_bind _ (fun _ _ _ => _)
-      | apply Relational.relTriple_eqRel_of_evalDist_eq; try rfl
-      | apply Relational.relTriple_eqRel_of_eq rfl
-      | apply Relational.relTriple_query
-      | apply Relational.relTriple_query_bij)
-    all_goals try simp [game_rule]
-  ))
-
-/-- `game_hop` tries to close a game-hopping step via coarse coupling or TV-distance entry.
-Always enters `RelTriple` (not `RelTriple'`) so the step-through tactics still compose if the
-macro does not finish the proof. -/
-macro "game_hop" : tactic =>
-  `(tactic| (
-    first
-      | (apply GameEquiv.of_relTriple; coupling)
-      | (apply AdvBound.of_tvDist <;> [skip; try simp [game_rule]])
-  ))
 
 end OracleComp.ProgramLogic
