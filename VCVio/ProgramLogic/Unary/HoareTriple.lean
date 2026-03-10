@@ -172,13 +172,17 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp oa (fun _ => c) = c := by
   rw [wp_eq_tsum, ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
-theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
+@[game_rule] theorem wp_add (oa : OracleComp spec α) (f g : α → ℝ≥0∞) :
     wp oa (fun x => f x + g x) = wp oa f + wp oa g := by
   simp only [wp_eq_tsum, mul_add, ENNReal.tsum_add]
 
-theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
+@[game_rule] theorem wp_mul_const (oa : OracleComp spec α) (c : ℝ≥0∞) (f : α → ℝ≥0∞) :
     wp oa (fun x => c * f x) = c * wp oa f := by
   simp only [wp_eq_tsum]; simp_rw [mul_left_comm]; exact ENNReal.tsum_mul_left
+
+theorem wp_const_mul (oa : OracleComp spec α) (f : α → ℝ≥0∞) (c : ℝ≥0∞) :
+    wp oa (fun x => f x * c) = wp oa f * c := by
+  simp_rw [mul_comm _ c]; rw [wp_mul_const, mul_comm]
 
 theorem triple_conseq {pre pre' : ℝ≥0∞} {oa : OracleComp spec α}
     {post post' : α → ℝ≥0∞}
