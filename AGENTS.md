@@ -20,7 +20,7 @@ VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computati
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
   → {SimSemantics, QueryTracking, Constructions, Coercions, ProbComp}
-  → {ProgramLogic, CryptoFoundations} → Examples
+  → {ProgramLogic, CryptoFoundations, CryptoFoundations/Asymptotics} → Examples
 ```
 
 New files must respect this DAG. `EvalDist/` must never import from `OracleComp/`.
@@ -50,7 +50,11 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
-- DLog / CDH / DDH assumptions: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
+- DLog / CDH / DDH via HHS: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
+- Cost model / polynomial time: `VCVio/OracleComp/QueryTracking/CostModel.lean`
+- Asymptotic security games: `VCVio/CryptoFoundations/Asymptotics/AsymSecExp.lean`
+- Negligible function algebra: `VCVio/CryptoFoundations/Asymptotics/Negligible.lean`
+- Query enforcement: `VCVio/OracleComp/QueryTracking/Enforcement.lean`
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`

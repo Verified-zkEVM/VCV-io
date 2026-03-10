@@ -167,6 +167,65 @@ def myQueryImpl (challenge : ...) :
   ...
 ```
 
+## Asymptotic Security
+
+Defined in `VCVio/CryptoFoundations/Asymptotics/`.
+
+### Negligible functions (`Negligible.lean`)
+
+```lean
+def negligible (f : ℕ → ℝ≥0∞) : Prop := SuperpolynomialDecay atTop (λ x ↦ ↑x) f
+```
+
+Closure properties: `negligible_add`, `negligible_const_mul`, `negligible_sum`,
+`negligible_of_le`, `negligible_pow_mul`, `negligible_polynomial_mul`.
+
+### `AsymSecExp` and `AsymSecGame` (`AsymSecExp.lean`)
+
+```lean
+structure AsymSecExp (m : ℕ → Type → Type*) where
+  exp : (n : ℕ) → SecExp (m n)
+
+structure AsymSecGame (Adv : Type*) (m : ℕ → Type → Type*) where
+  game : Adv → (n : ℕ) → SecExp (m n)
+```
+
+- `AsymSecExp.secure`: advantage is `negligible`.
+- `AsymSecGame.secureAgainst isPPT`: every adversary satisfying `isPPT` has negligible advantage.
+- The predicate `isPPT` is abstract — specialize to `PolyQueries` or custom efficiency notions.
+
+### Key reduction/game-hopping lemmas
+
+| Lemma | Use |
+|-------|-----|
+| `secureAgainst_of_reduction` | Tight reduction: `adv(A) ≤ adv(reduce A)` |
+| `secureAgainst_of_poly_reduction` | Polynomial-loss: `adv(A) ≤ p(n) · adv(reduce A)` |
+| `secureAgainst_of_close` | Game hop: `adv_g₁(A) ≤ adv_g₂(A) + ε(n)` |
+| `secureAgainst_of_hybrid` | Chain of `k` games differing by `ε` each |
+
+## Cost Model
+
+Defined in `VCVio/OracleComp/QueryTracking/CostModel.lean`. Uses `AddWriterT ω` for
+additive cost accumulation through `simulateQ`.
+
+```lean
+structure CostModel (spec : OracleSpec ι) (ω : Type) [AddCommMonoid ω] where
+  queryCost : spec.Domain → ω
+```
+
+| Definition | Purpose |
+|------------|---------|
+| `costDist oa cm` | Joint distribution `(output, totalCost)` |
+| `expectedCost oa cm val` | `E[val(cost)]` via `wp` |
+| `StrictCostBound oa cm bound` | All paths have cost `≤ bound` |
+| `ExpectedCostBound oa cm val bound` | Expected valued cost `≤ bound` |
+| `StrictPolyTime family cm val` | Worst-case poly bound over security parameter |
+| `ExpPolyTime family cm val` | Expected poly bound over security parameter |
+
+Key results: `fst_map_costDist` (instrumentation is transparent),
+`probEvent_cost_gt_le_expectedCost_div` (Markov's inequality),
+`StrictPolyTime.toExpPolyTime`.
+
 ## Common Gotchas
 
 1. **Avoid `guard`**: use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
@@ -174,3 +233,5 @@ def myQueryImpl (challenge : ...) :
 2. **`SymmEncAlg` vs `AsymmEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
+
+4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. Use `ProbComp.advantage` / `ProbComp.advantage₂` for distinguishing-style games.

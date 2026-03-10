@@ -58,11 +58,8 @@ def secure [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
 then the experiment is secure. -/
 theorem secure_of_pointwise_bound [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
     (ase : AsymSecExp m) (f : ℕ → ℝ≥0∞) (hf : negligible f)
-    (hbound : ∀ n, ase.advantage n ≤ f n) : ase.secure := by
-  intro p
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds (hf p)
-  · intro n; exact zero_le _
-  · intro n; exact mul_le_mul_of_nonneg_left (hbound n) (zero_le _)
+    (hbound : ∀ n, ase.advantage n ≤ f n) : ase.secure :=
+  negligible_of_le hbound hf
 
 end AsymSecExp
 
@@ -99,8 +96,8 @@ def toAsymSecExp (g : AsymSecGame Adv m) (A : Adv) : AsymSecExp m where
   exp n := g.game A n
 
 @[simp]
-theorem advantage_eq_toAsymSecExp_advantage (g : AsymSecGame Adv m) (A : Adv) :
-    g.advantage A = (g.toAsymSecExp A).advantage := rfl
+theorem toAsymSecExp_advantage (g : AsymSecGame Adv m) (A : Adv) :
+    (g.toAsymSecExp A).advantage = g.advantage A := rfl
 
 /-- Basic security reduction: if there is a map `reduce : Adv → Adv'` that
 preserves efficiency and the advantage of `g` is pointwise ≤ the advantage of `g'`

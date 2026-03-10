@@ -129,6 +129,45 @@ by_dist                     -- enters TV distance mode
 -- now need to show tvDist ... ≤ ε
 ```
 
+## Asymptotic Security Reductions
+
+For proofs involving asymptotic security (negligible advantage), use the lemmas in
+`VCVio/CryptoFoundations/Asymptotics/AsymSecExp.lean`.
+
+### Tight reduction
+
+```lean
+exact secureAgainst_of_reduction hreduce hbound hsecure
+```
+
+where `hbound : ∀ A n, g.advantage A n ≤ g'.advantage (reduce A) n`.
+
+### Polynomial-loss reduction
+
+```lean
+exact secureAgainst_of_poly_reduction hreduce hbound hsecure
+```
+
+where `hbound : ∀ A n, g.advantage A n ≤ ↑(loss.eval n) * g'.advantage (reduce A) n`.
+Uses `negligible_polynomial_mul` under the hood.
+
+### Game hop (absorb negligible difference)
+
+```lean
+exact secureAgainst_of_close hε hclose hsecure
+```
+
+where `hclose : ∀ A, isPPT A → ∀ n, g₁.advantage A n ≤ g₂.advantage A n + ε n`.
+
+### Hybrid argument
+
+```lean
+exact secureAgainst_of_hybrid hε hconsec hsecure
+```
+
+Takes a chain of `k+1` games where consecutive games differ by at most `ε(n)`.
+Proves by induction, applying `secureAgainst_of_close` at each step.
+
 ## Parallel Agent Workflow
 
 When parallelizing proof work across multiple agents, use one `git worktree` per task so
