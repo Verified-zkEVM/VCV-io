@@ -1,6 +1,8 @@
-import Mathlib.CategoryTheory.Enriched.Basic
-import Mathlib.Order.Category.Preord
-import Mathlib.Order.Monotone.Basic
+module
+
+public import Mathlib.CategoryTheory.Enriched.Basic
+public import Mathlib.Order.Category.Preord
+public import Mathlib.Order.Monotone.Basic
 
 open CategoryTheory
 
@@ -9,6 +11,8 @@ open CategoryTheory
 We show that the general definition of an enriched category over a monoidal category specializes to
 an order-enriched category when the monoidal category is the category of preorders.
 -/
+
+@[expose] public section
 
 universe w v u u₁ u₂
 

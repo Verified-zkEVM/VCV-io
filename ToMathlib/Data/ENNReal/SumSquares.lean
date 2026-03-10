@@ -3,7 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
+module
+
+public import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 
 /-!
 # Sum-of-squares inequalities for `ℝ≥0∞`
@@ -11,6 +13,8 @@ import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 Cauchy-Schwarz-style inequalities relating sums, products, and squares over `ℝ≥0∞`.
 These are used in the forking lemma and other game-hopping arguments.
 -/
+
+@[expose] public section
 
 open Finset ENNReal
 

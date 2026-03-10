@@ -3,8 +3,9 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.PFunctor.Basic
+public import ToMathlib.PFunctor.Basic
 
 /-!
 # Equivalences of Polynomial Functors
@@ -32,6 +33,8 @@ We provide various canonical equivalences for operations on polynomial functors,
 - Basic equivalence properties: reflexivity, symmetry, transitivity
 - Canonical equivalences for sum, product, and other constructions on polynomial functors
 -/
+
+@[expose] public section
 
 universe u v uA uB uA' uB' uA₁ uB₁ uA₂ uB₂ uA₃ uB₃ uA₄ uB₄
 

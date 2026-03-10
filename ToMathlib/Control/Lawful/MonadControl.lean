@@ -3,8 +3,10 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Control.Monad.Basic
-import Init.Control.State
+module
+
+public import Mathlib.Control.Monad.Basic
+public import Init.Control.State
 
 /-!
 # Lawful version of `MonadControl`
@@ -13,6 +15,8 @@ This file defines the `LawfulMonadControl` class, which adds laws to the `MonadC
 These laws ensure that control operations behave consistently and preserve monad laws.
 
 -/
+
+@[expose] public section
 
 universe u v w
 

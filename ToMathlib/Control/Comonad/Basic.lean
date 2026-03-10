@@ -3,7 +3,9 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Logic.Equiv.Prod
+module
+
+public import Mathlib.Logic.Equiv.Prod
 
 /-! # Comonads
 
@@ -25,6 +27,8 @@ It follows the structure of the `Monad` hierarchy:
 * `Lawful` variants mirroring `LawfulFunctor`, `LawfulApplicative`, `LawfulMonad`.
 
 -/
+
+@[expose] public section
 
 universe u v z
 

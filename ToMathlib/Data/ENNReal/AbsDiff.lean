@@ -3,7 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
+module
+
+public import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 
 /-!
 # Symmetric Absolute Difference and Supporting Lemmas for `ℝ≥0∞`
@@ -24,6 +26,8 @@ interactions. These are the building blocks for total variation distance on `PMF
 - `ENNReal.absDiff_mul_right_le` — `|ac - bc| ≤ |a - b| · c`
 - `ENNReal.tsum_fiber` — fiber decomposition for `ℝ≥0∞`-valued sums
 -/
+
+@[expose] public section
 
 noncomputable section
 

@@ -3,9 +3,10 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import Mathlib.Data.DFinsupp.BigOperators
+public import Mathlib.Probability.ProbabilityMassFunction.Constructions
+public import Mathlib.Data.DFinsupp.BigOperators
 
 /-!
 # Probability mass functions with finite support and non-negative rational weights
@@ -15,6 +16,8 @@ oracle specifications.
 
 We define this separately to ease computational behavior.
 -/
+
+@[expose] public section
 
 universe u
 

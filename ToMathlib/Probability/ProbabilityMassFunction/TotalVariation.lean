@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Probability.ProbabilityMassFunction.Monad
-import ToMathlib.Data.ENNReal.AbsDiff
+module
+
+public import Mathlib.Probability.ProbabilityMassFunction.Monad
+public import ToMathlib.Data.ENNReal.AbsDiff
 
 /-!
 # Total Variation Distance for PMFs
@@ -32,6 +34,8 @@ an `ℝ`-valued version (`tvDist`), connected by `tvDist = etvDist.toReal`.
 - `PMF.etvDist_bind_right_le` / `PMF.tvDist_bind_right_le` — data processing inequality for
   Markov kernels (post-processing)
 -/
+
+@[expose] public section
 
 noncomputable section
 

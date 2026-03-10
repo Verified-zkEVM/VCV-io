@@ -4,11 +4,12 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+module
 
-import ToMathlib.Control.Monad.Hom
-import Mathlib.Data.PFunctor.Univariate.Basic
-import Mathlib.Data.ENat.Lattice
-import Mathlib.Tactic
+public import ToMathlib.Control.Monad.Hom
+public import Mathlib.Data.PFunctor.Univariate.Basic
+public import Mathlib.Data.ENat.Lattice
+public import Mathlib.Tactic
 
 /-!
 # Free Monads
@@ -20,6 +21,8 @@ object as a continuation into an interactive protocol.
 See `PFunctor.FreeM` for the free monad of a polynomial functor, which does not raise the universe
 level.
 -/
+
+@[expose] public section
 
 universe u v w
 

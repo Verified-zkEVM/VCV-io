@@ -3,9 +3,11 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import Mathlib.Data.Finset.Card
-import Mathlib.Data.Vector.Defs
-import Mathlib.Probability.Distributions.Uniform
+module
+
+public import Mathlib.Data.Finset.Card
+public import Mathlib.Data.Vector.Defs
+public import Mathlib.Probability.Distributions.Uniform
 
 /-!
 # Lemmas to be Ported to Mathlib
@@ -13,6 +15,8 @@ import Mathlib.Probability.Distributions.Uniform
 This file gives a centralized location to add lemmas that belong better
 in general mathlib than in the project itself.
 -/
+
+@[expose] public section
 
 universe u v w
 

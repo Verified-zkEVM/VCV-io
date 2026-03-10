@@ -3,8 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Order.CompleteLattice.Basic
+public import Mathlib.Order.CompleteLattice.Basic
 
 /-!
 # Monad algebras
@@ -23,6 +24,8 @@ Public credit / attribution:
 The ordered monad algebra perspective (`MAlgOrdered`, `wp`, `triple`) in this file is adapted from
 Loom's `MonadAlgebras` development.
 -/
+
+@[expose] public section
 
 universe u v
 

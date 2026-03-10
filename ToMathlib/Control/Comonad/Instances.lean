@@ -3,11 +3,15 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.Control.Comonad.Basic
-import Mathlib.Data.Stream.Init
+public import ToMathlib.Control.Comonad.Basic
+public import Mathlib.Data.Stream.Init
+public import Batteries.Data.List.Basic
 
 /-! # Instances of Comonads -/
+
+@[expose] public section
 
 universe u v -- Declare universes
 

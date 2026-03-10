@@ -3,13 +3,17 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
-import ToMathlib.Control.Monad.Free
-import ToMathlib.General
-import Batteries.Control.Lemmas
+module
+
+public import ToMathlib.Control.Monad.Free
+public import ToMathlib.General
+public import Batteries.Control.Lemmas
 
 /-!
 # Lemmas about `StateT`
 -/
+
+@[expose] public section
 
 universe u v w
 

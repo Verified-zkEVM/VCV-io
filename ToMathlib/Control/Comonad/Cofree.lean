@@ -3,10 +3,11 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import ToMathlib.Control.Comonad.Basic
-import Mathlib.Data.PFunctor.Univariate.M
-import ToMathlib.PFunctor.Equiv.Basic
+public import ToMathlib.Control.Comonad.Basic
+public import Mathlib.Data.PFunctor.Univariate.M
+public import ToMathlib.PFunctor.Equiv.Basic
 
 /-! # Cofree Comonads
 
@@ -21,3 +22,5 @@ type mapping `f : Type u → Type v`).
 
 * `CofreeC`: The `Cofree` comonad.
 -/
+
+@[expose] public section

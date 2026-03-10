@@ -3,9 +3,11 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
+
 -- import Mathlib.CategoryTheory.Monad.Basic
-import Mathlib.Control.Lawful -- Enables inferInstance : LawfulMonad (OptionT m)
-import Batteries.Control.OptionT
+public import Mathlib.Control.Lawful -- Enables inferInstance : LawfulMonad (OptionT m)
+public import Batteries.Control.OptionT
 
 /-!
 # Monad transformers
@@ -13,6 +15,8 @@ import Batteries.Control.OptionT
 Taken from [Zulip thread](https://leanprover.zulipchat.com/#narrow/channel/270676-lean4/topic/MonadFunctor.20misunderstanding.20or.20bug.3F/near/477088609).
 
 -/
+
+@[expose] public section
 
 universe u v w
 

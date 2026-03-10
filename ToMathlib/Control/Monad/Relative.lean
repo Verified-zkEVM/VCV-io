@@ -3,9 +3,11 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Control.Monad.Basic
-import Mathlib.CategoryTheory.Monad.Basic
-import Mathlib.CategoryTheory.Enriched.Basic
+module
+
+public import Mathlib.Control.Monad.Basic
+public import Mathlib.CategoryTheory.Monad.Basic
+public import Mathlib.CategoryTheory.Enriched.Basic
 
 /-!
 # Relative monad
@@ -14,6 +16,8 @@ This file defines the `RelativeMonad` type class, both as a category-theoretic o
 programming object.
 
 -/
+
+@[expose] public section
 
 namespace CategoryTheory
 

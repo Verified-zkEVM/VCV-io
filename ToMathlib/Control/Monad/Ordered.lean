@@ -3,13 +3,14 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Control.Monad.Cont
-import Mathlib.CategoryTheory.Monad.Basic
-import ToMathlib.Control.Monad.Algebra
-import ToMathlib.Control.Monad.Relation
-import ToMathlib.Control.Monad.Transformer
-import Mathlib.Order.Monotone.Basic
+public import Mathlib.Control.Monad.Cont
+public import Mathlib.CategoryTheory.Monad.Basic
+public import ToMathlib.Control.Monad.Algebra
+public import ToMathlib.Control.Monad.Relation
+public import ToMathlib.Control.Monad.Transformer
+public import Mathlib.Order.Monotone.Basic
 
 /-!
 # Ordered monads
@@ -26,6 +27,8 @@ This file collects all definitions and basic theorems about adding ordering to m
 - Left / right Kan extension of ordered monads
 
 -/
+
+@[expose] public section
 
 universe u v w
 

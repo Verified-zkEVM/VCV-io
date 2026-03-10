@@ -3,11 +3,13 @@ Copyright (c) 2025 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Mathlib.Control.Monad.Basic
-import Mathlib.Control.Monad.Cont
-import Mathlib.CategoryTheory.Monad.Basic
-import ToMathlib.Control.Monad.Ordered
-import ToMathlib.Control.Monad.Free
+module
+
+public import Mathlib.Control.Monad.Basic
+public import Mathlib.Control.Monad.Cont
+public import Mathlib.CategoryTheory.Monad.Basic
+public import ToMathlib.Control.Monad.Ordered
+public import ToMathlib.Control.Monad.Free
 
 /-!
 # Dijkstra monad
@@ -16,6 +18,8 @@ This file aims to formalize the content of the paper
 [Dijkstra monads for all](https://dl.acm.org/doi/pdf/10.1145/3341708).
 
 -/
+
+@[expose] public section
 
 universe u v w z
 

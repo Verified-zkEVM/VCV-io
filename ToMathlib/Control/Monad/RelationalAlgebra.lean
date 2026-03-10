@@ -3,8 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+module
 
-import Mathlib.Order.CompleteLattice.Basic
+public import Mathlib.Order.CompleteLattice.Basic
 
 /-!
 # Relational monad algebras
@@ -21,6 +22,8 @@ Attribution:
   Vladimir Gladshtein, George Pîrlea, Qiyuan Zhao, Vitaly Kurin, Ilya Sergey.
   DOI: https://doi.org/10.1145/3776719
 -/
+
+@[expose] public section
 
 universe u v₁ v₂ v₃ v₄
 
