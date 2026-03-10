@@ -1,5 +1,11 @@
+/-
+Copyright (c) 2026 Quang Dao. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Quang Dao
+-/
 import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.StateT
 
 /-!
 # Fujisaki-Okamoto Shared Definitions
@@ -106,34 +112,54 @@ end OW_CPA
 
 end DeterministicPKE
 
+/-- Executing a lifted `ProbComp` in a public random-oracle world ignores the oracle state and
+collapses back to the original probabilistic computation. -/
+theorem exec_lift_probComp_withHashOracle
+    {ι : Type} {hashSpec : OracleSpec ι} {σ : Type}
+    (hashImpl : QueryImpl hashSpec (StateT σ ProbComp)) (s : σ)
+    {α : Type} (c : ProbComp α) :
+    StateT.run' (simulateQ
+      ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
+      (monadLift c)) s = c := by
+  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp)
+  change StateT.run' (simulateQ (idImpl + hashImpl) (monadLift c)) s = c
+  rw [show simulateQ (idImpl + hashImpl) (monadLift c) = simulateQ idImpl c by
+    simpa [MonadLift.monadLift] using
+      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := hashImpl) c)]
+  have hid : ∀ t s', (idImpl t).run' s' = query t := by
+    intro t s'
+    rfl
+  simpa using
+    (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c) (s := s))
+
 section OW_PCVA
 
 variable {ι : Type u} {spec : OracleSpec ι} {M PK SK C : Type}
 
-/-- OW-PCVA oracle interface: the base oracle set, a plaintext-checking oracle on the fixed
-challenge ciphertext, and a validity oracle for the same ciphertext. -/
+/-- OW-PCVA oracle interface: the base oracle set, a plaintext-checking oracle on arbitrary
+ciphertexts, and a ciphertext-validity oracle. -/
 def OW_PCVA_oracleSpec (_encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) :=
-  spec + ((M →ₒ Bool) + (Unit →ₒ Bool))
+  spec + (((C × M) →ₒ Bool) + (C →ₒ Bool))
 
 /-- An OW-PCVA adversary gets the public key and challenge ciphertext, and outputs a plaintext
-guess after querying the challenge-relative checking oracles. -/
+guess after querying the plaintext-checking and validity oracles. -/
 abbrev OW_PCVA_Adversary (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) :=
   PK → C → OracleComp (OW_PCVA_oracleSpec encAlg) M
 
-/-- Challenge-relative oracle implementation for OW-PCVA. -/
+/-- Oracle implementation for OW-PCVA. -/
 def OW_PCVA_queryImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
-    [DecidableEq M] (sk : SK) (cStar : C) :
+    [DecidableEq M] (sk : SK) :
     QueryImpl (OW_PCVA_oracleSpec encAlg) (OracleComp spec) :=
-  let checkImpl : QueryImpl (M →ₒ Bool) (OracleComp spec) := fun msg => do
-    let msg' ← encAlg.decrypt sk cStar
+  let checkImpl : QueryImpl ((C × M) →ₒ Bool) (OracleComp spec) := fun (c, msg) => do
+    let msg' ← encAlg.decrypt sk c
     return decide (msg' = some msg)
-  let validImpl : QueryImpl (Unit →ₒ Bool) (OracleComp spec) := fun _ => do
-    let msg' ← encAlg.decrypt sk cStar
+  let validImpl : QueryImpl (C →ₒ Bool) (OracleComp spec) := fun c => do
+    let msg' ← encAlg.decrypt sk c
     return msg'.isSome
   (QueryImpl.ofLift spec (OracleComp spec)) + (checkImpl + validImpl)
 
 /-- OW-PCVA experiment: challenge the adversary with an honestly generated ciphertext and ask it to
-recover the underlying message using the challenge-relative checking oracles. -/
+recover the underlying message using plaintext-checking and validity oracles. -/
 def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     [SampleableType M] [DecidableEq M]
     (adversary : OW_PCVA_Adversary encAlg) : ProbComp Bool :=
@@ -141,7 +167,7 @@ def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     let (pk, sk) ← encAlg.keygen
     let msg ← encAlg.lift_probComp ($ᵗ M)
     let cStar ← encAlg.encrypt pk msg
-    let msg' ← simulateQ (OW_PCVA_queryImpl encAlg sk cStar) (adversary pk cStar)
+    let msg' ← simulateQ (OW_PCVA_queryImpl encAlg sk) (adversary pk cStar)
     return decide (msg' = msg)
 
 /-- OW-PCVA advantage is the message-recovery probability in the above game. -/
