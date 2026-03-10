@@ -74,46 +74,58 @@ Success = non-failure. Advantage: `1 - Pr[⊥ | exp.main]`.
 ### `SecAdv`
 
 ```lean
-structure SecAdv (spec : OracleSpec ι) (α β : Type) where
+structure SecAdv {ι : Type u} [DecidableEq ι]
+    (spec : OracleSpec ι) (α β : Type u) where
   run : α → OracleComp spec β
-  qb : ι → ℕ                    -- per-index query bound
+  qb : ι → ℕ
+  qb_isQueryBound (x : α) : IsPerIndexQueryBound (run x) (qb)
   activeOracles : List ι
+  mem_activeOracles_iff (i : ι) : i ∈ activeOracles ↔ qb i ≠ 0
 ```
 
 ### Advantage functions
 
-| Function | Input | Measures |
-|----------|-------|----------|
-| `ProbComp.advantage` | `ProbComp Unit` | `|1/2 - Pr[= () \| p]|` |
-| `ProbComp.advantage'` | `ProbComp Bool` | `|Pr[= true \| p] - Pr[= false \| p]|` |
-| `ProbComp.advantage₂` | Two `ProbComp Unit` | `|Pr[= () \| p] - Pr[= () \| q]|` |
-| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `|Pr[= true \| p] - Pr[= true \| q]|` |
+| Function | Input | Type | Measures |
+|----------|-------|------|----------|
+| `ProbComp.advantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
+| `ProbComp.advantage'` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
+| `ProbComp.advantage₂` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
+| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
+
+All return `ℝ` via `.toReal` conversion from `ℝ≥0∞`. This is essential since subtraction on `ℝ≥0∞` is truncated.
 
 ## Hardness Assumptions
 
-### Hard Homogeneous Spaces (HHS)
+### Discrete Log Assumptions (DLog / CDH / DDH)
 
-Requires `[AddCommGroup G] [AddTorsor G P] [SampleableType G] [SampleableType P]`.
+Requires `[Field F] [Fintype F] [DecidableEq F] [SampleableType F]` and
+`[AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]`
+plus a fixed generator `g : G`.
+
+Uses additive / EC-style notation: `a • g` means scalar multiplication (textbook `g^a`).
 
 | Problem | Adversary type | Experiment |
 |---------|---------------|------------|
-| DLog (vectorization) | `P → P → ProbComp G` | `vectorizationExp` |
-| CDH (parallelization) | `P → P → P → ProbComp P` | `parallelizationExp` |
-| DDH (parallel testing) | `P → P → P → P → ProbComp Bool` | `parallelTesting_experiment` |
+| DLog | `DLogAdversary F G` (= `G → G → ProbComp F`) | `dlogExp g adversary` |
+| CDH | `CDHAdversary F G` (= `G → G → G → ProbComp G`) | `cdhExp g adversary` |
+| DDH | `DDHAdversary F G` (= `G → G → G → G → ProbComp Bool`) | `ddhExp g adversary` |
 
-DDH abbreviations: `ddhExp`, `ddhAdvantage` (in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`).
+`CDHAdversary` and `DDHAdversary` carry a phantom `_F` parameter so Lean can infer the scalar field at call sites.
+
+Defined in `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`.
 
 ### Hard Relations
 
 ```lean
-structure GenerableRelation (X W : Type) (r : X → W → Bool) where
+structure GenerableRelation (X W : Type) (r : X → W → Bool)
+    [SampleableType X] [SampleableType W] where
   gen : ProbComp (X × W)
-  gen_sound : ∀ x w, (x, w) ∈ support gen → r x w
-  gen_uniform_right : ∀ x, Pr[= x | Prod.fst <$> gen] = Pr[= x | $ᵗ X]
-  gen_uniform_left : ∀ w, Pr[= w | Prod.snd <$> gen] = Pr[= w | $ᵗ W]
+  gen_sound (x : X) (w : W) : (x, w) ∈ support gen → r x w
+  gen_uniform_right (x : X) : Pr[= x | Prod.fst <$> gen] = Pr[= x | $ᵗ X]
+  gen_uniform_left (w : W) : Pr[= w | Prod.snd <$> gen] = Pr[= w | $ᵗ W]
 ```
 
-Note: the relation is `r : X → W → Bool` (not `Prop`).
+Note: the relation is `r : X → W → Bool` (not `Prop`), and `[SampleableType]` instances are required for both types.
 
 ## Building a Reduction
 
@@ -124,10 +136,9 @@ A reduction proves: if adversary A breaks scheme S, then adversary B breaks assu
 1. **Define the reduction adversary** that takes a challenge from H and embeds it into S:
 
 ```lean
-def myReduction (adversary : ...) : DDHAdversary G P := fun x x₁ x₂ x₃ => do
-  -- embed (x, x₁, x₂, x₃) as scheme parameters
+def myReduction (adversary : ...) : DDHAdversary F G := fun g A B T => do
+  -- embed DDH challenge (g, A = a•g, B = b•g, T) as scheme parameters
   let result ← adversary ...
-  -- convert adversary's output to DDH guess
   return result
 ```
 
@@ -137,7 +148,7 @@ def myReduction (adversary : ...) : DDHAdversary G P := fun x x₁ x₂ x₃ => 
 
 ### Hybrid Argument Pattern
 
-For q-query IND-CPA → DDH (as in `HHS_Elgamal.lean`):
+For q-query IND-CPA → DDH (as in `Examples/ElGamal.lean`):
 
 1. Define `HybridGame adversary k`: first `k` queries use real encryption, rest use random
 2. `HybridGame 0 = IND-CPA random`, `HybridGame q = IND-CPA real`
