@@ -115,6 +115,22 @@ theorem expectedCost_pure (x : α) (cm : CostModel spec ω)
   -- `1 : Multiplicative ω` is definitionally `Multiplicative.ofAdd 0 = 0 : ω`
   exact hval
 
+/-- If `val z.2 ≤ c` for all `z` in the support of `costDist`, then `expectedCost ≤ c`.
+This is the key bridge from worst-case (support) bounds to expected bounds. -/
+theorem expectedCost_le_of_support_bound (oa : OracleComp spec α) (cm : CostModel spec ω)
+    (val : ω → ℝ≥0∞) (c : ℝ≥0∞)
+    (h : ∀ z ∈ support (costDist oa cm), val z.2 ≤ c) :
+    expectedCost oa cm val ≤ c := by
+  rw [expectedCost, wp_eq_tsum]
+  calc ∑' z, Pr[= z | costDist oa cm] * val z.2
+      ≤ ∑' z, Pr[= z | costDist oa cm] * c := by
+        apply ENNReal.tsum_le_tsum fun z => ?_
+        by_cases hz : z ∈ support (costDist oa cm)
+        · exact mul_le_mul_of_nonneg_left (h z hz) (zero_le _)
+        · simp [probOutput_eq_zero_of_not_mem_support hz]
+    _ = c := by
+        rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
+
 end ExpectedCost
 
 /-! ## Cost Bounds -/
@@ -132,6 +148,16 @@ def StrictCostBound [LE ω] (oa : OracleComp spec α) (cm : CostModel spec ω)
 def ExpectedCostBound (oa : OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℝ≥0∞) (bound : ℝ≥0∞) : Prop :=
   expectedCost oa cm val ≤ bound
+
+/-- A strict cost bound implies an expected cost bound, provided the valuation `val`
+is monotone with respect to `≤` on `ω`. -/
+theorem StrictCostBound.toExpectedCostBound [Preorder ω]
+    {oa : OracleComp spec α} {cm : CostModel spec ω} {bound : ω}
+    (hstrict : StrictCostBound oa cm bound)
+    {val : ω → ℝ≥0∞} (hval_mono : Monotone val) :
+    ExpectedCostBound oa cm val (val bound) :=
+  expectedCost_le_of_support_bound oa cm val (val bound)
+    (fun z hz => hval_mono (hstrict z hz))
 
 /-- **Markov's inequality for cost distributions** (multiplication form).
 The probability that the valued cost exceeds `t`, times `t`, is at most `expectedCost`. -/
@@ -199,15 +225,7 @@ theorem StrictPolyTime.toExpPolyTime (family : ℕ → OracleComp spec α)
     (h : StrictPolyTime family cm val) :
     ExpPolyTime family cm (fun w => ↑(val w)) := by
   obtain ⟨p, hp⟩ := h
-  exact ⟨p, fun n => by
-    rw [expectedCost, wp_eq_tsum]
-    calc ∑' z, Pr[= z | costDist (family n) cm] * ↑(val z.2)
-        ≤ ∑' z, Pr[= z | costDist (family n) cm] * ↑(p.eval n) := by
-          apply ENNReal.tsum_le_tsum fun z => ?_
-          by_cases hz : z ∈ support (costDist (family n) cm)
-          · exact mul_le_mul_of_nonneg_left (Nat.cast_le.mpr (hp n z hz)) (zero_le _)
-          · simp [probOutput_eq_zero_of_not_mem_support hz]
-      _ = ↑(p.eval n) := by
-          rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]⟩
+  exact ⟨p, fun n => expectedCost_le_of_support_bound _ _ _ _ fun z hz =>
+    Nat.cast_le.mpr (hp n z hz)⟩
 
 end PolyTime
