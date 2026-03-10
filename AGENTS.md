@@ -20,7 +20,7 @@ VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computati
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
   → {SimSemantics, QueryTracking, Constructions, Coercions, ProbComp}
-  → CryptoFoundations → Examples
+  → {ProgramLogic, CryptoFoundations} → Examples
 ```
 
 New files must respect this DAG. `EvalDist/` must never import from `OracleComp/`.
@@ -45,10 +45,15 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 ## Canonical Examples
 
 - Compact modern crypto proof: `Examples/OneTimePad.lean`
+- ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal.lean`
+- Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr.lean`
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
+- DLog / CDH / DDH assumptions: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
+- Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
+- Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 
 ## Program Logic Tactics
 

@@ -75,15 +75,20 @@ class SubSpec (spec : OracleSpec ι) (superSpec : OracleSpec τ)
 
 When lifting `OracleComp spec α` to `OracleComp superSpec α` (e.g., a sub-computation uses fewer oracles than the enclosing computation).
 
-### Key lemmas (require `[MonadLift (OracleQuery spec) (OracleQuery superSpec)]`)
+### Structural lemmas (require `[MonadLift (OracleQuery spec) (OracleQuery superSpec)]`)
+
+| Lemma | Signature |
+|-------|-----------|
+| `liftComp_pure` | `liftComp (pure x) superSpec = pure x` |
+| `liftComp_bind` | `liftComp (mx >>= my) superSpec = liftComp mx superSpec >>= ...` |
+
+### Probability lemmas (additionally require `[spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]` and `Fintype`/`Inhabited` on both specs)
 
 | Lemma | Signature |
 |-------|-----------|
 | `evalDist_liftComp` | `evalDist (liftComp mx superSpec) = evalDist mx` |
 | `probOutput_liftComp` | `Pr[= x \| liftComp mx superSpec] = Pr[= x \| mx]` |
 | `probEvent_liftComp` | `Pr[p \| liftComp mx superSpec] = Pr[p \| mx]` |
-| `liftComp_pure` | `liftComp (pure x) superSpec = pure x` |
-| `liftComp_bind` | `liftComp (mx >>= my) superSpec = liftComp mx superSpec >>= ...` |
 
 ## QueryImpl and simulateQ
 
@@ -140,7 +145,8 @@ Key lemma: `simulateQ (so' ∘ₛ so) oa = simulateQ so' (simulateQ so oa)`
 `evalDist` is literally `simulateQ` with uniform distributions as the oracle implementation. This is definitional (`rfl`). The implementation is `uniformSampleImpl`:
 
 ```lean
-def uniformSampleImpl : QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
+def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
+    QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
 ```
 
 Key simp lemmas: `evalDist_simulateQ`, `probOutput_simulateQ`, `probEvent_simulateQ` (all with `uniformSampleImpl`).

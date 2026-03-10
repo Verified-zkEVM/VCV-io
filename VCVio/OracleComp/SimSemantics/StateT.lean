@@ -68,4 +68,9 @@ lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (Oracle
       have := congr_arg (· >>= oa) (h t s)
       simpa [ih] using this
 
+omit [LawfulMonad m] in
+lemma liftM_run_StateT {α : Type u} (x : m α) (s : σ) :
+    (liftM x : StateT σ m α).run s = x >>= fun a => pure (a, s) :=
+  StateT.run_lift x s
+
 end OracleComp

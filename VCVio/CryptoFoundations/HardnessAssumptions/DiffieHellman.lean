@@ -3,93 +3,280 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.HardnessAssumptions.HardHomogeneousSpace
+import VCVio.CryptoFoundations.SecExp
+import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.SimSemantics.Append
+import VCVio.EvalDist.Bool
+import VCVio.ProgramLogic.Tactics
 
 /-!
-# Diffie-Hellman Assumptions
+# Discrete Logarithm Assumptions (DLog / CDH / DDH)
 
-This file defines DLog/CDH/DDH *via* the `HardHomogeneousSpace` experiments:
-- DLog = vectorization
-- CDH = parallelization
-- DDH = parallel testing
+Standard hardness assumptions for cryptographic groups, formalized using Mathlib's
+`Module F G` for scalar multiplication.
 
-This enforces the intended modeling choice directly at the definition level.
+## Mathematical setup
 
-For cyclic-group instantiations, we also define an explicit
-`NondegenerateGenerator` condition to rule out degenerate choices of base element.
+We model a cyclic group as:
+- `F` : the scalar field (exponents), e.g. `ZMod p` for a prime-order group
+- `G` : the group of elements (e.g. elliptic curve points), with `[AddCommGroup G]`
+- `Module F G` : scalar multiplication `a • g` (corresponds to `g^a` in multiplicative notation)
+- `g : G` : a fixed generator (public system parameter)
+
+## Notation correspondence
+
+| Textbook (multiplicative) | This file (additive / EC-style) |
+|---|---|
+| `g^a`                     | `a • g`                         |
+| `g^a · g^b = g^{a+b}`    | `a • g + b • g = (a + b) • g`  |
+| `(g^a)^b = g^{ab}`       | `b • (a • g) = (b * a) • g`    |
+
+## Assumptions
+
+- **DLog**: given `(g, x • g)`, find `x`
+- **CDH**: given `(g, a • g, b • g)`, find `(a * b) • g`
+- **DDH**: distinguish `(g, a • g, b • g, (a * b) • g)` from `(g, a • g, b • g, c • g)`
 -/
 
-open OracleComp OracleSpec ENNReal
+set_option autoImplicit false
+
+open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic
 
 namespace DiffieHellman
 
-section HardHomogeneousModel
+variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
+variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
 
-variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
-  [SampleableType V] [SampleableType P]
+/-! ## DLog (Discrete Logarithm) -/
 
-/-- DLog adversary, modeled as vectorization on a hard homogeneous space. -/
-abbrev DLogAdversary (V P : Type) := vectorizationAdversary V P
+/-- A DLog adversary receives a generator and a group element, and tries to find the
+discrete logarithm (scalar). -/
+def DLogAdversary (F G : Type) := G → G → ProbComp F
 
-/-- DLog experiment, defined as `HardHomogeneousSpace.vectorizationExp`. -/
-abbrev dlogExp [DecidableEq V] (adversary : DLogAdversary V P) : ProbComp Bool :=
-  vectorizationExp (G := V) (P := P) adversary
+/-- DLog experiment: sample a random scalar `x`, give the adversary `(g, x • g)`,
+and check whether the adversary's guess equals `x`. -/
+def dlogExp (g : G) (adversary : DLogAdversary F G) : ProbComp Bool := do
+  let x ← $ᵗ F
+  let x' ← adversary g (x • g)
+  return decide (x' = x)
 
-/-- CDH adversary, modeled as parallelization on a hard homogeneous space. -/
-abbrev CDHAdversary (V P : Type) := parallelizationAdversary V P
+/-! ## CDH (Computational Diffie-Hellman) -/
 
-/-- CDH experiment, defined as `HardHomogeneousSpace.parallelizationExp`. -/
-abbrev cdhExp [DecidableEq P] (adversary : CDHAdversary V P) : ProbComp Bool :=
-  parallelizationExp (G := V) (P := P) adversary
+/-- A CDH adversary receives `(g, a • g, b • g)` and tries to compute `(a * b) • g`.
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `cdhExp`. -/
+def CDHAdversary (_F G : Type) := G → G → G → ProbComp G
 
-/-- DDH adversary, modeled as parallel testing on a hard homogeneous space. -/
-abbrev DDHAdversary (V P : Type) := parallelTestingAdversary V P
+/-- CDH experiment: sample random scalars `a, b`, give the adversary `(g, a • g, b • g)`,
+and check whether the adversary's output equals `(a * b) • g`. -/
+def cdhExp (g : G) (adversary : CDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  let h ← adversary g (a • g) (b • g)
+  return decide (h = (a * b) • g)
 
-/-- DDH experiment, defined as `HardHomogeneousSpace.parallelTesting_experiment`. -/
-abbrev ddhExp (adversary : DDHAdversary V P) : ProbComp Bool :=
-  parallelTesting_experiment (G := V) (P := P) adversary
+/-! ## DDH (Decisional Diffie-Hellman) -/
 
-/-- DDH advantage from the hard-homogeneous-space parallel-testing experiment. -/
-noncomputable abbrev ddhAdvantage
-    (adversary : DDHAdversary V P) : ℝ≥0∞ :=
-  parallelTestingAdvantage (G := V) (P := P) adversary
+/-- A DDH adversary receives `(g, A, B, T)` and guesses whether `T = (a * b) • g`
+(real) or `T` is a random group element (random).
+`_F` is a phantom type parameter for the scalar field, enabling Lean to infer `F`
+at call sites of `ddhExp` and related definitions. -/
+def DDHAdversary (_F G : Type) := G → G → G → G → ProbComp Bool
 
-end HardHomogeneousModel
+/-- DDH experiment: sample random scalars `a, b` and a bit. If the bit is `true`, set
+`c = a * b` (the real DH scalar); otherwise sample `c ← $ᵗ F` independently. The adversary
+receives `(g, a • g, b • g, c • g)` and wins by guessing the bit.
 
-section NondegenerateBase
+All sampling is from the scalar field `F`, so the experiment is well-defined for any
+`Module F G` without requiring that `g` generates all of `G`. -/
+def ddhExp (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  let bit ← $ᵗ Bool
+  let c ← if bit then pure (a * b) else $ᵗ F
+  let b' ← adversary g (a • g) (b • g) (c • g)
+  return (bit == b')
 
-variable {V P : Type} [AddCommGroup V] [AddTorsor V P]
+/-- DDH advantage: absolute distance from random guessing (1/2).
+Uses `ℝ` with absolute value rather than `ℝ≥0∞` subtraction, which would silently
+saturate at zero for adversaries that guess the wrong bit more often than not. -/
+noncomputable def ddhAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExp g adversary]).toReal - 1 / 2|
 
-/-- A base point is nondegenerate when translating vectors from it is bijective. -/
-def NondegenerateBase (base : P) : Prop :=
-  Function.Bijective fun v : V => v +ᵥ base
+/-! ## DDH: Two-game formulation -/
 
-/-- In any additive torsor, every base point is nondegenerate. -/
-lemma nondegenerateBase (base : P) : NondegenerateBase (V := V) base := by
-  constructor
-  · intro v₁ v₂ h
-    simpa using congrArg (fun p => p -ᵥ base) h
-  · intro p
-    refine ⟨p -ᵥ base, ?_⟩
-    simp
+/-- DDH real game: the adversary receives a genuine DH triple `(g, a • g, b • g, (a * b) • g)`. -/
+def ddhExpReal (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F
+  adversary g (a • g) (b • g) ((a * b) • g)
 
-end NondegenerateBase
+/-- DDH random game: the adversary receives `(g, a • g, b • g, c • g)` with independent
+`c ← $ᵗ F`. -/
+def ddhExpRand (g : G) (adversary : DDHAdversary F G) : ProbComp Bool := do
+  let a ← $ᵗ F; let b ← $ᵗ F; let c ← $ᵗ F
+  adversary g (a • g) (b • g) (c • g)
+
+/-- Two-game DDH advantage: `|Pr[output 1 | real] - Pr[output 1 | random]|`. -/
+noncomputable def ddhDistAdvantage (g : G) (adversary : DDHAdversary F G) : ℝ :=
+  |(Pr[= true | ddhExpReal g adversary]).toReal -
+    (Pr[= true | ddhExpRand g adversary]).toReal|
+
+/-- Generic identity: for any two `ProbComp Bool` computations, the "guess the
+uniform bit" game decomposes as:
+  `Pr[correct guess] - 1/2 = (Pr[output 1 | real] - Pr[output 1 | rand]) / 2`. -/
+lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) :
+    (Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)]).toReal - 1 / 2 =
+    ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
+  have hgameRepr :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if b then real else rand
+        pure (b == z)] =
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
+    refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+    intro b
+    cases b
+    · have hbeqFalse : (BEq.beq false : Bool → Bool) = Bool.not := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqFalse]
+    · have hbeqTrue : (BEq.beq true : Bool → Bool) = id := by
+        funext t
+        cases t <;> rfl
+      simp [hbeqTrue]
+  have hmix :
+      Pr[= true | do
+        let b ← ($ᵗ Bool : ProbComp Bool)
+        if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
+      (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
+    probOutput_bind_uniformBool
+      (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
+      (x := true)
+  have hformula : Pr[= true | do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)] =
+    (Pr[= true | real] + Pr[= false | rand]) / 2 := by
+    rw [hgameRepr, hmix,
+      show (BEq.beq true : Bool → Bool) = id from by ext b; cases b <;> rfl, id_map,
+      show (BEq.beq false : Bool → Bool) = (! ·) from by ext b; cases b <;> rfl,
+      probOutput_not_map]
+  have hfalseAsSub : Pr[= false | rand] = 1 - Pr[= true | rand] := by
+    have hsum : Pr[= true | rand] + Pr[= false | rand] = 1 := by
+      have := HasEvalPMF.sum_probOutput_eq_one (m := ProbComp) (mx := rand)
+      simp
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  rw [hformula, ENNReal.toReal_div,
+    ENNReal.toReal_add probOutput_ne_top probOutput_ne_top,
+    hfalseAsSub, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  simp [ENNReal.toReal_ofNat]
+  ring
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
+/-- The single-game DDH experiment can be decomposed as a uniform-bit branch over
+the real and random DDH games. -/
+private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G) :
+    Pr[= true | ddhExp g adversary] =
+    Pr[= true | do
+      let bit ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if bit then ddhExpReal g adversary
+               else ddhExpRand g adversary
+      pure (bit == z)] := by
+  unfold ddhExp
+  simp only [← probEvent_eq_eq_probOutput]
+  rw [probEvent_bind_congr fun a _ => probEvent_bind_bind_swap _ _ _ _,
+      probEvent_bind_bind_swap]
+  simp only [probEvent_eq_eq_probOutput]
+  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+  intro bit; cases bit <;> simp [ddhExpReal, ddhExpRand]
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
+/-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/
+lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
+    (Pr[= true | ddhExp g adversary]).toReal - 1 / 2 =
+    ((Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal) / 2 := by
+  rw [show (Pr[= true | ddhExp g adversary]).toReal =
+      (Pr[= true | do
+        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if bit then ddhExpReal g adversary
+                 else ddhExpRand g adversary
+        pure (bit == z)]).toReal from by
+    congr 1; exact ddhExp_probOutput_eq_branch (F := F) g adversary]
+  exact probOutput_uniformBool_branch_toReal_sub_half
+    (ddhExpReal g adversary)
+    (ddhExpRand g adversary)
+
+omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
+/-- The two DDH advantage formulations are related by a factor of 2:
+`ddhDistAdvantage = 2 * ddhAdvantage`. -/
+theorem ddhDistAdvantage_eq_two_mul_ddhAdvantage (g : G) (adversary : DDHAdversary F G) :
+    ddhDistAdvantage g adversary = 2 * ddhAdvantage g adversary := by
+  unfold ddhDistAdvantage ddhAdvantage
+  have h := ddhExp_probOutput_sub_half (F := F) g adversary
+  have h2 : (Pr[= true | ddhExpReal g adversary]).toReal -
+      (Pr[= true | ddhExpRand g adversary]).toReal =
+      2 * ((Pr[= true | ddhExp g adversary]).toReal - 1 / 2) := by linarith
+  rw [h2, abs_mul, abs_of_nonneg (by positivity)]
+
+/-! ## Generable relation for discrete log -/
+
+section DLogGenerable
+
+variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
+variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
+variable (g : G)
+
+lemma probOutput_map_bijective_uniform_cross
+    {α β : Type} [SampleableType α] [SampleableType β] [Fintype α] [Fintype β]
+    (f : α → β) (hf : Function.Bijective f) (y : β) :
+    Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by
+  obtain ⟨x, rfl⟩ := hf.surjective y
+  rw [probOutput_map_injective ($ᵗ α) hf.injective x,
+      probOutput_uniformSample, probOutput_uniformSample,
+      Fintype.card_of_bijective hf]
+
+/-- The discrete log relation is generable when `· • g` is bijective:
+sample `sk ← $ᵗ F` and return `(sk • g, sk)`. -/
+def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
+    GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
+  gen := do let sk ← $ᵗ F; return (sk • g, sk)
+  gen_sound := fun pk sk hmem => by
+    rw [decide_eq_true_eq]
+    simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
+               Prod.mk.injEq] at hmem
+    obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
+  gen_uniform_right := fun pk => by
+    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]
+    exact probOutput_map_bijective_uniform_cross (· • g) hg pk
+  gen_uniform_left := fun sk => by
+    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind, bind_pure]
+
+end DLogGenerable
+
+/-! ## Cyclic group instantiation helpers -/
 
 section CyclicInstantiation
 
-variable {G : Type} [CommGroup G] [Fintype G]
+variable {G : Type} [AddCommGroup G] [Fintype G]
 
-/-- In a cyclic-group style instantiation, this rules out degenerate base choices. -/
+/-- A generator `g` is nondegenerate if `fun a => a.val • g` surjects onto `G`,
+ruling out the trivial case. Uses additive notation consistent with `Module F G`. -/
 def NondegenerateGenerator (g : G) : Prop :=
-  Function.Surjective fun a : Fin (Fintype.card G) => g ^ a.1
+  Function.Surjective fun a : Fin (Fintype.card G) => a.val • g
 
-lemma NondegenerateGenerator.ne_one [Nontrivial G] {g : G}
-    (hg : NondegenerateGenerator (G := G) g) : g ≠ 1 := by
-  intro hg1
-  rcases exists_ne (1 : G) with ⟨x, hx⟩
+lemma NondegenerateGenerator.ne_zero [Nontrivial G] {g : G}
+    (hg : NondegenerateGenerator (G := G) g) : g ≠ 0 := by
+  intro hg0
+  rcases exists_ne (0 : G) with ⟨x, hx⟩
   rcases hg x with ⟨a, ha⟩
-  have h1x : (1 : G) = x := by simpa [hg1] using ha
-  exact hx h1x.symm
+  have h0x : (0 : G) = x := by simpa [hg0] using ha
+  exact hx h0x.symm
 
 end CyclicInstantiation
 
