@@ -9,10 +9,16 @@ import Mathlib.Probability.CDF
 /-!
 # Negligible Functions
 
-This file defines a simple wrapper around `SuperpolynomialDecay` for function from `ℕ → ℝ≥0∞`,
+This file defines a simple wrapper around `SuperpolynomialDecay` for functions `ℕ → ℝ≥0∞`,
 as this is usually the situation for cryptographic reductions.
 
-Adding a general API might be useful, but usually unfolding to `SuperpolynomialDecay` is fine.
+## Main Results
+
+- `negligible_zero`, `negligible_of_zero`: The zero function is negligible.
+- `negligible_of_le`: Monotonicity — bounded by negligible is negligible.
+- `negligible_add`: Sum of negligible functions is negligible.
+- `negligible_sum`: Finite sum of negligible functions is negligible.
+- `negligible_const_mul`: Constant multiple of negligible is negligible.
 -/
 
 open ENNReal Asymptotics Filter
@@ -28,3 +34,38 @@ lemma negligible_zero : negligible 0 := superpolynomialDecay_zero _ _
 
 lemma negligible_of_zero {f : ℕ → ℝ≥0∞} (hf : ∀ n, f n = 0) : negligible f :=
   have : f = 0 := funext hf; this ▸ negligible_zero
+
+/-- Negligibility is monotone: if `f ≤ g` pointwise and `g` is negligible, then `f` is. -/
+theorem negligible_of_le {f g : ℕ → ℝ≥0∞} (hfg : ∀ n, f n ≤ g n) (hg : negligible g) :
+    negligible f := by
+  intro p
+  apply tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds (hg p)
+  · intro n; exact zero_le _
+  · intro n; exact mul_le_mul_of_nonneg_left (hfg n) (zero_le _)
+
+/-- Sum of two negligible functions is negligible. -/
+theorem negligible_add {f g : ℕ → ℝ≥0∞} (hf : negligible f) (hg : negligible g) :
+    negligible (f + g) :=
+  hf.add hg
+
+/-- Constant multiple of a negligible function is negligible (requires `c ≠ ⊤`
+because multiplication by `⊤` is discontinuous at `0` in `ℝ≥0∞`). -/
+theorem negligible_const_mul {f : ℕ → ℝ≥0∞} (hf : negligible f)
+    {c : ℝ≥0∞} (hc : c ≠ ⊤) :
+    negligible (fun n => c * f n) := by
+  intro p
+  have h := ENNReal.Tendsto.const_mul (hf p) (.inr hc)
+  simp only [mul_zero] at h
+  exact h.congr (fun n => by rw [mul_left_comm])
+
+/-- A finite sum of negligible functions is negligible. -/
+theorem negligible_sum {ι : Type*} [DecidableEq ι] {s : Finset ι} {f : ι → ℕ → ℝ≥0∞}
+    (h : ∀ i ∈ s, negligible (f i)) :
+    negligible (fun n => ∑ i ∈ s, f i n) := by
+  induction s using Finset.induction with
+  | empty => exact negligible_of_zero (fun _ => by simp)
+  | insert _ _ hnotin ih =>
+    simp_rw [Finset.sum_insert hnotin]
+    exact negligible_add
+      (h _ (Finset.mem_insert_self _ _))
+      (ih fun i hi => h i (Finset.mem_insert_of_mem hi))

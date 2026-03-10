@@ -26,8 +26,9 @@ has negligible advantage.
 ## Main Results
 
 - `AsymSecExp.secure_of_pointwise_bound`: Pointwise ≤ negligible ⟹ secure.
-- `negligible_of_le`: Monotonicity of negligibility.
 - `AsymSecGame.secureAgainst_of_reduction`: Basic security reduction (tight).
+- `AsymSecGame.secureAgainst_of_close`: Game-hopping step — transfer security from a
+  "close" game, absorbing negligible advantage difference.
 -/
 
 open OracleComp OracleSpec ENNReal Filter
@@ -62,16 +63,6 @@ theorem secure_of_pointwise_bound [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)
   · intro n; exact mul_le_mul_of_nonneg_left (hbound n) (zero_le _)
 
 end AsymSecExp
-
-/-! ## Negligibility helpers -/
-
-/-- Negligibility is monotone: if `f ≤ g` pointwise and `g` is negligible, then `f` is. -/
-theorem negligible_of_le {f g : ℕ → ℝ≥0∞} (hfg : ∀ n, f n ≤ g n) (hg : negligible g) :
-    negligible f := by
-  intro p
-  apply tendsto_of_tendsto_of_tendsto_of_le_of_le tendsto_const_nhds (hg p)
-  · intro n; exact zero_le _
-  · intro n; exact mul_le_mul_of_nonneg_left (hfg n) (zero_le _)
 
 /-! ## Asymptotic Security Games
 
@@ -109,7 +100,7 @@ def toAsymSecExp (g : AsymSecGame Adv m) (A : Adv) : AsymSecExp m where
 theorem advantage_eq_toAsymSecExp_advantage (g : AsymSecGame Adv m) (A : Adv) :
     g.advantage A = (g.toAsymSecExp A).advantage := rfl
 
-/-- Basic security reduction (tight): if there is a map `reduce : Adv → Adv'` that
+/-- Basic security reduction: if there is a map `reduce : Adv → Adv'` that
 preserves efficiency and the advantage of `g` is pointwise ≤ the advantage of `g'`
 on the reduced adversary, then security of `g'` implies security of `g`. -/
 theorem secureAgainst_of_reduction {Adv' : Type*} {m' : ℕ → Type → Type*}
@@ -122,5 +113,38 @@ theorem secureAgainst_of_reduction {Adv' : Type*} {m' : ℕ → Type → Type*}
     (hsecure : g'.secureAgainst isPPT') :
     g.secureAgainst isPPT := fun A hA =>
   negligible_of_le (hbound A) (hsecure (reduce A) (hreduce A hA))
+
+/-! ### Game hopping -/
+
+/-- **Game-hopping step**: if the advantage of `g₁` at every security parameter is at most the
+advantage of `g₂` plus some negligible `ε`, and `g₂` is secure, then `g₁` is secure.
+
+This is the fundamental lemma for game-hopping proofs: each "hop" from `g₁` to `g₂`
+introduces at most `ε(n)` advantage loss, and `ε` is absorbed because negligible functions
+are closed under addition. -/
+theorem secureAgainst_of_close
+    {g₁ g₂ : AsymSecGame Adv m} {isPPT : Adv → Prop}
+    {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
+    (hclose : ∀ A, isPPT A → ∀ n, g₁.advantage A n ≤ g₂.advantage A n + ε n)
+    (hsecure : g₂.secureAgainst isPPT) :
+    g₁.secureAgainst isPPT := fun A hA =>
+  negligible_of_le (hclose A hA) (negligible_add (hsecure A hA) hε)
+
+/-- Game-hopping step with a reduction: if the advantage of `g₁` with adversary `A` is at most
+the advantage of `g₂` with reduced adversary plus `ε`, then security of `g₂` (against the
+target class) implies security of `g₁`. Combines reduction and game hop. -/
+theorem secureAgainst_of_close_reduction {Adv' : Type*} {m' : ℕ → Type → Type*}
+    [∀ n, Monad (m' n)] [∀ n, HasEvalSPMF (m' n)]
+    {g₁ : AsymSecGame Adv m} {g₂ : AsymSecGame Adv' m'}
+    {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
+    {reduce : Adv → Adv'}
+    {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
+    (hreduce : ∀ A, isPPT A → isPPT' (reduce A))
+    (hclose : ∀ A, isPPT A → ∀ n,
+      g₁.advantage A n ≤ g₂.advantage (reduce A) n + ε n)
+    (hsecure : g₂.secureAgainst isPPT') :
+    g₁.secureAgainst isPPT := fun A hA =>
+  negligible_of_le (hclose A hA)
+    (negligible_add (hsecure (reduce A) (hreduce A hA)) hε)
 
 end AsymSecGame
