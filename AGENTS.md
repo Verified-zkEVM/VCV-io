@@ -77,7 +77,8 @@ For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
   (`wp_step` / `qvcgen_step` also understand bounded iteration via `replicate`, `List.mapM`,
   and `List.foldlM`)
 - **Expectation normalization**: `exp_norm`
-- **Rewriting / congruence**: `prob_swap` (handles 0–2 tsum layers), `prob_swap_rw`,
+- **Rewriting / congruence**: `prob_swap` (handles 0–2 tsum layers), `prob_swap_rw`
+  / `prob_swap_rw under n`,
   `prob_congr` (auto-intros `x` and `hx`), `prob_congr'` (auto-intros `x`).
   Also dispatched by `qvcgen_step` on `Pr[...] = Pr[...]` goals.
 

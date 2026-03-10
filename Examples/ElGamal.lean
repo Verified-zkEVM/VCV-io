@@ -714,41 +714,8 @@ private lemma stepDDH_rand_simulation_deferred
                 (r • gen) y (Sum.inl tu) =
               IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
                 (Sum.inl tu) from fun _ _ => rfl]
-          have hswapY : ∀ r : F,
-              Pr[= z | do
-                let y ← ($ᵗ G : ProbComp G)
-                let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                  (Sum.inl tu)).run st
-                (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                  (r • gen) y) (oa p.1)).run p.2] =
-              Pr[= z | do
-                let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                  (Sum.inl tu)).run st
-                let y ← ($ᵗ G : ProbComp G)
-                (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                  (r • gen) y) (oa p.1)).run p.2] := by
-            intro r
-            prob_swap
-          have hswapRY :
-              Pr[= z | do
-                let r ← ($ᵗ F : ProbComp F)
-                let y ← ($ᵗ G : ProbComp G)
-                let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                  (Sum.inl tu)).run st
-                (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                  (r • gen) y) (oa p.1)).run p.2] =
-              Pr[= z | do
-                let r ← ($ᵗ F : ProbComp F)
-                let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                  (Sum.inl tu)).run st
-                let y ← ($ᵗ G : ProbComp G)
-                (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                  (r • gen) y) (oa p.1)).run p.2] := by
-            prob_congr'; rename_i r
-            exact hswapY r
-          rw [hswapRY]
-          prob_swap_rw
-          prob_congr; rename_i p hp
+          qvcgen_step
+          rename_i p hp
           have hst : p.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
               QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
@@ -778,41 +745,8 @@ private lemma stepDDH_rand_simulation_deferred
               · simp only [if_pos hlt]
               · simp only [StateT.run_pure]
             simp_rw [hq]
-            have hswapY : ∀ r : F,
-                Pr[= z | do
-                  let y ← ($ᵗ G : ProbComp G)
-                  let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                    (Sum.inr (m₁, m₂))).run st
-                  (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                    (r • gen) y) (oa p.1)).run p.2] =
-                Pr[= z | do
-                  let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                    (Sum.inr (m₁, m₂))).run st
-                  let y ← ($ᵗ G : ProbComp G)
-                  (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                    (r • gen) y) (oa p.1)).run p.2] := by
-              intro r
-              prob_swap
-            have hswapRY :
-                Pr[= z | do
-                  let r ← ($ᵗ F : ProbComp F)
-                  let y ← ($ᵗ G : ProbComp G)
-                  let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                    (Sum.inr (m₁, m₂))).run st
-                  (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                    (r • gen) y) (oa p.1)).run p.2] =
-                Pr[= z | do
-                  let r ← ($ᵗ F : ProbComp F)
-                  let p ← (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
-                    (Sum.inr (m₁, m₂))).run st
-                  let y ← ($ᵗ G : ProbComp G)
-                  (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
-                    (r • gen) y) (oa p.1)).run p.2] := by
-              prob_congr'; rename_i r
-              exact hswapY r
-            rw [hswapRY]
-            prob_swap_rw
-            prob_congr; rename_i p hp
+            qvcgen_step
+            rename_i p hp
             have hle' : p.2.2 ≤ k := by
               change p ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
                 (gen := gen) pk b k (m₁, m₂)).run st) at hp

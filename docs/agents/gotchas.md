@@ -52,7 +52,8 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 ### 10. `prob_swap` closes goals, doesn't rewrite
 
-If you need to swap and then continue proving, use `prob_swap_rw` or the manual pattern:
+If you need to swap and then continue proving, use `prob_swap_rw` for a top-level swap,
+or `prob_swap_rw under 1` to swap under one shared bind prefix. The manual pattern is:
 ```lean
 simp only [← probEvent_eq_eq_probOutput ...]
 rw [probEvent_bind_bind_swap]

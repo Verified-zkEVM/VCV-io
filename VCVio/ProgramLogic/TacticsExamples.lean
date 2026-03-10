@@ -683,6 +683,14 @@ example {α β γ : Type} {mx : OracleComp spec α} {my : OracleComp spec β}
     Pr[= y | my >>= fun b => mx >>= fun a => f a b] := by
   prob_swap_rw
 
+/-- `prob_swap_rw under 1` rewrites a swap below one shared prefix. -/
+example {α β γ δ : Type}
+    {mx : OracleComp spec α} {my : OracleComp spec β} {mz : OracleComp spec γ}
+    {f : α → β → γ → OracleComp spec δ} {y : δ} :
+    Pr[= y | mx >>= fun a => my >>= fun b => mz >>= fun c => f a b c] =
+    Pr[= y | mx >>= fun a => mz >>= fun c => my >>= fun b => f a b c] := by
+  prob_swap_rw under 1
+
 end ProbSwapRw
 
 /-! ## Quantitative VCGen examples -/
@@ -849,6 +857,14 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
     Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
   qvcgen_step
   exact h _ ‹_›
+
+/-- `qvcgen_step` can combine an under-prefix swap with a top-level swap. -/
+example {α β γ δ : Type}
+    {mx : OracleComp spec α} {my : OracleComp spec β} {mz : OracleComp spec γ}
+    {f : α → β → γ → OracleComp spec δ} {y : δ} :
+    Pr[= y | mx >>= fun a => my >>= fun b => mz >>= fun c => f a b c] =
+    Pr[= y | mz >>= fun c => mx >>= fun a => my >>= fun b => f a b c] := by
+  qvcgen_step
 
 /-- `qvcgen` closes a simple bind-swap equality. -/
 example {mx : OracleComp spec α} {my : OracleComp spec β}

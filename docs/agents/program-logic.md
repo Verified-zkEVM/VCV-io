@@ -76,7 +76,8 @@ classes of probability goals:
 2. **`Pr[...] = Pr[...]` equality** → dispatches swap/congr:
    - Bind swap via `probEvent_bind_bind_swap` (handles 0–2 layers of tsum nesting)
    - Bind congruence via `probOutput_bind_congr` / `probEvent_bind_congr` with auto-intro
-   - Swap-then-congr composition for non-adjacent reorderings
+   - One-sided under-prefix rewrites via `prob_swap_rw under 1`
+   - Small bounded compositions such as congr-then-swap and under-prefix-swap-then-congr
 
 3. **General `Pr[...]`** → fallback rewrite to raw `wp` form
 
@@ -107,7 +108,8 @@ These are also dispatched automatically by `qvcgen_step` on `Pr[...] = Pr[...]` 
 |--------|--------------|
 | `prob_swap` | Swaps two independent sampling operations in a `Pr[...]` goal (handles 0–2 tsum layers) |
 | `prob_swap_at n` | Applies `prob_swap` up to `n` times |
-| `prob_swap_rw` | Rewrites one bind-swap without closing the goal |
+| `prob_swap_rw` | Rewrites one top-level bind-swap without closing the goal |
+| `prob_swap_rw under n` | Rewrites one bind-swap under `n` shared bind prefixes on one side of the equality |
 | `prob_congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to pointwise equality with auto-intro of `x` and `hx : x ∈ support mx` |
 | `prob_congr'` | Same but without support restriction, auto-intros `x` only |
 
@@ -132,7 +134,7 @@ These are also dispatched automatically by `qvcgen_step` on `Pr[...] = Pr[...]` 
 
 ### What it does NOT handle
 
-- **Rewriting a subexpression**: use `prob_swap_rw` or `rw [probEvent_bind_bind_swap]` directly
+- **Rewriting a subexpression**: use `prob_swap_rw` for the top-level swap, or `prob_swap_rw under n` for deeper swaps
 - **Deeply nested swaps** (2+ layers deep): manually peel outer layers first, then use `prob_swap` for the inner swap
 - **`rw`-style usage**: `prob_swap` closes goals; if you need to continue, use the manual pattern
 

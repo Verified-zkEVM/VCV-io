@@ -58,7 +58,7 @@ For new proofs, import this file and treat the tactics below as the primary proo
 
 ### Bind reordering and congruence
 - `prob_swap`: Swap two independent sampling operations in a `Pr[...]` goal (closes goal)
-- `prob_swap_rw`: Rewrite variant of `prob_swap` for use inside larger proofs
+- `prob_swap_rw`: Rewrite one top-level swap; use `prob_swap_rw under n` for deeper swaps
 - `prob_congr`: Pointwise congruence under a shared outer bind
 -/
 
@@ -296,7 +296,7 @@ private def throwQVCGenStepError : TacticM Unit := withMainContext do
           throwError
             "qvcgen_step: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
             Goal:{indentExpr target}\n\
-            Try `prob_swap`, `prob_congr`, or manual rewriting with `probEvent_bind_bind_swap`."
+            Try `prob_swap`, `prob_congr`, `prob_swap_rw under 1`, or manual rewriting with `probEvent_bind_bind_swap`."
         else
           throwError
             "qvcgen_step: found a probability goal but could not lower it to a `Triple` or `wp` goal.\n\
@@ -706,8 +706,16 @@ private def tryProbCongr : TacticM Bool := do
     return true
   return false
 
-/-- Try to rewrite one bind-swap without closing the goal. -/
-private def tryProbSwapRw : TacticM Bool := do
+/-- Build a theorem that swaps adjacent binds under `depth` shared prefixes. -/
+private partial def mkProbSwapUnderProof (depth : Nat) : TacticM (TSyntax `term) := do
+  match depth with
+  | 0 => `(term| probEvent_bind_bind_swap _ _ _ _)
+  | depth + 1 =>
+      let inner ← mkProbSwapUnderProof depth
+      `(term| probEvent_bind_congr fun _ _ => $inner)
+
+/-- Try to rewrite one top-level bind-swap without closing the goal. -/
+private def tryProbSwapRwDirect : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| (
     first
       | (simp only [← probEvent_eq_eq_probOutput]
@@ -715,16 +723,45 @@ private def tryProbSwapRw : TacticM Bool := do
          try simp only [probEvent_eq_eq_probOutput])
       | rw [probEvent_bind_bind_swap])))
 
-/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr. -/
+/-- Try to rewrite one bind-swap under `depth` shared prefixes on either side. -/
+private def tryProbSwapRwUnder (depth : Nat) : TacticM Bool := do
+  let proof ← mkProbSwapUnderProof depth
+  tryEvalTacticSyntax (← `(tactic| (
+    first
+      | (simp only [← probEvent_eq_eq_probOutput]
+         first
+           | (conv_lhs => rw [show _ from $proof])
+           | (conv_rhs => rw [show _ from $proof])
+         try simp only [probEvent_eq_eq_probOutput])
+      | first
+          | (conv_lhs => rw [show _ from $proof])
+          | (conv_rhs => rw [show _ from $proof]))))
+
+/-- Try to rewrite one bind-swap without closing the goal. -/
+private def tryProbSwapRw : TacticM Bool := do
+  tryProbSwapRwDirect
+
+/-- Try a small backtracking-free sequence of probability rewrites. -/
+private def tryProbEqSequence (steps : List (TacticM Bool)) : TacticM Bool := do
+  let saved ← saveState
+  for step in steps do
+    if (← getGoals).isEmpty then
+      return true
+    if !(← step) then
+      saved.restore
+      return false
+  return true
+
+/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
+Also tries small bounded rewrite sequences such as congr-then-swap and
+one-sided under-prefix rewrites. -/
 private def tryProbEqGoal : TacticM Bool := do
   if ← tryProbSwap then return true
   if ← tryProbCongr then return true
-  if ← (do
-    let saved ← saveState
-    if ← tryProbSwapRw then
-      if ← tryProbCongr then return true
-      saved.restore
-    return false) then return true
+  if ← tryProbEqSequence [tryProbSwapRw, tryProbCongr] then return true
+  if ← tryProbEqSequence [tryProbCongr, tryProbSwap] then return true
+  if ← tryProbEqSequence [tryProbSwapRwUnder 1, tryProbSwapRw, tryProbCongr] then
+    return true
   return false
 
 /-- Try to lower a probability goal into a `Triple`, `wp`, or probability-equality goal.
@@ -1317,7 +1354,9 @@ Unlike `prob_swap` which proves an equality goal, `prob_swap_rw` performs a rewr
 and leaves the modified goal for further work. Useful when the swap is one step in a
 larger proof.
 
-Handles both `probOutput` (`Pr[= x | ...]`) and `probEvent` (`Pr[p | ...]`) goals. -/
+Handles both `probOutput` (`Pr[= x | ...]`) and `probEvent` (`Pr[p | ...]`) goals.
+This is the top-level one-step rewrite. Use `prob_swap_rw under n` to rewrite a swap
+under `n` shared bind prefixes on one side of the equality. -/
 macro "prob_swap_rw" : tactic =>
   `(tactic| (
     first
@@ -1325,6 +1364,29 @@ macro "prob_swap_rw" : tactic =>
          rw [probEvent_bind_bind_swap]
          try simp only [probEvent_eq_eq_probOutput])
       | rw [probEvent_bind_bind_swap]))
+
+/-- `prob_swap_rw under n` rewrites one swap under `n` shared bind prefixes on one side
+of the goal. This is useful when you want to keep outer binds fixed while reordering a
+deeper pair of independent draws. -/
+syntax "prob_swap_rw" " under " num : tactic
+
+elab_rules : tactic
+  | `(tactic| prob_swap_rw under $n:num) => do
+      let depth := n.getNat
+      if depth = 0 then
+        evalTactic (← `(tactic| prob_swap_rw))
+      else
+        let proof ← mkProbSwapUnderProof depth
+        evalTactic (← `(tactic| (
+          first
+            | (simp only [← probEvent_eq_eq_probOutput]
+               first
+                 | (conv_lhs => rw [show _ from $proof])
+                 | (conv_rhs => rw [show _ from $proof])
+               try simp only [probEvent_eq_eq_probOutput])
+            | first
+                | (conv_lhs => rw [show _ from $proof])
+                | (conv_rhs => rw [show _ from $proof]))))
 
 /-! ## Bind congruence tactics -/
 
