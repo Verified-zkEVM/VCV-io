@@ -67,7 +67,7 @@ Following `elgamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
     let y ← $ᵗ F
     return (y • g, hash pk.1 (y • pk.2) + msg)
   decrypt sk c :=
-    some (c.2 - hash sk.1 (sk.2 • c.1))
+    return (some (c.2 - hash sk.1 (sk.2 • c.1)))
   __ := ExecutionMethod.default
 
 namespace hashedElGamal

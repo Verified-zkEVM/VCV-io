@@ -74,7 +74,7 @@ Decryption recovers `msg` as `c₂ - sk • c₁`. -/
     let r ← $ᵗ F
     return (r • gen, msg + r • pk)
   decrypt := fun sk (c₁, c₂) =>
-    some (c₂ - sk • c₁)
+    return (some (c₂ - sk • c₁))
   __ := ExecutionMethod.default
 
 namespace elgamalAsymmEnc

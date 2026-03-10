@@ -51,7 +51,7 @@ variable [Inhabited M] [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGr
     let r ← $ᵗ Rand
     return (tdp.forward pk r, hash r + msg)
   decrypt sk c :=
-    some (c.2 - hash (tdp.inverse sk c.1))
+    return (some (c.2 - hash (tdp.inverse sk c.1)))
   __ := ExecutionMethod.default
 
 namespace br93AsymmEnc

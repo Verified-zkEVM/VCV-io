@@ -5,6 +5,10 @@ import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
+import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
+import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
+import VCVio.CryptoFoundations.FujisakiOkamoto.UTransform
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation

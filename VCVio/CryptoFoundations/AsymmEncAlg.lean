@@ -28,7 +28,7 @@ structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
-  decrypt : (sk : SK) → (c : C) → Option M
+  decrypt : (sk : SK) → (c : C) →  m (Option M)
 
 alias PKE_Alg := AsymmEncAlg
 
@@ -48,7 +48,8 @@ The old version used `guard` (requiring `AlternativeMonad`); we return `Bool` in
 def CorrectExp (msg : M) : m Bool := do
   let (pk, sk) ← encAlg.keygen
   let c ← encAlg.encrypt pk msg
-  return decide (encAlg.decrypt sk c = some msg)
+  let msg' ← encAlg.decrypt sk c
+  return decide (msg' = some msg)
 
 def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
   ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
@@ -118,10 +119,9 @@ section decryptionOracle
 variable [Monad m]
 
 /-- Oracle that uses a secret key to respond to decryption requests.
-Invalid ciphertexts cause oracle failure in `OptionT`, matching the old
-`Option.getM` behavior but without requiring `AlternativeMonad` on `m`. -/
+Invalid ciphertexts become oracle failure in `OptionT`. -/
 def decryptionOracle (sk : SK) : QueryImpl (C →ₒ M) (OptionT m) :=
-  fun c => OptionT.mk (pure (encAlg.decrypt sk c))
+  fun c => OptionT.mk (encAlg.decrypt sk c)
 
 end decryptionOracle
 
@@ -129,54 +129,47 @@ section IND_CCA
 
 variable {ι : Type} {spec : OracleSpec ι} [DecidableEq C]
 
-/-- Two oracles for IND-CCA Experiment, the first for decrypting ciphertexts, and the second
-for getting a challenge from a pair of messages.
-
-API change: `++ₒ` → `+`. -/
+/-- IND-CCA adversaries get access to the base oracle set `spec` plus a decryption oracle.
+Challenge generation is handled explicitly between the two phases of the game. -/
 def IND_CCA_oracleSpec (_encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) :=
-    (C →ₒ Option M) + ((M × M) →ₒ C)
+    spec + (C →ₒ Option M)
 
+/-- Two-phase IND-CCA adversary:
+`chooseMessages` runs before the challenge and outputs `(m₀, m₁, st)`;
+`distinguish st c⋆` runs after seeing the challenge ciphertext. -/
 structure IND_CCA_Adversary (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C) where
-    main : PK → OracleComp encAlg.IND_CCA_oracleSpec Bool
+  State : Type
+  chooseMessages : PK → OracleComp encAlg.IND_CCA_oracleSpec (M × M × State)
+  distinguish : State → C → OracleComp encAlg.IND_CCA_oracleSpec Bool
 
-/-- Implement oracles for IND-CCA security game. A state monad tracks the current challenge.
-The decryption oracle refuses to decrypt the challenge ciphertext.
+/-- Pre-challenge decryption oracle for the IND-CCA game. -/
+def IND_CCA_preChallengeImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
+    (sk : SK) : QueryImpl (IND_CCA_oracleSpec encAlg) (OracleComp spec) :=
+  (QueryImpl.ofLift spec (OracleComp spec)) + fun c => encAlg.decrypt sk c
 
-Uses `OptionT` to handle failure (the old version used `guard` + `AlternativeMonad`).
-When an oracle check fails, the `OptionT` layer produces `none`.
+/-- Post-challenge decryption oracle for the IND-CCA game.
+The challenge ciphertext itself is answered with `none`, while all other ciphertexts are
+decrypted normally. -/
+def IND_CCA_postChallengeImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
+    (sk : SK) (cStar : C) : QueryImpl (IND_CCA_oracleSpec encAlg) (OracleComp spec) :=
+  (QueryImpl.ofLift spec (OracleComp spec)) + fun c =>
+    if c = cStar then return none else encAlg.decrypt sk c
 
-Important semantic split:
-- forbidden query (decrypt challenge / request second challenge) => oracle failure (`none`)
-- normal decryption miss (`encAlg.decrypt sk c = none`) => successful oracle response `some none` -/
-def IND_CCA_oracleImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
-    (pk : PK) (sk : SK) (b : Bool) : QueryImpl (IND_CCA_oracleSpec encAlg)
-      (OptionT (StateT (Option C) (OracleComp spec))) := fun
-  | Sum.inl c => OptionT.mk do
-      let challenge ← get
-      if challenge = some c then return none
-      else return some (encAlg.decrypt sk c)
-  | Sum.inr (m₁, m₂) => OptionT.mk do
-      let challenge ← get
-      if challenge.isSome then return none
-      else
-        let c ← liftM (encAlg.encrypt pk (if b then m₁ else m₂))
-        set (some c)
-        return some c
-
-/-- IND-CCA security game. If the adversary triggers an oracle failure (e.g., tries to decrypt
-the challenge ciphertext), the game returns `false` (adversary loses).
-
-Uses `return (b == b')` instead of the old `guard (b = b')`. -/
+/-- IND-CCA security game in the standard two-phase form.
+The adversary chooses challenge messages with access to the decryption oracle, then receives
+the challenge ciphertext and continues interacting with a decryption oracle that returns `none`
+on the challenge ciphertext. -/
 def IND_CCA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : encAlg.IND_CCA_Adversary) : ProbComp Bool :=
   encAlg.exec do
     let (pk, sk) ← encAlg.keygen
+    let (m₀, m₁, st) ← simulateQ (encAlg.IND_CCA_preChallengeImpl sk)
+      (adversary.chooseMessages pk)
     let b ← encAlg.lift_probComp ($ᵗ Bool)
-    let (optB', _) ← ((simulateQ (encAlg.IND_CCA_oracleImpl pk sk b)
-        (adversary.main pk)).run).run none
-    match optB' with
-    | some b' => return (b == b')
-    | none => return false
+    let cStar ← encAlg.encrypt pk (if b then m₀ else m₁)
+    let b' ← simulateQ (encAlg.IND_CCA_postChallengeImpl sk cStar)
+      (adversary.distinguish st cStar)
+    return (b == b')
 
 noncomputable def IND_CCA_Advantage {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : encAlg.IND_CCA_Adversary) : ℝ :=
