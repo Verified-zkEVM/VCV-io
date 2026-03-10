@@ -1,6 +1,5 @@
-import VCVio.CryptoFoundations.AsymmEncAlg
-import VCVio.CryptoFoundations.Asymptotics.AsymSecExp
 import VCVio.CryptoFoundations.Asymptotics.Negligible
+import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
@@ -8,10 +7,11 @@ import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.LWE
 import VCVio.CryptoFoundations.KeyEncapMech
+import VCVio.CryptoFoundations.PublicKeyEncAlg
 import VCVio.CryptoFoundations.SecExp
+import VCVio.CryptoFoundations.SecretKeyEncAlg
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
-import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.EvalDist.BitVec
 import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Defs.AlternativeMonad

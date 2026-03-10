@@ -29,7 +29,7 @@
 
 ```lean
 theorem myScheme_secure :
-    advantage (myExp adversary) ≤ q * ddhAdvantage (myReduction adversary) := by
+    advantage (myExp adversary) ≤ q * ddhGuessAdvantage (myReduction adversary) := by
 ```
 
 ### Step 2: Define intermediate games (hybrids)
@@ -132,7 +132,7 @@ by_dist                     -- enters TV distance mode
 ## Asymptotic Security Reductions
 
 For proofs involving asymptotic security (negligible advantage), use the lemmas in
-`VCVio/CryptoFoundations/Asymptotics/AsymSecExp.lean`.
+`VCVio/CryptoFoundations/Asymptotics/Security.lean`.
 
 ### Tight reduction
 

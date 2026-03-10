@@ -2,20 +2,20 @@
 
 ## Crypto Primitive Structures
 
-### Asymmetric encryption (`AsymmEncAlg`)
+### Asymmetric encryption (`PublicKeyEncAlg`)
 
 ```lean
-structure AsymmEncAlg (m : Type → Type) (M PK SK C : Type)
+structure PublicKeyEncAlg (m : Type → Type) (M PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : PK → M → m C
   decrypt : SK → C → Option M
 ```
 
-### Symmetric encryption (`SymmEncAlg`)
+### Symmetric encryption (`SecretKeyEncAlg`)
 
 ```lean
-structure SymmEncAlg (M K C : ℕ → Type) (Q : Type)
+structure SecretKeyEncAlg (M K C : ℕ → Type) (Q : Type)
     extends OracleContext Q ProbComp where
   keygen (sp : ℕ) : OracleComp spec (K sp)
   encrypt {sp : ℕ} (k : K sp) (msg : M sp) : OracleComp spec (C sp)
@@ -45,20 +45,20 @@ structure SigmaProtocol (S W PC SC Ω P : Type) (p : S → W → Bool) where
 
 ### Key difference: `OracleContext` vs `ExecutionMethod`
 
-- `SymmEncAlg` extends `OracleContext` — operations are `OracleComp spec`, spec comes from context
-- `AsymmEncAlg` / `SignatureAlg` extend `ExecutionMethod` — operations are in abstract `m`, converted via `exec`
+- `SecretKeyEncAlg` extends `OracleContext` — operations are `OracleComp spec`, spec comes from context
+- `PublicKeyEncAlg` / `SignatureAlg` extend `ExecutionMethod` — operations are in abstract `m`, converted via `exec`
 
 ### Instantiation pattern
 
 ```lean
-@[simps!] def myAlg : AsymmEncAlg ProbComp M PK SK C where
+@[simps!] def myAlg : PublicKeyEncAlg ProbComp M PK SK C where
   keygen := do ...
   encrypt pk msg := do ...
   decrypt sk c := ...
   __ := ExecutionMethod.default
 ```
 
-For `SymmEncAlg`, use `__ := unifSpec.defaultContext`.
+For `SecretKeyEncAlg`, use `__ := unifSpec.defaultContext`.
 
 ## Security Experiments
 
@@ -71,10 +71,10 @@ structure SecExp (m : Type → Type) extends ExecutionMethod m where
 
 Success = non-failure. Advantage: `1 - Pr[⊥ | exp.main]`.
 
-### `SecAdv`
+### `BoundedAdversary`
 
 ```lean
-structure SecAdv {ι : Type u} [DecidableEq ι]
+structure BoundedAdversary {ι : Type u} [DecidableEq ι]
     (spec : OracleSpec ι) (α β : Type u) where
   run : α → OracleComp spec β
   qb : ι → ℕ
@@ -87,10 +87,10 @@ structure SecAdv {ι : Type u} [DecidableEq ι]
 
 | Function | Input | Type | Measures |
 |----------|-------|------|----------|
-| `ProbComp.advantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
-| `ProbComp.advantage'` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
-| `ProbComp.advantage₂` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
-| `ProbComp.advantage₂'` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
+| `ProbComp.guessAdvantage` | `ProbComp Unit` | `ℝ` | `\|1/2 - (Pr[= () \| p]).toReal\|` |
+| `ProbComp.boolBiasAdvantage` | `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= false \| p]).toReal\|` |
+| `ProbComp.distAdvantage` | Two `ProbComp Unit` | `ℝ` | `\|(Pr[= () \| p]).toReal - (Pr[= () \| q]).toReal\|` |
+| `ProbComp.boolDistAdvantage` | Two `ProbComp Bool` | `ℝ` | `\|(Pr[= true \| p]).toReal - (Pr[= true \| q]).toReal\|` |
 
 All return `ℝ` via `.toReal` conversion from `ℝ≥0∞`. This is essential since subtraction on `ℝ≥0∞` is truncated.
 
@@ -180,33 +180,33 @@ def negligible (f : ℕ → ℝ≥0∞) : Prop := SuperpolynomialDecay atTop (λ
 Closure properties: `negligible_add`, `negligible_const_mul`, `negligible_sum`,
 `negligible_of_le`, `negligible_pow_mul`, `negligible_polynomial_mul`.
 
-### `AsymSecExp` and `AsymSecGame` (`AsymSecExp.lean`)
+### `SecurityExp` and `SecurityGame` (`Security.lean`)
 
 Both are decoupled from `SecExp` — they store an abstract advantage function (`ℕ → ℝ≥0∞`)
 rather than a family of concrete experiments. This lets the same meta-theorems work for
 failure-based games, distinguishing games, and any other advantage metric.
 
 ```lean
-structure AsymSecExp where
+structure SecurityExp where
   advantage : ℕ → ℝ≥0∞
 
-structure AsymSecGame (Adv : Type*) where
+structure SecurityGame (Adv : Type*) where
   advantage : Adv → ℕ → ℝ≥0∞
 ```
 
-- `AsymSecExp.secure`: advantage is `negligible`.
-- `AsymSecGame.secureAgainst isPPT`: every adversary satisfying `isPPT` has negligible advantage.
+- `SecurityExp.secure`: advantage is `negligible`.
+- `SecurityGame.secureAgainst isPPT`: every adversary satisfying `isPPT` has negligible advantage.
 - The predicate `isPPT` is abstract — specialize to `PolyQueries` or custom efficiency notions.
 
 ### Smart constructors
 
 | Constructor | Game style | Advantage metric |
 |-------------|-----------|-----------------|
-| `AsymSecGame.ofSecExp` | Failure-based (`SecExp`) | `1 - Pr[⊥]` |
-| `AsymSecGame.ofDistGame` | Two-game distinguishing | `\|Pr[game₀] - Pr[game₁]\|` |
-| `AsymSecGame.ofGuessGame` | Single-game guessing | `\|1/2 - Pr[success]\|` |
+| `SecurityGame.ofSecExp` | Failure-based (`SecExp`) | `1 - Pr[⊥]` |
+| `SecurityGame.ofDistGame` | Two-game distinguishing | `\|Pr[game₀] - Pr[game₁]\|` |
+| `SecurityGame.ofGuessGame` | Single-game guessing | `\|1/2 - Pr[success]\|` |
 
-Analogous constructors exist for `AsymSecExp`: `ofSecExp`, `ofDistExp`, `ofGuessExp`.
+Analogous constructors exist for `SecurityExp`: `ofSecExp`, `ofDistExp`, `ofGuessExp`.
 
 ### Key reduction/game-hopping lemmas
 
@@ -231,21 +231,21 @@ structure CostModel (spec : OracleSpec ι) (ω : Type) [AddCommMonoid ω] where
 |------------|---------|
 | `costDist oa cm` | Joint distribution `(output, totalCost)` |
 | `expectedCost oa cm val` | `E[val(cost)]` via `wp` |
-| `StrictCostBound oa cm bound` | All paths have cost `≤ bound` |
+| `WorstCaseCostBound oa cm bound` | All paths have cost `≤ bound` |
 | `ExpectedCostBound oa cm val bound` | Expected valued cost `≤ bound` |
-| `StrictPolyTime family cm val` | Worst-case poly bound over security parameter |
-| `ExpPolyTime family cm val` | Expected poly bound over security parameter |
+| `WorstCasePolyTime family cm val` | Worst-case poly bound over security parameter |
+| `ExpectedPolyTime family cm val` | Expected poly bound over security parameter |
 
 Key results: `fst_map_costDist` (instrumentation is transparent),
 `probEvent_cost_gt_le_expectedCost_div` (Markov's inequality),
-`StrictPolyTime.toExpPolyTime`.
+`WorstCasePolyTime.toExpectedPolyTime`.
 
 ## Common Gotchas
 
 1. **Avoid `guard`**: use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
 
-2. **`SymmEncAlg` vs `AsymmEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
+2. **`SecretKeyEncAlg` vs `PublicKeyEncAlg`**: different parent classes (`OracleContext` vs `ExecutionMethod`), different oracle access patterns.
 
 3. **DDH experiment uses `$ᵗ Bool`**: the experiment samples a bit `b`, returns real or random based on `b`, then checks `b == b'`.
 
-4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. For distinguishing-style games, use `AsymSecGame.ofDistGame` or `AsymSecGame.ofGuessGame` instead of `AsymSecGame.ofSecExp`.
+4. **`SecExp.advantage` measures `1 - Pr[⊥]`**: this is failure-based, not distinguishing-based. For `ProbComp` (which never fails), advantage is always 1. For distinguishing-style games, use `SecurityGame.ofDistGame` or `SecurityGame.ofGuessGame` instead of `SecurityGame.ofSecExp`.

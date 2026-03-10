@@ -12,40 +12,40 @@ import VCVio.CryptoFoundations.Asymptotics.Negligible
 This file defines asymptotic security experiments and games where the advantage function
 is abstract — not tied to any specific game formulation. This allows the same meta-theorems
 (reductions, game-hopping, hybrid arguments) to work for failure-based games (`SecExp`),
-distinguishing games (`ProbComp.advantage₂`), and any other advantage metric.
+distinguishing games (`ProbComp.distAdvantage`), and any other advantage metric.
 
 ## Main Definitions
 
-- `AsymSecExp`: An advantage function `ℕ → ℝ≥0∞` with security = negligibility.
-- `AsymSecGame Adv`: An advantage function `Adv → ℕ → ℝ≥0∞` with quantified security.
+- `SecurityExp`: An advantage function `ℕ → ℝ≥0∞` with security = negligibility.
+- `SecurityGame Adv`: An advantage function `Adv → ℕ → ℝ≥0∞` with quantified security.
 - Smart constructors: `ofSecExp`, `ofDistGame`, `ofGuessGame`.
 
 ## Main Results
 
-- `AsymSecExp.secure_of_pointwise_bound`: Pointwise ≤ negligible ⟹ secure.
-- `AsymSecGame.secureAgainst_of_reduction`: Basic security reduction (tight).
-- `AsymSecGame.secureAgainst_of_poly_reduction`: Polynomial-loss security reduction.
-- `AsymSecGame.secureAgainst_of_close`: Game-hopping step.
-- `AsymSecGame.secureAgainst_of_hybrid`: Hybrid argument over a chain of games.
+- `SecurityExp.secure_of_pointwise_bound`: Pointwise ≤ negligible ⟹ secure.
+- `SecurityGame.secureAgainst_of_reduction`: Basic security reduction (tight).
+- `SecurityGame.secureAgainst_of_poly_reduction`: Polynomial-loss security reduction.
+- `SecurityGame.secureAgainst_of_close`: Game-hopping step.
+- `SecurityGame.secureAgainst_of_hybrid`: Hybrid argument over a chain of games.
 -/
 
 open OracleComp OracleSpec ENNReal Filter
 
 /-- An asymptotic security experiment: an advantage function of the security parameter.
 Secure means the advantage is negligible. -/
-structure AsymSecExp where
+structure SecurityExp where
   advantage : ℕ → ℝ≥0∞
 
-namespace AsymSecExp
+namespace SecurityExp
 
 /-- An asymptotic security experiment is **secure** if its advantage is negligible. -/
-def secure (ase : AsymSecExp) : Prop :=
+def secure (ase : SecurityExp) : Prop :=
   negligible ase.advantage
 
 /-- If the advantage at each `n` is bounded by `f n`, and `f` is negligible,
 then the experiment is secure. -/
 theorem secure_of_pointwise_bound
-    (ase : AsymSecExp) (f : ℕ → ℝ≥0∞) (hf : negligible f)
+    (ase : SecurityExp) (f : ℕ → ℝ≥0∞) (hf : negligible f)
     (hbound : ∀ n, ase.advantage n ≤ f n) : ase.secure :=
   negligible_of_le hbound hf
 
@@ -54,22 +54,22 @@ theorem secure_of_pointwise_bound
 /-- Build from a family of failure-based `SecExp`. -/
 noncomputable def ofSecExp {m : ℕ → Type → Type*}
     [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
-    (exp : (n : ℕ) → SecExp (m n)) : AsymSecExp where
+    (exp : (n : ℕ) → SecExp (m n)) : SecurityExp where
   advantage n := (exp n).advantage
 
 /-- Build from a two-game distinguishing experiment.
 Advantage = `|Pr[= () | game₀ n] - Pr[= () | game₁ n]|`. -/
 noncomputable def ofDistExp
-    (game₀ game₁ : ℕ → ProbComp Unit) : AsymSecExp where
-  advantage n := ENNReal.ofReal ((game₀ n).advantage₂ (game₁ n))
+    (game₀ game₁ : ℕ → ProbComp Unit) : SecurityExp where
+  advantage n := ENNReal.ofReal ((game₀ n).distAdvantage (game₁ n))
 
 /-- Build from a single-game guessing experiment.
 Advantage = `|1/2 - Pr[= () | game n]|`. -/
 noncomputable def ofGuessExp
-    (game : ℕ → ProbComp Unit) : AsymSecExp where
-  advantage n := ENNReal.ofReal ((game n).advantage)
+    (game : ℕ → ProbComp Unit) : SecurityExp where
+  advantage n := ENNReal.ofReal ((game n).guessAdvantage)
 
-end AsymSecExp
+end SecurityExp
 
 /-! ## Asymptotic Security Games
 
@@ -82,45 +82,45 @@ efficiency notions as appropriate. -/
 /-- An asymptotic security game: maps each adversary and security parameter to an
 advantage value. Decoupled from any specific game formulation — the same meta-theorems
 work for failure-based, distinguishing, and other game styles. -/
-structure AsymSecGame (Adv : Type*) where
+structure SecurityGame (Adv : Type*) where
   advantage : Adv → ℕ → ℝ≥0∞
 
-namespace AsymSecGame
+namespace SecurityGame
 
 variable {Adv : Type*}
 
 /-- A game is **secure against a class of adversaries** (specified by `isPPT`)
 if every adversary in that class has negligible advantage. -/
-def secureAgainst (g : AsymSecGame Adv) (isPPT : Adv → Prop) : Prop :=
+def secureAgainst (g : SecurityGame Adv) (isPPT : Adv → Prop) : Prop :=
   ∀ A, isPPT A → negligible (g.advantage A)
 
 /-- Fixing an adversary in a game produces an asymptotic security experiment. -/
-def toAsymSecExp (g : AsymSecGame Adv) (A : Adv) : AsymSecExp where
+def toSecurityExp (g : SecurityGame Adv) (A : Adv) : SecurityExp where
   advantage := g.advantage A
 
 @[simp]
-theorem toAsymSecExp_advantage (g : AsymSecGame Adv) (A : Adv) :
-    (g.toAsymSecExp A).advantage = g.advantage A := rfl
+theorem toSecurityExp_advantage (g : SecurityGame Adv) (A : Adv) :
+    (g.toSecurityExp A).advantage = g.advantage A := rfl
 
 /-! ### Smart constructors -/
 
 /-- Build from a family of failure-based `SecExp`. -/
 noncomputable def ofSecExp {m : ℕ → Type → Type*}
     [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
-    (game : Adv → (n : ℕ) → SecExp (m n)) : AsymSecGame Adv where
+    (game : Adv → (n : ℕ) → SecExp (m n)) : SecurityGame Adv where
   advantage A n := (game A n).advantage
 
 /-- Build from a two-game distinguishing experiment.
 Advantage = `|Pr[= () | game₀ A n] - Pr[= () | game₁ A n]|`. -/
 noncomputable def ofDistGame
-    (game₀ game₁ : Adv → ℕ → ProbComp Unit) : AsymSecGame Adv where
-  advantage A n := ENNReal.ofReal ((game₀ A n).advantage₂ (game₁ A n))
+    (game₀ game₁ : Adv → ℕ → ProbComp Unit) : SecurityGame Adv where
+  advantage A n := ENNReal.ofReal ((game₀ A n).distAdvantage (game₁ A n))
 
 /-- Build from a single-game guessing experiment.
 Advantage = `|1/2 - Pr[= () | game A n]|`. -/
 noncomputable def ofGuessGame
-    (game : Adv → ℕ → ProbComp Unit) : AsymSecGame Adv where
-  advantage A n := ENNReal.ofReal ((game A n).advantage)
+    (game : Adv → ℕ → ProbComp Unit) : SecurityGame Adv where
+  advantage A n := ENNReal.ofReal ((game A n).guessAdvantage)
 
 /-! ### Security reductions -/
 
@@ -128,7 +128,7 @@ noncomputable def ofGuessGame
 preserves efficiency and the advantage of `g` is pointwise ≤ the advantage of `g'`
 on the reduced adversary, then security of `g'` implies security of `g`. -/
 theorem secureAgainst_of_reduction {Adv' : Type*}
-    {g : AsymSecGame Adv} {g' : AsymSecGame Adv'}
+    {g : SecurityGame Adv} {g' : SecurityGame Adv'}
     {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
     {reduce : Adv → Adv'}
     (hreduce : ∀ A, isPPT A → isPPT' (reduce A))
@@ -146,7 +146,7 @@ This is the fundamental lemma for game-hopping proofs: each "hop" from `g₁` to
 introduces at most `ε(n)` advantage loss, and `ε` is absorbed because negligible functions
 are closed under addition. -/
 theorem secureAgainst_of_close
-    {g₁ g₂ : AsymSecGame Adv} {isPPT : Adv → Prop}
+    {g₁ g₂ : SecurityGame Adv} {isPPT : Adv → Prop}
     {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
     (hclose : ∀ A, isPPT A → ∀ n, g₁.advantage A n ≤ g₂.advantage A n + ε n)
     (hsecure : g₂.secureAgainst isPPT) :
@@ -157,7 +157,7 @@ theorem secureAgainst_of_close
 the advantage of `g₂` with reduced adversary plus `ε`, then security of `g₂` (against the
 target class) implies security of `g₁`. Combines reduction and game hop. -/
 theorem secureAgainst_of_close_reduction {Adv' : Type*}
-    {g₁ : AsymSecGame Adv} {g₂ : AsymSecGame Adv'}
+    {g₁ : SecurityGame Adv} {g₂ : SecurityGame Adv'}
     {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
     {reduce : Adv → Adv'}
     {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
@@ -178,7 +178,7 @@ advantage of `g'` on the reduced adversary, then security of `g'` implies securi
 This handles reductions where the adversary's advantage is amplified by a polynomial factor,
 e.g., from a hybrid argument guessing which of `poly(n)` steps to exploit. -/
 theorem secureAgainst_of_poly_reduction {Adv' : Type*}
-    {g : AsymSecGame Adv} {g' : AsymSecGame Adv'}
+    {g : SecurityGame Adv} {g' : SecurityGame Adv'}
     {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
     {reduce : Adv → Adv'}
     {loss : Polynomial ℕ}
@@ -191,7 +191,7 @@ theorem secureAgainst_of_poly_reduction {Adv' : Type*}
 
 /-- Combined game-hopping step with polynomial advantage loss and reduction. -/
 theorem secureAgainst_of_close_poly_reduction {Adv' : Type*}
-    {g₁ : AsymSecGame Adv} {g₂ : AsymSecGame Adv'}
+    {g₁ : SecurityGame Adv} {g₂ : SecurityGame Adv'}
     {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
     {reduce : Adv → Adv'}
     {loss : Polynomial ℕ}
@@ -213,7 +213,7 @@ first game is also secure.
 The total advantage loss is at most `k · ε(n)`, which is negligible since `ε` is
 negligible and `k` is constant. -/
 theorem secureAgainst_of_hybrid
-    {games : ℕ → AsymSecGame Adv}
+    {games : ℕ → SecurityGame Adv}
     {isPPT : Adv → Prop}
     {ε : ℕ → ℝ≥0∞} (hε : negligible ε)
     {k : ℕ}
@@ -227,4 +227,4 @@ theorem secureAgainst_of_hybrid
     exact ih (fun j hj => hconsec j (by omega))
       (secureAgainst_of_close hε (hconsec k (by omega)) hsecure)
 
-end AsymSecGame
+end SecurityGame

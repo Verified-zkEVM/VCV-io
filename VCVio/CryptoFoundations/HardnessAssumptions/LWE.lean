@@ -58,7 +58,7 @@ def Experiment (n m p : ℕ) [NeZero p] (errSamp : ProbComp (ZMod p))
 
 noncomputable def Advantage (n m p : ℕ) [NeZero p] (errSamp : ProbComp (ZMod p))
     (adv : Adversary n m p) : ℝ :=
-  (Experiment n m p errSamp adv).advantage'
+  (Experiment n m p errSamp adv).boolBiasAdvantage
 
 /-- Game 0: adversary sees an LWE sample. -/
 def Game_0 (n m p : ℕ) [NeZero p] (errSamp : ProbComp (ZMod p))
@@ -84,6 +84,6 @@ def SearchExperiment (n m p : ℕ) [NeZero p] (errSamp : ProbComp (ZMod p))
 
 noncomputable def SearchAdvantage (n m p : ℕ) [NeZero p] (errSamp : ProbComp (ZMod p))
     (adv : SearchAdversary n m p) : ℝ :=
-  (SearchExperiment n m p errSamp adv).advantage'
+  (SearchExperiment n m p errSamp adv).boolBiasAdvantage
 
 end LWE

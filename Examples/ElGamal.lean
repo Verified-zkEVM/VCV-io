@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.AsymmEncAlg
+import VCVio.CryptoFoundations.PublicKeyEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
@@ -65,7 +65,7 @@ Encryption of `msg` under public key `pk` samples `r ← $ᵗ F` and returns `(r
 Decryption recovers `msg` as `c₂ - sk • c₁`. -/
 @[simps!] def elgamalAsymmEnc (F G : Type) [Field F] [Fintype F] [DecidableEq F]
     [SampleableType F] [AddCommGroup G] [Module F G] [SampleableType G]
-    (gen : G) : AsymmEncAlg ProbComp
+    (gen : G) : PublicKeyEncAlg ProbComp
     (M := G) (PK := G) (SK := F) (C := G × G) where
   keygen := do
     let sk ← $ᵗ F
@@ -94,7 +94,7 @@ theorem correct [DecidableEq G] : (elgamalAsymmEnc F G gen).PerfectlyCorrect := 
     have : r • (sk • gen) = sk • (r • gen) := by
       rw [← mul_smul, ← mul_smul, mul_comm]
     rw [this, add_sub_cancel_right]
-  simp [AsymmEncAlg.PerfectlyCorrect, AsymmEncAlg.CorrectExp, elgamalAsymmEnc, hcancel]
+  simp [PublicKeyEncAlg.PerfectlyCorrect, PublicKeyEncAlg.CorrectExp, elgamalAsymmEnc, hcancel]
 
 /-! ## 2. Hybrid game infrastructure -/
 
@@ -1528,7 +1528,7 @@ private lemma allReal_queryImpl_proj_eq_real
   rcases st with ⟨cache, n⟩
   cases t with
   | inl tu =>
-      simp [IND_CPA_queryImpl_allReal, AsymmEncAlg.IND_CPA_queryImpl']
+      simp [IND_CPA_queryImpl_allReal, PublicKeyEncAlg.IND_CPA_queryImpl']
   | inr mm =>
       rcases hcache : cache mm with _ | c
       · have hallReal :
@@ -1556,11 +1556,11 @@ private lemma allReal_queryImpl_proj_eq_real
             (do
               let c ← (elgamalAsymmEnc F G gen).encrypt pk (if b then mm.1 else mm.2)
               pure (c, cache.cacheQuery mm c) : ProbComp _) := by
-          simp [AsymmEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
+          simp [PublicKeyEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
             StateT.run_bind, StateT.run_get, pure_bind]
         simpa [IND_CPA_queryImpl_allReal] using hallReal.trans hreal.symm
       · simp [IND_CPA_queryImpl_allReal, IND_CPA_allRealChallengeOracle,
-          AsymmEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
+          PublicKeyEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
           StateT.run_bind, StateT.run_get, pure_bind]
 
 private lemma hybrid_q_run'_evalDist_eq_real
@@ -1629,7 +1629,7 @@ theorem IND_CPA_HybridGame_q_eq_game
         (adversary pk)).run' ∅) :=
     fun pk b => hybrid_q_run'_evalDist_eq_real (F := F) (gen := gen)
       pk b q (adversary pk) q (hq pk) ∅ 0 (by omega)
-  simp only [IND_CPA_HybridGame, IND_CPA_game, AsymmEncAlg.IND_CPA_experiment,
+  simp only [IND_CPA_HybridGame, IND_CPA_game, PublicKeyEncAlg.IND_CPA_experiment,
     probOutput_bind_eq_tsum]
   refine tsum_congr fun b => ?_
   congr 1
@@ -1655,9 +1655,9 @@ theorem elGamal_IND_CPA_bound_toReal
               DiffieHellman.ddhExp gen
                 (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal
                 - 1 / 2|) := by
-  refine le_trans (AsymmEncAlg.IND_CPA_advantage_toReal_le_abs_signedAdvantageReal adversary) ?_
+  refine le_trans (PublicKeyEncAlg.IND_CPA_advantage_toReal_le_abs_signedAdvantageReal adversary) ?_
   refine le_trans
-    (AsymmEncAlg.IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
+    (PublicKeyEncAlg.IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
       adversary q (IND_CPA_HybridFamily (F := F) (gen := gen) adversary q)
       (by simp only [IND_CPA_HybridFamily_zero]; exact hstart)
       (by simp only [IND_CPA_HybridFamily_q];

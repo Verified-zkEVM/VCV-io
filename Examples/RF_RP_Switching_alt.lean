@@ -14,16 +14,16 @@ open OracleSpec OracleComp ENNReal
 -- /-- Security adversary for RF-RP distinguisher experiments. -/
 -- def RF_RP_Adv' (α : ℕ → Type) [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)] :=
---   SecAdv (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
 
 -- /-- Security adversary for RF-RP distinguisher experiments.
 -- Note: We don't give the adversary a `unifSpec` oracle, it only has distinguisher pieces. -/
 -- def RF_RP_Adv (α : ℕ → Type) [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)] :=
---   SecAdv (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
 
 -- def distinguisher {ι : Type} [DecidableEq ι] (spec : ℕ → OracleSpec ι) :=
---   SecAdv spec (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary spec (λ _ ↦ Unit) (λ _ ↦ Bool)
 
 -- variable {α : ℕ → Type} [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)]

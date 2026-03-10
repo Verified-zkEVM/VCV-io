@@ -40,7 +40,7 @@ For the full list, see `docs/agents/gotchas.md`.
 
 Follow Mathlib convention: `{head_symbol}_{operation}_{rhs_form}`.
 Examples: `probOutput_bind_eq_tsum`, `support_pure`, `simulateQ_map`.
-Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
+Structures use UpperCamelCase: `SecExp`, `SecretKeyEncAlg`, `RelTriple`.
 
 ## Canonical Examples
 
@@ -52,7 +52,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
 - DLog / CDH / DDH via HHS: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
 - Cost model / polynomial time: `VCVio/OracleComp/QueryTracking/CostModel.lean`
-- Asymptotic security games: `VCVio/CryptoFoundations/Asymptotics/AsymSecExp.lean`
+- Asymptotic security games: `VCVio/CryptoFoundations/Asymptotics/Security.lean`
 - Negligible function algebra: `VCVio/CryptoFoundations/Asymptotics/Negligible.lean`
 - Query enforcement: `VCVio/OracleComp/QueryTracking/Enforcement.lean`
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`

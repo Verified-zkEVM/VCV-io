@@ -23,8 +23,8 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 - `CostModel spec ω`: Assigns cost `queryCost t : ω` to each oracle query `t`.
 - `costDist oa cm`: Joint distribution of `(output, totalCost)`.
 - `expectedCost oa cm val`: Expected total cost `E[val(cost)]`, computed via `wp`.
-- `StrictCostBound`, `ExpectedCostBound`: Cost bound predicates.
-- `StrictPolyTime`, `ExpPolyTime`: Asymptotic polynomial-time predicates for computation
+- `WorstCaseCostBound`, `ExpectedCostBound`: Cost bound predicates.
+- `WorstCasePolyTime`, `ExpectedPolyTime`: Asymptotic polynomial-time predicates for computation
   families indexed by a security parameter.
 
 ## Key Results
@@ -32,7 +32,7 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 - `fst_map_costDist`: Cost instrumentation doesn't change the output distribution.
 - `expectedCost_pure`: Expected cost of a pure computation is `0`.
 - `probEvent_cost_gt_le_expectedCost_div`: Markov's inequality for cost distributions.
-- `StrictPolyTime.toExpPolyTime`: Strict polynomial time implies expected polynomial time.
+- `WorstCasePolyTime.toExpectedPolyTime`: Strict polynomial time implies expected polynomial time.
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
@@ -141,7 +141,7 @@ section CostBounds
 variable [spec.Fintype] [spec.Inhabited]
 
 /-- Every execution path of `oa` under `cm` has total cost at most `bound`. -/
-def StrictCostBound [LE ω] (oa : OracleComp spec α) (cm : CostModel spec ω)
+def WorstCaseCostBound [LE ω] (oa : OracleComp spec α) (cm : CostModel spec ω)
     (bound : ω) : Prop :=
   ∀ z ∈ support (costDist oa cm), z.2 ≤ bound
 
@@ -152,9 +152,9 @@ def ExpectedCostBound (oa : OracleComp spec α) (cm : CostModel spec ω)
 
 /-- A strict cost bound implies an expected cost bound, provided the valuation `val`
 is monotone with respect to `≤` on `ω`. -/
-theorem StrictCostBound.toExpectedCostBound [Preorder ω]
+theorem WorstCaseCostBound.toExpectedCostBound [Preorder ω]
     {oa : OracleComp spec α} {cm : CostModel spec ω} {bound : ω}
-    (hstrict : StrictCostBound oa cm bound)
+    (hstrict : WorstCaseCostBound oa cm bound)
     {val : ω → ℝ≥0∞} (hval_mono : Monotone val) :
     ExpectedCostBound oa cm val (val bound) :=
   expectedCost_le_of_support_bound oa cm val (val bound)
@@ -255,9 +255,9 @@ omit [spec.Fintype] in
 /-- A strict bound under the unit cost model yields a uniform per-index query bound:
 if every execution uses at most `bound` total unit-cost steps, then each oracle index
 is queried at most `bound` times. -/
-theorem StrictCostBound.toIsPerIndexQueryBound_unit
+theorem WorstCaseCostBound.toIsPerIndexQueryBound_unit
     {oa : OracleComp spec α} {bound : ℕ}
-    (h : StrictCostBound oa CostModel.unit bound) :
+    (h : WorstCaseCostBound oa CostModel.unit bound) :
     IsPerIndexQueryBound oa (fun _ => bound) := by
   induction oa using OracleComp.inductionOn generalizing bound with
   | pure x =>
@@ -273,7 +273,7 @@ theorem StrictCostBound.toIsPerIndexQueryBound_unit
         have hle : Multiplicative.toAdd c + 1 ≤ bound := by
           simpa using (h _ hparent)
         omega
-      · have hcont : StrictCostBound (mx u) CostModel.unit (bound - 1) := by
+      · have hcont : WorstCaseCostBound (mx u) CostModel.unit (bound - 1) := by
           intro z hz
           have hparent :=
             mem_support_costDist_unit_query_bind_of_mem_support t mx u hz
@@ -301,22 +301,22 @@ section PolyTime
 variable [spec.Fintype] [spec.Inhabited]
 
 /-- All execution paths of `family n` have valued cost at most `p(n)` for some polynomial `p`. -/
-def StrictPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
+def WorstCasePolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℕ) : Prop :=
   ∃ p : Polynomial ℕ, ∀ n z, z ∈ support (costDist (family n) cm) → val z.2 ≤ p.eval n
 
 /-- Expected valued cost of `family n` is at most `p(n)` for some polynomial `p`. -/
-def ExpPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
+def ExpectedPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℝ≥0∞) : Prop :=
   ∃ p : Polynomial ℕ, ∀ n, expectedCost (family n) cm val ≤ ↑(p.eval n)
 
 /-- Strict polynomial time implies expected polynomial time.
 If every execution path's cost is bounded by `p(n)`, then the expected cost is also
 bounded by `p(n)` (since the expectation of a bounded random variable is at most the bound). -/
-theorem StrictPolyTime.toExpPolyTime (family : ℕ → OracleComp spec α)
+theorem WorstCasePolyTime.toExpectedPolyTime (family : ℕ → OracleComp spec α)
     (cm : CostModel spec ω) (val : ω → ℕ)
-    (h : StrictPolyTime family cm val) :
-    ExpPolyTime family cm (fun w => ↑(val w)) := by
+    (h : WorstCasePolyTime family cm val) :
+    ExpectedPolyTime family cm (fun w => ↑(val w)) := by
   obtain ⟨p, hp⟩ := h
   exact ⟨p, fun n => expectedCost_le_of_support_bound _ _ _ _ fun z hz =>
     Nat.cast_le.mpr (hp n z hz)⟩
@@ -324,9 +324,9 @@ theorem StrictPolyTime.toExpPolyTime (family : ℕ → OracleComp spec α)
 /-- Strict polynomial time under the unit cost model yields polynomial query bounds.
 The resulting per-index bound uses the same polynomial for every oracle index, since
 each individual query count is bounded by the total unit cost. -/
-noncomputable def StrictPolyTime.toPolyQueries_unit [DecidableEq ι]
+noncomputable def WorstCasePolyTime.toPolyQueries_unit [DecidableEq ι]
     (family : ℕ → OracleComp spec α)
-    (h : StrictPolyTime family CostModel.unit id) :
+    (h : WorstCasePolyTime family CostModel.unit id) :
     PolyQueries (ι := ι) (spec := fun _ => spec) (α := fun _ => PUnit) (β := fun _ => α)
       (fun n _ => family n) := by
   classical
@@ -334,7 +334,7 @@ noncomputable def StrictPolyTime.toPolyQueries_unit [DecidableEq ι]
   have hp := Classical.choose_spec h
   refine ⟨fun _ => p, ?_⟩
   intro n _
-  exact StrictCostBound.toIsPerIndexQueryBound_unit
+  exact WorstCaseCostBound.toIsPerIndexQueryBound_unit
     (oa := family n) (bound := p.eval n) (fun z hz => hp n z hz)
 
 end PolyTime
