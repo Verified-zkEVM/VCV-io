@@ -43,9 +43,4 @@ def test3 (n : ℕ) : ProbComp (List ℕ) := do
 def test4 (n : ℕ) : ProbComp (List ℕ) := do
   (List.replicate n ()).mapM (fun () => Fin.val <$> ($[0..100]))
 
--- #eval test1
--- #eval test2 100
--- #eval test3 100
--- #eval test4 100
-
 end OracleComp

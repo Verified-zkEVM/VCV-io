@@ -79,6 +79,7 @@ underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) := by
   intro msg
+  classical
   let ro : QueryImpl (M × PC →ₒ Ω)
       (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
   let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
@@ -203,30 +204,38 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
     simp_rw [hpure_run']]
-  have hinner :
-      ∀ x ∈ support hr.gen,
-        Pr[= true | (do
-          let (c, e) ← σ.commit x.1 x.2
-          let r ← $ᵗ Ω
-          let s ← σ.respond x.1 x.2 e r
-          pure (σ.verify x.1 c r s))] =
-          Pr[= true | (pure true : ProbComp Bool)] := by
-    intro x hx
-    rcases x with ⟨pk, sk⟩
-    have hrel : p pk sk = true := hr.gen_sound pk sk hx
-    simpa using hc pk sk hrel
-  calc
-    Pr[= true | (do
+  rw [← one_le_probOutput_iff, OracleComp.ProgramLogic.probOutput_eq_wp_indicator]
+  change OracleComp.ProgramLogic.Triple 1
+    (do
       let (pk, sk) ← hr.gen
       let (c, e) ← σ.commit pk sk
       let r ← $ᵗ Ω
       let s ← σ.respond pk sk e r
-      pure (σ.verify pk c r s))] =
-        Pr[= true | (do
-          let _x ← hr.gen
-          pure true : ProbComp Bool)] := by
-            prob_congr; exact hinner
-    _ = 1 := by simp
+      pure (σ.verify pk c r s))
+    (fun y => if y = true then 1 else 0)
+  hoare_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
+  · simpa [OracleComp.ProgramLogic.propInd] using
+      OracleComp.ProgramLogic.triple_support (oa := hr.gen)
+  · intro x
+    rcases x with ⟨pk, sk⟩
+    by_cases hx : (pk, sk) ∈ support hr.gen
+    · have hrel : p pk sk = true := hr.gen_sound pk sk hx
+      simpa [OracleComp.ProgramLogic.propInd, hx] using
+        (OracleComp.ProgramLogic.triple_probOutput_eq_one
+          (oa := do
+            let (c, e) ← σ.commit pk sk
+            let r ← $ᵗ Ω
+            let s ← σ.respond pk sk e r
+            pure (σ.verify pk c r s))
+          (x := true) (h := by simpa using hc pk sk hrel))
+    · simpa [OracleComp.ProgramLogic.propInd, hx] using
+        (OracleComp.ProgramLogic.triple_zero
+          (oa := do
+            let (c, e) ← σ.commit pk sk
+            let r ← $ᵗ Ω
+            let s ← σ.respond pk sk e r
+            pure (σ.verify pk c r s))
+          (post := fun y => if y = true then 1 else 0))
 
 /-- EUF-CMA security of Fiat-Shamir: if the Σ-protocol is specially sound, then
 forgery probability is bounded by the forking lemma probability. -/
@@ -239,23 +248,3 @@ theorem euf_cma_bound
   sorry
 
 end FiatShamir
-
-/-! ## Old commented code (for reference)
-
--- variable {ι : Type} (spec : ℕ → OracleSpec ι)
---     (X W : ℕ → Type) (p : {n : ℕ} → X n → W n → Bool)
---     (PC SC Ω P M : ℕ → Type)
---     [Π n, Inhabited (Ω n)] [Π n, DecidableEq (Ω n)]
---     [Π n, Fintype (Ω n)] [Π n, SampleableType (Ω n)]
---     [Π n, DecidableEq (PC n)] [Π n, DecidableEq (M n)]
---     [Π n, Fintype (X n)] [Π n, Inhabited (X n)] [Π n, SampleableType (X n)]
---     [Π n, Fintype (W n)] [Π n, Inhabited (W n)] [Π n, SampleableType (W n)]
-
--- structure GenerableRelation
---     (X W : Type) (r : X → W → Bool)
---     [SampleableType X] [SampleableType W] where
---   gen : ProbComp (X × W)
---   gen_sound (x : X) (w : W) : (x, w) ∈ gen.support → r x w
---   gen_uniform_right (x : X) : [= x | Prod.fst <$> gen] = [= x | $ᵗ X]
---   gen_uniform_left (w : W) : [= w | Prod.snd <$> gen] = [= w | $ᵗ W]
--/

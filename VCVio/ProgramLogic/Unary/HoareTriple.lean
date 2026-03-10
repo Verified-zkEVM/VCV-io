@@ -199,6 +199,11 @@ theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
     Triple (spec := spec) (post x) (pure x) post := by
   simp [Triple, MAlgOrdered.Triple]
 
+/-- A quantitative triple with precondition `0` is always true. -/
+theorem triple_zero (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    Triple (spec := spec) 0 oa post := by
+  simp [Triple, MAlgOrdered.Triple]
+
 /-- `probEvent` as a WP of an indicator postcondition. -/
 lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
     [DecidablePred p] :
@@ -290,6 +295,34 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
     Triple (spec := spec) (Pr[= x | oa]) oa (fun y => if y = x then 1 else 0) := by
   unfold Triple MAlgOrdered.Triple
   simp [probOutput_eq_wp_indicator]
+
+/-- The support event of an `OracleComp` occurs almost surely. -/
+@[simp] theorem probEvent_mem_support (oa : OracleComp spec α) :
+    Pr[fun x => x ∈ support oa | oa] = 1 := by
+  rw [probEvent_eq_one_iff]
+  constructor
+  · simp
+  · intro x hx
+    exact hx
+
+/-- Exact probability-1 events are exact quantitative triples. -/
+theorem triple_probEvent_eq_one (oa : OracleComp spec α) (p : α → Prop)
+    [DecidablePred p] (h : Pr[p | oa] = 1) :
+    Triple (spec := spec) 1 oa (fun x => if p x then 1 else 0) := by
+  simpa [h] using triple_probEvent_indicator (oa := oa) p
+
+/-- Exact probability-1 singleton outputs are exact quantitative triples. -/
+theorem triple_probOutput_eq_one (oa : OracleComp spec α) [DecidableEq α]
+    (x : α) (h : Pr[= x | oa] = 1) :
+    Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
+  simpa [h] using triple_probOutput_indicator (oa := oa) x
+
+/-- Support membership is a useful default cut function for support-sensitive bind proofs. -/
+theorem triple_support (oa : OracleComp spec α) [DecidablePred fun x => x ∈ support oa] :
+    Triple (spec := spec) 1 oa (fun x => if x ∈ support oa then 1 else 0) := by
+  simpa using
+    triple_probEvent_eq_one (oa := oa) (p := fun x => x ∈ support oa)
+      (h := probEvent_mem_support (oa := oa))
 
 /-! ## Congruence under evalDist equality -/
 

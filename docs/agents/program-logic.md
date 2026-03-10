@@ -46,6 +46,8 @@
 
 - `rel_step using R` — provide explicit intermediate relation
 - `rel_seq n using R` — use `rel_step using R` first, then keep stepping with plain `rel_step`
+- `hoare_step using cut` — provide an explicit unary cut function for a bind step
+- `hoare_seq n using cut` — use `hoare_step using cut` first, then keep stepping with plain `hoare_step`
 - `rel_rnd using f` — provide explicit bijection for coupling
 - `rel_sim using R` — provide the state invariant relation for `simulateQ` proofs
 - `rel_sim_dist` — specialize to the exact-distribution `call` pattern with equal states
@@ -67,6 +69,8 @@
 For `replicate`, split on the loop count (`0` vs `n + 1`) in the surrounding theorem or proof.
 For `List.mapM`, split on the input list (`[]` vs `x :: xs`).
 For `List.foldlM`, split on the input list and treat the goal postcondition as the loop invariant.
+For support-sensitive binds, `hoare_step using (fun x => if x ∈ support oa then 1 else 0)` is the
+main explicit-cut pattern, paired with `triple_support` and `triple_zero`.
 
 ### Bind Reordering
 
