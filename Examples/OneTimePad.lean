@@ -21,7 +21,7 @@ The file includes two proof styles:
    probabilities directly using `probOutput_pair_xor_uniform`.
 2. **Relational / game-hopping** (`cipherGivenMsg_equiv`, `ciphertextRowsEqual`):
    proves that any two messages yield the same ciphertext distribution via a bijection
-   coupling, using the `by_equiv` / `rel_step` / `rel_rnd` tactic workflow.
+   coupling, using the `by_equiv` / `rvcgen_step` tactic workflow.
 -/
 
 open Mathlib OracleSpec OracleComp ENNReal BigOperators
@@ -88,8 +88,9 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
   show GameEquiv (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₀))
     (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))
   by_equiv
-  rel_step using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
-  · rel_rnd using (· ^^^ c)
+  rvcgen_step using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
+  swap
+  · rvcgen_step using (· ^^^ c)
     · exact Function.Involutive.bijective fun x => by
         rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
     · intro; rfl

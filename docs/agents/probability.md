@@ -79,7 +79,7 @@ Available for: `Bool`, `Fin n` (for `[NeZero n]`), `ZMod n`, `BitVec n`, `α × 
 
 | Lemma | Use |
 |-------|-----|
-| `probEvent_bind_bind_swap` | Swap two independent binds (used by `prob_swap` tactic) |
+| `probEvent_bind_bind_swap` | Swap two independent binds (used internally by `qvcgen_step` probability-equality rewrites) |
 | `probOutput_bind_congr` | Congruence: equal on support → equal probability |
 | `probEvent_bind_congr` | Same for events |
 
@@ -100,7 +100,8 @@ Available for: `Bool`, `Fin n` (for `[NeZero n]`), `ZMod n`, `BitVec n`, `α × 
    → Start with `probEvent_bind_eq_tsum`
 
 3. **Need to swap two binds?**
-   → Use `prob_swap` tactic (or `probEvent_bind_bind_swap` manually)
+   → Use `qvcgen_step` if the swap should close the equality
+   → Use `qvcgen_step rw` / `qvcgen_step rw under n` if you need an explicit rewrite step
 
 4. **Need `Pr[= y | f <$> mx]`?**
    → If `f` is injective: `probOutput_map_injective`
