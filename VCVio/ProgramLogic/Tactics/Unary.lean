@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Tactics.Common
+import VCVio.ProgramLogic.Tactics.Relational
 
 open Lean Elab Tactic Meta
 
@@ -20,8 +21,7 @@ private def throwWpStepError : TacticM Unit := withMainContext do
       throwError
         "wp_step: found a `wp` goal, but none of the current single-step rules apply to:{indentExpr comp}\n\
         Current rules handle bind, pure, `replicate`, `List.mapM`, `List.foldlM`, query, `if`, \
-        uniform sampling, `map`, \
-        `simulateQ`, and `liftComp`."
+        uniform sampling, `map`, `simulateQ`, `simulateQ ... run'`, and `liftComp`."
 
 private def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
@@ -309,6 +309,27 @@ private def tryProbEqActions (steps : List ProbEqAction) : TacticM Bool := do
 /-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
 Also tries small bounded rewrite sequences such as congr-then-swap and
 one-sided under-prefix rewrites. -/
+private def runProbOutputEqRelBridge : TacticM Bool := do
+  let saved ← saveState
+  let tryBridge (symmFirst : Bool) : TacticM Bool := do
+    match ← observing? do
+      if symmFirst then
+        evalTactic (← `(tactic| symm))
+      evalTactic (← `(tactic|
+        apply OracleComp.ProgramLogic.Relational.probOutput_eq_of_relTriple_eqRel))
+    with
+    | some _ => return true
+    | none => return false
+  if ← tryBridge false then
+    return true
+  saved.restore
+  if ← tryBridge true then
+    return true
+  saved.restore
+  return false
+
+/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
+Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
 private def tryProbEqGoal : TacticM Bool := do
   if ← tryProbEqActions [.swap] then return true
   if ← tryProbEqActions [.congrAny] then return true
@@ -316,7 +337,7 @@ private def tryProbEqGoal : TacticM Bool := do
   if ← tryProbEqActions [.congrAny, .swap] then return true
   if ← tryProbEqActions [.rewriteUnder 1, .rewrite, .congrAny] then
     return true
-  return false
+  runProbOutputEqRelBridge
 
 private def throwQVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -345,7 +366,8 @@ private def throwQVCGenStepRwCongrError (supportSensitive : Bool) : TacticM Unit
 Recognized shapes:
 - `Pr[p | oa] = 1` or `1 = Pr[p | oa]` → rewrite to `Triple 1 oa (indicator)`
 - `Pr[= x | oa] = 1` or `1 = Pr[= x | oa]` → rewrite to `Triple 1 oa (indicator)`
-- `Pr[... | oa] = Pr[... | ob]` → try swap (bind reorder), congr (shared prefix), or swap+congr
+- `Pr[... | oa] = Pr[... | ob]` → try swap (bind reorder), congr (shared prefix), swap+congr,
+  or an exact-`probOutput` bridge into `RelTriple`
 - `Pr[p | oa] = ...` or `... = Pr[p | oa]` (general) → rewrite `Pr` to `wp`
 - `_ ≤ Pr[p | oa]` or `Pr[p | oa] ≤ _` → rewrite `Pr` to `wp`
 
@@ -408,6 +430,8 @@ private def runVCGenStep : TacticM Bool := do
   if target.isForall then
     if ← tryEvalTacticSyntax (← `(tactic| intro _)) then
       return true
+  if relTripleGoalParts? target |>.isSome then
+    return (← tryEvalTacticSyntax (← `(tactic| rvcgen_step)))
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
@@ -466,12 +490,13 @@ private def runVCGenPass : TacticM Bool := do
 For `Triple` goals: decomposes a bind via `triple_bind` and automatically tries to close
 the spec subgoal using hypotheses in the local context, with backward WP fallback.
 Also handles `ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection
-from context, and WP-rule unfolding.
+from context, and WP-rule unfolding, including `simulateQ ... run'`.
 
 For `Pr[...] = 1` goals: automatically lowers the goal into a `Triple` form.
 
 For `Pr[...] = Pr[...]` goals: tries bind-swap (`probEvent_bind_bind_swap`), bind
-congruence (`probOutput_bind_congr` / `probEvent_bind_congr`), or swap-then-congr.
+congruence (`probOutput_bind_congr` / `probEvent_bind_congr`), swap-then-congr,
+or an exact-`probOutput` bridge into relational VCGen.
 Handles up to 2 layers of tsum peeling for nested swaps.
 
 Variants:
@@ -528,12 +553,14 @@ decomposition continues.
 
 Enhancements over simple structural decomposition:
 - Lowers `Pr[...]` goals into `Triple` or `wp` form before decomposition
+- Bridges exact `Pr[= x | oa] = Pr[= x | ob]` goals into relational VCGen when helpful
 - After bind decomposition, tries to close spec subgoals from local context
 - Falls back to backward WP (`triple_bind_wp`) when no spec is available
 - Splits `ite`/`dite` conditionals into branch goals with hypotheses
 - Case-splits `match` expressions on their discriminants
 - Auto-detects loop invariants from context for `replicate`/`foldlM`/`mapM`
 - Keeps decomposing across all open goals after branch splits
+- Understands `simulateQ` and `simulateQ ... run'` through the unary WP rules
 - Normalizes remaining `wp` terms and indicator arithmetic via simp
 - Finishes with bounded local consequence search on closed goals
 

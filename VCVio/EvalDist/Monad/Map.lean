@@ -38,6 +38,16 @@ lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
 lemma evalDist_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (f : α → β) :
     evalDist (f <$> mx) = f <$> (evalDist mx) := by simp [map_eq_bind_pure_comp]
 
+lemma evalDist_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m]
+    {mx my : m α} (h : evalDist mx = evalDist my) (f : α → β) :
+    evalDist (f <$> mx) = evalDist (f <$> my) := by
+  simpa [evalDist_map] using congrArg (fun p => f <$> p) h
+
+lemma probOutput_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m] [DecidableEq β]
+    {mx my : m α} (h : evalDist mx = evalDist my) (f : α → β) (y : β) :
+    Pr[= y | f <$> mx] = Pr[= y | f <$> my] := by
+  exact (evalDist_ext_iff.mp (evalDist_map_eq_of_evalDist_eq h f)) y
+
 @[simp] lemma evalDist_comp_map [HasEvalSPMF m] [LawfulMonad m] (mx : m α) :
     evalDist ∘ (fun f => f <$> mx) = fun f : (α → β) => f <$> evalDist mx := by aesop
 
