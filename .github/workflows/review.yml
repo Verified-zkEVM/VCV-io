@@ -85,7 +85,7 @@ jobs:
           external_refs: "${{ steps.get_args.outputs.external_refs }}"
           repo_context_refs: "${{ steps.get_args.outputs.repo_context_refs }}"
           additional_comments: "${{ steps.get_args.outputs.additional_comments }}"
-      - name: Post visible review marker
+      - name: Annotate AI review comment
         if: success()
         uses: actions/github-script@v8
         with:
@@ -96,22 +96,7 @@ jobs:
             const pull_number = context.issue.number || context.payload.pull_request?.number;
 
             if (!pull_number) {
-              core.setFailed('Could not determine pull request number for review marker.');
-              return;
-            }
-
-            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
-            const runMarker = `Workflow run: ${runUrl}`;
-
-            const { data: existingReviews } = await github.rest.pulls.listReviews({
-              owner,
-              repo,
-              pull_number,
-              per_page: 100,
-            });
-
-            if (existingReviews.some(review => review.body?.includes(runMarker))) {
-              core.info(`Review marker already exists for ${runUrl}`);
+              core.setFailed('Could not determine pull request number for AI review annotation.');
               return;
             }
 
@@ -119,6 +104,12 @@ jobs:
               owner,
               repo,
               pull_number,
+            });
+
+            const { data: headCommit } = await github.rest.repos.getCommit({
+              owner,
+              repo,
+              ref: pull.head.sha,
             });
 
             const { data: comments } = await github.rest.issues.listComments({
@@ -138,24 +129,43 @@ jobs:
               )
               .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
 
-            const trigger =
-              context.eventName === 'issue_comment' ? 'manual `/review` command' : 'PR synchronize event';
+            if (!botComment) {
+              core.warning('AI review comment not found; skipping metadata annotation.');
+              return;
+            }
 
-            const body = [
-              'Automated AI review refreshed.',
-              '',
-              `Trigger: ${trigger}`,
-              botComment
-                ? `Updated review comment: ${botComment.html_url}`
-                : 'Updated review comment: bot comment not found',
-              runMarker,
-              `Head SHA: \`${pull.head.sha}\``,
+            const metadataStart = '<!-- ai-review-metadata:start -->';
+            const metadataEnd = '<!-- ai-review-metadata:end -->';
+            const commitMessage = headCommit.commit.message.trim();
+            const metadataBlock = [
+              metadataStart,
+              '### Reviewed Revision',
+              `- Commit: \`${pull.head.sha}\``,
+              '- Commit message:',
+              '```text',
+              commitMessage,
+              '```',
+              metadataEnd,
             ].join('\n');
 
-            await github.rest.pulls.createReview({
+            const metadataPattern = new RegExp(
+              `${metadataStart.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}[\\s\\S]*?${metadataEnd.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\n*`,
+              'm'
+            );
+            const cleanedBody = botComment.body.replace(metadataPattern, '').trim();
+            const anchor = '### 🤖 AI Review';
+            const anchorIndex = cleanedBody.indexOf(anchor);
+            const updatedBody = anchorIndex === -1
+              ? `${metadataBlock}\n\n${cleanedBody}`
+              : [
+                  cleanedBody.slice(0, anchorIndex + anchor.length),
+                  metadataBlock,
+                  cleanedBody.slice(anchorIndex + anchor.length).trimStart(),
+                ].filter(Boolean).join('\n\n');
+
+            await github.rest.issues.updateComment({
               owner,
               repo,
-              pull_number,
-              event: 'COMMENT',
-              body,
+              comment_id: botComment.id,
+              body: updatedBody,
             });
