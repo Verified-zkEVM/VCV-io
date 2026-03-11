@@ -169,7 +169,7 @@ def tryMatchDecomp (comp : Expr) : TacticM Bool := do
 (i.e. a constant function `fun _ => c`). -/
 def isConstantLambda (e : Expr) : Bool :=
   match e.consumeMData with
-  | .lam _ _ body _ => !body.hasLooseBVars
+  | .lam _ _ body _ => !body.hasLooseBVar 0
   | _ => false
 
 /-- Try the strongest automatic bind step: `triple_bind` plus immediate closure of the
@@ -594,7 +594,7 @@ private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
   let target ← instantiateMVars (← getMainTarget)
   unless isProbEqGoal target do
     return none
-  if plainPreview.ok && plainPreview.goals.isEmpty then
+  if plainPreview.ok && plainPreview.goalCount = 0 then
     return none
   let supportNames ← getProbCongrNames true
   let supportStep :=

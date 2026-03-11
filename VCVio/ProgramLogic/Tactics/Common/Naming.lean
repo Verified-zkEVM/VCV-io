@@ -16,25 +16,25 @@ def isUsableBinderName (name : Name) : Bool :=
 def mkSupportHypName (name : Name) : Name :=
   Name.mkSimple s!"h{toString name}"
 
-private partial def freshUserNameAux (used : Name → Bool) (base : String) (idx : Nat) : Name :=
-  let candidate :=
-    if idx = 0 then
-      Name.mkSimple base
-    else
-      Name.mkSimple s!"{base}{idx + 1}"
-  if used candidate then
-    freshUserNameAux used base (idx + 1)
+private def indexedUserName (base : Name) (idx : Nat) : Name :=
+  if idx = 0 then
+    base
   else
-    candidate
+    base.appendIndexAfter (idx + 1)
 
 def freshUserNameLike (base : Name) : TacticM Name := do
-  let baseStr :=
+  let base :=
     if base.isAnonymous then
-      "x"
+      Name.mkSimple "x"
     else
-      toString base
+      base
   let lctx ← getLCtx
-  return freshUserNameAux (fun name => (lctx.findFromUserName? name).isSome) baseStr 0
+  let mut idx := 0
+  let mut fresh := indexedUserName base idx
+  while (lctx.findFromUserName? fresh).isSome do
+    idx := idx + 1
+    fresh := indexedUserName base idx
+  return fresh
 
 def freshenSuggestedNames (names : Array Name) : TacticM (Array Name) := do
   let lctx ← getLCtx
@@ -50,11 +50,7 @@ def freshenSuggestedNames (names : Array Name) : TacticM (Array Name) := do
     let mut fresh := base
     let mut searching := true
     while searching do
-      fresh :=
-        if idx = 0 then
-          base
-        else
-          Name.mkSimple s!"{toString base}{idx + 1}"
+      fresh := indexedUserName base idx
       if (lctx.findFromUserName? fresh).isSome || fresh ∈ used then
         idx := idx + 1
       else
@@ -181,7 +177,8 @@ def introAllGoalsNames (names : Array Name) : TacticM Unit := do
 
 def renameInaccessibleNames (names : Array Name) : TacticM Unit := do
   for name in names do
-    discard <| tryEvalTacticSyntax (← `(tactic| all_goals first | rename_i $(mkIdent name):ident | skip))
+    discard <| tryEvalTacticSyntax
+      (← `(tactic| all_goals first | rename_i $(mkIdent name):ident | skip))
 
 def renderAsClause (names : Array Name) : String :=
   if names.isEmpty then

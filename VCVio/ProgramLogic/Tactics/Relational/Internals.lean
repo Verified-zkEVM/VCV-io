@@ -24,8 +24,7 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) <||>
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure
-    assumption))
+    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption))
 
 def tryCloseLeadingRelGoalImmediate : TacticM Unit := do
   let goals ← getGoals
@@ -116,7 +115,7 @@ def runRelRndRuleUsing (f : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_query_bij _ (f := $f) <;> [skip])) <||>
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij (f := $f) <;> [skip; skip]))
+    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij (f := $f) <;> skip))
 
 def runRelRndRuleWithContextBijection : TacticM Bool := withMainContext do
   for localDecl in ← getLCtx do
@@ -138,14 +137,14 @@ def runRelRndRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_query_bij <;> [skip])) <||>
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij <;> [skip; skip]))
+    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij <;> skip))
 
 def runRelCondRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _])) <||>
+    apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _)) <||>
   tryEvalTacticSyntax (← `(tactic|
     (simp only [game_rule]
-     apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _])))
+     apply OracleComp.ProgramLogic.Relational.relTriple_if <;> intro _)))
 
 def runByUptoRule (bad : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
@@ -345,7 +344,7 @@ def planRVCGenStep? : TacticM (Option PlannedStep) := do
       runRVCGenStructuralCore
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
   if let some hintName ← findUniqueRelHint? then
-    if !(structuralPreview.ok && structuralPreview.goals.isEmpty) then
+    if !(structuralPreview.ok && structuralPreview.goalCount = 0) then
       if let some (oa, ob, _) := relTripleGoalParts? target then
         let oa ← whnfReducible (← instantiateMVars oa)
         let ob ← whnfReducible (← instantiateMVars ob)
@@ -439,13 +438,13 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
     throwError "rvcgen_step: failed to lower the `evalDist` equality into a `RelTriple` goal."
   match relTripleGoalParts? target with
   | none =>
-      throwError
+      throwError m!
         "rvcgen_step: expected a `GameEquiv`, `evalDist` equality, or `RelTriple` goal; got:{indentExpr target}"
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
       if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
-        throwError
+        throwError m!
           "rvcgen_step: found a `simulateQ` relational goal but no simulation rule applied.\n\
           If the proof needs a state invariant, try `rvcgen_step using R_state`.\n\
           If the goal is an output-only `run'` equality coupling, `rvcgen_step` also tries the \
@@ -454,33 +453,33 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       if isListMapMExpr oa || isListMapMExpr ob then
-        throwError
+        throwError m!
           "rvcgen_step: found a `List.mapM` relational goal but no traversal rule applied.\n\
           Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       if isListFoldlMExpr oa || isListFoldlMExpr ob then
-        throwError
+        throwError m!
           "rvcgen_step: found a `List.foldlM` relational goal but no fold rule applied.\n\
           Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       if isReplicateExpr oa || isReplicateExpr ob then
-        throwError
+        throwError m!
           "rvcgen_step: found a `replicate` relational goal but no iteration rule applied.\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       if isBindExpr oa && isBindExpr ob then
-        throwError
+        throwError m!
           "rvcgen_step: found a bind-on-both-sides relational goal but could not choose an intermediate relation.\n\
           Try `rvcgen_step using R` when equality is not the right cut relation.\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
-      throwError
+      throwError m!
         "rvcgen_step: found a `RelTriple` goal, but no relational VCGen rule matched.\n\
         Left side:{indentExpr oa}\n\
         Right side:{indentExpr ob}\n\
@@ -489,7 +488,7 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
 
 def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  throwError
+  throwError m!
     "rvcgen_step using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\
     - bind cut relation\n\

@@ -555,7 +555,7 @@ private lemma stepDDH_real_simulation_deferred
               IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b (k + 1)
                 (Sum.inl tu) from fun _ => rfl]
           qvcgen_step
-          have hst : b2.2 = st := by
+          have hst : b_2.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
               QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
               liftM, monadLift, StateT.instMonadLift] at hb
@@ -564,7 +564,7 @@ private lemma stepDDH_real_simulation_deferred
             rw [mem_support_pure_iff] at ha
             exact congrArg Prod.snd ha
           subst hst
-          exact ih b2.1 _ hle z
+          exact ih b_2.1 _ hle z
       | inr mm =>
           obtain ⟨m₁, m₂⟩ := mm
           rcases Nat.lt_or_eq_of_le hle with hlt | heq
@@ -585,8 +585,8 @@ private lemma stepDDH_real_simulation_deferred
               · simp only [StateT.run_pure]
             simp_rw [hq]
             qvcgen_step
-            have hle' : b2.2.2 ≤ k := by
-              change b2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
+            have hle' : b_2.2.2 ≤ k := by
+              change b_2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
                 (gen := gen) pk b (k + 1) (m₁, m₂)).run st) at hb
               revert hb
               rcases hcache : st.1 (m₁, m₂) with _ | c <;> intro hp
@@ -609,7 +609,7 @@ private lemma stepDDH_real_simulation_deferred
                 have := congrArg (fun x => x.2.2) hp
                 simp at this
                 omega
-            exact ih b2.1 b2.2 hle' z
+            exact ih b_2.1 b_2.2 hle' z
           · rcases hcache : st.1 (m₁, m₂) with _ | c
             · have hstep : ∀ r : F,
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
@@ -702,7 +702,7 @@ private lemma stepDDH_rand_simulation_deferred
               IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
                 (Sum.inl tu) from fun _ _ => rfl]
           qvcgen_step
-          have hst : b2.2 = st := by
+          have hst : b_2.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
               QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
               liftM, monadLift, StateT.instMonadLift] at hb
@@ -711,7 +711,7 @@ private lemma stepDDH_rand_simulation_deferred
             rw [mem_support_pure_iff] at ha
             exact congrArg Prod.snd ha
           subst hst
-          exact ih b2.1 _ hle z
+          exact ih b_2.1 _ hle z
       | inr mm =>
           obtain ⟨m₁, m₂⟩ := mm
           rcases Nat.lt_or_eq_of_le hle with hlt | heq
@@ -732,8 +732,8 @@ private lemma stepDDH_rand_simulation_deferred
               · simp only [StateT.run_pure]
             simp_rw [hq]
             qvcgen_step
-            have hle' : b2.2.2 ≤ k := by
-              change b2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
+            have hle' : b_2.2.2 ≤ k := by
+              change b_2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
                 (gen := gen) pk b k (m₁, m₂)).run st) at hb
               revert hb
               rcases hcache : st.1 (m₁, m₂) with _ | c <;> intro hp
@@ -756,7 +756,7 @@ private lemma stepDDH_rand_simulation_deferred
                 have := congrArg (fun x => x.2.2) hp
                 simp at this
                 omega
-            exact ih b2.1 b2.2 hle' z
+            exact ih b_2.1 b_2.2 hle' z
           · rcases hcache : st.1 (m₁, m₂) with _ | c
             · have hstep : ∀ (r : F) (y : G),
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k

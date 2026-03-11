@@ -26,11 +26,11 @@ private def getVCGenHeadFromType (declTy : Expr) : MetaM Name := do
   let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
   let some comp := tripleGoalComp? targetTy
     | throwError
-        "@[vcgen] expects a theorem whose target is a unary `Triple` goal, got:{indentExpr declTy}"
+        m!"@[vcgen] expects a theorem whose target is a unary `Triple` goal, got:{indentExpr declTy}"
   let comp ← whnfReducible (← instantiateMVars comp)
   let some head := headConstName? comp
     | throwError
-        "@[vcgen] only supports computations with a constant head symbol, got:{indentExpr comp}"
+        m!"@[vcgen] only supports computations with a constant head symbol, got:{indentExpr comp}"
   return head
 
 initialize registerBuiltinAttribute {

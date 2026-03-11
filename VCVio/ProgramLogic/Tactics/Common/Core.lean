@@ -30,7 +30,7 @@ structure PlannedStep where
 
 structure PreviewResult where
   ok : Bool
-  goals : List MVarId
+  goalCount : Nat
 
 def previewAction (action : TacticM Bool) : TacticM Bool := do
   let saved ← saveState
@@ -41,9 +41,9 @@ def previewAction (action : TacticM Bool) : TacticM Bool := do
 def previewActionWithGoals (action : TacticM Bool) : TacticM PreviewResult := do
   let saved ← saveState
   let ok ← action
-  let goals ← getGoals
+  let goalCount := (← getGoals).length
   saved.restore
-  return { ok, goals }
+  return { ok, goalCount }
 
 def previewPlannedStep (step : PlannedStep) : TacticM Bool :=
   previewAction step.run
@@ -81,34 +81,26 @@ def trailingArgs? (e : Expr) (n : Nat) : Option (Array Expr) :=
   else
     none
 
-partial def findAppWithHead? (head : Name) (e : Expr) : Option Expr :=
-  let e := e.consumeMData
-  if e.getAppFn.isConstOf head then
-    some e
-  else
-    match e with
-    | .app f a => findAppWithHead? head f <|> findAppWithHead? head a
-    | .lam _ t b _ => findAppWithHead? head t <|> findAppWithHead? head b
-    | .forallE _ t b _ => findAppWithHead? head t <|> findAppWithHead? head b
-    | .letE _ t v b _ => findAppWithHead? head t <|> findAppWithHead? head v <|> findAppWithHead? head b
-    | .mdata _ b => findAppWithHead? head b
-    | .proj _ _ b => findAppWithHead? head b
-    | _ => none
+def findAppWithHead? (head : Name) (e : Expr) : Option Expr :=
+  (e.find? fun e' => e'.consumeMData.getAppFn.isConstOf head).map Expr.consumeMData
 
 def relTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.RelTriple target
   let args ← trailingArgs? app 3
-  some (args[0]!, args[1]!, args[2]!)
+  let #[oa, ob, post] := args | none
+  some (oa, ob, post)
 
 def wpGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
   let args ← trailingArgs? app 2
-  some args[0]!
+  let #[oa, _post] := args | none
+  some oa
 
 def tripleGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
   let args ← trailingArgs? app 3
-  some args[1]!
+  let #[_pre, oa, _post] := args | none
+  some oa
 
 def isSimulateQAction (e : Expr) : Bool :=
   (findAppWithHead? ``simulateQ e).isSome
@@ -184,9 +176,8 @@ def isProbEqGoal (target : Expr) : Bool :=
   else
     false
 
-def tryEvalTacticSyntax (stx : Syntax) : TacticM Bool := do
-  let some _ ← observing? (evalTactic stx) | return false
-  return true
+def tryEvalTacticSyntax (stx : Syntax) : TacticM Bool :=
+  (evalTactic stx *> pure true) <|> pure false
 
 def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do
   let maxPasses := vcvio.vcgen.maxPasses.get (← getOptions)
@@ -200,7 +191,7 @@ def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do
   let more ← step
   saved.restore
   if more then
-    throwError
+    throwError m!
       "{label}: exhausted the configured pass budget ({maxPasses}).\n\
       Increase `set_option vcvio.vcgen.maxPasses <n>` or keep stepping manually."
   return passes
@@ -220,7 +211,7 @@ def runBoundedPassesCollect {α : Type} (label : String)
   let more ← step
   saved.restore
   if !more.isEmpty then
-    throwError
+    throwError m!
       "{label}: exhausted the configured pass budget ({maxPasses}).\n\
       Increase `set_option vcvio.vcgen.maxPasses <n>` or keep stepping manually."
   return batches
