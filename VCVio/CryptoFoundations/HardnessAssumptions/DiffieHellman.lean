@@ -133,8 +133,7 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
       pure (bit == z)] := by
   unfold ddhExp
   qvcgen_step
-  rename_i bit hbit
-  cases bit <;> simp [ddhExpReal, ddhExpRand]
+  cases b <;> simp [ddhExpReal, ddhExpRand]
 
 omit [Fintype F] [DecidableEq F] [DecidableEq G] [SampleableType G] in
 /-- The single-game DDH decomposes: `Pr[win] - 1/2 = (Pr[real=1] - Pr[rand=1]) / 2`. -/

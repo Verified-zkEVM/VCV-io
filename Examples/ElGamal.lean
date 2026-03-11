@@ -408,8 +408,8 @@ private lemma hybridBranch_probOutput_eq
       pure (b == z)] =
     Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary realUntil] := by
   simp [IND_CPA_HybridGame, elgamalAsymmEnc]
-  qvcgen_step rw congr'; rename_i b
-  qvcgen_step rw congr'; rename_i a
+  qvcgen_step rw congr' as ⟨b⟩
+  qvcgen_step rw congr' as ⟨a⟩
   simpa using
     (probOutput_map_eq_of_evalDist_eq (f := fun z => b == z) (y := true) (h a b))
 
@@ -520,7 +520,7 @@ private lemma simulateQ_stepDDH_probOutput_eq_hybrid_post_k
       have hq := stepDDHQueryImpl_eq_hybridQueryImpl_post_k (F := F) (gen := gen) pk b k x₂ x₃
         realUntil hrealUntil t st hgt
       rw [hq]
-      qvcgen_step; rename_i p hp
+      qvcgen_step as ⟨p, hp⟩
       refine ih p.1 p.2 ?_ z
       exact Nat.lt_of_lt_of_le hgt
         (hybridQueryImpl_counter_mono (F := F) (gen := gen) pk b realUntil t st p hp)
@@ -554,17 +554,17 @@ private lemma stepDDH_real_simulation_deferred
                 (r • gen) (r • pk) (Sum.inl tu) =
               IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b (k + 1)
                 (Sum.inl tu) from fun _ => rfl]
-          qvcgen_step; rename_i p hp
-          have hst : p.2 = st := by
+          qvcgen_step
+          have hst : b2.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
               QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-              liftM, monadLift, StateT.instMonadLift] at hp
-            rw [StateT.run_lift, mem_support_bind_iff] at hp
-            obtain ⟨a, _, ha⟩ := hp
+              liftM, monadLift, StateT.instMonadLift] at hb
+            rw [StateT.run_lift, mem_support_bind_iff] at hb
+            obtain ⟨a, _, ha⟩ := hb
             rw [mem_support_pure_iff] at ha
             exact congrArg Prod.snd ha
           subst hst
-          exact ih p.1 _ hle z
+          exact ih b2.1 _ hle z
       | inr mm =>
           obtain ⟨m₁, m₂⟩ := mm
           rcases Nat.lt_or_eq_of_le hle with hlt | heq
@@ -584,11 +584,11 @@ private lemma stepDDH_real_simulation_deferred
               · simp only [if_pos hlt, if_pos (show st.2 < k + 1 by omega)]
               · simp only [StateT.run_pure]
             simp_rw [hq]
-            qvcgen_step; rename_i p hp
-            have hle' : p.2.2 ≤ k := by
-              change p ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
-                (gen := gen) pk b (k + 1) (m₁, m₂)).run st) at hp
-              revert hp
+            qvcgen_step
+            have hle' : b2.2.2 ≤ k := by
+              change b2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
+                (gen := gen) pk b (k + 1) (m₁, m₂)).run st) at hb
+              revert hb
               rcases hcache : st.1 (m₁, m₂) with _ | c <;> intro hp
               · simp only [IND_CPA_hybridChallengeOracle, hcache,
                   StateT.run_bind, StateT.run_get, pure_bind] at hp
@@ -609,7 +609,7 @@ private lemma stepDDH_real_simulation_deferred
                 have := congrArg (fun x => x.2.2) hp
                 simp at this
                 omega
-            exact ih p.1 p.2 hle' z
+            exact ih b2.1 b2.2 hle' z
           · rcases hcache : st.1 (m₁, m₂) with _ | c
             · have hstep : ∀ r : F,
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
@@ -646,7 +646,7 @@ private lemma stepDDH_real_simulation_deferred
               simp_rw [hstep, pure_bind]
               rw [hhybrid, bind_assoc]
               simp_rw [pure_bind]
-              qvcgen_step rw congr'; rename_i r
+              qvcgen_step rw congr' as ⟨r⟩
               exact simulateQ_stepDDH_probOutput_eq_hybrid_post_k (F := F)
                 (gen := gen) pk b k (r • gen) (r • pk) (k + 1)
                 (Or.inr rfl) (oa _) _ (by rw [heq]; omega) z
@@ -702,17 +702,16 @@ private lemma stepDDH_rand_simulation_deferred
               IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b k
                 (Sum.inl tu) from fun _ _ => rfl]
           qvcgen_step
-          rename_i p hp
-          have hst : p.2 = st := by
+          have hst : b2.2 = st := by
             simp only [IND_CPA_queryImpl_hybrid, QueryImpl.add_apply_inl,
               QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-              liftM, monadLift, StateT.instMonadLift] at hp
-            rw [StateT.run_lift, mem_support_bind_iff] at hp
-            obtain ⟨a, _, ha⟩ := hp
+              liftM, monadLift, StateT.instMonadLift] at hb
+            rw [StateT.run_lift, mem_support_bind_iff] at hb
+            obtain ⟨a, _, ha⟩ := hb
             rw [mem_support_pure_iff] at ha
             exact congrArg Prod.snd ha
           subst hst
-          exact ih p.1 _ hle z
+          exact ih b2.1 _ hle z
       | inr mm =>
           obtain ⟨m₁, m₂⟩ := mm
           rcases Nat.lt_or_eq_of_le hle with hlt | heq
@@ -733,11 +732,10 @@ private lemma stepDDH_rand_simulation_deferred
               · simp only [StateT.run_pure]
             simp_rw [hq]
             qvcgen_step
-            rename_i p hp
-            have hle' : p.2.2 ≤ k := by
-              change p ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
-                (gen := gen) pk b k (m₁, m₂)).run st) at hp
-              revert hp
+            have hle' : b2.2.2 ≤ k := by
+              change b2 ∈ support ((IND_CPA_hybridChallengeOracle (F := F)
+                (gen := gen) pk b k (m₁, m₂)).run st) at hb
+              revert hb
               rcases hcache : st.1 (m₁, m₂) with _ | c <;> intro hp
               · simp only [IND_CPA_hybridChallengeOracle, hcache,
                   StateT.run_bind, StateT.run_get, pure_bind] at hp
@@ -758,7 +756,7 @@ private lemma stepDDH_rand_simulation_deferred
                 have := congrArg (fun x => x.2.2) hp
                 simp at this
                 omega
-            exact ih p.1 p.2 hle' z
+            exact ih b2.1 b2.2 hle' z
           · rcases hcache : st.1 (m₁, m₂) with _ | c
             · have hstep : ∀ (r : F) (y : G),
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
@@ -796,8 +794,8 @@ private lemma stepDDH_rand_simulation_deferred
               simp_rw [hstep, pure_bind]
               rw [hhybrid]
               simp_rw [bind_assoc, pure_bind]
-              qvcgen_step rw congr'; rename_i r
-              qvcgen_step rw congr'; rename_i y
+              qvcgen_step rw congr' as ⟨r⟩
+              qvcgen_step rw congr' as ⟨y⟩
               exact simulateQ_stepDDH_probOutput_eq_hybrid_post_k (F := F)
                 (gen := gen) pk b k (r • gen) y k
                 (Or.inl rfl) (oa ((r • gen, (if b = true then m₁ else m₂) + y))) _
@@ -901,7 +899,7 @@ private lemma stepDDH_randBranch_probOutput_eq
     intro a b
     apply evalDist_ext
     intro z
-    qvcgen_step rw congr'; rename_i b_scalar
+    qvcgen_step rw congr' as ⟨b_scalar⟩
     exact probOutput_bind_uniform_smul_eq (gen := gen) hg
       (fun y => do
         let pk : G := a • gen
@@ -1017,7 +1015,7 @@ private lemma ddhExp_stepDDH_eq_mixture
         else
           stepDDH_randBranchGame (F := F) (gen := gen) adversary k
         pure (d == z)] := by
-    qvcgen_step rw congr'; rename_i d
+    qvcgen_step rw congr' as ⟨d⟩
     cases d
     · simp [stepDDH_randBranchGame, stepDDH_randBranchCore,
         map_eq_bind_pure_comp, bind_assoc]
@@ -1182,7 +1180,7 @@ private lemma hybrid_q_probOutput_eq_allReal
       | inl tu =>
           simp only [IND_CPA_queryImpl_hybrid, IND_CPA_queryImpl_allReal,
             QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply]
-          qvcgen_step; rename_i p hp
+          qvcgen_step as ⟨p, hp⟩
           have hst : p.2 = st := by
             simp only [liftM, monadLift, StateT.instMonadLift] at hp
             rw [StateT.run_lift, mem_support_bind_iff] at hp
@@ -1197,7 +1195,7 @@ private lemma hybrid_q_probOutput_eq_allReal
             omega
           have hquery := allReal_eq_hybrid_on_bounded (F := F) (gen := gen) pk b q (Sum.inr mm) st hlt
           rw [← hquery]
-          qvcgen_step; rename_i p hp
+          qvcgen_step as ⟨p, hp⟩
           have hle' : p.2.2 + (budget - 1) ≤ q := by
             have hsucc := allReal_counter_le_succ (F := F) (gen := gen)
               pk b (Sum.inr mm) st p hp

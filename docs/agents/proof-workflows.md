@@ -15,6 +15,7 @@
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
    → Start with `qvcgen_step` if the goal should lower or decompose automatically
+   → Use `qvcgen_step?` when you want the explicit script, binder names, or rewrite form surfaced
    → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
    → Use `qvcgen_step`, `qvcgen_step rw`, or `qvcgen_step rw congr'` for probability equalities
@@ -116,6 +117,11 @@ rvcgen_step using R         -- if needed, provide the bind cut relation
   rvcgen                    -- keep taking obvious relational steps
 ```
 
+```lean
+-- Same workflow, but ask the tactic to surface the explicit script:
+rvcgen_step?
+```
+
 ### `qvcgen_step` on probability equalities
 
 ```lean
@@ -127,6 +133,46 @@ qvcgen_step                -- closes the goal automatically
 ```lean
 -- Same shape, but keep going after one rewrite:
 qvcgen_step rw
+```
+
+### Naming and suggestion modes
+
+```lean
+-- Ask for the explicit next script and binder names:
+qvcgen_step?
+```
+
+```lean
+-- Keep the step, but force stable names for the new binders:
+qvcgen_step as ⟨x⟩
+```
+
+```lean
+-- Same idea on the relational side:
+rvcgen_step using S as ⟨a₁, a₂, hrel⟩
+```
+
+### Opt-in unary theorem lookup
+
+When a computation head is user-defined and not one of the built-in structural cases, register a
+unary `Triple` lemma explicitly:
+
+```lean
+@[irreducible] def wrappedTrue : OracleComp spec Bool := pure true
+
+@[vcgen] theorem triple_wrappedTrue :
+    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  simpa [wrappedTrue] using
+    (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
+```
+
+After that, `qvcgen_step` can use the theorem when the goal head symbol is `wrappedTrue`.
+
+If an exhaustive `qvcgen` / `rvcgen` run stops too early, raise the local pass budget with:
+
+```lean
+set_option vcvio.vcgen.maxPasses 128 in
+  qvcgen
 ```
 
 ### `by_dist` for advantage bounds

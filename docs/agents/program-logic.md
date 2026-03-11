@@ -35,8 +35,10 @@ before generating the remaining subgoals.
 |--------|-----------|--------------|
 | `rvcgen_step` | `g₁ ≡ₚ g₂`, `evalDist g₁ = evalDist g₂`, or `⟪oa ~ ob \| R⟫` | Lowers into `RelTriple` if needed, then applies one obvious relational step |
 | `rvcgen_step using t` | same | Supplies the explicit witness needed by the current shape (bind cut relation, bijection, traversal input relation, or simulation state relation) |
+| `rvcgen_step?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcgen?` | same | Runs `rvcgen` and emits the corresponding explicit script |
 | `rel_conseq` | `⟪oa ~ ob \| R'⟫` | Weakens/strengthens postcondition |
 | `rel_inline foo` | `⟪... ~ ... \| R⟫` | Unfolds definitions, simplifies |
 | `rel_dist` | `⟪oa ~ ob \| EqRel α⟫` | Exits relational mode back to `evalDist oa = evalDist ob` |
@@ -47,6 +49,7 @@ before generating the remaining subgoals.
 - `rvcgen_step using f` — on random/query goals, provide the coupling bijection explicitly
 - `rvcgen_step using Rin` — on `List.mapM` / `List.foldlM` goals, provide the input relation
 - `rvcgen_step using R_state` — on `simulateQ` goals, provide the state invariant relation
+- `rvcgen_step as ⟨x₁, x₂, h⟩` — explicitly name the binders introduced by the current step
 - `rvcgen using t` — use one explicit first hint, then keep stepping automatically
 - `rel_conseq with R` — provide explicit weaker postcondition
 
@@ -59,7 +62,10 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 |--------|--------------|
 | `qvcgen` | Exhaustively decomposes a `Triple` or probability goal with spec-aware stepping, loop invariant auto-detection, and support/indicator leaf closure |
 | `qvcgen_step` | One step: probability lowering → bind → conditional → match → loop → leaf |
+| `qvcgen_step?` | Performs one step and emits the corresponding explicit script, often including binder names |
+| `qvcgen?` | Runs `qvcgen` and emits the full explicit script |
 | `qvcgen_step using cut` | Explicit intermediate postcondition for a bind step |
+| `qvcgen_step as ⟨x, hx⟩` | Explicit names for binders introduced by the current step |
 | `qvcgen_step inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
 | `qvcgen_step rw` | One explicit top-level bind-swap rewrite on a `Pr[...] = Pr[...]` goal |
 | `qvcgen_step rw under n` | One bind-swap rewrite under `n` shared outer bind prefixes |
@@ -90,6 +96,21 @@ Use `qvcgen_step inv I` to provide an explicit invariant.
 **Support-sensitive leaf closure**: `qvcgen` final pass tries `triple_support`,
 `triple_propInd_of_support`, `triple_probEvent_eq_one`, and `triple_probOutput_eq_one`
 in addition to the standard `triple_pure`, `triple_zero`, and consequence search.
+
+**Naming and suggestions**: plain `qvcgen_step` / `rvcgen_step` now try to pick useful binder
+names automatically. The `?` variants run the same step but also emit a concrete `Try this`
+script, typically surfacing an explicit `using ...` hint or `as ⟨...⟩` clause that you can paste
+back into the proof.
+
+**Opt-in unary lookup**: mark a unary `Triple` theorem with `@[vcgen]` to register it for
+bounded head-symbol lookup. This is intentionally narrow: `qvcgen_step` first tries the built-in
+leaf rules and local hypotheses, then consults only `@[vcgen]` theorems whose computation head
+matches the current goal.
+
+**Pass budget**: exhaustive `qvcgen` / `rvcgen` runs are bounded by
+`set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
+predictable; if you intentionally want a longer exhaustive run, raise the option locally around
+that proof.
 
 ### Raw WP Tactics
 

@@ -90,6 +90,17 @@ example (impl : QueryImpl spec (OracleComp spec))
   wp_step
   exact hImpl
 
+@[irreducible] def wrappedTrue : OracleComp spec Bool := pure true
+
+@[local vcgen] theorem triple_wrappedTrue :
+    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  simpa [wrappedTrue] using
+    (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
+
+example :
+    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  qvcgen_step
+
 section LiftComp
 
 variable {ι' : Type} {superSpec : OracleSpec ι'}
@@ -109,6 +120,22 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
     ⦃pre⦄ (oa >>= f) ⦃post⦄ := by
   qvcgen_step
   exact hob
+
+example {oa : OracleComp spec α} {f : α → OracleComp spec β}
+    {pre : ℝ≥0∞} {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
+    (hoa : ⦃pre⦄ oa ⦃cut⦄)
+    (hob : ∀ x, ⦃cut x⦄ f x ⦃post⦄) :
+    ⦃pre⦄ (oa >>= f) ⦃post⦄ := by
+  qvcgen_step as ⟨x⟩
+  exact hob x
+
+example {oa : OracleComp spec α} {f : α → OracleComp spec β}
+    {pre : ℝ≥0∞} {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
+    (hoa : ⦃pre⦄ oa ⦃cut⦄)
+    (hob : ∀ x, ⦃cut x⦄ f x ⦃post⦄) :
+    ⦃pre⦄ (oa >>= f) ⦃post⦄ := by
+  qvcgen_step?
+  exact hob x
 
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
@@ -150,6 +177,12 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     (h1 : ⦃1⦄ oa ⦃cut⦄) (h2 : ∀ x, ⦃cut x⦄ ob x ⦃post⦄) :
     ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
   qvcgen
+
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
+    (h1 : ⦃1⦄ oa ⦃cut⦄) (h2 : ∀ x, ⦃cut x⦄ ob x ⦃post⦄) :
+    ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
+  qvcgen?
 
 example (x : α) (post : α → ℝ≥0∞) :
     ⦃post x⦄ (pure x : OracleComp spec α) ⦃post⦄ := by
@@ -250,6 +283,18 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → 
   qvcgen_step rw congr'
   exact h _
 
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
+    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
+    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+  qvcgen_step rw congr' as ⟨x⟩
+  exact h x
+
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
+    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
+    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+  qvcgen_step?
+  exact h x
+
 example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
   exp_norm
 
@@ -283,6 +328,20 @@ example {oa₁ oa₂ : OracleComp spec α}
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcgen_step using S
   · exact hoa
+
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen_step using S
+  · exact hoa
+
+example (f : α → OracleComp spec β) :
+    ∀ x, ⟪f x ~ f x | EqRel β⟫ := by
+  rvcgen_step as ⟨x⟩
+  rvcgen_step
 
 example (t : spec.Domain) :
     ⟪(liftM (query t) : OracleComp spec (spec.Range t))
@@ -333,6 +392,17 @@ example {xs : List α} {ys : List β}
     (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
     ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
   rvcgen_step using S
+  · exact hxy
+  · exact hfg
+
+example {xs : List α} {ys : List β}
+    {S : α → β → Prop}
+    {f : α → OracleComp spec γ} {g : β → OracleComp spec γ}
+    {R : RelPost γ γ}
+    (hxy : List.Forall₂ S xs ys)
+    (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
+    ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
+  rvcgen_step?
   · exact hxy
   · exact hfg
 
@@ -509,6 +579,10 @@ section GameEquiv
 example (oa : OracleComp spec α) :
     oa ≡ₚ oa := by
   rvcgen
+
+example (oa : OracleComp spec α) :
+    oa ≡ₚ oa := by
+  rvcgen?
 
 example [SampleableType α]
     (f : α → α) (hf : Function.Bijective f) :

@@ -4,376 +4,78 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.ProgramLogic.Tactics.Common
+import VCVio.ProgramLogic.Tactics.Relational.Internals
 
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
 
-private def tryCloseRelGoalImmediate : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic| assumption)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure
-    assumption))
+private def binderIdentsToNames (ids : Syntax.TSepArray `Lean.binderIdent ",") : Array Name :=
+  ids.getElems.map fun
+    | `(binderIdent| $name:ident) => name.getId
+    | _ => Name.anonymous
 
-private def tryCloseLeadingRelGoalImmediate : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | [] => pure ()
-  | goal :: rest =>
-      setGoals [goal]
-      if ← tryCloseRelGoalImmediate then
-        let solvedPrefix ← getGoals
-        setGoals (solvedPrefix ++ rest)
-      else
-        setGoals goals
+private def previewRelAction (action : TacticM Bool) : TacticM Bool := do
+  let saved ← saveState
+  let ok ← action
+  saved.restore
+  return ok
 
-private def reorderRelBindGoals : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | first :: second :: rest =>
-      setGoals ([second, first] ++ rest)
-  | _ => pure ()
-
-private def tryLowerRelGoal : TacticM Bool := withMainContext do
+private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  if relTripleGoalParts? target |>.isSome then
-    return false
-  if isGameEquivGoal target then
-    tryEvalTacticSyntax (← `(tactic|
-      apply OracleComp.ProgramLogic.GameEquiv.of_relTriple))
-  else if isEvalDistEqGoal target then
-    tryEvalTacticSyntax (← `(tactic|
-      apply OracleComp.ProgramLogic.Relational.evalDist_eq_of_relTriple_eqRel))
-  else
-    return false
-
-private def runRelBindRule : TacticM Bool := do
-  if ← tryEvalTacticSyntax (← `(tactic|
-      refine OracleComp.ProgramLogic.Relational.relTriple_bind
-        (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
-    return true
-  if ← tryEvalTacticSyntax (← `(tactic|
-      refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+  if target.isForall then
+    return (← introMainGoalNames names)
+  if ← TacticInternals.Relational.runRVCGenStep then
+    introAllGoalsNames names
+    renameInaccessibleNames names
     return true
   return false
 
-private def runRelBindRuleUsing (R : TSyntax `term) : TacticM Bool := do
-  if ← tryEvalTacticSyntax (← `(tactic|
-      refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+private def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  if target.isForall then
+    return (← introMainGoalNames names)
+  if ← TacticInternals.Relational.runRVCGenStepUsing hint then
+    introAllGoalsNames names
+    renameInaccessibleNames names
     return true
   return false
 
-private def runRelMapRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_map))
-
-private def runRelReplicateRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_replicate))
-
-private def runRelMapMRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
-      (Rin := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))
-
-private def runRelMapMRuleUsing (R : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
-      (Rin := $R) ?_ ?_))
-
-private def runRelFoldlMRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same))
-
-private def runRelFoldlMRuleUsing (R : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
-      (Rin := $R) ?_ ?_ ?_))
-
-private def runRelRndRuleUsing (f : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_query_bij _ (f := $f) <;> [skip])) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij (f := $f) <;> [skip; skip]))
-
-private def runRelRndRuleWithContextBijection : TacticM Bool := withMainContext do
+private def findRelUsingHint? : TacticM (Option Name) := withMainContext do
   for localDecl in ← getLCtx do
     unless localDecl.isImplementationDetail do
-      let type ← instantiateMVars localDecl.type
-      if let some app := findAppWithHead? ``Function.Bijective type then
-        if let some args := trailingArgs? app 1 then
-          let fStx ← PrettyPrinter.delab args[0]!
-          if ← runRelRndRuleUsing fStx then
-            return true
-  return false
+      let name := localDecl.userName
+      if isUsableBinderName name then
+        let type ← instantiateMVars localDecl.type
+        unless type.isSort do
+          unless ← isProp type do
+            if type.isForall then
+              let hint := mkIdent name
+              if ← previewRelAction (TacticInternals.Relational.runRVCGenStepUsing hint) then
+                return some name
+  return none
 
-private def runRelRndRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_query _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) <||>
-  runRelRndRuleWithContextBijection <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_query_bij <;> [skip])) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij <;> [skip; skip]))
+private inductive RVCGenStepSuggestion where
+  | plain
+  | namedStep (names : Array Name)
+  | usingHint (name : Name)
 
-private def runRelCondRule : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _])) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    (simp only [game_rule]
-     apply OracleComp.ProgramLogic.Relational.relTriple_if <;> [intro _; intro _])))
+private def RVCGenStepSuggestion.text : RVCGenStepSuggestion → String
+  | .plain => "rvcgen_step"
+  | .namedStep names => s!"rvcgen_step{renderAsClause names}"
+  | .usingHint name => s!"rvcgen_step using {name}"
 
-private def runByUptoRule (bad : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.tvDist_simulateQ_le_probEvent_bad
-      (bad := $bad)))
-
-private def runRelSimRule : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match relTripleGoalParts? target with
-  | some (oa, ob, _) =>
-      if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
-        return false
-      if hasStateTRun'Expr oa && hasStateTRun'Expr ob then
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := Eq))) <||>
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run')) <||>
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run))
-      else
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run))
-  | none => return false
-
-private def runRelSimRuleUsing (R : TSyntax `term) : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match relTripleGoalParts? target with
-  | some (oa, ob, _) =>
-      if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) then
-        return false
-      if hasStateTRun'Expr oa && hasStateTRun'Expr ob then
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run' (R_state := $R))) <||>
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run (R_state := $R)))
-      else
-        tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run (R_state := $R)))
-  | none => return false
-
-private def runRelSimDistRule : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match relTripleGoalParts? target with
-  | some (oa, ob, post) =>
-      if !(hasSimulateQRunLike oa) || !(hasSimulateQRunLike ob) || !isEqRelPost post then
-        return false
-      tryEvalTacticSyntax (← `(tactic|
-        apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_impl_evalDist_eq))
-  | none => return false
-
-private def runRVCGenCore : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match relTripleGoalParts? target with
-  | none => return false
-  | some (oa, ob, post) =>
-      let oa ← whnfReducible (← instantiateMVars oa)
-      let ob ← whnfReducible (← instantiateMVars ob)
-      if ← tryCloseRelGoalImmediate then
-        return true
-      if isIfExpr oa && isIfExpr ob then
-        if ← runRelCondRule then
-          return true
-      if hasStateTRun'Expr oa && hasStateTRun'Expr ob && hasSimulateQRunLike oa &&
-          hasSimulateQRunLike ob && isEqRelPost post then
-        if ← runRelSimDistRule then
-          return true
-      if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
-        if ← runRelSimRule then
-          return true
-      if isMapExpr oa && isMapExpr ob then
-        if ← runRelMapRule then
-          return true
-      if isReplicateExpr oa || isReplicateExpr ob then
-        if ← runRelReplicateRule then
-          return true
-      if isListMapMExpr oa || isListMapMExpr ob then
-        if ← runRelMapMRule then
-          return true
-      if isListFoldlMExpr oa || isListFoldlMExpr ob then
-        if ← runRelFoldlMRule then
-          return true
-      if isBindExpr oa && isBindExpr ob then
-        if ← runRelBindRule then
-          return true
-      runRelRndRule
-
-private def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match relTripleGoalParts? target with
-  | none => return false
-  | some (oa, ob, post) =>
-      let oa ← whnfReducible (← instantiateMVars oa)
-      let ob ← whnfReducible (← instantiateMVars ob)
-      if hasSimulateQRunLike oa && hasSimulateQRunLike ob && !(hasStateTRun'Expr oa && hasStateTRun'Expr ob && isEqRelPost post) then
-        if ← runRelSimRuleUsing hint then
-          return true
-      if isListMapMExpr oa || isListMapMExpr ob then
-        if ← runRelMapMRuleUsing hint then
-          return true
-      if isListFoldlMExpr oa || isListFoldlMExpr ob then
-        if ← runRelFoldlMRuleUsing hint then
-          return true
-      if isBindExpr oa && isBindExpr ob then
-        if ← runRelBindRuleUsing hint then
-          return true
-      if ← runRelRndRuleUsing hint then
-        return true
-      if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
-        runRelSimRuleUsing hint
-      else
-        return false
-
-/-- One step of relational VCGen.
-
-Strategy:
-1. Lower `GameEquiv` / `evalDist = evalDist` goals into `RelTriple`
-2. `∀`-binder: `intro` and continue
-3. Close trivial `RelTriple` leaves (`refl`, `pure`, assumptions)
-4. Synchronized control flow (`if`)
-5. Oracle simulation (`simulateQ`) with exact-distribution specialization when obvious
-6. Structural traversals (`map`, `replicate`, `List.mapM`, `List.foldlM`)
-7. Monadic bind decomposition with auto-intro of continuation binders
-8. Random/query coupling as the fallback structural rule -/
-private def runRVCGenStep : TacticM Bool := do
-  if (← getGoals).isEmpty then
-    return false
-  let mut progress := false
-  if ← tryLowerRelGoal then
-    progress := true
-  let target ← instantiateMVars (← getMainTarget)
-  if target.isForall then
-    if ← tryEvalTacticSyntax (← `(tactic| intro _)) then
-      progress := true
-  if ← runRVCGenCore then
-    return true
-  return progress
-
-private def runRVCGenStepUsing (hint : TSyntax `term) : TacticM Bool := do
-  if (← getGoals).isEmpty then
-    return false
-  let mut progress := false
-  if ← tryLowerRelGoal then
-    progress := true
-  let target ← instantiateMVars (← getMainTarget)
-  if target.isForall then
-    if ← tryEvalTacticSyntax (← `(tactic| intro _)) then
-      progress := true
-  if ← runRVCGenCoreUsing hint then
-    return true
-  return progress
-
-private def runRVCGenPass : TacticM Bool := do
-  let goals ← getGoals
-  if goals.isEmpty then
-    return false
-  let mut progress := false
-  let mut newGoals : List MVarId := []
-  for goal in goals do
-    setGoals [goal]
-    if ← runRVCGenStep then
-      progress := true
-      newGoals := newGoals ++ (← getGoals)
-    else
-      newGoals := newGoals ++ [goal]
-  setGoals newGoals
-  return progress
-
-private def throwRVCGenStepError : TacticM Unit := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  if isGameEquivGoal target then
-    throwError "rvcgen_step: failed to lower the `GameEquiv` goal into relational proof mode."
-  if isEvalDistEqGoal target then
-    throwError "rvcgen_step: failed to lower the `evalDist` equality into a `RelTriple` goal."
-  match relTripleGoalParts? target with
-  | none =>
-      throwError
-        "rvcgen_step: expected a `GameEquiv`, `evalDist` equality, or `RelTriple` goal; got:{indentExpr target}"
-  | some (oa, ob, post) =>
-      let oa ← whnfReducible (← instantiateMVars oa)
-      let ob ← whnfReducible (← instantiateMVars ob)
-      if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
-        throwError
-          "rvcgen_step: found a `simulateQ` relational goal but no simulation rule applied.\n\
-          If the proof needs a state invariant, try `rvcgen_step using R_state`.\n\
-          If the goal is an output-only `run'` equality coupling, `rvcgen_step` also tries the \
-          exact-distribution specialization automatically.\n\
-          Left side:{indentExpr oa}\n\
-          Right side:{indentExpr ob}\n\
-          Postcondition:{indentExpr post}"
-      if isListMapMExpr oa || isListMapMExpr ob then
-        throwError
-          "rvcgen_step: found a `List.mapM` relational goal but no traversal rule applied.\n\
-          Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
-          Left side:{indentExpr oa}\n\
-          Right side:{indentExpr ob}\n\
-          Postcondition:{indentExpr post}"
-      if isListFoldlMExpr oa || isListFoldlMExpr ob then
-        throwError
-          "rvcgen_step: found a `List.foldlM` relational goal but no fold rule applied.\n\
-          Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
-          Left side:{indentExpr oa}\n\
-          Right side:{indentExpr ob}\n\
-          Postcondition:{indentExpr post}"
-      if isReplicateExpr oa || isReplicateExpr ob then
-        throwError
-          "rvcgen_step: found a `replicate` relational goal but no iteration rule applied.\n\
-          Left side:{indentExpr oa}\n\
-          Right side:{indentExpr ob}\n\
-          Postcondition:{indentExpr post}"
-      if isBindExpr oa && isBindExpr ob then
-        throwError
-          "rvcgen_step: found a bind-on-both-sides relational goal but could not choose an intermediate relation.\n\
-          Try `rvcgen_step using R` when equality is not the right cut relation.\n\
-          Left side:{indentExpr oa}\n\
-          Right side:{indentExpr ob}\n\
-          Postcondition:{indentExpr post}"
-      throwError
-        "rvcgen_step: found a `RelTriple` goal, but no relational VCGen rule matched.\n\
-        Left side:{indentExpr oa}\n\
-        Right side:{indentExpr ob}\n\
-        Postcondition:{indentExpr post}\n\
-        Consider `rel_conseq`, `rel_inline`, or `rel_dist` for a non-structural step."
-
-private def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  throwError
-    "rvcgen_step using {hint}: the explicit hint did not match the current relational goal shape.\n\
-    `using` is interpreted by goal shape as one of:\n\
-    - bind cut relation\n\
-    - random/query bijection\n\
-    - `List.mapM` / `List.foldlM` input relation\n\
-    - `simulateQ` state relation\n\
-    Goal:{indentExpr target}"
+private def chooseRVCGenStepSuggestion : TacticM (Option RVCGenStepSuggestion) := do
+  if let some hintName ← findRelUsingHint? then
+    let hint := mkIdent hintName
+    if ← previewRelAction (TacticInternals.Relational.runRVCGenStepUsing hint) then
+      return some (.usingHint hintName)
+  let names ← getSuggestedIntroNames 1
+  if ← previewRelAction (runRVCGenStepWithNames names) then
+    return some (.namedStep names)
+  if ← previewRelAction TacticInternals.Relational.runRVCGenStep then
+    return some .plain
+  return none
 
 /-- `rvcgen_step` applies one relational VCGen step.
 
@@ -387,46 +89,88 @@ tries the obvious structural relational rule: synchronized conditionals, `simula
 - traversal input relation (`List.mapM` / `List.foldlM`)
 - `simulateQ` state relation -/
 syntax "rvcgen_step" ("using" term)? : tactic
+syntax "rvcgen_step" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcgen_step" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcgen_step?" : tactic
 
 elab_rules : tactic
+  | `(tactic| rvcgen_step as ⟨ $ids,* ⟩) => do
+      let names := binderIdentsToNames ids
+      if ← runRVCGenStepWithNames names then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcgen_step using $hint as ⟨ $ids,* ⟩) => do
+      let names := binderIdentsToNames ids
+      if ← runRVCGenStepUsingWithNames hint names then
+        return
+      TacticInternals.Relational.throwRVCGenStepUsingError hint
   | `(tactic| rvcgen_step) => do
-      if ← runRVCGenStep then
+      if ← TacticInternals.Relational.runRVCGenStep then
         return
-      throwRVCGenStepError
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcgen_step using $hint) => do
-      if ← runRVCGenStepUsing hint then
+      if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         return
-      throwRVCGenStepUsingError hint
+      TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcgen_step?) => do
+      let some suggestion ← chooseRVCGenStepSuggestion
+        | TacticInternals.Relational.throwRVCGenStepError
+      match suggestion with
+      | .plain =>
+          if ← TacticInternals.Relational.runRVCGenStep then
+            addTryThisTextSuggestion (← getRef) suggestion.text
+          else
+            TacticInternals.Relational.throwRVCGenStepError
+      | .namedStep names =>
+          if ← runRVCGenStepWithNames names then
+            addTryThisTextSuggestion (← getRef) suggestion.text
+          else
+            TacticInternals.Relational.throwRVCGenStepError
+      | .usingHint name =>
+          let hint := mkIdent name
+          if ← TacticInternals.Relational.runRVCGenStepUsing hint then
+            addTryThisTextSuggestion (← getRef) suggestion.text
+          else
+            TacticInternals.Relational.throwRVCGenStepUsingError hint
 
 /-- `rvcgen` repeatedly applies relational VCGen steps across all current goals until stuck.
 
 `rvcgen using t` uses the explicit hint `t` for the first step on the main goal, then
 continues with ordinary hint-free relational VCGen on all remaining goals. -/
 syntax "rvcgen" ("using" term)? : tactic
-
-private def runRVCGenFinish : TacticM Unit := do
-  unless (← getGoals).isEmpty do
-    let _ ← tryEvalTacticSyntax
-      (← `(tactic| all_goals try simp only [game_rule]))
-  unless (← getGoals).isEmpty do
-    let _ ← tryEvalTacticSyntax
-      (← `(tactic| all_goals first
-        | assumption
-        | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
-        | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
-        | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+syntax "rvcgen?" : tactic
 
 elab_rules : tactic
   | `(tactic| rvcgen) => do
-      while (← runRVCGenPass) do pure ()
-      runRVCGenFinish
+      discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
+      TacticInternals.Relational.runRVCGenFinish
   | `(tactic| rvcgen using $hint) => do
-      if ← runRVCGenStepUsing hint then
-        while (← runRVCGenPass) do pure ()
-        runRVCGenFinish
+      if ← TacticInternals.Relational.runRVCGenStepUsing hint then
+        discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
+        TacticInternals.Relational.runRVCGenFinish
       else
-        throwRVCGenStepUsingError hint
+        TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcgen?) => do
+      if let some hintName ← findRelUsingHint? then
+        let hint := mkIdent hintName
+        if ← TacticInternals.Relational.runRVCGenStepUsing hint then
+          discard <| runBoundedPasses "rvcgen?" TacticInternals.Relational.runRVCGenPass
+          TacticInternals.Relational.runRVCGenFinish
+          addTryThisTextSuggestion (← getRef) s!"rvcgen using {hintName}"
+          return
+      let passes ← runBoundedPasses "rvcgen?" TacticInternals.Relational.runRVCGenPass
+      let needsFinish := !(← getGoals).isEmpty
+      TacticInternals.Relational.runRVCGenFinish
+      let mut lines : List String :=
+        List.replicate passes "all_goals first | rvcgen_step | skip"
+      if needsFinish then
+        lines := lines ++ [
+          "all_goals try simp only [game_rule]",
+          "all_goals first | assumption | exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)"
+        ]
+      if lines.isEmpty then
+        lines := ["rvcgen"]
+      addTryThisTextSuggestion (← getRef) <| String.intercalate "\n" lines
 
 /-- `rel_conseq` weakens or strengthens the postcondition of a `RelTriple` goal.
 
@@ -523,7 +267,7 @@ syntax "by_upto" term : tactic
 
 elab_rules : tactic
   | `(tactic| by_upto $bad) => do
-      if ← runByUptoRule bad then
+      if ← TacticInternals.Relational.runByUptoRule bad then
         return
       let target ← instantiateMVars (← getMainTarget)
       throwError
