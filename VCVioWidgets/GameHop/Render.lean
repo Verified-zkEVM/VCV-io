@@ -31,12 +31,23 @@ private def edgeAccent : EdgeKind → String
   | .consequence => "#b279a2"
 
 private def wrapReveal (resolved? : Option (AnchorRef × ResolvedAnchor))
-    (title? : Option String) (child : Html) : Html :=
+    (title? : Option String) (child : Html) (block : Bool := false) : Html :=
   match resolved? with
   | some (anchor, resolved) =>
       Html.ofComponent VCVioWidgets.RevealLocation
-        { uri := resolved.uri, range := anchor.targetRange resolved, title? } #[child]
+        { uri := resolved.uri, range := anchor.targetRange resolved, title?, block } #[child]
   | none => child
+
+private def declAnchor (declName : Name) : AnchorRef :=
+  AnchorRef.withSelection <| AnchorRef.result declName
+
+private def ppExprCard (expr : Expr) : MetaM Widget.CodeWithInfos :=
+  withOptions
+      (fun opts =>
+        opts.set `format.width (54 : Nat)
+          |>.set `pp.universes false
+          |>.set `pp.fullNames false) do
+    Widget.ppExprTagged expr
 
 private def resolveAnchor? (anchor? : Option AnchorRef) :
     MetaM (Option (AnchorRef × ResolvedAnchor)) := do
@@ -66,46 +77,65 @@ private def renderAnchorChip (anchor? : Option AnchorRef) :
 private def renderSnippet (snippet : CodeSnippet) : MetaM Html := do
   match snippet with
   | .declName declName =>
+      let resolved? ← resolveAnchor? (some <| declAnchor declName)
       try
-        let fmt ← Widget.ppExprTagged (← mkConstWithLevelParams declName)
-        pure <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px")
-        ]}>
-          <InteractiveCode fmt={fmt} />
-        </div>
-      catch _ =>
-        pure <div style={css [
+        let fmt ← ppExprCard (← mkConstWithLevelParams declName)
+        pure <| wrapReveal resolved? (some declName.toString)
+          <div style={css [
           ("fontFamily", "var(--vscode-editor-font-family)"),
           ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "normal"),
+          ("overflowX", "auto")
+        ]}>
+            <InteractiveCode fmt={fmt} />
+          </div>
+          (block := true)
+      catch _ =>
+        pure <| wrapReveal resolved? (some declName.toString)
+          <div style={css [
+          ("fontFamily", "var(--vscode-editor-font-family)"),
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
           ("whiteSpace", "pre-wrap")
         ]}>{.text declName.toString}</div>
+          (block := true)
   | .declType declName =>
+      let resolved? ← resolveAnchor? (some <| declAnchor declName)
       try
         let expr ← mkConstWithLevelParams declName
-        let fmt ← Widget.ppExprTagged (← Meta.inferType expr)
-        pure <div style={css [
+        let fmt ← ppExprCard (← Meta.inferType expr)
+        pure <| wrapReveal resolved? (some declName.toString)
+          <div style={css [
           ("fontFamily", "var(--vscode-editor-font-family)"),
           ("fontSize", "12px"),
-          ("whiteSpace", "normal")
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "normal"),
+          ("overflowX", "auto")
         ]}>
-          <InteractiveCode fmt={fmt} />
-        </div>
+            <InteractiveCode fmt={fmt} />
+          </div>
+          (block := true)
       catch _ =>
-        pure <div style={css [
+        pure <| wrapReveal resolved? (some declName.toString)
+          <div style={css [
           ("fontFamily", "var(--vscode-editor-font-family)"),
           ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
           ("whiteSpace", "pre-wrap")
         ]}>{.text declName.toString}</div>
+          (block := true)
   | .text contents anchor? =>
       let resolved? ← resolveAnchor? anchor?
       let body : Html :=
         <div style={css [
           ("fontFamily", "var(--vscode-editor-font-family)"),
           ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
           ("whiteSpace", "pre-wrap")
         ]}>{.text contents}</div>
       pure <| wrapReveal resolved? (anchor?.map fun a => a.declName.toString) body
+        (block := true)
 
 private def renderNode (node : GameNode) : MetaM Html := do
   let resolved? ← resolveAnchor? node.anchor?
@@ -117,12 +147,13 @@ private def renderNode (node : GameNode) : MetaM Html := do
         ("fontSize", "14px"),
         ("fontWeight", "700")
       ]}>{.text node.title}</span>
-  pure <div style={css [
+  let body : Html :=
+    <div style={css [
     ("display", "flex"),
     ("flexDirection", "column"),
     ("gap", "10px"),
-    ("minWidth", "220px"),
-    ("maxWidth", "280px"),
+    ("minWidth", "240px"),
+    ("maxWidth", "380px"),
     ("padding", "12px"),
     ("border", s!"1px solid {nodeAccent node.kind}"),
     ("borderLeft", s!"4px solid {nodeAccent node.kind}"),
@@ -154,11 +185,14 @@ private def renderNode (node : GameNode) : MetaM Html := do
         ("gap", "6px"),
         ("padding", "8px"),
         ("borderRadius", "6px"),
-        ("background", "var(--vscode-editorHoverWidget-background)")
+        ("background", "var(--vscode-editorHoverWidget-background)"),
+        ("overflowX", "auto")
       ]}>
         {...snippets}
       </div>}
   </div>
+  pure <| wrapReveal resolved? (node.anchor?.map fun a => a.declName.toString) body
+    (block := true)
 
 private def renderEdgeNote (edge : GameEdge) (note : GameEdgeNote) : MetaM Html := do
   let resolved? ← resolveAnchor? note.anchor?
@@ -168,14 +202,15 @@ private def renderEdgeNote (edge : GameEdge) (note : GameEdgeNote) : MetaM Html 
         ("fontSize", "11px"),
         ("fontWeight", "600")
       ]}>{.text note.label}</span>
-  pure <div style={css [
+  let body : Html :=
+    <div style={css [
     ("display", "flex"),
     ("flexDirection", "column"),
     ("gap", "3px"),
     ("padding", "6px 8px"),
     ("borderRadius", "6px"),
     ("border", s!"1px solid {edgeAccent edge.kind}"),
-    ("maxWidth", "220px"),
+    ("maxWidth", "260px"),
     ("textAlign", "center"),
     ("background", "var(--vscode-editorHoverWidget-background)")
   ]}>
@@ -189,6 +224,8 @@ private def renderEdgeNote (edge : GameEdge) (note : GameEdgeNote) : MetaM Html 
          ]}>{.text detail}</div>
      | none => Html.text ""}
   </div>
+  pure <| wrapReveal resolved? (note.anchor?.map fun a => a.declName.toString) body
+    (block := true)
 
 private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM Html := do
   let some edge := edge?
@@ -214,14 +251,15 @@ private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM H
         ("color", edgeAccent edge.kind),
         ("textAlign", "center")
       ]}>{.text edge.label}</span>
-  pure <div style={css [
+  let body : Html :=
+    <div style={css [
     ("display", "flex"),
     ("flexDirection", "column"),
     ("alignItems", "center"),
     ("justifyContent", "center"),
     ("gap", "8px"),
-    ("minWidth", "170px"),
-    ("maxWidth", "220px")
+    ("minWidth", "190px"),
+    ("maxWidth", "260px")
   ]}>
     <div style={css [
       ("fontSize", "28px"),
@@ -253,6 +291,8 @@ private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM H
         {...notes}
       </div>}
   </div>
+  pure <| wrapReveal resolved? (edge.anchor?.map fun a => a.declName.toString) body
+    (block := true)
 
 private def renderMissingNode (nodeId : NodeId) : Html :=
   <div style={css [
