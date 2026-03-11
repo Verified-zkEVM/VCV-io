@@ -12,20 +12,17 @@ namespace OneTimePad
 open Lean
 open VCVioWidgets.GameHop
 
-private def dotted (parts : List String) : Name :=
-  parts.foldl Name.str Name.anonymous
-
 private def perfectSecrecyCipherGivenMsgExp : Name :=
-  dotted ["SymmEncAlg", "PerfectSecrecyCipherGivenMsgExp"]
+  `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp
 
 private def otpCipherGivenMsgEquiv : Name :=
-  dotted ["oneTimePad", "cipherGivenMsg_equiv"]
+  `oneTimePad.cipherGivenMsg_equiv
 
 private def otpCiphertextRowsEqual : Name :=
-  dotted ["oneTimePad", "ciphertextRowsEqual"]
+  `oneTimePad.ciphertextRowsEqual
 
 private def otpPerfectSecrecyAt : Name :=
-  dotted ["oneTimePad", "perfectSecrecyAt"]
+  `oneTimePad.perfectSecrecyAt
 
 def cipherGivenMsgEquivDiagram : VCVioWidgets.GameHop.GameDiagram :=
   { title := "One-time pad: relational hop"

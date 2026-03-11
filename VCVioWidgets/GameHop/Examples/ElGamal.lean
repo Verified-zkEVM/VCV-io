@@ -12,35 +12,32 @@ namespace ElGamal
 open Lean
 open VCVioWidgets.GameHop
 
-private def dotted (parts : List String) : Name :=
-  parts.foldl Name.str Name.anonymous
-
 private def indCpaGame : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_game"]
+  `elgamalAsymmEnc.IND_CPA_game
 
 private def hybridGame : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_HybridGame"]
+  `elgamalAsymmEnc.IND_CPA_HybridGame
 
 private def hybridFamily : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_HybridFamily"]
+  `elgamalAsymmEnc.IND_CPA_HybridFamily
 
 private def allRandomHalf : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_allRandomHalf"]
+  `elgamalAsymmEnc.IND_CPA_allRandomHalf
 
 private def stepReduction : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_stepDDHReduction"]
+  `elgamalAsymmEnc.IND_CPA_stepDDHReduction
 
 private def hopBound : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_stepDDH_hopBound"]
+  `elgamalAsymmEnc.IND_CPA_stepDDH_hopBound
 
 private def hybridQEqGame : Name :=
-  dotted ["elgamalAsymmEnc", "IND_CPA_HybridGame_q_eq_game"]
+  `elgamalAsymmEnc.IND_CPA_HybridGame_q_eq_game
 
 private def summedBound : Name :=
-  dotted ["elgamalAsymmEnc", "elGamal_IND_CPA_bound_toReal"]
+  `elgamalAsymmEnc.elGamal_IND_CPA_bound_toReal
 
 private def finalTheorem : Name :=
-  dotted ["elgamalAsymmEnc", "elGamal_IND_CPA_le_q_mul_ddh"]
+  `elgamalAsymmEnc.elGamal_IND_CPA_le_q_mul_ddh
 
 def hybridSequenceDiagram : VCVioWidgets.GameHop.GameDiagram :=
   { title := "ElGamal IND-CPA via DDH"

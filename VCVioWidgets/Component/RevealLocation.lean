@@ -12,7 +12,7 @@ structure RevealLocationProps where
   uri : Lsp.DocumentUri
   range : Lsp.Range
   title? : Option String := none
-  deriving Server.RpcEncodable
+  deriving RpcEncodable
 
 @[widget_module]
 def RevealLocation : ProofWidgets.Component RevealLocationProps where

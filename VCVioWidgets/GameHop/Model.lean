@@ -111,10 +111,10 @@ structure GameDiagram where
 namespace GameDiagram
 
 def findNode? (diagram : GameDiagram) (nodeId : NodeId) : Option GameNode :=
-  diagram.nodes.find? (·.id = nodeId)
+  diagram.nodes.find? (·.id == nodeId)
 
 def findEdge? (diagram : GameDiagram) (source target : NodeId) : Option GameEdge :=
-  diagram.edges.find? fun edge => edge.source = source && edge.target = target
+  diagram.edges.find? fun edge => edge.source == source && edge.target == target
 
 end GameDiagram
 
