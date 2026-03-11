@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.SecExp
 import VCVio.EvalDist.Prod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.OracleContext
+import VCVioWidgets.GameHop.Panel
 
 /-!
 # Symmetric Encryption Schemes.
@@ -15,6 +16,10 @@ This file defines a type `SymmEncAlg spec M K C` to represent a protocol
 for symmetric encryption using oracles in `spec`, with message space `M`,
 secret keys of type `K`, and ciphertext space `C`.
 -/
+
+-- Keep the OTP game-hop panel visible when navigation jumps from the example
+-- file into the core perfect-secrecy experiment definitions in this module.
+show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 
 universe u v w
 

@@ -7,8 +7,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
-import VCVioWidgets.GameHop.Command
-import VCVioWidgets.GameHop.Examples.ElGamal
+import VCVioWidgets.GameHop.Panel
 
 /-!
 # ElGamal Encryption: Multi-query IND-CPA via DDH
@@ -52,6 +51,8 @@ The main theorem takes `hstart`, which asserts that the `q`-th hybrid has the sa
 probability as the actual IND-CPA experiment. This holds for any adversary making at most `q`
 distinct fresh LR oracle queries.
 -/
+
+show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 
 open OracleSpec OracleComp ENNReal
 
@@ -1432,8 +1433,6 @@ theorem elGamal_IND_CPA_le_q_mul_ddh
             intro k hk
             exact mul_le_mul_of_nonneg_left (hddh k (Finset.mem_range.mp hk)) (by positivity)
     _ = q * (2 * ε) := by simp [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
-
-game_hop_widget VCVioWidgets.GameHop.Examples.ElGamal.hybridSequenceDiagram
 
 #print axioms elGamal_IND_CPA_le_q_mul_ddh
 
