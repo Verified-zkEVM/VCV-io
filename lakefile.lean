@@ -32,6 +32,8 @@ require "leanprover-community" / "mathlib" @ git "v4.28.0"
 @[default_target] lean_lib VCVio
 /-- Example constructions of cryptographic primitives. -/
 @[default_target] lean_lib Examples
+/-- Optional proof widget experiments and visualizations. -/
+lean_lib VCVioWidgets
 
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib

@@ -6,6 +6,8 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.OracleComp.Constructions.BitVec
 import VCVio.ProgramLogic.Tactics
+import VCVioWidgets.GameHop.Command
+import VCVioWidgets.GameHop.Examples.OneTimePad
 import Mathlib.Data.Vector.Zip
 
 /-!
@@ -102,5 +104,7 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
 ciphertext distribution. Derived from the relational `GameEquiv` proof above. -/
 lemma ciphertextRowsEqual (sp : ℕ) : oneTimePad.ciphertextRowsEqualAt sp :=
   fun msg₀ msg₁ σ => (cipherGivenMsg_equiv sp msg₀ msg₁).probOutput_eq σ
+
+game_hop_widget VCVioWidgets.GameHop.Examples.OneTimePad.cipherGivenMsgEquivDiagram
 
 end oneTimePad

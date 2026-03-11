@@ -7,6 +7,8 @@ import VCVio.CryptoFoundations.AsymmEncAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
+import VCVioWidgets.GameHop.Command
+import VCVioWidgets.GameHop.Examples.ElGamal
 
 /-!
 # ElGamal Encryption: Multi-query IND-CPA via DDH
@@ -1716,6 +1718,8 @@ theorem elGamal_IND_CPA_le_q_mul_ddh
             intro k hk
             exact mul_le_mul_of_nonneg_left (hddh k (Finset.mem_range.mp hk)) (by positivity)
     _ = q * (2 * ε) := by simp [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+
+game_hop_widget VCVioWidgets.GameHop.Examples.ElGamal.hybridSequenceDiagram
 
 #print axioms elGamal_IND_CPA_le_q_mul_ddh
 
