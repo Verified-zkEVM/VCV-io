@@ -713,20 +713,12 @@ theorem fork_precondition_le_one :
       (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
   have hq : (1 : ℝ≥0∞) ≤ (↑(qb i + 1) : ℝ≥0∞) := by
     exact_mod_cast Nat.succ_le_succ (Nat.zero_le (qb i))
-  have hdiv_le_acc : acc / (↑(qb i + 1) : ℝ≥0∞) ≤ acc := by
-    rw [div_eq_mul_inv]
-    calc
-      acc * ((↑(qb i + 1) : ℝ≥0∞))⁻¹ ≤ acc * 1 := by
-        gcongr
-        exact ENNReal.inv_le_one.2 hq
-      _ = acc := by simp
-  calc
-    acc * (acc / (↑(qb i + 1) : ℝ≥0∞) - (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹)
-      ≤ acc * (acc / (↑(qb i + 1) : ℝ≥0∞)) := by gcongr; exact tsub_le_self
-    _ ≤ acc * 1 := by
-      have hdiv_le_one : acc / (↑(qb i + 1) : ℝ≥0∞) ≤ 1 := le_trans hdiv_le_acc hacc_le_one
-      gcongr
-    _ ≤ 1 := by simpa [acc] using hacc_le_one
+  simpa [acc] using
+    (ENNReal.mul_tsub_div_le_one
+      (a := acc)
+      (q := (↑(qb i + 1) : ℝ≥0∞))
+      (r := (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹)
+      hacc_le_one hq)
 
 /-- Main forking lemma: the failure probability is bounded by `1 - acc * (acc / q - 1/h)`. -/
 theorem probOutput_none_fork_le :
