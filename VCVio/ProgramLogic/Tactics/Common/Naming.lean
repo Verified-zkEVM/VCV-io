@@ -156,6 +156,18 @@ def getProbCongrNames (supportSensitive : Bool) : TacticM (Array Name) := do
       names
   freshenSuggestedNames names
 
+def getRelBindNames : TacticM (Array Name) := do
+  let target ← instantiateMVars (← getMainTarget)
+  let defaults := #[Name.mkSimple "a1", Name.mkSimple "a2", Name.mkSimple "hrel"]
+  let names :=
+    if let some (oa, ob, _) := relTripleGoalParts? target then
+      let left := getBindLambdaName? oa |>.getD defaults[0]!
+      let right := getBindLambdaName? ob |>.getD defaults[1]!
+      #[left, right, defaults[2]!]
+    else
+      defaults
+  freshenSuggestedNames names
+
 def introMainGoalNames (names : Array Name) : TacticM Bool := do
   let mut progress := false
   for name in names do

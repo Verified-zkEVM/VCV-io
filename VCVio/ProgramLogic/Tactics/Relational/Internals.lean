@@ -12,6 +12,9 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
 
+private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
+  { label, replayText, run }
+
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -281,6 +284,99 @@ def findUniqueRelHint? : TacticM (Option Name) := withMainContext do
                 found := some name
   return found
 
+private def runRVCGenExplicitHintStep (hint : TSyntax `term) : TacticM Bool := do
+  if (← getGoals).isEmpty then
+    return false
+  let mut progress := false
+  if ← tryLowerRelGoal then
+    progress := true
+  let target ← instantiateMVars (← getMainTarget)
+  if target.isForall then
+    let names ← getSuggestedIntroNames 1
+    if ← introMainGoalNames names then
+      progress := true
+  if ← runRVCGenCoreUsing hint then
+    return true
+  return progress
+
+def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
+  let mut progress := false
+  if ← tryLowerRelGoal then
+    progress := true
+  let target ← instantiateMVars (← getMainTarget)
+  if target.isForall then
+    if ← introMainGoalNames names then
+      progress := true
+  if ← runRVCGenCoreUsing hint then
+    introAllGoalsNames names
+    renameInaccessibleNames names
+    return true
+  return progress
+
+/-- Structural/default relational VCGen step, excluding explicit `using`-hint fallbacks. -/
+def runRVCGenStructuralCore : TacticM Bool := do
+  if (← getGoals).isEmpty then
+    return false
+  let mut progress := false
+  if ← tryLowerRelGoal then
+    progress := true
+  if ← runRVCGenCore then
+    return true
+  return progress
+
+/-- Choose one relational VCGen step and remember how to replay it explicitly. -/
+def planRVCGenStep? : TacticM (Option PlannedStep) := do
+  if (← getGoals).isEmpty then
+    return none
+  let target ← instantiateMVars (← getMainTarget)
+  if target.isForall then
+    let names ← getSuggestedIntroNames 1
+    let introStep :=
+      mkRVCGenPlannedStep
+        "rvcgen intro"
+        s!"rvcgen_step{renderAsClause names}"
+        (introMainGoalNames names)
+    if ← previewPlannedStep introStep then
+      return some introStep
+  let structuralStep :=
+    mkRVCGenPlannedStep
+      "rvcgen structural step"
+      "rvcgen_step"
+      runRVCGenStructuralCore
+  let structuralPreview ← previewPlannedStepWithGoals structuralStep
+  if let some hintName ← findUniqueRelHint? then
+    if !(structuralPreview.ok && structuralPreview.goals.isEmpty) then
+      if let some (oa, ob, _) := relTripleGoalParts? target then
+        let oa ← whnfReducible (← instantiateMVars oa)
+        let ob ← whnfReducible (← instantiateMVars ob)
+        if isBindExpr oa && isBindExpr ob then
+          let names ← getRelBindNames
+          let namedHintStep :=
+            mkRVCGenPlannedStep
+              "rvcgen explicit hint with names"
+              s!"rvcgen_step using {hintName}{renderAsClause names}"
+              (runRVCGenStepUsingWithNames (mkIdent hintName) names)
+          if ← previewPlannedStep namedHintStep then
+            return some namedHintStep
+      let hintStep :=
+        mkRVCGenPlannedStep
+          "rvcgen explicit hint"
+          s!"rvcgen_step using {hintName}"
+          (runRVCGenExplicitHintStep (mkIdent hintName))
+      if ← previewPlannedStep hintStep then
+        return some hintStep
+  if structuralPreview.ok then
+    return some structuralStep
+  return none
+
+/-- Execute one planned relational VCGen step, returning the chosen step for replay/trace. -/
+def runRVCGenPlannedStep? : TacticM (Option PlannedStep) := do
+  let some step ← planRVCGenStep?
+    | return none
+  if ← executePlannedStep step then
+    return some step
+  return none
+
 /-- One step of relational VCGen. -/
 def runRVCGenStep : TacticM Bool := do
   if (← getGoals).isEmpty then
@@ -301,19 +397,23 @@ def runRVCGenStep : TacticM Bool := do
   return progress
 
 def runRVCGenStepUsing (hint : TSyntax `term) : TacticM Bool := do
-  if (← getGoals).isEmpty then
-    return false
-  let mut progress := false
-  if ← tryLowerRelGoal then
-    progress := true
-  let target ← instantiateMVars (← getMainTarget)
-  if target.isForall then
-    let names ← getSuggestedIntroNames 1
-    if ← introMainGoalNames names then
-      progress := true
-  if ← runRVCGenCoreUsing hint then
-    return true
-  return progress
+  runRVCGenExplicitHintStep hint
+
+def runRVCGenPassPlanned : TacticM (Array PlannedStep) := do
+  let goals ← getGoals
+  if goals.isEmpty then
+    return #[]
+  let mut newGoals : List MVarId := []
+  let mut steps := #[]
+  for goal in goals do
+    setGoals [goal]
+    if let some step ← runRVCGenPlannedStep? then
+      steps := steps.push step
+      newGoals := newGoals ++ (← getGoals)
+    else
+      newGoals := newGoals ++ [goal]
+  setGoals newGoals
+  return steps
 
 def runRVCGenPass : TacticM Bool := do
   let goals ← getGoals

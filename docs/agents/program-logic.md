@@ -62,9 +62,10 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 |--------|--------------|
 | `qvcgen` | Exhaustively decomposes a `Triple` or probability goal with spec-aware stepping, loop invariant auto-detection, and support/indicator leaf closure |
 | `qvcgen_step` | One step: probability lowering → bind → conditional → match → loop → leaf |
-| `qvcgen_step?` | Performs one step and emits the corresponding explicit script, often including binder names |
-| `qvcgen?` | Runs `qvcgen` and emits the full explicit script |
+| `qvcgen_step?` | Performs one step and emits the corresponding explicit script, often surfacing `as ⟨...⟩`, `using cut`, `inv I`, or `with theorem` |
+| `qvcgen?` | Runs `qvcgen` and emits the planned step replay across each pass |
 | `qvcgen_step using cut` | Explicit intermediate postcondition for a bind step |
+| `qvcgen_step with thm` | Force one explicit unary theorem/assumption step |
 | `qvcgen_step as ⟨x, hx⟩` | Explicit names for binders introduced by the current step |
 | `qvcgen_step inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
 | `qvcgen_step rw` | One explicit top-level bind-swap rewrite on a `Pr[...] = Pr[...]` goal |
@@ -97,20 +98,24 @@ Use `qvcgen_step inv I` to provide an explicit invariant.
 `triple_propInd_of_support`, `triple_probEvent_eq_one`, and `triple_probOutput_eq_one`
 in addition to the standard `triple_pure`, `triple_zero`, and consequence search.
 
-**Naming and suggestions**: plain `qvcgen_step` / `rvcgen_step` now try to pick useful binder
-names automatically. The `?` variants run the same step but also emit a concrete `Try this`
-script, typically surfacing an explicit `using ...` hint or `as ⟨...⟩` clause that you can paste
-back into the proof.
+**Naming and suggestions**: plain `qvcgen_step` / `rvcgen_step` keep the stable execution path.
+The `?` variants run a planner-backed version of the same next move and emit a concrete
+`Try this` script, typically surfacing an explicit `using ...` hint, `inv I`, `with theorem`,
+or `as ⟨...⟩` clause that you can paste back into the proof.
 
 **Opt-in unary lookup**: mark a unary `Triple` theorem with `@[vcgen]` to register it for
-bounded head-symbol lookup. This is intentionally narrow: `qvcgen_step` first tries the built-in
-leaf rules and local hypotheses, then consults only `@[vcgen]` theorems whose computation head
-matches the current goal.
+bounded head-symbol lookup. This is intentionally narrow: after the built-in structural step and
+explicit hint opportunities, `qvcgen_step` / `qvcgen` consult only `@[vcgen]` theorems whose
+computation head matches the current goal. Use `qvcgen_step with myLemma` when you want to force
+one specific theorem/assumption step manually.
 
 **Pass budget**: exhaustive `qvcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
 predictable; if you intentionally want a longer exhaustive run, raise the option locally around
 that proof.
+
+**Trace output**: set `set_option vcvio.vcgen.traceSteps true` to log the chosen planned step
+labels and their explicit replay text while debugging tactic choice.
 
 ### Raw WP Tactics
 

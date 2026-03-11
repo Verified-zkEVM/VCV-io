@@ -15,12 +15,6 @@ private def binderIdentsToNames (ids : Syntax.TSepArray `Lean.binderIdent ",") :
     | `(binderIdent| $name:ident) => name.getId
     | _ => Name.anonymous
 
-private def previewRelAction (action : TacticM Bool) : TacticM Bool := do
-  let saved ← saveState
-  let ok ← action
-  saved.restore
-  return ok
-
 private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   if target.isForall then
@@ -32,51 +26,7 @@ private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   return false
 
 private def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
-  let target ← instantiateMVars (← getMainTarget)
-  if target.isForall then
-    return (← introMainGoalNames names)
-  if ← TacticInternals.Relational.runRVCGenStepUsing hint then
-    introAllGoalsNames names
-    renameInaccessibleNames names
-    return true
-  return false
-
-private def findRelUsingHint? : TacticM (Option Name) := withMainContext do
-  for localDecl in ← getLCtx do
-    unless localDecl.isImplementationDetail do
-      let name := localDecl.userName
-      if isUsableBinderName name then
-        let type ← instantiateMVars localDecl.type
-        unless type.isSort do
-          unless ← isProp type do
-            let whnfType ← whnfReducible type
-            if whnfType.isForall then
-              let hint := mkIdent name
-              if ← previewRelAction (TacticInternals.Relational.runRVCGenStepUsing hint) then
-                return some name
-  return none
-
-private inductive RVCGenStepSuggestion where
-  | plain
-  | namedStep (names : Array Name)
-  | usingHint (name : Name)
-
-private def RVCGenStepSuggestion.text : RVCGenStepSuggestion → String
-  | .plain => "rvcgen_step"
-  | .namedStep names => s!"rvcgen_step{renderAsClause names}"
-  | .usingHint name => s!"rvcgen_step using {name}"
-
-private def chooseRVCGenStepSuggestion : TacticM (Option RVCGenStepSuggestion) := do
-  if let some hintName ← findRelUsingHint? then
-    let hint := mkIdent hintName
-    if ← previewRelAction (TacticInternals.Relational.runRVCGenStepUsing hint) then
-      return some (.usingHint hintName)
-  let names ← getSuggestedIntroNames 1
-  if ← previewRelAction (runRVCGenStepWithNames names) then
-    return some (.namedStep names)
-  if ← previewRelAction TacticInternals.Relational.runRVCGenStep then
-    return some .plain
-  return none
+  TacticInternals.Relational.runRVCGenStepUsingWithNames hint names
 
 /-- `rvcgen_step` applies one relational VCGen step.
 
@@ -114,25 +64,9 @@ elab_rules : tactic
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
   | `(tactic| rvcgen_step?) => do
-      let some suggestion ← chooseRVCGenStepSuggestion
+      let some step ← TacticInternals.Relational.runRVCGenPlannedStep?
         | TacticInternals.Relational.throwRVCGenStepError
-      match suggestion with
-      | .plain =>
-          if ← TacticInternals.Relational.runRVCGenStep then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Relational.throwRVCGenStepError
-      | .namedStep names =>
-          if ← runRVCGenStepWithNames names then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Relational.throwRVCGenStepError
-      | .usingHint name =>
-          let hint := mkIdent name
-          if ← TacticInternals.Relational.runRVCGenStepUsing hint then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Relational.throwRVCGenStepUsingError hint
+      addTryThisTextSuggestion (← getRef) step.replayText
 
 /-- `rvcgen` repeatedly applies relational VCGen steps across all current goals until stuck.
 
@@ -152,18 +86,11 @@ elab_rules : tactic
       else
         TacticInternals.Relational.throwRVCGenStepUsingError hint
   | `(tactic| rvcgen?) => do
-      if let some hintName ← findRelUsingHint? then
-        let hint := mkIdent hintName
-        if ← TacticInternals.Relational.runRVCGenStepUsing hint then
-          discard <| runBoundedPasses "rvcgen?" TacticInternals.Relational.runRVCGenPass
-          TacticInternals.Relational.runRVCGenFinish
-          addTryThisTextSuggestion (← getRef) s!"rvcgen using {hintName}"
-          return
-      let passes ← runBoundedPasses "rvcgen?" TacticInternals.Relational.runRVCGenPass
+      let batches ← runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
       TacticInternals.Relational.runRVCGenFinish
       let mut lines : List String :=
-        List.replicate passes "all_goals first | rvcgen_step | skip"
+        batches.toList.filterMap renderPassReplayLine
       if needsFinish then
         lines := lines ++ [
           "all_goals try simp only [game_rule]",

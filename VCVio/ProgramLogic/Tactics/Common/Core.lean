@@ -18,6 +18,56 @@ register_option vcvio.vcgen.maxPasses : Nat := {
   descr := "Maximum number of exhaustive qvcgen/rvcgen passes before requiring manual stepping."
 }
 
+register_option vcvio.vcgen.traceSteps : Bool := {
+  defValue := false
+  descr := "Emit opt-in trace messages for chosen qvcgen/rvcgen planned steps."
+}
+
+structure PlannedStep where
+  label : String
+  replayText : String
+  run : TacticM Bool
+
+structure PreviewResult where
+  ok : Bool
+  goals : List MVarId
+
+def previewAction (action : TacticM Bool) : TacticM Bool := do
+  let saved ← saveState
+  let ok ← action
+  saved.restore
+  return ok
+
+def previewActionWithGoals (action : TacticM Bool) : TacticM PreviewResult := do
+  let saved ← saveState
+  let ok ← action
+  let goals ← getGoals
+  saved.restore
+  return { ok, goals }
+
+def previewPlannedStep (step : PlannedStep) : TacticM Bool :=
+  previewAction step.run
+
+def previewPlannedStepWithGoals (step : PlannedStep) : TacticM PreviewResult :=
+  previewActionWithGoals step.run
+
+def logPlannedStep (step : PlannedStep) : TacticM Unit := do
+  if vcvio.vcgen.traceSteps.get (← getOptions) then
+    logInfo m!"[{step.label}] {step.replayText}"
+
+def executePlannedStep (step : PlannedStep) : TacticM Bool := do
+  let ok ← step.run
+  if ok then
+    logPlannedStep step
+  return ok
+
+def renderPassReplayLine (steps : Array PlannedStep) : Option String :=
+  if steps.isEmpty then
+    none
+  else
+    let body := String.intercalate " | " <| steps.toList.map (·.replayText)
+    some s!"all_goals first | {body} | skip"
+
 def whnfReducible (e : Expr) : MetaM Expr :=
   withReducible <| whnf e
 
@@ -154,6 +204,26 @@ def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do
       "{label}: exhausted the configured pass budget ({maxPasses}).\n\
       Increase `set_option vcvio.vcgen.maxPasses <n>` or keep stepping manually."
   return passes
+
+def runBoundedPassesCollect {α : Type} (label : String)
+    (step : TacticM (Array α)) : TacticM (Array (Array α)) := do
+  let maxPasses := vcvio.vcgen.maxPasses.get (← getOptions)
+  let mut passes := 0
+  let mut batches := #[]
+  while passes < maxPasses do
+    let batch ← step
+    if batch.isEmpty then
+      return batches
+    passes := passes + 1
+    batches := batches.push batch
+  let saved ← saveState
+  let more ← step
+  saved.restore
+  if !more.isEmpty then
+    throwError
+      "{label}: exhausted the configured pass budget ({maxPasses}).\n\
+      Increase `set_option vcvio.vcgen.maxPasses <n>` or keep stepping manually."
+  return batches
 
 def runWpStepRules : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_bind])) <||>

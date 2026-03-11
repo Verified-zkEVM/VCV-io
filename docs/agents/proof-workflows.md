@@ -15,7 +15,8 @@
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
    → Start with `qvcgen_step` if the goal should lower or decompose automatically
-   → Use `qvcgen_step?` when you want the explicit script, binder names, or rewrite form surfaced
+  → Use `qvcgen_step?` when you want the explicit script, binder names, rewrite form, or an
+    explicit `using` / `inv` / `with` step surfaced
    → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
    → Use `qvcgen_step`, `qvcgen_step rw`, or `qvcgen_step rw congr'` for probability equalities
@@ -118,7 +119,7 @@ rvcgen_step using R         -- if needed, provide the bind cut relation
 ```
 
 When there is exactly one viable local hypothesis that works as a `using` hint,
-`rvcgen_step` and `rvcgen` will auto-consume it — no explicit `using` needed:
+plain `rvcgen_step` and `rvcgen` will auto-consume it — no explicit `using` needed:
 
 ```lean
 -- hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫ is the only viable hint
@@ -140,6 +141,12 @@ rvcgen                      -- closes via relTriple_post_mono + assumption
 rvcgen_step?
 ```
 
+On bind goals, the replay can now surface the full tuple naming form:
+
+```lean
+rvcgen_step using S as ⟨a1, a2, hrel⟩
+```
+
 ### `qvcgen_step` on probability equalities
 
 ```lean
@@ -158,6 +165,14 @@ qvcgen_step rw
 ```lean
 -- Ask for the explicit next script and binder names:
 qvcgen_step?
+```
+
+The surfaced script may now include:
+
+```lean
+qvcgen_step using cut
+qvcgen_step inv I
+qvcgen_step with triple_wrappedTrue
 ```
 
 ```lean
@@ -218,12 +233,27 @@ unary `Triple` lemma explicitly:
 ```
 
 After that, `qvcgen_step` can use the theorem when the goal head symbol is `wrappedTrue`.
+The lookup is step-level and bounded: it runs after the built-in structural rules and only over
+registered head-matching theorems.
+
+You can also force a specific theorem or local assumption explicitly:
+
+```lean
+qvcgen_step with triple_wrappedTrue
+```
 
 If an exhaustive `qvcgen` / `rvcgen` run stops too early, raise the local pass budget with:
 
 ```lean
 set_option vcvio.vcgen.maxPasses 128 in
   qvcgen
+```
+
+For tactic-choice debugging, enable the planned-step trace locally:
+
+```lean
+set_option vcvio.vcgen.traceSteps true in
+  qvcgen_step
 ```
 
 ### `by_dist` for advantage bounds

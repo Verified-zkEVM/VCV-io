@@ -101,6 +101,28 @@ example :
     ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
   qvcgen_step
 
+@[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
+
+@[local vcgen] theorem triple_wrappedTrueStep (_haux : True) :
+    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  simpa [wrappedTrueStep] using
+    (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
+
+example :
+    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  qvcgen_step
+  trivial
+
+example :
+    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  qvcgen_step?
+  trivial
+
+example :
+    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+  qvcgen_step with triple_wrappedTrueStep
+  trivial
+
 section LiftComp
 
 variable {ι' : Type} {superSpec : OracleSpec ι'}
@@ -512,6 +534,15 @@ example {oa₁ oa₂ : OracleComp spec α}
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcgen_step
   · exact hoa
+
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen_step?
+  simpa [OracleComp.ProgramLogic.Relational.RelWP] using hoa
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}

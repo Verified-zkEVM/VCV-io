@@ -43,23 +43,6 @@ private def runQVCGenFinish : TacticM Unit := do
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "qvcgen finish" TacticInternals.Unary.runVCGenClosePass
 
-private inductive QVCGenStepSuggestion where
-  | plain
-  | namedStep (names : Array Name)
-  | namedCongr (supportSensitive : Bool) (names : Array Name)
-
-private def QVCGenStepSuggestion.text : QVCGenStepSuggestion → String
-  | .plain => "qvcgen_step"
-  | .namedStep names => s!"qvcgen_step{renderAsClause names}"
-  | .namedCongr true names => s!"qvcgen_step rw congr{renderAsClause names}"
-  | .namedCongr false names => s!"qvcgen_step rw congr'{renderAsClause names}"
-
-private def previewStepAction (action : TacticM Bool) : TacticM Bool := do
-  let saved ← saveState
-  let ok ← action
-  saved.restore
-  return ok
-
 private def runQVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   if target.isForall then
@@ -77,19 +60,13 @@ private def runQVCGenStepWithNames (names : Array Name) : TacticM Bool := do
     return true
   return false
 
-private def chooseQVCGenStepSuggestion : TacticM (Option QVCGenStepSuggestion) := do
-  let congrNoSupportNames ← getProbCongrNames false
-  if ← previewStepAction (TacticInternals.Unary.runProbEqCongrNoSupportWithNames congrNoSupportNames) then
-    return some (.namedCongr false congrNoSupportNames)
-  let congrNames ← getProbCongrNames true
-  if ← previewStepAction (TacticInternals.Unary.runProbEqCongrWithNames congrNames) then
-    return some (.namedCongr true congrNames)
-  let stepNames ← getSuggestedIntroNames 1
-  if ← previewStepAction (runQVCGenStepWithNames stepNames) then
-    return some (.namedStep stepNames)
-  if ← previewStepAction TacticInternals.Unary.runVCGenStep then
-    return some .plain
-  return none
+private def runQVCGenStepWithTheoremNames
+    (thm : TSyntax `term) (names : Array Name) : TacticM Bool := do
+  if ← TacticInternals.Unary.runVCGenStepWithTheorem thm then
+    introAllGoalsNames names
+    renameInaccessibleNames names
+    return true
+  return false
 
 /-- `qvcgen_step` applies one quantitative VCGen step to a `Triple` or probability goal.
 
@@ -109,6 +86,7 @@ Handles up to 2 layers of tsum peeling for nested swaps.
 
 Variants:
 - `qvcgen_step using cut` for an explicit intermediate postcondition.
+- `qvcgen_step with thm` to force a specific unary theorem/assumption step.
 - `qvcgen_step inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal.
 - `qvcgen_step rw` to perform one explicit top-level probability-equality rewrite step.
 - `qvcgen_step rw under n` to rewrite one bind-swap under `n` shared bind prefixes.
@@ -117,8 +95,10 @@ Variants:
 
 Use `@[vcgen]` on unary `Triple` theorems to opt them into the bounded head-symbol lookup. -/
 syntax "qvcgen_step" ("using" term)? : tactic
+syntax "qvcgen_step" "with" term : tactic
 syntax "qvcgen_step" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "qvcgen_step" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "qvcgen_step" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "qvcgen_step?" : tactic
 
 elab_rules : tactic
@@ -133,36 +113,23 @@ elab_rules : tactic
         renameInaccessibleNames names
         return
       TacticInternals.Unary.throwQVCGenStepError
+  | `(tactic| qvcgen_step with $thm as ⟨ $ids,* ⟩) => do
+      let names := binderIdentsToNames ids
+      if ← runQVCGenStepWithTheoremNames thm names then return
+      TacticInternals.Unary.throwQVCGenStepError
   | `(tactic| qvcgen_step) => do
       if ← TacticInternals.Unary.runVCGenStep then return
       TacticInternals.Unary.throwQVCGenStepError
   | `(tactic| qvcgen_step using $cut) => do
       if ← TacticInternals.Unary.runHoareStepRuleUsing cut then return
       TacticInternals.Unary.throwQVCGenStepError
+  | `(tactic| qvcgen_step with $thm) => do
+      if ← TacticInternals.Unary.runVCGenStepWithTheorem thm then return
+      TacticInternals.Unary.throwQVCGenStepError
   | `(tactic| qvcgen_step?) => do
-      let some suggestion ← chooseQVCGenStepSuggestion
+      let some step ← TacticInternals.Unary.runVCGenPlannedStep?
         | TacticInternals.Unary.throwQVCGenStepError
-      match suggestion with
-      | .plain =>
-          if ← TacticInternals.Unary.runVCGenStep then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Unary.throwQVCGenStepError
-      | .namedStep names =>
-          if ← runQVCGenStepWithNames names then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Unary.throwQVCGenStepError
-      | .namedCongr true names =>
-          if ← TacticInternals.Unary.runProbEqCongrWithNames names then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Unary.throwQVCGenStepRwCongrError true
-      | .namedCongr false names =>
-          if ← TacticInternals.Unary.runProbEqCongrNoSupportWithNames names then
-            addTryThisTextSuggestion (← getRef) suggestion.text
-          else
-            TacticInternals.Unary.throwQVCGenStepRwCongrError false
+      addTryThisTextSuggestion (← getRef) step.replayText
 
 syntax "qvcgen_step" &"rw" : tactic
 syntax "qvcgen_step" &"rw" " under " num : tactic
@@ -282,11 +249,11 @@ elab_rules : tactic
           "qvcgen inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
           or `List.mapM`."
   | `(tactic| qvcgen?) => do
-      let passes ← runBoundedPasses "qvcgen?" TacticInternals.Unary.runVCGenPass
+      let batches ← runBoundedPassesCollect "qvcgen?" TacticInternals.Unary.runVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
       runQVCGenFinish
       let mut lines : List String :=
-        List.replicate passes "all_goals first | qvcgen_step | skip"
+        batches.toList.filterMap renderPassReplayLine
       if needsFinish then
         lines := lines ++ [
           "all_goals try simp only [OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind, OracleComp.ProgramLogic.wp_query, OracleComp.ProgramLogic.wp_ite, OracleComp.ProgramLogic.wp_dite, OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_uniformSample, OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false, OracleComp.ProgramLogic.propInd_eq_ite, ite_true, ite_false, if_true, if_false, dite_true, dite_false, one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero, game_rule]",
