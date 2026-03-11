@@ -220,15 +220,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
     simp_rw [hpure_run']]
-  rw [← one_le_probOutput_iff, OracleComp.ProgramLogic.probOutput_eq_wp_indicator]
-  change OracleComp.ProgramLogic.Triple 1
-    (do
-      let (pk, sk) ← hr.gen
-      let (c, e) ← σ.commit pk sk
-      let r ← $ᵗ Ω
-      let s ← σ.respond pk sk e r
-      pure (σ.verify pk c r s))
-    (fun y => if y = true then 1 else 0)
+  qvcgen_step
   qvcgen_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
   · simpa [OracleComp.ProgramLogic.propInd] using
       OracleComp.ProgramLogic.triple_support (oa := hr.gen)

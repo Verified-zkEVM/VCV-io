@@ -153,7 +153,7 @@ noncomputable def RelPost.indicator (R : α → β → Prop) : α → β → ℝ
 Equivalent to the coupling-based `RelTriple` (see `relTriple'_iff_relTriple`).
 
 **Do not target this in tactics or proofs.** Use `RelTriple` instead — all step-through
-tactics (`rel_step`, `rel_rnd`, `rel_skip`, etc.) and the `⟪c₁ ~ c₂ | R⟫` notation
+tactics (`rvcgen_step`, `rvcgen`, etc.) and the `⟪c₁ ~ c₂ | R⟫` notation
 operate on `RelTriple`. This definition exists only to witness that pRHL is the
 `ε = 0` special case of eRHL/apRHL (see `relTriple'_eq_approxRelTriple_zero`). -/
 def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)

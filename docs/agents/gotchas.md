@@ -50,9 +50,12 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 `simp` won't unfold `probOutput` of a bind. Use `rw [probOutput_bind_eq_tsum]` or `grind`.
 
-### 10. `prob_swap` closes goals, doesn't rewrite
+### 10. Plain `qvcgen_step` may solve a probability equality when you only wanted a rewrite
 
-If you need to swap and then continue proving, use `prob_swap_rw` or the manual pattern:
+On `Pr[...] = Pr[...]` goals, plain `qvcgen_step` heuristically tries swap, congruence, and
+small bounded compositions. If you need to rewrite and continue, use `qvcgen_step rw` for a
+top-level swap, `qvcgen_step rw under 1` under one shared bind prefix, or
+`qvcgen_step rw congr` / `qvcgen_step rw congr'` to expose a shared outer bind. The manual pattern is:
 ```lean
 simp only [← probEvent_eq_eq_probOutput ...]
 rw [probEvent_bind_bind_swap]

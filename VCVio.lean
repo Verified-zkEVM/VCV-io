@@ -80,7 +80,16 @@ import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics
-import VCVio.ProgramLogic.TacticsExamples
+import VCVio.ProgramLogic.Tactics.Common
+import VCVio.ProgramLogic.Tactics.Common.Core
+import VCVio.ProgramLogic.Tactics.Common.Naming
+import VCVio.ProgramLogic.Tactics.Common.Registry
+import VCVio.ProgramLogic.Tactics.Common.Suggestions
+import VCVio.ProgramLogic.Tactics.Examples
+import VCVio.ProgramLogic.Tactics.Relational
+import VCVio.ProgramLogic.Tactics.Relational.Internals
+import VCVio.ProgramLogic.Tactics.Unary
+import VCVio.ProgramLogic.Tactics.Unary.Internals
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.SimulateQ
