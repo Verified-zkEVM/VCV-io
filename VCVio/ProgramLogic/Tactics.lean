@@ -22,6 +22,9 @@ For probability equalities, use `qvcgen_step` directly:
 - `qvcgen_step rw` / `qvcgen_step rw under n` expose explicit bind-swap rewrites;
 - `qvcgen_step rw congr` / `qvcgen_step rw congr'` expose one shared bind explicitly.
 
+For unary leaf lemmas, `@[vcgen]` registers an explicit opt-in theorem for bounded
+head-symbol lookup by `qvcgen_step` / `qvcgen`.
+
 For normal proof work, import `VCVio.ProgramLogic.Tactics` and treat it as the default
 interactive tactic surface.
 -/
