@@ -1,40 +1,42 @@
-import ToMathlib.Control.AlternativeMonad
-import ToMathlib.Control.Comonad.Basic
-import ToMathlib.Control.Comonad.Cofree
-import ToMathlib.Control.Comonad.Instances
-import ToMathlib.Control.Lawful.MonadControl
-import ToMathlib.Control.Lawful.MonadFunctor
-import ToMathlib.Control.Lawful.MonadReader
-import ToMathlib.Control.Lawful.MonadState
-import ToMathlib.Control.Monad.Algebra
-import ToMathlib.Control.Monad.Commutative
-import ToMathlib.Control.Monad.Dijkstra
-import ToMathlib.Control.Monad.Equiv
-import ToMathlib.Control.Monad.Free
-import ToMathlib.Control.Monad.FreeCont
-import ToMathlib.Control.Monad.Graded
-import ToMathlib.Control.Monad.Hom
-import ToMathlib.Control.Monad.Indexed
-import ToMathlib.Control.Monad.Ordered
-import ToMathlib.Control.Monad.Relation
-import ToMathlib.Control.Monad.RelationalAlgebra
-import ToMathlib.Control.Monad.Relative
-import ToMathlib.Control.Monad.Transformer
-import ToMathlib.Control.OptionT
-import ToMathlib.Control.StateT
-import ToMathlib.Control.WriterT
-import ToMathlib.Data.ENNReal.AbsDiff
-import ToMathlib.Data.ENNReal.SumSquares
-import ToMathlib.General
-import ToMathlib.OrderEnrichedCategory
-import ToMathlib.PFunctor.Basic
-import ToMathlib.PFunctor.Category
-import ToMathlib.PFunctor.Chart.Basic
-import ToMathlib.PFunctor.Cofree
-import ToMathlib.PFunctor.Equiv.Basic
-import ToMathlib.PFunctor.Free
-import ToMathlib.PFunctor.Lens.Basic
-import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
-import ToMathlib.ProbabilityTheory.Coupling
-import ToMathlib.ProbabilityTheory.FinRatPMF
-import ToMathlib.ProbabilityTheory.OptimalCoupling
+module
+
+public import ToMathlib.Control.AlternativeMonad
+public import ToMathlib.Control.Comonad.Basic
+public import ToMathlib.Control.Comonad.Cofree
+public import ToMathlib.Control.Comonad.Instances
+public import ToMathlib.Control.Lawful.MonadControl
+public import ToMathlib.Control.Lawful.MonadFunctor
+public import ToMathlib.Control.Lawful.MonadReader
+public import ToMathlib.Control.Lawful.MonadState
+public import ToMathlib.Control.Monad.Algebra
+public import ToMathlib.Control.Monad.Commutative
+public import ToMathlib.Control.Monad.Dijkstra
+public import ToMathlib.Control.Monad.Equiv
+public import ToMathlib.Control.Monad.Free
+public import ToMathlib.Control.Monad.FreeCont
+public import ToMathlib.Control.Monad.Graded
+public import ToMathlib.Control.Monad.Hom
+public import ToMathlib.Control.Monad.Indexed
+public import ToMathlib.Control.Monad.Ordered
+public import ToMathlib.Control.Monad.Relation
+public import ToMathlib.Control.Monad.RelationalAlgebra
+public import ToMathlib.Control.Monad.Relative
+public import ToMathlib.Control.Monad.Transformer
+public import ToMathlib.Control.OptionT
+public import ToMathlib.Control.StateT
+public import ToMathlib.Control.WriterT
+public import ToMathlib.Data.ENNReal.AbsDiff
+public import ToMathlib.Data.ENNReal.SumSquares
+public import ToMathlib.General
+public import ToMathlib.OrderEnrichedCategory
+public import ToMathlib.PFunctor.Basic
+public import ToMathlib.PFunctor.Category
+public import ToMathlib.PFunctor.Chart.Basic
+public import ToMathlib.PFunctor.Cofree
+public import ToMathlib.PFunctor.Equiv.Basic
+public import ToMathlib.PFunctor.Free
+public import ToMathlib.PFunctor.Lens.Basic
+public import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
+public import ToMathlib.ProbabilityTheory.Coupling
+public import ToMathlib.ProbabilityTheory.FinRatPMF
+public import ToMathlib.ProbabilityTheory.OptimalCoupling
