@@ -5,9 +5,9 @@
 - Import `VCVio.ProgramLogic.Tactics` for normal proof work. This is the canonical user-facing proof mode.
 - Internally the tactic implementation is split into `VCVio.ProgramLogic.Tactics.Unary` and
   `VCVio.ProgramLogic.Tactics.Relational`; the umbrella import is still the intended default.
-- `VCVio.ProgramLogic.Notation` provides notation, convenience predicates, and coarse compatibility macros:
-  `game_wp`, `game_rel`, `coupling`, `game_hop`.
-- Prefer the step-through tactics from `Tactics` over the coarse macros for new proofs.
+- `VCVio.ProgramLogic.Notation` provides the core notation and convenience predicates used by
+  the tactic surface.
+- Prefer the step-through tactics from `Tactics` for new proofs.
 - `VCVio.ProgramLogic.Unary.StdDoBridge` is a narrow unary bridge for almost-sure correctness in the `.pure`
   `Std.Do` view. It is not the main engine for quantitative or relational VCGen.
 
@@ -25,6 +25,9 @@
 
 `by_equiv` enters the coupling-based `RelTriple` shell, not `RelTriple'`, so that
 `rvcgen_step` / `rvcgen` can keep decomposing the relational goal.
+
+`by_dist ε` is the explicit variant that fixes the TV-distance contribution to `ε`
+before generating the remaining subgoals.
 
 ### Relational (pRHL) Tactics
 
@@ -95,7 +98,7 @@ Use them when working directly at the weakest-precondition level.
 
 | Tactic | What it does |
 |--------|--------------|
-| `wp_step` | One WP decomposition (wp_bind, wp_pure, wp_replicate, wp_list_mapM, wp_list_foldlM, wp_query, wp_ite, wp_uniformSample, wp_map) |
+| `wp_step` | One WP decomposition (`wp_bind`, `wp_pure`, `wp_replicate`, `wp_list_mapM`, `wp_list_foldlM`, `wp_query`, `wp_ite`, `wp_dite`, `wp_uniformSample`, `wp_map`, `wp_simulateQ_eq`, `wp_liftComp`) |
 | `wp_seq n` | Repeats `wp_step` for `n` layers |
 
 
@@ -116,9 +119,6 @@ All probability-equality control now lives under `qvcgen_step`.
 | Tactic | What it does |
 |--------|--------------|
 | `rvcgen` | Exhaustive relational VCGen over all open goals, with automatic lowering from `GameEquiv` / `evalDist` equality |
-| `game_wp` | Compatibility macro: repeatedly applies WP rules, including bounded iteration and traversals |
-| `game_rel` / `coupling` | Compatibility macros: coarse relational decomposition through bind/query |
-| `game_hop` | Compatibility macro: tries to close a game-hopping step |
 | `rel_dist` | Turns `RelTriple oa ob (EqRel α)` into `evalDist oa = evalDist ob` |
 
 ## Probability Equality Guide

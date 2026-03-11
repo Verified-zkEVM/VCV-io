@@ -10,6 +10,7 @@
 
 2. **Advantage is bounded** (`advantage ≤ ε`):
    → `by_dist` to enter TV distance reasoning
+   → Use `by_dist ε₂` when you want to pin the TV-distance contribution explicitly
    → For identical-until-bad: use `tvDist_simulateQ_le_probEvent_bad`
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
@@ -134,6 +135,11 @@ qvcgen_step rw
 -- Goal: AdvBound game ε
 by_dist                     -- enters TV distance mode
 -- now need to show tvDist ... ≤ ε
+```
+
+```lean
+-- Same shape, but fix the TV-distance contribution first:
+by_dist ε₂
 ```
 
 ## Asymptotic Security Reductions

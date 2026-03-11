@@ -63,6 +63,45 @@ example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
       wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post) := by
   wp_step
 
+example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    wp⟦(liftM (query t) : OracleComp spec (spec.Range t))⟧ post =
+      ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
+  wp_step
+
+example (c : Prop) [Decidable c]
+    (a : c → OracleComp spec α) (b : ¬c → OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp⟦dite c a b⟧ post = if h : c then wp⟦a h⟧ post else wp⟦b h⟧ post := by
+  wp_step
+
+example [SampleableType α] (post : α → ℝ≥0∞) :
+    wp⟦($ᵗ α : ProbComp α)⟧ post =
+      ∑' u : α, Pr[= u | ($ᵗ α : ProbComp α)] * post u := by
+  wp_step
+
+example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
+    wp⟦f <$> oa⟧ post = wp⟦oa⟧ (post ∘ f) := by
+  wp_step
+
+example (impl : QueryImpl spec (OracleComp spec))
+    (hImpl : ∀ (t : spec.Domain),
+      evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
+    (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp⟦simulateQ impl oa⟧ post = wp⟦oa⟧ post := by
+  wp_step
+  exact hImpl
+
+section LiftComp
+
+variable {ι' : Type} {superSpec : OracleSpec ι'}
+variable [superSpec.Fintype] [superSpec.Inhabited]
+variable [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+
+example (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
+    wp⟦liftComp oa superSpec⟧ post = wp⟦oa⟧ post := by
+  wp_step
+
+end LiftComp
+
 example {oa : OracleComp spec α} {f : α → OracleComp spec β}
     {pre : ℝ≥0∞} {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
     (hoa : ⦃pre⦄ oa ⦃cut⦄)
@@ -71,10 +110,49 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
   qvcgen_step
   exact hob
 
+example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
+    (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
+    ⦃1⦄ (do
+      let x ← oa
+      f x) ⦃fun y => if y = true then 1 else 0⦄ := by
+  classical
+  qvcgen_step using (fun x => ⌜x ∈ support oa⌝)
+  · simpa [propInd_eq_ite] using triple_support (oa := oa)
+  · intro x
+    by_cases hx : x ∈ support oa
+    · simpa [propInd, hx] using triple_probOutput_eq_one (oa := f x) (x := true) (h := h x hx)
+    · simpa [propInd, hx] using
+        triple_zero (oa := f x) (post := fun y => if y = true then 1 else 0)
+
+example (oa : OracleComp spec α) (n : ℕ) (pre : ℝ≥0∞) (post : List α → ℝ≥0∞)
+    (h :
+      pre ≤ wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs)))) :
+    ⦃pre⦄ oa.replicate (n + 1) ⦃post⦄ := by
+  qvcgen_step
+  exact h
+
+example (x : α) (xs : List α) (f : α → OracleComp spec β)
+    (pre : ℝ≥0∞) (post : List β → ℝ≥0∞)
+    (h : pre ≤ wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys)))) :
+    ⦃pre⦄ (x :: xs).mapM f ⦃post⦄ := by
+  qvcgen_step
+  exact h
+
+example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
+    (init : β) (pre : ℝ≥0∞) (post : β → ℝ≥0∞)
+    (h : pre ≤ wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post)) :
+    ⦃pre⦄ (x :: xs).foldlM f init ⦃post⦄ := by
+  qvcgen_step
+  exact h
+
 example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
     (h1 : ⦃1⦄ oa ⦃cut⦄) (h2 : ∀ x, ⦃cut x⦄ ob x ⦃post⦄) :
     ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
+  qvcgen
+
+example (x : α) (post : α → ℝ≥0∞) :
+    ⦃post x⦄ (pure x : OracleComp spec α) ⦃post⦄ := by
   qvcgen
 
 example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
@@ -86,6 +164,73 @@ example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
   · exact hpre
   · intro xs; exact hpost xs
   · exact hstep
+
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {oc : β → OracleComp spec γ}
+    {cut1 : α → ℝ≥0∞} {cut2 : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
+    (h1 : ⦃1⦄ oa ⦃cut1⦄)
+    (h2 : ∀ x, ⦃cut1 x⦄ ob x ⦃cut2⦄)
+    (h3 : ∀ y, ⦃cut2 y⦄ oc y ⦃post⦄) :
+    ⦃1⦄ (do
+      let x ← oa
+      let y ← ob x
+      oc y) ⦃post⦄ := by
+  qvcgen
+
+example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {post : β → ℝ≥0∞}
+    (h : ⦃1⦄ oa ⦃fun x => wp⟦ob x⟧ post⦄) :
+    ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
+  qvcgen
+
+example (c : Prop) [Decidable c] {oa ob : OracleComp spec α}
+    {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (ht : ⦃pre⦄ oa ⦃post⦄) (hf : ⦃pre⦄ ob ⦃post⦄) :
+    ⦃pre⦄ (if c then oa else ob) ⦃post⦄ := by
+  qvcgen
+
+example (n : ℕ) {oa : n > 0 → OracleComp spec α} {ob : ¬(n > 0) → OracleComp spec α}
+    {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
+    (ht : ∀ h, ⦃pre⦄ oa h ⦃post⦄) (hf : ∀ h, ⦃pre⦄ ob h ⦃post⦄) :
+    ⦃pre⦄ (dite (n > 0) oa ob) ⦃post⦄ := by
+  qvcgen
+
+example {f : α → OracleComp spec β} {g : OracleComp spec β}
+    (x : Option α) {pre : ℝ≥0∞} {post : β → ℝ≥0∞}
+    (hsome : ∀ a, ⦃pre⦄ f a ⦃post⦄) (hnone : ⦃pre⦄ g ⦃post⦄) :
+    ⦃pre⦄ (match x with | some a => f a | none => g) ⦃post⦄ := by
+  qvcgen
+
+example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
+    (hstep : ⦃I⦄ oa ⦃fun _ => I⦄) :
+    ⦃I⦄ oa.replicate n ⦃fun _ => I⦄ := by
+  qvcgen
+
+example {σ : Type} {f : σ → α → OracleComp spec σ} {l : List α} {s₀ : σ}
+    {I : σ → ℝ≥0∞}
+    (hstep : ∀ s x, x ∈ l → ⦃I s⦄ f s x ⦃I⦄) :
+    ⦃I s₀⦄ l.foldlM f s₀ ⦃I⦄ := by
+  qvcgen
+
+example {f : α → OracleComp spec β} {l : List α} {I : ℝ≥0∞}
+    (hstep : ∀ x, x ∈ l → ⦃I⦄ f x ⦃fun _ => I⦄) :
+    ⦃I⦄ l.mapM f ⦃fun _ => I⦄ := by
+  qvcgen
+
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
+    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    Pr[p | oa] = 1 := by
+  qvcgen
+
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
+    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    1 = Pr[p | oa] := by
+  qvcgen
+
+example {oa : OracleComp spec Bool}
+    (h : ⦃1⦄ oa ⦃fun y => if y = true then 1 else 0⦄) :
+    Pr[= true | oa] = 1 := by
+  qvcgen
 
 example {mx : OracleComp spec α} {my : OracleComp spec β}
     {f : α → β → OracleComp spec γ} {z : γ} :
@@ -99,8 +244,22 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
   qvcgen_step rw congr
   exact h _ ‹_›
 
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
+    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
+    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+  qvcgen_step rw congr'
+  exact h _
+
 example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
   exp_norm
+
+example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
+    Pr[p | oa] = wp⟦oa⟧ (fun x => if p x then 1 else 0) := by
+  by_hoare
+
+example (oa : OracleComp spec α) [DecidableEq α] (x : α) :
+    Pr[= x | oa] = wp⟦oa⟧ (fun y => if y = x then 1 else 0) := by
+  by_hoare
 
 end Unary
 
@@ -116,6 +275,15 @@ example {oa₁ oa₂ : OracleComp spec α}
   rvcgen_step
   exact hoa
 
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen_step using S
+  · exact hoa
+
 example (t : spec.Domain) :
     ⟪(liftM (query t) : OracleComp spec (spec.Range t))
      ~ (liftM (query t) : OracleComp spec (spec.Range t))
@@ -130,9 +298,24 @@ example [SampleableType α]
   · intro x
     rfl
 
+example [SampleableType α]
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪($ᵗ α : ProbComp α) ~ ($ᵗ α : ProbComp α) | fun x y => y = f x⟫ := by
+  rvcgen_step
+  · exact hf
+  · intro x
+    rfl
+
 example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
     (h : ⟪oa₁ ~ oa₂ | EqRel α⟫) :
     ⟪oa₁.replicate n ~ oa₂.replicate n | EqRel (List α)⟫ := by
+  rvcgen_step
+  exact h
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β} (n : ℕ)
+    {R : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫) :
+    ⟪oa.replicate n ~ ob.replicate n | List.Forall₂ R⟫ := by
   rvcgen_step
   exact h
 
@@ -186,10 +369,6 @@ example (a : α) :
     ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
   rvcgen_step
 
-example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
-    ⟪(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) | R⟫ := by
-  exact Relational.relTriple_pure_pure h
-
 example {c : Prop} [Decidable c]
     {oa₁ oa₂ ob₁ ob₂ : OracleComp spec α}
     (h1 : ⟪oa₁ ~ ob₁ | EqRel α⟫)
@@ -204,9 +383,24 @@ example {oa : OracleComp spec α} {ob : OracleComp spec β}
     (h : ⟪oa ~ ob | R⟫)
     (hpost : ∀ x y, R x y → R' x y) :
     ⟪oa ~ ob | R'⟫ := by
+  rel_conseq
+  · exact h
+  · exact hpost
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
   rel_conseq with R
   · exact h
   · exact hpost
+
+private def inlineId (oa : OracleComp spec α) : OracleComp spec α := oa
+
+example (oa : OracleComp spec α) :
+    ⟪inlineId oa ~ oa | EqRel α⟫ := by
+  rel_inline inlineId
 
 end Relational
 
@@ -312,6 +506,10 @@ end RelSimDist
 
 section GameEquiv
 
+example (oa : OracleComp spec α) :
+    oa ≡ₚ oa := by
+  rvcgen
+
 example [SampleableType α]
     (f : α → α) (hf : Function.Bijective f) :
     (f <$> ($ᵗ α : ProbComp α)) ≡ₚ ($ᵗ α : ProbComp α) := by
@@ -321,7 +519,27 @@ example [SampleableType α]
   · exact hf
   · exact rfl
 
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ f₂ : α → OracleComp spec β}
+    {g₁ g₂ : β → OracleComp spec γ}
+    {R : RelPost β β}
+    (h12 : ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫)
+    (h23 : ∀ b₁ b₂, R b₁ b₂ → ⟪g₁ b₁ ~ g₂ b₂ | EqRel γ⟫) :
+    (oa₁ >>= f₁ >>= g₁) ≡ₚ (oa₂ >>= f₂ >>= g₂) := by
+  rvcgen using R
+
 end GameEquiv
+
+section ByDist
+
+example {game₁ game₂ : OracleComp spec Bool} {ε₁ ε₂ : ℝ}
+    (hbound : AdvBound game₁ ε₁) (htv : tvDist game₁ game₂ ≤ ε₂) :
+    AdvBound game₂ (ε₁ + ε₂) := by
+  by_dist ε₂
+  · exact hbound
+  · exact htv
+
+end ByDist
 
 section RelDist
 
@@ -343,7 +561,7 @@ end EntryExit
 section Probability
 
 variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
-variable {α β γ δ : Type}
+variable {α β γ δ ε : Type}
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
     (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
@@ -362,5 +580,24 @@ example {mx : OracleComp spec α} {my : OracleComp spec β}
     Pr[= y | mx >>= fun a => my >>= fun b => mz >>= fun c => f a b c] =
     Pr[= y | mx >>= fun a => mz >>= fun c => my >>= fun b => f a b c] := by
   qvcgen_step rw under 1
+
+example {mw : OracleComp spec α} {mx : OracleComp spec β}
+    {my : OracleComp spec γ} {mz : OracleComp spec δ}
+    {f : α → β → γ → δ → OracleComp spec ε} {out : ε} :
+    Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
+    Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
+  qvcgen_step rw under 2
+
+example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
+    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
+    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+  qvcgen_step rw congr'
+  exact h _
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {q : γ → Prop} :
+    Pr[q | mx >>= fun a => my >>= fun b => f a b] =
+    Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
+  qvcgen
 
 end Probability

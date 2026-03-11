@@ -70,6 +70,11 @@ example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
   relTriple_refl (spec₁ := spec₁) oa
 
+example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
+    RelTriple (spec₁ := spec₁) (spec₂ := spec₂)
+      (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R :=
+  relTriple_pure_pure h
+
 /-! ### Tactic-mode examples (using `rvcgen_step`) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
