@@ -433,6 +433,23 @@ def tryProbEqActions (steps : List ProbEqAction) : TacticM Bool := do
       return false
   return true
 
+def probEqActionPlans : List (List ProbEqAction) :=
+  [ [.swap]
+  , [.congrAny]
+  , [.rewrite, .congrAny]
+  , [.congrAny, .swap]
+  , [.rewriteUnder 1, .rewrite, .congrAny]
+  , [.rewriteUnder 1, .rewrite]
+  , [.rewriteUnder 2, .rewriteUnder 1, .rewrite]
+  , [.rewriteUnder 2, .rewriteUnder 1, .rewrite, .congrAny]
+  ]
+
+def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
+  for plan in plans do
+    if ← tryProbEqActions plan then
+      return true
+  return false
+
 /-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
 Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
 def runProbOutputEqRelBridge : TacticM Bool := do
@@ -456,11 +473,7 @@ def runProbOutputEqRelBridge : TacticM Bool := do
 
 /-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr. -/
 def tryProbEqGoal : TacticM Bool := do
-  if ← tryProbEqActions [.swap] then return true
-  if ← tryProbEqActions [.congrAny] then return true
-  if ← tryProbEqActions [.rewrite, .congrAny] then return true
-  if ← tryProbEqActions [.congrAny, .swap] then return true
-  if ← tryProbEqActions [.rewriteUnder 1, .rewrite, .congrAny] then
+  if ← tryProbEqPlans probEqActionPlans then
     return true
   runProbOutputEqRelBridge
 
@@ -696,16 +709,24 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
   if let some explicitProbEqStep ← planExplicitProbEqStep? structuralPreview then
     return some explicitProbEqStep
+  let theoremCandidate? ← do
+    if let some theoremName ← findRegisteredVCGenTheorem? then
+      let theoremStep :=
+        mkQVCGenPlannedStep
+          "qvcgen registered theorem"
+          s!"qvcgen_step with {theoremName}"
+          (runVCGenStepWithTheorem (mkIdent theoremName))
+      let theoremPreview ← previewPlannedStepWithGoals theoremStep
+      pure <| if theoremPreview.ok then some (theoremStep, theoremPreview.goalCount) else none
+    else
+      pure none
   if structuralPreview.ok then
+    if let some (theoremStep, theoremGoalCount) := theoremCandidate? then
+      if theoremGoalCount < structuralPreview.goalCount then
+        return some theoremStep
     return some structuralStep
-  if let some theoremName ← findRegisteredVCGenTheorem? then
-    let theoremStep :=
-      mkQVCGenPlannedStep
-        "qvcgen registered theorem"
-        s!"qvcgen_step with {theoremName}"
-        (runVCGenStepWithTheorem (mkIdent theoremName))
-    if ← previewPlannedStep theoremStep then
-      return some theoremStep
+  if let some (theoremStep, _) := theoremCandidate? then
+    return some theoremStep
   let closeStep :=
     mkQVCGenPlannedStep
       "qvcgen close/search"

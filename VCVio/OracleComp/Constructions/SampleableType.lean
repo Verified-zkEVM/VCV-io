@@ -69,6 +69,23 @@ lemma probOutput_map_bijective_uniform_cross
       probOutput_uniformSample, probOutput_uniformSample,
       Fintype.card_of_bijective hf]
 
+/-- Binding after pushing forward uniform sampling along a bijection preserves output
+probabilities. -/
+lemma probOutput_bind_bijective_uniform_cross
+    {β γ : Type} [SampleableType β] [Fintype α]
+    (f : α → β) (hf : Function.Bijective f) (g : β → ProbComp γ) (z : γ) :
+    Pr[= z | ($ᵗ α : ProbComp α) >>= fun x => g (f x)] =
+      Pr[= z | ($ᵗ β : ProbComp β) >>= fun y => g y] := by
+  haveI : Fintype β := Fintype.ofBijective _ hf
+  have h : (($ᵗ α : ProbComp α) >>= fun x => g (f x)) =
+      ((f <$> ($ᵗ α : ProbComp α)) >>= g) := by
+    simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
+  rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  congr 1
+  funext y
+  congr 1
+  exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
+
 /-- Pushing forward uniform sampling along a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]

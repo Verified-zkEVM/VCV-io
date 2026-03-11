@@ -95,7 +95,7 @@ theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
 
 omit [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- On `fork` support, first-projection success equals old pair-style success event. -/
-private lemma probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
+theorem probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
     Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf] =
       Pr[fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] := by
   refine probEvent_ext ?_
@@ -283,6 +283,149 @@ private lemma probOutput_collision_le_main_div (s : Fin (qb i + 1)) :
         ↑(Fintype.card (spec.Range i)) := by
     exact hStep2.trans <| hStep3.trans <| by rw [hSeed]
   exact hChain ▸ hStep1
+
+omit [spec.DecidableEq] in
+private lemma sq_probOutput_main_le_noGuardComp (s : Fin (qb i + 1)) :
+    let z : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) := some (some s, some s)
+    let noGuardComp :
+        OracleComp spec (Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1)))) := do
+      let seed ← liftComp (generateSeed spec qb js) spec
+      let x₁ ← (simulateQ seededOracle main).run' seed
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      let seed' := (seed.takeAtIndex i ↑s).addValue i u
+      let x₂ ← (simulateQ seededOracle main).run' seed'
+      return some (cf x₁, cf x₂)
+    Pr[= s | cf <$> main] ^ 2 ≤ Pr[= z | noGuardComp] := by
+  simp only
+  let z : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) := some (some s, some s)
+  let noGuardComp :
+      OracleComp spec (Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1)))) := do
+    let seed ← liftComp (generateSeed spec qb js) spec
+    let x₁ ← (simulateQ seededOracle main).run' seed
+    let u ← liftComp ($ᵗ spec.Range i) spec
+    let seed' := (seed.takeAtIndex i ↑s).addValue i u
+    let x₂ ← (simulateQ seededOracle main).run' seed'
+    return some (cf x₁, cf x₂)
+  change Pr[= s | cf <$> main] ^ 2 ≤ Pr[= z | noGuardComp]
+  have hMain : (Pr[= s | cf <$> main] : ℝ≥0∞) =
+      ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' σ] := by
+    rw [show (Pr[= s | cf <$> main] : ℝ≥0∞) =
+      Pr[= (some s : Option (Fin (qb i + 1))) |
+        (do let seed ← liftComp (generateSeed spec qb js) spec
+            cf <$> (simulateQ seededOracle main).run' seed :
+          OracleComp spec (Option (Fin (qb i + 1))))] from by
+      simpa using (seededOracle.probOutput_generateSeed_bind_map_simulateQ
+        (qc := qb) (js := js) (oa := main) (f := cf)
+        (y := (some s : Option (Fin (qb i + 1))))).symm]
+    rw [probOutput_bind_eq_tsum]
+    simp_rw [probOutput_liftComp]
+  have hFactor : Pr[= z | noGuardComp] =
+      ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        (Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' σ] *
+         Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run'
+            (σ.takeAtIndex i ↑s)]) := by
+    simp only [noGuardComp, z]
+    rw [probOutput_bind_eq_tsum]
+    simp_rw [probOutput_liftComp]
+    congr 1; ext σ; congr 1
+    have hcomp : (do let x₁ ← (simulateQ seededOracle main).run' σ
+                     let u ← liftComp ($ᵗ spec.Range i) spec
+                     let x₂ ← (simulateQ seededOracle main).run'
+                       ((σ.takeAtIndex i ↑s).addValue i u)
+                     pure (some (cf x₁, cf x₂)) : OracleComp spec _) =
+        some <$> (do let x₁ ← (simulateQ seededOracle main).run' σ
+                     let x₂ ← (liftComp ($ᵗ spec.Range i) spec >>= fun u =>
+                       (simulateQ seededOracle main).run'
+                         ((σ.takeAtIndex i ↑s).addValue i u))
+                     pure (cf x₁, cf x₂)) := by
+      simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
+    rw [hcomp, probOutput_some_map_some, probOutput_bind_bind_prod_mk_eq_mul']
+    congr 1
+    have h := seededOracle.evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
+      (σ.takeAtIndex i ↑s) i main
+    exact congrFun (congrArg DFunLike.coe (by simp only [evalDist_map, h])) (some s)
+  have hJensen :
+      (∑' σ, Pr[= σ | generateSeed spec qb js] *
+        Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' σ]) ^ 2 ≤
+      ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        (Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' σ] *
+         Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run'
+            (σ.takeAtIndex i ↑s)]) := by
+    have hMainTake : ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] =
+        Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] := by
+      have hTake :=
+        seededOracle.probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
+          (qc := qb) (js := js) (i₀ := i) (k := ↑s) (oa := main) (f := cf)
+          (y := (some s : Option (Fin (qb i + 1))))
+      rw [probOutput_bind_eq_tsum] at hTake
+      simp_rw [probOutput_liftComp] at hTake
+      exact hTake
+    have hEq : ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' σ] =
+      ∑' σ, Pr[= σ | generateSeed spec qb js] *
+        Pr[= (some s : Option (Fin (qb i + 1))) |
+          cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] := by
+      calc
+        ∑' σ, Pr[= σ | generateSeed spec qb js] *
+            Pr[= (some s : Option (Fin (qb i + 1))) |
+              cf <$> (simulateQ seededOracle main).run' σ]
+          = Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] := by
+              simpa using hMain.symm
+        _ = ∑' σ, Pr[= σ | generateSeed spec qb js] *
+              Pr[= (some s : Option (Fin (qb i + 1))) |
+                cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] := by
+              simpa using hMainTake.symm
+    set w : QuerySeed spec → ℝ≥0∞ := fun σ => Pr[= σ | generateSeed spec qb js]
+    set Q : QuerySeed spec → ℝ≥0∞ := fun σ =>
+      Pr[= (some s : Option (Fin (qb i + 1))) |
+        cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)]
+    have hw : ∑' σ, w σ ≤ 1 := tsum_probOutput_le_one
+    have hEq2 : ∑' σ, w σ * Q σ ^ 2 =
+        ∑' σ, w σ *
+          (Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' σ] * Q σ) := by
+      simp only [sq, Q, w]
+      have hSim : ∀ σ', (simulateQ seededOracle (cf <$> main :
+          OracleComp spec (Option (Fin (qb i + 1))))).run' σ' =
+          cf <$> (simulateQ seededOracle main).run' σ' := by
+        intro σ'
+        simp only [simulateQ_map]
+        show Prod.fst <$> (Prod.map cf id <$> (simulateQ seededOracle main).run σ') =
+          cf <$> (Prod.fst <$> (simulateQ seededOracle main).run σ')
+        simp [Functor.map_map]
+      have hWF := seededOracle.tsum_probOutput_generateSeed_weight_takeAtIndex
+        qb js i (↑s) (cf <$> main : OracleComp spec (Option (Fin (qb i + 1))))
+        (some s : Option (Fin (qb i + 1)))
+        (fun τ => Pr[= (some s : Option (Fin (qb i + 1))) |
+          (simulateQ seededOracle (cf <$> main :
+            OracleComp spec (Option (Fin (qb i + 1))))).run' τ])
+      simp_rw [hSim] at hWF
+      exact hWF.symm.trans (by congr 1; ext σ; congr 1; exact mul_comm _ _)
+    calc _ = (∑' σ, w σ * Q σ) ^ 2 := by rw [hEq]
+      _ ≤ ∑' σ, w σ * Q σ ^ 2 := ENNReal.sq_tsum_le_tsum_sq w Q hw
+      _ = _ := hEq2
+  calc Pr[= s | cf <$> main] ^ 2
+      = (∑' σ, Pr[= σ | generateSeed spec qb js] *
+          Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' σ]) ^ 2 := by
+            rw [hMain]
+    _ ≤ ∑' σ, Pr[= σ | generateSeed spec qb js] *
+          (Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run' σ] *
+           Pr[= (some s : Option (Fin (qb i + 1))) |
+            cf <$> (simulateQ seededOracle main).run'
+              (σ.takeAtIndex i ↑s)]) := hJensen
+    _ = Pr[= z | noGuardComp] := hFactor.symm
 
 /-- Key bound of the forking lemma: the probability that both runs succeed with fork point `s`
 is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/
@@ -518,137 +661,9 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
     exact (tsub_le_iff_right).2 hNoGuardLeAdd
   have hNoGuardGeSquare :
       Pr[= s | cf <$> main] ^ 2 ≤ Pr[= z | noGuardComp] := by
-    -- Step 1: Express Pr[= s | cf <$> main] as E_σ[P(σ)] via seeded oracle factorization
-    have hMain : (Pr[= s | cf <$> main] : ℝ≥0∞) =
-        ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' σ] := by
-      rw [show (Pr[= s | cf <$> main] : ℝ≥0∞) =
-        Pr[= (some s : Option (Fin (qb i + 1))) |
-          (do let seed ← liftComp (generateSeed spec qb js) spec
-              cf <$> (simulateQ seededOracle main).run' seed :
-            OracleComp spec (Option (Fin (qb i + 1))))] from by
-        simpa using (seededOracle.probOutput_generateSeed_bind_map_simulateQ
-          (qc := qb) (js := js) (oa := main) (f := cf)
-          (y := (some s : Option (Fin (qb i + 1))))).symm]
-      rw [probOutput_bind_eq_tsum]
-      simp_rw [probOutput_liftComp]
-    -- Step 2: Factor Pr[= z | noGuardComp] = ∑' σ, w(σ) * P(σ) * P(take(σ))
-    -- Uses conditional independence (probOutput_bind_bind_prod_mk_eq_mul')
-    -- and the addValue factorization lemma.
-    have hFactor : Pr[= z | noGuardComp] =
-        ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          (Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' σ] *
-           Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run'
-              (σ.takeAtIndex i ↑s)]) := by
-      simp only [noGuardComp, z]
-      rw [probOutput_bind_eq_tsum]
-      simp_rw [probOutput_liftComp]
-      congr 1; ext σ; congr 1
-      have hcomp : (do let x₁ ← (simulateQ seededOracle main).run' σ
-                       let u ← liftComp ($ᵗ spec.Range i) spec
-                       let x₂ ← (simulateQ seededOracle main).run'
-                         ((σ.takeAtIndex i ↑s).addValue i u)
-                       pure (some (cf x₁, cf x₂)) : OracleComp spec _) =
-          some <$> (do let x₁ ← (simulateQ seededOracle main).run' σ
-                       let x₂ ← (liftComp ($ᵗ spec.Range i) spec >>= fun u =>
-                         (simulateQ seededOracle main).run'
-                           ((σ.takeAtIndex i ↑s).addValue i u))
-                       pure (cf x₁, cf x₂)) := by
-        simp only [map_eq_bind_pure_comp, bind_assoc, Function.comp, pure_bind]
-      rw [hcomp, probOutput_some_map_some, probOutput_bind_bind_prod_mk_eq_mul']
-      congr 1
-      have h := seededOracle.evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
-        (σ.takeAtIndex i ↑s) i main
-      exact congrFun (congrArg DFunLike.coe (by simp only [evalDist_map, h])) (some s)
-    -- Step 3: Jensen/Cauchy-Schwarz via prefix grouping
-    -- (∑ w * P)² ≤ ∑ w * P * P(take) by decomposing into prefix groups
-    -- and applying sq_tsum_le_tsum_sq.
-    have hJensen :
-        (∑' σ, Pr[= σ | generateSeed spec qb js] *
-          Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' σ]) ^ 2 ≤
-        ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          (Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' σ] *
-           Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run'
-              (σ.takeAtIndex i ↑s)]) := by
-      -- Notation: w(σ) = Pr[=σ|gen], P(σ) = Pr[=y|run'(σ)], Q(σ) = Pr[=y|run'(take(σ))]
-      -- hEq: ∑ w * P = ∑ w * Q (both equal Pr[= some s | cf <$> main])
-      have hMainTake : ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] =
-          Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] := by
-        have hTake :=
-          seededOracle.probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
-            (qc := qb) (js := js) (i₀ := i) (k := ↑s) (oa := main) (f := cf)
-            (y := (some s : Option (Fin (qb i + 1))))
-        rw [probOutput_bind_eq_tsum] at hTake
-        simp_rw [probOutput_liftComp] at hTake
-        exact hTake
-      have hEq : ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' σ] =
-        ∑' σ, Pr[= σ | generateSeed spec qb js] *
-          Pr[= (some s : Option (Fin (qb i + 1))) |
-            cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] :=
-        by
-          calc
-            ∑' σ, Pr[= σ | generateSeed spec qb js] *
-                Pr[= (some s : Option (Fin (qb i + 1))) |
-                  cf <$> (simulateQ seededOracle main).run' σ]
-              = Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] := by
-                  simpa using hMain.symm
-            _ = ∑' σ, Pr[= σ | generateSeed spec qb js] *
-                  Pr[= (some s : Option (Fin (qb i + 1))) |
-                    cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)] := by
-                  simpa using hMainTake.symm
-      -- Jensen: (∑ w * Q)² ≤ ∑ w * Q²
-      set w : QuerySeed spec → ℝ≥0∞ := fun σ => Pr[= σ | generateSeed spec qb js]
-      set Q : QuerySeed spec → ℝ≥0∞ := fun σ =>
-        Pr[= (some s : Option (Fin (qb i + 1))) |
-          cf <$> (simulateQ seededOracle main).run' (σ.takeAtIndex i ↑s)]
-      have hw : ∑' σ, w σ ≤ 1 := tsum_probOutput_le_one
-      -- hEq2: ∑ w * Q² = ∑ w * (P * Q) via weighted takeAtIndex faithfulness
-      have hEq2 : ∑' σ, w σ * Q σ ^ 2 =
-          ∑' σ, w σ *
-            (Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run' σ] * Q σ) := by
-        simp only [sq, Q, w]
-        have hSim : ∀ σ', (simulateQ seededOracle (cf <$> main :
-            OracleComp spec (Option (Fin (qb i + 1))))).run' σ' =
-            cf <$> (simulateQ seededOracle main).run' σ' := by
-          intro σ'
-          simp only [simulateQ_map]
-          show Prod.fst <$> (Prod.map cf id <$> (simulateQ seededOracle main).run σ') =
-            cf <$> (Prod.fst <$> (simulateQ seededOracle main).run σ')
-          simp [Functor.map_map]
-        have hWF := seededOracle.tsum_probOutput_generateSeed_weight_takeAtIndex
-          qb js i (↑s) (cf <$> main : OracleComp spec (Option (Fin (qb i + 1))))
-          (some s : Option (Fin (qb i + 1)))
-          (fun τ => Pr[= (some s : Option (Fin (qb i + 1))) |
-            (simulateQ seededOracle (cf <$> main :
-              OracleComp spec (Option (Fin (qb i + 1))))).run' τ])
-        simp_rw [hSim] at hWF
-        exact hWF.symm.trans (by congr 1; ext σ; congr 1; exact mul_comm _ _)
-      calc _ = (∑' σ, w σ * Q σ) ^ 2 := by rw [hEq]
-        _ ≤ ∑' σ, w σ * Q σ ^ 2 := ENNReal.sq_tsum_le_tsum_sq w Q hw
-        _ = _ := hEq2
-    calc Pr[= s | cf <$> main] ^ 2
-        = (∑' σ, Pr[= σ | generateSeed spec qb js] *
-            Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run' σ]) ^ 2 := by
-          rw [hMain]
-      _ ≤ ∑' σ, Pr[= σ | generateSeed spec qb js] *
-            (Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run' σ] *
-             Pr[= (some s : Option (Fin (qb i + 1))) |
-              cf <$> (simulateQ seededOracle main).run'
-                (σ.takeAtIndex i ↑s)]) := hJensen
-      _ = Pr[= z | noGuardComp] := hFactor.symm
+    simpa [z, noGuardComp] using
+      (sq_probOutput_main_le_noGuardComp
+        (main := main) (qb := qb) (js := js) (i := i) (cf := cf) s)
   exact le_trans
     (tsub_le_tsub_right hNoGuardGeSquare (Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp]))
     hNoGuardMinusLeRhs
@@ -682,18 +697,36 @@ private lemma sum_probEvent_fork_le_tsum_some :
   · rw [Finset.sum_eq_single s₀ (by intro b _ hb; simp [Ne.symm hb]) (by simp)]
     simp
 
-omit [DecidableEq ι] [(i : ι) → SampleableType (spec.Range i)]
-  [spec.DecidableEq] [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
-/-- The acceptance probability `∑ Pr[cf(main) = some s]` is at most 1. -/
-private lemma sum_probOutput_cf_le_one :
-    ∑ s : Fin (qb i + 1), Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] ≤ 1 := by
-  calc ∑ s, Pr[= (some s : Option _) | cf <$> main]
-    _ ≤ ∑' (x : Option (Fin (qb i + 1))), Pr[= x | cf <$> main] := by
-        rw [← tsum_fintype (L := .unconditional _)]
-        have h := tsum_option (fun x : Option (Fin (qb i + 1)) =>
-          Pr[= x | cf <$> main]) ENNReal.summable
-        rw [h]; exact le_add_self
-    _ ≤ 1 := tsum_probOutput_le_one
+omit [DecidableEq ι] [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq]
+  [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- The standard forking-lemma precondition is itself a valid probability bound. -/
+theorem fork_precondition_le_one :
+    (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+     let q := qb i + 1
+     acc * (acc / q - h⁻¹)) ≤ 1 := by
+  simp only
+  set acc : ℝ≥0∞ := ∑ s : Fin (qb i + 1),
+    Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main]
+  have hacc_le_one : acc ≤ 1 := by
+    simpa [acc] using
+      (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
+  have hq : (1 : ℝ≥0∞) ≤ (↑(qb i + 1) : ℝ≥0∞) := by
+    exact_mod_cast Nat.succ_le_succ (Nat.zero_le (qb i))
+  have hdiv_le_acc : acc / (↑(qb i + 1) : ℝ≥0∞) ≤ acc := by
+    rw [div_eq_mul_inv]
+    calc
+      acc * ((↑(qb i + 1) : ℝ≥0∞))⁻¹ ≤ acc * 1 := by
+        gcongr
+        exact ENNReal.inv_le_one.2 hq
+      _ = acc := by simp
+  calc
+    acc * (acc / (↑(qb i + 1) : ℝ≥0∞) - (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹)
+      ≤ acc * (acc / (↑(qb i + 1) : ℝ≥0∞)) := by gcongr; exact tsub_le_self
+    _ ≤ acc * 1 := by
+      have hdiv_le_one : acc / (↑(qb i + 1) : ℝ≥0∞) ≤ 1 := le_trans hdiv_le_acc hacc_le_one
+      gcongr
+    _ ≤ 1 := by simpa [acc] using hacc_le_one
 
 /-- Main forking lemma: the failure probability is bounded by `1 - acc * (acc / q - 1/h)`. -/
 theorem probOutput_none_fork_le :
@@ -706,7 +739,8 @@ theorem probOutput_none_fork_le :
   set acc := ∑ s, ps s
   set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
   have hacc_ne_top : acc ≠ ⊤ :=
-    ne_top_of_le_ne_top one_ne_top (sum_probOutput_cf_le_one main qb i cf)
+    ne_top_of_le_ne_top one_ne_top
+      (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
   have htotal := probOutput_none_add_tsum_some (mx := fork main qb js i cf)
   rw [HasEvalPMF.probFailure_eq_zero, tsub_zero] at htotal
   have hne_top : (∑' p, Pr[= some p | fork main qb js i cf]) ≠ ⊤ :=
@@ -749,5 +783,33 @@ theorem probOutput_none_fork_le :
                     Finset.sum_le_sum fun s _ => le_tsub_add
                 _ = ∑ s, (ps s ^ 2 - ps s / h) + ∑ s, ps s / h :=
                     Finset.sum_add_distrib
+
+/-- Forking-lemma lower bound, packaged directly as the success-event probability. -/
+theorem le_probEvent_isSome_fork :
+    (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+     let q := qb i + 1
+     acc * (acc / q - h⁻¹)) ≤
+      Pr[fun r : Option (α × α) => r.isSome | fork main qb js i cf] := by
+  rw [probEvent_isSome_eq_one_sub_probOutput_none (mx := fork main qb js i cf)]
+  have hpre_le_one := fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
+  have hpre_ne_top :
+      (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+       let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+       let q := qb i + 1
+       acc * (acc / q - h⁻¹)) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top hpre_le_one
+  have hnone_ne_top : Pr[= none | fork main qb js i cf] ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top probOutput_le_one
+  have hfork :
+      Pr[= none | fork main qb js i cf] +
+          (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+           let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+           let q := qb i + 1
+           acc * (acc / q - h⁻¹)) ≤ 1 := by
+    exact (ENNReal.le_sub_iff_add_le_right hpre_ne_top hpre_le_one).1
+      (probOutput_none_fork_le (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
+  exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
+    (by simpa [add_comm] using hfork)
 
 end OracleComp
