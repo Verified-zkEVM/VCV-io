@@ -75,7 +75,7 @@ variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
-def HashQueryBound {S' α : Type}
+def hashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (M × PC →ₒ Ω)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
   OracleComp.IsQueryBound oa Q
     (fun t b => match t with
@@ -270,11 +270,11 @@ theorem euf_cma_bound
     (hhvzk : σ.HVZK simTranscript)
     (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
     (qBound : ℕ)
-    (hQ : ∀ pk, HashQueryBound (M := M) (PC := PC) (Ω := Ω)
+    (hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
     ∃ reduction : X → ProbComp W,
       (adv.advantage *
-          (adv.advantage / ((qBound + 1 : ℕ) : ENNReal) - challengeSpaceInv Ω)) ≤
+          (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by
   sorry
 

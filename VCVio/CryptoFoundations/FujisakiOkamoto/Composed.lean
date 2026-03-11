@@ -61,13 +61,6 @@ def singleROOracleImpl {PKHash M R K : Type}
       set (cache.cacheQuery inp out)
       return out
 
-/-- Query implementation for the single-RO Fujisaki-Okamoto world. -/
-def singleROQueryImpl {PKHash M R K : Type}
-    [DecidableEq PKHash] [DecidableEq M] [SampleableType R] [SampleableType K] :
-    QueryImpl (singleROHashOracleSpec PKHash M R K)
-      (StateT (SingleROQueryCache PKHash M R K) ProbComp) :=
-  singleROOracleImpl (PKHash := PKHash) (M := M) (R := R) (K := K)
-
 /-- Single-RO FO hash world: both the encryption coins and the shared key are derived from the
 same public random-oracle query on `(pkh pk, msg)`. -/
 def singleROVariant
@@ -79,7 +72,7 @@ def singleROVariant
   hashOracleSpec := singleROHashOracleSpec PKHash M R K
   QueryCache := SingleROQueryCache PKHash M R K
   initCache := ∅
-  queryImpl := singleROQueryImpl (PKHash := PKHash) (M := M) (R := R) (K := K)
+  queryImpl := singleROOracleImpl (PKHash := PKHash) (M := M) (R := R) (K := K)
   deriveCoins := fun pk msg => do
     let out ← query (spec := singleROOracleSpec PKHash M R K) (Sum.inr (pkh pk, msg))
     return out.1

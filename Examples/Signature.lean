@@ -63,10 +63,10 @@ theorem schnorrSignature_euf_cma (g : G) (hg : Function.Bijective (· • g : F 
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (schnorrSignature F G g hg M))
     (qBound : ℕ)
-    (hQ : ∀ pk, FiatShamir.HashQueryBound (M := M) (PC := G) (Ω := F)
+    (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (PC := G) (Ω := F)
       (oa := adv.main pk) qBound) :
     ∃ reduction : DLogAdversary F G,
       adv.advantage *
-          (adv.advantage / ((qBound + 1 : ℕ) : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
+          (adv.advantage / (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   sorry
