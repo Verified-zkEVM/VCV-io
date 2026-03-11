@@ -117,6 +117,24 @@ rvcgen_step using R         -- if needed, provide the bind cut relation
   rvcgen                    -- keep taking obvious relational steps
 ```
 
+When there is exactly one viable local hypothesis that works as a `using` hint,
+`rvcgen_step` and `rvcgen` will auto-consume it — no explicit `using` needed:
+
+```lean
+-- hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫ is the only viable hint
+rvcgen                      -- auto-selects hf as the bind-cut relation
+```
+
+If there are 0 or ≥ 2 viable hints, the tactic keeps ambiguity explicit and
+falls back to `EqRel`. Use `using` to disambiguate.
+
+The relational finish pass also handles postcondition weakening automatically:
+
+```lean
+-- Goal: ⟪oa ~ ob | R'⟫ with h : ⟪oa ~ ob | R⟫ and hpost : ∀ x y, R x y → R' x y
+rvcgen                      -- closes via relTriple_post_mono + assumption
+```
+
 ```lean
 -- Same workflow, but ask the tactic to surface the explicit script:
 rvcgen_step?
@@ -150,6 +168,39 @@ qvcgen_step as ⟨x⟩
 ```lean
 -- Same idea on the relational side:
 rvcgen_step using S as ⟨a₁, a₂, hrel⟩
+```
+
+### `qvcgen` driver variants
+
+Use `qvcgen using cut` to perform one explicit bind step with an intermediate
+postcondition, then continue with exhaustive decomposition:
+
+```lean
+-- Goal: ⦃1⦄ (do let x ← oa; let y ← f x; g y) ⦃post⦄
+-- with hoa : ⦃1⦄ oa ⦃cut⦄ in context
+qvcgen using cut            -- splits at first bind with `cut`, then auto-decomposes
+```
+
+Use `qvcgen inv I` to apply an explicit loop invariant to the first
+`replicate`/`foldlM`/`mapM` goal, then continue:
+
+```lean
+-- Goal: ⦃pre⦄ oa.replicate n ⦃post⦄
+-- with hstep : ⦃I⦄ oa ⦃fun _ => I⦄ in context
+qvcgen inv I                -- applies invariant I, then auto-decomposes
+```
+
+### Support-cut synthesis
+
+When decomposing a bind `oa >>= f`, if no explicit spec is available in context,
+`qvcgen_step` and `qvcgen` will automatically try a support-based intermediate
+postcondition. This applies `triple_bind` with `triple_support` as the spec for `oa`,
+unifying the cut to `fun x => ⌜x ∈ support oa⌝`:
+
+```lean
+-- Goal: ⦃1⦄ (do let x ← oa; f x) ⦃post⦄
+-- No spec for oa, but h : ∀ x ∈ support oa, ⦃...⦄ f x ⦃post⦄
+qvcgen                      -- auto-inserts support cut, then decomposes f
 ```
 
 ### Opt-in unary theorem lookup

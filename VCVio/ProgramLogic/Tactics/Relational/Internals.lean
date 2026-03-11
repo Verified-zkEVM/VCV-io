@@ -256,6 +256,31 @@ def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext 
       else
         return false
 
+/-- Find the unique local hypothesis that works as a relational `using` hint.
+Returns `none` if there are 0 or ≥ 2 viable hints (keeping ambiguity explicit). -/
+def findUniqueRelHint? : TacticM (Option Name) := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  unless relTripleGoalParts? target |>.isSome do return none
+  let mut found : Option Name := none
+  for localDecl in ← getLCtx do
+    unless localDecl.isImplementationDetail do
+      let name := localDecl.userName
+      if isUsableBinderName name then
+        let type ← instantiateMVars localDecl.type
+        unless type.isSort do
+          unless ← isProp type do
+            let whnfType ← whnfReducible type
+            if whnfType.isForall then
+              let saved ← saveState
+              let hint := mkIdent name
+              let ok ← runRVCGenCoreUsing hint
+              saved.restore
+              if ok then
+                if found.isSome then
+                  return none
+                found := some name
+  return found
+
 /-- One step of relational VCGen. -/
 def runRVCGenStep : TacticM Bool := do
   if (← getGoals).isEmpty then
@@ -268,6 +293,9 @@ def runRVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       progress := true
+  if let some hintName ← findUniqueRelHint? then
+    if ← runRVCGenCoreUsing (mkIdent hintName) then
+      return true
   if ← runRVCGenCore then
     return true
   return progress
@@ -370,6 +398,28 @@ def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainC
     - `simulateQ` state relation\n\
     Goal:{indentExpr target}"
 
+/-- Try to close a relational goal by applying postcondition monotonicity and
+closing both the inner triple and the implication from local hypotheses. -/
+def tryCloseRelGoalConseq : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_post_mono <;> assumption))
+
+def runRVCGenCloseConseqPass : TacticM Bool := do
+  let goals ← getGoals
+  if goals.isEmpty then
+    return false
+  let mut progress := false
+  let mut newGoals : List MVarId := []
+  for goal in goals do
+    setGoals [goal]
+    if ← tryCloseRelGoalConseq then
+      progress := true
+      newGoals := newGoals ++ (← getGoals)
+    else
+      newGoals := newGoals ++ [goal]
+  setGoals newGoals
+  return progress
+
 def runRVCGenFinish : TacticM Unit := do
   unless (← getGoals).isEmpty do
     let _ ← tryEvalTacticSyntax
@@ -382,6 +432,8 @@ def runRVCGenFinish : TacticM Unit := do
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
         | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+  unless (← getGoals).isEmpty do
+    discard <| runBoundedPasses "rvcgen finish" runRVCGenCloseConseqPass
 
 end Relational
 end TacticInternals

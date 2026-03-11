@@ -49,7 +49,8 @@ private def findRelUsingHint? : TacticM (Option Name) := withMainContext do
         let type ← instantiateMVars localDecl.type
         unless type.isSort do
           unless ← isProp type do
-            if type.isForall then
+            let whnfType ← whnfReducible type
+            if whnfType.isForall then
               let hint := mkIdent name
               if ← previewRelAction (TacticInternals.Relational.runRVCGenStepUsing hint) then
                 return some name

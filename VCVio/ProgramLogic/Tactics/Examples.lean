@@ -306,6 +306,36 @@ example (oa : OracleComp spec α) [DecidableEq α] (x : α) :
     Pr[= x | oa] = wp⟦oa⟧ (fun y => if y = x then 1 else 0) := by
   by_hoare
 
+/-! ### `qvcgen using cut` and `qvcgen inv I` driver variants -/
+
+example {oa : OracleComp spec α} {f : α → OracleComp spec β}
+    {g : β → OracleComp spec γ}
+    {cut : α → ℝ≥0∞} {cut2 : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
+    (hoa : ⦃1⦄ oa ⦃cut⦄)
+    (hf : ∀ x, ⦃cut x⦄ f x ⦃cut2⦄)
+    (hg : ∀ y, ⦃cut2 y⦄ g y ⦃post⦄) :
+    ⦃1⦄ (do let x ← oa; let y ← f x; g y) ⦃post⦄ := by
+  qvcgen using cut
+
+example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
+    {pre : ℝ≥0∞} {post : List α → ℝ≥0∞}
+    (hpre : pre ≤ I) (hpost : ∀ xs, I ≤ post xs)
+    (hstep : ⦃I⦄ oa ⦃fun _ => I⦄) :
+    ⦃pre⦄ oa.replicate n ⦃post⦄ := by
+  qvcgen inv I
+
+/-! ### Support-cut synthesis -/
+
+example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
+    (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
+    ⦃1⦄ (do let x ← oa; f x) ⦃fun y => if y = true then 1 else 0⦄ := by
+  qvcgen_step
+  intro x
+  by_cases hx : x ∈ support oa
+  · simpa [propInd, hx] using triple_probOutput_eq_one (oa := f x) (x := true) (h := h x hx)
+  · simpa [propInd, hx] using
+      triple_zero (oa := f x) (post := fun y => if y = true then 1 else 0)
+
 end Unary
 
 /-! ## Relational VCGen examples -/
@@ -471,6 +501,34 @@ private def inlineId (oa : OracleComp spec α) : OracleComp spec α := oa
 example (oa : OracleComp spec α) :
     ⟪inlineId oa ~ oa | EqRel α⟫ := by
   rel_inline inlineId
+
+/-! ### Auto relational hint consumption -/
+
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen_step
+  · exact hoa
+
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen
+
+/-! ### Relational consequence close -/
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
+  rvcgen
 
 end Relational
 

@@ -250,27 +250,51 @@ Enhancements over simple structural decomposition:
 - Finishes with bounded local consequence search on closed goals
 
 Typical usage: bring specs into context with `have` or as function parameters, then
-call `qvcgen` to automatically decompose and apply them. -/
+call `qvcgen` to automatically decompose and apply them.
+
+Variants:
+- `qvcgen using cut` performs one explicit bind step with intermediate postcondition `cut`,
+  then continues with exhaustive decomposition on all resulting goals.
+- `qvcgen inv I` applies an explicit loop invariant `I` to the first `replicate`/`foldlM`/`mapM`
+  goal, then continues with exhaustive decomposition. -/
+syntax "qvcgen" ("using" term)? : tactic
+syntax "qvcgen" &"inv" term : tactic
 syntax "qvcgen?" : tactic
 
-elab "qvcgen" : tactic => do
-  discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
-  runQVCGenFinish
-
-elab tk:"qvcgen?" : tactic => do
-  let passes ← runBoundedPasses "qvcgen?" TacticInternals.Unary.runVCGenPass
-  let needsFinish := !(← getGoals).isEmpty
-  runQVCGenFinish
-  let mut lines : List String :=
-    List.replicate passes "all_goals first | qvcgen_step | skip"
-  if needsFinish then
-    lines := lines ++ [
-      "all_goals try simp only [OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind, OracleComp.ProgramLogic.wp_query, OracleComp.ProgramLogic.wp_ite, OracleComp.ProgramLogic.wp_dite, OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_uniformSample, OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false, OracleComp.ProgramLogic.propInd_eq_ite, ite_true, ite_false, if_true, if_false, dite_true, dite_false, one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero, game_rule]",
-      "all_goals first | assumption | exact OracleComp.ProgramLogic.triple_pure _ _ | exact OracleComp.ProgramLogic.triple_zero _ _ | (classical exact OracleComp.ProgramLogic.triple_support _) | (exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption)) | exact le_refl _ | (repeat intro; simp only [OracleComp.ProgramLogic.Triple] at *; solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans])"
-    ]
-  if lines.isEmpty then
-    lines := ["qvcgen"]
-  addTryThisTextSuggestion tk <| String.intercalate "\n" lines
+elab_rules : tactic
+  | `(tactic| qvcgen) => do
+      discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
+      runQVCGenFinish
+  | `(tactic| qvcgen using $cut) => do
+      discard <| TacticInternals.Unary.tryLowerProbGoal
+      if ← TacticInternals.Unary.runHoareStepRuleUsing cut then
+        discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
+        runQVCGenFinish
+      else
+        TacticInternals.Unary.throwQVCGenStepError
+  | `(tactic| qvcgen inv $inv) => do
+      discard <| TacticInternals.Unary.tryLowerProbGoal
+      if ← TacticInternals.Unary.runLoopInvExplicit inv then
+        discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
+        runQVCGenFinish
+      else
+        throwError
+          "qvcgen inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+          or `List.mapM`."
+  | `(tactic| qvcgen?) => do
+      let passes ← runBoundedPasses "qvcgen?" TacticInternals.Unary.runVCGenPass
+      let needsFinish := !(← getGoals).isEmpty
+      runQVCGenFinish
+      let mut lines : List String :=
+        List.replicate passes "all_goals first | qvcgen_step | skip"
+      if needsFinish then
+        lines := lines ++ [
+          "all_goals try simp only [OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind, OracleComp.ProgramLogic.wp_query, OracleComp.ProgramLogic.wp_ite, OracleComp.ProgramLogic.wp_dite, OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_uniformSample, OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false, OracleComp.ProgramLogic.propInd_eq_ite, ite_true, ite_false, if_true, if_false, dite_true, dite_false, one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero, game_rule]",
+          "all_goals first | assumption | exact OracleComp.ProgramLogic.triple_pure _ _ | exact OracleComp.ProgramLogic.triple_zero _ _ | (classical exact OracleComp.ProgramLogic.triple_support _) | (exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption)) | exact le_refl _ | (repeat intro; simp only [OracleComp.ProgramLogic.Triple] at *; solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans])"
+        ]
+      if lines.isEmpty then
+        lines := ["qvcgen"]
+      addTryThisTextSuggestion (← getRef) <| String.intercalate "\n" lines
 
 /-- `exp_norm` normalizes expectation / indicator arithmetic in the current goal.
 

@@ -448,6 +448,20 @@ def tryLowerProbGoal : TacticM Bool := do
       return true
   return false
 
+/-- Try to synthesize a support-based intermediate postcondition for a bind step.
+When the computation is `oa >>= f` and no explicit spec is available, tries applying
+`triple_bind` with an inferred cut and closing the spec subgoal via `triple_support`,
+which unifies the cut to `fun x => ⌜x ∈ support oa⌝`. -/
+def trySupportCutBind (comp : Expr) : TacticM Bool := do
+  if !isBindExpr comp then return false
+  match ← observing? do
+    evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_bind))
+    unless ← tryEvalTacticSyntax (← `(tactic|
+      classical exact OracleComp.ProgramLogic.triple_support _)) do
+      throwError "" with
+  | some _ => return true
+  | none => return false
+
 /-- One step of VCGen on a `Triple` goal. Returns `true` if any progress was made. -/
 def runVCGenStep : TacticM Bool := do
   if (← getGoals).isEmpty then return false
@@ -469,6 +483,8 @@ def runVCGenStep : TacticM Bool := do
           unless ← tryCloseSpecGoalImmediate do throwError "" with
         | some _ => return true
         | none =>
+          if ← trySupportCutBind comp then
+            return true
           if ← tryEvalTacticSyntax (← `(tactic|
             apply OracleComp.ProgramLogic.triple_bind_wp)) then
             return true

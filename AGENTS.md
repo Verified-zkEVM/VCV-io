@@ -76,7 +76,9 @@ the umbrella import is still the intended default.
 - **Unary stepping**: `wp_step` (raw `wp` goals), `qvcgen_step` (`Triple` or probability goals,
   spec-aware, auto probability lowering), `qvcgen_step inv I` (explicit loop invariant)
 - **Unary exhaustive**: `qvcgen` (exhaustive `Triple` / probability goal decomposition with
-  auto lowering, auto loop invariants, and support/indicator leaf closure)
+  auto lowering, auto loop invariants, support-cut synthesis, and support/indicator leaf closure),
+  `qvcgen using cut` (one explicit bind step then exhaustive), `qvcgen inv I` (explicit loop
+  invariant then exhaustive)
   (`wp_step` / `qvcgen_step` also understand bounded iteration via `replicate`, `List.mapM`,
   and `List.foldlM`)
 - **Expectation normalization**: `exp_norm`
@@ -93,9 +95,15 @@ Quick usage notes:
   bind cut relation, random/query bijection, traversal input relation,
   or `simulateQ` state invariant.
 - `rvcgen` repeats relational VCGen across all open goals until stuck.
+  When exactly one local hypothesis works as a `using` hint, `rvcgen_step` / `rvcgen`
+  auto-consume it. If 0 or ≥ 2 viable hints exist, ambiguity is kept explicit.
+  The relational finish pass also handles postcondition weakening
+  (`relTriple_post_mono` + assumption) automatically.
 - `qvcgen_step` accepts both `Triple` and probability goals (`Pr[p | oa] = 1`,
   `Pr[= x | oa] = 1`, etc.), automatically lowering probability goals into the `Triple`
   engine before decomposing.
+- `qvcgen using cut` performs one explicit bind step with `cut`, then runs the exhaustive driver.
+- `qvcgen inv I` applies an explicit loop invariant `I`, then runs the exhaustive driver.
 - `qvcgen_step using cut` specifies an explicit intermediate postcondition for a bind step.
 - `qvcgen_step inv I` applies a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal,
   leaving pre-to-invariant, step-preservation, and invariant-to-post subgoals.
@@ -116,6 +124,7 @@ Quick usage notes:
   invariants for `replicate`/`foldlM`/`mapM`.
 - `qvcgen` is the exhaustive driver: lowers probability goals, decomposes `Triple` goals
   across all open branches, closes spec subgoals and loop invariants from context,
+  synthesizes support-based intermediate postconditions when no explicit spec is available,
   normalizes residual `wp` terms, applies support/indicator leaf closure, then runs bounded
   local consequence search.
 - `exp_norm` normalizes indicator (`propInd`) and expectation (`wp`) arithmetic.
