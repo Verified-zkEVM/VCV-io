@@ -38,10 +38,10 @@ namespace NatEquiv
 variable {m : Type u → Type v} {n : Type u → Type w} {p : Type u → Type z}
 
 def toNatHom (e : NatEquiv m n) : NatHom m n where
-  toFun := e.toFun
+  toFun α x := @e.toFun α x
 
 def invNatHom (e : NatEquiv m n) : NatHom n m where
-  toFun := e.invFun
+  toFun α x := @e.invFun α x
 
 instance : Coe (NatEquiv m n) (NatHom m n) where
   coe f := f.toNatHom
@@ -97,9 +97,6 @@ variable {m : Type u → Type v} [Pure m] {n : Type u → Type w} [Pure n]
 instance : Coe (PureEquiv m n) (NatEquiv m n) where
   coe f := f.toNatEquiv
 
-instance : Coe (PureEquiv m n) (PureHom m n) where
-  coe f := ⟨f.toNatEquiv, f.map_pure'⟩
-
 @[simp]
 lemma map_pure (f : PureEquiv m n) {α : Type u} (x : α) :
     f.toFun (pure x) = (pure x : n α) := f.map_pure' x
@@ -111,9 +108,6 @@ lemma map_pure_inv (f : PureEquiv m n) {α : Type u} (x : α) :
   have h2 : f.toFun (pure x) = pure x := f.map_pure' x
   have h3 : f.toFun (f.invFun (pure x)) = f.toFun (pure x) := by rw [h1, h2]
   exact Function.LeftInverse.injective f.left_inv h3
-
-instance : Coe (PureEquiv m n) (PureHom n m) where
-  coe f := ⟨f.toNatEquiv, f.map_pure_inv⟩
 
 end PureEquiv
 
@@ -132,9 +126,6 @@ variable {m : Type u → Type v} [Bind m] {n : Type u → Type w} [Bind n]
 
 instance : Coe (BindEquiv m n) (NatEquiv m n) where
   coe f := f.toNatEquiv
-
-instance : Coe (BindEquiv m n) (BindHom m n) where
-  coe f := ⟨f.toNatEquiv, f.map_bind'⟩
 
 @[simp]
 lemma map_bind (f : BindEquiv m n) {α β : Type u} (x : m α) (y : α → m β) :
@@ -157,9 +148,6 @@ lemma map_bind_inv (f : BindEquiv m n) {α β : Type u} (x : n α) (y : α → n
   have h6 : f.toFun (f.invFun (x >>= y)) = f.toFun (f.invFun x >>= (fun a => f.invFun (y a))) := by
     rw [h1, h5]
   exact Function.LeftInverse.injective f.left_inv h6
-
-instance : Coe (BindEquiv m n) (BindHom n m) where
-  coe f := ⟨f.toNatEquiv, f.map_bind_inv⟩
 
 end BindEquiv
 
@@ -187,9 +175,17 @@ instance : Coe (MonadEquiv m n) (NatEquiv m n) where
   coe f := f.toNatEquiv
 
 instance : Coe (MonadEquiv m n) (MonadHom m n) where
-  coe f := ⟨f.toNatHom, f.map_pure, f.map_bind⟩
+  coe f := {
+    toFun := fun α x => @f.toFun α x
+    toFun_pure' := f.map_pure
+    toFun_bind' := f.map_bind
+  }
 
 instance : Coe (MonadEquiv m n) (MonadHom n m) where
-  coe f := ⟨f.invNatHom, f.map_pure_inv, f.map_bind_inv⟩
+  coe f := {
+    toFun := fun α x => @f.invFun α x
+    toFun_pure' := f.map_pure_inv
+    toFun_bind' := f.map_bind_inv
+  }
 
 end MonadEquiv

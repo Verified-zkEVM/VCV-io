@@ -85,17 +85,22 @@ theorem pir_correct [DecidableEq W]
     Pr[= a i₀ | pirMain a i₀] = 1 := by
   sorry
 
-/-! ## Privacy -/
-
-/-- Privacy: the distribution of the first query set `s` is independent of which
-index is being queried. Intuitively, each index `j` appears in `s` with
+/-- Privacy of the first server view: the distribution of the first query set `s`
+is independent of which index is being queried. Intuitively, each index `j` appears in `s` with
 probability 1/2 regardless of whether `j = i₀` or not:
 - If `j = i₀`: `j ∈ s` iff coin is heads (prob 1/2)
 - If `j ≠ i₀`: `j ∈ s` iff coin is heads (prob 1/2)
 
-This is the key information-theoretic privacy guarantee: the query sent to
-each server reveals nothing about the target index. -/
+This is one half of the information-theoretic privacy guarantee; the second
+server view is handled by `pir_private_snd`. -/
 theorem pir_private (i₁ i₂ : Fin N) :
     evalDist (Prod.fst <$> pirQuery i₁) =
     evalDist (Prod.fst <$> pirQuery i₂) := by
+  sorry
+
+/-- Privacy of the second server view: the distribution of the second query set `s'`
+is independent of which index is being queried. -/
+theorem pir_private_snd (i₁ i₂ : Fin N) :
+    evalDist (Prod.snd <$> pirQuery i₁) =
+    evalDist (Prod.snd <$> pirQuery i₂) := by
   sorry

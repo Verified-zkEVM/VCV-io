@@ -246,15 +246,7 @@ lemma depth_eq_one_iff {x : FreeMonad f α} : depth x = 1 ↔
     rename_i β
     simp
     constructor <;> intro h
-    -- Why is this so painful?
-    · have hNeTop : ⨆ u, (r u).depth ≠ ⊤ := by
-        have : ⨆ u, (r u).depth ≤ 1 := le_of_add_le_right (le_of_eq h)
-        exact ne_top_of_le_ne_top (by simp) this
-      have : (1 + ⨆ u, (r u).depth).toNat = 1 := by exact
-        (ENat.toNat_eq_iff_eq_coe (1 + ⨆ u, (r u).depth) 1).mpr h
-      rw [ENat.toNat_add (by simp) hNeTop] at this
-      simp [hNeTop] at this
-      refine ⟨β, y, r, ⟨⟨rfl, by simp, by simp⟩, this⟩⟩
+    · exact ⟨β, y, r, ⟨⟨rfl, by simp, by simp⟩, h⟩⟩
     · obtain ⟨β', y_1, r_1, ⟨⟨hβ, hy, hr⟩, hr'⟩⟩ := h
       subst hβ hy hr
       simp [hr']
