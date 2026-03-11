@@ -85,3 +85,77 @@ jobs:
           external_refs: "${{ steps.get_args.outputs.external_refs }}"
           repo_context_refs: "${{ steps.get_args.outputs.repo_context_refs }}"
           additional_comments: "${{ steps.get_args.outputs.additional_comments }}"
+      - name: Post visible review marker
+        if: success()
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = context.issue.number || context.payload.pull_request?.number;
+
+            if (!pull_number) {
+              core.setFailed('Could not determine pull request number for review marker.');
+              return;
+            }
+
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const runMarker = `Workflow run: ${runUrl}`;
+
+            const { data: existingReviews } = await github.rest.pulls.listReviews({
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            if (existingReviews.some(review => review.body?.includes(runMarker))) {
+              core.info(`Review marker already exists for ${runUrl}`);
+              return;
+            }
+
+            const { data: pull } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number,
+            });
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: pull_number,
+              per_page: 100,
+            });
+
+            const botComment = comments
+              .filter(comment =>
+                comment.user?.type === 'Bot' &&
+                (
+                  comment.body?.includes('### 🤖 AI Review') ||
+                  comment.body?.includes('### 🤖 Initial AI review')
+                )
+              )
+              .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+
+            const trigger =
+              context.eventName === 'issue_comment' ? 'manual `/review` command' : 'PR synchronize event';
+
+            const body = [
+              'Automated AI review refreshed.',
+              '',
+              `Trigger: ${trigger}`,
+              botComment
+                ? `Updated review comment: ${botComment.html_url}`
+                : 'Updated review comment: bot comment not found',
+              runMarker,
+              `Head SHA: \`${pull.head.sha}\``,
+            ].join('\n');
+
+            await github.rest.pulls.createReview({
+              owner,
+              repo,
+              pull_number,
+              event: 'COMMENT',
+              body,
+            });

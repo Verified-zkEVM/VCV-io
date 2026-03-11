@@ -22,8 +22,9 @@ This file defines two oracle implementations built from uniform sampling:
 
 These two models differ when an oracle is queried more than once: the lazy version returns
 the cached value (consistency), while the eager version consumes the next seed value
-(independence). When averaged over a uniformly sampled seed, the eager version is a faithful
-simulation (`eagerRandomOracle_evalDist_generateSeed_bind`).
+(independence). When averaged over a uniformly sampled seed, the eager version matches
+the fresh independent-query semantics of `evalDist`; it does *not* coincide with the
+lazy cached `randomOracle` on repeated queries.
 -/
 
 open OracleComp OracleSpec
@@ -95,9 +96,9 @@ theorem evalDist_simulateQ_run'_empty [spec₀.Fintype] [spec₀.Inhabited]
 
 end eagerRandomOracle
 
-/-- The eager random oracle, averaged over a uniformly sampled seed, faithfully simulates
-any computation. This is because the pre-sampled seed values are i.i.d. uniform,
-exactly matching fresh oracle queries.
+/-- The eager random oracle, averaged over a uniformly sampled seed, matches the
+fresh independent-query semantics of `evalDist`. This is because the pre-sampled
+seed values are i.i.d. uniform, exactly matching fresh oracle queries.
 
 This is the analog of `seededOracle.evalDist_liftComp_generateSeed_bind_simulateQ_run'`
 but for `eagerRandomOracle` (which falls back to `ProbComp` rather than `OracleComp spec`). -/

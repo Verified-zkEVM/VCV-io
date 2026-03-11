@@ -25,10 +25,10 @@ message space `M`. This allows encrypting messages in an arbitrary additive grou
 | Game | Description | Distance to next |
 |------|-------------|-----------------|
 | Game 0 (CPA) | Real hashed ElGamal | = DDH real |
-| Game 1 | Replace DH shared secret with random | DDH advantage |
+| Game 1 | Replace the DH shared secret with an independent random scalar-multiple of `g` | DDH advantage |
 | Game 2 (= Game 1) | Reinterpret as entropy smoothing real | 0 |
 | Game 3 | Replace hash output with random | ES advantage |
-| Game 4 (= 1/2) | Ciphertext is uniform, independent of message | 0 |
+| Game 4 (= 1/2) | The masking term is uniform, so the challenge bit is hidden | 0 |
 
 Main theorem: `|Pr[CPA wins] - 1/2| ≤ ddhAdvantage + esAdvantage`.
 
@@ -67,7 +67,7 @@ Following `elgamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
     let y ← $ᵗ F
     return (y • g, hash pk.1 (y • pk.2) + msg)
   decrypt sk c :=
-    some (c.2 - hash sk.1 (sk.2 • c.1))
+    return (some (c.2 - hash sk.1 (sk.2 • c.1)))
   __ := ExecutionMethod.default
 
 namespace hashedElGamal
@@ -152,16 +152,17 @@ theorem esIdeal_eq_half
 
 /-! ## Main theorem -/
 
-/-- **Main theorem.** The one-time IND-CPA advantage of hashed ElGamal is bounded by
+/-- **Main theorem.** The one-time IND-CPA bias of hashed ElGamal is bounded by
 the DDH distinguishing advantage plus the entropy smoothing advantage:
 
-`IND_CPA_OneTime_AdvantageENN.toReal ≤ ddhDistAdvantage(D) + EntropySmoothing.advantage(E)`
+`|Pr[CPA wins] - 1/2| ≤ ddhDistAdvantage(D) + EntropySmoothing.advantage(E)`
 
 where `D` is the DDH reduction and `E` is the ES reduction, both constructed
 from the CPA adversary. -/
 theorem hashedElGamal_indcpa_bound
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
-    (AsymmEncAlg.IND_CPA_OneTime_AdvantageENN (encAlg := hashedElGamal F g hash) adv).toReal ≤
+    |(Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
+      (encAlg' := hashedElGamal F g hash) adv]).toReal - 1 / 2| ≤
       ddhDistAdvantage g (ddhReduction (F := F) (hash := hash) adv) +
       EntropySmoothing.advantage F g hash (esReduction (F := F) (g := g) adv) := by
   sorry

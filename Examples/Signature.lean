@@ -50,11 +50,23 @@ theorem schnorrSignature_complete (g : G) (hg : Function.Bijective (· • g : F
     SignatureAlg.PerfectlyComplete (schnorrSignature F G g hg M) :=
   FiatShamir.perfectlyCorrect _ _ M (schnorrSigma_complete F G g)
 
-/-- EUF-CMA security of the Schnorr signature. The bound is deferred to the
-generic `FiatShamir.euf_cma_bound` which depends on the forking lemma. -/
+/-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
+
+The corrected statement includes:
+* an explicit bound on random-oracle queries by the adversary;
+* an explicit DLog reduction target;
+* the standard forking-lemma loss term `eps * (eps / (q + 1) - 1 / |F|)`.
+
+This matches the intended Schnorr security theorem much more closely than the
+old placeholder `adv.advantage ≤ sorry`. -/
 theorem schnorrSignature_euf_cma (g : G) (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (schnorrSignature F G g hg M))
-    (qBound : ℕ) :
-    adv.advantage ≤ sorry := by
+    (qBound : ℕ)
+    (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (PC := G) (Ω := F)
+      (oa := adv.main pk) qBound) :
+    ∃ reduction : DLogAdversary F G,
+      adv.advantage *
+          (adv.advantage / (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
+        Pr[= true | dlogExp g reduction] := by
   sorry
