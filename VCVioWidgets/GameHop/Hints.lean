@@ -29,12 +29,8 @@ structure GameHopHintUpdate where
 private def GameHopHint.applyUpdate (hint : GameHopHint) (update : GameHopHintUpdate) : GameHopHint :=
   { hide := update.hide?.getD hint.hide
     focus := update.focus?.getD hint.focus
-    title? := match update.title? with
-      | some title => some title
-      | none => hint.title?
-    kind? := match update.kind? with
-      | some kind => some kind
-      | none => hint.kind? }
+    title? := update.title? <|> hint.title?
+    kind? := update.kind? <|> hint.kind? }
 
 initialize gameHopHintExt :
     SimpleScopedEnvExtension GameHopHintUpdate (NameMap GameHopHint) ←
@@ -49,12 +45,12 @@ initialize gameHopHintExt :
 
 syntax (name := gameHopHideAttr) "game_hop_hide" : attr
 syntax (name := gameHopFocusAttr) "game_hop_focus" : attr
-syntax (name := gameHopTitleAttr) "game_hop_title " str : attr
-syntax (name := gameHopKindAttr) "game_hop_kind " ("game" <|> "hybrid" <|> "endpoint" <|> "result") : attr
+syntax (name := gameHopTitleAttr) "game_hop_title" str : attr
+syntax (name := gameHopKindAttr) "game_hop_kind" ("game" <|> "hybrid" <|> "endpoint" <|> "result") : attr
 
-private def addHintUpdate (decl : Name) (update : GameHopHintUpdate) (kind : AttributeKind) :
+private def addHintUpdate (update : GameHopHintUpdate) (kind : AttributeKind) :
     AttrM Unit := do
-  gameHopHintExt.add ({ update with declName := decl }) kind
+  gameHopHintExt.add update kind
 
 initialize
   registerBuiltinAttribute {
@@ -62,7 +58,7 @@ initialize
     descr := "Hide this declaration from the inferred game-hop diagram."
     add := fun decl stx kind => match stx with
       | `(attr| game_hop_hide) =>
-          addHintUpdate decl { declName := decl, hide? := some true } kind
+          addHintUpdate { declName := decl, hide? := some true } kind
       | _ => throwUnsupportedSyntax
   }
   registerBuiltinAttribute {
@@ -70,7 +66,7 @@ initialize
     descr := "Prefer this declaration when selecting the main inferred game-hop path."
     add := fun decl stx kind => match stx with
       | `(attr| game_hop_focus) =>
-          addHintUpdate decl { declName := decl, focus? := some true } kind
+          addHintUpdate { declName := decl, focus? := some true } kind
       | _ => throwUnsupportedSyntax
   }
   registerBuiltinAttribute {
@@ -78,7 +74,7 @@ initialize
     descr := "Override the inferred title for this declaration in a game-hop diagram."
     add := fun decl stx kind => match stx with
       | `(attr| game_hop_title $title:str) =>
-          addHintUpdate decl { declName := decl, title? := some title.getString } kind
+          addHintUpdate { declName := decl, title? := some title.getString } kind
       | _ => throwUnsupportedSyntax
   }
   registerBuiltinAttribute {
@@ -91,7 +87,7 @@ initialize
         | `(attr| game_hop_kind endpoint) => pure .endpoint
         | `(attr| game_hop_kind result) => pure .result
         | _ => throwUnsupportedSyntax
-      addHintUpdate decl { declName := decl, kind? := some nodeKind } kind
+      addHintUpdate { declName := decl, kind? := some nodeKind } kind
   }
 
 /-- Return the currently registered dormant hint bundle for a declaration, if any. -/
