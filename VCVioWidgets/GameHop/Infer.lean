@@ -192,25 +192,14 @@ private def uniqueCompRefs (refs : Array CompRef) : Array CompRef :=
         out := out.push ref
     out
 
-private partial def extractGeneralCompRefs (rootModule : Name) (target : Expr) :
+private def extractGeneralCompRefs (rootModule : Name) (target : Expr) :
     MetaM (Array CompRef) := do
-  let current :=
-    match ← mkCompRef rootModule target with
-    | some ref => #[ref]
-    | none => #[]
-  let descend (xs : Array Expr) : MetaM (Array CompRef) := do
-    let mut out := #[]
-    for x in xs do
-      out := out ++ (← extractGeneralCompRefs rootModule x)
-    return out
-  match target.consumeMData with
-  | .forallE _ d b _ => return uniqueCompRefs (current ++ (← descend #[d, b]))
-  | .lam _ d b _ => return uniqueCompRefs (current ++ (← descend #[d, b]))
-  | .letE _ t v b _ => return uniqueCompRefs (current ++ (← descend #[t, v, b]))
-  | .app f a => return uniqueCompRefs (current ++ (← descend #[f, a]))
-  | .mdata _ b => return uniqueCompRefs (current ++ (← extractGeneralCompRefs rootModule b))
-  | .proj _ _ b => return uniqueCompRefs (current ++ (← extractGeneralCompRefs rootModule b))
-  | _ => return current
+  let (_, refs) ← StateT.run (m := MetaM) (s := #[]) <|
+    Lean.Meta.transform target (pre := fun expr => do
+      if let some ref ← liftM <| mkCompRef rootModule expr then
+        modify fun refs => refs.push ref
+      return TransformStep.continue)
+  return uniqueCompRefs refs
 
 private def extractGameEquivSides? (rootModule : Name) (target : Expr) :
     MetaM (Option (CompRef × CompRef)) := do
@@ -495,10 +484,11 @@ private partial def buildMainPath (rootId : NodeId) (edges : Array GameEdge) : L
   match incoming[0]? with
   | none => [rootId]
   | some edge =>
-      if (buildMainPath edge.source edges).contains rootId then
+      let path := buildMainPath edge.source edges
+      if path.contains rootId then
         [rootId]
       else
-        buildMainPath edge.source edges ++ [rootId]
+        path ++ [rootId]
 
 private def ensureRootNode (root : Name) : BuildM NodeId := do
   let anchor? ← liftM <| anchorRefForDecl root (preferResult := true)

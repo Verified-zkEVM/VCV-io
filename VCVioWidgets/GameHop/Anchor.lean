@@ -36,14 +36,20 @@ def targetRange (anchor : AnchorRef) (resolved : ResolvedAnchor) : Lsp.Range :=
   | AnchorMode.declaration => resolved.declarationRange
   | AnchorMode.selection => resolved.selectionRange
 
-def resolve? (anchor : AnchorRef) : MetaM (Option ResolvedAnchor) := do
+def resolve? (anchor : AnchorRef) (currentUri? : Option Lsp.DocumentUri := none) :
+    MetaM (Option ResolvedAnchor) := do
   if !(← getEnv).contains anchor.declName then
     return none
   let some ranges ← Lean.findDeclarationRanges? anchor.declName
     | return none
-  let some modName ← Lean.findModuleOf? anchor.declName
-    | return none
-  let some uri ← Lean.Server.documentUriFromModule? modName
+  let uri? ←
+    match ← Lean.findModuleOf? anchor.declName with
+    | some modName =>
+        match ← Lean.Server.documentUriFromModule? modName with
+        | some uri => pure (some uri)
+        | none => pure currentUri?
+    | none => pure currentUri?
+  let some uri := uri?
     | return none
   return some {
     declName := anchor.declName

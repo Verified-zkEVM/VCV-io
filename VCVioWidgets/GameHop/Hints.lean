@@ -29,12 +29,8 @@ structure GameHopHintUpdate where
 private def GameHopHint.applyUpdate (hint : GameHopHint) (update : GameHopHintUpdate) : GameHopHint :=
   { hide := update.hide?.getD hint.hide
     focus := update.focus?.getD hint.focus
-    title? := match update.title? with
-      | some title => some title
-      | none => hint.title?
-    kind? := match update.kind? with
-      | some kind => some kind
-      | none => hint.kind? }
+    title? := update.title? <|> hint.title?
+    kind? := update.kind? <|> hint.kind? }
 
 initialize gameHopHintExt :
     SimpleScopedEnvExtension GameHopHintUpdate (NameMap GameHopHint) ←
@@ -49,12 +45,12 @@ initialize gameHopHintExt :
 
 syntax (name := gameHopHideAttr) "game_hop_hide" : attr
 syntax (name := gameHopFocusAttr) "game_hop_focus" : attr
-syntax (name := gameHopTitleAttr) "game_hop_title " str : attr
-syntax (name := gameHopKindAttr) "game_hop_kind " ("game" <|> "hybrid" <|> "endpoint" <|> "result") : attr
+syntax (name := gameHopTitleAttr) "game_hop_title" str : attr
+syntax (name := gameHopKindAttr) "game_hop_kind" ("game" <|> "hybrid" <|> "endpoint" <|> "result") : attr
 
-private def addHintUpdate (decl : Name) (update : GameHopHintUpdate) (kind : AttributeKind) :
+private def addHintUpdate (_decl : Name) (update : GameHopHintUpdate) (kind : AttributeKind) :
     AttrM Unit := do
-  gameHopHintExt.add ({ update with declName := decl }) kind
+  gameHopHintExt.add update kind
 
 initialize
   registerBuiltinAttribute {

@@ -20,6 +20,9 @@ private def hasDecl (declName : Name) : MetaM Bool := do
 private def pendingDeclText (declName : Name) : String :=
   s!"Waiting for `{declName}` to elaborate."
 
+private def currentModuleUri? (currentModule : Name) : MetaM (Option Lsp.DocumentUri) :=
+  Lean.Server.documentUriFromModule? currentModule
+
 private def declBasename : Name → String
   | .anonymous => ""
   | .str _ s => s
@@ -77,7 +80,7 @@ private def unresolvedDeclTarget? (currentModule : Name) (declName : Name) :
     | return none
   let some path := System.Uri.fileUriToPath? uri
     | return none
-  let contents ← liftM <| IO.FS.readFile path
+  let contents ← IO.FS.readFile path
   let patterns := declSearchPatterns declName
   let patternCpLengths := patterns.map fun pattern =>
     String.Pos.Raw.offsetOfPos pattern pattern.endPos.offset
@@ -112,7 +115,7 @@ private def unresolvedDeclTarget? (currentModule : Name) (declName : Name) :
 
 def declTarget? (currentModule : Name) (declName : Name) : MetaM (Option RevealTarget) := do
   let anchor := AnchorRef.withSelection <| AnchorRef.result declName
-  match (← anchor.resolve?) with
+  match (← anchor.resolve? (← currentModuleUri? currentModule)) with
   | some resolved => return some <| RevealTarget.ofAnchor anchor resolved
   | none => unresolvedDeclTarget? currentModule declName
 
@@ -137,11 +140,12 @@ private def readSourceRange (uri : Lsp.DocumentUri) (range : Lsp.Range) : IO (Op
   let utf8Range := text.lspRangeToUtf8Range range
   return some <| String.Pos.Raw.extract text.source utf8Range.start utf8Range.stop
 
-private def declSource? (declName : Name) : MetaM (Option (String × RevealTarget)) := do
+private def declSource? (currentModule : Name) (declName : Name) :
+    MetaM (Option (String × RevealTarget)) := do
   let anchor := AnchorRef.result declName
-  let some resolved ← anchor.resolve?
+  let some resolved ← anchor.resolve? (← currentModuleUri? currentModule)
     | return none
-  let some contents ← liftM <| readSourceRange resolved.uri resolved.declarationRange
+  let some contents ← readSourceRange resolved.uri resolved.declarationRange
     | return none
   return some (stripLeadingDocComment contents, RevealTarget.ofAnchor anchor resolved)
 
@@ -179,7 +183,7 @@ def resolveTextSource (currentModule : Name) (anchor? : Option AnchorRef) (sourc
   | .declDoc declName =>
       if !(← hasDecl declName) then
         return none
-      let doc? ← liftM <| Lean.findDocString? (← getEnv) declName
+      let doc? ← Lean.findDocString? (← getEnv) declName
       match doc? with
       | some contents =>
           return some <| .markdown contents (target? := (← declTarget? currentModule declName))
@@ -195,7 +199,7 @@ def resolveTextSource (currentModule : Name) (anchor? : Option AnchorRef) (sourc
         | return none
       if !(← hasDecl anchor.declName) then
         return none
-      let doc? ← liftM <| Lean.findDocString? (← getEnv) anchor.declName
+      let doc? ← Lean.findDocString? (← getEnv) anchor.declName
       match doc? with
       | some contents =>
           return some <| .markdown contents (target? := (← declTarget? currentModule anchor.declName))
@@ -223,7 +227,7 @@ def resolveSnippet (currentModule : Name) (snippet : CodeSnippet) :
   | .declDoc declName =>
       if !(← hasDecl declName) then
         return .text (pendingDeclText declName) (target? := (← declTarget? currentModule declName))
-      let doc? ← liftM <| Lean.findDocString? (← getEnv) declName
+      let doc? ← Lean.findDocString? (← getEnv) declName
       match doc? with
       | some contents =>
           return .markdown contents (target? := (← declTarget? currentModule declName))
@@ -232,7 +236,7 @@ def resolveSnippet (currentModule : Name) (snippet : CodeSnippet) :
   | .declSource declName =>
       if !(← hasDecl declName) then
         return .text (pendingDeclText declName) (target? := (← declTarget? currentModule declName))
-      match (← declSource? declName) with
+      match (← declSource? currentModule declName) with
       | some (contents, target) =>
           return .code contents (target? := some target)
       | none =>
@@ -249,7 +253,8 @@ def resolveSnippet (currentModule : Name) (snippet : CodeSnippet) :
         match anchor? with
         | none => pure none
         | some anchor =>
-            pure <| (← anchor.resolve?).map <| RevealTarget.ofAnchor anchor
+            pure <| (← anchor.resolve? (← currentModuleUri? currentModule)).map <|
+              RevealTarget.ofAnchor anchor
       return .text contents (target? := target?)
 
 end GameHop
