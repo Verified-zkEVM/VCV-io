@@ -317,6 +317,14 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → 
   qvcgen_step?
   exact h x
 
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f g : α → β → OracleComp spec γ} {q : γ → Prop}
+    (h : ∀ x y, Pr[q | f x y] = Pr[q | g x y]) :
+    Pr[q | mx >>= fun x => my >>= fun y => f x y] =
+    Pr[q | mx >>= fun x => my >>= fun y => g x y] := by
+  qvcgen_step rw congr' as ⟨x, y⟩
+  exact h x y
+
 example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
   exp_norm
 
@@ -552,6 +560,53 @@ example {oa₁ oa₂ : OracleComp spec α}
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcgen
 
+@[irreducible] def wrappedTrueLeft : OracleComp spec Bool := pure true
+@[irreducible] def wrappedTrueRight : OracleComp spec Bool := pure true
+
+@[local rvcgen] theorem relTriple_wrappedTruePair :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
+  simpa [wrappedTrueLeft, wrappedTrueRight] using
+    (relTriple_refl (pure true : OracleComp spec Bool))
+
+example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
+  rvcgen_step
+
+example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
+  rvcgen_step with relTriple_wrappedTruePair
+
+/--
+info: Try this:
+
+  [apply] rvcgen_step with relTriple_wrappedTruePair
+-/
+#guard_msgs in
+example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
+  rvcgen_step?
+
+/--
+error: rvcgen_step using hf: the explicit hint did not match the current relational goal shape.
+`using` is interpreted by goal shape as one of:
+- bind cut relation
+- random/query bijection
+- `List.mapM` / `List.foldlM` input relation
+- `simulateQ` state relation
+
+Viable local `using` hints here: `S`
+Goal:
+  ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫
+-/
+#guard_msgs in
+example {oa₁ oa₂ : OracleComp spec α}
+    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
+    {S : RelPost α α} {R : RelPost β γ}
+    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
+    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
+    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
+  rvcgen_step using hf
+
 /-! ### Relational consequence close -/
 
 example {oa : OracleComp spec α} {ob : OracleComp spec β}
@@ -757,6 +812,33 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β}
     Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
     Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
   qvcgen_step
+
+example {mw : OracleComp spec α} {mx : OracleComp spec β} {my : OracleComp spec γ}
+    {f : α → β → γ → δ} [DecidableEq δ] {out : δ} :
+    Pr[= out | do
+      let w ← mw
+      let x ← mx
+      let z ← f w x <$> my
+      pure z] =
+    Pr[= out | do
+      let x ← mx
+      let w ← mw
+      let z ← f w x <$> my
+      pure z] := by
+  qvcgen_step
+
+/--
+info: Try this:
+
+  [apply] (qvcgen_step rw under 2; qvcgen_step rw under 1; qvcgen_step rw; qvcgen_step rw congr as ⟨w, hw⟩)
+-/
+#guard_msgs in
+example {mw : OracleComp spec α} {mx : OracleComp spec β}
+    {my : OracleComp spec γ} {mz : OracleComp spec δ}
+    {f : α → β → γ → δ → OracleComp spec ε} {out : ε} :
+    Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
+    Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
+  qvcgen_step?
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
     (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :

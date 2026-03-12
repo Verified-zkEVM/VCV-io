@@ -158,11 +158,11 @@ elab_rules : tactic
       TacticInternals.Unary.throwQVCGenStepRwError depth
   | `(tactic| qvcgen_step rw congr as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
-      if ← TacticInternals.Unary.runProbEqCongrWithNames names then return
+      if ← TacticInternals.Unary.runProbEqCongrChainWithNames true names then return
       TacticInternals.Unary.throwQVCGenStepRwCongrError true
   | `(tactic| qvcgen_step rw congr' as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
-      if ← TacticInternals.Unary.runProbEqCongrNoSupportWithNames names then return
+      if ← TacticInternals.Unary.runProbEqCongrChainWithNames false names then return
       TacticInternals.Unary.throwQVCGenStepRwCongrError false
   | `(tactic| qvcgen_step rw) => do
       if ← TacticInternals.Unary.runProbEqAction .rewrite then return

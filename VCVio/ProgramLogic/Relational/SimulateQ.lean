@@ -168,6 +168,31 @@ theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
   intro p₁ p₂ hp
   exact ⟨Prod.ext hp.1 hp.2.1, hp.2.2⟩
 
+/-- Exact-equality specialization of `relTriple_simulateQ_run_of_impl_eq_preservesInv`.
+
+This weakens the stronger invariant-carrying postcondition to plain equality on `(output, state)`,
+which is the shape consumed directly by probability-transport lemmas and theorem-driven
+`rvcgen` steps. -/
+theorem relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type _}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2)
+    (s : σ) (hs : Inv s) :
+    RelTriple
+      ((simulateQ impl₁ oa).run s)
+      ((simulateQ impl₂ oa).run s)
+      (EqRel (α × σ)) := by
+  refine relTriple_post_mono
+    (relTriple_simulateQ_run_of_impl_eq_preservesInv
+      impl₁ impl₂ Inv oa himpl_eq hpres₂ s hs) ?_
+  intro p₁ p₂ hp
+  exact hp.1
+
 /-- Output-probability projection of
 `relTriple_simulateQ_run_of_impl_eq_preservesInv`. -/
 theorem probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
@@ -282,6 +307,22 @@ theorem run'_simulateQ_eq_of_query_map_eq
   have hrun := map_run_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s
   have hmap := congrArg (fun p => Prod.fst <$> p) hrun
   simpa [StateT.run'] using hmap
+
+/-- Relational transport corollary of `run'_simulateQ_eq_of_query_map_eq`. -/
+theorem relTriple_simulateQ_run'_of_query_map_eq
+    {ι : Type} {spec : OracleSpec ι}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ ProbComp))
+    (impl₂ : QueryImpl spec (StateT σ₂ ProbComp))
+    (proj : σ₁ → σ₂)
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) :
+    RelTriple
+      ((simulateQ impl₁ oa).run' s)
+      ((simulateQ impl₂ oa).run' (proj s))
+      (EqRel α) := by
+  exact relTriple_eqRel_of_eq (run'_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s)
 
 /-! ## "Identical until bad" fundamental lemma -/
 
