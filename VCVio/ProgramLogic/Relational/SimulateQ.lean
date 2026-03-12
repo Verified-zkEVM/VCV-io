@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Relational.Quantitative
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.SimSemantics.StateT
 
 /-!
@@ -117,6 +118,170 @@ theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
   intro t s₁ s₂ hs'
   cases hs'
   exact relTriple_of_evalDist_eq (himpl t s₁) (fun _ => ⟨rfl, rfl⟩)
+
+/-- If two stateful oracle implementations agree on every query while `Inv` holds, and the
+second implementation preserves `Inv`, then the full simulations have identical `(output, state)`
+distributions from any invariant-satisfying initial state. -/
+theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type _}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2)
+    (s : σ) (hs : Inv s) :
+    RelTriple
+      ((simulateQ impl₁ oa).run s)
+      ((simulateQ impl₂ oa).run s)
+      (fun p₁ p₂ => p₁ = p₂ ∧ Inv p₁.2) := by
+  have hrel :
+      RelTriple
+        ((simulateQ impl₁ oa).run s)
+        ((simulateQ impl₂ oa).run s)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2) := by
+    refine relTriple_simulateQ_run (spec := spec) (spec₁ := unifSpec) (spec₂ := unifSpec)
+      impl₁ impl₂ (fun s₁ s₂ => s₁ = s₂ ∧ Inv s₁) oa ?_ s s
+      ⟨rfl, hs⟩
+    intro t s₁ s₂ hs'
+    rcases hs' with ⟨rfl, hs₁⟩
+    rw [himpl_eq t s₁ hs₁]
+    apply (relTriple_iff_relWP
+      (oa := (impl₂ t).run s₁)
+      (ob := (impl₂ t).run s₁)
+      (R := fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2)).2
+    refine ⟨_root_.SPMF.Coupling.refl (evalDist ((impl₂ t).run s₁)), ?_⟩
+    intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist ((impl₂ t).run s₁))
+      (fun a => (pure (a, a) : SPMF ((spec.Range t × σ) × (spec.Range t × σ)))) z).1 hz with
+      ⟨a, ha, hz'⟩
+    have hzEq : z = (a, a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    have ha' : a ∈ support ((impl₂ t).run s₁) := by
+      simpa [mem_support_iff, probOutput_def] using ha
+    have hInv : Inv a.2 := hpres₂ t s₁ hs₁ a ha'
+    subst hzEq
+    simp [hInv]
+  refine relTriple_post_mono hrel ?_
+  intro p₁ p₂ hp
+  exact ⟨Prod.ext hp.1 hp.2.1, hp.2.2⟩
+
+/-- Output-probability projection of
+`relTriple_simulateQ_run_of_impl_eq_preservesInv`. -/
+theorem probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type _}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2)
+    (s : σ) (hs : Inv s) (z : α × σ) :
+    Pr[= z | (simulateQ impl₁ oa).run s] =
+      Pr[= z | (simulateQ impl₂ oa).run s] := by
+  have hrel := relTriple_simulateQ_run_of_impl_eq_preservesInv
+    impl₁ impl₂ Inv oa himpl_eq hpres₂ s hs
+  exact probOutput_eq_of_relTriple_eqRel
+    (relTriple_post_mono hrel (fun _ _ hp => hp.1)) z
+
+/-- Query-bounded exact-output transport for `simulateQ`.
+
+If `oa` satisfies a structural query bound `IsQueryBound budget canQuery cost`, the two
+implementations agree on every query that the bound permits, and the second implementation
+preserves a budget-indexed invariant `Inv`, then the full simulated computations have identical
+output-state probabilities from any initial state satisfying `Inv`. -/
+theorem probOutput_simulateQ_run_eq_of_impl_eq_queryBound
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type _} {B : Type _}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → B → Prop)
+    (canQuery : spec.Domain → B → Prop)
+    (cost : spec.Domain → B → B)
+    (oa : OracleComp spec α)
+    (budget : B)
+    (hbound : oa.IsQueryBound budget canQuery cost)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ) (b : B),
+      Inv s b → canQuery t b → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ) (b : B), Inv s b → canQuery t b →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2 (cost t b))
+    (s : σ) (hs : Inv s budget) (z : α × σ) :
+    Pr[= z | (simulateQ impl₁ oa).run s] =
+      Pr[= z | (simulateQ impl₂ oa).run s] := by
+  induction oa using OracleComp.inductionOn generalizing s budget z with
+  | pure x =>
+      simp
+  | query_bind t oa ih =>
+      rw [isQueryBound_query_bind_iff] at hbound
+      rcases hbound with ⟨hcan, hcont⟩
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind]
+      rw [himpl_eq t s budget hs hcan]
+      rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+      refine tsum_congr fun p => ?_
+      by_cases hp : p ∈ support ((impl₂ t).run s)
+      · have hs' : Inv p.2 (cost t budget) := hpres₂ t s budget hs hcan p hp
+        congr 1
+        exact ih p.1 (cost t budget) (hcont p.1) p.2 hs' z
+      · simp [(probOutput_eq_zero_iff _ _).2 hp]
+
+/-- State-projection transport for `simulateQ.run`.
+
+If each oracle call under `impl₁` becomes the corresponding `impl₂` call after mapping the state
+with `proj`, then the full simulated runs agree under the same projection. -/
+theorem map_run_simulateQ_eq_of_query_map_eq
+    {ι : Type} {spec : OracleSpec ι}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ ProbComp))
+    (impl₂ : QueryImpl spec (StateT σ₂ ProbComp))
+    (proj : σ₁ → σ₂)
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) :
+    Prod.map id proj <$> (simulateQ impl₁ oa).run s =
+      (simulateQ impl₂ oa).run (proj s) := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x =>
+      simp
+  | query_bind t oa ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, map_bind]
+      calc
+        ((impl₁ t).run s >>= fun x =>
+            Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2)
+            =
+            ((impl₁ t).run s >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run (proj x.2)) := by
+                  refine bind_congr fun x => ?_
+                  simpa using ih x.1 x.2
+        _ =
+            ((Prod.map id proj <$> (impl₁ t).run s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  exact
+                    (bind_map_left (m := ProbComp) (Prod.map id proj)
+                      ((impl₁ t).run s)
+                      (fun y => (simulateQ impl₂ (oa y.1)).run y.2)).symm
+        _ =
+            ((impl₂ t).run (proj s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  rw [hproj t s]
+
+/-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq`. -/
+theorem run'_simulateQ_eq_of_query_map_eq
+    {ι : Type} {spec : OracleSpec ι}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ ProbComp))
+    (impl₂ : QueryImpl spec (StateT σ₂ ProbComp))
+    (proj : σ₁ → σ₂)
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) :
+    (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by
+  have hrun := map_run_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s
+  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  simpa [StateT.run'] using hmap
 
 /-! ## "Identical until bad" fundamental lemma -/
 

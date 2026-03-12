@@ -751,6 +751,13 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β}
     Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
   qvcgen_step rw under 2
 
+example {mw : OracleComp spec α} {mx : OracleComp spec β}
+    {my : OracleComp spec γ} {mz : OracleComp spec δ}
+    {f : α → β → γ → δ → OracleComp spec ε} {out : ε} :
+    Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
+    Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
+  qvcgen_step
+
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
     (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
     Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
