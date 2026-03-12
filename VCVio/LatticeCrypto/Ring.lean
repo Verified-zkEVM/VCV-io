@@ -16,26 +16,28 @@ optimized array-backed implementations later.
 
 set_option autoImplicit false
 
+universe u
+
 namespace LatticeCrypto
 
 /-- A degree-`n` polynomial represented by its coefficient vector. -/
-abbrev Poly (Coeff : Type) (n : Nat) := Vector Coeff n
+abbrev Poly (Coeff : Type u) (n : Nat) := Vector Coeff n
 
 /-- A length-`k` vector of degree-`n` polynomials. -/
-abbrev PolyVec (Coeff : Type) (n k : Nat) := Vector (Poly Coeff n) k
+abbrev PolyVec (Coeff : Type u) (n k : Nat) := Vector (Poly Coeff n) k
 
 /-- A `rows × cols` row-major matrix of degree-`n` polynomials. -/
-abbrev PolyMatrix (Coeff : Type) (n rows cols : Nat) := Vector (PolyVec Coeff n cols) rows
+abbrev PolyMatrix (Coeff : Type u) (n rows cols : Nat) := Vector (PolyVec Coeff n cols) rows
 
 /-- The abstract NTT-domain operations needed by lattice-based cryptosystems. -/
-structure NTTRingOps (Coeff : Type) (n : Nat) where
+structure NTTRingOps (Coeff : Type u) (n : Nat) where
   ntt : Poly Coeff n → Poly Coeff n
   invNTT : Poly Coeff n → Poly Coeff n
   multiplyNTTs : Poly Coeff n → Poly Coeff n → Poly Coeff n
 
 namespace NTTRingOps
 
-variable {Coeff : Type} {n : Nat}
+variable {Coeff : Type u} {n : Nat}
 
 /-- Transpose a row-major polynomial matrix. -/
 def transpose {rows cols : Nat} (A : PolyMatrix Coeff n rows cols) :

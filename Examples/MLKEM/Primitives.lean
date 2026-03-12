@@ -44,11 +44,11 @@ def publicMatrix (rho : Seed32) : TqMatrix params.k params.k :=
 
 /-- Sample a length-`k` noise vector using `PRF_η₁` and an explicit counter offset. -/
 def sampleVecEta1 (seed : Seed32) (offset : ℕ) : RqVec params.k :=
-  Vector.ofFn fun i => prims.prfEta1 seed (offset + i.1)
+  Vector.ofFn fun i => prims.prfEta1 seed (offset + i.val)
 
 /-- Sample a length-`k` noise vector using `PRF_η₂` and an explicit counter offset. -/
 def sampleVecEta2 (seed : Seed32) (offset : ℕ) : RqVec params.k :=
-  Vector.ofFn fun i => prims.prfEta2 seed (offset + i.1)
+  Vector.ofFn fun i => prims.prfEta2 seed (offset + i.val)
 
 end Primitives
 

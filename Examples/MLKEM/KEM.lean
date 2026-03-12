@@ -31,7 +31,7 @@ def decapsulationKeyCheck (encoding : Encoding params) (prims : Primitives param
 
 /-- In the semantic model, ciphertexts are already well-typed, so the top-level runtime check is
 reduced to `true`. A later byte-level refinement can strengthen this predicate. -/
-def ciphertextCheck (_params : Params) (encoding : Encoding params)
+def ciphertextCheck (params : Params) (encoding : Encoding params)
     (_c : Ciphertext params encoding) : Bool := true
 
 /-- Combined decapsulation input check. -/
@@ -57,7 +57,7 @@ def encaps (ring : NTTRingOps) (encoding : Encoding params) [DecidableEq encodin
     OptionT.mk (pure none)
 
 /-- `ML-KEM.Decaps` with its input checks made explicit. -/
-def decaps (ring : NTTRingOps) (encoding : Encoding params) [DecidableEq encoding.EncodedTHat]
+def decaps (ring : NTTRingOps) (encoding : Encoding params)
     [DecidableEq encoding.EncodedU] [DecidableEq encoding.EncodedV]
     (prims : Primitives params encoding) (dk : DecapsulationKey params encoding)
     (c : Ciphertext params encoding) : Option SharedSecret :=

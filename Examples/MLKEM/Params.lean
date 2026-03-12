@@ -98,13 +98,17 @@ def recommended : ParameterSet := .MLKEM768
 
 end ParameterSet
 
-/-- The three approved parameter records, exposed directly for generic code. -/
+/-- The approved parameter record for ML-KEM-512. -/
 def mlkem512 : Params := ParameterSet.params .MLKEM512
+
+/-- The approved parameter record for ML-KEM-768. -/
 def mlkem768 : Params := ParameterSet.params .MLKEM768
+
+/-- The approved parameter record for ML-KEM-1024. -/
 def mlkem1024 : Params := ParameterSet.params .MLKEM1024
 
 /-- Recognize the approved FIPS 203 parameter sets. -/
-def Params.IsApproved (params : Params) : Prop :=
+def Params.isApproved (params : Params) : Prop :=
   params = mlkem512 ∨ params = mlkem768 ∨ params = mlkem1024
 
 /-- The recommended default parameter record. -/

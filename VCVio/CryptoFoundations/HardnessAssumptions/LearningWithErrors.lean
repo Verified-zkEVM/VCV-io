@@ -44,7 +44,7 @@ section Generic
 variable {Sample Secret Output : Type}
 
 /-- The real LWE-style distribution `(A, signal + error)`. -/
-def Distr [Add Output] (problem : Problem Sample Secret Output) :
+def distr [Add Output] (problem : Problem Sample Secret Output) :
     ProbComp (Sample × Output) := do
   let challenge ← problem.sampleChallenge
   let secret ← problem.sampleSecret
@@ -52,7 +52,7 @@ def Distr [Add Output] (problem : Problem Sample Secret Output) :
   return (challenge, problem.noiseless secret challenge + error)
 
 /-- The matching uniform distribution `(A, u)`. -/
-def UniformDistr (problem : Problem Sample Secret Output) :
+def uniformDistr (problem : Problem Sample Secret Output) :
     ProbComp (Sample × Output) := do
   let challenge ← problem.sampleChallenge
   let uniform ← problem.sampleUniform
@@ -64,34 +64,34 @@ abbrev Adversary (_problem : Problem Sample Secret Output) :=
 
 /-- The decisional LWE experiment: flip `b`, give the adversary either the real distribution or the
 matching uniform one, then check whether the guess matches `b`. -/
-def Experiment [Add Output] (problem : Problem Sample Secret Output)
+def experiment [Add Output] (problem : Problem Sample Secret Output)
     (adv : Adversary problem) : ProbComp Bool := do
   let b ← $ᵗ Bool
-  let distr ← if b then Distr problem else UniformDistr problem
-  let b' ← adv distr
+  let sample ← if b then distr problem else uniformDistr problem
+  let b' ← adv sample
   return (b == b')
 
 /-- Distinguishing advantage for the generic LWE experiment. -/
-noncomputable def Advantage [Add Output] (problem : Problem Sample Secret Output)
+noncomputable def advantage [Add Output] (problem : Problem Sample Secret Output)
     (adv : Adversary problem) : ℝ :=
-  (Experiment problem adv).boolBiasAdvantage
+  (experiment problem adv).boolBiasAdvantage
 
 /-- Game 0: the adversary sees a sample from the real LWE-style distribution. -/
-def Game_0 [Add Output] (problem : Problem Sample Secret Output)
+def game0 [Add Output] (problem : Problem Sample Secret Output)
     (adv : Adversary problem) : ProbComp Bool := do
-  adv (← Distr problem)
+  adv (← distr problem)
 
 /-- Game 1: the adversary sees a sample from the matching uniform distribution. -/
-def Game_1 (problem : Problem Sample Secret Output)
+def game1 (problem : Problem Sample Secret Output)
     (adv : Adversary problem) : ProbComp Bool := do
-  adv (← UniformDistr problem)
+  adv (← uniformDistr problem)
 
 /-- A search adversary for an LWE-style problem. -/
 abbrev SearchAdversary (_problem : Problem Sample Secret Output) :=
   Sample × Output → ProbComp Secret
 
 /-- The search LWE experiment: the adversary must recover the sampled secret. -/
-def SearchExperiment [Add Output] [DecidableEq Secret]
+def searchExperiment [Add Output] [DecidableEq Secret]
     (problem : Problem Sample Secret Output) (adv : SearchAdversary problem) :
     ProbComp Bool := do
   let challenge ← problem.sampleChallenge
@@ -101,9 +101,9 @@ def SearchExperiment [Add Output] [DecidableEq Secret]
   return decide (secret' = secret)
 
 /-- Search advantage for the generic LWE experiment. -/
-noncomputable def SearchAdvantage [Add Output] [DecidableEq Secret]
+noncomputable def searchAdvantage [Add Output] [DecidableEq Secret]
     (problem : Problem Sample Secret Output) (adv : SearchAdversary problem) : ℝ :=
-  (SearchExperiment problem adv).boolBiasAdvantage
+  (Pr[= true | searchExperiment problem adv]).toReal
 
 end Generic
 
