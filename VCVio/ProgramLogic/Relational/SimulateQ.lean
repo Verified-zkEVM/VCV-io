@@ -118,6 +118,74 @@ theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
   cases hs'
   exact relTriple_of_evalDist_eq (himpl t s₁) (fun _ => ⟨rfl, rfl⟩)
 
+/-- If two stateful oracle implementations agree on every query while `Inv` holds, and the
+second implementation preserves `Inv`, then the full simulations have identical `(output, state)`
+distributions from any invariant-satisfying initial state. -/
+theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2)
+    (s : σ) (hs : Inv s) :
+    RelTriple
+      ((simulateQ impl₁ oa).run s)
+      ((simulateQ impl₂ oa).run s)
+      (fun p₁ p₂ => p₁ = p₂ ∧ Inv p₁.2) := by
+  have hrel :
+      RelTriple
+        ((simulateQ impl₁ oa).run s)
+        ((simulateQ impl₂ oa).run s)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2) := by
+    refine relTriple_simulateQ_run (spec₁ := unifSpec) (spec₂ := unifSpec)
+      impl₁ impl₂ (fun s₁ s₂ => s₁ = s₂ ∧ Inv s₁) oa ?_ s s
+      ⟨rfl, hs⟩
+    intro t s₁ s₂ hs'
+    rcases hs' with ⟨rfl, hs₁⟩
+    rw [himpl_eq t s₁ hs₁]
+    apply (relTriple_iff_relWP
+      (oa := (impl₂ t).run s₁)
+      (ob := (impl₂ t).run s₁)
+      (R := fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2)).2
+    refine ⟨_root_.SPMF.Coupling.refl (evalDist ((impl₂ t).run s₁)), ?_⟩
+    intro z hz
+    rcases (mem_support_bind_iff
+      (evalDist ((impl₂ t).run s₁))
+      (fun a => (pure (a, a) : SPMF ((spec.Range t × σ) × (spec.Range t × σ)))) z).1 hz with
+      ⟨a, ha, hz'⟩
+    have hzEq : z = (a, a) := by
+      simpa [support_pure, Set.mem_singleton_iff] using hz'
+    have ha' : a ∈ support ((impl₂ t).run s₁) := by
+      simpa [mem_support_iff, probOutput_def] using ha
+    have hInv : Inv a.2 := hpres₂ t s₁ hs₁ a ha'
+    subst hzEq
+    simp [hInv]
+  refine relTriple_post_mono hrel ?_
+  intro p₁ p₂ hp
+  exact ⟨Prod.ext hp.1 hp.2.1, hp.2.2⟩
+
+/-- Output-probability projection of
+`relTriple_simulateQ_run_of_impl_eq_preservesInv`. -/
+theorem probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
+    {ι : Type} {spec : OracleSpec ι}
+    {σ : Type}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl₂ t).run s), Inv z.2)
+    (s : σ) (hs : Inv s) (z : α × σ) :
+    Pr[= z | (simulateQ impl₁ oa).run s] =
+      Pr[= z | (simulateQ impl₂ oa).run s] := by
+  have hrel := relTriple_simulateQ_run_of_impl_eq_preservesInv
+    impl₁ impl₂ Inv oa himpl_eq hpres₂ s hs
+  exact probOutput_eq_of_relTriple_eqRel
+    (relTriple_post_mono hrel (fun _ _ hp => hp.1)) z
+
 /-! ## "Identical until bad" fundamental lemma -/
 
 variable [spec.Fintype] [spec.Inhabited]

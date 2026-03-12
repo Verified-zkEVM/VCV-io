@@ -50,9 +50,7 @@ The main theorem takes `hstart`, which asserts that the `q`-th hybrid has the sa
 probability as the actual IND-CPA experiment. This holds for any adversary making at most `q`
 distinct fresh LR oracle queries.
 -/
-
 open OracleSpec OracleComp ENNReal
-
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G]
 
@@ -393,7 +391,31 @@ def stepDDH_randBranchGame
   let b' ← (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ (c • gen))
     (adversary pk)).run' (∅, 0)
   return (b == b')
-
+private lemma stepDDH_realBranchFold (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
+    (k : ℕ) :
+    Pr[= true | do
+      let a ← ($ᵗ F : ProbComp F); let b_scalar ← ($ᵗ F : ProbComp F)
+      let z ← stepDDH_realBranchCore (F := F) (gen := gen) adversary k a b_scalar
+      pure (true == z)] =
+    Pr[= true | do
+      let z ← stepDDH_realBranchGame (F := F) (gen := gen) adversary k
+      pure (true == z)] := by
+  simp [stepDDH_realBranchGame, stepDDH_realBranchCore, map_eq_bind_pure_comp, bind_assoc]
+  qvcgen_step rw under 1
+  qvcgen_step rw
+private lemma stepDDH_randBranchFold (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
+    (k : ℕ) :
+    Pr[= true | do
+      let a ← ($ᵗ F : ProbComp F); let b_scalar ← ($ᵗ F : ProbComp F)
+      let z ← stepDDH_randBranchCore (F := F) (gen := gen) adversary k a b_scalar
+      pure (false == z)] =
+    Pr[= true | do
+      let z ← stepDDH_randBranchGame (F := F) (gen := gen) adversary k
+      pure (false == z)] := by
+  simp [stepDDH_randBranchGame, stepDDH_randBranchCore, map_eq_bind_pure_comp, bind_assoc]
+  qvcgen_step rw under 2
+  qvcgen_step rw under 1
+  qvcgen_step rw
 private lemma hybridBranch_probOutput_eq
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (realUntil : ℕ) (lhs : F → Bool → ProbComp Bool)
@@ -575,7 +597,6 @@ private lemma hybridQueryImpl_counter_le_succ
         have := congrArg (fun x => x.2.2) hp
         simp at this
         omega
-
 private lemma simulateQ_stepDDH_probOutput_eq_hybrid_post_k
     (pk : G) (b : Bool) (k : ℕ) (x₂ x₃ : G) (realUntil : ℕ)
     (hrealUntil : realUntil = k ∨ realUntil = k + 1)
@@ -584,22 +605,39 @@ private lemma simulateQ_stepDDH_probOutput_eq_hybrid_post_k
     ∀ z : α × IND_CPA_HybridState (G := G),
     Pr[= z | (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ x₃) a).run st] =
     Pr[= z | (simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil) a).run st] := by
-  induction a using OracleComp.inductionOn with
-  | pure x =>
-      intro st _ z
-      simp
-  | query_bind t oa ih =>
-      intro st hgt z
-      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-        OracleQuery.cont_query, id_map, StateT.run_bind]
-      have hq := stepDDHQueryImpl_eq_hybridQueryImpl_post_k (F := F) (gen := gen) pk b k x₂ x₃
-        realUntil hrealUntil t st hgt
-      rw [hq]
-      qvcgen_step as ⟨p, hp⟩
-      refine ih p.1 p.2 ?_ z
-      exact Nat.lt_of_lt_of_le hgt
-        (hybridQueryImpl_counter_mono (F := F) (gen := gen) pk b realUntil t st p hp)
-
+  intro st hgt z
+  simpa using OracleComp.ProgramLogic.Relational.probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
+    (impl₁ := IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k x₂ x₃)
+    (impl₂ := IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil)
+    (Inv := fun st : IND_CPA_HybridState (G := G) => k < st.2) (oa := a) (s := st) (z := z)
+    (himpl_eq := fun t st hInv =>
+      stepDDHQueryImpl_eq_hybridQueryImpl_post_k (F := F) (gen := gen) pk b k x₂ x₃
+        realUntil hrealUntil t st hInv)
+    (hpres₂ := fun t st hInv p hp =>
+      Nat.lt_of_lt_of_le hInv
+        (hybridQueryImpl_counter_mono (F := F) (gen := gen) pk b realUntil t st p hp))
+    hgt
+private lemma stepDDH_fresh_query_simulation_core
+    (pk : G) (b : Bool) (k : ℕ) (realUntil : ℕ)
+    (hrealUntil : realUntil = k ∨ realUntil = k + 1)
+    {β α : Type} (sample : ProbComp β) (x₂ : β → G) (x₃ : β → G) (resp : β → G × G)
+    (nextState : β → IND_CPA_HybridState (G := G))
+    (oa : G × G → OracleComp (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec α)
+    (hgt : ∀ s, k < (nextState s).2)
+    (z : α × IND_CPA_HybridState (G := G)) :
+    Pr[= z | do
+      let s ← sample
+      (simulateQ (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k (x₂ s) (x₃ s))
+        (oa (resp s))).run (nextState s)] =
+    Pr[= z | do
+      let s ← sample
+      (simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil)
+        (oa (resp s))).run (nextState s)] := by
+  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  refine tsum_congr fun s => ?_
+  have hs := simulateQ_stepDDH_probOutput_eq_hybrid_post_k (F := F) (gen := gen) pk b k
+    (x₂ s) (x₃ s) realUntil hrealUntil (oa (resp s)) (nextState s) (hgt s) z
+  simpa using congrArg (fun p => Pr[= s | sample] * p) hs
 -- Real simulation deferred: absorbing the DDH challenge scalar into real ElGamal encryption
 private lemma stepDDH_real_simulation_deferred
     (pk : G) (b : Bool) (k : ℕ)
@@ -693,11 +731,17 @@ private lemma stepDDH_real_simulation_deferred
                   StateT.run_pure, pure_bind, StateT.run_set]
               simp_rw [hstep, pure_bind]
               rw [hhybrid, bind_assoc]
-              simp_rw [pure_bind]
-              qvcgen_step rw congr' as ⟨r⟩
-              exact simulateQ_stepDDH_probOutput_eq_hybrid_post_k (F := F)
-                (gen := gen) pk b k (r • gen) (r • pk) (k + 1)
-                (Or.inr rfl) (oa _) _ (by rw [heq]; omega) z
+              simpa using
+                stepDDH_fresh_query_simulation_core (F := F) (gen := gen) pk b k (k + 1)
+                  (Or.inr rfl) ($ᵗ F : ProbComp F)
+                  (fun r => r • gen) (fun r => r • pk)
+                  (fun r => (r • gen, (if b = true then m₁ else m₂) + r • pk))
+                  (fun r =>
+                    (st.1.cacheQuery (m₁, m₂) (r • gen,
+                      (if b = true then m₁ else m₂) + r • pk),
+                     st.2 + 1))
+                  oa
+                  (fun _ => by simp [heq]) z
             · have hstep : ∀ r : F,
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
                     (r • gen) (r • pk)
@@ -814,13 +858,21 @@ private lemma stepDDH_rand_simulation_deferred
                   StateT.run_pure, pure_bind, StateT.run_set]
               simp_rw [hstep, pure_bind]
               rw [hhybrid]
-              simp_rw [bind_assoc, pure_bind]
-              qvcgen_step rw congr' as ⟨r⟩
-              qvcgen_step rw congr' as ⟨y⟩
-              exact simulateQ_stepDDH_probOutput_eq_hybrid_post_k (F := F)
-                (gen := gen) pk b k (r • gen) y k
-                (Or.inl rfl) (oa ((r • gen, (if b = true then m₁ else m₂) + y))) _
-                (by rw [heq]; omega) z
+              simpa [bind_assoc] using
+                stepDDH_fresh_query_simulation_core (F := F) (gen := gen) pk b k k
+                  (Or.inl rfl)
+                  (do
+                    let r ← ($ᵗ F : ProbComp F)
+                    let y ← ($ᵗ G : ProbComp G)
+                    pure (r, y))
+                  (fun p => p.1 • gen) (fun p => p.2)
+                  (fun p => (p.1 • gen, (if b = true then m₁ else m₂) + p.2))
+                  (fun p =>
+                    (st.1.cacheQuery (m₁, m₂) (p.1 • gen,
+                      (if b = true then m₁ else m₂) + p.2),
+                     st.2 + 1))
+                  oa
+                  (fun _ => by simp [heq]) z
             · have hstep : ∀ (r : F) (y : G),
                   (IND_CPA_stepDDHQueryImpl (F := F) (gen := gen) pk b k
                     (r • gen) y (Sum.inr (m₁, m₂))).run st =
@@ -959,7 +1011,6 @@ private lemma stepDDH_randBranch_probOutput_eq
     exact (hbridge a b).trans (hsim_run a b)
   simpa [stepDDH_randBranchGame, lhsRun] using
     stepDDH_branch_probOutput_eq_of_run (F := F) (gen := gen) adversary k lhsRun hmain_run
-
 -- The DDH experiment decomposes into a mixture of real and random branches.
 private lemma ddhExp_stepDDH_eq_mixture
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
@@ -1035,19 +1086,12 @@ private lemma ddhExp_stepDDH_eq_mixture
         else
           stepDDH_randBranchGame (F := F) (gen := gen) adversary k
         pure (d == z)] := by
-    qvcgen_step rw congr' as ⟨d⟩
-    cases d
-    · simp [stepDDH_randBranchGame, stepDDH_randBranchCore,
-        map_eq_bind_pure_comp, bind_assoc]
-      qvcgen_step rw under 2
-      qvcgen_step rw under 1
-      qvcgen_step rw
-    · simp [stepDDH_realBranchGame, stepDDH_realBranchCore,
-        map_eq_bind_pure_comp, bind_assoc]
-      qvcgen_step rw under 1
-      qvcgen_step rw
+    refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) true ?_
+    intro d
+    cases d <;> first
+      | exact stepDDH_randBranchFold (F := F) (gen := gen) adversary k
+      | exact stepDDH_realBranchFold (F := F) (gen := gen) adversary k
   rw [hrepr, hswap₁, hswap₂, hfold]
-
 private lemma ddhExp_stepDDHReduction_decomp_toReal
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
@@ -1121,7 +1165,6 @@ private lemma allReal_eq_hybrid_on_bounded
       rcases hcache : st.1 mm with _ | c
       · simp only [if_pos hlt]
       · simp only [StateT.run_pure]
-
 private lemma allReal_counter_mono
     (pk : G) (b : Bool)
     (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
@@ -1133,7 +1176,6 @@ private lemma allReal_counter_mono
     t st (p := p)
   rw [← allReal_eq_hybrid_on_bounded (F := F) (gen := gen) pk b (st.2 + 1) t st (by omega)] at this
   exact this hp
-
 private lemma allReal_counter_le_succ
     (pk : G) (b : Bool)
     (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
@@ -1173,7 +1215,6 @@ private lemma allReal_counter_le_succ
         have := congrArg (fun x => x.2.2) hp
         simp at this
         omega
-
 private lemma hybrid_q_probOutput_eq_allReal
     (pk : G) (b : Bool) (q : ℕ)
     {α : Type} (comp : OracleComp (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec α)
@@ -1221,7 +1262,6 @@ private lemma hybrid_q_probOutput_eq_allReal
               pk b (Sum.inr mm) st p hp
             omega
           simpa using ih p.1 (budget - 1) (hcont p.1) p.2 hle' z
-
 private lemma proj_map_run_simulateQ_eq
     {ι' : Type} {spec' : OracleSpec ι'}
     {σ₁ σ₂ α : Type}
