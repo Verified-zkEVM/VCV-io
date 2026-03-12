@@ -962,6 +962,7 @@ theorem elGamal_IND_CPA_bound_toReal
 
 /-- **Main theorem.** If an adversary makes at most `q` LR queries and each per-hop DDH
 reduction has advantage at most `ε`, then ElGamal has IND-CPA advantage at most `q * (2 * ε)`. -/
+@[game_hop_root]
 theorem elGamal_IND_CPA_le_q_mul_ddh
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
