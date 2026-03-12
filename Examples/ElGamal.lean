@@ -332,8 +332,7 @@ private lemma hybridBranch_probOutput_eq
       pure (b == z)] =
     Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary realUntil] := by
   simp [IND_CPA_HybridGame, elgamalAsymmEnc]
-  qvcgen_step rw congr' as ⟨b⟩
-  qvcgen_step rw congr' as ⟨a⟩
+  qvcgen_step rw congr' as ⟨b, a⟩
   simpa using
     (probOutput_map_eq_of_evalDist_eq (f := fun z => b == z) (y := true) (h a b))
 
@@ -753,10 +752,8 @@ private lemma stepDDH_realBranch_probOutput_eq
         let a ← ($ᵗ F : ProbComp F)
         let z ← Prod.fst <$> lhsRun a b
         pure (b == z)] := by
-          simp [DiffieHellman.ddhExpReal, IND_CPA_stepDDHReduction, lhsRun,
-            map_eq_bind_pure_comp, bind_assoc]
-          qvcgen_step rw under 1
-          qvcgen_step rw
+          simp [DiffieHellman.ddhExpReal, IND_CPA_stepDDHReduction, lhsRun]
+          qvcgen_step
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)] := by
           refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary (k + 1)
             (fun a b => Prod.fst <$> lhsRun a b) ?_
@@ -832,11 +829,8 @@ private lemma stepDDH_randBranch_probOutput_eq
         let a ← ($ᵗ F : ProbComp F)
         let z ← Prod.fst <$> lhsRun a b
         pure (b == z)] := by
-          simp [DiffieHellman.ddhExpRand, IND_CPA_stepDDHReduction, lhsRun,
-            map_eq_bind_pure_comp, bind_assoc]
-          qvcgen_step rw under 2
-          qvcgen_step rw under 1
-          qvcgen_step rw
+          simp [DiffieHellman.ddhExpRand, IND_CPA_stepDDHReduction, lhsRun]
+          qvcgen_step
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k] := by
           refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary k
             (fun a b => Prod.fst <$> lhsRun a b) ?_

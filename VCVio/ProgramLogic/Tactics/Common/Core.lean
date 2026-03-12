@@ -27,10 +27,17 @@ structure PlannedStep where
   label : String
   replayText : String
   run : TacticM Bool
+  notes : List String := []
 
 structure PreviewResult where
   ok : Bool
   goalCount : Nat
+
+def withStepNotes (step : PlannedStep) (notes : List String) : PlannedStep :=
+  { step with notes := step.notes ++ notes }
+
+def formatCandidateNames (names : Array Name) : String :=
+  String.intercalate ", " <| names.toList.map fun name => s!"`{name}`"
 
 def previewAction (action : TacticM Bool) : TacticM Bool := do
   let saved ← saveState
@@ -51,14 +58,18 @@ def previewPlannedStep (step : PlannedStep) : TacticM Bool :=
 def previewPlannedStepWithGoals (step : PlannedStep) : TacticM PreviewResult :=
   previewActionWithGoals step.run
 
-def logPlannedStep (step : PlannedStep) : TacticM Unit := do
+def logPlannedStep (step : PlannedStep) (beforeGoals afterGoals : Nat) : TacticM Unit := do
   if vcvio.vcgen.traceSteps.get (← getOptions) then
-    logInfo m!"[{step.label}] {step.replayText}"
+    logInfo m!"[{step.label}] {step.replayText} (goals {beforeGoals} -> {afterGoals})"
+    for note in step.notes do
+      logInfo m!"  {note}"
 
 def executePlannedStep (step : PlannedStep) : TacticM Bool := do
+  let beforeGoals := (← getGoals).length
   let ok ← step.run
   if ok then
-    logPlannedStep step
+    let afterGoals := (← getGoals).length
+    logPlannedStep step beforeGoals afterGoals
   return ok
 
 def renderPassReplayLine (steps : Array PlannedStep) : Option String :=

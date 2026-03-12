@@ -86,14 +86,16 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
       (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₁) := by
   simp only [SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_id']
   let c := msg₀ ^^^ msg₁
+  have hxor : Function.Bijective (fun x : BitVec sp => x ^^^ c) := by
+    exact Function.Involutive.bijective fun x => by
+      rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
   show GameEquiv (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₀))
     (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))
   by_equiv
   rvcgen_step using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
   swap
-  · rvcgen_step using (· ^^^ c)
-    · exact Function.Involutive.bijective fun x => by
-        rw [BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
+  · rvcgen_step
+    · exact hxor
     · intro; rfl
   · intro k₁ k₂ hk
     subst hk

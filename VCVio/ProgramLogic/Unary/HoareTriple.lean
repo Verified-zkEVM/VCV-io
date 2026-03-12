@@ -331,6 +331,20 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
   unfold Triple MAlgOrdered.Triple
   simp [probOutput_eq_wp_indicator]
 
+/-- Lower bounds on `probEvent` are exactly indicator-postcondition triples. -/
+theorem le_probEvent_iff_triple_indicator (oa : OracleComp spec α) (p : α → Prop)
+    [DecidablePred p] (r : ℝ≥0∞) :
+    r ≤ Pr[p | oa] ↔ Triple (spec := spec) r oa (fun x => if p x then 1 else 0) := by
+  show r ≤ Pr[p | oa] ↔ r ≤ wp oa (fun x => if p x then 1 else 0)
+  rw [probEvent_eq_wp_indicator]
+
+/-- Lower bounds on `probOutput` are exactly singleton-indicator triples. -/
+theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableEq α]
+    (x : α) (r : ℝ≥0∞) :
+    r ≤ Pr[= x | oa] ↔ Triple (spec := spec) r oa (fun y => if y = x then 1 else 0) := by
+  show r ≤ Pr[= x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)
+  rw [probOutput_eq_wp_indicator]
+
 /-- The support event of an `OracleComp` occurs almost surely. -/
 @[simp] theorem probEvent_mem_support (oa : OracleComp spec α) :
     Pr[fun x => x ∈ support oa | oa] = 1 := by
