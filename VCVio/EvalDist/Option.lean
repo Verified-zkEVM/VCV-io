@@ -43,14 +43,15 @@ lemma probEvent_isSome_eq_one_sub_probOutput_none [NeverFail mx] :
   have htotal : Pr[= none | mx] + ∑' x, Pr[= some x | mx] = 1 := by
     simpa [probFailure_eq_zero (mx := mx), tsub_zero] using probOutput_none_add_tsum_some (mx := mx)
   have hnone_ne_top : Pr[= none | mx] ≠ ⊤ :=
-    ne_top_of_le_ne_top (by simp) probOutput_le_one
+    ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one
   have htotal' : (∑' x, Pr[= some x | mx]) + Pr[= none | mx] = 1 := by
     simpa [add_comm] using htotal
   exact ENNReal.eq_sub_of_add_eq hnone_ne_top htotal'
 
 omit [LawfulMonad m] in
-lemma sum_probOutput_some_le_one [Fintype α] [DecidableEq α] :
+lemma sum_probOutput_some_le_one [Fintype α] :
     ∑ x : α, Pr[= (some x : Option α) | mx] ≤ 1 := by
+  classical
   calc
     ∑ x : α, Pr[= (some x : Option α) | mx]
       ≤ ∑' y : Option α, Pr[= y | mx] := by

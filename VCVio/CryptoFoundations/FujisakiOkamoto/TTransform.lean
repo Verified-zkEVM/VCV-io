@@ -112,10 +112,10 @@ theorem OW_PCVA_bound
     (correctnessBound gamma epsMsg : ℝ)
     (qH qP qV : ℕ) :
     adversary.MakesAtMostQueries qH qP qV →
-    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg).IND_CPA_adversary,
+    ∃ cpaAdv₁ cpaAdv₂ : pke.toAsymmEncAlg.IND_CPA_adversary,
       (OW_PCVA_Advantage (encAlg := TTransform pke) adversary).toReal ≤
-        2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₁).toReal) +
-        2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₂).toReal) +
+        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₁).toReal +
+        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₂).toReal +
         correctnessBound +
         (qV : ℝ) * gamma +
         2 * ((qH + qP + 1 : ℕ) : ℝ) * epsMsg := by

@@ -1,6 +1,6 @@
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
 import VCVio.CryptoFoundations.AsymmEncAlg.IND_CCA
+import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme

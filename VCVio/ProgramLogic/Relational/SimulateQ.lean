@@ -124,7 +124,7 @@ second implementation preserves `Inv`, then the full simulations have identical 
 distributions from any invariant-satisfying initial state. -/
 theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
     {ι : Type} {spec : OracleSpec ι}
-    {σ : Type}
+    {σ : Type _}
     (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
     (Inv : σ → Prop)
     (oa : OracleComp spec α)
@@ -141,7 +141,7 @@ theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
         ((simulateQ impl₁ oa).run s)
         ((simulateQ impl₂ oa).run s)
         (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2) := by
-    refine relTriple_simulateQ_run (spec₁ := unifSpec) (spec₂ := unifSpec)
+    refine relTriple_simulateQ_run (spec := spec) (spec₁ := unifSpec) (spec₂ := unifSpec)
       impl₁ impl₂ (fun s₁ s₂ => s₁ = s₂ ∧ Inv s₁) oa ?_ s s
       ⟨rfl, hs⟩
     intro t s₁ s₂ hs'
@@ -172,7 +172,7 @@ theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
 `relTriple_simulateQ_run_of_impl_eq_preservesInv`. -/
 theorem probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
     {ι : Type} {spec : OracleSpec ι}
-    {σ : Type}
+    {σ : Type _}
     (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
     (Inv : σ → Prop)
     (oa : OracleComp spec α)
@@ -195,7 +195,7 @@ preserves a budget-indexed invariant `Inv`, then the full simulated computations
 output-state probabilities from any initial state satisfying `Inv`. -/
 theorem probOutput_simulateQ_run_eq_of_impl_eq_queryBound
     {ι : Type} {spec : OracleSpec ι}
-    {σ : Type} {B : Type}
+    {σ : Type _} {B : Type _}
     (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
     (Inv : σ → B → Prop)
     (canQuery : spec.Domain → B → Prop)
@@ -233,11 +233,11 @@ If each oracle call under `impl₁` becomes the corresponding `impl₂` call aft
 with `proj`, then the full simulated runs agree under the same projection. -/
 theorem map_run_simulateQ_eq_of_query_map_eq
     {ι : Type} {spec : OracleSpec ι}
-    {σ₁ σ₂ : Type}
+    {σ₁ σ₂ : Type _}
     (impl₁ : QueryImpl spec (StateT σ₁ ProbComp))
     (impl₂ : QueryImpl spec (StateT σ₂ ProbComp))
     (proj : σ₁ → σ₂)
-    (hproj : ∀ (t : spec.Domain) (s : σ₁),
+    (hproj : ∀ t s,
       Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
     (oa : OracleComp spec α) (s : σ₁) :
     Prod.map id proj <$> (simulateQ impl₁ oa).run s =
@@ -271,11 +271,11 @@ theorem map_run_simulateQ_eq_of_query_map_eq
 /-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq`. -/
 theorem run'_simulateQ_eq_of_query_map_eq
     {ι : Type} {spec : OracleSpec ι}
-    {σ₁ σ₂ : Type}
+    {σ₁ σ₂ : Type _}
     (impl₁ : QueryImpl spec (StateT σ₁ ProbComp))
     (impl₂ : QueryImpl spec (StateT σ₂ ProbComp))
     (proj : σ₁ → σ₂)
-    (hproj : ∀ (t : spec.Domain) (s : σ₁),
+    (hproj : ∀ t s,
       Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
     (oa : OracleComp spec α) (s : σ₁) :
     (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by

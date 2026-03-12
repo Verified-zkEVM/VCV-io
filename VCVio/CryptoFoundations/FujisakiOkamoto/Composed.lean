@@ -105,11 +105,11 @@ theorem IND_CCA_bound
     (adversary : (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Adversary)
     (correctnessBound epsMsg : ℝ)
     (qHK : ℕ) :
-    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg).IND_CPA_adversary,
+    ∃ cpaAdv₁ cpaAdv₂ : pke.toAsymmEncAlg.IND_CPA_adversary,
       ∃ prfAdv : PRFScheme.PRFAdversary C K,
         (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage adversary ≤
-          2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₁).toReal) +
-          2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₂).toReal) +
+          2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₁).toReal +
+          2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₂).toReal +
           PRFScheme.prfAdvantage prf prfAdv +
           ((2 * qHK + 3 : ℕ) : ℝ) * correctnessBound +
           2 * ((2 * qHK + 2 : ℕ) : ℝ) * epsMsg := by

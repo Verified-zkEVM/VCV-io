@@ -35,7 +35,7 @@ structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) (M PK SK R C : Type)
   encrypt : (pk : PK) → (msg : M) → (coins : R) → C
   decrypt : (sk : SK) → (c : C) → Option M
 
-alias PKE_Alg := AsymmEncAlg
+abbrev PKE_Alg := AsymmEncAlg
 
 namespace AsymmEncAlg
 
@@ -58,7 +58,7 @@ def CorrectExp (msg : M) : m Bool := do
 
 /-- An asymmetric encryption scheme is perfectly correct when decrypting a fresh encryption of any
 message succeeds with probability `1`. -/
-def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
+def PerfectlyCorrect : Prop :=
   ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
 
 end Correct
