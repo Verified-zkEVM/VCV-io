@@ -84,6 +84,39 @@ lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (b : B)
     IsQueryBound (f <$> oa) b canQuery cost ↔ IsQueryBound oa b canQuery cost :=
   isQueryBound_map_aux oa f canQuery cost
 
+private lemma isQueryBound_congr_aux
+    (oa : OracleComp spec α)
+    (canQuery₁ canQuery₂ : ι → B → Prop) (cost₁ cost₂ : ι → B → B)
+    (hcan : ∀ (t : ι) (b : B), canQuery₁ t b ↔ canQuery₂ t b)
+    (hcost : ∀ (t : ι) (b : B), cost₁ t b = cost₂ t b) :
+    ∀ {b : B}, oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ := by
+  induction oa using OracleComp.inductionOn with
+  | pure _ =>
+      intro b
+      simp
+  | query_bind t mx ih =>
+      intro b
+      rw [isQueryBound_query_bind_iff, isQueryBound_query_bind_iff]
+      constructor
+      · intro h
+        refine ⟨(hcan t b).1 h.1, fun u => ?_⟩
+        have hu : IsQueryBound (mx u) (cost₁ t b) canQuery₂ cost₂ :=
+          (ih u (b := cost₁ t b)).1 (h.2 u)
+        simpa [hcost t b] using hu
+      · intro h
+        refine ⟨(hcan t b).2 h.1, fun u => ?_⟩
+        have hu : IsQueryBound (mx u) (cost₁ t b) canQuery₂ cost₂ := by
+          simpa [hcost t b] using h.2 u
+        exact (ih u (b := cost₁ t b)).2 hu
+
+lemma isQueryBound_congr
+    {oa : OracleComp spec α} {b : B}
+    {canQuery₁ canQuery₂ : ι → B → Prop} {cost₁ cost₂ : ι → B → B}
+    (hcan : ∀ (t : ι) (b : B), canQuery₁ t b ↔ canQuery₂ t b)
+    (hcost : ∀ (t : ι) (b : B), cost₁ t b = cost₂ t b) :
+    oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ :=
+  isQueryBound_congr_aux oa canQuery₁ canQuery₂ cost₁ cost₂ hcan hcost
+
 end IsQueryBound
 
 section IsPerIndexQueryBound

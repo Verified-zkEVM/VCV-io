@@ -101,4 +101,24 @@ lemma sq_tsum_le_tsum_sq {α : Type*} (w f : α → ℝ≥0∞) (hw : ∑' a, w 
     _ ≤ 1 * ∑' a, w a * f a ^ 2 := by gcongr
     _ = ∑' a, w a * f a ^ 2 := one_mul _
 
+/-- A simple ENNReal upper bound used in the forking lemma: if `a ≤ 1` and `q ≥ 1`, then
+`a * (a / q - r)` is still bounded by `1`, regardless of `r`. -/
+lemma mul_tsub_div_le_one {a q r : ℝ≥0∞} (ha : a ≤ 1) (hq : 1 ≤ q) :
+    a * (a / q - r) ≤ 1 := by
+  calc
+    a * (a / q - r) ≤ a * (a / q) := by
+      gcongr
+      exact tsub_le_self
+    _ ≤ a * 1 := by
+      have hdiv_le_a : a / q ≤ a := by
+        rw [div_eq_mul_inv]
+        calc
+          a * q⁻¹ ≤ a * 1 := by
+            gcongr
+            exact ENNReal.inv_le_one.2 hq
+          _ = a := by simp
+      have hdiv_le_one : a / q ≤ 1 := le_trans hdiv_le_a ha
+      gcongr
+    _ ≤ 1 := by simpa using ha
+
 end ENNReal

@@ -69,6 +69,55 @@ lemma probOutput_map_bijective_uniform_cross
       probOutput_uniformSample, probOutput_uniformSample,
       Fintype.card_of_bijective hf]
 
+/-- Binding after pushing forward uniform sampling along a bijection preserves output
+probabilities. -/
+lemma probOutput_bind_bijective_uniform_cross
+    {β γ : Type} [SampleableType β] [Fintype α]
+    (f : α → β) (hf : Function.Bijective f) (g : β → ProbComp γ) (z : γ) :
+    Pr[= z | ($ᵗ α : ProbComp α) >>= fun x => g (f x)] =
+      Pr[= z | ($ᵗ β : ProbComp β) >>= fun y => g y] := by
+  haveI := Fintype.ofBijective f hf
+  have h : (($ᵗ α : ProbComp α) >>= fun x => g (f x)) =
+      ((f <$> ($ᵗ α : ProbComp α)) >>= g) := by
+    simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
+  rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  congr 1
+  funext y
+  congr 1
+  exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
+
+lemma probOutput_add_left_uniform [AddGroup α] (m x : α) :
+    Pr[= x | (fun y : α => m + y) <$> ($ᵗ α)] = Pr[= x | $ᵗ α] := by
+  have h : Pr[= m + (-m + x) | (fun y : α => m + y) <$> ($ᵗ α)] =
+      Pr[= -m + x | $ᵗ α] :=
+    probOutput_map_injective
+      (mx := ($ᵗ α))
+      (f := fun y : α => m + y)
+      (hf := by intro a b hab; exact add_left_cancel hab)
+      (x := -m + x)
+  calc
+    Pr[= x | (fun y : α => m + y) <$> ($ᵗ α)]
+        = Pr[= m + (-m + x) | (fun y : α => m + y) <$> ($ᵗ α)] := by
+          congr 1
+          symm
+          exact add_neg_cancel_left m x
+    _ = Pr[= -m + x | $ᵗ α] := h
+    _ = Pr[= x | $ᵗ α] := by
+          symm
+          simpa [uniformSample] using
+            (SampleableType.probOutput_selectElem_eq (β := α) x (-m + x))
+
+lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
+    (m : α) (f : α → ProbComp β) (z : β) :
+    Pr[= z | (do let y ← $ᵗ α; f (m + y))] =
+      Pr[= z | (do let y ← $ᵗ α; f y)] := by
+  have hleft :
+      (do let y ← $ᵗ α; f (m + y)) = (((fun y : α => m + y) <$> ($ᵗ α)) >>= fun y => f y) := by
+    simp [map_eq_bind_pure_comp, bind_assoc]
+  rw [hleft, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  refine tsum_congr fun y => ?_
+  rw [probOutput_add_left_uniform (α := α) m y]
+
 /-- Pushing forward uniform sampling along a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]

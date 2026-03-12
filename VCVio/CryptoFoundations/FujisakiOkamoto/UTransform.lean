@@ -70,7 +70,7 @@ theorem exec_lift_probComp {M PK C R K : Type} (variant : Variant M PK C R K)
 /-- Generic FO construction parameterized by a hash world and a rejection policy. -/
 def scheme
     {M PK SK R C K : Type}
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (variant : Variant M PK C R K)
     (policy : RejectionPolicy K C)
     [SampleableType M] [DecidableEq C] :
@@ -178,7 +178,7 @@ variable {M PK SK R C KD K KPRF : Type}
 /-- The generic two-RO U-transform family. The argument `kdInput` chooses whether the shared key
 is derived from `m`, `(m, c)`, or some other encoding of the recovered plaintext and ciphertext. -/
 def UTransform
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
     [DecidableEq M] [DecidableEq C] [DecidableEq KD]
@@ -198,7 +198,7 @@ theorem IND_CCA_bound
     {M PK SK R C KD K KPRF : Type}
     [DecidableEq M] [DecidableEq C] [DecidableEq KD]
     [SampleableType M] [SampleableType R] [SampleableType K]
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (prf : PRFScheme KPRF C K)
     (kdInput : M → C → KD)
     (adversary : (UTransform pke kdInput (FujisakiOkamoto.implicitRejection prf)).IND_CCA_Adversary)
