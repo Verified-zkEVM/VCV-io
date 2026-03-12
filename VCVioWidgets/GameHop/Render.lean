@@ -2,9 +2,8 @@ module
 
 public meta import ProofWidgets.Component.Basic
 public meta import ProofWidgets.Data.Html
-public meta import VCVioWidgets.GameHop.Model
 public import VCVioWidgets.Component.RevealLocation
-public import VCVioWidgets.GameHop.Anchor
+public import VCVioWidgets.GameHop.Extract
 
 public meta section
 
@@ -30,37 +29,89 @@ private def edgeAccent : EdgeKind → String
   | .bound => "#e45756"
   | .consequence => "#b279a2"
 
-private def wrapReveal (resolved? : Option (AnchorRef × ResolvedAnchor))
-    (title? : Option String) (child : Html) (block : Bool := false) : Html :=
-  match resolved? with
-  | some (anchor, resolved) =>
+private def wrapReveal (target? : Option RevealTarget) (child : Html) (block : Bool := false) : Html :=
+  match target? with
+  | some target =>
       Html.ofComponent VCVioWidgets.RevealLocation
-        { uri := resolved.uri, range := anchor.targetRange resolved, title?, block } #[child]
+        { uri := target.uri, range := target.range, title? := target.title?, block } #[child]
   | none => child
 
-private def declAnchor (declName : Name) : AnchorRef :=
-  AnchorRef.withSelection <| AnchorRef.result declName
-
-private def ppExprCard (expr : Expr) : MetaM Widget.CodeWithInfos :=
-  withOptions
-      (fun opts =>
-        opts.set `format.width (54 : Nat)
-          |>.set `pp.universes false
-          |>.set `pp.fullNames false) do
-    Widget.ppExprTagged expr
-
-private def resolveAnchor? (anchor? : Option AnchorRef) :
-    MetaM (Option (AnchorRef × ResolvedAnchor)) := do
+private def anchorTarget? (currentModule : Name) (anchor? : Option AnchorRef) :
+    MetaM (Option RevealTarget) := do
   match anchor? with
   | none => pure none
   | some anchor =>
-      return (← anchor.resolve?).map fun resolved => (anchor, resolved)
+      match (← anchor.resolve?) with
+      | some resolved => pure <| some <| RevealTarget.ofAnchor anchor resolved
+      | none => declTarget? currentModule anchor.declName
 
-private def renderAnchorChip (anchor? : Option AnchorRef) :
+private def renderResolvedText (resolved : ResolvedText) : Html :=
+  match resolved with
+  | .text contents target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "pre-wrap")
+        ]}>{.text contents}</div>
+        (block := true)
+  | .markdown contents target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45")
+        ]}>
+          <MarkdownDisplay contents={contents} />
+        </div>
+        (block := true)
+
+private def renderResolvedSnippet (snippet : ResolvedSnippet) : Html :=
+  match snippet with
+  | .interactiveCode fmt target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontFamily", "var(--vscode-editor-font-family)"),
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "normal"),
+          ("overflowX", "auto")
+        ]}>
+          <InteractiveCode fmt={fmt} />
+        </div>
+        (block := true)
+  | .code contents target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontFamily", "var(--vscode-editor-font-family)"),
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "pre-wrap"),
+          ("overflowX", "auto")
+        ]}>{.text contents}</div>
+        (block := true)
+  | .text contents target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45"),
+          ("whiteSpace", "pre-wrap")
+        ]}>{.text contents}</div>
+        (block := true)
+  | .markdown contents target? =>
+      wrapReveal target?
+        <div style={css [
+          ("fontSize", "12px"),
+          ("lineHeight", "1.45")
+        ]}>
+          <MarkdownDisplay contents={contents} />
+        </div>
+        (block := true)
+
+private def renderAnchorChip (currentModule : Name) (anchor? : Option AnchorRef) :
     MetaM (Option Html) := do
   let some anchor := anchor?
     | return none
-  let resolved? ← resolveAnchor? anchor?
+  let target? ← anchorTarget? currentModule anchor?
   let base : Html :=
     <span style={css [
       ("border", "1px solid var(--vscode-editor-foreground)"),
@@ -72,77 +123,18 @@ private def renderAnchorChip (anchor? : Option AnchorRef) :
     ]}>
       {.text anchor.kind.chipLabel}
     </span>
-  return some <| wrapReveal resolved? (some anchor.declName.toString) base
+  return some <| wrapReveal target? base
 
-private def renderSnippet (snippet : CodeSnippet) : MetaM Html := do
-  match snippet with
-  | .declName declName =>
-      let resolved? ← resolveAnchor? (some <| declAnchor declName)
-      try
-        let fmt ← ppExprCard (← mkConstWithLevelParams declName)
-        pure <| wrapReveal resolved? (some declName.toString)
-          <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px"),
-          ("lineHeight", "1.45"),
-          ("whiteSpace", "normal"),
-          ("overflowX", "auto")
-        ]}>
-            <InteractiveCode fmt={fmt} />
-          </div>
-          (block := true)
-      catch _ =>
-        pure <| wrapReveal resolved? (some declName.toString)
-          <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px"),
-          ("lineHeight", "1.45"),
-          ("whiteSpace", "pre-wrap")
-        ]}>{.text declName.toString}</div>
-          (block := true)
-  | .declType declName =>
-      let resolved? ← resolveAnchor? (some <| declAnchor declName)
-      try
-        let expr ← mkConstWithLevelParams declName
-        let fmt ← ppExprCard (← Meta.inferType expr)
-        pure <| wrapReveal resolved? (some declName.toString)
-          <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px"),
-          ("lineHeight", "1.45"),
-          ("whiteSpace", "normal"),
-          ("overflowX", "auto")
-        ]}>
-            <InteractiveCode fmt={fmt} />
-          </div>
-          (block := true)
-      catch _ =>
-        pure <| wrapReveal resolved? (some declName.toString)
-          <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px"),
-          ("lineHeight", "1.45"),
-          ("whiteSpace", "pre-wrap")
-        ]}>{.text declName.toString}</div>
-          (block := true)
-  | .text contents anchor? =>
-      let resolved? ← resolveAnchor? anchor?
-      let body : Html :=
-        <div style={css [
-          ("fontFamily", "var(--vscode-editor-font-family)"),
-          ("fontSize", "12px"),
-          ("lineHeight", "1.45"),
-          ("whiteSpace", "pre-wrap")
-        ]}>{.text contents}</div>
-      pure <| wrapReveal resolved? (anchor?.map fun a => a.declName.toString) body
-        (block := true)
+private def renderSnippet (currentModule : Name) (snippet : CodeSnippet) : MetaM Html := do
+  renderResolvedSnippet <$> resolveSnippet currentModule snippet
 
-private def renderNode (node : GameNode) : MetaM Html := do
-  let resolved? ← resolveAnchor? node.anchor?
-  let chip? ← renderAnchorChip node.anchor?
-  let snippets ← node.snippets.mapM renderSnippet
+private def renderNode (currentModule : Name) (node : GameNode) : MetaM Html := do
+  let target? ← anchorTarget? currentModule node.anchor?
+  let chip? ← renderAnchorChip currentModule node.anchor?
+  let snippets ← node.snippets.mapM (renderSnippet currentModule)
+  let summary? ← resolveTextSource currentModule node.anchor? node.summary
   let titleHtml : Html :=
-    wrapReveal resolved? (node.anchor?.map fun a => a.declName.toString)
+    wrapReveal target?
       <span style={css [
         ("fontSize", "14px"),
         ("fontWeight", "700")
@@ -171,11 +163,9 @@ private def renderNode (node : GameNode) : MetaM Html := do
        | some chip => chip
        | none => Html.text ""}
     </div>
-    <div style={css [
-      ("fontSize", "12px"),
-      ("lineHeight", "1.45"),
-      ("whiteSpace", "pre-wrap")
-    ]}>{.text node.summary}</div>
+    {match summary? with
+     | some summary => renderResolvedText summary
+     | none => Html.text ""}
     {if snippets.isEmpty then
       Html.text ""
     else
@@ -191,13 +181,14 @@ private def renderNode (node : GameNode) : MetaM Html := do
         {...snippets}
       </div>}
   </div>
-  pure <| wrapReveal resolved? (node.anchor?.map fun a => a.declName.toString) body
+  pure <| wrapReveal target? body
     (block := true)
 
-private def renderEdgeNote (edge : GameEdge) (note : GameEdgeNote) : MetaM Html := do
-  let resolved? ← resolveAnchor? note.anchor?
+private def renderEdgeNote (currentModule : Name) (edge : GameEdge) (note : GameEdgeNote) :
+    MetaM Html := do
+  let target? ← anchorTarget? currentModule note.anchor?
   let labelHtml : Html :=
-    wrapReveal resolved? (note.anchor?.map fun a => a.declName.toString)
+    wrapReveal target?
       <span style={css [
         ("fontSize", "11px"),
         ("fontWeight", "600")
@@ -224,10 +215,11 @@ private def renderEdgeNote (edge : GameEdge) (note : GameEdgeNote) : MetaM Html 
          ]}>{.text detail}</div>
      | none => Html.text ""}
   </div>
-  pure <| wrapReveal resolved? (note.anchor?.map fun a => a.declName.toString) body
+  pure <| wrapReveal target? body
     (block := true)
 
-private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM Html := do
+private def renderEdge (currentModule : Name) (layout : LayoutHint) (edge? : Option GameEdge) :
+    MetaM Html := do
   let some edge := edge?
     | pure <div style={css [
       ("display", "flex"),
@@ -236,15 +228,15 @@ private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM H
       ("minWidth", "110px"),
       ("fontSize", "28px")
     ]}>{.text "⟶"}</div>
-  let resolved? ← resolveAnchor? edge.anchor?
-  let chip? ← renderAnchorChip edge.anchor?
+  let target? ← anchorTarget? currentModule edge.anchor?
+  let chip? ← renderAnchorChip currentModule edge.anchor?
   let notes ←
     if layout = .sequenceWithSideEdges then
-      edge.notes.mapM (renderEdgeNote edge)
+      edge.notes.mapM (renderEdgeNote currentModule edge)
     else
       pure #[]
   let labelHtml : Html :=
-    wrapReveal resolved? (edge.anchor?.map fun a => a.declName.toString)
+    wrapReveal target?
       <span style={css [
         ("fontSize", "12px"),
         ("fontWeight", "700"),
@@ -291,7 +283,7 @@ private def renderEdge (layout : LayoutHint) (edge? : Option GameEdge) : MetaM H
         {...notes}
       </div>}
   </div>
-  pure <| wrapReveal resolved? (edge.anchor?.map fun a => a.declName.toString) body
+  pure <| wrapReveal target? body
     (block := true)
 
 private def renderMissingNode (nodeId : NodeId) : Html :=
@@ -305,27 +297,28 @@ private def renderMissingNode (nodeId : NodeId) : Html :=
     {.text s!"Missing node: {nodeId}"}
   </div>
 
-private def renderPathItems (diagram : GameDiagram) (path : List NodeId) :
+private def renderPathItemsFor (currentModule : Name) (diagram : GameDiagram) (path : List NodeId) :
     MetaM (Array Html) := do
   match path with
   | [] => pure #[]
   | [nodeId] =>
       let nodeHtml ←
         match diagram.findNode? nodeId with
-        | some node => renderNode node
+        | some node => renderNode currentModule node
         | none => pure <| renderMissingNode nodeId
       pure #[nodeHtml]
   | nodeId :: nextId :: rest =>
       let nodeHtml ←
         match diagram.findNode? nodeId with
-        | some node => renderNode node
+        | some node => renderNode currentModule node
         | none => pure <| renderMissingNode nodeId
-      let edgeHtml ← renderEdge diagram.layout (diagram.findEdge? nodeId nextId)
-      let tail ← renderPathItems diagram (nextId :: rest)
+      let edgeHtml ← renderEdge currentModule diagram.layout (diagram.findEdge? nodeId nextId)
+      let tail ← renderPathItemsFor currentModule diagram (nextId :: rest)
       pure <| #[nodeHtml, edgeHtml] ++ tail
 
-def GameDiagram.renderHtml (diagram : GameDiagram) : MetaM Html := do
-  let items ← renderPathItems diagram diagram.mainPath.toList
+def GameDiagram.renderHtml (currentModule : Name) (diagram : GameDiagram) : MetaM Html := do
+  let items ← renderPathItemsFor currentModule diagram diagram.mainPath.toList
+  let subtitle? ← resolveTextSource currentModule none diagram.subtitle
   pure <div style={css [
     ("display", "flex"),
     ("flexDirection", "column"),
@@ -341,13 +334,8 @@ def GameDiagram.renderHtml (diagram : GameDiagram) : MetaM Html := do
         ("fontSize", "16px"),
         ("fontWeight", "700")
       ]}>{.text diagram.title}</div>
-      {match diagram.subtitle? with
-       | some subtitle =>
-           <div style={css [
-             ("fontSize", "12px"),
-             ("lineHeight", "1.4"),
-             ("whiteSpace", "pre-wrap")
-           ]}>{.text subtitle}</div>
+      {match subtitle? with
+       | some subtitle => renderResolvedText subtitle
        | none => Html.text ""}
     </div>
     <div style={css [

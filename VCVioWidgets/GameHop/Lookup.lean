@@ -1,8 +1,7 @@
 module
 
 public import Lean
-public import VCVioWidgets.GameHop.Examples.ElGamal
-public import VCVioWidgets.GameHop.Examples.OneTimePad
+public import VCVioWidgets.GameHop.Model
 
 public section
 
@@ -12,15 +11,15 @@ namespace GameHop
 open Lean
 
 /--
-Maps modules to the game-hop diagram that should be shown while browsing them.
+Maps modules to the source-local GameHop diagram declaration that should be shown while browsing them.
 
-For the first persistent cutover we keep lookup file-scoped instead of trying to
-recover declaration-local context from the infotree. This is enough to keep the
-diagram visible while moving around the relevant proof files.
+The diagram declarations themselves live in the proof files; this table only points to
+those declarations by name so the panel can evaluate them from the fully elaborated file
+snapshot.
 -/
 structure DiagramBinding where
   modules : Array Name
-  diagram : GameDiagram
+  diagramDecl : Name
   deriving Inhabited, Repr
 
 namespace DiagramBinding
@@ -31,21 +30,14 @@ def matchesModule (binding : DiagramBinding) (modName : Name) : Bool :=
 end DiagramBinding
 
 private def bindings : Array DiagramBinding := #[
-  { modules := #[
-      `Examples.OneTimePad,
-      `VCVio.CryptoFoundations.SymmEncAlg,
-      `VCVioWidgets.GameHop.Examples.OneTimePad
-    ]
-    diagram := Examples.OneTimePad.cipherGivenMsgEquivDiagram }
-  , { modules := #[
-        `Examples.ElGamal,
-        `VCVioWidgets.GameHop.Examples.ElGamal
-      ]
-      diagram := Examples.ElGamal.hybridSequenceDiagram }
+  { modules := #[`Examples.OneTimePad]
+    diagramDecl := `oneTimePadGameHopDiagram }
+  , { modules := #[`Examples.ElGamal]
+      diagramDecl := `elGamalGameHopDiagram }
 ]
 
-def diagramForModule? (modName : Name) : Option GameDiagram :=
-  (bindings.find? fun binding => binding.matchesModule modName).map (·.diagram)
+def diagramForModule? (_env : Environment) (modName : Name) : Option Name :=
+  (bindings.find? (·.matchesModule modName)).map (·.diagramDecl)
 
 end GameHop
 end VCVioWidgets

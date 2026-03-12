@@ -26,6 +26,59 @@ The file includes two proof styles:
 show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 
 open Mathlib OracleSpec OracleComp ENNReal BigOperators
+open VCVioWidgets.GameHop
+
+/-- Source-backed GameHop diagram metadata for the OTP proof.
+Placed near the top of the file so the infoview can render it without waiting for
+the entire proof file to elaborate. -/
+def oneTimePadGameHopDiagram : GameDiagram := {
+  title := "One-time pad: relational hop"
+  subtitle := .moduleDoc
+  layout := .sequenceWithSideEdges
+  mainPath := #["msg0", "msg1", "rows"]
+  nodes := #[
+    { id := "msg0"
+      kind := .game
+      title := "Cipher game for msg₀"
+      anchor? := some (AnchorRef.defn `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp)
+      snippets := #[
+        .declSource `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp
+      ] }
+    , { id := "msg1"
+        kind := .game
+        title := "Cipher game for msg₁"
+        anchor? := some (AnchorRef.defn `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp)
+        snippets := #[
+          .declSource `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp
+        ] }
+    , { id := "rows"
+        kind := .result
+        title := "Equal ciphertext rows"
+        anchor? := some (AnchorRef.result `oneTimePad.ciphertextRowsEqual)
+        snippets := #[
+          .declSignature `oneTimePad.ciphertextRowsEqual
+        ] }
+  ]
+  edges := #[
+    { source := "msg0"
+      target := "msg1"
+      kind := .equivalence
+      label := "GameEquiv"
+      detail? := some "Couple keys by the bijection `k ↦ k ⊕ msg₀ ⊕ msg₁`."
+      anchor? := some (AnchorRef.thm `oneTimePad.cipherGivenMsg_equiv) }
+    , { source := "msg1"
+        target := "rows"
+        kind := .consequence
+        label := "probOutput_eq"
+        detail? := some "Turn the equivalence into equality of ciphertext output probabilities."
+        anchor? := some (AnchorRef.result `oneTimePad.ciphertextRowsEqual)
+        notes := #[
+          { label := "separate direct proof"
+            detail? := some "`perfectSecrecyAt` is proved independently via probability identities."
+            anchor? := some (AnchorRef.result `oneTimePad.perfectSecrecyAt) }
+        ] }
+  ]
+}
 
 /-- The one-time pad symmetric encryption algorithm, using `BitVec`s as keys and messages.
 Encryption and decryption both just apply `BitVec.xor` with the key.

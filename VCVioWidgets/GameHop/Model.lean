@@ -11,6 +11,14 @@ open Lean
 
 abbrev NodeId := String
 
+inductive TextSource where
+  | none
+  | text (contents : String)
+  | declDoc (declName : Name)
+  | moduleDoc (modName? : Option Name := none)
+  | anchorDoc
+  deriving Inhabited, Repr
+
 inductive LayoutHint where
   | sequence
   | sequenceWithSideEdges
@@ -71,14 +79,38 @@ end AnchorRef
 inductive CodeSnippet where
   | declName (declName : Name)
   | declType (declName : Name)
+  | declSignature (declName : Name)
+  | declDoc (declName : Name)
+  | declSource (declName : Name)
+  | moduleDoc (modName? : Option Name := none)
   | text (contents : String) (anchor? : Option AnchorRef := none)
   deriving Inhabited, Repr
+
+namespace TextSource
+
+def fromAnchorDoc : TextSource :=
+  .anchorDoc
+
+end TextSource
+
+namespace CodeSnippet
+
+def signature (declName : Name) : CodeSnippet :=
+  .declSignature declName
+
+def doc (declName : Name) : CodeSnippet :=
+  .declDoc declName
+
+def source (declName : Name) : CodeSnippet :=
+  .declSource declName
+
+end CodeSnippet
 
 structure GameNode where
   id : NodeId
   kind : NodeKind := .game
   title : String
-  summary : String
+  summary : TextSource := .fromAnchorDoc
   anchor? : Option AnchorRef := none
   snippets : Array CodeSnippet := #[]
   deriving Inhabited, Repr
@@ -101,7 +133,7 @@ structure GameEdge where
 
 structure GameDiagram where
   title : String
-  subtitle? : Option String := none
+  subtitle : TextSource := .none
   layout : LayoutHint := .sequence
   mainPath : Array NodeId
   nodes : Array GameNode
