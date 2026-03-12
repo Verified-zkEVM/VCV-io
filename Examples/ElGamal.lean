@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
+import VCVioWidgets.GameHop.Panel
 
 /-!
 # ElGamal Encryption: Multi-query IND-CPA via DDH
@@ -53,7 +54,11 @@ that the `q`-th hybrid has the same winning probability as the actual IND-CPA ex
 generic counted-game bridge in `AsymmEncAlg`. The intermediate theorem
 `elGamal_IND_CPA_bound_toReal` exposes that starting equality as a separate hypothesis `hstart`.
 -/
+
+show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
+
 open OracleSpec OracleComp ENNReal
+
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G]
 
@@ -180,6 +185,7 @@ def IND_CPA_HybridFamily
       IND_CPA_HybridGame (F := F) (gen := gen) adversary 0 := by
   simp [IND_CPA_HybridFamily]
 
+/-- The real IND-CPA experiment for ElGamal, packaged as a `ProbComp Bool`. -/
 abbrev IND_CPA_game
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) : ProbComp Bool :=
   (elgamalAsymmEnc F G gen).IND_CPA_experiment adversary
@@ -956,6 +962,7 @@ theorem elGamal_IND_CPA_bound_toReal
 
 /-- **Main theorem.** If an adversary makes at most `q` LR queries and each per-hop DDH
 reduction has advantage at most `ε`, then ElGamal has IND-CPA advantage at most `q * (2 * ε)`. -/
+@[game_hop_root]
 theorem elGamal_IND_CPA_le_q_mul_ddh
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)

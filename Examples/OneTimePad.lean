@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.OracleComp.Constructions.BitVec
 import VCVio.ProgramLogic.Tactics
+import VCVioWidgets.GameHop.Panel
 import Mathlib.Data.Vector.Zip
 
 /-!
@@ -21,6 +22,8 @@ The file includes two proof styles:
    proves that any two messages yield the same ciphertext distribution via a bijection
    coupling, using the `by_equiv` / `rvcgen_step` tactic workflow.
 -/
+
+show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 
 open Mathlib OracleSpec OracleComp ENNReal BigOperators
 
@@ -101,6 +104,7 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
 
 /-- The one-time pad has equal ciphertext rows: all messages yield the same
 ciphertext distribution. Derived from the relational `GameEquiv` proof above. -/
+@[game_hop_root]
 lemma ciphertextRowsEqual (sp : ℕ) : oneTimePad.ciphertextRowsEqualAt sp :=
   fun msg₀ msg₁ σ => (cipherGivenMsg_equiv sp msg₀ msg₁).probOutput_eq σ
 
