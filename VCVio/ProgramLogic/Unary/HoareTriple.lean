@@ -339,7 +339,7 @@ theorem le_probEvent_iff_triple_indicator (oa : OracleComp spec α) (p : α → 
   rw [probEvent_eq_wp_indicator]
 
 /-- Lower bounds on `probOutput` are exactly singleton-indicator triples. -/
-theorem le_probOutput_iff_triple (oa : OracleComp spec α) [DecidableEq α]
+theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableEq α]
     (x : α) (r : ℝ≥0∞) :
     r ≤ Pr[= x | oa] ↔ Triple (spec := spec) r oa (fun y => if y = x then 1 else 0) := by
   show r ≤ Pr[= x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)

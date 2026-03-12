@@ -685,7 +685,7 @@ def tryLowerProbGoal : TacticM Bool := do
         rw [eq_comm, OracleComp.ProgramLogic.probOutput_eq_one_iff_triple])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
-        rw [OracleComp.ProgramLogic.le_probOutput_iff_triple])) then
+        rw [OracleComp.ProgramLogic.le_probOutput_iff_triple_indicator])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
