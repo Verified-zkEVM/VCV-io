@@ -21,7 +21,7 @@ variable {M PK SK R C KD K KPRF : Type}
 /-- The canonical two-RO Fujisaki-Okamoto family is the U-transform instantiated with a
 variant-specific key-derivation input and rejection policy. -/
 def FujisakiOkamoto
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
     [DecidableEq M] [DecidableEq C] [DecidableEq KD]
@@ -84,7 +84,7 @@ def singleROVariant
 oracle output supplies both the encryption coins and the shared key. -/
 def singleRO
     {PKHash : Type}
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pkh : PK → PKHash)
     (policy : RejectionPolicy K C)
     [DecidableEq PKHash] [DecidableEq M] [DecidableEq C]
@@ -99,17 +99,17 @@ theorem IND_CCA_bound
     {M PK SK R C KD K KPRF : Type}
     [DecidableEq M] [DecidableEq C] [DecidableEq KD]
     [SampleableType M] [SampleableType R] [SampleableType K]
-    (pke : DeterministicPKE M PK SK R C)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (prf : PRFScheme KPRF C K)
     (adversary : (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Adversary)
     (correctnessBound epsMsg : ℝ)
     (qHK : ℕ) :
-    ∃ cpaAdv₁ cpaAdv₂ : (pke.toRandomized).IND_CPA_adversary,
+    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg).IND_CPA_adversary,
       ∃ prfAdv : PRFScheme.PRFAdversary C K,
         (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage adversary ≤
-          2 * ((pke.toRandomized.IND_CPA_advantage cpaAdv₁).toReal) +
-          2 * ((pke.toRandomized.IND_CPA_advantage cpaAdv₂).toReal) +
+          2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₁).toReal) +
+          2 * (((pke.toAsymmEncAlg).IND_CPA_advantage cpaAdv₂).toReal) +
           PRFScheme.prfAdvantage prf prfAdv +
           ((2 * qHK + 3 : ℕ) : ℝ) * correctnessBound +
           2 * ((2 * qHK + 2 : ℕ) : ℝ) * epsMsg := by

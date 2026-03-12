@@ -24,6 +24,17 @@ structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
   encrypt : (pk : PK) → (msg : M) →  m C
   decrypt : (sk : SK) → (c : C) →  m (Option M)
 
+/-- An explicit-coins asymmetric encryption scheme in the monad `m`.
+
+Key generation runs in `m`, while encryption and decryption become pure once the randomness type
+`R` is supplied explicitly. This is the natural refinement used by FO-style transforms, where the
+coins are sampled externally or derived from an oracle. -/
+structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) (M PK SK R C : Type)
+    extends ExecutionMethod m where
+  keygen : m (PK × SK)
+  encrypt : (pk : PK) → (msg : M) → (coins : R) → C
+  decrypt : (sk : SK) → (c : C) → Option M
+
 alias PKE_Alg := AsymmEncAlg
 
 namespace AsymmEncAlg
@@ -51,5 +62,22 @@ def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
   ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
 
 end Correct
+
+namespace ExplicitCoins
+
+variable {m : Type → Type v} {M PK SK R C : Type}
+  (encAlg : AsymmEncAlg.ExplicitCoins m M PK SK R C)
+
+/-- Forget the explicit-coins presentation by sampling the coins through the ambient execution
+method. -/
+def toAsymmEncAlg [Monad m] [SampleableType R] : AsymmEncAlg m M PK SK C where
+  keygen := encAlg.keygen
+  encrypt := fun pk msg => do
+    let r ← encAlg.lift_probComp ($ᵗ R)
+    return encAlg.encrypt pk msg r
+  decrypt := fun sk c => return (encAlg.decrypt sk c)
+  __ := encAlg.toExecutionMethod
+
+end ExplicitCoins
 
 end AsymmEncAlg
