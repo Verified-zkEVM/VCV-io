@@ -11,6 +11,15 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 
 `AGENTS.md` is the canonical guide. `CLAUDE.md` is a symlink to this file.
 
+## Attribution And Headers
+
+Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution policy.
+
+- New Lean files should use the standard copyright / license / authors header and a module docstring.
+- Preserve existing headers on routine edits.
+- Only rewrite attribution when a file is genuinely new or materially replaced.
+- Do not add a separate AI-attribution line.
+
 ## What This Project Is
 
 VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computations (free monad over `OracleSpec`), with `simulateQ` for operational semantics and `evalDist` for denotational semantics (probability distributions). `ProbComp α` is the abbreviation for `OracleComp unifSpec α`.
