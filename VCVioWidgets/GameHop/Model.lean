@@ -17,19 +17,19 @@ inductive TextSource where
   | declDoc (declName : Name)
   | moduleDoc (modName? : Option Name := none)
   | anchorDoc
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, BEq, Hashable
 
 inductive LayoutHint where
   | sequence
   | sequenceWithSideEdges
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 inductive NodeKind where
   | game
   | hybrid
   | endpoint
   | result
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 inductive EdgeKind where
   | step
@@ -37,25 +37,25 @@ inductive EdgeKind where
   | equality
   | bound
   | consequence
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 inductive AnchorKind where
   | defn
   | theorem
   | reduction
   | result
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 inductive AnchorMode where
   | declaration
   | selection
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 structure AnchorRef where
   declName : Name
   kind : AnchorKind
   mode : AnchorMode := .declaration
-  deriving Inhabited, DecidableEq, Repr
+  deriving Inhabited, DecidableEq, Repr, BEq, Hashable
 
 namespace AnchorRef
 
@@ -84,7 +84,7 @@ inductive CodeSnippet where
   | declSource (declName : Name)
   | moduleDoc (modName? : Option Name := none)
   | text (contents : String) (anchor? : Option AnchorRef := none)
-  deriving Inhabited, Repr
+  deriving Inhabited, Repr, BEq, Hashable
 
 namespace TextSource
 

@@ -16,6 +16,14 @@ open scoped ProofWidgets.Jsx
 private def css (entries : List (String × String)) : Json :=
   Json.mkObj <| entries.map fun (k, v) => (k, Json.str v)
 
+private structure RenderCache where
+  anchorTargets : Std.HashMap AnchorRef (Option RevealTarget) := {}
+  resolvedTexts : Std.HashMap (Option AnchorRef × TextSource) (Option ResolvedText) := {}
+  resolvedSnippets : Std.HashMap CodeSnippet ResolvedSnippet := {}
+  deriving Inhabited
+
+private abbrev RenderM := StateT RenderCache MetaM
+
 private def nodeAccent : NodeKind → String
   | .game => "#4c78a8"
   | .hybrid => "#f58518"
@@ -36,7 +44,7 @@ private def wrapReveal (target? : Option RevealTarget) (child : Html) (block : B
         { uri := target.uri, range := target.range, title? := target.title?, block } #[child]
   | none => child
 
-private def anchorTarget? (currentModule : Name) (anchor? : Option AnchorRef) :
+private def anchorTargetCore? (currentModule : Name) (anchor? : Option AnchorRef) :
     MetaM (Option RevealTarget) := do
   match anchor? with
   | none => pure none
@@ -44,6 +52,43 @@ private def anchorTarget? (currentModule : Name) (anchor? : Option AnchorRef) :
       match (← anchor.resolve?) with
       | some resolved => pure <| some <| RevealTarget.ofAnchor anchor resolved
       | none => declTarget? currentModule anchor.declName
+
+private def anchorTarget? (currentModule : Name) (anchor? : Option AnchorRef) :
+    RenderM (Option RevealTarget) := do
+  match anchor? with
+  | none => pure none
+  | some anchor =>
+      let cache ← get
+      match cache.anchorTargets.get? anchor with
+      | some target? => pure target?
+      | none =>
+          let target? ← liftM <| anchorTargetCore? currentModule anchor?
+          modify fun cache =>
+            { cache with anchorTargets := cache.anchorTargets.insert anchor target? }
+          pure target?
+
+private def resolveTextCached (currentModule : Name) (anchor? : Option AnchorRef)
+    (source : TextSource) : RenderM (Option ResolvedText) := do
+  let key := (anchor?, source)
+  let cache ← get
+  match cache.resolvedTexts.get? key with
+  | some resolved => pure resolved
+  | none =>
+      let resolved ← liftM <| resolveTextSource currentModule anchor? source
+      modify fun cache =>
+        { cache with resolvedTexts := cache.resolvedTexts.insert key resolved }
+      pure resolved
+
+private def resolveSnippetCached (currentModule : Name) (snippet : CodeSnippet) :
+    RenderM ResolvedSnippet := do
+  let cache ← get
+  match cache.resolvedSnippets.get? snippet with
+  | some resolved => pure resolved
+  | none =>
+      let resolved ← liftM <| resolveSnippet currentModule snippet
+      modify fun cache =>
+        { cache with resolvedSnippets := cache.resolvedSnippets.insert snippet resolved }
+      pure resolved
 
 private def renderResolvedText (resolved : ResolvedText) : Html :=
   match resolved with
@@ -107,32 +152,32 @@ private def renderResolvedSnippet (snippet : ResolvedSnippet) : Html :=
         </div>
         (block := true)
 
-private def renderAnchorChip (currentModule : Name) (anchor? : Option AnchorRef) :
-    MetaM (Option Html) := do
-  let some anchor := anchor?
-    | return none
-  let target? ← anchorTarget? currentModule anchor?
-  let base : Html :=
-    <span style={css [
-      ("border", "1px solid var(--vscode-editor-foreground)"),
-      ("borderRadius", "999px"),
-      ("padding", "2px 8px"),
-      ("fontSize", "11px"),
-      ("fontWeight", "600"),
-      ("textTransform", "uppercase")
-    ]}>
-      {.text anchor.kind.chipLabel}
-    </span>
-  return some <| wrapReveal target? base
+private def renderAnchorChip (anchor? : Option AnchorRef) (target? : Option RevealTarget) :
+    Option Html :=
+  match anchor? with
+  | none => none
+  | some anchor =>
+      let base : Html :=
+        <span style={css [
+          ("border", "1px solid var(--vscode-editor-foreground)"),
+          ("borderRadius", "999px"),
+          ("padding", "2px 8px"),
+          ("fontSize", "11px"),
+          ("fontWeight", "600"),
+          ("textTransform", "uppercase")
+        ]}>
+          {.text anchor.kind.chipLabel}
+        </span>
+      some <| wrapReveal target? base
 
-private def renderSnippet (currentModule : Name) (snippet : CodeSnippet) : MetaM Html := do
-  renderResolvedSnippet <$> resolveSnippet currentModule snippet
+private def renderSnippet (currentModule : Name) (snippet : CodeSnippet) : RenderM Html := do
+  renderResolvedSnippet <$> resolveSnippetCached currentModule snippet
 
-private def renderNode (currentModule : Name) (node : GameNode) : MetaM Html := do
+private def renderNode (currentModule : Name) (node : GameNode) : RenderM Html := do
   let target? ← anchorTarget? currentModule node.anchor?
-  let chip? ← renderAnchorChip currentModule node.anchor?
+  let chip? := renderAnchorChip node.anchor? target?
   let snippets ← node.snippets.mapM (renderSnippet currentModule)
-  let summary? ← resolveTextSource currentModule node.anchor? node.summary
+  let summary? ← resolveTextCached currentModule node.anchor? node.summary
   let titleHtml : Html :=
     wrapReveal target?
       <span style={css [
@@ -185,7 +230,7 @@ private def renderNode (currentModule : Name) (node : GameNode) : MetaM Html := 
     (block := true)
 
 private def renderEdgeNote (currentModule : Name) (edge : GameEdge) (note : GameEdgeNote) :
-    MetaM Html := do
+    RenderM Html := do
   let target? ← anchorTarget? currentModule note.anchor?
   let labelHtml : Html :=
     wrapReveal target?
@@ -219,7 +264,7 @@ private def renderEdgeNote (currentModule : Name) (edge : GameEdge) (note : Game
     (block := true)
 
 private def renderEdge (currentModule : Name) (layout : LayoutHint) (edge? : Option GameEdge) :
-    MetaM Html := do
+    RenderM Html := do
   let some edge := edge?
     | pure <div style={css [
       ("display", "flex"),
@@ -229,7 +274,7 @@ private def renderEdge (currentModule : Name) (layout : LayoutHint) (edge? : Opt
       ("fontSize", "28px")
     ]}>{.text "⟶"}</div>
   let target? ← anchorTarget? currentModule edge.anchor?
-  let chip? ← renderAnchorChip currentModule edge.anchor?
+  let chip? := renderAnchorChip edge.anchor? target?
   let notes ←
     if layout = .sequenceWithSideEdges then
       edge.notes.mapM (renderEdgeNote currentModule edge)
@@ -298,7 +343,7 @@ private def renderMissingNode (nodeId : NodeId) : Html :=
   </div>
 
 private def renderPathItemsFor (currentModule : Name) (diagram : GameDiagram) (path : List NodeId) :
-    MetaM (Array Html) := do
+    RenderM (Array Html) := do
   match path with
   | [] => pure #[]
   | [nodeId] =>
@@ -316,9 +361,9 @@ private def renderPathItemsFor (currentModule : Name) (diagram : GameDiagram) (p
       let tail ← renderPathItemsFor currentModule diagram (nextId :: rest)
       pure <| #[nodeHtml, edgeHtml] ++ tail
 
-def GameDiagram.renderHtml (currentModule : Name) (diagram : GameDiagram) : MetaM Html := do
+private def renderHtmlCached (currentModule : Name) (diagram : GameDiagram) : RenderM Html := do
   let items ← renderPathItemsFor currentModule diagram diagram.mainPath.toList
-  let subtitle? ← resolveTextSource currentModule none diagram.subtitle
+  let subtitle? ← resolveTextCached currentModule none diagram.subtitle
   pure <div style={css [
     ("display", "flex"),
     ("flexDirection", "column"),
@@ -348,6 +393,10 @@ def GameDiagram.renderHtml (currentModule : Name) (diagram : GameDiagram) : Meta
       {...items}
     </div>
   </div>
+
+def GameDiagram.renderHtml (currentModule : Name) (diagram : GameDiagram) : MetaM Html := do
+  let (html, _) ← (renderHtmlCached currentModule diagram).run {}
+  pure html
 
 end GameHop
 end VCVioWidgets
