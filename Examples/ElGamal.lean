@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.AsymmEncAlg
+import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
 import VCVio.ProgramLogic.Tactics
@@ -41,14 +41,17 @@ Here `F` is the scalar field (e.g. `ZMod p`), `G` is the group of elements
    DDH-random branch equals hybrid k.
 5. Per-hop bound (`IND_CPA_stepDDH_hopBound`): the absolute difference between consecutive
    hybrid winning probabilities is at most twice the DDH advantage of the step-k reduction.
-6. Main theorem (`elGamal_IND_CPA_le_q_mul_ddh`): IND-CPA advantage ≤ `q * (2ε)` where `ε`
+6. Query-bound bridge: the `q`-th hybrid equals the actual IND-CPA experiment for adversaries
+   making at most `q` fresh LR queries.
+7. Main theorem (`elGamal_IND_CPA_le_q_mul_ddh`): IND-CPA advantage ≤ `q * (2ε)` where `ε`
    bounds each per-hop DDH advantage.
 
 ## Query-bound hypothesis
 
-The main theorem takes `hstart`, which asserts that the `q`-th hybrid has the same winning
-probability as the actual IND-CPA experiment. This holds for any adversary making at most `q`
-distinct fresh LR oracle queries.
+The final theorem takes `hq : adversary.MakesAtMostQueries q`. This hypothesis is used to prove
+that the `q`-th hybrid has the same winning probability as the actual IND-CPA experiment via the
+generic counted-game bridge in `AsymmEncAlg`. The intermediate theorem
+`elGamal_IND_CPA_bound_toReal` exposes that starting equality as a separate hypothesis `hstart`.
 -/
 open OracleSpec OracleComp ENNReal
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
@@ -111,16 +114,15 @@ private lemma hybridState_run_liftM_eq {α : Type}
       x >>= fun a => pure (a, st) := by
   simp
 
-/-- A random-masked ciphertext: `(r • gen, msg + y)` with independent `r ← $ᵗ F`, `y ← $ᵗ G`.
-Unlike real ElGamal encryption, the second component is masked by a uniform group element
-rather than `r • pk`, making it information-theoretically independent of the message. -/
+/-- A random-masked ciphertext `(r • gen, msg + y)` with independent `r ← $ᵗ F`, `y ← $ᵗ G`,
+so the second component is information-theoretically independent of the message. -/
 def randomMaskedCipher (msg : G) : ProbComp (G × G) := do
   let r ← $ᵗ F
   let y ← $ᵗ G
   return (r • gen, msg + y)
 
-/-- The hybrid LR oracle: uses real ElGamal encryption for the first `realUntil` fresh queries
-and `randomMaskedCipher` for subsequent ones. Repeated queries are served from cache. -/
+/-- The hybrid LR oracle: real ElGamal for the first `realUntil` fresh queries, then
+`randomMaskedCipher`; repeated queries are served from cache. -/
 def IND_CPA_hybridChallengeOracle (pk : G) (b : Bool) (realUntil : ℕ) :
     QueryImpl (G × G →ₒ G × G)
       (StateT (IND_CPA_HybridState (G := G)) ProbComp) := fun mm => do
@@ -266,8 +268,6 @@ theorem IND_CPA_allRandomHalf
     by_equiv
     exact IND_CPA_hybridOracle_allRandom_eqDist (F := F) (gen := gen) adversary pk)
 
-/-! ## 3a. DDH helper lemmas -/
-
 /-! ## 4. Per-hop DDH reduction -/
 
 private def IND_CPA_stepDDHOracle
@@ -330,7 +330,6 @@ private lemma hybridBranch_probOutput_eq
   qvcgen_step rw congr' as ⟨a⟩
   simpa using
     (probOutput_map_eq_of_evalDist_eq (f := fun z => b == z) (y := true) (h a b))
-
 
 -- Mechanical StateT bookkeeping: the step DDH oracle agrees with the hybrid oracle
 -- for queries past position k.
@@ -706,26 +705,6 @@ private lemma stepDDH_rand_simulation_deferred
   simpa [bind_assoc] using hbase
 
 -- The DDH-real branch has the same success probability as hybrid k+1.
-private lemma stepDDH_branch_probOutput_eq_of_run
-    (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
-    (realUntil : ℕ)
-    (lhsRun : F → Bool → ProbComp (Bool × IND_CPA_HybridState (G := G)))
-    (hsim_run : ∀ a b,
-      evalDist (lhsRun a b) =
-        evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) (a • gen) b realUntil)
-          (adversary (a • gen))).run (∅, 0))) :
-    Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let a ← ($ᵗ F : ProbComp F)
-      let z ← Prod.fst <$> lhsRun a b
-      pure (b == z)] =
-    Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary realUntil] := by
-  refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary realUntil
-    (fun a b => Prod.fst <$> lhsRun a b) ?_
-  intro a b
-  simpa [StateT.run'] using
-    (evalDist_map_eq_of_evalDist_eq (f := Prod.fst) (hsim_run a b))
-
 private lemma stepDDH_realBranch_probOutput_eq
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
     Pr[= true | DiffieHellman.ddhExpReal gen
@@ -773,8 +752,11 @@ private lemma stepDDH_realBranch_probOutput_eq
           qvcgen_step rw under 1
           qvcgen_step rw
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)] := by
-          exact stepDDH_branch_probOutput_eq_of_run (F := F) (gen := gen) adversary (k + 1)
-            lhsRun hsim_run
+          refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary (k + 1)
+            (fun a b => Prod.fst <$> lhsRun a b) ?_
+          intro a b
+          simpa [StateT.run'] using
+            (evalDist_map_eq_of_evalDist_eq (f := Prod.fst) (hsim_run a b))
 
 -- The DDH-random branch has the same success probability as hybrid k.
 private lemma stepDDH_randBranch_probOutput_eq
@@ -850,8 +832,11 @@ private lemma stepDDH_randBranch_probOutput_eq
           qvcgen_step rw under 1
           qvcgen_step rw
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k] := by
-          exact stepDDH_branch_probOutput_eq_of_run (F := F) (gen := gen) adversary k
-            lhsRun hmain_run
+          refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary k
+            (fun a b => Prod.fst <$> lhsRun a b) ?_
+          intro a b
+          simpa [StateT.run'] using
+            (evalDist_map_eq_of_evalDist_eq (f := Prod.fst) (hmain_run a b))
 private lemma ddhExp_stepDDHReduction_decomp_toReal
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (k : ℕ) :
@@ -901,214 +886,26 @@ lemma IND_CPA_stepDDH_hopBound
 
 /-! ## 6. Bridging hybrid game to real game via query bound -/
 
-private def IND_CPA_allRealChallengeOracle (pk : G) (b : Bool) :
-    QueryImpl (G × G →ₒ G × G)
-      (StateT (IND_CPA_HybridState (G := G)) ProbComp) := fun mm => do
-  let st ← get
-  match st.1 mm with
-  | some c => return c
-  | none =>
-      let msg : G := if b then mm.1 else mm.2
-      let c ← (elgamalAsymmEnc F G gen).encrypt pk msg
-      let cache' := st.1.cacheQuery mm c
-      set (cache', st.2 + 1)
-      return c
-
-private def IND_CPA_queryImpl_allReal (pk : G) (b : Bool) :
-    QueryImpl (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec
-      (StateT (IND_CPA_HybridState (G := G)) ProbComp) :=
-  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-    (StateT (IND_CPA_HybridState (G := G)) ProbComp) +
-    IND_CPA_allRealChallengeOracle (F := F) (gen := gen) pk b
-
 private lemma allReal_eq_hybrid_on_bounded
     (pk : G) (b : Bool) (realUntil : ℕ)
     (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
     (st : IND_CPA_HybridState (G := G)) (hlt : st.2 < realUntil) :
-    (IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b t).run st =
+    (AsymmEncAlg.IND_CPA_queryImpl'_counted
+      (encAlg' := elgamalAsymmEnc F G gen) pk b t).run st =
     (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil t).run st := by
   cases t with
   | inl _ => rfl
   | inr mm =>
-      simp only [IND_CPA_queryImpl_allReal, IND_CPA_queryImpl_hybrid]
-      show (IND_CPA_allRealChallengeOracle (F := F) (gen := gen) pk b mm).run st =
-        (IND_CPA_hybridChallengeOracle (F := F) (gen := gen) pk b realUntil mm).run st
-      simp only [IND_CPA_allRealChallengeOracle, IND_CPA_hybridChallengeOracle,
-        StateT.run_bind, StateT.run_get, pure_bind]
       rcases hcache : st.1 mm with _ | c
-      · simp only [if_pos hlt]
-      · simp only [StateT.run_pure]
-private lemma allReal_counter_le_succ
-    (pk : G) (b : Bool)
-    (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
-    (st : IND_CPA_HybridState (G := G))
-    (p : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Range t × IND_CPA_HybridState (G := G))
-    (hp : p ∈ support ((IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b t).run st)) :
-    p.2.2 ≤ st.2 + 1 := by
-  have := hybridQueryImpl_counter_le_succ (F := F) (gen := gen) pk b (st.2 + 1)
-    t st (p := p)
-  rw [← allReal_eq_hybrid_on_bounded (F := F) (gen := gen) pk b (st.2 + 1) t st (by omega)] at this
-  exact this hp
-
-private lemma allReal_queryImpl_proj_eq_real
-    (pk : G) (b : Bool)
-    (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
-    (st : IND_CPA_HybridState (G := G)) :
-    Prod.map id Prod.fst <$>
-      (IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b t).run st =
-    (((elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b) t).run st.1 := by
-  rcases st with ⟨cache, n⟩
-  cases t with
-  | inl tu =>
-      simp [IND_CPA_queryImpl_allReal, AsymmEncAlg.IND_CPA_queryImpl']
-  | inr mm =>
-      rcases hcache : cache mm with _ | c
-      · have hallReal :
-            Prod.map id Prod.fst <$>
-              (IND_CPA_allRealChallengeOracle (F := F) (gen := gen) pk b mm).run (cache, n) =
-            (do
-              let c ← (elgamalAsymmEnc F G gen).encrypt pk (if b then mm.1 else mm.2)
-              pure (c, cache.cacheQuery mm c) : ProbComp _) := by
-          simp only [IND_CPA_allRealChallengeOracle, hcache,
-            StateT.run_bind, StateT.run_get, pure_bind,
-            hybridState_run_liftM_eq (G := G) (st := (cache, n)), bind_assoc,
-            StateT.run_pure]
-          rw [map_bind]
-          refine bind_congr fun c => ?_
-          simp
-        have hreal :
-            (((elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b) (Sum.inr mm)).run cache =
-            (do
-              let c ← (elgamalAsymmEnc F G gen).encrypt pk (if b then mm.1 else mm.2)
-              pure (c, cache.cacheQuery mm c) : ProbComp _) := by
-          simp [AsymmEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
-            StateT.run_bind, StateT.run_get, pure_bind]
-        simpa [IND_CPA_queryImpl_allReal] using hallReal.trans hreal.symm
-      · simp [IND_CPA_queryImpl_allReal, IND_CPA_allRealChallengeOracle,
-          AsymmEncAlg.IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
-          StateT.run_bind, StateT.run_get, pure_bind]
-
-private lemma hybrid_q_run'_evalDist_eq_real
-    (pk : G) (b : Bool) (q : ℕ)
-    {α : Type} (comp : OracleComp (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec α)
-    (budget : ℕ)
-    (hbound : comp.IsQueryBound budget
-      (fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
-      (fun t n => match t with | .inl _ => n | .inr _ => n - 1))
-    (cache : IND_CPA_LRCache (G := G)) (n : ℕ) (hn : n + budget ≤ q) :
-    evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b q)
-      comp).run' (cache, n)) =
-    evalDist ((simulateQ ((elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b)
-      comp).run' cache) := by
-  set canQuery : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain → ℕ → Prop :=
-    fun t n => match t with | .inl _ => True | .inr _ => 0 < n
-  set cost : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain → ℕ → ℕ :=
-    fun t n => match t with | .inl _ => n | .inr _ => n - 1
-  have hbound' : comp.IsQueryBound budget canQuery cost := by
-    refine (isQueryBound_congr
-      (oa := comp)
-      (canQuery₁ := fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
-      (canQuery₂ := canQuery)
-      (cost₁ := fun t n => match t with | .inl _ => n | .inr _ => n - 1)
-      (cost₂ := cost)
-      (hcan := ?_) (hcost := ?_)).1 ?_
-    · intro t n
-      cases t <;> simp [canQuery]
-    · intro t n
-      cases t <;> simp [cost]
-    · exact hbound
-  have hrun :
-      evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b q) comp).run
-        (cache, n)) =
-      evalDist ((simulateQ (IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b) comp).run
-        (cache, n)) := by
-    apply evalDist_ext
-    intro z
-    exact probOutput_simulateQ_run_eq_of_impl_eq_queryBound
-      (impl₁ := IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b q)
-      (impl₂ := IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b)
-      (Inv := fun st budget => st.2 + budget ≤ q)
-      (canQuery := canQuery)
-      (cost := cost)
-      (oa := comp) (budget := budget) (hbound := hbound')
-      (himpl_eq := by
-        intro t st budget hInv hcan
-        cases t with
-        | inl _ => rfl
-        | inr mm =>
-            simpa using
-              (allReal_eq_hybrid_on_bounded (F := F) (gen := gen) pk b q (Sum.inr mm) st
-                (by omega)).symm)
-      (hpres₂ := by
-        intro t st budget hInv hcan z hz
-        cases t with
-        | inl tu =>
-            simp only [IND_CPA_queryImpl_allReal, QueryImpl.add_apply_inl,
-              QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-              liftM, monadLift, StateT.instMonadLift] at hz
-            rw [StateT.run_lift, mem_support_bind_iff] at hz
-            obtain ⟨a, _, ha⟩ := hz
-            rw [mem_support_pure_iff] at ha
-            have hst : z.2 = st := congrArg Prod.snd ha
-            simpa [hst] using hInv
-        | inr mm =>
-            have hsucc := allReal_counter_le_succ (F := F) (gen := gen)
-              pk b (Sum.inr mm) st z hz
-            have hpos : 0 < budget := by simpa [canQuery] using hcan
-            have hle' : z.2.2 + (budget - 1) ≤ q := by
-              omega
-            simpa [cost] using hle')
-      (s := (cache, n)) (hs := hn) (z := z)
-  have hhybrid_run' :
-      evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b q) comp).run'
-        (cache, n)) =
-      evalDist ((simulateQ (IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b) comp).run'
-        (cache, n)) := by
-    simp only [StateT.run']
-    simpa [evalDist_map] using congrArg (fun p => Prod.fst <$> p) hrun
-  have hallReal_run' :
-      evalDist ((simulateQ (IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b) comp).run'
-        (cache, n)) =
-      evalDist ((simulateQ ((elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b) comp).run'
-        cache) := by
-    simpa using congrArg evalDist
-      (run'_simulateQ_eq_of_query_map_eq
-      (impl₁ := IND_CPA_queryImpl_allReal (F := F) (gen := gen) pk b)
-      (impl₂ := (elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b)
-      (proj := Prod.fst)
-      (hproj := allReal_queryImpl_proj_eq_real (F := F) (gen := gen) pk b)
-      comp (cache, n))
-  exact hhybrid_run'.trans hallReal_run'
-
-/-- The all-real hybrid (`realUntil = q`) has the same winning probability as the actual
-IND-CPA experiment, for any adversary making at most `q` distinct fresh LR queries. -/
-theorem IND_CPA_HybridGame_q_eq_game
-    (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary) (q : ℕ)
-    (hq : adversary.MakesAtMostQueries q) :
-    (Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary q]).toReal =
-    (Pr[= true | IND_CPA_game (gen := gen) adversary]).toReal := by
-  congr 1
-  have hinner : ∀ (pk : G) (b : Bool),
-      evalDist ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b q)
-        (adversary pk)).run' (∅, 0)) =
-      evalDist ((simulateQ ((elgamalAsymmEnc F G gen).IND_CPA_queryImpl' pk b)
-        (adversary pk)).run' ∅) :=
-    fun pk b => hybrid_q_run'_evalDist_eq_real (F := F) (gen := gen)
-      pk b q (adversary pk) q (hq pk) ∅ 0 (by omega)
-  simp only [IND_CPA_HybridGame, IND_CPA_game, AsymmEncAlg.IND_CPA_experiment,
-    probOutput_bind_eq_tsum]
-  refine tsum_congr fun b => ?_
-  congr 1
-  refine tsum_congr fun ⟨pk, _sk⟩ => ?_
-  congr 1
-  refine tsum_congr fun b' => ?_
-  congr 1
-  exact (evalDist_ext_iff.mp (hinner pk b)) b'
-
+      · simp [AsymmEncAlg.IND_CPA_queryImpl'_counted, AsymmEncAlg.IND_CPA_challengeOracle'_counted,
+          IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache, hlt,
+          hybridState_run_liftM_eq (G := G) (st := st)]
+      · simp [AsymmEncAlg.IND_CPA_queryImpl'_counted, AsymmEncAlg.IND_CPA_challengeOracle'_counted,
+          IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache]
 /-! ## 7. Main theorem -/
 
-/-- IND-CPA advantage is bounded by the sum of per-hop DDH advantages. This is the
-"summed" form before collapsing to a single `ε` bound. -/
+/-- IND-CPA advantage is bounded by the sum of per-hop DDH advantages before collapsing to a
+single `ε` bound. -/
 theorem elGamal_IND_CPA_bound_toReal
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
@@ -1157,9 +954,8 @@ theorem elGamal_IND_CPA_bound_toReal
                   adversary i)]).toReal - 1 / 2|)
             q
 
-/-- **Main theorem.** For any adversary making at most `q` LR oracle queries, if every
-per-hop DDH reduction has advantage at most `ε`, then the IND-CPA advantage of ElGamal
-is at most `q * (2 * ε)`. -/
+/-- **Main theorem.** If an adversary makes at most `q` LR queries and each per-hop DDH
+reduction has advantage at most `ε`, then ElGamal has IND-CPA advantage at most `q * (2 * ε)`. -/
 theorem elGamal_IND_CPA_le_q_mul_ddh
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
@@ -1169,8 +965,20 @@ theorem elGamal_IND_CPA_le_q_mul_ddh
       |(Pr[= true | DiffieHellman.ddhExp gen
         (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal - 1 / 2| ≤ ε) :
     ((elgamalAsymmEnc F G gen).IND_CPA_advantage adversary).toReal ≤ q * (2 * ε) := by
-  refine le_trans (elGamal_IND_CPA_bound_toReal hg adversary q
-    (IND_CPA_HybridGame_q_eq_game (gen := gen) adversary q hq)) ?_
+  refine le_trans (elGamal_IND_CPA_bound_toReal hg adversary q ?_) ?_
+  · simpa [IND_CPA_HybridGame, IND_CPA_game] using
+      (AsymmEncAlg.IND_CPA_countedGame_eq_game_of_MakesAtMostQueries
+        (encAlg' := elgamalAsymmEnc F G gen)
+        (implCounted := fun pk b realUntil =>
+          IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil)
+        (hsame := by
+          intro pk b realUntil t st hcond
+          cases t with
+          | inl _ => rfl
+          | inr mm =>
+              exact allReal_eq_hybrid_on_bounded
+                (F := F) (gen := gen) pk b realUntil (Sum.inr mm) st hcond)
+        adversary q hq)
   calc
     Finset.sum (Finset.range q) (fun k =>
           2 * |(Pr[= true |
