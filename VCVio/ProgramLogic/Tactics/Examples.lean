@@ -328,6 +328,24 @@ example {mx : OracleComp spec α} {my : OracleComp spec β}
 example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
   exp_norm
 
+example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p] {r : ℝ≥0∞}
+    (h : ⦃r⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    r ≤ Pr[p | oa] := by
+  qvcgen_step
+  exact h
+
+example {oa : OracleComp spec α} [DecidableEq α] {x : α} {r : ℝ≥0∞}
+    (h : ⦃r⦄ oa ⦃fun y => if y = x then 1 else 0⦄) :
+    Pr[= x | oa] ≥ r := by
+  qvcgen_step
+  exact h
+
+example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
+    (p : α → Prop) [DecidablePred p] :
+    Pr[p | if c then oa else ob] =
+      if c then wp⟦oa⟧ (fun x => ⌜p x⌝) else wp⟦ob⟧ (fun x => ⌜p x⌝) := by
+  qvcgen_step
+
 example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
     Pr[p | oa] = wp⟦oa⟧ (fun x => if p x then 1 else 0) := by
   by_hoare
@@ -335,6 +353,20 @@ example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
 example (oa : OracleComp spec α) [DecidableEq α] (x : α) :
     Pr[= x | oa] = wp⟦oa⟧ (fun y => if y = x then 1 else 0) := by
   by_hoare
+
+/--
+info: Try this:
+
+  [apply] qvcgen_step
+---
+info: Planner note: continuing in raw `wp` mode
+-/
+#guard_msgs in
+example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
+    (post : α → ℝ≥0∞) :
+    wp⟦if c then oa else ob⟧ post =
+      if c then wp⟦oa⟧ post else wp⟦ob⟧ post := by
+  qvcgen_step?
 
 /-! ### `qvcgen using cut` and `qvcgen inv I` driver variants -/
 
@@ -811,6 +843,27 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β}
     {f : α → β → γ → δ → OracleComp spec ε} {out : ε} :
     Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
     Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
+  qvcgen_step
+
+example {mw : OracleComp spec α} {mx : OracleComp spec β}
+    {my : OracleComp spec γ} {mz : OracleComp spec δ}
+    {f : α → β → γ → δ → OracleComp spec (Bool × ε)} :
+    Pr[= true | do
+      let w ← mw
+      let x ← mx
+      let b ← Prod.fst <$> (do
+        let y ← my
+        let z ← mz
+        f w x y z)
+      pure b] =
+    Pr[= true | do
+      let w ← mw
+      let x ← mx
+      let b ← Prod.fst <$> (do
+        let z ← mz
+        let y ← my
+        f w x y z)
+      pure b] := by
   qvcgen_step
 
 example {mw : OracleComp spec α} {mx : OracleComp spec β} {my : OracleComp spec γ}

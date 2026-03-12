@@ -68,7 +68,17 @@ private def runQVCGenStepWithTheoremNames
     return true
   return false
 
-/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple` or probability goal.
+private def logPlannerNotes (steps : Array PlannedStep) : TacticM Unit := do
+  let mut emitted : Array String := #[]
+  for step in steps do
+    for note in step.notes do
+      unless note = "continuing in raw `wp` mode" do
+        continue
+      unless emitted.contains note do
+        emitted := emitted.push note
+        logInfo m!"Planner note: {note}"
+
+/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple`, raw `wp`, or probability goal.
 
 For `Triple` goals: decomposes a bind via `triple_bind` and automatically tries to close
 the spec subgoal using hypotheses in the local context, with backward WP fallback.
@@ -77,12 +87,16 @@ from context, and WP-rule unfolding, including `simulateQ ... run'`.
 After the built-in leaf rules, it may also use user-authored `@[vcgen]` lemmas whose
 registered head symbol matches the current computation.
 
-For `Pr[...] = 1` goals: automatically lowers the goal into a `Triple` form.
+For `Pr[...] = 1` and lower-bound goals such as `r ≤ Pr[p | oa]`: automatically lowers the
+goal into a `Triple` form.
 
 For `Pr[...] = Pr[...]` goals: tries bind-swap (`probEvent_bind_bind_swap`), bind
 congruence (`probOutput_bind_congr` / `probEvent_bind_congr`), swap-then-congr,
 or an exact-`probOutput` bridge into relational VCGen.
 Handles up to 2 layers of tsum peeling for nested swaps.
+
+For other general `Pr[...]` goals: rewrites to raw `wp` form and keeps stepping structurally
+when a `wp` rule applies, rather than immediately exiting the VCGen pipeline.
 
 Variants:
 - `qvcgen_step using cut` for an explicit intermediate postcondition.
@@ -130,6 +144,7 @@ elab_rules : tactic
       let some step ← TacticInternals.Unary.runVCGenPlannedStep?
         | TacticInternals.Unary.throwQVCGenStepError
       addTryThisTextSuggestion (← getRef) step.replayText
+      logPlannerNotes #[step]
 
 syntax "qvcgen_step" &"rw" : tactic
 syntax "qvcgen_step" &"rw" " under " num : tactic
@@ -197,14 +212,14 @@ elab_rules : tactic
         "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
         or `List.mapM`."
 
-/-- `qvcgen` exhaustively decomposes a `Triple` or probability goal with spec-aware stepping.
+/-- `qvcgen` exhaustively decomposes a `Triple`, raw `wp`, or probability goal with spec-aware stepping.
 
-Accepts `Triple` goals, `Pr[...] = 1` goals, and `Pr[...] = Pr[...]` equality goals.
-Probability goals are automatically lowered or dispatched (swap/congr) before structural
-decomposition continues.
+Accepts `Triple` goals, raw `wp` goals, lower-bound / exact probability goals, and
+`Pr[...] = Pr[...]` equality goals. Probability goals are automatically lowered or
+dispatched (swap/congr) before structural decomposition continues.
 
 Enhancements over simple structural decomposition:
-- Lowers `Pr[...]` goals into `Triple` or `wp` form before decomposition
+- Lowers `Pr[...]` goals into `Triple` or raw `wp` form before decomposition
 - Bridges exact `Pr[= x | oa] = Pr[= x | ob]` goals into relational VCGen when helpful
 - After bind decomposition, tries to close spec subgoals from local context
 - Falls back to backward WP (`triple_bind_wp`) when no spec is available
@@ -252,6 +267,8 @@ elab_rules : tactic
       let batches ← runBoundedPassesCollect "qvcgen?" TacticInternals.Unary.runVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
       runQVCGenFinish
+      for batch in batches do
+        logPlannerNotes batch
       let mut lines : List String :=
         batches.toList.filterMap renderPassReplayLine
       if needsFinish then

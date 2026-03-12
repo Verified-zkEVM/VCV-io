@@ -28,6 +28,9 @@ private def attachPlannerChoiceNotes
       else
         [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
 
+private def hasProbGoal (target : Expr) : Bool :=
+  (findAppWithHead? ``probEvent target).isSome || (findAppWithHead? ``probOutput target).isSome
+
 def throwWpStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match wpGoalComp? target with
@@ -309,9 +312,7 @@ def throwQVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
   | none =>
-      let hasProbGoal := (findAppWithHead? ``probEvent target).isSome ||
-                         (findAppWithHead? ``probOutput target).isSome
-      if hasProbGoal then
+      if hasProbGoal target then
         if isProbEqGoal target then
           throwError
             "qvcgen_step: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
@@ -321,11 +322,18 @@ def throwQVCGenStepError : TacticM Unit := withMainContext do
             `probEvent_bind_bind_swap`."
         else
           throwError
-            "qvcgen_step: found a probability goal but could not lower it to a `Triple` or `wp` goal.\n\
+            "qvcgen_step: found a probability goal but could not lower it to a supported `Triple` or raw `wp` shape.\n\
             Goal:{indentExpr target}\n\
-            Try `rw [probEvent_eq_wp_propInd]`, or manual rewriting."
+            Supported direct lowerings include `Pr[...] = 1`, `Pr[...] = Pr[...]`, and lower bounds \
+            such as `r ≤ Pr[...]` / `Pr[...] ≥ r`.\n\
+            Try `rw [probEvent_eq_wp_propInd]`, `qvcgen_step?`, or manual rewriting."
+      else if let some comp := wpGoalComp? target then
+        let comp ← whnfReducible (← instantiateMVars comp)
+        throwError
+          "qvcgen_step: currently in raw `wp` continuation mode, but no matching rule applied to:{indentExpr comp}\n\
+          Try `qvcgen_step?`, `wp_step`, or manual rewriting."
       else
-        throwError "qvcgen_step: expected a `Triple` or probability goal; got:{indentExpr target}"
+        throwError "qvcgen_step: expected a `Triple`, raw `wp`, or probability goal; got:{indentExpr target}"
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       let cutMsg ←
@@ -399,6 +407,7 @@ def runProbEqSwap : TacticM Bool := do
               exact probEvent_bind_bind_swap _ _ _ _)))))
 
 def runProbEqCongrNoSupportWithNames (names : Array Name) : TacticM Bool := do
+  normalizeProbEqGoal
   if ← tryEvalTacticSyntax (← `(tactic| apply probOutput_bind_congr')) then
     discard <| introMainGoalNames names
     return true
@@ -414,6 +423,7 @@ def runProbEqCongrNoSupport : TacticM Bool := do
 /-- Try to decompose a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal by congruence,
 then auto-intro the bound variable and support hypothesis. -/
 def runProbEqCongrWithNames (names : Array Name) : TacticM Bool := do
+  normalizeProbEqGoal
   if ← tryEvalTacticSyntax (← `(tactic| apply probOutput_bind_congr)) then
     discard <| introMainGoalNames names
     return true
@@ -659,6 +669,9 @@ def tryLowerProbGoal : TacticM Bool := do
         simp only [OracleComp.ProgramLogic.propInd_true])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        rw [← OracleComp.ProgramLogic.triple_propInd_iff_le_probEvent])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
@@ -672,11 +685,26 @@ def tryLowerProbGoal : TacticM Bool := do
         rw [eq_comm, OracleComp.ProgramLogic.probOutput_eq_one_iff_triple])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        rw [OracleComp.ProgramLogic.le_probOutput_iff_triple])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         simp only [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
       return true
+  return false
+
+/-- Continue structural stepping on a raw `wp` goal after probability lowering or explicit
+`wp`-level work. This stays deliberately smaller than the `Triple` path. -/
+def tryRawWpStructuralStep : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some comp := wpGoalComp? target | return false
+  let comp ← whnfReducible (← instantiateMVars comp)
+  if ← runWpStepRules then
+    return true
+  if ← tryMatchDecomp comp then
+    return true
   return false
 
 /-- Try to synthesize a support-based intermediate postcondition for a bind step.
@@ -699,6 +727,13 @@ def runVCGenStructuralCore : TacticM Bool := do
   if (← getGoals).isEmpty then return false
   let target ← instantiateMVars (← getMainTarget)
   if ← tryLowerProbGoal then
+    if (← getGoals).isEmpty then
+      return true
+    let target ← instantiateMVars (← getMainTarget)
+    if (tripleGoalComp? target |>.isNone) && (relTripleGoalParts? target |>.isNone) &&
+        (wpGoalComp? target).isSome then
+      if ← tryRawWpStructuralStep then
+        return true
     return true
   if relTripleGoalParts? target |>.isSome then
     return (← tryEvalTacticSyntax (← `(tactic| rvcgen_step)))
@@ -734,7 +769,19 @@ def runVCGenStructuralCore : TacticM Bool := do
           throwError "qvcgen_step: no matching wp rule after unfolding `Triple`") with
       | some _ => return true
       | none => return false
-  | none => return false
+  | none => return (← tryRawWpStructuralStep)
+
+private def mkStructuralStepForTarget (target : Expr) : PlannedStep :=
+  let step := mkQVCGenPlannedStep
+    "qvcgen structural step"
+    "qvcgen_step"
+    runVCGenStructuralCore
+  if !(hasProbGoal target) && (tripleGoalComp? target |>.isNone) &&
+      (relTripleGoalParts? target |>.isNone) &&
+      (wpGoalComp? target).isSome then
+    withStepNotes step ["continuing in raw `wp` mode"]
+  else
+    step
 
 private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool := do
   if ← runVCGenStructuralCore then
@@ -819,11 +866,7 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
         (introMainGoalNames names)
     if ← previewPlannedStep introStep then
       return some introStep
-  let structuralStep :=
-    mkQVCGenPlannedStep
-      "qvcgen structural step"
-      "qvcgen_step"
-      runVCGenStructuralCore
+  let structuralStep := mkStructuralStepForTarget target
   if let some comp := tripleGoalComp? target then
     let comp ← whnfReducible (← instantiateMVars comp)
     if isBindExpr comp then

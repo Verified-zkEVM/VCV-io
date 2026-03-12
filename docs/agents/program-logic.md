@@ -77,21 +77,28 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 | `qvcgen_step rw congr'` | Expose one or more shared binds without support hypotheses |
 | `exp_norm` | Normalize indicator (`propInd`) and expectation (`wp`) arithmetic |
 
-**Probability-goal handling**: `qvcgen` and `qvcgen_step` automatically handle three
+**Probability-goal handling**: `qvcgen` and `qvcgen_step` automatically handle four
 classes of probability goals:
 
 1. **`Pr[...] = 1` lowering** → rewrites into `Triple` form for structural decomposition:
    - `Pr[p | oa] = 1` → `Triple 1 oa (fun x => ⌜p x⌝)`
    - `Pr[= x | oa] = 1` → `Triple 1 oa (fun y => if y = x then 1 else 0)`
 
-2. **`Pr[...] = Pr[...]` equality**:
+2. **Lower-bound event/output goals** → stay inside unary VCGen by reusing the same `Triple`
+   shell:
+   - `r ≤ Pr[p | oa]` / `Pr[p | oa] ≥ r` → `Triple r oa (fun x => ⌜p x⌝)`
+   - `r ≤ Pr[= x | oa]` / `Pr[= x | oa] ≥ r` → `Triple r oa (fun y => if y = x then 1 else 0)`
+
+3. **`Pr[...] = Pr[...]` equality**:
    - Plain `qvcgen_step` first normalizes common `map`/`bind` surface syntax (`map_eq_bind_pure_comp`,
      `bind_assoc`), then preview-selects the best bounded swap/congruence plan from the fast path
    - `qvcgen_step rw` performs exactly one top-level bind-swap rewrite
    - `qvcgen_step rw under n` rewrites one swap beneath `n` shared outer bind prefixes
    - `qvcgen_step rw congr` / `qvcgen_step rw congr'` expose one or more shared binds explicitly
 
-3. **General `Pr[...]`** → fallback rewrite to raw `wp` form
+4. **Other general `Pr[...]` goals** → rewrite to raw `wp` form and keep stepping structurally
+   when a `wp` rule applies. On an already-lowered raw-`wp` goal, `qvcgen_step?` / `qvcgen?`
+   will explicitly note that they are continuing in raw `wp` mode.
 
 **Loop invariants**: `qvcgen` auto-detects `replicate`, `List.foldlM`, and `List.mapM`
 in `Triple` goals and applies matching invariant hypotheses from context.
@@ -133,7 +140,7 @@ Use them when working directly at the weakest-precondition level.
 
 | Tactic | What it does |
 |--------|--------------|
-| `wp_step` | One WP decomposition (`wp_bind`, `wp_pure`, `wp_replicate`, `wp_list_mapM`, `wp_list_foldlM`, `wp_query`, `wp_ite`, `wp_dite`, `wp_uniformSample`, `wp_map`, `wp_simulateQ_eq`, `wp_liftComp`) |
+| `wp_step` | One WP decomposition (`wp_bind`, `wp_pure`, `wp_replicate`, `wp_list_mapM`, `wp_list_foldlM`, `wp_query`, `wp_ite`, `wp_dite`, `wp_uniformSample`, `wp_map`, `wp_simulateQ_eq`, `wp_liftComp`); `qvcgen_step` now reuses the same rules when it falls through to raw `wp` continuation |
 | `wp_seq n` | Repeats `wp_step` for `n` layers |
 
 
