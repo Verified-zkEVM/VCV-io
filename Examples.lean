@@ -2,6 +2,14 @@ import Examples.BR93
 import Examples.ElGamal
 import Examples.FrankingProtocol
 import Examples.HashedElGamal
+import Examples.MLKEM
+import Examples.MLKEM.Encoding
+import Examples.MLKEM.Internal
+import Examples.MLKEM.KEM
+import Examples.MLKEM.KPKE
+import Examples.MLKEM.Params
+import Examples.MLKEM.Primitives
+import Examples.MLKEM.Ring
 import Examples.OneTimePad
 import Examples.PRGfromPRF
 import Examples.Pedersen

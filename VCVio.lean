@@ -14,7 +14,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.UTransform
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.CryptoFoundations.HardnessAssumptions.LWE
+import VCVio.CryptoFoundations.HardnessAssumptions.LearningWithErrors
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.PRF
@@ -42,6 +42,7 @@ import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
 import VCVio.EvalDist.TVDist
+import VCVio.LatticeCrypto.Ring
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.BitVec

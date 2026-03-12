@@ -42,6 +42,10 @@ abbrev ProbComp : Type → Type := OracleComp unifSpec
 
 namespace ProbComp
 
+/-- Independently sample `k` values from `samp`, returning them as a `Fin k → α`. -/
+def sampleIID {α : Type} (k : ℕ) (samp : ProbComp α) : ProbComp (Fin k → α) :=
+  Fin.mOfFn k fun _ => samp
+
 section uniformFin
 
 /-- `$[0..n]` is the computation choosing a random value in the given range, inclusively.
