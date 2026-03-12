@@ -23,7 +23,6 @@ import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
-import VCVio.LatticeCrypto.Ring
 import VCVio.EvalDist.BitVec
 import VCVio.EvalDist.Bool
 import VCVio.EvalDist.Defs.AlternativeMonad
@@ -43,6 +42,7 @@ import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
 import VCVio.EvalDist.TVDist
+import VCVio.LatticeCrypto.Ring
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.BitVec
