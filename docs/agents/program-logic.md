@@ -35,9 +35,11 @@ before generating the remaining subgoals.
 |--------|-----------|--------------|
 | `rvcgen_step` | `g₁ ≡ₚ g₂`, `evalDist g₁ = evalDist g₂`, or `⟪oa ~ ob \| R⟫` | Lowers into `RelTriple` if needed, then applies one obvious relational step |
 | `rvcgen_step using t` | same | Supplies the explicit witness needed by the current shape (bind cut relation, bijection, traversal input relation, or simulation state relation) |
-| `rvcgen_step?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint or `as ⟨...⟩` clause |
+| `rvcgen_step with thm` | same | Force one explicit relational theorem/assumption step |
+| `rvcgen_step?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcgen with thm` | same | Uses `thm` for the first step on the main goal, then continues with ordinary `rvcgen` |
 | `rvcgen?` | same | Runs `rvcgen` and emits the corresponding explicit script |
 | `rel_conseq` | `⟪oa ~ ob \| R'⟫` | Weakens/strengthens postcondition |
 | `rel_inline foo` | `⟪... ~ ... \| R⟫` | Unfolds definitions, simplifies |
@@ -49,8 +51,9 @@ before generating the remaining subgoals.
 - `rvcgen_step using f` — on random/query goals, provide the coupling bijection explicitly
 - `rvcgen_step using Rin` — on `List.mapM` / `List.foldlM` goals, provide the input relation
 - `rvcgen_step using R_state` — on `simulateQ` goals, provide the state invariant relation
+- `rvcgen_step with thm` — force one explicit registered/local relational theorem
 - `rvcgen_step as ⟨x₁, x₂, h⟩` — explicitly name the binders introduced by the current step
-- `rvcgen using t` — use one explicit first hint, then keep stepping automatically
+- `rvcgen using t` / `rvcgen with thm` — use one explicit first hint/theorem, then keep stepping automatically
 - `rel_conseq with R` — provide explicit weaker postcondition
 
 ### Quantitative VCGen (`qvcgen`)
@@ -70,25 +73,32 @@ probability goals, automatically lowering `Pr[...]` into the quantitative engine
 | `qvcgen_step inv I` | Explicit loop invariant for `replicate`/`foldlM`/`mapM` |
 | `qvcgen_step rw` | One explicit top-level bind-swap rewrite on a `Pr[...] = Pr[...]` goal |
 | `qvcgen_step rw under n` | One bind-swap rewrite under `n` shared outer bind prefixes |
-| `qvcgen_step rw congr` | Expose one shared bind plus its support hypothesis |
-| `qvcgen_step rw congr'` | Expose one shared bind without a support hypothesis |
+| `qvcgen_step rw congr` | Expose one or more shared binds plus their support hypotheses |
+| `qvcgen_step rw congr'` | Expose one or more shared binds without support hypotheses |
 | `exp_norm` | Normalize indicator (`propInd`) and expectation (`wp`) arithmetic |
 
-**Probability-goal handling**: `qvcgen` and `qvcgen_step` automatically handle three
+**Probability-goal handling**: `qvcgen` and `qvcgen_step` automatically handle four
 classes of probability goals:
 
 1. **`Pr[...] = 1` lowering** → rewrites into `Triple` form for structural decomposition:
    - `Pr[p | oa] = 1` → `Triple 1 oa (fun x => ⌜p x⌝)`
    - `Pr[= x | oa] = 1` → `Triple 1 oa (fun y => if y = x then 1 else 0)`
 
-2. **`Pr[...] = Pr[...]` equality**:
-   - Plain `qvcgen_step` heuristically tries bind swap, bind congruence, swap-then-congr,
-     congr-then-swap, and the current bounded under-prefix rewrite sequence
+2. **Lower-bound event/output goals** → stay inside unary VCGen by reusing the same `Triple`
+   shell:
+   - `r ≤ Pr[p | oa]` / `Pr[p | oa] ≥ r` → `Triple r oa (fun x => ⌜p x⌝)`
+   - `r ≤ Pr[= x | oa]` / `Pr[= x | oa] ≥ r` → `Triple r oa (fun y => if y = x then 1 else 0)`
+
+3. **`Pr[...] = Pr[...]` equality**:
+   - Plain `qvcgen_step` first normalizes common `map`/`bind` surface syntax (`map_eq_bind_pure_comp`,
+     `bind_assoc`), then preview-selects the best bounded swap/congruence plan from the fast path
    - `qvcgen_step rw` performs exactly one top-level bind-swap rewrite
    - `qvcgen_step rw under n` rewrites one swap beneath `n` shared outer bind prefixes
-   - `qvcgen_step rw congr` / `qvcgen_step rw congr'` expose one shared bind explicitly
+   - `qvcgen_step rw congr` / `qvcgen_step rw congr'` expose one or more shared binds explicitly
 
-3. **General `Pr[...]`** → fallback rewrite to raw `wp` form
+4. **Other general `Pr[...]` goals** → rewrite to raw `wp` form and keep stepping structurally
+   when a `wp` rule applies. On an already-lowered raw-`wp` goal, `qvcgen_step?` / `qvcgen?`
+   will explicitly note that they are continuing in raw `wp` mode.
 
 **Loop invariants**: `qvcgen` auto-detects `replicate`, `List.foldlM`, and `List.mapM`
 in `Triple` goals and applies matching invariant hypotheses from context.
@@ -101,7 +111,8 @@ in addition to the standard `triple_pure`, `triple_zero`, and consequence search
 **Naming and suggestions**: plain `qvcgen_step` / `rvcgen_step` keep the stable execution path.
 The `?` variants run a planner-backed version of the same next move and emit a concrete
 `Try this` script, typically surfacing an explicit `using ...` hint, `inv I`, `with theorem`,
-or `as ⟨...⟩` clause that you can paste back into the proof.
+or `as ⟨...⟩` clause that you can paste back into the proof. On probability-equality goals the
+planner may emit a grouped multi-step replay when the best explanation is an explicit rewrite chain.
 
 **Opt-in unary lookup**: mark a unary `Triple` theorem with `@[vcgen]` to register it for
 bounded head-symbol lookup. This is intentionally narrow: after the built-in structural step and
@@ -109,13 +120,18 @@ explicit hint opportunities, `qvcgen_step` / `qvcgen` consult only `@[vcgen]` th
 computation head matches the current goal. Use `qvcgen_step with myLemma` when you want to force
 one specific theorem/assumption step manually.
 
+**Opt-in relational lookup**: mark a relational `RelTriple` theorem with `@[rvcgen]` to register it
+for the analogous bounded head-pair lookup on the relational side. This is especially useful for
+automation-oriented `simulateQ` transport lemmas whose outer computation heads are stable but whose
+inner invariants or projection arguments still come from the local context.
+
 **Pass budget**: exhaustive `qvcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
 predictable; if you intentionally want a longer exhaustive run, raise the option locally around
 that proof.
 
-**Trace output**: set `set_option vcvio.vcgen.traceSteps true` to log the chosen planned step
-labels and their explicit replay text while debugging tactic choice.
+**Trace output**: set `set_option vcvio.vcgen.traceSteps true` to log the chosen planned step,
+goal delta, and any planner alternatives that were previewed while debugging tactic choice.
 
 ### Raw WP Tactics
 
@@ -124,7 +140,7 @@ Use them when working directly at the weakest-precondition level.
 
 | Tactic | What it does |
 |--------|--------------|
-| `wp_step` | One WP decomposition (`wp_bind`, `wp_pure`, `wp_replicate`, `wp_list_mapM`, `wp_list_foldlM`, `wp_query`, `wp_ite`, `wp_dite`, `wp_uniformSample`, `wp_map`, `wp_simulateQ_eq`, `wp_liftComp`) |
+| `wp_step` | One WP decomposition (`wp_bind`, `wp_pure`, `wp_replicate`, `wp_list_mapM`, `wp_list_foldlM`, `wp_query`, `wp_ite`, `wp_dite`, `wp_uniformSample`, `wp_map`, `wp_simulateQ_eq`, `wp_liftComp`); `qvcgen_step` now reuses the same rules when it falls through to raw `wp` continuation |
 | `wp_seq n` | Repeats `wp_step` for `n` layers |
 
 
@@ -134,11 +150,11 @@ All probability-equality control now lives under `qvcgen_step`.
 
 | Tactic | What it does |
 |--------|--------------|
-| `qvcgen_step` | Heuristic dispatcher for common `Pr[...] = Pr[...]` steps: swap, congruence, and small bounded compositions |
+| `qvcgen_step` | Fast dispatcher for common `Pr[...] = Pr[...]` steps: syntax normalization, swap, congruence, and bounded compositions chosen by preview |
 | `qvcgen_step rw` | Rewrites one top-level bind swap without trying to close the goal |
 | `qvcgen_step rw under n` | Rewrites one bind swap under `n` shared outer bind prefixes on one side |
-| `qvcgen_step rw congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to a pointwise goal, auto-introducing `x` and `hx : x ∈ support mx` |
-| `qvcgen_step rw congr'` | Same, but without the support restriction, auto-introducing only `x` |
+| `qvcgen_step rw congr` | Reduces `Pr[... \| mx >>= f₁] = Pr[... \| mx >>= f₂]` to a pointwise goal, auto-introducing `x` and `hx : x ∈ support mx`; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
+| `qvcgen_step rw congr'` | Same, but without the support restriction; the explicit `as ⟨...⟩` form can peel multiple shared binds at once |
 
 ### Automation
 
@@ -155,15 +171,20 @@ On `Pr[...] = Pr[...]` goals, plain `qvcgen_step` already tries the common
 `probEvent_bind_bind_swap` / bind-congruence patterns:
 
 1. **Direct `probOutput` equalities**: `Pr[= x | mx >>= ... >>= ...] = Pr[= x | my >>= ... >>= ...]`
-2. **Singly-nested under tsum**: automatically peels one layer via `probOutput_bind_eq_tsum` + `tsum_congr` + `congr 1`
+2. **Nested bounded rewrites**: automatically peels small shared-bind prefixes and prefers a
+   closing swap/congruence plan when one is available
+3. **Surface `map` wrappers**: normalizes the common `map_eq_bind_pure_comp` / `bind_assoc` shape
+   before searching for swaps or congruence
 
 ### When to use the explicit `rw` subcommands
 
 - **Need to keep going after a swap**: use `qvcgen_step rw`
 - **Need to swap below shared outer binds**: use `qvcgen_step rw under n`
-- **Need to expose one common outer bind with support information**: use `qvcgen_step rw congr`
+- **Need to expose one or more common outer binds with support information**: use `qvcgen_step rw congr`
 - **Need the support-free congruence variant**: use `qvcgen_step rw congr'`
-- **Need a deeper swap than the current bounded automation knows**: peel outer layers manually, then use `qvcgen_step rw`
+- **Need the full explicit replay for a bounded nested swap**: use `qvcgen_step?`
+- **Need a deeper swap than the current bounded automation knows**: peel outer layers manually, or
+  use `qvcgen_step?` to see the best bounded replay the planner found before finishing the rest by hand
 
 ### Key insight: `probOutput` vs `probEvent`
 
@@ -198,6 +219,11 @@ exact h _ ‹_›
 ```lean
 qvcgen_step rw congr'
 rename_i x
+```
+
+**Expose two shared binds explicitly at once**:
+```lean
+qvcgen_step rw congr' as ⟨x, y⟩
 ```
 
 ## Relational Infrastructure

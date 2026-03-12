@@ -28,6 +28,14 @@ private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
 private def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
   TacticInternals.Relational.runRVCGenStepUsingWithNames hint names
 
+private def runRVCGenStepWithTheoremNames
+    (thm : TSyntax `term) (names : Array Name) : TacticM Bool := do
+  if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
+    introAllGoalsNames names
+    renameInaccessibleNames names
+    return true
+  return false
+
 /-- `rvcgen_step` applies one relational VCGen step.
 
 It first lowers `GameEquiv` / `evalDist` equality goals into relational mode, then
@@ -38,10 +46,14 @@ tries the obvious structural relational rule: synchronized conditionals, `simula
 - bind cut relation
 - random/query bijection
 - traversal input relation (`List.mapM` / `List.foldlM`)
-- `simulateQ` state relation -/
+- `simulateQ` state relation
+
+`rvcgen_step with thm` forces one explicit relational theorem/assumption step. -/
 syntax "rvcgen_step" ("using" term)? : tactic
+syntax "rvcgen_step" "with" term : tactic
 syntax "rvcgen_step" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcgen_step" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcgen_step" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcgen_step?" : tactic
 
 elab_rules : tactic
@@ -55,6 +67,11 @@ elab_rules : tactic
       if ← runRVCGenStepUsingWithNames hint names then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcgen_step with $thm as ⟨ $ids,* ⟩) => do
+      let names := binderIdentsToNames ids
+      if ← runRVCGenStepWithTheoremNames thm names then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcgen_step) => do
       if ← TacticInternals.Relational.runRVCGenStep then
         return
@@ -63,6 +80,10 @@ elab_rules : tactic
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcgen_step with $thm) => do
+      if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcgen_step?) => do
       let some step ← TacticInternals.Relational.runRVCGenPlannedStep?
         | TacticInternals.Relational.throwRVCGenStepError
@@ -71,8 +92,12 @@ elab_rules : tactic
 /-- `rvcgen` repeatedly applies relational VCGen steps across all current goals until stuck.
 
 `rvcgen using t` uses the explicit hint `t` for the first step on the main goal, then
-continues with ordinary hint-free relational VCGen on all remaining goals. -/
+continues with ordinary hint-free relational VCGen on all remaining goals.
+
+`rvcgen with thm` forces one explicit relational theorem step on the main goal, then continues
+with ordinary hint-free relational VCGen on all remaining goals. -/
 syntax "rvcgen" ("using" term)? : tactic
+syntax "rvcgen" "with" term : tactic
 syntax "rvcgen?" : tactic
 
 elab_rules : tactic
@@ -85,6 +110,12 @@ elab_rules : tactic
         TacticInternals.Relational.runRVCGenFinish
       else
         TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcgen with $thm) => do
+      if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
+        discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
+        TacticInternals.Relational.runRVCGenFinish
+      else
+        TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcgen?) => do
       let batches ← runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty

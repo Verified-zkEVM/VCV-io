@@ -183,6 +183,14 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
   rw [propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
+/-- Lower-bound event goals are exactly quantitative triples with `⌜p⌝` postconditions. -/
+lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
+    [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
+    Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa] := by
+  show r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa]
+  rw [← probEvent_eq_wp_propInd]
+
 /-! ## Expectation-level bridge lemmas -/
 
 /-- WP of a disjunction indicator is bounded by the sum of individual WP indicators. -/

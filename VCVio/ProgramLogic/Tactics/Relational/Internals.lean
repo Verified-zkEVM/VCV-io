@@ -12,8 +12,25 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
 
+attribute [rvcgen]
+  OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
+attribute [rvcgen]
+  OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_query_map_eq
+
 private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
+
+private def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
+  s!"{step.replayText} -> {preview.goalCount} goal(s)"
+
+private def attachPlannerChoiceNotes
+    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
+  withStepNotes step <|
+    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
+      if alternatives.isEmpty then
+        []
+      else
+        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
 
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
@@ -258,12 +275,11 @@ def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext 
       else
         return false
 
-/-- Find the unique local hypothesis that works as a relational `using` hint.
-Returns `none` if there are 0 or ≥ 2 viable hints (keeping ambiguity explicit). -/
-def findUniqueRelHint? : TacticM (Option Name) := withMainContext do
+/-- Find the local hypotheses that work as relational `using` hints. -/
+def findRelHintCandidates : TacticM (Array Name) := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  unless relTripleGoalParts? target |>.isSome do return none
-  let mut found : Option Name := none
+  unless relTripleGoalParts? target |>.isSome do return #[]
+  let mut found : Array Name := #[]
   for localDecl in ← getLCtx do
     unless localDecl.isImplementationDetail do
       let name := localDecl.userName
@@ -278,10 +294,15 @@ def findUniqueRelHint? : TacticM (Option Name) := withMainContext do
               let ok ← runRVCGenCoreUsing hint
               saved.restore
               if ok then
-                if found.isSome then
-                  return none
-                found := some name
+                found := found.push name
   return found
+
+/-- Find the unique local hypothesis that works as a relational `using` hint.
+Returns `none` if there are 0 or ≥ 2 viable hints (keeping ambiguity explicit). -/
+def findUniqueRelHint? : TacticM (Option Name) := do
+  let found ← findRelHintCandidates
+  return found.toList.head? >>= fun first =>
+    if found.size = 1 then some first else none
 
 private def runRVCGenExplicitHintStep (hint : TSyntax `term) : TacticM Bool := do
   if (← getGoals).isEmpty then
@@ -311,6 +332,107 @@ def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : Ta
     renameInaccessibleNames names
     return true
   return progress
+
+/-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
+def runRVCGenStepWithTheorem (thm : TSyntax `term) (requireClosed : Bool := false) :
+    TacticM Bool := do
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      evalTactic (← `(tactic| apply $thm))
+      discard <| tryEvalTacticSyntax (← `(tactic| all_goals try simp only [game_rule]))
+      discard <| tryEvalTacticSyntax (← `(tactic|
+        all_goals first
+          | assumption
+          | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+          | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+          | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+          | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+    return true
+  saved.restore
+  return false
+
+/-- Find the registered relational theorems whose bounded application makes progress. -/
+def findRegisteredRVCGenTheoremCandidates : TacticM (Array Name) := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (oa, ob, _) := relTripleGoalParts? target | return #[]
+  let candidates := (← getRegisteredRVCGenTheorems oa ob).toList.take 8
+  let mut found : Array Name := #[]
+  for thm in candidates do
+    let saved ← saveState
+    let ok ← runRVCGenStepWithTheorem (mkIdent thm)
+    saved.restore
+    if ok then
+      found := found.push thm
+  return found
+
+private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
+  let target ← instantiateMVars (← getMainTarget)
+  if let some (oa, ob, _) := relTripleGoalParts? target then
+    let oa ← whnfReducible (← instantiateMVars oa)
+    let ob ← whnfReducible (← instantiateMVars ob)
+    if isBindExpr oa && isBindExpr ob then
+      let names ← getRelBindNames
+      let namedHintStep :=
+        mkRVCGenPlannedStep
+          "rvcgen explicit hint with names"
+          s!"rvcgen_step using {hintName}{renderAsClause names}"
+          (runRVCGenStepUsingWithNames (mkIdent hintName) names)
+      if ← previewPlannedStep namedHintStep then
+        return namedHintStep
+  return mkRVCGenPlannedStep
+    "rvcgen explicit hint"
+    s!"rvcgen_step using {hintName}"
+    (runRVCGenExplicitHintStep (mkIdent hintName))
+
+private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
+  let hintNames ← findRelHintCandidates
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for hintName in hintNames do
+    let step ← buildRelHintStep hintName
+    let preview ← previewPlannedStepWithGoals step
+    if preview.ok then
+      accepted := accepted.push (renderPlannedStepPreview step preview)
+      match best? with
+      | none => best? := some (step, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (step, preview)
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+
+private def chooseBestRegisteredRVCGenTheoremStep? :
+    TacticM (Option (PlannedStep × PreviewResult)) := do
+  let theoremNames ← findRegisteredRVCGenTheoremCandidates
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for theoremName in theoremNames do
+    let step :=
+      mkRVCGenPlannedStep
+        "rvcgen registered theorem"
+        s!"rvcgen_step with {theoremName}"
+        (runRVCGenStepWithTheorem (mkIdent theoremName))
+    let preview ← previewPlannedStepWithGoals step
+    if preview.ok then
+      accepted := accepted.push (renderPlannedStepPreview step preview)
+      match best? with
+      | none => best? := some (step, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (step, preview)
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+      return some (attachPlannerChoiceNotes step preview alternatives, preview)
 
 /-- Structural/default relational VCGen step, excluding explicit `using`-hint fallbacks. -/
 def runRVCGenStructuralCore : TacticM Bool := do
@@ -343,29 +465,24 @@ def planRVCGenStep? : TacticM (Option PlannedStep) := do
       "rvcgen_step"
       runRVCGenStructuralCore
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
-  if let some hintName ← findUniqueRelHint? then
-    if !(structuralPreview.ok && structuralPreview.goalCount = 0) then
-      if let some (oa, ob, _) := relTripleGoalParts? target then
-        let oa ← whnfReducible (← instantiateMVars oa)
-        let ob ← whnfReducible (← instantiateMVars ob)
-        if isBindExpr oa && isBindExpr ob then
-          let names ← getRelBindNames
-          let namedHintStep :=
-            mkRVCGenPlannedStep
-              "rvcgen explicit hint with names"
-              s!"rvcgen_step using {hintName}{renderAsClause names}"
-              (runRVCGenStepUsingWithNames (mkIdent hintName) names)
-          if ← previewPlannedStep namedHintStep then
-            return some namedHintStep
-      let hintStep :=
-        mkRVCGenPlannedStep
-          "rvcgen explicit hint"
-          s!"rvcgen_step using {hintName}"
-          (runRVCGenExplicitHintStep (mkIdent hintName))
-      if ← previewPlannedStep hintStep then
-        return some hintStep
+  let hintCandidate? ← do
+    if structuralPreview.ok && structuralPreview.goalCount = 0 then
+      pure none
+    else
+      chooseBestRelHintStep?
+  let theoremCandidate? ← chooseBestRegisteredRVCGenTheoremStep?
   if structuralPreview.ok then
+    if let some (hintStep, hintPreview) := hintCandidate? then
+      if hintPreview.goalCount < structuralPreview.goalCount then
+        return some hintStep
+    if let some (theoremStep, theoremPreview) := theoremCandidate? then
+      if theoremPreview.goalCount < structuralPreview.goalCount then
+        return some theoremStep
     return some structuralStep
+  if let some (hintStep, _) := hintCandidate? then
+    return some hintStep
+  if let some (theoremStep, _) := theoremCandidate? then
+    return some theoremStep
   return none
 
 /-- Execute one planned relational VCGen step, returning the chosen step for replay/trace. -/
@@ -393,6 +510,9 @@ def runRVCGenStep : TacticM Bool := do
       return true
   if ← runRVCGenCore then
     return true
+  if let some theoremName := (← findRegisteredRVCGenTheoremCandidates).toList.head? then
+    if ← runRVCGenStepWithTheorem (mkIdent theoremName) then
+      return true
   return progress
 
 def runRVCGenStepUsing (hint : TSyntax `term) : TacticM Bool := do
@@ -443,12 +563,26 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
+      let hintCandidates ← findRelHintCandidates
+      let theoremCandidates ← findRegisteredRVCGenTheoremCandidates
+      let hintMsg :=
+        if hintCandidates.isEmpty then
+          ""
+        else
+          s!"\nViable local `using` hints: {formatCandidateNames hintCandidates}"
+      let theoremMsg :=
+        if theoremCandidates.isEmpty then
+          ""
+        else
+          s!"\nRegistered `@[rvcgen]` candidates: {formatCandidateNames theoremCandidates}\n\
+          Try `rvcgen_step?` or `rvcgen_step with <theorem>` for an explicit replay."
       if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
         throwError m!
           "rvcgen_step: found a `simulateQ` relational goal but no simulation rule applied.\n\
           If the proof needs a state invariant, try `rvcgen_step using R_state`.\n\
           If the goal is an output-only `run'` equality coupling, `rvcgen_step` also tries the \
           exact-distribution specialization automatically.\n\
+          {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
@@ -456,6 +590,7 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
         throwError m!
           "rvcgen_step: found a `List.mapM` relational goal but no traversal rule applied.\n\
           Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
+          {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
@@ -463,12 +598,14 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
         throwError m!
           "rvcgen_step: found a `List.foldlM` relational goal but no fold rule applied.\n\
           Use `rvcgen_step using Rin` when the two input lists are related by a non-equality relation.\n\
+          {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       if isReplicateExpr oa || isReplicateExpr ob then
         throwError m!
           "rvcgen_step: found a `replicate` relational goal but no iteration rule applied.\n\
+          {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
@@ -476,11 +613,13 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
         throwError m!
           "rvcgen_step: found a bind-on-both-sides relational goal but could not choose an intermediate relation.\n\
           Try `rvcgen_step using R` when equality is not the right cut relation.\n\
+          {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
           Postcondition:{indentExpr post}"
       throwError m!
         "rvcgen_step: found a `RelTriple` goal, but no relational VCGen rule matched.\n\
+        {hintMsg}{theoremMsg}\n\
         Left side:{indentExpr oa}\n\
         Right side:{indentExpr ob}\n\
         Postcondition:{indentExpr post}\n\
@@ -488,6 +627,12 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
 
 def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
+  let hintCandidates ← findRelHintCandidates
+  let hintMsg :=
+    if hintCandidates.isEmpty then
+      ""
+    else
+      s!"\nViable local `using` hints here: {formatCandidateNames hintCandidates}"
   throwError m!
     "rvcgen_step using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\
@@ -495,6 +640,7 @@ def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainC
     - random/query bijection\n\
     - `List.mapM` / `List.foldlM` input relation\n\
     - `simulateQ` state relation\n\
+    {hintMsg}\n\
     Goal:{indentExpr target}"
 
 /-- Try to close a relational goal by applying postcondition monotonicity and

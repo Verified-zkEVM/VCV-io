@@ -16,6 +16,21 @@ namespace Unary
 private def mkQVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
+private def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
+  s!"{step.replayText} -> {preview.goalCount} goal(s)"
+
+private def attachPlannerChoiceNotes
+    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
+  withStepNotes step <|
+    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
+      if alternatives.isEmpty then
+        []
+      else
+        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
+
+private def hasProbGoal (target : Expr) : Bool :=
+  (findAppWithHead? ``probEvent target).isSome || (findAppWithHead? ``probOutput target).isSome
+
 def throwWpStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match wpGoalComp? target with
@@ -39,32 +54,6 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
       else
         return false
   | none => return false
-
-def throwQVCGenStepError : TacticM Unit := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  match tripleGoalComp? target with
-  | none =>
-      let hasProbGoal := (findAppWithHead? ``probEvent target).isSome ||
-                         (findAppWithHead? ``probOutput target).isSome
-      if hasProbGoal then
-        if isProbEqGoal target then
-          throwError
-            "qvcgen_step: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
-            Goal:{indentExpr target}\n\
-            Try `qvcgen_step rw`, `qvcgen_step rw under 1`, `qvcgen_step rw congr`, \
-            `qvcgen_step rw congr'`, or manual rewriting with `probEvent_bind_bind_swap`."
-        else
-          throwError
-            "qvcgen_step: found a probability goal but could not lower it to a `Triple` or `wp` goal.\n\
-            Goal:{indentExpr target}\n\
-            Try `rw [probEvent_eq_wp_propInd]`, or manual rewriting."
-      else
-        throwError "qvcgen_step: expected a `Triple` or probability goal; got:{indentExpr target}"
-  | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
-      throwError
-        "qvcgen_step: found a `Triple` goal, but no matching rule applied to:{indentExpr comp}\n\
-        Try `wp_step`, or manually unfolding the remaining arithmetic side conditions."
 
 /-- Try to close the current goal using only immediate local information.
 This is intentionally cheap: it is used while speculating on `triple_bind`, so it must not
@@ -246,14 +235,13 @@ def runLoopInvExplicit (inv : TSyntax `term) : TacticM Bool := do
     else
       return false
 
-/-- Find the unique local hypothesis that works as an explicit bind cut.
-Returns `none` if there are 0 or ≥ 2 viable candidates. -/
-def findUniqueHoareCutHint? : TacticM (Option Name) := withMainContext do
+/-- Find the local hypotheses that work as explicit bind cuts. -/
+def findHoareCutHintCandidates : TacticM (Array Name) := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return none
+  let some comp := tripleGoalComp? target | return #[]
   let comp ← whnfReducible (← instantiateMVars comp)
-  unless isBindExpr comp do return none
-  let mut found : Option Name := none
+  unless isBindExpr comp do return #[]
+  let mut found : Array Name := #[]
   for localDecl in ← getLCtx do
     unless localDecl.isImplementationDetail do
       let name := localDecl.userName
@@ -264,20 +252,24 @@ def findUniqueHoareCutHint? : TacticM (Option Name) := withMainContext do
           let ok ← runHoareStepRuleUsing (mkIdent name)
           saved.restore
           if ok then
-            if found.isSome then
-              return none
-            found := some name
+            found := found.push name
   return found
 
-/-- Find the unique local hypothesis that works as an explicit loop invariant.
+/-- Find the unique local hypothesis that works as an explicit bind cut.
 Returns `none` if there are 0 or ≥ 2 viable candidates. -/
-def findUniqueLoopInvHint? : TacticM (Option Name) := withMainContext do
+def findUniqueHoareCutHint? : TacticM (Option Name) := do
+  let found ← findHoareCutHintCandidates
+  return found.toList.head? >>= fun first =>
+    if found.size = 1 then some first else none
+
+/-- Find the local hypotheses that work as explicit loop invariants. -/
+def findLoopInvHintCandidates : TacticM (Array Name) := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return none
+  let some comp := tripleGoalComp? target | return #[]
   let comp ← whnfReducible (← instantiateMVars comp)
   unless isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp do
-    return none
-  let mut found : Option Name := none
+    return #[]
+  let mut found : Array Name := #[]
   for localDecl in ← getLCtx do
     unless localDecl.isImplementationDetail do
       let name := localDecl.userName
@@ -288,23 +280,84 @@ def findUniqueLoopInvHint? : TacticM (Option Name) := withMainContext do
           let ok ← runLoopInvExplicit (mkIdent name)
           saved.restore
           if ok then
-            if found.isSome then
-              return none
-            found := some name
+            found := found.push name
   return found
 
-/-- Find the first registered theorem whose bounded application makes progress. -/
-def findRegisteredVCGenTheorem? : TacticM (Option Name) := do
+/-- Find the unique local hypothesis that works as an explicit loop invariant.
+Returns `none` if there are 0 or ≥ 2 viable candidates. -/
+def findUniqueLoopInvHint? : TacticM (Option Name) := do
+  let found ← findLoopInvHintCandidates
+  return found.toList.head? >>= fun first =>
+    if found.size = 1 then some first else none
+
+/-- Find the registered theorems whose bounded application makes progress. -/
+def findRegisteredVCGenTheoremCandidates : TacticM (Array Name) := do
   let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return none
+  let some comp := tripleGoalComp? target | return #[]
   let candidates := (← getRegisteredVCGenTheorems comp).toList.take 8
+  let mut found : Array Name := #[]
   for thm in candidates do
     let saved ← saveState
     let ok ← runVCGenStepWithTheorem (mkIdent thm)
     saved.restore
     if ok then
-      return some thm
-  return none
+      found := found.push thm
+  return found
+
+/-- Find the first registered theorem whose bounded application makes progress. -/
+def findRegisteredVCGenTheorem? : TacticM (Option Name) := do
+  return (← findRegisteredVCGenTheoremCandidates).toList.head?
+
+def throwQVCGenStepError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  match tripleGoalComp? target with
+  | none =>
+      if hasProbGoal target then
+        if isProbEqGoal target then
+          throwError
+            "qvcgen_step: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
+            Goal:{indentExpr target}\n\
+            Try `qvcgen_step rw`, `qvcgen_step rw under 1`, `qvcgen_step rw congr`, \
+            `qvcgen_step rw congr'`, `qvcgen_step?`, or manual rewriting with \
+            `probEvent_bind_bind_swap`."
+        else
+          throwError
+            "qvcgen_step: found a probability goal but could not lower it to a supported `Triple` or raw `wp` shape.\n\
+            Goal:{indentExpr target}\n\
+            Supported direct lowerings include `Pr[...] = 1`, `Pr[...] = Pr[...]`, and lower bounds \
+            such as `r ≤ Pr[...]` / `Pr[...] ≥ r`.\n\
+            Try `rw [probEvent_eq_wp_propInd]`, `qvcgen_step?`, or manual rewriting."
+      else if let some comp := wpGoalComp? target then
+        let comp ← whnfReducible (← instantiateMVars comp)
+        throwError
+          "qvcgen_step: currently in raw `wp` continuation mode, but no matching rule applied to:{indentExpr comp}\n\
+          Try `qvcgen_step?`, `wp_step`, or manual rewriting."
+      else
+        throwError "qvcgen_step: expected a `Triple`, raw `wp`, or probability goal; got:{indentExpr target}"
+  | some comp =>
+      let comp ← whnfReducible (← instantiateMVars comp)
+      let cutMsg ←
+        if isBindExpr comp then
+          let cuts ← findHoareCutHintCandidates
+          pure <| if cuts.isEmpty then "" else
+            s!"\nViable local cut candidates: {formatCandidateNames cuts}"
+        else
+          pure ""
+      let invMsg ←
+        if isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp then
+          let invs ← findLoopInvHintCandidates
+          pure <| if invs.isEmpty then "" else
+            s!"\nViable local invariant candidates: {formatCandidateNames invs}"
+        else
+          pure ""
+      let theoremMsg ← do
+        let thms ← findRegisteredVCGenTheoremCandidates
+        pure <| if thms.isEmpty then "" else
+          s!"\nRegistered `@[vcgen]` candidates: {formatCandidateNames thms}"
+      throwError
+        "qvcgen_step: found a `Triple` goal, but no matching rule applied to:{indentExpr comp}\n\
+        Try `wp_step`, or manually unfolding the remaining arithmetic side conditions.\
+        {cutMsg}{invMsg}{theoremMsg}"
 
 /-- Try to close or rewrite a `Pr[...] = Pr[...]` goal by swapping adjacent independent binds.
 Handles 0–2 layers of tsum peeling. -/
@@ -312,11 +365,15 @@ inductive ProbEqAction where
   | swap
   | congr
   | congrNoSupport
-  | congrAny
   | rewrite
   | rewriteUnder (depth : Nat)
 
+private def normalizeProbEqGoal : TacticM Unit := do
+  discard <| tryEvalTacticSyntax (← `(tactic|
+    simp only [map_eq_bind_pure_comp, bind_assoc]))
+
 def runProbEqSwap : TacticM Bool := do
+  normalizeProbEqGoal
   tryEvalTacticSyntax (← `(tactic| (
     try simp only [bind_assoc]
     first
@@ -350,6 +407,7 @@ def runProbEqSwap : TacticM Bool := do
               exact probEvent_bind_bind_swap _ _ _ _)))))
 
 def runProbEqCongrNoSupportWithNames (names : Array Name) : TacticM Bool := do
+  normalizeProbEqGoal
   if ← tryEvalTacticSyntax (← `(tactic| apply probOutput_bind_congr')) then
     discard <| introMainGoalNames names
     return true
@@ -365,6 +423,7 @@ def runProbEqCongrNoSupport : TacticM Bool := do
 /-- Try to decompose a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal by congruence,
 then auto-intro the bound variable and support hypothesis. -/
 def runProbEqCongrWithNames (names : Array Name) : TacticM Bool := do
+  normalizeProbEqGoal
   if ← tryEvalTacticSyntax (← `(tactic| apply probOutput_bind_congr)) then
     discard <| introMainGoalNames names
     return true
@@ -379,6 +438,34 @@ def runProbEqCongr : TacticM Bool := do
     return true
   runProbEqCongrNoSupport
 
+private def chunkNameArray (names : Array Name) (width : Nat) : Option (Array (Array Name)) := Id.run do
+  if width = 0 || names.isEmpty then
+    return none
+  if names.size % width != 0 then
+    return none
+  let mut chunks : Array (Array Name) := #[]
+  let mut i := 0
+  while i < names.size do
+    chunks := chunks.push (names.extract i (i + width))
+    i := i + width
+  return some chunks
+
+def runProbEqCongrChainWithNames
+    (supportSensitive : Bool) (names : Array Name) : TacticM Bool := do
+  let width := if supportSensitive then 2 else 1
+  let some chunks := chunkNameArray names width | return false
+  let saved ← saveState
+  for chunk in chunks do
+    let ok ←
+      if supportSensitive then
+        runProbEqCongrWithNames chunk
+      else
+        runProbEqCongrNoSupportWithNames chunk
+    if !ok then
+      saved.restore
+      return false
+  return true
+
 /-- Build a theorem that swaps adjacent binds under `depth` shared prefixes. -/
 partial def mkProbSwapUnderProof (depth : Nat) : TacticM (TSyntax `term) := do
   match depth with
@@ -389,6 +476,7 @@ partial def mkProbSwapUnderProof (depth : Nat) : TacticM (TSyntax `term) := do
 
 /-- Try to rewrite one top-level bind-swap without closing the goal. -/
 def runProbEqRewrite : TacticM Bool := do
+  normalizeProbEqGoal
   tryEvalTacticSyntax (← `(tactic| (
     first
       | (simp only [← probEvent_eq_eq_probOutput]
@@ -398,6 +486,7 @@ def runProbEqRewrite : TacticM Bool := do
 
 /-- Try to rewrite one bind-swap under `depth` shared prefixes on either side. -/
 def runProbEqRewriteUnder (depth : Nat) : TacticM Bool := do
+  normalizeProbEqGoal
   let proof ← mkProbSwapUnderProof depth
   tryEvalTacticSyntax (← `(tactic| (
     first
@@ -414,13 +503,30 @@ def runProbEqAction : ProbEqAction → TacticM Bool
   | .swap => runProbEqSwap
   | .congr => runProbEqCongr
   | .congrNoSupport => runProbEqCongrNoSupport
-  | .congrAny => runProbEqCongr
   | .rewrite => runProbEqRewrite
   | .rewriteUnder depth =>
       if depth = 0 then
         runProbEqRewrite
       else
         runProbEqRewriteUnder depth
+
+private def renderProbEqAction : ProbEqAction → TacticM String
+  | .swap => pure "qvcgen_step"
+  | .congr => do
+      let names ← getProbCongrNames true
+      pure s!"qvcgen_step rw congr{renderAsClause names}"
+  | .congrNoSupport => do
+      let names ← getProbCongrNames false
+      pure s!"qvcgen_step rw congr'{renderAsClause names}"
+  | .rewrite => pure "qvcgen_step rw"
+  | .rewriteUnder depth => pure s!"qvcgen_step rw under {depth}"
+
+private def renderProbEqPlan (actions : List ProbEqAction) : TacticM String := do
+  let parts ← actions.mapM renderProbEqAction
+  match parts with
+  | [] => pure "qvcgen_step"
+  | [part] => pure part
+  | _ => pure s!"({String.intercalate "; " parts})"
 
 /-- Try a small backtracking-free sequence of probability-equality steps. -/
 def tryProbEqActions (steps : List ProbEqAction) : TacticM Bool := do
@@ -433,22 +539,67 @@ def tryProbEqActions (steps : List ProbEqAction) : TacticM Bool := do
       return false
   return true
 
+private def chooseBestProbEqPlan? (plans : List (List ProbEqAction)) :
+    TacticM (Option (List ProbEqAction × PreviewResult)) := do
+  let mut best? : Option (List ProbEqAction × PreviewResult) := none
+  for plan in plans do
+    let preview ← previewActionWithGoals (tryProbEqActions plan)
+    if preview.ok then
+      if preview.goalCount = 0 then
+        return some (plan, preview)
+      match best? with
+      | none => best? := some (plan, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (plan, preview)
+  return best?
+
+private def mkRewriteChain (depth : Nat) : List ProbEqAction :=
+  ((List.range depth).reverse.map fun idx => ProbEqAction.rewriteUnder (idx + 1)) ++
+    [ProbEqAction.rewrite]
+
+private def probEqCongrPlans (maxDepth : Nat) : List (List ProbEqAction) :=
+  let layers := (List.range maxDepth).map fun idx =>
+    let depth := idx + 1
+    [List.replicate depth ProbEqAction.congr,
+      List.replicate depth ProbEqAction.congrNoSupport]
+  layers.foldr List.append []
+
+private def probEqRewritePlans (maxDepth : Nat) : List (List ProbEqAction) :=
+  let layers := ((List.range (maxDepth + 1)).reverse.map fun depth =>
+    let chain := mkRewriteChain depth
+    [chain ++ [ProbEqAction.congr], chain ++ [ProbEqAction.congrNoSupport], chain])
+  layers.foldr List.append []
+
 def probEqActionPlans : List (List ProbEqAction) :=
   [ [.swap]
-  , [.congrAny]
-  , [.rewrite, .congrAny]
-  , [.congrAny, .swap]
-  , [.rewriteUnder 1, .rewrite, .congrAny]
+  , [.congr]
+  , [.congrNoSupport]
+  , [.rewrite, .congr]
+  , [.rewrite, .congrNoSupport]
+  , [.congr, .swap]
+  , [.congrNoSupport, .swap]
+  , [.rewriteUnder 1, .rewrite, .congr]
+  , [.rewriteUnder 1, .rewrite, .congrNoSupport]
   , [.rewriteUnder 1, .rewrite]
+  , [.rewriteUnder 2, .rewriteUnder 1, .rewrite, .congr]
+  , [.rewriteUnder 2, .rewriteUnder 1, .rewrite, .congrNoSupport]
   , [.rewriteUnder 2, .rewriteUnder 1, .rewrite]
-  , [.rewriteUnder 2, .rewriteUnder 1, .rewrite, .congrAny]
   ]
 
+private def probEqPlannerActionPlans : List (List ProbEqAction) :=
+  probEqRewritePlans 4 ++ probEqCongrPlans 3 ++
+    [ [.congr]
+    , [.congrNoSupport]
+    , [.congr, .swap]
+    , [.congrNoSupport, .swap]
+    , [.swap]
+    ]
+
 def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
-  for plan in plans do
-    if ← tryProbEqActions plan then
-      return true
-  return false
+  match ← chooseBestProbEqPlan? plans with
+  | none => return false
+  | some (plan, _) => tryProbEqActions plan
 
 /-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
 Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
@@ -518,6 +669,9 @@ def tryLowerProbGoal : TacticM Bool := do
         simp only [OracleComp.ProgramLogic.propInd_true])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        rw [← OracleComp.ProgramLogic.triple_propInd_iff_le_probEvent])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
@@ -531,11 +685,26 @@ def tryLowerProbGoal : TacticM Bool := do
         rw [eq_comm, OracleComp.ProgramLogic.probOutput_eq_one_iff_triple])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        rw [OracleComp.ProgramLogic.le_probOutput_iff_triple_indicator])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         simp only [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then
       return true
+  return false
+
+/-- Continue structural stepping on a raw `wp` goal after probability lowering or explicit
+`wp`-level work. This stays deliberately smaller than the `Triple` path. -/
+def tryRawWpStructuralStep : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some comp := wpGoalComp? target | return false
+  let comp ← whnfReducible (← instantiateMVars comp)
+  if ← runWpStepRules then
+    return true
+  if ← tryMatchDecomp comp then
+    return true
   return false
 
 /-- Try to synthesize a support-based intermediate postcondition for a bind step.
@@ -558,6 +727,13 @@ def runVCGenStructuralCore : TacticM Bool := do
   if (← getGoals).isEmpty then return false
   let target ← instantiateMVars (← getMainTarget)
   if ← tryLowerProbGoal then
+    if (← getGoals).isEmpty then
+      return true
+    let target ← instantiateMVars (← getMainTarget)
+    if (tripleGoalComp? target |>.isNone) && (relTripleGoalParts? target |>.isNone) &&
+        (wpGoalComp? target).isSome then
+      if ← tryRawWpStructuralStep then
+        return true
     return true
   if relTripleGoalParts? target |>.isSome then
     return (← tryEvalTacticSyntax (← `(tactic| rvcgen_step)))
@@ -593,7 +769,19 @@ def runVCGenStructuralCore : TacticM Bool := do
           throwError "qvcgen_step: no matching wp rule after unfolding `Triple`") with
       | some _ => return true
       | none => return false
-  | none => return false
+  | none => return (← tryRawWpStructuralStep)
+
+private def mkStructuralStepForTarget (target : Expr) : PlannedStep :=
+  let step := mkQVCGenPlannedStep
+    "qvcgen structural step"
+    "qvcgen_step"
+    runVCGenStructuralCore
+  if !(hasProbGoal target) && (tripleGoalComp? target |>.isNone) &&
+      (relTripleGoalParts? target |>.isNone) &&
+      (wpGoalComp? target).isSome then
+    withStepNotes step ["continuing in raw `wp` mode"]
+  else
+    step
 
 private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool := do
   if ← runVCGenStructuralCore then
@@ -602,48 +790,67 @@ private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool 
     return true
   return false
 
+private def chooseBestPlannedStepCandidate? (steps : Array PlannedStep) :
+    TacticM (Option (PlannedStep × PreviewResult)) := do
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for step in steps do
+    let preview ← previewPlannedStepWithGoals step
+    if preview.ok then
+      accepted := accepted.push (renderPlannedStepPreview step preview)
+      match best? with
+      | none => best? := some (step, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (step, preview)
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+
+private def chooseBestCutStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
+  let steps := (← findHoareCutHintCandidates).map fun cutName =>
+    mkQVCGenPlannedStep
+      "qvcgen explicit cut"
+      s!"qvcgen_step using {cutName}"
+      (runHoareStepRuleUsing (mkIdent cutName))
+  chooseBestPlannedStepCandidate? steps
+
+private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
+  let steps := (← findLoopInvHintCandidates).map fun invName =>
+    mkQVCGenPlannedStep
+      "qvcgen explicit invariant"
+      s!"qvcgen_step inv {invName}"
+      (runLoopInvExplicit (mkIdent invName))
+  chooseBestPlannedStepCandidate? steps
+
+private def chooseBestTheoremStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
+  let steps := (← findRegisteredVCGenTheoremCandidates).map fun theoremName =>
+    mkQVCGenPlannedStep
+      "qvcgen registered theorem"
+      s!"qvcgen_step with {theoremName}"
+      (runVCGenStepWithTheorem (mkIdent theoremName))
+  chooseBestPlannedStepCandidate? steps
+
 private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
     TacticM (Option PlannedStep) := do
   let target ← instantiateMVars (← getMainTarget)
   unless isProbEqGoal target do
     return none
-  if plainPreview.ok && plainPreview.goalCount = 0 then
-    return none
-  let supportNames ← getProbCongrNames true
-  let supportStep :=
-    mkQVCGenPlannedStep
-      "qvcgen probability congruence with support"
-      s!"qvcgen_step rw congr{renderAsClause supportNames}"
-      (runProbEqCongrWithNames supportNames)
-  let noSupportNames ← getProbCongrNames false
-  let noSupportStep :=
-    mkQVCGenPlannedStep
-      "qvcgen probability congruence"
-      s!"qvcgen_step rw congr'{renderAsClause noSupportNames}"
-      (runProbEqCongrNoSupportWithNames noSupportNames)
-  let closesAfter (step : PlannedStep) : TacticM Bool := do
-    let saved ← saveState
-    let ok ← executePlannedStep step
-    let closed ←
-      if ok then
-        tryEvalTacticSyntax (← `(tactic| first
-          | assumption
-          | solve_by_elim (maxDepth := 2)))
-      else
-        pure false
-    saved.restore
-    return ok && closed
-  if ← previewPlannedStep supportStep then
-    if ← closesAfter supportStep then
-      return some supportStep
-  if ← previewPlannedStep noSupportStep then
-    if ← closesAfter noSupportStep then
-      return some noSupportStep
-  if ← previewPlannedStep supportStep then
-    return some supportStep
-  if ← previewPlannedStep noSupportStep then
-    return some noSupportStep
-  return none
+  let mut steps : Array PlannedStep := #[]
+  for plan in probEqPlannerActionPlans do
+    let replayText ← renderProbEqPlan plan
+    steps := steps.push <| mkQVCGenPlannedStep
+      "qvcgen probability plan"
+      replayText
+      (tryProbEqActions plan)
+  match ← chooseBestPlannedStepCandidate? steps with
+  | none => return none
+  | some (step, preview) =>
+      if !(plainPreview.ok) || preview.goalCount ≤ plainPreview.goalCount then
+        return some step
+      return none
 
 /-- Choose one unary VCGen step and remember how to replay it explicitly. -/
 def planVCGenStep? : TacticM (Option PlannedStep) := do
@@ -659,11 +866,7 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
         (introMainGoalNames names)
     if ← previewPlannedStep introStep then
       return some introStep
-  let structuralStep :=
-    mkQVCGenPlannedStep
-      "qvcgen structural step"
-      "qvcgen_step"
-      runVCGenStructuralCore
+  let structuralStep := mkStructuralStepForTarget target
   if let some comp := tripleGoalComp? target then
     let comp ← whnfReducible (← instantiateMVars comp)
     if isBindExpr comp then
@@ -682,14 +885,8 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
         if ← previewPlannedStep namedStructuralStep then
           return some namedStructuralStep
         return some structuralStep
-      if let some cutName ← findUniqueHoareCutHint? then
-        let cutStep :=
-          mkQVCGenPlannedStep
-            "qvcgen explicit cut"
-            s!"qvcgen_step using {cutName}"
-            (runHoareStepRuleUsing (mkIdent cutName))
-        if ← previewPlannedStep cutStep then
-          return some cutStep
+      if let some (cutStep, _) ← chooseBestCutStep? then
+        return some cutStep
     if isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp then
       let autoInvariantStep :=
         mkQVCGenPlannedStep
@@ -698,31 +895,15 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
           (tryLoopInvariantRuleAuto comp)
       if ← previewPlannedStep autoInvariantStep then
         return some structuralStep
-      if let some invName ← findUniqueLoopInvHint? then
-        let invStep :=
-          mkQVCGenPlannedStep
-            "qvcgen explicit invariant"
-            s!"qvcgen_step inv {invName}"
-            (runLoopInvExplicit (mkIdent invName))
-        if ← previewPlannedStep invStep then
-          return some invStep
+      if let some (invStep, _) ← chooseBestInvariantStep? then
+        return some invStep
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
   if let some explicitProbEqStep ← planExplicitProbEqStep? structuralPreview then
     return some explicitProbEqStep
-  let theoremCandidate? ← do
-    if let some theoremName ← findRegisteredVCGenTheorem? then
-      let theoremStep :=
-        mkQVCGenPlannedStep
-          "qvcgen registered theorem"
-          s!"qvcgen_step with {theoremName}"
-          (runVCGenStepWithTheorem (mkIdent theoremName))
-      let theoremPreview ← previewPlannedStepWithGoals theoremStep
-      pure <| if theoremPreview.ok then some (theoremStep, theoremPreview.goalCount) else none
-    else
-      pure none
+  let theoremCandidate? ← chooseBestTheoremStep?
   if structuralPreview.ok then
-    if let some (theoremStep, theoremGoalCount) := theoremCandidate? then
-      if theoremGoalCount < structuralPreview.goalCount then
+    if let some (theoremStep, theoremPreview) := theoremCandidate? then
+      if theoremPreview.goalCount < structuralPreview.goalCount then
         return some theoremStep
     return some structuralStep
   if let some (theoremStep, _) := theoremCandidate? then
