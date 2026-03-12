@@ -40,6 +40,7 @@ def resolve? (anchor : AnchorRef) (currentUri? : Option Lsp.DocumentUri := none)
     MetaM (Option ResolvedAnchor) := do
   if !(← getEnv).contains anchor.declName then
     return none
+  let currentModule := (← getEnv).mainModule
   let some ranges ← Lean.findDeclarationRanges? anchor.declName
     | return none
   let uri? ←
@@ -47,7 +48,8 @@ def resolve? (anchor : AnchorRef) (currentUri? : Option Lsp.DocumentUri := none)
     | some modName =>
         match ← Lean.Server.documentUriFromModule? modName with
         | some uri => pure (some uri)
-        | none => pure currentUri?
+        | none =>
+            if modName == currentModule then pure currentUri? else pure none
     | none => pure currentUri?
   let some uri := uri?
     | return none

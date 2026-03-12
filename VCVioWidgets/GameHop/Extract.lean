@@ -20,9 +20,6 @@ private def hasDecl (declName : Name) : MetaM Bool := do
 private def pendingDeclText (declName : Name) : String :=
   s!"Waiting for `{declName}` to elaborate."
 
-private def currentModuleUri? (currentModule : Name) : MetaM (Option Lsp.DocumentUri) :=
-  Lean.Server.documentUriFromModule? currentModule
-
 private def declBasename : Name → String
   | .anonymous => ""
   | .str _ s => s
@@ -115,7 +112,7 @@ private def unresolvedDeclTarget? (currentModule : Name) (declName : Name) :
 
 def declTarget? (currentModule : Name) (declName : Name) : MetaM (Option RevealTarget) := do
   let anchor := AnchorRef.withSelection <| AnchorRef.result declName
-  match (← anchor.resolve? (← currentModuleUri? currentModule)) with
+  match (← anchor.resolve? (← Lean.Server.documentUriFromModule? currentModule)) with
   | some resolved => return some <| RevealTarget.ofAnchor anchor resolved
   | none => unresolvedDeclTarget? currentModule declName
 
@@ -143,7 +140,7 @@ private def readSourceRange (uri : Lsp.DocumentUri) (range : Lsp.Range) : IO (Op
 private def declSource? (currentModule : Name) (declName : Name) :
     MetaM (Option (String × RevealTarget)) := do
   let anchor := AnchorRef.result declName
-  let some resolved ← anchor.resolve? (← currentModuleUri? currentModule)
+  let some resolved ← anchor.resolve? (← Lean.Server.documentUriFromModule? currentModule)
     | return none
   let some contents ← readSourceRange resolved.uri resolved.declarationRange
     | return none
@@ -253,7 +250,7 @@ def resolveSnippet (currentModule : Name) (snippet : CodeSnippet) :
         match anchor? with
         | none => pure none
         | some anchor =>
-            pure <| (← anchor.resolve? (← currentModuleUri? currentModule)).map <|
+            pure <| (← anchor.resolve? (← Lean.Server.documentUriFromModule? currentModule)).map <|
               RevealTarget.ofAnchor anchor
       return .text contents (target? := target?)
 
