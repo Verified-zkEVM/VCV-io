@@ -505,10 +505,7 @@ private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
 
 private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
   let hintNames ← findRelHintCandidates
-  let mut steps : Array PlannedStep := #[]
-  for hintName in hintNames do
-    let step ← buildRelHintStep hintName
-    steps := steps.push step
+  let steps ← hintNames.mapM buildRelHintStep
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
