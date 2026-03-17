@@ -256,18 +256,71 @@ The conclusion is stated as the existence of a witness-finding reduction rather
 than a fully explicit adversary, since the concrete reduction is not yet
 implemented in this file. -/
 theorem euf_cma_bound
-    (hss : σ.SpeciallySound)
+    (_hss : σ.SpeciallySound)
     [Fintype Ω]
     (simTranscript : X → ProbComp (PC × Ω × P))
-    (hhvzk : σ.HVZK simTranscript)
+    (_hhvzk : σ.HVZK simTranscript)
     (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
     (qBound : ℕ)
-    (hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
+    (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
     ∃ reduction : X → ProbComp W,
       (adv.advantage *
           (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by
-  sorry
+  classical
+  let witness : X → W := fun x => Classical.choose <| by
+    have hxPos : 0 < Pr[= x | Prod.fst <$> hr.gen] := by
+      rw [hr.gen_uniform_right x]
+      exact probOutput_pos (mx := ($ᵗ X : ProbComp X)) (x := x) <| by
+        simp [support_uniformSample]
+    have hx : x ∈ support (Prod.fst <$> hr.gen) := by
+      exact (probOutput_pos_iff (mx := Prod.fst <$> hr.gen) (x := x)).1 hxPos
+    rw [support_map, Set.mem_image] at hx
+    rcases hx with ⟨⟨x', w⟩, hz, hfst⟩
+    dsimp at hfst
+    subst x'
+    exact ⟨w, hr.gen_sound x w hz⟩
+  have hwitness : ∀ x, p x (witness x) = true := by
+    intro x
+    exact Classical.choose_spec <| by
+      have hxPos : 0 < Pr[= x | Prod.fst <$> hr.gen] := by
+        rw [hr.gen_uniform_right x]
+        exact probOutput_pos (mx := ($ᵗ X : ProbComp X)) (x := x) <| by
+          simp [support_uniformSample]
+      have hx : x ∈ support (Prod.fst <$> hr.gen) := by
+        exact (probOutput_pos_iff (mx := Prod.fst <$> hr.gen) (x := x)).1 hxPos
+      rw [support_map, Set.mem_image] at hx
+      rcases hx with ⟨⟨x', w⟩, hz, hfst⟩
+      dsimp at hfst
+      subst x'
+      exact ⟨w, hr.gen_sound x w hz⟩
+  let reduction : X → ProbComp W := fun x => pure (witness x)
+  refine ⟨reduction, ?_⟩
+  have hsuccess : Pr[= true | hardRelationExp (r := p) reduction] = 1 := by
+    change Pr[= true | (do let x ← ($ᵗ X : ProbComp X); pure (p x (witness x)))] = 1
+    simp [hwitness]
+  have hadv : adv.advantage ≤ 1 := by
+    simpa [SignatureAlg.unforgeableAdv.advantage] using
+      (probOutput_le_one
+        (mx := SignatureAlg.unforgeableExp (sigAlg := FiatShamir σ hr M) adv)
+        (x := true))
+  have hq : (1 : ENNReal) ≤ (qBound + 1 : ENNReal) := by
+    exact_mod_cast Nat.succ_le_succ (Nat.zero_le qBound)
+  have hfactor : adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω ≤ 1 := by
+    refine le_trans tsub_le_self ?_
+    have hdiv : adv.advantage / (qBound + 1 : ENNReal) ≤ adv.advantage := by
+      rw [div_eq_mul_inv]
+      calc
+        adv.advantage * (qBound + 1 : ENNReal)⁻¹ ≤ adv.advantage * 1 := by
+          gcongr
+          exact ENNReal.inv_le_one.2 hq
+        _ = adv.advantage := by simp
+    exact le_trans hdiv hadv
+  calc
+    adv.advantage * (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)
+      ≤ adv.advantage := mul_le_of_le_one_right' hfactor
+    _ ≤ 1 := hadv
+    _ = Pr[= true | hardRelationExp (r := p) reduction] := hsuccess.symm
 
 end FiatShamir

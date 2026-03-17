@@ -205,17 +205,17 @@ def tryEvalTacticSyntax (stx : Syntax) : TacticM Bool :=
 def focusFirstGoalSatisfying (pred : Expr → Bool) : TacticM Bool := do
   let goals ← getGoals
   let mut matched? : Option MVarId := none
-  let mut rest : List MVarId := []
+  let mut rest : Array MVarId := #[]
   for goal in goals do
     let target ← instantiateMVars (← goal.getType)
     if matched?.isNone && pred target then
       matched? := some goal
     else
-      rest := rest ++ [goal]
+      rest := rest.push goal
   match matched? with
   | none => return false
   | some goal =>
-      setGoals (goal :: rest)
+      setGoals (goal :: rest.toList)
       return true
 
 def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do

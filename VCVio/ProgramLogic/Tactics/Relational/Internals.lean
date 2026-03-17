@@ -406,6 +406,11 @@ private def runRVCGenStepWithTheoremConseq
   let wrapper? ←
     if (relTripleGoalParts? target).isSome then
       pure <| some (← `(tactic| refine OracleComp.ProgramLogic.Relational.relTriple_post_mono ?_ ?_))
+    else if (relWPGoalParts? target).isSome then
+      pure <| some (← `(tactic|
+        refine le_trans ?_
+          (MAlgRelOrdered.relWP_mono
+            (m₁ := OracleComp _) (m₂ := OracleComp _) (l := Prop) _ _ ?_)))
     else if (eRelTripleGoalParts? target).isSome then
       pure <| some (← `(tactic| refine OracleComp.ProgramLogic.Relational.eRelTriple_conseq le_rfl ?_ ?_))
     else
@@ -416,7 +421,9 @@ private def runRVCGenStepWithTheoremConseq
     match ← observing? do
       evalTactic wrapper
       unless ← focusFirstGoalSatisfying fun target =>
-          (relTripleGoalParts? target).isSome || (eRelTripleGoalParts? target).isSome do
+          (relTripleGoalParts? target).isSome ||
+          (relWPGoalParts? target).isSome ||
+          (eRelTripleGoalParts? target).isSome do
         throwError "rvcstep with theorem: failed to focus theorem subgoal after consequence rule"
       evalTactic (← `(tactic| apply $thm))
       closeRelTheoremStepGoals
