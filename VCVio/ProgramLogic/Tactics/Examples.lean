@@ -39,6 +39,10 @@ example (oa : OracleComp spec α) :
 
 section Unary
 
+@[local vcspec] theorem wp_pure_eq_spec (x : α) (post : α → ℝ≥0∞) :
+    wp⟦(pure x : OracleComp spec α)⟧ post = post x := by
+  simp [OracleComp.ProgramLogic.wp]
+
 example (x : α) (post : α → ℝ≥0∞) :
     wp⟦(pure x : OracleComp spec α)⟧ post = post x := by
   vcstep
