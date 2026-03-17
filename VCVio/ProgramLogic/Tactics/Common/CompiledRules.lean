@@ -15,9 +15,19 @@ inductive UnaryRuleApplicationMode where
   | tripleConseq
   deriving Inhabited, BEq, Repr
 
+inductive RelationalRuleApplicationMode where
+  | direct
+  | postConseq
+  deriving Inhabited, BEq, Repr
+
 structure CompiledUnaryVCSpecRule where
   entry : VCSpecEntry
   modes : Array UnaryRuleApplicationMode
+  deriving Inhabited, Repr
+
+structure CompiledRelationalVCSpecRule where
+  entry : VCSpecEntry
+  modes : Array RelationalRuleApplicationMode
   deriving Inhabited, Repr
 
 def CompiledUnaryVCSpecRule.theoremName (rule : CompiledUnaryVCSpecRule) : Name :=
@@ -31,6 +41,18 @@ def CompiledUnaryVCSpecRule.replayText (rule : CompiledUnaryVCSpecRule) : String
 
 def CompiledUnaryVCSpecRule.canUseConsequence (rule : CompiledUnaryVCSpecRule) : Bool :=
   rule.modes.contains .tripleConseq
+
+def CompiledRelationalVCSpecRule.theoremName (rule : CompiledRelationalVCSpecRule) : Name :=
+  rule.entry.decl
+
+def CompiledRelationalVCSpecRule.kind (rule : CompiledRelationalVCSpecRule) : VCSpecKind :=
+  rule.entry.kind
+
+def CompiledRelationalVCSpecRule.replayText (rule : CompiledRelationalVCSpecRule) : String :=
+  s!"rvcstep with {rule.theoremName}"
+
+def CompiledRelationalVCSpecRule.canUseConsequence (rule : CompiledRelationalVCSpecRule) : Bool :=
+  rule.modes.contains .postConseq
 
 def compileUnaryVCSpecRule? (entry : VCSpecEntry) : Option CompiledUnaryVCSpecRule :=
   match entry.kind with
@@ -48,10 +70,42 @@ def compileUnaryVCSpecRule? (entry : VCSpecEntry) : Option CompiledUnaryVCSpecRu
 def compileUnaryVCSpecRules (entries : Array VCSpecEntry) : Array CompiledUnaryVCSpecRule :=
   entries.filterMap compileUnaryVCSpecRule?
 
+def compileRelationalVCSpecRule? (entry : VCSpecEntry) : Option CompiledRelationalVCSpecRule :=
+  match entry.kind with
+  | .relTriple =>
+      let modes :=
+        if entry.spec.postShape == .concrete then
+          #[.direct, .postConseq]
+        else
+          #[.direct]
+      some { entry, modes }
+  | .relWP =>
+      some { entry, modes := #[.direct] }
+  | .eRelTriple =>
+      let modes :=
+        if entry.spec.postShape == .concrete then
+          #[.direct, .postConseq]
+        else
+          #[.direct]
+      some { entry, modes }
+  | _ => none
+
+def compileRelationalVCSpecRules
+    (entries : Array VCSpecEntry) : Array CompiledRelationalVCSpecRule :=
+  entries.filterMap compileRelationalVCSpecRule?
+
 def getCompiledUnaryVCSpecRules (comp : Expr) : MetaM (Array CompiledUnaryVCSpecRule) := do
   return compileUnaryVCSpecRules (← getRegisteredUnaryVCSpecEntries comp)
 
 def getCompiledUnaryVCSpecRulesOfKind (kind : VCSpecKind) : CoreM (Array CompiledUnaryVCSpecRule) := do
   return compileUnaryVCSpecRules (← getVCSpecEntriesOfKind kind)
+
+def getCompiledRelationalVCSpecRules (oa ob : Expr) :
+    MetaM (Array CompiledRelationalVCSpecRule) := do
+  return compileRelationalVCSpecRules (← getRegisteredRelationalVCSpecEntries oa ob)
+
+def getCompiledRelationalVCSpecRulesOfKind (kind : VCSpecKind) :
+    CoreM (Array CompiledRelationalVCSpecRule) := do
+  return compileRelationalVCSpecRules (← getVCSpecEntriesOfKind kind)
 
 end OracleComp.ProgramLogic

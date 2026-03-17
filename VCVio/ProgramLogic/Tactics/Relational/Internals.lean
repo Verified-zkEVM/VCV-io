@@ -435,29 +435,22 @@ private def runRVCGenStepWithTheoremConseq
   saved.restore
   return false
 
-private def theoremHasConcreteRelationalPost (kind : VCSpecKind) (thm : Name) : MetaM Bool := do
-  let declTy := (← getConstInfo thm).type
-  let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
-  let post? :=
-    match kind with
-    | .relTriple =>
-        match relTripleGoalParts? targetTy with
-        | some (_, _, post) => some post
-        | none => none
-    | .eRelTriple =>
-        match eRelTripleGoalParts? targetTy with
-        | some (_, _, _, post) => some post
-        | none => none
-    | .relWP =>
-        match relWPGoalParts? targetTy with
-        | some (_, _, post) => some post
-        | none => none
-    | _ => none
-  match post? with
-  | none => return false
-  | some post =>
-      let post := post.consumeMData
-      return !(post.isMVar || post.isFVar || post.isBVar)
+private def runCompiledRelationalRuleMode
+    (rule : CompiledRelationalVCSpecRule)
+    (mode : RelationalRuleApplicationMode)
+    (requireClosed : Bool := false) : TacticM Bool := do
+  match mode with
+  | .direct =>
+      runRVCGenStepWithTheoremDirect (mkIdent rule.theoremName) requireClosed
+  | .postConseq =>
+      runRVCGenStepWithTheoremConseq (mkIdent rule.theoremName) requireClosed
+
+private def runCompiledRelationalRule
+    (rule : CompiledRelationalVCSpecRule) (requireClosed : Bool := false) : TacticM Bool := do
+  for mode in rule.modes do
+    if ← runCompiledRelationalRuleMode rule mode requireClosed then
+      return true
+  return false
 
 /-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
 def runRVCGenStepWithTheorem (thm : TSyntax `term) (requireClosed : Bool := false) :
@@ -477,41 +470,30 @@ private def relationalGoalKind? (target : Expr) : Option VCSpecKind :=
     none
 
 /-- Find the registered relational theorems whose bounded application makes progress. -/
-def findRegisteredRVCGenTheoremCandidates : TacticM (Array Name) := do
+def findRegisteredRVCGenRuleCandidates : TacticM (Array CompiledRelationalVCSpecRule) := do
   let target ← instantiateMVars (← getMainTarget)
   let some kind := relationalGoalKind? target | return #[]
   let some (oa, ob, _) := relationalGoalParts? target | return #[]
   let direct :=
-    ((← getRegisteredRelationalVCSpecEntries oa ob).filter (·.kind == kind)).map (·.decl)
+    (← getCompiledRelationalVCSpecRules oa ob).filter (·.kind == kind)
   let fallback :=
-    (← getVCSpecTheoremsOfKind kind).filter (fun name => !(direct.contains name))
-  let mut found : Array Name := #[]
-  for thm in direct.toList.take 8 do
+    (← getCompiledRelationalVCSpecRulesOfKind kind).filter fun rule =>
+      !(direct.any fun directRule => directRule.theoremName == rule.theoremName)
+  let mut found : Array CompiledRelationalVCSpecRule := #[]
+  for rule in direct.toList.take 8 do
     let saved ← saveState
-    let ok ←
-      if ← runRVCGenStepWithTheoremDirect (mkIdent thm) then
-        pure true
-      else if ← theoremHasConcreteRelationalPost kind thm then
-        runRVCGenStepWithTheoremConseq (mkIdent thm)
-      else
-        pure false
+    let ok ← runCompiledRelationalRule rule
     saved.restore
     if ok then
-      found := found.push thm
+      found := found.push rule
   unless found.isEmpty do
     return found
-  for thm in fallback.toList.take 8 do
+  for rule in fallback.toList.take 8 do
     let saved ← saveState
-    let ok ←
-      if ← runRVCGenStepWithTheoremDirect (mkIdent thm) then
-        pure true
-      else if ← theoremHasConcreteRelationalPost kind thm then
-        runRVCGenStepWithTheoremConseq (mkIdent thm)
-      else
-        pure false
+    let ok ← runCompiledRelationalRule rule
     saved.restore
     if ok then
-      found := found.push thm
+      found := found.push rule
   return found
 
 private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
@@ -555,15 +537,15 @@ private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResu
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
     TacticM (Option (PlannedStep × PreviewResult)) := do
-  let theoremNames ← findRegisteredRVCGenTheoremCandidates
+  let theoremRules ← findRegisteredRVCGenRuleCandidates
   let mut best? : Option (PlannedStep × PreviewResult) := none
   let mut accepted : Array String := #[]
-  for theoremName in theoremNames do
+  for rule in theoremRules do
     let step :=
       mkRVCGenPlannedStep
-        "rvcgen registered theorem"
-        s!"rvcstep with {theoremName}"
-        (runRVCGenStepWithTheorem (mkIdent theoremName))
+        "rvcgen compiled theorem rule"
+        rule.replayText
+        (runCompiledRelationalRule rule)
     let preview ← previewPlannedStepWithGoals step
     if preview.ok then
       accepted := accepted.push (renderPlannedStepPreview step preview)
@@ -654,8 +636,8 @@ def runRVCGenStep : TacticM Bool := do
       return true
   if ← runRVCGenCore then
     return true
-  if let some theoremName := (← findRegisteredRVCGenTheoremCandidates).toList.head? then
-    if ← runRVCGenStepWithTheorem (mkIdent theoremName) then
+  if let some rule := (← findRegisteredRVCGenRuleCandidates).toList.head? then
+    if ← runCompiledRelationalRule rule then
       return true
   return progress
 
@@ -708,7 +690,7 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
       let hintCandidates ← findRelHintCandidates
-      let theoremCandidates ← findRegisteredRVCGenTheoremCandidates
+      let theoremCandidates := (← findRegisteredRVCGenRuleCandidates).map (·.theoremName)
       let goalLabel :=
         if isERelTripleGoal target then
           "`eRelTriple`"
