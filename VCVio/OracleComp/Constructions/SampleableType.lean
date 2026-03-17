@@ -87,17 +87,17 @@ lemma probOutput_bind_bijective_uniform_cross
   exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
 
 lemma probOutput_add_left_uniform [AddGroup α] (m x : α) :
-    Pr[= x | (fun y : α => m + y) <$> ($ᵗ α)] = Pr[= x | $ᵗ α] := by
-  have h : Pr[= m + (-m + x) | (fun y : α => m + y) <$> ($ᵗ α)] =
+    Pr[= x | (m + ·) <$> ($ᵗ α)] = Pr[= x | $ᵗ α] := by
+  have h : Pr[= m + (-m + x) | ((m + ·) : α → α) <$> ($ᵗ α)] =
       Pr[= -m + x | $ᵗ α] :=
     probOutput_map_injective
       (mx := ($ᵗ α))
-      (f := fun y : α => m + y)
+      (f := (m + ·))
       (hf := by intro a b hab; exact add_left_cancel hab)
       (x := -m + x)
   calc
-    Pr[= x | (fun y : α => m + y) <$> ($ᵗ α)]
-        = Pr[= m + (-m + x) | (fun y : α => m + y) <$> ($ᵗ α)] := by
+    Pr[= x | ((m + ·) : α → α) <$> ($ᵗ α)]
+        = Pr[= m + (-m + x) | ((m + ·) : α → α) <$> ($ᵗ α)] := by
           congr 1
           symm
           exact add_neg_cancel_left m x
@@ -119,8 +119,9 @@ lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
   rw [probOutput_add_left_uniform (α := α) m y]
 
 /-- Translating a uniform additive sample preserves the full evaluation distribution. -/
+@[simp]
 lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
-    evalDist ((fun y : α => m + y) <$> ($ᵗ α : ProbComp α)) =
+    evalDist (((m + ·) : α → α) <$> ($ᵗ α : ProbComp α)) =
       evalDist ($ᵗ α : ProbComp α) := by
   apply evalDist_ext
   intro x
@@ -128,8 +129,8 @@ lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
 
 /-- Two additive translations of a uniform sample have the same evaluation distribution. -/
 lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
-    evalDist ((fun y : α => m₁ + y) <$> ($ᵗ α : ProbComp α)) =
-      evalDist ((fun y : α => m₂ + y) <$> ($ᵗ α : ProbComp α)) := by
+    evalDist (((m₁ + ·) : α → α) <$> ($ᵗ α : ProbComp α)) =
+      evalDist (((m₂ + ·) : α → α) <$> ($ᵗ α : ProbComp α)) := by
   trans evalDist ($ᵗ α : ProbComp α)
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm

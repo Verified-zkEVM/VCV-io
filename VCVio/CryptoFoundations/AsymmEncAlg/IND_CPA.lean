@@ -670,6 +670,7 @@ private lemma IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted, hcache])
     pk true q (adversary pk) q (hq pk) ∅ 0 (by omega)
 
+omit [DecidableEq C] in
 /-- The standard random-bit IND-CPA experiment is the uniform-bit branch over the all-left and
 all-right endpoint games. -/
 private lemma IND_CPA_experiment_probOutput_eq_branch
@@ -689,6 +690,7 @@ private lemma IND_CPA_experiment_probOutput_eq_branch
 noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
   (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
 
+omit [DecidableEq C] in
 /-- The signed real IND-CPA advantage is half the left/right endpoint gap. -/
 theorem IND_CPA_signedAdvantageReal_eq_lrDiff_half
     (adversary : encAlg'.IND_CPA_adversary) :

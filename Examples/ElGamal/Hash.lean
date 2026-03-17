@@ -55,7 +55,7 @@ open OracleComp OracleSpec ENNReal DiffieHellman
 The additive group operation `+` on `M` plays the role of XOR.
 Following `elgamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
 @[simps!] def hashedElGamal (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
-    {G : Type} [AddCommGroup G] [Module F G] [SampleableType G]
+    {G : Type} [AddCommGroup G] [Module F G]
     {HK : Type} [SampleableType HK]
     {M : Type} [AddCommGroup M] [SampleableType M]
     (g : G) (hash : HK → G → M) :
@@ -74,14 +74,14 @@ Following `elgamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
 namespace hashedElGamal
 
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
-variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
+variable {G : Type} [AddCommGroup G] [Module F G] [DecidableEq G]
 variable {HK : Type} [SampleableType HK]
-variable {M : Type} [AddCommGroup M] [SampleableType M] [DecidableEq M] [Fintype M]
+variable {M : Type} [AddCommGroup M] [SampleableType M] [DecidableEq M]
 variable {g : G} {hash : HK → G → M}
 
 /-! ## Correctness -/
 
-omit [DecidableEq G] [Fintype M] in
+omit [DecidableEq G] in
 theorem correct :
     (hashedElGamal F g hash).PerfectlyCorrect := by
   have hcomm : ∀ (a b : F), a • (b • g) = b • (a • g) := by
@@ -90,6 +90,10 @@ theorem correct :
   simp [AsymmEncAlg.CorrectExp, hashedElGamal, hcomm]
 
 /-! ## DDH Reduction -/
+
+section Security
+
+variable [SampleableType G]
 
 /-- Construct a DDH adversary from a CPA adversary for hashed ElGamal.
 Given DDH challenge `(g, A, B, T)`:
@@ -135,7 +139,7 @@ private lemma probOutput_bind_bind_swap
   simpa [probEvent_eq_eq_probOutput] using
     (probEvent_bind_bind_swap (mx := mx) (my := my) (f := f) (q := fun x : γ => x = z))
 
-omit [DecidableEq G] [DecidableEq M] in
+omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 private lemma idealMaskedCipher_dist_indep
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash))
     (y : F) (m₁ m₂ : M) (st : adv.State) :
@@ -155,7 +159,7 @@ private lemma idealMaskedCipher_dist_indep
 
 /-! ## Game-hop lemmas -/
 
-omit [DecidableEq G] [DecidableEq M] [Fintype M] in
+omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 /-- Game 0 = CPA game equals DDH real branch (by construction). -/
 theorem cpaGame_eq_ddhReal
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
@@ -245,7 +249,7 @@ theorem cpaGame_eq_ddhReal
           true)
   exact hleft.trans (hswap.trans hright.symm)
 
-omit [DecidableEq G] [DecidableEq M] [Fintype M] in
+omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 /-- DDH random branch equals ES real experiment (by construction). -/
 theorem ddhRand_eq_esReal
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
@@ -349,7 +353,7 @@ theorem ddhRand_eq_esReal
           pure (b == b'))
         true)
   exact hleft.trans hright.symm
-omit [DecidableEq G] [DecidableEq M] in
+omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 /-- ES ideal experiment: the ciphertext `v + m_b` with uniform `v` is uniform
 regardless of `b`, so the game reduces to random guessing.
 Uses the same uniform-masking principle as the one-time pad. -/
@@ -468,7 +472,7 @@ theorem esIdeal_eq_half
 
 /-! ## Main theorem -/
 
-omit [DecidableEq G] [DecidableEq M] in
+omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 /-- **Main theorem.** The one-time IND-CPA bias of hashed ElGamal is bounded by
 the DDH distinguishing advantage plus the entropy smoothing advantage:
 
@@ -515,5 +519,7 @@ theorem hashedElGamal_indcpa_bound
     _ = ddhDistAdvantage g (ddhReduction (F := F) (hash := hash) adv) +
         EntropySmoothing.advantage F g hash (esReduction (F := F) (g := g) adv) := by
       rw [EntropySmoothing.advantage]
+
+end Security
 
 end hashedElGamal
