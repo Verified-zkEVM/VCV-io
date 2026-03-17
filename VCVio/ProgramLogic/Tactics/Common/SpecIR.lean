@@ -95,10 +95,10 @@ def classifyVCSpecCompForm (comp : Expr) : VCSpecCompForm :=
     .listMapM
   else if isListFoldlMExpr comp then
     .listFoldlM
-  else if (findAppWithHead? ``query comp).isSome then
-    .query
   else if isSimulateQAction comp then
     .simulateQ
+  else if (findAppWithHead? ``query comp).isSome then
+    .query
   else
     .other
 
@@ -133,6 +133,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .unaryWP
       lookupKey := .unary (← headConstNameOrError attrName "unary computations" comp)
+      compPattern := classifyUnaryCompPattern comp
       theoremBinderCount := binderCount
       preShape := none
       postShape := classifyArgShape post
