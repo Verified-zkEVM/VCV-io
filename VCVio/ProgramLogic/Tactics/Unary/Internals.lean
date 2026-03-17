@@ -126,13 +126,21 @@ private def runVCGenStepWithTheoremConseq
   saved.restore
   return false
 
-private def theoremHasConcreteUnaryPost (thm : Name) : MetaM Bool := do
-  let declTy := (← getConstInfo thm).type
-  let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
-  if let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple targetTy then
-    if let some args := trailingArgs? app 3 then
-      let post := (args[2]!).consumeMData
-      return !(post.isMVar || post.isFVar || post.isBVar)
+private def runCompiledUnaryRuleMode
+    (rule : CompiledUnaryVCSpecRule)
+    (mode : UnaryRuleApplicationMode)
+    (requireClosed : Bool := false) : TacticM Bool := do
+  match mode with
+  | .direct =>
+      runVCGenStepWithTheoremDirect (mkIdent rule.theoremName) requireClosed
+  | .tripleConseq =>
+      runVCGenStepWithTheoremConseq (mkIdent rule.theoremName) requireClosed
+
+private def runCompiledUnaryRule
+    (rule : CompiledUnaryVCSpecRule) (requireClosed : Bool := false) : TacticM Bool := do
+  for mode in rule.modes do
+    if ← runCompiledUnaryRuleMode rule mode requireClosed then
+      return true
   return false
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.
@@ -338,45 +346,34 @@ private def unaryGoalKindAndComp? (target : Expr) : Option (VCSpecKind × Expr) 
       | none => none
 
 /-- Find the registered theorems whose bounded application makes progress. -/
-def findRegisteredVCGenTheoremCandidates : TacticM (Array Name) := do
+def findRegisteredVCGenRuleCandidates : TacticM (Array CompiledUnaryVCSpecRule) := do
   let target ← instantiateMVars (← getMainTarget)
   let some (kind, comp) := unaryGoalKindAndComp? target | return #[]
   let direct :=
-    ((← getRegisteredUnaryVCSpecEntries comp).filter (·.kind == kind)).map (·.decl)
+    (← getCompiledUnaryVCSpecRules comp).filter (·.kind == kind)
   let fallback :=
-    (← getVCSpecTheoremsOfKind kind).filter (fun name => !(direct.contains name))
-  let mut found : Array Name := #[]
-  for thm in direct.toList.take 8 do
+    (← getCompiledUnaryVCSpecRulesOfKind kind).filter fun rule =>
+      !(direct.any fun directRule => directRule.theoremName == rule.theoremName)
+  let mut found : Array CompiledUnaryVCSpecRule := #[]
+  for rule in direct.toList.take 8 do
     let saved ← saveState
-    let ok ←
-      if ← runVCGenStepWithTheoremDirect (mkIdent thm) then
-        pure true
-      else if ← theoremHasConcreteUnaryPost thm then
-        runVCGenStepWithTheoremConseq (mkIdent thm)
-      else
-        pure false
+    let ok ← runCompiledUnaryRule rule
     saved.restore
     if ok then
-      found := found.push thm
+      found := found.push rule
   unless found.isEmpty do
     return found
-  for thm in fallback.toList.take 8 do
+  for rule in fallback.toList.take 8 do
     let saved ← saveState
-    let ok ←
-      if ← runVCGenStepWithTheoremDirect (mkIdent thm) then
-        pure true
-      else if ← theoremHasConcreteUnaryPost thm then
-        runVCGenStepWithTheoremConseq (mkIdent thm)
-      else
-        pure false
+    let ok ← runCompiledUnaryRule rule
     saved.restore
     if ok then
-      found := found.push thm
+      found := found.push rule
   return found
 
 /-- Find the first registered theorem whose bounded application makes progress. -/
-def findRegisteredVCGenTheorem? : TacticM (Option Name) := do
-  return (← findRegisteredVCGenTheoremCandidates).toList.head?
+def findRegisteredVCGenRule? : TacticM (Option CompiledUnaryVCSpecRule) := do
+  return (← findRegisteredVCGenRuleCandidates).toList.head?
 
 def throwVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -400,7 +397,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
       else if let some comp := wpGoalComp? target then
         let comp ← whnfReducible (← instantiateMVars comp)
         let theoremMsg ← do
-          let thms ← findRegisteredVCGenTheoremCandidates
+          let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName)
           pure <| if thms.isEmpty then "" else
             s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
         throwError
@@ -425,7 +422,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
         else
           pure ""
       let theoremMsg ← do
-        let thms ← findRegisteredVCGenTheoremCandidates
+        let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName)
         pure <| if thms.isEmpty then "" else
           s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
       throwError
@@ -900,11 +897,11 @@ private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewRe
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestTheoremStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← findRegisteredVCGenTheoremCandidates).map fun theoremName =>
+  let steps := (← findRegisteredVCGenRuleCandidates).map fun rule =>
     mkVCGenPlannedStep
-      "vcgen registered theorem"
-      s!"vcstep with {theoremName}"
-      (runVCGenStepWithTheorem (mkIdent theoremName))
+      "vcgen compiled theorem rule"
+      rule.replayText
+      (runCompiledUnaryRule rule)
   chooseBestPlannedStepCandidate? steps
 
 private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
@@ -1010,8 +1007,8 @@ def runVCGenStep : TacticM Bool := do
       return true
   if ← runVCGenStructuralCore then
     return true
-  if let some theoremName ← findRegisteredVCGenTheorem? then
-    if ← runVCGenStepWithTheorem (mkIdent theoremName) then
+  if let some rule ← findRegisteredVCGenRule? then
+    if ← runCompiledUnaryRule rule then
       return true
   tryCloseSpecGoal
 

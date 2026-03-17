@@ -119,11 +119,33 @@ def wpGoalComp? (target : Expr) : Option Expr := do
   let #[oa, _post] := args | none
   some oa
 
+def wpGoalParts? (target : Expr) : Option (Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
+  let args ← trailingArgs? app 2
+  let #[oa, post] := args | none
+  some (oa, post)
+
+def rawWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let target := target.consumeMData
+  if target.isAppOfArity ``LE.le 4 then
+    let pre := target.getArg! 2
+    let rhs := target.getArg! 3
+    let (oa, post) ← wpGoalParts? rhs
+    some (pre, oa, post)
+  else
+    none
+
 def tripleGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
   let args ← trailingArgs? app 3
   let #[_pre, oa, _post] := args | none
   some oa
+
+def tripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
+  let args ← trailingArgs? app 3
+  let #[pre, oa, post] := args | none
+  some (pre, oa, post)
 
 def isSimulateQAction (e : Expr) : Bool :=
   (findAppWithHead? ``simulateQ e).isSome
