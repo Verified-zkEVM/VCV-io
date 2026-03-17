@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+import Examples.ElGamal.Common
 import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.EvalDist.Bool
@@ -194,28 +195,15 @@ abbrev IND_CPA_game
 
 open OracleComp.ProgramLogic OracleComp.ProgramLogic.Relational
 
-omit [Fintype F] [DecidableEq F] in
+omit [Fintype F] [DecidableEq F] [DecidableEq G] in
 lemma randomMaskedCipher_dist_indep (m₁ m₂ : G) :
     evalDist (randomMaskedCipher (F := F) (gen := gen) m₁) =
     evalDist (randomMaskedCipher (F := F) (gen := gen) m₂) := by
-  apply evalDist_ext; intro ⟨c₁, c₂⟩
-  simp only [randomMaskedCipher, probOutput_bind_eq_tsum, probOutput_pure, Prod.mk.injEq]
-  congr 1; funext r; congr 1
-  by_cases h : c₁ = r • gen
-  · simp only [h, true_and]
-    have hsum : ∀ msg : G,
-        (∑' y, Pr[= y | $ᵗ G] * if c₂ = msg + y then 1 else 0) =
-          Pr[= -msg + c₂ | $ᵗ G] := by
-      intro msg
-      rw [tsum_eq_single (-msg + c₂)]
-      · have : msg + (-msg + c₂) = c₂ := by abel
-        simp [this]
-      · intro y hy
-        have : c₂ ≠ msg + y := fun heq => hy (show y = -msg + c₂ by rw [heq]; abel)
-        simp [this]
-    rw [hsum, hsum]
-    exact SampleableType.probOutput_selectElem_eq _ _
-  · simp [h]
+  rw [randomMaskedCipher, randomMaskedCipher, evalDist_bind, evalDist_bind]
+  congr 1
+  funext r
+  simpa [randomMaskedCipher, map_eq_bind_pure_comp, Function.comp] using
+    ElGamalExamples.uniformMaskedCipher_dist_indep (head := r • gen) (m₁ := m₁) (m₂ := m₂)
 
 private lemma hybridChallengeOracle_allRandom_evalDist_eq
     (pk : G) (mm : G × G) (s : IND_CPA_HybridState (G := G)) :

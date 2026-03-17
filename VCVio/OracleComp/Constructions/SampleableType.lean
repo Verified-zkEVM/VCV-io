@@ -118,6 +118,22 @@ lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
   refine tsum_congr fun y => ?_
   rw [probOutput_add_left_uniform (α := α) m y]
 
+/-- Translating a uniform additive sample preserves the full evaluation distribution. -/
+lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
+    evalDist ((fun y : α => m + y) <$> ($ᵗ α : ProbComp α)) =
+      evalDist ($ᵗ α : ProbComp α) := by
+  apply evalDist_ext
+  intro x
+  exact probOutput_add_left_uniform (α := α) m x
+
+/-- Two additive translations of a uniform sample have the same evaluation distribution. -/
+lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
+    evalDist ((fun y : α => m₁ + y) <$> ($ᵗ α : ProbComp α)) =
+      evalDist ((fun y : α => m₂ + y) <$> ($ᵗ α : ProbComp α)) := by
+  trans evalDist ($ᵗ α : ProbComp α)
+  · exact evalDist_add_left_uniform (α := α) m₁
+  · exact (evalDist_add_left_uniform (α := α) m₂).symm
+
 /-- Pushing forward uniform sampling along a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]
