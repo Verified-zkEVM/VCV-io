@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
-import VCVio.ProgramLogic.Tactics
 
 /-!
 # Pedersen Commitment Scheme
@@ -58,6 +57,7 @@ variable {g : G}
 
 /-! ## Correctness -/
 
+omit [Fintype F] [DecidableEq F] [Fintype G] [SampleableType G] in
 theorem correct : (pedersenCommit (F := F) g).PerfectlyCorrect := by
   intro pp _hpp m cd hmem
   have hmem' : cd ∈ support (do
@@ -80,12 +80,14 @@ private lemma commit_fst_bijective (hg : Function.Bijective (· • g : F → G)
      fun y => ⟨y - m • pp, sub_add_cancel y (m • pp)⟩⟩
     hg
 
+omit [Fintype F] [DecidableEq F] [Fintype G] [SampleableType G] in
 /-- Rewrite the commitment distribution as a mapped uniform sample. -/
 private lemma commit_fst_eq_map (pp : G) (m : F) :
     Prod.fst <$> (pedersenCommit (F := F) g).commit pp m =
     (fun d : F => d • g + m • pp) <$> ($ᵗ F : ProbComp F) := by
   simp [pedersenCommit]
 
+omit [DecidableEq F] in
 /-- The Pedersen commitment scheme is perfectly hiding: the commitment distribution
 is independent of the committed message.
 
@@ -114,12 +116,86 @@ def dlogReduction (binder : BindingAdv G F G F) : DLogAdversary F G :=
       (d₁ - d₂) / (m₂ - m₁)
     else 0
 
+omit [Fintype F] [DecidableEq F] [SampleableType F]
+  [Fintype G] [SampleableType G] [DecidableEq G] in
+private lemma extractedLog_eq_dlog (hg : Function.Bijective (· • g : F → G))
+    {x m₁ d₁ m₂ d₂ : F} {c : G}
+    (hm : m₁ ≠ m₂)
+    (h₁ : d₁ • g + m₁ • (x • g) = c)
+    (h₂ : d₂ • g + m₂ • (x • g) = c) :
+    (d₁ - d₂) / (m₂ - m₁) = x := by
+  have hmul : d₁ - d₂ = (m₂ - m₁) * x := by
+    have hcoeff : d₁ + m₁ * x = d₂ + m₂ * x := by
+      apply hg.1
+      calc
+        (d₁ + m₁ * x) • g = d₁ • g + m₁ • (x • g) := by rw [add_smul, mul_smul]
+        _ = c := h₁
+        _ = d₂ • g + m₂ • (x • g) := h₂.symm
+        _ = (d₂ + m₂ * x) • g := by rw [add_smul, mul_smul]
+    have hcoeff' := congrArg (fun t : F => t - d₂ - m₁ * x) hcoeff
+    ring_nf at hcoeff' ⊢
+    exact hcoeff'
+  have hneq : m₂ - m₁ ≠ 0 := sub_ne_zero.mpr hm.symm
+  calc
+    (d₁ - d₂) / (m₂ - m₁)
+        = ((m₂ - m₁) * x) / (m₂ - m₁) := by rw [hmul]
+    _ = x := by
+      field_simp [hneq]
+
+omit [Fintype F] [SampleableType F] [Fintype G] [SampleableType G] in
+private lemma bindingWin_implies_dlogWin (hg : Function.Bijective (· • g : F → G))
+    {x m₁ d₁ m₂ d₂ : F} {c : G}
+    (hwin : m₁ ≠ m₂ ∧ d₁ • g + m₁ • (x • g) = c ∧ d₂ • g + m₂ • (x • g) = c) :
+    (if decide (m₁ ≠ m₂ ∧ d₁ • g + m₁ • (x • g) = c ∧ d₂ • g + m₂ • (x • g) = c) then
+      (d₁ - d₂) / (m₂ - m₁)
+    else 0) = x := by
+  rcases hwin with ⟨hm, h₁, h₂⟩
+  have hdec : decide (m₁ ≠ m₂ ∧ d₁ • g + m₁ • (x • g) = c ∧ d₂ • g + m₂ • (x • g) = c) = true := by
+    simp [hm, h₁, h₂]
+  simp [hdec, extractedLog_eq_dlog hg hm h₁ h₂]
+
+omit [Fintype F] [Fintype G] [SampleableType G] in
 /-- Computational binding: a successful Pedersen binding adversary yields a
 successful DLog solver. Specifically, `Pr[binding wins] ≤ Pr[DLog wins]`. -/
 theorem binding_le_dlog (hg : Function.Bijective (· • g : F → G))
     (binder : BindingAdv G F G F) :
     Pr[= true | (pedersenCommit g).bindingExp binder] ≤
     Pr[= true | dlogExp g (dlogReduction binder)] := by
-  sorry
+  let base : ProbComp (F × (G × F × F × F × F)) := do
+    let x ← $ᵗ F
+    let out ← binder (x • g)
+    return (x, out)
+  let bindingWin : F × (G × F × F × F × F) → Prop := fun
+    | (x, (c, m₁, d₁, m₂, d₂)) =>
+        m₁ ≠ m₂ ∧ d₁ • g + m₁ • (x • g) = c ∧ d₂ • g + m₂ • (x • g) = c
+  let dlogWin : F × (G × F × F × F × F) → Prop := fun
+    | (x, (c, m₁, d₁, m₂, d₂)) =>
+        (if decide (m₁ ≠ m₂ ∧ d₁ • g + m₁ • (x • g) = c ∧ d₂ • g + m₂ • (x • g) = c) then
+          (d₁ - d₂) / (m₂ - m₁)
+        else 0) = x
+  have hbinding :
+      Pr[= true | (pedersenCommit g).bindingExp binder] = Pr[bindingWin | base] := by
+    rw [← probEvent_eq_eq_probOutput]
+    rw [show (pedersenCommit g).bindingExp binder = (fun z => decide (bindingWin z)) <$> base by
+      simp [CommitmentScheme.bindingExp, pedersenCommit, base, bindingWin, Bool.and_assoc]]
+    rw [probEvent_map]
+    refine probEvent_ext ?_
+    intro z hz
+    rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
+    simp [bindingWin, Bool.and_eq_true, decide_eq_true_eq]
+  have hdlog :
+      Pr[= true | dlogExp g (dlogReduction binder)] = Pr[dlogWin | base] := by
+    rw [← probEvent_eq_eq_probOutput]
+    rw [show dlogExp g (dlogReduction binder) = (fun z => decide (dlogWin z)) <$> base by
+      simp [DiffieHellman.dlogExp, dlogReduction, base, dlogWin]]
+    rw [probEvent_map]
+    refine probEvent_ext ?_
+    intro z hz
+    rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
+    simp [dlogWin, decide_eq_true_eq]
+  rw [hbinding, hdlog]
+  exact OracleComp.ProgramLogic.probEvent_mono base (fun z hwin => by
+    rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
+    simpa [bindingWin, dlogWin] using bindingWin_implies_dlogWin (g := g) hg hwin)
 
 end pedersenCommit
