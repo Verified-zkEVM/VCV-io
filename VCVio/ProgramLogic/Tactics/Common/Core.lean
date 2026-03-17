@@ -58,6 +58,37 @@ def previewPlannedStep (step : PlannedStep) : TacticM Bool :=
 def previewPlannedStepWithGoals (step : PlannedStep) : TacticM PreviewResult :=
   previewActionWithGoals step.run
 
+def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
+  s!"{step.replayText} -> {preview.goalCount} goal(s)"
+
+def attachPlannerChoiceNotes
+    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
+  withStepNotes step <|
+    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
+      if alternatives.isEmpty then
+        []
+      else
+        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
+
+def chooseBestPlannedStepCandidate? (steps : Array PlannedStep) :
+    TacticM (Option (PlannedStep × PreviewResult)) := do
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for step in steps do
+    let preview ← previewPlannedStepWithGoals step
+    if preview.ok then
+      accepted := accepted.push (renderPlannedStepPreview step preview)
+      match best? with
+      | none => best? := some (step, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (step, preview)
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+
 def logPlannedStep (step : PlannedStep) (beforeGoals afterGoals : Nat) : TacticM Unit := do
   if vcvio.vcgen.traceSteps.get (← getOptions) then
     logInfo m!"[{step.label}] {step.replayText} (goals {beforeGoals} -> {afterGoals})"

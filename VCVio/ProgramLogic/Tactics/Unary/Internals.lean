@@ -16,18 +16,6 @@ namespace Unary
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
-private def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
-  s!"{step.replayText} -> {preview.goalCount} goal(s)"
-
-private def attachPlannerChoiceNotes
-    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
-  withStepNotes step <|
-    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
-      if alternatives.isEmpty then
-        []
-      else
-        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
-
 private def hasProbGoal (target : Expr) : Bool :=
   (findAppWithHead? ``probEvent target).isSome || (findAppWithHead? ``probOutput target).isSome
 
@@ -860,25 +848,6 @@ private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool 
     renameInaccessibleNames names
     return true
   return false
-
-private def chooseBestPlannedStepCandidate? (steps : Array PlannedStep) :
-    TacticM (Option (PlannedStep × PreviewResult)) := do
-  let mut best? : Option (PlannedStep × PreviewResult) := none
-  let mut accepted : Array String := #[]
-  for step in steps do
-    let preview ← previewPlannedStepWithGoals step
-    if preview.ok then
-      accepted := accepted.push (renderPlannedStepPreview step preview)
-      match best? with
-      | none => best? := some (step, preview)
-      | some (_, bestPreview) =>
-          if preview.goalCount < bestPreview.goalCount then
-            best? := some (step, preview)
-  match best? with
-  | none => return none
-  | some (step, preview) =>
-      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
-      return some (attachPlannerChoiceNotes step preview alternatives, preview)
 
 private def chooseBestCutStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
   let steps := (← findHoareCutHintCandidates).map fun cutName =>

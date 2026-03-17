@@ -20,18 +20,6 @@ attribute [vcspec]
 private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
-private def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
-  s!"{step.replayText} -> {preview.goalCount} goal(s)"
-
-private def attachPlannerChoiceNotes
-    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
-  withStepNotes step <|
-    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
-      if alternatives.isEmpty then
-        []
-      else
-        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
-
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -517,48 +505,21 @@ private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
 
 private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
   let hintNames ← findRelHintCandidates
-  let mut best? : Option (PlannedStep × PreviewResult) := none
-  let mut accepted : Array String := #[]
+  let mut steps : Array PlannedStep := #[]
   for hintName in hintNames do
     let step ← buildRelHintStep hintName
-    let preview ← previewPlannedStepWithGoals step
-    if preview.ok then
-      accepted := accepted.push (renderPlannedStepPreview step preview)
-      match best? with
-      | none => best? := some (step, preview)
-      | some (_, bestPreview) =>
-          if preview.goalCount < bestPreview.goalCount then
-            best? := some (step, preview)
-  match best? with
-  | none => return none
-  | some (step, preview) =>
-      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
-      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+    steps := steps.push step
+  chooseBestPlannedStepCandidate? steps
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
     TacticM (Option (PlannedStep × PreviewResult)) := do
   let theoremRules ← findRegisteredRVCGenRuleCandidates
-  let mut best? : Option (PlannedStep × PreviewResult) := none
-  let mut accepted : Array String := #[]
-  for rule in theoremRules do
-    let step :=
-      mkRVCGenPlannedStep
-        "rvcgen compiled theorem rule"
-        rule.replayText
-        (runCompiledRelationalRule rule)
-    let preview ← previewPlannedStepWithGoals step
-    if preview.ok then
-      accepted := accepted.push (renderPlannedStepPreview step preview)
-      match best? with
-      | none => best? := some (step, preview)
-      | some (_, bestPreview) =>
-          if preview.goalCount < bestPreview.goalCount then
-            best? := some (step, preview)
-  match best? with
-  | none => return none
-  | some (step, preview) =>
-      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
-      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+  let steps := theoremRules.map fun rule =>
+    mkRVCGenPlannedStep
+      "rvcgen compiled theorem rule"
+      rule.replayText
+      (runCompiledRelationalRule rule)
+  chooseBestPlannedStepCandidate? steps
 
 /-- Structural/default relational VCGen step, excluding explicit `using`-hint fallbacks. -/
 def runRVCGenStructuralCore : TacticM Bool := do
