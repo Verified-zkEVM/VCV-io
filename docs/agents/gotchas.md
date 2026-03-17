@@ -50,12 +50,12 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 `simp` won't unfold `probOutput` of a bind. Use `rw [probOutput_bind_eq_tsum]` or `grind`.
 
-### 10. Plain `qvcgen_step` may solve a probability equality when you only wanted a rewrite
+### 10. Plain `vcstep` may solve a probability equality when you only wanted a rewrite
 
-On `Pr[...] = Pr[...]` goals, plain `qvcgen_step` heuristically tries swap, congruence, and
-small bounded compositions. If you need to rewrite and continue, use `qvcgen_step rw` for a
-top-level swap, `qvcgen_step rw under 1` under one shared bind prefix, or
-`qvcgen_step rw congr` / `qvcgen_step rw congr'` to expose a shared outer bind. The manual pattern is:
+On `Pr[...] = Pr[...]` goals, plain `vcstep` heuristically tries swap, congruence, and
+small bounded compositions. If you need to rewrite and continue, use `vcstep rw` for a
+top-level swap, `vcstep rw under 1` under one shared bind prefix, or
+`vcstep rw congr` / `vcstep rw congr'` to expose a shared outer bind. The manual pattern is:
 ```lean
 simp only [← probEvent_eq_eq_probOutput ...]
 rw [probEvent_bind_bind_swap]

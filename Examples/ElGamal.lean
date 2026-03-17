@@ -243,7 +243,7 @@ lemma IND_CPA_hybridOracle_allRandom_eqDist
       ((simulateQ (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk false 0)
         (adversary pk)).run' (∅, 0))
       (EqRel _) := by
-  rvcgen_step
+  rvcstep
   · intro t s
     cases t with
     | inl _ => rfl
@@ -332,7 +332,7 @@ private lemma hybridBranch_probOutput_eq
       pure (b == z)] =
     Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary realUntil] := by
   simp [IND_CPA_HybridGame, elgamalAsymmEnc]
-  qvcgen_step rw congr' as ⟨b, a⟩
+  vcstep rw congr' as ⟨b, a⟩
   simpa using
     (probOutput_map_eq_of_evalDist_eq (f := fun z => b == z) (y := true) (h a b))
 
@@ -637,7 +637,7 @@ private lemma stepDDH_simulation_deferred_inl
         (x₂ s) (x₃ s) (Sum.inl tu) =
       IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil
         (Sum.inl tu) from fun _ => rfl]
-  qvcgen_step
+  vcstep
   have hst : b_2.2 = st := hybridQueryImpl_support_inl_state_eq (F := F) (gen := gen)
     pk b realUntil tu st b_2 hb
   subst hst
@@ -670,7 +670,7 @@ private lemma stepDDH_simulation_deferred_inr_lt
   simp only [StepDDHSimulationEq, simulateQ_bind, simulateQ_query, OracleQuery.input_query,
     OracleQuery.cont_query, id_map, StateT.run_bind]
   simp_rw [hq]
-  qvcgen_step
+  vcstep
   have hle' : b_2.2.2 ≤ k := by
     have hsucc := hybridQueryImpl_counter_le_succ (F := F) (gen := gen)
       pk b realUntil (Sum.inr (m₁, m₂)) st b_2 hb
@@ -879,7 +879,7 @@ private lemma stepDDH_realBranch_probOutput_eq
         let z ← Prod.fst <$> lhsRun a b
         pure (b == z)] := by
           simp [DiffieHellman.ddhExpReal, IND_CPA_stepDDHReduction, lhsRun]
-          qvcgen_step
+          vcstep
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary (k + 1)] := by
           refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary (k + 1)
             (fun a b => Prod.fst <$> lhsRun a b) ?_
@@ -913,7 +913,7 @@ private lemma stepDDH_randBranch_probOutput_eq
     intro a b
     apply evalDist_ext
     intro z
-    qvcgen_step rw congr' as ⟨b_scalar⟩
+    vcstep rw congr' as ⟨b_scalar⟩
     exact probOutput_bind_bijective_uniform_cross (α := F) (β := G) (f := (· • gen)) hg
       (fun y => do
         let pk : G := a • gen
@@ -956,7 +956,7 @@ private lemma stepDDH_randBranch_probOutput_eq
         let z ← Prod.fst <$> lhsRun a b
         pure (b == z)] := by
           simp [DiffieHellman.ddhExpRand, IND_CPA_stepDDHReduction, lhsRun]
-          qvcgen_step
+          vcstep
     _ = Pr[= true | IND_CPA_HybridGame (F := F) (gen := gen) adversary k] := by
           refine hybridBranch_probOutput_eq (F := F) (gen := gen) adversary k
             (fun a b => Prod.fst <$> lhsRun a b) ?_

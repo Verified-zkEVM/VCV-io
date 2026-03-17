@@ -366,7 +366,7 @@ theorem triple_probOutput_eq_one (oa : OracleComp spec α) [DecidableEq α]
     Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
   simpa [h] using triple_probOutput_indicator (oa := oa) x
 
-/-- `Pr[= x | oa] = 1` ↔ `Triple 1 oa (indicator)`. Bridge for `qvcgen` probability lowering. -/
+/-- `Pr[= x | oa] = 1` ↔ `Triple 1 oa (indicator)`. Bridge for `vcgen` probability lowering. -/
 theorem probOutput_eq_one_iff_triple (oa : OracleComp spec α) [DecidableEq α] (x : α) :
     Pr[= x | oa] = 1 ↔ Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
   constructor

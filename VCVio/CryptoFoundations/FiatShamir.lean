@@ -220,8 +220,8 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
     simp_rw [hpure_run']]
-  qvcgen_step
-  qvcgen_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
+  vcstep
+  vcstep using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
   · simpa [OracleComp.ProgramLogic.propInd] using
       OracleComp.ProgramLogic.triple_support (oa := hr.gen)
   · intro x
