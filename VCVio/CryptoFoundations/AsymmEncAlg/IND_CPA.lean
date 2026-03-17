@@ -14,7 +14,18 @@ import VCVio.ProgramLogic.Relational.SimulateQ
 /-!
 # Asymmetric Encryption Schemes: IND-CPA
 
-Oracle-based, one-time, and multi-query IND-CPA interfaces and generic transport lemmas.
+This file develops IND-CPA security for asymmetric encryption schemes at three levels:
+
+- oracle-based multi-query adversaries against a cached left/right challenge oracle,
+- two-phase one-time adversaries,
+- generic left/right hybrid games and counted-query transport lemmas for multi-query proofs.
+
+In addition to the basic game definitions, it contains:
+
+- the generic embedding of one-time adversaries into the oracle IND-CPA interface,
+- generic telescoping lemmas for hybrid arguments,
+- a generic step-adversary extraction that isolates the next fresh LR query of an
+  oracle adversary as a one-time challenge.
 -/
 
 open OracleSpec OracleComp ENNReal
@@ -83,6 +94,13 @@ def IND_CPA_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
   let b' ← (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
   return (b == b')
 
+/-- Deterministic left/right endpoint IND-CPA experiment: all fresh LR queries use the branch
+selected by `b`, and the adversary's final guess is returned directly. -/
+def IND_CPA_LR_experiment {encAlg : AsymmEncAlg ProbComp M PK SK C}
+    (adversary : encAlg.IND_CPA_adversary) (b : Bool) : ProbComp Bool := do
+  let (pk, _sk) ← encAlg.keygen
+  (simulateQ (encAlg.IND_CPA_queryImpl' pk b) (adversary pk)).run' ∅
+
 variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
 /-- Cached IND-CPA state extended with a query counter. -/
@@ -118,6 +136,37 @@ def IND_CPA_queryImpl'_counted
   (QueryImpl.ofLift unifSpec ProbComp).liftTarget
     (StateT encAlg'.IND_CPA_CountedState ProbComp) +
     encAlg'.IND_CPA_challengeOracle'_counted pk b
+
+/-- Counted left/right hybrid oracle: the first `leftUntil` fresh LR queries use the left
+message and all later fresh queries use the right message. Repeated queries are answered from
+the cache. -/
+def IND_CPA_hybridChallengeOracleLR_counted
+    (pk : PK) (leftUntil : ℕ) :
+    QueryImpl (M × M →ₒ C)
+      (StateT encAlg'.IND_CPA_CountedState ProbComp) := fun mm => do
+  let st ← get
+  match st.1 mm with
+  | some c => return c
+  | none =>
+      let c ← encAlg'.encrypt pk (if st.2 < leftUntil then mm.1 else mm.2)
+      let cache' := st.1.cacheQuery mm c
+      set (cache', st.2 + 1)
+      return c
+
+/-- Full counted query implementation for the generic left-prefix/right-suffix hybrid family. -/
+def IND_CPA_queryImpl_hybridLR_counted
+    (pk : PK) (leftUntil : ℕ) : QueryImpl encAlg'.IND_CPA_oracleSpec
+      (StateT encAlg'.IND_CPA_CountedState ProbComp) :=
+  (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    (StateT encAlg'.IND_CPA_CountedState ProbComp) +
+    encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk leftUntil
+
+/-- The generic left/right hybrid family: the first `leftUntil` fresh LR queries use the left
+branch, and all later fresh queries use the right branch. -/
+def IND_CPA_LR_hybridGame
+    (adversary : encAlg'.IND_CPA_adversary) (leftUntil : ℕ) : ProbComp Bool := do
+  let (pk, _sk) ← encAlg'.keygen
+  (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (adversary pk)).run' (∅, 0)
 
 omit [DecidableEq C] in
 /-- One-step counter monotonicity for the counted real IND-CPA implementation. -/
@@ -198,6 +247,46 @@ lemma IND_CPA_queryImpl'_counted_proj_eq_queryImpl'
             StateT.run_bind, StateT.run_get, pure_bind]
         simpa [IND_CPA_queryImpl'_counted] using hcounted.trans hreal.symm
       · simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
+          IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
+          StateT.run_bind, StateT.run_get, pure_bind]
+
+omit [DecidableEq C] in
+/-- The `leftUntil = 0` left/right hybrid is exactly the all-right endpoint game once the
+counter is projected away. -/
+lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
+    (pk : PK)
+    (t : encAlg'.IND_CPA_oracleSpec.Domain)
+    (st : encAlg'.IND_CPA_CountedState) :
+    Prod.map id Prod.fst <$> (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk 0 t).run st =
+      ((encAlg'.IND_CPA_queryImpl' pk false) t).run st.1 := by
+  rcases st with ⟨cache, n⟩
+  cases t with
+  | inl tu =>
+      simp [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImpl']
+  | inr mm =>
+      rcases hcache : cache mm with _ | c
+      · have hcounted :
+            Prod.map id Prod.fst <$>
+              (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk 0 mm).run (cache, n) =
+            (do
+              let c ← encAlg'.encrypt pk mm.2
+              pure (c, cache.cacheQuery mm c) : ProbComp _) := by
+          simp only [IND_CPA_hybridChallengeOracleLR_counted, hcache,
+            StateT.run_bind, StateT.run_get, pure_bind, Nat.not_lt_zero,
+            IND_CPA_countedState_run_liftM_eq (encAlg' := encAlg') (st := (cache, n)),
+            bind_assoc, StateT.run_pure]
+          rw [map_bind]
+          refine bind_congr fun c => ?_
+          simp
+        have hreal :
+            ((encAlg'.IND_CPA_queryImpl' pk false) (Sum.inr mm)).run cache =
+            (do
+              let c ← encAlg'.encrypt pk mm.2
+              pure (c, cache.cacheQuery mm c) : ProbComp _) := by
+          simp [IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
+            StateT.run_bind, StateT.run_get, pure_bind]
+        simpa [IND_CPA_queryImpl_hybridLR_counted] using hcounted.trans hreal.symm
+      · simp [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
           IND_CPA_queryImpl', QueryImpl.withCaching_apply, hcache,
           StateT.run_bind, StateT.run_get, pure_bind]
 
@@ -461,13 +550,163 @@ theorem IND_CPA_advantage_eq_oneTimeAdvantageENN_of_oneQueryFactorization
 
 end OracleLift
 
+section MultiQueryToOneTime
+
+variable {encAlg' : AsymmEncAlg ProbComp M PK SK C} [Inhabited M]
+
+/-- Result of running the generic step-adversary prefix simulation. Either the oracle adversary
+has already terminated, or we have paused exactly at the target fresh LR query and captured the
+messages plus the continuation waiting for the challenge ciphertext. -/
+private inductive IND_CPA_StepResult (α : Type)
+  | done (a : α) : IND_CPA_StepResult α
+  | paused (mm : M × M) (cont : C → OracleComp encAlg'.IND_CPA_oracleSpec α) :
+      IND_CPA_StepResult α
+
+/-- Prefix simulation for the generic step adversary. Starting from counter value `n ≤ k`, it
+answers the first `k - n` fresh LR queries with the left branch, stops at the next fresh LR
+query, and records the continuation. -/
+private def IND_CPA_stepPrefix
+    (pk : PK) (k : ℕ) {α : Type} :
+    OracleComp encAlg'.IND_CPA_oracleSpec α →
+      StateT encAlg'.IND_CPA_CountedState ProbComp (IND_CPA_StepResult (encAlg' := encAlg') α) :=
+  OracleComp.construct
+    (C := fun (_ : OracleComp encAlg'.IND_CPA_oracleSpec α) =>
+      StateT encAlg'.IND_CPA_CountedState ProbComp
+        (IND_CPA_StepResult (encAlg' := encAlg') α))
+    (fun a => pure (.done a))
+    (fun t oa rec => by
+      cases t with
+      | inl tu =>
+          exact do
+            let u ← liftM (query (spec := unifSpec) tu)
+            rec u
+      | inr mm =>
+          exact do
+            let st ← get
+            match st.1 mm with
+            | some c => rec c
+            | none =>
+                if hlt : st.2 < k then
+                  let c ← liftM (encAlg'.encrypt pk mm.1)
+                  let cache' := st.1.cacheQuery mm c
+                  set (cache', st.2 + 1)
+                  rec c
+                else
+                  pure (.paused mm oa))
+
+/-- State carried by the generic extracted one-time adversary for the `k`-th adjacent hybrid
+gap. If the original oracle adversary already terminated before issuing the target fresh query,
+we store its final guess. Otherwise we store the paused continuation and counted cache state. -/
+private inductive IND_CPA_StepState
+  | done (guess : Bool) : IND_CPA_StepState
+  | paused (pk : PK) (mm : M × M) (st : encAlg'.IND_CPA_CountedState)
+      (cont : C → OracleComp encAlg'.IND_CPA_oracleSpec Bool) : IND_CPA_StepState
+
+/-- Generic extraction of the one-time adversary for the `k`-th fresh LR query. -/
+def IND_CPA_stepAdversary
+    (adversary : encAlg'.IND_CPA_adversary) (k : ℕ) : IND_CPA_Adv encAlg' where
+  State := IND_CPA_StepState (encAlg' := encAlg')
+  chooseMessages pk := do
+    let ⟨res, st⟩ ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k (adversary pk)).run (∅, 0)
+    match res with
+    | .done guess => pure (default, default, .done guess)
+    | .paused mm cont => pure (mm.1, mm.2, .paused pk mm st cont)
+  distinguish state c := do
+    match state with
+    | .done guess => pure guess
+    | .paused pk mm st cont =>
+        let st' := (st.1.cacheQuery mm c, st.2 + 1)
+        (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run' st'
+
+end MultiQueryToOneTime
+
 section MultiQueryHybridLift
 
 variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
+omit [DecidableEq C] in
+private lemma IND_CPA_LR_hybridGame_zero_evalDist_eq_right
+    (adversary : encAlg'.IND_CPA_adversary) :
+    evalDist (encAlg'.IND_CPA_LR_hybridGame adversary 0) =
+      evalDist (encAlg'.IND_CPA_LR_experiment adversary false) := by
+  simp only [IND_CPA_LR_hybridGame, IND_CPA_LR_experiment, evalDist_bind]
+  congr 1
+  funext ⟨pk, _sk⟩
+  simpa using congrArg evalDist
+    (OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq
+      (impl₁ := encAlg'.IND_CPA_queryImpl_hybridLR_counted pk 0)
+      (impl₂ := encAlg'.IND_CPA_queryImpl' pk false)
+      (proj := Prod.fst)
+      (hproj := encAlg'.IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false pk)
+      (adversary pk) (∅, 0))
+
+omit [DecidableEq C] in
+private lemma IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
+    (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
+    (hq : adversary.MakesAtMostQueries q) :
+    evalDist (encAlg'.IND_CPA_LR_hybridGame adversary q) =
+      evalDist (encAlg'.IND_CPA_LR_experiment adversary true) := by
+  simp only [IND_CPA_LR_hybridGame, IND_CPA_LR_experiment, evalDist_bind]
+  congr 1
+  funext ⟨pk, _sk⟩
+  exact IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
+    (encAlg' := encAlg')
+    (implCounted := fun pk b realUntil =>
+      if b then encAlg'.IND_CPA_queryImpl_hybridLR_counted pk realUntil
+      else encAlg'.IND_CPA_queryImpl_hybridLR_counted pk 0)
+    (hsame := by
+      intro pk b realUntil t st hcond
+      cases t with
+      | inl _ =>
+          cases b <;> simp [IND_CPA_queryImpl'_counted, IND_CPA_queryImpl_hybridLR_counted]
+      | inr mm =>
+          rcases hcache : st.1 mm with _ | c
+          · cases b <;>
+              simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
+                IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
+                hcache, hcond, IND_CPA_countedState_run_liftM_eq (encAlg' := encAlg') (st := st)]
+          · cases b <;>
+              simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
+                IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted, hcache])
+    pk true q (adversary pk) q (hq pk) ∅ 0 (by omega)
+
+/-- The standard random-bit IND-CPA experiment is the uniform-bit branch over the all-left and
+all-right endpoint games. -/
+private lemma IND_CPA_experiment_probOutput_eq_branch
+    (adversary : encAlg'.IND_CPA_adversary) :
+    Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary] =
+      Pr[= true | do
+        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if bit then encAlg'.IND_CPA_LR_experiment adversary true
+                 else encAlg'.IND_CPA_LR_experiment adversary false
+        pure (bit == z)] := by
+  unfold IND_CPA_experiment IND_CPA_LR_experiment
+  refine probOutput_bind_congr' ($ᵗ Bool) true ?_
+  intro bit
+  cases bit <;> simp
+
 /-- Signed real IND-CPA advantage `Pr[win] - 1/2` for the oracle IND-CPA experiment. -/
 noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
   (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
+
+/-- The signed real IND-CPA advantage is half the left/right endpoint gap. -/
+theorem IND_CPA_signedAdvantageReal_eq_lrDiff_half
+    (adversary : encAlg'.IND_CPA_adversary) :
+    IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary =
+      ((Pr[= true | encAlg'.IND_CPA_LR_experiment adversary true]).toReal -
+        (Pr[= true | encAlg'.IND_CPA_LR_experiment adversary false]).toReal) / 2 := by
+  unfold IND_CPA_signedAdvantageReal
+  rw [show (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal =
+      (Pr[= true | do
+        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if bit then encAlg'.IND_CPA_LR_experiment adversary true
+                 else encAlg'.IND_CPA_LR_experiment adversary false
+        pure (bit == z)]).toReal from by
+          congr 1
+          exact IND_CPA_experiment_probOutput_eq_branch (encAlg' := encAlg') adversary]
+  exact probOutput_uniformBool_branch_toReal_sub_half
+    (encAlg'.IND_CPA_LR_experiment adversary true)
+    (encAlg'.IND_CPA_LR_experiment adversary false)
 
 /-- Telescoping identity for adjacent hybrid differences over a finite game sequence. -/
 lemma sum_hybridDiff_eq_trueProb_sub (games : ℕ → ProbComp Bool) (q : ℕ) :
