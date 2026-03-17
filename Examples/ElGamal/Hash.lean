@@ -130,15 +130,6 @@ def esReduction (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     let b' ← adv.distinguish st c
     return (b == b')
 
-private lemma probOutput_bind_bind_swap
-    {α β γ : Type}
-    (mx : ProbComp α) (my : ProbComp β) (f : α → β → ProbComp γ) (z : γ)
-    [DecidableEq γ] :
-    Pr[= z | mx >>= fun a => my >>= fun b => f a b] =
-      Pr[= z | my >>= fun b => mx >>= fun a => f a b] := by
-  simpa [probEvent_eq_eq_probOutput] using
-    (probEvent_bind_bind_swap (mx := mx) (my := my) (f := f) (q := fun x : γ => x = z))
-
 omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 private lemma idealMaskedCipher_dist_indep
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash))

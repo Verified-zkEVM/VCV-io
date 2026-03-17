@@ -767,17 +767,6 @@ theorem IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
       (f := fun i => (Pr[= true | games i]).toReal -
         (Pr[= true | games (i + 1)]).toReal))
 
-/-- Real bridge for truncated ENNReal subtraction: `(a - b).toReal` is bounded by
-`|a.toReal - b.toReal|`. -/
-lemma toReal_tsub_le_abs_toReal_sub (a b : ℝ≥0∞) (ha : a ≠ ∞) :
-    (a - b).toReal ≤ |a.toReal - b.toReal| := by
-  by_cases h : b ≤ a
-  · rw [ENNReal.toReal_sub_of_le h ha]
-    exact le_abs_self _
-  · have h' : a ≤ b := le_of_not_ge h
-    rw [tsub_eq_zero_of_le h']
-    exact abs_nonneg _
-
 omit [DecidableEq C] in
 /-- Compatibility bridge to the existing `IND_CPA_advantage` API:
 the `toReal` of the `ℝ≥0∞` signed advantage is bounded by the absolute signed real advantage. -/
@@ -788,7 +777,7 @@ theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
       |IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary| := by
   unfold IND_CPA_advantage IND_CPA_signedAdvantageReal
   simpa using
-    (toReal_tsub_le_abs_toReal_sub
+    (ENNReal.toReal_tsub_le_abs_toReal_sub
       (a := Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary])
       (b := (1 / 2 : ℝ≥0∞))
       (ha := probOutput_ne_top))
