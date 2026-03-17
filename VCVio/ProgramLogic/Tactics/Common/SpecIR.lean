@@ -29,9 +29,28 @@ inductive VCSpecArgShape where
   | concrete
   deriving Inhabited, BEq, Repr
 
+inductive VCSpecCompForm where
+  | bind
+  | pure
+  | ite
+  | map
+  | replicate
+  | listMapM
+  | listFoldlM
+  | query
+  | simulateQ
+  | other
+  deriving Inhabited, BEq, Repr
+
+inductive VCSpecCompPattern where
+  | unary (form : VCSpecCompForm)
+  | relational (leftForm rightForm : VCSpecCompForm)
+  deriving Inhabited, BEq, Repr
+
 structure NormalizedVCSpec where
   kind : VCSpecKind
   lookupKey : VCSpecLookupKey
+  compPattern : VCSpecCompPattern
   theoremBinderCount : Nat
   preShape : Option VCSpecArgShape
   postShape : VCSpecArgShape
@@ -60,6 +79,35 @@ private def relationalLookupKeyOrError (oa ob : Expr) : MetaM VCSpecLookupKey :=
   let rightHead ← headConstNameOrError `vcspec "relational right computations" ob
   return .relational leftHead rightHead
 
+def classifyVCSpecCompForm (comp : Expr) : VCSpecCompForm :=
+  let comp := comp.consumeMData
+  if isBindExpr comp then
+    .bind
+  else if isPureExpr comp then
+    .pure
+  else if isIfExpr comp then
+    .ite
+  else if isMapExpr comp then
+    .map
+  else if isReplicateExpr comp then
+    .replicate
+  else if isListMapMExpr comp then
+    .listMapM
+  else if isListFoldlMExpr comp then
+    .listFoldlM
+  else if (findAppWithHead? ``query comp).isSome then
+    .query
+  else if isSimulateQAction comp then
+    .simulateQ
+  else
+    .other
+
+def classifyUnaryCompPattern (comp : Expr) : VCSpecCompPattern :=
+  .unary (classifyVCSpecCompForm comp)
+
+def classifyRelationalCompPattern (oa ob : Expr) : VCSpecCompPattern :=
+  .relational (classifyVCSpecCompForm oa) (classifyVCSpecCompForm ob)
+
 def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVCSpec := do
   let (xs, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
   let binderCount := xs.size
@@ -67,6 +115,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .unaryTriple
       lookupKey := .unary (← headConstNameOrError attrName "unary computations" comp)
+      compPattern := classifyUnaryCompPattern comp
       theoremBinderCount := binderCount
       preShape := some (classifyArgShape pre)
       postShape := classifyArgShape post
@@ -75,6 +124,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .unaryWP
       lookupKey := .unary (← headConstNameOrError attrName "unary computations" comp)
+      compPattern := classifyUnaryCompPattern comp
       theoremBinderCount := binderCount
       preShape := some (classifyArgShape pre)
       postShape := classifyArgShape post
@@ -91,6 +141,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .relTriple
       lookupKey := ← relationalLookupKeyOrError oa ob
+      compPattern := classifyRelationalCompPattern oa ob
       theoremBinderCount := binderCount
       preShape := none
       postShape := classifyArgShape post
@@ -99,6 +150,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .relWP
       lookupKey := ← relationalLookupKeyOrError oa ob
+      compPattern := classifyRelationalCompPattern oa ob
       theoremBinderCount := binderCount
       preShape := none
       postShape := classifyArgShape post
@@ -107,6 +159,7 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
     return {
       kind := .eRelTriple
       lookupKey := ← relationalLookupKeyOrError oa ob
+      compPattern := classifyRelationalCompPattern oa ob
       theoremBinderCount := binderCount
       preShape := some (classifyArgShape pre)
       postShape := classifyArgShape post

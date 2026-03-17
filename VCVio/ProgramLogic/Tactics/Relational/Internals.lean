@@ -462,11 +462,14 @@ def findRegisteredRVCGenRuleCandidates : TacticM (Array CompiledRelationalVCSpec
   let target ← instantiateMVars (← getMainTarget)
   let some kind := relationalGoalKind? target | return #[]
   let some (oa, ob, _) := relationalGoalParts? target | return #[]
+  let goalPattern := classifyRelationalCompPattern oa ob
   let direct :=
     (← getCompiledRelationalVCSpecRules oa ob).filter (·.kind == kind)
-  let fallback :=
+  let fallbackAll :=
     (← getCompiledRelationalVCSpecRulesOfKind kind).filter fun rule =>
       !(direct.any fun directRule => directRule.theoremName == rule.theoremName)
+  let fallbackPreferred := fallbackAll.filter (·.entry.spec.compPattern == goalPattern)
+  let fallbackFallback := fallbackAll.filter (·.entry.spec.compPattern != goalPattern)
   let mut found : Array CompiledRelationalVCSpecRule := #[]
   for rule in direct.toList.take 8 do
     let saved ← saveState
@@ -476,12 +479,15 @@ def findRegisteredRVCGenRuleCandidates : TacticM (Array CompiledRelationalVCSpec
       found := found.push rule
   unless found.isEmpty do
     return found
-  for rule in fallback.toList.take 8 do
-    let saved ← saveState
-    let ok ← runCompiledRelationalRule rule
-    saved.restore
-    if ok then
-      found := found.push rule
+  for fallback in [fallbackPreferred, fallbackFallback] do
+    for rule in fallback.toList.take 8 do
+      let saved ← saveState
+      let ok ← runCompiledRelationalRule rule
+      saved.restore
+      if ok then
+        found := found.push rule
+    unless found.isEmpty do
+      return found
   return found
 
 private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do

@@ -337,11 +337,14 @@ private def unaryGoalKindAndComp? (target : Expr) : Option (VCSpecKind × Expr) 
 def findRegisteredVCGenRuleCandidates : TacticM (Array CompiledUnaryVCSpecRule) := do
   let target ← instantiateMVars (← getMainTarget)
   let some (kind, comp) := unaryGoalKindAndComp? target | return #[]
+  let goalPattern := classifyUnaryCompPattern comp
   let direct :=
     (← getCompiledUnaryVCSpecRules comp).filter (·.kind == kind)
-  let fallback :=
+  let fallbackAll :=
     (← getCompiledUnaryVCSpecRulesOfKind kind).filter fun rule =>
       !(direct.any fun directRule => directRule.theoremName == rule.theoremName)
+  let fallbackPreferred := fallbackAll.filter (·.entry.spec.compPattern == goalPattern)
+  let fallbackFallback := fallbackAll.filter (·.entry.spec.compPattern != goalPattern)
   let mut found : Array CompiledUnaryVCSpecRule := #[]
   for rule in direct.toList.take 8 do
     let saved ← saveState
@@ -351,12 +354,15 @@ def findRegisteredVCGenRuleCandidates : TacticM (Array CompiledUnaryVCSpecRule) 
       found := found.push rule
   unless found.isEmpty do
     return found
-  for rule in fallback.toList.take 8 do
-    let saved ← saveState
-    let ok ← runCompiledUnaryRule rule
-    saved.restore
-    if ok then
-      found := found.push rule
+  for fallback in [fallbackPreferred, fallbackFallback] do
+    for rule in fallback.toList.take 8 do
+      let saved ← saveState
+      let ok ← runCompiledUnaryRule rule
+      saved.restore
+      if ok then
+        found := found.push rule
+    unless found.isEmpty do
+      return found
   return found
 
 /-- Find the first registered theorem whose bounded application makes progress. -/
