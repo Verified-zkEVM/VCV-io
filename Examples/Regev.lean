@@ -513,7 +513,7 @@
 -- -- (2) the LHL consequence advantage
 
 -- theorem IND_CPA_advantage_le :
---   IND_CPA_OneTime_Advantage (encAlg := uniformRegevAsymmEnc n m p χ he) adv ≤
+--   IND_CPA_OneTime_biasAdvantage (encAlg := uniformRegevAsymmEnc n m p χ he) adv ≤
 --     (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv))
 --       + (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) := by
 --   calc

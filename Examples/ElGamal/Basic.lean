@@ -38,15 +38,13 @@ Here `F` is the scalar field (e.g. `ZMod p`), `G` is the group of elements
 3. Key lemma (`IND_CPA_allRandomHalf`): the all-random hybrid (i = 0) has success probability
    exactly 1/2, because `randomMaskedCipher` produces a uniform distribution independent of the
    message (the component `msg + y` with `y ~ U(G)` is uniform in `G`).
-4. Per-hop DDH reduction (`IND_CPA_stepDDHReduction`): a DDH adversary that embeds the DDH
-   challenge into the k-th fresh query, so that the DDH-real branch equals hybrid k+1 and the
-   DDH-random branch equals hybrid k.
-5. Per-hop bound (`IND_CPA_stepDDH_hopBound`): the absolute difference between consecutive
-   hybrid winning probabilities is at most twice the DDH advantage of the step-k reduction.
-6. Query-bound bridge: the `q`-th hybrid equals the actual IND-CPA experiment for adversaries
-   making at most `q` fresh LR queries.
-7. Main theorem (`elGamal_IND_CPA_le_q_mul_ddh`): IND-CPA advantage ≤ `q * (2ε)` where `ε`
-   bounds each per-hop DDH advantage.
+4. Legacy local hybrid argument: this file still contains the original ElGamal-specific
+   per-hop DDH reduction and query-bound bridge used to prove the many-query theorem directly.
+5. One-time DDH bridge for the generic lift: `IND_CPA_OneTime_DDHReduction` together with helper
+   lemmas identifying the one-time ElGamal game with the DDH-real branch and the DDH-random
+   branch with a `1/2` guessing game.
+6. Final theorem in generic-lift form: `elGamal_IND_CPA_le_q_mul_ddh` is stated to consume the
+   generic one-time-to-many-time theorem from `AsymmEncAlg.IND_CPA`.
 
 ## Query-bound hypothesis
 
@@ -998,25 +996,82 @@ lemma IND_CPA_stepDDH_hopBound
     linarith
   rw [heq, abs_mul, abs_of_nonneg (by positivity)]
 
-/-! ## 6. Bridging hybrid game to real game via query bound -/
+/-! ## 6. One-time DDH bridge and final theorem -/
 
-private lemma allReal_eq_hybrid_on_bounded
-    (pk : G) (b : Bool) (realUntil : ℕ)
-    (t : (elgamalAsymmEnc F G gen).IND_CPA_oracleSpec.Domain)
-    (st : IND_CPA_HybridState (G := G)) (hlt : st.2 < realUntil) :
-    (AsymmEncAlg.IND_CPA_queryImpl'_counted
-      (encAlg' := elgamalAsymmEnc F G gen) pk b t).run st =
-    (IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil t).run st := by
-  cases t with
-  | inl _ => rfl
-  | inr mm =>
-      rcases hcache : st.1 mm with _ | c
-      · simp [AsymmEncAlg.IND_CPA_queryImpl'_counted, AsymmEncAlg.IND_CPA_challengeOracle'_counted,
-          IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache, hlt,
-          hybridState_run_liftM_eq (G := G) (st := st)]
-      · simp [AsymmEncAlg.IND_CPA_queryImpl'_counted, AsymmEncAlg.IND_CPA_challengeOracle'_counted,
-          IND_CPA_queryImpl_hybrid, IND_CPA_hybridChallengeOracle, hcache]
-/-! ## 7. Main theorem -/
+/-- One-time DDH reduction for ElGamal. On input `(gen, A, B, T)`, use `A` as the ElGamal
+public key, form the challenge ciphertext `(B, T + m_b)`, and return whether the one-time
+adversary guessed the hidden bit `b`.
+
+This is the scheme-specific bridge intended to feed the generic one-time-to-many-time lift in
+`AsymmEncAlg.IND_CPA`. -/
+def IND_CPA_OneTime_DDHReduction
+    (adv : AsymmEncAlg.IND_CPA_Adv (elgamalAsymmEnc F G gen)) :
+    DiffieHellman.DDHAdversary F G := fun _ A B T => do
+  let (m₁, m₂, st) ← adv.chooseMessages A
+  let bit ← ($ᵗ Bool : ProbComp Bool)
+  let c : G × G := (B, T + if bit then m₁ else m₂)
+  let bit' ← adv.distinguish st c
+  pure (bit == bit')
+
+/-- Planned real-branch identification for the one-time ElGamal reduction. After unfolding
+`IND_CPA_OneTime_Game_ProbComp`, `elgamalAsymmEnc`, `DiffieHellman.ddhExpReal`, and
+`IND_CPA_OneTime_DDHReduction`, both sides should normalize to the same sample space. -/
+private lemma IND_CPA_OneTime_game_evalDist_eq_ddhExpReal
+    (adv : AsymmEncAlg.IND_CPA_Adv (elgamalAsymmEnc F G gen)) :
+    evalDist
+      (AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
+        (encAlg := elgamalAsymmEnc F G gen) adv) =
+      evalDist
+        (DiffieHellman.ddhExpReal (F := F) gen
+          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)) := by
+  -- Proof plan:
+  -- 1. unfold `IND_CPA_OneTime_Game_ProbComp`, `elgamalAsymmEnc`, `DiffieHellman.ddhExpReal`,
+  --    and `IND_CPA_OneTime_DDHReduction`
+  -- 2. align the bind order on both sides
+  -- 3. rewrite `((r * sk) • gen)` as `r • (sk • gen)`
+  -- 4. conclude by reflexivity after normalization
+  sorry
+
+/-- Planned random-branch half lemma for the one-time ElGamal reduction. Under bijectivity of
+`(· • gen)`, the DDH-random branch gives a uniform additive mask independent of the challenge
+bit, so the adversary can do no better than random guessing. -/
+private lemma IND_CPA_OneTime_DDHReduction_rand_half
+    (hg : Function.Bijective (· • gen : F → G))
+    (adv : AsymmEncAlg.IND_CPA_Adv (elgamalAsymmEnc F G gen)) :
+    Pr[= true | DiffieHellman.ddhExpRand (F := F) gen
+      (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] = 1 / 2 := by
+  -- Proof plan:
+  -- 1. unfold the random DDH branch and the reduction
+  -- 2. rewrite the second ciphertext component as `u + m_b` with `u ← $ᵗ G`
+  --    using bijectivity of `(· • gen)`
+  -- 3. apply the shared ElGamal masking helper from `Examples.ElGamal.Common`
+  -- 4. close with `probOutput_decide_eq_uniformBool_half`
+  sorry
+
+/-- Planned one-time ElGamal-to-DDH equality. The factor `2` is essential:
+
+* the one-time ElGamal game is the DDH-real branch of `IND_CPA_OneTime_DDHReduction`,
+* the DDH-random branch is exactly `1 / 2`,
+* `ddhGuessAdvantage` is defined from the mixed single-game DDH experiment, so
+  `ddhDistAdvantage = 2 * ddhGuessAdvantage`.
+
+Therefore the absolute one-time signed IND-CPA advantage for ElGamal should equal
+`2 * ddhGuessAdvantage` for the reduction below. -/
+theorem elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
+    (hg : Function.Bijective (· • gen : F → G))
+    (adv : AsymmEncAlg.IND_CPA_Adv (elgamalAsymmEnc F G gen)) :
+    |AsymmEncAlg.IND_CPA_OneTime_signedAdvantageReal
+        (encAlg := elgamalAsymmEnc F G gen) adv| =
+      2 * DiffieHellman.ddhGuessAdvantage gen
+        (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) := by
+  -- Proof plan:
+  -- 1. rewrite the one-time game using `IND_CPA_OneTime_game_evalDist_eq_ddhExpReal`
+  -- 2. rewrite the DDH-random branch to `1 / 2` using
+  --    `IND_CPA_OneTime_DDHReduction_rand_half`
+  -- 3. identify the resulting absolute real-branch gap with `ddhDistAdvantage`
+  -- 4. conclude via
+  --    `DiffieHellman.ddhDistAdvantage_eq_two_mul_ddhGuessAdvantage`
+  sorry
 
 /-- IND-CPA advantage is bounded by the sum of per-hop DDH advantages before collapsing to a
 single `ε` bound. -/
@@ -1034,7 +1089,7 @@ theorem elGamal_IND_CPA_bound_toReal
                 - 1 / 2|) := by
   refine le_trans (AsymmEncAlg.IND_CPA_advantage_toReal_le_abs_signedAdvantageReal adversary) ?_
   refine le_trans
-    (AsymmEncAlg.IND_CPA_advantage'_abs_le_sum_hybridDiff_abs
+    (AsymmEncAlg.IND_CPA_abs_signedAdvantageReal_le_sum_hybridDiff_abs
       adversary q (IND_CPA_HybridFamily (F := F) (gen := gen) adversary q)
       (by simp only [IND_CPA_HybridFamily_zero]; exact hstart)
       (by simp only [IND_CPA_HybridFamily_q];
@@ -1068,43 +1123,33 @@ theorem elGamal_IND_CPA_bound_toReal
                   adversary i)]).toReal - 1 / 2|)
             q
 
-/-- **Main theorem.** If an adversary makes at most `q` LR queries and each per-hop DDH
-reduction has advantage at most `ε`, then ElGamal has IND-CPA advantage at most `q * (2 * ε)`. -/
+/-- **Main theorem.** If an adversary makes at most `q` LR queries and every one-time ElGamal
+DDH reduction has guess advantage at most `ε`, then ElGamal has IND-CPA advantage at most
+`q * (2 * ε)`.
+
+This theorem is stated in the generic-lift form consumed by `AsymmEncAlg.IND_CPA`.
+The one-time DDH bridge lemmas above package the ElGamal-specific step needed for that
+instantiation. -/
 @[game_hop_root]
 theorem elGamal_IND_CPA_le_q_mul_ddh
     (hg : Function.Bijective (· • gen : F → G))
     (adversary : (elgamalAsymmEnc F G gen).IND_CPA_adversary)
     (q : ℕ) (ε : ℝ)
     (hq : adversary.MakesAtMostQueries q)
-    (hddh : ∀ k < q,
-      |(Pr[= true | DiffieHellman.ddhExp gen
-        (IND_CPA_stepDDHReduction (F := F) (gen := gen) adversary k)]).toReal - 1 / 2| ≤ ε) :
+    (hε : 0 ≤ ε)
+    (hddh : ∀ adv : AsymmEncAlg.IND_CPA_Adv (elgamalAsymmEnc F G gen),
+      DiffieHellman.ddhGuessAdvantage gen
+        (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) ≤ ε) :
     ((elgamalAsymmEnc F G gen).IND_CPA_advantage adversary).toReal ≤ q * (2 * ε) := by
-  refine le_trans (elGamal_IND_CPA_bound_toReal hg adversary q ?_) ?_
-  · simpa [IND_CPA_HybridGame, IND_CPA_game] using
-      (AsymmEncAlg.IND_CPA_countedGame_eq_game_of_MakesAtMostQueries
-        (encAlg' := elgamalAsymmEnc F G gen)
-        (implCounted := fun pk b realUntil =>
-          IND_CPA_queryImpl_hybrid (F := F) (gen := gen) pk b realUntil)
-        (hsame := by
-          intro pk b realUntil t st hcond
-          cases t with
-          | inl _ => rfl
-          | inr mm =>
-              exact allReal_eq_hybrid_on_bounded
-                (F := F) (gen := gen) pk b realUntil (Sum.inr mm) st hcond)
-        adversary q hq)
-  calc
-    Finset.sum (Finset.range q) (fun k =>
-          2 * |(Pr[= true |
-                DiffieHellman.ddhExp gen
-                  (IND_CPA_stepDDHReduction (F := F) (gen := gen)
-                    adversary k)]).toReal - 1 / 2|)
-        ≤ Finset.sum (Finset.range q) (fun _ => 2 * ε) := by
-            refine Finset.sum_le_sum ?_
-            intro k hk
-            exact mul_le_mul_of_nonneg_left (hddh k (Finset.mem_range.mp hk)) (by positivity)
-    _ = q * (2 * ε) := by simp [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
+  -- Proof plan:
+  -- 1. apply
+  --    `AsymmEncAlg.IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound`
+  --    with one-time bound `2 * ε`
+  -- 2. for an arbitrary one-time adversary `adv`, rewrite its signed advantage using
+  --    `elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage`
+  -- 3. bound the resulting DDH term by `2 * ε` using `hddh adv`
+  -- 4. discharge the nonnegativity side condition from `hε`
+  sorry
 
 #print axioms elGamal_IND_CPA_le_q_mul_ddh
 

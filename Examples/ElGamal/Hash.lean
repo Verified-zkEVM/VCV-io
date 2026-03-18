@@ -155,7 +155,7 @@ omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
 theorem cpaGame_eq_ddhReal
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
-      (encAlg' := hashedElGamal F g hash) adv] =
+      (encAlg := hashedElGamal F g hash) adv] =
     Pr[= true | ddhExpReal g (ddhReduction (F := F) (hash := hash) adv)] := by
   let cpaCanonical : ProbComp Bool := do
     let b ← ($ᵗ Bool : ProbComp Bool)
@@ -177,10 +177,10 @@ theorem cpaGame_eq_ddhReal
     pure (b == b')
   have hleft :
       Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
-        (encAlg' := hashedElGamal F g hash) adv] =
+        (encAlg := hashedElGamal F g hash) adv] =
       Pr[= true | cpaCanonical] := by
-    simp [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp, hashedElGamal, cpaCanonical,
-      bind_assoc, map_eq_bind_pure_comp, smul_smul, mul_comm]
+    simp [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp, AsymmEncAlg.IND_CPA_OneTime_Game,
+      hashedElGamal, cpaCanonical, map_eq_bind_pure_comp, smul_smul, mul_comm]
   have hswap :
       Pr[= true | cpaCanonical] =
       Pr[= true | ddhCanonical] := by
@@ -474,7 +474,7 @@ from the CPA adversary. -/
 theorem hashedElGamal_indcpa_bound
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     |(Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
-      (encAlg' := hashedElGamal F g hash) adv]).toReal - 1 / 2| ≤
+      (encAlg := hashedElGamal F g hash) adv]).toReal - 1 / 2| ≤
       ddhDistAdvantage g (ddhReduction (F := F) (hash := hash) adv) +
       EntropySmoothing.advantage F g hash (esReduction (F := F) (g := g) adv) := by
   rw [cpaGame_eq_ddhReal (F := F) (g := g) (hash := hash)]
