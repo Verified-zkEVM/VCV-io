@@ -430,7 +430,8 @@ variable [DecidableEq M] [DecidableEq C]
 variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
 omit [DecidableEq C] in
-private lemma IND_CPA_LR_hybridGame_zero_evalDist_eq_right
+/-- The `leftUntil = 0` LR-hybrid is the all-right endpoint game. -/
+theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
     (adversary : encAlg'.IND_CPA_adversary) :
     evalDist (encAlg'.IND_CPA_LR_hybridGame adversary 0) =
       evalDist (encAlg'.IND_CPA_LR_experiment adversary false) := by
@@ -446,7 +447,9 @@ private lemma IND_CPA_LR_hybridGame_zero_evalDist_eq_right
       (adversary pk) (∅, 0))
 
 omit [DecidableEq C] in
-private lemma IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
+/-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid is the
+all-left endpoint game. -/
+theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     evalDist (encAlg'.IND_CPA_LR_hybridGame adversary q) =
@@ -479,6 +482,27 @@ private lemma IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
                 IND_CPA_queryImplFromChallenge, IND_CPA_countedChallengeOracle, hcache])
     pk true q (adversary pk) q (hq pk) ∅ 0 (by omega)
+
+omit [DecidableEq C] in
+/-- The `leftUntil = 0` LR-hybrid has the same success probability as the all-right endpoint. -/
+theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
+    (adversary : encAlg'.IND_CPA_adversary) :
+    Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary 0] =
+      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary false] := by
+  exact (evalDist_ext_iff.mp
+    (IND_CPA_LR_hybridGame_zero_evalDist_eq_right (encAlg' := encAlg') adversary)) true
+
+omit [DecidableEq C] in
+/-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid has
+the same success probability as the all-left endpoint. -/
+theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
+    (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
+    (hq : adversary.MakesAtMostQueries q) :
+    Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary q] =
+      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary true] := by
+  exact (evalDist_ext_iff.mp
+    (IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
+      (encAlg' := encAlg') adversary q hq)) true
 
 omit [DecidableEq C] in
 /-- The standard random-bit IND-CPA experiment is the uniform-bit branch over the all-left and

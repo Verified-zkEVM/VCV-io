@@ -140,51 +140,137 @@ variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 `IND_CPA_stepAdversary_game_eq_hybridBranch` is proved, this is just the one-time analogue of
 `IND_CPA_signedAdvantageReal_eq_lrDiff_half`. -/
 theorem IND_CPA_stepAdversary_signedAdvantageReal_eq_hybridDiff_half
-    [Inhabited M] [DecidableEq C]
+    [Inhabited M]
     (adversary : encAlg'.IND_CPA_adversary) (k : ℕ) :
     IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg')
       (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k) =
       ((Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary (k + 1)]).toReal -
         (Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary k]).toReal) / 2 := by
-  -- Proof plan:
-  -- 1. rewrite the one-time game via `IND_CPA_stepAdversary_game_eq_hybridBranch`
-  -- 2. apply `probOutput_uniformBool_branch_toReal_sub_half`
-  -- 3. simplify the branch order to the stated adjacent hybrid difference
-  sorry
+  unfold IND_CPA_OneTime_signedAdvantageReal
+  rw [show
+      (Pr[= true | IND_CPA_OneTime_Game_ProbComp (encAlg := encAlg')
+        (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)]).toReal =
+      (Pr[= true | do
+        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let z ← if bit then encAlg'.IND_CPA_LR_hybridGame adversary (k + 1)
+                 else encAlg'.IND_CPA_LR_hybridGame adversary k
+        pure (bit == z)]).toReal from by
+          congr 1
+          exact (evalDist_ext_iff.mp
+            (IND_CPA_stepAdversary_game_eq_hybridBranch
+              (encAlg' := encAlg') adversary k)) true]
+  exact probOutput_uniformBool_branch_toReal_sub_half
+    (encAlg'.IND_CPA_LR_hybridGame adversary (k + 1))
+    (encAlg'.IND_CPA_LR_hybridGame adversary k)
 
 /-- Planned generic one-time-to-many-time lift: bounded multi-query IND-CPA advantage is at most
 the sum of the extracted one-time signed advantages over the first `q` fresh LR queries. -/
 theorem IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs
-    [Inhabited M] [DecidableEq C]
+    [Inhabited M]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤
       Finset.sum (Finset.range q) (fun k =>
         |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg')
           (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)|) := by
-  -- Proof plan:
-  -- 1. bound `IND_CPA_advantage.toReal` by `|IND_CPA_signedAdvantageReal|`
-  -- 2. rewrite the signed real advantage as half the LR endpoint gap
-  -- 3. telescope across the LR hybrid family using the bounded endpoint theorem
-  -- 4. replace each adjacent hybrid gap by the corresponding step-adversary signed advantage
-  -- 5. finish by triangle inequality
-  sorry
+  let H : ℕ → ℝ := fun i =>
+    (Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary i]).toReal
+  have hleft :
+      (Pr[= true | encAlg'.IND_CPA_LR_experiment adversary true]).toReal = H q := by
+    unfold H
+    congr 1
+    symm
+    exact encAlg'.IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries adversary q hq
+  have hright :
+      (Pr[= true | encAlg'.IND_CPA_LR_experiment adversary false]).toReal = H 0 := by
+    unfold H
+    congr 1
+    symm
+    exact encAlg'.IND_CPA_LR_hybridGame_zero_probOutput_eq_right adversary
+  have hsub :
+      Finset.sum (Finset.range q) (fun i => H (i + 1)) -
+        Finset.sum (Finset.range q) (fun i => H i) = H q - H 0 := by
+    simpa using (Finset.sum_range_sub (f := H) q)
+  have htel :
+      Finset.sum (Finset.range q) (fun i => H (i + 1) - H i) = H q - H 0 := by
+    simpa [Finset.sum_sub_distrib] using hsub
+  have htri :
+      |H q - H 0| ≤ Finset.sum (Finset.range q) (fun i => |H (i + 1) - H i|) := by
+    rw [← htel]
+    simpa using
+      (Finset.abs_sum_le_sum_abs
+        (s := Finset.range q)
+        (f := fun i => H (i + 1) - H i))
+  have habs_half :
+      |(H q - H 0) / 2| = (1 / 2 : ℝ) * |H q - H 0| := by
+    rw [show (H q - H 0) / 2 = (1 / 2 : ℝ) * (H q - H 0) by ring]
+    rw [abs_mul, abs_of_nonneg (by positivity)]
+  have hterm_half :
+      ∀ i : ℕ, |(H (i + 1) - H i) / 2| = (1 / 2 : ℝ) * |H (i + 1) - H i| := by
+    intro i
+    rw [show (H (i + 1) - H i) / 2 = (1 / 2 : ℝ) * (H (i + 1) - H i) by ring]
+    rw [abs_mul, abs_of_nonneg (by positivity)]
+  have hsum_half :
+      (1 / 2 : ℝ) * Finset.sum (Finset.range q) (fun i => |H (i + 1) - H i|) =
+        Finset.sum (Finset.range q) (fun i => |(H (i + 1) - H i) / 2|) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl ?_
+    intro i hi
+    symm
+    exact hterm_half i
+  have hhalf :
+      |(H q - H 0) / 2| ≤ Finset.sum (Finset.range q) (fun i => |(H (i + 1) - H i) / 2|) := by
+    rw [habs_half]
+    calc
+      (1 / 2 : ℝ) * |H q - H 0|
+          ≤ (1 / 2 : ℝ) * Finset.sum (Finset.range q) (fun i => |H (i + 1) - H i|) := by
+              exact mul_le_mul_of_nonneg_left htri (by positivity)
+      _ = Finset.sum (Finset.range q) (fun i => |(H (i + 1) - H i) / 2|) := hsum_half
+  have hsteps :
+      Finset.sum (Finset.range q) (fun i =>
+        |(H (i + 1) - H i) / 2|) =
+      Finset.sum (Finset.range q) (fun i =>
+        |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg')
+          (IND_CPA_stepAdversary (encAlg' := encAlg') adversary i)|) := by
+    refine Finset.sum_congr rfl ?_
+    intro i hi
+    symm
+    rw [IND_CPA_stepAdversary_signedAdvantageReal_eq_hybridDiff_half
+      (encAlg' := encAlg') adversary i]
+  refine le_trans
+    (IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
+      (encAlg' := encAlg') adversary) ?_
+  rw [IND_CPA_signedAdvantageReal_eq_lrDiff_half (encAlg' := encAlg') adversary, hleft, hright]
+  calc
+    |(H q - H 0) / 2|
+        ≤ Finset.sum (Finset.range q) (fun i => |(H (i + 1) - H i) / 2|) := hhalf
+    _ = Finset.sum (Finset.range q) (fun i =>
+          |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg')
+            (IND_CPA_stepAdversary (encAlg' := encAlg') adversary i)|) := hsteps
 
 /-- Planned uniform corollary of the generic lift. If every extracted one-time adversary has
 signed real advantage at most `ε`, then any `q`-query oracle adversary has IND-CPA advantage at
 most `q * ε`. -/
 theorem IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound
-    [Inhabited M] [DecidableEq C]
+    [Inhabited M]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (ε : ℝ)
-    (hq : adversary.MakesAtMostQueries q) (hε : 0 ≤ ε)
+    (hq : adversary.MakesAtMostQueries q) (_hε : 0 ≤ ε)
     (hstep : ∀ adv : IND_CPA_Adv encAlg',
       |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg') adv| ≤ ε) :
     (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤ q * ε := by
-  -- Proof plan:
-  -- 1. apply `IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs`
-  -- 2. bound each summand with `hstep`
-  -- 3. simplify the resulting finite sum to `q * ε`
-  sorry
+  refine le_trans
+    (IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs
+      (encAlg' := encAlg') adversary q hq) ?_
+  calc
+    Finset.sum (Finset.range q) (fun k =>
+          |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg')
+            (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)|)
+        ≤ Finset.sum (Finset.range q) (fun _ => ε) := by
+            refine Finset.sum_le_sum ?_
+            intro k hk
+            exact hstep (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)
+    _ = q * ε := by
+        simp [Finset.sum_const, Finset.card_range, nsmul_eq_mul]
 
 end MultiQueryHybridLift
 
