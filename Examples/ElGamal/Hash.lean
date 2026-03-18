@@ -93,8 +93,6 @@ theorem correct :
 
 section Security
 
-variable [SampleableType G]
-
 /-- Construct a DDH adversary from a CPA adversary for hashed ElGamal.
 Given DDH challenge `(g, A, B, T)`:
 - Set `pk = (hk, A)` where `hk ← $ᵗ HK`
@@ -130,7 +128,7 @@ def esReduction (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     let b' ← adv.distinguish st c
     return (b == b')
 
-omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
+omit [DecidableEq G] [DecidableEq M] in
 private lemma idealMaskedCipher_dist_indep
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash))
     (y : F) (m₁ m₂ : M) (st : adv.State) :
@@ -150,7 +148,7 @@ private lemma idealMaskedCipher_dist_indep
 
 /-! ## Game-hop lemmas -/
 
-omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
+omit [DecidableEq G] [DecidableEq M] in
 /-- Game 0 = CPA game equals DDH real branch (by construction). -/
 theorem cpaGame_eq_ddhReal
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
@@ -240,7 +238,7 @@ theorem cpaGame_eq_ddhReal
           true)
   exact hleft.trans (hswap.trans hright.symm)
 
-omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
+omit [DecidableEq G] [DecidableEq M] in
 /-- DDH random branch equals ES real experiment (by construction). -/
 theorem ddhRand_eq_esReal
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
@@ -344,7 +342,7 @@ theorem ddhRand_eq_esReal
           pure (b == b'))
         true)
   exact hleft.trans hright.symm
-omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
+omit [DecidableEq G] [DecidableEq M] in
 /-- ES ideal experiment: the ciphertext `v + m_b` with uniform `v` is uniform
 regardless of `b`, so the game reduces to random guessing.
 Uses the same uniform-masking principle as the one-time pad. -/
@@ -463,7 +461,7 @@ theorem esIdeal_eq_half
 
 /-! ## Main theorem -/
 
-omit [SampleableType G] [DecidableEq G] [DecidableEq M] in
+omit [DecidableEq G] [DecidableEq M] in
 /-- **Main theorem.** The one-time IND-CPA bias of hashed ElGamal is bounded by
 the DDH distinguishing advantage plus the entropy smoothing advantage:
 
@@ -471,7 +469,7 @@ the DDH distinguishing advantage plus the entropy smoothing advantage:
 
 where `D` is the DDH reduction and `E` is the ES reduction, both constructed
 from the CPA adversary. -/
-theorem hashedElGamal_indcpa_bound
+theorem hashedElGamal_IND_CPA_bound
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     |(Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
       (encAlg := hashedElGamal F g hash) adv]).toReal - 1 / 2| ≤

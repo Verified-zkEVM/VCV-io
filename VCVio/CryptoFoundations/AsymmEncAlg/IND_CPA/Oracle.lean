@@ -605,16 +605,14 @@ omit [DecidableEq C] in
 /-- Compatibility bridge to the existing `IND_CPA_advantage` API:
 the `toReal` of the `ℝ≥0∞` signed advantage is bounded by the absolute signed real advantage. -/
 theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
-    [DecidableEq C]
     (adversary : encAlg'.IND_CPA_adversary) :
     (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤
       |IND_CPA_signedAdvantageReal (encAlg' := encAlg') adversary| := by
   unfold IND_CPA_advantage IND_CPA_signedAdvantageReal
   simpa using
-    (ENNReal.toReal_tsub_le_abs_toReal_sub
+    (ENNReal.toReal_sub_le_abs_toReal_sub
       (a := Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary])
-      (b := (1 / 2 : ℝ≥0∞))
-      (ha := probOutput_ne_top))
+      (b := (1 / 2 : ℝ≥0∞)))
 
 end MultiQueryHybrid
 

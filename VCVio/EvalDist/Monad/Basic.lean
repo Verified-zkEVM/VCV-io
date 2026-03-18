@@ -545,7 +545,6 @@ variable [HasEvalSPMF m]
 
 /-- Swapping two independent random draws preserves probability of any event. -/
 lemma probEvent_bind_bind_swap [LawfulMonad m]
-    {β γ : Type u}
     (mx : m α) (my : m β) (f : α → β → m γ) (q : γ → Prop) :
     Pr[q | mx >>= fun a => my >>= fun b => f a b] =
       Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
@@ -575,12 +574,11 @@ lemma probEvent_bind_bind_swap [LawfulMonad m]
 
 /-- Swapping two independent random draws preserves the probability of any fixed output. -/
 lemma probOutput_bind_bind_swap [LawfulMonad m]
-    {β γ : Type u}
     (mx : m α) (my : m β) (f : α → β → m γ) (z : γ) :
     Pr[= z | mx >>= fun a => my >>= fun b => f a b] =
       Pr[= z | my >>= fun b => mx >>= fun a => f a b] := by
   simpa [probEvent_eq_eq_probOutput] using
-    (probEvent_bind_bind_swap (mx := mx) (my := my) (f := f) (q := fun x : γ => x = z))
+    probEvent_bind_bind_swap mx my f (· = z)
 
 /-- If `Pr[p | mx] ≥ 1 - ε` and `mx` never fails, then `Pr[¬p | mx] ≤ ε`. -/
 lemma probEvent_compl_le_of_ge

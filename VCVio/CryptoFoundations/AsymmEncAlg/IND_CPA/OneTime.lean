@@ -14,7 +14,7 @@ specialization used by the generic many-query lift.
 
 open OracleSpec OracleComp
 
-universe u v
+universe v
 
 namespace AsymmEncAlg
 
