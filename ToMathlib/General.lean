@@ -49,6 +49,21 @@ lemma list_prod_natCast_ne_top {ι : Type*} (f : ι → ℕ) (js : List ι) :
     | cons j js ih => simp [ih, Nat.cast_mul]
   rw [h]; exact natCast_ne_top _
 
+/-- Real bridge for truncated `ENNReal` subtraction:
+`(a - b).toReal` is bounded by `|a.toReal - b.toReal|`. -/
+lemma toReal_sub_le_abs_toReal_sub (a b : ℝ≥0∞) :
+    (a - b).toReal ≤ |a.toReal - b.toReal| := by
+  by_cases ha : a = ⊤
+  · by_cases hb : b = ⊤
+    · simp [ha, hb]
+    · simp [ha, hb]
+  · by_cases h : b ≤ a
+    · rw [ENNReal.toReal_sub_of_le h ha]
+      exact le_abs_self _
+    · have h' : a ≤ b := le_of_not_ge h
+      rw [tsub_eq_zero_of_le h']
+      exact abs_nonneg _
+
 end ENNReal
 
 @[simp]

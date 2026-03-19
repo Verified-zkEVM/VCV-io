@@ -45,7 +45,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 ## Canonical Examples
 
 - Compact modern crypto proof: `Examples/OneTimePad.lean`
-- ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal.lean`
+- ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal/Basic.lean`
 - Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr.lean`
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`
 - Probability lemmas: `VCVio/EvalDist/Monad/Basic.lean`

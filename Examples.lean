@@ -1,7 +1,8 @@
 import Examples.BR93
-import Examples.ElGamal
+import Examples.ElGamal.Basic
+import Examples.ElGamal.Common
+import Examples.ElGamal.Hash
 import Examples.FrankingProtocol
-import Examples.HashedElGamal
 import Examples.OneTimePad
 import Examples.PRGfromPRF
 import Examples.Pedersen

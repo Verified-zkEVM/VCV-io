@@ -92,7 +92,7 @@ def OTP_encrypt (k m : Fin n → Bool) : ProbComp (Fin n → Bool) := pure (k + 
 
 ## Worked Example: ElGamal IND-CPA
 
-From `Examples/ElGamal.lean` — multi-query security via DDH.
+From `Examples/ElGamal/Basic.lean` — multi-query security via DDH.
 
 **Key patterns used**:
 - Hybrid argument indexed by query count `k`
