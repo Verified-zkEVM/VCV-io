@@ -25,7 +25,7 @@ structure VCSpecEntry where
   deriving Inhabited, BEq, Repr
 
 structure VCSpecRegistry where
-  all : Array VCSpecEntry := #[]
+  all : List VCSpecEntry := []
   unary : NameMap (Array VCSpecEntry) := {}
   relational : NameMap (NameMap (Array VCSpecEntry)) := {}
   deriving Inhabited
@@ -89,7 +89,7 @@ initialize vcSpecRegistry :
       VCSpecRegistry ←
   registerSimpleScopedEnvExtension {
     addEntry := fun registry (entry, key) =>
-      let registry := { registry with all := registry.all.push entry }
+      let registry := { registry with all := entry :: registry.all }
       match key with
       | .inl head => registry.addUnary head entry
       | .inr (leftHead, rightHead) => registry.addRelational leftHead rightHead entry
@@ -142,7 +142,7 @@ def getRegisteredRelationalVCSpecTheorems (oa ob : Expr) : MetaM (Array Name) :=
 
 def getVCSpecEntriesOfKind (kind : VCSpecKind) : CoreM (Array VCSpecEntry) := do
   let registry := vcSpecRegistry.getState (← getEnv)
-  return registry.all.filter (·.kind == kind)
+  return (registry.all.filter (·.kind == kind)).toArray
 
 def getVCSpecTheoremsOfKind (kind : VCSpecKind) : CoreM (Array Name) := do
   return (← getVCSpecEntriesOfKind kind).map (·.decl)
