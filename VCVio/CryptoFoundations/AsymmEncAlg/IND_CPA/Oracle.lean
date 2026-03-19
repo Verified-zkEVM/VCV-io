@@ -614,6 +614,99 @@ theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
       (a := Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary])
       (b := (1 / 2 : ℝ≥0∞)))
 
+omit [DecidableEq C] in
+/-- When the counter is above both thresholds, two hybrid LR counted oracles agree pointwise. -/
+lemma IND_CPA_hybridLR_counted_run_eq_of_ge
+    (pk : PK) (k : ℕ)
+    (t : encAlg'.IND_CPA_oracleSpec.Domain)
+    (st : encAlg'.IND_CPA_CountedState)
+    (hst : st.2 ≥ k + 1) :
+    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k t).run st =
+      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1) t).run st := by
+  cases t with
+  | inl tu =>
+      rfl
+  | inr mm =>
+      show (IND_CPA_countedChallengeOracle pk
+          (fun n mm => if n < k then mm.1 else mm.2) mm).run st =
+        (IND_CPA_countedChallengeOracle pk
+          (fun n mm => if n < k + 1 then mm.1 else mm.2) mm).run st
+      simp only [IND_CPA_countedChallengeOracle, StateT.run_bind, StateT.run_get, pure_bind]
+      rcases st.1 mm with _ | c
+      · simp only [show ¬(st.2 < k) from by omega, show ¬(st.2 < k + 1) from by omega,
+          ite_false]
+      · rfl
+
+omit [DecidableEq C] in
+/-- Counter monotonicity for the hybrid LR counted oracle: the counter never decreases. -/
+lemma IND_CPA_hybridLR_counted_counter_le
+    (pk : PK) (k : ℕ)
+    (t : encAlg'.IND_CPA_oracleSpec.Domain)
+    (st : encAlg'.IND_CPA_CountedState)
+    (p : encAlg'.IND_CPA_oracleSpec.Range t × encAlg'.IND_CPA_CountedState)
+    (hp : p ∈ support ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k t).run st)) :
+    st.2 ≤ p.2.2 := by
+  cases t with
+  | inl tu =>
+      simp only [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImplFromChallenge,
+        QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
+        liftM, monadLift, StateT.instMonadLift] at hp
+      rw [StateT.run_lift, mem_support_bind_iff] at hp
+      obtain ⟨a, _, ha⟩ := hp
+      rw [mem_support_pure_iff] at ha
+      have hst : p.2 = st := congrArg Prod.snd ha
+      simp [hst]
+  | inr mm =>
+      have hp' :
+          p ∈ support ((IND_CPA_hybridChallengeOracleLR_counted (encAlg' := encAlg') pk k mm).run
+            st) := by
+        simpa [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImplFromChallenge] using hp
+      clear hp
+      revert hp'
+      simp only [IND_CPA_hybridChallengeOracleLR_counted, IND_CPA_countedChallengeOracle]
+      rcases hcache : st.1 mm with _ | c <;> intro hp
+      · simp only [hcache, StateT.run_bind, StateT.run_get, pure_bind] at hp
+        rw [mem_support_iff] at hp
+        rw [← mem_support_iff] at hp
+        simp only [StateT.run_pure, support_bind, Set.mem_iUnion, support_pure,
+          Set.mem_singleton_iff] at hp
+        obtain ⟨c, _, ⟨i, hi, hp⟩⟩ := hp
+        simp only [StateT.run_set, support_pure, Set.mem_singleton_iff] at hi
+        subst hi
+        simp only [hp]
+        omega
+      · simp only [hcache, StateT.run_bind, StateT.run_get, pure_bind,
+          StateT.run_pure, mem_support_pure_iff] at hp
+        have := congrArg (fun x => x.2.2) hp
+        simp at this
+        omega
+
+omit [DecidableEq C] in
+/-- Behavior of the hybrid challenge oracle on a cache miss. -/
+lemma IND_CPA_hybridChallengeOracleLR_counted_run_none
+    (pk : PK) (k : ℕ) (mm : M × M)
+    (st : encAlg'.IND_CPA_CountedState)
+    (hcache : st.1 mm = none) :
+    (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk k mm).run st =
+      (do
+        let c ← encAlg'.encrypt pk (if st.2 < k then mm.1 else mm.2)
+        pure (c, (st.1.cacheQuery mm c, st.2 + 1))) := by
+  simp only [IND_CPA_hybridChallengeOracleLR_counted, IND_CPA_countedChallengeOracle,
+    StateT.run_bind, StateT.run_get, pure_bind, hcache,
+    IND_CPA_countedState_run_liftM_eq, StateT.run_set, StateT.run_pure]
+  simp only [bind_assoc, pure_bind]
+
+omit [DecidableEq C] in
+/-- Behavior of the hybrid challenge oracle on a cache hit. -/
+lemma IND_CPA_hybridChallengeOracleLR_counted_run_some
+    (pk : PK) (k : ℕ) (mm : M × M) (c : C)
+    (st : encAlg'.IND_CPA_CountedState)
+    (hcache : st.1 mm = some c) :
+    (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk k mm).run st =
+      pure (c, st) := by
+  simp only [IND_CPA_hybridChallengeOracleLR_counted, IND_CPA_countedChallengeOracle,
+    StateT.run_bind, StateT.run_get, pure_bind, hcache, StateT.run_pure]
+
 end MultiQueryHybrid
 
 end AsymmEncAlg
