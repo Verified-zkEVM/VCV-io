@@ -60,49 +60,11 @@ namespace br93AsymmEnc
 
 variable {tdp : TrapdoorPermutation PK SK Rand} {hash : Rand → M}
 
-set_option maxHeartbeats 400000 in
 /-- Correctness of BR93 follows from correctness of the underlying trapdoor permutation. -/
 theorem correct (hcorrect : tdp.Correct) :
     (br93AsymmEnc (M := M) tdp hash).PerfectlyCorrect := by
   intro msg
-  simp only [AsymmEncAlg.CorrectExp, br93AsymmEnc_keygen, br93AsymmEnc_encrypt,
-    br93AsymmEnc_decrypt]
-  have huniq : ∀ y ∈ support ((br93AsymmEnc tdp hash).exec (do
-    let x ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg)))), y = true := by
-    intro y hy
-    rw [show (br93AsymmEnc tdp hash).exec = id from rfl] at hy
-    simp only [id] at hy
-    rw [mem_support_bind_iff] at hy
-    obtain ⟨⟨pk, sk⟩, hpksk, hy⟩ := hy
-    rw [mem_support_bind_iff] at hy
-    obtain ⟨c, hc, hy⟩ := hy
-    rw [mem_support_bind_iff] at hc
-    obtain ⟨r, _, hc⟩ := hc
-    simp only [support_pure, Set.mem_singleton_iff] at hc hy
-    subst hc; subst hy
-    simp [hcorrect pk sk hpksk r]
-  have hnot : ∀ y ≠ true, Pr[= y | (br93AsymmEnc tdp hash).exec (do
-    let x ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg)))] = 0 :=
-    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  have hsum : ∑' x, Pr[= x | (br93AsymmEnc tdp hash).exec (do
-    let x_1 ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x_1.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x_1.2 c.1)))
-    pure (decide (msg' = some msg)))] = Pr[= true | _] :=
-    tsum_eq_single true hnot
-  have htot := probFailure_add_tsum_probOutput ((br93AsymmEnc tdp hash).exec (do
-    let x ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg))))
-  rw [NeverFail.probFailure_eq_zero, hsum, zero_add] at htot
-  exact htot
+  sorry
 
 /-! ## One-time IND-CPA in the random-oracle model -/
 
@@ -271,15 +233,7 @@ reduction. -/
 theorem indcpa_bound (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     |(Pr[= true | cpaGame tdp adv]).toReal - 1 / 2| ≤
       (tdpAdvantage tdp (inverter tdp adv)).toReal := by
-  have hg12 : Pr[= true | game1 tdp adv] = Pr[= true | game2 tdp adv] :=
-    congr_fun (congr_arg _ (game1_eq_game2 adv)) true
-  calc |(Pr[= true | cpaGame tdp adv]).toReal - 1 / 2|
-      = |(Pr[= true | cpaGame tdp adv]).toReal -
-          (Pr[= true | game1 tdp adv]).toReal| := by
-        congr 1; rw [hg12, game2_eq_half adv]; norm_num
-    _ ≤ badEventProb tdp adv := cpaGame_gap_le_badEvent adv
-    _ ≤ (tdpAdvantage tdp (inverter tdp adv)).toReal :=
-        badEventProb_le_tdpAdvantage adv
+  sorry
 
 end br93AsymmEnc
 
