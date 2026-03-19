@@ -46,7 +46,7 @@ open OracleComp OracleSpec ENNReal
 variable {N : ℕ}
 
 /-- Imperative-style PIR query generation using `for` / `let mut` syntax. -/
-def pirQuery' {N : ℕ} (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) := do
+def pirQuery' (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) := do
   let mut s  : List (Fin N) := []
   let mut s' : List (Fin N) := []
   for j in List.finRange N do
@@ -61,7 +61,7 @@ def pirQuery' {N : ℕ} (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N))
 
 /-- PIR query generation: build two index sets `s, s'` whose "symmetric difference"
 is `{i₀}`. Uses `foldlM` over `List.finRange N` with a random coin per index. -/
-def pirQuery {N : ℕ} (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) :=
+def pirQuery (i₀ : Fin N) : ProbComp (List (Fin N) × List (Fin N)) :=
   (List.finRange N).foldlM (fun (acc : List (Fin N) × List (Fin N)) (j : Fin N) => do
     let b ← $ᵗ Bool
     if j = i₀ then
@@ -77,7 +77,7 @@ Uses the general `List.forIn_mprod_yield_eq_foldlM` bridge from `ToMathlib.Gener
 to convert the `for`/`let mut` desugaring (which uses `forIn` + `MProd` state +
 `ForInStep.yield`) into the direct `foldlM` formulation. The only proof obligation
 is showing that each branch of the loop body wraps its result in `ForInStep.yield`. -/
-theorem pirQuery'_eq_pirQuery {N : ℕ} (i₀ : Fin N) : pirQuery' i₀ = pirQuery i₀ := by
+theorem pirQuery'_eq_pirQuery (i₀ : Fin N) : pirQuery' i₀ = pirQuery i₀ := by
   simp only [pirQuery', pirQuery, pure_bind]
   exact List.forIn_mprod_yield_eq_foldlM _ _ _ _ _ (fun j b c => by
     simp only [bind_assoc]
@@ -112,7 +112,7 @@ private lemma pirResponse_cons (a : Fin N → W) (j : Fin N) (s : List (Fin N)) 
 
 /-- For any output in the support of the foldlM, the sum of responses accumulates `a i₀`
 exactly when `i₀` appears in the fold list. -/
-private lemma pirQuery_foldl_support [DecidableEq W]
+private lemma pirQuery_foldl_support
     (hchar : ∀ x : W, x + x = 0) (a : Fin N → W) (i₀ : Fin N)
     (l : List (Fin N)) (hl : l.Nodup)
     (init ss : List (Fin N) × List (Fin N))
