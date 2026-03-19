@@ -22,9 +22,9 @@ open OracleComp OracleSpec ENNReal
 namespace EntropySmoothing
 
 variable (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
-variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G]
+variable {G : Type} [AddCommGroup G] [Module F G]
 variable {HK : Type} [SampleableType HK]
-variable {M : Type} [AddCommGroup M] [SampleableType M] [DecidableEq M] [Fintype M]
+variable {M : Type} [AddCommGroup M] [SampleableType M] [DecidableEq M]
 
 /-- Real entropy-smoothing experiment. The adversary sees `(hk, hash hk (z • g))`
 for uniform `hk` and `z`, and tries to distinguish this from the ideal experiment. -/
