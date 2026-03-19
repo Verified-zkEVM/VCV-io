@@ -53,7 +53,7 @@ open OracleComp OracleSpec ENNReal DiffieHellman
 | Decrypt(sk, c) | Compute `c.2 - hash sk.1 (sk.2 • c.1)` |
 
 The additive group operation `+` on `M` plays the role of XOR.
-Following `elgamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
+Following `elGamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
 @[simps!] def hashedElGamal (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
     {G : Type} [AddCommGroup G] [Module F G]
     {HK : Type} [SampleableType HK]
@@ -128,24 +128,6 @@ def esReduction (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     let b' ← adv.distinguish st c
     return (b == b')
 
-omit [DecidableEq G] [DecidableEq M] in
-private lemma idealMaskedCipher_dist_indep
-    (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash))
-    (y : F) (m₁ m₂ : M) (st : adv.State) :
-    evalDist (do
-      let h ← ($ᵗ M : ProbComp M)
-      adv.distinguish st (y • g, h + m₁)) =
-    evalDist (do
-      let h ← ($ᵗ M : ProbComp M)
-      adv.distinguish st (y • g, h + m₂)) := by
-  have hmask :
-      evalDist (((fun h : M => (y • g, h + m₁)) <$> ($ᵗ M : ProbComp M))) =
-        evalDist (((fun h : M => (y • g, h + m₂)) <$> ($ᵗ M : ProbComp M))) := by
-    simpa [add_comm, add_left_comm, add_assoc] using
-      ElGamalExamples.uniformMaskedCipher_dist_indep (head := y • g) (m₁ := m₁) (m₂ := m₂)
-  simpa [map_eq_bind_pure_comp, Function.comp, evalDist_bind, bind_assoc] using
-    congrArg (fun p => p >>= fun c => evalDist (adv.distinguish st c)) hmask
-
 /-! ## Game-hop lemmas -/
 
 omit [DecidableEq G] [DecidableEq M] in
@@ -177,8 +159,8 @@ theorem cpaGame_eq_ddhReal
       Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
         (encAlg := hashedElGamal F g hash) adv] =
       Pr[= true | cpaCanonical] := by
-    simp [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp, AsymmEncAlg.IND_CPA_OneTime_Game,
-      hashedElGamal, cpaCanonical, map_eq_bind_pure_comp, smul_smul, mul_comm]
+    simp [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp, hashedElGamal, cpaCanonical,
+      map_eq_bind_pure_comp, smul_smul, mul_comm]
   have hswap :
       Pr[= true | cpaCanonical] =
       Pr[= true | ddhCanonical] := by
@@ -376,8 +358,9 @@ theorem esIdeal_eq_half
     rw [evalDist_bind, evalDist_bind]
     congr 1
     funext y
-    simpa using
-      idealMaskedCipher_dist_indep (F := F) (g := g) (hash := hash) adv y m₁ m₂ st
+    simpa [add_comm, add_left_comm, add_assoc] using
+      ElGamalExamples.uniformMaskedCipher_bind_dist_indep
+        (head := y • g) (m₁ := m₁) (m₂ := m₂) (cont := adv.distinguish st)
   have hrepr : ∀ hk,
       Pr[= true | inner hk] =
         Pr[= true | do

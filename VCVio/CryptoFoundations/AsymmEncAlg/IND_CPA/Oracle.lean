@@ -10,6 +10,7 @@ import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.ProgramLogic.Relational.SimulateQ
+import ToMathlib.Control.StateT
 
 /-!
 # Asymmetric Encryption Schemes: IND-CPA Oracle Games
@@ -100,13 +101,6 @@ variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 /-- Cached IND-CPA state extended with a query counter. -/
 abbrev IND_CPA_CountedState (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   _encAlg.IND_CPA_Cache × ℕ
-
-omit [DecidableEq M] [DecidableEq C] in
-private lemma IND_CPA_countedState_run_liftM_eq {α : Type}
-    (st : encAlg'.IND_CPA_CountedState) (x : ProbComp α) :
-    (liftM x : StateT encAlg'.IND_CPA_CountedState ProbComp α).run st =
-      x >>= fun a => pure (a, st) := by
-  simp
 
 private def IND_CPA_countedChallengeOracle
     (pk : PK) (select : ℕ → M × M → M) :
@@ -224,13 +218,8 @@ private lemma IND_CPA_countedChallengeOracle_proj_eq_cached
         (do
           let c ← encAlg'.encrypt pk (select mm)
           pure (c, cache.cacheQuery mm c) : ProbComp _) := by
-      simp only [IND_CPA_countedChallengeOracle, hcache,
-        StateT.run_bind, StateT.run_get, pure_bind,
-        IND_CPA_countedState_run_liftM_eq (encAlg' := encAlg') (st := (cache, n)),
-        bind_assoc, StateT.run_pure]
-      rw [hselect n mm, map_bind]
-      refine bind_congr fun c => ?_
-      simp
+      simp [IND_CPA_countedChallengeOracle, hcache, StateT.run_bind, StateT.run_get,
+        StateT.run_set, hselect n mm]
     have hcached :
         (IND_CPA_cachedChallengeOracle encAlg' pk select mm).run cache =
         (do
@@ -475,8 +464,7 @@ theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
               simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
                 IND_CPA_queryImplFromChallenge, IND_CPA_countedChallengeOracle,
-                hcache, hcond,
-                IND_CPA_countedState_run_liftM_eq (encAlg' := encAlg') (st := st)]
+                hcache, hcond]
           · cases b <;>
               simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
@@ -692,9 +680,8 @@ lemma IND_CPA_hybridChallengeOracleLR_counted_run_none
         let c ← encAlg'.encrypt pk (if st.2 < k then mm.1 else mm.2)
         pure (c, (st.1.cacheQuery mm c, st.2 + 1))) := by
   simp only [IND_CPA_hybridChallengeOracleLR_counted, IND_CPA_countedChallengeOracle,
-    StateT.run_bind, StateT.run_get, pure_bind, hcache,
-    IND_CPA_countedState_run_liftM_eq, StateT.run_set, StateT.run_pure]
-  simp only [bind_assoc, pure_bind]
+    StateT.run_bind, StateT.run_get, pure_bind, hcache, StateT.run_set, StateT.run_pure]
+  simp
 
 omit [DecidableEq C] in
 /-- Behavior of the hybrid challenge oracle on a cache hit. -/

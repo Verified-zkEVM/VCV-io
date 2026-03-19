@@ -156,105 +156,6 @@ private lemma IND_CPA_hybridLR_counted_run'_evalDist_eq_above
   simp only [StateT.run', evalDist_map]
   exact congrArg (fun d => Prod.fst <$> d) hrun
 
-private lemma IND_CPA_queryImpl_hybridLR_counted_run_inl
-    (pk : PK) (leftUntil : ℕ) (tu : unifSpec.Domain)
-    (st : encAlg'.IND_CPA_CountedState) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (.inl tu)).run st =
-      (($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) >>= fun u => pure (u, st)) := by
-  change
-    (((liftM ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))) :
-        StateT encAlg'.IND_CPA_CountedState ProbComp (unifSpec.Range tu)).run st) = _
-  exact
-    (StateT.run_lift ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) st)
-
-private lemma probComp_query_eq_uniform (tu : unifSpec.Domain) :
-    (monadLift (query tu) : ProbComp (unifSpec.Range tu)) =
-      ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) := by
-  rfl
-
-private lemma probOutput_bind_ignore_left {α β : Type} [DecidableEq β]
-    (mx : ProbComp α) (y x : β) :
-    Pr[= x | (do
-      let _ ← mx
-      pure y : ProbComp β)] =
-    Pr[= x | (pure y : ProbComp β)] := by
-  simp
-
-private lemma IND_CPA_queryImpl_hybridLR_counted_run_inr_none
-    (pk : PK) (leftUntil : ℕ) (mm : M × M)
-    (st : encAlg'.IND_CPA_CountedState)
-    (hcache : st.1 mm = none) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (.inr mm)).run st =
-      (do
-        let c ← encAlg'.encrypt pk (if st.2 < leftUntil then mm.1 else mm.2)
-        pure (c, (st.1.cacheQuery mm c, st.2 + 1))) := by
-  change (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk leftUntil mm).run st = _
-  simpa using
-    (IND_CPA_hybridChallengeOracleLR_counted_run_none
-      (encAlg' := encAlg') pk leftUntil mm st hcache)
-
-private lemma IND_CPA_queryImpl_hybridLR_counted_run_inr_some
-    (pk : PK) (leftUntil : ℕ) (mm : M × M) (c : C)
-    (st : encAlg'.IND_CPA_CountedState)
-    (hcache : st.1 mm = some c) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (.inr mm)).run st =
-      pure (c, st) := by
-  change (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk leftUntil mm).run st = _
-  simpa using
-    (IND_CPA_hybridChallengeOracleLR_counted_run_some
-      (encAlg' := encAlg') pk leftUntil mm c st hcache)
-
-private lemma IND_CPA_hybridLR_simulateQ_query_inl
-    (pk : PK) (leftUntil : ℕ) (tu : unifSpec.Domain)
-    {α : Type}
-    (oa : unifSpec.Range tu → OracleComp encAlg'.IND_CPA_oracleSpec α)
-    (st : encAlg'.IND_CPA_CountedState) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inl tu) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)) st) =
-      (($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) >>= fun u =>
-        (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)).run st) := by
-  change
-    (((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inl tu) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)).run st) = _)
-  rw [StateT.run_bind, IND_CPA_queryImpl_hybridLR_counted_run_inl (encAlg' := encAlg') pk
-    leftUntil tu st]
-  simp
-
-private lemma IND_CPA_hybridLR_simulateQ_query_inr_none
-    (pk : PK) (leftUntil : ℕ) (mm : M × M)
-    {α : Type}
-    (oa : C → OracleComp encAlg'.IND_CPA_oracleSpec α)
-    (st : encAlg'.IND_CPA_CountedState)
-    (hcache : st.1 mm = none) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inr mm) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)) st) =
-      (do
-        let c ← encAlg'.encrypt pk (if st.2 < leftUntil then mm.1 else mm.2)
-        (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa c)).run
-          (st.1.cacheQuery mm c, st.2 + 1)) := by
-  change
-    (((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inr mm) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)).run st) = _)
-  rw [StateT.run_bind, IND_CPA_queryImpl_hybridLR_counted_run_inr_none
-    (encAlg' := encAlg') pk leftUntil mm st hcache]
-  simp
-
-private lemma IND_CPA_hybridLR_simulateQ_query_inr_some
-    (pk : PK) (leftUntil : ℕ) (mm : M × M) (c : C)
-    {α : Type}
-    (oa : C → OracleComp encAlg'.IND_CPA_oracleSpec α)
-    (st : encAlg'.IND_CPA_CountedState)
-    (hcache : st.1 mm = some c) :
-    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inr mm) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)) st) =
-      (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa c)).run st := by
-  change
-    (((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil (.inr mm) >>= fun u =>
-        simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (oa u)).run st) = _)
-  rw [StateT.run_bind, IND_CPA_queryImpl_hybridLR_counted_run_inr_some
-    (encAlg' := encAlg') pk leftUntil mm c st hcache]
-  simp
-
 /-- Planned semantic bridge: resuming the paused prefix simulation with the chosen branch should
 match the corresponding counted LR hybrid on the same sample space. This is the core local
 decomposition lemma needed for the generic step-adversary proof. -/
@@ -309,13 +210,52 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                     let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
                     (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run'
                       (QueryCache.cacheQuery __discr.2.1 mm c, __discr.2.2 + 1)] := by
-            simp [StateT.run_bind, probComp_query_eq_uniform]
+            change Pr[= x | do
+              let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
+              let __discr ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k (oa u)).run st
+              match __discr.1 with
+              | .done a => pure a
+              | .paused mm cont =>
+                  let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
+                  (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run'
+                    (QueryCache.cacheQuery __discr.2.1 mm c, __discr.2.2 + 1)] = _
+            rfl
           rw [hleft]
-          simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-            OracleQuery.cont_query, id_map, StateT.run']
-          rw [IND_CPA_hybridLR_simulateQ_query_inl (encAlg' := encAlg') pk
-            (if branch then k + 1 else k) tu oa st]
-          simp [map_eq_bind_pure_comp, bind_assoc]
+          have hquery :
+              (simulateQ
+                (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inl tu)) >>= oa)).run' st =
+              (do
+                let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
+                (simulateQ
+                  (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                  (oa u)).run' st) := by
+            have hrun :
+                (simulateQ
+                  (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                  (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inl tu)) >>= oa)).run st =
+                (($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) >>= fun u =>
+                  (simulateQ
+                    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                    (oa u)).run st) := by
+              rw [simulateQ_query_bind, StateT.run_bind]
+              change
+                (((liftM ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))) :
+                    StateT encAlg'.IND_CPA_CountedState ProbComp (unifSpec.Range tu)).run st >>=
+                  fun p =>
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                      (oa p.1)).run p.2) = _
+              rw [show
+                  (((liftM ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))) :
+                      StateT encAlg'.IND_CPA_CountedState ProbComp (unifSpec.Range tu)).run st) =
+                    (($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) >>= fun u =>
+                      pure (u, st)) from
+                  StateT.run_liftM ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) st]
+              simp
+            simpa [StateT.run', StateT.run_bind, simulateQ_query_bind] using
+              congrArg (fun d => Prod.fst <$> d) hrun
+          rw [hquery]
           change Pr[= x | do
               let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
               let __discr ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k (oa u)).run st
@@ -372,10 +312,66 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                           (QueryCache.cacheQuery __discr.2.1 mm c', __discr.2.2 + 1)] := by
                 simp [hcache, hlt, StateT.run_bind, StateT.run_get, StateT.run_set]
               rw [hleft]
-              simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-                OracleQuery.cont_query, id_map, StateT.run']
-              rw [IND_CPA_hybridLR_simulateQ_query_inr_none (encAlg' := encAlg') pk
-                (if branch then k + 1 else k) mm oa st hcache]
+              have hquery :
+                  (simulateQ
+                    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                      st =
+                  (do
+                    let c ← encAlg'.encrypt pk
+                      (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (oa c)).run' (st.1.cacheQuery mm c, st.2 + 1)) := by
+                have hrun :
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                        st =
+                    (do
+                      let c ← encAlg'.encrypt pk
+                        (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                      (simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa c)).run (st.1.cacheQuery mm c, st.2 + 1)) := by
+                  rw [simulateQ_query_bind, StateT.run_bind]
+                  change
+                    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k) (.inr mm)).run st >>= fun u =>
+                      (simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa u.1)).run u.2) = _
+                  rw [show
+                      ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k) (.inr mm)).run st) =
+                        (do
+                          let c ← encAlg'.encrypt pk
+                            (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                          pure (c, (st.1.cacheQuery mm c, st.2 + 1))) from by
+                        change
+                          (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk
+                            (if branch then k + 1 else k) mm).run st = _
+                        simpa using
+                          (IND_CPA_hybridChallengeOracleLR_counted_run_none
+                            (encAlg' := encAlg') pk (if branch then k + 1 else k) mm st hcache)]
+                  simp
+                rw [simulateQ_query_bind, StateT.run']
+                change
+                  Prod.fst <$>
+                    (((liftM
+                        ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                            (if branch then k + 1 else k)) (.inr mm))) >>= fun u =>
+                      simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa u)).run st) = _
+                rw [StateT.run_bind]
+                simpa using congrArg (fun d => Prod.fst <$> d) hrun
+              rw [hquery]
               have hkLt : st.2 < if branch then k + 1 else k := by
                 cases hbranch : branch
                 · simpa [hbranch] using hlt
@@ -384,7 +380,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
               have hsel :
                   (if st.2 < if branch then k + 1 else k then mm.1 else mm.2) = mm.1 :=
                 if_pos hkLt
-              simp [map_eq_bind_pure_comp, bind_assoc]
+              simp [map_eq_bind_pure_comp]
               rw [hsel]
               refine probOutput_bind_congr' (encAlg'.encrypt pk mm.1) x ?_
               intro c
@@ -420,15 +416,71 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                       (QueryCache.cacheQuery st.1 mm c, st.2 + 1)] := by
                 simp [hcache, hlt, StateT.run_bind, StateT.run_get, StateT.run_pure]
               rw [hleft]
-              simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-                OracleQuery.cont_query, id_map, StateT.run']
-              rw [IND_CPA_hybridLR_simulateQ_query_inr_none (encAlg' := encAlg') pk
-                (if branch then k + 1 else k) mm oa st hcache]
+              have hquery :
+                  (simulateQ
+                    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                      st =
+                  (do
+                    let c ← encAlg'.encrypt pk
+                      (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (oa c)).run' (st.1.cacheQuery mm c, st.2 + 1)) := by
+                have hrun :
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                        st =
+                    (do
+                      let c ← encAlg'.encrypt pk
+                        (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                      (simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa c)).run (st.1.cacheQuery mm c, st.2 + 1)) := by
+                  rw [simulateQ_query_bind, StateT.run_bind]
+                  change
+                    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k) (.inr mm)).run st >>= fun u =>
+                      (simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa u.1)).run u.2) = _
+                  rw [show
+                      ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k) (.inr mm)).run st) =
+                        (do
+                          let c ← encAlg'.encrypt pk
+                            (if st.2 < if branch then k + 1 else k then mm.1 else mm.2)
+                          pure (c, (st.1.cacheQuery mm c, st.2 + 1))) from by
+                        change
+                          (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk
+                            (if branch then k + 1 else k) mm).run st = _
+                        simpa using
+                          (IND_CPA_hybridChallengeOracleLR_counted_run_none
+                            (encAlg' := encAlg') pk (if branch then k + 1 else k) mm st hcache)]
+                  simp
+                rw [simulateQ_query_bind, StateT.run']
+                change
+                  Prod.fst <$>
+                    (((liftM
+                        ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                            (if branch then k + 1 else k)) (.inr mm))) >>= fun u =>
+                      simulateQ
+                        (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k))
+                        (oa u)).run st) = _
+                rw [StateT.run_bind]
+                simpa using congrArg (fun d => Prod.fst <$> d) hrun
+              rw [hquery]
               have hsel :
                   (if st.2 < if branch then k + 1 else k then mm.1 else mm.2) =
                     (if branch then mm.1 else mm.2) := by
                 cases branch <;> simp [hEq]
-              simp [map_eq_bind_pure_comp, bind_assoc]
+              simp [map_eq_bind_pure_comp]
               rw [hsel]
               refine probOutput_bind_congr' (encAlg'.encrypt pk (if branch then mm.1 else mm.2))
                 x ?_
@@ -471,11 +523,55 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                         (QueryCache.cacheQuery __discr.2.1 mm c', __discr.2.2 + 1)] := by
               simp [hcache, StateT.run_bind, StateT.run_get]
             rw [hleft]
-            simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-              OracleQuery.cont_query, id_map, StateT.run']
-            rw [IND_CPA_hybridLR_simulateQ_query_inr_some (encAlg' := encAlg') pk
-              (if branch then k + 1 else k) mm c oa st hcache]
-            simp [map_eq_bind_pure_comp]
+            have hquery :
+                (simulateQ
+                  (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                  (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                    st =
+                (simulateQ
+                  (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
+                  (oa c)).run' st := by
+              have hrun :
+                  (simulateQ
+                    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                      (if branch then k + 1 else k))
+                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                      st =
+                  (simulateQ
+                    (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                      (if branch then k + 1 else k))
+                    (oa c)).run st := by
+                rw [simulateQ_query_bind, StateT.run_bind]
+                change
+                  ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                      (if branch then k + 1 else k) (.inr mm)).run st >>= fun u =>
+                    (simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (oa u.1)).run u.2) = _
+                rw [show
+                    ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k) (.inr mm)).run st) = pure (c, st) from by
+                      change
+                        (encAlg'.IND_CPA_hybridChallengeOracleLR_counted pk
+                          (if branch then k + 1 else k) mm).run st = _
+                      simpa using
+                        (IND_CPA_hybridChallengeOracleLR_counted_run_some
+                          (encAlg' := encAlg') pk (if branch then k + 1 else k) mm c st hcache)]
+                simp
+              rw [simulateQ_query_bind, StateT.run']
+              change
+                Prod.fst <$>
+                  (((liftM
+                      ((encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                          (if branch then k + 1 else k)) (.inr mm))) >>= fun u =>
+                    simulateQ
+                      (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
+                        (if branch then k + 1 else k))
+                      (oa u)).run st) = _
+              rw [StateT.run_bind]
+              simpa using congrArg (fun d => Prod.fst <$> d) hrun
+            rw [hquery]
             exact (evalDist_ext_iff.mp (ih c st hst)) x
 
 /-- Planned game-level bridge for the extracted step adversary: its one-time IND-CPA game is the
@@ -527,7 +623,7 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     cases res with
     | done guess =>
         dsimp; simp only [pure_bind]
-        exact probOutput_bind_ignore_left _ _ _
+        simp
     | paused _ _ =>
         dsimp; simp only [map_eq_bind_pure_comp, Function.comp, pure_bind, bind_assoc]
   · rename_i pk_sk
@@ -543,7 +639,7 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     cases res with
     | done guess =>
         dsimp; simp only [pure_bind]
-        exact probOutput_bind_ignore_left _ _ _
+        simp
     | paused _ _ =>
         dsimp; simp only [map_eq_bind_pure_comp, Function.comp, pure_bind, bind_assoc]
 
@@ -672,7 +768,7 @@ most `q * ε`. -/
 theorem IND_CPA_advantage_toReal_le_q_mul_of_oneTime_signedAdvantageReal_bound
     [Inhabited M]
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ) (ε : ℝ)
-    (hq : adversary.MakesAtMostQueries q) (_hε : 0 ≤ ε)
+    (hq : adversary.MakesAtMostQueries q)
     (hstep : ∀ adv : IND_CPA_Adv encAlg',
       |IND_CPA_OneTime_signedAdvantageReal (encAlg := encAlg') adv| ≤ ε) :
     (IND_CPA_advantage (encAlg := encAlg') adversary).toReal ≤ q * ε := by
