@@ -1,6 +1,7 @@
 /.lake/
 .DS_Store
 /.ignore/
+/.gauss/
 
 # LaTeX compilation files
 *.aux
