@@ -136,7 +136,8 @@
 --     return none
 
 -- -- -- DEVON: made this an `OracleComp` so you can fail explicitly with guard
--- -- def verify_message_package (package : MessagePackage) : OracleComp unifSpec SecretMessage := do
+-- -- def verify_message_package
+-- --     (package : MessagePackage) : OracleComp unifSpec SecretMessage := do
 -- --   let content := decrypt_message package.encrypted_message package.nonce
 -- --   let serialized_data := package.nonce.xor (string_to_bitvec content)
 -- --   let computed_tf := mock_hmac_sha256 package.nonce serialized_data
@@ -159,7 +160,8 @@
 --   facebook_key : BitVec 256
 --   deriving Repr
 
--- def simulation_setup (message_content : String) : OracleComp unifSpec (Option SimulationData) := do
+-- def simulation_setup
+--     (message_content : String) : OracleComp unifSpec (Option SimulationData) := do
 --   let facebook_key := BitVec.ofNat 256 123456789
 --   let context : Context := {
 --     sender_id := BitVec.ofNat 256 1001, recipient_id := BitVec.ofNat 256 1002,

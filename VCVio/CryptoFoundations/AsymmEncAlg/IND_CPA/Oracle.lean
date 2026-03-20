@@ -344,7 +344,8 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
             have hst : z.2 = st := congrArg Prod.snd ha
             simpa [cost, hst] using hInv
         | inr mm =>
-            have hsucc := encAlg'.IND_CPA_queryImpl'_counted_counter_le_succ pk b (Sum.inr mm) st z hz
+            have hsucc :=
+              encAlg'.IND_CPA_queryImpl'_counted_counter_le_succ pk b (Sum.inr mm) st z hz
             have hpos : 0 < budget := by simpa [canQuery] using hcan
             have hle' : z.2.2 + (budget - 1) ≤ q := by
               omega

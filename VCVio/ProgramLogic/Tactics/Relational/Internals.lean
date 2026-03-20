@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common
 
+/-!
+# Relational VCGen Internals
+
+Implementation details for the relational VCGen planner and step selection.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
@@ -405,14 +411,16 @@ private def runRVCGenStepWithTheoremConseq
   let target ← instantiateMVars (← getMainTarget)
   let wrapper? ←
     if (relTripleGoalParts? target).isSome then
-      pure <| some (← `(tactic| refine OracleComp.ProgramLogic.Relational.relTriple_post_mono ?_ ?_))
+      pure <| some (← `(tactic|
+        refine OracleComp.ProgramLogic.Relational.relTriple_post_mono ?_ ?_))
     else if (relWPGoalParts? target).isSome then
       pure <| some (← `(tactic|
         refine le_trans ?_
           (MAlgRelOrdered.relWP_mono
             (m₁ := OracleComp _) (m₂ := OracleComp _) (l := Prop) _ _ ?_)))
     else if (eRelTripleGoalParts? target).isSome then
-      pure <| some (← `(tactic| refine OracleComp.ProgramLogic.Relational.eRelTriple_conseq le_rfl ?_ ?_))
+      pure <| some (← `(tactic|
+        refine OracleComp.ProgramLogic.Relational.eRelTriple_conseq le_rfl ?_ ?_))
     else
       pure none
   let some wrapper := wrapper? | return false
@@ -703,7 +711,8 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
   match relationalGoalParts? target with
   | none =>
       throwError m!
-        "rvcstep: expected a `GameEquiv`, `evalDist` equality, `RelTriple`, `RelWP`, or `eRelTriple` goal; got:{indentExpr target}"
+        "rvcstep: expected a `GameEquiv`, `evalDist` equality, `RelTriple`, `RelWP`,\n\
+        or `eRelTriple` goal; got:{indentExpr target}"
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
@@ -740,7 +749,8 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
       if isListMapMExpr oa || isListMapMExpr ob then
         throwError m!
           "rvcstep: found a `List.mapM` relational goal but no traversal rule applied.\n\
-          Use `rvcstep using Rin` when the two input lists are related by a non-equality relation.\n\
+          Use `rvcstep using Rin` when the two input lists are related by a\n\
+          non-equality relation.\n\
           {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
@@ -748,7 +758,8 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
       if isListFoldlMExpr oa || isListFoldlMExpr ob then
         throwError m!
           "rvcstep: found a `List.foldlM` relational goal but no fold rule applied.\n\
-          Use `rvcstep using Rin` when the two input lists are related by a non-equality relation.\n\
+          Use `rvcstep using Rin` when the two input lists are related by a\n\
+          non-equality relation.\n\
           {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\
           Right side:{indentExpr ob}\n\
@@ -762,7 +773,8 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
           Postcondition:{indentExpr post}"
       if isBindExpr oa && isBindExpr ob then
         throwError m!
-          "rvcstep: found a bind-on-both-sides relational goal but could not choose an intermediate cut.\n\
+          "rvcstep: found a bind-on-both-sides relational goal but could not choose\n\
+          an intermediate cut.\n\
           Try `rvcstep using R` when the default cut is not the right one.\n\
           {hintMsg}{theoremMsg}\n\
           Left side:{indentExpr oa}\n\

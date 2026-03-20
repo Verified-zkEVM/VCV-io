@@ -1,0 +1,39 @@
+name: Lint Style
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "VCVio/**/*.lean"
+      - "Examples/**/*.lean"
+      - "lakefile.lean"
+      - "scripts/lint-style.py"
+      - "scripts/print-style-errors.sh"
+      - "scripts/nolints-style.txt"
+      - "scripts/style-exceptions.txt"
+      - ".github/workflows/linting.yml"
+  push:
+    branches: [main, master]
+    paths:
+      - "VCVio/**/*.lean"
+      - "Examples/**/*.lean"
+      - "lakefile.lean"
+      - "scripts/lint-style.py"
+      - "scripts/print-style-errors.sh"
+      - "scripts/nolints-style.txt"
+      - "scripts/style-exceptions.txt"
+      - ".github/workflows/linting.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint Style
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: leanprover-community/lint-style-action@a7e7428fa44f9635d6eb8e01919d16fd498d387a # 2025-08-18
+        with:
+          mode: check
