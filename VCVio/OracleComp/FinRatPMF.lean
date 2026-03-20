@@ -33,11 +33,6 @@ variable [spec.Inhabited] [∀ t : spec.Domain, FinEnum (spec.Range t)]
 local instance instSpecFintypeOfFinEnum : spec.Fintype where
   fintype_B _ := inferInstance
 
-lemma uniformOfFintype_eq {α : Type u} (f1 f2 : Fintype α) :
-    @PMF.uniformOfFintype α f1 = @PMF.uniformOfFintype α f2 := by
-  ext x
-  simp [PMF.uniformOfFintype_apply, @Fintype.card_congr α α f1 f2 (Equiv.refl α)]
-
 @[simp] lemma toPMF_apply (t : spec.Domain) :
     @Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t) =
       PMF.uniformOfFintype (spec.Range t) := by
@@ -74,10 +69,7 @@ lemma uniformOfFintype_eq {α : Type u} (f1 f2 : Fintype α) :
     evalDist (simulateQ (finRatImpl (spec := spec)) oa) = evalDist oa := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
-  | query_bind t mx h =>
-      let g : PMF (spec.Range t) → SPMF α := fun p =>
-        (liftM p : SPMF (spec.Range t)) >>= fun x => evalDist (mx x)
-      simp [evalDist_bind, evalDist_apply, OracleComp.evalDist_query, h]
+  | query_bind t mx h => simp [evalDist_bind, evalDist_apply, OracleComp.evalDist_query, h]
 
 @[simp] lemma probOutput_simulateQ {α : Type v}
     (oa : OracleComp spec α) (x : α) :
@@ -106,7 +98,7 @@ end finRatImpl
 
 namespace Demo
 
-instance : FinEnum Bool where
+local instance : FinEnum Bool where
   card := 2
   equiv :=
     { toFun := fun b => if b then ⟨1, by decide⟩ else ⟨0, by decide⟩
