@@ -202,12 +202,12 @@ theorem pir_private (i₁ i₂ : Fin N) :
     evalDist (Prod.fst <$> pirQuery i₂) := by
   simp only [pirQuery]
   by_equiv
-  rvcgen_step -- handle map
-  rvcgen_step -- handle foldlM
+  rvcstep -- handle map
+  rvcstep -- handle foldlM
   · rfl -- initial states: ([], []).1 = ([], []).1
   · intro j acc₁ acc₂ hS
     simp only [ProgramLogic.Relational.EqRel] at hS
-    rvcgen_step using (fun b₁ b₂ => b₁ = b₂)
+    rvcstep using (fun b₁ b₂ => b₁ = b₂)
     · intro b₁ b₂ hb; subst hb
       cases b₁ <;> simp <;>
         (split <;> split <;>
@@ -231,35 +231,35 @@ theorem pir_private_snd (i₁ i₂ : Fin N) :
     evalDist (Prod.snd <$> pirQuery i₂) := by
   simp only [pirQuery]
   by_equiv
-  rvcgen_step -- handle map
-  rvcgen_step -- handle foldlM
+  rvcstep -- handle map
+  rvcstep -- handle foldlM
   · rfl
   · intro j acc₁ acc₂ hS
     simp only [ProgramLogic.Relational.EqRel] at hS
     by_cases h₁ : j = i₁ <;> by_cases h₂ : j = i₂
     -- Case 1: j = i₁ ∧ j = i₂ — identical, identity coupling
     · subst h₁; subst h₂
-      rvcgen_step using (fun b₁ b₂ => b₁ = b₂)
+      rvcstep using (fun b₁ b₂ => b₁ = b₂)
       · intro b₁ b₂ hb; subst hb; cases b₁ <;>
           simp_all [ProgramLogic.Relational.EqRel]
       · exact ProgramLogic.Relational.relTriple_uniformSample_bij
           Function.bijective_id _ (fun _ => rfl)
     -- Case 2: j = i₁ ∧ j ≠ i₂ — negation coupling
     · subst h₁
-      rvcgen_step using (fun b₁ b₂ => b₂ = !b₁)
+      rvcstep using (fun b₁ b₂ => b₂ = !b₁)
       · intro b₁ b₂ hb; subst hb; simp [h₂]; cases b₁ <;>
           simp_all [ProgramLogic.Relational.EqRel]
       · exact ProgramLogic.Relational.relTriple_uniformSample_bij
           Bool.involutive_not.bijective _ (fun _ => rfl)
     -- Case 3: j ≠ i₁ ∧ j = i₂ — negation coupling
     · subst h₂
-      rvcgen_step using (fun b₁ b₂ => b₂ = !b₁)
+      rvcstep using (fun b₁ b₂ => b₂ = !b₁)
       · intro b₁ b₂ hb; subst hb; simp [h₁]; cases b₁ <;>
           simp_all [ProgramLogic.Relational.EqRel]
       · exact ProgramLogic.Relational.relTriple_uniformSample_bij
           Bool.involutive_not.bijective _ (fun _ => rfl)
     -- Case 4: j ≠ i₁ ∧ j ≠ i₂ — identity coupling
-    · rvcgen_step using (fun b₁ b₂ => b₁ = b₂)
+    · rvcstep using (fun b₁ b₂ => b₁ = b₂)
       · intro b₁ b₂ hb; subst hb; simp [h₁, h₂]; cases b₁ <;>
           simp_all [ProgramLogic.Relational.EqRel]
       · exact ProgramLogic.Relational.relTriple_uniformSample_bij

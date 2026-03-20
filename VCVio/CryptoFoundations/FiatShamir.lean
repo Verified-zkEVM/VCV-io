@@ -220,8 +220,8 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
     simp_rw [hpure_run']]
-  qvcgen_step
-  qvcgen_step using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
+  vcstep
+  vcstep using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
   · simpa [OracleComp.ProgramLogic.propInd] using
       OracleComp.ProgramLogic.triple_support (oa := hr.gen)
   · intro x
@@ -252,22 +252,23 @@ To obtain a meaningful EUF-CMA theorem we need:
 * an HVZK simulator for the underlying Σ-protocol, to model signing without the witness;
 * a structural bound on hash-oracle queries.
 
-The conclusion is stated as the existence of a witness-finding reduction rather
-than a fully explicit adversary, since the concrete reduction is not yet
-implemented in this file. -/
+The intended conclusion is stated as the existence of a witness-finding
+reduction. The concrete Pointcheval-Stern reduction is not yet implemented in
+this file, so the proof below remains a placeholder. -/
 theorem euf_cma_bound
-    (hss : σ.SpeciallySound)
+    (_hss : σ.SpeciallySound)
     [Fintype Ω]
     (simTranscript : X → ProbComp (PC × Ω × P))
-    (hhvzk : σ.HVZK simTranscript)
+    (_hhvzk : σ.HVZK simTranscript)
     (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
     (qBound : ℕ)
-    (hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
+    (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
     ∃ reduction : X → ProbComp W,
       (adv.advantage *
           (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by
+  -- TODO: implement the explicit Pointcheval-Stern reduction.
   sorry
 
 end FiatShamir

@@ -80,58 +80,58 @@ Internally the implementation is split between
 the umbrella import is still the intended default.
 
 - **Proof-mode entry**: `by_equiv`, `game_trans`, `by_dist`, `by_upto`, `by_hoare`
-- **Relational stepping**: `rvcgen_step`, `rvcgen`,
+- **Relational stepping**: `rvcstep`, `rvcgen`,
   `rel_conseq`, `rel_inline`, `rel_dist`
-- **Unary stepping**: `wp_step` (raw `wp` goals), `qvcgen_step` (`Triple` or probability goals,
-  spec-aware, auto probability lowering), `qvcgen_step inv I` (explicit loop invariant)
-- **Unary exhaustive**: `qvcgen` (exhaustive `Triple` / probability goal decomposition with
+- **Unary stepping**: `vcstep` (raw `wp` goals), `vcstep` (`Triple` or probability goals,
+  spec-aware, auto probability lowering), `vcstep inv I` (explicit loop invariant)
+- **Unary exhaustive**: `vcgen` (exhaustive `Triple` / probability goal decomposition with
   auto lowering, auto loop invariants, support-cut synthesis, and support/indicator leaf closure),
-  `qvcgen using cut` (one explicit bind step then exhaustive), `qvcgen inv I` (explicit loop
+  `vcgen using cut` (one explicit bind step then exhaustive), `vcgen inv I` (explicit loop
   invariant then exhaustive)
-  (`wp_step` / `qvcgen_step` also understand bounded iteration via `replicate`, `List.mapM`,
+  (`vcstep` / `vcstep` also understand bounded iteration via `replicate`, `List.mapM`,
   and `List.foldlM`)
 - **Expectation normalization**: `exp_norm`
-- **Probability equalities**: plain `qvcgen_step` heuristically dispatches swap / congruence on
-  `Pr[...] = Pr[...]` goals; use `qvcgen_step rw`, `qvcgen_step rw under n`,
-  `qvcgen_step rw congr`, and `qvcgen_step rw congr'` for explicit control.
+- **Probability equalities**: plain `vcstep` heuristically dispatches swap / congruence on
+  `Pr[...] = Pr[...]` goals; use `vcstep rw`, `vcstep rw under n`,
+  `vcstep rw congr`, and `vcstep rw congr'` for explicit control.
 
 Quick usage notes:
 
 - `by_equiv` enters the coupling-based `RelTriple` shell intentionally.
-- `rvcgen_step` lowers `GameEquiv` / `evalDist` equality goals into `RelTriple`,
+- `rvcstep` lowers `GameEquiv` / `evalDist` equality goals into `RelTriple`,
   then tries the obvious relational rule for the current shape.
-- `rvcgen_step using t` interprets `t` by goal shape:
+- `rvcstep using t` interprets `t` by goal shape:
   bind cut relation, random/query bijection, traversal input relation,
   or `simulateQ` state invariant.
 - `rvcgen` repeats relational VCGen across all open goals until stuck.
-  When exactly one local hypothesis works as a `using` hint, `rvcgen_step` / `rvcgen`
+  When exactly one local hypothesis works as a `using` hint, `rvcstep` / `rvcgen`
   auto-consume it. If 0 or ≥ 2 viable hints exist, ambiguity is kept explicit.
   The relational finish pass also handles postcondition weakening
   (`relTriple_post_mono` + assumption) automatically.
-- `qvcgen_step` accepts both `Triple` and probability goals (`Pr[p | oa] = 1`,
+- `vcstep` accepts both `Triple` and probability goals (`Pr[p | oa] = 1`,
   `Pr[= x | oa] = 1`, etc.), automatically lowering probability goals into the `Triple`
   engine before decomposing.
-- `qvcgen using cut` performs one explicit bind step with `cut`, then runs the exhaustive driver.
-- `qvcgen inv I` applies an explicit loop invariant `I`, then runs the exhaustive driver.
-- `qvcgen_step using cut` specifies an explicit intermediate postcondition for a bind step.
-- `qvcgen_step inv I` applies a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal,
+- `vcgen using cut` performs one explicit bind step with `cut`, then runs the exhaustive driver.
+- `vcgen inv I` applies an explicit loop invariant `I`, then runs the exhaustive driver.
+- `vcstep using cut` specifies an explicit intermediate postcondition for a bind step.
+- `vcstep inv I` applies a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal,
   leaving pre-to-invariant, step-preservation, and invariant-to-post subgoals.
-- `qvcgen_step rw` performs one explicit bind-swap rewrite; `qvcgen_step rw under n` keeps
+- `vcstep rw` performs one explicit bind-swap rewrite; `vcstep rw under n` keeps
   `n` shared outer binds fixed while swapping deeper draws on one side.
-- `qvcgen_step rw congr` exposes one shared bind plus its support hypothesis;
-  `qvcgen_step rw congr'` exposes one shared bind without the support hypothesis.
-- `qvcgen` auto-detects loop invariants: when a `Triple I (replicate n oa) (fun _ => I)` goal
+- `vcstep rw congr` exposes one shared bind plus its support hypothesis;
+  `vcstep rw congr'` exposes one shared bind without the support hypothesis.
+- `vcgen` auto-detects loop invariants: when a `Triple I (replicate n oa) (fun _ => I)` goal
   (or `foldlM`/`mapM` equivalent) has a step-preservation hypothesis in context, it applies
   `triple_replicate_inv` / `triple_list_foldlM_inv` / `triple_list_mapM_inv` automatically.
-- `qvcgen` final pass also tries `triple_support`, `triple_propInd_of_support`,
+- `vcgen` final pass also tries `triple_support`, `triple_propInd_of_support`,
   `triple_probEvent_eq_one`, and `triple_probOutput_eq_one` for support-sensitive leaf closure.
-- `rvcgen_step` covers synchronized `replicate`, `List.mapM`, and `List.foldlM`
+- `rvcstep` covers synchronized `replicate`, `List.mapM`, and `List.foldlM`
   goals directly; use `using Rin` for non-equality input relations on the traversal/fold cases.
-- `qvcgen_step` auto-lowers probability goals, then decomposes a `Triple` bind,
+- `vcstep` auto-lowers probability goals, then decomposes a `Triple` bind,
   auto-closes the spec subgoal via `solve_by_elim`, falls back to backward WP
   (`triple_bind_wp`), handles `ite`/`dite`/`match` splitting, and auto-detects loop
   invariants for `replicate`/`foldlM`/`mapM`.
-- `qvcgen` is the exhaustive driver: lowers probability goals, decomposes `Triple` goals
+- `vcgen` is the exhaustive driver: lowers probability goals, decomposes `Triple` goals
   across all open branches, closes spec subgoals and loop invariants from context,
   synthesizes support-based intermediate postconditions when no explicit spec is available,
   normalizes residual `wp` terms, applies support/indicator leaf closure, then runs bounded

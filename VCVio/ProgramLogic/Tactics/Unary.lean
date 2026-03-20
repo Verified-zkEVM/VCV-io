@@ -10,23 +10,14 @@ open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
 
-/-! ## Unary WP tactics -/
-
-/-- `wp_step` applies exactly one WP decomposition rule and stops.
-This gives step-by-step control for raw `wp` goals (`_ ≤ wp _ _`). -/
-elab "wp_step" : tactic => do
-  if ← runWpStepRules then
-    return
-  TacticInternals.Unary.throwWpStepError
-
-/-! ## Quantitative VCGen: spec-aware stepping for `Triple` goals -/
+/-! ## Unary VC tactics -/
 
 private def binderIdentsToNames (ids : Syntax.TSepArray `Lean.binderIdent ",") : Array Name :=
   ids.getElems.map fun
     | `(binderIdent| $name:ident) => name.getId
     | _ => Name.anonymous
 
-private def runQVCGenFinish : TacticM Unit := do
+private def runVCGenFinish : TacticM Unit := do
   unless (← getGoals).isEmpty do
     let _ ← tryEvalTacticSyntax
       (← `(tactic| all_goals try simp only [
@@ -41,9 +32,9 @@ private def runQVCGenFinish : TacticM Unit := do
         one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero,
         game_rule]))
   unless (← getGoals).isEmpty do
-    discard <| runBoundedPasses "qvcgen finish" TacticInternals.Unary.runVCGenClosePass
+    discard <| runBoundedPasses "vcgen finish" TacticInternals.Unary.runVCGenClosePass
 
-private def runQVCGenStepWithNames (names : Array Name) : TacticM Bool := do
+private def runVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   if target.isForall then
     return (← introMainGoalNames names)
@@ -60,7 +51,7 @@ private def runQVCGenStepWithNames (names : Array Name) : TacticM Bool := do
     return true
   return false
 
-private def runQVCGenStepWithTheoremNames
+private def runVCGenStepWithTheoremNames
     (thm : TSyntax `term) (names : Array Name) : TacticM Bool := do
   if ← TacticInternals.Unary.runVCGenStepWithTheorem thm then
     introAllGoalsNames names
@@ -78,13 +69,13 @@ private def logPlannerNotes (steps : Array PlannedStep) : TacticM Unit := do
         emitted := emitted.push note
         logInfo m!"Planner note: {note}"
 
-/-- `qvcgen_step` applies one quantitative VCGen step to a `Triple`, raw `wp`, or probability goal.
+/-- `vcstep` applies one quantitative VCGen step to a `Triple`, raw `wp`, or probability goal.
 
 For `Triple` goals: decomposes a bind via `triple_bind` and automatically tries to close
 the spec subgoal using hypotheses in the local context, with backward WP fallback.
 Also handles `ite`/`dite` splitting, `match` case analysis, loop invariant auto-detection
 from context, and WP-rule unfolding, including `simulateQ ... run'`.
-After the built-in leaf rules, it may also use user-authored `@[vcgen]` lemmas whose
+After the built-in leaf rules, it may also use user-authored `@[vcspec]` lemmas whose
 registered head symbol matches the current computation.
 
 For `Pr[...] = 1` and lower-bound goals such as `r ≤ Pr[p | oa]`: automatically lowers the
@@ -99,120 +90,120 @@ For other general `Pr[...]` goals: rewrites to raw `wp` form and keeps stepping 
 when a `wp` rule applies, rather than immediately exiting the VCGen pipeline.
 
 Variants:
-- `qvcgen_step using cut` for an explicit intermediate postcondition.
-- `qvcgen_step with thm` to force a specific unary theorem/assumption step.
-- `qvcgen_step inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal.
-- `qvcgen_step rw` to perform one explicit top-level probability-equality rewrite step.
-- `qvcgen_step rw under n` to rewrite one bind-swap under `n` shared bind prefixes.
-- `qvcgen_step rw congr` to expose one shared bind plus its support hypothesis.
-- `qvcgen_step rw congr'` to expose one shared bind without a support hypothesis.
+- `vcstep using cut` for an explicit intermediate postcondition.
+- `vcstep with thm` to force a specific unary theorem/assumption step.
+- `vcstep inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal.
+- `vcstep rw` to perform one explicit top-level probability-equality rewrite step.
+- `vcstep rw under n` to rewrite one bind-swap under `n` shared bind prefixes.
+- `vcstep rw congr` to expose one shared bind plus its support hypothesis.
+- `vcstep rw congr'` to expose one shared bind without a support hypothesis.
 
-Use `@[vcgen]` on unary `Triple` theorems to opt them into the bounded head-symbol lookup. -/
-syntax "qvcgen_step" ("using" term)? : tactic
-syntax "qvcgen_step" "with" term : tactic
-syntax "qvcgen_step" "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step?" : tactic
+Use `@[vcspec]` on unary `Triple` or raw `wp` theorems to opt them into bounded lookup. -/
+syntax "vcstep" ("using" term)? : tactic
+syntax "vcstep" "with" term : tactic
+syntax "vcstep" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep?" : tactic
 
 elab_rules : tactic
-  | `(tactic| qvcgen_step as ⟨ $ids,* ⟩) => do
+  | `(tactic| vcstep as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
-      if ← runQVCGenStepWithNames names then return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step using $cut as ⟨ $ids,* ⟩) => do
+      if ← runVCGenStepWithNames names then return
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep using $cut as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runHoareStepRuleUsing cut then
         introAllGoalsNames names
         renameInaccessibleNames names
         return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step with $thm as ⟨ $ids,* ⟩) => do
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep with $thm as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
-      if ← runQVCGenStepWithTheoremNames thm names then return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step) => do
+      if ← runVCGenStepWithTheoremNames thm names then return
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep) => do
       if ← TacticInternals.Unary.runVCGenStep then return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step using $cut) => do
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep using $cut) => do
       if ← TacticInternals.Unary.runHoareStepRuleUsing cut then return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step with $thm) => do
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep with $thm) => do
       if ← TacticInternals.Unary.runVCGenStepWithTheorem thm then return
-      TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen_step?) => do
+      TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcstep?) => do
       let some step ← TacticInternals.Unary.runVCGenPlannedStep?
-        | TacticInternals.Unary.throwQVCGenStepError
+        | TacticInternals.Unary.throwVCGenStepError
       addTryThisTextSuggestion (← getRef) step.replayText
       logPlannerNotes #[step]
 
-syntax "qvcgen_step" &"rw" : tactic
-syntax "qvcgen_step" &"rw" " under " num : tactic
-syntax "qvcgen_step" &"rw" &"congr" : tactic
-syntax "qvcgen_step" &"rw" &"congr'" : tactic
-syntax "qvcgen_step" &"rw" "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step" &"rw" " under " num "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step" &"rw" &"congr" "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "qvcgen_step" &"rw" &"congr'" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" &"rw" : tactic
+syntax "vcstep" &"rw" " under " num : tactic
+syntax "vcstep" &"rw" &"congr" : tactic
+syntax "vcstep" &"rw" &"congr'" : tactic
+syntax "vcstep" &"rw" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" &"rw" " under " num "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" &"rw" &"congr" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" &"rw" &"congr'" "as" "⟨" binderIdent,* "⟩" : tactic
 
 elab_rules : tactic
-  | `(tactic| qvcgen_step rw as ⟨ $ids,* ⟩) => do
+  | `(tactic| vcstep rw as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runProbEqAction .rewrite then
         introAllGoalsNames names
         renameInaccessibleNames names
         return
-      TacticInternals.Unary.throwQVCGenStepRwError 0
-  | `(tactic| qvcgen_step rw under $n:num as ⟨ $ids,* ⟩) => do
+      TacticInternals.Unary.throwVCGenStepRwError 0
+  | `(tactic| vcstep rw under $n:num as ⟨ $ids,* ⟩) => do
       let depth := n.getNat
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runProbEqAction (.rewriteUnder depth) then
         introAllGoalsNames names
         renameInaccessibleNames names
         return
-      TacticInternals.Unary.throwQVCGenStepRwError depth
-  | `(tactic| qvcgen_step rw congr as ⟨ $ids,* ⟩) => do
+      TacticInternals.Unary.throwVCGenStepRwError depth
+  | `(tactic| vcstep rw congr as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runProbEqCongrChainWithNames true names then return
-      TacticInternals.Unary.throwQVCGenStepRwCongrError true
-  | `(tactic| qvcgen_step rw congr' as ⟨ $ids,* ⟩) => do
+      TacticInternals.Unary.throwVCGenStepRwCongrError true
+  | `(tactic| vcstep rw congr' as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runProbEqCongrChainWithNames false names then return
-      TacticInternals.Unary.throwQVCGenStepRwCongrError false
-  | `(tactic| qvcgen_step rw) => do
+      TacticInternals.Unary.throwVCGenStepRwCongrError false
+  | `(tactic| vcstep rw) => do
       if ← TacticInternals.Unary.runProbEqAction .rewrite then return
-      TacticInternals.Unary.throwQVCGenStepRwError 0
-  | `(tactic| qvcgen_step rw under $n:num) => do
+      TacticInternals.Unary.throwVCGenStepRwError 0
+  | `(tactic| vcstep rw under $n:num) => do
       let depth := n.getNat
       if ← TacticInternals.Unary.runProbEqAction (.rewriteUnder depth) then return
-      TacticInternals.Unary.throwQVCGenStepRwError depth
-  | `(tactic| qvcgen_step rw congr) => do
+      TacticInternals.Unary.throwVCGenStepRwError depth
+  | `(tactic| vcstep rw congr) => do
       if ← TacticInternals.Unary.runProbEqAction .congr then return
-      TacticInternals.Unary.throwQVCGenStepRwCongrError true
-  | `(tactic| qvcgen_step rw congr') => do
+      TacticInternals.Unary.throwVCGenStepRwCongrError true
+  | `(tactic| vcstep rw congr') => do
       if ← TacticInternals.Unary.runProbEqAction .congrNoSupport then return
-      TacticInternals.Unary.throwQVCGenStepRwCongrError false
+      TacticInternals.Unary.throwVCGenStepRwCongrError false
 
-syntax "qvcgen_step" &"inv" term : tactic
-syntax "qvcgen_step" &"inv" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "vcstep" &"inv" term : tactic
+syntax "vcstep" &"inv" term "as" "⟨" binderIdent,* "⟩" : tactic
 
 elab_rules : tactic
-  | `(tactic| qvcgen_step inv $inv as ⟨ $ids,* ⟩) => do
+  | `(tactic| vcstep inv $inv as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← TacticInternals.Unary.runLoopInvExplicit inv then
         introAllGoalsNames names
         renameInaccessibleNames names
         return
       throwError
-        "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+        "vcstep inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
         or `List.mapM`."
-  | `(tactic| qvcgen_step inv $inv) => do
+  | `(tactic| vcstep inv $inv) => do
       if ← TacticInternals.Unary.runLoopInvExplicit inv then return
       throwError
-        "qvcgen_step inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+        "vcstep inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
         or `List.mapM`."
 
-/-- `qvcgen` exhaustively decomposes a `Triple`, raw `wp`, or probability goal with spec-aware stepping.
+/-- `vcgen` exhaustively decomposes a `Triple`, raw `wp`, or probability goal with spec-aware stepping.
 
 Accepts `Triple` goals, raw `wp` goals, lower-bound / exact probability goals, and
 `Pr[...] = Pr[...]` equality goals. Probability goals are automatically lowered or
@@ -232,41 +223,41 @@ Enhancements over simple structural decomposition:
 - Finishes with bounded local consequence search on closed goals
 
 Typical usage: bring specs into context with `have` or as function parameters, then
-call `qvcgen` to automatically decompose and apply them.
+call `vcgen` to automatically decompose and apply them.
 
 Variants:
-- `qvcgen using cut` performs one explicit bind step with intermediate postcondition `cut`,
+- `vcgen using cut` performs one explicit bind step with intermediate postcondition `cut`,
   then continues with exhaustive decomposition on all resulting goals.
-- `qvcgen inv I` applies an explicit loop invariant `I` to the first `replicate`/`foldlM`/`mapM`
+- `vcgen inv I` applies an explicit loop invariant `I` to the first `replicate`/`foldlM`/`mapM`
   goal, then continues with exhaustive decomposition. -/
-syntax "qvcgen" ("using" term)? : tactic
-syntax "qvcgen" &"inv" term : tactic
-syntax "qvcgen?" : tactic
+syntax "vcgen" ("using" term)? : tactic
+syntax "vcgen" &"inv" term : tactic
+syntax "vcgen?" : tactic
 
 elab_rules : tactic
-  | `(tactic| qvcgen) => do
-      discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
-      runQVCGenFinish
-  | `(tactic| qvcgen using $cut) => do
+  | `(tactic| vcgen) => do
+      discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
+      runVCGenFinish
+  | `(tactic| vcgen using $cut) => do
       discard <| TacticInternals.Unary.tryLowerProbGoal
       if ← TacticInternals.Unary.runHoareStepRuleUsing cut then
-        discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
-        runQVCGenFinish
+        discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
+        runVCGenFinish
       else
-        TacticInternals.Unary.throwQVCGenStepError
-  | `(tactic| qvcgen inv $inv) => do
+        TacticInternals.Unary.throwVCGenStepError
+  | `(tactic| vcgen inv $inv) => do
       discard <| TacticInternals.Unary.tryLowerProbGoal
       if ← TacticInternals.Unary.runLoopInvExplicit inv then
-        discard <| runBoundedPasses "qvcgen" TacticInternals.Unary.runVCGenPass
-        runQVCGenFinish
+        discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
+        runVCGenFinish
       else
         throwError
-          "qvcgen inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
+          "vcgen inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
           or `List.mapM`."
-  | `(tactic| qvcgen?) => do
-      let batches ← runBoundedPassesCollect "qvcgen?" TacticInternals.Unary.runVCGenPassPlanned
+  | `(tactic| vcgen?) => do
+      let batches ← runBoundedPassesCollect "vcgen?" TacticInternals.Unary.runVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
-      runQVCGenFinish
+      runVCGenFinish
       for batch in batches do
         logPlannerNotes batch
       let mut lines : List String :=
@@ -277,7 +268,7 @@ elab_rules : tactic
           "all_goals first | assumption | exact OracleComp.ProgramLogic.triple_pure _ _ | exact OracleComp.ProgramLogic.triple_zero _ _ | (classical exact OracleComp.ProgramLogic.triple_support _) | (exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption)) | exact le_refl _ | (repeat intro; simp only [OracleComp.ProgramLogic.Triple] at *; solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans])"
         ]
       if lines.isEmpty then
-        lines := ["qvcgen"]
+        lines := ["vcgen"]
       addTryThisTextSuggestion (← getRef) <| String.intercalate "\n" lines
 
 /-- `exp_norm` normalizes expectation / indicator arithmetic in the current goal.

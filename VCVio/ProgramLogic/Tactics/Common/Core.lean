@@ -15,12 +15,12 @@ namespace OracleComp.ProgramLogic
 
 register_option vcvio.vcgen.maxPasses : Nat := {
   defValue := 64
-  descr := "Maximum number of exhaustive qvcgen/rvcgen passes before requiring manual stepping."
+  descr := "Maximum number of exhaustive vcgen/rvcgen passes before requiring manual stepping."
 }
 
 register_option vcvio.vcgen.traceSteps : Bool := {
   defValue := false
-  descr := "Emit opt-in trace messages for chosen qvcgen/rvcgen planned steps."
+  descr := "Emit opt-in trace messages for chosen vcgen/rvcgen planned steps."
 }
 
 structure PlannedStep where
@@ -100,6 +100,18 @@ def relTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   let args ← trailingArgs? app 3
   let #[oa, ob, post] := args | none
   some (oa, ob, post)
+
+def relWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.RelWP target
+  let args ← trailingArgs? app 3
+  let #[oa, ob, post] := args | none
+  some (oa, ob, post)
+
+def eRelTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.eRelTriple target
+  let args ← trailingArgs? app 4
+  let #[pre, oa, ob, post] := args | none
+  some (pre, oa, ob, post)
 
 def wpGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
@@ -189,6 +201,22 @@ def isProbEqGoal (target : Expr) : Bool :=
 
 def tryEvalTacticSyntax (stx : Syntax) : TacticM Bool :=
   (evalTactic stx *> pure true) <|> pure false
+
+def focusFirstGoalSatisfying (pred : Expr → Bool) : TacticM Bool := do
+  let goals ← getGoals
+  let mut matched? : Option MVarId := none
+  let mut rest : Array MVarId := #[]
+  for goal in goals do
+    let target ← instantiateMVars (← goal.getType)
+    if matched?.isNone && pred target then
+      matched? := some goal
+    else
+      rest := rest.push goal
+  match matched? with
+  | none => return false
+  | some goal =>
+      setGoals (goal :: rest.toList)
+      return true
 
 def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do
   let maxPasses := vcvio.vcgen.maxPasses.get (← getOptions)

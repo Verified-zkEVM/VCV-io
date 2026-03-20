@@ -5,7 +5,7 @@
 **What are you trying to prove?**
 
 1. **Two games have the same distribution** (`g₁ ≡ₚ g₂`):
-   → `by_equiv` to enter relational mode, then use `rvcgen_step` / `rvcgen`
+   → `by_equiv` to enter relational mode, then use `rvcstep` / `rvcgen`
    → Add `using ...` when the current relational step needs an explicit witness
 
 2. **Advantage is bounded** (`advantage ≤ ε`):
@@ -14,19 +14,19 @@
    → For identical-until-bad: use `tvDist_simulateQ_le_probEvent_bad`
 
 3. **Probability equals a specific value** (`Pr[= x | oa] = ...`):
-   → Start with `qvcgen_step` if the goal should lower or decompose automatically
-  → Use `qvcgen_step?` when you want the explicit script, binder names, rewrite form, or an
+   → Start with `vcstep` if the goal should lower or decompose automatically
+  → Use `vcstep?` when you want the explicit script, binder names, rewrite form, or an
     explicit `using` / `inv` / `with` step surfaced
    → Otherwise use `probOutput_bind_eq_tsum` to decompose binds manually
    → Use `simp` with project simp lemmas
-   → Use `qvcgen_step`, `qvcgen_step rw`, or `qvcgen_step rw congr'` for probability equalities
+   → Use `vcstep`, `vcstep rw`, or `vcstep rw congr'` for probability equalities
 
 4. **Multi-hop security proof** (`g₁ ≡ₚ gₙ`):
    → `game_trans g₂` to split into two goals, repeat
 
 5. **Need to swap sampling order**:
-   → Use `qvcgen_step` if the swap should close the goal
-   → Use `qvcgen_step rw` (or `qvcgen_step rw under n`) if you need to continue after rewriting
+   → Use `vcstep` if the swap should close the goal
+   → Use `vcstep rw` (or `vcstep rw under n`) if you need to continue after rewriting
 
 ## Game-Hopping Recipe
 
@@ -97,8 +97,8 @@ From `Examples/ElGamal/Basic.lean` — multi-query security via DDH.
 **Key patterns used**:
 - Hybrid argument indexed by query count `k`
 - `StateT` for oracle implementations that track query counter + cache
-- `qvcgen_step` to close common probability-equality swaps
-- `qvcgen_step rw congr'` to expose common random-sampling prefixes without support noise
+- `vcstep` to close common probability-equality swaps
+- `vcstep rw congr'` to expose common random-sampling prefixes without support noise
 - Telescope bound: `IND_CPA_advantage ≤ q * 2ε`
 
 ## Annotated Tactic Usage
@@ -108,8 +108,8 @@ From `Examples/ElGamal/Basic.lean` — multi-query security via DDH.
 ```lean
 -- Goal: g₁ ≡ₚ g₂
 by_equiv                    -- now: ⟪g₁ ~ g₂ | EqRel α⟫
-rvcgen_step using R         -- if needed, provide the bind cut relation
-· rvcgen_step using f       -- couples the sampling step with a bijection
+rvcstep using R         -- if needed, provide the bind cut relation
+· rvcstep using f       -- couples the sampling step with a bijection
   · exact hf
   · intro x
     exact hR x
@@ -119,7 +119,7 @@ rvcgen_step using R         -- if needed, provide the bind cut relation
 ```
 
 When there is exactly one viable local hypothesis that works as a `using` hint,
-plain `rvcgen_step` and `rvcgen` will auto-consume it — no explicit `using` needed:
+plain `rvcstep` and `rvcgen` will auto-consume it — no explicit `using` needed:
 
 ```lean
 -- hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫ is the only viable hint
@@ -138,84 +138,84 @@ rvcgen                      -- closes via relTriple_post_mono + assumption
 
 ```lean
 -- Same workflow, but ask the tactic to surface the explicit script:
-rvcgen_step?
+rvcstep?
 ```
 
 On bind goals, the replay can now surface the full tuple naming form:
 
 ```lean
-rvcgen_step using S as ⟨a1, a2, hrel⟩
+rvcstep using S as ⟨a1, a2, hrel⟩
 ```
 
-### `qvcgen_step` on probability equalities
+### `vcstep` on probability equalities
 
 ```lean
 -- Goal: Pr[= true | do let x ← $ᵗ P; let b ← $ᵗ Bool; f x b]
 --     = Pr[= true | do let b ← $ᵗ Bool; let x ← $ᵗ P; f x b]
-qvcgen_step                -- closes the goal automatically
+vcstep                -- closes the goal automatically
 ```
 
 ```lean
 -- Same shape, but keep going after one rewrite:
-qvcgen_step rw
+vcstep rw
 ```
 
 ### Naming and suggestion modes
 
 ```lean
 -- Ask for the explicit next script and binder names:
-qvcgen_step?
+vcstep?
 ```
 
 The surfaced script may now include:
 
 ```lean
-qvcgen_step using cut
-qvcgen_step inv I
-qvcgen_step with triple_wrappedTrue
+vcstep using cut
+vcstep inv I
+vcstep with triple_wrappedTrue
 ```
 
 ```lean
 -- Keep the step, but force stable names for the new binders:
-qvcgen_step as ⟨x⟩
+vcstep as ⟨x⟩
 ```
 
 ```lean
 -- Same idea on the relational side:
-rvcgen_step using S as ⟨a₁, a₂, hrel⟩
+rvcstep using S as ⟨a₁, a₂, hrel⟩
 ```
 
-### `qvcgen` driver variants
+### `vcgen` driver variants
 
-Use `qvcgen using cut` to perform one explicit bind step with an intermediate
+Use `vcgen using cut` to perform one explicit bind step with an intermediate
 postcondition, then continue with exhaustive decomposition:
 
 ```lean
 -- Goal: ⦃1⦄ (do let x ← oa; let y ← f x; g y) ⦃post⦄
 -- with hoa : ⦃1⦄ oa ⦃cut⦄ in context
-qvcgen using cut            -- splits at first bind with `cut`, then auto-decomposes
+vcgen using cut            -- splits at first bind with `cut`, then auto-decomposes
 ```
 
-Use `qvcgen inv I` to apply an explicit loop invariant to the first
+Use `vcgen inv I` to apply an explicit loop invariant to the first
 `replicate`/`foldlM`/`mapM` goal, then continue:
 
 ```lean
 -- Goal: ⦃pre⦄ oa.replicate n ⦃post⦄
 -- with hstep : ⦃I⦄ oa ⦃fun _ => I⦄ in context
-qvcgen inv I                -- applies invariant I, then auto-decomposes
+vcgen inv I                -- applies invariant I, then auto-decomposes
 ```
 
 ### Support-cut synthesis
 
 When decomposing a bind `oa >>= f`, if no explicit spec is available in context,
-`qvcgen_step` and `qvcgen` will automatically try a support-based intermediate
+`vcstep` and `vcgen` will automatically try a support-based intermediate
 postcondition. This applies `triple_bind` with `triple_support` as the spec for `oa`,
 unifying the cut to `fun x => ⌜x ∈ support oa⌝`:
 
 ```lean
 -- Goal: ⦃1⦄ (do let x ← oa; f x) ⦃post⦄
 -- No spec for oa, but h : ∀ x ∈ support oa, ⦃...⦄ f x ⦃post⦄
-qvcgen                      -- auto-inserts support cut, then decomposes f
+vcgen                      -- auto-inserts support cut, then decomposes f
 ```
 
 ### Opt-in unary theorem lookup
@@ -226,34 +226,34 @@ unary `Triple` lemma explicitly:
 ```lean
 @[irreducible] def wrappedTrue : OracleComp spec Bool := pure true
 
-@[vcgen] theorem triple_wrappedTrue :
+@[vcspec] theorem triple_wrappedTrue :
     ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
   simpa [wrappedTrue] using
     (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
 ```
 
-After that, `qvcgen_step` can use the theorem when the goal head symbol is `wrappedTrue`.
+After that, `vcstep` can use the theorem when the goal head symbol is `wrappedTrue`.
 The lookup is step-level and bounded: it runs after the built-in structural rules and only over
 registered head-matching theorems.
 
 You can also force a specific theorem or local assumption explicitly:
 
 ```lean
-qvcgen_step with triple_wrappedTrue
+vcstep with triple_wrappedTrue
 ```
 
-If an exhaustive `qvcgen` / `rvcgen` run stops too early, raise the local pass budget with:
+If an exhaustive `vcgen` / `rvcgen` run stops too early, raise the local pass budget with:
 
 ```lean
 set_option vcvio.vcgen.maxPasses 128 in
-  qvcgen
+  vcgen
 ```
 
 For tactic-choice debugging, enable the planned-step trace locally:
 
 ```lean
 set_option vcvio.vcgen.traceSteps true in
-  qvcgen_step
+  vcstep
 ```
 
 ### `by_dist` for advantage bounds
