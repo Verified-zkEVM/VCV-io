@@ -58,6 +58,37 @@ def previewPlannedStep (step : PlannedStep) : TacticM Bool :=
 def previewPlannedStepWithGoals (step : PlannedStep) : TacticM PreviewResult :=
   previewActionWithGoals step.run
 
+def renderPlannedStepPreview (step : PlannedStep) (preview : PreviewResult) : String :=
+  s!"{step.replayText} -> {preview.goalCount} goal(s)"
+
+def attachPlannerChoiceNotes
+    (step : PlannedStep) (preview : PreviewResult) (alternatives : Array String) : PlannedStep :=
+  withStepNotes step <|
+    [s!"planner preview leaves {preview.goalCount} goal(s)"] ++
+      if alternatives.isEmpty then
+        []
+      else
+        [s!"alternatives: {String.intercalate "; " alternatives.toList}"]
+
+def chooseBestPlannedStepCandidate? (steps : Array PlannedStep) :
+    TacticM (Option (PlannedStep × PreviewResult)) := do
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for step in steps do
+    let preview ← previewPlannedStepWithGoals step
+    if preview.ok then
+      accepted := accepted.push (renderPlannedStepPreview step preview)
+      match best? with
+      | none => best? := some (step, preview)
+      | some (_, bestPreview) =>
+          if preview.goalCount < bestPreview.goalCount then
+            best? := some (step, preview)
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+
 def logPlannedStep (step : PlannedStep) (beforeGoals afterGoals : Nat) : TacticM Unit := do
   if vcvio.vcgen.traceSteps.get (← getOptions) then
     logInfo m!"[{step.label}] {step.replayText} (goals {beforeGoals} -> {afterGoals})"
@@ -119,11 +150,33 @@ def wpGoalComp? (target : Expr) : Option Expr := do
   let #[oa, _post] := args | none
   some oa
 
+def wpGoalParts? (target : Expr) : Option (Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
+  let args ← trailingArgs? app 2
+  let #[oa, post] := args | none
+  some (oa, post)
+
+def rawWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let target := target.consumeMData
+  if target.isAppOfArity ``LE.le 4 then
+    let pre := target.getArg! 2
+    let rhs := target.getArg! 3
+    let (oa, post) ← wpGoalParts? rhs
+    some (pre, oa, post)
+  else
+    none
+
 def tripleGoalComp? (target : Expr) : Option Expr := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
   let args ← trailingArgs? app 3
   let #[_pre, oa, _post] := args | none
   some oa
+
+def tripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
+  let args ← trailingArgs? app 3
+  let #[pre, oa, post] := args | none
+  some (pre, oa, post)
 
 def isSimulateQAction (e : Expr) : Bool :=
   (findAppWithHead? ``simulateQ e).isSome
