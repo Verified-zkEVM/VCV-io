@@ -4,6 +4,11 @@ import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
 import Examples.FrankingProtocol
 import Examples.MLKEM
+import Examples.MLKEM.Concrete.CBD
+import Examples.MLKEM.Concrete.Encoding
+import Examples.MLKEM.Concrete.FFI
+import Examples.MLKEM.Concrete.Instance
+import Examples.MLKEM.Concrete.NTT
 import Examples.MLKEM.Encoding
 import Examples.MLKEM.Internal
 import Examples.MLKEM.KEM
