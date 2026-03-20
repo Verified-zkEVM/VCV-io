@@ -86,9 +86,11 @@ import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
+import VCVio.ProgramLogic.Tactics.Common.CompiledRules
 import VCVio.ProgramLogic.Tactics.Common.Core
 import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.Registry
+import VCVio.ProgramLogic.Tactics.Common.SpecIR
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
 import VCVio.ProgramLogic.Tactics.Examples.Probability
 import VCVio.ProgramLogic.Tactics.Examples.ProofMode
