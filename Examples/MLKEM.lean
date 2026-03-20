@@ -11,6 +11,11 @@ import Examples.MLKEM.Primitives
 import Examples.MLKEM.KPKE
 import Examples.MLKEM.Internal
 import Examples.MLKEM.KEM
+import Examples.MLKEM.Concrete.FFI
+import Examples.MLKEM.Concrete.NTT
+import Examples.MLKEM.Concrete.Encoding
+import Examples.MLKEM.Concrete.CBD
+import Examples.MLKEM.Concrete.Instance
 
 /-!
 # ML-KEM Example

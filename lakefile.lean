@@ -43,6 +43,42 @@ lean_lib LibSodium
 /-- Main function for testing -/
 lean_exe test where root := `Test
 
+-- Compile mlkem-native core and Lean FFI wrapper as separate translation units.
+-- Both share the same include paths and config defines.
+private def mlkemCFlags (pkg : NPackage __name__) :
+    FetchM (Array String × Array String) := do
+  let mlkemDir := pkg.dir / "third_party" / "mlkem-native" / "mlkem"
+  let weakArgs := #[
+    "-I", (← getLeanIncludeDir).toString,
+    "-I", mlkemDir.toString,
+    "-I", (mlkemDir / "src").toString,
+    "-DMLK_CONFIG_NO_RANDOMIZED_API",
+    "-std=c99", "-O2"]
+  return (weakArgs, #["-fPIC"])
+
+target mlkem_native.o pkg : System.FilePath := do
+  let oFile := pkg.buildDir / "c" / "mlkem_native.o"
+  let mlkemDir := pkg.dir / "third_party" / "mlkem-native" / "mlkem"
+  let srcJob ← inputTextFile <| mlkemDir / "mlkem_native.c"
+  let (weakArgs, traceArgs) ← mlkemCFlags pkg
+  buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
+
+target mlkem_ffi.o pkg : System.FilePath := do
+  let oFile := pkg.buildDir / "c" / "mlkem_ffi.o"
+  let srcJob ← inputTextFile <| pkg.dir / "ffi" / "mlkem" / "lean_mlkem_ffi.c"
+  let (weakArgs, traceArgs) ← mlkemCFlags pkg
+  buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
+
+extern_lib leanmlkem pkg := do
+  let nativeO ← mlkem_native.o.fetch
+  let ffiO ← mlkem_ffi.o.fetch
+  let name := nameToStaticLib "leanmlkem"
+  buildStaticLib (pkg.staticLibDir / name) #[nativeO, ffiO]
+
+/-- ML-KEM test executable (links against mlkem-native FFI). -/
+lean_exe mlkem_test where
+  root := `MLKEMTest
+
 -- /-- Runnable implementations of specific cryptographic algorithms.
 -- Set `precompileModules` in order to allow execution of external code. -/
 -- lean_lib Implementations where
