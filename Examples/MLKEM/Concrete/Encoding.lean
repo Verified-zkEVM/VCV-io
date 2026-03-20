@@ -226,8 +226,7 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
     let pair := idx.val / 2
     have hpair : pair < 128 := by
       dsimp [pair]
-      have : idx.val < 256 := by
-        simpa [ringDegree] using idx.isLt
+      have : idx.val < 256 := idx.isLt
       omega
     have h0 : 2 * pair < ringDegree := by
       have : 2 * pair < 256 := by omega
@@ -323,7 +322,8 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
         simp
 
 private theorem byteDecode12VecPoly_byteEncode12Vec_eq {k : Nat} (v : TqVec k) (poly : Fin k) :
-    byteDecode12VecPoly (byteEncode12Vec v) poly = byteDecode12Poly (byteEncode12Poly (v[poly.val])) := by
+    byteDecode12VecPoly (byteEncode12Vec v) poly =
+      byteDecode12Poly (byteEncode12Poly (v[poly.val])) := by
   have hfun :
       (fun idx : Fin ringDegree =>
         let pair := idx.val / 2
@@ -349,8 +349,7 @@ private theorem byteDecode12VecPoly_byteEncode12Vec_eq {k : Nat} (v : TqVec k) (
     let pair := idx.val / 2
     have hpair : pair < 128 := by
       dsimp [pair]
-      have : idx.val < 256 := by
-        simpa [ringDegree] using idx.isLt
+      have : idx.val < 256 := idx.isLt
       omega
     have hb0 :
         (getByteD (byteEncode12Vec v) (poly.val * 384 + 3 * pair)).toNat =
@@ -358,7 +357,8 @@ private theorem byteDecode12VecPoly_byteEncode12Vec_eq {k : Nat} (v : TqVec k) (
       have h :
           getByteD (byteEncode12Vec v) (poly.val * 384 + 3 * pair) =
             getByteD (byteEncode12Poly (v[poly.val])) (3 * pair) := by
-        rw [getByteD_byteEncode12Vec (v := v) (poly := poly.val) (j := 3 * pair) poly.isLt (by omega)]
+        rw [getByteD_byteEncode12Vec (v := v) (poly := poly.val) (j := 3 * pair)
+          poly.isLt (by omega)]
         rw [getByteD_byteEncode12Poly (f := v[poly.val]) (j := 3 * pair) (by omega)]
       exact congrArg UInt8.toNat h
     have hb1 :

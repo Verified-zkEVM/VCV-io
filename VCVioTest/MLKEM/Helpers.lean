@@ -45,7 +45,7 @@ def hexByte (b : UInt8) : String :=
   let hi := b.toNat / 16
   let lo := b.toNat % 16
   let c (n : Nat) : Char := if n < 10 then Char.ofNat (48 + n) else Char.ofNat (87 + n)
-  String.mk [c hi, c lo]
+  String.ofList [c hi, c lo]
 
 def toHex (ba : ByteArray) (maxBytes : Nat := 8) : String :=
   let pfx := Id.run do

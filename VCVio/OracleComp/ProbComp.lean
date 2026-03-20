@@ -270,7 +270,8 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
   | [] => by simp
   | y :: ys => by simp [uniformSelectList_cons]
 
-@[simp, grind =] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
+@[simp, grind =] lemma probEvent_uniformSelectList
+    (xs : List α) (p : α → Prop) [DecidablePred p] :
     Pr[p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
   | [] => by simp
   | y :: ys => by

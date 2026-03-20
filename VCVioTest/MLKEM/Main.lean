@@ -33,7 +33,7 @@ def main : IO Unit := do
   IO.println "=== ML-KEM-768 Correctness Tests ==="
   IO.println ""
 
-  -- ── 1. SHA-3 known-answer (full digests) ──────────────────
+  -- ── 1. SHA-3 known-answer (full digests) ────────────
   IO.println "1. SHA-3 known-answer vectors"
   do
     let abc : ByteArray := ⟨#[0x61, 0x62, 0x63]⟩
@@ -44,7 +44,9 @@ def main : IO Unit := do
       s!"got={toHex d256 32}"
 
     let d512 := FFI.sha3_512 abc
-    let exp512 := parseHex "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"
+    let exp512 := parseHex <|
+      "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e" ++
+      "10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"
     check st "SHA3-512(\"abc\") full 64 bytes" (d512 == exp512)
       s!"got={toHex d512 64}"
 
@@ -54,7 +56,7 @@ def main : IO Unit := do
     check st "SHA3-256(\"\") full digest" (d256e == exp256e)
   IO.println ""
 
-  -- ── 2. SHAKE known-answer ──────────────────────────────────
+  -- ── 2. SHAKE known-answer ──────────────────────────
   IO.println "2. SHAKE known-answer vectors"
   do
     let empty : ByteArray := ⟨#[]⟩
@@ -67,7 +69,7 @@ def main : IO Unit := do
     check st "SHAKE-128(\"\", 32) full output" (shake128out == expShake128)
   IO.println ""
 
-  -- ── 3. NTT roundtrip ──────────────────────────────────────
+  -- ── 3. NTT roundtrip ──────────────────────────────
   IO.println "3. NTT roundtrip (invNTT ∘ NTT = id)"
   do
     let f : Rq := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
@@ -83,7 +85,7 @@ def main : IO Unit := do
     check st "NTT roundtrip on pseudorandom poly" (h == h')
   IO.println ""
 
-  -- ── 4. NTT multiplication ─────────────────────────────────
+  -- ── 4. NTT multiplication ─────────────────────────
   IO.println "4. NTT multiplication (invNTT(mul(NTT f, NTT g)) = f*g mod X^256+1)"
   do
     let f : Rq := Vector.ofFn fun ⟨i, _⟩ => if i < 3 then (1 : Coeff) else 0
@@ -93,7 +95,8 @@ def main : IO Unit := do
     let nttResult := MLKEM.Concrete.invNTT
       (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt f) (MLKEM.Concrete.ntt g))
     check st "NTT mul: (1+X+X²)*(1+2X)" (nttResult == expected)
-      s!"NTT=[{(nttResult.toArray.toList.take 6).map (·.val)}] expected=[{(expected.toArray.toList.take 6).map (·.val)}]"
+      s!"NTT=[{(nttResult.toArray.toList.take 6).map (·.val)}] " ++
+      s!"expected=[{(expected.toArray.toList.take 6).map (·.val)}]"
 
     let f2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
     let g2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (256 - i : Coeff)
@@ -109,7 +112,7 @@ def main : IO Unit := do
     check st "NTT mul: f * 1 = f" (mulOneResult == f)
   IO.println ""
 
-  -- ── 5. ByteEncode / ByteDecode roundtrip ──────────────────
+  -- ── 5. ByteEncode / ByteDecode roundtrip ────────────
   IO.println "5. ByteEncode / ByteDecode roundtrip"
   do
     let f : Rq := Vector.ofFn fun ⟨i, _⟩ => (i * 13 : Coeff)
@@ -126,7 +129,7 @@ def main : IO Unit := do
       check st s!"ByteDecode_{d}(ByteEncode_{d}(h)) roundtrip" (h == dec)
   IO.println ""
 
-  -- ── 6. Compress / Decompress ──────────────────────────────
+  -- ── 6. Compress / Decompress ───────────────────────
   IO.println "6. Compress / Decompress approximation"
   do
     for d in [1, 4, 5, 10, 11] do
@@ -147,7 +150,7 @@ def main : IO Unit := do
       check st s!"Compress_{d} roundtrip error ≤ {maxErr}" allClose
   IO.println ""
 
-  -- ── 7. CBD bounds ─────────────────────────────────────────
+  -- ── 7. CBD bounds ─────────────────────────────────
   IO.println "7. CBD output bounds"
   do
     for eta in [2, 3] do
@@ -158,7 +161,7 @@ def main : IO Unit := do
       check st s!"samplePolyCBD eta={eta} output bounded by [-{eta},{eta}]" allBounded
   IO.println ""
 
-  -- ── 8. SampleNTT known-answer ─────────────────────────────
+  -- ── 8. SampleNTT known-answer ──────────────────────
   IO.println "8. SampleNTT known-answer (Lean vs mlkem-native)"
   do
     let rho : Seed32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
@@ -194,7 +197,7 @@ def main : IO Unit := do
       s!"Lean={toHex dkB} ref={toHex dkRef}"
   IO.println ""
 
-  -- ── 10. Full encaps + decaps ──────────────────────────────
+  -- ── 10. Full encaps + decaps ───────────────────────
   IO.println "10. Full ML-KEM-768 encaps + decaps: Lean spec vs mlkem-native"
   do
     let d : Seed32 := Vector.ofFn fun _ => (0xAA : UInt8)
@@ -231,7 +234,7 @@ def main : IO Unit := do
     check st "decaps roundtrip: ss_enc = ss_dec" (ssB == ssDecB)
   IO.println ""
 
-  -- ── 11. Second key pair (different coins) ─────────────────
+  -- ── 11. Second key pair (different coins) ──────────
   IO.println "11. Second key pair (different coins)"
   do
     let d : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8
@@ -269,7 +272,7 @@ def main : IO Unit := do
       (vecToBA ssDecLean == ssDecRef)
   IO.println ""
 
-  -- ── 12. Implicit rejection ────────────────────────────────
+  -- ── 12. Implicit rejection ────────────────────────
   IO.println "12. Implicit rejection (corrupted ciphertext)"
   do
     let d : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 3).toUInt8
@@ -302,7 +305,7 @@ def main : IO Unit := do
       (vecToBA ssDecCorruptLean == ssDecCorruptRef)
   IO.println ""
 
-  -- ── 13. NIST ACVP keygen vectors ────────────────────────
+  -- ── 13. NIST ACVP keygen vectors ──────────────────
   IO.println "13. NIST ACVP keygen vectors (ML-KEM-768)"
   do
     for vec in ACVP.keyGenVectors do
