@@ -84,7 +84,7 @@ private def tryApplyTripleHyp : TacticM Bool := withMainContext do
     let hypType ← instantiateMVars ldecl.type
     unless hasTripleHead hypType do continue
     let some hypCompFn := tripleCompFn? hypType | continue
-    unless goalCompFn.equal hypCompFn do continue
+    unless goalCompFn == hypCompFn do continue
     if ← tryEvalTacticSyntax (← `(tactic| exact $(mkIdent ldecl.userName))) then
       return true
     if hypType.isForall then
@@ -425,7 +425,7 @@ def findRegisteredVCGenRuleCandidates : TacticM (Array CompiledUnaryVCSpecRule) 
       found := found.push rule
   unless found.isEmpty do
     return found
-  for fallback in [fallbackPreferred, fallbackFallback] do
+  for fallback in #[fallbackPreferred, fallbackFallback] do
     for rule in fallback.toList.take 8 do
       let saved ← saveState
       let ok ← runCompiledUnaryRule rule

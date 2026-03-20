@@ -139,15 +139,6 @@ def normalizeVCSpecTarget (attrName : Name) (declTy : Expr) : MetaM NormalizedVC
       preShape := none
       postShape := classifyArgShape post
     }
-  if let some comp := wpGoalComp? targetTy then
-    return {
-      kind := .unaryWP
-      lookupKey := .unary (← headConstNameOrError attrName "unary computations" comp)
-      compPattern := classifyUnaryCompPattern comp
-      theoremBinderCount := binderCount
-      preShape := none
-      postShape := .schematic
-    }
   if let some (oa, ob, post) := relTripleGoalParts? targetTy then
     return {
       kind := .relTriple
