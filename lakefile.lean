@@ -12,6 +12,7 @@ abbrev vcvLinters : Array LeanOption := #[
   ⟨`linter.style.dollarSyntax, true⟩,
   ⟨`linter.style.longLine, false⟩, -- temp
   ⟨`linter.style.longFile, .ofNat 1500⟩,
+  ⟨`linter.pythonStyle, true⟩,
   ⟨`linter.style.missingEnd, true⟩,
   ⟨`linter.style.setOption, true⟩
 ]

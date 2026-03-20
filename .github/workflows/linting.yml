@@ -6,8 +6,10 @@ on:
     paths:
       - "VCVio/**/*.lean"
       - "Examples/**/*.lean"
+      - "lakefile.lean"
       - "scripts/lint-style.py"
-      - "scripts/lint-style.sh"
+      - "scripts/print-style-errors.sh"
+      - "scripts/nolints-style.txt"
       - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
   push:
@@ -15,8 +17,10 @@ on:
     paths:
       - "VCVio/**/*.lean"
       - "Examples/**/*.lean"
+      - "lakefile.lean"
       - "scripts/lint-style.py"
-      - "scripts/lint-style.sh"
+      - "scripts/print-style-errors.sh"
+      - "scripts/nolints-style.txt"
       - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
 
@@ -28,68 +32,8 @@ jobs:
   lint:
     name: Lint Style
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: leanprover-community/lint-style-action@a7e7428fa44f9635d6eb8e01919d16fd498d387a # 2025-08-18
         with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Select changed Lean files
-        id: changed-files
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-            HEAD_SHA="${{ github.sha }}"
-            if [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
-              BASE_SHA="$(git hash-object -t tree /dev/null)"
-            fi
-          fi
-
-          git diff --name-only --diff-filter=ACMRTUXB "$BASE_SHA" "$HEAD_SHA" \
-            | grep -E '^(VCVio|Examples)/.*\.lean$' > changed_files.txt || true
-
-          if [ -s changed_files.txt ]; then
-            echo "has_files=true" >> "$GITHUB_OUTPUT"
-            echo "Changed Lean files:"
-            cat changed_files.txt
-          else
-            echo "has_files=false" >> "$GITHUB_OUTPUT"
-            echo "No changed Lean files to lint."
-          fi
-
-      - name: Run style linter on changed files
-        if: steps.changed-files.outputs.has_files == 'true'
-        run: |
-          touch scripts/style-exceptions.txt
-          xargs -a changed_files.txt -r python3 scripts/lint-style.py
-
-      - name: Check executable bits on Lean files
-        shell: bash
-        run: |
-          executable_files="$(find . -name '*.lean' -type f \( -perm -u=x -o -perm -g=x -o -perm -o=x \))"
-          if [[ -n "$executable_files" ]]; then
-            echo "ERROR: The following Lean files have the executable bit set."
-            echo "$executable_files"
-            exit 1
-          fi
-
-      - name: Check case-insensitive filename clashes
-        shell: bash
-        run: |
-          ignore_case_clashes="$(git ls-files | sort --ignore-case | uniq -D --ignore-case)"
-          if [ -n "$ignore_case_clashes" ]; then
-            printf $'The following files have the same lower-case form:\n\n%s\n\nPlease, make sure to avoid such clashes!\n' "$ignore_case_clashes"
-            exit 1
-          fi
+          mode: check
