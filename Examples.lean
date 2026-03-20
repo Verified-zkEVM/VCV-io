@@ -2,7 +2,6 @@ import Examples.BR93
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
-import Examples.FinRatPMFDemo
 import Examples.FrankingProtocol
 import Examples.OneTimePad
 import Examples.PRGfromPRF
