@@ -395,7 +395,7 @@ private def runRVCGenStepWithTheoremDirect
     with
     | some _ => pure true
     | none => pure false
-  if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+  if ok && (!requireClosed || (← getGoals).isEmpty) then
     return true
   saved.restore
   return false
@@ -430,7 +430,7 @@ private def runRVCGenStepWithTheoremConseq
     with
     | some _ => pure true
     | none => pure false
-  if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+  if ok && (!requireClosed || (← getGoals).isEmpty) then
     return true
   saved.restore
   return false

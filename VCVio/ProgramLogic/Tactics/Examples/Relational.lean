@@ -44,15 +44,6 @@ example {oa₁ oa₂ : OracleComp spec α}
   rvcstep using S
   · exact hoa
 
-example {oa₁ oa₂ : OracleComp spec α}
-    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
-    {S : RelPost α α} {R : RelPost β γ}
-    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
-    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
-    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
-  rvcstep using S
-  · exact hoa
-
 example (f : α → OracleComp spec β) :
     ∀ x, ⟪f x ~ f x | EqRel β⟫ := by
   rvcstep as ⟨x⟩

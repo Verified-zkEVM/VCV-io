@@ -20,8 +20,6 @@ open OracleComp.ProgramLogic
 open OracleComp.ProgramLogic.Relational
 open scoped OracleComp.ProgramLogic
 
-universe u
-
 variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
 variable {α β γ δ ε : Type}
 
