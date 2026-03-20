@@ -39,7 +39,7 @@ private def byteArrayToVector (ba : ByteArray) (offset : Nat) (n : Nat) : Vector
 private def rejectionSample (stream : ByteArray) : Array Coeff := Id.run do
   let mut acc : Array Coeff := Array.mkEmpty 256
   let numChunks := stream.size / 3
-  for chunk in List.range numChunks do
+  for chunk in [0:numChunks] do
     if acc.size < 256 then
       let pos := chunk * 3
       let b0 := stream.get! pos |>.toNat
@@ -56,6 +56,7 @@ private def rejectionSample (stream : ByteArray) : Array Coeff := Id.run do
 /-- FIPS 203 Algorithm 7: sample an NTT-domain polynomial from `SHAKE-128(ρ ‖ j ‖ i)`. -/
 def concreteSampleNTT (rho : Seed32) (j i : Nat) : Tq :=
   let input := vectorToByteArray rho |>.push j.toUInt8 |>.push i.toUInt8
+  -- A fixed 840-byte squeeze is enough to cover the acceptance process in practice.
   let stream := FFI.shake128 input 840
   let coeffs := rejectionSample stream
   Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0
@@ -92,8 +93,8 @@ def concretePrimitives (params : Params) (encoding : Encoding params)
     (hU : encoding.EncodedU = ByteArray)
     (hV : encoding.EncodedV = ByteArray) :
     Primitives params encoding where
-  gKeygen := fun p d =>
-    hashG (vectorToByteArray d |>.push p.k.toUInt8)
+  gKeygen := fun d =>
+    hashG (vectorToByteArray d |>.push params.k.toUInt8)
   sampleNTT := fun rho j i =>
     concreteSampleNTT rho j.val i.val
   prfEta1 := prfCBD params.eta1

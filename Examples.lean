@@ -3,7 +3,6 @@ import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
 import Examples.FrankingProtocol
-import Examples.MLKEM
 import Examples.MLKEM.Concrete.CBD
 import Examples.MLKEM.Concrete.Encoding
 import Examples.MLKEM.Concrete.FFI

@@ -45,8 +45,8 @@ def main : IO Unit := do
 
     let d512 := FFI.sha3_512 abc
     let exp512 := parseHex "b751850b1a57168a5693cd924b6b096e08f621827444f70d884f5d0240d2712e10e116e9192af3c91a7ec57647e3934057340b4cf408d5a56592f8274eec53f0"
-    check st "SHA3-512(\"abc\") first 63 bytes" (d512.size == 64 && (d512.toList.take 63 == exp512.toList.take 63))
-      s!"size={d512.size}"
+    check st "SHA3-512(\"abc\") full 64 bytes" (d512 == exp512)
+      s!"got={toHex d512 64}"
 
     let empty : ByteArray := ⟨#[]⟩
     let d256e := FFI.sha3_256 empty
@@ -78,7 +78,7 @@ def main : IO Unit := do
     let g' := MLKEM.Concrete.invNTT (MLKEM.Concrete.ntt g)
     check st "NTT roundtrip on constant poly" (g == g')
 
-    let h : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i * 137 + 42) % modulus : Nat)
+    let h : Rq := Vector.ofFn fun ⟨i, _⟩ => (i * 137 + 42 : Coeff)
     let h' := MLKEM.Concrete.invNTT (MLKEM.Concrete.ntt h)
     check st "NTT roundtrip on pseudorandom poly" (h == h')
   IO.println ""
@@ -96,7 +96,7 @@ def main : IO Unit := do
       s!"NTT=[{(nttResult.toArray.toList.take 6).map (·.val)}] expected=[{(expected.toArray.toList.take 6).map (·.val)}]"
 
     let f2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
-    let g2 : Rq := Vector.ofFn fun ⟨i, _⟩ => ((256 - i) % modulus : Nat)
+    let g2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (256 - i : Coeff)
     let expected2 := schoolbookMul f2 g2
     let nttResult2 := MLKEM.Concrete.invNTT
       (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt f2) (MLKEM.Concrete.ntt g2))
@@ -112,16 +112,16 @@ def main : IO Unit := do
   -- ── 5. ByteEncode / ByteDecode roundtrip ──────────────────
   IO.println "5. ByteEncode / ByteDecode roundtrip"
   do
-    let f : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i * 13 % modulus : Nat) : Coeff)
+    let f : Rq := Vector.ofFn fun ⟨i, _⟩ => (i * 13 : Coeff)
     let decoded := byteDecode 12 (byteEncode 12 f)
     check st "ByteDecode_12(ByteEncode_12(f)) = f" (f == decoded)
 
-    let g : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % 16 : Nat) : Coeff)
+    let g : Rq := Vector.ofFn fun ⟨i, _⟩ => (i % 16 : Coeff)
     let dec4 := byteDecode 4 (byteEncode 4 g)
     check st "ByteDecode_4(ByteEncode_4(g)) = g" (g == dec4)
 
     for d in [1, 4, 5, 10, 11, 12] do
-      let h : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % (1 <<< d)) : Nat)
+      let h : Rq := Vector.ofFn fun ⟨i, _⟩ => (i % (1 <<< d) : Coeff)
       let dec := byteDecode d (byteEncode d h)
       check st s!"ByteDecode_{d}(ByteEncode_{d}(h)) roundtrip" (h == dec)
   IO.println ""
@@ -131,14 +131,19 @@ def main : IO Unit := do
   do
     for d in [1, 4, 5, 10, 11] do
       let maxErr := modulus / (2 * (1 <<< d)) + 1
-      let f : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i * 37 % modulus : Nat) : Coeff)
+      let f : Rq := Vector.ofFn fun ⟨i, _⟩ => (i * 37 : Coeff)
       let roundtrip := decompressPoly d (compressPoly d f)
-      let allClose := (List.range 256).all fun i =>
-        let orig := (f.toArray.getD i 0).val
-        let rt := (roundtrip.toArray.getD i 0).val
-        let diff := if orig ≥ rt then min (orig - rt) (modulus - orig + rt)
-                    else min (rt - orig) (modulus - rt + orig)
-        diff ≤ maxErr
+      let allClose := Id.run do
+        let fa := f.toArray
+        let rta := roundtrip.toArray
+        let mut ok := true
+        for i in [0:256] do
+          let orig := (fa.getD i 0).val
+          let rt := (rta.getD i 0).val
+          let diff := if orig ≥ rt then min (orig - rt) (modulus - orig + rt)
+                      else min (rt - orig) (modulus - rt + orig)
+          ok := ok && diff ≤ maxErr
+        return ok
       check st s!"Compress_{d} roundtrip error ≤ {maxErr}" allClose
   IO.println ""
 
@@ -316,8 +321,8 @@ def main : IO Unit := do
 
       let ekExpFirst32 := parseHex vec.ekFirst32
       let dkExpFirst32 := parseHex vec.dkFirst32
-      let ekFirst32 := ByteArray.mk (ekB.toList.take 32).toArray
-      let dkFirst32 := ByteArray.mk (dkB.toList.take 32).toArray
+      let ekFirst32 := ekB.extract 0 32
+      let dkFirst32 := dkB.extract 0 32
 
       check st s!"tcId={vec.tcId} ek first 32 bytes match ACVP"
         (ekFirst32 == ekExpFirst32)

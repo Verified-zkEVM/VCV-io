@@ -20,7 +20,7 @@ namespace MLKEM
 /-- The primitive algorithms referenced by the ML-KEM specification. -/
 structure Primitives (params : Params) (encoding : Encoding params) where
   /-- `G(d || k)` from K-PKE key generation, modeled as a pair of 32-byte seeds. -/
-  gKeygen : Params → Seed32 → Seed32 × Seed32
+  gKeygen : Seed32 → Seed32 × Seed32
   /-- `SampleNTT(ρ || j || i)` specialized to the chosen parameter set. -/
   sampleNTT : Seed32 → Fin params.k → Fin params.k → Tq
   /-- `PRF_η₁` followed by CBD sampling, specialized to output one polynomial. -/

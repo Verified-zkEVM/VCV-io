@@ -67,7 +67,7 @@ key relation `tHat = Ahat * sHat + eHat` before serializing the public and secre
 def keygenFromSeed (ring : NTTRingOps) (encoding : Encoding params)
     (prims : Primitives params encoding) (d : Seed32) :
     PublicKey params encoding × SecretKey params encoding :=
-  let (rho, sigma) := prims.gKeygen params d
+  let (rho, sigma) := prims.gKeygen d
   let aHat := prims.publicMatrix rho
   let s := prims.sampleVecEta1 sigma 0
   let e := prims.sampleVecEta1 sigma params.k

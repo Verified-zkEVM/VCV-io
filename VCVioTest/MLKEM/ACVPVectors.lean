@@ -20,8 +20,6 @@ set_option autoImplicit false
 
 namespace VCVioTest.MLKEM.ACVP
 
-open VCVioTest.MLKEM (parseHex)
-
 structure KeyGenVector where
   tcId : Nat
   d : String

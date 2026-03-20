@@ -59,7 +59,7 @@ def bitRev7 (i : Nat) : Nat :=
 def zetaArray : Array Coeff :=
   (Array.range 128).map fun i => zeta ^ bitRev7 i
 
-/-- `256⁻¹ mod 3329 = 3303`. Applied after the inverse NTT. -/
+/-- `128⁻¹ mod 3329 = 3303`. Applied after the inverse NTT. -/
 private def nInv : Coeff := 3303
 
 /-- Safe array access with fallback to zero. -/
@@ -71,11 +71,11 @@ private def nttLayer (a : Array Coeff) (len : Nat) (k : Nat) : Array Coeff × Na
   let mut arr := a
   let mut ki := k
   let numGroups := 256 / (2 * len)
-  for s in List.range numGroups do
+  for s in [0:numGroups] do
     let start := s * 2 * len
     let z := getZ zetaArray ki
     ki := ki + 1
-    for jj in List.range len do
+    for jj in [0:len] do
       let j := start + jj
       let t := z * getZ arr (j + len)
       let fj := getZ arr j
@@ -96,11 +96,11 @@ private def invNttLayer (a : Array Coeff) (len : Nat) (k : Nat) :
   let mut arr := a
   let mut ki := k
   let numGroups := 256 / (2 * len)
-  for s in List.range numGroups do
+  for s in [0:numGroups] do
     let start := s * 2 * len
     let z := getZ zetaArray ki
     ki := ki - 1
-    for jj in List.range len do
+    for jj in [0:len] do
       let j := start + jj
       let t := getZ arr j
       let u := getZ arr (j + len)
