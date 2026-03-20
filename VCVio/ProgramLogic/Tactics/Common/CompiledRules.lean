@@ -72,14 +72,7 @@ def compileUnaryVCSpecRules (entries : Array VCSpecEntry) : Array CompiledUnaryV
 
 def compileRelationalVCSpecRule? (entry : VCSpecEntry) : Option CompiledRelationalVCSpecRule :=
   match entry.kind with
-  | .relTriple | .eRelTriple =>
-      let modes :=
-        if entry.spec.postShape == .concrete then
-          #[.direct, .postConseq]
-        else
-          #[.direct]
-      some { entry, modes }
-  | .relWP =>
+  | .relTriple | .eRelTriple | .relWP =>
       let modes :=
         if entry.spec.postShape == .concrete then
           #[.direct, .postConseq]

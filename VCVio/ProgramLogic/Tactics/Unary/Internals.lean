@@ -50,10 +50,64 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
         return false
   | none => return false
 
+/-- Check whether an expression (possibly under `∀` quantifiers and `mdata`) contains
+a `Triple` application as its head. -/
+private def hasTripleHead (e : Expr) : Bool :=
+  let rec go : Expr → Bool
+    | .forallE _ _ body _ => go body
+    | .mdata _ e => go e
+    | e => (findAppWithHead? ``OracleComp.ProgramLogic.Triple e).isSome
+  go e
+
+/-- Extract the head function of the computation argument from a `Triple` application,
+after stripping `∀` quantifiers and `mdata`. -/
+private def tripleCompFn? (e : Expr) : Option Expr :=
+  let rec go : Expr → Option Expr
+    | .forallE _ _ body _ => go body
+    | .mdata _ e => go e
+    | e => do
+        let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple e
+        let args ← trailingArgs? app 3
+        some (args[1]!).consumeMData.getAppFn
+  go e
+
+/-- Try to close a `Triple` goal by targeted application of local hypotheses
+whose type (possibly under `∀` quantifiers) has `Triple` as head and whose
+computation argument structurally matches the goal's computation.
+Much faster than `assumption` + `solve_by_elim` when the goal has unresolved metavariables,
+because it skips expensive `isDefEq` checks against non-matching hypotheses. -/
+private def tryApplyTripleHyp : TacticM Bool := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  let some goalCompFn := tripleCompFn? target | return false
+  for ldecl in ← getLCtx do
+    if ldecl.isImplementationDetail then continue
+    let hypType ← instantiateMVars ldecl.type
+    unless hasTripleHead hypType do continue
+    let some hypCompFn := tripleCompFn? hypType | continue
+    unless goalCompFn.equal hypCompFn do continue
+    if ← tryEvalTacticSyntax (← `(tactic| exact $(mkIdent ldecl.userName))) then
+      return true
+    if hypType.isForall then
+      let saved ← saveState
+      if ← tryEvalTacticSyntax (← `(tactic| apply $(mkIdent ldecl.userName))) then
+        let remaining ← getGoals
+        let mut allClosed := true
+        for g in remaining do
+          setGoals [g]
+          unless ← tryEvalTacticSyntax (← `(tactic| assumption)) do
+            allClosed := false
+            break
+        if allClosed then
+          setGoals []
+          return true
+      saved.restore
+  return false
+
 /-- Try to close the current goal using only immediate local information.
 This is intentionally cheap: it is used while speculating on `triple_bind`, so it must not
 launch expensive proof search on goals with unresolved cut metavariables. -/
 def tryCloseSpecGoalImmediate : TacticM Bool := do
+  tryApplyTripleHyp <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic| solve_by_elim (maxDepth := 2))) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -76,14 +130,23 @@ def tryCloseSpecGoalSearch : TacticM Bool := do
   )))
 
 private def closeTheoremStepGoals : TacticM Unit := do
-  discard <| tryEvalTacticSyntax (← `(tactic|
-    all_goals first
-      | assumption
-      | (
-          repeat intro
-          simp only [OracleComp.ProgramLogic.Triple] at *
-          solve_by_elim (maxDepth := 4) [OracleComp.ProgramLogic.wp_mono, le_trans]
-        )))
+  let goals ← getGoals
+  let mut remaining : List MVarId := []
+  for goal in goals do
+    if ← goal.isAssigned then continue
+    setGoals [goal]
+    unless ← tryApplyTripleHyp do
+      remaining := remaining ++ [goal]
+  setGoals remaining
+  unless remaining.isEmpty do
+    discard <| tryEvalTacticSyntax (← `(tactic|
+      all_goals first
+        | assumption
+        | (
+            repeat intro
+            simp only [OracleComp.ProgramLogic.Triple] at *
+            solve_by_elim (maxDepth := 4) [OracleComp.ProgramLogic.wp_mono, le_trans]
+          )))
 
 private def runVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
@@ -154,6 +217,7 @@ def tryCloseSpecGoal : TacticM Bool := do
 /-- Finish-only closure step: includes the support-sensitive leaf rules that are too expensive
 for the default `vcstep` hot path. -/
 def tryCloseSpecGoalFinal : TacticM Bool := do
+  tryApplyTripleHyp <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
