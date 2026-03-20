@@ -3,10 +3,12 @@
 -- /-!
 -- # The Regev encryption scheme
 
--- This file contains the implementation of the Regev encryption scheme, as well as some useful lemmas
+-- This file contains the implementation of the Regev encryption scheme, as well as
+-- some useful lemmas
 -- for the proof of correctness.
 
--- NOTE: since the update to `v4.22.0-rc2`, there is no longer an automatic coercion from `ℕ` to `Fin
+-- NOTE: since the update to `v4.22.0-rc2`, there is no longer an automatic
+-- coercion from `ℕ` to `Fin
 -- n` via taking modulo `n`. This breaks the proofs. Someone should fix this.
 -- -/
 
@@ -295,7 +297,8 @@
 --     simp_all [Fin.ofNat, this]
 
 -- -- This lemma is no longer needed
--- lemma Fin_bound_shift_cast_vec {p χ m : ℕ} {v : Vector (Fin (2*χ + 1)) m} [NeZero p] (h : p > 2*χ) :
+-- lemma Fin_bound_shift_cast_vec {p χ m : ℕ}
+--     {v : Vector (Fin (2*χ + 1)) m} [NeZero p] (h : p > 2*χ) :
 --     Fin_Bound_vec (v.map (fun t ↦ (Fin.castLE h t) - (Fin.ofNat p χ))) χ := by
 --   intro i
 --   simp [Vector.get]
@@ -312,7 +315,8 @@
 -- /-- Correctness of the Regev encryption scheme, with respect to the uniform error sampling
 --   distribution in `[-χ, χ]`.
 
---   This is where we add the extra parameter `χ`, and the conditions `m > 0` and `p > 4*(χ*m + 1)` -/
+--   This is where we add the extra parameter `χ`, and the conditions `m > 0`
+--   and `p > 4*(χ*m + 1)` -/
 -- theorem isCorrect_of_uniformErrSamp [hm : NeZero m] (χ : ℕ) (he: p > 4*(χ*m + 1)) :
 --     (regevAsymmEnc n m p (uniformErrSamp χ (relax_p_bound he))).PerfectlyCorrect := by
 --   rintro msg
@@ -383,7 +387,8 @@
 
 -- -- Want to show:
 -- -- ∀ adv in hybrid 0,
---   -- advantage (hybrid 0, adv) ≤ advantage (hybrid 1, reduction1 (adv)) + advantage (LWE game, ...)
+--   -- advantage (hybrid 0, adv) ≤ advantage (hybrid 1, reduction1 (adv))
+--   --   + advantage (LWE game, ...)
 -- -- ∀ adv in hybrid 1, advantage (hybrid 1, adv) ≤ advantage (hybrid 2, reduction2 (adv))
 
 -- def Hybrid_0 : ProbComp Bool :=
@@ -400,13 +405,15 @@
 -- --   let x_1 ← $ᵗVector (Fin p) n
 -- --   let a ← $ᵗVector (Fin (2 * χ + 1)) m
 -- --   let __discr ←
--- --     adv.chooseMessages (x, Vector.ofFn (Matrix.vecMul x_1.get x) + Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a)
+-- --     adv.chooseMessages
+-- --       (x, Vector.ofFn (Matrix.vecMul x_1.get x) + Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a)
 -- --   let a_1 ← $ᵗVector (Fin 2) m
 -- --   let b' ←
 -- --     adv.distinguish __discr.2.2
 -- --         (Vector.ofFn (x.mulVec (Vector.map (Fin.castLE hp2) a_1).get),
 -- --           Matrix.vecMul x_1.get x ⬝ᵥ (Vector.map (Fin.castLE hp2) a_1).get +
--- --               (Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a).get ⬝ᵥ (Vector.map (Fin.castLE hp2) a_1).get +
+-- --               (Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a).get ⬝ᵥ
+-- --                 (Vector.map (Fin.castLE hp2) a_1).get +
 -- --             if if b = true then __discr.1 = true else __discr.2.1 = true then 0 else ↑(p / 2))
 -- --   if b = b' then pure () else failure
 
@@ -434,8 +441,10 @@
 -- /-- From an adversary that can distinguish between Hybrid 0 and Hybrid 1, we can construct an
 -- adversary that can distinguish between LWE and the uniform distribution. -/
 -- theorem Hybrid_0_ind_Hybrid_1 :
---     (Hybrid_0 adv).boolBiasAdvantage ≤ (Hybrid_1 adv).boolBiasAdvantage
---       + (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) := by
+--     (Hybrid_0 adv).boolBiasAdvantage ≤
+--       (Hybrid_1 adv).boolBiasAdvantage
+--       + (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he))
+--           (Hybrid_01_Reduction adv)) := by
 --   unfold LWE_Advantage ProbComp.boolBiasAdvantage Hybrid_0 Hybrid_1 Hybrid_01_Reduction
 --     IND_CPA_OneTime_Game LWE_Experiment uniformRegevAsymmEnc
 --   -- An absolute mess, need to refactor games
@@ -454,7 +463,8 @@
 
 -- -- Hybrid 1 and Hybrid 2 are indistinguishable due to the leftover hash lemma (or LWE itself)
 
--- -- In other words, we will reduce to the fact that `(A.mulVec x, dotProd u x)` is statistically indistinguishable from random
+-- -- In other words, we will reduce to the fact that `(A.mulVec x, dotProd u x)`
+-- -- is statistically indistinguishable from random
 
 -- section LHL
 
@@ -492,7 +502,8 @@
 --     (Hybrid_1 adv).boolBiasAdvantage ≤ (Hybrid_2 adv).boolBiasAdvantage
 --       + (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) := by
 --   unfold LHL_Consequence_Advantage Hybrid_1 Hybrid_2 Hybrid_12_Reduction
---     LHL_Consequence_Game_0 LHL_Consequence_Game_1 ProbComp.boolBiasAdvantage ProbComp.boolDistAdvantage
+--     LHL_Consequence_Game_0 LHL_Consequence_Game_1
+--     ProbComp.boolBiasAdvantage ProbComp.boolDistAdvantage
 --     uniformRegevAsymmEnc regevAsymmEnc
 --   simp
 --   -- rw [probOutput_false_eq_probOutput_true_not]
@@ -502,7 +513,8 @@
 --   -- Still a mess...
 --   sorry
 
--- -- Finally, Hybrid 2's advantage is zero, since `b` is uniform and have nothing to do with other variables
+-- -- Finally, Hybrid 2's advantage is zero, since `b` is uniform and has
+-- -- nothing to do with other variables
 -- theorem Hybrid_2_advantage_zero : (Hybrid_2 adv).boolBiasAdvantage = 0 := by
 --   unfold ProbComp.boolBiasAdvantage Hybrid_2
 --   simp [sub_eq_zero, probOutput_false_eq_probOutput_true_not, probOutput_bind_eq_sum_fintype]
@@ -519,11 +531,13 @@
 --   calc
 --     _ = (Hybrid_0 adv).boolBiasAdvantage := rfl
 --     _ ≤ (Hybrid_1 adv).boolBiasAdvantage +
---           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) :=
+--           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he))
+--             (Hybrid_01_Reduction adv)) :=
 --         Hybrid_0_ind_Hybrid_1 adv
 --     _ ≤ (Hybrid_2 adv).boolBiasAdvantage +
 --           (LHL_Consequence_Advantage (m := m) (Hybrid_12_Reduction adv)) +
---           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he)) (Hybrid_01_Reduction adv)) := by
+--           (LWE_Advantage n m p (uniformErrSamp χ (relax_p_bound he))
+--             (Hybrid_01_Reduction adv)) := by
 --         gcongr
 --         exact Hybrid_1_ind_Hybrid_2 adv
 --     _ = _ := by

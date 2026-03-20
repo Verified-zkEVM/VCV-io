@@ -77,8 +77,8 @@ This models the sequential search in Construction 1 of the Fischlin paper:
 the prover queries `H` on each input and keeps the best. -/
 private def fischlinSearchAux {X W PC SC Ω P M : Type} {p : X → W → Bool} {ρ b : ℕ}
     (σ : SigmaProtocol X W PC SC Ω P p)
-    (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
-    : List Ω → Option (Ω × P × Fin (2 ^ b)) →
+    (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ) :
+    List Ω → Option (Ω × P × Fin (2 ^ b)) →
       OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M) (Option (Ω × P))
   | [], best => return best.map fun (ω, resp, _) => (ω, resp)
   | ω :: rest, best => do

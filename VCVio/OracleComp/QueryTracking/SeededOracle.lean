@@ -571,13 +571,12 @@ lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
     have hrew : (do
         let u ← liftComp ($ᵗ spec₀.Range i) spec₀
         let us ← liftComp (replicate n ($ᵗ spec₀.Range i)) spec₀
-        (simulateQ seededOracle oa).run' (σ.addValues (u :: us))
-          : OracleComp spec₀ α) =
+        (simulateQ seededOracle oa).run' (σ.addValues (u :: us)) : OracleComp spec₀ α) =
       (do
         let u ← liftComp ($ᵗ spec₀.Range i) spec₀
         let us ← liftComp (replicate n ($ᵗ spec₀.Range i)) spec₀
-        (simulateQ seededOracle oa).run' ((σ.addValues [u]).addValues us)
-          : OracleComp spec₀ α) := by
+        (simulateQ seededOracle oa).run' ((σ.addValues [u]).addValues us) :
+          OracleComp spec₀ α) := by
       congr 1; ext u; congr 1; ext us
       rw [QuerySeed.addValues_cons]
     rw [congrArg evalDist hrew, evalDist_bind]
@@ -789,15 +788,13 @@ lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
     Pr[= y | (do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      f <$> (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k)
-        : OracleComp spec₀ β)] =
+      f <$> (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k) : OracleComp spec₀ β)] =
       Pr[= y | f <$> oa] := by
   have h := evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
     qc js i₀ k oa
   have hcomp : (do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      f <$> (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k)
-        : OracleComp spec₀ β) =
+      f <$> (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k) : OracleComp spec₀ β) =
     f <$> (do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
       (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k)) := by

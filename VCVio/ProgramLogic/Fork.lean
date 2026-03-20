@@ -36,7 +36,8 @@ theorem triple_fork :
        acc * (acc / q - h⁻¹))
       (fork main qb js i cf)
       (fun r => if r.isSome then 1 else 0) := by
-  refine le_trans ?_ (triple_probEvent_indicator (oa := fork main qb js i cf) (p := fun r => r.isSome))
+  refine le_trans ?_
+    (triple_probEvent_indicator (oa := fork main qb js i cf) (p := fun r => r.isSome))
   exact OracleComp.le_probEvent_isSome_fork
     (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
 

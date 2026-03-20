@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common.Core
 
+/-!
+# VCGen Naming Helpers
+
+Utilities for choosing user-facing binder and support-hypothesis names in VCGen tactics.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
@@ -173,7 +179,8 @@ def introMainGoalNames (names : Array Name) : TacticM Bool := do
 
 def introAllGoalsNames (names : Array Name) : TacticM Unit := do
   for name in names do
-    discard <| tryEvalTacticSyntax (← `(tactic| all_goals first | intro $(mkIdent name):ident | skip))
+    discard <| tryEvalTacticSyntax
+      (← `(tactic| all_goals first | intro $(mkIdent name):ident | skip))
 
 def renameInaccessibleNames (names : Array Name) : TacticM Unit := do
   for name in names do

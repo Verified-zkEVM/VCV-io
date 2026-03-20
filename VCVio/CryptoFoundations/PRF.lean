@@ -14,8 +14,8 @@ import VCVio.OracleComp.SimSemantics.Append
 
 This file defines pseudorandom functions and their security game.
 
-A PRF adversary gets oracle access to uniform sampling plus a function `D → R` and tries to distinguish
-the real function `PRF.eval k` (for a random key `k`) from a truly random function
+A PRF adversary gets oracle access to uniform sampling plus a function `D → R` and tries to
+distinguish the real function `PRF.eval k` (for a random key `k`) from a truly random function
 (modeled as a lazy random oracle with consistent responses).
 
 ## Main Definitions

@@ -198,7 +198,7 @@ lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys 
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
-        simp
+        simp only [mapM_cons, bind_pure_comp, zipWith_cons_cons, prod_cons]
         rw [probOutput_bind_eq_mul y]
         simp [ih]
         clear *- hys
@@ -229,7 +229,7 @@ lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys
       split_ifs with hys
       · simp at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
-        simp
+        simp only [mapM'_cons, bind_pure_comp, zipWith_cons_cons, prod_cons]
         rw [probOutput_bind_eq_mul y]
         simp [ih]
         clear *- hys

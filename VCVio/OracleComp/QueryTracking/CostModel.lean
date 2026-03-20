@@ -244,7 +244,8 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
   rw [costDist, simulateQ_bind, simulateQ_query, WriterT.run_bind]
   refine (mem_support_bind_iff _ _ _).2 ?_
   refine ⟨(u, (Multiplicative.ofAdd 1 : Multiplicative ℕ)), ?_, ?_⟩
-  · have hq : (u, Multiplicative.ofAdd 1) ∈ support ((addCostOracle CostModel.unit.queryCost t).run) := by
+  · have hq : (u, Multiplicative.ofAdd 1) ∈
+      support ((addCostOracle CostModel.unit.queryCost t).run) := by
       rw [addCostOracle_unit_run_apply, support_map]
       exact ⟨u, mem_support_query t u, by simp⟩
     simp [OracleQuery.cont_query]

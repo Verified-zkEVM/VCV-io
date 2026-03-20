@@ -99,10 +99,13 @@ theorem probEvent_counting_budget_eq
         simp only [zero_add]
         rw [show (fun z : α × QueryCount ι => p z.1) = p ∘ Prod.fst from rfl, ← probEvent_map]
         simp only [Functor.map_map]
-        change Pr[p | (fun a : α × QueryCount ι => (Prod.map id (fun q : QueryCount ι => q) a).1) <$>
-          (simulateQ countingOracle oa).run] = Pr[p | oa]
+        change
+          Pr[p |
+            (fun a : α × QueryCount ι => (Prod.map id (fun q : QueryCount ι => q) a).1) <$>
+              (simulateQ countingOracle oa).run] = Pr[p | oa]
         have hfst :
-            (fun a : α × QueryCount ι => (Prod.map id (fun q : QueryCount ι => q) a).1) = Prod.fst := by
+            (fun a : α × QueryCount ι => (Prod.map id (fun q : QueryCount ι => q) a).1) =
+              Prod.fst := by
           funext a
           cases a
           rfl

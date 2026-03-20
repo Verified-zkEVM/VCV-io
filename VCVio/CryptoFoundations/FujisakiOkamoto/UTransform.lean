@@ -50,7 +50,8 @@ def implicitRejection {K C KPRF : Type} (prf : PRFScheme KPRF C K) : RejectionPo
   keygen := prf.keygen
   onReject := fun kPrf c => some (prf.eval kPrf c)
 
-/-- Execute an FO computation by combining public randomness with the variant-specific hash world. -/
+/-- Execute an FO computation by combining public randomness with the
+variant-specific hash world. -/
 def exec {M PK C R K : Type} (variant : Variant M PK C R K)
     {α : Type} (comp : OracleComp (unifSpec + variant.hashOracleSpec) α) : ProbComp α :=
   let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget

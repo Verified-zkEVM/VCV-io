@@ -46,7 +46,8 @@ lemma probOutput_pair_xor_uniform (sp : ℕ) (mx : ProbComp (BitVec sp))
       Pr[= (msg, σ) | do
         let k ← $ᵗ BitVec sp
         return (msg', k ^^^ msg')] =
-          Pr[= (msg, σ) | (msg', ·) <$> ((fun k : BitVec sp => k ^^^ msg') <$> ($ᵗ BitVec sp))] := by
+          Pr[= (msg, σ) |
+            (msg', ·) <$> ((fun k : BitVec sp => k ^^^ msg') <$> ($ᵗ BitVec sp))] := by
             simp
       _ = if msg = msg' then
           Pr[= σ | (fun k : BitVec sp => k ^^^ msg') <$> ($ᵗ BitVec sp)] else 0 := by

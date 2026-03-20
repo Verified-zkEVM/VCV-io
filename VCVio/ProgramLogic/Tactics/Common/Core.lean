@@ -9,6 +9,12 @@ import Lean.Meta.Match.MatcherApp
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.ProgramLogic.Notation
 
+/-!
+# VCGen Planner Core
+
+Shared planning infrastructure for the unary and relational VCGen tactics.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
