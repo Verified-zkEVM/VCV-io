@@ -148,7 +148,7 @@ def myReduction (adversary : ...) : DDHAdversary F G := fun g A B T => do
 
 ### Hybrid Argument Pattern
 
-For q-query IND-CPA → DDH (as in `Examples/ElGamal.lean`):
+For q-query IND-CPA → DDH (as in `Examples/ElGamal/Basic.lean`):
 
 1. Define `HybridGame adversary k`: first `k` queries use real encryption, rest use random
 2. `HybridGame 0 = IND-CPA random`, `HybridGame q = IND-CPA real`

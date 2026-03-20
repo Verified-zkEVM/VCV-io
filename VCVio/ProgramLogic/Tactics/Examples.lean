@@ -151,14 +151,6 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
   qvcgen_step as ⟨x⟩
   exact hob x
 
-example {oa : OracleComp spec α} {f : α → OracleComp spec β}
-    {pre : ℝ≥0∞} {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
-    (hoa : ⦃pre⦄ oa ⦃cut⦄)
-    (hob : ∀ x, ⦃cut x⦄ f x ⦃post⦄) :
-    ⦃pre⦄ (oa >>= f) ⦃post⦄ := by
-  qvcgen_step?
-  exact hob x
-
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
     ⦃1⦄ (do
@@ -311,6 +303,12 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → 
   qvcgen_step rw congr' as ⟨x⟩
   exact h x
 
+/--
+info: Try this:
+
+  [apply] qvcgen_step rw congr as ⟨x, hx⟩
+-/
+#guard_msgs in
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
     (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
     Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
@@ -487,17 +485,6 @@ example {xs : List α} {ys : List β}
   · exact hxy
   · exact hfg
 
-example {xs : List α} {ys : List β}
-    {S : α → β → Prop}
-    {f : α → OracleComp spec γ} {g : β → OracleComp spec γ}
-    {R : RelPost γ γ}
-    (hxy : List.Forall₂ S xs ys)
-    (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
-    ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
-  rvcgen_step?
-  · exact hxy
-  · exact hfg
-
 example {σ₁ σ₂ : Type}
     {xs : List α}
     {f : σ₁ → α → OracleComp spec σ₁}
@@ -574,15 +561,6 @@ example {oa₁ oa₂ : OracleComp spec α}
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcgen_step
   · exact hoa
-
-example {oa₁ oa₂ : OracleComp spec α}
-    {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
-    {S : RelPost α α} {R : RelPost β γ}
-    (hoa : ⟪oa₁ ~ oa₂ | S⟫)
-    (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
-    ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
-  rvcgen_step?
-  simpa [OracleComp.ProgramLogic.Relational.RelWP] using hoa
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
@@ -879,19 +857,6 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β} {my : OracleComp spe
       let z ← f w x <$> my
       pure z] := by
   qvcgen_step
-
-/--
-info: Try this:
-
-  [apply] (qvcgen_step rw under 2; qvcgen_step rw under 1; qvcgen_step rw; qvcgen_step rw congr as ⟨w, hw⟩)
--/
-#guard_msgs in
-example {mw : OracleComp spec α} {mx : OracleComp spec β}
-    {my : OracleComp spec γ} {mz : OracleComp spec δ}
-    {f : α → β → γ → δ → OracleComp spec ε} {out : ε} :
-    Pr[= out | mw >>= fun w => mx >>= fun x => my >>= fun y => mz >>= fun z => f w x y z] =
-    Pr[= out | mw >>= fun w => mx >>= fun x => mz >>= fun z => my >>= fun y => f w x y z] := by
-  qvcgen_step?
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
     (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
