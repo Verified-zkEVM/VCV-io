@@ -45,6 +45,25 @@ namespace Encoding
 
 variable {params : Params} (encoding : Encoding params)
 
+/-- Roundtrip laws needed to reason about ciphertext and message encoding at the semantic layer.
+These are kept separate from the executable encoding bundle so concrete implementations can expose
+their proofs incrementally without blocking computation. -/
+structure Laws : Prop where
+  byteDecodeDUVec_byteEncodeDUVec_compressDU :
+    ∀ u : RqVec params.k,
+      encoding.byteDecodeDUVec (encoding.byteEncodeDUVec (encoding.compressDU u)) =
+        encoding.compressDU u
+  byteDecodeDV_byteEncodeDV_compressDV :
+    ∀ v : Rq,
+      encoding.byteDecodeDV (encoding.byteEncodeDV (encoding.compressDV v)) =
+        encoding.compressDV v
+  byteEncode1_byteDecode1 :
+    ∀ msg : Message, encoding.byteEncode1 (encoding.byteDecode1 msg) = msg
+  byteDecode1_byteEncode1_compress1 :
+    ∀ v : Rq,
+      encoding.byteDecode1 (encoding.byteEncode1 (encoding.compress1 v)) =
+        encoding.compress1 v
+
 /-- Canonicality check mirroring the FIPS 203 public-key modulus check. -/
 def publicKeyCanonical [DecidableEq encoding.EncodedTHat]
     (tHatEncoded : encoding.EncodedTHat) : Bool :=

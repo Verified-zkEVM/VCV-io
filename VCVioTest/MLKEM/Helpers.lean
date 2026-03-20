@@ -21,6 +21,14 @@ instance : DecidableEq (MLKEM.Concrete.mlkem768Encoding).EncodedU :=
   inferInstanceAs (DecidableEq ByteArray)
 instance : DecidableEq (MLKEM.Concrete.mlkem768Encoding).EncodedV :=
   inferInstanceAs (DecidableEq ByteArray)
+instance : DecidableEq (MLKEM.Concrete.mlkem512Encoding).EncodedU :=
+  inferInstanceAs (DecidableEq ByteArray)
+instance : DecidableEq (MLKEM.Concrete.mlkem512Encoding).EncodedV :=
+  inferInstanceAs (DecidableEq ByteArray)
+instance : DecidableEq (MLKEM.Concrete.mlkem1024Encoding).EncodedU :=
+  inferInstanceAs (DecidableEq ByteArray)
+instance : DecidableEq (MLKEM.Concrete.mlkem1024Encoding).EncodedV :=
+  inferInstanceAs (DecidableEq ByteArray)
 
 namespace VCVioTest.MLKEM
 
@@ -91,22 +99,5 @@ def serializeCT (ct : KPKE.Ciphertext mlkem768 mlkem768Encoding) : ByteArray :=
   let u : ByteArray := ct.uEncoded
   let v : ByteArray := ct.vEncoded
   u ++ v
-
-/-! ## Schoolbook multiplication (reference for NTT tests) -/
-
-def schoolbookMul (f g : Rq) : Rq := Id.run do
-  let fa := f.toArray
-  let ga := g.toArray
-  let mut h : Array Coeff := Array.replicate 256 0
-  for i in [0:256] do
-    for j in [0:256] do
-      let fi := fa.getD i 0
-      let gj := ga.getD j 0
-      let k := (i + j) % 256
-      if i + j < 256 then
-        h := h.set! k ((h.getD k 0) + fi * gj)
-      else
-        h := h.set! k ((h.getD k 0) - fi * gj)
-  Vector.ofFn fun ⟨i, _⟩ => h.getD i 0
 
 end VCVioTest.MLKEM

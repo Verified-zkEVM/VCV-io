@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.MLKEM.Ring
+import VCVio.OracleComp.ProbComp
 
 /-!
 # Concrete CBD Sampling for ML-KEM
@@ -43,5 +44,10 @@ def samplePolyCBD (eta : Nat) (bytes : ByteArray) : Rq :=
         acc := acc + bits.getD (2 * i * eta + eta + j) 0
       return acc
     (x : Coeff) - (y : Coeff)
+
+/-- Sample a polynomial from `CBD_η` by drawing the required `64 * η` bytes uniformly. -/
+def cbdSample (eta : Nat) : ProbComp Rq := do
+  let bytes ← $ᵗ Bytes (64 * eta)
+  return samplePolyCBD eta (ByteArray.mk bytes.toArray)
 
 end MLKEM.Concrete

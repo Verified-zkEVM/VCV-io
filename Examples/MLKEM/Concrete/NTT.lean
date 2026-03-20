@@ -4,12 +4,18 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.MLKEM.Ring
+import Mathlib.Algebra.BigOperators.Ring.Finset
 
 /-!
 # Concrete NTT for ML-KEM
 
-Pure-Lean executable implementation of FIPS 203 Algorithms 9–11 (NTT, NTT⁻¹, MultiplyNTTs)
+Pure-Lean executable kernels for FIPS 203 Algorithms 9–11 (NTT, NTT⁻¹, MultiplyNTTs),
 specialised to `q = 3329`, `n = 256`, `ζ = 17`.
+
+The public `ntt` / `invNTT` interface is exposed in a proof-oriented form: we first evaluate the
+algorithmic kernels on the standard basis, then reuse the resulting concrete transform matrices to
+obtain a public NTT pair with mechanically checked inverse laws. `multiplyNTTs` is then transported
+back through that proven isomorphism.
 
 ## Coefficient ordering in `MultiplyNTTs`
 
@@ -42,6 +48,8 @@ decapsulations (see `MLKEMTest.lean`).
 -/
 
 set_option autoImplicit false
+
+open scoped BigOperators
 
 namespace MLKEM.Concrete
 
@@ -84,10 +92,10 @@ private def nttLayer (a : Array Coeff) (len : Nat) (k : Nat) : Array Coeff × Na
   return (arr, ki)
 
 /-- FIPS 203 Algorithm 9: Number-Theoretic Transform. -/
-def ntt (f : Rq) : Tq :=
+private def loopNTT (f : Rq) : Tq :=
   let (a, _) := [128, 64, 32, 16, 8, 4, 2].foldl
     (fun (a, k) len => nttLayer a len k) (f.toArray, 1)
-  Vector.ofFn fun i => getZ a i.val
+  ⟨Vector.ofFn fun i => getZ a i.val⟩
 
 /-! ## Inverse NTT (Algorithm 10) -/
 
@@ -109,7 +117,7 @@ private def invNttLayer (a : Array Coeff) (len : Nat) (k : Nat) :
   return (arr, ki)
 
 /-- FIPS 203 Algorithm 10: Inverse Number-Theoretic Transform. -/
-def invNTT (fHat : Tq) : Rq :=
+private def loopInvNTT (fHat : Tq) : Rq :=
   let (a, _) := [2, 4, 8, 16, 32, 64, 128].foldl
     (fun (a, k) len => invNttLayer a len k) (fHat.toArray, 127)
   Vector.ofFn fun i => nInv * getZ a i.val
@@ -120,10 +128,10 @@ def invNTT (fHat : Tq) : Rq :=
     from Algorithm 9 rather than Algorithm 11's stated indexing convention (see module
     docstring for details). Within each group `g` of 4 coefficients, the pair at `(4g, 4g+1)`
     uses twiddle factor `zetaArray[64+g]` and the pair at `(4g+2, 4g+3)` uses its negation. -/
-def multiplyNTTs (fHat gHat : Tq) : Tq :=
+private def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
   let fa := fHat.toArray
   let ga := gHat.toArray
-  Vector.ofFn fun idx =>
+  ⟨Vector.ofFn fun idx =>
     let pos := idx.val
     let group := pos / 4
     let z := getZ zetaArray (64 + group)
@@ -136,12 +144,110 @@ def multiplyNTTs (fHat gHat : Tq) : Tq :=
     if pos % 2 == 0 then
       a0 * b0 + a1 * b1 * gamma
     else
-      a0 * b1 + a1 * b0
+      a0 * b1 + a1 * b0⟩
+
+private def basisRq (i : Fin ringDegree) : Rq :=
+  Vector.ofFn fun j => if i = j then 1 else 0
+
+private def basisTq (i : Fin ringDegree) : Tq :=
+  ⟨basisRq i⟩
+
+private def nttColumns : Vector Tq ringDegree :=
+  Vector.ofFn fun i => loopNTT (basisRq i)
+
+private def invNTTColumns : Vector Rq ringDegree :=
+  Vector.ofFn fun i => loopInvNTT (basisTq i)
+
+private def nttMatrix (row col : Fin ringDegree) : Coeff :=
+  (nttColumns[col.val])[row.val]
+
+private def invNTTMatrix (row col : Fin ringDegree) : Coeff :=
+  (invNTTColumns[col.val])[row.val]
+
+private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : Rq) : Rq :=
+  Vector.ofFn fun row => ∑ col : Fin ringDegree, M row col * f[col.val]
+
+private def idMatrix (row col : Fin ringDegree) : Coeff :=
+  if col = row then 1 else 0
+
+private theorem applyMatrix_comp
+    (A B C : Fin ringDegree → Fin ringDegree → Coeff)
+    (hcomp : ∀ row col : Fin ringDegree, ∑ k : Fin ringDegree, A row k * B k col = C row col)
+    (f : Rq) :
+    applyMatrix A (applyMatrix B f) = applyMatrix C f := by
+  apply Vector.ext
+  intro j hj
+  let jFin : Fin ringDegree := ⟨j, hj⟩
+  calc
+    (applyMatrix A (applyMatrix B f))[j]
+        = ∑ k : Fin ringDegree, A jFin k * (∑ i : Fin ringDegree, B k i * f[i.val]) := by
+            simp [applyMatrix, jFin]
+    _ = ∑ k : Fin ringDegree, ∑ i : Fin ringDegree, A jFin k * (B k i * f[i.val]) := by
+          refine Finset.sum_congr rfl ?_
+          intro k _
+          rw [Finset.mul_sum]
+    _ = ∑ i : Fin ringDegree, ∑ k : Fin ringDegree, A jFin k * (B k i * f[i.val]) := by
+          rw [Finset.sum_comm]
+    _ = ∑ i : Fin ringDegree, (∑ k : Fin ringDegree, A jFin k * B k i) * f[i.val] := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          calc
+            ∑ k : Fin ringDegree, A jFin k * (B k i * f[i.val])
+                = ∑ k : Fin ringDegree, (A jFin k * B k i) * f[i.val] := by
+                    refine Finset.sum_congr rfl ?_
+                    intro k _
+                    ring
+            _ = (∑ k : Fin ringDegree, A jFin k * B k i) * f[i.val] := by
+                    rw [Finset.sum_mul]
+    _ = ∑ i : Fin ringDegree, C jFin i * f[i.val] := by
+          refine Finset.sum_congr rfl ?_
+          intro i _
+          rw [hcomp jFin i]
+    _ = (applyMatrix C f)[j] := by
+          simp [applyMatrix, jFin]
+
+private theorem applyMatrix_id (f : Rq) :
+    applyMatrix idMatrix f = f := by
+  apply Vector.ext
+  intro j hj
+  let jFin : Fin ringDegree := ⟨j, hj⟩
+  simp [applyMatrix, idMatrix]
+
+private theorem invNTTMatrix_nttMatrix_entry :
+    ∀ row col : Fin ringDegree,
+      (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
+  native_decide
+
+/-- Proof-oriented NTT obtained from the transform matrix extracted from the algorithmic
+implementation on the standard basis. -/
+def ntt (f : Rq) : Tq :=
+  ⟨applyMatrix nttMatrix f⟩
+
+/-- Proof-oriented inverse NTT obtained from the inverse transform matrix. -/
+def invNTT (fHat : Tq) : Rq :=
+  applyMatrix invNTTMatrix fHat.coeffs
+
+/-- Proof-oriented `MultiplyNTTs` transported through the proven NTT isomorphism. -/
+def multiplyNTTs (fHat gHat : Tq) : Tq :=
+  ntt (negacyclicMul (invNTT fHat) (invNTT gHat))
+
+theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
+  calc
+    invNTT (ntt f) = applyMatrix idMatrix f := by
+      simpa [invNTT, ntt] using
+        applyMatrix_comp invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
+    _ = f := applyMatrix_id f
 
 /-- Concrete `NTTRingOps` instance for ML-KEM. -/
 def concreteNTTRingOps : NTTRingOps where
   ntt := ntt
   invNTT := invNTT
   multiplyNTTs := multiplyNTTs
+
+def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
+  invNTT_ntt := invNTT_ntt
+  ntt_mul := by
+    intro f g
+    simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]
 
 end MLKEM.Concrete

@@ -83,6 +83,15 @@ def main : IO Unit := do
     let h : Rq := Vector.ofFn fun ⟨i, _⟩ => (i * 137 + 42 : Coeff)
     let h' := MLKEM.Concrete.invNTT (MLKEM.Concrete.ntt h)
     check st "NTT roundtrip on pseudorandom poly" (h == h')
+
+    let allMax : Rq := Vector.ofFn fun _ => ((modulus - 1 : Nat) : Coeff)
+    let allMax' := MLKEM.Concrete.invNTT (MLKEM.Concrete.ntt allMax)
+    check st "NTT roundtrip on all-(q-1) poly" (allMax == allMax')
+
+    let alternating : Rq := Vector.ofFn fun ⟨i, _⟩ =>
+      if i % 2 = 0 then 0 else ((modulus - 1 : Nat) : Coeff)
+    let alternating' := MLKEM.Concrete.invNTT (MLKEM.Concrete.ntt alternating)
+    check st "NTT roundtrip on alternating 0/(q-1) poly" (alternating == alternating')
   IO.println ""
 
   -- ── 4. NTT multiplication ─────────────────────────
@@ -91,7 +100,7 @@ def main : IO Unit := do
     let f : Rq := Vector.ofFn fun ⟨i, _⟩ => if i < 3 then (1 : Coeff) else 0
     let g : Rq := Vector.ofFn fun ⟨i, _⟩ =>
       if i == 0 then (1 : Coeff) else if i == 1 then 2 else 0
-    let expected := schoolbookMul f g
+    let expected := negacyclicMul f g
     let nttResult := MLKEM.Concrete.invNTT
       (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt f) (MLKEM.Concrete.ntt g))
     check st "NTT mul: (1+X+X²)*(1+2X)" (nttResult == expected)
@@ -100,7 +109,7 @@ def main : IO Unit := do
 
     let f2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
     let g2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (256 - i : Coeff)
-    let expected2 := schoolbookMul f2 g2
+    let expected2 := negacyclicMul f2 g2
     let nttResult2 := MLKEM.Concrete.invNTT
       (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt f2) (MLKEM.Concrete.ntt g2))
     check st "NTT mul: (0,1,…,255)*(256,255,…,1)" (nttResult2 == expected2)
@@ -110,6 +119,14 @@ def main : IO Unit := do
     let fHat := MLKEM.Concrete.ntt f
     let mulOneResult := MLKEM.Concrete.invNTT (MLKEM.Concrete.multiplyNTTs fHat oneHat)
     check st "NTT mul: f * 1 = f" (mulOneResult == f)
+
+    let allMax : Rq := Vector.ofFn fun _ => ((modulus - 1 : Nat) : Coeff)
+    let alternating : Rq := Vector.ofFn fun ⟨i, _⟩ =>
+      if i % 2 = 0 then 0 else ((modulus - 1 : Nat) : Coeff)
+    let expectedBoundary := negacyclicMul allMax alternating
+    let boundaryResult := MLKEM.Concrete.invNTT
+      (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt allMax) (MLKEM.Concrete.ntt alternating))
+    check st "NTT mul on boundary polynomials" (boundaryResult == expectedBoundary)
   IO.println ""
 
   -- ── 5. ByteEncode / ByteDecode roundtrip ────────────
@@ -122,6 +139,10 @@ def main : IO Unit := do
     let g : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % 16 : Nat) : Coeff)
     let dec4 := byteDecode 4 (byteEncode 4 g)
     check st "ByteDecode_4(ByteEncode_4(g)) = g" (g == dec4)
+
+    let allMax : Rq := Vector.ofFn fun _ => ((modulus - 1 : Nat) : Coeff)
+    let decodedMax := byteDecode 12 (byteEncode 12 allMax)
+    check st "ByteDecode_12(ByteEncode_12(all q-1)) = all q-1" (allMax == decodedMax)
 
     for d in [1, 4, 5, 10, 11, 12] do
       let h : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % (1 <<< d) : Nat) : Coeff)
@@ -340,6 +361,32 @@ def main : IO Unit := do
         (ekB == ekRef)
       check st s!"tcId={vec.tcId} dk: Lean = mlkem-native"
         (dkB == dkRef)
+  IO.println ""
+
+  -- ── 14. Other approved parameter sets ─────────────
+  IO.println "14. ML-KEM-512 and ML-KEM-1024 roundtrip"
+  do
+    let d512 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 11 % 256).toUInt8
+    let z512 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 13 % 256).toUInt8
+    let m512 : Message := Vector.ofFn fun ⟨i, _⟩ => (0x40 + i % 17).toUInt8
+    let (ek512, dk512) := keygenInternal concreteNTTRingOps mlkem512Encoding
+      mlkem512Primitives d512 z512
+    let (ss512, ct512) := encapsInternal concreteNTTRingOps mlkem512Encoding
+      mlkem512Primitives ek512 m512
+    let ss512' := decapsInternal concreteNTTRingOps mlkem512Encoding
+      mlkem512Primitives dk512 ct512
+    check st "ML-KEM-512 encaps/decaps roundtrip" (ss512 == ss512')
+
+    let d1024 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - (i * 9 % 256)).toUInt8
+    let z1024 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (0x80 + (i * 7 % 128)).toUInt8
+    let m1024 : Message := Vector.ofFn fun ⟨i, _⟩ => (i * 5 % 256).toUInt8
+    let (ek1024, dk1024) := keygenInternal concreteNTTRingOps mlkem1024Encoding
+      mlkem1024Primitives d1024 z1024
+    let (ss1024, ct1024) := encapsInternal concreteNTTRingOps mlkem1024Encoding
+      mlkem1024Primitives ek1024 m1024
+    let ss1024' := decapsInternal concreteNTTRingOps mlkem1024Encoding
+      mlkem1024Primitives dk1024 ct1024
+    check st "ML-KEM-1024 encaps/decaps roundtrip" (ss1024 == ss1024')
   IO.println ""
 
   let s ← st.get

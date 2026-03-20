@@ -53,18 +53,25 @@ private def rejectionSample (stream : ByteArray) : Array Coeff := Id.run do
         acc := acc.push (d2 : Coeff)
   return acc
 
+/-- Reject silent zero-padding by requiring a full 256-coefficient output. -/
+private def requireFullRejectionSample (coeffs : Array Coeff) : Array Coeff :=
+  if _h : coeffs.size = ringDegree then
+    coeffs
+  else
+    panic! s!"ML-KEM rejection sampler produced {coeffs.size} coefficients; expected {ringDegree}"
+
 /-- FIPS 203 Algorithm 7: sample an NTT-domain polynomial from `SHAKE-128(ρ ‖ j ‖ i)`. -/
 def concreteSampleNTT (rho : Seed32) (j i : Nat) : Tq :=
   let input := vectorToByteArray rho |>.push j.toUInt8 |>.push i.toUInt8
   -- A fixed 840-byte squeeze is enough to cover the acceptance process in practice.
   let stream := FFI.shake128 input 840
-  let coeffs := rejectionSample stream
-  Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0
+  let coeffs := requireFullRejectionSample (rejectionSample stream)
+  ⟨Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0⟩
 
 /-- Exposed wrapper around `rejectionSample` for testing. -/
 def rejectionSampleForTest (stream : ByteArray) : Tq :=
-  let coeffs := rejectionSample stream
-  Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0
+  let coeffs := requireFullRejectionSample (rejectionSample stream)
+  ⟨Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0⟩
 
 /-! ## PRF + CBD (FIPS 203 Algorithms 6 + 8) -/
 
@@ -112,8 +119,37 @@ def concretePrimitives (params : Params) (encoding : Encoding params)
 /-- Concrete encoding for ML-KEM-768. -/
 def mlkem768Encoding : Encoding mlkem768 := concreteEncoding mlkem768
 
+/-- Concrete encoding for ML-KEM-512. -/
+def mlkem512Encoding : Encoding mlkem512 := concreteEncoding mlkem512
+
+/-- Concrete encoding for ML-KEM-1024. -/
+def mlkem1024Encoding : Encoding mlkem1024 := concreteEncoding mlkem1024
+
+/-- Encoding roundtrip laws for ML-KEM-512. -/
+def mlkem512EncodingLaws : mlkem512Encoding.Laws :=
+  concreteEncodingLaws mlkem512
+    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+
+/-- Encoding roundtrip laws for ML-KEM-768. -/
+def mlkem768EncodingLaws : mlkem768Encoding.Laws :=
+  concreteEncodingLaws mlkem768
+    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+
+/-- Encoding roundtrip laws for ML-KEM-1024. -/
+def mlkem1024EncodingLaws : mlkem1024Encoding.Laws :=
+  concreteEncodingLaws mlkem1024
+    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+
+/-- Concrete primitives for ML-KEM-512. -/
+def mlkem512Primitives : Primitives mlkem512 mlkem512Encoding :=
+  concretePrimitives mlkem512 mlkem512Encoding rfl rfl rfl
+
 /-- Concrete primitives for ML-KEM-768. -/
 def mlkem768Primitives : Primitives mlkem768 mlkem768Encoding :=
   concretePrimitives mlkem768 mlkem768Encoding rfl rfl rfl
+
+/-- Concrete primitives for ML-KEM-1024. -/
+def mlkem1024Primitives : Primitives mlkem1024 mlkem1024Encoding :=
+  concretePrimitives mlkem1024 mlkem1024Encoding rfl rfl rfl
 
 end MLKEM.Concrete

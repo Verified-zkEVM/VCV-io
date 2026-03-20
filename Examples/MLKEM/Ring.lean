@@ -23,20 +23,70 @@ abbrev Coeff := ZMod modulus
 /-- Coefficient-vector representation of a polynomial in `R_q`. -/
 abbrev Rq := LatticeCrypto.Poly Coeff ringDegree
 
-/-- Coefficient-vector representation of an element of `T_q`. -/
-abbrev Tq := LatticeCrypto.Poly Coeff ringDegree
+/-- Schoolbook negacyclic multiplication in `R_q = Z_q[X]/(X^256 + 1)`. -/
+def negacyclicMul (f g : Rq) : Rq := Id.run do
+  let fa := f.toArray
+  let ga := g.toArray
+  let mut h : Array Coeff := Array.replicate ringDegree 0
+  for i in [0:ringDegree] do
+    for j in [0:ringDegree] do
+      let fi := fa.getD i 0
+      let gj := ga.getD j 0
+      let k := (i + j) % ringDegree
+      if i + j < ringDegree then
+        h := h.set! k ((h.getD k 0) + fi * gj)
+      else
+        h := h.set! k ((h.getD k 0) - fi * gj)
+  return Vector.ofFn fun ⟨i, _⟩ => h.getD i 0
+
+/-- NTT-domain polynomials are kept distinct from coefficient-domain polynomials. -/
+@[ext] structure Tq where
+  coeffs : LatticeCrypto.Poly Coeff ringDegree
+deriving Repr, DecidableEq
+
+namespace Tq
+
+/-- Rewrap a coefficient vector as an NTT-domain polynomial. -/
+def ofRq (f : Rq) : Tq := ⟨f⟩
+
+/-- Forget the NTT-domain tag. -/
+def toRq (fHat : Tq) : Rq := fHat.coeffs
+
+/-- Access the underlying coefficient array. -/
+def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
+
+instance : Coe Tq Rq := ⟨Tq.toRq⟩
+
+instance : Zero Tq := ⟨⟨0⟩⟩
+instance : Add Tq := ⟨fun fHat gHat => ⟨fHat.coeffs + gHat.coeffs⟩⟩
+instance : Sub Tq := ⟨fun fHat gHat => ⟨fHat.coeffs - gHat.coeffs⟩⟩
+instance : Neg Tq := ⟨fun fHat => ⟨-fHat.coeffs⟩⟩
+
+instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
+  getElem fHat i hi := fHat.coeffs[i]'hi
+
+@[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
+    fHat[i] = fHat.coeffs[i] := rfl
+
+@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
+    fHat.toArray[i]'(by simpa [Tq.toArray] using hi) = fHat.coeffs[i] := rfl
+
+end Tq
 
 /-- Length-`k` vectors over `R_q`. -/
 abbrev RqVec (k : ℕ) := LatticeCrypto.PolyVec Coeff ringDegree k
 
 /-- Length-`k` vectors over `T_q`. -/
-abbrev TqVec (k : ℕ) := LatticeCrypto.PolyVec Coeff ringDegree k
+abbrev TqVec (k : ℕ) := Vector Tq k
 
 /-- `rows × cols` row-major matrices over `T_q`. -/
-abbrev TqMatrix (rows cols : ℕ) := LatticeCrypto.PolyMatrix Coeff ringDegree rows cols
+abbrev TqMatrix (rows cols : ℕ) := Vector (TqVec cols) rows
 
 /-- The NTT-domain operations needed by the FIPS 203 pseudocode. -/
-abbrev NTTRingOps := LatticeCrypto.NTTRingOps Coeff ringDegree
+abbrev NTTRingOps := LatticeCrypto.NTTRingOps Rq Tq
+
+/-- Proof-oriented algebraic laws for an ML-KEM NTT implementation. -/
+abbrev NTTRingLaws (ops : NTTRingOps) := LatticeCrypto.NTTRingOps.Laws ops negacyclicMul
 
 namespace NTTRingOps
 
