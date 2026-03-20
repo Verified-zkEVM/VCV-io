@@ -135,11 +135,14 @@ private lemma IND_CPA_hybridLR_counted_run'_evalDist_eq_above
     (oa : OracleComp encAlg'.IND_CPA_oracleSpec α)
     (st : encAlg'.IND_CPA_CountedState)
     (hst : st.2 ≥ k + 1) :
-    evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run' st) =
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run' st) := by
+    evalDist
+      ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run' st) =
+      evalDist
+        ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run' st) := by
   have hrun :
       evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run st) =
-        evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run st) := by
+        evalDist
+          ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run st) := by
     apply evalDist_ext
     intro z
     exact OracleComp.ProgramLogic.Relational.probOutput_simulateQ_run_eq_of_impl_eq_preservesInv

@@ -86,7 +86,7 @@ lemma mem_finSupport_iff [DecidableEq α] [HasEvalFinset m] (mx : m α) (x : α)
 
 @[aesop unsafe 50% forward]
 lemma probOutput_ne_zero_of_mem_support {mx : m α} {x : α}
-   (h : x ∈ support mx) : Pr[= x | mx] ≠ 0 := by rwa [mem_support_iff] at h
+    (h : x ∈ support mx) : Pr[= x | mx] ≠ 0 := by rwa [mem_support_iff] at h
 
 @[aesop safe norm, grind =]
 lemma probOutput_eq_zero_of_not_mem_support {mx : m α} {x : α}

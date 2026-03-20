@@ -7,6 +7,12 @@ Authors: Quang Dao
 import Lean
 import VCVio.ProgramLogic.Tactics.Common.Core
 
+/-!
+# VCSpec Registry
+
+Shared registry structures for looking up VC specification lemmas by head symbol.
+-/
+
 open Lean Elab Meta
 
 namespace OracleComp.ProgramLogic

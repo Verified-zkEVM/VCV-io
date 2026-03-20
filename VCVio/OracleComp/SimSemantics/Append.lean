@@ -76,7 +76,9 @@ lemma simulateQ_add_liftComp_left (oa : OracleComp spec₁' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp oa (spec₁' + spec₂')) =
       simulateQ impl₁' oa := by
   have h : (impl₁' + impl₂') ∘ₛ
-      (fun t => liftM (OracleQuery.query (spec := spec₁') t) : QueryImpl spec₁' (OracleComp (spec₁' + spec₂'))) =
+      (fun t =>
+        liftM (OracleQuery.query (spec := spec₁') t) :
+          QueryImpl spec₁' (OracleComp (spec₁' + spec₂'))) =
       impl₁' := by
     funext t; exact simulateQ_add_liftM_left impl₁' impl₂' t
   rw [OracleComp.liftComp_def, ← simulateQ_compose, h]
@@ -86,7 +88,9 @@ lemma simulateQ_add_liftComp_right (ob : OracleComp spec₂' α) :
     simulateQ (impl₁' + impl₂') (OracleComp.liftComp ob (spec₁' + spec₂')) =
       simulateQ impl₂' ob := by
   have h : (impl₁' + impl₂') ∘ₛ
-      (fun t => liftM (OracleQuery.query (spec := spec₂') t) : QueryImpl spec₂' (OracleComp (spec₁' + spec₂'))) =
+      (fun t =>
+        liftM (OracleQuery.query (spec := spec₂') t) :
+          QueryImpl spec₂' (OracleComp (spec₁' + spec₂'))) =
       impl₂' := by
     funext t; exact simulateQ_add_liftM_right impl₁' impl₂' t
   rw [OracleComp.liftComp_def, ← simulateQ_compose, h]

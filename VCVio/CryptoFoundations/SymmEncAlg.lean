@@ -298,7 +298,8 @@ theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
             by_cases hkKey : k ∈ support keyExp
             · have hkEnc : σ ∉ support (encExp k) := by
                 intro hkEnc'
-                exact hkne (hk0uniq k ⟨by simpa [keyExp] using hkKey, by simpa [encExp] using hkEnc'⟩)
+                exact hkne <| hk0uniq k
+                  ⟨by simpa [keyExp] using hkKey, by simpa [encExp] using hkEnc'⟩
               simp [probOutput_eq_zero_of_not_mem_support hkEnc]
             · simp [probOutput_eq_zero_of_not_mem_support hkKey]
           · simp

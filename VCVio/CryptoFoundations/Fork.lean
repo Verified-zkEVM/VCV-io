@@ -147,7 +147,8 @@ private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
       let x₁ ← (simulateQ seededOracle main).run' seed
       let u ← liftComp ($ᵗ spec.Range i) spec
       if (seed i)[↑s]? = some u then return cf x₁ else return none] ≤
-    Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> (simulateQ seededOracle main).run' seed] / h := by
+    Pr[= (some s : Option (Fin (qb i + 1))) |
+      cf <$> (simulateQ seededOracle main).run' seed] / h := by
   simp only
   rw [probOutput_bind_eq_tsum, probOutput_map_eq_tsum]
   simp_rw [div_eq_mul_inv]
@@ -167,7 +168,8 @@ private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
         Pr[= (some s : Option (Fin (qb i + 1))) | do
             let u ← liftComp ($ᵗ spec.Range i) spec
             if (seed i)[↑s]? = some u then return cf x₁ else return none]
-          = Pr[fun u : spec.Range i => (seed i)[↑s]? = some u | liftComp ($ᵗ spec.Range i) spec] := by
+          = Pr[fun u : spec.Range i => (seed i)[↑s]? = some u |
+              liftComp ($ᵗ spec.Range i) spec] := by
               rw [probOutput_bind_eq_tsum, probEvent_eq_tsum_ite]
               refine tsum_congr fun u => ?_
               by_cases hu : (seed i)[↑s]? = some u <;> simp [hcf, hu]
@@ -452,9 +454,11 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
               (probEvent_map
                 (mx := fork main qb js i cf)
                 (f := f)
-                (q := fun x : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) => x = z)).symm
+                (q := fun x : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) =>
+                  x = z)).symm
       _ = Pr[= z | f <$> fork main qb js i cf] := by
-            simp [probEvent_eq_eq_probOutput (mx := f <$> fork main qb js i cf) (x := z)]
+            simp [probEvent_eq_eq_probOutput
+              (mx := f <$> fork main qb js i cf) (x := z)]
   rw [hRhsEq]
   -- Guard-collision branch contributes at most `Pr[cf(main)=s] / h`.
   have hCollision :
@@ -545,8 +549,13 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                       (fun r ↦ Option.map (Prod.map cf cf) r) <$>
                         if (seed i)[↑s]? = some u then pure none
                         else do
-                          let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                          if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] +
+                          let a_1 ←
+                            (simulateQ seededOracle main).run
+                              ((seed.takeAtIndex i ↑s).addValue i u)
+                          if cf a_1.1 = some s then
+                            pure (some (a.1, a_1.1))
+                          else
+                            pure none] +
                     Pr[= (some s : Option (Fin (qb i + 1))) |
                       if (seed i)[↑s]? = some u then
                         (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
@@ -556,8 +565,13 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                       (fun r ↦ Option.map (Prod.map cf cf) r) <$>
                         if (seed i)[↑s]? = some u then pure none
                         else do
-                          let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                          if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] := zero_le _
+                          let a_1 ←
+                            (simulateQ seededOracle main).run
+                              ((seed.takeAtIndex i ↑s).addValue i u)
+                          if cf a_1.1 = some s then
+                            pure (some (a.1, a_1.1))
+                          else
+                            pure none] := zero_le _
               have haux :
                   (1 : ℝ≥0∞) ≤
                     Pr[= z |
@@ -566,7 +580,10 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                           else do
                             let a_1 ← (simulateQ seededOracle main).run
                               ((seed.takeAtIndex i ↑s).addValue i u)
-                            if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none] + 1 := by
+                            if cf a_1.1 = some s then
+                              pure (some (a.1, a_1.1))
+                            else
+                              pure none] + 1 := by
                 simp
               simp [hu']
             exact le_trans h1 h2
@@ -598,11 +615,21 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                     (pure none : OracleComp spec (Option (α × α)))
                  else
                     do
-                      let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                      if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none) =
+                      let a_1 ←
+                        (simulateQ seededOracle main).run
+                          ((seed.takeAtIndex i ↑s).addValue i u)
+                      if cf a_1.1 = some s then
+                        pure (some (a.1, a_1.1))
+                      else
+                        pure none) =
                 (do
-                  let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                  if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none) := by
+                  let a_1 ←
+                    (simulateQ seededOracle main).run
+                      ((seed.takeAtIndex i ↑s).addValue i u)
+                  if cf a_1.1 = some s then
+                    pure (some (a.1, a_1.1))
+                  else
+                    pure none) := by
               exact if_neg hu''
             have hmono' :
                 Pr[= z |
@@ -613,8 +640,13 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                     (if (seed i)[↑s]? = some u then
                        (pure none : OracleComp spec (Option (α × α)))
                      else do
-                       let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                       if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] := by
+                       let a_1 ←
+                         (simulateQ seededOracle main).run
+                           ((seed.takeAtIndex i ↑s).addValue i u)
+                       if cf a_1.1 = some s then
+                         pure (some (a.1, a_1.1))
+                       else
+                         pure none)] := by
               rw [hif]
               simpa [map_eq_bind_pure_comp] using hmono
             have hadd :
@@ -623,15 +655,25 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                     (if (seed i)[↑s]? = some u then
                        (pure none : OracleComp spec (Option (α × α)))
                      else do
-                       let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                       if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] ≤
+                       let a_1 ←
+                         (simulateQ seededOracle main).run
+                           ((seed.takeAtIndex i ↑s).addValue i u)
+                       if cf a_1.1 = some s then
+                         pure (some (a.1, a_1.1))
+                       else
+                         pure none)] ≤
                   Pr[= z |
                     (fun r ↦ Option.map (Prod.map cf cf) r) <$>
                       (if (seed i)[↑s]? = some u then
                          (pure none : OracleComp spec (Option (α × α)))
                        else do
-                         let a_1 ← (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)
-                         if cf a_1.1 = some s then pure (some (a.1, a_1.1)) else pure none)] +
+                         let a_1 ←
+                           (simulateQ seededOracle main).run
+                             ((seed.takeAtIndex i ↑s).addValue i u)
+                         if cf a_1.1 = some s then
+                           pure (some (a.1, a_1.1))
+                         else
+                           pure none)] +
                     Pr[= (some s : Option (Fin (qb i + 1))) |
                       if (seed i)[↑s]? = some u then
                         (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
@@ -644,14 +686,16 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
               Pr[= z | do
                 let u ← liftM ($ᵗ spec.Range i)
                 (fun a₂ : α × QuerySeed spec ↦ some (some t, cf a₂.1)) <$>
-                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
+                  (simulateQ seededOracle main).run
+                    ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
             rw [probOutput_eq_zero_iff]
             simp [support_bind, support_map, z, hts']
           have hzero' :
               Pr[= z | do
                 let u ← liftM ($ᵗ spec.Range i)
                 (fun a₂ : α × QuerySeed spec ↦ some (some t, cf a₂.1)) <$>
-                  (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
+                  (simulateQ seededOracle main).run
+                    ((seed.takeAtIndex i ↑s).addValue i u)] = 0 := by
             simpa using hzero
           rw [hzero']
           exact zero_le _

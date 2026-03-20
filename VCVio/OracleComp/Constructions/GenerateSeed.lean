@@ -194,7 +194,8 @@ lemma probOutput_pop_some_eq_probOutput_prepend
           simpa [Function.update_of_ne hj] using this
       calc
         seed' j = rest j := hrestj.symm
-        _ = (rest.prependValues [u]) j := by simp [QuerySeed.prependValues, Function.update_of_ne hj]
+        _ = (rest.prependValues [u]) j := by
+            simp [QuerySeed.prependValues, Function.update_of_ne hj]
   have hpop_prepend :
       (rest.prependValues [u]).pop i = some (u, rest) := by
     have hcons_pre : (rest.prependValues [u]) i = u :: rest i := by
@@ -202,7 +203,8 @@ lemma probOutput_pop_some_eq_probOutput_prepend
     have hpop' :
         (rest.prependValues [u]).pop i =
           some (u, Function.update (rest.prependValues [u]) i (rest i)) := by
-      exact QuerySeed.pop_eq_some_of_cons (seed := rest.prependValues [u]) (i := i) (u := u)
+      exact QuerySeed.pop_eq_some_of_cons
+        (seed := rest.prependValues [u]) (i := i) (u := u)
         (us := rest i) hcons_pre
     have hupdate : Function.update (rest.prependValues [u]) i (rest i) = rest := by
       ext j
@@ -219,8 +221,10 @@ lemma probOutput_pop_some_eq_probOutput_prepend
             rfl
     _ = Pr[= rest.prependValues [u] | generateSeed spec qc js] *
           Pr[= some (u, rest) | pure ((rest.prependValues [u]).pop i)] := by
-            exact probOutput_bind_eq_mul (mx := generateSeed spec qc js)
-              (my := fun seed => (pure (seed.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec))))
+            exact probOutput_bind_eq_mul
+              (mx := generateSeed spec qc js)
+              (my := fun seed =>
+                (pure (seed.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec))))
               (y := some (u, rest)) (x := rest.prependValues [u]) huniq
     _ = Pr[= rest.prependValues [u] | generateSeed spec qc js] * 1 := by
           simp [hpop_prepend]
@@ -287,7 +291,8 @@ lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
       exact (QuerySeed.eq_of_prependValues_eq seed rest' xs' hlen_xs' hEq).1 ▸ rfl
     have hrest_unique :
         ∀ rest' ∈ support (generateSeed spec qc js),
-          seed ∈ support (return rest'.prependValues xs : ProbComp (QuerySeed spec)) → rest' = rest := by
+          seed ∈ support (return rest'.prependValues xs : ProbComp (QuerySeed spec)) →
+            rest' = rest := by
       intro rest' _ hseed'
       have hEq : rest'.prependValues xs = seed := by
         simpa [support_pure, Set.mem_singleton_iff] using hseed'.symm
@@ -325,7 +330,9 @@ lemma probOutput_generateSeed [spec.Fintype] (seed : QuerySeed spec)
             simp only [List.map, List.prod_cons, Nat.cast_mul]
             have ha : ((↑(Fintype.card (spec.Range j)) : ENNReal) ^ qc j) ≠ ⊤ :=
               ENNReal.pow_ne_top (ENNReal.natCast_ne_top _)
-            have hb : (List.map (Nat.cast ∘ fun j => Fintype.card (spec.Range j) ^ qc j) js).prod ≠ ⊤ :=
+            have hb :
+                (List.map (Nat.cast ∘ fun j => Fintype.card (spec.Range j) ^ qc j) js).prod ≠
+                  ⊤ :=
               ENNReal.list_prod_natCast_ne_top _ js
             simpa [mul_assoc, mul_comm, mul_left_comm] using
               (ENNReal.mul_inv (a := (↑(Fintype.card (spec.Range j)) : ENNReal) ^ qc j)
@@ -363,13 +370,15 @@ lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
       · intro hs
         rw [support_generateSeed (spec := spec) (qc := qc') (js := js'), Set.mem_setOf_eq]
         have hs0 : ∀ i, (s i).length = qc i * js.count i := by
-          simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc) (js := js)] using hs
+          simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc) (js := js)]
+            using hs
         intro i
         exact (hs0 i).trans (hcount i)
       · intro hs
         rw [support_generateSeed (spec := spec) (qc := qc) (js := js), Set.mem_setOf_eq]
         have hs0 : ∀ i, (s i).length = qc' i * js'.count i := by
-          simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc') (js := js')] using hs
+          simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc') (js := js')]
+            using hs
         intro i
         exact (hs0 i).trans ((hcount i).symm)
     have hfin :
@@ -384,7 +393,8 @@ lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
       apply hmem
       rw [support_generateSeed (spec := spec) (qc := qc) (js := js), Set.mem_setOf_eq]
       have hs0 : ∀ i, (seed i).length = qc' i * js'.count i := by
-        simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc') (js := js')] using hmem'
+        simpa [Set.mem_setOf_eq, support_generateSeed (spec := spec) (qc := qc') (js := js')]
+          using hmem'
       intro i
       exact (hs0 i).trans ((hcount i).symm)
     have hzero : Pr[= seed | generateSeed spec qc js] = 0 :=

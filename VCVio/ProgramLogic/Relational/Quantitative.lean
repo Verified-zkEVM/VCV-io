@@ -367,7 +367,8 @@ theorem relTriple'_iff_couplingPost
         calc
           ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
               = Pr[fun z : α × β => R z.1 z.2 | c.1] := by
-                  simpa [RelPost.indicator] using indicator_objective_eq_probEvent (mx := c.1) (R := R)
+                  simpa [RelPost.indicator] using
+                    indicator_objective_eq_probEvent (mx := c.1) (R := R)
           _ = Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
                 exact (hlift_obj c).symm
           _ = Pr[fun z : A × B => R z.1.1 z.2.1 | (packPair <$> c.1 : SubPMF (A × B))] := by
@@ -380,7 +381,8 @@ theorem relTriple'_iff_couplingPost
       have hmax_ge : 1 ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := le_trans h hupper
       have hmax_eq : Pr[fun z : α × β => R z.1 z.2 | cMax.1] = 1 :=
         le_antisymm probEvent_le_one hmax_ge
-      exact ⟨cMax, (probEvent_eq_one_iff (mx := cMax.1) (p := fun z : α × β => R z.1 z.2)).1 hmax_eq |>.2⟩
+      exact ⟨cMax,
+        (probEvent_eq_one_iff (mx := cMax.1) (p := fun z : α × β => R z.1 z.2)).1 hmax_eq |>.2⟩
     · exfalso
       haveI : IsEmpty (SPMF.Coupling (evalDist oa) (evalDist ob)) := not_nonempty_iff.mp hne
       rw [eRelWP, iSup_of_empty] at h
@@ -666,8 +668,11 @@ private lemma tsum_min_le_eRelWP
     intro b
     show ∑' a, ((if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹) = Q b
     rw [ENNReal.tsum_add]
-    conv_lhs => arg 1; rw [show (fun a => if a = b then min (P a) (Q a) else (0 : ℝ≥0∞)) =
-        (fun a => if a = b then min (Q b) (P b) else 0) from by ext a; split <;> simp_all [min_comm]]
+    conv_lhs => arg 1; rw [show
+      (fun a => if a = b then min (P a) (Q a) else (0 : ℝ≥0∞)) =
+        (fun a => if a = b then min (Q b) (P b) else 0) from by
+          ext a
+          split <;> simp_all [min_comm]]
     rw [tsum_eq_single b (fun a ha => if_neg ha)]
     simp only [ite_true]
     have htsum_rQ : ∑' a, rP a * rQ b * δ⁻¹ = rQ b := by

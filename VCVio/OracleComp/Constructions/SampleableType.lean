@@ -136,7 +136,8 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
-/-- Pushing forward uniform sampling along a bijection preserves the full evaluation distribution. -/
+/-- Pushing forward uniform sampling along a bijection preserves the full
+evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]
     (f : α → β) (hf : Function.Bijective f) :
@@ -313,9 +314,11 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
       rcases Vector.push_eq_push.mp hxy with ⟨hxy', hxs⟩
       exact ⟨hxs, hxy'⟩
     rw [← Vector.push_pop_back x, ← Vector.push_pop_back y]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _ (fun (xs : Vector α m) (x : α) => Vector.push xs x)
+    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
+      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
       hpush x.pop x.back]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _ (fun (xs : Vector α m) (x : α) => Vector.push xs x)
+    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
+      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
       hpush y.pop y.back]
     have hback : Pr[= x.back | $ᵗ α] = Pr[= y.back | $ᵗ α] := by
       simpa [uniformSample] using
