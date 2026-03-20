@@ -90,7 +90,10 @@ import VCVio.ProgramLogic.Tactics.Common.Core
 import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.Registry
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
-import VCVio.ProgramLogic.Tactics.Examples
+import VCVio.ProgramLogic.Tactics.Examples.Probability
+import VCVio.ProgramLogic.Tactics.Examples.ProofMode
+import VCVio.ProgramLogic.Tactics.Examples.Relational
+import VCVio.ProgramLogic.Tactics.Examples.Unary
 import VCVio.ProgramLogic.Tactics.Relational
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Unary

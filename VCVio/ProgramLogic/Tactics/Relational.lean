@@ -36,55 +36,56 @@ private def runRVCGenStepWithTheoremNames
     return true
   return false
 
-/-- `rvcgen_step` applies one relational VCGen step.
+/-- `rvcstep` applies one relational VCGen step.
 
 It first lowers `GameEquiv` / `evalDist` equality goals into relational mode, then
-tries the obvious structural relational rule: synchronized conditionals, `simulateQ`,
-`Functor.map`, bounded traversals, bind decomposition, or random/query coupling.
+tries the obvious structural relational rule on `RelTriple` / `RelWP` / `eRelTriple`
+goals: synchronized conditionals, `simulateQ`, `Functor.map`, bounded traversals,
+bind decomposition, or random/query coupling.
 
-`rvcgen_step using t` supplies the explicit witness needed for the current shape:
+`rvcstep using t` supplies the explicit witness needed for the current shape:
 - bind cut relation
 - random/query bijection
 - traversal input relation (`List.mapM` / `List.foldlM`)
 - `simulateQ` state relation
 
-`rvcgen_step with thm` forces one explicit relational theorem/assumption step. -/
-syntax "rvcgen_step" ("using" term)? : tactic
-syntax "rvcgen_step" "with" term : tactic
-syntax "rvcgen_step" "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "rvcgen_step" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "rvcgen_step" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
-syntax "rvcgen_step?" : tactic
+`rvcstep with thm` forces one explicit relational theorem/assumption step. -/
+syntax "rvcstep" ("using" term)? : tactic
+syntax "rvcstep" "with" term : tactic
+syntax "rvcstep" "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcstep" "with" term "as" "⟨" binderIdent,* "⟩" : tactic
+syntax "rvcstep?" : tactic
 
 elab_rules : tactic
-  | `(tactic| rvcgen_step as ⟨ $ids,* ⟩) => do
+  | `(tactic| rvcstep as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← runRVCGenStepWithNames names then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcgen_step using $hint as ⟨ $ids,* ⟩) => do
+  | `(tactic| rvcstep using $hint as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← runRVCGenStepUsingWithNames hint names then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
-  | `(tactic| rvcgen_step with $thm as ⟨ $ids,* ⟩) => do
+  | `(tactic| rvcstep with $thm as ⟨ $ids,* ⟩) => do
       let names := binderIdentsToNames ids
       if ← runRVCGenStepWithTheoremNames thm names then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcgen_step) => do
+  | `(tactic| rvcstep) => do
       if ← TacticInternals.Relational.runRVCGenStep then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcgen_step using $hint) => do
+  | `(tactic| rvcstep using $hint) => do
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
-  | `(tactic| rvcgen_step with $thm) => do
+  | `(tactic| rvcstep with $thm) => do
       if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcgen_step?) => do
+  | `(tactic| rvcstep?) => do
       let some step ← TacticInternals.Relational.runRVCGenPlannedStep?
         | TacticInternals.Relational.throwRVCGenStepError
       addTryThisTextSuggestion (← getRef) step.replayText
@@ -174,7 +175,7 @@ macro "rel_inline" ids:ident* : tactic =>
 /-- `by_equiv` transforms a `GameEquiv g₁ g₂` goal into `RelTriple g₁ g₂ (EqRel α)`.
 Also works for `evalDist g₁ = evalDist g₂` goals.
 Always targets `RelTriple` (coupling-based), never `RelTriple'` (eRHL-based),
-so that `rvcgen_step` / `rvcgen` work on the resulting goal. -/
+so that `rvcstep` / `rvcgen` work on the resulting goal. -/
 macro "by_equiv" : tactic =>
   `(tactic|
     first

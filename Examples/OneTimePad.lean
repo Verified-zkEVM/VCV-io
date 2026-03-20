@@ -20,7 +20,7 @@ The file includes two proof styles:
    probabilities directly using `probOutput_pair_xor_uniform`.
 2. **Relational / game-hopping** (`cipherGivenMsg_equiv`, `ciphertextRowsEqual`):
    proves that any two messages yield the same ciphertext distribution via a bijection
-   coupling, using the `by_equiv` / `rvcgen_step` tactic workflow.
+   coupling, using the `by_equiv` / `rvcstep` tactic workflow.
 -/
 
 show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
@@ -92,9 +92,9 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
   show GameEquiv (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₀))
     (($ᵗ BitVec sp) >>= fun k => pure (k ^^^ msg₁))
   by_equiv
-  rvcgen_step using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
+  rvcstep using (fun k₁ k₂ => k₂ = k₁ ^^^ c)
   swap
-  · rvcgen_step
+  · rvcstep
     · exact hxor
     · intro; rfl
   · intro k₁ k₂ hk
