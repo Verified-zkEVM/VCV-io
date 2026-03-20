@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import Mathlib.Tactic.TryThis
 
+/-!
+# VCGen Suggestions
+
+Helpers for attaching `Try this` suggestions to tactic diagnostics.
+-/
+
 open Lean Meta
 
 namespace OracleComp.ProgramLogic

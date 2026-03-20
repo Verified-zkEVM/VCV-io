@@ -15,8 +15,9 @@ This file gives a basic way to represent security experiments, as an extension o
 The definition is meant to be simple enough to give useful lemmas while still being
 able to represent most common use cases.
 
-We also give a definition `BoundedAdversary α β` of a security adversary with input `α` and output `β`,
-as just a computation bundled with a bound on the number of queries it makes.
+We also give a definition `BoundedAdversary α β` of a security adversary with input
+`α` and output `β`, as just a computation bundled with a bound on the number of queries
+it makes.
 
 The main definition is `SecExp spec α β`, which extends `OracleAlg` with three functions:
 * `inp_gen` that chooses an input for the experiment of type `α`
@@ -68,7 +69,8 @@ noncomputable def ProbComp.distAdvantage (p q : ProbComp Unit) : ℝ :=
 lemma ProbComp.distAdvantage_self (p : ProbComp Unit) : p.distAdvantage p = 0 := by
   simp [ProbComp.distAdvantage]
 
-lemma ProbComp.distAdvantage_comm (p q : ProbComp Unit) : p.distAdvantage q = q.distAdvantage p := by
+lemma ProbComp.distAdvantage_comm (p q : ProbComp Unit) :
+    p.distAdvantage q = q.distAdvantage p := by
   unfold ProbComp.distAdvantage
   exact abs_sub_comm _ _
 

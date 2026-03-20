@@ -99,11 +99,11 @@ end QueryImpl
 namespace cachingOracle
 
 lemma apply_eq (t : spec.Domain) : cachingOracle t =
-  (do match (← get) t with
-    | Option.some u => return u
-    | Option.none =>
-        let u ← query t
-        modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
+    (do match (← get) t with
+      | Option.some u => return u
+      | Option.none =>
+          let u ← query t
+          modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]

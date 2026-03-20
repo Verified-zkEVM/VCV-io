@@ -95,8 +95,8 @@ section liftComp
 /-- Lift a computation from `spec` to `superSpec` using a `SubSpec` instance on queries.
 Usually `liftM` should be preferred but this can allow more explicit annotation. -/
 def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
-      [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
-      OracleComp superSpec α :=
+    [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
+    OracleComp superSpec α :=
     simulateQ (fun t => liftM (query (spec := spec) t)) mx
 
 variable (superSpec : OracleSpec τ)
@@ -211,7 +211,8 @@ lemma liftM_OptionT_eq [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
 
 @[simp]
 lemma liftM_failure [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
-    (liftM (failure : OptionT (OracleComp spec) α) : OptionT (OracleComp superSpec) α) = failure := by
+    (liftM (failure : OptionT (OracleComp spec) α) : OptionT (OracleComp superSpec) α) =
+      failure := by
   rw [OracleComp.failure_def, liftM_OptionT_eq, OptionT.fail]
   simp only [OptionT.mk, simulateQ_pure]
   rfl

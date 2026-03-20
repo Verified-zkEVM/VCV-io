@@ -59,7 +59,8 @@ theorem relTriple_simulateQ_run
       (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2) := by
   induction oa using OracleComp.inductionOn generalizing s₁ s₂ with
   | pure x =>
-    simp
+    simp only [simulateQ_pure, StateT.run_pure, relTriple_iff_relWP,
+      MAlgRelOrdered.relWP_pure, true_and]
     exact hs
   | query_bind t oa ih =>
     simp [StateT.run_bind]

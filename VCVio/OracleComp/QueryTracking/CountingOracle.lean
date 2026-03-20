@@ -363,7 +363,8 @@ lemma mem_support_simulate_queryBind_iff (t : spec.Domain)
       (z := (z.1, Function.update z.2 t (z.2 t - 1)))).1 hu with ⟨b, hb0, hbEq⟩
     have hbRun : (z.1, b) ∈ support ((simulateQ countingOracle (oa u)).run) := by
       simpa [simulate] using hb0
-    have hbRun' : (z.1, b) ∈ support ((simulateQ (QueryImpl.id' spec).withCounting (oa u)).run) := by
+    have hbRun' : (z.1, b) ∈
+        support ((simulateQ (QueryImpl.id' spec).withCounting (oa u)).run) := by
       simpa [countingOracle] using hbRun
     let q0 : QueryCount ι := QueryCount.single t + b
     have hq0mem : (z.1, q0) ∈ support (simulate ((query t : OracleComp spec _) >>= oa) 0) := by

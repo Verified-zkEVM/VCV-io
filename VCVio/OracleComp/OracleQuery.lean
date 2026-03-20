@@ -5,6 +5,12 @@ Authors: Devon Tuma
 -/
 import VCVio.OracleComp.OracleSpec
 
+/-!
+# Oracle Queries
+
+This file defines `OracleQuery`, the single-query functor induced by an `OracleSpec`.
+-/
+
 universe u v w z
 
 open OracleSpec

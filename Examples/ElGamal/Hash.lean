@@ -26,7 +26,7 @@ message space `M`. This allows encrypting messages in an arbitrary additive grou
 | Game | Description | Distance to next |
 |------|-------------|-----------------|
 | Game 0 (CPA) | Real hashed ElGamal | = DDH real |
-| Game 1 | Replace the DH shared secret with an independent random scalar-multiple of `g` | DDH advantage |
+| Game 1 | Replace the DH shared secret with an independent random multiple of `g` | DDH advantage |
 | Game 2 (= Game 1) | Reinterpret as entropy smoothing real | 0 |
 | Game 3 | Replace hash output with random | ES advantage |
 | Game 4 (= 1/2) | The masking term is uniform, so the challenge bit is hidden | 0 |
@@ -309,7 +309,8 @@ theorem ddhRand_eq_esReal
       Pr[= true | canonical] := by
     refine probOutput_bind_congr' ($ᵗ HK : ProbComp HK) true ?_
     intro hk
-    simpa [EntropySmoothing.realExp, esReduction, canonical, bind_assoc, map_eq_bind_pure_comp] using
+    simpa [EntropySmoothing.realExp, esReduction, canonical, bind_assoc,
+      map_eq_bind_pure_comp] using
       (probOutput_bind_bind_swap
         ($ᵗ F : ProbComp F)
         (do
@@ -471,7 +472,8 @@ theorem hashedElGamal_IND_CPA_bound
   rw [hddhEs]
   have hreal :
       (Pr[= true | ddhExpRand g (ddhReduction (F := F) (hash := hash) adv)]).toReal =
-        (Pr[= true | EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)]).toReal := by
+        (Pr[= true |
+          EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)]).toReal := by
     congr 1
     exact ddhRand_eq_esReal (F := F) (g := g) (hash := hash) adv
   calc
@@ -483,7 +485,8 @@ theorem hashedElGamal_IND_CPA_bound
           (Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)]).toReal| := by
       exact abs_sub_le _ _ _
     _ = ddhDistAdvantage g (ddhReduction (F := F) (hash := hash) adv) +
-        |(Pr[= true | EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)]).toReal -
+        |(Pr[= true |
+          EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)]).toReal -
           (Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)]).toReal| := by
       rw [ddhDistAdvantage]
       congr 1

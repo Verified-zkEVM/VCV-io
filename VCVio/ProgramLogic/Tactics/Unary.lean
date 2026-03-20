@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Unary.Internals
 
+/-!
+# Unary VC Tactics
+
+User-facing unary VCGen tactics and finish passes.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
@@ -203,7 +209,8 @@ elab_rules : tactic
         "vcstep inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
         or `List.mapM`."
 
-/-- `vcgen` exhaustively decomposes a `Triple`, raw `wp`, or probability goal with spec-aware stepping.
+/-- `vcgen` exhaustively decomposes a `Triple`, raw `wp`, or probability goal
+with spec-aware stepping.
 
 Accepts `Triple` goals, raw `wp` goals, lower-bound / exact probability goals, and
 `Pr[...] = Pr[...]` equality goals. Probability goals are automatically lowered or
@@ -264,8 +271,26 @@ elab_rules : tactic
         batches.toList.filterMap renderPassReplayLine
       if needsFinish then
         lines := lines ++ [
-          "all_goals try simp only [OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind, OracleComp.ProgramLogic.wp_query, OracleComp.ProgramLogic.wp_ite, OracleComp.ProgramLogic.wp_dite, OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_uniformSample, OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false, OracleComp.ProgramLogic.propInd_eq_ite, ite_true, ite_false, if_true, if_false, dite_true, dite_false, one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero, game_rule]",
-          "all_goals first | assumption | exact OracleComp.ProgramLogic.triple_pure _ _ | exact OracleComp.ProgramLogic.triple_zero _ _ | (classical exact OracleComp.ProgramLogic.triple_support _) | (exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption)) | (exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption)) | exact le_refl _ | (repeat intro; simp only [OracleComp.ProgramLogic.Triple] at *; solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans])"
+          String.intercalate "" [
+            "all_goals try simp only [OracleComp.ProgramLogic.wp_pure, ",
+            "OracleComp.ProgramLogic.wp_bind, OracleComp.ProgramLogic.wp_query, ",
+            "OracleComp.ProgramLogic.wp_ite, OracleComp.ProgramLogic.wp_dite, ",
+            "OracleComp.ProgramLogic.wp_map, OracleComp.ProgramLogic.wp_uniformSample, ",
+            "OracleComp.ProgramLogic.wp_const, OracleComp.ProgramLogic.propInd_true, ",
+            "OracleComp.ProgramLogic.propInd_false, OracleComp.ProgramLogic.propInd_eq_ite, ",
+            "ite_true, ite_false, if_true, if_false, dite_true, dite_false, ",
+            "one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero, game_rule]",
+          ],
+          String.intercalate "" [
+            "all_goals first | assumption | exact OracleComp.ProgramLogic.triple_pure _ _ | ",
+            "exact OracleComp.ProgramLogic.triple_zero _ _ | ",
+            "(classical exact OracleComp.ProgramLogic.triple_support _) | ",
+            "(exact OracleComp.ProgramLogic.triple_propInd_of_support _ _ (by assumption)) | ",
+            "(exact OracleComp.ProgramLogic.triple_probEvent_eq_one _ _ (by assumption)) | ",
+            "(exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption)) | ",
+            "exact le_refl _ | (repeat intro; simp only [OracleComp.ProgramLogic.Triple] at *; ",
+            "solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans])",
+          ]
         ]
       if lines.isEmpty then
         lines := ["vcgen"]

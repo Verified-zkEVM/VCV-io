@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 
+/-!
+# Relational VC Tactics
+
+User-facing relational VCGen tactics and syntax.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
@@ -25,7 +31,8 @@ private def runRVCGenStepWithNames (names : Array Name) : TacticM Bool := do
     return true
   return false
 
-private def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
+private def runRVCGenStepUsingWithNames
+    (hint : TSyntax `term) (names : Array Name) : TacticM Bool := do
   TacticInternals.Relational.runRVCGenStepUsingWithNames hint names
 
 private def runRVCGenStepWithTheoremNames
@@ -118,7 +125,8 @@ elab_rules : tactic
       else
         TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcgen?) => do
-      let batches ← runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
+      let batches ←
+        runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
       TacticInternals.Relational.runRVCGenFinish
       let mut lines : List String :=
@@ -126,7 +134,13 @@ elab_rules : tactic
       if needsFinish then
         lines := lines ++ [
           "all_goals try simp only [game_rule]",
-          "all_goals first | assumption | exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)"
+          String.intercalate "" [
+            "all_goals first | assumption | ",
+            "exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | ",
+            "exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | ",
+            "exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | ",
+            "(apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)",
+          ]
         ]
       if lines.isEmpty then
         lines := ["rvcgen"]
@@ -231,7 +245,9 @@ elab_rules : tactic
         return
       let target ← instantiateMVars (← getMainTarget)
       throwError
-        "by_upto: expected a TV-distance goal for two `simulateQ ... run'` computations bounded by\n\
-        the probability of a bad event on the left simulation; got:{indentExpr target}"
+        "by_upto: expected a TV-distance goal for two `simulateQ ... run'` computations\n\
+        bounded by\n\
+        the probability of a bad event on the left simulation;\n\
+        got:{indentExpr target}"
 
 end OracleComp.ProgramLogic

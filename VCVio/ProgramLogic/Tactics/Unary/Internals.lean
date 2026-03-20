@@ -7,6 +7,12 @@ Authors: Quang Dao
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Tactics.Relational
 
+/-!
+# Unary VCGen Internals
+
+Implementation details for the unary VCGen planner and close passes.
+-/
+
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
@@ -39,7 +45,8 @@ def throwWpStepError : TacticM Unit := withMainContext do
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       throwError
-        "vcstep: found a `wp` goal, but none of the current single-step rules apply to:{indentExpr comp}\n\
+        "vcstep: found a `wp` goal, but none of the current single-step rules apply to:\n\
+        {indentExpr comp}\n\
         Current rules handle bind, pure, `replicate`, `List.mapM`, `List.foldlM`, query, `if`, \
         uniform sampling, `map`, `simulateQ`, `simulateQ ... run'`, and `liftComp`."
 
@@ -392,10 +399,11 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
             `probEvent_bind_bind_swap`."
         else
           throwError
-            "vcstep: found a probability goal but could not lower it to a supported `Triple` or raw `wp` shape.\n\
+            "vcstep: found a probability goal but could not lower it to a supported\n\
+            `Triple` or raw `wp` shape.\n\
             Goal:{indentExpr target}\n\
-            Supported direct lowerings include `Pr[...] = 1`, `Pr[...] = Pr[...]`, and lower bounds \
-            such as `r ≤ Pr[...]` / `Pr[...] ≥ r`.\n\
+            Supported direct lowerings include `Pr[...] = 1`, `Pr[...] = Pr[...]`,\n\
+            and lower bounds such as `r ≤ Pr[...]` / `Pr[...] ≥ r`.\n\
             Try `rw [probEvent_eq_wp_propInd]`, `vcstep?`, or manual rewriting."
       else if let some comp := wpGoalComp? target then
         let comp ← whnfReducible (← instantiateMVars comp)
@@ -404,10 +412,12 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
           pure <| if thms.isEmpty then "" else
             s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
         throwError
-          "vcstep: currently in raw `wp` continuation mode, but no matching rule applied to:{indentExpr comp}\n\
+          "vcstep: currently in raw `wp` continuation mode, but no matching rule applied to:\n\
+          {indentExpr comp}\n\
           Try `vcstep?`, `vcstep`, or manual rewriting.{theoremMsg}"
       else
-        throwError "vcstep: expected a `Triple`, raw `wp`, or probability goal; got:{indentExpr target}"
+        throwError
+          "vcstep: expected a `Triple`, raw `wp`, or probability goal; got:{indentExpr target}"
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
       let cutMsg ←
@@ -512,7 +522,8 @@ def runProbEqCongr : TacticM Bool := do
     return true
   runProbEqCongrNoSupport
 
-private def chunkNameArray (names : Array Name) (width : Nat) : Option (Array (Array Name)) := Id.run do
+private def chunkNameArray
+    (names : Array Name) (width : Nat) : Option (Array (Array Name)) := Id.run do
   if width = 0 || names.isEmpty then
     return none
   if names.size % width != 0 then
@@ -706,22 +717,26 @@ def throwVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   if depth = 0 then
     throwError
-      "vcstep rw: expected a `Pr[...] = Pr[...]` goal where one top-level bind-swap rewrite applies.\n\
+      "vcstep rw: expected a `Pr[...] = Pr[...]` goal where one top-level\n\
+      bind-swap rewrite applies.\n\
       Goal:{indentExpr target}"
   else
     throwError
-      "vcstep rw under {depth}: expected a `Pr[...] = Pr[...]` goal where one bind-swap rewrite applies under {depth} shared bind prefix(es).\n\
+      "vcstep rw under {depth}: expected a `Pr[...] = Pr[...]` goal where one\n\
+      bind-swap rewrite applies under {depth} shared bind prefix(es).\n\
       Goal:{indentExpr target}"
 
 def throwVCGenStepRwCongrError (supportSensitive : Bool) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   if supportSensitive then
     throwError
-      "vcstep rw congr: expected a `Pr[...] = Pr[...]` goal with a shared outer bind, leaving the bound variable and a support hypothesis.\n\
+      "vcstep rw congr: expected a `Pr[...] = Pr[...]` goal with a shared outer\n\
+      bind, leaving the bound variable and a support hypothesis.\n\
       Goal:{indentExpr target}"
   else
     throwError
-      "vcstep rw congr': expected a `Pr[...] = Pr[...]` goal with a shared outer bind, leaving only the bound variable.\n\
+      "vcstep rw congr': expected a `Pr[...] = Pr[...]` goal with a shared outer\n\
+      bind, leaving only the bound variable.\n\
       Goal:{indentExpr target}"
 
 /-- Try to lower a probability goal into a `Triple`, `wp`, or probability-equality goal. -/
