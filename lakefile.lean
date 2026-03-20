@@ -37,11 +37,6 @@ lean_lib VCVioWidgets
 
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib
-/-- Access to external C++ implementations of crypto primitives. -/
-lean_lib LibSodium
-
-/-- Main function for testing -/
-lean_exe test where root := `Test
 
 -- Compile mlkem-native core and Lean FFI wrapper as separate translation units.
 -- Both share the same include paths and config defines.
@@ -75,22 +70,14 @@ extern_lib leanmlkem pkg := do
   let name := nameToStaticLib "leanmlkem"
   buildStaticLib (pkg.staticLibDir / name) #[nativeO, ffiO]
 
+/-- Test support modules (helpers, vectors). -/
+lean_lib VCVioTest
+
+/-- Smoke test: imports VCVio and prints OK. -/
+lean_exe smoke_test where
+  root := `VCVioTest.Smoke
+
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where
-  root := `MLKEMTest
+  root := `VCVioTest.MLKEM.Main
 
--- /-- Runnable implementations of specific cryptographic algorithms.
--- Set `precompileModules` in order to allow execution of external code. -/
--- lean_lib Implementations where
---    precompileModules := true
-
--- Compiling extenal C++ files
--- target libsodium.o pkg : System.FilePath := do
---   let oFile := pkg.buildDir / "c" / "libsodium.o"
---   let srcJob ← inputTextFile <| pkg.dir / "LibSodium" / "c" / "libsodium.cpp"
---   let weakArgs := #["-I", (← getLeanIncludeDir).toString]
---   buildO oFile srcJob weakArgs #["-fPIC"] "c++" getLeanTrace
--- extern_lib libleanffi pkg := do
---   let ffiO ← libsodium.o.fetch
---   let name := nameToStaticLib "leanlibsodium"
---   buildStaticLib (pkg.sharedLibDir / name) #[ffiO]

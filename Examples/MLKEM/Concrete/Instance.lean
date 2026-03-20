@@ -60,6 +60,11 @@ def concreteSampleNTT (rho : Seed32) (j i : Nat) : Tq :=
   let coeffs := rejectionSample stream
   Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0
 
+/-- Exposed wrapper around `rejectionSample` for testing. -/
+def rejectionSampleForTest (stream : ByteArray) : Tq :=
+  let coeffs := rejectionSample stream
+  Vector.ofFn fun ⟨idx, _⟩ => coeffs.getD idx 0
+
 /-! ## PRF + CBD (FIPS 203 Algorithms 6 + 8) -/
 
 /-- `PRF_η(σ, N) = SHAKE-256(σ ‖ N, 64η)` followed by `CBD_η`. -/
