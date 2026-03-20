@@ -24,6 +24,10 @@ structure Encoding (params : Params) where
   EncodedV : Type
   byteEncode12Vec : TqVec params.k → EncodedTHat
   byteDecode12Vec : EncodedTHat → TqVec params.k
+  /-- Freshly serialized public-key vectors decode back to the original semantic value. This is
+  the canonicality invariant relied on by the top-level checked ML-KEM API. -/
+  byteDecode12Vec_byteEncode12Vec :
+    ∀ tHat : TqVec params.k, byteDecode12Vec (byteEncode12Vec tHat) = tHat
   compressDU : RqVec params.k → RqVec params.k
   decompressDU : RqVec params.k → RqVec params.k
   byteEncodeDUVec : RqVec params.k → EncodedU
@@ -45,6 +49,12 @@ variable {params : Params} (encoding : Encoding params)
 def publicKeyCanonical [DecidableEq encoding.EncodedTHat]
     (tHatEncoded : encoding.EncodedTHat) : Bool :=
   encoding.byteEncode12Vec (encoding.byteDecode12Vec tHatEncoded) == tHatEncoded
+
+@[simp] theorem publicKeyCanonical_byteEncode12Vec_eq_true
+    [DecidableEq encoding.EncodedTHat] (tHat : TqVec params.k) :
+    encoding.publicKeyCanonical (encoding.byteEncode12Vec tHat) = true := by
+  unfold Encoding.publicKeyCanonical
+  simp [encoding.byteDecode12Vec_byteEncode12Vec tHat]
 
 /-- Ciphertext decoding into the semantic `(u, v)` pair used by decryption. -/
 def decodeCiphertext (uEncoded : encoding.EncodedU) (vEncoded : encoding.EncodedV) :

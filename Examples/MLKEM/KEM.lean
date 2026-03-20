@@ -24,6 +24,19 @@ def encapsulationKeyCheck (encoding : Encoding params) [DecidableEq encoding.Enc
     (ek : EncapsulationKey params encoding) : Bool :=
   encoding.publicKeyCanonical ek.tHatEncoded
 
+@[simp] theorem encapsulationKeyCheck_keygenFromSeed_eq_true (ring : NTTRingOps)
+    (encoding : Encoding params) [DecidableEq encoding.EncodedTHat]
+    (prims : Primitives params encoding) (d : Seed32) :
+    encapsulationKeyCheck encoding (KPKE.keygenFromSeed ring encoding prims d).1 = true := by
+  unfold encapsulationKeyCheck KPKE.keygenFromSeed
+  simp
+
+@[simp] theorem encapsulationKeyCheck_keygenInternal_eq_true (ring : NTTRingOps)
+    (encoding : Encoding params) [DecidableEq encoding.EncodedTHat]
+    (prims : Primitives params encoding) (d z : Seed32) :
+    encapsulationKeyCheck encoding (keygenInternal ring encoding prims d z).1 = true := by
+  simp [keygenInternal]
+
 /-- Check the semantic decapsulation key against the stored encapsulation-key hash. -/
 def decapsulationKeyCheck (encoding : Encoding params) (prims : Primitives params encoding)
     (dk : DecapsulationKey params encoding) : Bool :=
@@ -39,7 +52,8 @@ def decapsulationInputCheck (encoding : Encoding params) (prims : Primitives par
     (dk : DecapsulationKey params encoding) (c : Ciphertext params encoding) : Bool :=
   decapsulationKeyCheck encoding prims dk && ciphertextCheck params encoding c
 
-/-- `ML-KEM.KeyGen`. This spec-level version assumes randomness generation succeeds. -/
+/-- `ML-KEM.KeyGen`. This spec-level version assumes randomness generation succeeds and, by the
+encoding canonicality law, always outputs an encapsulation key accepted by `encaps`. -/
 def keygen (ring : NTTRingOps) (encoding : Encoding params) (prims : Primitives params encoding) :
     ProbComp (EncapsulationKey params encoding × DecapsulationKey params encoding) := do
   let d ← $ᵗ Seed32
