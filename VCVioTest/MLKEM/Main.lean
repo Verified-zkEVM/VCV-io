@@ -95,8 +95,8 @@ def main : IO Unit := do
     let nttResult := MLKEM.Concrete.invNTT
       (MLKEM.Concrete.multiplyNTTs (MLKEM.Concrete.ntt f) (MLKEM.Concrete.ntt g))
     check st "NTT mul: (1+X+X²)*(1+2X)" (nttResult == expected)
-      s!"NTT=[{(nttResult.toArray.toList.take 6).map (·.val)}] " ++
-      s!"expected=[{(expected.toArray.toList.take 6).map (·.val)}]"
+      (s!"NTT=[{(nttResult.toArray.toList.take 6).map (·.val)}] " ++
+        s!"expected=[{(expected.toArray.toList.take 6).map (·.val)}]")
 
     let f2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
     let g2 : Rq := Vector.ofFn fun ⟨i, _⟩ => (256 - i : Coeff)
@@ -119,12 +119,12 @@ def main : IO Unit := do
     let decoded := byteDecode 12 (byteEncode 12 f)
     check st "ByteDecode_12(ByteEncode_12(f)) = f" (f == decoded)
 
-    let g : Rq := Vector.ofFn fun ⟨i, _⟩ => (i % 16 : Coeff)
+    let g : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % 16 : Nat) : Coeff)
     let dec4 := byteDecode 4 (byteEncode 4 g)
     check st "ByteDecode_4(ByteEncode_4(g)) = g" (g == dec4)
 
     for d in [1, 4, 5, 10, 11, 12] do
-      let h : Rq := Vector.ofFn fun ⟨i, _⟩ => (i % (1 <<< d) : Coeff)
+      let h : Rq := Vector.ofFn fun ⟨i, _⟩ => ((i % (1 <<< d) : Nat) : Coeff)
       let dec := byteDecode d (byteEncode d h)
       check st s!"ByteDecode_{d}(ByteEncode_{d}(h)) roundtrip" (h == dec)
   IO.println ""
