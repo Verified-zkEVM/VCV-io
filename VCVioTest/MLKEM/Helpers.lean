@@ -48,12 +48,12 @@ def hexByte (b : UInt8) : String :=
   String.mk [c hi, c lo]
 
 def toHex (ba : ByteArray) (maxBytes : Nat := 8) : String :=
-  let prefix := Id.run do
+  let pfx := Id.run do
     let mut parts : Array String := Array.mkEmpty (min ba.size maxBytes)
     for i in [0:min ba.size maxBytes] do
       parts := parts.push (hexByte (ba[i]!))
     return String.join parts.toList
-  prefix ++ if ba.size > maxBytes then "…" else ""
+  pfx ++ if ba.size > maxBytes then "…" else ""
 
 def parseHex (s : String) : ByteArray := Id.run do
   let chars := s.toList.toArray
