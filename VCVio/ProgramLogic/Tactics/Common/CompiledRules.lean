@@ -80,7 +80,12 @@ def compileRelationalVCSpecRule? (entry : VCSpecEntry) : Option CompiledRelation
           #[.direct]
       some { entry, modes }
   | .relWP =>
-      some { entry, modes := #[.direct] }
+      let modes :=
+        if entry.spec.postShape == .concrete then
+          #[.direct, .postConseq]
+        else
+          #[.direct]
+      some { entry, modes }
   | _ => none
 
 def compileRelationalVCSpecRules
