@@ -21,6 +21,10 @@ namespace MLKEM.Concrete
 
 open MLKEM
 
+local instance : NeZero modulus := by
+  unfold modulus
+  exact ⟨by decide⟩
+
 /-! ## Bit-level helpers -/
 
 /-- Extract the `j`-th bit (LSB = 0) of a byte. -/
@@ -380,27 +384,17 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
   simp [byteDecode]
   rw [hcoeffBitsInput]
   rw [hcoeffBits, hdigits, ofDigits_digitsAppend_two hcoeffBound]
-  letI : NeZero modulus := by
-    unfold modulus
-    exact ⟨by decide⟩
   exact ZMod.natCast_zmod_val (f[i])
 
 private theorem byteDecode_one_coeff (bytes : ByteArray) {i : Nat} (hi : i < ringDegree) :
     ((byteDecode 1 bytes)[i] : Coeff).val = (bytesToBits bytes).getD i 0 := by
   have hbitMod : (bytesToBits bytes).getD i 0 < modulus := by
     exact lt_trans (bytesToBits_getD_lt_two bytes i) (by decide)
-  letI : NeZero modulus := by
-    unfold modulus
-    exact ⟨by decide⟩
   have hcast : (((bytesToBits bytes).getD i 0 : Nat) : Coeff).val = (bytesToBits bytes).getD i 0 := by
     exact ZMod.val_cast_of_lt hbitMod
   simpa [byteDecode, Nat.ofDigits_singleton] using hcast
 
 /-! ## 12-bit public-key encoding -/
-
-local instance : NeZero modulus := by
-  unfold modulus
-  exact ⟨by decide⟩
 
 /-- Encode one byte of a 12-bit-packed polynomial block. -/
 private def byteEncode12PolyByte (f : Tq) (idx : Fin 384) : UInt8 :=
@@ -432,9 +426,9 @@ private def byteDecode12Poly (bytes : ByteArray) : Tq :=
     let b1 := (getByteD bytes (3 * pair + 1)).toNat
     let b2 := (getByteD bytes (3 * pair + 2)).toNat
     if idx.val % 2 = 0 then
-      (((b0 + 256 * (b1 % 16) : Nat) : Coeff))
+      ((b0 + 256 * (b1 % 16) : Nat) : Coeff)
     else
-      (((b1 / 16 + 16 * b2 : Nat) : Coeff))⟩
+      ((b1 / 16 + 16 * b2 : Nat) : Coeff)⟩
 
 /-- Encode one byte of a concatenated 12-bit-packed vector block. -/
 private def byteEncode12VecByte {k : Nat} (v : TqVec k) (idx : Fin (384 * k)) : UInt8 :=
@@ -454,9 +448,9 @@ private def byteDecode12VecPoly {k : Nat} (bytes : ByteArray) (poly : Fin k) : T
     let b1 := (getByteD bytes (poly.val * 384 + (3 * pair + 1))).toNat
     let b2 := (getByteD bytes (poly.val * 384 + (3 * pair + 2))).toNat
     if idx.val % 2 = 0 then
-      (((b0 + 256 * (b1 % 16) : Nat) : Coeff))
+      ((b0 + 256 * (b1 % 16) : Nat) : Coeff)
     else
-      (((b1 / 16 + 16 * b2 : Nat) : Coeff))⟩
+      ((b1 / 16 + 16 * b2 : Nat) : Coeff)⟩
 
 private theorem decode12Pair_fst {a b : Nat} (ha : a < 4096) :
     a % 256 + 256 * ((a / 256 + 16 * (b % 16)) % 16) = a := by
@@ -863,9 +857,6 @@ private theorem compress_val_lt_pow {d : Nat} (hpow : (1 <<< d) < modulus) (x : 
     exact hmul
   have hmod : shifted % (1 <<< d) < (1 <<< d) := Nat.mod_lt _ hpowPos
   have hltMod : shifted % (1 <<< d) < modulus := lt_trans hmod hpow
-  letI : NeZero modulus := by
-    unfold modulus
-    exact ⟨by decide⟩
   have hval : (((shifted % (1 <<< d) : Nat) : Coeff)).val = shifted % (1 <<< d) := by
     exact ZMod.val_cast_of_lt hltMod
   calc
@@ -900,9 +891,6 @@ private theorem byteDecode1Msg_val (msg : Message) {i : Nat} (hi : i < ringDegre
     ((byteDecode1Msg msg)[i] : Coeff).val = (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 := by
   have hbitMod : (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 < modulus := by
     exact lt_trans (bytesToBits_getD_lt_two (ByteArray.mk msg.toArray) i) (by decide)
-  letI : NeZero modulus := by
-    unfold modulus
-    exact ⟨by decide⟩
   have hcast :
       ((((bytesToBits (ByteArray.mk msg.toArray)).getD i 0 : Nat) : Coeff).val) =
         (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 := by
@@ -954,9 +942,6 @@ private theorem byteArray_byteEncode1Msg (f : Rq) :
 
 private theorem byteDecode1Msg_eq_byteDecode1 (msg : Message) :
     byteDecode1Msg msg = byteDecode 1 (ByteArray.mk msg.toArray) := by
-  letI : NeZero modulus := by
-    unfold modulus
-    exact ⟨by decide⟩
   apply Vector.ext
   intro i hi
   apply (ZMod.val_injective modulus)
@@ -1050,7 +1035,7 @@ def concreteEncoding (params : Params) : Encoding params where
   byteEncode1 := byteEncode1Msg
   byteDecode1 := byteDecode1Msg
 
-def concreteEncodingLaws (params : Params)
+theorem concreteEncodingLaws (params : Params)
     (hduPos : 0 < params.du) (hdvPos : 0 < params.dv)
     (hduPow : (1 <<< params.du) < modulus) (hdvPow : (1 <<< params.dv) < modulus) :
     (concreteEncoding params).Laws := by

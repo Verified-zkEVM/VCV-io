@@ -22,6 +22,10 @@ open MLKEM
 private def bitOf (b : UInt8) (j : Nat) : Nat :=
   ((b >>> j.toUInt8) &&& 1).toNat
 
+/-- Total byte lookup with zero fallback. -/
+private def getByteD (bytes : ByteArray) (i : Nat) : UInt8 :=
+  (bytes[i]?).getD 0
+
 /-- FIPS 203 Algorithm 8: sample a polynomial from the centered binomial distribution CBD_η.
     Input: `64 * eta` bytes. Output: a polynomial in `R_q`. -/
 def samplePolyCBD (eta : Nat) (bytes : ByteArray) : Rq :=
@@ -29,7 +33,7 @@ def samplePolyCBD (eta : Nat) (bytes : ByteArray) : Rq :=
     let mut b := Array.mkEmpty (bytes.size * 8)
     for k in [0:bytes.size] do
       for j in [0:8] do
-        b := b.push (bitOf (bytes[k]!) j)
+        b := b.push (bitOf (getByteD bytes k) j)
     return b
   Vector.ofFn fun idx =>
     let i := idx.val

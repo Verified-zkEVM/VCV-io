@@ -217,6 +217,8 @@ private theorem applyMatrix_id (f : Rq) :
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
+  -- This closed 256x256 matrix identity is intentionally discharged with `native_decide`
+  -- to avoid severe kernel reduction timeouts in the proof-oriented model.
   native_decide
 
 /-- Proof-oriented NTT obtained from the transform matrix extracted from the algorithmic
