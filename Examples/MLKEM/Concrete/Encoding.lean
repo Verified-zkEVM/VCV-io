@@ -31,6 +31,8 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
+-- These finite bit-twiddling identities are intentionally discharged with `native_decide`
+-- to avoid slow kernel reduction on the explicit byte-level search space.
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
@@ -51,7 +53,7 @@ private theorem packByte_bitOf_byte (b : UInt8) :
     packByte (fun j => bitOf b j.val) = b := by
   simpa using packByte_bitOf_fin ⟨b.toNat, UInt8.toNat_lt b⟩
 
-private theorem array_getD_eq_getElem {α : Type} [Inhabited α] (a : Array α) {i : Nat}
+private theorem array_getD_eq_getElem {α : Type} (a : Array α) {i : Nat}
     {fallback : α} (hi : i < a.size) :
     a.getD i fallback = a[i] := by
   simp [Array.getD, hi]
@@ -393,10 +395,6 @@ private theorem byteDecode_one_coeff (bytes : ByteArray) {i : Nat} (hi : i < rin
   have hcast : (((bytesToBits bytes).getD i 0 : Nat) : Coeff).val = (bytesToBits bytes).getD i 0 := by
     exact ZMod.val_cast_of_lt hbitMod
   simpa [byteDecode, Nat.ofDigits_singleton] using hcast
-
-/-- Extract a slice of a `ByteArray` as a new `ByteArray`. -/
-private def sliceBA (ba : ByteArray) (offset len : Nat) : ByteArray :=
-  ba.extract offset (offset + len)
 
 /-! ## 12-bit public-key encoding -/
 
@@ -1057,7 +1055,7 @@ def concreteEncodingLaws (params : Params)
     (hduPow : (1 <<< params.du) < modulus) (hdvPow : (1 <<< params.dv) < modulus) :
     (concreteEncoding params).Laws := by
   have hpow1 : (1 <<< 1) < modulus := by
-    native_decide
+    decide
   refine
     { byteDecodeDUVec_byteEncodeDUVec_compressDU := ?_
       byteDecodeDV_byteEncodeDV_compressDV := ?_

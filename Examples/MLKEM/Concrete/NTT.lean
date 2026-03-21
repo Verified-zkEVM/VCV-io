@@ -14,8 +14,9 @@ specialised to `q = 3329`, `n = 256`, `ζ = 17`.
 
 The public `ntt` / `invNTT` interface is exposed in a proof-oriented form: we first evaluate the
 algorithmic kernels on the standard basis, then reuse the resulting concrete transform matrices to
-obtain a public NTT pair with mechanically checked inverse laws. `multiplyNTTs` is then transported
-back through that proven isomorphism.
+obtain a public NTT pair with mechanically checked inverse laws. At runtime, `@[implemented_by]`
+rebinds those public definitions to the fast loop kernels, so execution keeps the intended
+`O(n log n)` / `O(n)` behavior while proofs continue to see the matrix-based semantics.
 
 ## Coefficient ordering in `MultiplyNTTs`
 
@@ -91,8 +92,8 @@ private def nttLayer (a : Array Coeff) (len : Nat) (k : Nat) : Array Coeff × Na
       arr := arr.set! j (fj + t)
   return (arr, ki)
 
-/-- FIPS 203 Algorithm 9: Number-Theoretic Transform. -/
-private def loopNTT (f : Rq) : Tq :=
+/-- FIPS 203 Algorithm 9: executable loop kernel for the Number-Theoretic Transform. -/
+def loopNTT (f : Rq) : Tq :=
   let (a, _) := [128, 64, 32, 16, 8, 4, 2].foldl
     (fun (a, k) len => nttLayer a len k) (f.toArray, 1)
   ⟨Vector.ofFn fun i => getZ a i.val⟩
@@ -116,19 +117,19 @@ private def invNttLayer (a : Array Coeff) (len : Nat) (k : Nat) :
       arr := arr.set! (j + len) (z * (u - t))
   return (arr, ki)
 
-/-- FIPS 203 Algorithm 10: Inverse Number-Theoretic Transform. -/
-private def loopInvNTT (fHat : Tq) : Rq :=
+/-- FIPS 203 Algorithm 10: executable loop kernel for the inverse Number-Theoretic Transform. -/
+def loopInvNTT (fHat : Tq) : Rq :=
   let (a, _) := [2, 4, 8, 16, 32, 64, 128].foldl
     (fun (a, k) len => invNttLayer a len k) (fHat.toArray, 127)
   Vector.ofFn fun i => nInv * getZ a i.val
 
 /-! ## Base-case multiplication and MultiplyNTTs (Algorithm 11) -/
 
-/-- FIPS 203 Algorithm 11 (MultiplyNTTs), using the butterfly-natural coefficient ordering
+/-- FIPS 203 Algorithm 11 executable kernel, using the butterfly-natural coefficient ordering
     from Algorithm 9 rather than Algorithm 11's stated indexing convention (see module
     docstring for details). Within each group `g` of 4 coefficients, the pair at `(4g, 4g+1)`
     uses twiddle factor `zetaArray[64+g]` and the pair at `(4g+2, 4g+3)` uses its negation. -/
-private def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
+def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
   let fa := fHat.toArray
   let ga := gHat.toArray
   ⟨Vector.ofFn fun idx =>
@@ -220,17 +221,21 @@ private theorem invNTTMatrix_nttMatrix_entry :
 
 /-- Proof-oriented NTT obtained from the transform matrix extracted from the algorithmic
 implementation on the standard basis. -/
+@[implemented_by loopNTT]
 def ntt (f : Rq) : Tq :=
   ⟨applyMatrix nttMatrix f⟩
 
 /-- Proof-oriented inverse NTT obtained from the inverse transform matrix. -/
+@[implemented_by loopInvNTT]
 def invNTT (fHat : Tq) : Rq :=
   applyMatrix invNTTMatrix fHat.coeffs
 
 /-- Proof-oriented `MultiplyNTTs` transported through the proven NTT isomorphism. -/
+@[implemented_by loopMultiplyNTTs]
 def multiplyNTTs (fHat gHat : Tq) : Tq :=
   ntt (negacyclicMul (invNTT fHat) (invNTT gHat))
 
+/-- The concrete inverse transform is a left inverse to the concrete forward transform. -/
 theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
   calc
     invNTT (ntt f) = applyMatrix idMatrix f := by

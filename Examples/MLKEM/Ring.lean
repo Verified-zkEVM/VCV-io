@@ -93,7 +93,7 @@ namespace NTTRingOps
 variable (ops : NTTRingOps)
 
 /-- Transpose a row-major matrix over `T_q`. -/
-abbrev transpose {rows cols : ℕ} (A : TqMatrix rows cols) : TqMatrix cols rows :=
+abbrev transpose (_ops : NTTRingOps) {rows cols : ℕ} (A : TqMatrix rows cols) : TqMatrix cols rows :=
   LatticeCrypto.NTTRingOps.transpose A
 
 /-- Apply NTT coordinate-wise to a vector over `R_q`. -/

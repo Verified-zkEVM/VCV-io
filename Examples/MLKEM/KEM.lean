@@ -44,13 +44,13 @@ def decapsulationKeyCheck (encoding : Encoding params) (prims : Primitives param
 
 /-- In the semantic model, ciphertexts are already well-typed, so the top-level runtime check is
 reduced to `true`. A later byte-level refinement can strengthen this predicate. -/
-def ciphertextCheck (params : Params) (encoding : Encoding params)
+def ciphertextCheck (encoding : Encoding params)
     (_c : Ciphertext params encoding) : Bool := true
 
 /-- Combined decapsulation input check. -/
 def decapsulationInputCheck (encoding : Encoding params) (prims : Primitives params encoding)
     (dk : DecapsulationKey params encoding) (c : Ciphertext params encoding) : Bool :=
-  decapsulationKeyCheck encoding prims dk && ciphertextCheck params encoding c
+  decapsulationKeyCheck encoding prims dk && ciphertextCheck encoding c
 
 /-- `ML-KEM.KeyGen`. This spec-level version assumes randomness generation succeeds and, by the
 encoding canonicality law, always outputs an encapsulation key accepted by `encaps`. -/
@@ -84,7 +84,7 @@ def decaps (ring : NTTRingOps) (encoding : Encoding params)
 
 This wrapper is intended for reuse inside the repo's generic KEM interfaces; it assumes callers
 only supply inputs that have already passed the public `encaps` / `decaps` checks above. -/
-def asKEMScheme (params : Params) (ring : NTTRingOps) (encoding : Encoding params)
+def asKEMScheme (ring : NTTRingOps) (encoding : Encoding params)
     (prims : Primitives params encoding) [DecidableEq encoding.EncodedTHat]
     [DecidableEq encoding.EncodedU] [DecidableEq encoding.EncodedV] :
     KEMScheme ProbComp SharedSecret (EncapsulationKey params encoding)

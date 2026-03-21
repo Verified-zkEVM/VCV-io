@@ -126,19 +126,19 @@ def mlkem512Encoding : Encoding mlkem512 := concreteEncoding mlkem512
 def mlkem1024Encoding : Encoding mlkem1024 := concreteEncoding mlkem1024
 
 /-- Encoding roundtrip laws for ML-KEM-512. -/
-def mlkem512EncodingLaws : mlkem512Encoding.Laws :=
+theorem mlkem512EncodingLaws : mlkem512Encoding.Laws :=
   concreteEncodingLaws mlkem512
-    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+    (by decide) (by decide) (by decide) (by decide)
 
 /-- Encoding roundtrip laws for ML-KEM-768. -/
-def mlkem768EncodingLaws : mlkem768Encoding.Laws :=
+theorem mlkem768EncodingLaws : mlkem768Encoding.Laws :=
   concreteEncodingLaws mlkem768
-    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+    (by decide) (by decide) (by decide) (by decide)
 
 /-- Encoding roundtrip laws for ML-KEM-1024. -/
-def mlkem1024EncodingLaws : mlkem1024Encoding.Laws :=
+theorem mlkem1024EncodingLaws : mlkem1024Encoding.Laws :=
   concreteEncodingLaws mlkem1024
-    (by native_decide) (by native_decide) (by native_decide) (by native_decide)
+    (by decide) (by decide) (by decide) (by decide)
 
 /-- Concrete primitives for ML-KEM-512. -/
 def mlkem512Primitives : Primitives mlkem512 mlkem512Encoding :=
