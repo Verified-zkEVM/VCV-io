@@ -125,6 +125,11 @@ lemma zero_def : (0 : SPMF α) = failure := rfl
 lemma toPMF_zero : (0 : SPMF α).toPMF = PMF.pure none := rfl
 
 @[simp, grind =]
+lemma zero_apply (x : α) : (0 : SPMF α) x = 0 := by aesop
+
+end zero
+
+@[simp, grind =]
 lemma toPMF_bind (p : SPMF α) (q : α → SPMF β) :
     (p >>= q).toPMF = Option.elimM p.toPMF (PMF.pure none) (fun x => (q x).toPMF) := by
   simp [← run_eq_toPMF]
@@ -134,9 +139,7 @@ lemma toPMF_map (p : SPMF α) (f : α → β) : (f <$> p).toPMF = Option.map f <
   simp [← run_eq_toPMF]
 
 @[simp, grind =]
-lemma zero_apply (x : α) : (0 : SPMF α) x = 0 := by aesop
-
-end zero
+lemma mk_pure_some (x : α) : SPMF.mk (PMF.pure (some x)) = pure x := rfl
 
 @[simp, grind =]
 lemma tsum_toPMF_some_add_toPMF_none (p : SPMF α) :
@@ -164,21 +167,15 @@ lemma toPMF_none_eq_one_sub_tsum (p : SPMF α) :
 @[simp] lemma tsum_run_some_ne_top (p : SPMF α) : ∑' x, p.toPMF (some x) ≠ ⊤ :=
   ne_top_of_le_ne_top one_ne_top (p.tsum_run_some_eq_one_sub ▸ tsub_le_self)
 
-lemma run_none_eq_one_sub (p : SPMF α) :
-    p.toPMF none = 1 - ∑' x, p.toPMF (some x) := by
-  rw [p.tsum_coe.symm.trans (tsum_option _ ENNReal.summable)]
-  refine ENNReal.eq_sub_of_add_eq ?_ rfl
-  simp only [ne_eq, tsum_run_some_ne_top, not_false_eq_true]
-
 @[ext]
 lemma ext {p q : SPMF α} (h : ∀ x : α, p x = q x) : p = q := by
   simp [SPMF.apply_eq_toPMF_some] at h
   refine PMF.ext fun
     | some x => h x
     | none =>  calc p.toPMF none
-        _ = 1 - ∑' x, p.toPMF (some x) := by rw [run_none_eq_one_sub]
+        _ = 1 - ∑' x, p.toPMF (some x) := by grind
         _ = 1 - ∑' x, q.toPMF (some x) := by simp [h]
-        _ = q.toPMF none := by rw [run_none_eq_one_sub]
+        _ = q.toPMF none := by grind
 
 open Classical in
 lemma eq_liftM_iff_forall (p : SPMF α) (q : PMF α) :
@@ -203,7 +200,7 @@ lemma eq_liftM_iff_forall (p : SPMF α) (q : PMF α) :
 section support
 
 /-- The set of outputs with non-zero probability mass. -/
-protected def support {α : Type _} (p : SPMF α) : Set α :=
+protected def support {α : Type*} (p : SPMF α) : Set α :=
   Function.support (p : α → ℝ≥0∞)
 
 lemma support_def (p : SPMF α) :
@@ -253,9 +250,6 @@ end gap
 @[simp] lemma map_mk (p : PMF (Option α)) (f : α → β) :
     f <$> SPMF.mk p = SPMF.mk (Option.map f <$> p) := by aesop
 
-theorem pure_eq_pmf_pure {a : α} : (pure a : SPMF α) = PMF.pure a := by
-  simp [pure, liftM, OptionT.pure, monadLift, MonadLift.monadLift, OptionT.lift, PMF.instMonad]
-
 theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
     (p >>= f) = PMF.bind p (fun a => match a with | some a' => f a' | none => PMF.pure none) := by
   simp [bind, OptionT.bind, PMF.instMonad, OptionT.mk]
@@ -265,22 +259,16 @@ theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
   simp [PMF.monad_map_eq_map]
 
 /-- `pure a` in `SPMF` equals `PMF.pure (some a)` as a PMF on `Option α`. -/
-protected lemma pure_eq_pure_some (a : α) : (pure a : SPMF α) = PMF.pure (some a) := by
-  have : (pure a : SPMF α) = liftM (PMF.pure a) := by
-    simp [pure, liftM, OptionT.pure, monadLift, MonadLift.monadLift, OptionT.lift, PMF.instMonad]
-  rw [this]; change (PMF.pure a).bind (fun x => PMF.pure (some x)) = _; rw [PMF.pure_bind]
+protected lemma pure_eq_pure_some (a : α) :
+    (pure a : SPMF α) = SPMF.mk (PMF.pure (some a)) := by rfl
+
+@[simp, grind =]
+lemma toPMF_inj (p q : SPMF α) : p.toPMF = q.toPMF ↔ p = q := by aesop
 
 /-- The functor map for SPMF equals `PMF.map (Option.map f)`. -/
 protected lemma fmap_eq_map (f : α → β) (c : SPMF α) :
-    (f <$> c : SPMF β) = PMF.map (Option.map f) c := by
-  have : (f <$> c : SPMF β) =
-    PMF.bind c (fun a => match a with
-      | some a' => (pure (f a') : SPMF β) | none => PMF.pure none) := by
-    show (c >>= (pure ∘ f)) = _; exact bind_eq_pmf_bind
-  rw [this]; apply PMF.ext; intro x
-  simp only [PMF.bind_apply, PMF.map_apply]
-  congr 1; ext y; cases y with
-  | none => cases x <;> simp [PMF.pure_apply]
-  | some a => simp only [SPMF.pure_eq_pure_some, PMF.pure_apply]; cases x <;> simp
+    (f <$> c : SPMF β) = (PMF.map (Option.map f) c) :=
+  show (f <$> c : SPMF β) = SPMF.mk (PMF.map (Option.map f) c.toPMF)
+  by rw [← SPMF.toPMF_inj, SPMF.toPMF_map, SPMF.toPMF_mk, PMF.monad_map_eq_map]
 
 end SPMF

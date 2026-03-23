@@ -304,31 +304,6 @@ theorem relTriple'_iff_couplingPost
           Pr[((fun z : α × β => R z.1 z.2) ∘ valPair) | cMaxSub'.1]
         exact probEvent_map (mx := cMaxSub'.1) (f := valPair)
           (q := fun z : α × β => R z.1 z.2)
-      -- have hpush_obj' :
-      --     Pr[fun z : α × β => R z.1 z.2 | cMax.1] =
-      --       Pr[fun z : A × B => R z.1.1 z.2.1 | (cMaxSub.1 : SPMF (A × B))] := by
-      --   change
-      --     @probEvent SPMF SPMF.instAlternativeMonad.toMonad (α × β) SPMF.instHasEvalSPMF
-      --         cMax.1 (fun z : α × β => R z.1 z.2) =
-      --       @probEvent (OptionT PMF) OptionT.instMonad (A × B) (OptionT.instHasEvalSPMF PMF)
-      --         (cMaxSub.1 : SPMF (A × B))
-      --         (fun z : A × B => R z.1.1 z.2.1)
-      --   calc
-      --     @probEvent SPMF SPMF.instAlternativeMonad.toMonad (α × β) SPMF.instHasEvalSPMF
-      --         cMax.1 (fun z : α × β => R z.1 z.2)
-      --         =
-      --       @probEvent SPMF SPMF.instAlternativeMonad.toMonad (A × B) SPMF.instHasEvalSPMF
-      --         cMaxSub'.1 (fun z : A × B => R z.1.1 z.2.1) :=
-      --           hpush_obj
-      --     _ =
-      --       @probEvent SPMF SPMF.instAlternativeMonad.toMonad (A × B) SPMF.instHasEvalSPMF
-      --         cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1) := by
-      --           rfl
-      --     _ =
-      --       @probEvent SPMF OptionT.instMonad (A × B) (OptionT.instHasEvalSPMF PMF)
-      --         (cMaxSub.1 : SPMF (A × B))
-      --         (fun z : A × B => R z.1.1 z.2.1) :=
-      --           (OptionT.probEvent_SPMF_eq_spmf cMaxSub.1 (fun z : A × B => R z.1.1 z.2.1)).symm
       have hsub_le_max :
           ∀ c : SPMF.Coupling pa pb,
             Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] ≤
@@ -373,7 +348,7 @@ theorem relTriple'_iff_couplingPost
                 exact (hlift_obj c).symm
           _ ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := by
             rw [hpush_obj]
-            refine le_trans ?_ (hsub_le_max cLift)
+            refine le_of_eq_of_le ?_ (hsub_le_max cLift)
             rw [hlift_obj]
       have hmax_ge : 1 ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := le_trans h hupper
       have hmax_eq : Pr[fun z : α × β => R z.1 z.2 | cMax.1] = 1 :=

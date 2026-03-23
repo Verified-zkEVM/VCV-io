@@ -38,31 +38,10 @@ variable {α β : Type u} [Fintype α] [Fintype β]
 
 section Topology
 
--- To show compactness, we embed `SPMF (α × β)` into `Option (α × β) → ℝ`.
-
-omit [Fintype α] [Fintype β] in
-private lemma spmf_pure_eq (a : α) : (pure a : SPMF α) = PMF.pure (some a) := by
-  have : (pure a : SPMF α) = liftM (PMF.pure a) := by
-    simp [pure, liftM, OptionT.pure, monadLift, MonadLift.monadLift, OptionT.lift, PMF.instMonad]
-  rw [this]; change (PMF.pure a).bind (fun x => PMF.pure (some x)) = _; rw [PMF.pure_bind]
-
-omit [Fintype α] [Fintype β] in
-private lemma spmf_fmap_eq_map (f : α → β) (c : SPMF α) :
-    (f <$> c : SPMF β) = PMF.map (Option.map f) c := by
-  have : (f <$> c : SPMF β) =
-    PMF.bind c (fun a => match a with
-      | some a' => (pure (f a') : SPMF β) | none => PMF.pure none) := by
-    show (c >>= (pure ∘ f)) = _; exact SPMF.bind_eq_pmf_bind
-  rw [this]; apply PMF.ext; intro x
-  simp only [PMF.bind_apply, PMF.map_apply]
-  congr 1; ext y; cases y with
-  | none => cases x <;> simp [PMF.pure_apply]
-  | some a => simp only [spmf_pure_eq, PMF.pure_apply]; cases x <;> simp
-
 lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
     (Prod.fst <$> c) a = ∑ b, c (a, b) := by
   classical
-  erw [spmf_fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
+  erw [SPMF.fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
   have hsimp :
       ((if some a = Option.map Prod.fst (none : Option (α × β)) then c.gap else 0) +
           ∑ x : α × β, if some a = Option.map Prod.fst (some x : Option (α × β)) then c x else 0) =
@@ -85,7 +64,7 @@ lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
 lemma map_snd_eval (c : SPMF (α × β)) (b : β) :
     (Prod.snd <$> c) b = ∑ a, c (a, b) := by
   classical
-  erw [spmf_fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
+  erw [SPMF.fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
   have hsimp :
       ((if some b = Option.map Prod.snd (none : Option (α × β)) then c.gap else 0) +
           ∑ x : α × β, if some b = Option.map Prod.snd (some x : Option (α × β)) then c x else 0) =
@@ -216,14 +195,7 @@ lemma mem_couplings_set_of_isCoupling {p : SPMF α} {q : SPMF β} (c : SPMF (α 
       exact PMF.apply_ne_top c _
     rw [h_sum_toReal] at h_toReal
     exact h_toReal
-  · have h_total : c.gap + ∑ z, c z = 1 := by
-      simpa [tsum_fintype, Fintype.sum_option] using c.tsum_coe
-    have h_some_le_one : ∑ z, c z ≤ 1 := by
-      calc
-        ∑ z, c z ≤ c.gap + ∑ z, c z := by
-          exact le_add_of_nonneg_left bot_le
-        _ = 1 := h_total
-    exact SPMF.toReal_gap_eq_one_sub_sum_toReal c
+  · exact SPMF.toReal_gap_eq_one_sub_sum_toReal c
 
 omit [Fintype α] [Fintype β] in
 private lemma sum_option_eq_one_of_none_eq_sub {γ : Type u} [Fintype γ]
