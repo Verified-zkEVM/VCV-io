@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: update root import files
-        run: bash ./scripts/update-lib.sh
+        run: lake exe mk_all
 
       - name: check that all files are imported
         run: git diff --exit-code
