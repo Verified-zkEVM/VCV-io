@@ -189,7 +189,7 @@ section OptionPUnit
 
 variable (p q : PMF (Option PUnit))
 
-private lemma pmf_none_eq (p : PMF (Option PUnit)) :
+lemma pmf_none_eq (p : PMF (Option PUnit)) :
     p none = 1 - p (some ()) := by
   have h := p.tsum_coe
   rw [tsum_fintype, Fintype.sum_option, Fintype.sum_unique] at h
