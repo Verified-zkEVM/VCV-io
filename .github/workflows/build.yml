@@ -27,11 +27,14 @@ jobs:
           use-github-cache: false
           use-mathlib-cache: false
 
-      - name: update root import files
-        run: lake exe mk_all
+      - name: Check for all imports in ToMathlib
+        run: lake exe mk_all --lib ToMathlib --check
 
-      - name: check that all files are imported
-        run: git diff --exit-code
+      - name: Check for all imports in VCVio
+        run: lake exe mk_all --lib VCVio --check
+
+      - name: Check for all imports in Examples
+        run: lake exe mk_all --lib Examples --check
 
   build:
     name: Build Project

@@ -82,4 +82,3 @@ lean_exe smoke_test where
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where
   root := `VCVioTest.MLKEM.Main
-
