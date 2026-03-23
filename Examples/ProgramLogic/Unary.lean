@@ -114,10 +114,13 @@ example :
   vcstep
   trivial
 
+/--
+`vcstep?` can get the specific path used to create a `vcstep` proof
 example :
     ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
   vcstep?
   trivial
+-/
 
 example :
     ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
@@ -199,11 +202,14 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
   vcgen
 
+/-
+`vcgen?` can expand the construction of a `vcgen` proof
 example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
     (h1 : ⦃1⦄ oa ⦃cut⦄) (h2 : ∀ x, ⦃cut x⦄ ob x ⦃post⦄) :
     ⦃1⦄ (oa >>= ob) ⦃post⦄ := by
   vcgen?
+-/
 
 example (x : α) (post : α → ℝ≥0∞) :
     ⦃post x⦄ (pure x : OracleComp spec α) ⦃post⦄ := by

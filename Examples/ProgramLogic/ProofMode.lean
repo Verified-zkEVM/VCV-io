@@ -137,9 +137,13 @@ example (oa : OracleComp spec α) :
     oa ≡ₚ oa := by
   rvcgen
 
+/-
+Using `rvcgen?` can explain the behavior of `rvcgen`:
+
 example (oa : OracleComp spec α) :
     oa ≡ₚ oa := by
   rvcgen?
+-/
 
 example [SampleableType α]
     (f : α → α) (hf : Function.Bijective f) :
