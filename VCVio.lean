@@ -35,6 +35,7 @@ import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Defs.Support
 import VCVio.EvalDist.Fintype
 import VCVio.EvalDist.Instances.ErrorT
+import VCVio.EvalDist.Instances.FinRatPMF
 import VCVio.EvalDist.Instances.OptionT
 import VCVio.EvalDist.Instances.ReaderT
 import VCVio.EvalDist.List
@@ -52,6 +53,7 @@ import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.ExecutionMethod
+import VCVio.OracleComp.FinRatPMF
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery
