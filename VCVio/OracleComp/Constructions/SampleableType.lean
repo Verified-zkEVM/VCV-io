@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.BitVec
 import VCVio.EvalDist.Bool
+import Init.Data.UInt.Lemmas
 
 /-!
 # Uniform Selection Over a Type
@@ -112,7 +113,8 @@ lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
     Pr[= z | (do let y ← $ᵗ α; f (m + y))] =
       Pr[= z | (do let y ← $ᵗ α; f y)] := by
   have hleft :
-      (do let y ← $ᵗ α; f (m + y)) = (((fun y : α => m + y) <$> ($ᵗ α)) >>= fun y => f y) := by
+      (do let y ← $ᵗ α; f (m + y)) =
+        (((fun y : α => m + y) <$> ($ᵗ α)) >>= fun y => f y) := by
     simp [map_eq_bind_pure_comp, bind_assoc]
   rw [hleft, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   refine tsum_congr fun y => ?_
@@ -339,6 +341,36 @@ def SampleableType.ofEquiv {α β : Type} [DecidableEq α] [DecidableEq β] [Sam
       _ = Pr[= y | e <$> ($ᵗ α)] := by
         symm
         simpa using probOutput_map_injective ($ᵗ α) e.injective (e.symm y)
+
+/-- Unsigned machine words inherit uniform sampling from the corresponding
+fixed-width bitvectors. -/
+instance : SampleableType UInt8 :=
+  SampleableType.ofEquiv
+    { toFun := UInt8.ofBitVec
+      invFun := UInt8.toBitVec
+      left_inv := by intro x; simp
+      right_inv := by intro x; simp }
+
+instance : SampleableType UInt16 :=
+  SampleableType.ofEquiv
+    { toFun := UInt16.ofBitVec
+      invFun := UInt16.toBitVec
+      left_inv := by intro x; simp
+      right_inv := by intro x; simp }
+
+instance : SampleableType UInt32 :=
+  SampleableType.ofEquiv
+    { toFun := UInt32.ofBitVec
+      invFun := UInt32.toBitVec
+      left_inv := by intro x; simp
+      right_inv := by intro x; simp }
+
+instance : SampleableType UInt64 :=
+  SampleableType.ofEquiv
+    { toFun := UInt64.ofBitVec
+      invFun := UInt64.toBitVec
+      left_inv := by intro x; simp
+      right_inv := by intro x; simp }
 
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [DecidableEq α] :

@@ -38,6 +38,8 @@ the Loom project (see [LOOM-REPO](REFERENCES.md#loom-repo) and [LOOM26](REFERENC
 ## Contributions
 
 Contributions to the library are welcome via PR.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contribution workflow and the repo's explicit
+attribution / file-header policy.
 See [LEANCRYPTO3-REPO](REFERENCES.md#leancrypto3-repo) for an outdated version of the library in Lean 3.
 
 # Framework Overview

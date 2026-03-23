@@ -42,6 +42,10 @@ abbrev ProbComp : Type → Type := OracleComp unifSpec
 
 namespace ProbComp
 
+/-- Independently sample `k` values from `samp`, returning them as a `Fin k → α`. -/
+def sampleIID {α : Type} (k : ℕ) (samp : ProbComp α) : ProbComp (Fin k → α) :=
+  Fin.mOfFn k fun _ => samp
+
 section uniformFin
 
 /-- `$[0..n]` is the computation choosing a random value in the given range, inclusively.
@@ -266,7 +270,8 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
   | [] => by simp
   | y :: ys => by simp [uniformSelectList_cons]
 
-@[simp, grind =] lemma probEvent_uniformSelectList (xs : List α) (p : α → Prop) [DecidablePred p] :
+@[simp, grind =] lemma probEvent_uniformSelectList
+    (xs : List α) (p : α → Prop) [DecidablePred p] :
     Pr[p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
   | [] => by simp
   | y :: ys => by

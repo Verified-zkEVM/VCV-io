@@ -1,0 +1,3 @@
+[submodule "third_party/mlkem-native"]
+	path = third_party/mlkem-native
+	url = https://github.com/pq-code-package/mlkem-native.git

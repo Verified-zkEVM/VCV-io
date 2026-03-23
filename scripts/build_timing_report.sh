@@ -107,17 +107,21 @@ import sys
 
 results_path = pathlib.Path(sys.argv[1])
 baseline_dir = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 and sys.argv[2] else None
+clean_build_command = os.environ.get(
+    "BUILD_TIMING_CLEAN_COMMAND", "rm -rf .lake/build && lake build"
+)
+warm_rebuild_command = os.environ.get("BUILD_TIMING_WARM_COMMAND", "lake build")
 test_path_name = os.environ.get("BUILD_TIMING_TEST_NAME", "Test path")
 test_path_command = os.environ.get("BUILD_TIMING_TEST_COMMAND", "lake test")
 
 display = {
     "clean_build": {
         "name": "Clean build",
-        "command": "`rm -rf .lake/build && lake build`",
+        "command": f"`{clean_build_command}`",
     },
     "warm_rebuild": {
         "name": "Warm rebuild",
-        "command": "`lake build`",
+        "command": f"`{warm_rebuild_command}`",
     },
     "test_path": {
         "name": test_path_name,
@@ -125,7 +129,7 @@ display = {
     },
 }
 ordered_labels = ["clean_build", "warm_rebuild", "test_path"]
-repo_prefixes = ("VCVio", "Examples", "ToMathlib", "LibSodium", "VCVioWidgets", "Test")
+repo_prefixes = ("VCVio", "Examples", "ToMathlib", "VCVioWidgets", "VCVioTest")
 
 
 def load_records(path: pathlib.Path) -> dict[str, dict]:

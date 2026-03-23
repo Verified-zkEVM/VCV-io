@@ -27,11 +27,14 @@ jobs:
           use-github-cache: false
           use-mathlib-cache: false
 
-      - name: update root import files
-        run: lake exe mk_all
+      - name: Check for all imports in ToMathlib
+        run: lake exe mk_all --lib ToMathlib --check
 
-      - name: check that all files are imported
-        run: git diff --exit-code
+      - name: Check for all imports in VCVio
+        run: lake exe mk_all --lib VCVio --check
+
+      - name: Check for all imports in Examples
+        run: lake exe mk_all --lib Examples --check
 
   build:
     name: Build Project
@@ -45,6 +48,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
       - name: Initialize timing paths
         run: |
           echo "BUILD_TIMING_RESULTS=$RUNNER_TEMP/build-timing.jsonl" >> "$GITHUB_ENV"
@@ -58,8 +62,10 @@ jobs:
           echo "BUILD_TIMING_SOURCE_BRANCH=${{ github.head_ref || github.ref_name }}" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_BASE_REF=" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_MERGE_BASE_SHA=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_TEST_NAME=Test module" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_TEST_COMMAND=lake env lean Test.lean" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio Examples" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio Examples" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_TEST_NAME=Smoke test" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_TEST_COMMAND=lake env lean VCVioTest/Smoke.lean" >> "$GITHUB_ENV"
           {
             echo "BUILD_TIMING_SOURCE_SUBJECT<<EOF"
             git log -1 --format=%s
@@ -95,15 +101,18 @@ jobs:
       - name: Time clean build
         run: |
           bash scripts/build_timing_report.sh run clean_build "$BUILD_TIMING_RESULTS" -- \
-            bash -eo pipefail -c 'rm -rf .lake/build && lake build'
+            bash -eo pipefail -c "$BUILD_TIMING_CLEAN_COMMAND"
       - name: Time warm rebuild
         run: |
           bash scripts/build_timing_report.sh run warm_rebuild "$BUILD_TIMING_RESULTS" -- \
-            bash -eo pipefail -c 'lake build'
+            bash -eo pipefail -c "$BUILD_TIMING_WARM_COMMAND"
       - name: Time test module
         run: |
           bash scripts/build_timing_report.sh run test_path "$BUILD_TIMING_RESULTS" -- \
-            bash -eo pipefail -c 'lake env lean Test.lean'
+            bash -eo pipefail -c 'lake env lean VCVioTest/Smoke.lean'
+      # - name: Run ML-KEM tests
+      #   run: |
+      #     .lake/build/bin/mlkem_test
       - name: Save Lake cache
         if: success() && steps.lake-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
