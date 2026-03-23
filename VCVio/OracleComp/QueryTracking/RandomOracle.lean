@@ -92,7 +92,27 @@ This is a faithful simulation (preserves `evalDist`). -/
 theorem evalDist_simulateQ_run'_empty [spec₀.Fintype] [spec₀.Inhabited]
     {α : Type} (oa : OracleComp spec₀ α) :
     evalDist ((simulateQ (eagerRandomOracle (spec := spec₀)) oa).run' ∅) = evalDist oa := by
-  sorry
+  induction oa using OracleComp.inductionOn with
+  | pure a => simp [simulateQ_pure, evalDist_pure]
+  | query_bind t f ih =>
+    rw [simulateQ_bind,
+      show simulateQ eagerRandomOracle (liftM (query t)) = eagerRandomOracle t by
+        rw [simulateQ_query]; simp [OracleQuery.cont_query, OracleQuery.input_query, id_map],
+      evalDist_query_bind]
+    have hsimp : (eagerRandomOracle t >>= fun u =>
+        simulateQ eagerRandomOracle (f u)).run' (∅ : QuerySeed spec₀) =
+        $ᵗ spec₀.Range t >>= fun u => (simulateQ eagerRandomOracle (f u)).run' ∅ := by
+      show Prod.fst <$> ((eagerRandomOracle t).run ∅ >>= fun p =>
+          (simulateQ eagerRandomOracle (f p.1)).run p.2) =
+        $ᵗ spec₀.Range t >>= fun u => Prod.fst <$> (simulateQ eagerRandomOracle (f u)).run ∅
+      have h : (eagerRandomOracle t).run (∅ : QuerySeed spec₀) =
+          (fun u => (u, (∅ : QuerySeed spec₀))) <$> ($ᵗ spec₀.Range t) := by
+        simp [eagerRandomOracle, StateT.mk, StateT.run]
+      rw [h]; simp [map_bind, bind_map_left]
+    rw [hsimp, evalDist_bind]
+    congr 1
+    · exact evalDist_uniformSample (spec₀.Range t)
+    · funext u; exact ih u
 
 end eagerRandomOracle
 
