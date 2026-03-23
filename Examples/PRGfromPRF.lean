@@ -140,7 +140,19 @@ theorem security
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +
       collisionProb (S := S) (O := O) n := by
-  sorry
+  unfold PRGScheme.prgAdvantage PRFScheme.prfAdvantage
+  have hreal : (Pr[= true | PRGScheme.prgRealExp (streamPRG prf n) adv]).toReal =
+      (Pr[= true | PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)]).toReal :=
+    congrArg ENNReal.toReal (probOutput_congr rfl (prgRealExp_eq_prfRealExp hkey adv))
+  rw [hreal]
+  set a := (Pr[= true | PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)]).toReal
+  set b := (Pr[= true | PRFScheme.prfIdealExp (prfReduction (S := S) (O := O) n adv)]).toReal
+  set c := (Pr[= true | PRGScheme.prgIdealExp adv]).toReal
+  have hgap : |b - c| ≤ collisionProb (S := S) (O := O) n :=
+    prfIdealGap_le_collisionProb adv
+  calc |a - c| = |(a - b) + (b - c)| := by ring_nf
+    _ ≤ |a - b| + |b - c| := abs_add_le _ _
+    _ ≤ |a - b| + collisionProb (S := S) (O := O) n := by linarith
 
 end streamPRG
 
