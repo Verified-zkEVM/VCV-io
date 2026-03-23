@@ -52,17 +52,17 @@ noncomputable instance instMAlgRelOrdered :
     constructor
     · intro h
       rcases h with ⟨c, hc⟩
-      have hcPure : _root_.SubPMF.IsCoupling c.1 (pure a) (pure b) := by
+      have hcPure : _root_.SPMF.IsCoupling c.1 (pure a) (pure b) := by
         simpa [evalDist_pure] using c.2
       have hcEq : c.1 = (pure (a, b) : SPMF (_ × _)) :=
-        (_root_.SubPMF.IsCoupling.pure_iff).1 hcPure
+        (_root_.SPMF.IsCoupling.pure_iff).1 hcPure
       have hmem : (a, b) ∈ support c.1 := by
         simp [hcEq, support_pure]
       exact hc (a, b) hmem
     · intro hR
       refine ⟨⟨(pure (a, b) : SPMF (_ × _)), ?_⟩, ?_⟩
-      · have hcPure : _root_.SubPMF.IsCoupling (pure (a, b) : SPMF (_ × _)) (pure a) (pure b) :=
-          (_root_.SubPMF.IsCoupling.pure_iff).2 rfl
+      · have hcPure : _root_.SPMF.IsCoupling (pure (a, b) : SPMF (_ × _)) (pure a) (pure b) :=
+          (_root_.SPMF.IsCoupling.pure_iff).2 rfl
         simpa [evalDist_pure] using hcPure
       · intro z hz
         have hzEq : z = (a, b) := by
@@ -145,7 +145,7 @@ lemma relTriple_pure_pure {a : α} {b : β} {R : RelPost α β} (h : R a b) :
     RelTriple (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R := by
   rw [relTriple_iff_relWP, relWP_iff_couplingPost]
   refine ⟨⟨pure (a, b), ?_⟩, fun z hz => ?_⟩
-  · simpa [evalDist_pure] using _root_.SubPMF.IsCoupling.pure_iff.mpr rfl
+  · simpa [evalDist_pure] using _root_.SPMF.IsCoupling.pure_iff.mpr rfl
   · have : z = (a, b) := by simpa [support_pure] using hz
     subst this; exact h
 
