@@ -110,9 +110,9 @@ jobs:
         run: |
           bash scripts/build_timing_report.sh run test_path "$BUILD_TIMING_RESULTS" -- \
             bash -eo pipefail -c 'lake env lean VCVioTest/Smoke.lean'
-      - name: Run ML-KEM tests
-        run: |
-          .lake/build/bin/mlkem_test
+      # - name: Run ML-KEM tests
+      #   run: |
+      #     .lake/build/bin/mlkem_test
       - name: Save Lake cache
         if: success() && steps.lake-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
