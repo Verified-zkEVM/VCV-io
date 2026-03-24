@@ -1,4 +1,5 @@
 import Examples.BR93
+import Examples.CommitmentSchemeRO
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
