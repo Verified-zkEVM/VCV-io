@@ -69,4 +69,19 @@ theorem schnorrSignature_euf_cma (g : G) (hg : Function.Bijective (· • g : F 
       adv.advantage *
           (adv.advantage / (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
-  sorry
+  obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (schnorrSigma F G g) (dlogGenerable g hg) M
+    (schnorrSigma_speciallySound F G g) (schnorrSimTranscript F G g)
+    (schnorrSigma_hvzk F G g) adv qBound hQ
+  refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
+  simp only [hardRelationExp, dlogExp]
+  rw [show Pr[= true | ($ᵗ G : ProbComp G) >>= fun pk =>
+        red pk >>= fun sk => pure (decide (sk • g = pk))] =
+      Pr[= true | ((· • g) <$> ($ᵗ F : ProbComp F)) >>= fun pk =>
+        red pk >>= fun sk => pure (decide (sk • g = pk))] from by
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    congr 1; ext pk; congr 1
+    exact (probOutput_map_bijective_uniform_cross F (· • g) hg pk).symm,
+    map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp, pure_bind]
+  exact probOutput_bind_congr' _ true fun x =>
+    probOutput_bind_congr' _ true fun sk => by simp [hg.1.eq_iff]
