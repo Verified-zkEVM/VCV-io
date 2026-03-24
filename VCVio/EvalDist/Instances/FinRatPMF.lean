@@ -31,7 +31,7 @@ instance : HasEvalFinset Raw where
     rw [Finset.mem_coe, _root_.mem_support_iff, Raw.mem_support_iff]
     rw [probOutput_def, HasEvalPMF.evalDist_of_hasEvalPMF_def, SPMF.liftM_apply]
     change mx.prob x ≠ 0 ↔ ((@Raw.toPMF _ (Classical.decEq _) mx) x) ≠ 0
-    simpa [Raw.toPMF_apply, Raw.prob_eq_prob inferInstance (Classical.decEq _) mx x]
+    simp [Raw.toPMF_apply, Raw.prob_eq_prob inferInstance (Classical.decEq _) mx x]
 
 @[simp] lemma finSupport_eq_support [DecidableEq α] (mx : Raw α) :
     finSupport mx = mx.support := rfl

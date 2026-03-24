@@ -218,7 +218,7 @@ protected def uniformList (l : List α) (hl : l ≠ []) : Raw α :=
       intro hlen
       exact hl (List.eq_nil_iff_length_eq_zero.2 hlen)
     have hmap : List.map Prod.snd (List.map (fun a => (a, w)) l) = List.replicate l.length w := by
-      simpa [Function.comp_def] using (List.map_const' l w)
+      simp [Function.comp_def]
     rw [show (((l.map (fun a => (a, w))).toArray.toList.map Prod.snd).sum) =
         (List.map Prod.snd (List.map (fun a => (a, w)) l)).sum by rw [List.toList_toArray],
       hmap]
@@ -229,7 +229,7 @@ protected def uniform [FinEnum α] [Inhabited α] : Raw α :=
   Raw.uniformList (FinEnum.toList α) <| by
     intro hnil
     have hmem : default ∈ FinEnum.toList α := FinEnum.mem_toList default
-    simpa [hnil] using hmem
+    simp [hnil] at hmem
 
 /-- Fair coin. -/
 protected def coin : Raw Bool :=
@@ -351,7 +351,7 @@ private lemma probOfList_map_const_eq_length_filter [DecidableEq α]
             unfold probOfList
             simp]
       rw [ih]
-      simpa [add_mul, add_comm]
+      simp [add_mul, add_comm]
     · rw [show probOfList (List.map (fun b => (b, w)) (a :: tl)) x =
           probOfList (List.map (fun b => (b, w)) tl) x by
             unfold probOfList
@@ -381,7 +381,7 @@ private lemma filter_eq_singleton_of_nodup [DecidableEq α] {l : List α} (hnd :
         cases hx with
         | head => exact False.elim (hax rfl)
         | tail _ hx' => exact hx'
-      simp [List.filter_cons, decide_eq_true_eq, hax]
+      simp [hax]
       exact ih hndtl hx'
 
 /-- Point probabilities for `uniformList` on a duplicate-free list. -/
@@ -423,7 +423,7 @@ lemma support_uniformList_of_nodup [DecidableEq α] {l : List α} (hl : l ≠ []
       (by
         intro hnil
         have hmem : default ∈ FinEnum.toList α := FinEnum.mem_toList default
-        simpa [hnil] using hmem)
+        simp [hnil] at hmem)
       FinEnum.nodup_toList
       x
 
@@ -441,7 +441,7 @@ lemma support_uniformList_of_nodup [DecidableEq α] {l : List α} (hl : l ≠ []
           = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := α)) x := by
               exact Raw.prob_eq_prob inferInstance (FinEnum.decEq) (Raw.uniform (α := α)) x
       _ = (Fintype.card α : ℚ≥0)⁻¹ := prob_uniform (α := α) x
-  simpa [hprob] using inv_ne_zero hcard
+  simp [hprob]
 
 /-- Point probabilities of `Raw.coin`. -/
 @[simp] lemma prob_coin (b : Bool) : Raw.coin.prob b = 2⁻¹ := by
@@ -519,8 +519,7 @@ private lemma list_sum_prob_mul_eq [DecidableEq α] (l : List (α × ℚ≥0)) (
             (insert hd.1 s).sum (fun x => (if hd.1 = x then hd.2 else 0) * w x)
                 = ∑ x ∈ insert hd.1 s, if hd.1 = x then hd.2 * w x else 0 := by
                     simp_rw [ite_mul, zero_mul]
-            _ = hd.2 * w hd.1 := by
-              simpa using (Finset.sum_ite_eq (insert hd.1 s) hd.1 fun x => hd.2 * w x)
+            _ = hd.2 * w hd.1 := by simp
         · by_cases hm : hd.1 ∈ s
           · rw [Finset.insert_eq_of_mem hm]
             exact ih
@@ -537,7 +536,7 @@ private lemma probOfList_bind_eq_sum [DecidableEq α] [DecidableEq β]
   | nil => simp [probOfList]
   | cons hd tl ih =>
     rw [List.flatMap_cons, probOfList_append, ih, probOfList_map_mul]
-    simp [Raw.prob, Raw.toList, add_comm, add_left_comm, add_assoc]
+    simp [Raw.prob, Raw.toList]
 
 @[simp] lemma prob_bind [DecidableEq α] [DecidableEq β] (m : Raw α) (f : α → Raw β) (y : β) :
     (m >>= f).prob y = m.support.sum (fun a => m.prob a * (f a).prob y) := by
@@ -606,12 +605,12 @@ private lemma getD_foldl_addWeight_eq_probOfList [DecidableEq α] [BEq α] [Hash
     rw [List.foldl_cons, ih]
     unfold addWeight
     by_cases h : hd.1 = x
-    · have hbeq : (hd.1 == x) = true := by simpa [h]
+    · have hbeq : (hd.1 == x) = true := by simp [h]
       rw [Std.HashMap.getD_insert]
-      simp [probOfList, List.filter_cons, h, hbeq, add_assoc, add_left_comm, add_comm]
-    · have hbeq : (hd.1 == x) = false := by simpa [h]
+      simp [probOfList, h, add_assoc, add_left_comm, add_comm]
+    · have hbeq : (hd.1 == x) = false := by simp [h]
       rw [Std.HashMap.getD_insert]
-      simp [probOfList, List.filter_cons, h, hbeq, add_assoc, add_left_comm, add_comm]
+      simp [probOfList, h, hbeq]
 
 private lemma getD_accumulateWeights_eq_prob [DecidableEq α] [BEq α] [Hashable α]
     [LawfulBEq α] [LawfulHashable α] (xs : Array (α × ℚ≥0)) (x : α) :
@@ -625,7 +624,7 @@ private lemma pairwise_ne_keys_toList [BEq α] [Hashable α] [LawfulBEq α] [Law
     m.toList.Pairwise (fun a b => a.1 ≠ b.1) := by
   refine (Std.HashMap.distinct_keys_toList (m := m)).imp ?_
   intro a b hab hEq
-  simpa [hEq] using hab
+  simp [hEq] at hab
 
 private lemma probOfList_eq_find?_getD [DecidableEq α] [BEq α] [LawfulBEq α]
     (l : List (α × ℚ≥0)) (x : α)
@@ -643,9 +642,9 @@ private lemma probOfList_eq_find?_getD [DecidableEq α] [BEq α] [LawfulBEq α]
         simp only [decide_eq_true_eq]
         intro hb'
         exact ha _ hb (h.trans hb'.symm)
-      have hbeq : (a.1 == x) = true := by simpa [h]
-      simpa [probOfList, h, hbeq, hnil]
-    · have hbeq : (a.1 == x) = false := by simpa [h]
+      have hbeq : (a.1 == x) = true := by simp [h]
+      simp [probOfList, h, hnil]
+    · have hbeq : (a.1 == x) = false := by simp [h]
       simpa [probOfList, h, hbeq] using ih hpair
 
 private lemma probOfList_toList_eq_getD [DecidableEq α] [BEq α] [Hashable α]
@@ -657,19 +656,19 @@ private lemma probOfList_toList_eq_getD [DecidableEq α] [BEq α] [Hashable α]
   | none =>
     have hnot : x ∉ m := by
       rw [Std.HashMap.mem_iff_isSome_getElem?]
-      simpa [hopt]
+      simp [hopt]
     have hfind : m.toList.find? (fun a => a.1 == x) = none := by
       exact (Std.HashMap.find?_toList_eq_none_iff_not_mem (m := m) (k := x)).2 hnot
-    simp [hopt, hfind]
+    simp [hfind]
   | some q =>
     have hxmem : x ∈ m := by
       rw [Std.HashMap.mem_iff_isSome_getElem?]
-      simpa [hopt]
+      simp [hopt]
     have hkey : m.getKey? x = some x := Std.HashMap.getKey?_eq_some (m := m) hxmem
     have hfind : m.toList.find? (fun a => a.1 == x) = some (x, q) := by
       exact (Std.HashMap.find?_toList_eq_some_iff_getKey?_eq_some_and_getElem?_eq_some
         (m := m) (k := x) (k' := x) (v := q)).2 ⟨hkey, hopt⟩
-    simp [hopt, hfind]
+    simp [hfind]
 
 def normalizeMap [BEq α] [Hashable α] [LawfulBEq α] [LawfulHashable α] (p : Raw α) :
     Std.HashMap α ℚ≥0 :=
@@ -687,7 +686,7 @@ private lemma probOfNormalizeMap_eq_prob [DecidableEq α] [BEq α] [Hashable α]
   cases hopt : (accumulateWeights p.data)[x]? with
   | none =>
     simp [hopt] at hacc
-    simpa [hopt, hacc]
+    simp [hacc]
   | some q =>
     have hacc' : q = p.prob x := by simpa [hopt] using hacc
     by_cases hq : q = 0
@@ -715,7 +714,7 @@ private lemma snd_ne_zero_of_mem_normalizeMap_toList [BEq α] [Hashable α]
     by_cases hq : q = 0
     · simp [hacc, hq] at hsome
       exact False.elim (hsome.2 hsome.1.symm)
-    · simp [hacc, hq] at hsome
+    · simp [hacc] at hsome
       exact hsome.2
 
 private lemma normalizeMap_keys_eq_support [DecidableEq α] [BEq α] [Hashable α]
@@ -1092,9 +1091,8 @@ noncomputable instance : LawfulMonad FinRatPMF := LawfulMonad.mk'
             exact bind_pure_comp (m := PMF) f (toPMF x)
       _ = toPMF (f <$> x) := by
             rw [show f <$> x = x >>= fun a => pure (f a) by rfl, toPMF_bind]
-            simp [toPMF_pure]
-            change f <$> toPMF x = toPMF x >>= fun a => PMF.pure (f a)
-            exact (bind_pure_comp (m := PMF) f (toPMF x)).symm)
+            simp [map_eq_bind_pure_comp]
+            rfl)
 
 instance instDecidableSameDist [DecidableEq α] (p q : Raw α) : Decidable (SameDist p q) := by
   let s := p.support ∪ q.support
@@ -1125,6 +1123,6 @@ instance [DecidableEq α] : BEq (Raw α) where
 @[simp] lemma beq_iff_sameDist [DecidableEq α] (p q : Raw α) :
     (p == q) = true ↔ SameDist p q := by
   show decide (SameDist p q) = true ↔ SameDist p q
-  simpa using (decide_eq_true_eq (p := SameDist p q))
+  simp
 
 end FinRatPMF
