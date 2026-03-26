@@ -9,7 +9,8 @@ package VCVio where
     ⟨`autoImplicit, false⟩,
     ⟨`relaxedAutoImplicit, false⟩,
     ⟨`weak.linter.mathlibStandardSet, true⟩,
-    ⟨`weak.linter.style.whitespace, false⟩ -- causes too many false positives with notation]
+    ⟨`linter.modulesUpperCamelCase, false⟩, -- not good with a lot of common crypto abbreviations
+    ⟨`weak.linter.style.whitespace, false⟩ -- causes too many false positives with notation
   ]
 
 require "leanprover-community" / "mathlib" @ git "v4.28.0"
