@@ -216,9 +216,8 @@ def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) : 
 /-- Any finitely enumerable type can be sampled uniformly using the underlying equivalence. -/
 instance FinEnum.SampleableType (α : Type)
     [h : FinEnum α] [Nonempty α] : SampleableType α := by
-  convert SampleableType.ofEquiv h.equiv.symm
   have : NeZero (card α) := NeZero.mk FinEnum.card_ne_zero
-  infer_instance
+  exact SampleableType.ofEquiv h.equiv.symm
 
 instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
   card := n
