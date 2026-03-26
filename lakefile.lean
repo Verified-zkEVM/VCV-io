@@ -9,7 +9,7 @@ package VCVio where
     ⟨`autoImplicit, false⟩,
     ⟨`relaxedAutoImplicit, false⟩,
     ⟨`weak.linter.mathlibStandardSet, true⟩,
-    ⟨`linter.modulesUpperCamelCase, false⟩, -- not good with a lot of common crypto abbreviations
+    ⟨`weak.linter.modulesUpperCamelCase, false⟩, -- not good with a lot of common crypto abbreviations
     ⟨`weak.linter.style.whitespace, false⟩ -- causes too many false positives with notation
   ]
 
