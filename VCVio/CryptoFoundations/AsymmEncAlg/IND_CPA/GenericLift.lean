@@ -159,9 +159,6 @@ private lemma IND_CPA_hybridLR_counted_run'_evalDist_eq_above
   simp only [StateT.run', evalDist_map]
   exact congrArg (fun d => Prod.fst <$> d) hrun
 
--- @[simp]
--- lemma liftM
-
 /-- Planned semantic bridge: resuming the paused prefix simulation with the chosen branch should
 match the corresponding counted LR hybrid on the same sample space. This is the core local
 decomposition lemma needed for the generic step-adversary proof. -/
