@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import Lean
-import VCVio.ProgramLogic.Tactics.Common.Core
+import VCVio.ProgramLogic.Tactics.Common.SpecIR
 
 /-!
 # VCSpec Registry
@@ -17,21 +17,19 @@ open Lean Elab Meta
 
 namespace OracleComp.ProgramLogic
 
-inductive VCSpecKind where
-  | unaryTriple
-  | unaryWP
-  | relTriple
-  | relWP
-  | eRelTriple
-  deriving Inhabited, BEq, Repr
-
 structure VCSpecEntry where
   decl : Name
-  kind : VCSpecKind
+  spec : NormalizedVCSpec
   deriving Inhabited, BEq, Repr
 
+def VCSpecEntry.kind (entry : VCSpecEntry) : VCSpecKind :=
+  entry.spec.kind
+
+def VCSpecEntry.lookupKey (entry : VCSpecEntry) : VCSpecLookupKey :=
+  entry.spec.lookupKey
+
 structure VCSpecRegistry where
-  all : List VCSpecEntry := []
+  all : Array VCSpecEntry := #[]
   unary : NameMap (Array VCSpecEntry) := {}
   relational : NameMap (NameMap (Array VCSpecEntry)) := {}
   deriving Inhabited
@@ -55,50 +53,16 @@ private def VCSpecRegistry.addRelational
   { registry with
       relational := registry.relational.insert leftHead (inner.insert rightHead (prev.push entry)) }
 
-private def headConstNameOrError (attrName : Name) (kindMsg : String) (comp : Expr) :
-    MetaM Name := do
-  let comp ← whnfReducible (← instantiateMVars comp)
-  let some head := headConstName? comp
-    | throwError
-        m!"@[{attrName}] only supports {kindMsg} with a constant head symbol, got:{indentExpr comp}"
-  return head
-
-private def relationalHeadsOrError (oa ob : Expr) : MetaM (Name × Name) := do
-  let leftHead ← headConstNameOrError `vcspec "relational left computations" oa
-  let rightHead ← headConstNameOrError `vcspec "relational right computations" ob
-  return (leftHead, rightHead)
-
-private def detectVCSpecShape (declTy : Expr) : MetaM (VCSpecKind × Sum Name (Name × Name)) := do
-  let (_, _, targetTy) ← withReducible <| forallMetaTelescopeReducing declTy
-  if let some comp := tripleGoalComp? targetTy then
-    return (.unaryTriple, .inl (← headConstNameOrError `vcspec "unary computations" comp))
-  if let some comp := wpGoalComp? targetTy then
-    return (.unaryWP, .inl (← headConstNameOrError `vcspec "unary computations" comp))
-  if let some (oa, ob, _) := relTripleGoalParts? targetTy then
-    return (.relTriple, .inr (← relationalHeadsOrError oa ob))
-  if let some (oa, ob, _) := relWPGoalParts? targetTy then
-    return (.relWP, .inr (← relationalHeadsOrError oa ob))
-  if let some (_, oa, ob, _) := eRelTripleGoalParts? targetTy then
-    return (.eRelTriple, .inr (← relationalHeadsOrError oa ob))
-  throwError
-    m!"@[vcspec] expects a theorem whose target is one of:\n\
-    - a unary `Triple`\n\
-    - a unary raw `wp` goal\n\
-    - a relational `RelTriple`\n\
-    - a relational raw `RelWP`\n\
-    - an `eRelTriple`\n\
-    got:{indentExpr declTy}"
-
 initialize vcSpecRegistry :
     SimpleScopedEnvExtension
-      (VCSpecEntry × Sum Name (Name × Name))
+      VCSpecEntry
       VCSpecRegistry ←
   registerSimpleScopedEnvExtension {
-    addEntry := fun registry (entry, key) =>
-      let registry := { registry with all := entry :: registry.all }
-      match key with
-      | .inl head => registry.addUnary head entry
-      | .inr (leftHead, rightHead) => registry.addRelational leftHead rightHead entry
+    addEntry := fun registry entry =>
+      let registry := { registry with all := registry.all.push entry }
+      match entry.lookupKey with
+      | .unary head => registry.addUnary head entry
+      | .relational leftHead rightHead => registry.addRelational leftHead rightHead entry
     initial := {}
   }
 
@@ -107,8 +71,8 @@ initialize registerBuiltinAttribute {
   descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen lookup."
   add := fun decl _ kind => MetaM.run' do
     let declTy := (← getConstInfo decl).type
-    let (specKind, key) ← detectVCSpecShape declTy
-    vcSpecRegistry.add ({ decl, kind := specKind }, key) kind
+    let spec ← normalizeVCSpecTarget `vcspec declTy
+    vcSpecRegistry.add { decl, spec } kind
 }
 
 private def getUnaryEntriesForHead (head : Name) : CoreM (Array VCSpecEntry) := do
@@ -148,9 +112,15 @@ def getRegisteredRelationalVCSpecTheorems (oa ob : Expr) : MetaM (Array Name) :=
 
 def getVCSpecEntriesOfKind (kind : VCSpecKind) : CoreM (Array VCSpecEntry) := do
   let registry := vcSpecRegistry.getState (← getEnv)
-  return (registry.all.filter (·.kind == kind)).toArray
+  return registry.all.filter (·.kind == kind)
 
 def getVCSpecTheoremsOfKind (kind : VCSpecKind) : CoreM (Array Name) := do
   return (← getVCSpecEntriesOfKind kind).map (·.decl)
+
+def getNormalizedUnaryVCSpecs (comp : Expr) : MetaM (Array NormalizedVCSpec) := do
+  return (← getRegisteredUnaryVCSpecEntries comp).map (·.spec)
+
+def getNormalizedRelationalVCSpecs (oa ob : Expr) : MetaM (Array NormalizedVCSpec) := do
+  return (← getRegisteredRelationalVCSpecEntries oa ob).map (·.spec)
 
 end OracleComp.ProgramLogic
