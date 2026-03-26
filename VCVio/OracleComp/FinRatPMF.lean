@@ -132,13 +132,13 @@ def twoCoinQueries : OracleComp coinSpec Nat := do
   let b2 <- OracleComp.coin
   pure (cond b1 1 0 + cond b2 1 0)
 
-#eval FinRatPMF.Raw.coin
-#eval xorTwoCoins
-#eval xorTwoCoins.normalize
-#eval threeCoinCount.normalize
-#eval! simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries
-#eval! (simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize
-#eval! (((simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize.prob 1 : ℚ≥0) : ℚ)
+-- #eval FinRatPMF.Raw.coin
+-- #eval xorTwoCoins
+-- #eval xorTwoCoins.normalize
+-- #eval threeCoinCount.normalize
+-- #eval! simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries
+-- #eval! (simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize
+-- #eval! (((simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize.prob 1 : ℚ≥0) : ℚ)
 
 end Demo
 end FinRatPMF

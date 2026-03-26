@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
+import VCVio.EvalDist.TVDist
 
 /-!
 # PRG from PRF
@@ -19,9 +20,6 @@ The proof outline follows the standard switching argument:
 2. Show that, except when the state chain repeats, the random-function world is
    identical to the ideal PRG world of independent uniform outputs.
 3. Bound the remaining gap by the probability of a state collision.
-
-We set up the construction and the reduction; the proof bodies remain `sorry`
-for now.
 -/
 
 set_option autoImplicit false
@@ -36,20 +34,12 @@ variable [Inhabited K] [Fintype K] [SampleableType K]
 variable [Inhabited S] [Fintype S] [DecidableEq S] [SampleableType S]
 variable [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O]
 
-instance instSampleableTypeListVector (n : ℕ) : SampleableType (List.Vector O n) := by
-  let e : (Fin n → O) ≃ List.Vector O n :=
+instance instSampleableTypeListVector (n : ℕ) : SampleableType (List.Vector O n) :=
+  SampleableType.ofEquiv
     { toFun := List.Vector.ofFn
       invFun := fun xs i => xs.get i
-      left_inv := by
-        intro f
-        funext i
-        simp
-      right_inv := by
-        intro xs
-        apply List.Vector.ext
-        intro i
-        simp }
-  exact SampleableType.ofEquiv e
+      left_inv := fun f => funext fun i => by simp
+      right_inv := fun xs => List.Vector.ext fun i => by simp }
 
 /-- Deterministically unroll `n` rounds of a state transition/output function. -/
 def streamOutputs (step : S → S × O) : (n : ℕ) → S → List.Vector O n
@@ -113,6 +103,44 @@ def idealCollisionExp (n : ℕ) : ProbComp Bool := do
 noncomputable def collisionProb (n : ℕ) : ℝ :=
   (Pr[= true | idealCollisionExp (S := S) (O := O) n]).toReal
 
+set_option linter.unusedSectionVars false in
+/-- Under the real PRF query implementation, querying the oracle `n` times produces the
+same outputs as the deterministic `streamOutputs`. -/
+private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
+    simulateQ (prfRealQueryImpl prf k) (oracleOutputs n s) =
+      (pure (streamOutputs (prf.eval k) n s) : ProbComp _) := by
+  induction n generalizing s with
+  | zero => simp [oracleOutputs, streamOutputs]
+  | succ n ih =>
+    simp only [oracleOutputs, streamOutputs, simulateQ_bind, simulateQ_query,
+      OracleQuery.cont_query, id_map, OracleQuery.input_query]
+    show prfRealQueryImpl prf k (Sum.inr s) >>= _ = _
+    simp only [prfRealQueryImpl, QueryImpl.add_apply_inr, pure_bind, simulateQ_bind,
+      simulateQ_pure]
+    change (do let x ← simulateQ (prfRealQueryImpl prf k)
+                  (oracleOutputs n (prf.eval k s).1)
+               pure ((prf.eval k s).2 ::ᵥ x)) = _
+    rw [ih]; simp
+
+/-- Applying the real PRF query implementation to the full reduction body simplifies to
+sampling a seed and running the adversary on deterministic output. -/
+private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
+    (adv : PRGAdversary (List.Vector O n)) :
+    simulateQ (prf.prfRealQueryImpl k)
+      (show OracleComp (unifSpec + (S →ₒ S × O)) Bool from do
+        let seed ← liftComp ($ᵗ S) (unifSpec + ofFn fun _ => S × O)
+        let outputs ← oracleOutputs n seed
+        liftComp (adv outputs) (unifSpec + ofFn fun _ => S × O)) =
+    (do let s ← $ᵗ S; adv (streamOutputs (prf.eval k) n s)) := by
+  simp only [simulateQ_bind]
+  have h1 : simulateQ (prf.prfRealQueryImpl k)
+      (liftComp ($ᵗ S) (unifSpec + ofFn fun _ => S × O)) = ($ᵗ S : ProbComp S) := by
+    simp only [prfRealQueryImpl]; rw [QueryImpl.simulateQ_add_liftComp_left]
+    exact simulateQ_ofLift_eq_self _
+  rw [h1]; congr 1; funext s
+  rw [simulateQ_prfReal_oracleOutputs, pure_bind, prfRealQueryImpl,
+    QueryImpl.simulateQ_add_liftComp_left]; exact simulateQ_ofLift_eq_self _
+
 /-- In the real world, the stream PRG experiment has the same output distribution as
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
@@ -121,10 +149,32 @@ theorem prgRealExp_eq_prfRealExp
     (adv : PRGAdversary (List.Vector O n)) :
     evalDist (PRGScheme.prgRealExp (streamPRG prf n) adv) =
       evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
-  sorry
+  simp only [PRGScheme.prgRealExp, PRFScheme.prfRealExp, prfReduction, streamPRG]
+  simp_rw [simulateQ_prfReal_reduction]
+  show evalDist ((·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
+    fun ks => adv (streamOutputs (prf.eval ks.1) n ks.2)) = _
+  simp only [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
+  rw [evalDist_bind, evalDist_bind, hkey]
 
-/-- In the ideal world, the reduction adversary only differs from an ideal PRG adversary
-when the iterated state chain queries the same state twice. -/
+/-- The gap between the ideal PRF and ideal PRG experiments is bounded by the
+collision probability. This follows from the fundamental lemma of game playing:
+when a lazy random function never receives the same input twice, its outputs are
+independent uniform — matching the ideal PRG distribution exactly. The bound
+comes from the probability that the state chain revisits some state.
+
+*Proof outline (switching argument):*
+1. Factor both experiments as: sample inputs to `adv`, then run `adv`.
+2. In the ideal PRF world, the inputs come from a random-oracle chain.
+3. In the ideal PRG world, the inputs are i.i.d. uniform.
+4. Conditioned on no state collision, the random-oracle chain produces
+   independent uniform outputs, so the two input distributions coincide.
+5. By the "identical until bad" lemma (`tvDist_simulateQ_le_probEvent_bad`),
+   the TV distance between the two input distributions is at most `Pr[collision]`.
+6. By the data-processing inequality, running `adv` cannot increase the gap.
+
+Full formalization requires coupling the random-oracle chain with independent
+uniform outputs and instantiating the switching-lemma infrastructure for this
+specific oracle. -/
 theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
     |(Pr[= true | PRFScheme.prfIdealExp (prfReduction (S := S) (O := O) n adv)]).toReal -
       (Pr[= true | PRGScheme.prgIdealExp adv]).toReal| ≤
@@ -140,7 +190,19 @@ theorem security
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +
       collisionProb (S := S) (O := O) n := by
-  sorry
+  unfold PRGScheme.prgAdvantage PRFScheme.prfAdvantage
+  have hreal : (Pr[= true | PRGScheme.prgRealExp (streamPRG prf n) adv]).toReal =
+      (Pr[= true | PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)]).toReal :=
+    congrArg ENNReal.toReal (probOutput_congr rfl (prgRealExp_eq_prfRealExp hkey adv))
+  rw [hreal]
+  set a := (Pr[= true | PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)]).toReal
+  set b := (Pr[= true | PRFScheme.prfIdealExp (prfReduction (S := S) (O := O) n adv)]).toReal
+  set c := (Pr[= true | PRGScheme.prgIdealExp adv]).toReal
+  have hgap : |b - c| ≤ collisionProb (S := S) (O := O) n :=
+    prfIdealGap_le_collisionProb adv
+  calc |a - c| = |(a - b) + (b - c)| := by ring_nf
+    _ ≤ |a - b| + |b - c| := abs_add_le _ _
+    _ ≤ |a - b| + collisionProb (S := S) (O := O) n := by linarith
 
 end streamPRG
 
