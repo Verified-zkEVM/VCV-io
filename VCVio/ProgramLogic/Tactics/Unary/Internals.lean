@@ -89,17 +89,8 @@ private def tryApplyTripleHyp : TacticM Bool := withMainContext do
       return true
     if hypType.isForall then
       let saved ← saveState
-      if ← tryEvalTacticSyntax (← `(tactic| apply $(mkIdent ldecl.userName))) then
-        let remaining ← getGoals
-        let mut allClosed := true
-        for g in remaining do
-          setGoals [g]
-          unless ← tryEvalTacticSyntax (← `(tactic| assumption)) do
-            allClosed := false
-            break
-        if allClosed then
-          setGoals []
-          return true
+      if ← tryEvalTacticSyntax (← `(tactic| apply $(mkIdent ldecl.userName) <;> assumption)) then
+        return true
       saved.restore
   return false
 

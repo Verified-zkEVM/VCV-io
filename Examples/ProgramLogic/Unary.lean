@@ -394,12 +394,12 @@ example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
 /-! ### `vcgen using cut` and `vcgen inv I` driver variants -/
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β}
-    {g : β → OracleComp spec γ}
+    {g : β → OracleComp spec γ} {pre : ℝ≥0∞}
     {cut : α → ℝ≥0∞} {cut2 : β → ℝ≥0∞} {post : γ → ℝ≥0∞}
-    (hoa : ⦃1⦄ oa ⦃cut⦄)
+    (hoa : ⦃pre⦄ oa ⦃cut⦄)
     (hf : ∀ x, ⦃cut x⦄ f x ⦃cut2⦄)
     (hg : ∀ y, ⦃cut2 y⦄ g y ⦃post⦄) :
-    ⦃1⦄ (do let x ← oa; let y ← f x; g y) ⦃post⦄ := by
+    ⦃pre⦄ (do let x ← oa; let y ← f x; g y) ⦃post⦄ := by
   vcstep using cut
   · exact hoa
   · intro x
