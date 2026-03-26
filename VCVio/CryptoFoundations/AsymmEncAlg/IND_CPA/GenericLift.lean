@@ -192,38 +192,6 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
           apply evalDist_ext
           intro x
           rw [IND_CPA_stepPrefix_query_inl]
-          have hleft :
-              Pr[= x | do
-                let __discr ←
-                  (do
-                    let u ← liftM (query (spec := unifSpec) tu)
-                    IND_CPA_stepPrefix (encAlg' := encAlg') pk k (oa u)).run st
-                match __discr.1 with
-                | .done a => pure a
-                | .paused mm cont =>
-                    let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
-                    (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run'
-                      (QueryCache.cacheQuery __discr.2.1 mm c, __discr.2.2 + 1)] =
-              Pr[= x | do
-                let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
-                let __discr ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k (oa u)).run st
-                match __discr.1 with
-                | .done a => pure a
-                | .paused mm cont =>
-                    let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
-                    (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run'
-                      (QueryCache.cacheQuery __discr.2.1 mm c, __discr.2.2 + 1)] := by
-            change Pr[= x | do
-              let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
-              let __discr ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k (oa u)).run st
-              match __discr.1 with
-              | .done a => pure a
-              | .paused mm cont =>
-                  let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
-                  (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run'
-                    (QueryCache.cacheQuery __discr.2.1 mm c, __discr.2.2 + 1)] = _
-            rfl
-          rw [hleft]
           have hquery :
               (simulateQ
                 (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))

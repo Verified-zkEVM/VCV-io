@@ -6,7 +6,9 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.BitVec
 import VCVio.EvalDist.Bool
+import VCVio.EvalDist.Prod
 import Init.Data.UInt.Lemmas
+import Mathlib.Data.FinEnum
 
 /-!
 # Uniform Selection Over a Type
@@ -52,6 +54,10 @@ lemma probOutput_uniformSample [Fintype α] (x : α) :
   simp_rw [this, Finset.mul_sum, mul_one]
   rw [← sum_probOutput_eq_one (mx := $ᵗ α) (by aesop)]
   exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
+
+@[grind .]
+lemma probOutput_uniformSample_inj (x y : α) : Pr[= x | $ᵗ α] = Pr[= y | $ᵗ α] :=
+  SampleableType.probOutput_selectElem_eq _ _
 
 lemma probOutput_map_bijective_uniformSample [Fintype α]
     {f : α → α} (hf : Function.Bijective f) (x : α) :
@@ -174,6 +180,16 @@ lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
 
 section instances
 
+def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
+  selectElem := $[0..n]
+  mem_support_selectElem := by simp
+  probOutput_selectElem_eq := by simp
+
+instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) := by
+  cases n with
+  | zero => have := hn.out; contradiction
+  | succ n => exact SampleableType.Fin n
+
 instance (α : Type) [Unique α] : SampleableType α where
   selectElem := return default
   mem_support_selectElem x := Unique.eq_default x ▸ (by simp)
@@ -189,106 +205,72 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
     [SampleableType α] [SampleableType β] : SampleableType (α × β) where
   selectElem := (·, ·) <$> ($ᵗ α) <*> ($ᵗ β)
   mem_support_selectElem x := by simp
-  probOutput_selectElem_eq x y := by
-    classical
-    rcases x with ⟨x₁, x₂⟩
-    rcases y with ⟨y₁, y₂⟩
-    rw [probOutput_seq_map_eq_mul_of_injective2 ($ᵗ α) ($ᵗ β) Prod.mk
-      (fun _ _ _ _ h => by cases h; aesop) x₁ x₂]
-    rw [probOutput_seq_map_eq_mul_of_injective2 ($ᵗ α) ($ᵗ β) Prod.mk
-      (fun _ _ _ _ h => by cases h; aesop) y₁ y₂]
-    simp [probOutput_uniformSample]
-
-/-- Nonempty `Fin` types can be selected from, using implicit casting of `Fin (n - 1 + 1)`. -/
-instance (n : ℕ) : SampleableType (Fin (n + 1)) where
-  selectElem := $[0..n]
-  mem_support_selectElem := by simp
   probOutput_selectElem_eq x y := by simp
 
-/-- Version of `Fin` selection using the `NeZero` typeclass, avoiding the need for `n + 1`. -/
-instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) where
-  selectElem :=
-    (Fin.cast (by
-      simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-        (Nat.succ_pred (NeZero.ne n)))) <$> ($ᵗ (Fin (n - 1 + 1)))
-  mem_support_selectElem x := by
-    have hx : ∃ y : Fin (n - 1 + 1),
-        Fin.cast (by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n))) y = x := by
-      refine ⟨Fin.cast (by
-        simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-          (Nat.succ_pred (NeZero.ne n)).symm) x, ?_⟩
-      simp [Fin.cast_cast
-        (h := by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)).symm)
-        (h' := by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)))
-        (i := x)]
-    simpa [support_map] using hx
-  probOutput_selectElem_eq x y := by
-    have hx : Pr[= x |
-        (Fin.cast (by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)))) <$> ($ᵗ (Fin (n - 1 + 1)))] =
-        Pr[= Fin.cast (by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)).symm) x | $ᵗ (Fin (n - 1 + 1))] := by
-      simpa using
-        (probOutput_map_injective ($ᵗ (Fin (n - 1 + 1)))
-          (Fin.cast_injective (by
-            simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-              (Nat.succ_pred (NeZero.ne n))))
-          (Fin.cast (by
-            simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-              (Nat.succ_pred (NeZero.ne n)).symm) x))
-    have hy : Pr[= y |
-        (Fin.cast (by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)))) <$> ($ᵗ (Fin (n - 1 + 1)))] =
-        Pr[= Fin.cast (by
-          simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-            (Nat.succ_pred (NeZero.ne n)).symm) y | $ᵗ (Fin (n - 1 + 1))] := by
-      simpa using
-        (probOutput_map_injective ($ᵗ (Fin (n - 1 + 1)))
-          (Fin.cast_injective (by
-            simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-              (Nat.succ_pred (NeZero.ne n))))
-          (Fin.cast (by
-            simpa [Nat.pred_eq_sub_one, Nat.succ_eq_add_one] using
-              (Nat.succ_pred (NeZero.ne n)).symm) y))
-    rw [hx, hy]
-    exact SampleableType.probOutput_selectElem_eq _ _
+/-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
+def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) : SampleableType β where
+  selectElem := e <$> ($ᵗ α)
+  mem_support_selectElem := fun x => by simp
+  probOutput_selectElem_eq := fun x y => by grind
 
-/-- Version of `ZMod` selection using the `NeZero` typeclass, matching `Fin n`. -/
-instance (n : ℕ) [hn : NeZero n] : SampleableType (ZMod n) where
-  selectElem := (ZMod.finEquiv n) <$> ($ᵗ Fin n)
-  mem_support_selectElem x := by
-    rw [support_map]
-    refine ⟨(ZMod.finEquiv n).symm x, ?_, by simp⟩
-    simp
-  probOutput_selectElem_eq x y := by
-    calc
-      Pr[= x | (ZMod.finEquiv n) <$> ($ᵗ Fin n)] =
-          Pr[= (ZMod.finEquiv n).symm x | $ᵗ Fin n] := by
-            simpa using
-              (probOutput_map_injective ($ᵗ Fin n) (ZMod.finEquiv n).injective
-                ((ZMod.finEquiv n).symm x))
-      _ = Pr[= (ZMod.finEquiv n).symm y | $ᵗ Fin n] := by
-            exact SampleableType.probOutput_selectElem_eq _ _
-      _ = Pr[= y | (ZMod.finEquiv n) <$> ($ᵗ Fin n)] := by
-            symm
-            simpa using
-              (probOutput_map_injective ($ᵗ Fin n) (ZMod.finEquiv n).injective
-                ((ZMod.finEquiv n).symm y))
+/-- Any finitely enumerable type can be sampled uniformly using the underlying equivalence. -/
+instance FinEnum.SampleableType (α : Type)
+    [h : FinEnum α] [Nonempty α] : SampleableType α := by
+  have : NeZero (FinEnum.card α) := NeZero.mk FinEnum.card_ne_zero
+  exact SampleableType.ofEquiv h.equiv.symm
 
-/-- Choose a random bit-vector by converting a random number between `0` and `2 ^ n`. -/
-instance (n : ℕ) : SampleableType (BitVec n) where
-  selectElem := BitVec.ofFin <$> ($ᵗ Fin (2 ^ n))
-  mem_support_selectElem x := by aesop
-  probOutput_selectElem_eq x y := by grind
+instance (n : ℕ) [NeZero n] : FinEnum (ZMod n) where
+  card := n
+  equiv := (ZMod.finEquiv n).symm.toEquiv
+
+instance (n : ℕ) : FinEnum (BitVec n) where
+  card := 2 ^ n
+  equiv := ⟨BitVec.toFin, BitVec.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum UInt8 where
+  card := 2 ^ 8
+  equiv := ⟨UInt8.toFin, UInt8.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum UInt16 where
+  card := 2 ^ 16
+  equiv := ⟨UInt16.toFin, UInt16.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum UInt32 where
+  card := 2 ^ 32
+  equiv := ⟨UInt32.toFin, UInt32.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum UInt64 where
+  card := 2 ^ 64
+  equiv := ⟨UInt64.toFin, UInt64.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum USize where
+  card := 2 ^ System.Platform.numBits
+  equiv := ⟨USize.toFin, USize.ofFin, fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum Int8 where
+  card := 2 ^ 8
+  equiv := ⟨BitVec.toFin ∘ Int8.toBitVec, Int8.ofBitVec ∘ BitVec.ofFin,
+    fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum Int16 where
+  card := 2 ^ 16
+  equiv := ⟨BitVec.toFin ∘ Int16.toBitVec, Int16.ofBitVec ∘ BitVec.ofFin,
+    fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum Int32 where
+  card := 2 ^ 32
+  equiv := ⟨BitVec.toFin ∘ Int32.toBitVec, Int32.ofBitVec ∘ BitVec.ofFin,
+    fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum Int64 where
+  card := 2 ^ 64
+  equiv := ⟨BitVec.toFin ∘ Int64.toBitVec, Int64.ofBitVec ∘ BitVec.ofFin,
+    fun x => by simp, fun x => by simp⟩
+
+instance : FinEnum ISize where
+  card := 2 ^ System.Platform.numBits
+  equiv := ⟨BitVec.toFin ∘ ISize.toBitVec, ISize.ofBitVec ∘ BitVec.ofFin,
+    fun x => by simp, fun x => by simp⟩
 
 /-- Select a uniform element from `Vector α n` by independently selecting `α` at each index. -/
 instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n) where
@@ -298,99 +280,31 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
   mem_support_selectElem x := by induction n with
   | zero => simp
   | succ m ih =>
-    simp [ih]
-    use x.pop, x.back
-    apply Vector.push_pop_back
+      have : ∃ ys y, Vector.push ys y = x := ⟨x.pop, x.back, Vector.push_pop_back x⟩
+      simpa [ih] using this
   probOutput_selectElem_eq x y := by induction n with
-  | zero =>
-    have : x=y := by
-      apply Vector.ext
-      rintro i hi
-      linarith
-    simp [this]
+  | zero => rw [show x = y by grind]
   | succ m ih =>
-    classical
-    have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by
-      intro xs ys x y hxy
-      rcases Vector.push_eq_push.mp hxy with ⟨hxy', hxs⟩
-      exact ⟨hxs, hxy'⟩
-    rw [← Vector.push_pop_back x, ← Vector.push_pop_back y]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
-      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
-      hpush x.pop x.back]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
-      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
-      hpush y.pop y.back]
-    have hback : Pr[= x.back | $ᵗ α] = Pr[= y.back | $ᵗ α] := by
-      simpa [uniformSample] using
-        (SampleableType.probOutput_selectElem_eq (β := α) x.back y.back)
-    rw [hback]
-    exact congrArg (fun z => z * Pr[= y.back | $ᵗ α]) (ih x.pop y.pop)
+      have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by
+        intro xs ys x y hxy; simp [Vector.push_eq_push.mp hxy]
+      rw [← Vector.push_pop_back x, ← Vector.push_pop_back y,
+        probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush x.pop x.back,
+        probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush y.pop y.back,
+        probOutput_uniformSample_inj, ih x.pop y.pop]
 
-/-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
-def SampleableType.ofEquiv {α β : Type} [DecidableEq α] [DecidableEq β] [SampleableType α]
-    (e : α ≃ β) : SampleableType β where
-  selectElem := e <$> ($ᵗ α)
-  mem_support_selectElem := fun x => by simp [support_map]
-  probOutput_selectElem_eq := fun x y => by
-    calc
-      Pr[= x | e <$> ($ᵗ α)] = Pr[= e.symm x | ($ᵗ α)] := by
-        simpa using probOutput_map_injective ($ᵗ α) e.injective (e.symm x)
-      _ = Pr[= e.symm y | ($ᵗ α)] := by
-        exact SampleableType.probOutput_selectElem_eq (e.symm x) (e.symm y)
-      _ = Pr[= y | e <$> ($ᵗ α)] := by
-        symm
-        simpa using probOutput_map_injective ($ᵗ α) e.injective (e.symm y)
-
-/-- Unsigned machine words inherit uniform sampling from the corresponding
-fixed-width bitvectors. -/
-instance : SampleableType UInt8 :=
-  SampleableType.ofEquiv
-    { toFun := UInt8.ofBitVec
-      invFun := UInt8.toBitVec
-      left_inv := by intro x; simp
-      right_inv := by intro x; simp }
-
-instance : SampleableType UInt16 :=
-  SampleableType.ofEquiv
-    { toFun := UInt16.ofBitVec
-      invFun := UInt16.toBitVec
-      left_inv := by intro x; simp
-      right_inv := by intro x; simp }
-
-instance : SampleableType UInt32 :=
-  SampleableType.ofEquiv
-    { toFun := UInt32.ofBitVec
-      invFun := UInt32.toBitVec
-      left_inv := by intro x; simp
-      right_inv := by intro x; simp }
-
-instance : SampleableType UInt64 :=
-  SampleableType.ofEquiv
-    { toFun := UInt64.ofBitVec
-      invFun := UInt64.toBitVec
-      left_inv := by intro x; simp
-      right_inv := by intro x; simp }
 
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
-instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [DecidableEq α] :
-    SampleableType (Fin n → α) := by
-  letI instVectorFinFuncEquiv: (_root_.Vector α n) ≃ (Fin n → α) :=
+instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
+    SampleableType (Fin n → α) :=
+  SampleableType.ofEquiv
     { toFun := fun v i => v.get i
-      invFun := _root_.Vector.ofFn
-      left_inv := fun v => by
-        ext i
-        simp only [Vector.ofFn, Vector.get, Fin.val_cast, Vector.getElem_toArray, Vector.getElem_mk,
-          Array.getElem_ofFn]
-      right_inv := fun f => by
-        funext i
-        simp only [Vector.get, Vector.ofFn, Fin.val_cast, Array.getElem_ofFn, Fin.eta] }
-  exact SampleableType.ofEquiv (instVectorFinFuncEquiv)
+      invFun := Vector.ofFn
+      left_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get]
+      right_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn] }
 
 /-- Select a uniform element from `Matrix α n` by selecting each row independently. -/
-instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
-    SampleableType (Matrix (Fin n) (Fin m) α) := by
-  simpa [Matrix] using (inferInstance : SampleableType (Fin n → Fin m → α))
+instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (Fin n) (Fin m) α) :=
+  inferInstanceAs (SampleableType (Fin n → Fin m → α))
 
 end instances
 

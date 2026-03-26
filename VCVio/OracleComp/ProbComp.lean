@@ -82,6 +82,19 @@ lemma probEvent_uniformFin (n : ℕ) (p : Fin (n + 1) → Prop) [DecidablePred p
 lemma probFailure_uniformFin (n : ℕ) :
     Pr[⊥ | do $[0..n]] = 0 := by aesop
 
+/-- Nicer induction rule for `ProbComp` that uses monad notation.
+Allows inductive definitions on computations by considering the two cases:
+* `return x` / `pure x` for any `x`
+* `do let u ← $[0..n]; oa u` (with inductive results for `oa u`)
+See `oracleComp_emptySpec_equiv` for an example of using this in a proof.
+If the final result needs to be a `Type` and not a `Prop`, see `OracleComp.construct`. -/
+@[elab_as_elim]
+protected def inductionOn {α} {C : ProbComp α → Prop}
+    (pure : (a : α) → C (pure a))
+    (query_bind : (n : ℕ) → (mx : Fin (n + 1) → ProbComp α) → (∀ m, C (mx m)) → C ($[0..n] >>= mx))
+    (oa : ProbComp α) : C oa :=
+  PFunctor.FreeM.inductionOn pure query_bind oa
+
 end uniformFin
 
 section uniformRange

@@ -990,15 +990,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
           have hcard_ne_top : (↑(Fintype.card (spec₀.Range t)) : ENNReal) ≠ ⊤ := by
             exact ENNReal.natCast_ne_top (n := Fintype.card (spec₀.Range t))
           rw [← mul_assoc, ENNReal.mul_inv_cancel hcard_ne_zero hcard_ne_top, one_mul]
-          have hrun'_eq : ∀ i : spec₀.Range t,
-              (simulateQ seededOracle (mx i)).run' (s'.takeAtIndex t 0) =
-                (fun x ↦ x.1) <$> (simulateQ seededOracle (mx i)).run (s'.takeAtIndex t 0) := by
-            intro i; rfl
-          simp_rw [hrun'_eq]
-          exact (tsum_fintype (L := .unconditional _)
-            (f := fun i : spec₀.Range t =>
-              Pr[= x | (fun x ↦ x.1) <$> (simulateQ seededOracle (mx i)).run
-                (s'.takeAtIndex t 0)]))
+          simp
         · -- Case 2a: t = i₀, k > 0 — both pop some, k decreases
           have hk_pos : 0 < k := Nat.pos_of_ne_zero hk
           simp only [QuerySeed.pop_takeAtIndex_prependValues_self _ _ _ hk_pos]
