@@ -103,6 +103,7 @@ def idealCollisionExp (n : ℕ) : ProbComp Bool := do
 noncomputable def collisionProb (n : ℕ) : ℝ :=
   (Pr[= true | idealCollisionExp (S := S) (O := O) n]).toReal
 
+set_option linter.unusedSectionVars false in
 /-- Under the real PRF query implementation, querying the oracle `n` times produces the
 same outputs as the deterministic `streamOutputs`. -/
 private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :

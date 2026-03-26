@@ -26,6 +26,9 @@ section seq
     support (mf <*> mx) = ⋃ f ∈ support mf, f '' support mx := by
   simp [seq_eq_bind_map]
 
+lemma mem_support_seq_iff [HasEvalSet m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) (y : β) :
+    y ∈ support (mf <*> mx) ↔ ∃ f ∈ support mf, ∃ x ∈ support mx, f x = y := by simp
+
 @[simp] lemma finSupport_seq [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]
     [DecidableEq (α → β)] [DecidableEq α] [DecidableEq β]
     (mf : m (α → β)) (mx : m α) :
@@ -165,11 +168,11 @@ lemma probOutput_seq_map_eq_tsum_ite [HasEvalSPMF m] [DecidableEq γ]
 
 section injective2
 
-lemma probOutput_seq_map_eq_mul_of_injective2 [HasEvalSPMF m] [DecidableEq γ]
+lemma probOutput_seq_map_eq_mul_of_injective2 [HasEvalSPMF m]
     (hf : f.Injective2) (x : α) (y : β) :
     Pr[= f x y | f <$> mx <*> my] = Pr[= x | mx] * Pr[= y | my] := by
   rw [probOutput_seq_map_eq_tsum]
-  simp only [probOutput_pure, mul_ite, mul_one, mul_zero]
+  simp only [probOutput_pure_eq_indicator, Set.indicator, mul_ite, mul_zero]
   refine (tsum_eq_single x fun x' hx' => ?_).trans ?_
   · exact ENNReal.tsum_eq_zero.mpr fun b =>
       if_neg (show f x y ≠ f x' b from fun h' => hx' (hf h').1.symm)
@@ -197,10 +200,9 @@ end injective2
 
 section swap
 
-@[simp]
-lemma probOutput_seq_map_swap [HasEvalSPMF m] [DecidableEq γ] (z : γ) :
+lemma probOutput_seq_map_swap [HasEvalSPMF m]  (z : γ) :
     Pr[= z | Function.swap f <$> my <*> mx] = Pr[= z | f <$> mx <*> my] := by
-  simp only [probOutput_seq_map_eq_tsum_ite, Function.swap]
+  simp only [probOutput_seq_map_eq_tsum, Function.swap]
   rw [ENNReal.tsum_comm]
   refine tsum_congr fun x' => tsum_congr fun y' => ?_
   rw [mul_comm (Pr[= y' | my])]

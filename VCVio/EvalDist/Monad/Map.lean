@@ -190,6 +190,10 @@ lemma probOutput_map_eq_probOutput_apply
     (hl : f (g y) = y) (hr : ∀ y, g (f y) = y) :
     Pr[= y | f <$> mx] = Pr[= g y | mx] := by aesop
 
+@[simp, grind =]
+lemma probOutput_map_equiv {α β : Type u} (e : α ≃ β) (mx : m α) (y : β) :
+    Pr[= y | e <$> mx] = Pr[= e.symm y | mx] := by aesop
+
 end inverse
 
 section injective
@@ -209,6 +213,7 @@ lemma probOutput_map_eq_probOutput_invFunOn [Nonempty α]
   rw [dif_pos hy]
   rw [(Classical.choose_spec hy).2]
 
+@[grind .]
 lemma probOutput_map_injective (mx : m α) {f : α → β} (hf : f.Injective) (x : α) :
     Pr[= f x | f <$> mx] = Pr[= x | mx] := by
   aesop
