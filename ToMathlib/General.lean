@@ -67,13 +67,13 @@ lemma toReal_sub_le_abs_toReal_sub (a b : ℝ≥0∞) :
 end ENNReal
 
 @[simp, grind =]
-lemma fst_map_prod_map {m : Type u → Type v} [Monad m] [LawfulMonad m] {α β γ δ : Type u}
+lemma fst_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}
     (mx : m (α × β)) (f : α → γ) (g : β → δ) :
     Prod.fst <$> Prod.map f g <$> mx = (f ∘ Prod.fst) <$> mx := by
   simp [Functor.map_map]; rfl
 
 @[simp, grind =]
-lemma snd_map_prod_map {m : Type u → Type v} [Monad m] [LawfulMonad m] {α β γ δ : Type u}
+lemma snd_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}
     (mx : m (α × β)) (f : α → γ) (g : β → δ) :
     Prod.snd <$> Prod.map f g <$> mx = (g ∘ Prod.snd) <$> mx := by
   simp [Functor.map_map]; rfl

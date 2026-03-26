@@ -89,7 +89,7 @@ lemma ite_bind (p : Prop) [Decidable p] (oa oa' : OracleComp spec α)
   apply_ite (· >>= ob) p oa oa'
 
 /-- Nicer induction rule for `OracleComp` that uses monad notation.
-Allows inductive definitions on compuations by considering the three cases:
+Allows inductive definitions on computations by considering the two cases:
 * `return x` / `pure x` for any `x`
 * `do let u ← query i t; oa u` (with inductive results for `oa u`)
 See `oracleComp_emptySpec_equiv` for an example of using this in a proof.

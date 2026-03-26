@@ -83,7 +83,7 @@ lemma probFailure_uniformFin (n : ℕ) :
     Pr[⊥ | do $[0..n]] = 0 := by aesop
 
 /-- Nicer induction rule for `ProbComp` that uses monad notation.
-Allows inductive definitions on compuations by considering the three cases:
+Allows inductive definitions on computations by considering the two cases:
 * `return x` / `pure x` for any `x`
 * `do let u ← $[0..n]; oa u` (with inductive results for `oa u`)
 See `oracleComp_emptySpec_equiv` for an example of using this in a proof.

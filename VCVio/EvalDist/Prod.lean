@@ -57,7 +57,7 @@ lemma probEvent_fst_map (mx : m (α × β)) (p : α → Prop) :
 
 /-- NOTE: Added since we don't choose to set the general `probEvent_map` to `simp`. -/
 @[simp low, grind =]
-lemma probEvent_snd (mx : m (α × β)) (p : β → Prop) :
+lemma probEvent_snd_map (mx : m (α × β)) (p : β → Prop) :
     Pr[p | Prod.snd <$> mx] = Pr[fun y => p y.2 | mx] := by grind
 
 omit [LawfulMonad m] in
