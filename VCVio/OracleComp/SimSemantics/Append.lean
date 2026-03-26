@@ -22,7 +22,7 @@ to this definition for greater flexibility. -/
 protected def add (impl₁ : QueryImpl spec₁ m) (impl₂ : QueryImpl spec₂ m) :
     QueryImpl (spec₁ + spec₂) m | .inl t => impl₁ t | .inr t => impl₂ t
 
-/-- Add two `QueryImpl` to get an implementation on the sum of the two `OracleSpec`.-/
+/-- Add two `QueryImpl` to get an implementation on the sum of the two `OracleSpec`. -/
 instance : HAdd (QueryImpl spec₁ m) (QueryImpl spec₂ m) (QueryImpl (spec₁ + spec₂) m) where
   hAdd := QueryImpl.add
 
@@ -59,7 +59,7 @@ private lemma simulateQ_add_liftM_left (t : spec₁'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (OracleQuery.query (spec := spec₁') t) : OracleComp (spec₁' + spec₂') _) =
     impl₁' t := by
-  show simulateQ (impl₁' + impl₂')
+  change simulateQ (impl₁' + impl₂')
     (liftM (liftM (OracleQuery.query (spec := spec₁') t) : OracleQuery (spec₁' + spec₂') _)) = _
   simp [simulateQ_query]
 
@@ -67,7 +67,7 @@ private lemma simulateQ_add_liftM_right (t : spec₂'.Domain) :
     simulateQ (impl₁' + impl₂')
       (liftM (OracleQuery.query (spec := spec₂') t) : OracleComp (spec₁' + spec₂') _) =
     impl₂' t := by
-  show simulateQ (impl₁' + impl₂')
+  change simulateQ (impl₁' + impl₂')
     (liftM (liftM (OracleQuery.query (spec := spec₂') t) : OracleQuery (spec₁' + spec₂') _)) = _
   simp [simulateQ_query]
 

@@ -56,7 +56,7 @@ then `wp` of the simulated computation equals `wp` of the original. -/
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
     (mx : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (liftComp mx superSpec) post = wp mx post := by
-  show @μ _ superSpec _ _ (liftComp mx superSpec >>= fun a => pure (post a)) =
+  change @μ _ superSpec _ _ (liftComp mx superSpec >>= fun a => pure (post a)) =
        μ (mx >>= fun a => pure (post a))
   exact μ_cross_congr_evalDist
     (by simp only [evalDist_bind, evalDist_liftComp, evalDist_pure])

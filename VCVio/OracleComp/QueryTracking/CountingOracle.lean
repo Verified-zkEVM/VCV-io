@@ -104,13 +104,13 @@ lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp s
   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
 @[simp]
-lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type} (oa : OracleComp spec₀ α) :
     Pr[⊥ | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
 @[simp]
-lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) :
     NeverFail (simulateQ (countingOracle (spec := spec₀)) oa).run ↔ NeverFail oa := by
@@ -118,7 +118,7 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι�
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 @[simp]
-lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (p : α → Prop) :
     Pr[fun z => p z.1 | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[p | oa] := by
@@ -126,7 +126,7 @@ lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι�
     ← probEvent_map, fst_map_run_simulateQ]
 
 @[simp]
-lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (countingOracle (spec := spec₀)) oa).run] =

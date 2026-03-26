@@ -57,7 +57,7 @@ end add_left
 
 section add_right
 
-/-- Add additional oracles to the left side of the exiting ones-/
+/-- Add additional oracles to the left side of the exiting ones. -/
 instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
   monadLift | q => .mk (.inr q.input) q.cont
   liftM_map | ⟨t, g⟩ => by simp [liftM, monadLift]

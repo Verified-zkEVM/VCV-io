@@ -221,9 +221,9 @@ lemma support_seq_map_swap [HasEvalSet m] :
     support (Function.swap f <$> my <*> mx) = support (f <$> mx <*> my) := by
   simp only [support_seq_map_eq_image2, Set.image2_swap f]
 
-lemma finSupport_seq_map_swap [HasEvalSet m] [HasEvalFinset m]
-    [DecidableEq α] [DecidableEq β] [DecidableEq γ] :
+lemma finSupport_seq_map_swap [HasEvalSet m] [HasEvalFinset m] [DecidableEq γ] :
     finSupport (Function.swap f <$> my <*> mx) = finSupport (f <$> mx <*> my) := by
+  classical
   simp only [finSupport_seq_map_eq_image2, Finset.image₂_swap f]
 
 end swap

@@ -41,6 +41,8 @@ verification is `g^z = R · pk^c`.
 -/
 
 set_option autoImplicit false
+set_option linter.unusedDecidableInType false
+set_option linter.unusedFintypeInType false
 
 open OracleSpec OracleComp SigmaProtocol
 

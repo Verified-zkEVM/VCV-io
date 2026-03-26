@@ -52,7 +52,7 @@ namespace loggingOracle
 
 
 @[simp]
-lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
+lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
     Pr[⊥ | (WriterT.run
@@ -61,19 +61,19 @@ lemma probFailure_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
   simp only [HasEvalPMF.probFailure_eq_zero]
 
 @[simp]
-lemma fst_map_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
+lemma fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     (oa : OracleComp spec α) :
     Prod.fst <$> (simulateQ (loggingOracle (spec := spec)) oa).run = oa := by
   rw [loggingOracle, QueryImpl.fst_map_run_withLogging, simulateQ_ofLift_eq_self]
 
 @[simp]
-lemma run_simulateQ_bind_fst {spec : OracleSpec.{0,0} ι} {α β : Type}
+lemma run_simulateQ_bind_fst {spec : OracleSpec.{0, 0} ι} {α β : Type}
     (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     ((simulateQ (loggingOracle (spec := spec)) oa).run >>= fun x => ob x.1) = oa >>= ob := by
   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
 @[simp]
-lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0,0} ι} {α : Type}
+lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
     NeverFail (simulateQ (loggingOracle (spec := spec)) oa).run ↔ NeverFail oa := by
@@ -81,7 +81,7 @@ lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0,0} ι} {α : Type}
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 @[simp]
-lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
+lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (p : α → Prop) :
     Pr[fun z => p z.1 | (simulateQ (loggingOracle (spec := spec)) oa).run] = Pr[p | oa] := by
@@ -89,7 +89,7 @@ lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
     ← probEvent_map, fst_map_run_simulateQ]
 
 @[simp]
-lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
+lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (loggingOracle (spec := spec)) oa).run] =
@@ -98,7 +98,7 @@ lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0,0} ι} {α : Type}
 
 end loggingOracle
 
-/-- Add a query log to a computation using a logging oracle.  -/
+/-- Add a query log to a computation using a logging oracle. -/
 @[reducible] def OracleComp.withQueryLog {α} (mx : OracleComp spec α) :
     OracleComp spec (α × QueryLog spec) :=
   WriterT.run (simulateQ (QueryImpl.ofLift spec (OracleComp spec)).withLogging mx)

@@ -214,6 +214,7 @@ private theorem applyMatrix_id (f : Rq) :
   let jFin : Fin ringDegree := ⟨j, hj⟩
   simp [applyMatrix, idMatrix]
 
+set_option linter.style.nativeDecide false
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by

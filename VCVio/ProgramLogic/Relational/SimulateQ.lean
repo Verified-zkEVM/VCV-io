@@ -63,7 +63,8 @@ theorem relTriple_simulateQ_run
       MAlgRelOrdered.relWP_pure, true_and]
     exact hs
   | query_bind t oa ih =>
-    simp [StateT.run_bind]
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind, relTriple_iff_relWP, relWP_iff_couplingPost]
     exact (relTriple_bind (himpl t s₁ s₂ hs) (fun ⟨u₁, s₁'⟩ ⟨u₂, s₂'⟩ ⟨eq_u, hs'⟩ => by
       dsimp at eq_u hs' ⊢; subst eq_u; exact ih u₁ s₁' s₂' hs')) trivial
 
@@ -332,7 +333,7 @@ variable [spec.Fintype] [spec.Inhabited]
 private lemma probOutput_simulateQ_run_eq_zero_of_bad
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_mono : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl t).run s), bad x.2)
     (oa : OracleComp spec α) (s₀ : σ) (h_bad : bad s₀)
@@ -342,19 +343,21 @@ private lemma probOutput_simulateQ_run_eq_zero_of_bad
   | pure a =>
     rw [simulateQ_pure]
     show Pr[= (x, s) | (pure a : StateT σ (OracleComp spec) α).run s₀] = 0
-    simp [Prod.ext_iff]
+    simp only [StateT.run_pure, probOutput_eq_zero_iff, support_pure, Set.mem_singleton_iff,
+      Prod.ext_iff, not_and]
     rintro rfl rfl
     exact hs h_bad
   | query_bind t oa ih =>
-    simp [StateT.run_bind]
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind, probOutput_eq_zero_iff, support_bind, Set.mem_iUnion, exists_prop,
+      Prod.exists, not_exists, not_and]
     intro u s' h_mem
     rw [← probOutput_eq_zero_iff]
     exact ih u s' (h_mono t s₀ h_bad (u, s') h_mem)
 
 private lemma probOutput_simulateQ_run_eq_of_not_bad
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
-    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec))) (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       (impl₁ t).run s = (impl₂ t).run s)
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -374,14 +377,15 @@ private lemma probOutput_simulateQ_run_eq_of_not_bad
     by_cases h_bad : bad s₀
     · rw [probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ _ s₀ h_bad x s hs,
           probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ _ s₀ h_bad x s hs]
-    · simp [StateT.run_bind]
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind]
       rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum, h_agree t s₀ h_bad]
       exact tsum_congr (fun ⟨u, s'⟩ => by congr 1; exact ih u s')
 
 private lemma probEvent_not_bad_eq
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       (impl₁ t).run s = (impl₂ t).run s)
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -391,6 +395,7 @@ private lemma probEvent_not_bad_eq
     (oa : OracleComp spec α) (s₀ : σ) :
     Pr[fun x => ¬bad x.2 | (simulateQ impl₁ oa).run s₀] =
     Pr[fun x => ¬bad x.2 | (simulateQ impl₂ oa).run s₀] := by
+  classical
   rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
   refine tsum_congr (fun ⟨a, s⟩ => ?_)
   split_ifs with h
@@ -401,7 +406,7 @@ private lemma probEvent_not_bad_eq
 private lemma probEvent_bad_eq
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       (impl₁ t).run s = (impl₂ t).run s)
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -443,7 +448,7 @@ bad-to-non-bad transitions in each implementation independently. -/
 theorem tvDist_simulateQ_le_probEvent_bad
     {σ : Type}
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (oa : OracleComp spec α) (s₀ : σ)
     (h_init : ¬bad s₀)
     (h_agree : ∀ (t : spec.Domain) (s : σ), ¬bad s →

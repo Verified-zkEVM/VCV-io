@@ -178,7 +178,7 @@ lemma run_failure [Monoid ω] {α : Type u} : (failure : WriterT ω m α).run = 
 instance [Monoid ω] [LawfulMonad m] : LawfulMonadLift m (WriterT ω m) where
   monadLift_pure x := map_pure (·, 1) x
   monadLift_bind {α β} x y := by
-    show WriterT.mk _ = WriterT.mk _
+    change WriterT.mk _ = WriterT.mk _
     simp [monadLift_def, WriterT.mk]
 
 end fail

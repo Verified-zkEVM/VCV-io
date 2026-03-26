@@ -289,7 +289,7 @@ lemma relTriple_query_bij (t : spec₁.Domain)
   · constructor
     · simp
     · simp only [map_bind, map_pure, evalDist_query]
-      show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+      change f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
         (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _)
       rw [show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
         (liftM (f <$> PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) from by simp]

@@ -436,7 +436,8 @@ section Lemmas
 
 @[ext (iff := false)]
 theorem ext {P Q : PFunctor.{uA, uB}} (h : P.A = Q.A) (h' : ∀ a, P.B a = Q.B (h ▸ a)) : P = Q := by
-  cases P; cases Q; simp at h h' ⊢; subst h; simp_all; funext; exact h' _
+  cases P; cases Q; simp only [mk.injEq] at h h' ⊢; subst h;
+  simp_all only [heq_eq_eq, true_and]; funext; exact h' _
 
 lemma X_eq_linear_pUnit : X = linear PUnit := rfl
 lemma X_eq_purePower_pUnit : X = purePower PUnit := rfl

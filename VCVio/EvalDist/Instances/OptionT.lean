@@ -106,11 +106,12 @@ noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSPMF m] :
   toSPMF := OptionT.mapM' HasEvalSPMF.toSPMF
   support_eq mx := by
     ext x
-    simp [mem_support_iff, OptionT.mapM']
+    simp only [mem_support_iff, OptionT.mapM', SPMF.mem_support_iff, SPMF.bind_apply_eq_tsum, ne_eq,
+      ENNReal.tsum_eq_zero, mul_eq_zero, not_forall, not_or]
     constructor
-    · simp [mem_support_iff_evalDist_apply_ne_zero]
+    · simp only [mem_support_iff_evalDist_apply_ne_zero, ne_eq]
       refine fun h => ⟨some x, by simpa using h⟩
-    · simp [mem_support_iff_evalDist_apply_ne_zero]
+    · simp only [mem_support_iff_evalDist_apply_ne_zero, ne_eq, forall_exists_index, and_imp]
       intro x
       cases x <;> aesop
 
@@ -128,7 +129,7 @@ lemma evalDist_eq (mx : OptionT m α) :
 lemma probOutput_eq (mx : OptionT m α) (x : α) :
     Pr[= x | mx] = Pr[= some x | mx.run] := by
   simp only [probOutput_def]
-  show (OptionT.mapM' HasEvalSPMF.toSPMF mx) x = HasEvalSPMF.toSPMF mx.run (some x)
+  change (OptionT.mapM' HasEvalSPMF.toSPMF mx) x = HasEvalSPMF.toSPMF mx.run (some x)
   rw [show (OptionT.mapM' HasEvalSPMF.toSPMF mx : SPMF α) =
     HasEvalSPMF.toSPMF mx.run >>= fun y =>
       match y with | some a => pure a | none => failure from rfl]

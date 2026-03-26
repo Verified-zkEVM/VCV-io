@@ -57,10 +57,11 @@ lemma generateSeed_zero :
     {seed : QuerySeed spec | ∀ i, (seed i).length = qc i * js.count i} := by
   induction js with
   | nil =>
-    simp; ext seed; simp
+    simp only [generateSeed_nil, support_pure, List.count_nil, mul_zero,
+      List.length_eq_zero_iff]; ext seed; simp only [Set.mem_singleton_iff, Set.mem_setOf_eq]
     constructor
     · intro h; rw [h]; simp
-    · intro h; funext i; have := h i; simp at this; exact this
+    · intro h; funext i; simpa using h i
   | cons j js ih =>
     ext seed
     simp only [generateSeed_cons, Set.mem_setOf_eq]

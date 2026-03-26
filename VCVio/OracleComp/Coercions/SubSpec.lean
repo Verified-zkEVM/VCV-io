@@ -118,7 +118,7 @@ lemma liftComp_query (q : OracleQuery spec α) :
 @[simp]
 lemma liftComp_bind (mx : OracleComp spec α) (ob : α → OracleComp spec β) :
     liftComp (mx >>= ob) superSpec =
-      liftComp mx superSpec >>= λ x ↦ liftComp (ob x) superSpec := by
+      liftComp mx superSpec >>= fun x ↦ liftComp (ob x) superSpec := by
   grind
 
 @[simp]
@@ -224,7 +224,8 @@ instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     rfl
   monadLift_bind mx my := by
     apply OptionT.ext
-    simp [MonadLift.monadLift, OptionT.run_bind, Option.elimM, simulateQ_bind]
+    simp only [MonadLift.monadLift, OptionT.run_bind, Option.elimM, simulateQ_bind, OptionT.mk_bind,
+      OptionT.run_monadLift, monadLift_self, OptionT.run_mk, bind_map_left, Option.elim_some]
     refine bind_congr ?_
     intro x
     cases x <;> simp

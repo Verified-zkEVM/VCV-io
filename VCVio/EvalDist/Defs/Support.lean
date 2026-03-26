@@ -100,7 +100,7 @@ lemma finSupport_eqRec {m} [hm : Monad m] [hms : HasEvalSet m] [hmfs : HasEvalFi
 
 section decidable
 
-/-- Membership in the support of computations in  -/
+/-- Membership in the support of computations in. -/
 protected class HasEvalSet.Decidable (m : Type u → Type v) [Monad m] [HasEvalSet m] where
   mem_support_decidable {α : Type u} (mx : m α) : DecidablePred (· ∈ support mx)
 

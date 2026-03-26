@@ -236,7 +236,7 @@ def single [DecidableEq ι] (i : ι) : QueryCount ι := Function.update 0 i 1
 @[simp]
 lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
     single i ≤ qc ↔ 0 < qc i := by
-  simp [single, Function.update, Pi.hasLe]
+  simp only [Pi.hasLe, single, Function.update, eq_rec_constant, Pi.zero_apply, dite_eq_ite]
   constructor <;> intro h
   · have : 1 ≤ qc i := by simpa using h i
     exact this
@@ -451,7 +451,7 @@ lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
     (h : rest.prependValues xs = seed) :
     xs = (seed i).take n ∧ rest = Function.update seed i ((seed i).drop n) := by
   have hi : xs ++ rest i = seed i := by
-    have := congrArg (· i) h; simp [prependValues] at this; exact this
+    have := congrArg (· i) h; simpa [prependValues] using this
   constructor
   · calc xs = (xs ++ rest i).take xs.length := by simp
       _ = (seed i).take n := by rw [hi, hlen]
@@ -462,8 +462,7 @@ lemma eq_of_prependValues_eq (seed rest : QuerySeed spec)
       have : rest i = (xs ++ rest i).drop xs.length := by simp
       rw [this, hi, hlen]
     · have hj' : rest j = seed j := by
-        have := congrArg (· j) h; simp [prependValues, Function.update_of_ne hj] at this
-        exact this
+        have := congrArg (· j) h; simpa [prependValues, Function.update_of_ne hj] using this
       simp [Function.update_of_ne hj, hj']
 
 lemma eq_of_prependValues_singleton_eq (seed rest : QuerySeed spec)
@@ -538,7 +537,7 @@ lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
   | nil =>
     simp [hsi] at h
   | cons u0 us =>
-    simp [hsi] at h
+    simp only [hsi, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨hu, hrest⟩
     subst hu hrest
     simp
@@ -552,7 +551,7 @@ lemma rest_eq_update_tail_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
   | nil =>
     simp [hsi] at h
   | cons u0 us =>
-    simp [hsi] at h
+    simp only [hsi, Option.some.injEq, Prod.mk.injEq] at h
     rcases h with ⟨hu, hrest⟩
     subst hu hrest
     simp

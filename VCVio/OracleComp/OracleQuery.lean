@@ -20,7 +20,7 @@ defined to be the object type of the corresponding `PFunctor`.
 In particular an element of `OracleQuery spec α` consists of an input value `t : spec.Domain`,
 and a continuation `f : spec.Range t → α` specifying what to do with the result.
 See `OracleQuery.query` for the case when the continuation `f` just returns the query result. -/
-def OracleQuery {ι : Type u} (spec : OracleSpec.{u,v} ι) :
+def OracleQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) :
     Type w → Type (max u v w) :=
   PFunctor.Obj spec.toPFunctor
 
@@ -69,6 +69,11 @@ extensionally equal continuation on the results of the query. -/
 @[ext] lemma ext {α} {q q' : OracleQuery spec α}
     (h : q.input = q'.input) (h' : q.cont ≍ q'.cont) : q = q' := Sigma.ext h h'
 
+/-- Version of `OracleQuery.ext` that avoids using `HEq` when the inputs are the same. -/
+lemma ext' {α} (t : spec.Domain) {cont cont' : spec.Range t → α}
+    (h : cont = cont') : (⟨t, cont⟩ : OracleQuery spec α) = ⟨t, cont'⟩ := by
+  simpa [funext_iff] using h
+
 /-- If an oracle exists and the output type is non-empty then the type of queries is non-empty. -/
 instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) :=
   inferInstanceAs (Inhabited ((t : spec.Domain) × (spec.Range t → α)))
@@ -77,13 +82,12 @@ instance {α} [Inhabited ι] [Inhabited α] : Inhabited (OracleQuery spec α) :=
 instance {α} [h : IsEmpty ι] : IsEmpty (OracleQuery spec α) :=
   inferInstanceAs (IsEmpty ((t : spec.Domain) × (spec.Range t → α)))
 
-/-- If there is a at most one oracle and output, then ther is at most one query.-/
-instance {α} [h : Subsingleton ι] [h' : Subsingleton α] :
-    Subsingleton (OracleQuery spec α) where
-  allEq := fun ⟨t, f⟩ ⟨u, g⟩ => by
-    cases h.allEq t u
-    simp [OracleQuery.ext_iff, funext_iff]
-    refine fun x => h'.allEq (f x) (g x)
+/-- If there is a at most one oracle and output, then ther is at most one query. -/
+instance {α} [h : Subsingleton ι] [h' : Subsingleton α] : Subsingleton (OracleQuery spec α) where
+  allEq := fun ⟨t, cont⟩ ⟨t', cont'⟩ => by
+    cases show t = t' from h.allEq t t'
+    have h' : Subsingleton (spec.Range t → α) := by infer_instance
+    exact OracleQuery.ext' t (h'.allEq cont cont')
 
 /-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
 Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/

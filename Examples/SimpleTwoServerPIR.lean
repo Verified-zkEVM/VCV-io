@@ -38,6 +38,7 @@ Port of EasyCrypt's `PIR.ec`.
 -/
 
 set_option autoImplicit false
+set_option linter.unusedDecidableInType false
 
 open OracleComp OracleSpec ENNReal
 
@@ -125,7 +126,7 @@ private lemma pirQuery_foldl_support
     pirResponse a ss.1 + pirResponse a ss.2 =
       pirResponse a init.1 + pirResponse a init.2 + if i₀ ∈ l then a i₀ else 0 := by
   induction l generalizing init with
-  | nil => simp [List.foldlM] at hss; subst hss; simp
+  | nil => simp only [List.foldlM, support_pure, Set.mem_singleton_iff] at hss; subst hss; simp
   | cons j rest ih =>
     rw [List.foldlM_cons] at hss
     rw [mem_support_bind_iff] at hss
@@ -140,17 +141,20 @@ private lemma pirQuery_foldl_support
     obtain ⟨b, _, hmid⟩ := hmid
     by_cases hj : j = i₀
     · subst hj
-      simp [hnodup.1] at hmid ⊢
+      simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hmid
+      simp only [hnodup.1, ↓reduceIte, add_zero, List.mem_cons, or_false]
       -- mid is either (j :: init.1, init.2) or (init.1, j :: init.2)
-      rcases b with _ | _  <;> simp at hmid <;> subst hmid <;>
-        simp [pirResponse_cons] <;> abel
+      rcases b with _ | _  <;> simp only [Bool.false_eq_true, ↓reduceIte] at hmid
+        <;> subst hmid <;> simp [pirResponse_cons] <;> abel
     · have hij : i₀ ≠ j := Ne.symm hj
       simp only [hj, hij, ↓reduceIte, false_or, List.mem_cons] at hmid ⊢
       rcases b with _ | _
       · -- b = false: mid = init, unchanged
-        simp at hmid; subst hmid; rfl
+        simp only [Bool.false_eq_true, ↓reduceIte, support_pure, Set.mem_singleton_iff] at hmid
+        subst hmid; rfl
       · -- b = true: mid = (j :: init.1, j :: init.2)
-        simp at hmid; subst hmid; simp only [pirResponse_cons]; congr 1
+        simp only [↓reduceIte, support_pure, Set.mem_singleton_iff] at hmid
+        subst hmid; simp only [pirResponse_cons]; congr 1
         have h := hchar (a j)
         calc _ = (a j + a j) + (pirResponse a init.1 + pirResponse a init.2) := by abel
           _ = 0 + _ := by rw [h]
@@ -176,7 +180,7 @@ theorem pir_correct [DecidableEq W]
     rw [support_pure, Set.mem_singleton_iff] at hy
     have h := pirQuery_foldl_support hchar a i₀ (List.finRange N)
       (List.nodup_finRange N) ([], []) ss hss
-    simp [pirResponse] at h
+    simp only [pirResponse, List.foldl_nil, add_zero, List.mem_finRange, ↓reduceIte, zero_add] at h
     exact hy.trans h
   -- All outputs other than a i₀ have probability 0
   have hnot : ∀ y ≠ a i₀, Pr[= y | pirMain a i₀] = 0 :=
@@ -209,8 +213,9 @@ theorem pir_private (i₁ i₂ : Fin N) :
     simp only [ProgramLogic.Relational.EqRel] at hS
     rvcstep using (fun b₁ b₂ => b₁ = b₂)
     · intro b₁ b₂ hb; subst hb
-      cases b₁ <;> simp <;>
-        (split <;> split <;>
+      cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte,
+        ProgramLogic.Relational.relTriple_iff_relWP, ProgramLogic.Relational.relWP_iff_couplingPost]
+        <;> (split <;> split <;>
           apply ProgramLogic.Relational.relTriple_pure_pure <;>
           simp_all [ProgramLogic.Relational.EqRel])
     · exact ProgramLogic.Relational.relTriple_uniformSample_bij

@@ -56,9 +56,8 @@ instance {spec : OracleSpec ι} [h : spec.DecidableEq] (t : spec.Domain) :
 /-- Type-class gadget to enable probability notation for computation over an `OracleSpec`.
 Can be defined for any `spec` with `spec.Range` finite and inhabited, but generally should
 only be instantied for things like `coinSpec` or `unifSpec`.
-dtumad: we should examine if this should be used more strictly in `evalDist` stuff.
-We could require computations without this tag to provide their own `PMF` embedding,
-even if it can be inferred implicitly. -/
+TODO: Examine if this should be used as a requirement in `evalDist` instances.
+Just forces more explicit differentiation of when the semantics should apply. -/
 protected class IsProbSpec (spec : OracleSpec ι) [spec.Inhabited] [spec.Fintype]
 
 section ofFn
@@ -197,21 +196,20 @@ end OracleSpec
 
 /-- Access to a coin flipping oracle. Because of termination rules in Lean this is slightly
 weaker than `unifSpec`, as we have only finitely many coin flips. -/
-@[reducible] def coinSpec : OracleSpec.{0,0} Unit := Unit →ₒ Bool
+@[reducible] def coinSpec : OracleSpec.{0, 0} Unit := Unit →ₒ Bool
 
 section unifSpec
 
 /-- Access to oracles for uniformly selecting from `Fin (n + 1)` for arbitrary `n : ℕ`.
-By adding `1` to the index we avoid selection from the empty type `Fin 0 ≃ empty`.-/
+By adding `1` to the index we avoid selection from the empty type `Fin 0 ≃ empty`. -/
 @[inline, reducible] def unifSpec : OracleSpec ℕ :=
   OracleSpec.ofFn fun n => Fin (n + 1)
 
 end unifSpec
 
 section probSpec
-/-- dt: should or shouldn't we switch to this. Compare to `(· + m) <$> $[0..n]`.
-One question is that we may have empty selection
-Select uniformly from a range (not starting from zero).-/
+/-- NOTE: There isn't really any built in
+Select uniformly from a range (not starting from zero). -/
 @[inline, reducible] def probSpec : OracleSpec (ℕ × ℕ) :=
   OracleSpec.ofFn fun (_n, m) => Fin (m + 1)
 

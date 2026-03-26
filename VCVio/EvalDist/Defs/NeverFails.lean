@@ -57,7 +57,7 @@ lemma probFailure_eq_zero' [HasEvalSPMF m]
 
 namespace HasEvalPMF
 
-/-- A computation in a monad with `HasEvalPMF` can't fail as outputs sum to probability `1`.  -/
+/-- A computation in a monad with `HasEvalPMF` can't fail as outputs sum to probability `1`. -/
 instance [HasEvalPMF m] (mx : m α) : NeverFail mx where
   probFailure_eq_zero := probFailure_eq_zero mx
 
@@ -176,15 +176,12 @@ instance instSeq [LawfulMonad m] {mf : m (α → β)} {mx : m α}
 /-- If `mx` and `my` never fail, then `mx <* my` never fails. -/
 @[simp, grind .]
 instance instSeqLeft [LawfulMonad m] {mx : m α} {my : m β}
-    [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by
-  simp [seqLeft_eq]; exact ⟨inferInstance, inferInstance⟩
+    [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx <* my) := by aesop
 
 /-- If `mx` and `my` never fail, then `mx *> my` never fails. -/
 @[simp, grind .]
 instance instSeqRight [LawfulMonad m] {mx : m α} {my : m β}
-    [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by
-  simp [seqRight_eq]; exact ⟨inferInstance, inferInstance⟩
-
+    [hx : NeverFail mx] [hy : NeverFail my] : NeverFail (mx *> my) := by aesop
 
 example [LawfulMonad m] (mx : m α) [h : NeverFail mx] : NeverFail (do
     let x ← mx

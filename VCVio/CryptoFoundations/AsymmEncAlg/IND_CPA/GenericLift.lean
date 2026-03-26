@@ -351,7 +351,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
               have hsel :
                   (if st.2 < if branch then k + 1 else k then mm.1 else mm.2) = mm.1 :=
                 if_pos hkLt
-              simp [map_eq_bind_pure_comp]
+              simp only [StateT.run'_eq, map_eq_bind_pure_comp]
               rw [hsel]
               refine probOutput_bind_congr' (encAlg'.encrypt pk mm.1) x ?_
               intro c
@@ -451,7 +451,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                   (if st.2 < if branch then k + 1 else k then mm.1 else mm.2) =
                     (if branch then mm.1 else mm.2) := by
                 cases branch <;> simp [hEq]
-              simp [map_eq_bind_pure_comp]
+              simp only [StateT.run'_eq, map_eq_bind_pure_comp]
               rw [hsel]
               refine probOutput_bind_congr' (encAlg'.encrypt pk (if branch then mm.1 else mm.2))
                 x ?_
@@ -563,7 +563,7 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
   intro x
   refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) x ?_
   intro bit
-  show Pr[= x | do
+  change Pr[= x | do
       let (pk, _sk) ← encAlg'.keygen
       let (m₁, m₂, state) ←
         (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k).chooseMessages pk
@@ -579,7 +579,7 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     (refine probOutput_bind_congr' encAlg'.keygen x ?_) <;>
     intro pk_sk <;>
     simp only [IND_CPA_stepAdversary, bind_assoc] <;>
-    (show (evalDist _) x = (evalDist _) x) <;>
+    (change (evalDist _) x = (evalDist _) x) <;>
     congr 1
   · rename_i pk_sk
     have hresume := IND_CPA_stepPrefix_resume_eq_hybridLR (encAlg' := encAlg')

@@ -157,7 +157,7 @@ theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
 @[game_rule] theorem wp_map
     (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp (f <$> oa) post = wp oa (post ∘ f) := by
-  show wp (oa >>= fun a => pure (f a)) post = wp oa (post ∘ f)
+  change wp (oa >>= fun a => pure (f a)) post = wp oa (post ∘ f)
   rw [wp_bind]
   congr 1
   funext a
@@ -166,7 +166,7 @@ theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
 /-- General unfolding: `wp` as weighted sum over output probabilities. -/
 theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp oa post = ∑' x, Pr[= x | oa] * post x := by
-  show μ (oa >>= fun a => pure (post a)) = _
+  change μ (oa >>= fun a => pure (post a)) = _
   rw [μ_bind_eq_tsum]
   refine tsum_congr fun x => ?_
   have : μ (pure (post x) : OracleComp spec ℝ≥0∞) = post x := by
@@ -209,7 +209,7 @@ theorem triple_bind_wp {pre : ℝ≥0∞} {oa : OracleComp spec α}
     {ob : α → OracleComp spec β} {post : β → ℝ≥0∞}
     (h : Triple (spec := spec) pre oa (fun x => wp (ob x) post)) :
     Triple pre (oa >>= ob) post := by
-  show pre ≤ wp (oa >>= ob) post
+  change pre ≤ wp (oa >>= ob) post
   rw [wp_bind]; exact h
 
 theorem triple_pure (x : α) (post : α → ℝ≥0∞) :
@@ -335,14 +335,14 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
 theorem le_probEvent_iff_triple_indicator (oa : OracleComp spec α) (p : α → Prop)
     [DecidablePred p] (r : ℝ≥0∞) :
     r ≤ Pr[p | oa] ↔ Triple (spec := spec) r oa (fun x => if p x then 1 else 0) := by
-  show r ≤ Pr[p | oa] ↔ r ≤ wp oa (fun x => if p x then 1 else 0)
+  change r ≤ Pr[p | oa] ↔ r ≤ wp oa (fun x => if p x then 1 else 0)
   rw [probEvent_eq_wp_indicator]
 
 /-- Lower bounds on `probOutput` are exactly singleton-indicator triples. -/
 theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableEq α]
     (x : α) (r : ℝ≥0∞) :
     r ≤ Pr[= x | oa] ↔ Triple (spec := spec) r oa (fun y => if y = x then 1 else 0) := by
-  show r ≤ Pr[= x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)
+  change r ≤ Pr[= x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)
   rw [probOutput_eq_wp_indicator]
 
 /-- The support event of an `OracleComp` occurs almost surely. -/
@@ -389,21 +389,21 @@ theorem triple_replicate_succ {pre : ℝ≥0∞} {oa : OracleComp spec α} {n : 
     {post : List α → ℝ≥0∞}
     (h : Triple pre oa (fun x => wp (oa.replicate n) (fun xs => post (x :: xs)))) :
     Triple pre (oa.replicate (n + 1)) post := by
-  show pre ≤ wp (oa.replicate (n + 1)) post
+  change pre ≤ wp (oa.replicate (n + 1)) post
   rw [wp_replicate_succ]; exact h
 
 theorem triple_list_mapM_cons {pre : ℝ≥0∞} {x : α} {xs : List α}
     {f : α → OracleComp spec β} {post : List β → ℝ≥0∞}
     (h : Triple pre (f x) (fun y => wp (xs.mapM f) (fun ys => post (y :: ys)))) :
     Triple pre ((x :: xs).mapM f) post := by
-  show pre ≤ wp ((x :: xs).mapM f) post
+  change pre ≤ wp ((x :: xs).mapM f) post
   rw [wp_list_mapM_cons]; exact h
 
 theorem triple_list_foldlM_cons {pre : ℝ≥0∞} {x : α} {xs : List α}
     {f : σ → α → OracleComp spec σ} {init : σ} {post : σ → ℝ≥0∞}
     (h : Triple pre (f init x) (fun s => wp (xs.foldlM f s) post)) :
     Triple pre ((x :: xs).foldlM f init) post := by
-  show pre ≤ wp ((x :: xs).foldlM f init) post
+  change pre ≤ wp ((x :: xs).foldlM f init) post
   rw [wp_list_foldlM_cons]; exact h
 
 /-! ## Loop invariant rules -/
@@ -474,7 +474,7 @@ theorem triple_list_mapM {I : ℝ≥0∞}
 lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
     (h : evalDist oa = evalDist ob) (x : α) :
     Pr[= x | oa] = Pr[= x | ob] := by
-  show evalDist oa x = evalDist ob x
+  change evalDist oa x = evalDist ob x
   rw [h]
 
 lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
@@ -486,7 +486,7 @@ lemma μ_congr_evalDist {oa ob : OracleComp spec ℝ≥0∞}
 lemma wp_congr_evalDist {oa ob : OracleComp spec α}
     (h : evalDist oa = evalDist ob) (post : α → ℝ≥0∞) :
     wp oa post = wp ob post := by
-  show μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
+  change μ (oa >>= fun a => pure (post a)) = μ (ob >>= fun a => pure (post a))
   exact μ_congr_evalDist (by simp [h])
 
 lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
@@ -496,7 +496,7 @@ lemma μ_cross_congr_evalDist {ι' : Type*} {spec' : OracleSpec ι'}
     @μ _ spec' _ _ oa = μ ob := by
   simp only [μ]
   exact tsum_congr fun x => by
-    show evalDist oa x * x = evalDist ob x * x
+    change evalDist oa x * x = evalDist ob x * x
     rw [h]
 
 end OracleComp.ProgramLogic

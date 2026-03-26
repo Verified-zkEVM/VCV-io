@@ -616,7 +616,7 @@ lemma IND_CPA_hybridLR_counted_run_eq_of_ge
   | inl tu =>
       rfl
   | inr mm =>
-      show (IND_CPA_countedChallengeOracle pk
+      change (IND_CPA_countedChallengeOracle pk
           (fun n mm => if n < k then mm.1 else mm.2) mm).run st =
         (IND_CPA_countedChallengeOracle pk
           (fun n mm => if n < k + 1 then mm.1 else mm.2) mm).run st

@@ -33,7 +33,7 @@ structure SigmaProtocol
     (S W PC SC Ω P : Type) (p : S → W → Bool) where
   /-- Given a statement `s`, make a commitment to prove that you have a valid witness `w`. -/
   commit (s : S) (w : W) : ProbComp (PC × SC)
-  /-- Given a previous secret commitment `sc`, repond to the challenge `ω`-/
+  /-- Given a previous secret commitment `sc`, repond to the challenge `ω`. -/
   respond (s : S) (w : W) (sc : SC) (ω : Ω) : ProbComp P
   /-- Deterministic function to check that the proof `p` satisfies the challenge `ω`. -/
   verify (s : S) (pc : PC) (ω : Ω) (p : P) : Bool

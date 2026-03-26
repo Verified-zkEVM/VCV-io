@@ -70,7 +70,7 @@ theorem GameEquiv.trans {g₁ g₂ g₃ : OracleComp spec₁ α}
 
 theorem GameEquiv.probOutput_eq {g₁ g₂ : OracleComp spec₁ α}
     (h : GameEquiv g₁ g₂) (x : α) : Pr[= x | g₁] = Pr[= x | g₂] := by
-  show evalDist g₁ x = evalDist g₂ x; rw [h]
+  change evalDist g₁ x = evalDist g₂ x; rw [h]
 
 /-! ## Prop-to-ℝ≥0∞ indicator -/
 
@@ -179,7 +179,7 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Triple (spec := spec) ⌜True⌝ oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1 := by
-  show ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1
+  change ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1
   rw [propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
@@ -188,7 +188,7 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
     Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa] := by
-  show r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa]
+  change r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa]
   rw [← probEvent_eq_wp_propInd]
 
 /-! ## Expectation-level bridge lemmas -/

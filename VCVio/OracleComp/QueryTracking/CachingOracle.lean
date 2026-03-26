@@ -63,12 +63,11 @@ lemma withCaching_cache_le [LawfulMonad m] [HasEvalSet m]
     have hrun : (pure u : StateT spec.QueryCache m (spec.Range t)).run cache₀ =
         pure (u, cache₀) := rfl
     rw [hrun] at hz
-    simp at hz; rw [hz]
+    simp only [support_pure, Set.mem_singleton_iff] at hz; rw [hz]
   | none =>
     simp only [ht, StateT.run_bind] at hz
     have hlift : (liftM (so t) : StateT spec.QueryCache m (spec.Range t)).run cache₀ =
-        so t >>= fun v => pure (v, cache₀) := by
-      show StateT.lift (so t) cache₀ = _; rfl
+        so t >>= fun v => pure (v, cache₀) := rfl
     rw [hlift, bind_assoc] at hz
     simp only [pure_bind] at hz
     rcases (mem_support_bind_iff _ _ _).1 hz with ⟨v, _, hmod⟩
@@ -76,12 +75,12 @@ lemma withCaching_cache_le [LawfulMonad m] [HasEvalSet m]
         StateT spec.QueryCache m (spec.Range t)).run cache₀ =
         pure (v, cache₀.cacheQuery t v) := rfl
     rw [this] at hmod
-    simp at hmod
+    simp only [support_pure, Set.mem_singleton_iff] at hmod
     rw [hmod]
     exact QueryCache.le_cacheQuery cache₀ ht
 
 /-- `withCaching` preserves the invariant `(cache₀ ≤ ·)` (the cache only grows). -/
-lemma PreservesInv.withCaching_le {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀}
+lemma PreservesInv.withCaching_le {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀}
     [DecidableEq ι₀] [spec₀.DecidableEq]
     (so : QueryImpl spec₀ ProbComp) (cache₀ : QueryCache spec₀) :
     QueryImpl.PreservesInv (so.withCaching) (cache₀ ≤ ·) :=
@@ -106,14 +105,14 @@ lemma apply_eq (t : spec.Domain) : cachingOracle t =
           modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
 @[simp]
-lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
     Pr[⊥ | (simulateQ (cachingOracle (spec := spec₀)) oa).run cache] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
 @[simp]
-lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0,0} ι₀} [DecidableEq ι₀]
+lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
     NeverFail ((simulateQ (cachingOracle (spec := spec₀)) oa).run cache) ↔ NeverFail oa := by

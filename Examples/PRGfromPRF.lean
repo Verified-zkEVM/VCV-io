@@ -23,6 +23,9 @@ The proof outline follows the standard switching argument:
 -/
 
 set_option autoImplicit false
+set_option linter.unusedSectionVars false
+set_option linter.unusedDecidableInType false
+set_option linter.unusedFintypeInType false
 
 open OracleComp OracleSpec ENNReal PRFScheme PRGScheme
 open List (Vector)
@@ -103,7 +106,6 @@ def idealCollisionExp (n : ℕ) : ProbComp Bool := do
 noncomputable def collisionProb (n : ℕ) : ℝ :=
   (Pr[= true | idealCollisionExp (S := S) (O := O) n]).toReal
 
-set_option linter.unusedSectionVars false in
 /-- Under the real PRF query implementation, querying the oracle `n` times produces the
 same outputs as the deterministic `streamOutputs`. -/
 private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
@@ -151,7 +153,7 @@ theorem prgRealExp_eq_prfRealExp
       evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
   simp only [PRGScheme.prgRealExp, PRFScheme.prfRealExp, prfReduction, streamPRG]
   simp_rw [simulateQ_prfReal_reduction]
-  show evalDist ((·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
+  change evalDist ((·, ·) <$> ($ᵗ K) <*> ($ᵗ S) >>=
     fun ks => adv (streamOutputs (prf.eval ks.1) n ks.2)) = _
   simp only [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
   rw [evalDist_bind, evalDist_bind, hkey]

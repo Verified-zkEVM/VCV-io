@@ -26,6 +26,8 @@ Uses the same additive `Module F G` notation as `DiffieHellman.lean`:
 -/
 
 set_option autoImplicit false
+set_option linter.unusedDecidableInType false
+set_option linter.unusedFintypeInType false
 
 open OracleComp OracleSpec ENNReal DiffieHellman CommitmentScheme
 
@@ -65,7 +67,7 @@ theorem correct : (pedersenCommit (F := F) g).PerfectlyCorrect := by
   simp only [support_bind, support_pure, Set.mem_iUnion,
              Set.mem_singleton_iff] at hmem'
   obtain ⟨d', -, rfl, rfl⟩ := hmem'
-  show decide ((d' : F) • g + m • pp = d' • g + m • pp) = true
+  change decide ((d' : F) • g + m • pp = d' • g + m • pp) = true
   simp
 
 /-! ## Perfect hiding -/
@@ -74,7 +76,7 @@ omit [Fintype F] [DecidableEq F] [SampleableType F]
   [Fintype G] [SampleableType G] [DecidableEq G] in
 private lemma commit_fst_bijective (hg : Function.Bijective (· • g : F → G))
     (pp : G) (m : F) : Function.Bijective (fun d : F => d • g + m • pp) := by
-  show Function.Bijective ((· + m • pp) ∘ (· • g : F → G))
+  change Function.Bijective ((· + m • pp) ∘ (· • g : F → G))
   exact Function.Bijective.comp
     ⟨fun a b h => add_right_cancel h,
      fun y => ⟨y - m • pp, sub_add_cancel y (m • pp)⟩⟩

@@ -53,6 +53,6 @@ lemma run_failure' [Monad m] [Alternative m] :
 
 @[simp]
 lemma mk_pure_eq_pure [Monad m] (x : α) :
-  StateT.mk (λ s ↦ pure (x, s)) = (pure x : StateT σ m α) := rfl
+  StateT.mk (fun s ↦ pure (x, s)) = (pure x : StateT σ m α) := rfl
 
 end StateT

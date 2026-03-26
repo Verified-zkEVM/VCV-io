@@ -14,16 +14,16 @@ open OracleSpec OracleComp ENNReal
 -- /-- Security adversary for RF-RP distinguisher experiments. -/
 -- def RF_RP_Adv' (α : ℕ → Type) [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)] :=
---   BoundedAdversary (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary (fun n ↦ (α n →ₒ α n)) (fun _ ↦ Unit) (fun _ ↦ Bool)
 
 -- /-- Security adversary for RF-RP distinguisher experiments.
 -- Note: We don't give the adversary a `unifSpec` oracle, it only has distinguisher pieces. -/
 -- def RF_RP_Adv (α : ℕ → Type) [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)] :=
---   BoundedAdversary (λ n ↦ (α n →ₒ α n)) (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary (fun n ↦ (α n →ₒ α n)) (fun _ ↦ Unit) (fun _ ↦ Bool)
 
 -- def distinguisher {ι : Type} [DecidableEq ι] (spec : ℕ → OracleSpec ι) :=
---   BoundedAdversary spec (λ _ ↦ Unit) (λ _ ↦ Bool)
+--   BoundedAdversary spec (fun _ ↦ Unit) (fun _ ↦ Bool)
 
 -- variable {α : ℕ → Type} [∀ n, Fintype (α n)]
 --     [∀ n, Inhabited (α n)] [∀ n, DecidableEq (α n)]
@@ -31,7 +31,7 @@ open OracleSpec OracleComp ENNReal
 
 -- /-- Run a `RF_RP_Adv` using a random function to answer queries,
 -- implemented as a simulation with a random oracle. -/
--- def RF_Exp (adv : RF_RP_Adv α) : SecExp (λ n ↦ (α n →ₒ α n)) where
+-- def RF_Exp (adv : RF_RP_Adv α) : SecExp (fun n ↦ (α n →ₒ α n)) where
 --   main n := (· = true) <$> adv.run n ()
 --   baseState n := QueryCache (α n →ₒ α n)
 --   init_state _ := ∅
@@ -55,11 +55,11 @@ open OracleSpec OracleComp ENNReal
 
 -- Note: We could implement a `randUniqOracle` rather than do this ad hoc.
 -- unsure other use cases. -/
--- noncomputable def RP_Exp (adv : RF_RP_Adv α) : SecExp (λ n ↦ (α n →ₒ α n)) where
+-- noncomputable def RP_Exp (adv : RF_RP_Adv α) : SecExp (fun n ↦ (α n →ₒ α n)) where
 --   main n := (· = false) <$> adv.run n ()
 --   baseState n := QueryCache (α n →ₒ α n) × Finset (α n)
 --   init_state _ := (∅, ∅)
---   baseSimOracle _ := λ () t (cache, used) ↦ do
+--   baseSimOracle _ := fun () t (cache, used) ↦ do
 --     let (u, cache') ← cache.lookup_or_else () t ($ usedᶜ)
 --     return (u, cache', insert u used)
 
@@ -82,9 +82,9 @@ open OracleSpec OracleComp ENNReal
 --     (ε ε' : ℝ≥0∞) (s₁ : σ₁) (s₂ : σ₂)
 --     -- Simulation with
 --     (h₂ : ∀ view : QueryLog spec', good_view view →
---       [= view | (λ z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₂) (s₂, ∅) oa] ≥
---         (1 - ε') * [= view | (λ z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa])
---     (h₁ : [good_view | (λ z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa] ≥ 1 - ε) :
+--       [= view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₂) (s₂, ∅) oa] ≥
+--         (1 - ε') * [= view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa])
+--    (h₁ : [good_view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa] ≥ 1 - ε) :
 --     [= true | simulate' so₁ s₁ oa] + [= false | simulate' so₂ s₂ oa] ≤ ε + ε' := by
 --   sorry
 

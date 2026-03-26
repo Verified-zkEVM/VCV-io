@@ -216,8 +216,8 @@ noncomputable instance instOptionTRight :
             | none => ⊥
             | some b => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (g b).run collapse)
         ≤
-        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x y.run
-          (fun a ob => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (gRun ob) collapse) := by
+        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x y.run (fun a ob =>
+          MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (gRun ob) collapse) := by
       apply MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l)
       intro a ob
       cases ob with
@@ -260,8 +260,8 @@ noncomputable instance instOptionTLeft :
             | none => ⊥
             | some a => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a).run (g b) collapse)
         ≤
-        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y
-          (fun oa b => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun oa) (g b) collapse) := by
+        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y (fun oa b =>
+          MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun oa) (g b) collapse) := by
       apply MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l)
       intro oa b
       cases oa with
@@ -276,8 +276,8 @@ noncomputable instance instOptionTLeft :
             | none => ⊥
             | some a => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a).run (g b) collapse)
         ≤
-        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y
-          (fun oa b => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun oa) (g b) collapse) := by
+        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y (fun oa b =>
+          MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun oa) (g b) collapse) := by
       simpa [collapse] using hmono
     exact le_trans hmono' <|
       by
@@ -317,8 +317,8 @@ noncomputable instance instExceptTRight (ε : Type u) :
             | Except.ok b =>
                 MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (g b).run collapse)
         ≤
-        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x y.run
-          (fun a eb => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (gRun eb) collapse) := by
+        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x y.run (fun a eb =>
+          MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a) (gRun eb) collapse) := by
       apply MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l)
       intro a eb
       cases eb with
@@ -364,8 +364,8 @@ noncomputable instance instExceptTLeft (ε : Type u) :
             | Except.ok a =>
                 MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (f a).run (g b) collapse)
         ≤
-        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y
-          (fun ea b => MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun ea) (g b) collapse) := by
+        MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) x.run y (fun ea b =>
+          MAlgRelOrdered.rwp (m₁ := m₁) (m₂ := m₂) (l := l) (fRun ea) (g b) collapse) := by
       apply MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l)
       intro ea b
       cases ea with

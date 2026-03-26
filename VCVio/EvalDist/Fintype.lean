@@ -39,9 +39,7 @@ lemma probEvent_bind_eq_sum_fintype [HasEvalSPMF m]
 /-- Union bound: the probability that *some* event `E i` holds is at most the sum of the
 individual probabilities, over a finite index set `s`. -/
 lemma probEvent_exists_finset_le_sum [HasEvalSPMF m]
-    {ι : Type u} (s : Finset ι) (mx : m α) (E : ι → α → Prop)
-    [DecidablePred (fun x => ∃ i ∈ s, E i x)]
-    [∀ i, DecidablePred (E i)] :
+    {ι : Type u} (s : Finset ι) (mx : m α) (E : ι → α → Prop) :
     Pr[(fun x => ∃ i ∈ s, E i x) | mx] ≤ s.sum (fun i => Pr[E i | mx]) := by
   classical
   refine Finset.induction_on s (by simp) ?_

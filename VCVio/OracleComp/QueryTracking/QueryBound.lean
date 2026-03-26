@@ -63,8 +63,7 @@ lemma isQueryBound_query_iff (t : ι) (b : B)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
     IsQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) b canQuery cost ↔
     canQuery t b := by
-  show (canQuery t b ∧ ∀ _ : spec t, True) ↔ _
-  simp
+  simp [IsQueryBound]
 
 private lemma isQueryBound_map_aux (oa : OracleComp spec α) (f : α → β)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
@@ -142,8 +141,7 @@ lemma isPerIndexQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp s
 lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
     IsPerIndexQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) qb ↔
     0 < qb t := by
-  show (0 < qb t ∧ ∀ _ : spec t, True) ↔ _
-  simp
+  simp [IsPerIndexQueryBound]
 
 private lemma update_le_update {qb qb' : ι → ℕ} {t : ι} (hle : qb ≤ qb') :
     Function.update qb t (qb t - 1) ≤ Function.update qb' t (qb' t - 1) := by

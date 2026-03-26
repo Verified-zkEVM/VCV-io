@@ -16,6 +16,7 @@ compression / decompression (FIPS 203 Section 4.2.1) operations.
 -/
 
 set_option autoImplicit false
+set_option linter.style.nativeDecide false
 
 namespace MLKEM.Concrete
 
@@ -381,7 +382,7 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
           _ ≤ ringDegree * d := Nat.mul_le_mul_right _ (Nat.succ_le_of_lt hi)
       simpa [hencodedBitsLen] using this
     simp [Array.getD, hij]
-  simp [byteDecode]
+  simp only [byteDecode, Array.getD_eq_getD_getElem?, Vector.getElem_ofFn]
   rw [hcoeffBitsInput]
   rw [hcoeffBits, hdigits, ofDigits_digitsAppend_two hcoeffBound]
   exact ZMod.natCast_zmod_val (f[i])
@@ -390,8 +391,8 @@ private theorem byteDecode_one_coeff (bytes : ByteArray) {i : Nat} (hi : i < rin
     ((byteDecode 1 bytes)[i] : Coeff).val = (bytesToBits bytes).getD i 0 := by
   have hbitMod : (bytesToBits bytes).getD i 0 < modulus := by
     exact lt_trans (bytesToBits_getD_lt_two bytes i) (by decide)
-  have hcast : (((bytesToBits bytes).getD i 0 : Nat) : Coeff).val = (bytesToBits bytes).getD i 0 := by
-    exact ZMod.val_cast_of_lt hbitMod
+  have hcast : (((bytesToBits bytes).getD i 0 : Nat) : Coeff).val = (bytesToBits bytes).getD i 0 :=
+    ZMod.val_cast_of_lt hbitMod
   simpa [byteDecode, Nat.ofDigits_singleton] using hcast
 
 /-! ## 12-bit public-key encoding -/
@@ -572,8 +573,8 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
     have hb1 :
         (getByteD (byteEncode12Poly f) (3 * pair + 1)).toNat = a / 256 + 16 * (b % 16) := by
       have hab' :
-          ZMod.val f.coeffs[2 * pair] / 256 + 16 * (ZMod.val f.coeffs[2 * pair + 1] % 16) < 256 := by
-        simpa [a, b] using hab
+          ZMod.val f.coeffs[2 * pair] / 256 + 16 * (ZMod.val f.coeffs[2 * pair + 1] % 16) < 256 :=
+        by simpa [a, b] using hab
       rw [getByteD_byteEncode12Poly (f := f) (j := 3 * pair + 1) (by omega)]
       simp [byteEncode12PolyByte, a, b, hdiv1, hmod1, Nat.mod_eq_of_lt hab']
     have hb2 :
@@ -808,11 +809,11 @@ private theorem byteDecodeVec_byteEncodeVec_of_bound {d k : Nat} (hd : 0 < d) (v
         simpa [byteEncode_size] using hj2
       have hjEnc : j < (byteEncode d (v[i]'hi)).size := by
         simpa [byteEncode_size] using hj
-      simp
+      simp only [Array.getElem_ofFn]
       rw [getByteD_byteEncodeVec (hd := hd) (v := v) (poly := i) (j := j) hi hj]
       rw [← ByteArray.getElem_eq_getElem_data (a := byteEncode d (v[i]'hi)) (h := hjEnc)]
       rw [getByteD_eq_getElem hjEnc]
-  simp [byteDecodeVec]
+  simp only [byteDecodeVec, Vector.getElem_ofFn]
   rw [hbytes]
   exact byteDecode_byteEncode_of_bound hd (f := v[i]'hi) (hbound := hbound ⟨i, hi⟩)
 

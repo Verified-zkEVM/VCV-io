@@ -108,11 +108,12 @@ theorem probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
       x₁ x₂ hmem with ⟨t, h₁, h₂⟩
     simp [h₁, h₂]
 
-omit [spec.DecidableEq] in
+omit [spec.DecidableEq] [DecidableEq ι] in
 private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
     (seed : QuerySeed spec) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
     Pr[fun u : spec.Range i => (seed i)[↑s]? = some u | liftComp ($ᵗ spec.Range i) spec] ≤ h⁻¹ := by
+  classical
   simp only
   by_cases hnone : (seed i)[↑s]? = none
   · simp [hnone]
@@ -125,7 +126,7 @@ private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
     rw [this]
     exact le_of_eq (seededOracle.probEvent_liftComp_uniformSample_eq_of_eq u₀)
 
-omit [spec.DecidableEq] in
+omit [spec.DecidableEq] [DecidableEq ι] in
 private lemma probEvent_uniform_eq_seedSlot_eq_inv_of_get (s : Fin (qb i + 1))
     (seed : QuerySeed spec) {u₀ : spec.Range i}
     (hu₀ : (seed i)[↑s]? = some u₀) :
@@ -402,7 +403,7 @@ private lemma sq_probOutput_main_le_noGuardComp (s : Fin (qb i + 1)) :
           cf <$> (simulateQ seededOracle main).run' σ' := by
         intro σ'
         simp only [simulateQ_map]
-        show Prod.fst <$> (Prod.map cf id <$> (simulateQ seededOracle main).run σ') =
+        change Prod.fst <$> (Prod.map cf id <$> (simulateQ seededOracle main).run σ') =
           cf <$> (Prod.fst <$> (simulateQ seededOracle main).run σ')
         simp [Functor.map_map]
       have hWF := seededOracle.tsum_probOutput_generateSeed_weight_takeAtIndex
@@ -509,7 +510,8 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
         Pr[= z | f <$> fork main qb js i cf] +
           Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] := by
     simp only [noGuardComp, collisionComp]
-    simp [fork, f, z]
+    simp only [liftComp_eq_liftM, StateT.run'_eq, bind_pure_comp, Functor.map_map, bind_map_left,
+      fork, Fin.getElem?_fin, map_bind, z, f]
     refine (probOutput_bind_congr_le_add
       (mx := (liftComp (generateSeed spec qb js) spec : OracleComp spec (QuerySeed spec)))
       (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
@@ -533,7 +535,7 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
     | some t =>
         by_cases hts : t = s
         · cases hts
-          simp [z]
+          simp only [map_bind, z]
           refine (probOutput_bind_congr_le_add
             (mx := (liftComp ($ᵗ spec.Range i) spec : OracleComp spec (spec.Range i)))
             (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_

@@ -18,8 +18,7 @@ universe u v w z
 open OracleSpec OracleComp Polynomial MvPolynomial
 
 /-- An `OracleContext ι m` bundles a specification `spec` of oracles with input set `ι`
-and an implementation of the oracles in terms of the monad `m`.
-Structures can extend this to get  -/
+and an implementation of the oracles in terms of the monad `m`. -/
 structure OracleContext (ι : Type u) (m : Type v → Type w) :
       Type (max u v w + 1) where
   spec : OracleSpec.{u,v} ι

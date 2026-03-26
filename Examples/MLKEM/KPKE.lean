@@ -41,14 +41,14 @@ instance [DecidableEq encoding.EncodedTHat] : DecidableEq (PublicKey params enco
   intro x y
   cases x
   cases y
-  simp
+  simp only [PublicKey.mk.injEq]
   infer_instance
 
 instance [DecidableEq encoding.EncodedTHat] : DecidableEq (SecretKey params encoding) := by
   intro x y
   cases x
   cases y
-  simp
+  simp only [SecretKey.mk.injEq]
   infer_instance
 
 instance [DecidableEq encoding.EncodedU] [DecidableEq encoding.EncodedV] :
@@ -56,7 +56,7 @@ instance [DecidableEq encoding.EncodedU] [DecidableEq encoding.EncodedV] :
   intro x y
   cases x
   cases y
-  simp
+  simp only [Ciphertext.mk.injEq]
   infer_instance
 
 /-- K-PKE key generation from an explicit 32-byte seed.

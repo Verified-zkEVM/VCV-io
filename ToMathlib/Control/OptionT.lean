@@ -55,7 +55,7 @@ protected def mapM {m : Type u → Type v} {n : Type u → Type w}
 --     cases x <;> simp
 
 /-- Bundled version of `mapM`.
-dtumad: we should probably just pick one of these (probably the hom class non-bundled approach)-/
+dtumad: we should probably just pick one of these (probably the hom class non-bundled approach). -/
 protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
     [Monad m] [AlternativeMonad n] [LawfulMonad n] [LawfulAlternative n]
     (f : m →ᵐ n) : OptionT m →ᵐ n where
@@ -65,12 +65,9 @@ protected def mapM' {m : Type u → Type v} {n : Type u → Type w}
   toFun_pure' x := by
     simp
   toFun_bind' x y := by
-    simp [Option.elimM]
+    simp only [run_bind, Option.elimM, MonadHom.toFun_bind', bind_assoc]
     congr 1
-    ext x
-    cases x
-    simp
-    simp
+    ext x; cases x; all_goals simp
 
 @[simp]
 lemma mapM'_lift {m : Type u → Type v} {n : Type u → Type w}
@@ -98,7 +95,7 @@ lemma liftM_elimM {m} [Monad m] {α β}
     {n} [Monad n] [MonadLiftT m n] [LawfulMonadLiftT m n] :
     (liftM (Option.elimM x y z) : n β) =
       Option.elimM (liftM x : n (Option α)) (liftM y) (fun x => liftM (z x)) := by
-  simp [Option.elimM]
+  simp only [Option.elimM, liftM_bind]
   refine bind_congr fun x => by cases x <;> simp
 
 end OptionT

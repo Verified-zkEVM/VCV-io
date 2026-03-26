@@ -1,45 +1,27 @@
 import Lake
 open Lake DSL
 
--- TODO: update linters and remove all errors in library
--- should probably adopt conventions similar to `Batteries`.
-abbrev vcvLinters : Array LeanOption := #[
-  -- ⟨`linter.docPrime, true⟩,
-  ⟨`linter.hashCommand, true⟩,
-  ⟨`linter.oldObtain, true,⟩,
-  ⟨`linter.refine, true⟩,
-  ⟨`linter.style.cdot, true⟩,
-  ⟨`linter.style.dollarSyntax, true⟩,
-  ⟨`linter.style.longLine, false⟩, -- temp
-  ⟨`linter.style.longFile, .ofNat 1500⟩,
-  ⟨`linter.pythonStyle, false⟩,
-  ⟨`linter.modulesUpperCamelCase, false⟩,
-  ⟨`linter.style.missingEnd, true⟩,
-  ⟨`linter.style.setOption, true⟩
-]
-
 package VCVio where
   -- Settings applied to both builds and interactive editing
   leanOptions := #[
     ⟨`pp.unicode.fun, true⟩, -- pretty-prints `fun a ↦ b`
     ⟨`pp.proofs.withType, false⟩,
     ⟨`autoImplicit, false⟩,
-    ⟨`relaxedAutoImplicit, false⟩]
-    ++ vcvLinters.map fun s ↦
-      { s with name := `weak ++ s.name }
+    ⟨`relaxedAutoImplicit, false⟩,
+    ⟨`weak.linter.mathlibStandardSet, true⟩,
+    ⟨`weak.linter.modulesUpperCamelCase, false⟩, -- not good with a lot of common crypto abbreviations
+    ⟨`weak.linter.style.whitespace, false⟩ -- causes too many false positives with notation
+  ]
 
 require "leanprover-community" / "mathlib" @ git "v4.28.0"
 
 /-- Main library. -/
-@[default_target]
-lean_lib VCVio
+@[default_target] lean_lib VCVio
 
 /-- Example constructions of cryptographic primitives. -/
 lean_lib Examples
-
 /-- Optional proof widget experiments and visualizations. -/
 lean_lib VCVioWidgets
-
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib
 

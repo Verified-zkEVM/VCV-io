@@ -34,11 +34,11 @@ lemma one_sub_one_sub_mul_one_sub {x y : ℝ≥0∞} (hx : x ≤ 1) (hy : y ≤ 
     calc (1 - x) * (1 - y) ≤ 1 * 1 := by
           exact mul_le_mul' (tsub_le_self) (tsub_le_self)
         _ = 1 := one_mul 1
-  rw [← ENNReal.toReal_eq_toReal_iff']
-  rw [ENNReal.toReal_sub_of_le, ENNReal.toReal_mul, ENNReal.toReal_sub_of_le,
+  rw [← ENNReal.toReal_eq_toReal_iff' (by aesop) (by aesop),
+    ENNReal.toReal_sub_of_le, ENNReal.toReal_mul, ENNReal.toReal_sub_of_le,
     ENNReal.toReal_sub_of_le, ENNReal.toReal_sub_of_le, ENNReal.toReal_add, ENNReal.toReal_mul]
-  simp
-  linarith
+  · simp
+    linarith
   all_goals try aesop
 
 lemma list_prod_natCast_ne_top {ι : Type*} (f : ι → ℕ) (js : List ι) :
@@ -83,7 +83,8 @@ lemma List.prod_map_const {α M : Type*} [CommMonoid M] (xs : List α) (c : M) :
     (xs.map (fun _ => c)).prod = c ^ xs.length := by
   induction xs with
   | nil => simp
-  | cons _ _ ih => simp only [List.map_cons, List.prod_cons, ih, List.length_cons, pow_succ, mul_comm]
+  | cons _ _ ih => simp only [List.map_cons, List.prod_cons, ih,
+      List.length_cons, pow_succ, mul_comm]
 
 section sum_thing
 
@@ -136,7 +137,7 @@ lemma PMF.apply_eq_one_sub_tsum_ite {α} [DecidableEq α] (p : PMF α) (x : α) 
   rw [← p.tsum_coe]
   rw [Summable.tsum_eq_add_tsum_ite' x ENNReal.summable]
   refine ENNReal.eq_sub_of_add_eq' ?_ rfl
-  simp [ne_eq, ENNReal.add_eq_top, apply_ne_top, false_or]
+  simp only [ne_eq, ENNReal.add_eq_top, apply_ne_top, false_or]
   refine ne_top_of_le_ne_top ENNReal.one_ne_top ?_
   refine le_trans ?_ (le_of_eq p.tsum_coe)
   refine ENNReal.tsum_le_tsum fun x => ?_
@@ -178,8 +179,8 @@ end abs
 open BigOperators ENNReal
 
 lemma Fintype.sum_inv_card (α : Type*) [Fintype α] [Nonempty α] :
-  Finset.sum Finset.univ (λ _ ↦ (Fintype.card α)⁻¹ : α → ℝ≥0∞) = 1 := by
-  rw [Finset.sum_eq_card_nsmul (λ _ _ ↦ rfl), Finset.card_univ,
+  Finset.sum Finset.univ (fun _ ↦ (Fintype.card α)⁻¹ : α → ℝ≥0∞) = 1 := by
+  rw [Finset.sum_eq_card_nsmul (fun _ _ ↦ rfl), Finset.card_univ,
     nsmul_eq_mul, ENNReal.mul_inv_cancel] <;> simp
 
 section List.Vector
@@ -219,7 +220,7 @@ lemma Prod.mk.injective2 {α β : Type*} :
 
 lemma Function.injective2_swap_iff {α β γ : Type*} (f : α → β → γ) :
     (Function.swap f).Injective2 ↔ f.Injective2 :=
-  ⟨λ h _ _ _ _ h' ↦ and_comm.1 (h h'), λ h _ _ _ _ h' ↦ and_comm.1 (h h')⟩
+  ⟨fun h _ _ _ _ h' ↦ and_comm.1 (h h'), fun h _ _ _ _ h' ↦ and_comm.1 (h h')⟩
 
 @[simp] theorem Finset.image_const_univ {α β} [DecidableEq β]  [Fintype α]
     [Nonempty α] (b : β) : (Finset.univ.image fun _ : α => b) = singleton b :=
@@ -241,7 +242,7 @@ lemma List.countP_eq_sum_fin_ite {α : Type*} (xs : List α) (p : α → Bool) :
 
 lemma List.card_filter_getElem_eq {α : Type*} [DecidableEq α]
     (xs : List α) (x : α) :
-    (Finset.filter (λ i : Fin (xs.length) ↦ xs[i] = x) Finset.univ).card =
+    (Finset.filter (fun i : Fin (xs.length) ↦ xs[i] = x) Finset.univ).card =
       xs.count x := by
   rw [List.count, ← List.countP_eq_sum_fin_ite]
   simp only [Fin.getElem_fin, beq_iff_eq, Finset.sum_boole, Nat.cast_id]
@@ -352,11 +353,11 @@ calc (∑ x ∈ s, if p x then r else 0 : β) = (∑ x ∈ s, if p x then 1 else
 lemma Finset.count_toList {α} [DecidableEq α] (x : α) (s : Finset α) :
     s.toList.count x = if x ∈ s then 1 else 0 := by
   by_cases hx : x ∈ s
-  · simp [hx]
+  · simp only [hx, ↓reduceIte]
     refine List.count_eq_one_of_mem ?_ ?_
     · exact nodup_toList s
     · simp [hx]
-  · simp [hx]
+  · simp only [hx, ↓reduceIte]
     refine List.count_eq_zero_of_not_mem ?_
     simp [hx]
 
@@ -373,7 +374,7 @@ lemma BitVec.toFin_bijective (n : ℕ) :
 
 instance (n : ℕ) : Fintype (BitVec n) := by
   refine Fintype.ofBijective (α := Fin (2 ^ n)) ?_ ?_
-  · refine λ x ↦ ?_
+  · refine fun x ↦ ?_
     refine BitVec.ofFin x
   · refine ⟨?_, ?_⟩
     · intro i j
@@ -464,22 +465,21 @@ theorem vectorofFn_get {α : Type} {n : ℕ} (v : Fin n → α) : (Vector.ofFn v
 theorem vectorAdd_get {α : Type} {n : ℕ} [Add α] [Zero α]
  (vx : Vector α n) (vy : Vector α n)
  : (vx + vy).get = vx.get + vy.get := by
-  show (Vector.ofFn (vx.get + vy.get)).get = vx.get + vy.get
+  change (Vector.ofFn (vx.get + vy.get)).get = vx.get + vy.get
   simp
 
 end add
 
 end Vector
 
-open Classical
-
+open Classical in
 lemma tsum_option {α β : Type*} [AddCommMonoid α] [TopologicalSpace α]
     [ContinuousAdd α] [T2Space α]
     (f : Option β → α) (hf : Summable (Function.update f none 0)) :
     ∑' x : Option β, f x = f none + ∑' x : β, f (some x) := by
   refine (Summable.tsum_eq_add_tsum_ite' none hf).trans ?_
   refine congr_arg (f none + ·) ?_
-  refine tsum_eq_tsum_of_ne_zero_bij (λ x ↦ some x.1) ?_ ?_ ?_
+  refine tsum_eq_tsum_of_ne_zero_bij (fun x ↦ some x.1) ?_ ?_ ?_
   · intro x y
     simp [SetCoe.ext_iff]
   · intro x
@@ -499,7 +499,7 @@ theorem PMF.bind_eq_zero {α β : Type _} {p : PMF α} {f : α → PMF β} {b : 
 
 theorem PMF.heq_iff {α β : Type u} {pa : PMF α} {pb : PMF β} (h : α = β) :
     HEq pa pb ↔ ∀ x, pa x = pb (cast h x) := by
-  subst h; simp; constructor <;> intro h'
+  subst h; simp only [heq_eq_eq, cast_eq]; constructor <;> intro h'
   · intro x; rw [h']
   · ext x; rw [h' x]
 
@@ -524,6 +524,7 @@ lemma PMF.uniformOfFintype_map_of_bijective {α β : Type*} [Fintype α] [Fintyp
   simp only [PMF.map_apply, PMF.uniformOfFintype_apply, heq, hf.1.eq_iff, eq_comm (a := a)]
   convert tsum_ite_eq a (fun _ : α => ((Fintype.card β : ENNReal)⁻¹))
 
+open Classical in
 /-- This doesn't get applied properly without `Classical` so add with high priority. -/
 @[simp high] lemma PMF.some_map_apply_some {α} (p : PMF α) (x : α) :
     (p.map Option.some) (some x) = p x := by simp
@@ -555,7 +556,7 @@ lemma List.foldlM_range {m : Type u → Type v} [Monad m] [LawfulMonad m]
   | succ n hn =>
       intro init
       simp only [List.finRange_succ, List.foldlM_cons, Fin.foldlM_succ]
-      refine congr_arg (_ >>= ·) (funext λ x ↦ ?_)
+      refine congr_arg (_ >>= ·) (funext fun x ↦ ?_)
       rw [← hn, List.foldlM_map]
 
 lemma list_mapM_loop_eq {m : Type u → Type v} [Monad m] [LawfulMonad m]
@@ -567,7 +568,7 @@ lemma list_mapM_loop_eq {m : Type u → Type v} [Monad m] [LawfulMonad m]
   | cons x xs h =>
       intro ys
       simp only [List.mapM.loop, map_bind]
-      refine congr_arg (f x >>= ·) (funext λ x ↦ ?_)
+      refine congr_arg (f x >>= ·) (funext fun x ↦ ?_)
       simp [h (x :: ys), h [x]]
 
 /-! ### `forIn` / `foldlM` bridge for imperative-style loops

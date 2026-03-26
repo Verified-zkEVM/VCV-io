@@ -47,7 +47,7 @@ protected lemma bind_congr {γ δ : Type*} (p : PMF γ) (f g : γ → PMF δ)
 lemma map_eq_pure_zero {γ δ : Type*} (f : γ → δ) (c : PMF γ) (b : δ)
     (h : PMF.map f c = PMF.pure b) (a : γ) (ha : f a ≠ b) : c a = 0 := by
   have key := congr_fun (congrArg DFunLike.coe h) (f a)
-  simp [PMF.map_apply, PMF.pure_apply, ha] at key
+  simp only [map_apply, pure_apply, ha, ↓reduceIte, ENNReal.tsum_eq_zero, ite_eq_right_iff] at key
   exact key a rfl
 
 end PMF
@@ -77,7 +77,7 @@ noncomputable instance : AlternativeMonad SPMF := OptionT.instAlternativeMonadOf
 noncomputable instance : LawfulAlternative SPMF := OptionT.instLawfulAlternativeOfLawfulMonad PMF
 noncomputable instance : LawfulMonad SPMF := OptionT.instLawfulMonad
 
-/-- Expose the lifting operations from `PMF` to `SPMF` given by `OptionT.lift`-/
+/-- Expose the lifting operations from `PMF` to `SPMF` given by `OptionT.lift`. -/
 noncomputable instance : MonadLift PMF SPMF where monadLift := OptionT.lift
 instance : LawfulMonadLift PMF SPMF := OptionT.instLawfulMonadLift
 
@@ -101,7 +101,8 @@ lemma toPMF_liftM (p : PMF α) : (liftM p : SPMF α).toPMF = p := rfl
 
 @[simp, grind =]
 lemma liftM_apply (p : PMF α) (x : α) : (liftM p : SPMF α) x = p x := by
-  simp [apply_eq_toPMF_some]
+  simp only [apply_eq_toPMF_some, toPMF_liftM, PMF.monad_pure_eq_pure, PMF.monad_bind_eq_bind,
+    PMF.bind_apply, PMF.pure_apply, Option.some.injEq, mul_ite, mul_one, mul_zero]
   refine (tsum_eq_single x ?_).trans ?_ <;> aesop
 
 @[simp, grind =]
@@ -169,7 +170,7 @@ lemma toPMF_none_eq_one_sub_tsum (p : SPMF α) :
 
 @[ext]
 lemma ext {p q : SPMF α} (h : ∀ x : α, p x = q x) : p = q := by
-  simp [SPMF.apply_eq_toPMF_some] at h
+  simp only [apply_eq_toPMF_some] at h
   refine PMF.ext fun
     | some x => h x
     | none =>  calc p.toPMF none
@@ -236,9 +237,9 @@ lemma gap_eq_one_sub_tsum (p : SPMF α) : p.gap = 1 - ∑' x : α, p x := by gri
 @[grind =]
 lemma toReal_gap_eq_one_sub_sum_toReal [Fintype α] (p : SPMF α) :
     p.gap.toReal = 1 - ∑ x : α, (p x).toReal := by
-  simp [SPMF.gap_eq_one_sub_tsum]
+  simp only [gap_eq_one_sub_tsum, tsum_fintype]
   rw [ENNReal.toReal_sub_of_le]
-  · simp
+  · simp only [toReal_one, _root_.sub_right_inj]
     rw [ENNReal.toReal_sum]
     simp
   · refine le_of_le_of_eq ?_ (run_none_add_tsum_run_some p)

@@ -139,8 +139,8 @@ lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y 
 @[grind =]
 lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
     Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by
-  simp [probEvent_eq_tsum_indicator, probOutput_bind_eq_tsum,
-    Set.indicator, ← ENNReal.tsum_mul_left]
+  simp only [probEvent_eq_tsum_indicator, Set.indicator, Set.mem_setOf_eq, probOutput_bind_eq_tsum,
+    ← ENNReal.tsum_mul_left, mul_ite, mul_zero]
   rw [ENNReal.tsum_comm]
   refine tsum_congr fun x => by split_ifs <;> simp
 

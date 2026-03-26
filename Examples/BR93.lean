@@ -36,6 +36,8 @@ bodies remain `sorry` for now.
 -/
 
 set_option autoImplicit false
+set_option linter.unusedDecidableInType false
+set_option linter.unusedFintypeInType false
 
 open OracleComp OracleSpec ENNReal OneWay
 
@@ -60,7 +62,6 @@ namespace br93AsymmEnc
 
 variable {tdp : TrapdoorPermutation PK SK Rand} {hash : Rand → M}
 
-set_option maxHeartbeats 400000 in
 omit [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [Inhabited M] [Fintype M]
   [SampleableType M] in
 /-- Correctness of BR93 follows from correctness of the underlying trapdoor permutation. -/

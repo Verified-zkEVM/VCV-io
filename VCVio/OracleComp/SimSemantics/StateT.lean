@@ -52,8 +52,8 @@ adding back any state at the end of the computation. -/
 lemma StateT_run_simulateQ_eq_map_run'_simulateQ {α} [Subsingleton σ]
     (oa : OracleComp spec α) (s s' : σ) :
     (simulateQ so oa).run s = (·, s') <$> (simulateQ so oa).run' s := by
-  have : (λ x : α × σ ↦ (x.1, s')) = id :=
-    funext λ (x, s) ↦ Prod.eq_iff_fst_eq_snd_eq.2 ⟨rfl, Subsingleton.elim _ _⟩
+  have : (fun x : α × σ ↦ (x.1, s')) = id :=
+    funext fun (x, s) ↦ Prod.eq_iff_fst_eq_snd_eq.2 ⟨rfl, Subsingleton.elim _ _⟩
   simp [this]
 
 lemma StateT_run'_simulateQ_eq_self {α} (so : QueryImpl spec (StateT σ (OracleComp spec)))
