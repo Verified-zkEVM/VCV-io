@@ -66,6 +66,7 @@ lemma probOutput_map_bijective_uniformSample
   rw [probOutput_map_injective ($ᵗ α) hf.injective x']
   exact SampleableType.probOutput_selectElem_eq _ _
 
+set_option linter.unusedFintypeInType false in
 /-- Pushing forward uniform sampling along a bijection preserves output probabilities. -/
 lemma probOutput_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]
@@ -76,6 +77,7 @@ lemma probOutput_map_bijective_uniform_cross
       probOutput_uniformSample, probOutput_uniformSample,
       Fintype.card_of_bijective hf]
 
+set_option linter.unusedFintypeInType false in
 /-- Binding after pushing forward uniform sampling along a bijection preserves output
 probabilities. -/
 lemma probOutput_bind_bijective_uniform_cross
@@ -143,8 +145,8 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
-/-- Pushing forward uniform sampling along a bijection preserves the full
-evaluation distribution. -/
+set_option linter.unusedFintypeInType false
+/-- Pushing forward uniform sampling via a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Fintype α] [Fintype β]
     (f : α → β) (hf : Function.Bijective f) :
@@ -325,7 +327,7 @@ lemma probOutput_bind_uniformBool {α : Type}
       (Pr[= x | f true] + Pr[= x | f false]) / 2 := by
   rw [probOutput_bind_eq_tsum]
   rw [tsum_fintype (L := .unconditional _), Fintype.sum_bool]
-  simp [probOutput_uniformSample, div_eq_mul_inv, add_comm]
+  simp only [probOutput_uniformSample, Fintype.card_bool, Nat.cast_ofNat, add_comm, div_eq_mul_inv]
   rw [← left_distrib, mul_comm]
 
 /-- Guessing a uniformly random bit after branching between `real` and `rand` decomposes into
