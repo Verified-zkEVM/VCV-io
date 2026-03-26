@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
 
@@ -52,6 +53,48 @@ def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
 
 end Correct
 
+section IND_CPA
+
+variable {ι : Type} {spec : OracleSpec ι} [SampleableType K]
+
+/-- A KEM IND-CPA adversary receives the public key, challenge ciphertext, and either the real or
+random shared key, then outputs a Boolean guess. The argument order follows the upstream
+proof-ladders KEM game: `(pk, k, c)`. -/
+abbrev IND_CPA_Adversary (_kem : KEMScheme (OracleComp spec) K PK SK C) :=
+  PK → K → C → OracleComp spec Bool
+
+/-- Fixed-branch IND-CPA experiment for a KEM, matching the source proof-ladders formulation
+`Exp.run(b)`. -/
+def IND_CPA_Exp {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) (b : Bool) : ProbComp Bool :=
+  kem.exec do
+    let (pk, _sk) ← kem.keygen
+    let (cStar, kReal) ← kem.encaps pk
+    let kRand ← kem.lift_probComp ($ᵗ K)
+    adversary pk (if b then kReal else kRand) cStar
+
+/-- Single-game IND-CPA experiment obtained by sampling the challenge bit uniformly and checking
+whether the adversary guessed it correctly. -/
+def IND_CPA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : ProbComp Bool := do
+  let b ← $ᵗ Bool
+  let b' ← kem.IND_CPA_Exp adversary b
+  return (b == b')
+
+/-- IND-CPA distinguishing advantage for a KEM in the fixed-branch source formulation. -/
+noncomputable def IND_CPA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : ℝ :=
+  (IND_CPA_Exp adversary true).boolDistAdvantage (IND_CPA_Exp adversary false)
+
+/-- The fixed-branch source formulation and the single-game win/lose formulation induce the same
+IND-CPA distinguishing advantage. -/
+theorem IND_CPA_Advantage_eq_game_bias {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) :
+    kem.IND_CPA_Advantage adversary = (kem.IND_CPA_Game adversary).boolBiasAdvantage := by
+  sorry
+
+end IND_CPA
+
 section IND_CCA
 
 variable {ι : Type} {spec : OracleSpec ι} [DecidableEq C] [SampleableType K]
@@ -94,6 +137,23 @@ def IND_CCA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
 noncomputable def IND_CCA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CCA_Adversary) : ℝ :=
   (IND_CCA_Game adversary).boolBiasAdvantage
+
+/-- Any IND-CPA adversary can be viewed as an IND-CCA adversary that simply ignores the
+decryption oracle and performs no pre-challenge interaction. -/
+def IND_CPA_Adversary.toIND_CCA {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : kem.IND_CCA_Adversary where
+  State := PK
+  preChallenge pk := pure pk
+  postChallenge pk cStar kStar :=
+    (liftM (adversary pk kStar cStar) : OracleComp (spec + (C →ₒ Option K)) Bool)
+
+/-- The one-stage IND-CPA game is exactly the IND-CCA game instantiated with the trivial
+CPA-to-CCA embedding that never uses the decryption oracle. -/
+theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
+    {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) :
+    kem.IND_CPA_Game adversary = kem.IND_CCA_Game adversary.toIND_CCA := by
+  sorry
 
 end IND_CCA
 
