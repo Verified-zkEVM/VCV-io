@@ -56,7 +56,7 @@ lemma monadLift_eq_lift (x : P.Obj α) : (x : FreeM P α) = FreeM.lift x := rfl
 @[always_inline, inline]
 protected def bind : FreeM P α → (α → FreeM P β) → FreeM P β
   | FreeM.pure x, g => g x
-  | FreeM.roll x r, g => FreeM.roll x (λ u ↦ FreeM.bind (r u) g)
+  | FreeM.roll x r, g => FreeM.roll x (fun u ↦ FreeM.bind (r u) g)
 
 @[simp]
 lemma bind_pure (x : α) (r : α → FreeM P β) :
@@ -64,7 +64,7 @@ lemma bind_pure (x : α) (r : α → FreeM P β) :
 
 @[simp]
 lemma bind_roll (a : P.A) (r : P.B a → FreeM P β) (g : β → FreeM P γ) :
-    FreeM.bind (FreeM.roll a r) g = FreeM.roll a (λ u ↦ FreeM.bind (r u) g) := rfl
+    FreeM.bind (FreeM.roll a r) g = FreeM.roll a (fun u ↦ FreeM.bind (r u) g) := rfl
 
 @[simp]
 lemma bind_lift (x : P.Obj α) (r : α → FreeM P β) :
@@ -89,15 +89,15 @@ lemma monad_bind_def (x : FreeM P α) (g : α → FreeM P β) :
 
 instance : LawfulMonad (FreeM P) :=
   LawfulMonad.mk' (FreeM P)
-    (λ x ↦ by
+    (fun x ↦ by
       induction x with
       | pure _ => rfl
-      | roll a _ h => refine congr_arg (FreeM.roll a) (funext λ i ↦ h i))
-    (λ x f ↦ rfl)
-    (λ x f g ↦ by
+      | roll a _ h => refine congr_arg (FreeM.roll a) (funext fun i ↦ h i))
+    (fun x f ↦ rfl)
+    (fun x f g ↦ by
       induction x with
       | pure _ => rfl
-      | roll a _ h => refine congr_arg (FreeM.roll a) (funext λ i ↦ h i))
+      | roll a _ h => refine congr_arg (FreeM.roll a) (funext fun i ↦ h i))
 
 lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by simp
 
@@ -114,25 +114,25 @@ lemma pure_inj (x y : α) : FreeM.pure (P := P) x = FreeM.pure y ↔ x = y := by
 /-- Proving a predicate `C` of `FreeM P α` requires two cases:
 * `pure x` for some `x : α`
 * `roll x r h` for some `x : P.A`, `r : P.B x → FreeM P α`, and `h : ∀ y, C (r y)`
-Note that we can't use `Sort v` instead of `Prop` due to universe levels.-/
+Note that we can't use `Sort v` instead of `Prop` due to universe levels. -/
 @[elab_as_elim]
 protected def inductionOn {C : FreeM P α → Prop}
     (pure : ∀ x, C (pure x))
     (roll : (x : P.A) → (r : P.B x → FreeM P α) → (∀ y, C (r y)) → C (FreeM.roll x r)) :
     (oa : FreeM P α) → C oa
   | FreeM.pure x => pure x
-  | FreeM.roll x r => roll x _ (λ u ↦ FreeM.inductionOn pure roll (r u))
+  | FreeM.roll x r => roll x _ (fun u ↦ FreeM.inductionOn pure roll (r u))
 
 section construct
 
-/-- Shoulde be possible to unify with the above-/
+/-- Shoulde be possible to unify with the above -/
 @[elab_as_elim]
 protected def construct {C : FreeM P α → Type*}
     (pure : (x : α) → C (pure x))
     (roll : (x : P.A) → (r : P.B x → FreeM P α) → ((y : P.B x) → C (r y)) → C (FreeM.roll x r)) :
     (oa : FreeM P α) → C oa
   | .pure x => pure x
-  | .roll x r => roll x _ (λ u ↦ FreeM.construct pure roll (r u))
+  | .roll x r => roll x _ (fun u ↦ FreeM.construct pure roll (r u))
 
 variable {C : FreeM P α → Type*} (h_pure : (x : α) → C (pure x))
   (h_roll : (x : P.A) → (r : P.B x → FreeM P α) → ((y : P.B x) → C (r y)) → C (FreeM.roll x r))
@@ -154,7 +154,7 @@ variable {m : Type uB → Type v} {α : Type uB}
 /-- Canonical mapping of `FreeM P` into any other monad, given a map `s : (a : P.A) → m (P.B a)`. -/
 protected def mapM [Pure m] [Bind m] (s : (a : P.A) → m (P.B a)) : FreeM P α → m α
   | .pure a => Pure.pure a
-  | .roll a r => (s a) >>= (λ u ↦ (r u).mapM s)
+  | .roll a r => (s a) >>= (fun u ↦ (r u).mapM s)
 
 variable [Monad m] (s : (a : P.A) → m (P.B a))
 
@@ -194,7 +194,7 @@ lemma mapM_seq {α β}
 
 @[simp]
 lemma mapM_lift (s : (a : P.A) → m (P.B a)) (x : P.Obj α) :
-    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (λ u ↦ (pure (x.2 u)).mapM s) := by
+    FreeM.mapM s (FreeM.lift x) = s x.1 >>= (fun u ↦ (pure (x.2 u)).mapM s) := by
   simp [FreeM.mapM]
 
 @[simp]

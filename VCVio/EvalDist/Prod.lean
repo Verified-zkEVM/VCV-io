@@ -70,8 +70,9 @@ lemma probEvent_snd_map (mx : m (α × β)) (p : β → Prop) :
 
 omit [LawfulMonad m] in
 @[simp, grind =]
-lemma probEvent_fst_eq_snd [DecidableEq α] (mx : m (α × α)) :
+lemma probEvent_fst_eq_snd (mx : m (α × α)) :
     Pr[fun z => z.1 = z.2 | mx] = ∑' x : α, Pr[= (x, x) | mx] := by
+  classical
   rw [probEvent_eq_tsum_ite, ENNReal.tsum_prod']
   refine tsum_congr fun x => ?_
   refine (tsum_eq_single x fun b hb => ?_).trans (by simp)

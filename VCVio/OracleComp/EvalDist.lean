@@ -29,7 +29,7 @@ NOTE: currently proofs using this should reduce to `simulateQ`. A full API would
 def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
   simulateQ (r := SetM) o mx
 
-/-- The `support` instance for `OracleComp`, defined as  -/
+/-- The `support` instance for `OracleComp`, defined as -/
 instance hasEvalSet : HasEvalSet (OracleComp spec) where
   toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
 
@@ -281,7 +281,7 @@ lemma probOutput_guard_eq_sub_probOutput_guard_not {α : Type} {oa : OracleComp 
       1 - Pr[= () | (do let a ← oa; guard (¬ p a) : OptionT (OracleComp spec) Unit)] := by
   rw [probOutput_bind_guard_eq_probEvent, probOutput_bind_guard_eq_probEvent]
   have h := probEvent_compl oa p
-  simp at h
+  simp only [HasEvalPMF.probFailure_eq_zero, tsub_zero] at h
   exact ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top probEvent_le_one) h
 
 end guard
@@ -307,7 +307,7 @@ lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
     intro s
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
       OracleQuery.input_query]
-    show evalDist (Prod.fst <$> ((so t).run s >>= fun p =>
+    change evalDist (Prod.fst <$> ((so t).run s >>= fun p =>
       (simulateQ so (mx p.1)).run p.2)) = _
     rw [@map_bind (OracleComp spec), show (fun p : spec.Range t × σ =>
         Prod.fst <$> (simulateQ so (mx p.1)).run p.2) =
@@ -318,7 +318,7 @@ lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
       ((so t).run' s >>= mx) from
       (bind_map_left (m := OracleComp spec) Prod.fst ((so t).run s) mx).symm]
     rw [evalDist_bind, h t s]
-    show OptionT.lift (PMF.uniformOfFintype (spec.Range t)) >>= (fun u => evalDist (mx u)) = _
+    change OptionT.lift (PMF.uniformOfFintype (spec.Range t)) >>= (fun u => evalDist (mx u)) = _
     rw [show (fun u => evalDist (mx u)) = evalDist ∘ mx from rfl, ← evalDist_query_bind]
 
 /-- Stronger version with computational hypothesis: if the implementation passes through

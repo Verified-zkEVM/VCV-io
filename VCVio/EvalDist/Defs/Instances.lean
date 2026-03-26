@@ -101,8 +101,9 @@ lemma probOutput_eq_ite [DecidableEq α] (x : Id α) (y : α) :
   aesop
 
 @[simp, grind =]
-lemma probEvent_eq_ite [DecidableEq α] (x : Id α) (p : α → Prop) [DecidablePred p] :
+lemma probEvent_eq_ite (x : Id α) (p : α → Prop) [DecidablePred p] :
     Pr[p | x] = if p x.run then 1 else 0 := by
+  classical
   simp [probEvent_eq_sum_finSupport_ite]
 
 lemma probFailure_eq_zero (x : Id α) : Pr[⊥ | x] = 0 := by aesop

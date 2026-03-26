@@ -95,13 +95,12 @@ lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx m
   exact SPMF.tvDist_bind_right_le _ _ _
 
 /-! ### TV distance bounds -/
-
 lemma tvDist_le_probEvent_of_probOutput_eq_of_not
     {mx my : m α} [NeverFail mx] [NeverFail my]
-    (p : α → Prop) [DecidablePred p]
-    (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
+    (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
     (h_event_eq : Pr[p | mx] = Pr[p | my]) :
     tvDist mx my ≤ Pr[p | mx].toReal := by
+  classical
   rw [tvDist, SPMF.tvDist, PMF.tvDist]
   refine ENNReal.toReal_mono probEvent_ne_top ?_
   rw [PMF.etvDist, tsum_option _ ENNReal.summable]

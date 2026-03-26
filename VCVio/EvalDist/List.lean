@@ -37,12 +37,12 @@ lemma cons_mem_finSupport_seq_map_cons_iff [LawfulMonad m] [HasEvalFinset m] [De
   simp_rw [mem_finSupport_iff_mem_support]
   exact cons_mem_support_seq_map_cons_iff mx my x xs
 
-lemma probOutput_cons_seq_map_cons_eq_mul [LawfulMonad m] [DecidableEq α]
+lemma probOutput_cons_seq_map_cons_eq_mul [LawfulMonad m]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     Pr[= x :: xs | cons <$> mx <*> my] = Pr[= x | mx] * Pr[= xs | my] :=
   probOutput_seq_map_eq_mul_of_injective2 mx my cons injective2_cons x xs
 
-lemma probOutput_cons_seq_map_cons_eq_mul' [LawfulMonad m] [DecidableEq α]
+lemma probOutput_cons_seq_map_cons_eq_mul' [LawfulMonad m]
     (mx : m α) (my : m (List α)) (x : α) (xs : List α) :
     Pr[= x :: xs | (fun xs x => x :: xs) <$> my <*> mx] =
       Pr[= x | mx] * Pr[= xs | my] :=
@@ -81,9 +81,9 @@ lemma probFailure_list_mapM_loop (xs : List α) (f : α → m β) (ys : List β)
       rw [probFailure_bind_eq_sub_mul _ _ (1 - (List.map (fun x ↦ 1 - Pr[⊥|f x]) xs).prod)]
       · congr 2
         rw [AddLECancellable.tsub_tsub_cancel_of_le]
-        simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.sub_eq_top_iff,
-          ENNReal.one_ne_top, false_and, not_false_eq_true]
-        refine (List.prod_le_pow_card _ 1 <| by simp).trans (le_of_eq <| one_pow _)
+        · simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.sub_eq_top_iff,
+            ENNReal.one_ne_top, false_and, not_false_eq_true]
+        · refine (List.prod_le_pow_card _ 1 <| by simp).trans (le_of_eq <| one_pow _)
       · simp
       · simp [h]
 
@@ -165,10 +165,10 @@ lemma probOutput_bind_eq_mul {mx : m α} {my : α → m β} {y : β} (x : α)
   grind [= mul_eq_zero]
 
 @[simp]
-lemma probOutput_cons_map [LawfulMonad m] [DecidableEq α]
-    (mx : m (List α)) (x : α) (xs : List α) :
+lemma probOutput_cons_map [LawfulMonad m] (mx : m (List α)) (x : α) (xs : List α) :
     Pr[= xs | cons x <$> mx] =
       if hxs : xs = [] then 0 else Pr[= xs.head hxs | (pure x : m α)] * Pr[= xs.tail | mx] := by
+  classical
   split
   case isTrue h =>
     subst h
@@ -196,14 +196,16 @@ lemma probOutput_list_mapM [LawfulMonad m] (xs : List α) (f : α → m β) (ys 
   | cons x xs ih =>
       intro ys
       split_ifs with hys
-      · simp at hys
+      · simp only [length_cons] at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp only [mapM_cons, bind_pure_comp, zipWith_cons_cons, prod_cons]
         rw [probOutput_bind_eq_mul y]
-        simp [ih]
-        clear *- hys
-        aesop
-        simp
+        · simp only [probOutput_cons_map, reduceCtorEq, ↓reduceDIte, head_cons, probOutput_pure,
+            ↓reduceIte, tail_cons, ih, mul_ite, one_mul, mul_zero, ite_eq_left_iff, zero_eq_mul,
+            probOutput_eq_zero_iff, prod_eq_zero_iff]
+          clear *- hys
+          aesop
+        · simp
       · refine probOutput_eq_zero_of_not_mem_support ?_
         simp only [mapM_cons, support_bind, Set.mem_iUnion, not_exists]
         intro y _ zs hzs
@@ -227,13 +229,15 @@ lemma probOutput_list_mapM' [LawfulMonad m] (xs : List α) (f : α → m β) (ys
   | cons x xs ih =>
       intro ys
       split_ifs with hys
-      · simp at hys
+      · simp only [length_cons] at hys
         obtain ⟨y, ys, rfl⟩ := List.exists_cons_of_length_eq_add_one hys
         simp only [mapM'_cons, bind_pure_comp, zipWith_cons_cons, prod_cons]
         rw [probOutput_bind_eq_mul y]
-        simp [ih]
-        clear *- hys
-        aesop
+        · simp only [probOutput_cons_map, reduceCtorEq, ↓reduceDIte, head_cons, probOutput_pure,
+          ↓reduceIte, tail_cons, ih, mul_ite, one_mul, mul_zero, ite_eq_left_iff, zero_eq_mul,
+          probOutput_eq_zero_iff, prod_eq_zero_iff]
+          clear *- hys
+          aesop
         simp
       · refine probOutput_eq_zero_of_not_mem_support ?_
         simp only [List.mapM'_cons, support_bind, Set.mem_iUnion, not_exists]
@@ -269,23 +273,20 @@ lemma support_seq_map_vector_cons [LawfulMonad m] :
     exact ⟨xs.head, hh, xs.tail, ht, List.Vector.cons_head_tail xs⟩
 
 @[simp]
-lemma probOutput_seq_map_vector_cons_eq_mul [LawfulMonad m] [DecidableEq α]
-    (xs : List.Vector α (n + 1)) :
+lemma probOutput_seq_map_vector_cons_eq_mul [LawfulMonad m] (xs : List.Vector α (n + 1)) :
     Pr[= xs | (· ::ᵥ ·) <$> mx <*> my] = Pr[= xs.head | mx] * Pr[= xs.tail | my] := by
   rw [← probOutput_seq_map_eq_mul_of_injective2 mx my _ Vector.injective2_cons,
     List.Vector.cons_head_tail]
 
 @[simp]
-lemma probOutput_seq_map_vector_cons_eq_mul' [LawfulMonad m] [DecidableEq α]
-    (xs : List.Vector α (n + 1)) :
+lemma probOutput_seq_map_vector_cons_eq_mul' [LawfulMonad m] (xs : List.Vector α (n + 1)) :
     Pr[= xs | (fun xs x => x ::ᵥ xs) <$> my <*> mx] =
     Pr[= xs.head | mx] * Pr[= xs.tail | my] :=
   (probOutput_seq_map_swap mx my (· ::ᵥ ·) xs).trans
     (probOutput_seq_map_vector_cons_eq_mul mx my xs)
 
 @[simp]
-lemma probOutput_vector_toList [LawfulMonad m] [DecidableEq α]
-    (mx' : m (List.Vector α n))
+lemma probOutput_vector_toList [LawfulMonad m] (mx' : m (List.Vector α n))
     (xs : List α) : Pr[= xs | List.Vector.toList <$> mx'] =
       if h : xs.length = n then Pr[= (⟨xs, h⟩ : List.Vector α n) | mx'] else 0 := by
   split_ifs with h

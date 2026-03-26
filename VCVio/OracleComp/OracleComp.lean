@@ -72,7 +72,7 @@ protected lemma failure_def : (failure : OptionT (OracleComp spec) α) = OptionT
 
 protected lemma orElse_def (oa oa' : OptionT (OracleComp spec) α) : (oa <|> oa') = OptionT.mk
     (do match ← OptionT.run oa with | some a => pure (some a) | _  => OptionT.run oa') := by
-  simp [HOrElse.hOrElse, OrElse.orElse, Alternative.orElse, OptionT.orElse]
+  simp only [HOrElse.hOrElse, OrElse.orElse, Alternative.orElse, OptionT.orElse]
   refine congr_arg OptionT.mk <| bind_congr fun x => by aesop
 
 @[aesop unsafe apply, grind =>]
@@ -223,10 +223,9 @@ section inj
 and the second computation does something pure with the result. -/
 @[simp] lemma bind_eq_pure_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
     oa >>= ob = pure y ↔ ∃ x : α, oa = pure x ∧ ob x = pure y := by
-  refine ⟨λ h ↦ ?_, λ h ↦ let ⟨x, ⟨h, h'⟩⟩ := h; h ▸ h'⟩
-  simp [OracleComp.pure_def, PFunctor.FreeM.monad_bind_def] at h
-  rw [PFunctor.FreeM.bind_eq_pure_iff] at h
-  exact h
+  refine ⟨fun h ↦ ?_, fun h ↦ let ⟨x, ⟨h, h'⟩⟩ := h; h ▸ h'⟩
+  simp only [PFunctor.FreeM.monad_bind_def, OracleComp.pure_def] at h
+  rwa [PFunctor.FreeM.bind_eq_pure_iff] at h
 
 /-- Binding two computations gives a pure operation iff the first computation is pure
 and the second computation does something pure with the result. -/

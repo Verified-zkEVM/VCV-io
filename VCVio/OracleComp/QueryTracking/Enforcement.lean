@@ -65,7 +65,7 @@ theorem fst_map_run_simulateQ
     rw [isPerIndexQueryBound_query_bind_iff] at h
     obtain ⟨hpos, hcont⟩ := h
     simp only [simulateQ_query_bind]
-    show Prod.fst <$> ((enforceOracle (spec := spec) t).run qb >>=
+    change Prod.fst <$> ((enforceOracle (spec := spec) t).run qb >>=
       fun p => (simulateQ enforceOracle (mx p.1)).run p.2) = liftM (query t) >>= mx
     rw [run_apply, if_pos hpos]
     simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]

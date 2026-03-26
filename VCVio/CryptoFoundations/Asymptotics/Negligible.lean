@@ -25,10 +25,10 @@ open ENNReal Asymptotics Filter
 
 /-- A function `f` is negligible if it decays faster than any polynomial function. -/
 def negligible (f : ℕ → ℝ≥0∞) : Prop :=
-  SuperpolynomialDecay atTop (λ x ↦ ↑x) f
+  SuperpolynomialDecay atTop (fun x ↦ ↑x) f
 
 @[simp] def negligible_iff (f : ℕ → ℝ≥0∞) :
-    negligible f ↔ SuperpolynomialDecay atTop (λ x ↦ ↑x) f := Iff.rfl
+    negligible f ↔ SuperpolynomialDecay atTop (fun x ↦ ↑x) f := Iff.rfl
 
 lemma negligible_zero : negligible 0 := superpolynomialDecay_zero _ _
 
@@ -58,6 +58,7 @@ theorem negligible_const_mul {f : ℕ → ℝ≥0∞} (hf : negligible f)
   simp only [mul_zero] at h
   exact h.congr (fun n => by rw [mul_left_comm])
 
+set_option linter.unusedDecidableInType false in
 /-- A finite sum of negligible functions is negligible. -/
 theorem negligible_sum {ι : Type*} [DecidableEq ι] {s : Finset ι} {f : ι → ℕ → ℝ≥0∞}
     (h : ∀ i ∈ s, negligible (f i)) :
@@ -74,7 +75,7 @@ theorem negligible_sum {ι : Type*} [DecidableEq ι] {s : Finset ι} {f : ι →
 Absorbs polynomial powers of the parameter into the superpolynomial decay. -/
 theorem negligible_pow_mul {f : ℕ → ℝ≥0∞} (hf : negligible f) (d : ℕ) :
     negligible (fun n => (↑n : ℝ≥0∞) ^ d * f n) := fun k => by
-  show Tendsto (fun (n : ℕ) => (↑n : ℝ≥0∞) ^ k * ((↑n : ℝ≥0∞) ^ d * f n)) atTop (nhds 0)
+  change Tendsto (fun (n : ℕ) => (↑n : ℝ≥0∞) ^ k * ((↑n : ℝ≥0∞) ^ d * f n)) atTop (nhds 0)
   simp_rw [← mul_assoc, ← pow_add]
   exact hf (k + d)
 

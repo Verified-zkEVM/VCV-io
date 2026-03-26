@@ -69,8 +69,9 @@ lemma probOutput_some_map_option_map {f : α → β} (hf : f.Injective) (x : α)
   cases a <;> cases b <;> simp_all [Option.map, hf.eq_iff]
 
 @[simp]
-lemma probOutput_none_map_option_map [DecidableEq β] (f : α → β) :
+lemma probOutput_none_map_option_map (f : α → β) :
     Pr[= none | Option.map f <$> mx] = Pr[= none | mx] := by
+  classical
   rw [probOutput_map_eq_tsum_ite]
   refine (tsum_eq_single none fun x hx => ?_).trans (by simp)
   cases x with

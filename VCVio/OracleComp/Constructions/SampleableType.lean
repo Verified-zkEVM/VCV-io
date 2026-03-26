@@ -53,13 +53,13 @@ lemma probOutput_uniformSample [Fintype α] (x : α) :
   refine ENNReal.eq_inv_of_mul_eq_one_left ?_
   simp_rw [this, Finset.mul_sum, mul_one]
   rw [← sum_probOutput_eq_one (mx := $ᵗ α) (by aesop)]
-  exact Finset.sum_congr rfl λ y _ ↦ SampleableType.probOutput_selectElem_eq x y
+  exact Finset.sum_congr rfl fun y _ ↦ SampleableType.probOutput_selectElem_eq x y
 
 @[grind .]
 lemma probOutput_uniformSample_inj (x y : α) : Pr[= x | $ᵗ α] = Pr[= y | $ᵗ α] :=
   SampleableType.probOutput_selectElem_eq _ _
 
-lemma probOutput_map_bijective_uniformSample [Fintype α]
+lemma probOutput_map_bijective_uniformSample
     {f : α → α} (hf : Function.Bijective f) (x : α) :
     Pr[= x | f <$> ($ᵗ α)] = Pr[= x | $ᵗ α] := by
   obtain ⟨x', rfl⟩ := hf.surjective x
@@ -291,7 +291,6 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
         probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush x.pop x.back,
         probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush y.pop y.back,
         probOutput_uniformSample_inj, ih x.pop y.pop]
-
 
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :

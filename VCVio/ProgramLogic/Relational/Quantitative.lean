@@ -36,6 +36,7 @@ indicator R      1-ε, indicator R    1, indicator(=)
 ```
 -/
 
+set_option linter.style.openClassical false
 open scoped Classical
 open ENNReal OracleSpec OracleComp
 
@@ -70,7 +71,7 @@ private lemma coupling_tsum_probOutput_eq_one
 private lemma spmf_bind_const_of_no_failure {p : SPMF α} (hp : Pr[⊥ | p] = 0) (q : SPMF β) :
     (p >>= fun _ => q) = q := by
   apply SPMF.ext; intro y
-  show Pr[= y | p >>= fun _ => q] = Pr[= y | q]
+  change Pr[= y | p >>= fun _ => q] = Pr[= y | q]
   rw [probOutput_bind_eq_tsum, ENNReal.tsum_mul_right, tsum_probOutput_eq_sub, hp,
     tsub_zero, one_mul]
 
@@ -85,18 +86,19 @@ private lemma nonempty_spmf_coupling
     change (evalDist ob).toPMF none = 0; exact probFailure_eq_zero (mx := ob)
   let c : SPMF (α × β) := p >>= fun (a : α) => q >>= fun (b : β) => pure (a, b)
   refine ⟨⟨c, ?_, ?_⟩⟩
-  · show Prod.fst <$> c = p
+  · change Prod.fst <$> c = p
     simp only [c, map_bind, map_pure]
     conv_rhs => rw [← bind_pure p]
     congr 1; funext a
     exact spmf_bind_const_of_no_failure hq (pure a)
-  · show Prod.snd <$> c = q
+  · change Prod.snd <$> c = q
     simp only [c, map_bind, map_pure]
     have : (fun (_ : α) => q >>= fun (b : β) => pure b) = fun _ => q := by
       funext _; exact bind_pure q
     rw [this]
     exact spmf_bind_const_of_no_failure hp q
 
+set_option linter.unusedDecidableInType false
 -- TODO: move to ToMathlib
 private lemma Finset_sum_iSup_le_iSup_sum {ι : Type*} {J : ι → Type*}
     [DecidableEq ι] [hne : ∀ i, Nonempty (J i)]
@@ -261,7 +263,7 @@ theorem relTriple'_iff_couplingPost
               Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] := by
         intro c
         rw [probEvent_eq_tsum_ite, tsum_option _ ENNReal.summable]
-        simp [fSub, RelPost.indicator]
+        simp only [RelPost.indicator, mul_zero, mul_ite, mul_one, tsum_fintype, zero_add, fSub]
         refine Finset.sum_congr rfl ?_
         intro x hx
         by_cases hR : R x.1.1 x.2.1
@@ -338,7 +340,6 @@ theorem relTriple'_iff_couplingPost
                 simp [packPair]
               _ = packB <$> evalDist ob := by rw [c.2.map_snd]
               _ = pb := rfl⟩
-
         calc
           ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
               = Pr[fun z : α × β => R z.1 z.2 | c.1] := by
@@ -401,7 +402,7 @@ theorem eRelTriple_pure (a : α) (b : β) (post : α → β → ℝ≥0∞) :
   unfold eRelTriple eRelWP
   have hc : SPMF.IsCoupling (pure (a, b) : SPMF (α × β))
       (evalDist (pure a : OracleComp spec₁ α)) (evalDist (pure b : OracleComp spec₂ β)) := by
-    simp [evalDist_pure]; exact SPMF.IsCoupling.pure_iff.mpr rfl
+    simpa only [evalDist_pure] using SPMF.IsCoupling.pure_iff.mpr rfl
   apply le_iSup_of_le ⟨pure (a, b), hc⟩
   have key : ∑' z, Pr[= z | (pure (a, b) : SPMF (α × β))] * post z.1 z.2 = post a b := by
     rw [tsum_eq_single (a, b)]
@@ -439,7 +440,7 @@ theorem eRelTriple_bind
     eRelTriple pre (oa >>= fa) (ob >>= fb) post := by
   have hstep : eRelTriple pre oa ob (fun a b => eRelWP (fa a) (fb b) post) :=
     eRelTriple_conseq le_rfl (fun a b => hfg a b) hxy
-  show pre ≤ eRelWP (oa >>= fa) (ob >>= fb) post
+  change pre ≤ eRelWP (oa >>= fa) (ob >>= fb) post
   refine le_trans hstep ?_
   show eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) ≤
     eRelWP (oa >>= fa) (ob >>= fb) post
@@ -627,18 +628,18 @@ private lemma tsum_min_le_eRelWP
     | some (a, b) => (if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹
   have hfst_sum : ∀ a, ∑' b, cf (some (a, b)) = P a := by
     intro a
-    show ∑' b, ((if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹) = P a
+    change ∑' b, ((if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹) = P a
     rw [ENNReal.tsum_add]
     rw [tsum_eq_single a (fun b hb => if_neg (Ne.symm hb))]
     simp only [ite_true]
     simp_rw [show ∀ b, rP a * rQ b * δ⁻¹ = (rP a * δ⁻¹) * rQ b
         from fun b => mul_right_comm _ _ _]
     rw [ENNReal.tsum_mul_left, hδ_eq_rQ, mul_assoc, mul_comm δ⁻¹ δ, hmul_δ]
-    show min (P a) (Q a) + (P a - min (P a) (Q a)) = P a
+    change min (P a) (Q a) + (P a - min (P a) (Q a)) = P a
     exact add_tsub_cancel_of_le (min_le_left _ _)
   have hsnd_sum : ∀ b, ∑' a, cf (some (a, b)) = Q b := by
     intro b
-    show ∑' a, ((if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹) = Q b
+    change ∑' a, ((if a = b then min (P a) (Q a) else 0) + rP a * rQ b * δ⁻¹) = Q b
     rw [ENNReal.tsum_add]
     conv_lhs => arg 1; rw [show
       (fun a => if a = b then min (P a) (Q a) else (0 : ℝ≥0∞)) =
@@ -657,7 +658,7 @@ private lemma tsum_min_le_eRelWP
         simp only [hrQ0, zero_mul]
       · rw [mul_assoc, ENNReal.inv_mul_cancel hδ0 hδ_ne_top, mul_one]
     rw [htsum_rQ]
-    show min (Q b) (P b) + (Q b - min (Q b) (P b)) = Q b
+    change min (Q b) (P b) + (Q b - min (Q b) (P b)) = Q b
     exact add_tsub_cancel_of_le (min_le_left _ _)
   have hcf_sum : ∑' x, cf x = 1 := by
     rw [tsum_option _ ENNReal.summable, show cf none = 0 from rfl, zero_add]
@@ -674,7 +675,7 @@ private lemma tsum_min_le_eRelWP
     apply SPMF.ext; intro a
     rw [show (Prod.fst <$> c_spmf) a = Pr[= a | Prod.fst <$> c_spmf] from rfl,
       probOutput_map_eq_tsum_ite c_spmf Prod.fst a]
-    show ∑' z : α × α, (if a = z.1 then cf (some z) else 0) = P a
+    change ∑' z : α × α, (if a = z.1 then cf (some z) else 0) = P a
     rw [ENNReal.tsum_prod']; dsimp only [Prod.fst]
     simp_rw [hite_tsum]
     rw [tsum_eq_single a (fun a' (ha' : a' ≠ a) => if_neg (Ne.symm ha'))]
@@ -683,7 +684,7 @@ private lemma tsum_min_le_eRelWP
     apply SPMF.ext; intro b
     rw [show (Prod.snd <$> c_spmf) b = Pr[= b | Prod.snd <$> c_spmf] from rfl,
       probOutput_map_eq_tsum_ite c_spmf Prod.snd b]
-    show ∑' z : α × α, (if b = z.2 then cf (some z) else 0) = Q b
+    change ∑' z : α × α, (if b = z.2 then cf (some z) else 0) = Q b
     rw [ENNReal.tsum_prod', ENNReal.tsum_comm]; dsimp only [Prod.snd]
     simp_rw [hite_tsum]
     rw [tsum_eq_single b (fun b' (hb' : b' ≠ b) => if_neg (Ne.symm hb'))]
@@ -699,7 +700,7 @@ private lemma tsum_min_le_eRelWP
     · simp [RelPost.indicator, EqRel, Ne.symm hb]
   calc ∑' a, min (P a) (Q a)
       ≤ ∑' a, cf (some (a, a)) := ENNReal.tsum_le_tsum fun a => by
-        show min (P a) (Q a) ≤ (if a = a then min (P a) (Q a) else 0) + _
+        change min (P a) (Q a) ≤ (if a = a then min (P a) (Q a) else 0) + _
         simp
     _ = ∑' z : α × α, Pr[= z | c.1] * RelPost.indicator (EqRel α) z.1 z.2 :=
         hobj_eq.symm

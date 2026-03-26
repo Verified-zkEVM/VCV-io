@@ -62,7 +62,8 @@ def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.Query
   induction is with
   | nil =>
     ext seed
-    simp [generateSeedCounts]
+    simp only [generateSeedCounts, support_pure, Set.mem_singleton_iff, List.not_mem_nil,
+      ↓reduceIte, List.length_eq_zero_iff, Set.mem_setOf_eq]
     constructor
     · intro h
       subst h
@@ -185,7 +186,7 @@ namespace seededOracle
 
 /-- The probability that a lifted uniform sample equals a fixed value is `(card α)⁻¹`. -/
 lemma probEvent_liftComp_uniformSample_eq_of_eq
-    {ι : Type} {spec : OracleSpec ι} [DecidableEq ι]
+    {ι : Type} {spec : OracleSpec ι}
     [(i : ι) → SampleableType (spec.Range i)]
     [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec]
     [spec.Fintype] [spec.Inhabited]
@@ -277,7 +278,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
         | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
         | some (u, s') => (simulateQ seededOracle (mx u)).run' s' := by
       intro s
-      show Prod.fst <$>
+      change Prod.fst <$>
         (seededOracle t >>= fun u => simulateQ seededOracle (mx u)).run s = _
       rw [run_bind_query_eq_pop]
       cases s.pop t with
@@ -431,7 +432,6 @@ lemma probOutput_generateSeed_bind_map_simulateQ
     (probOutput_generateSeed_bind_simulateQ_bind (qc := qc) (js := js)
       (oa := oa) (ob := fun x => pure (f x)) (y := y))
 
-set_option maxHeartbeats 800000 in
 /-- Adding a uniform value at index `i` to a seed does not change the distribution of
 running a computation with the seeded oracle. This is because the extra value replaces
 what would otherwise be a fresh uniform oracle response. -/
@@ -450,9 +450,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
   | pure x =>
     intro σ
     have hrun' : ∀ s, (simulateQ seededOracle (pure x : OracleComp spec₀ α)).run' s =
-        (pure x : OracleComp spec₀ α) := fun s => by
-      show Prod.fst <$> (pure (x, s) : OracleComp spec₀ _) = pure x
-      rw [map_pure]
+        (pure x : OracleComp spec₀ α) := fun s => by simp
     apply evalDist_ext; intro a
     simp_rw [hrun']
     rw [probOutput_bind_const]
@@ -469,7 +467,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
         | none => liftM (query t) >>= fun r => (simulateQ seededOracle (mx r)).run' s
         | some (r, s') => (simulateQ seededOracle (mx r)).run' s' := by
       intro s
-      show Prod.fst <$>
+      change Prod.fst <$>
         (seededOracle t >>= fun r => simulateQ seededOracle (mx r)).run s = _
       rw [run_bind_query_eq_pop]
       cases s.pop t with
@@ -538,7 +536,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ rest hlist]
           suffices Function.update (σ.addValue i v) t rest =
               QuerySeed.addValue (Function.update σ t rest) i v by rw [this]
-          show Function.update (Function.update σ i (σ i ++ [v])) t rest =
+          change Function.update (Function.update σ i (σ i ++ [v])) t rest =
             Function.update (Function.update σ t rest) i
               ((Function.update σ t rest) i ++ [v])
           conv_rhs =>
@@ -584,7 +582,6 @@ lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
     rw [← evalDist_bind]
     exact evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue σ i oa
 
-set_option maxHeartbeats 4000000 in
 /-- Truncating the seed at oracle `i₀` to only the first `k` entries does not change
 the distribution when averaging over seeds from `generateSeed`. -/
 lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
@@ -615,7 +612,7 @@ lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
         | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
         | some (u, s') => (simulateQ seededOracle (mx u)).run' s' := by
       intro s
-      show Prod.fst <$>
+      change Prod.fst <$>
         (seededOracle t >>= fun u => simulateQ seededOracle (mx u)).run s = _
       rw [run_bind_query_eq_pop]
       cases s.pop t with
@@ -802,7 +799,6 @@ lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
   rw [hcomp]
   exact congrFun (congrArg DFunLike.coe (by simp only [evalDist_map, h])) y
 
-set_option maxHeartbeats 8000000 in
 /-- Weighted takeAtIndex faithfulness: a prefix-dependent weight `h` preserves the
 faithfulness equality between full-seed and truncated-seed simulation.
 This generalizes the basic takeAtIndex faithfulness by allowing multiplication
@@ -837,7 +833,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
         | none => liftM (query t) >>= fun u => (simulateQ seededOracle (mx u)).run' s
         | some (u, s') => (simulateQ seededOracle (mx u)).run' s' := by
       intro s
-      show Prod.fst <$>
+      change Prod.fst <$>
         (seededOracle t >>= fun u => simulateQ seededOracle (mx u)).run s = _
       rw [run_bind_query_eq_pop]
       cases s.pop t with

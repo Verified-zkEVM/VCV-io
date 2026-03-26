@@ -48,7 +48,8 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
                 (Raw.uniform (α := spec.Range t)) x
       _ = (Fintype.card (spec.Range t) : ℚ≥0)⁻¹ := Raw.prob_uniform (α := spec.Range t) x
   rw [PMF.uniformOfFintype_apply]
-  change (((@Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
+  change (((@Raw.prob _ (Classical.decEq _)
+    (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
       = ((Fintype.card (spec.Range t) : ENNReal)⁻¹)
   calc
     (((@Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
@@ -132,13 +133,15 @@ def twoCoinQueries : OracleComp coinSpec Nat := do
   let b2 <- OracleComp.coin
   pure (cond b1 1 0 + cond b2 1 0)
 
--- #eval FinRatPMF.Raw.coin
--- #eval xorTwoCoins
--- #eval xorTwoCoins.normalize
--- #eval threeCoinCount.normalize
--- #eval! simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries
--- #eval! (simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize
--- #eval! (((simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize.prob 1 : ℚ≥0) : ℚ)
+/-
+#eval FinRatPMF.Raw.coin
+#eval xorTwoCoins
+#eval xorTwoCoins.normalize
+#eval threeCoinCount.normalize
+#eval! simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries
+#eval! (simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize
+#eval! (simulateQ (FinRatPMF.finRatImpl (spec := coinSpec)) twoCoinQueries).normalize.prob 1)
+-/
 
 end Demo
 end FinRatPMF

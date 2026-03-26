@@ -4,18 +4,8 @@ open Lake DSL
 -- TODO: update linters and remove all errors in library
 -- should probably adopt conventions similar to `Batteries`.
 abbrev vcvLinters : Array LeanOption := #[
-  -- ⟨`linter.docPrime, true⟩,
-  ⟨`linter.hashCommand, true⟩,
-  ⟨`linter.oldObtain, true,⟩,
-  ⟨`linter.refine, true⟩,
-  ⟨`linter.style.cdot, true⟩,
-  ⟨`linter.style.dollarSyntax, true⟩,
-  ⟨`linter.style.longLine, false⟩, -- temp
-  ⟨`linter.style.longFile, .ofNat 1500⟩,
-  ⟨`linter.pythonStyle, false⟩,
-  ⟨`linter.modulesUpperCamelCase, false⟩,
-  ⟨`linter.style.missingEnd, true⟩,
-  ⟨`linter.style.setOption, true⟩
+  ⟨`linter.mathlibStandardSet, true⟩,
+  ⟨`linter.style.whitespace, false⟩ -- causes too many false positives with notation
 ]
 
 package VCVio where

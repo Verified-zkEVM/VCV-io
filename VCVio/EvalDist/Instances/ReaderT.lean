@@ -89,7 +89,7 @@ variable [HasEvalSPMF m] (ρ0 : ρ)
 @[simp] lemma evalSPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
     HasEvalSPMF.readerAt ρ0 (mx >>= f) =
       HasEvalSPMF.readerAt ρ0 mx >>= fun x => HasEvalSPMF.readerAt ρ0 (f x) := by
-  simp [HasEvalSPMF.readerAt, MonadHom.comp_apply]
+  simp only [HasEvalSPMF.readerAt, MonadHom.comp_apply, evalAt_apply]
   apply MonadHom.toFun_bind'
 
 end evalDist_lemmas
@@ -100,13 +100,14 @@ variable [HasEvalPMF m] (ρ0 : ρ)
 
 @[simp] lemma evalPMF_pure (x : α) :
     HasEvalPMF.readerAt ρ0 (pure x : ReaderT ρ m α) = HasEvalPMF.toPMF (pure x : m α) := by
-  simp [HasEvalPMF.readerAt]
+  simp only [HasEvalPMF.readerAt, MonadHom.comp_apply, evalAt_apply, MonadHom.toFun_pure',
+    PMF.monad_pure_eq_pure]
   apply MonadHom.toFun_pure'
 
 @[simp] lemma evalPMF_bind (mx : ReaderT ρ m α) (f : α → ReaderT ρ m β) :
     HasEvalPMF.readerAt ρ0 (mx >>= f) =
       HasEvalPMF.readerAt ρ0 mx >>= fun x => HasEvalPMF.readerAt ρ0 (f x) := by
-  simp [HasEvalPMF.readerAt, MonadHom.comp_apply]
+  simp only [HasEvalPMF.readerAt, MonadHom.comp_apply, evalAt_apply, PMF.monad_bind_eq_bind]
   apply MonadHom.toFun_bind'
 
 end evalPMF_lemmas

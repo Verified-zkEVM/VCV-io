@@ -166,7 +166,7 @@ theorem probEvent_cost_gt_mul_le_expectedCost
     (oa : OracleComp spec α) (cm : CostModel spec ω) (val : ω → ℝ≥0∞) (t : ℝ≥0∞) :
     Pr[fun z => t < val z.2 | costDist oa cm] * t ≤ expectedCost oa cm val := by
   rw [probEvent_eq_wp_indicator]
-  show wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t ≤
+  change wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t ≤
     wp (costDist oa cm) (fun z => val z.2)
   calc wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t
       = wp (costDist oa cm) (fun z => t * (if t < val z.2 then 1 else 0)) := by
@@ -175,7 +175,7 @@ theorem probEvent_cost_gt_mul_le_expectedCost
         apply wp_mono
         intro z
         split_ifs with h
-        · simp; exact le_of_lt h
+        · simpa using le_of_lt h
         · simp
 
 /-- **Markov's inequality for cost distributions** (division form). -/

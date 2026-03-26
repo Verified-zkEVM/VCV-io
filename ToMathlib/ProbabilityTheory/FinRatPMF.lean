@@ -283,7 +283,7 @@ private lemma list_prob_eq_zero [DecidableEq α] {l : List (α × ℚ≥0)} {x :
   suffices l.filter (fun a => a.1 = x) = [] by simp [this]
   rw [List.filter_eq_nil_iff]
   simp only [List.mem_toFinset, List.mem_map] at hx
-  exact fun a ha => by simp; intro heq; exact hx ⟨a, ha, heq ▸ rfl⟩
+  exact fun a ha => by simp only [decide_eq_true_eq]; intro heq; exact hx ⟨a, ha, heq ▸ rfl⟩
 
 private lemma list_sum_prob_eq [DecidableEq α] (l : List (α × ℚ≥0)) :
     (l.map Prod.fst |>.toFinset).sum
@@ -381,7 +381,7 @@ private lemma filter_eq_singleton_of_nodup [DecidableEq α] {l : List α} (hnd :
         cases hx with
         | head => exact False.elim (hax rfl)
         | tail _ hx' => exact hx'
-      simp [hax]
+      simp only [hax, decide_false, Bool.false_eq_true, not_false_eq_true, List.filter_cons_of_neg]
       exact ih hndtl hx'
 
 /-- Point probabilities for `uniformList` on a duplicate-free list. -/
@@ -528,7 +528,7 @@ private lemma list_sum_prob_mul_eq [DecidableEq α] (l : List (α × ℚ≥0)) (
             rw [Finset.sum_insert hm, hzero, zero_mul, zero_add]
             exact ih
 
-private lemma probOfList_bind_eq_sum [DecidableEq α] [DecidableEq β]
+private lemma probOfList_bind_eq_sum [DecidableEq β]
     (l : List (α × ℚ≥0)) (g : α → Raw β) (y : β) :
     probOfList (l.flatMap (fun (a, p) => (g a).toList.map (fun (b, q) => (b, p * q)))) y =
       (l.map (fun (a, p) => p * (g a).prob y)).sum := by
@@ -712,9 +712,11 @@ private lemma snd_ne_zero_of_mem_normalizeMap_toList [BEq α] [Hashable α]
   | none => simp [hacc] at hsome
   | some q =>
     by_cases hq : q = 0
-    · simp [hacc, hq] at hsome
+    · simp only [ne_eq, decide_not, hacc, hq, Option.filter_eq_some_iff, Option.some.injEq,
+        Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not] at hsome
       exact False.elim (hsome.2 hsome.1.symm)
-    · simp [hacc] at hsome
+    · simp only [ne_eq, decide_not, hacc, Option.filter_eq_some_iff, Option.some.injEq,
+        Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not] at hsome
       exact hsome.2
 
 private lemma normalizeMap_keys_eq_support [DecidableEq α] [BEq α] [Hashable α]
@@ -736,7 +738,8 @@ protected def normalize [DecidableEq α] [BEq α] [Hashable α] [LawfulBEq α] [
       normalizeMap_keys_eq_support p
     calc
       (((normalizeMap p).toList.map Prod.snd).sum) =
-          (((normalizeMap p).toList.map Prod.fst).toFinset.sum (probOfList (normalizeMap p).toList)) := by
+          (((normalizeMap p).toList.map Prod.fst).toFinset.sum
+            (probOfList (normalizeMap p).toList)) := by
         symm
         exact list_sum_prob_eq (normalizeMap p).toList
       _ = p.support.sum p.prob := by
@@ -852,7 +855,7 @@ lemma SameDist.support_eq [DecidableEq α] {p q : Raw α} (h : SameDist p q) :
   ext x
   rw [Raw.mem_support_iff, Raw.mem_support_iff, h.prob_eq x]
 
-lemma SameDist.bind_congr [DecidableEq α] [DecidableEq β] {p q : Raw α}
+lemma SameDist.bind_congr {p q : Raw α}
     {f g : α → Raw β} (hpq : SameDist p q) (hfg : ∀ x, SameDist (f x) (g x)) :
     SameDist (p >>= f) (q >>= g) := by
   intro y
@@ -872,7 +875,7 @@ lemma SameDist.bind_congr [DecidableEq α] [DecidableEq β] {p q : Raw α}
   intro x hx
   rw [hpq x, hfg x y]
 
-lemma SameDist.map_congr [DecidableEq α] [DecidableEq β] {p q : Raw α}
+lemma SameDist.map_congr {p q : Raw α}
     (hpq : SameDist p q) (f : α → β) :
     SameDist (f <$> p) (f <$> q) := by
   simpa [Functor.map] using
@@ -989,7 +992,8 @@ noncomputable def toPMF (p : FinRatPMF α) : PMF α := by
   classical
   rw [show (pure a : FinRatPMF α) = mk (Raw.pure a) by rfl, toPMF_mk, Raw.toPMF_pure]
 
-lemma toPMF_out (p : FinRatPMF α) : toPMF p = @Raw.toPMF _ (Classical.decEq _) (Quotient.out p) := by
+lemma toPMF_out (p : FinRatPMF α) :
+    toPMF p = @Raw.toPMF _ (Classical.decEq _) (Quotient.out p) := by
   classical
   refine Quotient.inductionOn p ?_
   intro q
@@ -1122,7 +1126,6 @@ instance [DecidableEq α] : BEq (Raw α) where
 
 @[simp] lemma beq_iff_sameDist [DecidableEq α] (p q : Raw α) :
     (p == q) = true ↔ SameDist p q := by
-  show decide (SameDist p q) = true ↔ SameDist p q
-  simp
+  change decide (SameDist p q) = true ↔ SameDist p q; simp
 
 end FinRatPMF

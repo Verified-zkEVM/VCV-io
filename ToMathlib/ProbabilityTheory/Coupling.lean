@@ -58,7 +58,8 @@ theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × 
     rw [SPMF.fmap_eq_map] at h1 h2
     change PMF.map (Option.map Prod.fst) c = PMF.pure (some a) at h1
     change PMF.map (Option.map Prod.snd) c = PMF.pure (some b) at h2
-    rw [show (pure (a, b) : SPMF (α × β)) = PMF.pure (some (a, b)) from SPMF.pure_eq_pure_some (a, b)]
+    rw [show (pure (a, b) : SPMF (α × β)) = PMF.pure (some (a, b))
+        from SPMF.pure_eq_pure_some (a, b)]
     exact PMF.eq_pure_of_forall_ne_eq_zero c (some (a, b)) fun x hx => by
       cases x with
       | none => exact PMF.map_eq_pure_zero _ c _ h1 none (by simp)
@@ -73,7 +74,7 @@ theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × 
 
 theorem IsCoupling.none_iff {α β : Type u} {c : SPMF (α × β)} :
     IsCoupling c (failure : SPMF α) (failure : SPMF β) ↔ c = failure := by
-  simp [failure]
+  simp only [failure]
   constructor
   · intro ⟨h1, h2⟩
     rw [SPMF.fmap_eq_map] at h1
@@ -96,7 +97,7 @@ theorem IsCoupling.bind {α₁ α₂ β₁ β₂ : Type u}
     {p : SPMF α₁} {q : SPMF α₂} {f : α₁ → SPMF β₁} {g : α₂ → SPMF β₂}
     (c : Coupling p q) (d : (a₁ : α₁) → (a₂ : α₂) → SPMF (β₁ × β₂))
     (h : ∀ (a₁ : α₁) (a₂ : α₂), c.1.1 (some (a₁, a₂)) ≠ 0 → IsCoupling (d a₁ a₂) (f a₁) (g a₂)) :
-    IsCoupling (c.1 >>= λ (p : α₁ × α₂) => d p.1 p.2) (p >>= f) (q >>= g) := by
+    IsCoupling (c.1 >>= fun (p : α₁ × α₂) => d p.1 p.2) (p >>= f) (q >>= g) := by
   obtain ⟨hc₁, hc₂⟩ := c.2
   constructor
   · rw [SPMF.fmap_eq_map, bind_eq_pmf_bind, PMF.map_bind]
@@ -130,7 +131,7 @@ theorem IsCoupling.exists_bind {α₁ α₂ β₁ β₂ : Type u}
     fun a₁ a₂ => Classical.choose (h a₁ a₂)
   let hd : ∀ (a₁ : α₁) (a₂ : α₂), c.1.1 (some (a₁, a₂)) ≠ 0 → IsCoupling (d a₁ a₂) (f a₁) (g a₂) :=
     fun a₁ a₂ _ => Classical.choose_spec (h a₁ a₂)
-  ⟨c.1 >>= λ (p : α₁ × α₂) => d p.1 p.2, IsCoupling.bind c d hd⟩
+  ⟨c.1 >>= fun (p : α₁ × α₂) => d p.1 p.2, IsCoupling.bind c d hd⟩
 
 /-- Every `SPMF` has a diagonal self-coupling. -/
 theorem IsCoupling.refl (p : SPMF α) :

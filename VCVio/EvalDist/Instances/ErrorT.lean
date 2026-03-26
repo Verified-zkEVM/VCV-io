@@ -52,11 +52,11 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalS
     HasEvalSet (ExceptT ε m) where
   toSet.toFun α mx := Except.ok ⁻¹' (support mx.run)
   toSet.toFun_pure' x := Set.ext fun y => by
-    show Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
+    change Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
     simp
   toSet.toFun_bind' mx f := Set.ext fun x => by
     simp only [Set.mem_preimage, Set.bind_def, Set.mem_iUnion₂]
-    show Except.ok x ∈ support (mx.run >>= ExceptT.bindCont f) ↔ _
+    change Except.ok x ∈ support (mx.run >>= ExceptT.bindCont f) ↔ _
     rw [mem_support_bind_iff]
     constructor
     · rintro ⟨r, hr, hx⟩
@@ -142,12 +142,12 @@ noncomputable def toSPMF' [HasEvalPMF m] : ExceptT ε m →ᵐ SPMF where
       | Except.error _ => failure
   toFun_pure' x := by simp
   toFun_bind' mx f := by
-    show HasEvalSPMF.toSPMF (mx.run >>= ExceptT.bindCont f) >>= _ = _
+    change HasEvalSPMF.toSPMF (mx.run >>= ExceptT.bindCont f) >>= _ = _
     simp only [MonadHom.toFun_bind', bind_assoc]
     congr 1; funext r
     cases r with
     | ok a =>
-      show HasEvalSPMF.toSPMF (f a).run >>= _ =
+      change HasEvalSPMF.toSPMF (f a).run >>= _ =
         pure a >>= fun b => HasEvalSPMF.toSPMF (f b).run >>= _
       simp
     | error e => simp [ExceptT.bindCont]
@@ -195,11 +195,12 @@ lemma probFailure_eq (mx : ExceptT ε m α) :
   simp only [probFailure_def, probEvent_eq_tsum_indicator, probOutput_def]
   rw [show evalDist mx = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure : SPMF α) from rfl]
-  simp [SPMF.toPMF_bind, Option.elimM, PMF.bind_apply, tsum_option,
-    SPMF.apply_eq_toPMF_some, evalDist_def]
+  simp only [SPMF.run_eq_toPMF, SPMF.toPMF_bind, Option.elimM, PMF.monad_bind_eq_bind,
+    PMF.bind_apply, ENNReal.summable, tsum_option, Option.elim_none, PMF.pure_apply, ↓reduceIte,
+    mul_one, Option.elim_some, evalDist_def, SPMF.apply_eq_toPMF_some, ne_eq, PMF.apply_ne_top,
+    not_false_eq_true, add_right_inj_of_ne_top]
   refine tsum_congr fun r => ?_
   cases r <;> simp [SPMF.toPMF_failure, SPMF.toPMF_pure]
-
 
 lemma probOutput_liftM [LawfulMonad m] (mx : m α) (x : α) :
     Pr[= x | (liftM mx : ExceptT ε m α)] = Pr[= x | mx] := by

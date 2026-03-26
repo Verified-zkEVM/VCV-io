@@ -20,7 +20,7 @@
 
 -- -- helpers for converting String's & BitVec's
 -- def string_to_bitvec (s : String) : BitVec 256 :=
---   s.foldl (λ acc c => (acc.shiftLeft 8) + BitVec.ofNat 256 c.toNat) 0
+--   s.foldl (fun acc c => (acc.shiftLeft 8) + BitVec.ofNat 256 c.toNat) 0
 
 -- def bitvec_to_string (bv : BitVec 256) : String :=
 --   let rec chars (n : Nat) (acc : List Char) :=

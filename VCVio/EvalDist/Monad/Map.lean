@@ -43,7 +43,7 @@ lemma evalDist_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m]
     evalDist (f <$> mx) = evalDist (f <$> my) := by
   simpa [evalDist_map] using congrArg (fun p => f <$> p) h
 
-lemma probOutput_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m] [DecidableEq β]
+lemma probOutput_map_eq_of_evalDist_eq [HasEvalSPMF m] [LawfulMonad m]
     {mx my : m α} (h : evalDist mx = evalDist my) (f : α → β) (y : β) :
     Pr[= y | f <$> mx] = Pr[= y | f <$> my] := by
   exact (evalDist_ext_iff.mp (evalDist_map_eq_of_evalDist_eq h f)) y
@@ -70,7 +70,7 @@ lemma probOutput_map_eq_tsum_subtype (y : β) :
     Pr[= y | f <$> mx] = ∑' x : {x ∈ support mx | y = f x}, Pr[= x | mx] := by
   simp only [map_eq_bind_pure_comp, tsum_subtype _, probOutput_bind_eq_tsum, Function.comp_apply,
     Set.indicator, Set.mem_setOf_eq]
-  refine (tsum_congr (λ x ↦ ?_))
+  refine (tsum_congr (fun x ↦ ?_))
   by_cases hy : y = f x <;> by_cases hx : x ∈ support mx <;> simp [hy, hx]
 
 lemma probOutput_map_eq_tsum (y : β) :
@@ -127,7 +127,7 @@ lemma probOutput_map_eq_single {mx : m α} {f : α → β} {y : β}
     (x : α) (h : ∀ x' ∈ support mx, y = f x' → x = x') (h' : f x = y) :
     Pr[= y | f <$> mx] = Pr[= x | mx] := by
   rw [probOutput_map_eq_tsum]
-  refine (tsum_eq_single x (λ x' hx' ↦ ?_)).trans (by rw [h', probOutput_pure_self, mul_one])
+  refine (tsum_eq_single x (fun x' hx' ↦ ?_)).trans (by rw [h', probOutput_pure_self, mul_one])
   specialize h x'
   simp only [mul_eq_zero, probOutput_eq_zero_iff, support_pure, Set.mem_singleton_iff]
   tauto

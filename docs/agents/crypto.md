@@ -174,7 +174,7 @@ Defined in `VCVio/CryptoFoundations/Asymptotics/`.
 ### Negligible functions (`Negligible.lean`)
 
 ```lean
-def negligible (f : ℕ → ℝ≥0∞) : Prop := SuperpolynomialDecay atTop (λ x ↦ ↑x) f
+def negligible (f : ℕ → ℝ≥0∞) : Prop := SuperpolynomialDecay atTop (fun x ↦ ↑x) f
 ```
 
 Closure properties: `negligible_add`, `negligible_const_mul`, `negligible_sum`,

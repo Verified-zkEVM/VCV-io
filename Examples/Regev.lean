@@ -29,13 +29,13 @@
 --     let s ←$ᵗ Vector (Fin p) n
 --     let e ← (Vector.Range m).mapM (fun _ ↦ errSampKG)
 --     return ((A, Vector.ofFn (Matrix.vecMul s.get A) + e), s)
---   encrypt := λ (A, y) msg ↦ do
+--   encrypt := fun (A, y) msg ↦ do
 --     let r2 ←$ᵗ Vector (Fin 2) m
 --     let r := (r2.map (Fin.castLE hp2.one_lt)).get
 --     let yr := dotProduct y.get r
 --     let signal := if msg then 0 else p / 2
 --     return (Vector.ofFn (Matrix.mulVec A r), yr + (Fin.ofNat p signal))
---   decrypt := λ s (a, b) ↦ do
+--   decrypt := fun s (a, b) ↦ do
 --     let sa := dotProduct s.get a.get
 --     let val := Fin.val (sa - b)
 --     return if val < p/4 then true else val > 3*p/4

@@ -54,7 +54,7 @@ instance [Inhabited (f α)] : Inhabited (FreeMonad f α) := ⟨FreeMonad.lift de
 @[always_inline, inline]
 protected def bind : FreeMonad f α → (α → FreeMonad f β) → FreeMonad f β
   | FreeMonad.pure x, g => g x
-  | FreeMonad.roll x r, g => FreeMonad.roll x (λ u ↦ FreeMonad.bind (r u) g)
+  | FreeMonad.roll x r, g => FreeMonad.roll x (fun u ↦ FreeMonad.bind (r u) g)
 
 @[simp]
 lemma bind_pure (x : α) (r : α → FreeMonad f β) :
@@ -62,7 +62,7 @@ lemma bind_pure (x : α) (r : α → FreeMonad f β) :
 
 @[simp]
 lemma bind_roll (x : f α) (r : α → FreeMonad f β) (g : β → FreeMonad f γ) :
-    FreeMonad.bind (FreeMonad.roll x r) g = FreeMonad.roll x (λ u ↦ FreeMonad.bind (r u) g) := rfl
+    FreeMonad.bind (FreeMonad.roll x r) g = FreeMonad.roll x (fun u ↦ FreeMonad.bind (r u) g) := rfl
 
 @[simp]
 lemma bind_lift (x : f α) (r : α → FreeMonad f β) :
@@ -81,15 +81,15 @@ lemma monad_bind_def (x : FreeMonad f α) (g : α → FreeMonad f β) :
 
 instance : LawfulMonad (FreeMonad f) :=
   LawfulMonad.mk' (FreeMonad f)
-    (λ x ↦ by
-      induction' x with α x g r hr
-      · rfl
-      · exact congr_arg (FreeMonad.roll g) (funext λ u ↦ hr u))
-    (λ x f ↦ rfl)
-    (λ x f g ↦ by
-      induction' x with α x g r hr
-      · rfl
-      · exact congr_arg (FreeMonad.roll g) (funext λ u ↦ hr u))
+    (fun x ↦ by
+      induction x with -- α x g r hr
+      | pure x => rfl
+      | roll g r hr => exact congr_arg (FreeMonad.roll g) (funext fun u ↦ hr u))
+    (fun x f ↦ rfl)
+    (fun x f g ↦ by
+      induction x with
+      | pure x => rfl
+      | roll g r hr => exact congr_arg (FreeMonad.roll g) (funext fun u ↦ hr u))
 
 instance : MonadFunctor f (FreeMonad f) where
   monadMap g
@@ -98,7 +98,7 @@ instance : MonadFunctor f (FreeMonad f) where
 
 /-- Proving something about `FreeMonad f α` only requires two cases:
 * `pure x` for some `x : α`
-Note that we can't use `Sort v` instead of `Prop` due to universe levels.-/
+Note that we can't use `Sort v` instead of `Prop` due to universe levels. -/
 @[elab_as_elim]
 protected def inductionOn {C : FreeMonad f α → Prop}
     (pure : ∀ x, C (pure x))
@@ -106,12 +106,12 @@ protected def inductionOn {C : FreeMonad f α → Prop}
       (∀ y, C (r y)) → C (x >>= r)) :
     (oa : FreeMonad f α) → C oa
   | FreeMonad.pure x => pure x
-  | FreeMonad.roll x r => roll x _ (λ u ↦
+  | FreeMonad.roll x r => roll x _ (fun u ↦
       FreeMonad.inductionOn pure roll (r u))
 
 section construct
 
-/-- Shoulde be possible to unify with the above-/
+/-- Shoulde be possible to unify with the above. -/
 @[elab_as_elim]
 protected def construct {C : FreeMonad f α → Type*}
     (pure : (x : α) → C (pure x))
@@ -119,7 +119,7 @@ protected def construct {C : FreeMonad f α → Type*}
       ((y : β) → C (r y)) → C (x >>= r)) :
     (oa : FreeMonad f α) → C oa
   | .pure x => pure x
-  | .roll x r => roll x _ (λ u ↦ FreeMonad.construct pure roll (r u))
+  | .roll x r => roll x _ (fun u ↦ FreeMonad.construct pure roll (r u))
 
 variable {C : FreeMonad f α → Type*} (h_pure : (x : α) → C (pure x))
   (h_roll : {β : Type u} → (x : f β) → (r : β → FreeMonad f α) →
@@ -131,7 +131,7 @@ lemma construct_pure (y : α) : FreeMonad.construct h_pure h_roll (pure y) = h_p
 @[simp]
 lemma construct_roll (x : f β) (r : β → FreeMonad f α) :
     (FreeMonad.construct h_pure h_roll (roll x r) : C (roll x r)) =
-      (h_roll x r (λ u ↦ FreeMonad.construct h_pure h_roll (r u))) := rfl
+      (h_roll x r (fun u ↦ FreeMonad.construct h_pure h_roll (r u))) := rfl
 
 end construct
 
@@ -142,7 +142,7 @@ variable {m : Type u → Type w} (s : {α : Type u} → f α → m α)
 protected def mapM_aux [Pure m] [Bind m] (s : {α : Type u} → f α → m α) :
     (oa : FreeMonad f α) → m α
   | .pure x => pure x
-  | .roll x r => s x >>= λ u ↦ (r u).mapM_aux s
+  | .roll x r => s x >>= fun u ↦ (r u).mapM_aux s
 
 protected def mapM' (m : Type u → Type w) [Monad m] [LawfulMonad m]
     (s : {α : Type u} → f α → m α) : FreeMonad f →ᵐ m where
@@ -159,11 +159,11 @@ lemma mapM'_lift [Monad m] [LawfulMonad m]
     FreeMonad.mapM' m s (FreeMonad.lift x) = s x := by
   simp [FreeMonad.mapM', FreeMonad.lift, FreeMonad.mapM_aux]
 
-/-- Canonical mapping of a free monad into any other monad, given a map on the base functor, -/
+/-- Canonical mapping of a free monad into any other monad, given a map on the base functor. -/
 protected def mapM [Pure m] [Bind m] :
     (oa : FreeMonad f α) → (s : {α : Type u} → f α → m α) → m α
   | .pure x, _ => pure x
-  | .roll x r, s => s x >>= λ u ↦ (r u).mapM s
+  | .roll x r, s => s x >>= fun u ↦ (r u).mapM s
 
 variable [Monad m]
 
@@ -175,7 +175,7 @@ lemma mapM_pure (x : α) : (FreeMonad.pure x : FreeMonad f α).mapM s = pure x :
 
 @[simp]
 lemma mapM_roll (x : f α) (r : α → FreeMonad f β) :
-    (FreeMonad.roll x r).mapM s = s x >>= λ u ↦ (r u).mapM s := rfl
+    (FreeMonad.roll x r).mapM s = s x >>= fun u ↦ (r u).mapM s := rfl
 
 end mapM
 
@@ -194,7 +194,7 @@ section depth
   maximum depth of its children. -/
 noncomputable def depth : FreeMonad f α → ℕ∞
   | .pure _ => 0
-  | .roll _ r => 1 + iSup (λ u ↦ depth (r u))
+  | .roll _ r => 1 + iSup (fun u ↦ depth (r u))
 
 @[simp]
 lemma depth_pure {x : α} : depth (pure x : FreeMonad f α) = 0 := rfl
@@ -204,13 +204,13 @@ lemma depth_pure' {x : α} : depth (FreeMonad.pure x : FreeMonad f α) = 0 := rf
 
 @[simp]
 lemma depth_roll {x : f α} {r : α → FreeMonad f β} :
-    depth (roll x r : FreeMonad f β) = 1 + iSup (λ u ↦ depth (r u)) := rfl
+    depth (roll x r : FreeMonad f β) = 1 + iSup (fun u ↦ depth (r u)) := rfl
 
 @[simp]
 noncomputable def depthBindAux {f : Type u → Type v} {α β : Type u} :
     FreeMonad f α → (α → FreeMonad f β) → ℕ∞
   | .pure x, g => depth (g x)
-  | .roll _ r, g => 1 + iSup (λ u ↦ depthBindAux (r u) g)
+  | .roll _ r, g => 1 + iSup (fun u ↦ depthBindAux (r u) g)
 
 /-- The depth of a bind computation can be defined _exactly_
   using the definition of bind (but might not be very revealing) -/
@@ -221,17 +221,18 @@ lemma depth_bind_eq {x : FreeMonad f α} {g : α → FreeMonad f β} :
   | roll x r hr => simp_all [depthBindAux, FreeMonad.monad_bind_def]
 
 lemma depth_bind_le {x : FreeMonad f α} {g : α → FreeMonad f β} :
-    depth (x >>= g) ≤ depth x + iSup (λ u ↦ depth (g u)) := by
+    depth (x >>= g) ≤ depth x + iSup (fun u ↦ depth (g u)) := by
   induction x using FreeMonad.inductionOn with
-  | pure x => simp; exact le_iSup_iff.mpr fun b a ↦ a x
+  | pure x => simp only [monad_pure_def, monad_bind_def, bind_pure, depth_pure', zero_add]
+              exact le_iSup_iff.mpr fun b a ↦ a x
   | roll x r hr =>
-    simp_all
+    simp_all only [monad_bind_def, monadLift_eq_lift, bind_lift, bind_roll, depth_roll]
     calc
       _ ≤ 1 + ⨆ u, (r u).depth + ⨆ v, (g v).depth := by
         gcongr; exact hr _
       _ ≤ 1 + (⨆ u, (r u).depth) + ⨆ v, (g v).depth := by
         rw [add_assoc]
-        gcongr; simp; intro b; gcongr; exact le_iSup_iff.mpr fun b_1 a ↦ a b
+        gcongr; simp only [iSup_le_iff]; intro b; gcongr; exact le_iSup_iff.mpr fun b_1 a ↦ a b
 
 lemma depth_eq_zero_iff {x : FreeMonad f α} : depth x = 0 ↔ ∃ y, x = pure y := by
   induction x using FreeMonad.inductionOn with
@@ -244,7 +245,9 @@ lemma depth_eq_one_iff {x : FreeMonad f α} : depth x = 1 ↔
   | pure x' => simp
   | roll y r _hr =>
     rename_i β
-    simp
+    simp only [monadLift_eq_lift, monad_bind_def, bind_lift, depth_roll,
+      isAddLeftRegular_iff_isAddRegular, ne_eq, ENat.one_ne_top, not_false_eq_true,
+      IsAddRegular.of_ne_top, IsAddLeftRegular.add_left_eq_self_iff, ENat.iSup_eq_zero, roll.injEq]
     constructor <;> intro h
     · exact ⟨β, y, r, ⟨⟨rfl, by simp, by simp⟩, h⟩⟩
     · obtain ⟨β', y_1, r_1, ⟨⟨hβ, hy, hr⟩, hr'⟩⟩ := h

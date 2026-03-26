@@ -111,7 +111,7 @@ variable {C₁ : Type u₁} [Category.{v₁} C₁] {D₁ : Type u₂} [Category.
   {J₁ : C₁ ⥤ D₁} {J₂ : C₂ ⥤ D₂}
 
 /-- The product of two relative monads is a relative monad on the corresponding product categories.
-  -/
+ -/
 @[simps!]
 def prod (M₁ : RelativeMonad C₁ D₁ J₁) (M₂ : RelativeMonad C₂ D₂ J₂) :
     RelativeMonad (C₁ × C₂) (D₁ × D₂) (Functor.prod J₁ J₂) where

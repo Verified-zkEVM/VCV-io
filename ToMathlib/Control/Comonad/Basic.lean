@@ -93,7 +93,7 @@ class Comonad (w : Type u → Type v) extends Coapplicative w, Extend w where
       1. `extend` over the first context, so we may look inside it,
       2. pair its extracted value with the *already* extracted value of `wb`.
 
-      This yields `w (α × β)` as required.  -/
+      This yields `w (α × β)` as required. -/
   coseq wa wb := extend wa (fun wa' => (extract wa', extract wb))
 
 -- Lawful Hierarchy --

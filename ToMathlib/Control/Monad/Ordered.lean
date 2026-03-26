@@ -130,7 +130,7 @@ class MonadLift.LE (m : Type u → Type v) (n : Type u → Type w) [Monad m] [Or
   monadLift_le {α} (a : m α) : φ.monadLift a ≤ₘ ψ.monadLift a
 
 /-- If the target monad `n` is ordered, then we have a preorder on the monad lifts from `m` to `n`.
-  -/
+ -/
 instance {m n} [Monad m] [OrderedMonad n] : Preorder (MonadLift m n) where
   le := fun φ ψ => ∀ {α : Type u} (a : m α), φ.monadLift a ≤ₘ ψ.monadLift a
   le_refl _ := by intro α a; simp only [ge_iff_le, le_refl]

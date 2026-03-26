@@ -152,7 +152,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
           let r ← $ᵗ Ω
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
-    show StateT.run' (simulateQ (idImpl + ro) (do
+    change StateT.run' (simulateQ (idImpl + ro) (do
         let (pk, sk) ← (FiatShamir σ hr M).keygen
         let sig ← (FiatShamir σ hr M).sign pk sk msg
         (FiatShamir σ hr M).verify pk msg sig)) ∅ = _
@@ -166,7 +166,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         (simulateQ (idImpl + ro) (liftM oa) >>= rest).run' s =
           oa >>= fun x => (rest x).run' s := by
       intro α β oa rest s
-      show Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
+      change Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
         oa >>= fun x => Prod.fst <$> (rest x).run s
       rw [StateT.run_bind, hrunLift]
       simp [map_bind]
@@ -190,7 +190,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
           $ᵗ Ω >>= fun r =>
             (rest r).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) := by
       intro β q rest
-      show Prod.fst <$> ((ro q >>= rest).run ∅) =
+      change Prod.fst <$> ((ro q >>= rest).run ∅) =
         $ᵗ Ω >>= fun r =>
           Prod.fst <$> (rest r).run ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)
       simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
@@ -206,7 +206,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         (ro q >>= rest).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) =
           (rest r).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) := by
       intro β q r rest
-      show Prod.fst <$> ((ro q >>= rest).run
+      change Prod.fst <$> ((ro q >>= rest).run
           ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)) =
         Prod.fst <$> (rest r).run
           ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r)
@@ -245,6 +245,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
             pure (σ.verify pk c r s))
           (post := fun y => if y = true then 1 else 0))
 
+set_option linter.unusedDecidableInType false
 /-- Pointcheval-Stern style Fiat-Shamir reduction statement.
 
 To obtain a meaningful EUF-CMA theorem we need:

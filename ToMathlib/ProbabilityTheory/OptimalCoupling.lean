@@ -38,6 +38,7 @@ variable {α β : Type u} [Fintype α] [Fintype β]
 
 section Topology
 
+set_option linter.unusedFintypeInType false in
 lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
     (Prod.fst <$> c) a = ∑ b, c (a, b) := by
   classical
@@ -61,6 +62,7 @@ lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
       simp [ha'']
   simpa [hsimp] using hmain
 
+set_option linter.unusedFintypeInType false in
 lemma map_snd_eval (c : SPMF (α × β)) (b : β) :
     (Prod.snd <$> c) b = ∑ a, c (a, b) := by
   classical
@@ -90,20 +92,12 @@ lemma map_snd_eval (c : SPMF (α × β)) (b : β) :
 omit [Fintype α] [Fintype β] in
 private lemma pmf_none_eq {γ : Type u} [Fintype γ] (p : PMF (Option γ)) :
     p none = 1 - ∑ x, p (some x) := by
-  have h := p.tsum_coe
-  rw [tsum_fintype, Fintype.sum_option] at h
-  exact ENNReal.eq_sub_of_add_eq' one_ne_top h
+  refine (SPMF.gap_eq_one_sub_tsum p).trans (congr_arg _ (tsum_eq_sum ?_))
+  simp
 
 omit [Fintype α] [Fintype β] in
-private lemma spmf_ext {γ : Type u} [Fintype γ] {p q : SPMF γ}
-    (h : ∀ x, p x = q x) : p = q := by
-  refine PMF.ext fun x => ?_
-  cases x with
-  | none =>
-      rw [pmf_none_eq, pmf_none_eq]
-      congr with y
-      exact h y
-  | some x => exact h x
+private lemma spmf_ext {γ : Type u} {p q : SPMF γ}
+    (h : ∀ x, p x = q x) : p = q := SPMF.ext h
 
 def couplings_set (p : SPMF α) (q : SPMF β) : Set (Option (α × β) → ℝ) :=
   { c | (∀ z, 0 ≤ c z) ∧
@@ -125,7 +119,6 @@ lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
     simp only [couplings_set, mem_inter_iff, mem_setOf_eq]
     tauto
   ]
-
   have h1 : IsClosed {c : Option (α × β) → ℝ | ∀ z, 0 ≤ c z} := by
     have : {c : Option (α × β) → ℝ | ∀ z, 0 ≤ c z} = ⋂ z, {c | 0 ≤ c z} := by ext; simp
     rw [this]
@@ -138,15 +131,17 @@ lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
     have : {c : Option (α × β) → ℝ | ∀ a, ∑ b, c (some (a, b)) = (p a).toReal} =
       ⋂ a, {c | ∑ b, c (some (a, b)) = (p a).toReal} := by ext; simp
     rw [this]
-    exact isClosed_iInter fun a => isClosed_eq (continuous_finset_sum _ (fun b _ => continuous_apply _)) continuous_const
+    exact isClosed_iInter fun a => isClosed_eq (continuous_finset_sum _
+      (fun b _ => continuous_apply _)) continuous_const
   have h4 : IsClosed {c : Option (α × β) → ℝ | ∀ b, ∑ a, c (some (a, b)) = (q b).toReal} := by
     have : {c : Option (α × β) → ℝ | ∀ b, ∑ a, c (some (a, b)) = (q b).toReal} =
       ⋂ b, {c | ∑ a, c (some (a, b)) = (q b).toReal} := by ext; simp
     rw [this]
-    exact isClosed_iInter fun b => isClosed_eq (continuous_finset_sum _ (fun a _ => continuous_apply _)) continuous_const
+    exact isClosed_iInter fun b => isClosed_eq (continuous_finset_sum _
+      (fun a _ => continuous_apply _)) continuous_const
   have h5 : IsClosed {c : Option (α × β) → ℝ | c none = 1 - (∑ z, c (some z))} := by
-    exact isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finset_sum _ (fun z _ => continuous_apply _)))
-
+    exact isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finset_sum _
+      (fun z _ => continuous_apply _)))
   exact (((h1.inter h2).inter h3).inter h4).inter h5
 
 lemma isBounded_couplings_set (p : SPMF α) (q : SPMF β) :
@@ -172,7 +167,7 @@ lemma mem_couplings_set_of_isCoupling {p : SPMF α} {q : SPMF β} (c : SPMF (α 
     (fun z => (c.toPMF z).toReal) ∈ couplings_set p q := by
   simp only [couplings_set, mem_setOf_eq]
   refine ⟨fun z => ENNReal.toReal_nonneg, ?_, ?_, ?_, ?_⟩
-  · intro z; have h := ENNReal.toReal_mono (by exact ENNReal.one_ne_top) (PMF.coe_le_one c z); exact h
+  · intro z; exact ENNReal.toReal_mono (by exact ENNReal.one_ne_top) (PMF.coe_le_one c z)
   · intro a
     have h_fst : (Prod.fst <$> c) a = p a := by rw [hc.map_fst]
     have h_sum : (Prod.fst <$> c) a = ∑ b, c (a, b) := map_fst_eval c a
@@ -300,22 +295,23 @@ private lemma objective_eq_ofReal (c : SPMF (α × β))
               (f := fun z => (c.1 z).toReal * (f z).toReal)
               (fun z _ => mul_nonneg ENNReal.toReal_nonneg ENNReal.toReal_nonneg))
 
+set_option linter.unusedFintypeInType false in
 -- 3. Attaining supremum
 lemma SPMF.exists_max_coupling {p : SPMF α} {q : SPMF β}
     (f : Option (α × β) → ℝ≥0∞) (hf : ∀ z, f z ≠ ⊤)
     (h_nonempty : Nonempty (SPMF.Coupling p q)) :
     ∃ (c : SPMF.Coupling p q),
-      (⨆ c' : SPMF.Coupling p q, ∑' (z : Option (α × β)), (c'.1.1 z) * f z) = ∑' (z : Option (α × β)), (c.1.1 z) * f z := by
+      (⨆ c' : SPMF.Coupling p q, ∑' (z : Option (α × β)), (c'.1.1 z) * f z) =
+        ∑' (z : Option (α × β)), (c.1.1 z) * f z := by
   let F : (Option (α × β) → ℝ) → ℝ := fun c => ∑ z, c z * (f z).toReal
-  have hF_cont : Continuous F := continuous_finset_sum _ (fun z _ => (continuous_apply z).mul continuous_const)
+  have hF_cont : Continuous F := continuous_finset_sum _
+    (fun z _ => (continuous_apply z).mul continuous_const)
   have h_comp := isCompact_couplings_set p q
-
   -- Show set is nonempty
   obtain ⟨c0⟩ := h_nonempty
   have h_nonempty_set : (couplings_set p q).Nonempty := by
     use fun z => (c0.1.1 z).toReal
     exact mem_couplings_set_of_isCoupling c0.1 c0.2
-
   -- Using compact max theorem
   have h_exists := h_comp.exists_isMaxOn h_nonempty_set hF_cont.continuousOn
   obtain ⟨c_max, hc_max_in, hc_max_prop⟩ := h_exists

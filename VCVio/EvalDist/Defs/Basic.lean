@@ -216,7 +216,7 @@ end zero
 lemma probEvent_eq_tsum_subtype_mem_support (mx : m α) (p : α → Prop) :
     Pr[p | mx] = ∑' x : {x ∈ support mx | p x}, Pr[= x | mx] := by
   simp_rw [probEvent_eq_tsum_subtype, tsum_subtype]
-  refine tsum_congr (λ x ↦ ?_)
+  refine tsum_congr (fun x ↦ ?_)
   by_cases hpx : p x
   · refine (if_pos hpx).trans ?_
     by_cases hx : x ∈ support mx
@@ -229,19 +229,19 @@ lemma probEvent_eq_tsum_subtype_support_ite (mx : m α) (p : α → Prop) [Decid
     Pr[p | mx] = ∑' x : support mx, if p x then Pr[= x | mx] else 0 :=
 calc
   Pr[p | mx] = (∑' x, if p x then Pr[= x | mx] else 0) := by rw [probEvent_eq_tsum_ite mx p]
-  _ = ∑' x, (support mx).indicator (λ x ↦ if p x then Pr[= x | mx] else 0) x := by
-    refine tsum_congr (λ x ↦ ?_)
+  _ = ∑' x, (support mx).indicator (fun x ↦ if p x then Pr[= x | mx] else 0) x := by
+    refine tsum_congr (fun x ↦ ?_)
     unfold Set.indicator
     split_ifs with h1 h2 h2 <;> simp [h1, h2]
   _ = ∑' x : support mx, if p x then Pr[= x | mx] else 0 := by
-    rw [tsum_subtype (support mx) (λ x ↦ if p x then Pr[= x | mx] else 0)]
+    rw [tsum_subtype (support mx) (fun x ↦ if p x then Pr[= x | mx] else 0)]
 
 lemma probEvent_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :
     Pr[p | mx] = ∑ x ∈ (finSupport mx).filter p, Pr[= x | mx] :=
   (probEvent_eq_tsum_ite mx p).trans <|
     (tsum_eq_sum' <| by simp; tauto).trans
-      (Finset.sum_congr rfl <| λ x hx ↦ if_pos (Finset.mem_filter.1 hx).2)
+      (Finset.sum_congr rfl <| fun x hx ↦ if_pos (Finset.mem_filter.1 hx).2)
 
 lemma probEvent_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :

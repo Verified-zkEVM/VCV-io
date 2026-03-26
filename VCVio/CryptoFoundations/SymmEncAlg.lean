@@ -146,9 +146,11 @@ def ciphertextRowsEqualAt (encAlg : SymmEncAlg M K C Q) (sp : ℕ) : Prop :=
     Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg₀] =
       Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg₁]
 
+
 theorem perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt
-    (encAlg : SymmEncAlg M K C Q) (sp : ℕ) [Fintype (M sp)] :
+    (encAlg : SymmEncAlg M K C Q) (sp : ℕ) [Finite (M sp)] :
     encAlg.perfectSecrecyAtAllPriors sp ↔ encAlg.ciphertextRowsEqualAt sp := by
+  have : Fintype (M sp) := Fintype.ofFinite (M sp)
   constructor
   · intro hAll msg₀ msg₁ σ
     haveI : Nonempty (M sp) := ⟨msg₀⟩
@@ -336,7 +338,7 @@ Note: the converse direction requires stronger prior expressivity assumptions th
 `perfectSecrecyAt` currently encodes; see `perfectSecrecyAtAllPriors`. -/
 theorem perfectSecrecyAt_of_uniformKey_of_uniqueKey
     (encAlg : SymmEncAlg M K C Q) (sp : ℕ)
-    [Fintype (M sp)] [Fintype (K sp)] [Fintype (C sp)]
+    [Finite (M sp)] [Fintype (K sp)] [Finite (C sp)]
     (deterministicEnc : ∀ (k : K sp) (msg : M sp),
       ∃ c, support (simulateQ encAlg.impl (encAlg.encrypt k msg)) = {c}) :
     ((∀ k : K sp, Pr[= k | simulateQ encAlg.impl (encAlg.keygen sp)] =
