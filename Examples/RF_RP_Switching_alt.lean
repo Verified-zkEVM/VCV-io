@@ -84,7 +84,7 @@ open OracleSpec OracleComp ENNReal
 --     (h₂ : ∀ view : QueryLog spec', good_view view →
 --       [= view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₂) (s₂, ∅) oa] ≥
 --         (1 - ε') * [= view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa])
---     (h₁ : [good_view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa] ≥ 1 - ε) :
+--    (h₁ : [good_view | (fun z ↦ z.2.2) <$> simulate (loggingOracle ∘ₛₒ so₁) (s₁, ∅) oa] ≥ 1 - ε) :
 --     [= true | simulate' so₁ s₁ oa] + [= false | simulate' so₂ s₂ oa] ≤ ε + ε' := by
 --   sorry
 

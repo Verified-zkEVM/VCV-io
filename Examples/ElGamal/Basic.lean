@@ -115,8 +115,8 @@ private lemma IND_CPA_OneTime_game_evalDist_eq_ddhExpReal
     DiffieHellman.ddhExpReal, IND_CPA_OneTime_DDHReduction,
     elGamalAsymmEnc, ExecutionMethod.default]
   ext z
-  show Pr[= z | _] = Pr[= z | _]
-  simp
+  change Pr[= z | _] = Pr[= z | _]
+  simp only [bind_pure_comp, bind_map_left]
   -- Step 1: swap $ᵗBool past $ᵗF in LHS
   rw [probOutput_bind_bind_swap ($ᵗ Bool) ($ᵗ F)]
   -- Now LHS starts with $ᵗF. Use congr under $ᵗF.

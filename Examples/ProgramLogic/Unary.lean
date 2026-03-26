@@ -121,7 +121,6 @@ example :
   vcstep?
   trivial
 -/
-
 example :
     ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
   vcstep with triple_wrappedTrueStep
