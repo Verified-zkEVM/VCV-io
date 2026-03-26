@@ -91,7 +91,7 @@ If the final result needs to be a `Type` and not a `Prop`, see `OracleComp.const
 @[elab_as_elim]
 protected def inductionOn {α} {C : ProbComp α → Prop}
     (pure : (a : α) → C (pure a))
-    (query_bind : (n : ℕ) → (mx : Fin (n + 1) → ProbComp α) → (∀ n, C (mx n)) → C ($[0..n] >>= mx))
+    (query_bind : (n : ℕ) → (mx : Fin (n + 1) → ProbComp α) → (∀ m, C (mx m)) → C ($[0..n] >>= mx))
     (oa : ProbComp α) : C oa :=
   PFunctor.FreeM.inductionOn pure query_bind oa
 

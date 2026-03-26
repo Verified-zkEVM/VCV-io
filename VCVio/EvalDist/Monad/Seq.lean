@@ -207,24 +207,20 @@ lemma probOutput_seq_map_swap [HasEvalSPMF m]  (z : γ) :
   refine tsum_congr fun x' => tsum_congr fun y' => ?_
   rw [mul_comm (Pr[= y' | my])]
 
-@[simp]
 lemma evalDist_seq_map_swap [HasEvalSPMF m] :
     evalDist (Function.swap f <$> my <*> mx) = evalDist (f <$> mx <*> my) := by
   have : DecidableEq γ := Classical.decEq γ
   exact evalDist_ext (probOutput_seq_map_swap mx my f)
 
-@[simp]
 lemma probEvent_seq_map_swap [HasEvalSPMF m] (p : γ → Prop) :
     Pr[p | Function.swap f <$> my <*> mx] = Pr[p | f <$> mx <*> my] := by
   have : DecidableEq γ := Classical.decEq γ
   simp only [probEvent_eq_tsum_indicator, probOutput_seq_map_swap]
 
-@[simp]
 lemma support_seq_map_swap [HasEvalSet m] :
     support (Function.swap f <$> my <*> mx) = support (f <$> mx <*> my) := by
   simp only [support_seq_map_eq_image2, Set.image2_swap f]
 
-@[simp]
 lemma finSupport_seq_map_swap [HasEvalSet m] [HasEvalFinset m]
     [DecidableEq α] [DecidableEq β] [DecidableEq γ] :
     finSupport (Function.swap f <$> my <*> mx) = finSupport (f <$> mx <*> my) := by

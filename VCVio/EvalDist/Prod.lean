@@ -22,7 +22,7 @@ lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :
     Pr[= (x, y) | mx] = Pr[fun z => z.1 = x ∧ z.2 = y | mx] := by
   simp [← probEvent_eq_eq_probOutput, Prod.eq_iff_fst_eq_snd_eq]
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_fst_map_eq_tsum (mx : m (α × β)) (x : α) :
     Pr[= x | Prod.fst <$> mx] = ∑' y, Pr[= (x, y) | mx] := by
   have : DecidableEq α := Classical.decEq _
@@ -31,12 +31,12 @@ lemma probOutput_fst_map_eq_tsum (mx : m (α × β)) (x : α) :
   refine (tsum_eq_single x ?_).trans (by simp)
   intro a ha; simp [Ne.symm ha]
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_fst_map_eq_sum [Fintype β] (mx : m (α × β)) (x : α) :
     Pr[= x | Prod.fst <$> mx] = ∑ y, Pr[= (x, y) | mx] := by
   rw [probOutput_fst_map_eq_tsum, tsum_fintype]
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_snd_map_eq_tsum (mx : m (α × β)) (y : β) :
     Pr[= y | Prod.snd <$> mx] = ∑' x, Pr[= (x, y) | mx] := by
   have : DecidableEq β := Classical.decEq _
@@ -45,18 +45,26 @@ lemma probOutput_snd_map_eq_tsum (mx : m (α × β)) (y : β) :
   refine tsum_congr fun _ => (tsum_eq_single y ?_).trans (by simp)
   intro b hb; simp [Ne.symm hb]
 
-@[simp, grind =]
+@[grind =]
 lemma probOutput_snd_map_eq_sum [Fintype α] (mx : m (α × β)) (y : β) :
     Pr[= y | Prod.snd <$> mx] = ∑ x, Pr[= (x, y) | mx] := by
   rw [probOutput_snd_map_eq_tsum, tsum_fintype]
 
-/-- NOTE: Added since we don't choose to set the general `probEvent_map` to `simp`. -/
-@[simp low, grind =]
+@[grind =]
+lemma probOutput_fst_map_eq_probEvent (mx : m (α × β)) (x : α) :
+    Pr[= x | Prod.fst <$> mx] = Pr[fun z => z.1 = x | mx] := by grind
+
+/-- Unlike `probEvent_map` this unfolds the function composition automatically. -/
+@[simp high, grind =]
 lemma probEvent_fst_map (mx : m (α × β)) (p : α → Prop) :
     Pr[p | Prod.fst <$> mx] = Pr[fun x => p x.1 | mx] := by grind
 
-/-- NOTE: Added since we don't choose to set the general `probEvent_map` to `simp`. -/
-@[simp low, grind =]
+@[grind =]
+lemma probOutput_snd_map_eq_probEvent (mx : m (α × β)) (y : β) :
+    Pr[= y | Prod.snd <$> mx] = Pr[fun z => z.2 = y | mx] := by grind
+
+/-- Unlike `probEvent_map` this unfolds the function composition automatically. -/
+@[simp high, grind =]
 lemma probEvent_snd_map (mx : m (α × β)) (p : β → Prop) :
     Pr[p | Prod.snd <$> mx] = Pr[fun y => p y.2 | mx] := by grind
 
@@ -73,7 +81,7 @@ section prod_mk
 
 variable (mx : m α) (my : m β) (f : α → γ) (g : β → δ)
 
-@[simp]
+@[simp high]
 lemma probOutput_seq_map_prod_mk_eq_mul (z : α × β) :
     Pr[= z | Prod.mk <$> mx <*> my] = Pr[= z.1 | mx] * Pr[= z.2 | my] :=
   probOutput_seq_map_eq_mul_of_injective2 mx my Prod.mk Prod.mk.injective2 z.1 z.2
@@ -120,45 +128,32 @@ lemma support_seq_map_prod_mk_eq_sprod :
 lemma finSupport_seq_map_prod_mk_eq_product [HasEvalFinset m] [DecidableEq α] [DecidableEq β]
     [DecidableEq γ] [DecidableEq δ] : finSupport ((f ·, g ·) <$> mx <*> my) =
       ((finSupport mx).image f).product ((finSupport my).image g) := by
-  -- TODO: find the problem with using just `simp` in this proof
-  simp only [finSupport_eq_iff_support_eq_coe]; simp
+  simp [Finset.ext_iff]; grind
 
 lemma probOutput_bind_bind_prod_mk_eq_mul
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (z : γ × δ) :
     Pr[= z | do let x ← mx; let y ← my; return (f x, g y)] =
       Pr[= z.1 | f <$> mx] * Pr[= z.2 | g <$> my] := by simp
 
-@[simp]
 lemma probOutput_bind_bind_prod_mk_eq_mul'
     (mx : m α) (my : m β) (f : α → γ) (g : β → δ) (x : γ) (y : δ) :
     Pr[= (x, y) | do let a ← mx; let b ← my; return (f a, g b)] =
-      Pr[= x | f <$> mx] * Pr[= y | g <$> my] :=
-  probOutput_bind_bind_prod_mk_eq_mul mx my f g (x, y)
+      Pr[= x | f <$> mx] * Pr[= y | g <$> my] := by simp
 
 @[simp]
 lemma probOutput_prod_mk_fst_map [DecidableEq β] (mx : m α) (y : β) (z : α × β) :
-    Pr[= z | (·, y) <$> mx] = if z.2 = y then Pr[= z.1 | mx] else 0 := by
-  split
-  · next h =>
-    subst h
-    exact probOutput_map_injective mx (fun _ _ hab => (Prod.mk.inj hab).1) z.1
-  · next h =>
-    rw [probOutput_eq_zero_iff]
-    intro hmem
-    simp [support_map] at hmem
-    exact h (by obtain ⟨_, _, ha⟩ := hmem; exact ha ▸ rfl)
+    Pr[= z | (·, y) <$> mx] = if z.2 = y then Pr[= z.1 | mx] else 0 :=
+  calc Pr[= z | (·, y) <$> mx]
+    _ = Pr[= z | Prod.mk <$> mx <*> pure y] := by simp; rfl
+    _ = if z.2 = y then Pr[= z.1 | mx] else 0 := by simp only [probOutput_seq_map_prod_mk_eq_mul,
+      probOutput_pure, mul_ite, mul_one, mul_zero]
 
 @[simp]
 lemma probOutput_prod_mk_snd_map [DecidableEq α] (my : m β) (x : α) (z : α × β) :
-    Pr[= z | (x, ·) <$> my] = if z.1 = x then Pr[= z.2 | my] else 0 := by
-  split
-  · next h =>
-    subst h
-    exact probOutput_map_injective my (fun _ _ hab => (Prod.mk.inj hab).2) z.2
-  · next h =>
-    rw [probOutput_eq_zero_iff]
-    intro hmem
-    simp [support_map] at hmem
-    exact h (by obtain ⟨_, _, ha⟩ := hmem; exact ha ▸ rfl)
+    Pr[= z | (x, ·) <$> my] = if z.1 = x then Pr[= z.2 | my] else 0 :=
+  calc Pr[= z | (x, ·) <$> my]
+    _ = Pr[= z | Prod.mk <$> pure x <*> my] := by simp [seq_eq_bind_map]; rfl
+    _ = if z.1 = x then Pr[= z.2 | my] else 0 := by simp only [probOutput_seq_map_prod_mk_eq_mul,
+      probOutput_pure, ite_mul, one_mul, zero_mul]
 
 end prod_mk

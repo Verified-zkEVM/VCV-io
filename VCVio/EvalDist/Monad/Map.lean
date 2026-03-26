@@ -191,7 +191,7 @@ lemma probOutput_map_eq_probOutput_apply
     Pr[= y | f <$> mx] = Pr[= g y | mx] := by aesop
 
 @[simp, grind =]
-lemma probOutput_map_equiv {α β : Type u} (e : α ≃ β) (mx : m α) (y : β) :
+lemma probOutput_map_equiv (e : α ≃ β) (mx : m α) (y : β) :
     Pr[= y | e <$> mx] = Pr[= e.symm y | mx] := by aesop
 
 end inverse

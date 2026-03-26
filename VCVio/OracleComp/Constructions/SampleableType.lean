@@ -180,14 +180,14 @@ lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
 
 section instances
 
-instance SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
+def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by simp
   probOutput_selectElem_eq := by simp
 
 instance (n : ℕ) [hn : NeZero n] : SampleableType (Fin n) := by
   cases n with
-  | zero => simp at hn
+  | zero => have := hn.out; contradiction
   | succ n => exact SampleableType.Fin n
 
 instance (α : Type) [Unique α] : SampleableType α where
@@ -280,49 +280,31 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
   mem_support_selectElem x := by induction n with
   | zero => simp
   | succ m ih =>
-    simp [ih]
-    use x.pop, x.back
-    apply Vector.push_pop_back
+      have : ∃ ys y, Vector.push ys y = x := ⟨x.pop, x.back, Vector.push_pop_back x⟩
+      simpa [ih] using this
   probOutput_selectElem_eq x y := by induction n with
-  | zero =>
-    have : x=y := by
-      apply Vector.ext
-      rintro i hi
-      linarith
-    simp [this]
+  | zero => rw [show x = y by grind]
   | succ m ih =>
-    classical
-    have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by
-      intro xs ys x y hxy
-      rcases Vector.push_eq_push.mp hxy with ⟨hxy', hxs⟩
-      exact ⟨hxs, hxy'⟩
-    rw [← Vector.push_pop_back x, ← Vector.push_pop_back y]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
-      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
-      hpush x.pop x.back]
-    rw [probOutput_seq_map_eq_mul_of_injective2 _ _
-      (fun (xs : Vector α m) (x : α) => Vector.push xs x)
-      hpush y.pop y.back]
-    have hback : Pr[= x.back | $ᵗ α] = Pr[= y.back | $ᵗ α] := by
-      simpa [uniformSample] using
-        (SampleableType.probOutput_selectElem_eq (β := α) x.back y.back)
-    rw [hback]
-    exact congrArg (fun z => z * Pr[= y.back | $ᵗ α]) (ih x.pop y.pop)
+      have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by
+        intro xs ys x y hxy; simp [Vector.push_eq_push.mp hxy]
+      rw [← Vector.push_pop_back x, ← Vector.push_pop_back y,
+        probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush x.pop x.back,
+        probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush y.pop y.back,
+        probOutput_uniformSample_inj, ih x.pop y.pop]
+
 
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
-instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] [DecidableEq α] :
-    SampleableType (Fin n → α) := by
-  letI instVectorFinFuncEquiv: (Vector α n) ≃ (Fin n → α) :=
+instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
+    SampleableType (Fin n → α) :=
+  SampleableType.ofEquiv
     { toFun := fun v i => v.get i
       invFun := Vector.ofFn
       left_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get]
       right_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn] }
-  exact SampleableType.ofEquiv (instVectorFinFuncEquiv)
 
 /-- Select a uniform element from `Matrix α n` by selecting each row independently. -/
-instance (α : Type) (n m : ℕ) [SampleableType α] [DecidableEq α] :
-    SampleableType (Matrix (Fin n) (Fin m) α) := by
-  simpa [Matrix] using (inferInstance : SampleableType (Fin n → Fin m → α))
+instance (α : Type) (n m : ℕ) [SampleableType α] : SampleableType (Matrix (Fin n) (Fin m) α) :=
+  inferInstanceAs (SampleableType (Fin n → Fin m → α))
 
 end instances
 

@@ -233,45 +233,16 @@ lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : Oracle
 
 /-- Equality-relation relational triples imply equality of point output probabilities. -/
 lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
-    (h : RelTriple oa ob (EqRel α)) (x : α) :
-    Pr[= x | oa] = Pr[= x | ob] := by
+    (h : RelTriple oa ob (EqRel α)) (x : α) : Pr[= x | oa] = Pr[= x | ob] := by
   rcases (relTriple_iff_relWP (oa := oa) (ob := ob) (R := EqRel α)).1 h with ⟨c, hc⟩
-  have hfst :
-      Pr[= x | Prod.fst <$> c.1] = Pr[= x | oa] := by
+  have hfst : Pr[= x | Prod.fst <$> c.1] = Pr[= x | oa] := by
     simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_fst
-  have hsnd :
-      Pr[= x | Prod.snd <$> c.1] = Pr[= x | ob] := by
+  have hsnd : Pr[= x | Prod.snd <$> c.1] = Pr[= x | ob] := by
     simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_snd
-  have hmap_fst :
-      Pr[= x | Prod.fst <$> c.1] = Pr[(fun z : α × α => z.1 = x) | c.1] := by
-    calc
-      Pr[= x | Prod.fst <$> c.1]
-          = Pr[(fun a : α => a = x) | Prod.fst <$> c.1] := by
-              simp
-      _ = Pr[(fun z : α × α => z.1 = x) | c.1] := by
-            simpa [Function.comp] using
-              (probEvent_map (mx := c.1) (f := Prod.fst) (q := fun a : α => a = x))
-  have hmap_snd :
-      Pr[(fun z : α × α => z.2 = x) | c.1] = Pr[= x | Prod.snd <$> c.1] := by
-    calc
-      Pr[(fun z : α × α => z.2 = x) | c.1]
-          = Pr[(fun a : α => a = x) | Prod.snd <$> c.1] := by
-              simpa [Function.comp] using
-                (probEvent_map (mx := c.1) (f := Prod.snd) (q := fun a : α => a = x)).symm
-      _ = Pr[= x | Prod.snd <$> c.1] := by
-            simp
-  have hevent :
-      Pr[(fun z : α × α => z.1 = x) | c.1] = Pr[(fun z : α × α => z.2 = x) | c.1] := by
-    refine probEvent_ext (mx := c.1) ?_
-    intro z hz
-    have hzEq : z.1 = z.2 := hc z hz
-    constructor <;> intro hx <;> simpa [hzEq] using hx
-  calc
-    Pr[= x | oa] = Pr[= x | Prod.fst <$> c.1] := hfst.symm
-    _ = Pr[(fun z : α × α => z.1 = x) | c.1] := hmap_fst
-    _ = Pr[(fun z : α × α => z.2 = x) | c.1] := hevent
-    _ = Pr[= x | Prod.snd <$> c.1] := hmap_snd
-    _ = Pr[= x | ob] := hsnd
+  have hevent : Pr[(fun z : α × α => z.1 = x) | c.1] = Pr[(fun z : α × α => z.2 = x) | c.1] := by
+    refine probEvent_ext (mx := c.1) fun z hz => ?_
+    have hzEq : z.1 = z.2 := hc z hz; grind
+  grind only [= probOutput_fst_map_eq_probEvent, = probOutput_snd_map_eq_probEvent]
 
 /-- Equality-relation relational triples imply equality of evaluation distributions. -/
 lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
