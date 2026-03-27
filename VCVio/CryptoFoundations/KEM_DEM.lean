@@ -46,7 +46,7 @@ variable [DecidableEq K] [DecidableEq M] [Monad m] [HasEvalSPMF m]
 
 /-- Perfect correctness for the KEM+DEM composition follows from perfect correctness of both
 components, provided they are interpreted under the same execution method. -/
-theorem PerfectlyCorrect.composeWithDEM
+theorem perfectlyCorrect_composeWithDEM
     (kem : KEMScheme m K PK SK CKEM) (dem : DEMScheme m K M CDEM)
     (hkem : kem.PerfectlyCorrect)
     (hdem : (dem.withExecutionMethod kem.toExecutionMethod).PerfectlyCorrect) :
@@ -80,21 +80,21 @@ def composeWithDEM_toKEMRightReduction
       adversary.distinguish st (kc, dc)
 
 /-- DEM reduction from a one-time IND-CPA adversary against the composed KEM+DEM PKE. It samples
-the public key internally during the message-selection phase, mirroring the proof-ladders
-`B_s(E_kem, A)` construction. -/
+the public key and KEM ciphertext during the message-selection phase so that the simulatee sees
+the same `encaps`-then-`encrypt` effect order as the composed scheme. -/
 def composeWithDEM_toDEMReduction
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
     (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
     dem.IND_CPA_Adversary where
-  State := PK × adversary.State
+  State := CKEM × adversary.State
   chooseMessages := do
     let (pk, _sk) ← kem.keygen
     let (m₀, m₁, st) ← adversary.chooseMessages pk
-    return (m₀, m₁, (pk, st))
+    let (kc, _k) ← kem.encaps pk
+    return (m₀, m₁, (kc, st))
   distinguish st dc := do
-    let (kc, _k) ← kem.encaps st.1
-    adversary.distinguish st.2 (kc, dc)
+    adversary.distinguish st.2 (st.1, dc)
 
 /-- Proof-ladders A1 reduction statement: the one-time IND-CPA advantage of textbook KEM+DEM is
 bounded by two KEM IND-CPA advantages plus one DEM IND-CPA advantage, using the canonical

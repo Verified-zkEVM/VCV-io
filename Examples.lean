@@ -16,6 +16,7 @@ import Examples.MLKEM.Params
 import Examples.MLKEM.Primitives
 import Examples.MLKEM.Ring
 import Examples.OneTimePad
+import Examples.PRFTagReader
 import Examples.PRGfromPRF
 import Examples.Pedersen
 import Examples.ProgramLogic.Probability
