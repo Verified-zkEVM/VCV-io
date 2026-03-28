@@ -39,12 +39,22 @@ namespace Tq
 
 def ofRq (f : Rq) : Tq := ⟨f⟩
 def toRq (fHat : Tq) : Rq := fHat.coeffs
+def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
 
 instance : Coe Tq Rq := ⟨Tq.toRq⟩
 instance : Zero Tq := ⟨⟨0⟩⟩
 instance : Add Tq := ⟨fun fHat gHat => ⟨fHat.coeffs + gHat.coeffs⟩⟩
 instance : Sub Tq := ⟨fun fHat gHat => ⟨fHat.coeffs - gHat.coeffs⟩⟩
 instance : Neg Tq := ⟨fun fHat => ⟨-fHat.coeffs⟩⟩
+
+instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
+  getElem fHat i hi := fHat.coeffs[i]'hi
+
+@[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
+    fHat[i] = fHat.coeffs[i] := rfl
+
+@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
+    fHat.toArray[i]'(by simpa [Tq.toArray] using hi) = fHat.coeffs[i] := rfl
 
 end Tq
 
