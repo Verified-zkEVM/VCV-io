@@ -7,8 +7,8 @@ import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.Oracle
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
-import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.FiatShamir
+import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
