@@ -15,7 +15,7 @@ identification scheme) is EUF-CMA secure, reducing to:
 
 1. The **SelfTargetMSIS** assumption on the public matrix `A`
 2. The **HVZK** property of the underlying identification scheme
-3. **Commitment recoverability**: `w₁` can be recomputed as `HighBits(Az - ct₁ · 2^d)`
+3. **Commitment recoverability**: `w₁` can be recomputed as `UseHint(h, Az - ct₁·2^d)`
 
 The proof is future work and follows the structure of Theorem 4 in the CRYPTO 2023 paper
 (Barbosa et al., "Fixing and Mechanizing the Security Proof of Fiat-Shamir with Aborts
@@ -36,7 +36,7 @@ open OracleComp OracleSpec
 namespace ML_DSA
 
 variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
-  [DecidableEq (Bytes 32)]
+  [DecidableEq (Bytes 32)] [DecidableEq prims.High]
 
 section Properties
 
@@ -54,8 +54,8 @@ theorem idsWithAbort_complete :
 
 The simulator produces transcripts by:
 1. Sampling `z` uniformly from the response space (with appropriate norm bound)
-2. Sampling `c` uniformly
-3. Computing `w₁ = HighBits(Az - ct₁ · 2^d)` (the commitment recovery equation)
+2. Sampling `c̃` uniformly
+3. Computing `w₁ = UseHint(h, Az - ct₁·2^d)` (the commitment recovery equation)
 
 When the response rejection probability is sufficiently close to uniform, the simulated
 transcript distribution matches the honest transcript distribution. -/
@@ -64,8 +64,12 @@ theorem idsWithAbort_hvzk :
   sorry
 
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
-from `(pk, c, z)` alone as `HighBits(Az - ct₁ · 2^d)`. This is the key property enabling
-the CMA-to-NMA reduction in the security proof. -/
+from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
+enabling the CMA-to-NMA reduction in the security proof.
+
+In our formalization, this is directly enforced by the `verify` function: it checks
+`UseHint(h, w'_Approx) = w₁`, so any accepted transcript necessarily satisfies
+commitment recoverability. -/
 theorem idsWithAbort_commitment_recoverable :
     ∃ recover, (identificationScheme p prims nttOps).CommitmentRecoverable recover := by
   sorry
@@ -75,7 +79,7 @@ end Properties
 section MainTheorem
 
 variable {M : Type} [DecidableEq M]
-  [DecidableEq prims.High]
+  [DecidableEq prims.Hint]
   [SampleableType (PublicKey p prims)] [SampleableType (SecretKey p)]
   [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
@@ -100,10 +104,10 @@ This theorem statement is parametric over the message type `M` and the primitive
 implementations. The proof is future work following the EasyCrypt mechanization. -/
 theorem euf_cma_security
     (stmsis : SelfTargetMSIS.Problem
-      (TqMatrix p.k p.l) (RqVec p.l × ChallengePoly)
+      (TqMatrix p.k p.l) (Response p prims)
       (PublicKey p prims) (M × Commitment p prims))
     (maxAttempts : ℕ)
-    [Inhabited (Response p)]
+    [Inhabited (Response p prims)]
     (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
       (validKeyPair p prims)) :
     ∀ (adv : SignatureAlg.unforgeableAdv

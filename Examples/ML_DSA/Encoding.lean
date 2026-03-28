@@ -30,9 +30,9 @@ structure Encoding (p : Params) (prims : Primitives p) where
   /-- Encoded signature bytes. -/
   EncodedSig : Type
   /-- `pkEncode(ρ, t₁)` (Algorithm 22). -/
-  pkEncode : Bytes 32 → Vector prims.High p.k → EncodedPK
+  pkEncode : Bytes 32 → Vector prims.Power2High p.k → EncodedPK
   /-- `pkDecode(pk)` (Algorithm 23). -/
-  pkDecode : EncodedPK → Bytes 32 × Vector prims.High p.k
+  pkDecode : EncodedPK → Bytes 32 × Vector prims.Power2High p.k
   /-- `skEncode(ρ, K, tr, s₁, s₂, t₀)` (Algorithm 24). -/
   skEncode : Bytes 32 → Bytes 32 → Bytes 64 → RqVec p.l → RqVec p.k → RqVec p.k → EncodedSK
   /-- `skDecode(sk)` (Algorithm 25). -/
@@ -41,6 +41,7 @@ structure Encoding (p : Params) (prims : Primitives p) where
   sigEncode : CommitHashBytes p → RqVec p.l → Vector prims.Hint p.k → EncodedSig
   /-- `sigDecode(σ)` (Algorithm 27). Returns `none` if the hint is malformed. -/
   sigDecode : EncodedSig → Option (CommitHashBytes p × RqVec p.l × Vector prims.Hint p.k)
+
 namespace Encoding
 
 variable {p : Params} {prims : Primitives p} (enc : Encoding p prims)
@@ -48,7 +49,7 @@ variable {p : Params} {prims : Primitives p} (enc : Encoding p prims)
 /-- Roundtrip laws for the encoding operations. -/
 structure Laws : Prop where
   pkDecode_pkEncode :
-    ∀ (rho : Bytes 32) (t1 : Vector prims.High p.k),
+    ∀ (rho : Bytes 32) (t1 : Vector prims.Power2High p.k),
       enc.pkDecode (enc.pkEncode rho t1) = (rho, t1)
   skDecode_skEncode :
     ∀ (rho K : Bytes 32) (tr : Bytes 64) (s1 : RqVec p.l) (s2 t0 : RqVec p.k),
