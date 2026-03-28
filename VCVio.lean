@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.Oracle
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
+import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
@@ -19,6 +20,8 @@ import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.LearningWithErrors
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
+import VCVio.CryptoFoundations.HardnessAssumptions.SIS
+import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
@@ -45,7 +48,9 @@ import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
 import VCVio.EvalDist.TVDist
+import VCVio.LatticeCrypto.Norm
 import VCVio.LatticeCrypto.Ring
+import VCVio.LatticeCrypto.Rounding
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.BitVec
