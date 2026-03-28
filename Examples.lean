@@ -8,6 +8,12 @@ import Examples.MLKEM.Concrete.Encoding
 import Examples.MLKEM.Concrete.FFI
 import Examples.MLKEM.Concrete.Instance
 import Examples.MLKEM.Concrete.NTT
+import Examples.ML_DSA.Encoding
+import Examples.ML_DSA.Params
+import Examples.ML_DSA.Primitives
+import Examples.ML_DSA.Ring
+import Examples.ML_DSA.Scheme
+import Examples.ML_DSA.Security
 import Examples.MLKEM.Encoding
 import Examples.MLKEM.Internal
 import Examples.MLKEM.KEM
