@@ -55,7 +55,7 @@ noncomputable def fipsKeyGen : ProbComp (PublicKey p prims × SecretKey p) := do
 
 Deterministic given all its inputs; randomness enters through `ρ''` which was
 derived from a random `rnd` by the caller. -/
-noncomputable def fipsSignAttempt
+def fipsSignAttempt
     (sk : SecretKey p) (aHat : TqMatrix p.k p.l)
     (mu : Bytes 64) (rhoDoublePrime : Bytes 64) (kappa : ℕ) :
     Option (FIPSSignature p prims) :=
@@ -80,7 +80,7 @@ noncomputable def fipsSignAttempt
 
 /-- The deterministic signing loop: try counter values `κ = 0, l, 2l, ...`
 up to `maxAttempts` iterations (Algorithm 7, lines 4–31). -/
-noncomputable def fipsSignLoop
+def fipsSignLoop
     (sk : SecretKey p) (aHat : TqMatrix p.k p.l)
     (mu : Bytes 64) (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ) :
     Option (FIPSSignature p prims) :=
@@ -107,9 +107,6 @@ noncomputable def fipsSign (pk : PublicKey p prims) (sk : SecretKey p)
 
 /-! ### Verification -/
 
-private noncomputable instance : DecidableEq (CommitHashBytes p) :=
-  show DecidableEq (Bytes (p.lambda / 4)) from inferInstance
-
 /-- ML-DSA.Verify (Algorithm 3 / Algorithm 8): verify a signature.
 
 1. Expand `Â = ExpandA(ρ)` from the public key
@@ -118,7 +115,7 @@ private noncomputable instance : DecidableEq (CommitHashBytes p) :=
 4. Apply hint: `w₁' = UseHint(h, w'_Approx)`
 5. Recompute `c̃' = H(μ ‖ w1Encode(w₁'))`
 6. Accept iff `‖z‖∞ < γ₁ - β`, `c̃' = c̃`, and `hintWeight(h) ≤ ω` -/
-noncomputable def fipsVerify (pk : PublicKey p prims) (msg : List Byte)
+def fipsVerify (pk : PublicKey p prims) (msg : List Byte)
     (sig : FIPSSignature p prims) : Bool :=
   let aHat := prims.expandA pk.rho
   let tr := prims.hashPublicKey pk.rho pk.t1

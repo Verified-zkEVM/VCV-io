@@ -41,6 +41,7 @@ def concretePrimitives (p : Params) : Primitives p where
   hashPublicKey := fun rho t1 =>
     ML_DSA.Concrete.hashPublicKeyBytes (ML_DSA.Concrete.pkEncode p rho t1)
   highBits := ML_DSA.Concrete.highBits p
+  highBitsShift := ML_DSA.Concrete.highBitsShift p
   lowBits := ML_DSA.Concrete.lowBits p
   makeHint := ML_DSA.Concrete.makeHint p
   useHint := ML_DSA.Concrete.useHint p

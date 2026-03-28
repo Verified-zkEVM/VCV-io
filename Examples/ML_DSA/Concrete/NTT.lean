@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ML_DSA.Ring
-import Mathlib.Algebra.BigOperators.Ring.Finset
 
 /-!
 # Concrete NTT for ML-DSA
@@ -12,69 +11,95 @@ import Mathlib.Algebra.BigOperators.Ring.Finset
 Concrete executable NTT operations for `q = 8380417`, `n = 256`, and the FIPS 204 root
 `ζ = 1753`.
 
-The proof-facing transform is defined as the evaluation map at the 256 odd powers of the
-primitive 512th root `ζ`; multiplication in the transform domain is therefore coefficientwise.
-As in the ML-KEM concrete layer, the public `ntt` / `invNTT` pair is exposed through a
-matrix model with a mechanically checked inverse law, while `@[implemented_by]` keeps the
-runtime path routed through direct executable kernels.
+Implements the FIPS 204 in-place butterfly NTT (Algorithm 41) and its inverse (Algorithm 42)
+exactly, using twiddle factors `ζ^(BitRev₇(k))`. The butterfly NTT output ordering matches
+the reference C implementations (e.g. mldsa-native), which is essential for bitwise agreement
+on key generation, signing, and verification.
+
+Multiplication in the NTT domain is pointwise (coefficientwise).
 -/
 
 set_option autoImplicit false
-set_option linter.style.nativeDecide false
-
-open scoped BigOperators
 
 namespace ML_DSA.Concrete
 
 open ML_DSA
 
-/-- Reverse the low 7 bits of `i`. Included for parity with the ML-KEM twiddle table setup. -/
+/-- Reverse the low 7 bits of `i`. -/
 def bitRev7 (i : Nat) : Nat :=
   let b := fun k => (i >>> k) &&& 1
   (b 0 <<< 6) ||| (b 1 <<< 5) ||| (b 2 <<< 4) ||| (b 3 <<< 3) |||
   (b 4 <<< 2) ||| (b 5 <<< 1) ||| b 6
 
-/-- `ζ^(bitRev7(i))` for `i = 0 .. 127`. -/
-def zetaArray : Array Coeff :=
-  (Array.range 128).map fun i => zeta ^ bitRev7 i
+/-- Reverse the low 8 bits of `i` (FIPS 204: `brv(k)`). -/
+def bitRev8 (i : Nat) : Nat :=
+  let b := fun k => (i >>> k) &&& 1
+  (b 0 <<< 7) ||| (b 1 <<< 6) ||| (b 2 <<< 5) ||| (b 3 <<< 4) |||
+  (b 4 <<< 3) ||| (b 5 <<< 2) ||| (b 6 <<< 1) ||| b 7
 
-/-- `256⁻¹ mod q = q - (q - 1) / 256 = 8347681`. -/
+/-- Precomputed twiddle table: `zetas[k] = ζ^(brv(k))` for `k = 0 .. 255`,
+where `brv` is 8-bit reversal per FIPS 204 §4.5.
+The forward NTT uses indices 1..255; the inverse NTT uses the same indices
+(negated) in reverse order 255..1. -/
+def zetaTable : Array Coeff :=
+  (Array.range 256).map fun i => zeta ^ bitRev8 i
+
+/-- `256⁻¹ mod q`. -/
 def nInv : Coeff := ((modulus - (modulus - 1) / ringDegree : ℕ) : Coeff)
 
-/-- The `j`-th negacyclic evaluation root `ζ^(2j+1)`. -/
-def evalRoot (j : Nat) : Coeff := zeta ^ (2 * j + 1)
+/-- FIPS 204 Algorithm 41 — forward NTT (in-place Cooley–Tukey butterfly).
 
-/-- Executable forward transform: evaluate at the odd powers of `ζ`. -/
-def loopNTT (f : Rq) : Tq :=
-  ⟨Vector.ofFn fun j =>
-    ∑ i : Fin ringDegree, (evalRoot j.val) ^ i.val * f[i.val]⟩
+Twiddle factors are accessed via `ζ^(BitRev₇(k))` with `k` counting from 1 to 127.
+The seven stages halve `len` from 128 down to 1. -/
+def butterflyNTT (f : Rq) : Tq := Id.run do
+  let mut a := f.toArray
+  let mut k := 1
+  let mut len := 128
+  while len ≥ 1 do
+    let mut start := 0
+    while start < ringDegree do
+      let z := zetaTable.getD k 0
+      k := k + 1
+      for j in [start : start + len] do
+        let t := z * a.getD (j + len) 0
+        a := a.set! (j + len) (a.getD j 0 - t)
+        a := a.set! j (a.getD j 0 + t)
+      start := start + 2 * len
+    len := len / 2
+  return ⟨Vector.ofFn fun i => a.getD i.val 0⟩
 
-/-- Executable inverse transform: interpolate from the odd-power evaluations. -/
-def loopInvNTT (fHat : Tq) : Rq :=
-  Vector.ofFn fun i =>
-    nInv * ∑ j : Fin ringDegree, (evalRoot j.val) ^ (2 * ringDegree - i.val) * fHat[j.val]
+/-- FIPS 204 Algorithm 42 — inverse NTT (in-place Gentleman–Sande butterfly).
+
+Twiddle factors are accessed in reverse, negated. The seven stages double `len` from 1
+to 128. A final scaling by `256⁻¹ mod q` restores the coefficient norm. -/
+def butterflyInvNTT (fHat : Tq) : Rq := Id.run do
+  let mut a := fHat.coeffs.toArray
+  let mut k := 255
+  let mut len := 1
+  while len ≤ 128 do
+    let mut start := 0
+    while start < ringDegree do
+      let z := -(zetaTable.getD k 0)
+      k := k - 1
+      for j in [start : start + len] do
+        let t := a.getD j 0
+        a := a.set! j (t + a.getD (j + len) 0)
+        a := a.set! (j + len) (z * (t - a.getD (j + len) 0))
+      start := start + 2 * len
+    len := len * 2
+  for j in [0 : ringDegree] do
+    a := a.set! j (nInv * a.getD j 0)
+  return Vector.ofFn fun i => a.getD i.val 0
 
 /-- Pointwise multiplication in the ML-DSA NTT domain. -/
-def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
+def multiplyNTTs (fHat gHat : Tq) : Tq :=
   ⟨Vector.ofFn fun i => fHat[i.val] * gHat[i.val]⟩
-
-/-! The proof-heavy matrix extraction used in the ML-KEM concrete layer is intentionally
-omitted here for now. The direct evaluation kernels are already executable and match the
-intended NTT semantics, which is enough for wiring the concrete ML-DSA primitive bundle. -/
 
 /-! ## Public API -/
 
-@[implemented_by loopNTT]
-def ntt (f : Rq) : Tq :=
-  loopNTT f
+def ntt (f : Rq) : Tq := butterflyNTT f
 
-@[implemented_by loopInvNTT]
-def invNTT (fHat : Tq) : Rq :=
-  loopInvNTT fHat
-
-@[implemented_by loopMultiplyNTTs]
-def multiplyNTTs (fHat gHat : Tq) : Tq :=
-  loopMultiplyNTTs fHat gHat
+def invNTT (fHat : Tq) : Rq := butterflyInvNTT fHat
 
 /-- Concrete `NTTRingOps` instance for ML-DSA. -/
 def concreteNTTRingOps : NTTRingOps where

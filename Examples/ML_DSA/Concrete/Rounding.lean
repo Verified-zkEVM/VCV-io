@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ML_DSA.Ring
+import Mathlib.Data.Int.NatAbs
 import Mathlib.Data.ZMod.ValMinAbs
 
 /-!
@@ -118,7 +119,7 @@ def power2Round (r : Rq) : Power2High × Rq :=
 
 /-- Reconstruct `t₁ · 2^d` from a power-2 rounded high representative. -/
 def power2RoundShift (r1 : Power2High) : Rq :=
-  Vector.map (fun x => (power2Scale : Coeff) * x) r1
+  Vector.ofFn fun i => (power2Scale : Coeff) * r1.get i
 
 /-- Reconstruct the `2γ₂`-multiple of a `HighBits` representative. -/
 def highBitsShift (p : Params) (r1 : High) : Rq :=
@@ -144,6 +145,166 @@ def useHint (p : Params) (h : Hint) (r : Rq) : High :=
 def hintWeight (h : Hint) : ℕ :=
   h.toList.foldl (fun acc b => acc + cond b 1 0) 0
 
+/-- Transport the standard additive group structure from functions to `Rq` for proofs. -/
+private noncomputable def polyEquiv : Rq ≃ (Fin ringDegree → Coeff) where
+  toFun := LatticeCrypto.Poly.toPi
+  invFun := LatticeCrypto.Poly.ofPi
+  left_inv := LatticeCrypto.Poly.ofPi_toPi
+  right_inv := LatticeCrypto.Poly.toPi_ofPi
+
+local instance : Add Rq := Vector.instAdd
+local instance : Sub Rq := Vector.instSub
+local instance : Neg Rq := Vector.instNeg
+noncomputable local instance : AddCommGroup Rq := polyEquiv.addCommGroup
+
+/-- Casting `centeredRepr` back into `ZMod q` recovers the original coefficient. -/
+private theorem centeredRepr_cast (x : Coeff) :
+    x = intToCoeff (LatticeCrypto.centeredRepr x) := by
+  by_cases h : (x.val : ℤ) ≤ (modulus : ℤ) / 2
+  · rw [LatticeCrypto.centeredRepr_of_le h, intToCoeff, Int.cast_natCast, ZMod.natCast_zmod_val]
+  · have hgt : (modulus : ℤ) / 2 < x.val := lt_of_not_ge h
+    rw [LatticeCrypto.centeredRepr_of_gt hgt, intToCoeff, Int.cast_sub, Int.cast_natCast,
+      Int.cast_natCast, ZMod.natCast_zmod_val, ZMod.natCast_self]
+    simp
+
+/-- `centeredRepr x` lies in the `valMinAbs` interval `(-q/2, q/2]`. -/
+private theorem centeredRepr_mem_Ioc (x : Coeff) :
+    LatticeCrypto.centeredRepr x * 2 ∈ Set.Ioc (-(modulus : ℤ)) modulus := by
+  by_cases h : (x.val : ℤ) ≤ (modulus : ℤ) / 2
+  · rw [LatticeCrypto.centeredRepr_of_le h]
+    have hx : 0 ≤ (x.val : ℤ) := by positivity
+    have hmod : (0 : ℤ) < modulus := by norm_num [modulus]
+    constructor <;> omega
+  · have hgt : (modulus : ℤ) / 2 < x.val := lt_of_not_ge h
+    rw [LatticeCrypto.centeredRepr_of_gt hgt]
+    have hval := ZMod.val_lt x
+    constructor <;> omega
+
+/-- `centeredRepr` agrees with Mathlib's `valMinAbs` on `ZMod q`. -/
+private theorem centeredRepr_eq_valMinAbs (x : Coeff) :
+    LatticeCrypto.centeredRepr x = x.valMinAbs := by
+  simpa using ((ZMod.valMinAbs_spec x (LatticeCrypto.centeredRepr x)).2
+    ⟨centeredRepr_cast x, centeredRepr_mem_Ioc x⟩).symm
+
+private theorem centeredRepr_intToCoeff_eq (z : ℤ)
+    (hzlo : -(modulus : ℤ) < z * 2) (hzhi : z * 2 ≤ modulus) :
+    LatticeCrypto.centeredRepr (intToCoeff z) = z := by
+  rw [centeredRepr_eq_valMinAbs]
+  exact (ZMod.valMinAbs_spec (intToCoeff z) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
+
+private theorem power2RoundCoeff_eq (r : Coeff) :
+    let (r1, r0) := power2RoundCoeff r
+    ((power2Scale : Coeff) * (r1 : Coeff)) + (intToCoeff r0) = r := by
+  unfold power2RoundCoeff
+  set t : ℕ := r.val % power2Scale
+  have hdiv : t + power2Scale * (r.val / power2Scale) = r.val := by
+    subst t
+    exact Nat.mod_add_div _ _
+  have hdiv' : ((t + power2Scale * (r.val / power2Scale) : ℕ) : Coeff) = r := by
+    simpa [ZMod.natCast_zmod_val] using congrArg (fun n : ℕ => (n : Coeff)) hdiv
+  by_cases h : t ≤ power2Scale / 2
+  · simp only [h, ↓reduceDIte, intToCoeff, Int.cast_natCast]
+    calc
+      ((power2Scale : Coeff) * ((r.val / power2Scale : ℕ) : Coeff)) + (t : Coeff)
+          = ((power2Scale * (r.val / power2Scale) + t : ℕ) : Coeff) := by
+              rw [← Nat.cast_mul, ← Nat.cast_add]
+      _ = r := by
+            simpa [Nat.add_comm] using hdiv'
+  · simp only [h, ↓reduceDIte, Nat.cast_add, Nat.cast_one, intToCoeff, Int.cast_sub,
+      Int.cast_natCast]
+    calc
+      (↑power2Scale : Coeff) * (↑(r.val / power2Scale) + 1) + ((t : Coeff) - power2Scale)
+          = ((power2Scale : Coeff) * ((r.val / power2Scale : ℕ) : Coeff)) + (t : Coeff) := by
+              ring
+      _ = ((power2Scale * (r.val / power2Scale) + t : ℕ) : Coeff) := by
+            rw [← Nat.cast_mul, ← Nat.cast_add]
+      _ = r := by
+            simpa [Nat.add_comm] using hdiv'
+
+private theorem power2RoundCoeff_bound (r : Coeff) :
+    (power2RoundCoeff r).2.natAbs ≤ power2Scale / 2 := by
+  unfold power2RoundCoeff
+  set t : ℕ := r.val % power2Scale
+  have htlt : t < power2Scale := by
+    subst t
+    simpa [power2Scale] using Nat.mod_lt r.val (show 0 < power2Scale by decide)
+  by_cases h : t ≤ power2Scale / 2
+  · simp only [h, ↓reduceDIte, Int.natAbs_natCast]
+  · have ht : power2Scale / 2 < t := Nat.lt_of_not_ge h
+    simp only [h, ↓reduceDIte, ge_iff_le]
+    rw [Int.natAbs_natCast_sub_natCast_of_le htlt.le]
+    omega
+
+private theorem power2RoundLow_centeredRepr (r : Coeff) :
+    LatticeCrypto.centeredRepr (intToCoeff ((power2RoundCoeff r).2)) = (power2RoundCoeff r).2 := by
+  let z : ℤ := (power2RoundCoeff r).2
+  have hbound : z.natAbs ≤ power2Scale / 2 := by
+    simpa [z] using power2RoundCoeff_bound r
+  have hzupper : z ≤ power2Scale / 2 := by
+    have hz : z ≤ (z.natAbs : ℤ) := by
+      simpa using (Int.le_natAbs (a := z))
+    have hb : (z.natAbs : ℤ) ≤ power2Scale / 2 := by
+      exact_mod_cast hbound
+    omega
+  have hzlower : -(power2Scale / 2 : ℤ) ≤ z := by
+    have hz : -z ≤ (z.natAbs : ℤ) := by
+      have hz' := Int.le_natAbs (a := -z)
+      simpa using hz'
+    have hb : (z.natAbs : ℤ) ≤ power2Scale / 2 := by
+      exact_mod_cast hbound
+    omega
+  apply centeredRepr_intToCoeff_eq
+  · have hscale : (power2Scale : ℤ) = 2 ^ droppedBits := by
+      norm_num [power2Scale, droppedBits]
+    have hmod : (power2Scale : ℤ) < modulus := by
+      norm_num [power2Scale, droppedBits, modulus]
+    omega
+  · have hscale : (power2Scale : ℤ) = 2 ^ droppedBits := by
+      norm_num [power2Scale, droppedBits]
+    have hmod : (power2Scale : ℤ) ≤ modulus := by
+      norm_num [power2Scale, droppedBits, modulus]
+    omega
+
+private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
+    (power2RoundShift (power2RoundHigh r)).get i =
+      (power2Scale : Coeff) * ((power2RoundCoeff (r.get i)).1 : Coeff) := by
+  simp [power2RoundShift, power2RoundHigh]
+
+private theorem power2RoundLow_get (r : Rq) (i : Fin ringDegree) :
+    (power2RoundLow r).get i = intToCoeff ((power2RoundCoeff (r.get i)).2) := by
+  simp [power2RoundLow]
+
+theorem concretePower2Round_high_low_decomp (r : Rq) :
+    power2RoundShift (power2RoundHigh r) + power2RoundLow r = r := by
+  apply Vector.ext
+  intro i hi
+  let j : Fin ringDegree := ⟨i, hi⟩
+  rw [Vector.getElem_add]
+  change (power2RoundShift (power2RoundHigh r)).get j +
+      (power2RoundLow r).get j = r.get j
+  rw [power2RoundShift_high_get, power2RoundLow_get]
+  exact power2RoundCoeff_eq (r.get j)
+
+theorem concretePower2Round_remainder_eq_low (r : Rq) :
+    r - power2RoundShift (power2RoundHigh r) = power2RoundLow r := by
+  apply Vector.ext
+  intro i hi
+  let j : Fin ringDegree := ⟨i, hi⟩
+  rw [Vector.getElem_sub]
+  change r.get j - (power2RoundShift (power2RoundHigh r)).get j =
+      (power2RoundLow r).get j
+  rw [power2RoundShift_high_get, power2RoundLow_get]
+  exact sub_eq_iff_eq_add'.2 (power2RoundCoeff_eq (r.get j)).symm
+
+theorem concretePower2Round_bound (r : Rq) :
+    LatticeCrypto.cInfNorm (r - power2RoundShift (power2RoundHigh r)) ≤ 2 ^ (droppedBits - 1) := by
+  rw [concretePower2Round_remainder_eq_low]
+  refine LatticeCrypto.cInfNorm_le_of_coeff_le ?_
+  intro i
+  rw [power2RoundLow_get]
+  rw [power2RoundLow_centeredRepr (r.get i)]
+  simpa [power2Scale, droppedBits] using power2RoundCoeff_bound (r.get i)
+
 /-- Concrete `Power2RoundOps` with `Power2High = Rq`. -/
 def concretePower2RoundOps : ML_DSA.Power2RoundOps where
   High2 := Power2High
@@ -159,5 +320,11 @@ def concreteRoundingOps (p : Params) : ML_DSA.RoundingOps (2 * p.gamma2) where
   shift := highBitsShift p
   makeHint := makeHint p
   useHint := useHint p
+
+/-
+The vector-level `Power2Round` decomposition and bound lemmas above compile. The remaining
+unresolved wrapper is `concretePower2RoundLaws`, followed by the harder `RoundingOps.Laws`
+obligations for `decompose`/`highBits`/`lowBits`.
+-/
 
 end ML_DSA.Concrete
