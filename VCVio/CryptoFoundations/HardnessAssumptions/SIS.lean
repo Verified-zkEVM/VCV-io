@@ -97,49 +97,58 @@ namespace SelfTargetMSIS
 /-- The SelfTargetMSIS problem for lattice-based signatures.
 
 The adversary receives a matrix `A` and a target vector `t`, and has access to a random
-oracle `H`. The adversary must find `(m, c, z)` such that:
-1. `c = H(m, highBits(Az - ct))` (self-targeting condition via the random oracle)
-2. `‖z‖∞ < β` (shortness bound)
-3. The verification equation holds
+oracle `H`. The adversary must produce `(hashInput, response)` such that:
+1. `c = H(hashInput)` (self-targeting: the adversary must have queried the RO on `hashInput`)
+2. `isValid(challenge, target, c, response)` holds (shortness bound + verification equation)
+
+The experiment enforces RO consistency by looking up `hashInput` in the RO's query cache.
+If the adversary never queried `H(hashInput)`, the check fails automatically.
 
 This captures the core hardness assumption in the ML-DSA/Dilithium security proof. -/
-structure Problem (Challenge Response Target HashInput : Type) where
+structure Problem (Challenge Response Target HashInput HashOutput : Type) where
   /-- Sample the public parameters (matrix + target). -/
   sampleParams : ProbComp (Challenge × Target)
-  /-- Check whether a purported solution is valid. -/
-  isValid : Challenge → Target → Response → Bool
+  /-- Check whether a purported solution is valid, given the hash output from the RO. -/
+  isValid : Challenge → Target → HashOutput → Response → Bool
 
 section Experiment
 
 variable {Challenge Response Target HashInput HashOutput : Type}
 
 /-- A SelfTargetMSIS adversary has access to a random oracle `HashInput →ₒ HashOutput`
-(modeling the hash function `H`) and uniform randomness. -/
-structure Adversary (problem : Problem Challenge Response Target HashInput)
-    (HashOutput : Type) where
+(modeling the hash function `H`) and uniform randomness. The adversary returns a hash
+preimage and a response; the experiment checks RO consistency by looking up the preimage
+in the oracle's cache. -/
+structure Adversary (problem : Problem Challenge Response Target HashInput HashOutput)
+    where
   run (params : Challenge × Target) :
-    OracleComp (unifSpec + (HashInput →ₒ HashOutput)) Response
+    OracleComp (unifSpec + (HashInput →ₒ HashOutput)) (HashInput × Response)
 
 variable [DecidableEq HashInput] [SampleableType HashOutput]
 
-/-- The SelfTargetMSIS experiment in the ROM: sample parameters, give the adversary
-access to uniform randomness and a random oracle for `H`, and check the solution. -/
+/-- The SelfTargetMSIS experiment in the ROM: sample parameters, run the adversary with
+uniform randomness and a lazy random oracle for `H`, then enforce:
+1. The adversary actually queried `H(hashInput)` (RO consistency check via the query cache)
+2. The solution passes `isValid` with the RO's cached output -/
 noncomputable def experiment
-    {problem : Problem Challenge Response Target HashInput}
-    (adv : Adversary problem HashOutput) :
+    {problem : Problem Challenge Response Target HashInput HashOutput}
+    (adv : Adversary problem) :
     ProbComp Bool := do
   let params ← problem.sampleParams
   let ro : QueryImpl (HashInput →ₒ HashOutput)
     (StateT ((HashInput →ₒ HashOutput).QueryCache) ProbComp) := randomOracle
   let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
     (StateT ((HashInput →ₒ HashOutput).QueryCache) ProbComp)
-  let result ← StateT.run' (simulateQ (idImpl + ro) (adv.run params)) ∅
-  return problem.isValid params.1 params.2 result
+  let ((hashInput, response), cache) ←
+    StateT.run (simulateQ (idImpl + ro) (adv.run params)) ∅
+  match cache hashInput with
+  | some hashOutput => return problem.isValid params.1 params.2 hashOutput response
+  | none => return false
 
 /-- Advantage of a SelfTargetMSIS adversary. -/
 noncomputable def advantage
-    {problem : Problem Challenge Response Target HashInput}
-    (adv : Adversary problem HashOutput) :
+    {problem : Problem Challenge Response Target HashInput HashOutput}
+    (adv : Adversary problem) :
     ℝ≥0∞ :=
   Pr[= true | experiment adv]
 

@@ -34,7 +34,11 @@ in `{-1, +1}` and the rest zero, sampled by `SampleInBall` (Algorithm 29). -/
 abbrev ChallengePoly := Rq
 
 /-- The type of the commitment hash `c̃`, which is `λ/4` bytes long. -/
-def CommitHashBytes (p : Params) := Bytes (p.lambda / 4)
+abbrev CommitHashBytes (p : Params) := Bytes (p.lambda / 4)
+
+instance (p : Params) : DecidableEq (CommitHashBytes p) := inferInstance
+instance (p : Params) : BEq (CommitHashBytes p) := inferInstance
+instance (p : Params) : LawfulBEq (CommitHashBytes p) := inferInstance
 
 /-- The primitive algorithms referenced by the ML-DSA specification. -/
 structure Primitives (p : Params) where
@@ -70,6 +74,9 @@ structure Primitives (p : Params) where
   /-- `HighBits(r)`: extract the high-order representative (Algorithm 37).
   Returns the quotient of `r` by `2γ₂`, with boundary correction. -/
   highBits : Rq → High
+  /-- Reconstruct the contribution of a high-order representative as a ring element.
+  This is the left inverse of `HighBits`: `highBitsShift(HighBits(r)) + LowBits(r) = r`. -/
+  highBitsShift : High → Rq
   /-- `LowBits(r)`: extract the low-order part (Algorithm 38).
   Returns `r mod± 2γ₂`. -/
   lowBits : Rq → Rq
@@ -123,5 +130,50 @@ def useHintVec {k : ℕ} (h : Vector prims.Hint k) (r : RqVec k) :
   Vector.zipWith prims.useHint h r
 
 end Primitives
+
+/-- Algebraic and range laws that the ML-DSA primitives must satisfy for the security proof.
+These correspond to the axioms in EasyCrypt's `DRing.eca` plus the hash/encoding coherence
+needed to connect the IDS-core view to the FIPS 204 signing layer. -/
+structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingOps) : Prop where
+  /-- `SampleInBall(c̃)` has infinity norm at most 1 (coefficients in {-1, 0, +1}). -/
+  sampleInBall_norm : ∀ cTilde, polyNorm (prims.sampleInBall cTilde) ≤ 1
+  /-- `ExpandS(ρ')` produces secret vectors bounded by `η`. -/
+  expandS_bound : ∀ rhoPrime,
+    let (s1, s2) := prims.expandS rhoPrime
+    polyVecBounded s1 p.eta ∧ polyVecBounded s2 p.eta
+  /-- `ExpandMask(ρ'', κ)` produces masking vectors bounded by `γ₁ - 1`. -/
+  expandMask_bound : ∀ rhoDoublePrime kappa,
+    polyVecBounded (prims.expandMask rhoDoublePrime kappa) (p.gamma1 - 1)
+  /-- NTT roundtrip: `NTT⁻¹(NTT(f)) = f`. -/
+  ntt_invNTT : ∀ f : Rq, nttOps.invNTT (nttOps.ntt f) = f
+  /-- NTT multiplication correctness:
+  `NTT(f) ⊙ NTT(g) = NTT(f * g)` where `*` is negacyclic multiplication. -/
+  ntt_mul : ∀ f g : Rq,
+    nttOps.multiplyNTTs (nttOps.ntt f) (nttOps.ntt g) =
+    nttOps.ntt (negacyclicMul f g)
+  /-- Decomposition identity: `highBitsShift(highBits(r)) + lowBits(r) = r`. -/
+  highLow_decomp : ∀ r : Rq,
+    prims.highBitsShift (prims.highBits r) + prims.lowBits r = r
+  /-- The low-order part is bounded by `γ₂`. -/
+  lowBits_bound : ∀ r : Rq,
+    LatticeCrypto.cInfNorm (prims.lowBits r) ≤ p.gamma2
+  /-- If the perturbation `s` is small enough relative to the low-order part of `r`,
+  then adding `s` does not change the high-order bits. -/
+  hide_low : ∀ (r s : Rq) (b : ℕ),
+    LatticeCrypto.cInfNorm s ≤ b →
+    LatticeCrypto.cInfNorm (prims.lowBits r) < p.gamma2 - b →
+    prims.highBits (r + s) = prims.highBits r
+  /-- `highBitsShift` is injective: distinct high-order representatives produce
+  distinct ring elements. -/
+  highBitsShift_injective : Function.Injective prims.highBitsShift
+  /-- `UseHint(MakeHint(z, r), r) = HighBits(r + z)` when `z` is small enough. -/
+  useHint_makeHint : ∀ z r : Rq,
+    LatticeCrypto.cInfNorm z ≤ p.gamma2 →
+    prims.useHint (prims.makeHint z r) r = prims.highBits (r + z)
+  /-- `Power2Round` roundtrip: `power2RoundShift(fst(power2Round(r))) + snd(power2Round(r)) = r`. -/
+  power2Round_decomp : ∀ r : Rq,
+    prims.power2RoundShift (prims.power2Round r).1 + (prims.power2Round r).2 = r
+  /-- `w1Encode` is injective: distinct commitments encode to distinct byte strings. -/
+  w1Encode_injective : Function.Injective prims.w1Encode
 
 end ML_DSA

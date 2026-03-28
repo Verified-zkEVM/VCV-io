@@ -25,6 +25,9 @@ abbrev Byte := UInt8
 
 abbrev Bytes (n : ℕ) := Vector Byte n
 
+instance (n : ℕ) : BEq (Bytes n) := inferInstance
+instance (n : ℕ) : LawfulBEq (Bytes n) := inferInstance
+
 /-- The variable parameters that distinguish the approved ML-DSA instantiations. -/
 structure Params where
   /-- Number of rows in the matrix A. -/

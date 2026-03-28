@@ -8,8 +8,6 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
-import VCVio.OracleComp.Constructions.Replicate
-
 /-!
 # Fiat-Shamir with Aborts Transform
 
@@ -23,6 +21,7 @@ This is the transform used by ML-DSA (CRYSTALS-Dilithium, FIPS 204).
 
 ## Main Definitions
 
+- `fsAbortSignLoop`: the retry loop with early return
 - `FiatShamirWithAbort`: the signature scheme produced by the transform
 - `FiatShamirWithAbort.euf_cma_bound`: EUF-CMA security statement (proof is future work)
 
@@ -45,13 +44,32 @@ variable {S W W' St C Z P : Type}
   [SampleableType S] [SampleableType W]
   [DecidableEq W'] [DecidableEq C] [SampleableType C]
 
+/-- Signing retry loop with early return for the Fiat-Shamir with aborts transform.
+
+Tries up to `n` commit-hash-respond cycles:
+1. Commit to get `(w', st)`
+2. Hash `(msg, w')` via the random oracle to get challenge `c`
+3. Attempt to respond; if `some z`, return immediately; if `none` (abort), decrement
+   the counter and retry.
+
+Returns `none` only when all `n` attempts abort. -/
+def fsAbortSignLoop (ids : IdenSchemeWithAbort S W W' St C Z p)
+    (M : Type) [DecidableEq M] (pk : S) (sk : W) (m : M) :
+    ℕ → OracleComp (unifSpec + (M × W' →ₒ C)) (Option (W' × Z))
+  | 0 => return none
+  | n + 1 => do
+    let (w', st) ← (ids.commit pk sk : ProbComp _)
+    let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
+    let oz ← (ids.respond pk sk st c : ProbComp _)
+    match oz with
+    | some z => return some (w', z)
+    | none => fsAbortSignLoop ids M pk sk m n
+
 /-- The Fiat-Shamir with aborts transform applied to an identification scheme with aborts.
 Produces a signature scheme in the random oracle model.
 
-The signing algorithm runs a retry loop (up to `maxAttempts` iterations):
-1. Commit to get `(w', st)`
-2. Hash `(msg, w')` using the random oracle to get challenge `c`
-3. Try to respond; if `none` (abort), retry from step 1
+The signing algorithm runs `fsAbortSignLoop` (up to `maxAttempts` iterations) with
+early return on the first non-aborting response.
 
 The type parameters are:
 - `M`: message space
@@ -61,26 +79,17 @@ The type parameters are:
 - `S` / `W`: statement / witness (= public key / secret key) -/
 def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
-    [Inhabited Z] (maxAttempts : ℕ) :
+    (maxAttempts : ℕ) :
     SignatureAlg (OracleComp (unifSpec + (M × W' →ₒ C)))
-      (M := M) (PK := S) (SK := W) (S := W' × Z) where
+      (M := M) (PK := S) (SK := W) (S := Option (W' × Z)) where
   keygen := hr.gen
-  sign := fun _pk sk m => do
-    let result ← OracleComp.replicate maxAttempts (do
-      let (w', st) ← (ids.commit _pk sk : ProbComp _)
+  sign := fun pk sk m => fsAbortSignLoop ids M pk sk m maxAttempts
+  verify := fun pk m sig => do
+    match sig with
+    | none => return false
+    | some (w', z) =>
       let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
-      let oz ← (ids.respond _pk sk st c : ProbComp _)
-      return oz.map fun z => (w', z))
-    match result.filterMap id |>.head? with
-    | some sig => return sig
-    | none =>
-        let (w', st) ← (ids.commit _pk sk : ProbComp _)
-        let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
-        let oz ← (ids.respond _pk sk st c : ProbComp _)
-        return (w', oz.getD default)
-  verify := fun pk m (w', z) => do
-    let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
-    return ids.verify pk w' c z
+      return ids.verify pk w' c z
   exec comp :=
     let ro : QueryImpl (M × W' →ₒ C)
       (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
@@ -114,7 +123,7 @@ section EUF_CMA
 
 set_option linter.unusedDecidableInType false
 
-variable [DecidableEq Z] [Inhabited Z]
+variable [DecidableEq Z]
 
 /-- Structural query bound counting only random-oracle queries in a
 Fiat-Shamir with aborts EUF-CMA adversary. -/
@@ -147,7 +156,7 @@ theorem euf_cma_bound
       (FiatShamirWithAbort ids hr M maxAttempts))
     (qBound : ℕ)
     (_hQ : ∀ pk, hashQueryBound M
-      (S' := W' × Z) (oa := adv.main pk) qBound) :
+      (S' := Option (W' × Z)) (oa := adv.main pk) qBound) :
     ∃ reduction : S → ProbComp W,
       adv.advantage ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by

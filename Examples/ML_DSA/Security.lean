@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ML_DSA.Scheme
+import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.HardnessAssumptions.SIS
 
 /-!
@@ -36,11 +37,11 @@ open OracleComp OracleSpec
 namespace ML_DSA
 
 variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
-  [DecidableEq (Bytes 32)] [DecidableEq prims.High]
+  [DecidableEq prims.High]
 
 section Properties
 
-variable [SampleableType (CommitHashBytes p)]
+variable [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
@@ -80,8 +81,8 @@ section MainTheorem
 
 variable {M : Type} [DecidableEq M]
   [DecidableEq prims.Hint]
-  [SampleableType (PublicKey p prims)] [SampleableType (SecretKey p)]
-  [SampleableType (CommitHashBytes p)]
+  [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
+  [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- **Main Security Theorem (EUF-CMA).**
@@ -105,15 +106,14 @@ implementations. The proof is future work following the EasyCrypt mechanization.
 theorem euf_cma_security
     (stmsis : SelfTargetMSIS.Problem
       (TqMatrix p.k p.l) (Response p prims)
-      (PublicKey p prims) (M × Commitment p prims))
+      (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
     (maxAttempts : ℕ)
-    [Inhabited (Response p prims)]
     (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
       (validKeyPair p prims)) :
     ∀ (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort (identificationScheme p prims nttOps)
         hr M maxAttempts)),
-    ∃ (reduction : SelfTargetMSIS.Adversary stmsis (CommitHashBytes p)),
+    ∃ (reduction : SelfTargetMSIS.Adversary stmsis),
       adv.advantage ≤ SelfTargetMSIS.advantage reduction := by
   sorry
 

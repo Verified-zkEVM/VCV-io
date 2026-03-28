@@ -5,15 +5,15 @@ Authors: Quang Dao
 -/
 import Examples.ML_DSA.Primitives
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
-import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
-# ML-DSA Scheme Definition
+# ML-DSA Identification Scheme Core
 
-This file defines the ML-DSA digital signature scheme following FIPS 204. At the abstract
-level, ML-DSA is modeled as an instance of `IdenSchemeWithAbort` (identification scheme with
-aborts), which is then transformed into a signature scheme via `FiatShamirWithAbort`.
+This file defines the core ML-DSA identification scheme with aborts, following the
+proof-level abstraction used in the EasyCrypt formalization (formosa-crypto/dilithium).
+The concrete FIPS 204 signing algorithm (with message-dependent hashing and retry counters)
+is built on top of this in `Examples.ML_DSA.Signature`.
 
 ## Architecture
 
@@ -23,36 +23,26 @@ The `IdenSchemeWithAbort` type parameters instantiate as follows for ML-DSA:
 |---|---|
 | `S` (statement) | `PublicKey` — `(ρ, t₁)` |
 | `W` (witness) | `SecretKey` — `(ρ, K, tr, s₁, s₂, t₀)` |
-| `W'` (commitment) | `Vector prims.High p.k` — the high-order bits `w₁ = HighBits(Ay)` |
+| `W'` (commitment) | `Vector prims.High p.k` — `w₁ = HighBits(Ay)` |
 | `St` (state) | `SigningState` — `(y, w)` retained for the respond phase |
 | `C` (challenge) | `CommitHashBytes p` — the `λ/4`-byte hash `c̃` |
-| `Z` (response) | `RqVec p.l × Vector prims.Hint p.k` — the pair `(z, h)` |
+| `Z` (response) | `RqVec p.l × Vector prims.Hint p.k` — `(z, h)` |
 
-The `FiatShamirWithAbort` transform then produces a signature scheme with:
-- Signature type = `W' × Z` = `w₁ × (z, h)`, where `w₁` is the commitment
-- The random oracle maps `(M, w₁) ↦ c̃`
+## Separation from FIPS 204
 
-In the concrete FIPS 204 encoding, the signature stores `(c̃, z, h)` instead of `(w₁, z, h)`.
-This is an equivalent representation via the random oracle: given `(w₁, z, h)` and the message,
-`c̃` can be recomputed, and vice versa.
+This file models the **proof-level IDS** used in the Fiat-Shamir-with-aborts security argument:
 
-## Verification (Algorithm 8)
-
-`ids.verify(pk, w₁, c̃, (z, h))` checks:
-1. `‖z‖∞ < γ₁ - β` (response is short)
-2. Compute `c = SampleInBall(c̃)` (derive challenge polynomial from hash)
-3. Compute `w'_Approx = Az - c · (t₁ · 2^d)` (reconstruct approximate commitment)
-4. Compute `w₁' = UseHint(h, w'_Approx)` (apply hint to recover high bits)
-5. `w₁' = w₁` (reconstructed commitment matches)
-6. Hint weight `≤ ω` (hint is valid)
-
-The `FiatShamirWithAbort` layer additionally checks `c̃ = H(M ‖ w₁)` via the random oracle.
-Together, checks 1–6 + RO consistency = full FIPS 204 Algorithm 8.
+- **Commit** samples `y` uniformly at random, rather than deriving it from message-dependent
+  seeds via `ExpandMask(ρ'', κ)`.
+- **No message hashing**: the IDS operates without messages; the message enters only through
+  the Fiat-Shamir transform.
+- **No retry counter**: the IDS commit is a single probabilistic step; retry logic with
+  incrementing `κ` is handled by the signing layer.
 
 ## References
 
-- NIST FIPS 204, Algorithms 6 (KeyGen_internal), 7 (Sign_internal), 8 (Verify_internal)
-- EasyCrypt `SimplifiedScheme.ec` (formosa-crypto/dilithium)
+- EasyCrypt `IDSabort.ec`, `SimplifiedScheme.ec` (formosa-crypto/dilithium)
+- NIST FIPS 204, Algorithms 7 and 8 (for the underlying arithmetic)
 -/
 
 set_option autoImplicit false
@@ -77,20 +67,43 @@ structure SecretKey where
   s2 : RqVec p.k
   t0 : RqVec p.k
 
-/-- The signing state: commitment data retained between commit and respond phases.
-Contains `y` (masking vector) and `w = Ay` (needed for rejection checks). -/
+/-- The signing state: commitment data retained between commit and respond phases. -/
 structure SigningState where
   y : RqVec p.l
   w : RqVec p.k
 
-/-- The public commitment sent to the verifier: `w₁ = HighBits(w)`.
-This is the high-order representative of `w = Ay` with respect to rounding by `2γ₂`. -/
+/-- The public commitment: `w₁ = HighBits(w)`. -/
 abbrev Commitment := Vector prims.High p.k
 
-/-- The signature response: the short vector `z` paired with the hint `h`.
-- `z = y + c·s₁` with `‖z‖∞ < γ₁ - β` (response vector)
-- `h = MakeHint(-c·t₀, w - c·s₂ + c·t₀)` (hint for commitment recovery) -/
+/-- The signature response: the short vector `z` paired with the hint `h`. -/
 abbrev Response := RqVec p.l × Vector prims.Hint p.k
+
+/-! ### Shared Arithmetic Helpers -/
+
+/-- Pointwise multiply scalar `cHat` by each component of `vHat` in NTT domain. -/
+def nttScalarVecMul (cHat : Tq) {k : ℕ} (vHat : TqVec k) : TqVec k :=
+  Vector.map (nttOps.multiplyNTTs cHat) vHat
+
+/-- Multiply polynomial `c` by polynomial vector `v` via NTT: `NTT⁻¹(NTT(c) ⊙ NTT(v))`. -/
+def polyVecMul (c : Rq) {k : ℕ} (v : RqVec k) : RqVec k :=
+  nttOps.invNTTVec (nttScalarVecMul nttOps (nttOps.ntt c) (nttOps.nttVec v))
+
+/-- Compute `w = NTT⁻¹(Â · NTT(y))`. -/
+def computeW {k l : ℕ} (aHat : TqMatrix k l) (y : RqVec l) : RqVec k :=
+  nttOps.invNTTVec (nttOps.matVecMul aHat (nttOps.nttVec y))
+
+/-- Compute `w'_Approx = NTT⁻¹(Â · NTT(z) - NTT(c) · NTT(t₁ · 2^d))` (Algorithm 8, line 9). -/
+def computeWApprox (aHat : TqMatrix p.k p.l) (c : ChallengePoly) (z : RqVec p.l)
+    (t1 : Vector prims.Power2High p.k) : RqVec p.k :=
+  let cHat := nttOps.ntt c
+  let zHat := nttOps.nttVec z
+  let t1Shifted := prims.power2RoundShiftVec t1
+  let t1ShiftedHat := nttOps.nttVec t1Shifted
+  let azHat := nttOps.matVecMul aHat zHat
+  let ct1Hat := nttScalarVecMul nttOps cHat t1ShiftedHat
+  nttOps.invNTTVec (Vector.zipWith (· - ·) azHat ct1Hat)
+
+/-! ### Key Generation -/
 
 /-- ML-DSA key generation (Algorithm 6), modeled as a deterministic function from seed.
 
@@ -105,59 +118,52 @@ def keyGenFromSeed (seed : Bytes 32) : PublicKey p prims × SecretKey p :=
   let (rho, rhoPrime, key) := prims.expandSeed seed
   let aHat := prims.expandA rho
   let (s1, s2) := prims.expandS rhoPrime
-  let s1Hat := nttOps.nttVec s1
-  let t := nttOps.invNTTVec (nttOps.matVecMul aHat s1Hat) + s2
+  let t := computeW nttOps aHat s1 + s2
   let (t1, t0) := prims.power2RoundVec t
   let pk : PublicKey p prims := ⟨rho, t1⟩
   let tr := prims.hashPublicKey rho t1
   let sk : SecretKey p := ⟨rho, key, tr, s1, s2, t0⟩
   (pk, sk)
 
-/-- A key pair is valid when the public and secret keys share the same public seed `ρ`. -/
-def validKeyPair [DecidableEq (Bytes 32)]
-    (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
-  pk.rho == sk.rho
+/-- A key pair is valid when the public and secret keys are consistently derived:
+the public seed matches, and `tr` is the hash of the encoded public key. -/
+def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
+  decide (pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1)
 
-/-- The underlying identification scheme with aborts for ML-DSA.
+/-! ### Identification Scheme -/
 
-Maps to FIPS 204 as follows:
-- **Commit** (Alg 7, lines 11–13): sample `y ← ExpandMask(ρ'', κ)`, compute
-  `w = NTT⁻¹(Â · NTT(y))`, return `w₁ = HighBits(w)` and state `(y, w)`.
+/-- The core identification scheme with aborts for ML-DSA.
+
+- **Commit**: sample `y` uniformly, compute `w = NTT⁻¹(Â · NTT(y))`,
+  return `(w₁ = HighBits(w), state = (y, w))`.
 - **Respond** (Alg 7, lines 16–30): derive `c = SampleInBall(c̃)`, compute
   `z = y + c·s₁`, check `‖z‖∞ < γ₁ - β` and `‖LowBits(w - c·s₂)‖∞ < γ₂ - β`,
   compute hint `h = MakeHint(-c·t₀, w - c·s₂ + c·t₀)`, check `‖c·t₀‖∞ < γ₂`
   and hint weight `≤ ω`. Return `some (z, h)` on success, `none` on abort.
 - **Verify** (Alg 8, lines 8–13): check `‖z‖∞ < γ₁ - β`, reconstruct
-  `w'_Approx = Az - c · (t₁ · 2^d)`, compute `w₁' = UseHint(h, w'_Approx)`,
-  check `w₁' = w₁` and hint weight `≤ ω`. -/
+  `w'_Approx = Az - c·(t₁·2^d)`, verify `UseHint(h, w'_Approx) = w₁` and
+  hint weight `≤ ω`. -/
 noncomputable def identificationScheme
-    [DecidableEq (Bytes 32)] [DecidableEq prims.High] :
+    [DecidableEq prims.High] [SampleableType (RqVec p.l)] :
     IdenSchemeWithAbort
       (PublicKey p prims) (SecretKey p)
       (Commitment p prims) (SigningState p)
       (CommitHashBytes p) (Response p prims)
       (validKeyPair p prims) where
-  commit := fun pk sk => do
+  commit := fun pk _sk => do
     let aHat := prims.expandA pk.rho
-    let mu := prims.hashMessage sk.tr []
-    let rhoDoublePrime := prims.hashPrivateSeed sk.key (Vector.replicate 32 0) mu
-    let y := prims.expandMask rhoDoublePrime 0
-    let yHat := nttOps.nttVec y
-    let w := nttOps.invNTTVec (nttOps.matVecMul aHat yHat)
+    let y ← $ᵗ (RqVec p.l)
+    let w := computeW nttOps aHat y
     let w1 := prims.highBitsVec w
     return (w1, ⟨y, w⟩)
   respond := fun _pk sk st cTilde => do
     let c := prims.sampleInBall cTilde
-    let cHat := nttOps.ntt c
-    let cs1 := nttOps.invNTTVec
-      (Vector.map (nttOps.multiplyNTTs cHat) (nttOps.nttVec sk.s1))
-    let cs2 := nttOps.invNTTVec
-      (Vector.map (nttOps.multiplyNTTs cHat) (nttOps.nttVec sk.s2))
+    let cs1 := polyVecMul nttOps c sk.s1
+    let cs2 := polyVecMul nttOps c sk.s2
     let z := st.y + cs1
     let r0 := prims.lowBitsVec (st.w - cs2)
     if polyVecNorm z < p.gamma1 - p.beta ∧ polyVecNorm r0 < p.gamma2 - p.beta then do
-      let ct0 := nttOps.invNTTVec
-        (Vector.map (nttOps.multiplyNTTs cHat) (nttOps.nttVec sk.t0))
+      let ct0 := polyVecMul nttOps c sk.t0
       let h := prims.makeHintVec (-ct0) (st.w - cs2 + ct0)
       if polyVecNorm ct0 < p.gamma2 ∧ prims.hintWeight h ≤ p.omega then
         return some (z, h)
@@ -167,14 +173,8 @@ noncomputable def identificationScheme
       return none
   verify := fun pk w1 cTilde (z, h) =>
     let c := prims.sampleInBall cTilde
-    let cHat := nttOps.ntt c
     let aHat := prims.expandA pk.rho
-    let zHat := nttOps.nttVec z
-    let t1Shifted := prims.power2RoundShiftVec pk.t1
-    let t1ShiftedHat := nttOps.nttVec t1Shifted
-    let azHat := nttOps.matVecMul aHat zHat
-    let ct1Hat := Vector.map (nttOps.multiplyNTTs cHat) t1ShiftedHat
-    let wApprox := nttOps.invNTTVec (Vector.zipWith (· - ·) azHat ct1Hat)
+    let wApprox := computeWApprox p prims nttOps aHat c z pk.t1
     let w1' := prims.useHintVec h wApprox
     decide (polyVecNorm z < p.gamma1 - p.beta) &&
     decide (w1' = w1) &&
