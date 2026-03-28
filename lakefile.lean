@@ -57,6 +57,37 @@ extern_lib leanmlkem pkg := do
   let name := nameToStaticLib "leanmlkem"
   buildStaticLib (pkg.staticLibDir / name) #[nativeO, ffiO]
 
+-- Compile mldsa-native core and Lean FFI wrapper as separate translation units.
+private def mldsaCFlags (pkg : NPackage __name__) :
+    FetchM (Array String × Array String) := do
+  let mldsaDir := pkg.dir / "third_party" / "mldsa-native" / "mldsa"
+  let weakArgs := #[
+    "-I", (← getLeanIncludeDir).toString,
+    "-I", mldsaDir.toString,
+    "-I", (mldsaDir / "src").toString,
+    "-DMLD_CONFIG_PARAMETER_SET=65",
+    "-std=c99", "-O2"]
+  return (weakArgs, #["-fPIC"])
+
+target mldsa_native.o pkg : System.FilePath := do
+  let oFile := pkg.buildDir / "c" / "mldsa_native.o"
+  let mldsaDir := pkg.dir / "third_party" / "mldsa-native" / "mldsa"
+  let srcJob ← inputTextFile <| mldsaDir / "mldsa_native.c"
+  let (weakArgs, traceArgs) ← mldsaCFlags pkg
+  buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
+
+target mldsa_ffi.o pkg : System.FilePath := do
+  let oFile := pkg.buildDir / "c" / "mldsa_ffi.o"
+  let srcJob ← inputTextFile <| pkg.dir / "ffi" / "mldsa" / "lean_mldsa_ffi.c"
+  let (weakArgs, traceArgs) ← mldsaCFlags pkg
+  buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
+
+extern_lib leanmldsa pkg := do
+  let nativeO ← mldsa_native.o.fetch
+  let ffiO ← mldsa_ffi.o.fetch
+  let name := nameToStaticLib "leanmldsa"
+  buildStaticLib (pkg.staticLibDir / name) #[nativeO, ffiO]
+
 /-- Test support modules (helpers, vectors). -/
 lean_lib VCVioTest
 
@@ -67,3 +98,7 @@ lean_exe smoke_test where
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where
   root := `VCVioTest.MLKEM.Main
+
+/-- ML-DSA test executable (links against mldsa-native FFI). -/
+lean_exe mldsa_test where
+  root := `VCVioTest.MLDSA.Main

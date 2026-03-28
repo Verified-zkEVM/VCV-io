@@ -16,6 +16,7 @@ import Examples.MLKEM.Params
 import Examples.MLKEM.Primitives
 import Examples.MLKEM.Ring
 import Examples.ML_DSA.Concrete.Encoding
+import Examples.ML_DSA.Concrete.FFI
 import Examples.ML_DSA.Concrete.Instance
 import Examples.ML_DSA.Concrete.NTT
 import Examples.ML_DSA.Concrete.Rounding
