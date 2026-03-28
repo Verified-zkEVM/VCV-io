@@ -53,8 +53,9 @@ instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
     fHat[i] = fHat.coeffs[i] := rfl
 
-@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
-    fHat.toArray[i]'(by simpa [Tq.toArray] using hi) = fHat.coeffs[i] := rfl
+@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree)
+    (h_size : i < fHat.toArray.size) :
+    fHat.toArray[i]'h_size = fHat.coeffs[i] := rfl
 
 end Tq
 
@@ -72,21 +73,19 @@ abbrev NTTRingOps := LatticeCrypto.NTTRingOps Rq Tq
 
 section Norms
 
-variable (p : Params)
-
 /-- The centered infinity norm of an ML-DSA polynomial. -/
-noncomputable abbrev polyNorm (f : Rq) : ℕ := LatticeCrypto.cInfNorm f
+abbrev polyNorm (f : Rq) : ℕ := LatticeCrypto.cInfNorm f
 
 /-- The centered infinity norm of an ML-DSA polynomial vector. -/
-noncomputable abbrev polyVecNorm {k : ℕ} (v : RqVec k) : ℕ :=
+abbrev polyVecNorm {k : ℕ} (v : RqVec k) : ℕ :=
   LatticeCrypto.PolyVec.cInfNorm v
 
 /-- Whether all coefficients of a polynomial are in `[-b, b]`. -/
-def polyBounded (f : Rq) (b : ℕ) : Prop := LatticeCrypto.cInfNorm f ≤ b
+def polyBounded (f : Rq) (b : ℕ) : Prop := polyNorm f ≤ b
 
 /-- Whether all coefficients of every component of a polynomial vector are in `[-b, b]`. -/
 def polyVecBounded {k : ℕ} (v : RqVec k) (b : ℕ) : Prop :=
-  LatticeCrypto.PolyVec.cInfNorm v ≤ b
+  polyVecNorm v ≤ b
 
 end Norms
 
@@ -120,7 +119,7 @@ namespace NTTRingOps
 
 variable (ops : NTTRingOps)
 
-abbrev transpose {rows cols : ℕ} (A : TqMatrix rows cols) :
+abbrev transpose (_ops : NTTRingOps) {rows cols : ℕ} (A : TqMatrix rows cols) :
     TqMatrix cols rows := LatticeCrypto.NTTRingOps.transpose A
 
 abbrev nttVec {k : ℕ} (v : RqVec k) : TqVec k :=

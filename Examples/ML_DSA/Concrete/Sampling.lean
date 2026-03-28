@@ -135,7 +135,7 @@ def expandS (rhoPrime : Bytes 64) (p : Params) : RqVec p.l × RqVec p.k :=
 def expandMask (rhoPrime : Bytes 64) (kappa : ℕ) (p : Params) : RqVec p.l :=
   let seed := vectorToByteArray rhoPrime
   Vector.ofFn fun i =>
-    polyZUnpack p <| shake256Stream seed (p.l * kappa + i.val) (polyZPackedBytes p)
+    polyZUnpack p <| shake256Stream seed (kappa + i.val) (polyZPackedBytes p)
 
 /-! ## Challenge sampling -/
 

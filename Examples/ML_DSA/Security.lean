@@ -64,6 +64,7 @@ theorem idsWithAbort_hvzk :
     ∃ sim, (identificationScheme p prims nttOps).HVZK sim := by
   sorry
 
+omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited] in
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
@@ -73,7 +74,15 @@ In our formalization, this is directly enforced by the `verify` function: it che
 commitment recoverability. -/
 theorem idsWithAbort_commitment_recoverable :
     ∃ recover, (identificationScheme p prims nttOps).CommitmentRecoverable recover := by
-  sorry
+  refine ⟨fun pk cTilde (z, h) =>
+    prims.useHintVec h (computeWApprox p prims nttOps (prims.expandA pk.rho)
+      (prims.sampleInBall cTilde) z pk.t1), ?_⟩
+  intro s w' c z hverify
+  unfold identificationScheme at hverify
+  simp only [Bool.and_eq_true, decide_eq_true_eq] at hverify
+  change prims.useHintVec z.2
+    (computeWApprox p prims nttOps (prims.expandA s.rho) (prims.sampleInBall c) z.1 s.t1) = w'
+  exact hverify.1.2
 
 end Properties
 

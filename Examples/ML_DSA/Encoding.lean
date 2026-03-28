@@ -61,16 +61,11 @@ structure Laws : Prop where
 /-- Extended laws including hash/encoding coherence for the FIPS 204 pipeline.
 
 These laws connect the abstract primitives to the encoding layer, ensuring that
-hash functions applied to semantic data agree with hash functions applied to
-encoded byte representations. -/
+decoded signatures always satisfy the semantic side conditions required by the
+specification. -/
 structure CoherenceLaws : Prop where
   /-- Encoding roundtrips. -/
   encoding : enc.Laws
-  /-- `hashPublicKey(ρ, t₁)` is invariant under encode-decode roundtrip. -/
-  hashPublicKey_consistent :
-    ∀ (rho : Bytes 32) (t1 : Vector prims.Power2High p.k),
-      let (rho', t1') := enc.pkDecode (enc.pkEncode rho t1)
-      prims.hashPublicKey rho t1 = prims.hashPublicKey rho' t1'
   /-- Signature decoding rejects hints with weight exceeding `ω`. -/
   sigDecode_rejects_bad_hints :
     ∀ (encoded : enc.EncodedSig),

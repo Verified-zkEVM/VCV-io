@@ -66,7 +66,7 @@ Dilithium/ML-DSA security proof. These correspond to the axioms in EasyCrypt's
 `DRing.eca` `HighLow` theory. -/
 structure RoundingOps.Laws {Rq : Type*} [AddCommGroup Rq]
     {α : ℕ} (ops : RoundingOps Rq α)
-    (cInfNorm : Rq → ℕ) where
+    (cInfNorm : Rq → ℕ) : Prop where
   /-- Decomposition identity: the high and low parts sum to the original element. -/
   high_low_decomp : ∀ x : Rq, ops.shift (ops.highBits x) + ops.lowBits x = x
   /-- The low-order part is bounded by `α / 2`. -/
@@ -89,12 +89,8 @@ structure RoundingOps.Laws {Rq : Type*} [AddCommGroup Rq]
 /-- Algebraic laws for `Power2RoundOps`. -/
 structure Power2RoundOps.Laws {Rq : Type*} [AddCommGroup Rq]
     {d : ℕ} (ops : Power2RoundOps Rq d)
-    (cInfNorm : Rq → ℕ) where
+    (cInfNorm : Rq → ℕ) : Prop where
   /-- The remainder after power-2 rounding is bounded by `2^(d-1)`. -/
   power2Round_bound : ∀ r : Rq, cInfNorm (r - ops.shift2 (ops.power2Round r)) ≤ 2 ^ (d - 1)
-  /-- Decomposition: shift of rounded value plus remainder equals original. -/
-  high_low_decomp : ∀ r : Rq,
-    ops.shift2 (ops.power2Round r) +
-      (r - ops.shift2 (ops.power2Round r)) = r
 
 end LatticeCrypto

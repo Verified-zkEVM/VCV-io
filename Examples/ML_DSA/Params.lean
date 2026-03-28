@@ -79,7 +79,7 @@ def secretKeyBytes (params : Params) : ℕ :=
 /-- Size of a signature in bytes. -/
 def signatureBytes (params : Params) : ℕ :=
   params.lambda / 4 +
-  32 * params.l * (1 + Nat.log2 (params.gamma1 - 1)) +
+  32 * params.l * (1 + Nat.log2 (2 * params.gamma1 - 1)) +
   params.omega + params.k
 
 end Params

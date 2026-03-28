@@ -32,7 +32,7 @@ section CenteredRepr
 variable {q : ℕ} [NeZero q]
 
 /-- The centered representative of `x : ZMod q`, mapping to the unique integer in
-`[-(q-1)/2, (q-1)/2]` (or `[-⌊q/2⌋, ⌈q/2⌉-1]` for even `q`) congruent to `x` mod `q`. -/
+`[-(q-1)/2, (q-1)/2]` (or `[-⌊q/2⌋ + 1, ⌈q/2⌉]` for even `q`) congruent to `x` mod `q`. -/
 def centeredRepr (x : ZMod q) : ℤ :=
   if (x.val : ℤ) ≤ (q : ℤ) / 2 then (x.val : ℤ) else (x.val : ℤ) - q
 
@@ -66,12 +66,12 @@ variable {q : ℕ} [NeZero q] {n : ℕ}
 
 /-- The centered infinity norm of a polynomial: the maximum absolute value of the centered
 representatives of its coefficients. Returns `0` for the degree-0 polynomial. -/
-noncomputable def cInfNorm (p : Poly (ZMod q) n) : ℕ :=
+def cInfNorm (p : Poly (ZMod q) n) : ℕ :=
   Finset.sup Finset.univ (fun i : Fin n => (centeredRepr (p.get i)).natAbs)
 
 /-- The ℓ₁ norm of a polynomial: the sum of absolute values of the centered representatives
 of its coefficients. -/
-noncomputable def l1Norm (p : Poly (ZMod q) n) : ℕ :=
+def l1Norm (p : Poly (ZMod q) n) : ℕ :=
   ∑ i : Fin n, (centeredRepr (p.get i)).natAbs
 
 omit [NeZero q] in
@@ -108,13 +108,13 @@ variable {q : ℕ} [NeZero q] {n k : ℕ}
 
 /-- The centered infinity norm of a polynomial vector: the maximum `cInfNorm` across
 all component polynomials. -/
-noncomputable def PolyVec.cInfNorm (v : PolyVec (ZMod q) n k) : ℕ :=
+def PolyVec.cInfNorm (v : PolyVec (ZMod q) n k) : ℕ :=
   Finset.sup Finset.univ (fun j : Fin k => LatticeCrypto.cInfNorm (v.get j))
 
 /-- The ℓ₁ norm of a polynomial vector: the maximum `l1Norm` across all component polynomials.
 This follows the convention where the ℓ₁ norm of a module element is the max over its ring
 components, as used in lattice-based cryptography. -/
-noncomputable def PolyVec.l1Norm (v : PolyVec (ZMod q) n k) : ℕ :=
+def PolyVec.l1Norm (v : PolyVec (ZMod q) n k) : ℕ :=
   Finset.sup Finset.univ (fun j : Fin k => LatticeCrypto.l1Norm (v.get j))
 
 omit [NeZero q] in

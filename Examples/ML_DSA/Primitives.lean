@@ -36,10 +36,6 @@ abbrev ChallengePoly := Rq
 /-- The type of the commitment hash `c̃`, which is `λ/4` bytes long. -/
 abbrev CommitHashBytes (p : Params) := Bytes (p.lambda / 4)
 
-instance (p : Params) : DecidableEq (CommitHashBytes p) := inferInstance
-instance (p : Params) : BEq (CommitHashBytes p) := inferInstance
-instance (p : Params) : LawfulBEq (CommitHashBytes p) := inferInstance
-
 /-- The primitive algorithms referenced by the ML-DSA specification. -/
 structure Primitives (p : Params) where
   /-- The type of high-order representatives from `HighBits` (rounding by `2γ₂`).
@@ -99,7 +95,7 @@ structure Primitives (p : Params) where
 
 namespace Primitives
 
-variable {p : Params} (prims : Primitives p) (nttOps : NTTRingOps)
+variable {p : Params} (prims : Primitives p)
 
 /-- Lift `highBits` component-wise to a polynomial vector. -/
 def highBitsVec {k : ℕ} (v : RqVec k) : Vector prims.High k :=
@@ -156,19 +152,19 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
     prims.highBitsShift (prims.highBits r) + prims.lowBits r = r
   /-- The low-order part is bounded by `γ₂`. -/
   lowBits_bound : ∀ r : Rq,
-    LatticeCrypto.cInfNorm (prims.lowBits r) ≤ p.gamma2
+    polyNorm (prims.lowBits r) ≤ p.gamma2
   /-- If the perturbation `s` is small enough relative to the low-order part of `r`,
   then adding `s` does not change the high-order bits. -/
   hide_low : ∀ (r s : Rq) (b : ℕ),
-    LatticeCrypto.cInfNorm s ≤ b →
-    LatticeCrypto.cInfNorm (prims.lowBits r) < p.gamma2 - b →
+    polyNorm s ≤ b →
+    polyNorm (prims.lowBits r) < p.gamma2 - b →
     prims.highBits (r + s) = prims.highBits r
   /-- `highBitsShift` is injective: distinct high-order representatives produce
   distinct ring elements. -/
   highBitsShift_injective : Function.Injective prims.highBitsShift
   /-- `UseHint(MakeHint(z, r), r) = HighBits(r + z)` when `z` is small enough. -/
   useHint_makeHint : ∀ z r : Rq,
-    LatticeCrypto.cInfNorm z ≤ p.gamma2 →
+    polyNorm z ≤ p.gamma2 →
     prims.useHint (prims.makeHint z r) r = prims.highBits (r + z)
   /-- `Power2Round` roundtrip: `power2RoundShift(fst(power2Round(r))) + snd(power2Round(r)) = r`. -/
   power2Round_decomp : ∀ r : Rq,

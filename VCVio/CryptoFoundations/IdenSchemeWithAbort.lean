@@ -32,8 +32,6 @@ The structure follows the EasyCrypt formalization in `IDSabort.ec` (formosa-cryp
 
 set_option autoImplicit false
 
-universe u v
-
 open OracleSpec OracleComp
 
 /-- An identification scheme with aborts for statements in `S` and witnesses in `W`, where
@@ -105,17 +103,14 @@ end HVZK
 
 section CommitmentRecoverability
 
-/-- Commitment recoverability: the public commitment `W'` can be recovered from the statement,
-challenge, and response alone. This property is required for the CMA-to-NMA reduction in the
-Fiat-Shamir with aborts security proof.
+/-- Commitment recoverability: any accepting transcript determines the public commitment `W'`
+from the statement, challenge, and response alone. This property is required for the
+CMA-to-NMA reduction in the Fiat-Shamir with aborts security proof.
 
 In Dilithium/ML-DSA, the commitment `w1` can be recomputed as `highBits(Az - c*t)`. -/
 def CommitmentRecoverable (ids : IdenSchemeWithAbort S W W' St C Z p)
     (recover : S → C → Z → W') : Prop :=
-  ∀ s w c w' st z,
-    p s w = true →
-    (w', st) ∈ support (ids.commit s w) →
-    some z ∈ support (ids.respond s w st c) →
+  ∀ s w' c z,
     ids.verify s w' c z = true →
     recover s c z = w'
 

@@ -35,11 +35,9 @@ This is the transform used by ML-DSA (CRYSTALS-Dilithium, FIPS 204).
 
 set_option autoImplicit false
 
-universe u v
-
 open OracleComp OracleSpec
 
-variable {S W W' St C Z P : Type}
+variable {S W W' St C Z : Type}
   {p : S → W → Bool}
   [SampleableType S] [SampleableType W]
   [DecidableEq W'] [DecidableEq C] [SampleableType C]
