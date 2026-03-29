@@ -13,9 +13,6 @@ import LatticeCrypto.MLDSA.Ring
 import LatticeCrypto.MLDSA.Scheme
 import LatticeCrypto.MLDSA.Security
 import LatticeCrypto.MLDSA.Signature
-import LatticeCrypto.MLDSA.Test.ACVPVectors
-import LatticeCrypto.MLDSA.Test.Helpers
-import LatticeCrypto.MLDSA.Test.Main
 import LatticeCrypto.MLKEM.Concrete.CBD
 import LatticeCrypto.MLKEM.Concrete.Encoding
 import LatticeCrypto.MLKEM.Concrete.FFI
@@ -29,9 +26,6 @@ import LatticeCrypto.MLKEM.Params
 import LatticeCrypto.MLKEM.Primitives
 import LatticeCrypto.MLKEM.Ring
 import LatticeCrypto.MLKEM.Security
-import LatticeCrypto.MLKEM.Test.ACVPVectors
-import LatticeCrypto.MLKEM.Test.Helpers
-import LatticeCrypto.MLKEM.Test.Main
 import LatticeCrypto.Norm
 import LatticeCrypto.Ring
 import LatticeCrypto.Rounding

@@ -115,14 +115,17 @@ extern_lib leanmldsa pkg := do
 /-- Test support modules (helpers, vectors). -/
 lean_lib VCVioTest
 
+/-- Lattice crypto test support modules (helpers, ACVP vectors). -/
+lean_lib LatticeCryptoTest
+
 /-- Smoke test: imports VCVio and prints OK. -/
 lean_exe smoke_test where
   root := `VCVioTest.Smoke
 
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where
-  root := `LatticeCrypto.MLKEM.Test.Main
+  root := `LatticeCryptoTest.MLKEM.Main
 
 /-- ML-DSA test executable (links against mldsa-native FFI). -/
 lean_exe mldsa_test where
-  root := `LatticeCrypto.MLDSA.Test.Main
+  root := `LatticeCryptoTest.MLDSA.Main

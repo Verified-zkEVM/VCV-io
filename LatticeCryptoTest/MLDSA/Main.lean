@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.MLDSA.Test.Helpers
-import LatticeCrypto.MLDSA.Test.ACVPVectors
+import LatticeCryptoTest.MLDSA.Helpers
+import LatticeCryptoTest.MLDSA.ACVPVectors
 
 /-!
 # ML-DSA-65 Test Runner
