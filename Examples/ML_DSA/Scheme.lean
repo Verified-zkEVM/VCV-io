@@ -130,6 +130,12 @@ the public seed matches, and `tr` is the hash of the encoded public key. -/
 def validKeyPair (pk : PublicKey p prims) (sk : SecretKey p) : Bool :=
   decide (pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1)
 
+@[simp]
+theorem validKeyPair_eq_true_iff (pk : PublicKey p prims) (sk : SecretKey p) :
+    validKeyPair p prims pk sk = true ↔
+      pk.rho = sk.rho ∧ sk.tr = prims.hashPublicKey pk.rho pk.t1 := by
+  simp [validKeyPair]
+
 /-! ### Identification Scheme -/
 
 /-- The core identification scheme with aborts for ML-DSA.

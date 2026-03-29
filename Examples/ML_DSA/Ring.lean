@@ -37,9 +37,7 @@ deriving Repr, DecidableEq
 
 namespace Tq
 
-def ofRq (f : Rq) : Tq := ⟨f⟩
 def toRq (fHat : Tq) : Rq := fHat.coeffs
-def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
 
 instance : Coe Tq Rq := ⟨Tq.toRq⟩
 instance : Zero Tq := ⟨⟨0⟩⟩
@@ -52,10 +50,6 @@ instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
 
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
     fHat[i] = fHat.coeffs[i] := rfl
-
-@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree)
-    (h_size : i < fHat.toArray.size) :
-    fHat.toArray[i]'h_size = fHat.coeffs[i] := rfl
 
 end Tq
 

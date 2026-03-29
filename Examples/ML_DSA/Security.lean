@@ -58,9 +58,6 @@ variable
     some zh ∈ support ((identificationScheme p prims nttOps).respond pk sk st cTilde) →
     (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
 
-set_option linter.style.setOption false in
-set_option linter.style.maxHeartbeats false in
-set_option maxHeartbeats 800000 in
 include hRespondVerify in
 /-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
 whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact follows

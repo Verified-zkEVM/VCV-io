@@ -23,7 +23,7 @@ mldsa-native's monolithic `mldsa_native.c` (pinned at `v1.0.0-beta`).
 
 set_option autoImplicit false
 
-namespace MLDSA.Concrete.FFI
+namespace ML_DSA.Concrete.FFI
 
 /-- Deterministic internal key generation (FIPS 204 Algorithm 6).
     Input: 32-byte seed `ξ`. Output: `(pk, sk)` as serialized byte arrays. -/
@@ -45,4 +45,4 @@ opaque mldsa65SignInternal : @& ByteArray → @& ByteArray → @& ByteArray →
 opaque mldsa65VerifyInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   UInt8
 
-end MLDSA.Concrete.FFI
+end ML_DSA.Concrete.FFI

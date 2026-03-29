@@ -105,18 +105,6 @@ def params : ParameterSet → Params
       k := 8, l := 7, eta := 2, tau := 60, lambda := 256,
       gamma1 := 2^19, gamma2 := (modulus - 1) / 32, omega := 75 }
 
-/-- Required RBG security strength from FIPS 204 Section 3.6.1. -/
-def requiredRBGStrength : ParameterSet → ℕ
-  | .ML_DSA_44 => 128
-  | .ML_DSA_65 => 192
-  | .ML_DSA_87 => 256
-
-/-- NIST security category. -/
-def securityCategory : ParameterSet → ℕ
-  | .ML_DSA_44 => 2
-  | .ML_DSA_65 => 3
-  | .ML_DSA_87 => 5
-
 end ParameterSet
 
 def mldsa44 : Params := ParameterSet.params .ML_DSA_44

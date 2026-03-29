@@ -189,7 +189,7 @@ Proof strategy:
 2. Result: `highBits((r + ct₀) + (-ct₀)) = highBits(r)` — need `r + ct₀ + (-ct₀) = r`.
 3. `hide_low` with perturbation `s`: `highBits(r + s) = highBits(r)` when
    `polyNorm s ≤ β` and `polyNorm(lowBits(r)) < γ₂ - β`. -/
-lemma useHint_recovers_highBits_single
+lemma useHint_makeHint_eq_highBits
     (h_laws : Primitives.Laws prims nttOps)
     (w_j r_j ct0_j s_j : Rq)
     (h_r_eq : r_j = w_j - s_j)
@@ -212,8 +212,8 @@ lemma useHint_recovers_highBits_single
 /-- When all signing norm bounds hold, UseHint recovers the original commitment:
 `UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`.
 
-Follows componentwise from `useHint_recovers_highBits_single`. -/
-lemma useHintVec_recovers_highBits
+Follows componentwise from `useHint_makeHint_eq_highBits`. -/
+lemma useHintVec_makeHintVec_eq_highBitsVec
     (h_laws : Primitives.Laws prims nttOps)
     (w cs2 ct0 : RqVec p.k)
     (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
@@ -222,7 +222,28 @@ lemma useHintVec_recovers_highBits
       LatticeCrypto.cInfNorm (cs2.get j) ≤ p.beta) :
     prims.useHintVec (prims.makeHintVec (-ct0) (w - cs2 + ct0))
       (w - cs2 + ct0) = prims.highBitsVec w := by
-  sorry
+  simp only [Primitives.useHintVec, Primitives.makeHintVec, Primitives.highBitsVec]
+  apply Vector.ext; intro i hi
+  simp only [Vector.getElem_zipWith, Vector.getElem_map]
+  let j : Fin p.k := ⟨i, hi⟩
+  have h_ct0_comp : polyNorm (ct0.get j) ≤ p.gamma2 :=
+    (LatticeCrypto.PolyVec.component_cInfNorm_le ct0 j).trans h_norm_ct0.le
+  have h_low_comp : polyNorm (prims.lowBits ((w - cs2).get j)) < p.gamma2 - p.beta := by
+    calc LatticeCrypto.cInfNorm (prims.lowBits ((w - cs2).get j))
+        = LatticeCrypto.cInfNorm ((prims.lowBitsVec (w - cs2)).get j) := by
+          simp [Primitives.lowBitsVec, Vector.get]
+      _ ≤ LatticeCrypto.PolyVec.cInfNorm (prims.lowBitsVec (w - cs2)) :=
+          LatticeCrypto.PolyVec.component_cInfNorm_le _ j
+      _ < p.gamma2 - p.beta := h_norm_r0
+  have hneg : (-ct0)[i] = -(ct0.get j) := Vector.getElem_map (- ·) hi
+  have hadd : (w - cs2 + ct0)[i] = (w - cs2).get j + ct0.get j :=
+    congr_fun (Vector.vectorAdd_get (w - cs2) ct0) j
+  have hsub : (w - cs2).get j = w.get j - cs2.get j := by
+    change (Vector.zipWith (· - ·) w cs2).get j = _
+    simp [Vector.get, Vector.zipWith]
+  rw [hneg, hadd, hsub]
+  exact useHint_makeHint_eq_highBits p prims nttOps h_laws (w.get j) _ (ct0.get j)
+    (cs2.get j) rfl h_ct0_comp (by rwa [hsub] at h_low_comp) (h_cs2_bound j)
 
 /-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)
 and the product norm bound (`h_cs2_bound`). These conditions follow from the key generation
@@ -256,7 +277,7 @@ theorem fipsSign_fipsVerify_correct'
       prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
         (prims.expandMask rhoDoublePrime (i * p.l))) := by
     rw [h_cTilde, h_z, h_h, h_wApprox_eq]
-    exact useHintVec_recovers_highBits p prims nttOps h_laws _ _ _
+    exact useHintVec_makeHintVec_eq_highBitsVec p prims nttOps h_laws _ _ _
       h_norm_ct0 h_norm_r0 (h_cs2_bound _)
   change fipsVerify p prims nttOps pk msg sig = true
   simp only [fipsVerify]
@@ -266,18 +287,8 @@ theorem fipsSign_fipsVerify_correct'
   refine ⟨⟨h_norm_z', ?_⟩, h_hint_wt⟩
   have hmu : prims.hashMessage (prims.hashPublicKey pk.rho pk.t1) msg =
       prims.hashMessage sk.tr msg := by rw [h_tr]
-  calc prims.hashCommitment (prims.hashMessage (prims.hashPublicKey pk.rho pk.t1) msg)
-        (prims.w1Encode (prims.useHintVec sig.h
-          (computeWApprox p prims nttOps (prims.expandA pk.rho)
-            (prims.sampleInBall sig.cTilde) sig.z pk.t1)))
-    _ = prims.hashCommitment (prims.hashMessage sk.tr msg)
-        (prims.w1Encode (prims.useHintVec sig.h
-          (computeWApprox p prims nttOps (prims.expandA pk.rho)
-            (prims.sampleInBall sig.cTilde) sig.z pk.t1))) := by rw [hmu]
-    _ = prims.hashCommitment (prims.hashMessage sk.tr msg)
-        (prims.w1Encode (prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
-          (prims.expandMask rhoDoublePrime (i * p.l))))) := by rw [h_w1_eq]
-    _ = sig.cTilde := h_cTilde.symm
+  rw [hmu, h_w1_eq]
+  exact h_cTilde.symm
 
 /-- Correctness of FIPS ML-DSA: if a key pair was generated honestly and signing succeeds,
 then verification accepts the resulting signature.

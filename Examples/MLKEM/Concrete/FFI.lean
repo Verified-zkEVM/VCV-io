@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Examples.Crypto.FFI
 
 /-!
 # ML-KEM FFI Bindings
@@ -13,8 +14,8 @@ a formally verified (CBMC + HOL-Light) C90 implementation of ML-KEM / FIPS 203.
 
 Two groups of functions are exposed:
 
-1. **SHA-3 / FIPS 202** primitives (`sha3_256`, `sha3_512`, `shake128`, `shake256`) —
-   used to instantiate the abstract `Primitives` interface.
+1. **SHA-3 / FIPS 202** primitives — re-exported from `Crypto.FFI` for backward
+   compatibility with existing callers.
 
 2. **End-to-end ML-KEM** deterministic API (`mlkemKeypairDerand`, `mlkemEncDerand`,
    `mlkemDec`) — used as a reference oracle in tests.
@@ -27,23 +28,12 @@ set_option autoImplicit false
 
 namespace MLKEM.Concrete.FFI
 
-/-! ## SHA-3 / FIPS 202 -/
+/-! ## SHA-3 / FIPS 202 (re-exported from `Crypto.FFI`) -/
 
-/-- SHA3-256: produces a 32-byte digest. -/
-@[extern "lean_sha3_256"]
-opaque sha3_256 : @& ByteArray → ByteArray
-
-/-- SHA3-512: produces a 64-byte digest. -/
-@[extern "lean_sha3_512"]
-opaque sha3_512 : @& ByteArray → ByteArray
-
-/-- SHAKE-256 XOF: produces `outLen` bytes of output. -/
-@[extern "lean_shake256"]
-opaque shake256 : @& ByteArray → (outLen : USize) → ByteArray
-
-/-- SHAKE-128 XOF: produces `outLen` bytes of output. -/
-@[extern "lean_shake128"]
-opaque shake128 : @& ByteArray → (outLen : USize) → ByteArray
+def sha3_256 := Crypto.FFI.sha3_256
+def sha3_512 := Crypto.FFI.sha3_512
+def shake256 := Crypto.FFI.shake256
+def shake128 := Crypto.FFI.shake128
 
 /-! ## End-to-end ML-KEM (deterministic, ML-KEM-768) -/
 

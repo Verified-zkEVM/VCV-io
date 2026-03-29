@@ -49,7 +49,7 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
-private def getByteD (bytes : ByteArray) (i : Nat) : UInt8 :=
+def getByteD (bytes : ByteArray) (i : Nat) : UInt8 :=
   (bytes[i]?).getD 0
 
 private def bitsToBytes (bits : Array Nat) : ByteArray :=

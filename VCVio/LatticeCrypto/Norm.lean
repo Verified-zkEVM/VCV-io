@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.LatticeCrypto.Ring
 import Mathlib.Data.ZMod.Basic
+import Mathlib.Data.ZMod.ValMinAbs
 
 /-!
 # Polynomial Norms for Lattice Cryptography
@@ -67,6 +68,51 @@ theorem centeredRepr_natAbs_neg (x : ZMod q) :
     have hval := ZMod.val_lt x
     have hpos : 0 < x.val := Nat.pos_of_ne_zero ((ZMod.val_ne_zero x).mpr hx)
     split_ifs <;> omega
+
+theorem centeredRepr_intCast (x : ZMod q) :
+    (x : ZMod q) = ((centeredRepr x : ℤ) : ZMod q) := by
+  by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
+  · rw [centeredRepr_of_le h, Int.cast_natCast, ZMod.natCast_zmod_val]
+  · have hgt : (q : ℤ) / 2 < x.val := lt_of_not_ge h
+    rw [centeredRepr_of_gt hgt, Int.cast_sub, Int.cast_natCast,
+      Int.cast_natCast, ZMod.natCast_zmod_val, ZMod.natCast_self]
+    simp
+
+theorem centeredRepr_mem_Ioc (x : ZMod q) :
+    centeredRepr x * 2 ∈ Set.Ioc (-(q : ℤ)) q := by
+  by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
+  · rw [centeredRepr_of_le h]
+    have hx : 0 ≤ (x.val : ℤ) := by positivity
+    have hmod : (0 : ℤ) < q := by exact_mod_cast NeZero.pos q
+    constructor <;> omega
+  · have hgt : (q : ℤ) / 2 < x.val := lt_of_not_ge h
+    rw [centeredRepr_of_gt hgt]
+    have hval := ZMod.val_lt x
+    constructor <;> omega
+
+theorem centeredRepr_eq_valMinAbs (x : ZMod q) :
+    centeredRepr x = x.valMinAbs := by
+  simpa using ((ZMod.valMinAbs_spec x (centeredRepr x)).2
+    ⟨centeredRepr_intCast x, centeredRepr_mem_Ioc x⟩).symm
+
+theorem centeredRepr_intCast_eq (z : ℤ)
+    (hzlo : -(q : ℤ) < z * 2) (hzhi : z * 2 ≤ q) :
+    centeredRepr ((z : ZMod q)) = z := by
+  rw [centeredRepr_eq_valMinAbs]
+  exact (ZMod.valMinAbs_spec ((z : ZMod q)) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
+
+theorem centeredRepr_intCast_eq_of_natAbs_le (z : ℤ) {b : ℕ}
+    (hbound : z.natAbs ≤ b) (hbq : 2 * b < q) :
+    centeredRepr ((z : ZMod q)) = z := by
+  apply centeredRepr_intCast_eq
+  · have : -(b : ℤ) ≤ z := by omega
+    omega
+  · have : z ≤ b := by omega
+    omega
+
+theorem neg_le_and_le_of_natAbs_le {z : ℤ} {b : ℕ}
+    (hbound : z.natAbs ≤ b) : -(b : ℤ) ≤ z ∧ z ≤ b := by
+  constructor <;> omega
 
 end CenteredRepr
 

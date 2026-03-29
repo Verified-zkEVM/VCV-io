@@ -178,7 +178,7 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
     let seedBA := vecToBA seed
-    let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
+    let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     check st "mldsa-native keygen sizes" (pkRef.size == 1952 && skRef.size == 4032)
 
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
@@ -198,16 +198,16 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
     let seedBA := vecToBA seed
-    let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
+    let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
 
     let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩  -- "Hello"
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
 
-    let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
+    let sigRef := ML_DSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
     check st "mldsa-native sign produces 3309-byte sig" (sigRef.size == 3309)
 
-    let verRef := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg sigRef
+    let verRef := ML_DSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg sigRef
     check st "mldsa-native verify accepts valid sig" (verRef == 1)
 
     let mu := mldsa65Primitives.hashMessage sk.tr msg.toList
@@ -232,7 +232,7 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8
     let seedBA := vecToBA seed
-    let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
+    let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
     let pkB := serializePK65 pk
     let skB := serializeSK65 sk
@@ -247,16 +247,16 @@ def main : IO Unit := do
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 3).toUInt8
     let seedBA := vecToBA seed
-    let (pkRef, skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
+    let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
 
     let msg : ByteArray := ⟨#[0x54, 0x65, 0x73, 0x74]⟩  -- "Test"
     let rndZero : ByteArray := ⟨Array.replicate 32 0⟩
 
-    let sigRef := MLDSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
+    let sigRef := ML_DSA.Concrete.FFI.mldsa65SignInternal skRef msg rndZero
 
     let corruptedSig := sigRef.set! 0 (sigRef[0]! ^^^ 0xFF)
-    let verCorruptRef := MLDSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg corruptedSig
+    let verCorruptRef := ML_DSA.Concrete.FFI.mldsa65VerifyInternal pkRef msg corruptedSig
     check st "mldsa-native rejects corrupted sig" (verCorruptRef == 0)
 
     let mu' := mldsa65Primitives.hashMessage sk.tr msg.toList
@@ -298,7 +298,7 @@ def main : IO Unit := do
       check st s!"tcId={vec.tcId} pk first 32 bytes match ACVP"
         (pkFirst32 == pkExpFirst32)
         s!"got={toHex pkFirst32 32} exp={toHex pkExpFirst32 32}"
-      let (pkRef, _skRef) := MLDSA.Concrete.FFI.mldsa65KeypairInternal seedBA
+      let (pkRef, _skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
       check st s!"tcId={vec.tcId} pk: Lean = mldsa-native" (pkB == pkRef)
   IO.println ""
   -- ── 14. ML-DSA-44 and ML-DSA-87 internal roundtrip ─

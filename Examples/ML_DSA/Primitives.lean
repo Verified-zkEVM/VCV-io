@@ -125,6 +125,16 @@ def useHintVec {k : ℕ} (h : Vector prims.Hint k) (r : RqVec k) :
     Vector prims.High k :=
   Vector.zipWith prims.useHint h r
 
+/-- Bundle the rounding operations from `Primitives` into an abstract `RoundingOps`. -/
+def toRoundingOps : LatticeCrypto.RoundingOps Rq (2 * p.gamma2) where
+  High := prims.High
+  Hint := prims.Hint
+  lowBits := prims.lowBits
+  highBits := prims.highBits
+  shift := prims.highBitsShift
+  makeHint := prims.makeHint
+  useHint := prims.useHint
+
 end Primitives
 
 /-- Algebraic and range laws that the ML-DSA primitives must satisfy for the security proof.
