@@ -136,14 +136,26 @@ def hashQueryBound {S' α : Type}
       | .inl (.inl _) | .inr _ => b
       | .inl (.inr _) => b - 1)
 
-/-- EUF-CMA security bound for the Fiat-Shamir with aborts transform.
+/-- **CMA-to-NMA reduction for Fiat-Shamir with aborts (Theorem 3, CRYPTO 2023).**
 
-The security reduces to:
-1. The hardness of the underlying relation (via SelfTargetMSIS-like assumption)
-2. The HVZK property of the identification scheme (for simulating signing queries)
-3. Commitment recoverability (for the CMA-to-NMA reduction)
+For any EUF-CMA adversary `A` making at most `qBound` random oracle queries, there exists
+an NMA reduction and a statistical loss `L` such that:
 
-The proof follows the structure of Theorem 4 in the CRYPTO 2023 paper. -/
+  `Adv^{EUF-CMA}(A) ≤ Adv^{EUF-NMA}(B) + L`
+
+The reduction uses:
+1. The HVZK simulator `sim` to answer signing queries without the secret key
+2. Commitment recoverability `recover` to map between the standard and commitment-recoverable
+   variants of the signature scheme
+3. Nested hybrid arguments over ROM reprogramming (accepted and rejected transcripts)
+
+The statistical loss `L` involves the commitment guessing probability `ε`, the effective
+abort probability `p`, the regularity failure probability `δ`, and the query bounds `qS`,
+`qH`. See `ML_DSA.cmaToNmaLoss` for the precise formula from the paper.
+
+The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE +
+SelfTargetMSIS for ML-DSA) is stated separately; see `ML_DSA.nma_security` and
+`ML_DSA.euf_cma_security`. -/
 theorem euf_cma_bound
     (_hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))

@@ -12,7 +12,7 @@ Concrete executable NTT operations for `q = 8380417`, `n = 256`, and the FIPS 20
 `ζ = 1753`.
 
 Implements the FIPS 204 in-place butterfly NTT (Algorithm 41) and its inverse (Algorithm 42)
-exactly, using twiddle factors `ζ^(BitRev₇(k))`. The butterfly NTT output ordering matches
+exactly, using twiddle factors `ζ^(BitRev₈(k))`. The butterfly NTT output ordering matches
 the reference C implementations (e.g. mldsa-native), which is essential for bitwise agreement
 on key generation, signing, and verification.
 
@@ -24,12 +24,6 @@ set_option autoImplicit false
 namespace ML_DSA.Concrete
 
 open ML_DSA
-
-/-- Reverse the low 7 bits of `i`. -/
-def bitRev7 (i : Nat) : Nat :=
-  let b := fun k => (i >>> k) &&& 1
-  (b 0 <<< 6) ||| (b 1 <<< 5) ||| (b 2 <<< 4) ||| (b 3 <<< 3) |||
-  (b 4 <<< 2) ||| (b 5 <<< 1) ||| b 6
 
 /-- Reverse the low 8 bits of `i` (FIPS 204: `brv(k)`). -/
 def bitRev8 (i : Nat) : Nat :=
@@ -49,8 +43,8 @@ def nInv : Coeff := ((modulus - (modulus - 1) / ringDegree : ℕ) : Coeff)
 
 /-- FIPS 204 Algorithm 41 — forward NTT (in-place Cooley–Tukey butterfly).
 
-Twiddle factors are accessed via `ζ^(BitRev₇(k))` with `k` counting from 1 to 127.
-The seven stages halve `len` from 128 down to 1. -/
+Twiddle factors are accessed via `ζ^(BitRev₈(k))` with `k` counting from 1 to 255.
+The eight stages halve `len` from 128 down to 1. -/
 def butterflyNTT (f : Rq) : Tq := Id.run do
   let mut a := f.toArray
   let mut k := 1
@@ -61,16 +55,18 @@ def butterflyNTT (f : Rq) : Tq := Id.run do
       let z := zetaTable.getD k 0
       k := k + 1
       for j in [start : start + len] do
-        let t := z * a.getD (j + len) 0
-        a := a.set! (j + len) (a.getD j 0 - t)
-        a := a.set! j (a.getD j 0 + t)
+        let u := a.getD j 0
+        let v := a.getD (j + len) 0
+        let t := z * v
+        a := a.set! (j + len) (u - t)
+        a := a.set! j (u + t)
       start := start + 2 * len
     len := len / 2
   return ⟨Vector.ofFn fun i => a.getD i.val 0⟩
 
 /-- FIPS 204 Algorithm 42 — inverse NTT (in-place Gentleman–Sande butterfly).
 
-Twiddle factors are accessed in reverse, negated. The seven stages double `len` from 1
+Twiddle factors are accessed in reverse, negated. The eight stages double `len` from 1
 to 128. A final scaling by `256⁻¹ mod q` restores the coefficient norm. -/
 def butterflyInvNTT (fHat : Tq) : Rq := Id.run do
   let mut a := fHat.coeffs.toArray
@@ -82,9 +78,10 @@ def butterflyInvNTT (fHat : Tq) : Rq := Id.run do
       let z := -(zetaTable.getD k 0)
       k := k - 1
       for j in [start : start + len] do
-        let t := a.getD j 0
-        a := a.set! j (t + a.getD (j + len) 0)
-        a := a.set! (j + len) (z * (t - a.getD (j + len) 0))
+        let u := a.getD j 0
+        let v := a.getD (j + len) 0
+        a := a.set! j (u + v)
+        a := a.set! (j + len) (z * (u - v))
       start := start + 2 * len
     len := len * 2
   for j in [0 : ringDegree] do

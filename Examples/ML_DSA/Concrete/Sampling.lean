@@ -32,9 +32,6 @@ open ML_DSA
 private def nonceLE (nonce : Nat) : ByteArray :=
   ByteArray.mk #[nonce.toUInt8, (nonce / 256).toUInt8]
 
-private def shake128Stream (seed : ByteArray) (nonce outLen : Nat) : ByteArray :=
-  Crypto.FFI.shake128 (seed ++ nonceLE nonce) outLen.toUSize
-
 private def shake256Stream (seed : ByteArray) (nonce outLen : Nat) : ByteArray :=
   Crypto.FFI.shake256 (seed ++ nonceLE nonce) outLen.toUSize
 
@@ -78,7 +75,10 @@ def rejNTTPoly (input : ByteArray) : Tq :=
   let coeffs := requireFullUniformSample <| rejUniformCoeffs stream
   ⟨Vector.ofFn fun i => coeffs.getD i.val 0⟩
 
-/-- FIPS 204 Algorithm 32. -/
+/-- FIPS 204 Algorithm 32: `ExpandA(ρ)`.
+FIPS 204 specifies the input as `ρ ∥ IntegerToBytes(s, 1) ∥ IntegerToBytes(r, 1)` where
+`r` is the row and `s` is the column. Since `nonceLE` writes in little-endian, passing
+`row.val * 256 + col.val` produces the bytes `[col, row]` = `[s, r]` as required. -/
 def expandA (rho : Bytes 32) (p : Params) : TqMatrix p.k p.l :=
   let rhoBytes := vectorToByteArray rho
   Vector.ofFn fun row =>

@@ -145,20 +145,26 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   sampleInBall_norm : ∀ cTilde, polyNorm (prims.sampleInBall cTilde) ≤ 1
   /-- `ExpandS(ρ')` produces secret vectors bounded by `η`. -/
   expandS_bound : ∀ rhoPrime,
-    let (s1, s2) := prims.expandS rhoPrime
-    polyVecBounded s1 p.eta ∧ polyVecBounded s2 p.eta
+    polyVecBounded (prims.expandS rhoPrime).1 p.eta ∧
+    polyVecBounded (prims.expandS rhoPrime).2 p.eta
   /-- `ExpandMask(ρ'', κ)` produces masking vectors bounded by `γ₁ - 1`. -/
   expandMask_bound : ∀ rhoDoublePrime kappa,
     polyVecBounded (prims.expandMask rhoDoublePrime kappa) (p.gamma1 - 1)
   /-- NTT roundtrip: `NTT⁻¹(NTT(f)) = f`. -/
   ntt_invNTT : ∀ f : Rq, nttOps.invNTT (nttOps.ntt f) = f
+  /-- Inverse NTT roundtrip: `NTT(NTT⁻¹(f̂)) = f̂`. -/
+  invNTT_ntt : ∀ fHat : Tq, nttOps.ntt (nttOps.invNTT fHat) = fHat
+  /-- NTT distributes over addition. -/
+  ntt_add : ∀ f g : Rq, nttOps.ntt (f + g) = nttOps.ntt f + nttOps.ntt g
+  /-- NTT distributes over subtraction. -/
+  ntt_sub : ∀ f g : Rq, nttOps.ntt (f - g) = nttOps.ntt f - nttOps.ntt g
   /-- NTT multiplication correctness:
   `NTT(f) ⊙ NTT(g) = NTT(f * g)` where `*` is negacyclic multiplication. -/
   ntt_mul : ∀ f g : Rq,
     nttOps.multiplyNTTs (nttOps.ntt f) (nttOps.ntt g) =
     nttOps.ntt (negacyclicMul f g)
   /-- Decomposition identity: `highBitsShift(highBits(r)) + lowBits(r) = r`. -/
-  highLow_decomp : ∀ r : Rq,
+  high_low_decomp : ∀ r : Rq,
     prims.highBitsShift (prims.highBits r) + prims.lowBits r = r
   /-- The low-order part is bounded by `γ₂`. -/
   lowBits_bound : ∀ r : Rq,
@@ -179,6 +185,9 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   /-- `Power2Round` roundtrip: `power2RoundShift(fst(power2Round(r))) + snd(power2Round(r)) = r`. -/
   power2Round_decomp : ∀ r : Rq,
     prims.power2RoundShift (prims.power2Round r).1 + (prims.power2Round r).2 = r
+  /-- The low-order remainder of `Power2Round` is bounded by `2^(d-1)`. -/
+  power2Round_bound : ∀ r : Rq,
+    polyNorm (prims.power2Round r).2 ≤ 2 ^ (droppedBits - 1)
   /-- `w1Encode` is injective: distinct commitments encode to distinct byte strings. -/
   w1Encode_injective : Function.Injective prims.w1Encode
 

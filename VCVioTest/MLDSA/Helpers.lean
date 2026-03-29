@@ -68,11 +68,6 @@ where
     else if 'A' ≤ c && c ≤ 'F' then c.toNat - 'A'.toNat + 10
     else 0
 
-/-! ## Conversion helpers -/
-
-def vecToBA {n : Nat} (v : Vector UInt8 n) : ByteArray :=
-  ByteArray.mk v.toArray
-
 /-! ## FIPS 204 serialization (ML-DSA-65) -/
 
 def serializePK65 (pk : PublicKey mldsa65 mldsa65Primitives) : ByteArray :=

@@ -177,7 +177,7 @@ def main : IO Unit := do
   IO.println "9. Full ML-DSA-65 keygen: Lean spec vs mldsa-native"
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
-    let seedBA := vecToBA seed
+    let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     check st "mldsa-native keygen sizes" (pkRef.size == 1952 && skRef.size == 4032)
 
@@ -197,7 +197,7 @@ def main : IO Unit := do
   IO.println "10. Full ML-DSA-65 sign + verify: Lean spec vs mldsa-native"
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => i.toUInt8
-    let seedBA := vecToBA seed
+    let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
 
@@ -231,7 +231,7 @@ def main : IO Unit := do
   IO.println "11. Second key pair (different seed)"
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8
-    let seedBA := vecToBA seed
+    let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
     let pkB := serializePK65 pk
@@ -246,7 +246,7 @@ def main : IO Unit := do
   IO.println "12. Corrupted signature rejection"
   do
     let seed : Bytes 32 := Vector.ofFn fun ⟨i, _⟩ => (i * 3).toUInt8
-    let seedBA := vecToBA seed
+    let seedBA := vectorToByteArray seed
     let (pkRef, skRef) := ML_DSA.Concrete.FFI.mldsa65KeypairInternal seedBA
     let (pk, sk) := keyGenFromSeed mldsa65 mldsa65Primitives concreteNTTRingOps seed
 

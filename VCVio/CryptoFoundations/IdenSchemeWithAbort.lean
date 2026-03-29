@@ -57,7 +57,7 @@ namespace IdenSchemeWithAbort
 
 variable {S W W' St C Z : Type} {p : S → W → Bool}
 
-section Completeness
+section HonestExecution
 
 variable [SampleableType C] [unifSpec.Fintype] [unifSpec.Inhabited]
 
@@ -69,6 +69,12 @@ def honestExecution (ids : IdenSchemeWithAbort S W W' St C Z p) (s : S) (w : W) 
   let c ← $ᵗ C
   let oz ← ids.respond s w st c
   return oz.map fun z => (w', c, z)
+
+end HonestExecution
+
+section Completeness
+
+variable [SampleableType C] [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- An identification scheme with aborts is complete if: whenever the prover does not abort,
 the verifier always accepts. -/
@@ -125,7 +131,7 @@ structure ImpAdv (ids : IdenSchemeWithAbort S W W' St C Z p) where
   commit (s : S) : ProbComp W'
   respond (s : S) (c : C) : ProbComp Z
 
-variable [SampleableType S] [SampleableType W] [SampleableType C]
+variable [SampleableType S] [SampleableType C]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- The impersonation experiment: the adversary tries to produce a valid transcript

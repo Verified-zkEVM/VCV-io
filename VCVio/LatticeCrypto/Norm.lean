@@ -121,7 +121,7 @@ section PolyNorm
 variable {q : ℕ} [NeZero q] {n : ℕ}
 
 /-- The centered infinity norm of a polynomial: the maximum absolute value of the centered
-representatives of its coefficients. Returns `0` for the degree-0 polynomial. -/
+representatives of its coefficients. Returns `0` for the zero polynomial or when `n = 0`. -/
 def cInfNorm (p : Poly (ZMod q) n) : ℕ :=
   Finset.sup Finset.univ (fun i : Fin n => (centeredRepr (p.get i)).natAbs)
 

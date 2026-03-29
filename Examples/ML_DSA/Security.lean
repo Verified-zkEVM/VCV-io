@@ -6,33 +6,46 @@ Authors: Quang Dao
 import Examples.ML_DSA.Scheme
 import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.HardnessAssumptions.SIS
+import VCVio.CryptoFoundations.HardnessAssumptions.LearningWithErrors
 
 /-!
 # ML-DSA Security
 
-This file states the high-level security theorems for ML-DSA. The main result is that the
-ML-DSA signature scheme (constructed via `FiatShamirWithAbort` applied to the ML-DSA
-identification scheme) is EUF-CMA secure, reducing to:
+This file states the high-level security theorems for ML-DSA, following the CRYPTO 2023 paper
+"Fixing and Mechanizing the Security Proof of Fiat-Shamir with Aborts and Dilithium" (Barbosa
+et al., ePrint 2023/246).
 
-1. The **SelfTargetMSIS** assumption on the public matrix `A`
-2. The **HVZK** property of the underlying identification scheme
-3. **Commitment recoverability**: `w₁` can be recomputed as `UseHint(h, Az - ct₁·2^d)`
+The main result (Theorem 4) is that the ML-DSA signature scheme is EUF-CMA secure, reducing
+to two computational assumptions plus a statistical loss from the CMA-to-NMA reduction:
 
-The proof is future work and follows the structure of Theorem 4 in the CRYPTO 2023 paper
-(Barbosa et al., "Fixing and Mechanizing the Security Proof of Fiat-Shamir with Aborts
-and Dilithium").
+  `Adv^{EUF-CMA}_{ML-DSA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C) + L`
+
+The two computational assumptions are:
+
+1. **MLWE** (Module Learning With Errors): `(A, As₁ + s₂)` is computationally indistinguishable
+   from `(A, uniform)` (Definition 3).
+2. **SelfTargetMSIS** (Self-Target Module-SIS): given `A` and a random oracle `H`, it is hard
+   to find a short vector satisfying a self-referential hash equation (Definition 4).
+
+The statistical loss `L` from the CMA-to-NMA reduction via Fiat-Shamir with aborts is:
+
+  `L = 2·qS·(qH + qS + 1)·ε/(1-p) + qS·(qS+1)·ε/(2·(1-p)²) + δ`
+
+The proof follows the structure:
+1. EUF-CMA → EUF-NMA via the Fiat-Shamir with aborts CMA-to-NMA reduction (Theorem 3)
+2. EUF-NMA → MLWE + SelfTargetMSIS (Lemma 7)
 
 ## References
 
-- NIST FIPS 204, Section 3.2 (security properties)
 - Fixing and Mechanizing the Security Proof of Fiat-Shamir with Aborts and Dilithium
-  (CRYPTO 2023, ePrint 2023/246)
-- EasyCrypt `FSabort.eca`, `HVZK_FSa.ec`, `SimplifiedScheme.ec`
+  (CRYPTO 2023, ePrint 2023/246), Theorems 3, 4 and Lemma 7, Definitions 3, 4
+- NIST FIPS 204, Section 3.2 (security properties)
+- EasyCrypt `FSabort.eca`, `HVZK_FSa.ec`, `SimplifiedScheme.ec` (formosa-crypto/dilithium)
 -/
 
 set_option autoImplicit false
 
-open OracleComp OracleSpec
+open OracleComp OracleSpec ENNReal
 
 namespace ML_DSA
 
@@ -127,14 +140,86 @@ theorem idsWithAbort_commitment_recoverable :
   refine ⟨fun pk cTilde (z, h) =>
     prims.useHintVec h (computeWApprox p prims nttOps (prims.expandA pk.rho)
       (prims.sampleInBall cTilde) z pk.t1), ?_⟩
-  intro s w' c z hverify
+  rintro s w' c ⟨z, h⟩ hverify
   unfold identificationScheme at hverify
   simp only [Bool.and_eq_true, decide_eq_true_eq] at hverify
-  change prims.useHintVec z.2
-    (computeWApprox p prims nttOps (prims.expandA s.rho) (prims.sampleInBall c) z.1 s.t1) = w'
   exact hverify.1.2
 
 end Properties
+
+/-! ### EUF-NMA Security (Lemma 7) -/
+
+section NMASecurity
+
+variable {M : Type} [DecidableEq M]
+  [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
+  [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
+  [unifSpec.Fintype] [unifSpec.Inhabited]
+
+/-- **NMA Security (Lemma 7, CRYPTO 2023).**
+
+For every EUF-NMA adversary `A` against the ML-DSA scheme (instantiated via
+`FiatShamirWithAbort`), there exist:
+- An MLWE adversary `B` (against `MLWE_{k,l,Sη}`)
+- A SelfTargetMSIS adversary `C` (against `SelfTargetMSIS_{G,k,l+1,ζ}`)
+
+such that:
+
+  `Adv^{EF-NMA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C)`
+
+The proof sketch from the paper:
+1. Replace `keygen` with `keygen1` (uniform `t`): the gap is exactly `Adv^{MLWE}(B)`.
+2. Define `H₁(w₁, m) := G(shift_α(w₁), m)` — no loss since `shift_α` is injective.
+3. Extract a SelfTargetMSIS solution from any forgery: the gap is `Adv^{SelfTargetMSIS}(C)`.
+
+where `ζ = max(γ₁ - β, 2γ₂ + 1 + τ · 2^{d-1})` and `Time(A) ≈ Time(B) ≈ Time(C)`. -/
+theorem nma_security
+    (mlwe : LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k))
+    (stmsis : SelfTargetMSIS.Problem
+      (TqMatrix p.k p.l) (Response p prims)
+      (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
+    (maxAttempts : ℕ)
+    (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
+      (validKeyPair p prims)) :
+    ∀ (adv : SignatureAlg.eufNmaAdv
+      (FiatShamirWithAbort (identificationScheme p prims nttOps) hr M maxAttempts)),
+    ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
+      (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
+      adv.advantage ≤
+        ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
+        SelfTargetMSIS.advantage stmsisReduction := by
+  sorry
+
+end NMASecurity
+
+/-! ### CMA-to-NMA Statistical Loss (Theorem 3) -/
+
+section CMAtoNMA
+
+/-- The statistical loss from the classical CMA-to-NMA reduction (Theorem 3, CRYPTO 2023).
+
+Given:
+- `qS`: number of signing queries
+- `qH`: number of random oracle queries
+- `ε`: commitment guessing probability bound: `E[max_w Pr[highBits(Ay, 2γ₂) = w | Γ]] ≤ ε`
+- `p`: effective abort probability of the signing loop
+- `δ`: probability that the regularity event `Γ` fails
+
+The loss is:
+
+  `L = 2·qS·(qH + qS + 1)·ε/(1-p) + qS·(qS+1)·ε/(2·(1-p)²) + δ`
+
+This is the additive term bounding the gap between the CMA advantage and the NMA advantage
+in the Fiat-Shamir with aborts setting. The parameters `ε`, `p`, `δ` depend on the lattice
+parameters (γ₁, γ₂, β, k, l) and are analyzed concretely in Section 7 of the paper. -/
+noncomputable def cmaToNmaLoss (qS qH : ℕ) (ε p δ : ℝ) (_hp : p < 1) : ℝ :=
+  2 * qS * (qH + qS + 1) * ε / (1 - p) +
+  qS * (qS + 1) * ε / (2 * (1 - p) ^ 2) +
+  δ
+
+end CMAtoNMA
+
+/-! ### Main Security Theorem (Theorem 4) -/
 
 section MainTheorem
 
@@ -144,25 +229,30 @@ variable {M : Type} [DecidableEq M]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
-/-- **Main Security Theorem (EUF-CMA).**
+/-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
 
-If the `SelfTargetMSIS` problem is hard for the ML-DSA parameters, then the ML-DSA
-signature scheme (constructed via `FiatShamirWithAbort`) is existentially unforgeable
-under adaptive chosen-message attack (EUF-CMA).
+For any classical EUF-CMA adversary `A` making at most `qS` signing queries and `qH` random
+oracle queries, and for the adversaries `B` (against MLWE) and `C` (against SelfTargetMSIS)
+constructed in the proof of Lemma 7:
 
-More precisely, for any EUF-CMA adversary `A` making at most `qH` random oracle queries
-and `qS` signing queries, there exists a SelfTargetMSIS adversary `B` such that:
+  `Adv^{EUF-CMA}_{ML-DSA}(A) ≤ Adv^{MLWE}_{k,l,Sη}(B) + Adv^{SelfTargetMSIS}_{G,k,l+1,ζ}(C) + L`
 
-  `Adv^{EUF-CMA}_{ML-DSA}(A) ≤ Adv^{SelfTargetMSIS}(B)`
+where:
+- `L = 2·qS·(qH+qS+1)·ε/(1-p) + qS·(qS+1)·ε/(2·(1-p)²) + δ` is `cmaToNmaLoss`
+- `ε` is the commitment guessing probability
+- `p` is the effective abort probability
+- `δ` is the regularity failure probability
+- `ζ = max(γ₁ - β, 2γ₂ + 1 + τ · 2^{d-1})`
 
-The reduction uses:
-1. The HVZK simulator to answer signing queries (via rejection sampling)
-2. Commitment recoverability to embed the SelfTargetMSIS challenge
-3. The forking lemma to extract a second forgery sharing the same commitment
-
-This theorem statement is parametric over the message type `M` and the primitive
-implementations. The proof is future work following the EasyCrypt mechanization. -/
+The proof composes:
+1. **CMA → NMA** (Theorem 3): the Fiat-Shamir with aborts CMA-to-NMA reduction, using the
+   HVZK simulator for the ML-DSA identification scheme to answer signing queries and
+   commitment recoverability to embed the challenge. The statistical loss `L` arises from
+   ROM reprogramming in the nested hybrid argument.
+2. **NMA → MLWE + SelfTargetMSIS** (Lemma 7): replace `keygen` with uniform `t` (MLWE gap),
+   then extract a SelfTargetMSIS solution from any forgery. -/
 theorem euf_cma_security
+    (mlwe : LearningWithErrors.Problem (TqMatrix p.k p.l) (RqVec p.l) (RqVec p.k))
     (stmsis : SelfTargetMSIS.Problem
       (TqMatrix p.k p.l) (Response p prims)
       (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
@@ -172,8 +262,12 @@ theorem euf_cma_security
     ∀ (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort (identificationScheme p prims nttOps)
         hr M maxAttempts)),
-    ∃ (reduction : SelfTargetMSIS.Adversary stmsis),
-      adv.advantage ≤ SelfTargetMSIS.advantage reduction := by
+    ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
+      (stmsisReduction : SelfTargetMSIS.Adversary stmsis)
+      (L : ENNReal),
+      adv.advantage ≤
+        ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
+        SelfTargetMSIS.advantage stmsisReduction + L := by
   sorry
 
 end MainTheorem

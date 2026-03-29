@@ -91,4 +91,32 @@ noncomputable def unforgeableAdv.advantage
 
 end unforgeable
 
+section eufNma
+
+variable {ι : Type u} {spec : OracleSpec ι} {M PK SK S : Type}
+
+/-- An EUF-NMA (existential unforgeability under no-message attack) adversary for a
+signature scheme. Unlike a CMA adversary (`unforgeableAdv`), the NMA adversary has NO
+access to a signing oracle — it must forge a signature having only seen the public key.
+
+In the random oracle model, the adversary still has access to the scheme's oracle spec
+(e.g., the random oracle `H`), but never sees any legitimately generated signatures. -/
+structure eufNmaAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
+  main (pk : PK) : OracleComp spec (M × S)
+
+/-- The EUF-NMA experiment: generate a key pair, give the public key to the adversary
+(with no signing oracle), and check whether the adversary produced a valid forgery. -/
+def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : eufNmaAdv sigAlg) : ProbComp Bool :=
+  sigAlg.exec do
+    let (pk, _) ← sigAlg.keygen
+    let (msg, σ) ← adv.main pk
+    sigAlg.verify pk msg σ
+
+noncomputable def eufNmaAdv.advantage
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp adv]
+
+end eufNma
+
 end SignatureAlg
