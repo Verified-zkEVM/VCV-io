@@ -58,6 +58,16 @@ theorem centeredRepr_abs_le (x : ZMod q) : (centeredRepr x).natAbs ≤ q / 2 := 
   have hval := ZMod.val_lt x
   split_ifs with h <;> omega
 
+theorem centeredRepr_natAbs_neg (x : ZMod q) :
+    (centeredRepr (-x)).natAbs = (centeredRepr x).natAbs := by
+  by_cases hx : x = 0
+  · simp [hx]
+  · haveI : NeZero x := ⟨hx⟩
+    simp only [centeredRepr, ZMod.val_neg_of_ne_zero]
+    have hval := ZMod.val_lt x
+    have hpos : 0 < x.val := Nat.pos_of_ne_zero ((ZMod.val_ne_zero x).mpr hx)
+    split_ifs <;> omega
+
 end CenteredRepr
 
 section PolyNorm
@@ -91,6 +101,13 @@ theorem coeff_le_cInfNorm (p : Poly (ZMod q) n) (i : Fin n) :
 
 theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=
   cInfNorm_le_iff.mpr (fun i => centeredRepr_abs_le (p.get i))
+
+@[simp]
+theorem cInfNorm_neg (f : Poly (ZMod q) n) : cInfNorm (-f) = cInfNorm f := by
+  simp only [cInfNorm]
+  congr 1; ext i
+  have : (-f).get i = -(f.get i) := Vector.getElem_map (- ·) i.isLt
+  rw [this, centeredRepr_natAbs_neg]
 
 omit [NeZero q] in
 theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}

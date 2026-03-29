@@ -62,10 +62,11 @@ set_option linter.style.setOption false in
 set_option linter.style.maxHeartbeats false in
 set_option maxHeartbeats 800000 in
 include hRespondVerify in
-/-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
-the verifier always accepts. This follows from the correctness of the rounding operations
-and the norm bounds satisfied by honest responses. -/
-theorem idsWithAbort_complete :
+/-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
+whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact follows
+from the key generation identity, NTT linearity, and `Primitives.Laws`, but is isolated
+here to separate the probabilistic argument from the algebraic one. -/
+theorem idsWithAbort_complete' :
     (identificationScheme p prims nttOps).Complete := by
   intro pk sk hvalid
   rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
@@ -89,6 +90,17 @@ theorem idsWithAbort_complete :
       simp only [Option.map, Option.some.injEq, Prod.mk.injEq] at heq
       obtain ⟨rfl, rfl, rfl⟩ := heq
       exact hRespondVerify pk sk hvalid w1 st cTilde hw1st _ hoz
+
+omit hRespondVerify in
+/-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
+the verifier always accepts. This follows from the correctness of the rounding operations
+and the norm bounds satisfied by honest responses.
+
+The proof requires deriving the `hRespondVerify` algebraic fact from `Primitives.Laws`;
+see `idsWithAbort_complete'` for the conditional version. -/
+theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
+    (identificationScheme p prims nttOps).Complete := by
+  sorry
 
 omit hRespondVerify in
 /-- There exists a simulator for the HVZK property of the ML-DSA identification scheme.

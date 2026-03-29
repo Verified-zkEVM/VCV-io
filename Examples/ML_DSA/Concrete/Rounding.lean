@@ -407,6 +407,28 @@ private theorem lowBits_centeredRepr (r : Coeff) {gamma2 : ℕ}
   · omega
   · omega
 
+private theorem centeredRepr_eq_of_natAbs_le (z : ℤ) {b : ℕ}
+    (hbound : z.natAbs ≤ b) (hbq : 2 * b < modulus) :
+    LatticeCrypto.centeredRepr (intToCoeff z) = z := by
+  have hzupper : z ≤ b := by
+    have hz : z ≤ (z.natAbs : ℤ) := by
+      simpa using (Int.le_natAbs (a := z))
+    have hb : (z.natAbs : ℤ) ≤ b := by
+      exact_mod_cast hbound
+    omega
+  have hzlower : -(b : ℤ) ≤ z := by
+    have hz : -z ≤ (z.natAbs : ℤ) := by
+      have hz' := Int.le_natAbs (a := -z)
+      simpa using hz'
+    have hb : (z.natAbs : ℤ) ≤ b := by
+      exact_mod_cast hbound
+    omega
+  have hbqz : ((2 * b : ℕ) : ℤ) < modulus := by
+    exact_mod_cast hbq
+  apply centeredRepr_intToCoeff_eq
+  · omega
+  · omega
+
 private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
     (power2RoundShift (power2RoundHigh r)).get i =
       (power2Scale : Coeff) * ((power2RoundCoeff (r.get i)).1 : Coeff) := by
@@ -483,6 +505,100 @@ private theorem gamma2_double_lt_modulus_of_isApproved {p : Params} (hp : p.isAp
     2 * p.gamma2 < modulus := by
   rcases hp with rfl | rfl | rfl <;> decide
 
+private theorem useHintModulus_pos_of_isApproved {p : Params} (hp : p.isApproved) :
+    0 < (modulus - 1) / (2 * p.gamma2) := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem twoGamma_dvd_modulus_sub_one_of_isApproved {p : Params} (hp : p.isApproved) :
+    2 * p.gamma2 ∣ modulus - 1 := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem alphaPlusOne_double_lt_modulus_of_isApproved {p : Params} (hp : p.isApproved) :
+    2 * (2 * p.gamma2 + 1) < modulus := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem highBitsCoeff_lt_useHintModulus_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Coeff) :
+    highBitsCoeff r p.gamma2 < (modulus - 1) / (2 * p.gamma2) := by
+  unfold highBitsCoeff decomposeCoeff
+  set alpha : ℕ := 2 * p.gamma2
+  set m : ℕ := (modulus - 1) / alpha
+  set t : ℕ := r.val % alpha
+  have hα : 0 < alpha := by
+    have hγ := gamma2_pos_of_isApproved hp
+    dsimp [alpha]
+    omega
+  have hm : 0 < m := by
+    simpa [m, alpha] using useHintModulus_pos_of_isApproved hp
+  have hqm : alpha * m = modulus - 1 := by
+    have hdvd : alpha ∣ modulus - 1 := by
+      simpa [alpha] using twoGamma_dvd_modulus_sub_one_of_isApproved hp
+    simpa [m] using (Nat.mul_div_cancel' hdvd)
+  have htlt : t < alpha := by
+    subst t
+    exact Nat.mod_lt _ hα
+  have hdiv : t + alpha * (r.val / alpha) = r.val := by
+    subst t
+    exact Nat.mod_add_div _ _
+  by_cases h : t ≤ alpha / 2
+  · have hcond : r.val % (2 * p.gamma2) ≤ p.gamma2 := by
+      simpa [alpha, t] using h
+    by_cases hs : alpha * (r.val / alpha) = modulus - 1
+    · simpa [t, h, hs] using hm
+    · have hlt : r.val / alpha < m := by
+        by_contra hge
+        have hmle : m ≤ r.val / alpha := Nat.not_lt.mp hge
+        have hmul : modulus - 1 ≤ alpha * (r.val / alpha) := by
+          simpa [hqm] using Nat.mul_le_mul_left alpha hmle
+        have hupper : alpha * (r.val / alpha) ≤ r.val := by
+          have hhdiv := hdiv
+          omega
+        have hval : r.val = modulus - 1 := by
+          have hltq : r.val < modulus := ZMod.val_lt r
+          omega
+        have heq : alpha * (r.val / alpha) = modulus - 1 := by
+          have hhdiv := hdiv
+          omega
+        exact hs heq
+      simpa [t, h, hs] using hlt
+  · have hnotcond : ¬r.val % (2 * p.gamma2) ≤ p.gamma2 := by
+      intro hcond
+      apply h
+      simpa [alpha, t] using hcond
+    by_cases hs : alpha * (1 + r.val / alpha) = modulus - 1
+    · simpa [t, h, hs, Nat.add_comm] using hm
+    · have hlt : r.val / alpha + 1 < m := by
+        have hqdiv_lt_m : r.val / alpha < m := by
+          by_contra hge
+          have hmle : m ≤ r.val / alpha := Nat.not_lt.mp hge
+          have hmul : modulus - 1 ≤ alpha * (r.val / alpha) := by
+            simpa [hqm] using Nat.mul_le_mul_left alpha hmle
+          have htpos : 0 < t := by
+            have htgt : alpha / 2 < t := Nat.lt_of_not_ge h
+            omega
+          have hval : modulus ≤ r.val := by
+            have hhdiv := hdiv
+            omega
+          exact (Nat.not_lt.mpr hval) (ZMod.val_lt r)
+        have hle : r.val / alpha + 1 ≤ m := Nat.succ_le_of_lt hqdiv_lt_m
+        have hne : r.val / alpha + 1 ≠ m := by
+          intro heq
+          have heq' : alpha * (1 + r.val / alpha) = modulus - 1 := by
+            rw [Nat.add_comm, heq, hqm]
+          exact hs heq'
+        exact lt_of_le_of_ne hle hne
+      simpa [t, h, hs, Nat.add_comm] using hlt
+
+private theorem alphaMulUseHintModulus_eq_neg_one_of_isApproved (p : Params)
+    (hp : p.isApproved) :
+    let alpha := 2 * p.gamma2
+    let m := (modulus - 1) / alpha
+    (((alpha : ℕ) : Coeff) * (m : Coeff)) = (-1 : Coeff) := by
+  dsimp
+  have hdvd : 2 * p.gamma2 ∣ modulus - 1 := twoGamma_dvd_modulus_sub_one_of_isApproved hp
+  rw [← Nat.cast_mul, Nat.mul_div_cancel' hdvd]
+  exact modulus_sub_one_eq_neg_one
+
 theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     highBitsShift p (highBits p r) + lowBits p r = r :=
@@ -529,6 +645,12 @@ def concretePower2RoundOps : ML_DSA.Power2RoundOps where
   power2Round := power2RoundHigh
   shift2 := power2RoundShift
 
+theorem concretePower2Round_bound_field (r : Rq) :
+    LatticeCrypto.cInfNorm
+      (r - concretePower2RoundOps.shift2 (concretePower2RoundOps.power2Round r)) ≤
+        2 ^ (droppedBits - 1) := by
+  simpa [concretePower2RoundOps] using concretePower2Round_bound r
+
 /-- Concrete `RoundingOps` with `High = Rq` and Boolean hints. -/
 def concreteRoundingOps (p : Params) : ML_DSA.RoundingOps (2 * p.gamma2) where
   High := High
@@ -538,6 +660,28 @@ def concreteRoundingOps (p : Params) : ML_DSA.RoundingOps (2 * p.gamma2) where
   shift := highBitsShift p
   makeHint := makeHint p
   useHint := useHint p
+
+theorem concreteRounding_high_low_decomp_field_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) :
+    (concreteRoundingOps p).shift ((concreteRoundingOps p).highBits r) +
+      (concreteRoundingOps p).lowBits r = r := by
+  change highBitsShift p (highBits p r) + lowBits p r = r
+  exact concreteRounding_high_low_decomp_of_isApproved p hp r
+
+theorem concreteRounding_lowBits_bound_field_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) :
+    LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) ≤ (2 * p.gamma2) / 2 := by
+  have hbound := concreteRounding_lowBits_bound_of_isApproved p hp r
+  have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
+    omega
+  change LatticeCrypto.cInfNorm (lowBits p r) ≤ (2 * p.gamma2) / 2
+  simpa [hhalf] using hbound
+
+theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
+    (hp : p.isApproved) :
+    Function.Injective (concreteRoundingOps p).shift := by
+  change Function.Injective (highBitsShift p)
+  exact highBitsShift_injective_of_isApproved p hp
 
 /-
 The vector-level `Power2Round` decomposition and bound lemmas above compile. The remaining

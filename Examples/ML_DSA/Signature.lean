@@ -130,24 +130,15 @@ def fipsVerify (pk : PublicKey p prims) (msg : List Byte)
 
 /-! ### Vector Arithmetic Helpers -/
 
-set_option maxRecDepth 2048 in
-set_option linter.style.maxHeartbeats false in
-set_option maxHeartbeats 800000 in
 private lemma rqvec_add_get {k : ℕ} (v u : RqVec k) (j : Fin k) :
     (v + u).get j = v.get j + u.get j :=
   congr_fun (Vector.vectorAdd_get v u) j
 
-set_option maxRecDepth 2048 in
-set_option linter.style.maxHeartbeats false in
-set_option maxHeartbeats 800000 in
 private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a := by
   change Vector.ofFn ((Vector.zipWith (· - ·) a b).get + b.get) = a
   rw [Vector.ext_iff]; intro i hi
   simp [Vector.getElem_ofFn, Pi.add_apply, Vector.get]
 
-set_option maxRecDepth 2048 in
-set_option linter.style.maxHeartbeats false in
-set_option maxHeartbeats 800000 in
 private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
   change Vector.ofFn ((Vector.ofFn (a.get + b.get)).get +
     (Vector.map (- ·) b).get) = a
@@ -190,11 +181,31 @@ private lemma fipsSignAttempt_spec
   subst h
   exact ⟨rfl, rfl, rfl, h1.1, h1.2, h2.1, h2.2⟩
 
+/-- Single-component recovery: `UseHint(MakeHint(-ct₀, r + ct₀), r + ct₀) = HighBits(r + s)`
+when `‖ct₀‖ ≤ γ₂`, `‖LowBits(r)‖ < γ₂ - β`, and `‖s‖ ≤ β`, and `r + s = w`.
+
+Proof strategy:
+1. `useHint_makeHint` with `z = -ct₀`: need `polyNorm (-ct₀) ≤ γ₂`, from `cInfNorm_neg`.
+2. Result: `highBits((r + ct₀) + (-ct₀)) = highBits(r)` — need `r + ct₀ + (-ct₀) = r`.
+3. `hide_low` with perturbation `s`: `highBits(r + s) = highBits(r)` when
+   `polyNorm s ≤ β` and `polyNorm(lowBits(r)) < γ₂ - β`. -/
+lemma useHint_recovers_highBits_single
+    (h_laws : Primitives.Laws prims nttOps)
+    (w_j r_j ct0_j s_j : Rq)
+    (h_r_eq : r_j = w_j - s_j)
+    (h_norm_ct0 : polyNorm ct0_j ≤ p.gamma2)
+    (h_norm_r0 : polyNorm (prims.lowBits r_j) < p.gamma2 - p.beta)
+    (h_s_bound : polyNorm s_j ≤ p.beta) :
+    prims.useHint (prims.makeHint (-ct0_j) (r_j + ct0_j)) (r_j + ct0_j) =
+      prims.highBits w_j := by
+  sorry
+
 /-- When all signing norm bounds hold, UseHint recovers the original commitment:
-`UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`. -/
+`UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`.
+
+Follows componentwise from `useHint_recovers_highBits_single`. -/
 lemma useHintVec_recovers_highBits
     (h_laws : Primitives.Laws prims nttOps)
-    (h_cInfNorm_neg : ∀ (f : Rq), LatticeCrypto.cInfNorm (-f) ≤ LatticeCrypto.cInfNorm f)
     (w cs2 ct0 : RqVec p.k)
     (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
     (h_norm_r0 : polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta)
@@ -204,9 +215,11 @@ lemma useHintVec_recovers_highBits
       (w - cs2 + ct0) = prims.highBitsVec w := by
   sorry
 
-/-- Correctness of FIPS ML-DSA: if a key pair was generated honestly and signing succeeds,
-then verification accepts the resulting signature. -/
-theorem fipsSign_fipsVerify_correct
+/-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)
+and the product norm bound (`h_cs2_bound`). These conditions follow from the key generation
+relationship `t = A·s₁ + s₂`, `(t₁,t₀) = Power2Round(t)`, and the weight/norm structure
+of challenge polynomials and secret keys. -/
+theorem fipsSign_fipsVerify_correct'
     (pk : PublicKey p prims) (sk : SecretKey p)
     (msg : List Byte) (sig : FIPSSignature p prims)
     (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ)
@@ -219,7 +232,6 @@ theorem fipsSign_fipsVerify_correct
         polyVecMul nttOps c sk.t0)
     (h_cs2_bound : ∀ (c : Rq) (j : Fin p.k),
       LatticeCrypto.cInfNorm ((polyVecMul nttOps c sk.s2).get j) ≤ p.beta)
-    (h_cInfNorm_neg : ∀ (f : Rq), LatticeCrypto.cInfNorm (-f) ≤ LatticeCrypto.cInfNorm f)
     (h_sign : fipsSignLoop p prims nttOps sk
       (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
       rhoDoublePrime maxAttempts = some sig) :
@@ -235,7 +247,7 @@ theorem fipsSign_fipsVerify_correct
       prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
         (prims.expandMask rhoDoublePrime (i * p.l))) := by
     rw [h_cTilde, h_z, h_h, h_wApprox_eq]
-    exact useHintVec_recovers_highBits p prims nttOps h_laws h_cInfNorm_neg _ _ _
+    exact useHintVec_recovers_highBits p prims nttOps h_laws _ _ _
       h_norm_ct0 h_norm_r0 (h_cs2_bound _)
   change fipsVerify p prims nttOps pk msg sig = true
   simp only [fipsVerify]
@@ -257,5 +269,23 @@ theorem fipsSign_fipsVerify_correct
         (prims.w1Encode (prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
           (prims.expandMask rhoDoublePrime (i * p.l))))) := by rw [h_w1_eq]
     _ = sig.cTilde := h_cTilde.symm
+
+/-- Correctness of FIPS ML-DSA: if a key pair was generated honestly and signing succeeds,
+then verification accepts the resulting signature.
+
+The proof requires deriving the algebraic key identity and product norm bounds from
+`validKeyPair` and `Primitives.Laws`; see `fipsSign_fipsVerify_correct'` for the
+conditional version. -/
+theorem fipsSign_fipsVerify_correct
+    (pk : PublicKey p prims) (sk : SecretKey p)
+    (msg : List Byte) (sig : FIPSSignature p prims)
+    (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ)
+    (h_valid : validKeyPair p prims pk sk = true)
+    (h_laws : Primitives.Laws prims nttOps)
+    (h_sign : fipsSignLoop p prims nttOps sk
+      (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
+      rhoDoublePrime maxAttempts = some sig) :
+    fipsVerify p prims nttOps pk msg sig = true := by
+  sorry
 
 end ML_DSA
