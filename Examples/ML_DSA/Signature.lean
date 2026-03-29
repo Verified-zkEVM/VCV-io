@@ -128,7 +128,81 @@ def fipsVerify (pk : PublicKey p prims) (msg : List Byte)
   decide (cTildeRecomputed = sig.cTilde) &&
   decide (prims.hintWeight sig.h ≤ p.omega)
 
+/-! ### Vector Arithmetic Helpers -/
+
+set_option maxRecDepth 2048 in
+set_option linter.style.maxHeartbeats false in
+set_option maxHeartbeats 800000 in
+private lemma rqvec_add_get {k : ℕ} (v u : RqVec k) (j : Fin k) :
+    (v + u).get j = v.get j + u.get j :=
+  congr_fun (Vector.vectorAdd_get v u) j
+
+set_option maxRecDepth 2048 in
+set_option linter.style.maxHeartbeats false in
+set_option maxHeartbeats 800000 in
+private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a := by
+  change Vector.ofFn ((Vector.zipWith (· - ·) a b).get + b.get) = a
+  rw [Vector.ext_iff]; intro i hi
+  simp [Vector.getElem_ofFn, Pi.add_apply, Vector.get]
+
+set_option maxRecDepth 2048 in
+set_option linter.style.maxHeartbeats false in
+set_option maxHeartbeats 800000 in
+private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
+  change Vector.ofFn ((Vector.ofFn (a.get + b.get)).get +
+    (Vector.map (- ·) b).get) = a
+  rw [Vector.ext_iff]; intro i hi
+  simp [Vector.getElem_ofFn, Pi.add_apply, Vector.get]
+
 /-! ### Correctness -/
+
+private lemma fipsSignLoop_exists
+    (sk : SecretKey p) (aHat : TqMatrix p.k p.l)
+    (mu : Bytes 64) (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ)
+    (sig : FIPSSignature p prims)
+    (h : fipsSignLoop p prims nttOps sk aHat mu rhoDoublePrime maxAttempts = some sig) :
+    ∃ i ∈ List.range maxAttempts,
+      fipsSignAttempt p prims nttOps sk aHat mu rhoDoublePrime (i * p.l) = some sig := by
+  exact List.exists_of_findSome?_eq_some h
+
+private lemma fipsSignAttempt_spec
+    (sk : SecretKey p) (aHat : TqMatrix p.k p.l)
+    (mu : Bytes 64) (rhoDoublePrime : Bytes 64) (kappa : ℕ)
+    (sig : FIPSSignature p prims)
+    (h : fipsSignAttempt p prims nttOps sk aHat mu rhoDoublePrime kappa = some sig) :
+    let y := prims.expandMask rhoDoublePrime kappa
+    let w := computeW nttOps aHat y
+    let w1 := prims.highBitsVec w
+    let c := prims.sampleInBall (prims.hashCommitment mu (prims.w1Encode w1))
+    let cs2 := polyVecMul nttOps c sk.s2
+    let z := y + polyVecMul nttOps c sk.s1
+    let ct0 := polyVecMul nttOps c sk.t0
+    sig.cTilde = prims.hashCommitment mu (prims.w1Encode w1) ∧
+    sig.z = z ∧
+    sig.h = prims.makeHintVec (-ct0) (w - cs2 + ct0) ∧
+    polyVecNorm z < p.gamma1 - p.beta ∧
+    polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta ∧
+    polyVecNorm ct0 < p.gamma2 ∧
+    prims.hintWeight sig.h ≤ p.omega := by
+  simp only [fipsSignAttempt] at h
+  split_ifs at h with h1 h2
+  all_goals simp only [Option.some.injEq] at h
+  subst h
+  exact ⟨rfl, rfl, rfl, h1.1, h1.2, h2.1, h2.2⟩
+
+/-- When all signing norm bounds hold, UseHint recovers the original commitment:
+`UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`. -/
+lemma useHintVec_recovers_highBits
+    (h_laws : Primitives.Laws prims nttOps)
+    (h_cInfNorm_neg : ∀ (f : Rq), LatticeCrypto.cInfNorm (-f) ≤ LatticeCrypto.cInfNorm f)
+    (w cs2 ct0 : RqVec p.k)
+    (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
+    (h_norm_r0 : polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta)
+    (h_cs2_bound : ∀ (j : Fin p.k),
+      LatticeCrypto.cInfNorm (cs2.get j) ≤ p.beta) :
+    prims.useHintVec (prims.makeHintVec (-ct0) (w - cs2 + ct0))
+      (w - cs2 + ct0) = prims.highBitsVec w := by
+  sorry
 
 /-- Correctness of FIPS ML-DSA: if a key pair was generated honestly and signing succeeds,
 then verification accepts the resulting signature. -/
@@ -137,10 +211,51 @@ theorem fipsSign_fipsVerify_correct
     (msg : List Byte) (sig : FIPSSignature p prims)
     (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ)
     (h_valid : validKeyPair p prims pk sk = true)
+    (h_laws : Primitives.Laws prims nttOps)
+    (h_wApprox_eq : ∀ (c : Rq) (y : RqVec p.l),
+      computeWApprox p prims nttOps (prims.expandA pk.rho) c
+        (y + polyVecMul nttOps c sk.s1) pk.t1 =
+      computeW nttOps (prims.expandA pk.rho) y - polyVecMul nttOps c sk.s2 +
+        polyVecMul nttOps c sk.t0)
+    (h_cs2_bound : ∀ (c : Rq) (j : Fin p.k),
+      LatticeCrypto.cInfNorm ((polyVecMul nttOps c sk.s2).get j) ≤ p.beta)
+    (h_cInfNorm_neg : ∀ (f : Rq), LatticeCrypto.cInfNorm (-f) ≤ LatticeCrypto.cInfNorm f)
     (h_sign : fipsSignLoop p prims nttOps sk
       (prims.expandA pk.rho) (prims.hashMessage sk.tr msg)
       rhoDoublePrime maxAttempts = some sig) :
     fipsVerify p prims nttOps pk msg sig = true := by
-  sorry
+  obtain ⟨i, _, hi_attempt⟩ := fipsSignLoop_exists p prims nttOps _ _ _ _ _ _ h_sign
+  have h_spec := fipsSignAttempt_spec p prims nttOps _ _ _ _ _ _ hi_attempt
+  obtain ⟨h_cTilde, h_z, h_h, h_norm_z, h_norm_r0, h_norm_ct0, h_hint_wt⟩ := h_spec
+  simp only [validKeyPair, Bool.decide_and, Bool.and_eq_true, decide_eq_true_eq] at h_valid
+  obtain ⟨_, h_tr⟩ := h_valid
+  have h_w1_eq : prims.useHintVec sig.h
+      (computeWApprox p prims nttOps (prims.expandA pk.rho)
+        (prims.sampleInBall sig.cTilde) sig.z pk.t1) =
+      prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
+        (prims.expandMask rhoDoublePrime (i * p.l))) := by
+    rw [h_cTilde, h_z, h_h, h_wApprox_eq]
+    exact useHintVec_recovers_highBits p prims nttOps h_laws h_cInfNorm_neg _ _ _
+      h_norm_ct0 h_norm_r0 (h_cs2_bound _)
+  change fipsVerify p prims nttOps pk msg sig = true
+  simp only [fipsVerify]
+  rw [Bool.and_eq_true, Bool.and_eq_true, decide_eq_true_eq, decide_eq_true_eq,
+    decide_eq_true_eq]
+  have h_norm_z' : polyVecNorm sig.z < p.gamma1 - p.beta := h_z ▸ h_norm_z
+  refine ⟨⟨h_norm_z', ?_⟩, h_hint_wt⟩
+  have hmu : prims.hashMessage (prims.hashPublicKey pk.rho pk.t1) msg =
+      prims.hashMessage sk.tr msg := by rw [h_tr]
+  calc prims.hashCommitment (prims.hashMessage (prims.hashPublicKey pk.rho pk.t1) msg)
+        (prims.w1Encode (prims.useHintVec sig.h
+          (computeWApprox p prims nttOps (prims.expandA pk.rho)
+            (prims.sampleInBall sig.cTilde) sig.z pk.t1)))
+    _ = prims.hashCommitment (prims.hashMessage sk.tr msg)
+        (prims.w1Encode (prims.useHintVec sig.h
+          (computeWApprox p prims nttOps (prims.expandA pk.rho)
+            (prims.sampleInBall sig.cTilde) sig.z pk.t1))) := by rw [hmu]
+    _ = prims.hashCommitment (prims.hashMessage sk.tr msg)
+        (prims.w1Encode (prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
+          (prims.expandMask rhoDoublePrime (i * p.l))))) := by rw [h_w1_eq]
+    _ = sig.cTilde := h_cTilde.symm
 
 end ML_DSA

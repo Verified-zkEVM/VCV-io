@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import Examples.ML_DSA.Ring
 import Batteries.Data.Vector.Lemmas
+import Mathlib.Data.Int.Lemmas
 import Mathlib.Data.Int.NatAbs
 import Mathlib.Data.ZMod.ValMinAbs
 
@@ -330,6 +331,82 @@ private theorem decomposeCoeff_eq (r : Coeff) {gamma2 : ℕ} (hγ : 0 < gamma2) 
         simpa [Nat.add_comm] using hs
       simpa [t, h, hs', intToCoeff] using base
 
+private theorem lowBitsCoeff_bound (r : Coeff) {gamma2 : ℕ} (hγ : 0 < gamma2) :
+    (lowBitsCoeff r gamma2).natAbs ≤ gamma2 := by
+  unfold lowBitsCoeff decomposeCoeff
+  set alpha : ℕ := 2 * gamma2
+  set t : ℕ := r.val % alpha
+  have hα : 0 < alpha := by
+    dsimp [alpha]
+    omega
+  have htlt : t < alpha := by
+    subst t
+    exact Nat.mod_lt _ hα
+  have hhalf : alpha / 2 = gamma2 := by
+    dsimp [alpha]
+    omega
+  by_cases h : t ≤ alpha / 2
+  · have htγ : t ≤ gamma2 := by simpa [hhalf] using h
+    have hcond : r.val % (2 * gamma2) ≤ gamma2 := by
+      simpa [alpha, t] using htγ
+    by_cases hs : alpha * (r.val / alpha) = modulus - 1
+    · have hbound : Int.natAbs ((t : ℤ) - 1) ≤ gamma2 := by
+        simpa using Int.natAbs_coe_sub_coe_le_of_le htγ (show 1 ≤ gamma2 by omega)
+      simpa [lowBitsCoeff, decomposeCoeff, alpha, t, hcond, hs] using hbound
+    · have hbound : Int.natAbs (t : ℤ) ≤ gamma2 := by
+        simpa using htγ
+      simpa [lowBitsCoeff, decomposeCoeff, alpha, t, hcond, hs] using hbound
+  · have htgt : alpha / 2 < t := Nat.lt_of_not_ge h
+    have htgeγ : gamma2 + 1 ≤ t := by
+      have : gamma2 < t := by simpa [hhalf] using htgt
+      omega
+    have hnotcond : ¬r.val % (2 * gamma2) ≤ gamma2 := by
+      intro hcond
+      apply h
+      simpa [alpha, t, hhalf] using hcond
+    by_cases hs : alpha * (1 + r.val / alpha) = modulus - 1
+    · have hs' : (2 * gamma2) * (1 + r.val / (2 * gamma2)) = modulus - 1 := by
+        simpa [alpha] using hs
+      have hbound : Int.natAbs ((t : ℤ) - ((alpha + 1 : ℕ) : ℤ)) ≤ gamma2 := by
+        rw [Int.natAbs_natCast_sub_natCast_of_le (show t ≤ alpha + 1 by omega)]
+        rw [show alpha = 2 * gamma2 by rfl]
+        omega
+      have hbound' : Int.natAbs ((t : ℤ) - alpha - 1) ≤ gamma2 := by
+        simpa [sub_eq_add_neg, add_assoc, add_left_comm, add_comm] using hbound
+      simpa [lowBitsCoeff, decomposeCoeff, alpha, t, hnotcond, hs', Nat.add_comm] using hbound'
+    · have hs' : (2 * gamma2) * (1 + r.val / (2 * gamma2)) ≠ modulus - 1 := by
+        simpa [alpha] using hs
+      have hbound : Int.natAbs ((t : ℤ) - alpha) ≤ gamma2 := by
+        rw [Int.natAbs_natCast_sub_natCast_of_le htlt.le]
+        rw [show alpha = 2 * gamma2 by rfl]
+        omega
+      simpa [lowBitsCoeff, decomposeCoeff, alpha, t, hnotcond, hs', Nat.add_comm] using hbound
+
+private theorem lowBits_centeredRepr (r : Coeff) {gamma2 : ℕ}
+    (hγ : 0 < gamma2) (hq : 2 * gamma2 < modulus) :
+    LatticeCrypto.centeredRepr (intToCoeff (lowBitsCoeff r gamma2)) = lowBitsCoeff r gamma2 := by
+  let z : ℤ := lowBitsCoeff r gamma2
+  have hbound : z.natAbs ≤ gamma2 := by
+    simpa [z] using lowBitsCoeff_bound (r := r) hγ
+  have hzupper : z ≤ gamma2 := by
+    have hz : z ≤ (z.natAbs : ℤ) := by
+      simpa using (Int.le_natAbs (a := z))
+    have hb : (z.natAbs : ℤ) ≤ gamma2 := by
+      exact_mod_cast hbound
+    omega
+  have hzlower : -(gamma2 : ℤ) ≤ z := by
+    have hz : -z ≤ (z.natAbs : ℤ) := by
+      have hz' := Int.le_natAbs (a := -z)
+      simpa using hz'
+    have hb : (z.natAbs : ℤ) ≤ gamma2 := by
+      exact_mod_cast hbound
+    omega
+  have hqz : ((2 * gamma2 : ℕ) : ℤ) < modulus := by
+    exact_mod_cast hq
+  apply centeredRepr_intToCoeff_eq
+  · omega
+  · omega
+
 private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
     (power2RoundShift (power2RoundHigh r)).get i =
       (power2Scale : Coeff) * ((power2RoundCoeff (r.get i)).1 : Coeff) := by
@@ -388,6 +465,63 @@ theorem concreteRounding_high_low_decomp (p : Params) (hγ : 0 < p.gamma2) (r : 
   change (highBitsShift p (highBits p r)).get j + (lowBits p r).get j = r.get j
   rw [highBitsShift_high_get, lowBits_get]
   simpa [highBitsCoeff, lowBitsCoeff] using decomposeCoeff_eq (r.get j) hγ
+
+theorem concreteRounding_lowBits_bound (p : Params)
+    (hγ : 0 < p.gamma2) (hq : 2 * p.gamma2 < modulus) (r : Rq) :
+    LatticeCrypto.cInfNorm (lowBits p r) ≤ p.gamma2 := by
+  refine LatticeCrypto.cInfNorm_le_of_coeff_le ?_
+  intro i
+  rw [lowBits_get]
+  rw [lowBits_centeredRepr (r := r.get i) hγ hq]
+  simpa using lowBitsCoeff_bound (r := r.get i) hγ
+
+private theorem gamma2_pos_of_isApproved {p : Params} (hp : p.isApproved) :
+    0 < p.gamma2 := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem gamma2_double_lt_modulus_of_isApproved {p : Params} (hp : p.isApproved) :
+    2 * p.gamma2 < modulus := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) :
+    highBitsShift p (highBits p r) + lowBits p r = r :=
+  concreteRounding_high_low_decomp p (gamma2_pos_of_isApproved hp) r
+
+theorem concreteRounding_lowBits_bound_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) :
+    LatticeCrypto.cInfNorm (lowBits p r) ≤ p.gamma2 :=
+  concreteRounding_lowBits_bound p (gamma2_pos_of_isApproved hp)
+    (gamma2_double_lt_modulus_of_isApproved hp) r
+
+private theorem coeff_mul_left_injective_of_isUnit {c : Coeff} (hc : IsUnit c) :
+    Function.Injective fun x : Coeff => c * x := by
+  intro x y hxy
+  rcases hc with ⟨u, rfl⟩
+  have hxy' := congrArg (fun z : Coeff => ↑u⁻¹ * z) hxy
+  simpa [mul_assoc] using hxy'
+
+private theorem twoGamma_coprime_modulus_of_isApproved {p : Params} (hp : p.isApproved) :
+    Nat.Coprime (2 * p.gamma2) modulus := by
+  rcases hp with rfl | rfl | rfl <;> decide
+
+private theorem twoGamma_isUnit_of_isApproved {p : Params} (hp : p.isApproved) :
+    IsUnit (((2 * p.gamma2 : ℕ) : Coeff)) := by
+  simpa using (ZMod.isUnit_iff_coprime (2 * p.gamma2) modulus).2
+    (twoGamma_coprime_modulus_of_isApproved hp)
+
+theorem highBitsShift_injective_of_isApproved (p : Params)
+    (hp : p.isApproved) :
+    Function.Injective (highBitsShift p) := by
+  intro x y hxy
+  apply Vector.ext
+  intro i hi
+  let j : Fin ringDegree := ⟨i, hi⟩
+  have hcoeff :
+      (((2 * p.gamma2 : ℕ) : Coeff) * x.get j) =
+        (((2 * p.gamma2 : ℕ) : Coeff) * y.get j) := by
+    simpa [highBitsShift] using congrArg (fun v : Rq => v.get j) hxy
+  exact coeff_mul_left_injective_of_isUnit (twoGamma_isUnit_of_isApproved hp) hcoeff
 
 /-- Concrete `Power2RoundOps` with `Power2High = Rq`. -/
 def concretePower2RoundOps : ML_DSA.Power2RoundOps where

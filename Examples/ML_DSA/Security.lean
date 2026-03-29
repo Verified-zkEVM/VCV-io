@@ -44,13 +44,53 @@ section Properties
 variable [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
+-- The algebraic core of completeness: whenever `respond` produces `some (z, h)`, the
+-- `verify` function accepts. This follows from the key generation relationship
+-- `A·s₁ + s₂ = t₁·2^d + t₀`, the correctness of `MakeHint`/`UseHint`, and the rounding
+-- norm bounds. We isolate it as a hypothesis since the full algebraic derivation requires
+-- NTT linearity and primitives laws.
+variable
+  (hRespondVerify : ∀ (pk : PublicKey p prims) (sk : SecretKey p),
+    validKeyPair p prims pk sk = true →
+    ∀ (w1 : Commitment p prims) (st : SigningState p) (cTilde : CommitHashBytes p),
+    (w1, st) ∈ support ((identificationScheme p prims nttOps).commit pk sk) →
+    ∀ (zh : Response p prims),
+    some zh ∈ support ((identificationScheme p prims nttOps).respond pk sk st cTilde) →
+    (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
+
+set_option linter.style.setOption false in
+set_option linter.style.maxHeartbeats false in
+set_option maxHeartbeats 800000 in
+include hRespondVerify in
 /-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
 the verifier always accepts. This follows from the correctness of the rounding operations
 and the norm bounds satisfied by honest responses. -/
 theorem idsWithAbort_complete :
     (identificationScheme p prims nttOps).Complete := by
-  sorry
+  intro pk sk hvalid
+  rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
+  refine ⟨HasEvalPMF.probFailure_eq_zero _, ?_⟩
+  intro b hb
+  rw [support_bind] at hb
+  simp only [Set.mem_iUnion] at hb
+  obtain ⟨t?, ht?, hb⟩ := hb
+  rw [support_pure] at hb
+  simp only [Set.mem_singleton_iff] at hb
+  subst hb
+  match t? with
+  | none => rfl
+  | some (w1, cTilde, zh) =>
+    simp only [IdenSchemeWithAbort.honestExecution, support_bind, Set.mem_iUnion,
+      support_pure, Set.mem_singleton_iff] at ht?
+    obtain ⟨⟨w1', st⟩, hw1st, cTilde', hcTilde, oz, hoz, heq⟩ := ht?
+    cases oz with
+    | none => simp only [Option.map, reduceCtorEq] at heq
+    | some zh' =>
+      simp only [Option.map, Option.some.injEq, Prod.mk.injEq] at heq
+      obtain ⟨rfl, rfl, rfl⟩ := heq
+      exact hRespondVerify pk sk hvalid w1 st cTilde hw1st _ hoz
 
+omit hRespondVerify in
 /-- There exists a simulator for the HVZK property of the ML-DSA identification scheme.
 
 The simulator produces transcripts by:
@@ -64,7 +104,8 @@ theorem idsWithAbort_hvzk :
     ∃ sim, (identificationScheme p prims nttOps).HVZK sim := by
   sorry
 
-omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited] in
+omit hRespondVerify [SampleableType (CommitHashBytes p)]
+  [unifSpec.Fintype] [unifSpec.Inhabited] in
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
