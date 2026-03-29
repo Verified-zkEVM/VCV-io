@@ -192,4 +192,45 @@ theorem PolyVec.component_cInfNorm_le (v : PolyVec (ZMod q) n k) (j : Fin k) :
 
 end PolyVecNorm
 
+/-! ## Squared ℓ₂ Norm
+
+The squared ℓ₂ norm is used by Falcon (FIPS 206 / FN-DSA) for signature verification:
+a signature `(s₁, s₂)` is accepted iff `‖(s₁, s₂)‖₂² ≤ ⌊β²⌋`. We define the squared
+norm to avoid square roots in the formalization. -/
+
+section L2Norm
+
+variable {q : ℕ} [NeZero q] {n : ℕ}
+
+/-- The squared ℓ₂ norm of a polynomial: the sum of squares of the centered representatives
+of its coefficients. -/
+def l2NormSq (p : Poly (ZMod q) n) : ℕ :=
+  ∑ i : Fin n, (centeredRepr (p.get i)).natAbs ^ 2
+
+/-- The squared ℓ₂ norm of a pair of polynomials: the sum of their individual squared norms.
+Used by Falcon to check `‖(s₁, s₂)‖₂² ≤ ⌊β²⌋`. -/
+def pairL2NormSq (p₁ p₂ : Poly (ZMod q) n) : ℕ :=
+  l2NormSq p₁ + l2NormSq p₂
+
+omit [NeZero q] in
+theorem l2NormSq_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
+    (h : cInfNorm p ≤ b) : l2NormSq p ≤ n * b ^ 2 := by
+  unfold l2NormSq
+  calc ∑ i : Fin n, (centeredRepr (p.get i)).natAbs ^ 2
+      ≤ ∑ _i : Fin n, b ^ 2 :=
+        Finset.sum_le_sum fun i _ => Nat.pow_le_pow_left (cInfNorm_le_iff.mp h i) 2
+    _ = n * b ^ 2 := by simp [Finset.sum_const]
+
+end L2Norm
+
+section PolyVecL2Norm
+
+variable {q : ℕ} [NeZero q] {n k : ℕ}
+
+/-- The squared ℓ₂ norm of a polynomial vector: the sum of `l2NormSq` across all components. -/
+def PolyVec.l2NormSq (v : PolyVec (ZMod q) n k) : ℕ :=
+  ∑ j : Fin k, LatticeCrypto.l2NormSq (v.get j)
+
+end PolyVecL2Norm
+
 end LatticeCrypto

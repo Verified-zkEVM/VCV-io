@@ -87,10 +87,9 @@ structure RoundingOps.Laws {Rq : Type*} [AddCommGroup Rq]
     cInfNorm (r - ops.shift (ops.useHint h r)) ≤ α + 1
 
 /-- Algebraic laws for `Power2RoundOps`. -/
-structure Power2RoundOps.Laws {Rq : Type*} [AddCommGroup Rq]
+abbrev Power2RoundOps.Laws {Rq : Type*} [AddCommGroup Rq]
     {d : ℕ} (ops : Power2RoundOps Rq d)
-    (cInfNorm : Rq → ℕ) : Prop where
-  /-- The remainder after power-2 rounding is bounded by `2^(d-1)`. -/
-  power2Round_bound : ∀ r : Rq, cInfNorm (r - ops.shift2 (ops.power2Round r)) ≤ 2 ^ (d - 1)
+    (cInfNorm : Rq → ℕ) : Prop :=
+  ∀ r : Rq, cInfNorm (r - ops.shift2 (ops.power2Round r)) ≤ 2 ^ (d - 1)
 
 end LatticeCrypto
