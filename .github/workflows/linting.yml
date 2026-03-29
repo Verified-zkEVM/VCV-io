@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "VCVio/**/*.lean"
+      - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
       - "lakefile.lean"
       - "scripts/lint-style.py"
@@ -16,6 +17,7 @@ on:
     branches: [main, master]
     paths:
       - "VCVio/**/*.lean"
+      - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
       - "lakefile.lean"
       - "scripts/lint-style.py"

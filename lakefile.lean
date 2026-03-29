@@ -18,6 +18,9 @@ require "leanprover-community" / "mathlib" @ git "v4.28.0"
 /-- Main library. -/
 @[default_target] lean_lib VCVio
 
+/-- Lattice-based cryptography: ring arithmetic, hardness assumptions, and scheme definitions. -/
+lean_lib LatticeCrypto
+
 /-- Example constructions of cryptographic primitives. -/
 lean_lib Examples
 /-- Optional proof widget experiments and visualizations. -/
@@ -97,8 +100,8 @@ lean_exe smoke_test where
 
 /-- ML-KEM test executable (links against mlkem-native FFI). -/
 lean_exe mlkem_test where
-  root := `VCVioTest.MLKEM.Main
+  root := `LatticeCrypto.MLKEM.Test.Main
 
 /-- ML-DSA test executable (links against mldsa-native FFI). -/
 lean_exe mldsa_test where
-  root := `VCVioTest.MLDSA.Main
+  root := `LatticeCrypto.MLDSA.Test.Main

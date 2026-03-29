@@ -151,11 +151,11 @@ The reduction uses:
 
 The statistical loss `L` involves the commitment guessing probability `ε`, the effective
 abort probability `p`, the regularity failure probability `δ`, and the query bounds `qS`,
-`qH`. See `ML_DSA.cmaToNmaLoss` for the precise formula from the paper.
+`qH`. See `MLDSA.cmaToNmaLoss` for the precise formula from the paper.
 
 The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE +
-SelfTargetMSIS for ML-DSA) is stated separately; see `ML_DSA.nma_security` and
-`ML_DSA.euf_cma_security`. -/
+SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
+`MLDSA.euf_cma_security`. -/
 theorem euf_cma_bound
     (_hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
