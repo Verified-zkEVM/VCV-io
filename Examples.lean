@@ -1,5 +1,4 @@
 import Examples.BR93
-import Examples.Crypto.FFI
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash

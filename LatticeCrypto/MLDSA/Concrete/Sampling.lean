@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Examples.Crypto.FFI
+import FFI.Hashing
 import LatticeCrypto.MLDSA.Concrete.Encoding
 import LatticeCrypto.MLDSA.Concrete.NTT
 
@@ -33,10 +33,10 @@ private def nonceLE (nonce : Nat) : ByteArray :=
   ByteArray.mk #[nonce.toUInt8, (nonce / 256).toUInt8]
 
 private def shake256Stream (seed : ByteArray) (nonce outLen : Nat) : ByteArray :=
-  Crypto.FFI.shake256 (seed ++ nonceLE nonce) outLen.toUSize
+  FFI.Hashing.shake256 (seed ++ nonceLE nonce) outLen.toUSize
 
 def shake256Vector (input : ByteArray) (outLen : Nat) : Vector Byte outLen :=
-  byteArrayToVector (Crypto.FFI.shake256 input outLen.toUSize) 0 outLen
+  byteArrayToVector (FFI.Hashing.shake256 input outLen.toUSize) 0 outLen
 
 def hashBytes64 (input : ByteArray) : Bytes 64 :=
   shake256Vector input 64
@@ -45,7 +45,7 @@ def hashBytes64 (input : ByteArray) : Bytes 64 :=
 
 def expandSeed (seed : Bytes 32) (p : Params) : Bytes 32 × Bytes 64 × Bytes 32 :=
   let input := vectorToByteArray seed |>.push p.k.toUInt8 |>.push p.l.toUInt8
-  let out := Crypto.FFI.shake256 input 128
+  let out := FFI.Hashing.shake256 input 128
   (byteArrayToVector out 0 32, byteArrayToVector out 32 64, byteArrayToVector out 96 32)
 
 /-! ## Uniform rejection sampling in `Tq` -/
@@ -71,7 +71,7 @@ private def requireFullUniformSample (coeffs : Array Coeff) : Array Coeff :=
 
 /-- FIPS 204 Algorithm 30. -/
 def rejNTTPoly (input : ByteArray) : Tq :=
-  let stream := Crypto.FFI.shake128 input 4096
+  let stream := FFI.Hashing.shake128 input 4096
   let coeffs := requireFullUniformSample <| rejUniformCoeffs stream
   ⟨Vector.ofFn fun i => coeffs.getD i.val 0⟩
 
@@ -137,7 +137,7 @@ def expandMask (rhoPrime : Bytes 64) (kappa : ℕ) (p : Params) : RqVec p.l :=
 /-! ## Challenge sampling -/
 
 private def shake256Prefix (input : ByteArray) (len : Nat) : ByteArray :=
-  Crypto.FFI.shake256 input len.toUSize
+  FFI.Hashing.shake256 input len.toUSize
 
 /-- FIPS 204 Algorithm 29. -/
 def sampleInBall (p : Params) (seed : CommitHashBytes p) : Rq :=

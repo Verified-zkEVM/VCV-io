@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "VCVio/**/*.lean"
+      - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
       - "lakefile.lean"
@@ -17,6 +18,7 @@ on:
     branches: [main, master]
     paths:
       - "VCVio/**/*.lean"
+      - "FFI/**/*.lean"
       - "LatticeCrypto/**/*.lean"
       - "Examples/**/*.lean"
       - "lakefile.lean"

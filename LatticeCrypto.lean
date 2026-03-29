@@ -28,6 +28,7 @@ import LatticeCrypto.MLKEM.KPKE
 import LatticeCrypto.MLKEM.Params
 import LatticeCrypto.MLKEM.Primitives
 import LatticeCrypto.MLKEM.Ring
+import LatticeCrypto.MLKEM.Security
 import LatticeCrypto.MLKEM.Test.ACVPVectors
 import LatticeCrypto.MLKEM.Test.Helpers
 import LatticeCrypto.MLKEM.Test.Main

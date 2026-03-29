@@ -18,6 +18,9 @@ require "leanprover-community" / "mathlib" @ git "v4.28.0"
 /-- Main library. -/
 @[default_target] lean_lib VCVio
 
+/-- Shared FFI bindings (SHA-3 / FIPS 202, etc.). -/
+lean_lib FFI
+
 /-- Lattice-based cryptography: ring arithmetic, hardness assumptions, and scheme definitions. -/
 lean_lib LatticeCrypto
 
@@ -27,6 +30,24 @@ lean_lib Examples
 lean_lib VCVioWidgets
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib
+
+-- Compile the shared FIPS 202 (SHA-3/SHAKE) FFI wrapper.
+-- Uses mlkem-native's FIPS 202 headers for the underlying implementation.
+target hashing_ffi.o pkg : System.FilePath := do
+  let oFile := pkg.buildDir / "c" / "hashing_ffi.o"
+  let srcJob ← inputTextFile <| pkg.dir / "csrc" / "hashing" / "lean_hashing_ffi.c"
+  let mlkemDir := pkg.dir / "third_party" / "mlkem-native" / "mlkem"
+  let weakArgs := #[
+    "-I", (← getLeanIncludeDir).toString,
+    "-I", mlkemDir.toString,
+    "-I", (mlkemDir / "src").toString,
+    "-std=c99", "-O2"]
+  buildO oFile srcJob weakArgs #["-fPIC"] "cc" getLeanTrace
+
+extern_lib leanhashing pkg := do
+  let hashO ← hashing_ffi.o.fetch
+  let name := nameToStaticLib "leanhashing"
+  buildStaticLib (pkg.staticLibDir / name) #[hashO]
 
 -- Compile mlkem-native core and Lean FFI wrapper as separate translation units.
 -- Both share the same include paths and config defines.
@@ -50,7 +71,7 @@ target mlkem_native.o pkg : System.FilePath := do
 
 target mlkem_ffi.o pkg : System.FilePath := do
   let oFile := pkg.buildDir / "c" / "mlkem_ffi.o"
-  let srcJob ← inputTextFile <| pkg.dir / "ffi" / "mlkem" / "lean_mlkem_ffi.c"
+  let srcJob ← inputTextFile <| pkg.dir / "csrc" / "mlkem" / "lean_mlkem_ffi.c"
   let (weakArgs, traceArgs) ← mlkemCFlags pkg
   buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
 
@@ -81,7 +102,7 @@ target mldsa_native.o pkg : System.FilePath := do
 
 target mldsa_ffi.o pkg : System.FilePath := do
   let oFile := pkg.buildDir / "c" / "mldsa_ffi.o"
-  let srcJob ← inputTextFile <| pkg.dir / "ffi" / "mldsa" / "lean_mldsa_ffi.c"
+  let srcJob ← inputTextFile <| pkg.dir / "csrc" / "mldsa" / "lean_mldsa_ffi.c"
   let (weakArgs, traceArgs) ← mldsaCFlags pkg
   buildO oFile srcJob weakArgs traceArgs "cc" getLeanTrace
 

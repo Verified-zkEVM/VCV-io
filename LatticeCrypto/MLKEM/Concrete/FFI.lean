@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Examples.Crypto.FFI
+import FFI.Hashing
 
 /-!
 # ML-KEM FFI Bindings
@@ -14,13 +14,13 @@ a formally verified (CBMC + HOL-Light) C90 implementation of ML-KEM / FIPS 203.
 
 Two groups of functions are exposed:
 
-1. **SHA-3 / FIPS 202** primitives — re-exported from `Crypto.FFI` for backward
+1. **SHA-3 / FIPS 202** primitives — re-exported from `FFI.Hashing` for backward
    compatibility with existing callers.
 
 2. **End-to-end ML-KEM** deterministic API (`mlkemKeypairDerand`, `mlkemEncDerand`,
    `mlkemDec`) — used as a reference oracle in tests.
 
-The C side is compiled from `ffi/mlkem/lean_mlkem_ffi.c`, which `#include`s
+The C side is compiled from `csrc/mlkem/lean_mlkem_ffi.c`, which `#include`s
 mlkem-native's monolithic `mlkem_native.c` (pinned at `v1.1.0`).
 -/
 
@@ -28,12 +28,12 @@ set_option autoImplicit false
 
 namespace MLKEM.Concrete.FFI
 
-/-! ## SHA-3 / FIPS 202 (re-exported from `Crypto.FFI`) -/
+/-! ## SHA-3 / FIPS 202 (re-exported from `FFI.Hashing`) -/
 
-def sha3_256 := Crypto.FFI.sha3_256
-def sha3_512 := Crypto.FFI.sha3_512
-def shake256 := Crypto.FFI.shake256
-def shake128 := Crypto.FFI.shake128
+def sha3_256 := FFI.Hashing.sha3_256
+def sha3_512 := FFI.Hashing.sha3_512
+def shake256 := FFI.Hashing.shake256
+def shake128 := FFI.Hashing.shake128
 
 /-! ## End-to-end ML-KEM (deterministic, ML-KEM-768) -/
 

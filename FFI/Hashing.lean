@@ -15,7 +15,7 @@ These primitives are shared across ML-KEM (FIPS 203) and ML-DSA (FIPS 204).
 
 set_option autoImplicit false
 
-namespace Crypto.FFI
+namespace FFI.Hashing
 
 /-- SHA3-256: produces a 32-byte digest. -/
 @[extern "lean_sha3_256"]
@@ -33,4 +33,4 @@ opaque shake256 : @& ByteArray → (outLen : USize) → ByteArray
 @[extern "lean_shake128"]
 opaque shake128 : @& ByteArray → (outLen : USize) → ByteArray
 
-end Crypto.FFI
+end FFI.Hashing
