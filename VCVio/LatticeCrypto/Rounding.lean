@@ -55,11 +55,11 @@ structure RoundingOps (Rq : Type*) (α : ℕ) where
 dropped bits `d`. Used in ML-DSA for splitting `t = t1 * 2^d + t0`. -/
 structure Power2RoundOps (Rq : Type*) (d : ℕ) where
   /-- The type of high-order (power-2 rounded) representatives. -/
-  High2 : Type*
+  Power2High : Type*
   /-- Round `r` by dropping the `d` lowest bits. -/
-  power2Round : Rq → High2
+  power2Round : Rq → Power2High
   /-- Reconstruct from the rounded representative. -/
-  shift2 : High2 → Rq
+  shift2 : Power2High → Rq
 
 /-- Algebraic laws for `RoundingOps`, capturing the properties required by the
 Dilithium/ML-DSA security proof. These correspond to the axioms in EasyCrypt's

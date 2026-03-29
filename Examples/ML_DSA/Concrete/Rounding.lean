@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ML_DSA.Ring
+import Batteries.Data.Vector.Lemmas
 import Mathlib.Data.Int.NatAbs
 import Mathlib.Data.ZMod.ValMinAbs
 
@@ -265,6 +266,70 @@ private theorem power2RoundLow_centeredRepr (r : Coeff) :
       norm_num [power2Scale, droppedBits, modulus]
     omega
 
+private theorem modulus_sub_one_eq_neg_one : ((modulus - 1 : ℕ) : Coeff) = (-1 : Coeff) := by
+  rw [Nat.cast_sub (show 1 ≤ modulus by norm_num [modulus])]
+  rw [ZMod.natCast_self]
+  simp
+
+private theorem decomposeCoeff_eq (r : Coeff) {gamma2 : ℕ} (hγ : 0 < gamma2) :
+    let (r1, r0) := decomposeCoeff r gamma2
+    (((2 * gamma2 : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 = r := by
+  unfold decomposeCoeff
+  set alpha : ℕ := 2 * gamma2
+  set t : ℕ := r.val % alpha
+  have hα : 0 < alpha := by
+    dsimp [alpha]
+    omega
+  have hdiv : t + alpha * (r.val / alpha) = r.val := by
+    subst t
+    exact Nat.mod_add_div _ _
+  have hdiv' : ((t + alpha * (r.val / alpha) : ℕ) : Coeff) = r := by
+    calc
+      ((t + alpha * (r.val / alpha) : ℕ) : Coeff) = (r.val : Coeff) := by
+        exact congrArg (fun n : ℕ => (n : Coeff)) hdiv
+      _ = r := by
+        exact ZMod.natCast_zmod_val r
+  by_cases h : t ≤ alpha / 2
+  · have base : ((alpha : Coeff) * ((r.val / alpha : ℕ) : Coeff)) + intToCoeff (t : ℤ) = r := by
+      calc
+        ((alpha : Coeff) * ((r.val / alpha : ℕ) : Coeff)) + intToCoeff (t : ℤ)
+            = ((alpha * (r.val / alpha) + t : ℕ) : Coeff) := by
+                rw [intToCoeff, Int.cast_natCast, ← Nat.cast_mul, ← Nat.cast_add]
+        _ = r := by
+              simpa [Nat.add_comm] using hdiv'
+    by_cases hs : alpha * (r.val / alpha) = modulus - 1
+    · have hsCoeff : ((alpha : Coeff) * ((r.val / alpha : ℕ) : Coeff)) = (-1 : Coeff) := by
+        rw [← Nat.cast_mul, hs]
+        exact modulus_sub_one_eq_neg_one
+      rw [hsCoeff] at base
+      simpa [t, h, hs, intToCoeff, sub_eq_add_neg, add_assoc, add_left_comm, add_comm] using
+        base
+    · simpa [t, h, hs, intToCoeff] using base
+  · have base :
+        ((alpha : Coeff) * (((r.val / alpha) + 1 : ℕ) : Coeff)) +
+          intToCoeff ((t : ℤ) - alpha) = r := by
+      calc
+        ((alpha : Coeff) * (((r.val / alpha) + 1 : ℕ) : Coeff)) + intToCoeff ((t : ℤ) - alpha)
+            = ((alpha : Coeff) * ((r.val / alpha : ℕ) : Coeff)) + (t : Coeff) := by
+                simp [intToCoeff]
+                ring
+        _ = ((alpha * (r.val / alpha) + t : ℕ) : Coeff) := by
+              rw [← Nat.cast_mul, ← Nat.cast_add]
+        _ = r := by
+              simpa [Nat.add_comm] using hdiv'
+    by_cases hs : alpha * (1 + r.val / alpha) = modulus - 1
+    · have hsCoeff : ((alpha : Coeff) * ((1 + r.val / alpha : ℕ) : Coeff)) = (-1 : Coeff) := by
+        rw [← Nat.cast_mul, hs]
+        exact modulus_sub_one_eq_neg_one
+      rw [show ((alpha : Coeff) * (((r.val / alpha) + 1 : ℕ) : Coeff)) =
+            ((alpha : Coeff) * ((1 + r.val / alpha : ℕ) : Coeff)) by simp [Nat.add_comm]] at base
+      rw [hsCoeff] at base
+      simpa [t, h, hs, intToCoeff, sub_eq_add_neg, add_assoc, add_left_comm, add_comm,
+        Nat.add_comm] using base
+    · have hs' : alpha * ((r.val / alpha) + 1) ≠ modulus - 1 := by
+        simpa [Nat.add_comm] using hs
+      simpa [t, h, hs', intToCoeff] using base
+
 private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
     (power2RoundShift (power2RoundHigh r)).get i =
       (power2Scale : Coeff) * ((power2RoundCoeff (r.get i)).1 : Coeff) := by
@@ -305,9 +370,28 @@ theorem concretePower2Round_bound (r : Rq) :
   rw [power2RoundLow_centeredRepr (r.get i)]
   simpa [power2Scale, droppedBits] using power2RoundCoeff_bound (r.get i)
 
+private theorem highBitsShift_high_get (p : Params) (r : Rq) (i : Fin ringDegree) :
+    (highBitsShift p (highBits p r)).get i =
+      ((2 * p.gamma2 : ℕ) : Coeff) * (highBitsCoeff (r.get i) p.gamma2 : Coeff) := by
+  simp [highBitsShift, highBits]
+
+private theorem lowBits_get (p : Params) (r : Rq) (i : Fin ringDegree) :
+    (lowBits p r).get i = intToCoeff (lowBitsCoeff (r.get i) p.gamma2) := by
+  simp [lowBits]
+
+theorem concreteRounding_high_low_decomp (p : Params) (hγ : 0 < p.gamma2) (r : Rq) :
+    highBitsShift p (highBits p r) + lowBits p r = r := by
+  apply Vector.ext
+  intro i hi
+  let j : Fin ringDegree := ⟨i, hi⟩
+  rw [Vector.getElem_add]
+  change (highBitsShift p (highBits p r)).get j + (lowBits p r).get j = r.get j
+  rw [highBitsShift_high_get, lowBits_get]
+  simpa [highBitsCoeff, lowBitsCoeff] using decomposeCoeff_eq (r.get j) hγ
+
 /-- Concrete `Power2RoundOps` with `Power2High = Rq`. -/
 def concretePower2RoundOps : ML_DSA.Power2RoundOps where
-  High2 := Power2High
+  Power2High := Power2High
   power2Round := power2RoundHigh
   shift2 := power2RoundShift
 

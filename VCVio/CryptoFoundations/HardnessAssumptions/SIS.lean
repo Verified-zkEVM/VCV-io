@@ -86,7 +86,7 @@ def matrixProblem (n m : ℕ) [Semiring α] [DecidableEq α] [SampleableType α]
     (isShort : (Fin m → α) → Bool) :
     Problem (Matrix (Fin n) (Fin m) α) (Fin m → α) where
   sampleChallenge := $ᵗ Matrix (Fin n) (Fin m) α
-  isValid A x := isShort x && decide (vecMul x Aᵀ = 0)
+  isValid A x := isShort x && decide (mulVec A x = 0)
 
 end MatrixSIS
 
