@@ -198,7 +198,16 @@ lemma useHint_recovers_highBits_single
     (h_s_bound : polyNorm s_j ≤ p.beta) :
     prims.useHint (prims.makeHint (-ct0_j) (r_j + ct0_j)) (r_j + ct0_j) =
       prims.highBits w_j := by
-  sorry
+  have h_neg_norm : polyNorm (-ct0_j) ≤ p.gamma2 := by
+    have : NeZero modulus := ⟨by unfold modulus; decide⟩
+    rw [show polyNorm (-ct0_j) = polyNorm ct0_j from LatticeCrypto.cInfNorm_neg ct0_j]
+    exact h_norm_ct0
+  rw [h_laws.useHint_makeHint (-ct0_j) (r_j + ct0_j) h_neg_norm]
+  rw [rq_add_neg_cancel]
+  have h_hide := h_laws.hide_low r_j s_j p.beta h_s_bound h_norm_r0
+  rw [← h_hide]
+  have h_sum : r_j + s_j = w_j := by rw [h_r_eq]; exact rq_sub_add_cancel w_j s_j
+  rw [h_sum]
 
 /-- When all signing norm bounds hold, UseHint recovers the original commitment:
 `UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`.

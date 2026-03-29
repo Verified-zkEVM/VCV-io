@@ -186,7 +186,7 @@ noncomputable def identificationScheme
 theorem keyGenFromSeed_validKeyPair (seed : Bytes 32) :
     let (pk, sk) := keyGenFromSeed p prims nttOps seed
     validKeyPair p prims pk sk = true := by
-  sorry
+  simp [keyGenFromSeed, validKeyPair]
 
 /-- The key generation algebraic identity: `A·z - c·(t₁·2^d) = A·y - c·s₂ + c·t₀`
 when `z = y + c·s₁` and the key pair comes from `keyGenFromSeed`.

@@ -429,6 +429,21 @@ private theorem centeredRepr_eq_of_natAbs_le (z : ℤ) {b : ℕ}
   · omega
   · omega
 
+private theorem neg_le_and_le_of_natAbs_le {z : ℤ} {b : ℕ}
+    (hbound : z.natAbs ≤ b) : -(b : ℤ) ≤ z ∧ z ≤ b := by
+  constructor
+  · have hz : -z ≤ (z.natAbs : ℤ) := by
+      have hz' := Int.le_natAbs (a := -z)
+      simpa using hz'
+    have hb : (z.natAbs : ℤ) ≤ b := by
+      exact_mod_cast hbound
+    omega
+  · have hz : z ≤ (z.natAbs : ℤ) := by
+      simpa using (Int.le_natAbs (a := z))
+    have hb : (z.natAbs : ℤ) ≤ b := by
+      exact_mod_cast hbound
+    omega
+
 private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
     (power2RoundShift (power2RoundHigh r)).get i =
       (power2Scale : Coeff) * ((power2RoundCoeff (r.get i)).1 : Coeff) := by
@@ -599,6 +614,185 @@ private theorem alphaMulUseHintModulus_eq_neg_one_of_isApproved (p : Params)
   rw [← Nat.cast_mul, Nat.mul_div_cancel' hdvd]
   exact modulus_sub_one_eq_neg_one
 
+private theorem useHintCoeff_shift_sub_bound_of_isApproved (p : Params)
+    (hp : p.isApproved) (h : Bool) (r : Coeff) :
+    (LatticeCrypto.centeredRepr
+      (r - (((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff h r p.gamma2 : Coeff)))).natAbs ≤
+        2 * p.gamma2 + 1 := by
+  let alpha : ℕ := 2 * p.gamma2
+  let m : ℕ := (modulus - 1) / alpha
+  let dec := decomposeCoeff r p.gamma2
+  let r1 : ℕ := dec.1
+  let r0 : ℤ := dec.2
+  have hγ := gamma2_pos_of_isApproved hp
+  have hm : 0 < m := by
+    simpa [m, alpha] using useHintModulus_pos_of_isApproved hp
+  have hsmall : 2 * (alpha + 1) < modulus := by
+    simpa [alpha, Nat.mul_add, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc, two_mul] using
+      alphaPlusOne_double_lt_modulus_of_isApproved hp
+  have hdec : decomposeCoeff r p.gamma2 = (r1, r0) := by
+    simp [dec, r1, r0]
+  have hdecomp : (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 = r := by
+    simpa [alpha, dec, r1, r0] using decomposeCoeff_eq (r := r) (gamma2 := p.gamma2) hγ
+  have hr1lt : r1 < m := by
+    simpa [alpha, m, dec, r1] using highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
+  have hr0bound : r0.natAbs ≤ p.gamma2 := by
+    simpa [dec, r0] using lowBitsCoeff_bound (r := r) (gamma2 := p.gamma2) hγ
+  have hr0bounds := neg_le_and_le_of_natAbs_le hr0bound
+  have hr0low : -(p.gamma2 : ℤ) ≤ r0 := hr0bounds.1
+  have hr0up : r0 ≤ p.gamma2 := hr0bounds.2
+  cases h with
+  | false =>
+      have huse : useHintCoeff false r p.gamma2 = r1 := by
+        simp [useHintCoeff, hdec]
+      have hcoeff :
+          r - (((alpha : ℕ) : Coeff) * (useHintCoeff false r p.gamma2 : Coeff)) =
+            intToCoeff r0 := by
+        rw [huse]
+        exact sub_eq_iff_eq_add'.2 hdecomp.symm
+      have hbound : r0.natAbs ≤ alpha + 1 := by
+        dsimp [alpha]
+        omega
+      rw [hcoeff, centeredRepr_eq_of_natAbs_le (z := r0) hbound hsmall]
+      exact hbound
+  | true =>
+      by_cases hr0pos : 0 < r0
+      · by_cases hwrap : r1 + 1 < m
+        · have huse : useHintCoeff true r p.gamma2 = r1 + 1 := by
+            simpa [m, alpha, useHintCoeff, hdec, hr0pos] using (Nat.mod_eq_of_lt hwrap)
+          have hcoeff :
+              r - (((alpha : ℕ) : Coeff) * (useHintCoeff true r p.gamma2 : Coeff)) =
+                intToCoeff (r0 - alpha) := by
+            rw [huse]
+            exact sub_eq_iff_eq_add'.2 <| by
+              calc
+                r = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 := hdecomp.symm
+                _ = (((alpha : ℕ) : Coeff) * ((r1 + 1 : ℕ) : Coeff)) + intToCoeff (r0 - alpha) := by
+                      simp [intToCoeff]
+                      ring
+          have hr0ge1 : 1 ≤ r0 := by omega
+          have hbound : (r0 - alpha).natAbs ≤ alpha + 1 := by
+            dsimp [alpha]
+            omega
+          rw [hcoeff, centeredRepr_eq_of_natAbs_le (z := r0 - alpha) hbound hsmall]
+          exact hbound
+        · have heq : r1 + 1 = m := by omega
+          have hr1eq : r1 = m - 1 := by omega
+          have huse : useHintCoeff true r p.gamma2 = 0 := by
+            simp [useHintCoeff, hdec, hr0pos, heq, m, alpha]
+          have hmulm : (((alpha : ℕ) : Coeff) * (m : Coeff)) = (-1 : Coeff) := by
+            simpa [alpha, m] using alphaMulUseHintModulus_eq_neg_one_of_isApproved p hp
+          have hm_succ_cast : (m : Coeff) = (((m - 1 : ℕ) : Coeff) + 1) := by
+            rw [show m = (m - 1) + 1 by omega]
+            norm_num
+          have hcastm1 : (((m - 1 : ℕ) : Coeff)) = (m : Coeff) - 1 := by
+            calc
+              (((m - 1 : ℕ) : Coeff)) = ((((m - 1 : ℕ) : Coeff) + 1) - 1) := by ring
+              _ = (m : Coeff) - 1 := by rw [← hm_succ_cast]
+          have hmcoeff : (((alpha : ℕ) : Coeff) * (r1 : Coeff)) = (-1 : Coeff) - alpha := by
+            calc
+              (((alpha : ℕ) : Coeff) * (r1 : Coeff))
+                  = (((alpha : ℕ) : Coeff) * ((m - 1 : ℕ) : Coeff)) := by rw [hr1eq]
+              _ = (((alpha : ℕ) : Coeff) * ((m : Coeff) - 1)) := by rw [hcastm1]
+              _ = (((alpha : ℕ) : Coeff) * (m : Coeff)) - alpha := by
+                    ring
+              _ = (-1 : Coeff) - alpha := by rw [hmulm]
+          have hcoeff :
+              r - (((alpha : ℕ) : Coeff) * (useHintCoeff true r p.gamma2 : Coeff)) =
+                intToCoeff (r0 - alpha - 1) := by
+            rw [huse]
+            simp only [Nat.cast_zero, mul_zero, sub_zero]
+            calc
+              r = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 := hdecomp.symm
+              _ = intToCoeff (r0 - alpha - 1) := by
+                    rw [hmcoeff]
+                    simp [intToCoeff]
+                    ring
+          have hr0ge1 : 1 ≤ r0 := by omega
+          have hbound : (r0 - alpha - 1).natAbs ≤ alpha + 1 := by
+            dsimp [alpha]
+            omega
+          rw [hcoeff, centeredRepr_eq_of_natAbs_le (z := r0 - alpha - 1) hbound hsmall]
+          exact hbound
+      · have hr0nonpos : r0 ≤ 0 := le_of_not_gt hr0pos
+        by_cases hr1zero : r1 = 0
+        · have huse : useHintCoeff true r p.gamma2 = m - 1 := by
+            have hpred : (m - 1) % m = m - 1 := Nat.mod_eq_of_lt (Nat.pred_lt hm.ne')
+            simp [useHintCoeff, hdec, alpha, m, hr0pos, hr1zero, hpred]
+          have hmulm : (((alpha : ℕ) : Coeff) * (m : Coeff)) = (-1 : Coeff) := by
+            simpa [alpha, m] using alphaMulUseHintModulus_eq_neg_one_of_isApproved p hp
+          have hm_succ_cast : (m : Coeff) = (((m - 1 : ℕ) : Coeff) + 1) := by
+            rw [show m = (m - 1) + 1 by omega]
+            norm_num
+          have hcastm1 : (((m - 1 : ℕ) : Coeff)) = (m : Coeff) - 1 := by
+            calc
+              (((m - 1 : ℕ) : Coeff)) = ((((m - 1 : ℕ) : Coeff) + 1) - 1) := by ring
+              _ = (m : Coeff) - 1 := by rw [← hm_succ_cast]
+          have hmcoeff :
+              (((alpha : ℕ) : Coeff) * ((m - 1 : ℕ) : Coeff)) = (-1 : Coeff) - alpha := by
+            calc
+              (((alpha : ℕ) : Coeff) * ((m - 1 : ℕ) : Coeff))
+                  = (((alpha : ℕ) : Coeff) * ((m : Coeff) - 1)) := by rw [hcastm1]
+              _ = (((alpha : ℕ) : Coeff) * (m : Coeff)) - alpha := by
+                      ring
+              _ = (-1 : Coeff) - alpha := by rw [hmulm]
+          have hcoeff :
+              r - (((alpha : ℕ) : Coeff) * (useHintCoeff true r p.gamma2 : Coeff)) =
+                intToCoeff (r0 + alpha + 1) := by
+            rw [huse]
+            exact sub_eq_iff_eq_add'.2 <| by
+              calc
+                r = intToCoeff r0 := by simpa [hr1zero] using hdecomp.symm
+                _ =
+                    (((alpha : ℕ) : Coeff) * ((m - 1 : ℕ) : Coeff)) +
+                      intToCoeff (r0 + alpha + 1) := by
+                      rw [hmcoeff]
+                      simp [intToCoeff]
+                      ring
+          have hbound : (r0 + alpha + 1).natAbs ≤ alpha + 1 := by
+            dsimp [alpha]
+            omega
+          rw [hcoeff, centeredRepr_eq_of_natAbs_le (z := r0 + alpha + 1) hbound hsmall]
+          exact hbound
+        · have hr1pos : 0 < r1 := Nat.pos_of_ne_zero hr1zero
+          have hmle : m ≤ r1 + (m - 1) := by omega
+          have hadd : (r1 + (m - 1)) % m + m = r1 + (m - 1) := by
+            have hc : m ≤ r1 % m + (m - 1) % m := by
+              simpa [Nat.mod_eq_of_lt hr1lt, Nat.mod_eq_of_lt (Nat.pred_lt hm.ne')] using hmle
+            simpa [Nat.mod_eq_of_lt hr1lt, Nat.mod_eq_of_lt (Nat.pred_lt hm.ne')] using
+              (Nat.add_mod_add_of_le_add_mod (a := r1) (b := m - 1) (c := m) hc)
+          have hmod : (r1 + (m - 1)) % m = r1 - 1 := by
+            omega
+          have hmod' : (r1 + m - 1) % m = r1 - 1 := by
+            have hsum : r1 + m - 1 = r1 + (m - 1) := by omega
+            rw [hsum]
+            exact hmod
+          have huse : useHintCoeff true r p.gamma2 = r1 - 1 := by
+            simpa [useHintCoeff, hdec, hr0pos, m, alpha] using hmod'
+          have hr1_succ_cast : (r1 : Coeff) = (((r1 - 1 : ℕ) : Coeff) + 1) := by
+            rw [show r1 = (r1 - 1) + 1 by omega]
+            norm_num
+          have hcastr1 : (((r1 - 1 : ℕ) : Coeff)) = (r1 : Coeff) - 1 := by
+            calc
+              (((r1 - 1 : ℕ) : Coeff)) = ((((r1 - 1 : ℕ) : Coeff) + 1) - 1) := by ring
+              _ = (r1 : Coeff) - 1 := by rw [← hr1_succ_cast]
+          have hcoeff :
+              r - (((alpha : ℕ) : Coeff) * (useHintCoeff true r p.gamma2 : Coeff)) =
+                intToCoeff (r0 + alpha) := by
+            rw [huse]
+            exact sub_eq_iff_eq_add'.2 <| by
+              calc
+                r = (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 := hdecomp.symm
+                _ = (((alpha : ℕ) : Coeff) * ((r1 - 1 : ℕ) : Coeff)) + intToCoeff (r0 + alpha) := by
+                      rw [hcastr1]
+                      simp [intToCoeff]
+                      ring
+          have hbound : (r0 + alpha).natAbs ≤ alpha + 1 := by
+            dsimp [alpha]
+            omega
+          rw [hcoeff, centeredRepr_eq_of_natAbs_le (z := r0 + alpha) hbound hsmall]
+          exact hbound
+
 theorem concreteRounding_high_low_decomp_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) :
     highBitsShift p (highBits p r) + lowBits p r = r :=
@@ -682,6 +876,34 @@ theorem concreteRounding_shift_injective_field_of_isApproved (p : Params)
     Function.Injective (concreteRoundingOps p).shift := by
   change Function.Injective (highBitsShift p)
   exact highBitsShift_injective_of_isApproved p hp
+
+private theorem highBitsShift_useHint_get (p : Params) (h : Hint) (r : Rq) (i : Fin ringDegree) :
+    (highBitsShift p (useHint p h r)).get i =
+      ((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
+  simp [highBitsShift, useHint]
+
+theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) (h : Hint) :
+    LatticeCrypto.cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1 := by
+  refine LatticeCrypto.cInfNorm_le_of_coeff_le ?_
+  intro i
+  rw [Vector.get_eq_getElem]
+  rw [Vector.getElem_sub]
+  have hshift :
+      (highBitsShift p (useHint p h r))[i.1] =
+        ((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
+    simpa [Vector.get_eq_getElem] using highBitsShift_useHint_get p h r i
+  rw [hshift]
+  simpa [Vector.get_eq_getElem] using
+    useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get i) (r.get i)
+
+theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
+    (hp : p.isApproved) (r : Rq) (h : Hint) :
+    LatticeCrypto.cInfNorm
+      (r - (concreteRoundingOps p).shift ((concreteRoundingOps p).useHint h r)) ≤
+        2 * p.gamma2 + 1 := by
+  change LatticeCrypto.cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1
+  exact concreteRounding_useHint_bound_of_isApproved p hp r h
 
 /-
 The vector-level `Power2Round` decomposition and bound lemmas above compile. The remaining
