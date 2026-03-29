@@ -249,14 +249,18 @@ def sigEncode (p : Params) (cTilde : CommitHashBytes p) (z : RqVec p.l) (h : Vec
 def sigDecode (p : Params) (bytes : ByteArray) :
     Option (CommitHashBytes p × RqVec p.l × Vector Hint p.k) :=
   let cLen := p.lambda / 4
-  let zOff := cLen
   let zLen := p.l * polyZPackedBytes p
-  let hOff := zOff + zLen
-  let cTilde := byteArrayToVector bytes 0 cLen
-  let zBytes := sliceByteArray bytes zOff zLen
-  let z := unpackPolyVector p.l (polyZPackedBytes p) zBytes (polyZUnpack p)
-  match hintBitUnpack p (sliceByteArray bytes hOff (p.omega + p.k)) with
-  | some h => some (cTilde, z, h)
-  | none => none
+  let hLen := p.omega + p.k
+  if bytes.size ≠ cLen + zLen + hLen then
+    none
+  else
+    let zOff := cLen
+    let hOff := zOff + zLen
+    let cTilde := byteArrayToVector bytes 0 cLen
+    let zBytes := sliceByteArray bytes zOff zLen
+    let z := unpackPolyVector p.l (polyZPackedBytes p) zBytes (polyZUnpack p)
+    match hintBitUnpack p (sliceByteArray bytes hOff hLen) with
+    | some h => some (cTilde, z, h)
+    | none => none
 
 end MLDSA.Concrete

@@ -258,16 +258,17 @@ theorem euf_cma_security
       (PublicKey p prims) (M × Commitment p prims) (CommitHashBytes p))
     (maxAttempts : ℕ)
     (hr : GenerableRelation (PublicKey p prims) (SecretKey p)
-      (validKeyPair p prims)) :
+      (validKeyPair p prims))
+    (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1) :
     ∀ (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort (identificationScheme p prims nttOps)
         hr M maxAttempts)),
     ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
-      (stmsisReduction : SelfTargetMSIS.Adversary stmsis)
-      (L : ENNReal),
+      (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
       adv.advantage ≤
         ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
-        SelfTargetMSIS.advantage stmsisReduction + L := by
+        SelfTargetMSIS.advantage stmsisReduction +
+        ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort δ hp) := by
   sorry
 
 end MainTheorem

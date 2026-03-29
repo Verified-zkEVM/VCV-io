@@ -30,10 +30,10 @@ namespace MLKEM.Concrete.FFI
 
 /-! ## SHA-3 / FIPS 202 (re-exported from `FFI.Hashing`) -/
 
-def sha3_256 := FFI.Hashing.sha3_256
-def sha3_512 := FFI.Hashing.sha3_512
-def shake256 := FFI.Hashing.shake256
-def shake128 := FFI.Hashing.shake128
+abbrev sha3_256 := FFI.Hashing.sha3_256
+abbrev sha3_512 := FFI.Hashing.sha3_512
+abbrev shake256 := FFI.Hashing.shake256
+abbrev shake128 := FFI.Hashing.shake128
 
 /-! ## End-to-end ML-KEM (deterministic, ML-KEM-768) -/
 
