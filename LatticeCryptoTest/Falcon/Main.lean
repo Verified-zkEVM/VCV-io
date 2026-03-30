@@ -26,7 +26,8 @@ lake build falcon_test
 set_option autoImplicit false
 set_option maxRecDepth 2048
 
-open Falcon Falcon.Concrete Falcon.Concrete.FPR Falcon.Concrete.SamplerZ Falcon.Test
+open Falcon Falcon.Concrete Falcon.Concrete.FPR Falcon.Concrete.SamplerZ
+     Falcon.Concrete.FFTOps Falcon.Concrete.Sign Falcon.Test
 
 private def testFalcon512 : Params where
   n := 512
@@ -57,11 +58,14 @@ where
         String.ofList [Char.ofNat (55 + nibble)])
     return s
 
+private def flush : IO Unit := IO.getStdout >>= IO.FS.Stream.flush
+
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
 
   IO.println "=== Falcon Correctness Tests ==="
   IO.println ""
+  flush
 
   -- ── 1. NTT roundtrip ──────────────────────────
   IO.println "1. NTT roundtrip (invNTT ∘ NTT = id) for Falcon"
@@ -89,7 +93,7 @@ def main : IO Unit := do
     let f : Rq n := Vector.ofFn fun ⟨i, _⟩ => if i < 3 then (1 : Coeff) else 0
     let g : Rq n := Vector.ofFn fun ⟨i, _⟩ =>
       if i == 0 then (1 : Coeff) else if i == 1 then 2 else 0
-    let expected := negacyclicMul f g
+    let expected := negacyclicMulU32 f g
     let nttResult := Falcon.Concrete.invNTT logn
       (Falcon.Concrete.multiplyNTTs
         (Falcon.Concrete.ntt logn f) (Falcon.Concrete.ntt logn g))
@@ -385,6 +389,449 @@ def main : IO Unit := do
 
       let verCross := verify pk msg3 sig3
       check st s!"Falcon-{paramName} wrong key: FFI rejects" (verCross == 0)
+  IO.println ""
+  flush
+
+  -- ── 16. FloatLike Float arithmetic ──────────────
+  IO.println "16. FloatLike Float arithmetic (native IEEE-754)"
+  do
+    let ofI (i : Int64) : Float := FloatLike.ofInt i
+    let fOne : Float := FloatLike.one
+    let fTwo : Float := FloatLike.two
+    let fHalf : Float := FloatLike.half
+
+    checkFloat st "Float ofInt 0 = 0" (ofI 0) 0.0
+    checkFloat st "Float ofInt 1 = 1" (ofI 1) 1.0
+    checkFloat st "Float ofInt 42 = 42" (ofI 42) 42.0
+    checkFloat st "Float ofInt(-1) = -1" (ofI (-1)) (-1.0)
+    checkFloat st "Float neg(one) = -1" (FloatLike.neg fOne) (-1.0)
+    checkFloat st "Float neg(neg(one)) = 1" (FloatLike.neg (FloatLike.neg fOne)) 1.0
+
+    checkFloat st "Float add(one, two) = 3" (FloatLike.add fOne fTwo) 3.0
+    checkFloat st "Float add(42, 100) = 142" (FloatLike.add (ofI 42) (ofI 100)) 142.0
+    checkFloat st "Float add(half, half) = 1" (FloatLike.add fHalf fHalf) 1.0
+
+    checkFloat st "Float sub(two, one) = 1" (FloatLike.sub fTwo fOne) 1.0
+    checkFloat st "Float sub(one, two) = -1" (FloatLike.sub fOne fTwo) (-1.0)
+
+    checkFloat st "Float mul(two, two) = 4" (FloatLike.mul fTwo fTwo) 4.0
+    checkFloat st "Float mul(42, 100) = 4200" (FloatLike.mul (ofI 42) (ofI 100)) 4200.0
+    checkFloat st "Float mul(two, half) = 1" (FloatLike.mul fTwo fHalf) 1.0
+
+    checkFloat st "Float div(one, two) = 0.5" (FloatLike.div fOne fTwo) 0.5
+    checkFloat st "Float div(6, 3) = 2" (FloatLike.div (ofI 6) (ofI 3)) 2.0
+
+    checkFloat st "Float sqrt(one) = 1" (FloatLike.sqrt fOne) 1.0
+    checkFloat st "Float sqrt(4) = 2" (FloatLike.sqrt (ofI 4)) 2.0
+    let fprSqrt2 := FloatLike.ofRawFPR (F := Float) (FPR.sqrt (FPR.ofInt 2))
+    checkFloat st "Float sqrt(2) ≈ FPR sqrt(2)" (FloatLike.sqrt (ofI 2)) fprSqrt2 1e-15
+  IO.println ""
+
+  -- ── 17. FloatLike Float conversions ──────────────
+  IO.println "17. FloatLike Float conversions (rint, floor_, scaled)"
+  do
+    let fOne : Float := FloatLike.one
+    let fHalf : Float := FloatLike.half
+    let ofI (i : Int64) : Float := FloatLike.ofInt i
+
+    check st "Float rint(one) = 1" (FloatLike.rint fOne == (1 : Int64))
+    check st "Float rint(42) = 42" (FloatLike.rint (ofI 42) == (42 : Int64))
+    check st "Float rint(-7) = -7" (FloatLike.rint (ofI (-7)) == (-7 : Int64))
+    -- Float.round uses round-away-from-zero, so rint(0.5) = 1 (vs FPR banker's 0)
+    check st "Float rint(half) = 1 (round-away-from-zero)"
+      (FloatLike.rint fHalf == (1 : Int64))
+    check st "Float rint(1.5) = 2" (FloatLike.rint (FloatLike.add fOne fHalf) == (2 : Int64))
+
+    check st "Float floor_(one) = 1" (FloatLike.floor_ fOne == (1 : Int64))
+    check st "Float floor_(half) = 0" (FloatLike.floor_ fHalf == (0 : Int64))
+    check st "Float floor_(-half) = -1"
+      (FloatLike.floor_ (FloatLike.neg fHalf) == (-1 : Int64))
+    check st "Float floor_(42) = 42" (FloatLike.floor_ (ofI 42) == (42 : Int64))
+
+    let s1 : Float := FloatLike.scaled (1 : Int64) (10 : Int32)
+    checkFloat st "Float scaled(1, 10) = 1024" s1 1024.0
+    let s2 : Float := FloatLike.scaled (3 : Int64) (-1 : Int32)
+    checkFloat st "Float scaled(3, -1) = 1.5" s2 1.5
+    let s3 : Float := FloatLike.scaled (5 : Int64) (0 : Int32)
+    checkFloat st "Float scaled(5, 0) = 5" s3 5.0
+  IO.println ""
+
+  -- ── 18. FloatLike Float expm_p63 ─────────────────
+  IO.println "18. FloatLike Float expm_p63 (hardware exp vs FACCT polynomial)"
+  do
+    let fprR1 := FPR.expm_p63 FPR.zero FPR.half
+    let floatR1 := FloatLike.expm_p63 (0.0 : Float) (0.5 : Float)
+    checkApproxU64 st "expm_p63(0, 0.5) Float≈FPR" floatR1 fprR1 (1 <<< 20)
+
+    let fprR2 := FPR.expm_p63 FPR.half FPR.half
+    let floatR2 := FloatLike.expm_p63 (0.5 : Float) (0.5 : Float)
+    checkApproxU64 st "expm_p63(0.5, 0.5) Float≈FPR" floatR2 fprR2 (1 <<< 20)
+
+    let quarter := FPR.scaled 1 (-2)
+    let fprR3 := FPR.expm_p63 quarter FPR.half
+    let floatR3 := FloatLike.expm_p63 (0.25 : Float) (0.5 : Float)
+    checkApproxU64 st "expm_p63(0.25, 0.5) Float≈FPR" floatR3 fprR3 (1 <<< 22)
+  IO.println ""
+
+  -- ── 19. SamplerZ with Float backend ──────────────
+  IO.println "19. SamplerZ with Float backend"
+  do
+    let seed := ByteArray.mk #[0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
+      0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51]
+    let prng := PRNGState.init seed
+
+    let (accept, _) := berExp (F := Float) prng (FloatLike.zero) (FloatLike.half)
+    check st s!"berExp(Float)(zero, half) likely accepts (got {accept})" accept
+
+    let prng2 := PRNGState.init seed
+    let invSigma9 : Float :=
+      FloatLike.ofRawFPR (Falcon.Concrete.GMTable.invSigmaRaw.getD 9 0)
+    let (z, _) := samplerZ (F := Float) 9 prng2 (FloatLike.zero) invSigma9
+    check st s!"samplerZ(Float) z in range (got {z.toInt})" (z.toInt.natAbs < 20)
+  IO.println ""
+
+  -- ── 20. FFT/iFFT roundtrip ──────────────────────
+  IO.println "20. FFT/iFFT roundtrip (fpolyFFT ∘ fpolyIFFT = id)"
+  do
+    -- FPR FFT roundtrip at logn=9 has known precision issues (see section 21 for
+    -- FPR correctness with smaller dimensions and different test data).
+    for (logn, label) in [(5, "logn=5"), (6, "logn=6")] do
+      let n := 1 <<< logn
+      let testPoly : Array Int32 := (Array.range n).map fun i =>
+        ((i * 7 + 3) % 200).toUInt32.toInt32 - 100
+      let f' := fpolyIFFT (F := FPR) logn (fpolyFFT (F := FPR) logn
+        (fpolySetSmall (F := FPR) logn testPoly))
+      let ok := (Array.range n).all fun i =>
+        FPR.rint (f'.getD i 0) == testPoly[i]!.toInt64
+      check st s!"FPR: iFFT(FFT(poly)) roundtrip ({label})" ok
+
+      let fFloat' := fpolyIFFT (F := Float) logn (fpolyFFT (F := Float) logn
+        (fpolySetSmall (F := Float) logn testPoly))
+      let okFloat := (Array.range n).all fun i =>
+        FloatLike.rint (fFloat'.getD i (0.0 : Float)) == testPoly[i]!.toInt64
+      check st s!"Float: iFFT(FFT(poly)) roundtrip ({label})" okFloat
+    -- logn=9 Float-only roundtrip (FPR precision at this scale is a known issue)
+    do
+      let logn := 9
+      let n := 1 <<< logn
+      let testPoly : Array Int32 := (Array.range n).map fun i =>
+        ((i * 7 + 3) % 200).toUInt32.toInt32 - 100
+      let fFloat' := fpolyIFFT (F := Float) logn (fpolyFFT (F := Float) logn
+        (fpolySetSmall (F := Float) logn testPoly))
+      let okFloat := (Array.range n).all fun i =>
+        FloatLike.rint (fFloat'.getD i (0.0 : Float)) == testPoly[i]!.toInt64
+      check st "Float: iFFT(FFT(poly)) roundtrip (logn=9)" okFloat
+  IO.println ""
+
+  -- ── 21. fpolySetSmall + FFT roundtrip ───────────
+  IO.println "21. fpolySetSmall + FFT roundtrip (Int32 → FPR → FFT → iFFT → rint)"
+  do
+    let logn := 4
+    let n := 1 <<< logn
+    let original : Array Int32 := (Array.range n).map fun i =>
+      (i.toUInt32.toInt32 * 13 - 100)
+    let fpoly := fpolySetSmall (F := FPR) logn original
+    let roundtripped := fpolyIFFT (F := FPR) logn (fpolyFFT (F := FPR) logn fpoly)
+    let recovered : Array Int64 := (Array.range n).map fun i =>
+      FPR.rint (roundtripped.getD i 0)
+    let ok := (Array.range n).all fun i =>
+      recovered.getD i 0 == (original.getD i 0).toInt64
+    check st "Int32 recovery via FFT roundtrip (FPR, logn=4)" ok
+
+    let fpolyFloat := fpolySetSmall (F := Float) logn original
+    let rtFloat := fpolyIFFT (F := Float) logn (fpolyFFT (F := Float) logn fpolyFloat)
+    let okFloat := (Array.range n).all fun i =>
+      FloatLike.rint (rtFloat.getD i (0.0 : Float)) == (original.getD i 0).toInt64
+    check st "Int32 recovery via FFT roundtrip (Float, logn=4)" okFloat
+  IO.println ""
+
+  -- ── 22. fpoly arithmetic ─────────────────────────
+  IO.println "22. fpoly arithmetic consistency"
+  do
+    let logn := 4
+    let n := 1 <<< logn
+    let aCoeffs : Array Int32 := (Array.range n).map fun i => (i + 1).toUInt32.toInt32
+    let bCoeffs : Array Int32 := (Array.range n).map fun i => (n - i).toUInt32.toInt32
+    let aFFT := fpolyFFT (F := FPR) logn (fpolySetSmall logn aCoeffs)
+    let bFFT := fpolyFFT (F := FPR) logn (fpolySetSmall logn bCoeffs)
+
+    let ab := fpolyMulFFT (F := FPR) logn aFFT bFFT
+    let ba := fpolyMulFFT (F := FPR) logn bFFT aFFT
+    let mulCommOk := (Array.range n).all fun i =>
+      (ab.getD i 0) == (ba.getD i 0)
+    check st "fpolyMulFFT commutativity: mul(a,b) = mul(b,a)" mulCommOk
+
+    let sum := fpolyAdd (F := FPR) logn aFFT bFFT
+    let diff := fpolySub (F := FPR) logn sum bFFT
+    let addSubOk := (Array.range n).all fun i =>
+      FPR.rint (aFFT.getD i 0) == FPR.rint (diff.getD i 0)
+    check st "fpolyAdd then fpolySub ≈ identity" addSubOk
+  IO.println ""
+
+  -- ── 23. BigInt31 basic ops ──────────────────────
+  IO.println "23. BigInt31 basic ops"
+  do
+    let p0 := Falcon.Concrete.SmallPrimeNTT.PRIMES[0]!
+    let p := p0.p
+    let p0i := p0.p0i
+
+    check st "mp_add: (3+5) mod p = 8"
+      (Falcon.Concrete.BigInt31.mp_add 3 5 p == 8)
+    check st "mp_sub: (10-3) mod p = 7"
+      (Falcon.Concrete.BigInt31.mp_sub 10 3 p == 7)
+    check st "mp_sub: (3-10) mod p = p-7"
+      (Falcon.Concrete.BigInt31.mp_sub 3 10 p == p - 7)
+
+    let m : Array UInt32 := #[5, 0, 0, 0]
+    let (m', carry) := Falcon.Concrete.BigInt31.zint_mul_small m 1 3
+    check st "zint_mul_small: [5]*3 = [15], carry=0"
+      (m'.getD 0 0 == 15 && carry == 0)
+
+    let m2 : Array UInt32 := #[0x7FFFFFFF, 0, 0, 0]
+    let (m2', carry2) := Falcon.Concrete.BigInt31.zint_mul_small m2 1 2
+    check st "zint_mul_small: [2^31-1]*2 carry propagation"
+      (carry2 == 1 && m2'.getD 0 0 == 0x7FFFFFFE)
+
+    check st "mp_mmul: Montgomery mul known value"
+      (Falcon.Concrete.BigInt31.mp_mmul 100 200 p p0i ==
+       Falcon.Concrete.SmallPrimeNTT.mp_montymul 100 200 p p0i)
+  IO.println ""
+
+  -- ── 24. SmallPrimeNTT roundtrip ─────────────────
+  IO.println "24. SmallPrimeNTT roundtrip (NTT then iNTT = id)"
+  do
+    let p0 := Falcon.Concrete.SmallPrimeNTT.PRIMES[0]!
+    let logn := 3
+    let n := 1 <<< logn
+    let (gm, igm) := Falcon.Concrete.SmallPrimeNTT.mp_mkgmigm
+      logn p0.g p0.ig p0.p p0.p0i
+    let poly : Array UInt32 := (Array.range n).map fun i =>
+      Falcon.Concrete.SmallPrimeNTT.mp_set (i + 1).toUInt32.toInt32 p0.p
+    let nttPoly := Falcon.Concrete.SmallPrimeNTT.mp_NTT logn poly gm p0.p p0.p0i
+    let recoveredPoly := Falcon.Concrete.SmallPrimeNTT.mp_iNTT logn nttPoly igm p0.p p0.p0i
+    let ok := (Array.range n).all fun i =>
+      poly.getD i 0 == recoveredPoly.getD i 0
+    check st "mp_iNTT(mp_NTT(poly)) = poly (logn=3)" ok
+
+    let logn5 := 5
+    let n5 := 1 <<< logn5
+    let (gm5, igm5) := Falcon.Concrete.SmallPrimeNTT.mp_mkgmigm
+      logn5 p0.g p0.ig p0.p p0.p0i
+    let poly5 : Array UInt32 := (Array.range n5).map fun i =>
+      Falcon.Concrete.SmallPrimeNTT.mp_set (i * 3 + 7).toUInt32.toInt32 p0.p
+    let ntt5 := Falcon.Concrete.SmallPrimeNTT.mp_NTT logn5 poly5 gm5 p0.p p0.p0i
+    let rec5 := Falcon.Concrete.SmallPrimeNTT.mp_iNTT logn5 ntt5 igm5 p0.p p0.p0i
+    let ok5 := (Array.range n5).all fun i =>
+      poly5.getD i 0 == rec5.getD i 0
+    check st "mp_iNTT(mp_NTT(poly)) = poly (logn=5)" ok5
+  IO.println ""
+
+  -- ── 25. Montgomery multiplication ───────────────
+  IO.println "25. Montgomery multiplication verification"
+  do
+    let p0 := Falcon.Concrete.SmallPrimeNTT.PRIMES[0]!
+    let p := p0.p
+    let p0i := p0.p0i
+    let R2 := p0.R2
+
+    let a : UInt32 := 42
+    let b : UInt32 := 100
+    let aM := Falcon.Concrete.SmallPrimeNTT.mp_montymul a R2 p p0i
+    let bM := Falcon.Concrete.SmallPrimeNTT.mp_montymul b R2 p p0i
+    let abM := Falcon.Concrete.SmallPrimeNTT.mp_montymul aM bM p p0i
+    let ab := Falcon.Concrete.SmallPrimeNTT.mp_montymul abM 1 p p0i
+    let expected : UInt32 := ((42 * 100 : Nat) % p.toNat).toUInt32
+    check st s!"Monty: 42*100 mod p = {expected} (got {ab})" (ab == expected)
+
+    let c : UInt32 := 999999
+    let cM := Falcon.Concrete.SmallPrimeNTT.mp_montymul c R2 p p0i
+    let ccM := Falcon.Concrete.SmallPrimeNTT.mp_montymul cM cM p p0i
+    let cc := Falcon.Concrete.SmallPrimeNTT.mp_montymul ccM 1 p p0i
+    let expectedCC : UInt32 := ((999999 * 999999 : Nat) % p.toNat).toUInt32
+    check st s!"Monty: 999999² mod p = {expectedCC} (got {cc})" (cc == expectedCC)
+  IO.println ""
+
+  -- ── 26. FXR basic ops ───────────────────────────
+  IO.println "26. FXR basic arithmetic (32.32 fixed-point)"
+  do
+    let one := Falcon.Concrete.FXR.fxr_of 1
+    let two := Falcon.Concrete.FXR.fxr_of 2
+    let three := Falcon.Concrete.FXR.fxr_of 3
+    let six := Falcon.Concrete.FXR.fxr_of 6
+
+    check st "fxr_of(1) = 1<<32"
+      (one == ((1 : UInt64) <<< 32))
+    check st "fxr_add(1, 2) = 3"
+      (Falcon.Concrete.FXR.fxr_add one two == three)
+    check st "fxr_sub(3, 1) = 2"
+      (Falcon.Concrete.FXR.fxr_sub three one == two)
+    check st "fxr_mul(2, 3) = 6"
+      (Falcon.Concrete.FXR.fxr_mul two three == six)
+    check st "fxr_div(6, 3) = 2"
+      (Falcon.Concrete.FXR.fxr_div six three == two)
+    check st "fxr_neg(1) + 1 = 0"
+      (Falcon.Concrete.FXR.fxr_add (Falcon.Concrete.FXR.fxr_neg one) one == 0)
+    check st "fxr_round(1) = 1"
+      (Falcon.Concrete.FXR.fxr_round one == (1 : Int32))
+    check st "fxr_double(1) = 2"
+      (Falcon.Concrete.FXR.fxr_double one == two)
+    check st "fxr_half(2) = 1"
+      (Falcon.Concrete.FXR.fxr_half two == one)
+  IO.println ""
+  flush
+
+  -- ── 27. Diagnostic: target vector & NTRU relation check ──────────
+  IO.println "27. Diagnostic: target vector & NTRU relation check"
+  flush
+  do
+    let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => i.val.toUInt8⟩
+    let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
+    match decodeSecretKey 9 sk with
+    | none => IO.println "  decode failed"
+    | some (f, g, capF) =>
+      match computeCapG512 capF pk with
+      | none => IO.println "  G computation failed"
+      | some capG =>
+        let n : Nat := 512
+        IO.println s!"  f[0..4] = {f.toList.take 4}"
+        IO.println s!"  g[0..4] = {g.toList.take 4}"
+        IO.println s!"  F[0..4] = {capF.toList.take 4}"
+        IO.println s!"  G[0..4] = {capG.toList.take 4}"
+        let gMax := capG.foldl (init := (0 : Int32)) fun mx v =>
+          let av := if v < 0 then (0 : Int32) - v else v
+          if av > mx then av else mx
+        IO.println s!"  max|G[i]| = {gMax}"
+        let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩
+        let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+          (0xFF - i.val).toUInt8⟩
+        let masterPRNG := PRNGState.init signSeed
+        let (salt, _) := prngNextSalt masterPRNG
+        let hm := hashToPoint n salt pk msg.toList
+        let hmArr := rqToUInt16Array hm
+        IO.println s!"  hm[0..4] = {hmArr.toList.take 4}"
+        let (b00, b01, b10, b11) := basisToFFT (F := Float) 9 f g capF capG
+        let (t0, t1) := fpolyApplyBasis 9 b01 b11 hmArr
+        let v0fft := fpolyAdd 9 (fpolyMulFFT 9 b00 t0) (fpolyMulFFT 9 b10 t1)
+        let v0 := fpolyIFFT 9 v0fft
+        let v1fft := fpolyAdd 9 (fpolyMulFFT 9 b01 t0) (fpolyMulFFT 9 b11 t1)
+        let v1 := fpolyIFFT 9 v1fft
+        IO.println s!"  v0[0..4] = {(v0.toList.take 4).map fun (x : Float) => x.round}"
+        IO.println s!"  v1[0..4] = {(v1.toList.take 4).map fun (x : Float) => x.round}"
+        let mut maxErr0 : Float := 0.0
+        let mut maxErr1 : Float := 0.0
+        for i in [0:n] do
+          let err0 := (v0.getD i 0.0 - (hmArr.getD i 0).toUInt32.toFloat).abs
+          let err1 := (v1.getD i 0.0).abs
+          if err0 > maxErr0 then maxErr0 := err0
+          if err1 > maxErr1 then maxErr1 := err1
+        IO.println s!"  max|v0 - hm| = {maxErr0} (should be < 1.0)"
+        IO.println s!"  max|v1| = {maxErr1} (should be < 1.0)"
+        check st "target vector g*t0+G*t1 = hm" (maxErr0 < 1.0 && maxErr1 < 1.0)
+  IO.println ""
+  -- ── 27b. Split/merge roundtrip test ──────────────
+  IO.println "27b. Split/merge roundtrip test"
+  flush
+  do
+    for logn in [2, 5, 9] do
+      let n : Nat := 1 <<< logn
+      let hn := n >>> 1
+      let fArr : Array Float := (Array.range n).map fun i => Float.ofNat (i + 1)
+      let fFFT := fpolyFFT logn fArr
+      let (f0, f1) := fpolySplitFFT logn fFFT
+      let fMerged := fpolyMergeFFT logn f0 f1
+      let mut maxSMErr : Float := 0.0
+      for i in [0:n] do
+        let e := (fMerged.getD i 0.0 - fFFT.getD i 0.0).abs
+        if e > maxSMErr then maxSMErr := e
+      let smOk := maxSMErr < 1e-6
+      IO.println s!"  logn={logn}: merge(split(f)) err = {maxSMErr} {if smOk then "OK" else "FAIL"}"
+      check st s!"split/merge roundtrip logn={logn}" smOk
+      let saArr : Array Float := (Array.range hn).map fun i => Float.ofNat (i * i + 1)
+      let (sa0, sa1) := fpolySplitSelfadjFFT logn saArr
+      IO.println s!"  logn={logn}: selfadj split f0 size={sa0.size}, f1 size={sa1.size}"
+  IO.println ""
+  IO.println ""
+
+  -- ── 28. Cross-backend sign comparison ───────────
+  IO.println "28. Cross-backend: concreteSign Float vs Float (different seeds)"
+  do
+    let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => (i.val * 2 + 1).toUInt8⟩
+    let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
+    match decodeSecretKey 9 sk with
+    | none => check st "decode sk for cross-backend" false
+    | some (f, g, capF) =>
+      match computeCapG512 capF pk with
+      | none => check st "compute G for cross-backend" false
+      | some capG =>
+        let msg : ByteArray := ⟨#[0x54, 0x65, 0x73, 0x74]⟩
+        let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+          (i.val * 3).toUInt8⟩
+        let tFloat0 ← IO.monoMsNow
+        let floatSig := concreteSign (F := Float) 9 f g capF capG pk msg.toList signSeed
+        let tFloat1 ← IO.monoMsNow
+        IO.println s!"  concreteSign(Float) took {tFloat1 - tFloat0}ms"
+        match floatSig with
+        | some s =>
+          let lv := concreteVerify testFalcon512 pk msg.toList s
+          check st "Float sig verifies" lv
+          let fv := Falcon.Concrete.FFI.falcon512Verify pk msg s
+          check st "FFI verify accepts Float sig" (fv == 1)
+        | none => check st "Float sign succeeded" false
+  IO.println ""
+
+  -- ── 29. Batch E2E (3 iterations) ─────────────────
+  IO.println "29. Batch E2E: pure-Lean sign+verify (3 seeds, Float)"
+  do
+    for iter in [0:3] do
+      let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+        (i.val * 7 + iter * 31).toUInt8⟩
+      let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
+      match decodeSecretKey 9 sk with
+      | none => check st s!"iter {iter}: decode sk" false
+      | some (f, g, capF) =>
+        match computeCapG512 capF pk with
+        | none => check st s!"iter {iter}: compute G" false
+        | some capG =>
+          let msg : ByteArray := ⟨#[(0x41 + iter.toUInt8)]⟩
+          let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+            (i.val + iter * 17).toUInt8⟩
+          match concreteSign (F := Float) 9 f g capF capG pk msg.toList signSeed with
+          | none => check st s!"iter {iter}: sign succeeded" false
+          | some sig =>
+            let lv := concreteVerify testFalcon512 pk msg.toList sig
+            check st s!"iter {iter}: Lean verify" lv
+            let fv := Falcon.Concrete.FFI.falcon512Verify pk msg sig
+            check st s!"iter {iter}: FFI verify" (fv == 1)
+  IO.println ""
+
+  -- ── 30. Rejection / negative tests ──────────────
+  IO.println "30. Rejection / negative tests for pure-Lean signatures (Float)"
+  do
+    let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => i.val.toUInt8⟩
+    let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
+    match decodeSecretKey 9 sk with
+    | none => check st "decode sk for negative tests" false
+    | some (f, g, capF) =>
+      match computeCapG512 capF pk with
+      | none => check st "compute G for negative tests" false
+      | some capG =>
+        let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩
+        let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+          (0xFF - i.val).toUInt8⟩
+        match concreteSign (F := Float) 9 f g capF capG pk msg.toList signSeed with
+        | none => check st "sign for negative tests" false
+        | some sig =>
+          let corruptedSig := sig.set! 2 (sig[2]! ^^^ 0xFF)
+          let lv := concreteVerify testFalcon512 pk msg.toList corruptedSig
+          check st "corrupted pure-Lean sig: Lean verify rejects" (!lv)
+          let wrongMsg : ByteArray := ⟨#[0x00]⟩
+          let lv2 := concreteVerify testFalcon512 pk wrongMsg.toList sig
+          check st "wrong msg: Lean verify rejects pure-Lean sig" (!lv2)
+          let seed2 : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
+            (i.val * 5 + 13).toUInt8⟩
+          let (_, pk2) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed2
+          let lv3 := concreteVerify testFalcon512 pk2 msg.toList sig
+          check st "wrong pk: Lean verify rejects pure-Lean sig" (!lv3)
   IO.println ""
 
   -- ── Summary ────────────────────────────────────

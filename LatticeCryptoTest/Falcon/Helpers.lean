@@ -7,6 +7,12 @@ import LatticeCrypto.Falcon.Concrete.Instance
 import LatticeCrypto.Falcon.Concrete.FFI
 import LatticeCrypto.Falcon.Concrete.FPR
 import LatticeCrypto.Falcon.Concrete.SamplerZ
+import LatticeCrypto.Falcon.Concrete.FloatLike
+import LatticeCrypto.Falcon.Concrete.FFT
+import LatticeCrypto.Falcon.Concrete.BigInt31
+import LatticeCrypto.Falcon.Concrete.SmallPrimeNTT
+import LatticeCrypto.Falcon.Concrete.FXR
+import LatticeCrypto.Falcon.Concrete.Sign
 
 /-!
 # Falcon Test Helpers
@@ -77,5 +83,105 @@ def byteArrayToVector (ba : ByteArray) (offset len : Nat) :
   Vector.ofFn fun ⟨i, _⟩ =>
     let idx := offset + i
     if h : idx < ba.size then ba[idx] else 0
+
+/-! ## Approximate comparison helpers -/
+
+def checkFloat (ref : IO.Ref TestState) (name : String)
+    (got expected : Float) (tol : Float := 0.0) : IO Unit := do
+  let diff := Float.abs (got - expected)
+  check ref name (diff ≤ tol) s!"got={got} exp={expected} diff={diff}"
+
+def checkApproxU64 (ref : IO.Ref TestState) (name : String)
+    (got expected : UInt64) (tol : Nat := 0) : IO Unit := do
+  let diff := if got ≥ expected then (got - expected).toNat else (expected - got).toNat
+  check ref name (diff ≤ tol) s!"got=0x{hexU64 got} exp=0x{hexU64 expected} diff={diff}"
+where
+  hexU64 (v : UInt64) : String := Id.run do
+    let mut s := ""
+    for i in [0:16] do
+      let nibble := ((v >>> ((15 - i) * 4).toUInt64) &&& 0xF).toNat
+      s := s ++ (if nibble < 10 then String.ofList [Char.ofNat (48 + nibble)]
+        else String.ofList [Char.ofNat (55 + nibble)])
+    return s
+
+/-! ## Secret key decoding -/
+
+def nbitsFG (logn : Nat) : Nat :=
+  if logn ≥ 10 then 5 else if logn ≥ 8 then 6 else if logn ≥ 6 then 7 else 8
+
+def trimI8Decode (data : ByteArray) (offset n nbits : Nat) :
+    Option (Array Int32) := Id.run do
+  let needed := (nbits * n) / 8
+  let mask1 : UInt32 := ((1 : UInt32) <<< nbits.toUInt32) - 1
+  let mask2 : UInt32 := (1 : UInt32) <<< (nbits.toUInt32 - 1)
+  let mut acc : UInt32 := 0
+  let mut accLen : Nat := 0
+  let mut result : Array Int32 := Array.mkEmpty n
+  for i in [0:needed] do
+    let idx := offset + i
+    let byte : UInt32 := if idx < data.size then data[idx]!.toUInt32 else 0
+    acc := (acc <<< (8 : UInt32)) ||| byte
+    accLen := accLen + 8
+    for _ in [0:3] do
+      if accLen ≥ nbits then
+        accLen := accLen - nbits
+        let w := (acc >>> accLen.toUInt32) &&& mask1
+        let signExtended := w ||| ((0 : UInt32) - (w &&& mask2))
+        if signExtended == (0 : UInt32) - mask2 then
+          return none
+        result := result.push signExtended.toInt32
+  if result.size ≠ n then return none
+  return some result
+
+def decodeSecretKey (logn : Nat) (sk : ByteArray) :
+    Option (Array Int32 × Array Int32 × Array Int32) := Id.run do
+  let n := 1 <<< logn
+  let nbits := nbitsFG logn
+  let mut off := 1
+  match trimI8Decode sk off n nbits with
+  | none => return none
+  | some f =>
+    off := off + (n * nbits) / 8
+    match trimI8Decode sk off n nbits with
+    | none => return none
+    | some g =>
+      off := off + (n * nbits) / 8
+      match trimI8Decode sk off n 8 with
+      | none => return none
+      | some capF => return some (f, g, capF)
+
+/-! ## Coefficient conversions for G computation -/
+
+def int32ToCoeff (v : Int32) : Falcon.Coeff :=
+  let u := v.toUInt32.toNat
+  if u < 0x80000000 then (u : Falcon.Coeff)
+  else (0 : Falcon.Coeff) - ((0x100000000 - u : Nat) : Falcon.Coeff)
+
+def coeffToInt32 (c : Falcon.Coeff) : Int32 :=
+  if c.val > Falcon.modulus / 2 then
+    (0 : Int32) - ((Falcon.modulus - c.val).toUInt32.toInt32)
+  else c.val.toUInt32.toInt32
+
+def computeCapG512 (capF : Array Int32) (pk : ByteArray) :
+    Option (Array Int32) :=
+  match Falcon.Concrete.pkDecode 512 (pk.extract 1 pk.size) with
+  | none => none
+  | some h =>
+    let capFRq : Falcon.Rq 512 := Vector.ofFn fun ⟨i, _⟩ =>
+      int32ToCoeff (capF.getD i 0)
+    let capGRq := Falcon.Concrete.invNTT 9 (Falcon.Concrete.multiplyNTTs
+      (Falcon.Concrete.ntt 9 h) (Falcon.Concrete.ntt 9 capFRq))
+    some (capGRq.toArray.map coeffToInt32)
+
+def computeCapG1024 (capF : Array Int32) (pk : ByteArray) :
+    Option (Array Int32) :=
+  match Falcon.Concrete.pkDecode 1024 (pk.extract 1 pk.size) with
+  | none => none
+  | some h =>
+    let capFRq : Falcon.Rq 1024 := Vector.ofFn fun ⟨i, _⟩ =>
+      int32ToCoeff (capF.getD i 0)
+    let capGRq := Falcon.Concrete.invNTT 10 (Falcon.Concrete.multiplyNTTs
+      (Falcon.Concrete.ntt 10 h) (Falcon.Concrete.ntt 10 capFRq))
+    some (capGRq.toArray.map coeffToInt32)
 
 end Falcon.Test
