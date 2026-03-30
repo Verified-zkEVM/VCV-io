@@ -37,6 +37,7 @@ structure Ciphertext (params : Params) (encoding : Encoding params) where
 variable {params : Params}
 variable {encoding : Encoding params}
 
+/-- Public keys have decidable equality when their encoded polynomial payload does. -/
 instance [DecidableEq encoding.EncodedTHat] : DecidableEq (PublicKey params encoding) := by
   intro x y
   cases x
@@ -44,6 +45,7 @@ instance [DecidableEq encoding.EncodedTHat] : DecidableEq (PublicKey params enco
   simp only [PublicKey.mk.injEq]
   infer_instance
 
+/-- Secret keys have decidable equality when their encoded polynomial payload does. -/
 instance [DecidableEq encoding.EncodedTHat] : DecidableEq (SecretKey params encoding) := by
   intro x y
   cases x
@@ -51,6 +53,7 @@ instance [DecidableEq encoding.EncodedTHat] : DecidableEq (SecretKey params enco
   simp only [SecretKey.mk.injEq]
   infer_instance
 
+/-- Ciphertexts have decidable equality when their encoded components do. -/
 instance [DecidableEq encoding.EncodedU] [DecidableEq encoding.EncodedV] :
     DecidableEq (Ciphertext params encoding) := by
   intro x y

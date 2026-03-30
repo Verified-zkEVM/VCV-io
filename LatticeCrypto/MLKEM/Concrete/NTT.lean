@@ -252,6 +252,8 @@ def concreteNTTRingOps : NTTRingOps where
   invNTT := invNTT
   multiplyNTTs := multiplyNTTs
 
+/-- Proof bundle showing that the concrete ML-KEM NTT implementation satisfies the abstract
+`NTTRingLaws`. -/
 def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   invNTT_ntt := invNTT_ntt
   ntt_mul := by

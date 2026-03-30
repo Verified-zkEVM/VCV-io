@@ -22,12 +22,14 @@ namespace MLDSA.Test.ACVP
 
 /-! ## Key generation vectors (ML-DSA-65, tgId=2) -/
 
+/-- A single ML-DSA-65 ACVP key-generation test vector. -/
 structure KeyGenVector where
   tcId : Nat
   seed : String
   pkFirst32 : String
   skFirst32 : String
 
+/-- Embedded ML-DSA-65 ACVP key-generation vectors. -/
 def keyGenVectors : Array KeyGenVector := #[
   { tcId := 26
     seed := "1BD67DC782B2958E189E315C040DD1F64C8AB232A6A170E1A7A52C33F10851B1"
@@ -49,11 +51,13 @@ Each vector specifies a 32-byte keygen seed and a message (both hex-encoded).
 The test generates keys from the seed, signs the message with both Lean and
 mldsa-native (with `rnd = 0^32`), and compares the results byte-exactly. -/
 
+/-- A single ML-DSA-65 deterministic signature-generation test vector. -/
 structure SigGenVector where
   tcId : Nat
   seed : String
   message : String
 
+/-- Embedded ML-DSA-65 deterministic signature-generation vectors. -/
 def sigGenVectors : Array SigGenVector := #[
   { tcId := 1
     seed := "1BD67DC782B2958E189E315C040DD1F64C8AB232A6A170E1A7A52C33F10851B1"

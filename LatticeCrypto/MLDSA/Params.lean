@@ -21,8 +21,10 @@ set_option autoImplicit false
 
 namespace MLDSA
 
+/-- Byte values used by the concrete ML-DSA encodings and hash inputs. -/
 abbrev Byte := UInt8
 
+/-- Fixed-length byte vectors used by the FIPS 204 interfaces. -/
 abbrev Bytes (n : ℕ) := Vector Byte n
 
 /-- The variable parameters that distinguish the approved ML-DSA instantiations. -/
@@ -104,8 +106,11 @@ def params : ParameterSet → Params
 
 end ParameterSet
 
+/-- The approved ML-DSA-44 parameter record. -/
 def mldsa44 : Params := ParameterSet.params .MLDSA_44
+/-- The approved ML-DSA-65 parameter record. -/
 def mldsa65 : Params := ParameterSet.params .MLDSA_65
+/-- The approved ML-DSA-87 parameter record. -/
 def mldsa87 : Params := ParameterSet.params .MLDSA_87
 
 /-- Recognize the approved FIPS 204 parameter sets. -/

@@ -20,6 +20,7 @@ set_option autoImplicit false
 
 namespace MLKEM.Test.ACVP
 
+/-- A single ML-KEM-768 ACVP key-generation test vector. -/
 structure KeyGenVector where
   tcId : Nat
   d : String
@@ -27,6 +28,7 @@ structure KeyGenVector where
   ekFirst32 : String
   dkFirst32 : String
 
+/-- Embedded ML-KEM-768 ACVP key-generation vectors. -/
 def keyGenVectors : Array KeyGenVector := #[
   { tcId := 26
     d := "A2B4BCA315A6EA4600B4A316E09A2578AA1E8BCE919C8DF3A96C71C843F5B38B"
@@ -51,12 +53,14 @@ Each vector specifies keygen coins `d`, `z` and an encaps message `m` (all 32-by
 The test generates keys, encapsulates, decapsulates with both Lean and mlkem-native, and
 compares byte-exactly. -/
 
+/-- A single ML-KEM-768 encapsulation/decapsulation test vector. -/
 structure EncDecapVector where
   tcId : Nat
   d : String
   z : String
   m : String
 
+/-- Embedded ML-KEM-768 encapsulation/decapsulation vectors. -/
 def encDecapVectors : Array EncDecapVector := #[
   { tcId := 1
     d := "A2B4BCA315A6EA4600B4A316E09A2578AA1E8BCE919C8DF3A96C71C843F5B38B"

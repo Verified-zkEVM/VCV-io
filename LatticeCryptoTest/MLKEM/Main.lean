@@ -27,6 +27,7 @@ set_option maxRecDepth 2048
 
 open MLKEM MLKEM.Concrete MLKEM.Test
 
+/-- Entry point for the ML-KEM regression and interoperability test runner. -/
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
 

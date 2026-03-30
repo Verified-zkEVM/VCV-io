@@ -50,17 +50,25 @@ namespace Tq
 
 variable {n : ℕ}
 
+/-- Forget the `Tq` wrapper and view an NTT-domain polynomial as its underlying polynomial. -/
 def toRq (fHat : Tq n) : Rq n := fHat.coeffs
 
+/-- Coercion from `Tq` to the underlying polynomial representation. -/
 instance : Coe (Tq n) (Rq n) := ⟨Tq.toRq⟩
+/-- The zero NTT-domain polynomial. -/
 instance : Zero (Tq n) := ⟨⟨0⟩⟩
+/-- Pointwise addition on NTT-domain polynomials. -/
 instance : Add (Tq n) := ⟨fun fHat gHat => ⟨fHat.coeffs + gHat.coeffs⟩⟩
+/-- Pointwise subtraction on NTT-domain polynomials. -/
 instance : Sub (Tq n) := ⟨fun fHat gHat => ⟨fHat.coeffs - gHat.coeffs⟩⟩
+/-- Pointwise negation on NTT-domain polynomials. -/
 instance : Neg (Tq n) := ⟨fun fHat => ⟨-fHat.coeffs⟩⟩
 
+/-- Indexing into an NTT-domain polynomial by coefficient position. -/
 instance : GetElem (Tq n) Nat Coeff (fun _ i => i < n) where
   getElem fHat i hi := fHat.coeffs[i]'hi
 
+/-- Indexing through `Tq` agrees with indexing the underlying polynomial. -/
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq n) {i : Nat} (hi : i < n) :
     fHat[i] = fHat.coeffs[i] := rfl
 

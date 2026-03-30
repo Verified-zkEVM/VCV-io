@@ -24,39 +24,48 @@ namespace MLDSA.Concrete.FFI
 
 /-! ## ML-DSA-65 -/
 
+/-- ML-DSA-65 key generation from the internal C reference implementation. -/
 @[extern "lean_mldsa_keypair_internal"]
 opaque mldsa65KeypairInternal : @& ByteArray → ByteArray × ByteArray
 
+/-- ML-DSA-65 signing from the internal C reference implementation. -/
 @[extern "lean_mldsa_sign_internal"]
 opaque mldsa65SignInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   ByteArray
 
+/-- ML-DSA-65 verification from the internal C reference implementation. -/
 @[extern "lean_mldsa_verify_internal"]
 opaque mldsa65VerifyInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   UInt8
 
 /-! ## ML-DSA-44 -/
 
+/-- ML-DSA-44 key generation from the internal C reference implementation. -/
 @[extern "lean_mldsa44_keypair_internal"]
 opaque mldsa44KeypairInternal : @& ByteArray → ByteArray × ByteArray
 
+/-- ML-DSA-44 signing from the internal C reference implementation. -/
 @[extern "lean_mldsa44_sign_internal"]
 opaque mldsa44SignInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   ByteArray
 
+/-- ML-DSA-44 verification from the internal C reference implementation. -/
 @[extern "lean_mldsa44_verify_internal"]
 opaque mldsa44VerifyInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   UInt8
 
 /-! ## ML-DSA-87 -/
 
+/-- ML-DSA-87 key generation from the internal C reference implementation. -/
 @[extern "lean_mldsa87_keypair_internal"]
 opaque mldsa87KeypairInternal : @& ByteArray → ByteArray × ByteArray
 
+/-- ML-DSA-87 signing from the internal C reference implementation. -/
 @[extern "lean_mldsa87_sign_internal"]
 opaque mldsa87SignInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   ByteArray
 
+/-- ML-DSA-87 verification from the internal C reference implementation. -/
 @[extern "lean_mldsa87_verify_internal"]
 opaque mldsa87VerifyInternal : @& ByteArray → @& ByteArray → @& ByteArray →
   UInt8

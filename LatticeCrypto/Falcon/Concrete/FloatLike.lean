@@ -20,6 +20,7 @@ FACCT exponential approximation.
 
 set_option autoImplicit false
 
+/-- Floating-point-like operations needed by the executable Falcon implementation. -/
 class FloatLike (F : Type) where
   zero : F
   one : F
@@ -45,9 +46,13 @@ namespace FloatLike
 
 variable {F : Type} [FloatLike F]
 
+/-- The constant `1 / 2` in a `FloatLike` type. -/
 @[inline] def half : F := div one (add one one)
+/-- The constant `2` in a `FloatLike` type. -/
 @[inline] def two : F := add one one
+/-- Square a `FloatLike` value. -/
 @[inline] def sqr (x : F) : F := mul x x
+/-- Multiplicative inverse in a `FloatLike` type. -/
 @[inline] def inv (x : F) : F := div one x
 
 end FloatLike
@@ -55,6 +60,7 @@ end FloatLike
 /-! ## FPR instance -/
 
 open Falcon.Concrete.FPR in
+/-- The bit-exact Falcon floating-point backend based on `FPR`. -/
 instance : FloatLike FPR where
   zero := zero
   one := one
@@ -107,6 +113,7 @@ private def floatRint (x : Float) : Int64 :=
   else
     floorInt + 1
 
+/-- The fast native-`Float` Falcon floating-point backend. -/
 instance : FloatLike Float where
   zero := 0.0
   one := 1.0

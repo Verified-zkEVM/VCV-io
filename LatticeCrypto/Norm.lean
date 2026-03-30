@@ -39,26 +39,31 @@ def centeredRepr (x : ZMod q) : ℤ :=
 
 omit [NeZero q] in
 @[simp]
+/-- If `x.val` is already in the centered interval, `centeredRepr` returns that value. -/
 theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
     centeredRepr x = x.val := by
   unfold centeredRepr; exact if_pos h
 
 omit [NeZero q] in
+/-- If `x.val` lies above the centered interval, `centeredRepr` subtracts `q`. -/
 theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
     centeredRepr x = (x.val : ℤ) - q := by
   unfold centeredRepr; exact if_neg (not_le.mpr h)
 
+/-- The centered representative is always at most `q / 2`. -/
 theorem centeredRepr_upper_bound (x : ZMod q) : centeredRepr x ≤ (q : ℤ) / 2 := by
   simp only [centeredRepr]
   split_ifs with h
   · exact h
   · push_neg at h; have hval := ZMod.val_lt x; omega
 
+/-- The centered representative has absolute value at most `q / 2`. -/
 theorem centeredRepr_abs_le (x : ZMod q) : (centeredRepr x).natAbs ≤ q / 2 := by
   simp only [centeredRepr]
   have hval := ZMod.val_lt x
   split_ifs with h <;> omega
 
+/-- Negation preserves the absolute value of the centered representative. -/
 theorem centeredRepr_natAbs_neg (x : ZMod q) :
     (centeredRepr (-x)).natAbs = (centeredRepr x).natAbs := by
   by_cases hx : x = 0
@@ -69,6 +74,7 @@ theorem centeredRepr_natAbs_neg (x : ZMod q) :
     have hpos : 0 < x.val := Nat.pos_of_ne_zero ((ZMod.val_ne_zero x).mpr hx)
     split_ifs <;> omega
 
+/-- Casting the centered representative back into `ZMod q` recovers the original element. -/
 theorem centeredRepr_intCast (x : ZMod q) :
     (x : ZMod q) = ((centeredRepr x : ℤ) : ZMod q) := by
   by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
@@ -78,6 +84,7 @@ theorem centeredRepr_intCast (x : ZMod q) :
       Int.cast_natCast, ZMod.natCast_zmod_val, ZMod.natCast_self]
     simp
 
+/-- Twice the centered representative lies in the interval used by `ZMod.valMinAbs`. -/
 theorem centeredRepr_mem_Ioc (x : ZMod q) :
     centeredRepr x * 2 ∈ Set.Ioc (-(q : ℤ)) q := by
   by_cases h : (x.val : ℤ) ≤ (q : ℤ) / 2
@@ -90,17 +97,20 @@ theorem centeredRepr_mem_Ioc (x : ZMod q) :
     have hval := ZMod.val_lt x
     constructor <;> omega
 
+/-- The centered representative agrees with `ZMod.valMinAbs`. -/
 theorem centeredRepr_eq_valMinAbs (x : ZMod q) :
     centeredRepr x = x.valMinAbs := by
   simpa using ((ZMod.valMinAbs_spec x (centeredRepr x)).2
     ⟨centeredRepr_intCast x, centeredRepr_mem_Ioc x⟩).symm
 
+/-- Casting an integer already in the centered interval preserves that integer. -/
 theorem centeredRepr_intCast_eq (z : ℤ)
     (hzlo : -(q : ℤ) < z * 2) (hzhi : z * 2 ≤ q) :
     centeredRepr ((z : ZMod q)) = z := by
   rw [centeredRepr_eq_valMinAbs]
   exact (ZMod.valMinAbs_spec ((z : ZMod q)) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
 
+/-- A small-enough integer is unchanged by casting into `ZMod q` and taking `centeredRepr`. -/
 theorem centeredRepr_intCast_eq_of_natAbs_le (z : ℤ) {b : ℕ}
     (hbound : z.natAbs ≤ b) (hbq : 2 * b < q) :
     centeredRepr ((z : ZMod q)) = z := by
@@ -110,6 +120,7 @@ theorem centeredRepr_intCast_eq_of_natAbs_le (z : ℤ) {b : ℕ}
   · have : z ≤ b := by omega
     omega
 
+/-- A `natAbs` bound yields both lower and upper integer bounds. -/
 theorem neg_le_and_le_of_natAbs_le {z : ℤ} {b : ℕ}
     (hbound : z.natAbs ≤ b) : -(b : ℤ) ≤ z ∧ z ≤ b := by
   constructor <;> omega
@@ -131,24 +142,29 @@ def l1Norm (p : Poly (ZMod q) n) : ℕ :=
   ∑ i : Fin n, (centeredRepr (p.get i)).natAbs
 
 omit [NeZero q] in
+/-- `cInfNorm p ≤ b` exactly when every centered coefficient has absolute value at most `b`. -/
 theorem cInfNorm_le_iff {p : Poly (ZMod q) n} {b : ℕ} :
     cInfNorm p ≤ b ↔ ∀ i : Fin n, (centeredRepr (p.get i)).natAbs ≤ b := by
   simp [cInfNorm, Finset.sup_le_iff]
 
 omit [NeZero q] in
+/-- Pointwise coefficient bounds imply an upper bound on `cInfNorm`. -/
 theorem cInfNorm_le_of_coeff_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : ∀ i : Fin n, (centeredRepr (p.get i)).natAbs ≤ b) : cInfNorm p ≤ b :=
   cInfNorm_le_iff.mpr h
 
 omit [NeZero q] in
+/-- Each centered coefficient is bounded by the centered infinity norm. -/
 theorem coeff_le_cInfNorm (p : Poly (ZMod q) n) (i : Fin n) :
     (centeredRepr (p.get i)).natAbs ≤ cInfNorm p := by
   exact Finset.le_sup (f := fun i => (centeredRepr (p.get i)).natAbs) (Finset.mem_univ i)
 
+/-- Every polynomial has centered infinity norm at most `q / 2`. -/
 theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=
   cInfNorm_le_iff.mpr (fun i => centeredRepr_abs_le (p.get i))
 
 @[simp]
+/-- Negation preserves the centered infinity norm. -/
 theorem cInfNorm_neg (f : Poly (ZMod q) n) : cInfNorm (-f) = cInfNorm f := by
   simp only [cInfNorm]
   congr 1; ext i
@@ -156,6 +172,7 @@ theorem cInfNorm_neg (f : Poly (ZMod q) n) : cInfNorm (-f) = cInfNorm f := by
   rw [this, centeredRepr_natAbs_neg]
 
 omit [NeZero q] in
+/-- A centered infinity-norm bound implies the standard `n * b` bound on `l1Norm`. -/
 theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l1Norm p ≤ n * b := by
   unfold l1Norm
@@ -181,11 +198,13 @@ def PolyVec.l1Norm (v : PolyVec (ZMod q) n k) : ℕ :=
   Finset.sup Finset.univ (fun j : Fin k => LatticeCrypto.l1Norm (v.get j))
 
 omit [NeZero q] in
+/-- `PolyVec.cInfNorm v ≤ b` exactly when each component polynomial has that bound. -/
 theorem PolyVec.cInfNorm_le_iff {v : PolyVec (ZMod q) n k} {b : ℕ} :
     PolyVec.cInfNorm v ≤ b ↔ ∀ j : Fin k, LatticeCrypto.cInfNorm (v.get j) ≤ b := by
   simp [PolyVec.cInfNorm, Finset.sup_le_iff]
 
 omit [NeZero q] in
+/-- Each component polynomial is bounded by the vector centered infinity norm. -/
 theorem PolyVec.component_cInfNorm_le (v : PolyVec (ZMod q) n k) (j : Fin k) :
     LatticeCrypto.cInfNorm (v.get j) ≤ PolyVec.cInfNorm v :=
   Finset.le_sup (f := fun j => LatticeCrypto.cInfNorm (v.get j)) (Finset.mem_univ j)
@@ -213,6 +232,7 @@ def pairL2NormSq (p₁ p₂ : Poly (ZMod q) n) : ℕ :=
   l2NormSq p₁ + l2NormSq p₂
 
 omit [NeZero q] in
+/-- A centered infinity-norm bound implies the standard `n * b^2` bound on `l2NormSq`. -/
 theorem l2NormSq_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l2NormSq p ≤ n * b ^ 2 := by
   unfold l2NormSq

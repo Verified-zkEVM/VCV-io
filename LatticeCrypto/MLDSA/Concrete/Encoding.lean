@@ -28,18 +28,23 @@ open MLDSA
 
 /-! ## Basic byte helpers -/
 
+/-- Convert a fixed-length byte vector to a `ByteArray`. -/
 def vectorToByteArray {n : Nat} (v : Bytes n) : ByteArray :=
   ByteArray.mk v.toArray
 
+/-- Read `n` bytes from a `ByteArray` starting at `offset`, padding with zeros if needed. -/
 def byteArrayToVector (ba : ByteArray) (offset : Nat) (n : Nat) : Vector Byte n :=
   Vector.ofFn fun i => (ba[offset + i.val]?).getD 0
 
+/-- Extract a byte slice with zero padding beyond the end of the array. -/
 def sliceByteArray (ba : ByteArray) (offset len : Nat) : ByteArray :=
   ByteArray.mk <| Array.ofFn fun i : Fin len => (ba[offset + i.val]?).getD 0
 
+/-- Convert a `ByteArray` to a `List Byte`. -/
 def byteArrayToList (ba : ByteArray) : List Byte :=
   ba.data.toList
 
+/-- Concatenate a list of byte-array chunks. -/
 def concatByteArrays (chunks : List ByteArray) : ByteArray :=
   chunks.foldl (· ++ ·) (ByteArray.mk #[])
 
@@ -49,6 +54,7 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
+/-- Total byte lookup with zero fallback. -/
 def getByteD (bytes : ByteArray) (i : Nat) : UInt8 :=
   (bytes[i]?).getD 0
 
@@ -108,45 +114,59 @@ def bitUnpackPoly (bytes : ByteArray) (a b : ℤ) : Rq :=
 
 /-! ## Polynomial codec specializations -/
 
+/-- Packed size of an `η`-bounded polynomial. -/
 def polyEtaPackedBytes (p : Params) : Nat :=
   ringDegree * rangeWidth (-(p.eta : ℤ)) p.eta / 8
 
+/-- Packed size of a `t₁` polynomial. -/
 def polyT1PackedBytes : Nat :=
   ringDegree * simpleWidth (2 ^ (Nat.log2 (modulus - 1) + 1 - droppedBits) - 1) / 8
 
+/-- Packed size of a `t₀` polynomial. -/
 def polyT0PackedBytes : Nat :=
   ringDegree * rangeWidth (-(2 ^ (droppedBits - 1) - 1 : ℤ)) (2 ^ (droppedBits - 1) : ℤ) / 8
 
+/-- Packed size of a `z` polynomial. -/
 def polyZPackedBytes (p : Params) : Nat :=
   ringDegree * rangeWidth (-(p.gamma1 : ℤ) + 1) p.gamma1 / 8
 
+/-- Packed size of a `w₁` polynomial. -/
 def polyW1PackedBytes (p : Params) : Nat :=
   ringDegree * simpleWidth ((modulus - 1) / (2 * p.gamma2) - 1) / 8
 
+/-- Encode an `η`-bounded polynomial with the FIPS 204 bit-pack format. -/
 def polyEtaPack (p : Params) (f : Rq) : ByteArray :=
   bitPackPoly f (-(p.eta : ℤ)) p.eta
 
+/-- Decode an `η`-bounded polynomial from the FIPS 204 bit-pack format. -/
 def polyEtaUnpack (p : Params) (bytes : ByteArray) : Rq :=
   bitUnpackPoly bytes (-(p.eta : ℤ)) p.eta
 
+/-- Encode a `t₁` polynomial. -/
 def polyT1Pack (f : Power2High) : ByteArray :=
   simpleBitPackPoly f (2 ^ (Nat.log2 (modulus - 1) + 1 - droppedBits) - 1)
 
+/-- Decode a `t₁` polynomial. -/
 def polyT1Unpack (bytes : ByteArray) : Power2High :=
   simpleBitUnpackPoly bytes (2 ^ (Nat.log2 (modulus - 1) + 1 - droppedBits) - 1)
 
+/-- Encode a `t₀` polynomial. -/
 def polyT0Pack (f : Rq) : ByteArray :=
   bitPackPoly f (-(2 ^ (droppedBits - 1) - 1 : ℤ)) (2 ^ (droppedBits - 1) : ℤ)
 
+/-- Decode a `t₀` polynomial. -/
 def polyT0Unpack (bytes : ByteArray) : Rq :=
   bitUnpackPoly bytes (-(2 ^ (droppedBits - 1) - 1 : ℤ)) (2 ^ (droppedBits - 1) : ℤ)
 
+/-- Encode a `z` polynomial. -/
 def polyZPack (p : Params) (f : Rq) : ByteArray :=
   bitPackPoly f (-(p.gamma1 : ℤ) + 1) p.gamma1
 
+/-- Decode a `z` polynomial. -/
 def polyZUnpack (p : Params) (bytes : ByteArray) : Rq :=
   bitUnpackPoly bytes (-(p.gamma1 : ℤ) + 1) p.gamma1
 
+/-- Encode a `w₁` polynomial. -/
 def polyW1Pack (p : Params) (f : High) : ByteArray :=
   simpleBitPackPoly f ((modulus - 1) / (2 * p.gamma2) - 1)
 
@@ -163,20 +183,24 @@ private def unpackPolyVector (k chunkSize : Nat) (bytes : ByteArray) (unpack : B
 def w1EncodeBytes (p : Params) (w1 : Vector High p.k) : ByteArray :=
   packPolyVector w1 (polyW1Pack p)
 
+/-- FIPS 204 `w1Encode`, returned as a byte list. -/
 def w1Encode (p : Params) (w1 : Vector High p.k) : List Byte :=
   byteArrayToList (w1EncodeBytes p w1)
 
 /-! ## Key and signature encodings -/
 
+/-- Encode an ML-DSA public key as `ρ || t₁`. -/
 def pkEncode (p : Params) (rho : Bytes 32) (t1 : Vector Power2High p.k) : ByteArray :=
   vectorToByteArray rho ++ packPolyVector t1 polyT1Pack
 
+/-- Decode an ML-DSA public key from `ρ || t₁`. -/
 def pkDecode (p : Params) (bytes : ByteArray) : Bytes 32 × Vector Power2High p.k :=
   let rho := byteArrayToVector bytes 0 32
   let t1Bytes := sliceByteArray bytes 32 (p.k * polyT1PackedBytes)
   let t1 := unpackPolyVector p.k polyT1PackedBytes t1Bytes polyT1Unpack
   (rho, t1)
 
+/-- Encode an ML-DSA secret key as the concatenation of seeds and packed secret polynomials. -/
 def skEncode (p : Params) (rho key : Bytes 32) (tr : Bytes 64)
     (s1 : RqVec p.l) (s2 t0 : RqVec p.k) : ByteArray :=
   vectorToByteArray rho ++
@@ -186,6 +210,7 @@ def skEncode (p : Params) (rho key : Bytes 32) (tr : Bytes 64)
   packPolyVector s2 (polyEtaPack p) ++
   packPolyVector t0 polyT0Pack
 
+/-- Decode an ML-DSA secret key from its concrete byte encoding. -/
 def skDecode (p : Params) (bytes : ByteArray) :
     Bytes 32 × Bytes 32 × Bytes 64 × RqVec p.l × RqVec p.k × RqVec p.k :=
   let rho := byteArrayToVector bytes 0 32
@@ -204,6 +229,7 @@ def skDecode (p : Params) (bytes : ByteArray) :
     (sliceByteArray bytes t0Off (p.k * polyT0PackedBytes)) polyT0Unpack
   (rho, key, tr, s1, s2, t0)
 
+/-- Pack the sparse hint vector into the FIPS 204 hint-byte format. -/
 def hintBitPack (p : Params) (h : Vector Hint p.k) : ByteArray :=
   ByteArray.mk <| Id.run do
     let mut out : Array Byte := Array.replicate (p.omega + p.k) 0
@@ -218,6 +244,7 @@ def hintBitPack (p : Params) (h : Vector Hint p.k) : ByteArray :=
       out := out.set! (p.omega + i) cursor.toUInt8
     return out
 
+/-- Decode a sparse hint vector from the FIPS 204 hint-byte format. -/
 def hintBitUnpack (p : Params) (bytes : ByteArray) : Option (Vector Hint p.k) := Id.run do
   let mut hints : Array Hint := Array.mkEmpty p.k
   let mut cursor := 0
@@ -242,10 +269,12 @@ def hintBitUnpack (p : Params) (bytes : ByteArray) : Option (Vector Hint p.k) :=
       return none
   return some <| Vector.ofFn fun i => hints.getD i.val (Vector.ofFn fun _ => false)
 
+/-- Encode an ML-DSA signature as `c̃ || z || h`. -/
 def sigEncode (p : Params) (cTilde : CommitHashBytes p) (z : RqVec p.l) (h : Vector Hint p.k) :
     ByteArray :=
   vectorToByteArray cTilde ++ packPolyVector z (polyZPack p) ++ hintBitPack p h
 
+/-- Decode an ML-DSA signature from `c̃ || z || h`. -/
 def sigDecode (p : Params) (bytes : ByteArray) :
     Option (CommitHashBytes p × RqVec p.l × Vector Hint p.k) :=
   let cLen := p.lambda / 4

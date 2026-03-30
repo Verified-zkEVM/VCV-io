@@ -28,6 +28,7 @@ set_option linter.style.emptyLine false
 
 open MLDSA MLDSA.Concrete MLDSA.Test
 
+/-- Entry point for the ML-DSA regression and interoperability test runner. -/
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
 

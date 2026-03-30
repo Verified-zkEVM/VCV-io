@@ -73,6 +73,8 @@ def pairL2NormSqU32 {n : ℕ} (s₁ s₂ : Rq n) : Nat := Id.run do
     sqn := sqn + (c * c).toUInt64
   return sqn.toNat
 
+/-- Standalone executable Falcon verification using the concrete hash, codec, and arithmetic
+implementations. -/
 def concreteVerify (p : Params) (pk : ByteArray) (msg : List Byte)
     (sig : ByteArray) : Bool := Id.run do
   let logn := p.logn
@@ -92,6 +94,8 @@ def concreteVerify (p : Params) (pk : ByteArray) (msg : List Byte)
 
 /-! ## Abstract primitives instance -/
 
+/-- Concrete Falcon primitive bundle used to connect the executable code to the abstract
+Falcon interfaces. -/
 noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
     Primitives p where
   publicKeyBytes := fun h => publicKeyBytes p.logn h
@@ -101,10 +105,12 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
   decompress := decompress p.n
   nttOps := hn ▸ concreteNTTRingOps p.logn
 
+/-- `publicKeyBytes` for `concretePrimitives` unfolds to the concrete Falcon encoder. -/
 @[simp] theorem concretePrimitives_publicKeyBytes_eq
     (p : Params) (hn : p.n = 2 ^ p.logn) (h : Rq p.n) :
     (concretePrimitives p hn).publicKeyBytes h = publicKeyBytes p.logn h := rfl
 
+/-- `hashToPointForPublicKey` for `concretePrimitives` unfolds to the concrete FN-DSA hash path. -/
 @[simp] theorem concretePrimitives_hashToPointForPublicKey_eq
     (p : Params) (hn : p.n = 2 ^ p.logn) (h : Rq p.n)
     (salt : Bytes 40) (msg : List Byte) :
@@ -113,9 +119,11 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
 
 /-! ## Named bundles -/
 
+/-- Concrete primitives specialized to Falcon-512. -/
 noncomputable def falcon512Primitives : Primitives falcon512 :=
   concretePrimitives falcon512 rfl
 
+/-- Concrete primitives specialized to Falcon-1024. -/
 noncomputable def falcon1024Primitives : Primitives falcon1024 :=
   concretePrimitives falcon1024 rfl
 

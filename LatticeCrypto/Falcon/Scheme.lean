@@ -76,6 +76,7 @@ It ensures that `[[g, -f], [G, -F]]` forms a basis of the NTRU lattice. -/
 def ntruEquation (f g capF capG : IntPoly p.n) : Prop :=
   intPolyMul f capG - intPolyMul g capF = intPolyConst (modulus : ℤ)
 
+/-- Decidable equality reduces the Falcon NTRU equation to decidable polynomial equality. -/
 instance (f g capF capG : IntPoly p.n) : Decidable (ntruEquation p f g capF capG) :=
   inferInstanceAs (Decidable (_ = _))
 

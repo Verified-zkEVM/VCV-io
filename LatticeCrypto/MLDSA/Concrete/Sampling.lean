@@ -35,14 +35,17 @@ private def nonceLE (nonce : Nat) : ByteArray :=
 private def shake256Stream (seed : ByteArray) (nonce outLen : Nat) : ByteArray :=
   FFI.Hashing.shake256 (seed ++ nonceLE nonce) outLen.toUSize
 
+/-- Materialize a SHAKE-256 output stream as a fixed-length byte vector. -/
 def shake256Vector (input : ByteArray) (outLen : Nat) : Vector Byte outLen :=
   byteArrayToVector (FFI.Hashing.shake256 input outLen.toUSize) 0 outLen
 
+/-- Hash a byte array to 64 bytes with SHAKE-256. -/
 def hashBytes64 (input : ByteArray) : Bytes 64 :=
   shake256Vector input 64
 
 /-! ## ExpandSeed -/
 
+/-- FIPS 204 `ExpandSeed`, returning `(ρ, ρ', K)` from a 32-byte seed and the parameter tags. -/
 def expandSeed (seed : Bytes 32) (p : Params) : Bytes 32 × Bytes 64 × Bytes 32 :=
   let input := vectorToByteArray seed |>.push p.k.toUInt8 |>.push p.l.toUInt8
   let out := FFI.Hashing.shake256 input 128
@@ -169,15 +172,19 @@ def sampleInBall (p : Params) (seed : CommitHashBytes p) : Rq :=
 
 /-! ## Hash wrappers -/
 
+/-- Hash the transcript and message into the 64-byte `μ` value used by ML-DSA. -/
 def hashMessage (tr : Bytes 64) (msg : List Byte) : Bytes 64 :=
   hashBytes64 (vectorToByteArray tr ++ ByteArray.mk msg.toArray)
 
+/-- Hash the secret key material and `μ` into the seed used during signing. -/
 def hashPrivateSeed (key rnd : Bytes 32) (mu : Bytes 64) : Bytes 64 :=
   hashBytes64 (vectorToByteArray key ++ vectorToByteArray rnd ++ vectorToByteArray mu)
 
+/-- Hash `μ` and the encoded `w₁` bytes into the challenge seed `c̃`. -/
 def hashCommitmentBytes (mu : Bytes 64) (w1 : ByteArray) (p : Params) : CommitHashBytes p :=
   shake256Vector (vectorToByteArray mu ++ w1) (p.lambda / 4)
 
+/-- Hash an encoded public key into the transcript prefix `tr`. -/
 def hashPublicKeyBytes (pkBytes : ByteArray) : Bytes 64 :=
   hashBytes64 pkBytes
 

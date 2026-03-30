@@ -37,19 +37,28 @@ deriving Repr, DecidableEq
 
 namespace Tq
 
+/-- Expose an NTT-domain polynomial as its underlying coefficient array. -/
 def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
 
+/-- Forget the `Tq` wrapper and view an NTT-domain polynomial as its underlying polynomial. -/
 def toRq (fHat : Tq) : Rq := fHat.coeffs
 
+/-- Coercion from `Tq` to the underlying polynomial representation. -/
 instance : Coe Tq Rq := ⟨Tq.toRq⟩
+/-- The zero NTT-domain polynomial. -/
 instance : Zero Tq := ⟨⟨0⟩⟩
+/-- Pointwise addition on NTT-domain polynomials. -/
 instance : Add Tq := ⟨fun fHat gHat => ⟨fHat.coeffs + gHat.coeffs⟩⟩
+/-- Pointwise subtraction on NTT-domain polynomials. -/
 instance : Sub Tq := ⟨fun fHat gHat => ⟨fHat.coeffs - gHat.coeffs⟩⟩
+/-- Pointwise negation on NTT-domain polynomials. -/
 instance : Neg Tq := ⟨fun fHat => ⟨-fHat.coeffs⟩⟩
 
+/-- Indexing into an NTT-domain polynomial by coefficient position. -/
 instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
   getElem fHat i hi := fHat.coeffs[i]'hi
 
+/-- Indexing through `Tq` agrees with indexing the underlying polynomial. -/
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
     fHat[i] = fHat.coeffs[i] := rfl
 
@@ -121,18 +130,23 @@ namespace NTTRingOps
 
 variable (ops : NTTRingOps)
 
+/-- Matrix transpose for row-major `Tq` matrices. -/
 abbrev transpose (_ops : NTTRingOps) {rows cols : ℕ} (A : TqMatrix rows cols) :
     TqMatrix cols rows := LatticeCrypto.NTTRingOps.transpose A
 
+/-- Apply the NTT componentwise to a polynomial vector. -/
 abbrev nttVec {k : ℕ} (v : RqVec k) : TqVec k :=
   LatticeCrypto.NTTRingOps.nttVec ops v
 
+/-- Apply the inverse NTT componentwise to an NTT-domain vector. -/
 abbrev invNTTVec {k : ℕ} (v : TqVec k) : RqVec k :=
   LatticeCrypto.NTTRingOps.invNTTVec ops v
 
+/-- Dot product in the NTT domain. -/
 abbrev dot {k : ℕ} (u v : TqVec k) : Tq :=
   LatticeCrypto.NTTRingOps.dot ops u v
 
+/-- Matrix-vector multiplication in the NTT domain. -/
 abbrev matVecMul {rows cols : ℕ} (A : TqMatrix rows cols) (v : TqVec cols) :
     TqVec rows :=
   LatticeCrypto.NTTRingOps.matVecMul ops A v

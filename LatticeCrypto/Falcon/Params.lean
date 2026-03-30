@@ -24,8 +24,10 @@ set_option autoImplicit false
 
 namespace Falcon
 
+/-- Byte values used by the concrete Falcon encodings and hash inputs. -/
 abbrev Byte := UInt8
 
+/-- Fixed-length byte vectors used by the Falcon specification interfaces. -/
 abbrev Bytes (n : ℕ) := Vector Byte n
 
 /-- The fixed modulus used by Falcon: `q = 12289`, the smallest prime of the form
@@ -98,7 +100,9 @@ noncomputable def params : ParameterSet → Params
 
 end ParameterSet
 
+/-- The approved Falcon-512 parameter record. -/
 noncomputable def falcon512 : Params := ParameterSet.params .Falcon512
+/-- The approved Falcon-1024 parameter record. -/
 noncomputable def falcon1024 : Params := ParameterSet.params .Falcon1024
 
 /-- Recognize the approved Falcon parameter sets. -/

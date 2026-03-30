@@ -55,16 +55,23 @@ def toRq (fHat : Tq) : Rq := fHat.coeffs
 /-- Access the underlying coefficient array. -/
 def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
 
+/-- Coercion from `Tq` to the underlying polynomial representation. -/
 instance : Coe Tq Rq := ⟨Tq.toRq⟩
 
+/-- The zero NTT-domain polynomial. -/
 instance : Zero Tq := ⟨⟨0⟩⟩
+/-- Pointwise addition on NTT-domain polynomials. -/
 instance : Add Tq := ⟨fun fHat gHat => ⟨fHat.coeffs + gHat.coeffs⟩⟩
+/-- Pointwise subtraction on NTT-domain polynomials. -/
 instance : Sub Tq := ⟨fun fHat gHat => ⟨fHat.coeffs - gHat.coeffs⟩⟩
+/-- Pointwise negation on NTT-domain polynomials. -/
 instance : Neg Tq := ⟨fun fHat => ⟨-fHat.coeffs⟩⟩
 
+/-- Indexing into an NTT-domain polynomial by coefficient position. -/
 instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
   getElem fHat i hi := fHat.coeffs[i]'hi
 
+/-- Indexing through `Tq` agrees with indexing the underlying polynomial. -/
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
     fHat[i] = fHat.coeffs[i] := rfl
 

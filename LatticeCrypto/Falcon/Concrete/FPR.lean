@@ -34,6 +34,7 @@ set_option autoImplicit false
 
 namespace Falcon.Concrete.FPR
 
+/-- Raw IEEE-754 binary64 values encoded as `UInt64` words. -/
 abbrev FPR := UInt64
 
 private def M52 : UInt64 := ((1 : UInt64) <<< 52) - 1
@@ -80,15 +81,23 @@ private def M63 : UInt64 := ((1 : UInt64) <<< 63) - 1
 
 /-! ## Core Arithmetic -/
 
+/-- The floating-point value `0`. -/
 def zero : FPR := (0 : UInt64)
+/-- The floating-point value `1`. -/
 def one : FPR := (0x3FF0000000000000 : UInt64)
+/-- The floating-point value `2`. -/
 def two : FPR := (0x4000000000000000 : UInt64)
+/-- The floating-point value `1 / 2`. -/
 def half : FPR := (0x3FE0000000000000 : UInt64)
+/-- The Falcon modulus `q = 12289` encoded as an `FPR`. -/
 def q : FPR := (0x40C8008000000000 : UInt64)
+/-- The reciprocal of the Falcon modulus encoded as an `FPR`. -/
 def invQ : FPR := (0x3F1554E39097A782 : UInt64)
 
+/-- Negate an `FPR` value by flipping its sign bit. -/
 @[inline] def neg (x : FPR) : FPR := x ^^^ ((1 : UInt64) <<< 63)
 
+/-- Convert an integer scaled by `2^sc` into an `FPR`. -/
 def scaled (i : Int64) (sc : Int32) : FPR :=
   let s := (i.toUInt64 >>> 63)
   let m := ((i.toUInt64 ^^^ (0 - s)) - (0 - s))
@@ -99,8 +108,10 @@ def scaled (i : Int64) (sc : Int32) : FPR :=
   let m'' := (m' ||| ((m' &&& 0x1FF) + 0x1FF)) >>> 9
   make_z s sc'' m''
 
+/-- Convert an integer into an `FPR`. -/
 @[inline] def ofInt (i : Int64) : FPR := scaled i 0
 
+/-- Add two `FPR` values. -/
 def add (x y : FPR) : FPR :=
   let za := (x &&& M63) - (y &&& M63)
   let za' := za ||| ((za - 1) &&& x)
@@ -130,8 +141,10 @@ def add (x y : FPR) : FPR :=
   let ex''' := ex'' + 9
   make_z sx.toUInt64 ex''' zu''
 
+/-- Subtract two `FPR` values. -/
 @[inline] def sub (x y : FPR) : FPR := add x (neg y)
 
+/-- Multiply two `FPR` values. -/
 def mul (x y : FPR) : FPR :=
   let xu : UInt64 := (x &&& M52) ||| ((1 : UInt64) <<< 52)
   let yu : UInt64 := (y &&& M52) ||| ((1 : UInt64) <<< 52)
@@ -163,6 +176,7 @@ def mul (x y : FPR) : FPR :=
   let zu''' := zu'' &&& ((dzu &&& 1).toUInt64 - 1)
   make s e' zu'''
 
+/-- Divide two `FPR` values. -/
 def div (x y : FPR) : FPR := Id.run do
   let xu : UInt64 := (x &&& M52) ||| ((1 : UInt64) <<< 52)
   let yu : UInt64 := (y &&& M52) ||| ((1 : UInt64) <<< 52)
@@ -186,6 +200,7 @@ def div (x y : FPR) : FPR := Id.run do
   let dm := (dzu &&& 1).toUInt64 - 1
   return make (s &&& dm) e' (q_ &&& dm)
 
+/-- Compute the square root of a nonnegative `FPR` value. -/
 def sqrt (x : FPR) : FPR := Id.run do
   let xu_ : UInt64 := (x &&& M52) ||| ((1 : UInt64) <<< 52)
   let ex_ := (x >>> 52).toUInt32 &&& 0x7FF
@@ -217,6 +232,7 @@ def sqrt (x : FPR) : FPR := Id.run do
   if n == 0 then x
   else (x >>> n.toUInt64) ||| (sign <<< (64 - n.toUInt64))
 
+/-- Round an `FPR` value to the nearest integer using the reference binary64 rule. -/
 @[inline] def rint (x : FPR) : Int64 :=
   let m0 : UInt64 := ((x <<< 10) ||| ((1 : UInt64) <<< 62)) &&& M63
   let e0 : UInt32 := (1085 : UInt32) - ((x >>> 52).toUInt32 &&& 0x7FF)
@@ -229,6 +245,7 @@ def sqrt (x : FPR) : FPR := Id.run do
   let s := (0 : UInt64) - (x >>> 63)
   ((r ^^^ s) - s).toInt64
 
+/-- Round an `FPR` value toward negative infinity. -/
 @[inline] def floor_ (x : FPR) : Int64 :=
   let m0 : UInt64 := ((x <<< 10) ||| ((1 : UInt64) <<< 62)) &&& M63
   let s := (0 : UInt64) - (x >>> 63)
@@ -275,6 +292,7 @@ private def mulHi64 (a b : UInt64) : UInt64 :=
   let ue := (e ||| ((63 - e) >>> 16)) &&& 63
   m >>> ue.toUInt64
 
+/-- Compute `⌊2^63 * ccs * exp(-x)⌋` with the FACCT polynomial approximation. -/
 def expm_p63 (x : FPR) (ccs : FPR) : UInt64 := Id.run do
   let z := (mtwop63 x) <<< 1
   let w := (mtwop63 ccs) <<< 1

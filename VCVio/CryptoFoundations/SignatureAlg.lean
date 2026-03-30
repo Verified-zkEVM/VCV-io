@@ -47,6 +47,7 @@ section sound
 
 variable {m : Type → Type v} [Monad m] [HasEvalSPMF m] {M PK SK S : Type}
 
+/-- Perfect completeness for a signature scheme: honestly generated signatures always verify. -/
 def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
   ∀ msg : M, Pr[= true | sigAlg.exec do
     let (pk, sk) ← sigAlg.keygen
@@ -85,6 +86,7 @@ def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     let verified ← sigAlg.verify pk msg σ
     return !log.wasQueried msg && verified
 
+/-- The success probability of a CMA adversary in the unforgeability experiment. -/
 noncomputable def unforgeableAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp adv]
@@ -113,6 +115,7 @@ def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     let (msg, σ) ← adv.main pk
     sigAlg.verify pk msg σ
 
+/-- The success probability of an EUF-NMA adversary. -/
 noncomputable def eufNmaAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp adv]

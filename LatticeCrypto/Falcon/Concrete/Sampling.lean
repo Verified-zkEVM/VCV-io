@@ -33,6 +33,8 @@ open Falcon
 @[inline] private def hashToPointChunkBytes (n : ℕ) : Nat :=
   max 64 (4 * n)
 
+/-- Concrete FN-DSA `HashToPoint`, hashing the salt, encoded public key, and message into a
+uniform polynomial in `R_q`. -/
 def hashToPoint (n : ℕ) (salt : Bytes 40) (pk : ByteArray) (msg : List Byte) :
     Rq n := Id.run do
   let hk := FFI.Hashing.shake256 pk 64

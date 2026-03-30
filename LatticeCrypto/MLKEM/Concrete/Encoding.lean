@@ -1036,6 +1036,8 @@ def concreteEncoding (params : Params) : Encoding params where
   byteEncode1 := byteEncode1Msg
   byteDecode1 := byteDecode1Msg
 
+/-- Proof bundle showing that the concrete ML-KEM encoding satisfies the abstract encoding laws
+under the standard bit-width side conditions. -/
 theorem concreteEncodingLaws (params : Params)
     (hduPos : 0 < params.du) (hdvPos : 0 < params.dv)
     (hduPow : (1 <<< params.du) < modulus) (hdvPow : (1 <<< params.dv) < modulus) :

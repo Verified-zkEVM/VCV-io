@@ -39,6 +39,7 @@ open Falcon
 
 /-! ## Signature compression -/
 
+/-- Compress a Falcon signature polynomial into at most `dlen` bytes. -/
 def compress (n : ℕ) (s : IntPoly n) (dlen : ℕ) : Option (List UInt8) := Id.run do
   let mut acc : UInt32 := 0
   let mut accLen : UInt32 := 0
@@ -67,6 +68,7 @@ def compress (n : ℕ) (s : IntPoly n) (dlen : ℕ) : Option (List UInt8) := Id.
     out := out.push 0
   return some out.toList
 
+/-- Decompress a Falcon signature polynomial from its compressed byte representation. -/
 def decompress (n : ℕ) (d : List UInt8) (dlen : ℕ) : Option (IntPoly n) := Id.run do
   if d.length < dlen then return none
   let bytes := d.toArray
@@ -110,9 +112,11 @@ def decompress (n : ℕ) (d : List UInt8) (dlen : ℕ) : Option (IntPoly n) := I
 
 /-! ## Public key encoding (14 bits per coefficient) -/
 
+/-- The FN-DSA public-key header byte for a given `logn`. -/
 @[inline] def publicKeyHeader (logn : Nat) : UInt8 :=
   (0x00 + logn).toUInt8
 
+/-- Encode a Falcon public key polynomial using the packed 14-bit coefficient format. -/
 def pkEncode (n : ℕ) (h : Rq n) : ByteArray := Id.run do
   if n % 4 != 0 then
     panic! s!"Falcon public-key encoding requires n divisible by 4, got {n}"
@@ -133,6 +137,7 @@ def pkEncode (n : ℕ) (h : Rq n) : ByteArray := Id.run do
     i := i + 4
   return out
 
+/-- Decode a Falcon public key polynomial from the packed 14-bit coefficient format. -/
 def pkDecode (n : ℕ) (d : ByteArray) : Option (Rq n) := Id.run do
   if n % 4 != 0 then return none
   let needed := 7 * n / 4
@@ -169,12 +174,14 @@ def publicKeyBytes (logn : Nat) {n : ℕ} (h : Rq n) : ByteArray :=
 
 /-! ## Full signature encoding/decoding -/
 
+/-- Encode a Falcon signature as header, salt, and compressed `s₂` bytes. -/
 def sigEncode (salt : Bytes 40) (compSig : List UInt8) (logn : ℕ) : ByteArray :=
   let header : UInt8 := (0x30 + logn).toUInt8
   let saltBA := ByteArray.mk salt.toArray
   let compBA := ByteArray.mk compSig.toArray
   ByteArray.mk #[header] ++ saltBA ++ compBA
 
+/-- Decode a Falcon signature into its salt and compressed `s₂` bytes. -/
 def sigDecode (d : ByteArray) (logn : ℕ) : Option (Bytes 40 × List UInt8) := Id.run do
   if d.size < 42 then return none
   let header := d[0]!
