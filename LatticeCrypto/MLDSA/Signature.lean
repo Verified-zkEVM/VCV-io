@@ -190,7 +190,13 @@ Proof strategy:
 3. `hide_low` with perturbation `s`: `highBits(r + s) = highBits(r)` when
    `polyNorm s ≤ β` and `polyNorm(lowBits(r)) < γ₂ - β`. -/
 lemma useHint_makeHint_eq_highBits
-    (h_laws : Primitives.Laws prims nttOps)
+    (h_useHint_makeHint : ∀ z r : Rq,
+      polyNorm z ≤ p.gamma2 →
+      prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
+    (h_hide_low : ∀ (r s : Rq) (b : ℕ),
+      polyNorm s ≤ b →
+      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      prims.highBits (r + s) = prims.highBits r)
     (w_j r_j ct0_j s_j : Rq)
     (h_r_eq : r_j = w_j - s_j)
     (h_norm_ct0 : polyNorm ct0_j ≤ p.gamma2)
@@ -202,9 +208,9 @@ lemma useHint_makeHint_eq_highBits
     have : NeZero modulus := ⟨by unfold modulus; decide⟩
     rw [show polyNorm (-ct0_j) = polyNorm ct0_j from LatticeCrypto.cInfNorm_neg ct0_j]
     exact h_norm_ct0
-  rw [h_laws.useHint_makeHint (-ct0_j) (r_j + ct0_j) h_neg_norm]
+  rw [h_useHint_makeHint (-ct0_j) (r_j + ct0_j) h_neg_norm]
   rw [rq_add_neg_cancel]
-  have h_hide := h_laws.hide_low r_j s_j p.beta h_s_bound h_norm_r0
+  have h_hide := h_hide_low r_j s_j p.beta h_s_bound h_norm_r0
   rw [← h_hide]
   have h_sum : r_j + s_j = w_j := by rw [h_r_eq]; exact rq_sub_add_cancel w_j s_j
   rw [h_sum]
@@ -214,7 +220,13 @@ lemma useHint_makeHint_eq_highBits
 
 Follows componentwise from `useHint_makeHint_eq_highBits`. -/
 lemma useHintVec_makeHintVec_eq_highBitsVec
-    (h_laws : Primitives.Laws prims nttOps)
+    (h_useHint_makeHint : ∀ z r : Rq,
+      polyNorm z ≤ p.gamma2 →
+      prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
+    (h_hide_low : ∀ (r s : Rq) (b : ℕ),
+      polyNorm s ≤ b →
+      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      prims.highBits (r + s) = prims.highBits r)
     (w cs2 ct0 : RqVec p.k)
     (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
     (h_norm_r0 : polyVecNorm (prims.lowBitsVec (w - cs2)) < p.gamma2 - p.beta)
@@ -242,7 +254,8 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
     change (Vector.zipWith (· - ·) w cs2).get j = _
     simp [Vector.get, Vector.zipWith]
   rw [hneg, hadd, hsub]
-  exact useHint_makeHint_eq_highBits p prims nttOps h_laws (w.get j) _ (ct0.get j)
+  exact useHint_makeHint_eq_highBits p prims h_useHint_makeHint h_hide_low (w.get j) _
+    (ct0.get j)
     (cs2.get j) rfl h_ct0_comp (by rwa [hsub] at h_low_comp) (h_cs2_bound j)
 
 /-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)
@@ -254,7 +267,13 @@ theorem fipsSign_fipsVerify_correct'
     (msg : List Byte) (sig : FIPSSignature p prims)
     (rhoDoublePrime : Bytes 64) (maxAttempts : ℕ)
     (h_valid : validKeyPair p prims pk sk = true)
-    (h_laws : Primitives.Laws prims nttOps)
+    (h_useHint_makeHint : ∀ z r : Rq,
+      polyNorm z ≤ p.gamma2 →
+      prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
+    (h_hide_low : ∀ (r s : Rq) (b : ℕ),
+      polyNorm s ≤ b →
+      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      prims.highBits (r + s) = prims.highBits r)
     (h_wApprox_eq : ∀ (c : Rq) (y : RqVec p.l),
       computeWApprox p prims nttOps (prims.expandA pk.rho) c
         (y + polyVecMul nttOps c sk.s1) pk.t1 =
@@ -277,7 +296,7 @@ theorem fipsSign_fipsVerify_correct'
       prims.highBitsVec (computeW nttOps (prims.expandA pk.rho)
         (prims.expandMask rhoDoublePrime (i * p.l))) := by
     rw [h_cTilde, h_z, h_h, h_wApprox_eq]
-    exact useHintVec_makeHintVec_eq_highBitsVec p prims nttOps h_laws _ _ _
+    exact useHintVec_makeHintVec_eq_highBitsVec p prims h_useHint_makeHint h_hide_low _ _ _
       h_norm_ct0 h_norm_r0 (h_cs2_bound _)
   change fipsVerify p prims nttOps pk msg sig = true
   simp only [fipsVerify]

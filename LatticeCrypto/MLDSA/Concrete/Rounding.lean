@@ -143,16 +143,79 @@ def useHint (p : Params) (h : Hint) (r : Rq) : High :=
 def hintWeight (h : Hint) : ℕ :=
   h.toList.foldl (fun acc b => acc + cond b 1 0) 0
 
-private noncomputable def polyEquiv : Rq ≃ (Fin ringDegree → Coeff) where
-  toFun := LatticeCrypto.Poly.toPi
-  invFun := LatticeCrypto.Poly.ofPi
-  left_inv := LatticeCrypto.Poly.ofPi_toPi
-  right_inv := LatticeCrypto.Poly.toPi_ofPi
+private def rqNSMul (n : ℕ) (x : Rq) : Rq :=
+  Vector.ofFn fun i => n • x.get i
+
+private def rqZSMul (n : ℤ) (x : Rq) : Rq :=
+  Vector.ofFn fun i => n • x.get i
 
 local instance : Add Rq := Vector.instAdd
+local instance : Zero Rq := Vector.instZero
 local instance : Sub Rq := Vector.instSub
 local instance : Neg Rq := Vector.instNeg
-noncomputable local instance : AddCommGroup Rq := polyEquiv.addCommGroup
+
+local instance instRqAddCommGroup : AddCommGroup Rq where
+  add := (· + ·)
+  add_assoc a b c := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add, Vector.getElem_add, Vector.getElem_add, Vector.getElem_add]
+    exact add_assoc _ _ _
+  zero := 0
+  zero_add a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add, Vector.getElem_zero]
+    exact zero_add _
+  add_zero a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add, Vector.getElem_zero]
+    exact add_zero _
+  nsmul := rqNSMul
+  nsmul_zero x := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_zero]
+    simp [rqNSMul]
+  nsmul_succ n x := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add]
+    simpa [rqNSMul] using AddMonoid.nsmul_succ n (x.get ⟨i, hi⟩)
+  neg := Neg.neg
+  sub := Sub.sub
+  sub_eq_add_neg a b := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_sub, Vector.getElem_add, Vector.getElem_neg]
+    exact sub_eq_add_neg _ _
+  zsmul := rqZSMul
+  zsmul_zero' a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_zero]
+    simp [rqZSMul]
+  zsmul_succ' n a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add]
+    simpa [rqZSMul] using SubNegMonoid.zsmul_succ' n (a.get ⟨i, hi⟩)
+  zsmul_neg' n a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_neg]
+    simpa [rqZSMul] using SubNegMonoid.zsmul_neg' n (a.get ⟨i, hi⟩)
+  neg_add_cancel a := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add, Vector.getElem_neg, Vector.getElem_zero]
+    exact neg_add_cancel _
+  add_comm a b := by
+    apply Vector.ext
+    intro i hi
+    rw [Vector.getElem_add, Vector.getElem_add]
+    exact add_comm _ _
 
 /-- Casting `centeredRepr` back into `ZMod q` recovers the original coefficient. -/
 private theorem centeredRepr_cast (x : Coeff) :
@@ -1871,10 +1934,24 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
   change highBits p (r + s) = highBits p r
   exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [hhalf] using hlow)
 
+theorem concretePower2RoundLaws :
+    @LatticeCrypto.Power2RoundOps.Laws Rq instRqAddCommGroup droppedBits
+      concretePower2RoundOps LatticeCrypto.cInfNorm := by
+  exact concretePower2Round_bound_field
+
+theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
+    @LatticeCrypto.RoundingOps.Laws Rq instRqAddCommGroup (2 * p.gamma2)
+      (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
+  refine
+    { high_low_decomp := concreteRounding_high_low_decomp_field_of_isApproved p hp
+      lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
+      hide_low := concreteRounding_hide_low_field_of_isApproved p hp
+      shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
+      useHint_correct := concreteRounding_useHint_correct_field_of_isApproved p hp
+      useHint_bound := concreteRounding_useHint_bound_field_of_isApproved p hp }
+
 /-
-The vector-level `Power2Round` decomposition and bound lemmas above compile. The remaining
-unresolved wrapper is `concretePower2RoundLaws`, followed by the harder `RoundingOps.Laws`
-obligations for `decompose`/`highBits`/`lowBits`.
+The concrete `Power2Round` and approved-parameter `RoundingOps` wrappers now compile.
 -/
 
 end MLDSA.Concrete

@@ -37,6 +37,8 @@ deriving Repr, DecidableEq
 
 namespace Tq
 
+def toArray (fHat : Tq) : Array Coeff := fHat.coeffs.toArray
+
 def toRq (fHat : Tq) : Rq := fHat.coeffs
 
 instance : Coe Tq Rq := ⟨Tq.toRq⟩
@@ -50,6 +52,9 @@ instance : GetElem Tq Nat Coeff (fun _ i => i < ringDegree) where
 
 @[simp] theorem getElem_eq_coeffs_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
     fHat[i] = fHat.coeffs[i] := rfl
+
+@[simp] theorem toArray_getElem (fHat : Tq) {i : Nat} (hi : i < ringDegree) :
+    fHat.toArray[i]'(by simpa [Tq.toArray] using hi) = fHat.coeffs[i] := rfl
 
 end Tq
 
@@ -108,6 +113,9 @@ def negacyclicMul (f g : Rq) : Rq := Id.run do
       else
         h := h.set! k ((h.getD k 0) - fi * gj)
   return Vector.ofFn fun ⟨i, _⟩ => h.getD i 0
+
+/-- Proof-oriented algebraic laws for an ML-DSA NTT implementation. -/
+abbrev NTTRingLaws (ops : NTTRingOps) := LatticeCrypto.NTTRingOps.Laws ops negacyclicMul
 
 namespace NTTRingOps
 

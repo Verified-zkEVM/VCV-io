@@ -154,10 +154,10 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   ntt_invNTT : ∀ f : Rq, nttOps.invNTT (nttOps.ntt f) = f
   /-- Inverse NTT roundtrip: `NTT(NTT⁻¹(f̂)) = f̂`. -/
   invNTT_ntt : ∀ fHat : Tq, nttOps.ntt (nttOps.invNTT fHat) = fHat
-  /-- NTT distributes over addition. -/
-  ntt_add : ∀ f g : Rq, nttOps.ntt (f + g) = nttOps.ntt f + nttOps.ntt g
-  /-- NTT distributes over subtraction. -/
-  ntt_sub : ∀ f g : Rq, nttOps.ntt (f - g) = nttOps.ntt f - nttOps.ntt g
+  /-- NTT distributes over addition, viewed in the coefficient-vector carrier of `T_q`. -/
+  ntt_add : ∀ f g : Rq, (nttOps.ntt (f + g) : Rq) = (nttOps.ntt f : Rq) + (nttOps.ntt g : Rq)
+  /-- NTT distributes over subtraction, viewed in the coefficient-vector carrier of `T_q`. -/
+  ntt_sub : ∀ f g : Rq, (nttOps.ntt (f - g) : Rq) = (nttOps.ntt f : Rq) - (nttOps.ntt g : Rq)
   /-- NTT multiplication correctness:
   `NTT(f) ⊙ NTT(g) = NTT(f * g)` where `*` is negacyclic multiplication. -/
   ntt_mul : ∀ f g : Rq,
