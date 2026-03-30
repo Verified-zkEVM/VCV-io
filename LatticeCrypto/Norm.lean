@@ -39,13 +39,11 @@ def centeredRepr (x : ZMod q) : ℤ :=
 
 omit [NeZero q] in
 @[simp]
-/-- If `x.val` is already in the centered interval, `centeredRepr` returns that value. -/
 theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
     centeredRepr x = x.val := by
   unfold centeredRepr; exact if_pos h
 
 omit [NeZero q] in
-/-- If `x.val` lies above the centered interval, `centeredRepr` subtracts `q`. -/
 theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
     centeredRepr x = (x.val : ℤ) - q := by
   unfold centeredRepr; exact if_neg (not_le.mpr h)
@@ -142,19 +140,16 @@ def l1Norm (p : Poly (ZMod q) n) : ℕ :=
   ∑ i : Fin n, (centeredRepr (p.get i)).natAbs
 
 omit [NeZero q] in
-/-- `cInfNorm p ≤ b` exactly when every centered coefficient has absolute value at most `b`. -/
 theorem cInfNorm_le_iff {p : Poly (ZMod q) n} {b : ℕ} :
     cInfNorm p ≤ b ↔ ∀ i : Fin n, (centeredRepr (p.get i)).natAbs ≤ b := by
   simp [cInfNorm, Finset.sup_le_iff]
 
 omit [NeZero q] in
-/-- Pointwise coefficient bounds imply an upper bound on `cInfNorm`. -/
 theorem cInfNorm_le_of_coeff_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : ∀ i : Fin n, (centeredRepr (p.get i)).natAbs ≤ b) : cInfNorm p ≤ b :=
   cInfNorm_le_iff.mpr h
 
 omit [NeZero q] in
-/-- Each centered coefficient is bounded by the centered infinity norm. -/
 theorem coeff_le_cInfNorm (p : Poly (ZMod q) n) (i : Fin n) :
     (centeredRepr (p.get i)).natAbs ≤ cInfNorm p := by
   exact Finset.le_sup (f := fun i => (centeredRepr (p.get i)).natAbs) (Finset.mem_univ i)
@@ -163,8 +158,8 @@ theorem coeff_le_cInfNorm (p : Poly (ZMod q) n) (i : Fin n) :
 theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=
   cInfNorm_le_iff.mpr (fun i => centeredRepr_abs_le (p.get i))
 
-@[simp]
 /-- Negation preserves the centered infinity norm. -/
+@[simp]
 theorem cInfNorm_neg (f : Poly (ZMod q) n) : cInfNorm (-f) = cInfNorm f := by
   simp only [cInfNorm]
   congr 1; ext i
@@ -172,7 +167,6 @@ theorem cInfNorm_neg (f : Poly (ZMod q) n) : cInfNorm (-f) = cInfNorm f := by
   rw [this, centeredRepr_natAbs_neg]
 
 omit [NeZero q] in
-/-- A centered infinity-norm bound implies the standard `n * b` bound on `l1Norm`. -/
 theorem l1Norm_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l1Norm p ≤ n * b := by
   unfold l1Norm
@@ -198,13 +192,11 @@ def PolyVec.l1Norm (v : PolyVec (ZMod q) n k) : ℕ :=
   Finset.sup Finset.univ (fun j : Fin k => LatticeCrypto.l1Norm (v.get j))
 
 omit [NeZero q] in
-/-- `PolyVec.cInfNorm v ≤ b` exactly when each component polynomial has that bound. -/
 theorem PolyVec.cInfNorm_le_iff {v : PolyVec (ZMod q) n k} {b : ℕ} :
     PolyVec.cInfNorm v ≤ b ↔ ∀ j : Fin k, LatticeCrypto.cInfNorm (v.get j) ≤ b := by
   simp [PolyVec.cInfNorm, Finset.sup_le_iff]
 
 omit [NeZero q] in
-/-- Each component polynomial is bounded by the vector centered infinity norm. -/
 theorem PolyVec.component_cInfNorm_le (v : PolyVec (ZMod q) n k) (j : Fin k) :
     LatticeCrypto.cInfNorm (v.get j) ≤ PolyVec.cInfNorm v :=
   Finset.le_sup (f := fun j => LatticeCrypto.cInfNorm (v.get j)) (Finset.mem_univ j)
@@ -232,7 +224,6 @@ def pairL2NormSq (p₁ p₂ : Poly (ZMod q) n) : ℕ :=
   l2NormSq p₁ + l2NormSq p₂
 
 omit [NeZero q] in
-/-- A centered infinity-norm bound implies the standard `n * b^2` bound on `l2NormSq`. -/
 theorem l2NormSq_le_of_cInfNorm_le {p : Poly (ZMod q) n} {b : ℕ}
     (h : cInfNorm p ≤ b) : l2NormSq p ≤ n * b ^ 2 := by
   unfold l2NormSq

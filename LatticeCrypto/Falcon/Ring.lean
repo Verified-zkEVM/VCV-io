@@ -106,7 +106,7 @@ This is needed to verify that `f` is invertible in `R_q`, which is required for 
 the public key `h = g · f⁻¹ mod q`. -/
 def isInvertibleModQ (nttOps : NTTRingOps n) (f : Rq n) : Bool :=
   let fHat := nttOps.ntt f
-  (Vector.toList fHat.coeffs).all (· ≠ 0)
+  (Vector.toList fHat.coeffs).all (· != 0)
 
 end IntPolyOps
 

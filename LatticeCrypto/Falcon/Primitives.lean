@@ -104,9 +104,9 @@ end Primitives
 structure Primitives.Laws {p : Params} (prims : Primitives p) : Prop where
   /-- The discrete Gaussian sampler produces output distributed according to the ideal
   discrete Gaussian PMF `D_{ℤ,σ',μ}`. -/
-  samplerZ_correct : ∀ (μ σ' : ℝ) (hσ : 0 < σ'),
+  samplerZ_correct : ∀ (μ σ' : ℝ) (_hσ : 0 < σ'),
     ∀ z : ℤ, Pr[= z | prims.samplerZ μ σ'] =
-      ENNReal.ofReal (LatticeCrypto.discreteGaussianPMF σ' μ hσ z)
+      ENNReal.ofReal (LatticeCrypto.discreteGaussianPMF σ' μ z)
   /-- `HashToPoint` output lies in `R_q` (coefficients in `[0, q-1]`).
   In the random oracle model, this is modeled by the random oracle itself;
   this law is a placeholder for any additional structural constraint. -/

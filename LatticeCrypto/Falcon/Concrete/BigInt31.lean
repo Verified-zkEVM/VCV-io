@@ -386,11 +386,10 @@ def zint_bezout (x y : Array UInt32) (len : Nat) :
   let mut v1 := x.extract 0 len
   v1 := setLimb v1 0 1 0 (getLimb v1 0 1 0 - 1)
 
-  let numIter := 62 * len + 31
-  for iter in [:numIter] do
-    let num := numIter - iter
-    if num < 31 then
-      break
+  -- The C loop runs `num = 62 * len + 31, 62 * len, ..., 31`,
+  -- which is exactly `2 * len + 1` iterations.
+  let numIter := 2 * len + 1
+  for _ in [:numIter] do
 
     let mut c0 : UInt32 := 0xFFFFFFFF
     let mut c1 : UInt32 := 0xFFFFFFFF
@@ -429,8 +428,8 @@ def zint_bezout (x y : Array UInt32) (len : Nat) :
     for _ in [:31] do
       let a_odd : UInt64 := - (xa &&& 1)
       let dx := xa - xb
-      let dxSign : UInt64 := dx.toInt64.toUInt64 >>> (63 : UInt64)
-      let swap := a_odd &&& dxSign
+      let dxMask : UInt64 := (dx.toInt64 >>> (63 : Int64)).toUInt64
+      let swap := a_odd &&& dxMask
       let t1 := swap &&& (xa ^^^ xb)
       xa := xa ^^^ t1
       xb := xb ^^^ t1

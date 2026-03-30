@@ -128,6 +128,8 @@ def main : IO Unit := do
   -- ── 5. FFI keygen sizes ───────────────────────
   IO.println "5. FFI keygen sizes"
   do
+    check st "Falcon-512 param sk size = 1281" (Falcon.Params.secretKeyBytesForDegree 512 == 1281)
+    check st "Falcon-1024 param sk size = 2305" (Falcon.Params.secretKeyBytesForDegree 1024 == 2305)
     let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => i.val.toUInt8⟩
     let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
     check st "Falcon-512 sk size = 1281" (sk.size == 1281)
@@ -597,6 +599,10 @@ def main : IO Unit := do
     check st "mp_mmul: Montgomery mul known value"
       (Falcon.Concrete.BigInt31.mp_mmul 100 200 p p0i ==
        Falcon.Concrete.SmallPrimeNTT.mp_montymul 100 200 p p0i)
+
+    let (uBez, vBez, bezOk) := Falcon.Concrete.BigInt31.zint_bezout #[3] #[5] 1
+    check st "zint_bezout: 3*u - 5*v = 1"
+      (bezOk == 1 && uBez.getD 0 0 == 2 && vBez.getD 0 0 == 1)
   IO.println ""
 
   -- ── 24. SmallPrimeNTT roundtrip ─────────────────

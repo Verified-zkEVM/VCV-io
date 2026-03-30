@@ -60,9 +60,17 @@ namespace Params
 since `q = 12289 < 2^14`. -/
 def publicKeyBytes (p : Params) : ℕ := 1 + 14 * p.n / 8
 
-/-- Size of the secret key in bytes (expanded format):
-1 (header) + n (f) + n (g) + n (F) bytes, with each coefficient taking ~8 bits. -/
-def secretKeyBytes (p : Params) : ℕ := 1 + 3 * p.n
+/-- Size of the encoded Falcon secret key in bytes for the supported parameter sets:
+`1281` for Falcon-512 and `2305` for Falcon-1024. -/
+def secretKeyBytesForDegree (n : ℕ) : ℕ :=
+  match n with
+  | 512 => 1281
+  | 1024 => 2305
+  | _ => panic! s!"Falcon secretKeyBytes is only defined for supported degrees, got n={n}"
+
+/-- Size of the encoded Falcon secret key in bytes for the supported parameter sets:
+`1281` for Falcon-512 and `2305` for Falcon-1024. -/
+def secretKeyBytes (p : Params) : ℕ := secretKeyBytesForDegree p.n
 
 /-- Maximum signature size in bytes: 1 (header) + 40 (salt) + sbytelen (compressed s₂). -/
 def signatureBytes (p : Params) : ℕ := 1 + 40 + p.sbytelen

@@ -71,25 +71,25 @@ theorem discreteGaussianSum_pos (σ μ : ℝ) (hσ : 0 < σ) :
 deviation `σ`. Defined as the normalized Gaussian weight:
 
   `P(z) = exp(-(z - μ)² / (2σ²)) / (∑_{z' ∈ ℤ} exp(-(z' - μ)² / (2σ²)))` -/
-noncomputable def discreteGaussianPMF (σ μ : ℝ) (_hσ : 0 < σ) : ℤ → ℝ :=
+noncomputable def discreteGaussianPMF (σ μ : ℝ) : ℤ → ℝ :=
   fun z => discreteGaussianWeight σ μ z / discreteGaussianSum σ μ
 
 /-- The discrete Gaussian PMF is pointwise nonnegative. -/
 theorem discreteGaussianPMF_nonneg (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
-    0 ≤ discreteGaussianPMF σ μ hσ z :=
+    0 ≤ discreteGaussianPMF σ μ z :=
   div_nonneg (discreteGaussianWeight_nonneg σ μ z)
     (le_of_lt (discreteGaussianSum_pos σ μ hσ))
 
 /-- The discrete Gaussian PMF sums to `1`. -/
 theorem discreteGaussianPMF_sum_eq_one (σ μ : ℝ) (hσ : 0 < σ) :
-    ∑' (z : ℤ), discreteGaussianPMF σ μ hσ z = 1 := by
+    ∑' (z : ℤ), discreteGaussianPMF σ μ z = 1 := by
   unfold discreteGaussianPMF
   rw [tsum_div_const]
   exact div_self (ne_of_gt (discreteGaussianSum_pos σ μ hσ))
 
 /-- The discrete Gaussian PMF is strictly positive at every integer point. -/
 theorem discreteGaussianPMF_pos (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
-    0 < discreteGaussianPMF σ μ hσ z :=
+    0 < discreteGaussianPMF σ μ z :=
   div_pos (discreteGaussianWeight_pos σ μ z) (discreteGaussianSum_pos σ μ hσ)
 
 end LatticeCrypto
