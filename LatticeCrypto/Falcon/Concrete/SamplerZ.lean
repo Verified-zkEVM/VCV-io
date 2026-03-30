@@ -3,14 +3,15 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.Falcon.Concrete.FPR
+import LatticeCrypto.Falcon.Concrete.FloatLike
 import FFI.Hashing
 
 /-!
 # Concrete Discrete Gaussian Sampler (SamplerZ)
 
 Integer-only discrete Gaussian sampler for Falcon, faithfully translating
-Pornin's constant-time implementation.
+Pornin's constant-time implementation. Generic over `FloatLike F` so it
+works with both FPR (integer emulation) and Float (native hardware).
 
 ## Components
 
@@ -19,10 +20,10 @@ Pornin's constant-time implementation.
    half-Gaussian with `σ₀ = σ_min`.
 
 2. **Bernoulli exponential** (`berExp`): Accepts with probability `ccs·exp(-x)`
-   using the FACCT polynomial approximation `expm_p63`.
+   using `FloatLike.expm_p63`.
 
 3. **Full sampler** (`samplerZ`): Given center `μ` and inverse standard
-   deviation `1/σ` (both as `FPR`), returns an integer `z` from the discrete
+   deviation `1/σ` (both as `F`), returns an integer `z` from the discrete
    Gaussian `D_{ℤ,σ,μ}`.
 
 ## PRNG
@@ -41,8 +42,6 @@ set_option autoImplicit false
 
 namespace Falcon.Concrete.SamplerZ
 
-open Falcon.Concrete.FPR
-
 /-! ## PRNG state -/
 
 structure PRNGState where
@@ -50,24 +49,36 @@ structure PRNGState where
   pos : Nat
 deriving Inhabited
 
-def PRNGState.init (seed : ByteArray) : PRNGState :=
+@[inline] def PRNGState.init (seed : ByteArray) : PRNGState :=
   { buffer := FFI.Hashing.shake256 seed 4096, pos := 0 }
 
-def PRNGState.nextByte (s : PRNGState) : UInt8 × PRNGState :=
+@[inline] def PRNGState.nextByte (s : PRNGState) : UInt8 × PRNGState :=
   if s.pos < s.buffer.size then
     (s.buffer[s.pos]!, { s with pos := s.pos + 1 })
   else
     let newBuf := FFI.Hashing.shake256 s.buffer 4096
     (newBuf[0]!, { buffer := newBuf, pos := 1 })
 
-def PRNGState.nextU64 (s : PRNGState) : UInt64 × PRNGState := Id.run do
-  let mut state := s
-  let mut val : UInt64 := 0
-  for i in [0:8] do
-    let (b, s') := state.nextByte
-    state := s'
-    val := val ||| (b.toUInt64 <<< (i * 8).toUInt64)
-  return (val, state)
+def PRNGState.nextU64 (s : PRNGState) : UInt64 × PRNGState :=
+  if s.pos + 8 ≤ s.buffer.size then
+    let val : UInt64 :=
+      s.buffer[s.pos]!.toUInt64 |||
+      (s.buffer[s.pos + 1]!.toUInt64 <<< 8) |||
+      (s.buffer[s.pos + 2]!.toUInt64 <<< 16) |||
+      (s.buffer[s.pos + 3]!.toUInt64 <<< 24) |||
+      (s.buffer[s.pos + 4]!.toUInt64 <<< 32) |||
+      (s.buffer[s.pos + 5]!.toUInt64 <<< 40) |||
+      (s.buffer[s.pos + 6]!.toUInt64 <<< 48) |||
+      (s.buffer[s.pos + 7]!.toUInt64 <<< 56)
+    (val, { s with pos := s.pos + 8 })
+  else Id.run do
+    let mut state := s
+    let mut val : UInt64 := 0
+    for i in [0:8] do
+      let (b, s') := state.nextByte
+      state := s'
+      val := val ||| (b.toUInt64 <<< (i * 8).toUInt64)
+    return (val, state)
 
 /-! ## CDT half-Gaussian base sampler -/
 
@@ -93,69 +104,114 @@ private def gauss0Table : Array (UInt32 × UInt32 × UInt32) := #[
 ]
 
 def gaussian0 (s : PRNGState) : Int32 × PRNGState :=
-  let (lo, s') := s.nextU64
-  let (hiB, s'') := s'.nextByte
-  let hi := hiB.toUInt32
-  let v0 := lo.toUInt32 &&& 0xFFFFFF
-  let v1 := (lo >>> 24).toUInt32 &&& 0xFFFFFF
-  let v2 := (lo >>> 48).toUInt32 ||| (hi <<< 16)
-  let z := gauss0Table.foldl (fun z entry =>
-    let (g2, g1, g0) := entry
-    let cc0 := (v0 - g0) >>> 31
-    let cc1 := (v1 - g1 - cc0) >>> 31
-    let cc2 := (v2 - g2 - cc1) >>> 31
-    z + cc2.toInt32
-  ) (0 : Int32)
-  (z, s'')
+  if s.pos + 9 ≤ s.buffer.size then
+    let lo : UInt64 :=
+      s.buffer[s.pos]!.toUInt64 |||
+      (s.buffer[s.pos + 1]!.toUInt64 <<< 8) |||
+      (s.buffer[s.pos + 2]!.toUInt64 <<< 16) |||
+      (s.buffer[s.pos + 3]!.toUInt64 <<< 24) |||
+      (s.buffer[s.pos + 4]!.toUInt64 <<< 32) |||
+      (s.buffer[s.pos + 5]!.toUInt64 <<< 40) |||
+      (s.buffer[s.pos + 6]!.toUInt64 <<< 48) |||
+      (s.buffer[s.pos + 7]!.toUInt64 <<< 56)
+    let hi := s.buffer[s.pos + 8]!.toUInt32
+    let s' : PRNGState := { s with pos := s.pos + 9 }
+    let v0 := lo.toUInt32 &&& 0xFFFFFF
+    let v1 := (lo >>> 24).toUInt32 &&& 0xFFFFFF
+    let v2 := (lo >>> 48).toUInt32 ||| (hi <<< 16)
+    let z := gauss0Table.foldl (fun z entry =>
+      let (g2, g1, g0) := entry
+      let cc0 := (v0 - g0) >>> 31
+      let cc1 := (v1 - g1 - cc0) >>> 31
+      let cc2 := (v2 - g2 - cc1) >>> 31
+      z + cc2.toInt32
+    ) (0 : Int32)
+    (z, s')
+  else
+    let (lo, s') := s.nextU64
+    let (hiB, s'') := s'.nextByte
+    let hi := hiB.toUInt32
+    let v0 := lo.toUInt32 &&& 0xFFFFFF
+    let v1 := (lo >>> 24).toUInt32 &&& 0xFFFFFF
+    let v2 := (lo >>> 48).toUInt32 ||| (hi <<< 16)
+    let z := gauss0Table.foldl (fun z entry =>
+      let (g2, g1, g0) := entry
+      let cc0 := (v0 - g0) >>> 31
+      let cc1 := (v1 - g1 - cc0) >>> 31
+      let cc2 := (v2 - g2 - cc1) >>> 31
+      z + cc2.toInt32
+    ) (0 : Int32)
+    (z, s'')
 
 /-! ## Bernoulli exponential sampling -/
 
-private def log2FPR : FPR := (0x3FE62E42FEFA39EF : UInt64)
-private def invLog2FPR : FPR := (0x3FF71547652B82FE : UInt64)
+section Generic
 
-def berExp (s : PRNGState) (x ccs : FPR) : Bool × PRNGState := Id.run do
-  let si := rint (mul x invLog2FPR)
-  let r := sub x (mul (ofInt si) log2FPR)
+variable {F : Type} [FloatLike F]
+
+private def log2Const : F := FloatLike.scaled (6243314768165359 : Int64) (-53 : Int32)
+private def invLog2Const : F := FloatLike.scaled (6497320848556798 : Int64) (-52 : Int32)
+
+def berExp (s : PRNGState) (x ccs : F) : Bool × PRNGState := Id.run do
+  let si := FloatLike.rint (FloatLike.mul x (invLog2Const (F := F)))
+  let r := FloatLike.sub x (FloatLike.mul (FloatLike.ofInt si) (log2Const (F := F)))
   let mut sShift := si.toUInt64.toUInt32
   sShift := sShift ||| (((63 : UInt32) - sShift) >>> 26)
   sShift := sShift &&& 63
-  let z := ((expm_p63 r ccs <<< 1) - 1) >>> sShift.toUInt64
-  let mut state := s
-  let mut accept := true
-  for i in [0:8] do
-    let w_ := (z >>> ((7 - i) * 8 : Nat).toUInt64) &&& 0xFF
-    let (rndByte, s') := state.nextByte
-    state := s'
-    if rndByte.toUInt64 < w_ then
-      accept := true
-    else if rndByte.toUInt64 > w_ then
-      accept := false
-  return (accept, state)
+  let z := ((FloatLike.expm_p63 r ccs <<< 1) - 1) >>> sShift.toUInt64
+  if s.pos + 8 ≤ s.buffer.size then
+    let mut decided := false
+    let mut accept := false
+    for i in [0:8] do
+      if !decided then
+        let w_ := (z >>> ((7 - i) * 8 : Nat).toUInt64) &&& 0xFF
+        let rndByte := s.buffer[s.pos + i]!.toUInt64
+        if rndByte < w_ then
+          decided := true; accept := true
+        else if rndByte > w_ then
+          decided := true; accept := false
+    return (accept, { s with pos := s.pos + 8 })
+  else
+    let mut state := s
+    let mut decided := false
+    let mut accept := false
+    for i in [0:8] do
+      let w_ := (z >>> ((7 - i) * 8 : Nat).toUInt64) &&& 0xFF
+      let (rndByte, s') := state.nextByte
+      state := s'
+      if !decided then
+        if rndByte.toUInt64 < w_ then
+          decided := true; accept := true
+        else if rndByte.toUInt64 > w_ then
+          decided := true; accept := false
+    return (accept, state)
 
 /-! ## Full SamplerZ -/
 
-private def invSqr2Sigma0 : FPR := (0x3FC2F76F031D7480 : UInt64)
+private def invSqr2Sigma0Const : F :=
+  FloatLike.scaled (5435486223186882 : Int64) (-55 : Int32)
 
-def sigmaMinTable : Array FPR := #[
-  (0 : UInt64),
-  (0 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF0000000000000 : UInt64),
-  (0x3FF4710BB39B2569 : UInt64),
-  (0x3FF4710BB39B2569 : UInt64),
-  (0x3FF4C4B4C1F7F6CF : UInt64)
+private def sigmaMinConsts : Array F := #[
+  FloatLike.zero,
+  FloatLike.scaled (5028307297130123 : Int64) (-52 : Int32),
+  FloatLike.scaled (5098636688852518 : Int64) (-52 : Int32),
+  FloatLike.scaled (5168009084304506 : Int64) (-52 : Int32),
+  FloatLike.scaled (5270355833453349 : Int64) (-52 : Int32),
+  FloatLike.scaled (5370752584786614 : Int64) (-52 : Int32),
+  FloatLike.scaled (5469306724145091 : Int64) (-52 : Int32),
+  FloatLike.scaled (5566116128735780 : Int64) (-52 : Int32),
+  FloatLike.scaled (5661270305715104 : Int64) (-52 : Int32),
+  FloatLike.scaled (5754851361258101 : Int64) (-52 : Int32),
+  FloatLike.scaled (5846934829975396 : Int64) (-52 : Int32)
 ]
 
-def samplerZ (logn : Nat) (s : PRNGState) (mu isigma : FPR) : Int32 × PRNGState := Id.run do
-  let sInt := floor_ mu
-  let r := sub mu (ofInt sInt)
-  let dss := mul (mul isigma isigma) half
-  let sigmaMin := sigmaMinTable.getD logn (0 : UInt64)
-  let ccs := mul isigma sigmaMin
+def samplerZ (logn : Nat) (s : PRNGState) (mu isigma : F) :
+    Int32 × PRNGState := Id.run do
+  let sInt := FloatLike.floor_ mu
+  let r := FloatLike.sub mu (FloatLike.ofInt sInt)
+  let dss := FloatLike.mul (FloatLike.mul isigma isigma) (FloatLike.half (F := F))
+  let sigmaMin := (sigmaMinConsts (F := F)).getD logn FloatLike.zero
+  let ccs := FloatLike.mul isigma sigmaMin
   let mut state := s
   for _ in [0:1000] do
     let (z0, s') := gaussian0 state
@@ -164,15 +220,17 @@ def samplerZ (logn : Nat) (s : PRNGState) (mu isigma : FPR) : Int32 × PRNGState
     state := s''
     let b : Int32 := (bByte &&& 1).toUInt32.toInt32
     let z := b + ((b <<< 1) - (1 : Int32)) * z0
-    let zFPR := ofInt z.toInt64
-    let diff := sub zFPR r
-    let x_ := mul (mul diff diff) dss
-    let z0sq := ofInt (z0 * z0).toInt64
-    let x := sub x_ (mul z0sq invSqr2Sigma0)
+    let zF : F := FloatLike.ofInt32 z
+    let diff := FloatLike.sub zF r
+    let x_ := FloatLike.mul (FloatLike.mul diff diff) dss
+    let z0sq : F := FloatLike.ofInt32 (z0 * z0)
+    let x := FloatLike.sub x_ (FloatLike.mul z0sq (invSqr2Sigma0Const (F := F)))
     let (accept, s''') := berExp state x ccs
     state := s'''
     if accept then
       return (sInt.toInt32 + z, state)
   return (sInt.toInt32, state)
+
+end Generic
 
 end Falcon.Concrete.SamplerZ

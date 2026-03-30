@@ -39,10 +39,10 @@ abbrev FPR := UInt64
 private def M52 : UInt64 := ((1 : UInt64) <<< 52) - 1
 private def M63 : UInt64 := ((1 : UInt64) <<< 63) - 1
 
-private def tbmask (x : UInt32) : UInt32 :=
+@[inline] private def tbmask (x : UInt32) : UInt32 :=
   (0 : UInt32) - (x >>> 31)
 
-private def lzcnt_nonzero (x : UInt32) : UInt32 := Id.run do
+@[inline] private def lzcnt_nonzero (x : UInt32) : UInt32 := Id.run do
   let mut n : UInt32 := 0
   let mut v := x
   if v &&& 0xFFFF0000 == 0 then n := n + 16; v := v <<< 16
@@ -52,29 +52,29 @@ private def lzcnt_nonzero (x : UInt32) : UInt32 := Id.run do
   if v &&& 0x80000000 == 0 then n := n + 1
   return n
 
-private def lzcnt64_nonzero (x : UInt64) : UInt32 :=
+@[inline] private def lzcnt64_nonzero (x : UInt64) : UInt32 :=
   let x0 : UInt32 := x.toUInt32
   let x1_ : UInt32 := (x >>> 32).toUInt32
   let m := ~~~(tbmask (x1_ ||| ((0 : UInt32) - x1_)))
   let x1 := x1_ ||| (x0 &&& m)
   lzcnt_nonzero x1 + (m &&& 32)
 
-private def fpr_ulsh (x : UInt64) (n : UInt32) : UInt64 :=
+@[inline] private def fpr_ulsh (x : UInt64) (n : UInt32) : UInt64 :=
   x <<< n.toUInt64
 
-private def fpr_ursh (x : UInt64) (n : UInt32) : UInt64 :=
+@[inline] private def fpr_ursh (x : UInt64) (n : UInt32) : UInt64 :=
   x >>> n.toUInt64
 
-private def make (s : UInt64) (e : Int32) (m : UInt64) : FPR :=
+@[inline] private def make (s : UInt64) (e : Int32) (m : UInt64) : FPR :=
   let cc : UInt64 := ((0xC8 : UInt64) >>> (m.toUInt32 &&& 7).toUInt64) &&& 1
   (s <<< 63) + ((e + 1076).toUInt32.toUInt64 <<< 52) + (m >>> 2) + cc
 
-private def make_z (s : UInt64) (e : Int32) (m : UInt64) : FPR :=
+@[inline] private def make_z (s : UInt64) (e : Int32) (m : UInt64) : FPR :=
   let eu : UInt32 := ((e + 1076).toUInt32 &&& ((0 : UInt32) - (m >>> 54).toUInt32))
   let cc : UInt64 := ((0xC8 : UInt64) >>> (m.toUInt32 &&& 7).toUInt64) &&& 1
   (s <<< 63) + (eu.toUInt64 <<< 52) + (m >>> 2) + cc
 
-private def norm64 (m : UInt64) (e : Int32) : UInt64 × Int32 :=
+@[inline] private def norm64 (m : UInt64) (e : Int32) : UInt64 × Int32 :=
   let c := lzcnt64_nonzero (m ||| 1)
   (fpr_ulsh m c, e - c.toInt32)
 
@@ -87,17 +87,19 @@ def half : FPR := (0x3FE0000000000000 : UInt64)
 def q : FPR := (0x40C8008000000000 : UInt64)
 def invQ : FPR := (0x3F1554E39097A782 : UInt64)
 
-def neg (x : FPR) : FPR := x ^^^ ((1 : UInt64) <<< 63)
+@[inline] def neg (x : FPR) : FPR := x ^^^ ((1 : UInt64) <<< 63)
 
 def scaled (i : Int64) (sc : Int32) : FPR :=
   let s := (i.toUInt64 >>> 63)
   let m := ((i.toUInt64 ^^^ (0 - s)) - (0 - s))
-  let (m', sc') := norm64 m sc
+  let c_sc := lzcnt64_nonzero (m ||| 1)
+  let m' := fpr_ulsh m c_sc
+  let sc' := sc - c_sc.toInt32
   let sc'' := sc' + 9
   let m'' := (m' ||| ((m' &&& 0x1FF) + 0x1FF)) >>> 9
   make_z s sc'' m''
 
-def ofInt (i : Int64) : FPR := scaled i 0
+@[inline] def ofInt (i : Int64) : FPR := scaled i 0
 
 def add (x y : FPR) : FPR :=
   let za := (x &&& M63) - (y &&& M63)
@@ -121,12 +123,14 @@ def add (x y : FPR) : FPR :=
   let yu := fpr_ursh (yu' ||| ((yu' &&& m) + m)) n'
   let dm := (0 - (sx ^^^ sy).toUInt64)
   let zu := xu + yu - (dm &&& (yu <<< 1))
-  let (zu', ex'') := norm64 zu ex'
+  let c_add := lzcnt64_nonzero (zu ||| 1)
+  let zu' := fpr_ulsh zu c_add
+  let ex'' := ex' - c_add.toInt32
   let zu'' := (zu' ||| ((zu' &&& 0x1FF) + 0x1FF)) >>> 9
   let ex''' := ex'' + 9
   make_z sx.toUInt64 ex''' zu''
 
-def sub (x y : FPR) : FPR := add x (neg y)
+@[inline] def sub (x y : FPR) : FPR := add x (neg y)
 
 def mul (x y : FPR) : FPR :=
   let xu : UInt64 := (x &&& M52) ||| ((1 : UInt64) <<< 52)
@@ -208,12 +212,12 @@ def sqrt (x : FPR) : FPR := Id.run do
 
 /-! ## Conversion Utilities -/
 
-private def fpr_arsh64 (x : UInt64) (n : UInt32) : UInt64 :=
+@[inline] private def fpr_arsh64 (x : UInt64) (n : UInt32) : UInt64 :=
   let sign := (0 : UInt64) - (x >>> 63)
   if n == 0 then x
   else (x >>> n.toUInt64) ||| (sign <<< (64 - n.toUInt64))
 
-def rint (x : FPR) : Int64 :=
+@[inline] def rint (x : FPR) : Int64 :=
   let m0 : UInt64 := ((x <<< 10) ||| ((1 : UInt64) <<< 62)) &&& M63
   let e0 : UInt32 := (1085 : UInt32) - ((x >>> 52).toUInt32 &&& 0x7FF)
   let m := m0 &&& ((0 : UInt64) - ((e0 - 64) >>> 31).toUInt64)
@@ -225,7 +229,7 @@ def rint (x : FPR) : Int64 :=
   let s := (0 : UInt64) - (x >>> 63)
   ((r ^^^ s) - s).toInt64
 
-def floor_ (x : FPR) : Int64 :=
+@[inline] def floor_ (x : FPR) : Int64 :=
   let m0 : UInt64 := ((x <<< 10) ||| ((1 : UInt64) <<< 62)) &&& M63
   let s := (0 : UInt64) - (x >>> 63)
   let m := (m0 ^^^ s) - s
@@ -239,9 +243,17 @@ Returns `⌊2^63 · ccs · exp(-x)⌋` using only integer multiply-add.
 The polynomial coefficients are from the FACCT paper (eprint 2018/1234). -/
 
 private def mulHi64 (a b : UInt64) : UInt64 :=
-  ((a.toNat * b.toNat) >>> 64).toUInt64
+  let aLo := a &&& 0xFFFFFFFF
+  let aHi := a >>> 32
+  let bLo := b &&& 0xFFFFFFFF
+  let bHi := b >>> 32
+  let cross1 := aHi * bLo
+  let cross2 := aLo * bHi
+  let lo_lo := aLo * bLo
+  let mid := (lo_lo >>> 32) + (cross1 &&& 0xFFFFFFFF) + (cross2 &&& 0xFFFFFFFF)
+  aHi * bHi + (cross1 >>> 32) + (cross2 >>> 32) + (mid >>> 32)
 
-private def mtwop63 (x : FPR) : UInt64 :=
+@[inline] private def mtwop63 (x : FPR) : UInt64 :=
   let m : UInt64 := ((x <<< 10) ||| ((1 : UInt64) <<< 62)) &&& M63
   let e : UInt32 := (1022 : UInt32) - ((x >>> 52).toUInt32 &&& 0x7FF)
   let ue := (e ||| ((63 - e) >>> 16)) &&& 63
