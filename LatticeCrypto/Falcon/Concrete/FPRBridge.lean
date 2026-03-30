@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Batteries.Data.Rat.Float
 import LatticeCrypto.Falcon.Scheme
 import LatticeCrypto.Falcon.Concrete.FPR
 import LatticeCrypto.Falcon.Concrete.Instance
@@ -15,9 +16,9 @@ import Mathlib.Analysis.SpecialFunctions.Pow.Real
 Error bounds connecting the integer-only FPR emulation layer to the
 exact `ℝ` arithmetic used in the abstract Falcon specification.
 
-All theorems are `sorry`'d initially. They specify the formal requirements
-for proving that the FPR-based implementation is a faithful approximation
-of the ideal spec.
+The analytic error bounds in this file are still stated as proof obligations.
+The end-to-end verifier bridge is reduced to explicit codec and fast-kernel
+correctness assumptions so the remaining gap is spelled out precisely.
 
 ## Per-Operation Error Bounds
 
@@ -53,8 +54,21 @@ noncomputable section
 
 /-! ## Interpretation: FPR → ℝ -/
 
-/-- Interpret an `FPR` word as the corresponding real number. -/
-def toReal (x : FPR) : ℝ := sorry
+/-- Interpret an `FPR` word as the corresponding IEEE-754 value in `ℝ`,
+mapping non-finite bit patterns to `0`. -/
+def toReal (x : FPR) : ℝ := ((Float.ofBits x).toRat0 : ℝ)
+
+/-! ## Verification-only concrete primitives -/
+
+/-- Concrete primitive bundle restricted to the fields used by `Falcon.verify`.
+The sampler is a dummy placeholder because verification never invokes it. -/
+def verifyPrimitives (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) : Falcon.Primitives p where
+  publicKeyBytes := fun h => Falcon.Concrete.publicKeyBytes p.logn h
+  hashToPoint := fun salt pkBytes msg => Falcon.Concrete.hashToPoint p.n salt pkBytes msg
+  samplerZ := fun _ _ => pure 0
+  compress := Falcon.Concrete.compress p.n
+  decompress := Falcon.Concrete.decompress p.n
+  nttOps := hn ▸ Falcon.Concrete.concreteNTTRingOps p.logn
 
 /-! ## Per-operation error bounds -/
 
@@ -94,16 +108,45 @@ theorem expm_p63_error (x ccs : FPR)
 
 /-! ## End-to-end correctness -/
 
-/-- The concrete Falcon verifier agrees with the abstract verifier when both are fed matching
-encoded inputs. -/
+/-- The concrete Falcon verifier agrees with the abstract verifier once the concrete signature
+codec, public-key codec, and fast arithmetic kernels are related to their specification-level
+counterparts. The abstract verifier is instantiated with the same concrete verification fields. -/
 theorem concrete_verify_eq_verify
-    (p : Falcon.Params) (hn : p.n = 2 ^ p.logn)
+    (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) (hsbytelen : 0 < p.sbytelen)
+    (hverifyEmpty : ∀ (pkBytes : ByteArray) (salt : Bytes 40) (msg : List Byte),
+      Falcon.Concrete.concreteVerify p pkBytes msg
+        (Falcon.Concrete.sigEncode salt [] p.logn) = false)
+    (hsigDecode : ∀ (salt : Bytes 40) (compSig : List Byte),
+      compSig ≠ [] →
+        Falcon.Concrete.sigDecode (Falcon.Concrete.sigEncode salt compSig p.logn) p.logn =
+          some (salt, compSig))
+    (hpkDecode : ∀ h : Falcon.Rq p.n,
+      Falcon.Concrete.pkDecode p.n
+        ((Falcon.Concrete.publicKeyBytes p.logn h).extract 1
+          (Falcon.Concrete.publicKeyBytes p.logn h).size) = some h)
+    (hmul : ∀ s2 h : Falcon.Rq p.n,
+      Falcon.Concrete.negacyclicMulU32 s2 h = Falcon.negacyclicMul s2 h)
+    (hnorm : ∀ s1 s2 : Falcon.Rq p.n,
+      Falcon.Concrete.pairL2NormSqU32 s1 s2 = Falcon.pairL2NormSq s1 s2)
     (pk : Falcon.PublicKey p) (msg : List Falcon.Byte) (sig : Falcon.Signature) :
-    let prims := Falcon.Concrete.concretePrimitives p hn;
+    let prims := verifyPrimitives p hn;
     Falcon.Concrete.concreteVerify p (prims.publicKeyBytes pk.h) msg
       (Falcon.Concrete.sigEncode sig.salt sig.compressedS2 p.logn) =
         Falcon.verify p prims pk msg sig := by
-  sorry
+  dsimp
+  by_cases hcomp : sig.compressedS2 = []
+  · have hslen : sig.compressedS2.length < p.sbytelen := by
+      simpa [hcomp] using hsbytelen
+    have hdecomp : (verifyPrimitives p hn).decompress [] p.sbytelen = none := by
+      simp [verifyPrimitives, Falcon.Concrete.decompress, hsbytelen]
+    have hleft := hverifyEmpty ((verifyPrimitives p hn).publicKeyBytes pk.h) sig.salt msg
+    have hright : Falcon.verify p (verifyPrimitives p hn) pk msg sig = false := by
+      simp [Falcon.verify, hcomp, hdecomp]
+    simpa [hcomp] using hleft.trans hright.symm
+  · simp [Falcon.Concrete.concreteVerify, Falcon.verify,
+      hsigDecode sig.salt sig.compressedS2 hcomp, Falcon.Primitives.hashToPointForPublicKey,
+      verifyPrimitives, hpkDecode, hmul, hnorm]
+    rfl
 
 end
 

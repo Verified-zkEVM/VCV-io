@@ -3,15 +3,15 @@ import LatticeCrypto.Falcon.Concrete.BigInt31
 import LatticeCrypto.Falcon.Concrete.Encoding
 import LatticeCrypto.Falcon.Concrete.FFI
 import LatticeCrypto.Falcon.Concrete.FFT
-import LatticeCrypto.Falcon.Concrete.FloatLike
 import LatticeCrypto.Falcon.Concrete.FPR
 import LatticeCrypto.Falcon.Concrete.FPRBridge
 import LatticeCrypto.Falcon.Concrete.FXR
+import LatticeCrypto.Falcon.Concrete.FloatLike
 import LatticeCrypto.Falcon.Concrete.GMTable
 import LatticeCrypto.Falcon.Concrete.Instance
 import LatticeCrypto.Falcon.Concrete.KeyGen
-import LatticeCrypto.Falcon.Concrete.NTT
 import LatticeCrypto.Falcon.Concrete.NTRUSolver
+import LatticeCrypto.Falcon.Concrete.NTT
 import LatticeCrypto.Falcon.Concrete.PolyBigInt
 import LatticeCrypto.Falcon.Concrete.SamplerZ
 import LatticeCrypto.Falcon.Concrete.Sampling
