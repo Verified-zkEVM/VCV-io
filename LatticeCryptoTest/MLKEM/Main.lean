@@ -363,32 +363,229 @@ def main : IO Unit := do
         (dkB == dkRef)
   IO.println ""
 
-  -- ── 14. Other approved parameter sets ─────────────
-  IO.println "14. ML-KEM-512 and ML-KEM-1024 roundtrip"
+  -- ── 14. ML-KEM-512 and ML-KEM-1024: Lean vs native ──
+  IO.println "14. ML-KEM-512 and ML-KEM-1024: Lean vs native"
   do
     let d512 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 11 % 256).toUInt8
     let z512 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 13 % 256).toUInt8
     let m512 : Message := Vector.ofFn fun ⟨i, _⟩ => (0x40 + i % 17).toUInt8
+    let coins512 := vecToBA d512 ++ vecToBA z512
+
+    let (ekRef512, dkRef512) := FFI.mlkem512KeypairDerand coins512
     let (ek512, dk512) := keygenInternal concreteNTTRingOps mlkem512Encoding
       mlkem512Primitives d512 z512
+    let ekB512 := serializeEK512 ek512
+    let dkB512 := serializeDK512 dk512
+    check st "ML-KEM-512 ek: Lean = native" (ekB512 == ekRef512)
+    check st "ML-KEM-512 dk: Lean = native" (dkB512 == dkRef512)
+
+    let (ctRef512, ssRef512) := FFI.mlkem512EncDerand ekRef512 (vecToBA m512)
     let (ss512, ct512) := encapsInternal concreteNTTRingOps mlkem512Encoding
       mlkem512Primitives ek512 m512
+    let ctB512 := serializeCT512 ct512
+    let ssB512 := vecToBA ss512
+    check st "ML-KEM-512 ct: Lean = native" (ctB512 == ctRef512)
+    check st "ML-KEM-512 ss_enc: Lean = native" (ssB512 == ssRef512)
+
+    let ssDecRef512 := FFI.mlkem512Dec dkRef512 ctRef512
     let ss512' := decapsInternal concreteNTTRingOps mlkem512Encoding
       mlkem512Primitives dk512 ct512
-    check st "ML-KEM-512 encaps/decaps roundtrip" (ss512 == ss512')
+    check st "ML-KEM-512 ss_dec: Lean = native" (vecToBA ss512' == ssDecRef512)
+    check st "ML-KEM-512 roundtrip" (ss512 == ss512')
 
     let d1024 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (0xFF - (i * 9 % 256)).toUInt8
     let z1024 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (0x80 + (i * 7 % 128)).toUInt8
     let m1024 : Message := Vector.ofFn fun ⟨i, _⟩ => (i * 5 % 256).toUInt8
+    let coins1024 := vecToBA d1024 ++ vecToBA z1024
+
+    let (ekRef1024, dkRef1024) := FFI.mlkem1024KeypairDerand coins1024
     let (ek1024, dk1024) := keygenInternal concreteNTTRingOps mlkem1024Encoding
       mlkem1024Primitives d1024 z1024
+    let ekB1024 := serializeEK1024 ek1024
+    let dkB1024 := serializeDK1024 dk1024
+    check st "ML-KEM-1024 ek: Lean = native" (ekB1024 == ekRef1024)
+    check st "ML-KEM-1024 dk: Lean = native" (dkB1024 == dkRef1024)
+
+    let (ctRef1024, ssRef1024) := FFI.mlkem1024EncDerand ekRef1024 (vecToBA m1024)
     let (ss1024, ct1024) := encapsInternal concreteNTTRingOps mlkem1024Encoding
       mlkem1024Primitives ek1024 m1024
+    let ctB1024 := serializeCT1024 ct1024
+    let ssB1024 := vecToBA ss1024
+    check st "ML-KEM-1024 ct: Lean = native" (ctB1024 == ctRef1024)
+    check st "ML-KEM-1024 ss_enc: Lean = native" (ssB1024 == ssRef1024)
+
+    let ssDecRef1024 := FFI.mlkem1024Dec dkRef1024 ctRef1024
     let ss1024' := decapsInternal concreteNTTRingOps mlkem1024Encoding
       mlkem1024Primitives dk1024 ct1024
-    check st "ML-KEM-1024 encaps/decaps roundtrip" (ss1024 == ss1024')
+    check st "ML-KEM-1024 ss_dec: Lean = native" (vecToBA ss1024' == ssDecRef1024)
+    check st "ML-KEM-1024 roundtrip" (ss1024 == ss1024')
   IO.println ""
 
+  -- ── 15. ACVP encapDecap vectors: Lean spec vs mlkem-native ──
+  IO.println "15. ACVP encapDecap vectors: Lean spec vs mlkem-native"
+  do
+    for vec in ACVP.encDecapVectors do
+      let dBA := parseHex vec.d
+      let zBA := parseHex vec.z
+      let mBA := parseHex vec.m
+      let d : Seed32 := Vector.ofFn fun ⟨i, _⟩ => dBA[i]!
+      let z : Seed32 := Vector.ofFn fun ⟨i, _⟩ => zBA[i]!
+      let m : Message := Vector.ofFn fun ⟨i, _⟩ => mBA[i]!
+      let coins64 := vecToBA d ++ vecToBA z
+
+      let (ekRef, dkRef) := FFI.mlkemKeypairDerand coins64
+      let (ekLean, dkLean) := keygenInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives d z
+      let ekB := serializeEK ekLean
+      let dkB := serializeDK dkLean
+
+      check st s!"encDecap tcId={vec.tcId} ek: Lean = native" (ekB == ekRef)
+      check st s!"encDecap tcId={vec.tcId} dk: Lean = native" (dkB == dkRef)
+
+      let (ctRef, ssRef) := FFI.mlkemEncDerand ekRef (vecToBA m)
+      let (ssLean, ctLean) := encapsInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives ekLean m
+      let ctB := serializeCT ctLean
+      let ssB := vecToBA ssLean
+
+      check st s!"encDecap tcId={vec.tcId} ct: Lean = native" (ctB == ctRef)
+        s!"Lean={toHex ctB} ref={toHex ctRef}"
+      check st s!"encDecap tcId={vec.tcId} ss_enc: Lean = native" (ssB == ssRef)
+        s!"Lean={toHex ssB} ref={toHex ssRef}"
+
+      let ssDecRef := FFI.mlkemDec dkRef ctRef
+      let ssDecLean := decapsInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives dkLean ctLean
+      let ssDecB := vecToBA ssDecLean
+
+      check st s!"encDecap tcId={vec.tcId} ss_dec: Lean = native" (ssDecB == ssDecRef)
+      check st s!"encDecap tcId={vec.tcId} roundtrip: ss_enc = ss_dec" (ssB == ssDecB)
+  IO.println ""
+
+  -- ── 16. Batch FFI tests (10 coin/message triples) ──────
+  IO.println "16. Batch FFI tests (10 coin/message triples)"
+  do
+    let dSeeds : Array Seed32 := #[
+      Vector.ofFn fun _ => (0 : UInt8),
+      Vector.ofFn fun _ => (0xFF : UInt8),
+      Vector.ofFn fun ⟨i, _⟩ => i.toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 7 + 13).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 31) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 17 + 42) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 3).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 53 + 97) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * i) % 256).toUInt8
+    ]
+    let zSeeds : Array Seed32 := #[
+      Vector.ofFn fun _ => (0x11 : UInt8),
+      Vector.ofFn fun _ => (0xEE : UInt8),
+      Vector.ofFn fun ⟨i, _⟩ => (32 + i).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (0xFE - i).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 3 + 7).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 41) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 23 + 99) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 5 + 1).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 61 + 37) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * i + i) % 256).toUInt8
+    ]
+    let mSeeds : Array Message := #[
+      Vector.ofFn fun _ => (0x55 : UInt8),
+      Vector.ofFn fun _ => (0xAA : UInt8),
+      Vector.ofFn fun ⟨i, _⟩ => i.toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (0xFF - i).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 11 + 3).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 37) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 19 + 77) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => (i * 7 + 2).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * 47 + 13) % 256).toUInt8,
+      Vector.ofFn fun ⟨i, _⟩ => ((i * i * 3) % 256).toUInt8
+    ]
+    for i in [0:dSeeds.size] do
+      let d := dSeeds[i]!
+      let z := zSeeds[i]!
+      let m := mSeeds[i]!
+      let coins64 := vecToBA d ++ vecToBA z
+
+      let (ekRef, dkRef) := FFI.mlkemKeypairDerand coins64
+      let (ekLean, dkLean) := keygenInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives d z
+      let ekB := serializeEK ekLean
+      let dkB := serializeDK dkLean
+      check st s!"batch[{i}] ek: Lean = native" (ekB == ekRef)
+      check st s!"batch[{i}] dk: Lean = native" (dkB == dkRef)
+
+      let (ctRef, ssRef) := FFI.mlkemEncDerand ekRef (vecToBA m)
+      let (ssLean, ctLean) := encapsInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives ekLean m
+      let ctB := serializeCT ctLean
+      let ssB := vecToBA ssLean
+      check st s!"batch[{i}] ct: Lean = native" (ctB == ctRef)
+      check st s!"batch[{i}] ss_enc: Lean = native" (ssB == ssRef)
+
+      let ssDecRef := FFI.mlkemDec dkRef ctRef
+      let ssDecLean := decapsInternal concreteNTTRingOps mlkem768Encoding
+        mlkem768Primitives dkLean ctLean
+      check st s!"batch[{i}] ss_dec: Lean = native"
+        (vecToBA ssDecLean == ssDecRef)
+      check st s!"batch[{i}] roundtrip" (ssB == vecToBA ssDecLean)
+  IO.println ""
+
+  -- ── 17. Negative tests ─────────────────────────────────
+  IO.println "17. Negative tests"
+  do
+    let d1 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 11 + 5).toUInt8
+    let z1 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 13 + 7).toUInt8
+    let d2 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 19 + 3).toUInt8
+    let z2 : Seed32 := Vector.ofFn fun ⟨i, _⟩ => (i * 23 + 1).toUInt8
+    let m : Message := Vector.ofFn fun _ => (0x77 : UInt8)
+
+    let (ekLean1, dkLean1) := keygenInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives d1 z1
+    let (_ekLean2, dkLean2) := keygenInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives d2 z2
+    let coins1 := vecToBA d1 ++ vecToBA z1
+    let coins2 := vecToBA d2 ++ vecToBA z2
+    let (ekRef1, dkRef1) := FFI.mlkemKeypairDerand coins1
+    let (_ekRef2, dkRef2) := FFI.mlkemKeypairDerand coins2
+
+    let (ssEnc, ctLean) := encapsInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives ekLean1 m
+    let (ctRef, ssRef) := FFI.mlkemEncDerand ekRef1 (vecToBA m)
+    let ctB := serializeCT ctLean
+
+    let ssDecWrongKeyLean := decapsInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives dkLean2 ctLean
+    check st "wrong key: Lean decaps ≠ original ss" (ssEnc != ssDecWrongKeyLean)
+    let ssDecWrongKeyNative := FFI.mlkemDec dkRef2 ctRef
+    check st "wrong key: native decaps ≠ original ss" (ssRef != ssDecWrongKeyNative)
+    let ssDecWrongKeyLeanBA := vecToBA ssDecWrongKeyLean
+    let ssDecWrongKeyNativeBA := ssDecWrongKeyNative
+    check st "wrong key: Lean = native (implicit rejection)"
+      (ssDecWrongKeyLeanBA == ssDecWrongKeyNativeBA)
+    let zeroCt := ByteArray.mk (Array.replicate ctB.size 0)
+    let ssDecZeroNative := FFI.mlkemDec dkRef1 zeroCt
+    let zeroCtLean : KPKE.Ciphertext mlkem768 mlkem768Encoding :=
+      let uSize := ctLean.uEncoded.size
+      { uEncoded := ByteArray.mk (Array.replicate uSize 0),
+        vEncoded := ByteArray.mk (Array.replicate (ctB.size - uSize) 0) }
+    let ssDecZeroLean := decapsInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives dkLean1 zeroCtLean
+    check st "all-zero ct: Lean = native (implicit rejection)"
+      (vecToBA ssDecZeroLean == ssDecZeroNative)
+    check st "all-zero ct: ss ≠ original" (vecToBA ssDecZeroLean != vecToBA ssEnc)
+    let corruptedCtRef := ctRef.set! 0 (ctRef[0]! ^^^ 0xFF)
+    let ssDecCorruptNative := FFI.mlkemDec dkRef1 corruptedCtRef
+    check st "corrupted ct: native decaps ≠ original ss" (ssDecCorruptNative != ssRef)
+    let corruptedCtLean : KPKE.Ciphertext mlkem768 mlkem768Encoding :=
+      let origU : ByteArray := ctLean.uEncoded
+      let flipped := origU.set! 0 (origU[0]! ^^^ 0xFF)
+      { ctLean with uEncoded := flipped }
+    let ssDecCorruptLean := decapsInternal concreteNTTRingOps mlkem768Encoding
+      mlkem768Primitives dkLean1 corruptedCtLean
+    check st "corrupted ct: Lean = native (implicit rejection)"
+      (vecToBA ssDecCorruptLean == ssDecCorruptNative)
+  IO.println ""
   let s ← st.get
   IO.println s!"=== {s.passed} passed, {s.failed} failed ==="
   if s.failed > 0 then

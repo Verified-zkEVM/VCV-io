@@ -35,21 +35,37 @@ abbrev sha3_512 := FFI.Hashing.sha3_512
 abbrev shake256 := FFI.Hashing.shake256
 abbrev shake128 := FFI.Hashing.shake128
 
-/-! ## End-to-end ML-KEM (deterministic, ML-KEM-768) -/
+/-! ## ML-KEM-768 (deterministic) -/
 
-/-- Deterministic key generation (FIPS 203 Algorithm 16).
-    Input: 64 bytes of coins `d ‖ z`. Output: `(ek, dk)`. -/
 @[extern "lean_mlkem_keypair_derand"]
 opaque mlkemKeypairDerand : @& ByteArray → ByteArray × ByteArray
 
-/-- Deterministic encapsulation (FIPS 203 Algorithm 17).
-    Input: encapsulation key `ek`, 32-byte message `m`. Output: `(ct, ss)`. -/
 @[extern "lean_mlkem_enc_derand"]
 opaque mlkemEncDerand : @& ByteArray → @& ByteArray → ByteArray × ByteArray
 
-/-- Decapsulation (FIPS 203 Algorithm 18/21).
-    Input: decapsulation key `dk`, ciphertext `ct`. Output: shared secret `ss`. -/
 @[extern "lean_mlkem_dec"]
 opaque mlkemDec : @& ByteArray → @& ByteArray → ByteArray
+
+/-! ## ML-KEM-512 (deterministic) -/
+
+@[extern "lean_mlkem512_keypair_derand"]
+opaque mlkem512KeypairDerand : @& ByteArray → ByteArray × ByteArray
+
+@[extern "lean_mlkem512_enc_derand"]
+opaque mlkem512EncDerand : @& ByteArray → @& ByteArray → ByteArray × ByteArray
+
+@[extern "lean_mlkem512_dec"]
+opaque mlkem512Dec : @& ByteArray → @& ByteArray → ByteArray
+
+/-! ## ML-KEM-1024 (deterministic) -/
+
+@[extern "lean_mlkem1024_keypair_derand"]
+opaque mlkem1024KeypairDerand : @& ByteArray → ByteArray × ByteArray
+
+@[extern "lean_mlkem1024_enc_derand"]
+opaque mlkem1024EncDerand : @& ByteArray → @& ByteArray → ByteArray × ByteArray
+
+@[extern "lean_mlkem1024_dec"]
+opaque mlkem1024Dec : @& ByteArray → @& ByteArray → ByteArray
 
 end MLKEM.Concrete.FFI

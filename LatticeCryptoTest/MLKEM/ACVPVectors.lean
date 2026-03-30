@@ -6,14 +6,14 @@ Authors: Quang Dao
 import LatticeCryptoTest.MLKEM.Helpers
 
 /-!
-# NIST ACVP Test Vectors for ML-KEM-768
+# ML-KEM-768 Test Vectors
 
-Hardcoded test vectors from the NIST ACVP server
-(https://github.com/usnistgov/ACVP-Server, ML-KEM-keyGen-FIPS203, tgId=2).
+Keygen vectors originate from the NIST ACVP server
+(https://github.com/usnistgov/ACVP-Server, ML-KEM-keyGen-FIPS203).
 
-We store the full `d`, `z` inputs and the first 32 bytes of the expected `ek` and `dk` outputs
-as fingerprints. The full byte-exact comparison against mlkem-native is done in the main test
-suite; these vectors provide an independent cross-check against the official NIST expected values.
+Encapsulation vectors specify keygen coins `d`, `z` and an encaps message `m` (all hex-encoded).
+The test generates keys, encapsulates, decapsulates, and compares Lean vs mlkem-native
+byte-exactly.
 -/
 
 set_option autoImplicit false
@@ -43,6 +43,41 @@ def keyGenVectors : Array KeyGenVector := #[
     z := "00F6EEC72778E02ACD04BB056113C571982E45018BEAC566EC59953724F38A4B"
     ekFirst32 := "EAD840B81B03BFE75805595DCF0808B83738AF14C758920F80E209D68B9192C5"
     dkFirst32 := "C397104AE63A279795F3243F6EAC3A74AA0B414C822A668664826003F7CEDC26" }
+]
+
+/-! ## Encapsulation / decapsulation vectors (ML-KEM-768)
+
+Each vector specifies keygen coins `d`, `z` and an encaps message `m` (all 32-byte hex).
+The test generates keys, encapsulates, decapsulates with both Lean and mlkem-native, and
+compares byte-exactly. -/
+
+structure EncDecapVector where
+  tcId : Nat
+  d : String
+  z : String
+  m : String
+
+def encDecapVectors : Array EncDecapVector := #[
+  { tcId := 1
+    d := "A2B4BCA315A6EA4600B4A316E09A2578AA1E8BCE919C8DF3A96C71C843F5B38B"
+    z := "D6BF055CB7B375E3271ED131F1BA31F83FEF533A239878A71074578B891265D1"
+    m := "48656C6C6F576F726C6448656C6C6F576F726C6448656C6C6F576F726C644821" },
+  { tcId := 2
+    d := "6DBB99AE6889AF01DA387D7D99BD4E91BACB11A6051B14AECD4C96F30CD9F9D9"
+    z := "360557CADDFCF5FEE7C0DE6A363F095757588C35A3FD11C58677AB5E8797C2B8"
+    m := "0000000000000000000000000000000000000000000000000000000000000000" },
+  { tcId := 3
+    d := "7725321C56F925868FF834F5D1EE90A70332AA9283434E122C60A8D474AC6C0F"
+    z := "00F6EEC72778E02ACD04BB056113C571982E45018BEAC566EC59953724F38A4B"
+    m := "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" },
+  { tcId := 4
+    d := "0000000000000000000000000000000000000000000000000000000000000000"
+    z := "0000000000000000000000000000000000000000000000000000000000000000"
+    m := "5555555555555555555555555555555555555555555555555555555555555555" },
+  { tcId := 5
+    d := "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+    z := "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
+    m := "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" }
 ]
 
 end MLKEM.Test.ACVP

@@ -100,4 +100,34 @@ def serializeCT (ct : KPKE.Ciphertext mlkem768 mlkem768Encoding) : ByteArray :=
   let v : ByteArray := ct.vEncoded
   u ++ v
 
+/-! ## FIPS 203 serialization (ML-KEM-512) -/
+
+def serializeEK512 (ek : KPKE.PublicKey mlkem512 mlkem512Encoding) : ByteArray :=
+  let t : ByteArray := ek.tHatEncoded
+  t ++ vecToBA ek.rho
+
+def serializeDK512 (dk : DecapsulationKey mlkem512 mlkem512Encoding) : ByteArray :=
+  let s : ByteArray := dk.dkPKE.sHatEncoded
+  s ++ serializeEK512 dk.ekPKE ++ vecToBA dk.ekHash ++ vecToBA dk.z
+
+def serializeCT512 (ct : KPKE.Ciphertext mlkem512 mlkem512Encoding) : ByteArray :=
+  let u : ByteArray := ct.uEncoded
+  let v : ByteArray := ct.vEncoded
+  u ++ v
+
+/-! ## FIPS 203 serialization (ML-KEM-1024) -/
+
+def serializeEK1024 (ek : KPKE.PublicKey mlkem1024 mlkem1024Encoding) : ByteArray :=
+  let t : ByteArray := ek.tHatEncoded
+  t ++ vecToBA ek.rho
+
+def serializeDK1024 (dk : DecapsulationKey mlkem1024 mlkem1024Encoding) : ByteArray :=
+  let s : ByteArray := dk.dkPKE.sHatEncoded
+  s ++ serializeEK1024 dk.ekPKE ++ vecToBA dk.ekHash ++ vecToBA dk.z
+
+def serializeCT1024 (ct : KPKE.Ciphertext mlkem1024 mlkem1024Encoding) : ByteArray :=
+  let u : ByteArray := ct.uEncoded
+  let v : ByteArray := ct.vEncoded
+  u ++ v
+
 end MLKEM.Test
