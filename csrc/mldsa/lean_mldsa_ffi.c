@@ -22,6 +22,8 @@
 #define MLDSA65_PK_BYTES MLDSA_PUBLICKEYBYTES(65)
 #define MLDSA65_SK_BYTES MLDSA_SECRETKEYBYTES(65)
 #define MLDSA65_SIG_BYTES MLDSA_BYTES(65)
+#define MLDSA_SEED_BYTES 32
+#define MLDSA_RND_BYTES 32
 
 static lean_obj_res lean_mk_byte_array_copy(const uint8_t *src, size_t n) {
   lean_object *arr = lean_alloc_sarray(1, n, n);
@@ -43,6 +45,10 @@ static lean_obj_res lean_mk_pair(lean_obj_res a, lean_obj_res b) {
  * Output: (pk, sk) pair as serialized byte arrays.
  */
 LEAN_EXPORT lean_obj_res lean_mldsa_keypair_internal(b_lean_obj_arg seed) {
+  if (lean_sarray_size(seed) != MLDSA_SEED_BYTES) {
+    return lean_mk_pair(lean_mk_byte_array_copy((const uint8_t *)"", 0),
+                        lean_mk_byte_array_copy((const uint8_t *)"", 0));
+  }
   const uint8_t *seed_ptr = lean_sarray_cptr(seed);
   uint8_t pk[MLDSA65_PK_BYTES];
   uint8_t sk[MLDSA65_SK_BYTES];
@@ -63,6 +69,10 @@ LEAN_EXPORT lean_obj_res lean_mldsa_keypair_internal(b_lean_obj_arg seed) {
 LEAN_EXPORT lean_obj_res lean_mldsa_sign_internal(b_lean_obj_arg sk,
                                                    b_lean_obj_arg msg,
                                                    b_lean_obj_arg rnd) {
+  if (lean_sarray_size(sk) != MLDSA65_SK_BYTES ||
+      lean_sarray_size(rnd) != MLDSA_RND_BYTES) {
+    return lean_mk_byte_array_copy((const uint8_t *)"", 0);
+  }
   const uint8_t *sk_ptr = lean_sarray_cptr(sk);
   const uint8_t *msg_ptr = lean_sarray_cptr(msg);
   size_t msg_len = lean_sarray_size(msg);
@@ -90,6 +100,10 @@ LEAN_EXPORT lean_obj_res lean_mldsa_sign_internal(b_lean_obj_arg sk,
 LEAN_EXPORT uint8_t lean_mldsa_verify_internal(b_lean_obj_arg pk,
                                                 b_lean_obj_arg msg,
                                                 b_lean_obj_arg sig) {
+  if (lean_sarray_size(pk) != MLDSA65_PK_BYTES ||
+      lean_sarray_size(sig) != MLDSA65_SIG_BYTES) {
+    return 0;
+  }
   const uint8_t *pk_ptr = lean_sarray_cptr(pk);
   const uint8_t *msg_ptr = lean_sarray_cptr(msg);
   size_t msg_len = lean_sarray_size(msg);
