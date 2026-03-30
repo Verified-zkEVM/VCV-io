@@ -1,0 +1,81 @@
+/-
+Copyright (c) 2026 Quang Dao. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Quang Dao
+-/
+import LatticeCrypto.Falcon.Concrete.Instance
+import LatticeCrypto.Falcon.Concrete.FFI
+import LatticeCrypto.Falcon.Concrete.FPR
+import LatticeCrypto.Falcon.Concrete.SamplerZ
+
+/-!
+# Falcon Test Helpers
+
+Shared test infrastructure: pass/fail counter, hex formatting, and utility
+functions used by the Falcon test suite.
+-/
+
+set_option autoImplicit false
+
+namespace Falcon.Test
+
+/-! ## Test harness -/
+
+structure TestState where
+  passed : Nat := 0
+  failed : Nat := 0
+
+def check (ref : IO.Ref TestState) (name : String) (ok : Bool)
+    (detail : String := "") : IO Unit := do
+  if ok then
+    IO.println s!"  ✓ {name}"
+    ref.modify fun s => { s with passed := s.passed + 1 }
+  else
+    IO.println s!"  ✗ {name} {detail}"
+    ref.modify fun s => { s with failed := s.failed + 1 }
+
+/-! ## Hex formatting -/
+
+def hexByte (b : UInt8) : String :=
+  let hi := b.toNat / 16
+  let lo := b.toNat % 16
+  let c (n : Nat) : Char := if n < 10 then Char.ofNat (48 + n) else Char.ofNat (55 + n)
+  String.ofList [c hi, c lo]
+
+def toHex (ba : ByteArray) (maxBytes : Nat := 8) : String :=
+  let pfx := Id.run do
+    let mut parts : Array String := Array.mkEmpty (min ba.size maxBytes)
+    for i in [0:min ba.size maxBytes] do
+      parts := parts.push (hexByte (ba[i]!))
+    return String.join parts.toList
+  pfx ++ if ba.size > maxBytes then "…" else ""
+
+def parseHex (s : String) : ByteArray := Id.run do
+  let chars := s.toList.toArray
+  let mut out := ByteArray.empty
+  let mut i := 0
+  while i + 1 < chars.size do
+    let hi := hexVal (chars.getD i ' ')
+    let lo := hexVal (chars.getD (i + 1) ' ')
+    out := out.push (hi * 16 + lo).toUInt8
+    i := i + 2
+  return out
+where
+  hexVal (c : Char) : Nat :=
+    if '0' ≤ c && c ≤ '9' then c.toNat - '0'.toNat
+    else if 'a' ≤ c && c ≤ 'f' then c.toNat - 'a'.toNat + 10
+    else if 'A' ≤ c && c ≤ 'F' then c.toNat - 'A'.toNat + 10
+    else 0
+
+/-! ## ByteArray / Vector conversion -/
+
+def vectorToByteArray {n : Nat} (v : Vector UInt8 n) : ByteArray :=
+  ByteArray.mk v.toArray
+
+def byteArrayToVector (ba : ByteArray) (offset len : Nat) :
+    Vector UInt8 len :=
+  Vector.ofFn fun ⟨i, _⟩ =>
+    let idx := offset + i
+    if h : idx < ba.size then ba[idx] else 0
+
+end Falcon.Test

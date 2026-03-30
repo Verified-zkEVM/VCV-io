@@ -88,13 +88,13 @@ noncomputable def params : ParameterSet → Params
       sigma := (1657366171829776 : ℝ) / 10000000000000
       sigmaMin := (12778336969128337 : ℝ) / 10000000000000000
       betaSquared := 34034726
-      sbytelen := 666 }
+      sbytelen := 625 }
   | .Falcon1024 => {
       n := 1024
       sigma := (16838857144654395 : ℝ) / 100000000000000
       sigmaMin := (1298280334344292 : ℝ) / 1000000000000000
       betaSquared := 70265242
-      sbytelen := 1280 }
+      sbytelen := 1239 }
 
 end ParameterSet
 
