@@ -125,23 +125,21 @@ end CommitmentRecoverability
 section Impersonation
 
 /-- An adversary for the impersonation game against an identification scheme with aborts.
-The adversary sees the public key (statement) and must produce a commitment, then respond
-to a challenge. -/
-structure ImpAdv (ids : IdenSchemeWithAbort S W W' St C Z p) where
-  commit (s : S) : ProbComp W'
-  respond (s : S) (c : C) : ProbComp Z
+The adversary sees the public key (statement), produces a commitment together with an
+internal state, and then responds to a challenge using that state. -/
+structure ImpAdv (ids : IdenSchemeWithAbort S W W' St C Z p) (AdvSt : Type) where
+  commit (s : S) : ProbComp (W' × AdvSt)
+  respond (s : S) (c : C) (st : AdvSt) : ProbComp Z
 
-variable [SampleableType S] [SampleableType C]
-  [unifSpec.Fintype] [unifSpec.Inhabited]
+variable [SampleableType C] [unifSpec.Fintype] [unifSpec.Inhabited]
 
 /-- The impersonation experiment: the adversary tries to produce a valid transcript
-without knowing the witness. -/
+without knowing the witness, against a fixed statement `s`. -/
 def impExp {ids : IdenSchemeWithAbort S W W' St C Z p}
-    (adv : ImpAdv ids) : ProbComp Bool := do
-  let s ← $ᵗ S
-  let w' ← adv.commit s
+    {AdvSt : Type} (adv : ImpAdv ids AdvSt) (s : S) : ProbComp Bool := do
+  let (w', st) ← adv.commit s
   let c ← $ᵗ C
-  let z ← adv.respond s c
+  let z ← adv.respond s c st
   return ids.verify s w' c z
 
 end Impersonation

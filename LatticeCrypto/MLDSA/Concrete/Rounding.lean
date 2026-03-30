@@ -1877,7 +1877,7 @@ theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
 theorem concreteRounding_hide_low_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
     LatticeCrypto.cInfNorm s ≤ b →
-    LatticeCrypto.cInfNorm (lowBits p r) < p.gamma2 - b →
+    LatticeCrypto.cInfNorm (lowBits p r) + b < p.gamma2 →
     highBits p (r + s) = highBits p r := by
   intro hs hlow
   have hfin : ∀ j : Fin ringDegree, (highBits p (r + s)).get j = (highBits p r).get j := by
@@ -1886,7 +1886,8 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
       exact (LatticeCrypto.cInfNorm_le_iff.mp hs) j
     have hlowj0 :
         (LatticeCrypto.centeredRepr ((lowBits p r).get j)).natAbs < p.gamma2 - b := by
-      exact lt_of_le_of_lt (LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j) hlow
+      have hcoeff := LatticeCrypto.coeff_le_cInfNorm (lowBits p r) j
+      omega
     have hlowj : (lowBitsCoeff (r.get j) p.gamma2).natAbs < p.gamma2 - b := by
       have hq := gamma2_double_lt_modulus_of_isApproved hp
       rw [lowBits_get, lowBits_centeredRepr (r := r.get j)
@@ -1926,7 +1927,7 @@ theorem concreteRounding_useHint_correct_field_of_isApproved (p : Params)
 theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
     LatticeCrypto.cInfNorm s ≤ b →
-    LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) < (2 * p.gamma2) / 2 - b →
+    LatticeCrypto.cInfNorm ((concreteRoundingOps p).lowBits r) + b < (2 * p.gamma2) / 2 →
     (concreteRoundingOps p).highBits (r + s) = (concreteRoundingOps p).highBits r := by
   intro hs hlow
   have hhalf : (2 * p.gamma2) / 2 = p.gamma2 := by
@@ -1937,7 +1938,7 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
 theorem concretePower2RoundLaws :
     @LatticeCrypto.Power2RoundOps.Laws Rq instRqAddCommGroup droppedBits
       concretePower2RoundOps LatticeCrypto.cInfNorm := by
-  exact concretePower2Round_bound_field
+  exact ⟨concretePower2Round_bound_field⟩
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
     @LatticeCrypto.RoundingOps.Laws Rq instRqAddCommGroup (2 * p.gamma2)

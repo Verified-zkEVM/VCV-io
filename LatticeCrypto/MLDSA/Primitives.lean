@@ -173,7 +173,7 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   then adding `s` does not change the high-order bits. -/
   hide_low : ∀ (r s : Rq) (b : ℕ),
     polyNorm s ≤ b →
-    polyNorm (prims.lowBits r) < p.gamma2 - b →
+    polyNorm (prims.lowBits r) + b < p.gamma2 →
     prims.highBits (r + s) = prims.highBits r
   /-- `highBitsShift` is injective: distinct high-order representatives produce
   distinct ring elements. -/

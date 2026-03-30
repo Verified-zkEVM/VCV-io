@@ -44,6 +44,7 @@ theorem centeredRepr_of_le {x : ZMod q} (h : (x.val : ℤ) ≤ (q : ℤ) / 2) :
   unfold centeredRepr; exact if_pos h
 
 omit [NeZero q] in
+@[simp]
 theorem centeredRepr_of_gt {x : ZMod q} (h : (q : ℤ) / 2 < (x.val : ℤ)) :
     centeredRepr x = (x.val : ℤ) - q := by
   unfold centeredRepr; exact if_neg (not_le.mpr h)

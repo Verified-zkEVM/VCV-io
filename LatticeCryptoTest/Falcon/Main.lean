@@ -43,20 +43,19 @@ private def testFalcon1024 : Params where
   betaSquared := 70265242
   sbytelen := 1239
 
+private def u64ToHex (v : UInt64) : String := Id.run do
+  let mut s := ""
+  for i in [0:16] do
+    let nibble := ((v >>> ((15 - i) * 4).toUInt64) &&& 0xF).toNat
+    let digit :=
+      if nibble < 10 then Char.ofNat (48 + nibble) else Char.ofNat (55 + nibble)
+    s := s.push digit
+  return s
+
 private def checkFPR (st : IO.Ref TestState) (name : String)
     (got expected : FPR) : IO Unit :=
   check st name (got == expected)
-    s!"got=0x{hexU64 got} exp=0x{hexU64 expected}"
-where
-  hexU64 (v : UInt64) : String := Id.run do
-    let mut s := ""
-    for i in [0:16] do
-      let nibble := ((v >>> ((15 - i) * 4).toUInt64) &&& 0xF).toNat
-      s := s ++ (if nibble < 10 then
-        String.ofList [Char.ofNat (48 + nibble)]
-      else
-        String.ofList [Char.ofNat (55 + nibble)])
-    return s
+    s!"got=0x{u64ToHex got} exp=0x{u64ToHex expected}"
 
 private def flush : IO Unit := IO.getStdout >>= IO.FS.Stream.flush
 
@@ -285,10 +284,10 @@ def main : IO Unit := do
   do
     check st "expm_p63(zero, half) = 2^62"
       (expm_p63 zero half == (0x4000000000000000 : UInt64))
-      s!"got=0x{reprHex (expm_p63 zero half)}"
+      s!"got=0x{u64ToHex (expm_p63 zero half)}"
     check st "expm_p63(half, half)"
       (expm_p63 half half == (0x26D165F8DF2C11B0 : UInt64))
-      s!"got=0x{reprHex (expm_p63 half half)}"
+      s!"got=0x{u64ToHex (expm_p63 half half)}"
   IO.println ""
 
   -- ── 12. SamplerZ components ────────────────────
@@ -847,13 +846,3 @@ def main : IO Unit := do
   IO.println s!"=== {s.passed} passed, {s.failed} failed ==="
   if s.failed > 0 then
     IO.Process.exit 1
-where
-  reprHex (v : UInt64) : String := Id.run do
-    let mut s := ""
-    for i in [0:16] do
-      let nibble := ((v >>> ((15 - i) * 4).toUInt64) &&& 0xF).toNat
-      s := s ++ (if nibble < 10 then
-        String.ofList [Char.ofNat (48 + nibble)]
-      else
-        String.ofList [Char.ofNat (55 + nibble)])
-    return s

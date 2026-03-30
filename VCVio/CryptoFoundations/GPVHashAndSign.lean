@@ -151,6 +151,26 @@ def hashQueryBound {S' α : Type}
       | .inl (.inl _) | .inr _ => b
       | .inl (.inr _) => b - 1)
 
+/-- A preimage-finding adversary receives a public key and a target in the image of
+`psf.eval`, and must return a short preimage. -/
+abbrev PreimageAdversary := PK → Range → ProbComp Domain
+
+/-- Keyed preimage-finding experiment for a preimage sampleable function. -/
+def preimageFindingExp [SampleableType Domain]
+    (adversary : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range)) :
+    ProbComp Bool := do
+  let keyPair ← hr.gen
+  let pk := keyPair.1
+  let x ← $ᵗ Domain
+  let x' ← adversary pk (psf.eval pk x)
+  return decide (psf.eval pk x' = psf.eval pk x) && psf.isShort x'
+
+/-- Success probability in the keyed preimage-finding experiment. -/
+noncomputable def preimageFindingAdvantage [SampleableType Domain]
+    (adversary : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range)) :
+    ℝ≥0∞ :=
+  Pr[= true | preimageFindingExp (psf := psf) (hr := hr) adversary]
+
 /-- **GPV EUF-CMA security in the random-oracle model.**
 
 For any adversary `A` against the GPV hash-and-sign scheme, there exists a preimage-finding
@@ -168,11 +188,12 @@ The proof is a standard GPV argument:
    which directly yields a preimage-finding adversary.
 
 Reference: GPV08, Theorem 6.1; see also BDF+11 for the QROM extension. -/
-theorem euf_cma_bound [DecidableEq Domain]
+theorem euf_cma_bound [DecidableEq Domain] [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv (GPVHashAndSign psf hr M Salt)) :
-    ∃ (reduction : PK → ProbComp SK) (collisionBound : ENNReal),
+    ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
+      (collisionBound : ENNReal),
       adv.advantage ≤
-        Pr[= true | hardRelationExp (r := p) reduction] + collisionBound := by
+        preimageFindingAdvantage (psf := psf) (hr := hr) reduction + collisionBound := by
   sorry
 
 end GPVHashAndSign

@@ -50,7 +50,7 @@ def hexByte (b : UInt8) : String :=
 def toHex (ba : ByteArray) (maxBytes : Nat := 8) : String :=
   let pfx := Id.run do
     let mut parts : Array String := Array.mkEmpty (min ba.size maxBytes)
-    for i in [0:min ba.size maxBytes] do
+    for i in [:min ba.size maxBytes] do
       parts := parts.push (hexByte (ba[i]!))
     return String.join parts.toList
   pfx ++ if ba.size > maxBytes then "…" else ""

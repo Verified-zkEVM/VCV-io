@@ -188,14 +188,14 @@ Proof strategy:
 1. `useHint_makeHint` with `z = -ct₀`: need `polyNorm (-ct₀) ≤ γ₂`, from `cInfNorm_neg`.
 2. Result: `highBits((r + ct₀) + (-ct₀)) = highBits(r)` — need `r + ct₀ + (-ct₀) = r`.
 3. `hide_low` with perturbation `s`: `highBits(r + s) = highBits(r)` when
-   `polyNorm s ≤ β` and `polyNorm(lowBits(r)) < γ₂ - β`. -/
+   `polyNorm s ≤ β` and `polyNorm(lowBits(r)) + β < γ₂`. -/
 lemma useHint_makeHint_eq_highBits
     (h_useHint_makeHint : ∀ z r : Rq,
       polyNorm z ≤ p.gamma2 →
       prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
     (h_hide_low : ∀ (r s : Rq) (b : ℕ),
       polyNorm s ≤ b →
-      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      polyNorm (prims.lowBits r) + b < p.gamma2 →
       prims.highBits (r + s) = prims.highBits r)
     (w_j r_j ct0_j s_j : Rq)
     (h_r_eq : r_j = w_j - s_j)
@@ -210,7 +210,9 @@ lemma useHint_makeHint_eq_highBits
     exact h_norm_ct0
   rw [h_useHint_makeHint (-ct0_j) (r_j + ct0_j) h_neg_norm]
   rw [rq_add_neg_cancel]
-  have h_hide := h_hide_low r_j s_j p.beta h_s_bound h_norm_r0
+  have h_low_sum : polyNorm (prims.lowBits r_j) + p.beta < p.gamma2 := by
+    omega
+  have h_hide := h_hide_low r_j s_j p.beta h_s_bound h_low_sum
   rw [← h_hide]
   have h_sum : r_j + s_j = w_j := by rw [h_r_eq]; exact rq_sub_add_cancel w_j s_j
   rw [h_sum]
@@ -225,7 +227,7 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
       prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
     (h_hide_low : ∀ (r s : Rq) (b : ℕ),
       polyNorm s ≤ b →
-      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      polyNorm (prims.lowBits r) + b < p.gamma2 →
       prims.highBits (r + s) = prims.highBits r)
     (w cs2 ct0 : RqVec p.k)
     (h_norm_ct0 : polyVecNorm ct0 < p.gamma2)
@@ -272,7 +274,7 @@ theorem fipsSign_fipsVerify_correct'
       prims.useHint (prims.makeHint z r) r = prims.highBits (r + z))
     (h_hide_low : ∀ (r s : Rq) (b : ℕ),
       polyNorm s ≤ b →
-      polyNorm (prims.lowBits r) < p.gamma2 - b →
+      polyNorm (prims.lowBits r) + b < p.gamma2 →
       prims.highBits (r + s) = prims.highBits r)
     (h_wApprox_eq : ∀ (c : Rq) (y : RqVec p.l),
       computeWApprox p prims nttOps (prims.expandA pk.rho) c

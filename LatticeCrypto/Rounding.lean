@@ -74,7 +74,7 @@ structure RoundingOps.Laws {Rq : Type*} [AddCommGroup Rq]
   /-- If the perturbation `s` is small enough relative to the low-order part of `r`,
   then adding `s` does not change the high-order bits. -/
   hide_low : ∀ (r s : Rq) (b : ℕ),
-    cInfNorm s ≤ b → cInfNorm (ops.lowBits r) < α / 2 - b →
+    cInfNorm s ≤ b → cInfNorm (ops.lowBits r) + b < α / 2 →
     ops.highBits (r + s) = ops.highBits r
   /-- `shift` is injective on the image of `highBits`. -/
   shift_injective : Function.Injective ops.shift
@@ -87,9 +87,9 @@ structure RoundingOps.Laws {Rq : Type*} [AddCommGroup Rq]
     cInfNorm (r - ops.shift (ops.useHint h r)) ≤ α + 1
 
 /-- Algebraic laws for `Power2RoundOps`. -/
-abbrev Power2RoundOps.Laws {Rq : Type*} [AddCommGroup Rq]
+structure Power2RoundOps.Laws {Rq : Type*} [AddCommGroup Rq]
     {d : ℕ} (ops : Power2RoundOps Rq d)
-    (cInfNorm : Rq → ℕ) : Prop :=
-  ∀ r : Rq, cInfNorm (r - ops.shift2 (ops.power2Round r)) ≤ 2 ^ (d - 1)
+    (cInfNorm : Rq → ℕ) : Prop where
+  power2Round_bound : ∀ r : Rq, cInfNorm (r - ops.shift2 (ops.power2Round r)) ≤ 2 ^ (d - 1)
 
 end LatticeCrypto

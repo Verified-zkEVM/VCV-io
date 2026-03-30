@@ -40,7 +40,7 @@ open OracleComp OracleSpec
 variable {S W W' St C Z : Type}
   {p : S → W → Bool}
   [SampleableType S] [SampleableType W]
-  [DecidableEq W'] [DecidableEq C] [SampleableType C]
+  [DecidableEq W'] [SampleableType C]
 
 /-- Signing retry loop with early return for the Fiat-Shamir with aborts transform.
 
@@ -119,10 +119,6 @@ variable (ids : IdenSchemeWithAbort S W W' St C Z p)
 
 section EUF_CMA
 
-set_option linter.unusedDecidableInType false
-
-variable [DecidableEq Z]
-
 /-- Structural query bound counting only random-oracle queries in a
 Fiat-Shamir with aborts EUF-CMA adversary. -/
 def hashQueryBound {S' α : Type}
@@ -156,7 +152,7 @@ abort probability `p`, the regularity failure probability `δ`, and the query bo
 The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE +
 SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
 `MLDSA.euf_cma_security`. -/
-theorem euf_cma_bound
+theorem euf_cma_bound [DecidableEq Z]
     (_hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
     (_hhvzk : ids.HVZK sim)

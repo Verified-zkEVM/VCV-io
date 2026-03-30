@@ -60,15 +60,16 @@ variable [SampleableType Coins]
 
 /-- **K-PKE δ-correctness.**
 
-For honestly generated keys, decryption recovers the encrypted plaintext with probability
-at least `1 - δ`. The failure probability `δ` depends on the noise distribution parameters
+For honestly generated keys, there exists a concrete failure bound `δ` such that decryption
+recovers the encrypted plaintext with probability at least `1 - δ`. The failure probability
+depends on the noise distribution parameters
 (η₁, η₂) and compression parameters (d_u, d_v); concrete values are given in FIPS 203 Table 1:
 
 - ML-KEM-512:  δ ≈ 2⁻¹³⁸·⁸
 - ML-KEM-768:  δ ≈ 2⁻¹⁶⁴·⁸
 - ML-KEM-1024: δ ≈ 2⁻¹⁷⁴·⁸ -/
-theorem kpke_deltaCorrect (δ : ℝ≥0∞) :
-    (KPKE.asExplicitCoins params ring encoding prims).deltaCorrect δ := by
+theorem kpke_delta_correct :
+    ∃ δ : ℝ≥0∞, (KPKE.asExplicitCoins params ring encoding prims).deltaCorrect δ := by
   sorry
 
 end Correctness
@@ -94,15 +95,17 @@ When `t` is uniform, the ciphertext carries no information about which of the tw
 messages was encrypted, so the adversary's advantage is 0. The gap between the two cases
 is exactly the MLWE advantage.
 
-The MLWE problem instance is parameterized abstractly; the concrete instantiation uses
-`k×k` matrices over `T_q` with secrets and errors sampled from `CBD(η₁)` in the NTT domain. -/
-theorem kpke_ind_cpa_security
-    (mlwe : LearningWithErrors.Problem
-      (TqMatrix params.k params.k) (TqVec params.k) (TqVec params.k)) :
-    ∀ (cpaAdv : (KPKE.asExplicitCoins params ring encoding prims).toAsymmEncAlg.IND_CPA_adversary),
-    ∃ (mlweAdv : LearningWithErrors.Adversary mlwe),
-      (IND_CPA_advantage cpaAdv).toReal ≤
-        |LearningWithErrors.advantage mlwe mlweAdv| := by
+The concrete instantiation uses `k×k` matrices over `T_q` with secrets and errors sampled
+from `CBD(η₁)` in the NTT domain. -/
+theorem kpke_ind_cpa_security :
+    ∃ mlwe : LearningWithErrors.Problem
+        (TqMatrix params.k params.k) (TqVec params.k) (TqVec params.k),
+      ∀
+        (cpaAdv :
+          (KPKE.asExplicitCoins params ring encoding prims).toAsymmEncAlg.IND_CPA_adversary),
+        ∃ (mlweAdv : LearningWithErrors.Adversary mlwe),
+          (IND_CPA_advantage cpaAdv).toReal ≤
+            |LearningWithErrors.advantage mlwe mlweAdv| := by
   sorry
 
 end KPKE_IND_CPA
@@ -159,18 +162,22 @@ The proof composes three reductions:
 2. **IND-CPA → MLWE**: Each IND-CPA term reduces to an MLWE advantage.
 3. **Concrete parameters**: `ε_msg = 1/|Message| = 2⁻²⁵⁶` and `δ` from FIPS 203 Table 1. -/
 theorem ind_cca_security
-    (mlwe : LearningWithErrors.Problem
-      (TqMatrix params.k params.k) (TqVec params.k) (TqVec params.k))
-    (correctnessBound epsMsg : ℝ) (qHK : ℕ) :
-    ∀ (adv : (foKEMScheme params ring encoding prims).IND_CCA_Adversary),
-    ∃ (mlweAdv₁ mlweAdv₂ : LearningWithErrors.Adversary mlwe)
-      (prfAdv : PRFScheme.PRFAdversary (KPKE.Ciphertext params encoding) SharedSecret),
-      (foKEMScheme params ring encoding prims).IND_CCA_Advantage adv ≤
-        2 * |LearningWithErrors.advantage mlwe mlweAdv₁| +
-        2 * |LearningWithErrors.advantage mlwe mlweAdv₂| +
-        PRFScheme.prfAdvantage (prfJ params encoding prims) prfAdv +
-        ((2 * qHK + 3 : ℕ) : ℝ) * correctnessBound +
-        2 * ((2 * qHK + 2 : ℕ) : ℝ) * epsMsg := by
+    (correctnessBound epsMsg : ℝ) (qHK : ℕ)
+    (h_correct :
+      (KPKE.asExplicitCoins params ring encoding prims).deltaCorrect
+        (ENNReal.ofReal correctnessBound))
+    (h_epsMsg : epsMsg = (2 : ℝ) ^ (-(256 : ℤ))) :
+    ∃ mlwe : LearningWithErrors.Problem
+        (TqMatrix params.k params.k) (TqVec params.k) (TqVec params.k),
+      ∀ (adv : (foKEMScheme params ring encoding prims).IND_CCA_Adversary),
+        ∃ (mlweAdv₁ mlweAdv₂ : LearningWithErrors.Adversary mlwe)
+          (prfAdv : PRFScheme.PRFAdversary (KPKE.Ciphertext params encoding) SharedSecret),
+          (foKEMScheme params ring encoding prims).IND_CCA_Advantage adv ≤
+            2 * |LearningWithErrors.advantage mlwe mlweAdv₁| +
+            2 * |LearningWithErrors.advantage mlwe mlweAdv₂| +
+            PRFScheme.prfAdvantage (prfJ params encoding prims) prfAdv +
+            ((2 * qHK + 3 : ℕ) : ℝ) * correctnessBound +
+            2 * ((2 * qHK + 2 : ℕ) : ℝ) * epsMsg := by
   sorry
 
 end IND_CCA
