@@ -22,9 +22,9 @@ function for testing.
    the testable surface.
 
 2. **`concretePrimitives`**: Fills the abstract `Primitives` structure with
-   concrete implementations for executable fields (`hashToPoint`, `compress`,
-   `decompress`, `nttOps`) and a `sorry`'d ideal discrete Gaussian for
-   `samplerZ`. Used for the proof bridge, never executed.
+   concrete implementations for executable fields (`publicKeyBytes`,
+   `hashToPoint`, `compress`, `decompress`, `nttOps`) and a `sorry`'d ideal
+   discrete Gaussian for `samplerZ`. Used for the proof bridge, never executed.
 -/
 
 set_option autoImplicit false
@@ -39,6 +39,7 @@ open Falcon
 `ZMod` typeclass dispatch and heap allocation overhead. Computes the same result
 as `negacyclicMul` but ~1000× faster for `q = 12289`. -/
 def negacyclicMulU32 {n : ℕ} (f g : Rq n) : Rq n := Id.run do
+  let q : UInt32 := modulus.toUInt32
   let fa := f.toArray.map (fun c => (ZMod.val c).toUInt32)
   let ga := g.toArray.map (fun c => (ZMod.val c).toUInt32)
   let mut out : Array UInt32 := Array.replicate n 0
@@ -46,28 +47,29 @@ def negacyclicMulU32 {n : ℕ} (f g : Rq n) : Rq n := Id.run do
     let fi := fa.getD i 0
     for j in [0:n] do
       let gj := ga.getD j 0
-      let prod := fi * gj % 12289
+      let prod := fi * gj % q
       let k := (i + j) % n
       let cur := out.getD k 0
       if i + j < n then
         let s := cur + prod
-        out := out.set! k (if s >= 12289 then s - 12289 else s)
+        out := out.set! k (if s >= q then s - q else s)
       else
-        out := out.set! k (if cur >= prod then cur - prod else cur + 12289 - prod)
+        out := out.set! k (if cur >= prod then cur - prod else cur + q - prod)
   return Vector.ofFn fun ⟨i, _⟩ => (Nat.cast (out.getD i 0).toNat : ZMod modulus)
 
 /-- Fast squared ℓ₂ norm of a pair of polynomials using `Int32`/`UInt64`
 arithmetic, avoiding `ℤ` and `Finset.sum` overhead. -/
 def pairL2NormSqU32 {n : ℕ} (s₁ s₂ : Rq n) : Nat := Id.run do
-  let halfQ : UInt32 := 6144
+  let q : Int64 := modulus.toUInt64.toInt64
+  let halfQ : UInt32 := (modulus / 2).toUInt32
   let mut sqn : UInt64 := 0
   for i in [0:n] do
     let v := (ZMod.val (s₁.getD i 0)).toUInt32
-    let c : Int64 := if v ≤ halfQ then v.toUInt64.toInt64 else v.toUInt64.toInt64 - 12289
+    let c : Int64 := if v ≤ halfQ then v.toUInt64.toInt64 else v.toUInt64.toInt64 - q
     sqn := sqn + (c * c).toUInt64
   for i in [0:n] do
     let v := (ZMod.val (s₂.getD i 0)).toUInt32
-    let c : Int64 := if v ≤ halfQ then v.toUInt64.toInt64 else v.toUInt64.toInt64 - 12289
+    let c : Int64 := if v ≤ halfQ then v.toUInt64.toInt64 else v.toUInt64.toInt64 - q
     sqn := sqn + (c * c).toUInt64
   return sqn.toNat
 
@@ -92,11 +94,22 @@ def concreteVerify (p : Params) (pk : ByteArray) (msg : List Byte)
 
 noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
     Primitives p where
-  hashToPoint := fun salt msg => hashToPoint p.n salt ByteArray.empty msg
+  publicKeyBytes := fun h => publicKeyBytes p.logn h
+  hashToPoint := fun salt pkBytes msg => hashToPoint p.n salt pkBytes msg
   samplerZ := fun _μ _σ => sorry
   compress := compress p.n
   decompress := decompress p.n
-  nttOps := by rw [hn]; exact concreteNTTRingOps p.logn
+  nttOps := hn ▸ concreteNTTRingOps p.logn
+
+@[simp] theorem concretePrimitives_publicKeyBytes_eq
+    (p : Params) (hn : p.n = 2 ^ p.logn) (h : Rq p.n) :
+    (concretePrimitives p hn).publicKeyBytes h = publicKeyBytes p.logn h := rfl
+
+@[simp] theorem concretePrimitives_hashToPointForPublicKey_eq
+    (p : Params) (hn : p.n = 2 ^ p.logn) (h : Rq p.n)
+    (salt : Bytes 40) (msg : List Byte) :
+    (concretePrimitives p hn).hashToPointForPublicKey h salt msg =
+      hashToPoint p.n salt (publicKeyBytes p.logn h) msg := rfl
 
 /-! ## Named bundles -/
 

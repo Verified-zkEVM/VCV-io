@@ -30,6 +30,9 @@ namespace Falcon.Concrete
 
 open Falcon
 
+@[inline] private def hashToPointChunkBytes (n : ℕ) : Nat :=
+  max 64 (4 * n)
+
 def hashToPoint (n : ℕ) (salt : Bytes 40) (pk : ByteArray) (msg : List Byte) :
     Rq n := Id.run do
   let hk := FFI.Hashing.shake256 pk 64
@@ -37,13 +40,16 @@ def hashToPoint (n : ℕ) (salt : Bytes 40) (pk : ByteArray) (msg : List Byte) :
   input := input ++ hk
   input := input ++ ByteArray.mk #[0x00, 0x00]
   input := input ++ ByteArray.mk msg.toArray
-  let streamLen := 2 * (n + n)
-  let stream := FFI.Hashing.shake256 input streamLen.toUSize
-  let mut result : Array Coeff := #[]
+  let chunkBytes := hashToPointChunkBytes n
+  let mut streamLen := chunkBytes
+  let mut stream := FFI.Hashing.shake256 input streamLen.toUSize
+  let mut result : Array Coeff := Array.mkEmpty n
   let mut j := 0
   while result.size < n do
     if j + 1 ≥ stream.size then
-      result := result.push 0
+      -- SHAKE-256 is extendable, so grow the stream instead of padding.
+      streamLen := streamLen + chunkBytes
+      stream := FFI.Hashing.shake256 input streamLen.toUSize
     else
       let hi := stream[j]!.toNat
       let lo := stream[j + 1]!.toNat

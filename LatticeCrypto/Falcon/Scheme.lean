@@ -110,7 +110,7 @@ def keyGenFromSeed (_seed : List Byte) : PublicKey p × SecretKey p := sorry
 
 Given `(pk, sk, message)`:
 1. Sample a 40-byte random salt `r`.
-2. Hash `c = HashToPoint(r ‖ message)` to get the target in `R_q`.
+2. Hash `c = HashToPoint(r, pk, message)` to get the target in `R_q`.
 3. Compute the FFT of the target vector `t = (t₀, t₁)` where:
    `t₀ = (1/q) · FFT(c) · FFT(F)`, `t₁ = (1/q) · FFT(c) · FFT(f)`.
 4. Call `ffSampling(t, tree)` to get integer vector `z = (z₀, z₁)`.
@@ -126,14 +126,14 @@ noncomputable def sign (pk : PublicKey p) (sk : SecretKey p) (msg : List Byte) :
 
 Given `(pk, message, signature)`:
 1. Decompress `s₂` from the signature.
-2. Recompute `c = HashToPoint(r ‖ message)`.
+2. Recompute `c = HashToPoint(r, pk, message)`.
 3. Compute `s₁ = c - s₂ · h mod q`.
 4. Accept iff `‖(s₁, s₂)‖₂² ≤ ⌊β²⌋`. -/
 def verify (pk : PublicKey p) (msg : List Byte) (sig : Signature) : Bool :=
   match prims.decompress sig.compressedS2 p.sbytelen with
   | none => false
   | some s2Int =>
-    let c := prims.hashToPoint sig.salt msg
+    let c := prims.hashToPointForPublicKey pk.h sig.salt msg
     let s2 := IntPoly.toRq s2Int
     let s1 := c - negacyclicMul s2 pk.h
     decide (pairL2NormSq s1 s2 ≤ p.betaSquared)

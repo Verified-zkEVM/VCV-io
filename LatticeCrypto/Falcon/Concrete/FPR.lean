@@ -242,6 +242,22 @@ def sqrt (x : FPR) : FPR := Id.run do
 Returns `⌊2^63 · ccs · exp(-x)⌋` using only integer multiply-add.
 The polynomial coefficients are from the FACCT paper (eprint 2018/1234). -/
 
+private def facctCoeffs : Array UInt64 := #[
+  0x00000004741183A3,
+  0x00000036548CFC06,
+  0x0000024FDCBF140A,
+  0x0000171D939DE045,
+  0x0000D00CF58F6F84,
+  0x000680681CF796E3,
+  0x002D82D8305B0FEA,
+  0x011111110E066FD0,
+  0x0555555555070F00,
+  0x155555555581FF00,
+  0x400000000002B400,
+  0x7FFFFFFFFFFF4800,
+  0x8000000000000000
+]
+
 private def mulHi64 (a b : UInt64) : UInt64 :=
   let aLo := a &&& 0xFFFFFFFF
   let aHi := a >>> 32
@@ -260,27 +276,12 @@ private def mulHi64 (a b : UInt64) : UInt64 :=
   m >>> ue.toUInt64
 
 def expm_p63 (x : FPR) (ccs : FPR) : UInt64 := Id.run do
-  let coeffs : Array UInt64 := #[
-    0x00000004741183A3,
-    0x00000036548CFC06,
-    0x0000024FDCBF140A,
-    0x0000171D939DE045,
-    0x0000D00CF58F6F84,
-    0x000680681CF796E3,
-    0x002D82D8305B0FEA,
-    0x011111110E066FD0,
-    0x0555555555070F00,
-    0x155555555581FF00,
-    0x400000000002B400,
-    0x7FFFFFFFFFFF4800,
-    0x8000000000000000
-  ]
   let z := (mtwop63 x) <<< 1
   let w := (mtwop63 ccs) <<< 1
-  let mut y := coeffs[0]!
-  for i in [1:coeffs.size] do
+  let mut y := facctCoeffs[0]!
+  for i in [1:facctCoeffs.size] do
     let hi := mulHi64 z y
-    y := coeffs[i]! - hi
+    y := facctCoeffs[i]! - hi
   return mulHi64 w y
 
 end Falcon.Concrete.FPR

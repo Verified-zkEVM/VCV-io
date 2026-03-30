@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.Falcon.Primitives
+import LatticeCrypto.Falcon.Scheme
 import LatticeCrypto.Falcon.Concrete.FPR
+import LatticeCrypto.Falcon.Concrete.Instance
+import LatticeCrypto.Falcon.Concrete.Encoding
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 /-!
@@ -79,16 +81,20 @@ theorem sqrt_error (a : FPR) (ha : 0 ≤ toReal a) :
 
 theorem expm_p63_error (x ccs : FPR)
     (hx : 0 ≤ toReal x) (hx' : toReal x < Real.log 2) :
-    |(FPR.expm_p63 x ccs).toNat / (2 : ℝ) ^ 63 -
-     toReal ccs * Real.exp (-(toReal x))| ≤
+    abs ((((FPR.expm_p63 x ccs).toNat : ℕ) : ℝ) / (2 : ℝ) ^ 63 -
+      (toReal ccs * Real.exp (-(toReal x)))) ≤
     (2 : ℝ) ^ (-(51 : ℤ)) := by
   sorry
 
 /-! ## End-to-end correctness -/
 
-theorem concrete_sign_produces_valid_signatures
-    (p : Falcon.Params) :
-    True := by
+theorem concrete_verify_eq_verify
+    (p : Falcon.Params) (hn : p.n = 2 ^ p.logn)
+    (pk : Falcon.PublicKey p) (msg : List Falcon.Byte) (sig : Falcon.Signature) :
+    let prims := Falcon.Concrete.concretePrimitives p hn;
+    Falcon.Concrete.concreteVerify p (prims.publicKeyBytes pk.h) msg
+      (Falcon.Concrete.sigEncode sig.salt sig.compressedS2 p.logn) =
+        Falcon.verify p prims pk msg sig := by
   sorry
 
 end

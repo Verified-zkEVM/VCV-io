@@ -45,34 +45,34 @@ open Falcon.Concrete.SamplerZ
 
 /-! ## Constants -/
 
-/-- Squared norm bound `β²` by `logn`. Falcon-512 (`logn = 9`) and Falcon-1024 (`logn = 10`)
-are the approved production parameter sets; smaller values are for testing. -/
-def betaSquaredForLogn (logn : Nat) : Nat :=
+/-- Squared norm bound `β²` by `logn`. Returns `none` for unsupported dimensions. -/
+def betaSquaredForLogn? (logn : Nat) : Option Nat :=
   match logn with
-  | 2  => 101498
-  | 3  => 208714
-  | 4  => 428865
-  | 5  => 892039
-  | 6  => 1852696
-  | 7  => 3842630
-  | 8  => 7959734
-  | 9  => 34034726
-  | 10 => 70265242
-  | _  => 0
+  | 2  => some 101498
+  | 3  => some 208714
+  | 4  => some 428865
+  | 5  => some 892039
+  | 6  => some 1852696
+  | 7  => some 3842630
+  | 8  => some 7959734
+  | 9  => some 34034726
+  | 10 => some 70265242
+  | _  => none
 
-/-- Compressed signature data length (bytes) by `logn`. -/
-def sbytelenForLogn (logn : Nat) : Nat :=
+/-- Compressed signature data length (bytes) by `logn`. Returns `none` for unsupported
+dimensions. -/
+def sbytelenForLogn? (logn : Nat) : Option Nat :=
   match logn with
-  | 2  => 44
-  | 3  => 47
-  | 4  => 52
-  | 5  => 63
-  | 6  => 82
-  | 7  => 122
-  | 8  => 200
-  | 9  => 625
-  | 10 => 1239
-  | _  => 0
+  | 2  => some 44
+  | 3  => some 47
+  | 4  => some 52
+  | 5  => some 63
+  | 6  => some 82
+  | 7  => some 122
+  | 8  => some 200
+  | 9  => some 625
+  | 10 => some 1239
+  | _  => none
 
 /-! ## PRNG helpers -/
 
@@ -216,6 +216,8 @@ Returns `some s₂` if the norm `‖(s₁, s₂)‖² ≤ β²`, or `none` to si
 def signAttempt (logn : Nat) (f g capF capG : Array Int32)
     (hm : Array UInt16) (prng : PRNGState) :
     Option (Array ℤ) × PRNGState := Id.run do
+  let some betaSquared := betaSquaredForLogn? logn
+    | return (none, prng)
   let n := 1 <<< logn
   let (b00, b01, b10, b11) := basisToFFT (F := F) logn f g capF capG
   let (g00, g01, g11) := fpolyGramFFT logn b00 b01 b10 b11
@@ -228,7 +230,7 @@ def signAttempt (logn : Nat) (f g capF capG : Array Int32)
   let z1fft : Array F := (Array.range n).map fun i => buf'.getD (n + i) FloatLike.zero
   let (v0, v1) := applyBasisToSampled logn z0fft z1fft b00 b01 b10 b11
   let (sqn, s2) := computeSignature logn hm v0 v1
-  if sqn ≤ betaSquaredForLogn logn then
+  if sqn ≤ betaSquared then
     return (some s2, prng')
   else
     return (none, prng')
@@ -244,8 +246,8 @@ Takes the secret key polynomials as `Array Int32`; use `int8ArrayToInt32` to con
 def concreteSign (logn : Nat) (f g capF capG : Array Int32)
     (pk : ByteArray) (msg : List Byte) (seed : ByteArray) : Option ByteArray := Id.run do
   let n := 1 <<< logn
-  let dlen := sbytelenForLogn logn
-  if dlen == 0 then return none
+  let some dlen := sbytelenForLogn? logn
+    | return none
   let mut masterPRNG := PRNGState.init seed
   for _ in [0:1000] do
     let (salt, prng1) := prngNextSalt masterPRNG

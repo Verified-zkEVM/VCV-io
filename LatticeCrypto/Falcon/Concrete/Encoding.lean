@@ -110,7 +110,12 @@ def decompress (n : ℕ) (d : List UInt8) (dlen : ℕ) : Option (IntPoly n) := I
 
 /-! ## Public key encoding (14 bits per coefficient) -/
 
+@[inline] def publicKeyHeader (logn : Nat) : UInt8 :=
+  (0x00 + logn).toUInt8
+
 def pkEncode (n : ℕ) (h : Rq n) : ByteArray := Id.run do
+  if n % 4 != 0 then
+    panic! s!"Falcon public-key encoding requires n divisible by 4, got {n}"
   let mut out := ByteArray.empty
   let mut i := 0
   while i + 3 < n do
@@ -129,6 +134,7 @@ def pkEncode (n : ℕ) (h : Rq n) : ByteArray := Id.run do
   return out
 
 def pkDecode (n : ℕ) (d : ByteArray) : Option (Rq n) := Id.run do
+  if n % 4 != 0 then return none
   let needed := 7 * n / 4
   if d.size < needed then return none
   let mut result : Array Coeff := Array.replicate n 0
@@ -155,6 +161,11 @@ def pkDecode (n : ℕ) (d : ByteArray) : Option (Rq n) := Id.run do
     result := result.set! (i+3) (h3 : Coeff)
     i := i + 4
   return some (Vector.ofFn fun ⟨i, _⟩ => result.getD i 0)
+
+/-- External public-key bytes used by FN-DSA verification and raw-message hashing:
+one header byte followed by the packed 14-bit coefficient encoding. -/
+def publicKeyBytes (logn : Nat) {n : ℕ} (h : Rq n) : ByteArray :=
+  ByteArray.mk #[publicKeyHeader logn] ++ pkEncode n h
 
 /-! ## Full signature encoding/decoding -/
 

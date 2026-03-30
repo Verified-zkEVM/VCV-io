@@ -45,7 +45,9 @@ instance : Inhabited F := ⟨FloatLike.zero⟩
   FloatLike.ofRawFPR (gmRaw.getD idx 0)
 
 @[inline] private def invSigmaLoad (logn : Nat) : F :=
-  FloatLike.ofRawFPR (invSigmaRaw.getD logn 0)
+  match invSigmaRaw[logn]? with
+  | some raw => FloatLike.ofRawFPR raw
+  | none => panic! s!"Falcon ffSampling does not support logn={logn}"
 
 @[inline] private def fZero : F := FloatLike.zero
 

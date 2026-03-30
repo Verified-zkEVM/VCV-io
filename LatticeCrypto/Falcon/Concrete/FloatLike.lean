@@ -80,46 +80,32 @@ private def floatOfInt64 (i : Int64) : Float :=
 
 private def floatOfInt32 (i : Int32) : Float := floatOfInt64 i.toInt64
 
-private def floatScaled (i : Int64) (sc : Int32) : Float := Id.run do
-  let base := floatOfInt64 i
-  let e := sc.toInt
-  if e >= 0 then
-    let mut r := base
-    for _ in [0:e.toNat] do r := r * 2.0
-    return r
-  else
-    let mut r := base
-    for _ in [0:(-e).toNat] do r := r / 2.0
-    return r
+private def floatScaled (i : Int64) (sc : Int32) : Float :=
+  (floatOfInt64 i).scaleB sc.toInt
 
 private def floatExpmP63 (x ccs : Float) : UInt64 :=
   let v := ccs * Float.exp (-x)
   let twoTo63 : Float := 9223372036854775808.0
   let result := v * twoTo63
   if result <= 0.0 then 0
-  else
-    let hi := Float.floor (result / 4294967296.0)
-    let lo := result - hi * 4294967296.0
-    let hiU : UInt64 := (Float.toUInt32 hi).toUInt64
-    let loU : UInt64 := (Float.toUInt32 (Float.floor lo)).toUInt64
-    (hiU <<< 32) ||| loU
+  else result.toUInt64
 
-private def floatOfRawFPR (bits : UInt64) : Float :=
-  let signBit := bits >>> 63
-  let rawExp := ((bits >>> 52) &&& 0x7FF).toNat
-  let mantissa := (bits &&& 0xFFFFFFFFFFFFF).toNat
-  if rawExp == 0 then
-    if signBit == 1 then -0.0 else 0.0
-  else if rawExp == 0x7FF then
-    0.0
+private def floatFloorInt64 (x : Float) : Int64 :=
+  let r := Float.floor x
+  if r >= 0.0 then r.toUInt64.toInt64
+  else (0 : Int64) - ((-r).toUInt64).toInt64
+
+private def floatRint (x : Float) : Int64 :=
+  let floorInt := floatFloorInt64 x
+  let frac := x - Float.floor x
+  if frac < 0.5 then
+    floorInt
+  else if frac > 0.5 then
+    floorInt + 1
+  else if (floorInt.toUInt64 &&& 1) == 0 then
+    floorInt
   else
-    let m : Float := Float.ofNat (mantissa + (1 <<< 52))
-    let e : Int := (rawExp : Int) - 1023 - 52
-    let scaled := if e ≥ 0 then
-      m * Float.ofNat (2 ^ e.toNat)
-    else
-      m / Float.ofNat (2 ^ (-e).toNat)
-    if signBit == 1 then -scaled else scaled
+    floorInt + 1
 
 instance : FloatLike Float where
   zero := 0.0
@@ -133,13 +119,7 @@ instance : FloatLike Float where
   ofInt := floatOfInt64
   ofInt32 := floatOfInt32
   scaled := floatScaled
-  rint x :=
-    let r := Float.round x
-    if r >= 0.0 then r.toUInt64.toInt64
-    else (0 : Int64) - ((-r).toUInt64).toInt64
-  floor_ x :=
-    let r := Float.floor x
-    if r >= 0.0 then r.toUInt64.toInt64
-    else (0 : Int64) - ((-r).toUInt64).toInt64
+  rint := floatRint
+  floor_ := floatFloorInt64
   expm_p63 := floatExpmP63
-  ofRawFPR := floatOfRawFPR
+  ofRawFPR := Float.ofBits

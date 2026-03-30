@@ -93,11 +93,15 @@ private structure GaussParams where
   tabLen : Nat
   zz : Nat
 
-private def getGaussParams (logn : Nat) : GaussParams :=
+private def getGaussParams? (logn : Nat) : Option GaussParams :=
   match logn with
-  | 9  => ⟨gauss512, 34, 1⟩
-  | 10 => ⟨gauss1024, 24, 1⟩
-  | _  => ⟨gauss256, 48, 1 <<< (8 - logn)⟩
+  | 9  => some ⟨gauss512, 34, 1⟩
+  | 10 => some ⟨gauss1024, 24, 1⟩
+  | _  =>
+    if logn ≤ 8 then
+      some ⟨gauss256, 48, 1 <<< (8 - logn)⟩
+    else
+      none
 
 /-! ## Gaussian CDT coefficient sampling
 
@@ -132,7 +136,8 @@ rejected unless it has odd parity (the sum of coefficients is odd).
 
 Port of `sample_f` from `kgen_gauss.c`. -/
 def sample_f (logn : Nat) (prng : PRNGState) : Array Int8 × PRNGState := Id.run do
-  let gp := getGaussParams logn
+  let some gp := getGaussParams? logn
+    | panic! s!"Falcon keygen does not support logn={logn}"
   let n := 1 <<< logn
   let mut state := prng
   for _ in [0:10000] do

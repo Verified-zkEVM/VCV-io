@@ -10,7 +10,7 @@ This file contains the precomputed twiddle factor (GM) table used in Falcon's FF
 extracted from the reference C implementation (`c-fn-dsa sign_fpoly.c`).
 
 The `gmRaw` array stores 2048 `UInt64` values representing IEEE 754 double-precision
-floating-point bit patterns for the roots of unity used in the Number Theoretic Transform.
+floating-point bit patterns for the complex twiddle factors used in Falcon's FFT.
 
 The `invSigmaRaw` array stores 11 `UInt64` values (for `logn` 0..10) representing the
 inverse of the normalization factor `sigma`.

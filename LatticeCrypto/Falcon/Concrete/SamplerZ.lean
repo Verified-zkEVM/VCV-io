@@ -149,6 +149,8 @@ section Generic
 
 variable {F : Type} [FloatLike F]
 
+instance : Inhabited F := ⟨FloatLike.zero⟩
+
 private def log2Const : F := FloatLike.scaled (6243314768165359 : Int64) (-53 : Int32)
 private def invLog2Const : F := FloatLike.scaled (6497320848556798 : Int64) (-52 : Int32)
 
@@ -205,31 +207,36 @@ private def sigmaMinConsts : Array F := #[
   FloatLike.scaled (5846934829975396 : Int64) (-52 : Int32)
 ]
 
+@[inline] private def sigmaMinForLogn (logn : Nat) : F :=
+  match (sigmaMinConsts (F := F))[logn]? with
+  | some sigmaMin => sigmaMin
+  | none => panic! s!"Falcon samplerZ does not support logn={logn}"
+
+partial def samplerZLoop (state : PRNGState) (sInt : Int64)
+    (r dss ccs : F) : Int32 × PRNGState :=
+  let (z0, s') := gaussian0 state
+  let (bByte, s'') := s'.nextByte
+  let b : Int32 := (bByte &&& 1).toUInt32.toInt32
+  let z := b + ((b <<< 1) - (1 : Int32)) * z0
+  let zF : F := FloatLike.ofInt32 z
+  let diff := FloatLike.sub zF r
+  let x_ := FloatLike.mul (FloatLike.mul diff diff) dss
+  let z0sq : F := FloatLike.ofInt32 (z0 * z0)
+  let x := FloatLike.sub x_ (FloatLike.mul z0sq (invSqr2Sigma0Const (F := F)))
+  let (accept, s''') := berExp s'' x ccs
+  if accept then
+    (sInt.toInt32 + z, s''')
+  else
+    samplerZLoop s''' sInt r dss ccs
+
 def samplerZ (logn : Nat) (s : PRNGState) (mu isigma : F) :
-    Int32 × PRNGState := Id.run do
+    Int32 × PRNGState :=
   let sInt := FloatLike.floor_ mu
   let r := FloatLike.sub mu (FloatLike.ofInt sInt)
   let dss := FloatLike.mul (FloatLike.mul isigma isigma) (FloatLike.half (F := F))
-  let sigmaMin := (sigmaMinConsts (F := F)).getD logn FloatLike.zero
+  let sigmaMin := sigmaMinForLogn (F := F) logn
   let ccs := FloatLike.mul isigma sigmaMin
-  let mut state := s
-  for _ in [0:1000] do
-    let (z0, s') := gaussian0 state
-    state := s'
-    let (bByte, s'') := state.nextByte
-    state := s''
-    let b : Int32 := (bByte &&& 1).toUInt32.toInt32
-    let z := b + ((b <<< 1) - (1 : Int32)) * z0
-    let zF : F := FloatLike.ofInt32 z
-    let diff := FloatLike.sub zF r
-    let x_ := FloatLike.mul (FloatLike.mul diff diff) dss
-    let z0sq : F := FloatLike.ofInt32 (z0 * z0)
-    let x := FloatLike.sub x_ (FloatLike.mul z0sq (invSqr2Sigma0Const (F := F)))
-    let (accept, s''') := berExp state x ccs
-    state := s'''
-    if accept then
-      return (sInt.toInt32 + z, state)
-  return (sInt.toInt32, state)
+  samplerZLoop (F := F) s sInt r dss ccs
 
 end Generic
 

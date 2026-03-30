@@ -437,10 +437,12 @@ def main : IO Unit := do
     check st "Float rint(one) = 1" (FloatLike.rint fOne == (1 : Int64))
     check st "Float rint(42) = 42" (FloatLike.rint (ofI 42) == (42 : Int64))
     check st "Float rint(-7) = -7" (FloatLike.rint (ofI (-7)) == (-7 : Int64))
-    -- Float.round uses round-away-from-zero, so rint(0.5) = 1 (vs FPR banker's 0)
-    check st "Float rint(half) = 1 (round-away-from-zero)"
-      (FloatLike.rint fHalf == (1 : Int64))
+    check st "Float rint(half) = 0 (ties-to-even)"
+      (FloatLike.rint fHalf == (0 : Int64))
     check st "Float rint(1.5) = 2" (FloatLike.rint (FloatLike.add fOne fHalf) == (2 : Int64))
+    check st "Float rint(2.5) = 2" (FloatLike.rint (FloatLike.add (ofI 2) fHalf) == (2 : Int64))
+    check st "Float rint(-half) = 0"
+      (FloatLike.rint (FloatLike.neg fHalf) == (0 : Int64))
 
     check st "Float floor_(one) = 1" (FloatLike.floor_ fOne == (1 : Int64))
     check st "Float floor_(half) = 0" (FloatLike.floor_ fHalf == (0 : Int64))
@@ -752,16 +754,16 @@ def main : IO Unit := do
   IO.println ""
   IO.println ""
 
-  -- ── 28. Cross-backend sign comparison ───────────
-  IO.println "28. Cross-backend: concreteSign Float vs Float (different seeds)"
+  -- ── 28. Pure-Lean signing smoke test ────────────
+  IO.println "28. Pure-Lean signing smoke test (Float)"
   do
     let seed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => (i.val * 2 + 1).toUInt8⟩
     let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
     match decodeSecretKey 9 sk with
-    | none => check st "decode sk for cross-backend" false
+    | none => check st "decode sk for signing smoke test" false
     | some (f, g, capF) =>
       match computeCapG512 capF pk with
-      | none => check st "compute G for cross-backend" false
+      | none => check st "compute G for signing smoke test" false
       | some capG =>
         let msg : ByteArray := ⟨#[0x54, 0x65, 0x73, 0x74]⟩
         let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>

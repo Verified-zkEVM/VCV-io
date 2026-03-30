@@ -54,10 +54,13 @@ inductive FalconTree : ℕ → Type where
 
 /-- The primitive algorithms referenced by the Falcon specification. -/
 structure Primitives (p : Params) where
-  /-- `HashToPoint(salt ‖ message, q, n)` (Algorithm 2): hash a salt-message pair to a
-  polynomial in `R_q` with coefficients uniform in `[0, q-1]`. This is the random oracle
-  `H` in the GPV framework. -/
-  hashToPoint : Bytes 40 → List Byte → Rq p.n
+  /-- External verification-key bytes used by the raw-message FN-DSA hash-to-point path.
+  In the concrete implementation this is the standard public-key encoding with its header. -/
+  publicKeyBytes : Rq p.n → ByteArray
+  /-- `HashToPoint(nonce, vrfy_key, message, q, n)` (FIPS 206, raw-message mode): hash a
+  salt-message pair together with the external verification-key bytes to a polynomial in `R_q`
+  with coefficients uniform in `[0, q-1]`. -/
+  hashToPoint : Bytes 40 → ByteArray → List Byte → Rq p.n
   /-- `SamplerZ(μ, σ')` (Algorithm 12): sample an integer `z` from the discrete Gaussian
   distribution `D_{ℤ,σ',μ}` centered at `μ ∈ ℝ` with standard deviation `σ' ∈ ℝ`. -/
   samplerZ : ℝ → ℝ → ProbComp ℤ
@@ -74,6 +77,11 @@ structure Primitives (p : Params) where
 namespace Primitives
 
 variable {p : Params} (prims : Primitives p)
+
+/-- Hash a message using the verification-key bytes derived from `pk`. -/
+@[inline] def hashToPointForPublicKey (pk : Rq p.n) (salt : Bytes 40) (msg : List Byte) :
+    Rq p.n :=
+  prims.hashToPoint salt (prims.publicKeyBytes pk) msg
 
 /-- `ffSampling(t, T)` (Algorithm 11): the fast Fourier sampling algorithm.
 
@@ -102,7 +110,7 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) : Prop where
   /-- `HashToPoint` output lies in `R_q` (coefficients in `[0, q-1]`).
   In the random oracle model, this is modeled by the random oracle itself;
   this law is a placeholder for any additional structural constraint. -/
-  hashToPoint_welldefined : True
+  hashToPoint_welldefined : ∀ (_salt : Bytes 40) (_vrfyKey : ByteArray) (_msg : List Byte), True
   /-- Compress/decompress roundtrip: decompressing a compressed polynomial recovers
   the original. -/
   compress_decompress : ∀ (s : IntPoly p.n) (slen : ℕ) (bytes : List Byte),
