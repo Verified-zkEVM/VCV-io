@@ -29,7 +29,6 @@ The `Float` type is intentionally avoided; see the plan for rationale.
 - Falcon specification v1.2, Section 3.8 (Algorithm 9: ffLDL*)
 -/
 
-set_option autoImplicit false
 
 open OracleComp
 
@@ -116,13 +115,7 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) : Prop where
   compress_decompress : ∀ (s : IntPoly p.n) (slen : ℕ) (bytes : List Byte),
     prims.compress s slen = some bytes →
     prims.decompress bytes slen = some s
-  /-- NTT roundtrip: `NTT⁻¹(NTT(f)) = f`. -/
-  ntt_invNTT : ∀ f : Rq p.n, prims.nttOps.invNTT (prims.nttOps.ntt f) = f
-  /-- Inverse NTT roundtrip: `NTT(NTT⁻¹(f̂)) = f̂`. -/
-  invNTT_ntt : ∀ fHat : Tq p.n, prims.nttOps.ntt (prims.nttOps.invNTT fHat) = fHat
-  /-- NTT multiplication correctness. -/
-  ntt_mul : ∀ f g : Rq p.n,
-    prims.nttOps.multiplyNTTs (prims.nttOps.ntt f) (prims.nttOps.ntt g) =
-    prims.nttOps.ntt (negacyclicMul f g)
+  /-- Generic transform laws for the instantiated Falcon ring backend. -/
+  transform : NTTRingLaws prims.nttOps
 
 end Falcon

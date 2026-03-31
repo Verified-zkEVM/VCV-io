@@ -25,7 +25,6 @@ spec executable without committing to one implementation yet.
 - NIST FIPS 204, Section 7 (supporting algorithms)
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA
 
@@ -150,19 +149,8 @@ structure Primitives.Laws {p : Params} (prims : Primitives p) (nttOps : NTTRingO
   /-- `ExpandMask(ρ'', κ)` produces masking vectors bounded by `γ₁ - 1`. -/
   expandMask_bound : ∀ rhoDoublePrime kappa,
     polyVecBounded (prims.expandMask rhoDoublePrime kappa) (p.gamma1 - 1)
-  /-- NTT roundtrip: `NTT⁻¹(NTT(f)) = f`. -/
-  ntt_invNTT : ∀ f : Rq, nttOps.invNTT (nttOps.ntt f) = f
-  /-- Inverse NTT roundtrip: `NTT(NTT⁻¹(f̂)) = f̂`. -/
-  invNTT_ntt : ∀ fHat : Tq, nttOps.ntt (nttOps.invNTT fHat) = fHat
-  /-- NTT distributes over addition, viewed in the coefficient-vector carrier of `T_q`. -/
-  ntt_add : ∀ f g : Rq, (nttOps.ntt (f + g) : Rq) = (nttOps.ntt f : Rq) + (nttOps.ntt g : Rq)
-  /-- NTT distributes over subtraction, viewed in the coefficient-vector carrier of `T_q`. -/
-  ntt_sub : ∀ f g : Rq, (nttOps.ntt (f - g) : Rq) = (nttOps.ntt f : Rq) - (nttOps.ntt g : Rq)
-  /-- NTT multiplication correctness:
-  `NTT(f) ⊙ NTT(g) = NTT(f * g)` where `*` is negacyclic multiplication. -/
-  ntt_mul : ∀ f g : Rq,
-    nttOps.multiplyNTTs (nttOps.ntt f) (nttOps.ntt g) =
-    nttOps.ntt (negacyclicMul f g)
+  /-- Generic transform laws for the instantiated ring backend. -/
+  transform : NTTRingLaws nttOps
   /-- Decomposition identity: `highBitsShift(highBits(r)) + lowBits(r) = r`. -/
   high_low_decomp : ∀ r : Rq,
     prims.highBitsShift (prims.highBits r) + prims.lowBits r = r

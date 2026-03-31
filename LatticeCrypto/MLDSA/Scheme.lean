@@ -45,7 +45,6 @@ This file models the **proof-level IDS** used in the Fiat-Shamir-with-aborts sec
 - NIST FIPS 204, Algorithms 7 and 8 (for the underlying arithmetic)
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec
 
@@ -78,30 +77,16 @@ abbrev Commitment := Vector prims.High p.k
 /-- The signature response: the short vector `z` paired with the hint `h`. -/
 abbrev Response := RqVec p.l × Vector prims.Hint p.k
 
-/-! ### Shared Arithmetic Helpers -/
-
-/-- Pointwise multiply scalar `cHat` by each component of `vHat` in NTT domain. -/
-def nttScalarVecMul (cHat : Tq) {k : ℕ} (vHat : TqVec k) : TqVec k :=
-  Vector.map (nttOps.multiplyNTTs cHat) vHat
-
-/-- Multiply polynomial `c` by polynomial vector `v` via NTT: `NTT⁻¹(NTT(c) ⊙ NTT(v))`. -/
-def polyVecMul (c : Rq) {k : ℕ} (v : RqVec k) : RqVec k :=
-  nttOps.invNTTVec (nttScalarVecMul nttOps (nttOps.ntt c) (nttOps.nttVec v))
-
-/-- Compute `w = NTT⁻¹(Â · NTT(y))`. -/
-def computeW {k l : ℕ} (aHat : TqMatrix k l) (y : RqVec l) : RqVec k :=
-  nttOps.invNTTVec (nttOps.matVecMul aHat (nttOps.nttVec y))
-
 /-- Compute `w'_Approx = NTT⁻¹(Â · NTT(z) - NTT(c) · NTT(t₁ · 2^d))` (Algorithm 8, line 9). -/
 def computeWApprox (aHat : TqMatrix p.k p.l) (c : ChallengePoly) (z : RqVec p.l)
     (t1 : Vector prims.Power2High p.k) : RqVec p.k :=
-  let cHat := nttOps.ntt c
-  let zHat := nttOps.nttVec z
+  let cHat := nttOps.toHat c
+  let zHat := nttOps.hatVec z
   let t1Shifted := prims.power2RoundShiftVec t1
-  let t1ShiftedHat := nttOps.nttVec t1Shifted
+  let t1ShiftedHat := nttOps.hatVec t1Shifted
   let azHat := nttOps.matVecMul aHat zHat
-  let ct1Hat := nttScalarVecMul nttOps cHat t1ShiftedHat
-  nttOps.invNTTVec (Vector.zipWith (· - ·) azHat ct1Hat)
+  let ct1Hat := nttOps.scalarVecMul cHat t1ShiftedHat
+  nttOps.unhatVec (Vector.zipWith (· - ·) azHat ct1Hat)
 
 /-! ### Key Generation -/
 
@@ -118,7 +103,7 @@ def keyGenFromSeed (seed : Bytes 32) : PublicKey p prims × SecretKey p :=
   let (rho, rhoPrime, key) := prims.expandSeed seed
   let aHat := prims.expandA rho
   let (s1, s2) := prims.expandS rhoPrime
-  let t := computeW nttOps aHat s1 + s2
+  let t := nttOps.coeffMatVecMul aHat s1 + s2
   let (t1, t0) := prims.power2RoundVec t
   let pk : PublicKey p prims := ⟨rho, t1⟩
   let tr := prims.hashPublicKey rho t1
@@ -159,17 +144,17 @@ noncomputable def identificationScheme
   commit := fun pk _sk => do
     let aHat := prims.expandA pk.rho
     let y ← $ᵗ (RqVec p.l)
-    let w := computeW nttOps aHat y
+    let w := nttOps.coeffMatVecMul aHat y
     let w1 := prims.highBitsVec w
     return (w1, ⟨y, w⟩)
   respond := fun _pk sk st cTilde => do
     let c := prims.sampleInBall cTilde
-    let cs1 := polyVecMul nttOps c sk.s1
-    let cs2 := polyVecMul nttOps c sk.s2
+    let cs1 := nttOps.coeffScalarVecMul c sk.s1
+    let cs2 := nttOps.coeffScalarVecMul c sk.s2
     let z := st.y + cs1
     let r0 := prims.lowBitsVec (st.w - cs2)
     if polyVecNorm z < p.gamma1 - p.beta ∧ polyVecNorm r0 < p.gamma2 - p.beta then do
-      let ct0 := polyVecMul nttOps c sk.t0
+      let ct0 := nttOps.coeffScalarVecMul c sk.t0
       let h := prims.makeHintVec (-ct0) (st.w - cs2 + ct0)
       if polyVecNorm ct0 < p.gamma2 ∧ prims.hintWeight h ≤ p.omega then
         return some (z, h)
@@ -206,9 +191,9 @@ theorem keyGenFromSeed_wApprox_eq
     let (pk, sk) := keyGenFromSeed p prims nttOps seed
     ∀ (c : Rq) (y : RqVec p.l),
       computeWApprox p prims nttOps (prims.expandA pk.rho) c
-        (y + polyVecMul nttOps c sk.s1) pk.t1 =
-      computeW nttOps (prims.expandA pk.rho) y - polyVecMul nttOps c sk.s2 +
-        polyVecMul nttOps c sk.t0 := by
+        (y + nttOps.coeffScalarVecMul c sk.s1) pk.t1 =
+      nttOps.coeffMatVecMul (prims.expandA pk.rho) y - nttOps.coeffScalarVecMul c sk.s2 +
+        nttOps.coeffScalarVecMul c sk.t0 := by
   sorry
 
 end MLDSA

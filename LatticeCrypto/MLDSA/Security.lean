@@ -45,14 +45,13 @@ The proof follows the structure:
 - EasyCrypt `FSabort.eca`, `HVZK_FSa.ec`, `SimplifiedScheme.ec` (formosa-crypto/dilithium)
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 
 namespace MLDSA
 
 variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
-  [DecidableEq prims.High]
+  [DecidableEq prims.High] [DecidableEq prims.Hint]
 
 section Properties
 

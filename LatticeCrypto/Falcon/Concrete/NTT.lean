@@ -22,7 +22,6 @@ with twiddle factors `ζ^(brv(k))` where `ζ` is a primitive `2n`-th root of uni
 - For `n = 512`:  `ζ = 11^(12288/1024) = 11^12 mod 12289`
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete
 
@@ -103,8 +102,9 @@ def invNTT (logn : ℕ) (fHat : Tq (2 ^ logn)) : Rq (2 ^ logn) :=
   butterflyInvNTT logn fHat
 
 def concreteNTTRingOps (logn : ℕ) : NTTRingOps (2 ^ logn) where
-  ntt := ntt logn
-  invNTT := invNTT logn
-  multiplyNTTs := multiplyNTTs
+  coeffOps := negacyclicOps (2 ^ logn)
+  toHat := ntt logn
+  fromHat := invNTT logn
+  mulHat := multiplyNTTs
 
 end Falcon.Concrete

@@ -24,9 +24,14 @@ centered coefficients.
 - EasyCrypt `DRing.eca` (abstract `cnorm` and `l1_norm` axioms)
 -/
 
-set_option autoImplicit false
 
 namespace LatticeCrypto
+
+/-- Optional norm bundle layered over a coefficient-domain carrier. -/
+structure NormOps (Rq : Type*) where
+  cInfNorm : Rq → ℕ
+  l1Norm : Rq → ℕ
+  l2NormSq : Rq → ℕ
 
 section CenteredRepr
 
@@ -244,5 +249,11 @@ def PolyVec.l2NormSq (v : PolyVec (ZMod q) n k) : ℕ :=
   ∑ j : Fin k, LatticeCrypto.l2NormSq (v.get j)
 
 end PolyVecL2Norm
+
+/-- The canonical norm bundle for vector-backed `ZMod q` polynomials. -/
+def zmodPolyNormOps (q n : ℕ) [NeZero q] : NormOps (Poly (ZMod q) n) where
+  cInfNorm := LatticeCrypto.cInfNorm
+  l1Norm := LatticeCrypto.l1Norm
+  l2NormSq := LatticeCrypto.l2NormSq
 
 end LatticeCrypto
