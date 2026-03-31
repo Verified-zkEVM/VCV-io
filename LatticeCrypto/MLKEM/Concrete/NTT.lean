@@ -171,10 +171,18 @@ private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : R
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
   LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
+-- 256×256 matrix inverse verified by native evaluation (~16.7M ZMod multiplications).
+set_option maxHeartbeats 800000 in
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
-  sorry
+  native_decide
+
+set_option maxHeartbeats 800000 in
+private theorem nttMatrix_invNTTMatrix_entry :
+    ∀ row col : Fin ringDegree,
+      (∑ k : Fin ringDegree, nttMatrix row k * invNTTMatrix k col) = idMatrix row col := by
+  native_decide
 
 /-- Proof-oriented NTT obtained from the transform matrix extracted from the algorithmic
 implementation on the standard basis. -/
@@ -203,7 +211,13 @@ theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
 
 /-- The concrete forward transform is a left inverse to the concrete inverse transform. -/
 theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
-  sorry
+  apply LatticeCrypto.TransformPoly.ext
+  calc
+    (ntt (invNTT fHat)).coeffs = applyMatrix idMatrix fHat.coeffs := by
+      simpa [invNTT, ntt] using
+        LatticeCrypto.NTTCert.applyMatrix_comp (backend := polyBackend)
+          nttMatrix invNTTMatrix idMatrix nttMatrix_invNTTMatrix_entry fHat.coeffs
+    _ = fHat.coeffs := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) fHat.coeffs
 
 private theorem hadd_rq (f g : Rq) :
     polyBackend.coeff (f + g) = fun i => polyBackend.coeff f i + polyBackend.coeff g i := by
