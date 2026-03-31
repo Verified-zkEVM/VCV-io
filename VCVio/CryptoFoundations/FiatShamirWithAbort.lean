@@ -184,36 +184,41 @@ The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE 
 SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
 `MLDSA.euf_cma_security`. -/
 theorem euf_cma_bound [DecidableEq Z]
-    (_hc : ids.Complete)
+    (hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
     (ζ_zk : ℝ)
-    (_hζ : 0 ≤ ζ_zk)
-    (_hhvzk : ids.HVZK sim ζ_zk)
+    (hζ : 0 ≤ ζ_zk)
+    (hhvzk : ids.HVZK sim ζ_zk)
     (recover : S → C → Z → W')
-    (_hcr : ids.CommitmentRecoverable recover)
+    (hcr : ids.CommitmentRecoverable recover)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort ids hr M maxAttempts))
     (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
-    (_hQ : ∀ pk, signHashQueryBound M
+    (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
       adv.advantage ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
+  let _ := hc
+  let _ := hζ
+  let _ := hhvzk
+  let _ := hcr
+  let _ := hQ
   sorry
 
 /-- Perfect-HVZK special case of `euf_cma_bound`, where the simulator contributes no
 `qS · ζ_zk` loss term. -/
 theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
-    (_hc : ids.Complete)
+    (hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
-    (_hhvzk : ids.PerfectHVZK sim)
+    (hhvzk : ids.PerfectHVZK sim)
     (recover : S → C → Z → W')
-    (_hcr : ids.CommitmentRecoverable recover)
+    (hcr : ids.CommitmentRecoverable recover)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort ids hr M maxAttempts))
     (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
-    (_hQ : ∀ pk, signHashQueryBound M
+    (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
       adv.advantage ≤
@@ -221,11 +226,11 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
   simpa using
     (euf_cma_bound (ids := ids) (hr := hr) (M := M) (maxAttempts := maxAttempts)
-      (_hc := _hc) (sim := sim) (ζ_zk := 0) (_hζ := le_rfl)
-      (_hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp _hhvzk)
-      (recover := recover) (_hcr := _hcr) (adv := adv)
+      (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
+      (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
+      (recover := recover) (hcr := hcr) (adv := adv)
       (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ) (hp := hp)
-      (_hQ := _hQ))
+      (hQ := hQ))
 
 end EUF_CMA
 
