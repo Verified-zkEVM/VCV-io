@@ -134,7 +134,7 @@ In the concrete ML-KEM instantiation, both `H₁` and `H₂` are derived from a 
 `G(m ‖ H(ek))`, which can be modeled via `FujisakiOkamoto.singleRO`. The two-RO formulation is
 used here because the composed FO security bound (`FujisakiOkamoto.IND_CCA_bound`) is stated for
 this variant. -/
-abbrev foKEMScheme :=
+noncomputable abbrev foKEMScheme :=
   FujisakiOkamoto
     (KPKE.asExplicitCoins params ring encoding prims)
     (fun (m : Message) (_c : KPKE.Ciphertext params encoding) => m)

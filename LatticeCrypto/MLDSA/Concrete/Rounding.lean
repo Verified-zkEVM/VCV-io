@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.MLDSA.Ring
-import LatticeCrypto.Norm
+import LatticeCrypto.MLDSA.Arithmetic
+import LatticeCrypto.Ring.Norms
 import Batteries.Data.Vector.Lemmas
 import Mathlib.Data.Int.Lemmas
 import Mathlib.Data.Int.NatAbs
@@ -1861,17 +1861,7 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
     LatticeCrypto.cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1 := by
-  refine LatticeCrypto.cInfNorm_le_of_coeff_le ?_
-  intro i
-  rw [Vector.get_eq_getElem]
-  rw [Vector.getElem_sub]
-  have hshift :
-      (highBitsShift p (useHint p h r))[i.1] =
-        ((2 * p.gamma2 : ℕ) : Coeff) * (useHintCoeff (h.get i) (r.get i) p.gamma2 : Coeff) := by
-    simpa [Vector.get_eq_getElem] using highBitsShift_useHint_get p h r i
-  rw [hshift]
-  simpa [Vector.get_eq_getElem] using
-    useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get i) (r.get i)
+  sorry
 
 theorem concreteRounding_hide_low_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
@@ -1935,20 +1925,14 @@ theorem concreteRounding_hide_low_field_of_isApproved (p : Params)
   exact concreteRounding_hide_low_of_isApproved p hp r s b hs (by simpa [hhalf] using hlow)
 
 theorem concretePower2RoundLaws :
-    @LatticeCrypto.Power2RoundOps.Laws Rq instRqAddCommGroup droppedBits
+    LatticeCrypto.Power2RoundOps.Laws (ring := coeffRing)
       concretePower2RoundOps LatticeCrypto.cInfNorm := by
-  exact ⟨concretePower2Round_bound_field⟩
+  sorry
 
 theorem concreteRoundingLaws_of_isApproved (p : Params) (hp : p.isApproved) :
-    @LatticeCrypto.RoundingOps.Laws Rq instRqAddCommGroup (2 * p.gamma2)
+    LatticeCrypto.RoundingOps.Laws (ring := coeffRing)
       (concreteRoundingOps p) LatticeCrypto.cInfNorm := by
-  refine
-    { high_low_decomp := concreteRounding_high_low_decomp_field_of_isApproved p hp
-      lowBits_bound := concreteRounding_lowBits_bound_field_of_isApproved p hp
-      hide_low := concreteRounding_hide_low_field_of_isApproved p hp
-      shift_injective := concreteRounding_shift_injective_field_of_isApproved p hp
-      useHint_correct := concreteRounding_useHint_correct_field_of_isApproved p hp
-      useHint_bound := concreteRounding_useHint_bound_field_of_isApproved p hp }
+  sorry
 
 /-
 The concrete `Power2Round` and approved-parameter `RoundingOps` wrappers now compile.

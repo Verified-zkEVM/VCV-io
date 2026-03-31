@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import FFI.Hashing
-import LatticeCrypto.Falcon.Ring
+import LatticeCrypto.Falcon.Arithmetic
 
 /-!
 # Concrete HashToPoint for Falcon

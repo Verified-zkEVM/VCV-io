@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.Falcon.Ring
+import LatticeCrypto.Falcon.Arithmetic
 
 /-!
 # Concrete NTT for Falcon
@@ -71,7 +71,7 @@ def butterflyNTT (logn : ℕ) (f : Rq (2 ^ logn)) : Tq (2 ^ logn) := Id.run do
 def butterflyInvNTT (logn : ℕ) (fHat : Tq (2 ^ logn)) : Rq (2 ^ logn) := Id.run do
   let n := 2 ^ logn
   let table := zetaTable logn
-  let mut a := fHat.coeffs.toArray
+  let mut a := fHat.toArray
   let mut k := n - 1
   let mut len := 1
   while len ≤ n / 2 do
@@ -102,9 +102,11 @@ def invNTT (logn : ℕ) (fHat : Tq (2 ^ logn)) : Rq (2 ^ logn) :=
   butterflyInvNTT logn fHat
 
 def concreteNTTRingOps (logn : ℕ) : NTTRingOps (2 ^ logn) where
-  coeffOps := negacyclicOps (2 ^ logn)
   toHat := ntt logn
   fromHat := invNTT logn
+  zeroHat := 0
+  addHat := (· + ·)
+  subHat := (· - ·)
   mulHat := multiplyNTTs
 
 end Falcon.Concrete

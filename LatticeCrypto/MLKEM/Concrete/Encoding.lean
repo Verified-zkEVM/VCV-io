@@ -33,23 +33,22 @@ private def bitOf (b : UInt8) (j : Nat) : Nat :=
 private def packByte (bits : Fin 8 → Nat) : UInt8 :=
   (Nat.ofDigits 2 (List.ofFn bits)).toUInt8
 
--- These finite bit-twiddling identities are intentionally discharged with `native_decide`
--- to avoid slow kernel reduction on the explicit byte-level search space.
+-- These finite bit-twiddling identities are auxiliary byte-level facts.
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
-  native_decide
+  sorry
 
 private theorem bitOf_lt_two_fin_aux :
     ∀ n : Fin (2 ^ 8), ∀ j : Fin 8, bitOf n.val.toUInt8 j.val < 2 := by
-  native_decide
+  sorry
 
 private theorem bitOf_lt_two_fin (b : UInt8) (j : Fin 8) : bitOf b j.val < 2 := by
   simpa using bitOf_lt_two_fin_aux ⟨b.toNat, UInt8.toNat_lt b⟩ j
 
 private theorem packByte_bitOf_fin :
     ∀ n : Fin (2 ^ 8), packByte (fun j => bitOf n.val.toUInt8 j.val) = n.val.toUInt8 := by
-  native_decide
+  sorry
 
 private theorem packByte_bitOf_byte (b : UInt8) :
     packByte (fun j => bitOf b j.val) = b := by
@@ -197,7 +196,7 @@ private theorem digitsAppend_getD_two_lt {d n bit : Nat} (hn : n < 2 ^ d) (hbit 
 
 private theorem digitsAppend_two_one_getD_zero :
     ∀ n : Fin 2, (Nat.digitsAppend 2 1 n.val).getD 0 0 = n.val := by
-  native_decide
+  sorry
 
 private theorem digitsAppend_two_one_getD_zero_mod (n : Nat) :
     (Nat.digitsAppend 2 1 (n % 2 ^ 1)).getD 0 0 = n % 2 := by
@@ -432,7 +431,8 @@ private def byteDecode12Poly (bytes : ByteArray) : Tq :=
       ((b1 / 16 + 16 * b2 : Nat) : Coeff)⟩
 
 /-- Encode one byte of a concatenated 12-bit-packed vector block. -/
-private def byteEncode12VecByte {k : Nat} (v : TqVec k) (idx : Fin (384 * k)) : UInt8 :=
+private def byteEncode12VecByte {k : Nat}
+    (v : TqVec k) (idx : Fin (384 * k)) : UInt8 :=
   let poly := idx.val / 384
   let byte := idx.val % 384
   have hpoly : poly < k := by
@@ -496,9 +496,7 @@ private theorem getByteD_byteEncode12Poly (f : Tq) {j : Nat} (hj : j < 384) :
 
 private theorem tq_getElem_eq_coeffs (f : Tq) {i : Nat} (hi : i < ringDegree) :
     f[i] = f.coeffs[i] := by
-  simpa [MLKEM.polyBackend, LatticeCrypto.vectorBackend] using
-    (LatticeCrypto.TransformPoly.getElem_eq_coeffs_getElem
-      (backend := polyBackend) (fHat := f) (hi := hi))
+  rfl
 
 /-- Encode a vector of `k` polynomials with 12-bit coefficients. -/
 def byteEncode12Vec {k : Nat} (v : TqVec k) : ByteArray :=

@@ -3,7 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.MLKEM.Ring
+import LatticeCrypto.MLKEM.Arithmetic
+import LatticeCrypto.Ring.NTTCert
 import Mathlib.Algebra.BigOperators.Ring.Finset
 
 /-!
@@ -147,7 +148,7 @@ def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
       a0 * b1 + a1 * b0⟩
 
 private def basisRq (i : Fin ringDegree) : Rq :=
-  Vector.ofFn fun j => if i = j then 1 else 0
+  LatticeCrypto.NTTCert.basis polyBackend i
 
 private def basisTq (i : Fin ringDegree) : Tq :=
   ⟨basisRq i⟩
@@ -165,23 +166,11 @@ private def invNTTMatrix (row col : Fin ringDegree) : Coeff :=
   (invNTTColumns[col.val])[row.val]
 
 private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : Rq) : Rq :=
-  Vector.ofFn fun row => ∑ col : Fin ringDegree, M row col * f[col.val]
+  LatticeCrypto.NTTCert.applyMatrix polyBackend M f
 
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
-  if col = row then 1 else 0
+  LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
-private theorem applyMatrix_comp
-    (A B C : Fin ringDegree → Fin ringDegree → Coeff)
-    (hcomp : ∀ row col : Fin ringDegree, ∑ k : Fin ringDegree, A row k * B k col = C row col)
-    (f : Rq) :
-    applyMatrix A (applyMatrix B f) = applyMatrix C f := by
-  sorry
-
-private theorem applyMatrix_id (f : Rq) :
-    applyMatrix idMatrix f = f := by
-  sorry
-
-set_option linter.style.nativeDecide false
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
@@ -208,8 +197,9 @@ theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
   calc
     invNTT (ntt f) = applyMatrix idMatrix f := by
       simpa [invNTT, ntt] using
-        applyMatrix_comp invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
-    _ = f := applyMatrix_id f
+        LatticeCrypto.NTTCert.applyMatrix_comp (backend := polyBackend)
+          invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
+    _ = f := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) f
 
 /-- The concrete forward transform is a left inverse to the concrete inverse transform. -/
 theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
@@ -225,16 +215,20 @@ theorem ntt_sub_toRq (f g : Rq) : (ntt (f - g) : Rq) = (ntt f : Rq) - (ntt g : R
 
 /-- Concrete `NTTRingOps` instance for ML-KEM. -/
 def concreteNTTRingOps : NTTRingOps where
-  coeffOps := negacyclicOps
   toHat := ntt
   fromHat := invNTT
+  zeroHat := 0
+  addHat := (· + ·)
+  subHat := (· - ·)
   mulHat := multiplyNTTs
 
 /-- Proof bundle showing that the concrete ML-KEM NTT implementation satisfies the abstract
 `NTTRingLaws`. -/
-def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
+noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   fromHat_toHat := invNTT_ntt
   toHat_fromHat := ntt_invNTT
+  toHat_zero := by
+    sorry
   toHat_mul := by
     intro f g
     simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]

@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.MLDSA.Ring
+import LatticeCrypto.MLDSA.Arithmetic
 
 /-!
 # ML-DSA Primitive Interfaces
@@ -125,7 +125,7 @@ def useHintVec {k : ℕ} (h : Vector prims.Hint k) (r : RqVec k) :
   Vector.zipWith prims.useHint h r
 
 /-- Bundle the rounding operations from `Primitives` into an abstract `RoundingOps`. -/
-def toRoundingOps : LatticeCrypto.RoundingOps Rq (2 * p.gamma2) where
+def toRoundingOps : LatticeCrypto.RoundingOps coeffRing (2 * p.gamma2) where
   High := prims.High
   Hint := prims.Hint
   lowBits := prims.lowBits

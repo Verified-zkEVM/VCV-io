@@ -134,7 +134,7 @@ theorem validKeyPair_eq_true_iff (pk : PublicKey p prims) (sk : SecretKey p) :
 - **Verify** (Alg 8, lines 8–13): check `‖z‖∞ < γ₁ - β`, reconstruct
   `w'_Approx = Az - c·(t₁·2^d)`, verify `UseHint(h, w'_Approx) = w₁` and
   hint weight `≤ ω`. -/
-noncomputable def identificationScheme
+def identificationScheme
     [DecidableEq prims.High] [SampleableType (RqVec p.l)] :
     IdenSchemeWithAbort
       (PublicKey p prims) (SecretKey p)

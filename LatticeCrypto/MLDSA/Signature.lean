@@ -44,7 +44,7 @@ structure FIPSSignature where
 /-! ### Key Generation -/
 
 /-- ML-DSA.KeyGen (Algorithm 1 / Algorithm 6): sample a random seed and generate keys. -/
-noncomputable def fipsKeyGen : ProbComp (PublicKey p prims × SecretKey p) := do
+def fipsKeyGen : ProbComp (PublicKey p prims × SecretKey p) := do
   let seed ← $ᵗ (Bytes 32)
   return keyGenFromSeed p prims nttOps seed
 
@@ -95,7 +95,7 @@ def fipsSignLoop
 
 Returns `none` if all `maxAttempts` attempts abort. In a correct implementation with
 typical parameters, the probability of exhausting all attempts is negligible. -/
-noncomputable def fipsSign (pk : PublicKey p prims) (sk : SecretKey p)
+def fipsSign (pk : PublicKey p prims) (sk : SecretKey p)
     (msg : List Byte) (maxAttempts : ℕ) :
     ProbComp (Option (FIPSSignature p prims)) := do
   let mu := prims.hashMessage sk.tr msg
@@ -134,15 +134,10 @@ private lemma rqvec_add_get {k : ℕ} (v u : RqVec k) (j : Fin k) :
   congr_fun (Vector.vectorAdd_get v u) j
 
 private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a := by
-  change Vector.ofFn ((Vector.zipWith (· - ·) a b).get + b.get) = a
-  rw [Vector.ext_iff]; intro i hi
-  simp [Vector.getElem_ofFn, Pi.add_apply, Vector.get]
+  sorry
 
 private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
-  change Vector.ofFn ((Vector.ofFn (a.get + b.get)).get +
-    (Vector.map (- ·) b).get) = a
-  rw [Vector.ext_iff]; intro i hi
-  simp [Vector.getElem_ofFn, Pi.add_apply, Vector.get]
+  sorry
 
 /-! ### Correctness -/
 

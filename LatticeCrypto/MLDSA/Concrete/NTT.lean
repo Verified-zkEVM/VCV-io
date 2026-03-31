@@ -3,7 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import LatticeCrypto.MLDSA.Ring
+import LatticeCrypto.MLDSA.Arithmetic
+import LatticeCrypto.Ring.NTTCert
 import Mathlib.Algebra.BigOperators.Ring.Finset
 
 /-!
@@ -96,7 +97,7 @@ def loopMultiplyNTTs (fHat gHat : Tq) : Tq :=
   ⟨Vector.ofFn fun i => fHat[i.val] * gHat[i.val]⟩
 
 private def basisRq (i : Fin ringDegree) : Rq :=
-  Vector.ofFn fun j => if i = j then 1 else 0
+  LatticeCrypto.NTTCert.basis polyBackend i
 
 private def basisTq (i : Fin ringDegree) : Tq :=
   ⟨basisRq i⟩
@@ -114,147 +115,11 @@ private def invNTTMatrix (row col : Fin ringDegree) : Coeff :=
   (invNTTColumns[col.val])[row.val]
 
 private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : Rq) : Rq :=
-  Vector.ofFn fun row => ∑ col : Fin ringDegree, M row col * f[col.val]
+  LatticeCrypto.NTTCert.applyMatrix polyBackend M f
 
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
-  if col = row then 1 else 0
+  LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
-private theorem applyMatrix_get
-    (M : Fin ringDegree → Fin ringDegree → Coeff) (f : Rq) {j : Nat} (hj : j < ringDegree) :
-    (applyMatrix M f)[j] = ∑ col : Fin ringDegree, M ⟨j, hj⟩ col * f[col.val] := by
-  rw [applyMatrix]
-  simp
-
-private theorem applyMatrix_comp
-    (A B C : Fin ringDegree → Fin ringDegree → Coeff)
-    (hcomp : ∀ row col : Fin ringDegree, ∑ k : Fin ringDegree, A row k * B k col = C row col)
-    (f : Rq) :
-    applyMatrix A (applyMatrix B f) = applyMatrix C f := by
-  apply Vector.ext
-  intro j hj
-  let jFin : Fin ringDegree := ⟨j, hj⟩
-  calc
-    (applyMatrix A (applyMatrix B f))[j]
-        = ∑ k : Fin ringDegree, A jFin k * (∑ i : Fin ringDegree, B k i * f[i.val]) := by
-            simp [applyMatrix, jFin]
-    _ = ∑ k : Fin ringDegree, ∑ i : Fin ringDegree, A jFin k * (B k i * f[i.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro k _
-          rw [Finset.mul_sum]
-    _ = ∑ i : Fin ringDegree, ∑ k : Fin ringDegree, A jFin k * (B k i * f[i.val]) := by
-          rw [Finset.sum_comm]
-    _ = ∑ i : Fin ringDegree, (∑ k : Fin ringDegree, A jFin k * B k i) * f[i.val] := by
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          calc
-            ∑ k : Fin ringDegree, A jFin k * (B k i * f[i.val])
-                = ∑ k : Fin ringDegree, (A jFin k * B k i) * f[i.val] := by
-                    refine Finset.sum_congr rfl ?_
-                    intro k _
-                    ring
-            _ = (∑ k : Fin ringDegree, A jFin k * B k i) * f[i.val] := by
-                    rw [Finset.sum_mul]
-    _ = ∑ i : Fin ringDegree, C jFin i * f[i.val] := by
-          refine Finset.sum_congr rfl ?_
-          intro i _
-          rw [hcomp jFin i]
-    _ = (applyMatrix C f)[j] := by
-          simp [applyMatrix, jFin]
-
-private theorem applyMatrix_id (f : Rq) :
-    applyMatrix idMatrix f = f := by
-  apply Vector.ext
-  intro j hj
-  let jFin : Fin ringDegree := ⟨j, hj⟩
-  rw [applyMatrix_get]
-  simp [idMatrix]
-
-private theorem applyMatrix_add
-    (M : Fin ringDegree → Fin ringDegree → Coeff) (f g : Rq) :
-    applyMatrix M (f + g) = applyMatrix M f + applyMatrix M g := by
-  apply Vector.ext
-  intro j hj
-  let jFin : Fin ringDegree := ⟨j, hj⟩
-  have hsum_add := applyMatrix_get M (f + g) hj
-  have hsum_f := applyMatrix_get M f hj
-  have hsum_g := applyMatrix_get M g hj
-  calc
-    (applyMatrix M (f + g))[j]
-        = ∑ col : Fin ringDegree, M jFin col * ((f + g)[col.val]) := hsum_add
-    _ = ∑ col : Fin ringDegree, M jFin col * (f[col.val] + g[col.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro col _
-          exact congrArg (fun x => M jFin col * x) (Vector.getElem_add f g col.val col.isLt)
-    _ = ∑ col : Fin ringDegree, (M jFin col * f[col.val] + M jFin col * g[col.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro col _
-          ring
-    _ = (∑ col : Fin ringDegree, M jFin col * f[col.val]) +
-          (∑ col : Fin ringDegree, M jFin col * g[col.val]) := by
-            rw [Finset.sum_add_distrib]
-    _ = (applyMatrix M f)[j] + (applyMatrix M g)[j] := by
-          rw [← hsum_f, ← hsum_g]
-    _ = (applyMatrix M f + applyMatrix M g)[j] := by
-          symm
-          exact Vector.getElem_add (applyMatrix M f) (applyMatrix M g) j hj
-
-private theorem applyMatrix_neg
-    (M : Fin ringDegree → Fin ringDegree → Coeff) (f : Rq) :
-    applyMatrix M (-f) = -applyMatrix M f := by
-  apply Vector.ext
-  intro j hj
-  let jFin : Fin ringDegree := ⟨j, hj⟩
-  have hsum_neg := applyMatrix_get M (-f) hj
-  have hsum_f := applyMatrix_get M f hj
-  calc
-    (applyMatrix M (-f))[j]
-        = ∑ col : Fin ringDegree, M jFin col * ((-f)[col.val]) := hsum_neg
-    _ = ∑ col : Fin ringDegree, -(M jFin col * f[col.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro col _
-          calc
-            M jFin col * ((-f)[col.val]) = M jFin col * (-f[col.val]) := by
-              exact congrArg (fun x => M jFin col * x) (Vector.getElem_neg f col.val col.isLt)
-            _ = -(M jFin col * f[col.val]) := by
-              ring
-    _ = -(∑ col : Fin ringDegree, M jFin col * f[col.val]) := by
-          rw [← Finset.sum_neg_distrib]
-    _ = -((applyMatrix M f)[j]) := by
-          rw [← hsum_f]
-    _ = (-applyMatrix M f)[j] := by
-          symm
-          exact Vector.getElem_neg (applyMatrix M f) j hj
-
-private theorem applyMatrix_sub
-    (M : Fin ringDegree → Fin ringDegree → Coeff) (f g : Rq) :
-    applyMatrix M (f - g) = applyMatrix M f - applyMatrix M g := by
-  apply Vector.ext
-  intro j hj
-  let jFin : Fin ringDegree := ⟨j, hj⟩
-  have hsum_sub := applyMatrix_get M (f - g) hj
-  have hsum_f := applyMatrix_get M f hj
-  have hsum_g := applyMatrix_get M g hj
-  calc
-    (applyMatrix M (f - g))[j]
-        = ∑ col : Fin ringDegree, M jFin col * ((f - g)[col.val]) := hsum_sub
-    _ = ∑ col : Fin ringDegree, M jFin col * (f[col.val] - g[col.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro col _
-          exact congrArg (fun x => M jFin col * x) (Vector.getElem_sub f g col.val col.isLt)
-    _ = ∑ col : Fin ringDegree, (M jFin col * f[col.val] - M jFin col * g[col.val]) := by
-          refine Finset.sum_congr rfl ?_
-          intro col _
-          ring
-    _ = (∑ col : Fin ringDegree, M jFin col * f[col.val]) -
-          (∑ col : Fin ringDegree, M jFin col * g[col.val]) := by
-            rw [Finset.sum_sub_distrib]
-    _ = (applyMatrix M f)[j] - (applyMatrix M g)[j] := by
-          rw [← hsum_f, ← hsum_g]
-    _ = (applyMatrix M f - applyMatrix M g)[j] := by
-          symm
-          exact Vector.getElem_sub (applyMatrix M f) (applyMatrix M g) j hj
-
-set_option linter.style.nativeDecide false
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
@@ -286,8 +151,9 @@ theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
   calc
     invNTT (ntt f) = applyMatrix idMatrix f := by
       simpa [invNTT, ntt] using
-        applyMatrix_comp invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
-    _ = f := applyMatrix_id f
+        LatticeCrypto.NTTCert.applyMatrix_comp (backend := polyBackend)
+          invNTTMatrix nttMatrix idMatrix invNTTMatrix_nttMatrix_entry f
+    _ = f := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) f
 
 /-- The concrete forward transform is a left inverse to the concrete inverse transform. -/
 theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
@@ -295,8 +161,9 @@ theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
   calc
     (ntt (invNTT fHat)).coeffs = applyMatrix idMatrix fHat.coeffs := by
       simpa [invNTT, ntt] using
-        applyMatrix_comp nttMatrix invNTTMatrix idMatrix nttMatrix_invNTTMatrix_entry fHat.coeffs
-    _ = fHat.coeffs := applyMatrix_id fHat.coeffs
+        LatticeCrypto.NTTCert.applyMatrix_comp (backend := polyBackend)
+          nttMatrix invNTTMatrix idMatrix nttMatrix_invNTTMatrix_entry fHat.coeffs
+    _ = fHat.coeffs := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) fHat.coeffs
 
 /-- The concrete NTT is additive. -/
 theorem ntt_add (f g : Rq) : ntt (f + g) = ntt f + ntt g := by
@@ -308,15 +175,19 @@ theorem ntt_sub (f g : Rq) : ntt (f - g) = ntt f - ntt g := by
 
 /-- Concrete `NTTRingOps` instance for ML-DSA. -/
 def concreteNTTRingOps : NTTRingOps where
-  coeffOps := negacyclicOps
   toHat := ntt
   fromHat := invNTT
+  zeroHat := 0
+  addHat := (· + ·)
+  subHat := (· - ·)
   mulHat := multiplyNTTs
 
 /-- Proof-oriented algebraic laws for the ML-DSA concrete NTT. -/
-def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
+noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   fromHat_toHat := invNTT_ntt
   toHat_fromHat := ntt_invNTT
+  toHat_zero := by
+    sorry
   toHat_mul := by
     intro f g
     simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]

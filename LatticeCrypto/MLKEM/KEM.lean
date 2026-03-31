@@ -53,14 +53,16 @@ def decapsulationInputCheck (encoding : Encoding params) (prims : Primitives par
 
 /-- `ML-KEM.KeyGen`. This spec-level version assumes randomness generation succeeds and, by the
 encoding canonicality law, always outputs an encapsulation key accepted by `encaps`. -/
-def keygen (ring : NTTRingOps) (encoding : Encoding params) (prims : Primitives params encoding) :
+def keygen (ring : NTTRingOps) (encoding : Encoding params)
+    (prims : Primitives params encoding) :
     ProbComp (EncapsulationKey params encoding × DecapsulationKey params encoding) := do
   let d ← $ᵗ Seed32
   let z ← $ᵗ Seed32
   return keygenInternal ring encoding prims d z
 
 /-- `ML-KEM.Encaps` with its input check made explicit. -/
-def encaps (ring : NTTRingOps) (encoding : Encoding params) [DecidableEq encoding.EncodedTHat]
+def encaps (ring : NTTRingOps) (encoding : Encoding params)
+    [DecidableEq encoding.EncodedTHat]
     (prims : Primitives params encoding) (ek : EncapsulationKey params encoding) :
     OptionT ProbComp (SharedSecret × Ciphertext params encoding) := do
   if encapsulationKeyCheck encoding ek then

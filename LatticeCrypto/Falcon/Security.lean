@@ -84,7 +84,7 @@ theorem verify_sign_correct (pk : PublicKey p) (sk : SecretKey p)
 This is the lattice problem underlying Falcon's security. It is an instance of
 the generic SIS problem where the matrix is the single-row matrix `[I | h]`
 over the cyclotomic ring `R_q = ℤ_q[x]/(x^n + 1)`. -/
-def ntruSISProblem [SampleableType (Rq p.n)] :
+noncomputable def ntruSISProblem [SampleableType (Rq p.n)] :
     SIS.Problem (Rq p.n) (Rq p.n × Rq p.n) where
   sampleChallenge := $ᵗ (Rq p.n)
   isValid h x :=
