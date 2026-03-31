@@ -64,11 +64,31 @@ theorem applyMatrix_comp
       ∑ k : Fin backend.degree, A row k * B k col = C row col)
     (f : backend.Poly) :
     applyMatrix backend A (applyMatrix backend B f) = applyMatrix backend C f := by
-  sorry
+  suffices h : ∀ row : Fin backend.degree,
+      ∑ col, A row col * backend.coeff (applyMatrix backend B f) col =
+      ∑ col, C row col * backend.coeff f col by
+    unfold applyMatrix; congr 1; funext row; exact h row
+  intro row
+  simp_rw [applyMatrix_get B f]
+  simp_rw [Finset.mul_sum]
+  simp_rw [← mul_assoc]
+  rw [Finset.sum_comm]
+  simp_rw [← Finset.sum_mul]
+  congr 1; funext col; congr 1; exact hcomp row col
 
 theorem applyMatrix_id (f : backend.Poly) :
     applyMatrix backend (idMatrix backend.degree) f = f := by
-  sorry
+  unfold applyMatrix
+  have h : ∀ row : Fin backend.degree,
+      (∑ col : Fin backend.degree,
+        idMatrix backend.degree row col * backend.coeff f col) =
+      backend.coeff f row := by
+    intro row
+    rw [Finset.sum_eq_single_of_mem row (Finset.mem_univ _)]
+    · simp [idMatrix]
+    · intro b _ hne; simp [idMatrix, hne]
+  simp_rw [h]
+  exact backend.build_coeff f
 
 theorem applyMatrix_add
     (M : Fin backend.degree → Fin backend.degree → Coeff)
@@ -80,6 +100,12 @@ theorem applyMatrix_add
         ∑ col : Fin backend.degree, M row col * backend.coeff f col) +
       backend.build (fun row =>
         ∑ col : Fin backend.degree, M row col * backend.coeff g col) := by
-  sorry
+  simp only [applyMatrix]
+  have hfg : ∀ col, backend.coeff (f + g) col = backend.coeff f col + backend.coeff g col :=
+    fun col => congr_fun (hadd f g) col
+  simp_rw [hfg, mul_add, Finset.sum_add_distrib]
+  rw [← backend.build_coeff (_ + _)]
+  congr 1; funext row
+  rw [congr_fun (hadd _ _) row, backend.coeff_build, backend.coeff_build]
 
 end LatticeCrypto.NTTCert

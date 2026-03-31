@@ -134,10 +134,14 @@ private lemma rqvec_add_get {k : ℕ} (v u : RqVec k) (j : Fin k) :
   congr_fun (Vector.vectorAdd_get v u) j
 
 private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a := by
-  sorry
+  apply Vector.ext; intro i hi
+  show ((coeffRing.add (coeffRing.sub a b) b) : Rq).get ⟨i, hi⟩ = a.get ⟨i, hi⟩
+  simp [sub_add_cancel]
 
 private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
-  sorry
+  apply Vector.ext; intro i hi
+  show ((coeffRing.add (coeffRing.add a b) (coeffRing.neg b)) : Rq).get ⟨i, hi⟩ = a.get ⟨i, hi⟩
+  simp [add_neg_cancel_right]
 
 /-! ### Correctness -/
 

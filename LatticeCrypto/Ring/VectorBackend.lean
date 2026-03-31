@@ -102,6 +102,27 @@ def vectorNegacyclicRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :
   neg := fun f => Vector.ofFn fun i => -f.get i
   mul := schoolbookNegacyclicMul (vectorKernel Coeff n)
 
+section VectorRingSimp
+
+variable {Coeff : Type u} [CommRing Coeff] {n : Nat}
+
+private abbrev vRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :=
+  vectorNegacyclicRing Coeff n
+
+@[simp] theorem vectorRing_add_get (f g : Poly Coeff n) (i : Fin n) :
+    ((vRing Coeff n).add f g).get i = f.get i + g.get i := by
+  simp [vRing, vectorNegacyclicRing, Vector.get]
+
+@[simp] theorem vectorRing_sub_get (f g : Poly Coeff n) (i : Fin n) :
+    ((vRing Coeff n).sub f g).get i = f.get i - g.get i := by
+  simp [vRing, vectorNegacyclicRing, Vector.get]
+
+@[simp] theorem vectorRing_neg_get (f : Poly Coeff n) (i : Fin n) :
+    ((vRing Coeff n).neg f).get i = -f.get i := by
+  simp [vRing, vectorNegacyclicRing, Vector.get]
+
+end VectorRingSimp
+
 /-- Proof-facing quotient interpretation for the canonical vector backend.
 
 Maps each executable operation to its counterpart in the quotient ring
@@ -109,19 +130,10 @@ Maps each executable operation to its counterpart in the quotient ring
 noncomputable def vectorNegacyclicSemantics (Coeff : Type u) [CommRing Coeff] (n : Nat) :
     NegacyclicRingSemantics (vectorNegacyclicRing Coeff n) where
   quotientOf := NegacyclicQuotient.ofBackend (vectorBackend Coeff n)
-  zero_sound := by
-    sorry
-  add_sound := by
-    intro f g
-    sorry
-  sub_sound := by
-    intro f g
-    sorry
-  neg_sound := by
-    intro f
-    sorry
-  mul_sound := by
-    intro f g
-    sorry
+  zero_sound := by sorry
+  add_sound := by intro f g; sorry
+  sub_sound := by intro f g; sorry
+  neg_sound := by intro f; sorry
+  mul_sound := by intro f g; sorry
 
 end LatticeCrypto
