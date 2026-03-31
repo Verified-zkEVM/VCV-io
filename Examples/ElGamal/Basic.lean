@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import Examples.ElGamal.Common
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 
 /-!

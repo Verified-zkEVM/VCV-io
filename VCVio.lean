@@ -1,9 +1,9 @@
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CCA
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.GenericLift
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.OneTime
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.Oracle
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCCA
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.GenericLift
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.OneTime
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme

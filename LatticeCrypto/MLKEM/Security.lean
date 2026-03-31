@@ -6,7 +6,7 @@ Authors: Quang Dao
 import LatticeCrypto.MLKEM.KEM
 import LatticeCrypto.HardnessAssumptions.LearningWithErrors
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA.Oracle
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 
 /-!
 # ML-KEM Security

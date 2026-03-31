@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.RandomOracle
 
