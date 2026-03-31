@@ -108,4 +108,30 @@ theorem applyMatrix_add
   congr 1; funext row
   rw [congr_fun (hadd _ _) row, backend.coeff_build, backend.coeff_build]
 
+theorem applyMatrix_zero
+    (M : Fin backend.degree → Fin backend.degree → Coeff)
+    [Zero backend.Poly] (hzero : ∀ i, backend.coeff (0 : backend.Poly) i = 0) :
+    applyMatrix backend M 0 = 0 := by
+  simp only [applyMatrix, hzero, mul_zero, Finset.sum_const_zero]
+  conv_rhs => rw [← backend.build_coeff (0 : backend.Poly)]
+  congr 1; funext row; exact (hzero row).symm
+
+theorem applyMatrix_sub
+    (M : Fin backend.degree → Fin backend.degree → Coeff)
+    [Sub backend.Poly] (hsub : ∀ f g : backend.Poly,
+      backend.coeff (f - g) = fun i => backend.coeff f i - backend.coeff g i)
+    (f g : backend.Poly) :
+    applyMatrix backend M (f - g) =
+      backend.build (fun row =>
+        ∑ col : Fin backend.degree, M row col * backend.coeff f col) -
+      backend.build (fun row =>
+        ∑ col : Fin backend.degree, M row col * backend.coeff g col) := by
+  simp only [applyMatrix]
+  have hfg : ∀ col, backend.coeff (f - g) col = backend.coeff f col - backend.coeff g col :=
+    fun col => congr_fun (hsub f g) col
+  simp_rw [hfg, mul_sub, Finset.sum_sub_distrib]
+  rw [← backend.build_coeff (_ - _)]
+  congr 1; funext row
+  rw [congr_fun (hsub _ _) row, backend.coeff_build, backend.coeff_build]
+
 end LatticeCrypto.NTTCert
