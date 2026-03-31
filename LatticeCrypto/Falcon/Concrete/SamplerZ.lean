@@ -45,19 +45,25 @@ namespace Falcon.Concrete.SamplerZ
 /-! ## PRNG state -/
 
 structure PRNGState where
+  seed : ByteArray
   buffer : ByteArray
+  offset : Nat
   pos : Nat
 deriving Inhabited
 
 @[inline] def PRNGState.init (seed : ByteArray) : PRNGState :=
-  { buffer := FFI.Hashing.shake256 seed 4096, pos := 0 }
+  { seed := seed, buffer := FFI.Hashing.shake256 seed 4096, offset := 0, pos := 0 }
+
+@[inline] private def PRNGState.refill (s : PRNGState) : PRNGState :=
+  let nextOffset := s.offset + s.buffer.size
+  let nextEnd := nextOffset + 4096
+  let full := FFI.Hashing.shake256 s.seed nextEnd.toUSize
+  let nextBuf := full.extract nextOffset nextEnd
+  { s with buffer := nextBuf, offset := nextOffset, pos := 0 }
 
 @[inline] def PRNGState.nextByte (s : PRNGState) : UInt8 × PRNGState :=
-  if s.pos < s.buffer.size then
-    (s.buffer[s.pos]!, { s with pos := s.pos + 1 })
-  else
-    let newBuf := FFI.Hashing.shake256 s.buffer 4096
-    (newBuf[0]!, { buffer := newBuf, pos := 1 })
+  let s' := if s.pos < s.buffer.size then s else s.refill
+  (s'.buffer[s'.pos]!, { s' with pos := s'.pos + 1 })
 
 def PRNGState.nextU64 (s : PRNGState) : UInt64 × PRNGState :=
   if s.pos + 8 ≤ s.buffer.size then

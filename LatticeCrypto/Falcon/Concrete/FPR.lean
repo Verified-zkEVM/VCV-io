@@ -66,6 +66,11 @@ private def M63 : UInt64 := ((1 : UInt64) <<< 63) - 1
 @[inline] private def fpr_ursh (x : UInt64) (n : UInt32) : UInt64 :=
   x >>> n.toUInt64
 
+@[inline] private def fpr_arsh32 (x : UInt32) (n : UInt32) : UInt32 :=
+  let sign := (0 : UInt32) - (x >>> 31)
+  if n == 0 then x
+  else (x >>> n) ||| (sign <<< (32 - n))
+
 @[inline] private def make (s : UInt64) (e : Int32) (m : UInt64) : FPR :=
   let cc : UInt64 := ((0xC8 : UInt64) >>> (m.toUInt32 &&& 7).toUInt64) &&& 1
   (s <<< 63) + ((e + 1076).toUInt32.toUInt64 <<< 52) + (m >>> 2) + cc
@@ -172,7 +177,7 @@ def mul (x y : FPR) : FPR :=
   let e := ex + ey - 2100 + es.toUInt32
   let s := (x ^^^ y) >>> 63
   let dzu := tbmask ((ex - 1) ||| (ey - 1))
-  let e' : Int32 := (e ^^^ (dzu &&& (e ^^^ (0 - 1076).toUInt32))).toInt32
+  let e' : Int32 := (e ^^^ (dzu &&& (e ^^^ ((0 : UInt32) - 1076)))).toInt32
   let zu''' := zu'' &&& ((dzu &&& 1).toUInt64 - 1)
   make s e' zu'''
 
@@ -196,7 +201,7 @@ def div (x y : FPR) : FPR := Id.run do
   let e := ex - ey - 55 + es.toUInt32
   let s := (x ^^^ y) >>> 63
   let dzu := tbmask (ex - 1)
-  let e' : Int32 := (e ^^^ (dzu &&& (e ^^^ (0 - 1076).toUInt32))).toInt32
+  let e' : Int32 := (e ^^^ (dzu &&& (e ^^^ ((0 : UInt32) - 1076)))).toInt32
   let dm := (dzu &&& 1).toUInt64 - 1
   return make (s &&& dm) e' (q_ &&& dm)
 
@@ -206,7 +211,7 @@ def sqrt (x : FPR) : FPR := Id.run do
   let ex_ := (x >>> 52).toUInt32 &&& 0x7FF
   let e_ : Int32 := ex_.toInt32 - 1023
   let xu := xu_ + (xu_ &&& (0 - (e_.toUInt32 &&& 1).toUInt64))
-  let e := e_ >>> 1
+  let e := (fpr_arsh32 e_.toUInt32 1).toInt32
   let mut xu' := xu <<< 1
   let mut q_ : UInt64 := 0
   let mut s_ : UInt64 := 0

@@ -248,11 +248,13 @@ def zint_co_reduce (a b : Array UInt32) (len : Nat)
   if len > 0 then
     a' := setLimb a' 0 1 (len - 1) (cca.toUInt64.toUInt32 &&& LIMB_MASK)
     b' := setLimb b' 0 1 (len - 1) (ccb.toUInt64.toUInt32 &&& LIMB_MASK)
-  let nega : UInt32 := (cca >>> (63 : Int64)).toUInt64.toUInt32
-  let negb : UInt32 := (ccb >>> (63 : Int64)).toUInt64.toUInt32
-  a' := zint_negate a' len nega
-  b' := zint_negate b' len negb
-  return (a', b', (- nega) ||| ((- negb) <<< (1 : UInt32)))
+  let nega : UInt32 := (cca.toUInt64 >>> 63).toUInt32
+  let negb : UInt32 := (ccb.toUInt64 >>> 63).toUInt32
+  let negaMask : UInt32 := (0 : UInt32) - nega
+  let negbMask : UInt32 := (0 : UInt32) - negb
+  a' := zint_negate a' len negaMask
+  b' := zint_negate b' len negbMask
+  return (a', b', nega ||| (negb <<< (1 : UInt32)))
 
 /-! ## Modular finish and `zint_co_reduce_mod` -/
 
@@ -428,7 +430,7 @@ def zint_bezout (x y : Array UInt32) (len : Nat) :
     for _ in [:31] do
       let a_odd : UInt64 := - (xa &&& 1)
       let dx := xa - xb
-      let dxMask : UInt64 := (dx.toInt64 >>> (63 : Int64)).toUInt64
+      let dxMask : UInt64 := (0 : UInt64) - (dx >>> 63)
       let swap := a_odd &&& dxMask
       let t1 := swap &&& (xa ^^^ xb)
       xa := xa ^^^ t1

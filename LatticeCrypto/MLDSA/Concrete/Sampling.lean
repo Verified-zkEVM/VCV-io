@@ -60,7 +60,7 @@ private def rejUniformCoeffs (stream : ByteArray) : Array Coeff := Id.run do
     let b0 := (getByteD stream pos).toNat
     let b1 := (getByteD stream (pos + 1)).toNat
     let b2 := (getByteD stream (pos + 2)).toNat
-    let t := (b0 + (b1 <<< 8) + (b2 <<< 16)) &&& 0x7FFFFF
+    let t := (b0 + Nat.shiftLeft b1 8 + Nat.shiftLeft b2 16) &&& 0x7FFFFF
     if t < modulus then
       coeffs := coeffs.push (t : Coeff)
     pos := pos + 3
@@ -96,19 +96,19 @@ private def rejEtaCoeffs (eta : Nat) (stream : ByteArray) : Array ℤ := Id.run 
   while coeffs.size < ringDegree && pos < stream.size do
     let byte := (getByteD stream pos).toNat
     let t0 := byte &&& 0x0F
-    let t1 := byte >>> 4
+    let t1 := Nat.shiftRight byte 4
     if eta = 2 then
       if t0 < 15 && coeffs.size < ringDegree then
-        let u0 := t0 - ((205 * t0) >>> 10) * 5
-        coeffs := coeffs.push (2 - u0)
+        let u0 := t0 - Nat.shiftRight (205 * t0) 10 * 5
+        coeffs := coeffs.push ((2 : ℤ) - (u0 : ℤ))
       if t1 < 15 && coeffs.size < ringDegree then
-        let u1 := t1 - ((205 * t1) >>> 10) * 5
-        coeffs := coeffs.push (2 - u1)
+        let u1 := t1 - Nat.shiftRight (205 * t1) 10 * 5
+        coeffs := coeffs.push ((2 : ℤ) - (u1 : ℤ))
     else if eta = 4 then
       if t0 < 9 && coeffs.size < ringDegree then
-        coeffs := coeffs.push (4 - t0)
+        coeffs := coeffs.push ((4 : ℤ) - (t0 : ℤ))
       if t1 < 9 && coeffs.size < ringDegree then
-        coeffs := coeffs.push (4 - t1)
+        coeffs := coeffs.push ((4 : ℤ) - (t1 : ℤ))
     pos := pos + 1
   return coeffs
 

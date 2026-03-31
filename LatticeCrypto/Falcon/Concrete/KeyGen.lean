@@ -259,9 +259,9 @@ The loop retries until a valid pair is found.
 Port of the inner loop of `keygen_inner` from `kgen.c`. -/
 
 /-- Generate a valid NTRU polynomial pair `(f, g)` by repeated Gaussian
-sampling with validation. Returns the pair and the updated PRNG state. -/
+sampling with validation. Returns `none` if the retry budget is exhausted. -/
 def ntruGen (logn : Nat) (prng : PRNGState) :
-    (Array Int8 × Array Int8) × PRNGState := Id.run do
+    Option (Array Int8 × Array Int8) × PRNGState := Id.run do
   let n := 1 <<< logn
   let mut state := prng
   for _ in [0:10000] do
@@ -270,8 +270,8 @@ def ntruGen (logn : Nat) (prng : PRNGState) :
     state := st2
     if sqNorm f g n >= SQ_NORM_BOUND then continue
     if !isInvertibleModQ logn f then continue
-    return ((f, g), state)
-  return ((Array.replicate n (0 : Int8), Array.replicate n (0 : Int8)), state)
+    return (some (f, g), state)
+  return (none, state)
 
 /-! ## Raw key pair structure -/
 
@@ -347,9 +347,9 @@ Returns `none` if key generation fails (exhausts retry budget). -/
 def keyGen (logn : Nat) (seed : ByteArray) : Option RawKeyPair := Id.run do
   let mut state := PRNGState.init seed
   for _ in [0:100] do
-    let ((f, g), st1) := ntruGen logn state
+    let (fg?, st1) := ntruGen logn state
     state := st1
-    if f.size == 0 then continue
+    let some (f, g) := fg? | continue
     if !NTRUSolver.check_ortho_norm logn f g then continue
     match NTRUSolver.solve_NTRU logn f g with
     | none => continue

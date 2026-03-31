@@ -53,8 +53,6 @@ variable {n : ℕ}
 /-- Forget the `Tq` wrapper and view an NTT-domain polynomial as its underlying polynomial. -/
 def toRq (fHat : Tq n) : Rq n := fHat.coeffs
 
-/-- Coercion from `Tq` to the underlying polynomial representation. -/
-instance : Coe (Tq n) (Rq n) := ⟨Tq.toRq⟩
 /-- The zero NTT-domain polynomial. -/
 instance : Zero (Tq n) := ⟨⟨0⟩⟩
 /-- Pointwise addition on NTT-domain polynomials. -/
