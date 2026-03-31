@@ -60,11 +60,9 @@ private def flush : IO Unit := IO.getStdout >>= IO.FS.Stream.flush
 
 def main : IO Unit := do
   let st ← IO.mkRef ({} : TestState)
-
   IO.println "=== Falcon Correctness Tests ==="
   IO.println ""
   flush
-
   -- ── 1. NTT roundtrip ──────────────────────────
   IO.println "1. NTT roundtrip (invNTT ∘ NTT = id) for Falcon"
   do
@@ -73,16 +71,13 @@ def main : IO Unit := do
     let f : Rq n := Vector.ofFn fun ⟨i, _⟩ => (i : Coeff)
     let f' := Falcon.Concrete.invNTT logn (Falcon.Concrete.ntt logn f)
     check st "invNTT(NTT(0,1,…,511)) = (0,1,…,511)" (f == f')
-
     let g : Rq n := Vector.ofFn fun _ => (42 : Coeff)
     let g' := Falcon.Concrete.invNTT logn (Falcon.Concrete.ntt logn g)
     check st "NTT roundtrip on constant poly" (g == g')
-
     let h : Rq n := Vector.ofFn fun ⟨i, _⟩ => (i * 137 + 42 : Coeff)
     let h' := Falcon.Concrete.invNTT logn (Falcon.Concrete.ntt logn h)
     check st "NTT roundtrip on pseudorandom poly" (h == h')
   IO.println ""
-
   -- ── 2. NTT multiplication ─────────────────────
   IO.println "2. NTT multiplication"
   do
@@ -97,7 +92,6 @@ def main : IO Unit := do
         (Falcon.Concrete.ntt logn f) (Falcon.Concrete.ntt logn g))
     check st "NTT mul: (1+X+X²)*(1+2X)" (nttResult == expected)
   IO.println ""
-
   -- ── 3. Compress/decompress roundtrip ──────────
   IO.println "3. Compress/decompress roundtrip"
   do
@@ -111,7 +105,6 @@ def main : IO Unit := do
       | none => check st "decompress should succeed" false
       | some s' => check st "decompress(compress(s)) = s" (s == s')
   IO.println ""
-
   -- ── 4. Public key encode/decode roundtrip ─────
   IO.println "4. Public key encode/decode roundtrip"
   do
@@ -122,7 +115,6 @@ def main : IO Unit := do
     | none => check st "pkDecode should succeed" false
     | some h' => check st "pkDecode(pkEncode(h)) = h" (h == h')
   IO.println ""
-
   -- ── 5. FFI keygen sizes ───────────────────────
   IO.println "5. FFI keygen sizes"
   do
@@ -133,7 +125,6 @@ def main : IO Unit := do
     check st "Falcon-512 sk size = 1281" (sk.size == 1281)
     check st "Falcon-512 pk size = 897" (pk.size == 897)
   IO.println ""
-
   -- ── 6. FFI sign + verify roundtrip ────────────
   IO.println "6. FFI sign + verify roundtrip"
   do
@@ -145,15 +136,12 @@ def main : IO Unit := do
     let sig := Falcon.Concrete.FFI.falcon512SignSeeded sk msg signSeed
     check st "FFI sign produces non-empty sig" (sig.size > 0)
     check st s!"FFI sig size = {sig.size}" (sig.size == 666)
-
     let ver := Falcon.Concrete.FFI.falcon512Verify pk msg sig
     check st "FFI verify accepts valid sig" (ver == 1)
-
     let corruptedSig := sig.set! 1 (sig[1]! ^^^ 0xFF)
     let verCorrupt := Falcon.Concrete.FFI.falcon512Verify pk msg corruptedSig
     check st "FFI verify rejects corrupted sig" (verCorrupt == 0)
   IO.println ""
-
   -- ── 7. FFI sign → Lean verify ─────────────────
   IO.println "7. FFI sign → Lean concreteVerify (Falcon-512)"
   do
@@ -166,7 +154,6 @@ def main : IO Unit := do
     let leanResult := concreteVerify testFalcon512 pk msg.toList sig
     check st "Lean concreteVerify accepts FFI-signed sig" leanResult
   IO.println ""
-
   -- ── 8. Hardcoded test vectors ─────────────────
   IO.println "8. Hardcoded test vectors"
   do
@@ -174,31 +161,25 @@ def main : IO Unit := do
       let seed := parseHex vec.seed
       let msg := parseHex vec.msg
       let signSeed := parseHex vec.signSeed
-
       let (sk, pk) := Falcon.Concrete.FFI.falcon512KeygenSeeded seed
       check st s!"tcId={vec.tcId} sk size" (sk.size == vec.skSize)
       check st s!"tcId={vec.tcId} pk size" (pk.size == vec.pkSize)
-
       let pkFirst32 := parseHex vec.pkFirst32
       let pkActual32 := pk.extract 0 32
       check st s!"tcId={vec.tcId} pk first 32 bytes"
         (pkActual32 == pkFirst32)
         s!"got={toHex pkActual32 32} exp={toHex pkFirst32 32}"
-
       let sig := Falcon.Concrete.FFI.falcon512SignSeeded sk msg signSeed
       check st s!"tcId={vec.tcId} sig size" (sig.size == vec.sigSize)
-
       let sigFirst32 := parseHex vec.sigFirst32
       let sigActual32 := sig.extract 0 32
       check st s!"tcId={vec.tcId} sig first 32 bytes"
         (sigActual32 == sigFirst32)
         s!"got={toHex sigActual32 32} exp={toHex sigFirst32 32}"
-
       let ver := Falcon.Concrete.FFI.falcon512Verify pk msg sig
       check st s!"tcId={vec.tcId} FFI verify = {vec.verifyResult}"
         ((ver == 1) == vec.verifyResult)
   IO.println ""
-
   -- ── 9. FPR arithmetic ─────────────────────────
   IO.println "9. FPR arithmetic (integer-only IEEE-754 emulation)"
   do
@@ -212,43 +193,36 @@ def main : IO Unit := do
     checkFPR st "ofInt 12289 = q" (ofInt 12289) q
     checkFPR st "ofInt 100" (ofInt 100) (0x4059000000000000 : UInt64)
     checkFPR st "ofInt 1000000" (ofInt 1000000) (0x412E848000000000 : UInt64)
-
     checkFPR st "neg(one)" (neg one) (0xBFF0000000000000 : UInt64)
     checkFPR st "neg(neg(one)) = one" (neg (neg one)) one
     checkFPR st "neg(two)" (neg two) (0xC000000000000000 : UInt64)
-
     checkFPR st "add(one, two) = 3" (add one two) (0x4008000000000000 : UInt64)
     checkFPR st "add(one, neg one) = 0" (add one (neg one)) zero
     checkFPR st "add(one, one) = two" (add one one) two
     checkFPR st "add(half, half) = one" (add half half) one
     checkFPR st "add(42, 100) = 142" (add (ofInt 42) (ofInt 100))
       (0x4061C00000000000 : UInt64)
-
     checkFPR st "sub(two, one) = one" (sub two one) one
     checkFPR st "sub(one, two) = -1" (sub one two) (neg one)
     checkFPR st "sub(one, one) = zero" (sub one one) zero
     checkFPR st "sub(142, 42) = 100" (sub (ofInt 142) (ofInt 42))
       (0x4059000000000000 : UInt64)
-
     checkFPR st "mul(two, two) = 4" (mul two two) (0x4010000000000000 : UInt64)
     checkFPR st "mul(one, one) = one" (mul one one) one
     checkFPR st "mul(two, half) = one" (mul two half) one
     checkFPR st "mul(42, 100) = 4200" (mul (ofInt 42) (ofInt 100))
       (0x40B0680000000000 : UInt64)
     checkFPR st "mul(q, invQ) = one" (mul q invQ) one
-
     checkFPR st "div(one, two) = half" (div one two) half
     checkFPR st "div(6, 3) = two" (div (ofInt 6) (ofInt 3)) two
     checkFPR st "div(100, 10) = 10" (div (ofInt 100) (ofInt 10))
       (0x4024000000000000 : UInt64)
     checkFPR st "div(one, q) = invQ" (div one q) invQ
-
     checkFPR st "sqrt(one) = one" (sqrt one) one
     checkFPR st "sqrt(4) = two" (sqrt (ofInt 4)) two
     checkFPR st "sqrt(two)" (sqrt two) (0x3FF6A09E667F3BCD : UInt64)
     checkFPR st "sqrt(100) = 10" (sqrt (ofInt 100)) (0x4024000000000000 : UInt64)
   IO.println ""
-
   -- ── 10. FPR conversions ────────────────────────
   IO.println "10. FPR conversions (rint, floor_, scaled)"
   do
@@ -260,14 +234,12 @@ def main : IO Unit := do
     check st "rint(1.5) = 2" (rint (add one half) == 2)
     check st "rint(2.5) = 2" (rint (add two half) == 2)
     check st "rint(neg(half)) = 0" (rint (neg half) == 0)
-
     check st "floor_(one) = 1" (floor_ one == 1)
     check st "floor_(half) = 0" (floor_ half == 0)
     check st "floor_(neg(half)) = -1" (floor_ (neg half) == -1)
     check st "floor_(1.5) = 1" (floor_ (add one half) == 1)
     check st "floor_(neg(1.5)) = -2" (floor_ (neg (add one half)) == -2)
     check st "floor_(ofInt 42) = 42" (floor_ (ofInt 42) == 42)
-
     checkFPR st "scaled(1, 10) = 1024" (scaled 1 10)
       (0x4090000000000000 : UInt64)
     checkFPR st "scaled(3, -1) = 1.5" (scaled 3 (-1))
@@ -277,7 +249,6 @@ def main : IO Unit := do
     checkFPR st "scaled(-7, 2) = -28" (scaled (-7) 2)
       (0xC03C000000000000 : UInt64)
   IO.println ""
-
   -- ── 11. FPR expm_p63 ───────────────────────────
   IO.println "11. FPR expm_p63 (FACCT polynomial exp approximation)"
   do
@@ -288,7 +259,6 @@ def main : IO Unit := do
       (expm_p63 half half == (0x26D165F8DF2C11B0 : UInt64))
       s!"got=0x{u64ToHex (expm_p63 half half)}"
   IO.println ""
-
   -- ── 12. SamplerZ components ────────────────────
   IO.println "12. SamplerZ components"
   do
@@ -298,12 +268,10 @@ def main : IO Unit := do
     let (z, _) := gaussian0 prng
     check st s!"gaussian0 returns non-negative z (got {z})" (z >= 0)
     check st s!"gaussian0 z in reasonable range (got {z})" (z < 20)
-
     let prng2 := PRNGState.init seed
     let (accept1, _) := berExp prng2 zero half
     check st s!"berExp(zero, half) likely accepts (got {accept1})" accept1
   IO.println ""
-
   -- ── 13. Falcon-1024 FFI end-to-end ─────────────
   IO.println "13. Falcon-1024 FFI end-to-end"
   do
@@ -311,22 +279,18 @@ def main : IO Unit := do
     let (sk, pk) := Falcon.Concrete.FFI.falcon1024KeygenSeeded seed
     check st "Falcon-1024 sk size = 2305" (sk.size == 2305)
     check st "Falcon-1024 pk size = 1793" (pk.size == 1793)
-
     let msg : ByteArray := ⟨#[0x48, 0x65, 0x6C, 0x6C, 0x6F]⟩
     let signSeed : ByteArray := ⟨Array.ofFn fun (i : Fin 48) =>
       (0xFF - i.val).toUInt8⟩
     let sig := Falcon.Concrete.FFI.falcon1024SignSeeded sk msg signSeed
     check st "FFI-1024 sign produces non-empty sig" (sig.size > 0)
     check st s!"FFI-1024 sig size ≤ 1282 (got {sig.size})" (sig.size <= 1282)
-
     let ver := Falcon.Concrete.FFI.falcon1024Verify pk msg sig
     check st "FFI-1024 verify accepts valid sig" (ver == 1)
-
     let corruptedSig := sig.set! 1 (sig[1]! ^^^ 0xFF)
     let verCorrupt := Falcon.Concrete.FFI.falcon1024Verify pk msg corruptedSig
     check st "FFI-1024 verify rejects corrupted sig" (verCorrupt == 0)
   IO.println ""
-
   -- ── 14. Falcon-1024 FFI sign → Lean verify ─────
   IO.println "14. FFI sign → Lean concreteVerify (Falcon-1024)"
   do
@@ -339,17 +303,14 @@ def main : IO Unit := do
     let leanResult := concreteVerify testFalcon1024 pk msg.toList sig
     check st "Lean concreteVerify accepts FFI-1024 sig" leanResult
   IO.println ""
-
   -- ── 15. Varied-input end-to-end ────────────────
   IO.println "15. Varied-input end-to-end (both 512 and 1024)"
   do
     let seed1 : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => (i.val * 3 + 7).toUInt8⟩
     let seed2 : ByteArray := ⟨Array.ofFn fun (i : Fin 48) => (i.val * 5 + 13).toUInt8⟩
-
     let emptyMsg : ByteArray := ByteArray.empty
     let longMsg : ByteArray := ⟨Array.ofFn fun (i : Fin 1000) =>
       (i.val % 256).toUInt8⟩
-
     for (paramName, keygen, sign, verify, leanParams) in [
       ("512",
         Falcon.Concrete.FFI.falcon512KeygenSeeded,
@@ -361,23 +322,19 @@ def main : IO Unit := do
         Falcon.Concrete.FFI.falcon1024SignSeeded,
         Falcon.Concrete.FFI.falcon1024Verify,
         testFalcon1024)] do
-
       let (sk, pk) := keygen seed1
-
       let sig1 := sign sk emptyMsg seed2
       check st s!"Falcon-{paramName} empty msg: sig non-empty" (sig1.size > 0)
       let ver1 := verify pk emptyMsg sig1
       check st s!"Falcon-{paramName} empty msg: FFI verify" (ver1 == 1)
       let lv1 := concreteVerify leanParams pk emptyMsg.toList sig1
       check st s!"Falcon-{paramName} empty msg: Lean verify" lv1
-
       let sig2 := sign sk longMsg seed2
       check st s!"Falcon-{paramName} 1000-byte msg: sig non-empty" (sig2.size > 0)
       let ver2 := verify pk longMsg sig2
       check st s!"Falcon-{paramName} 1000-byte msg: FFI verify" (ver2 == 1)
       let lv2 := concreteVerify leanParams pk longMsg.toList sig2
       check st s!"Falcon-{paramName} 1000-byte msg: Lean verify" lv2
-
       let (sk3, pk3) := keygen seed2
       let msg3 : ByteArray := ⟨#[0x41, 0x42, 0x43]⟩
       let sig3 := sign sk3 msg3 seed1
@@ -386,12 +343,10 @@ def main : IO Unit := do
       check st s!"Falcon-{paramName} alt seed: FFI verify" (ver3 == 1)
       let lv3 := concreteVerify leanParams pk3 msg3.toList sig3
       check st s!"Falcon-{paramName} alt seed: Lean verify" lv3
-
       let verCross := verify pk msg3 sig3
       check st s!"Falcon-{paramName} wrong key: FFI rejects" (verCross == 0)
   IO.println ""
   flush
-
   -- ── 16. FloatLike Float arithmetic ──────────────
   IO.println "16. FloatLike Float arithmetic (native IEEE-754)"
   do
@@ -399,41 +354,33 @@ def main : IO Unit := do
     let fOne : Float := FloatLike.one
     let fTwo : Float := FloatLike.two
     let fHalf : Float := FloatLike.half
-
     checkFloat st "Float ofInt 0 = 0" (ofI 0) 0.0
     checkFloat st "Float ofInt 1 = 1" (ofI 1) 1.0
     checkFloat st "Float ofInt 42 = 42" (ofI 42) 42.0
     checkFloat st "Float ofInt(-1) = -1" (ofI (-1)) (-1.0)
     checkFloat st "Float neg(one) = -1" (FloatLike.neg fOne) (-1.0)
     checkFloat st "Float neg(neg(one)) = 1" (FloatLike.neg (FloatLike.neg fOne)) 1.0
-
     checkFloat st "Float add(one, two) = 3" (FloatLike.add fOne fTwo) 3.0
     checkFloat st "Float add(42, 100) = 142" (FloatLike.add (ofI 42) (ofI 100)) 142.0
     checkFloat st "Float add(half, half) = 1" (FloatLike.add fHalf fHalf) 1.0
-
     checkFloat st "Float sub(two, one) = 1" (FloatLike.sub fTwo fOne) 1.0
     checkFloat st "Float sub(one, two) = -1" (FloatLike.sub fOne fTwo) (-1.0)
-
     checkFloat st "Float mul(two, two) = 4" (FloatLike.mul fTwo fTwo) 4.0
     checkFloat st "Float mul(42, 100) = 4200" (FloatLike.mul (ofI 42) (ofI 100)) 4200.0
     checkFloat st "Float mul(two, half) = 1" (FloatLike.mul fTwo fHalf) 1.0
-
     checkFloat st "Float div(one, two) = 0.5" (FloatLike.div fOne fTwo) 0.5
     checkFloat st "Float div(6, 3) = 2" (FloatLike.div (ofI 6) (ofI 3)) 2.0
-
     checkFloat st "Float sqrt(one) = 1" (FloatLike.sqrt fOne) 1.0
     checkFloat st "Float sqrt(4) = 2" (FloatLike.sqrt (ofI 4)) 2.0
     let fprSqrt2 := FloatLike.ofRawFPR (F := Float) (FPR.sqrt (FPR.ofInt 2))
     checkFloat st "Float sqrt(2) ≈ FPR sqrt(2)" (FloatLike.sqrt (ofI 2)) fprSqrt2 1e-15
   IO.println ""
-
   -- ── 17. FloatLike Float conversions ──────────────
   IO.println "17. FloatLike Float conversions (rint, floor_, scaled)"
   do
     let fOne : Float := FloatLike.one
     let fHalf : Float := FloatLike.half
     let ofI (i : Int64) : Float := FloatLike.ofInt i
-
     check st "Float rint(one) = 1" (FloatLike.rint fOne == (1 : Int64))
     check st "Float rint(42) = 42" (FloatLike.rint (ofI 42) == (42 : Int64))
     check st "Float rint(-7) = -7" (FloatLike.rint (ofI (-7)) == (-7 : Int64))
@@ -443,13 +390,11 @@ def main : IO Unit := do
     check st "Float rint(2.5) = 2" (FloatLike.rint (FloatLike.add (ofI 2) fHalf) == (2 : Int64))
     check st "Float rint(-half) = 0"
       (FloatLike.rint (FloatLike.neg fHalf) == (0 : Int64))
-
     check st "Float floor_(one) = 1" (FloatLike.floor_ fOne == (1 : Int64))
     check st "Float floor_(half) = 0" (FloatLike.floor_ fHalf == (0 : Int64))
     check st "Float floor_(-half) = -1"
       (FloatLike.floor_ (FloatLike.neg fHalf) == (-1 : Int64))
     check st "Float floor_(42) = 42" (FloatLike.floor_ (ofI 42) == (42 : Int64))
-
     let s1 : Float := FloatLike.scaled (1 : Int64) (10 : Int32)
     checkFloat st "Float scaled(1, 10) = 1024" s1 1024.0
     let s2 : Float := FloatLike.scaled (3 : Int64) (-1 : Int32)
@@ -457,41 +402,34 @@ def main : IO Unit := do
     let s3 : Float := FloatLike.scaled (5 : Int64) (0 : Int32)
     checkFloat st "Float scaled(5, 0) = 5" s3 5.0
   IO.println ""
-
   -- ── 18. FloatLike Float expm_p63 ─────────────────
   IO.println "18. FloatLike Float expm_p63 (hardware exp vs FACCT polynomial)"
   do
     let fprR1 := FPR.expm_p63 FPR.zero FPR.half
     let floatR1 := FloatLike.expm_p63 (0.0 : Float) (0.5 : Float)
     checkApproxU64 st "expm_p63(0, 0.5) Float≈FPR" floatR1 fprR1 (1 <<< 20)
-
     let fprR2 := FPR.expm_p63 FPR.half FPR.half
     let floatR2 := FloatLike.expm_p63 (0.5 : Float) (0.5 : Float)
     checkApproxU64 st "expm_p63(0.5, 0.5) Float≈FPR" floatR2 fprR2 (1 <<< 20)
-
     let quarter := FPR.scaled 1 (-2)
     let fprR3 := FPR.expm_p63 quarter FPR.half
     let floatR3 := FloatLike.expm_p63 (0.25 : Float) (0.5 : Float)
     checkApproxU64 st "expm_p63(0.25, 0.5) Float≈FPR" floatR3 fprR3 (1 <<< 22)
   IO.println ""
-
   -- ── 19. SamplerZ with Float backend ──────────────
   IO.println "19. SamplerZ with Float backend"
   do
     let seed := ByteArray.mk #[0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49,
       0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F, 0x50, 0x51]
     let prng := PRNGState.init seed
-
     let (accept, _) := berExp (F := Float) prng (FloatLike.zero) (FloatLike.half)
     check st s!"berExp(Float)(zero, half) likely accepts (got {accept})" accept
-
     let prng2 := PRNGState.init seed
     let invSigma9 : Float :=
       FloatLike.ofRawFPR (Falcon.Concrete.GMTable.invSigmaRaw.getD 9 0)
     let (z, _) := samplerZ (F := Float) 9 prng2 (FloatLike.zero) invSigma9
     check st s!"samplerZ(Float) z in range (got {z.toInt})" (z.toInt.natAbs < 20)
   IO.println ""
-
   -- ── 20. FFT/iFFT roundtrip ──────────────────────
   IO.println "20. FFT/iFFT roundtrip (fpolyFFT ∘ fpolyIFFT = id)"
   do
@@ -506,7 +444,6 @@ def main : IO Unit := do
       let ok := (Array.range n).all fun i =>
         FPR.rint (f'.getD i 0) == testPoly[i]!.toInt64
       check st s!"FPR: iFFT(FFT(poly)) roundtrip ({label})" ok
-
       let fFloat' := fpolyIFFT (F := Float) logn (fpolyFFT (F := Float) logn
         (fpolySetSmall (F := Float) logn testPoly))
       let okFloat := (Array.range n).all fun i =>
@@ -524,7 +461,6 @@ def main : IO Unit := do
         FloatLike.rint (fFloat'.getD i (0.0 : Float)) == testPoly[i]!.toInt64
       check st "Float: iFFT(FFT(poly)) roundtrip (logn=9)" okFloat
   IO.println ""
-
   -- ── 21. fpolySetSmall + FFT roundtrip ───────────
   IO.println "21. fpolySetSmall + FFT roundtrip (Int32 → FPR → FFT → iFFT → rint)"
   do
@@ -539,14 +475,12 @@ def main : IO Unit := do
     let ok := (Array.range n).all fun i =>
       recovered.getD i 0 == (original.getD i 0).toInt64
     check st "Int32 recovery via FFT roundtrip (FPR, logn=4)" ok
-
     let fpolyFloat := fpolySetSmall (F := Float) logn original
     let rtFloat := fpolyIFFT (F := Float) logn (fpolyFFT (F := Float) logn fpolyFloat)
     let okFloat := (Array.range n).all fun i =>
       FloatLike.rint (rtFloat.getD i (0.0 : Float)) == (original.getD i 0).toInt64
     check st "Int32 recovery via FFT roundtrip (Float, logn=4)" okFloat
   IO.println ""
-
   -- ── 22. fpoly arithmetic ─────────────────────────
   IO.println "22. fpoly arithmetic consistency"
   do
@@ -556,53 +490,44 @@ def main : IO Unit := do
     let bCoeffs : Array Int32 := (Array.range n).map fun i => (n - i).toUInt32.toInt32
     let aFFT := fpolyFFT (F := FPR) logn (fpolySetSmall logn aCoeffs)
     let bFFT := fpolyFFT (F := FPR) logn (fpolySetSmall logn bCoeffs)
-
     let ab := fpolyMulFFT (F := FPR) logn aFFT bFFT
     let ba := fpolyMulFFT (F := FPR) logn bFFT aFFT
     let mulCommOk := (Array.range n).all fun i =>
       (ab.getD i 0) == (ba.getD i 0)
     check st "fpolyMulFFT commutativity: mul(a,b) = mul(b,a)" mulCommOk
-
     let sum := fpolyAdd (F := FPR) logn aFFT bFFT
     let diff := fpolySub (F := FPR) logn sum bFFT
     let addSubOk := (Array.range n).all fun i =>
       FPR.rint (aFFT.getD i 0) == FPR.rint (diff.getD i 0)
     check st "fpolyAdd then fpolySub ≈ identity" addSubOk
   IO.println ""
-
   -- ── 23. BigInt31 basic ops ──────────────────────
   IO.println "23. BigInt31 basic ops"
   do
     let p0 := Falcon.Concrete.SmallPrimeNTT.PRIMES[0]!
     let p := p0.p
     let p0i := p0.p0i
-
     check st "mp_add: (3+5) mod p = 8"
       (Falcon.Concrete.BigInt31.mp_add 3 5 p == 8)
     check st "mp_sub: (10-3) mod p = 7"
       (Falcon.Concrete.BigInt31.mp_sub 10 3 p == 7)
     check st "mp_sub: (3-10) mod p = p-7"
       (Falcon.Concrete.BigInt31.mp_sub 3 10 p == p - 7)
-
     let m : Array UInt32 := #[5, 0, 0, 0]
     let (m', carry) := Falcon.Concrete.BigInt31.zint_mul_small m 1 3
     check st "zint_mul_small: [5]*3 = [15], carry=0"
       (m'.getD 0 0 == 15 && carry == 0)
-
     let m2 : Array UInt32 := #[0x7FFFFFFF, 0, 0, 0]
     let (m2', carry2) := Falcon.Concrete.BigInt31.zint_mul_small m2 1 2
     check st "zint_mul_small: [2^31-1]*2 carry propagation"
       (carry2 == 1 && m2'.getD 0 0 == 0x7FFFFFFE)
-
     check st "mp_mmul: Montgomery mul known value"
       (Falcon.Concrete.BigInt31.mp_mmul 100 200 p p0i ==
        Falcon.Concrete.SmallPrimeNTT.mp_montymul 100 200 p p0i)
-
     let (uBez, vBez, bezOk) := Falcon.Concrete.BigInt31.zint_bezout #[3] #[5] 1
     check st "zint_bezout: 3*u - 5*v = 1"
       (bezOk == 1 && uBez.getD 0 0 == 2 && vBez.getD 0 0 == 1)
   IO.println ""
-
   -- ── 24. SmallPrimeNTT roundtrip ─────────────────
   IO.println "24. SmallPrimeNTT roundtrip (NTT then iNTT = id)"
   do
@@ -618,7 +543,6 @@ def main : IO Unit := do
     let ok := (Array.range n).all fun i =>
       poly.getD i 0 == recoveredPoly.getD i 0
     check st "mp_iNTT(mp_NTT(poly)) = poly (logn=3)" ok
-
     let logn5 := 5
     let n5 := 1 <<< logn5
     let (gm5, igm5) := Falcon.Concrete.SmallPrimeNTT.mp_mkgmigm
@@ -631,7 +555,6 @@ def main : IO Unit := do
       poly5.getD i 0 == rec5.getD i 0
     check st "mp_iNTT(mp_NTT(poly)) = poly (logn=5)" ok5
   IO.println ""
-
   -- ── 25. Montgomery multiplication ───────────────
   IO.println "25. Montgomery multiplication verification"
   do
@@ -639,7 +562,6 @@ def main : IO Unit := do
     let p := p0.p
     let p0i := p0.p0i
     let R2 := p0.R2
-
     let a : UInt32 := 42
     let b : UInt32 := 100
     let aM := Falcon.Concrete.SmallPrimeNTT.mp_montymul a R2 p p0i
@@ -648,7 +570,6 @@ def main : IO Unit := do
     let ab := Falcon.Concrete.SmallPrimeNTT.mp_montymul abM 1 p p0i
     let expected : UInt32 := ((42 * 100 : Nat) % p.toNat).toUInt32
     check st s!"Monty: 42*100 mod p = {expected} (got {ab})" (ab == expected)
-
     let c : UInt32 := 999999
     let cM := Falcon.Concrete.SmallPrimeNTT.mp_montymul c R2 p p0i
     let ccM := Falcon.Concrete.SmallPrimeNTT.mp_montymul cM cM p p0i
@@ -656,7 +577,6 @@ def main : IO Unit := do
     let expectedCC : UInt32 := ((999999 * 999999 : Nat) % p.toNat).toUInt32
     check st s!"Monty: 999999² mod p = {expectedCC} (got {cc})" (cc == expectedCC)
   IO.println ""
-
   -- ── 26. FXR basic ops ───────────────────────────
   IO.println "26. FXR basic arithmetic (32.32 fixed-point)"
   do
@@ -664,7 +584,6 @@ def main : IO Unit := do
     let two := Falcon.Concrete.FXR.fxr_of 2
     let three := Falcon.Concrete.FXR.fxr_of 3
     let six := Falcon.Concrete.FXR.fxr_of 6
-
     check st "fxr_of(1) = 1<<32"
       (one == ((1 : UInt64) <<< 32))
     check st "fxr_add(1, 2) = 3"
@@ -685,7 +604,6 @@ def main : IO Unit := do
       (Falcon.Concrete.FXR.fxr_half two == one)
   IO.println ""
   flush
-
   -- ── 27. Diagnostic: target vector & NTRU relation check ──────────
   IO.println "27. Diagnostic: target vector & NTRU relation check"
   flush
@@ -757,7 +675,6 @@ def main : IO Unit := do
       IO.println s!"  logn={logn}: selfadj split f0 size={sa0.size}, f1 size={sa1.size}"
   IO.println ""
   IO.println ""
-
   -- ── 28. Pure-Lean signing smoke test ────────────
   IO.println "28. Pure-Lean signing smoke test (Float)"
   do
@@ -784,7 +701,6 @@ def main : IO Unit := do
           check st "FFI verify accepts Float sig" (fv == 1)
         | none => check st "Float sign succeeded" false
   IO.println ""
-
   -- ── 29. Batch E2E (3 iterations) ─────────────────
   IO.println "29. Batch E2E: pure-Lean sign+verify (3 seeds, Float)"
   do
@@ -809,7 +725,6 @@ def main : IO Unit := do
             let fv := Falcon.Concrete.FFI.falcon512Verify pk msg sig
             check st s!"iter {iter}: FFI verify" (fv == 1)
   IO.println ""
-
   -- ── 30. Rejection / negative tests ──────────────
   IO.println "30. Rejection / negative tests for pure-Lean signatures (Float)"
   do
@@ -839,7 +754,6 @@ def main : IO Unit := do
           let lv3 := concreteVerify testFalcon512 pk2 msg.toList sig
           check st "wrong pk: Lean verify rejects pure-Lean sig" (!lv3)
   IO.println ""
-
   -- ── Summary ────────────────────────────────────
   let s ← st.get
   IO.println s!"=== {s.passed} passed, {s.failed} failed ==="
