@@ -112,6 +112,9 @@ private abbrev vRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :=
 @[simp] theorem vectorBackend_coeff (p : Poly Coeff n) (i : Fin n) :
     (vectorBackend Coeff n).coeff p i = p.get i := rfl
 
+@[simp] theorem Poly.get_zero [Zero Coeff] (i : Fin n) : (0 : Poly Coeff n).get i = 0 := by
+  simp [Vector.get, Vector.instZero, Vector.replicate]
+
 @[simp] theorem vectorRing_zero :
     (vectorNegacyclicRing Coeff n).zero = (0 : Poly Coeff n) := rfl
 
@@ -141,10 +144,25 @@ Maps each executable operation to its counterpart in the quotient ring
 noncomputable def vectorNegacyclicSemantics (Coeff : Type u) [CommRing Coeff] (n : Nat) :
     NegacyclicRingSemantics (vectorNegacyclicRing Coeff n) where
   quotientOf := NegacyclicQuotient.ofBackend (vectorBackend Coeff n)
-  zero_sound := by sorry
-  add_sound := by intro f g; sorry
-  sub_sound := by intro f g; sorry
-  neg_sound := by intro f; sorry
+  zero_sound := by
+    unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
+    simp [vectorBackend_coeff, vectorRing_zero_get, Polynomial.monomial_zero_right,
+      Finset.sum_const_zero, map_zero]
+  add_sound := by
+    intro f g
+    unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
+    simp only [vectorBackend_coeff, vectorRing_add_get, Polynomial.monomial_add,
+      Finset.sum_add_distrib, map_add]
+  sub_sound := by
+    intro f g
+    unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
+    simp only [vectorBackend_coeff, vectorRing_sub_get, Polynomial.monomial_sub,
+      Finset.sum_sub_distrib, map_sub]
+  neg_sound := by
+    intro f
+    unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
+    simp only [vectorBackend_coeff, vectorRing_neg_get, Polynomial.monomial_neg,
+      Finset.sum_neg_distrib, map_neg]
   mul_sound := by intro f g; sorry
 
 end LatticeCrypto
