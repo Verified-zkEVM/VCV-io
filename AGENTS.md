@@ -16,6 +16,7 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution policy.
 
 - New Lean files should use the standard copyright / license / authors header and a module docstring.
+- For ordinary Lean source files, use the standard prologue layout: header, blank line, imports, blank line, module docstring.
 - Preserve existing headers on routine edits.
 - Only rewrite attribution when a file is genuinely new or materially replaced.
 - Do not add a separate AI-attribution line.
@@ -104,73 +105,11 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 ## Program Logic Tactics
 
 For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
-`VCVio.ProgramLogic.Notation` keeps notation plus coarse compatibility macros, but
+`VCVio.ProgramLogic.Notation` keeps notation plus compatibility macros, but
 `Tactics.lean` is the canonical interactive proof mode.
 
-Internally the implementation is split between
-`VCVio/ProgramLogic/Tactics/Unary.lean` and
-`VCVio/ProgramLogic/Tactics/Relational.lean`;
-the umbrella import is still the intended default.
-
-- **Proof-mode entry**: `by_equiv`, `game_trans`, `by_dist`, `by_upto`, `by_hoare`
-- **Relational stepping**: `rvcstep`, `rvcgen`,
-  `rel_conseq`, `rel_inline`, `rel_dist`
-- **Unary stepping**: `vcstep` (raw `wp` goals), `vcstep` (`Triple` or probability goals,
-  spec-aware, auto probability lowering), `vcstep inv I` (explicit loop invariant)
-- **Unary exhaustive**: `vcgen` (exhaustive `Triple` / probability goal decomposition with
-  auto lowering, auto loop invariants, support-cut synthesis, and support/indicator leaf closure),
-  `vcgen using cut` (one explicit bind step then exhaustive), `vcgen inv I` (explicit loop
-  invariant then exhaustive)
-  (`vcstep` / `vcstep` also understand bounded iteration via `replicate`, `List.mapM`,
-  and `List.foldlM`)
-- **Expectation normalization**: `exp_norm`
-- **Probability equalities**: plain `vcstep` heuristically dispatches swap / congruence on
-  `Pr[...] = Pr[...]` goals; use `vcstep rw`, `vcstep rw under n`,
-  `vcstep rw congr`, and `vcstep rw congr'` for explicit control.
-
-Quick usage notes:
-
-- `by_equiv` enters the coupling-based `RelTriple` shell intentionally.
-- `rvcstep` lowers `GameEquiv` / `evalDist` equality goals into `RelTriple`,
-  then tries the obvious relational rule for the current shape.
-- `rvcstep using t` interprets `t` by goal shape:
-  bind cut relation, random/query bijection, traversal input relation,
-  or `simulateQ` state invariant.
-- `rvcgen` repeats relational VCGen across all open goals until stuck.
-  When exactly one local hypothesis works as a `using` hint, `rvcstep` / `rvcgen`
-  auto-consume it. If 0 or ≥ 2 viable hints exist, ambiguity is kept explicit.
-  The relational finish pass also handles postcondition weakening
-  (`relTriple_post_mono` + assumption) automatically.
-- `vcstep` accepts both `Triple` and probability goals (`Pr[p | oa] = 1`,
-  `Pr[= x | oa] = 1`, etc.), automatically lowering probability goals into the `Triple`
-  engine before decomposing.
-- `vcgen using cut` performs one explicit bind step with `cut`, then runs the exhaustive driver.
-- `vcgen inv I` applies an explicit loop invariant `I`, then runs the exhaustive driver.
-- `vcstep using cut` specifies an explicit intermediate postcondition for a bind step.
-- `vcstep inv I` applies a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal,
-  leaving pre-to-invariant, step-preservation, and invariant-to-post subgoals.
-- `vcstep rw` performs one explicit bind-swap rewrite; `vcstep rw under n` keeps
-  `n` shared outer binds fixed while swapping deeper draws on one side.
-- `vcstep rw congr` exposes one shared bind plus its support hypothesis;
-  `vcstep rw congr'` exposes one shared bind without the support hypothesis.
-- `vcgen` auto-detects loop invariants: when a `Triple I (replicate n oa) (fun _ => I)` goal
-  (or `foldlM`/`mapM` equivalent) has a step-preservation hypothesis in context, it applies
-  `triple_replicate_inv` / `triple_list_foldlM_inv` / `triple_list_mapM_inv` automatically.
-- `vcgen` final pass also tries `triple_support`, `triple_propInd_of_support`,
-  `triple_probEvent_eq_one`, and `triple_probOutput_eq_one` for support-sensitive leaf closure.
-- `rvcstep` covers synchronized `replicate`, `List.mapM`, and `List.foldlM`
-  goals directly; use `using Rin` for non-equality input relations on the traversal/fold cases.
-- `vcstep` auto-lowers probability goals, then decomposes a `Triple` bind,
-  auto-closes the spec subgoal via `solve_by_elim`, falls back to backward WP
-  (`triple_bind_wp`), handles `ite`/`dite`/`match` splitting, and auto-detects loop
-  invariants for `replicate`/`foldlM`/`mapM`.
-- `vcgen` is the exhaustive driver: lowers probability goals, decomposes `Triple` goals
-  across all open branches, closes spec subgoals and loop invariants from context,
-  synthesizes support-based intermediate postconditions when no explicit spec is available,
-  normalizes residual `wp` terms, applies support/indicator leaf closure, then runs bounded
-  local consequence search.
-- `exp_norm` normalizes indicator (`propInd`) and expectation (`wp`) arithmetic.
-- `by_upto bad` applies the existing identical-until-bad TV-distance bound for `simulateQ`.
+For the tactic reference, proof-mode entry points, and workflow details, see
+[`docs/agents/program-logic.md`](docs/agents/program-logic.md).
 
 ## Building
 

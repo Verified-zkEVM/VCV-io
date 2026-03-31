@@ -46,6 +46,13 @@ When in doubt, prefer:
 - Every Lean file should have a module docstring near the top using `/-! ... -/`.
 - Public definitions and major theorems should have declaration docstrings using `/-- ... -/`.
 - If a file cites papers, include a references section in the module docstring or cite the source clearly in the surrounding docs.
+- For ordinary Lean source files, use this prologue layout:
+  1. copyright / license / authors header
+  2. one blank line
+  3. imports
+  4. one blank line
+  5. module docstring
+  Keep exactly one blank line between these blocks.
 
 ## Style Notes
 
