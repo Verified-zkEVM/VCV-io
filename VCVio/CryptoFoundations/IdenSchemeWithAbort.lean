@@ -115,6 +115,7 @@ def PerfectHVZK (ids : IdenSchemeWithAbort S W W' St C Z p)
   ∀ s w, p s w = true →
     evalDist (ids.honestExecution s w) = evalDist (sim s)
 
+/-- The perfect HVZK property is equivalent to the approximate HVZK property with `ζ_zk = 0`. -/
 @[grind =]
 lemma perfectHVZK_iff_hvzk_zero
     (ids : IdenSchemeWithAbort S W W' St C Z p)
