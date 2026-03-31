@@ -40,9 +40,6 @@ verification is `g^z = R · pk^c`.
   distribution matches via change of variables
 -/
 
-set_option linter.unusedDecidableInType false
-set_option linter.unusedFintypeInType false
-
 open OracleSpec OracleComp SigmaProtocol
 
 variable (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
@@ -100,43 +97,36 @@ def schnorrSimTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
   let z ← $ᵗ F
   return (z • g - c • pk, c, z)
 
+omit [Fintype F] [DecidableEq F] in
 /-- Honest-verifier zero-knowledge: the real transcript distribution equals the simulated one.
 The proof swaps sampling order and uses uniformity of `F` to reindex via the bijection
 `r ↦ r + c * sk`. -/
-theorem schnorrSigma_hvzk (g : G) :
-    HVZK (schnorrSigma F G g) (schnorrSimTranscript F G g) := by
+theorem schnorrSigma_hvzk (g : G) [Finite F] :
+    PerfectHVZK (schnorrSigma F G g) (schnorrSimTranscript F G g) := by
+  let _ : Fintype F := Fintype.ofFinite F
   intro pk sk h_sk
   have h_eq : sk • g = pk := of_decide_eq_true h_sk
-  simp only [schnorrSigma, schnorrSimTranscript, bind_assoc, pure_bind]
-  apply evalDist_ext; intro t
-  vcstep rw
-  vcstep rw congr' as ⟨c⟩
-  rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-  simp only [show ∀ r : F,
-      (r • g, c, r + c * sk) =
-        ((r + c * sk) • g - c • pk, c, r + c * sk) from
-    fun r => by rw [add_smul, mul_smul, h_eq, add_sub_cancel_right]]
-  calc
-    ∑' r : F,
-        Pr[= r | ($ᵗ F : ProbComp F)] *
-          Pr[= t | (pure (((r + c * sk) • g - c • pk, c, r + c * sk) : G × F × F) :
-            ProbComp _)] =
-      ∑' r : F,
-        Pr[= r + c * sk | ($ᵗ F : ProbComp F)] *
-          Pr[= t | (pure (((r + c * sk) • g - c • pk, c, r + c * sk) : G × F × F) :
-            ProbComp _)] := by
-        refine tsum_congr fun r => ?_
-        congr 1
-        change
-          Pr[= r | (SampleableType.selectElem : ProbComp F)] =
-            Pr[= r + c * sk | (SampleableType.selectElem : ProbComp F)]
-        exact (inferInstance : SampleableType F).probOutput_selectElem_eq r (r + c * sk)
-    _ =
-      ∑' z : F,
-        Pr[= z | ($ᵗ F : ProbComp F)] *
-          Pr[= t | (pure ((z • g - c • pk, c, z) : G × F × F) : ProbComp _)] := by
-        simpa using
-          (Equiv.tsum_eq (Equiv.addRight (c * sk))
-            (fun z : F =>
-              Pr[= z | ($ᵗ F : ProbComp F)] *
-                Pr[= t | (pure ((z • g - c • pk, c, z) : G × F × F) : ProbComp _)]))
+  apply evalDist_ext
+  intro t
+  trans Pr[= t | do
+    let c ← ($ᵗ F : ProbComp F)
+    let r ← ($ᵗ F : ProbComp F)
+    pure (((r + c * sk) • g - c • pk, c, r + c * sk) : G × F × F)]
+  · simp only [SigmaProtocol.realTranscript, schnorrSigma]
+    vcstep rw
+    simp [h_eq, add_smul, mul_smul, add_sub_cancel_right]
+  · refine probOutput_bind_congr' ($ᵗ F : ProbComp F) t ?_
+    intro c
+    simpa [schnorrSimTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+      (probOutput_bind_bijective_uniform_cross
+        (α := F) (β := F)
+        (f := fun r => r + c * sk)
+        (hf := by
+          constructor
+          · intro r₁ r₂ h
+            exact add_right_cancel h
+          · intro z
+            refine ⟨z - c * sk, ?_⟩
+            simp [sub_eq_add_neg, add_left_comm, add_comm])
+        (g := fun z => pure ((z • g - c • pk, c, z) : G × F × F))
+        t)
