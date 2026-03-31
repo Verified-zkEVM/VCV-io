@@ -222,7 +222,7 @@ lemma Function.injective2_swap_iff {α β γ : Type*} (f : α → β → γ) :
     (Function.swap f).Injective2 ↔ f.Injective2 :=
   ⟨fun h _ _ _ _ h' ↦ and_comm.1 (h h'), fun h _ _ _ _ h' ↦ and_comm.1 (h h')⟩
 
-@[simp] theorem Finset.image_const_univ {α β} [DecidableEq β]  [Fintype α]
+@[simp] theorem Finset.image_const_univ {α β} [DecidableEq β] [Fintype α]
     [Nonempty α] (b : β) : (Finset.univ.image fun _ : α => b) = singleton b :=
   Finset.univ.image_const Finset.univ_nonempty b
 
@@ -547,7 +547,7 @@ def Fin.mOfFn {m : Type u → Type v} [Monad m] {α : Type u} :
 
 @[simp]
 lemma List.foldlM_range {m : Type u → Type v} [Monad m] [LawfulMonad m]
-    {s : Type u} (n : ℕ) (f : s → Fin n → m s) (init : s)  :
+    {s : Type u} (n : ℕ) (f : s → Fin n → m s) (init : s) :
     List.foldlM f init (List.finRange n) =
       Fin.foldlM n f init := by
   revert init

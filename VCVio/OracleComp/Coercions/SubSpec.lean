@@ -35,7 +35,7 @@ it can be perfectly simulated by a computation using the oracles of `superSpec`.
 
 We avoid implementing this via the built-in subset notation as we care about the actual data
 of the mapping rather than just its existence, which is needed when defining type coercions. -/
-class SubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec.{v,w} τ)
+class SubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
   liftM_map {α β : Type _} (q : OracleQuery spec α) (f : α → β) :
       liftM (n := OracleQuery superSpec) (f <$> q) = f <$> liftM q
@@ -65,7 +65,7 @@ end SubSpec
 distributions. The axiom requires that the continuation of each lifted query is a
 bijection from the super-range to the sub-range, which guarantees that the uniform
 distribution is preserved under the mapping. -/
-class LawfulSubSpec (spec : OracleSpec.{u,w} ι) (superSpec : OracleSpec.{v,w} τ)
+class LawfulSubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     [h : SubSpec spec superSpec] : Prop where
   cont_bijective (t : spec.Domain) :
     Function.Bijective (h.toMonadLift.monadLift (query (spec := spec) t)).snd

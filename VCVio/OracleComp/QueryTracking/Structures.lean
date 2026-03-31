@@ -23,7 +23,7 @@ variable {ι : Type u} {spec : OracleSpec ι}
 
 /-- Type to represent a cache of queries to oracles in `spec`.
 Defined to be a function from (indexed) inputs to an optional output. -/
-def QueryCache (spec : OracleSpec.{u,v} ι) : Type (max u v) :=
+def QueryCache (spec : OracleSpec.{u, v} ι) : Type (max u v) :=
   (t : spec.Domain) → Option (spec.Range t)
 
 namespace QueryCache
@@ -250,7 +250,7 @@ end QueryCount
 /-- Log of queries represented by a list of dependent product's tagging the oracle's index.
 `(t : spec.Domain) × (spec.Range t)` is slightly more restricted as it doesn't
 keep track of query ordering between different oracles. -/
-@[reducible] def QueryLog (spec : OracleSpec.{u,v} ι) : Type (max u v) :=
+@[reducible] def QueryLog (spec : OracleSpec.{u, v} ι) : Type (max u v) :=
   List ((t : spec.Domain) × spec.Range t)
 
 namespace QueryLog
@@ -354,12 +354,12 @@ end QueryLog
 
 /-- A store of pre-generated seed values for oracle queries, indexed by oracle.
 Maps each oracle index `i` to a list of outputs `List (spec.Range i)`. -/
-def QuerySeed (spec : OracleSpec.{u,v} ι) : Type (max u v) :=
+def QuerySeed (spec : OracleSpec.{u, v} ι) : Type (max u v) :=
   (i : ι) → List (spec.Range i)
 
 namespace QuerySeed
 
-variable {ι : Type u} {spec : OracleSpec.{u,v} ι}
+variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
 
 instance : EmptyCollection (QuerySeed spec) := ⟨fun _ => []⟩
 

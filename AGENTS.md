@@ -69,6 +69,7 @@ Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
+7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
 
 For the full list, see `docs/agents/gotchas.md`.
 

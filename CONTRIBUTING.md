@@ -14,6 +14,7 @@ Before sending work for review:
 - After adding new `.lean` files, run `./scripts/update-lib.sh`.
 - Avoid leaving `sorry` in finished work unless the change is explicitly meant to preserve partial work.
 - Keep repo-wide Lean options in `lakefile.lean`. Do not restate `autoImplicit = false` with per-file `set_option` lines.
+- Do not disable linters locally or globally to make warnings disappear. Fix the underlying issue instead of adding `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level linter suppressions.
 
 ## Attribution And File Headers
 

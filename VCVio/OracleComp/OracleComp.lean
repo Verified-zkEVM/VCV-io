@@ -16,11 +16,11 @@ universe u v w
 /-- `OracleComp spec α` represents computations with oracle access to oracles in `spec`,
 where the final return value has type `α`, represented as a free monad over the `PFunctor`
 corresponding to `spec.` -/
-def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) :
+def OracleComp {ι : Type u} (spec : OracleSpec.{u, v} ι) :
     Type w → Type (max u v w) :=
   PFunctor.FreeM spec.toPFunctor
 
-variable {α β γ : Type v} {ι} {spec : OracleSpec.{u,v} ι}
+variable {α β γ : Type v} {ι} {spec : OracleSpec.{u, v} ι}
 
 namespace OracleComp
 

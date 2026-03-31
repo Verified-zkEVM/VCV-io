@@ -97,24 +97,30 @@ pass. Do not add deprecated aliases, migration wrappers, or compatibility layers
 
 Building Mathlib from source takes hours. Always fetch the precompiled cache first.
 
-### 17. After adding new `.lean` files, run `./scripts/update-lib.sh`
+### 17. Do not disable linters to silence warnings
+
+Do not add `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level
+`leanOptions` that turn lints off just to get a clean build. Treat linter failures as real
+problems and fix the underlying declaration, proof, naming, or formatting issue instead.
+
+### 18. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
 This regenerates root import files (`VCVio.lean`, `Examples.lean`, `ToMathlib.lean`). CI checks they're up to date.
 
-### 18. Lean toolchain and Mathlib version must stay in sync
+### 19. Lean toolchain and Mathlib version must stay in sync
 
 Both currently `v4.28.0`. When upgrading, update both `lean-toolchain` and `lakefile.lean`'s `require mathlib` line simultaneously.
 
-### 19. Use public references in shared docs
+### 20. Use public references in shared docs
 
 When a proof framework follows an external paper, cite the public paper by title, venue,
 or URL rather than pointing agents at a repo-local file path.
 
-### 20. Public reference papers are authoritative for design work
+### 21. Public reference papers are authoritative for design work
 
 For relational program logic, start with
 *A Quantitative Probabilistic Relational Hoare Logic* ([ERHL25](../../REFERENCES.md#erhl25)).
 
-### 21. Agent guidance files must be committed
+### 22. Agent guidance files must be committed
 
 Agents dispatched to `git worktree` clones need to read `AGENTS.md`, `docs/agents/`, and any other guidance files. Ensure these are committed so all worktrees see them.

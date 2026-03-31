@@ -453,7 +453,7 @@ lemma relTriple_if {c : Prop} [Decidable c]
 lemma relTriple_pure_left {a : α} {ob : OracleComp spec₂ β}
     {R : RelPost α β}
     (h : RelTriple (pure a : OracleComp spec₁ α) ob
-      (fun x y => x = a ∧ R x y))  :
+      (fun x y => x = a ∧ R x y)) :
     RelTriple (pure a : OracleComp spec₁ α) ob R :=
   relTriple_post_mono h (fun _ _ ⟨_, hr⟩ => hr)
 

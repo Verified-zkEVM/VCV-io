@@ -67,10 +67,10 @@ variable {PK SK Domain Range : Type}
 
 /-- A PSF is correct if the trapdoor sampler always produces a valid preimage that is
 accepted by the shortness predicate. -/
-def Correct (psf : PreimageSampleableFunction PK SK Domain Range)
-    : Prop :=
+def Correct (psf : PreimageSampleableFunction PK SK Domain Range) : Prop :=
   ∀ pk sk t, ∀ x ∈ support (psf.trapdoorSample pk sk t),
-    psf.eval pk x = t ∧ psf.isShort x = true
+    psf.eval pk x = t ∧
+      psf.isShort x = true
 
 end PreimageSampleableFunction
 

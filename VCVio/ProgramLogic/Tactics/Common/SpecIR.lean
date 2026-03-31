@@ -7,6 +7,12 @@ Authors: Quang Dao
 import Lean
 import VCVio.ProgramLogic.Tactics.Common.Core
 
+/-! # VC Spec Intermediate Representation
+
+This module defines the intermediate representation used to classify and index program-logic
+specification rules for tactic lookup and compilation.
+-/
+
 open Lean Elab Meta
 
 namespace OracleComp.ProgramLogic
