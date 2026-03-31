@@ -1,5 +1,8 @@
 # Crypto Primitives and Reductions
 
+For the `LatticeCrypto/` directory layout, scheme entry points, and proof-vs-concrete split,
+see [`docs/agents/lattice.md`](lattice.md).
+
 ## Crypto Primitive Structures
 
 ### Asymmetric encryption (`AsymmEncAlg`)

@@ -9,6 +9,10 @@ This library aims to provide a foundational framework in Lean for reasoning abou
 
 It also provides definitions for cryptographic primitives such as symmetric/asymmetric encryption, signatures, $\Sigma$-protocols, and transforms like Fiat-Shamir and Fischlin.
 
+On top of that generic framework, the repo now contains a dedicated `LatticeCrypto` library for
+ML-DSA, ML-KEM, and Falcon, including both proof-level abstractions and executable concrete
+implementations.
+
 Assuming Lean 4 and lake are already installed, the project can be built by just running:
 
 ```
@@ -23,9 +27,19 @@ It allows for fully foundational proofs of things like forking/rewinding adversa
 Asymptotic reasoning is also supported, but tooling and automation for this is currently limited.
 Computational complexity is not considered.
 
-The `VCVio` directory provides all of the foundations and framework definitions / APIs.
-`Examples` contains example proofs including OneTimePad (perfect secrecy), ElGamal (IND-CPA via DDH), and Schnorr ($\Sigma$-protocol completeness, soundness, HVZK).
-`ToMathlib` contains constructions that eventually should be moved to another project.
+## Repository Map
+
+- `VCVio/` contains the oracle-computation framework, probability semantics, program logic, and generic crypto abstractions.
+- `LatticeCrypto/` contains lattice algebra, hardness assumptions, ML-DSA, ML-KEM, Falcon, and their concrete implementations.
+- `LatticeCryptoTest/` contains ACVP vectors, regression tests, and differential checks against native backends.
+- `Examples/` contains compact framework proofs including OneTimePad, ElGamal, and Schnorr.
+- `csrc/` contains C FFI bridges for the native ML-DSA, ML-KEM, and Falcon implementations used in tests.
+- `third_party/` contains the vendored native backends used by the FFI layer.
+- `ToMathlib/` contains supporting constructions that may eventually move to a separate project.
+
+For agent-oriented repo guidance, see [`AGENTS.md`](AGENTS.md) and the focused docs in
+[`docs/agents/`](docs/agents/), especially [`docs/agents/lattice.md`](docs/agents/lattice.md)
+for lattice-specific entry points and workflows.
 
 External papers and project references cited in this repo are centralized in
 [`REFERENCES.md`](REFERENCES.md).

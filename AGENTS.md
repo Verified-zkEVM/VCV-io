@@ -6,7 +6,7 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 
 1. Run `lake exe cache get && lake build`.
 2. Read `Examples/OneTimePad.lean` for a compact modern proof (correctness and privacy).
-3. Keep `VCVio/` as your default work area.
+3. Choose the work area by task: use `VCVio/` for oracle/probability/program-logic work, `LatticeCrypto/` for lattice schemes and reductions, and `LatticeCryptoTest/` for vectors or differential tests.
 4. If probability lemmas fail unexpectedly, first check for `[spec.Fintype]` and `[spec.Inhabited]`.
 
 `AGENTS.md` is the canonical guide. `CLAUDE.md` is a symlink to this file.
@@ -24,7 +24,20 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 
 VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computations (free monad over `OracleSpec`), with `simulateQ` for operational semantics and `evalDist` for denotational semantics (probability distributions). `ProbComp α` is the abbreviation for `OracleComp unifSpec α`.
 
+The repo also includes a first-class lattice cryptography library under `LatticeCrypto/`, built on top of the `VCVio` framework. That layer contains generic lattice algebra plus ML-DSA, ML-KEM, and Falcon specifications, security statements, concrete implementations, FFI bridges, and tests.
+
+## Repo Map
+
+- `VCVio/`: generic oracle-computation framework, program logic, crypto abstractions, and generic reductions.
+- `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
+- `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
+- `Examples/`: compact framework examples such as OneTimePad, ElGamal, and Schnorr.
+- `csrc/`: C FFI shims used for differential testing against native ML-DSA, ML-KEM, and Falcon code.
+- `third_party/`: vendored native backends used by the FFI and test harnesses.
+
 ## Module Layering
+
+For `VCVio/`:
 
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
@@ -33,6 +46,18 @@ ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
 ```
 
 New files must respect this DAG. `EvalDist/` must never import from `OracleComp/`.
+
+For `LatticeCrypto/`, the rough dependency direction is:
+
+```
+{Norm, Ring, Rounding, DiscreteGaussian}
+  → HardnessAssumptions
+  → {MLDSA, MLKEM, Falcon}
+  → Concrete implementations / security wrappers
+  → LatticeCryptoTest
+```
+
+Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`, but not the other way around.
 
 ## Critical Gotchas
 
@@ -67,6 +92,14 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
+- Generic lattice algebra: `LatticeCrypto/Norm.lean`, `LatticeCrypto/Ring.lean`, `LatticeCrypto/Rounding.lean`
+- ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
+- ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
+- ML-KEM internal deterministic core: `LatticeCrypto/MLKEM/Internal.lean`
+- ML-KEM top-level KEM wrapper: `LatticeCrypto/MLKEM/KEM.lean`
+- Falcon GPV instantiation: `LatticeCrypto/Falcon/Scheme.lean`
+- Lattice hardness assumptions: `LatticeCrypto/HardnessAssumptions/LearningWithErrors.lean`, `LatticeCrypto/HardnessAssumptions/ShortIntegerSolution.lean`
+- Differential and vector tests: `LatticeCryptoTest/`
 
 ## Program Logic Tactics
 
@@ -153,6 +186,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.28.0`). Files s
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
+- **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)
 - **Probability reasoning (EvalDist, ProbComp)**: [`docs/agents/probability.md`](docs/agents/probability.md)
 - **Crypto primitives and reductions**: [`docs/agents/crypto.md`](docs/agents/crypto.md)
