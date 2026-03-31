@@ -109,6 +109,17 @@ variable {Coeff : Type u} [CommRing Coeff] {n : Nat}
 private abbrev vRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :=
   vectorNegacyclicRing Coeff n
 
+@[simp] theorem vectorBackend_coeff (p : Poly Coeff n) (i : Fin n) :
+    (vectorBackend Coeff n).coeff p i = p.get i := rfl
+
+@[simp] theorem vectorRing_zero :
+    (vectorNegacyclicRing Coeff n).zero = (0 : Poly Coeff n) := rfl
+
+@[simp] theorem vectorRing_zero_get (i : Fin n) :
+    ((vectorNegacyclicRing Coeff n).zero).get i = (0 : Coeff) := by
+  show (0 : Vector Coeff n).get i = 0
+  simp [Vector.get, Zero.zero, Vector.instZero]
+
 @[simp] theorem vectorRing_add_get (f g : Poly Coeff n) (i : Fin n) :
     ((vRing Coeff n).add f g).get i = f.get i + g.get i := by
   simp [vRing, vectorNegacyclicRing, Vector.get]

@@ -205,13 +205,29 @@ theorem invNTT_ntt (f : Rq) : invNTT (ntt f) = f := by
 theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
   sorry
 
+private theorem hadd_rq (f g : Rq) :
+    polyBackend.coeff (f + g) = fun i => polyBackend.coeff f i + polyBackend.coeff g i := by
+  funext i
+  change ((LatticeCrypto.vectorNegacyclicRing Coeff ringDegree).add f g).get i = f.get i + g.get i
+  simp
+
+private theorem hsub_rq (f g : Rq) :
+    polyBackend.coeff (f - g) = fun i => polyBackend.coeff f i - polyBackend.coeff g i := by
+  funext i
+  change ((LatticeCrypto.vectorNegacyclicRing Coeff ringDegree).sub f g).get i = f.get i - g.get i
+  simp
+
+private theorem hzero_rq (i : Fin polyBackend.degree) :
+    polyBackend.coeff (0 : Rq) i = 0 :=
+  LatticeCrypto.vectorRing_zero_get i
+
 /-- The concrete NTT is additive on the coefficient-vector carrier of `T_q`. -/
-theorem ntt_add_toRq (f g : Rq) : (ntt (f + g) : Rq) = (ntt f : Rq) + (ntt g : Rq) := by
-  sorry
+theorem ntt_add_toRq (f g : Rq) : (ntt (f + g) : Rq) = (ntt f : Rq) + (ntt g : Rq) :=
+  LatticeCrypto.NTTCert.applyMatrix_add (backend := polyBackend) nttMatrix hadd_rq f g
 
 /-- The concrete NTT preserves subtraction on the coefficient-vector carrier of `T_q`. -/
-theorem ntt_sub_toRq (f g : Rq) : (ntt (f - g) : Rq) = (ntt f : Rq) - (ntt g : Rq) := by
-  sorry
+theorem ntt_sub_toRq (f g : Rq) : (ntt (f - g) : Rq) = (ntt f : Rq) - (ntt g : Rq) :=
+  LatticeCrypto.NTTCert.applyMatrix_sub (backend := polyBackend) nttMatrix hsub_rq f g
 
 /-- Concrete `NTTRingOps` instance for ML-KEM. -/
 def concreteNTTRingOps : NTTRingOps where
@@ -228,7 +244,8 @@ noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   fromHat_toHat := invNTT_ntt
   toHat_fromHat := ntt_invNTT
   toHat_zero := by
-    sorry
+    apply LatticeCrypto.TransformPoly.ext
+    exact LatticeCrypto.NTTCert.applyMatrix_zero (backend := polyBackend) nttMatrix hzero_rq
   toHat_mul := by
     intro f g
     simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]

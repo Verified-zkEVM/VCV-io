@@ -27,10 +27,6 @@ namespace MLDSA.Concrete
 
 open MLDSA
 
-private local instance instAddRqNTT : Add Rq := Vector.instAdd
-private local instance instZeroRqNTT : Zero Rq := Vector.instZero
-private local instance instSubRqNTT : Sub Rq := Vector.instSub
-private local instance instNegRqNTT : Neg Rq := Vector.instNeg
 
 /-- Reverse the low 8 bits of `i` (FIPS 204: `brv(k)`). -/
 def bitRev8 (i : Nat) : Nat :=
@@ -165,13 +161,31 @@ theorem ntt_invNTT (fHat : Tq) : ntt (invNTT fHat) = fHat := by
           nttMatrix invNTTMatrix idMatrix nttMatrix_invNTTMatrix_entry fHat.coeffs
     _ = fHat.coeffs := LatticeCrypto.NTTCert.applyMatrix_id (backend := polyBackend) fHat.coeffs
 
+private theorem hadd_rq (f g : Rq) :
+    polyBackend.coeff (f + g) = fun i => polyBackend.coeff f i + polyBackend.coeff g i := by
+  funext i
+  change ((LatticeCrypto.vectorNegacyclicRing Coeff ringDegree).add f g).get i = f.get i + g.get i
+  simp
+
+private theorem hsub_rq (f g : Rq) :
+    polyBackend.coeff (f - g) = fun i => polyBackend.coeff f i - polyBackend.coeff g i := by
+  funext i
+  change ((LatticeCrypto.vectorNegacyclicRing Coeff ringDegree).sub f g).get i = f.get i - g.get i
+  simp
+
+private theorem hzero_rq (i : Fin polyBackend.degree) :
+    polyBackend.coeff (0 : Rq) i = 0 :=
+  LatticeCrypto.vectorRing_zero_get i
+
 /-- The concrete NTT is additive. -/
 theorem ntt_add (f g : Rq) : ntt (f + g) = ntt f + ntt g := by
-  sorry
+  apply LatticeCrypto.TransformPoly.ext
+  exact LatticeCrypto.NTTCert.applyMatrix_add (backend := polyBackend) nttMatrix hadd_rq f g
 
 /-- The concrete NTT preserves subtraction. -/
 theorem ntt_sub (f g : Rq) : ntt (f - g) = ntt f - ntt g := by
-  sorry
+  apply LatticeCrypto.TransformPoly.ext
+  exact LatticeCrypto.NTTCert.applyMatrix_sub (backend := polyBackend) nttMatrix hsub_rq f g
 
 /-- Concrete `NTTRingOps` instance for ML-DSA. -/
 def concreteNTTRingOps : NTTRingOps where
@@ -187,13 +201,14 @@ noncomputable def concreteNTTRingLaws : NTTRingLaws concreteNTTRingOps where
   fromHat_toHat := invNTT_ntt
   toHat_fromHat := ntt_invNTT
   toHat_zero := by
-    sorry
+    apply LatticeCrypto.TransformPoly.ext
+    exact LatticeCrypto.NTTCert.applyMatrix_zero (backend := polyBackend) nttMatrix hzero_rq
   toHat_mul := by
     intro f g
     simp [concreteNTTRingOps, multiplyNTTs, invNTT_ntt]
   toHat_add := by
-    sorry
+    intro f g; exact ntt_add f g
   toHat_sub := by
-    sorry
+    intro f g; exact ntt_sub f g
 
 end MLDSA.Concrete
