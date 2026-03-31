@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.TVDist
 
 /-!
 # Identification Scheme with Aborts
@@ -20,7 +21,9 @@ The structure follows the EasyCrypt formalization in `IDSabort.ec` (formosa-cryp
 
 - `IdenSchemeWithAbort`: identification scheme where `respond` returns `Option Z`
 - `IdenSchemeWithAbort.Complete`: honest prover convinces verifier (conditioned on non-abort)
-- `IdenSchemeWithAbort.HVZK`: transcript distribution matching with a simulator
+- `IdenSchemeWithAbort.HVZK`: transcript distribution is within a stated TV-distance
+  of a simulator
+- `IdenSchemeWithAbort.PerfectHVZK`: exact transcript distribution matching with a simulator
 - `IdenSchemeWithAbort.CommitmentRecoverable`: ability to recover commitment from the transcript
 
 ## References
@@ -93,17 +96,44 @@ section HVZK
 
 variable [SampleableType C] [unifSpec.Fintype] [unifSpec.Inhabited]
 
-/-- Honest-verifier zero-knowledge for an identification scheme with aborts: the distribution
-of non-aborting transcripts produced by the honest prover equals the distribution produced by
-the simulator.
+/-- Approximate honest-verifier zero-knowledge for an identification scheme with aborts:
+the transcript distribution produced by the honest prover is within total variation
+distance `ζ_zk` of the distribution produced by the simulator.
 
 Both distributions are over `Option (W' × C × Z)`, where `none` represents an abort.
-HVZK requires that the conditional distributions (given non-abort) are identical, and
-that the abort probabilities match. -/
+The parameter `ζ_zk` captures both transcript mismatch and abort-probability mismatch. -/
 def HVZK (ids : IdenSchemeWithAbort S W W' St C Z p)
+    (sim : S → ProbComp (Option (W' × C × Z))) (ζ_zk : ℝ) : Prop :=
+  ∀ s w, p s w = true →
+    tvDist (ids.honestExecution s w) (sim s) ≤ ζ_zk
+
+/-- Exact honest-verifier zero-knowledge for an identification scheme with aborts:
+the transcript distribution produced by the honest prover exactly matches the
+distribution produced by the simulator. -/
+def PerfectHVZK (ids : IdenSchemeWithAbort S W W' St C Z p)
     (sim : S → ProbComp (Option (W' × C × Z))) : Prop :=
   ∀ s w, p s w = true →
     evalDist (ids.honestExecution s w) = evalDist (sim s)
+
+@[grind =]
+lemma perfectHVZK_iff_hvzk_zero
+    (ids : IdenSchemeWithAbort S W W' St C Z p)
+    (sim : S → ProbComp (Option (W' × C × Z))) :
+    ids.PerfectHVZK sim ↔ ids.HVZK sim 0 := by
+  constructor
+  · intro h
+    dsimp [HVZK]
+    intro s w hs
+    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 := by
+      simpa using (tvDist_eq_zero_iff (ids.honestExecution s w) (sim s)).2 (h s w hs)
+    exact le_of_eq hzero
+  · intro h
+    dsimp [HVZK] at h
+    intro s w hs
+    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 := by
+      exact le_antisymm (h s w hs) (by
+        simpa using (tvDist_nonneg (ids.honestExecution s w) (sim s)))
+    simpa using (tvDist_eq_zero_iff (ids.honestExecution s w) (sim s)).mp hzero
 
 end HVZK
 

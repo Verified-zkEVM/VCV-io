@@ -119,35 +119,66 @@ variable (ids : IdenSchemeWithAbort S W W' St C Z p)
 
 section EUF_CMA
 
-/-- Structural query bound counting only random-oracle queries in a
-Fiat-Shamir with aborts EUF-CMA adversary. -/
-def hashQueryBound {S' α : Type}
+/-- Structural query bound for Fiat-Shamir-with-aborts EUF-CMA adversaries:
+uniform-sampling queries are unrestricted, while `qS` and `qH` bound signing-oracle
+and random-oracle queries respectively. -/
+def signHashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (M × W' →ₒ C)) + (M →ₒ S')) α)
-    (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => True
-      | .inl (.inr _) => 0 < b)
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => b
-      | .inl (.inr _) => b - 1)
+    (qS qH : ℕ) : Prop :=
+  OracleComp.IsQueryBound oa (qS, qH)
+    (fun t b => match t, b with
+      | .inl (.inl _), _ => True
+      | .inl (.inr _), (_, qH') => 0 < qH'
+      | .inr _, (qS', _) => 0 < qS')
+    (fun t b => match t, b with
+      | .inl (.inl _), b' => b'
+      | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+      | .inr _, (qS', qH') => (qS' - 1, qH'))
+
+/-- The exact classical ROM statistical loss from the Fiat-Shamir-with-aborts
+CMA-to-NMA reduction (Theorem 3, CRYPTO 2023), parameterized by the HVZK simulator
+error `ζ_zk`.
+
+The paper proves
+
+`Adv_EUF-CMA(A) ≤ Adv_EUF-NMA(B)
+  + 2·qS·(qH+1)·ε/(1-p)
+  + qS·ε·(qS+1)/(2·(1-p)^2)
+  + qS·ζ_zk
+  + δ`
+
+where:
+- `qS`: number of signing-oracle queries
+- `qH`: number of adversarial random-oracle queries
+- `ε`: commitment-guessing bound
+- `p`: effective abort probability
+- `ζ_zk`: total-variation error of the HVZK simulator for one signing transcript
+- `δ`: regularity failure probability
+
+The `qH + 1` term comes from applying the paper's hybrid bounds to the forging
+experiment, which adds one final verification query to the random oracle. -/
+noncomputable def cmaToNmaLoss (qS qH : ℕ) (ε p ζ_zk δ : ℝ) (_hp : p < 1) : ℝ :=
+  2 * qS * (qH + 1) * ε / (1 - p) +
+  qS * ε * (qS + 1) / (2 * (1 - p) ^ 2) +
+  qS * ζ_zk +
+  δ
 
 /-- **CMA-to-NMA reduction for Fiat-Shamir with aborts (Theorem 3, CRYPTO 2023).**
 
-For any EUF-CMA adversary `A` making at most `qBound` random oracle queries, there exists
-an NMA reduction and a statistical loss `L` such that:
+For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
+random-oracle queries, there exists an NMA reduction such that:
 
   `Adv^{EUF-CMA}(A) ≤ Adv^{EUF-NMA}(B) + L`
 
 The reduction uses:
-1. The HVZK simulator `sim` to answer signing queries without the secret key
+1. The quantitative HVZK simulator `sim` to answer signing queries without the secret key
 2. Commitment recoverability `recover` to map between the standard and commitment-recoverable
    variants of the signature scheme
 3. Nested hybrid arguments over ROM reprogramming (accepted and rejected transcripts)
 
 The statistical loss `L` involves the commitment guessing probability `ε`, the effective
-abort probability `p`, the regularity failure probability `δ`, and the query bounds `qS`,
-`qH`. See `MLDSA.cmaToNmaLoss` for the precise formula from the paper.
+abort probability `p`, the simulator error `ζ_zk`, the regularity failure probability `δ`,
+and the query bounds `qS`, `qH`; it is captured here by `cmaToNmaLoss`.
 
 The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE +
 SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
@@ -155,18 +186,46 @@ SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
 theorem euf_cma_bound [DecidableEq Z]
     (_hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
-    (_hhvzk : ids.HVZK sim)
+    (ζ_zk : ℝ)
+    (_hζ : 0 ≤ ζ_zk)
+    (_hhvzk : ids.HVZK sim ζ_zk)
     (recover : S → C → Z → W')
     (_hcr : ids.CommitmentRecoverable recover)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamirWithAbort ids hr M maxAttempts))
-    (qBound : ℕ)
-    (_hQ : ∀ pk, hashQueryBound M
-      (S' := Option (W' × Z)) (oa := adv.main pk) qBound) :
+    (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
+    (_hQ : ∀ pk, signHashQueryBound M
+      (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
       adv.advantage ≤
-        Pr[= true | hardRelationExp (r := p) reduction] := by
+        Pr[= true | hardRelationExp (r := p) reduction] +
+          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
   sorry
+
+/-- Perfect-HVZK special case of `euf_cma_bound`, where the simulator contributes no
+`qS · ζ_zk` loss term. -/
+theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
+    (_hc : ids.Complete)
+    (sim : S → ProbComp (Option (W' × C × Z)))
+    (_hhvzk : ids.PerfectHVZK sim)
+    (recover : S → C → Z → W')
+    (_hcr : ids.CommitmentRecoverable recover)
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamirWithAbort ids hr M maxAttempts))
+    (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
+    (_hQ : ∀ pk, signHashQueryBound M
+      (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
+    ∃ reduction : S → ProbComp W,
+      adv.advantage ≤
+        Pr[= true | hardRelationExp (r := p) reduction] +
+          ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
+  simpa using
+    (euf_cma_bound (ids := ids) (hr := hr) (M := M) (maxAttempts := maxAttempts)
+      (_hc := _hc) (sim := sim) (ζ_zk := 0) (_hζ := le_rfl)
+      (_hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp _hhvzk)
+      (recover := recover) (_hcr := _hcr) (adv := adv)
+      (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ) (hp := hp)
+      (_hQ := _hQ))
 
 end EUF_CMA
 

@@ -73,6 +73,11 @@ noncomputable def tvDist (mx my : m α) : ℝ :=
 
 @[simp] lemma tvDist_self (mx : m α) : tvDist mx mx = 0 := SPMF.tvDist_self _
 
+@[simp] lemma tvDist_eq_zero_iff (mx my : m α) :
+    tvDist mx my = 0 ↔ evalDist mx = evalDist my := by
+  unfold tvDist
+  rw [SPMF.tvDist_eq_zero_iff, SPMF.toPMF_inj]
+
 lemma tvDist_comm (mx my : m α) : tvDist mx my = tvDist my mx :=
   SPMF.tvDist_comm _ _
 
