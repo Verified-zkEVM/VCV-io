@@ -52,7 +52,7 @@ New files must respect this DAG. `EvalDist/` must never import from `OracleComp/
 For `LatticeCrypto/`, the rough dependency direction is:
 
 ```
-{Norm, Ring, Rounding, DiscreteGaussian}
+{Ring/*, DiscreteGaussian}
   → HardnessAssumptions
   → {MLDSA, MLKEM, Falcon}
   → Concrete implementations / security wrappers
@@ -95,7 +95,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
-- Generic lattice algebra: `LatticeCrypto/Norm.lean`, `LatticeCrypto/Ring.lean`, `LatticeCrypto/Rounding.lean`
+- Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
 - ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
 - ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
 - ML-KEM internal deterministic core: `LatticeCrypto/MLKEM/Internal.lean`

@@ -15,9 +15,14 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 
 ### Shared algebra and utilities
 
-- `LatticeCrypto/Norm.lean`: centered representatives and norm lemmas.
-- `LatticeCrypto/Ring.lean`: common ring-level infrastructure shared across schemes.
-- `LatticeCrypto/Rounding.lean`: abstract rounding interfaces and laws used by ML-DSA.
+- `LatticeCrypto/Ring/Core.lean`: `PolyBackend`, `PolyVec`, `PolyMatrix`, `NegacyclicQuotient`.
+- `LatticeCrypto/Ring/Kernel.lean`: `PolyKernel`, `NegacyclicRing`, `NegacyclicRingSemantics`, schoolbook multiplication.
+- `LatticeCrypto/Ring/VectorBackend.lean`: canonical vector-backed instantiation.
+- `LatticeCrypto/Ring/Transform.lean`: `TransformPoly`, `TransformOps`, and transform laws.
+- `LatticeCrypto/Ring/Norms.lean`: centered representatives, `NormOps`, and generic norm infrastructure.
+- `LatticeCrypto/Ring/Rounding.lean`: abstract `RoundingOps` and `Power2RoundOps` used by ML-DSA.
+- `LatticeCrypto/Ring/IntegralLift.lean`: `IntegralLift` for Falcon integer-polynomial arithmetic.
+- `LatticeCrypto/Ring/NTTCert.lean`: shared matrix certification scaffolding for concrete NTTs.
 - `LatticeCrypto/DiscreteGaussian.lean`: generic discrete Gaussian support used by Falcon.
 
 ### Hardness assumptions
@@ -28,7 +33,7 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 ### ML-DSA
 
 - `LatticeCrypto/MLDSA/Params.lean`: parameter sets and byte sizes.
-- `LatticeCrypto/MLDSA/Ring.lean`: ML-DSA-specific rings, vectors, and NTT-facing types.
+- `LatticeCrypto/MLDSA/Arithmetic.lean`: ML-DSA-specific arithmetic assembly, vectors, and NTT-facing types.
 - `LatticeCrypto/MLDSA/Primitives.lean`: abstract hashing, sampling, rounding, and encoding-facing operations.
 - `LatticeCrypto/MLDSA/Scheme.lean`: proof-level identification scheme with aborts.
 - `LatticeCrypto/MLDSA/Signature.lean`: FIPS-style signing and verification layer built on the proof-level scheme.
@@ -38,7 +43,7 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 ### ML-KEM
 
 - `LatticeCrypto/MLKEM/Params.lean`: parameter sets and ciphertext / key dimensions.
-- `LatticeCrypto/MLKEM/Ring.lean`: ML-KEM ring and vector types.
+- `LatticeCrypto/MLKEM/Arithmetic.lean`: ML-KEM arithmetic assembly and vector types.
 - `LatticeCrypto/MLKEM/Primitives.lean`: abstract sampling, hashing, and encoding-facing operations.
 - `LatticeCrypto/MLKEM/KPKE.lean`: public-key encryption layer.
 - `LatticeCrypto/MLKEM/Internal.lean`: deterministic internal algorithms following the FIPS decomposition.
@@ -49,7 +54,7 @@ Use `VCVio/` when you are changing framework abstractions such as `SignatureAlg`
 ### Falcon
 
 - `LatticeCrypto/Falcon/Params.lean`: scheme constants.
-- `LatticeCrypto/Falcon/Ring.lean`: Falcon ring types and integer-polynomial infrastructure.
+- `LatticeCrypto/Falcon/Arithmetic.lean`: Falcon arithmetic assembly and integer-polynomial infrastructure.
 - `LatticeCrypto/Falcon/Primitives.lean`: abstract primitive operations such as sampling, hashing, and compression.
 - `LatticeCrypto/Falcon/Scheme.lean`: scheme semantics and the GPV bridge.
 - `LatticeCrypto/Falcon/Security.lean`: high-level security statements.
