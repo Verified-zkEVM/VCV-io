@@ -22,7 +22,6 @@ the budget. This implements EasyCrypt's `Enforce`/`Bounder` pattern.
   within their query bound.
 -/
 
-set_option autoImplicit false
 
 open OracleSpec OracleComp
 

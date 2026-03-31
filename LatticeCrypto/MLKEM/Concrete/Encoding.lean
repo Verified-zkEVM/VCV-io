@@ -15,7 +15,6 @@ Pure-Lean executable implementation of the byte-encoding (FIPS 203 Algorithms 4â
 compression / decompression (FIPS 203 Section 4.2.1) operations.
 -/
 
-set_option autoImplicit false
 set_option linter.style.nativeDecide false
 
 namespace MLKEM.Concrete

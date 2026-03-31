@@ -33,7 +33,6 @@ This is the transform used by ML-DSA (CRYSTALS-Dilithium, FIPS 204).
 - NIST FIPS 204, Algorithms 2 (ML-DSA.Sign) and 3 (ML-DSA.Verify)
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec
 

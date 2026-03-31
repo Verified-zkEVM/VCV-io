@@ -24,7 +24,6 @@ the 16-bit value is `< 61445 = 5 · 12289`, then reduces mod `q`.
 - c-fn-dsa: `util.c` (hash_to_point), `vrfy.c` (inner_verify)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete
 

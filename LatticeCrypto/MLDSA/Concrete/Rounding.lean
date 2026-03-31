@@ -27,7 +27,6 @@ ML-DSA ring layer and avoiding conversion overhead in the verifier equation
 `Az - c · (t₁ · 2^d)`.
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA.Concrete
 

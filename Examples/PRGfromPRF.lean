@@ -22,7 +22,6 @@ The proof outline follows the standard switching argument:
 3. Bound the remaining gap by the probability of a state collision.
 -/
 
-set_option autoImplicit false
 set_option linter.unusedSectionVars false
 set_option linter.unusedDecidableInType false
 set_option linter.unusedFintypeInType false

@@ -27,7 +27,6 @@ function for testing.
    discrete Gaussian for `samplerZ`. Used for the proof bridge, never executed.
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete
 

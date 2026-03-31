@@ -29,7 +29,6 @@ framework, Falcon) and masking (ML-DSA / Dilithium).
 - Micciancio, Regev. "Lattice-based Cryptography." 2009.
 -/
 
-set_option autoImplicit false
 
 open Real BigOperators
 

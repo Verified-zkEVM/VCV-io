@@ -26,7 +26,6 @@ The `ffsamp` functions use a flat buffer layout matching the C reference,
 organized into regions indexed by multiples of `qn = n/4`.
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.FFTOps
 

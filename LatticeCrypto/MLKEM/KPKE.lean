@@ -15,7 +15,6 @@ arithmetic, encoding, and primitive operations are supplied abstractly, but the 
 follows FIPS 203 Section 5 closely.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 namespace KPKE

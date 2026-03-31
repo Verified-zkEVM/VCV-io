@@ -22,7 +22,6 @@ The C side is compiled from `csrc/falcon/lean_falcon_ffi.c`, which links
 against the c-fn-dsa SCU amalgamation (`csrc/falcon/fndsa_native.c`).
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.FFI
 

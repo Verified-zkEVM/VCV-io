@@ -43,7 +43,6 @@ MLWE + PRF + correctness parameters.
 - CRYSTALS-KYBER (TCHES 2018), Section 3 (security analysis)
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal AsymmEncAlg
 

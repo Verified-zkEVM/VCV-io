@@ -17,7 +17,6 @@ named NIST-approved instantiations.
 - NIST FIPS 204, Section 4 (Table 1: ML-DSA parameter sets)
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA
 

@@ -22,7 +22,6 @@ lake build mldsa_test
 ```
 -/
 
-set_option autoImplicit false
 set_option maxRecDepth 2048
 set_option linter.style.emptyLine false
 

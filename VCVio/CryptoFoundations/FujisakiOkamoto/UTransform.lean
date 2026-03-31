@@ -14,7 +14,6 @@ import VCVio.OracleComp.Coercions.Add
 This file defines the U-transform family on top of the T-transform oracle world.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

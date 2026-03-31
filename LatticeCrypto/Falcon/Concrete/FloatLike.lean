@@ -18,7 +18,6 @@ pipeline: FFT, LDL decomposition, discrete Gaussian sampling, and the
 FACCT exponential approximation.
 -/
 
-set_option autoImplicit false
 
 /-- Floating-point-like operations needed by the executable Falcon implementation. -/
 class FloatLike (F : Type) where

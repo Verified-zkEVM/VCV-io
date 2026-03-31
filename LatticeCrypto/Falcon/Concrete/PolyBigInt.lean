@@ -29,7 +29,6 @@ in NTRU equation solving.
 - `poly_sub_scaled_ntt` — subtract scaled polynomial using NTT
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.PolyBigInt
 

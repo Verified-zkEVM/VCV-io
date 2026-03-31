@@ -13,7 +13,6 @@ implementation from [mlkem-native](https://github.com/pq-code-package/mlkem-nati
 These primitives are shared across ML-KEM (FIPS 203) and ML-DSA (FIPS 204).
 -/
 
-set_option autoImplicit false
 
 namespace FFI.Hashing
 

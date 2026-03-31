@@ -30,7 +30,6 @@ Division uses a bit-by-bit long-division algorithm.
 - `c-fn-dsa/kgen_inner.h` — inline helpers (`fxr_mul`, `fxr_sqr`, etc.)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.FXR
 

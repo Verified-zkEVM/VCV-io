@@ -11,12 +11,13 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 
 `AGENTS.md` is the canonical guide. `CLAUDE.md` is a symlink to this file.
 
-## Attribution And Headers
+## Attribution, Headers, And Docstrings
 
 Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution policy.
 
 - New Lean files should use the standard copyright / license / authors header and a module docstring.
 - For ordinary Lean source files, use the standard prologue layout: header, blank line, imports, blank line, module docstring.
+- Docstrings must be intrinsic and descriptive. Cross-reference live sibling definitions when helpful, but do not mention removed or renamed declarations, change history, or use reactive wording such as "replaces" or "renamed from".
 - Preserve existing headers on routine edits.
 - Only rewrite attribution when a file is genuinely new or materially replaced.
 - Do not add a separate AI-attribution line.
@@ -63,7 +64,7 @@ Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`
 ## Critical Gotchas
 
 1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`).
-2. **`autoImplicit` is `false`** project-wide. Every variable must be explicitly declared.
+2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
 3. **`evalDist` IS `simulateQ`** with uniform distributions. This is definitional (`rfl`).
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad.lean` as canonical reference.

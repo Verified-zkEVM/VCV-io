@@ -11,7 +11,6 @@ import LatticeCrypto.MLKEM.KPKE
 This file models the deterministic internal algorithms from FIPS 203 Section 6.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 

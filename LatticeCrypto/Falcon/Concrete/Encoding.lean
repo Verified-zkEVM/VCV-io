@@ -31,7 +31,6 @@ packed 4 coefficients into 7 bytes.
 - Falcon specification v1.2, Section 3.12 (Algorithms 17–18)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete
 

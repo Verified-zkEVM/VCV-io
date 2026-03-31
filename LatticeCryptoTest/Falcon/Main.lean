@@ -23,7 +23,6 @@ lake build falcon_test
 ```
 -/
 
-set_option autoImplicit false
 set_option maxRecDepth 2048
 
 open Falcon Falcon.Concrete Falcon.Concrete.FPR Falcon.Concrete.SamplerZ

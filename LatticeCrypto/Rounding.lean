@@ -24,7 +24,6 @@ for the security proof.
   (CRYPTO 2023, ePrint 2023/246)
 -/
 
-set_option autoImplicit false
 
 namespace LatticeCrypto
 

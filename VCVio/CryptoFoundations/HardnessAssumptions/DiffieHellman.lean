@@ -40,7 +40,6 @@ We model a cyclic group as:
 - **DDH**: distinguish `(g, a • g, b • g, (a * b) • g)` from `(g, a • g, b • g, c • g)`
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic
 

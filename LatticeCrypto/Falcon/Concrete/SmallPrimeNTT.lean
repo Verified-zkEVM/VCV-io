@@ -26,7 +26,6 @@ Each entry of the `PRIMES` table stores:
 Ported from `c-fn-dsa/kgen_mp31.c` and `c-fn-dsa/kgen_inner.h`.
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.SmallPrimeNTT
 

@@ -13,7 +13,6 @@ This file packages the probabilistic top-level algorithms from FIPS 203 Section 
 deterministic internal algorithms from `Examples.MLKEM.Internal`.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 

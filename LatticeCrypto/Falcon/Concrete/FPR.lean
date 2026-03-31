@@ -30,7 +30,6 @@ branches on data values.
 - Pornin 2019 (eprint 2019/893), Section 3.1
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.FPR
 

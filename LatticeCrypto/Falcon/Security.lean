@@ -51,7 +51,6 @@ and would appear as an additional additive term in the security bound.
 - GPV08: Gentry, Peikert, Vaikuntanathan. STOC 2008, Theorem 6.1.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

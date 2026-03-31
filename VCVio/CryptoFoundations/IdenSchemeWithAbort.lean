@@ -33,7 +33,6 @@ The structure follows the EasyCrypt formalization in `IDSabort.ec` (formosa-cryp
 - EasyCrypt `IDSabort.ec`
 -/
 
-set_option autoImplicit false
 
 open OracleSpec OracleComp
 

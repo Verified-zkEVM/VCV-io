@@ -41,7 +41,6 @@ ported from Pornin's `c-fn-dsa` (`kgen.c`, `kgen_gauss.c`, `mq.c`).
 - Falcon specification v1.2, Algorithms 4–9
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.KeyGen
 

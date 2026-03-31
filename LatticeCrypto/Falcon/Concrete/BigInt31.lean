@@ -38,7 +38,6 @@ We also port the small modular-arithmetic helpers from `kgen_inner.h`:
 - `zint_sub_scaled` — scaled subtract
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.BigInt31
 

@@ -16,7 +16,6 @@ signs the message with both Lean and mldsa-native (deterministic, `rnd = 0`), an
 results byte-exactly.
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA.Test.ACVP
 

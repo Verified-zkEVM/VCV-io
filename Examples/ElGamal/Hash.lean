@@ -38,7 +38,6 @@ Main theorem: `|Pr[CPA wins] - 1/2| ≤ ddhAdvantage + esAdvantage`.
 Port of EasyCrypt's `hashed_elgamal_std.ec`.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal DiffieHellman
 

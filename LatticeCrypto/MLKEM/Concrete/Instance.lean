@@ -17,7 +17,6 @@ SHA-3 / SHAKE primitives to produce fully executable `NTTRingOps`, `Encoding`, a
 instances for ML-KEM.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM.Concrete
 

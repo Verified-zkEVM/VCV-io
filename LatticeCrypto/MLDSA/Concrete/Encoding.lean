@@ -20,7 +20,6 @@ FIPS-valid compressed ranges, while the standardized encodings are only injectiv
 well-formed subset actually produced by the concrete primitives.
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA.Concrete
 

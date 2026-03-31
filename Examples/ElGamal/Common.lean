@@ -11,7 +11,6 @@ import VCVio.OracleComp.Constructions.SampleableType
 Small distribution lemmas shared by the plain and hashed ElGamal examples.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

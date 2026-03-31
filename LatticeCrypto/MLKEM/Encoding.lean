@@ -13,7 +13,6 @@ pseudocode. In this first phase they are kept abstract, but their types match th
 consumed by the spec-level `K-PKE` and `ML-KEM` algorithms.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 

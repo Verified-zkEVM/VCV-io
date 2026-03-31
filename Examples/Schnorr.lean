@@ -40,7 +40,6 @@ verification is `g^z = R · pk^c`.
   distribution matches via change of variables
 -/
 
-set_option autoImplicit false
 set_option linter.unusedDecidableInType false
 set_option linter.unusedFintypeInType false
 

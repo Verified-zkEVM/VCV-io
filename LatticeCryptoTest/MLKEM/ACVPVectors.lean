@@ -16,7 +16,6 @@ The test generates keys, encapsulates, decapsulates, and compares Lean vs mlkem-
 byte-exactly.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM.Test.ACVP
 

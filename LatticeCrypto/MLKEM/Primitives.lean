@@ -13,7 +13,6 @@ the FIPS 203 pseudocode needs. The intent is to keep the spec executable once a 
 bundle is supplied, without committing to one implementation yet.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 

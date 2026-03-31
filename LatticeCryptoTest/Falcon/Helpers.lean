@@ -21,7 +21,6 @@ Shared test infrastructure: pass/fail counter, hex formatting, and utility
 functions used by the Falcon test suite.
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Test
 

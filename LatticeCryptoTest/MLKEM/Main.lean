@@ -22,7 +22,6 @@ lake build mlkem_test
 ```
 -/
 
-set_option autoImplicit false
 set_option maxRecDepth 2048
 
 open MLKEM MLKEM.Concrete MLKEM.Test

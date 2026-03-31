@@ -21,7 +21,6 @@ The first phase only introduces definitions and executable experiments; no secur
 attempted here.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal Matrix
 

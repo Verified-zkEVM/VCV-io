@@ -26,7 +26,6 @@ properties: correctness, hiding, and binding.
 - `CommitmentScheme.extractExp` — extraction experiment (game-based, allows error).
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

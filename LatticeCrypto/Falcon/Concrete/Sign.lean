@@ -34,7 +34,6 @@ generic over `FloatLike F`.
 - FIPS 206 (FN-DSA) draft
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.Sign
 

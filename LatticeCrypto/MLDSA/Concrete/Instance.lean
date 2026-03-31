@@ -16,7 +16,6 @@ Wires the concrete rounding, NTT, sampling, hashing, and byte encoding layers in
 abstract `Primitives` and `Encoding` bundles used by the ML-DSA specification.
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA.Concrete
 

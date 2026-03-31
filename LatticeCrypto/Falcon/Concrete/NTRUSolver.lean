@@ -34,7 +34,6 @@ finds short polynomials `F, G` satisfying `fG - gF = q` where `q = 12289`.
 - `c-fn-dsa/kgen_ntru.c`, `c-fn-dsa/kgen_inner.h`
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.NTRUSolver
 

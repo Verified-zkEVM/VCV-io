@@ -21,7 +21,6 @@ FIPS 204:
 - message / commitment hash wrappers
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA.Concrete
 

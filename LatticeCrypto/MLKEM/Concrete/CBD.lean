@@ -12,7 +12,6 @@ import VCVio.OracleComp.ProbComp
 Pure-Lean executable implementation of FIPS 203 Algorithm 8 (SamplePolyCBD_η).
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM.Concrete
 

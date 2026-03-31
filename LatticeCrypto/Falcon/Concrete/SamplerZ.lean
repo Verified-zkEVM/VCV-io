@@ -38,7 +38,6 @@ is squeezed to produce random bytes.
 - FACCT (eprint 2018/1234)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.SamplerZ
 

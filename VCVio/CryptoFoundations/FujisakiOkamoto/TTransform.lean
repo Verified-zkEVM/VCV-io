@@ -17,7 +17,6 @@ This file defines the derandomizing T transform:
 - decryption re-derives the coins and checks re-encryption
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

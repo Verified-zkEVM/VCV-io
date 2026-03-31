@@ -13,7 +13,6 @@ The development stays generic over the variable parameters while exposing the th
 named NIST-approved instantiations.
 -/
 
-set_option autoImplicit false
 
 namespace MLKEM
 

@@ -42,7 +42,6 @@ The GPV framework is the hash-and-sign analogue of the Fiat-Shamir transform:
   World." ASIACRYPT 2011.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

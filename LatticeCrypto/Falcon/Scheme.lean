@@ -34,7 +34,6 @@ The Falcon scheme is an instantiation of the GPV hash-and-sign framework over NT
 - GPV08: Gentry, Peikert, Vaikuntanathan. STOC 2008.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec
 

@@ -10,9 +10,10 @@ Any file using `evalDist`, `probOutput`, `probEvent`, or `Pr[...]` on `OracleCom
 
 **Fix**: Add `[spec.Fintype] [spec.Inhabited]` to your variable/hypothesis list.
 
-### 2. `autoImplicit` is `false` project-wide
+### 2. `autoImplicit = false` is set globally in `lakefile.lean`
 
-Every variable must be explicitly declared. Do not rely on Lean's auto-implicit mechanism.
+Every variable must be explicitly declared. Do not rely on Lean's auto-implicit mechanism,
+and do not add `set_option autoImplicit false` in individual files.
 
 **Symptom**: "unknown identifier" for variables you expected Lean to infer.
 

@@ -25,7 +25,6 @@ algorithms.
 - Falcon specification v1.2, Section 3.12 (Algorithms 17–18: compress/decompress)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon
 

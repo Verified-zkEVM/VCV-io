@@ -44,7 +44,6 @@ where `ε_renyi < 2^{-64}` for 53-bit mantissa precision.
 - Falcon specification v1.2, Section 2.5.2 (sampler quality)
 -/
 
-set_option autoImplicit false
 
 namespace Falcon.Concrete.FPRBridge
 

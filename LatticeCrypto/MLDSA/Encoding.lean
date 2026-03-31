@@ -17,7 +17,6 @@ semantic objects consumed by the spec-level KeyGen, Sign, and Verify algorithms.
 - NIST FIPS 204, Section 7.1–7.2 (key and signature encodings)
 -/
 
-set_option autoImplicit false
 
 namespace MLDSA
 

@@ -14,7 +14,6 @@ Shared test infrastructure: pass/fail counter, hex formatting, and FIPS 204 seri
 helpers used by the ML-DSA test suite.
 -/
 
-set_option autoImplicit false
 
 open MLDSA MLDSA.Concrete
 

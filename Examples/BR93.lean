@@ -35,7 +35,6 @@ The bad event is then reduced to the repo's trapdoor-preimage experiment
 bodies remain `sorry` for now.
 -/
 
-set_option autoImplicit false
 set_option linter.unusedDecidableInType false
 set_option linter.unusedFintypeInType false
 

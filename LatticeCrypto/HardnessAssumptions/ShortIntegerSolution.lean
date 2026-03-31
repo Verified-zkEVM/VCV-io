@@ -38,7 +38,6 @@ that the adversary must produce a hash preimage `c = H(...)` as part of the solu
   (CRYPTO 2023, ePrint 2023/246)
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal Matrix
 
