@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
+import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.Fischlin
@@ -22,7 +23,6 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.KEMDEM
-import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.PRF
