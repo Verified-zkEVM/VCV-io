@@ -29,7 +29,6 @@ Given `Module F G`, a generator `g : G`, and a bijection proof
   itself incomplete, pending the full forking lemma).
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec DiffieHellman
 

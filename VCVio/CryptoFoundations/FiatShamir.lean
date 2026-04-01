@@ -250,17 +250,20 @@ set_option linter.unusedDecidableInType false
 
 To obtain a meaningful EUF-CMA theorem we need:
 * special soundness, to extract a witness from a successful fork;
-* an HVZK simulator for the underlying Σ-protocol, to model signing without the witness;
+* a perfect HVZK simulator for the underlying Σ-protocol, to model signing without the witness;
 * a structural bound on hash-oracle queries.
 
 The intended conclusion is stated as the existence of a witness-finding
 reduction. The concrete Pointcheval-Stern reduction is not yet implemented in
-this file, so the proof below remains a placeholder. -/
+this file, so the proof below remains a placeholder.
+
+THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT LOSS TERM
+FOR QUANTITATIVE HVZK. -/
 theorem euf_cma_bound
     (_hss : σ.SpeciallySound)
     [Fintype Ω]
     (simTranscript : X → ProbComp (PC × Ω × P))
-    (_hhvzk : σ.HVZK simTranscript)
+    (_hhvzk : σ.PerfectHVZK simTranscript)
     (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
     (qBound : ℕ)
     (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)

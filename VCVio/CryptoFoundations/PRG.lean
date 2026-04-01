@@ -25,7 +25,6 @@ from a truly random output `r`.
 - `prgAdvantage` — distinguishing advantage.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

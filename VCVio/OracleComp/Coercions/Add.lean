@@ -28,12 +28,12 @@ variable {ι₁} {ι₂} {ι₃} {ι₄}
 section instances
 
 /-- We need `Inhabited` to prevent infinite type-class searching. -/
-instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v} τ} :
+instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v} τ} :
     OracleSpec.emptySpec.{u,v} ⊂ₒ spec where
   monadLift | q => PEmpty.elim q.input
   liftM_map q := PEmpty.elim q.input
 
-instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u,v} τ} :
+instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v} τ} :
     OracleSpec.LawfulSubSpec OracleSpec.emptySpec spec where
   cont_bijective t := PEmpty.elim t
 

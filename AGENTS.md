@@ -6,16 +6,18 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 
 1. Run `lake exe cache get && lake build`.
 2. Read `Examples/OneTimePad.lean` for a compact modern proof (correctness and privacy).
-3. Keep `VCVio/` as your default work area.
+3. Choose the work area by task: use `VCVio/` for oracle/probability/program-logic work, `LatticeCrypto/` for lattice schemes and reductions, and `LatticeCryptoTest/` for vectors or differential tests.
 4. If probability lemmas fail unexpectedly, first check for `[spec.Fintype]` and `[spec.Inhabited]`.
 
 `AGENTS.md` is the canonical guide. `CLAUDE.md` is a symlink to this file.
 
-## Attribution And Headers
+## Attribution, Headers, And Docstrings
 
 Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution policy.
 
 - New Lean files should use the standard copyright / license / authors header and a module docstring.
+- For ordinary Lean source files, use the standard prologue layout: header, blank line, imports, blank line, module docstring.
+- Docstrings must be intrinsic and descriptive. Cross-reference live sibling definitions when helpful, but do not mention removed or renamed declarations, change history, or use reactive wording such as "replaces" or "renamed from".
 - Preserve existing headers on routine edits.
 - Only rewrite attribution when a file is genuinely new or materially replaced.
 - Do not add a separate AI-attribution line.
@@ -24,7 +26,20 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 
 VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computations (free monad over `OracleSpec`), with `simulateQ` for operational semantics and `evalDist` for denotational semantics (probability distributions). `ProbComp α` is the abbreviation for `OracleComp unifSpec α`.
 
+The repo also includes a first-class lattice cryptography library under `LatticeCrypto/`, built on top of the `VCVio` framework. That layer contains generic lattice algebra plus ML-DSA, ML-KEM, and Falcon specifications, security statements, concrete implementations, FFI bridges, and tests.
+
+## Repo Map
+
+- `VCVio/`: generic oracle-computation framework, program logic, crypto abstractions, and generic reductions.
+- `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
+- `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
+- `Examples/`: compact framework examples such as OneTimePad, ElGamal, and Schnorr.
+- `csrc/`: C FFI shims used for differential testing against native ML-DSA, ML-KEM, and Falcon code.
+- `third_party/`: vendored native backends used by the FFI and test harnesses.
+
 ## Module Layering
+
+For `VCVio/`:
 
 ```
 ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
@@ -34,14 +49,27 @@ ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
 
 New files must respect this DAG. `EvalDist/` must never import from `OracleComp/`.
 
+For `LatticeCrypto/`, the rough dependency direction is:
+
+```
+{Ring/*, DiscreteGaussian}
+  → HardnessAssumptions
+  → {MLDSA, MLKEM, Falcon}
+  → Concrete implementations / security wrappers
+  → LatticeCryptoTest
+```
+
+Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`, but not the other way around.
+
 ## Critical Gotchas
 
 1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`).
-2. **`autoImplicit` is `false`** project-wide. Every variable must be explicitly declared.
+2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
 3. **`evalDist` IS `simulateQ`** with uniform distributions. This is definitional (`rfl`).
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
+7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
 
 For the full list, see `docs/agents/gotchas.md`.
 
@@ -67,77 +95,23 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
+- Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
+- ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
+- ML-DSA FIPS signing layer: `LatticeCrypto/MLDSA/Signature.lean`
+- ML-KEM internal deterministic core: `LatticeCrypto/MLKEM/Internal.lean`
+- ML-KEM top-level KEM wrapper: `LatticeCrypto/MLKEM/KEM.lean`
+- Falcon GPV instantiation: `LatticeCrypto/Falcon/Scheme.lean`
+- Lattice hardness assumptions: `LatticeCrypto/HardnessAssumptions/LearningWithErrors.lean`, `LatticeCrypto/HardnessAssumptions/ShortIntegerSolution.lean`
+- Differential and vector tests: `LatticeCryptoTest/`
 
 ## Program Logic Tactics
 
 For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
-`VCVio.ProgramLogic.Notation` keeps notation plus coarse compatibility macros, but
+`VCVio.ProgramLogic.Notation` keeps notation plus compatibility macros, but
 `Tactics.lean` is the canonical interactive proof mode.
 
-Internally the implementation is split between
-`VCVio/ProgramLogic/Tactics/Unary.lean` and
-`VCVio/ProgramLogic/Tactics/Relational.lean`;
-the umbrella import is still the intended default.
-
-- **Proof-mode entry**: `by_equiv`, `game_trans`, `by_dist`, `by_upto`, `by_hoare`
-- **Relational stepping**: `rvcstep`, `rvcgen`,
-  `rel_conseq`, `rel_inline`, `rel_dist`
-- **Unary stepping**: `vcstep` (raw `wp` goals), `vcstep` (`Triple` or probability goals,
-  spec-aware, auto probability lowering), `vcstep inv I` (explicit loop invariant)
-- **Unary exhaustive**: `vcgen` (exhaustive `Triple` / probability goal decomposition with
-  auto lowering, auto loop invariants, support-cut synthesis, and support/indicator leaf closure),
-  `vcgen using cut` (one explicit bind step then exhaustive), `vcgen inv I` (explicit loop
-  invariant then exhaustive)
-  (`vcstep` / `vcstep` also understand bounded iteration via `replicate`, `List.mapM`,
-  and `List.foldlM`)
-- **Expectation normalization**: `exp_norm`
-- **Probability equalities**: plain `vcstep` heuristically dispatches swap / congruence on
-  `Pr[...] = Pr[...]` goals; use `vcstep rw`, `vcstep rw under n`,
-  `vcstep rw congr`, and `vcstep rw congr'` for explicit control.
-
-Quick usage notes:
-
-- `by_equiv` enters the coupling-based `RelTriple` shell intentionally.
-- `rvcstep` lowers `GameEquiv` / `evalDist` equality goals into `RelTriple`,
-  then tries the obvious relational rule for the current shape.
-- `rvcstep using t` interprets `t` by goal shape:
-  bind cut relation, random/query bijection, traversal input relation,
-  or `simulateQ` state invariant.
-- `rvcgen` repeats relational VCGen across all open goals until stuck.
-  When exactly one local hypothesis works as a `using` hint, `rvcstep` / `rvcgen`
-  auto-consume it. If 0 or ≥ 2 viable hints exist, ambiguity is kept explicit.
-  The relational finish pass also handles postcondition weakening
-  (`relTriple_post_mono` + assumption) automatically.
-- `vcstep` accepts both `Triple` and probability goals (`Pr[p | oa] = 1`,
-  `Pr[= x | oa] = 1`, etc.), automatically lowering probability goals into the `Triple`
-  engine before decomposing.
-- `vcgen using cut` performs one explicit bind step with `cut`, then runs the exhaustive driver.
-- `vcgen inv I` applies an explicit loop invariant `I`, then runs the exhaustive driver.
-- `vcstep using cut` specifies an explicit intermediate postcondition for a bind step.
-- `vcstep inv I` applies a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal,
-  leaving pre-to-invariant, step-preservation, and invariant-to-post subgoals.
-- `vcstep rw` performs one explicit bind-swap rewrite; `vcstep rw under n` keeps
-  `n` shared outer binds fixed while swapping deeper draws on one side.
-- `vcstep rw congr` exposes one shared bind plus its support hypothesis;
-  `vcstep rw congr'` exposes one shared bind without the support hypothesis.
-- `vcgen` auto-detects loop invariants: when a `Triple I (replicate n oa) (fun _ => I)` goal
-  (or `foldlM`/`mapM` equivalent) has a step-preservation hypothesis in context, it applies
-  `triple_replicate_inv` / `triple_list_foldlM_inv` / `triple_list_mapM_inv` automatically.
-- `vcgen` final pass also tries `triple_support`, `triple_propInd_of_support`,
-  `triple_probEvent_eq_one`, and `triple_probOutput_eq_one` for support-sensitive leaf closure.
-- `rvcstep` covers synchronized `replicate`, `List.mapM`, and `List.foldlM`
-  goals directly; use `using Rin` for non-equality input relations on the traversal/fold cases.
-- `vcstep` auto-lowers probability goals, then decomposes a `Triple` bind,
-  auto-closes the spec subgoal via `solve_by_elim`, falls back to backward WP
-  (`triple_bind_wp`), handles `ite`/`dite`/`match` splitting, and auto-detects loop
-  invariants for `replicate`/`foldlM`/`mapM`.
-- `vcgen` is the exhaustive driver: lowers probability goals, decomposes `Triple` goals
-  across all open branches, closes spec subgoals and loop invariants from context,
-  synthesizes support-based intermediate postconditions when no explicit spec is available,
-  normalizes residual `wp` terms, applies support/indicator leaf closure, then runs bounded
-  local consequence search.
-- `exp_norm` normalizes indicator (`propInd`) and expectation (`wp`) arithmetic.
-- `by_upto bad` applies the existing identical-until-bad TV-distance bound for `simulateQ`.
+For the tactic reference, proof-mode entry points, and workflow details, see
+[`docs/agents/program-logic.md`](docs/agents/program-logic.md).
 
 ## Building
 
@@ -153,6 +127,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.28.0`). Files s
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
+- **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)
 - **Probability reasoning (EvalDist, ProbComp)**: [`docs/agents/probability.md`](docs/agents/probability.md)
 - **Crypto primitives and reductions**: [`docs/agents/crypto.md`](docs/agents/crypto.md)

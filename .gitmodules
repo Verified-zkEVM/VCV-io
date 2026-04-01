@@ -1,3 +1,9 @@
 [submodule "third_party/mlkem-native"]
 	path = third_party/mlkem-native
 	url = https://github.com/pq-code-package/mlkem-native.git
+[submodule "third_party/mldsa-native"]
+	path = third_party/mldsa-native
+	url = https://github.com/pq-code-package/mldsa-native.git
+[submodule "third_party/c-fn-dsa"]
+	path = third_party/c-fn-dsa
+	url = https://github.com/pornin/c-fn-dsa.git

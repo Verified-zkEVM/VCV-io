@@ -37,7 +37,6 @@ regardless of `iâ‚€`. So the distribution of `s` alone reveals nothing about `iâ
 Port of EasyCrypt's `PIR.ec`.
 -/
 
-set_option autoImplicit false
 set_option linter.unusedDecidableInType false
 
 open OracleComp OracleSpec ENNReal

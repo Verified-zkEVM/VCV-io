@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.EvalDist
+import VCVio.EvalDist.TVDist
 
 /-!
 # Sigma Protocol
@@ -81,22 +82,55 @@ section hvzk
 
 variable [SampleableType Ω] [unifSpec.Fintype] [unifSpec.Inhabited]
 
-/-- Honest-verifier zero-knowledge: the real transcript distribution equals the simulated one.
+/-- The honest prover's transcript distribution for a Σ-protocol. -/
+def realTranscript (σ : SigmaProtocol S W PC SC Ω P p) (x : S) (w : W) :
+    ProbComp (PC × Ω × P) := do
+  let (pc, sc) ← σ.commit x w
+  let ω ← $ᵗ Ω
+  let π ← σ.respond x w sc ω
+  return (pc, ω, π)
 
-The real transcript is `(pc, ω, respond x w sc ω)` with `(pc, sc) ← commit x w` and `ω ← $ᵗ Ω`.
+/-- Honest-verifier zero-knowledge: the real transcript distribution is within total variation
+distance `ζ_zk` of the simulated one.
+
+The real transcript is `σ.realTranscript x w`.
 The simulated transcript is produced by `simTranscript` given only the statement `x`.
 
 Note: the `sim` field of `SigmaProtocol` only produces a public commitment `PC`. For HVZK we need
 a full transcript simulator `S → ProbComp (PC × Ω × P)`. We parameterize by this simulator. -/
 def HVZK (σ : SigmaProtocol S W PC SC Ω P p)
+    (simTranscript : S → ProbComp (PC × Ω × P)) (ζ_zk : ℝ) : Prop :=
+  ∀ x w, p x w = true →
+    tvDist (σ.realTranscript x w) (simTranscript x) ≤ ζ_zk
+
+/-- Exact honest-verifier zero-knowledge: the real transcript distribution equals the
+simulated one. -/
+def PerfectHVZK (σ : SigmaProtocol S W PC SC Ω P p)
     (simTranscript : S → ProbComp (PC × Ω × P)) : Prop :=
   ∀ x w, p x w = true →
-    evalDist (do
-      let (pc, sc) ← σ.commit x w
-      let ω ← $ᵗ Ω
-      let π ← σ.respond x w sc ω
-      return (pc, ω, π)) =
-    evalDist (simTranscript x)
+    evalDist (σ.realTranscript x w) = evalDist (simTranscript x)
+
+/-- The perfect HVZK property is equivalent to the approximate HVZK property with `ζ_zk = 0`. -/
+@[grind =]
+lemma perfectHVZK_iff_hvzk_zero
+    (σ : SigmaProtocol S W PC SC Ω P p)
+    (simTranscript : S → ProbComp (PC × Ω × P)) :
+    σ.PerfectHVZK simTranscript ↔ σ.HVZK simTranscript 0 := by
+  constructor
+  · intro h
+    dsimp [HVZK]
+    intro x w hx
+    have hzero : tvDist (σ.realTranscript x w) (simTranscript x) = 0 := by
+      simpa using
+        (tvDist_eq_zero_iff (σ.realTranscript x w) (simTranscript x)).2 (h x w hx)
+    exact le_of_eq hzero
+  · intro h
+    dsimp [HVZK] at h
+    intro x w hx
+    have hzero : tvDist (σ.realTranscript x w) (simTranscript x) = 0 := by
+      exact le_antisymm (h x w hx) (by
+        simpa using (tvDist_nonneg (σ.realTranscript x w) (simTranscript x)))
+    simpa using (tvDist_eq_zero_iff (σ.realTranscript x w) (simTranscript x)).mp hzero
 
 end hvzk
 

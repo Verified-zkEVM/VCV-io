@@ -27,7 +27,6 @@ distinguish the real function `PRF.eval k` (for a random key `k`) from a truly r
 - `prfAdvantage` — distinguishing advantage.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

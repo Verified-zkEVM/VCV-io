@@ -25,7 +25,6 @@ Uses the same additive `Module F G` notation as `DiffieHellman.lean`:
 - Verification: check `c = d • g + m • h`
 -/
 
-set_option autoImplicit false
 set_option linter.unusedDecidableInType false
 set_option linter.unusedFintypeInType false
 

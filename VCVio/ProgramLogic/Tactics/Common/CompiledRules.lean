@@ -6,6 +6,12 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common.Registry
 
+/-! # Compiled Program-Logic Rules
+
+This module packages registered unary and relational VC-spec rules into compact compiled forms
+used by the `vcstep` and `rvcstep` tactic infrastructure.
+-/
+
 open Lean Elab Meta
 
 namespace OracleComp.ProgramLogic
