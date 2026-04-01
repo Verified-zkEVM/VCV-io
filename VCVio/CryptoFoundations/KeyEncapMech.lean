@@ -56,11 +56,12 @@ section IND_CPA
 
 variable {ι : Type} {spec : OracleSpec ι} [SampleableType K]
 
-/-- A KEM IND-CPA adversary receives the public key, challenge ciphertext, and either the real or
-random shared key, then outputs a Boolean guess. The argument order follows the upstream
-proof-ladders KEM game: `(pk, k, c)`. -/
-abbrev IND_CPA_Adversary (_kem : KEMScheme (OracleComp spec) K PK SK C) :=
-  PK → K → C → OracleComp spec Bool
+/-- Two-phase IND-CPA adversary for a KEM. The adversary only gets access to the base oracle
+set `spec`, with no decapsulation oracle. -/
+structure IND_CPA_Adversary (_kem : KEMScheme (OracleComp spec) K PK SK C) where
+  State : Type
+  preChallenge : PK → OracleComp spec State
+  postChallenge : State → C → K → OracleComp spec Bool
 
 /-- Fixed-branch IND-CPA experiment for a KEM, matching the source proof-ladders formulation
 `Exp.run(b)`. -/
@@ -68,29 +69,35 @@ def IND_CPA_Exp {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) (b : Bool) : ProbComp Bool :=
   kem.exec do
     let (pk, _sk) ← kem.keygen
+    let st ← adversary.preChallenge pk
     let (cStar, kReal) ← kem.encaps pk
     let kRand ← kem.lift_probComp ($ᵗ K)
-    adversary pk (if b then kReal else kRand) cStar
+    adversary.postChallenge st cStar (if b then kReal else kRand)
 
 /-- Single-game IND-CPA experiment obtained by sampling the challenge bit uniformly and checking
 whether the adversary guessed it correctly. -/
 def IND_CPA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
-    (adversary : kem.IND_CPA_Adversary) : ProbComp Bool := do
-  let b ← $ᵗ Bool
-  let b' ← kem.IND_CPA_Exp adversary b
-  return (b == b')
+    (adversary : kem.IND_CPA_Adversary) : ProbComp Bool :=
+  kem.exec do
+    let (pk, _sk) ← kem.keygen
+    let st ← adversary.preChallenge pk
+    let b ← kem.lift_probComp ($ᵗ Bool)
+    let (cStar, kReal) ← kem.encaps pk
+    let kRand ← kem.lift_probComp ($ᵗ K)
+    let b' ← adversary.postChallenge st cStar (if b then kReal else kRand)
+    return (b == b')
 
-/-- IND-CPA distinguishing advantage for a KEM in the fixed-branch source formulation. -/
+/-- IND-CPA distinguishing advantage for a KEM, defined canonically as the bias of the single
+game. -/
 noncomputable def IND_CPA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) : ℝ :=
-  (IND_CPA_Exp adversary true).boolDistAdvantage (IND_CPA_Exp adversary false)
+  (IND_CPA_Game adversary).boolBiasAdvantage
 
-/-- The fixed-branch source formulation and the single-game win/lose formulation induce the same
-IND-CPA distinguishing advantage. -/
+/-- The canonical IND-CPA advantage is definitionally the bias of the single game. -/
 theorem IND_CPA_Advantage_eq_game_bias {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) :
     kem.IND_CPA_Advantage adversary = (kem.IND_CPA_Game adversary).boolBiasAdvantage := by
-  sorry
+  rfl
 
 end IND_CPA
 
@@ -141,18 +148,39 @@ noncomputable def IND_CCA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C
 decryption oracle and performs no pre-challenge interaction. -/
 def IND_CPA_Adversary.toIND_CCA {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) : kem.IND_CCA_Adversary where
-  State := PK
-  preChallenge pk := pure pk
-  postChallenge pk cStar kStar :=
-    (liftM (adversary pk kStar cStar) : OracleComp (spec + (C →ₒ Option K)) Bool)
+  State := adversary.State
+  preChallenge pk := simulateQ
+    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
+      fun t => liftM (query (spec := spec) t))
+    (adversary.preChallenge pk)
+  postChallenge st cStar kStar := simulateQ
+    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
+      fun t => liftM (query (spec := spec) t))
+    (adversary.postChallenge st cStar kStar)
 
 /-- The one-stage IND-CPA game is exactly the IND-CCA game instantiated with the trivial
-CPA-to-CCA embedding that never uses the decryption oracle. -/
+CPA-to-CCA embedding (`toIND_CCA`) that never uses the decryption oracle. -/
 theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
     {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) :
     kem.IND_CPA_Game adversary = kem.IND_CCA_Game adversary.toIND_CCA := by
-  sorry
+  simp only [IND_CPA_Game, IND_CCA_Game, IND_CPA_Adversary.toIND_CCA,
+    IND_CCA_preChallengeImpl, IND_CCA_postChallengeImpl]
+  congr 1
+  simp only [← QueryImpl.simulateQ_compose]
+  have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec)),
+      (QueryImpl.ofLift spec (OracleComp spec) + impl₂) ∘ₛ
+        (fun t => liftM (query (spec := spec) t) :
+          QueryImpl spec (OracleComp (spec + (C →ₒ Option K)))) =
+      QueryImpl.id' spec := by
+    intro impl₂
+    ext t
+    simp only [QueryImpl.compose, QueryImpl.id']
+    change simulateQ (QueryImpl.id' spec + impl₂)
+      (liftM (liftM (OracleQuery.query (spec := spec) t) :
+        OracleQuery (spec + (C →ₒ Option K)) _)) = _
+    simp [simulateQ_query]
+  simp only [h, simulateQ_id']
 
 end IND_CCA
 

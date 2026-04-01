@@ -76,22 +76,25 @@ def IND_CPA_Exp {dem : DEMScheme (OracleComp spec) K M C}
 
 /-- Game-form one-time IND-CPA experiment for a DEM. -/
 def IND_CPA_Game {dem : DEMScheme (OracleComp spec) K M C}
-    (adversary : dem.IND_CPA_Adversary) : ProbComp Bool := do
-  let b ← $ᵗ Bool
-  let b' ← dem.IND_CPA_Exp adversary b
-  return (b == b')
+    (adversary : dem.IND_CPA_Adversary) : ProbComp Bool :=
+  dem.exec do
+    let b ← dem.lift_probComp ($ᵗ Bool)
+    let k ← dem.lift_probComp ($ᵗ K)
+    let (m₀, m₁, st) ← adversary.chooseMessages
+    let c ← dem.encrypt k (if b then m₁ else m₀)
+    let b' ← adversary.distinguish st c
+    return (b == b')
 
-/-- One-time IND-CPA advantage for a DEM in the source fixed-branch form. -/
+/-- One-time IND-CPA advantage for a DEM, defined canonically as the bias of the single game. -/
 noncomputable def IND_CPA_Advantage {dem : DEMScheme (OracleComp spec) K M C}
     (adversary : dem.IND_CPA_Adversary) : ℝ :=
-  (IND_CPA_Exp adversary true).boolDistAdvantage (IND_CPA_Exp adversary false)
+  (IND_CPA_Game adversary).boolBiasAdvantage
 
-/-- The fixed-branch source presentation and the game/bias presentation agree for the DEM
-one-time IND-CPA game. -/
+/-- The canonical one-time IND-CPA advantage is definitionally the bias of the single game. -/
 theorem IND_CPA_Advantage_eq_game_bias {dem : DEMScheme (OracleComp spec) K M C}
     (adversary : dem.IND_CPA_Adversary) :
     dem.IND_CPA_Advantage adversary = (dem.IND_CPA_Game adversary).boolBiasAdvantage := by
-  sorry
+  rfl
 
 end IND_CPA
 

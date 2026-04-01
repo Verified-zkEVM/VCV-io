@@ -42,14 +42,59 @@ section Correct
 
 variable [DecidableEq K] [DecidableEq M] [Monad m] [HasEvalSPMF m]
 
-/-- Perfect correctness for the KEM+DEM composition follows from perfect correctness of both
-components, provided they are interpreted under the same execution method. -/
+/-- From KEM correctness at the monadic probability level, every reachable decapsulation of an
+honest ciphertext returns the encapsulated key. -/
+private lemma kem_decaps_mem_support
+    {kem : KEMScheme m K PK SK CKEM}
+    (hkem : Pr[=true | kem.CorrectExp] = 1)
+    {pk : PK} {sk : SK} (hks : (pk, sk) ∈ support kem.keygen)
+    {c : CKEM} {k : K} (hck : (c, k) ∈ support (kem.encaps pk))
+    {kOpt : Option K} (hkOpt : kOpt ∈ support (kem.decaps sk c)) :
+    kOpt = some k := by
+  have hsup : support kem.CorrectExp = {true} :=
+    (probOutput_eq_one_iff (mx := kem.CorrectExp) (x := true)).mp hkem |>.2
+  rw [KEMScheme.CorrectExp] at hsup
+  have : decide (kOpt = some k) ∈ ({true} : Set Bool) := by
+    rw [← hsup]
+    simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
+      decide_eq_decide, exists_prop, Prod.exists]
+    exact ⟨pk, sk, hks, c, k, hck, kOpt, hkOpt, Iff.rfl⟩
+  simpa using this
+
+/-- If a KEM and externally keyed DEM are both perfectly correct in the concrete probabilistic
+semantics of `m`, then their composition is also perfectly correct. -/
 theorem perfectlyCorrect_composeWithDEM
+    [LawfulMonad m]
     (kem : KEMScheme m K PK SK CKEM) (dem : DEMScheme m K M CDEM)
-    (hkem : kem.PerfectlyCorrect)
-    (hdem : (dem.withExecutionMethod kem.toExecutionMethod).PerfectlyCorrect) :
-    (kem.composeWithDEM dem).PerfectlyCorrect := by
-  sorry
+    (hkem : Pr[=true | kem.CorrectExp] = 1)
+    (hdem : ∀ k : K, ∀ msg : M, Pr[=true | dem.CorrectExp k msg] = 1) :
+    ∀ msg, Pr[=true | (kem.composeWithDEM dem).CorrectExp msg] = 1 := by
+  intro msg
+  simp only [AsymmEncAlg.CorrectExp, composeWithDEM]
+  rw [← hkem]
+  unfold KEMScheme.CorrectExp
+  simp only [bind_assoc, pure_bind]
+  apply probOutput_bind_congr
+  intro ⟨pk, sk⟩ hks
+  apply probOutput_bind_congr
+  intro ⟨kc, k⟩ hck
+  rw [probOutput_bind_bind_swap
+    (mx := dem.encrypt k msg)
+    (my := kem.decaps sk kc)
+    (f := fun dc kOpt => do
+      let msgOpt ← (
+        match kOpt with
+        | none => return none
+        | some k' => return some (← dem.decrypt k' dc))
+      return decide (msgOpt = some msg))
+    (z := true)]
+  apply probOutput_bind_congr
+  intro kOpt hkOpt
+  have hkEq := kem_decaps_mem_support hkem hks hck hkOpt
+  subst hkEq
+  simp only [probOutput_pure]
+  simpa [DEMScheme.CorrectExp, bind_assoc]
+    using (hdem k msg)
 
 end Correct
 
@@ -62,20 +107,28 @@ def composeWithDEM_toKEMLeftReduction
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
     (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
-    kem.IND_CPA_Adversary := fun pk k kc => do
-      let (m₀, _m₁, st) ← adversary.chooseMessages pk
-      let dc ← dem.encrypt k m₀
-      adversary.distinguish st (kc, dc)
+    kem.IND_CPA_Adversary where
+  State := M × adversary.State
+  preChallenge pk := do
+    let (m₀, _m₁, st) ← adversary.chooseMessages pk
+    return (m₀, st)
+  postChallenge st kc k := do
+    let dc ← dem.encrypt k st.1
+    adversary.distinguish st.2 (kc, dc)
 
 /-- Right KEM reduction from a one-time IND-CPA adversary against the composed KEM+DEM PKE. -/
 def composeWithDEM_toKEMRightReduction
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
     (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
-    kem.IND_CPA_Adversary := fun pk k kc => do
-      let (_m₀, m₁, st) ← adversary.chooseMessages pk
-      let dc ← dem.encrypt k m₁
-      adversary.distinguish st (kc, dc)
+    kem.IND_CPA_Adversary where
+  State := M × adversary.State
+  preChallenge pk := do
+    let (_m₀, m₁, st) ← adversary.chooseMessages pk
+    return (m₁, st)
+  postChallenge st kc k := do
+    let dc ← dem.encrypt k st.1
+    adversary.distinguish st.2 (kc, dc)
 
 /-- DEM reduction from a one-time IND-CPA adversary against the composed KEM+DEM PKE. It samples
 the public key and KEM ciphertext during the message-selection phase so that the simulatee sees
