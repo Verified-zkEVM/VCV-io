@@ -37,18 +37,18 @@ private def packByte (bits : Fin 8 → Nat) : UInt8 :=
 private theorem bitOf_packByte_fin :
     ∀ bits : Fin 8 → Fin 2, ∀ j : Fin 8,
       bitOf (packByte fun i => (bits i).val) j.val = (bits j).val := by
-  sorry
+  native_decide
 
 private theorem bitOf_lt_two_fin_aux :
     ∀ n : Fin (2 ^ 8), ∀ j : Fin 8, bitOf n.val.toUInt8 j.val < 2 := by
-  sorry
+  native_decide
 
 private theorem bitOf_lt_two_fin (b : UInt8) (j : Fin 8) : bitOf b j.val < 2 := by
   simpa using bitOf_lt_two_fin_aux ⟨b.toNat, UInt8.toNat_lt b⟩ j
 
 private theorem packByte_bitOf_fin :
     ∀ n : Fin (2 ^ 8), packByte (fun j => bitOf n.val.toUInt8 j.val) = n.val.toUInt8 := by
-  sorry
+  native_decide
 
 private theorem packByte_bitOf_byte (b : UInt8) :
     packByte (fun j => bitOf b j.val) = b := by
@@ -196,7 +196,7 @@ private theorem digitsAppend_getD_two_lt {d n bit : Nat} (hn : n < 2 ^ d) (hbit 
 
 private theorem digitsAppend_two_one_getD_zero :
     ∀ n : Fin 2, (Nat.digitsAppend 2 1 n.val).getD 0 0 = n.val := by
-  sorry
+  native_decide
 
 private theorem digitsAppend_two_one_getD_zero_mod (n : Nat) :
     (Nat.digitsAppend 2 1 (n % 2 ^ 1)).getD 0 0 = n % 2 := by
