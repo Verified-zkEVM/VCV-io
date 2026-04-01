@@ -77,7 +77,27 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
         Polynomial.monomial (i.val + j.val) (f i * g j)) =
     (Ideal.Quotient.mk _)
       (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
-  sorry
+  have h_reduction : ∀ i j : Fin n,
+      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+        (Polynomial.monomial (i.val + j.val) (f i * g j)) =
+      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+        (Polynomial.monomial ((i.val + j.val) % n)
+          (if i.val + j.val < n then f i * g j else -(f i * g j))) := by
+    intro i j
+    split_ifs with h
+    · rw [Nat.mod_eq_of_lt h]
+    · have h_neg : (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+          (Polynomial.monomial (n + (i.val + j.val - n)) (f i * g j)) =
+        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+          (-Polynomial.monomial ((i.val + j.val - n)) (f i * g j)) := by
+        grind +suggestions
+      simp_all +decide [Nat.mod_eq_sub_mod (le_of_not_gt h)]
+      rw [Nat.mod_eq_of_lt (by rw [tsub_lt_iff_left h]; linarith [Fin.is_lt i, Fin.is_lt j])]
+  simp +decide [h_reduction, negacyclicConvCoeff]
+  rw [← Finset.sum_product']
+  rw [Finset.sum_comm]
+  refine Finset.sum_congr rfl fun x hx => ?_
+  rw [Finset.sum_eq_single ⟨(x.1 + x.2) % n, Nat.mod_lt _ hn⟩] <;> aesop
 
 /-! ## Section 4: Assembly -/
 
@@ -93,12 +113,30 @@ theorem negacyclicMulPure_toPolynomial (backend : PolyBackend R)
 
 /-- Soundness of `negacyclicMulPure`: its image in `R[X]/(X^n + 1)` equals the
 product of the images. -/
-theorem negacyclicMulPure_sound (hn : 0 < n)
+theorem negacyclicMulPure_sound
     (backend : PolyBackend R) (kernel : PolyKernel R backend)
-    (hd : backend.degree = n) (f g : backend.Poly) :
+    (f g : backend.Poly) :
     NegacyclicQuotient.ofBackend backend (negacyclicMulPure kernel f g) =
       NegacyclicQuotient.ofBackend backend f *
         NegacyclicQuotient.ofBackend backend g := by
-  sorry
+  simp only [NegacyclicQuotient.ofBackend, NegacyclicQuotient.ofPolynomial]
+  rw [negacyclicMulPure_toPolynomial, ← map_mul, toPolynomial_mul_eq_double_sum]
+  by_cases hn : 0 < backend.degree
+  · exact (mk_double_sum_eq_mk_negacyclicConv hn _ _).symm
+  · -- n = 0: both sums are over Fin 0, hence empty
+    push_neg at hn
+    have hd : backend.degree = 0 := by omega
+    have : IsEmpty (Fin backend.degree) := by rw [hd]; exact Fin.isEmpty
+    simp [Finset.univ_eq_empty]
+
+/-- Proof-facing quotient interpretation for the canonical vector backend.
+
+Maps each executable operation to its counterpart in the quotient ring
+`R[X] / (X^n + 1)` and asserts soundness of the mapping.
+Requires `0 < n` for the negacyclic reduction in `mul_sound`. -/
+noncomputable def vectorNegacyclicSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
+    NegacyclicRingSemantics (vectorNegacyclicRing Coeff n) :=
+  vectorNegacyclicSemantics_additive Coeff n
+    (fun f g => negacyclicMulPure_sound (vectorBackend Coeff n) (vectorKernel Coeff n) f g)
 
 end LatticeCrypto

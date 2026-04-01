@@ -137,11 +137,15 @@ private abbrev vRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :=
 
 end VectorRingSimp
 
-/-- Proof-facing quotient interpretation for the canonical vector backend.
-
-Maps each executable operation to its counterpart in the quotient ring
-`R[X] / (X^n + 1)` and asserts soundness of the mapping. -/
-noncomputable def vectorNegacyclicSemantics (Coeff : Type u) [CommRing Coeff] (n : Nat) :
+/-- Proof-facing quotient interpretation for the canonical vector backend
+(additive part). The `mul_sound` field is filled in
+`LatticeCrypto.Ring.SchoolbookCert` to avoid a circular import. -/
+noncomputable def vectorNegacyclicSemantics_additive (Coeff : Type u) [CommRing Coeff] (n : Nat)
+    (hmul : ∀ f g : (vectorNegacyclicRing Coeff n).Poly,
+      NegacyclicQuotient.ofBackend (vectorBackend Coeff n)
+        ((vectorNegacyclicRing Coeff n).mul f g) =
+      NegacyclicQuotient.ofBackend (vectorBackend Coeff n) f *
+        NegacyclicQuotient.ofBackend (vectorBackend Coeff n) g) :
     NegacyclicRingSemantics (vectorNegacyclicRing Coeff n) where
   quotientOf := NegacyclicQuotient.ofBackend (vectorBackend Coeff n)
   zero_sound := by
@@ -163,6 +167,6 @@ noncomputable def vectorNegacyclicSemantics (Coeff : Type u) [CommRing Coeff] (n
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [vectorBackend_coeff, vectorRing_neg_get, Polynomial.monomial_neg,
       Finset.sum_neg_distrib, map_neg]
-  mul_sound := by intro f g; sorry
+  mul_sound := hmul
 
 end LatticeCrypto

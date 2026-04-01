@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import LatticeCrypto.MLDSA.Params
-import LatticeCrypto.Ring.VectorBackend
+import LatticeCrypto.Ring.SchoolbookCert
 import LatticeCrypto.Ring.Transform
 import LatticeCrypto.Ring.Norms
 import LatticeCrypto.Ring.Rounding
