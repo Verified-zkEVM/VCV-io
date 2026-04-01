@@ -98,7 +98,7 @@ theorem validKeyPair_eq_true_iff (pk : PublicKey p) (sk : SecretKey p) :
     validKeyPair p pk sk = true ↔
       ntruEquation p sk.f sk.g sk.capF sk.capG ∧
       negacyclicMul (IntPoly.toRq sk.f) pk.h = IntPoly.toRq sk.g := by
-  sorry
+  simp [validKeyPair, Bool.and_eq_true, decide_eq_true_eq]
 
 /-! ### Core Algorithms -/
 
