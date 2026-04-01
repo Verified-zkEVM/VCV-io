@@ -145,7 +145,8 @@ noncomputable def IND_CCA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C
   (IND_CCA_Game adversary).boolBiasAdvantage
 
 /-- Any IND-CPA adversary can be viewed as an IND-CCA adversary that simply ignores the
-decryption oracle and performs no pre-challenge interaction. -/
+decapsulation oracle while preserving its ordinary pre-challenge interaction with the base
+oracle set `spec`. -/
 def IND_CPA_Adversary.toIND_CCA {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) : kem.IND_CCA_Adversary where
   State := adversary.State

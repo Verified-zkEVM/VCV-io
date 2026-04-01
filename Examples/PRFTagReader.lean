@@ -1,8 +1,9 @@
-/- 
+/-
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.PRF
 
 /-!
@@ -299,7 +300,7 @@ variable {TagId Slot Nonce Digest : Type}
   [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest]
-  {sessionsPerTag : ℕ} [Fact (0 < sessionsPerTag)]
+  {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
 /-- Reader acceptance for a fixed tag in a given unlinkability session pattern. -/
 def tagAccepts (hash : Slot → Nonce → Digest)
@@ -406,7 +407,7 @@ variable {TagId Nonce Digest : Type}
   [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest] [SampleableType Digest]
-  {sessionsPerTag : ℕ} [Fact (0 < sessionsPerTag)]
+  {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
 /-- Tag oracle for the `RF_bad` multiple-session collision world. It
 samples a fresh ideal hash output on every tag query, records all outputs associated with a given
@@ -465,7 +466,7 @@ variable {TagId Nonce Digest K : Type}
   [DecidableEq TagId] [Fintype TagId] [Nonempty TagId]
   [DecidableEq Nonce] [SampleableType Nonce]
   [DecidableEq Digest] [SampleableType Digest]
-  {sessionsPerTag : ℕ} [Fact (0 < sessionsPerTag)]
+  {sessionsPerTag : ℕ} [NeZero sessionsPerTag]
 
 /-- Authentication reduction statement: the real game is bounded by a PRF distinguishing advantage
 plus the success probability in the ideal authentication world. -/
