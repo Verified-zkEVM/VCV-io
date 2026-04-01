@@ -266,9 +266,9 @@ def authIdealReaderQueryImpl :
       (StateT (AuthIdealState TagId Nonce Digest) ProbComp) := fun transcript => do
         let st ← get
         let matching := Finset.univ.filter fun tag =>
-          (st.responses (tag, transcript.nonce)).any (· == transcript.auth)
+          st.responses (tag, transcript.nonce) = some transcript.auth
         let newForged := matching.filter fun tag =>
-          decide ((tag, transcript) ∉ st.honestOutputs)
+          (tag, transcript) ∉ st.honestOutputs
         set
           ({ responses := st.responses
              honestOutputs := st.honestOutputs
