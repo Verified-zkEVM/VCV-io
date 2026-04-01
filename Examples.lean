@@ -4,6 +4,7 @@ import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
 import Examples.FrankingProtocol
 import Examples.OneTimePad
+import Examples.PRFTagReader
 import Examples.PRGfromPRF
 import Examples.Pedersen
 import Examples.ProgramLogic.Probability
