@@ -13,7 +13,6 @@ Wraps the probabilistic forking lemma bounds from `CryptoFoundations/Fork.lean` 
 quantitative Hoare triples (`Triple`) for use in the program logic framework.
 -/
 
-set_option autoImplicit false
 
 open OracleSpec OracleComp ENNReal
 

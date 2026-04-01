@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ElGamal.Common
-import VCVio.CryptoFoundations.AsymmEncAlg.IND_CPA
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.EvalDist.Bool
@@ -38,7 +38,6 @@ Main theorem: `|Pr[CPA wins] - 1/2| ≤ ddhAdvantage + esAdvantage`.
 Port of EasyCrypt's `hashed_elgamal_std.ec`.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal DiffieHellman
 

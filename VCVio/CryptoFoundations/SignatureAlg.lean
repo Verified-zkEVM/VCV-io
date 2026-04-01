@@ -47,6 +47,7 @@ section sound
 
 variable {m : Type → Type v} [Monad m] [HasEvalSPMF m] {M PK SK S : Type}
 
+/-- Perfect completeness for a signature scheme: honestly generated signatures always verify. -/
 def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
   ∀ msg : M, Pr[= true | sigAlg.exec do
     let (pk, sk) ← sigAlg.keygen
@@ -85,10 +86,40 @@ def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     let verified ← sigAlg.verify pk msg σ
     return !log.wasQueried msg && verified
 
+/-- The success probability of a CMA adversary in the unforgeability experiment. -/
 noncomputable def unforgeableAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp adv]
 
 end unforgeable
+
+section eufNma
+
+variable {ι : Type u} {spec : OracleSpec ι} {M PK SK S : Type}
+
+/-- An EUF-NMA (existential unforgeability under no-message attack) adversary for a
+signature scheme. Unlike a CMA adversary (`unforgeableAdv`), the NMA adversary has NO
+access to a signing oracle — it must forge a signature having only seen the public key.
+
+In the random oracle model, the adversary still has access to the scheme's oracle spec
+(e.g., the random oracle `H`), but never sees any legitimately generated signatures. -/
+structure eufNmaAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
+  main (pk : PK) : OracleComp spec (M × S)
+
+/-- The EUF-NMA experiment: generate a key pair, give the public key to the adversary
+(with no signing oracle), and check whether the adversary produced a valid forgery. -/
+def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : eufNmaAdv sigAlg) : ProbComp Bool :=
+  sigAlg.exec do
+    let (pk, _) ← sigAlg.keygen
+    let (msg, σ) ← adv.main pk
+    sigAlg.verify pk msg σ
+
+/-- The success probability of an EUF-NMA adversary. -/
+noncomputable def eufNmaAdv.advantage
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp adv]
+
+end eufNma
 
 end SignatureAlg

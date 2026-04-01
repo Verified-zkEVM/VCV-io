@@ -36,32 +36,32 @@ variable {α β σ : Type}
 
 /-- Expectation-style algebra for oracle computations returning `ℝ≥0∞`. -/
 noncomputable def μ (oa : OracleComp spec ℝ≥0∞) : ℝ≥0∞ :=
-  ∑' x, Pr[= x | oa] * x
+  ∑' x, Pr[=x | oa] * x
 
 private lemma μ_bind_eq_tsum {α : Type}
     (oa : OracleComp spec α) (ob : α → OracleComp spec ℝ≥0∞) :
-    μ (oa >>= ob) = ∑' x, Pr[= x | oa] * μ (ob x) := by
+    μ (oa >>= ob) = ∑' x, Pr[=x | oa] * μ (ob x) := by
   unfold μ
   calc
-    (∑' y, Pr[= y | oa >>= ob] * y)
-        = (∑' y, (∑' x, Pr[= x | oa] * Pr[= y | ob x]) * y) := by
+    (∑' y, Pr[=y | oa >>= ob] * y)
+        = (∑' y, (∑' x, Pr[=x | oa] * Pr[=y | ob x]) * y) := by
             refine tsum_congr ?_
             intro y
             rw [probOutput_bind_eq_tsum]
-    _ = (∑' y, ∑' x, (Pr[= x | oa] * Pr[= y | ob x]) * y) := by
+    _ = (∑' y, ∑' x, (Pr[=x | oa] * Pr[=y | ob x]) * y) := by
           refine tsum_congr ?_
           intro y
           rw [ENNReal.tsum_mul_right]
-    _ = ∑' x, ∑' y, (Pr[= x | oa] * Pr[= y | ob x]) * y := by
+    _ = ∑' x, ∑' y, (Pr[=x | oa] * Pr[=y | ob x]) * y := by
           rw [ENNReal.tsum_comm]
-    _ = ∑' x, Pr[= x | oa] * ∑' y, Pr[= y | ob x] * y := by
+    _ = ∑' x, Pr[=x | oa] * ∑' y, Pr[=y | ob x] * y := by
           refine tsum_congr ?_
           intro x
           rw [← ENNReal.tsum_mul_left]
           refine tsum_congr ?_
           intro y
           rw [mul_assoc]
-    _ = ∑' x, Pr[= x | oa] * μ (ob x) := by
+    _ = ∑' x, Pr[=x | oa] * μ (ob x) := by
           rfl
 
 noncomputable instance instMAlgOrdered :
@@ -74,7 +74,7 @@ noncomputable instance instMAlgOrdered :
     rw [μ_bind_eq_tsum (oa := x) (ob := f), μ_bind_eq_tsum (oa := x) (ob := g)]
     refine ENNReal.tsum_le_tsum ?_
     intro a
-    simpa [mul_comm] using (mul_le_mul_right (hfg a) (Pr[= a | x]))
+    simpa [mul_comm] using (mul_le_mul_right (hfg a) (Pr[=a | x]))
 
 /-- Quantitative weakest precondition for `OracleComp`. -/
 noncomputable abbrev wp (oa : OracleComp spec α) (post : α → ℝ≥0∞) : ℝ≥0∞ :=
@@ -165,7 +165,7 @@ theorem wp_mono (oa : OracleComp spec α) {post post' : α → ℝ≥0∞}
 
 /-- General unfolding: `wp` as weighted sum over output probabilities. -/
 theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
-    wp oa post = ∑' x, Pr[= x | oa] * post x := by
+    wp oa post = ∑' x, Pr[=x | oa] * post x := by
   change μ (oa >>= fun a => pure (post a)) = _
   rw [μ_bind_eq_tsum]
   refine tsum_congr fun x => ?_
@@ -244,7 +244,7 @@ lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
     [DecidablePred p] :
     Pr[p | oa] = wp oa (fun x => if p x then 1 else 0) := by
   rw [probEvent_eq_tsum_ite, wp, MAlgOrdered.wp]
-  change (∑' x : α, if p x then Pr[= x | oa] else 0) =
+  change (∑' x : α, if p x then Pr[=x | oa] else 0) =
     μ ((oa >>= fun a => pure (if p a then 1 else 0)) : OracleComp spec ℝ≥0∞)
   rw [μ_bind_eq_tsum]
   refine tsum_congr ?_
@@ -258,7 +258,7 @@ lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
 
 /-- `probOutput` as a WP of a singleton-indicator postcondition. -/
 lemma probOutput_eq_wp_indicator (oa : OracleComp spec α) [DecidableEq α] (x : α) :
-    Pr[= x | oa] = wp oa (fun y => if y = x then 1 else 0) := by
+    Pr[=x | oa] = wp oa (fun y => if y = x then 1 else 0) := by
   simpa [probEvent_eq_eq_probOutput] using
     (probEvent_eq_wp_indicator (oa := oa) (p := fun y => y = x))
 
@@ -270,7 +270,7 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
   calc
     μ (do let a ← liftM (query t); pure (post a))
         = ∑' u : spec.Range t,
-            Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] *
+            Pr[=u | (liftM (query t) : OracleComp spec (spec.Range t))] *
               μ (pure (post u) : OracleComp spec ℝ≥0∞) := by
             simpa using
               (μ_bind_eq_tsum
@@ -285,7 +285,7 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
               let _ : DecidableEq ℝ≥0∞ := Classical.decEq ℝ≥0∞
               simp [μ, probOutput_pure]
             have hprob :
-                Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] =
+                Pr[=u | (liftM (query t) : OracleComp spec (spec.Range t))] =
                   (1 / Fintype.card (spec.Range t) : ℝ≥0∞) := by
               exact (probOutput_query_eq_div (spec := spec) t u)
             rw [hμ]
@@ -302,14 +302,14 @@ section Sampling
 variable [SampleableType α]
 
 @[game_rule] theorem wp_uniformSample (post : α → ℝ≥0∞) :
-    wp ($ᵗ α) post = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+    wp ($ᵗ α) post = ∑' x, Pr[=x | ($ᵗ α : ProbComp α)] * post x := by
   rw [wp, MAlgOrdered.wp]
   calc
     μ (do let a ← $ᵗ α; pure (post a))
-        = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
+        = ∑' x, Pr[=x | ($ᵗ α : ProbComp α)] * μ (pure (post x) : ProbComp ℝ≥0∞) := by
           simpa using
             (μ_bind_eq_tsum (oa := ($ᵗ α : ProbComp α)) (ob := fun a => pure (post a)))
-    _ = ∑' x, Pr[= x | ($ᵗ α : ProbComp α)] * post x := by
+    _ = ∑' x, Pr[=x | ($ᵗ α : ProbComp α)] * post x := by
           refine tsum_congr ?_
           intro x
           have hμ : μ (pure (post x) : ProbComp ℝ≥0∞) = post x := by
@@ -327,7 +327,7 @@ theorem triple_probEvent_indicator (oa : OracleComp spec α) (p : α → Prop) [
 
 /-- Singleton-output probability as an exact quantitative triple. -/
 theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (x : α) :
-    Triple (spec := spec) (Pr[= x | oa]) oa (fun y => if y = x then 1 else 0) := by
+    Triple (spec := spec) (Pr[=x | oa]) oa (fun y => if y = x then 1 else 0) := by
   unfold Triple MAlgOrdered.Triple
   simp [probOutput_eq_wp_indicator]
 
@@ -341,8 +341,8 @@ theorem le_probEvent_iff_triple_indicator (oa : OracleComp spec α) (p : α → 
 /-- Lower bounds on `probOutput` are exactly singleton-indicator triples. -/
 theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableEq α]
     (x : α) (r : ℝ≥0∞) :
-    r ≤ Pr[= x | oa] ↔ Triple (spec := spec) r oa (fun y => if y = x then 1 else 0) := by
-  change r ≤ Pr[= x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)
+    r ≤ Pr[=x | oa] ↔ Triple (spec := spec) r oa (fun y => if y = x then 1 else 0) := by
+  change r ≤ Pr[=x | oa] ↔ r ≤ wp oa (fun y => if y = x then 1 else 0)
   rw [probOutput_eq_wp_indicator]
 
 /-- The support event of an `OracleComp` occurs almost surely. -/
@@ -362,17 +362,17 @@ theorem triple_probEvent_eq_one (oa : OracleComp spec α) (p : α → Prop)
 
 /-- Exact probability-1 singleton outputs are exact quantitative triples. -/
 theorem triple_probOutput_eq_one (oa : OracleComp spec α) [DecidableEq α]
-    (x : α) (h : Pr[= x | oa] = 1) :
+    (x : α) (h : Pr[=x | oa] = 1) :
     Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
   simpa [h] using triple_probOutput_indicator (oa := oa) x
 
-/-- `Pr[= x | oa] = 1` ↔ `Triple 1 oa (indicator)`. Bridge for `vcgen` probability lowering. -/
+/-- `Pr[=x | oa] = 1` ↔ `Triple 1 oa (indicator)`. Bridge for `vcgen` probability lowering. -/
 theorem probOutput_eq_one_iff_triple (oa : OracleComp spec α) [DecidableEq α] (x : α) :
-    Pr[= x | oa] = 1 ↔ Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
+    Pr[=x | oa] = 1 ↔ Triple (spec := spec) 1 oa (fun y => if y = x then 1 else 0) := by
   constructor
   · exact triple_probOutput_eq_one oa x
   · intro h
-    have : 1 ≤ Pr[= x | oa] := by
+    have : 1 ≤ Pr[=x | oa] := by
       rw [probOutput_eq_wp_indicator]; exact h
     rwa [one_le_probOutput_iff] at this
 
@@ -473,7 +473,7 @@ theorem triple_list_mapM {I : ℝ≥0∞}
 
 lemma probOutput_congr_evalDist {oa ob : OracleComp spec α}
     (h : evalDist oa = evalDist ob) (x : α) :
-    Pr[= x | oa] = Pr[= x | ob] := by
+    Pr[=x | oa] = Pr[=x | ob] := by
   change evalDist oa x = evalDist ob x
   rw [h]
 

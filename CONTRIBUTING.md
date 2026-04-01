@@ -13,6 +13,8 @@ Before sending work for review:
 - Run `lake exe cache get && lake build`.
 - After adding new `.lean` files, run `./scripts/update-lib.sh`.
 - Avoid leaving `sorry` in finished work unless the change is explicitly meant to preserve partial work.
+- Keep repo-wide Lean options in `lakefile.lean`. Do not restate `autoImplicit = false` with per-file `set_option` lines.
+- Do not disable linters locally or globally to make warnings disappear. Fix the underlying issue instead of adding `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level linter suppressions.
 
 ## Attribution And File Headers
 
@@ -43,9 +45,20 @@ When in doubt, prefer:
 
 ## Documentation Expectations
 
-- Every Lean file should have a module docstring near the top using `/-! ... -/`.
+- Every ordinary Lean source file should have a module docstring near the top using `/-! ... -/`.
+- Import-only umbrella modules such as `VCVio.lean`, `LatticeCrypto.lean`, and `Examples.lean`, along with `lakefile.lean`, should stay bare.
 - Public definitions and major theorems should have declaration docstrings using `/-- ... -/`.
+- Module docstrings should give a concise title and summary, and include notation or references when that context materially helps a reader.
+- Declaration docstrings should describe what a definition is or what a theorem states, not how it evolved.
+- Docstrings must be intrinsic and descriptive. Cross-reference live definitions when helpful, but do not mention removed or renamed declarations, change history, or reactive phrases such as "replaces" or "renamed from".
 - If a file cites papers, include a references section in the module docstring or cite the source clearly in the surrounding docs.
+- For ordinary Lean source files, use this prologue layout:
+  1. copyright / license / authors header
+  2. one blank line
+  3. imports
+  4. one blank line
+  5. module docstring
+  Keep exactly one blank line between these blocks.
 
 ## Style Notes
 

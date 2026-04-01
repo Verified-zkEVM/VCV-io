@@ -22,7 +22,7 @@ universe u v w
 namespace OptionT
 
 variable {m : Type u → Type v} {n : Type u → Type w}
-  (f : {α : Type u} →  m α → n α) {α β γ : Type u}
+  (f : {α : Type u} → m α → n α) {α β γ : Type u}
 
 lemma monad_pure_eq_pure [Monad m] (x : α) :
     (pure x : OptionT m α) = OptionT.pure x := rfl

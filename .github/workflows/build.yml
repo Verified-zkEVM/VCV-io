@@ -33,6 +33,12 @@ jobs:
       - name: Check for all imports in VCVio
         run: lake exe mk_all --lib VCVio --check
 
+      - name: Check for all imports in FFI
+        run: lake exe mk_all --lib FFI --check
+
+      - name: Check for all imports in LatticeCrypto
+        run: lake exe mk_all --lib LatticeCrypto --check
+
       - name: Check for all imports in Examples
         run: lake exe mk_all --lib Examples --check
 
@@ -62,8 +68,8 @@ jobs:
           echo "BUILD_TIMING_SOURCE_BRANCH=${{ github.head_ref || github.ref_name }}" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_BASE_REF=" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_MERGE_BASE_SHA=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio Examples" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio Examples" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto Examples" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto Examples" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_NAME=Smoke test" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_COMMAND=lake env lean VCVioTest/Smoke.lean" >> "$GITHUB_ENV"
           {

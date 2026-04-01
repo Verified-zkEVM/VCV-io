@@ -15,7 +15,6 @@ constructions: the adversary distinguishes a real hash output `hash hk (z • g)
 independent uniform element of the output space.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

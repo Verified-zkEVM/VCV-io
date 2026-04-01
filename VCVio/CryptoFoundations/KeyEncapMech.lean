@@ -16,7 +16,6 @@ This file defines a type to represent protocols for key encapsulation mechanisms
 We also define basic correctness and security properties for these protocols.
 -/
 
-set_option autoImplicit false
 
 open OracleSpec OracleComp ENNReal
 

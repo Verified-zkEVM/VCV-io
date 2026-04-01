@@ -33,7 +33,6 @@ invert given only `pk`; the secret key enables efficient inversion via `f⁻¹(s
 - `tdpExp` — the TDP inversion experiment.
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 

@@ -20,7 +20,6 @@ This file defines the shared objects used by the Fujisaki-Okamoto transform:
 - OW-PCVA games for the general monadic interface
 -/
 
-set_option autoImplicit false
 
 open OracleComp OracleSpec ENNReal
 
