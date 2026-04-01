@@ -57,7 +57,31 @@ noncomputable def discreteGaussianSum (σ μ : ℝ) : ℝ :=
 exponentially, so the sum over `ℤ` is absolutely convergent. -/
 theorem discreteGaussianSum_summable (σ μ : ℝ) (hσ : 0 < σ) :
     Summable (discreteGaussianWeight σ μ) := by
-  sorry
+  rw [summable_int_iff_summable_nat_and_neg]
+  have hσ2 : (0 : ℝ) < 2 * σ ^ 2 := by positivity
+  constructor
+  · -- Nonneg part: compare with exp(μ + σ²/2) * exp(-n)
+    refine .of_norm_bounded (g := fun n ↦ exp (μ + σ ^ 2 / 2) * exp (-(↑n : ℝ)))
+      (summable_exp_neg_nat.mul_left _) fun n ↦ ?_
+    simp only [discreteGaussianWeight, Int.cast_natCast, norm_of_nonneg (exp_nonneg _), ← exp_add]
+    apply exp_le_exp_of_le
+    rw [neg_div]
+    have h : ((↑n : ℝ) - μ - σ ^ 2) ^ 2 / (2 * σ ^ 2) =
+             ((↑n : ℝ) - μ) ^ 2 / (2 * σ ^ 2) - ↑n + μ + σ ^ 2 / 2 := by
+      field_simp; ring
+    linarith [div_nonneg (sq_nonneg ((↑n : ℝ) - μ - σ ^ 2)) hσ2.le]
+  · -- Neg part: compare with exp(-μ + σ²/2) * exp(-n)
+    refine .of_norm_bounded (g := fun n ↦ exp (-μ + σ ^ 2 / 2) * exp (-(↑n : ℝ)))
+      (summable_exp_neg_nat.mul_left _) fun n ↦ ?_
+    simp only [discreteGaussianWeight, Int.cast_neg, Int.cast_natCast,
+      norm_of_nonneg (exp_nonneg _), ← exp_add]
+    apply exp_le_exp_of_le
+    have hsq : (-(↑n : ℝ) - μ) ^ 2 = ((↑n : ℝ) + μ) ^ 2 := by ring
+    rw [hsq, neg_div]
+    have h : ((↑n : ℝ) + μ - σ ^ 2) ^ 2 / (2 * σ ^ 2) =
+             ((↑n : ℝ) + μ) ^ 2 / (2 * σ ^ 2) - ↑n - μ + σ ^ 2 / 2 := by
+      field_simp; ring
+    linarith [div_nonneg (sq_nonneg ((↑n : ℝ) + μ - σ ^ 2)) hσ2.le]
 
 /-- The discrete Gaussian normalizing constant is strictly positive when `σ > 0`. -/
 theorem discreteGaussianSum_pos (σ μ : ℝ) (hσ : 0 < σ) :
