@@ -1861,7 +1861,20 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
     LatticeCrypto.cInfNorm (r - highBitsShift p (useHint p h r)) ≤ 2 * p.gamma2 + 1 := by
-  sorry
+  apply LatticeCrypto.cInfNorm_le_iff.mpr
+  intro j
+  have hcoeff : (r - highBitsShift p (useHint p h r)).get j =
+      r.get j -
+        (((2 * p.gamma2 : ℕ) : Coeff) *
+          (useHintCoeff (h.get j) (r.get j) p.gamma2 : Coeff)) := by
+    rw [Vector.get_eq_getElem, Vector.getElem_sub]
+    simp only [Vector.get_eq_getElem]
+    congr 1
+    have := highBitsShift_useHint_get p h r j
+    simp only [Vector.get_eq_getElem] at this
+    exact this
+  rw [hcoeff]
+  exact useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get j) (r.get j)
 
 theorem concreteRounding_hide_low_of_isApproved (p : Params)
     (hp : p.isApproved) (r s : Rq) (b : ℕ) :
