@@ -143,6 +143,21 @@ private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
   show ((coeffRing.add (coeffRing.add a b) (coeffRing.neg b)) : Rq).get ⟨i, hi⟩ = a.get ⟨i, hi⟩
   simp [add_neg_cancel_right]
 
+private lemma neg_rq_get (f : Rq) (i : Fin ringDegree) : (-f).get i = -(f.get i) := by
+  change (coeffRing.neg f).get i = _
+  simp [LatticeCrypto.vectorNegacyclicRing, Vector.get_ofFn]
+
+private lemma polyNorm_neg (f : Rq) : polyNorm (-f) = polyNorm f := by
+  unfold polyNorm normOps
+  simp only [LatticeCrypto.zmodPolyNormOps, LatticeCrypto.normOpsOfCenteredView]
+  unfold LatticeCrypto.cInfNormOf
+  apply Finset.sup_congr rfl
+  intro i _
+  simp only [LatticeCrypto.zmodCenteredCoeffView, polyBackend,
+    LatticeCrypto.vectorNegacyclicRing, LatticeCrypto.vectorBackend]
+  rw [neg_rq_get]
+  exact LatticeCrypto.centeredRepr_natAbs_neg _
+
 /-! ### Correctness -/
 
 private lemma fipsSignLoop_exists
@@ -198,7 +213,13 @@ lemma useHint_makeHint_eq_highBits
     (h_s_bound : polyNorm s_j ≤ p.beta) :
     prims.useHint (prims.makeHint (-ct0_j) (r_j + ct0_j)) (r_j + ct0_j) =
       prims.highBits w_j := by
-  sorry
+  have h_neg_norm : polyNorm (-ct0_j) ≤ p.gamma2 := by
+    rw [polyNorm_neg]; exact h_norm_ct0
+  rw [h_useHint_makeHint (-ct0_j) (r_j + ct0_j) h_neg_norm]
+  rw [rq_add_neg_cancel r_j ct0_j]
+  have h2 : polyNorm (prims.lowBits r_j) + p.beta < p.gamma2 := by omega
+  rw [← h_hide_low r_j s_j p.beta h_s_bound h2]
+  rw [h_r_eq, rq_sub_add_cancel w_j s_j]
 
 /-- When all signing norm bounds hold, UseHint recovers the original commitment:
 `UseHintVec(MakeHintVec(-ct₀, w - cs₂ + ct₀), w - cs₂ + ct₀) = HighBitsVec(w)`.
