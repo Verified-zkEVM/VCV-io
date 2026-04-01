@@ -96,4 +96,84 @@ noncomputable def IND_CCA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C
 
 end IND_CCA
 
+section IND_CPA
+
+variable {ι : Type} {spec : OracleSpec ι} [SampleableType K]
+
+/-- Two-phase IND-CPA adversary for a KEM. The adversary only gets access to the base oracle
+set `spec`, with no decapsulation oracle. -/
+structure IND_CPA_Adversary (kem : KEMScheme (OracleComp spec) K PK SK C) where
+  State : Type
+  preChallenge : PK → OracleComp spec State
+  postChallenge : State → C → K → OracleComp spec Bool
+
+/-- IND-CPA real-or-random experiment for a KEM. -/
+def IND_CPA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : ProbComp Bool :=
+  kem.exec do
+    let (pk, _sk) ← kem.keygen
+    let st ← adversary.preChallenge pk
+    let b ← kem.lift_probComp ($ᵗ Bool)
+    let (cStar, kReal) ← kem.encaps pk
+    let kRand ← kem.lift_probComp ($ᵗ K)
+    let b' ← adversary.postChallenge st cStar (if b then kReal else kRand)
+    return (b == b')
+
+/-- IND-CPA distinguishing advantage for a KEM. -/
+noncomputable def IND_CPA_Advantage {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : ℝ :=
+  (IND_CPA_Game adversary).boolBiasAdvantage
+
+/-- The IND-CPA advantage is definitionally the bias of the IND-CPA game. -/
+theorem IND_CPA_Advantage_eq_game_bias {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) :
+    IND_CPA_Advantage adversary = (IND_CPA_Game adversary).boolBiasAdvantage := by
+  rfl
+
+section ToINDCCA
+
+variable [DecidableEq C]
+
+/-- Trivial CPA-to-CCA embedding: lift the adversary's base-oracle queries into the combined
+oracle space without ever querying the decapsulation oracle. -/
+def IND_CPA_Adversary.toIND_CCA {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) : kem.IND_CCA_Adversary where
+  State := adversary.State
+  preChallenge pk := simulateQ
+    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
+      fun t => liftM (query (spec := spec) t))
+    (adversary.preChallenge pk)
+  postChallenge st c k := simulateQ
+    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
+      fun t => liftM (query (spec := spec) t))
+    (adversary.postChallenge st c k)
+
+/-- The IND-CPA game agrees with the IND-CCA game instantiated with the trivial CPA-to-CCA
+embedding, since the embedded adversary never queries the decapsulation oracle. -/
+theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
+    {kem : KEMScheme (OracleComp spec) K PK SK C}
+    (adversary : kem.IND_CPA_Adversary) :
+    IND_CPA_Game adversary = IND_CCA_Game adversary.toIND_CCA := by
+  simp only [IND_CPA_Game, IND_CCA_Game, IND_CPA_Adversary.toIND_CCA,
+    IND_CCA_preChallengeImpl, IND_CCA_postChallengeImpl]
+  congr 1
+  simp only [← QueryImpl.simulateQ_compose]
+  have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec)),
+      (QueryImpl.ofLift spec (OracleComp spec) + impl₂) ∘ₛ
+        (fun t => liftM (query (spec := spec) t) :
+          QueryImpl spec (OracleComp (spec + (C →ₒ Option K)))) =
+      QueryImpl.id' spec := by
+    intro impl₂
+    ext t
+    simp only [QueryImpl.compose, QueryImpl.id']
+    change simulateQ (QueryImpl.id' spec + impl₂)
+      (liftM (liftM (OracleQuery.query (spec := spec) t) :
+        OracleQuery (spec + (C →ₒ Option K)) _)) = _
+    simp [simulateQ_query]
+  simp only [h, simulateQ_id']
+
+end ToINDCCA
+
+end IND_CPA
+
 end KEMScheme
