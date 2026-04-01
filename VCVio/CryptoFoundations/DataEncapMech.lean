@@ -13,8 +13,6 @@ This file defines data encapsulation mechanisms (DEMs), their correctness notion
 one-time IND-CPA game used by the KEM+DEM composition theorem.
 -/
 
-set_option autoImplicit false
-
 universe u v
 
 open OracleSpec OracleComp ENNReal

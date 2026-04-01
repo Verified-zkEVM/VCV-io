@@ -22,7 +22,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.KEMDEM
-import VCVio.CryptoFoundations.KeyDecapMech
+import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.PRF

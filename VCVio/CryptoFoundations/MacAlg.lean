@@ -15,8 +15,6 @@ This file defines keyed message-authentication-code algorithms together with the
 UF-CMA security game.
 -/
 
-set_option autoImplicit false
-
 universe u v
 
 open OracleSpec OracleComp ENNReal

@@ -25,8 +25,6 @@ PRF security plus an ideal-world argument, and unlinkability reduces to PRF secu
 collision bound.
 -/
 
-set_option autoImplicit false
-
 open OracleComp OracleSpec ENNReal
 
 namespace PRFTagReader

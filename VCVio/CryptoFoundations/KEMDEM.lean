@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
-import VCVio.CryptoFoundations.KeyDecapMech
+import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.KeyEncapMech
 
 /-!
@@ -13,8 +13,6 @@ import VCVio.CryptoFoundations.KeyEncapMech
 This file defines the textbook KEM+DEM public-key encryption construction and the proof-ladders A1
 reduction skeleton against the repo's existing KEM and one-time IND-CPA interfaces.
 -/
-
-set_option autoImplicit false
 
 universe u v
 
