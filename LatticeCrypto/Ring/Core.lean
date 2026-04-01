@@ -136,6 +136,8 @@ def mapCoeffs {Coeff' : Type v}
 
 end PolyBackend
 
+
+
 /-- The semantic modulus polynomial `X^n + 1`. -/
 noncomputable def negacyclicModulus (R : Type u) [Semiring R] (n : Nat) : Polynomial R :=
   Polynomial.X ^ n + 1

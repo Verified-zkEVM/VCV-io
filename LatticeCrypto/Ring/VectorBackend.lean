@@ -100,7 +100,7 @@ def vectorNegacyclicRing (Coeff : Type u) [CommRing Coeff] (n : Nat) :
   add := fun f g => Vector.ofFn fun i => f.get i + g.get i
   sub := fun f g => Vector.ofFn fun i => f.get i - g.get i
   neg := fun f => Vector.ofFn fun i => -f.get i
-  mul := schoolbookNegacyclicMul (vectorKernel Coeff n)
+  mul := negacyclicMulPure (vectorKernel Coeff n)
 
 section VectorRingSimp
 

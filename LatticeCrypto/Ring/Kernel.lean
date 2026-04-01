@@ -166,4 +166,29 @@ def schoolbookNegacyclicMul {Coeff : Type u} [Ring Coeff]
         h := h.set! k ((h.getD k 0) - fi * gj)
   return kernel.ofArray h
 
+/-- The k-th coefficient of the negacyclic convolution `(f · g) mod (X^n + 1)`.
+
+Sums over all input-pair contributions `f[i] · g[j]` that land at output
+index `k` under the negacyclic wrap rule: add when `i + j < n`, subtract
+when `i + j ≥ n` (because `X^n ≡ -1`). -/
+def negacyclicConvCoeff {Coeff : Type u} [Ring Coeff] {n : Nat}
+    (f g : Fin n → Coeff) (k : Fin n) : Coeff :=
+  ∑ ij : Fin n × Fin n,
+    if (ij.1.val + ij.2.val) % n = k.val then
+      if ij.1.val + ij.2.val < n then f ij.1 * g ij.2
+      else -(f ij.1 * g ij.2)
+    else 0
+
+/-- Pure functional negacyclic multiplication via `negacyclicConvCoeff`.
+
+Computes the same negacyclic convolution as `schoolbookNegacyclicMul` but is
+expressed as a `Finset.sum` for proof purposes. At runtime, `@[implemented_by]`
+rebinds to the imperative `O(n²)` loop. -/
+@[implemented_by schoolbookNegacyclicMul]
+def negacyclicMulPure {Coeff : Type u} [Ring Coeff]
+    {backend : PolyBackend.{u, u} Coeff} (_kernel : PolyKernel Coeff backend)
+    (f g : backend.Poly) : backend.Poly :=
+  backend.build fun k =>
+    negacyclicConvCoeff (backend.coeff f) (backend.coeff g) k
+
 end LatticeCrypto
