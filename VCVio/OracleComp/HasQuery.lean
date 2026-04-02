@@ -116,5 +116,4 @@ lemma map_query (F : QueryHom spec m n) (t : spec.Domain) :
   F.map_query' t
 
 end Morphisms
-
 end HasQuery
