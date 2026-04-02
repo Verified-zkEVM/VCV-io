@@ -19,14 +19,14 @@ open OracleSpec OracleComp ENNReal
 
 /-- A data encapsulation mechanism with key space `K`, message space `M`, and ciphertext space
 `C`. The key is supplied externally, matching the proof-ladders DEM model. -/
-structure DEMScheme (m : Type → Type u) (K M C : Type)
+structure DEMScheme (m : Type → Type u) [Monad m] (K M C : Type)
     extends ExecutionMethod m where
   encrypt : K → M → m C
   decrypt : K → C → m M
 
 namespace DEMScheme
 
-variable {m : Type → Type v} {K M C : Type}
+variable {m : Type → Type v} [Monad m] {K M C : Type}
   (dem : DEMScheme m K M C)
 
 /-- Reinterpret a DEM under a different execution method without changing its algorithms. This is
@@ -38,7 +38,7 @@ def withExecutionMethod (execMethod : ExecutionMethod m) : DEMScheme m K M C whe
 
 section Correct
 
-variable [DecidableEq M] [Monad m]
+variable [DecidableEq M]
 
 /-- Correctness experiment for a DEM under an externally supplied key. -/
 def CorrectExp (k : K) (msg : M) : m Bool := do
@@ -69,7 +69,7 @@ structure IND_CPA_Adversary (_dem : DEMScheme (OracleComp spec) K M C) where
 def IND_CPA_Exp {dem : DEMScheme (OracleComp spec) K M C}
     (adversary : dem.IND_CPA_Adversary) (b : Bool) : ProbComp Bool :=
   dem.exec do
-    let k ← dem.lift_probComp ($ᵗ K)
+    let k ← dem.liftProbComp ($ᵗ K)
     let (m₀, m₁, st) ← adversary.chooseMessages
     let c ← dem.encrypt k (if b then m₁ else m₀)
     adversary.distinguish st c
@@ -78,8 +78,8 @@ def IND_CPA_Exp {dem : DEMScheme (OracleComp spec) K M C}
 def IND_CPA_Game {dem : DEMScheme (OracleComp spec) K M C}
     (adversary : dem.IND_CPA_Adversary) : ProbComp Bool :=
   dem.exec do
-    let b ← dem.lift_probComp ($ᵗ Bool)
-    let k ← dem.lift_probComp ($ᵗ K)
+    let b ← dem.liftProbComp ($ᵗ Bool)
+    let k ← dem.liftProbComp ($ᵗ K)
     let (m₀, m₁, st) ← adversary.chooseMessages
     let c ← dem.encrypt k (if b then m₁ else m₀)
     let b' ← adversary.distinguish st c

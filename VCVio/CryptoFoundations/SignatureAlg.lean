@@ -23,7 +23,7 @@ open OracleSpec OracleComp ENNReal
 /-- Signature algorithm with computations in the monad `m`,
 where `M` is the space of messages, `PK`/`SK` are the spaces of the public/private keys,
 and `S` is the type of the final signature. -/
-structure SignatureAlg (m : Type → Type v) (M PK SK S : Type)
+structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   sign (pk : PK) (sk : SK) (msg : M) : m S

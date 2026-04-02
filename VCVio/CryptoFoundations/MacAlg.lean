@@ -22,7 +22,7 @@ open OracleSpec OracleComp ENNReal
 
 /-- MAC algorithm with computations in the monad `m`, where `M` is the message space, `K` the key
 space, and `T` the tag space. -/
-structure MacAlg (m : Type → Type v) (M K T : Type)
+structure MacAlg (m : Type → Type v) [Monad m] (M K T : Type)
     extends ExecutionMethod m where
   keygen : m K
   tag : K → M → m T

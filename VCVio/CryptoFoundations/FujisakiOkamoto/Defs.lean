@@ -90,25 +90,48 @@ end OW_CPA
 
 end AsymmEncAlg.ExplicitCoins
 
-/-- Executing a lifted `ProbComp` in a public random-oracle world ignores the oracle state and
-collapses back to the original probabilistic computation. -/
-theorem exec_lift_probComp_withHashOracle
+/-- In a public random-oracle world, lifted `ProbComp` computations ignore the oracle state even
+before the initial cache is chosen. -/
+theorem execSem_liftProbComp_withHashOracle
     {ι : Type} {hashSpec : OracleSpec ι} {σ : Type}
-    (hashImpl : QueryImpl hashSpec (StateT σ ProbComp)) (s : σ)
+    (hashImpl : QueryImpl hashSpec (StateT σ ProbComp))
     {α : Type} (c : ProbComp α) :
-    StateT.run' (simulateQ
+    simulateQ
       ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
-      (monadLift c)) s = c := by
+      (monadLift c) =
+        (MonadHom.ofLift ProbComp (StateT σ ProbComp)) c := by
   let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp)
-  change StateT.run' (simulateQ (idImpl + hashImpl) (monadLift c)) s = c
+  ext s
   rw [show simulateQ (idImpl + hashImpl) (monadLift c) = simulateQ idImpl c by
     simpa [MonadLift.monadLift] using
       (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := hashImpl) c)]
-  have hid : ∀ t s', (idImpl t).run' s' = query t := by
-    intro t s'
-    rfl
+  change (simulateQ idImpl c).run s = ((MonadHom.ofLift ProbComp (StateT σ ProbComp)) c).run s
+  have hrun :
+      ∀ {β : Type} (oa : ProbComp β) (s : σ),
+        (simulateQ idImpl oa).run s = (fun x => (x, s)) <$> oa := by
+    intro β oa
+    induction oa using OracleComp.inductionOn with
+    | pure x =>
+        intro s
+        simp
+    | query_bind t oa ih =>
+        intro s
+        change
+          (do
+            let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
+            (simulateQ idImpl (oa a)).run s) =
+            (do
+              let a ← liftM (query t)
+              (fun x => (x, s)) <$> oa a)
+        have hfun :
+            (fun a => (simulateQ idImpl (oa a)).run s) =
+              (fun a => (fun x => (x, s)) <$> oa a) := by
+          funext a
+          exact ih a s
+        simp [hfun]
+  rw [hrun c s]
   simpa using
-    (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c) (s := s))
+    (OracleComp.liftM_run_StateT (x := c) (s := s))
 
 section OW_PCVA
 
@@ -153,7 +176,7 @@ def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     (adversary : OW_PCVA_Adversary encAlg) : ProbComp Bool :=
   encAlg.exec do
     let (pk, sk) ← encAlg.keygen
-    let msg ← encAlg.lift_probComp ($ᵗ M)
+    let msg ← encAlg.liftProbComp ($ᵗ M)
     let cStar ← encAlg.encrypt pk msg
     let msg' ← simulateQ (OW_PCVA_queryImpl encAlg sk) (adversary pk cStar)
     return decide (msg' = msg)

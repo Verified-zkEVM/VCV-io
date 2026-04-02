@@ -18,7 +18,7 @@ universe u v w
 /-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
 `m` is the monad used to execute key generation, encryption, and decryption.
 It extends `ExecutionMethod m`, typically `ExecutionMethod.default`. -/
-structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
+structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
@@ -29,7 +29,7 @@ structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
 Key generation runs in `m`, while encryption and decryption become pure once the randomness type
 `R` is supplied explicitly. This is the natural refinement used by FO-style transforms, where the
 coins are sampled externally or derived from an oracle. -/
-structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) (M PK SK R C : Type)
+structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) [Monad m] (M PK SK R C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) → (coins : R) → C
@@ -39,12 +39,12 @@ abbrev PKE_Alg := AsymmEncAlg
 
 namespace AsymmEncAlg
 
-variable {m : Type → Type v} {M PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
 
 section Correct
 
-variable [DecidableEq M] [Monad m]
+variable [DecidableEq M]
 
 /-- Correctness experiment: returns `true` iff decrypting the ciphertext recovers the message.
 
@@ -65,15 +65,15 @@ end Correct
 
 namespace ExplicitCoins
 
-variable {m : Type → Type v} {M PK SK R C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK R C : Type}
   (encAlg : AsymmEncAlg.ExplicitCoins m M PK SK R C)
 
 /-- Forget the explicit-coins presentation by sampling the coins through the ambient execution
 method. -/
-def toAsymmEncAlg [Monad m] [SampleableType R] : AsymmEncAlg m M PK SK C where
+def toAsymmEncAlg [SampleableType R] : AsymmEncAlg m M PK SK C where
   keygen := encAlg.keygen
   encrypt := fun pk msg => do
-    let r ← encAlg.lift_probComp ($ᵗ R)
+    let r ← encAlg.liftProbComp ($ᵗ R)
     return encAlg.encrypt pk msg r
   decrypt := fun sk c => return (encAlg.decrypt sk c)
   __ := encAlg.toExecutionMethod

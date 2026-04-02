@@ -49,23 +49,22 @@ def implicitRejection {K C KPRF : Type} (prf : PRFScheme KPRF C K) : RejectionPo
   keygen := prf.keygen
   onReject := fun kPrf c => some (prf.eval kPrf c)
 
-/-- Execute an FO computation by combining public randomness with the
-variant-specific hash world. -/
-def exec {M PK C R K : Type} (variant : Variant M PK C R K)
-    {α : Type} (comp : OracleComp (unifSpec + variant.hashOracleSpec) α) : ProbComp α :=
+/-- Stateful FO semantics given by the public-randomness and hash-oracle world. -/
+def execSem {M PK C R K : Type} (variant : Variant M PK C R K) :
+    OracleComp (unifSpec + variant.hashOracleSpec) →ᵐ StateT variant.QueryCache ProbComp :=
   let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
     (StateT variant.QueryCache ProbComp)
-  StateT.run' (simulateQ (idImpl + variant.queryImpl) comp) variant.initCache
+  simulateQ' (idImpl + variant.queryImpl)
 
-/-- Lifted probabilistic computations ignore the FO hash world. -/
-theorem exec_lift_probComp {M PK C R K : Type} (variant : Variant M PK C R K)
+/-- Lifted probabilistic computations ignore the FO hash world at the stateful semantics level. -/
+theorem execSem_liftProbComp {M PK C R K : Type} (variant : Variant M PK C R K)
     {α : Type} (c : ProbComp α) :
-    FujisakiOkamoto.exec variant (monadLift c) = c := by
-  simpa [exec] using
-    (exec_lift_probComp_withHashOracle
-      (hashImpl := variant.queryImpl)
-      (s := variant.initCache)
-      c)
+    FujisakiOkamoto.execSem variant (monadLift c) =
+      (MonadHom.ofLift ProbComp (StateT variant.QueryCache ProbComp)) c := by
+  simpa using
+    (ExecutionMethod.execSem_liftProbComp_withStateOracle
+      (stateImpl := variant.queryImpl)
+      (c := c))
 
 /-- Generic FO construction parameterized by a hash world and a rejection policy. -/
 def scheme
@@ -99,11 +98,18 @@ def scheme
           return some k
         else
           return policy.onReject fb c
-  exec := FujisakiOkamoto.exec variant
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
-    simpa using FujisakiOkamoto.exec_lift_probComp (variant := variant) (c := c)
+  SemState := variant.QueryCache
+  execSem := FujisakiOkamoto.execSem variant
+  initState := variant.initCache
+  exec := fun comp => StateT.run' (FujisakiOkamoto.execSem variant comp) variant.initCache
+  exec_eq_execSem := by
+    intro α comp
+    rfl
+  liftProbComp := MonadHom.ofLift ProbComp (OracleComp (unifSpec + variant.hashOracleSpec))
+  execSem_liftProbComp := by
+    ext α c s
+    simpa using congrArg (fun st => st.run s) <|
+      FujisakiOkamoto.execSem_liftProbComp (variant := variant) (c := c)
 
 end FujisakiOkamoto
 

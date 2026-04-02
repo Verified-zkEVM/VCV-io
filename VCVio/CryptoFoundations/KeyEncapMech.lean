@@ -23,7 +23,7 @@ universe u v
 
 /-- A key encapsulation mechanism with shared-key space `K`, public/secret key spaces `PK` and
 `SK`, and ciphertext space `C`. -/
-structure KEMScheme (m : Type → Type u) (K PK SK C : Type)
+structure KEMScheme (m : Type → Type u) [Monad m] (K PK SK C : Type)
     extends ExecutionMethod m where
   keygen : m (PK × SK)
   encaps : PK → m (C × K)
@@ -31,12 +31,12 @@ structure KEMScheme (m : Type → Type u) (K PK SK C : Type)
 
 namespace KEMScheme
 
-variable {m : Type → Type v} {K PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {K PK SK C : Type}
   (kem : KEMScheme m K PK SK C)
 
 section Correct
 
-variable [DecidableEq K] [Monad m]
+variable [DecidableEq K]
 
 /-- Correctness experiment: decapsulation of an honestly generated encapsulation should recover the
 shared key. -/
@@ -71,7 +71,7 @@ def IND_CPA_Exp {kem : KEMScheme (OracleComp spec) K PK SK C}
     let (pk, _sk) ← kem.keygen
     let st ← adversary.preChallenge pk
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.liftProbComp ($ᵗ K)
     adversary.postChallenge st cStar (if b then kReal else kRand)
 
 /-- Single-game IND-CPA experiment obtained by sampling the challenge bit uniformly and checking
@@ -81,9 +81,9 @@ def IND_CPA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
   kem.exec do
     let (pk, _sk) ← kem.keygen
     let st ← adversary.preChallenge pk
-    let b ← kem.lift_probComp ($ᵗ Bool)
+    let b ← kem.liftProbComp ($ᵗ Bool)
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.liftProbComp ($ᵗ K)
     let b' ← adversary.postChallenge st cStar (if b then kReal else kRand)
     return (b == b')
 
@@ -132,9 +132,9 @@ def IND_CCA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
   kem.exec do
     let (pk, sk) ← kem.keygen
     let st ← simulateQ (kem.IND_CCA_preChallengeImpl sk) (adversary.preChallenge pk)
-    let b ← kem.lift_probComp ($ᵗ Bool)
+    let b ← kem.liftProbComp ($ᵗ Bool)
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.liftProbComp ($ᵗ K)
     let b' ← simulateQ (kem.IND_CCA_postChallengeImpl sk cStar)
       (adversary.postChallenge st cStar (if b then kReal else kRand))
     return (b == b')

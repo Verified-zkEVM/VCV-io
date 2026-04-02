@@ -138,28 +138,33 @@ def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     let allVerified := (List.finRange ρ).all fun i => (results i).1
     let hashSum := (List.finRange ρ).foldl (fun acc i => acc + (results i).2) 0
     return (allVerified && decide (hashSum ≤ S))
-  exec comp :=
+  SemState := (fischlinROSpec X PC Ω P ρ b M).QueryCache
+  execSem :=
+    let roSpec := fischlinROSpec X PC Ω P ρ b M
+    let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT roSpec.QueryCache ProbComp)
+    simulateQ' (idImpl + ro)
+  initState := ∅
+  exec := fun comp =>
     let roSpec := fischlinROSpec X PC Ω P ρ b M
     let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
     let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
       (StateT roSpec.QueryCache ProbComp)
     StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
+  exec_eq_execSem := by
+    intro α comp
+    rfl
+  liftProbComp := MonadHom.ofLift ProbComp (OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+  execSem_liftProbComp := by
+    ext α c s
     let roSpec := fischlinROSpec X PC Ω P ρ b M
     let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT roSpec.QueryCache ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s
-      rfl
     simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : roSpec.QueryCache)))
+      congrArg (fun st => st.run s) <|
+      (ExecutionMethod.execSem_liftProbComp_withStateOracle
+        (stateImpl := ro)
+        (c := c))
 
 namespace Fischlin
 

@@ -87,28 +87,33 @@ def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     | some (w', z) =>
       let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
       return ids.verify pk w' c z
-  exec comp :=
+  SemState := (M × W' →ₒ C).QueryCache
+  execSem :=
+    let ro : QueryImpl (M × W' →ₒ C)
+      (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
+    simulateQ' (idImpl + ro)
+  initState := ∅
+  exec := fun comp =>
     let ro : QueryImpl (M × W' →ₒ C)
       (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
     let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
       (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
     StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
+  exec_eq_execSem := by
+    intro α comp
+    rfl
+  liftProbComp := MonadHom.ofLift ProbComp (OracleComp (unifSpec + (M × W' →ₒ C)))
+  execSem_liftProbComp := by
+    ext α c s
     let ro : QueryImpl (M × W' →ₒ C)
       (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left
-          (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s; rfl
     simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (M × W' →ₒ C).QueryCache)))
+      congrArg (fun st => st.run s) <|
+      (ExecutionMethod.execSem_liftProbComp_withStateOracle
+        (stateImpl := ro)
+        (c := c))
 
 namespace FiatShamirWithAbort
 

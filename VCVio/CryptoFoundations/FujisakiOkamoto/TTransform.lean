@@ -67,17 +67,26 @@ def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
     return pke.encrypt pk msg r
   decrypt := fun (pk, sk) c => TTransform.decrypt pke pk sk c
+  SemState := QueryCache M R
+  execSem :=
+    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+      (StateT (QueryCache M R) ProbComp)
+    simulateQ' (idImpl + TTransform.queryImpl (M := M) (R := R))
+  initState := ∅
   exec := fun comp =>
     let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
       (StateT (QueryCache M R) ProbComp)
     StateT.run' (simulateQ (idImpl + TTransform.queryImpl (M := M) (R := R)) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
+  exec_eq_execSem := by
+    intro α comp
+    rfl
+  liftProbComp := MonadHom.ofLift ProbComp (OracleComp (TTransform.oracleSpec M R))
+  execSem_liftProbComp := by
+    ext α c s
     simpa using
-      (exec_lift_probComp_withHashOracle
-        (hashImpl := TTransform.queryImpl (M := M) (R := R))
-        (s := (∅ : QueryCache M R))
+      congrArg (fun st => st.run s) <|
+      (ExecutionMethod.execSem_liftProbComp_withStateOracle
+        (stateImpl := TTransform.queryImpl (M := M) (R := R))
         c)
 
 namespace TTransform
