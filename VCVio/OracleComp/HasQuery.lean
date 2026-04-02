@@ -17,9 +17,10 @@ induction, and query-bound reasoning. `HasQuery` is the lighter interface used w
 construction only needs to *ask* oracle queries, without reifying or analyzing the query syntax.
 
 The key design choice is that `HasQuery` is just a facade over the existing lifting story:
+the primitive single-query syntax `OracleQuery spec` is itself a `HasQuery spec` instance, and
 any monad that supports `MonadLiftT (OracleQuery spec) m` automatically gets a `HasQuery spec m`
-instance. As a result, the capability composes with the existing `SubSpec` coercions and with
-standard transformer lifts such as `StateT`, `ReaderT`, `ExceptT`, and `WriterT`.
+instance as well. As a result, the capability composes with the existing `SubSpec` coercions
+and with standard transformer lifts such as `StateT`, `ReaderT`, `ExceptT`, and `WriterT`.
 -/
 
 open OracleSpec
@@ -34,6 +35,15 @@ class HasQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type 
 namespace HasQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
+
+/-- The primitive single-query syntax `OracleQuery spec` has the obvious query capability. -/
+instance instOracleQuery : HasQuery spec (OracleQuery spec) where
+  query := OracleQuery.query
+
+@[simp]
+lemma instOracleQuery_query (t : spec.Domain) :
+    (instOracleQuery (spec := spec)).query t = OracleQuery.query (spec := spec) t :=
+  rfl
 
 /-- Repackage `HasQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
 implementations. -/
