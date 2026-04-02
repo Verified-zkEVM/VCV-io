@@ -37,6 +37,7 @@ import VCVio.EvalDist.Defs.AlternativeMonad
 import VCVio.EvalDist.Defs.Basic
 import VCVio.EvalDist.Defs.Instances
 import VCVio.EvalDist.Defs.NeverFails
+import VCVio.EvalDist.Defs.Semantics
 import VCVio.EvalDist.Defs.Support
 import VCVio.EvalDist.Fintype
 import VCVio.EvalDist.Instances.ErrorT

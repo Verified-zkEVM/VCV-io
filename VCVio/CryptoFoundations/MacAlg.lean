@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append

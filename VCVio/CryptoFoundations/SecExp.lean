@@ -3,37 +3,136 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.EvalDist.TVDist
+import VCVio.EvalDist.Defs.Semantics
 
 /-!
 # Security Experiments
 
-This file gives a basic way to represent security experiments, as an extension of `OracleAlg`.
-The definition is meant to be simple enough to give useful lemmas while still being
-able to represent most common use cases.
+This file defines simple security experiments that succeed unless they terminate with failure.
+Each experiment carries bundled subprobabilistic semantics, so the experiment can be interpreted
+through an internal semantic monad instead of requiring a global `HasEvalSPMF` instance on the
+ambient monad.
 
-We also give a definition `BoundedAdversary α β` of a security adversary with input
-`α` and output `β`, as just a computation bundled with a bound on the number of queries
-it makes.
-
-The main definition is `SecExp spec α β`, which extends `OracleAlg` with three functions:
-* `inp_gen` that chooses an input for the experiment of type `α`
-* `main` that takes an input and computes a result of type `β`
-* `isValid` that decides whether the experiment succeeded
+We also define `BoundedAdversary α β` as an oracle computation bundled with a query bound.
 -/
 
 universe u v w
 
 open OracleComp OracleSpec ENNReal Polynomial Prod
 
+/-- Bias advantage of a Boolean-valued game: the gap between the probabilities of the two outputs.
+
+This is the canonical single-game formulation for hidden-bit guessing experiments. -/
 noncomputable def ProbComp.boolBiasAdvantage (p : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= false | p]).toReal|
 
+/-- Distinguishing advantage between two Boolean-valued games, measured on the `true` branch.
+
+For Boolean outputs this is equivalent to measuring the gap on `false`; choosing `true` is just a
+conventional presentation. -/
 noncomputable def ProbComp.boolDistAdvantage (p q : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
+
+/-- Triangle inequality for Boolean distinguishing advantage. -/
+lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
+  unfold ProbComp.boolDistAdvantage
+  exact abs_sub_le _ _ _
+
+/-- Re-express Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`. -/
+lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
+    p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
+  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
+    have hsum : Pr[= true | p] + Pr[= false | p] = 1 := by simp
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  unfold ProbComp.boolBiasAdvantage
+  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  rw [ENNReal.toReal_one]
+  rw [show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
+      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring]
+  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+
+/-- A hidden-bit guessing game over two Boolean branches has bias exactly equal to the
+distinguishing advantage between those two branches. -/
+lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
+    (real rand : ProbComp Bool) :
+    (do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)).boolBiasAdvantage =
+    real.boolDistAdvantage rand := by
+  rw [ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half]
+  rw [probOutput_uniformBool_branch_toReal_sub_half]
+  unfold ProbComp.boolDistAdvantage
+  calc
+    2 * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2|
+        = |(2 : ℝ)| * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2| := by
+            norm_num
+    _ = |(2 : ℝ) * (((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2)| := by
+          rw [← abs_mul]
+    _ = |(Pr[= true | real]).toReal - (Pr[= true | rand]).toReal| := by
+          congr 1
+          ring
+
+/-- Version of `boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch` with a shared sampled
+prefix before the real/random branch is chosen. -/
+lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
+    {α : Type} (pref : ProbComp α) (real rand : α → ProbComp Bool) :
+    (do
+      let a ← pref
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real a else rand a
+      pure (b == z)).boolBiasAdvantage =
+    (do
+      let a ← pref
+      real a).boolDistAdvantage
+      (do
+        let a ← pref
+        rand a) := by
+  let game : ProbComp Bool := do
+    let a ← pref
+    let b ← ($ᵗ Bool : ProbComp Bool)
+    let z ← if b then real a else rand a
+    pure (b == z)
+  let left : ProbComp Bool := do
+    let a ← pref
+    real a
+  let right : ProbComp Bool := do
+    let a ← pref
+    rand a
+  let branchGame : ProbComp Bool := do
+    let b ← ($ᵗ Bool : ProbComp Bool)
+    let z ← if b then left else right
+    pure (b == z)
+  have hbranch : evalDist game = evalDist branchGame := by
+    apply evalDist_ext
+    intro x
+    calc
+      Pr[= x | game] =
+          Pr[= x | do
+            let b ← ($ᵗ Bool : ProbComp Bool)
+            let a ← pref
+            let z ← if b then real a else rand a
+            pure (b == z)] := by
+              simpa [game, bind_assoc] using
+                (probOutput_bind_bind_swap pref ($ᵗ Bool : ProbComp Bool)
+                  (fun a b => do
+                    let z ← if b then real a else rand a
+                    pure (b == z))
+                  x)
+      _ = Pr[= x | branchGame] := by
+            refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) x ?_
+            intro b
+            cases b <;> simp [left, right]
+  have hprob := evalDist_ext_iff.mp hbranch
+  rw [show game.boolBiasAdvantage = branchGame.boolBiasAdvantage by
+    unfold ProbComp.boolBiasAdvantage
+    rw [hprob true, hprob false]]
+  simpa [branchGame, left, right] using
+    ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch left right
 
 /-- The **advantage** of a game `p`, assumed to be a probabilistic computation ending with a `guard`
   statement, is the absolute difference between the probability of success and 1/2. -/
@@ -129,29 +228,39 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 end BoundedAdversary
 
 /-- Structure to represent a security experiment.
-The experiment is considered successful unless it terminates with `failure`. -/
-structure SecExp (m : Type → Type w)
-    extends ExecutionMethod m where
+The experiment is considered successful unless it terminates with failure.
+
+A `SecExp` carries bundled `SPMFSemantics` directly. This keeps the semantic assumptions attached
+to the experiment itself: the surface monad can be interpreted through some internal semantic
+monad, and only then observed as a subdistribution for measuring success and failure
+probabilities. -/
+structure SecExp (m : Type → Type w) [Monad m]
+    extends SPMFSemantics m where
+  /-- Main experiment body. Success is interpreted as terminating without failure. -/
   main : m Unit
 
 namespace SecExp
 
-variable {m : Type → Type w}
+variable {m : Type → Type w} [Monad m]
 
 section advantage
 
-noncomputable def advantage [Monad m] [HasEvalSPMF m] (exp : SecExp m) : ℝ≥0∞ :=
-  1 - Pr[⊥ | exp.main]
+/-- Advantage of a failure-based security experiment: one minus its failure probability. -/
+noncomputable def advantage (exp : SecExp m) : ℝ≥0∞ :=
+  1 - Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main]
 
+/-- A failure-based experiment has zero advantage exactly when it fails with probability `1`. -/
 @[simp]
-lemma advantage_eq_zero_iff [Monad m] [HasEvalSPMF m] (exp : SecExp m) :
-    exp.advantage = 0 ↔ Pr[⊥ | exp.main] = 1 := by
+lemma advantage_eq_zero_iff (exp : SecExp m) :
+    exp.advantage = 0 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 1 := by
   rw [advantage, tsub_eq_zero_iff_le]
-  exact ⟨fun h => le_antisymm probFailure_le_one h, fun h => h ▸ le_refl _⟩
+  exact ⟨fun h => le_antisymm (exp.toSPMFSemantics.probFailure_le_one _) h,
+    fun h => h ▸ le_refl _⟩
 
+/-- A failure-based experiment has advantage `1` exactly when it never fails. -/
 @[simp]
-lemma advantage_eq_one_iff [Monad m] [HasEvalSPMF m] (exp : SecExp m) :
-    exp.advantage = 1 ↔ Pr[⊥ | exp.main] = 0 := by
+lemma advantage_eq_one_iff (exp : SecExp m) :
+    exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 0 := by
   constructor
   · intro h; by_contra hne
     have : exp.advantage < 1 := by
