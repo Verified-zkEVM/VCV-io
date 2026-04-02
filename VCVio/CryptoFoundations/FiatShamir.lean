@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.MonadQuery
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -34,17 +34,17 @@ def FiatShamir
     {m : Type → Type v} [Monad m]
     (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M]
-    [MonadLiftT ProbComp m] [MonadQuery (M × PC →ₒ Ω) m] :
+    [MonadLiftT ProbComp m] [HasQuery (M × PC →ₒ Ω) m] :
     SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := PC × P) where
   keygen := monadLift hr.gen
   sign := fun pk sk msg => do
     let (c, e) ← (monadLift (sigmaAlg.commit pk sk) : m _)
-    let r ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    let r ← HasQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
     let s ← (monadLift (sigmaAlg.respond pk sk e r) : m _)
     pure (c, s)
   verify := fun pk msg (c, s) => do
-    let r' ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    let r' ← HasQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
     pure (sigmaAlg.verify pk c r' s)
 
 namespace FiatShamir
@@ -71,7 +71,7 @@ section naturality
 variable {m : Type → Type u} [Monad m]
   {n : Type → Type v} [Monad n]
   [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
-  [MonadQuery (M × PC →ₒ Ω) m] [MonadQuery (M × PC →ₒ Ω) n]
+  [HasQuery (M × PC →ₒ Ω) m] [HasQuery (M × PC →ₒ Ω) n]
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir is natural in any oracle semantics morphism that preserves both random-oracle
@@ -79,15 +79,15 @@ queries and public-randomness lifting.
 
 This is the basic coherence theorem behind the generic/concrete split:
 
-- define Fiat-Shamir once over `MonadQuery`
+- define Fiat-Shamir once over `HasQuery`
 - specialize it in one monad
 - transport it along a query-preserving monad morphism into another analysis monad
 
 If the morphism also commutes with the designated `ProbComp` lift, then transporting the generic
 construction agrees with re-instantiating the construction directly in the target monad. -/
 theorem map_construction
-    (F : MonadQuery.QueryHom (M × PC →ₒ Ω) m n)
-    (hLift : MonadQuery.PreservesProbCompLift (m := m) (n := n) F.toMonadHom) :
+    (F : HasQuery.QueryHom (M × PC →ₒ Ω) m n)
+    (hLift : HasQuery.PreservesProbCompLift (m := m) (n := n) F.toMonadHom) :
     SignatureAlg.map F.toMonadHom (FiatShamir (m := m) σ hr M) =
       FiatShamir (m := n) σ hr M := by
   apply SignatureAlg.ext
@@ -196,7 +196,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     dsimp only [FiatShamir]
     have hquery :
         ∀ q : M × PC,
-          MonadQuery.query
+          HasQuery.query
               (spec := (M × PC →ₒ Ω))
               (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) q =
             (query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr q) :
