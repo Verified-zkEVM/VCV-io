@@ -23,17 +23,26 @@ universe u v w
 
 open OracleComp OracleSpec ENNReal Polynomial Prod
 
+/-- Bias advantage of a Boolean-valued game: the gap between the probabilities of the two outputs.
+
+This is the canonical single-game formulation for hidden-bit guessing experiments. -/
 noncomputable def ProbComp.boolBiasAdvantage (p : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= false | p]).toReal|
 
+/-- Distinguishing advantage between two Boolean-valued games, measured on the `true` branch.
+
+For Boolean outputs this is equivalent to measuring the gap on `false`; choosing `true` is just a
+conventional presentation. -/
 noncomputable def ProbComp.boolDistAdvantage (p q : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
 
+/-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
     p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
   unfold ProbComp.boolDistAdvantage
   exact abs_sub_le _ _ _
 
+/-- Re-express Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`. -/
 lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
     p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
   have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
@@ -46,6 +55,8 @@ lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
       2 * ((Pr[= true | p]).toReal - 1 / 2) by ring]
   rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
 
+/-- A hidden-bit guessing game over two Boolean branches has bias exactly equal to the
+distinguishing advantage between those two branches. -/
 lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
     (real rand : ProbComp Bool) :
     (do
@@ -66,6 +77,8 @@ lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
           congr 1
           ring
 
+/-- Version of `boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch` with a shared sampled
+prefix before the real/random branch is chosen. -/
 lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
     {α : Type} (pref : ProbComp α) (real rand : α → ProbComp Bool) :
     (do
@@ -215,9 +228,15 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 end BoundedAdversary
 
 /-- Structure to represent a security experiment.
-The experiment is considered successful unless it terminates with failure. -/
+The experiment is considered successful unless it terminates with failure.
+
+Unlike the older `ExecutionMethod`-based design, a `SecExp` carries bundled
+`SPMFSemantics` directly. This keeps the semantic assumptions attached to the experiment itself:
+the surface monad can be interpreted through some internal semantic monad, and only then observed
+as a subdistribution for measuring success and failure probabilities. -/
 structure SecExp (m : Type → Type w) [Monad m]
     extends SPMFSemantics m where
+  /-- Main experiment body. Success is interpreted as terminating without failure. -/
   main : m Unit
 
 namespace SecExp
@@ -226,9 +245,11 @@ variable {m : Type → Type w} [Monad m]
 
 section advantage
 
+/-- Advantage of a failure-based security experiment: one minus its failure probability. -/
 noncomputable def advantage (exp : SecExp m) : ℝ≥0∞ :=
   1 - exp.toSPMFSemantics.probFailure exp.main
 
+/-- A failure-based experiment has zero advantage exactly when it fails with probability `1`. -/
 @[simp]
 lemma advantage_eq_zero_iff (exp : SecExp m) :
     exp.advantage = 0 ↔ exp.toSPMFSemantics.probFailure exp.main = 1 := by
@@ -236,6 +257,7 @@ lemma advantage_eq_zero_iff (exp : SecExp m) :
   exact ⟨fun h => le_antisymm (exp.toSPMFSemantics.probFailure_le_one _) h,
     fun h => h ▸ le_refl _⟩
 
+/-- A failure-based experiment has advantage `1` exactly when it never fails. -/
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
     exp.advantage = 1 ↔ exp.toSPMFSemantics.probFailure exp.main = 0 := by
