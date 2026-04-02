@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.HasQuery
@@ -124,8 +125,7 @@ variable {PK SK Domain Range : Type}
   (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
 
 /-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
-noncomputable def runtime
-    (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt] :
+noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (Salt × M →ₒ Range))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :

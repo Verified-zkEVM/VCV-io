@@ -3,6 +3,7 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
@@ -40,7 +41,7 @@ variable [DecidableEq K]
 
 /-- Correctness experiment: decapsulation of an honestly generated encapsulation should recover the
 shared key. -/
-def CorrectExp (kem : KEMScheme m K PK SK C) : m Bool :=
+def CorrectExp : m Bool :=
   do
     let (pk, sk) ← kem.keygen
     let (c, k) ← kem.encaps pk

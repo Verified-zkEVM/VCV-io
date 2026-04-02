@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
@@ -104,8 +105,7 @@ variable (ids : IdenSchemeWithAbort S W W' St C Z p)
   (M : Type) [DecidableEq M] (maxAttempts : ℕ)
 
 /-- Runtime bundle for the Fiat-Shamir-with-aborts random-oracle world. -/
-noncomputable def runtime
-    (M : Type) [DecidableEq M] :
+noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (M × W' →ₒ C))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :

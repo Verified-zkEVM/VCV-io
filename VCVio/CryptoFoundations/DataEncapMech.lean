@@ -33,7 +33,7 @@ section Correct
 variable [DecidableEq M]
 
 /-- Correctness experiment for a DEM under an externally supplied key. -/
-def CorrectExp (dem : DEMScheme m K M C) (k : K) (msg : M) : m Bool :=
+def CorrectExp (k : K) (msg : M) : m Bool :=
   do
     let c ← dem.encrypt k msg
     let msg' ← dem.decrypt k c

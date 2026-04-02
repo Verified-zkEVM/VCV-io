@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.OracleComp.HasQuery
@@ -159,12 +160,12 @@ def game2 (tdp : TrapdoorPermutation PK SK Rand)
   do
     let b ← ($ᵗ Bool : ProbComp Bool)
     let b' ← (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let (pk, _sk) ← liftProbComp tdp.keygen
-    let (_m₁, _m₂, st) ← adv.choose pk
-    let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-    let h ← liftProbComp ($ᵗ M : ProbComp M)
-    let c : Rand × M := (tdp.forward pk r, h)
-    adv.guess st c)).run' ∅
+      let (pk, _sk) ← liftProbComp tdp.keygen
+      let (_m₁, _m₂, st) ← adv.choose pk
+      let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
+      let h ← liftProbComp ($ᵗ M : ProbComp M)
+      let c : Rand × M := (tdp.forward pk r, h)
+      adv.guess st c)).run' ∅
     return (b == b')
 
 /-- Bad event for the Game 0 → Game 1 hop: the adversary queries the random oracle at the

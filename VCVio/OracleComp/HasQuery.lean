@@ -60,7 +60,8 @@ instance instOracleQuery : HasQuery spec (OracleQuery spec) where
 
 @[simp]
 lemma instOracleQuery_query (t : spec.Domain) :
-    (instOracleQuery (spec := spec)).query t = OracleQuery.query (spec := spec) t :=
+    HasQuery.query (spec := spec) (m := OracleQuery spec) t =
+      OracleQuery.query (spec := spec) t :=
   rfl
 
 /-- Repackage `HasQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
@@ -80,7 +81,7 @@ instance (priority := low) instOfMonadLift [MonadLiftT (OracleQuery spec) m] :
 
 @[simp]
 lemma instOfMonadLift_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
-    (instOfMonadLift (spec := spec) (m := m)).query t =
+    HasQuery.query (spec := spec) (m := m) t =
       liftM (OracleQuery.query (spec := spec) t) :=
   rfl
 

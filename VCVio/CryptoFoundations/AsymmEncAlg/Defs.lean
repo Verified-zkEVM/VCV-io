@@ -49,7 +49,7 @@ variable [DecidableEq M]
 
 The game returns a `Bool` directly rather than using `guard`, so it does not require
 `AlternativeMonad`. -/
-def CorrectExp (encAlg : AsymmEncAlg m M PK SK C) (msg : M) : m Bool :=
+def CorrectExp (msg : M) : m Bool :=
   do
     let (pk, sk) ← encAlg.keygen
     let c ← encAlg.encrypt pk msg

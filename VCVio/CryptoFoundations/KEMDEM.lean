@@ -150,7 +150,7 @@ def composeWithDEM_toDEMReduction
 /-- Proof-ladders A1 reduction statement: the one-time IND-CPA advantage of textbook KEM+DEM is
 bounded by two KEM IND-CPA advantages plus one DEM IND-CPA advantage, using the canonical
 left/right and DEM reductions defined above. -/
-theorem IND_CPA_OneTime_biasAdvantage_composeWithDEM_le
+theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
     (runtime : ProbCompRuntime (OracleComp spec))
