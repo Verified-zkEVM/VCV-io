@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.RandomOracle
@@ -109,7 +111,7 @@ sampling, while the right component is a lazy random oracle on `Rand → M`. -/
 private def roQueryImpl :
     QueryImpl (RO_Spec Rand M) (StateT ((Rand →ₒ M).QueryCache) ProbComp) :=
   let ro : QueryImpl (Rand →ₒ M) (StateT ((Rand →ₒ M).QueryCache) ProbComp) := randomOracle
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (StateT ((Rand →ₒ M).QueryCache) ProbComp)
   idImpl + ro
 

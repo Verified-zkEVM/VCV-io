@@ -3,9 +3,11 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.Coercions.Add
@@ -77,15 +79,16 @@ Otherwise, tracks the `(challenge, response)` pair with the minimal hash value.
 This models the sequential search in Construction 1 of the Fischlin paper:
 the prover queries `H` on each input and keeps the best. -/
 private def fischlinSearchAux {X W PC SC Ω P M : Type} {p : X → W → Bool} {ρ b : ℕ}
+    {m : Type → Type v} [Monad m]
     (σ : SigmaProtocol X W PC SC Ω P p)
+    [MonadLiftT ProbComp m] [HasQuery (fischlinROSpec X PC Ω P ρ b M) m]
     (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ) :
-    List Ω → Option (Ω × P × Fin (2 ^ b)) →
-      OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M) (Option (Ω × P))
+    List Ω → Option (Ω × P × Fin (2 ^ b)) → m (Option (Ω × P))
   | [], best => return best.map fun (ω, resp, _) => (ω, resp)
   | ω :: rest, best => do
-    let resp ← σ.respond pk sk sc ω
-    let h ← query (spec := unifSpec + fischlinROSpec X PC Ω P ρ b M)
-      (Sum.inr ⟨pk, msg, comList, i, ω, resp⟩)
+    let resp ← (monadLift (σ.respond pk sk sc ω) : m _)
+    let h ← HasQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
+      ⟨pk, msg, comList, i, ω, resp⟩
     if h.val = 0 then return some (ω, resp)
     else
       let newBest := match best with
@@ -111,20 +114,27 @@ whose hash value is minimal, exiting early at hash `0`.
 **Verification**: re-hashes each `(commitment, challenge, response)` triple, checks
 sigma-protocol verification for each repetition, and verifies that the sum of hash
 values is at most `S`. -/
-def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
+def Fischlin
+    {m : Type → Type v} [Monad m]
+    (σ : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (ρ b S : ℕ) (M : Type)
-    [DecidableEq M] :
-    SignatureAlg (OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+    [DecidableEq M] [MonadLiftT ProbComp m]
+    [HasQuery (fischlinROSpec X PC Ω P ρ b M) m] :
+    SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := FischlinProof PC Ω P ρ) where
-  keygen := hr.gen
+  keygen := monadLift hr.gen
   sign := fun pk sk msg => do
-    let commits ← Fin.mOfFn ρ fun _ => σ.commit pk sk
+    let commits : Fin ρ → PC × SC ←
+      Fin.mOfFn ρ fun _ => (monadLift (σ.commit pk sk) : m (PC × SC))
     let comVec : Fin ρ → PC := fun i => (commits i).1
     let comList := List.ofFn comVec
     Fin.mOfFn ρ fun i => do
       let sc_i := (commits i).2
-      let result ← fischlinSearchAux σ pk sk sc_i msg comList i
-        (FinEnum.toList Ω) none
+      let result ←
+        fischlinSearchAux
+          (X := X) (W := W) (PC := PC) (SC := SC) (Ω := Ω) (P := P) (M := M)
+          (p := p) (ρ := ρ) (b := b) (m := m)
+          σ pk sk sc_i msg comList i (FinEnum.toList Ω) none
       match result with
       | some (ω, resp) => return (comVec i, ω, resp)
       | none => return (comVec i, default, default)
@@ -133,12 +143,12 @@ def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     let comList := List.ofFn comVec
     let results ← Fin.mOfFn ρ fun i => do
       let (_, ω_i, resp_i) := π i
-      let h_i ← query (spec := unifSpec + fischlinROSpec X PC Ω P ρ b M)
-        (Sum.inr ⟨pk, msg, comList, i, ω_i, resp_i⟩)
-      return (σ.verify pk (comVec i) ω_i resp_i, h_i.val)
+      let h_i ← HasQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
+        ⟨pk, msg, comList, i, ω_i, resp_i⟩
+      pure (σ.verify pk (comVec i) ω_i resp_i, h_i.val)
     let allVerified := (List.finRange ρ).all fun i => (results i).1
     let hashSum := (List.finRange ρ).foldl (fun acc i => acc + (results i).2) 0
-    return (allVerified && decide (hashSum ≤ S))
+    pure (allVerified && decide (hashSum ≤ S))
 
 namespace Fischlin
 
@@ -189,9 +199,14 @@ has a non-zero completeness error because the prover's proof-of-work search may 
 to find hash values whose sum is at most `S`. -/
 theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
     Pr[= true | (runtime ρ b M).evalDist do
-      let (pk, sk) ← (Fischlin σ hr ρ b S M).keygen
-      let sig ← (Fischlin σ hr ρ b S M).sign pk sk msg
-      (Fischlin σ hr ρ b S M).verify pk msg sig]
+      let (pk, sk) ←
+        (Fischlin (m := OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+          σ hr ρ b S M).keygen
+      let sig ←
+        (Fischlin (m := OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+          σ hr ρ b S M).sign pk sk msg
+      (Fischlin (m := OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+        σ hr ρ b S M).verify pk msg sig]
     ≥ 1 - completenessError ρ b S (FinEnum.card Ω) := by sorry
 
 /-! ### Online Extraction / Knowledge Soundness -/
@@ -272,14 +287,16 @@ noncomputable def knowledgeSoundnessExp
   let roSpec := fischlinROSpec X PC Ω P ρ b M
   let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
   let loggedRO := ro.withLogging
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (WriterT (QueryLog roSpec) (StateT roSpec.QueryCache ProbComp))
   do
     let ((π, roLog), cache) ← (simulateQ (idImpl + loggedRO) (prover x msg)).run |>.run ∅
-    let idImpl' := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    let idImpl' := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
       (StateT roSpec.QueryCache ProbComp)
     let (verified, _) ←
-      (simulateQ (idImpl' + ro) ((Fischlin σ hr ρ b S M).verify x msg π)).run cache
+      (simulateQ (idImpl' + ro)
+        ((Fischlin (m := OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
+          σ hr ρ b S M).verify x msg π)).run cache
     let extracted ← onlineExtract σ ρ b M x π roLog
     return (verified && !(match extracted with | some w => p x w | none => false))
 
