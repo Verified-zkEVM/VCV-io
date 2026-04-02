@@ -66,6 +66,48 @@ noncomputable def runtime :
     ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
+section naturality
+
+variable {m : Type → Type u} [Monad m]
+  {n : Type → Type v} [Monad n]
+  [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
+  [HasQuery (M × PC →ₒ Ω) m] [HasQuery (M × PC →ₒ Ω) n]
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Fiat-Shamir is natural in any oracle semantics morphism that preserves both random-oracle
+queries and public-randomness lifting.
+
+This is the basic coherence theorem behind the generic/concrete split:
+
+ - define Fiat-Shamir once over `HasQuery`
+- specialize it in one monad
+- transport it along a query-preserving monad morphism into another analysis monad
+
+If the morphism also commutes with the designated `ProbComp` lift, then transporting the generic
+construction agrees with re-instantiating the construction directly in the target monad. -/
+theorem map_construction
+    (F : HasQuery.QueryHom (M × PC →ₒ Ω) m n)
+    (hLift : HasQuery.PreservesProbCompLift (m := m) (n := n) F.toMonadHom) :
+    SignatureAlg.map F.toMonadHom (FiatShamir (m := m) σ hr M) =
+      FiatShamir (m := n) σ hr M := by
+  apply SignatureAlg.ext
+  · simpa [FiatShamir, liftM, MonadLiftT.monadLift] using hLift hr.gen
+  · intro pk sk msg
+    have hCommit :
+        F.toMonadHom (monadLift (σ.commit pk sk) : m (PC × SC)) =
+          (monadLift (σ.commit pk sk) : n (PC × SC)) :=
+      hLift (σ.commit pk sk)
+    have hRespond :
+        ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m P) =
+          (monadLift (σ.respond pk sk e r) : n P) :=
+      fun e r => hLift (σ.respond pk sk e r)
+    simp [FiatShamir, hCommit, hRespond]
+  · intro pk msg sig
+    cases sig
+    simp [FiatShamir]
+
+end naturality
+
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
 def hashQueryBound {S' α : Type}
