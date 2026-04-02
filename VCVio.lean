@@ -58,6 +58,7 @@ import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.MonadQuery
 import VCVio.OracleComp.FinRatPMF
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext

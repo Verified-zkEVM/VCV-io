@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.MonadQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -29,19 +30,22 @@ variable {X W PC SC Ω P : Type}
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
 commitment), and then responds to the challenge. -/
-def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
-    (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
-    SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
+def FiatShamir
+    {m : Type → Type v} [Monad m]
+    (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
+    (hr : GenerableRelation X W p) (M : Type) [DecidableEq M]
+    [MonadLiftT ProbComp m] [MonadQuery (M × PC →ₒ Ω) m] :
+    SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := PC × P) where
-  keygen := hr.gen
-  sign := fun pk sk m => do
-    let (c, e) ← sigmaAlg.commit pk sk
-    let r ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
-    let s ← sigmaAlg.respond pk sk e r
-    return (c, s)
-  verify := fun pk m (c, s) => do
-    let r' ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
-    return sigmaAlg.verify pk c r' s
+  keygen := monadLift hr.gen
+  sign := fun pk sk msg => do
+    let (c, e) ← (monadLift (sigmaAlg.commit pk sk) : m _)
+    let r ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    let s ← (monadLift (sigmaAlg.respond pk sk e r) : m _)
+    pure (c, s)
+  verify := fun pk msg (c, s) => do
+    let r' ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    pure (sigmaAlg.verify pk c r' s)
 
 namespace FiatShamir
 
@@ -82,7 +86,9 @@ omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
-    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) (runtime M) := by
+    SignatureAlg.PerfectlyComplete
+      (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M)
+      (runtime M) := by
   intro msg
   classical
   let ro : QueryImpl (M × PC →ₒ Ω)
@@ -128,13 +134,13 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     simpa using hrun oa s
   change
     Pr[= true | (runtime M).evalDist (do
-      let (pk, sk) ← (FiatShamir σ hr M).keygen
-      let sig ← (FiatShamir σ hr M).sign pk sk msg
-      (FiatShamir σ hr M).verify pk msg sig)] = 1
+      let (pk, sk) ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).keygen
+      let sig ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).sign pk sk msg
+      (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).verify pk msg sig)] = 1
   rw [show (runtime M).evalDist (do
-      let (pk, sk) ← (FiatShamir σ hr M).keygen
-      let sig ← (FiatShamir σ hr M).sign pk sk msg
-      (FiatShamir σ hr M).verify pk msg sig) =
+      let (pk, sk) ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).keygen
+      let sig ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).sign pk sk msg
+      (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).verify pk msg sig) =
         evalDist (do
           let (pk, sk) ← hr.gen
           let (c, e) ← σ.commit pk sk
@@ -142,10 +148,27 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
     change evalDist (StateT.run' (simulateQ (idImpl + ro) (do
-        let (pk, sk) ← (FiatShamir σ hr M).keygen
-        let sig ← (FiatShamir σ hr M).sign pk sk msg
-        (FiatShamir σ hr M).verify pk msg sig)) ∅) = _
+        let (pk, sk) ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).keygen
+        let sig ← (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).sign pk sk msg
+        (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M).verify pk msg sig)) ∅) = _
     dsimp only [FiatShamir]
+    have hquery :
+        ∀ q : M × PC,
+          @MonadQuery.query (M × PC) (M × PC →ₒ Ω)
+              (OracleComp (unifSpec + (M × PC →ₒ Ω)))
+              (inferInstanceAs (Monad (OracleComp (unifSpec + (M × PC →ₒ Ω)))))
+              (MonadQuery.instOfMonadLift
+                (spec := (M × PC →ₒ Ω))
+                (m := OracleComp (unifSpec + (M × PC →ₒ Ω))))
+              q =
+            (query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr q) :
+              OracleComp (unifSpec + (M × PC →ₒ Ω)) Ω) := by
+      intro q
+      exact congrArg
+        (fun z => (liftM z : OracleComp (unifSpec + (M × PC →ₒ Ω)) Ω))
+        (OracleQuery.liftM_add_right_query
+          (spec₁ := unifSpec) (spec₂ := (M × PC →ₒ Ω)) q)
+    simp_rw [hquery]
     simp only [simulateQ_bind, simulateQ_pure, simulateQ_query,
       QueryImpl.add_apply_inr,
       OracleQuery.cont_query, OracleQuery.input_query, id_map]
@@ -188,8 +211,8 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         MonadLift.monadLift, StateT.run_lift, hmod]
     simp only [bind_assoc, pure_bind]
     simp_rw [hpeel]
-    simp_rw [hro_miss]
-    simp_rw [hpeel]
+    try simp_rw [hro_miss]
+    try simp_rw [hpeel]
     have hro_hit : ∀ {β : Type} (q : M × PC) (r : Ω)
         (rest : Ω → StateT ((M × PC →ₒ Ω).QueryCache) ProbComp β),
         (ro q >>= rest).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) =
@@ -202,13 +225,13 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       rw [StateT.run_bind]
       simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
         StateT.run_get, pure_bind, QueryCache.cacheQuery_self, StateT.run_pure]
-    simp_rw [hro_hit]
+    try simp_rw [hro_hit]
     have hpure_run' : ∀ {α : Type} (a : α) (s : (M × PC →ₒ Ω).QueryCache),
         (pure a : StateT _ ProbComp α).run' s = (pure a : ProbComp α) := by
       intro α a s
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
-    simp_rw [hpure_run']]
+    try simp_rw [hpure_run']]
   change
     Pr[= true | (do
       let (pk, sk) ← hr.gen
@@ -260,7 +283,8 @@ theorem euf_cma_bound
     [Fintype Ω]
     (simTranscript : X → ProbComp (PC × Ω × P))
     (_hhvzk : σ.PerfectHVZK simTranscript)
-    (adv : SignatureAlg.unforgeableAdv (FiatShamir σ hr M))
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M))
     (qBound : ℕ)
     (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
