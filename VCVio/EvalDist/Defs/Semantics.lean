@@ -71,14 +71,12 @@ structure SemanticsVia
   /-- Internal monad used to give denotational meaning to computations in `m`. -/
   Sem : Type u → Type w
   /-- Monad structure on the internal semantic monad. -/
-  instMonadSem : Monad Sem
+  [instMonadSem : Monad Sem]
   /-- Interpret a surface computation into the internal semantic monad. -/
   interpret : m →ᵐ Sem
   /-- Observe the internal semantic computation as an external semantic object, forgetting any
   hidden internal structure. -/
   observe : {α : Type u} → Sem α → Obs α
-
-attribute [instance] SemanticsVia.instMonadSem
 
 namespace SemanticsVia
 

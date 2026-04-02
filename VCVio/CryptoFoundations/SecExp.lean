@@ -247,12 +247,12 @@ section advantage
 
 /-- Advantage of a failure-based security experiment: one minus its failure probability. -/
 noncomputable def advantage (exp : SecExp m) : ℝ≥0∞ :=
-  1 - exp.toSPMFSemantics.probFailure exp.main
+  1 - Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main]
 
 /-- A failure-based experiment has zero advantage exactly when it fails with probability `1`. -/
 @[simp]
 lemma advantage_eq_zero_iff (exp : SecExp m) :
-    exp.advantage = 0 ↔ exp.toSPMFSemantics.probFailure exp.main = 1 := by
+    exp.advantage = 0 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 1 := by
   rw [advantage, tsub_eq_zero_iff_le]
   exact ⟨fun h => le_antisymm (exp.toSPMFSemantics.probFailure_le_one _) h,
     fun h => h ▸ le_refl _⟩
@@ -260,7 +260,7 @@ lemma advantage_eq_zero_iff (exp : SecExp m) :
 /-- A failure-based experiment has advantage `1` exactly when it never fails. -/
 @[simp]
 lemma advantage_eq_one_iff (exp : SecExp m) :
-    exp.advantage = 1 ↔ exp.toSPMFSemantics.probFailure exp.main = 0 := by
+    exp.advantage = 1 ↔ Pr[⊥ | exp.toSPMFSemantics.evalDist exp.main] = 0 := by
   constructor
   · intro h; by_contra hne
     have : exp.advantage < 1 := by
