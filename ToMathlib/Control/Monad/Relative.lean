@@ -86,9 +86,15 @@ def monadOfId (M : RelativeMonad C _ (𝟭 _)) : Monad C where
   toFunctor := M.inducedFunctor
   η := { app X := M.η }
   μ := NatTrans.mk (fun X => M.μ (𝟙 (M.T X)))
-    (fun X Y f => by simp; rw [← assoc, ← assoc]; simp)
-  right_unit _ := by simp; rw [← assoc]; simp
-  assoc _ := by simp; rw [← assoc, ← assoc]; simp
+    (fun X Y f => by
+      rw [← assoc, ← assoc]
+      simp)
+  right_unit _ := by
+    rw [← assoc]
+    simp
+  assoc _ := by
+    rw [← assoc, ← assoc]
+    simp
 
 /-- Transport a relative monad along a natural isomorphism of the underlying functor. -/
 def ofNatIso {J₁ J₂ : C ⥤ D} (φ : J₁ ≅ J₂) (M : RelativeMonad C D J₁) : RelativeMonad C D J₂ where
@@ -110,8 +116,8 @@ variable {C₁ : Type u₁} [Category.{v₁} C₁] {D₁ : Type u₂} [Category.
   {C₂ : Type u₃} [Category.{v₃} C₂] {D₂ : Type u₄} [Category.{v₄} D₂]
   {J₁ : C₁ ⥤ D₁} {J₂ : C₂ ⥤ D₂}
 
-/-- The product of two relative monads is a relative monad on the corresponding product categories.
- -/
+/-- The product of two relative monads is a relative monad on the corresponding product
+categories. -/
 @[simps!]
 def prod (M₁ : RelativeMonad C₁ D₁ J₁) (M₂ : RelativeMonad C₂ D₂ J₂) :
     RelativeMonad (C₁ × C₂) (D₁ × D₂) (Functor.prod J₁ J₂) where
@@ -296,7 +302,7 @@ attribute [simp] pure_bindᵣ bind_pure_compᵣ bind_assocᵣ
 
 @[simp] theorem bind_pureᵣ [RelativeMonad j m] [LawfulRelativeMonad j m] (x : m α) :
     x >>=ᵣ pureᵣ (j := j) = x := by
-  show x >>=ᵣ (fun a => pureᵣ (id a)) = x
+  change x >>=ᵣ (fun a => pureᵣ (id a)) = x
   rw [bind_pure_compᵣ, id_mapᵣ]
 
 theorem map_eq_pure_bindᵣ [RelativeMonad j m] [LawfulRelativeMonad j m]

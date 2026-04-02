@@ -74,7 +74,7 @@ theorem correct (hcorrect : tdp.Correct) :
     let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
     pure (decide (msg' = some msg))
   change Pr[= true | ProbCompRuntime.probComp.evalDist mx] = 1
-  simp only [mx, SPMFSemantics.evalDist, SemanticsVia.denote]
+  simp only [mx]
   have huniq : ∀ y ∈ support mx, y = true := by
     intro y hy
     rw [mem_support_bind_iff] at hy

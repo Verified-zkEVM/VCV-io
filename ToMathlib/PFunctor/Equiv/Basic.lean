@@ -171,7 +171,7 @@ def sumProdDistrib (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₁}) (
 
 TODO: define in terms of `sumProdDistrib` -/
 @[simps]
-def prodSumDistrib (R : PFunctor.{uA₃, uB₂}):
+def prodSumDistrib (R : PFunctor.{uA₃, uB₂}) :
     (P * (Q + R) : PFunctor.{max uA₁ uA₂ uA₃, max uB₁ uB₂}) ≃ₚ
     ((P * Q) + (P * R) : PFunctor.{max uA₁ uA₂ uA₃, max uB₁ uB₂}) where
   equivA := _root_.Equiv.prodSumDistrib P.A Q.A R.A
@@ -502,7 +502,7 @@ def zeroTensor : 0 ⊗ P ≃ₚ 0 where
   equivB := fun a => Equiv.pemptyProd (P.B a.2)
 
 instance {P} {a : (P ⊗ 1).A} : IsEmpty ((P ⊗ 1).B a) := by
-  simp [tensor, OfNat.ofNat, One.one]
+  simp only [tensor, OfNat.ofNat, One.one]
   exact Or.inr (PEmpty.instIsEmpty)
 
 /-- Tensor product with `1` on the right is equivalent to the constant functor -/
@@ -511,7 +511,7 @@ def tensorOne : P ⊗ 1 ≃ₚ C P.A where
   equivB := fun _ => Equiv.equivPEmpty _
 
 instance {P} {a : (1 ⊗ P).A} : IsEmpty ((1 ⊗ P).B a) := by
-  simp [tensor, OfNat.ofNat, One.one]
+  simp only [tensor, OfNat.ofNat, One.one]
   exact Or.inl (PEmpty.instIsEmpty)
 
 /-- Tensor product with `1` on the left is equivalent to the constant functor -/
@@ -572,7 +572,7 @@ def sumTensorDistrib (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₁})
     Sum.casesOn a (fun _ => _root_.Equiv.refl _) (fun _ => _root_.Equiv.refl _)
 
 /-- Tensor product distributes over sum: `P ⊗ (Q + R) ≃ₚ (P ⊗ Q) + (P ⊗ R)` -/
-def tensorSumDistrib (R : PFunctor.{uA₃, uB₂}):
+def tensorSumDistrib (R : PFunctor.{uA₃, uB₂}) :
     (P ⊗ (Q + R : PFunctor.{max uA₂ uA₃, uB₂})) ≃ₚ
     ((P ⊗ Q) + (P ⊗ R) : PFunctor.{max uA₁ uA₂ uA₃, max uB₁ uB₂}) where
   equivA := _root_.Equiv.prodSumDistrib P.A Q.A R.A
@@ -660,9 +660,9 @@ def prodCompDistrib :
       rintro ⟨⟨pa, qa⟩, f⟩
       apply Sigma.ext
       · rfl
-      exact heq_of_eq (show Sum.elim (fun pb => f (Sum.inl pb)) (fun qb => f (Sum.inr qb)) = f from by
+      exact heq_of_eq <| by
         funext b
-        cases b <;> rfl)
+        cases b <;> rfl
     right_inv := by
       rintro ⟨⟨pa, fp⟩, ⟨qa, fq⟩⟩
       rfl

@@ -73,6 +73,7 @@ variable
     (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
 
 include hRespondVerify in
+omit [DecidableEq prims.Hint] in
 /-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
 whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact follows
 from the key generation identity, NTT linearity, and `Primitives.Laws`, but is isolated
@@ -133,6 +134,7 @@ theorem idsWithAbort_hvzk :
 
 omit hRespondVerify [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited] in
+omit [DecidableEq prims.Hint] in
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.

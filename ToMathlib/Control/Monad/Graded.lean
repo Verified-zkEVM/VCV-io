@@ -263,13 +263,14 @@ abbrev IxF (F : G → Type u → Type v) (i j : G) (α : Type u) : Type v :=
 `IxF F i j α := F (i⁻¹ * j) α`. -/
 instance toIndexedMonad : IndexedMonad G (IxF F) where
   ireturn {α i} a := by
-    show F (i⁻¹ * i) α
+    change F (i⁻¹ * i) α
     rw [inv_mul_cancel]
     exact gpure a
   ibind {α β i j k} x f := by
-    show F (i⁻¹ * k) β
-    rw [show i⁻¹ * k = i⁻¹ * j * (j⁻¹ * k) from by
-      rw [mul_assoc, ← mul_assoc j, mul_inv_cancel, one_mul]]
+    change F (i⁻¹ * k) β
+    have hij : i⁻¹ * k = i⁻¹ * j * (j⁻¹ * k) := by
+      rw [mul_assoc, ← mul_assoc j, mul_inv_cancel, one_mul]
+    rw [hij]
     exact gbind x f
 
 end GradedMonad

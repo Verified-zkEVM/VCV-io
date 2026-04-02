@@ -411,7 +411,7 @@ theorem prodPair_fst_snd :
 namespace Equiv
 
 /-- Commutativity of product -/
-def prodComm (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₂}):
+def prodComm (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₂}) :
     Lens.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂} (P * Q) (Q * P) where
   toLens := Prod.swap ⇆ (fun _ => Sum.elim Sum.inr Sum.inl)
   invLens := Prod.swap ⇆ (fun _ => Sum.elim Sum.inr Sum.inl)

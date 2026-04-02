@@ -146,7 +146,7 @@ private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
 theorem prgRealExp_eq_prfRealExp
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (hkey : evalDist prf.keygen = evalDist ($ᵗK : ProbComp K))
     (adv : PRGAdversary (List.Vector O n)) :
     evalDist (PRGScheme.prgRealExp (streamPRG prf n) adv) =
       evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
@@ -186,7 +186,7 @@ theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
 theorem security
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (hkey : evalDist prf.keygen = evalDist ($ᵗK : ProbComp K))
     (adv : PRGAdversary (List.Vector O n)) :
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +

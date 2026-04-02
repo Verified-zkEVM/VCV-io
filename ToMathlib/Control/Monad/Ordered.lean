@@ -96,9 +96,14 @@ scoped instance (priority := low) instDiscreteMonad (m) [Monad m] : OrderedMonad
   monadOrder := {
     le := (· = ·)
     le_refl _ := rfl
-    le_trans _ _ _ _ _ := by simp_all
+    le_trans _ _ _ hab hbc := hab.trans hbc
   }
-  bind_mono h hf := by simp_all; rename_i f f'; have : f = f' := funext hf; simp [this]
+  bind_mono h hf := by
+    subst h
+    rename_i f g
+    have hfg : f = g := funext hf
+    subst hfg
+    rfl
 
 end Discrete
 
@@ -129,12 +134,14 @@ class MonadLift.LE (m : Type u → Type v) (n : Type u → Type w) [Monad m] [Or
     [φ : MonadLift m n] [ψ : MonadLift m n] where
   monadLift_le {α} (a : m α) : φ.monadLift a ≤ₘ ψ.monadLift a
 
-/-- If the target monad `n` is ordered, then we have a preorder on the monad lifts from `m` to `n`.
- -/
+/-- If the target monad `n` is ordered, then we have a preorder on the monad lifts from `m`
+to `n`. -/
 instance {m n} [Monad m] [OrderedMonad n] : Preorder (MonadLift m n) where
   le := fun φ ψ => ∀ {α : Type u} (a : m α), φ.monadLift a ≤ₘ ψ.monadLift a
   le_refl _ := by intro α a; simp only [ge_iff_le, le_refl]
-  le_trans φ₁ φ₂ φ₃ h1 h2 := by simp_all; intro α a; exact le_trans (h1 a) (h2 a)
+  le_trans _ _ _ h1 h2 := by
+    intro α a
+    exact (h1 a).trans (h2 a)
 
 class OrderedMonadLift (m : semiOutParam (Type u → Type v)) (n : Type u → Type w)
     [OrderedMonad m] [OrderedMonad n] extends MonadLift m n where

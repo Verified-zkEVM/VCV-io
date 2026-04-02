@@ -171,7 +171,6 @@ private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : R
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
   LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
--- 256×256 matrix inverse verified by native evaluation (~16.7M ZMod multiplications).
 set_option maxHeartbeats 800000 in
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,

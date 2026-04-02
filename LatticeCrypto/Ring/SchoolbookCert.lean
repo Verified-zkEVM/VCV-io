@@ -35,7 +35,7 @@ theorem mk_negacyclicModulus_eq_zero :
   Ideal.Quotient.eq_zero_iff_mem.mpr (Ideal.subset_span rfl)
 
 /-- In `R[X]/(X^n + 1)`, `X^n = -1`. -/
-theorem mk_X_pow_n (hn : 0 < n) :
+theorem mk_X_pow_n :
     (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
       ((X : Polynomial R) ^ n) = -1 := by
   have h := mk_negacyclicModulus_eq_zero (R := R) (n := n)
@@ -91,9 +91,15 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
         (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
           (-Polynomial.monomial ((i.val + j.val - n)) (f i * g j)) := by
         grind +suggestions
-      simp_all +decide [Nat.mod_eq_sub_mod (le_of_not_gt h)]
+      have hle : n ≤ i.val + j.val := le_of_not_gt h
+      have hlt : i.val + j.val - n < n := by
+        rw [tsub_lt_iff_left hle]
+        linarith [Fin.is_lt i, Fin.is_lt j]
+      have hmod : (i.val + j.val) % n = i.val + j.val - n := by
+        rw [Nat.mod_eq_sub_mod hle, Nat.mod_eq_of_lt hlt]
+      simpa [Nat.add_sub_of_le hle, h, hmod] using h_neg
       rw [Nat.mod_eq_of_lt (by rw [tsub_lt_iff_left h]; linarith [Fin.is_lt i, Fin.is_lt j])]
-  simp +decide [h_reduction, negacyclicConvCoeff]
+  simp only [negacyclicConvCoeff]
   rw [← Finset.sum_product']
   rw [Finset.sum_comm]
   refine Finset.sum_congr rfl fun x hx => ?_

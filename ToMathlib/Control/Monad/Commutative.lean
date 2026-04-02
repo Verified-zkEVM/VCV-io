@@ -156,7 +156,7 @@ instance : Commutative Option where
 
 instance {ε} [Subsingleton ε] : Commutative (Except ε) where
   bind_comm := fun ma mb => by
-    cases ma <;> cases mb <;> simp [CommutativeAt, Bind.bind, Pure.pure, Except.bind, Except.pure]
+    cases ma <;> cases mb <;> try rfl
     exact Subsingleton.elim _ _
 
 /-- The `ReaderT ρ m` monad is commutative if the underlying monad is commutative -/

@@ -94,12 +94,15 @@ alias toOne := terminal
 theorem ext {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (c₁ c₂ : Chart P Q)
     (h₁ : ∀ a, c₁.toFunA a = c₂.toFunA a) (h₂ : ∀ a, c₁.toFunB a = (h₁ a) ▸ c₂.toFunB a) :
     c₁ = c₂ := by
-  rcases c₁ with ⟨toFunA₁, _⟩
-  rcases c₂ with ⟨toFunA₂, _⟩
+  rcases c₁ with ⟨toFunA₁, toFunB₁⟩
+  rcases c₂ with ⟨toFunA₂, toFunB₂⟩
   have h : toFunA₁ = toFunA₂ := funext h₁
   subst h
-  simp_all
-  exact funext h₂
+  have hB : toFunB₁ = toFunB₂ := by
+    funext a
+    simpa using h₂ a
+  subst hB
+  rfl
 
 end Chart
 
