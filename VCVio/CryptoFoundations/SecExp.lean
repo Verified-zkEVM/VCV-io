@@ -3,26 +3,20 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.EvalDist.TVDist
+import VCVio.EvalDist.Defs.Semantics
 
 /-!
 # Security Experiments
 
-This file gives a basic way to represent security experiments, as an extension of `OracleAlg`.
-The definition is meant to be simple enough to give useful lemmas while still being
-able to represent most common use cases.
+This file defines simple security experiments that succeed unless they terminate with failure.
+Each experiment carries bundled subprobabilistic semantics, so the experiment can be interpreted
+through an internal semantic monad instead of requiring a global `HasEvalSPMF` instance on the
+ambient monad.
 
-We also give a definition `BoundedAdversary α β` of a security adversary with input
-`α` and output `β`, as just a computation bundled with a bound on the number of queries
-it makes.
-
-The main definition is `SecExp spec α β`, which extends `OracleAlg` with three functions:
-* `inp_gen` that chooses an input for the experiment of type `α`
-* `main` that takes an input and computes a result of type `β`
-* `isValid` that decides whether the experiment succeeded
+We also define `BoundedAdversary α β` as an oracle computation bundled with a query bound.
 -/
 
 universe u v w
@@ -129,29 +123,30 @@ variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
 end BoundedAdversary
 
 /-- Structure to represent a security experiment.
-The experiment is considered successful unless it terminates with `failure`. -/
-structure SecExp (m : Type → Type w)
-    extends ExecutionMethod m where
+The experiment is considered successful unless it terminates with failure. -/
+structure SecExp (m : Type → Type w) [Monad m]
+    extends SPMFSemantics m where
   main : m Unit
 
 namespace SecExp
 
-variable {m : Type → Type w}
+variable {m : Type → Type w} [Monad m]
 
 section advantage
 
-noncomputable def advantage [Monad m] [HasEvalSPMF m] (exp : SecExp m) : ℝ≥0∞ :=
-  1 - Pr[⊥ | exp.main]
+noncomputable def advantage (exp : SecExp m) : ℝ≥0∞ :=
+  1 - exp.toSPMFSemantics.probFailure exp.main
 
 @[simp]
-lemma advantage_eq_zero_iff [Monad m] [HasEvalSPMF m] (exp : SecExp m) :
-    exp.advantage = 0 ↔ Pr[⊥ | exp.main] = 1 := by
+lemma advantage_eq_zero_iff (exp : SecExp m) :
+    exp.advantage = 0 ↔ exp.toSPMFSemantics.probFailure exp.main = 1 := by
   rw [advantage, tsub_eq_zero_iff_le]
-  exact ⟨fun h => le_antisymm probFailure_le_one h, fun h => h ▸ le_refl _⟩
+  exact ⟨fun h => le_antisymm (exp.toSPMFSemantics.probFailure_le_one _) h,
+    fun h => h ▸ le_refl _⟩
 
 @[simp]
-lemma advantage_eq_one_iff [Monad m] [HasEvalSPMF m] (exp : SecExp m) :
-    exp.advantage = 1 ↔ Pr[⊥ | exp.main] = 0 := by
+lemma advantage_eq_one_iff (exp : SecExp m) :
+    exp.advantage = 1 ↔ exp.toSPMFSemantics.probFailure exp.main = 0 := by
   constructor
   · intro h; by_contra hne
     have : exp.advantage < 1 := by

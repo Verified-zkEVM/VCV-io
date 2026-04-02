@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec

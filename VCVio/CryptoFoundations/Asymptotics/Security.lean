@@ -53,7 +53,7 @@ theorem secure_of_pointwise_bound
 
 /-- Build from a family of failure-based `SecExp`. -/
 noncomputable def ofSecExp {m : ℕ → Type → Type*}
-    [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
+    [∀ n, Monad (m n)]
     (exp : (n : ℕ) → SecExp (m n)) : SecurityExp where
   advantage n := (exp n).advantage
 
@@ -106,7 +106,7 @@ theorem toSecurityExp_advantage (g : SecurityGame Adv) (A : Adv) :
 
 /-- Build from a family of failure-based `SecExp`. -/
 noncomputable def ofSecExp {m : ℕ → Type → Type*}
-    [∀ n, Monad (m n)] [∀ n, HasEvalSPMF (m n)]
+    [∀ n, Monad (m n)]
     (game : Adv → (n : ℕ) → SecExp (m n)) : SecurityGame Adv where
   advantage A n := (game A n).advantage
 
