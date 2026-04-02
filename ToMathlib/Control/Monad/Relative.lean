@@ -87,12 +87,17 @@ def monadOfId (M : RelativeMonad C _ (𝟭 _)) : Monad C where
   η := { app X := M.η }
   μ := NatTrans.mk (fun X => M.μ (𝟙 (M.T X)))
     (fun X Y f => by
+      simp only [Functor.comp_obj, inducedFunctor_obj, Functor.comp_map, inducedFunctor_map,
+        Functor.id_obj, Functor.id_map]
       rw [← assoc, ← assoc]
       simp)
   right_unit _ := by
+    simp only [Functor.id_obj, inducedFunctor_obj, inducedFunctor_map, Functor.id_map]
     rw [← assoc]
     simp
   assoc _ := by
+    simp only [Functor.comp_obj, inducedFunctor_obj, inducedFunctor_map, Functor.id_obj,
+      Functor.id_map]
     rw [← assoc, ← assoc]
     simp
 

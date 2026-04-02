@@ -92,7 +92,7 @@ theorem map_construction
       FiatShamir (m := n) σ hr M := by
   apply SignatureAlg.ext
   · simpa [FiatShamir, liftM, MonadLiftT.monadLift] using hLift hr.gen
-  · intro pk sk msg
+  · funext pk sk msg
     have hCommit :
         F.toMonadHom (monadLift (σ.commit pk sk) : m (PC × SC)) =
           (monadLift (σ.commit pk sk) : n (PC × SC)) :=
@@ -102,7 +102,7 @@ theorem map_construction
           (monadLift (σ.respond pk sk e r) : n P) :=
       fun e r => hLift (σ.respond pk sk e r)
     simp [FiatShamir, hCommit, hRespond]
-  · intro pk msg sig
+  · funext pk msg sig
     cases sig
     simp [FiatShamir]
 
@@ -248,9 +248,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
         liftM, MonadLiftT.monadLift,
         MonadLift.monadLift, StateT.run_lift, hmod]
     simp only [bind_assoc, pure_bind]
-    simp_rw [hpeel]
-    try simp_rw [hro_miss]
-    try simp_rw [hpeel]
+    simp_rw [hpeel, hro_miss, hpeel]
     have hro_hit : ∀ {β : Type} (q : M × PC) (r : Ω)
         (rest : Ω → StateT ((M × PC →ₒ Ω).QueryCache) ProbComp β),
         (ro q >>= rest).run' ((∅ : (M × PC →ₒ Ω).QueryCache).cacheQuery q r) =
@@ -263,13 +261,13 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       rw [StateT.run_bind]
       simp only [ro, randomOracle, QueryImpl.withCaching_apply, StateT.run_bind,
         StateT.run_get, pure_bind, QueryCache.cacheQuery_self, StateT.run_pure]
-    try simp_rw [hro_hit]
+    simp_rw [hro_hit]
     have hpure_run' : ∀ {α : Type} (a : α) (s : (M × PC →ₒ Ω).QueryCache),
         (pure a : StateT _ ProbComp α).run' s = (pure a : ProbComp α) := by
       intro α a s
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
-    try simp_rw [hpure_run']]
+    simp_rw [hpure_run']]
   change
     Pr[= true | (do
       let (pk, sk) ← hr.gen

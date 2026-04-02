@@ -698,15 +698,18 @@ instance instLawfulCoapplicative [Comonad w] [LawfulCoapplicative w] :
 instance instLawfulComonad [Comonad w] [LawfulComonad w] : LawfulComonad (StoreT s w) where
   map_eq_extend_extract := by
     intro _ _ f ⟨r, p⟩
+    change StoreT.mk _ _ = StoreT.mk _ _
     congr 1
     rw [map_eq_extend_extract (f := fun g => f ∘ g)]; rfl
   extend_extract := by
     intro _ ⟨r, p⟩
+    change StoreT.mk _ _ = StoreT.mk _ _
     congr 1
     convert extend_extract r using 1
   extract_extend := by intros α β wa f; cases wa; simp [extend, extract, extract_extend]
   extend_assoc := by
     intro _ _ _ ⟨r, p⟩ f g
+    change StoreT.mk _ _ = StoreT.mk _ _
     congr 1
     exact extend_assoc r _ _
 

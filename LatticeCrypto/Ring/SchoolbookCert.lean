@@ -35,7 +35,7 @@ theorem mk_negacyclicModulus_eq_zero :
   Ideal.Quotient.eq_zero_iff_mem.mpr (Ideal.subset_span rfl)
 
 /-- In `R[X]/(X^n + 1)`, `X^n = -1`. -/
-theorem mk_X_pow_n :
+theorem mk_X_pow_n (_hn : 0 < n) :
     (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
       ((X : Polynomial R) ^ n) = -1 := by
   have h := mk_negacyclicModulus_eq_zero (R := R) (n := n)
@@ -90,7 +90,8 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
           (Polynomial.monomial (n + (i.val + j.val - n)) (f i * g j)) =
         (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
           (-Polynomial.monomial ((i.val + j.val - n)) (f i * g j)) := by
-        grind +suggestions
+        simpa [Nat.add_comm] using
+          mk_monomial_add_n hn (i.val + j.val - n) (f i * g j)
       have hle : n ≤ i.val + j.val := le_of_not_gt h
       have hlt : i.val + j.val - n < n := by
         rw [tsub_lt_iff_left hle]
@@ -98,12 +99,119 @@ theorem mk_double_sum_eq_mk_negacyclicConv (hn : 0 < n) (f g : Fin n → R) :
       have hmod : (i.val + j.val) % n = i.val + j.val - n := by
         rw [Nat.mod_eq_sub_mod hle, Nat.mod_eq_of_lt hlt]
       simpa [Nat.add_sub_of_le hle, h, hmod] using h_neg
-      rw [Nat.mod_eq_of_lt (by rw [tsub_lt_iff_left h]; linarith [Fin.is_lt i, Fin.is_lt j])]
-  simp only [negacyclicConvCoeff]
-  rw [← Finset.sum_product']
-  rw [Finset.sum_comm]
-  refine Finset.sum_congr rfl fun x hx => ?_
-  rw [Finset.sum_eq_single ⟨(x.1 + x.2) % n, Nat.mod_lt _ hn⟩] <;> aesop
+  calc
+    (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+        (∑ i : Fin n, ∑ j : Fin n,
+          Polynomial.monomial (i.val + j.val) (f i * g j)) =
+      ∑ i : Fin n, ∑ j : Fin n,
+        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+          (Polynomial.monomial (i.val + j.val) (f i * g j)) := by
+          rw [map_sum]
+          refine Finset.sum_congr rfl fun i _ => ?_
+          rw [map_sum]
+    _ =
+      ∑ i : Fin n, ∑ j : Fin n,
+        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+          (Polynomial.monomial ((i.val + j.val) % n)
+            (if i.val + j.val < n then f i * g j else -(f i * g j))) := by
+          refine Finset.sum_congr rfl fun i _ => ?_
+          refine Finset.sum_congr rfl fun j _ => ?_
+          exact h_reduction i j
+    _ =
+      ∑ x ∈ Finset.univ ×ˢ Finset.univ,
+        (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+          (Polynomial.monomial ((x.1.val + x.2.val) % n)
+            (if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2))) := by
+          rw [← Finset.sum_product']
+    _ =
+      ∑ x ∈ Finset.univ ×ˢ Finset.univ,
+        ∑ k : Fin n,
+          (Ideal.Quotient.mk _)
+            (Polynomial.monomial k.val
+              (if (x.1.val + x.2.val) % n = k.val then
+                if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+              else 0)) := by
+          refine Finset.sum_congr rfl fun x _ => ?_
+          rw [Finset.sum_eq_single ⟨(x.1.val + x.2.val) % n, Nat.mod_lt _ hn⟩]
+          · simp
+          · intro y hy hne
+            have hne' : (x.1.val + x.2.val) % n ≠ y.val := by
+              intro hEq
+              apply hne
+              exact Fin.ext hEq.symm
+            simp [hne']
+          · intro hnot
+            exact (hnot (Finset.mem_univ _)).elim
+    _ =
+      ∑ k : Fin n,
+        ∑ x ∈ Finset.univ ×ˢ Finset.univ,
+          (Ideal.Quotient.mk _)
+            (Polynomial.monomial k.val
+              (if (x.1.val + x.2.val) % n = k.val then
+                if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+              else 0)) := by
+          rw [Finset.sum_comm]
+    _ =
+      ∑ k : Fin n,
+        (Ideal.Quotient.mk _)
+          (∑ x ∈ Finset.univ ×ˢ Finset.univ,
+            Polynomial.monomial k.val
+              (if (x.1.val + x.2.val) % n = k.val then
+                if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+              else 0)) := by
+          refine Finset.sum_congr rfl fun k _ => ?_
+          rw [map_sum]
+    _ =
+      ∑ k : Fin n,
+        (Ideal.Quotient.mk _)
+          (Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
+          refine Finset.sum_congr rfl fun k _ => ?_
+          change
+            (Ideal.Quotient.mk _)
+              (∑ x ∈ Finset.univ ×ˢ Finset.univ,
+                Polynomial.monomial k.val
+                  (if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0)) =
+            (Ideal.Quotient.mk _)
+              (Polynomial.monomial k.val (negacyclicConvCoeff f g k))
+          change
+            (Ideal.Quotient.mk _)
+              (∑ x : Fin n × Fin n,
+                Polynomial.monomial k.val
+                  (if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0)) =
+            (Ideal.Quotient.mk _)
+              (Polynomial.monomial k.val (negacyclicConvCoeff f g k))
+          change
+            (Ideal.Quotient.mk _)
+              (∑ x : Fin n × Fin n,
+                Polynomial.monomial k.val
+                  (if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0)) =
+            (Ideal.Quotient.mk _)
+              (Polynomial.monomial k.val
+                (∑ x : Fin n × Fin n,
+                  if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0))
+          rw [show
+            Polynomial.monomial k.val
+                (∑ x : Fin n × Fin n,
+                  if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0) =
+              ∑ x : Fin n × Fin n,
+                Polynomial.monomial k.val
+                  (if (x.1.val + x.2.val) % n = k.val then
+                    if x.1.val + x.2.val < n then f x.1 * g x.2 else -(f x.1 * g x.2)
+                  else 0) by
+            rw [← map_sum]]
+    _ = (Ideal.Quotient.mk _)
+        (∑ k : Fin n, Polynomial.monomial k.val (negacyclicConvCoeff f g k)) := by
+          rw [← map_sum]
 
 /-! ## Section 4: Assembly -/
 

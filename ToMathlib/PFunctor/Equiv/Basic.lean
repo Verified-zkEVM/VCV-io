@@ -502,8 +502,8 @@ def zeroTensor : 0 ⊗ P ≃ₚ 0 where
   equivB := fun a => Equiv.pemptyProd (P.B a.2)
 
 instance {P} {a : (P ⊗ 1).A} : IsEmpty ((P ⊗ 1).B a) := by
-  simp only [tensor, OfNat.ofNat, One.one]
-  exact Or.inr (PEmpty.instIsEmpty)
+  simpa [tensor, OfNat.ofNat, One.one] using
+    (inferInstance : IsEmpty (P.B a.1 × PEmpty))
 
 /-- Tensor product with `1` on the right is equivalent to the constant functor -/
 def tensorOne : P ⊗ 1 ≃ₚ C P.A where
@@ -511,8 +511,8 @@ def tensorOne : P ⊗ 1 ≃ₚ C P.A where
   equivB := fun _ => Equiv.equivPEmpty _
 
 instance {P} {a : (1 ⊗ P).A} : IsEmpty ((1 ⊗ P).B a) := by
-  simp only [tensor, OfNat.ofNat, One.one]
-  exact Or.inl (PEmpty.instIsEmpty)
+  simpa [tensor, OfNat.ofNat, One.one] using
+    (inferInstance : IsEmpty (PEmpty × P.B a.2))
 
 /-- Tensor product with `1` on the left is equivalent to the constant functor -/
 def oneTensor : 1 ⊗ P ≃ₚ C P.A where
