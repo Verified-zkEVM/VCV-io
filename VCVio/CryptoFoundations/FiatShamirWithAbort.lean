@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.MonadQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -34,6 +35,8 @@ This is the transform used by ML-DSA (CRYSTALS-Dilithium, FIPS 204).
 - NIST FIPS 204, Algorithms 2 (ML-DSA.Sign) and 3 (ML-DSA.Verify)
 -/
 
+universe v
+
 
 open OracleComp OracleSpec
 
@@ -52,16 +55,18 @@ Tries up to `n` commit-hash-respond cycles:
 
 Returns `none` only when all `n` attempts abort. -/
 def fsAbortSignLoop (ids : IdenSchemeWithAbort S W W' St C Z p)
-    (M : Type) [DecidableEq M] (pk : S) (sk : W) (m : M) :
-    ℕ → OracleComp (unifSpec + (M × W' →ₒ C)) (Option (W' × Z))
+    {m : Type → Type v} [Monad m]
+    (M : Type) [DecidableEq M] [MonadLiftT ProbComp m] [MonadQuery (M × W' →ₒ C) m]
+    (pk : S) (sk : W) (msg : M) :
+    ℕ → m (Option (W' × Z))
   | 0 => return none
   | n + 1 => do
-    let (w', st) ← (ids.commit pk sk : ProbComp _)
-    let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
-    let oz ← (ids.respond pk sk st c : ProbComp _)
+    let (w', st) ← (monadLift (ids.commit pk sk : ProbComp _) : m _)
+    let c ← MonadQuery.query (spec := (M × W' →ₒ C)) (msg, w')
+    let oz ← (monadLift (ids.respond pk sk st c : ProbComp _) : m _)
     match oz with
     | some z => return some (w', z)
-    | none => fsAbortSignLoop ids M pk sk m n
+    | none => fsAbortSignLoop ids M pk sk msg n
 
 /-- The Fiat-Shamir with aborts transform applied to an identification scheme with aborts.
 Produces a signature scheme in the random oracle model.
@@ -75,19 +80,22 @@ The type parameters are:
 - `C`: challenge space (range of the hash/random oracle)
 - `Z`: response space
 - `S` / `W`: statement / witness (= public key / secret key) -/
-def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
+def FiatShamirWithAbort
+    {m : Type → Type v} [Monad m]
+    (ids : IdenSchemeWithAbort S W W' St C Z p)
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
+    [MonadLiftT ProbComp m] [MonadQuery (M × W' →ₒ C) m]
     (maxAttempts : ℕ) :
-    SignatureAlg (OracleComp (unifSpec + (M × W' →ₒ C)))
+    SignatureAlg m
       (M := M) (PK := S) (SK := W) (S := Option (W' × Z)) where
-  keygen := hr.gen
-  sign := fun pk sk m => fsAbortSignLoop ids M pk sk m maxAttempts
-  verify := fun pk m sig => do
+  keygen := monadLift hr.gen
+  sign := fun pk sk msg => fsAbortSignLoop ids M pk sk msg maxAttempts
+  verify := fun pk msg sig => do
     match sig with
     | none => return false
     | some (w', z) =>
-      let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
-      return ids.verify pk w' c z
+      let c ← MonadQuery.query (spec := (M × W' →ₒ C)) (msg, w')
+      pure (ids.verify pk w' c z)
 
 namespace FiatShamirWithAbort
 
@@ -179,7 +187,8 @@ theorem euf_cma_bound [DecidableEq Z]
     (recover : S → C → Z → W')
     (hcr : ids.CommitmentRecoverable recover)
     (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort ids hr M maxAttempts))
+      (FiatShamirWithAbort
+        (m := OracleComp (unifSpec + (M × W' →ₒ C))) ids hr M maxAttempts))
     (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
@@ -203,7 +212,8 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
     (recover : S → C → Z → W')
     (hcr : ids.CommitmentRecoverable recover)
     (adv : SignatureAlg.unforgeableAdv
-      (FiatShamirWithAbort ids hr M maxAttempts))
+      (FiatShamirWithAbort
+        (m := OracleComp (unifSpec + (M × W' →ₒ C))) ids hr M maxAttempts))
     (qS qH : ℕ) (ε p_abort δ : ℝ) (hp : p_abort < 1)
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :

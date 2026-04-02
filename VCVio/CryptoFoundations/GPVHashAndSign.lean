@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.MonadQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -42,6 +43,8 @@ The GPV framework is the hash-and-sign analogue of the Fiat-Shamir transform:
 - Boneh, Dagdelen, Fischlin, Lehmann, Schaffner, Zhandry. "Random Oracles in a Quantum
   World." ASIACRYPT 2011.
 -/
+
+universe v
 
 
 open OracleComp OracleSpec ENNReal
@@ -91,23 +94,25 @@ Given a preimage sampleable function `psf`, a generable key relation `hr`, and a
 The signature type is `Salt × Domain` (salt paired with the short preimage).
 The oracle spec is `unifSpec + (Salt × M →ₒ Range)` (uniform sampling + random oracle). -/
 def GPVHashAndSign
+    {m : Type → Type v} [Monad m]
     {PK SK Domain Range : Type}
     (psf : PreimageSampleableFunction PK SK Domain Range)
     {p : PK → SK → Bool} [SampleableType PK] [SampleableType SK]
     (hr : GenerableRelation PK SK p)
     (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
-    [DecidableEq Range] [SampleableType Range] :
-    SignatureAlg (OracleComp (unifSpec + (Salt × M →ₒ Range)))
+    [DecidableEq Range] [SampleableType Range]
+    [MonadLiftT ProbComp m] [MonadQuery (Salt × M →ₒ Range) m] :
+    SignatureAlg m
       (M := M) (PK := PK) (SK := SK) (S := Salt × Domain) where
-  keygen := hr.gen
-  sign := fun pk sk m => do
-    let r ← $ᵗ Salt
-    let c ← query (spec := unifSpec + (Salt × M →ₒ Range)) (Sum.inr (r, m))
-    let s ← psf.trapdoorSample pk sk c
-    return (r, s)
-  verify := fun pk m (r, s) => do
-    let c ← query (spec := unifSpec + (Salt × M →ₒ Range)) (Sum.inr (r, m))
-    return (decide (psf.eval pk s = c) && psf.isShort s)
+  keygen := monadLift hr.gen
+  sign := fun pk sk msg => do
+    let r ← (monadLift ($ᵗ Salt : ProbComp Salt) : m Salt)
+    let c ← MonadQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
+    let s ← (monadLift (psf.trapdoorSample pk sk c) : m _)
+    pure (r, s)
+  verify := fun pk msg (r, s) => do
+    let c ← MonadQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
+    pure (decide (psf.eval pk s = c) && psf.isShort s)
 
 namespace GPVHashAndSign
 
@@ -176,7 +181,8 @@ The proof is a standard GPV argument:
 
 Reference: GPV08, Theorem 6.1; see also BDF+11 for the QROM extension. -/
 theorem euf_cma_bound [DecidableEq Domain] [SampleableType Domain]
-    (adv : SignatureAlg.unforgeableAdv (GPVHashAndSign psf hr M Salt)) :
+    (adv : SignatureAlg.unforgeableAdv
+      (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
     ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
       (collisionBound : ENNReal),
       adv.advantage (runtime M Salt) ≤
