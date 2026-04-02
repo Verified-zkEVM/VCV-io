@@ -19,7 +19,7 @@ variable {M PK SK R C KD K KPRF : Type}
 
 /-- The canonical two-RO Fujisaki-Okamoto family is the U-transform instantiated with a
 variant-specific key-derivation input and rejection policy. -/
-def FujisakiOkamoto
+noncomputable def FujisakiOkamoto
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -81,7 +81,7 @@ def singleROVariant
 
 /-- Single-RO specialization for the `H(m)` branch. The oracle input is `(pkh pk, m)` and the
 oracle output supplies both the encryption coins and the shared key. -/
-def singleRO
+noncomputable def singleRO
     {PKHash : Type}
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pkh : PK → PKHash)

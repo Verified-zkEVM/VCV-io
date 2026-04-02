@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
 
@@ -90,26 +91,6 @@ end OW_CPA
 
 end AsymmEncAlg.ExplicitCoins
 
-/-- Executing a lifted `ProbComp` in a public random-oracle world ignores the oracle state and
-collapses back to the original probabilistic computation. -/
-theorem exec_lift_probComp_withHashOracle
-    {ι : Type} {hashSpec : OracleSpec ι} {σ : Type}
-    (hashImpl : QueryImpl hashSpec (StateT σ ProbComp)) (s : σ)
-    {α : Type} (c : ProbComp α) :
-    StateT.run' (simulateQ
-      ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
-      (monadLift c)) s = c := by
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp)
-  change StateT.run' (simulateQ (idImpl + hashImpl) (monadLift c)) s = c
-  rw [show simulateQ (idImpl + hashImpl) (monadLift c) = simulateQ idImpl c by
-    simpa [MonadLift.monadLift] using
-      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := hashImpl) c)]
-  have hid : ∀ t s', (idImpl t).run' s' = query t := by
-    intro t s'
-    rfl
-  simpa using
-    (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c) (s := s))
-
 section OW_PCVA
 
 variable {ι : Type u} {spec : OracleSpec ι} {M PK SK C : Type}
@@ -150,10 +131,10 @@ ambient oracle interface `spec`, the plaintext-checking oracle, and the validity
 game returns `true` exactly when the final guess equals the hidden challenge message. -/
 def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     [SampleableType M] [DecidableEq M]
-    (adversary : OW_PCVA_Adversary encAlg) : ProbComp Bool :=
-  encAlg.exec do
+    (adversary : OW_PCVA_Adversary encAlg) : SPMF Bool :=
+  encAlg.toSPMFSemantics.evalDist do
     let (pk, sk) ← encAlg.keygen
-    let msg ← encAlg.lift_probComp ($ᵗ M)
+    let msg ← encAlg.toProbCompLift.liftProbComp ($ᵗ M)
     let cStar ← encAlg.encrypt pk msg
     let msg' ← simulateQ (OW_PCVA_queryImpl encAlg sk) (adversary pk cStar)
     return decide (msg' = msg)

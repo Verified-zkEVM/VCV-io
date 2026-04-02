@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 /-!
 # Fiat-Shamir with Aborts Transform
 
@@ -74,7 +75,7 @@ The type parameters are:
 - `C`: challenge space (range of the hash/random oracle)
 - `Z`: response space
 - `S` / `W`: statement / witness (= public key / secret key) -/
-def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
+noncomputable def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
     (maxAttempts : ℕ) :
     SignatureAlg (OracleComp (unifSpec + (M × W' →ₒ C)))
@@ -87,28 +88,11 @@ def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     | some (w', z) =>
       let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
       return ids.verify pk w' c z
-  exec comp :=
-    let ro : QueryImpl (M × W' →ₒ C)
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let ro : QueryImpl (M × W' →ₒ C)
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left
-          (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s; rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (M × W' →ₒ C).QueryCache)))
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (M × W' →ₒ C) (StateT ((M × W' →ₒ C).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace FiatShamirWithAbort
 

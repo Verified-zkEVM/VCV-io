@@ -37,7 +37,8 @@ def composeWithDEM [Monad m]
     match k? with
     | none => return none
     | some k => return some (← dem.decrypt k c.2)
-  __ := kem.toExecutionMethod
+  toSPMFSemantics := kem.toSPMFSemantics
+  toProbCompLift := kem.toProbCompLift
 
 section Correct
 
@@ -158,9 +159,9 @@ theorem IND_CPA_OneTime_biasAdvantage_composeWithDEM_le
     AsymmEncAlg.IND_CPA_OneTime_biasAdvantage (kem.composeWithDEM dem) adversary ≤
       kem.IND_CPA_Advantage (kem.composeWithDEM_toKEMLeftReduction dem adversary) +
       kem.IND_CPA_Advantage (kem.composeWithDEM_toKEMRightReduction dem adversary) +
-      (dem.withExecutionMethod kem.toExecutionMethod).IND_CPA_Advantage
+      (dem.withSemantics kem.toSPMFSemantics).IND_CPA_Advantage
         (kem.composeWithDEM_toDEMReduction
-          (dem.withExecutionMethod kem.toExecutionMethod) adversary) := by
+          (dem.withSemantics kem.toSPMFSemantics) adversary) := by
   sorry
 
 end IND_CPA

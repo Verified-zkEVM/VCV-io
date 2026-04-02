@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # Fujisaki-Okamoto T Transform
@@ -57,7 +58,7 @@ def TTransform.decrypt (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
 
 /-- The HHK17 T transform, realized as a monadic `AsymmEncAlg` in the random-oracle world
 `unifSpec + (M →ₒ R)`. -/
-def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+noncomputable def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R] :
     AsymmEncAlg (OracleComp (TTransform.oracleSpec M R)) M PK (PK × SK) C where
   keygen := do
@@ -67,18 +68,10 @@ def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
     return pke.encrypt pk msg r
   decrypt := fun (pk, sk) c => TTransform.decrypt pke pk sk c
-  exec := fun comp =>
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT (QueryCache M R) ProbComp)
-    StateT.run' (simulateQ (idImpl + TTransform.queryImpl (M := M) (R := R)) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
-    simpa using
-      (exec_lift_probComp_withHashOracle
-        (hashImpl := TTransform.queryImpl (M := M) (R := R))
-        (s := (∅ : QueryCache M R))
-        c)
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := TTransform.queryImpl (M := M) (R := R))
+    (∅ : QueryCache M R)
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace TTransform
 

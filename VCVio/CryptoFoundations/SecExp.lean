@@ -36,10 +36,30 @@ conventional presentation. -/
 noncomputable def ProbComp.boolDistAdvantage (p q : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
 
+/-- Bias advantage of a Boolean-valued subdistribution: the gap between the probabilities of
+returning `true` and `false`.
+
+This is the `SPMF` analogue of `ProbComp.boolBiasAdvantage`, used when a game has already been
+observed under bundled subprobabilistic semantics. Any remaining mass corresponds to failure and
+does not contribute to either Boolean branch. -/
+noncomputable def SPMF.boolBiasAdvantage (p : SPMF Bool) : ℝ :=
+  |(Pr[= true | p]).toReal - (Pr[= false | p]).toReal|
+
+/-- Distinguishing advantage between two Boolean-valued subdistributions, measured on the `true`
+branch. -/
+noncomputable def SPMF.boolDistAdvantage (p q : SPMF Bool) : ℝ :=
+  |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
+
 /-- Triangle inequality for Boolean distinguishing advantage. -/
 lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
     p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
   unfold ProbComp.boolDistAdvantage
+  exact abs_sub_le _ _ _
+
+/-- Triangle inequality for Boolean distinguishing advantage on observed subdistributions. -/
+lemma SPMF.boolDistAdvantage_triangle (p q r : SPMF Bool) :
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
+  unfold SPMF.boolDistAdvantage
   exact abs_sub_le _ _ _
 
 /-- Re-express Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`. -/

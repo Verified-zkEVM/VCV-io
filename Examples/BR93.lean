@@ -47,7 +47,7 @@ variable [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [SampleableType Rand
 variable [Inhabited M] [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGroup M]
 
 /-- The concrete BR93 scheme instantiated with an explicit hash function `hash : Rand → M`. -/
-@[simps!] def br93AsymmEnc (tdp : TrapdoorPermutation PK SK Rand) (hash : Rand → M) :
+@[simps!] noncomputable def br93AsymmEnc (tdp : TrapdoorPermutation PK SK Rand) (hash : Rand → M) :
     AsymmEncAlg ProbComp (M := M) (PK := PK) (SK := SK) (C := Rand × M) where
   keygen := tdp.keygen
   encrypt pk msg := do
@@ -55,7 +55,8 @@ variable [Inhabited M] [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGr
     return (tdp.forward pk r, hash r + msg)
   decrypt sk c :=
     return (some (c.2 - hash (tdp.inverse sk c.1)))
-  __ := ExecutionMethod.default
+  toSPMFSemantics := SPMFSemantics.ofHasEvalSPMF ProbComp
+  toProbCompLift := ProbCompLift.id
 
 namespace br93AsymmEnc
 
@@ -67,16 +68,15 @@ omit [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [Inhabited M] [Fintype M
 theorem correct (hcorrect : tdp.Correct) :
     (br93AsymmEnc (M := M) tdp hash).PerfectlyCorrect := by
   intro msg
-  simp only [AsymmEncAlg.CorrectExp, br93AsymmEnc_keygen, br93AsymmEnc_encrypt,
-    br93AsymmEnc_decrypt]
-  have huniq : ∀ y ∈ support ((br93AsymmEnc tdp hash).exec (do
+  let mx : ProbComp Bool := do
     let x ← tdp.keygen
     let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
     let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg)))), y = true := by
+    pure (decide (msg' = some msg))
+  change Pr[= true | (br93AsymmEnc tdp hash).toSPMFSemantics.evalDist mx] = 1
+  simp only [mx, SPMFSemantics.evalDist, SemanticsVia.denote]
+  have huniq : ∀ y ∈ support mx, y = true := by
     intro y hy
-    rw [show (br93AsymmEnc tdp hash).exec = id from rfl] at hy
-    simp only [id] at hy
     rw [mem_support_bind_iff] at hy
     obtain ⟨⟨pk, sk⟩, hpksk, hy⟩ := hy
     rw [mem_support_bind_iff] at hy
@@ -86,23 +86,11 @@ theorem correct (hcorrect : tdp.Correct) :
     simp only [support_pure, Set.mem_singleton_iff] at hc hy
     subst hc; subst hy
     simp [hcorrect pk sk hpksk r]
-  have hnot : ∀ y ≠ true, Pr[= y | (br93AsymmEnc tdp hash).exec (do
-    let x ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg)))] = 0 :=
+  have hnot : ∀ y ≠ true, Pr[= y | mx] = 0 :=
     fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  have hsum : ∑' x, Pr[= x | (br93AsymmEnc tdp hash).exec (do
-    let x_1 ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x_1.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x_1.2 c.1)))
-    pure (decide (msg' = some msg)))] = Pr[= true | _] :=
+  have hsum : ∑' x, Pr[= x | mx] = Pr[= true | mx] :=
     tsum_eq_single true hnot
-  have htot := probFailure_add_tsum_probOutput ((br93AsymmEnc tdp hash).exec (do
-    let x ← tdp.keygen
-    let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
-    let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
-    pure (decide (msg' = some msg))))
+  have htot := probFailure_add_tsum_probOutput mx
   rw [NeverFail.probFailure_eq_zero, hsum, zero_add] at htot
   exact htot
 
@@ -169,15 +157,16 @@ def game1 (tdp : TrapdoorPermutation PK SK Rand)
 challenge message preserves uniformity, so the challenge ciphertext no longer depends on `b`. -/
 def game2 (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
-  (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let b ← liftProbComp ($ᵗ Bool : ProbComp Bool)
+  do
+    let b ← ($ᵗ Bool : ProbComp Bool)
+    let b' ← (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
     let (pk, _sk) ← liftProbComp tdp.keygen
     let (_m₁, _m₂, st) ← adv.choose pk
     let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
     let h ← liftProbComp ($ᵗ M : ProbComp M)
     let c : Rand × M := (tdp.forward pk r, h)
-    let b' ← adv.guess st c
-    return (b == b'))).run' ∅
+    adv.guess st c)).run' ∅
+    return (b == b')
 
 /-- Bad event for the Game 0 → Game 1 hop: the adversary queries the random oracle at the
 hidden challenge randomness `r`. -/
@@ -259,7 +248,7 @@ theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
       let c : Rand × M := (tdp.forward pk r, h)
       adv.guess st c)).run' ∅
   simpa [game2, f] using
-    (probOutput_decide_eq_uniformBool_half f (by simp [f]))
+    (probOutput_decide_eq_uniformBool_half f (by rfl))
 
 /-- The bad event is bounded by the trapdoor-preimage advantage of the inverter
 constructed from the adversary's random-oracle transcript. -/

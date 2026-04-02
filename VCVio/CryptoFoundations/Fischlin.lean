@@ -9,6 +9,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 import Mathlib.Data.FinEnum
 import Mathlib.Data.Nat.Choose.Basic
 
@@ -110,7 +111,7 @@ whose hash value is minimal, exiting early at hash `0`.
 **Verification**: re-hashes each `(commitment, challenge, response)` triple, checks
 sigma-protocol verification for each repetition, and verifies that the sum of hash
 values is at most `S`. -/
-def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
+noncomputable def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (ρ b S : ℕ) (M : Type)
     [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
@@ -138,28 +139,12 @@ def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     let allVerified := (List.finRange ρ).all fun i => (results i).1
     let hashSum := (List.finRange ρ).foldl (fun acc i => acc + (results i).2) 0
     return (allVerified && decide (hashSum ≤ S))
-  exec comp :=
-    let roSpec := fischlinROSpec X PC Ω P ρ b M
-    let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT roSpec.QueryCache ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let roSpec := fischlinROSpec X PC Ω P ρ b M
-    let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT roSpec.QueryCache ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s
-      rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : roSpec.QueryCache)))
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (fischlinROSpec X PC Ω P ρ b M)
+        (StateT (fischlinROSpec X PC Ω P ρ b M).QueryCache ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace Fischlin
 
@@ -198,7 +183,7 @@ Unlike the Fiat-Shamir transform (which is perfectly complete), the Fischlin tra
 has a non-zero completeness error because the prover's proof-of-work search may fail
 to find hash values whose sum is at most `S`. -/
 theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
-    Pr[= true | (Fischlin σ hr ρ b S M).exec do
+    Pr[= true | (Fischlin σ hr ρ b S M).toSPMFSemantics.evalDist do
       let (pk, sk) ← (Fischlin σ hr ρ b S M).keygen
       let sig ← (Fischlin σ hr ρ b S M).sign pk sk msg
       (Fischlin σ hr ρ b S M).verify pk msg sig]

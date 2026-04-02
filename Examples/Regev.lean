@@ -39,7 +39,8 @@
 --     let sa := dotProduct s.get a.get
 --     let val := Fin.val (sa - b)
 --     return if val < p/4 then true else val > 3*p/4
---   __ := ExecutionMethod.default
+--   toSPMFSemantics := SPMFSemantics.ofHasEvalSPMF ProbComp
+--   toProbCompLift := ProbCompLift.id
 
 -- lemma relax_p_bound {p χ m: ℕ} [hm : NeZero m] (h : p > 4 * (χ * m + 1)) : p > 2 * χ := by
 --   calc p > 4 * (χ * m + 1) := h

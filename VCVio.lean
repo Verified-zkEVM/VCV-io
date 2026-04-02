@@ -58,13 +58,13 @@ import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
-import VCVio.OracleComp.ExecutionMethod
 import VCVio.OracleComp.FinRatPMF
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.ProbComp
+import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
@@ -76,6 +76,7 @@ import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.OracleComp.SimSemantics.PreservesInv
 import VCVio.OracleComp.SimSemantics.QueryImpl

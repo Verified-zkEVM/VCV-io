@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.PRF
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # Fujisaki-Okamoto U Transform
@@ -49,26 +50,14 @@ def implicitRejection {K C KPRF : Type} (prf : PRFScheme KPRF C K) : RejectionPo
   keygen := prf.keygen
   onReject := fun kPrf c => some (prf.eval kPrf c)
 
-/-- Execute an FO computation by combining public randomness with the
-variant-specific hash world. -/
-def exec {M PK C R K : Type} (variant : Variant M PK C R K)
-    {α : Type} (comp : OracleComp (unifSpec + variant.hashOracleSpec) α) : ProbComp α :=
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-    (StateT variant.QueryCache ProbComp)
-  StateT.run' (simulateQ (idImpl + variant.queryImpl) comp) variant.initCache
-
-/-- Lifted probabilistic computations ignore the FO hash world. -/
-theorem exec_lift_probComp {M PK C R K : Type} (variant : Variant M PK C R K)
-    {α : Type} (c : ProbComp α) :
-    FujisakiOkamoto.exec variant (monadLift c) = c := by
-  simpa [exec] using
-    (exec_lift_probComp_withHashOracle
-      (hashImpl := variant.queryImpl)
-      (s := variant.initCache)
-      c)
+/-- Bundled subprobabilistic semantics for an FO hash world, obtained by hiding the
+variant-specific cache after running the public-randomness-plus-hash simulation. -/
+noncomputable def spmfSemantics {M PK C R K : Type} (variant : Variant M PK C R K) :
+    SPMFSemantics (OracleComp (unifSpec + variant.hashOracleSpec)) :=
+  SPMFSemantics.withStateOracle variant.queryImpl variant.initCache
 
 /-- Generic FO construction parameterized by a hash world and a rejection policy. -/
-def scheme
+noncomputable def scheme
     {M PK SK R C K : Type}
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (variant : Variant M PK C R K)
@@ -99,11 +88,8 @@ def scheme
           return some k
         else
           return policy.onReject fb c
-  exec := FujisakiOkamoto.exec variant
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
-    simpa using FujisakiOkamoto.exec_lift_probComp (variant := variant) (c := c)
+  toSPMFSemantics := FujisakiOkamoto.spmfSemantics variant
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 end FujisakiOkamoto
 
@@ -177,7 +163,7 @@ variable {M PK SK R C KD K KPRF : Type}
 
 /-- The generic two-RO U-transform family. The argument `kdInput` chooses whether the shared key
 is derived from `m`, `(m, c)`, or some other encoding of the recovered plaintext and ciphertext. -/
-def UTransform
+noncomputable def UTransform
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)

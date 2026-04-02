@@ -18,7 +18,7 @@ universe v
 
 namespace AsymmEncAlg
 
-variable {m : Type → Type v} {M PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
 
 section IND_CPA_TwoPhase
 
@@ -36,9 +36,9 @@ variable {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
 /-- One-time IND-CPA experiment for an asymmetric encryption algorithm:
 sample keys, let the adversary choose challenge messages, encrypt one branch, and return whether
 the adversary guessed the hidden bit. -/
-def IND_CPA_OneTime_Game : ProbComp Bool :=
-  encAlg.exec do
-    let b : Bool ← encAlg.lift_probComp ($ᵗ Bool)
+def IND_CPA_OneTime_Game : SPMF Bool :=
+  encAlg.toSPMFSemantics.evalDist do
+    let b : Bool ← encAlg.toProbCompLift.liftProbComp ($ᵗ Bool)
     let (pk, _) ← encAlg.keygen
     let (m₁, m₂, state) ← adv.chooseMessages pk
     let msg := if b then m₁ else m₂

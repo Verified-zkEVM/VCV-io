@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.ExecutionMethod
+import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
@@ -24,32 +24,33 @@ universe u v
 
 /-- A key encapsulation mechanism with shared-key space `K`, public/secret key spaces `PK` and
 `SK`, and ciphertext space `C`. -/
-structure KEMScheme (m : Type → Type u) (K PK SK C : Type)
-    extends ExecutionMethod m where
+structure KEMScheme (m : Type → Type u) [Monad m] (K PK SK C : Type) where
+  toSPMFSemantics : SPMFSemantics m
+  toProbCompLift : ProbCompLift m
   keygen : m (PK × SK)
   encaps : PK → m (C × K)
   decaps : SK → C → m (Option K)
 
 namespace KEMScheme
-
-variable {m : Type → Type v} {K PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {K PK SK C : Type}
   (kem : KEMScheme m K PK SK C)
 
 section Correct
 
-variable [DecidableEq K] [Monad m]
+variable [DecidableEq K]
 
 /-- Correctness experiment: decapsulation of an honestly generated encapsulation should recover the
 shared key. -/
-def CorrectExp : m Bool := do
-  let (pk, sk) ← kem.keygen
-  let (c, k) ← kem.encaps pk
-  let k' ← kem.decaps sk c
-  return decide (k' = some k)
+def CorrectExp (kem : KEMScheme m K PK SK C) : m Bool :=
+  do
+    let (pk, sk) ← kem.keygen
+    let (c, k) ← kem.encaps pk
+    let k' ← kem.decaps sk c
+    return decide (k' = some k)
 
 /-- Perfect correctness of a KEM. -/
-def PerfectlyCorrect [HasEvalSPMF m] : Prop :=
-  Pr[= true | kem.exec kem.CorrectExp] = 1
+def PerfectlyCorrect : Prop :=
+  Pr[= true | kem.toSPMFSemantics.evalDist kem.CorrectExp] = 1
 
 end Correct
 
@@ -67,24 +68,24 @@ structure IND_CPA_Adversary (_kem : KEMScheme (OracleComp spec) K PK SK C) where
 /-- Fixed-branch IND-CPA experiment for a KEM, matching the source proof-ladders formulation
 `Exp.run(b)`. -/
 def IND_CPA_Exp {kem : KEMScheme (OracleComp spec) K PK SK C}
-    (adversary : kem.IND_CPA_Adversary) (b : Bool) : ProbComp Bool :=
-  kem.exec do
+    (adversary : kem.IND_CPA_Adversary) (b : Bool) : SPMF Bool :=
+  kem.toSPMFSemantics.evalDist do
     let (pk, _sk) ← kem.keygen
     let st ← adversary.preChallenge pk
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.toProbCompLift.liftProbComp ($ᵗ K)
     adversary.postChallenge st cStar (if b then kReal else kRand)
 
 /-- Single-game IND-CPA experiment obtained by sampling the challenge bit uniformly and checking
 whether the adversary guessed it correctly. -/
 def IND_CPA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
-    (adversary : kem.IND_CPA_Adversary) : ProbComp Bool :=
-  kem.exec do
+    (adversary : kem.IND_CPA_Adversary) : SPMF Bool :=
+  kem.toSPMFSemantics.evalDist do
     let (pk, _sk) ← kem.keygen
     let st ← adversary.preChallenge pk
-    let b ← kem.lift_probComp ($ᵗ Bool)
+    let b ← kem.toProbCompLift.liftProbComp ($ᵗ Bool)
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.toProbCompLift.liftProbComp ($ᵗ K)
     let b' ← adversary.postChallenge st cStar (if b then kReal else kRand)
     return (b == b')
 
@@ -129,13 +130,13 @@ def IND_CCA_postChallengeImpl (kem : KEMScheme (OracleComp spec) K PK SK C)
 
 /-- IND-CCA real-or-random experiment for a KEM. -/
 def IND_CCA_Game {kem : KEMScheme (OracleComp spec) K PK SK C}
-    (adversary : kem.IND_CCA_Adversary) : ProbComp Bool :=
-  kem.exec do
+    (adversary : kem.IND_CCA_Adversary) : SPMF Bool :=
+  kem.toSPMFSemantics.evalDist do
     let (pk, sk) ← kem.keygen
     let st ← simulateQ (kem.IND_CCA_preChallengeImpl sk) (adversary.preChallenge pk)
-    let b ← kem.lift_probComp ($ᵗ Bool)
+    let b ← kem.toProbCompLift.liftProbComp ($ᵗ Bool)
     let (cStar, kReal) ← kem.encaps pk
-    let kRand ← kem.lift_probComp ($ᵗ K)
+    let kRand ← kem.toProbCompLift.liftProbComp ($ᵗ K)
     let b' ← simulateQ (kem.IND_CCA_postChallengeImpl sk cStar)
       (adversary.postChallenge st cStar (if b then kReal else kRand))
     return (b == b')

@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # GPV Hash-and-Sign Framework
@@ -89,7 +90,7 @@ Given a preimage sampleable function `psf`, a generable key relation `hr`, and a
 
 The signature type is `Salt × Domain` (salt paired with the short preimage).
 The oracle spec is `unifSpec + (Salt × M →ₒ Range)` (uniform sampling + random oracle). -/
-def GPVHashAndSign
+noncomputable def GPVHashAndSign
     {PK SK Domain Range : Type}
     (psf : PreimageSampleableFunction PK SK Domain Range)
     {p : PK → SK → Bool} [SampleableType PK] [SampleableType SK]
@@ -107,28 +108,11 @@ def GPVHashAndSign
   verify := fun pk m (r, s) => do
     let c ← query (spec := unifSpec + (Salt × M →ₒ Range)) (Sum.inr (r, m))
     return (decide (psf.eval pk s = c) && psf.isShort s)
-  exec comp :=
-    let ro : QueryImpl (Salt × M →ₒ Range)
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let ro : QueryImpl (Salt × M →ₒ Range)
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s
-      rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (Salt × M →ₒ Range).QueryCache)))
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (Salt × M →ₒ Range) (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace GPVHashAndSign
 

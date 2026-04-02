@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.ExecutionMethod
+import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append
@@ -23,14 +23,14 @@ open OracleSpec OracleComp ENNReal
 
 /-- MAC algorithm with computations in the monad `m`, where `M` is the message space, `K` the key
 space, and `T` the tag space. -/
-structure MacAlg (m : Type → Type v) (M K T : Type)
-    extends ExecutionMethod m where
+structure MacAlg (m : Type → Type v) [Monad m] (M K T : Type) where
+  toSPMFSemantics : SPMFSemantics m
+  toProbCompLift : ProbCompLift m
   keygen : m K
   tag : K → M → m T
   verify : K → M → T → m Bool
 
 namespace MacAlg
-
 section taggingOracle
 
 variable {m : Type → Type v} [Monad m] {M K T : Type}
@@ -44,11 +44,11 @@ end taggingOracle
 
 section sound
 
-variable {m : Type → Type v} [Monad m] [HasEvalSPMF m] {M K T : Type}
+variable {m : Type → Type v} [Monad m] {M K T : Type}
 
 /-- Perfect completeness for a MAC: honestly generated tags always verify. -/
 def PerfectlyComplete (macAlg : MacAlg m M K T) : Prop :=
-  ∀ msg : M, Pr[= true | macAlg.exec do
+  ∀ msg : M, Pr[= true | macAlg.toSPMFSemantics.evalDist do
     let k ← macAlg.keygen
     let τ ← macAlg.tag k msg
     macAlg.verify k msg τ] = 1
@@ -68,8 +68,8 @@ structure UF_CMA_Adversary (_macAlg : MacAlg (OracleComp spec) M K T) where
 /-- UF-CMA experiment for a MAC: the adversary succeeds iff it outputs a valid tag for a fresh
 message under the challenge key. -/
 def UF_CMA_Exp {macAlg : MacAlg (OracleComp spec) M K T}
-    (adversary : macAlg.UF_CMA_Adversary) : ProbComp Bool :=
-  macAlg.exec do
+    (adversary : macAlg.UF_CMA_Adversary) : SPMF Bool :=
+  macAlg.toSPMFSemantics.evalDist do
     let k ← macAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ T))
         (WriterT (QueryLog (M →ₒ T)) (OracleComp spec)) :=
