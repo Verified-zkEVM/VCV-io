@@ -27,41 +27,13 @@ open OracleSpec OracleComp ENNReal
 /-- Signature algorithm with computations in the monad `m`,
 where `M` is the space of messages, `PK`/`SK` are the spaces of the public/private keys,
 and `S` is the type of the final signature. -/
+@[ext]
 structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
   keygen : m (PK × SK)
   sign (pk : PK) (sk : SK) (msg : M) : m S
   verify (pk : PK) (msg : M) (σ : S) : m Bool
 
 namespace SignatureAlg
-
-section ext
-
-variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
-
-/-- Two signature schemes are equal when their key generation, signing, and verification
-components agree extensionally. -/
-@[ext]
-theorem ext {sigAlg₁ sigAlg₂ : SignatureAlg m M PK SK S}
-    (hkeygen : sigAlg₁.keygen = sigAlg₂.keygen)
-    (hsign : ∀ pk sk msg, sigAlg₁.sign pk sk msg = sigAlg₂.sign pk sk msg)
-    (hverify : ∀ pk msg σ, sigAlg₁.verify pk msg σ = sigAlg₂.verify pk msg σ) :
-    sigAlg₁ = sigAlg₂ := by
-  cases sigAlg₁ with
-  | mk keygen₁ sign₁ verify₁ =>
-    cases sigAlg₂ with
-    | mk keygen₂ sign₂ verify₂ =>
-      have hsign' : sign₁ = sign₂ := by
-        funext pk sk msg
-        exact hsign pk sk msg
-      have hverify' : verify₁ = verify₂ := by
-        funext pk msg σ
-        exact hverify pk msg σ
-      subst hkeygen
-      subst hsign'
-      subst hverify'
-      rfl
-
-end ext
 
 section signingOracle
 

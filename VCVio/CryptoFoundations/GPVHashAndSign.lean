@@ -105,11 +105,11 @@ def GPVHashAndSign
     [MonadLiftT ProbComp m] [HasQuery (Salt × M →ₒ Range) m] :
     SignatureAlg m
       (M := M) (PK := PK) (SK := SK) (S := Salt × Domain) where
-  keygen := monadLift hr.gen
+  keygen := liftM hr.gen
   sign := fun pk sk msg => do
-    let r ← (monadLift ($ᵗ Salt : ProbComp Salt) : m Salt)
+    let r ← ($ᵗ Salt : ProbComp Salt)
     let c ← HasQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
-    let s ← (monadLift (psf.trapdoorSample pk sk c) : m _)
+    let s ← psf.trapdoorSample pk sk c
     pure (r, s)
   verify := fun pk msg (r, s) => do
     let c ← HasQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
