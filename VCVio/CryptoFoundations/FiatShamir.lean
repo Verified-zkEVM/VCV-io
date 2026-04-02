@@ -93,7 +93,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
   classical
   let ro : QueryImpl (M × PC →ₒ Ω)
       (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
   have hleft :
       ∀ {α : Type} (oa : ProbComp α),

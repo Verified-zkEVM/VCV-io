@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.QueryTracking.RandomOracle
@@ -136,7 +137,7 @@ noncomputable def experiment
   let params ← problem.sampleParams
   let ro : QueryImpl (HashInput →ₒ HashOutput)
     (StateT ((HashInput →ₒ HashOutput).QueryCache) ProbComp) := randomOracle
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (StateT ((HashInput →ₒ HashOutput).QueryCache) ProbComp)
   let ((hashInput, response), cache) ←
     StateT.run (simulateQ (idImpl + ro) (adv.run params)) ∅

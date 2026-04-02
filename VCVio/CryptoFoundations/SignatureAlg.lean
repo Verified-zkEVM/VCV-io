@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
@@ -68,7 +69,7 @@ the adversary successfully forged a signature.
 
 API changes from old version:
 - `spec ++ₒ` → `spec +`
-- `idOracle ++ₛₒ sigAlg.signingOracle pk sk` → explicit `QueryImpl.ofLift` + `liftTarget` + `+`
+- `idOracle ++ₛₒ sigAlg.signingOracle pk sk` → explicit `HasQuery.toQueryImpl` + `liftTarget` + `+`
 - `log.wasQueried () m` → `log.wasQueried msg` (Domain of `M →ₒ S` is `M`, not `Unit × M`) -/
 def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
@@ -77,7 +78,7 @@ def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))
         (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
-      (QueryImpl.ofLift spec (OracleComp spec)).liftTarget
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
         (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
         sigAlg.signingOracle pk sk
     let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=

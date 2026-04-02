@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
@@ -72,7 +73,7 @@ def UF_CMA_Exp {macAlg : MacAlg (OracleComp spec) M K T}
     let k ← macAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ T))
         (WriterT (QueryLog (M →ₒ T)) (OracleComp spec)) :=
-      (QueryImpl.ofLift spec (OracleComp spec)).liftTarget
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
         (WriterT (QueryLog (M →ₒ T)) (OracleComp spec)) +
         macAlg.taggingOracle k
     let sim_adv : WriterT (QueryLog (M →ₒ T)) (OracleComp spec) (M × T) :=
