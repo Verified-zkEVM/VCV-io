@@ -29,6 +29,11 @@ open OracleSpec
 
 universe u v w x
 
+/-- Capability to issue queries to the oracle family `spec` inside the ambient monad `m`. -/
+class HasQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) where
+  /-- Issue a single oracle query. -/
+  query : (t : spec.Domain) → m (spec.Range t)
+
 namespace QueryImpl
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
@@ -44,11 +49,6 @@ lemma toHasQuery_query (impl : QueryImpl spec m) (t : spec.Domain) :
     (toHasQuery (spec := spec) (m := m) impl).query t = impl t := rfl
 
 end QueryImpl
-
-/-- Capability to issue queries to the oracle family `spec` inside the ambient monad `m`. -/
-class HasQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) where
-  /-- Issue a single oracle query. -/
-  query : (t : spec.Domain) → m (spec.Range t)
 
 namespace HasQuery
 
