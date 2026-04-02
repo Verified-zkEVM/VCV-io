@@ -49,7 +49,6 @@ lemma toHasQuery_query (impl : QueryImpl spec m) (t : spec.Domain) :
     (toHasQuery (spec := spec) (m := m) impl).query t = impl t := rfl
 
 end QueryImpl
-
 namespace HasQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
