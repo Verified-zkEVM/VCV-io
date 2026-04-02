@@ -8,6 +8,7 @@ import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.SimSemantics.Append
+import ToMathlib.Control.Monad.Hom
 
 /-!
 # Asymmetric Encryption Schemes.
@@ -30,6 +31,36 @@ structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
   verify (pk : PK) (msg : M) (σ : S) : m Bool
 
 namespace SignatureAlg
+
+section ext
+
+variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
+
+/-- Two signature schemes are equal when their key generation, signing, and verification
+components agree extensionally. -/
+@[ext]
+theorem ext {sigAlg₁ sigAlg₂ : SignatureAlg m M PK SK S}
+    (hkeygen : sigAlg₁.keygen = sigAlg₂.keygen)
+    (hsign : ∀ pk sk msg, sigAlg₁.sign pk sk msg = sigAlg₂.sign pk sk msg)
+    (hverify : ∀ pk msg σ, sigAlg₁.verify pk msg σ = sigAlg₂.verify pk msg σ) :
+    sigAlg₁ = sigAlg₂ := by
+  cases sigAlg₁ with
+  | mk keygen₁ sign₁ verify₁ =>
+    cases sigAlg₂ with
+    | mk keygen₂ sign₂ verify₂ =>
+      have hsign' : sign₁ = sign₂ := by
+        funext pk sk msg
+        exact hsign pk sk msg
+      have hverify' : verify₁ = verify₂ := by
+        funext pk msg σ
+        exact hverify pk msg σ
+      subst hkeygen
+      subst hsign'
+      subst hverify'
+      rfl
+
+end ext
+
 section signingOracle
 
 variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
@@ -41,6 +72,37 @@ def signingOracle (sigAlg : SignatureAlg m M PK SK S) (pk : PK) (sk : SK) :
   QueryImpl.withLogging (fun msg => sigAlg.sign pk sk msg)
 
 end signingOracle
+
+section map
+
+variable {m : Type → Type v} [Monad m] {n : Type → Type u} [Monad n]
+  {M PK SK S : Type}
+
+/-- Transport a signature scheme across a monad morphism by mapping each algorithmic component.
+
+This is the basic reindexing operation used by naturality theorems for generic constructions:
+if a signature scheme was defined in a source monad `m`, then any monad morphism `m →ᵐ n`
+induces the corresponding scheme in `n`. -/
+def map (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S) : SignatureAlg n M PK SK S where
+  keygen := F sigAlg.keygen
+  sign pk sk msg := F (sigAlg.sign pk sk msg)
+  verify pk msg σ := F (sigAlg.verify pk msg σ)
+
+@[simp]
+lemma map_keygen (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S) :
+    (sigAlg.map F).keygen = F sigAlg.keygen := rfl
+
+@[simp]
+lemma map_sign (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
+    (pk : PK) (sk : SK) (msg : M) :
+    (sigAlg.map F).sign pk sk msg = F (sigAlg.sign pk sk msg) := rfl
+
+@[simp]
+lemma map_verify (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
+    (pk : PK) (msg : M) (σ : S) :
+    (sigAlg.map F).verify pk msg σ = F (sigAlg.verify pk msg σ) := rfl
+
+end map
 
 section sound
 
