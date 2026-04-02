@@ -39,7 +39,7 @@ variable [DecidableEq K]
 
 /-- Correctness experiment: decapsulation of an honestly generated encapsulation should recover the
 shared key. -/
-def CorrectExp (kem : KEMScheme m K PK SK C) : m Bool :=
+def CorrectExp : m Bool :=
   do
     let (pk, sk) ← kem.keygen
     let (c, k) ← kem.encaps pk

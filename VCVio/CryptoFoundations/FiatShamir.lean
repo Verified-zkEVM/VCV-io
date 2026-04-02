@@ -53,8 +53,7 @@ variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
 
 /-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
-noncomputable def runtime
-    (M : Type) [DecidableEq M] :
+noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (M × PC →ₒ Ω))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :

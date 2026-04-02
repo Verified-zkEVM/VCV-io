@@ -119,8 +119,7 @@ variable {PK SK Domain Range : Type}
   (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
 
 /-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
-noncomputable def runtime
-    (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt] :
+noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (Salt × M →ₒ Range))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :
