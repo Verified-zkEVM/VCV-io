@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.MonadQuery
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.Coercions.Add
@@ -80,13 +80,13 @@ the prover queries `H` on each input and keeps the best. -/
 private def fischlinSearchAux {X W PC SC Ω P M : Type} {p : X → W → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m]
     (σ : SigmaProtocol X W PC SC Ω P p)
-    [MonadLiftT ProbComp m] [MonadQuery (fischlinROSpec X PC Ω P ρ b M) m]
+    [MonadLiftT ProbComp m] [HasQuery (fischlinROSpec X PC Ω P ρ b M) m]
     (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ) :
     List Ω → Option (Ω × P × Fin (2 ^ b)) → m (Option (Ω × P))
   | [], best => return best.map fun (ω, resp, _) => (ω, resp)
   | ω :: rest, best => do
     let resp ← (monadLift (σ.respond pk sk sc ω) : m _)
-    let h ← MonadQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
+    let h ← HasQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
       ⟨pk, msg, comList, i, ω, resp⟩
     if h.val = 0 then return some (ω, resp)
     else
@@ -118,7 +118,7 @@ def Fischlin
     (σ : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (ρ b S : ℕ) (M : Type)
     [DecidableEq M] [MonadLiftT ProbComp m]
-    [MonadQuery (fischlinROSpec X PC Ω P ρ b M) m] :
+    [HasQuery (fischlinROSpec X PC Ω P ρ b M) m] :
     SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := FischlinProof PC Ω P ρ) where
   keygen := monadLift hr.gen
@@ -142,7 +142,7 @@ def Fischlin
     let comList := List.ofFn comVec
     let results ← Fin.mOfFn ρ fun i => do
       let (_, ω_i, resp_i) := π i
-      let h_i ← MonadQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
+      let h_i ← HasQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
         ⟨pk, msg, comList, i, ω_i, resp_i⟩
       pure (σ.verify pk (comVec i) ω_i resp_i, h_i.val)
     let allVerified := (List.finRange ρ).all fun i => (results i).1

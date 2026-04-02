@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.MonadQuery
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -56,13 +56,13 @@ Tries up to `n` commit-hash-respond cycles:
 Returns `none` only when all `n` attempts abort. -/
 def fsAbortSignLoop (ids : IdenSchemeWithAbort S W W' St C Z p)
     {m : Type → Type v} [Monad m]
-    (M : Type) [DecidableEq M] [MonadLiftT ProbComp m] [MonadQuery (M × W' →ₒ C) m]
+    (M : Type) [DecidableEq M] [MonadLiftT ProbComp m] [HasQuery (M × W' →ₒ C) m]
     (pk : S) (sk : W) (msg : M) :
     ℕ → m (Option (W' × Z))
   | 0 => return none
   | n + 1 => do
     let (w', st) ← (monadLift (ids.commit pk sk : ProbComp _) : m _)
-    let c ← MonadQuery.query (spec := (M × W' →ₒ C)) (msg, w')
+    let c ← HasQuery.query (spec := (M × W' →ₒ C)) (msg, w')
     let oz ← (monadLift (ids.respond pk sk st c : ProbComp _) : m _)
     match oz with
     | some z => return some (w', z)
@@ -84,7 +84,7 @@ def FiatShamirWithAbort
     {m : Type → Type v} [Monad m]
     (ids : IdenSchemeWithAbort S W W' St C Z p)
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
-    [MonadLiftT ProbComp m] [MonadQuery (M × W' →ₒ C) m]
+    [MonadLiftT ProbComp m] [HasQuery (M × W' →ₒ C) m]
     (maxAttempts : ℕ) :
     SignatureAlg m
       (M := M) (PK := S) (SK := W) (S := Option (W' × Z)) where
@@ -94,7 +94,7 @@ def FiatShamirWithAbort
     match sig with
     | none => return false
     | some (w', z) =>
-      let c ← MonadQuery.query (spec := (M × W' →ₒ C)) (msg, w')
+      let c ← HasQuery.query (spec := (M × W' →ₒ C)) (msg, w')
       pure (ids.verify pk w' c z)
 
 namespace FiatShamirWithAbort
