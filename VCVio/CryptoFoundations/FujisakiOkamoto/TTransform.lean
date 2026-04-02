@@ -73,7 +73,7 @@ namespace TTransform
 
 /-- Runtime bundle for the T-transform random-oracle world. -/
 noncomputable def runtime
-    [DecidableEq M] [DecidableEq C] [SampleableType R] :
+    [DecidableEq M] [SampleableType R] :
     ProbCompRuntime (OracleComp (TTransform.oracleSpec M R)) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := TTransform.queryImpl (M := M) (R := R))
@@ -111,7 +111,7 @@ theorem OW_PCVA_bound
     adversary.MakesAtMostQueries qH qP qV →
     ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
       (OW_PCVA_Advantage (encAlg := TTransform pke)
-        (runtime (M := M) (C := C) (R := R)) adversary).toReal ≤
+        (runtime (M := M) (R := R)) adversary).toReal ≤
         2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
         2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
         correctnessBound +

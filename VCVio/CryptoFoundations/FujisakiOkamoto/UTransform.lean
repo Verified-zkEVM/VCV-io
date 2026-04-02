@@ -209,7 +209,7 @@ theorem IND_CCA_bound
           PRFScheme.prfAdvantage prf prfAdv +
           correctnessBound₁ +
           correctnessBound₂ +
-          (OW_PCVA_Advantage (encAlg := TTransform pke) (TTransform.runtime (M := M) (C := C)
+          (OW_PCVA_Advantage (encAlg := TTransform pke) (TTransform.runtime (M := M)
             (R := R)) owAdv).toReal := by
   sorry
 
