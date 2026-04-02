@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.Add
@@ -123,12 +124,12 @@ structure IND_CCA_Adversary (kem : KEMScheme (OracleComp spec) K PK SK C) where
 /-- Pre-challenge decapsulation oracle. -/
 def IND_CCA_preChallengeImpl (kem : KEMScheme (OracleComp spec) K PK SK C)
     (sk : SK) : QueryImpl (IND_CCA_oracleSpec kem) (OracleComp spec) :=
-  (QueryImpl.ofLift spec (OracleComp spec)) + fun c => kem.decaps sk c
+  (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + fun c => kem.decaps sk c
 
 /-- Post-challenge decapsulation oracle: the challenge ciphertext itself maps to `none`. -/
 def IND_CCA_postChallengeImpl (kem : KEMScheme (OracleComp spec) K PK SK C)
     (sk : SK) (cStar : C) : QueryImpl (IND_CCA_oracleSpec kem) (OracleComp spec) :=
-  (QueryImpl.ofLift spec (OracleComp spec)) + fun c =>
+  (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + fun c =>
     if c = cStar then return none else kem.decaps sk c
 
 /-- IND-CCA real-or-random experiment for a KEM. -/
@@ -158,12 +159,10 @@ def IND_CPA_Adversary.toIND_CCA {kem : KEMScheme (OracleComp spec) K PK SK C}
     (adversary : kem.IND_CPA_Adversary) : kem.IND_CCA_Adversary where
   State := adversary.State
   preChallenge pk := simulateQ
-    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
-      fun t => liftM (query (spec := spec) t))
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp (spec + (C →ₒ Option K))))
     (adversary.preChallenge pk)
   postChallenge st cStar kStar := simulateQ
-    (show QueryImpl spec (OracleComp (spec + (C →ₒ Option K))) from
-      fun t => liftM (query (spec := spec) t))
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp (spec + (C →ₒ Option K))))
     (adversary.postChallenge st cStar kStar)
 
 /-- The one-stage IND-CPA game is exactly the IND-CCA game instantiated with the trivial
@@ -178,9 +177,8 @@ theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
   congr 1
   simp only [← QueryImpl.simulateQ_compose]
   have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec)),
-      (QueryImpl.ofLift spec (OracleComp spec) + impl₂) ∘ₛ
-        (fun t => liftM (query (spec := spec) t) :
-          QueryImpl spec (OracleComp (spec + (C →ₒ Option K)))) =
+      ((HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + impl₂) ∘ₛ
+        (HasQuery.toQueryImpl (spec := spec) (m := OracleComp (spec + (C →ₒ Option K)))) =
       QueryImpl.id' spec := by
     intro impl₂
     ext t

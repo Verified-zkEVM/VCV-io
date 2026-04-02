@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -73,7 +74,7 @@ abbrev OW_CPA_Adversary := PK → C → OracleComp pke.OW_CPA_oracleSpec M
 
 /-- Implementation of the OW-CPA encryption oracle. -/
 def OW_CPA_queryImpl (pk : PK) : QueryImpl pke.OW_CPA_oracleSpec ProbComp :=
-  (QueryImpl.ofLift unifSpec ProbComp) + fun msg => do
+  (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) + fun msg => do
     let r ← ($ᵗ R : ProbComp R)
     pure (pke.encrypt pk msg r)
 
@@ -129,7 +130,7 @@ def OW_PCVA_queryImpl (encAlg : AsymmEncAlg (OracleComp spec) M PK SK C)
   let validImpl : QueryImpl (C →ₒ Bool) (OracleComp spec) := fun c => do
     let msg' ← encAlg.decrypt sk c
     return msg'.isSome
-  (QueryImpl.ofLift spec (OracleComp spec)) + (checkImpl + validImpl)
+  (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + (checkImpl + validImpl)
 
 /-- Main one-way under plaintext-checking and validity attacks (OW-PCVA) experiment.
 

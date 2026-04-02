@@ -286,11 +286,11 @@ noncomputable def knowledgeSoundnessExp
   let roSpec := fischlinROSpec X PC Ω P ρ b M
   let ro : QueryImpl roSpec (StateT roSpec.QueryCache ProbComp) := randomOracle
   let loggedRO := ro.withLogging
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (WriterT (QueryLog roSpec) (StateT roSpec.QueryCache ProbComp))
   do
     let ((π, roLog), cache) ← (simulateQ (idImpl + loggedRO) (prover x msg)).run |>.run ∅
-    let idImpl' := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+    let idImpl' := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
       (StateT roSpec.QueryCache ProbComp)
     let (verified, _) ←
       (simulateQ (idImpl' + ro)
