@@ -90,8 +90,6 @@ structure QueryHom (spec : OracleSpec.{u, v} ι)
     toFun _ (MonadQuery.query (spec := spec) (m := m) t) =
       MonadQuery.query (spec := spec) (m := n) t
 
-attribute [simp] QueryHom.map_query'
-
 /-- A monad morphism preserves public randomness when it commutes with the distinguished lifting
 of plain probabilistic computations into the ambient monad. -/
 def PreservesProbCompLift
