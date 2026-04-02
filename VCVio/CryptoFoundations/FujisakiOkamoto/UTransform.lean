@@ -56,8 +56,14 @@ noncomputable def spmfSemantics {M PK C R K : Type} (variant : Variant M PK C R 
     SPMFSemantics (OracleComp (unifSpec + variant.hashOracleSpec)) :=
   SPMFSemantics.withStateOracle variant.queryImpl variant.initCache
 
+/-- Full public-randomness runtime for an FO hash world. -/
+noncomputable def runtime {M PK C R K : Type} (variant : Variant M PK C R K) :
+    ProbCompRuntime (OracleComp (unifSpec + variant.hashOracleSpec)) where
+  toSPMFSemantics := spmfSemantics variant
+  toProbCompLift := ProbCompLift.ofMonadLift _
+
 /-- Generic FO construction parameterized by a hash world and a rejection policy. -/
-noncomputable def scheme
+def scheme
     {M PK SK R C K : Type}
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (variant : Variant M PK C R K)
@@ -88,8 +94,6 @@ noncomputable def scheme
           return some k
         else
           return policy.onReject fb c
-  toSPMFSemantics := FujisakiOkamoto.spmfSemantics variant
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 end FujisakiOkamoto
 
@@ -163,7 +167,7 @@ variable {M PK SK R C KD K KPRF : Type}
 
 /-- The generic two-RO U-transform family. The argument `kdInput` chooses whether the shared key
 is derived from `m`, `(m, c)`, or some other encoding of the recovered plaintext and ciphertext. -/
-noncomputable def UTransform
+def UTransform
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -177,6 +181,15 @@ noncomputable def UTransform
     policy
 
 namespace UTransform
+
+/-- Runtime bundle for the two-RO U-transform oracle world. -/
+noncomputable def runtime
+    {M PK C R KD K : Type}
+    [DecidableEq M] [DecidableEq KD] [SampleableType R] [SampleableType K]
+    (kdInput : M → C → KD) :
+    ProbCompRuntime (OracleComp (oracleSpec M R KD K)) :=
+  FujisakiOkamoto.runtime
+    (variant (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput)
 
 /-- The generic U-transform CCA bound. The proof is intentionally deferred, but the reduction
 artifacts are now existentially quantified rather than passed in as unrelated inputs. -/
@@ -192,11 +205,12 @@ theorem IND_CCA_bound
     ∃ prfAdv : PRFScheme.PRFAdversary C K,
       ∃ owAdv : OW_PCVA_Adversary (TTransform pke),
         (UTransform pke kdInput (FujisakiOkamoto.implicitRejection prf)).IND_CCA_Advantage
-            adversary ≤
+            (runtime (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput) adversary ≤
           PRFScheme.prfAdvantage prf prfAdv +
           correctnessBound₁ +
           correctnessBound₂ +
-          (OW_PCVA_Advantage (encAlg := TTransform pke) owAdv).toReal := by
+          (OW_PCVA_Advantage (encAlg := TTransform pke) (TTransform.runtime (M := M) (C := C)
+            (R := R)) owAdv).toReal := by
   sorry
 
 end UTransform

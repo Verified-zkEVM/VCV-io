@@ -90,7 +90,7 @@ Given a preimage sampleable function `psf`, a generable key relation `hr`, and a
 
 The signature type is `Salt × Domain` (salt paired with the short preimage).
 The oracle spec is `unifSpec + (Salt × M →ₒ Range)` (uniform sampling + random oracle). -/
-noncomputable def GPVHashAndSign
+def GPVHashAndSign
     {PK SK Domain Range : Type}
     (psf : PreimageSampleableFunction PK SK Domain Range)
     {p : PK → SK → Bool} [SampleableType PK] [SampleableType SK]
@@ -108,11 +108,6 @@ noncomputable def GPVHashAndSign
   verify := fun pk m (r, s) => do
     let c ← query (spec := unifSpec + (Salt × M →ₒ Range)) (Sum.inr (r, m))
     return (decide (psf.eval pk s = c) && psf.isShort s)
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := (randomOracle :
-      QueryImpl (Salt × M →ₒ Range) (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)))
-    ∅
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace GPVHashAndSign
 
@@ -122,6 +117,16 @@ variable {PK SK Domain Range : Type}
   (psf : PreimageSampleableFunction PK SK Domain Range)
   (hr : GenerableRelation PK SK p)
   (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
+
+/-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
+noncomputable def runtime
+    (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt] :
+    ProbCompRuntime (OracleComp (unifSpec + (Salt × M →ₒ Range))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (Salt × M →ₒ Range) (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural bound that counts only random-oracle queries in a GPV EUF-CMA adversary. -/
 def hashQueryBound {S' α : Type}
@@ -175,7 +180,7 @@ theorem euf_cma_bound [DecidableEq Domain] [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv (GPVHashAndSign psf hr M Salt)) :
     ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
       (collisionBound : ENNReal),
-      adv.advantage ≤
+      adv.advantage (runtime M Salt) ≤
         preimageFindingAdvantage (psf := psf) (hr := hr) reduction + collisionBound := by
   sorry
 

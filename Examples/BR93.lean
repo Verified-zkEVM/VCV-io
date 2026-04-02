@@ -47,7 +47,7 @@ variable [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [SampleableType Rand
 variable [Inhabited M] [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGroup M]
 
 /-- The concrete BR93 scheme instantiated with an explicit hash function `hash : Rand → M`. -/
-@[simps!] noncomputable def br93AsymmEnc (tdp : TrapdoorPermutation PK SK Rand) (hash : Rand → M) :
+@[simps!] def br93AsymmEnc (tdp : TrapdoorPermutation PK SK Rand) (hash : Rand → M) :
     AsymmEncAlg ProbComp (M := M) (PK := PK) (SK := SK) (C := Rand × M) where
   keygen := tdp.keygen
   encrypt pk msg := do
@@ -55,8 +55,6 @@ variable [Inhabited M] [Fintype M] [DecidableEq M] [SampleableType M] [AddCommGr
     return (tdp.forward pk r, hash r + msg)
   decrypt sk c :=
     return (some (c.2 - hash (tdp.inverse sk c.1)))
-  toSPMFSemantics := SPMFSemantics.ofHasEvalSPMF ProbComp
-  toProbCompLift := ProbCompLift.id
 
 namespace br93AsymmEnc
 
@@ -66,14 +64,14 @@ omit [Inhabited Rand] [Fintype Rand] [DecidableEq Rand] [Inhabited M] [Fintype M
   [SampleableType M] in
 /-- Correctness of BR93 follows from correctness of the underlying trapdoor permutation. -/
 theorem correct (hcorrect : tdp.Correct) :
-    (br93AsymmEnc (M := M) tdp hash).PerfectlyCorrect := by
+    (br93AsymmEnc (M := M) tdp hash).PerfectlyCorrect ProbCompRuntime.probComp := by
   intro msg
   let mx : ProbComp Bool := do
     let x ← tdp.keygen
     let c ← (do let r ← $ᵗ Rand; pure (tdp.forward x.1 r, hash r + msg))
     let msg' ← pure (some (c.2 - hash (tdp.inverse x.2 c.1)))
     pure (decide (msg' = some msg))
-  change Pr[= true | (br93AsymmEnc tdp hash).toSPMFSemantics.evalDist mx] = 1
+  change Pr[= true | ProbCompRuntime.probComp.evalDist mx] = 1
   simp only [mx, SPMFSemantics.evalDist, SemanticsVia.denote]
   have huniq : ∀ y ∈ support mx, y = true := by
     intro y hy

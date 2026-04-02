@@ -111,7 +111,7 @@ whose hash value is minimal, exiting early at hash `0`.
 **Verification**: re-hashes each `(commitment, challenge, response)` triple, checks
 sigma-protocol verification for each repetition, and verifies that the sum of hash
 values is at most `S`. -/
-noncomputable def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
+def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (ρ b S : ℕ) (M : Type)
     [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M))
@@ -139,12 +139,6 @@ noncomputable def Fischlin (σ : SigmaProtocol X W PC SC Ω P p)
     let allVerified := (List.finRange ρ).all fun i => (results i).1
     let hashSum := (List.finRange ρ).foldl (fun acc i => acc + (results i).2) 0
     return (allVerified && decide (hashSum ≤ S))
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := (randomOracle :
-      QueryImpl (fischlinROSpec X PC Ω P ρ b M)
-        (StateT (fischlinROSpec X PC Ω P ρ b M).QueryCache ProbComp)))
-    ∅
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace Fischlin
 
@@ -157,6 +151,17 @@ variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (ρ b S : ℕ) (M : Type) [DecidableEq M]
 
 open ENNReal
+
+/-- Runtime bundle for the Fischlin random-oracle world. -/
+noncomputable def runtime
+    (ρ b : ℕ) (M : Type) [DecidableEq M] :
+    ProbCompRuntime (OracleComp (unifSpec + fischlinROSpec X PC Ω P ρ b M)) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (fischlinROSpec X PC Ω P ρ b M)
+        (StateT (fischlinROSpec X PC Ω P ρ b M).QueryCache ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-! ### Completeness -/
 
@@ -183,7 +188,7 @@ Unlike the Fiat-Shamir transform (which is perfectly complete), the Fischlin tra
 has a non-zero completeness error because the prover's proof-of-work search may fail
 to find hash values whose sum is at most `S`. -/
 theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
-    Pr[= true | (Fischlin σ hr ρ b S M).toSPMFSemantics.evalDist do
+    Pr[= true | (runtime ρ b M).evalDist do
       let (pk, sk) ← (Fischlin σ hr ρ b S M).keygen
       let sig ← (Fischlin σ hr ρ b S M).sign pk sk msg
       (Fischlin σ hr ρ b S M).verify pk msg sig]

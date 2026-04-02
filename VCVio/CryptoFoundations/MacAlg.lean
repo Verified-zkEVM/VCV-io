@@ -24,8 +24,6 @@ open OracleSpec OracleComp ENNReal
 /-- MAC algorithm with computations in the monad `m`, where `M` is the message space, `K` the key
 space, and `T` the tag space. -/
 structure MacAlg (m : Type → Type v) [Monad m] (M K T : Type) where
-  toSPMFSemantics : SPMFSemantics m
-  toProbCompLift : ProbCompLift m
   keygen : m K
   tag : K → M → m T
   verify : K → M → T → m Bool
@@ -47,8 +45,8 @@ section sound
 variable {m : Type → Type v} [Monad m] {M K T : Type}
 
 /-- Perfect completeness for a MAC: honestly generated tags always verify. -/
-def PerfectlyComplete (macAlg : MacAlg m M K T) : Prop :=
-  ∀ msg : M, Pr[= true | macAlg.toSPMFSemantics.evalDist do
+def PerfectlyComplete (macAlg : MacAlg m M K T) (runtime : ProbCompRuntime m) : Prop :=
+  ∀ msg : M, Pr[= true | runtime.evalDist do
     let k ← macAlg.keygen
     let τ ← macAlg.tag k msg
     macAlg.verify k msg τ] = 1
@@ -68,8 +66,9 @@ structure UF_CMA_Adversary (_macAlg : MacAlg (OracleComp spec) M K T) where
 /-- UF-CMA experiment for a MAC: the adversary succeeds iff it outputs a valid tag for a fresh
 message under the challenge key. -/
 def UF_CMA_Exp {macAlg : MacAlg (OracleComp spec) M K T}
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : macAlg.UF_CMA_Adversary) : SPMF Bool :=
-  macAlg.toSPMFSemantics.evalDist do
+  runtime.evalDist do
     let k ← macAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ T))
         (WriterT (QueryLog (M →ₒ T)) (OracleComp spec)) :=
@@ -86,8 +85,9 @@ def UF_CMA_Exp {macAlg : MacAlg (OracleComp spec) M K T}
 fresh message. -/
 noncomputable def UF_CMA_Advantage
     {macAlg : MacAlg (OracleComp spec) M K T}
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : macAlg.UF_CMA_Adversary) : ℝ≥0∞ :=
-  Pr[= true | UF_CMA_Exp adversary]
+  Pr[= true | UF_CMA_Exp runtime adversary]
 
 end UF_CMA
 

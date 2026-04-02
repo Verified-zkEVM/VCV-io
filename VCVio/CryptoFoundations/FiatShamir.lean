@@ -29,7 +29,7 @@ variable {X W PC SC Ω P : Type}
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
 commitment), and then responds to the challenge. -/
-noncomputable def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
+def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + (M × PC →ₒ Ω)))
       (M := M) (PK := X) (SK := W) (S := PC × P) where
@@ -42,11 +42,6 @@ noncomputable def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
   verify := fun pk m (c, s) => do
     let r' ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
     return sigmaAlg.verify pk c r' s
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := (randomOracle :
-      QueryImpl (M × PC →ₒ Ω) (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)))
-    ∅
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace FiatShamir
 
@@ -56,6 +51,16 @@ variable {X W PC SC Ω P : Type} {p : X → W → Bool}
 
 variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
+
+/-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
+noncomputable def runtime
+    (M : Type) [DecidableEq M] :
+    ProbCompRuntime (OracleComp (unifSpec + (M × PC →ₒ Ω))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (M × PC →ₒ Ω) (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
@@ -77,7 +82,7 @@ omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
-    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) := by
+    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) (runtime M) := by
   intro msg
   classical
   let ro : QueryImpl (M × PC →ₒ Ω)
@@ -122,11 +127,11 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       simpa using hleft oa]
     simpa using hrun oa s
   change
-    Pr[= true | (FiatShamir σ hr M).toSPMFSemantics.evalDist (do
+    Pr[= true | (runtime M).evalDist (do
       let (pk, sk) ← (FiatShamir σ hr M).keygen
       let sig ← (FiatShamir σ hr M).sign pk sk msg
       (FiatShamir σ hr M).verify pk msg sig)] = 1
-  rw [show (FiatShamir σ hr M).toSPMFSemantics.evalDist (do
+  rw [show (runtime M).evalDist (do
       let (pk, sk) ← (FiatShamir σ hr M).keygen
       let sig ← (FiatShamir σ hr M).sign pk sk msg
       (FiatShamir σ hr M).verify pk msg sig) =
@@ -260,8 +265,8 @@ theorem euf_cma_bound
     (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
     ∃ reduction : X → ProbComp W,
-      (adv.advantage *
-          (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
+      (adv.advantage (runtime M) *
+          (adv.advantage (runtime M) / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by
   -- TODO: implement the explicit Pointcheval-Stern reduction.
   sorry

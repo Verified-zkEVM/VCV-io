@@ -58,7 +58,7 @@ def TTransform.decrypt (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
 
 /-- The HHK17 T transform, realized as a monadic `AsymmEncAlg` in the random-oracle world
 `unifSpec + (M →ₒ R)`. -/
-noncomputable def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R] :
     AsymmEncAlg (OracleComp (TTransform.oracleSpec M R)) M PK (PK × SK) C where
   keygen := do
@@ -68,12 +68,17 @@ noncomputable def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R
     let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
     return pke.encrypt pk msg r
   decrypt := fun (pk, sk) c => TTransform.decrypt pke pk sk c
+
+namespace TTransform
+
+/-- Runtime bundle for the T-transform random-oracle world. -/
+noncomputable def runtime
+    [DecidableEq M] [DecidableEq C] [SampleableType R] :
+    ProbCompRuntime (OracleComp (TTransform.oracleSpec M R)) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := TTransform.queryImpl (M := M) (R := R))
     (∅ : QueryCache M R)
   toProbCompLift := ProbCompLift.ofMonadLift _
-
-namespace TTransform
 
 /-- Structural query bound for T-transform OW-PCVA adversaries: uniform-sampling queries are
 unrestricted, while `qH`, `qP`, and `qV` bound the hash, plaintext-checking, and validity
@@ -104,10 +109,11 @@ theorem OW_PCVA_bound
     (correctnessBound gamma epsMsg : ℝ)
     (qH qP qV : ℕ) :
     adversary.MakesAtMostQueries qH qP qV →
-    ∃ cpaAdv₁ cpaAdv₂ : pke.toAsymmEncAlg.IND_CPA_adversary,
-      (OW_PCVA_Advantage (encAlg := TTransform pke) adversary).toReal ≤
-        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₁).toReal +
-        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₂).toReal +
+    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
+      (OW_PCVA_Advantage (encAlg := TTransform pke)
+        (runtime (M := M) (C := C) (R := R)) adversary).toReal ≤
+        2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
+        2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
         correctnessBound +
         (qV : ℝ) * gamma +
         2 * ((qH + qP + 1 : ℕ) : ℝ) * epsMsg := by

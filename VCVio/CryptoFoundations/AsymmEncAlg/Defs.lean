@@ -17,11 +17,10 @@ open OracleSpec OracleComp ENNReal
 universe u v w
 
 /-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
-`m` is the monad used to execute key generation, encryption, and decryption.
-It carries bundled subprobabilistic semantics for that monad. -/
+`m` is the monad used to execute key generation, encryption, and decryption. The scheme data stays
+purely algorithmic; probabilistic semantics and public-randomness injection are supplied
+separately when defining security experiments. -/
 structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
-  toSPMFSemantics : SPMFSemantics m
-  toProbCompLift : ProbCompLift m
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
   decrypt : (sk : SK) → (c : C) →  m (Option M)
@@ -32,8 +31,6 @@ Key generation runs in `m`, while encryption and decryption become pure once the
 `R` is supplied explicitly. This is the natural refinement used by FO-style transforms, where the
 coins are sampled externally or derived from an oracle. -/
 structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) [Monad m] (M PK SK R C : Type) where
-  toSPMFSemantics : SPMFSemantics m
-  toProbCompLift : ProbCompLift m
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) → (coins : R) → C
   decrypt : (sk : SK) → (c : C) → Option M
@@ -59,10 +56,10 @@ def CorrectExp (encAlg : AsymmEncAlg m M PK SK C) (msg : M) : m Bool :=
     let msg' ← encAlg.decrypt sk c
     return decide (msg' = some msg)
 
-/-- An asymmetric encryption scheme is perfectly correct when decrypting a fresh encryption of any
-message succeeds with probability `1`. -/
-def PerfectlyCorrect : Prop :=
-  ∀ (msg : M), Pr[= true | encAlg.toSPMFSemantics.evalDist (encAlg.CorrectExp msg)] = 1
+/-- An asymmetric encryption scheme is perfectly correct under the given runtime when decrypting a
+fresh encryption of any message succeeds with probability `1`. -/
+def PerfectlyCorrect (runtime : ProbCompRuntime m) : Prop :=
+  ∀ (msg : M), Pr[= true | runtime.evalDist (encAlg.CorrectExp msg)] = 1
 
 end Correct
 
@@ -70,16 +67,14 @@ namespace ExplicitCoins
 variable {m : Type → Type v} [Monad m] {M PK SK R C : Type}
   (encAlg : AsymmEncAlg.ExplicitCoins m M PK SK R C)
 
-/-- Forget the explicit-coins presentation by sampling the coins through the ambient execution
-method. -/
-def toAsymmEncAlg [SampleableType R] : AsymmEncAlg m M PK SK C :=
+/-- Forget the explicit-coins presentation by sampling the coins through the ambient runtime's
+public-randomness capability. -/
+def toAsymmEncAlg [SampleableType R] (runtime : ProbCompRuntime m) : AsymmEncAlg m M PK SK C :=
   { keygen := encAlg.keygen
     encrypt := fun pk msg => do
-      let r ← encAlg.toProbCompLift.liftProbComp ($ᵗ R)
+      let r ← runtime.liftProbComp ($ᵗ R)
       return encAlg.encrypt pk msg r
-    decrypt := fun sk c => return (encAlg.decrypt sk c)
-    toSPMFSemantics := encAlg.toSPMFSemantics
-    toProbCompLift := encAlg.toProbCompLift }
+    decrypt := fun sk c => return (encAlg.decrypt sk c) }
 
 end ExplicitCoins
 

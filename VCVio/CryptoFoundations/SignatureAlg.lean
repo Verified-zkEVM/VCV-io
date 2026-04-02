@@ -25,8 +25,6 @@ open OracleSpec OracleComp ENNReal
 where `M` is the space of messages, `PK`/`SK` are the spaces of the public/private keys,
 and `S` is the type of the final signature. -/
 structure SignatureAlg (m : Type → Type v) [Monad m] (M PK SK S : Type) where
-  toSPMFSemantics : SPMFSemantics m
-  toProbCompLift : ProbCompLift m
   keygen : m (PK × SK)
   sign (pk : PK) (sk : SK) (msg : M) : m S
   verify (pk : PK) (msg : M) (σ : S) : m Bool
@@ -49,8 +47,8 @@ section sound
 variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
 
 /-- Perfect completeness for a signature scheme: honestly generated signatures always verify. -/
-def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) : Prop :=
-  ∀ msg : M, Pr[= true | sigAlg.toSPMFSemantics.evalDist do
+def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) : Prop :=
+  ∀ msg : M, Pr[= true | runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let sig ← sigAlg.sign pk sk msg
     sigAlg.verify pk msg sig] = 1
@@ -73,8 +71,9 @@ API changes from old version:
 - `idOracle ++ₛₒ sigAlg.signingOracle pk sk` → explicit `QueryImpl.ofLift` + `liftTarget` + `+`
 - `log.wasQueried () m` → `log.wasQueried msg` (Domain of `M →ₒ S` is `M`, not `Unit × M`) -/
 def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : SPMF Bool :=
-  sigAlg.toSPMFSemantics.evalDist do
+  runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))
         (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
@@ -90,7 +89,8 @@ def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
 /-- The success probability of a CMA adversary in the unforgeability experiment. -/
 noncomputable def unforgeableAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp adv]
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp runtime adv]
 
 end unforgeable
 
@@ -110,8 +110,9 @@ structure eufNmaAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
 /-- The EUF-NMA experiment: generate a key pair, give the public key to the adversary
 (with no signing oracle), and check whether the adversary produced a valid forgery. -/
 def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adv : eufNmaAdv sigAlg) : SPMF Bool :=
-  sigAlg.toSPMFSemantics.evalDist do
+  runtime.evalDist do
     let (pk, _) ← sigAlg.keygen
     let (msg, σ) ← adv.main pk
     sigAlg.verify pk msg σ
@@ -119,7 +120,8 @@ def eufNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
 /-- The success probability of an EUF-NMA adversary. -/
 noncomputable def eufNmaAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
-    (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp adv]
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp runtime adv]
 
 end eufNma
 

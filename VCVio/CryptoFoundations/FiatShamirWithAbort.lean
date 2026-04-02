@@ -75,7 +75,7 @@ The type parameters are:
 - `C`: challenge space (range of the hash/random oracle)
 - `Z`: response space
 - `S` / `W`: statement / witness (= public key / secret key) -/
-noncomputable def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
+def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
     (maxAttempts : ℕ) :
     SignatureAlg (OracleComp (unifSpec + (M × W' →ₒ C)))
@@ -88,17 +88,22 @@ noncomputable def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p
     | some (w', z) =>
       let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
       return ids.verify pk w' c z
-  toSPMFSemantics := SPMFSemantics.withStateOracle
-    (hashImpl := (randomOracle :
-      QueryImpl (M × W' →ₒ C) (StateT ((M × W' →ₒ C).QueryCache) ProbComp)))
-    ∅
-  toProbCompLift := ProbCompLift.ofMonadLift _
 
 namespace FiatShamirWithAbort
 
 variable (ids : IdenSchemeWithAbort S W W' St C Z p)
   (hr : GenerableRelation S W p)
   (M : Type) [DecidableEq M] (maxAttempts : ℕ)
+
+/-- Runtime bundle for the Fiat-Shamir-with-aborts random-oracle world. -/
+noncomputable def runtime
+    (M : Type) [DecidableEq M] :
+    ProbCompRuntime (OracleComp (unifSpec + (M × W' →ₒ C))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (M × W' →ₒ C) (StateT ((M × W' →ₒ C).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 section EUF_CMA
 
@@ -180,7 +185,7 @@ theorem euf_cma_bound [DecidableEq Z]
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
-      adv.advantage ≤
+      adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
   let _ := hc
@@ -204,7 +209,7 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
-      adv.advantage ≤
+      adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
   simpa using
