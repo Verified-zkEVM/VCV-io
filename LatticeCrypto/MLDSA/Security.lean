@@ -190,7 +190,9 @@ theorem nma_security
       (FiatShamirWithAbort (identificationScheme p prims nttOps) hr M maxAttempts)),
     ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
       (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
-      adv.advantage ≤
+      adv.advantage
+          (FiatShamirWithAbort.runtime
+            (W' := Commitment p prims) (C := CommitHashBytes p) M) ≤
         ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
         SelfTargetMSIS.advantage stmsisReduction := by
   sorry
@@ -283,7 +285,9 @@ theorem euf_cma_security
         hr M maxAttempts)),
     ∃ (mlweReduction : LearningWithErrors.Adversary mlwe)
       (stmsisReduction : SelfTargetMSIS.Adversary stmsis),
-      adv.advantage ≤
+      adv.advantage
+          (FiatShamirWithAbort.runtime
+            (W' := Commitment p prims) (C := CommitHashBytes p) M) ≤
         ENNReal.ofReal (LearningWithErrors.advantage mlwe mlweReduction) +
         SelfTargetMSIS.advantage stmsisReduction +
         ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by

@@ -96,6 +96,5 @@ def asKEMScheme (ring : NTTRingOps) (encoding : Encoding params)
     let (k, c) := encapsInternal ring encoding prims ek m
     return (c, k)
   decaps := fun dk c => return some (decapsInternal ring encoding prims dk c)
-  __ := ExecutionMethod.default
 
 end MLKEM
