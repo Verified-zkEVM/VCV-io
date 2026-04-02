@@ -29,6 +29,98 @@ noncomputable def ProbComp.boolBiasAdvantage (p : ProbComp Bool) : ℝ :=
 noncomputable def ProbComp.boolDistAdvantage (p q : ProbComp Bool) : ℝ :=
   |(Pr[= true | p]).toReal - (Pr[= true | q]).toReal|
 
+lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
+    p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
+  unfold ProbComp.boolDistAdvantage
+  exact abs_sub_le _ _ _
+
+lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
+    p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by
+  have hfalse : Pr[= false | p] = 1 - Pr[= true | p] := by
+    have hsum : Pr[= true | p] + Pr[= false | p] = 1 := by simp
+    rw [← hsum, ENNReal.add_sub_cancel_left probOutput_ne_top]
+  unfold ProbComp.boolBiasAdvantage
+  rw [hfalse, ENNReal.toReal_sub_of_le probOutput_le_one ENNReal.one_ne_top]
+  rw [ENNReal.toReal_one]
+  rw [show (Pr[= true | p]).toReal - (1 - (Pr[= true | p]).toReal) =
+      2 * ((Pr[= true | p]).toReal - 1 / 2) by ring]
+  rw [abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2)]
+
+lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
+    (real rand : ProbComp Bool) :
+    (do
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real else rand
+      pure (b == z)).boolBiasAdvantage =
+    real.boolDistAdvantage rand := by
+  rw [ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half]
+  rw [probOutput_uniformBool_branch_toReal_sub_half]
+  unfold ProbComp.boolDistAdvantage
+  calc
+    2 * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2|
+        = |(2 : ℝ)| * |((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2| := by
+            norm_num
+    _ = |(2 : ℝ) * (((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2)| := by
+          rw [← abs_mul]
+    _ = |(Pr[= true | real]).toReal - (Pr[= true | rand]).toReal| := by
+          congr 1
+          ring
+
+lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
+    {α : Type} (pref : ProbComp α) (real rand : α → ProbComp Bool) :
+    (do
+      let a ← pref
+      let b ← ($ᵗ Bool : ProbComp Bool)
+      let z ← if b then real a else rand a
+      pure (b == z)).boolBiasAdvantage =
+    (do
+      let a ← pref
+      real a).boolDistAdvantage
+      (do
+        let a ← pref
+        rand a) := by
+  let game : ProbComp Bool := do
+    let a ← pref
+    let b ← ($ᵗ Bool : ProbComp Bool)
+    let z ← if b then real a else rand a
+    pure (b == z)
+  let left : ProbComp Bool := do
+    let a ← pref
+    real a
+  let right : ProbComp Bool := do
+    let a ← pref
+    rand a
+  let branchGame : ProbComp Bool := do
+    let b ← ($ᵗ Bool : ProbComp Bool)
+    let z ← if b then left else right
+    pure (b == z)
+  have hbranch : evalDist game = evalDist branchGame := by
+    apply evalDist_ext
+    intro x
+    calc
+      Pr[= x | game] =
+          Pr[= x | do
+            let b ← ($ᵗ Bool : ProbComp Bool)
+            let a ← pref
+            let z ← if b then real a else rand a
+            pure (b == z)] := by
+              simpa [game, bind_assoc] using
+                (probOutput_bind_bind_swap pref ($ᵗ Bool : ProbComp Bool)
+                  (fun a b => do
+                    let z ← if b then real a else rand a
+                    pure (b == z))
+                  x)
+      _ = Pr[= x | branchGame] := by
+            refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) x ?_
+            intro b
+            cases b <;> simp [left, right]
+  have hprob := evalDist_ext_iff.mp hbranch
+  rw [show game.boolBiasAdvantage = branchGame.boolBiasAdvantage by
+    unfold ProbComp.boolBiasAdvantage
+    rw [hprob true, hprob false]]
+  simpa [branchGame, left, right] using
+    ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch left right
+
 /-- The **advantage** of a game `p`, assumed to be a probabilistic computation ending with a `guard`
   statement, is the absolute difference between the probability of success and 1/2. -/
 noncomputable def ProbComp.guessAdvantage (p : ProbComp Unit) : ℝ := |1 / 2 - (Pr[= () | p]).toReal|
