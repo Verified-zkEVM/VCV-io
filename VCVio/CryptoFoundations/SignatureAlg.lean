@@ -3,7 +3,9 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+
 import VCVio.CryptoFoundations.SecExp
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
@@ -64,12 +66,9 @@ structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) wh
   main (pk : PK) : OracleComp (spec + (M →ₒ S)) (M × S)
 
 /-- Unforgeability experiment for a signature algorithm: runs the adversary and checks whether
-the adversary successfully forged a signature.
-
-API changes from old version:
-- `spec ++ₒ` → `spec +`
-- `idOracle ++ₛₒ sigAlg.signingOracle pk sk` → explicit `QueryImpl.ofLift` + `liftTarget` + `+`
-- `log.wasQueried () m` → `log.wasQueried msg` (Domain of `M →ₒ S` is `M`, not `Unit × M`) -/
+the adversary successfully forged a signature. The ambient oracle family is forwarded unchanged,
+the signing oracle is logged, and the final check requires both signature validity and that the
+forged message was never submitted to the signing oracle. -/
 def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : SPMF Bool :=
@@ -77,7 +76,7 @@ def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))
         (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
-      (QueryImpl.ofLift spec (OracleComp spec)).liftTarget
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
         (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
         sigAlg.signingOracle pk sk
     let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=

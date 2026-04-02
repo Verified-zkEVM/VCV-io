@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.SimSemantics.Append
@@ -26,7 +28,6 @@ distinguish the real function `PRF.eval k` (for a random key `k`) from a truly r
 - `prfIdealExp` — the ideal experiment (adversary queries a random oracle).
 - `prfAdvantage` — distinguishing advantage.
 -/
-
 
 open OracleComp OracleSpec ENNReal
 
@@ -57,13 +58,14 @@ by the ambient `unifSpec`; function queries are answered by `prf.eval k`. -/
 def prfRealQueryImpl (prf : PRFScheme K D R) (k : K) :
     QueryImpl (PRFOracleSpec D R) ProbComp :=
   let so : QueryImpl (D →ₒ R) ProbComp := fun d => pure (prf.eval k d)
-  (QueryImpl.ofLift unifSpec ProbComp) + so
+  (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) + so
 
 /-- Query implementation for the ideal PRF experiment. Uniform-sampling queries are handled
 by the ambient `unifSpec`; function queries are answered by a lazy random oracle. -/
 def prfIdealQueryImpl [DecidableEq D] [SampleableType R] :
     QueryImpl (PRFOracleSpec D R) (StateT ((D →ₒ R).QueryCache) ProbComp) :=
-  (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT ((D →ₒ R).QueryCache) ProbComp) +
+  (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
+    (StateT ((D →ₒ R).QueryCache) ProbComp) +
     randomOracle (spec := (D →ₒ R))
 
 /-- Real PRF experiment: sample a key, let the adversary query `prf.eval k`. -/
