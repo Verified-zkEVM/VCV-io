@@ -230,10 +230,10 @@ end BoundedAdversary
 /-- Structure to represent a security experiment.
 The experiment is considered successful unless it terminates with failure.
 
-Unlike the older `ExecutionMethod`-based design, a `SecExp` carries bundled
-`SPMFSemantics` directly. This keeps the semantic assumptions attached to the experiment itself:
-the surface monad can be interpreted through some internal semantic monad, and only then observed
-as a subdistribution for measuring success and failure probabilities. -/
+A `SecExp` carries bundled `SPMFSemantics` directly. This keeps the semantic assumptions attached
+to the experiment itself: the surface monad can be interpreted through some internal semantic
+monad, and only then observed as a subdistribution for measuring success and failure
+probabilities. -/
 structure SecExp (m : Type → Type w) [Monad m]
     extends SPMFSemantics m where
   /-- Main experiment body. Success is interpreted as terminating without failure. -/
