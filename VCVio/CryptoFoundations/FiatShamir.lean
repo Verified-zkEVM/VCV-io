@@ -154,13 +154,9 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     dsimp only [FiatShamir]
     have hquery :
         ∀ q : M × PC,
-          @MonadQuery.query (M × PC) (M × PC →ₒ Ω)
-              (OracleComp (unifSpec + (M × PC →ₒ Ω)))
-              (inferInstanceAs (Monad (OracleComp (unifSpec + (M × PC →ₒ Ω)))))
-              (MonadQuery.instOfMonadLift
-                (spec := (M × PC →ₒ Ω))
-                (m := OracleComp (unifSpec + (M × PC →ₒ Ω))))
-              q =
+          MonadQuery.query
+              (spec := (M × PC →ₒ Ω))
+              (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) q =
             (query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr q) :
               OracleComp (unifSpec + (M × PC →ₒ Ω)) Ω) := by
       intro q

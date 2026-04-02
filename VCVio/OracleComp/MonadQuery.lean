@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.OracleComp.SimSemantics.QueryImpl
 
 /-!
@@ -26,13 +27,13 @@ open OracleSpec
 universe u v w
 
 /-- Capability to issue queries to the oracle family `spec` inside the ambient monad `m`. -/
-class MonadQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) [Monad m] where
+class MonadQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) where
   /-- Issue a single oracle query. -/
   query : (t : spec.Domain) → m (spec.Range t)
 
 namespace MonadQuery
 
-variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w} [Monad m]
+variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
 
 /-- Repackage `MonadQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
 implementations. -/
@@ -52,12 +53,6 @@ instance (priority := low) instOfMonadLift [MonadLiftT (OracleQuery spec) m] :
 @[simp]
 lemma instOfMonadLift_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
     (instOfMonadLift (spec := spec) (m := m)).query t =
-      liftM (OracleQuery.query (spec := spec) t) :=
-  rfl
-
-@[simp]
-lemma query_eq_liftM_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
-    @MonadQuery.query ι spec m ‹Monad m› (instOfMonadLift (spec := spec) (m := m)) t =
       liftM (OracleQuery.query (spec := spec) t) :=
   rfl
 
