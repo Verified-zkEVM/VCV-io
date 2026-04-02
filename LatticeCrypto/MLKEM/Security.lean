@@ -101,7 +101,8 @@ theorem kpke_ind_cpa_security :
         (TqMatrix params.k params.k) (TqVec params.k) (TqVec params.k),
       ∀
         (cpaAdv :
-          (KPKE.asExplicitCoins params ring encoding prims).toAsymmEncAlg.IND_CPA_adversary),
+          ((KPKE.asExplicitCoins params ring encoding prims).toAsymmEncAlg
+            ProbCompRuntime.probComp).IND_CPA_adversary),
         ∃ (mlweAdv : LearningWithErrors.Adversary mlwe),
           (IND_CPA_advantage cpaAdv).toReal ≤
             |LearningWithErrors.advantage mlwe mlweAdv| := by
@@ -171,7 +172,12 @@ theorem ind_cca_security
       ∀ (adv : (foKEMScheme params ring encoding prims).IND_CCA_Adversary),
         ∃ (mlweAdv₁ mlweAdv₂ : LearningWithErrors.Adversary mlwe)
           (prfAdv : PRFScheme.PRFAdversary (KPKE.Ciphertext params encoding) SharedSecret),
-          (foKEMScheme params ring encoding prims).IND_CCA_Advantage adv ≤
+          (foKEMScheme params ring encoding prims).IND_CCA_Advantage
+              (FujisakiOkamoto.twoRORuntime
+                (PK := EncapsulationKey params encoding) (R := Coins)
+                (C := KPKE.Ciphertext params encoding) (KD := Message) (K := SharedSecret)
+                (fun (m : Message) (_c : KPKE.Ciphertext params encoding) => m))
+              adv ≤
             2 * |LearningWithErrors.advantage mlwe mlweAdv₁| +
             2 * |LearningWithErrors.advantage mlwe mlweAdv₂| +
             PRFScheme.prfAdvantage (prfJ params encoding prims) prfAdv +

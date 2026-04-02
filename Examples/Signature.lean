@@ -38,7 +38,9 @@ variable (G : Type) [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G]
 /-- Schnorr signature scheme: Fiat-Shamir applied to the Schnorr Σ-protocol
 with the discrete-log generable relation. -/
 def schnorrSignature (g : G) (hg : Function.Bijective (· • g : F → G))
-    (M : Type) [DecidableEq M] :=
+    (M : Type) [DecidableEq M] :
+    SignatureAlg (OracleComp (unifSpec + (M × G →ₒ F)))
+      (M := M) (PK := G) (SK := F) (S := G × F) :=
   FiatShamir (schnorrSigma F G g) (dlogGenerable g hg) M
 
 omit [DecidableEq F] in
@@ -46,7 +48,9 @@ omit [DecidableEq F] in
 underlying Schnorr Σ-protocol via the generic Fiat-Shamir completeness theorem. -/
 theorem schnorrSignature_complete (g : G) (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M] :
-    SignatureAlg.PerfectlyComplete (schnorrSignature F G g hg M) :=
+    SignatureAlg.PerfectlyComplete
+      (schnorrSignature F G g hg M)
+      (FiatShamir.runtime (PC := G) (Ω := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (schnorrSigma_complete F G g)
 
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
@@ -65,8 +69,9 @@ theorem schnorrSignature_euf_cma (g : G) (hg : Function.Bijective (· • g : F 
     (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (PC := G) (Ω := F)
       (oa := adv.main pk) qBound) :
     ∃ reduction : DLogAdversary F G,
-      adv.advantage *
-          (adv.advantage / (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
+      adv.advantage (FiatShamir.runtime (PC := G) (Ω := F) M) *
+          (adv.advantage (FiatShamir.runtime (PC := G) (Ω := F) M) /
+            (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (schnorrSigma F G g) (dlogGenerable g hg) M
     (schnorrSigma_speciallySound F G g) (schnorrSimTranscript F G g)

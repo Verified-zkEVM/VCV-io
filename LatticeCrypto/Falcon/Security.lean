@@ -127,7 +127,9 @@ theorem euf_cma_security
       (falconSignatureAlg p hr)) :
     ∃ (sisReduction : SIS.Adversary (ntruSISProblem p))
       (collisionBound : ENNReal),
-      adv.advantage ≤
+      adv.advantage
+          (GPVHashAndSign.runtime
+            (Range := Rq p.n) (List Byte) (Bytes 40)) ≤
         SIS.advantage (ntruSISProblem p) sisReduction + collisionBound := by
   sorry
 

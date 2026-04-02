@@ -122,7 +122,6 @@ def asExplicitCoins (params : Params) (ring : NTTRingOps) (encoding : Encoding p
     return keygenFromSeed ring encoding prims d
   encrypt := encrypt ring encoding prims
   decrypt := fun sk c => some (decrypt ring encoding prims sk c)
-  __ := ExecutionMethod.default
 
 end KPKE
 end MLKEM
