@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
-import VCVio.OracleComp.ExecutionMethod
+import VCVio.OracleComp.ProbCompLift
 
 /-!
 # Asymmetric Encryption Schemes
@@ -17,10 +17,10 @@ open OracleSpec OracleComp ENNReal
 universe u v w
 
 /-- An `AsymmEncAlg` with message space `M`, key spaces `PK` and `SK`, and ciphertexts in `C`.
-`m` is the monad used to execute key generation, encryption, and decryption.
-It extends `ExecutionMethod m`, typically `ExecutionMethod.default`. -/
-structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
-    extends ExecutionMethod m where
+`m` is the monad used to execute key generation, encryption, and decryption. The scheme data stays
+purely algorithmic; probabilistic semantics and public-randomness injection are supplied
+separately when defining security experiments. -/
+structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
   decrypt : (sk : SK) → (c : C) →  m (Option M)
@@ -30,8 +30,7 @@ structure AsymmEncAlg (m : Type → Type u) (M PK SK C : Type)
 Key generation runs in `m`, while encryption and decryption become pure once the randomness type
 `R` is supplied explicitly. This is the natural refinement used by FO-style transforms, where the
 coins are sampled externally or derived from an oracle. -/
-structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) (M PK SK R C : Type)
-    extends ExecutionMethod m where
+structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) [Monad m] (M PK SK R C : Type) where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) → (coins : R) → C
   decrypt : (sk : SK) → (c : C) → Option M
@@ -39,45 +38,43 @@ structure AsymmEncAlg.ExplicitCoins (m : Type → Type u) (M PK SK R C : Type)
 abbrev PKE_Alg := AsymmEncAlg
 
 namespace AsymmEncAlg
-
-variable {m : Type → Type v} {M PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
 
 section Correct
 
-variable [DecidableEq M] [Monad m]
+variable [DecidableEq M]
 
 /-- Correctness experiment: returns `true` iff decrypting the ciphertext recovers the message.
 
 The game returns a `Bool` directly rather than using `guard`, so it does not require
 `AlternativeMonad`. -/
-def CorrectExp (msg : M) : m Bool := do
-  let (pk, sk) ← encAlg.keygen
-  let c ← encAlg.encrypt pk msg
-  let msg' ← encAlg.decrypt sk c
-  return decide (msg' = some msg)
+def CorrectExp (msg : M) : m Bool :=
+  do
+    let (pk, sk) ← encAlg.keygen
+    let c ← encAlg.encrypt pk msg
+    let msg' ← encAlg.decrypt sk c
+    return decide (msg' = some msg)
 
-/-- An asymmetric encryption scheme is perfectly correct when decrypting a fresh encryption of any
-message succeeds with probability `1`. -/
-def PerfectlyCorrect : Prop :=
-  ∀ (msg : M), Pr[= true | encAlg.exec (encAlg.CorrectExp msg)] = 1
+/-- An asymmetric encryption scheme is perfectly correct under the given runtime when decrypting a
+fresh encryption of any message succeeds with probability `1`. -/
+def PerfectlyCorrect (runtime : ProbCompRuntime m) : Prop :=
+  ∀ (msg : M), Pr[= true | runtime.evalDist (encAlg.CorrectExp msg)] = 1
 
 end Correct
 
 namespace ExplicitCoins
-
-variable {m : Type → Type v} {M PK SK R C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK R C : Type}
   (encAlg : AsymmEncAlg.ExplicitCoins m M PK SK R C)
 
-/-- Forget the explicit-coins presentation by sampling the coins through the ambient execution
-method. -/
-def toAsymmEncAlg [Monad m] [SampleableType R] : AsymmEncAlg m M PK SK C where
-  keygen := encAlg.keygen
-  encrypt := fun pk msg => do
-    let r ← encAlg.lift_probComp ($ᵗ R)
-    return encAlg.encrypt pk msg r
-  decrypt := fun sk c => return (encAlg.decrypt sk c)
-  __ := encAlg.toExecutionMethod
+/-- Forget the explicit-coins presentation by sampling the coins through the ambient runtime's
+public-randomness capability. -/
+def toAsymmEncAlg [SampleableType R] (runtime : ProbCompRuntime m) : AsymmEncAlg m M PK SK C :=
+  { keygen := encAlg.keygen
+    encrypt := fun pk msg => do
+      let r ← runtime.liftProbComp ($ᵗ R)
+      return encAlg.encrypt pk msg r
+    decrypt := fun sk c => return (encAlg.decrypt sk c) }
 
 end ExplicitCoins
 

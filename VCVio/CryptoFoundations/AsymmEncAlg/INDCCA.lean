@@ -20,12 +20,10 @@ universe u v w
 
 namespace AsymmEncAlg
 
-variable {m : Type → Type v} {M PK SK C : Type}
+variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
 
 section decryptionOracle
-
-variable [Monad m]
 
 /-- Oracle that uses a secret key to respond to decryption requests.
 Invalid ciphertexts become oracle failure in `OptionT`. -/
@@ -69,12 +67,13 @@ The adversary chooses challenge messages with access to the decryption oracle, t
 the challenge ciphertext and continues interacting with a decryption oracle that returns `none`
 on the challenge ciphertext. -/
 def IND_CCA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
-    (adversary : encAlg.IND_CCA_Adversary) : ProbComp Bool :=
-  encAlg.exec do
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adversary : encAlg.IND_CCA_Adversary) : SPMF Bool :=
+  runtime.evalDist do
     let (pk, sk) ← encAlg.keygen
     let (m₀, m₁, st) ← simulateQ (encAlg.IND_CCA_preChallengeImpl sk)
       (adversary.chooseMessages pk)
-    let b ← encAlg.lift_probComp ($ᵗ Bool)
+    let b ← runtime.liftProbComp ($ᵗ Bool)
     let cStar ← encAlg.encrypt pk (if b then m₀ else m₁)
     let b' ← simulateQ (encAlg.IND_CCA_postChallengeImpl sk cStar)
       (adversary.distinguish st cStar)
@@ -82,8 +81,9 @@ def IND_CCA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
 
 /-- Real-valued IND-CCA advantage, expressed as the Boolean bias of the IND-CCA game. -/
 noncomputable def IND_CCA_Advantage {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : encAlg.IND_CCA_Adversary) : ℝ :=
-  (IND_CCA_Game adversary).boolBiasAdvantage
+  (IND_CCA_Game runtime adversary).boolBiasAdvantage
 
 end IND_CCA
 

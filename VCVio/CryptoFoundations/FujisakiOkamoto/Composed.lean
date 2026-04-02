@@ -92,6 +92,22 @@ def singleRO
       K PK ((PK × SK) × policy.FallbackState) C :=
   scheme pke (singleROVariant (PK := PK) (C := C) (R := R) (K := K) pkh) policy
 
+/-- Runtime bundle for the canonical two-RO Fujisaki-Okamoto oracle world. -/
+noncomputable def twoRORuntime
+    (kdInput : M → C → KD)
+    [DecidableEq M] [DecidableEq C] [DecidableEq KD]
+    [SampleableType M] [SampleableType R] [SampleableType K] :
+    ProbCompRuntime (OracleComp (UTransform.oracleSpec M R KD K)) :=
+  UTransform.runtime (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput
+
+/-- Runtime bundle for the single-RO Fujisaki-Okamoto oracle world. -/
+noncomputable def singleRORuntime
+    {PKHash : Type}
+    (pkh : PK → PKHash)
+    [DecidableEq PKHash] [DecidableEq M] [SampleableType R] [SampleableType K] :
+    ProbCompRuntime (OracleComp (singleROOracleSpec PKHash M R K)) :=
+  FujisakiOkamoto.runtime (singleROVariant (PK := PK) (C := C) (R := R) (K := K) pkh)
+
 /-- Main composed Fujisaki-Okamoto theorem statement. The proof is intentionally deferred, but the
 reduction artifacts are now existentially quantified rather than passed in as unrelated inputs. -/
 theorem IND_CCA_bound
@@ -104,11 +120,13 @@ theorem IND_CCA_bound
     (adversary : (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Adversary)
     (correctnessBound epsMsg : ℝ)
     (qHK : ℕ) :
-    ∃ cpaAdv₁ cpaAdv₂ : pke.toAsymmEncAlg.IND_CPA_adversary,
+    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
       ∃ prfAdv : PRFScheme.PRFAdversary C K,
-        (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage adversary ≤
-          2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₁).toReal +
-          2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₂).toReal +
+        (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage
+            (twoRORuntime (PK := PK) (R := R) (C := C) (KD := KD) (K := K) kdInput)
+            adversary ≤
+          2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
+          2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
           PRFScheme.prfAdvantage prf prfAdv +
           ((2 * qHK + 3 : ℕ) : ℝ) * correctnessBound +
           2 * ((2 * qHK + 2 : ℕ) : ℝ) * epsMsg := by

@@ -37,7 +37,6 @@ def composeWithDEM [Monad m]
     match k? with
     | none => return none
     | some k => return some (← dem.decrypt k c.2)
-  __ := kem.toExecutionMethod
 
 section Correct
 
@@ -151,16 +150,16 @@ def composeWithDEM_toDEMReduction
 /-- Proof-ladders A1 reduction statement: the one-time IND-CPA advantage of textbook KEM+DEM is
 bounded by two KEM IND-CPA advantages plus one DEM IND-CPA advantage, using the canonical
 left/right and DEM reductions defined above. -/
-theorem IND_CPA_OneTime_biasAdvantage_composeWithDEM_le
+theorem ind_cpa_one_time_bias_advantage_compose_with_dem_le
     (kem : KEMScheme (OracleComp spec) K PK SK CKEM)
     (dem : DEMScheme (OracleComp spec) K M CDEM)
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : AsymmEncAlg.IND_CPA_Adv (kem.composeWithDEM dem)) :
-    AsymmEncAlg.IND_CPA_OneTime_biasAdvantage (kem.composeWithDEM dem) adversary ≤
-      kem.IND_CPA_Advantage (kem.composeWithDEM_toKEMLeftReduction dem adversary) +
-      kem.IND_CPA_Advantage (kem.composeWithDEM_toKEMRightReduction dem adversary) +
-      (dem.withExecutionMethod kem.toExecutionMethod).IND_CPA_Advantage
-        (kem.composeWithDEM_toDEMReduction
-          (dem.withExecutionMethod kem.toExecutionMethod) adversary) := by
+    AsymmEncAlg.IND_CPA_OneTime_biasAdvantage (kem.composeWithDEM dem) runtime adversary ≤
+      kem.IND_CPA_Advantage runtime (kem.composeWithDEM_toKEMLeftReduction dem adversary) +
+      kem.IND_CPA_Advantage runtime (kem.composeWithDEM_toKEMRightReduction dem adversary) +
+      dem.IND_CPA_Advantage runtime
+        (kem.composeWithDEM_toDEMReduction dem adversary) := by
   sorry
 
 end IND_CPA

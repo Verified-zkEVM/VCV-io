@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # GPV Hash-and-Sign Framework
@@ -107,28 +108,6 @@ def GPVHashAndSign
   verify := fun pk m (r, s) => do
     let c ← query (spec := unifSpec + (Salt × M →ₒ Range)) (Sum.inr (r, m))
     return (decide (psf.eval pk s = c) && psf.isShort s)
-  exec comp :=
-    let ro : QueryImpl (Salt × M →ₒ Range)
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let ro : QueryImpl (Salt × M →ₒ Range)
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s
-      rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (Salt × M →ₒ Range).QueryCache)))
 
 namespace GPVHashAndSign
 
@@ -138,6 +117,15 @@ variable {PK SK Domain Range : Type}
   (psf : PreimageSampleableFunction PK SK Domain Range)
   (hr : GenerableRelation PK SK p)
   (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
+
+/-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
+noncomputable def runtime :
+    ProbCompRuntime (OracleComp (unifSpec + (Salt × M →ₒ Range))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (Salt × M →ₒ Range) (StateT ((Salt × M →ₒ Range).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural bound that counts only random-oracle queries in a GPV EUF-CMA adversary. -/
 def hashQueryBound {S' α : Type}
@@ -191,7 +179,7 @@ theorem euf_cma_bound [DecidableEq Domain] [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv (GPVHashAndSign psf hr M Salt)) :
     ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
       (collisionBound : ENNReal),
-      adv.advantage ≤
+      adv.advantage (runtime M Salt) ≤
         preimageFindingAdvantage (psf := psf) (hr := hr) reduction + collisionBound := by
   sorry
 

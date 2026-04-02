@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 /-!
 # Fiat-Shamir with Aborts Transform
 
@@ -87,34 +88,21 @@ def FiatShamirWithAbort (ids : IdenSchemeWithAbort S W W' St C Z p)
     | some (w', z) =>
       let c ← query (spec := unifSpec + (M × W' →ₒ C)) (Sum.inr (m, w'))
       return ids.verify pk w' c z
-  exec comp :=
-    let ro : QueryImpl (M × W' →ₒ C)
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let ro : QueryImpl (M × W' →ₒ C)
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × W' →ₒ C).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left
-          (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s; rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (M × W' →ₒ C).QueryCache)))
 
 namespace FiatShamirWithAbort
 
 variable (ids : IdenSchemeWithAbort S W W' St C Z p)
   (hr : GenerableRelation S W p)
   (M : Type) [DecidableEq M] (maxAttempts : ℕ)
+
+/-- Runtime bundle for the Fiat-Shamir-with-aborts random-oracle world. -/
+noncomputable def runtime :
+    ProbCompRuntime (OracleComp (unifSpec + (M × W' →ₒ C))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (M × W' →ₒ C) (StateT ((M × W' →ₒ C).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 section EUF_CMA
 
@@ -196,7 +184,7 @@ theorem euf_cma_bound [DecidableEq Z]
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
-      adv.advantage ≤
+      adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
   let _ := hc
@@ -220,7 +208,7 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
     (hQ : ∀ pk, signHashQueryBound M
       (S' := Option (W' × Z)) (oa := adv.main pk) qS qH) :
     ∃ reduction : S → ProbComp W,
-      adv.advantage ≤
+      adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
   simpa using

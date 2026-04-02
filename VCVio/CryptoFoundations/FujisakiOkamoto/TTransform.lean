@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # Fujisaki-Okamoto T Transform
@@ -67,20 +68,17 @@ def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
     return pke.encrypt pk msg r
   decrypt := fun (pk, sk) c => TTransform.decrypt pke pk sk c
-  exec := fun comp =>
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT (QueryCache M R) ProbComp)
-    StateT.run' (simulateQ (idImpl + TTransform.queryImpl (M := M) (R := R)) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
-    simpa using
-      (exec_lift_probComp_withHashOracle
-        (hashImpl := TTransform.queryImpl (M := M) (R := R))
-        (s := (∅ : QueryCache M R))
-        c)
 
 namespace TTransform
+
+/-- Runtime bundle for the T-transform random-oracle world. -/
+noncomputable def runtime
+    [DecidableEq M] [SampleableType R] :
+    ProbCompRuntime (OracleComp (TTransform.oracleSpec M R)) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := TTransform.queryImpl (M := M) (R := R))
+    (∅ : QueryCache M R)
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural query bound for T-transform OW-PCVA adversaries: uniform-sampling queries are
 unrestricted, while `qH`, `qP`, and `qV` bound the hash, plaintext-checking, and validity
@@ -111,10 +109,11 @@ theorem OW_PCVA_bound
     (correctnessBound gamma epsMsg : ℝ)
     (qH qP qV : ℕ) :
     adversary.MakesAtMostQueries qH qP qV →
-    ∃ cpaAdv₁ cpaAdv₂ : pke.toAsymmEncAlg.IND_CPA_adversary,
-      (OW_PCVA_Advantage (encAlg := TTransform pke) adversary).toReal ≤
-        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₁).toReal +
-        2 * (pke.toAsymmEncAlg.IND_CPA_advantage cpaAdv₂).toReal +
+    ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
+      (OW_PCVA_Advantage (encAlg := TTransform pke)
+        (runtime (M := M) (R := R)) adversary).toReal ≤
+        2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
+        2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
         correctnessBound +
         (qV : ℝ) * gamma +
         2 * ((qH + qP + 1 : ℕ) : ℝ) * epsMsg := by

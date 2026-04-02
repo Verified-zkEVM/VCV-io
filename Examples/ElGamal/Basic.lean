@@ -63,7 +63,6 @@ Encryption of `msg` under public key `pk` samples `r ← $ᵗ F` and returns
     return (r • gen, msg + r • pk)
   decrypt := fun sk (c₁, c₂) =>
     return (some (c₂ - sk • c₁))
-  __ := ExecutionMethod.default
 
 namespace elGamalAsymmEnc
 
@@ -72,14 +71,17 @@ variable {G : Type} [AddCommGroup G] [Module F G] [SampleableType G]
 variable {gen : G}
 
 /-- ElGamal decryption perfectly inverts encryption: `Dec(sk, Enc(pk, msg)) = msg`. -/
-theorem correct [DecidableEq G] : (elGamalAsymmEnc F G gen).PerfectlyCorrect := by
+theorem correct [DecidableEq G] :
+    (elGamalAsymmEnc F G gen).PerfectlyCorrect ProbCompRuntime.probComp := by
   have hcancel : ∀ (msg : G) (sk r : F),
       msg + r • (sk • gen) - sk • (r • gen) = msg := by
     intro msg sk r
     have : r • (sk • gen) = sk • (r • gen) := by
       rw [← mul_smul, ← mul_smul, mul_comm]
     rw [this, add_sub_cancel_right]
-  simp [AsymmEncAlg.PerfectlyCorrect, AsymmEncAlg.CorrectExp, elGamalAsymmEnc, hcancel]
+  simp [AsymmEncAlg.PerfectlyCorrect, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
+    AsymmEncAlg.CorrectExp, elGamalAsymmEnc, hcancel,
+    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, HasEvalPMF.probFailure_eq_zero]
 
 section IND_CPA
 
@@ -112,8 +114,7 @@ private lemma IND_CPA_OneTime_game_evalDist_eq_ddhExpReal
         (DiffieHellman.ddhExpReal (F := F) gen
           (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)) := by
   simp only [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp,
-    DiffieHellman.ddhExpReal, IND_CPA_OneTime_DDHReduction,
-    elGamalAsymmEnc, ExecutionMethod.default]
+    DiffieHellman.ddhExpReal, IND_CPA_OneTime_DDHReduction, elGamalAsymmEnc]
   ext z
   change Pr[= z | _] = Pr[= z | _]
   simp only [bind_pure_comp, bind_map_left]

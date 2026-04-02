@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
 
@@ -37,14 +38,21 @@ variable [DecidableEq M] [SampleableType R]
 /-- `delta`-correctness: failure in the canonical `AsymmEncAlg.CorrectExp` experiment occurs with
 probability at most `delta`. -/
 def deltaCorrect (delta : ℝ≥0∞) : Prop :=
-  ∀ msg : M, Pr[= false | pke.toAsymmEncAlg.CorrectExp msg] ≤ delta
+  ∀ msg : M, Pr[= false | do
+    let (pk, sk) ← pke.keygen
+    let r ← ($ᵗ R : ProbComp R)
+    let c := pke.encrypt pk msg r
+    let msg' := pke.decrypt sk c
+    pure (decide (msg' = some msg))] ≤ delta
 
 end Correct
 
 /-- `gamma`-spread: no ciphertext occurs with probability more than `gamma` for any fixed public
 key and plaintext. -/
 def gammaSpread [SampleableType R] [DecidableEq C] (gamma : ℝ≥0∞) : Prop :=
-  ∀ pk msg c, Pr[= c | pke.toAsymmEncAlg.encrypt pk msg] ≤ gamma
+  ∀ pk msg c, Pr[= c | do
+    let r ← ($ᵗ R : ProbComp R)
+    pure (pke.encrypt pk msg r)] ≤ gamma
 
 section OW_CPA
 
@@ -65,8 +73,9 @@ abbrev OW_CPA_Adversary := PK → C → OracleComp pke.OW_CPA_oracleSpec M
 
 /-- Implementation of the OW-CPA encryption oracle. -/
 def OW_CPA_queryImpl (pk : PK) : QueryImpl pke.OW_CPA_oracleSpec ProbComp :=
-  let encAlg := pke.toAsymmEncAlg
-  (QueryImpl.ofLift unifSpec ProbComp) + fun msg => encAlg.encrypt pk msg
+  (QueryImpl.ofLift unifSpec ProbComp) + fun msg => do
+    let r ← ($ᵗ R : ProbComp R)
+    pure (pke.encrypt pk msg r)
 
 /-- Main one-way under chosen-plaintext attack (OW-CPA) experiment.
 
@@ -75,10 +84,10 @@ ciphertext via the induced randomized `AsymmEncAlg`, runs the adversary with ora
 described by `OW_CPA_oracleSpec`, and returns `true` exactly when the adversary recovers the
 challenge message. -/
 def OW_CPA_Game (adversary : pke.OW_CPA_Adversary) : ProbComp Bool := do
-  let encAlg := pke.toAsymmEncAlg
-  let (pk, _sk) ← encAlg.keygen
+  let (pk, _sk) ← pke.keygen
   let msg ← $ᵗ M
-  let c ← encAlg.encrypt pk msg
+  let r ← ($ᵗ R : ProbComp R)
+  let c := pke.encrypt pk msg r
   let msg' ← simulateQ (pke.OW_CPA_queryImpl pk) (adversary pk c)
   return decide (msg' = msg)
 
@@ -89,26 +98,6 @@ noncomputable def OW_CPA_Advantage (adversary : pke.OW_CPA_Adversary) : ℝ≥0�
 end OW_CPA
 
 end AsymmEncAlg.ExplicitCoins
-
-/-- Executing a lifted `ProbComp` in a public random-oracle world ignores the oracle state and
-collapses back to the original probabilistic computation. -/
-theorem exec_lift_probComp_withHashOracle
-    {ι : Type} {hashSpec : OracleSpec ι} {σ : Type}
-    (hashImpl : QueryImpl hashSpec (StateT σ ProbComp)) (s : σ)
-    {α : Type} (c : ProbComp α) :
-    StateT.run' (simulateQ
-      ((QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp) + hashImpl)
-      (monadLift c)) s = c := by
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget (StateT σ ProbComp)
-  change StateT.run' (simulateQ (idImpl + hashImpl) (monadLift c)) s = c
-  rw [show simulateQ (idImpl + hashImpl) (monadLift c) = simulateQ idImpl c by
-    simpa [MonadLift.monadLift] using
-      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := hashImpl) c)]
-  have hid : ∀ t s', (idImpl t).run' s' = query t := by
-    intro t s'
-    rfl
-  simpa using
-    (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c) (s := s))
 
 section OW_PCVA
 
@@ -150,10 +139,11 @@ ambient oracle interface `spec`, the plaintext-checking oracle, and the validity
 game returns `true` exactly when the final guess equals the hidden challenge message. -/
 def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     [SampleableType M] [DecidableEq M]
-    (adversary : OW_PCVA_Adversary encAlg) : ProbComp Bool :=
-  encAlg.exec do
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adversary : OW_PCVA_Adversary encAlg) : SPMF Bool :=
+  runtime.evalDist do
     let (pk, sk) ← encAlg.keygen
-    let msg ← encAlg.lift_probComp ($ᵗ M)
+    let msg ← runtime.liftProbComp ($ᵗ M)
     let cStar ← encAlg.encrypt pk msg
     let msg' ← simulateQ (OW_PCVA_queryImpl encAlg sk) (adversary pk cStar)
     return decide (msg' = msg)
@@ -161,7 +151,8 @@ def OW_PCVA_Game {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
 /-- OW-PCVA advantage is the message-recovery probability in the above game. -/
 noncomputable def OW_PCVA_Advantage {encAlg : AsymmEncAlg (OracleComp spec) M PK SK C}
     [SampleableType M] [DecidableEq M]
+    (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : OW_PCVA_Adversary encAlg) : ℝ≥0∞ :=
-  Pr[= true | OW_PCVA_Game adversary]
+  Pr[= true | OW_PCVA_Game runtime adversary]
 
 end OW_PCVA

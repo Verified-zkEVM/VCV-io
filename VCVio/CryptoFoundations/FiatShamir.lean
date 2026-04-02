@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.ProgramLogic.Tactics
 
 /-!
@@ -41,28 +42,6 @@ def FiatShamir (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
   verify := fun pk m (c, s) => do
     let r' ← query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr (m, c))
     return sigmaAlg.verify pk c r' s
-  exec comp :=
-    let ro : QueryImpl (M × PC →ₒ Ω)
-      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
-    StateT.run' (simulateQ (idImpl + ro) comp) ∅
-  lift_probComp := monadLift
-  exec_lift_probComp c := by
-    let ro : QueryImpl (M × PC →ₒ Ω)
-      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp) := randomOracle
-    let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-      (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)
-    change StateT.run' (simulateQ (idImpl + ro) (monadLift c)) ∅ = c
-    rw [show simulateQ (idImpl + ro) (monadLift c) = simulateQ idImpl c by
-      simpa [MonadLift.monadLift] using
-        (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) c)]
-    have hid : ∀ t s, (idImpl t).run' s = query t := by
-      intro t s
-      rfl
-    simpa using
-      (StateT_run'_simulateQ_eq_self (so := idImpl) (h := hid) (oa := c)
-        (s := (∅ : (M × PC →ₒ Ω).QueryCache)))
 
 namespace FiatShamir
 
@@ -72,6 +51,15 @@ variable {X W PC SC Ω P : Type} {p : X → W → Bool}
 
 variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
   (M : Type) [DecidableEq M]
+
+/-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
+noncomputable def runtime :
+    ProbCompRuntime (OracleComp (unifSpec + (M × PC →ₒ Ω))) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := (randomOracle :
+      QueryImpl (M × PC →ₒ Ω) (StateT ((M × PC →ₒ Ω).QueryCache) ProbComp)))
+    ∅
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
@@ -93,7 +81,7 @@ omit [DecidableEq P] [DecidableEq Ω] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
-    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) := by
+    SignatureAlg.PerfectlyComplete (FiatShamir σ hr M) (runtime M) := by
   intro msg
   classical
   let ro : QueryImpl (M × PC →ₒ Ω)
@@ -138,24 +126,24 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       simpa using hleft oa]
     simpa using hrun oa s
   change
-    Pr[= true | (FiatShamir σ hr M).exec (do
+    Pr[= true | (runtime M).evalDist (do
       let (pk, sk) ← (FiatShamir σ hr M).keygen
       let sig ← (FiatShamir σ hr M).sign pk sk msg
       (FiatShamir σ hr M).verify pk msg sig)] = 1
-  rw [show (FiatShamir σ hr M).exec (do
+  rw [show (runtime M).evalDist (do
       let (pk, sk) ← (FiatShamir σ hr M).keygen
       let sig ← (FiatShamir σ hr M).sign pk sk msg
       (FiatShamir σ hr M).verify pk msg sig) =
-        (do
+        evalDist (do
           let (pk, sk) ← hr.gen
           let (c, e) ← σ.commit pk sk
           let r ← $ᵗ Ω
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
-    change StateT.run' (simulateQ (idImpl + ro) (do
+    change evalDist (StateT.run' (simulateQ (idImpl + ro) (do
         let (pk, sk) ← (FiatShamir σ hr M).keygen
         let sig ← (FiatShamir σ hr M).sign pk sk msg
-        (FiatShamir σ hr M).verify pk msg sig)) ∅ = _
+        (FiatShamir σ hr M).verify pk msg sig)) ∅) = _
     dsimp only [FiatShamir]
     simp only [simulateQ_bind, simulateQ_pure, simulateQ_query,
       QueryImpl.add_apply_inr,
@@ -220,6 +208,13 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
       change Prod.fst <$> (pure (a, s) : ProbComp _) = pure a
       simp [map_pure]
     simp_rw [hpure_run']]
+  change
+    Pr[= true | (do
+      let (pk, sk) ← hr.gen
+      let (c, e) ← σ.commit pk sk
+      let r ← $ᵗ Ω
+      let s ← σ.respond pk sk e r
+      pure (σ.verify pk c r s) : ProbComp Bool)] = 1
   vcstep
   vcstep using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support hr.gen))
   · simpa [OracleComp.ProgramLogic.propInd] using
@@ -269,8 +264,8 @@ theorem euf_cma_bound
     (_hQ : ∀ pk, hashQueryBound (M := M) (PC := PC) (Ω := Ω)
       (S' := PC × P) (oa := adv.main pk) qBound) :
     ∃ reduction : X → ProbComp W,
-      (adv.advantage *
-          (adv.advantage / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
+      (adv.advantage (runtime M) *
+          (adv.advantage (runtime M) / (qBound + 1 : ENNReal) - challengeSpaceInv Ω)) ≤
         Pr[= true | hardRelationExp (r := p) reduction] := by
   -- TODO: implement the explicit Pointcheval-Stern reduction.
   sorry

@@ -7,6 +7,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.PRF
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!
 # Fujisaki-Okamoto U Transform
@@ -49,23 +50,17 @@ def implicitRejection {K C KPRF : Type} (prf : PRFScheme KPRF C K) : RejectionPo
   keygen := prf.keygen
   onReject := fun kPrf c => some (prf.eval kPrf c)
 
-/-- Execute an FO computation by combining public randomness with the
-variant-specific hash world. -/
-def exec {M PK C R K : Type} (variant : Variant M PK C R K)
-    {α : Type} (comp : OracleComp (unifSpec + variant.hashOracleSpec) α) : ProbComp α :=
-  let idImpl := (QueryImpl.ofLift unifSpec ProbComp).liftTarget
-    (StateT variant.QueryCache ProbComp)
-  StateT.run' (simulateQ (idImpl + variant.queryImpl) comp) variant.initCache
+/-- Bundled subprobabilistic semantics for an FO hash world, obtained by hiding the
+variant-specific cache after running the public-randomness-plus-hash simulation. -/
+noncomputable def spmfSemantics {M PK C R K : Type} (variant : Variant M PK C R K) :
+    SPMFSemantics (OracleComp (unifSpec + variant.hashOracleSpec)) :=
+  SPMFSemantics.withStateOracle variant.queryImpl variant.initCache
 
-/-- Lifted probabilistic computations ignore the FO hash world. -/
-theorem exec_lift_probComp {M PK C R K : Type} (variant : Variant M PK C R K)
-    {α : Type} (c : ProbComp α) :
-    FujisakiOkamoto.exec variant (monadLift c) = c := by
-  simpa [exec] using
-    (exec_lift_probComp_withHashOracle
-      (hashImpl := variant.queryImpl)
-      (s := variant.initCache)
-      c)
+/-- Full public-randomness runtime for an FO hash world. -/
+noncomputable def runtime {M PK C R K : Type} (variant : Variant M PK C R K) :
+    ProbCompRuntime (OracleComp (unifSpec + variant.hashOracleSpec)) where
+  toSPMFSemantics := spmfSemantics variant
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Generic FO construction parameterized by a hash world and a rejection policy. -/
 def scheme
@@ -99,11 +94,6 @@ def scheme
           return some k
         else
           return policy.onReject fb c
-  exec := FujisakiOkamoto.exec variant
-  lift_probComp := monadLift
-  exec_lift_probComp := by
-    intro α c
-    simpa using FujisakiOkamoto.exec_lift_probComp (variant := variant) (c := c)
 
 end FujisakiOkamoto
 
@@ -192,6 +182,15 @@ def UTransform
 
 namespace UTransform
 
+/-- Runtime bundle for the two-RO U-transform oracle world. -/
+noncomputable def runtime
+    {M PK C R KD K : Type}
+    [DecidableEq M] [DecidableEq KD] [SampleableType R] [SampleableType K]
+    (kdInput : M → C → KD) :
+    ProbCompRuntime (OracleComp (oracleSpec M R KD K)) :=
+  FujisakiOkamoto.runtime
+    (variant (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput)
+
 /-- The generic U-transform CCA bound. The proof is intentionally deferred, but the reduction
 artifacts are now existentially quantified rather than passed in as unrelated inputs. -/
 theorem IND_CCA_bound
@@ -206,11 +205,12 @@ theorem IND_CCA_bound
     ∃ prfAdv : PRFScheme.PRFAdversary C K,
       ∃ owAdv : OW_PCVA_Adversary (TTransform pke),
         (UTransform pke kdInput (FujisakiOkamoto.implicitRejection prf)).IND_CCA_Advantage
-            adversary ≤
+            (runtime (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput) adversary ≤
           PRFScheme.prfAdvantage prf prfAdv +
           correctnessBound₁ +
           correctnessBound₂ +
-          (OW_PCVA_Advantage (encAlg := TTransform pke) owAdv).toReal := by
+          (OW_PCVA_Advantage (encAlg := TTransform pke) (TTransform.runtime (M := M)
+            (R := R)) owAdv).toReal := by
   sorry
 
 end UTransform

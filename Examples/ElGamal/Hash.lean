@@ -53,7 +53,8 @@ open OracleComp OracleSpec ENNReal DiffieHellman
 
 The additive group operation `+` on `M` plays the role of XOR.
 Following `elGamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
-@[simps!] def hashedElGamal (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
+@[simps!] def hashedElGamal
+    (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
     {G : Type} [AddCommGroup G] [Module F G]
     {HK : Type} [SampleableType HK]
     {M : Type} [AddCommGroup M] [SampleableType M]
@@ -68,7 +69,6 @@ Following `elGamalAsymmEnc`, `F` and `G` are explicit type parameters. -/
     return (y • g, hash pk.1 (y • pk.2) + msg)
   decrypt sk c :=
     return (some (c.2 - hash sk.1 (sk.2 • c.1)))
-  __ := ExecutionMethod.default
 
 namespace hashedElGamal
 
@@ -82,11 +82,13 @@ variable {g : G} {hash : HK → G → M}
 
 omit [DecidableEq G] in
 theorem correct :
-    (hashedElGamal F g hash).PerfectlyCorrect := by
+    (hashedElGamal F g hash).PerfectlyCorrect ProbCompRuntime.probComp := by
   have hcomm : ∀ (a b : F), a • (b • g) = b • (a • g) := by
     intro a b; rw [← mul_smul, mul_comm, mul_smul]
   intro msg
-  simp [AsymmEncAlg.CorrectExp, hashedElGamal, hcomm]
+  simp [AsymmEncAlg.CorrectExp, ProbCompRuntime.probComp, ProbCompRuntime.evalDist,
+    hashedElGamal, hcomm,
+    HasEvalPMF.toSPMF_eq, SPMF.probFailure_liftM, HasEvalPMF.probFailure_eq_zero]
 
 /-! ## DDH Reduction -/
 
