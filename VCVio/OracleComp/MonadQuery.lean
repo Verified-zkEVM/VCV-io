@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.Monad.Hom
 
@@ -27,13 +28,13 @@ open OracleSpec
 universe u v w x
 
 /-- Capability to issue queries to the oracle family `spec` inside the ambient monad `m`. -/
-class MonadQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) [Monad m] where
+class MonadQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) where
   /-- Issue a single oracle query. -/
   query : (t : spec.Domain) → m (spec.Range t)
 
 namespace QueryImpl
 
-variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w} [Monad m]
+variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
 
 /-- View a concrete query implementation as query capability in the same monad. This is useful
 when instantiating a generic `MonadQuery` construction directly inside an analysis monad such as
@@ -50,7 +51,7 @@ end QueryImpl
 namespace MonadQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
-  {m : Type v → Type w} [Monad m]
+  {m : Type v → Type w}
 
 /-- Repackage `MonadQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
 implementations. -/
@@ -73,15 +74,9 @@ lemma instOfMonadLift_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) 
       liftM (OracleQuery.query (spec := spec) t) :=
   rfl
 
-@[simp]
-lemma query_eq_liftM_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
-    @MonadQuery.query ι spec m ‹Monad m› (instOfMonadLift (spec := spec) (m := m)) t =
-      liftM (OracleQuery.query (spec := spec) t) :=
-  rfl
-
 section Morphisms
 
-variable [MonadQuery spec m]
+variable [Monad m] [MonadQuery spec m]
   {n : Type v → Type x} [Monad n] [MonadQuery spec n]
 
 /-- A `QueryHom spec m n` is a monad morphism `m →ᵐ n` that also preserves the distinguished
@@ -112,5 +107,4 @@ lemma map_query (F : QueryHom spec m n) (t : spec.Domain) :
   F.map_query' t
 
 end Morphisms
-
 end MonadQuery
