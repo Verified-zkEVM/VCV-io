@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.MonadQuery
+import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -34,17 +34,17 @@ def FiatShamir
     {m : Type → Type v} [Monad m]
     (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
     (hr : GenerableRelation X W p) (M : Type) [DecidableEq M]
-    [MonadLiftT ProbComp m] [MonadQuery (M × PC →ₒ Ω) m] :
+    [MonadLiftT ProbComp m] [HasQuery (M × PC →ₒ Ω) m] :
     SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := PC × P) where
   keygen := monadLift hr.gen
   sign := fun pk sk msg => do
     let (c, e) ← (monadLift (sigmaAlg.commit pk sk) : m _)
-    let r ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    let r ← HasQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
     let s ← (monadLift (sigmaAlg.respond pk sk e r) : m _)
     pure (c, s)
   verify := fun pk msg (c, s) => do
-    let r' ← MonadQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
+    let r' ← HasQuery.query (spec := (M × PC →ₒ Ω)) (msg, c)
     pure (sigmaAlg.verify pk c r' s)
 
 namespace FiatShamir
@@ -154,7 +154,7 @@ theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
     dsimp only [FiatShamir]
     have hquery :
         ∀ q : M × PC,
-          MonadQuery.query
+          HasQuery.query
               (spec := (M × PC →ₒ Ω))
               (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) q =
             (query (spec := unifSpec + (M × PC →ₒ Ω)) (Sum.inr q) :
