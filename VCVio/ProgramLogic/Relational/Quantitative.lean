@@ -10,19 +10,20 @@ import VCVio.EvalDist.TVDist
 /-!
 # Quantitative Relational Program Logic (eRHL)
 
-This file defines the eRHL-style quantitative relational logic for `OracleComp`.
+This file develops the main theorem layer for the eRHL-style quantitative relational
+logic for `OracleComp`, building on the core interfaces in
+`VCVio.ProgramLogic.Relational.QuantitativeDefs`.
 
 The core idea (from Avanzini-Barthe-Gregoire-Davoli, POPL 2025) is to make pre/postconditions
 `ℝ≥0∞`-valued instead of `Prop`-valued. This subsumes both pRHL (exact coupling, via indicator
 postconditions) and apRHL (ε-approximate coupling, via threshold preconditions).
 
-## Main definitions
+## Main results in this file
 
-- `eRelWP`: quantitative relational WP — supremum over couplings of expected postcondition
-- `eRelTriple`: quantitative relational triple (`pre ≤ eRelWP oa ob post`)
-- `RelPost.indicator`: indicator postcondition lifting `Prop` to `ℝ≥0∞`
-- `RelTriple'`: pRHL-style exact coupling as eRHL special case
-- `ApproxRelTriple`: apRHL-style ε-approximate coupling as eRHL special case
+- coupling-mass lemmas and support facts
+- introduction, consequence, and bind rules for eRHL
+- bridges to exact and approximate couplings
+- total-variation characterizations via `EqRel`
 
 ## Design
 

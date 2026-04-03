@@ -84,7 +84,7 @@ This is the quantitative analogue of Std.Do's `⌜P⌝ : SPred`. -/
 noncomputable def propInd (P : Prop) : ℝ≥0∞ := if P then 1 else 0
 
 @[simp] lemma propInd_true : propInd True = 1 := if_pos trivial
-@[simp] lemma propInd_false : propInd False = 0 := if_neg not_false
+@[simp] lemma propInd_false : propInd False = 0 := if_neg id
 
 lemma propInd_eq_ite {P : Prop} [Decidable P] : propInd P = if P then 1 else 0 := by
   simp [propInd]
@@ -109,23 +109,11 @@ lemma propInd_le_one (P : Prop) : propInd P ≤ 1 := by
 
 open scoped Classical in
 lemma propInd_eq_one_iff {P : Prop} : propInd P = 1 ↔ P := by
-  unfold propInd
-  constructor
-  · intro h
-    by_contra hn
-    simp [hn] at h
-  · intro h
-    simp [h]
+  by_cases hP : P <;> simp [propInd, hP]
 
 open scoped Classical in
 lemma propInd_eq_zero_iff {P : Prop} : propInd P = 0 ↔ ¬P := by
-  unfold propInd
-  constructor
-  · intro h
-    by_contra hn
-    simp [hn] at h
-  · intro h
-    simp [h]
+  by_cases hP : P <;> simp [propInd, hP]
 
 open scoped Classical in
 lemma propInd_or_le {P Q : Prop} : propInd (P ∨ Q) ≤ propInd P + propInd Q := by
@@ -291,7 +279,9 @@ theorem AdvBound.of_tvDist
     (htv : tvDist game₁ game₂ ≤ ε₂) :
     AdvBound game₂ (ε₁ + ε₂) := by
   unfold AdvBound at *
-  have hdiff := abs_probOutput_toReal_sub_le_tvDist game₁ game₂
+  have hdiff :
+      |Pr[= true | game₁].toReal - Pr[= true | game₂].toReal| ≤ tvDist game₁ game₂ :=
+    abs_probOutput_toReal_sub_le_tvDist game₁ game₂
   rw [abs_le] at hbound hdiff ⊢
   obtain ⟨hd1, hd2⟩ := hdiff
   obtain ⟨hb1, hb2⟩ := hbound

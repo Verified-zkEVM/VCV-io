@@ -112,9 +112,9 @@ The proof requires deriving the `hRespondVerify` algebraic fact from `Primitives
 see `idsWithAbort_complete'` for the conditional version. -/
 theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
     (identificationScheme p prims nttOps).Complete := by
+  classical
   sorry
 
-omit hRespondVerify
 /-- Placeholder quantitative HVZK theorem surface for the ML-DSA identification scheme.
 
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE.
@@ -130,6 +130,7 @@ transcript distribution. The bound is nonnegative by definition of total variati
 distance. -/
 theorem idsWithAbort_hvzk :
     ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims nttOps).HVZK sim ζ_zk := by
+  classical
   sorry
 
 omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited]
