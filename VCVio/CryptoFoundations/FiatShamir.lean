@@ -9,6 +9,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.ProgramLogic.Tactics.Unary
@@ -91,7 +92,8 @@ theorem map_construction
     SignatureAlg.map F.toMonadHom (FiatShamir (m := m) σ hr M) =
       FiatShamir (m := n) σ hr M := by
   apply SignatureAlg.ext
-  · simpa [FiatShamir, liftM, MonadLiftT.monadLift] using hLift hr.gen
+  · simpa [FiatShamir, liftM, MonadLiftT.monadLift, -QueryRuntime.toHasQuery_query]
+      using hLift hr.gen
   · funext pk sk msg
     have hCommit :
         F.toMonadHom (monadLift (σ.commit pk sk) : m (PC × SC)) =
@@ -101,12 +103,139 @@ theorem map_construction
         ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m P) =
           (monadLift (σ.respond pk sk e r) : n P) :=
       fun e r => hLift (σ.respond pk sk e r)
-    simp [FiatShamir, hCommit, hRespond]
+    simp [FiatShamir, hCommit, hRespond, -QueryRuntime.toHasQuery_query]
   · funext pk msg sig
     cases sig
-    simp [FiatShamir]
+    simp [FiatShamir, -QueryRuntime.toHasQuery_query]
 
 end naturality
+
+section costAccounting
+
+variable {m : Type → Type u} [Monad m] [LawfulMonad m]
+  [MonadLiftT ProbComp m]
+omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
+  [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
+private lemma fst_map_sign_core
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
+    (do
+      let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ℕ => (a.1.1, z.1)) <$>
+        WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
+    (do
+      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+      let r ← runtime.impl (msg, a.1)
+      Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) := by
+  change (do
+      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
+        AddWriterT ℕ m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ℕ => (a.1.1, z.1)) <$>
+        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) : AddWriterT ℕ m P)) =
+    (do
+      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+      let r ← runtime.impl (msg, a.1)
+      Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P))
+  simp [bind_map_left]
+
+omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
+  [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
+private lemma snd_map_sign_core
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
+    (do
+      let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ℕ => a.2 * (Multiplicative.ofAdd 1 * z.2)) <$>
+        WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
+    (do
+      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+      let r ← runtime.impl (msg, a.1)
+      (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P)) := by
+  change (do
+      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
+        AddWriterT ℕ m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ℕ => a.2 * (Multiplicative.ofAdd 1 * z.2)) <$>
+        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) : AddWriterT ℕ m P)) =
+    (do
+      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+      let r ← runtime.impl (msg, a.1)
+      (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P))
+  simp [bind_map_left]
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Output projection of unit-cost-instrumented Fiat-Shamir signing. -/
+theorem fst_map_sign_run_withAddCost
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
+    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
+      (FiatShamir (m := m) σ hr M).sign pk sk msg := by
+  intros
+  suffices h :
+      (do
+        let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
+        let r ← runtime.impl (msg, a.1.1)
+        (fun z : P × Multiplicative ℕ => (a.1.1, z.1)) <$>
+          WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
+      (do
+        let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+        let r ← runtime.impl (msg, a.1)
+        Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
+    simpa [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+  exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Cost projection of unit-cost-instrumented Fiat-Shamir signing. -/
+theorem snd_map_sign_run_withAddCost
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
+    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
+      (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
+  intros
+  suffices h :
+      (do
+        let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
+        let r ← runtime.impl (msg, a.1.1)
+        (fun z : P × Multiplicative ℕ => a.2 * (Multiplicative.ofAdd 1 * z.2)) <$>
+          WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
+      (do
+        let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
+        let r ← runtime.impl (msg, a.1)
+        (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
+    simpa [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+  exact snd_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Output projection of unit-cost-instrumented Fiat-Shamir verification. -/
+theorem fst_map_verify_run_withAddCost
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
+    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
+      (FiatShamir (m := m) σ hr M).verify pk msg sig := by
+  intros
+  rcases sig with ⟨c, s⟩
+  simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Cost projection of unit-cost-instrumented Fiat-Shamir verification. -/
+theorem snd_map_verify_run_withAddCost
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
+    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
+      (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
+  intros
+  rcases sig with ⟨c, s⟩
+  simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+attribute [simp] fst_map_sign_run_withAddCost snd_map_sign_run_withAddCost
+  fst_map_verify_run_withAddCost snd_map_verify_run_withAddCost
+
+end costAccounting
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/

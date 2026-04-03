@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.ProbCompLift
+import ToMathlib.Control.Monad.Hom
 
 /-!
 # Asymmetric Encryption Schemes
@@ -20,6 +21,7 @@ universe u v w
 `m` is the monad used to execute key generation, encryption, and decryption. The scheme data stays
 purely algorithmic; probabilistic semantics and public-randomness injection are supplied
 separately when defining security experiments. -/
+@[ext]
 structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
@@ -40,6 +42,31 @@ abbrev PKE_Alg := AsymmEncAlg
 namespace AsymmEncAlg
 variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
+
+section map
+
+variable {n : Type → Type w} [Monad n]
+
+/-- Transport an asymmetric encryption scheme across a monad morphism by mapping each algorithmic
+component. -/
+def map (F : m →ᵐ n) : AsymmEncAlg n M PK SK C where
+  keygen := F encAlg.keygen
+  encrypt pk msg := F (encAlg.encrypt pk msg)
+  decrypt sk c := F (encAlg.decrypt sk c)
+
+@[simp]
+lemma map_keygen {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) :
+    (encAlg.map F).keygen = F encAlg.keygen := rfl
+
+@[simp]
+lemma map_encrypt {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) (pk : PK) (msg : M) :
+    (encAlg.map F).encrypt pk msg = F (encAlg.encrypt pk msg) := rfl
+
+@[simp]
+lemma map_decrypt {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) (sk : SK) (c : C) :
+    (encAlg.map F).decrypt sk c = F (encAlg.decrypt sk c) := rfl
+
+end map
 
 section Correct
 
