@@ -21,6 +21,7 @@ universe u v w
 `m` is the monad used to execute key generation, encryption, and decryption. The scheme data stays
 purely algorithmic; probabilistic semantics and public-randomness injection are supplied
 separately when defining security experiments. -/
+@[ext]
 structure AsymmEncAlg (m : Type → Type u) [Monad m] (M PK SK C : Type) where
   keygen : m (PK × SK)
   encrypt : (pk : PK) → (msg : M) →  m C
@@ -54,36 +55,18 @@ def map (F : m →ᵐ n) : AsymmEncAlg n M PK SK C where
   decrypt sk c := F (encAlg.decrypt sk c)
 
 @[simp]
-lemma map_keygen (F : m →ᵐ n) :
+lemma map_keygen {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) :
     (encAlg.map F).keygen = F encAlg.keygen := rfl
 
 @[simp]
-lemma map_encrypt (F : m →ᵐ n) (pk : PK) (msg : M) :
+lemma map_encrypt {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) (pk : PK) (msg : M) :
     (encAlg.map F).encrypt pk msg = F (encAlg.encrypt pk msg) := rfl
 
 @[simp]
-lemma map_decrypt (F : m →ᵐ n) (sk : SK) (c : C) :
+lemma map_decrypt {encAlg : AsymmEncAlg m M PK SK C} (F : m →ᵐ n) (sk : SK) (c : C) :
     (encAlg.map F).decrypt sk c = F (encAlg.decrypt sk c) := rfl
 
 end map
-
-section ext
-
-/-- Two asymmetric encryption schemes are equal when their algorithmic components agree. -/
-@[ext]
-theorem ext {encAlg' : AsymmEncAlg m M PK SK C}
-    (hKeygen : encAlg.keygen = encAlg'.keygen)
-    (hEncrypt : encAlg.encrypt = encAlg'.encrypt)
-    (hDecrypt : encAlg.decrypt = encAlg'.decrypt) :
-    encAlg = encAlg' := by
-  cases encAlg
-  cases encAlg'
-  cases hKeygen
-  cases hEncrypt
-  cases hDecrypt
-  rfl
-
-end ext
 
 section Correct
 
