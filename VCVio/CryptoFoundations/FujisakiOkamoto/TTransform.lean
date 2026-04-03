@@ -113,7 +113,7 @@ section costAccounting
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
-/-- Output projection of unit-cost-instrumented T-transform encryption. -/
+/-- Running unit-cost-instrumented T-transform encryption preserves the ciphertext output. -/
 theorem encrypt_outputs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
@@ -157,8 +157,8 @@ theorem decrypt_outputs_withUnitCost
       simp [AddWriterT.outputs, TTransform, TTransform.decrypt, hdec,
         QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-/-- Unit-cost-instrumented T-transform decryption incurs no
-oracle cost if deterministic decryption fails immediately, and exactly one query otherwise. -/
+/-- Unit-cost-instrumented T-transform decryption incurs no oracle cost if deterministic
+decryption fails immediately, and exactly one query otherwise. -/
 theorem decrypt_costs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
