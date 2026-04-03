@@ -92,7 +92,8 @@ theorem map_construction
     SignatureAlg.map F.toMonadHom (FiatShamir (m := m) σ hr M) =
       FiatShamir (m := n) σ hr M := by
   apply SignatureAlg.ext
-  · simpa [FiatShamir, liftM, MonadLiftT.monadLift] using hLift hr.gen
+  · simpa [FiatShamir, liftM, MonadLiftT.monadLift, -QueryRuntime.toHasQuery_query]
+      using hLift hr.gen
   · funext pk sk msg
     have hCommit :
         F.toMonadHom (monadLift (σ.commit pk sk) : m (PC × SC)) =
@@ -102,10 +103,10 @@ theorem map_construction
         ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m P) =
           (monadLift (σ.respond pk sk e r) : n P) :=
       fun e r => hLift (σ.respond pk sk e r)
-    simp [FiatShamir, hCommit, hRespond]
+    simp [FiatShamir, hCommit, hRespond, -QueryRuntime.toHasQuery_query]
   · funext pk msg sig
     cases sig
-    simp [FiatShamir]
+    simp [FiatShamir, -QueryRuntime.toHasQuery_query]
 
 end naturality
 
@@ -113,40 +114,6 @@ section costAccounting
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
-
-omit [LawfulMonad m] [MonadLiftT ProbComp m] in
-private lemma run_monadLift_addWriterT {α : Type} (x : m α) :
-    WriterT.run (monadLift x : AddWriterT ℕ m α) =
-      (fun y => (y, Multiplicative.ofAdd 0)) <$> x := by
-  simp
-
-omit [MonadLiftT ProbComp m] in
-private lemma fst_map_run_monadLift_query_monadLift
-    {α β γ : Type} (x : m α) (q : α → m β) (f : α → β → m γ) :
-    (do
-      let a ← WriterT.run (monadLift x : AddWriterT ℕ m α)
-      let b ← q a.1
-      (fun c ↦ (a.1, c.1)) <$> WriterT.run (monadLift (f a.1 b) : AddWriterT ℕ m γ)) =
-      (do
-        let a ← x
-        let b ← q a
-        Prod.mk a <$> f a b) := by
-  simp [bind_map_left]
-
-omit [MonadLiftT ProbComp m] in
-private lemma snd_map_run_monadLift_query_monadLift
-    {α β γ : Type} (x : m α) (q : α → m β) (f : α → β → m γ) :
-    (do
-      let a ← WriterT.run (monadLift x : AddWriterT ℕ m α)
-      let b ← q a.1
-      (fun c ↦ a.2 * (Multiplicative.ofAdd 1 * c.2)) <$>
-        WriterT.run (monadLift (f a.1 b) : AddWriterT ℕ m γ)) =
-      (do
-        let a ← x
-        let b ← q a
-        (fun _ ↦ Multiplicative.ofAdd 1) <$> f a b) := by
-  simp [bind_map_left]
-
 omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
   [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
 private lemma fst_map_sign_core
@@ -205,8 +172,7 @@ theorem fst_map_sign_run_withAddCost
     let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
     Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
       (FiatShamir (m := m) σ hr M).sign pk sk msg := by
-  let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  intros
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -228,8 +194,7 @@ theorem snd_map_sign_run_withAddCost
     let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
     Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
       (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
-  let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  intros
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -251,8 +216,7 @@ theorem fst_map_verify_run_withAddCost
     let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
     Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
       (FiatShamir (m := m) σ hr M).verify pk msg sig := by
-  let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  intros
   rcases sig with ⟨c, s⟩
   simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 
@@ -264,8 +228,7 @@ theorem snd_map_verify_run_withAddCost
     let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
     Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
       (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
-  let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  intros
   rcases sig with ⟨c, s⟩
   simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 

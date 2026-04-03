@@ -39,6 +39,7 @@ variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*}
 def toHasQuery (runtime : QueryRuntime spec m) : HasQuery spec m :=
   runtime.impl.toHasQuery
 
+@[simp]
 lemma toHasQuery_query (runtime : QueryRuntime spec m) (t : spec.Domain) :
     (runtime.toHasQuery).query t = runtime.impl t := rfl
 
