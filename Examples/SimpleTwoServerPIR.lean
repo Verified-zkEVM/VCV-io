@@ -6,7 +6,7 @@ Authors: Quang Dao
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Constructions.SampleableType
-import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.Tactics.Relational
 
 /-!
 # Information-Theoretic Private Information Retrieval (PIR)

@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import VCVio.ProgramLogic.NotationCore
 
 /-!
 # Pedersen Commitment Scheme

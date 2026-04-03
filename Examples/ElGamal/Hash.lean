@@ -8,7 +8,6 @@ import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.EvalDist.Bool
-import VCVio.ProgramLogic.Tactics
 
 /-!
 # Hashed ElGamal Encryption

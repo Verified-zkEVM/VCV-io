@@ -7,7 +7,7 @@ Authors: Quang Dao
 import Lean.Elab.Tactic
 import Lean.Meta.Match.MatcherApp
 import VCVio.OracleComp.Constructions.Replicate
-import VCVio.ProgramLogic.Notation
+import VCVio.ProgramLogic.NotationCore
 
 /-!
 # VCGen Planner Core

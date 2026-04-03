@@ -11,7 +11,7 @@ import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
-import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.Tactics.Unary
 
 /-!
 # Fiat-Shamir Transform

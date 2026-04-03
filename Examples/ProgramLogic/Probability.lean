@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.Tactics.Unary
 
 /-!
 # Probability Rewrite Tactic Examples
@@ -17,7 +17,6 @@ on `Pr[...] = Pr[...]` goals.
 
 open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
-open OracleComp.ProgramLogic.Relational
 open scoped OracleComp.ProgramLogic
 
 variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]

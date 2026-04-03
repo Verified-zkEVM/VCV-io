@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SymmEncAlg
 import VCVio.OracleComp.Constructions.BitVec
-import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.Tactics.Relational
 import VCVioWidgets.GameHop.Panel
 import Mathlib.Data.Vector.Zip
 
