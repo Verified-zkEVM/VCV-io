@@ -260,6 +260,17 @@ variable {Coeff : Type*} {backend : PolyBackend Coeff} (ops : NormOps backend) {
 def cInfNorm (v : PolyVec backend.Poly k) : ℕ :=
   Finset.sup Finset.univ fun j : Fin k => ops.cInfNorm (v.get j)
 
+/-- A polynomial vector has centered infinity norm at most `b` exactly when each component
+polynomial does. -/
+theorem cInfNorm_le_iff {v : PolyVec backend.Poly k} {b : ℕ} :
+    PolyVec.cInfNorm ops v ≤ b ↔ ∀ j : Fin k, ops.cInfNorm (v.get j) ≤ b := by
+  simp [PolyVec.cInfNorm, Finset.sup_le_iff]
+
+/-- Each component polynomial is bounded by the centered infinity norm of the whole vector. -/
+theorem component_cInfNorm_le (v : PolyVec backend.Poly k) (j : Fin k) :
+    ops.cInfNorm (v.get j) ≤ PolyVec.cInfNorm ops v :=
+  Finset.le_sup (f := fun j => ops.cInfNorm (v.get j)) (Finset.mem_univ j)
+
 /-- The `ℓ₁` norm of a polynomial vector. -/
 def l1Norm (v : PolyVec backend.Poly k) : ℕ :=
   Finset.sup Finset.univ fun j : Fin k => ops.l1Norm (v.get j)
