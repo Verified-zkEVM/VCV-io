@@ -42,8 +42,8 @@ def eRelTriple (pre : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp 
   pre ≤ eRelWP oa ob post
 
 /-- Indicator postcondition: lifts a `Prop`-valued relation to an `ℝ≥0∞`-valued one. -/
-noncomputable def RelPost.indicator (R : α → β → Prop) : α → β → ℝ≥0∞ :=
-  fun a b => if R a b then 1 else 0
+noncomputable def RelPost.indicator (R : RelPost α β) (a : α) (b : β) : ℝ≥0∞ :=
+  if R a b then 1 else 0
 
 /-- pRHL-style exact relational triple, defined via eRHL with indicator postcondition. -/
 def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)

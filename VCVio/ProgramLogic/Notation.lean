@@ -20,9 +20,9 @@ universe u
 
 namespace OracleComp.ProgramLogic
 
-variable {ι₁ : Type u} {ι₂ : Type u}
-variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable {ι₁ : Type u}
+variable {spec₁ : OracleSpec ι₁}
+variable [spec₁.Fintype] [spec₁.Inhabited]
 variable {α : Type}
 
 /-- Game equivalence from exact pRHL equality coupling. -/

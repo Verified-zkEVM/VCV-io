@@ -47,9 +47,9 @@ universe u
 
 namespace OracleComp.ProgramLogic
 
-variable {ι₁ : Type u} {ι₂ : Type u}
-variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
-variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+variable {ι₁ : Type u}
+variable {spec₁ : OracleSpec ι₁}
+variable [spec₁.Fintype] [spec₁.Inhabited]
 variable {α β : Type}
 
 /-! ## Convenience predicates -/
@@ -64,10 +64,10 @@ def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
 
 @[refl] theorem GameEquiv.rfl {g : OracleComp spec₁ α} : GameEquiv g g := Eq.refl _
 
-theorem GameEquiv.symm {g₁ g₂ : OracleComp spec₁ α}
+@[symm] theorem GameEquiv.symm {g₁ g₂ : OracleComp spec₁ α}
     (h : GameEquiv g₁ g₂) : GameEquiv g₂ g₁ := Eq.symm h
 
-theorem GameEquiv.trans {g₁ g₂ g₃ : OracleComp spec₁ α}
+@[trans] theorem GameEquiv.trans {g₁ g₂ g₃ : OracleComp spec₁ α}
     (h₁ : GameEquiv g₁ g₂) (h₂ : GameEquiv g₂ g₃) : GameEquiv g₁ g₃ :=
   Eq.trans h₁ h₂
 
