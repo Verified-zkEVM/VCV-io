@@ -11,7 +11,15 @@ public import Mathlib.Order.Basic
 public import Batteries.Control.AlternativeMonad
 
 /-!
-# Laws for well behaved monadic `failure` operation
+# Writer Monad Transformer Utilities
+
+This file extends `WriterT` with helper lemmas and the additive wrapper `AddWriterT`.
+
+The first half of the file collects basic `WriterT` run, bind, and lifting lemmas, together with
+the `LawfulAppend` class used to build lawful `WriterT` instances over append-like logs.
+
+The second half specializes `WriterT` to additive cost accumulation via `Multiplicative`, and
+introduces predicates and notation for reasoning about outputs and accumulated costs.
 -/
 
 @[expose] public section
@@ -56,7 +64,7 @@ variable {m : Type u → Type v} [Monad m] {ω : Type u} {α β γ : Type u}
 
 @[simp]
 lemma run_mk {ω : Type u} [LawfulMonad m] (x : m (α × ω)) :
-  (WriterT.mk x).run = x := rfl
+    (WriterT.mk x).run = x := rfl
 
 @[simp]
 lemma run_tell (w : ω) : (tell w : WriterT ω m PUnit).run = pure (⟨⟩, w) := rfl
