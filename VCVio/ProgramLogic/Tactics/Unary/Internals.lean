@@ -5,7 +5,8 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Tactics.Common
-import VCVio.ProgramLogic.Tactics.Relational
+import VCVio.ProgramLogic.Relational.Basic
+import VCVio.ProgramLogic.Tactics.Relational.Internals
 
 /-!
 # Unary VCGen Internals
@@ -871,7 +872,7 @@ def runVCGenStructuralCore : TacticM Bool := do
         return true
     return true
   if relTripleGoalParts? target |>.isSome then
-    return (← tryEvalTacticSyntax (← `(tactic| rvcstep)))
+    return (← TacticInternals.Relational.runRVCGenStep)
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)

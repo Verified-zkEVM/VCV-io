@@ -4,9 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.ProgramLogic.Relational.Basic
+import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.EvalDist.TVDist
-import ToMathlib.ProbabilityTheory.OptimalCoupling
 
 /-!
 # Quantitative Relational Program Logic (eRHL)
@@ -127,40 +126,6 @@ private lemma ENNReal_tsum_iSup_le {ι : Type*} {J : ι → Type*}
   rw [ENNReal.tsum_eq_iSup_sum]
   refine iSup_le fun s => le_trans (Finset_sum_iSup_le_iSup_sum g s) ?_
   exact iSup_mono fun f => ENNReal.sum_le_tsum _
-
-/-! ## Core eRHL definitions -/
-
-/-- eRHL-style quantitative relational WP for `OracleComp`.
-`eRelWP oa ob g` = supremum over all couplings `c` of `E_c[g(a,b)]`.
-This is the expected value of postcondition `g` under the optimal coupling. -/
-noncomputable def eRelWP (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (g : α → β → ℝ≥0∞) : ℝ≥0∞ :=
-  ⨆ (c : SPMF.Coupling (evalDist oa) (evalDist ob)),
-    ∑' z, Pr[= z | c.1] * g z.1 z.2
-
-/-- eRHL triple: `pre ≤ eRelWP oa ob post`. -/
-def eRelTriple (pre : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (post : α → β → ℝ≥0∞) : Prop :=
-  pre ≤ eRelWP oa ob post
-
-/-! ## Indicator postconditions: bridge from Prop to ℝ≥0∞ -/
-
-/-- Indicator postcondition: lifts a `Prop`-valued relation to an `ℝ≥0∞`-valued one. -/
-noncomputable def RelPost.indicator (R : α → β → Prop) : α → β → ℝ≥0∞ :=
-  fun a b => if R a b then 1 else 0
-
-/-! ## pRHL as a special case of eRHL -/
-
-/-- pRHL-style exact relational triple, defined via eRHL with indicator postcondition.
-Equivalent to the coupling-based `RelTriple` (see `relTriple'_iff_relTriple`).
-
-**Do not target this in tactics or proofs.** Use `RelTriple` instead — all step-through
-tactics (`rvcstep`, `rvcgen`, etc.) and the `⟪c₁ ~ c₂ | R⟫` notation
-operate on `RelTriple`. This definition exists only to witness that pRHL is the
-`ε = 0` special case of eRHL/apRHL (see `relTriple'_eq_approxRelTriple_zero`). -/
-def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (R : RelPost α β) : Prop :=
-  eRelTriple 1 oa ob (RelPost.indicator R)
 
 /-- Bridge: the eRHL-based definition agrees with the existing coupling-based one.
 
@@ -379,20 +344,6 @@ theorem relTriple'_iff_relTriple
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β} {R : RelPost α β} :
     RelTriple' oa ob R ↔ RelTriple oa ob R := by
   rw [relTriple'_iff_couplingPost, relTriple_iff_relWP, relWP_iff_couplingPost]
-
-/-! ## apRHL as a special case of eRHL -/
-
-/-- ε-approximate relational triple via eRHL:
-"R holds except with probability at most ε." -/
-def ApproxRelTriple (ε : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (R : RelPost α β) : Prop :=
-  eRelTriple (1 - ε) oa ob (RelPost.indicator R)
-
-/-- Exact coupling is the zero-error special case of approximate coupling. -/
-theorem relTriple'_eq_approxRelTriple_zero
-    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β} {R : RelPost α β} :
-    RelTriple' oa ob R ↔ ApproxRelTriple 0 oa ob R := by
-  simp [RelTriple', ApproxRelTriple]
 
 /-! ## eRHL rules -/
 

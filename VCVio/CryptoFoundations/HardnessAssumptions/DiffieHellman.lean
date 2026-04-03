@@ -9,7 +9,6 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.EvalDist.Bool
-import VCVio.ProgramLogic.Tactics
 
 /-!
 # Discrete Logarithm Assumptions (DLog / CDH / DDH)
@@ -41,7 +40,7 @@ We model a cyclic group as:
 -/
 
 
-open OracleComp OracleSpec ENNReal OracleComp.ProgramLogic
+open OracleComp OracleSpec ENNReal
 
 namespace DiffieHellman
 

@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.FiatShamir
-import VCVio.ProgramLogic.Tactics
+import VCVio.ProgramLogic.Tactics.Unary
 
 /-!
 # Schnorr Sigma Protocol
