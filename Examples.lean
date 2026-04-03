@@ -10,7 +10,12 @@ import Examples.Pedersen
 import Examples.ProgramLogic.Probability
 import Examples.ProgramLogic.ProofMode
 import Examples.ProgramLogic.Relational
+import Examples.ProgramLogic.RelationalDerived
+import Examples.ProgramLogic.RelationalStep
 import Examples.ProgramLogic.Unary
+import Examples.ProgramLogic.UnaryProbability
+import Examples.ProgramLogic.UnaryStep
+import Examples.ProgramLogic.UnaryTriple
 import Examples.RF_RP_Switching_alt
 import Examples.Regev
 import Examples.Schnorr
