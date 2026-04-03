@@ -72,14 +72,15 @@ variable
     some zh ∈ support ((identificationScheme p prims nttOps).respond pk sk st cTilde) →
     (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
 
-include hRespondVerify in
-open scoped Classical in
+include hRespondVerify
+
 /-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
 whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact follows
 from the key generation identity, NTT linearity, and `Primitives.Laws`, but is isolated
 here to separate the probabilistic argument from the algebraic one. -/
 theorem idsWithAbort_complete' :
     (identificationScheme p prims nttOps).Complete := by
+  classical
   intro pk sk hvalid
   rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
   refine ⟨HasEvalPMF.probFailure_eq_zero _, ?_⟩
@@ -103,8 +104,8 @@ theorem idsWithAbort_complete' :
       obtain ⟨rfl, rfl, rfl⟩ := heq
       exact hRespondVerify pk sk hvalid w1 st cTilde hw1st _ hoz
 
-omit hRespondVerify in
-open scoped Classical in
+omit hRespondVerify
+
 /-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
 the verifier always accepts. This follows from the correctness of the rounding operations
 and the norm bounds satisfied by honest responses.
@@ -115,8 +116,6 @@ theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
     (identificationScheme p prims nttOps).Complete := by
   sorry
 
-omit hRespondVerify in
-open scoped Classical in
 /-- Placeholder quantitative HVZK theorem surface for the ML-DSA identification scheme.
 
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE.
@@ -134,9 +133,8 @@ theorem idsWithAbort_hvzk :
     ∃ sim ζ_zk, 0 ≤ ζ_zk ∧ (identificationScheme p prims nttOps).HVZK sim ζ_zk := by
   sorry
 
-omit hRespondVerify [SampleableType (CommitHashBytes p)]
-  [unifSpec.Fintype] [unifSpec.Inhabited] in
-open scoped Classical in
+omit [SampleableType (CommitHashBytes p)] [unifSpec.Fintype] [unifSpec.Inhabited]
+
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
@@ -146,6 +144,7 @@ In our formalization, this is directly enforced by the `verify` function: it che
 commitment recoverability. -/
 theorem idsWithAbort_commitment_recoverable :
     ∃ recover, (identificationScheme p prims nttOps).CommitmentRecoverable recover := by
+  classical
   refine ⟨fun pk cTilde (z, h) =>
     prims.useHintVec h (computeWApprox p prims nttOps (prims.expandA pk.rho)
       (prims.sampleInBall cTilde) z pk.t1), ?_⟩
@@ -160,12 +159,11 @@ end Properties
 
 section NMASecurity
 
-variable {M : Type}
+variable {M : Type} [DecidableEq M]
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
-open scoped Classical in
 /-- **NMA Security (Lemma 7, CRYPTO 2023).**
 
 For every EUF-NMA adversary `A` against the ML-DSA scheme (instantiated via
@@ -236,12 +234,23 @@ end CMAtoNMA
 
 section MainTheorem
 
-variable {M : Type}
+variable {M : Type} [DecidableEq M]
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
-open scoped Classical in
+noncomputable local instance : DecidableEq (Commitment p prims) := by
+  classical
+  infer_instance
+
+noncomputable local instance : DecidableEq (CommitHashBytes p) := by
+  classical
+  infer_instance
+
+noncomputable local instance : DecidableEq (Response p prims) := by
+  classical
+  infer_instance
+
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
 
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE
