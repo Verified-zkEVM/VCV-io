@@ -114,7 +114,6 @@ section costAccounting
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
-
 omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
   [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
 private lemma fst_map_sign_core
