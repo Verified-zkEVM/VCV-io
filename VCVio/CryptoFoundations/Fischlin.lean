@@ -487,6 +487,50 @@ theorem sign_usesAtMostRhoCardOmegaQueries
         AddWriterT.queryBoundedAboveBy_fin_mOfFn (n := ρ) (k := FinEnum.card Ω)
           (fun i => hrep commits i)))
 
+section expectedQueries
+
+variable [HasEvalSPMF m]
+
+omit [HasEvalSet m] in
+/-- Fischlin signing has expected query count at most `ρ * |Ω|` in the unit-cost runtime model.
+
+This is the expectation-level counterpart of
+[`Fischlin.sign_usesAtMostRhoCardOmegaQueries`]. -/
+theorem sign_expectedQueries_le_rhoCardOmega
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (msg : M) :
+    ExpectedQueries[ (Fischlin σ hr ρ b S M).sign pk sk msg in runtime ]
+      ≤ ρ * FinEnum.card Ω := by
+  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  simpa [Nat.cast_mul] using HasQuery.expectedQueries_le_of_usesAtMostQueries
+    (sign_usesAtMostRhoCardOmegaQueries
+      (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
+      (runtime := runtime) (pk := pk) (sk := sk) (msg := msg))
+
+end expectedQueries
+
+section expectedQueriesPMF
+
+variable [HasEvalPMF m]
+
+omit [HasEvalSet m] in
+/-- Fischlin verification has expected query count exactly `ρ` in the unit-cost runtime model. -/
+theorem verify_expectedQueries_eq_rho
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (msg : M) (π : FischlinProof PC Ω P ρ) :
+    ExpectedQueries[ (Fischlin σ hr ρ b S M).verify pk msg π in runtime ] = ρ := by
+  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
+  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  apply HasQuery.expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
+  · exact verify_usesAtMostRhoQueries
+      (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
+      (runtime := runtime) (pk := pk) (msg := msg) π
+  · exact verify_usesAtLeastRhoQueries
+      (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
+      (runtime := runtime) (pk := pk) (msg := msg) π
+
+end expectedQueriesPMF
+
 end
 
 end costAccounting
