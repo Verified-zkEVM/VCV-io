@@ -97,3 +97,162 @@ lemma withUnitCost_impl (runtime : QueryRuntime spec m) (t : spec.Domain) :
 end instrumentation
 
 end QueryRuntime
+
+namespace HasQuery
+
+section runtimeInstantiation
+
+variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*} {α : Type}
+
+/-- Instantiate a generic `HasQuery` computation in the concrete runtime `runtime`. -/
+def inRuntime (oa : [HasQuery spec m] → m α) (runtime : QueryRuntime spec m) : m α := by
+  letI := runtime.toHasQuery
+  exact oa
+
+section instrumentation
+
+variable [Monad m]
+
+/-- Instantiate a generic `HasQuery` computation in the additive-cost instrumented runtime
+obtained from `runtime`. -/
+def withAddCost {ω : Type} [AddMonoid ω]
+    (oa : [HasQuery spec (AddWriterT ω m)] → AddWriterT ω m α)
+    (runtime : QueryRuntime spec m) (costFn : spec.Domain → ω) : AddWriterT ω m α := by
+  letI := (runtime.withAddCost costFn).toHasQuery
+  exact oa
+
+/-- Instantiate a generic `HasQuery` computation in the unit-cost instrumented runtime obtained
+from `runtime`. -/
+def withUnitCost (oa : [HasQuery spec (AddWriterT ℕ m)] → AddWriterT ℕ m α)
+    (runtime : QueryRuntime spec m) : AddWriterT ℕ m α := by
+  letI := runtime.withUnitCost.toHasQuery
+  exact oa
+
+end instrumentation
+end runtimeInstantiation
+
+section costAccounting
+
+variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*} {α : Type}
+
+/-- A computation generic over a `HasQuery spec m` capability. -/
+abbrev Computation (spec : OracleSpec ι) (m : Type → Type*) (α : Type) :=
+  [HasQuery spec m] → m α
+
+section genericCost
+
+variable [Monad m]
+
+/-- Running `oa` in the additive-cost instrumentation of `runtime` yields an output-dependent
+cost described by `f`. -/
+def UsesCostAs {ω : Type} [AddMonoid ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) (f : α → ω) : Prop :=
+  AddWriterT.CostsAs (HasQuery.withAddCost oa runtime costFn) f
+
+/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs constant cost `w`. -/
+def UsesCostExactly {ω : Type} [AddMonoid ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) (w : ω) : Prop :=
+  Cost[ HasQuery.withAddCost oa runtime costFn ] = w
+
+/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at most `w`. -/
+def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) (w : ω) : Prop :=
+  Cost[ HasQuery.withAddCost oa runtime costFn ] ≤ w
+
+/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at least `w`. -/
+def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) (w : ω) : Prop :=
+  Cost[ HasQuery.withAddCost oa runtime costFn ] ≥ w
+
+lemma usesCostAtMost_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {w b : ω}
+    (h : HasQuery.UsesCostExactly oa runtime costFn w) (hwb : w ≤ b) :
+    HasQuery.UsesCostAtMost oa runtime costFn b := by
+  exact AddWriterT.costAtMost_of_hasCost h hwb
+
+lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {w b : ω}
+    (h : HasQuery.UsesCostExactly oa runtime costFn w) (hbw : b ≤ w) :
+    HasQuery.UsesCostAtLeast oa runtime costFn b := by
+  exact AddWriterT.costAtLeast_of_hasCost h hbw
+
+/-- Unit-cost specialization: every query contributes cost `1`. -/
+def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
+    (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
+  HasQuery.UsesCostExactly oa runtime (fun _ ↦ 1) n
+
+/-- Unit-cost specialization: every query contributes cost `1`, with an upper bound. -/
+def UsesAtMostQueries (oa : Computation spec (AddWriterT ℕ m) α)
+    (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
+  HasQuery.UsesCostAtMost oa runtime (fun _ ↦ 1) n
+
+/-- Unit-cost specialization: every query contributes cost `1`, with a lower bound. -/
+def UsesAtLeastQueries (oa : Computation spec (AddWriterT ℕ m) α)
+    (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
+  HasQuery.UsesCostAtLeast oa runtime (fun _ ↦ 1) n
+
+lemma usesAtMostQueries_of_usesExactlyQueries
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m}
+    {n b : ℕ} (h : HasQuery.UsesExactlyQueries oa runtime n) (hnb : n ≤ b) :
+    HasQuery.UsesAtMostQueries oa runtime b :=
+  usesCostAtMost_of_usesCostExactly h hnb
+
+lemma usesAtLeastQueries_of_usesExactlyQueries
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m}
+    {n b : ℕ} (h : HasQuery.UsesExactlyQueries oa runtime n) (hbn : b ≤ n) :
+    HasQuery.UsesAtLeastQueries oa runtime b :=
+  usesCostAtLeast_of_usesCostExactly h hbn
+
+end genericCost
+
+/-- Human-readable notation for exact query-count statements in the unit-cost model. -/
+syntax:max "Queries[ " term " in " term " ]" " = " term : term
+
+macro_rules
+  | `(Queries[ $oa in $runtime ] = $n) =>
+      `(HasQuery.UsesExactlyQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+
+/-- Human-readable notation for upper-bound query-count statements in the unit-cost model. -/
+syntax:max "Queries[ " term " in " term " ]" " ≤ " term : term
+
+macro_rules
+  | `(Queries[ $oa in $runtime ] ≤ $n) =>
+      `(HasQuery.UsesAtMostQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+
+/-- Human-readable notation for lower-bound query-count statements in the unit-cost model. -/
+syntax:max "Queries[ " term " in " term " ]" " ≥ " term : term
+
+macro_rules
+  | `(Queries[ $oa in $runtime ] ≥ $n) =>
+      `(HasQuery.UsesAtLeastQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+
+/-- Human-readable notation for exact additive-cost statements under a named cost function. -/
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " = " term : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime by $costFn ] = $w) =>
+      `(HasQuery.UsesCostExactly (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+
+/-- Human-readable notation for additive-cost upper bounds under a named cost function. -/
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime by $costFn ] ≤ $w) =>
+      `(HasQuery.UsesCostAtMost (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+
+/-- Human-readable notation for additive-cost lower bounds under a named cost function. -/
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime by $costFn ] ≥ $w) =>
+      `(HasQuery.UsesCostAtLeast (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+
+end costAccounting
+
+end HasQuery

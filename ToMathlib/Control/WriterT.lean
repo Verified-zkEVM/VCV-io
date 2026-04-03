@@ -295,6 +295,16 @@ lemma costAtLeast_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
     (Cost[ oa ] ≥ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a :=
   Iff.rfl
 
+lemma costAtMost_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
+    (h : Cost[ oa ] = w) (hwb : w ≤ b) : Cost[ oa ] ≤ b := by
+  refine ⟨fun _ ↦ w, ?_, fun _ ↦ hwb⟩
+  simpa [HasCost, CostsAs] using h
+
+lemma costAtLeast_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
+    (h : Cost[ oa ] = w) (hbw : b ≤ w) : Cost[ oa ] ≥ b := by
+  refine ⟨fun _ ↦ w, ?_, fun _ ↦ hbw⟩
+  simpa [HasCost, CostsAs] using h
+
 end costPredicates
 
 end AddWriterT

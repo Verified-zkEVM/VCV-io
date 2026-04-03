@@ -165,8 +165,7 @@ private lemma snd_map_sign_core
   simp [bind_map_left]
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Running Fiat-Shamir signing in a unit-cost query runtime preserves the signed output. -/
-theorem sign_outputs_withUnitCost
+private theorem sign_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
@@ -213,16 +212,48 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    Cost[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg ] = 1 := by
-  rw [AddWriterT.HasCost, AddWriterT.CostsAs, sign_outputs_withUnitCost,
-    sign_costs_formula_withUnitCost]
+    Queries[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg in runtime ] = 1 := by
+  change Cost[
+    HasQuery.withUnitCost
+      (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+        (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
+      runtime
+  ] = 1
+  letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+  letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
+  have h_outputs :
+      AddWriterT.outputs
+          (HasQuery.withUnitCost
+            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+              (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
+            runtime) =
+        HasQuery.inRuntime
+          (fun [HasQuery (M × PC →ₒ Ω) m] =>
+            (FiatShamir (m := m) σ hr M).sign pk sk msg)
+          runtime := by
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
+      using sign_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+        (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+  have h_costs :
+      AddWriterT.costs
+          (HasQuery.withUnitCost
+            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+              (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
+            runtime) =
+        (fun _ ↦ 1) <$>
+          HasQuery.inRuntime
+            (fun [HasQuery (M × PC →ₒ Ω) m] =>
+              (FiatShamir (m := m) σ hr M).sign pk sk msg)
+            runtime := by
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
+      using sign_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+        (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+  rw [AddWriterT.HasCost, AddWriterT.CostsAs]
+  rw [h_outputs]
+  exact h_costs
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Running Fiat-Shamir verification in a unit-cost query runtime preserves the verdict. -/
-theorem verify_outputs_withUnitCost
+private theorem verify_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
@@ -250,15 +281,47 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    Cost[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig ] = 1 := by
-  rw [AddWriterT.HasCost, AddWriterT.CostsAs, verify_outputs_withUnitCost,
-    verify_costs_formula_withUnitCost]
+    Queries[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig in runtime ] = 1 := by
+  change Cost[
+    HasQuery.withUnitCost
+      (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+        (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
+      runtime
+  ] = 1
+  letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+  letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
+  have h_outputs :
+      AddWriterT.outputs
+          (HasQuery.withUnitCost
+            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+              (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
+            runtime) =
+        HasQuery.inRuntime
+          (fun [HasQuery (M × PC →ₒ Ω) m] =>
+            (FiatShamir (m := m) σ hr M).verify pk msg sig)
+          runtime := by
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
+      using verify_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+        (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
+  have h_costs :
+      AddWriterT.costs
+          (HasQuery.withUnitCost
+            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+              (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
+            runtime) =
+        (fun _ ↦ 1) <$>
+          HasQuery.inRuntime
+            (fun [HasQuery (M × PC →ₒ Ω) m] =>
+              (FiatShamir (m := m) σ hr M).verify pk msg sig)
+            runtime := by
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
+      using verify_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+        (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
+  rw [AddWriterT.HasCost, AddWriterT.CostsAs]
+  rw [h_outputs]
+  exact h_costs
 
-attribute [simp] sign_outputs_withUnitCost verify_outputs_withUnitCost
-  sign_usesExactlyOneQuery verify_usesExactlyOneQuery
+attribute [simp] sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
 end costAccounting
 
