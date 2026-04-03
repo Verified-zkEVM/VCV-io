@@ -29,7 +29,7 @@ variable {M PK SK C : Type}
 
 section IND_CPA_Oracle
 
-variable [DecidableEq M] [DecidableEq C]
+variable [DecidableEq M]
 
 /-- Oracle-based multi-query IND-CPA game. The adversary gets oracle access to an encryption
 oracle that encrypts one of two challenge messages depending on a hidden bit. -/
@@ -156,7 +156,6 @@ def IND_CPA_LR_hybridGame
   (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk leftUntil) (adversary pk)).run'
     (∅, 0)
 
-omit [DecidableEq C] in
 /-- One-step counter monotonicity for the counted real IND-CPA implementation. -/
 lemma IND_CPA_queryImpl'_counted_counter_le_succ
     (pk : PK) (b : Bool)
@@ -199,7 +198,6 @@ lemma IND_CPA_queryImpl'_counted_counter_le_succ
         simp at this
         omega
 
-omit [DecidableEq C] in
 private lemma IND_CPA_countedChallengeOracle_proj_eq_cached
     (pk : PK)
     (selectCount : ℕ → M × M → M)
@@ -231,7 +229,6 @@ private lemma IND_CPA_countedChallengeOracle_proj_eq_cached
   · simp [IND_CPA_countedChallengeOracle, IND_CPA_cachedChallengeOracle, hcache,
       StateT.run_bind, StateT.run_get, pure_bind]
 
-omit [DecidableEq C] in
 /-- Projecting away the counter from the counted real IND-CPA implementation recovers the
 ordinary cached real implementation. -/
 lemma IND_CPA_queryImpl'_counted_proj_eq_queryImpl'
@@ -251,7 +248,6 @@ lemma IND_CPA_queryImpl'_counted_proj_eq_queryImpl'
             (fun mm => if b then mm.1 else mm.2)
             (by intro n mm; rfl) mm st)
 
-omit [DecidableEq C] in
 /-- The `leftUntil = 0` left/right hybrid is exactly the all-right endpoint game once the
 counter is projected away. -/
 lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
@@ -272,7 +268,6 @@ lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
             (fun mm => mm.2)
             (by intro n mm; simp) mm st)
 
-omit [DecidableEq C] in
 /-- If a counted IND-CPA hybrid implementation agrees with the counted real implementation
 through the first `q` fresh LR queries, then any adversary making at most `q` LR queries sees
 the same output distribution as in the real IND-CPA game. -/
@@ -370,7 +365,6 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
         comp (cache, n))
   exact hcounted_run'.trans hreal_run'
 
-omit [DecidableEq C] in
 /-- A counted IND-CPA hybrid game agrees with the real IND-CPA experiment whenever the hybrid
 implementation matches the real counted implementation on all states that stay below the query
 budget. -/
@@ -416,10 +410,9 @@ end IND_CPA_Oracle
 
 section MultiQueryHybrid
 
-variable [DecidableEq M] [DecidableEq C]
+variable [DecidableEq M]
 variable {encAlg' : AsymmEncAlg ProbComp M PK SK C}
 
-omit [DecidableEq C] in
 /-- The `leftUntil = 0` LR-hybrid is the all-right endpoint game. -/
 theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
     (adversary : encAlg'.IND_CPA_adversary) :
@@ -436,7 +429,6 @@ theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
       (hproj := encAlg'.IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false pk)
       (adversary pk) (∅, 0))
 
-omit [DecidableEq C] in
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid is the
 all-left endpoint game. -/
 theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
@@ -472,7 +464,6 @@ theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
                 IND_CPA_queryImplFromChallenge, IND_CPA_countedChallengeOracle, hcache])
     pk true q (adversary pk) q (hq pk) ∅ 0 (by omega)
 
-omit [DecidableEq C] in
 /-- The `leftUntil = 0` LR-hybrid has the same success probability as the all-right endpoint. -/
 theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
     (adversary : encAlg'.IND_CPA_adversary) :
@@ -481,7 +472,6 @@ theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
   exact (evalDist_ext_iff.mp
     (IND_CPA_LR_hybridGame_zero_evalDist_eq_right (encAlg' := encAlg') adversary)) true
 
-omit [DecidableEq C] in
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid has
 the same success probability as the all-left endpoint. -/
 theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
@@ -493,7 +483,6 @@ theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
     (IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
       (encAlg' := encAlg') adversary q hq)) true
 
-omit [DecidableEq C] in
 /-- The standard random-bit IND-CPA experiment is the uniform-bit branch over the all-left and
 all-right endpoint games. -/
 private lemma IND_CPA_experiment_probOutput_eq_branch
@@ -513,7 +502,6 @@ private lemma IND_CPA_experiment_probOutput_eq_branch
 noncomputable def IND_CPA_signedAdvantageReal (adversary : encAlg'.IND_CPA_adversary) : ℝ :=
   (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal - 1 / 2
 
-omit [DecidableEq C] in
 /-- The signed real IND-CPA advantage is half the left/right endpoint gap. -/
 theorem IND_CPA_signedAdvantageReal_eq_lrDiff_half
     (adversary : encAlg'.IND_CPA_adversary) :
@@ -551,7 +539,6 @@ private lemma sum_hybridDiff_eq_trueProb_sub (games : ℕ → ProbComp Bool) (q 
     _ = -(f q - f 0) := by simpa using hneg
     _ = f 0 - f q := by ring
 
-omit [DecidableEq C] in
 /-- Generic telescoping identity for multi-query game-hopping:
 if `games 0` is the target IND-CPA experiment and `games q` has success probability `1/2`,
 then the signed IND-CPA advantage is the sum of adjacent hybrid differences. -/
@@ -572,7 +559,6 @@ theorem IND_CPA_signedAdvantageReal_eq_sum_hybridDiff
             (Pr[= true | games (i + 1)]).toReal) := by
           simpa using (sum_hybridDiff_eq_trueProb_sub (games := games) q).symm
 
-omit [DecidableEq C] in
 /-- Generic multi-query bound: absolute signed IND-CPA advantage is at most the sum of absolute
 adjacent hybrid gaps. -/
 theorem IND_CPA_abs_signedAdvantageReal_le_sum_hybridDiff_abs
@@ -590,7 +576,6 @@ theorem IND_CPA_abs_signedAdvantageReal_le_sum_hybridDiff_abs
       (f := fun i => (Pr[= true | games i]).toReal -
         (Pr[= true | games (i + 1)]).toReal))
 
-omit [DecidableEq C] in
 /-- Compatibility bridge to the existing `IND_CPA_advantage` API:
 the `toReal` of the `ℝ≥0∞` signed advantage is bounded by the absolute signed real advantage. -/
 theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
@@ -603,7 +588,6 @@ theorem IND_CPA_advantage_toReal_le_abs_signedAdvantageReal
       (a := Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary])
       (b := (1 / 2 : ℝ≥0∞)))
 
-omit [DecidableEq C] in
 /-- When the counter is above both thresholds, two hybrid LR counted oracles agree pointwise. -/
 lemma IND_CPA_hybridLR_counted_run_eq_of_ge
     (pk : PK) (k : ℕ)
@@ -626,7 +610,6 @@ lemma IND_CPA_hybridLR_counted_run_eq_of_ge
           ite_false]
       · rfl
 
-omit [DecidableEq C] in
 /-- Counter monotonicity for the hybrid LR counted oracle: the counter never decreases. -/
 lemma IND_CPA_hybridLR_counted_counter_le
     (pk : PK) (k : ℕ)
@@ -670,7 +653,6 @@ lemma IND_CPA_hybridLR_counted_counter_le
         simp at this
         omega
 
-omit [DecidableEq C] in
 /-- Behavior of the hybrid challenge oracle on a cache miss. -/
 lemma IND_CPA_hybridChallengeOracleLR_counted_run_none
     (pk : PK) (k : ℕ) (mm : M × M)
@@ -684,7 +666,6 @@ lemma IND_CPA_hybridChallengeOracleLR_counted_run_none
     StateT.run_bind, StateT.run_get, pure_bind, hcache, StateT.run_set, StateT.run_pure]
   simp
 
-omit [DecidableEq C] in
 /-- Behavior of the hybrid challenge oracle on a cache hit. -/
 lemma IND_CPA_hybridChallengeOracleLR_counted_run_some
     (pk : PK) (k : ℕ) (mm : M × M) (c : C)

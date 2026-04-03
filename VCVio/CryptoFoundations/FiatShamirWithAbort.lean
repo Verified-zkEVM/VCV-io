@@ -43,8 +43,6 @@ open OracleComp OracleSpec
 
 variable {S W W' St C Z : Type}
   {p : S → W → Bool}
-  [SampleableType S] [SampleableType W]
-  [DecidableEq W'] [SampleableType C]
 
 /-- Signing retry loop with early return for the Fiat-Shamir with aborts transform.
 
@@ -84,6 +82,7 @@ The type parameters are:
 def FiatShamirWithAbort
     {m : Type → Type v} [Monad m]
     (ids : IdenSchemeWithAbort S W W' St C Z p)
+    [SampleableType S] [SampleableType W]
     (hr : GenerableRelation S W p) (M : Type) [DecidableEq M]
     [MonadLiftT ProbComp m] [HasQuery (M × W' →ₒ C) m]
     (maxAttempts : ℕ) :
@@ -100,9 +99,9 @@ def FiatShamirWithAbort
 
 namespace FiatShamirWithAbort
 
-variable (ids : IdenSchemeWithAbort S W W' St C Z p)
-  (hr : GenerableRelation S W p)
-  (M : Type) [DecidableEq M] (maxAttempts : ℕ)
+section runtime
+
+variable (M : Type) [DecidableEq M] [DecidableEq W'] [SampleableType C]
 
 /-- Runtime bundle for the Fiat-Shamir-with-aborts random-oracle world. -/
 noncomputable def runtime :
@@ -113,7 +112,15 @@ noncomputable def runtime :
     ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
+end runtime
+
 section EUF_CMA
+
+variable [SampleableType S] [SampleableType W]
+variable [DecidableEq W'] [SampleableType C]
+variable (ids : IdenSchemeWithAbort S W W' St C Z p)
+  (hr : GenerableRelation S W p)
+  (M : Type) [DecidableEq M] (maxAttempts : ℕ)
 
 /-- Structural query bound for Fiat-Shamir-with-aborts EUF-CMA adversaries:
 uniform-sampling queries are unrestricted, while `qS` and `qH` bound signing-oracle
@@ -223,7 +230,7 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
   simpa using
-    (euf_cma_bound (ids := ids) (hr := hr) (M := M) (maxAttempts := maxAttempts)
+    (euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)
       (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
       (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
       (recover := recover) (hcr := hcr) (adv := adv)
