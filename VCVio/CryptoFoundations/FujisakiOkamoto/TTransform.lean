@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 
@@ -105,6 +106,81 @@ theorem map_construction
             simp [TTransform.decrypt, hdec, HasQuery.map_query]
 
 end naturality
+
+section costAccounting
+
+variable {m : Type → Type u} [Monad m] [LawfulMonad m]
+  [MonadLiftT ProbComp m]
+
+/-- Output projection of unit-cost-instrumented T-transform encryption. -/
+theorem fst_map_encrypt_run_withAddCost
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    (pk : PK) (msg : M) :
+    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
+      (TTransform (m := m) pke).encrypt pk msg := by
+  let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+  let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+/-- Cost projection of unit-cost-instrumented T-transform encryption. -/
+theorem snd_map_encrypt_run_withAddCost
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    (pk : PK) (msg : M) :
+    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
+      (fun _ ↦ Multiplicative.ofAdd 1) <$> (TTransform (m := m) pke).encrypt pk msg := by
+  let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+  let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+/-- Output projection of unit-cost-instrumented T-transform decryption. -/
+theorem fst_map_decrypt_run_withAddCost
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    (pk : PK) (sk : SK) (c : C) :
+    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
+      (TTransform (m := m) pke).decrypt (pk, sk) c := by
+  let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+  let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  cases hdec : pke.decrypt sk c with
+  | none =>
+      simp [TTransform, TTransform.decrypt, hdec]
+  | some msg =>
+      simp [TTransform, TTransform.decrypt, hdec, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+/-- Cost projection of unit-cost-instrumented T-transform decryption. The transform incurs no
+oracle cost if deterministic decryption fails immediately, and exactly one query otherwise. -/
+theorem snd_map_decrypt_run_withAddCost
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    (pk : PK) (sk : SK) (c : C) :
+    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
+      match pke.decrypt sk c with
+      | none => pure (Multiplicative.ofAdd 0)
+      | some _ => (fun _ ↦ Multiplicative.ofAdd 1) <$>
+          (TTransform (m := m) pke).decrypt (pk, sk) c := by
+  let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
+  let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+  cases hdec : pke.decrypt sk c with
+  | none =>
+      simp [TTransform, TTransform.decrypt, hdec]
+  | some msg =>
+      simp [TTransform, TTransform.decrypt, hdec, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+
+end costAccounting
 
 namespace TTransform
 
