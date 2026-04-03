@@ -165,13 +165,13 @@ private lemma snd_map_sign_core
   simp [bind_map_left]
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Output projection of unit-cost-instrumented Fiat-Shamir signing. -/
-theorem fst_map_sign_run_withAddCost
+/-- Running Fiat-Shamir signing in a unit-cost query runtime preserves the signed output. -/
+theorem sign_outputs_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.outputs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg) =
       (FiatShamir (m := m) σ hr M).sign pk sk msg := by
   suffices h :
       (do
@@ -183,18 +183,19 @@ theorem fst_map_sign_run_withAddCost
         let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
         let r ← runtime.impl (msg, a.1)
         Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+    simpa [AddWriterT.outputs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+      using h
   exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Cost projection of unit-cost-instrumented Fiat-Shamir signing. -/
-theorem snd_map_sign_run_withAddCost
+/-- Running Fiat-Shamir signing in a unit-cost query runtime records exactly one query cost. -/
+theorem sign_costs_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
-      (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.costs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg) =
+      (fun _ ↦ 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -205,35 +206,37 @@ theorem snd_map_sign_run_withAddCost
         let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
         let r ← runtime.impl (msg, a.1)
         (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+    simpa [AddWriterT.costs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+      using h
   exact snd_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Output projection of unit-cost-instrumented Fiat-Shamir verification. -/
-theorem fst_map_verify_run_withAddCost
+/-- Running Fiat-Shamir verification in a unit-cost query runtime preserves the verdict. -/
+theorem verify_outputs_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.outputs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig) =
       (FiatShamir (m := m) σ hr M).verify pk msg sig := by
   rcases sig with ⟨c, s⟩
-  simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+  simp [AddWriterT.outputs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Cost projection of unit-cost-instrumented Fiat-Shamir verification. -/
-theorem snd_map_verify_run_withAddCost
+/-- Running Fiat-Shamir verification in a unit-cost query runtime records exactly one query
+cost. -/
+theorem verify_costs_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
-      (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.costs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig) =
+      (fun _ ↦ 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
   rcases sig with ⟨c, s⟩
-  simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+  simp [AddWriterT.costs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-attribute [simp] fst_map_sign_run_withAddCost snd_map_sign_run_withAddCost
-  fst_map_verify_run_withAddCost snd_map_verify_run_withAddCost
+attribute [simp] sign_outputs_withUnitCost sign_costs_withUnitCost
+  verify_outputs_withUnitCost verify_costs_withUnitCost
 
 end costAccounting
 
