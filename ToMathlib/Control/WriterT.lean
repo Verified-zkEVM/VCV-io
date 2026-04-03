@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Algebra.Group.TypeTags.Basic
 public import Mathlib.Control.Monad.Writer
+public import Mathlib.Order.Basic
 public import Batteries.Control.AlternativeMonad
 
 /-!
@@ -232,5 +233,68 @@ lemma outputs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
 lemma costs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
     (addTell (M := M) w).costs = pure w := by
   simp [costs, addTell]
+
+section costPredicates
+
+variable [Functor M]
+
+/-- `CostsAs oa f` means that the cost accumulated by `oa` is determined by its output via the
+cost function `f`. -/
+def CostsAs (oa : AddWriterT ω M α) (f : α → ω) : Prop :=
+  oa.costs = f <$> oa.outputs
+
+/-- `HasCost oa w` means that every execution path of `oa` incurs the constant cost `w`. -/
+def HasCost (oa : AddWriterT ω M α) (w : ω) : Prop :=
+  oa.CostsAs (fun _ ↦ w)
+
+/-- `CostAtMost oa w` means that `oa`'s cost is bounded above by the constant `w` on every
+execution path. -/
+def CostAtMost [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
+  ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, f a ≤ w
+
+/-- `CostAtLeast oa w` means that `oa`'s cost is bounded below by the constant `w` on every
+execution path. -/
+def CostAtLeast [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
+  ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a
+
+/-- Human-readable notation for exact constant-cost statements. -/
+syntax:max "Cost[ " term " ]" " = " term : term
+
+macro_rules
+  | `(Cost[ $oa ] = $w) => `(AddWriterT.HasCost $oa $w)
+
+/-- Human-readable notation for constant upper-bound cost statements. -/
+syntax:max "Cost[ " term " ]" " ≤ " term : term
+
+macro_rules
+  | `(Cost[ $oa ] ≤ $w) => `(AddWriterT.CostAtMost $oa $w)
+
+/-- Human-readable notation for constant lower-bound cost statements. -/
+syntax:max "Cost[ " term " ]" " ≥ " term : term
+
+macro_rules
+  | `(Cost[ $oa ] ≥ $w) => `(AddWriterT.CostAtLeast $oa $w)
+
+@[simp]
+lemma costsAs_iff (oa : AddWriterT ω M α) (f : α → ω) :
+    oa.CostsAs f ↔ oa.costs = f <$> oa.outputs :=
+  Iff.rfl
+
+@[simp]
+lemma hasCost_iff (oa : AddWriterT ω M α) (w : ω) :
+    (Cost[ oa ] = w) ↔ oa.costs = (fun _ ↦ w) <$> oa.outputs :=
+  Iff.rfl
+
+@[simp]
+lemma costAtMost_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
+    (Cost[ oa ] ≤ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, f a ≤ w :=
+  Iff.rfl
+
+@[simp]
+lemma costAtLeast_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
+    (Cost[ oa ] ≥ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a :=
+  Iff.rfl
+
+end costPredicates
 
 end AddWriterT

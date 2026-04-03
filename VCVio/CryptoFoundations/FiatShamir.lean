@@ -188,8 +188,7 @@ theorem sign_outputs_withUnitCost
   exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-/-- Running Fiat-Shamir signing in a unit-cost query runtime records exactly one query cost. -/
-theorem sign_costs_withUnitCost
+private lemma sign_costs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
@@ -211,6 +210,17 @@ theorem sign_costs_withUnitCost
   exact snd_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
+theorem sign_usesExactlyOneQuery
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      runtime.withUnitCost.toHasQuery
+    Cost[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg ] = 1 := by
+  rw [AddWriterT.HasCost, AddWriterT.CostsAs, sign_outputs_withUnitCost,
+    sign_costs_formula_withUnitCost]
+
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Running Fiat-Shamir verification in a unit-cost query runtime preserves the verdict. -/
 theorem verify_outputs_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
@@ -225,7 +235,7 @@ theorem verify_outputs_withUnitCost
 omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Running Fiat-Shamir verification in a unit-cost query runtime records exactly one query
 cost. -/
-theorem verify_costs_withUnitCost
+private lemma verify_costs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
     letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
     letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
@@ -235,8 +245,20 @@ theorem verify_costs_withUnitCost
   rcases sig with ⟨c, s⟩
   simp [AddWriterT.costs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-attribute [simp] sign_outputs_withUnitCost sign_costs_withUnitCost
-  verify_outputs_withUnitCost verify_costs_withUnitCost
+omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
+/-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
+instrumentation. -/
+theorem verify_usesExactlyOneQuery
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      runtime.withUnitCost.toHasQuery
+    Cost[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig ] = 1 := by
+  rw [AddWriterT.HasCost, AddWriterT.CostsAs, verify_outputs_withUnitCost,
+    verify_costs_formula_withUnitCost]
+
+attribute [simp] sign_outputs_withUnitCost verify_outputs_withUnitCost
+  sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
 end costAccounting
 
