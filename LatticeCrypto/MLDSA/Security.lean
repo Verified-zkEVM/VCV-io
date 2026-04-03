@@ -51,7 +51,7 @@ open OracleComp OracleSpec ENNReal
 namespace MLDSA
 
 variable (p : Params) (prims : Primitives p) (nttOps : NTTRingOps)
-  [DecidableEq prims.High] [DecidableEq prims.Hint]
+  [DecidableEq prims.High]
 
 section Properties
 
@@ -73,6 +73,7 @@ variable
     (identificationScheme p prims nttOps).verify pk w1 cTilde zh = true)
 
 include hRespondVerify in
+open scoped Classical in
 /-- Completeness of the ML-DSA identification scheme, conditional on `hRespondVerify`:
 whenever `respond` returns `some (z, h)`, `verify` accepts. This algebraic fact follows
 from the key generation identity, NTT linearity, and `Primitives.Laws`, but is isolated
@@ -103,6 +104,7 @@ theorem idsWithAbort_complete' :
       exact hRespondVerify pk sk hvalid w1 st cTilde hw1st _ hoz
 
 omit hRespondVerify in
+open scoped Classical in
 /-- The ML-DSA identification scheme is complete: whenever the honest prover does not abort,
 the verifier always accepts. This follows from the correctness of the rounding operations
 and the norm bounds satisfied by honest responses.
@@ -114,6 +116,7 @@ theorem idsWithAbort_complete (h_laws : Primitives.Laws prims nttOps) :
   sorry
 
 omit hRespondVerify in
+open scoped Classical in
 /-- Placeholder quantitative HVZK theorem surface for the ML-DSA identification scheme.
 
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE.
@@ -133,6 +136,7 @@ theorem idsWithAbort_hvzk :
 
 omit hRespondVerify [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited] in
+open scoped Classical in
 /-- Commitment recoverability for ML-DSA: the public commitment `w₁` can be reconstructed
 from `(pk, c̃, (z, h))` alone using `UseHint(h, Az - ct₁·2^d)`. This is the key property
 enabling the CMA-to-NMA reduction in the security proof.
@@ -156,11 +160,12 @@ end Properties
 
 section NMASecurity
 
-variable {M : Type} [DecidableEq M]
+variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
+open scoped Classical in
 /-- **NMA Security (Lemma 7, CRYPTO 2023).**
 
 For every EUF-NMA adversary `A` against the ML-DSA scheme (instantiated via
@@ -231,12 +236,12 @@ end CMAtoNMA
 
 section MainTheorem
 
-variable {M : Type} [DecidableEq M]
-  [DecidableEq prims.Hint]
+variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
+open scoped Classical in
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
 
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE

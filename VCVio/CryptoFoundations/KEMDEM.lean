@@ -46,7 +46,7 @@ variable [DecidableEq K] [DecidableEq M] [Monad m] [HasEvalSPMF m]
 honest ciphertext returns the encapsulated key. -/
 private lemma kem_decaps_mem_support
     {kem : KEMScheme m K PK SK CKEM}
-    (hkem : Pr[=true | kem.CorrectExp] = 1)
+    (hkem : Pr[= true | kem.CorrectExp] = 1)
     {pk : PK} {sk : SK} (hks : (pk, sk) ∈ support kem.keygen)
     {c : CKEM} {k : K} (hck : (c, k) ∈ support (kem.encaps pk))
     {kOpt : Option K} (hkOpt : kOpt ∈ support (kem.decaps sk c)) :
@@ -66,9 +66,9 @@ semantics of `m`, then their composition is also perfectly correct. -/
 theorem perfectlyCorrect_composeWithDEM
     [LawfulMonad m]
     (kem : KEMScheme m K PK SK CKEM) (dem : DEMScheme m K M CDEM)
-    (hkem : Pr[=true | kem.CorrectExp] = 1)
-    (hdem : ∀ k : K, ∀ msg : M, Pr[=true | dem.CorrectExp k msg] = 1) :
-    ∀ msg, Pr[=true | (kem.composeWithDEM dem).CorrectExp msg] = 1 := by
+    (hkem : Pr[= true | kem.CorrectExp] = 1)
+    (hdem : ∀ k : K, ∀ msg : M, Pr[= true | dem.CorrectExp k msg] = 1) :
+    ∀ msg, Pr[= true | (kem.composeWithDEM dem).CorrectExp msg] = 1 := by
   intro msg
   simp only [AsymmEncAlg.CorrectExp, composeWithDEM]
   rw [← hkem]

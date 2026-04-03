@@ -313,7 +313,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
             (probOutput_eq_zero_iff _ _).2 hs
           simp [h0]
       simp_rw [step1, probOutput_bind_eq_tsum (liftM (query t))]
-      -- ∑' s, Pr[=s|gen] * ∑' u, Pr[=u|query t] * Pr[=x|run'(mx u) s]
+      -- ∑' s, Pr[= s|gen] * ∑' u, Pr[= u|query t] * Pr[= x|run'(mx u) s]
       -- Distribute and swap
       simp_rw [← ENNReal.tsum_mul_left, mul_left_comm]
       rw [ENNReal.tsum_comm]
@@ -357,10 +357,10 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
       -- Reparametrize: ∑' s, f(s) = ∑' (u,s'), f(s'.prependValues [u])
       -- using injectivity of prependValues and support ⊆ range
       have h_supp : Function.support (fun s =>
-          Pr[=s | generateSeed spec₀ qc js] *
+          Pr[= s | generateSeed spec₀ qc js] *
             match s.pop t with
             | none => 0
-            | some (u, s') => Pr[=x | (simulateQ seededOracle (mx u)).run' s']) ⊆
+            | some (u, s') => Pr[= x | (simulateQ seededOracle (mx u)).run' s']) ⊆
           Set.range (fun (p : spec₀.Range t × QuerySeed spec₀) =>
             p.2.prependValues [p.1]) := by
         intro s hs
@@ -373,8 +373,8 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
       simp only [QuerySeed.pop_prependValues_singleton]
       rw [ENNReal.tsum_prod', probOutput_bind_eq_tsum]
       congr 1; ext u
-      -- Goal: ∑' s', Pr[=s'.prependValues [u]|gen] * Pr[=x|run'(mx u) s']
-      --     = Pr[=u|liftM (query t)] * Pr[=x|mx u]
+      -- Goal: ∑' s', Pr[= s'.prependValues [u]|gen] * Pr[= x|run'(mx u) s']
+      --     = Pr[= u|liftM (query t)] * Pr[= x|mx u]
       have hpos : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
       have hfact := fun s' => probOutput_generateSeed_prependValues spec₀ qc js u s' hpos
       simp_rw [hfact, mul_assoc]

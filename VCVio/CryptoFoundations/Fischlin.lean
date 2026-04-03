@@ -86,7 +86,7 @@ private def fischlinSearchAux {X W PC SC Ω P M : Type} {p : X → W → Bool} {
     List Ω → Option (Ω × P × Fin (2 ^ b)) → m (Option (Ω × P))
   | [], best => return best.map fun (ω, resp, _) => (ω, resp)
   | ω :: rest, best => do
-    let resp ← (monadLift (σ.respond pk sk sc ω) : m _)
+    let resp ← σ.respond pk sk sc ω
     let h ← HasQuery.query (spec := (fischlinROSpec X PC Ω P ρ b M))
       ⟨pk, msg, comList, i, ω, resp⟩
     if h.val = 0 then return some (ω, resp)
@@ -122,19 +122,18 @@ def Fischlin
     [HasQuery (fischlinROSpec X PC Ω P ρ b M) m] :
     SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := FischlinProof PC Ω P ρ) where
-  keygen := monadLift hr.gen
+  keygen := liftM hr.gen
   sign := fun pk sk msg => do
     let commits : Fin ρ → PC × SC ←
-      Fin.mOfFn ρ fun _ => (monadLift (σ.commit pk sk) : m (PC × SC))
+      Fin.mOfFn ρ fun _ => σ.commit pk sk
     let comVec : Fin ρ → PC := fun i => (commits i).1
     let comList := List.ofFn comVec
     Fin.mOfFn ρ fun i => do
       let sc_i := (commits i).2
       let result ←
         fischlinSearchAux
-          (X := X) (W := W) (PC := PC) (SC := SC) (Ω := Ω) (P := P) (M := M)
-          (p := p) (ρ := ρ) (b := b) (m := m)
-          σ pk sk sc_i msg comList i (FinEnum.toList Ω) none
+          σ pk sk sc_i msg comList i (FinEnum.toList Ω)
+          (none : Option (Ω × P × Fin (2 ^ b)))
       match result with
       | some (ω, resp) => return (comVec i, ω, resp)
       | none => return (comVec i, default, default)

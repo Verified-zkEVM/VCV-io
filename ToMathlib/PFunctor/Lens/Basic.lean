@@ -40,8 +40,8 @@ theorem ext {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (l₁ l�
   rcases l₂ with ⟨toFunA₂, _⟩
   have h : toFunA₁ = toFunA₂ := funext h₁
   subst h
-  simp_all
-  exact funext h₂
+  simp_all only [mk.injEq, heq_eq_eq, true_and]
+  simpa using funext h₂
 
 /-- The identity lens -/
 protected def id (P : PFunctor.{uA, uB}) : Lens P P where
@@ -411,7 +411,7 @@ theorem prodPair_fst_snd :
 namespace Equiv
 
 /-- Commutativity of product -/
-def prodComm (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₂}):
+def prodComm (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₂}) :
     Lens.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂} (P * Q) (Q * P) where
   toLens := Prod.swap ⇆ (fun _ => Sum.elim Sum.inr Sum.inl)
   invLens := Prod.swap ⇆ (fun _ => Sum.elim Sum.inr Sum.inl)
@@ -732,31 +732,29 @@ def toLensEquiv (e : P ≃ₚ Q) : P ≃ₗ Q where
     simp only [Lens.comp, Lens.id]
     ext a b
     · simp [PFunctor.Equiv.symm]
-    · simp [PFunctor.Equiv.symm]
+    · simp only [Function.comp_apply, id_eq]
       have hb :
-          (e.equivB a).symm ((_root_.Equiv.cast
-            (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm
-            ((e.equivB (e.equivA.symm (e.equivA a))) b)) =
+          (e.equivB a).symm ((e.symm.equivB (e.equivA a)).symm b) =
             _root_.cast (congrArg P.B (e.equivA.symm_apply_apply a)) b := by
         simpa [PFunctor.Equiv.symm] using
           (equivB_symm_apply (e := e) (a := a) (b := b))
       have h0 : a = e.equivA.symm (e.equivA a) := (e.equivA.symm_apply_apply a).symm
       have hr := eqRec_id_apply (β := P.B) (h := h0) (x := b)
-      exact hb.trans (by simpa [h0] using hr.symm)
+      simpa [h0] using hb.trans hr.symm
   right_inv := by
     simp only [Lens.comp, Lens.id]
     ext a b
     · simp [PFunctor.Equiv.symm]
-    · simp [PFunctor.Equiv.symm]
+    · simp only [Function.comp_apply, id_eq]
       have hb :
-          (_root_.Equiv.cast (congrArg Q.B ((_root_.Equiv.symm_apply_eq e.equivA).mp rfl))).symm b =
+          (e.symm.equivB a).symm ((e.equivB (e.symm.equivA a)).symm b) =
             _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b := by
         simpa [PFunctor.Equiv.symm] using
           (symm_equivB_symm_apply (e := e) (a := a) (b := b))
       have h0 : a = e.equivA (e.equivA.symm a) :=
         (_root_.Equiv.symm_apply_eq e.equivA).mp rfl
       have hr := eqRec_id_apply (β := Q.B) (h := h0) (x := b)
-      exact hb.trans (by simpa [h0] using hr.symm)
+      simpa [h0] using hb.trans hr.symm
 
 end Equiv
 

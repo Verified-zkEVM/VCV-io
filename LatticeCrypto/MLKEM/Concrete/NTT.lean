@@ -171,14 +171,30 @@ private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : R
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
   LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
--- 256×256 matrix inverse verified by native evaluation (~16.7M ZMod multiplications).
+-- The extracted 256×256 transform matrices expand to a large closed `ZMod` expression for
+-- each entry. At the moment, `native_decide` is the only practical way we have to discharge
+-- this fully concrete certificate inside Lean without a separate proof-oriented certificate
+-- artifact. Plain kernel reduction (`decide`/`rfl`) gets stuck on the resulting arithmetic.
+--
+-- To move off `native_decide`, we likely need one of:
+-- 1. generated row/entry certificates for the matrix product `M⁻¹ · M = I`, checked by small
+--    kernel proofs, or
+-- 2. a more algebraic NTT correctness development showing the loop kernels implement the
+--    canonical transform and deriving inversion abstractly.
+--
+-- Both are larger refactors than the current warning-cleanup pass, so we leave this as an
+-- explicit deferred follow-up rather than papering over it with linter suppression.
 set_option maxHeartbeats 800000 in
+-- The concrete matrix certificate currently needs a larger heartbeat budget.
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
   native_decide
 
+-- The reverse composition carries the same concrete matrix-expansion cost and the same
+-- deferred-certificate status as `invNTTMatrix_nttMatrix_entry` above.
 set_option maxHeartbeats 800000 in
+-- The reverse certificate has the same concrete reduction cost.
 private theorem nttMatrix_invNTTMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, nttMatrix row k * invNTTMatrix k col) = idMatrix row col := by

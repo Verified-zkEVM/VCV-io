@@ -401,14 +401,14 @@
 
 -- -- What Hybrid 0 looks like:
 -- -- do
--- --   let b ← $ᵗBool
--- --   let x ← $ᵗMatrix (Fin n) (Fin m) (Fin p)
--- --   let x_1 ← $ᵗVector (Fin p) n
--- --   let a ← $ᵗVector (Fin (2 * χ + 1)) m
+-- --   let b ← $ᵗ Bool
+-- --   let x ← $ᵗ Matrix (Fin n) (Fin m) (Fin p)
+-- --   let x_1 ← $ᵗ Vector (Fin p) n
+-- --   let a ← $ᵗ Vector (Fin (2 * χ + 1)) m
 -- --   let __discr ←
 -- --     adv.chooseMessages
 -- --       (x, Vector.ofFn (Matrix.vecMul x_1.get x) + Vector.map (fun t ↦ Fin.castLE ⋯ t - ↑χ) a)
--- --   let a_1 ← $ᵗVector (Fin 2) m
+-- --   let a_1 ← $ᵗ Vector (Fin 2) m
 -- --   let b' ←
 -- --     adv.distinguish __discr.2.2
 -- --         (Vector.ofFn (x.mulVec (Vector.map (Fin.castLE hp2) a_1).get),

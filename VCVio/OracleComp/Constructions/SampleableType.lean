@@ -41,7 +41,7 @@ NOTE: naming is somewhat strange now that `Fintype` isn't explicitly required. -
 def uniformSample (β : Type) [h : SampleableType β] :
     ProbComp β := h.selectElem
 
-prefix : 90 "$ᵗ" => uniformSample
+notation:90 "$ᵗ " α:91 => uniformSample α
 
 variable (α : Type) [hα : SampleableType α]
 
@@ -400,7 +400,7 @@ lemma probOutput_decide_eq_uniformBool_half
   have hfalse : Pr[= true | f false >>= fun b' => pure (decide (false = b'))] =
       Pr[= false | f false] := by
     rw [probOutput_bind_eq_tsum]; simp
-  have hsum : Pr[=true | f false] + Pr[=false | f false] = 1 := by
+  have hsum : Pr[= true | f false] + Pr[= false | f false] = 1 := by
     have := HasEvalPMF.sum_probOutput_eq_one (f false)
     rwa [Fintype.sum_bool] at this
   rw [htrue, hfalse, h true, ← mul_add, hsum, mul_one]

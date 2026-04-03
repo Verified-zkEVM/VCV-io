@@ -24,7 +24,6 @@ When unfolded (recall that `ContT r m α = (α → m r) → m r`), it takes the 
 Compare this to the inductive definition, which has two constructors:
 - `pure : α → FreeMonad f α`
 - `roll : f β → (β → FreeMonad f α) → FreeMonad f α`
-
 -/
 def FreeContT (f : Type z → Type y) (m : Type u → Type v) (α : Type w) :
     Type (max (u + 1) v w y (z + 1)) :=
@@ -204,7 +203,7 @@ lemma FreeMonad.toFreeMonad_toFreeContM (x : FreeMonad f α) :
       funext b
       exact ih b
 
-lemma FreeContM.toFreeContM_toFreeMonad (x : FreeContM f α):
+lemma FreeContM.toFreeContM_toFreeMonad (x : FreeContM f α) :
     @FreeMonad.toFreeContM f α (FreeContM.toFreeMonad x) = @x := by
   funext r handleEff handlePure
   set y := FreeContM.toFreeMonad x with hy

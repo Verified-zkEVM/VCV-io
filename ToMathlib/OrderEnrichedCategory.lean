@@ -22,9 +22,13 @@ namespace Preord
 instance : MonoidalCategory (Preord) where
   tensorObj X Y := ⟨X.carrier × Y.carrier⟩
   whiskerLeft X Y := fun f => ofHom ⟨fun x => (x.1, f.1 x.2),
-      (by simp [Monotone]; intro _ _ _ _ h h'; exact ⟨h, f.hom.2 h'⟩)⟩
+      by
+        intro a b hab
+        exact ⟨hab.1, f.hom.2 hab.2⟩⟩
   whiskerRight f Y := ofHom ⟨fun y => (f.hom y.1, y.2),
-      (by simp [Monotone]; intro _ _ _ _ h h'; exact ⟨f.hom.2 h, h'⟩)⟩
+      by
+        intro a b hab
+        exact ⟨f.hom.2 hab.1, hab.2⟩⟩
   tensorUnit := ⟨PUnit⟩
   associator X Y Z := {
     hom := ofHom ⟨fun ⟨⟨x, y⟩, z⟩ => ⟨x, ⟨y, z⟩⟩, by
@@ -118,7 +122,8 @@ def inducedFunctor (M : RelativeMonad C D J) : EnrichedFunctor (Bundled c) C D w
 
 -- def postcompose
 
--- def lift (F : EnrichedFunctor C D) (φ : J₂ ≅ (J₁ ⋙ F)) (M : RelativeMonad C D₂ J₂) : RelativeMonad C D₁ J₁ where
+-- def lift (F : EnrichedFunctor C D) (φ : J₂ ≅ (J₁ ⋙ F))
+--     (M : RelativeMonad C D₂ J₂) : RelativeMonad C D₁ J₁ where
 
 end RelativeMonad
 
