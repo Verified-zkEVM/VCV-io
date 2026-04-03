@@ -197,14 +197,22 @@ private theorem hzero_rq (i : Fin polyBackend.degree) :
   LatticeCrypto.vectorRing_zero_get i
 
 /-- The concrete NTT is additive. -/
+theorem ntt_add_toRq (f g : Rq) : (ntt (f + g) : Rq) = (ntt f : Rq) + (ntt g : Rq) :=
+  LatticeCrypto.NTTCert.applyMatrix_add (backend := polyBackend) nttMatrix hadd_rq f g
+
+/-- The concrete NTT is additive. -/
 theorem ntt_add (f g : Rq) : ntt (f + g) = ntt f + ntt g := by
   apply LatticeCrypto.TransformPoly.ext
-  exact LatticeCrypto.NTTCert.applyMatrix_add (backend := polyBackend) nttMatrix hadd_rq f g
+  simpa using ntt_add_toRq f g
+
+/-- The concrete NTT preserves subtraction. -/
+theorem ntt_sub_toRq (f g : Rq) : (ntt (f - g) : Rq) = (ntt f : Rq) - (ntt g : Rq) :=
+  LatticeCrypto.NTTCert.applyMatrix_sub (backend := polyBackend) nttMatrix hsub_rq f g
 
 /-- The concrete NTT preserves subtraction. -/
 theorem ntt_sub (f g : Rq) : ntt (f - g) = ntt f - ntt g := by
   apply LatticeCrypto.TransformPoly.ext
-  exact LatticeCrypto.NTTCert.applyMatrix_sub (backend := polyBackend) nttMatrix hsub_rq f g
+  simpa using ntt_sub_toRq f g
 
 /-- Concrete `NTTRingOps` instance for ML-DSA. -/
 def concreteNTTRingOps : NTTRingOps where
