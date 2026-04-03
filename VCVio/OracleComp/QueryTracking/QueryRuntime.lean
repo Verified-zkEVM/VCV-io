@@ -211,7 +211,13 @@ lemma usesAtLeastQueries_of_usesExactlyQueries
 
 end genericCost
 
-/-- Human-readable notation for exact query-count statements in the unit-cost model. -/
+/-- `Queries[ oa in runtime ] = n` means that the generic `HasQuery` computation `oa` makes
+exactly `n` oracle queries when instantiated in `runtime` and instrumented with unit additive
+cost per query.
+
+The computation `oa` is written in direct `HasQuery` style. The notation elaborates it against
+the unit-cost analysis monad induced by `runtime`, so statements can usually be written without
+explicit monad annotations such as `m := AddWriterT ℕ m`. -/
 syntax:max "Queries[ " term " in " term " ]" " = " term : term
 
 macro_rules
@@ -220,7 +226,11 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
           $runtime $n)
 
-/-- Human-readable notation for upper-bound query-count statements in the unit-cost model. -/
+/-- `Queries[ oa in runtime ] ≤ n` means that `oa` makes at most `n` oracle queries when run in
+the unit-cost instrumentation of `runtime`.
+
+This packages the common cryptographic statement “the construction uses at most `n` queries” on
+top of [`HasQuery.UsesAtMostQueries`]. -/
 syntax:max "Queries[ " term " in " term " ]" " ≤ " term : term
 
 macro_rules
@@ -229,7 +239,11 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
           $runtime $n)
 
-/-- Human-readable notation for lower-bound query-count statements in the unit-cost model. -/
+/-- `Queries[ oa in runtime ] ≥ n` means that every execution of `oa` in the unit-cost
+instrumentation of `runtime` incurs at least `n` query-cost units.
+
+This is less common than the exact and upper-bound forms, but it is useful for statements saying
+that a construction must query the oracle at least a certain number of times. -/
 syntax:max "Queries[ " term " in " term " ]" " ≥ " term : term
 
 macro_rules
@@ -238,7 +252,12 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
           $runtime $n)
 
-/-- Human-readable notation for exact additive-cost statements under a named cost function. -/
+/-- `QueryCost[ oa in runtime by costFn ] = w` means that `oa`, instantiated in `runtime` and
+instrumented so that each query `t` contributes cost `costFn t`, has constant total query cost
+`w`.
+
+Use this when the cost model is not unit cost, for example when different query families or
+different query shapes carry different weights. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " = " term : term
 
 macro_rules
@@ -247,7 +266,10 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
-/-- Human-readable notation for additive-cost upper bounds under a named cost function. -/
+/-- `QueryCost[ oa in runtime by costFn ] ≤ w` means that the total query cost of `oa` is bounded
+above by `w` under the weighting function `costFn`.
+
+This is the weighted analogue of [`Queries[ oa in runtime ] ≤ n`]. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term : term
 
 macro_rules
@@ -256,7 +278,10 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
-/-- Human-readable notation for additive-cost lower bounds under a named cost function. -/
+/-- `QueryCost[ oa in runtime by costFn ] ≥ w` means that the total query cost of `oa` is bounded
+below by `w` under the weighting function `costFn`.
+
+This is the weighted analogue of [`Queries[ oa in runtime ] ≥ n`]. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term : term
 
 macro_rules

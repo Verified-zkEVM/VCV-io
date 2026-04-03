@@ -257,19 +257,31 @@ execution path. -/
 def CostAtLeast [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
   ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a
 
-/-- Human-readable notation for exact constant-cost statements. -/
+/-- `Cost[ oa ] = w` means that the `AddWriterT` computation `oa` incurs the same additive cost
+`w` on every execution path.
+
+This is notation for [`AddWriterT.HasCost`]. It is intended for theorem statements where the
+constant-cost reading is more natural than the underlying output-indexed formulation
+[`AddWriterT.CostsAs`]. -/
 syntax:max "Cost[ " term " ]" " = " term : term
 
 macro_rules
   | `(Cost[ $oa ] = $w) => `(AddWriterT.HasCost $oa $w)
 
-/-- Human-readable notation for constant upper-bound cost statements. -/
+/-- `Cost[ oa ] ≤ w` means that every execution of `oa` incurs additive cost at most `w`.
+
+This is notation for [`AddWriterT.CostAtMost`]. The bound is uniform over all outputs of `oa`,
+but the underlying witness may still depend on the output when proving the statement. -/
 syntax:max "Cost[ " term " ]" " ≤ " term : term
 
 macro_rules
   | `(Cost[ $oa ] ≤ $w) => `(AddWriterT.CostAtMost $oa $w)
 
-/-- Human-readable notation for constant lower-bound cost statements. -/
+/-- `Cost[ oa ] ≥ w` means that every execution of `oa` incurs additive cost at least `w`.
+
+This is notation for [`AddWriterT.CostAtLeast`]. As with [`Cost[ oa ] ≤ w`], the underlying
+cost description may depend on the output of `oa`; the notation packages only the uniform lower
+bound visible at the theorem statement level. -/
 syntax:max "Cost[ " term " ]" " ≥ " term : term
 
 macro_rules
