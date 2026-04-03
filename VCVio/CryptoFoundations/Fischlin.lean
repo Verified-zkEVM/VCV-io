@@ -227,18 +227,18 @@ omit [SampleableType X] [SampleableType W]
   [DecidableEq X] [DecidableEq PC] [DecidableEq Ω] [DecidableEq P]
   [FinEnum Ω] [Inhabited Ω] [Inhabited P] [SampleableType Ω]
   [DecidableEq M] in
-private lemma fischlinSearchAuxWithUnitCost_queryBoundedBy
+private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
     (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
     (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
     (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b))) :
-    AddWriterT.QueryBoundedBy
+    AddWriterT.QueryBoundedAboveBy
       (fischlinSearchAuxWithUnitCost
         (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := sc) (msg := msg)
         (comList := comList) (i := i) challenges best)
       challenges.length := by
   induction challenges generalizing best with
   | nil =>
-      exact AddWriterT.queryBoundedBy_pure
+      exact AddWriterT.queryBoundedAboveBy_pure
         (m := m) ((best.map fun (ω, resp, _) => (ω, resp)) : Option (Ω × P))
   | cons ω rest ih =>
       let hashStep : P → AddWriterT ℕ m (Option (Ω × P)) := fun resp =>
@@ -253,29 +253,29 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedBy
                   | none => some (ω, resp, h)
                   | some (ω', resp', h') =>
                       if h.val < h'.val then some (ω, resp, h) else some (ω', resp', h'))
-      change AddWriterT.QueryBoundedBy
+      change AddWriterT.QueryBoundedAboveBy
         ((monadLift (σ.respond pk sk sc ω) : AddWriterT ℕ m P) >>= hashStep)
         (rest.length + 1)
-      refine AddWriterT.queryBoundedBy_mono
-        (AddWriterT.queryBoundedBy_bind (n₁ := 0) (n₂ := 1 + rest.length)
-          (AddWriterT.queryBoundedBy_monadLift (m := m) (σ.respond pk sk sc ω))
+      refine AddWriterT.queryBoundedAboveBy_mono
+        (AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := 1 + rest.length)
+          (AddWriterT.queryBoundedAboveBy_monadLift (m := m) (σ.respond pk sk sc ω))
           (fun resp => ?_))
         (by omega)
-      refine AddWriterT.queryBoundedBy_mono
-        (AddWriterT.queryBoundedBy_bind (n₁ := 1) (n₂ := rest.length)
-          (AddWriterT.queryBoundedBy_addTell 1)
+      refine AddWriterT.queryBoundedAboveBy_mono
+        (AddWriterT.queryBoundedAboveBy_bind (n₁ := 1) (n₂ := rest.length)
+          (AddWriterT.queryBoundedAboveBy_addTell 1)
           (fun _ => ?_))
         (by omega)
-      refine AddWriterT.queryBoundedBy_mono
-        (AddWriterT.queryBoundedBy_bind (n₁ := 0) (n₂ := rest.length)
-          (AddWriterT.queryBoundedBy_monadLift (m := m)
+      refine AddWriterT.queryBoundedAboveBy_mono
+        (AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := rest.length)
+          (AddWriterT.queryBoundedAboveBy_monadLift (m := m)
             (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩))
           (fun h => ?_))
         (by omega)
       by_cases hh : h.val = 0
       · simpa [hashStep, hh] using
-          AddWriterT.queryBoundedBy_mono
-            (AddWriterT.queryBoundedBy_pure ((some (ω, resp)) : Option (Ω × P)))
+          AddWriterT.queryBoundedAboveBy_mono
+            (AddWriterT.queryBoundedAboveBy_pure ((some (ω, resp)) : Option (Ω × P)))
             (Nat.zero_le rest.length)
       · let newBest : Option (Ω × P × Fin (2 ^ b)) := match best with
           | none => some (ω, resp, h)
@@ -299,24 +299,24 @@ theorem verify_usesAtMostRhoQueries
     AddWriterT.addTell (M := m) 1
     let h_i ← monadLift (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, ω_i, resp_i⟩)
     pure (σ.verify pk (π i).1 ω_i resp_i, h_i.val)
-  have hstep : ∀ i, AddWriterT.QueryBoundedBy (step i) 1 := by
+  have hstep : ∀ i, AddWriterT.QueryBoundedAboveBy (step i) 1 := by
     intro i
-    change AddWriterT.QueryBoundedBy
+    change AddWriterT.QueryBoundedAboveBy
       (do
         AddWriterT.addTell (M := m) 1
         let h_i ← monadLift (runtime.impl
           ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
         pure (σ.verify pk (π i).1 (π i).2.1 (π i).2.2, h_i.val))
       1
-    apply AddWriterT.queryBoundedBy_bind (n₁ := 1) (n₂ := 0)
-    · exact AddWriterT.queryBoundedBy_addTell 1
+    apply AddWriterT.queryBoundedAboveBy_bind (n₁ := 1) (n₂ := 0)
+    · exact AddWriterT.queryBoundedAboveBy_addTell 1
     · intro _
-      apply AddWriterT.queryBoundedBy_bind (n₁ := 0) (n₂ := 0)
-      · exact AddWriterT.queryBoundedBy_monadLift
+      apply AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := 0)
+      · exact AddWriterT.queryBoundedAboveBy_monadLift
           (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
       · intro _
-        exact AddWriterT.queryBoundedBy_pure _
-  change AddWriterT.QueryBoundedBy
+        exact AddWriterT.queryBoundedAboveBy_pure _
+  change AddWriterT.QueryBoundedAboveBy
       (HasQuery.withUnitCost
         (fun [HasQuery (fischlinROSpec X PC Ω P ρ b M) (AddWriterT ℕ m)] =>
           (Fischlin (m := AddWriterT ℕ m) σ hr ρ b S M).verify pk msg π)
@@ -324,7 +324,7 @@ theorem verify_usesAtMostRhoQueries
       ρ
   simpa [Fischlin, HasQuery.withUnitCost, QueryRuntime.withUnitCost_impl, AddWriterT.addTell, step]
     using
-      (AddWriterT.queryBoundedBy_bind
+      (AddWriterT.queryBoundedAboveBy_bind
         (oa := Fin.mOfFn ρ step)
         (f := fun results => pure
           (((List.finRange ρ).all fun i => (results i).1) &&
@@ -332,8 +332,8 @@ theorem verify_usesAtMostRhoQueries
         (n₁ := ρ) (n₂ := 0)
         (by
           simpa using
-            (AddWriterT.queryBoundedBy_fin_mOfFn (n := ρ) (k := 1) hstep))
-        (fun _ => AddWriterT.queryBoundedBy_pure _))
+            (AddWriterT.queryBoundedAboveBy_fin_mOfFn (n := ρ) (k := 1) hstep))
+        (fun _ => AddWriterT.queryBoundedAboveBy_pure _))
 
 /-- Fischlin verification makes at least `ρ` random-oracle queries under unit-cost
 instrumentation. -/
@@ -403,17 +403,17 @@ theorem sign_usesAtMostRhoCardOmegaQueries
   have hlen : (FinEnum.toList Ω).length = FinEnum.card Ω := by
     simp [FinEnum.toList]
   have hrep : ∀ commits i,
-      AddWriterT.QueryBoundedBy (repStep commits i) (FinEnum.card Ω) := by
+      AddWriterT.QueryBoundedAboveBy (repStep commits i) (FinEnum.card Ω) := by
     intro commits i
     have hsearch :
-        AddWriterT.QueryBoundedBy
+        AddWriterT.QueryBoundedAboveBy
           (fischlinSearchAuxWithUnitCost
             (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
             (msg := msg) (comList := List.ofFn fun j => (commits j).1) (i := i)
             (FinEnum.toList Ω) (none : Option (Ω × P × Fin (2 ^ b))))
           (FinEnum.toList Ω).length := by
       simpa using
-        (fischlinSearchAuxWithUnitCost_queryBoundedBy
+        (fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
           (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
           (msg := msg) (comList := List.ofFn fun j => (commits j).1) (i := i)
           (challenges := FinEnum.toList Ω) (best := none))
@@ -421,33 +421,36 @@ theorem sign_usesAtMostRhoCardOmegaQueries
       | some (ω, resp) => pure (((fun j => (commits j).1) i), ω, resp)
       | none => pure (((fun j => (commits j).1) i), default, default)
     have hcont :
-        ∀ result : Option (Ω × P), AddWriterT.QueryBoundedBy (finish result) 0 := by
+        ∀ result : Option (Ω × P), AddWriterT.QueryBoundedAboveBy (finish result) 0 := by
       intro result
       cases result with
       | none =>
-          simpa [finish] using AddWriterT.queryBoundedBy_pure
+          simpa [finish] using AddWriterT.queryBoundedAboveBy_pure
             (m := m) ((((fun j => (commits j).1) i), default, default) : PC × Ω × P)
       | some pair =>
           rcases pair with ⟨ω, resp⟩
-          simpa [finish] using AddWriterT.queryBoundedBy_pure
+          simpa [finish] using AddWriterT.queryBoundedAboveBy_pure
             (m := m) ((((fun j => (commits j).1) i), ω, resp) : PC × Ω × P)
-    exact AddWriterT.queryBoundedBy_mono
-      (AddWriterT.queryBoundedBy_bind (n₁ := (FinEnum.toList Ω).length) (n₂ := 0) hsearch hcont)
+    exact AddWriterT.queryBoundedAboveBy_mono
+      (AddWriterT.queryBoundedAboveBy_bind (n₁ := (FinEnum.toList Ω).length) (n₂ := 0)
+        hsearch hcont)
       (by simp [hlen])
   let commitComp : AddWriterT ℕ m (Fin ρ → PC × SC) :=
     Fin.mOfFn ρ fun _ => (liftM (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
   have hcommit :
-      AddWriterT.QueryBoundedBy commitComp 0 := by
+      AddWriterT.QueryBoundedAboveBy commitComp 0 := by
     have hstep :
-        AddWriterT.QueryBoundedBy (liftM (σ.commit pk sk) : AddWriterT ℕ m (PC × SC)) 0 := by
+        AddWriterT.QueryBoundedAboveBy
+          (liftM (σ.commit pk sk) : AddWriterT ℕ m (PC × SC)) 0 := by
       simpa [WriterT.liftM_def] using
-        (AddWriterT.queryBoundedBy_monadLift (monadLift (σ.commit pk sk) : m (PC × SC)))
+        (AddWriterT.queryBoundedAboveBy_monadLift
+          (monadLift (σ.commit pk sk) : m (PC × SC)))
     simpa [commitComp] using
-      (AddWriterT.queryBoundedBy_fin_mOfFn (n := ρ) (k := 0)
+      (AddWriterT.queryBoundedAboveBy_fin_mOfFn (n := ρ) (k := 0)
         (f := fun _ => (liftM (σ.commit pk sk) : AddWriterT ℕ m (PC × SC)))
         (fun _ => hstep))
   suffices
-      AddWriterT.QueryBoundedBy
+      AddWriterT.QueryBoundedAboveBy
         (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits))
         (ρ * FinEnum.card Ω) by
     have hsign :
@@ -475,9 +478,9 @@ theorem sign_usesAtMostRhoCardOmegaQueries
           (challenges := FinEnum.toList Ω) (best := none))
     simpa [HasQuery.UsesAtMostQueries, hsign] using this
   simpa [Nat.zero_add] using
-    (AddWriterT.queryBoundedBy_bind (n₁ := 0) (n₂ := ρ * FinEnum.card Ω) hcommit
+    (AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := ρ * FinEnum.card Ω) hcommit
       (fun commits =>
-        AddWriterT.queryBoundedBy_fin_mOfFn (n := ρ) (k := FinEnum.card Ω)
+        AddWriterT.queryBoundedAboveBy_fin_mOfFn (n := ρ) (k := FinEnum.card Ω)
           (fun i => hrep commits i)))
 
 end

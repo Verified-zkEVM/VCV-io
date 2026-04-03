@@ -236,8 +236,12 @@ lemma costs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
 
 section costPredicates
 
-/-- `CostsAs oa f` means that the cost accumulated by `oa` is determined by its output via the
-cost function `f`. -/
+/-- `CostsAs oa f` means that the accumulated cost of `oa` is determined by its output via the
+function `f`.
+
+Concretely, whenever `oa` produces output `a`, the recorded cost is exactly `f a`. This is a
+strong structural property: it can fail when the same output can be reached by different execution
+paths carrying different costs. -/
 def CostsAs (oa : AddWriterT ω M α) (f : α → ω) : Prop :=
   oa.costs = f <$> oa.outputs
 
@@ -245,14 +249,21 @@ def CostsAs (oa : AddWriterT ω M α) (f : α → ω) : Prop :=
 def HasCost (oa : AddWriterT ω M α) (w : ω) : Prop :=
   oa.CostsAs (fun _ ↦ w)
 
-/-- `CostAtMost oa w` means that `oa`'s cost is bounded above by the constant `w` on every
-execution path. -/
-def CostAtMost [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
+/-- `OutputCostAtMost oa w` means that `oa` admits an output-indexed cost description bounded above
+by the constant `w`.
+
+Concretely, there is some function `f : α → ω` such that every execution producing output `a`
+accumulates cost `f a`, and each such `f a` is at most `w`. This is stronger than a merely
+pathwise upper bound when the same output can be reached with different costs. -/
+def OutputCostAtMost [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
   ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, f a ≤ w
 
-/-- `CostAtLeast oa w` means that `oa`'s cost is bounded below by the constant `w` on every
-execution path. -/
-def CostAtLeast [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
+/-- `OutputCostAtLeast oa w` means that `oa` admits an output-indexed cost description bounded
+below by the constant `w`.
+
+As with [`AddWriterT.OutputCostAtMost`], this packages a cost function determined by the final
+output, not just an arbitrary pathwise lower bound. -/
+def OutputCostAtLeast [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
   ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a
 
 /-- `Cost[ oa ] = w` means that the `AddWriterT` computation `oa` incurs the same additive cost
@@ -266,24 +277,24 @@ syntax:max "Cost[ " term " ]" " = " term:50 : term
 macro_rules
   | `(Cost[ $oa ] = $w) => `(AddWriterT.HasCost $oa $w)
 
-/-- `Cost[ oa ] ≤ w` means that every execution of `oa` incurs additive cost at most `w`.
+/-- `OutputCost[ oa ] ≤ w` means that `oa` admits an output-indexed additive-cost bound by `w`.
 
-This is notation for [`AddWriterT.CostAtMost`]. The bound is uniform over all outputs of `oa`,
-but the underlying witness may still depend on the output when proving the statement. -/
-syntax:max "Cost[ " term " ]" " ≤ " term:50 : term
-
-macro_rules
-  | `(Cost[ $oa ] ≤ $w) => `(AddWriterT.CostAtMost $oa $w)
-
-/-- `Cost[ oa ] ≥ w` means that every execution of `oa` incurs additive cost at least `w`.
-
-This is notation for [`AddWriterT.CostAtLeast`]. As with [`Cost[ oa ] ≤ w`], the underlying
-cost description may depend on the output of `oa`; the notation packages only the uniform lower
-bound visible at the theorem statement level. -/
-syntax:max "Cost[ " term " ]" " ≥ " term:50 : term
+This is notation for [`AddWriterT.OutputCostAtMost`]. It is best used when cost is already known
+to be determined by the final output, or when that stronger formulation is useful in a proof. -/
+syntax:max "OutputCost[ " term " ]" " ≤ " term:50 : term
 
 macro_rules
-  | `(Cost[ $oa ] ≥ $w) => `(AddWriterT.CostAtLeast $oa $w)
+  | `(OutputCost[ $oa ] ≤ $w) => `(AddWriterT.OutputCostAtMost $oa $w)
+
+/-- `OutputCost[ oa ] ≥ w` means that `oa` admits an output-indexed additive-cost lower bound by
+`w`.
+
+This is notation for [`AddWriterT.OutputCostAtLeast`]. As with [`OutputCost[ oa ] ≤ w`], it is
+formulated in terms of an output-indexed cost witness rather than arbitrary execution paths. -/
+syntax:max "OutputCost[ " term " ]" " ≥ " term:50 : term
+
+macro_rules
+  | `(OutputCost[ $oa ] ≥ $w) => `(AddWriterT.OutputCostAtLeast $oa $w)
 
 @[simp]
 lemma costsAs_iff (oa : AddWriterT ω M α) (f : α → ω) :
@@ -296,22 +307,22 @@ lemma hasCost_iff (oa : AddWriterT ω M α) (w : ω) :
   Iff.rfl
 
 @[simp]
-lemma costAtMost_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
-    (Cost[ oa ] ≤ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, f a ≤ w :=
+lemma outputCostAtMost_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
+    (OutputCost[ oa ] ≤ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, f a ≤ w :=
   Iff.rfl
 
 @[simp]
-lemma costAtLeast_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
-    (Cost[ oa ] ≥ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a :=
+lemma outputCostAtLeast_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
+    (OutputCost[ oa ] ≥ w) ↔ ∃ f : α → ω, oa.CostsAs f ∧ ∀ a, w ≤ f a :=
   Iff.rfl
 
-lemma costAtMost_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
-    (h : Cost[ oa ] = w) (hwb : w ≤ b) : Cost[ oa ] ≤ b := by
+lemma outputCostAtMost_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
+    (h : Cost[ oa ] = w) (hwb : w ≤ b) : OutputCost[ oa ] ≤ b := by
   refine ⟨fun _ ↦ w, ?_, fun _ ↦ hwb⟩
   exact h
 
-lemma costAtLeast_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
-    (h : Cost[ oa ] = w) (hbw : b ≤ w) : Cost[ oa ] ≥ b := by
+lemma outputCostAtLeast_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
+    (h : Cost[ oa ] = w) (hbw : b ≤ w) : OutputCost[ oa ] ≥ b := by
   refine ⟨fun _ ↦ w, ?_, fun _ ↦ hbw⟩
   exact h
 
