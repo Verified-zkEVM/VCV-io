@@ -116,7 +116,6 @@ private def applyMatrix (M : Fin ringDegree → Fin ringDegree → Coeff) (f : R
 private def idMatrix (row col : Fin ringDegree) : Coeff :=
   LatticeCrypto.NTTCert.idMatrix ringDegree row col
 
-set_option maxHeartbeats 800000 in
 -- The extracted 256×256 transform matrices expand to a large closed `ZMod` expression for
 -- each entry. At the moment, `native_decide` is the only practical way we have to discharge
 -- this fully concrete certificate inside Lean without a separate proof-oriented certificate
@@ -130,14 +129,17 @@ set_option maxHeartbeats 800000 in
 --
 -- Both are larger refactors than the current warning-cleanup pass, so we leave this as an
 -- explicit deferred follow-up rather than papering over it with linter suppression.
+set_option maxHeartbeats 800000 in
+-- The concrete matrix certificate currently needs a larger heartbeat budget.
 private theorem invNTTMatrix_nttMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, invNTTMatrix row k * nttMatrix k col) = idMatrix row col := by
   native_decide
 
-set_option maxHeartbeats 800000 in
 -- The reverse composition carries the same concrete matrix-expansion cost and the same
 -- deferred-certificate status as `invNTTMatrix_nttMatrix_entry` above.
+set_option maxHeartbeats 800000 in
+-- The reverse certificate has the same concrete reduction cost.
 private theorem nttMatrix_invNTTMatrix_entry :
     ∀ row col : Fin ringDegree,
       (∑ k : Fin ringDegree, nttMatrix row k * invNTTMatrix k col) = idMatrix row col := by

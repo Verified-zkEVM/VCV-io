@@ -160,7 +160,7 @@ end Properties
 
 section NMASecurity
 
-variable {M : Type} [DecidableEq M]
+variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
@@ -236,7 +236,7 @@ end CMAtoNMA
 
 section MainTheorem
 
-variable {M : Type} [DecidableEq M]
+variable {M : Type}
   [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
   [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
