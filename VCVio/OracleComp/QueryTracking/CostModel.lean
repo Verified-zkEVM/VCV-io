@@ -39,7 +39,7 @@ open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
 
 /-! ## Cost Model, Cost Oracle, Cost Distribution
 
-All definitions below operate at `Type` (= `Type 0`), matching `wp`, `support`, and `Pr[...]`
+All definitions below operate at `Type` (= `Type 0`), matching `wp`, `support`, and `Pr[ ...]`
 which are defined for `{α : Type}` in the program logic.
 -/
 
@@ -164,7 +164,7 @@ theorem WorstCaseCostBound.toExpectedCostBound [Preorder ω]
 The probability that the valued cost exceeds `t`, times `t`, is at most `expectedCost`. -/
 theorem probEvent_cost_gt_mul_le_expectedCost
     (oa : OracleComp spec α) (cm : CostModel spec ω) (val : ω → ℝ≥0∞) (t : ℝ≥0∞) :
-    Pr[fun z => t < val z.2 | costDist oa cm] * t ≤ expectedCost oa cm val := by
+    Pr[ fun z => t < val z.2 | costDist oa cm] * t ≤ expectedCost oa cm val := by
   rw [probEvent_eq_wp_indicator]
   change wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t ≤
     wp (costDist oa cm) (fun z => val z.2)
@@ -182,7 +182,7 @@ theorem probEvent_cost_gt_mul_le_expectedCost
 theorem probEvent_cost_gt_le_expectedCost_div
     (oa : OracleComp spec α) (cm : CostModel spec ω) (val : ω → ℝ≥0∞)
     (t : ℝ≥0∞) (ht : 0 < t) (ht' : t ≠ ⊤) :
-    Pr[fun z => t < val z.2 | costDist oa cm] ≤ expectedCost oa cm val / t :=
+    Pr[ fun z => t < val z.2 | costDist oa cm] ≤ expectedCost oa cm val / t :=
   (ENNReal.le_div_iff_mul_le (.inl (ne_of_gt ht)) (.inl ht')).mpr
     (probEvent_cost_gt_mul_le_expectedCost oa cm val t)
 

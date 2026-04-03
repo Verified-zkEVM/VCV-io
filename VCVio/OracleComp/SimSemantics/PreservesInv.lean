@@ -15,7 +15,7 @@ This module provides minimal, **model-agnostic** infrastructure for reasoning ab
 shared, stateful oracle simulations (ROM/AGM/hybrids) via a user-supplied invariant
 `Inv : σ → Prop` on oracle states.
 
-We use **support-based** formulations (rather than `Pr[...] = 1`) to keep downstream
+We use **support-based** formulations (rather than `Pr[ ...] = 1`) to keep downstream
 proofs lightweight.
 
 ## Main definitions

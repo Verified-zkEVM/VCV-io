@@ -12,7 +12,7 @@ import VCVio.ProgramLogic.Tactics.Unary
 This file validates probability-rewrite tactics from
 `VCVio.ProgramLogic.Tactics`: `vcstep rw`, `vcstep rw under`,
 `vcstep rw congr`, `vcstep rw congr'`, and the exhaustive `vcgen` driver
-on `Pr[...] = Pr[...]` goals.
+on `Pr[ ...] = Pr[ ...]` goals.
 -/
 
 open ENNReal OracleSpec OracleComp
@@ -100,8 +100,8 @@ example {mw : OracleComp spec α} {mx : OracleComp spec β} {my : OracleComp spe
 /-! ## `rw congr` / `rw congr'` -/
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
-    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
-    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+    (h : ∀ x, Pr[ q | f x] = Pr[ q | g x]) :
+    Pr[ q | mx >>= f] = Pr[ q | mx >>= g] := by
   vcstep rw congr'
   exact h _
 
@@ -109,6 +109,6 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → 
 
 example {mx : OracleComp spec α} {my : OracleComp spec β}
     {f : α → β → OracleComp spec γ} {q : γ → Prop} :
-    Pr[q | mx >>= fun a => my >>= fun b => f a b] =
-    Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
+    Pr[ q | mx >>= fun a => my >>= fun b => f a b] =
+    Pr[ q | my >>= fun b => mx >>= fun a => f a b] := by
   vcgen

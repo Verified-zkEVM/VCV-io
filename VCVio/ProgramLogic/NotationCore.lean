@@ -164,7 +164,7 @@ macro_rules | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) => `(Relational.eRelTriple
 lemma probEvent_eq_wp_propInd {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Pr[p | oa] = wp oa (fun x => ⌜p x⌝) := by
+    Pr[ p | oa] = wp oa (fun x => ⌜p x⌝) := by
   classical
   have h := probEvent_eq_wp_indicator oa p
   simp only [propInd_eq_ite] at *
@@ -176,12 +176,12 @@ lemma Relational.RelPost.indicator_eq_propInd {α β : Type}
     Relational.RelPost.indicator R a b = ⌜R a b⌝ := by
   simp [Relational.RelPost.indicator, propInd]
 
-/-- Almost-sure correctness: `⦃⌜True⌝⦄ c ⦃fun x => ⌜p x⌝⦄` iff `Pr[p | c] = 1`. -/
+/-- Almost-sure correctness: `⦃⌜True⌝⦄ c ⦃fun x => ⌜p x⌝⦄` iff `Pr[ p | c] = 1`. -/
 lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Triple (spec := spec) ⌜True⌝ oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1 := by
-  change ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[p | oa] = 1
+    Triple (spec := spec) ⌜True⌝ oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1 := by
+  change ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1
   rw [propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
@@ -189,8 +189,8 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
 lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
-    Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa] := by
-  change r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[p | oa]
+    Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa] := by
+  change r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa]
   rw [← probEvent_eq_wp_propInd]
 
 /-! ## Expectation-level bridge lemmas -/
@@ -208,15 +208,15 @@ theorem probEvent_mono {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) {p q : α → Prop}
     (h : ∀ x, p x → q x) :
-    Pr[p | oa] ≤ Pr[q | oa] :=
+    Pr[ p | oa] ≤ Pr[ q | oa] :=
   _root_.probEvent_mono (mx := oa) (fun x _ => h x)
 
-/-- Markov inequality: if `a ≤ f x` whenever `p x`, then `a * Pr[p | oa] ≤ E[f | oa]`. -/
+/-- Markov inequality: if `a ≤ f x` whenever `p x`, then `a * Pr[ p | oa] ≤ E[f | oa]`. -/
 theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (f : α → ℝ≥0∞) (a : ℝ≥0∞)
     (p : α → Prop) (hf : ∀ x, p x → a ≤ f x) :
-    a * Pr[p | oa] ≤ wp oa f := by
+    a * Pr[ p | oa] ≤ wp oa f := by
   rw [probEvent_eq_wp_propInd, ← wp_mul_const]
   exact wp_mono oa fun x => by
     unfold propInd

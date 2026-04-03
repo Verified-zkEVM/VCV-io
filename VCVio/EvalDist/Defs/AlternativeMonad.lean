@@ -45,7 +45,7 @@ lemma probOutput_failure [HasEvalSPMF m] [LawfulFailure m]
 
 @[simp, grind =]
 lemma probEvent_failure [HasEvalSPMF m] [LawfulFailure m]
-    (p : α → Prop) : Pr[p | (failure : m α)] = 0 := by aesop
+    (p : α → Prop) : Pr[ p | (failure : m α)] = 0 := by aesop
 
 @[simp, grind =]
 lemma probFailure_failure [HasEvalSPMF m] [LawfulFailure m] :

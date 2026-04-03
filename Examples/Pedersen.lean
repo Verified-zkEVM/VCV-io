@@ -176,7 +176,7 @@ theorem binding_le_dlog (hg : Function.Bijective (· • g : F → G))
           (d₁ - d₂) / (m₂ - m₁)
         else 0) = x
   have hbinding :
-      Pr[= true | (pedersenCommit g).bindingExp binder] = Pr[bindingWin | base] := by
+      Pr[= true | (pedersenCommit g).bindingExp binder] = Pr[ bindingWin | base] := by
     rw [← probEvent_eq_eq_probOutput]
     rw [show (pedersenCommit g).bindingExp binder = (fun z => decide (bindingWin z)) <$> base by
       simp [CommitmentScheme.bindingExp, pedersenCommit, base, bindingWin, Bool.and_assoc]]
@@ -186,7 +186,7 @@ theorem binding_le_dlog (hg : Function.Bijective (· • g : F → G))
     rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
     simp [bindingWin, Bool.and_eq_true, decide_eq_true_eq]
   have hdlog :
-      Pr[= true | dlogExp g (dlogReduction binder)] = Pr[dlogWin | base] := by
+      Pr[= true | dlogExp g (dlogReduction binder)] = Pr[ dlogWin | base] := by
     rw [← probEvent_eq_eq_probOutput]
     rw [show dlogExp g (dlogReduction binder) = (fun z => decide (dlogWin z)) <$> base by
       simp [DiffieHellman.dlogExp, dlogReduction, base, dlogWin]]

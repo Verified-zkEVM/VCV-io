@@ -103,8 +103,8 @@ lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx m
 lemma tvDist_le_probEvent_of_probOutput_eq_of_not
     {mx my : m α} [NeverFail mx] [NeverFail my]
     (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
-    (h_event_eq : Pr[p | mx] = Pr[p | my]) :
-    tvDist mx my ≤ Pr[p | mx].toReal := by
+    (h_event_eq : Pr[ p | mx] = Pr[ p | my]) :
+    tvDist mx my ≤ Pr[ p | mx].toReal := by
   classical
   rw [tvDist, SPMF.tvDist, PMF.tvDist]
   refine ENNReal.toReal_mono probEvent_ne_top ?_
@@ -130,7 +130,7 @@ lemma tvDist_le_probEvent_of_probOutput_eq_of_not
               by_cases hx : p x
               · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
               · simp [hx, h_eq x hx, ENNReal.absDiff_self]) _
-    _ = (Pr[p | mx] + Pr[p | my]) / 2 := by
+    _ = (Pr[ p | mx] + Pr[ p | my]) / 2 := by
         rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
         congr 1
         calc
@@ -142,9 +142,9 @@ lemma tvDist_le_probEvent_of_probOutput_eq_of_not
           _ = (∑' x, if p x then Pr[= x | mx] else 0) +
               (∑' x, if p x then Pr[= x | my] else 0) := by
                 rw [ENNReal.tsum_add]
-    _ = (Pr[p | mx] + Pr[p | mx]) / 2 := by
+    _ = (Pr[ p | mx] + Pr[ p | mx]) / 2 := by
         rw [← h_event_eq]
-    _ = Pr[p | mx] := by
+    _ = Pr[ p | mx] := by
         rw [← two_mul, mul_div_assoc]
         simp [ENNReal.mul_div_cancel two_ne_zero ofNat_ne_top]
 

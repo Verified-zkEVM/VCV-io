@@ -84,15 +84,15 @@ from context, and WP-rule unfolding, including `simulateQ ... run'`.
 After the built-in leaf rules, it may also use user-authored `@[vcspec]` lemmas whose
 registered head symbol matches the current computation.
 
-For `Pr[...] = 1` and lower-bound goals such as `r ≤ Pr[p | oa]`: automatically lowers the
+For `Pr[ ...] = 1` and lower-bound goals such as `r ≤ Pr[ p | oa]`: automatically lowers the
 goal into a `Triple` form.
 
-For `Pr[...] = Pr[...]` goals: tries bind-swap (`probEvent_bind_bind_swap`), bind
+For `Pr[ ...] = Pr[ ...]` goals: tries bind-swap (`probEvent_bind_bind_swap`), bind
 congruence (`probOutput_bind_congr` / `probEvent_bind_congr`), swap-then-congr,
 or an exact-`probOutput` bridge into relational VCGen.
 Handles up to 2 layers of tsum peeling for nested swaps.
 
-For other general `Pr[...]` goals: rewrites to raw `wp` form and keeps stepping structurally
+For other general `Pr[ ...]` goals: rewrites to raw `wp` form and keeps stepping structurally
 when a `wp` rule applies, rather than immediately exiting the VCGen pipeline.
 
 Variants:
@@ -213,11 +213,11 @@ elab_rules : tactic
 with spec-aware stepping.
 
 Accepts `Triple` goals, raw `wp` goals, lower-bound / exact probability goals, and
-`Pr[...] = Pr[...]` equality goals. Probability goals are automatically lowered or
+`Pr[ ...] = Pr[ ...]` equality goals. Probability goals are automatically lowered or
 dispatched (swap/congr) before structural decomposition continues.
 
 Enhancements over simple structural decomposition:
-- Lowers `Pr[...]` goals into `Triple` or raw `wp` form before decomposition
+- Lowers `Pr[ ...]` goals into `Triple` or raw `wp` form before decomposition
 - Bridges exact `Pr[= x | oa] = Pr[= x | ob]` goals into relational VCGen when helpful
 - After bind decomposition, tries to close spec subgoals from local context
 - Falls back to backward WP (`triple_bind_wp`) when no spec is available

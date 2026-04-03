@@ -59,7 +59,8 @@ def probFailure [HasEvalSPMF m] (mx : m α) : ℝ≥0∞ :=
 notation "Pr[= " x " | " mx "]" => probOutput mx x
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
-notation "Pr[" p " | " mx "]" => probEvent mx p
+macro (name := probEventNotation) "Pr[ " p:term " | " mx:term "]" : term =>
+  `(probEvent $mx $p)
 
 /-- Probability that a computation fails to return a value. -/
 notation "Pr[⊥" " | " mx "]" => probFailure mx
@@ -144,37 +145,37 @@ section probEvent
 
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma probEvent_def [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
-    Pr[p | mx] = (evalDist mx).run.toOuterMeasure (some '' {x | p x}) := rfl
+    Pr[ p | mx] = (evalDist mx).run.toOuterMeasure (some '' {x | p x}) := rfl
 
 @[grind =]
 lemma probEvent_eq_tsum_indicator [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
-    Pr[p | mx] = ∑' x : α, {x | p x}.indicator (Pr[= · | mx]) x := by
+    Pr[ p | mx] = ∑' x : α, {x | p x}.indicator (Pr[= · | mx]) x := by
   simp [probEvent_def, PMF.toOuterMeasure_apply, tsum_option _ ENNReal.summable,
     Set.indicator_image (Option.some_injective _), Function.comp_def, probOutput_def,
     SPMF.apply_eq_toPMF_some]
 
 @[grind =]
 lemma probEvent_eq_sum_fintype_indicator [HasEvalSPMF m] [Fintype α]
-    (mx : m α) (p : α → Prop) : Pr[p | mx] = ∑ x : α, {x | p x}.indicator (Pr[= · | mx]) x :=
+    (mx : m α) (p : α → Prop) : Pr[ p | mx] = ∑ x : α, {x | p x}.indicator (Pr[= · | mx]) x :=
   (probEvent_eq_tsum_indicator mx p).trans (tsum_fintype _)
 
 @[grind =]
 lemma probEvent_eq_tsum_ite [HasEvalSPMF m] (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] = ∑' x : α, if p x then Pr[= x | mx] else 0 := by
+    Pr[ p | mx] = ∑' x : α, if p x then Pr[= x | mx] else 0 := by
   grind [Set.indicator]
 
 @[grind =]
 lemma probEvent_eq_sum_fintype_ite [HasEvalSPMF m] [Fintype α] (mx : m α)
-    (p : α → Prop) [DecidablePred p] : Pr[p | mx] = ∑ x : α, if p x then Pr[= x | mx] else 0 := by
+    (p : α → Prop) [DecidablePred p] : Pr[ p | mx] = ∑ x : α, if p x then Pr[= x | mx] else 0 := by
   grind [Set.indicator]
 
 lemma probEvent_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
-    Pr[p | mx] = ∑' x : {x | p x}, Pr[= x | mx] := by
+    Pr[ p | mx] = ∑' x : {x | p x}, Pr[= x | mx] := by
   rw [probEvent_eq_tsum_indicator, tsum_subtype]
 
 lemma probEvent_eq_sum_filter_univ [HasEvalSPMF m] [Fintype α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] = ∑ x ∈ Finset.univ.filter p, Pr[= x | mx] := by
+    Pr[ p | mx] = ∑ x ∈ Finset.univ.filter p, Pr[= x | mx] := by
   rw [probEvent_eq_sum_fintype_ite, Finset.sum_filter]
 
 variable [HasEvalSPMF m]
@@ -185,36 +186,36 @@ variable {mx : m α} {p : α → Prop}
 
 @[simp, grind =]
 lemma probEvent_eq_zero_iff :
-    Pr[p | mx] = 0 ↔ ∀ x ∈ support mx, ¬ p x := by
+    Pr[ p | mx] = 0 ↔ ∀ x ∈ support mx, ¬ p x := by
   rw [probEvent_eq_tsum_indicator]; aesop
 alias ⟨_, probEvent_eq_zero⟩ := probEvent_eq_zero_iff
 
 @[simp]
 lemma probEvent_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
-    Pr[p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind
+    Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind
 alias ⟨_, probEvent_eq_zero'⟩ := probEvent_eq_zero_iff'
 
-lemma probEvent_ne_zero_iff : Pr[p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by  grind
+lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by  grind
 alias ⟨_, probEvent_ne_zero⟩ := probEvent_ne_zero_iff
 
 lemma probEvent_ne_zero_iff' [HasEvalFinset m] [DecidableEq α] :
-    Pr[p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
+    Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
 alias ⟨_, probEvent_ne_zero'⟩ := probEvent_ne_zero_iff'
 
 @[simp, grind =]
-lemma probEvent_pos_iff : 0 < Pr[p | mx] ↔ ∃ x ∈ support mx, p x := by
+lemma probEvent_pos_iff : 0 < Pr[ p | mx] ↔ ∃ x ∈ support mx, p x := by
   simp [pos_iff_ne_zero]
 alias ⟨_, probEvent_pos⟩ := probEvent_pos_iff
 
 @[simp]
 lemma probEvent_pos_iff' [HasEvalFinset m] [DecidableEq α] :
-    0 < Pr[p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind
+    0 < Pr[ p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind
 alias ⟨_, probEvent_pos'⟩ := probEvent_pos_iff'
 
 end zero
 
 lemma probEvent_eq_tsum_subtype_mem_support (mx : m α) (p : α → Prop) :
-    Pr[p | mx] = ∑' x : {x ∈ support mx | p x}, Pr[= x | mx] := by
+    Pr[ p | mx] = ∑' x : {x ∈ support mx | p x}, Pr[= x | mx] := by
   simp_rw [probEvent_eq_tsum_subtype, tsum_subtype]
   refine tsum_congr (fun x ↦ ?_)
   by_cases hpx : p x
@@ -226,9 +227,9 @@ lemma probEvent_eq_tsum_subtype_mem_support (mx : m α) (p : α → Prop) :
   · exact (if_neg hpx).trans (by simp [Set.indicator, hpx])
 
 lemma probEvent_eq_tsum_subtype_support_ite (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] = ∑' x : support mx, if p x then Pr[= x | mx] else 0 :=
+    Pr[ p | mx] = ∑' x : support mx, if p x then Pr[= x | mx] else 0 :=
 calc
-  Pr[p | mx] = (∑' x, if p x then Pr[= x | mx] else 0) := by rw [probEvent_eq_tsum_ite mx p]
+  Pr[ p | mx] = (∑' x, if p x then Pr[= x | mx] else 0) := by rw [probEvent_eq_tsum_ite mx p]
   _ = ∑' x, (support mx).indicator (fun x ↦ if p x then Pr[= x | mx] else 0) x := by
     refine tsum_congr (fun x ↦ ?_)
     unfold Set.indicator
@@ -238,20 +239,20 @@ calc
 
 lemma probEvent_eq_sum_filter_finSupport [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] = ∑ x ∈ (finSupport mx).filter p, Pr[= x | mx] :=
+    Pr[ p | mx] = ∑ x ∈ (finSupport mx).filter p, Pr[= x | mx] :=
   (probEvent_eq_tsum_ite mx p).trans <|
     (tsum_eq_sum' <| by simp; tauto).trans
       (Finset.sum_congr rfl <| fun x hx ↦ if_pos (Finset.mem_filter.1 hx).2)
 
 lemma probEvent_eq_sum_finSupport_ite [HasEvalFinset m] [DecidableEq α]
     (mx : m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] = ∑ x ∈ finSupport mx, if p x then Pr[= x | mx] else 0 := by
+    Pr[ p | mx] = ∑ x ∈ finSupport mx, if p x then Pr[= x | mx] else 0 := by
   rw [probEvent_eq_sum_filter_finSupport, Finset.sum_filter]
 
 /-- If two events are equivalent on the support of `mx` then they have the same output chance. -/
 @[aesop unsafe apply, grind .]
 lemma probEvent_ext {mx : m α} {p q : α → Prop}
-    (h : ∀ x ∈ support mx, p x ↔ q x) : Pr[p | mx] = Pr[q | mx] := by
+    (h : ∀ x ∈ support mx, p x ↔ q x) : Pr[ p | mx] = Pr[ q | mx] := by
   classical
   rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
   refine tsum_congr fun x => ?_
@@ -259,13 +260,13 @@ lemma probEvent_ext {mx : m α} {p q : α → Prop}
 
 @[simp, grind =_, aesop unsafe norm]
 lemma probEvent_eq_eq_probOutput (mx : m α) (x : α) :
-    Pr[(· = x) | mx] = Pr[= x | mx] := by
+    Pr[ (· = x) | mx] = Pr[= x | mx] := by
   simp [probEvent_def, PMF.toOuterMeasure_apply_singleton, probOutput_def,
     SPMF.apply_eq_toPMF_some]
 
 @[simp, grind =_, aesop unsafe norm]
 lemma probEvent_eq_eq_probOutput' (mx : m α) (x : α) :
-    Pr[(x = ·) | mx] = Pr[= x | mx] := by
+    Pr[ (x = ·) | mx] = Pr[= x | mx] := by
   grind
 
 end probEvent
@@ -280,10 +281,10 @@ end probFailure
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
 syntax (name := probEventBinding1)
-  "Pr[" term " | " ident " ← " term "]" : term
+  "Pr[ " term " | " ident " ← " term "]" : term
 
 macro_rules (kind := probEventBinding1)
-  | `(Pr[$cond:term | $var:ident ← $src:term]) => `(Pr[fun $var => $cond | $src])
+  | `(Pr[ $cond:term | $var:ident ← $src:term]) => `(Pr[ fun $var => $cond | $src])
 
 /-- Probability that a computation returns a value satisfying a predicate.
 See `probOutput_true_eq_probEvent` for relation to the above definitions. -/
@@ -298,8 +299,8 @@ macro_rules (kind := probEventBinding2)
 /-- Tests for all the different probability notations. -/
 example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[= 10 | mx]
-  let _ := Pr[fun x => x^2 + x < 10 | mx]
-  let _ := Pr[x^2 + x < 10 | x ← mx]
+  let _ := Pr[ fun x => x^2 + x < 10 | mx]
+  let _ := Pr[ x^2 + x < 10 | x ← mx]
   let _ := Pr{let x ← mx}[x = 10]
   let _ := Pr[⊥ | mx]
   ()
@@ -365,7 +366,7 @@ variable (p : Prop) [Decidable p]
     Pr[⊥ | if p then mx else mx'] = if p then Pr[⊥ | mx] else Pr[⊥ | mx'] := by grind
 
 @[simp] lemma probEvent_ite [HasEvalSPMF m] (mx mx' : m α) (q : α → Prop) :
-    Pr[q | if p then mx else mx'] = if p then Pr[q | mx] else Pr[q | mx'] := by aesop
+    Pr[ q | if p then mx else mx'] = if p then Pr[ q | mx] else Pr[ q | mx'] := by aesop
 
 end ite
 
@@ -381,7 +382,7 @@ lemma probOutput_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) (y : β) :
     Pr[⊥ | h ▸ mx] = Pr[⊥ | mx] := by grind
 
 lemma probEvent_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) (q : β → Prop) :
-    Pr[q | h ▸ mx] = Pr[fun x ↦ q (h ▸ x) | mx] := by induction h; rfl
+    Pr[ q | h ▸ mx] = Pr[ fun x ↦ q (h ▸ x) | mx] := by induction h; rfl
 
 end eqRec
 
@@ -389,7 +390,7 @@ section sums
 
 /-- Connection between the two different probability notations. -/
 lemma probOutput_true_eq_probEvent {α} {m : Type → Type u} [Monad m] [HasEvalSPMF m]
-    (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[p | mx] := by
+    (mx : m α) (p : α → Prop) : Pr{let x ← mx}[p x] = Pr[ p | mx] := by
   simp [probEvent_eq_tsum_indicator, probOutput_def, evalDist, map_eq_bind_pure_comp]
   congr 1; aesop
 
@@ -421,17 +422,17 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 @[simp] lemma tsum_probOutput_ne_top [HasEvalSPMF m] : ∑' x : α, Pr[= x | mx] ≠ ⊤ :=
   ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one
 
-@[simp, grind .] lemma probEvent_le_one [HasEvalSPMF m] : Pr[p | mx] ≤ 1 := by
+@[simp, grind .] lemma probEvent_le_one [HasEvalSPMF m] : Pr[ p | mx] ≤ 1 := by
   rw [probEvent_def, PMF.toOuterMeasure_apply]
   refine le_of_le_of_eq (ENNReal.tsum_le_tsum ?_) ((evalDist mx).tsum_coe)
   exact Set.indicator_le_self (some '' {x | p x}) _
 
 @[simp, grind .] lemma probEvent_ne_top [HasEvalSPMF m] :
-    Pr[p | mx] ≠ ∞ := ne_top_of_le_ne_top one_ne_top probEvent_le_one
+    Pr[ p | mx] ≠ ∞ := ne_top_of_le_ne_top one_ne_top probEvent_le_one
 @[simp, grind .] lemma probEvent_lt_top [HasEvalSPMF m] :
-    Pr[p | mx] < ∞ := lt_top_iff_ne_top.2 probEvent_ne_top
+    Pr[ p | mx] < ∞ := lt_top_iff_ne_top.2 probEvent_ne_top
 @[simp, grind .] lemma not_one_lt_probEvent [HasEvalSPMF m] :
-    ¬ 1 < Pr[p | mx] := not_lt.2 probEvent_le_one
+    ¬ 1 < Pr[ p | mx] := not_lt.2 probEvent_le_one
 
 @[simp, grind .] lemma probFailure_le_one [HasEvalSPMF m] :
     Pr[⊥ | mx] ≤ 1 := PMF.coe_le_one (evalDist mx) none
@@ -447,7 +448,7 @@ lemma one_le_probOutput_iff [HasEvalSPMF m] : 1 ≤ Pr[= x | mx] ↔ Pr[= x | mx
   simp only [le_iff_eq_or_lt, not_one_lt_probOutput, or_false, eq_comm]
 
 @[simp, grind =]
-lemma one_le_probEvent_iff [HasEvalSPMF m] : 1 ≤ Pr[p | mx] ↔ Pr[p | mx] = 1 := by
+lemma one_le_probEvent_iff [HasEvalSPMF m] : 1 ≤ Pr[ p | mx] ↔ Pr[ p | mx] = 1 := by
   simp only [le_iff_eq_or_lt, not_one_lt_probEvent, or_false, eq_comm]
 
 @[simp, grind =]
@@ -500,10 +501,10 @@ lemma mul_probFailure_le : r * Pr[⊥ | mx] ≤ r :=
 @[simp] lemma mul_probOutput_le (x : α) : r * Pr[= x | mx] ≤ r :=
   mul_le_of_le_one_right' <| by simp
 
-@[simp] lemma probEvent_mul_le (p : α → Prop) : Pr[p | mx] * r ≤ r :=
+@[simp] lemma probEvent_mul_le (p : α → Prop) : Pr[ p | mx] * r ≤ r :=
   mul_le_of_le_one_left' <| by simp
 
-@[simp] lemma mul_probEvent_le (p : α → Prop) : r * Pr[p | mx] ≤ r :=
+@[simp] lemma mul_probEvent_le (p : α → Prop) : r * Pr[ p | mx] ≤ r :=
   mul_le_of_le_one_right' <| by simp
 
 end mono_le
@@ -562,27 +563,27 @@ variable [HasEvalSPMF m]
 
 @[simp]
 lemma probEvent_False (mx : m α) :
-    Pr[fun _ => False | mx] = 0 := by grind
+    Pr[ fun _ => False | mx] = 0 := by grind
 
 @[simp]
 lemma probEvent_false (mx : m α) :
-    Pr[fun _ => false | mx] = 0 := by aesop
+    Pr[ fun _ => false | mx] = 0 := by aesop
 
 @[simp, grind =]
 lemma probEvent_True_eq_sub (mx : m α) :
-    Pr[fun _ => True | mx] = 1 - Pr[⊥ | mx] := by
+    Pr[ fun _ => True | mx] = 1 - Pr[⊥ | mx] := by
   simp [probEvent_eq_tsum_indicator]
 
 lemma probEvent_true_eq_sub (mx : m α) :
-    Pr[fun _ => true | mx] = 1 - Pr[⊥ | mx] := by grind
+    Pr[ fun _ => true | mx] = 1 - Pr[⊥ | mx] := by grind
 
 lemma probFailure_eq_sub_probEvent (mx : m α) :
-    Pr[⊥ | mx] = 1 - Pr[fun _ => True | mx] := by
+    Pr[⊥ | mx] = 1 - Pr[ fun _ => True | mx] := by
   refine ENNReal.eq_sub_of_add_eq (by simp only [ne_eq, probEvent_ne_top, not_false_eq_true]) ?_
   simp only [probEvent_True_eq_sub, probFailure_le_one, add_tsub_cancel_of_le]
 
 lemma probFailure_eq_one_iff_probEvent_true (mx : m α) :
-    Pr[⊥ | mx] = 1 ↔ Pr[fun _ => True | mx] = 0 := by
+    Pr[⊥ | mx] = 1 ↔ Pr[ fun _ => True | mx] = 0 := by
   rw [probFailure_eq_sub_probEvent, ← ENNReal.toReal_eq_one_iff]
   rw [ENNReal.toReal_sub_of_le (by grind) (by simp)]
   simp [tsub_eq_zero_iff_le, ENNReal.toReal_eq_one_iff]
@@ -596,7 +597,7 @@ lemma probFailure_eq_one {mx : m α} (h : support mx = ∅) : Pr[⊥ | mx] = 1 :
 
 @[simp, aesop norm]
 lemma probEvent_const (mx : m α) (p : Prop) [Decidable p] :
-    Pr[fun _ => p | mx] = if p then (1 - Pr[⊥ | mx]) else 0 := by
+    Pr[ fun _ => p | mx] = if p then (1 - Pr[⊥ | mx]) else 0 := by
   aesop
 
 end bool
@@ -663,7 +664,7 @@ section probEvent_mono_compl
 variable [HasEvalSPMF m] {mx : m α} {p q : α → Prop}
 
 /-- If `p` implies `q` on the `support` of a computation then it is more likely to happen. -/
-lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[p | mx] ≤ Pr[q | mx] := by
+lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] := by
   have := Classical.decPred p; have := Classical.decPred q
   simp only [probEvent_eq_tsum_ite]
   refine ENNReal.tsum_le_tsum fun x => ?_
@@ -675,11 +676,11 @@ lemma probEvent_mono (h : ∀ x ∈ support mx, p x → q x) : Pr[p | mx] ≤ Pr
 
 /-- If `p` implies `q` on the `finSupport` of a computation then it is more likely to happen. -/
 lemma probEvent_mono' [HasEvalFinset m] [DecidableEq α]
-    (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[p | mx] ≤ Pr[q | mx] :=
+    (h : ∀ x ∈ finSupport mx, p x → q x) : Pr[ p | mx] ≤ Pr[ q | mx] :=
   probEvent_mono (fun x hx hpx => h x (mem_finSupport_of_mem_support hx) hpx)
 
 lemma probEvent_compl (mx : m α) (p : α → Prop) :
-    Pr[p | mx] + Pr[fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
+    Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 - Pr[⊥ | mx] := by
   have := Classical.decPred p
   rw [probEvent_eq_tsum_ite mx p, probEvent_eq_tsum_ite mx (fun x => ¬p x)]
   rw [← ENNReal.tsum_add, ← tsum_probOutput_eq_sub]
@@ -688,7 +689,7 @@ lemma probEvent_compl (mx : m α) (p : α → Prop) :
 
 /-- Union bound: the probability of `p ∨ q` is at most the sum of probabilities. -/
 lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
-    Pr[fun x => p x ∨ q x | mx] ≤ Pr[p | mx] + Pr[q | mx] := by
+    Pr[ fun x => p x ∨ q x | mx] ≤ Pr[ p | mx] + Pr[ q | mx] := by
   have := Classical.decPred p; have := Classical.decPred q
   simp only [probEvent_eq_tsum_ite, ← ENNReal.tsum_add]
   refine ENNReal.tsum_le_tsum fun x => ?_
@@ -696,7 +697,7 @@ lemma probEvent_or_le (mx : m α) (p q : α → Prop) :
 
 @[simp low, grind =]
 lemma probEvent_eq_one_iff :
-    Pr[p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
+    Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
   constructor
   · intro h
     have hcompl := probEvent_compl mx p
@@ -708,7 +709,7 @@ lemma probEvent_eq_one_iff :
       exact not_lt.mpr (hcompl ▸ le_add_right le_rfl) h1
     refine ⟨hfail, fun x hx => ?_⟩
     rw [hfail, tsub_zero] at hcompl
-    have h3 : Pr[fun x => ¬p x | mx] = 0 := by
+    have h3 : Pr[ fun x => ¬p x | mx] = 0 := by
       have hcancel : AddLECancellable (1 : ℝ≥0∞) :=
         WithTop.addLECancellable_iff_ne_top.mpr one_ne_top
       exact le_antisymm (hcancel (by rw [add_zero]; exact hcompl.le)) (zero_le _)
@@ -728,21 +729,21 @@ alias ⟨_, probEvent_eq_one⟩ := probEvent_eq_one_iff
 
 @[simp low]
 lemma one_eq_probEvent_iff :
-    1 = Pr[p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
+    1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff]
 
 alias ⟨_, one_eq_probEvent⟩ := one_eq_probEvent_iff
 
 @[simp]
 lemma probEvent_eq_one_iff' [HasEvalFinset m] [DecidableEq α] :
-    Pr[p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
+    Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   simp_rw [probEvent_eq_one_iff, mem_finSupport_iff_mem_support]
 
 alias ⟨_, probEvent_eq_one'⟩ := probEvent_eq_one_iff'
 
 @[simp]
 lemma one_eq_probEvent_iff' [HasEvalFinset m] [DecidableEq α] :
-    1 = Pr[p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
+    1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff']
 
 alias ⟨_, one_eq_probEvent'⟩ := one_eq_probEvent_iff'
@@ -765,7 +766,7 @@ lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n
 
 open Classical in
 lemma indicator_objective_eq_probEvent (mx : m (α × β)) (R : α → β → Prop) :
-    (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[fun z => R z.1 z.2 | mx] := by
+    (∑' z, Pr[= z | mx] * (if R z.1 z.2 then 1 else 0)) = Pr[ fun z => R z.1 z.2 | mx] := by
   rw [probEvent_eq_tsum_ite]
   refine tsum_congr fun z => ?_
   by_cases hR : R z.1 z.2 <;> simp [hR]

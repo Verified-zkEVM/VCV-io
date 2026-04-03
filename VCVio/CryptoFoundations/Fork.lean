@@ -96,8 +96,8 @@ theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
 omit [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- On `fork` support, first-projection success equals old pair-style success event. -/
 theorem probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
-    Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf] =
-      Pr[fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] := by
+    Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf] =
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] := by
   refine probEvent_ext ?_
   intro r hr
   rcases r with _ | ⟨x₁, x₂⟩
@@ -112,16 +112,17 @@ omit [spec.DecidableEq] [DecidableEq ι] in
 private lemma probEvent_uniform_eq_seedSlot_le_inv (s : Fin (qb i + 1))
     (seed : QuerySeed spec) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
-    Pr[fun u : spec.Range i => (seed i)[↑s]? = some u | liftComp ($ᵗ spec.Range i) spec] ≤ h⁻¹ := by
+    Pr[ fun u : spec.Range i => (seed i)[↑s]? = some u
+      | liftComp ($ᵗ spec.Range i) spec] ≤ h⁻¹ := by
   classical
   simp only
   by_cases hnone : (seed i)[↑s]? = none
   · simp [hnone]
   · rcases Option.ne_none_iff_exists'.mp hnone with ⟨u₀, hu₀⟩
     rw [hu₀]
-    have : Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
+    have : Pr[ fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
           liftComp ($ᵗ spec.Range i) spec] =
-        Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
+        Pr[ fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
       congr 1; ext; simp
     rw [this]
     exact le_of_eq (seededOracle.probEvent_liftComp_uniformSample_eq_of_eq u₀)
@@ -131,12 +132,13 @@ private lemma probEvent_uniform_eq_seedSlot_eq_inv_of_get (s : Fin (qb i + 1))
     (seed : QuerySeed spec) {u₀ : spec.Range i}
     (hu₀ : (seed i)[↑s]? = some u₀) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
-    Pr[fun u : spec.Range i => (seed i)[↑s]? = some u | liftComp ($ᵗ spec.Range i) spec] = h⁻¹ := by
+    Pr[ fun u : spec.Range i => (seed i)[↑s]? = some u
+      | liftComp ($ᵗ spec.Range i) spec] = h⁻¹ := by
   simp only
   rw [hu₀]
-  have : Pr[fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
+  have : Pr[ fun u : spec.Range i => (some u₀ : Option (spec.Range i)) = some u |
         liftComp ($ᵗ spec.Range i) spec] =
-      Pr[fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
+      Pr[ fun u : spec.Range i => u₀ = u | liftComp ($ᵗ spec.Range i) spec] := by
     congr 1; ext; simp
   rw [this]
   exact seededOracle.probEvent_liftComp_uniformSample_eq_of_eq u₀
@@ -169,7 +171,7 @@ private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
         Pr[= (some s : Option (Fin (qb i + 1))) | do
             let u ← liftComp ($ᵗ spec.Range i) spec
             if (seed i)[↑s]? = some u then return cf x₁ else return none]
-          = Pr[fun u : spec.Range i => (seed i)[↑s]? = some u |
+          = Pr[ fun u : spec.Range i => (seed i)[↑s]? = some u |
               liftComp ($ᵗ spec.Range i) spec] := by
               rw [probOutput_bind_eq_tsum, probEvent_eq_tsum_ite]
               refine tsum_congr fun u => ?_
@@ -435,7 +437,7 @@ is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/
 theorem le_probOutput_fork (s : Fin (qb i + 1)) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
     Pr[= s | cf <$> main] ^ 2 - Pr[= s | cf <$> main] / h
-      ≤ Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) |
+      ≤ Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) |
             fork main qb js i cf] := by
   set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
   -- Reduce to the old pair-style success event on `fork` outputs.
@@ -444,13 +446,13 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
     fun r => r.map (Prod.map cf cf)
   let z : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) := some (some s, some s)
   have hRhsEq :
-      Pr[fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] =
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] =
       Pr[= z | f <$> fork main qb js i cf] := by
     calc
-      Pr[fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf]
-        = Pr[fun r => f r = z | fork main qb js i cf] := by
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf]
+        = Pr[ fun r => f r = z | fork main qb js i cf] := by
             simp [f, z]
-      _ = Pr[fun x => x = z | f <$> fork main qb js i cf] := by
+      _ = Pr[ fun x => x = z | f <$> fork main qb js i cf] := by
             simpa [Function.comp] using
               (probEvent_map
                 (mx := fork main qb js i cf)
@@ -718,7 +720,7 @@ omit [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- Sum of disjoint fork-success events is at most the total `some` probability. -/
 private lemma sum_probEvent_fork_le_tsum_some :
     ∑ s : Fin (qb i + 1),
-      Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf]
+      Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf]
     ≤ ∑' (p : α × α), Pr[= some p | fork main qb js i cf] := by
   classical
   simp_rw [probEvent_eq_tsum_ite]
@@ -788,7 +790,7 @@ theorem probOutput_none_fork_le :
     ENNReal.eq_sub_of_add_eq hne_top htotal
   calc Pr[= none | fork main qb js i cf]
     _ = 1 - ∑' p, Pr[= some p | fork main qb js i cf] := hPr_eq
-    _ ≤ 1 - ∑ s, Pr[fun r => r.map (cf ∘ Prod.fst) = some (some s) |
+    _ ≤ 1 - ∑ s, Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) |
             fork main qb js i cf] :=
         tsub_le_tsub_left (sum_probEvent_fork_le_tsum_some main qb js i cf) 1
     _ ≤ 1 - ∑ s, (ps s ^ 2 - ps s / h) :=
@@ -828,7 +830,7 @@ theorem le_probEvent_isSome_fork :
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤
-      Pr[fun r : Option (α × α) => r.isSome | fork main qb js i cf] := by
+      Pr[ fun r : Option (α × α) => r.isSome | fork main qb js i cf] := by
   rw [probEvent_isSome_eq_one_sub_probOutput_none (mx := fork main qb js i cf)]
   have hpre_le_one := fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
   have hpre_ne_top :

@@ -176,7 +176,7 @@ lemma finSupport_uniformSample [Fintype α] [DecidableEq α] :
 
 @[simp, grind =]
 lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
-    Pr[p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
+    Pr[ p | $ᵗ α] = (Finset.univ.filter p).card / Fintype.card α := by
   simp only [probEvent_eq_sum_filter_univ, probOutput_uniformSample, Finset.sum_const,
     nsmul_eq_mul, div_eq_mul_inv]
 

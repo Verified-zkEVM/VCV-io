@@ -27,12 +27,12 @@ variable {α β γ : Type}
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
     (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
-    Pr[p | oa] = 1 := by
+    Pr[ p | oa] = 1 := by
   vcgen
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
     (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
-    1 = Pr[p | oa] := by
+    1 = Pr[ p | oa] := by
   vcgen
 
 example {oa : OracleComp spec Bool}
@@ -55,14 +55,14 @@ example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
   exact h _ ‹_›
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
-    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
-    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+    (h : ∀ x, Pr[ q | f x] = Pr[ q | g x]) :
+    Pr[ q | mx >>= f] = Pr[ q | mx >>= g] := by
   vcstep rw congr'
   exact h _
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
-    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
-    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+    (h : ∀ x, Pr[ q | f x] = Pr[ q | g x]) :
+    Pr[ q | mx >>= f] = Pr[ q | mx >>= g] := by
   vcstep rw congr' as ⟨x⟩
   exact h x
 
@@ -73,16 +73,16 @@ info: Try this:
 -/
 #guard_msgs in
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {q : β → Prop}
-    (h : ∀ x, Pr[q | f x] = Pr[q | g x]) :
-    Pr[q | mx >>= f] = Pr[q | mx >>= g] := by
+    (h : ∀ x, Pr[ q | f x] = Pr[ q | g x]) :
+    Pr[ q | mx >>= f] = Pr[ q | mx >>= g] := by
   vcstep?
   exact h x
 
 example {mx : OracleComp spec α} {my : OracleComp spec β}
     {f g : α → β → OracleComp spec γ} {q : γ → Prop}
-    (h : ∀ x y, Pr[q | f x y] = Pr[q | g x y]) :
-    Pr[q | mx >>= fun x => my >>= fun y => f x y] =
-    Pr[q | mx >>= fun x => my >>= fun y => g x y] := by
+    (h : ∀ x y, Pr[ q | f x y] = Pr[ q | g x y]) :
+    Pr[ q | mx >>= fun x => my >>= fun y => f x y] =
+    Pr[ q | mx >>= fun x => my >>= fun y => g x y] := by
   vcstep rw congr' as ⟨x, y⟩
   exact h x y
 
@@ -93,7 +93,7 @@ example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p] {r : ℝ≥0∞}
     (h : ⦃r⦄ oa ⦃fun x => ⌜p x⌝⦄) :
-    r ≤ Pr[p | oa] := by
+    r ≤ Pr[ p | oa] := by
   vcstep
   exact h
 
@@ -105,14 +105,14 @@ example {oa : OracleComp spec α} [DecidableEq α] {x : α} {r : ℝ≥0∞}
 
 example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
     (p : α → Prop) [DecidablePred p] :
-    Pr[p | if c then oa else ob] =
+    Pr[ p | if c then oa else ob] =
       if c then wp⟦oa⟧ (fun x => ⌜p x⌝) else wp⟦ob⟧ (fun x => ⌜p x⌝) := by
   vcstep
 
 /-! ### `by_hoare` -/
 
 example (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | oa] = wp⟦oa⟧ (fun x => if p x then 1 else 0) := by
+    Pr[ p | oa] = wp⟦oa⟧ (fun x => if p x then 1 else 0) := by
   by_hoare
 
 example (oa : OracleComp spec α) [DecidableEq α] (x : α) :

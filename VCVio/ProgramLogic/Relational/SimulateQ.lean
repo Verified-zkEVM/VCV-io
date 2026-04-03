@@ -394,8 +394,8 @@ private lemma probEvent_not_bad_eq
     (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl₂ t).run s), bad x.2)
     (oa : OracleComp spec α) (s₀ : σ) :
-    Pr[fun x => ¬bad x.2 | (simulateQ impl₁ oa).run s₀] =
-    Pr[fun x => ¬bad x.2 | (simulateQ impl₂ oa).run s₀] := by
+    Pr[ fun x => ¬bad x.2 | (simulateQ impl₁ oa).run s₀] =
+    Pr[ fun x => ¬bad x.2 | (simulateQ impl₂ oa).run s₀] := by
   classical
   rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
   refine tsum_congr (fun ⟨a, s⟩ => ?_)
@@ -415,23 +415,23 @@ private lemma probEvent_bad_eq
     (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl₂ t).run s), bad x.2)
     (oa : OracleComp spec α) (s₀ : σ) :
-    Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀] =
-    Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
+    Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀] =
+    Pr[ bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
   have h1 := probEvent_compl ((simulateQ impl₁ oa).run s₀) (bad ∘ Prod.snd)
   have h2 := probEvent_compl ((simulateQ impl₂ oa).run s₀) (bad ∘ Prod.snd)
   simp only [NeverFail.probFailure_eq_zero, tsub_zero] at h1 h2
   have h_not_bad := probEvent_not_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
-  have h_not_bad' : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] =
-      Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] :=
+  have h_not_bad' : Pr[ fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] =
+      Pr[ fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] :=
     h_not_bad
-  have hne : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] ≠ ⊤ :=
+  have hne : Pr[ fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top probEvent_le_one
-  calc Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀]
-      = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] := by
+  calc Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀]
+      = 1 - Pr[ fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] := by
         rw [← h1]; exact (ENNReal.add_sub_cancel_right hne).symm
-    _ = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] := by
+    _ = 1 - Pr[ fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] := by
         rw [h_not_bad']
-    _ = Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
+    _ = Pr[ bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
         rw [← h2]; exact ENNReal.add_sub_cancel_right
           (ne_top_of_le_ne_top one_ne_top probEvent_le_one)
 
@@ -459,7 +459,7 @@ theorem tvDist_simulateQ_le_probEvent_bad
     (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl₂ t).run s), bad x.2) :
     tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀)
-      ≤ Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
+      ≤ Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
   classical
   have _hs₀ : ¬bad s₀ := h_init
   let sim₁ := (simulateQ impl₁ oa).run s₀
@@ -468,9 +468,9 @@ theorem tvDist_simulateQ_le_probEvent_bad
       Pr[= (x, s) | sim₁] = Pr[= (x, s) | sim₂] :=
     fun x s hs => probOutput_simulateQ_run_eq_of_not_bad impl₁ impl₂ bad h_agree
       h_mono₁ h_mono₂ oa s₀ x s hs
-  have h_bad_eq : Pr[bad ∘ Prod.snd | sim₁] = Pr[bad ∘ Prod.snd | sim₂] :=
+  have h_bad_eq : Pr[ bad ∘ Prod.snd | sim₁] = Pr[ bad ∘ Prod.snd | sim₂] :=
     probEvent_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
-  have h_tv_joint : tvDist sim₁ sim₂ ≤ Pr[bad ∘ Prod.snd | sim₁].toReal :=
+  have h_tv_joint : tvDist sim₁ sim₂ ≤ Pr[ bad ∘ Prod.snd | sim₁].toReal :=
     tvDist_le_probEvent_of_probOutput_eq_of_not (mx := sim₁) (my := sim₂) (bad ∘ Prod.snd)
       (fun xs hxs => by
         rcases xs with ⟨x, s⟩
