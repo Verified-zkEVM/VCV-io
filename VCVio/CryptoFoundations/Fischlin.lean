@@ -405,32 +405,34 @@ theorem sign_usesAtMostRhoCardOmegaQueries
   have hrep : ∀ commits i,
       AddWriterT.QueryBoundedAboveBy (repStep commits i) (FinEnum.card Ω) := by
     intro commits i
+    let comVec : Fin ρ → PC := fun j => (commits j).1
+    let comList := List.ofFn comVec
     have hsearch :
         AddWriterT.QueryBoundedAboveBy
           (fischlinSearchAuxWithUnitCost
             (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
-            (msg := msg) (comList := List.ofFn fun j => (commits j).1) (i := i)
+            (msg := msg) (comList := comList) (i := i)
             (FinEnum.toList Ω) (none : Option (Ω × P × Fin (2 ^ b))))
           (FinEnum.toList Ω).length := by
       simpa using
         (fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
           (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
-          (msg := msg) (comList := List.ofFn fun j => (commits j).1) (i := i)
+          (msg := msg) (comList := comList) (i := i)
           (challenges := FinEnum.toList Ω) (best := none))
     let finish : Option (Ω × P) → AddWriterT ℕ m (PC × Ω × P)
-      | some (ω, resp) => pure (((fun j => (commits j).1) i), ω, resp)
-      | none => pure (((fun j => (commits j).1) i), default, default)
+      | some (ω, resp) => pure (comVec i, ω, resp)
+      | none => pure (comVec i, default, default)
     have hcont :
         ∀ result : Option (Ω × P), AddWriterT.QueryBoundedAboveBy (finish result) 0 := by
       intro result
       cases result with
       | none =>
           simpa [finish] using AddWriterT.queryBoundedAboveBy_pure
-            (m := m) ((((fun j => (commits j).1) i), default, default) : PC × Ω × P)
+            (m := m) ((comVec i, default, default) : PC × Ω × P)
       | some pair =>
           rcases pair with ⟨ω, resp⟩
           simpa [finish] using AddWriterT.queryBoundedAboveBy_pure
-            (m := m) ((((fun j => (commits j).1) i), ω, resp) : PC × Ω × P)
+            (m := m) ((comVec i, ω, resp) : PC × Ω × P)
     exact AddWriterT.queryBoundedAboveBy_mono
       (AddWriterT.queryBoundedAboveBy_bind (n₁ := (FinEnum.toList Ω).length) (n₂ := 0)
         hsearch hcont)
@@ -466,15 +468,17 @@ theorem sign_usesAtMostRhoCardOmegaQueries
       refine congrArg
         (fun f : Fin ρ → AddWriterT ℕ m (PC × Ω × P) => Fin.mOfFn ρ f) ?_
       funext i
+      let comVec : Fin ρ → PC := fun j => (commits j).1
+      let comList := List.ofFn comVec
       let finish : AddWriterT ℕ m (Option (Ω × P)) → AddWriterT ℕ m (PC × Ω × P) := fun oa => do
         let result ← oa
         match result with
-        | some (ω, resp) => pure (((fun j => (commits j).1) i), ω, resp)
-        | none => pure (((fun j => (commits j).1) i), default, default)
+        | some (ω, resp) => pure (comVec i, ω, resp)
+        | none => pure (comVec i, default, default)
       simpa [finish] using congrArg finish
         (fischlinSearchAux_eq_withUnitCost
           (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
-          (msg := msg) (comList := List.ofFn fun j => (commits j).1) (i := i)
+          (msg := msg) (comList := comList) (i := i)
           (challenges := FinEnum.toList Ω) (best := none))
     simpa [HasQuery.UsesAtMostQueries, hsign] using this
   simpa [Nat.zero_add] using

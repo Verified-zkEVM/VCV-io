@@ -229,7 +229,10 @@ lemma queryBoundedAboveBy_bind [LawfulMonad m]
     QueryBoundedAboveBy (oa >>= f) (n₁ + n₂) := by
   intro z hz
   rw [WriterT.run_bind] at hz
-  rcases (mem_support_bind_iff _ _ _).1 hz with ⟨aw, haw, hz⟩
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
   rcases aw with ⟨a, wa⟩
   rw [support_map] at hz
   rcases hz with ⟨bw, hbw, rfl⟩
@@ -242,7 +245,10 @@ lemma queryBoundedBelowBy_bind [LawfulMonad m]
     QueryBoundedBelowBy (oa >>= f) (n₁ + n₂) := by
   intro z hz
   rw [WriterT.run_bind] at hz
-  rcases (mem_support_bind_iff _ _ _).1 hz with ⟨aw, haw, hz⟩
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
   rcases aw with ⟨a, wa⟩
   rw [support_map] at hz
   rcases hz with ⟨bw, hbw, rfl⟩
@@ -380,14 +386,14 @@ def UsesCostExactly {ω : Type} [AddMonoid ω]
 /-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at most `w` on
 every execution path. This is a semantic support bound, not merely an output-indexed cost
 description. -/
-def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m] [HasEvalSet m]
+def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalSet m]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
   AddWriterT.PathwiseCostAtMost (HasQuery.withAddCost oa runtime costFn) w
 
 /-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at least `w` on
 every execution path. -/
-def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m] [HasEvalSet m]
+def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalSet m]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
   AddWriterT.PathwiseCostAtLeast (HasQuery.withAddCost oa runtime costFn) w
@@ -398,15 +404,7 @@ lemma usesCostAtMost_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hwb : w ≤ b) :
     HasQuery.UsesCostAtMost oa runtime costFn b := by
-  intro z hz
-  have hzCost : Multiplicative.toAdd z.2 ∈
-      support (HasQuery.withAddCost oa runtime costFn).costs := by
-    rw [AddWriterT.costs_def, support_map]
-    exact ⟨z, hz, rfl⟩
-  rw [h] at hzCost
-  rw [support_map] at hzCost
-  rcases hzCost with ⟨a, _, hzCost⟩
-  simpa [hzCost] using hwb
+  exact AddWriterT.pathwiseCostAtMost_of_hasCost h hwb
 
 lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
     [LawfulMonad m] [HasEvalSet m]
@@ -414,15 +412,7 @@ lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hbw : b ≤ w) :
     HasQuery.UsesCostAtLeast oa runtime costFn b := by
-  intro z hz
-  have hzCost : Multiplicative.toAdd z.2 ∈
-      support (HasQuery.withAddCost oa runtime costFn).costs := by
-    rw [AddWriterT.costs_def, support_map]
-    exact ⟨z, hz, rfl⟩
-  rw [h] at hzCost
-  rw [support_map] at hzCost
-  rcases hzCost with ⟨a, _, hzCost⟩
-  simpa [hzCost] using hbw
+  exact AddWriterT.pathwiseCostAtLeast_of_hasCost h hbw
 
 /-- Unit-cost specialization: every query contributes cost `1`. -/
 def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
@@ -430,13 +420,13 @@ def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
   HasQuery.UsesCostExactly oa runtime (fun _ ↦ 1) n
 
 /-- Unit-cost specialization: every query contributes cost `1`, with an upper bound. -/
-def UsesAtMostQueries [LawfulMonad m] [HasEvalSet m]
+def UsesAtMostQueries [HasEvalSet m]
     (oa : Computation spec (AddWriterT ℕ m) α)
     (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
   AddWriterT.QueryBoundedAboveBy (HasQuery.withUnitCost oa runtime) n
 
 /-- Unit-cost specialization: every query contributes cost `1`, with a lower bound. -/
-def UsesAtLeastQueries [LawfulMonad m] [HasEvalSet m]
+def UsesAtLeastQueries [HasEvalSet m]
     (oa : Computation spec (AddWriterT ℕ m) α)
     (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
   AddWriterT.QueryBoundedBelowBy (HasQuery.withUnitCost oa runtime) n
