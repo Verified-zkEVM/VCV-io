@@ -210,7 +210,8 @@ private lemma fischlinSearchAux_eq_withUnitCost
     (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
     (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
     (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b))) :
-    letI := runtime.withUnitCost.toHasQuery
+    let _ : HasQuery (fischlinROSpec X PC Ω P ρ b M) (AddWriterT ℕ m) :=
+      runtime.withUnitCost.toHasQuery
     fischlinSearchAux
       (m := AddWriterT ℕ m) σ pk sk sc msg comList i challenges best =
       fischlinSearchAuxWithUnitCost

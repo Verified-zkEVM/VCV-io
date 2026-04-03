@@ -114,11 +114,7 @@ section costAccounting
 variable [DecidableEq C]
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
-  [HasEvalSet m] [MonadLiftT ProbComp m]
-
-section
-
-omit [HasEvalSet m]
+  [MonadLiftT ProbComp m]
 
 /-- Running unit-cost-instrumented T-transform encryption preserves the ciphertext output. -/
 private lemma encrypt_outputs_formula_withUnitCost
@@ -154,12 +150,6 @@ private lemma encrypt_costs_formula_withUnitCost
   simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
     QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-end
-
-section
-
-omit [HasEvalSet m]
-
 /-- T-transform encryption makes exactly one hash-oracle query under unit-cost instrumentation. -/
 theorem encrypt_usesExactlyOneQuery
     (runtime : QueryRuntime (M →ₒ R) m)
@@ -177,12 +167,6 @@ theorem encrypt_usesExactlyOneQuery
     (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)]
   exact encrypt_costs_formula_withUnitCost
     (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
-
-end
-
-section
-
-omit [HasEvalSet m]
 
 /-- Running unit-cost-instrumented T-transform decryption preserves the decryption result. -/
 private lemma decrypt_outputs_formula_withUnitCost
@@ -231,12 +215,6 @@ private lemma decrypt_costs_formula_withUnitCost
       simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
         TTransform.decrypt, hdec,
         QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
-
-end
-
-section
-
-omit [HasEvalSet m]
 
 /-- If deterministic decryption fails immediately, the T-transform makes no hash-oracle
 queries. -/
@@ -294,10 +272,8 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
   simpa [hdec] using decrypt_costs_formula_withUnitCost
     (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
 
-end
-
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
-theorem decrypt_usesAtMostOneQuery
+theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :

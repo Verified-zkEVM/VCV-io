@@ -60,16 +60,12 @@ variable {queryPred : spec.Domain → Prop} {outputPred : α → Prop}
   {possibleOutputs : (x : spec.Domain) → Set (spec.Range x)}
 
 @[simp]
-lemma allPathsSatisfy_pure (x : α)
-    (queryPred : spec.Domain → Prop) (outputPred : α → Prop)
-    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x)) :
+lemma allPathsSatisfy_pure (x : α) :
     (pure x : OracleComp spec α).allPathsSatisfy queryPred outputPred possibleOutputs =
       outputPred x := rfl
 
 @[simp]
-lemma somePathSatisfies_pure (x : α)
-    (queryPred : spec.Domain → Prop) (outputPred : α → Prop)
-    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x)) :
+lemma somePathSatisfies_pure (x : α) :
     (pure x : OracleComp spec α).somePathSatisfies queryPred outputPred possibleOutputs =
       outputPred x := rfl
 
