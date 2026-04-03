@@ -59,10 +59,8 @@ def probFailure [HasEvalSPMF m] (mx : m α) : ℝ≥0∞ :=
 notation "Pr[= " x " | " mx "]" => probOutput mx x
 
 /-- Probability that a computation returns a value satisfying a predicate. -/
-syntax (name := probEventNotation) "Pr[ " term " | " term "]" : term
-
-macro_rules (kind := probEventNotation)
-  | `(Pr[ $p | $mx ]) => `(probEvent $mx $p)
+macro (name := probEventNotation) "Pr[ " p:term " | " mx:term "]" : term =>
+  `(probEvent $mx $p)
 
 /-- Probability that a computation fails to return a value. -/
 notation "Pr[⊥" " | " mx "]" => probFailure mx
