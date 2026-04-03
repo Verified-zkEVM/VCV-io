@@ -54,7 +54,7 @@ example
     (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
       ∀ x ∈ support ((impl₂ t).run s), bad x.2) :
     tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀)
-      ≤ Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
+      ≤ Pr[ bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
   by_upto bad
   · exact h_init
   · exact h_agree

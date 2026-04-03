@@ -60,12 +60,12 @@ lemma probFailure_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx :
 
 lemma probEvent_seq_eq_tsum [HasEvalSPMF m] [LawfulMonad m]
     (mf : m (α → β)) (mx : m α) (p : β → Prop) :
-    Pr[p | mf <*> mx] = ∑' f, Pr[= f | mf] * Pr[p ∘ f | mx] := by
+    Pr[ p | mf <*> mx] = ∑' f, Pr[= f | mf] * Pr[ p ∘ f | mx] := by
   simp only [seq_eq_bind_map, probEvent_bind_eq_tsum, probEvent_map]
 
 lemma probEvent_seq_eq_tsum_ite [HasEvalSPMF m] [LawfulMonad m]
     (mf : m (α → β)) (mx : m α) (p : β → Prop) [DecidablePred p] :
-    Pr[p | mf <*> mx] = ∑' (f : α → β) (x : α),
+    Pr[ p | mf <*> mx] = ∑' (f : α → β) (x : α),
       if p (f x) then Pr[= f | mf] * Pr[= x | mx] else 0 := by
   simp_rw [probEvent_seq_eq_tsum, probEvent_eq_tsum_ite, ← ENNReal.tsum_mul_left,
     Function.comp_apply, mul_ite, mul_zero]
@@ -98,11 +98,11 @@ section seqLeft
 
 @[simp] lemma probEvent_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
     (p : α → Prop) :
-    Pr[p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[p | mx] := by
+    Pr[ p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[ p | mx] := by
   rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
   simp only [Function.comp_apply, pure_bind, probEvent_bind_eq_tsum]
-  simp_rw [show ∀ a : α, Pr[p | (Function.const β a <$> my : m α)] =
-    (1 - Pr[⊥ | my]) * Pr[p | (pure a : m α)] from fun a => probEvent_map_const my a p,
+  simp_rw [show ∀ a : α, Pr[ p | (Function.const β a <$> my : m α)] =
+    (1 - Pr[⊥ | my]) * Pr[ p | (pure a : m α)] from fun a => probEvent_map_const my a p,
     mul_left_comm _ (1 - Pr[⊥ | my])]
   rw [ENNReal.tsum_mul_left, ← probEvent_bind_eq_tsum, bind_pure]
 
@@ -130,7 +130,7 @@ section seqRight
 
 @[simp] lemma probEvent_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
     (p : β → Prop) :
-    Pr[p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
+    Pr[ p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by
   have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
   rw [h, probEvent_bind_const]
 
@@ -213,7 +213,7 @@ lemma evalDist_seq_map_swap [HasEvalSPMF m] :
   exact evalDist_ext (probOutput_seq_map_swap mx my f)
 
 lemma probEvent_seq_map_swap [HasEvalSPMF m] (p : γ → Prop) :
-    Pr[p | Function.swap f <$> my <*> mx] = Pr[p | f <$> mx <*> my] := by
+    Pr[ p | Function.swap f <$> my <*> mx] = Pr[ p | f <$> mx <*> my] := by
   have : DecidableEq γ := Classical.decEq γ
   simp only [probEvent_eq_tsum_indicator, probOutput_seq_map_swap]
 
@@ -231,14 +231,14 @@ end swap
 lemma probEvent_seq_map_eq_mul [HasEvalSPMF m]
     (p : γ → Prop) (q1 : α → Prop) (q2 : β → Prop)
     (h : ∀ x ∈ support mx, ∀ y ∈ support my, p (f x y) ↔ q1 x ∧ q2 y) :
-    Pr[p | f <$> mx <*> my] = Pr[q1 | mx] * Pr[q2 | my] := by
+    Pr[ p | f <$> mx <*> my] = Pr[ q1 | mx] * Pr[ q2 | my] := by
   classical
   rw [show f <$> mx <*> my = mx >>= fun x => f x <$> my from by simp [seq_eq_bind_map]]
   rw [probEvent_bind_eq_tsum]
   simp only [probEvent_map]
-  suffices hs : ∀ x, Pr[= x | mx] * Pr[p ∘ f x | my] =
-      (if q1 x then Pr[= x | mx] else 0) * Pr[q2 | my] by
-    trans (∑' x, (if q1 x then Pr[= x | mx] else 0) * Pr[q2 | my])
+  suffices hs : ∀ x, Pr[= x | mx] * Pr[ p ∘ f x | my] =
+      (if q1 x then Pr[= x | mx] else 0) * Pr[ q2 | my] by
+    trans (∑' x, (if q1 x then Pr[= x | mx] else 0) * Pr[ q2 | my])
     · exact tsum_congr hs
     · rw [ENNReal.tsum_mul_right]; symm; rw [probEvent_eq_tsum_ite]
   intro x
@@ -276,14 +276,14 @@ lemma probOutput_seq_map_eq_mul [HasEvalSPMF m] (x : α) (y : β) (z : γ)
       · simp [probOutput_eq_zero_of_not_mem_support hxs]
 
 lemma probEvent_seq_map_eq_probEvent_comp_uncurry [HasEvalSPMF m] (p : γ → Prop) :
-    Pr[p | f <$> mx <*> my] = Pr[p ∘ Function.uncurry f | Prod.mk <$> mx <*> my] := by
+    Pr[ p | f <$> mx <*> my] = Pr[ p ∘ Function.uncurry f | Prod.mk <$> mx <*> my] := by
   rw [← probEvent_map]
   congr 1
   rw [map_seq, Functor.map_map]
   congr 1
 
 lemma probEvent_seq_map_eq_probEvent [HasEvalSPMF m] (p : γ → Prop) :
-    Pr[p | f <$> mx <*> my] = Pr[fun z => p (f z.1 z.2) | Prod.mk <$> mx <*> my] :=
+    Pr[ p | f <$> mx <*> my] = Pr[ fun z => p (f z.1 z.2) | Prod.mk <$> mx <*> my] :=
   probEvent_seq_map_eq_probEvent_comp_uncurry mx my f p
 
 end seq_map

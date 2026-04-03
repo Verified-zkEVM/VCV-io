@@ -69,7 +69,7 @@ end PMF
     Pr[= x | (liftM p : SPMF α)] = Pr[= x | p] := rfl
 
 @[simp] lemma SPMF.probEvent_liftM (p : PMF α) (e : α → Prop) :
-    Pr[e | (liftM p : SPMF α)] = Pr[e | p] := rfl
+    Pr[ e | (liftM p : SPMF α)] = Pr[ e | p] := rfl
 
 @[simp] lemma SPMF.probFailure_liftM (p : PMF α) :
     Pr[⊥ | (liftM p : SPMF α)] = Pr[⊥ | p] := rfl
@@ -102,7 +102,7 @@ lemma probOutput_eq_ite [DecidableEq α] (x : Id α) (y : α) :
 
 @[simp, grind =]
 lemma probEvent_eq_ite (x : Id α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | x] = if p x.run then 1 else 0 := by
+    Pr[ p | x] = if p x.run then 1 else 0 := by
   classical
   simp [probEvent_eq_sum_finSupport_ite]
 

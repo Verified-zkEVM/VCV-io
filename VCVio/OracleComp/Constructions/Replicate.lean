@@ -97,7 +97,7 @@ lemma probOutput_replicate (xs : List α) :
 
 lemma probEvent_replicate_of_probEvent_cons
     (p : List α → Prop) (hp : p []) (q : α → Prop) (hq : ∀ x xs, p (x :: xs) ↔ q x ∧ p xs) :
-    Pr[p | oa.replicate n] = Pr[q | oa] ^ n := by
+    Pr[ p | oa.replicate n] = Pr[ q | oa] ^ n := by
   induction n with
   | zero => simp [hp]
   | succ n ih =>

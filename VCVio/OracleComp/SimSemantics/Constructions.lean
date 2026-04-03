@@ -76,7 +76,7 @@ lemma probOutput_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
 @[simp]
 lemma probEvent_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (p : α → Prop) :
-    Pr[p | simulateQ uniformSampleImpl oa] = Pr[p | oa] := by
+    Pr[ p | simulateQ uniformSampleImpl oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp]

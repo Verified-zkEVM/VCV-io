@@ -78,7 +78,7 @@ lemma probFailure_list_mapM_loop (xs : List α) (f : α → m β) (ys : List β)
   | cons x xs h =>
       intros ys
       simp only [List.mapM.loop, List.map_cons, List.prod_cons]
-      rw [probFailure_bind_eq_sub_mul _ _ (1 - (List.map (fun x ↦ 1 - Pr[⊥|f x]) xs).prod)]
+      rw [probFailure_bind_eq_sub_mul _ _ (1 - (List.map (fun x ↦ 1 - Pr[⊥ | f x]) xs).prod)]
       · congr 2
         rw [AddLECancellable.tsub_tsub_cancel_of_le]
         · simp only [ENNReal.addLECancellable_iff_ne, ne_eq, ENNReal.sub_eq_top_iff,
