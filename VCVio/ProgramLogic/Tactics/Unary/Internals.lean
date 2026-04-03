@@ -439,7 +439,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
       if hasProbGoal target then
         if isProbEqGoal target then
           throwError
-            "vcstep: found a `Pr[...] = Pr[...]` goal but no swap or congruence rule applied.\n\
+            "vcstep: found a `Pr[ ...] = Pr[ ...]` goal but no swap or congruence rule applied.\n\
             Goal:{indentExpr target}\n\
             Try `vcstep rw`, `vcstep rw under 1`, `vcstep rw congr`, \
             `vcstep rw congr'`, `vcstep?`, or manual rewriting with \
@@ -449,8 +449,8 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
             "vcstep: found a probability goal but could not lower it to a supported\n\
             `Triple` or raw `wp` shape.\n\
             Goal:{indentExpr target}\n\
-            Supported direct lowerings include `Pr[...] = 1`, `Pr[...] = Pr[...]`,\n\
-            and lower bounds such as `r ≤ Pr[...]` / `Pr[...] ≥ r`.\n\
+            Supported direct lowerings include `Pr[ ...] = 1`, `Pr[ ...] = Pr[ ...]`,\n\
+            and lower bounds such as `r ≤ Pr[ ...]` / `Pr[ ...] ≥ r`.\n\
             Try `rw [probEvent_eq_wp_propInd]`, `vcstep?`, or manual rewriting."
       else if let some comp := wpGoalComp? target then
         let comp ← whnfReducible (← instantiateMVars comp)
@@ -490,7 +490,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
         Try `vcstep`, or manually unfolding the remaining arithmetic side conditions.\
         {cutMsg}{invMsg}{theoremMsg}"
 
-/-- Try to close or rewrite a `Pr[...] = Pr[...]` goal by swapping adjacent independent binds.
+/-- Try to close or rewrite a `Pr[ ...] = Pr[ ...]` goal by swapping adjacent independent binds.
 Handles 0–2 layers of tsum peeling. -/
 inductive ProbEqAction where
   | swap
@@ -510,12 +510,12 @@ def runProbEqSwap : TacticM Bool := do
     first
       | (rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput]
          exact probEvent_bind_bind_swap _ _ _ _)
-      | (rw [show Pr[_ | _ >>= fun a => _ >>= fun b => _] =
-              Pr[_ | _ >>= fun b => _ >>= fun a => _] from
+      | (rw [show Pr[ _ | _ >>= fun a => _ >>= fun b => _] =
+              Pr[ _ | _ >>= fun b => _ >>= fun a => _] from
             probEvent_bind_bind_swap _ _ _ _])
-      | (conv in (Pr[_ | _]) =>
-          rw [show Pr[_ | _ >>= fun a => _ >>= fun b => _] =
-                Pr[_ | _ >>= fun b => _ >>= fun a => _] from
+      | (conv in (Pr[ _ | _]) =>
+          rw [show Pr[ _ | _ >>= fun a => _ >>= fun b => _] =
+                Pr[ _ | _ >>= fun b => _ >>= fun a => _] from
               probEvent_bind_bind_swap _ _ _ _])
       | (rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
          refine tsum_congr fun _ => ?_
@@ -551,7 +551,7 @@ def runProbEqCongrNoSupport : TacticM Bool := do
   let names ← getProbCongrNames false
   runProbEqCongrNoSupportWithNames names
 
-/-- Try to decompose a `Pr[... | mx >>= f₁] = Pr[... | mx >>= f₂]` goal by congruence,
+/-- Try to decompose a `Pr[ ... | mx >>= f₁] = Pr[ ... | mx >>= f₂]` goal by congruence,
 then auto-intro the bound variable and support hypothesis. -/
 def runProbEqCongrWithNames (names : Array Name) : TacticM Bool := do
   normalizeProbEqGoal
@@ -733,7 +733,7 @@ def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
   | none => return false
   | some (plan, _) => tryProbEqActions plan
 
-/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr.
+/-- Try to handle a `Pr[ ...] = Pr[ ...]` equality goal by swap, congr, or swap+congr.
 Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
 def runProbOutputEqRelBridge : TacticM Bool := do
   let saved ← saveState
@@ -754,7 +754,7 @@ def runProbOutputEqRelBridge : TacticM Bool := do
   saved.restore
   return false
 
-/-- Try to handle a `Pr[...] = Pr[...]` equality goal by swap, congr, or swap+congr. -/
+/-- Try to handle a `Pr[ ...] = Pr[ ...]` equality goal by swap, congr, or swap+congr. -/
 def tryProbEqGoal : TacticM Bool := do
   if ← tryProbEqPlans probEqActionPlans then
     return true
@@ -764,12 +764,12 @@ def throwVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   if depth = 0 then
     throwError
-      "vcstep rw: expected a `Pr[...] = Pr[...]` goal where one top-level\n\
+      "vcstep rw: expected a `Pr[ ...] = Pr[ ...]` goal where one top-level\n\
       bind-swap rewrite applies.\n\
       Goal:{indentExpr target}"
   else
     throwError
-      "vcstep rw under {depth}: expected a `Pr[...] = Pr[...]` goal where one\n\
+      "vcstep rw under {depth}: expected a `Pr[ ...] = Pr[ ...]` goal where one\n\
       bind-swap rewrite applies under {depth} shared bind prefix(es).\n\
       Goal:{indentExpr target}"
 
@@ -777,12 +777,12 @@ def throwVCGenStepRwCongrError (supportSensitive : Bool) : TacticM Unit := withM
   let target ← instantiateMVars (← getMainTarget)
   if supportSensitive then
     throwError
-      "vcstep rw congr: expected a `Pr[...] = Pr[...]` goal with a shared outer\n\
+      "vcstep rw congr: expected a `Pr[ ...] = Pr[ ...]` goal with a shared outer\n\
       bind, leaving the bound variable and a support hypothesis.\n\
       Goal:{indentExpr target}"
   else
     throwError
-      "vcstep rw congr': expected a `Pr[...] = Pr[...]` goal with a shared outer\n\
+      "vcstep rw congr': expected a `Pr[ ...] = Pr[ ...]` goal with a shared outer\n\
       bind, leaving only the bound variable.\n\
       Goal:{indentExpr target}"
 

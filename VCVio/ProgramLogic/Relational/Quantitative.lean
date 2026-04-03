@@ -165,14 +165,14 @@ theorem relTriple'_iff_couplingPost
         intro x
         change Pr[= x | Subtype.val <$> pa] = Pr[= x | evalDist oa]
         calc
-          Pr[= x | Subtype.val <$> pa] = Pr[fun a : A => a.1 = x | pa] := by
+          Pr[= x | Subtype.val <$> pa] = Pr[ fun a : A => a.1 = x | pa] := by
             simpa using
               (probEvent_map (mx := pa) (f := Subtype.val) (q := fun y : α => y = x))
-          _ = Pr[((fun a : A => a.1 = x) ∘ packA) | evalDist oa] := by
+          _ = Pr[ ((fun a : A => a.1 = x) ∘ packA) | evalDist oa] := by
                 rw [show pa = packA <$> evalDist oa by rfl]
                 exact probEvent_map (mx := evalDist oa) (f := packA) (q := fun a : A => a.1 = x)
-          _ = Pr[fun y : α => (packA y).1 = x | evalDist oa] := rfl
-          _ = Pr[fun y : α => y = x | evalDist oa] := by
+          _ = Pr[ fun y : α => (packA y).1 = x | evalDist oa] := rfl
+          _ = Pr[ fun y : α => y = x | evalDist oa] := by
                 apply probEvent_ext
                 intro y hy
                 have hyfin : y ∈ finSupport oa := by
@@ -184,14 +184,14 @@ theorem relTriple'_iff_couplingPost
         intro y
         change Pr[= y | Subtype.val <$> pb] = Pr[= y | evalDist ob]
         calc
-          Pr[= y | Subtype.val <$> pb] = Pr[fun b : B => b.1 = y | pb] := by
+          Pr[= y | Subtype.val <$> pb] = Pr[ fun b : B => b.1 = y | pb] := by
             simpa using
               (probEvent_map (mx := pb) (f := Subtype.val) (q := fun x : β => x = y))
-          _ = Pr[((fun b : B => b.1 = y) ∘ packB) | evalDist ob] := by
+          _ = Pr[ ((fun b : B => b.1 = y) ∘ packB) | evalDist ob] := by
                 rw [show pb = packB <$> evalDist ob by rfl]
                 exact probEvent_map (mx := evalDist ob) (f := packB) (q := fun b : B => b.1 = y)
-          _ = Pr[fun x : β => (packB x).1 = y | evalDist ob] := rfl
-          _ = Pr[fun x : β => x = y | evalDist ob] := by
+          _ = Pr[ fun x : β => (packB x).1 = y | evalDist ob] := rfl
+          _ = Pr[ fun x : β => x = y | evalDist ob] := by
                 apply probEvent_ext
                 intro x hx
                 have hxfin : x ∈ finSupport ob := by
@@ -226,7 +226,7 @@ theorem relTriple'_iff_couplingPost
       have hsub_obj :
           ∀ c : SPMF.Coupling pa pb,
             (∑' z : Option (A × B), c.1.1 z * fSub z) =
-              Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] := by
+              Pr[ fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] := by
         intro c
         rw [probEvent_eq_tsum_ite, tsum_option _ ENNReal.summable]
         simp only [RelPost.indicator, mul_zero, mul_ite, mul_one, tsum_fintype, zero_add, fSub]
@@ -237,8 +237,8 @@ theorem relTriple'_iff_couplingPost
         · simp [hR]
       have hlift_obj :
           ∀ c : SPMF.Coupling (evalDist oa) (evalDist ob),
-            Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] =
-              Pr[fun z : α × β => R z.1 z.2 | c.1] := by
+            Pr[ fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] =
+              Pr[ fun z : α × β => R z.1 z.2 | c.1] := by
         intro c
         rw [probEvent_map]
         apply probEvent_ext
@@ -266,16 +266,16 @@ theorem relTriple'_iff_couplingPost
       let cMaxSub' : SPMF.Coupling pa pb := ⟨cMaxSub.1, cMaxSub.2⟩
       let cMax : SPMF.Coupling (evalDist oa) (evalDist ob) := ⟨valPair <$> cMaxSub.1, hpush⟩
       have hpush_obj :
-          Pr[fun z : α × β => R z.1 z.2 | cMax.1] =
-            Pr[fun z : A × B => R z.1.1 z.2.1 | cMaxSub'.1] := by
-        change Pr[fun z : α × β => R z.1 z.2 | valPair <$> cMaxSub'.1] =
-          Pr[((fun z : α × β => R z.1 z.2) ∘ valPair) | cMaxSub'.1]
+          Pr[ fun z : α × β => R z.1 z.2 | cMax.1] =
+            Pr[ fun z : A × B => R z.1.1 z.2.1 | cMaxSub'.1] := by
+        change Pr[ fun z : α × β => R z.1 z.2 | valPair <$> cMaxSub'.1] =
+          Pr[ ((fun z : α × β => R z.1 z.2) ∘ valPair) | cMaxSub'.1]
         exact probEvent_map (mx := cMaxSub'.1) (f := valPair)
           (q := fun z : α × β => R z.1 z.2)
       have hsub_le_max :
           ∀ c : SPMF.Coupling pa pb,
-            Pr[fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] ≤
-              Pr[fun z : A × B => R z.1.1 z.2.1 | (cMaxSub.1 : SPMF (A × B))] := by
+            Pr[ fun z : A × B => R z.1.1 z.2.1 | (c.1 : SPMF (A × B))] ≤
+              Pr[ fun z : A × B => R z.1.1 z.2.1 | (cMaxSub.1 : SPMF (A × B))] := by
         intro c
         have hle :
             (∑' z : Option (A × B), c.1.1 z * fSub z) ≤
@@ -290,7 +290,7 @@ theorem relTriple'_iff_couplingPost
         exact hle
       have hupper :
           eRelWP oa ob (RelPost.indicator R) ≤
-            Pr[fun z : α × β => R z.1 z.2 | cMax.1] := by
+            Pr[ fun z : α × β => R z.1 z.2 | cMax.1] := by
         unfold eRelWP
         refine iSup_le ?_
         intro c
@@ -308,17 +308,17 @@ theorem relTriple'_iff_couplingPost
               _ = pb := rfl⟩
         calc
           ∑' z, Pr[= z | c.1] * RelPost.indicator R z.1 z.2
-              = Pr[fun z : α × β => R z.1 z.2 | c.1] := by
+              = Pr[ fun z : α × β => R z.1 z.2 | c.1] := by
                   simpa [RelPost.indicator] using
                     indicator_objective_eq_probEvent (mx := c.1) (R := R)
-          _ = Pr[fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
+          _ = Pr[ fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
                 exact (hlift_obj c).symm
-          _ ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := by
+          _ ≤ Pr[ fun z : α × β => R z.1 z.2 | cMax.1] := by
             rw [hpush_obj]
             refine le_of_eq_of_le ?_ (hsub_le_max cLift)
             rw [hlift_obj]
-      have hmax_ge : 1 ≤ Pr[fun z : α × β => R z.1 z.2 | cMax.1] := le_trans h hupper
-      have hmax_eq : Pr[fun z : α × β => R z.1 z.2 | cMax.1] = 1 :=
+      have hmax_ge : 1 ≤ Pr[ fun z : α × β => R z.1 z.2 | cMax.1] := le_trans h hupper
+      have hmax_eq : Pr[ fun z : α × β => R z.1 z.2 | cMax.1] = 1 :=
         le_antisymm probEvent_le_one hmax_ge
       exact ⟨cMax,
         (probEvent_eq_one_iff (mx := cMax.1) (p := fun z : α × β => R z.1 z.2)).1 hmax_eq |>.2⟩
@@ -448,18 +448,18 @@ private lemma probOutput_diag_le_min_marginals
     Pr[= (a, a) | c.1] ≤ min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) := by
   refine le_min ?_ ?_
   · calc Pr[= (a, a) | c.1]
-        = Pr[(· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
-      _ ≤ Pr[(· = a) ∘ Prod.fst | c.1] :=
+        = Pr[ (· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
+      _ ≤ Pr[ (· = a) ∘ Prod.fst | c.1] :=
           probEvent_mono fun z _ h => h ▸ rfl
-      _ = Pr[(· = a) | Prod.fst <$> c.1] :=
+      _ = Pr[ (· = a) | Prod.fst <$> c.1] :=
           (probEvent_map c.1 Prod.fst (· = a)).symm
       _ = Pr[= a | evalDist oa] := by
           rw [probEvent_eq_eq_probOutput, c.2.map_fst]
   · calc Pr[= (a, a) | c.1]
-        = Pr[(· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
-      _ ≤ Pr[(· = a) ∘ Prod.snd | c.1] :=
+        = Pr[ (· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
+      _ ≤ Pr[ (· = a) ∘ Prod.snd | c.1] :=
           probEvent_mono fun z _ h => h ▸ rfl
-      _ = Pr[(· = a) | Prod.snd <$> c.1] :=
+      _ = Pr[ (· = a) | Prod.snd <$> c.1] :=
           (probEvent_map c.1 Prod.snd (· = a)).symm
       _ = Pr[= a | evalDist ob] := by
           rw [probEvent_eq_eq_probOutput, c.2.map_snd]

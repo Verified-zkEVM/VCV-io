@@ -19,7 +19,7 @@ variable {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalSPMF m] {α �
 
 omit [LawfulMonad m] in
 lemma probOutput_prod_mk_eq_probEvent (mx : m (α × β)) (x : α) (y : β) :
-    Pr[= (x, y) | mx] = Pr[fun z => z.1 = x ∧ z.2 = y | mx] := by
+    Pr[= (x, y) | mx] = Pr[ fun z => z.1 = x ∧ z.2 = y | mx] := by
   simp [← probEvent_eq_eq_probOutput, Prod.eq_iff_fst_eq_snd_eq]
 
 @[grind =]
@@ -52,26 +52,26 @@ lemma probOutput_snd_map_eq_sum [Fintype α] (mx : m (α × β)) (y : β) :
 
 @[grind =]
 lemma probOutput_fst_map_eq_probEvent (mx : m (α × β)) (x : α) :
-    Pr[= x | Prod.fst <$> mx] = Pr[fun z => z.1 = x | mx] := by grind
+    Pr[= x | Prod.fst <$> mx] = Pr[ fun z => z.1 = x | mx] := by grind
 
 /-- Unlike `probEvent_map` this unfolds the function composition automatically. -/
 @[simp high, grind =]
 lemma probEvent_fst_map (mx : m (α × β)) (p : α → Prop) :
-    Pr[p | Prod.fst <$> mx] = Pr[fun x => p x.1 | mx] := by grind
+    Pr[ p | Prod.fst <$> mx] = Pr[ fun x => p x.1 | mx] := by grind
 
 @[grind =]
 lemma probOutput_snd_map_eq_probEvent (mx : m (α × β)) (y : β) :
-    Pr[= y | Prod.snd <$> mx] = Pr[fun z => z.2 = y | mx] := by grind
+    Pr[= y | Prod.snd <$> mx] = Pr[ fun z => z.2 = y | mx] := by grind
 
 /-- Unlike `probEvent_map` this unfolds the function composition automatically. -/
 @[simp high, grind =]
 lemma probEvent_snd_map (mx : m (α × β)) (p : β → Prop) :
-    Pr[p | Prod.snd <$> mx] = Pr[fun y => p y.2 | mx] := by grind
+    Pr[ p | Prod.snd <$> mx] = Pr[ fun y => p y.2 | mx] := by grind
 
 omit [LawfulMonad m] in
 @[simp, grind =]
 lemma probEvent_fst_eq_snd (mx : m (α × α)) :
-    Pr[fun z => z.1 = z.2 | mx] = ∑' x : α, Pr[= (x, x) | mx] := by
+    Pr[ fun z => z.1 = z.2 | mx] = ∑' x : α, Pr[= (x, x) | mx] := by
   classical
   rw [probEvent_eq_tsum_ite, ENNReal.tsum_prod']
   refine tsum_congr fun x => ?_

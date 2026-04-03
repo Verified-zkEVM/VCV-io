@@ -191,7 +191,7 @@ lemma probOutput_eq (mx : ExceptT ε m α) (x : α) :
 @[grind =]
 lemma probFailure_eq (mx : ExceptT ε m α) :
     Pr[⊥ | mx] = Pr[⊥ | mx.run] +
-      Pr[(fun r => match r with | Except.error _ => True | Except.ok _ => False) | mx.run] := by
+      Pr[ (fun r => match r with | Except.error _ => True | Except.ok _ => False) | mx.run] := by
   simp only [probFailure_def, probEvent_eq_tsum_indicator, probOutput_def]
   rw [show evalDist mx = (HasEvalSPMF.toSPMF mx.run >>= fun r =>
       match r with | Except.ok a => pure a | Except.error _ => failure : SPMF α) from rfl]
@@ -216,7 +216,7 @@ lemma probFailure_liftM [LawfulMonad m] (mx : m α) :
   simp only [probFailure_def, evalDist_liftM]
 
 lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
-    Pr[p | (liftM mx : ExceptT ε m α)] = Pr[p | mx] := by
+    Pr[ p | (liftM mx : ExceptT ε m α)] = Pr[ p | mx] := by
   simp only [probEvent_def, evalDist_liftM]
 
 end HasEvalSPMF

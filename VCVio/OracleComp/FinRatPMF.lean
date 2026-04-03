@@ -79,7 +79,7 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
 
 @[simp] lemma probEvent_simulateQ {α : Type v}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Pr[p | simulateQ (finRatImpl (spec := spec)) oa] = Pr[p | oa] := by
+    Pr[ p | simulateQ (finRatImpl (spec := spec)) oa] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_simulateQ]
 
 @[simp] lemma support_simulateQ {α : Type v} (oa : OracleComp spec α) :

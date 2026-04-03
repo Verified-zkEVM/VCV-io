@@ -55,7 +55,7 @@ variable [HasEvalSPMF m] (mx : m α) (f : α → β)
 
 @[simp, grind =]
 lemma probEvent_bind_pure_comp (q : β → Prop) :
-    Pr[q | mx >>= pure ∘ f] = Pr[q ∘ f | mx] := by
+    Pr[ q | mx >>= pure ∘ f] = Pr[ q ∘ f | mx] := by
   have := Classical.decPred q
   rw [probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
   simp
@@ -111,10 +111,10 @@ lemma probFailure_map : Pr[⊥ | f <$> mx] = Pr[⊥ | mx] := by
   simp [map_eq_bind_pure_comp, probFailure_bind_eq_add_tsum]
 
 @[simp, grind =]
-lemma probEvent_map (q : β → Prop) : Pr[q | f <$> mx] = Pr[q ∘ f | mx] := by
+lemma probEvent_map (q : β → Prop) : Pr[ q | f <$> mx] = Pr[ q ∘ f | mx] := by
   grind [= map_eq_bind_pure_comp]
 
-lemma probEvent_comp (q : β → Prop) : Pr[q ∘ f | mx] = Pr[q | f <$> mx] :=
+lemma probEvent_comp (q : β → Prop) : Pr[ q ∘ f | mx] = Pr[ q | f <$> mx] :=
   symm <| probEvent_map mx f q
 
 
@@ -155,13 +155,13 @@ lemma probOutput_map_const (y' : β) :
 
 @[simp, aesop safe norm, grind =_]
 lemma probEvent_map_const (p : β → Prop) :
-    Pr[p | (fun _ => y) <$> mx] =
-      (1 - Pr[⊥ | mx]) * Pr[p | (pure y : m β)] := by
+    Pr[ p | (fun _ => y) <$> mx] =
+      (1 - Pr[⊥ | mx]) * Pr[ p | (pure y : m β)] := by
   rw [map_eq_bind_pure_comp, Function.comp_def, probEvent_bind_const]
 
 @[simp, aesop safe norm]
 lemma probEvent_map_const' (p : β → Prop) [DecidablePred p] :
-    Pr[p | (fun _ => y) <$> mx] =
+    Pr[ p | (fun _ => y) <$> mx] =
       if p y then (1 - Pr[⊥ | mx]) else 0 := by
   simp [Function.comp_def]
 

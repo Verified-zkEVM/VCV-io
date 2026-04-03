@@ -36,7 +36,7 @@ lemma probOutput_none_add_tsum_some :
 
 omit [LawfulMonad m] in
 lemma probEvent_isSome_eq_one_sub_probOutput_none [NeverFail mx] :
-    Pr[fun r => r.isSome | mx] = 1 - Pr[= none | mx] := by
+    Pr[ fun r => r.isSome | mx] = 1 - Pr[= none | mx] := by
   rw [probEvent_eq_tsum_ite]
   rw [tsum_option (fun r : Option α => if r.isSome then Pr[= r | mx] else 0) ENNReal.summable]
   simp only [Option.isSome, reduceCtorEq, ↓reduceIte, zero_add]

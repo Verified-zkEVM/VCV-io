@@ -239,7 +239,7 @@ lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : Oracle
     simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_fst
   have hsnd : Pr[= x | Prod.snd <$> c.1] = Pr[= x | ob] := by
     simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_snd
-  have hevent : Pr[(fun z : α × α => z.1 = x) | c.1] = Pr[(fun z : α × α => z.2 = x) | c.1] := by
+  have hevent : Pr[ (fun z : α × α => z.1 = x) | c.1] = Pr[ (fun z : α × α => z.2 = x) | c.1] := by
     refine probEvent_ext (mx := c.1) fun z hz => ?_
     have hzEq : z.1 = z.2 := hc z hz; grind
   grind only [= probOutput_fst_map_eq_probEvent, = probOutput_snd_map_eq_probEvent]

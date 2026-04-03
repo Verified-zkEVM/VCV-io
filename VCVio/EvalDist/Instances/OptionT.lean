@@ -143,7 +143,7 @@ lemma probOutput_eq (mx : OptionT m α) (x : α) :
 
 @[grind =]
 lemma probEvent_eq (mx : OptionT m α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | mx] + Pr[= none | mx.run] = Pr[fun x => x.all p | mx.run] := by
+    Pr[ p | mx] + Pr[= none | mx.run] = Pr[ fun x => x.all p | mx.run] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_eq]
   rw [add_comm, tsum_option _ ENNReal.summable]
   congr 1
@@ -169,12 +169,12 @@ lemma probOutput_lift [LawfulMonad m] (mx : m α) (x : α) :
 
 @[simp, grind =]
 lemma probEvent_liftM [LawfulMonad m] (mx : m α) (p : α → Prop) :
-    Pr[p | liftM (n := OptionT m) mx] = Pr[p | mx] := by
+    Pr[ p | liftM (n := OptionT m) mx] = Pr[ p | mx] := by
   grind only [= probEvent_eq_tsum_indicator, = probOutput_liftM]
 
 @[simp, grind =]
 lemma probEvent_lift [LawfulMonad m] (mx : m α) (p : α → Prop) :
-    Pr[p | OptionT.lift mx] = Pr[p | mx] := by
+    Pr[ p | OptionT.lift mx] = Pr[ p | mx] := by
   grind only [= probEvent_eq_tsum_indicator, = probOutput_lift]
 
 @[simp, grind =]

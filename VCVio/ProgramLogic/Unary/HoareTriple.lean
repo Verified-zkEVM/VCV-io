@@ -242,7 +242,7 @@ theorem triple_dite {c : Prop} [Decidable c] {pre : ℝ≥0∞}
 /-- `probEvent` as a WP of an indicator postcondition. -/
 lemma probEvent_eq_wp_indicator (oa : OracleComp spec α) (p : α → Prop)
     [DecidablePred p] :
-    Pr[p | oa] = wp oa (fun x => if p x then 1 else 0) := by
+    Pr[ p | oa] = wp oa (fun x => if p x then 1 else 0) := by
   rw [probEvent_eq_tsum_ite, wp, MAlgOrdered.wp]
   change (∑' x : α, if p x then Pr[= x | oa] else 0) =
     μ ((oa >>= fun a => pure (if p a then 1 else 0)) : OracleComp spec ℝ≥0∞)
@@ -321,7 +321,7 @@ end Sampling
 
 /-- Indicator-event probability as an exact quantitative triple. -/
 theorem triple_probEvent_indicator (oa : OracleComp spec α) (p : α → Prop) [DecidablePred p] :
-    Triple (spec := spec) (Pr[p | oa]) oa (fun x => if p x then 1 else 0) := by
+    Triple (spec := spec) (Pr[ p | oa]) oa (fun x => if p x then 1 else 0) := by
   unfold Triple MAlgOrdered.Triple
   simp [probEvent_eq_wp_indicator]
 
@@ -334,8 +334,8 @@ theorem triple_probOutput_indicator (oa : OracleComp spec α) [DecidableEq α] (
 /-- Lower bounds on `probEvent` are exactly indicator-postcondition triples. -/
 theorem le_probEvent_iff_triple_indicator (oa : OracleComp spec α) (p : α → Prop)
     [DecidablePred p] (r : ℝ≥0∞) :
-    r ≤ Pr[p | oa] ↔ Triple (spec := spec) r oa (fun x => if p x then 1 else 0) := by
-  change r ≤ Pr[p | oa] ↔ r ≤ wp oa (fun x => if p x then 1 else 0)
+    r ≤ Pr[ p | oa] ↔ Triple (spec := spec) r oa (fun x => if p x then 1 else 0) := by
+  change r ≤ Pr[ p | oa] ↔ r ≤ wp oa (fun x => if p x then 1 else 0)
   rw [probEvent_eq_wp_indicator]
 
 /-- Lower bounds on `probOutput` are exactly singleton-indicator triples. -/
@@ -347,7 +347,7 @@ theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableE
 
 /-- The support event of an `OracleComp` occurs almost surely. -/
 @[simp] theorem probEvent_mem_support (oa : OracleComp spec α) :
-    Pr[fun x => x ∈ support oa | oa] = 1 := by
+    Pr[ fun x => x ∈ support oa | oa] = 1 := by
   rw [probEvent_eq_one_iff]
   constructor
   · simp
@@ -356,7 +356,7 @@ theorem le_probOutput_iff_triple_indicator (oa : OracleComp spec α) [DecidableE
 
 /-- Exact probability-1 events are exact quantitative triples. -/
 theorem triple_probEvent_eq_one (oa : OracleComp spec α) (p : α → Prop)
-    [DecidablePred p] (h : Pr[p | oa] = 1) :
+    [DecidablePred p] (h : Pr[ p | oa] = 1) :
     Triple (spec := spec) 1 oa (fun x => if p x then 1 else 0) := by
   simpa [h] using triple_probEvent_indicator (oa := oa) p
 

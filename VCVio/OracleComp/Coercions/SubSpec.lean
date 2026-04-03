@@ -166,7 +166,7 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
   congrFun (congrArg DFunLike.coe (evalDist_liftComp mx)) x
 
 @[simp] lemma probEvent_liftComp (mx : OracleComp spec α) (p : α → Prop) :
-    Pr[p | liftComp mx superSpec] = Pr[p | mx] := by
+    Pr[ p | liftComp mx superSpec] = Pr[ p | mx] := by
   simp only [probEvent_eq_tsum_indicator]
   congr 1; funext x
   simp only [probOutput_liftComp]
