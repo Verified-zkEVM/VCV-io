@@ -454,6 +454,19 @@ section queryBounds
 variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*}
 variable [Monad m] [LawfulMonad m] [HasEvalSet m]
 
+omit [HasEvalSet m] in
+lemma hasCost_withAddCost_query {ω : Type} [AddMonoid ω]
+    (runtime : QueryRuntime spec m) (costFn : spec.Domain → ω) (t : spec.Domain) :
+    Cost[
+      HasQuery.withAddCost
+        (fun [HasQuery spec (AddWriterT ω m)] =>
+          HasQuery.query (spec := spec) (m := AddWriterT ω m) t)
+        runtime costFn
+    ] = costFn t := by
+  change Cost[(runtime.withAddCost costFn).impl t] = costFn t
+  rw [QueryRuntime.withAddCost_impl, AddWriterT.hasCost_iff]
+  simp [AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+
 lemma queryBoundedAboveBy_withUnitCost_query
     (runtime : QueryRuntime spec m) (t : spec.Domain) :
     AddWriterT.QueryBoundedAboveBy

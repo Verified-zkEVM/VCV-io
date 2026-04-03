@@ -247,55 +247,47 @@ theorem sign_usesExactlyOneQuery
   exact sign_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
     (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
-private lemma verify_outputs_formula_withUnitCost
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-            (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
-          runtime) =
-      HasQuery.inRuntime
-        (fun [HasQuery (M × PC →ₒ Ω) m] =>
-          (FiatShamir (m := m) σ hr M).verify pk msg sig)
-        runtime := by
+/-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
+random-oracle query on `(msg, sig.1)`. -/
+theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P)
+    (costFn : M × PC → ω) :
+    QueryCost[ (FiatShamir σ hr M).verify pk msg sig in runtime by costFn ] =
+      costFn (msg, sig.1) := by
   rcases sig with ⟨c, s⟩
-  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, FiatShamir,
-    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+  change Cost[
+    HasQuery.withAddCost
+      (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ω m)] =>
+        (FiatShamir (m := AddWriterT ω m) σ hr M).verify pk msg (c, s))
+      runtime costFn
+  ] = costFn (msg, c)
+  rw [AddWriterT.hasCost_iff]
+  simp [HasQuery.withAddCost, FiatShamir, QueryRuntime.withAddCost_impl,
+    AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
-/-- Running Fiat-Shamir verification in a unit-cost query runtime records exactly one query
-cost. -/
-private lemma verify_costs_formula_withUnitCost
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    AddWriterT.costs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-            (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
-          runtime) =
-      (fun _ ↦ 1) <$>
-        HasQuery.inRuntime
-          (fun [HasQuery (M × PC →ₒ Ω) m] =>
-            (FiatShamir (m := m) σ hr M).verify pk msg sig)
-          runtime := by
-  rcases sig with ⟨c, s⟩
-  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, FiatShamir,
-    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+/-- Fiat-Shamir verification has expected weighted query cost equal to the weight of its single
+random-oracle query. -/
+theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
+    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P)
+    (costFn : M × PC → ω) (val : ω → ENNReal) (hval : Monotone val) :
+    ExpectedQueryCost[
+      (FiatShamir σ hr M).verify pk msg sig in runtime by costFn via val
+    ] = val (costFn (msg, sig.1)) := by
+  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    (verify_usesExactQueryCost
+      (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (msg := msg)
+      (sig := sig) (costFn := costFn))
+    hval
 
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
     Queries[ (FiatShamir σ hr M).verify pk msg sig in runtime ] = 1 := by
-  change Cost[
-    HasQuery.withUnitCost
-      (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-        (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
-      runtime
-  ] = 1
-  rw [AddWriterT.HasCost, AddWriterT.CostsAs]
-  rw [verify_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-    (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)]
-  exact verify_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-    (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
+  simpa [HasQuery.UsesExactlyQueries] using
+    (verify_usesExactQueryCost
+      (ω := ℕ) (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk)
+      (msg := msg) (sig := sig) (costFn := fun _ ↦ 1))
 
 attribute [simp] sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
