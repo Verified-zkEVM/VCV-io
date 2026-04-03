@@ -230,6 +230,25 @@ instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
     intro x
     cases x <;> simp
 
+/-- Coherence: lifting an `OracleComp` to a superspec and then into `OptionT` via the standard
+  `MonadLift` equals lifting directly through the transitive `MonadLiftT` chain (which goes
+  through the `simulateQ`-based `OptionT` MonadLift instance). -/
+@[simp]
+lemma monadLift_liftM_OptionT [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
+    (mx : OracleComp spec α) :
+    (monadLift (liftM mx : OracleComp superSpec α) : OptionT (OracleComp superSpec) α) =
+    (liftM mx : OptionT (OracleComp superSpec) α) := by
+  apply OptionT.ext
+  simp only [OptionT.run_monadLift, monadLift_eq_self]
+  conv_rhs => dsimp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift]
+  simp only [OptionT.run_mk, OptionT.lift]
+  erw [simulateQ_bind]
+  simp only [simulateQ_pure, ← map_eq_pure_bind]
+  congr 1
+  rw [show mx.liftComp spec = mx from simulateQ_ofLift_eq_self mx]
+  change liftM mx = liftComp mx superSpec
+  rw [liftComp_eq_liftM]
+
 end OptionT
 
 section StateT
