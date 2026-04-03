@@ -270,6 +270,16 @@ lemma pathwiseCostAtLeast_monadLift [LawfulMonad m] (x : m α) :
   rcases hz with ⟨a, _, rfl⟩
   simp
 
+lemma pathwiseCostAtMost_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m] (x : ProbComp α) :
+    PathwiseCostAtMost (monadLift x : AddWriterT ω m α) 0 := by
+  change PathwiseCostAtMost (monadLift ((liftM x : m α)) : AddWriterT ω m α) 0
+  exact pathwiseCostAtMost_monadLift (m := m) (x := (liftM x : m α))
+
+lemma pathwiseCostAtLeast_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m] (x : ProbComp α) :
+    PathwiseCostAtLeast (monadLift x : AddWriterT ω m α) 0 := by
+  change PathwiseCostAtLeast (monadLift ((liftM x : m α)) : AddWriterT ω m α) 0
+  exact pathwiseCostAtLeast_monadLift (m := m) (x := (liftM x : m α))
+
 lemma pathwiseCostAtMost_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
     (h : PathwiseCostAtMost oa w₁) (hw : w₁ ≤ w₂) :
     PathwiseCostAtMost oa w₂ := by
@@ -696,6 +706,18 @@ lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hbw : b ≤ w) :
     HasQuery.UsesCostAtLeast oa runtime costFn b :=
   AddWriterT.pathwiseCostAtLeast_of_hasCost h hbw
+
+lemma usesCostAtMost_query_of_le {ω : Type} [AddMonoid ω] [Preorder ω]
+    [LawfulMonad m] [HasEvalSet m]
+    (runtime : QueryRuntime spec m) (costFn : spec.Domain → ω) (t : spec.Domain) {b : ω}
+    (ht : costFn t ≤ b) :
+    HasQuery.UsesCostAtMost
+      (fun [HasQuery spec (AddWriterT ω m)] =>
+        HasQuery.query (spec := spec) (m := AddWriterT ω m) t)
+      runtime costFn b :=
+  usesCostAtMost_of_usesCostExactly
+    (hasCost_withAddCost_query (runtime := runtime) (costFn := costFn) (t := t))
+    ht
 
 /-- Unit-cost specialization: every query contributes cost `1`. -/
 def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
