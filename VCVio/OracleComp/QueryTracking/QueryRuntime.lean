@@ -731,6 +731,17 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
           $runtime $n)
 
+/-- `QueryCost[ oa in runtime ] = n` is the unit-cost specialization of weighted query cost:
+each oracle query contributes additive cost `1`, so the total query cost is just the number of
+queries made by `oa`. -/
+syntax:max "QueryCost[ " term " in " term " ]" " = " term:50 : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime ] = $w) =>
+      `(HasQuery.UsesExactlyQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $w)
+
 /-- `QueryCost[ oa in runtime by costFn ] = w` means that `oa`, instantiated in `runtime` and
 instrumented so that each query `t` contributes cost `costFn t`, has constant total query cost
 `w`.
@@ -745,6 +756,16 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
+/-- `QueryCost[ oa in runtime ] ≤ n` is the unit-cost specialization of pathwise query-cost upper
+bounds. It says that every execution of `oa` makes at most `n` oracle queries. -/
+syntax:max "QueryCost[ " term " in " term " ]" " ≤ " term:50 : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime ] ≤ $w) =>
+      `(HasQuery.UsesAtMostQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $w)
+
 /-- `QueryCost[ oa in runtime by costFn ] ≤ w` means that every execution path of `oa` has total
 query cost bounded above by `w` under the weighting function `costFn`.
 
@@ -757,6 +778,16 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
+/-- `QueryCost[ oa in runtime ] ≥ n` is the unit-cost specialization of pathwise query-cost lower
+bounds. It says that every execution of `oa` makes at least `n` oracle queries. -/
+syntax:max "QueryCost[ " term " in " term " ]" " ≥ " term:50 : term
+
+macro_rules
+  | `(QueryCost[ $oa in $runtime ] ≥ $w) =>
+      `(HasQuery.UsesAtLeastQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $w)
+
 /-- `QueryCost[ oa in runtime by costFn ] ≥ w` means that every execution path of `oa` has total
 query cost bounded below by `w` under the weighting function `costFn`.
 
@@ -768,6 +799,16 @@ macro_rules
       `(HasQuery.UsesCostAtLeast
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
+
+/-- `ExpectedQueryCost[ oa in runtime ]` is the expected number of oracle queries made by `oa`
+when run in `runtime`, viewed as the unit-cost specialization of weighted expected query cost. -/
+syntax:max "ExpectedQueryCost[ " term " in " term " ]" : term
+
+macro_rules
+  | `(ExpectedQueryCost[ $oa in $runtime ]) =>
+      `(HasQuery.expectedQueryCost
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal)))
 
 /-- `ExpectedQueryCost[ oa in runtime by costFn via val ]` is the expected weighted query cost of
 `oa` when instantiated in `runtime`.
