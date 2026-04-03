@@ -403,16 +403,16 @@ lemma usesCostAtMost_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hwb : w ≤ b) :
-    HasQuery.UsesCostAtMost oa runtime costFn b := by
-  exact AddWriterT.pathwiseCostAtMost_of_hasCost h hwb
+    HasQuery.UsesCostAtMost oa runtime costFn b :=
+  AddWriterT.pathwiseCostAtMost_of_hasCost h hwb
 
 lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
     [LawfulMonad m] [HasEvalSet m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hbw : b ≤ w) :
-    HasQuery.UsesCostAtLeast oa runtime costFn b := by
-  exact AddWriterT.pathwiseCostAtLeast_of_hasCost h hbw
+    HasQuery.UsesCostAtLeast oa runtime costFn b :=
+  AddWriterT.pathwiseCostAtLeast_of_hasCost h hbw
 
 /-- Unit-cost specialization: every query contributes cost `1`. -/
 def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
