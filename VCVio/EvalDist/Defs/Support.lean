@@ -31,28 +31,10 @@ class HasEvalSet (m : Type u → Type v) [Monad m] where
 def support [HasEvalSet m] {α : Type u} (mx : m α) : Set α :=
   HasEvalSet.toSet.toFun _ mx
 
-/-- Every output in the support of `mx` satisfies the predicate `p`. -/
-def AllOutputsSatisfy [HasEvalSet m] (mx : m α) (p : α → Prop) : Prop :=
-  ∀ x ∈ support mx, p x
-
-/-- Some output in the support of `mx` satisfies the predicate `p`. -/
-def SomeOutputSatisfies [HasEvalSet m] (mx : m α) (p : α → Prop) : Prop :=
-  ∃ x ∈ support mx, p x
-
 -- dtumad: not sure if this should actually be in the ruleset?
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma support_def [HasEvalSet m] {α : Type u} (mx : m α) :
     support mx = HasEvalSet.toSet.toFun _ mx := rfl
-
-@[simp]
-lemma allOutputsSatisfy_iff [HasEvalSet m] (mx : m α) (p : α → Prop) :
-    AllOutputsSatisfy mx p ↔ ∀ x ∈ support mx, p x :=
-  Iff.rfl
-
-@[simp]
-lemma someOutputSatisfies_iff [HasEvalSet m] (mx : m α) (p : α → Prop) :
-    SomeOutputSatisfies mx p ↔ ∃ x ∈ support mx, p x :=
-  Iff.rfl
 
 /-- The support of a `SetM` computation is the resulting set. -/
 instance : HasEvalSet SetM where toSet := MonadHom.id SetM

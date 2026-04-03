@@ -29,6 +29,18 @@ NOTE: currently proofs using this should reduce to `simulateQ`. A full API would
 def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
   simulateQ (r := SetM) o mx
 
+@[simp]
+lemma supportWhen_pure (o : QueryImpl spec Set) (x : α) :
+    supportWhen o (pure x : OracleComp spec α) = {x} := by
+  simp [supportWhen]
+
+@[simp]
+lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
+    (oa : spec.Range q → OracleComp spec α) :
+    supportWhen o ((query q : OracleComp spec _) >>= oa) =
+      ⋃ x ∈ o q, supportWhen o (oa x) := by
+  simp [supportWhen]
+
 /-- The `support` instance for `OracleComp`, defined as -/
 instance hasEvalSet : HasEvalSet (OracleComp spec) where
   toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
