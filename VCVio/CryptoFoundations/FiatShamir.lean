@@ -168,11 +168,11 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Output projection of unit-cost-instrumented Fiat-Shamir signing. -/
 theorem fst_map_sign_run_withAddCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
       (FiatShamir (m := m) σ hr M).sign pk sk msg := by
-  intros
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -190,11 +190,11 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Cost projection of unit-cost-instrumented Fiat-Shamir signing. -/
 theorem snd_map_sign_run_withAddCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg).run =
       (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
-  intros
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -212,11 +212,11 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Output projection of unit-cost-instrumented Fiat-Shamir verification. -/
 theorem fst_map_verify_run_withAddCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.fst <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
       (FiatShamir (m := m) σ hr M).verify pk msg sig := by
-  intros
   rcases sig with ⟨c, s⟩
   simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 
@@ -224,11 +224,11 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Cost projection of unit-cost-instrumented Fiat-Shamir verification. -/
 theorem snd_map_verify_run_withAddCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    let _ : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    let _ : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := (runtime.withAddCost fun _ => 1).toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
+    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.snd <$> ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig).run =
       (fun _ => Multiplicative.ofAdd 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
-  intros
   rcases sig with ⟨c, s⟩
   simp [FiatShamir, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 

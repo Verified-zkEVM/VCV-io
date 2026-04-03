@@ -119,11 +119,11 @@ theorem fst_map_encrypt_run_withAddCost
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
-    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ ↦ 1).toHasQuery
+    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
       (TTransform (m := m) pke).encrypt pk msg := by
-  intros
   simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 
 /-- Cost projection of unit-cost-instrumented T-transform encryption. -/
@@ -132,11 +132,11 @@ theorem snd_map_encrypt_run_withAddCost
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
-    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ ↦ 1).toHasQuery
+    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
       (fun _ ↦ Multiplicative.ofAdd 1) <$> (TTransform (m := m) pke).encrypt pk msg := by
-  intros
   simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
 
 /-- Output projection of unit-cost-instrumented T-transform decryption. -/
@@ -145,11 +145,11 @@ theorem fst_map_decrypt_run_withAddCost
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
-    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ ↦ 1).toHasQuery
+    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
       (TTransform (m := m) pke).decrypt (pk, sk) c := by
-  intros
   cases hdec : pke.decrypt sk c with
   | none =>
       simp [TTransform, TTransform.decrypt, hdec]
@@ -163,14 +163,14 @@ theorem snd_map_decrypt_run_withAddCost
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
-    let _ : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    let _ : HasQuery (M →ₒ R) (AddWriterT ℕ m) := (runtime.withAddCost fun _ ↦ 1).toHasQuery
+    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
+    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
+      (runtime.withAddCost fun _ ↦ 1).toHasQuery
     Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
       match pke.decrypt sk c with
       | none => pure (Multiplicative.ofAdd 0)
       | some _ => (fun _ ↦ Multiplicative.ofAdd 1) <$>
           (TTransform (m := m) pke).decrypt (pk, sk) c := by
-  intros
   cases hdec : pke.decrypt sk c with
   | none =>
       simp [TTransform, TTransform.decrypt, hdec]
