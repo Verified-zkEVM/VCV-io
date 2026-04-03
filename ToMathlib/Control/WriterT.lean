@@ -197,14 +197,40 @@ abbrev AddWriterT (ω : Type u) (M : Type u → Type v) := WriterT (Multiplicati
 
 namespace AddWriterT
 
-variable {ω : Type u} {M : Type u → Type v} [Monad M]
+variable {ω : Type u} {M : Type u → Type v} [Monad M] {α : Type u}
+
+/-- Forget the additive cost log and keep only the outputs of an `AddWriterT` computation. -/
+def outputs (oa : AddWriterT ω M α) : M α :=
+  Prod.fst <$> oa.run
+
+/-- Observe only the accumulated additive cost of an `AddWriterT` computation. -/
+def costs (oa : AddWriterT ω M α) : M ω :=
+  (fun z => Multiplicative.toAdd z.2) <$> oa.run
 
 /-- Record an additive cost `w` in the writer log. -/
 def addTell [AddMonoid ω] (w : ω) : AddWriterT ω M PUnit :=
   tell (Multiplicative.ofAdd w)
 
 @[simp]
+lemma outputs_def (oa : AddWriterT ω M α) :
+    oa.outputs = Prod.fst <$> oa.run := rfl
+
+@[simp]
+lemma costs_def (oa : AddWriterT ω M α) :
+    oa.costs = (fun z => Multiplicative.toAdd z.2) <$> oa.run := rfl
+
+@[simp]
 lemma run_addTell [AddMonoid ω] (w : ω) :
     (addTell (M := M) w).run = pure (⟨⟩, Multiplicative.ofAdd w) := rfl
+
+@[simp]
+lemma outputs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
+    (addTell (M := M) w).outputs = pure ⟨⟩ := by
+  simp [outputs, addTell]
+
+@[simp]
+lemma costs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
+    (addTell (M := M) w).costs = pure w := by
+  simp [costs, addTell]
 
 end AddWriterT

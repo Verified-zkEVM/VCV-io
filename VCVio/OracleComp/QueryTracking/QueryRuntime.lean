@@ -83,6 +83,17 @@ lemma withAddCost_impl {ω : Type} [AddMonoid ω]
       (do AddWriterT.addTell (M := m) (costFn t); liftM (runtime.impl t)) := by
   simp [withAddCost, AddWriterT.addTell, QueryImpl.withCost]
 
+/-- Instrument a query runtime with unit additive cost for every query. -/
+def withUnitCost (runtime : QueryRuntime spec m) :
+    QueryRuntime spec (AddWriterT ℕ m) :=
+  runtime.withAddCost (fun _ ↦ 1)
+
+@[simp]
+lemma withUnitCost_impl (runtime : QueryRuntime spec m) (t : spec.Domain) :
+    runtime.withUnitCost.impl t =
+      (do AddWriterT.addTell (M := m) 1; liftM (runtime.impl t)) := by
+  simp [withUnitCost]
+
 end instrumentation
 
 end QueryRuntime
