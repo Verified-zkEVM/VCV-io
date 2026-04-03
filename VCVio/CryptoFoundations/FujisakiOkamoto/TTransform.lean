@@ -62,7 +62,7 @@ def TTransform.decrypt {m : Type → Type v} [Monad m]
 `unifSpec + (M →ₒ R)`. -/
 def TTransform {m : Type → Type v} [Monad m]
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    [DecidableEq C]
     [MonadLiftT ProbComp m] [HasQuery (M →ₒ R) m] :
     AsymmEncAlg m M PK (PK × SK) C where
   keygen := do
@@ -75,6 +75,8 @@ def TTransform {m : Type → Type v} [Monad m]
 
 section naturality
 
+variable [DecidableEq C]
+
 variable {m : Type → Type u} [Monad m]
   {n : Type → Type v} [Monad n]
   [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
@@ -84,7 +86,6 @@ variable {m : Type → Type u} [Monad m]
 plaintext-to-coins query capability and the distinguished lift of `ProbComp`. -/
 theorem map_construction
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (F : HasQuery.QueryHom (M →ₒ R) m n)
     (hLift : HasQuery.PreservesProbCompLift (m := m) (n := n) F.toMonadHom) :
     (TTransform (m := m) pke).map F.toMonadHom =
@@ -110,6 +111,8 @@ end naturality
 
 section costAccounting
 
+variable [DecidableEq C]
+
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
@@ -117,32 +120,40 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
 private lemma encrypt_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
-    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.outputs ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg) =
-      (TTransform (m := m) pke).encrypt pk msg := by
-  simp [AddWriterT.outputs, TTransform, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    AddWriterT.outputs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+            (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
+          runtime) =
+      HasQuery.inRuntime
+        (fun [HasQuery (M →ₒ R) m] =>
+          (TTransform (m := m) pke).encrypt pk msg)
+        runtime := by
+  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
+    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 private lemma encrypt_costs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
-    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.costs ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg) =
-      (fun _ ↦ 1) <$> (TTransform (m := m) pke).encrypt pk msg := by
-  simp [AddWriterT.costs, TTransform, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    AddWriterT.costs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+            (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
+          runtime) =
+      (fun _ ↦ 1) <$>
+        HasQuery.inRuntime
+          (fun [HasQuery (M →ₒ R) m] =>
+            (TTransform (m := m) pke).encrypt pk msg)
+          runtime := by
+  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
+    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 /-- T-transform encryption makes exactly one hash-oracle query under unit-cost instrumentation. -/
 theorem encrypt_usesExactlyOneQuery
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
     Queries[ (TTransform pke).encrypt pk msg in runtime ] = 1 := by
   change Cost[
@@ -151,75 +162,58 @@ theorem encrypt_usesExactlyOneQuery
         (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
       runtime
   ] = 1
-  letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-  letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
-  have h_outputs :
-      AddWriterT.outputs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
-            runtime) =
-        HasQuery.inRuntime
-          (fun [HasQuery (M →ₒ R) m] =>
-            (TTransform (m := m) pke).encrypt pk msg)
-          runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using encrypt_outputs_formula_withUnitCost
-        (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
-  have h_costs :
-      AddWriterT.costs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
-            runtime) =
-        (fun _ ↦ 1) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M →ₒ R) m] =>
-              (TTransform (m := m) pke).encrypt pk msg)
-            runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using encrypt_costs_formula_withUnitCost
-        (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
   rw [AddWriterT.hasCost_iff]
-  rw [h_outputs]
-  exact h_costs
+  rw [encrypt_outputs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)]
+  exact encrypt_costs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
 
 /-- Running unit-cost-instrumented T-transform decryption preserves the decryption result. -/
 private lemma decrypt_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
-    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.outputs ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c) =
-      (TTransform (m := m) pke).decrypt (pk, sk) c := by
+    AddWriterT.outputs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+          runtime) =
+      HasQuery.inRuntime
+        (fun [HasQuery (M →ₒ R) m] =>
+          (TTransform (m := m) pke).decrypt (pk, sk) c)
+        runtime := by
   cases hdec : pke.decrypt sk c with
   | none =>
-      simp [AddWriterT.outputs, TTransform, TTransform.decrypt, hdec]
+      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
+        TTransform.decrypt, hdec]
   | some msg =>
-      simp [AddWriterT.outputs, TTransform, TTransform.decrypt, hdec,
+      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
+        TTransform.decrypt, hdec,
         QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 private lemma decrypt_costs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
-    letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-    letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.costs ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c) =
+    AddWriterT.costs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+          runtime) =
       match pke.decrypt sk c with
       | none => pure 0
       | some _ => (fun _ ↦ 1) <$>
-          (TTransform (m := m) pke).decrypt (pk, sk) c := by
+          HasQuery.inRuntime
+            (fun [HasQuery (M →ₒ R) m] =>
+              (TTransform (m := m) pke).decrypt (pk, sk) c)
+            runtime := by
   cases hdec : pke.decrypt sk c with
   | none =>
-      simp [AddWriterT.costs, TTransform, TTransform.decrypt, hdec]
+      simp [HasQuery.withUnitCost, AddWriterT.costs, TTransform,
+        TTransform.decrypt, hdec]
   | some msg =>
-      simp [AddWriterT.costs, TTransform, TTransform.decrypt, hdec,
+      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
+        TTransform.decrypt, hdec,
         QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 /-- If deterministic decryption fails immediately, the T-transform makes no hash-oracle
@@ -227,7 +221,6 @@ queries. -/
 theorem decrypt_usesNoQueries_of_decrypt_eq_none
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C)
     (hdec : pke.decrypt sk c = none) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 0 := by
@@ -242,42 +235,23 @@ theorem decrypt_usesNoQueries_of_decrypt_eq_none
           (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
             (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
           runtime)
-  letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-  letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
-  have h_outputs :
-      AddWriterT.outputs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-            runtime) =
-        HasQuery.inRuntime
-          (fun [HasQuery (M →ₒ R) m] =>
-            (TTransform (m := m) pke).decrypt (pk, sk) c)
-          runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using decrypt_outputs_formula_withUnitCost
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-  have h_costs :
-      AddWriterT.costs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-            runtime) =
-        (fun _ ↦ 0) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M →ₒ R) m] =>
-              (TTransform (m := m) pke).decrypt (pk, sk) c)
-            runtime := by
-    simp [HasQuery.inRuntime, HasQuery.withUnitCost, TTransform, TTransform.decrypt, hdec]
-  rw [h_outputs]
-  exact h_costs
+  have h_outputs := decrypt_outputs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+  have h_decrypt :
+      HasQuery.inRuntime
+        (fun [HasQuery (M →ₒ R) m] =>
+          (TTransform (m := m) pke).decrypt (pk, sk) c)
+        runtime = pure none := by
+    simp [HasQuery.inRuntime, TTransform, TTransform.decrypt, hdec]
+  rw [h_outputs, h_decrypt]
+  simpa [hdec] using decrypt_costs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
 
 /-- If deterministic decryption returns a message, the T-transform makes exactly one
 hash-oracle query to re-derive the coins. -/
 theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) {msg : M}
     (hdec : pke.decrypt sk c = some msg) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 1 := by
@@ -292,43 +266,16 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
           (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
             (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
           runtime)
-  letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
-  letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
-  have h_outputs :
-      AddWriterT.outputs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-            runtime) =
-        HasQuery.inRuntime
-          (fun [HasQuery (M →ₒ R) m] =>
-            (TTransform (m := m) pke).decrypt (pk, sk) c)
-          runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using decrypt_outputs_formula_withUnitCost
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-  have h_costs :
-      AddWriterT.costs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-              (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-            runtime) =
-        (fun _ ↦ 1) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M →ₒ R) m] =>
-              (TTransform (m := m) pke).decrypt (pk, sk) c)
-            runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost, hdec]
-      using decrypt_costs_formula_withUnitCost
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+  have h_outputs := decrypt_outputs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
   rw [h_outputs]
-  exact h_costs
+  simpa [hdec] using decrypt_costs_formula_withUnitCost
+    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
 theorem decrypt_usesAtMostOneQuery
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] ≤ 1 := by
   by_cases hdec : pke.decrypt sk c = none

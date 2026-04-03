@@ -27,7 +27,6 @@ open OracleComp OracleSpec
 
 variable {X W PC SC Ω P : Type}
     {p : X → W → Bool} [SampleableType X] [SampleableType W]
-    [DecidableEq PC] [DecidableEq Ω] [SampleableType Ω]
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
@@ -35,7 +34,7 @@ commitment), and then responds to the challenge. -/
 def FiatShamir
     {m : Type → Type v} [Monad m]
     (sigmaAlg : SigmaProtocol X W PC SC Ω P p)
-    (hr : GenerableRelation X W p) (M : Type) [DecidableEq M]
+    (hr : GenerableRelation X W p) (M : Type)
     [MonadLiftT ProbComp m] [HasQuery (M × PC →ₒ Ω) m] :
     SignatureAlg m
       (M := M) (PK := X) (SK := W) (S := PC × P) where
@@ -52,11 +51,11 @@ def FiatShamir
 namespace FiatShamir
 
 variable {X W PC SC Ω P : Type} {p : X → W → Bool}
-  [SampleableType X] [SampleableType W]
-  [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω]
 
-variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
-  (M : Type) [DecidableEq M]
+section semantics
+
+variable (M : Type)
+variable [DecidableEq M] [DecidableEq PC] [SampleableType Ω]
 
 /-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
 noncomputable def runtime :
@@ -67,14 +66,19 @@ noncomputable def runtime :
     ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
+end semantics
+
 section naturality
+
+variable [SampleableType X] [SampleableType W]
+variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
+  (M : Type)
 
 variable {m : Type → Type u} [Monad m]
   {n : Type → Type v} [Monad n]
   [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
   [HasQuery (M × PC →ₒ Ω) m] [HasQuery (M × PC →ₒ Ω) n]
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir is natural in any oracle semantics morphism that preserves both random-oracle
 queries and public-randomness lifting.
 
@@ -103,19 +107,20 @@ theorem map_construction
         ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m P) =
           (monadLift (σ.respond pk sk e r) : n P) :=
       fun e r => hLift (σ.respond pk sk e r)
-    simp [FiatShamir, hCommit, hRespond, -QueryRuntime.toHasQuery_query]
+    simp [FiatShamir, hCommit, hRespond, HasQuery.map_query, -QueryRuntime.toHasQuery_query]
   · funext pk msg sig
     cases sig
-    simp [FiatShamir, -QueryRuntime.toHasQuery_query]
+    simp [FiatShamir, HasQuery.map_query, -QueryRuntime.toHasQuery_query]
 
 end naturality
 
-section costAccounting
+section signCore
+
+variable (σ : SigmaProtocol X W PC SC Ω P p) (M : Type)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
-omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
-  [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
+
 private lemma fst_map_sign_core
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     (do
@@ -139,8 +144,6 @@ private lemma fst_map_sign_core
       Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P))
   simp [bind_map_left]
 
-omit [SampleableType X] [SampleableType W] [DecidableEq PC] [DecidableEq P]
-  [DecidableEq Ω] [SampleableType Ω] [DecidableEq M] in
 private lemma snd_map_sign_core
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     (do
@@ -164,14 +167,28 @@ private lemma snd_map_sign_core
       (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P))
   simp [bind_map_left]
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-private theorem sign_outputs_formula_withUnitCost
+end signCore
+
+section costAccounting
+
+variable [SampleableType X] [SampleableType W]
+variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
+  (M : Type)
+
+variable {m : Type → Type u} [Monad m] [LawfulMonad m]
+  [MonadLiftT ProbComp m]
+
+private lemma sign_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.outputs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg) =
-      (FiatShamir (m := m) σ hr M).sign pk sk msg := by
+    AddWriterT.outputs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+            (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
+          runtime) =
+      HasQuery.inRuntime
+        (fun [HasQuery (M × PC →ₒ Ω) m] =>
+          (FiatShamir (m := m) σ hr M).sign pk sk msg)
+        runtime := by
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -182,18 +199,23 @@ private theorem sign_outputs_formula_withUnitCost
         let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
         let r ← runtime.impl (msg, a.1)
         Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [AddWriterT.outputs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, FiatShamir,
+      QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
       using h
   exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 private lemma sign_costs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.costs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg) =
-      (fun _ ↦ 1) <$> (FiatShamir (m := m) σ hr M).sign pk sk msg := by
+    AddWriterT.costs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+            (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
+          runtime) =
+      (fun _ ↦ 1) <$>
+        HasQuery.inRuntime
+          (fun [HasQuery (M × PC →ₒ Ω) m] =>
+            (FiatShamir (m := m) σ hr M).sign pk sk msg)
+          runtime := by
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
@@ -204,11 +226,11 @@ private lemma sign_costs_formula_withUnitCost
         let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
         let r ← runtime.impl (msg, a.1)
         (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [AddWriterT.costs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    simpa [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, FiatShamir,
+      QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
       using h
   exact snd_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
@@ -219,64 +241,45 @@ theorem sign_usesExactlyOneQuery
         (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
       runtime
   ] = 1
-  letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
-  have h_outputs :
-      AddWriterT.outputs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-              (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
-            runtime) =
-        HasQuery.inRuntime
-          (fun [HasQuery (M × PC →ₒ Ω) m] =>
-            (FiatShamir (m := m) σ hr M).sign pk sk msg)
-          runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using sign_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-        (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
-  have h_costs :
-      AddWriterT.costs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-              (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
-            runtime) =
-        (fun _ ↦ 1) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M × PC →ₒ Ω) m] =>
-              (FiatShamir (m := m) σ hr M).sign pk sk msg)
-            runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using sign_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-        (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
   rw [AddWriterT.HasCost, AddWriterT.CostsAs]
-  rw [h_outputs]
-  exact h_costs
+  rw [sign_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+    (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)]
+  exact sign_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+    (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
-private theorem verify_outputs_formula_withUnitCost
+private lemma verify_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.outputs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig) =
-      (FiatShamir (m := m) σ hr M).verify pk msg sig := by
+    AddWriterT.outputs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+            (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
+          runtime) =
+      HasQuery.inRuntime
+        (fun [HasQuery (M × PC →ₒ Ω) m] =>
+          (FiatShamir (m := m) σ hr M).verify pk msg sig)
+        runtime := by
   rcases sig with ⟨c, s⟩
-  simp [AddWriterT.outputs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, FiatShamir,
+    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Running Fiat-Shamir verification in a unit-cost query runtime records exactly one query
 cost. -/
 private lemma verify_costs_formula_withUnitCost
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-    letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) :=
-      runtime.withUnitCost.toHasQuery
-    AddWriterT.costs ((FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig) =
-      (fun _ ↦ 1) <$> (FiatShamir (m := m) σ hr M).verify pk msg sig := by
+    AddWriterT.costs
+        (HasQuery.withUnitCost
+          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
+            (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
+          runtime) =
+      (fun _ ↦ 1) <$>
+        HasQuery.inRuntime
+          (fun [HasQuery (M × PC →ₒ Ω) m] =>
+            (FiatShamir (m := m) σ hr M).verify pk msg sig)
+          runtime := by
   rcases sig with ⟨c, s⟩
-  simp [AddWriterT.costs, FiatShamir, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, FiatShamir,
+    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
@@ -288,42 +291,19 @@ theorem verify_usesExactlyOneQuery
         (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
       runtime
   ] = 1
-  letI : HasQuery (M × PC →ₒ Ω) m := runtime.toHasQuery
-  letI : HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m) := runtime.withUnitCost.toHasQuery
-  have h_outputs :
-      AddWriterT.outputs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-              (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
-            runtime) =
-        HasQuery.inRuntime
-          (fun [HasQuery (M × PC →ₒ Ω) m] =>
-            (FiatShamir (m := m) σ hr M).verify pk msg sig)
-          runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using verify_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-        (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
-  have h_costs :
-      AddWriterT.costs
-          (HasQuery.withUnitCost
-            (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-              (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig)
-            runtime) =
-        (fun _ ↦ 1) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M × PC →ₒ Ω) m] =>
-              (FiatShamir (m := m) σ hr M).verify pk msg sig)
-            runtime := by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost]
-      using verify_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-        (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
   rw [AddWriterT.HasCost, AddWriterT.CostsAs]
-  rw [h_outputs]
-  exact h_costs
+  rw [verify_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+    (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)]
+  exact verify_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
+    (runtime := runtime) (pk := pk) (msg := msg) (sig := sig)
 
 attribute [simp] sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
 end costAccounting
+
+section bounds
+
+variable (M : Type)
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
 EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
@@ -341,10 +321,18 @@ def hashQueryBound {S' α : Type}
 noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=
   (Fintype.card challenge : ENNReal)⁻¹
 
-omit [DecidableEq P] [DecidableEq Ω] in
+end bounds
+
+section security
+
+variable [SampleableType X] [SampleableType W]
+variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
+  (M : Type)
+
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
-theorem perfectlyCorrect (hc : σ.PerfectlyComplete) :
+theorem perfectlyCorrect [DecidableEq M] [DecidableEq PC] [SampleableType Ω]
+    (hc : σ.PerfectlyComplete) :
     SignatureAlg.PerfectlyComplete
       (FiatShamir (m := OracleComp (unifSpec + (M × PC →ₒ Ω))) σ hr M)
       (runtime M) := by
@@ -532,6 +520,7 @@ this file, so the proof below remains a placeholder.
 THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT LOSS TERM
 FOR QUANTITATIVE HVZK. -/
 theorem euf_cma_bound
+    [DecidableEq M] [DecidableEq PC] [DecidableEq P] [SampleableType Ω]
     (_hss : σ.SpeciallySound)
     [Fintype Ω]
     (simTranscript : X → ProbComp (PC × Ω × P))
@@ -547,5 +536,7 @@ theorem euf_cma_bound
         Pr[= true | hardRelationExp (r := p) reduction] := by
   -- TODO: implement the explicit Pointcheval-Stern reduction.
   sorry
+
+end security
 
 end FiatShamir
