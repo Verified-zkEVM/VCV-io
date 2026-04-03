@@ -84,7 +84,7 @@ lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0, 0} ι} {α : Type}
 lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (p : α → Prop) :
-    Pr[fun z => p z.1 | (simulateQ (loggingOracle (spec := spec)) oa).run] = Pr[p | oa] := by
+    Pr[ fun z => p z.1 | (simulateQ (loggingOracle (spec := spec)) oa).run] = Pr[ p | oa] := by
   rw [show (fun z : α × spec.QueryLog => p z.1) = p ∘ Prod.fst from rfl,
     ← probEvent_map, fst_map_run_simulateQ]
 

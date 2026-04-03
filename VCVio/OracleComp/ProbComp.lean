@@ -76,7 +76,7 @@ lemma probOutput_uniformFin (n : ℕ) (m : Fin (n + 1)) :
 
 @[simp, grind =]
 lemma probEvent_uniformFin (n : ℕ) (p : Fin (n + 1) → Prop) [DecidablePred p] :
-    Pr[p | do $[0..n]] = (Fin.countP fun i => p i) / ↑(n + 1) := by
+    Pr[ p | do $[0..n]] = (Fin.countP fun i => p i) / ↑(n + 1) := by
   simp [uniformFin_def, Fin.card_eq_countP_mem]
 
 lemma probFailure_uniformFin (n : ℕ) :
@@ -169,7 +169,7 @@ lemma finSupport_uniformRange (n m : ℕ) (h : n < m) :
 @[simp, grind =]
 lemma probEvent_uniformRange (n m : ℕ)
     (p : Fin (m + 1) → Prop) [DecidablePred p] (h : n < m) :
-    Pr[p | uniformRange n m h] = Finset.card {x : Fin (m + 1) | n ≤ x ∧ p x} / (m - n + 1) := by
+    Pr[ p | uniformRange n m h] = Finset.card {x : Fin (m + 1) | n ≤ x ∧ p x} / (m - n + 1) := by
   rw [probEvent_eq_sum_filter_finSupport, finSupport_uniformRange]
   simp_rw [probOutput_uniformRange]
   have hsum :
@@ -289,7 +289,7 @@ lemma probOutput_uniformSelectList [DecidableEq α] (xs : List α) (x : α) :
 
 @[simp, grind =] lemma probEvent_uniformSelectList
     (xs : List α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
+    Pr[ p | $ xs] = (xs.countP p : ℝ≥0∞) / xs.length := match xs with
   | [] => by simp
   | y :: ys => by
     simp only [uniformSelectList_cons, Fin.getElem_fin, liftM_map, probEvent_map,
@@ -339,7 +339,7 @@ lemma probOutput_uniformSelectVector [DecidableEq α] (x : α) :
 
 @[simp, grind =]
 lemma probEvent_uniformSelectVector (p : α → Prop) [DecidablePred p] :
-    Pr[p | $ xs] = xs.toList.countP p / (n + 1) := by
+    Pr[ p | $ xs] = xs.toList.countP p / (n + 1) := by
   rw [uniformSelect_eq_liftM_uniformSelect!]
   simp only [uniformSelectVector_def, Fin.getElem_fin, liftM_map, probEvent_map,
     probEvent_eq_sum_fintype_ite, Function.comp_apply, OptionT.probOutput_liftM,
@@ -371,7 +371,7 @@ lemma probOutput_uniformSelectListVector [DecidableEq α] (x : α) :
 
 @[simp, grind =]
 lemma probEvent_uniformSelectListVector (p : α → Prop) [DecidablePred p] :
-    Pr[p | $! xs] = xs.toList.countP p / (n + 1) := by
+    Pr[ p | $! xs] = xs.toList.countP p / (n + 1) := by
   simp only [uniformSelectListVector_def, Fin.getElem_fin, Vector.getElem_eq_get, Fin.eta,
     probEvent_map, probEvent_eq_sum_fintype_ite, Function.comp_apply, probOutput_uniformFin,
     Finset.sum_boole', nsmul_eq_mul]
@@ -412,7 +412,7 @@ lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
 set_option linter.unusedDecidableInType false in
 @[simp, grind =]
 lemma probEvent_uniformSelectFinset [DecidableEq α] (p : α → Prop) [DecidablePred p] :
-    Pr[p | $ s] = {x ∈ s | p x}.card / s.card := by
+    Pr[ p | $ s] = {x ∈ s | p x}.card / s.card := by
   simp only [uniformSelectFinset_def, probEvent_uniformSelectList, List.countP_eq_length_filter,
     Finset.length_toList]
   congr 2
@@ -455,7 +455,7 @@ lemma probOutput_coin (b : Bool) : Pr[= b | coin] = 2⁻¹ := by aesop
 
 @[simp, grind =]
 lemma probEvent_coin (p : Bool → Prop) [DecidablePred p] :
-    Pr[p | coin] = if p true then
+    Pr[ p | coin] = if p true then
       (if p false then 1 else 2⁻¹) else
       (if p false then 2⁻¹ else 0) := by
   have : (2 : ℝ≥0∞)⁻¹ + 2⁻¹ = 1 := by simp [← one_div]

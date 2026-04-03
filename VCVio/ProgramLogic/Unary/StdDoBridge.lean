@@ -37,7 +37,7 @@ def tripleProp (pre : Prop) (oa : OracleComp spec α) (post : α → Prop) : Pro
 
 /-- Adequacy bridge between `wpProp` and event probability `= 1`. -/
 theorem wpProp_iff_probEvent_eq_one (oa : OracleComp spec α) (p : α → Prop) :
-    wpProp (spec := spec) oa p ↔ Pr[p | oa] = 1 := by
+    wpProp (spec := spec) oa p ↔ Pr[ p | oa] = 1 := by
   classical
   let _ : DecidablePred p := Classical.decPred p
   constructor <;> intro h

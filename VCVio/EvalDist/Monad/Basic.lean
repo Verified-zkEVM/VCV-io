@@ -65,13 +65,13 @@ lemma probOutput_pure_eq_indicator [HasEvalSPMF m] (x y : α) :
 
 @[simp, grind =]
 lemma probEvent_pure [HasEvalSPMF m] (x : α) (p : α → Prop) [DecidablePred p] :
-    Pr[p | (pure x : m α)] = if p x then 1 else 0 := by
+    Pr[ p | (pure x : m α)] = if p x then 1 else 0 := by
   aesop (rule_sets := [UnfoldEvalDist])
 
 /-- Fallback when we don't have decidable equality. -/
 @[grind =]
 lemma probEvent_pure_eq_indicator [HasEvalSPMF m] (x : α) (p : α → Prop) :
-    Pr[p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by
+    Pr[ p | (pure x : m α)] = Set.indicator {x | p x} (Function.const α 1) x := by
   aesop (rule_sets := [UnfoldEvalDist])
 
 @[simp, grind =]
@@ -138,7 +138,7 @@ lemma probOutput_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (y 
 
 @[grind =]
 lemma probEvent_bind_eq_tsum [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
-    Pr[q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[q | my x] := by
+    Pr[ q | mx >>= my] = ∑' x : α, Pr[= x | mx] * Pr[ q | my x] := by
   simp only [probEvent_eq_tsum_indicator, Set.indicator, Set.mem_setOf_eq, probOutput_bind_eq_tsum,
     ← ENNReal.tsum_mul_left, mul_ite, mul_zero]
   rw [ENNReal.tsum_comm]
@@ -177,8 +177,8 @@ lemma probOutput_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m
   by_cases hx : x ∈ support mx <;> aesop
 
 lemma probEvent_bind_eq_tsum_subtype [HasEvalSPMF m] (mx : m α) (my : α → m β) (q : β → Prop) :
-    Pr[q | mx >>= my] = ∑' x : support mx, Pr[= x | mx] * Pr[q | my x] := by
-  rw [tsum_subtype _ (fun x ↦ Pr[= x | mx] * Pr[q | my x]), probEvent_bind_eq_tsum]
+    Pr[ q | mx >>= my] = ∑' x : support mx, Pr[= x | mx] * Pr[ q | my x] := by
+  rw [tsum_subtype _ (fun x ↦ Pr[= x | mx] * Pr[ q | my x]), probEvent_bind_eq_tsum]
   refine tsum_congr (fun x ↦ ?_)
   by_cases hx : x ∈ support mx <;> aesop
 
@@ -189,7 +189,7 @@ lemma probOutput_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
 
 lemma probEvent_bind_eq_sum_finSupport [HasEvalSPMF m] [HasEvalFinset m]
     (mx : m α) (my : α → m β) [DecidableEq α] (q : β → Prop) :
-    Pr[q | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[q | my x] :=
+    Pr[ q | mx >>= my] = ∑ x ∈ finSupport mx, Pr[= x | mx] * Pr[ q | my x] :=
   (probEvent_bind_eq_tsum mx my q).trans (tsum_eq_sum' <| by simp)
 
 section const
@@ -224,8 +224,8 @@ lemma probOutput_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) (y : β) :
 
 lemma probEvent_bind_of_const [HasEvalSPMF m] (mx : m α)
     {my : α → m β} {p : β → Prop} {r : ℝ≥0∞}
-    (h : ∀ x ∈ support mx, Pr[p | my x] = r) :
-    Pr[p | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
+    (h : ∀ x ∈ support mx, Pr[ p | my x] = r) :
+    Pr[ p | mx >>= my] = (1 - Pr[⊥ | mx]) * r := by
   rw [probEvent_bind_eq_tsum, ← tsum_probOutput_eq_sub, ← ENNReal.tsum_mul_right]
   refine tsum_congr fun x => ?_
   by_cases hx : x ∈ support mx
@@ -234,7 +234,7 @@ lemma probEvent_bind_of_const [HasEvalSPMF m] (mx : m α)
 
 @[simp, grind =_]
 lemma probEvent_bind_const [HasEvalSPMF m] (mx : m α) (my : m β) (p : β → Prop) :
-    Pr[p | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[p | my] := by
+    Pr[ p | mx >>= fun _ => my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by
   rw [probEvent_bind_of_const mx fun _ _ => rfl]
 
 /-- Write the probability of `mx >>= my` failing given that `my` has constant failure chance over
@@ -326,15 +326,15 @@ variable [HasEvalSPMF m]
 
 lemma mul_le_probEvent_bind {mx : m α} {my : α → m β}
     {p : α → Prop} {q : β → Prop} {r r' : ℝ≥0∞}
-    (h : r ≤ Pr[p | mx]) (h' : ∀ x ∈ support mx, p x → r' ≤ Pr[q | my x]) :
-    r * r' ≤ Pr[q | mx >>= my] := by
+    (h : r ≤ Pr[ p | mx]) (h' : ∀ x ∈ support mx, p x → r' ≤ Pr[ q | my x]) :
+    r * r' ≤ Pr[ q | mx >>= my] := by
   have := Classical.decPred p
   rw [probEvent_bind_eq_tsum]
   calc r * r'
-    _ ≤ Pr[p | mx] * r' := (mul_le_mul_left h) r'
+    _ ≤ Pr[ p | mx] * r' := (mul_le_mul_left h) r'
     _ = (∑' x, if p x then Pr[= x | mx] else 0) * r' := by rw [probEvent_eq_tsum_ite]
     _ = ∑' x, (if p x then Pr[= x | mx] else 0) * r' := ENNReal.tsum_mul_right.symm
-    _ ≤ ∑' x, Pr[= x | mx] * Pr[q | my x] := by
+    _ ≤ ∑' x, Pr[= x | mx] * Pr[ q | my x] := by
         refine ENNReal.tsum_le_tsum fun x => ?_
         split_ifs with hp
         · by_cases hx : x ∈ support mx
@@ -384,8 +384,8 @@ lemma probOutput_bind_mono {mx : m α}
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
 lemma probEvent_bind_congr {mx : m α} {ob₁ ob₂ : α → m β} {q : β → Prop}
-    (h : ∀ x ∈ support mx, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
-    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] := by
+    (h : ∀ x ∈ support mx, Pr[ q | ob₁ x] = Pr[ q | ob₂ x]) :
+    Pr[ q | mx >>= ob₁] = Pr[ q | mx >>= ob₂] := by
   simp only [probEvent_bind_eq_tsum]
   refine tsum_congr fun x => ?_
   by_cases hx : x ∈ support mx
@@ -393,13 +393,13 @@ lemma probEvent_bind_congr {mx : m α} {ob₁ ob₂ : α → m β} {q : β → P
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
 lemma probEvent_bind_congr' (mx : m α) {ob₁ ob₂ : α → m β} (q : β → Prop)
-    (h : ∀ x, Pr[q | ob₁ x] = Pr[q | ob₂ x]) :
-    Pr[q | mx >>= ob₁] = Pr[q | mx >>= ob₂] :=
+    (h : ∀ x, Pr[ q | ob₁ x] = Pr[ q | ob₂ x]) :
+    Pr[ q | mx >>= ob₁] = Pr[ q | mx >>= ob₂] :=
   probEvent_bind_congr fun x _ => h x
 
 lemma probEvent_bind_mono {mx : m α} {my oc : α → m β} {q : β → Prop}
-    (h : ∀ x ∈ support mx, Pr[q | my x] ≤ Pr[q | oc x]) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] := by
+    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ Pr[ q | oc x]) :
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] := by
   simp only [probEvent_bind_eq_tsum]
   refine ENNReal.tsum_le_tsum fun x => ?_
   by_cases hx : x ∈ support mx
@@ -488,17 +488,17 @@ lemma probOutput_bind_congr_sub_le {γ₁ γ₂ : Type u}
     exact mul_le_mul' le_rfl (tsub_le_iff_right.mp (h x hx))
   · simp [probOutput_eq_zero_of_not_mem_support hx]
 
-/-- Union bound for bind: if `Pr[¬p | mx] ≤ ε₁` and `Pr[¬q | my x] ≤ ε₂` for all `x` satisfying
-`p`, then `Pr[¬q | mx >>= my] ≤ ε₁ + ε₂`. Useful for sequential composition of error bounds. -/
+/-- Union bound for bind: if `Pr[ ¬p | mx] ≤ ε₁` and `Pr[ ¬q | my x] ≤ ε₂` for all `x` satisfying
+`p`, then `Pr[ ¬q | mx >>= my] ≤ ε₁ + ε₂`. Useful for sequential composition of error bounds. -/
 lemma probEvent_bind_le_add {mx : m α} {my : α → m β}
     {p : α → Prop} {q : β → Prop} {ε₁ ε₂ : ℝ≥0∞}
-    (h₁ : Pr[fun x => ¬p x | mx] ≤ ε₁)
-    (h₂ : ∀ x ∈ support mx, p x → Pr[fun y => ¬q y | my x] ≤ ε₂) :
-    Pr[fun y => ¬q y | mx >>= my] ≤ ε₁ + ε₂ := by
+    (h₁ : Pr[ fun x => ¬p x | mx] ≤ ε₁)
+    (h₂ : ∀ x ∈ support mx, p x → Pr[ fun y => ¬q y | my x] ≤ ε₂) :
+    Pr[ fun y => ¬q y | mx >>= my] ≤ ε₁ + ε₂ := by
   have := Classical.decPred p; have := Classical.decPred q
   rw [probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[fun y => ¬q y | my x]
-      = ∑' x, Pr[= x | mx] * Pr[fun y => ¬q y | my x] := rfl
+  calc ∑' x, Pr[= x | mx] * Pr[ fun y => ¬q y | my x]
+      = ∑' x, Pr[= x | mx] * Pr[ fun y => ¬q y | my x] := rfl
     _ ≤ ∑' x, (Pr[= x | mx] * if p x then ε₂ else 1) := by
         refine ENNReal.tsum_le_tsum fun x => ?_
         by_cases hx : x ∈ support mx
@@ -511,7 +511,7 @@ lemma probEvent_bind_le_add {mx : m α} {my : α → m β}
     _ ≤ ∑' x, (Pr[= x | mx] * ε₂ + (if ¬p x then Pr[= x | mx] else 0)) := by
         refine ENNReal.tsum_le_tsum fun x => ?_
         split_ifs <;> simp
-    _ = (∑' x, Pr[= x | mx]) * ε₂ + Pr[fun x => ¬p x | mx] := by
+    _ = (∑' x, Pr[= x | mx]) * ε₂ + Pr[ fun x => ¬p x | mx] := by
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right, probEvent_eq_tsum_ite]
     _ ≤ 1 * ε₂ + ε₁ := by
         exact add_le_add (mul_le_mul' tsum_probOutput_le_one le_rfl) h₁
@@ -520,21 +520,21 @@ lemma probEvent_bind_le_add {mx : m α} {my : α → m β}
 /-- `probEvent` version of `probEvent_bind_mono` with additive error bound. -/
 lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
     {q : β → Prop} {ε : ℝ≥0∞}
-    (h : ∀ x ∈ support mx, Pr[q | my x] ≤ Pr[q | oc x] + ε) :
-    Pr[q | mx >>= my] ≤ Pr[q | mx >>= oc] + ε := by
+    (h : ∀ x ∈ support mx, Pr[ q | my x] ≤ Pr[ q | oc x] + ε) :
+    Pr[ q | mx >>= my] ≤ Pr[ q | mx >>= oc] + ε := by
   simp only [probEvent_bind_eq_tsum]
-  calc ∑' x, Pr[= x | mx] * Pr[q | my x]
-      ≤ ∑' x, (Pr[= x | mx] * Pr[q | oc x] + Pr[= x | mx] * ε) := by
+  calc ∑' x, Pr[= x | mx] * Pr[ q | my x]
+      ≤ ∑' x, (Pr[= x | mx] * Pr[ q | oc x] + Pr[= x | mx] * ε) := by
         refine ENNReal.tsum_le_tsum fun x => ?_
         by_cases hx : x ∈ support mx
-        · calc Pr[= x | mx] * Pr[q | my x]
-            _ ≤ Pr[= x | mx] * (Pr[q | oc x] + ε) := mul_le_mul' le_rfl (h x hx)
-            _ = Pr[= x | mx] * Pr[q | oc x] + Pr[= x | mx] * ε := left_distrib ..
+        · calc Pr[= x | mx] * Pr[ q | my x]
+            _ ≤ Pr[= x | mx] * (Pr[ q | oc x] + ε) := mul_le_mul' le_rfl (h x hx)
+            _ = Pr[= x | mx] * Pr[ q | oc x] + Pr[= x | mx] * ε := left_distrib ..
         · simp [probOutput_eq_zero_of_not_mem_support hx]
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x]) + ∑' x, Pr[= x | mx] * ε := ENNReal.tsum_add
-    _ = (∑' x, Pr[= x | mx] * Pr[q | oc x]) + (∑' x, Pr[= x | mx]) * ε := by
+    _ = (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ∑' x, Pr[= x | mx] * ε := ENNReal.tsum_add
+    _ = (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + (∑' x, Pr[= x | mx]) * ε := by
         rw [ENNReal.tsum_mul_right]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[q | oc x]) + ε := by
+    _ ≤ (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ε := by
         exact add_le_add le_rfl (mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one)
 
 end congr_mono
@@ -546,30 +546,30 @@ variable [HasEvalSPMF m]
 /-- Swapping two independent random draws preserves probability of any event. -/
 lemma probEvent_bind_bind_swap [LawfulMonad m]
     (mx : m α) (my : m β) (f : α → β → m γ) (q : γ → Prop) :
-    Pr[q | mx >>= fun a => my >>= fun b => f a b] =
-      Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
+    Pr[ q | mx >>= fun a => my >>= fun b => f a b] =
+      Pr[ q | my >>= fun b => mx >>= fun a => f a b] := by
   classical
   calc
-    Pr[q | mx >>= fun a => my >>= fun b => f a b]
-        = ∑' a : α, Pr[= a | mx] * Pr[q | my >>= fun b => f a b] := by
+    Pr[ q | mx >>= fun a => my >>= fun b => f a b]
+        = ∑' a : α, Pr[= a | mx] * Pr[ q | my >>= fun b => f a b] := by
           simp [probEvent_bind_eq_tsum]
-    _ = ∑' a : α, Pr[= a | mx] * ∑' b : β, Pr[= b | my] * Pr[q | f a b] := by
+    _ = ∑' a : α, Pr[= a | mx] * ∑' b : β, Pr[= b | my] * Pr[ q | f a b] := by
           refine tsum_congr fun a => ?_
           simp [probEvent_bind_eq_tsum]
-    _ = ∑' a : α, ∑' b : β, Pr[= a | mx] * Pr[= b | my] * Pr[q | f a b] := by
+    _ = ∑' a : α, ∑' b : β, Pr[= a | mx] * Pr[= b | my] * Pr[ q | f a b] := by
           refine tsum_congr fun a => ?_
           simpa [mul_assoc, mul_left_comm, mul_comm] using
             (ENNReal.tsum_mul_left (a := Pr[= a | mx])
-              (f := fun b => Pr[= b | my] * Pr[q | f a b])).symm
-    _ = ∑' b : β, ∑' a : α, Pr[= a | mx] * Pr[= b | my] * Pr[q | f a b] := by
+              (f := fun b => Pr[= b | my] * Pr[ q | f a b])).symm
+    _ = ∑' b : β, ∑' a : α, Pr[= a | mx] * Pr[= b | my] * Pr[ q | f a b] := by
           simpa using (ENNReal.tsum_comm (f := fun a b =>
-            Pr[= a | mx] * Pr[= b | my] * Pr[q | f a b]))
-    _ = ∑' b : β, Pr[= b | my] * ∑' a : α, Pr[= a | mx] * Pr[q | f a b] := by
+            Pr[= a | mx] * Pr[= b | my] * Pr[ q | f a b]))
+    _ = ∑' b : β, Pr[= b | my] * ∑' a : α, Pr[= a | mx] * Pr[ q | f a b] := by
           refine tsum_congr fun b => ?_
           simpa [mul_assoc, mul_left_comm, mul_comm] using
             (ENNReal.tsum_mul_left (a := Pr[= b | my])
-              (f := fun a => Pr[= a | mx] * Pr[q | f a b]))
-    _ = Pr[q | my >>= fun b => mx >>= fun a => f a b] := by
+              (f := fun a => Pr[= a | mx] * Pr[ q | f a b]))
+    _ = Pr[ q | my >>= fun b => mx >>= fun a => f a b] := by
           simp [probEvent_bind_eq_tsum]
 
 /-- Swapping two independent random draws preserves the probability of any fixed output. -/
@@ -580,21 +580,21 @@ lemma probOutput_bind_bind_swap [LawfulMonad m]
   simpa [probEvent_eq_eq_probOutput] using
     probEvent_bind_bind_swap mx my f (· = z)
 
-/-- If `Pr[p | mx] ≥ 1 - ε` and `mx` never fails, then `Pr[¬p | mx] ≤ ε`. -/
+/-- If `Pr[ p | mx] ≥ 1 - ε` and `mx` never fails, then `Pr[ ¬p | mx] ≤ ε`. -/
 lemma probEvent_compl_le_of_ge
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
     (hfail : Pr[⊥ | mx] = 0)
-    (h : Pr[p | mx] ≥ 1 - ε) :
-    Pr[fun x => ¬p x | mx] ≤ ε := by
+    (h : Pr[ p | mx] ≥ 1 - ε) :
+    Pr[ fun x => ¬p x | mx] ≤ ε := by
   by_cases hε : (1 : ℝ≥0∞) ≤ ε
   · exact le_trans probEvent_le_one hε
   · have hε' : ε ≤ 1 := le_of_not_ge hε
-    have hsum : Pr[p | mx] + Pr[fun x => ¬p x | mx] = 1 := by
+    have hsum : Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 := by
       simpa [hfail] using probEvent_compl mx p
-    have hne : Pr[p | mx] ≠ ∞ :=
+    have hne : Pr[ p | mx] ≠ ∞ :=
       ne_of_lt (lt_of_le_of_lt probEvent_le_one (by simp))
-    have hnot : Pr[fun x => ¬p x | mx] = 1 - Pr[p | mx] := by
-      have hsum' : Pr[fun x => ¬p x | mx] + Pr[p | mx] = 1 := by
+    have hnot : Pr[ fun x => ¬p x | mx] = 1 - Pr[ p | mx] := by
+      have hsum' : Pr[ fun x => ¬p x | mx] + Pr[ p | mx] = 1 := by
         simpa [add_comm] using hsum
       have := ENNReal.eq_sub_of_add_eq (hc := hne) hsum'
       simpa using this
@@ -602,17 +602,17 @@ lemma probEvent_compl_le_of_ge
     exact le_trans (tsub_le_tsub_left h _)
       (by simp [ENNReal.sub_sub_cancel ENNReal.one_ne_top hε'])
 
-/-- If `Pr[¬p | mx] ≤ ε` and `mx` never fails, then `Pr[p | mx] ≥ 1 - ε`. -/
+/-- If `Pr[ ¬p | mx] ≤ ε` and `mx` never fails, then `Pr[ p | mx] ≥ 1 - ε`. -/
 lemma probEvent_ge_of_compl_le
     {mx : m α} {p : α → Prop} {ε : ℝ≥0∞}
     (hfail : Pr[⊥ | mx] = 0)
-    (h : Pr[fun x => ¬p x | mx] ≤ ε) :
-    Pr[p | mx] ≥ 1 - ε := by
-  have hsum : Pr[p | mx] + Pr[fun x => ¬p x | mx] = 1 := by
+    (h : Pr[ fun x => ¬p x | mx] ≤ ε) :
+    Pr[ p | mx] ≥ 1 - ε := by
+  have hsum : Pr[ p | mx] + Pr[ fun x => ¬p x | mx] = 1 := by
     simpa [hfail] using probEvent_compl mx p
-  have hne : Pr[fun x => ¬p x | mx] ≠ ∞ :=
+  have hne : Pr[ fun x => ¬p x | mx] ≠ ∞ :=
     ne_of_lt (lt_of_le_of_lt probEvent_le_one (by simp))
-  have hgood : Pr[p | mx] = 1 - Pr[fun x => ¬p x | mx] := by
+  have hgood : Pr[ p | mx] = 1 - Pr[ fun x => ¬p x | mx] := by
     have := ENNReal.eq_sub_of_add_eq (hc := hne) hsum
     simpa using this
   rw [hgood]
@@ -628,7 +628,7 @@ variable [HasEvalSPMF m]
 is at most the sum of the individual event probabilities. -/
 lemma probEvent_exists_finset_le_sum
     {ι : Type*} (s : Finset ι) (mx : m α) (E : ι → α → Prop) :
-    Pr[(fun x => ∃ i ∈ s, E i x) | mx] ≤ Finset.sum s (fun i => Pr[E i | mx]) := by
+    Pr[ (fun x => ∃ i ∈ s, E i x) | mx] ≤ Finset.sum s (fun i => Pr[ E i | mx]) := by
   classical
   refine Finset.induction_on s ?base ?step
   · simp
@@ -649,8 +649,8 @@ lemma probEvent_exists_finset_le_sum
             rcases hx' with ⟨i, hi, hix⟩
             exact ⟨i, Finset.mem_insert_of_mem hi, hix⟩
     have hor :
-        Pr[(fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
-          ≤ Pr[E a | mx] + Pr[(fun x => ∃ i ∈ s, E i x) | mx] := by
+        Pr[ (fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[ E a | mx] + Pr[ (fun x => ∃ i ∈ s, E i x) | mx] := by
       rw [probEvent_eq_tsum_ite (mx := mx) (p := fun x => E a x ∨ ∃ i ∈ s, E i x)]
       rw [probEvent_eq_tsum_ite (mx := mx) (p := E a)]
       rw [probEvent_eq_tsum_ite (mx := mx) (p := fun x => ∃ i ∈ s, E i x)]
@@ -672,12 +672,12 @@ lemma probEvent_exists_finset_le_sum
           (g := fun y : α => (if (∃ i ∈ s, E i y) then Pr[= y | mx] else 0)))
       exact le_trans hle (le_of_eq hspl)
     have hsum :
-        Pr[E a | mx] + Pr[(fun x => ∃ i ∈ s, E i x) | mx]
-          ≤ Pr[E a | mx] + Finset.sum s (fun i => Pr[E i | mx]) := by
-      simpa [add_comm, add_left_comm, add_assoc] using add_le_add_left ih (Pr[E a | mx])
+        Pr[ E a | mx] + Pr[ (fun x => ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[ E a | mx] + Finset.sum s (fun i => Pr[ E i | mx]) := by
+      simpa [add_comm, add_left_comm, add_assoc] using add_le_add_left ih (Pr[ E a | mx])
     have :
-        Pr[(fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
-          ≤ Pr[E a | mx] + Finset.sum s (fun i => Pr[E i | mx]) :=
+        Pr[ (fun x => E a x ∨ ∃ i ∈ s, E i x) | mx]
+          ≤ Pr[ E a | mx] + Finset.sum s (fun i => Pr[ E i | mx]) :=
       le_trans hor hsum
     simpa [hE, Finset.sum_insert ha, add_assoc, add_left_comm, add_comm] using this
 
