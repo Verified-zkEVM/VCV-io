@@ -6,6 +6,9 @@ Authors: Quang Dao
 
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.CountingOracle
+import VCVio.EvalDist.Monad.Map
+import ToMathlib.General
+import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 
 /-!
 # Bundled Query Runtimes
@@ -98,6 +101,321 @@ end instrumentation
 
 end QueryRuntime
 
+namespace AddWriterT
+
+variable {m : Type → Type*} [Monad m]
+variable {α β : Type}
+
+section pathwiseCost
+
+variable [HasEvalSet m]
+
+/-- Pathwise upper bound for an `AddWriterT` computation: every reachable execution result carries
+additive cost at most `w`. -/
+def PathwiseCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω]
+    (oa : AddWriterT ω m α) (w : ω) : Prop :=
+  ∀ z ∈ support oa.run, Multiplicative.toAdd z.2 ≤ w
+
+/-- Pathwise lower bound for an `AddWriterT` computation: every reachable execution result carries
+additive cost at least `w`. -/
+def PathwiseCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω]
+    (oa : AddWriterT ω m α) (w : ω) : Prop :=
+  ∀ z ∈ support oa.run, w ≤ Multiplicative.toAdd z.2
+
+lemma pathwiseCostAtMost_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+    {oa : AddWriterT ω m α} {w b : ω}
+    (h : AddWriterT.HasCost oa w) (hwb : w ≤ b) :
+    PathwiseCostAtMost oa b := by
+  intro z hz
+  have hzCost : Multiplicative.toAdd z.2 ∈ support oa.costs := by
+    rw [AddWriterT.costs_def, support_map]
+    exact ⟨z, hz, rfl⟩
+  rw [h] at hzCost
+  rw [support_map] at hzCost
+  rcases hzCost with ⟨a, _, hzCost⟩
+  simpa [hzCost] using hwb
+
+lemma pathwiseCostAtLeast_of_hasCost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+    {oa : AddWriterT ω m α} {w b : ω}
+    (h : AddWriterT.HasCost oa w) (hbw : b ≤ w) :
+    PathwiseCostAtLeast oa b := by
+  intro z hz
+  have hzCost : Multiplicative.toAdd z.2 ∈ support oa.costs := by
+    rw [AddWriterT.costs_def, support_map]
+    exact ⟨z, hz, rfl⟩
+  rw [h] at hzCost
+  rw [support_map] at hzCost
+  rcases hzCost with ⟨a, _, hzCost⟩
+  simpa [hzCost] using hbw
+
+end pathwiseCost
+
+section expectedCost
+
+variable {ω : Type} [AddMonoid ω]
+
+/-- The expected additive cost of an `AddWriterT` computation, obtained by taking the expectation
+of its cost marginal.
+
+This expectation is computed over the base monad's subdistribution semantics on `oa.costs`. In
+particular, if the underlying computation can fail, the missing mass contributes `0`, exactly as
+for other `wp`-style expectations in VCV-io. -/
+noncomputable def expectedCost [HasEvalSPMF m]
+    (oa : AddWriterT ω m α) (val : ω → ENNReal) : ENNReal :=
+  ∑' w : ω, Pr[= w | oa.costs] * val w
+
+/-- Convenience specialization of [`AddWriterT.expectedCost`] to natural-valued additive costs. -/
+noncomputable abbrev expectedCostNat [HasEvalSPMF m] (oa : AddWriterT ℕ m α) : ENNReal :=
+  expectedCost oa (fun n ↦ ↑n)
+
+omit [AddMonoid ω] in
+lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
+    (oa : AddWriterT ω m α) (val : ω → ENNReal) (c : ENNReal)
+    (h : ∀ w ∈ support oa.costs, val w ≤ c) :
+    expectedCost oa val ≤ c := by
+  unfold expectedCost
+  have hmass : ∑' w : ω, Pr[= w | oa.costs] ≤ 1 := by
+    exact tsum_probOutput_le_one (mx := oa.costs)
+  calc
+    ∑' w : ω, Pr[= w | oa.costs] * val w
+        ≤ ∑' w : ω, Pr[= w | oa.costs] * c := by
+          refine ENNReal.tsum_le_tsum ?_
+          intro w
+          by_cases hw : w ∈ support oa.costs
+          · exact mul_le_mul_of_nonneg_left (h w hw) (zero_le _)
+          · have hp : Pr[= w | oa.costs] = 0 := by
+              rw [AddWriterT.costs_def]
+              exact probOutput_eq_zero_of_not_mem_support
+                (mx := (fun z ↦ Multiplicative.toAdd z.2) <$> WriterT.run oa)
+                (by simpa [AddWriterT.costs_def] using hw)
+            rw [hp]
+            simp
+    _ = (∑' w : ω, Pr[= w | oa.costs]) * c := by
+          rw [ENNReal.tsum_mul_right]
+    _ ≤ 1 * c := by
+          simpa [mul_comm] using (mul_le_mul_right hmass c)
+    _ = c := by simp
+
+lemma expectedCost_le_of_pathwiseCostAtMost [HasEvalSPMF m] [LawfulMonad m] [Preorder ω]
+    {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
+    (h : PathwiseCostAtMost oa w) (hval : Monotone val) :
+    expectedCost oa val ≤ val w := by
+  refine expectedCost_le_of_support_bound oa val (val w) ?_
+  intro c hc
+  rw [AddWriterT.costs_def, support_map] at hc
+  rcases hc with ⟨z, hz, rfl⟩
+  exact hval (h z hz)
+
+lemma expectedCost_ge_of_pathwiseCostAtLeast [LawfulMonad m] [Preorder ω] [HasEvalPMF m]
+    {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
+    (h : PathwiseCostAtLeast oa w) (hval : Monotone val) :
+    val w ≤ expectedCost oa val := by
+  unfold expectedCost
+  have hmass : ∑' c : ω, Pr[= c | oa.costs] = 1 :=
+    HasEvalPMF.tsum_probOutput_eq_one (mx := oa.costs)
+  calc
+    val w = 1 * val w := by simp
+    _ = (∑' c : ω, Pr[= c | oa.costs]) * val w := by
+          rw [← hmass]
+    _ = ∑' c : ω, Pr[= c | oa.costs] * val w := by
+          rw [← ENNReal.tsum_mul_right]
+    _ ≤ ∑' c : ω, Pr[= c | oa.costs] * val c := by
+          refine ENNReal.tsum_le_tsum ?_
+          intro c
+          by_cases hc : c ∈ support oa.costs
+          · rw [AddWriterT.costs_def, support_map] at hc
+            rcases hc with ⟨z, hz, rfl⟩
+            exact mul_le_mul_of_nonneg_left (hval (h z hz)) (zero_le _)
+          · have hp : Pr[= c | oa.costs] = 0 := by
+              rw [AddWriterT.costs_def]
+              exact probOutput_eq_zero_of_not_mem_support
+                (mx := (fun z ↦ Multiplicative.toAdd z.2) <$> WriterT.run oa)
+                (by simpa [AddWriterT.costs_def] using hc)
+            rw [hp]
+            simp
+
+end expectedCost
+
+section unitCostBounds
+
+variable [HasEvalSet m]
+
+/-- Pathwise upper bound for a unit-cost `AddWriterT` computation. -/
+def QueryBoundedAboveBy (oa : AddWriterT ℕ m α) (n : ℕ) : Prop :=
+  PathwiseCostAtMost oa n
+
+/-- Pathwise lower bound for a unit-cost `AddWriterT` computation. -/
+def QueryBoundedBelowBy (oa : AddWriterT ℕ m α) (n : ℕ) : Prop :=
+  PathwiseCostAtLeast oa n
+
+lemma queryBoundedAboveBy_pure [LawfulMonad m] (x : α) :
+    QueryBoundedAboveBy (pure x : AddWriterT ℕ m α) 0 := by
+  intro z hz
+  rw [WriterT.run_pure, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma queryBoundedBelowBy_pure [LawfulMonad m] (x : α) :
+    QueryBoundedBelowBy (pure x : AddWriterT ℕ m α) 0 := by
+  intro z hz
+  rw [WriterT.run_pure, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma queryBoundedAboveBy_monadLift [LawfulMonad m] (x : m α) :
+    QueryBoundedAboveBy (monadLift x : AddWriterT ℕ m α) 0 := by
+  intro z hz
+  rw [WriterT.run_monadLift, support_map] at hz
+  rcases hz with ⟨a, _, rfl⟩
+  simp
+
+lemma queryBoundedBelowBy_monadLift [LawfulMonad m] (x : m α) :
+    QueryBoundedBelowBy (monadLift x : AddWriterT ℕ m α) 0 := by
+  intro z hz
+  rw [WriterT.run_monadLift, support_map] at hz
+  rcases hz with ⟨a, _, rfl⟩
+  simp
+
+lemma queryBoundedAboveBy_mono {oa : AddWriterT ℕ m α} {n₁ n₂ : ℕ}
+    (h : QueryBoundedAboveBy oa n₁) (hn : n₁ ≤ n₂) :
+    QueryBoundedAboveBy oa n₂ := by
+  intro z hz
+  exact le_trans (h z hz) hn
+
+lemma queryBoundedBelowBy_mono {oa : AddWriterT ℕ m α} {n₁ n₂ : ℕ}
+    (h : QueryBoundedBelowBy oa n₂) (hn : n₁ ≤ n₂) :
+    QueryBoundedBelowBy oa n₁ := by
+  intro z hz
+  exact le_trans hn (h z hz)
+
+lemma queryBoundedAboveBy_addTell [LawfulMonad m] (w : ℕ) :
+    QueryBoundedAboveBy (AddWriterT.addTell (M := m) w) w := by
+  intro z hz
+  rw [AddWriterT.run_addTell, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma queryBoundedBelowBy_addTell [LawfulMonad m] (w : ℕ) :
+    QueryBoundedBelowBy (AddWriterT.addTell (M := m) w) w := by
+  intro z hz
+  rw [AddWriterT.run_addTell, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma queryBoundedAboveBy_map [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ} (f : α → β)
+    (h : QueryBoundedAboveBy oa n) :
+    QueryBoundedAboveBy (f <$> oa) n := by
+  intro z hz
+  rw [WriterT.run_map, support_map] at hz
+  rcases hz with ⟨z', hz', rfl⟩
+  exact h z' hz'
+
+lemma queryBoundedBelowBy_map [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ} (f : α → β)
+    (h : QueryBoundedBelowBy oa n) :
+    QueryBoundedBelowBy (f <$> oa) n := by
+  intro z hz
+  rw [WriterT.run_map, support_map] at hz
+  rcases hz with ⟨z', hz', rfl⟩
+  exact h z' hz'
+
+lemma queryBoundedAboveBy_bind [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {f : α → AddWriterT ℕ m β} {n₁ n₂ : ℕ}
+    (h₁ : QueryBoundedAboveBy oa n₁) (h₂ : ∀ a, QueryBoundedAboveBy (f a) n₂) :
+    QueryBoundedAboveBy (oa >>= f) (n₁ + n₂) := by
+  intro z hz
+  rw [WriterT.run_bind] at hz
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
+  rcases aw with ⟨a, wa⟩
+  rw [support_map] at hz
+  rcases hz with ⟨bw, hbw, rfl⟩
+  rcases bw with ⟨b, wb⟩
+  simpa using Nat.add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+
+lemma queryBoundedBelowBy_bind [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {f : α → AddWriterT ℕ m β} {n₁ n₂ : ℕ}
+    (h₁ : QueryBoundedBelowBy oa n₁) (h₂ : ∀ a, QueryBoundedBelowBy (f a) n₂) :
+    QueryBoundedBelowBy (oa >>= f) (n₁ + n₂) := by
+  intro z hz
+  rw [WriterT.run_bind] at hz
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
+  rcases aw with ⟨a, wa⟩
+  rw [support_map] at hz
+  rcases hz with ⟨bw, hbw, rfl⟩
+  rcases bw with ⟨b, wb⟩
+  simpa using Nat.add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+
+lemma queryBoundedAboveBy_fin_mOfFn [LawfulMonad m] {n k : ℕ}
+    {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryBoundedAboveBy (f i) k) :
+    QueryBoundedAboveBy (Fin.mOfFn n f) (n * k) := by
+  induction n with
+  | zero =>
+      simp [Fin.mOfFn, queryBoundedAboveBy_pure]
+  | succ n ih =>
+      simp only [Fin.mOfFn, Nat.succ_mul]
+      simpa [Nat.add_comm] using
+        (queryBoundedAboveBy_bind (n₁ := k) (n₂ := n * k)
+          (by simpa using h 0)
+          (fun a ↦
+            queryBoundedAboveBy_map (fun rest ↦ Fin.cons a rest)
+              (ih (fun i ↦ h i.succ))))
+
+lemma queryBoundedBelowBy_fin_mOfFn [LawfulMonad m] {n k : ℕ}
+    {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryBoundedBelowBy (f i) k) :
+    QueryBoundedBelowBy (Fin.mOfFn n f) (n * k) := by
+  induction n with
+  | zero =>
+      simp [Fin.mOfFn, queryBoundedBelowBy_pure]
+  | succ n ih =>
+      simp only [Fin.mOfFn, Nat.succ_mul]
+      simpa [Nat.add_comm] using
+        (queryBoundedBelowBy_bind (n₁ := k) (n₂ := n * k)
+          (by simpa using h 0)
+          (fun a ↦
+            queryBoundedBelowBy_map (fun rest ↦ Fin.cons a rest)
+              (ih (fun i ↦ h i.succ))))
+
+end unitCostBounds
+
+section expectedUnitCost
+
+variable [HasEvalSPMF m]
+
+lemma expectedCostNat_le_of_queryBoundedAboveBy [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : QueryBoundedAboveBy oa n) :
+    expectedCostNat oa ≤ n := by
+  simpa [expectedCostNat, QueryBoundedAboveBy] using
+    (expectedCost_le_of_pathwiseCostAtMost
+      (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h
+      (fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+
+end expectedUnitCost
+
+section expectedUnitCostPMF
+
+variable [HasEvalPMF m]
+
+lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : QueryBoundedBelowBy oa n) :
+    (n : ENNReal) ≤ expectedCostNat oa := by
+  simpa [expectedCostNat, QueryBoundedBelowBy] using
+    (expectedCost_ge_of_pathwiseCostAtLeast
+      (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h
+      (fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+
+end expectedUnitCostPMF
+
+end AddWriterT
+
 namespace HasQuery
 
 section runtimeInstantiation
@@ -131,6 +449,43 @@ def withUnitCost (oa : [HasQuery spec (AddWriterT ℕ m)] → AddWriterT ℕ m �
 end instrumentation
 end runtimeInstantiation
 
+section queryBounds
+
+variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*}
+variable [Monad m] [LawfulMonad m] [HasEvalSet m]
+
+lemma queryBoundedAboveBy_withUnitCost_query
+    (runtime : QueryRuntime spec m) (t : spec.Domain) :
+    AddWriterT.QueryBoundedAboveBy
+      (HasQuery.withUnitCost
+        (fun [HasQuery spec (AddWriterT ℕ m)] =>
+          HasQuery.query (spec := spec) (m := AddWriterT ℕ m) t)
+        runtime)
+      1 := by
+  change AddWriterT.QueryBoundedAboveBy ((runtime.withUnitCost).impl t) 1
+  rw [QueryRuntime.withUnitCost_impl]
+  apply AddWriterT.queryBoundedAboveBy_bind (n₁ := 1) (n₂ := 0)
+  · exact AddWriterT.queryBoundedAboveBy_addTell 1
+  · intro _
+    exact AddWriterT.queryBoundedAboveBy_monadLift (runtime.impl t)
+
+lemma queryBoundedBelowBy_withUnitCost_query
+    (runtime : QueryRuntime spec m) (t : spec.Domain) :
+    AddWriterT.QueryBoundedBelowBy
+      (HasQuery.withUnitCost
+        (fun [HasQuery spec (AddWriterT ℕ m)] =>
+          HasQuery.query (spec := spec) (m := AddWriterT ℕ m) t)
+        runtime)
+      1 := by
+  change AddWriterT.QueryBoundedBelowBy ((runtime.withUnitCost).impl t) 1
+  rw [QueryRuntime.withUnitCost_impl]
+  apply AddWriterT.queryBoundedBelowBy_bind (n₁ := 1) (n₂ := 0)
+  · exact AddWriterT.queryBoundedBelowBy_addTell 1
+  · intro _
+    exact AddWriterT.queryBoundedBelowBy_monadLift (runtime.impl t)
+
+end queryBounds
+
 section costAccounting
 
 variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*} {α : Type}
@@ -156,31 +511,36 @@ def UsesCostExactly {ω : Type} [AddMonoid ω]
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
   Cost[ HasQuery.withAddCost oa runtime costFn ] = w
 
-/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at most `w`. -/
-def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω]
+/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at most `w` on
+every execution path. This is a semantic support bound, not merely an output-indexed cost
+description. -/
+def UsesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalSet m]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
-  Cost[ HasQuery.withAddCost oa runtime costFn ] ≤ w
+  AddWriterT.PathwiseCostAtMost (HasQuery.withAddCost oa runtime costFn) w
 
-/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at least `w`. -/
-def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω]
+/-- Running `oa` in the additive-cost instrumentation of `runtime` incurs cost at least `w` on
+every execution path. -/
+def UsesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalSet m]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
     (costFn : spec.Domain → ω) (w : ω) : Prop :=
-  Cost[ HasQuery.withAddCost oa runtime costFn ] ≥ w
+  AddWriterT.PathwiseCostAtLeast (HasQuery.withAddCost oa runtime costFn) w
 
 lemma usesCostAtMost_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
+    [LawfulMonad m] [HasEvalSet m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hwb : w ≤ b) :
-    HasQuery.UsesCostAtMost oa runtime costFn b := by
-  exact AddWriterT.costAtMost_of_hasCost h hwb
+    HasQuery.UsesCostAtMost oa runtime costFn b :=
+  AddWriterT.pathwiseCostAtMost_of_hasCost h hwb
 
 lemma usesCostAtLeast_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω]
+    [LawfulMonad m] [HasEvalSet m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w b : ω}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hbw : b ≤ w) :
-    HasQuery.UsesCostAtLeast oa runtime costFn b := by
-  exact AddWriterT.costAtLeast_of_hasCost h hbw
+    HasQuery.UsesCostAtLeast oa runtime costFn b :=
+  AddWriterT.pathwiseCostAtLeast_of_hasCost h hbw
 
 /-- Unit-cost specialization: every query contributes cost `1`. -/
 def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
@@ -188,28 +548,120 @@ def UsesExactlyQueries (oa : Computation spec (AddWriterT ℕ m) α)
   HasQuery.UsesCostExactly oa runtime (fun _ ↦ 1) n
 
 /-- Unit-cost specialization: every query contributes cost `1`, with an upper bound. -/
-def UsesAtMostQueries (oa : Computation spec (AddWriterT ℕ m) α)
+def UsesAtMostQueries [HasEvalSet m]
+    (oa : Computation spec (AddWriterT ℕ m) α)
     (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
-  HasQuery.UsesCostAtMost oa runtime (fun _ ↦ 1) n
+  AddWriterT.QueryBoundedAboveBy (HasQuery.withUnitCost oa runtime) n
 
 /-- Unit-cost specialization: every query contributes cost `1`, with a lower bound. -/
-def UsesAtLeastQueries (oa : Computation spec (AddWriterT ℕ m) α)
+def UsesAtLeastQueries [HasEvalSet m]
+    (oa : Computation spec (AddWriterT ℕ m) α)
     (runtime : QueryRuntime spec m) (n : ℕ) : Prop :=
-  HasQuery.UsesCostAtLeast oa runtime (fun _ ↦ 1) n
+  AddWriterT.QueryBoundedBelowBy (HasQuery.withUnitCost oa runtime) n
 
 lemma usesAtMostQueries_of_usesExactlyQueries
+    [LawfulMonad m] [HasEvalSet m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m}
     {n b : ℕ} (h : HasQuery.UsesExactlyQueries oa runtime n) (hnb : n ≤ b) :
     HasQuery.UsesAtMostQueries oa runtime b :=
   usesCostAtMost_of_usesCostExactly h hnb
 
 lemma usesAtLeastQueries_of_usesExactlyQueries
+    [LawfulMonad m] [HasEvalSet m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m}
     {n b : ℕ} (h : HasQuery.UsesExactlyQueries oa runtime n) (hbn : b ≤ n) :
     HasQuery.UsesAtLeastQueries oa runtime b :=
   usesCostAtLeast_of_usesCostExactly h hbn
 
 end genericCost
+
+section expectedCost
+
+variable [Monad m] [HasEvalSPMF m]
+
+/-- The expected weighted query cost of `oa`, instantiated in `runtime` and instrumented by
+`costFn`.
+
+This is the expectation of the additive cost marginal in the base monad's subdistribution
+semantics. For unit-cost query counting, use [`HasQuery.expectedQueries`] below. -/
+noncomputable def expectedCost {ω : Type} [AddMonoid ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) (val : ω → ENNReal) : ENNReal :=
+  AddWriterT.expectedCost (HasQuery.withAddCost oa runtime costFn) val
+
+/-- Expected number of oracle queries made by `oa` when run in `runtime`, counting each query
+with unit additive cost. -/
+noncomputable abbrev expectedQueries
+    (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m) : ENNReal :=
+  AddWriterT.expectedCostNat (HasQuery.withUnitCost oa runtime)
+
+lemma expectedCost_le_of_usesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
+    (h : HasQuery.UsesCostAtMost oa runtime costFn w) (hval : Monotone val) :
+    HasQuery.expectedCost oa runtime costFn val ≤ val w :=
+  AddWriterT.expectedCost_le_of_pathwiseCostAtMost h hval
+
+lemma expectedQueries_le_of_usesAtMostQueries [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
+    (h : HasQuery.UsesAtMostQueries oa runtime n) :
+    HasQuery.expectedQueries oa runtime ≤ n :=
+  AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy h
+
+end expectedCost
+
+section expectedCostPMF
+
+variable [Monad m] [HasEvalPMF m]
+
+lemma expectedCost_ge_of_usesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
+    (h : HasQuery.UsesCostAtLeast oa runtime costFn w) (hval : Monotone val) :
+    val w ≤ HasQuery.expectedCost oa runtime costFn val := by
+  have h' : AddWriterT.PathwiseCostAtLeast (HasQuery.withAddCost oa runtime costFn) w := by
+    simpa [HasQuery.UsesCostAtLeast] using h
+  simpa [HasQuery.expectedCost] using
+    (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
+      (oa := HasQuery.withAddCost oa runtime costFn) (w := w) (val := val) h' hval)
+
+lemma expectedCost_eq_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
+    (h : HasQuery.UsesCostExactly oa runtime costFn w) (hval : Monotone val) :
+    HasQuery.expectedCost oa runtime costFn val = val w := by
+  exact le_antisymm
+    (expectedCost_le_of_usesCostAtMost
+      (usesCostAtMost_of_usesCostExactly h le_rfl) hval)
+    (expectedCost_ge_of_usesCostAtLeast
+      (usesCostAtLeast_of_usesCostExactly h le_rfl) hval)
+
+lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
+    (h : HasQuery.UsesAtLeastQueries oa runtime n) :
+    (n : ENNReal) ≤ HasQuery.expectedQueries oa runtime :=
+  AddWriterT.expectedCostNat_ge_of_queryBoundedBelowBy h
+
+lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
+    [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
+    (hUpper : HasQuery.UsesAtMostQueries oa runtime n)
+    (hLower : HasQuery.UsesAtLeastQueries oa runtime n) :
+    HasQuery.expectedQueries oa runtime = n := by
+  exact le_antisymm
+    (expectedQueries_le_of_usesAtMostQueries hUpper)
+    (expectedQueries_ge_of_usesAtLeastQueries hLower)
+
+lemma expectedQueries_eq_of_usesExactlyQueries [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
+    (h : HasQuery.UsesExactlyQueries oa runtime n) :
+    HasQuery.expectedQueries oa runtime = n := by
+  exact expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
+    (m := m) (oa := oa) (runtime := runtime) (n := n)
+    (usesAtMostQueries_of_usesExactlyQueries h le_rfl)
+    (usesAtLeastQueries_of_usesExactlyQueries h le_rfl)
+
+end expectedCostPMF
 
 /-- `Queries[ oa in runtime ] = n` means that the generic `HasQuery` computation `oa` makes
 exactly `n` oracle queries when instantiated in `runtime` and instrumented with unit additive
@@ -226,8 +678,8 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
           $runtime $n)
 
-/-- `Queries[ oa in runtime ] ≤ n` means that `oa` makes at most `n` oracle queries when run in
-the unit-cost instrumentation of `runtime`.
+/-- `Queries[ oa in runtime ] ≤ n` means that every execution path of `oa` makes at most `n`
+oracle queries when run in the unit-cost instrumentation of `runtime`.
 
 This packages the common cryptographic statement “the construction uses at most `n` queries” on
 top of [`HasQuery.UsesAtMostQueries`]. -/
@@ -266,8 +718,8 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
-/-- `QueryCost[ oa in runtime by costFn ] ≤ w` means that the total query cost of `oa` is bounded
-above by `w` under the weighting function `costFn`.
+/-- `QueryCost[ oa in runtime by costFn ] ≤ w` means that every execution path of `oa` has total
+query cost bounded above by `w` under the weighting function `costFn`.
 
 This is the weighted analogue of [`Queries[ oa in runtime ] ≤ n`]. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term:50 : term
@@ -278,8 +730,8 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
-/-- `QueryCost[ oa in runtime by costFn ] ≥ w` means that the total query cost of `oa` is bounded
-below by `w` under the weighting function `costFn`.
+/-- `QueryCost[ oa in runtime by costFn ] ≥ w` means that every execution path of `oa` has total
+query cost bounded below by `w` under the weighting function `costFn`.
 
 This is the weighted analogue of [`Queries[ oa in runtime ] ≥ n`]. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term:50 : term
@@ -289,6 +741,20 @@ macro_rules
       `(HasQuery.UsesCostAtLeast
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
+
+/-- `ExpectedQueries[ oa in runtime ]` is the expected number of oracle queries made by `oa` when
+run in `runtime`, with each query carrying unit additive cost.
+
+The result is an `ℝ≥0∞` expectation, so it can be compared directly against natural-number
+bounds such as `ExpectedQueries[ oa in runtime ] ≤ n`. This is the expectation of the cost
+marginal, not a separate operational semantics. -/
+syntax:max "ExpectedQueries[ " term " in " term " ]" : term
+
+macro_rules
+  | `(ExpectedQueries[ $oa in $runtime ]) =>
+      `(HasQuery.expectedQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime)
 
 end costAccounting
 

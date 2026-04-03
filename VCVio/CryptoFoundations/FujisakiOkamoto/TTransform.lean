@@ -273,7 +273,7 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
     (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
-theorem decrypt_usesAtMostOneQuery
+theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :
