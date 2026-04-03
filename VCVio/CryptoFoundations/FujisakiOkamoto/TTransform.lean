@@ -114,68 +114,70 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
 /-- Output projection of unit-cost-instrumented T-transform encryption. -/
-theorem fst_map_encrypt_run_withAddCost
+theorem encrypt_outputs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
     letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
     letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.outputs ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg) =
       (TTransform (m := m) pke).encrypt pk msg := by
-  simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+  simp [AddWriterT.outputs, TTransform, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-/-- Cost projection of unit-cost-instrumented T-transform encryption. -/
-theorem snd_map_encrypt_run_withAddCost
+/-- Running unit-cost-instrumented T-transform encryption records exactly one query cost. -/
+theorem encrypt_costs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
     letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
     letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg).run =
-      (fun _ ↦ Multiplicative.ofAdd 1) <$> (TTransform (m := m) pke).encrypt pk msg := by
-  simp [TTransform, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.costs ((TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg) =
+      (fun _ ↦ 1) <$> (TTransform (m := m) pke).encrypt pk msg := by
+  simp [AddWriterT.costs, TTransform, QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-/-- Output projection of unit-cost-instrumented T-transform decryption. -/
-theorem fst_map_decrypt_run_withAddCost
+/-- Running unit-cost-instrumented T-transform decryption preserves the decryption result. -/
+theorem decrypt_outputs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
     letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
     letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.fst <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.outputs ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c) =
       (TTransform (m := m) pke).decrypt (pk, sk) c := by
   cases hdec : pke.decrypt sk c with
   | none =>
-      simp [TTransform, TTransform.decrypt, hdec]
+      simp [AddWriterT.outputs, TTransform, TTransform.decrypt, hdec]
   | some msg =>
-      simp [TTransform, TTransform.decrypt, hdec, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+      simp [AddWriterT.outputs, TTransform, TTransform.decrypt, hdec,
+        QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
-/-- Cost projection of unit-cost-instrumented T-transform decryption. The transform incurs no
+/-- Unit-cost-instrumented T-transform decryption incurs no
 oracle cost if deterministic decryption fails immediately, and exactly one query otherwise. -/
-theorem snd_map_decrypt_run_withAddCost
+theorem decrypt_costs_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
     letI : HasQuery (M →ₒ R) m := runtime.toHasQuery
     letI : HasQuery (M →ₒ R) (AddWriterT ℕ m) :=
-      (runtime.withAddCost fun _ ↦ 1).toHasQuery
-    Prod.snd <$> ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c).run =
+      runtime.withUnitCost.toHasQuery
+    AddWriterT.costs ((TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c) =
       match pke.decrypt sk c with
-      | none => pure (Multiplicative.ofAdd 0)
-      | some _ => (fun _ ↦ Multiplicative.ofAdd 1) <$>
+      | none => pure 0
+      | some _ => (fun _ ↦ 1) <$>
           (TTransform (m := m) pke).decrypt (pk, sk) c := by
   cases hdec : pke.decrypt sk c with
   | none =>
-      simp [TTransform, TTransform.decrypt, hdec]
+      simp [AddWriterT.costs, TTransform, TTransform.decrypt, hdec]
   | some msg =>
-      simp [TTransform, TTransform.decrypt, hdec, QueryRuntime.withAddCost_impl, AddWriterT.addTell]
+      simp [AddWriterT.costs, TTransform, TTransform.decrypt, hdec,
+        QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
 
 end costAccounting
 
