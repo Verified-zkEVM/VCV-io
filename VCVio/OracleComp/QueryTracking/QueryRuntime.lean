@@ -218,7 +218,7 @@ cost per query.
 The computation `oa` is written in direct `HasQuery` style. The notation elaborates it against
 the unit-cost analysis monad induced by `runtime`, so statements can usually be written without
 explicit monad annotations such as `m := AddWriterT ℕ m`. -/
-syntax:max "Queries[ " term " in " term " ]" " = " term : term
+syntax:max "Queries[ " term " in " term " ]" " = " term:50 : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] = $n) =>
@@ -231,7 +231,7 @@ the unit-cost instrumentation of `runtime`.
 
 This packages the common cryptographic statement “the construction uses at most `n` queries” on
 top of [`HasQuery.UsesAtMostQueries`]. -/
-syntax:max "Queries[ " term " in " term " ]" " ≤ " term : term
+syntax:max "Queries[ " term " in " term " ]" " ≤ " term:50 : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] ≤ $n) =>
@@ -244,7 +244,7 @@ instrumentation of `runtime` incurs at least `n` query-cost units.
 
 This is less common than the exact and upper-bound forms, but it is useful for statements saying
 that a construction must query the oracle at least a certain number of times. -/
-syntax:max "Queries[ " term " in " term " ]" " ≥ " term : term
+syntax:max "Queries[ " term " in " term " ]" " ≥ " term:50 : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] ≥ $n) =>
@@ -258,7 +258,7 @@ instrumented so that each query `t` contributes cost `costFn t`, has constant to
 
 Use this when the cost model is not unit cost, for example when different query families or
 different query shapes carry different weights. -/
-syntax:max "QueryCost[ " term " in " term " by " term " ]" " = " term : term
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " = " term:50 : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] = $w) =>
@@ -270,7 +270,7 @@ macro_rules
 above by `w` under the weighting function `costFn`.
 
 This is the weighted analogue of [`Queries[ oa in runtime ] ≤ n`]. -/
-syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term : term
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term:50 : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] ≤ $w) =>
@@ -282,7 +282,7 @@ macro_rules
 below by `w` under the weighting function `costFn`.
 
 This is the weighted analogue of [`Queries[ oa in runtime ] ≥ n`]. -/
-syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term : term
+syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term:50 : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] ≥ $w) =>

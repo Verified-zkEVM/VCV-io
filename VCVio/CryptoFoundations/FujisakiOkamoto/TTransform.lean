@@ -114,7 +114,7 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
 /-- Running unit-cost-instrumented T-transform encryption preserves the ciphertext output. -/
-private theorem encrypt_outputs_formula_withUnitCost
+private lemma encrypt_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
@@ -185,7 +185,7 @@ theorem encrypt_usesExactlyOneQuery
   exact h_costs
 
 /-- Running unit-cost-instrumented T-transform decryption preserves the decryption result. -/
-private theorem decrypt_outputs_formula_withUnitCost
+private lemma decrypt_outputs_formula_withUnitCost
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]

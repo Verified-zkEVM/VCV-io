@@ -236,8 +236,6 @@ lemma costs_addTell [AddMonoid ω] [LawfulMonad M] (w : ω) :
 
 section costPredicates
 
-variable [Functor M]
-
 /-- `CostsAs oa f` means that the cost accumulated by `oa` is determined by its output via the
 cost function `f`. -/
 def CostsAs (oa : AddWriterT ω M α) (f : α → ω) : Prop :=
@@ -263,7 +261,7 @@ def CostAtLeast [Preorder ω] (oa : AddWriterT ω M α) (w : ω) : Prop :=
 This is notation for [`AddWriterT.HasCost`]. It is intended for theorem statements where the
 constant-cost reading is more natural than the underlying output-indexed formulation
 [`AddWriterT.CostsAs`]. -/
-syntax:max "Cost[ " term " ]" " = " term : term
+syntax:max "Cost[ " term " ]" " = " term:50 : term
 
 macro_rules
   | `(Cost[ $oa ] = $w) => `(AddWriterT.HasCost $oa $w)
@@ -272,7 +270,7 @@ macro_rules
 
 This is notation for [`AddWriterT.CostAtMost`]. The bound is uniform over all outputs of `oa`,
 but the underlying witness may still depend on the output when proving the statement. -/
-syntax:max "Cost[ " term " ]" " ≤ " term : term
+syntax:max "Cost[ " term " ]" " ≤ " term:50 : term
 
 macro_rules
   | `(Cost[ $oa ] ≤ $w) => `(AddWriterT.CostAtMost $oa $w)
@@ -282,7 +280,7 @@ macro_rules
 This is notation for [`AddWriterT.CostAtLeast`]. As with [`Cost[ oa ] ≤ w`], the underlying
 cost description may depend on the output of `oa`; the notation packages only the uniform lower
 bound visible at the theorem statement level. -/
-syntax:max "Cost[ " term " ]" " ≥ " term : term
+syntax:max "Cost[ " term " ]" " ≥ " term:50 : term
 
 macro_rules
   | `(Cost[ $oa ] ≥ $w) => `(AddWriterT.CostAtLeast $oa $w)
@@ -310,12 +308,12 @@ lemma costAtLeast_iff [Preorder ω] (oa : AddWriterT ω M α) (w : ω) :
 lemma costAtMost_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
     (h : Cost[ oa ] = w) (hwb : w ≤ b) : Cost[ oa ] ≤ b := by
   refine ⟨fun _ ↦ w, ?_, fun _ ↦ hwb⟩
-  simpa [HasCost, CostsAs] using h
+  exact h
 
 lemma costAtLeast_of_hasCost [Preorder ω] {oa : AddWriterT ω M α} {w b : ω}
     (h : Cost[ oa ] = w) (hbw : b ≤ w) : Cost[ oa ] ≥ b := by
   refine ⟨fun _ ↦ w, ?_, fun _ ↦ hbw⟩
-  simpa [HasCost, CostsAs] using h
+  exact h
 
 end costPredicates
 
