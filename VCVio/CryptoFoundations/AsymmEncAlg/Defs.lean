@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.ProbCompLift
+import ToMathlib.Control.Monad.Hom
 
 /-!
 # Asymmetric Encryption Schemes
@@ -40,6 +41,49 @@ abbrev PKE_Alg := AsymmEncAlg
 namespace AsymmEncAlg
 variable {m : Type → Type v} [Monad m] {M PK SK C : Type}
   (encAlg : AsymmEncAlg m M PK SK C)
+
+section map
+
+variable {n : Type → Type w} [Monad n]
+
+/-- Transport an asymmetric encryption scheme across a monad morphism by mapping each algorithmic
+component. -/
+def map (F : m →ᵐ n) : AsymmEncAlg n M PK SK C where
+  keygen := F encAlg.keygen
+  encrypt pk msg := F (encAlg.encrypt pk msg)
+  decrypt sk c := F (encAlg.decrypt sk c)
+
+@[simp]
+lemma map_keygen (F : m →ᵐ n) :
+    (encAlg.map F).keygen = F encAlg.keygen := rfl
+
+@[simp]
+lemma map_encrypt (F : m →ᵐ n) (pk : PK) (msg : M) :
+    (encAlg.map F).encrypt pk msg = F (encAlg.encrypt pk msg) := rfl
+
+@[simp]
+lemma map_decrypt (F : m →ᵐ n) (sk : SK) (c : C) :
+    (encAlg.map F).decrypt sk c = F (encAlg.decrypt sk c) := rfl
+
+end map
+
+section ext
+
+/-- Two asymmetric encryption schemes are equal when their algorithmic components agree. -/
+@[ext]
+theorem ext {encAlg' : AsymmEncAlg m M PK SK C}
+    (hKeygen : encAlg.keygen = encAlg'.keygen)
+    (hEncrypt : encAlg.encrypt = encAlg'.encrypt)
+    (hDecrypt : encAlg.decrypt = encAlg'.decrypt) :
+    encAlg = encAlg' := by
+  cases encAlg
+  cases encAlg'
+  cases hKeygen
+  cases hEncrypt
+  cases hDecrypt
+  rfl
+
+end ext
 
 section Correct
 

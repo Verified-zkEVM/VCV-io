@@ -47,27 +47,64 @@ variable {M PK SK R C : Type}
 
 /-- Decryption for the T transform: decrypt deterministically, then re-query the coins oracle and
 check that re-encryption reproduces the ciphertext. -/
-def TTransform.decrypt (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq C] (pk : PK) (sk : SK) (c : C) :
-    OracleComp (TTransform.oracleSpec M R) (Option M) := do
+def TTransform.decrypt {m : Type → Type v} [Monad m]
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq C] [HasQuery (M →ₒ R) m] (pk : PK) (sk : SK) (c : C) :
+    m (Option M) := do
   match pke.decrypt sk c with
   | none => return none
   | some msg =>
-      let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
+      let r ← HasQuery.query (spec := (M →ₒ R)) msg
       return if pke.encrypt pk msg r = c then some msg else none
 
 /-- The HHK17 T transform, realized as a monadic `AsymmEncAlg` in the random-oracle world
 `unifSpec + (M →ₒ R)`. -/
-def TTransform (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    [DecidableEq M] [DecidableEq C] [SampleableType R] :
-    AsymmEncAlg (OracleComp (TTransform.oracleSpec M R)) M PK (PK × SK) C where
+def TTransform {m : Type → Type v} [Monad m]
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    [MonadLiftT ProbComp m] [HasQuery (M →ₒ R) m] :
+    AsymmEncAlg m M PK (PK × SK) C where
   keygen := do
-    let (pk, sk) ← (monadLift pke.keygen : OracleComp (TTransform.oracleSpec M R) (PK × SK))
+    let (pk, sk) ← (monadLift pke.keygen : m (PK × SK))
     return (pk, (pk, sk))
   encrypt := fun pk msg => do
-    let r ← query (spec := TTransform.oracleSpec M R) (Sum.inr msg)
+    let r ← HasQuery.query (spec := (M →ₒ R)) msg
     return pke.encrypt pk msg r
-  decrypt := fun (pk, sk) c => TTransform.decrypt pke pk sk c
+  decrypt := fun (pk, sk) c => TTransform.decrypt (m := m) pke pk sk c
+
+section naturality
+
+variable {m : Type → Type u} [Monad m]
+  {n : Type → Type v} [Monad n]
+  [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
+  [HasQuery (M →ₒ R) m] [HasQuery (M →ₒ R) n]
+
+/-- The T-transform is natural in any oracle-semantics morphism that preserves both the
+plaintext-to-coins query capability and the distinguished lift of `ProbComp`. -/
+theorem map_construction
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    [DecidableEq M] [DecidableEq C] [SampleableType R]
+    (F : HasQuery.QueryHom (M →ₒ R) m n)
+    (hLift : HasQuery.PreservesProbCompLift (m := m) (n := n) F.toMonadHom) :
+    (TTransform (m := m) pke).map F.toMonadHom =
+      TTransform (m := n) pke := by
+  cases pke with
+  | mk keygen encrypt decrypt =>
+      apply AsymmEncAlg.ext
+      · dsimp [AsymmEncAlg.map, TTransform]
+        simp [hLift keygen]
+      · funext pk msg
+        dsimp [AsymmEncAlg.map, TTransform]
+        simp [HasQuery.map_query]
+      · funext x c
+        dsimp [AsymmEncAlg.map, TTransform]
+        cases hdec : decrypt x.2 c with
+        | none =>
+            simp [TTransform.decrypt, hdec]
+        | some msg =>
+            simp [TTransform.decrypt, hdec, HasQuery.map_query]
+
+end naturality
 
 namespace TTransform
 
@@ -86,7 +123,8 @@ oracles respectively. -/
 def OW_PCVA_Adversary.MakesAtMostQueries
     {M PK SK R C : Type} [DecidableEq M] [DecidableEq C] [SampleableType R]
     {pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C}
-    (adversary : OW_PCVA_Adversary (TTransform pke)) (qH qP qV : ℕ) : Prop :=
+    (adversary : OW_PCVA_Adversary
+      (TTransform (m := OracleComp (TTransform.oracleSpec M R)) pke)) (qH qP qV : ℕ) : Prop :=
   ∀ pk cStar, OracleComp.IsQueryBound (adversary pk cStar) (qH, qP, qV)
     (fun t b => match t, b with
       | .inl (.inl _), _ => True
@@ -105,12 +143,14 @@ theorem OW_PCVA_bound
     {M PK SK R C : Type}
     [DecidableEq M] [DecidableEq C] [SampleableType M] [SampleableType R]
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    (adversary : OW_PCVA_Adversary (TTransform pke))
+    (adversary : OW_PCVA_Adversary
+      (TTransform (m := OracleComp (TTransform.oracleSpec M R)) pke))
     (correctnessBound gamma epsMsg : ℝ)
     (qH qP qV : ℕ) :
     adversary.MakesAtMostQueries qH qP qV →
     ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
-      (OW_PCVA_Advantage (encAlg := TTransform pke)
+      (OW_PCVA_Advantage
+        (encAlg := TTransform (m := OracleComp (TTransform.oracleSpec M R)) pke)
         (runtime (M := M) (R := R)) adversary).toReal ≤
         2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
         2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
