@@ -144,7 +144,7 @@ theorem encrypt_usesExactlyOneQuery
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (msg : M) :
-    Queries[ (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg in runtime ] = 1 := by
+    Queries[ (TTransform pke).encrypt pk msg in runtime ] = 1 := by
   change Cost[
     HasQuery.withUnitCost
       (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
@@ -230,7 +230,7 @@ theorem decrypt_usesNoQueries_of_decrypt_eq_none
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C)
     (hdec : pke.decrypt sk c = none) :
-    Queries[ (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c in runtime ] = 0 := by
+    Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 0 := by
   change AddWriterT.costs
       (HasQuery.withUnitCost
         (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
@@ -280,7 +280,7 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) {msg : M}
     (hdec : pke.decrypt sk c = some msg) :
-    Queries[ (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c in runtime ] = 1 := by
+    Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 1 := by
   change AddWriterT.costs
       (HasQuery.withUnitCost
         (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
@@ -330,7 +330,7 @@ theorem decrypt_usesAtMostOneQuery
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     [DecidableEq M] [DecidableEq C] [SampleableType R]
     (pk : PK) (sk : SK) (c : C) :
-    Queries[ (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c in runtime ] ≤ 1 := by
+    Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] ≤ 1 := by
   by_cases hdec : pke.decrypt sk c = none
   · exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
       (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>

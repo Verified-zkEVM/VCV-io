@@ -212,7 +212,7 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    Queries[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg in runtime ] = 1 := by
+    Queries[ (FiatShamir σ hr M).sign pk sk msg in runtime ] = 1 := by
   change Cost[
     HasQuery.withUnitCost
       (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
@@ -281,7 +281,7 @@ omit [DecidableEq PC] [DecidableEq P] [DecidableEq Ω] [SampleableType Ω] in
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (msg : M) (sig : PC × P) :
-    Queries[ (FiatShamir (m := AddWriterT ℕ m) σ hr M).verify pk msg sig in runtime ] = 1 := by
+    Queries[ (FiatShamir σ hr M).verify pk msg sig in runtime ] = 1 := by
   change Cost[
     HasQuery.withUnitCost
       (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>

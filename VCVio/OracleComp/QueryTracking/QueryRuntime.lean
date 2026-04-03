@@ -216,42 +216,54 @@ syntax:max "Queries[ " term " in " term " ]" " = " term : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] = $n) =>
-      `(HasQuery.UsesExactlyQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+      `(HasQuery.UsesExactlyQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $n)
 
 /-- Human-readable notation for upper-bound query-count statements in the unit-cost model. -/
 syntax:max "Queries[ " term " in " term " ]" " ≤ " term : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] ≤ $n) =>
-      `(HasQuery.UsesAtMostQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+      `(HasQuery.UsesAtMostQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $n)
 
 /-- Human-readable notation for lower-bound query-count statements in the unit-cost model. -/
 syntax:max "Queries[ " term " in " term " ]" " ≥ " term : term
 
 macro_rules
   | `(Queries[ $oa in $runtime ] ≥ $n) =>
-      `(HasQuery.UsesAtLeastQueries (fun [HasQuery _ _] => $oa) $runtime $n)
+      `(HasQuery.UsesAtLeastQueries
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
+          $runtime $n)
 
 /-- Human-readable notation for exact additive-cost statements under a named cost function. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " = " term : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] = $w) =>
-      `(HasQuery.UsesCostExactly (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+      `(HasQuery.UsesCostExactly
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
+          $runtime $costFn $w)
 
 /-- Human-readable notation for additive-cost upper bounds under a named cost function. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≤ " term : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] ≤ $w) =>
-      `(HasQuery.UsesCostAtMost (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+      `(HasQuery.UsesCostAtMost
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
+          $runtime $costFn $w)
 
 /-- Human-readable notation for additive-cost lower bounds under a named cost function. -/
 syntax:max "QueryCost[ " term " in " term " by " term " ]" " ≥ " term : term
 
 macro_rules
   | `(QueryCost[ $oa in $runtime by $costFn ] ≥ $w) =>
-      `(HasQuery.UsesCostAtLeast (fun [HasQuery _ _] => $oa) $runtime $costFn $w)
+      `(HasQuery.UsesCostAtLeast
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
+          $runtime $costFn $w)
 
 end costAccounting
 
