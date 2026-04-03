@@ -129,19 +129,100 @@ lemma someOutputSatisfiesWhen_iff_supportWhen
         rcases h with ⟨x, ⟨u, hu, hx⟩, hPx⟩
         exact ⟨u, hu, (ih u).2 ⟨x, hx, hPx⟩⟩
 
--- TODO: `allPathsSatisfy_bind_iff` statement is INCORRECT for the `pure` case.
--- When `oa = pure x`:
---   LHS = `(ob x).allPathsSatisfy Q P s`
---   RHS = `P x ∧ (ob x).allPathsSatisfy Q P s`
--- The RHS imposes an extra `P x` constraint on intermediate values that the LHS does not.
--- A correct formulation might either:
---   (a) use a separate predicate for intermediate vs. final values, or
---   (b) only state the `⟸` direction (which is valid), or
---   (c) weaken the `pure` case in `allPathsSatisfy` to `True` when used inside a bind.
--- @[simp] lemma allPathsSatisfy_bind_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
---     (oa >>= ob).allPathsSatisfy Q P possibleOutputs ↔
---       oa.allPathsSatisfy Q P possibleOutputs ∧
---       ∀ x ∈ oa.supportWhen possibleOutputs, (ob x).allPathsSatisfy Q P possibleOutputs := by
---   sorry
+/-- A bind satisfies a universal path property exactly when every path of the first computation
+leads to a continuation that also satisfies that path property. -/
+@[simp]
+lemma allPathsSatisfy_bind_iff
+    (queryPred : spec.Domain → Prop) (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).allPathsSatisfy queryPred outputPred possibleOutputs ↔
+      oa.allPathsSatisfy queryPred
+        (fun x ↦ (ob x).allPathsSatisfy queryPred outputPred possibleOutputs)
+        possibleOutputs := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      simp
+  | query_bind q oa ih =>
+      simp only [bind_assoc, OracleComp.allPathsSatisfy_query_bind, ih]
+
+/-- A bind satisfies an existential path property exactly when either the first computation
+already satisfies it on some path, or one reachable continuation does. -/
+@[simp]
+lemma somePathSatisfies_bind_iff
+    (queryPred : spec.Domain → Prop) (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).somePathSatisfies queryPred outputPred possibleOutputs ↔
+      oa.somePathSatisfies queryPred
+        (fun x ↦ (ob x).somePathSatisfies queryPred outputPred possibleOutputs)
+        possibleOutputs := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      simp
+  | query_bind q oa ih =>
+      simp only [bind_assoc, OracleComp.somePathSatisfies_query_bind, ih]
+
+/-- Output-only specialization of [`OracleComp.allPathsSatisfy_bind_iff`]. -/
+@[simp]
+lemma allOutputsSatisfyWhen_bind_iff
+    (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).allOutputsSatisfyWhen outputPred possibleOutputs ↔
+      oa.allOutputsSatisfyWhen
+        (fun x ↦ (ob x).allOutputsSatisfyWhen outputPred possibleOutputs)
+        possibleOutputs := by
+  change (oa >>= ob).allPathsSatisfy (fun _ ↦ True) outputPred possibleOutputs ↔
+      oa.allPathsSatisfy (fun _ ↦ True)
+        (fun x ↦ (ob x).allPathsSatisfy (fun _ ↦ True) outputPred possibleOutputs)
+        possibleOutputs
+  exact OracleComp.allPathsSatisfy_bind_iff (queryPred := fun _ ↦ True)
+    (outputPred := outputPred) (possibleOutputs := possibleOutputs) oa ob
+
+/-- Output-only specialization of [`OracleComp.somePathSatisfies_bind_iff`]. -/
+@[simp]
+lemma someOutputSatisfiesWhen_bind_iff
+    (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).someOutputSatisfiesWhen outputPred possibleOutputs ↔
+      oa.someOutputSatisfiesWhen
+        (fun x ↦ (ob x).someOutputSatisfiesWhen outputPred possibleOutputs)
+        possibleOutputs := by
+  change (oa >>= ob).somePathSatisfies (fun _ ↦ False) outputPred possibleOutputs ↔
+      oa.somePathSatisfies (fun _ ↦ False)
+        (fun x ↦ (ob x).somePathSatisfies (fun _ ↦ False) outputPred possibleOutputs)
+        possibleOutputs
+  exact OracleComp.somePathSatisfies_bind_iff (queryPred := fun _ ↦ False)
+    (outputPred := outputPred) (possibleOutputs := possibleOutputs) oa ob
+
+/-- Output-only bind rule phrased directly in terms of reachable intermediate outputs. -/
+lemma allOutputsSatisfyWhen_bind_iff_supportWhen
+    (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).allOutputsSatisfyWhen outputPred possibleOutputs ↔
+      ∀ x ∈ oa.supportWhen possibleOutputs,
+        (ob x).allOutputsSatisfyWhen outputPred possibleOutputs := by
+  rw [OracleComp.allOutputsSatisfyWhen_bind_iff]
+  simpa using
+    (OracleComp.allOutputsSatisfyWhen_iff_supportWhen
+      (outputPred := fun x ↦ (ob x).allOutputsSatisfyWhen outputPred possibleOutputs)
+      (possibleOutputs := possibleOutputs) (oa := oa))
+
+/-- Existential output bind rule phrased directly in terms of reachable intermediate outputs. -/
+lemma someOutputSatisfiesWhen_bind_iff_supportWhen
+    (outputPred : β → Prop)
+    (possibleOutputs : (x : spec.Domain) → Set (spec.Range x))
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    (oa >>= ob).someOutputSatisfiesWhen outputPred possibleOutputs ↔
+      ∃ x ∈ oa.supportWhen possibleOutputs,
+        (ob x).someOutputSatisfiesWhen outputPred possibleOutputs := by
+  rw [OracleComp.someOutputSatisfiesWhen_bind_iff]
+  simpa using
+    (OracleComp.someOutputSatisfiesWhen_iff_supportWhen
+      (outputPred := fun x ↦ (ob x).someOutputSatisfiesWhen outputPred possibleOutputs)
+      (possibleOutputs := possibleOutputs) (oa := oa))
 
 end OracleComp

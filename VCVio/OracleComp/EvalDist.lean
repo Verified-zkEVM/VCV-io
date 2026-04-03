@@ -41,6 +41,34 @@ lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
       ⋃ x ∈ o q, supportWhen o (oa x) := by
   simp [supportWhen]
 
+/-- Reachable outputs of a bind are the reachable outputs of the continuation over reachable
+outputs of the first computation. -/
+@[simp]
+lemma supportWhen_bind (o : QueryImpl spec Set) (oa : OracleComp spec α)
+    (ob : α → OracleComp spec β) :
+    supportWhen o (oa >>= ob) = ⋃ x ∈ supportWhen o oa, supportWhen o (ob x) := by
+  simp [supportWhen, simulateQ_bind, Set.bind_def]
+
+/-- Membership form of [`OracleComp.supportWhen_bind`]. -/
+lemma mem_supportWhen_bind_iff (o : QueryImpl spec Set) (oa : OracleComp spec α)
+    (ob : α → OracleComp spec β) (y : β) :
+    y ∈ supportWhen o (oa >>= ob) ↔
+      ∃ x ∈ supportWhen o oa, y ∈ supportWhen o (ob x) := by
+  simp [supportWhen_bind]
+
+/-- Enlarging the set of possible oracle outputs only enlarges the reachable output set. -/
+lemma supportWhen_mono {o₁ o₂ : QueryImpl spec Set}
+    (h : ∀ q, o₁ q ⊆ o₂ q) (oa : OracleComp spec α) :
+    supportWhen o₁ oa ⊆ supportWhen o₂ oa := by
+  intro y hy
+  induction oa using OracleComp.inductionOn generalizing y with
+  | pure x =>
+      simpa [supportWhen_pure] using hy
+  | query_bind q oa ih =>
+      simp only [supportWhen_query_bind, Set.mem_iUnion, exists_prop] at hy ⊢
+      rcases hy with ⟨u, hu, hy⟩
+      exact ⟨u, h q hu, ih u hy⟩
+
 /-- The `support` instance for `OracleComp`, defined as -/
 instance hasEvalSet : HasEvalSet (OracleComp spec) where
   toSet := simulateQ' (r := SetM) fun _ : spec.Domain => Set.univ
