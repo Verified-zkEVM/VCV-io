@@ -582,9 +582,12 @@ variable [Monad m] [HasEvalSPMF m]
 /-- The expected weighted query cost of `oa`, instantiated in `runtime` and instrumented by
 `costFn`.
 
-This is the expectation of the additive cost marginal in the base monad's subdistribution
-semantics. For unit-cost query counting, use [`HasQuery.expectedQueries`] below. -/
-noncomputable def expectedCost {ω : Type} [AddMonoid ω]
+This is the primary expectation notion for generic `HasQuery` computations. It is computed from
+the additive cost marginal in the base monad's subdistribution semantics, valued by `val`.
+
+The unit-cost query-counting notion [`HasQuery.expectedQueries`] is a specialization of this
+definition with `costFn := fun _ ↦ 1` and `val := fun n ↦ (n : ENNReal)`. -/
+noncomputable def expectedQueryCost {ω : Type} [AddMonoid ω]
     (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
     (costFn : spec.Domain → ω) (val : ω → ENNReal) : ENNReal :=
   AddWriterT.expectedCost (HasQuery.withAddCost oa runtime costFn) val
@@ -593,20 +596,25 @@ noncomputable def expectedCost {ω : Type} [AddMonoid ω]
 with unit additive cost. -/
 noncomputable abbrev expectedQueries
     (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m) : ENNReal :=
-  AddWriterT.expectedCostNat (HasQuery.withUnitCost oa runtime)
+  HasQuery.expectedQueryCost oa runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal))
 
-lemma expectedCost_le_of_usesCostAtMost {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+lemma expectedQueryCost_le_of_usesCostAtMost
+    {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
     (h : HasQuery.UsesCostAtMost oa runtime costFn w) (hval : Monotone val) :
-    HasQuery.expectedCost oa runtime costFn val ≤ val w :=
+    HasQuery.expectedQueryCost oa runtime costFn val ≤ val w :=
   AddWriterT.expectedCost_le_of_pathwiseCostAtMost h hval
 
 lemma expectedQueries_le_of_usesAtMostQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
     (h : HasQuery.UsesAtMostQueries oa runtime n) :
-    HasQuery.expectedQueries oa runtime ≤ n :=
-  AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy h
+    HasQuery.expectedQueries oa runtime ≤ n := by
+  simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost] using
+    (AddWriterT.expectedCost_le_of_pathwiseCostAtMost
+      (oa := HasQuery.withUnitCost oa runtime) (w := n) (val := fun k ↦ (k : ENNReal)) h
+      (fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
 end expectedCost
 
@@ -614,33 +622,39 @@ section expectedCostPMF
 
 variable [Monad m] [HasEvalPMF m]
 
-lemma expectedCost_ge_of_usesCostAtLeast {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+lemma expectedQueryCost_ge_of_usesCostAtLeast
+    {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
     (h : HasQuery.UsesCostAtLeast oa runtime costFn w) (hval : Monotone val) :
-    val w ≤ HasQuery.expectedCost oa runtime costFn val := by
+    val w ≤ HasQuery.expectedQueryCost oa runtime costFn val := by
   have h' : AddWriterT.PathwiseCostAtLeast (HasQuery.withAddCost oa runtime costFn) w := by
     simpa [HasQuery.UsesCostAtLeast] using h
-  simpa [HasQuery.expectedCost] using
+  simpa [HasQuery.expectedQueryCost] using
     (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
       (oa := HasQuery.withAddCost oa runtime costFn) (w := w) (val := val) h' hval)
 
-lemma expectedCost_eq_of_usesCostExactly {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
+lemma expectedQueryCost_eq_of_usesCostExactly
+    {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hval : Monotone val) :
-    HasQuery.expectedCost oa runtime costFn val = val w := by
+    HasQuery.expectedQueryCost oa runtime costFn val = val w := by
   exact le_antisymm
-    (expectedCost_le_of_usesCostAtMost
+    (expectedQueryCost_le_of_usesCostAtMost
       (usesCostAtMost_of_usesCostExactly h le_rfl) hval)
-    (expectedCost_ge_of_usesCostAtLeast
+    (expectedQueryCost_ge_of_usesCostAtLeast
       (usesCostAtLeast_of_usesCostExactly h le_rfl) hval)
 
 lemma expectedQueries_ge_of_usesAtLeastQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
     (h : HasQuery.UsesAtLeastQueries oa runtime n) :
-    (n : ENNReal) ≤ HasQuery.expectedQueries oa runtime :=
-  AddWriterT.expectedCostNat_ge_of_queryBoundedBelowBy h
+    (n : ENNReal) ≤ HasQuery.expectedQueries oa runtime := by
+  simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost] using
+    (AddWriterT.expectedCost_ge_of_pathwiseCostAtLeast
+      (oa := HasQuery.withUnitCost oa runtime) (w := n) (val := fun k ↦ (k : ENNReal)) h
+      (fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
 lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     [LawfulMonad m]
@@ -742,19 +756,36 @@ macro_rules
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
           $runtime $costFn $w)
 
+/-- `ExpectedQueryCost[ oa in runtime by costFn via val ]` is the expected weighted query cost of
+`oa` when instantiated in `runtime`.
+
+Each query `t` contributes additive cost `costFn t`, and the total cost is then valued by
+`val : ω → ENNReal` before taking expectation. This is the primary expected-cost term for generic
+`HasQuery` constructions. -/
+syntax:max "ExpectedQueryCost[ " term " in " term " by " term " via " term " ]" : term
+
+macro_rules
+  | `(ExpectedQueryCost[ $oa in $runtime by $costFn via $val ]) =>
+      `(HasQuery.expectedQueryCost
+          (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT _ _)] → AddWriterT _ _ _))
+          $runtime $costFn $val)
+
 /-- `ExpectedQueries[ oa in runtime ]` is the expected number of oracle queries made by `oa` when
 run in `runtime`, with each query carrying unit additive cost.
 
 The result is an `ℝ≥0∞` expectation, so it can be compared directly against natural-number
-bounds such as `ExpectedQueries[ oa in runtime ] ≤ n`. This is the expectation of the cost
-marginal, not a separate operational semantics. -/
+bounds such as `ExpectedQueries[ oa in runtime ] ≤ n`.
+
+This is the unit-cost specialization of
+[`ExpectedQueryCost[ oa in runtime by costFn via val ]`], with `costFn := fun _ ↦ 1` and
+`val := fun n ↦ (n : ENNReal)`. -/
 syntax:max "ExpectedQueries[ " term " in " term " ]" : term
 
 macro_rules
   | `(ExpectedQueries[ $oa in $runtime ]) =>
-      `(HasQuery.expectedQueries
+      `(HasQuery.expectedQueryCost
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
-          $runtime)
+          $runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal)))
 
 end costAccounting
 
