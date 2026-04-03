@@ -284,6 +284,141 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
               if h.val < h'.val then some (ω, resp, h) else some (ω', resp', h')
         simpa [hashStep, hh, newBest] using ih (best := newBest)
 
+/-- Fischlin's inner search, instantiated in a weighted additive-cost runtime. -/
+private def fischlinSearchAuxWithAddCost
+    {ω : Type} [AddMonoid ω]
+    {X W PC SC Ω P M : Type} {p : X → W → Bool} {ρ b : ℕ}
+    {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
+    (σ : SigmaProtocol X W PC SC Ω P p)
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
+    (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b)))
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → ω) :
+    AddWriterT ω m (Option (Ω × P)) :=
+  match challenges with
+  | [] => pure (best.map fun (ω, resp, _) => (ω, resp))
+  | ω :: rest => do
+      let resp ← monadLift (σ.respond pk sk sc ω)
+      AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, ω, resp⟩)
+      let h ← monadLift (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩)
+      if h.val = 0 then
+        pure (some (ω, resp))
+      else
+        let newBest := match best with
+          | none => some (ω, resp, h)
+          | some (ω', resp', h') =>
+            if h.val < h'.val then some (ω, resp, h) else some (ω', resp', h')
+        fischlinSearchAuxWithAddCost σ runtime pk sk sc msg comList i rest newBest costFn
+
+omit [SampleableType X] [SampleableType W]
+  [DecidableEq X] [DecidableEq PC] [DecidableEq Ω] [DecidableEq P]
+  [FinEnum Ω] [Inhabited Ω] [Inhabited P] [SampleableType Ω]
+  [DecidableEq M] [HasEvalSet m] in
+private lemma fischlinSearchAux_eq_withAddCost
+    {κ : Type} [AddMonoid κ]
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
+    (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b)))
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → κ) :
+    let _ : HasQuery (fischlinROSpec X PC Ω P ρ b M) (AddWriterT κ m) :=
+      runtime.withAddCost costFn |>.toHasQuery
+    fischlinSearchAux
+      (m := AddWriterT κ m) σ pk sk sc msg comList i challenges best =
+      fischlinSearchAuxWithAddCost
+        (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := sc) (msg := msg)
+        (comList := comList) (i := i) challenges best costFn := by
+  induction challenges generalizing best with
+  | nil =>
+      simp [fischlinSearchAux, fischlinSearchAuxWithAddCost]
+  | cons ω rest ih =>
+      simp [fischlinSearchAux, fischlinSearchAuxWithAddCost, ih]
+
+omit [SampleableType X] [SampleableType W]
+  [DecidableEq X] [DecidableEq PC] [DecidableEq Ω] [DecidableEq P]
+  [FinEnum Ω] [Inhabited Ω] [Inhabited P] [SampleableType Ω]
+  [DecidableEq M] in
+private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
+    {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
+    [CanonicallyOrderedAdd κ]
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
+    (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b)))
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → κ) {w : κ}
+    (hcost : ∀ t, costFn t ≤ w) :
+    AddWriterT.PathwiseCostAtMost
+      (fischlinSearchAuxWithAddCost
+        (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := sc) (msg := msg)
+        (comList := comList) (i := i) challenges best costFn)
+      (challenges.length • w) := by
+  induction challenges generalizing best with
+  | nil =>
+      simpa using
+        (AddWriterT.pathwiseCostAtMost_pure
+          (m := m) ((best.map fun (ω, resp, _) => (ω, resp)) : Option (Ω × P)))
+  | cons chal rest ih =>
+      let hashStep : P → AddWriterT κ m (Option (Ω × P)) := fun resp =>
+        (AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩) :
+          AddWriterT κ m PUnit) >>= fun _ =>
+          (monadLift (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩) :
+            AddWriterT κ m (Fin (2 ^ b))) >>= fun h =>
+              if h.val = 0 then
+                pure (some (chal, resp))
+              else
+                fischlinSearchAuxWithAddCost σ runtime pk sk sc msg comList i rest
+                  (match best with
+                  | none => some (chal, resp, h)
+                  | some (ω', resp', h') =>
+                      if h.val < h'.val then some (chal, resp, h) else some (ω', resp', h'))
+                  costFn
+      change AddWriterT.PathwiseCostAtMost
+        ((monadLift (σ.respond pk sk sc chal) : AddWriterT κ m P) >>= hashStep)
+        ((rest.length + 1) • w)
+      have hstep : ∀ resp, AddWriterT.PathwiseCostAtMost (hashStep resp) (w + rest.length • w) := by
+        intro resp
+        have htell :
+            AddWriterT.PathwiseCostAtMost
+              (AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
+              w := by
+          exact AddWriterT.pathwiseCostAtMost_mono
+            (AddWriterT.pathwiseCostAtMost_addTell
+              (m := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
+            (hcost _)
+        refine AddWriterT.pathwiseCostAtMost_bind (w₁ := w) (w₂ := rest.length • w) htell ?_
+        intro _
+        have hhash :
+            AddWriterT.PathwiseCostAtMost
+              (((monadLift (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩) :
+                    AddWriterT κ m (Fin (2 ^ b))) >>= fun h =>
+                  if h.val = 0 then
+                    pure (some (chal, resp))
+                  else
+                    fischlinSearchAuxWithAddCost σ runtime pk sk sc msg comList i rest
+                      (match best with
+                      | none => some (chal, resp, h)
+                      | some (ω', resp', h') =>
+                          if h.val < h'.val then some (chal, resp, h) else some (ω', resp', h'))
+                      costFn))
+              (0 + rest.length • w) := by
+          refine AddWriterT.pathwiseCostAtMost_bind (w₁ := 0) (w₂ := rest.length • w)
+            (AddWriterT.pathwiseCostAtMost_monadLift
+              (m := m) (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩)) ?_
+          intro h
+          by_cases hh : h.val = 0
+          · simpa [hh] using
+              AddWriterT.pathwiseCostAtMost_mono
+                (AddWriterT.pathwiseCostAtMost_pure ((some (chal, resp)) : Option (Ω × P)))
+                (zero_le _)
+          · let newBest : Option (Ω × P × Fin (2 ^ b)) := match best with
+              | none => some (chal, resp, h)
+              | some (ω', resp', h') =>
+                  if h.val < h'.val then some (chal, resp, h) else some (ω', resp', h')
+            simpa [hh, newBest] using ih (best := newBest)
+        exact AddWriterT.pathwiseCostAtMost_mono hhash (by simp [zero_add])
+      simpa [succ_nsmul'] using
+        (AddWriterT.pathwiseCostAtMost_bind (w₁ := 0) (w₂ := w + rest.length • w)
+          (AddWriterT.pathwiseCostAtMost_monadLift (m := m) (σ.respond pk sk sc chal))
+          hstep)
+
 section
 
 omit [DecidableEq X] [DecidableEq PC] [DecidableEq Ω] [DecidableEq P]
@@ -487,6 +622,144 @@ theorem sign_usesAtMostRhoCardOmegaQueries
       (fun commits =>
         AddWriterT.queryBoundedAboveBy_fin_mOfFn (n := ρ) (k := FinEnum.card Ω)
           (fun i => hrep commits i)))
+
+/-- Fischlin signing has weighted query cost at most `ρ • (|Ω| • w)` whenever every random-oracle
+query carries cost at most `w`. -/
+theorem sign_usesWeightedQueryCostAtMost
+    {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
+    [CanonicallyOrderedAdd κ]
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (msg : M)
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → κ) (w : κ)
+    (hcost : ∀ t, costFn t ≤ w) :
+    QueryCost[ (Fischlin σ hr ρ b S M).sign pk sk msg in runtime by costFn ] ≤
+      ρ • (FinEnum.card Ω • w) := by
+  have hlen : (FinEnum.toList Ω).length = FinEnum.card Ω := by
+    simp [FinEnum.toList]
+  let repStep : (Fin ρ → PC × SC) → Fin ρ → AddWriterT κ m (PC × Ω × P) := fun commits i => do
+    let comVec : Fin ρ → PC := fun j => (commits j).1
+    let comList := List.ofFn comVec
+    let sc_i := (commits i).2
+    let result ←
+      fischlinSearchAuxWithAddCost
+        (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := sc_i) (msg := msg)
+        (comList := comList) (i := i)
+        (FinEnum.toList Ω) (none : Option (Ω × P × Fin (2 ^ b))) costFn
+    match result with
+    | some (ω, resp) => pure (comVec i, ω, resp)
+    | none => pure (comVec i, default, default)
+  have hrep : ∀ commits i,
+      AddWriterT.PathwiseCostAtMost (repStep commits i) (FinEnum.card Ω • w) := by
+    intro commits i
+    let comVec : Fin ρ → PC := fun j => (commits j).1
+    let comList := List.ofFn comVec
+    have hsearch :
+        AddWriterT.PathwiseCostAtMost
+          (fischlinSearchAuxWithAddCost
+            (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
+            (msg := msg) (comList := comList) (i := i)
+            (FinEnum.toList Ω) (none : Option (Ω × P × Fin (2 ^ b))) costFn)
+          ((FinEnum.toList Ω).length • w) := by
+      exact fischlinSearchAuxWithAddCost_pathwiseCostAtMost
+        (κ := κ)
+        (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
+        (msg := msg) (comList := comList) (i := i)
+        (challenges := FinEnum.toList Ω) (best := none) (costFn := costFn) (w := w)
+        (hcost := hcost)
+    let finish : Option (Ω × P) → AddWriterT κ m (PC × Ω × P)
+      | some (ω, resp) => pure (comVec i, ω, resp)
+      | none => pure (comVec i, default, default)
+    have hcont :
+        ∀ result : Option (Ω × P), AddWriterT.PathwiseCostAtMost (finish result) 0 := by
+      intro result
+      cases result with
+      | none =>
+          simpa [finish] using AddWriterT.pathwiseCostAtMost_pure
+            (m := m) ((comVec i, default, default) : PC × Ω × P)
+      | some pair =>
+          rcases pair with ⟨ω, resp⟩
+          simpa [finish] using AddWriterT.pathwiseCostAtMost_pure
+            (m := m) ((comVec i, ω, resp) : PC × Ω × P)
+    refine AddWriterT.pathwiseCostAtMost_mono
+      (AddWriterT.pathwiseCostAtMost_bind (w₁ := (FinEnum.toList Ω).length • w) (w₂ := 0)
+        hsearch hcont) ?_
+    simp [hlen]
+  let commitComp : AddWriterT κ m (Fin ρ → PC × SC) :=
+    Fin.mOfFn ρ fun _ => (liftM (σ.commit pk sk) : AddWriterT κ m (PC × SC))
+  have hcommit :
+      AddWriterT.PathwiseCostAtMost commitComp 0 := by
+    have hstep :
+        AddWriterT.PathwiseCostAtMost
+          (liftM (σ.commit pk sk) : AddWriterT κ m (PC × SC)) 0 := by
+      simpa [WriterT.liftM_def] using
+        (AddWriterT.pathwiseCostAtMost_monadLift
+          (m := m) (monadLift (σ.commit pk sk) : m (PC × SC)))
+    simpa [commitComp] using
+      (AddWriterT.pathwiseCostAtMost_fin_mOfFn (n := ρ) (k := 0)
+        (f := fun _ => (liftM (σ.commit pk sk) : AddWriterT κ m (PC × SC)))
+        (fun _ => hstep))
+  suffices
+      AddWriterT.PathwiseCostAtMost
+        (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits))
+        (ρ • (FinEnum.card Ω • w)) by
+    have hsign :
+        HasQuery.withAddCost
+          (fun [HasQuery (fischlinROSpec X PC Ω P ρ b M) (AddWriterT κ m)] =>
+            (Fischlin (m := AddWriterT κ m) σ hr ρ b S M).sign pk sk msg)
+          runtime costFn =
+          (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits)) := by
+      simp only [Fischlin, HasQuery.withAddCost, repStep, commitComp]
+      refine congrArg
+        (fun k => commitComp >>= k) ?_
+      funext commits
+      refine congrArg
+        (fun f : Fin ρ → AddWriterT κ m (PC × Ω × P) => Fin.mOfFn ρ f) ?_
+      funext i
+      let comVec : Fin ρ → PC := fun j => (commits j).1
+      let comList := List.ofFn comVec
+      let finish : AddWriterT κ m (Option (Ω × P)) → AddWriterT κ m (PC × Ω × P) := fun oa => do
+        let result ← oa
+        match result with
+        | some (ω, resp) => pure (comVec i, ω, resp)
+        | none => pure (comVec i, default, default)
+      simpa [finish] using congrArg finish
+        (fischlinSearchAux_eq_withAddCost
+          (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
+          (msg := msg) (comList := comList) (i := i)
+          (challenges := FinEnum.toList Ω) (best := none) (costFn := costFn))
+    simpa [HasQuery.UsesCostAtMost, hsign] using this
+  simpa [zero_add] using
+    (AddWriterT.pathwiseCostAtMost_bind (w₁ := 0) (w₂ := ρ • (FinEnum.card Ω • w)) hcommit
+      (fun commits =>
+        AddWriterT.pathwiseCostAtMost_fin_mOfFn (n := ρ) (k := FinEnum.card Ω • w)
+          (fun i => hrep commits i)))
+
+section expectedWeightedQueryCost
+
+variable [HasEvalSPMF m]
+
+omit [HasEvalSet m] in
+/-- Fischlin signing has expected weighted query cost at most `ρ • (|Ω| • w)` whenever every
+random-oracle query is weighted by at most `w`. -/
+theorem sign_expectedQueryCost_le
+    {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
+    [CanonicallyOrderedAdd κ]
+    (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
+    (pk : X) (sk : W) (msg : M)
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → κ) (w : κ)
+    (val : κ → ENNReal) (hcost : ∀ t, costFn t ≤ w) (hval : Monotone val) :
+    ExpectedQueryCost[
+      (Fischlin σ hr ρ b S M).sign pk sk msg in runtime by costFn via val
+    ] ≤ val (ρ • (FinEnum.card Ω • w)) := by
+  let _ : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
+    (sign_usesWeightedQueryCostAtMost
+      (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)
+      (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+      (costFn := costFn) (w := w) hcost)
+    hval
+
+end expectedWeightedQueryCost
 
 section expectedQueries
 

@@ -8,6 +8,7 @@ import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.EvalDist.Monad.Map
 import ToMathlib.General
+import Mathlib.Algebra.Order.Monoid.Defs
 import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 
 /-!
@@ -235,6 +236,147 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [LawfulMonad m] [Preorder ω] [HasE
             simp
 
 end expectedCost
+
+section weightedPathwiseBounds
+
+variable [HasEvalSet m]
+variable {ω : Type} [AddCommMonoid ω] [PartialOrder ω]
+
+lemma pathwiseCostAtMost_pure [LawfulMonad m] (x : α) :
+    PathwiseCostAtMost (pure x : AddWriterT ω m α) 0 := by
+  intro z hz
+  rw [WriterT.run_pure, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma pathwiseCostAtLeast_pure [LawfulMonad m] (x : α) :
+    PathwiseCostAtLeast (pure x : AddWriterT ω m α) 0 := by
+  intro z hz
+  rw [WriterT.run_pure, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma pathwiseCostAtMost_monadLift [LawfulMonad m] (x : m α) :
+    PathwiseCostAtMost (monadLift x : AddWriterT ω m α) 0 := by
+  intro z hz
+  rw [WriterT.run_monadLift, support_map] at hz
+  rcases hz with ⟨a, _, rfl⟩
+  simp
+
+lemma pathwiseCostAtLeast_monadLift [LawfulMonad m] (x : m α) :
+    PathwiseCostAtLeast (monadLift x : AddWriterT ω m α) 0 := by
+  intro z hz
+  rw [WriterT.run_monadLift, support_map] at hz
+  rcases hz with ⟨a, _, rfl⟩
+  simp
+
+lemma pathwiseCostAtMost_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
+    (h : PathwiseCostAtMost oa w₁) (hw : w₁ ≤ w₂) :
+    PathwiseCostAtMost oa w₂ := by
+  intro z hz
+  exact le_trans (h z hz) hw
+
+lemma pathwiseCostAtLeast_mono {oa : AddWriterT ω m α} {w₁ w₂ : ω}
+    (h : PathwiseCostAtLeast oa w₂) (hw : w₁ ≤ w₂) :
+    PathwiseCostAtLeast oa w₁ := by
+  intro z hz
+  exact le_trans hw (h z hz)
+
+lemma pathwiseCostAtMost_addTell [LawfulMonad m] (w : ω) :
+    PathwiseCostAtMost (AddWriterT.addTell (M := m) w) w := by
+  intro z hz
+  rw [AddWriterT.run_addTell, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma pathwiseCostAtLeast_addTell [LawfulMonad m] (w : ω) :
+    PathwiseCostAtLeast (AddWriterT.addTell (M := m) w) w := by
+  intro z hz
+  rw [AddWriterT.run_addTell, support_pure] at hz
+  rcases hz with rfl
+  simp
+
+lemma pathwiseCostAtMost_map [LawfulMonad m] {oa : AddWriterT ω m α} {w : ω}
+    (f : α → β) (h : PathwiseCostAtMost oa w) :
+    PathwiseCostAtMost (f <$> oa) w := by
+  intro z hz
+  rw [WriterT.run_map, support_map] at hz
+  rcases hz with ⟨z', hz', rfl⟩
+  exact h z' hz'
+
+lemma pathwiseCostAtLeast_map [LawfulMonad m] {oa : AddWriterT ω m α} {w : ω}
+    (f : α → β) (h : PathwiseCostAtLeast oa w) :
+    PathwiseCostAtLeast (f <$> oa) w := by
+  intro z hz
+  rw [WriterT.run_map, support_map] at hz
+  rcases hz with ⟨z', hz', rfl⟩
+  exact h z' hz'
+
+lemma pathwiseCostAtMost_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
+    {oa : AddWriterT ω m α} {f : α → AddWriterT ω m β} {w₁ w₂ : ω}
+    (h₁ : PathwiseCostAtMost oa w₁) (h₂ : ∀ a, PathwiseCostAtMost (f a) w₂) :
+    PathwiseCostAtMost (oa >>= f) (w₁ + w₂) := by
+  intro z hz
+  rw [WriterT.run_bind] at hz
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
+  rcases aw with ⟨a, wa⟩
+  rw [support_map] at hz
+  rcases hz with ⟨bw, hbw, rfl⟩
+  rcases bw with ⟨b, wb⟩
+  simpa using add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+
+lemma pathwiseCostAtLeast_bind [LawfulMonad m] [IsOrderedAddMonoid ω]
+    {oa : AddWriterT ω m α} {f : α → AddWriterT ω m β} {w₁ w₂ : ω}
+    (h₁ : PathwiseCostAtLeast oa w₁) (h₂ : ∀ a, PathwiseCostAtLeast (f a) w₂) :
+    PathwiseCostAtLeast (oa >>= f) (w₁ + w₂) := by
+  intro z hz
+  rw [WriterT.run_bind] at hz
+  rcases (mem_support_bind_iff
+    (mx := oa.run)
+    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
+    (y := z)).1 hz with ⟨aw, haw, hz⟩
+  rcases aw with ⟨a, wa⟩
+  rw [support_map] at hz
+  rcases hz with ⟨bw, hbw, rfl⟩
+  rcases bw with ⟨b, wb⟩
+  simpa using add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+
+lemma pathwiseCostAtMost_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : ℕ} {k : ω}
+    {f : Fin n → AddWriterT ω m α} (h : ∀ i, PathwiseCostAtMost (f i) k) :
+    PathwiseCostAtMost (Fin.mOfFn n f) (n • k) := by
+  induction n with
+  | zero =>
+      simpa [zero_nsmul] using
+        (pathwiseCostAtMost_pure (m := m) (ω := ω) (x := (Fin.elim0 : Fin 0 → α)))
+  | succ n ih =>
+      simp only [Fin.mOfFn, succ_nsmul']
+      simpa [add_comm] using
+        (pathwiseCostAtMost_bind (w₁ := k) (w₂ := n • k)
+          (by simpa using h 0)
+          (fun a ↦
+            pathwiseCostAtMost_map (fun rest ↦ Fin.cons a rest)
+              (ih (fun i ↦ h i.succ))))
+
+lemma pathwiseCostAtLeast_fin_mOfFn [LawfulMonad m] [IsOrderedAddMonoid ω] {n : ℕ} {k : ω}
+    {f : Fin n → AddWriterT ω m α} (h : ∀ i, PathwiseCostAtLeast (f i) k) :
+    PathwiseCostAtLeast (Fin.mOfFn n f) (n • k) := by
+  induction n with
+  | zero =>
+      simpa [zero_nsmul] using
+        (pathwiseCostAtLeast_pure (m := m) (ω := ω) (x := (Fin.elim0 : Fin 0 → α)))
+  | succ n ih =>
+      simp only [Fin.mOfFn, succ_nsmul']
+      simpa [add_comm] using
+        (pathwiseCostAtLeast_bind (w₁ := k) (w₂ := n • k)
+          (by simpa using h 0)
+          (fun a ↦
+            pathwiseCostAtLeast_map (fun rest ↦ Fin.cons a rest)
+              (ih (fun i ↦ h i.succ))))
+
+end weightedPathwiseBounds
 
 section unitCostBounds
 
