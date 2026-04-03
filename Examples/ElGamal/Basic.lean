@@ -118,19 +118,19 @@ private lemma IND_CPA_OneTime_game_evalDist_eq_ddhExpReal
   ext z
   change Pr[= z | _] = Pr[= z | _]
   simp only [bind_pure_comp, bind_map_left]
-  -- Step 1: swap $ᵗBool past $ᵗF in LHS
+  -- Step 1: swap $ᵗ Bool past $ᵗ F in LHS
   rw [probOutput_bind_bind_swap ($ᵗ Bool) ($ᵗ F)]
-  -- Now LHS starts with $ᵗF. Use congr under $ᵗF.
+  -- Now LHS starts with $ᵗ F. Use congr under $ᵗ F.
   refine probOutput_bind_congr' ($ᵗ F) z (fun sk => ?_)
-  -- Step 2: swap $ᵗBool past chooseMessages in LHS
+  -- Step 2: swap $ᵗ Bool past chooseMessages in LHS
   rw [probOutput_bind_bind_swap ($ᵗ Bool) (adv.chooseMessages (sk • gen))]
-  -- Step 3: swap chooseMessages past $ᵗF in RHS
+  -- Step 3: swap chooseMessages past $ᵗ F in RHS
   conv_rhs => rw [probOutput_bind_bind_swap ($ᵗ F) (adv.chooseMessages (sk • gen))]
   -- Now both start with chooseMessages. Congr under it.
   refine probOutput_bind_congr' (adv.chooseMessages (sk • gen)) z (fun cm => ?_)
-  -- Step 4: swap $ᵗBool past $ᵗF in LHS
+  -- Step 4: swap $ᵗ Bool past $ᵗ F in LHS
   rw [probOutput_bind_bind_swap ($ᵗ Bool) ($ᵗ F)]
-  -- Now both: $ᵗF >>= fun r => $ᵗBool >>= fun bit => ...
+  -- Now both: $ᵗ F >>= fun r => $ᵗ Bool >>= fun bit => ...
   refine probOutput_bind_congr' ($ᵗ F) z (fun r => ?_)
   refine probOutput_bind_congr' ($ᵗ Bool) z (fun bit => ?_)
   -- Now need to show the ciphertext expressions match

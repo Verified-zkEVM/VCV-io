@@ -159,7 +159,7 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
   exact hob x
 
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
-    (h : ∀ x ∈ support oa, Pr[=true | f x] = 1) :
+    (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
     ⦃1⦄ (do
       let x ← oa
       f x) ⦃fun y => if y = true then 1 else 0⦄ := by
@@ -306,8 +306,8 @@ example {mx : OracleComp spec α} {my : OracleComp spec β}
   vcstep
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
-    (h : ∀ x ∈ support mx, Pr[=y | f x] = Pr[=y | g x]) :
-    Pr[=y | mx >>= f] = Pr[=y | mx >>= g] := by
+    (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
+    Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
   vcstep rw congr
   exact h _ ‹_›
 
@@ -414,7 +414,7 @@ example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
 /-! ### Support-cut synthesis -/
 
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
-    (h : ∀ x ∈ support oa, Pr[=true | f x] = 1) :
+    (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
     ⦃1⦄ (do let x ← oa; f x) ⦃fun y => if y = true then 1 else 0⦄ := by
   vcstep
   intro x

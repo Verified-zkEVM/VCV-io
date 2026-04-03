@@ -26,8 +26,8 @@ variable {α β γ δ ε : Type}
 /-! ## Congruence -/
 
 example {mx : OracleComp spec α} {f g : α → OracleComp spec β} {y : β}
-    (h : ∀ x ∈ support mx, Pr[=y | f x] = Pr[=y | g x]) :
-    Pr[=y | mx >>= f] = Pr[=y | mx >>= g] := by
+    (h : ∀ x ∈ support mx, Pr[= y | f x] = Pr[= y | g x]) :
+    Pr[= y | mx >>= f] = Pr[= y | mx >>= g] := by
   vcstep
   exact h _ ‹_›
 
