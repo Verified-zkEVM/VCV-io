@@ -178,22 +178,14 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
 @[simp] lemma intrinsic_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) :
     (∑ a ∈ s, f a).intrinsic = ∑ a ∈ s, (f a).intrinsic := by
-  classical
-  induction s using Finset.induction_on with
-  | empty =>
-      simp
-  | @insert a s ha ih =>
-      simp [ha, ih]
+  change (intrinsicAddMonoidHom (ω := ω) (κ := κ)) (∑ a ∈ s, f a) = ∑ a ∈ s, (f a).intrinsic
+  exact map_sum (intrinsicAddMonoidHom (ω := ω) (κ := κ)) (fun a ↦ f a) s
 
 @[simp] lemma usage_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) :
     (∑ a ∈ s, f a).usage = ∑ a ∈ s, (f a).usage := by
-  classical
-  induction s using Finset.induction_on with
-  | empty =>
-      simp
-  | @insert a s ha ih =>
-      simp [ha, ih]
+  change (usageAddMonoidHom (ω := ω) (κ := κ)) (∑ a ∈ s, f a) = ∑ a ∈ s, (f a).usage
+  exact map_sum (usageAddMonoidHom (ω := ω) (κ := κ)) (fun a ↦ f a) s
 
 @[simp] lemma intrinsic_instantiate [AddCommMonoid ω]
     (c : ResourceProfile ω κ) (impl : κ → ResourceProfile ω κ') :
@@ -237,17 +229,18 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
 @[simp] lemma eval_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) (weights : κ → ω) :
     (∑ a ∈ s, f a).eval weights = ∑ a ∈ s, (f a).eval weights := by
-  classical
-  induction s using Finset.induction_on with
-  | empty =>
-      simp
-  | @insert a s ha ih =>
-      simp [ha, ih, eval_add]
+  change (evalAddMonoidHom (ω := ω) (κ := κ) weights) (∑ a ∈ s, f a) =
+      ∑ a ∈ s, (f a).eval weights
+  exact map_sum (evalAddMonoidHom (ω := ω) (κ := κ) weights) (fun a ↦ f a) s
 
 @[simp] lemma instantiate_ofIntrinsic [AddCommMonoid ω]
     (w : ω) (impl : κ → ResourceProfile ω κ') :
     (ofIntrinsic (κ := κ) w).instantiate impl = ofIntrinsic (κ := κ') w := by
   simp [instantiate, ofIntrinsic]
+
+@[simp] lemma instantiate_zero [AddCommMonoid ω] (impl : κ → ResourceProfile ω κ') :
+    (0 : ResourceProfile ω κ).instantiate impl = 0 := by
+  simp [instantiate]
 
 @[simp] lemma instantiate_ofUsage [AddCommMonoid ω]
     (u : κ →₀ ℕ) (impl : κ → ResourceProfile ω κ') :

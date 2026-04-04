@@ -70,21 +70,12 @@ noncomputable def reductionProfile {ω : Type} [AddMonoid ω] (intrinsic : ω) :
     + ResourceProfile.single chooseMessages
     + ResourceProfile.single distinguish
 
-/-- Interpret the coarse reduction capabilities using concrete resource profiles.
-
-This packages the cost transform "plug the profile for `chooseMessages` and `distinguish` into the
-open reduction body" as a function on capability names. -/
-noncomputable def instantiateProfile {ω κ : Type} [AddMonoid ω]
-    (profile : OneTimeINDCPACapability → ResourceProfile ω κ) :
-    OneTimeINDCPACapability → ResourceProfile ω κ :=
-  profile
-
 /-- Cost transform induced by the open one-time ElGamal DDH reduction body. -/
 noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
     (intrinsic : ω)
     (profile : OneTimeINDCPACapability → ResourceProfile ω κ) :
     ResourceProfile ω κ :=
-  (reductionProfile intrinsic).instantiate (instantiateProfile profile)
+  (reductionProfile intrinsic).instantiate profile
 
 @[simp] lemma reductionTransform_eq {ω κ : Type} [AddCommMonoid ω]
     (intrinsic : ω) (profile : OneTimeINDCPACapability → ResourceProfile ω κ) :
@@ -92,7 +83,7 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
       ResourceProfile.ofIntrinsic (κ := κ) intrinsic
         + profile chooseMessages
         + profile distinguish := by
-  simp [reductionTransform, reductionProfile, instantiateProfile, add_assoc]
+  simp [reductionTransform, reductionProfile, add_assoc]
 
 @[simp] lemma instantiate_reductionTransform {ω κ κ' : Type} [AddCommMonoid ω]
     (intrinsic : ω)
@@ -100,7 +91,7 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
     (impl : κ → ResourceProfile ω κ') :
     (reductionTransform intrinsic profile).instantiate impl =
       reductionTransform intrinsic (fun k ↦ (profile k).instantiate impl) := by
-  simp [reductionTransform, instantiateProfile, ResourceProfile.instantiate_assoc]
+  simp [reductionTransform, ResourceProfile.instantiate_assoc]
 
 @[simp] lemma eval_reductionProfile {ω : Type} [AddCommMonoid ω]
     (intrinsic : ω) (weights : OneTimeINDCPACapability → ω) :
@@ -119,11 +110,11 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
   simp [reductionTransform_eq, add_assoc, add_left_comm, add_comm]
 
 @[simp] lemma reductionTransform_ofIntrinsic {ω κ : Type} [AddCommMonoid ω]
-    (intrinsic chooseCost distinguishCost : ω) :
+  (intrinsic chooseCost distinguishCost : ω) :
     reductionTransform (κ := κ) intrinsic
       (fun
-        | chooseMessages => ResourceProfile.ofIntrinsic (κ := κ) chooseCost
-        | distinguish => ResourceProfile.ofIntrinsic (κ := κ) distinguishCost) =
+        | .chooseMessages => ResourceProfile.ofIntrinsic (κ := κ) chooseCost
+        | .distinguish => ResourceProfile.ofIntrinsic (κ := κ) distinguishCost) =
       ResourceProfile.ofIntrinsic (κ := κ) (intrinsic + chooseCost + distinguishCost) := by
   ext <;> simp [reductionTransform_eq, add_assoc, add_left_comm, add_comm]
 
@@ -327,7 +318,7 @@ lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
             HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
               (.chooseMessages A)
           let bit ← monadLift ($ᵗ Bool : ProbComp Bool)
-          have c : G × G := (B, T + if bit then m₁ else m₂)
+          let c : G × G := (B, T + if bit then m₁ else m₂)
           AddWriterT.addTell (profile OneTimeINDCPACapability.distinguish)
           let bit' ← monadLift <|
             HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
