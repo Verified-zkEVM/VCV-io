@@ -77,4 +77,15 @@ theorem tsum_coe_mul_nat_eq_tsum_measure_Ioi (p : PMF ℕ) :
       refine tsum_congr fun n => ?_
       by_cases h : i < n <;> simp [Set.Ioi, Set.indicator, h]
 
+/-- Tail domination bounds the `ℝ≥0∞`-valued expectation of a `PMF ℕ`.
+
+If each tail probability `Pr[i < X]` is bounded above by `a i`, then
+`E[X] ≤ ∑ i, a i`. This is the generic discrete upper-bound principle used to turn
+tail estimates into expectation bounds. -/
+theorem tsum_coe_mul_nat_le_tsum_of_measure_Ioi_le (p : PMF ℕ) {a : ℕ → ℝ≥0∞}
+    (h : ∀ i : ℕ, p.toMeasure (Set.Ioi i) ≤ a i) :
+    (∑' n : ℕ, p n * (n : ℝ≥0∞)) ≤ ∑' i : ℕ, a i := by
+  rw [tsum_coe_mul_nat_eq_tsum_measure_Ioi]
+  exact ENNReal.tsum_le_tsum h
+
 end PMF

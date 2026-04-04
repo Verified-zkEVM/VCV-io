@@ -205,6 +205,17 @@ lemma expectedCostNat_eq_tsum_tail_probs [HasEvalSPMF m] (oa : AddWriterT ℕ m 
           refine tsum_congr fun n ↦ ?_
           by_cases h : i < n <;> simp [Set.indicator, h]
 
+/-- Tail domination bounds the expected natural-valued writer cost.
+
+If the tail probability `Pr[i < cost]` is bounded by `a i` for every `i`, then
+`E[cost] ≤ ∑ i, a i`. -/
+lemma expectedCostNat_le_tsum_of_tail_probs_le [HasEvalSPMF m]
+    (oa : AddWriterT ℕ m α) {a : ℕ → ENNReal}
+    (h : ∀ i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] ≤ a i) :
+    expectedCostNat oa ≤ ∑' i : ℕ, a i := by
+  rw [expectedCostNat_eq_tsum_tail_probs]
+  exact ENNReal.tsum_le_tsum h
+
 /-- Finite tail-sum formula for natural-valued writer cost under a pathwise upper bound.
 
 If every execution path of `oa` incurs cost at most `n`, then the tail probabilities vanish above
@@ -884,6 +895,18 @@ lemma expectedQueries_eq_tsum_tail_probs
       ∑' i : ℕ, Pr[ fun c ↦ i < c | HasQuery.queryCountDist oa runtime ] := by
   simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost] using
     AddWriterT.expectedCostNat_eq_tsum_tail_probs (oa := HasQuery.withUnitCost oa runtime)
+
+/-- Tail domination bounds expected query count.
+
+If `Pr[i < number of queries] ≤ a i` for every `i`, then
+`ExpectedQueries[ oa in runtime ] ≤ ∑ i, a i`. -/
+lemma expectedQueries_le_tsum_of_tail_probs_le
+    (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m)
+    {a : ℕ → ENNReal}
+    (h : ∀ i : ℕ, Pr[ fun c ↦ i < c | HasQuery.queryCountDist oa runtime ] ≤ a i) :
+    HasQuery.expectedQueries oa runtime ≤ ∑' i : ℕ, a i := by
+  rw [HasQuery.expectedQueries_eq_tsum_tail_probs]
+  exact ENNReal.tsum_le_tsum h
 
 /-- Finite tail-sum formula for expected query count under a pathwise upper bound.
 

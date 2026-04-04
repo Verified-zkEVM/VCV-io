@@ -12,6 +12,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
+import Mathlib.Analysis.SpecificLimits.Basic
 /-!
 # Fiat-Shamir with Aborts Transform
 
@@ -618,6 +619,15 @@ private lemma signLoop_inRuntime_succ
               runtime) := by
   rfl
 
+/-- The probability that a single Fiat-Shamir-with-aborts signing attempt aborts. -/
+noncomputable abbrev signAttemptAbortProbability
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) : ENNReal :=
+  Pr[ fun attempt ↦ attempt.2 = none |
+    HasQuery.inRuntime
+      (fun [HasQuery (M × W' →ₒ C) m] =>
+        fsAbortSignAttempt (m := m) ids M pk sk msg)
+      runtime]
+
 omit [HasEvalPMF m] in
 private lemma signLoop_queryCountDist_succ
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (n : ℕ) :
@@ -938,6 +948,63 @@ private theorem signLoop_queryTailProbability_eq_probNonePrefix
                       (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
                       (msg := msg) (n := i)
 
+omit [LawfulMonad m] in
+private theorem signLoop_probNone_eq_signAttemptAbortProbability_pow
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) :
+    ∀ i,
+      Pr[= none |
+        HasQuery.inRuntime
+          (fun [HasQuery (M × W' →ₒ C) m] =>
+            fsAbortSignLoop (m := m) ids M pk sk msg i)
+          runtime] =
+        (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i
+  | 0 => by
+      simp [signAttemptAbortProbability, HasQuery.inRuntime, fsAbortSignLoop]
+  | i + 1 => by
+      calc
+        Pr[= none |
+          HasQuery.inRuntime
+            (fun [HasQuery (M × W' →ₒ C) m] =>
+              fsAbortSignLoop (m := m) ids M pk sk msg (i + 1))
+            runtime] =
+          signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg *
+            Pr[= none |
+              HasQuery.inRuntime
+                (fun [HasQuery (M × W' →ₒ C) m] =>
+                  fsAbortSignLoop (m := m) ids M pk sk msg i)
+                runtime] := by
+                  simpa [signAttemptAbortProbability] using
+                    signLoop_probNone_succ
+                      (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+                      (msg := msg) (n := i)
+        _ =
+          signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg *
+            (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+              rw [signLoop_probNone_eq_signAttemptAbortProbability_pow
+                (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i]
+        _ =
+          (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ (i + 1) := by
+              simp [pow_succ']
+
+section
+
+omit [LawfulMonad m]
+
+/-- The probability that the first `i` signing attempts all abort is the `i`-th power of the
+single-attempt abort probability. -/
+theorem sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (i : ℕ) :
+    Pr[= none |
+      HasQuery.inRuntime
+        (fun [HasQuery (M × W' →ₒ C) m] =>
+          fsAbortSignLoop (m := m) ids M pk sk msg i)
+        runtime] =
+      (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  exact signLoop_probNone_eq_signAttemptAbortProbability_pow
+    (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i
+
+end
+
 section schemeCost
 
 variable [SampleableType S] [SampleableType W]
@@ -975,6 +1042,23 @@ length `i` returns `none`, meaning that the `(i + 1)`-st attempt is reached. -/
   exact signLoop_queryTailProbability_eq_probNonePrefix
     (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
     (i := i) (extra := extra)
+
+/-- The probability that signing makes more than `i` oracle queries is the `i`-th power of the
+single-attempt abort probability, as long as `i < maxAttempts`. -/
+theorem sign_queryTailProbability_eq_signAttemptAbortProbability_pow
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    {i maxAttempts : ℕ} (hi : i < maxAttempts) :
+    Pr[ fun q ↦ i < q |
+      HasQuery.queryCountDist
+        (fun [HasQuery (M × W' →ₒ C) (AddWriterT ℕ m)] =>
+          (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
+        runtime] =
+      (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  rw [sign_queryTailProbability_eq_probAllFirstAttemptsAbort
+    (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+    (msg := msg) (hi := hi)]
+  exact sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow
+    (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i
 
 /-- The expected number of signing queries is the sum, over prefixes of the retry loop, of the
 probability that every attempt in the prefix aborts. -/
@@ -1014,6 +1098,136 @@ theorem sign_expectedQueries_eq_sum_abortPrefixProbabilities
             exact sign_queryTailProbability_eq_probAllFirstAttemptsAbort
               (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
               (msg := msg) (hi := by exact Finset.mem_range.mp hi)
+
+/-- The expected number of signing queries is the finite geometric sum of the one-step abort
+probability. -/
+theorem sign_expectedQueries_eq_sum_signAttemptAbortProbability_powers
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (maxAttempts : ℕ) :
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] =
+      ∑ i ∈ Finset.range maxAttempts,
+        (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  calc
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] =
+      ∑ i ∈ Finset.range maxAttempts,
+        Pr[= none |
+          HasQuery.inRuntime
+            (fun [HasQuery (M × W' →ₒ C) m] =>
+              fsAbortSignLoop (m := m) ids M pk sk msg i)
+            runtime] := by
+              exact sign_expectedQueries_eq_sum_abortPrefixProbabilities
+                (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+                (msg := msg) (maxAttempts := maxAttempts)
+    _ = ∑ i ∈ Finset.range maxAttempts,
+          (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+            refine Finset.sum_congr rfl ?_
+            intro i _
+            exact sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow
+              (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i
+
+/-- Tail probabilities for the signer query count are bounded by the corresponding power of the
+single-attempt abort probability. -/
+theorem sign_queryTailProbability_le_signAttemptAbortProbability_pow
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (i maxAttempts : ℕ) :
+    Pr[ fun q ↦ i < q |
+      HasQuery.queryCountDist
+        (fun [HasQuery (M × W' →ₒ C) (AddWriterT ℕ m)] =>
+          (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
+        runtime] ≤
+      (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
+  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  by_cases hi : i < maxAttempts
+  · rw [sign_queryTailProbability_eq_signAttemptAbortProbability_pow
+      (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+      (msg := msg) (hi := hi)]
+  · have hzero :
+        Pr[ fun q ↦ i < q |
+          HasQuery.queryCountDist
+            (fun [HasQuery (M × W' →ₒ C) (AddWriterT ℕ m)] =>
+              (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
+            runtime] = 0 := by
+        refine probEvent_eq_zero ?_
+        intro c hc
+        have hc' : c ∈ support
+            (AddWriterT.costs
+              (HasQuery.withUnitCost
+                (fun [HasQuery (M × W' →ₒ C) (AddWriterT ℕ m)] =>
+                  (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
+                runtime)) := by
+          simpa [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
+            HasQuery.withAddCost] using hc
+        rw [AddWriterT.costs_def, support_map] at hc'
+        rcases hc' with ⟨z, hz, rfl⟩
+        exact not_lt_of_ge <|
+          le_trans
+            (sign_usesAtMostMaxAttemptsQueries
+              (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+              (msg := msg) (maxAttempts := maxAttempts) z hz)
+            (Nat.le_of_not_lt hi)
+    rw [hzero]
+    exact zero_le _
+
+/-- The expected number of signing queries is bounded by the infinite geometric series generated by
+the single-attempt abort probability. -/
+theorem sign_expectedQueries_le_tsum_signAttemptAbortProbability_powers
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (maxAttempts : ℕ) :
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] ≤
+      ∑' i : ℕ, (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF
+  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  exact HasQuery.expectedQueries_le_tsum_of_tail_probs_le
+    (oa := fun [HasQuery (M × W' →ₒ C) (AddWriterT ℕ m)] =>
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
+    (runtime := runtime)
+    (a := fun i ↦ (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i)
+    (fun i ↦ sign_queryTailProbability_le_signAttemptAbortProbability_pow
+      (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+      (msg := msg) (i := i) (maxAttempts := maxAttempts))
+
+/-- If the single-attempt abort probability is bounded by `q`, then the expected number of signing
+queries is bounded by the corresponding geometric series. -/
+theorem sign_expectedQueries_le_geometric_of_signAttemptAbortProbability_le
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (maxAttempts : ℕ) {q : ENNReal}
+    (hq : signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg ≤ q) :
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] ≤
+      (1 - q)⁻¹ := by
+  calc
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] ≤
+      ∑' i : ℕ, (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+          exact sign_expectedQueries_le_tsum_signAttemptAbortProbability_powers
+            (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+            (msg := msg) (maxAttempts := maxAttempts)
+    _ ≤ ∑' i : ℕ, q ^ i := by
+          refine ENNReal.tsum_le_tsum fun i ↦ ?_
+          exact ENNReal.pow_le_pow_left hq
+    _ = (1 - q)⁻¹ := ENNReal.tsum_geometric q
+
+/-- Specializing the geometric upper bound to the actual one-step abort probability yields the
+canonical infinite geometric upper bound on expected query count. -/
+theorem sign_expectedQueries_le_geometric
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (maxAttempts : ℕ) :
+    ExpectedQueries[
+      (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
+    ] ≤
+      (1 - signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg)⁻¹ := by
+  exact sign_expectedQueries_le_geometric_of_signAttemptAbortProbability_le
+    (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
+    (msg := msg) (maxAttempts := maxAttempts) le_rfl
 
 /-- Verification has expected weighted query cost equal to the cost of the single verification
 query when a signature is present, and `0` when the signature is `none`. -/
