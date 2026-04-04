@@ -286,15 +286,15 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
 
 /-- Fischlin's inner search, instantiated in a weighted additive-cost runtime. -/
 private def fischlinSearchAuxWithAddCost
-    {ω : Type} [AddMonoid ω]
+    {κ : Type} [AddMonoid κ]
     {X W PC SC Ω P M : Type} {p : X → W → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
     (σ : SigmaProtocol X W PC SC Ω P p)
     (runtime : QueryRuntime (fischlinROSpec X PC Ω P ρ b M) m)
     (pk : X) (sk : W) (sc : SC) (msg : M) (comList : List PC) (i : Fin ρ)
     (challenges : List Ω) (best : Option (Ω × P × Fin (2 ^ b)))
-    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → ω) :
-    AddWriterT ω m (Option (Ω × P)) :=
+    (costFn : (fischlinROSpec X PC Ω P ρ b M).Domain → κ) :
+    AddWriterT κ m (Option (Ω × P)) :=
   match challenges with
   | [] => pure (best.map fun (ω, resp, _) => (ω, resp))
   | ω :: rest => do
