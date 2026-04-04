@@ -300,22 +300,26 @@ section OpenCostTheorems
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G]
 
-/-- The open, resource-profile-instrumented DDH reduction has a fixed exact pathwise profile:
-intrinsic overhead together with the profiles assigned to `chooseMessages` and
-`distinguish`. -/
-lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
+/-- Every reachable execution of the open, resource-profile-instrumented DDH reduction carries the
+same resource profile: the reduction's intrinsic overhead together with the profiles assigned to
+`chooseMessages` and `distinguish`.
+
+This theorem is intentionally phrased as exactness on support. If the reified adversary interface
+has empty support, the reduction has no reachable executions, so the meaningful statement is that
+all reachable paths, if any, incur the displayed profile. -/
+lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
     {State ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
     (profile : OneTimeINDCPACapability → ResourceProfile ω κ)
     (g A B T : G)
     [HasQuery (oneTimeINDCPASpec G G State (G × G)) ProbComp] :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_openProfiled
         (State := State) (ω := ω) (κ := κ) intrinsic profile g A B T)
       (OneTimeINDCPACapability.reductionTransform intrinsic profile) := by
   unfold IND_CPA_OneTime_DDHReduction_openProfiled
   have h :
-      AddWriterT.PathwiseHasCost
+      AddWriterT.PathwiseCostEqOnSupport
         ((do
           AddWriterT.addTell (ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
           AddWriterT.addTell (profile OneTimeINDCPACapability.chooseMessages)
@@ -333,30 +337,30 @@ lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
         (ResourceProfile.ofIntrinsic (κ := κ) intrinsic +
           (profile OneTimeINDCPACapability.chooseMessages +
             profile OneTimeINDCPACapability.distinguish)) := by
-    refine AddWriterT.pathwiseHasCost_bind
+    refine AddWriterT.pathwiseCostEqOnSupport_bind
       (m := ProbComp)
       (ω := ResourceProfile ω κ)
       (w₁ := ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
       (w₂ := profile OneTimeINDCPACapability.chooseMessages +
         profile OneTimeINDCPACapability.distinguish)
       ?_ (fun _ ↦ ?_)
-    · exact AddWriterT.pathwiseHasCost_addTell
+    · exact AddWriterT.pathwiseCostEqOnSupport_addTell
         (m := ProbComp)
         (ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
-    · refine AddWriterT.pathwiseHasCost_bind
+    · refine AddWriterT.pathwiseCostEqOnSupport_bind
         (m := ProbComp)
         (ω := ResourceProfile ω κ)
         (w₁ := profile OneTimeINDCPACapability.chooseMessages)
         (w₂ := profile OneTimeINDCPACapability.distinguish)
         ?_ (fun _ ↦ ?_)
-      · exact AddWriterT.pathwiseHasCost_addTell
+      · exact AddWriterT.pathwiseCostEqOnSupport_addTell
           (m := ProbComp)
           (profile OneTimeINDCPACapability.chooseMessages)
-      · refine AddWriterT.pathwiseHasCost_bind_zero_left
+      · refine AddWriterT.pathwiseCostEqOnSupport_bind_zero_left
           (m := ProbComp)
           (ω := ResourceProfile ω κ)
           ?_ (fun msgs ↦ ?_)
-        · exact AddWriterT.pathwiseHasCost_probCompLift
+        · exact AddWriterT.pathwiseCostEqOnSupport_probCompLift
             (m := ProbComp)
             (ω := ResourceProfile ω κ)
             (x := HasQuery.query
@@ -364,53 +368,53 @@ lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
               (m := ProbComp)
               (.chooseMessages A))
         · rcases msgs with ⟨m₁, m₂, st⟩
-          refine AddWriterT.pathwiseHasCost_bind_zero_left
+          refine AddWriterT.pathwiseCostEqOnSupport_bind_zero_left
             (m := ProbComp)
             (ω := ResourceProfile ω κ)
             ?_ (fun bit ↦ ?_)
-          · exact AddWriterT.pathwiseHasCost_probCompLift
+          · exact AddWriterT.pathwiseCostEqOnSupport_probCompLift
               (m := ProbComp)
               (ω := ResourceProfile ω κ)
               (x := ($ᵗ Bool : ProbComp Bool))
-          · refine AddWriterT.pathwiseHasCost_bind_zero_right
+          · refine AddWriterT.pathwiseCostEqOnSupport_bind_zero_right
               (m := ProbComp)
               (ω := ResourceProfile ω κ)
               ?_ (fun _ ↦ by
                 let c : G × G := (B, T + if bit then m₁ else m₂)
-                refine AddWriterT.pathwiseHasCost_bind_zero_left
+                refine AddWriterT.pathwiseCostEqOnSupport_bind_zero_left
                   (m := ProbComp)
                   (ω := ResourceProfile ω κ)
                   ?_ (fun bit' ↦ ?_)
-                · exact AddWriterT.pathwiseHasCost_probCompLift
+                · exact AddWriterT.pathwiseCostEqOnSupport_probCompLift
                     (m := ProbComp)
                     (ω := ResourceProfile ω κ)
                     (x := HasQuery.query
                       (spec := oneTimeINDCPASpec G G State (G × G))
                       (m := ProbComp)
                       (.distinguish st c))
-                · exact AddWriterT.pathwiseHasCost_pure
+                · exact AddWriterT.pathwiseCostEqOnSupport_pure
                     (m := ProbComp)
                     (ω := ResourceProfile ω κ)
                     (bit == bit'))
-            · exact AddWriterT.pathwiseHasCost_addTell
+            · exact AddWriterT.pathwiseCostEqOnSupport_addTell
                 (m := ProbComp)
                 (profile OneTimeINDCPACapability.distinguish)
   rw [OneTimeINDCPACapability.reductionTransform_eq]
-  exact ⟨by simpa only [add_assoc] using h.1, by simpa only [add_assoc] using h.2⟩
+  simpa only [add_assoc] using h
 
 /-- The symbolic capability-counting theorem is the specialization of
-[`IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost`] where each capability is charged by
-its own singleton resource profile. -/
-lemma IND_CPA_OneTime_DDHReduction_openCost_pathwiseHasCost
+[`IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport`].
+Each capability is charged by its own singleton resource profile. -/
+lemma IND_CPA_OneTime_DDHReduction_openCost_pathwiseCostEqOnSupport
     {State ω : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω) (g A B T : G)
     [HasQuery (oneTimeINDCPASpec G G State (G × G)) ProbComp] :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_openCost
         (State := State) (ω := ω) intrinsic g A B T)
       (OneTimeINDCPACapability.reductionProfile intrinsic) := by
   simpa [IND_CPA_OneTime_DDHReduction_openCost] using
-    (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
+    (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
       (State := State) (ω := ω) (κ := OneTimeINDCPACapability)
       intrinsic (fun k ↦ ResourceProfile.single (ω := ω) k) g A B T)
 
@@ -459,53 +463,53 @@ lemma IND_CPA_OneTime_DDHReduction_open_inRuntime
 If `profile` assigns resource profiles to the two adversary capabilities `chooseMessages` and
 `distinguish`, then the instantiated reduction has exact pathwise cost equal to the reduction
 transform applied to those capability profiles. -/
-lemma IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
+lemma IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
     (profile : OneTimeINDCPACapability → ResourceProfile ω κ)
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
     (g A B T : G) :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_profiled
         (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ) intrinsic profile adv g A B T)
       (OneTimeINDCPACapability.reductionTransform intrinsic profile) := by
   letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
   simpa [IND_CPA_OneTime_DDHReduction_profiled] using
-    (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
+    (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
       (State := adv.State) (ω := ω) (κ := κ) intrinsic profile g A B T)
 
 /-- The asymptotic model [`oneTimeDDHReductionCost`] matches the exact pathwise cost of the
 instantiated DDH reduction when evaluated at the procedure-cost profile chosen for security
 parameter `n`. -/
-lemma IND_CPA_OneTime_DDHReduction_modeledCost_pathwiseHasCost
+lemma IND_CPA_OneTime_DDHReduction_modeledCost_pathwiseCostEqOnSupport
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
     (advCost :
       AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProcedureCost ω κ)
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
     (n : ℕ) (g A B T : G) :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_profiled
         (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
         intrinsic (advCost adv n).toProfile adv g A B T)
       (oneTimeDDHReductionCost (F := F) (G := G) (gen := gen) intrinsic advCost adv n) := by
   simpa [oneTimeDDHReductionCost] using
-    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
+    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
       intrinsic (advCost adv n).toProfile adv g A B T)
 
 /-- Scalar-cost specialization of
-[`IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost`].
+[`IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport`].
 
 If the reified adversary procedures `chooseMessages` and `distinguish` are assigned scalar
 intrinsic costs `chooseCost` and `distinguishCost`, then the whole reduction has exact pathwise
 cost `intrinsic + chooseCost + distinguishCost`. -/
-lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseHasCost
+lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseCostEqOnSupport
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic chooseCost distinguishCost : ω)
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
     (g A B T : G) :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_profiled
         (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
         intrinsic
@@ -517,7 +521,7 @@ lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseHasCost
         adv g A B T)
       (ResourceProfile.ofIntrinsic (κ := κ) (intrinsic + chooseCost + distinguishCost)) := by
   simpa [OneTimeINDCPACapability.reductionTransform_ofIntrinsic, add_assoc] using
-    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
+    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
       intrinsic
       (fun
@@ -679,18 +683,18 @@ theorem oneTimeINDCPA_secureAgainst_of_ddh_secureAgainst_withCost
 
 /-- Instantiating the open costed reduction with a concrete adversary preserves the exact pathwise
 resource profile proved for the open reduction body. -/
-lemma IND_CPA_OneTime_DDHReduction_costed_pathwiseHasCost
+lemma IND_CPA_OneTime_DDHReduction_costed_pathwiseCostEqOnSupport
     {gen : G} {ω : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
     (g A B T : G) :
-    AddWriterT.PathwiseHasCost
+    AddWriterT.PathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_costed
         (F := F) (G := G) (gen := gen) (ω := ω) intrinsic adv g A B T)
       (OneTimeINDCPACapability.reductionProfile intrinsic) := by
   letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
   simpa [IND_CPA_OneTime_DDHReduction_costed] using
-    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
+    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := OneTimeINDCPACapability)
       intrinsic (fun k ↦ ResourceProfile.single (ω := ω) k) adv g A B T)
 
