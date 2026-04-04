@@ -463,8 +463,15 @@ lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseHasCost
 
 /-- Cost-aware reduction packaging for the one-time ElGamal DDH reduction.
 
-The source cost object is a two-procedure adversary profile, and the target cost object is the
-closed reduction cost obtained by instantiating the open reduction transform with that profile. -/
+For each security parameter `n`, the source cost object is a profile assigning one resource bound
+to `chooseMessages` and one resource bound to `distinguish`. The target cost object is the closed
+resource profile of the DDH reduction obtained by plugging that two-procedure profile into
+[`OneTimeINDCPACapability.reductionTransform`].
+
+Operationally, this packages the statement that the one-time ElGamal DDH reduction contributes its
+own intrinsic overhead and makes exactly one call to each adversary procedure. The adversary map is
+`id` because this declaration isolates only the cost-transform part of the reduction theorem; the
+same extracted one-time adversary is viewed through a different cost model on the target side. -/
 noncomputable def oneTimeDDHReductionWithCost
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
@@ -477,7 +484,22 @@ noncomputable def oneTimeDDHReductionWithCost
   monotone_transform _ := OneTimeINDCPACapability.monotone_reductionTransform intrinsic
   cost_bound _ _ := by simp [oneTimeDDHReductionCost, OneTimeINDCPACapability.reductionTransform_eq]
 
-/-- Image lemma for the one-time ElGamal DDH reduction at the level of asymptotic cost classes. -/
+/-- Efficiency preservation for the one-time ElGamal DDH reduction.
+
+Assume `adv` is efficient with respect to a source class `isEff` of asymptotic procedure-cost
+bounds. Concretely, this means that for each security parameter `n`, there is a bound on the cost
+of `adv.chooseMessages` and a bound on the cost of `adv.distinguish`, packaged together as a value
+of [`OneTimeINDCPAProfile`].
+
+Assume also that the target class `isEff'` is closed under the ElGamal reduction transform
+`bound n ↦ reductionTransform intrinsic (bound n)`. In concrete terms, this transform adds the
+reduction's own intrinsic overhead `intrinsic` and then charges one use of the `chooseMessages`
+bound and one use of the `distinguish` bound.
+
+Then the DDH reduction built from `adv` is efficient with respect to the closed cost model
+[`oneTimeDDHReductionCost`]. This is the cost side of the usual cryptographic reduction claim:
+an efficient IND-CPA adversary induces an efficient DDH adversary, with explicit accounting for
+how the reduction transforms adversary runtime. -/
 theorem efficientFor_oneTimeDDHReduction
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
