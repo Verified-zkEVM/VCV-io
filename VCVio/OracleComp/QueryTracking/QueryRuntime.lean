@@ -171,7 +171,7 @@ end pathwiseCost
 
 section expectedCost
 
-variable {ω : Type} [AddMonoid ω]
+variable {ω : Type}
 
 /-- The expected additive cost of an `AddWriterT` computation, obtained by taking the expectation
 of its cost marginal.
@@ -234,7 +234,6 @@ lemma expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
     rcases hc with ⟨z, hz, rfl⟩
     exact not_lt_of_ge (le_trans (h z hz) hnb)
 
-omit [AddMonoid ω] in
 lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
     (oa : AddWriterT ω m α) (val : ω → ENNReal) (c : ENNReal)
     (h : ∀ w ∈ support oa.costs, val w ≤ c) :
@@ -262,7 +261,8 @@ lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
           simpa [mul_comm] using (mul_le_mul_right hmass c)
     _ = c := by simp
 
-lemma expectedCost_le_of_pathwiseCostAtMost [HasEvalSPMF m] [LawfulMonad m] [Preorder ω]
+lemma expectedCost_le_of_pathwiseCostAtMost [AddMonoid ω] [HasEvalSPMF m] [LawfulMonad m]
+    [Preorder ω]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtMost oa w) (hval : Monotone val) :
     expectedCost oa val ≤ val w := by
@@ -272,7 +272,8 @@ lemma expectedCost_le_of_pathwiseCostAtMost [HasEvalSPMF m] [LawfulMonad m] [Pre
   rcases hc with ⟨z, hz, rfl⟩
   exact hval (h z hz)
 
-lemma expectedCost_ge_of_pathwiseCostAtLeast [LawfulMonad m] [Preorder ω] [HasEvalPMF m]
+lemma expectedCost_ge_of_pathwiseCostAtLeast [AddMonoid ω] [LawfulMonad m] [Preorder ω]
+    [HasEvalPMF m]
     {oa : AddWriterT ω m α} {w : ω} {val : ω → ENNReal}
     (h : PathwiseCostAtLeast oa w) (hval : Monotone val) :
     val w ≤ expectedCost oa val := by
@@ -300,7 +301,6 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [LawfulMonad m] [Preorder ω] [HasE
             rw [hp]
             simp
 
-omit [AddMonoid ω] in
 lemma expectedCost_eq_tsum_outputs_of_costsAs [HasEvalSPMF m] [LawfulMonad m]
     {oa : AddWriterT ω m α} {f : α → ω} {val : ω → ENNReal}
     (h : oa.CostsAs f) :
@@ -701,9 +701,8 @@ end runtimeInstantiation
 section queryBounds
 
 variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*}
-variable [Monad m] [LawfulMonad m] [HasEvalSet m]
+variable [Monad m] [LawfulMonad m]
 
-omit [HasEvalSet m] in
 lemma hasCost_withAddCost_query {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime spec m) (costFn : spec.Domain → ω) (t : spec.Domain) :
     Cost[
@@ -717,6 +716,7 @@ lemma hasCost_withAddCost_query {ω : Type} [AddMonoid ω]
   simp [AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
 lemma queryBoundedAboveBy_withUnitCost_query
+    [HasEvalSet m]
     (runtime : QueryRuntime spec m) (t : spec.Domain) :
     AddWriterT.QueryBoundedAboveBy
       (HasQuery.withUnitCost
@@ -732,6 +732,7 @@ lemma queryBoundedAboveBy_withUnitCost_query
     exact AddWriterT.queryBoundedAboveBy_monadLift (runtime.impl t)
 
 lemma queryBoundedBelowBy_withUnitCost_query
+    [HasEvalSet m]
     (runtime : QueryRuntime spec m) (t : spec.Domain) :
     AddWriterT.QueryBoundedBelowBy
       (HasQuery.withUnitCost

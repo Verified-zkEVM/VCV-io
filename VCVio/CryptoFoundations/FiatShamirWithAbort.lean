@@ -593,11 +593,14 @@ end schemeCost
 
 end expectedCost
 
+end costAccounting
+
 section expectedCostPMF
 
-variable [HasEvalPMF m]
+variable (ids : IdenSchemeWithAbort S W W' St C Z p) (M : Type)
 
-omit [LawfulMonad m] [HasEvalPMF m] in
+variable {m : Type → Type u} [Monad m] [MonadLiftT ProbComp m]
+
 private lemma signLoop_inRuntime_succ
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (n : ℕ) :
     HasQuery.inRuntime
@@ -619,16 +622,8 @@ private lemma signLoop_inRuntime_succ
               runtime) := by
   rfl
 
-/-- The probability that a single Fiat-Shamir-with-aborts signing attempt aborts. -/
-noncomputable abbrev signAttemptAbortProbability
-    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) : ENNReal :=
-  Pr[ fun attempt ↦ attempt.2 = none |
-    HasQuery.inRuntime
-      (fun [HasQuery (M × W' →ₒ C) m] =>
-        fsAbortSignAttempt (m := m) ids M pk sk msg)
-      runtime]
+variable [LawfulMonad m]
 
-omit [HasEvalPMF m] in
 private lemma signLoop_queryCountDist_succ
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (n : ℕ) :
     HasQuery.queryCountDist
@@ -676,7 +671,17 @@ private lemma signLoop_queryCountDist_succ
       simp [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
         HasQuery.withAddCost, AddWriterT.costs, add_comm]
 
-omit [LawfulMonad m] in
+variable [HasEvalPMF m]
+
+/-- The probability that a single Fiat-Shamir-with-aborts signing attempt aborts. -/
+noncomputable abbrev signAttemptAbortProbability
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) : ENNReal :=
+  Pr[ fun attempt ↦ attempt.2 = none |
+    HasQuery.inRuntime
+      (fun [HasQuery (M × W' →ₒ C) m] =>
+        fsAbortSignAttempt (m := m) ids M pk sk msg)
+      runtime]
+
 private lemma signLoop_probNone_succ
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (n : ℕ) :
     Pr[= none |
@@ -948,7 +953,6 @@ private theorem signLoop_queryTailProbability_eq_probNonePrefix
                       (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
                       (msg := msg) (n := i)
 
-omit [LawfulMonad m] in
 private theorem signLoop_probNone_eq_signAttemptAbortProbability_pow
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) :
     ∀ i,
@@ -987,8 +991,6 @@ private theorem signLoop_probNone_eq_signAttemptAbortProbability_pow
               simp [pow_succ']
 
 section
-
-omit [LawfulMonad m]
 
 /-- The probability that the first `i` signing attempts all abort is the `i`-th power of the
 single-attempt abort probability. -/
@@ -1265,8 +1267,6 @@ theorem verify_expectedQueryCost_eq
 end schemeCost
 
 end expectedCostPMF
-
-end costAccounting
 
 section EUF_CMA
 

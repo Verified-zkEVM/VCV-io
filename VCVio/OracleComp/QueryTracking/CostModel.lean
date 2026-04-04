@@ -259,10 +259,7 @@ private lemma addCostOracle_unit_run_apply (t : spec.Domain) :
 
 section UnitCostBridge
 
-variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited]
-
-omit [DecidableEq ι] [spec.Fintype] in
-private lemma exists_mem_support (oa : OracleComp spec α) :
+private lemma exists_mem_support [spec.Inhabited] (oa : OracleComp spec α) :
     ∃ x, x ∈ support oa := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
@@ -273,7 +270,6 @@ private lemma exists_mem_support (oa : OracleComp spec α) :
       refine ⟨x, (mem_support_bind_iff _ _ _).2 ?_⟩
       exact ⟨u, mem_support_query t u, hx⟩
 
-omit [DecidableEq ι] [spec.Fintype] [spec.Inhabited] in
 private lemma exists_mem_support_costDist_of_mem_support
     [AddCommMonoid ω] (oa : OracleComp spec α) (cm : CostModel spec ω) {x : α}
     (hx : x ∈ support oa) :
@@ -286,7 +282,6 @@ private lemma exists_mem_support_costDist_of_mem_support
   subst x'
   exact ⟨c, hz⟩
 
-omit [DecidableEq ι] [spec.Fintype] [spec.Inhabited] in
 private lemma mem_support_costDist_unit_query_bind_of_mem_support
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (u : spec.Range t)
     {z : α × Multiplicative ℕ} (hz : z ∈ support (costDist (mx u) CostModel.unit)) :
@@ -303,8 +298,8 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
   · rw [support_map]
     exact ⟨z, hz, by ext <;> simp [Prod.map, Nat.add_comm]⟩
 
-omit [spec.Fintype] in
 private theorem isPerIndexQueryBound_of_unit_support_bound
+    [DecidableEq ι] [spec.Inhabited]
     {oa : OracleComp spec α} {bound : ℕ}
     (hSupport : ∀ z ∈ support (costDist oa CostModel.unit), z.2 ≤ bound) :
     IsPerIndexQueryBound oa (fun _ => bound) := by
@@ -338,11 +333,11 @@ private theorem isPerIndexQueryBound_of_unit_support_bound
           simp
         · simp [Function.update, hi]
 
-omit [spec.Fintype] in
 /-- A strict bound under the unit cost model yields a uniform per-index query bound:
 if every execution uses at most `bound` total unit-cost steps, then each oracle index
 is queried at most `bound` times. -/
 theorem WorstCaseCostBound.toIsPerIndexQueryBound_unit
+    [DecidableEq ι] [spec.Inhabited]
     {oa : OracleComp spec α} {bound : ℕ}
     (h : WorstCaseCostBound oa CostModel.unit bound) :
     IsPerIndexQueryBound oa (fun _ => bound) := by
