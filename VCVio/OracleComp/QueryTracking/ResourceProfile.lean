@@ -276,6 +276,45 @@ noncomputable def instantiateAddMonoidHom [AddCommMonoid ω]
     (n • a).instantiate impl = n • a.instantiate impl := by
   exact map_nsmul (instantiateAddMonoidHom (ω := ω) impl) n a
 
+/-- Instantiating symbolic capabilities is associative.
+
+Substituting `impl₁` into a profile `c`, and then substituting `impl₂` into the resulting
+profile, is the same as substituting the composite implementation
+`fun k ↦ (impl₁ k).instantiate impl₂` into `c` directly. -/
+@[simp] lemma instantiate_assoc [AddCommMonoid ω]
+    (c : ResourceProfile ω κ)
+    (impl₁ : κ → ResourceProfile ω κ')
+    (impl₂ : κ' → ResourceProfile ω κ'') :
+    (c.instantiate impl₁).instantiate impl₂ =
+      c.instantiate (fun k ↦ (impl₁ k).instantiate impl₂) := by
+  have hu :
+      ∀ u : κ →₀ ℕ,
+        ((ofUsage (ω := ω) u).instantiate impl₁).instantiate impl₂ =
+          (ofUsage (ω := ω) u).instantiate (fun k ↦ (impl₁ k).instantiate impl₂) := by
+    intro u
+    induction u using Finsupp.induction with
+    | zero =>
+        simp [instantiate]
+    | @single_add a n u ha hn ih =>
+        have ihu :
+            (u.sum fun k n ↦ n • impl₁ k).instantiate impl₂ =
+              u.sum fun k n ↦ n • (impl₁ k).instantiate impl₂ := by
+          simpa [instantiate_ofUsage] using ih
+        rw [instantiate_ofUsage, instantiate_ofUsage]
+        rw [Finsupp.sum_add_index' (h_zero := fun _ ↦ by simp)
+          (h_add := fun _ _ _ ↦ by simp [add_nsmul])]
+        rw [Finsupp.sum_add_index' (h_zero := fun _ ↦ by simp)
+          (h_add := fun _ _ _ ↦ by simp [add_nsmul])]
+        rw [instantiate_add, Finsupp.sum_single_index, instantiate_nsmul, Finsupp.sum_single_index]
+        · exact congrArg (fun t ↦ n • (impl₁ a).instantiate impl₂ + t) ihu
+        · simp
+        · simp
+  have hc : c = ofIntrinsic (κ := κ) c.intrinsic + ofUsage (ω := ω) c.usage := by
+    ext <;> simp [ofUsage]
+  rw [hc, instantiate_add, instantiate_ofIntrinsic, instantiate_add, instantiate_ofIntrinsic,
+    instantiate_add, instantiate_ofIntrinsic]
+  exact congrArg (fun t ↦ ofIntrinsic (κ := κ'') c.intrinsic + t) (hu c.usage)
+
 /-- Evaluating a purely intrinsic profile after instantiation leaves the intrinsic cost
 unchanged. -/
 @[simp] lemma eval_instantiate_ofIntrinsic [AddCommMonoid ω]
