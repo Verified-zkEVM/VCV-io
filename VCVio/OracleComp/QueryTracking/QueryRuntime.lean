@@ -56,6 +56,22 @@ lemma ofHasQuery_impl [HasQuery spec m] (t : spec.Domain) :
     (ofHasQuery (spec := spec) (m := m)).impl t =
       HasQuery.query (spec := spec) (m := m) t := rfl
 
+section OracleComp
+
+variable {ι : Type} {spec : OracleSpec ι}
+
+/-- The canonical bundled runtime for the free oracle monad `OracleComp spec`. -/
+abbrev oracleCompRuntime (spec : OracleSpec ι) : QueryRuntime spec (OracleComp spec) :=
+  QueryRuntime.ofHasQuery (spec := spec) (m := OracleComp spec)
+
+@[simp]
+lemma oracleCompRuntime_impl_eq_ofLift :
+    (oracleCompRuntime (spec := spec)).impl = QueryImpl.ofLift spec (OracleComp spec) := by
+  ext t
+  rfl
+
+end OracleComp
+
 section instrumentation
 
 variable [Monad m]
