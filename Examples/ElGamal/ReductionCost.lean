@@ -106,13 +106,13 @@ noncomputable def IND_CPA_OneTime_DDHReduction_openCost
     AddWriterT (ResourceProfile ω OneTimeINDCPACapability) ProbComp Bool := do
   AddWriterT.addTell (ResourceProfile.ofIntrinsic (κ := OneTimeINDCPACapability) intrinsic)
   AddWriterT.addTell (ResourceProfile.single OneTimeINDCPACapability.chooseMessages)
-  let (m₁, m₂, st) ← liftM <|
+  let (m₁, m₂, st) ← monadLift <|
     HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
       (.chooseMessages A)
-  let bit ← liftM ($ᵗ Bool : ProbComp Bool)
+  let bit ← monadLift ($ᵗ Bool : ProbComp Bool)
   let c : G × G := (B, T + if bit then m₁ else m₂)
   AddWriterT.addTell (ResourceProfile.single OneTimeINDCPACapability.distinguish)
-  let bit' ← liftM <|
+  let bit' ← monadLift <|
     HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
       (.distinguish st c)
   pure (bit == bit')
@@ -124,6 +124,121 @@ def oneTimeINDCPARuntime {gen : G}
   impl
     | .chooseMessages pk => adv.chooseMessages pk
     | .distinguish st c => adv.distinguish st c
+
+section OpenCostTheorems
+
+variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
+variable {G : Type} [AddCommGroup G] [Module F G]
+
+/-- The open, resource-profile-instrumented DDH reduction has a fixed exact pathwise profile:
+intrinsic overhead plus one use each of `chooseMessages` and `distinguish`. -/
+lemma IND_CPA_OneTime_DDHReduction_openCost_pathwiseHasCost
+    {State ω : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
+    (intrinsic : ω) (g A B T : G)
+    [HasQuery (oneTimeINDCPASpec G G State (G × G)) ProbComp] :
+    AddWriterT.PathwiseHasCost
+      (IND_CPA_OneTime_DDHReduction_openCost
+        (State := State) (ω := ω) intrinsic g A B T)
+      (OneTimeINDCPACapability.reductionProfile intrinsic) := by
+  unfold IND_CPA_OneTime_DDHReduction_openCost
+  have h :
+      AddWriterT.PathwiseHasCost
+        ((do
+          AddWriterT.addTell (ResourceProfile.ofIntrinsic (κ := OneTimeINDCPACapability) intrinsic)
+          AddWriterT.addTell
+            (ResourceProfile.single (ω := ω) OneTimeINDCPACapability.chooseMessages)
+          let (m₁, m₂, st) ← monadLift <|
+            HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
+              (.chooseMessages A)
+          let bit ← monadLift ($ᵗ Bool : ProbComp Bool)
+          have c : G × G := (B, T + if bit then m₁ else m₂)
+          AddWriterT.addTell
+            (ResourceProfile.single (ω := ω) OneTimeINDCPACapability.distinguish)
+          let bit' ← monadLift <|
+            HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
+              (.distinguish st c)
+          pure (bit == bit')) :
+          AddWriterT (ResourceProfile ω OneTimeINDCPACapability) ProbComp Bool)
+        (ResourceProfile.ofIntrinsic (κ := OneTimeINDCPACapability) intrinsic +
+          (ResourceProfile.single (ω := ω) OneTimeINDCPACapability.chooseMessages +
+            ResourceProfile.single (ω := ω) OneTimeINDCPACapability.distinguish)) := by
+    refine AddWriterT.pathwiseHasCost_bind
+      (m := ProbComp)
+      (ω := ResourceProfile ω OneTimeINDCPACapability)
+      (w₁ := ResourceProfile.ofIntrinsic (κ := OneTimeINDCPACapability) intrinsic)
+      (w₂ := ResourceProfile.single (ω := ω) OneTimeINDCPACapability.chooseMessages +
+        ResourceProfile.single (ω := ω) OneTimeINDCPACapability.distinguish)
+      ?_ (fun _ ↦ ?_)
+    · exact AddWriterT.pathwiseHasCost_addTell
+        (m := ProbComp)
+        (ResourceProfile.ofIntrinsic (κ := OneTimeINDCPACapability) intrinsic)
+    · refine AddWriterT.pathwiseHasCost_bind
+        (m := ProbComp)
+        (ω := ResourceProfile ω OneTimeINDCPACapability)
+        (w₁ := ResourceProfile.single (ω := ω) OneTimeINDCPACapability.chooseMessages)
+        (w₂ := ResourceProfile.single (ω := ω) OneTimeINDCPACapability.distinguish)
+        ?_ (fun _ ↦ ?_)
+      · exact AddWriterT.pathwiseHasCost_addTell
+          (m := ProbComp)
+          (ResourceProfile.single (ω := ω) OneTimeINDCPACapability.chooseMessages)
+      · refine AddWriterT.pathwiseHasCost_bind_zero_left
+          (m := ProbComp)
+          (ω := ResourceProfile ω OneTimeINDCPACapability)
+          ?_ (fun msgs ↦ ?_)
+        · exact AddWriterT.pathwiseHasCost_probCompLift
+            (m := ProbComp)
+            (ω := ResourceProfile ω OneTimeINDCPACapability)
+            (x := HasQuery.query
+              (spec := oneTimeINDCPASpec G G State (G × G))
+              (m := ProbComp)
+              (.chooseMessages A))
+        · rcases msgs with ⟨m₁, m₂, st⟩
+          refine AddWriterT.pathwiseHasCost_bind_zero_left
+            (m := ProbComp)
+            (ω := ResourceProfile ω OneTimeINDCPACapability)
+            ?_ (fun bit ↦ ?_)
+          · exact AddWriterT.pathwiseHasCost_probCompLift
+              (m := ProbComp)
+              (ω := ResourceProfile ω OneTimeINDCPACapability)
+              (x := ($ᵗ Bool : ProbComp Bool))
+          · refine AddWriterT.pathwiseHasCost_bind_zero_right
+              (m := ProbComp)
+              (ω := ResourceProfile ω OneTimeINDCPACapability)
+              ?_ (fun _ ↦ by
+                refine AddWriterT.pathwiseHasCost_bind_zero_left
+                  (m := ProbComp)
+                  (ω := ResourceProfile ω OneTimeINDCPACapability)
+                  ?_ (fun bit' ↦ ?_)
+                · exact AddWriterT.pathwiseHasCost_probCompLift
+                    (m := ProbComp)
+                    (ω := ResourceProfile ω OneTimeINDCPACapability)
+                    (x := HasQuery.query
+                      (spec := oneTimeINDCPASpec G G State (G × G))
+                      (m := ProbComp)
+                      (.distinguish st (B, T + if bit then m₁ else m₂)))
+                · exact AddWriterT.pathwiseHasCost_pure
+                    (m := ProbComp)
+                    (ω := ResourceProfile ω OneTimeINDCPACapability)
+                    (bit == bit'))
+            · exact AddWriterT.pathwiseHasCost_addTell
+                (m := ProbComp)
+                (ResourceProfile.single (ω := ω) OneTimeINDCPACapability.distinguish)
+  rw [OneTimeINDCPACapability.reductionProfile, add_assoc]
+  exact h
+
+end OpenCostTheorems
+
+/-- Closed, resource-profile-instrumented form of the one-time ElGamal DDH reduction. -/
+noncomputable def IND_CPA_OneTime_DDHReduction_costed
+    {gen : G} {ω : Type} [AddMonoid ω]
+    (intrinsic : ω)
+    (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)) :
+    G → G → G → G →
+      AddWriterT (ResourceProfile ω OneTimeINDCPACapability) ProbComp Bool :=
+  fun g A B T => by
+    letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
+    exact IND_CPA_OneTime_DDHReduction_openCost
+      (State := adv.State) (ω := ω) intrinsic g A B T
 
 /-- Instantiating the open reduction with a concrete adversary recovers the existing closed DDH
 reduction `IND_CPA_OneTime_DDHReduction` from `Examples.ElGamal.Basic`. -/
@@ -138,6 +253,22 @@ lemma IND_CPA_OneTime_DDHReduction_open_inRuntime
       (oneTimeINDCPARuntime (gen := gen) adv)
       = IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv g A B T := by
   rfl
+
+/-- Instantiating the open costed reduction with a concrete adversary preserves the exact pathwise
+resource profile proved for the open reduction body. -/
+lemma IND_CPA_OneTime_DDHReduction_costed_pathwiseHasCost
+    {gen : G} {ω : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
+    (intrinsic : ω)
+    (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
+    (g A B T : G) :
+    AddWriterT.PathwiseHasCost
+      (IND_CPA_OneTime_DDHReduction_costed
+        (F := F) (G := G) (gen := gen) (ω := ω) intrinsic adv g A B T)
+      (OneTimeINDCPACapability.reductionProfile intrinsic) := by
+  letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
+  simpa [IND_CPA_OneTime_DDHReduction_costed] using
+    (IND_CPA_OneTime_DDHReduction_openCost_pathwiseHasCost
+      (State := adv.State) (ω := ω) intrinsic g A B T)
 
 end IND_CPA
 
