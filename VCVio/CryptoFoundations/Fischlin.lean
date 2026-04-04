@@ -752,7 +752,7 @@ theorem sign_expectedQueryCost_le
     ExpectedQueryCost[
       (Fischlin σ hr ρ b S M).sign pk sk msg in runtime by costFn via val
     ] ≤ val (ρ • (FinEnum.card Ω • w)) := by
-  let _ : HasEvalSet m := HasEvalSPMF.toHasEvalSet
+  letI : HasEvalSet m := HasEvalSPMF.toHasEvalSet
   exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
     (sign_usesWeightedQueryCostAtMost
       (σ := σ) (hr := hr) (ρ := ρ) (b := b) (S := S) (M := M)

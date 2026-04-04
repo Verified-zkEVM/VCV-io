@@ -1160,9 +1160,9 @@ syntax:max "ExpectedQueries[ " term " in " term " ]" : term
 
 macro_rules
   | `(ExpectedQueries[ $oa in $runtime ]) =>
-      `(HasQuery.expectedQueryCost
+      `(HasQuery.expectedQueries
           (((fun [HasQuery _ _] => $oa) : [HasQuery _ (AddWriterT ℕ _)] → AddWriterT ℕ _ _))
-          $runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal)))
+          $runtime)
 
 end costAccounting
 

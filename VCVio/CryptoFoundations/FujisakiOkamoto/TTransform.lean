@@ -263,22 +263,23 @@ theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] ≤ 1 := by
-  by_cases hdec : pke.decrypt sk c = none
-  · exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-      (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-        (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-      (runtime := runtime)
-      (decrypt_usesNoQueries_of_decrypt_eq_none
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
-      (Nat.zero_le 1)
-  · rcases Option.ne_none_iff_exists'.mp hdec with ⟨msg, hsome⟩
-    exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-      (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-        (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-      (runtime := runtime)
-      (decrypt_usesExactlyOneQuery_of_decrypt_eq_some
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hsome)
-      le_rfl
+  cases hdec : pke.decrypt sk c with
+  | none =>
+      exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
+        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+        (runtime := runtime)
+        (decrypt_usesNoQueries_of_decrypt_eq_none
+          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
+        (Nat.zero_le 1)
+  | some msg =>
+      exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
+        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+        (runtime := runtime)
+        (decrypt_usesExactlyOneQuery_of_decrypt_eq_some
+          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
+        le_rfl
 
 end costAccounting
 
