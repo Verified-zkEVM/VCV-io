@@ -1015,7 +1015,7 @@ probability that the first `i` signing attempts all abort.
 
 Equivalently, the event `i < q` for the signer query count is the event that the retry loop of
 length `i` returns `none`, meaning that the `(i + 1)`-st attempt is reached. -/
-  theorem sign_queryTailProbability_eq_probAllFirstAttemptsAbort
+theorem sign_queryTailProbability_eq_probAllFirstAttemptsAbort
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
     {i maxAttempts : ℕ} (hi : i < maxAttempts) :
     Pr[ fun q ↦ i < q |

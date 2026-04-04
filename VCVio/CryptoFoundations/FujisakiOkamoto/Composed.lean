@@ -95,8 +95,8 @@ def singleRO
 
 /-- Runtime bundle for the canonical two-RO Fujisaki-Okamoto oracle world. -/
 noncomputable def twoRORuntime
-    [DecidableEq M] [DecidableEq C] [DecidableEq KD]
-    [SampleableType M] [SampleableType R] [SampleableType K] :
+    [DecidableEq M] [DecidableEq KD]
+    [SampleableType R] [SampleableType K] :
     ProbCompRuntime (OracleComp (UTransform.oracleSpec M R KD K)) :=
   UTransform.runtime (R := R) (KD := KD) (K := K)
 
@@ -125,7 +125,7 @@ theorem IND_CCA_bound
     ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
       ∃ prfAdv : PRFScheme.PRFAdversary C K,
         (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage
-            (twoRORuntime (M := M) (R := R) (C := C) (KD := KD) (K := K))
+            (twoRORuntime (M := M) (R := R) (KD := KD) (K := K))
             adversary ≤
           2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
           2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
