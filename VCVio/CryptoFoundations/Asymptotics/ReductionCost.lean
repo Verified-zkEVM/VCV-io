@@ -14,11 +14,12 @@ This file packages the cost-transform part of a reduction theorem.
 `ReductionWithCost` records:
 
 - a reduction `reduce : Adv → Adv'`,
-- a resource-profile transform on asymptotic bounds,
+- a monotone transform on asymptotic cost bounds,
 - a proof that the reduced adversary's cost profile is bounded by that transform.
 
-This is intentionally abstract in the choice of efficiency class. Users can instantiate the
-resulting meta-theorems with polynomial bounds, query bounds, or any other asymptotic notion
+This is intentionally abstract in both the choice of efficiency class and the shape of the cost
+objects being transformed. Users can instantiate the resulting meta-theorems with scalar costs,
+structured resource profiles, interface-profile bounds, or any other preordered asymptotic notion
 that is closed under the transform carried by the reduction.
 -/
 
@@ -27,37 +28,37 @@ open OracleComp OracleSpec ENNReal Filter
 namespace SecurityGame
 
 variable {Adv Adv' Adv'' : Type*}
-variable {ω κ κ' κ'' : Type*}
-variable [Preorder ω]
+variable {σ σ' σ'' : Type*}
+variable [Preorder σ] [Preorder σ'] [Preorder σ'']
 
 /-- An adversary is efficient for a profile class `isEff` if its concrete cost profile is bounded by
 some admissible asymptotic profile in that class. -/
 def EfficientFor
-    (cost : Adv → ℕ → ResourceProfile ω κ)
-    (isEff : (ℕ → ResourceProfile ω κ) → Prop) : Adv → Prop :=
+    (cost : Adv → ℕ → σ)
+    (isEff : (ℕ → σ) → Prop) : Adv → Prop :=
   fun A ↦ ∃ bound, isEff bound ∧ ∀ n, cost A n ≤ bound n
 
-/-- A reduction together with an explicit transform on asymptotic resource profiles. -/
+/-- A reduction together with an explicit transform on asymptotic cost bounds. -/
 structure ReductionWithCost
-    (cost : Adv → ℕ → ResourceProfile ω κ)
-    (cost' : Adv' → ℕ → ResourceProfile ω κ') where
+    (cost : Adv → ℕ → σ)
+    (cost' : Adv' → ℕ → σ') where
   reduce : Adv → Adv'
-  transform : ℕ → ResourceProfile ω κ → ResourceProfile ω κ'
+  transform : ℕ → σ → σ'
   monotone_transform : ∀ n, Monotone (transform n)
   cost_bound : ∀ A n, cost' (reduce A) n ≤ transform n (cost A n)
 
 namespace ReductionWithCost
 
-variable {cost : Adv → ℕ → ResourceProfile ω κ}
-variable {cost' : Adv' → ℕ → ResourceProfile ω κ'}
-variable {cost'' : Adv'' → ℕ → ResourceProfile ω κ''}
+variable {cost : Adv → ℕ → σ}
+variable {cost' : Adv' → ℕ → σ'}
+variable {cost'' : Adv'' → ℕ → σ''}
 
 /-- The cost transform of a reduction sends admissible profile bounds on the source adversary to
 admissible profile bounds on the reduced adversary. -/
 theorem efficientFor_image
     (R : ReductionWithCost cost cost')
-    {isEff : (ℕ → ResourceProfile ω κ) → Prop}
-    {isEff' : (ℕ → ResourceProfile ω κ') → Prop}
+    {isEff : (ℕ → σ) → Prop}
+    {isEff' : (ℕ → σ') → Prop}
     {A : Adv}
     (hA : EfficientFor cost isEff A)
     (hmap : ∀ bound, isEff bound → isEff' (fun n ↦ R.transform n (bound n))) :
@@ -88,10 +89,10 @@ reduction's cost transform, then security of the target game implies security of
 for adversaries whose cost profiles lie in the source class. -/
 theorem secureAgainst_of_reduction_withCost
     {g : SecurityGame Adv} {g' : SecurityGame Adv'}
-    {cost : Adv → ℕ → ResourceProfile ω κ}
-    {cost' : Adv' → ℕ → ResourceProfile ω κ'}
-    {isEff : (ℕ → ResourceProfile ω κ) → Prop}
-    {isEff' : (ℕ → ResourceProfile ω κ') → Prop}
+    {cost : Adv → ℕ → σ}
+    {cost' : Adv' → ℕ → σ'}
+    {isEff : (ℕ → σ) → Prop}
+    {isEff' : (ℕ → σ') → Prop}
     (R : ReductionWithCost cost cost')
     (hadv : ∀ A n, g.advantage A n ≤ g'.advantage (R.reduce A) n)
     (hmap : ∀ bound, isEff bound → isEff' (fun n ↦ R.transform n (bound n)))

@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.ElGamal.Basic
+import VCVio.CryptoFoundations.Asymptotics.ReductionCost
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 
@@ -125,7 +126,46 @@ noncomputable def reductionTransform {ω κ : Type} [AddCommMonoid ω]
       ResourceProfile.ofIntrinsic (κ := κ) (intrinsic + chooseCost + distinguishCost) := by
   ext <;> simp [reductionTransform_eq, add_assoc, add_left_comm, add_comm]
 
+/-- The ElGamal reduction transform is monotone in the procedure-cost profile assigned to the
+source adversary. -/
+lemma monotone_reductionTransform {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω]
+    [IsOrderedAddMonoid ω] (intrinsic : ω) :
+    Monotone (reductionTransform (κ := κ) intrinsic) := by
+  intro profile₁ profile₂ hprofile
+  rw [reductionTransform_eq, reductionTransform_eq]
+  simpa [add_assoc, add_left_comm, add_comm] using
+    add_le_add_left
+      (add_le_add (hprofile chooseMessages) (hprofile distinguish))
+      (ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
+
 end OneTimeINDCPACapability
+
+/-- Asymptotic cost assignment for the two procedures of a one-time IND-CPA adversary. -/
+abbrev OneTimeINDCPAProfile (ω κ : Type) :=
+  OneTimeINDCPACapability → ResourceProfile ω κ
+
+/-- Assemble the asymptotic procedure costs of a one-time IND-CPA adversary into a single
+interface-profile bound indexed by the two reified capabilities. -/
+def oneTimeINDCPAProfileCost
+    {gen : G} {ω κ : Type}
+    (chooseCost distinguishCost :
+      AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → ResourceProfile ω κ) :
+    AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProfile ω κ :=
+  fun adv n op =>
+    match op with
+    | .chooseMessages => chooseCost adv n
+    | .distinguish => distinguishCost adv n
+
+/-- Cost model for the DDH reduction obtained by instantiating the open reduction transform with
+the asymptotic procedure-cost profile of the source adversary. -/
+noncomputable def oneTimeDDHReductionCost
+    {gen : G} {ω κ : Type} [AddCommMonoid ω]
+    (intrinsic : ω)
+    (advCost :
+      AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProfile ω κ) :
+    AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → ResourceProfile ω κ :=
+  fun adv n =>
+    OneTimeINDCPACapability.reductionTransform intrinsic (advCost adv n)
 
 /-- Open version of the one-time ElGamal DDH reduction body.
 
@@ -368,6 +408,26 @@ lemma IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
     (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseHasCost
       (State := adv.State) (ω := ω) (κ := κ) intrinsic profile g A B T)
 
+/-- The asymptotic model [`oneTimeDDHReductionCost`] matches the exact pathwise cost of the
+instantiated DDH reduction when evaluated at the procedure-cost profile chosen for security
+parameter `n`. -/
+lemma IND_CPA_OneTime_DDHReduction_modeledCost_pathwiseHasCost
+    {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
+    (intrinsic : ω)
+    (advCost :
+      AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProfile ω κ)
+    (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
+    (n : ℕ) (g A B T : G) :
+    AddWriterT.PathwiseHasCost
+      (IND_CPA_OneTime_DDHReduction_profiled
+        (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
+        intrinsic (advCost adv n) adv g A B T)
+      (oneTimeDDHReductionCost (F := F) (G := G) (gen := gen) intrinsic advCost adv n) := by
+  simpa [oneTimeDDHReductionCost] using
+    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost
+      (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
+      intrinsic (advCost adv n) adv g A B T)
+
 /-- Scalar-cost specialization of
 [`IND_CPA_OneTime_DDHReduction_profiled_pathwiseHasCost`].
 
@@ -400,6 +460,44 @@ lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseHasCost
         | OneTimeINDCPACapability.distinguish =>
             ResourceProfile.ofIntrinsic (κ := κ) distinguishCost)
       adv g A B T)
+
+/-- Cost-aware reduction packaging for the one-time ElGamal DDH reduction.
+
+The source cost object is a two-procedure adversary profile, and the target cost object is the
+closed reduction cost obtained by instantiating the open reduction transform with that profile. -/
+noncomputable def oneTimeDDHReductionWithCost
+    {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
+    (intrinsic : ω)
+    (advCost :
+      AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProfile ω κ) :
+    SecurityGame.ReductionWithCost advCost
+      (oneTimeDDHReductionCost (F := F) (G := G) (gen := gen) intrinsic advCost) where
+  reduce := id
+  transform _ profile := OneTimeINDCPACapability.reductionTransform intrinsic profile
+  monotone_transform _ := OneTimeINDCPACapability.monotone_reductionTransform intrinsic
+  cost_bound _ _ := by simp [oneTimeDDHReductionCost, OneTimeINDCPACapability.reductionTransform_eq]
+
+/-- Image lemma for the one-time ElGamal DDH reduction at the level of asymptotic cost classes. -/
+theorem efficientFor_oneTimeDDHReduction
+    {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
+    (intrinsic : ω)
+    (advCost :
+      AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen) → ℕ → OneTimeINDCPAProfile ω κ)
+    {isEff : (ℕ → OneTimeINDCPAProfile ω κ) → Prop}
+    {isEff' : (ℕ → ResourceProfile ω κ) → Prop}
+    {adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)}
+    (hadv : SecurityGame.EfficientFor advCost isEff adv)
+    (hmap : ∀ bound, isEff bound →
+      isEff' (fun n ↦ OneTimeINDCPACapability.reductionTransform intrinsic (bound n))) :
+    SecurityGame.EfficientFor
+      (oneTimeDDHReductionCost (F := F) (G := G) (gen := gen) intrinsic advCost)
+      isEff' adv := by
+  refine
+    SecurityGame.ReductionWithCost.efficientFor_image
+      (R := oneTimeDDHReductionWithCost (F := F) (G := G) (gen := gen) intrinsic advCost)
+      hadv ?_
+  intro bound hbound
+  simpa [oneTimeDDHReductionWithCost] using hmap bound hbound
 
 /-- Instantiating the open costed reduction with a concrete adversary preserves the exact pathwise
 resource profile proved for the open reduction body. -/
