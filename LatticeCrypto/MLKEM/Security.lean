@@ -174,9 +174,7 @@ theorem ind_cca_security
           (prfAdv : PRFScheme.PRFAdversary (KPKE.Ciphertext params encoding) SharedSecret),
           (foKEMScheme params ring encoding prims).IND_CCA_Advantage
               (FujisakiOkamoto.twoRORuntime
-                (PK := EncapsulationKey params encoding) (R := Coins)
-                (C := KPKE.Ciphertext params encoding) (KD := Message) (K := SharedSecret)
-                (fun (m : Message) (_c : KPKE.Ciphertext params encoding) => m))
+                (M := Message) (R := Coins) (KD := Message) (K := SharedSecret))
               adv ≤
             2 * |LearningWithErrors.advantage mlwe mlweAdv₁| +
             2 * |LearningWithErrors.advantage mlwe mlweAdv₂| +

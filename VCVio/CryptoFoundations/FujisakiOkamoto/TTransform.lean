@@ -116,39 +116,37 @@ variable [DecidableEq C]
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
-/-- Running unit-cost-instrumented T-transform encryption preserves the ciphertext output. -/
-private lemma encrypt_outputs_formula_withUnitCost
+/-- T-transform encryption incurs exactly the weighted cost assigned to the single coins-oracle
+query on `msg`. -/
+theorem encrypt_usesExactQueryCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    (pk : PK) (msg : M) :
-    AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
-          runtime) =
-      HasQuery.inRuntime
-        (fun [HasQuery (M →ₒ R) m] =>
-          (TTransform (m := m) pke).encrypt pk msg)
-        runtime := by
-  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
-    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    (pk : PK) (msg : M) (costFn : M → ω) :
+    QueryCost[ (TTransform pke).encrypt pk msg in runtime by costFn ] = costFn msg := by
+  change Cost[
+    HasQuery.withAddCost
+      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
+        (TTransform (m := AddWriterT ω m) pke).encrypt pk msg)
+      runtime costFn
+  ] = costFn msg
+  rw [AddWriterT.hasCost_iff]
+  simp [HasQuery.withAddCost, TTransform, QueryRuntime.withAddCost_impl,
+    AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
-private lemma encrypt_costs_formula_withUnitCost
+/-- T-transform encryption has expected weighted query cost equal to the weight of querying
+`msg`. -/
+theorem encrypt_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω]
+    [HasEvalPMF m]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    (pk : PK) (msg : M) :
-    AddWriterT.costs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
-          runtime) =
-      (fun _ ↦ 1) <$>
-        HasQuery.inRuntime
-          (fun [HasQuery (M →ₒ R) m] =>
-            (TTransform (m := m) pke).encrypt pk msg)
-          runtime := by
-  simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
-    QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    (pk : PK) (msg : M) (costFn : M → ω) (val : ω → ENNReal) (hval : Monotone val) :
+    ExpectedQueryCost[
+      (TTransform pke).encrypt pk msg in runtime by costFn via val
+    ] = val (costFn msg) := by
+  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    (encrypt_usesExactQueryCost
+      (runtime := runtime) (pke := pke) (pk := pk) (msg := msg) (costFn := costFn))
+    hval
 
 /-- T-transform encryption makes exactly one hash-oracle query under unit-cost instrumentation. -/
 theorem encrypt_usesExactlyOneQuery
@@ -156,65 +154,82 @@ theorem encrypt_usesExactlyOneQuery
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (msg : M) :
     Queries[ (TTransform pke).encrypt pk msg in runtime ] = 1 := by
+  simpa [HasQuery.UsesExactlyQueries] using
+    (encrypt_usesExactQueryCost
+      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
+      (costFn := fun _ ↦ 1))
+
+/-- If deterministic decryption fails immediately, the T-transform incurs zero weighted
+query cost. -/
+theorem decrypt_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
+    (hdec : pke.decrypt sk c = none) :
+    QueryCost[ (TTransform pke).decrypt (pk, sk) c in runtime by costFn ] = 0 := by
   change Cost[
-    HasQuery.withUnitCost
-      (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-        (TTransform (m := AddWriterT ℕ m) pke).encrypt pk msg)
-      runtime
-  ] = 1
+    HasQuery.withAddCost
+      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
+        (TTransform (m := AddWriterT ω m) pke).decrypt (pk, sk) c)
+      runtime costFn
+  ] = 0
   rw [AddWriterT.hasCost_iff]
-  rw [encrypt_outputs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)]
-  exact encrypt_costs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (msg := msg)
+  simp [HasQuery.withAddCost, TTransform, TTransform.decrypt, hdec,
+    QueryRuntime.withAddCost_impl, AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
-/-- Running unit-cost-instrumented T-transform decryption preserves the decryption result. -/
-private lemma decrypt_outputs_formula_withUnitCost
+/-- If deterministic decryption fails immediately, the T-transform has expected weighted query
+cost `0`. -/
+theorem decrypt_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
+    [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    (pk : PK) (sk : SK) (c : C) :
-    AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-          runtime) =
-      HasQuery.inRuntime
-        (fun [HasQuery (M →ₒ R) m] =>
-          (TTransform (m := m) pke).decrypt (pk, sk) c)
-        runtime := by
-  cases hdec : pke.decrypt sk c with
-  | none =>
-      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
-        TTransform.decrypt, hdec]
-  | some msg =>
-      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, TTransform,
-        TTransform.decrypt, hdec,
-        QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
+    (val : ω → ENNReal) (hval : Monotone val)
+    (hdec : pke.decrypt sk c = none) :
+    ExpectedQueryCost[
+      (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
+    ] = val 0 := by
+  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    (decrypt_usesZeroQueryCost_of_decrypt_eq_none
+      (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+      (costFn := costFn) hdec)
+    hval
 
-private lemma decrypt_costs_formula_withUnitCost
+/-- If deterministic decryption returns a message, the T-transform incurs exactly the weighted
+cost of querying that message to re-derive the coins. -/
+theorem decrypt_usesExactQueryCost_of_decrypt_eq_some {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M →ₒ R) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
-    (pk : PK) (sk : SK) (c : C) :
-    AddWriterT.costs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-          runtime) =
-      match pke.decrypt sk c with
-      | none => pure 0
-      | some _ => (fun _ ↦ 1) <$>
-          HasQuery.inRuntime
-            (fun [HasQuery (M →ₒ R) m] =>
-              (TTransform (m := m) pke).decrypt (pk, sk) c)
-            runtime := by
-  cases hdec : pke.decrypt sk c with
-  | none =>
-      simp [HasQuery.withUnitCost, AddWriterT.costs, TTransform,
-        TTransform.decrypt, hdec]
-  | some msg =>
-      simp [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, TTransform,
-        TTransform.decrypt, hdec,
-        QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
+    (pk : PK) (sk : SK) (c : C) (costFn : M → ω) {msg : M}
+    (hdec : pke.decrypt sk c = some msg) :
+    QueryCost[ (TTransform pke).decrypt (pk, sk) c in runtime by costFn ] = costFn msg := by
+  change Cost[
+    HasQuery.withAddCost
+      (fun [HasQuery (M →ₒ R) (AddWriterT ω m)] =>
+        (TTransform (m := AddWriterT ω m) pke).decrypt (pk, sk) c)
+      runtime costFn
+  ] = costFn msg
+  rw [AddWriterT.hasCost_iff]
+  simp [HasQuery.withAddCost, TTransform, TTransform.decrypt, hdec,
+    QueryRuntime.withAddCost_impl, AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
+
+/-- If deterministic decryption returns a message, the T-transform has expected weighted query
+cost equal to the weight of querying that message. -/
+theorem decrypt_expectedQueryCost_eq_of_decrypt_eq_some {ω : Type}
+    [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
+    (runtime : QueryRuntime (M →ₒ R) m)
+    (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
+    (pk : PK) (sk : SK) (c : C) (costFn : M → ω)
+    (val : ω → ENNReal) (hval : Monotone val) {msg : M}
+    (hdec : pke.decrypt sk c = some msg) :
+    ExpectedQueryCost[
+      (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
+    ] = val (costFn msg) := by
+  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    (decrypt_usesExactQueryCost_of_decrypt_eq_some
+      (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+      (costFn := costFn) hdec)
+    hval
 
 /-- If deterministic decryption fails immediately, the T-transform makes no hash-oracle
 queries. -/
@@ -224,28 +239,10 @@ theorem decrypt_usesNoQueries_of_decrypt_eq_none
     (pk : PK) (sk : SK) (c : C)
     (hdec : pke.decrypt sk c = none) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 0 := by
-  change AddWriterT.costs
-      (HasQuery.withUnitCost
-        (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-        runtime) =
-    (fun _ ↦ 0) <$>
-      AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-          runtime)
-  have h_outputs := decrypt_outputs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-  have h_decrypt :
-      HasQuery.inRuntime
-        (fun [HasQuery (M →ₒ R) m] =>
-          (TTransform (m := m) pke).decrypt (pk, sk) c)
-        runtime = pure none := by
-    simp [HasQuery.inRuntime, TTransform, TTransform.decrypt, hdec]
-  rw [h_outputs, h_decrypt]
-  simpa [hdec] using decrypt_costs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+  simpa [HasQuery.UsesExactlyQueries] using
+    (decrypt_usesZeroQueryCost_of_decrypt_eq_none
+      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+      (costFn := fun _ ↦ 1) hdec)
 
 /-- If deterministic decryption returns a message, the T-transform makes exactly one
 hash-oracle query to re-derive the coins. -/
@@ -255,22 +252,10 @@ theorem decrypt_usesExactlyOneQuery_of_decrypt_eq_some
     (pk : PK) (sk : SK) (c : C) {msg : M}
     (hdec : pke.decrypt sk c = some msg) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] = 1 := by
-  change AddWriterT.costs
-      (HasQuery.withUnitCost
-        (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-        runtime) =
-    (fun _ ↦ 1) <$>
-      AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-            (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-          runtime)
-  have h_outputs := decrypt_outputs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
-  rw [h_outputs]
-  simpa [hdec] using decrypt_costs_formula_withUnitCost
-    (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+  simpa [HasQuery.UsesExactlyQueries] using
+    (decrypt_usesExactQueryCost_of_decrypt_eq_some
+      (ω := ℕ) (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
+      (costFn := fun _ ↦ 1) hdec)
 
 /-- T-transform decryption makes at most one hash-oracle query under unit-cost instrumentation. -/
 theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
@@ -278,22 +263,23 @@ theorem decrypt_usesAtMostOneQuery [HasEvalSet m]
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (pk : PK) (sk : SK) (c : C) :
     Queries[ (TTransform pke).decrypt (pk, sk) c in runtime ] ≤ 1 := by
-  by_cases hdec : pke.decrypt sk c = none
-  · exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-      (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-        (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-      (runtime := runtime)
-      (decrypt_usesNoQueries_of_decrypt_eq_none
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
-      (Nat.zero_le 1)
-  · rcases Option.ne_none_iff_exists'.mp hdec with ⟨msg, hsome⟩
-    exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
-      (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
-        (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
-      (runtime := runtime)
-      (decrypt_usesExactlyOneQuery_of_decrypt_eq_some
-        (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hsome)
-      le_rfl
+  cases hdec : pke.decrypt sk c with
+  | none =>
+      exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
+        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+        (runtime := runtime)
+        (decrypt_usesNoQueries_of_decrypt_eq_none
+          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
+        (Nat.zero_le 1)
+  | some msg =>
+      exact HasQuery.usesAtMostQueries_of_usesExactlyQueries
+        (oa := fun [HasQuery (M →ₒ R) (AddWriterT ℕ m)] =>
+          (TTransform (m := AddWriterT ℕ m) pke).decrypt (pk, sk) c)
+        (runtime := runtime)
+        (decrypt_usesExactlyOneQuery_of_decrypt_eq_some
+          (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c) hdec)
+        le_rfl
 
 end costAccounting
 

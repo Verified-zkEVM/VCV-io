@@ -27,7 +27,7 @@ def FujisakiOkamoto
     [SampleableType M] [SampleableType R] [SampleableType K] :
     KEMScheme (OracleComp (UTransform.oracleSpec M R KD K))
       K PK ((PK × SK) × policy.FallbackState) C :=
-  UTransform pke kdInput policy
+  UTransform (m := OracleComp (UTransform.oracleSpec M R KD K)) pke kdInput policy
 
 namespace FujisakiOkamoto
 
@@ -66,17 +66,17 @@ def singleROVariant
     {PKHash : Type}
     (pkh : PK → PKHash)
     [DecidableEq PKHash] [DecidableEq M] [SampleableType R] [SampleableType K] :
-    Variant M PK C R K where
-  ι := _
-  hashOracleSpec := singleROHashOracleSpec PKHash M R K
+    Variant (singleROHashOracleSpec PKHash M R K) M PK C R K where
   QueryCache := SingleROQueryCache PKHash M R K
   initCache := ∅
   queryImpl := singleROOracleImpl (PKHash := PKHash) (M := M) (R := R) (K := K)
-  deriveCoins := fun pk msg => do
-    let out ← query (spec := singleROOracleSpec PKHash M R K) (Sum.inr (pkh pk, msg))
+  deriveCoins := fun {m} [Monad m] [MonadLiftT ProbComp m]
+      [HasQuery (singleROHashOracleSpec PKHash M R K) m] pk msg => do
+    let out ← HasQuery.query (spec := singleROHashOracleSpec PKHash M R K) (m := m) (pkh pk, msg)
     return out.1
-  deriveKey := fun pk msg _c => do
-    let out ← query (spec := singleROOracleSpec PKHash M R K) (Sum.inr (pkh pk, msg))
+  deriveKey := fun {m} [Monad m] [MonadLiftT ProbComp m]
+      [HasQuery (singleROHashOracleSpec PKHash M R K) m] pk msg _c => do
+    let out ← HasQuery.query (spec := singleROHashOracleSpec PKHash M R K) (m := m) (pkh pk, msg)
     return out.2
 
 /-- Single-RO specialization for the `H(m)` branch. The oracle input is `(pkh pk, m)` and the
@@ -90,23 +90,25 @@ def singleRO
     [SampleableType M] [SampleableType R] [SampleableType K] :
     KEMScheme (OracleComp (singleROOracleSpec PKHash M R K))
       K PK ((PK × SK) × policy.FallbackState) C :=
-  scheme pke (singleROVariant (PK := PK) (C := C) (R := R) (K := K) pkh) policy
+  scheme (m := OracleComp (singleROOracleSpec PKHash M R K))
+    pke (singleROVariant (PK := PK) (C := C) (R := R) (K := K) pkh) policy
 
 /-- Runtime bundle for the canonical two-RO Fujisaki-Okamoto oracle world. -/
 noncomputable def twoRORuntime
-    (kdInput : M → C → KD)
-    [DecidableEq M] [DecidableEq C] [DecidableEq KD]
-    [SampleableType M] [SampleableType R] [SampleableType K] :
+    [DecidableEq M] [DecidableEq KD]
+    [SampleableType R] [SampleableType K] :
     ProbCompRuntime (OracleComp (UTransform.oracleSpec M R KD K)) :=
-  UTransform.runtime (PK := PK) (C := C) (R := R) (KD := KD) (K := K) kdInput
+  UTransform.runtime (R := R) (KD := KD) (K := K)
 
 /-- Runtime bundle for the single-RO Fujisaki-Okamoto oracle world. -/
 noncomputable def singleRORuntime
     {PKHash : Type}
-    (pkh : PK → PKHash)
     [DecidableEq PKHash] [DecidableEq M] [SampleableType R] [SampleableType K] :
-    ProbCompRuntime (OracleComp (singleROOracleSpec PKHash M R K)) :=
-  FujisakiOkamoto.runtime (singleROVariant (PK := PK) (C := C) (R := R) (K := K) pkh)
+    ProbCompRuntime (OracleComp (singleROOracleSpec PKHash M R K)) where
+  toSPMFSemantics := SPMFSemantics.withStateOracle
+    (hashImpl := singleROOracleImpl (PKHash := PKHash) (M := M) (R := R) (K := K))
+    (∅ : SingleROQueryCache PKHash M R K)
+  toProbCompLift := ProbCompLift.ofMonadLift _
 
 /-- Main composed Fujisaki-Okamoto theorem statement. The proof is intentionally deferred, but the
 reduction artifacts are now existentially quantified rather than passed in as unrelated inputs. -/
@@ -123,7 +125,7 @@ theorem IND_CCA_bound
     ∃ cpaAdv₁ cpaAdv₂ : (pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_adversary,
       ∃ prfAdv : PRFScheme.PRFAdversary C K,
         (FujisakiOkamoto pke kdInput (implicitRejection prf)).IND_CCA_Advantage
-            (twoRORuntime (PK := PK) (R := R) (C := C) (KD := KD) (K := K) kdInput)
+            (twoRORuntime (M := M) (R := R) (KD := KD) (K := K))
             adversary ≤
           2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₁).toReal +
           2 * ((pke.toAsymmEncAlg ProbCompRuntime.probComp).IND_CPA_advantage cpaAdv₂).toReal +
