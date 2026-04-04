@@ -8,6 +8,7 @@ import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.EvalDist.Monad.Map
 import ToMathlib.General
+import ToMathlib.Probability.ProbabilityMassFunction.TailSums
 import Mathlib.Algebra.Order.Monoid.Defs
 import Mathlib.Topology.Algebra.InfiniteSum.ENNReal
 
@@ -29,6 +30,7 @@ The main use cases are:
 -/
 
 open OracleSpec
+open scoped BigOperators
 
 /-- Bundled implementation of the oracle family `spec` in the ambient monad `m`. -/
 structure QueryRuntime {ι : Type} (spec : OracleSpec ι) (m : Type → Type*) where
@@ -185,6 +187,42 @@ noncomputable def expectedCost [HasEvalSPMF m]
 noncomputable abbrev expectedCostNat [HasEvalSPMF m] (oa : AddWriterT ℕ m α) : ENNReal :=
   expectedCost oa (fun n ↦ ↑n)
 
+/-- Tail-sum formula for the natural-valued expected cost of an `AddWriterT` computation:
+
+`E[cost] = ∑ i, Pr[i < cost]`.
+
+This is the standard discrete expectation identity specialized to the writer-cost marginal. -/
+lemma expectedCostNat_eq_tsum_tail_probs [HasEvalSPMF m] (oa : AddWriterT ℕ m α) :
+    expectedCostNat oa = ∑' i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] := by
+  unfold expectedCostNat expectedCost
+  calc
+    ∑' n : ℕ, Pr[= n | oa.costs] * (n : ENNReal)
+        = ∑' i : ℕ, ∑' n : ℕ, if i < n then Pr[= n | oa.costs] else 0 :=
+          ENNReal.tsum_mul_nat_eq_tsum_tail (fun n ↦ Pr[= n | oa.costs])
+    _ = ∑' i : ℕ, Pr[ fun c ↦ i < c | oa.costs ] := by
+          refine tsum_congr fun i ↦ ?_
+          rw [probEvent_eq_tsum_indicator]
+          refine tsum_congr fun n ↦ ?_
+          by_cases h : i < n <;> simp [Set.indicator, h]
+
+/-- Finite tail-sum formula for natural-valued writer cost under a pathwise upper bound.
+
+If every execution path of `oa` incurs cost at most `n`, then the tail probabilities vanish above
+`n`, so the infinite tail sum truncates to `Finset.range n`. -/
+lemma expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
+    [HasEvalSPMF m] [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : PathwiseCostAtMost oa n) :
+    expectedCostNat oa = ∑ i ∈ Finset.range n, Pr[ fun c ↦ i < c | oa.costs ] := by
+  rw [expectedCostNat_eq_tsum_tail_probs]
+  symm
+  rw [tsum_eq_sum (s := Finset.range n) (fun b hb => ?_)]
+  · have hnb : n ≤ b := Nat.le_of_not_lt (by simpa [Finset.mem_range] using hb)
+    refine probEvent_eq_zero ?_
+    intro c hc
+    rw [AddWriterT.costs_def, support_map] at hc
+    rcases hc with ⟨z, hz, rfl⟩
+    exact not_lt_of_ge (le_trans (h z hz) hnb)
+
 omit [AddMonoid ω] in
 lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
     (oa : AddWriterT ω m α) (val : ω → ENNReal) (c : ENNReal)
@@ -250,6 +288,38 @@ lemma expectedCost_ge_of_pathwiseCostAtLeast [LawfulMonad m] [Preorder ω] [HasE
                 (by simpa [AddWriterT.costs_def] using hc)
             rw [hp]
             simp
+
+omit [AddMonoid ω] in
+lemma expectedCost_eq_tsum_outputs_of_costsAs [HasEvalSPMF m] [LawfulMonad m]
+    {oa : AddWriterT ω m α} {f : α → ω} {val : ω → ENNReal}
+    (h : oa.CostsAs f) :
+    expectedCost oa val = ∑' a : α, Pr[= a | oa.outputs] * val (f a) := by
+  classical
+  letI : DecidableEq ω := Classical.decEq ω
+  unfold expectedCost
+  rw [h]
+  simp_rw [probOutput_map_eq_tsum]
+  calc
+    ∑' w : ω, (∑' a : α, Pr[= a | oa.outputs] * Pr[= w | (pure (f a) : m ω)]) * val w
+      = ∑' w : ω, ∑' a : α, Pr[= a | oa.outputs] *
+          (Pr[= w | (pure (f a) : m ω)] * val w) := by
+            refine tsum_congr fun w => ?_
+            simpa [mul_assoc] using
+              (ENNReal.tsum_mul_right
+                (f := fun a : α =>
+                  Pr[= a | oa.outputs] * Pr[= w | (pure (f a) : m ω)])
+                (a := val w)).symm
+    _ = ∑' a : α, ∑' w : ω, Pr[= a | oa.outputs] *
+          (Pr[= w | (pure (f a) : m ω)] * val w) := by
+            rw [ENNReal.tsum_comm]
+    _ = ∑' a : α, Pr[= a | oa.outputs] *
+          ∑' w : ω, Pr[= w | (pure (f a) : m ω)] * val w := by
+            refine tsum_congr fun a => by
+              rw [← ENNReal.tsum_mul_left]
+    _ = ∑' a : α, Pr[= a | oa.outputs] * val (f a) := by
+            refine tsum_congr fun a => by
+              letI : DecidableEq ω := Classical.decEq ω
+              simp
 
 end expectedCost
 
@@ -785,11 +855,49 @@ noncomputable def expectedQueryCost {ω : Type} [AddMonoid ω]
     (costFn : spec.Domain → ω) (val : ω → ENNReal) : ENNReal :=
   AddWriterT.expectedCost (HasQuery.withAddCost oa runtime costFn) val
 
+/-- The marginal distribution of weighted query costs induced by running `oa` in `runtime` with
+query-cost function `costFn`. -/
+def queryCostDist {ω : Type} [AddMonoid ω]
+    (oa : Computation spec (AddWriterT ω m) α) (runtime : QueryRuntime spec m)
+    (costFn : spec.Domain → ω) : m ω :=
+  AddWriterT.costs (HasQuery.withAddCost oa runtime costFn)
+
+/-- The marginal distribution of the unit-cost query count induced by running `oa` in `runtime`. -/
+abbrev queryCountDist
+    (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m) : m ℕ :=
+  HasQuery.queryCostDist oa runtime (fun _ ↦ 1)
+
 /-- Expected number of oracle queries made by `oa` when run in `runtime`, counting each query
 with unit additive cost. -/
 noncomputable abbrev expectedQueries
     (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m) : ENNReal :=
   HasQuery.expectedQueryCost oa runtime (fun _ ↦ 1) (fun n ↦ (n : ENNReal))
+
+/-- Tail-sum formula for the expected number of oracle queries made by `oa` in `runtime`:
+
+`E[number of queries] = ∑ i, Pr[i < number of queries]`.
+
+This is the generic `HasQuery` version of [`AddWriterT.expectedCostNat_eq_tsum_tail_probs`]. -/
+lemma expectedQueries_eq_tsum_tail_probs
+    (oa : Computation spec (AddWriterT ℕ m) α) (runtime : QueryRuntime spec m) :
+    HasQuery.expectedQueries oa runtime =
+      ∑' i : ℕ, Pr[ fun c ↦ i < c | HasQuery.queryCountDist oa runtime ] := by
+  simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost] using
+    AddWriterT.expectedCostNat_eq_tsum_tail_probs (oa := HasQuery.withUnitCost oa runtime)
+
+/-- Finite tail-sum formula for expected query count under a pathwise upper bound.
+
+If `oa` uses at most `n` oracle queries in every execution, then its expected query count is the
+finite sum of the probabilities that the query count exceeds `i`, for `i < n`. -/
+lemma expectedQueries_eq_sum_tail_probs_of_usesAtMostQueries [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
+    (h : HasQuery.UsesAtMostQueries oa runtime n) :
+    HasQuery.expectedQueries oa runtime =
+      ∑ i ∈ Finset.range n, Pr[ fun c ↦ i < c | HasQuery.queryCountDist oa runtime ] := by
+  simpa [HasQuery.expectedQueries, HasQuery.expectedQueryCost, HasQuery.queryCountDist,
+    HasQuery.withUnitCost, HasQuery.queryCostDist] using
+    (AddWriterT.expectedCostNat_eq_sum_tail_probs_of_pathwiseCostAtMost
+      (oa := HasQuery.withUnitCost oa runtime) h)
 
 lemma expectedQueryCost_le_of_usesCostAtMost
     {ω : Type} [AddMonoid ω] [Preorder ω] [LawfulMonad m]
@@ -798,6 +906,18 @@ lemma expectedQueryCost_le_of_usesCostAtMost
     (h : HasQuery.UsesCostAtMost oa runtime costFn w) (hval : Monotone val) :
     HasQuery.expectedQueryCost oa runtime costFn val ≤ val w :=
   AddWriterT.expectedCost_le_of_pathwiseCostAtMost h hval
+
+lemma expectedQueryCost_eq_tsum_outputs_of_usesCostAs
+    {ω : Type} [AddMonoid ω] [LawfulMonad m]
+    {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
+    {costFn : spec.Domain → ω} {f : α → ω} {val : ω → ENNReal}
+    (h : HasQuery.UsesCostAs oa runtime costFn f) :
+    HasQuery.expectedQueryCost oa runtime costFn val =
+      ∑' a : α,
+        Pr[= a | AddWriterT.outputs (HasQuery.withAddCost oa runtime costFn)] * val (f a) := by
+  simpa [HasQuery.expectedQueryCost, HasQuery.UsesCostAs] using
+    (AddWriterT.expectedCost_eq_tsum_outputs_of_costsAs
+      (oa := HasQuery.withAddCost oa runtime costFn) (f := f) (val := val) h)
 
 lemma expectedQueries_le_of_usesAtMostQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}

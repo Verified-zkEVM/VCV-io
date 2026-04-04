@@ -331,7 +331,8 @@ private lemma fischlinSearchAux_eq_withAddCost
   | nil =>
       simp [fischlinSearchAux, fischlinSearchAuxWithAddCost]
   | cons ω rest ih =>
-      simp [fischlinSearchAux, fischlinSearchAuxWithAddCost, ih]
+      simp [fischlinSearchAux, fischlinSearchAuxWithAddCost,
+        QueryRuntime.withAddCost_impl, liftM, MonadLiftT.monadLift, ih]
 
 omit [SampleableType X] [SampleableType W]
   [DecidableEq X] [DecidableEq PC] [DecidableEq Ω] [DecidableEq P]
