@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import VCVio.CryptoFoundations.Asymptotics.Security
-import VCVio.OracleComp.QueryTracking.ResourceProfile
 
 /-!
 # Cost-Aware Security Reductions
@@ -23,8 +23,6 @@ structured resource profiles, interface-profile bounds, or any other preordered 
 that is closed under the transform carried by the reduction.
 -/
 
-open OracleComp OracleSpec ENNReal Filter
-
 namespace SecurityGame
 
 variable {Adv Adv' Adv'' : Type*}
@@ -37,6 +35,13 @@ def EfficientFor
     (cost : Adv → ℕ → σ)
     (isEff : (ℕ → σ) → Prop) : Adv → Prop :=
   fun A ↦ ∃ bound, isEff bound ∧ ∀ n, cost A n ≤ bound n
+
+/-- A transform on asymptotic cost bounds maps a source efficiency class into a target one. -/
+structure CostClassMap
+    (isEff : (ℕ → σ) → Prop)
+    (isEff' : (ℕ → σ') → Prop)
+    (transform : ℕ → σ → σ') : Prop where
+  map_mem : ∀ bound, isEff bound → isEff' (fun n ↦ transform n (bound n))
 
 /-- A reduction together with an explicit transform on asymptotic cost bounds. -/
 structure ReductionWithCost
@@ -61,10 +66,10 @@ theorem efficientFor_image
     {isEff' : (ℕ → σ') → Prop}
     {A : Adv}
     (hA : EfficientFor cost isEff A)
-    (hmap : ∀ bound, isEff bound → isEff' (fun n ↦ R.transform n (bound n))) :
+    (hmap : CostClassMap isEff isEff' R.transform) :
     EfficientFor cost' isEff' (R.reduce A) := by
   rcases hA with ⟨bound, hboundEff, hbound⟩
-  refine ⟨fun n ↦ R.transform n (bound n), hmap bound hboundEff, ?_⟩
+  refine ⟨fun n ↦ R.transform n (bound n), hmap.map_mem bound hboundEff, ?_⟩
   intro n
   simpa using le_trans (R.cost_bound A n) ((R.monotone_transform n) (hbound n))
 
@@ -95,7 +100,7 @@ theorem secureAgainst_of_reduction_withCost
     {isEff' : (ℕ → σ') → Prop}
     (R : ReductionWithCost cost cost')
     (hadv : ∀ A n, g.advantage A n ≤ g'.advantage (R.reduce A) n)
-    (hmap : ∀ bound, isEff bound → isEff' (fun n ↦ R.transform n (bound n)))
+    (hmap : CostClassMap isEff isEff' R.transform)
     (hsecure : g'.secureAgainst (EfficientFor cost' isEff')) :
     g.secureAgainst (EfficientFor cost isEff) := by
   intro A hA

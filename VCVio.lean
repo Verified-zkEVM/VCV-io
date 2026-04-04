@@ -73,9 +73,9 @@ import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.Enforcement
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
-import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO

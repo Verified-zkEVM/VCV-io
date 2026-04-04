@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+
 import Mathlib.Data.Finsupp.Basic
 import Mathlib.Data.Finsupp.Order
 
@@ -153,16 +154,20 @@ noncomputable def instantiate [AddCommMonoid ω]
     ResourceProfile ω κ' :=
   ofIntrinsic (κ := κ') c.intrinsic + c.usage.sum (fun k n ↦ n • impl k)
 
+/-- Additive monoid hom extracting the intrinsic component of a resource profile. -/
 def intrinsicAddMonoidHom [AddMonoid ω] : ResourceProfile ω κ →+ ω where
   toFun := intrinsic
   map_zero' := rfl
   map_add' _ _ := rfl
 
+/-- Additive monoid hom extracting the symbolic capability-usage component of a resource profile. -/
 def usageAddMonoidHom [AddMonoid ω] : ResourceProfile ω κ →+ (κ →₀ ℕ) where
   toFun := usage
   map_zero' := rfl
   map_add' _ _ := rfl
 
+/-- Additive monoid hom evaluating a structured resource profile against concrete per-capability
+weights. -/
 noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
     ResourceProfile ω κ →+ ω where
   toFun := fun c ↦ c.eval weights
@@ -257,6 +262,8 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
   rw [Finsupp.sum_single_index]
   · simp
 
+/-- Additive monoid hom instantiating the symbolic capabilities in a resource profile with open
+implementations. -/
 noncomputable def instantiateAddMonoidHom [AddCommMonoid ω]
     (impl : κ → ResourceProfile ω κ') :
     ResourceProfile ω κ →+ ResourceProfile ω κ' where
