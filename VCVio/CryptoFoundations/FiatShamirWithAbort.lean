@@ -622,6 +622,8 @@ private lemma signLoop_inRuntime_succ
               runtime) := by
   rfl
 
+section
+
 variable [LawfulMonad m]
 
 private lemma signLoop_queryCountDist_succ
@@ -670,6 +672,8 @@ private lemma signLoop_queryCountDist_succ
   | none =>
       simp [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
         HasQuery.withAddCost, AddWriterT.costs, add_comm]
+
+end
 
 variable [HasEvalPMF m]
 
@@ -743,6 +747,10 @@ private lemma signLoop_probNone_succ
             rw [ENNReal.tsum_mul_right]
     _ = Pr[ fun attempt ↦ attempt.2 = none | attemptComp] * Pr[= none | recLoop] := by
             simp [probEvent_eq_tsum_indicator, Set.indicator, Set.mem_setOf_eq]
+
+section
+
+variable [LawfulMonad m]
 
 private lemma signLoop_queryTailProbability_zero
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) (n : ℕ) :
@@ -953,6 +961,8 @@ private theorem signLoop_queryTailProbability_eq_probNonePrefix
                       (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
                       (msg := msg) (n := i)
 
+end
+
 private theorem signLoop_probNone_eq_signAttemptAbortProbability_pow
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) :
     ∀ i,
@@ -1006,6 +1016,8 @@ theorem sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow
     (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i
 
 end
+
+variable [LawfulMonad m]
 
 section schemeCost
 

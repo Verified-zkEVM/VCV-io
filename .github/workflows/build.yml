@@ -108,6 +108,15 @@ jobs:
         run: |
           bash scripts/build_timing_report.sh run clean_build "$BUILD_TIMING_RESULTS" -- \
             bash -eo pipefail -c "$BUILD_TIMING_CLEAN_COMMAND"
+      - name: Check warning budget
+        run: |
+          python3 ./scripts/check-warning-log.py "$BUILD_TIMING_LOG_DIR/clean_build.log" \
+            --path-prefix ToMathlib/ \
+            --path-prefix VCVio/ \
+            --path-prefix FFI/ \
+            --path-prefix Examples/ \
+            --exclude-substring 'declaration uses `sorry`' \
+            --label 'repository non-sorry warnings'
       - name: Time warm rebuild
         run: |
           bash scripts/build_timing_report.sh run warm_rebuild "$BUILD_TIMING_RESULTS" -- \
