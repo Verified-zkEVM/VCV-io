@@ -139,6 +139,10 @@ instance [PartialOrder ω] : PartialOrder (ResourceProfile ω κ) where
     cases hprod
     rfl
 
+instance [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] :
+    IsOrderedAddMonoid (ResourceProfile ω κ) where
+  add_le_add_left _ _ hab _ := ⟨add_le_add_left hab.1 _, add_le_add_left hab.2 _⟩
+
 /-- Evaluate a structured resource profile against concrete per-capability costs. -/
 def eval [AddCommMonoid ω] (c : ResourceProfile ω κ) (w : κ → ω) : ω :=
   c.intrinsic + c.usage.sum (fun k n ↦ n • w k)

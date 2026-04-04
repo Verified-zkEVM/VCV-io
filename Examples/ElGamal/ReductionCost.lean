@@ -68,6 +68,12 @@ noncomputable def reductionProfile {ω : Type} [AddMonoid ω] (intrinsic : ω) :
     + ResourceProfile.single chooseMessages
     + ResourceProfile.single distinguish
 
+@[simp] lemma eval_reductionProfile {ω : Type} [AddCommMonoid ω]
+    (intrinsic : ω) (weights : OneTimeINDCPACapability → ω) :
+    (reductionProfile intrinsic).eval weights =
+      intrinsic + weights chooseMessages + weights distinguish := by
+  simp [reductionProfile, add_assoc, add_left_comm, add_comm]
+
 end OneTimeINDCPACapability
 
 /-- Open version of the one-time ElGamal DDH reduction body.
