@@ -115,6 +115,30 @@ lemma length_eq_of_mem_support_generateSeed
   have := (support_generateSeed (spec := spec) (qc := qc) (js := js)).symm ▸ hseed
   simpa [Set.mem_setOf_eq] using (this i)
 
+/-- If the seed-generation list `js` contains every oracle family with positive budget, then any
+seed sampled by `generateSeed spec qc js` contains at least `qc i` answers for each oracle `i`.
+
+This is the support-level coverage property needed by seeded replay arguments: one occurrence of
+`i` in `js` already contributes `qc i` pre-generated answers to the seed at `i`, and additional
+occurrences only increase that supply. -/
+lemma le_length_of_mem_support_generateSeed_of_covers
+    (seed : QuerySeed spec) (i : ι)
+    (hseed : seed ∈ support (generateSeed spec qc js))
+    (hcover : ∀ j, 0 < qc j → j ∈ js) :
+    qc i ≤ (seed i).length := by
+  have hlen := length_eq_of_mem_support_generateSeed (spec := spec) (qc := qc) (js := js)
+    seed i hseed
+  by_cases hq0 : qc i = 0
+  · simp [hq0]
+  · have hqpos : 0 < qc i := Nat.pos_of_ne_zero hq0
+    have hmem : i ∈ js := hcover i hqpos
+    have hcount_pos : 0 < js.count i := List.count_pos_iff.mpr hmem
+    have hcount_one : 1 ≤ js.count i := Nat.succ_le_of_lt hcount_pos
+    calc
+      qc i = qc i * 1 := by simp
+      _ ≤ qc i * js.count i := Nat.mul_le_mul_left _ hcount_one
+      _ = (seed i).length := hlen.symm
+
 lemma eq_nil_of_mem_support_generateSeed
     (seed : QuerySeed spec) (i : ι)
     (hseed : seed ∈ support (generateSeed spec qc js))

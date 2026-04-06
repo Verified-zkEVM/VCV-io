@@ -37,6 +37,14 @@ structure ForkInput (spec : OracleSpec ι) (α : Type) where
   queryBound : ι → ℕ
   js : List ι
 
+/-- `SeedListCovers qb js` means that every oracle family with positive query budget appears in
+the seed-generation list `js`.
+
+When this holds, any seed sampled from `generateSeed spec qb js` supplies enough pre-generated
+answers to cover one full execution of a computation satisfying the structural bound `qb`. -/
+def SeedListCovers (qb : ι → ℕ) (js : List ι) : Prop :=
+  ∀ t, 0 < qb t → t ∈ js
+
 section forkDef
 
 variable [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
@@ -103,6 +111,97 @@ theorem isPerIndexQueryBound_replayAfterFork
       (Function.update 0 i (qb i - (↑s + 1))) :=
   seededOracle.isPerIndexQueryBound_run'_takeAtIndex_addValue
     (oa := main) (qb := qb) (seed := seed) (i := i) hmain hseed s u
+
+section generateSeedCoverage
+
+variable [∀ i, SampleableType (spec.Range i)]
+
+/-- A seed sampled from `generateSeed spec qb js` covers the full structural query bound `qb`
+whenever the seed-generation list `js` contains every oracle family with positive budget. -/
+lemma generateSeed_covers_queryBound
+    (qb : ι → ℕ) (js : List ι) {seed : QuerySeed spec}
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js)) :
+    ∀ t, qb t ≤ (seed t).length :=
+  fun t =>
+    OracleComp.le_length_of_mem_support_generateSeed_of_covers
+      (spec := spec) (qc := qb) (js := js) seed t hseed hjs
+
+/-- If `main` satisfies structural query bound `qb` and `js` covers all positive entries of `qb`,
+then every seed sampled by `generateSeed spec qb js` makes the first seeded run of `main`
+oracle-free. -/
+theorem isPerIndexQueryBound_firstRun_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
+    {seed : QuerySeed spec}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js)) :
+    IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
+  isPerIndexQueryBound_firstRun_seeded
+    (main := main) (qb := qb) hmain
+    (generateSeed_covers_queryBound (spec := spec) qb js hjs hseed)
+
+/-- If `main` satisfies structural query bound `qb` and `js` covers all positive entries of `qb`,
+then every seed sampled by `generateSeed spec qb js` yields the standard replay bound after
+rewinding at oracle `i` and resampling the `(s+1)`-st answer there. -/
+theorem isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (s : Fin (qb i + 1)) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
+      (Function.update 0 i (qb i - (↑s + 1))) :=
+  isPerIndexQueryBound_replayAfterFork
+    (main := main) (qb := qb) (i := i) (u := u) hmain
+    (generateSeed_covers_queryBound (spec := spec) qb js hjs hseed) s
+
+/-- Under the same coverage hypotheses as
+[`isPerIndexQueryBound_firstRun_of_mem_support_generateSeed`], the counting oracle records zero
+live queries on every reachable execution of the first seeded run. -/
+theorem firstRun_queryCount_eq_zero_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
+    {seed : QuerySeed spec} {z : α × QueryCount ι}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (hz : z ∈ support (countingOracle.simulate ((simulateQ seededOracle main).run' seed) 0)) :
+    z.2 = 0 := by
+  have hbound :
+      IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
+    isPerIndexQueryBound_firstRun_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) hmain hjs hseed
+  have hzle : z.2 ≤ 0 := hbound.counting_bounded hz
+  funext t
+  exact Nat.eq_zero_of_le_zero (hzle t)
+
+/-- Under the same coverage hypotheses as
+[`isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed`], every reachable execution
+of the replay after the fork point makes live queries only to `i`, and at most
+`qb i - (s + 1)` of them remain. -/
+theorem replayAfterFork_queryCount_le_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (s : Fin (qb i + 1))
+    (hz :
+      z ∈ support
+        (countingOracle.simulate
+          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
+    z.2 ≤ Function.update (0 : QueryCount ι) i (qb i - (↑s + 1)) := by
+  have hbound :
+      IsPerIndexQueryBound
+        ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
+        (Function.update (0 : QueryCount ι) i (qb i - (↑s + 1))) :=
+    isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) (i := i) (u := u) hmain hjs hseed s
+  exact hbound.counting_bounded hz
+
+end generateSeedCoverage
 
 variable [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 variable (main : OracleComp spec α) (qb : ι → ℕ)
