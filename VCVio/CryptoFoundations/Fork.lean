@@ -116,6 +116,20 @@ section generateSeedCoverage
 
 variable [∀ i, SampleableType (spec.Range i)]
 
+/-- If the seed-generation list `js` covers every oracle family with positive budget, then a seed
+sampled from `generateSeed spec qb js` satisfies the resulting coverage predicate with
+probability `1`. -/
+theorem probEvent_generateSeed_covers_queryBound_eq_one
+    (qb : ι → ℕ) (js : List ι) (hjs : SeedListCovers qb js) :
+    Pr[ fun seed : QuerySeed spec => ∀ t, qb t ≤ (seed t).length
+      | generateSeed spec qb js] = 1 := by
+  exact probEvent_eq_one
+    (mx := generateSeed spec qb js)
+    (p := fun seed : QuerySeed spec => ∀ t, qb t ≤ (seed t).length)
+    ⟨by simp, fun seed hseed t =>
+      OracleComp.le_length_of_mem_support_generateSeed_of_covers
+        (spec := spec) (qc := qb) (js := js) seed t hseed hjs⟩
+
 /-- A seed sampled from `generateSeed spec qb js` covers the full structural query bound `qb`
 whenever the seed-generation list `js` contains every oracle family with positive budget. -/
 lemma generateSeed_covers_queryBound
@@ -200,6 +214,89 @@ theorem replayAfterFork_queryCount_le_of_mem_support_generateSeed
     isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
       (main := main) (qb := qb) (js := js) (i := i) (u := u) hmain hjs hseed s
   exact hbound.counting_bounded hz
+
+/-- In the replay after the fork point, the only live oracle family that can still be queried is
+the forked family `i`. -/
+theorem replayAfterFork_queryCount_eq_zero_of_ne_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (s : Fin (qb i + 1))
+    (hz :
+      z ∈ support
+        (countingOracle.simulate
+          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0))
+    {j : ι} (hj : j ≠ i) :
+    z.2 j = 0 := by
+  have hzle :=
+    replayAfterFork_queryCount_le_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) (i := i)
+      (u := u) (z := z) hmain hjs hseed s hz
+  exact Nat.eq_zero_of_le_zero (by simpa [Function.update_of_ne hj] using hzle j)
+
+/-- At the forked oracle family `i`, the replay after the fork point makes at most
+`qb i - (s + 1)` live queries. In the common single-oracle setting, this is the familiar
+`q - (s + 1)` replay bound. -/
+theorem replayAfterFork_queryCount_atFork_le_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (s : Fin (qb i + 1))
+    (hz :
+      z ∈ support
+        (countingOracle.simulate
+          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
+    z.2 i ≤ qb i - (↑s + 1) := by
+  have hzle :=
+    replayAfterFork_queryCount_le_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) (i := i)
+      (u := u) (z := z) hmain hjs hseed s hz
+  simpa using hzle i
+
+section singleOracle
+
+variable [Fintype ι]
+
+/-- The total number of live queries made by the replay after the fork point is at most
+`qb i - (s + 1)`.
+
+This is the textbook one-oracle replay-cost statement extracted from the more general
+per-index bound above. -/
+theorem replayAfterFork_totalQueryCount_le_of_mem_support_generateSeed
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js))
+    (s : Fin (qb i + 1))
+    (hz :
+      z ∈ support
+        (countingOracle.simulate
+          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
+    ∑ j, z.2 j ≤ qb i - (↑s + 1) := by
+  have hi :=
+    replayAfterFork_queryCount_atFork_le_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) (i := i)
+      (u := u) (z := z) hmain hjs hseed s hz
+  have hzero :
+      ∀ j, j ≠ i → z.2 j = 0 := by
+    intro j hj
+    exact replayAfterFork_queryCount_eq_zero_of_ne_of_mem_support_generateSeed
+      (main := main) (qb := qb) (js := js) (i := i)
+      (u := u) (z := z) hmain hjs hseed s hz hj
+  classical
+  rw [Finset.sum_eq_single i]
+  · exact hi
+  · intro j _ hj
+    simp [hzero j hj]
+  · intro hi_mem
+    exact (False.elim (hi_mem (Finset.mem_univ i)))
+
+end singleOracle
 
 end generateSeedCoverage
 
