@@ -29,15 +29,17 @@ open OracleSpec OracleComp ENNReal Function Finset
 
 namespace OracleComp
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
-  [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
-  {α β γ : Type}
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} {α β γ : Type}
 
 /-- Bundles the inputs to the forking lemma. -/
 structure ForkInput (spec : OracleSpec ι) (α : Type) where
   main : OracleComp spec α
   queryBound : ι → ℕ
   js : List ι
+
+section forkDef
+
+variable [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 
 /-- The forking operation: run `main` with a random seed, then re-run it with the seed modified
 at the `s`-th query to oracle `i` (where `s = cf x₁`), checking that both runs agree on `cf`.
@@ -68,6 +70,41 @@ def fork (main : OracleComp spec α)
       else
         return none
 
+end forkDef
+
+/-- If a seed already contains enough answers for every oracle family covered by `qb`, then the
+first seeded execution of `main` performs no live oracle queries.
+
+This isolates the replay bookkeeping used by `fork`: once the seed is fixed, the first run is a
+pure table-lookup execution of the adversary. -/
+theorem isPerIndexQueryBound_firstRun_seeded
+    (main : OracleComp spec α) (qb : ι → ℕ)
+    {seed : QuerySeed spec}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
+  seededOracle.isPerIndexQueryBound_run'_zero
+    (oa := main) (qb := qb) (seed := seed) hmain hseed
+
+/-- After rewinding to fork index `s` and resampling the next answer at oracle `i`, the replayed
+execution can make live queries only to `i`, and at most `qb i - (s + 1)` such queries remain.
+
+This is the structural replay-cost theorem behind the forking lemma: the seed fixes every oracle
+answer before the fork point, so only the suffix after the modified `i`-query can still touch the
+live oracle. -/
+theorem isPerIndexQueryBound_replayAfterFork
+    (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length)
+    (s : Fin (qb i + 1)) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
+      (Function.update 0 i (qb i - (↑s + 1))) :=
+  seededOracle.isPerIndexQueryBound_run'_takeAtIndex_addValue
+    (oa := main) (qb := qb) (seed := seed) (i := i) hmain hseed s u
+
+variable [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 variable (main : OracleComp spec α) (qb : ι → ℕ)
     (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
     [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec]

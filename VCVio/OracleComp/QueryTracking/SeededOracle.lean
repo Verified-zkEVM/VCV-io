@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Coercions.SubSpec
@@ -1041,5 +1042,164 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
         congr 1
         exact ih u₀ _ js.dedup k
           (fun σ => h (QuerySeed.prependValues σ [u₀]))
+
+section queryBounds
+
+variable {α : Type u}
+
+/-- If a pre-generated seed already supplies all but `residual t` of the answers allowed by the
+structural per-index query bound `qb`, then running `oa` against `seededOracle` can make at most
+those residual live queries.
+
+This theorem is the core replay-cost statement for seeded simulations: a large enough seed turns
+most oracle interactions into deterministic table lookups, leaving only the uncovered suffix of
+the computation as genuine oracle queries. -/
+theorem isPerIndexQueryBound_run'_of_seedCoverage
+    {oa : OracleComp spec α} {qb residual : ι → ℕ} {seed : QuerySeed spec}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t - residual t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle oa).run' seed) residual := by
+  revert qb residual seed
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro qb residual seed _ _
+      simp
+  | query_bind t mx ih =>
+      intro qb residual seed hqb hcover
+      rw [isPerIndexQueryBound_query_bind_iff] at hqb
+      have hrun' :
+          (do let r ← seededOracle t; simulateQ seededOracle (mx r) :
+            StateT (QuerySeed spec) (OracleComp spec) α).run' seed =
+          match seed.pop t with
+          | none => liftM (query t) >>= fun r => (simulateQ seededOracle (mx r)).run' seed
+          | some (r, seed') => (simulateQ seededOracle (mx r)).run' seed' := by
+        change Prod.fst <$> ((seededOracle t >>= fun r => simulateQ seededOracle (mx r)).run seed) =
+          _
+        rw [run_bind_query_eq_pop]
+        cases hpop : seed.pop t with
+        | none => simp [map_bind]
+        | some p => rfl
+      rw [show (simulateQ seededOracle (liftM (query t) >>= mx)).run' seed =
+          ((do let r ← seededOracle t; simulateQ seededOracle (mx r) :
+            StateT (QuerySeed spec) (OracleComp spec) α).run' seed) by
+            simp]
+      rw [hrun']
+      cases hpop : seed.pop t with
+      | none =>
+          rw [isPerIndexQueryBound_query_bind_iff]
+          have hres_pos : 0 < residual t := by
+            have hlen0 : (seed t).length = 0 := by
+              simpa [QuerySeed.pop_eq_none_iff] using hpop
+            have hcov_t : qb t - residual t ≤ 0 := by
+              simpa [hlen0] using hcover t
+            omega
+          refine ⟨hres_pos, ?_⟩
+          intro u
+          simpa using
+            (ih u
+              (qb := Function.update qb t (qb t - 1))
+              (residual := Function.update residual t (residual t - 1))
+              (seed := seed)
+              (hqb := hqb.2 u)
+              (by
+                intro j
+                have hcov_j := hcover j
+                by_cases hj : j = t
+                · subst hj
+                  have hsub :
+                      (qb j - 1) - (residual j - 1) = qb j - residual j := by
+                    omega
+                  simpa [Function.update_self, hsub] using hcov_j
+                · simpa [Function.update_of_ne hj, hj] using hcov_j))
+      | some p =>
+          rcases p with ⟨u, seed'⟩
+          simpa using
+            (ih u
+              (qb := Function.update qb t (qb t - 1))
+              (residual := residual)
+              (seed := seed')
+              (hqb := hqb.2 u)
+              (by
+                intro j
+                have hcov_j := hcover j
+                by_cases hj : j = t
+                · subst hj
+                  have hseedt : seed j = u :: seed' j := by
+                    simpa using (QuerySeed.cons_of_pop_eq_some seed j u seed' hpop).symm
+                  have hcov_j' : qb j - residual j ≤ (seed' j).length + 1 := by
+                    simpa [hseedt] using hcov_j
+                  simp [Function.update_self]
+                  by_cases hle : qb j ≤ residual j
+                  · omega
+                  · have hlt : residual j < qb j := Nat.lt_of_not_ge hle
+                    omega
+                · rcases QuerySeed.rest_eq_update_tail_of_pop_eq_some seed t u seed' hpop with hrest
+                  have hseed'_j : seed' j = seed j := by
+                    have := congrArg (fun s => s j) hrest
+                    simpa [Function.update_of_ne hj] using this
+                  simpa [Function.update_of_ne hj, hseed'_j, hj] using hcov_j))
+
+/-- A seed that covers the full structural query bound eliminates all live oracle queries. -/
+theorem isPerIndexQueryBound_run'_zero
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle oa).run' seed) 0 := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage (oa := oa) (qb := qb) (residual := 0)
+    (seed := seed) hqb ?_
+  intro t
+  simpa using hcover t
+
+/-- If the seed stores only the first `k` answers for oracle `i`, then the replay can make live
+queries only to `i`, and at most `qb i - k` of them remain.
+
+This is the structural query-bound form of the usual forking-lemma intuition: after rewinding to
+the `k`-th query to oracle `i`, every earlier answer is fixed by the prefix seed, so only the
+suffix after the fork point can still hit the live oracle. -/
+theorem isPerIndexQueryBound_run'_takeAtIndex
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec} {i : ι} {k : ℕ}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length)
+    (hk : k ≤ qb i) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle oa).run' (seed.takeAtIndex i k))
+      (Function.update 0 i (qb i - k)) := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage
+    (oa := oa) (qb := qb) (residual := Function.update 0 i (qb i - k))
+    (seed := seed.takeAtIndex i k) hqb ?_
+  intro t
+  by_cases ht : t = i
+  · subst ht
+    have hlen : qb t ≤ (seed t).length := hcover t
+    have hk' : k ≤ (seed t).length := le_trans hk hlen
+    rw [QuerySeed.takeAtIndex_apply_self, Function.update_self]
+    simp
+    omega
+  · simpa [Function.update_of_ne ht, QuerySeed.takeAtIndex_apply_of_ne _ _ _ _ ht] using hcover t
+
+/-- After rewinding to query index `s` and appending one fresh answer at oracle `i`, the replayed
+run can still make live queries only to `i`, with at most `qb i - (s + 1)` such queries left. -/
+theorem isPerIndexQueryBound_run'_takeAtIndex_addValue
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec} {i : ι}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length)
+    (s : Fin (qb i + 1)) (u : spec.Range i) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle oa).run' ((seed.takeAtIndex i ↑s).addValue i u))
+      (Function.update 0 i (qb i - (↑s + 1))) := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage
+    (oa := oa) (qb := qb) (residual := Function.update 0 i (qb i - (↑s + 1)))
+    (seed := (seed.takeAtIndex i ↑s).addValue i u) hqb ?_
+  intro t
+  by_cases ht : t = i
+  · subst ht
+    have hs0 : ↑s ≤ qb t := Nat.lt_succ_iff.mp s.2
+    have hlen : qb t ≤ (seed t).length := hcover t
+    have hs' : ↑s ≤ (seed t).length := le_trans hs0 hlen
+    simp [QuerySeed.addValue, QuerySeed.addValues]
+    omega
+  · simp [QuerySeed.addValue, QuerySeed.addValues, ht, hcover t]
+
+end queryBounds
 
 end seededOracle
