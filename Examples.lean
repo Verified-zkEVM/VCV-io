@@ -20,5 +20,6 @@ import Examples.ProgramLogic.UnaryTriple
 import Examples.RF_RP_Switching_alt
 import Examples.Regev
 import Examples.Schnorr
+import Examples.SchnorrExtractorRuntime
 import Examples.Signature
 import Examples.SimpleTwoServerPIR
