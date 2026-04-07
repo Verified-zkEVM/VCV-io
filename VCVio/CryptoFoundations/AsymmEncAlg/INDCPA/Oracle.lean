@@ -468,8 +468,8 @@ theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
 theorem IND_CPA_LR_hybridGame_zero_probOutput_eq_right
     (adversary : encAlg'.IND_CPA_adversary) :
     Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary 0] =
-      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary false] := by
-  exact (evalDist_ext_iff.mp
+      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary false] :=
+  (evalDist_ext_iff.mp
     (IND_CPA_LR_hybridGame_zero_evalDist_eq_right (encAlg' := encAlg') adversary)) true
 
 /-- If an adversary makes at most `q` fresh LR queries, then the `leftUntil = q` LR-hybrid has
@@ -478,8 +478,8 @@ theorem IND_CPA_LR_hybridGame_q_probOutput_eq_left_of_MakesAtMostQueries
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     Pr[= true | encAlg'.IND_CPA_LR_hybridGame adversary q] =
-      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary true] := by
-  exact (evalDist_ext_iff.mp
+      Pr[= true | encAlg'.IND_CPA_LR_experiment adversary true] :=
+  (evalDist_ext_iff.mp
     (IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
       (encAlg' := encAlg') adversary q hq)) true
 

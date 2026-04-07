@@ -43,8 +43,8 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
         (Fintype.card (spec.Range t) : ℚ≥0)⁻¹ := by
     calc
       @Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x
-          = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := spec.Range t)) x := by
-              exact Raw.prob_eq_prob (Classical.decEq _) (FinEnum.decEq)
+          = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := spec.Range t)) x :=
+              Raw.prob_eq_prob (Classical.decEq _) (FinEnum.decEq)
                 (Raw.uniform (α := spec.Range t)) x
       _ = (Fintype.card (spec.Range t) : ℚ≥0)⁻¹ := Raw.prob_uniform (α := spec.Range t) x
   rw [PMF.uniformOfFintype_apply]
@@ -53,8 +53,8 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
       = ((Fintype.card (spec.Range t) : ENNReal)⁻¹)
   calc
     (((@Raw.prob _ (Classical.decEq _) (Raw.uniform (α := spec.Range t)) x : NNReal) : ENNReal))
-        = (((((Fintype.card (spec.Range t) : ℚ≥0)⁻¹ : ℚ≥0) : NNReal) : ENNReal)) := by
-            exact congrArg
+        = (((((Fintype.card (spec.Range t) : ℚ≥0)⁻¹ : ℚ≥0) : NNReal) : ENNReal)) :=
+            congrArg
               (fun q : ℚ≥0 => ((q : NNReal) : ENNReal))
               hprob
     _ = ((Fintype.card (spec.Range t) : ENNReal)⁻¹) := by

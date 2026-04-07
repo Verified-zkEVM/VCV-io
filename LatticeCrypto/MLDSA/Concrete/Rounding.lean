@@ -341,10 +341,9 @@ private theorem decomposeCoeff_eq (r : Coeff) {gamma2 : ℕ} (hγ : 0 < gamma2) 
     exact Nat.mod_add_div _ _
   have hdiv' : ((t + alpha * (r.val / alpha) : ℕ) : Coeff) = r := by
     calc
-      ((t + alpha * (r.val / alpha) : ℕ) : Coeff) = (r.val : Coeff) := by
-        exact congrArg (fun n : ℕ => (n : Coeff)) hdiv
-      _ = r := by
-        exact ZMod.natCast_zmod_val r
+      ((t + alpha * (r.val / alpha) : ℕ) : Coeff) = (r.val : Coeff) :=
+        congrArg (fun n : ℕ => (n : Coeff)) hdiv
+      _ = r := ZMod.natCast_zmod_val r
   by_cases h : t ≤ alpha / 2
   · have base : ((alpha : Coeff) * ((r.val / alpha : ℕ) : Coeff)) + intToCoeff (t : ℤ) = r := by
       calc
@@ -704,8 +703,8 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
   have hvlower : -((p.gamma2 - 1 : ℕ) : ℤ) ≤ v := by
     dsimp [v]
     omega
-  have hvbound : v.natAbs ≤ p.gamma2 - 1 := by
-    exact natAbs_le_of_bounds hvlower hvupper
+  have hvbound : v.natAbs ≤ p.gamma2 - 1 :=
+    natAbs_le_of_bounds hvlower hvupper
   have hzcast : s = intToCoeff z := by
     simpa [z] using centeredRepr_cast s
   have hcandidate : (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v = r + s := by
@@ -729,14 +728,14 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
     omega
   have hdifflower : -((alpha - 1 : ℕ) : ℤ) ≤ v - w := by
     omega
-  have hdiffbound : (v - w).natAbs ≤ alpha - 1 := by
-    exact natAbs_le_of_bounds hdifflower hdiffupper
-  have hrepr_diff : LatticeCrypto.centeredRepr (intToCoeff (v - w)) = v - w := by
-    exact centeredRepr_eq_of_natAbs_le (z := v - w) hdiffbound hsmallq
+  have hdiffbound : (v - w).natAbs ≤ alpha - 1 :=
+    natAbs_le_of_bounds hdifflower hdiffupper
+  have hrepr_diff : LatticeCrypto.centeredRepr (intToCoeff (v - w)) = v - w :=
+    centeredRepr_eq_of_natAbs_le (z := v - w) hdiffbound hsmallq
   have heq :
       (((alpha : ℕ) : Coeff) * (u : Coeff)) + intToCoeff w =
-        (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v := by
-    exact hdecomp_rs.trans hcandidate.symm
+        (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v :=
+    hdecomp_rs.trans hcandidate.symm
   have hneq' : u ≠ r1 := by
     simpa [u, r1, decrs, decr, highBitsCoeff] using hneq
   have hlt_or_gt : r1 < u ∨ u < r1 := lt_or_gt_of_ne hneq'.symm
@@ -821,8 +820,8 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
         have hwvupper : w - v ≤ ((alpha - 1 : ℕ) : ℤ) := by omega
         have hwvlower : -((alpha - 1 : ℕ) : ℤ) ≤ w - v := by omega
         exact natAbs_le_of_bounds hwvlower hwvupper
-      have hrepr_diff' : LatticeCrypto.centeredRepr (intToCoeff (w - v)) = w - v := by
-        exact centeredRepr_eq_of_natAbs_le (z := w - v) hdiffbound' hsmallq
+      have hrepr_diff' : LatticeCrypto.centeredRepr (intToCoeff (w - v)) = w - v :=
+        centeredRepr_eq_of_natAbs_le (z := w - v) hdiffbound' hsmallq
       have hrepr_eq := congrArg LatticeCrypto.centeredRepr hdeltaeq
       rw [hrepr_diff'] at hrepr_eq
       have hbig' : alpha ≤ (w - v).natAbs := by
@@ -848,8 +847,8 @@ private theorem highBitsCoeff_nonneg_repr_of_isApproved (p : Params)
     simpa [alpha, m] using alphaMulUseHintModulus_eq_modulus_sub_one_of_isApproved p hp
   have hu_lt_m : u < m := by
     simpa [alpha, m] using hu
-  have huqm1 : alpha * u < modulus - 1 := by
-    exact lt_of_lt_of_eq (Nat.mul_lt_mul_of_pos_left hu_lt_m hα) hqm1
+  have huqm1 : alpha * u < modulus - 1 :=
+    lt_of_lt_of_eq (Nat.mul_lt_mul_of_pos_left hu_lt_m hα) hqm1
   have hltα : n < alpha := by
     dsimp [alpha]
     omega
@@ -911,8 +910,8 @@ private theorem highBitsCoeff_neg_repr_of_isApproved (p : Params)
     simpa [alpha, m] using alphaMulUseHintModulus_eq_modulus_sub_one_of_isApproved p hp
   have hu_lt_m : u < m := by
     simpa [alpha, m] using hu
-  have huqm1 : alpha * u < modulus - 1 := by
-    exact lt_of_lt_of_eq (Nat.mul_lt_mul_of_pos_left hu_lt_m hα) hqm1
+  have huqm1 : alpha * u < modulus - 1 :=
+    lt_of_lt_of_eq (Nat.mul_lt_mul_of_pos_left hu_lt_m hα) hqm1
   have hltαn : n < alpha := by
     dsimp [alpha]
     omega
@@ -926,8 +925,8 @@ private theorem highBitsCoeff_neg_repr_of_isApproved (p : Params)
     calc
       alpha = alpha * 1 := by ring
       _ ≤ alpha * u := Nat.mul_le_mul_left alpha (show 1 ≤ u by omega)
-  have hltq : alpha * u - n < modulus := by
-    exact lt_of_le_of_lt (Nat.sub_le _ _) (lt_trans huqm1 (by omega))
+  have hltq : alpha * u - n < modulus :=
+    lt_of_le_of_lt (Nat.sub_le _ _) (lt_trans huqm1 (by omega))
   have hval :
       (intToCoeff (((alpha * u - n : ℕ) : ℤ))).val = alpha * u - n := by
     simpa [intToCoeff] using (ZMod.val_natCast_of_lt (n := modulus) (a := alpha * u - n) hltq)
@@ -945,8 +944,8 @@ private theorem highBitsCoeff_neg_repr_of_isApproved (p : Params)
                 _ = alpha * (u - 1) := by rw [Nat.add_sub_cancel]]
             rw [Nat.mul_comm]
       _ = (alpha - n) + (u - 1) * alpha := by rw [add_comm]
-  have hltα : alpha - n < alpha := by
-    exact Nat.sub_lt hα hn0
+  have hltα : alpha - n < alpha :=
+    Nat.sub_lt hα hn0
   have hmod : (alpha * u - n) % alpha = alpha - n := by
     rw [hrepr, Nat.add_mul_mod_self_right, Nat.mod_eq_of_lt hltα]
   have hdiv : (alpha * u - n) / alpha = u - 1 := by
@@ -1424,8 +1423,8 @@ private theorem useHintCoeff_correct_of_small_of_isApproved (p : Params)
               rw [hvnat]
               exact_mod_cast hvupα
             exact_mod_cast this
-          have hnatabs_lt_alpha : v.natAbs < alpha := by
-            exact lt_of_le_of_ne hnatabs_le_alpha (by simpa using hvEqAlpha)
+          have hnatabs_lt_alpha : v.natAbs < alpha :=
+            lt_of_le_of_ne hnatabs_le_alpha (by simpa using hvEqAlpha)
           have hnatabs_gt_gamma : p.gamma2 < v.natAbs := by
             have : (p.gamma2 : ℤ) < ((v.natAbs : ℕ) : ℤ) := by
               rw [hvnat]

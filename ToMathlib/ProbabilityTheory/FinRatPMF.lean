@@ -179,8 +179,7 @@ instance : Monad Raw where
   bind := Raw.bind
 
 @[simp] lemma pure_toList (a : α) :
-    (Pure.pure a : Raw α).toList = [(a, 1)] := by
-  rfl
+    (Pure.pure a : Raw α).toList = [(a, 1)] := rfl
 
 @[simp] lemma bind_toList (f : Raw α) (g : α → Raw β) :
     (f >>= g).toList =
@@ -311,8 +310,8 @@ lemma sum_prob_eq_sum [DecidableEq α] (p : Raw α) :
     rcases List.mem_filter.1 ha with ⟨ha, _⟩
     exact List.mem_toFinset.2 (List.mem_map.2 ⟨a, ha, hax⟩)
   calc
-    p.support.sum p.prob = s.sum p.prob := by
-      exact Finset.sum_subset hs (by
+    p.support.sum p.prob = s.sum p.prob :=
+      Finset.sum_subset hs (by
         intro x _ hx
         exact prob_eq_zero_of_not_mem_support p hx)
     _ = (p.toList.map Prod.snd).sum := by
@@ -438,8 +437,8 @@ lemma support_uniformList_of_nodup [DecidableEq α] {l : List α} (hl : l ≠ []
   have hprob : (Raw.uniform (α := α)).prob x = (Fintype.card α : ℚ≥0)⁻¹ := by
     calc
       (Raw.uniform (α := α)).prob x
-          = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := α)) x := by
-              exact Raw.prob_eq_prob inferInstance (FinEnum.decEq) (Raw.uniform (α := α)) x
+          = @Raw.prob _ (FinEnum.decEq) (Raw.uniform (α := α)) x :=
+              Raw.prob_eq_prob inferInstance (FinEnum.decEq) (Raw.uniform (α := α)) x
       _ = (Fintype.card α : ℚ≥0)⁻¹ := prob_uniform (α := α) x
   simp [hprob]
 
@@ -575,11 +574,11 @@ lemma mem_support_bind_iff [DecidableEq α] [DecidableEq β] (m : Raw α) (f : �
   · rintro ⟨x, hx, hy⟩
     have hmx : m.prob x ≠ 0 := (mem_support_iff m x).1 hx
     have hfy : (f x).prob y ≠ 0 := (mem_support_iff (f x) y).1 hy
-    have hpos : 0 < m.prob x * (f x).prob y := by
-      exact mul_pos (pos_iff_ne_zero.mpr hmx) (pos_iff_ne_zero.mpr hfy)
+    have hpos : 0 < m.prob x * (f x).prob y :=
+      mul_pos (pos_iff_ne_zero.mpr hmx) (pos_iff_ne_zero.mpr hfy)
     have hle :
-        m.prob x * (f x).prob y ≤ ∑ a ∈ m.support, m.prob a * (f a).prob y := by
-      exact Finset.single_le_sum
+        m.prob x * (f x).prob y ≤ ∑ a ∈ m.support, m.prob a * (f a).prob y :=
+      Finset.single_le_sum
         (f := fun a => m.prob a * (f a).prob y) (fun _ _ => by exact zero_le _) hx
     exact pos_iff_ne_zero.mp (lt_of_lt_of_le hpos hle)
 
@@ -657,16 +656,16 @@ private lemma probOfList_toList_eq_getD [DecidableEq α] [BEq α] [Hashable α]
     have hnot : x ∉ m := by
       rw [Std.HashMap.mem_iff_isSome_getElem?]
       simp [hopt]
-    have hfind : m.toList.find? (fun a => a.1 == x) = none := by
-      exact (Std.HashMap.find?_toList_eq_none_iff_not_mem (m := m) (k := x)).2 hnot
+    have hfind : m.toList.find? (fun a => a.1 == x) = none :=
+      (Std.HashMap.find?_toList_eq_none_iff_not_mem (m := m) (k := x)).2 hnot
     simp [hfind]
   | some q =>
     have hxmem : x ∈ m := by
       rw [Std.HashMap.mem_iff_isSome_getElem?]
       simp [hopt]
     have hkey : m.getKey? x = some x := Std.HashMap.getKey?_eq_some (m := m) hxmem
-    have hfind : m.toList.find? (fun a => a.1 == x) = some (x, q) := by
-      exact (Std.HashMap.find?_toList_eq_some_iff_getKey?_eq_some_and_getElem?_eq_some
+    have hfind : m.toList.find? (fun a => a.1 == x) = some (x, q) :=
+      (Std.HashMap.find?_toList_eq_some_iff_getKey?_eq_some_and_getElem?_eq_some
         (m := m) (k := x) (k' := x) (v := q)).2 ⟨hkey, hopt⟩
     simp [hfind]
 
@@ -703,8 +702,8 @@ private lemma probOfNormalizeMap_eq_prob [DecidableEq α] [BEq α] [Hashable α]
 private lemma snd_ne_zero_of_mem_normalizeMap_toList [BEq α] [Hashable α]
     [LawfulBEq α] [LawfulHashable α] (p : Raw α) {a : α × ℚ≥0}
     (ha : a ∈ (normalizeMap p).toList) : a.2 ≠ 0 := by
-  have hsome : (normalizeMap p)[a.1]? = some a.2 := by
-    exact (Std.HashMap.mem_toList_iff_getElem?_eq_some (m := normalizeMap p)
+  have hsome : (normalizeMap p)[a.1]? = some a.2 :=
+    (Std.HashMap.mem_toList_iff_getElem?_eq_some (m := normalizeMap p)
       (k := a.1) (v := a.2)).1 ha
   unfold normalizeMap at hsome
   rw [Std.HashMap.getElem?_filter'] at hsome
@@ -969,8 +968,8 @@ lemma bind_eq_out (ma : FinRatPMF α) (f : α → FinRatPMF β) :
 
 private lemma out_bind_sameDist (ma : FinRatPMF α) (f : α → FinRatPMF β) :
     SameDist (Quotient.out (ma >>= f))
-      (Raw.bind (Quotient.out ma) (fun a => Quotient.out (f a))) := by
-  exact Quotient.exact ((Quotient.out_eq (ma >>= f)).trans (bind_eq_out ma f))
+      (Raw.bind (Quotient.out ma) (fun a => Quotient.out (f a))) :=
+  Quotient.exact ((Quotient.out_eq (ma >>= f)).trans (bind_eq_out ma f))
 
 /-! ### Connection to `PMF` -/
 
@@ -1013,8 +1012,8 @@ lemma toPMF_out (p : FinRatPMF α) :
             (Raw.bind (Quotient.out ma) (fun a => Quotient.out (f a))) := by
               rw [bind_eq_out, toPMF_mk]
     _ = @Raw.toPMF _ (Classical.decEq _) (Quotient.out ma) >>=
-          fun a => @Raw.toPMF _ (Classical.decEq _) (Quotient.out (f a)) := by
-            exact Raw.toPMF_bind _ _
+          fun a => @Raw.toPMF _ (Classical.decEq _) (Quotient.out (f a)) :=
+            Raw.toPMF_bind _ _
     _ = toPMF ma >>= fun a => toPMF (f a) := by
           rw [← toPMF_out ma]
           congr 1
@@ -1042,13 +1041,13 @@ lemma toPMF_injective : Function.Injective (toPMF (α := α)) := by
   intro x
   have hfun :
       (@Raw.toPMF _ (Classical.decEq _) a : PMF α) x =
-      (@Raw.toPMF _ (Classical.decEq _) b : PMF α) x := by
-    exact congrFun (congrArg DFunLike.coe hpq) x
+      (@Raw.toPMF _ (Classical.decEq _) b : PMF α) x :=
+    congrFun (congrArg DFunLike.coe hpq) x
   rw [Raw.toPMF_apply, Raw.toPMF_apply] at hfun
   have key' :
       ((@Raw.prob _ (Classical.decEq _) a x : ℚ≥0) : NNReal) =
-      ((@Raw.prob _ (Classical.decEq _) b x : ℚ≥0) : NNReal) := by
-    exact congrArg ENNReal.toNNReal hfun
+      ((@Raw.prob _ (Classical.decEq _) b x : ℚ≥0) : NNReal) :=
+    congrArg ENNReal.toNNReal hfun
   calc @Raw.prob _ (Classical.decEq _) a x
       = a.prob x := Raw.prob_eq_prob _ _ _ _
     _ = b.prob x := by exact_mod_cast key'
@@ -1070,8 +1069,8 @@ noncomputable instance : LawfulMonad FinRatPMF := LawfulMonad.mk'
     calc
       toPMF (pure x >>= f) = PMF.pure x >>= fun a => toPMF (f a) := by
         rw [toPMF_bind, toPMF_pure]
-      _ = toPMF (f x) := by
-            exact pure_bind (m := PMF) x (fun a => toPMF (f a)))
+      _ = toPMF (f x) :=
+            pure_bind (m := PMF) x (fun a => toPMF (f a)))
   (bind_assoc := fun m f g => by
     apply toPMF_injective
     calc
@@ -1091,8 +1090,8 @@ noncomputable instance : LawfulMonad FinRatPMF := LawfulMonad.mk'
           = toPMF x >>= fun a => PMF.pure (f a) := by
               rw [toPMF_bind]
               simp
-      _ = f <$> toPMF x := by
-            exact bind_pure_comp (m := PMF) f (toPMF x)
+      _ = f <$> toPMF x :=
+            bind_pure_comp (m := PMF) f (toPMF x)
       _ = toPMF (f <$> x) := by
             rw [show f <$> x = x >>= fun a => pure (f a) by rfl, toPMF_bind]
             simp [map_eq_bind_pure_comp]

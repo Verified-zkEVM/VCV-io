@@ -310,8 +310,8 @@ lemma expectedCost_le_of_support_bound [HasEvalSPMF m]
     (h : ∀ w ∈ support oa.costs, val w ≤ c) :
     expectedCost oa val ≤ c := by
   unfold expectedCost
-  have hmass : ∑' w : ω, Pr[= w | oa.costs] ≤ 1 := by
-    exact tsum_probOutput_le_one (mx := oa.costs)
+  have hmass : ∑' w : ω, Pr[= w | oa.costs] ≤ 1 :=
+    tsum_probOutput_le_one (mx := oa.costs)
   calc
     ∑' w : ω, Pr[= w | oa.costs] * val w
         ≤ ∑' w : ω, Pr[= w | oa.costs] * c := by
@@ -506,8 +506,8 @@ lemma pathwiseCostAtLeast_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m] (
 
 lemma pathwiseCostEqOnSupport_probCompLift [LawfulMonad m] [MonadLiftT ProbComp m]
     (x : ProbComp α) :
-    PathwiseCostEqOnSupport (monadLift x : AddWriterT ω m α) 0 := by
-  exact ⟨
+    PathwiseCostEqOnSupport (monadLift x : AddWriterT ω m α) 0 :=
+  ⟨
     pathwiseCostAtMost_probCompLift (m := m) (ω := ω) x,
     pathwiseCostAtLeast_probCompLift (m := m) (ω := ω) x
   ⟩
@@ -1213,8 +1213,8 @@ lemma expectedQueryCost_eq_of_usesCostExactly
     {oa : Computation spec (AddWriterT ω m) α} {runtime : QueryRuntime spec m}
     {costFn : spec.Domain → ω} {w : ω} {val : ω → ENNReal}
     (h : HasQuery.UsesCostExactly oa runtime costFn w) (hval : Monotone val) :
-    HasQuery.expectedQueryCost oa runtime costFn val = val w := by
-  exact le_antisymm
+    HasQuery.expectedQueryCost oa runtime costFn val = val w :=
+  le_antisymm
     (expectedQueryCost_le_of_usesCostAtMost
       (usesCostAtMost_of_usesCostExactly h le_rfl) hval)
     (expectedQueryCost_ge_of_usesCostAtLeast
@@ -1235,16 +1235,16 @@ lemma expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
     (hUpper : HasQuery.UsesAtMostQueries oa runtime n)
     (hLower : HasQuery.UsesAtLeastQueries oa runtime n) :
-    HasQuery.expectedQueries oa runtime = n := by
-  exact le_antisymm
+    HasQuery.expectedQueries oa runtime = n :=
+  le_antisymm
     (expectedQueries_le_of_usesAtMostQueries hUpper)
     (expectedQueries_ge_of_usesAtLeastQueries hLower)
 
 lemma expectedQueries_eq_of_usesExactlyQueries [LawfulMonad m]
     {oa : Computation spec (AddWriterT ℕ m) α} {runtime : QueryRuntime spec m} {n : ℕ}
     (h : HasQuery.UsesExactlyQueries oa runtime n) :
-    HasQuery.expectedQueries oa runtime = n := by
-  exact expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
+    HasQuery.expectedQueries oa runtime = n :=
+  expectedQueries_eq_of_usesAtMostQueries_of_usesAtLeastQueries
     (m := m) (oa := oa) (runtime := runtime) (n := n)
     (usesAtMostQueries_of_usesExactlyQueries h le_rfl)
     (usesAtLeastQueries_of_usesExactlyQueries h le_rfl)

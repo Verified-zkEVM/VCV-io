@@ -708,8 +708,8 @@ theorem IND_CPA_advantage_toReal_le_sum_step_signedAdvantageReal_abs
     rw [habs_half]
     calc
       (1 / 2 : ℝ) * |H q - H 0|
-          ≤ (1 / 2 : ℝ) * Finset.sum (Finset.range q) (fun i => |H (i + 1) - H i|) := by
-              exact mul_le_mul_of_nonneg_left htri (by positivity)
+          ≤ (1 / 2 : ℝ) * Finset.sum (Finset.range q) (fun i => |H (i + 1) - H i|) :=
+              mul_le_mul_of_nonneg_left htri (by positivity)
       _ = Finset.sum (Finset.range q) (fun i => |(H (i + 1) - H i) / 2|) := hsum_half
   have hsteps :
       Finset.sum (Finset.range q) (fun i =>

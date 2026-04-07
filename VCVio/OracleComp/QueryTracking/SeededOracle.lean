@@ -983,8 +983,8 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
           conv_rhs => rw [← Finset.mul_sum]
           have hcard_ne_zero : (↑(Fintype.card (spec₀.Range t)) : ENNReal) ≠ 0 := by
             exact_mod_cast Fintype.card_pos.ne'
-          have hcard_ne_top : (↑(Fintype.card (spec₀.Range t)) : ENNReal) ≠ ⊤ := by
-            exact ENNReal.natCast_ne_top (n := Fintype.card (spec₀.Range t))
+          have hcard_ne_top : (↑(Fintype.card (spec₀.Range t)) : ENNReal) ≠ ⊤ :=
+            ENNReal.natCast_ne_top (n := Fintype.card (spec₀.Range t))
           rw [← mul_assoc, ENNReal.mul_inv_cancel hcard_ne_zero hcard_ne_top, one_mul]
           simp
         · -- Case 2a: t = i₀, k > 0 — both pop some, k decreases

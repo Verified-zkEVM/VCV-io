@@ -91,8 +91,8 @@ theorem triple_bind {pre : l} {x : m₁ α} {y : m₂ β}
     (hxy : Triple pre x y cut)
     (hfg : ∀ a b, Triple (cut a b) (f a) (g b) post) :
     Triple pre (x >>= f) (y >>= g) post := by
-  have hcut : pre ≤ RelWP x y (fun a b => RelWP (f a) (g b) post) := by
-    exact le_trans hxy (relWP_mono x y hfg)
+  have hcut : pre ≤ RelWP x y (fun a b => RelWP (f a) (g b) post) :=
+    le_trans hxy (relWP_mono x y hfg)
   exact le_trans hcut (relWP_bind_le x y f g post)
 
 /-- Mapping on the left program is monotone for relational WP. -/
@@ -197,8 +197,8 @@ noncomputable instance instOptionTRight :
       | some b => post a b)
   rwp_pure a b post := by
     simp
-  rwp_mono hpost := by
-    exact MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun a ob => by
+  rwp_mono hpost :=
+    MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun a ob => by
       cases ob with
       | none => exact le_rfl
       | some b => simpa using hpost a b)
@@ -241,8 +241,8 @@ noncomputable instance instOptionTLeft :
       | some a => post a b)
   rwp_pure a b post := by
     simp
-  rwp_mono hpost := by
-    exact MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun oa b => by
+  rwp_mono hpost :=
+    MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun oa b => by
       cases oa with
       | none => exact le_rfl
       | some a => simpa using hpost a b)
@@ -295,8 +295,8 @@ noncomputable instance instExceptTRight (ε : Type u) :
       | Except.ok b => post a b)
   rwp_pure a b post := by
     simp
-  rwp_mono hpost := by
-    exact MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun a eb => by
+  rwp_mono hpost :=
+    MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun a eb => by
       cases eb with
       | error e => exact le_rfl
       | ok b => simpa using hpost a b)
@@ -342,8 +342,8 @@ noncomputable instance instExceptTLeft (ε : Type u) :
       | Except.ok a => post a b)
   rwp_pure a b post := by
     simp
-  rwp_mono hpost := by
-    exact MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun ea b => by
+  rwp_mono hpost :=
+    MAlgRelOrdered.rwp_mono (m₁ := m₁) (m₂ := m₂) (l := l) (fun ea b => by
       cases ea with
       | error e => exact le_rfl
       | ok a => simpa using hpost a b)

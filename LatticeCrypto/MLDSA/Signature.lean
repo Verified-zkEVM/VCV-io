@@ -166,8 +166,8 @@ private lemma fipsSignLoop_exists
     (sig : FIPSSignature p prims)
     (h : fipsSignLoop p prims nttOps sk aHat mu rhoDoublePrime maxAttempts = some sig) :
     ∃ i ∈ List.range maxAttempts,
-      fipsSignAttempt p prims nttOps sk aHat mu rhoDoublePrime (i * p.l) = some sig := by
-  exact List.exists_of_findSome?_eq_some h
+      fipsSignAttempt p prims nttOps sk aHat mu rhoDoublePrime (i * p.l) = some sig :=
+  List.exists_of_findSome?_eq_some h
 
 private lemma fipsSignAttempt_spec
     (sk : SecretKey p) (aHat : TqMatrix p.k p.l)
