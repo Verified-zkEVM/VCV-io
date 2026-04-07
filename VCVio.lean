@@ -30,6 +30,7 @@ import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.SecExp
+import VCVio.CryptoFoundations.SigmaExtractorRuntime
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
