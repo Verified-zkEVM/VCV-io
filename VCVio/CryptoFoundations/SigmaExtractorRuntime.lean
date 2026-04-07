@@ -89,13 +89,7 @@ theorem singleRewindExtractorExpectedQueryWork_le
     (cf : α → Option (Fin (qb i + 1))) (sampleCost : ι → ℕ)
     (hSampleUpper :
       ∀ j, AddWriterT.QueryBoundedAboveBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
-        (sampleCost j))
-    (hSampleLower :
-      ∀ j, AddWriterT.QueryBoundedBelowBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
         (sampleCost j))
     (hmain : IsPerIndexQueryBound main qb)
     (hjs : SeedListCovers qb js) :
@@ -103,7 +97,7 @@ theorem singleRewindExtractorExpectedQueryWork_le
       ((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ENNReal) :=
   OracleComp.forkExpectedWrapperAndLiveQueries_le
     (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
-    (sampleCost := sampleCost) hSampleUpper hSampleLower hmain hjs
+    (sampleCost := sampleCost) hSampleUpper hmain hjs
 
 /-- Repeating the single-rewind extractor `attempts` times multiplies the one-attempt expected
 query-work bound by `attempts`. -/
@@ -112,13 +106,7 @@ theorem rewindingExtractorExpectedQueryWork_le
     (cf : α → Option (Fin (qb i + 1))) (attempts : ℕ) (sampleCost : ι → ℕ)
     (hSampleUpper :
       ∀ j, AddWriterT.QueryBoundedAboveBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
-        (sampleCost j))
-    (hSampleLower :
-      ∀ j, AddWriterT.QueryBoundedBelowBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
         (sampleCost j))
     (hmain : IsPerIndexQueryBound main qb)
     (hjs : SeedListCovers qb js) :
@@ -129,7 +117,7 @@ theorem rewindingExtractorExpectedQueryWork_le
   gcongr
   exact singleRewindExtractorExpectedQueryWork_le
     (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
-    (sampleCost := sampleCost) hSampleUpper hSampleLower hmain hjs
+    (sampleCost := sampleCost) hSampleUpper hmain hjs
 
 /-- Textbook single-family specialization of the fork-based extractor runtime bound.
 
@@ -142,13 +130,7 @@ theorem singleRewindExtractorExpectedQueryWork_le_singleFamily
     (cf : α → Option (Fin (singleFamilyBudget i q i + 1))) (sampleCost : ι → ℕ)
     (hSampleUpper :
       ∀ j, AddWriterT.QueryBoundedAboveBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
-        (sampleCost j))
-    (hSampleLower :
-      ∀ j, AddWriterT.QueryBoundedBelowBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
         (sampleCost j))
     (hmain : IsPerIndexQueryBound main (singleFamilyBudget i q)) :
     OracleComp.forkExpectedWrapperAndLiveQueries
@@ -162,7 +144,7 @@ theorem singleRewindExtractorExpectedQueryWork_le_singleFamily
   have hsingle :=
     singleRewindExtractorExpectedQueryWork_le
       (main := main) (qb := singleFamilyBudget i q) (js := [i]) (i := i) (cf := cf)
-      (sampleCost := sampleCost) hSampleUpper hSampleLower hmain hjs
+      (sampleCost := sampleCost) hSampleUpper hmain hjs
   simpa [singleFamilyBudget] using hsingle
 
 /-- Repeating the single-family single-rewind extractor `attempts` times yields the linear
@@ -172,13 +154,7 @@ theorem rewindingExtractorExpectedQueryWork_le_singleFamily
     (cf : α → Option (Fin (singleFamilyBudget i q i + 1))) (sampleCost : ι → ℕ)
     (hSampleUpper :
       ∀ j, AddWriterT.QueryBoundedAboveBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
-        (sampleCost j))
-    (hSampleLower :
-      ∀ j, AddWriterT.QueryBoundedBelowBy
-        ((let oa : ProbComp (spec.Range j) := $ᵗ spec.Range j
-          simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa))
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
         (sampleCost j))
     (hmain : IsPerIndexQueryBound main (singleFamilyBudget i q)) :
     rewindingExtractorExpectedQueryWork
@@ -193,7 +169,7 @@ theorem rewindingExtractorExpectedQueryWork_le_singleFamily
     rewindingExtractorExpectedQueryWork_le
       (main := main) (qb := singleFamilyBudget i q) (js := [i]) (i := i)
       (cf := cf) (attempts := attempts) (sampleCost := sampleCost)
-      hSampleUpper hSampleLower hmain hjs
+      hSampleUpper hmain hjs
   simpa [singleFamilyBudget] using hrepeat
 
 end runtime

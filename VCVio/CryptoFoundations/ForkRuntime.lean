@@ -37,7 +37,7 @@ variable [∀ i, SampleableType (spec.Range i)]
 
 /-- Unit-cost instrumentation of a `ProbComp`, viewed as an `AddWriterT` computation whose cost
 tracks the number of calls to the underlying uniform-selection oracle. -/
-private abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
+abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
     AddWriterT ℕ ProbComp β :=
   simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa
 
@@ -192,48 +192,18 @@ theorem forkExpectedWrapperAndLiveQueries_le
       ∀ j, AddWriterT.QueryBoundedAboveBy
         (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
         (sampleCost j))
-    (hSampleLower :
-      ∀ j, AddWriterT.QueryBoundedBelowBy
-        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
-        (sampleCost j))
     (hmain : IsPerIndexQueryBound main qb)
     (hjs : SeedListCovers qb js) :
     forkExpectedWrapperAndLiveQueries main qb js i cf ≤
       ((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ENNReal) := by
   unfold forkExpectedWrapperAndLiveQueries
-  rw [generateSeed_expectedQueryCount_eq_sum_sampleCost
-    (spec := spec) (qc := qb) (js := js) (sampleCost := sampleCost) hSampleUpper hSampleLower]
-  have hi :
-      AddWriterT.expectedCostNat
-          (probCompUnitQueryRun ($ᵗ spec.Range i : ProbComp (spec.Range i))) =
-        (sampleCost i : ENNReal) := by
-    apply le_antisymm
-    · exact AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSampleUpper i)
-    · exact AddWriterT.expectedCostNat_ge_of_queryBoundedBelowBy (hSampleLower i)
-  rw [hi]
+  have hgen_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy
+    (generateSeed_queryBoundedAboveBy (spec := spec) qb js sampleCost hSampleUpper)
+  have hi_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSampleUpper i)
   have hcore :=
     wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
       (main := main) (qb := qb) (js := js) (i := i) (cf := cf) hmain hjs
-  have hsum :
-      ((js.map fun j => qb j * sampleCost j).sum : ENNReal) +
-          (sampleCost i : ENNReal) + qb i =
-        (((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ℕ) : ENNReal) := by
-    norm_num
-  have hbound :
-    ((js.map fun j => qb j * sampleCost j).sum : ENNReal) +
-        (sampleCost i : ENNReal) +
-        wp (generateSeed spec qb js)
-          (fun seed =>
-            wp ($ᵗ spec.Range i)
-              (fun u =>
-                expectedCost
-                  (forkWithSeedValue main qb i cf seed u)
-                  CostModel.unit
-                  (fun n : ℕ ↦ (n : ENNReal))))
-      ≤ ((js.map fun j => qb j * sampleCost j).sum : ENNReal) +
-          (sampleCost i : ENNReal) + qb i := by
-    gcongr
-  exact hsum ▸ hbound
+  exact add_le_add (add_le_add hgen_le hi_le) hcore
 
 end forkRuntime
 

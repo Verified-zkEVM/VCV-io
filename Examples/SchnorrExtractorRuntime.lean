@@ -222,7 +222,6 @@ theorem schnorrSingleRewindExpectedQueryWork_le
     SigmaProtocol.singleRewindExtractorExpectedQueryWork_le_singleFamily
       (main := main) (i := ()) (q := q) (cf := cf) (sampleCost := fun _ => 1)
       (hSampleUpper := fun _ => schnorrChallengeSample_queryBoundedAboveBy_one (F := F))
-      (hSampleLower := fun _ => schnorrChallengeSample_queryBoundedBelowBy_one (F := F))
       hmain
   simpa [schnorrChallengeBudget, Nat.mul_one, two_mul, add_assoc, add_left_comm, add_comm] using
     hbound
@@ -242,7 +241,6 @@ theorem schnorrRewindingExpectedQueryWork_le
       (main := main) (i := ()) (q := q) (attempts := attempts)
       (cf := cf) (sampleCost := fun _ => 1)
       (hSampleUpper := fun _ => schnorrChallengeSample_queryBoundedAboveBy_one (F := F))
-      (hSampleLower := fun _ => schnorrChallengeSample_queryBoundedBelowBy_one (F := F))
       hmain
   simpa [schnorrChallengeBudget, Nat.mul_one, two_mul, add_assoc, add_left_comm, add_comm] using
     hbound

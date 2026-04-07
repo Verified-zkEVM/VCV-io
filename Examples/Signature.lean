@@ -26,8 +26,8 @@ Given `Module F G`, a generator `g : G`, and a bijection proof
 ## Security
 
 - **Completeness** follows from `schnorrSigma_complete` via `FiatShamir.perfectlyCorrect`.
-- **EUF-CMA** security is stated with `sorry` (the generic bound in `FiatShamir` is
-  itself incomplete, pending the full forking lemma).
+- **EUF-CMA** security is proved from the generic Fiat-Shamir reduction theorem
+  `FiatShamir.euf_cma_bound`.
 -/
 
 

@@ -350,7 +350,6 @@ private lemma sum_update_pred_eq
     [DecidableEq ι] [Fintype ι]
     (qb : ι → ℕ) (t : ι) (ht : 0 < qb t) :
     (∑ j, Function.update qb t (qb t - 1) j) + 1 = ∑ j, qb j := by
-  classical
   have hsum :
       Finset.sum (Finset.univ.erase t) (fun j => Function.update qb t (qb t - 1) j) =
         Finset.sum (Finset.univ.erase t) qb := by
@@ -439,14 +438,13 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
 the sum of the coordinate budgets. -/
 theorem IsPerIndexQueryBound.toExpectedCostBound_unit_sum
     [DecidableEq ι] [Fintype ι] [spec.Fintype] [spec.Inhabited]
-    {oa : OracleComp spec α} {qb : ι → ℕ} :
-    IsPerIndexQueryBound oa qb →
-      ExpectedCostBound oa CostModel.unit (fun n ↦ (n : ENNReal)) (∑ i, qb i) := by
-  intro h
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb) :
+    ExpectedCostBound oa CostModel.unit (fun n ↦ (n : ENNReal)) (∑ i, qb i) := by
   simpa using
     (WorstCaseCostBound.toExpectedCostBound
       (oa := oa) (cm := CostModel.unit) (bound := ∑ i, qb i)
-      (val := fun n : ℕ => (n : ENNReal))
+      (val := fun n ↦ (n : ENNReal))
       (hstrict := IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum h)
       (hval_mono := fun a b hle ↦ by
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))

@@ -40,14 +40,11 @@ def attachForkQueryValues
     (qb : ι → ℕ) (i : ι) (cf : α → Option (Fin (qb i + 1)))
     (seed : QuerySeed spec) (u : spec.Range i) :
     Option (α × α) → Option (α × spec.Range i × α × spec.Range i)
-  | none => none
-  | some (x₁, x₂) =>
-      match cf x₁ with
-      | none => none
-      | some s =>
-          match (seed i)[↑s]? with
-          | none => none
-          | some u₀ => some (x₁, u₀, x₂, u)
+  | r => do
+      let (x₁, x₂) ← r
+      let s ← cf x₁
+      let u₀ ← (seed i)[↑s]?
+      return (x₁, u₀, x₂, u)
 
 /-- Forking wrapper that exposes the original and replacement values at the chosen fork point.
 
@@ -61,7 +58,7 @@ def forkWithQueryValues (main : OracleComp spec α)
   let seed ← liftComp (generateSeed spec qb js) spec
   let u ← liftComp ($ᵗ spec.Range i) spec
   let r ← forkWithSeedValue main qb i cf seed u
-  return attachForkQueryValues (qb := qb) (i := i) (cf := cf) seed u r
+  return attachForkQueryValues qb i cf seed u r
 
 end forkValues
 
