@@ -13,6 +13,7 @@ import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.FiatShamirWithAbort
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.ForkRuntime
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
