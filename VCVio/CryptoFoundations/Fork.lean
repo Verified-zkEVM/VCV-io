@@ -26,7 +26,7 @@ then re-samples one oracle response, bounding the probability that both runs suc
 - `generateSeed` returns `ProbComp`, lifted via `liftComp`.
 -/
 
-open OracleSpec OracleComp ENNReal Function Finset
+open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
 
 namespace OracleComp
 
@@ -634,6 +634,72 @@ theorem forkWithSeedValue_expectedQueryCountBound_of_mem_support_generateSeed
           (u := u) hmain hjs hseed)
       (hval_mono := fun a b hle ↦ by
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+
+/-- Averaging the fixed-seed fork core over the sampled seed and the fresh replacement value
+preserves the bound `qb i` on expected live-query count.
+
+The two outer expectations match the randomness sampled by [`fork`], but they are taken outside
+the costed computation. This isolates the live-oracle cost of the seeded replay core itself,
+without charging the wrapper's own randomness generation for the initial seed or the fresh
+replacement value. -/
+theorem wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
+    [spec.DecidableEq]
+    [Finite ι] [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js) :
+    wp (generateSeed spec qb js)
+      (fun seed =>
+        wp ($ᵗ spec.Range i)
+          (fun u =>
+            expectedCost
+              (forkWithSeedValue main qb i cf seed u)
+              CostModel.unit
+              (fun n : ℕ ↦ (n : ENNReal))))
+      ≤ qb i := by
+  rw [wp_eq_tsum]
+  calc
+    ∑' seed : QuerySeed spec,
+        Pr[= seed | generateSeed spec qb js] *
+          wp ($ᵗ spec.Range i)
+            (fun u =>
+              expectedCost
+                (forkWithSeedValue main qb i cf seed u)
+                CostModel.unit
+                (fun n : ℕ ↦ (n : ENNReal)))
+      ≤ ∑' seed : QuerySeed spec,
+          Pr[= seed | generateSeed spec qb js] * (qb i : ENNReal) := by
+            refine ENNReal.tsum_le_tsum ?_
+            intro seed
+            by_cases hseed : seed ∈ support (generateSeed spec qb js)
+            · refine mul_le_mul_of_nonneg_left ?_ ?_
+              · have hwp :
+                    wp ($ᵗ spec.Range i)
+                      (fun u =>
+                        expectedCost
+                          (forkWithSeedValue main qb i cf seed u)
+                          CostModel.unit
+                          (fun n : ℕ ↦ (n : ENNReal))) ≤
+                    wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) := by
+                      refine wp_mono ($ᵗ spec.Range i) ?_
+                      intro u
+                      simpa [ExpectedCostBound] using
+                        (forkWithSeedValue_expectedQueryCountBound_of_mem_support_generateSeed
+                          (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
+                          (seed := seed) (u := u) hmain hjs hseed)
+                have hconst :
+                    wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) = qb i := by
+                  exact wp_const ($ᵗ spec.Range i) (qb i : ENNReal)
+                exact hconst ▸ hwp
+              · exact zero_le _
+            · have hp : Pr[= seed | generateSeed spec qb js] = 0 :=
+                probOutput_eq_zero_of_not_mem_support hseed
+              rw [hp]
+              simp
+    _ ≤ qb i := by
+          exact le_of_eq (by
+            rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul])
 
 end replayCostBounds
 
