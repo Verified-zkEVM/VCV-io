@@ -38,6 +38,7 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
+open scoped BigOperators
 
 /-! ## Cost Model, Cost Oracle, Cost Distribution
 
@@ -344,6 +345,111 @@ theorem WorstCaseCostBound.toIsPerIndexQueryBound_unit
   refine isPerIndexQueryBound_of_unit_support_bound ?_
   intro z hz
   simpa [WorstCaseCostBound, costDist, instrumentedRun] using h z hz
+
+private lemma sum_update_pred_eq
+    [DecidableEq ι] [Fintype ι]
+    (qb : ι → ℕ) (t : ι) (ht : 0 < qb t) :
+    (∑ j, Function.update qb t (qb t - 1) j) + 1 = ∑ j, qb j := by
+  classical
+  have hsum :
+      Finset.sum (Finset.univ.erase t) (fun j => Function.update qb t (qb t - 1) j) =
+        Finset.sum (Finset.univ.erase t) qb := by
+    refine Finset.sum_congr rfl ?_
+    intro x hx
+    simp [Function.update, Finset.mem_erase.mp hx |>.1]
+  calc
+    (∑ j, Function.update qb t (qb t - 1) j) + 1
+        = ((qb t - 1) +
+            Finset.sum (Finset.univ.erase t) (fun j => Function.update qb t (qb t - 1) j)) + 1 := by
+            rw [← Finset.add_sum_erase Finset.univ
+              (fun j => Function.update qb t (qb t - 1) j) (Finset.mem_univ t)]
+            simp [Function.update]
+    _ = ((qb t - 1) + Finset.sum (Finset.univ.erase t) qb) + 1 := by
+          rw [hsum]
+    _ = qb t + Finset.sum (Finset.univ.erase t) qb := by
+          omega
+    _ = ∑ j, qb j := by
+          simpa using Finset.add_sum_erase Finset.univ qb (Finset.mem_univ t)
+
+/-- A structural per-index query bound yields a worst-case bound on total unit-cost query count by
+summing the coordinate budgets.
+
+This is the converse direction to [`WorstCaseCostBound.toIsPerIndexQueryBound_unit`]: the
+structural budget `qb` already controls each query family separately, so under the unit cost model
+every execution uses at most `∑ i, qb i` total queries. -/
+theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
+    [DecidableEq ι] [Fintype ι] [spec.Inhabited]
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb) :
+    WorstCaseCostBound oa CostModel.unit (∑ i, qb i) := by
+  have haux :
+      ∀ {oa : OracleComp spec α} {qb : ι → ℕ},
+        IsPerIndexQueryBound oa qb →
+          AddWriterT.QueryBoundedAboveBy (instrumentedRun oa CostModel.unit) (∑ i, qb i) := by
+    intro oa
+    induction oa using OracleComp.inductionOn with
+    | pure x =>
+        intro qb _
+        exact AddWriterT.queryBoundedAboveBy_mono
+          (by simpa [instrumentedRun] using
+            (AddWriterT.queryBoundedAboveBy_pure (m := OracleComp spec) x))
+          (Nat.zero_le _)
+    | query_bind t mx ih =>
+        intro qb hqb
+        rw [isPerIndexQueryBound_query_bind_iff] at hqb
+        have hquery :
+            AddWriterT.QueryBoundedAboveBy
+              (instrumentedRun
+                (liftM (query t) : OracleComp spec (spec.Range t))
+                CostModel.unit) 1 := by
+          change AddWriterT.QueryBoundedAboveBy
+            (HasQuery.withUnitCost
+              (fun [HasQuery spec (AddWriterT ℕ (OracleComp spec))] =>
+                HasQuery.query (spec := spec) (m := AddWriterT ℕ (OracleComp spec)) t)
+              (QueryRuntime.oracleCompRuntime (spec := spec)))
+            1
+          exact HasQuery.queryBoundedAboveBy_withUnitCost_query
+            (runtime := QueryRuntime.oracleCompRuntime (spec := spec)) t
+        have hcont :
+            ∀ u,
+              AddWriterT.QueryBoundedAboveBy
+                (instrumentedRun (mx u) CostModel.unit)
+                (∑ i, Function.update qb t (qb t - 1) i) := by
+          intro u
+          exact ih u (qb := Function.update qb t (qb t - 1)) (hqb.2 u)
+        have hbind :=
+          AddWriterT.queryBoundedAboveBy_bind
+            (oa := instrumentedRun
+              (liftM (query t) : OracleComp spec (spec.Range t))
+              CostModel.unit)
+            (f := fun u => instrumentedRun (mx u) CostModel.unit)
+            (n₁ := 1) (n₂ := ∑ i, Function.update qb t (qb t - 1) i)
+            hquery hcont
+        refine AddWriterT.queryBoundedAboveBy_mono
+          (oa := instrumentedRun (liftM (query t) >>= mx) CostModel.unit)
+          (n₁ := 1 + ∑ i, Function.update qb t (qb t - 1) i)
+          (n₂ := ∑ i, qb i)
+          ?_ ?_
+        · simpa [instrumentedRun, simulateQ_bind] using hbind
+        · have hsum := sum_update_pred_eq (qb := qb) (t := t) hqb.1
+          omega
+  exact haux h
+
+/-- A structural per-index query bound also bounds the expected number of unit-cost queries by
+the sum of the coordinate budgets. -/
+theorem IsPerIndexQueryBound.toExpectedCostBound_unit_sum
+    [DecidableEq ι] [Fintype ι] [spec.Fintype] [spec.Inhabited]
+    {oa : OracleComp spec α} {qb : ι → ℕ} :
+    IsPerIndexQueryBound oa qb →
+      ExpectedCostBound oa CostModel.unit (fun n ↦ (n : ENNReal)) (∑ i, qb i) := by
+  intro h
+  simpa using
+    (WorstCaseCostBound.toExpectedCostBound
+      (oa := oa) (cm := CostModel.unit) (bound := ∑ i, qb i)
+      (val := fun n : ℕ => (n : ENNReal))
+      (hstrict := IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum h)
+      (hval_mono := fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
 end UnitCostBridge
 
