@@ -68,7 +68,7 @@ def piRing (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   add := fun f g i => f i + g i
   sub := fun f g i => f i - g i
   neg := fun f i => -f i
-  mul := schoolbookNegacyclicMul (piKernel Coeff n)
+  mul := negacyclicMulPure (piKernel Coeff n)
 
 /-- Quotient semantics for the function-backed negacyclic ring. -/
 noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
@@ -91,7 +91,7 @@ noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
     simp only [piBackend, piRing, Finset.sum_neg_distrib, map_neg]
   mul_sound := by
     intro f g
-    sorry
+    exact negacyclicMulPure_sound (piBackend Coeff n) (piKernel Coeff n) f g
 
 /-! ### Typecheck-only roundtrip exercises
 
