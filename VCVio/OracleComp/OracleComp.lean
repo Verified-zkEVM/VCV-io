@@ -53,7 +53,7 @@ lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
 
 @[simp, grind =]
 protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
-    liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := by rfl
+    liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := rfl
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[inline]

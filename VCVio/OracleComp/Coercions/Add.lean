@@ -235,7 +235,7 @@ end instances
 lemma liftM_eq_liftM_liftM [spec₁ ⊂ₒ spec₂]
     [MonadLift (OracleQuery spec₂) (OracleQuery spec₃)] (q : OracleQuery spec₁ α) :
     (liftM q : OracleQuery spec₃ α) =
-      (liftM (liftM q : OracleQuery spec₂ α) : OracleQuery spec₃ α) := by rfl
+      (liftM (liftM q : OracleQuery spec₂ α) : OracleQuery spec₃ α) := rfl
 
 end OracleQuery
 

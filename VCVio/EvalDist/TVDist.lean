@@ -124,8 +124,8 @@ lemma tvDist_le_probEvent_of_probOutput_eq_of_not
   rw [hsum]
   calc
     (∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my])) / 2
-      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 := by
-          exact ENNReal.div_le_div_right
+      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 :=
+          ENNReal.div_le_div_right
             (ENNReal.tsum_le_tsum fun x => by
               by_cases hx : p x
               · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])

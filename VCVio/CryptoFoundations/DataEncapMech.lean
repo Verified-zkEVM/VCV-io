@@ -91,8 +91,7 @@ theorem IND_CPA_Advantage_eq_game_bias {dem : DEMScheme (OracleComp spec) K M C}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adversary : dem.IND_CPA_Adversary) :
     dem.IND_CPA_Advantage runtime adversary =
-      (dem.IND_CPA_Game runtime adversary).boolBiasAdvantage := by
-  rfl
+      (dem.IND_CPA_Game runtime adversary).boolBiasAdvantage := rfl
 
 end IND_CPA
 

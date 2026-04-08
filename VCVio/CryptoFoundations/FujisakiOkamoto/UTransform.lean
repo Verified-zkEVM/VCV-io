@@ -297,8 +297,8 @@ theorem encaps_expectedQueryCost_eq_of_constantOracleWeights {ω : Type}
     (hKeys : ∀ kd, costFn (Sum.inr kd) = wKey) :
     ExpectedQueryCost[
       (UTransform pke kdInput policy).encaps pk in runtime by costFn via val
-    ] = val (wCoins + wKey) := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val (wCoins + wKey) :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (encaps_usesExactFamilyWeightedCost
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy) (pk := pk)
       (costFn := costFn) (wCoins := wCoins) (wKey := wKey) hCoins hKeys)
@@ -318,8 +318,8 @@ theorem encaps_expectedQueryCost_le {ω : Type}
     (hKeys : ∀ kd, costFn (Sum.inr kd) ≤ wKey) :
     ExpectedQueryCost[
       (UTransform pke kdInput policy).encaps pk in runtime by costFn via val
-    ] ≤ val (wCoins + wKey) := by
-  exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
+    ] ≤ val (wCoins + wKey) :=
+  HasQuery.expectedQueryCost_le_of_usesCostAtMost
     (encaps_usesWeightedQueryCostAtMost
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy) (pk := pk)
       (costFn := costFn) (wCoins := wCoins) (wKey := wKey) hCoins hKeys)
@@ -332,8 +332,8 @@ theorem encaps_expectedQueries_eq_two [HasEvalPMF m]
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
     (pk : PK) :
-    ExpectedQueries[ (UTransform pke kdInput policy).encaps pk in runtime ] = 2 := by
-  exact HasQuery.expectedQueries_eq_of_usesExactlyQueries
+    ExpectedQueries[ (UTransform pke kdInput policy).encaps pk in runtime ] = 2 :=
+  HasQuery.expectedQueries_eq_of_usesExactlyQueries
     (encaps_usesExactlyTwoQueries
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy) (pk := pk))
 
@@ -445,8 +445,8 @@ theorem decaps_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
     (hdec : pke.decrypt sk c = none) :
     ExpectedQueryCost[
       (UTransform pke kdInput policy).decaps ((pk, sk), fb) c in runtime by costFn via val
-    ] = val 0 := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val 0 :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (decaps_usesZeroQueryCost_of_decrypt_eq_none
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy)
       (pk := pk) (sk := sk) (fb := fb) (c := c) (costFn := costFn) hdec)
@@ -468,8 +468,8 @@ theorem decaps_expectedQueryCost_le {ω : Type}
     (hKeys : ∀ kd, costFn (Sum.inr kd) ≤ wKey) :
     ExpectedQueryCost[
       (UTransform pke kdInput policy).decaps ((pk, sk), fb) c in runtime by costFn via val
-    ] ≤ val (wCoins + wKey) := by
-  exact HasQuery.expectedQueryCost_le_of_usesCostAtMost
+    ] ≤ val (wCoins + wKey) :=
+  HasQuery.expectedQueryCost_le_of_usesCostAtMost
     (decaps_usesWeightedQueryCostAtMost
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy)
       (pk := pk) (sk := sk) (fb := fb) (c := c) (costFn := costFn)
@@ -497,8 +497,8 @@ theorem decaps_expectedQueries_le_two [HasEvalPMF m]
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
     (pk : PK) (sk : SK) (fb : policy.FallbackState) (c : C) :
-    ExpectedQueries[ (UTransform pke kdInput policy).decaps ((pk, sk), fb) c in runtime ] ≤ 2 := by
-  exact HasQuery.expectedQueries_le_of_usesAtMostQueries
+    ExpectedQueries[ (UTransform pke kdInput policy).decaps ((pk, sk), fb) c in runtime ] ≤ 2 :=
+  HasQuery.expectedQueries_le_of_usesAtMostQueries
     (decaps_usesAtMostTwoQueries
       (runtime := runtime) (pke := pke) (kdInput := kdInput) (policy := policy)
       (pk := pk) (sk := sk) (fb := fb) (c := c))

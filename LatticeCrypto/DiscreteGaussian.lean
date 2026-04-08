@@ -85,8 +85,8 @@ theorem discreteGaussianSum_summable (σ μ : ℝ) (hσ : 0 < σ) :
 
 /-- The discrete Gaussian normalizing constant is strictly positive when `σ > 0`. -/
 theorem discreteGaussianSum_pos (σ μ : ℝ) (hσ : 0 < σ) :
-    0 < discreteGaussianSum σ μ := by
-  exact (discreteGaussianSum_summable σ μ hσ).tsum_pos
+    0 < discreteGaussianSum σ μ :=
+  (discreteGaussianSum_summable σ μ hσ).tsum_pos
     (fun z => discreteGaussianWeight_nonneg σ μ z) 0
     (discreteGaussianWeight_pos σ μ 0)
 

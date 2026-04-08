@@ -115,8 +115,7 @@ instance : Comonad (CofreeC F) where
     extend (extend t f) g = extend t (fun x => g (extend x f)) := by
   let l : CofreeC F α → CofreeC F γ := fun x => extend (extend x f) g
   let r : CofreeC F α → CofreeC F γ := fun x => extend x (fun y => g (extend y f))
-  have hr_corec : r = M.corec (F := constProd F γ) (extendF (fun y => g (extend y f))) := by
-    rfl
+  have hr_corec : r = M.corec (F := constProd F γ) (extendF (fun y => g (extend y f))) := rfl
   have hl_corec : l = M.corec (F := constProd F γ) (extendF (fun y => g (extend y f))) := by
     apply (M.corec_unique (P := constProd F γ)
       (g := extendF (fun y => g (extend y f))) (f := l))
