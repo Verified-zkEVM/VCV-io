@@ -24,8 +24,7 @@ lemma probOutput_xor_uniform (sp : ℕ) (msg σ : BitVec sp) :
     Pr[= σ | (fun k : BitVec sp => k ^^^ msg) <$> ($ᵗ BitVec sp)] =
         Pr[= σ | (msg ^^^ ·) <$> ($ᵗ BitVec sp)] := by
           simp [BitVec.xor_comm]
-    _ = Pr[= msg ^^^ σ | ($ᵗ BitVec sp)] := by
-          simpa using probOutput_xor_map (mx := ($ᵗ BitVec sp)) (x := msg) (y := σ)
+    _ = Pr[= msg ^^^ σ | ($ᵗ BitVec sp)] := by simp
     _ = (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
           simp [probOutput_uniformSample]
 
