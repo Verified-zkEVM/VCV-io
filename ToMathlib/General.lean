@@ -254,12 +254,8 @@ lemma List.countP_finRange_getElem {α : Type} (l : List α) (p : α → Bool) :
 
 lemma Fin.card_eq_countP_mem {n : ℕ} (s : Finset (Fin n)) :
     s.card = Fin.countP (· ∈ s) := by
-  rw [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter]
-  symm
-  rw [← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
-  congr
-  ext x
-  simp
+  simp [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter,
+    ← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
 
 lemma Array.card_eq_countP {α : Type} (as : Array α)
     (p : α → Prop) [DecidablePred p] :
