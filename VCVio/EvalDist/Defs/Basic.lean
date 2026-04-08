@@ -133,8 +133,8 @@ lemma probOutput_ne_zero (h : x ∈ support mx) : Pr[= x | mx] ≠ 0 := by simp 
 
 @[aesop unsafe apply]
 lemma probOutput_ne_zero' [HasEvalFinset m] [DecidableEq α]
-    (h : x ∈ finSupport mx) : Pr[= x | mx] ≠ 0 := by
-  exact probOutput_ne_zero mx x (mem_support_of_mem_finSupport h)
+    (h : x ∈ finSupport mx) : Pr[= x | mx] ≠ 0 :=
+  probOutput_ne_zero mx x (mem_support_of_mem_finSupport h)
 
 @[simp]
 lemma support_probOutput : Function.support (probOutput mx) = support mx := by aesop

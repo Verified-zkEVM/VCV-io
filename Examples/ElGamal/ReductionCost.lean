@@ -446,8 +446,7 @@ lemma IND_CPA_OneTime_DDHReduction_open_inRuntime
       (IND_CPA_OneTime_DDHReduction_open
         (State := adv.State) g A B T)
       (oneTimeINDCPARuntime (gen := gen) adv)
-      = IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv g A B T := by
-  rfl
+      = IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv g A B T := rfl
 
 /-- Cost-transform theorem for the closed one-time ElGamal DDH reduction.
 
@@ -626,8 +625,8 @@ lemma oneTimeINDCPASecurityGame_advantage_eq_oneTimeDDHReductionSecurityGame_adv
     |AsymmEncAlg.IND_CPA_OneTime_signedAdvantageReal
         (encAlg := elGamalAsymmEnc F G gen) adv| =
       2 * DiffieHellman.ddhGuessAdvantage gen
-        (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) := by
-          exact elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
+        (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) :=
+          elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
             (F := F) (G := G) (gen := gen) hg adv
     _ =
       DiffieHellman.ddhDistAdvantage gen

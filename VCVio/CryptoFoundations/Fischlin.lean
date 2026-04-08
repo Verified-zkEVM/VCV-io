@@ -373,8 +373,8 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
         have htell :
             AddWriterT.PathwiseCostAtMost
               (AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
-              w := by
-          exact AddWriterT.pathwiseCostAtMost_mono
+              w :=
+          AddWriterT.pathwiseCostAtMost_mono
             (AddWriterT.pathwiseCostAtMost_addTell
               (m := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩))
             (hcost _)
@@ -673,8 +673,8 @@ theorem sign_usesWeightedQueryCostAtMost
             (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
             (msg := msg) (comList := comList) (i := i)
             (FinEnum.toList Ω) (none : Option (Ω × P × Fin (2 ^ b))) costFn)
-          ((FinEnum.toList Ω).length • w) := by
-      exact fischlinSearchAuxWithAddCost_pathwiseCostAtMost
+          ((FinEnum.toList Ω).length • w) :=
+      fischlinSearchAuxWithAddCost_pathwiseCostAtMost
         σ (κ := κ) (runtime := runtime) (pk := pk) (sk := sk) (sc := (commits i).2)
         (msg := msg) (comList := comList) (i := i)
         (challenges := FinEnum.toList Ω) (best := none) (costFn := costFn) (w := w)

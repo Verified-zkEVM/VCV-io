@@ -219,12 +219,12 @@ noncomputable def evalAddMonoidHom [AddCommMonoid ω] (weights : κ → ω) :
   simp [eval]
 
 @[simp] lemma eval_add [AddCommMonoid ω] (a b : ResourceProfile ω κ) (weights : κ → ω) :
-    (a + b).eval weights = a.eval weights + b.eval weights := by
-  exact (evalAddMonoidHom (ω := ω) (κ := κ) weights).map_add a b
+    (a + b).eval weights = a.eval weights + b.eval weights :=
+  (evalAddMonoidHom (ω := ω) (κ := κ) weights).map_add a b
 
 @[simp] lemma eval_nsmul [AddCommMonoid ω] (n : ℕ) (a : ResourceProfile ω κ) (weights : κ → ω) :
-    (n • a).eval weights = n • a.eval weights := by
-  exact map_nsmul (evalAddMonoidHom (ω := ω) (κ := κ) weights) n a
+    (n • a).eval weights = n • a.eval weights :=
+  map_nsmul (evalAddMonoidHom (ω := ω) (κ := κ) weights) n a
 
 @[simp] lemma eval_sum [AddCommMonoid ω] {ι : Type*} (s : Finset ι)
     (f : ι → ResourceProfile ω κ) (weights : κ → ω) :
@@ -268,13 +268,13 @@ noncomputable def instantiateAddMonoidHom [AddCommMonoid ω]
 
 @[simp] lemma instantiate_add [AddCommMonoid ω]
     (a b : ResourceProfile ω κ) (impl : κ → ResourceProfile ω κ') :
-    (a + b).instantiate impl = a.instantiate impl + b.instantiate impl := by
-  exact (instantiateAddMonoidHom (ω := ω) impl).map_add a b
+    (a + b).instantiate impl = a.instantiate impl + b.instantiate impl :=
+  (instantiateAddMonoidHom (ω := ω) impl).map_add a b
 
 @[simp] lemma instantiate_nsmul [AddCommMonoid ω]
     (n : ℕ) (a : ResourceProfile ω κ) (impl : κ → ResourceProfile ω κ') :
-    (n • a).instantiate impl = n • a.instantiate impl := by
-  exact map_nsmul (instantiateAddMonoidHom (ω := ω) impl) n a
+    (n • a).instantiate impl = n • a.instantiate impl :=
+  map_nsmul (instantiateAddMonoidHom (ω := ω) impl) n a
 
 /-- Instantiating symbolic capabilities is associative.
 

@@ -175,8 +175,8 @@ theorem relTriple'_iff_couplingPost
           _ = Pr[ fun y : α => y = x | evalDist oa] := by
                 apply probEvent_ext
                 intro y hy
-                have hyfin : y ∈ finSupport oa := by
-                  exact mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy
+                have hyfin : y ∈ finSupport oa :=
+                  mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy
                 simp [packA, hyfin]
           _ = Pr[= x | evalDist oa] := by simp
       have hvalB : Subtype.val <$> pb = evalDist ob := by
@@ -194,8 +194,8 @@ theorem relTriple'_iff_couplingPost
           _ = Pr[ fun x : β => x = y | evalDist ob] := by
                 apply probEvent_ext
                 intro x hx
-                have hxfin : x ∈ finSupport ob := by
-                  exact mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx
+                have hxfin : x ∈ finSupport ob :=
+                  mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx
                 simp [packB, hxfin]
           _ = Pr[= y | evalDist ob] := by simp
       have hsub_nonempty : Nonempty (SPMF.Coupling pa pb) := by
@@ -311,8 +311,8 @@ theorem relTriple'_iff_couplingPost
               = Pr[ fun z : α × β => R z.1 z.2 | c.1] := by
                   simpa [RelPost.indicator] using
                     indicator_objective_eq_probEvent (mx := c.1) (R := R)
-          _ = Pr[ fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] := by
-                exact (hlift_obj c).symm
+          _ = Pr[ fun z : A × B => R z.1.1 z.2.1 | packPair <$> c.1] :=
+                (hlift_obj c).symm
           _ ≤ Pr[ fun z : α × β => R z.1 z.2 | cMax.1] := by
             rw [hpush_obj]
             refine le_of_eq_of_le ?_ (hsub_le_max cLift)
@@ -408,8 +408,8 @@ theorem eRelTriple_bind
         congr 1; ext z; exact ENNReal.mul_iSup ..
     _ ≤ ⨆ (D : ∀ z : α × β,
             SPMF.Coupling (evalDist (fa z.1)) (evalDist (fb z.2))),
-          ∑' z, Pr[= z | c.1] * (∑' w, Pr[= w | (D z).1] * post w.1 w.2) := by
-        exact ENNReal_tsum_iSup_le _
+          ∑' z, Pr[= z | c.1] * (∑' w, Pr[= w | (D z).1] * post w.1 w.2) :=
+        ENNReal_tsum_iSup_le _
     _ ≤ ⨆ c' : SPMF.Coupling (evalDist (oa >>= fa)) (evalDist (ob >>= fb)),
           ∑' w, Pr[= w | c'.1] * post w.1 w.2 := by
         refine iSup_le fun D => ?_
@@ -693,7 +693,7 @@ theorem tvDist_eq_one_sub_eRelWP_eqRel
 theorem gameEquiv_of_relTriple'_eqRel
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple' oa ob (EqRel α)) :
-    evalDist oa = evalDist ob := by
-  exact evalDist_eq_of_relTriple_eqRel (relTriple'_iff_relTriple.mp h)
+    evalDist oa = evalDist ob :=
+  evalDist_eq_of_relTriple_eqRel (relTriple'_iff_relTriple.mp h)
 
 end OracleComp.ProgramLogic.Relational

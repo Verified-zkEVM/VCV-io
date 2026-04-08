@@ -51,8 +51,7 @@ def piKernel (Coeff : Type*) [Zero Coeff] (n : Nat) :
     simp [piBackend]
   coeff_ofArray := by
     intro a h i
-    have hi : i.val < a.size := by
-      exact Nat.lt_of_lt_of_eq i.isLt h.symm
+    have hi : i.val < a.size := Nat.lt_of_lt_of_eq i.isLt h.symm
     simp [piBackend, hi]
   ofArray_toArray := by
     intro p

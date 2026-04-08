@@ -25,14 +25,13 @@ namespace ENNReal
 lemma one_sub_one_sub_mul_one_sub {x y : ℝ≥0∞} (hx : x ≤ 1) (hy : y ≤ 1) :
     1 - (1 - x) * (1 - y) = x + y - x * y := by
   have hxy : x * y ≤ x + y := by
-    have hxy_le_x : x * y ≤ x := by
-      exact mul_le_of_le_one_right' hy
+    have hxy_le_x : x * y ≤ x := mul_le_of_le_one_right' hy
     have hxy_le_y : x * y ≤ y := by
       apply mul_le_of_le_one_left (by positivity) hx;
     exact le_trans hxy_le_x ( le_add_of_nonneg_right <| by positivity )
   have hxy' : (1 - x) * (1 - y) ≤ 1 := by
-    calc (1 - x) * (1 - y) ≤ 1 * 1 := by
-          exact mul_le_mul' (tsub_le_self) (tsub_le_self)
+    calc (1 - x) * (1 - y) ≤ 1 * 1 :=
+          mul_le_mul' (tsub_le_self) (tsub_le_self)
         _ = 1 := one_mul 1
   rw [← ENNReal.toReal_eq_toReal_iff' (by aesop) (by aesop),
     ENNReal.toReal_sub_of_le, ENNReal.toReal_mul, ENNReal.toReal_sub_of_le,

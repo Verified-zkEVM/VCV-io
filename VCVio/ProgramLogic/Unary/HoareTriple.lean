@@ -61,8 +61,7 @@ private lemma μ_bind_eq_tsum {α : Type}
           refine tsum_congr ?_
           intro y
           rw [mul_assoc]
-    _ = ∑' x, Pr[= x | oa] * μ (ob x) := by
-          rfl
+    _ = ∑' x, Pr[= x | oa] * μ (ob x) := rfl
 
 noncomputable instance instMAlgOrdered :
     MAlgOrdered (OracleComp spec) ℝ≥0∞ where
@@ -286,8 +285,8 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
               simp [μ, probOutput_pure]
             have hprob :
                 Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] =
-                  (1 / Fintype.card (spec.Range t) : ℝ≥0∞) := by
-              exact (probOutput_query_eq_div (spec := spec) t u)
+                  (1 / Fintype.card (spec.Range t) : ℝ≥0∞) :=
+              (probOutput_query_eq_div (spec := spec) t u)
             rw [hμ]
             simp [hprob]
 

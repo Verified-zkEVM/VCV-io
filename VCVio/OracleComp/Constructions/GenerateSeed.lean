@@ -190,7 +190,6 @@ lemma probOutput_pop_some_eq_probOutput_prepend
         seed' j = u :: rest j := hcons.symm
         _ = (rest.prependValues [u]) j := by simp [QuerySeed.prependValues]
     · have hrestj : rest j = seed' j := by
-        exact by
           have := congrArg (fun s => s j) hrest
           simpa [Function.update_of_ne hj] using this
       calc
@@ -203,8 +202,8 @@ lemma probOutput_pop_some_eq_probOutput_prepend
       simp [QuerySeed.prependValues]
     have hpop' :
         (rest.prependValues [u]).pop i =
-          some (u, Function.update (rest.prependValues [u]) i (rest i)) := by
-      exact QuerySeed.pop_eq_some_of_cons
+          some (u, Function.update (rest.prependValues [u]) i (rest i)) :=
+      QuerySeed.pop_eq_some_of_cons
         (seed := rest.prependValues [u]) (i := i) (u := u)
         (us := rest i) hcons_pre
     have hupdate : Function.update (rest.prependValues [u]) i (rest i) = rest := by
@@ -218,11 +217,10 @@ lemma probOutput_pop_some_eq_probOutput_prepend
     Pr[= some (u, rest) | (fun seed => seed.pop i) <$> generateSeed spec qc js]
         = Pr[= some (u, rest) |
             generateSeed spec qc js >>= fun seed =>
-              (pure (seed.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec)))] := by
-            rfl
+              (pure (seed.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec)))] := rfl
     _ = Pr[= rest.prependValues [u] | generateSeed spec qc js] *
-          Pr[= some (u, rest) | pure ((rest.prependValues [u]).pop i)] := by
-            exact probOutput_bind_eq_mul
+          Pr[= some (u, rest) | pure ((rest.prependValues [u]).pop i)] :=
+            probOutput_bind_eq_mul
               (mx := generateSeed spec qc js)
               (my := fun seed =>
                 (pure (seed.pop i) : ProbComp (Option (spec.Range i × QuerySeed spec))))

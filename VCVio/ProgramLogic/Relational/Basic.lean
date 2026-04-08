@@ -488,10 +488,9 @@ lemma relTriple_uniformSample_bij
       calc
         (do
             let a ← evalDist ($ᵗ α : ProbComp α)
-            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := by
-              rfl
-        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) := by
-          exact (evalDist_map ($ᵗ α : ProbComp α) f).symm
+            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := rfl
+        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) :=
+          (evalDist_map ($ᵗ α : ProbComp α) f).symm
         _ = evalDist ($ᵗ α : ProbComp α) := by
           apply evalDist_ext
           intro x
