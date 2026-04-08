@@ -5,6 +5,7 @@ import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.GenericLift
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.OneTime
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 import VCVio.CryptoFoundations.Asymptotics.Negligible
+import VCVio.CryptoFoundations.Asymptotics.ReductionCost
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.DataEncapMech
@@ -74,6 +75,7 @@ import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.RunIO

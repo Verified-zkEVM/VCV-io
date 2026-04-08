@@ -129,8 +129,8 @@ lemma perfectHVZK_iff_hvzk_zero
   · intro h
     dsimp [HVZK] at h
     intro s w hs
-    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 := by
-      exact le_antisymm (h s w hs) (by
+    have hzero : tvDist (ids.honestExecution s w) (sim s) = 0 :=
+      le_antisymm (h s w hs) (by
         simpa using (tvDist_nonneg (ids.honestExecution s w) (sim s)))
     simpa using (tvDist_eq_zero_iff (ids.honestExecution s w) (sim s)).mp hzero
 

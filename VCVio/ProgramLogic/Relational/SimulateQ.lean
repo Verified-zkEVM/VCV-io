@@ -324,8 +324,8 @@ theorem relTriple_simulateQ_run'_of_query_map_eq
     RelTriple
       ((simulateQ impl₁ oa).run' s)
       ((simulateQ impl₂ oa).run' (proj s))
-      (EqRel α) := by
-  exact relTriple_eqRel_of_eq (run'_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s)
+      (EqRel α) :=
+  relTriple_eqRel_of_eq (run'_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s)
 
 /-! ## "Identical until bad" fundamental lemma -/
 

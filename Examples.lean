@@ -2,6 +2,7 @@ import Examples.BR93
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
+import Examples.ElGamal.ReductionCost
 import Examples.FrankingProtocol
 import Examples.OneTimePad
 import Examples.PRFTagReader
