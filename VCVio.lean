@@ -23,9 +23,11 @@ import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
+import VCVio.CryptoFoundations.InductiveMerkleTree
 import VCVio.CryptoFoundations.KEMDEM
 import VCVio.CryptoFoundations.KeyEncapMech
 import VCVio.CryptoFoundations.MacAlg
+import VCVio.CryptoFoundations.MerkleTree
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.SecExp
