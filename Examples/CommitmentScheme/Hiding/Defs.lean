@@ -124,6 +124,8 @@ def hidingImplCountAll :
       set (cache.cacheQuery ms u, counts')
       return u
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma hidingImpl₁_step_totalBound (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) :
     IsTotalQueryBound ((hidingImpl₁ s ms).run st) 1 := by
@@ -148,6 +150,8 @@ lemma hidingImpl₁_step_totalBound (s : S) (ms : M × S)
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma hidingImplCountAll_step_totalBound (ms : M × S)
     (st : QueryCache (CMOracle M S C) × (S → ℕ)) :
     IsTotalQueryBound ((hidingImplCountAll (M := M) (S := S) (C := C) ms).run st) 1 := by
@@ -173,6 +177,8 @@ lemma hidingImplCountAll_step_totalBound (ms : M × S)
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- Single-step projection: projecting `hidingImplCountAll` to one salt counter
 recovers `hidingImpl₁ s`. -/
 theorem hidingImplCountAll_proj_eq_hidingImpl₁
@@ -188,14 +194,16 @@ theorem hidingImplCountAll_proj_eq_hidingImpl₁
         pure_bind]
   | none =>
       simp [hidingImplCountAll, hidingImpl₁, hcache, StateT.run_bind, StateT.run_get,
-        pure_bind, StateT.run_set, StateT.run_pure, Function.update, Prod.map]
+        pure_bind, StateT.run_set, Function.update, Prod.map]
       congr
       funext a
       by_cases h : ms.2 = s
-      · simp [h, eq_comm]
+      · simp [h]
       · have hs : ¬ s = ms.2 := by simpa [eq_comm] using h
-        simp [h, hs, eq_comm]
+        simp [h, hs]
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 theorem hidingImplCountAll_proj_eq_cachingOracle
     (ms : M × S)
     (st : QueryCache (CMOracle M S C) × (S → ℕ)) :
@@ -209,9 +217,11 @@ theorem hidingImplCountAll_proj_eq_cachingOracle
         StateT.run_bind, StateT.run_get, pure_bind]
   | none =>
       simp [hidingImplCountAll, cachingOracle, QueryImpl.withCaching_apply, hcache,
-        StateT.run_bind, StateT.run_get, pure_bind, StateT.run_set, StateT.run_pure,
+        StateT.run_bind, StateT.run_get, pure_bind, StateT.run_set,
         StateT.run_modifyGet, Prod.map]
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 theorem run_hidingImplCountAll_proj_eq_cachingOracle
     {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
@@ -280,6 +290,8 @@ def hidingOa {AUX : Type} {t : ℕ} (A : HidingAdversary M S C AUX t) (s : S) :
   let cm ← query (spec := CMOracle M S C) (m, s)
   A.distinguish aux cm
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- Total query bound for the full two-phase hiding computation, matching the
 textbook's bounded-query setting: `t` adversary queries plus one challenge
 query. -/
@@ -288,6 +300,7 @@ lemma hidingOa_totalBound_current {AUX : Type} {t : ℕ}
     IsTotalQueryBound (hidingOa A s) (t + 1) := by
   simpa [hidingOa] using A.totalBound s
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] in
 lemma hiding_choose_totalBound {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     IsTotalQueryBound A.choose t := by
@@ -300,6 +313,7 @@ lemma hiding_choose_totalBound {AUX : Type} {t : ℕ}
       (n := t)
       (A.totalBound default))
 
+omit [DecidableEq C] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 lemma hiding_distinguish_totalBound_of_choose_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S)
@@ -329,6 +343,8 @@ lemma hiding_distinguish_totalBound_of_choose_support
     omega
   simpa [hbudget] using hcm
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma hidingImpl₁_run_totalBound_current {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     IsTotalQueryBound

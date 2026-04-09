@@ -84,6 +84,7 @@ private def extractabilityInner {AUX : Type} {t : ℕ}
     | some (m', s') => (c == cm) && decide ((m', s') ≠ (m, s))
     | none => (c == cm))
 
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- The extractability game equals `simulateQ cachingOracle` on `extractabilityInner`. -/
 private lemma extractabilityGame_eq {t : ℕ} (A : ExtractAdversary M S C AUX t) :
     extractabilityGame CMExtract A =
@@ -106,6 +107,7 @@ private def extractabilityInner_tagged {AUX : Type} {t : ℕ}
     | some (m', s') => ((c == cm) && decide ((m', s') ≠ (m, s)), false)
     | none => ((c == cm), true))
 
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- The untagged inner computation is the first projection of the tagged one. -/
 private lemma extractabilityInner_eq_fst_tagged {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
@@ -120,11 +122,12 @@ private lemma extractabilityInner_eq_fst_tagged {t : ℕ}
   | some entry => simp
   | none => simp
 
-/-- The some-case win (extractor found a different opening) implies cache collision.
+/- The some-case win (extractor found a different opening) implies cache collision.
 
 When `CMExtract` finds an entry `(m', s')` in the commit trace with `H(m', s') = cm`,
 and verification gives `H(m, s) = cm` with `(m', s') ≠ (m, s)`, both distinct inputs
 map to `cm` in the final cache. -/
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 private lemma extractability_someWin_implies_collision {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     ∀ z ∈ support ((simulateQ cachingOracle (extractabilityInner_tagged A)).run ∅),
@@ -184,6 +187,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
     exact ⟨entry.1, (m, s), entry.2, c, hne, hcache₃_entry, hcache₃,
       heq_of_eq (by rw [hentry_cm, hceq])⟩
 
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 /-- `IsTotalQueryBound` for the extractability game's inner computation.
 
 The inner computation consists of:
@@ -232,6 +236,7 @@ private lemma extractabilityInner_totalBound {t : ℕ}
     have := A.totalBound
     omega)
 
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 /-- The tagged inner computation has the same query bound as the untagged one. -/
 private lemma extractabilityInner_tagged_totalBound {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
@@ -242,9 +247,10 @@ private lemma extractabilityInner_tagged_totalBound {t : ℕ}
     IsTotalQueryBound (extractabilityInner_tagged A) (t + 1) from
     isQueryBound_map_iff _ _ _ _ _] at h
 
-/-- The some-case win event on the tagged game implies cache collision.
+/- The some-case win event on the tagged game implies cache collision.
 
 Wraps `extractability_someWin_implies_collision` for use with `probEvent_mono`. -/
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 private lemma extractability_someWin_le_collision {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     Pr[fun z => z.1.1 = true ∧ z.1.2 = false |
@@ -286,8 +292,9 @@ private def extractabilityRestOa {t : ℕ}
       | none => (c == cm))
 
 set_option maxHeartbeats 400000 in
-/-- Under a collision-free commit cache, any extractability win must create a fresh
+/- Under a collision-free commit cache, any extractability win must create a fresh
 post-commit cache entry equal to the commitment value. -/
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     {cm : C} {aux : AUX} {tr : QueryLog (CMOracle M S C)}
@@ -311,7 +318,6 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
   rw [support_bind] at hz
   simp only [Set.mem_iUnion] at hz
   obtain ⟨⟨c, cache₃⟩, hmem₃, hz⟩ := hz
-  simp only [StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
   rw [hz] at hwin
   unfold CMExtract at hwin
   cases hfind : tr.find? (fun entry => decide (entry.2 = cm)) with
@@ -386,7 +392,8 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
       rw [hcache_final_eq]
       exact ⟨(m, s), c, hcache₃, hcache₁_none, heq_of_eq hc_eq⟩
 
-/-- Winning the extractability rest-game implies a fresh cache entry matching `cm`. -/
+/- Winning the extractability rest-game implies a fresh cache entry matching `cm`. -/
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 private lemma extractability_rest_win_le_exists_fresh {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C))
@@ -402,8 +409,9 @@ private lemma extractability_rest_win_le_exists_fresh {t : ℕ}
   probEvent_mono fun z hz hwin =>
     extractability_rest_win_implies_fresh_cm A hx hno z hz hwin
 
-/-- Conditioned on a collision-free commit trace, the later extractability failure
+/- Conditioned on a collision-free commit trace, the later extractability failure
 probability is bounded by the fresh-hit term `(t₂ + 1) / |C|`. -/
+omit [Fintype M] [Fintype S] in
 private lemma extractability_rest_noCollision_le_inv {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C))
@@ -433,11 +441,12 @@ private lemma extractability_rest_noCollision_le_inv {t : ℕ}
         (n := A.t₂ + 1) hrest_bound (fun _ => le_refl _)
         cm cache₁ hno
 
-/-- The extraction error decomposes into collision in commit trace plus fresh query
+/- The extraction error decomposes into collision in commit trace plus fresh query
 matching `cm`. The commit trace has `≤ t₁` entries (birthday bound `t₁(t₁-1)/(2|C|)`),
 and the open+verify phase has `≤ t₂+1` fresh queries matching `cm` (`(t₂+1)/|C|`).
 Maximizing `t₁(t₁-1)/2 + t₂ + 1` over `t₁+t₂ ≤ t` gives `max{t+1, t(t-1)/2+1}`.
 For `t ≥ 3` this is `t(t-1)/2+1`, yielding `(t(t-1)+2)/(2|C|)`. -/
+omit [Fintype M] [Fintype S] in
 private lemma extractability_win_le_textbook_bound {t : ℕ} (ht : 3 ≤ t)
     (A : ExtractAdversary M S C AUX t) :
     Pr[fun z => z.1 = true | extractabilityGame CMExtract A] ≤
@@ -496,9 +505,10 @@ private lemma extractability_win_le_textbook_bound {t : ℕ} (ht : 3 ≤ t)
           simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
             add_div_two_card (C := C) (t * (t - 1)) 1
 
-/-- **Extractability theorem (Lemma cm-extractability)**: for `t ≥ 3`,
+/- **Extractability theorem (Lemma cm-extractability)**: for `t ≥ 3`,
 `Pr[win] ≤ (t(t-1)+2) / (2|C|)`. Combines the case-split decomposition
 `extractability_win_le_textbook_bound` with arithmetic. -/
+omit [Fintype M] [Fintype S] in
 theorem extractability_bound {t : ℕ} (ht : 3 ≤ t)
     (A : ExtractAdversary M S C AUX t) :
     Pr[fun z => z.1 = true | extractabilityGame CMExtract A] ≤

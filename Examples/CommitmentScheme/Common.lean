@@ -49,11 +49,15 @@ def CMCheck (c : C) (m : M) (s : S) : OracleComp (CMOracle M S C) Bool := do
   return (c == c')
 
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma simulateQ_cachingOracle_query (idx : (CMOracle M S C).Domain) :
     (simulateQ cachingOracle (liftM (query (spec := CMOracle M S C) idx))) =
     (cachingOracle (spec := CMOracle M S C) idx) := by
   simp [simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query]
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- After running `cachingOracle` on a single query at index `idx`, the resulting cache
 has an entry at `idx`. -/
 lemma cachingOracle_query_caches (idx : (CMOracle M S C).Domain)
@@ -81,6 +85,7 @@ lemma cachingOracle_query_caches (idx : (CMOracle M S C).Domain)
     obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
     exact QueryCache.cacheQuery_self cache₀ idx v
 
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 /-- If a fixed fresh query is the only way to win, its success probability is `1 / |C|`. -/
 lemma probEvent_from_fresh_query_le_inv
     (t : (CMOracle M S C).Domain)
@@ -114,7 +119,7 @@ lemma probEvent_from_fresh_query_le_inv
         modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
         StateT.modifyGet, StateT.run]
     rw [hstep, bind_assoc]
-    simpa [OracleQuery.cont_query]
+    simp [OracleQuery.cont_query]
   rw [hrun, probEvent_bind_eq_tsum]
   calc
     ∑' u, Pr[= u | (liftM (query (spec := CMOracle M S C) t) : OracleComp _ _)] *
@@ -132,7 +137,7 @@ lemma probEvent_from_fresh_query_le_inv
                   mul_le_mul' le_rfl probEvent_le_one
             _ = (Fintype.card C : ℝ≥0∞)⁻¹ := by
                 rw [mul_one]
-                simpa using (probOutput_query (spec := CMOracle M S C) t u)
+                simp
             _ = if u = target then (Fintype.card C : ℝ≥0∞)⁻¹ else 0 := by simp [hu]
         · rw [hzero u hu]
           simp [hu]

@@ -35,6 +35,7 @@ def CacheHasCollision (cache : QueryCache spec) : Prop :=
   ∃ (t₁ t₂ : spec.Domain) (u₁ : spec.Range t₁) (u₂ : spec.Range t₂),
     t₁ ≠ t₂ ∧ cache t₁ = some u₁ ∧ cache t₂ = some u₂ ∧ HEq u₁ u₂
 
+omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- In a collision-free cache, a value determines at most one query input. -/
 lemma cache_lookup_eq_of_noCollision
     {cache : QueryCache spec}
@@ -49,6 +50,7 @@ lemma cache_lookup_eq_of_noCollision
 
 /-! ## Log entries are cached after logging inside caching -/
 
+omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- When running `loggingOracle` inside `cachingOracle`, every log entry ends up in the cache.
 
 We prove two properties simultaneously by induction:
@@ -102,8 +104,8 @@ theorem log_entry_in_cache_and_mono {α : Type}
               (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
-      simp only [StateT.map, StateT.run, StateT.bind, map_eq_bind_pure_comp,
-        simulateQ_bind, simulateQ_pure, Function.comp_def, bind_assoc, pure_bind]
+      simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,
+        simulateQ_pure, Function.comp_def]
       rfl
     rw [hbind_rw] at hmem
     rw [StateT.run_bind] at hmem
@@ -120,7 +122,7 @@ theorem log_entry_in_cache_and_mono {α : Type}
         simp only [hc, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hu_mem
         obtain ⟨rfl, rfl⟩ := Prod.mk.inj hu_mem; exact hc
       | none =>
-        simp only [hc, StateT.run_bind, StateT.run_lift, StateT.run_modifyGet] at hu_mem
+        simp only [hc, StateT.run_bind, StateT.run_modifyGet] at hu_mem
         rw [support_bind] at hu_mem; simp only [Set.mem_iUnion] at hu_mem
         obtain ⟨w, _, hmem_w⟩ := hu_mem
         rw [support_pure, Set.mem_singleton_iff] at hmem_w
@@ -157,6 +159,7 @@ theorem log_entry_in_cache_and_mono {α : Type}
       | tail _ hentry' => exact ih_entries entry hentry',
       le_trans hcache₀_le_mid ih_mono⟩
 
+omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- **Converse of `log_entry_in_cache_and_mono`**: when running `loggingOracle` inside
 `cachingOracle`, every cache entry that was not in the initial cache has a corresponding
 log entry. Combined with `log_entry_in_cache_and_mono`, this shows that (starting from `∅`)
@@ -203,8 +206,8 @@ theorem cache_entry_in_log_or_initial {α : Type}
               (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
-      simp only [StateT.map, StateT.run, StateT.bind, map_eq_bind_pure_comp,
-        simulateQ_bind, simulateQ_pure, Function.comp_def, bind_assoc, pure_bind]
+      simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,
+        simulateQ_pure, Function.comp_def]
       rfl
     rw [hbind_rw] at hmem
     rw [StateT.run_bind] at hmem
@@ -217,7 +220,7 @@ theorem cache_entry_in_log_or_initial {α : Type}
         simp only [hc, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hu_mem
         obtain ⟨rfl, rfl⟩ := Prod.mk.inj hu_mem; exact hc
       | none =>
-        simp only [hc, StateT.run_bind, StateT.run_lift, StateT.run_modifyGet] at hu_mem
+        simp only [hc, StateT.run_bind, StateT.run_modifyGet] at hu_mem
         rw [support_bind] at hu_mem; simp only [Set.mem_iUnion] at hu_mem
         obtain ⟨w, _, hmem_w⟩ := hu_mem
         rw [support_pure, Set.mem_singleton_iff] at hmem_w

@@ -137,6 +137,7 @@ theorem probEvent_log_output_heq_le {α : Type}
   le_trans (probEvent_log_entry_eq_le oa k entry)
     (ENNReal.inv_le_inv.mpr (by exact_mod_cast hrange entry.1))
 
+omit [DecidableEq ι] [spec.DecidableEq] in
 /-- Probability that the k-th log entry's output is HEq to a fixed value `u₀ : spec.Range t₀`.
 Unlike `probEvent_log_entry_eq_le` which matches the full sigma entry, this only constrains
 the output component. The bound uses `hrange` to get `1/|Range default|`.
@@ -229,6 +230,7 @@ theorem probEvent_log_output_match_le {α : Type}
           mul_le_mul' tsum_probOutput_le_one le_rfl
         _ = (Fintype.card (spec.Range default) : ℝ≥0∞)⁻¹ := one_mul _
 
+omit [DecidableEq ι] [spec.DecidableEq] in
 /-- **Per-pair collision bound**: For any two positions in a `loggingOracle` trace
 with distinct inputs, the probability that their outputs are HEq-equal is ≤ 1/|C|.
 
@@ -427,7 +429,7 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
           -- Helper: reduce getElem? for Fin n index when val < list length
           have getElem?_fin (l : QueryLog spec) (k : Fin n) (hk : k.val < l.length) :
               l[k]? = some l[k.val] := by
-            simp [List.getElem?_eq_getElem, hk]
+            simp [hk]
           rcases lt_or_gt_of_ne hij with hlt | hgt
           · refine ⟨(⟨i.val, hi_lt⟩, ⟨j.val, hj_lt⟩), ?_, ?_⟩
             · simp only [pairs, Finset.mem_filter, Finset.mem_univ, true_and]; exact hlt

@@ -3,6 +3,7 @@ Copyright (c) 2026 James Waters. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: James Waters
 -/
+import VCVio.ProgramLogic.Unary.SimulateQ
 import Examples.CommitmentScheme.Hiding.CountBounds
 
 open OracleSpec OracleComp ENNReal
@@ -45,6 +46,8 @@ def hidingMixedSim {AUX : Type} {t : ℕ}
   let s ← query (spec := HidingAvgSpec M S C) (Sum.inl ())
   OracleComp.liftComp (hidingSim A s) (HidingAvgSpec M S C)
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma run_simulateQ_hidingAvgRightImpl_eq_liftComp {α : Type}
     (oa : OracleComp (CMOracle M S C) α)
     (st : HidingCountState M S C) :
@@ -73,6 +76,7 @@ lemma run_simulateQ_hidingAvgRightImpl_eq_liftComp {α : Type}
       exact OracleComp.bind_congr' hstep (fun p => by
         simpa using ih p.1 p.2)
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
 lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0) =
@@ -136,7 +140,7 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
     have hsprob :
         Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] =
           (Fintype.card S : ℝ≥0∞)⁻¹ := by
-      simpa using (probOutput_query (spec := Unit →ₒ S) () s)
+      simp
     rw [probEvent_map, probEvent_liftComp, hsprob]
     congr 1
   have hcard0 : (Fintype.card S : ℝ≥0∞) ≠ 0 := by simp
@@ -168,6 +172,7 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
             (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0)] := by
           rw [hprob]
 
+omit [DecidableEq C] [Fintype M] in
 lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -191,6 +196,7 @@ lemma probEvent_hidingAvg_bad_le_wp_selectedCountPred
         simpa using hcast)
   simpa [oa] using h
 
+omit [DecidableEq C] [Fintype M] in
 lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -285,12 +291,16 @@ theorem sum_probEvent_hidingBad_le_sum_wp_countPred {AUX : Type} {t : ℕ}
                 card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
                   (M := M) (S := S) (C := C) A
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- The real hiding game is `simulateQ cachingOracle` applied to the shared computation. -/
 theorem hidingReal_eq {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     hidingReal A s = (simulateQ cachingOracle (hidingOa A s)).run' ∅ := by
   simp only [hidingReal, hidingOa]
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- The real hiding game equals `simulateQ hidingImpl₁` projected to discard the counter.
 This lifts cachingOracle's state by pairing it with the salt counter. -/
 theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
@@ -304,13 +314,14 @@ theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
         QueryImpl.ofLift, StateT.run_bind, StateT.run_get, pure_bind]
       cases hc : cache ms with
       | some u =>
-        simp [hc, StateT.run_pure, Prod.map]
+        simp [StateT.run_pure, Prod.map]
       | none =>
-        simp only [hc, StateT.run_bind, OracleComp.liftM_run_StateT]
-        simp only [bind_assoc, pure_bind, Prod.map]
+        simp only [StateT.run_bind, OracleComp.liftM_run_StateT]
+        simp only [bind_assoc, pure_bind]
         simp [StateT.run_set, StateT.run_pure, Prod.map, StateT.run_modifyGet]
     ) (hidingOa A s) (∅, 0)).symm
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
 /-- The implementations agree when `¬bad`: when the counter is less than 2,
 `hidingImpl₁` and `hidingImpl₂` produce the same monadic computation.
 The redirect condition `cnt ≥ 2 && salt = s` is `false` since `cnt < 2`. -/
@@ -340,6 +351,8 @@ private lemma hidingBad_of_counter_le
     (h : hidingBad st₁) (hle : st₁.2 ≤ st₂.2) : hidingBad st₂ := by
   simp only [hidingBad] at h ⊢; omega
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- One-step counter growth bound for `hidingImpl₁`:
 the salt counter is monotone and increases by at most one. -/
 theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
@@ -361,9 +374,11 @@ theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
     simp only [StateT.run_set, StateT.run_pure, pure_bind,
       support_pure, Set.mem_singleton_iff] at hx
     rw [hx]
-    simp only [Prod.snd]
+    simp
     split <;> omega
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 /-- Bad is monotone for `hidingImpl₁`: once the counter reaches 2, it stays ≥ 2. -/
 theorem hidingImpl₁_bad_mono (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
@@ -407,9 +422,10 @@ theorem hidingImplSim_counter_le_succ (s : S) (ms : M × S)
     simp only [StateT.run_set, StateT.run_pure, pure_bind,
       support_pure, Set.mem_singleton_iff] at hx
     rw [hx]
-    simp only [Prod.snd]
+    simp
     split <;> omega
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
 /-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
 theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
@@ -418,6 +434,7 @@ theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
     hidingBad x.2 :=
   hidingBad_of_counter_le h (hidingImplSim_counter_le_succ s ms st x hx).1
 
+omit [DecidableEq C] [Fintype M] [Fintype S] in
 /-- `hidingImpl₁` and `hidingImplSim` agree **distributionally** when `¬bad`.
 
 When `cnt < 2`, the two implementations differ only in the query point for
@@ -438,7 +455,7 @@ theorem hidingImpl_agree_dist (s : S) (ms : M × S)
   cases hcache : cache ms with
   | some u =>
     -- Cache hit: both return the same cached value, state unchanged
-    simp [hcache]
+    simp
   | none =>
     -- Cache miss: impl₁ queries at ms, implSim queries at queryPoint.
     -- Both bind on (liftM (query _)).run st then set+return.
@@ -450,6 +467,7 @@ theorem hidingImpl_agree_dist (s : S) (ms : M × S)
     refine tsum_congr fun x => ?_
     congr 1
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
 /-- The sim game equals `hidingImplSim` applied to `hidingOa`, projected to output.
 
 This lifts `cachingOracle`'s state by pairing it with the salt counter and
@@ -460,6 +478,7 @@ theorem hidingSim_eq_implSim {AUX : Type} {t : ℕ}
     hidingSim A s = (simulateQ (hidingImplSim s) (hidingOa A s)).run' (∅, 0) := by
   rfl
 
+omit [DecidableEq C] [Fintype M] [Fintype S] in
 /-- For fixed `s`, the TV distance between real and sim games is bounded by
 the probability of the bad event under `hidingImpl₁`.
 
@@ -507,6 +526,7 @@ theorem indicator_le_natCast_count (P : Prop) [Decidable P] (n : ℕ)
   · simp [hP, h hP]
   · simp [hP]
 
+omit [DecidableEq M] [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_finset_sum {α : Type}
     (oa : OracleComp (CMOracle M S C) α) (ss : Finset S) (f : S → α → ℝ≥0∞) :
     (ss.sum fun s => OracleComp.ProgramLogic.wp oa (f s)) =
@@ -516,6 +536,7 @@ lemma wp_finset_sum {α : Type}
   · intro s ss hs ih
     simp [Finset.sum_insert, hs, ih, OracleComp.ProgramLogic.wp_add]
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_hidingOa_eq_wp_choose
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -577,6 +598,7 @@ lemma sum_wp_hidingOa_eq_wp_choose
                     ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2)
                     (post s))))
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_countPred_eq_wp_choose
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -599,6 +621,7 @@ lemma sum_wp_countPred_eq_wp_choose
       (M := M) (S := S) (C := C) A
       (fun s z => (z.2.2 s - 1 : ℝ≥0∞))
 
+omit [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 lemma wp_challenge_countPred_le_initialCount
     (m : M) (s : S) (st : HidingCountState M S C) :
     OracleComp.ProgramLogic.wp
@@ -628,6 +651,7 @@ lemma wp_challenge_countPred_le_initialCount
     _ = st.2 s := by
         rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_challenge_countPred_le_initialCount
     (m : M) (st : HidingCountState M S C) :
     (∑ s : S,
@@ -639,6 +663,7 @@ lemma sum_wp_challenge_countPred_le_initialCount
   intro s hs
   exact wp_challenge_countPred_le_initialCount (M := M) (S := S) (C := C) m s st
 
+omit [DecidableEq C] [Inhabited M] in
 lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -675,6 +700,7 @@ lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
     simpa [add_assoc, add_left_comm, add_comm] using
       add_le_add_left hincr (∑ s : S, (qchoose.2.2 s - 1 : ℝ≥0∞)))
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_countPred_le_sum_initialPred_add_queryBound_of_run_hidingImplCountAll
     {α : Type} {oa : OracleComp (CMOracle M S C) α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
@@ -699,6 +725,7 @@ lemma sum_wp_countPred_le_sum_initialPred_add_queryBound_of_run_hidingImplCountA
     simpa [add_assoc, add_left_comm, add_comm] using
       add_le_add_left hincr (∑ s : S, (st₀.2 s - 1 : ℝ≥0∞)))
 
+omit [DecidableEq C] [Inhabited M] in
 lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -744,7 +771,7 @@ lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
             ∑ m : M, ∑ s : S, qcChoose (m, s))
         _ = ∑ ms : M × S, qcChoose ms := by
           symm
-          simpa [Fintype.sum_prod_type]
+          simp [Fintype.sum_prod_type]
     exact le_trans hcoordSum (by simpa [hswap] using htotal)
   have hpred :
       (∑ s : S, (qchoose.2.2 s - 1 : ℝ≥0∞)) ≤ (∑ s : S, qchoose.2.2 s : ℝ≥0∞) := by
@@ -767,6 +794,7 @@ lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
         rw [Nat.cast_sum]
         exact tsub_add_cancel_of_le hcast
 
+omit [DecidableEq C] [Inhabited M] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -863,6 +891,7 @@ lemma sum_wp_badIndicator_eq_wp_choose
             (M := M) (S := S) (C := C) A
             (fun s z => OracleComp.ProgramLogic.propInd (2 ≤ z.2.2 s))
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -970,6 +999,7 @@ lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
           HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_support
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)
@@ -1083,6 +1113,7 @@ lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_suppo
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
           HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
+omit [DecidableEq S] [Inhabited S] in
 lemma sum_chooseHitIndicators_le_sumCounts
     (counts : S → ℕ) :
     (∑ s : S, OracleComp.ProgramLogic.propInd (0 < counts s)) ≤
@@ -1094,6 +1125,7 @@ lemma sum_chooseHitIndicators_le_sumCounts
     exact_mod_cast hpos
   · simp [OracleComp.ProgramLogic.propInd, hpos]
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_freshDistinguishIncrement_eq_query
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t)

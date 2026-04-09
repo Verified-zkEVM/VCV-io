@@ -11,6 +11,7 @@ variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
+omit [DecidableEq M] [DecidableEq S] [DecidableEq C] [Fintype M] [Inhabited M] in
 private lemma tvDist_liftComp_hidingAvgSpec {α : Type}
     (oa ob : OracleComp (CMOracle M S C) α) :
     tvDist
