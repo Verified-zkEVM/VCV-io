@@ -100,6 +100,59 @@ lemma tvDist_bind_right_le [LawfulMonad m] {β : Type u} (f : α → m β) (mx m
   simp only [tvDist, evalDist_def, MonadHom.mmap_bind]
   exact SPMF.tvDist_bind_right_le _ _ _
 
+/-! ### TV distance bounds -/
+lemma tvDist_le_probEvent_of_probOutput_eq_of_not
+    {mx my : m α} [NeverFail mx] [NeverFail my]
+    (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
+    (h_event_eq : Pr[ p | mx] = Pr[ p | my]) :
+    tvDist mx my ≤ Pr[ p | mx].toReal := by
+  classical
+  rw [tvDist, SPMF.tvDist, PMF.tvDist]
+  refine ENNReal.toReal_mono probEvent_ne_top ?_
+  rw [PMF.etvDist, tsum_option _ ENNReal.summable]
+  have hfailx : (evalDist mx).toPMF none = 0 := by
+    rw [← SPMF.run_eq_toPMF (p := evalDist mx), ← probFailure_def (mx := mx)]
+    exact probFailure_eq_zero (mx := mx)
+  have hfaily : (evalDist my).toPMF none = 0 := by
+    rw [← SPMF.run_eq_toPMF (p := evalDist my), ← probFailure_def (mx := my)]
+    exact probFailure_eq_zero (mx := my)
+  have hsum :
+      (∑' x, ENNReal.absDiff ((evalDist mx).toPMF (some x)) ((evalDist my).toPMF (some x))) =
+        ∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my]) := by
+    refine tsum_congr fun x => ?_
+    simp [probOutput_def, SPMF.apply_eq_toPMF_some]
+  rw [hfailx, hfaily, ENNReal.absDiff_self, zero_add]
+  rw [hsum]
+  calc
+    (∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my])) / 2
+      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 :=
+          ENNReal.div_le_div_right
+            (ENNReal.tsum_le_tsum fun x => by
+              by_cases hx : p x
+              · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
+              · simp [hx, h_eq x hx, ENNReal.absDiff_self]) _
+    _ = (Pr[ p | mx] + Pr[ p | my]) / 2 := by
+        rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
+        congr 1
+        calc
+          (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0)
+              = (∑' x, ((if p x then Pr[= x | mx] else 0) +
+                  (if p x then Pr[= x | my] else 0))) := by
+                  refine tsum_congr fun x => ?_
+                  by_cases hx : p x <;> simp [hx]
+          _ = (∑' x, if p x then Pr[= x | mx] else 0) +
+              (∑' x, if p x then Pr[= x | my] else 0) := by
+                rw [ENNReal.tsum_add]
+    _ = (Pr[ p | mx] + Pr[ p | mx]) / 2 := by
+        rw [← h_event_eq]
+    _ = Pr[ p | mx] := by
+        rw [← two_mul, mul_div_assoc]
+        simp [ENNReal.mul_div_cancel two_ne_zero ofNat_ne_top]
+
+end monadic
+
+/-! ### TV distance for bind (left) -/
+
 private lemma pmf_etvDist_bind_left_le {α : Type u} {β : Type u}
     (p : PMF α) (f g : α → PMF β) :
     (p.bind f).etvDist (p.bind g) ≤ ∑' a, (f a).etvDist (g a) * p a := by
@@ -120,7 +173,7 @@ private lemma pmf_etvDist_bind_left_le {α : Type u} {β : Type u}
       _ = (∑' a, (∑' b, ENNReal.absDiff ((f a) b) ((g a) b)) * p a) / 2 := by
               rw [div_eq_mul_inv]
   rw [PMF.etvDist, hrhs]
-  simpa [div_eq_mul_inv] using mul_le_mul_right' (a := (2 : ENNReal)⁻¹) (show
+  simpa [div_eq_mul_inv] using mul_le_mul_left (a := (2 : ENNReal)⁻¹) (show
     ∑' y, ENNReal.absDiff (∑' x, p x * (f x) y) (∑' x, p x * (g x) y)
       ≤ ∑' x, (∑' y, ENNReal.absDiff ((f x) y) ((g x) y)) * p x from by
         calc
@@ -173,8 +226,9 @@ private lemma spmf_tvDist_bind_left_le_liftM
     using pmf_tvDist_bind_left_le p (fun a => PMF.map Option.some (f a))
       (fun a => PMF.map Option.some (g a))
 
-lemma tvDist_bind_left_le [LawfulMonad m] [HasEvalPMF m]
-    {β : Type u}
+lemma tvDist_bind_left_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
     (mx : m α) (f g : α → m β) :
     tvDist (mx >>= f) (mx >>= g) ≤ ∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a) := by
   rw [tvDist, evalDist_bind, evalDist_bind]
@@ -191,57 +245,6 @@ lemma tvDist_bind_left_le [LawfulMonad m] [HasEvalPMF m]
     _ = ∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a) := by
           refine tsum_congr fun a => ?_
           simp [probOutput_def, tvDist, HasEvalPMF.evalDist_of_hasEvalPMF_def]
-
-/-! ### TV distance bounds -/
-lemma tvDist_le_probEvent_of_probOutput_eq_of_not
-    {mx my : m α} [NeverFail mx] [NeverFail my]
-    (p : α → Prop) (h_eq : ∀ x, ¬p x → Pr[= x | mx] = Pr[= x | my])
-    (h_event_eq : Pr[ p | mx] = Pr[ p | my]) :
-    tvDist mx my ≤ Pr[ p | mx].toReal := by
-  classical
-  rw [tvDist, SPMF.tvDist, PMF.tvDist]
-  refine ENNReal.toReal_mono probEvent_ne_top ?_
-  rw [PMF.etvDist, tsum_option _ ENNReal.summable]
-  have hfailx : (evalDist mx).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := evalDist mx), ← probFailure_def (mx := mx)]
-    exact probFailure_eq_zero (mx := mx)
-  have hfaily : (evalDist my).toPMF none = 0 := by
-    rw [← SPMF.run_eq_toPMF (p := evalDist my), ← probFailure_def (mx := my)]
-    exact probFailure_eq_zero (mx := my)
-  have hsum :
-      (∑' x, ENNReal.absDiff ((evalDist mx).toPMF (some x)) ((evalDist my).toPMF (some x))) =
-        ∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my]) := by
-    refine tsum_congr fun x => ?_
-    simp [probOutput_def, SPMF.apply_eq_toPMF_some]
-  rw [hfailx, hfaily, ENNReal.absDiff_self, zero_add]
-  rw [hsum]
-  calc
-    (∑' x, ENNReal.absDiff (Pr[= x | mx]) (Pr[= x | my])) / 2
-      ≤ (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0) / 2 :=
-          ENNReal.div_le_div_right
-            (ENNReal.tsum_le_tsum fun x => by
-              by_cases hx : p x
-              · simpa [hx] using ENNReal.absDiff_le_add (Pr[= x | mx]) (Pr[= x | my])
-              · simp [hx, h_eq x hx, ENNReal.absDiff_self]) _
-    _ = (Pr[ p | mx] + Pr[ p | my]) / 2 := by
-        rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
-        congr 1
-        calc
-          (∑' x, if p x then (Pr[= x | mx] + Pr[= x | my]) else 0)
-              = (∑' x, ((if p x then Pr[= x | mx] else 0) +
-                  (if p x then Pr[= x | my] else 0))) := by
-                  refine tsum_congr fun x => ?_
-                  by_cases hx : p x <;> simp [hx]
-          _ = (∑' x, if p x then Pr[= x | mx] else 0) +
-              (∑' x, if p x then Pr[= x | my] else 0) := by
-                rw [ENNReal.tsum_add]
-    _ = (Pr[ p | mx] + Pr[ p | mx]) / 2 := by
-        rw [← h_event_eq]
-    _ = Pr[ p | mx] := by
-        rw [← two_mul, mul_div_assoc]
-        simp [ENNReal.mul_div_cancel two_ne_zero ofNat_ne_top]
-
-end monadic
 
 section bool_tvdist
 
