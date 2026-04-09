@@ -20,8 +20,6 @@ Shared oracle/model definitions and helper lemmas for the random oracle commitme
 scheme proof split.
 -/
 
-set_option autoImplicit false
-
 open OracleSpec OracleComp ENNReal
 /-! ## Oracle Specification -/
 

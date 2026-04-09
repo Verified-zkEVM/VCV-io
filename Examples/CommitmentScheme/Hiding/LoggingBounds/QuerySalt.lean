@@ -5,8 +5,6 @@ Authors: jpwaters
 -/
 import Examples.CommitmentScheme.Hiding.LoggingBounds.Average
 
-set_option autoImplicit false
-
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}

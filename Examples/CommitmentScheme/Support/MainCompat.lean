@@ -15,8 +15,6 @@ import VCVio.ProgramLogic.Unary.SimulateQ
 This file is reserved for small proof-local adapters against `main` APIs.
 -/
 
-set_option autoImplicit false
-
 open OracleSpec OracleComp
 
 universe u v w

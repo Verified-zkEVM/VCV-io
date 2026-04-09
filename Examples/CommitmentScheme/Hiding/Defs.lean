@@ -5,8 +5,6 @@ Authors: jpwaters
 -/
 import Examples.CommitmentScheme.Common
 
-set_option autoImplicit false
-
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}

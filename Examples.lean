@@ -12,9 +12,11 @@ import Examples.CommitmentScheme.Hiding.LoggingBounds.QuerySalt
 import Examples.CommitmentScheme.Hiding.Main
 import Examples.CommitmentScheme.Support
 import Examples.CommitmentScheme.Support.Collision
+import Examples.CommitmentScheme.Support.Collision.Birthday
+import Examples.CommitmentScheme.Support.Collision.Infrastructure
+import Examples.CommitmentScheme.Support.Collision.Unpredictability
 import Examples.CommitmentScheme.Support.MainCompat
 import Examples.CommitmentScheme.Support.QueryBound
-import Examples.CommitmentSchemeRO
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash

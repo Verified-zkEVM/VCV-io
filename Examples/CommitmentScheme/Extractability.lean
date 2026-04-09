@@ -5,8 +5,6 @@ Authors: jpwaters
 -/
 import Examples.CommitmentScheme.Common
 
-set_option autoImplicit false
-
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}
@@ -195,18 +193,8 @@ The inner computation consists of:
 
 Total: `t₁ + t₂ + 1 ≤ t + 1`.
 
-**Status**: sorry — requires two pieces of missing infrastructure:
-1. `IsTotalQueryBound` preservation through `simulateQ loggingOracle ... .run`:
-   `loggingOracle` passes all queries through unchanged, so the query bound
-   should transfer. But `IsTotalQueryBound` is defined structurally via
-   `OracleComp.construct`, and `simulateQ loggingOracle` wraps each query in
-   `WriterT` machinery that changes the syntactic structure. A lemma like
-   `IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔ IsTotalQueryBound oa n`
-   would require induction showing the `WriterT.run` / `loggingOracle` composition
-   preserves the structural query bound.
-2. Composition of bounds through dependent bind: the open phase depends on `aux`
-   from the commit phase, requiring `isTotalQueryBound_bind` with the existential
-   intermediate result. -/
+The proof uses `isTotalQueryBound_run_simulateQ_loggingOracle_iff` (logging preserves
+query bounds) and `isTotalQueryBound_bind` (composition through dependent bind). -/
 private lemma extractabilityInner_totalBound {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     IsTotalQueryBound (extractabilityInner A) (t + 1) := by
