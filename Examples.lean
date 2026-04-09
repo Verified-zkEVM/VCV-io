@@ -16,7 +16,6 @@ import Examples.CommitmentScheme.Support.Collision.Birthday
 import Examples.CommitmentScheme.Support.Collision.Infrastructure
 import Examples.CommitmentScheme.Support.Collision.Unpredictability
 import Examples.CommitmentScheme.Support.MainCompat
-import Examples.CommitmentScheme.Support.QueryBound
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
