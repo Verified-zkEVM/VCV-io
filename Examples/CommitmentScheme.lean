@@ -7,3 +7,11 @@ import Examples.CommitmentScheme.Common
 import Examples.CommitmentScheme.Binding
 import Examples.CommitmentScheme.Extractability
 import Examples.CommitmentScheme.Hiding
+
+/-!
+# Random Oracle Commitment Scheme
+
+Re-exports all modules for the random oracle commitment scheme example:
+binding (`Binding`), extractability (`Extractability`), hiding (`Hiding`),
+and shared definitions (`Common`).
+-/

@@ -39,7 +39,6 @@ def bindingGame {t : ℕ} (A : BindingAdversary M S C t) :
     OracleComp (CMOracle M S C) (Bool × QueryCache (CMOracle M S C)) :=
   (simulateQ cachingOracle (do
     let (c, m₀, s₀, m₁, s₁) ← A.run
-    -- Verify both openings using the same oracle
     let c₀ ← query (spec := CMOracle M S C) (m₀, s₀)
     let c₁ ← query (spec := CMOracle M S C) (m₁, s₁)
     return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run ∅
@@ -55,9 +54,6 @@ private def bindingInner {t : ℕ} (A : BindingAdversary M S C t) :
 /-- The binding game equals `simulateQ cachingOracle` on `bindingInner`. -/
 private lemma bindingGame_eq {t : ℕ} (A : BindingAdversary M S C t) :
     bindingGame A = (simulateQ cachingOracle (bindingInner A)).run ∅ := rfl
-
-/-- `simulateQ cachingOracle (liftM (query idx))` equals `cachingOracle idx` as StateT actions.
-This follows from `simulateQ_query` with `cont = id`. -/
 
 private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S C t) :
     ∀ z ∈ support ((simulateQ cachingOracle (bindingInner A)).run ∅),

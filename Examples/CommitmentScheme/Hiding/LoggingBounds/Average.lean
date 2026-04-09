@@ -396,20 +396,16 @@ theorem hidingImpl₂_bad_mono (s : S) (ms : M × S)
     simp only [Prod.snd]
     split <;> omega
 
-/-! ### Corrected proof architecture
+/-! ### Distributional agreement via `hidingImplSim`
 
-The original three-step decomposition (`hidingImpl₂_eq_hidingSim`) was flawed
-because `hidingImpl₂` caches the challenge at `(m, s)` while the simulator
-caches at `(default, default)` — an adversary querying `(m, s)` during distinguish
-observes a cache hit in impl₂ but a miss in the simulator.
-
-**Corrected approach**: Use `hidingImplSim` which redirects ALL salt-s cache
-misses to `(default, default)`. Then:
-1. `hidingImpl₁` and `hidingImplSim` agree **distributionally** when `¬bad`
-   (both return fresh uniform on cache miss; the query point doesn't matter
-   because the underlying oracle is memoryless)
-2. `hidingImplSim.run' = hidingSim` (the simulator matches the impl)
-3. Apply `tvDist_simulateQ_le_probEvent_bad_dist` to bound the distance
+The proof uses `hidingImplSim`, which redirects all salt-`s` cache misses to
+`(default, default)`. The argument proceeds in three steps:
+1. `hidingImpl₁` and `hidingImplSim` agree distributionally when `¬bad`
+   (both return fresh uniform on cache miss; the query point is irrelevant
+   because the underlying oracle is memoryless).
+2. `hidingImplSim.run' = hidingSim` (the simulator matches the implementation).
+3. `tvDist_simulateQ_le_probEvent_bad_dist` bounds the statistical distance
+   by `Pr[bad]`.
 
 The `Pr[bad] ≤ t/|S|` bound requires `s` to be uniformly random (see below). -/
 

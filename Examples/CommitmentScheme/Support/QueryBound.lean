@@ -210,7 +210,7 @@ section CountingResidual
 
 variable [DecidableEq ι] [Fintype ι]
 
-private lemma sum_update_pred {qc : ι → ℕ} {t : ι} (ht : 0 < qc t) :
+lemma sum_update_pred {qc : ι → ℕ} {t : ι} (ht : 0 < qc t) :
     ∑ i, Function.update qc t (qc t - 1) i = (∑ i, qc i) - 1 := by
   have hsub : ∑ i, Function.update qc t (qc t - 1) i + 1 = (∑ i, qc i) := by
     rw [← Finset.add_sum_erase Finset.univ (fun i => Function.update qc t (qc t - 1) i)

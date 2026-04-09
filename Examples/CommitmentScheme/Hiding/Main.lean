@@ -35,24 +35,20 @@ theorem hiding_bound_avg {AUX : Type} {t : ℕ}
     (∑ s : S, tvDist (hidingReal A s) (hidingSim A s)) / (Fintype.card S : ℝ) ≤
     (t : ℝ) / (Fintype.card S : ℝ) := by
   apply div_le_div_of_nonneg_right _ (Nat.cast_nonneg _)
-  -- Step 1: tvDist ≤ Pr[bad] for each s (already proved)
   have h1 : ∀ s : S, tvDist (hidingReal A s) (hidingSim A s) ≤
       Pr[hidingBad ∘ Prod.snd |
         (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)].toReal :=
     fun s => tvDist_hidingReal_hidingSim_le_probBad A s
-  -- Step 2: Sum and use sum_probEvent_hidingBad_le
   calc ∑ s : S, tvDist (hidingReal A s) (hidingSim A s)
       ≤ ∑ s : S, Pr[hidingBad ∘ Prod.snd |
           (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)].toReal :=
         Finset.sum_le_sum fun s _ => h1 s
     _ ≤ (t : ℝ) := by
         have hsum := sum_probEvent_hidingBad_le A
-        -- Convert from ENNReal sum bound to Real sum bound
         have hne : ∀ s ∈ Finset.univ, Pr[hidingBad ∘ Prod.snd |
             (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0)] ≠ ⊤ :=
           fun _ _ => probEvent_ne_top
-        rw [← ENNReal.toReal_sum hne]
-        rw [← ENNReal.toReal_natCast]
+        rw [← ENNReal.toReal_sum hne, ← ENNReal.toReal_natCast]
         exact (ENNReal.toReal_le_toReal
           (ne_top_of_le_ne_top ENNReal.coe_ne_top hsum)
           ENNReal.coe_ne_top).mpr hsum

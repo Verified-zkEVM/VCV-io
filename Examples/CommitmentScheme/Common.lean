@@ -26,7 +26,6 @@ open OracleSpec OracleComp ENNReal
 /-- Oracle spec for the commitment scheme: maps `(M × S) → C`. -/
 abbrev CMOracle (M : Type) (S : Type) (C : Type) : OracleSpec (M × S) := fun _ => C
 
--- We need DecidableEq on the product for cachingOracle.
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]

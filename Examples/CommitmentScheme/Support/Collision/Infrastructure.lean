@@ -104,21 +104,6 @@ lemma gauss_sum_inv_eq (n : ℕ) (N : ℝ≥0∞) :
         ring
 
 /-- Updating one index and summing gives sum minus one. -/
-private lemma sum_update_pred [Fintype ι] {qb : ι → ℕ} {t : ι} (ht : 0 < qb t) :
-    ∑ i, Function.update qb t (qb t - 1) i = (∑ i, qb i) - 1 := by
-  have hsub : ∑ i, Function.update qb t (qb t - 1) i + 1 = (∑ i, qb i) := by
-    rw [← Finset.add_sum_erase Finset.univ (fun i => Function.update qb t (qb t - 1) i)
-      (Finset.mem_univ t)]
-    simp only [Function.update_self]
-    conv_rhs => rw [← Finset.add_sum_erase Finset.univ qb (Finset.mem_univ t)]
-    have herase : ∑ x ∈ Finset.univ.erase t,
-        Function.update qb t (qb t - 1) x = ∑ x ∈ Finset.univ.erase t, qb x := by
-      apply Finset.sum_congr rfl
-      intro i hi
-      rw [Function.update_of_ne (Finset.ne_of_mem_erase hi)]
-    rw [herase]; omega
-  omega
-
 /-- Per-index bound implies total bound (sum over indices). -/
 theorem IsTotalQueryBound.of_perIndex [Fintype ι] {α : Type}
     {oa : OracleComp spec α} {qb : ι → ℕ}
