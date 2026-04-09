@@ -1,3 +1,9 @@
+/-
+Copyright (c) 2024 ArkLib Contributors. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Quang Dao
+-/
+
 import ToMathlib.Data.IndexedBinaryTree.Basic
 
 
@@ -106,7 +112,7 @@ theorem SkeletonNodeIndex.rightChild_bind_parent {s : Skeleton}
       | ofRight _ =>
         simp [SkeletonNodeIndex.rightChild, SkeletonNodeIndex.parent, Option.bind, hchild, hc]
 
-/-- The parent of a leftChild is none or the node -/
+/-- The parent of a node of depth zero is none. -/
 theorem SkeletonNodeIndex.parent_of_depth_zero {s : Skeleton}
     (idx : SkeletonNodeIndex s) (h : idx.depth = 0) :
     parent idx = none := by

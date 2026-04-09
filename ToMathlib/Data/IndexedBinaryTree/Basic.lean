@@ -106,18 +106,21 @@ This section contains predicates about indices determined by their neighborhood 
 
 section Local
 
+/-- Check whether a leaf index is the root of its tree. -/
 def SkeletonLeafIndex.isRoot {s : Skeleton} (idx : SkeletonLeafIndex s) : Bool :=
   match idx with
   | SkeletonLeafIndex.ofLeaf => true
   | SkeletonLeafIndex.ofLeft _ => false
   | SkeletonLeafIndex.ofRight _ => false
 
+/-- Check whether an internal-node index is the root of its tree. -/
 def SkeletonInternalIndex.isRoot {s : Skeleton} (idx : SkeletonInternalIndex s) : Bool :=
   match idx with
   | SkeletonInternalIndex.ofInternal => true
   | SkeletonInternalIndex.ofLeft _ => false
   | SkeletonInternalIndex.ofRight _ => false
 
+/-- Check whether a node index is the root of its tree. -/
 def SkeletonNodeIndex.isRoot {s : Skeleton} (idx : SkeletonNodeIndex s) : Bool :=
   match idx with
   | SkeletonNodeIndex.ofLeaf => true
@@ -125,12 +128,15 @@ def SkeletonNodeIndex.isRoot {s : Skeleton} (idx : SkeletonNodeIndex s) : Bool :
   | SkeletonNodeIndex.ofLeft _ => false
   | SkeletonNodeIndex.ofRight _ => false
 
+/-- Every `SkeletonLeafIndex` points to a leaf. -/
 def SkeletonLeafIndex.isLeaf {s : Skeleton} (_ : SkeletonLeafIndex s) : Bool :=
   true
 
+/-- No `SkeletonInternalIndex` points to a leaf. -/
 def SkeletonInternalIndex.isLeaf {s : Skeleton} (_ : SkeletonInternalIndex s) : Bool :=
   false
 
+/-- Check whether a node index points to a leaf of the tree. -/
 def SkeletonNodeIndex.isLeaf {s : Skeleton} (idx : SkeletonNodeIndex s) : Bool :=
   match idx with
   | SkeletonNodeIndex.ofLeaf => true
@@ -343,6 +349,90 @@ theorem FullData.get_leaf {α} (a : α) :
     (FullData.leaf a).get SkeletonNodeIndex.ofLeaf = a := by
   rfl
 
+@[simp]
+theorem InternalData.get_internal {α} {s_left s_right : Skeleton}
+    (value : α) (left : InternalData α s_left) (right : InternalData α s_right) :
+    (InternalData.internal value left right).get SkeletonInternalIndex.ofInternal = value := by
+  rfl
+
+@[simp]
+theorem InternalData.get_ofLeft {s_left s_right : Skeleton} {α}
+    (tree : InternalData α (Skeleton.internal s_left s_right))
+    (idxLeft : SkeletonInternalIndex s_left) :
+    tree.get (SkeletonInternalIndex.ofLeft idxLeft) =
+      tree.leftSubtree.get idxLeft := by
+  match tree with
+  | InternalData.internal _ left _ =>
+    rfl
+
+@[simp]
+theorem InternalData.get_ofRight {s_left s_right : Skeleton} {α}
+    (tree : InternalData α (Skeleton.internal s_left s_right))
+    (idxRight : SkeletonInternalIndex s_right) :
+    tree.get (SkeletonInternalIndex.ofRight idxRight) =
+      tree.rightSubtree.get idxRight := by
+  match tree with
+  | InternalData.internal _ _ right =>
+    rfl
+
+@[simp]
+theorem InternalData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
+    (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
+    (idxLeft : SkeletonInternalIndex s_left) :
+    (InternalData.internal value left right).get (SkeletonInternalIndex.ofLeft idxLeft) =
+      left.get idxLeft := by
+  rfl
+
+@[simp]
+theorem InternalData.get_internal_ofRight {α} {s_left s_right : Skeleton}
+    (value : α) (left : InternalData α s_left) (right : InternalData α s_right)
+    (idxRight : SkeletonInternalIndex s_right) :
+    (InternalData.internal value left right).get (SkeletonInternalIndex.ofRight idxRight) =
+      right.get idxRight := by
+  rfl
+
+@[simp]
+theorem FullData.get_internal {α} {s_left s_right : Skeleton}
+    (value : α) (left : FullData α s_left) (right : FullData α s_right) :
+    (FullData.internal value left right).get SkeletonNodeIndex.ofInternal = value := by
+  rfl
+
+@[simp]
+theorem FullData.get_ofLeft {s_left s_right : Skeleton} {α}
+    (tree : FullData α (Skeleton.internal s_left s_right))
+    (idxLeft : SkeletonNodeIndex s_left) :
+    tree.get (SkeletonNodeIndex.ofLeft idxLeft) =
+      tree.leftSubtree.get idxLeft := by
+  match tree with
+  | FullData.internal _ left _ =>
+    rfl
+
+@[simp]
+theorem FullData.get_ofRight {s_left s_right : Skeleton} {α}
+    (tree : FullData α (Skeleton.internal s_left s_right))
+    (idxRight : SkeletonNodeIndex s_right) :
+    tree.get (SkeletonNodeIndex.ofRight idxRight) =
+      tree.rightSubtree.get idxRight := by
+  match tree with
+  | FullData.internal _ _ right =>
+    rfl
+
+@[simp]
+theorem FullData.get_internal_ofLeft {α} {s_left s_right : Skeleton}
+    (value : α) (left : FullData α s_left) (right : FullData α s_right)
+    (idxLeft : SkeletonNodeIndex s_left) :
+    (FullData.internal value left right).get (SkeletonNodeIndex.ofLeft idxLeft) =
+      left.get idxLeft := by
+  rfl
+
+@[simp]
+theorem FullData.get_internal_ofRight {α} {s_left s_right : Skeleton}
+    (value : α) (left : FullData α s_left) (right : FullData α s_right)
+    (idxRight : SkeletonNodeIndex s_right) :
+    (FullData.internal value left right).get (SkeletonNodeIndex.ofRight idxRight) =
+      right.get idxRight := by
+  rfl
+
 end get
 
 section forget
@@ -368,6 +458,7 @@ theorem FullData.toLeafData_leaf {α} (a : α) :
     (FullData.leaf a).toLeafData = LeafData.leaf a := by
   rfl
 
+@[simp]
 theorem FullData.toLeafData_leftSubtree {α} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     tree.toLeafData.leftSubtree =
@@ -376,6 +467,7 @@ theorem FullData.toLeafData_leftSubtree {α} {s_left s_right : Skeleton}
   | FullData.internal _ left _right =>
     rfl
 
+@[simp]
 theorem FullData.toLeafData_rightSubtree {α} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     tree.toLeafData.rightSubtree =
@@ -384,7 +476,7 @@ theorem FullData.toLeafData_rightSubtree {α} {s_left s_right : Skeleton}
   | FullData.internal _ _left right =>
     rfl
 
-theorem FullData.toLeafData_eq_leaf {α} (a : α) (tree)
+theorem FullData.toLeafData_eq_leaf {α} (a : α) (tree : FullData α Skeleton.leaf)
     (h : LeafData.leaf a = tree.toLeafData) :
     tree = FullData.leaf a := by
   cases tree with
@@ -485,7 +577,7 @@ def SkeletonNodeIndex.sibling {s : Skeleton} (idx : SkeletonNodeIndex s) :
     match idxLeft with
     -- If idx is a leaf, then its sibling is the root of the right subtree
     | SkeletonNodeIndex.ofLeaf => some (getRootIndex right).ofRight
-    -- If idx is an internal node, then its sibling is the root of the left subtree
+    -- If idx is an internal node, then its sibling is the root of the right subtree
     | SkeletonNodeIndex.ofInternal => some (getRootIndex right).ofRight
     -- If idx is in the left subtree of the left subtree,
     -- we can find its sibling by considering only the left subtree
@@ -567,6 +659,7 @@ end Paths
 section map
 
 
+/-- Apply a function to every value stored in a `LeafData`. -/
 def LeafData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : LeafData α s) : LeafData β s :=
   match tree with
@@ -574,6 +667,7 @@ def LeafData.map {α β : Type _} (f : α → β) {s : Skeleton}
   | LeafData.internal left right =>
     LeafData.internal (left.map f) (right.map f)
 
+/-- Apply a function to every value stored in an `InternalData`. -/
 def InternalData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : InternalData α s) : InternalData β s :=
   match tree with
@@ -581,6 +675,7 @@ def InternalData.map {α β : Type _} (f : α → β) {s : Skeleton}
   | InternalData.internal value left right =>
     InternalData.internal (f value) (left.map f) (right.map f)
 
+/-- Apply a function to every value stored in a `FullData`. -/
 def FullData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : FullData α s) : FullData β s :=
   match tree with
@@ -616,10 +711,7 @@ theorem LeafData.map_internal {α β} {s_left s_right : Skeleton}
 theorem FullData.map_getRootValue {α β : Type _} {s : Skeleton}
     (f : α → β) (tree : FullData α s) :
     (tree.map f).getRootValue = f (tree.getRootValue) := by
-  match tree with
-  | FullData.leaf value => rfl
-  | FullData.internal value left right =>
-    rfl
+  cases tree <;> rfl
 
 end map
 
@@ -631,25 +723,28 @@ section ComposeBuild
 This section contains theorems about building full trees from leaf trees.
 -/
 
+/-- Build a `FullData` tree by hashing together the roots of child subtrees. -/
 def LeafData.composeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → α) :
     FullData α s :=
-  match s, leaf_data_tree with
-  | Skeleton.leaf, LeafData.leaf value =>
-    FullData.leaf value
-  | Skeleton.internal _ _, LeafData.internal left right =>
-    let left_tree := LeafData.composeBuild left compose
-    let right_tree := LeafData.composeBuild right compose
-    FullData.internal
-      (compose left_tree.getRootValue right_tree.getRootValue)
-      left_tree
-      right_tree
+  match leaf_data_tree with
+  | .leaf value =>
+    .leaf value
+  | .internal left right =>
+    let leftTree := left.composeBuild compose
+    let rightTree := right.composeBuild compose
+    .internal
+      (compose leftTree.getRootValue rightTree.getRootValue)
+      leftTree
+      rightTree
 
+@[simp]
 theorem LeafData.composeBuild_leaf {α} (a : α)
     (compose : α → α → α) :
     (LeafData.leaf a).composeBuild compose = FullData.leaf a := by
   rfl
 
+@[simp]
 theorem LeafData.composeBuild_internal {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
@@ -660,6 +755,7 @@ theorem LeafData.composeBuild_internal {α} {s_left s_right : Skeleton}
         (right.composeBuild compose) := by
   rfl
 
+@[simp]
 theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
@@ -668,6 +764,7 @@ theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
         (right.composeBuild compose).getRootValue := by
   rfl
 
+/-- Lift a binary function through two `Option` arguments. -/
 def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
     (x : Option α) (y : Option β) : Option γ :=
   match x, y with
@@ -675,6 +772,7 @@ def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
   | _, none => none
   | some a, some b => f a b
 
+/-- Build a tree while allowing failures in the composition function. -/
 def LeafData.optionComposeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → Option α) :
     FullData (Option α) s :=

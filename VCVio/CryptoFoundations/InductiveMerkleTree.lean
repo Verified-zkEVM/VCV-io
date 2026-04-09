@@ -95,25 +95,26 @@ A functional form of merkle tree construction, that doesn't depend on the monad.
 This receives an explicit hash function
 -/
 @[simp, grind]
-def buildMerkleTree_with_hash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
+def buildMerkleTreeWithHash {s} (leaf_tree : LeafData α s) (hashFn : α → α → α) :
     (FullData α s) :=
   match leaf_tree with
   | LeafData.leaf a => FullData.leaf a
   | LeafData.internal left right =>
-    let leftTree := buildMerkleTree_with_hash left hashFn
-    let rightTree := buildMerkleTree_with_hash right hashFn
+    let leftTree := buildMerkleTreeWithHash left hashFn
+    let rightTree := buildMerkleTreeWithHash right hashFn
     let rootHash := hashFn (leftTree.getRootValue) (rightTree.getRootValue)
     FullData.internal rootHash leftTree rightTree
 
 /--
 Running the monadic version of `buildMerkleTree` with an oracle function `f`
-is equivalent to running the functional version of `buildMerkleTree_with_hash`
+is equivalent to running the functional version of `buildMerkleTreeWithHash`
 with the same oracle function.
 -/
+@[simp, grind =]
 lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s)
     (f : QueryImpl (spec α) Id) :
     simulateQ f (buildMerkleTree leaf_data_tree)
-    = buildMerkleTree_with_hash leaf_data_tree fun (left right : α) =>
+    = buildMerkleTreeWithHash leaf_data_tree fun (left right : α) =>
       (f ⟨left, right⟩) := by
   induction s with
   | leaf =>
@@ -123,8 +124,8 @@ lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s)
   | internal s_left s_right left_ih right_ih =>
     match leaf_data_tree with
     | LeafData.internal left right =>
-      simp only [buildMerkleTree, buildMerkleTree_with_hash, singleHash,
-        simulateQ_bind, simulateQ_pure] at left_ih right_ih ⊢
+      simp only [buildMerkleTree, buildMerkleTreeWithHash, singleHash,
+        simulateQ_bind, simulateQ_pure]
       rw [left_ih left, right_ih right]; rfl
 
 /--
@@ -170,34 +171,35 @@ It receives an explicit hash function `hashFn` that combines two hashes into one
 And recursively calls itself down the tree.
 -/
 @[simp, grind]
-def getPutativeRoot_with_hash {s} :
+def getPutativeRootWithHash {s} :
     (idx : BinaryTree.SkeletonLeafIndex s) → (leafValue : α) →
       List.Vector α idx.depth → (hashFn : α → α → α) → α
   | BinaryTree.SkeletonLeafIndex.ofLeaf, leafValue, _, _ =>
       leafValue
   | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft, leafValue, proof, hashFn =>
-      hashFn (getPutativeRoot_with_hash idxLeft leafValue proof.tail hashFn) proof.head
+      hashFn (getPutativeRootWithHash idxLeft leafValue proof.tail hashFn) proof.head
   | BinaryTree.SkeletonLeafIndex.ofRight idxRight, leafValue, proof, hashFn =>
-      hashFn proof.head (getPutativeRoot_with_hash idxRight leafValue proof.tail hashFn)
+      hashFn proof.head (getPutativeRootWithHash idxRight leafValue proof.tail hashFn)
 
 /--
 Running the monadic version of `getPutativeRoot` with an oracle function `f`,
-it is equivalent to running the functional version of `getPutativeRoot_with_hash`
+it is equivalent to running the functional version of `getPutativeRootWithHash`
 -/
+@[simp, grind =]
 lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
     (leafValue : α) (proof : List.Vector α idx.depth) (f : QueryImpl (spec α) Id) :
     simulateQ f (getPutativeRoot idx leafValue proof)
       =
-    getPutativeRoot_with_hash idx leafValue proof fun (left right : α) => (f ⟨left, right⟩) := by
+    getPutativeRootWithHash idx leafValue proof fun (left right : α) => (f ⟨left, right⟩) := by
   induction idx generalizing leafValue with
   | ofLeaf =>
       rfl
   | ofLeft idxLeft ih =>
-      simp only [getPutativeRoot, getPutativeRoot_with_hash, singleHash, simulateQ_bind]
+      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash, simulateQ_bind]
       rw [ih]
       rfl
   | ofRight idxRight ih =>
-      simp only [getPutativeRoot, getPutativeRoot_with_hash, singleHash, simulateQ_bind]
+      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash, simulateQ_bind]
       rw [ih]
       rfl
 
@@ -208,7 +210,7 @@ Works by computing the putative root based on the branch, and comparing that to 
 Outputs `failure` if the proof is invalid.
 -/
 @[simp, grind]
-def verifyProof {α} [DecidableEq α] {s}
+def verifyProof [DecidableEq α] {s}
     (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
     (proof : List.Vector α idx.depth) : OptionT (OracleComp (spec α)) Unit := do
   let putative_root ← getPutativeRoot idx leafValue proof
@@ -216,35 +218,34 @@ def verifyProof {α} [DecidableEq α] {s}
 
 /--
 A functional form of the completeness theorem for Merkle trees.
-This references the functional versions of `getPutativeRoot` and `buildMerkleTree_with_hash`
+This references the functional versions of `getPutativeRoot` and `buildMerkleTreeWithHash`
 -/
 @[simp, grind]
-theorem functional_completeness (α : Type) {s : Skeleton}
+theorem functional_completeness {s : Skeleton}
   (idx : SkeletonLeafIndex s)
   (leaf_data_tree : LeafData α s)
   (hash : α → α → α) :
-  (getPutativeRoot_with_hash
+  getPutativeRootWithHash
     idx
     (leaf_data_tree.get idx)
-    (generateProof
-      (buildMerkleTree_with_hash leaf_data_tree hash) idx)
-    (hash)) =
-  (buildMerkleTree_with_hash leaf_data_tree hash).getRootValue := by
+    (generateProof (buildMerkleTreeWithHash leaf_data_tree hash) idx)
+    hash =
+  (buildMerkleTreeWithHash leaf_data_tree hash).getRootValue := by
   induction idx with
   | ofLeaf =>
       cases leaf_data_tree with
       | leaf a =>
-          simp [buildMerkleTree_with_hash, getPutativeRoot_with_hash]
+          simp [buildMerkleTreeWithHash, getPutativeRootWithHash]
   | ofLeft idxLeft ih =>
       cases leaf_data_tree with
       | internal left right =>
-          simp [LeafData.get_ofLeft, buildMerkleTree_with_hash, generateProof,
-            getPutativeRoot_with_hash, ih, FullData.internal_getRootValue]
+          simp [LeafData.get_ofLeft, buildMerkleTreeWithHash, generateProof,
+            getPutativeRootWithHash, ih, FullData.internal_getRootValue]
   | ofRight idxRight ih =>
       cases leaf_data_tree with
       | internal left right =>
-          simp [LeafData.get_ofRight, buildMerkleTree_with_hash, generateProof,
-            getPutativeRoot_with_hash, ih, FullData.internal_getRootValue]
+          simp [LeafData.get_ofRight, buildMerkleTreeWithHash, generateProof,
+            getPutativeRootWithHash, ih, FullData.internal_getRootValue]
 
 
 /--
