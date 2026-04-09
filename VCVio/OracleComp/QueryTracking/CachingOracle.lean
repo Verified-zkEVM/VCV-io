@@ -120,3 +120,31 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
 end cachingOracle
+
+namespace OracleComp
+
+variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+
+/-- `simulateQ cachingOracle` only grows the cache: for any `oa`, if
+`z ∈ support ((simulateQ cachingOracle oa).run cache₀)` then `cache₀ ≤ z.2`. -/
+theorem simulateQ_cachingOracle_cache_le {α : Type u}
+    (oa : OracleComp spec α) (cache₀ : QueryCache spec)
+    (z : α × QueryCache spec)
+    (hmem : z ∈ support ((simulateQ cachingOracle oa).run cache₀)) :
+    cache₀ ≤ z.2 := by
+  induction oa using OracleComp.inductionOn generalizing cache₀ z with
+  | pure a =>
+      simp [simulateQ_pure, StateT.run] at hmem
+      rw [hmem]
+  | query_bind t mx ih =>
+      simp only [simulateQ_query_bind, StateT.run_bind] at hmem
+      rw [support_bind] at hmem
+      simp only [Set.mem_iUnion] at hmem
+      obtain ⟨⟨u, cache_mid⟩, hmid, hrest⟩ := hmem
+      have hle_mid : cache₀ ≤ cache_mid := by
+        simp only [liftM, MonadLiftT.monadLift] at hmid
+        unfold cachingOracle at hmid
+        exact QueryImpl.withCaching_cache_le _ _ cache₀ _ hmid
+      exact le_trans hle_mid (ih _ cache_mid z hrest)
+
+end OracleComp

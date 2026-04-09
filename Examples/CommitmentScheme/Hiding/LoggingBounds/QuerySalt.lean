@@ -5,6 +5,14 @@ Authors: James Waters
 -/
 import Examples.CommitmentScheme.Hiding.LoggingBounds.Average
 
+/-!
+# Query-Salt Logging Bounds
+
+Bounds on the probability that the adversary's salt-specific query count
+exceeds a threshold, obtained via counting-oracle projections and
+indicator function analysis. These feed into the averaged hiding bound.
+-/
+
 open OracleSpec OracleComp ENNReal
 
 variable {M S C : Type}

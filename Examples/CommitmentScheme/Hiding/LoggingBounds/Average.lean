@@ -11,12 +11,17 @@ variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]
   [Inhabited M] [Inhabited S] [Inhabited C]
+/-- Combined query implementation for the averaged hiding experiment,
+merging the left (uniform-salt) and right (commitment oracle) implementations. -/
 def hidingAvgQueryImpl :
     QueryImpl (HidingAvgSpec M S C)
       (StateT (HidingCountState M S C) (OracleComp (HidingAvgSpec M S C))) :=
   hidingAvgLeftImpl (M := M) (S := S) (C := C) +
     hidingAvgRightImpl (M := M) (S := S) (C := C)
 
+/-- The averaged hiding computation: sample a uniform salt `s`, then run the
+adversary's oracle computation for that salt. Returns `(s, b)` where `b` is the
+adversary's guess bit. -/
 def hidingAvgComp {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp (HidingAvgSpec M S C) (S × Bool) := do
@@ -326,28 +331,14 @@ theorem hidingImpl_agree (s : S) (ms : M × S)
       simp [this]
     rw [hcnt]
 
-/-- Bad is monotone for `hidingImpl₁`: once the counter reaches 2, it stays ≥ 2. -/
-theorem hidingImpl₁_bad_mono (s : S) (ms : M × S)
-    (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
-    (x : C × (QueryCache (CMOracle M S C) × ℕ))
-    (hx : x ∈ support ((hidingImpl₁ s ms).run st)) :
-    hidingBad x.2 := by
-  simp only [hidingBad] at h ⊢
-  obtain ⟨cache, cnt⟩ := st
-  simp only [hidingImpl₁, StateT.run_bind, StateT.run_get, pure_bind] at hx
-  cases hcache : cache ms with
-  | some u =>
-    simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]; exact h
-  | none =>
-    simp only [hcache, StateT.run_bind] at hx
-    rw [mem_support_bind_iff] at hx
-    obtain ⟨u, _, hx⟩ := hx
-    simp only [StateT.run_set, StateT.run_pure, pure_bind,
-      support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    simp only [Prod.snd]
-    split <;> omega
+omit [DecidableEq M] [DecidableEq S] [DecidableEq C]
+  [Fintype M] [Fintype S] [Fintype C]
+  [Inhabited M] [Inhabited S] [Inhabited C] in
+/-- `hidingBad` is upward-closed in the counter component. -/
+private lemma hidingBad_of_counter_le
+    {st₁ st₂ : QueryCache (CMOracle M S C) × ℕ}
+    (h : hidingBad st₁) (hle : st₁.2 ≤ st₂.2) : hidingBad st₂ := by
+  simp only [hidingBad] at h ⊢; omega
 
 /-- One-step counter growth bound for `hidingImpl₁`:
 the salt counter is monotone and increases by at most one. -/
@@ -373,28 +364,13 @@ theorem hidingImpl₁_counter_le_succ (s : S) (ms : M × S)
     simp only [Prod.snd]
     split <;> omega
 
-/-- Bad is monotone for `hidingImpl₂`: once the counter reaches 2, it stays ≥ 2. -/
-theorem hidingImpl₂_bad_mono (s : S) (ms : M × S)
+/-- Bad is monotone for `hidingImpl₁`: once the counter reaches 2, it stays ≥ 2. -/
+theorem hidingImpl₁_bad_mono (s : S) (ms : M × S)
     (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
     (x : C × (QueryCache (CMOracle M S C) × ℕ))
-    (hx : x ∈ support ((hidingImpl₂ s ms).run st)) :
-    hidingBad x.2 := by
-  simp only [hidingBad] at h ⊢
-  obtain ⟨cache, cnt⟩ := st
-  simp only [hidingImpl₂, StateT.run_bind, StateT.run_get, pure_bind] at hx
-  cases hcache : cache ms with
-  | some u =>
-    simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]; exact h
-  | none =>
-    simp only [hcache, StateT.run_bind] at hx
-    rw [mem_support_bind_iff] at hx
-    obtain ⟨u, _, hx⟩ := hx
-    simp only [StateT.run_set, StateT.run_pure, pure_bind,
-      support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]
-    simp only [Prod.snd]
-    split <;> omega
+    (hx : x ∈ support ((hidingImpl₁ s ms).run st)) :
+    hidingBad x.2 :=
+  hidingBad_of_counter_le h (hidingImpl₁_counter_le_succ s ms st x hx).1
 
 /-! ### Distributional agreement via `hidingImplSim`
 
@@ -409,19 +385,21 @@ The proof uses `hidingImplSim`, which redirects all salt-`s` cache misses to
 
 The `Pr[bad] ≤ t/|S|` bound requires `s` to be uniformly random (see below). -/
 
-/-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
-theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
-    (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
+/-- One-step counter growth bound for `hidingImplSim`:
+the salt counter is monotone and increases by at most one. -/
+theorem hidingImplSim_counter_le_succ (s : S) (ms : M × S)
+    (st : QueryCache (CMOracle M S C) × ℕ)
     (x : C × (QueryCache (CMOracle M S C) × ℕ))
     (hx : x ∈ support ((hidingImplSim s ms).run st)) :
-    hidingBad x.2 := by
-  simp only [hidingBad] at h ⊢
+    st.2 ≤ x.2.2 ∧ x.2.2 ≤ st.2 + 1 := by
   obtain ⟨cache, cnt⟩ := st
   simp only [hidingImplSim, StateT.run_bind, StateT.run_get, pure_bind] at hx
   cases hcache : cache ms with
   | some u =>
     simp only [hcache, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hx
-    rw [hx]; exact h
+    rw [hx]
+    exact ⟨Nat.le_refl _, Nat.le_succ _⟩
   | none =>
     simp only [hcache, StateT.run_bind] at hx
     rw [mem_support_bind_iff] at hx
@@ -431,6 +409,14 @@ theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
     rw [hx]
     simp only [Prod.snd]
     split <;> omega
+
+/-- Bad is monotone for `hidingImplSim`: once cnt ≥ 2, it stays ≥ 2. -/
+theorem hidingImplSim_bad_mono (s : S) (ms : M × S)
+    (st : QueryCache (CMOracle M S C) × ℕ) (h : hidingBad st)
+    (x : C × (QueryCache (CMOracle M S C) × ℕ))
+    (hx : x ∈ support ((hidingImplSim s ms).run st)) :
+    hidingBad x.2 :=
+  hidingBad_of_counter_le h (hidingImplSim_counter_le_succ s ms st x hx).1
 
 /-- `hidingImpl₁` and `hidingImplSim` agree **distributionally** when `¬bad`.
 

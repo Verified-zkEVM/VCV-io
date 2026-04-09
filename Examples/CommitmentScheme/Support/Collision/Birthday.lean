@@ -34,7 +34,7 @@ Proof by structural induction on the computation. For `query t >>= mx`:
 - The log is `[⟨t, u⟩] ++ sub_log` where `u` is uniform from `Range t`.
 - For k = 0: the event is `⟨t, u⟩ = entry`, bounded by `Pr[= v | query t] = 1/|Range t|`.
 - For k > 0: the event is `sub_log[k-1]? = entry`, bounded by the inductive hypothesis. -/
-private theorem probEvent_log_entry_eq_le {α : Type}
+theorem probEvent_log_entry_eq_le {α : Type}
     (oa : OracleComp spec α)
     (k : ℕ) (entry : (t : spec.Domain) × spec.Range t) :
     Pr[fun z => z.2[k]? = some entry |
@@ -126,7 +126,7 @@ is minimal across all oracle indices.
 
 This is a corollary of `probEvent_log_entry_eq_le` (which gives `1/|Range entry.1|`) combined
 with the `hrange` monotonicity hypothesis. -/
-private theorem probEvent_log_output_heq_le {α : Type}
+theorem probEvent_log_output_heq_le {α : Type}
     [Inhabited ι]
     (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t))
     (oa : OracleComp spec α)
@@ -142,7 +142,7 @@ Unlike `probEvent_log_entry_eq_le` which matches the full sigma entry, this only
 the output component. The bound uses `hrange` to get `1/|Range default|`.
 
 Proof by structural induction on the computation, same shape as `probEvent_log_entry_eq_le`. -/
-private theorem probEvent_log_output_match_le {α : Type}
+theorem probEvent_log_output_match_le {α : Type}
     [Inhabited ι]
     (hrange : ∀ t, Fintype.card (spec.Range default) ≤ Fintype.card (spec.Range t))
     (oa : OracleComp spec α)
@@ -403,60 +403,8 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
           (C : ℝ≥0∞)⁻¹ := by
         -- Step A: Log length ≤ n for elements in support
         have hlog_le : ∀ z ∈ support ((simulateQ loggingOracle oa).run),
-            z.2.length ≤ n := by
-          -- By induction on oa: pure gives empty log, query_bind appends one entry
-          suffices h : ∀ (β : Type) (ob : OracleComp spec β) (m : ℕ),
-              IsTotalQueryBound ob m → ∀ z ∈ support ((simulateQ loggingOracle ob).run),
-              z.2.length ≤ m from h α oa n hbound
-          intro β ob m hm
-          induction ob using OracleComp.inductionOn generalizing m with
-          | pure x =>
-            intro z hz
-            simp [simulateQ_pure] at hz
-            subst hz; simp
-          | query_bind t mx ih =>
-            intro z hz
-            rw [isTotalQueryBound_query_bind_iff] at hm
-            obtain ⟨hpos, hrest⟩ := hm
-            simp only [simulateQ_bind, simulateQ_query] at hz
-            rw [show ((query t).cont <$> loggingOracle (query t).input >>=
-              fun x => simulateQ loggingOracle (mx x) :
-              WriterT (QueryLog spec) (OracleComp spec) β).run =
-              ((query t).cont <$> loggingOracle (query t).input).run >>=
-              fun p => Prod.map id (p.2 ++ ·) <$>
-                (simulateQ loggingOracle (mx p.1)).run
-              from WriterT.run_bind' _ _] at hz
-            rw [support_bind] at hz
-            simp only [Set.mem_iUnion] at hz
-            obtain ⟨qu, hqu, hz⟩ := hz
-            rw [support_map] at hz
-            obtain ⟨z', hz', rfl⟩ := hz
-            simp only [Prod.map]
-            -- The log is qu.2 ++ z'.2
-            show (qu.2 ++ z'.2).length ≤ m
-            -- Analyze the query step to get qu.2.length = 1
-            have hqu_log : qu.2.length = 1 := by
-              -- The query oracle step maps (loggingOracle t).run through (query t).cont = id
-              simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query] at hqu
-              -- (loggingOracle t).run = liftM (query t) >>= fun u => pure (u, [⟨t, u⟩])
-              -- via the WriterT unfolding
-              have hrun : (loggingOracle (spec := spec) t).run =
-                  (query t : OracleComp spec _) >>= fun u =>
-                    pure (u, [⟨t, u⟩]) := by
-                simp [loggingOracle, QueryImpl.withLogging_apply,
-                  WriterT.run_bind', WriterT.run_monadLift', WriterT.run_tell,
-                  map_pure, Prod.map]
-              rw [hrun] at hqu
-              simp only [support_bind, support_pure, Set.mem_iUnion,
-                Set.mem_singleton_iff] at hqu
-              obtain ⟨u, _, rfl⟩ := hqu
-              simp
-            -- Bound continuation log length by IH
-            have hz'_len : z'.2.length ≤ m - 1 :=
-              ih qu.1 (m - 1) (hrest qu.1) z' hz'
-            -- Combine: qu.2 ++ z'.2 has length ≤ 1 + (m-1) = m
-            simp only [List.length_append]
-            omega
+            z.2.length ≤ n :=
+          fun z hz => log_length_le_of_mem_support_run_simulateQ hbound hz
         -- Step B: Define the per-pair collision event (matching probEvent_pair_collision_le)
         let E : Fin n × Fin n → α × QueryLog spec → Prop := fun ij z =>
           z.2.length > ij.1.val ∧ z.2.length > ij.2.val ∧

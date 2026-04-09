@@ -254,27 +254,6 @@ private lemma extractability_someWin_le_collision {t : ℕ}
   probEvent_mono fun z hz ⟨hwin, hsome⟩ =>
     extractability_someWin_implies_collision A z hz hwin hsome
 
-/-- Arithmetic: `a/(2C) + b/C = (a + 2b)/(2C)`. -/
-private lemma add_div_two_card
-    (a b : ℕ) :
-    ((a : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) +
-      ((b : ℕ) : ℝ≥0∞) * (Fintype.card C : ℝ≥0∞)⁻¹ =
-    ((a + 2 * b : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
-  set D := (2 * (Fintype.card C : ℝ≥0∞))
-  rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
-  rw [mul_comm (((b : ℕ) : ℝ≥0∞)) ((Fintype.card C : ℝ≥0∞)⁻¹)]
-  have hD_inv : (Fintype.card C : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
-    simp only [D]
-    rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
-      mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
-      ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
-        (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
-  rw [hD_inv, mul_assoc, ← mul_add]
-  congr 1
-  push_cast
-  ring
-
 /-- Textbook arithmetic: if `t₁ + t₂ ≤ t` and `t ≥ 3`, then
 `t₁(t₁-1) + 2t₂ ≤ t(t-1)`. -/
 private lemma extractability_num_le
@@ -407,7 +386,22 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
       rw [hcache_final_eq]
       exact ⟨(m, s), c, hcache₃, hcache₁_none, heq_of_eq hc_eq⟩
 
-set_option maxHeartbeats 1000000 in
+/-- Winning the extractability rest-game implies a fresh cache entry matching `cm`. -/
+private lemma extractability_rest_win_le_exists_fresh {t : ℕ}
+    (A : ExtractAdversary M S C AUX t)
+    (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C))
+    (cache₁ : QueryCache (CMOracle M S C))
+    (hx : (((cm, aux), tr), cache₁) ∈
+      support ((simulateQ cachingOracle ((simulateQ loggingOracle A.commit).run)).run ∅))
+    (hno : ¬ CacheHasCollision cache₁) :
+    Pr[fun z => z.1 = true |
+      (simulateQ cachingOracle (extractabilityRestOa A cm aux tr)).run cache₁] ≤
+    Pr[fun z => ∃ t₀ : (CMOracle M S C).Domain, ∃ v : (CMOracle M S C).Range t₀,
+          z.2 t₀ = some v ∧ cache₁ t₀ = none ∧ HEq v cm |
+        (simulateQ cachingOracle (extractabilityRestOa A cm aux tr)).run cache₁] :=
+  probEvent_mono fun z hz hwin =>
+    extractability_rest_win_implies_fresh_cm A hx hno z hz hwin
+
 /-- Conditioned on a collision-free commit trace, the later extractability failure
 probability is bounded by the fresh-hit term `(t₂ + 1) / |C|`. -/
 private lemma extractability_rest_noCollision_le_inv {t : ℕ}
@@ -431,10 +425,8 @@ private lemma extractability_rest_noCollision_le_inv {t : ℕ}
       (simulateQ cachingOracle (extractabilityRestOa A cm aux tr)).run cache₁]
       ≤ Pr[fun z => ∃ t₀ : (CMOracle M S C).Domain, ∃ v : (CMOracle M S C).Range t₀,
             z.2 t₀ = some v ∧ cache₁ t₀ = none ∧ HEq v cm |
-          (simulateQ cachingOracle (extractabilityRestOa A cm aux tr)).run cache₁] := by
-          apply probEvent_mono
-          intro z hz hwin
-          exact extractability_rest_win_implies_fresh_cm A hx hno z hz hwin
+          (simulateQ cachingOracle (extractabilityRestOa A cm aux tr)).run cache₁] :=
+          extractability_rest_win_le_exists_fresh A cm aux tr cache₁ hx hno
     _ ≤ (↑(A.t₂ + 1) : ℝ≥0∞) * (Fintype.card C : ℝ≥0∞)⁻¹ :=
       OracleComp.probEvent_cache_has_value_le_of_noCollision
         (oa := extractabilityRestOa A cm aux tr)
@@ -515,16 +507,6 @@ theorem extractability_bound {t : ℕ} (ht : 3 ≤ t)
       ≤ ((t * (t - 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) +
         (Fintype.card C : ℝ≥0∞)⁻¹ := extractability_win_le_textbook_bound ht A
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
-        set D := (2 * (Fintype.card C : ℝ≥0∞))
-        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
-        have hD_inv : (Fintype.card C : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
-          simp only [D]
-          rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
-            mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
-            ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
-              (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
-        rw [hD_inv, ← mul_add]
-        congr 1
-        push_cast
-        ring
+        have h := add_div_two_card (C := C) (t * (t - 1)) 1
+        simp only [Nat.cast_one, one_mul, Nat.mul_one] at h
+        exact h

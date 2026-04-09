@@ -681,8 +681,9 @@ lemma wp_choose_sumCounts_le_queryBound
     _ = t := by
         rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul]
 
-/-- Every support point of the shared counted run is dominated by some exact-query
-support point of `countingOracle.simulate` on the same computation. -/
+/-- Every support point of `simulateQ hidingImplCountAll` is dominated by some
+`countingOracle.simulate` support point: the total count across all salts is
+bounded by the initial counts plus the counting oracle's total query cost. -/
 lemma exists_counting_support_of_mem_support_run_hidingImplCountAll
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {st₀ : QueryCache (CMOracle M S C) × (S → ℕ)}
@@ -731,6 +732,9 @@ lemma exists_counting_support_of_mem_support_run_hidingImplCountAll
       refine ⟨qc, hqc, ?_⟩
       omega
 
+/-- Per-coordinate variant of `exists_counting_support_of_mem_support_run_hidingImplCountAll`:
+for each salt `t`, the per-salt count `z.2.2 t` is bounded by the initial count
+plus the counting oracle's per-index query count at `t`. -/
 lemma exists_counting_support_of_mem_support_run_hidingImplCountAll_coord
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {st₀ : QueryCache (CMOracle M S C) × (S → ℕ)}

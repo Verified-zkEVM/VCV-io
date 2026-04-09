@@ -270,17 +270,5 @@ theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
         exact probEvent_cacheCollision_le_birthday_total_tight A.run t A.queryBound
           Fintype.card_pos (fun _ => le_refl _)
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
-        -- Arithmetic: a/(2C) + 1/C = a/(2C) + 2/(2C) = (a+2)/(2C)
-        set D := (2 * (Fintype.card C : ℝ≥0∞))
-        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
-        have hD_inv : (Fintype.card C : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
-          simp only [D]
-          rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
-            mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
-            ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
-              (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
-        rw [hD_inv, ← mul_add]
-        congr 1
-        push_cast
-        ring
+        simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+          add_div_two_card (C := C) (t * (t - 1)) 1

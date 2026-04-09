@@ -5,7 +5,7 @@ Authors: James Waters
 -/
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import Examples.CommitmentScheme.Support.QueryBound
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.EvalDist
 
 /-!
@@ -13,14 +13,6 @@ import VCVio.OracleComp.EvalDist
 
 Collision predicates, Gauss sum arithmetic, logging oracle decomposition,
 query bound preservation through `loggingOracle`, and cache monotonicity lemmas.
-
-## TODO: upstream candidates
-
-- `gauss_sum_inv_le`, `gauss_sum_inv_eq` → `VCVio/ToMathlib/` or `VCVio/Prelude/`
-- `IsTotalQueryBound.of_perIndex` → `VCVio/OracleComp/QueryTracking/`
-- `isTotalQueryBound_run_simulateQ_loggingOracle_iff` → `VCVio/OracleComp/QueryTracking/`
-- `log_length_le_of_mem_support_run_simulateQ` → `VCVio/OracleComp/QueryTracking/`
-- `simulateQ_cachingOracle_cache_le` → `VCVio/OracleComp/QueryTracking/`
 -/
 
 open OracleSpec OracleComp ENNReal Finset
@@ -110,113 +102,6 @@ lemma gauss_sum_inv_eq (n : ℕ) (N : ℝ≥0∞) :
           ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
             (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
         ring
-
-/-- Updating one index and summing gives sum minus one. -/
-/-- Per-index bound implies total bound (sum over indices). -/
-theorem IsTotalQueryBound.of_perIndex [Fintype ι] {α : Type}
-    {oa : OracleComp spec α} {qb : ι → ℕ}
-    (h : IsPerIndexQueryBound oa qb) :
-    IsTotalQueryBound oa (∑ i, qb i) := by
-  induction oa using OracleComp.inductionOn generalizing qb with
-  | pure _ => exact trivial
-  | query_bind t mx ih =>
-    rw [isPerIndexQueryBound_query_bind_iff] at h
-    rw [isTotalQueryBound_query_bind_iff]
-    have hpos : 0 < ∑ i, qb i :=
-      Nat.lt_of_lt_of_le h.1 (Finset.single_le_sum (fun i _ => Nat.zero_le _) (Finset.mem_univ t))
-    refine ⟨hpos, fun u => ?_⟩
-    rw [← sum_update_pred h.1]
-    exact ih u (h.2 u)
-
-/-! ## Logging Oracle Run Decomposition -/
-
-/-- When running `loggingOracle` on `query t >>= mx`, the result decomposes as:
-a uniform draw `u` from `Range t`, followed by prepending `⟨t, u⟩` to the sub-log. -/
-lemma run_simulateQ_loggingOracle_query_bind {α : Type}
-    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) :
-    (simulateQ loggingOracle (liftM (query t) >>= mx)).run =
-      (query t : OracleComp spec _) >>= fun u =>
-        (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
-          <$> (simulateQ loggingOracle (mx u)).run := by
-  simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
-    Prod.map, Function.id_def, Function.comp]
-
-/-! ## IsTotalQueryBound preservation through loggingOracle -/
-
-/-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of
-`(simulateQ loggingOracle oa).run` is identical to that of `oa` (each query passes through
-unchanged, with only the WriterT log being appended).
-
-Proof by structural induction on `oa`. The pure case is trivial; the query_bind case
-uses `run_simulateQ_loggingOracle_query_bind` to decompose, then `isQueryBound_map_iff`
-to strip the log-prepend map, and finally the inductive hypothesis. -/
-theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff {α : Type}
-    (oa : OracleComp spec α) (n : ℕ) :
-    IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔
-    IsTotalQueryBound oa n := by
-  induction oa using OracleComp.inductionOn generalizing n with
-  | pure x =>
-    constructor <;> intro _ <;> trivial
-  | query_bind t mx ih =>
-    rw [run_simulateQ_loggingOracle_query_bind]
-    rw [isTotalQueryBound_query_bind_iff, isTotalQueryBound_query_bind_iff]
-    exact and_congr_right fun _ => forall_congr' fun u =>
-      (isQueryBound_map_iff _ _ _ _ _).trans (ih u (n - 1))
-
-/-- A total query bound controls the length of every `loggingOracle` trace in support:
-if `oa` makes at most `n` queries, then every support point of
-`(simulateQ loggingOracle oa).run` has log length at most `n`. -/
-theorem log_length_le_of_mem_support_run_simulateQ {α : Type}
-    {oa : OracleComp spec α} {n : ℕ}
-    (hbound : IsTotalQueryBound oa n)
-    {z : α × QueryLog spec}
-    (hz : z ∈ support ((simulateQ loggingOracle oa).run)) :
-    z.2.length ≤ n := by
-  suffices h : ∀ (β : Type) (ob : OracleComp spec β) (m : ℕ),
-      IsTotalQueryBound ob m → ∀ z ∈ support ((simulateQ loggingOracle ob).run),
-      z.2.length ≤ m from
-    h α oa n hbound z hz
-  intro β ob m hm
-  induction ob using OracleComp.inductionOn generalizing m with
-  | pure x =>
-      intro z hz
-      simp [simulateQ_pure] at hz
-      subst hz
-      simp
-  | query_bind t mx ih =>
-      intro z hz
-      rw [isTotalQueryBound_query_bind_iff] at hm
-      obtain ⟨hpos, hrest⟩ := hm
-      simp only [simulateQ_bind, simulateQ_query] at hz
-      rw [show ((query t).cont <$> loggingOracle (query t).input >>=
-        fun x => simulateQ loggingOracle (mx x) :
-        WriterT (QueryLog spec) (OracleComp spec) β).run =
-        ((query t).cont <$> loggingOracle (query t).input).run >>=
-        fun p => Prod.map id (p.2 ++ ·) <$>
-          (simulateQ loggingOracle (mx p.1)).run
-        from WriterT.run_bind' _ _] at hz
-      rw [support_bind] at hz
-      simp only [Set.mem_iUnion] at hz
-      obtain ⟨qu, hqu, hz⟩ := hz
-      rw [support_map] at hz
-      obtain ⟨z', hz', rfl⟩ := hz
-      have hqu_log : qu.2.length = 1 := by
-        simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query] at hqu
-        have hrun : (loggingOracle (spec := spec) t).run =
-            (query t : OracleComp spec _) >>= fun u =>
-              pure (u, [⟨t, u⟩]) := by
-          simp [loggingOracle, QueryImpl.withLogging_apply,
-            WriterT.run_bind', WriterT.run_monadLift', WriterT.run_tell,
-            map_pure, Prod.map]
-        rw [hrun] at hqu
-        simp only [support_bind, support_pure, Set.mem_iUnion,
-          Set.mem_singleton_iff] at hqu
-        obtain ⟨u, _, rfl⟩ := hqu
-        simp
-      have hz'_len : z'.2.length ≤ m - 1 :=
-        ih qu.1 (m - 1) (hrest qu.1) z' hz'
-      have hm : 1 + (m - 1) = m := by omega
-      simpa [List.length_append, hqu_log, hm] using Nat.add_le_add_left hz'_len 1
 
 /-! ## Log entries are cached after logging inside caching -/
 
@@ -483,29 +368,5 @@ theorem cache_entry_in_log_or_initial {α : Type}
         rw [hcache_mid_eq t₀ ht₀] at h_in_mid
         exact Or.inl h_in_mid
     · exact Or.inr ⟨entry, List.Mem.tail _ hentry, hentry_eq, hentry_heq⟩
-
-/-- `simulateQ cachingOracle` only grows the cache: for any `oa`, if
-`z ∈ support ((simulateQ cachingOracle oa).run cache₀)` then `cache₀ ≤ z.2`. -/
-theorem simulateQ_cachingOracle_cache_le {α : Type}
-    (oa : OracleComp spec α) (cache₀ : QueryCache spec)
-    (z : α × QueryCache spec)
-    (hmem : z ∈ support ((simulateQ cachingOracle oa).run cache₀)) :
-    cache₀ ≤ z.2 := by
-  induction oa using OracleComp.inductionOn generalizing cache₀ z with
-  | pure a =>
-    simp [simulateQ_pure, StateT.run] at hmem
-    rw [hmem]
-  | query_bind t mx ih =>
-    simp only [simulateQ_query_bind, StateT.run_bind] at hmem
-    rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
-    obtain ⟨⟨u, cache_mid⟩, hmid, hrest⟩ := hmem
-    have hle_mid : cache₀ ≤ cache_mid := by
-      -- The first step is (liftM (cachingOracle t)).run cache₀
-      -- which is cachingOracle applied at t — cache only grows
-      simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift,
-        StateT.run_bind, StateT.run_get, pure_bind] at hmid
-      unfold cachingOracle at hmid
-      exact QueryImpl.withCaching_cache_le _ _ cache₀ _ hmid
-    exact le_trans hle_mid (ih _ cache_mid z hrest)
 
 end OracleComp

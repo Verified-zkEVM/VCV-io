@@ -138,3 +138,25 @@ lemma probEvent_from_fresh_query_le_inv
           simp [hu]
     _ = (Fintype.card C : ℝ≥0∞)⁻¹ := by
         rw [tsum_ite_eq target]
+
+omit [DecidableEq C] [Inhabited C] in
+/-- Arithmetic: `a/(2C) + b/C = (a + 2b)/(2C)`. -/
+lemma add_div_two_card
+    (a b : ℕ) :
+    ((a : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) +
+      ((b : ℕ) : ℝ≥0∞) * (Fintype.card C : ℝ≥0∞)⁻¹ =
+    ((a + 2 * b : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
+  set D := (2 * (Fintype.card C : ℝ≥0∞))
+  rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
+  rw [mul_comm (((b : ℕ) : ℝ≥0∞)) ((Fintype.card C : ℝ≥0∞)⁻¹)]
+  have hD_inv : (Fintype.card C : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
+    simp only [D]
+    rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
+      mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
+      ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+        (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
+  rw [hD_inv, mul_assoc, ← mul_add]
+  congr 1
+  push_cast
+  ring
