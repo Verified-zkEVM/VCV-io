@@ -23,7 +23,7 @@ namespace MerkleTree
 
 open List OracleSpec OracleComp
 
-variable (α : Type)
+variable (α : Type _)
 
 /-- Define the domain & range of the (single) oracle needed for constructing a Merkle tree with
     elements from some type `α`.
@@ -80,7 +80,7 @@ lemma Cache.leaves_cons (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (cache
 /-- Compute the next layer of the Merkle tree -/
 def buildLayer (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) :
     OracleComp (spec α) (List.Vector α (2 ^ n)) := do
-  let leaves : List.Vector α (2 ^ n * 2) := by rwa [pow_succ] at leaves
+  let leaves : List.Vector α (2 ^ n * 2) := cast (by rw [pow_succ]) leaves
   -- Pair up the leaves to form pairs
   let pairs : List.Vector (α × α) (2 ^ n) :=
     List.Vector.ofFn (fun i =>
@@ -215,8 +215,8 @@ def verifyProof {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (root : α) (proof : Lis
   guard (putative_root = root)
 
 @[grind]
-theorem buildLayer_neverFails (α : Type) [inst : DecidableEq α]
-    [inst_1 : SampleableType α] [(spec α).DecidableEq]
+theorem buildLayer_neverFails (α : Type _) [DecidableEq α]
+    [SampleableType α] [(spec α).DecidableEq]
     (preexisting_cache : (spec α).QueryCache) (n : ℕ)
     (leaves : List.Vector α (2 ^ (n + 1))) : NeverFail
       ((simulateQ (randomOracle (spec := spec α))
@@ -228,7 +228,7 @@ Building a Merkle tree never results in failure
 (no matter what queries have already been made to the oracle before it runs).
 -/
 @[grind]
-theorem buildMerkleTree_neverFails (α : Type) [DecidableEq α]
+theorem buildMerkleTree_neverFails (α : Type _) [DecidableEq α]
     [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
     (leaves : List.Vector α (2 ^ n)) (preexisting_cache : (spec α).QueryCache) :
     NeverFail
@@ -239,7 +239,7 @@ theorem buildMerkleTree_neverFails (α : Type) [DecidableEq α]
 /-- A purely functional version of `buildLayer`, given an explicit hash function. -/
 def buildLayer_with_hash (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (hashFn : α × α → α) :
     List.Vector α (2 ^ n) :=
-  let leaves : List.Vector α (2 ^ n * 2) := by rwa [pow_succ] at leaves
+  let leaves : List.Vector α (2 ^ n * 2) := cast (by rw [pow_succ]) leaves
   let pairs : List.Vector (α × α) (2 ^ n) :=
     List.Vector.ofFn (fun i =>
       (leaves.get ⟨2 * i, by grind only⟩, leaves.get ⟨2 * i + 1, by grind only⟩))
@@ -307,8 +307,7 @@ lemma simulateQ_buildLayer_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simulateQ f (buildLayer α n leaves) =
       buildLayer_with_hash (α := α) n leaves f := by
   unfold buildLayer
-  simp_all only [range_def, eq_mp_eq_cast, cast_eq, bind_pure, simulateQ_listVector_mmap_query,
-    domain_def]
+  simp_all only [range_def, cast_eq, bind_pure, simulateQ_listVector_mmap_query, domain_def]
   rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
@@ -322,12 +321,12 @@ lemma simulateQ_buildMerkleTree_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simp_all only [Cache, Nat.reduceAdd, buildMerkleTree, Nat.pow_zero, eq_mpr_eq_cast]
     rfl
   | succ n ih =>
-    have sqb : ∀ {β γ : Type} (ma : OracleComp (spec α) β) (k : β → OracleComp (spec α) γ),
+    have sqb : ∀ {β γ : Type _} (ma : OracleComp (spec α) β) (k : β → OracleComp (spec α) γ),
         simulateQ f (ma >>= k) = simulateQ f (k (simulateQ f ma)) := by
       intros β γ ma k
       rw [simulateQ_bind]
       rfl
-    have sqp : ∀ {β : Type} (a : β),
+    have sqp : ∀ {β : Type _} (a : β),
         simulateQ f (pure a : OracleComp (spec α) β) = a := by
       intros β a
       rw [simulateQ_pure]
@@ -433,13 +432,8 @@ theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
       simulateQ (randomOracle (spec := spec α)) (do
         let cache ← buildMerkleTree α n leaves
         let proof := generateProof α i cache
-        let _ ← verifyProof α i leaves[i] (getRoot α cache) proof)).run preexisting_cache :
-      ProbComp (Unit × (spec α).QueryCache)) := by
+        let _ ← verifyProof α i leaves[i] (getRoot α cache) proof)).run preexisting_cache) := by
   grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
-
--- theorem soundness (i : Fin (2 ^ n)) (leaf : α) (proof : Vector α n) :
---     verifyMerkleProof i leaf proof = pure true →
---     getMerkleRoot (buildMerkleTree n (leaf ::ᵥ proof)) = leaf := sorry
 
 end
 

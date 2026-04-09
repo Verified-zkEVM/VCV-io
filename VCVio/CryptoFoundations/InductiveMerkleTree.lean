@@ -52,7 +52,7 @@ open List OracleSpec OracleComp BinaryTree
 
 section spec
 
-variable (α : Type)
+variable (α : Type _)
 
 /-- Define the domain & range of the (single) oracle needed for constructing a Merkle tree with
     elements from some type `α`.
@@ -71,7 +71,7 @@ lemma range_def (z) : (spec α).Range z = α := rfl
 end spec
 
 
-variable {α : Type}
+variable {α : Type _}
 
 /-- Example: a single hash computation -/
 @[simp, grind]
@@ -144,29 +144,6 @@ def generateProof {s} (cache_tree : FullData α s) :
   | .ofRight idxRight =>
     List.Vector.cons ((cache_tree.leftSubtree).getRootValue)
       (generateProof cache_tree.rightSubtree idxRight)
-
-@[simp, grind]
-theorem generateProof_leaf (a : α) :
-    generateProof (FullData.leaf a) SkeletonLeafIndex.ofLeaf = List.Vector.nil := by
-  rfl
-
-@[simp, grind]
-theorem generateProof_ofLeft {sleft sright : Skeleton}
-    (cache_tree : FullData α (Skeleton.internal sleft sright))
-    (idxLeft : SkeletonLeafIndex sleft) :
-    generateProof cache_tree (BinaryTree.SkeletonLeafIndex.ofLeft idxLeft) =
-      List.Vector.cons ((cache_tree.rightSubtree).getRootValue)
-        (generateProof cache_tree.leftSubtree idxLeft) := by
-  rfl
-
-@[simp, grind]
-theorem generateProof_ofRight {sleft sright : Skeleton}
-    (cache_tree : FullData α (Skeleton.internal sleft sright))
-    (idxRight : SkeletonLeafIndex sright) :
-    generateProof cache_tree (BinaryTree.SkeletonLeafIndex.ofRight idxRight) =
-      List.Vector.cons ((cache_tree.leftSubtree).getRootValue)
-        (generateProof cache_tree.rightSubtree idxRight) := by
-  rfl
 
 /--
 Given a leaf index, a leaf value at that index, and a proof of the corresponding depth,

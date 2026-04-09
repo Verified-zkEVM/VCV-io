@@ -125,24 +125,18 @@ def SkeletonNodeIndex.isRoot {s : Skeleton} (idx : SkeletonNodeIndex s) : Bool :
   | SkeletonNodeIndex.ofLeft _ => false
   | SkeletonNodeIndex.ofRight _ => false
 
-def SkeletonLeafIndex.isLeaf {s : Skeleton} (idx : SkeletonLeafIndex s) : Bool :=
-  match idx with
-  | SkeletonLeafIndex.ofLeaf => true
-  | SkeletonLeafIndex.ofLeft _ => false
-  | SkeletonLeafIndex.ofRight _ => false
+def SkeletonLeafIndex.isLeaf {s : Skeleton} (_ : SkeletonLeafIndex s) : Bool :=
+  true
 
-def SkeletonInternalIndex.isLeaf {s : Skeleton} (idx : SkeletonInternalIndex s) : Bool :=
-  match idx with
-  | SkeletonInternalIndex.ofInternal => false
-  | SkeletonInternalIndex.ofLeft _ => false
-  | SkeletonInternalIndex.ofRight _ => false
+def SkeletonInternalIndex.isLeaf {s : Skeleton} (_ : SkeletonInternalIndex s) : Bool :=
+  false
 
 def SkeletonNodeIndex.isLeaf {s : Skeleton} (idx : SkeletonNodeIndex s) : Bool :=
   match idx with
   | SkeletonNodeIndex.ofLeaf => true
   | SkeletonNodeIndex.ofInternal => false
-  | SkeletonNodeIndex.ofLeft _ => false
-  | SkeletonNodeIndex.ofRight _ => false
+  | SkeletonNodeIndex.ofLeft idxLeft => idxLeft.isLeaf
+  | SkeletonNodeIndex.ofRight idxRight => idxRight.isLeaf
 
 end Local
 
@@ -151,7 +145,7 @@ section Data
 /--
 A binary tree with values stored at leaves.
 -/
-inductive LeafData (α : Type) : Skeleton → Type
+inductive LeafData (α : Type _) : Skeleton → Type _
   | leaf (value : α) : LeafData α Skeleton.leaf
   | internal {left right} (leftData : LeafData α left) (rightData : LeafData α right) :
       LeafData α (Skeleton.internal left right)
@@ -160,7 +154,7 @@ inductive LeafData (α : Type) : Skeleton → Type
 /--
 A binary tree with values stored in internal nodes.
 -/
-inductive InternalData (α : Type) : Skeleton → Type
+inductive InternalData (α : Type _) : Skeleton → Type _
   | leaf : InternalData α Skeleton.leaf
   | internal {left right} (value : α)
       (leftData : InternalData α left)
@@ -170,7 +164,7 @@ inductive InternalData (α : Type) : Skeleton → Type
 /--
 A binary tree with values stored at both leaves and internal nodes.
 -/
-inductive FullData (α : Type) : Skeleton → Type
+inductive FullData (α : Type _) : Skeleton → Type _
   | leaf (value : α) : FullData α Skeleton.leaf
   | internal {left right} (value : α)
       (leftData : FullData α left)
@@ -185,7 +179,7 @@ section Subtree
 /--
 Get the left subtree of a `LeafData`.
 -/
-def LeafData.leftSubtree {α : Type} {s_left s_right : Skeleton}
+def LeafData.leftSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : LeafData α (Skeleton.internal s_left s_right)) :
     LeafData α s_left :=
   match tree with
@@ -193,7 +187,7 @@ def LeafData.leftSubtree {α : Type} {s_left s_right : Skeleton}
     left
 
 /-- Get the right subtree of a `LeafData`. -/
-def LeafData.rightSubtree {α : Type} {s_left s_right : Skeleton}
+def LeafData.rightSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : LeafData α (Skeleton.internal s_left s_right)) :
     LeafData α s_right :=
   match tree with
@@ -201,7 +195,7 @@ def LeafData.rightSubtree {α : Type} {s_left s_right : Skeleton}
     right
 
 /-- Get the left subtree of a `InternalData`. -/
-def InternalData.leftSubtree {α : Type} {s_left s_right : Skeleton}
+def InternalData.leftSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : InternalData α (Skeleton.internal s_left s_right)) :
     InternalData α s_left :=
   match tree with
@@ -209,7 +203,7 @@ def InternalData.leftSubtree {α : Type} {s_left s_right : Skeleton}
     left
 
 /-- Get the right subtree of a `InternalData`. -/
-def InternalData.rightSubtree {α : Type} {s_left s_right : Skeleton}
+def InternalData.rightSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : InternalData α (Skeleton.internal s_left s_right)) :
     InternalData α s_right :=
   match tree with
@@ -217,7 +211,7 @@ def InternalData.rightSubtree {α : Type} {s_left s_right : Skeleton}
     right
 
 /-- Get the left subtree of a `FullData`. -/
-def FullData.leftSubtree {α : Type} {s_left s_right : Skeleton}
+def FullData.leftSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     FullData α s_left :=
   match tree with
@@ -225,7 +219,7 @@ def FullData.leftSubtree {α : Type} {s_left s_right : Skeleton}
     left
 
 /-- Get the right subtree of a `FullData`. -/
-def FullData.rightSubtree {α : Type} {s_left s_right : Skeleton}
+def FullData.rightSubtree {α : Type _} {s_left s_right : Skeleton}
     (tree : FullData α (Skeleton.internal s_left s_right)) :
     FullData α s_right :=
   match tree with
@@ -273,7 +267,7 @@ end Subtree
 section get
 
 /-- Get a value of a `LeafData` at an index. -/
-def LeafData.get {s} {α : Type}
+def LeafData.get {s} {α : Type _}
     (tree : LeafData α s) (idx : SkeletonLeafIndex s) : α :=
   match tree, idx with
   | LeafData.leaf value, SkeletonLeafIndex.ofLeaf => value
@@ -283,7 +277,7 @@ def LeafData.get {s} {α : Type}
     LeafData.get right idxRight
 
 /-- Get a value of a `InternalData` at an index. -/
-def InternalData.get {s} {α : Type}
+def InternalData.get {s} {α : Type _}
     (tree : InternalData α s) (idx : SkeletonInternalIndex s) : α :=
   match tree, idx with
   | InternalData.internal value _ _, SkeletonInternalIndex.ofInternal => value
@@ -293,7 +287,7 @@ def InternalData.get {s} {α : Type}
     InternalData.get right idxRight
 
 /-- Get a value of a `FullData` at an index. -/
-def FullData.get {s} {α : Type}
+def FullData.get {s} {α : Type _}
     (tree : FullData α s) (idx : SkeletonNodeIndex s) : α :=
   match tree, idx with
   | FullData.leaf value, SkeletonNodeIndex.ofLeaf => value
@@ -309,7 +303,7 @@ theorem LeafData.get_leaf {α} (a : α) :
   rfl
 
 @[simp]
-theorem LeafData.get_ofLeft {s_left s_right : Skeleton} {α : Type}
+theorem LeafData.get_ofLeft {s_left s_right : Skeleton} {α : Type _}
     (tree : LeafData α (Skeleton.internal s_left s_right))
     (idxLeft : SkeletonLeafIndex s_left) :
     tree.get (SkeletonLeafIndex.ofLeft idxLeft) =
@@ -319,7 +313,7 @@ theorem LeafData.get_ofLeft {s_left s_right : Skeleton} {α : Type}
     rfl
 
 @[simp]
-theorem LeafData.get_ofRight {s_left s_right : Skeleton} {α : Type}
+theorem LeafData.get_ofRight {s_left s_right : Skeleton} {α : Type _}
     (tree : LeafData α (Skeleton.internal s_left s_right))
     (idxRight : SkeletonLeafIndex s_right) :
     tree.get (SkeletonLeafIndex.ofRight idxRight) =
@@ -354,7 +348,7 @@ end get
 section forget
 
 /-- Convert a `FullData` to a `LeafData` by dropping the internal node values. -/
-def FullData.toLeafData {α : Type} {s : Skeleton}
+def FullData.toLeafData {α : Type _} {s : Skeleton}
     (tree : FullData α s) : LeafData α s :=
   match tree with
   | FullData.leaf value => LeafData.leaf value
@@ -362,7 +356,7 @@ def FullData.toLeafData {α : Type} {s : Skeleton}
     LeafData.internal (left.toLeafData) (right.toLeafData)
 
 /-- Convert a `FullData` to a `InternalData` by dropping the leaf node values. -/
-def FullData.toInternalData {α : Type} {s : Skeleton}
+def FullData.toInternalData {α : Type _} {s : Skeleton}
     (tree : FullData α s) : InternalData α s :=
   match tree with
   | FullData.leaf _ => InternalData.leaf
@@ -417,7 +411,7 @@ def getRootIndex (s : Skeleton) : SkeletonNodeIndex s := match s with
     SkeletonNodeIndex.ofInternal
 
 /-- Get the root value of a FullData. -/
-def FullData.getRootValue {s} {α : Type} (tree : FullData α s) :=
+def FullData.getRootValue {s} {α : Type _} (tree : FullData α s) :=
   tree.get (getRootIndex s)
 
 @[simp]
@@ -426,7 +420,7 @@ theorem FullData.getRootValue_leaf {α} (a : α) :
   rfl
 
 @[simp]
-theorem FullData.internal_getRootValue {s_left s_right : Skeleton} {α : Type}
+theorem FullData.internal_getRootValue {s_left s_right : Skeleton} {α : Type _}
     (value : α) (left : FullData α s_left) (right : FullData α s_right) :
     (FullData.internal value left right).getRootValue =
       value := by
@@ -573,21 +567,21 @@ end Paths
 section map
 
 
-def LeafData.map {α β : Type} (f : α → β) {s : Skeleton}
+def LeafData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : LeafData α s) : LeafData β s :=
   match tree with
   | LeafData.leaf value => LeafData.leaf (f value)
   | LeafData.internal left right =>
     LeafData.internal (left.map f) (right.map f)
 
-def InternalData.map {α β : Type} (f : α → β) {s : Skeleton}
+def InternalData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : InternalData α s) : InternalData β s :=
   match tree with
   | InternalData.leaf => InternalData.leaf
   | InternalData.internal value left right =>
     InternalData.internal (f value) (left.map f) (right.map f)
 
-def FullData.map {α β : Type} (f : α → β) {s : Skeleton}
+def FullData.map {α β : Type _} (f : α → β) {s : Skeleton}
     (tree : FullData α s) : FullData β s :=
   match tree with
   | FullData.leaf value => FullData.leaf (f value)
@@ -619,7 +613,7 @@ theorem LeafData.map_internal {α β} {s_left s_right : Skeleton}
   rfl
 
 
-theorem FullData.map_getRootValue {α β : Type} {s : Skeleton}
+theorem FullData.map_getRootValue {α β : Type _} {s : Skeleton}
     (f : α → β) (tree : FullData α s) :
     (tree.map f).getRootValue = f (tree.getRootValue) := by
   match tree with
@@ -637,7 +631,7 @@ section ComposeBuild
 This section contains theorems about building full trees from leaf trees.
 -/
 
-def LeafData.composeBuild {α : Type} {s : Skeleton} (leaf_data_tree : LeafData α s)
+def LeafData.composeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → α) :
     FullData α s :=
   match s, leaf_data_tree with
@@ -674,23 +668,14 @@ theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
         (right.composeBuild compose).getRootValue := by
   rfl
 
-def Option.doubleBind {α β γ : Type} (f : α → β → Option γ)
+def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
     (x : Option α) (y : Option β) : Option γ :=
   match x, y with
   | none, _ => none
   | _, none => none
   | some a, some b => f a b
 
-def Option.doubleBind_v2 {α β γ : Type} (f : α → β → Option γ)
-    (x : Option α) (y : Option β) : Option γ := do
-  let a ← x
-  let b ← y
-  f a b
-
-def Option.doubleBind_v3 {α β γ : Type} (f : α → β → Option γ)
-    (x : Option α) (y : Option β) : Option γ := do f (← x) (← y)
-
-def LeafData.optionComposeBuild {α : Type} {s : Skeleton} (leaf_data_tree : LeafData α s)
+def LeafData.optionComposeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
     (compose : α → α → Option α) :
     FullData (Option α) s :=
   (leaf_data_tree.map (.some)).composeBuild (Option.doubleBind compose)

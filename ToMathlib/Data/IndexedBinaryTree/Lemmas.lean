@@ -133,7 +133,6 @@ instance {s} : Functor (fun α => FullData α s) where
 
 
 instance {s} : LawfulFunctor (fun α => LeafData α s) := by
-  classical
   refine
     { map_const := rfl
       id_map := ?_
@@ -141,16 +140,15 @@ instance {s} : LawfulFunctor (fun α => LeafData α s) := by
   · intro α x
     induction x with
     | leaf value => simp [Functor.map, LeafData.map]
-    | @internal left right tl tr ihL ihR =>
+    | internal left right ihL ihR =>
       simp_all [Functor.map, LeafData.map]
   · intro α β γ g h x
     induction x with
     | leaf value => simp [Functor.map, LeafData.map]
-    | @internal left right ihL ihR =>
+    | internal left right ihL ihR =>
       simp_all [Functor.map, LeafData.map]
 
 instance {s} : LawfulFunctor (fun α => InternalData α s) := by
-  classical
   refine
     { map_const := rfl
       id_map := ?_
@@ -158,16 +156,15 @@ instance {s} : LawfulFunctor (fun α => InternalData α s) := by
   · intro α x
     induction x with
     | leaf => simp [Functor.map, InternalData.map]
-    | @internal value tL tR ihL ihR =>
+    | internal value tL tR ihL ihR =>
       simp_all [Functor.map, InternalData.map]
   · intro α β γ g h x
     induction x with
     | leaf => simp [Functor.map, InternalData.map]
-    | @internal value tL tR ihL ihR =>
+    | internal value tL tR ihL ihR =>
       simp_all [Functor.map, InternalData.map]
 
 instance {s} : LawfulFunctor (fun α => FullData α s) := by
-  classical
   refine
     { map_const := rfl
       id_map := ?_
@@ -175,12 +172,12 @@ instance {s} : LawfulFunctor (fun α => FullData α s) := by
   · intro α x
     induction x with
     | leaf value => simp [Functor.map, FullData.map]
-    | @internal value tL tR ihL ihR =>
+    | internal value tL tR ihL ihR =>
       simp_all [Functor.map, FullData.map]
   · intro α β γ g h x
     induction x with
     | leaf value => simp [Functor.map, FullData.map]
-    | @internal value tL tR ihL ihR =>
+    | internal value tL tR ihL ihR =>
       simp_all [Functor.map, FullData.map]
 
 end Navigation

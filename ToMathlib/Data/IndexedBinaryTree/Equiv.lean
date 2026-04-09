@@ -1,4 +1,5 @@
 import ToMathlib.Data.IndexedBinaryTree.Basic
+import Mathlib.Logic.Equiv.Prod
 
 
 /-!
@@ -13,7 +14,7 @@ namespace BinaryTree
 section Equivalences
 
 /-- Build `LeafData` from a function on leaf indices. -/
-def LeafData.ofFun {α : Type} (s : Skeleton)
+def LeafData.ofFun {α : Type _} (s : Skeleton)
     (f : SkeletonLeafIndex s → α) : LeafData α s :=
   match s with
   | .leaf => LeafData.leaf (f SkeletonLeafIndex.ofLeaf)
@@ -43,7 +44,7 @@ theorem LeafData.get_ofFun {α} {s} (f : SkeletonLeafIndex s → α) :
   | ofRight idx ih => simp [LeafData.ofFun, ih]
 
 /-- Build `InternalData` from a function on internal indices. -/
-def InternalData.ofFun {α : Type} (s : Skeleton)
+def InternalData.ofFun {α : Type _} (s : Skeleton)
     (f : SkeletonInternalIndex s → α) : InternalData α s :=
   match s with
   | .leaf => InternalData.leaf
@@ -73,7 +74,7 @@ theorem InternalData.get_ofFun {α} {s} (f : SkeletonInternalIndex s → α) :
   | ofRight idx ih => simp [InternalData.ofFun, InternalData.get, ih]
 
 /-- Build `FullData` from a function on all node indices. -/
-def FullData.ofFun {α : Type} (s : Skeleton)
+def FullData.ofFun {α : Type _} (s : Skeleton)
     (f : SkeletonNodeIndex s → α) : FullData α s :=
   match s with
   | .leaf => FullData.leaf (f SkeletonNodeIndex.ofLeaf)
@@ -104,74 +105,41 @@ theorem FullData.get_ofFun {α} {s} (f : SkeletonNodeIndex s → α) :
   | ofRight idx ih => simp [FullData.ofFun, FullData.get, ih]
 
 /-- `LeafData`s are equivalent to functions from `SkeletonLeafIndex` to values -/
-def LeafData.EquivIndexFun {α : Type} (s : Skeleton) :
+def LeafData.EquivIndexFun {α : Type _} (s : Skeleton) :
     LeafData α s ≃ (SkeletonLeafIndex s → α) where
   toFun := fun tree idx => tree.get idx
   invFun := fun f => LeafData.ofFun s f
-  left_inv := by
-    intro tree
-    cases s with
-    | leaf =>
-        cases tree with
-        | leaf value =>
-            simp [LeafData.ofFun, LeafData.get_leaf]
-    | @internal l r =>
-        cases tree with
-        | internal left right =>
-            simp [LeafData.ofFun]
-  right_inv := by
-    intro f
-    simp [LeafData.get_ofFun (s := s) f]
+  left_inv := LeafData.ofFun_get (s := s)
+  right_inv := LeafData.get_ofFun (s := s)
 
 /-- `InternalData`s are equivalent to functions from `SkeletonInternalIndex` to values -/
-def InternalData.EquivIndexFun {α : Type} (s : Skeleton) :
+def InternalData.EquivIndexFun {α : Type _} (s : Skeleton) :
     InternalData α s ≃ (SkeletonInternalIndex s → α) where
   toFun := fun tree idx => tree.get idx
   invFun := fun f => InternalData.ofFun s f
-  left_inv := by
-    intro tree
-    cases s with
-    | leaf =>
-        cases tree with
-        | leaf => simp [InternalData.ofFun]
-    | @internal l r =>
-        cases tree with
-        | internal value left right => simp [InternalData.ofFun, InternalData.get]
-  right_inv := by
-    intro f
-    simp [InternalData.get_ofFun (s := s) f]
+  left_inv := InternalData.ofFun_get (s := s)
+  right_inv := InternalData.get_ofFun (s := s)
 
 /-- `FullData`s are equivalent to functions from `SkeletonNodeIndex` to values -/
-def FullData.EquivIndexFun {α : Type} (s : Skeleton) :
+def FullData.EquivIndexFun {α : Type _} (s : Skeleton) :
     FullData α s ≃ (SkeletonNodeIndex s → α) where
   toFun := fun tree idx => tree.get idx
   invFun := fun f => FullData.ofFun s f
-  left_inv := by
-    intro tree
-    cases s with
-    | leaf =>
-        cases tree with
-        | leaf value => simp [FullData.ofFun, FullData.get_leaf]
-    | @internal l r =>
-        cases tree with
-        | internal value left right =>
-            simp [FullData.ofFun, FullData.get]
-  right_inv := by
-    intro f
-    simp [FullData.get_ofFun (s := s) f]
+  left_inv := FullData.ofFun_get (s := s)
+  right_inv := FullData.get_ofFun (s := s)
 
 /-- A `LeafData` can be interpreted as a function from `SkeletonLeafIndex` to values -/
-instance {α : Type} {s : Skeleton} :
+instance {α : Type _} {s : Skeleton} :
     CoeFun (LeafData α s) fun (_ : LeafData α s) => SkeletonLeafIndex s → α where
   coe := fun tree idx => tree.get idx
 
 /-- An `InternalData` can be interpreted as a function from `SkeletonInternalIndex` to values -/
-instance {α : Type} {s : Skeleton} :
+instance {α : Type _} {s : Skeleton} :
     CoeFun (InternalData α s) fun (_ : InternalData α s) => SkeletonInternalIndex s → α where
   coe := fun tree idx => tree.get idx
 
 /-- A `FullData` can be interpreted as a function from `SkeletonNodeIndex` to values -/
-instance {α : Type} {s : Skeleton} :
+instance {α : Type _} {s : Skeleton} :
     CoeFun (FullData α s) fun (_ : FullData α s) => SkeletonNodeIndex s → α where
   coe := fun tree idx => tree.get idx
 
@@ -259,52 +227,13 @@ def SkeletonNodeIndex.SumEquiv (s : Skeleton) :
               simpa [SkeletonNodeIndex.toSum, hSum, SkeletonInternalIndex.toNodeIndex,
                      SkeletonLeafIndex.toNodeIndex] using ih }
 
-/-
-Precomposition by an equivalence on the domain.
-Given `e : α ≃ β`, this yields `(β → γ) ≃ (α → γ)`.
--/
-def Equiv.precomp {α β γ} (e : α ≃ β) : (β → γ) ≃ (α → γ) :=
-{ toFun := fun f a => f (e a)
-  , invFun := fun g b => g (e.invFun b)
-  , left_inv := by intro f; funext b; simp
-  , right_inv := by intro g; funext a; simp }
-
-/-
-Equivalence between functions from a sum type and a product of functions.
--/
-def SumFunEquivProd (α β γ : Type) : ((α ⊕ β) → γ) ≃ (α → γ) × (β → γ) :=
-{ toFun := fun f => (fun a => f (.inl a), fun b => f (.inr b))
-  , invFun := fun p x => match x with | .inl a => p.fst a | .inr b => p.snd b
-  , left_inv := by intro f; funext x; cases x <;> rfl
-  , right_inv := by intro p; cases p; rfl }
-
 /-- Equivalence between `FullData` and the product of `InternalData` and `LeafData` -/
-def FullData.Equiv {α} (s : Skeleton) :
-    FullData α s ≃ InternalData α s × LeafData α s := by
-  calc
-    FullData α s ≃ (SkeletonNodeIndex s → α) := FullData.EquivIndexFun s
-    _ ≃ ((SkeletonInternalIndex s ⊕ SkeletonLeafIndex s) → α) :=
-      (Equiv.precomp (SkeletonNodeIndex.SumEquiv s))
-    _ ≃ (SkeletonInternalIndex s → α) × (SkeletonLeafIndex s → α) :=
-      (SumFunEquivProd (SkeletonInternalIndex s) (SkeletonLeafIndex s) α)
-    _ ≃ InternalData α s × LeafData α s := by
-      refine
-        { toFun := (fun p => ((InternalData.EquivIndexFun s).invFun p.fst,
-                               (LeafData.EquivIndexFun s).invFun p.snd))
-          , invFun := (fun q => ((InternalData.EquivIndexFun s).toFun q.fst,
-                                 (LeafData.EquivIndexFun s).toFun q.snd))
-          , left_inv := ?_
-          , right_inv := ?_ };
-      · intro p; cases p with
-        | mk f g =>
-          exact Prod.ext
-            ((InternalData.EquivIndexFun s).right_inv f)
-            ((LeafData.EquivIndexFun s).right_inv g)
-      · intro q; cases q with
-        | mk tInt tLeaf =>
-          exact Prod.ext
-            ((InternalData.EquivIndexFun s).left_inv tInt)
-            ((LeafData.EquivIndexFun s).left_inv tLeaf)
+def FullData.Equiv {α : Type _} (s : Skeleton) :
+    FullData α s ≃ InternalData α s × LeafData α s :=
+  (FullData.EquivIndexFun s).trans <|
+    (Equiv.arrowCongr (SkeletonNodeIndex.SumEquiv s).symm (Equiv.refl α)).trans <|
+      (Equiv.sumArrowEquivProdArrow (SkeletonInternalIndex s) (SkeletonLeafIndex s) α).trans <|
+        Equiv.prodCongr (InternalData.EquivIndexFun s).symm (LeafData.EquivIndexFun s).symm
 
 
 end Equivalences
