@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio
+import VCVio.OracleComp.QueryTracking.RandomOracle
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import Mathlib.Data.Vector.Snoc
 
@@ -130,32 +130,32 @@ lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s)
 /--
 Generate a Merkle proof for a leaf at a given idx
 The proof consists of the sibling hashes needed to recompute the root.
+Its length is indexed by the leaf depth, so malformed extra hashes are unrepresentable.
 
 TODO rename this to copath and move to BinaryTree?
 -/
 @[simp, grind]
 def generateProof {s} (cache_tree : FullData α s) :
-    BinaryTree.SkeletonLeafIndex s → List α
-  | .ofLeaf => []
+    (idx : BinaryTree.SkeletonLeafIndex s) → List.Vector α idx.depth
+  | .ofLeaf => List.Vector.nil
   | .ofLeft idxLeft =>
-    (cache_tree.rightSubtree).getRootValue ::
+    List.Vector.cons ((cache_tree.rightSubtree).getRootValue)
       (generateProof cache_tree.leftSubtree idxLeft)
   | .ofRight idxRight =>
-    (cache_tree.leftSubtree).getRootValue ::
+    List.Vector.cons ((cache_tree.leftSubtree).getRootValue)
       (generateProof cache_tree.rightSubtree idxRight)
 
 @[simp, grind]
-theorem generateProof_leaf (a : α) (idx) :
-    generateProof (FullData.leaf a) idx = [] := by
-  cases idx with
-  | ofLeaf => rfl
+theorem generateProof_leaf (a : α) :
+    generateProof (FullData.leaf a) SkeletonLeafIndex.ofLeaf = List.Vector.nil := by
+  rfl
 
 @[simp, grind]
 theorem generateProof_ofLeft {sleft sright : Skeleton}
     (cache_tree : FullData α (Skeleton.internal sleft sright))
     (idxLeft : SkeletonLeafIndex sleft) :
     generateProof cache_tree (BinaryTree.SkeletonLeafIndex.ofLeft idxLeft) =
-      (cache_tree.rightSubtree).getRootValue ::
+      List.Vector.cons ((cache_tree.rightSubtree).getRootValue)
         (generateProof cache_tree.leftSubtree idxLeft) := by
   rfl
 
@@ -164,36 +164,28 @@ theorem generateProof_ofRight {sleft sright : Skeleton}
     (cache_tree : FullData α (Skeleton.internal sleft sright))
     (idxRight : SkeletonLeafIndex sright) :
     generateProof cache_tree (BinaryTree.SkeletonLeafIndex.ofRight idxRight) =
-      (cache_tree.leftSubtree).getRootValue ::
+      List.Vector.cons ((cache_tree.leftSubtree).getRootValue)
         (generateProof cache_tree.rightSubtree idxRight) := by
   rfl
 
 /--
-Given a leaf index, a leaf value at that index, and putative proof,
+Given a leaf index, a leaf value at that index, and a proof of the corresponding depth,
 returns the hash that would be the root of the tree if the proof was valid.
 i.e. the hash obtained by combining the leaf in sequence with each member of the proof,
 according to its index.
 -/
 @[simp, grind]
-def getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α)
-    (proof : List α) : OracleComp (spec α) α :=
-  match proof with
-  | [] => return leafValue -- If no proof, the root is just the leaf value
-  | siblingBelowRootHash :: restProof => do
-    match idx with
-    | BinaryTree.SkeletonLeafIndex.ofLeaf =>
-      -- This indicates that the proof is longer than the depth of the tree, which is invalid.
-      -- A more well-typed version using `Vector` might prevent this.
-      -- For now, we just return the leaf value.
+def getPutativeRoot {s} :
+    (idx : BinaryTree.SkeletonLeafIndex s) → (leafValue : α) →
+      List.Vector α idx.depth → OracleComp (spec α) α
+  | BinaryTree.SkeletonLeafIndex.ofLeaf, leafValue, _ => do
       return leafValue
-    | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft =>
-      -- Recursively get the hash of the ancestor of the leaf which is just below the root
-      let ancestorBelowRootHash ← getPutativeRoot idxLeft leafValue restProof
-      singleHash ancestorBelowRootHash siblingBelowRootHash
-    | BinaryTree.SkeletonLeafIndex.ofRight idxRight =>
-      -- Recursively get the hash of the ancestor of the leaf which is just below the root
-      let ancestorBelowRootHash ← getPutativeRoot idxRight leafValue restProof
-      singleHash siblingBelowRootHash ancestorBelowRootHash
+  | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft, leafValue, proof => do
+      let ancestorBelowRootHash ← getPutativeRoot idxLeft leafValue proof.tail
+      singleHash ancestorBelowRootHash proof.head
+  | BinaryTree.SkeletonLeafIndex.ofRight idxRight, leafValue, proof => do
+      let ancestorBelowRootHash ← getPutativeRoot idxRight leafValue proof.tail
+      singleHash proof.head ancestorBelowRootHash
 
 /--
 A functional version of `getPutativeRoot` that does not depend on the monad.
@@ -201,55 +193,36 @@ It receives an explicit hash function `hashFn` that combines two hashes into one
 And recursively calls itself down the tree.
 -/
 @[simp, grind]
-def getPutativeRoot_with_hash {s} (idx : BinaryTree.SkeletonLeafIndex s)
-    (leafValue : α) (proof : List α) (hashFn : α → α → α) : α :=
-  match proof with
-  | [] => leafValue -- If no proof, the root is just the leaf value
-  | siblingBelowRootHash :: restProof =>
-    match idx with
-    | BinaryTree.SkeletonLeafIndex.ofLeaf =>
-      -- This indicates that the proof is longer than the depth of the tree, which is invalid.
-      -- A more well-typed version using `Vector` might prevent this.
-      -- For now, we just return the leaf value.
+def getPutativeRoot_with_hash {s} :
+    (idx : BinaryTree.SkeletonLeafIndex s) → (leafValue : α) →
+      List.Vector α idx.depth → (hashFn : α → α → α) → α
+  | BinaryTree.SkeletonLeafIndex.ofLeaf, leafValue, _, _ =>
       leafValue
-    | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft =>
-      -- Recursively get the hash of the ancestor of the leaf which is just below the root
-      hashFn (getPutativeRoot_with_hash idxLeft leafValue restProof hashFn) siblingBelowRootHash
-    | BinaryTree.SkeletonLeafIndex.ofRight idxRight =>
-      -- Recursively get the hash of the ancestor of the leaf which is just below the root
-      hashFn siblingBelowRootHash (getPutativeRoot_with_hash idxRight leafValue restProof hashFn)
+  | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft, leafValue, proof, hashFn =>
+      hashFn (getPutativeRoot_with_hash idxLeft leafValue proof.tail hashFn) proof.head
+  | BinaryTree.SkeletonLeafIndex.ofRight idxRight, leafValue, proof, hashFn =>
+      hashFn proof.head (getPutativeRoot_with_hash idxRight leafValue proof.tail hashFn)
 
 /--
 Running the monadic version of `getPutativeRoot` with an oracle function `f`,
 it is equivalent to running the functional version of `getPutativeRoot_with_hash`
 -/
 lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
-    (leafValue : α) (proof : List α) (f : QueryImpl (spec α) Id) :
+    (leafValue : α) (proof : List.Vector α idx.depth) (f : QueryImpl (spec α) Id) :
     simulateQ f (getPutativeRoot idx leafValue proof)
       =
     getPutativeRoot_with_hash idx leafValue proof fun (left right : α) => (f ⟨left, right⟩) := by
-  induction proof generalizing s with
-  | nil =>
-    unfold getPutativeRoot
-    simp only [getPutativeRoot_with_hash]
-    rfl
-  | cons siblingBelowRootHash restProof ih =>
-    unfold getPutativeRoot
-    cases s with
-    | leaf =>
-      cases idx with
-      | ofLeaf =>
-        rfl
-    | internal s_left s_right =>
-      cases idx with
-      | ofLeft idxLeft =>
-        simp only [singleHash, simulateQ_bind, simulateQ_pure,
-          getPutativeRoot_with_hash] at ih ⊢
-        rw [ih]; rfl
-      | ofRight idxRight =>
-        simp only [singleHash, simulateQ_bind, simulateQ_pure,
-          getPutativeRoot_with_hash] at ih ⊢
-        rw [ih]; rfl
+  induction idx generalizing leafValue with
+  | ofLeaf =>
+      rfl
+  | ofLeft idxLeft ih =>
+      simp only [getPutativeRoot, getPutativeRoot_with_hash, singleHash, simulateQ_bind]
+      rw [ih]
+      rfl
+  | ofRight idxRight ih =>
+      simp only [getPutativeRoot, getPutativeRoot_with_hash, singleHash, simulateQ_bind]
+      rw [ih]
+      rfl
 
 /--
 Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
@@ -260,7 +233,7 @@ Outputs `failure` if the proof is invalid.
 @[simp, grind]
 def verifyProof {α} [DecidableEq α] {s}
     (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
-    (proof : List α) : OptionT (OracleComp (spec α)) Unit := do
+    (proof : List.Vector α idx.depth) : OptionT (OracleComp (spec α)) Unit := do
   let putative_root ← getPutativeRoot idx leafValue proof
   guard (putative_root = rootValue)
 
@@ -280,25 +253,21 @@ theorem functional_completeness (α : Type) {s : Skeleton}
       (buildMerkleTree_with_hash leaf_data_tree hash) idx)
     (hash)) =
   (buildMerkleTree_with_hash leaf_data_tree hash).getRootValue := by
-  induction s with
-  | leaf =>
-    match leaf_data_tree with
-    | LeafData.leaf a =>
-      cases idx with
-      | ofLeaf =>
-        simp [buildMerkleTree_with_hash, getPutativeRoot_with_hash]
-  | internal s_left s_right left_ih right_ih =>
-    match leaf_data_tree with
-    | LeafData.internal left right =>
-      cases idx with
-      | ofLeft idxLeft =>
-        simp_rw [LeafData.get_ofLeft, LeafData.leftSubtree_internal, buildMerkleTree_with_hash,
-          generateProof_ofLeft, FullData.rightSubtree, FullData.leftSubtree,
-          getPutativeRoot_with_hash, left_ih, FullData.internal_getRootValue]
-      | ofRight idxRight =>
-        simp_rw [LeafData.get_ofRight, LeafData.rightSubtree_internal, buildMerkleTree_with_hash,
-          generateProof_ofRight, FullData.leftSubtree, FullData.rightSubtree,
-          getPutativeRoot_with_hash, right_ih, FullData.internal_getRootValue]
+  induction idx with
+  | ofLeaf =>
+      cases leaf_data_tree with
+      | leaf a =>
+          simp [buildMerkleTree_with_hash, getPutativeRoot_with_hash]
+  | ofLeft idxLeft ih =>
+      cases leaf_data_tree with
+      | internal left right =>
+          simp [LeafData.get_ofLeft, buildMerkleTree_with_hash, generateProof,
+            getPutativeRoot_with_hash, ih, FullData.internal_getRootValue]
+  | ofRight idxRight ih =>
+      cases leaf_data_tree with
+      | internal left right =>
+          simp [LeafData.get_ofRight, buildMerkleTree_with_hash, generateProof,
+            getPutativeRoot_with_hash, ih, FullData.internal_getRootValue]
 
 
 /--
