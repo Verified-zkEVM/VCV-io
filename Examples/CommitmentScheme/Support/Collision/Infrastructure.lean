@@ -47,62 +47,6 @@ lemma cache_lookup_eq_of_noCollision
   by_contra hne
   exact hno ⟨t₀, t₁, v, v', hne, h₀, hcache₁, hv'.symm⟩
 
-/-! ## Gauss Sum Arithmetic -/
-
--- 1+2+...+(n-1) = n*(n-1)/2
-/-- The Gauss sum `∑_{k=0}^{n-1} k/N ≤ n²/(2N)`, the arithmetic core of the birthday bound. -/
-lemma gauss_sum_inv_le (n : ℕ) (N : ℝ≥0∞) (_hN : 0 < N) :
-    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ ≤
-      (n ^ 2 : ℝ≥0∞) / (2 * N) := by
-  rw [← Finset.sum_mul]
-  -- Key inequality in ℕ: 2 * ∑_{k<n} k = n*(n-1) ≤ n^2
-  have hnat : 2 * (∑ k ∈ range n, k) ≤ n ^ 2 := by
-    have := Finset.sum_range_id_mul_two n; nlinarith [Nat.sub_le n 1]
-  -- Lift to ENNReal
-  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 := by
-    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
-      simp [Nat.cast_sum]
-    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num,
-      show (n : ℝ≥0∞) ^ 2 = ((n ^ 2 : ℕ) : ℝ≥0∞) from by push_cast; ring,
-      ← Nat.cast_mul]
-    exact_mod_cast hnat
-  -- From 2 * sum ≤ n^2, derive sum ≤ n^2 / 2
-  have hle : (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 / 2 := by
-    rw [ENNReal.le_div_iff_mul_le (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
-    rwa [mul_comm]
-  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
-      ≤ ((n : ℝ≥0∞) ^ 2 / 2) * N⁻¹ := mul_le_mul_left hle N⁻¹
-    _ = (n : ℝ≥0∞) ^ 2 / (2 * N) := by
-        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
-          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
-        ring
-
-/-- Tight Gauss sum: `∑_{k=0}^{n-1} k/N ≤ n*(n-1)/(2N)`. -/
-lemma gauss_sum_inv_eq (n : ℕ) (N : ℝ≥0∞) :
-    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ =
-      ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
-  rw [← Finset.sum_mul]
-  have hnat : (∑ k ∈ range n, k) * 2 = n * (n - 1) :=
-    Finset.sum_range_id_mul_two n
-  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) := by
-    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
-      simp [Nat.cast_sum]
-    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num, ← Nat.cast_mul]
-    congr 1; omega
-  have heq : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 := by
-    rw [ENNReal.eq_div_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)
-      (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)]
-    exact henn
-  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
-      = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 * N⁻¹ := by rw [heq]
-    _ = ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
-        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
-          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
-        ring
-
 /-! ## Log entries are cached after logging inside caching -/
 
 /-- When running `loggingOracle` inside `cachingOracle`, every log entry ends up in the cache.

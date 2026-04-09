@@ -530,7 +530,7 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
               omega
           have := hcard_nat n; push_cast [this]; rfl
         rw [hcard_eq, Finset.sum_mul]
-        exact gauss_sum_inv_le n C (by exact_mod_cast hC)
+        exact ENNReal.gauss_sum_inv_le n C (by exact_mod_cast hC)
 
 /-- **Tight birthday bound for `cachingOracle`** (total query bound):
 The probability of a collision in the cache is ≤ n*(n-1)/(2|C|). -/
@@ -580,7 +580,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
     calc Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle oa).run ∅]
         ≤ ∑ j ∈ range n, ((0 + j : ℕ) : ℝ≥0∞) * C⁻¹ := gen α oa n 0 _hbound ∅ h0 hbnd
       _ = ∑ j ∈ range n, (j : ℝ≥0∞) * C⁻¹ := by simp
-      _ = ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * C) := gauss_sum_inv_eq n C
+      _ = ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * C) := ENNReal.gauss_sum_inv_eq n C
   -- Main induction
   intro β ob
   induction ob using OracleComp.inductionOn with
