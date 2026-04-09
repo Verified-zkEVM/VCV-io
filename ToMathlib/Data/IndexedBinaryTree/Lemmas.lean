@@ -107,7 +107,6 @@ theorem SkeletonNodeIndex.rightChild_bind_parent {s : Skeleton}
         simp [SkeletonNodeIndex.rightChild, SkeletonNodeIndex.parent, Option.bind, hchild, hc]
 
 /-- The parent of a leftChild is none or the node -/
-
 theorem SkeletonNodeIndex.parent_of_depth_zero {s : Skeleton}
     (idx : SkeletonNodeIndex s) (h : idx.depth = 0) :
     parent idx = none := by

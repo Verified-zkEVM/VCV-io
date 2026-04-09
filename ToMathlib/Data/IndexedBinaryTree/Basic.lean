@@ -547,7 +547,6 @@ Given a `Skeleton`, and a node index of the skeleton,
 return a list of node indices which are the ancestors of the node,
 starting with the root node, and going down to but not including the node itself.
 -/
-
 def SkeletonNodeIndex.path {s : Skeleton} (idx : SkeletonNodeIndex s) :
     List (SkeletonNodeIndex s) :=
   match idx with
@@ -671,7 +670,8 @@ theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
     (left : LeafData α s_left) (right : LeafData α s_right)
     (compose : α → α → α) :
     ((LeafData.internal left right).composeBuild compose).getRootValue =
-      compose (left.composeBuild compose).getRootValue (right.composeBuild compose).getRootValue := by
+      compose (left.composeBuild compose).getRootValue
+        (right.composeBuild compose).getRootValue := by
   rfl
 
 def Option.doubleBind {α β γ : Type} (f : α → β → Option γ)
