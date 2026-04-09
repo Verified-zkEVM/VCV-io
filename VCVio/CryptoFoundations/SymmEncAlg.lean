@@ -184,10 +184,9 @@ theorem perfectSecrecyAtAllPriors_iff_ciphertextRowsEqualAt
         _ = 1 * q := by rw [μ.tsum_coe]
         _ = q := by simp
     calc
-      μ msg * Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg] = μ msg * q := by rfl
+      μ msg * Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp msg] = μ msg * q := rfl
       _ = μ msg * (∑' m : M sp, μ m * row m) := by rw [← hsum]
-      _ = μ msg * (∑' m : M sp, μ m * Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp m]) := by
-            rfl
+      _ = μ msg * (∑' m : M sp, μ m * Pr[= σ | encAlg.PerfectSecrecyCipherGivenMsgExp sp m]) := rfl
 
 /-- Standard perfect secrecy at one security parameter, expressed as independence:
 `Pr[(M, C)] = Pr[M] * Pr[C]`. This is the canonical code-level definition. -/

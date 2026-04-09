@@ -230,7 +230,20 @@ theorem probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp
     (g : G) (adversary : CDHAdversary F G) :
     Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)] =
       Pr[= true | cdhExp g adversary] := by
-  sorry
+  simp only [ddhExpReal, cdhToDDHReduction, cdhExp]
+
+private lemma probOutput_decide_smul_eq_inv_card
+    [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G)) (h : G) :
+    Pr[= true | ($ᵗ F : ProbComp F) >>= fun c => pure (decide (h = c • g))] =
+      (Fintype.card F : ℝ≥0∞)⁻¹ := by
+  obtain ⟨c₀, hc₀⟩ := hg.surjective h
+  rw [probOutput_bind_eq_tsum]
+  simp only [probOutput_uniformSample, probOutput_pure]
+  rw [tsum_fintype, Finset.sum_eq_single c₀]
+  · simp [← hc₀]
+  · intro c _ hne
+    simp [show h ≠ c • g from fun heq => hne (hg.injective (hc₀.trans heq)).symm]
+  · exact absurd (Finset.mem_univ c₀)
 
 /-- In the random DDH game, the CDH-to-DDH reduction only matches the target with the uniform
 baseline probability. The bijectivity assumption identifies scalar samples with uniformly sampled
@@ -240,7 +253,20 @@ theorem probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar
     (adversary : CDHAdversary F G) :
     Pr[= true | ddhExpRand g (cdhToDDHReduction (F := F) adversary)] =
       (Fintype.card F : ℝ≥0∞)⁻¹ := by
-  sorry
+  simp only [ddhExpRand, cdhToDDHReduction]
+  have key : ∀ a b : F,
+      Pr[= true | ($ᵗ F : ProbComp F) >>= fun c =>
+        adversary g (a • g) (b • g) >>= fun h =>
+          pure (decide (h = c • g))] =
+        (Fintype.card F : ℝ≥0∞)⁻¹ := by
+    intro a b
+    rw [probOutput_bind_bind_swap]
+    rw [probOutput_bind_of_const _ fun h _ =>
+      probOutput_decide_smul_eq_inv_card g hg h]
+    simp [HasEvalPMF.probFailure_eq_zero]
+  rw [probOutput_bind_of_const _ fun a _ =>
+    probOutput_bind_of_const _ fun b _ => key a b]
+  simp [HasEvalPMF.probFailure_eq_zero]
 
 /-- Concrete form of the hardness implication `DDH ⇒ CDH`: a CDH solver can only beat the uniform
 DH-target baseline by the DDH distinguishing advantage of the associated adversary-map reduction. -/
@@ -250,7 +276,12 @@ theorem cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage
     (Pr[= true | cdhExp g adversary]).toReal ≤
       uniformDHTargetSuccessProb F +
         ddhDistAdvantage g (cdhToDDHReduction (F := F) adversary) := by
-  sorry
+  unfold ddhDistAdvantage uniformDHTargetSuccessProb
+  rw [← probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp g adversary,
+      probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar g hg adversary]
+  linarith [le_abs_self
+    ((Pr[= true | ddhExpReal g (cdhToDDHReduction (F := F) adversary)]).toReal -
+     ((Fintype.card F : ℝ≥0∞)⁻¹).toReal)]
 
 end CDHToDDH
 
@@ -274,7 +305,13 @@ theorem dlogSuccess_sq_le_uniform_add_ddhDistAdvantage
     (Pr[= true | dlogExp g adversary]).toReal ^ 2 ≤
       uniformDHTargetSuccessProb F +
         ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) := by
-  sorry
+  calc (Pr[= true | dlogExp g adversary]).toReal ^ 2
+      ≤ (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal :=
+        dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction g adversary
+    _ ≤ uniformDHTargetSuccessProb F +
+          ddhDistAdvantage g (dlogToDDHReduction (F := F) adversary) :=
+        cdhSuccess_toReal_le_uniform_add_ddhDistAdvantage g hg
+          (dlogToCDHReduction (F := F) adversary)
 
 end DLogToCDH
 

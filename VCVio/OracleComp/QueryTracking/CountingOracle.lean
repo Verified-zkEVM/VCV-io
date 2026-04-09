@@ -248,8 +248,8 @@ lemma sub_mem_support_snd_map_simulate {oa : OracleComp spec α}
     (h : qc' ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa qc) :
       OracleComp spec (QueryCount ι))) :
     qc' - qc ∈ support (((fun z : α × QueryCount ι => z.2) <$> simulate oa 0) :
-      OracleComp spec (QueryCount ι)) := by
-  exact (mem_support_snd_map_simulate_iff_of_le (oa := oa)
+      OracleComp spec (QueryCount ι)) :=
+  (mem_support_snd_map_simulate_iff_of_le (oa := oa)
     (hqc := le_of_mem_support_snd_map_simulate h)).1 h
 
 end snd_map

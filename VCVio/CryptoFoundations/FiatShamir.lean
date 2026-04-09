@@ -338,8 +338,8 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
           (HasQuery.withAddCost
             (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ω m)] =>
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
-            runtime costFn)] * val (costFn (msg, sig.1)) := by
-          exact HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
+            runtime costFn)] * val (costFn (msg, sig.1)) :=
+          HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
             (oa := fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ω m)] =>
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
             (runtime := runtime) (costFn := costFn) (f := fun sig ↦ costFn (msg, sig.1))
@@ -397,8 +397,8 @@ theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [Ha
     (costFn : M × PC → ω) (val : ω → ENNReal) (hval : Monotone val) :
     ExpectedQueryCost[
       (FiatShamir σ hr M).verify pk msg sig in runtime by costFn via val
-    ] = val (costFn (msg, sig.1)) := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val (costFn (msg, sig.1)) :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (verify_usesExactQueryCost
       (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (msg := msg)
       (sig := sig) (costFn := costFn))

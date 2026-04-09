@@ -260,7 +260,7 @@ instance {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
 @[simp]
 lemma liftM_StateT_eq {σ : Type _} [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : StateT σ (OracleComp spec) α) : (liftM mx : StateT σ (OracleComp superSpec) α) =
-      StateT.mk fun s => liftM (StateT.run mx s) := by rfl
+      StateT.mk fun s => liftM (StateT.run mx s) := rfl
 
 end StateT
 

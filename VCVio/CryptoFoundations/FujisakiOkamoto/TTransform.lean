@@ -142,8 +142,8 @@ theorem encrypt_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω]
     (pk : PK) (msg : M) (costFn : M → ω) (val : ω → ENNReal) (hval : Monotone val) :
     ExpectedQueryCost[
       (TTransform pke).encrypt pk msg in runtime by costFn via val
-    ] = val (costFn msg) := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val (costFn msg) :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (encrypt_usesExactQueryCost
       (runtime := runtime) (pke := pke) (pk := pk) (msg := msg) (costFn := costFn))
     hval
@@ -188,8 +188,8 @@ theorem decrypt_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
     (hdec : pke.decrypt sk c = none) :
     ExpectedQueryCost[
       (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
-    ] = val 0 := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val 0 :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (decrypt_usesZeroQueryCost_of_decrypt_eq_none
       (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
       (costFn := costFn) hdec)
@@ -224,8 +224,8 @@ theorem decrypt_expectedQueryCost_eq_of_decrypt_eq_some {ω : Type}
     (hdec : pke.decrypt sk c = some msg) :
     ExpectedQueryCost[
       (TTransform pke).decrypt (pk, sk) c in runtime by costFn via val
-    ] = val (costFn msg) := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val (costFn msg) :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (decrypt_usesExactQueryCost_of_decrypt_eq_some
       (runtime := runtime) (pke := pke) (pk := pk) (sk := sk) (c := c)
       (costFn := costFn) hdec)
