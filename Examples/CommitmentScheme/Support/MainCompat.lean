@@ -12,7 +12,16 @@ import VCVio.ProgramLogic.Unary.SimulateQ
 /-!
 # Commitment Scheme local compatibility shims
 
-This file is reserved for small proof-local adapters against `main` APIs.
+This file contains proof-local adapters against `main` APIs.
+
+## TODO: upstream candidates
+
+The following declarations are not commitment-scheme-specific and should
+eventually move to VCVio core:
+- `tvDist_bind_left_le` → `VCVio/EvalDist/TVDist.lean`
+- `map_run_simulateQ_eq_of_query_map_eq'` → `VCVio/ProgramLogic/Relational/`
+- `run'_simulateQ_eq_of_query_map_eq'` → `VCVio/ProgramLogic/Relational/`
+- `tvDist_simulateQ_le_probEvent_bad_dist` → `VCVio/ProgramLogic/Relational/`
 -/
 
 open OracleSpec OracleComp

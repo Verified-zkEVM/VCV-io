@@ -11,6 +11,17 @@ import VCVio.OracleComp.SimSemantics.StateT
 
 This file adds the total-query-bound API used by the commitment-scheme proofs on
 top of `main`'s `IsQueryBound` infrastructure.
+
+## TODO: upstream candidates
+
+The following declarations are generic oracle infrastructure and should
+eventually move to VCVio core:
+- `IsTotalQueryBound`, `isTotalQueryBound_query_bind_iff`,
+  `isTotalQueryBound_bind`, `IsTotalQueryBound.mono` → `VCVio/OracleComp/QueryTracking/`
+- `isQueryBound_map_iff` → `VCVio/OracleComp/QueryTracking/QueryBound.lean`
+- `sum_update_pred` → `VCVio/ToMathlib/` or `VCVio/Prelude/`
+- `IsTotalQueryBound.residual_of_mem_support_counting`,
+  `IsTotalQueryBound.counting_total_le` → `VCVio/OracleComp/QueryTracking/`
 -/
 
 open OracleSpec

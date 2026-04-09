@@ -13,6 +13,14 @@ import VCVio.OracleComp.EvalDist
 
 Collision predicates, Gauss sum arithmetic, logging oracle decomposition,
 query bound preservation through `loggingOracle`, and cache monotonicity lemmas.
+
+## TODO: upstream candidates
+
+- `gauss_sum_inv_le`, `gauss_sum_inv_eq` → `VCVio/ToMathlib/` or `VCVio/Prelude/`
+- `IsTotalQueryBound.of_perIndex` → `VCVio/OracleComp/QueryTracking/`
+- `isTotalQueryBound_run_simulateQ_loggingOracle_iff` → `VCVio/OracleComp/QueryTracking/`
+- `log_length_le_of_mem_support_run_simulateQ` → `VCVio/OracleComp/QueryTracking/`
+- `simulateQ_cachingOracle_cache_le` → `VCVio/OracleComp/QueryTracking/`
 -/
 
 open OracleSpec OracleComp ENNReal Finset
