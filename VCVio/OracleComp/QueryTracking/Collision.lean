@@ -11,8 +11,21 @@ import VCVio.OracleComp.EvalDist
 /-!
 # ROM Collision Infrastructure
 
-Collision predicates, Gauss sum arithmetic, logging oracle decomposition,
-query bound preservation through `loggingOracle`, and cache monotonicity lemmas.
+Collision predicates on `QueryLog` and `QueryCache`, together with structural
+lemmas relating log entries and cache entries when running `loggingOracle`
+inside `cachingOracle`.
+
+## Main declarations
+
+* `OracleComp.LogHasCollision`: two log entries at distinct positions with
+  distinct inputs but `HEq`-equal outputs.
+* `OracleComp.CacheHasCollision`: two distinct cache inputs map to the same output.
+* `OracleComp.cache_lookup_eq_of_noCollision`: in a collision-free cache,
+  a value determines at most one query input.
+* `OracleComp.log_entry_in_cache_and_mono`: every log entry ends up in the
+  cache, and the cache is monotone.
+* `OracleComp.cache_entry_in_log_or_initial`: every new cache entry has a
+  corresponding log entry.
 -/
 
 open OracleSpec OracleComp ENNReal Finset
@@ -71,16 +84,12 @@ theorem log_entry_in_cache_and_mono {α : Type}
   induction oa using OracleComp.inductionOn generalizing cache₀ z with
   | pure a =>
     simp only [simulateQ_pure] at hmem
-    -- (simulateQ cachingOracle (pure (a, []))).run cache₀ = pure ((a, []), cache₀)
     change z ∈ support (pure ((a, ([] : QueryLog spec)), cache₀)) at hmem
     rw [support_pure, Set.mem_singleton_iff] at hmem
     subst hmem
     refine ⟨fun _ h => ?_, le_refl _⟩; simp at h
   | query_bind t mx ih =>
     rw [run_simulateQ_loggingOracle_query_bind] at hmem
-    -- After logging decomposition, the inner computation is:
-    --   query t >>= fun u => (fun p => (p.1, ⟨t,u⟩ :: p.2)) <$> (sim loggingOracle (mx u)).run
-    -- simulateQ cachingOracle on (query t >>= ...) unfolds via simulateQ_query_bind
     rw [show simulateQ cachingOracle
           ((query t : OracleComp spec _) >>= fun u =>
             (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
@@ -92,8 +101,6 @@ theorem log_entry_in_cache_and_mono {α : Type}
             StateT (QueryCache spec) (OracleComp spec) _)
         from by simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
           OracleQuery.cont_query]] at hmem
-    -- simulateQ cachingOracle (f <$> oa) = f <$> simulateQ cachingOracle oa
-    -- Rewrite inside the bind: simulateQ cachingOracle (f <$> oa) = StateT.map f (simulateQ cachingOracle oa)
     have hbind_rw : (cachingOracle t >>= fun u =>
             simulateQ cachingOracle
               ((fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
@@ -111,7 +118,6 @@ theorem log_entry_in_cache_and_mono {α : Type}
     rw [StateT.run_bind] at hmem
     rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
     obtain ⟨⟨u, cache_mid⟩, hu_mem, hmem⟩ := hmem
-    -- Prove cache_mid has entry at t and cache₀ ≤ cache_mid
     have hu_mem' : (u, cache_mid) ∈ support ((cachingOracle (spec := spec) t).run cache₀) := by
       simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem ⊢
       exact hu_mem
@@ -134,8 +140,6 @@ theorem log_entry_in_cache_and_mono {α : Type}
       unfold cachingOracle at hu_mem'
       exact QueryImpl.withCaching_cache_le
         (QueryImpl.ofLift spec (OracleComp spec)) t cache₀ (u, cache_mid) hu_mem'
-    -- Continuation: StateT.run of (f <$> simulateQ cachingOracle ...) at cache_mid
-    -- This maps the result to prepend ⟨t, u⟩ to the log
     change z ∈ support ((StateT.map
       (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
       (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))).run cache_mid) at hmem
@@ -151,7 +155,6 @@ theorem log_entry_in_cache_and_mono {α : Type}
     obtain ⟨⟨⟨x', log'⟩, cache_final⟩, hmem_cont, heq⟩ := hmem
     have hz : z = ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'), cache_final) := heq.symm
     rw [hz]
-    -- Apply IH to get properties of log' and cache_final
     have ⟨ih_entries, ih_mono⟩ := ih u cache_mid ((x', log'), cache_final) hmem_cont
     exact ⟨fun entry hentry => by
       cases hentry with
@@ -235,7 +238,6 @@ theorem cache_entry_in_log_or_initial {α : Type}
       unfold cachingOracle at hu_mem'
       exact QueryImpl.withCaching_cache_le
         (QueryImpl.ofLift spec (OracleComp spec)) t cache₀ (u, cache_mid) hu_mem'
-    -- Continuation
     change z ∈ support ((StateT.map
       (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
       (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))).run cache_mid) at hmem
@@ -251,12 +253,8 @@ theorem cache_entry_in_log_or_initial {α : Type}
     obtain ⟨⟨⟨x', log'⟩, cache_final⟩, hmem_cont, heq⟩ := hmem
     have hz : z = ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'), cache_final) := heq.symm
     rw [hz]
-    -- We need: cache_mid t₀ = cache₀ t₀ for t₀ ≠ t
-    -- cachingOracle at t only modifies cache at index t: either cache_mid = cache₀ (hit)
-    -- or cache_mid = cache₀.cacheQuery t u (miss). In both cases, unchanged at t₀ ≠ t.
     have hcache_mid_eq : ∀ t₀ : spec.Domain, t₀ ≠ t → cache_mid t₀ = cache₀ t₀ := by
       intro t₀ hne
-      -- Derive: cache_mid = cache₀ or cache_mid = cache₀.cacheQuery t u
       have hu_mem' : (u, cache_mid) ∈ support ((cachingOracle (spec := spec) t).run cache₀) := by
         simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem ⊢
         exact hu_mem
@@ -266,22 +264,7 @@ theorem cache_entry_in_log_or_initial {α : Type}
         simp only [hc, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hu_mem'
         have := (Prod.mk.inj hu_mem').2; rw [this]
       | none =>
-        -- In the miss case, cachingOracle draws a fresh value and caches it.
-        -- The resulting cache is cache₀.cacheQuery t (fresh value).
-        -- After the simp, hu_mem' has the form involving modifyGet.
-        -- We use QueryImpl.withCaching_cache_le and the cacheQuery structure.
-        -- cache_mid ≤ cache₀.cacheQuery t u because the only modification is at t
-        -- Actually, let's just derive from withCaching behavior:
-        -- (u, cache_mid) is in support of (withCaching (ofLift ...) t).run cache₀
-        -- In the none case, cache_mid = cache₀.cacheQuery t u
-        -- We know cache₀ t = none, so cacheQuery only adds at t
         simp only [hc, StateT.run_bind] at hu_mem'
-        -- After simp, hu_mem' involves the lift/modifyGet pattern
-        -- Use: cache_mid t₀ = cache₀ t₀ because cacheQuery only modifies at t
-        -- Direct approach: show cache_mid = cache₀.cacheQuery t u
-        -- from the support membership, then use cacheQuery_of_ne
-        -- hu_mem' is now in the miss case. Extract cache_mid structure.
-        -- The do block is definitionally equal to a bind.
         change (u, cache_mid) ∈ support
           ((liftM (query t) : StateT _ (OracleComp spec) _).run cache₀ >>= fun p =>
             ((modifyGet fun cache => (p.1, QueryCache.cacheQuery cache t p.1) :
@@ -290,9 +273,7 @@ theorem cache_entry_in_log_or_initial {α : Type}
         obtain ⟨⟨r, s⟩, hrs, hfinal⟩ := hu_mem'
         simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
           StateT.modifyGet, StateT.run, support_pure, Set.mem_singleton_iff] at hfinal
-        have hru : u = r := congr_arg Prod.fst hfinal
         have hcm : cache_mid = s.cacheQuery t r := congr_arg Prod.snd hfinal
-        -- s comes from (liftM (query t)).run cache₀, so s = cache₀
         simp only [liftM, MonadLiftT.monadLift, MonadLift.monadLift,
           StateT.run, StateT.lift] at hrs
         rw [support_bind] at hrs; simp only [Set.mem_iUnion] at hrs
@@ -301,18 +282,13 @@ theorem cache_entry_in_log_or_initial {α : Type}
         have hs : s = cache₀ := congr_arg Prod.snd hq
         rw [hcm, hs, QueryCache.cacheQuery_of_ne _ _ hne]
     intro t₀ v hcache_final
-    -- Apply IH
     have ih_result := ih u cache_mid ((x', log'), cache_final) hmem_cont t₀ v hcache_final
     rcases ih_result with h_in_mid | ⟨entry, hentry, hentry_eq, hentry_heq⟩
-    · -- v was in cache_mid. Was it in cache₀?
-      by_cases ht₀ : t₀ = t
-      · -- cache_mid t = some u, and cache_mid t₀ = some v with t₀ = t, so v = u
-        subst ht₀
+    · by_cases ht₀ : t₀ = t
+      · subst ht₀
         rw [hcache_mid_entry] at h_in_mid; cases h_in_mid
-        -- The log entry ⟨t₀, v⟩ is at the head (t₀ = t, v = u)
         exact Or.inr ⟨⟨t₀, _⟩, List.Mem.head _, rfl, HEq.rfl⟩
-      · -- t₀ ≠ t: cache_mid t₀ = cache₀ t₀
-        rw [hcache_mid_eq t₀ ht₀] at h_in_mid
+      · rw [hcache_mid_eq t₀ ht₀] at h_in_mid
         exact Or.inl h_in_mid
     · exact Or.inr ⟨entry, List.Mem.tail _ hentry, hentry_eq, hentry_heq⟩
 

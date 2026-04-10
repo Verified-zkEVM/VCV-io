@@ -6,12 +6,10 @@ Authors: James Waters
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.Append
-import VCVio.OracleComp.QueryTracking.CachingOracle
-import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.Unpredictability
 import VCVio.EvalDist.TVDist
 import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.Relational.SimulateQ
-import Examples.CommitmentScheme.Support
 
 /-!
 # Random Oracle Commitment Scheme — Shared Definitions
@@ -47,43 +45,6 @@ def CMCommit (m : M) (s : S) : OracleComp (CMOracle M S C) C :=
 def CMCheck (c : C) (m : M) (s : S) : OracleComp (CMOracle M S C) Bool := do
   let c' ← query (spec := CMOracle M S C) (m, s)
   return (c == c')
-
-
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
-lemma simulateQ_cachingOracle_query (idx : (CMOracle M S C).Domain) :
-    (simulateQ cachingOracle (liftM (query (spec := CMOracle M S C) idx))) =
-    (cachingOracle (spec := CMOracle M S C) idx) := by
-  simp [simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query]
-
-omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
-  [Inhabited C] in
-/-- After running `cachingOracle` on a single query at index `idx`, the resulting cache
-has an entry at `idx`. -/
-lemma cachingOracle_query_caches (idx : (CMOracle M S C).Domain)
-    (cache₀ : QueryCache (CMOracle M S C))
-    (v : (CMOracle M S C).Range idx) (cache₁ : QueryCache (CMOracle M S C))
-    (hmem : (v, cache₁) ∈ support ((cachingOracle (spec := CMOracle M S C) idx).run cache₀)) :
-    cache₁ idx = some v := by
-  simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hmem
-  cases hc : cache₀ idx with
-  | some u =>
-    simp only [hc, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hmem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
-    exact hc
-  | none =>
-    simp only [hc, StateT.run_bind] at hmem
-    rw [show (liftM (query (spec := CMOracle M S C) idx) :
-        StateT (QueryCache (CMOracle M S C)) (OracleComp (CMOracle M S C)) _).run cache₀ =
-        ((liftM (query (spec := CMOracle M S C) idx) : OracleComp _ _) >>= fun u =>
-          pure (u, cache₀)) from rfl] at hmem
-    rw [bind_assoc] at hmem; simp only [pure_bind] at hmem
-    rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
-    obtain ⟨u, _, hmem⟩ := hmem
-    simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
-      StateT.modifyGet, StateT.run, support_pure, Set.mem_singleton_iff] at hmem
-    obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
-    exact QueryCache.cacheQuery_self cache₀ idx v
 
 omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
 /-- If a fixed fresh query is the only way to win, its success probability is `1 / |C|`. -/
@@ -143,25 +104,3 @@ lemma probEvent_from_fresh_query_le_inv
           simp [hu]
     _ = (Fintype.card C : ℝ≥0∞)⁻¹ := by
         rw [tsum_ite_eq target]
-
-omit [DecidableEq C] [Inhabited C] in
-/-- Arithmetic: `a/(2C) + b/C = (a + 2b)/(2C)`. -/
-lemma add_div_two_card
-    (a b : ℕ) :
-    ((a : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) +
-      ((b : ℕ) : ℝ≥0∞) * (Fintype.card C : ℝ≥0∞)⁻¹ =
-    ((a + 2 * b : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
-  set D := (2 * (Fintype.card C : ℝ≥0∞))
-  rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
-  rw [mul_comm (((b : ℕ) : ℝ≥0∞)) ((Fintype.card C : ℝ≥0∞)⁻¹)]
-  have hD_inv : (Fintype.card C : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
-    simp only [D]
-    rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
-      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
-      mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
-      ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
-        (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
-  rw [hD_inv, mul_assoc, ← mul_add]
-  congr 1
-  push_cast
-  ring

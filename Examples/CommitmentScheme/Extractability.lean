@@ -146,7 +146,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
   simp only [StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
   rw [hz] at hwin hsome ⊢
   -- cache₃ has entry at (m, s) with value c
-  rw [simulateQ_cachingOracle_query] at hmem₃
+  rw [cachingOracle.simulateQ_query] at hmem₃
   have hcache₃ : cache₃ (m, s) = some c :=
     cachingOracle_query_caches (m, s) cache₂ c cache₃ hmem₃
   -- Cache monotonicity: cache₂ ≤ cache₃
@@ -324,7 +324,7 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
   | none =>
       simp only [hfind, beq_iff_eq] at hwin
       have hc_eq : c = cm := hwin
-      rw [simulateQ_cachingOracle_query] at hmem₃
+      rw [cachingOracle.simulateQ_query] at hmem₃
       have hcache₃ : cache₃ (m, s) = some c :=
         cachingOracle_query_caches (m, s) cache₂ c cache₃ hmem₃
       have hcache_mono₁₂ : cache₁ ≤ cache₂ :=
@@ -358,7 +358,7 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
   | some entry =>
       simp only [hfind, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at hwin
       obtain ⟨hc_eq, hne⟩ := hwin
-      rw [simulateQ_cachingOracle_query] at hmem₃
+      rw [cachingOracle.simulateQ_query] at hmem₃
       have hcache₃ : cache₃ (m, s) = some c :=
         cachingOracle_query_caches (m, s) cache₂ c cache₃ hmem₃
       have hcache_mono₁₂ : cache₁ ≤ cache₂ :=
@@ -492,7 +492,7 @@ private lemma extractability_win_le_textbook_bound {t : ℕ} (ht : 3 ≤ t)
     _ = ((A.t₁ * (A.t₁ - 1) + 2 * (A.t₂ + 1) : ℕ) : ℝ≥0∞) /
           (2 * Fintype.card C) := by
           simpa [Nat.mul_add, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
-            add_div_two_card (C := C) (A.t₁ * (A.t₁ - 1)) (A.t₂ + 1)
+            add_div_two_mul_nat (A.t₁ * (A.t₁ - 1)) (A.t₂ + 1) (Fintype.card C)
     _ ≤ ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
           have hnat :
               A.t₁ * (A.t₁ - 1) + 2 * (A.t₂ + 1) ≤ t * (t - 1) + 2 := by
@@ -503,7 +503,7 @@ private lemma extractability_win_le_textbook_bound {t : ℕ} (ht : 3 ≤ t)
           (Fintype.card C : ℝ≥0∞)⁻¹ := by
           symm
           simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
-            add_div_two_card (C := C) (t * (t - 1)) 1
+            add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
 
 /- **Extractability theorem (Lemma cm-extractability)**: for `t ≥ 3`,
 `Pr[win] ≤ (t(t-1)+2) / (2|C|)`. Combines the case-split decomposition
@@ -517,6 +517,6 @@ theorem extractability_bound {t : ℕ} (ht : 3 ≤ t)
       ≤ ((t * (t - 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) +
         (Fintype.card C : ℝ≥0∞)⁻¹ := extractability_win_le_textbook_bound ht A
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
-        have h := add_div_two_card (C := C) (t * (t - 1)) 1
+        have h := add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
         simp only [Nat.cast_one, one_mul, Nat.mul_one] at h
         exact h

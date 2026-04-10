@@ -62,31 +62,6 @@ theorem probEvent_hidingBad_eq_countAll {AUX : Type} {t : ℕ}
   rw [probEvent_map]
   rfl
 
-/-- Updating one coordinate by `+1` increases the total sum by exactly one. -/
-lemma sum_update_succ_count {ι : Type} [Fintype ι] [DecidableEq ι]
-    (counts : ι → ℕ) (i : ι) :
-    ∑ j : ι, Function.update counts i (counts i + 1) j =
-      (∑ j : ι, counts j) + 1 := by
-  classical
-  calc
-    ∑ j : ι, Function.update counts i (counts i + 1) j =
-        Function.update counts i (counts i + 1) i +
-          Finset.sum (Finset.univ.erase i)
-            (fun j : ι => Function.update counts i (counts i + 1) j) := by
-          symm
-          exact Finset.univ.add_sum_erase
-            (f := fun j : ι => Function.update counts i (counts i + 1) j) (Finset.mem_univ i)
-    _ = counts i + 1 + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) := by
-          simp only [Function.update_self]
-          congr 1
-          refine Finset.sum_congr rfl ?_
-          intro j hj
-          rw [Function.update_of_ne (Finset.ne_of_mem_erase hj)]
-    _ = counts i + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) + 1 := by
-          omega
-    _ = (∑ j : ι, counts j) + 1 := by
-          rw [← Finset.univ.add_sum_erase (f := fun j : ι => counts j) (Finset.mem_univ i)]
-
 omit [DecidableEq C] [Fintype M] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- One-step growth bound for the shared counted hiding implementation:
 the total count increases by at most one. -/

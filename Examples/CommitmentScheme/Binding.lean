@@ -77,7 +77,7 @@ private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S 
   obtain ⟨⟨hne, hc₀⟩, hc₁⟩ := hwin
   have hpair_ne : (m₀, s₀) ≠ (m₁, s₁) := fun h => hne (Prod.ext_iff.mp h).1
   -- cache₂ has entry at (m₀, s₀) with value c₀
-  rw [simulateQ_cachingOracle_query] at hmem₂
+  rw [cachingOracle.simulateQ_query] at hmem₂
   have hcache₂ : cache₂ (m₀, s₀) = some c₀ :=
     cachingOracle_query_caches (m₀, s₀) cache₁ c₀ cache₂ hmem₂
   -- cache₃ has entry at (m₁, s₁) with value c₁
@@ -85,12 +85,12 @@ private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S 
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (c₁, cache₃) ∈ support
         ((cachingOracle (spec := CMOracle M S C) (m₁, s₁)).run cache₂) := by
-      simp only [simulateQ_cachingOracle_query] at hmem₃; exact hmem₃
+      simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
       (QueryImpl.ofLift (CMOracle M S C) (OracleComp (CMOracle M S C)))
       (m₁, s₁) cache₂ (c₁, cache₃) hmem₃_co
-  rw [simulateQ_cachingOracle_query] at hmem₃
+  rw [cachingOracle.simulateQ_query] at hmem₃
   have hcache₃ : cache₃ (m₁, s₁) = some c₁ :=
     cachingOracle_query_caches (m₁, s₁) cache₂ c₁ cache₃ hmem₃
   have hcache₃_m₀ : cache₃ (m₀, s₀) = some c₀ :=
@@ -276,4 +276,4 @@ theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
           Fintype.card_pos (fun _ => le_refl _)
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
         simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
-          add_div_two_card (C := C) (t * (t - 1)) 1
+          add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
