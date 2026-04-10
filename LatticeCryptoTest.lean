@@ -1,4 +1,9 @@
+import LatticeCryptoTest.Falcon.Helpers
+import LatticeCryptoTest.Falcon.Main
+import LatticeCryptoTest.Falcon.TestVectors
 import LatticeCryptoTest.MLDSA.ACVPVectors
 import LatticeCryptoTest.MLDSA.Helpers
+import LatticeCryptoTest.MLDSA.Main
 import LatticeCryptoTest.MLKEM.ACVPVectors
 import LatticeCryptoTest.MLKEM.Helpers
+import LatticeCryptoTest.MLKEM.Main

@@ -25,6 +25,9 @@ import ToMathlib.Control.StateT
 import ToMathlib.Control.WriterT
 import ToMathlib.Data.ENNReal.AbsDiff
 import ToMathlib.Data.ENNReal.SumSquares
+import ToMathlib.Data.IndexedBinaryTree.Basic
+import ToMathlib.Data.IndexedBinaryTree.Equiv
+import ToMathlib.Data.IndexedBinaryTree.Lemmas
 import ToMathlib.General
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic
