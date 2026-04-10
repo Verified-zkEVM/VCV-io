@@ -187,7 +187,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
     exact ⟨entry.1, (m, s), entry.2, c, hne, hcache₃_entry, hcache₃,
       heq_of_eq (by rw [hentry_cm, hceq])⟩
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
 /-- `IsTotalQueryBound` for the extractability game's inner computation.
 
 The inner computation consists of:
@@ -199,9 +199,10 @@ Total: `t₁ + t₂ + 1 ≤ t + 1`.
 
 The proof uses `isTotalQueryBound_run_simulateQ_loggingOracle_iff` (logging preserves
 query bounds) and `isTotalQueryBound_bind` (composition through dependent bind). -/
-private lemma extractabilityInner_totalBound {t : ℕ}
+private lemma extractabilityInner_totalBound [Finite C] {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     IsTotalQueryBound (extractabilityInner A) (t + 1) := by
+  haveI : Fintype C := Fintype.ofFinite C
   -- extractabilityInner A =
   --   (simulateQ loggingOracle A.commit).run >>= fun ((cm, aux), tr) =>
   --     A.open_ aux >>= fun (m, s) =>
@@ -229,18 +230,18 @@ private lemma extractabilityInner_totalBound {t : ℕ}
     intro ⟨⟨cm, aux⟩, tr⟩
     apply isTotalQueryBound_bind (A.openBound aux)
     intro ⟨m, s⟩
-    show IsTotalQueryBound _ 1
     rw [isTotalQueryBound_query_bind_iff]
     exact ⟨Nat.one_pos, fun _ => trivial⟩
   exact hbind.mono (by
     have := A.totalBound
     omega)
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
 /-- The tagged inner computation has the same query bound as the untagged one. -/
-private lemma extractabilityInner_tagged_totalBound {t : ℕ}
+private lemma extractabilityInner_tagged_totalBound [Finite C] {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     IsTotalQueryBound (extractabilityInner_tagged A) (t + 1) := by
+  haveI : Fintype C := Fintype.ofFinite C
   have h := extractabilityInner_totalBound A
   rw [extractabilityInner_eq_fst_tagged] at h
   rwa [show IsTotalQueryBound (Prod.fst <$> extractabilityInner_tagged A) (t + 1) ↔
@@ -278,7 +279,6 @@ private lemma extractability_num_le
     _ = t * (t - 1) := by
       rw [Nat.mul_comm (t - 1) (t - t₁), ← Nat.add_mul, Nat.add_sub_of_le ht₁_le]
 
-set_option maxHeartbeats 400000 in
 /-- The post-commit/open extractability computation for a fixed commit outcome. -/
 private def extractabilityRestOa {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
