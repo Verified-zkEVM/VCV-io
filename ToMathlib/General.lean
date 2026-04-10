@@ -63,7 +63,105 @@ lemma toReal_sub_le_abs_toReal_sub (a b : ℝ≥0∞) :
       rw [tsub_eq_zero_of_le h']
       exact abs_nonneg _
 
+open Finset in
+/-- The Gauss sum `∑_{k=0}^{n-1} k/N ≤ n²/(2N)`, the arithmetic core of the birthday bound. -/
+lemma gauss_sum_inv_le (n : ℕ) (N : ℝ≥0∞) (_hN : 0 < N) :
+    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ ≤
+      (n ^ 2 : ℝ≥0∞) / (2 * N) := by
+  rw [← Finset.sum_mul]
+  have hnat : 2 * (∑ k ∈ range n, k) ≤ n ^ 2 := by
+    have := Finset.sum_range_id_mul_two n; nlinarith [Nat.sub_le n 1]
+  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 := by
+    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
+      simp [Nat.cast_sum]
+    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num,
+      show (n : ℝ≥0∞) ^ 2 = ((n ^ 2 : ℕ) : ℝ≥0∞) from by push_cast; ring,
+      ← Nat.cast_mul]
+    exact_mod_cast hnat
+  have hle : (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 / 2 := by
+    rw [ENNReal.le_div_iff_mul_le (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+    rwa [mul_comm]
+  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
+      ≤ ((n : ℝ≥0∞) ^ 2 / 2) * N⁻¹ := mul_le_mul_left hle N⁻¹
+    _ = (n : ℝ≥0∞) ^ 2 / (2 * N) := by
+        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
+          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+        ring
+
+open Finset in
+/-- Tight Gauss sum: `∑_{k=0}^{n-1} k/N = n*(n-1)/(2N)`. -/
+lemma gauss_sum_inv_eq (n : ℕ) (N : ℝ≥0∞) :
+    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ =
+      ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
+  rw [← Finset.sum_mul]
+  have hnat : (∑ k ∈ range n, k) * 2 = n * (n - 1) :=
+    Finset.sum_range_id_mul_two n
+  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) := by
+    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
+      simp [Nat.cast_sum]
+    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num, ← Nat.cast_mul]
+    congr 1; omega
+  have heq : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 := by
+    rw [ENNReal.eq_div_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+      (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)]
+    exact henn
+  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
+      = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 * N⁻¹ := by rw [heq]
+    _ = ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
+        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
+          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+        ring
+
+/-- `a/(2N) + b/N = (a + 2b)/(2N)` for natural-number casts to `ℝ≥0∞`. -/
+lemma add_div_two_mul_nat (a b N : ℕ) :
+    ((a : ℕ) : ℝ≥0∞) / (2 * N) +
+      ((b : ℕ) : ℝ≥0∞) * (N : ℝ≥0∞)⁻¹ =
+    ((a + 2 * b : ℕ) : ℝ≥0∞) / (2 * N) := by
+  set D := (2 * (N : ℝ≥0∞))
+  rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
+  rw [mul_comm (((b : ℕ) : ℝ≥0∞)) ((N : ℝ≥0∞)⁻¹)]
+  have hD_inv : (N : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
+    simp only [D]
+    rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
+      mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
+      ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+        (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
+  rw [hD_inv, mul_assoc, ← mul_add]
+  congr 1
+  push_cast
+  ring
+
 end ENNReal
+
+open Finset in
+/-- Updating one coordinate by `+1` increases the total sum by exactly one. -/
+lemma sum_update_succ_count {ι : Type} [Fintype ι] [DecidableEq ι]
+    (counts : ι → ℕ) (i : ι) :
+    ∑ j : ι, Function.update counts i (counts i + 1) j =
+      (∑ j : ι, counts j) + 1 := by
+  classical
+  calc
+    ∑ j : ι, Function.update counts i (counts i + 1) j =
+        Function.update counts i (counts i + 1) i +
+          Finset.sum (Finset.univ.erase i)
+            (fun j : ι => Function.update counts i (counts i + 1) j) := by
+          symm
+          exact Finset.univ.add_sum_erase
+            (f := fun j : ι => Function.update counts i (counts i + 1) j) (Finset.mem_univ i)
+    _ = counts i + 1 + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) := by
+          simp only [Function.update_self]
+          congr 1
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          rw [Function.update_of_ne (Finset.ne_of_mem_erase hj)]
+    _ = counts i + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) + 1 := by
+          omega
+    _ = (∑ j : ι, counts j) + 1 := by
+          rw [← Finset.univ.add_sum_erase (f := fun j : ι => counts j) (Finset.mem_univ i)]
 
 @[simp, grind =]
 lemma fst_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}

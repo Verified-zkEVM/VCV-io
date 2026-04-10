@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 
 /-!
@@ -97,6 +98,95 @@ lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
   rw [fst_map_run_simulateQ]
 
 end loggingOracle
+
+namespace OracleComp
+
+lemma run_simulateQ_loggingOracle_query_bind
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
+    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) :
+    (simulateQ loggingOracle (liftM (query t) >>= mx)).run =
+      (query t : OracleComp spec _) >>= fun u =>
+        (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+          <$> (simulateQ loggingOracle (mx u)).run := by
+  simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
+    Prod.map, Function.id_def]
+
+/-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of
+`(simulateQ loggingOracle oa).run` is identical to that of `oa` (each query passes through
+unchanged, with only the writer log being appended). -/
+theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (n : ℕ) :
+    IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔
+    IsTotalQueryBound oa n := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure _ =>
+      constructor <;> intro _ <;> trivial
+  | query_bind t mx ih =>
+      rw [run_simulateQ_loggingOracle_query_bind]
+      rw [isTotalQueryBound_query_bind_iff, isTotalQueryBound_query_bind_iff]
+      exact and_congr_right fun _ => forall_congr' fun u =>
+        (isQueryBound_map_iff _ _ _ _ _).trans (ih u (n - 1))
+
+/-- A total query bound controls the length of every `loggingOracle` trace in support:
+if `oa` makes at most `n` queries, then every support point of
+`(simulateQ loggingOracle oa).run` has log length at most `n`. -/
+theorem log_length_le_of_mem_support_run_simulateQ
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    {oa : OracleComp spec α} {n : ℕ}
+    (hbound : IsTotalQueryBound oa n)
+    {z : α × QueryLog spec}
+    (hz : z ∈ support ((simulateQ loggingOracle oa).run)) :
+    z.2.length ≤ n := by
+  suffices h : ∀ (β : Type) (ob : OracleComp spec β) (m : ℕ),
+      IsTotalQueryBound ob m → ∀ z ∈ support ((simulateQ loggingOracle ob).run),
+      z.2.length ≤ m from
+    h α oa n hbound z hz
+  intro β ob m hm
+  induction ob using OracleComp.inductionOn generalizing m with
+  | pure x =>
+      intro z hz
+      simp only [simulateQ_pure] at hz
+      subst hz
+      simp
+  | query_bind t mx ih =>
+      intro z hz
+      rw [isTotalQueryBound_query_bind_iff] at hm
+      obtain ⟨hpos, hrest⟩ := hm
+      simp only [simulateQ_bind, simulateQ_query] at hz
+      rw [show ((query t).cont <$> loggingOracle (query t).input >>=
+        fun x => simulateQ loggingOracle (mx x) :
+        WriterT (QueryLog spec) (OracleComp spec) β).run =
+        ((query t).cont <$> loggingOracle (query t).input).run >>=
+        fun p => Prod.map id (p.2 ++ ·) <$>
+          (simulateQ loggingOracle (mx p.1)).run
+        from WriterT.run_bind' _ _] at hz
+      rw [support_bind] at hz
+      simp only [Set.mem_iUnion] at hz
+      obtain ⟨qu, hqu, hz⟩ := hz
+      rw [support_map] at hz
+      obtain ⟨z', hz', rfl⟩ := hz
+      have hqu_log : qu.2.length = 1 := by
+        simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query] at hqu
+        have hrun : (loggingOracle (spec := spec) t).run =
+            (query t : OracleComp spec _) >>= fun u =>
+              pure (u, [⟨t, u⟩]) := by
+          simp [loggingOracle, QueryImpl.withLogging_apply,
+            WriterT.run_bind', WriterT.run_monadLift', WriterT.run_tell,
+            map_pure, Prod.map]
+        rw [hrun] at hqu
+        simp only [support_bind, support_pure, Set.mem_iUnion,
+          Set.mem_singleton_iff] at hqu
+        obtain ⟨u, _, rfl⟩ := hqu
+        simp
+      have hz'_len : z'.2.length ≤ m - 1 :=
+        ih qu.1 (m - 1) (hrest qu.1) z' hz'
+      have hm : 1 + (m - 1) = m := by omega
+      simpa [List.length_append, hqu_log, hm] using Nat.add_le_add_left hz'_len 1
+
+end OracleComp
 
 /-- Add a query log to a computation using a logging oracle. -/
 @[reducible] def OracleComp.withQueryLog {α} (mx : OracleComp spec α) :

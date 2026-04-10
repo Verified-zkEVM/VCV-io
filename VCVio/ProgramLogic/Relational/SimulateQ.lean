@@ -327,6 +327,60 @@ theorem relTriple_simulateQ_run'_of_query_map_eq
       (EqRel α) :=
   relTriple_eqRel_of_eq (run'_simulateQ_eq_of_query_map_eq impl₁ impl₂ proj hproj oa s)
 
+/-- Generalized state-projection theorem: if applying `proj` to the state commutes with each
+oracle step, then it commutes with the full simulation. Generalizes the `ProbComp` version
+to any target spec. -/
+theorem map_run_simulateQ_eq_of_query_map_eq'
+    {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
+    (proj : σ₁ → σ₂)
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) :
+    Prod.map id proj <$> (simulateQ impl₁ oa).run s =
+      (simulateQ impl₂ oa).run (proj s) := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x => simp
+  | query_bind t oa ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, map_bind]
+      calc
+        ((impl₁ t).run s >>= fun x =>
+            Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2)
+            =
+            ((impl₁ t).run s >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run (proj x.2)) := by
+                  refine bind_congr fun x => ?_
+                  simpa using ih x.1 x.2
+        _ =
+            ((Prod.map id proj <$> (impl₁ t).run s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  exact
+                    (bind_map_left (m := OracleComp spec') (Prod.map id proj)
+                      ((impl₁ t).run s)
+                      (fun y => (simulateQ impl₂ (oa y.1)).run y.2)).symm
+        _ =
+            ((impl₂ t).run (proj s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  rw [hproj t s]
+
+/-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq'`. -/
+theorem run'_simulateQ_eq_of_query_map_eq'
+    {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
+    (proj : σ₁ → σ₂)
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) :
+    (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by
+  have hrun := map_run_simulateQ_eq_of_query_map_eq' impl₁ impl₂ proj hproj oa s
+  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  simpa [StateT.run'] using hmap
+
 /-! ## "Identical until bad" fundamental lemma -/
 
 variable [spec.Fintype] [spec.Inhabited]
@@ -471,6 +525,146 @@ theorem tvDist_simulateQ_le_probEvent_bad
   have h_bad_eq : Pr[ bad ∘ Prod.snd | sim₁] = Pr[ bad ∘ Prod.snd | sim₂] :=
     probEvent_bad_eq impl₁ impl₂ bad h_agree h_mono₁ h_mono₂ oa s₀
   have h_tv_joint : tvDist sim₁ sim₂ ≤ Pr[ bad ∘ Prod.snd | sim₁].toReal :=
+    tvDist_le_probEvent_of_probOutput_eq_of_not (mx := sim₁) (my := sim₂) (bad ∘ Prod.snd)
+      (fun xs hxs => by
+        rcases xs with ⟨x, s⟩
+        simpa using h_eq x s hxs)
+      h_bad_eq
+  have h_map :
+      tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀) ≤ tvDist sim₁ sim₂ := by
+    simpa [sim₁, sim₂, StateT.run'] using
+      (tvDist_map_le (m := OracleComp spec) (α := α × σ) (β := α) Prod.fst sim₁ sim₂)
+  exact le_trans h_map h_tv_joint
+
+/-! ## Distributional "identical until bad"
+
+The `_dist` variant weakens the agreement hypothesis from definitional equality
+(`impl₁ t).run s = (impl₂ t).run s`) to distributional equality
+(`∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s]`).
+This is needed when the two implementations differ intensionally but agree on
+output probabilities. -/
+
+open scoped Classical in
+private lemma probOutput_simulateQ_run_eq_of_not_bad_dist
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (bad : σ → Prop)
+    (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
+      ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
+    (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₁ t).run s), bad x.2)
+    (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₂ t).run s), bad x.2)
+    (oa : OracleComp spec α) (s₀ : σ) (x : α) (s : σ) (hs : ¬bad s) :
+    Pr[= (x, s) | (simulateQ impl₁ oa).run s₀] =
+      Pr[= (x, s) | (simulateQ impl₂ oa).run s₀] := by
+  induction oa using OracleComp.inductionOn generalizing s₀ with
+  | pure a =>
+    by_cases h_bad : bad s₀
+    · rw [probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ (pure a) s₀ h_bad x s hs,
+        probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ (pure a) s₀ h_bad x s hs]
+    · rfl
+  | query_bind t oa ih =>
+    by_cases h_bad : bad s₀
+    · rw [probOutput_simulateQ_run_eq_zero_of_bad impl₁ bad h_mono₁ _ s₀ h_bad x s hs,
+        probOutput_simulateQ_run_eq_zero_of_bad impl₂ bad h_mono₂ _ s₀ h_bad x s hs]
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind]
+      rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+      have step1 : ∀ (p : spec.Range t × σ),
+          Pr[= p | (impl₁ t).run s₀] *
+            Pr[= (x, s) | (simulateQ impl₁ (oa p.1)).run p.2] =
+          Pr[= p | (impl₁ t).run s₀] *
+            Pr[= (x, s) | (simulateQ impl₂ (oa p.1)).run p.2] := by
+        intro ⟨u, s'⟩; congr 1; exact ih u s'
+      rw [show (∑' p, Pr[= p | (impl₁ t).run s₀] *
+          Pr[= (x, s) | (simulateQ impl₁ (oa p.1)).run p.2]) =
+          (∑' p, Pr[= p | (impl₁ t).run s₀] *
+          Pr[= (x, s) | (simulateQ impl₂ (oa p.1)).run p.2]) from
+        tsum_congr step1]
+      exact tsum_congr (fun p => by rw [h_agree_dist t s₀ h_bad p])
+
+open scoped Classical in
+private lemma probEvent_not_bad_eq_dist
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (bad : σ → Prop)
+    (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
+      ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
+    (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₁ t).run s), bad x.2)
+    (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₂ t).run s), bad x.2)
+    (oa : OracleComp spec α) (s₀ : σ) :
+    Pr[fun x => ¬bad x.2 | (simulateQ impl₁ oa).run s₀] =
+    Pr[fun x => ¬bad x.2 | (simulateQ impl₂ oa).run s₀] := by
+  rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
+  refine tsum_congr (fun ⟨a, s⟩ => ?_)
+  split_ifs with h
+  · rfl
+  · exact probOutput_simulateQ_run_eq_of_not_bad_dist impl₁ impl₂ bad h_agree_dist h_mono₁ h_mono₂
+      oa s₀ a s h
+
+open scoped Classical in
+private lemma probEvent_bad_eq_dist
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (bad : σ → Prop)
+    (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
+      ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
+    (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₁ t).run s), bad x.2)
+    (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₂ t).run s), bad x.2)
+    (oa : OracleComp spec α) (s₀ : σ) :
+    Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀] =
+    Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
+  have h1 := probEvent_compl ((simulateQ impl₁ oa).run s₀) (bad ∘ Prod.snd)
+  have h2 := probEvent_compl ((simulateQ impl₂ oa).run s₀) (bad ∘ Prod.snd)
+  simp only [NeverFail.probFailure_eq_zero, tsub_zero] at h1 h2
+  have h_not_bad := probEvent_not_bad_eq_dist impl₁ impl₂ bad h_agree_dist h_mono₁ h_mono₂ oa s₀
+  have h_not_bad' : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] =
+      Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] :=
+    h_not_bad
+  have hne : Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] ≠ ⊤ :=
+    ne_top_of_le_ne_top (by simp) probEvent_le_one
+  calc Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀]
+      = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₁ oa).run s₀] := by
+        rw [← h1]; exact (ENNReal.add_sub_cancel_right hne).symm
+    _ = 1 - Pr[fun x => ¬(bad ∘ Prod.snd) x | (simulateQ impl₂ oa).run s₀] := by
+        rw [h_not_bad']
+    _ = Pr[bad ∘ Prod.snd | (simulateQ impl₂ oa).run s₀] := by
+        rw [← h2]; exact ENNReal.add_sub_cancel_right
+          (ne_top_of_le_ne_top (by simp) probEvent_le_one)
+
+open scoped Classical in
+/-- Distributional variant of `tvDist_simulateQ_le_probEvent_bad`:
+weakens the agreement hypothesis from definitional equality to distributional equality
+(pointwise equal output probabilities). -/
+theorem tvDist_simulateQ_le_probEvent_bad_dist
+    {σ : Type}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
+    (bad : σ → Prop)
+    (oa : OracleComp spec α) (s₀ : σ)
+    (_ : ¬bad s₀)
+    (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
+      ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
+    (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₁ t).run s), bad x.2)
+    (h_mono₂ : ∀ (t : spec.Domain) (s : σ), bad s →
+      ∀ x ∈ support ((impl₂ t).run s), bad x.2) :
+    tvDist ((simulateQ impl₁ oa).run' s₀) ((simulateQ impl₂ oa).run' s₀)
+      ≤ Pr[bad ∘ Prod.snd | (simulateQ impl₁ oa).run s₀].toReal := by
+  classical
+  let sim₁ := (simulateQ impl₁ oa).run s₀
+  let sim₂ := (simulateQ impl₂ oa).run s₀
+  have h_eq : ∀ (x : α) (s : σ), ¬bad s →
+      Pr[= (x, s) | sim₁] = Pr[= (x, s) | sim₂] :=
+    fun x s hs => probOutput_simulateQ_run_eq_of_not_bad_dist impl₁ impl₂ bad h_agree_dist
+      h_mono₁ h_mono₂ oa s₀ x s hs
+  have h_bad_eq : Pr[bad ∘ Prod.snd | sim₁] = Pr[bad ∘ Prod.snd | sim₂] :=
+    probEvent_bad_eq_dist impl₁ impl₂ bad h_agree_dist h_mono₁ h_mono₂ oa s₀
+  have h_tv_joint : tvDist sim₁ sim₂ ≤ Pr[bad ∘ Prod.snd | sim₁].toReal :=
     tvDist_le_probEvent_of_probOutput_eq_of_not (mx := sim₁) (my := sim₂) (bad ∘ Prod.snd)
       (fun xs hxs => by
         rcases xs with ⟨x, s⟩

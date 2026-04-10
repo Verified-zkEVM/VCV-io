@@ -69,7 +69,9 @@ import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.ProbCompLift
+import VCVio.OracleComp.QueryTracking.Birthday
 import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.Collision
 import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.Enforcement
@@ -80,6 +82,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.Unpredictability
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.BundledSemantics
