@@ -830,7 +830,11 @@ theorem probEvent_cacheCollision_le_birthday {α : Type} {t : ℕ}
   have h := probEvent_cacheCollision_le_birthday_total oa _ htotal hC hrange
   simp only [Nat.cast_mul] at h; exact h
 
-/-- Birthday bound for single-index oracle specs (typical ROM case: `t²/(2|C|)`). -/
+/-- **WARNING: vacuously true.** The `[Unique ι]` hypothesis means `ι` has exactly one element,
+but `CacheHasCollision` requires two *distinct* oracle indices `t₁ ≠ t₂ : ι`, which is impossible.
+The event `CacheHasCollision z.2` is therefore always false, making the bound trivially `0 ≤ ...`.
+
+The non-vacuous birthday bound is `probEvent_cacheCollision_le_birthday_total_tight`. -/
 theorem probEvent_cacheCollision_le_birthday' {α : Type} {t : ℕ}
     [Inhabited ι] [Unique ι]
     (oa : OracleComp spec α)

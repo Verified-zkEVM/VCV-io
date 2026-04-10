@@ -1369,15 +1369,10 @@ theorem euf_cma_bound [DecidableEq Z]
       adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
-  let _ := hc
-  let _ := hζ
-  let _ := hhvzk
-  let _ := hcr
-  let _ := hQ
   sorry
 
 /-- Perfect-HVZK special case of `euf_cma_bound`, where the simulator contributes no
-`qS · ζ_zk` loss term. -/
+`qS · ζ_zk` loss term. **Blocked** on `euf_cma_bound`. -/
 theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
     (hc : ids.Complete)
     (sim : S → ProbComp (Option (W' × C × Z)))
@@ -1394,13 +1389,7 @@ theorem euf_cma_bound_perfectHVZK [DecidableEq Z]
       adv.advantage (runtime M) ≤
         Pr[= true | hardRelationExp (r := p) reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
-  simpa using
-    (euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)
-      (hc := hc) (sim := sim) (ζ_zk := 0) (hζ := le_rfl)
-      (hhvzk := (IdenSchemeWithAbort.perfectHVZK_iff_hvzk_zero ids sim).mp hhvzk)
-      (recover := recover) (hcr := hcr) (adv := adv)
-      (qS := qS) (qH := qH) (ε := ε) (p_abort := p_abort) (δ := δ) (hp := hp)
-      (hQ := hQ))
+  sorry
 
 end EUF_CMA
 

@@ -735,136 +735,70 @@ def QueryBoundedBelowBy (oa : AddWriterT ℕ m α) (n : ℕ) : Prop :=
   PathwiseCostAtLeast oa n
 
 lemma queryBoundedAboveBy_pure [LawfulMonad m] (x : α) :
-    QueryBoundedAboveBy (pure x : AddWriterT ℕ m α) 0 := by
-  intro z hz
-  rw [WriterT.run_pure, support_pure] at hz
-  rcases hz with rfl
-  simp
+    QueryBoundedAboveBy (pure x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostAtMost_pure x
 
 lemma queryBoundedBelowBy_pure [LawfulMonad m] (x : α) :
-    QueryBoundedBelowBy (pure x : AddWriterT ℕ m α) 0 := by
-  intro z hz
-  rw [WriterT.run_pure, support_pure] at hz
-  rcases hz with rfl
-  simp
+    QueryBoundedBelowBy (pure x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostAtLeast_pure x
 
 lemma queryBoundedAboveBy_monadLift [LawfulMonad m] (x : m α) :
-    QueryBoundedAboveBy (monadLift x : AddWriterT ℕ m α) 0 := by
-  intro z hz
-  rw [WriterT.run_monadLift, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+    QueryBoundedAboveBy (monadLift x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostAtMost_monadLift x
 
 lemma queryBoundedBelowBy_monadLift [LawfulMonad m] (x : m α) :
-    QueryBoundedBelowBy (monadLift x : AddWriterT ℕ m α) 0 := by
-  intro z hz
-  rw [WriterT.run_monadLift, support_map] at hz
-  rcases hz with ⟨a, _, rfl⟩
-  simp
+    QueryBoundedBelowBy (monadLift x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostAtLeast_monadLift x
 
 lemma queryBoundedAboveBy_mono {oa : AddWriterT ℕ m α} {n₁ n₂ : ℕ}
     (h : QueryBoundedAboveBy oa n₁) (hn : n₁ ≤ n₂) :
-    QueryBoundedAboveBy oa n₂ := by
-  intro z hz
-  exact le_trans (h z hz) hn
+    QueryBoundedAboveBy oa n₂ :=
+  pathwiseCostAtMost_mono h hn
 
 lemma queryBoundedBelowBy_mono {oa : AddWriterT ℕ m α} {n₁ n₂ : ℕ}
     (h : QueryBoundedBelowBy oa n₂) (hn : n₁ ≤ n₂) :
-    QueryBoundedBelowBy oa n₁ := by
-  intro z hz
-  exact le_trans hn (h z hz)
+    QueryBoundedBelowBy oa n₁ :=
+  pathwiseCostAtLeast_mono h hn
 
 lemma queryBoundedAboveBy_addTell [LawfulMonad m] (w : ℕ) :
-    QueryBoundedAboveBy (AddWriterT.addTell (M := m) w) w := by
-  intro z hz
-  rw [AddWriterT.run_addTell, support_pure] at hz
-  rcases hz with rfl
-  simp
+    QueryBoundedAboveBy (AddWriterT.addTell (M := m) w) w :=
+  pathwiseCostAtMost_addTell w
 
 lemma queryBoundedBelowBy_addTell [LawfulMonad m] (w : ℕ) :
-    QueryBoundedBelowBy (AddWriterT.addTell (M := m) w) w := by
-  intro z hz
-  rw [AddWriterT.run_addTell, support_pure] at hz
-  rcases hz with rfl
-  simp
+    QueryBoundedBelowBy (AddWriterT.addTell (M := m) w) w :=
+  pathwiseCostAtLeast_addTell w
 
 lemma queryBoundedAboveBy_map [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ} (f : α → β)
     (h : QueryBoundedAboveBy oa n) :
-    QueryBoundedAboveBy (f <$> oa) n := by
-  intro z hz
-  rw [WriterT.run_map, support_map] at hz
-  rcases hz with ⟨z', hz', rfl⟩
-  exact h z' hz'
+    QueryBoundedAboveBy (f <$> oa) n :=
+  pathwiseCostAtMost_map f h
 
 lemma queryBoundedBelowBy_map [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ} (f : α → β)
     (h : QueryBoundedBelowBy oa n) :
-    QueryBoundedBelowBy (f <$> oa) n := by
-  intro z hz
-  rw [WriterT.run_map, support_map] at hz
-  rcases hz with ⟨z', hz', rfl⟩
-  exact h z' hz'
+    QueryBoundedBelowBy (f <$> oa) n :=
+  pathwiseCostAtLeast_map f h
 
 lemma queryBoundedAboveBy_bind [LawfulMonad m]
     {oa : AddWriterT ℕ m α} {f : α → AddWriterT ℕ m β} {n₁ n₂ : ℕ}
     (h₁ : QueryBoundedAboveBy oa n₁) (h₂ : ∀ a, QueryBoundedAboveBy (f a) n₂) :
-    QueryBoundedAboveBy (oa >>= f) (n₁ + n₂) := by
-  intro z hz
-  rw [WriterT.run_bind] at hz
-  rcases (mem_support_bind_iff
-    (mx := oa.run)
-    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
-    (y := z)).1 hz with ⟨aw, haw, hz⟩
-  rcases aw with ⟨a, wa⟩
-  rw [support_map] at hz
-  rcases hz with ⟨bw, hbw, rfl⟩
-  rcases bw with ⟨b, wb⟩
-  simpa using Nat.add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+    QueryBoundedAboveBy (oa >>= f) (n₁ + n₂) :=
+  pathwiseCostAtMost_bind h₁ h₂
 
 lemma queryBoundedBelowBy_bind [LawfulMonad m]
     {oa : AddWriterT ℕ m α} {f : α → AddWriterT ℕ m β} {n₁ n₂ : ℕ}
     (h₁ : QueryBoundedBelowBy oa n₁) (h₂ : ∀ a, QueryBoundedBelowBy (f a) n₂) :
-    QueryBoundedBelowBy (oa >>= f) (n₁ + n₂) := by
-  intro z hz
-  rw [WriterT.run_bind] at hz
-  rcases (mem_support_bind_iff
-    (mx := oa.run)
-    (my := fun aw ↦ Prod.map id (aw.2 * ·) <$> (f aw.1).run)
-    (y := z)).1 hz with ⟨aw, haw, hz⟩
-  rcases aw with ⟨a, wa⟩
-  rw [support_map] at hz
-  rcases hz with ⟨bw, hbw, rfl⟩
-  rcases bw with ⟨b, wb⟩
-  simpa using Nat.add_le_add (h₁ (a, wa) haw) (h₂ a (b, wb) hbw)
+    QueryBoundedBelowBy (oa >>= f) (n₁ + n₂) :=
+  pathwiseCostAtLeast_bind h₁ h₂
 
 lemma queryBoundedAboveBy_fin_mOfFn [LawfulMonad m] {n k : ℕ}
     {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryBoundedAboveBy (f i) k) :
-    QueryBoundedAboveBy (Fin.mOfFn n f) (n * k) := by
-  induction n with
-  | zero =>
-      simp [Fin.mOfFn, queryBoundedAboveBy_pure]
-  | succ n ih =>
-      simp only [Fin.mOfFn, Nat.succ_mul]
-      simpa [Nat.add_comm] using
-        (queryBoundedAboveBy_bind (n₁ := k) (n₂ := n * k)
-          (by simpa using h 0)
-          (fun a ↦
-            queryBoundedAboveBy_map (fun rest ↦ Fin.cons a rest)
-              (ih (fun i ↦ h i.succ))))
+    QueryBoundedAboveBy (Fin.mOfFn n f) (n * k) :=
+  pathwiseCostAtMost_fin_mOfFn h
 
 lemma queryBoundedBelowBy_fin_mOfFn [LawfulMonad m] {n k : ℕ}
     {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryBoundedBelowBy (f i) k) :
-    QueryBoundedBelowBy (Fin.mOfFn n f) (n * k) := by
-  induction n with
-  | zero =>
-      simp [Fin.mOfFn, queryBoundedBelowBy_pure]
-  | succ n ih =>
-      simp only [Fin.mOfFn, Nat.succ_mul]
-      simpa [Nat.add_comm] using
-        (queryBoundedBelowBy_bind (n₁ := k) (n₂ := n * k)
-          (by simpa using h 0)
-          (fun a ↦
-            queryBoundedBelowBy_map (fun rest ↦ Fin.cons a rest)
-              (ih (fun i ↦ h i.succ))))
+    QueryBoundedBelowBy (Fin.mOfFn n f) (n * k) :=
+  pathwiseCostAtLeast_fin_mOfFn h
 
 end unitCostBounds
 

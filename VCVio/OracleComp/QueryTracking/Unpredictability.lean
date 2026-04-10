@@ -45,7 +45,12 @@ theorem probOutput_fresh_cachingOracle_query
   exact probOutput_query t u
 
 omit [spec'.DecidableEq] in
-/-- **Unpredictability bound**: `Pr[cache miss] * 1/|C| ≤ 1/|C|`. -/
+/-- **WARNING: trivially true.** The proof uses only `probEvent_le_one`; the query bound
+`hbound` and `target` are completely unused. The conclusion `Pr[...] * |C|⁻¹ ≤ |C|⁻¹`
+holds for any computation regardless of how many queries it makes.
+
+A meaningful unpredictability bound should use `hbound` to establish that the queried point
+is fresh, giving a tight `1/|C|` bound on the probability of guessing the ROM output. -/
 theorem probEvent_unqueried_match_le {α : Type} {t : ℕ}
     (oa : OracleComp spec' α)
     (_hbound : IsPerIndexQueryBound oa (fun _ => t))
@@ -309,7 +314,14 @@ end Unpredictability
 
 /-! ## Collision-Based Win Bound -/
 
-/-- If winning implies a cache collision, the win probability is bounded by the birthday bound. -/
+/-- **WARNING: vacuously true.** The `[Unique ι]` hypothesis means `ι` has exactly one element,
+but `CacheHasCollision` (used via `probEvent_cacheCollision_le_birthday'`) requires two *distinct*
+oracle indices `t₁ ≠ t₂ : ι`, which is impossible when `ι` is unique. The event
+`CacheHasCollision z.2` is therefore always false, making the bound trivially `0 ≤ ...`.
+
+For a useful single-oracle collision bound, state it over `LogHasCollision` (which checks for
+equal outputs on distinct *inputs* within the same oracle index) rather than `CacheHasCollision`
+(which requires distinct indices). -/
 theorem probEvent_collision_win_le {α : Type} {t : ℕ}
     [Inhabited ι] [Unique ι]
     (oa : OracleComp spec α)

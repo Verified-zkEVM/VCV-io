@@ -40,6 +40,22 @@ lemma fst_map_run_withLogging [LawfulMonad m] (so : QueryImpl spec m) (mx : Orac
   | pure x => simp
   | query_bind t oa h => simp [h]
 
+/-- Logging preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
+wrapping an oracle implementation with `withLogging` does not change the probability of failure.
+When `m = OracleComp spec`, both sides are `0` (trivially true). When `m` can genuinely fail
+(e.g. `OptionT (OracleComp spec)`), this is a non-trivial faithfulness property. -/
+lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (mx : OracleComp spec α) :
+    Pr[⊥ | (simulateQ (so.withLogging) mx).run] = Pr[⊥ | simulateQ so mx] := by
+  rw [show Pr[⊥ | (simulateQ (so.withLogging) mx).run] =
+    Pr[⊥ | Prod.fst <$> (simulateQ (so.withLogging) mx).run] from
+    (probFailure_map _ _).symm, fst_map_run_withLogging]
+
+lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (mx : OracleComp spec α) :
+    NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) := by
+  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withLogging]
+
 end QueryImpl
 
 /-- Simulation oracle for tracking the quries in a `QueryLog`, without modifying the actual
@@ -52,6 +68,7 @@ def loggingOracle {spec : OracleSpec ι} :
 namespace loggingOracle
 
 
+/-- Specialization of `QueryImpl.probFailure_run_simulateQ_withLogging` to `loggingOracle`. -/
 @[simp]
 lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
@@ -59,7 +76,7 @@ lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     Pr[⊥ | (WriterT.run
         (simulateQ (loggingOracle (spec := spec)) oa) :
           OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
-  simp only [HasEvalPMF.probFailure_eq_zero]
+  rw [loggingOracle, QueryImpl.probFailure_run_simulateQ_withLogging, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
@@ -73,13 +90,13 @@ lemma run_simulateQ_bind_fst {spec : OracleSpec.{0, 0} ι} {α β : Type}
     ((simulateQ (loggingOracle (spec := spec)) oa).run >>= fun x => ob x.1) = oa >>= ob := by
   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
+/-- Specialization of `QueryImpl.NeverFail_run_simulateQ_withLogging_iff` to `loggingOracle`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
     NeverFail (simulateQ (loggingOracle (spec := spec)) oa).run ↔ NeverFail oa := by
-  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
-    HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
+  rw [loggingOracle, QueryImpl.NeverFail_run_simulateQ_withLogging_iff, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
