@@ -138,53 +138,38 @@ instance {s} : Functor (fun α => FullData α s) where
   map f x := x.map f
 
 
-instance {s} : LawfulFunctor (fun α => LeafData α s) := by
-  refine
-    { map_const := rfl
-      id_map := ?_
-      comp_map := ?_ }
-  · intro α x
+instance {s} : LawfulFunctor (fun α => LeafData α s) where
+  map_const := rfl
+  id_map x := by
     induction x with
     | leaf value => simp [Functor.map, LeafData.map]
-    | internal left right ihL ihR =>
-      simp_all [Functor.map, LeafData.map]
-  · intro α β γ g h x
+    | internal left right ihL ihR => simp_all [Functor.map, LeafData.map]
+  comp_map g h x := by
     induction x with
     | leaf value => simp [Functor.map, LeafData.map]
-    | internal left right ihL ihR =>
-      simp_all [Functor.map, LeafData.map]
+    | internal left right ihL ihR => simp_all [Functor.map, LeafData.map]
 
-instance {s} : LawfulFunctor (fun α => InternalData α s) := by
-  refine
-    { map_const := rfl
-      id_map := ?_
-      comp_map := ?_ }
-  · intro α x
+instance {s} : LawfulFunctor (fun α => InternalData α s) where
+  map_const := rfl
+  id_map x := by
     induction x with
     | leaf => simp [Functor.map, InternalData.map]
-    | internal value tL tR ihL ihR =>
-      simp_all [Functor.map, InternalData.map]
-  · intro α β γ g h x
+    | internal value tL tR ihL ihR => simp_all [Functor.map, InternalData.map]
+  comp_map g h x := by
     induction x with
     | leaf => simp [Functor.map, InternalData.map]
-    | internal value tL tR ihL ihR =>
-      simp_all [Functor.map, InternalData.map]
+    | internal value tL tR ihL ihR => simp_all [Functor.map, InternalData.map]
 
-instance {s} : LawfulFunctor (fun α => FullData α s) := by
-  refine
-    { map_const := rfl
-      id_map := ?_
-      comp_map := ?_ }
-  · intro α x
+instance {s} : LawfulFunctor (fun α => FullData α s) where
+  map_const := rfl
+  id_map x := by
     induction x with
     | leaf value => simp [Functor.map, FullData.map]
-    | internal value tL tR ihL ihR =>
-      simp_all [Functor.map, FullData.map]
-  · intro α β γ g h x
+    | internal value tL tR ihL ihR => simp_all [Functor.map, FullData.map]
+  comp_map g h x := by
     induction x with
     | leaf value => simp [Functor.map, FullData.map]
-    | internal value tL tR ihL ihR =>
-      simp_all [Functor.map, FullData.map]
+    | internal value tL tR ihL ihR => simp_all [Functor.map, FullData.map]
 
 end Navigation
 

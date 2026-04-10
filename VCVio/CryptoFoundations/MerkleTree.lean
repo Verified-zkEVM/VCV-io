@@ -84,7 +84,7 @@ def buildLayer (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) :
   -- Pair up the leaves to form pairs
   let pairs : List.Vector (α × α) (2 ^ n) :=
     List.Vector.ofFn (fun i =>
-      (leaves.get ⟨2 * i, by grind only⟩, leaves.get ⟨2 * i + 1, by grind only⟩))
+      (leaves.get ⟨2 * i, by omega⟩, leaves.get ⟨2 * i + 1, by omega⟩))
   -- Hash each pair to get the next layer
   let hashes : List.Vector α (2 ^ n) ←
     List.Vector.mmap (fun ⟨left, right⟩ => query (spec := spec α) ⟨left, right⟩) pairs
@@ -153,7 +153,7 @@ def siblingIndex {n : ℕ} (i : Fin (2 ^ (n + 1))) : Fin (2 ^ (n + 1)) :=
       have hle : i.val + 1 ≤ 2 ^ (n + 1) := Nat.succ_le_of_lt hi
       have hne : i.val + 1 ≠ 2 ^ (n + 1) := by
         intro hEq
-        have hiVal : i.val = 2 ^ (n + 1) - 1 := by grind only
+        have hiVal : i.val = 2 ^ (n + 1) - 1 := by omega
         have hpos : 0 < 2 ^ (n + 1) := by
           exact pow_pos (by decide : 0 < (2 : ℕ)) _
         have hle1 : 1 ≤ 2 ^ (n + 1) := Nat.succ_le_of_lt hpos
@@ -177,7 +177,7 @@ def generateProof {n : ℕ} (i : Fin (2 ^ n)) (cache : Cache α n) :
   | 0 => List.Vector.nil
   | n + 1 =>
       List.Vector.cons ((cache.leaves).get (siblingIndex i))
-        (generateProof ⟨i.val / 2, by grind only⟩ (cache.upper))
+        (generateProof ⟨i.val / 2, by omega⟩ (cache.upper))
 
 /--
 Given a leaf index, a leaf at that index, and putative proof,
@@ -195,7 +195,7 @@ def getPutativeRoot {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : List.Vector
     -- Get the sign bit of `i`
     let signBit := i.val % 2
     -- Show that `i / 2` is in `Fin (2 ^ (n - 1))`
-    let i' : Fin (2 ^ n) := ⟨i.val / 2, by grind only⟩
+    let i' : Fin (2 ^ n) := ⟨i.val / 2, by omega⟩
     if signBit = 0 then
       -- `i` is a left child
       let newLeaf ← query (spec := spec α) ⟨leaf, proof.head⟩
@@ -242,7 +242,7 @@ def buildLayer_with_hash (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (hash
   let leaves : List.Vector α (2 ^ n * 2) := cast (by rw [pow_succ]) leaves
   let pairs : List.Vector (α × α) (2 ^ n) :=
     List.Vector.ofFn (fun i =>
-      (leaves.get ⟨2 * i, by grind only⟩, leaves.get ⟨2 * i + 1, by grind only⟩))
+      (leaves.get ⟨2 * i, by omega⟩, leaves.get ⟨2 * i + 1, by omega⟩))
   pairs.map hashFn
 
 /-- A purely functional version of `buildMerkleTree`, given an explicit hash function. -/
@@ -267,7 +267,7 @@ def getPutativeRoot_with_hash {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : L
   | 0 => leaf
   | n + 1 =>
       let signBit := i.val % 2
-      let i' : Fin (2 ^ n) := ⟨i.val / 2, by grind only⟩
+      let i' : Fin (2 ^ n) := ⟨i.val / 2, by omega⟩
       if signBit = 0 then
         let newLeaf := hashFn (leaf, proof.head)
         getPutativeRoot_with_hash i' newLeaf proof.tail hashFn

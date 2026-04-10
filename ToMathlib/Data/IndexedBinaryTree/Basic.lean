@@ -563,36 +563,21 @@ def SkeletonNodeIndex.parent {s : Skeleton} (idx : SkeletonNodeIndex s) :
     idxRight.parent.map (SkeletonNodeIndex.ofRight)
 
 /--
-Return the sibling node index of a given `SkeletonNodeIndex`. Or `none` if the node is the root
+Return the sibling node index of a given `SkeletonNodeIndex`. Or `none` if the node is the root.
 -/
 def SkeletonNodeIndex.sibling {s : Skeleton} (idx : SkeletonNodeIndex s) :
     Option (SkeletonNodeIndex s) :=
   match idx with
-  -- s consists of s single leaf, idx is this leaf and is hence the root
-  | SkeletonNodeIndex.ofLeaf => none
-  -- idx is the root node of a nontrivial tree
-  | SkeletonNodeIndex.ofInternal => none
-  -- idx is in the left subtree of a nontrivial tree
-  | @SkeletonNodeIndex.ofLeft left right idxLeft =>
-    match idxLeft with
-    -- If idx is a leaf, then its sibling is the root of the right subtree
-    | SkeletonNodeIndex.ofLeaf => some (getRootIndex right).ofRight
-    -- If idx is an internal node, then its sibling is the root of the right subtree
-    | SkeletonNodeIndex.ofInternal => some (getRootIndex right).ofRight
-    -- If idx is in the left subtree of the left subtree,
-    -- we can find its sibling by considering only the left subtree
-    | SkeletonNodeIndex.ofLeft idxLeftLeft =>
-      idxLeftLeft.ofLeft.sibling.map (SkeletonNodeIndex.ofLeft)
-    | SkeletonNodeIndex.ofRight idxLeftRight =>
-      idxLeftRight.ofRight.sibling.map (SkeletonNodeIndex.ofLeft)
-  | @SkeletonNodeIndex.ofRight left right idxRight =>
-    match idxRight with
-    | SkeletonNodeIndex.ofLeaf => some (getRootIndex left).ofLeft
-    | SkeletonNodeIndex.ofInternal => some (getRootIndex left).ofLeft
-    | SkeletonNodeIndex.ofLeft idxRightLeft =>
-      idxRightLeft.ofLeft.sibling.map (SkeletonNodeIndex.ofRight)
-    | SkeletonNodeIndex.ofRight idxRightRight =>
-      idxRightRight.ofRight.sibling.map (SkeletonNodeIndex.ofRight)
+  | .ofLeaf => none
+  | .ofInternal => none
+  | @SkeletonNodeIndex.ofLeft _ right .ofLeaf => some (.ofRight (getRootIndex right))
+  | @SkeletonNodeIndex.ofLeft _ right .ofInternal => some (.ofRight (getRootIndex right))
+  | .ofLeft (.ofLeft idxLL) => idxLL.ofLeft.sibling.map .ofLeft
+  | .ofLeft (.ofRight idxLR) => idxLR.ofRight.sibling.map .ofLeft
+  | @SkeletonNodeIndex.ofRight left _ .ofLeaf => some (.ofLeft (getRootIndex left))
+  | @SkeletonNodeIndex.ofRight left _ .ofInternal => some (.ofLeft (getRootIndex left))
+  | .ofRight (.ofLeft idxRL) => idxRL.ofLeft.sibling.map .ofRight
+  | .ofRight (.ofRight idxRR) => idxRR.ofRight.sibling.map .ofRight
 
 /--
 Return the left child of a `SkeletonNodeIndex`, or `none` if the index is a leaf.
@@ -766,11 +751,8 @@ theorem LeafData.composeBuild_getRootValue {α} {s_left s_right : Skeleton}
 
 /-- Lift a binary function through two `Option` arguments. -/
 def Option.doubleBind {α β γ : Type _} (f : α → β → Option γ)
-    (x : Option α) (y : Option β) : Option γ :=
-  match x, y with
-  | none, _ => none
-  | _, none => none
-  | some a, some b => f a b
+    (x : Option α) (y : Option β) : Option γ := do
+  f (← x) (← y)
 
 /-- Build a tree while allowing failures in the composition function. -/
 def LeafData.optionComposeBuild {α : Type _} {s : Skeleton} (leaf_data_tree : LeafData α s)
