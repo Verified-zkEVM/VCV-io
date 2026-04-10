@@ -66,13 +66,13 @@ def Cache.leaves (n : ℕ) (cache : Cache α (n + 1)) :
     List.Vector α (2 ^ (n + 1)) := cache (Fin.last _)
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
-@[simp, grind]
+@[simp, grind =]
 lemma Cache.upper_cons (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (cache : Cache α n) :
     Cache.upper α n (Cache.cons α n leaves cache) = cache := by
   simp [Cache.upper, Cache.cons]
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
-@[simp, grind]
+@[simp, grind =]
 lemma Cache.leaves_cons (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (cache : Cache α n) :
     Cache.leaves α n (Cache.cons α n leaves cache) = leaves := by
   simp [Cache.leaves, Cache.cons]
@@ -214,7 +214,7 @@ def verifyProof {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (root : α) (proof : Lis
   let putative_root ← getPutativeRoot α i leaf proof
   guard (putative_root = root)
 
-@[grind]
+@[grind .]
 theorem buildLayer_neverFails (α : Type _) [DecidableEq α]
     [SampleableType α] [(spec α).DecidableEq]
     (preexisting_cache : (spec α).QueryCache) (n : ℕ)
@@ -227,7 +227,7 @@ theorem buildLayer_neverFails (α : Type _) [DecidableEq α]
 Building a Merkle tree never results in failure
 (no matter what queries have already been made to the oracle before it runs).
 -/
-@[grind]
+@[grind .]
 theorem buildMerkleTree_neverFails (α : Type _) [DecidableEq α]
     [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
     (leaves : List.Vector α (2 ^ n)) (preexisting_cache : (spec α).QueryCache) :

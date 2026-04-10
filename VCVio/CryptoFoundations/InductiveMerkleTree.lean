@@ -62,7 +62,7 @@ variable (α : Type _)
 @[reducible]
 def spec : OracleSpec (α × α) := (α × α) →ₒ α
 
-@[simp, grind]
+@[simp, grind =]
 lemma domain_def : (spec α).Domain = (α × α) := rfl
 
 @[simp]
@@ -220,7 +220,7 @@ def verifyProof [DecidableEq α] {s}
 A functional form of the completeness theorem for Merkle trees.
 This references the functional versions of `getPutativeRoot` and `buildMerkleTreeWithHash`
 -/
-@[simp, grind]
+@[simp, grind =]
 theorem functional_completeness {s : Skeleton}
   (idx : SkeletonLeafIndex s)
   (leaf_data_tree : LeafData α s)
