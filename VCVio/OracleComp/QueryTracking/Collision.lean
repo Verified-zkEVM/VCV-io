@@ -32,7 +32,7 @@ open OracleSpec OracleComp ENNReal Finset
 
 namespace OracleComp
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0,0} ι}
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
   [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 
 /-! ## Collision Predicates -/
@@ -48,7 +48,7 @@ def CacheHasCollision (cache : QueryCache spec) : Prop :=
   ∃ (t₁ t₂ : spec.Domain) (u₁ : spec.Range t₁) (u₂ : spec.Range t₂),
     t₁ ≠ t₂ ∧ cache t₁ = some u₁ ∧ cache t₂ = some u₂ ∧ HEq u₁ u₂
 
-omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+omit [DecidableEq ι] [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
 /-- In a collision-free cache, a value determines at most one query input. -/
 lemma cache_lookup_eq_of_noCollision
     {cache : QueryCache spec}
@@ -71,7 +71,8 @@ We prove two properties simultaneously by induction:
 2. The initial cache is a subset of the final cache (monotonicity).
 
 The proof works by induction on `oa`. The `pure` case is trivial (empty log).
-For `query t >>= mx`: the logging oracle decomposes as `query t >>= fun u => map (prepend ⟨t,u⟩) ...`,
+For `query t >>= mx`: the logging oracle decomposes as
+`query t >>= fun u => map (prepend ⟨t,u⟩) ...`,
 and `cachingOracle` caches the query result `u` at `t`. By the IH applied to `mx u`,
 all sub-log entries are in the final cache, and cache monotonicity ensures `t ↦ u` persists. -/
 theorem log_entry_in_cache_and_mono {α : Type}
@@ -92,23 +93,31 @@ theorem log_entry_in_cache_and_mono {α : Type}
     rw [run_simulateQ_loggingOracle_query_bind] at hmem
     rw [show simulateQ cachingOracle
           ((query t : OracleComp spec _) >>= fun u =>
-            (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+            (fun p : α × QueryLog spec =>
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                  :: p.2))
               <$> (simulateQ loggingOracle (mx u)).run) =
           ((cachingOracle t >>= fun u =>
             simulateQ cachingOracle
-              ((fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              ((fun p : α × QueryLog spec =>
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                    :: p.2))
                 <$> (simulateQ loggingOracle (mx u)).run)) :
             StateT (QueryCache spec) (OracleComp spec) _)
         from by simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
           OracleQuery.cont_query]] at hmem
     have hbind_rw : (cachingOracle t >>= fun u =>
             simulateQ cachingOracle
-              ((fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              ((fun p : α × QueryLog spec =>
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                    :: p.2))
                 <$> (simulateQ loggingOracle (mx u)).run) :
             StateT (QueryCache spec) (OracleComp spec) _) =
           (cachingOracle t >>= fun u =>
             StateT.map
-              (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              (fun p : α × QueryLog spec =>
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                  :: p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
       simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,
@@ -153,7 +162,9 @@ theorem log_entry_in_cache_and_mono {α : Type}
         Function.comp_def]] at hmem
     rw [support_map] at hmem
     obtain ⟨⟨⟨x', log'⟩, cache_final⟩, hmem_cont, heq⟩ := hmem
-    have hz : z = ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'), cache_final) := heq.symm
+    have hz : z =
+        ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'),
+          cache_final) := heq.symm
     rw [hz]
     have ⟨ih_entries, ih_mono⟩ := ih u cache_mid ((x', log'), cache_final) hmem_cont
     exact ⟨fun entry hentry => by
@@ -194,19 +205,25 @@ theorem cache_entry_in_log_or_initial {α : Type}
               <$> (simulateQ loggingOracle (mx u)).run) =
           ((cachingOracle t >>= fun u =>
             simulateQ cachingOracle
-              ((fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              ((fun p : α × QueryLog spec =>
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                    :: p.2))
                 <$> (simulateQ loggingOracle (mx u)).run)) :
             StateT (QueryCache spec) (OracleComp spec) _)
         from by simp [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
           OracleQuery.cont_query]] at hmem
     have hbind_rw : (cachingOracle t >>= fun u =>
             simulateQ cachingOracle
-              ((fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              ((fun p : α × QueryLog spec =>
+                  (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                    :: p.2))
                 <$> (simulateQ loggingOracle (mx u)).run) :
             StateT (QueryCache spec) (OracleComp spec) _) =
           (cachingOracle t >>= fun u =>
             StateT.map
-              (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
+              (fun p : α × QueryLog spec =>
+                (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i)
+                  :: p.2))
               (simulateQ cachingOracle ((simulateQ loggingOracle (mx u)).run))) := by
       congr 1; ext u s
       simp only [StateT.map, StateT.run, map_eq_bind_pure_comp, simulateQ_bind,
@@ -251,7 +268,9 @@ theorem cache_entry_in_log_or_initial {α : Type}
         Function.comp_def]] at hmem
     rw [support_map] at hmem
     obtain ⟨⟨⟨x', log'⟩, cache_final⟩, hmem_cont, heq⟩ := hmem
-    have hz : z = ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'), cache_final) := heq.symm
+    have hz : z =
+        ((x', (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: log'),
+          cache_final) := heq.symm
     rw [hz]
     have hcache_mid_eq : ∀ t₀ : spec.Domain, t₀ ≠ t → cache_mid t₀ = cache₀ t₀ := by
       intro t₀ hne

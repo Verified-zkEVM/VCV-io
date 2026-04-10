@@ -105,7 +105,7 @@ private lemma bindingInner_totalBound {t : ℕ} (A : BindingAdversary M S C t) :
     IsTotalQueryBound (bindingInner A) (t+2) := by
   apply isTotalQueryBound_bind A.queryBound
   intro ⟨c, m₀, s₀, m₁, s₁⟩
-  show IsTotalQueryBound _ 2
+  change IsTotalQueryBound _ 2
   rw [isTotalQueryBound_query_bind_iff]
   refine ⟨by omega, fun c₀ => ?_⟩
   rw [isTotalQueryBound_query_bind_iff]

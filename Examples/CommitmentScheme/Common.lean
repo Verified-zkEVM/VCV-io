@@ -46,7 +46,8 @@ def CMCheck (c : C) (m : M) (s : S) : OracleComp (CMOracle M S C) Bool := do
   let c' ← query (spec := CMOracle M S C) (m, s)
   return (c == c')
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+open scoped Classical in
+omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] [DecidableEq C] in
 /-- If a fixed fresh query is the only way to win, its success probability is `1 / |C|`. -/
 lemma probEvent_from_fresh_query_le_inv
     (t : (CMOracle M S C).Domain)
@@ -55,7 +56,7 @@ lemma probEvent_from_fresh_query_le_inv
     (hfresh : cache₀ t = none)
     (cont : C → OracleComp (CMOracle M S C) Bool)
     (hzero : ∀ u, u ≠ target →
-      Pr[fun z => z.1 = true |
+      Pr[ fun z => z.1 = true |
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)] = 0) :
     Pr[fun z => z.1 = true |
       (simulateQ cachingOracle
@@ -75,7 +76,7 @@ lemma probEvent_from_fresh_query_le_inv
           pure (u, cache₀.cacheQuery t u) : OracleComp (CMOracle M S C) _) := by
       simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
         StateT.run_bind, StateT.run_get, pure_bind, hfresh]
-      show (StateT.lift (PFunctor.FreeM.lift (query (spec := CMOracle M S C) t)) cache₀ >>= _) = _
+      change (StateT.lift (PFunctor.FreeM.lift (query (spec := CMOracle M S C) t)) cache₀ >>= _) = _
       simp only [StateT.lift, bind_assoc, pure_bind,
         modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
         StateT.modifyGet, StateT.run]

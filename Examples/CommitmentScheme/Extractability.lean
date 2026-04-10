@@ -127,7 +127,7 @@ private lemma extractabilityInner_eq_fst_tagged {t : ℕ}
 When `CMExtract` finds an entry `(m', s')` in the commit trace with `H(m', s') = cm`,
 and verification gives `H(m, s) = cm` with `(m', s') ≠ (m, s)`, both distinct inputs
 map to `cm` in the final cache. -/
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 private lemma extractability_someWin_implies_collision {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :
     ∀ z ∈ support ((simulateQ cachingOracle (extractabilityInner_tagged A)).run ∅),
@@ -294,7 +294,7 @@ private def extractabilityRestOa {t : ℕ}
 set_option maxHeartbeats 400000 in
 /- Under a collision-free commit cache, any extractability win must create a fresh
 post-commit cache entry equal to the commitment value. -/
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     {cm : C} {aux : AUX} {tr : QueryLog (CMOracle M S C)}

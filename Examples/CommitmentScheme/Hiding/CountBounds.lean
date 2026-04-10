@@ -545,7 +545,8 @@ lemma sum_counts_le_of_mem_support_run_hidingImplCountAll
         (ih (u := qu.1) (m := m - 1) (hm.2 qu.1)) (st := qu.2) (y := y) hy'
       omega
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma cache_le_of_mem_support_run_hidingImplCountAll
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     {st₀ : HidingCountState M S C}
@@ -562,7 +563,8 @@ lemma cache_le_of_mem_support_run_hidingImplCountAll
     simpa [run_hidingImplCountAll_proj_eq_cachingOracle (M := M) (S := S) (C := C) oa st₀] using hzmap
   exact simulateQ_cachingOracle_cache_le (spec := CMOracle M S C) oa st₀.1 (z.1, z.2.1) hz'
 
-omit [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
+  [Inhabited C] in
 lemma exists_new_salt_cacheEntry_of_count_gt_one
     {α : Type} (oa : OracleComp (CMOracle M S C) α)
     (m0 : M) (s : S)

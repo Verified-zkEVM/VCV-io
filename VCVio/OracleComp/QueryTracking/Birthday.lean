@@ -17,7 +17,7 @@ open OracleSpec OracleComp ENNReal Finset
 
 namespace OracleComp
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0,0} ι}
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
   [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 
 /-! ## Per-Pair Collision Bound (Textbook Step 3)
@@ -26,6 +26,7 @@ For each pair (i,j) of positions in the log with distinct inputs,
 Pr[outputs equal] ≤ 1/|C|. This is because in the evalDist model,
 each query returns an independent uniform sample. -/
 
+omit [DecidableEq ι] in
 /-- **ROM uniformity at a log position**: For any `loggingOracle` trace, the
 probability that the k-th log entry matches a fixed sigma-typed value `⟨t, v⟩`
 is at most `1/|Range t|`. Each query response is an independent uniform draw.
@@ -120,6 +121,7 @@ theorem probEvent_log_entry_eq_le {α : Type}
           mul_le_mul' tsum_probOutput_le_one le_rfl
         _ = (Fintype.card (spec.Range entry.1) : ℝ≥0∞)⁻¹ := one_mul _
 
+omit [DecidableEq ι] in
 /-- **Uniformized log entry bound**: the probability that position `k` of a `loggingOracle`
 trace equals a fixed sigma-typed entry is at most `1/|Range default|`, assuming `|Range default|`
 is minimal across all oracle indices.
@@ -157,7 +159,8 @@ theorem probEvent_log_output_match_le {α : Type}
   | pure _ =>
     simp only [simulateQ_pure]
     refine le_of_eq_of_le (probEvent_eq_zero fun z hmem h => ?_) (zero_le _)
-    simp at hmem; obtain ⟨_, rfl⟩ := hmem
+    simp only [WriterT.run_pure', List.empty_eq, support_pure,
+      Set.mem_singleton_iff] at hmem; obtain ⟨_, rfl⟩ := hmem
     obtain ⟨s, v, hlog, _⟩ := h; simp at hlog
   | query_bind t mx ih =>
     rw [run_simulateQ_loggingOracle_query_bind, probEvent_bind_eq_tsum]
@@ -316,7 +319,11 @@ theorem probEvent_pair_collision_le {α : Type}
           le_trans (probEvent_mono fun z _ hev => by
             match hz : z.2[j']? with
             | none => simp [hz] at hev
-            | some ⟨s, v⟩ => simp [hz] at hev; exact ⟨s, v, rfl, hev.2⟩)
+            | some ⟨s, v⟩ =>
+              simp only [ne_eq, hz, Option.map_some, Option.pure_def,
+                Option.bind_eq_bind, Option.bind_some, Option.some.injEq,
+                eq_iff_iff, iff_true] at hev
+              exact ⟨s, v, rfl, hev.2⟩)
             (probEvent_log_output_match_le hrange (mx u) j' t u)
         calc ∑' u, Pr[= u | (query t : OracleComp spec _)] * _
           ≤ ∑' u, Pr[= u | (query t : OracleComp spec _)] *
@@ -343,7 +350,11 @@ theorem probEvent_pair_collision_le {α : Type}
           le_trans (probEvent_mono fun z _ hev => by
             match hz : z.2[i']? with
             | none => simp [hz] at hev
-            | some ⟨s, v⟩ => simp [hz] at hev; exact ⟨s, v, rfl, hev.2.symm⟩)
+            | some ⟨s, v⟩ =>
+              simp only [hz, ne_eq, Option.map_some, Option.bind_some,
+                Option.pure_def, Option.bind_eq_bind, Option.some.injEq,
+                eq_iff_iff, iff_true] at hev
+              exact ⟨s, v, rfl, hev.2.symm⟩)
             (probEvent_log_output_match_le hrange (mx u) i' t u)
         calc ∑' u, Pr[= u | (query t : OracleComp spec _)] * _
           ≤ ∑' u, Pr[= u | (query t : OracleComp spec _)] *
@@ -376,6 +387,7 @@ theorem probEvent_pair_collision_le {α : Type}
 
 Collision = ∃ pair with collision. Union bound over C(n,2) pairs gives n²/(2|C|). -/
 
+omit [DecidableEq ι] in
 /-- **Birthday bound for `loggingOracle`** (total query bound):
 The probability of a collision in the query log is ≤ n²/(2|C|).
 
@@ -474,11 +486,11 @@ theorem probEvent_logCollision_le_birthday_total {α : Type}
                 -- Define the embedding from Fin k pairs to Fin (k+1) pairs
                 let emb : Fin k × Fin k ↪ Fin (k+1) × Fin (k+1) :=
                   ⟨fun p => (p.1.castSucc, p.2.castSucc), fun a b h => by
-                    simp [Prod.ext_iff, Fin.castSucc_inj] at h; exact Prod.ext h.1 h.2⟩
+                    simp only [Prod.ext_iff, Fin.castSucc_inj] at h; exact Prod.ext h.1 h.2⟩
                 -- Define the embedding for new pairs (i, last k)
                 let newEmb : Fin k ↪ Fin (k+1) × Fin (k+1) :=
                   ⟨fun i => (i.castSucc, Fin.last k), fun a b h => by
-                    simp [Prod.ext_iff, Fin.castSucc_inj] at h; exact h⟩
+                    simp only [Prod.ext_iff, Fin.castSucc_inj, and_true] at h; exact h⟩
                 -- The filtered set splits as a disjoint union
                 have hunion :
                     Finset.univ.filter (fun p : Fin (k+1) × Fin (k+1) => p.1 < p.2) =
@@ -589,10 +601,11 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
   | pure x =>
     intro m k _ cache₀ hnocoll _
     -- simulateQ on pure returns (x, cache₀) unchanged. CacheHasCollision cache₀ is False.
-    have : Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
+    have : Pr[fun z => CacheHasCollision z.2 |
+        (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp [StateT.run] at hz
+      simp only [StateT.run] at hz
       obtain ⟨rfl, rfl⟩ := hz
       exact hnocoll h
     rw [this]; exact zero_le _
@@ -629,7 +642,8 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
       push_neg at ht
       have ht_none : cache₀ t = none := by
         cases h : cache₀ t with | none => rfl | some v => exact absurd h (ht v)
-      -- The computation becomes: query t >>= fun u => (sim cachingOracle (mx u)).run (cache₀.cacheQuery t u)
+      -- The computation becomes: query t >>= fun u =>
+      -- (sim cachingOracle (mx u)).run (cache₀.cacheQuery t u)
       -- We prove this by showing the unfolded cachingOracle at a miss is a query + cacheQuery.
       have hrun : (simulateQ cachingOracle (liftM (query t) >>= mx)).run cache₀ =
           (liftM (query t) >>= fun u =>
@@ -642,7 +656,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
           simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
             StateT.run_bind, StateT.run_get, pure_bind, ht_none]
           -- Goal involves StateT.lift ... cache₀
-          show (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
+          change (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
           simp only [StateT.lift, bind_assoc, pure_bind,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]
@@ -681,12 +695,14 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
           · subst ht1
             refine ⟨t₂, hne.symm, u₂, ?_, ?_⟩
             · rwa [QueryCache.cacheQuery_of_ne _ _ hne.symm] at h2
-            · simp [QueryCache.cacheQuery_self] at h1; subst h1; exact hequ
+            · simp only [QueryCache.cacheQuery_self, Option.some.injEq] at h1
+              subst h1; exact hequ
           · by_cases ht2 : t₂ = t
             · subst ht2
               refine ⟨t₁, hne, u₁, ?_, ?_⟩
               · rwa [QueryCache.cacheQuery_of_ne _ _ ht1] at h1
-              · simp [QueryCache.cacheQuery_self] at h2; subst h2; exact hequ.symm
+              · simp only [QueryCache.cacheQuery_self, Option.some.injEq] at h2
+                subst h2; exact hequ.symm
             · exfalso; apply hnocoll
               exact ⟨t₁, t₂, u₁, u₂, hne,
                 by rwa [QueryCache.cacheQuery_of_ne _ _ ht1] at h1,
@@ -702,7 +718,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
             f u ∈ S := by
           intro u hu
           simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hu
-          show (if h : CacheHasCollision (cache₀.cacheQuery t u)
+          change (if h : CacheHasCollision (cache₀.cacheQuery t u)
             then (hmust u h).choose else default) ∈ S
           rw [dif_pos hu]
           obtain ⟨_, v, hcache, _⟩ := (hmust u hu).choose_spec
