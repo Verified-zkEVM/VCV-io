@@ -87,7 +87,8 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
             (HidingAvgSpec M S C)) := by
   have hleftrun :
       (simulateQ hidingAvgQueryImpl
-          (query (spec := HidingAvgSpec M S C) (Sum.inl ()) : OracleComp (HidingAvgSpec M S C) S)).run
+          (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+            OracleComp (HidingAvgSpec M S C) S)).run
           (∅, fun _ => 0) =
         (liftM (query (spec := Unit →ₒ S) ()) >>= fun s => pure (s, (∅, fun _ => 0))) := by
     simp [hidingAvgQueryImpl, hidingAvgLeftImpl, simulateQ_query]
@@ -113,6 +114,7 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
         OracleComp (HidingAvgSpec M S C) (Bool × HidingCountState M S C)))
   rfl
 
+omit [DecidableEq C] [Fintype M] in
 /-- Averaged-mass bridge for hiding.
 
 This packages the per-salt bad probabilities into the shared `hidingAvgComp`
@@ -257,6 +259,7 @@ lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
             (fun z : Bool × HidingCountState M S C => (z.2.2 s - 1 : ℝ≥0∞)) := by
           simp [Q]
 
+omit [DecidableEq C] [Fintype M] in
 /-- Textbook outer bridge: the bad-mass sum is bounded by the per-salt
 count-pred expectations from the shared counted implementation. -/
 theorem sum_probEvent_hidingBad_le_sum_wp_countPred {AUX : Type} {t : ℕ}
@@ -526,11 +529,13 @@ theorem indicator_le_natCast_count (P : Prop) [Decidable P] (n : ℕ)
   · simp [hP, h hP]
   · simp [hP]
 
-omit [DecidableEq M] [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M] [Inhabited S] in
+omit [DecidableEq M] [DecidableEq S] [DecidableEq C] [Fintype M] [Fintype S] [Inhabited M]
+  [Inhabited S] in
 lemma wp_finset_sum {α : Type}
     (oa : OracleComp (CMOracle M S C) α) (ss : Finset S) (f : S → α → ℝ≥0∞) :
     (ss.sum fun s => OracleComp.ProgramLogic.wp oa (f s)) =
       OracleComp.ProgramLogic.wp oa (fun z => ss.sum fun s => f s z) := by
+  letI := Classical.decEq S
   refine Finset.induction_on ss ?_ ?_
   · simp
   · intro s ss hs ih
@@ -663,9 +668,9 @@ lemma sum_wp_challenge_countPred_le_initialCount
   intro s hs
   exact wp_challenge_countPred_le_initialCount (M := M) (S := S) (C := C) m s st
 
-omit [DecidableEq C] [Inhabited M] in
+omit [DecidableEq C] [Fintype M] [Inhabited M] in
 lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
-    {AUX : Type} {t : ℕ}
+    {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
     (hqchoose : qchoose ∈ support ((simulateQ hidingImplCountAll A.choose).run (∅, fun _ => 0)))
@@ -675,6 +680,7 @@ lemma sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
         ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 cm)).run qchoose.2)
         (fun z : Bool × HidingCountState M S C => (z.2.2 s - 1 : ℝ≥0∞))) ≤
       (∑ s : S, (qchoose.2.2 s - 1 : ℝ≥0∞)) + (t - ∑ s : S, qchoose.2.2 s) := by
+  haveI := Fintype.ofFinite M
   have hsplit :=
     sum_wp_countPred_le_sum_initialPred_add_sum_wp_countIncrements
       (M := M) (S := S) (C := C)
@@ -725,9 +731,9 @@ lemma sum_wp_countPred_le_sum_initialPred_add_queryBound_of_run_hidingImplCountA
     simpa [add_assoc, add_left_comm, add_comm] using
       add_le_add_left hincr (∑ s : S, (st₀.2 s - 1 : ℝ≥0∞)))
 
-omit [DecidableEq C] [Inhabited M] in
+omit [DecidableEq C] [Fintype M] [Inhabited M] in
 lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
-    {AUX : Type} {t : ℕ}
+    {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
     (hqchoose : qchoose ∈ support ((simulateQ hidingImplCountAll A.choose).run (∅, fun _ => 0)))
@@ -736,6 +742,7 @@ lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
       OracleComp.ProgramLogic.wp
         ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 cm)).run qchoose.2)
         (fun z : Bool × HidingCountState M S C => (z.2.2 s - 1 : ℝ≥0∞))) ≤ t := by
+  haveI := Fintype.ofFinite M
   have hsplit :=
     sum_wp_distinguish_countPred_le_sum_initialPred_add_residual
       (M := M) (S := S) (C := C) A hqchoose cm
@@ -794,9 +801,9 @@ lemma sum_wp_distinguish_countPred_le_queryBound_of_choose_count_support
         rw [Nat.cast_sum]
         exact tsub_add_cancel_of_le hcast
 
-omit [DecidableEq C] [Inhabited M] in
+omit [DecidableEq C] [Fintype M] [Inhabited M] in
 lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_support
-    {AUX : Type} {t : ℕ}
+    {AUX : Type} {t : ℕ} [Finite M]
     (A : HidingAdversary M S C AUX t)
     {qchoose : (M × AUX) × HidingCountState M S C}
     (hqchoose : qchoose ∈ support ((simulateQ hidingImplCountAll A.choose).run (∅, fun _ => 0)))
@@ -807,6 +814,7 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
         (fun z : Bool × HidingCountState M S C =>
           OracleComp.ProgramLogic.propInd (qchoose.2.2 s < z.2.2 s))) ≤
       (t - ∑ s : S, qchoose.2.2 s) := by
+  haveI := Fintype.ofFinite M
   have hbound :
       IsTotalQueryBound (A.distinguish qchoose.1.2 cm) (t - ∑ s : S, qchoose.2.2 s) :=
     hiding_distinguish_totalBound_of_choose_count_support
@@ -839,11 +847,12 @@ lemma sum_wp_distinguish_incrementIndicators_le_queryResidual_of_choose_count_su
       ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 cm)).run qchoose.2) ?_
     intro z
     by_cases hslt : qchoose.2.2 s < z.2.2 s
-    · simp [OracleComp.ProgramLogic.propInd, hslt]
+    · simp only [OracleComp.ProgramLogic.propInd, if_pos hslt]
       exact_mod_cast (Nat.succ_le_of_lt (Nat.sub_pos_of_lt hslt))
     · simp [OracleComp.ProgramLogic.propInd, hslt]
   exact le_trans hmono hres
 
+omit [DecidableEq C] [Fintype M] [Inhabited M] [Inhabited S] in
 lemma sum_wp_badIndicator_eq_wp_choose
     {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
@@ -954,30 +963,33 @@ lemma wp_badIndicator_le_chooseHit_add_distinguishIncrement_of_choose_support
                 calc
                   ∑' z,
                       Pr[= z |
-                        (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                        (simulateQ hidingImplCountAll
+                          (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                         OracleComp.ProgramLogic.propInd (2 ≤ z.2.2 s)
                     ≤
                       ∑' z,
                         Pr[= z |
-                          (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                          (simulateQ hidingImplCountAll
+                            (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                           (OracleComp.ProgramLogic.propInd (0 < qchoose.2.2 s) +
                             OracleComp.ProgramLogic.propInd (qch.2.2 s < z.2.2 s)) := by
                               refine ENNReal.tsum_le_tsum ?_
                               intro z
                               by_cases hz :
                                   z ∈ support
-                                    ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2)
-                              · exact mul_le_mul'
-                                  le_rfl
-                                  (bad_indicator_le_chooseHitIndicator_add_distinguishIncrementIndicator
-                                    (M := M) (S := S) (C := C) A hqchoose s hqch hz)
+                                    ((simulateQ hidingImplCountAll
+                                      (A.distinguish qchoose.1.2 qch.1)).run qch.2)
+                              · exact (mul_le_mul' le_rfl
+                              (bad_indicator_le_chooseHitIndicator_add_distinguishIncrementIndicator
+                                (M := M) (S := S) (C := C) A hqchoose s hqch hz))
                               · rw [probOutput_eq_zero_of_not_mem_support hz]
                                 simp
                   _ =
                     OracleComp.ProgramLogic.propInd (0 < qchoose.2.2 s) +
                       ∑' z,
                         Pr[= z |
-                          (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                          (simulateQ hidingImplCountAll
+                            (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                           OracleComp.ProgramLogic.propInd (qch.2.2 s < z.2.2 s) := by
                             simp_rw [mul_add]
                             rw [ENNReal.tsum_add, ENNReal.tsum_mul_right,
@@ -1065,12 +1077,14 @@ lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_suppo
                 calc
                   ∑' z,
                       Pr[= z |
-                        (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                        (simulateQ hidingImplCountAll
+                          (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                         OracleComp.ProgramLogic.propInd (2 ≤ z.2.2 s)
                     ≤
                       ∑' z,
                         Pr[= z |
-                          (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                          (simulateQ hidingImplCountAll
+                            (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                           (OracleComp.ProgramLogic.propInd (0 < qchoose.2.2 s) +
                             OracleComp.ProgramLogic.propInd
                               (qchoose.2.2 s = 0 ∧ qch.2.2 s < z.2.2 s)) := by
@@ -1078,18 +1092,19 @@ lemma wp_badIndicator_le_chooseHit_add_freshDistinguishIncrement_of_choose_suppo
                               intro z
                               by_cases hz :
                                   z ∈ support
-                                    ((simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2)
-                              · exact mul_le_mul'
-                                  le_rfl
-                                  (bad_indicator_le_chooseHitIndicator_add_freshDistinguishIncrementIndicator
-                                    (M := M) (S := S) (C := C) A hqchoose s hqch hz)
+                                    ((simulateQ hidingImplCountAll
+                                      (A.distinguish qchoose.1.2 qch.1)).run qch.2)
+                              · exact (mul_le_mul' le_rfl
+                        (bad_indicator_le_chooseHitIndicator_add_freshDistinguishIncrementIndicator
+                          (M := M) (S := S) (C := C) A hqchoose s hqch hz))
                               · rw [probOutput_eq_zero_of_not_mem_support hz]
                                 simp
                   _ =
                     OracleComp.ProgramLogic.propInd (0 < qchoose.2.2 s) +
                       ∑' z,
                         Pr[= z |
-                          (simulateQ hidingImplCountAll (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
+                          (simulateQ hidingImplCountAll
+                            (A.distinguish qchoose.1.2 qch.1)).run qch.2] *
                           OracleComp.ProgramLogic.propInd
                             (qchoose.2.2 s = 0 ∧ qch.2.2 s < z.2.2 s) := by
                             simp_rw [mul_add]
@@ -1121,7 +1136,7 @@ lemma sum_chooseHitIndicators_le_sumCounts
   refine Finset.sum_le_sum ?_
   intro s hs
   by_cases hpos : 0 < counts s
-  · simp [OracleComp.ProgramLogic.propInd, hpos]
+  · simp only [OracleComp.ProgramLogic.propInd, if_pos hpos]
     exact_mod_cast hpos
   · simp [OracleComp.ProgramLogic.propInd, hpos]
 

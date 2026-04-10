@@ -20,6 +20,7 @@ private lemma tvDist_liftComp_hidingAvgSpec {α : Type}
       tvDist oa ob := by
   rw [tvDist, tvDist, evalDist_liftComp, evalDist_liftComp]
 
+omit [Fintype M] [DecidableEq C] in
 /-- **Hiding theorem (averaged technical form)**:
 The average statistical distance between real and simulated hiding games,
 taken over uniformly random salt `s`, is at most `t / |S|`.
@@ -31,7 +32,7 @@ For every individual `s`, we have `tvDist(real(s), sim(s)) ≤ Pr[bad(s)]`
 The per-salt bound `tvDist ≤ t/|S|` for fixed `s` is FALSE: a trivial adversary
 always querying salt `s` makes `Pr[bad] = 1`.  The textbook (Lemma cm-hiding)
 implicitly averages over the uniform salt. -/
-theorem hiding_bound_avg {AUX : Type} {t : ℕ}
+theorem hiding_bound_avg [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (∑ s : S, tvDist (hidingReal A s) (hidingSim A s)) / (Fintype.card S : ℝ) ≤
     (t : ℝ) / (Fintype.card S : ℝ) := by
@@ -54,10 +55,11 @@ theorem hiding_bound_avg {AUX : Type} {t : ℕ}
           (ne_top_of_le_ne_top ENNReal.coe_ne_top hsum)
           ENNReal.coe_ne_top).mpr hsum
 
+omit [Fintype M] [DecidableEq C] in
 /-- **Hiding theorem (Lemma cm-hiding, bounded packaged form)**:
 sample the salt uniformly inside the experiment, then compare the resulting real and simulated
 hiding games. This is the bounded-query textbook-facing wrapper around `hiding_bound_avg`. -/
-theorem hiding_bound_finite {AUX : Type} {t : ℕ}
+theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     tvDist (hidingMixedReal (M := M) (S := S) (C := C) A)
       (hidingMixedSim (M := M) (S := S) (C := C) A) ≤
