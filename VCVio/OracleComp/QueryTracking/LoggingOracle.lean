@@ -109,13 +109,13 @@ lemma run_simulateQ_loggingOracle_query_bind
         (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
           <$> (simulateQ loggingOracle (mx u)).run := by
   simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
-    Prod.map, Function.id_def, Function.comp]
+    Prod.map, Function.id_def]
 
 /-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of
 `(simulateQ loggingOracle oa).run` is identical to that of `oa` (each query passes through
 unchanged, with only the writer log being appended). -/
 theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
     [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (n : ℕ) :
     IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔
@@ -133,7 +133,7 @@ theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
 if `oa` makes at most `n` queries, then every support point of
 `(simulateQ loggingOracle oa).run` has log length at most `n`. -/
 theorem log_length_le_of_mem_support_run_simulateQ
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
     [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
     {oa : OracleComp spec α} {n : ℕ}
     (hbound : IsTotalQueryBound oa n)
@@ -148,7 +148,7 @@ theorem log_length_le_of_mem_support_run_simulateQ
   induction ob using OracleComp.inductionOn generalizing m with
   | pure x =>
       intro z hz
-      simp [simulateQ_pure] at hz
+      simp only [simulateQ_pure] at hz
       subst hz
       simp
   | query_bind t mx ih =>

@@ -544,10 +544,11 @@ The `_dist` variant weakens the agreement hypothesis from definitional equality
 This is needed when the two implementations differ intensionally but agree on
 output probabilities. -/
 
+open scoped Classical in
 private lemma probOutput_simulateQ_run_eq_of_not_bad_dist
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -583,10 +584,11 @@ private lemma probOutput_simulateQ_run_eq_of_not_bad_dist
         tsum_congr step1]
       exact tsum_congr (fun p => by rw [h_agree_dist t s₀ h_bad p])
 
+open scoped Classical in
 private lemma probEvent_not_bad_eq_dist
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -603,10 +605,11 @@ private lemma probEvent_not_bad_eq_dist
   · exact probOutput_simulateQ_run_eq_of_not_bad_dist impl₁ impl₂ bad h_agree_dist h_mono₁ h_mono₂
       oa s₀ a s h
 
+open scoped Classical in
 private lemma probEvent_bad_eq_dist
     {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →
@@ -634,15 +637,16 @@ private lemma probEvent_bad_eq_dist
         rw [← h2]; exact ENNReal.add_sub_cancel_right
           (ne_top_of_le_ne_top (by simp) probEvent_le_one)
 
+open scoped Classical in
 /-- Distributional variant of `tvDist_simulateQ_le_probEvent_bad`:
 weakens the agreement hypothesis from definitional equality to distributional equality
 (pointwise equal output probabilities). -/
 theorem tvDist_simulateQ_le_probEvent_bad_dist
     {σ : Type}
     (impl₁ impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
-    (bad : σ → Prop) [DecidablePred bad]
+    (bad : σ → Prop)
     (oa : OracleComp spec α) (s₀ : σ)
-    (h_init : ¬bad s₀)
+    (_ : ¬bad s₀)
     (h_agree_dist : ∀ (t : spec.Domain) (s : σ), ¬bad s →
       ∀ p, Pr[= p | (impl₁ t).run s] = Pr[= p | (impl₂ t).run s])
     (h_mono₁ : ∀ (t : spec.Domain) (s : σ), bad s →

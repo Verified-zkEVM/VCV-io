@@ -193,8 +193,10 @@ theorem hidingImplCountAll_proj_eq_hidingImpl₁
       simp [hidingImplCountAll, hidingImpl₁, hcache, StateT.run_bind, StateT.run_get,
         pure_bind]
   | none =>
-      simp [hidingImplCountAll, hidingImpl₁, hcache, StateT.run_bind, StateT.run_get,
-        pure_bind, StateT.run_set, Function.update, Prod.map]
+      simp only [hidingImplCountAll, bind_pure_comp, StateT.run_bind, StateT.run_get,
+        pure_bind, hcache, StateT.run_monadLift, StateT.run_map, StateT.run_set, map_pure,
+        Functor.map_map, Prod.map, id_eq, Function.update, eq_rec_constant, dite_eq_ite,
+        hidingImpl₁, beq_iff_eq]
       congr
       funext a
       by_cases h : ms.2 = s

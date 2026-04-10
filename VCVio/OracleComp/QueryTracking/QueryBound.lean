@@ -380,6 +380,7 @@ section CostSupport
 
 variable [DecidableEq ι] [spec.Fintype] [spec.Inhabited] [Fintype ι]
 
+omit [spec.Fintype] [spec.Inhabited] in
 lemma exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
     {σ : Type u} {impl : QueryImpl spec (StateT σ (OracleComp spec))}
     (cost : σ → ℕ)
@@ -394,7 +395,7 @@ lemma exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
       cost z.2 ≤ cost st₀ + ∑ i, qc i := by
   induction oa using OracleComp.inductionOn generalizing st₀ z with
   | pure x =>
-      simp [simulateQ_pure] at hz
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
       subst z
       refine ⟨0, ?_, ?_⟩
       · simp [countingOracle.simulate]
@@ -511,12 +512,13 @@ theorem IsTotalQueryBound.counting_total_le
           (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
       omega
 
+omit [Fintype ι] [DecidableEq ι] in
 /-- If a stateful simulation has support cost at most one per query step, then any support
 point of the simulated prefix leaves the continuation bounded by the residual budget measured
 by that cost. The cost may under-approximate the true query count, so the resulting residual
 budget is correspondingly weaker but still sound. -/
 theorem IsTotalQueryBound.residual_of_mem_support_run_simulateQ_le_cost
-    [spec.Fintype] [spec.Inhabited]
+    [spec.Fintype] [spec.Inhabited] [Finite ι]
     {σ : Type u} {impl : QueryImpl spec (StateT σ (OracleComp spec))}
     (cost : σ → ℕ)
     (hstep : ∀ t : spec.Domain, ∀ st : σ,
@@ -527,6 +529,8 @@ theorem IsTotalQueryBound.residual_of_mem_support_run_simulateQ_le_cost
     {st₀ : σ} {z : α × σ}
     (hz : z ∈ support ((simulateQ impl oa).run st₀)) :
     IsTotalQueryBound (ob z.1) (n - (cost z.2 - cost st₀)) := by
+  letI : DecidableEq ι := Classical.decEq ι
+  letI : Fintype ι := Fintype.ofFinite ι
   rcases countingOracle.exists_mem_support_simulate_of_mem_support_run_simulateQ_le_cost
       (spec := spec) (ι := ι) (impl := impl) cost hstep hz with
     ⟨qc, hqc, hcost⟩

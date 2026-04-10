@@ -16,14 +16,14 @@ open OracleSpec OracleComp ENNReal Finset
 
 namespace OracleComp
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0,0} ι}
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}
   [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 
 /-! ## Unpredictability -/
 
 section Unpredictability
 
-variable {spec' : OracleSpec.{0,0} ι} [spec'.DecidableEq] [spec'.Fintype] [spec'.Inhabited]
+variable {spec' : OracleSpec.{0, 0} ι} [spec'.DecidableEq] [spec'.Fintype] [spec'.Inhabited]
 
 omit [spec'.DecidableEq] in
 /-- **Fresh query uniformity**: querying `cachingOracle` at an uncached point
@@ -95,7 +95,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
         (simulateQ cachingOracle (pure x)).run cache₀] = 0 := by
       rw [simulateQ_pure]
       refine probEvent_eq_zero fun z hz h => ?_
-      simp [StateT.run] at hz; obtain ⟨_, rfl⟩ := hz
+      simp only [StateT.run] at hz; obtain ⟨_, rfl⟩ := hz
       obtain ⟨t₀, v, hcache, hnone, _⟩ := h
       simp [hnone] at hcache
     rw [this]; exact zero_le _
@@ -134,7 +134,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
               pure (u, cache₀.cacheQuery t u) : OracleComp spec _) := by
           simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
             StateT.run_bind, StateT.run_get, pure_bind, ht_none]
-          show (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
+          change (StateT.lift (PFunctor.FreeM.lift (query t)) cache₀ >>= _) = _
           simp only [StateT.lift, bind_assoc, pure_bind,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]

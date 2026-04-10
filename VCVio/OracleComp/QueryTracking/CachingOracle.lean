@@ -140,7 +140,7 @@ theorem simulateQ_cachingOracle_cache_le {α : Type u}
     cache₀ ≤ z.2 := by
   induction oa using OracleComp.inductionOn generalizing cache₀ z with
   | pure a =>
-      simp [simulateQ_pure, StateT.run] at hmem
+      simp only [StateT.run, simulateQ_pure] at hmem
       rw [hmem]
   | query_bind t mx ih =>
       simp only [simulateQ_query_bind, StateT.run_bind] at hmem
