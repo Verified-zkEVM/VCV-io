@@ -240,7 +240,44 @@ lemma useHintVec_makeHintVec_eq_highBitsVec
       LatticeCrypto.cInfNorm (cs2.get j) ≤ p.beta) :
     prims.useHintVec (prims.makeHintVec (-ct0) (w - cs2 + ct0))
       (w - cs2 + ct0) = prims.highBitsVec w := by
-  sorry
+  apply Vector.ext
+  intro j hj
+  unfold Primitives.useHintVec Primitives.makeHintVec Primitives.highBitsVec
+  simp only [Vector.getElem_zipWith, Vector.getElem_neg, Vector.getElem_map]
+  let jj : Fin p.k := ⟨j, hj⟩
+  let w_j := w.get jj
+  let r_j := (w - cs2).get jj
+  let ct0_j := ct0.get jj
+  let s_j := cs2.get jj
+  have h_ct0_lt : polyNorm ct0_j < p.gamma2 := by
+      exact lt_of_le_of_lt
+        (LatticeCrypto.PolyVec.component_cInfNorm_le normOps ct0 jj)
+        h_norm_ct0
+  have h_r0_lt : polyNorm ((prims.lowBitsVec (w - cs2)).get jj) < p.gamma2 - p.beta := by
+      exact lt_of_le_of_lt
+        (LatticeCrypto.PolyVec.component_cInfNorm_le normOps (prims.lowBitsVec (w - cs2)) jj)
+        h_norm_r0
+  have h_hint : -ct0[j] = -ct0_j := by
+    change -(ct0.get jj) = -ct0_j
+    simp only [ct0_j]
+  have h_arg : (w - cs2 + ct0)[j] = r_j + ct0_j := by
+    change (w - cs2 + ct0).get jj = r_j + ct0_j
+    simp only [Vector.vectorAdd_get, Pi.add_apply, r_j, ct0_j]
+  have h_w : w[j] = w_j := by
+    change w.get jj = w_j
+    simp only [w_j]
+  rw [h_hint, h_arg, h_w]
+  refine useHint_makeHint_eq_highBits (p := p) (prims := prims)
+    h_useHint_makeHint h_hide_low
+    w_j r_j ct0_j s_j
+    ?_ ?_ ?_ ?_
+  · change (w - cs2).get jj = w.get jj - cs2.get jj
+    simp only [Vector.get_eq_getElem, Vector.getElem_sub]
+  · exact Nat.le_of_lt h_ct0_lt
+  · simpa [Primitives.lowBitsVec, r_j] using h_r0_lt
+  · unfold polyNorm normOps
+    simpa [s_j, LatticeCrypto.zmodPolyNormOps, LatticeCrypto.normOpsOfCenteredView,
+      LatticeCrypto.cInfNorm] using h_cs2_bound jj
 
 /-- Correctness of FIPS ML-DSA, conditional on the algebraic key identity (`h_wApprox_eq`)
 and the product norm bound (`h_cs2_bound`). These conditions follow from the key generation
