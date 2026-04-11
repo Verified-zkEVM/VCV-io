@@ -144,9 +144,8 @@ omit [LawfulMonad n] in
   rw [simulateQ_bind]
   exact bind_congr fun x => simulateQ_option_elim impl x my my'
 
-omit [LawfulMonad n] in
 /-- `simulateQ` distributes through `OptionT.bind`, stated via `OptionT.run`. -/
-lemma simulateQ_optionT_bind' [LawfulMonad n]
+lemma simulateQ_optionT_bind'
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f).run =
     (simulateQ impl mx.run >>= fun a => simulateQ impl (f a).run : OptionT n β) := by
@@ -154,26 +153,23 @@ lemma simulateQ_optionT_bind' [LawfulMonad n]
   refine bind_congr fun x => ?_
   induction x <;> simp only [Option.elim_none, Option.elim_some, simulateQ_pure]
 
-omit [LawfulMonad n] in
 /-- `simulateQ` distributes through `OptionT.bind`, stated via `Option.elimM`. -/
-lemma simulateQ_optionT_bind'' [LawfulMonad n]
+lemma simulateQ_optionT_bind''
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f).run =
     Option.elimM (simulateQ impl mx.run) (pure none) (fun a => simulateQ impl (f a).run) := by
   simp
 
-omit [LawfulMonad n] in
 /-- `simulateQ` distributes through `OptionT.bind`: the simulated OptionT-bind is the
     OptionT-bind of the simulated pieces. -/
-lemma simulateQ_optionT_bind [LawfulMonad n]
+lemma simulateQ_optionT_bind
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
     simulateQ impl (mx >>= f : OptionT (OracleComp spec) β) =
     (simulateQ impl mx >>= fun a => simulateQ impl (f a) : OptionT n β) := by
   apply simulateQ_optionT_bind'
 
-omit [LawfulMonad n] in
 /-- `simulateQ` commutes with `OptionT.lift`. -/
-@[simp] lemma simulateQ_optionT_lift [LawfulMonad n]
+@[simp] lemma simulateQ_optionT_lift
     (comp : OracleComp spec α) :
     simulateQ impl (OptionT.lift comp : OptionT (OracleComp spec) α) =
       (OptionT.lift (simulateQ impl comp) : OptionT n α) := by
