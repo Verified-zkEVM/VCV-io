@@ -201,8 +201,7 @@ lemma query_eq_pure_iff_false : (query t : OracleComp spec _) = pure u ↔ False
 end noConfusion
 
 /-- Given a computation `oa : OracleComp spec α`, construct a value `x : α`,
-by assuming each query returns the `default` value given by the `Inhabited` instance.
-Returns `none` if the default path would lead to failure. -/
+by assuming each query returns the `default` value given by the `Inhabited` instance. -/
 def defaultResult [spec.Inhabited] (oa : OracleComp spec α) : α :=
   PFunctor.FreeM.mapM (m := Id) (fun _ => default) oa
 
