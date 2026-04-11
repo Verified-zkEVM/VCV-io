@@ -135,10 +135,8 @@ omit [LawfulMonad n] in
     OptionT-bind of the simulated pieces. -/
 lemma simulateQ_optionT_bind [LawfulMonad n]
     (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
-    simulateQ impl (@Bind.bind (OptionT (OracleComp spec)) _ _ _ mx f) =
-    @Bind.bind (OptionT n) _ _ _
-      (simulateQ impl mx)
-      (fun a => simulateQ impl (f a)) := by
+    simulateQ impl (mx >>= f : OptionT (OracleComp spec) β) =
+    (simulateQ impl mx >>= fun a => simulateQ impl (f a) : OptionT n β) := by
   change simulateQ impl (@Bind.bind (OracleComp spec) _ _ _
     mx (fun opt => match opt with | some a => f a | none => pure none)) = _
   rw [simulateQ_bind]
