@@ -201,14 +201,13 @@ lemma query_eq_pure_iff_false : (query t : OracleComp spec _) = pure u ↔ False
 end noConfusion
 
 /-- Given a computation `oa : OracleComp spec α`, construct a value `x : α`,
-by assuming each query returns the `default` value given by the `Inhabited` instance.
-Returns `none` if the default path would lead to failure. -/
-def defaultResult [spec.Inhabited] (oa : OracleComp spec α) : Option α :=
-  PFunctor.FreeM.mapM (fun _ => default) oa
+by assuming each query returns the `default` value given by the `Inhabited` instance. -/
+def defaultResult [spec.Inhabited] (oa : OracleComp spec α) : α :=
+  PFunctor.FreeM.mapM (m := Id) (fun _ => default) oa
 
 /-- Total number of queries in a computation across all possible execution paths.
 Can be a helpful alternative to `sizeOf` when proving recursive calls terminate. -/
-def totalQueries [spec.Fintype] [spec.Inhabited] {α : Type v} (oa : OracleComp spec α) : ℕ := by
+def totalQueries [spec.Fintype] {α : Type v} (oa : OracleComp spec α) : ℕ := by
   induction oa using OracleComp.construct with
   | pure x => exact 0
   | query_bind t oa rec_n => exact 1 + ∑ x, rec_n x
