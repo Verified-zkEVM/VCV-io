@@ -488,7 +488,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ v [] hlist]
           suffices Function.update (σ.addValue i v) i
-              ([] : List (spec₀.Range i)) = σ by rw [this]
+              ([] : List (spec₀.Range i)) = σ by rw [this]; rfl
           funext j; by_cases hj : j = i
           · subst hj; simp [hσi]
           · rw [Function.update_of_ne hj]
@@ -507,7 +507,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ (rest ++ [v]) hlist]
           suffices Function.update (σ.addValue i v) i (rest ++ [v]) =
-              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]
+              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]; rfl
           funext j; by_cases hj : j = i
           · subst hj; simp [QuerySeed.addValue, QuerySeed.addValues]
           · simp [Function.update_of_ne hj, QuerySeed.addValue,
@@ -539,7 +539,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             (QuerySeed.addValues_of_ne σ [_] hti).trans hσt
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ rest hlist]
           suffices Function.update (σ.addValue i v) t rest =
-              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]
+              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]; rfl
           change Function.update (Function.update σ i (σ i ++ [v])) t rest =
             Function.update (Function.update σ t rest) i
               ((Function.update σ t rest) i ++ [v])

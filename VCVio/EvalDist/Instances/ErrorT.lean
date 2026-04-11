@@ -55,15 +55,19 @@ noncomputable instance (ε : Type u) (m : Type u → Type v) [Monad m] [HasEvalS
     change Except.ok y ∈ support (pure (Except.ok x) : m _) ↔ y = x
     simp
   toSet.toFun_bind' mx f := Set.ext fun x => by
-    simp only [Set.mem_preimage, Set.bind_def, Set.mem_iUnion₂]
+    simp only [Set.mem_preimage]
     change Except.ok x ∈ support (mx.run >>= ExceptT.bindCont f) ↔ _
     rw [mem_support_bind_iff]
     constructor
     · rintro ⟨r, hr, hx⟩
       cases r with
-      | ok a => exact ⟨a, hr, hx⟩
+      | ok a =>
+        change x ∈ ⋃ a ∈ Except.ok ⁻¹' support mx.run, Except.ok ⁻¹' support (f a).run
+        exact Set.mem_iUnion₂.mpr ⟨a, hr, hx⟩
       | error e => simp [ExceptT.bindCont] at hx
-    · rintro ⟨a, ha, hx⟩
+    · intro h
+      have h : x ∈ ⋃ a ∈ Except.ok ⁻¹' support mx.run, Except.ok ⁻¹' support (f a).run := h
+      obtain ⟨a, ha, hx⟩ := Set.mem_iUnion₂.mp h
       exact ⟨.ok a, ha, hx⟩
 
 variable [HasEvalSet m]

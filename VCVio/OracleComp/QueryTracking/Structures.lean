@@ -236,14 +236,15 @@ def single [DecidableEq ι] (i : ι) : QueryCount ι := Function.update 0 i 1
 @[simp]
 lemma single_le_iff_pos [DecidableEq ι] (i : ι) (qc : QueryCount ι) :
     single i ≤ qc ↔ 0 < qc i := by
-  simp only [Pi.hasLe, single, Function.update, eq_rec_constant, Pi.zero_apply, dite_eq_ite]
   constructor <;> intro h
-  · have : 1 ≤ qc i := by simpa using h i
-    exact this
+  · have := h i
+    simp [single, Function.update_self] at this
+    omega
   · intro j
+    simp only [single]
     by_cases hj : j = i
-    · simp [hj]; omega
-    · simp [hj]
+    · subst hj; simp [Function.update_self]; omega
+    · simp [Function.update_of_ne hj]
 
 end QueryCount
 
@@ -525,8 +526,7 @@ lemma pop_eq_some_of_cons (seed : QuerySeed spec) (i : ι)
     (u : spec.Range i) (us : List (spec.Range i))
     (h : seed i = u :: us) :
     seed.pop i = some (u, Function.update seed i us) := by
-  unfold pop
-  simp [h]
+  unfold pop; simp [h]; rfl
 
 lemma cons_of_pop_eq_some (seed : QuerySeed spec) (i : ι)
     (u : spec.Range i) (rest : QuerySeed spec)

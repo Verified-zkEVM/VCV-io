@@ -36,7 +36,7 @@ lemma simulateQ_pure (x : α) :
 @[simp, grind =, game_rule]
 lemma simulateQ_bind [LawfulMonad r] (mx : OracleComp spec α) (my : α → OracleComp spec β) :
     simulateQ impl (mx >>= my) = simulateQ impl mx >>= fun x => simulateQ impl (my x) := by
-  simp [simulateQ]
+  unfold simulateQ; exact PFunctor.FreeM.mapM_bind' impl mx my
 
 /-- Version of `simulateQ` that bundles into a monad hom. -/
 @[reducible]
@@ -48,7 +48,7 @@ def simulateQ' [LawfulMonad r] (impl : QueryImpl spec r) : OracleComp spec →�
 @[simp, grind =, game_rule]
 lemma simulateQ_query [LawfulMonad r] (q : OracleQuery spec α) :
     simulateQ impl (liftM q) = q.cont <$> (impl q.input) := by
-  simp [simulateQ, PFunctor.FreeM.mapM.eq_def]
+  unfold simulateQ; simp [OracleComp.liftM_def]
 
 @[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)

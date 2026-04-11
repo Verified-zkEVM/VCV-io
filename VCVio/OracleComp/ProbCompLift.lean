@@ -23,7 +23,7 @@ defines `ProbCompRuntime`, the common crypto-facing bundle that pairs public-ran
 with bundled `SPMF` semantics for an ambient monad.
 -/
 
-universe v
+universe v w
 
 /-- Bundled way to lift plain probabilistic computations into an ambient monad `m`.
 
@@ -57,7 +57,7 @@ The bundle is kept separate from the core scheme definitions so that executable 
 not become noncomputable merely by carrying denotational semantics. -/
 structure ProbCompRuntime (m : Type → Type v) [Monad m] where
   /-- Bundled subprobabilistic semantics for the ambient monad. -/
-  toSPMFSemantics : SPMFSemantics m
+  toSPMFSemantics : SPMFSemantics.{0, v, w} m
   /-- Bundled injection of plain probabilistic sampling into the ambient monad. -/
   toProbCompLift : ProbCompLift m
 

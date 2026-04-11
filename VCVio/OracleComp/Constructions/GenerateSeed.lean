@@ -212,7 +212,7 @@ lemma probOutput_pop_some_eq_probOutput_prepend
       · subst hj
         simp
       · simp [Function.update_of_ne hj, QuerySeed.prependValues]
-    simp [hupdate, hpop']
+    simp [hupdate, hpop']; rfl
   calc
     Pr[= some (u, rest) | (fun seed => seed.pop i) <$> generateSeed spec qc js]
         = Pr[= some (u, rest) |

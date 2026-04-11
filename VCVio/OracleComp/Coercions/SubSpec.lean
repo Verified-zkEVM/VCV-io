@@ -157,9 +157,7 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
     simp only [evalDist_eq_simulateQ (spec := superSpec), evalDist_eq_simulateQ (spec := spec),
       simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query, id_map]
     congr 1
-    simp only [simulateQ, PFunctor.FreeM.mapM.eq_def, bind_pure_comp, PMF.monad_map_eq_map]
-    exact PMF.uniformOfFintype_map_of_bijective _
-      (LawfulSubSpec.cont_bijective (spec := spec) (superSpec := superSpec) t)
+    exact LawfulSubSpec.evalDist_liftM_query t
 
 @[simp] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
     Pr[= x | liftComp mx superSpec] = Pr[= x | mx] :=

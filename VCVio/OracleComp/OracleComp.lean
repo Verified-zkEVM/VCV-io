@@ -45,11 +45,11 @@ protected lemma liftM_def (q : OracleQuery spec α) :
 
 @[simp, grind .]
 lemma liftM_ne_pure (q : OracleQuery spec α) (x : α) :
-    liftM (n := OracleComp spec) q ≠ pure x := by aesop
+    liftM (n := OracleComp spec) q ≠ pure x := PFunctor.FreeM.lift_ne_pure q x
 
 @[simp, grind .]
 lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
-    pure x ≠ liftM (n := OracleComp spec) q := by aesop
+    pure x ≠ liftM (n := OracleComp spec) q := PFunctor.FreeM.pure_ne_lift q x
 
 @[simp, grind =]
 protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
@@ -224,8 +224,7 @@ and the second computation does something pure with the result. -/
 @[simp] lemma bind_eq_pure_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
     oa >>= ob = pure y ↔ ∃ x : α, oa = pure x ∧ ob x = pure y := by
   refine ⟨fun h ↦ ?_, fun h ↦ let ⟨x, ⟨h, h'⟩⟩ := h; h ▸ h'⟩
-  simp only [PFunctor.FreeM.monad_bind_def, OracleComp.pure_def] at h
-  rwa [PFunctor.FreeM.bind_eq_pure_iff] at h
+  exact (PFunctor.FreeM.bind_eq_pure_iff oa ob y).mp h
 
 /-- Binding two computations gives a pure operation iff the first computation is pure
 and the second computation does something pure with the result. -/

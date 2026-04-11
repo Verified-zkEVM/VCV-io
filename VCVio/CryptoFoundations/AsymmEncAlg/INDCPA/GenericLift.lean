@@ -529,7 +529,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                       simpa using
                         (IND_CPA_hybridChallengeOracleLR_counted_run_some
                           (encAlg' := encAlg') pk (if branch then k + 1 else k) mm c st hcache)]
-                simp
+                rfl
               rw [simulateQ_query_bind, StateT.run']
               change
                 Prod.fst <$>

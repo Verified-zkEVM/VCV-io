@@ -662,15 +662,18 @@ private lemma signLoop_queryCountDist_succ
   rw [AddWriterT.costs_def, WriterT.run_bind]
   rw [signAttempt_run_formula_withUnitCost
     (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)]
-  simp only [bind_map_left, map_bind, Functor.map_map, Prod.map_snd, toAdd_mul, toAdd_ofAdd]
+  simp only [bind_map_left, map_bind, Functor.map_map, toAdd_mul, toAdd_ofAdd]
   refine bind_congr (m := m) ?_
   intro attempt
   cases attempt.2 with
   | some z =>
-      simp
+      simp only [WriterT.run_pure, map_pure, toAdd_one, add_zero]
   | none =>
-      simp [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
-        HasQuery.withAddCost, AddWriterT.costs, add_comm]
+      simp only [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
+        HasQuery.withAddCost, AddWriterT.costs]
+      rw [← LawfulMonad.map_map (m := m)]
+      exact map_congr fun a => by
+        simp [Nat.succ_eq_add_one, add_comm]
 
 end
 

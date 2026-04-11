@@ -34,8 +34,17 @@ full `HasEvalSPMF m` — only `HasEvalSet m` is needed (e.g., for `support_liftM
 noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (OptionT m) where
   toSet.toFun α mx := some ⁻¹' (support (OptionT.run mx))
-  toSet.toFun_pure' mx := Set.ext fun x => by simp
-  toSet.toFun_bind' mx my := Set.ext fun x => by simp [Option.elimM, Option.exists]
+  toSet.toFun_pure' mx := Set.ext fun x => by simp; exact Iff.rfl
+  toSet.toFun_bind' mx my := Set.ext fun x => by
+    simp [Option.elimM, Option.exists]
+    constructor
+    · rintro ⟨a, ha, hx⟩
+      change x ∈ ⋃ a ∈ some ⁻¹' support mx.run, some ⁻¹' support (my a).run
+      exact Set.mem_iUnion₂.mpr ⟨a, ha, hx⟩
+    · intro h
+      have h : x ∈ ⋃ a ∈ some ⁻¹' support mx.run, some ⁻¹' support (my a).run := h
+      obtain ⟨a, ha, hx⟩ := Set.mem_iUnion₂.mp h
+      exact ⟨a, ha, hx⟩
 
 variable [HasEvalSet m]
 
