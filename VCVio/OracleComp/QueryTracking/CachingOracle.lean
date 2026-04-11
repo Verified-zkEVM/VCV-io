@@ -104,6 +104,9 @@ lemma apply_eq (t : spec.Domain) : cachingOracle t =
           let u ← query t
           modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
+/-- Trivially true via `probFailure_eq_zero` since both sides are `OracleComp` computations.
+A generic `withCaching` version for arbitrary base monads would require a separate argument
+because caching changes the oracle semantics (cache hits skip the underlying oracle call). -/
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
@@ -111,6 +114,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
     Pr[⊥ | (simulateQ (cachingOracle (spec := spec₀)) oa).run cache] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
+/-- Trivially true via `probFailure_eq_zero`; see `probFailure_run_simulateQ`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}

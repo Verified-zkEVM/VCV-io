@@ -565,20 +565,26 @@ theorem IsTotalQueryBound.of_perIndex [DecidableEq ι] [Fintype ι] {oa : Oracle
 
 /-- Worst-case per-index query bound as a function of input size:
 for all inputs `x` with `size x ≤ n`, the computation `f x` makes at most `bound n i`
-queries to oracle `i`. -/
+queries to oracle `i`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def QueryUpperBound [DecidableEq ι] (f : α → OracleComp spec β) (size : α → ℕ)
     (bound : ℕ → ι → ℕ) : Prop :=
   ∀ n x, size x ≤ n → IsPerIndexQueryBound (f x) (bound n)
 
 /-- Total query upper bound: there exists a constant `k` such that for all inputs `x`
 with `size x ≤ n`, the computation `f x` makes at most `k * bound n` total queries.
-Uses the structural `IsQueryBound` to avoid dependence on oracle responses. -/
+Uses the structural `IsQueryBound` to avoid dependence on oracle responses.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def TotalQueryUpperBound (f : α → OracleComp spec β) (size : α → ℕ) (bound : ℕ → ℕ) : Prop :=
   ∃ k : ℕ, ∀ n x, size x ≤ n → IsQueryBound (f x) (k * bound n)
     (fun _ b => 0 < b) (fun _ b => b - 1)
 
 /-- `PolyQueryUpperBound` says the per-index query count is polynomially bounded
-in the input size. This is a non-parameterized version of `PolyQueries`. -/
+in the input size. This is a non-parameterized version of `PolyQueries`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def PolyQueryUpperBound [DecidableEq ι] (f : α → OracleComp spec β) (size : α → ℕ) : Prop :=
   ∃ qb : ι → Polynomial ℕ, QueryUpperBound f size (fun n i => (qb i).eval n)
 
@@ -591,7 +597,9 @@ lemma QueryUpperBound.apply [DecidableEq ι]
 
 /-- If `oa` is a computation indexed by a security parameter, then `PolyQueries oa`
 means that for each oracle index there is a polynomial function `qb` of the security parameter,
-such that the number of queries to that oracle is bounded by the corresponding polynomial. -/
+such that the number of queries to that oracle is bounded by the corresponding polynomial.
+
+Currently used only in `CostModel.lean`; retained as scaffolding for future asymptotic analyses. -/
 structure PolyQueries {ι : Type} [DecidableEq ι] {spec : ℕ → OracleSpec ι}
     {α β : ℕ → Type} (oa : (n : ℕ) → α n → OracleComp (spec n) (β n)) where
   /-- `qb i` is a polynomial bound on the queries made to oracle `i`. -/

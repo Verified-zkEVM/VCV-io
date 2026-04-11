@@ -51,6 +51,20 @@ lemma fst_map_run_withCost [LawfulMonad m]
   | pure x => simp
   | query_bind t oa h => simp [h]
 
+/-- Cost-tracking preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
+wrapping an oracle implementation with `withCost` does not change the probability of failure. -/
+lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] = Pr[⊥ | simulateQ so mx] := by
+  rw [show Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] =
+    Pr[⊥ | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] from
+    (probFailure_map _ _).symm, fst_map_run_withCost]
+
+lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) := by
+  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withCost]
+
 end withCost
 
 /-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer.
@@ -103,19 +117,22 @@ lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp s
     ((simulateQ countingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
+/-- Specialization of `QueryImpl.probFailure_run_simulateQ_withCost` to `countingOracle`. -/
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type} (oa : OracleComp spec₀ α) :
     Pr[⊥ | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[⊥ | oa] := by
-  simp only [HasEvalPMF.probFailure_eq_zero]
+  simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
+    QueryImpl.probFailure_run_simulateQ_withCost, simulateQ_ofLift_eq_self]
 
+/-- Specialization of `QueryImpl.NeverFail_run_simulateQ_withCost_iff` to `countingOracle`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) :
     NeverFail (simulateQ (countingOracle (spec := spec₀)) oa).run ↔ NeverFail oa := by
-  rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
-    HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
+  simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
+    QueryImpl.NeverFail_run_simulateQ_withCost_iff, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]

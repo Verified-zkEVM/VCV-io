@@ -38,7 +38,9 @@ variable {ι : Type} [DecidableEq ι] (spec : OracleSpec ι)
 
 This is a “product” seed generator: for each `i ∈ is` (assumed duplicate-free), it samples
 `n i` i.i.d. uniform values of type `spec.Range i` and stores the resulting list at index `i`.
-For `i ∉ is`, the seed list is `[]`. -/
+For `i ∉ is`, the seed list is `[]`.
+
+Currently unused outside this section; retained as potential infrastructure for future work. -/
 def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.QuerySeed spec)
   | [] => return ∅
   | i :: is => do
@@ -196,6 +198,7 @@ lemma probEvent_liftComp_uniformSample_eq_of_eq
       (↑(Fintype.card (spec.Range i)) : ENNReal)⁻¹ := by
   rw [probEvent_eq_eq_probOutput', probOutput_liftComp, probOutput_uniformSample]
 
+/-- Unused helper: deduplication equivalence for `generateSeed`. -/
 private lemma evalDist_generateSeed_eq_canonical
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [spec₀.Fintype] [spec₀.Inhabited]
@@ -233,6 +236,7 @@ lemma run_bind_query_eq_pop {α : Type u}
   | cons u us =>
     simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
 
+/-- Unused helper: variant of `run_bind_query_eq_pop` with inlined `StateT.mk`. -/
 lemma run_bind_query_eq_pop_bindform {α : Type u}
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :
     (((StateT.mk fun seed =>
@@ -391,7 +395,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
           exact h
         exact congrFun (congrArg DFunLike.coe (ih u _ js.dedup)) x
 
--- @[simp] -- proof deferred; removing simp to avoid unsound rewriting
+@[simp]
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]

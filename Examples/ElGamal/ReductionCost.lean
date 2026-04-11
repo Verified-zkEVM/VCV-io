@@ -228,7 +228,14 @@ abbrev OneTimeDDHReductionClosedUnder
 This is the usual DDH reduction, but written against the reified one-time IND-CPA adversary
 interface instead of a concrete adversary structure. It samples the challenge bit internally and
 uses the externally provided `chooseMessages` and `distinguish` procedures for the two adversary
-phases. -/
+phases.
+
+**Design note on cost tracking.** Because the adversary queries are embedded via `HasQuery` rather
+than as first-class `OracleComp` queries, `IsPerIndexQueryBound` cannot directly count them.
+The cost accounting therefore uses `AddWriterT`-based instrumentation (see
+`IND_CPA_OneTime_DDHReduction_openProfiled`), where `addTell` is placed at each query site and the
+resulting pathwise cost is proved exact on support. The canonical cost theorem is
+`IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport`. -/
 def IND_CPA_OneTime_DDHReduction_open
     {State : Type} (_gen A B T : G)
     [HasQuery (oneTimeINDCPASpec G G State (G × G)) ProbComp] :
@@ -291,13 +298,16 @@ section OpenCostTheorems
 variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G]
 
-/-- Every reachable execution of the open, resource-profile-instrumented DDH reduction carries the
-same resource profile: the reduction's intrinsic overhead together with the profiles assigned to
-`chooseMessages` and `distinguish`.
+/-- **Canonical cost theorem.** Every reachable execution of the open, resource-profile-instrumented
+DDH reduction carries the same resource profile: the reduction's intrinsic overhead together with
+the profiles assigned to `chooseMessages` and `distinguish`.
 
 This theorem is intentionally phrased as exactness on support. If the reified adversary interface
 has empty support, the reduction has no reachable executions, so the meaningful statement is that
-all reachable paths, if any, incur the displayed profile. -/
+all reachable paths, if any, incur the displayed profile.
+
+All other cost theorems in this file (`_profiled_`, `_modeledCost_`, `_intrinsicProfile_`,
+`_costed_`) are specializations of this result. -/
 lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
     {State ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
@@ -468,9 +478,8 @@ lemma IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
     (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
       (State := adv.State) (ω := ω) (κ := κ) intrinsic profile g A B T)
 
-/-- The asymptotic model [`oneTimeDDHReductionCost`] matches the exact pathwise cost of the
-instantiated DDH reduction when evaluated at the procedure-cost profile chosen for security
-parameter `n`. -/
+/-- The asymptotic model [`oneTimeDDHReductionCost`] matches the exact pathwise cost.
+Immediate from `IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport`. -/
 lemma IND_CPA_OneTime_DDHReduction_modeledCost_pathwiseCostEqOnSupport
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
@@ -484,16 +493,13 @@ lemma IND_CPA_OneTime_DDHReduction_modeledCost_pathwiseCostEqOnSupport
         intrinsic (advCost adv n).toProfile adv g A B T)
       (oneTimeDDHReductionCost (F := F) (G := G) (gen := gen) intrinsic advCost adv n) := by
   simpa [oneTimeDDHReductionCost] using
-    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
+    IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
-      intrinsic (advCost adv n).toProfile adv g A B T)
+      intrinsic (advCost adv n).toProfile adv g A B T
 
-/-- Scalar-cost specialization of
-[`IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport`].
-
-If the reified adversary procedures `chooseMessages` and `distinguish` are assigned scalar
-intrinsic costs `chooseCost` and `distinguishCost`, then the whole reduction has exact pathwise
-cost `intrinsic + chooseCost + distinguishCost`. -/
+/-- Scalar-cost specialization: when both procedures have pure-intrinsic costs, the total
+pathwise cost collapses to `intrinsic + chooseCost + distinguishCost`.
+Immediate from `IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport`. -/
 lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseCostEqOnSupport
     {gen : G} {ω κ : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic chooseCost distinguishCost : ω)
@@ -511,7 +517,7 @@ lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseCostEqOnSupport
         adv g A B T)
       (ResourceProfile.ofIntrinsic (κ := κ) (intrinsic + chooseCost + distinguishCost)) := by
   simpa [OneTimeINDCPACapability.reductionTransform_ofIntrinsic, add_assoc] using
-    (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
+    IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ)
       intrinsic
       (fun
@@ -519,7 +525,7 @@ lemma IND_CPA_OneTime_DDHReduction_intrinsicProfile_pathwiseCostEqOnSupport
             ResourceProfile.ofIntrinsic (κ := κ) chooseCost
         | OneTimeINDCPACapability.distinguish =>
             ResourceProfile.ofIntrinsic (κ := κ) distinguishCost)
-      adv g A B T)
+      adv g A B T
 
 /-- Cost-aware reduction packaging for the one-time ElGamal DDH reduction.
 
@@ -672,7 +678,8 @@ theorem oneTimeINDCPA_secureAgainst_of_ddh_secureAgainst_withCost
       (F := F) (G := G) (gen := gen) hg adv n)
 
 /-- Instantiating the open costed reduction with a concrete adversary preserves the exact pathwise
-resource profile proved for the open reduction body. -/
+resource profile proved for the open reduction body.
+Immediate from `IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport`. -/
 lemma IND_CPA_OneTime_DDHReduction_costed_pathwiseCostEqOnSupport
     {gen : G} {ω : Type} [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω]
     (intrinsic : ω)
