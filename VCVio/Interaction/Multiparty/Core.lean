@@ -177,7 +177,7 @@ endpoint of one fixed participant viewpoint rather than a whole participant
 profile.
 -/
 def localSyntax (m : Type u → Type u) :
-    Spec.SyntaxOver.{u, 1, u, u + 1} PUnit (fun X : Type u => LocalView X) where
+    Spec.SyntaxOver (PUnit : Type) (fun X : Type u => LocalView X) where
   Node _ _ view Cont := view.Action m Cont
 
 /--

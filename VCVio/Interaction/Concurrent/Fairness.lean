@@ -103,8 +103,8 @@ def firedAt
 
 /--
 Weak fairness for one ticket:
-if the ticket is continuously enabled from some point onward, then it is
-eventually fired.
+if the ticket is continuously enabled from some point onward, then it fires
+infinitely often.
 -/
 def WeakFairOn
     {Γ : Interaction.Spec.Node.Context.{w, w₂}}
@@ -112,7 +112,7 @@ def WeakFairOn
     (run : ProcessOver.Run ticketed.toProcess)
     (ticket : ticketed.Ticket) : Prop :=
   ProcessOver.Run.EventuallyAlways (enabledAt ticketed run ticket) →
-    ProcessOver.Run.Eventually (firedAt ticketed run ticket)
+    ProcessOver.Run.InfinitelyOften (firedAt ticketed run ticket)
 
 /--
 Strong fairness for one ticket:

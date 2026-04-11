@@ -441,8 +441,8 @@ example :
 
 example :
     Process.Ticketed.WeakFairOn loopTicketed trueRun true := by
-  intro _
-  refine ⟨0, ?_⟩
+  intro _ N
+  refine ⟨N, Nat.le_refl _, ?_⟩
   simp [ProcessOver.Ticketed.firedAt, loopTicketed, trueRun]
 
 example :
