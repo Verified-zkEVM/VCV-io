@@ -127,3 +127,34 @@ example (mx : OptionT (OracleComp spec₁) α)
   simulateQ impl₂ <| simulateQ impl₁ <| mx
 
 end tests
+
+section OptionT
+
+omit [LawfulMonad n] in
+/-- `simulateQ` distributes through `OptionT.bind`: the simulated OptionT-bind is the
+    OptionT-bind of the simulated pieces. -/
+lemma simulateQ_optionT_bind [LawfulMonad n]
+    (mx : OptionT (OracleComp spec) α) (f : α → OptionT (OracleComp spec) β) :
+    simulateQ impl (@Bind.bind (OptionT (OracleComp spec)) _ _ _ mx f) =
+    @Bind.bind (OptionT n) _ _ _
+      (simulateQ impl mx)
+      (fun a => simulateQ impl (f a)) := by
+  change simulateQ impl (@Bind.bind (OracleComp spec) _ _ _
+    mx (fun opt => match opt with | some a => f a | none => pure none)) = _
+  rw [simulateQ_bind]
+  change _ = @Bind.bind n _ _ _
+    (simulateQ impl mx) (fun opt => match opt with
+      | some a => simulateQ impl (f a) | none => pure none)
+  exact bind_congr fun opt => match opt with
+    | none => simulateQ_pure impl none
+    | some _ => rfl
+
+omit [LawfulMonad n] in
+/-- `simulateQ` commutes with `OptionT.lift`. -/
+@[simp] lemma simulateQ_optionT_lift [LawfulMonad n]
+    (comp : OracleComp spec α) :
+    simulateQ impl (OptionT.lift comp : OptionT (OracleComp spec) α) =
+      (OptionT.lift (simulateQ impl comp) : OptionT n α) := by
+  simp only [OptionT.lift, OptionT.mk, simulateQ_bind, simulateQ_pure]
+
+end OptionT
