@@ -84,22 +84,57 @@ def inducedNatTrans (M : RelativeMonad C D J) : NatTrans J M.inducedFunctor wher
 /-- If a relative monad is over the identity functor, it is a monad. -/
 def monadOfId (M : RelativeMonad C _ (𝟭 _)) : Monad C where
   toFunctor := M.inducedFunctor
-  η := { app X := M.η }
+  η :=
+    { app := fun X => M.η
+      naturality := fun X Y f => by
+        simp only [Functor.id_map, inducedFunctor_map]
+        simpa using (M.right_unit (f := f ≫ M.η)).symm }
   μ := NatTrans.mk (fun X => M.μ (𝟙 (M.T X)))
     (fun X Y f => by
       simp only [Functor.comp_obj, inducedFunctor_obj, Functor.comp_map, inducedFunctor_map,
         Functor.id_obj, Functor.id_map]
-      rw [← assoc, ← assoc]
-      simp)
-  right_unit _ := by
+      calc
+        M.μ (M.μ (f ≫ M.η) ≫ M.η) ≫ M.μ (𝟙 (M.T Y))
+            = M.μ ((M.μ (f ≫ M.η) ≫ M.η) ≫ M.μ (𝟙 (M.T Y))) := by
+                symm
+                exact M.assoc (f := M.μ (f ≫ M.η) ≫ M.η) (g := 𝟙 (M.T Y))
+        _ = M.μ (M.μ (f ≫ M.η)) := by
+              congr 1
+              simpa [Category.assoc] using
+                congrArg (fun k => M.μ (f ≫ M.η) ≫ k) (M.right_unit (f := 𝟙 (M.T Y)))
+        _ = M.μ (𝟙 (M.T X) ≫ M.μ (f ≫ M.η)) := by simp
+        _ = M.μ (𝟙 (M.T X)) ≫ M.μ (f ≫ M.η) := by
+              exact M.assoc (f := 𝟙 (M.T X)) (g := f ≫ M.η))
+  left_unit X := by
+    simpa using (M.right_unit (f := 𝟙 (M.T X)))
+  right_unit X := by
     simp only [Functor.id_obj, inducedFunctor_obj, inducedFunctor_map, Functor.id_map]
-    rw [← assoc]
-    simp
-  assoc _ := by
+    calc
+      M.μ (M.η ≫ M.η) ≫ M.μ (𝟙 (M.T X))
+          = M.μ ((M.η ≫ M.η) ≫ M.μ (𝟙 (M.T X))) := by
+              symm
+              exact M.assoc (f := M.η ≫ M.η) (g := 𝟙 (M.T X))
+      _ = M.μ M.η := by
+            congr 1
+            simpa [Category.assoc] using
+              congrArg (fun k => M.η ≫ k) (M.right_unit (f := 𝟙 (M.T X)))
+      _ = 𝟙 (M.T X) := by
+            simpa using (M.left_unit (X := X))
+  assoc X := by
     simp only [Functor.comp_obj, inducedFunctor_obj, inducedFunctor_map, Functor.id_obj,
       Functor.id_map]
-    rw [← assoc, ← assoc]
-    simp
+    calc
+      M.μ (M.μ (𝟙 (M.T X)) ≫ M.η) ≫ M.μ (𝟙 (M.T X))
+          = M.μ ((M.μ (𝟙 (M.T X)) ≫ M.η) ≫ M.μ (𝟙 (M.T X))) := by
+              symm
+              exact M.assoc (f := M.μ (𝟙 (M.T X)) ≫ M.η) (g := 𝟙 (M.T X))
+      _ = M.μ (M.μ (𝟙 (M.T X))) := by
+            congr 1
+            simpa [Category.assoc] using
+              congrArg (fun k => M.μ (𝟙 (M.T X)) ≫ k) (M.right_unit (f := 𝟙 (M.T X)))
+      _ = M.μ (𝟙 (M.T (M.T X)) ≫ M.μ (𝟙 (M.T X))) := by simp
+      _ = M.μ (𝟙 (M.T (M.T X))) ≫ M.μ (𝟙 (M.T X)) := by
+            exact M.assoc (f := 𝟙 (M.T (M.T X))) (g := 𝟙 (M.T X))
 
 /-- Transport a relative monad along a natural isomorphism of the underlying functor. -/
 def ofNatIso {J₁ J₂ : C ⥤ D} (φ : J₁ ≅ J₂) (M : RelativeMonad C D J₁) : RelativeMonad C D J₂ where

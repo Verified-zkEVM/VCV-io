@@ -41,7 +41,7 @@ variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
 /-- View a concrete query implementation as query capability in the same monad. This is useful
 when instantiating a generic `HasQuery` construction directly inside an analysis monad such as
 `StateT σ ProbComp` or `WriterT ω (OracleComp spec)`. -/
-def toHasQuery (impl : QueryImpl spec m) : HasQuery spec m where
+@[reducible] def toHasQuery (impl : QueryImpl spec m) : HasQuery spec m where
   query := impl
 
 @[simp]

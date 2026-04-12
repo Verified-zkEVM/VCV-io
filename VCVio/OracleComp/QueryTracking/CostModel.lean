@@ -300,7 +300,7 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
       exact ⟨u, mem_support_query t u, by simp⟩
     simp [OracleQuery.cont_query, CostModel.unit]
   · rw [support_map]
-    exact ⟨z, hz, by ext <;> simp [Prod.map, Nat.add_comm]⟩
+    exact ⟨z, hz, by ext <;> simp [Nat.add_comm]⟩
 
 private theorem isPerIndexQueryBound_of_unit_support_bound
     [DecidableEq ι] [spec.Inhabited]

@@ -182,7 +182,7 @@ lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
 
 section instances
 
-def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
+@[reducible] def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by simp
   probOutput_selectElem_eq := by simp
@@ -210,7 +210,8 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
   probOutput_selectElem_eq x y := by simp
 
 /-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
-def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) : SampleableType β where
+@[reducible] def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) :
+    SampleableType β where
   selectElem := e <$> ($ᵗ α)
   mem_support_selectElem := fun x => by simp
   probOutput_selectElem_eq := fun x y => by grind

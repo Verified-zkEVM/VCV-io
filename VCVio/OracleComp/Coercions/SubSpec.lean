@@ -48,7 +48,7 @@ variable {κ : Type w'} {spec₃ : OracleSpec κ}
 
 /-- Transitivity for `SubSpec`: if `spec₁ ⊂ₒ spec₂` and `spec₂ ⊂ₒ spec₃`,
 then `spec₁ ⊂ₒ spec₃`. -/
-def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
+@[reducible] def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
   monadLift q := h₂.monadLift (h₁.monadLift q)
   liftM_map q f := by
     have h₁map := h₁.liftM_map (q := q) (f := f)

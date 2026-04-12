@@ -179,9 +179,9 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
     | ⟨.inr (.inl t), f⟩ => ⟨.inl (.inr t), f⟩
     | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩
   liftM_map
-    | ⟨.inl t, f⟩ => fun _ => rfl
-    | ⟨.inr (.inl t), f⟩ => fun _ => rfl
-    | ⟨.inr (.inr t), f⟩ => fun _ => rfl
+    | ⟨.inl _, _⟩ => fun _ => rfl
+    | ⟨.inr (.inl _), _⟩ => fun _ => rfl
+    | ⟨.inr (.inr _), _⟩ => fun _ => rfl
 
 @[simp] lemma liftM_add_assoc_def (q : OracleQuery (spec₁ + (spec₂ + spec₃)) α) :
     (liftM q : OracleQuery (spec₁ + spec₂ + spec₃) α) =

@@ -639,7 +639,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
             apply Finset.sum_le_sum_of_subset
             exact Finset.range_mono (Nat.sub_le m 1)
     · -- Cache miss: cache₀ t = none
-      push_neg at ht
+      push Not at ht
       have ht_none : cache₀ t = none := by
         cases h : cache₀ t with | none => rfl | some v => exact absurd h (ht v)
       -- The computation becomes: query t >>= fun u =>

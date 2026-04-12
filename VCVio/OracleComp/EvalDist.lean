@@ -39,7 +39,8 @@ lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
     (oa : spec.Range q → OracleComp spec α) :
     supportWhen o ((query q : OracleComp spec _) >>= oa) =
       ⋃ x ∈ o q, supportWhen o (oa x) := by
-  simp [supportWhen]; exact Set.bind_def
+  simp only [supportWhen, simulateQ_query_bind]
+  exact Set.bind_def
 
 /-- Reachable outputs of a bind are the reachable outputs of the continuation over reachable
 outputs of the first computation. -/
@@ -47,7 +48,8 @@ outputs of the first computation. -/
 lemma supportWhen_bind (o : QueryImpl spec Set) (oa : OracleComp spec α)
     (ob : α → OracleComp spec β) :
     supportWhen o (oa >>= ob) = ⋃ x ∈ supportWhen o oa, supportWhen o (ob x) := by
-  simp [supportWhen, simulateQ_bind]; exact Set.bind_def
+  simp only [supportWhen, simulateQ_bind]
+  exact Set.bind_def
 
 /-- Membership form of [`OracleComp.supportWhen_bind`]. -/
 lemma mem_supportWhen_bind_iff (o : QueryImpl spec Set) (oa : OracleComp spec α)
@@ -78,7 +80,7 @@ lemma support_eq_simulateQ (mx : OracleComp spec α) :
 
 @[simp, grind =] lemma support_liftM (q : OracleQuery spec α) :
     support (liftM q : OracleComp spec α) = Set.range q.cont := by
-  simp [support_eq_simulateQ]
+  simp only [support_eq_simulateQ, simulateQ_query]
   change q.cont '' Set.univ = Set.range q.cont
   exact Set.image_univ
 

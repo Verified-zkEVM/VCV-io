@@ -306,7 +306,7 @@ lemma simulateQ_buildLayer_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simulateQ f (buildLayer α n leaves) =
       buildLayer_with_hash (α := α) n leaves f := by
   unfold buildLayer
-  simp_all only [range_def, cast_eq, bind_pure, simulateQ_listVector_mmap_query, domain_def]
+  simp_all only [range_def, bind_pure, simulateQ_listVector_mmap_query, domain_def]
   rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
@@ -364,7 +364,7 @@ theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i :
     have hi : i = 0 := Fin.eq_zero i
     subst hi
     simp only [buildMerkleTree_with_hash, Fin.isValue, Nat.pow_zero, getPutativeRoot_with_hash,
-      getRoot, Fin.zero_eta, Vector.get_zero, List.Vector.head]
+      getRoot]
     simp
   | succ n ih =>
     -- Abbreviate the upper layer and the upper tree.
@@ -410,8 +410,8 @@ theorem functional_completeness {n : ℕ} (leaves : List.Vector α (2 ^ n)) (i :
               i := by
           ext
           simp [Nat.sub_add_cancel hiPos]
-        simp [lastLayer, buildLayer_with_hash, siblingIndex, hmod1, hdiv, hi']
-        congr; exact hi'.symm
+        simpa [lastLayer, buildLayer_with_hash, siblingIndex, hmod1, hdiv] using
+          congrArg (fun j => hashFn (leaves.get ⟨i.val - 1, by grind only⟩, leaves.get j)) hi'.symm
       simp [buildMerkleTree_with_hash, lastLayer, generateProof,
         getPutativeRoot_with_hash, getRoot, hsign, hnew]
       simpa [getRoot, Cache.cons, lastLayer, upperCache] using

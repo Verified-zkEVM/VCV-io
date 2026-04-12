@@ -116,12 +116,23 @@ private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
     simp only [oracleOutputs, streamOutputs, simulateQ_bind, simulateQ_query,
       OracleQuery.cont_query, id_map, OracleQuery.input_query]
     show prfRealQueryImpl prf k (Sum.inr s) >>= _ = _
-    simp only [prfRealQueryImpl, QueryImpl.add_apply_inr, pure_bind, simulateQ_bind,
-      simulateQ_pure]
-    change (do let x ← simulateQ (prfRealQueryImpl prf k)
-                  (oracleOutputs n (prf.eval k s).1)
-               pure ((prf.eval k s).2 ::ᵥ x)) = _
-    rw [ih]; simp
+    simp only [prfRealQueryImpl, QueryImpl.add_apply_inr]
+    cases h : prf.eval k s with
+    | mk s' out =>
+        let so : QueryImpl (S →ₒ S × O) ProbComp := fun d => pure (prf.eval k d)
+        change simulateQ
+            ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) + so)
+            (do
+              let rest ← oracleOutputs n s'
+              pure (out ::ᵥ rest)) = _
+        have ih' :
+            simulateQ
+                ((HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) + so)
+                (oracleOutputs n s') =
+              pure (streamOutputs (prf.eval k) n s') := by
+          simpa [PRFScheme.prfRealQueryImpl, so] using ih (s := s')
+        rw [simulateQ_bind, ih']
+        simp [h, so]
 
 /-- Applying the real PRF query implementation to the full reduction body simplifies to
 sampling a seed and running the adversary on deterministic output. -/
@@ -133,14 +144,31 @@ private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
         let outputs ← oracleOutputs n seed
         liftComp (adv outputs) (unifSpec + ofFn fun _ => S × O)) =
     (do let s ← $ᵗ S; adv (streamOutputs (prf.eval k) n s)) := by
-  simp only [simulateQ_bind]
-  have h1 : simulateQ (prf.prfRealQueryImpl k)
-      (liftComp ($ᵗ S) (unifSpec + ofFn fun _ => S × O)) = ($ᵗ S : ProbComp S) := by
-    simp only [prfRealQueryImpl]; rw [QueryImpl.simulateQ_add_liftComp_left]
-    exact simulateQ_ofLift_eq_self _
-  rw [h1]; congr 1; funext s
-  rw [simulateQ_prfReal_oracleOutputs, pure_bind, prfRealQueryImpl,
-    QueryImpl.simulateQ_add_liftComp_left]; exact simulateQ_ofLift_eq_self _
+  let so : QueryImpl (S →ₒ S × O) ProbComp := fun d => pure (prf.eval k d)
+  have hleft :
+      ∀ {α : Type} (oa : ProbComp α),
+        simulateQ (prf.prfRealQueryImpl k)
+          (liftComp oa (unifSpec + ofFn fun _ => S × O)) = oa := by
+    intro α oa
+    trans simulateQ (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) oa
+    · simpa [PRFScheme.prfRealQueryImpl, so] using
+        (QueryImpl.simulateQ_add_liftComp_left
+          (impl₁' := HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp))
+          (impl₂' := so)
+          oa)
+    · exact simulateQ_ofLift_eq_self _
+  change simulateQ (prf.prfRealQueryImpl k)
+      (do
+        let seed ← liftComp ($ᵗ S) (unifSpec + ofFn fun _ => S × O)
+        let outputs ← oracleOutputs n seed
+        liftComp (adv outputs) (unifSpec + ofFn fun _ => S × O)) =
+    (do
+      let s ← $ᵗ S
+      adv (streamOutputs (prf.eval k) n s))
+  rw [simulateQ_bind, hleft]
+  refine bind_congr ?_
+  intro s
+  rw [simulateQ_bind, simulateQ_prfReal_oracleOutputs, pure_bind, hleft]
 
 /-- In the real world, the stream PRG experiment has the same output distribution as
 the real PRF experiment for the reduction adversary, provided the PRF key

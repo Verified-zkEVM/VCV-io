@@ -124,7 +124,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
             gcongr
             exact_mod_cast Nat.sub_le n 1
     · -- Cache miss
-      push_neg at ht
+      push Not at ht
       have ht_none : cache₀ t = none := by
         cases h : cache₀ t with | none => rfl | some v => exact absurd h (ht v)
       have hrun : (simulateQ cachingOracle (liftM (query t) >>= mx)).run cache₀ =
