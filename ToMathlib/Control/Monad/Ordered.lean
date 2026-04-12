@@ -175,7 +175,7 @@ monad lifts from `m` to `n`.
 This is stated as a definition and not an instance, since oftentimes we want to have another
 instance on the monad lift.
 -/
-def instDiscreteMonadLift {m n} [Monad m] [h : OrderedMonad n] [MonadLift m n] :
+@[reducible] def instDiscreteMonadLift {m n} [Monad m] [h : OrderedMonad n] [MonadLift m n] :
     OrderedMonadLift m n where
   monadLift_mono h := by rename_i a b; have : a = b := h; simp only [this, le_refl]
 
