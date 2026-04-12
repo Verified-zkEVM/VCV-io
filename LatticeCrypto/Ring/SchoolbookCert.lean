@@ -39,8 +39,11 @@ theorem mk_X_pow_n :
     (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
       ((X : Polynomial R) ^ n) = -1 := by
   have h := mk_negacyclicModulus_eq_zero (R := R) (n := n)
-  simp only [negacyclicModulus] at h
-  rwa [map_add, map_one, add_eq_zero_iff_eq_neg] at h
+  have h' :
+      (Ideal.Quotient.mk (Ideal.span ({negacyclicModulus R n} : Set (Polynomial R))))
+        ((X : Polynomial R) ^ n) + 1 = 0 := by
+    simpa [negacyclicModulus, map_add, map_one] using h
+  exact (add_eq_zero_iff_eq_neg.mp h')
 
 /-- In `R[X]/(X^n + 1)`, `X^(k + n) = -X^k`. -/
 theorem mk_X_pow_add_n (k : Nat) :
@@ -211,7 +214,7 @@ theorem negacyclicMulPure_sound
   by_cases hn : 0 < backend.degree
   · exact (mk_double_sum_eq_mk_negacyclicConv hn _ _).symm
   · -- n = 0: both sums are over Fin 0, hence empty
-    push_neg at hn
+    push Not at hn
     have hd : backend.degree = 0 := by omega
     have : IsEmpty (Fin backend.degree) := by rw [hd]; exact Fin.isEmpty
     simp [Finset.univ_eq_empty]
