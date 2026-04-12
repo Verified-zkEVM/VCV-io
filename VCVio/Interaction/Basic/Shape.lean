@@ -170,24 +170,15 @@ def ShapeOver.mapOutput
     (∀ tr, A tr → B tr) →
     ShapeOver.Family shape agent spec ctxs A →
     ShapeOver.Family shape agent spec ctxs B
-  := by
+  :=
     match spec, ctxs with
-    | .done, _ =>
-        intro A B f out
-        exact f ⟨⟩ out
-    | .node X next, ⟨γ, ctxs⟩ =>
-        intro A B f node
-        exact shape.map
+    | .done, _ => fun f out => f ⟨⟩ out
+    | .node _ _, ⟨γ, ctxsRest⟩ => fun f node =>
+        shape.map
           (agent := agent)
           (γ := γ)
           (fun x =>
-            mapOutput shape
-              (agent := agent)
-              (spec := next x)
-              (ctxs := ctxs x)
-              (A := fun tr => A ⟨x, tr⟩)
-              (B := fun tr => B ⟨x, tr⟩)
-              (fun tr => f ⟨x, tr⟩))
+            mapOutput shape (ctxs := ctxsRest x) (fun tr => f ⟨x, tr⟩))
           node
 
 /--

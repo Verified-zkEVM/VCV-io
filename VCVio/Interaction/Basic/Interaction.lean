@@ -138,7 +138,7 @@ theorem InteractionOver.comap_id
     {syn : SyntaxOver Agent Γ}
     {m : Type w → Type w}
     (I : InteractionOver Agent Γ syn m) :
-    HEq (I.comap (Node.ContextHom.id Γ)) I := by
+    I.comap (Node.ContextHom.id Γ) = I := by
   cases I
   rfl
 
@@ -148,7 +148,7 @@ theorem InteractionOver.comap_comp
     {m : Type w → Type w}
     (I : InteractionOver Agent Λ syn m)
     (g : Node.ContextHom Δ Λ) (f : Node.ContextHom Γ Δ) :
-    HEq ((I.comap g).comap f) (I.comap (Node.ContextHom.comp g f)) := by
+    (I.comap g).comap f = I.comap (Node.ContextHom.comp g f) := by
   cases I
   rfl
 

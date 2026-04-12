@@ -77,8 +77,7 @@ theorem length_done {S : Spec} (h : Front S → False) :
 
 @[simp, grind =]
 theorem length_step {S : Spec} (event : Front S) (tail : Trace (residual event)) :
-    length (Trace.step event tail) = tail.length.succ := by
-  simp [length]
+    length (Trace.step event tail) = tail.length.succ := rfl
 
 /-- A `step` contributes exactly one additional frontier event to the trace
 length. -/

@@ -409,9 +409,7 @@ def loopTicketed : Process.Ticketed Party where
 /-- A simple always-true infinite run of `loopProcess`. -/
 def trueRun : Process.Run loopProcess where
   state _ := PUnit.unit
-  transcript _ := by
-    change Interaction.Spec.Transcript (.node Bool fun _ => .done)
-    exact ⟨true, PUnit.unit⟩
+  transcript _ := ⟨true, PUnit.unit⟩
   next_state _ := rfl
 
 example : Process.Run.initial trueRun = PUnit.unit := rfl

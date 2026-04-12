@@ -188,8 +188,8 @@ The first complete process-step transcript of the run.
 def head
     {Γ : Interaction.Spec.Node.Context.{w, w₂}}
     {process : ProcessOver Γ}
-    (run : Run process) : (process.step run.initial).spec.Transcript := by
-  simpa [Run.initial] using run.transcript 0
+    (run : Run process) : (process.step run.initial).spec.Transcript :=
+  run.transcript 0
 
 /--
 The tail of a run after its first process step.
@@ -200,10 +200,8 @@ def tail
     (run : Run process) :
     Run process where
   state n := run.state n.succ
-  transcript n := by
-    simpa using run.transcript n.succ
-  next_state n := by
-    simpa using run.next_state n.succ
+  transcript n := run.transcript n.succ
+  next_state n := run.next_state n.succ
 
 /--
 The initial state of `run.tail` is exactly the residual state obtained by
@@ -213,9 +211,8 @@ theorem tail_initial
     {Γ : Interaction.Spec.Node.Context.{w, w₂}}
     {process : ProcessOver Γ}
     (run : Run process) :
-    run.tail.initial = (process.step run.initial).next run.head := by
-  change run.state 1 = (process.step run.initial).next run.head
-  simpa [Run.initial, Run.head] using run.next_state 0
+    run.tail.initial = (process.step run.initial).next run.head :=
+  run.next_state 0
 
 /--
 `take run n` is the length-`n` finite execution prefix of the infinite run
@@ -227,7 +224,7 @@ def take
     (run : Run process) : (n : Nat) → Prefix process run.initial n
   | 0 => .nil
   | n + 1 =>
-      .step run.head (cast (by rw [run.tail_initial]) (run.tail.take n))
+      .step run.head (run.tail_initial ▸ run.tail.take n)
 
 /--
 The current controlling party of step `n` of a run, if any, after projecting
@@ -361,9 +358,7 @@ theorem relUpTo_of_pointwise
   | succ n ih =>
       refine ⟨?_, ?_⟩
       · exact hrel 0
-      · exact ih leftRun.tail rightRun.tail (by
-          intro k
-          simpa [Run.tail] using hrel k.succ)
+      · exact ih leftRun.tail rightRun.tail (fun k => hrel k.succ)
 
 /-- Pointwise step matching implies full run matching. -/
 theorem rel_of_pointwise
@@ -390,7 +385,7 @@ theorem take_succ
     {process : ProcessOver Γ}
     (run : Run process) (n : Nat) :
     run.take (n + 1) =
-      Prefix.step run.head (cast (by rw [run.tail_initial]) (run.tail.take n)) := rfl
+      Prefix.step run.head (run.tail_initial ▸ run.tail.take n) := rfl
 
 @[simp, grind =]
 theorem currentControllersUpTo_zero
@@ -634,7 +629,7 @@ theorem take_zero {Party : Type u} {process : Process Party}
 theorem take_succ {Party : Type u} {process : Process Party}
     (run : Run process) (n : Nat) :
     run.take (n + 1) =
-      ProcessOver.Prefix.step run.head (cast (by rw [run.tail_initial]) (run.tail.take n)) :=
+      ProcessOver.Prefix.step run.head (run.tail_initial ▸ run.tail.take n) :=
   ProcessOver.Run.take_succ run n
 
 @[simp, grind =]

@@ -110,6 +110,10 @@ theorem isLive_done : isLive .done = false := rfl
 theorem isLive_node (Moves : Type u) (rest : Moves → Concurrent.Spec) :
     isLive (.node Moves rest) = true := rfl
 
+@[simp, grind =]
+theorem isLive_par (left right : Concurrent.Spec) :
+    isLive (.par left right) = (left.isLive || right.isLive) := rfl
+
 end Spec
 end Concurrent
 end Interaction

@@ -117,13 +117,11 @@ information that is revealed:
 * `hidden` reveals nothing;
 * `quotient Obs toObs` reveals `toObs x`.
 -/
-def obsOf {X : Type u} (view : LocalView X) : X → view.ObsType
-  | x =>
-      match view with
-      | .active => x
-      | .observe => x
-      | .hidden => PUnit.unit
-      | .quotient _ toObs => toObs x
+def obsOf {X : Type u} : (view : LocalView X) → X → view.ObsType
+  | .active, x => x
+  | .observe, x => x
+  | .hidden, _ => PUnit.unit
+  | .quotient _ toObs, x => toObs x
 
 /--
 `LocalView.Action view m Cont` is the canonical local node type for a fixed
