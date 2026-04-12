@@ -152,18 +152,22 @@ noncomputable def vectorNegacyclicSemantics_additive (Coeff : Type u) [CommRing 
   zero_sound := by
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp [vectorBackend_coeff, Finset.sum_const_zero, map_zero]
+    rfl
   add_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [vectorBackend_coeff, vectorRing_add_get, Finset.sum_add_distrib, map_add]
+    rfl
   sub_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [vectorBackend_coeff, vectorRing_sub_get, Finset.sum_sub_distrib, map_sub]
+    rfl
   neg_sound := by
     intro f
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [vectorBackend_coeff, vectorRing_neg_get, Finset.sum_neg_distrib, map_neg]
+    rfl
   mul_sound := hmul
 
 end LatticeCrypto

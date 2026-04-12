@@ -93,7 +93,11 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
         (liftM (query (spec := Unit →ₒ S) ()) >>= fun s => pure (s, (∅, fun _ => 0))) := by
     simp [hidingAvgQueryImpl, hidingAvgLeftImpl, simulateQ_query]
   rw [hidingAvgComp, simulateQ_bind, StateT.run_bind, hleftrun]
-  simp only [bind_assoc, pure_bind]
+  change
+    (liftM (query (spec := Unit →ₒ S) ()) >>= fun s =>
+      (simulateQ hidingAvgQueryImpl (do
+          let b ← (hidingOa A s).liftComp (HidingAvgSpec M S C)
+          pure (s, b))).run (∅, fun _ => 0)) = _
   refine OracleComp.bind_congr' rfl ?_
   intro s
   rw [simulateQ_bind, StateT.run_bind]
