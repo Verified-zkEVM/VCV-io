@@ -153,67 +153,129 @@ local instance : Zero Rq := Vector.instZero
 local instance : Sub Rq := Vector.instSub
 local instance : Neg Rq := Vector.instNeg
 
+private theorem rq_get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 := by
+  calc
+    (0 : Rq).get i = (0 : Rq)[i.1] := by
+      simp [Vector.get_eq_getElem]
+      rfl
+    _ = 0 := Vector.getElem_zero i.1 i.2
+
+private theorem rq_get_add (a b : Rq) (i : Fin ringDegree) :
+    (a + b).get i = a.get i + b.get i := by
+  calc
+    (a + b).get i = (a + b)[i.1] := by
+      simp [Vector.get_eq_getElem]
+      rfl
+    _ = a[i.1] + b[i.1] := Vector.getElem_add a b i.1 i.2
+    _ = a.get i + b.get i := by
+      simp [Vector.get_eq_getElem]
+      rfl
+
+private theorem rq_get_neg (a : Rq) (i : Fin ringDegree) :
+    (-a).get i = -a.get i := by
+  calc
+    (-a).get i = (-a)[i.1] := by
+      simp [Vector.get_eq_getElem]
+      rfl
+    _ = -a[i.1] := Vector.getElem_neg a i.1 i.2
+    _ = -a.get i := by
+      simp [Vector.get_eq_getElem]
+      rfl
+
+private theorem rq_get_sub (a b : Rq) (i : Fin ringDegree) :
+    (a - b).get i = a.get i - b.get i := by
+  calc
+    (a - b).get i = (a - b)[i.1] := by
+      simp [Vector.get_eq_getElem]
+      rfl
+    _ = a[i.1] - b[i.1] := Vector.getElem_sub a b i.1 i.2
+    _ = a.get i - b.get i := by
+      simp [Vector.get_eq_getElem]
+      rfl
+
 local instance instRqAddCommGroup : AddCommGroup Rq where
   add := (· + ·)
   add_assoc a b c := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add, Vector.getElem_add, Vector.getElem_add, Vector.getElem_add]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (a + b + c).get j = (a + (b + c)).get j
+    rw [rq_get_add (a + b) c j, rq_get_add a b j, rq_get_add a (b + c) j, rq_get_add b c j]
     exact add_assoc _ _ _
   zero := 0
   zero_add a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add, Vector.getElem_zero]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (0 + a).get j = a.get j
+    rw [rq_get_add 0 a j, rq_get_zero j]
     exact zero_add _
   add_zero a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add, Vector.getElem_zero]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (a + 0).get j = a.get j
+    rw [rq_get_add a 0 j, rq_get_zero j]
     exact add_zero _
   nsmul := rqNSMul
   nsmul_zero x := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_zero]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (rqNSMul 0 x).get j = (0 : Rq).get j
+    rw [rq_get_zero j]
     simp [rqNSMul]
   nsmul_succ n x := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add]
-    simpa [rqNSMul] using AddMonoid.nsmul_succ n (x.get ⟨i, hi⟩)
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (rqNSMul (n + 1) x).get j = (rqNSMul n x + x).get j
+    rw [rq_get_add (rqNSMul n x) x j]
+    simpa [rqNSMul] using AddMonoid.nsmul_succ n (x.get j)
   neg := Neg.neg
   sub := Sub.sub
   sub_eq_add_neg a b := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_sub, Vector.getElem_add, Vector.getElem_neg]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (a - b).get j = (a + -b).get j
+    rw [rq_get_sub a b j, rq_get_add a (-b) j, rq_get_neg b j]
     exact sub_eq_add_neg _ _
   zsmul := rqZSMul
   zsmul_zero' a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_zero]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (rqZSMul 0 a).get j = (0 : Rq).get j
+    rw [rq_get_zero j]
     simp [rqZSMul]
   zsmul_succ' n a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add]
-    simpa [rqZSMul] using SubNegMonoid.zsmul_succ' n (a.get ⟨i, hi⟩)
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (rqZSMul (↑n.succ) a).get j = (rqZSMul (↑n) a + a).get j
+    rw [rq_get_add (rqZSMul (↑n) a) a j]
+    simpa [rqZSMul] using SubNegMonoid.zsmul_succ' n (a.get j)
   zsmul_neg' n a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_neg]
-    simpa [rqZSMul] using SubNegMonoid.zsmul_neg' n (a.get ⟨i, hi⟩)
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (rqZSMul (Int.negSucc n) a).get j = (-rqZSMul (↑n.succ) a).get j
+    rw [rq_get_neg (rqZSMul (↑n.succ) a) j]
+    simpa [rqZSMul] using SubNegMonoid.zsmul_neg' n (a.get j)
   neg_add_cancel a := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add, Vector.getElem_neg, Vector.getElem_zero]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (-a + a).get j = (0 : Rq).get j
+    rw [rq_get_add (-a) a j, rq_get_neg a j, rq_get_zero j]
     exact neg_add_cancel _
   add_comm a b := by
     apply Vector.ext
     intro i hi
-    rw [Vector.getElem_add, Vector.getElem_add]
+    let j : Fin ringDegree := ⟨i, hi⟩
+    change (a + b).get j = (b + a).get j
+    rw [rq_get_add a b j, rq_get_add b a j]
     exact add_comm _ _
 
 /-- Casting `centeredRepr` back into `ZMod q` recovers the original coefficient. -/
@@ -484,9 +546,8 @@ theorem concretePower2Round_high_low_decomp (r : Rq) :
   apply Vector.ext
   intro i hi
   let j : Fin ringDegree := ⟨i, hi⟩
-  rw [Vector.getElem_add]
-  change (power2RoundShift (power2RoundHigh r)).get j +
-      (power2RoundLow r).get j = r.get j
+  change (power2RoundShift (power2RoundHigh r) + power2RoundLow r).get j = r.get j
+  rw [rq_get_add]
   rw [power2RoundShift_high_get, power2RoundLow_get]
   exact power2RoundCoeff_eq (r.get j)
 
@@ -495,9 +556,8 @@ theorem concretePower2Round_remainder_eq_low (r : Rq) :
   apply Vector.ext
   intro i hi
   let j : Fin ringDegree := ⟨i, hi⟩
-  rw [Vector.getElem_sub]
-  change r.get j - (power2RoundShift (power2RoundHigh r)).get j =
-      (power2RoundLow r).get j
+  change (r - power2RoundShift (power2RoundHigh r)).get j = (power2RoundLow r).get j
+  rw [rq_get_sub]
   rw [power2RoundShift_high_get, power2RoundLow_get]
   exact sub_eq_iff_eq_add'.2 (power2RoundCoeff_eq (r.get j)).symm
 
@@ -524,8 +584,8 @@ theorem concreteRounding_high_low_decomp (p : Params) (hγ : 0 < p.gamma2) (r : 
   apply Vector.ext
   intro i hi
   let j : Fin ringDegree := ⟨i, hi⟩
-  rw [Vector.getElem_add]
-  change (highBitsShift p (highBits p r)).get j + (lowBits p r).get j = r.get j
+  change (highBitsShift p (highBits p r) + lowBits p r).get j = r.get j
+  rw [rq_get_add]
   rw [highBitsShift_high_get, lowBits_get]
   simpa [highBitsCoeff, lowBitsCoeff] using decomposeCoeff_eq (r.get j) hγ
 
@@ -1850,8 +1910,7 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     rw [makeHint_get]
     rw [highBits, Vector.get_ofFn]
     have hadd : (r + z).get j = r.get j + z.get j := by
-      rw [Vector.get_eq_getElem, Vector.getElem_add]
-      simp [Vector.get_eq_getElem]
+      rw [rq_get_add]
     rw [hadd]
     exact congrArg (fun n : ℕ => (n : Coeff))
       (useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj)
@@ -1866,12 +1925,9 @@ theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
       r.get j -
         (((2 * p.gamma2 : ℕ) : Coeff) *
           (useHintCoeff (h.get j) (r.get j) p.gamma2 : Coeff)) := by
-    rw [Vector.get_eq_getElem, Vector.getElem_sub]
-    simp only [Vector.get_eq_getElem]
+    rw [rq_get_sub]
     congr 1
-    have := highBitsShift_useHint_get p h r j
-    simp only [Vector.get_eq_getElem] at this
-    exact this
+    exact highBitsShift_useHint_get p h r j
   rw [hcoeff]
   exact useHintCoeff_shift_sub_bound_of_isApproved p hp (h.get j) (r.get j)
 
@@ -1896,8 +1952,7 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
       exact hlowj0
     rw [highBits, Vector.get_ofFn, highBits, Vector.get_ofFn]
     have hadd : (r + s).get j = r.get j + s.get j := by
-      rw [Vector.get_eq_getElem, Vector.getElem_add]
-      simp [Vector.get_eq_getElem]
+      rw [rq_get_add]
     rw [hadd]
     exact congrArg (fun n : ℕ => (n : Coeff))
       (highBitsCoeff_add_eq_of_small_of_isApproved p hp (r := r.get j)
