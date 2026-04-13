@@ -95,6 +95,20 @@ lemma mem_support_query (t : spec.Domain) (u : spec.Range t) :
 
 alias support_liftM_query := support_query
 
+/-- Support-aware bind congruence: if two continuations agree on all elements in the support
+    of `mx`, the resulting bind computations are equal. -/
+theorem bind_congr_of_forall_mem_support (mx : OracleComp spec α) {f g : α → OracleComp spec β}
+    (h : ∀ x ∈ support mx, f x = g x) : mx >>= f = mx >>= g := by
+  induction mx using OracleComp.inductionOn with
+  | pure a =>
+    simp only [pure_bind]
+    exact h a (by simp [support_pure])
+  | query_bind q k ih =>
+    change liftM (query q) >>= (fun u => k u >>= f) =
+      liftM (query q) >>= (fun u => k u >>= g)
+    exact bind_congr fun u => ih u (fun x hx =>
+      h x ((mem_support_bind_iff _ _ _).mpr ⟨u, by simp, hx⟩))
+
 end support
 
 section finSupport

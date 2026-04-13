@@ -699,3 +699,20 @@ theorem List.forIn_mprod_yield_eq_foldlM
     simp only [bind_assoc, pure_bind]
     congr 1; funext ⟨b', c'⟩
     exact ih b' c'
+
+section CrossTypeBind
+
+/-- If the first steps agree after projection, and continuations agree on matching inputs,
+    then the full bind computations agree. Generalizes `bind_congr` to different source types. -/
+theorem bind_eq_of_map_eq {m : Type → Type*} [Monad m] [LawfulMonad m]
+    {α₁ α₂ β : Type} {m₁ : m α₁} {m₂ : m α₂}
+    {f₁ : α₁ → m β} {f₂ : α₂ → m β}
+    (proj : α₁ → α₂)
+    (h_first : proj <$> m₁ = m₂)
+    (h_cont : ∀ a₁, f₁ a₁ = f₂ (proj a₁)) :
+    m₁ >>= f₁ = m₂ >>= f₂ := by
+  rw [← h_first, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp, pure_bind]
+  exact bind_congr fun a₁ => h_cont a₁
+
+end CrossTypeBind
