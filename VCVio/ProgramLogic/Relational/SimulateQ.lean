@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.EvalDist.TVDist
+import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.SimSemantics.StateT
 
@@ -675,5 +676,69 @@ theorem tvDist_simulateQ_le_probEvent_bad_dist
     simpa [sim₁, sim₂, StateT.run'] using
       (tvDist_map_le (m := OracleComp spec) (α := α × σ) (β := α) Prod.fst sim₁ sim₂)
   exact le_trans h_map h_tv_joint
+
+section SndInvariant
+
+/-- Given a `StateT (σ × Q) ProbComp` query implementation, fix the second state component
+    at `q₀` and project to `StateT σ ProbComp`. -/
+def QueryImpl.fixSndStateT {ι : Type} {spec : OracleSpec ι} {σ Q : Type}
+    (impl : QueryImpl spec (StateT (σ × Q) ProbComp)) (q₀ : Q) :
+    QueryImpl spec (StateT σ ProbComp) :=
+  fun t => StateT.mk fun s => Prod.map id Prod.fst <$> (impl t).run (s, q₀)
+
+/-- If the Q-component of product state `(σ × Q)` is invariant under all oracle queries
+    starting from `q₀`, then the full `simulateQ` computation decomposes: running with `(s, q₀)`
+    produces the same result as running the projected implementation on `s` alone, with `q₀`
+    appended back.
+
+    This generalizes `map_run_simulateQ_eq_of_query_map_eq` from all-states commutativity
+    to support-based invariance. -/
+theorem simulateQ_run_eq_of_snd_invariant
+    {ι : Type} {spec : OracleSpec ι} {σ Q α : Type}
+    (impl : QueryImpl spec (StateT (σ × Q) ProbComp))
+    (q₀ : Q)
+    (h_inv : ∀ (t : spec.Domain) (s : σ) (x : _ × (σ × Q)),
+      x ∈ support ((impl t).run (s, q₀)) → x.2.2 = q₀)
+    (oa : OracleComp spec α) (s : σ) :
+    (simulateQ impl oa).run (s, q₀) =
+    (fun p => (p.1, (p.2, q₀))) <$> (simulateQ (QueryImpl.fixSndStateT impl q₀) oa).run s := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x =>
+    simp [simulateQ_pure, StateT.run_pure]
+  | query_bind t oa ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+      OracleQuery.cont_query, id_map, StateT.run_bind]
+    -- Push <$> through >>= on RHS
+    rw [map_bind]
+    -- Unfold fixSndStateT to align first computations
+    -- (fixSndStateT impl q₀ t).run s = Prod.map id Prod.fst <$> (impl t).run (s, q₀)
+    -- Then bind_map_left to get (impl t).run (s, q₀) >>= ... on both sides
+    conv_rhs =>
+      rw [show (QueryImpl.fixSndStateT impl q₀ t).run s =
+        Prod.map id Prod.fst <$> (impl t).run (s, q₀) from rfl]
+    rw [bind_map_left]
+    -- Now both sides: (impl t).run (s, q₀) >>= continuation
+    refine OracleComp.bind_congr_of_forall_mem_support _ (fun ⟨u, s', q'⟩ hx => ?_)
+    have hq : q' = q₀ := h_inv t s ⟨u, s', q'⟩ hx
+    subst hq
+    simp only [Prod.map, id]
+    exact ih u s'
+
+/-- `run'` projection corollary of `simulateQ_run_eq_of_snd_invariant`. -/
+theorem simulateQ_run'_eq_of_snd_invariant
+    {ι : Type} {spec : OracleSpec ι} {σ Q α : Type}
+    (impl : QueryImpl spec (StateT (σ × Q) ProbComp))
+    (q₀ : Q)
+    (h_inv : ∀ (t : spec.Domain) (s : σ) (x : _ × (σ × Q)),
+      x ∈ support ((impl t).run (s, q₀)) → x.2.2 = q₀)
+    (oa : OracleComp spec α) (s : σ) :
+    (simulateQ impl oa).run' (s, q₀) =
+    (simulateQ (QueryImpl.fixSndStateT impl q₀) oa).run' s := by
+  have hrun := simulateQ_run_eq_of_snd_invariant impl q₀ h_inv oa s
+  change Prod.fst <$> (simulateQ impl oa).run (s, q₀) =
+    Prod.fst <$> (simulateQ (QueryImpl.fixSndStateT impl q₀) oa).run s
+  rw [hrun, Functor.map_map]
+
+end SndInvariant
 
 end OracleComp.ProgramLogic.Relational
