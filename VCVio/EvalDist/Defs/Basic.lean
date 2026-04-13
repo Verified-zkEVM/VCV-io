@@ -29,20 +29,8 @@ class HasEvalSPMF (m : Type u → Type v) [Monad m]
   support_eq {α : Type u} (mx : m α) : support mx = SPMF.support (toSPMF mx)
   toSet := MonadHom.comp {
     toFun := @SPMF.support
-    toFun_pure' x := Set.ext fun _ => by
-        simp only [SPMF.support_pure, Set.mem_singleton_iff]; exact Iff.rfl
-    toFun_bind' p q := Set.ext fun x => by
-      simp only [SPMF.mem_support_iff, ne_eq, SPMF.bind_apply_eq_tsum,
-        ENNReal.summable.tsum_ne_zero_iff, mul_ne_zero_iff]
-      constructor
-      · rintro ⟨a, ha1, ha2⟩
-        change x ∈ ⋃ a ∈ SPMF.support p, SPMF.support (q a)
-        exact Set.mem_iUnion₂.mpr ⟨a, (SPMF.mem_support_iff ..).mpr ha1,
-          (SPMF.mem_support_iff ..).mpr ha2⟩
-      · intro h
-        have h : x ∈ ⋃ a ∈ SPMF.support p, SPMF.support (q a) := h
-        obtain ⟨a, ha1, ha2⟩ := Set.mem_iUnion₂.mp h
-        exact ⟨a, (SPMF.mem_support_iff ..).mp ha1, (SPMF.mem_support_iff ..).mp ha2⟩
+    toFun_pure' x := Set.ext fun _ => by simp
+    toFun_bind' p q := Set.ext fun x => by aesop
    } toSPMF
 
 /-- The resulting distribution of running the monadic computation `mx`.

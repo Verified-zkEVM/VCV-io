@@ -20,7 +20,7 @@ open ENNReal
 section pure
 
 @[simp, grind =] lemma support_pure [HasEvalSet m] (x : α) :
-    support (pure x : m α) = {x} := by aesop (rule_sets := [UnfoldEvalDist])
+    support (pure x : m α) = {x} := HasEvalSet.toSet.toFun_pure' x
 
 lemma mem_support_pure_iff [HasEvalSet m] (x y : α) :
     x ∈ support (pure y : m α) ↔ x = y := by grind
@@ -104,8 +104,8 @@ section bind
 
 @[simp, grind =]
 lemma support_bind [HasEvalSet m] (mx : m α) (my : α → m β) :
-    support (mx >>= my) = ⋃ x ∈ support mx, support (my x) := by
-  aesop (rule_sets := [UnfoldEvalDist])
+    support (mx >>= my) = ⋃ x ∈ support mx, support (my x) :=
+  HasEvalSet.toSet.toFun_bind' mx my
 
 @[grind =]
 lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β) :

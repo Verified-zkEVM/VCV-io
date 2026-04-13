@@ -32,7 +32,7 @@ def supportWhen (o : QueryImpl spec Set) (mx : OracleComp spec α) : Set α :=
 @[simp]
 lemma supportWhen_pure (o : QueryImpl spec Set) (x : α) :
     supportWhen o (pure x : OracleComp spec α) = {x} := by
-  simp [supportWhen]; rfl
+  simp [supportWhen]
 
 @[simp]
 lemma supportWhen_query_bind (o : QueryImpl spec Set) (q : spec.Domain)
