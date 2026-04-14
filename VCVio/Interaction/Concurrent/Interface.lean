@@ -757,8 +757,8 @@ theorem tensor_comp
   cases f₂
   cases g₁
   cases g₂
-  simp [tensor, comp, Interface.Hom.sum_comp]
-  exact ⟨rfl, rfl⟩
+  simp only [tensor, comp, Interface.Hom.sum_comp]
+  rfl
 
 @[simp]
 theorem swap_id

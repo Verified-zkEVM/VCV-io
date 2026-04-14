@@ -60,7 +60,7 @@ This packages the fact that `Control.isLive` is the control-side decision
 procedure for whether a concurrent spec still exposes any enabled frontier
 event.
 -/
-private def frontIsEmptyOfNotLive {Party : Type u} :
+private theorem frontIsEmptyOfNotLive {Party : Type u} :
     {S : Spec} → (control : Control Party S) → control.isLive = false → IsEmpty (Front S)
   | .done, .done, _ => ⟨fun event => nomatch event⟩
   | .node _ _, .node _ _, h => by cases h
