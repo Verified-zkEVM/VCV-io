@@ -122,6 +122,30 @@ theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
   simp [mapBoundary, PortBoundary.Hom.comp, List.map_map,
     Interface.Hom.mapPacket_comp]
 
+/--
+Embed a boundary action on the left factor into the tensor boundary.
+
+Emitted packets are injected into the left summand of the combined output
+interface. The activation flag is preserved.
+-/
+def embedInlTensor {Δ₁ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
+    (b : BoundaryAction Δ₁ X) :
+    BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
+  isActivated := b.isActivated
+  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inl Δ₁.Out Δ₂.Out))
+
+/--
+Embed a boundary action on the right factor into the tensor boundary.
+
+Emitted packets are injected into the right summand of the combined output
+interface. The activation flag is preserved.
+-/
+def embedInrTensor (Δ₁ : PortBoundary) {Δ₂ : PortBoundary} {X : Type w}
+    (b : BoundaryAction Δ₂ X) :
+    BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
+  isActivated := b.isActivated
+  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inr Δ₁.Out Δ₂.Out))
+
 end BoundaryAction
 
 /--
@@ -235,6 +259,38 @@ theorem openStepContextMap_comp (Party : Type u)
       openStepContextMap Party (PortBoundary.Hom.comp g f) := by
   funext X ons; simp [openStepContextMap, Spec.Node.ContextHom.comp,
     OpenNodeSemantics.mapBoundary_comp]
+
+/--
+Embed the left factor's open-world context into the tensor boundary context.
+
+This injects emitted packets into the left summand of the combined output
+interface while preserving the closed-world node semantics.
+-/
+def openStepContextInlTensor (Party : Type u)
+    (Δ₁ : PortBoundary) (Δ₂ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenStepContext Party Δ₁ : Spec.Node.Context.{w})
+      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+  fun _ ons => {
+    toNodeSemantics := ons.toNodeSemantics
+    boundary := ons.boundary.embedInlTensor Δ₂
+  }
+
+/--
+Embed the right factor's open-world context into the tensor boundary context.
+
+This injects emitted packets into the right summand of the combined output
+interface while preserving the closed-world node semantics.
+-/
+def openStepContextInrTensor (Party : Type u)
+    (Δ₁ : PortBoundary) (Δ₂ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenStepContext Party Δ₂ : Spec.Node.Context.{w})
+      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+  fun _ ons => {
+    toNodeSemantics := ons.toNodeSemantics
+    boundary := ons.boundary.embedInrTensor Δ₁
+  }
 
 /--
 The open-world specialization of `StepOver`.

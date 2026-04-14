@@ -12,19 +12,19 @@ import VCVio.Interaction.UC.OpenTheory
 This file provides the first concrete realization of `UC.OpenTheory`
 using actual open processes (`OpenProcess Party Δ`).
 
-The key operation is `map`, which adapts an open process's exposed boundary
-along a `PortBoundary.Hom` by transforming every node's boundary action via
-`BoundaryAction.mapBoundary`. This is fully implemented and satisfies
-`IsLawfulMap` (functoriality).
+## Implemented operations
 
-The remaining operations (`par`, `wire`, `plug`) are structurally typed but
-their step functions are deferred (`sorry`). These operations involve process
-interleaving and boundary-traffic routing whose exact semantics belong partly
-in the runtime/execution layer. Their definitions here establish the type-level
-interface and will be fleshed out once the runtime layer is in place.
+* `map` adapts boundary actions along a `PortBoundary.Hom`, with a proven
+  `IsLawfulMap` instance (functoriality).
 
-This file validates that the `OpenTheory` algebra is realizable by actual
-processes, not just the free syntax model in `OpenSyntax.lean`.
+* `par` places two open processes side by side using binary-choice
+  interleaving: a scheduling node chooses left or right, then runs the
+  selected subprocess's step protocol. Emitted packets are injected into
+  the appropriate summand of the tensor output interface.
+
+The remaining operations (`wire`, `plug`) are structurally typed but their
+step functions are deferred (`sorry`). These require boundary-traffic routing
+whose exact semantics belong in the runtime/execution layer.
 -/
 
 universe u v w
@@ -44,7 +44,9 @@ The concrete open-composition theory backed by `OpenProcess`.
 * `Obj Δ` is `OpenProcess Party Δ`, the boundary-indexed family of open
   concurrent processes.
 * `map` adapts boundary actions along a `PortBoundary.Hom`.
-* `par` places two open processes side by side (step function deferred).
+* `par` places two open processes side by side with binary-choice
+  interleaving: a scheduling node selects left or right, then runs
+  the selected subprocess's step protocol.
 * `wire` connects a shared internal boundary (step function deferred).
 * `plug` closes against a matching context (step function deferred).
 -/
@@ -53,7 +55,28 @@ def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
   map φ p := p.mapBoundary φ
   par {Δ₁} {Δ₂} p₁ p₂ := {
     Proc := p₁.Proc × p₂.Proc
-    step := sorry
+    step := fun (s₁, s₂) =>
+      let step₁ := p₁.step s₁
+      let step₂ := p₂.step s₂
+      let schedulerNode : OpenNodeSemantics Party
+          (PortBoundary.tensor Δ₁ Δ₂) (ULift.{v} Bool) :=
+        { controllers := fun _ => []
+          views := fun _ => .hidden
+          boundary := .internal _ _ }
+      { spec := .node (ULift.{v} Bool) fun
+          | ⟨true⟩ => step₁.spec
+          | ⟨false⟩ => step₂.spec
+        semantics :=
+          ⟨schedulerNode, fun
+            | ⟨true⟩ => Interaction.Spec.Decoration.map
+                (openStepContextInlTensor Party Δ₁ Δ₂)
+                step₁.spec step₁.semantics
+            | ⟨false⟩ => Interaction.Spec.Decoration.map
+                (openStepContextInrTensor Party Δ₁ Δ₂)
+                step₂.spec step₂.semantics⟩
+        next := fun
+          | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
+          | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
   }
   wire {Δ₁} {_Γ} {Δ₂} p₁ p₂ := {
     Proc := p₁.Proc × p₂.Proc

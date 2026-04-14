@@ -460,6 +460,36 @@ theorem sum_comp
     sum (comp g₁ f₁) (comp g₂ f₂) = comp (sum g₁ g₂) (sum f₁ f₂) := by
   ext a <;> cases a <;> rfl
 
+/--
+Left inclusion into a disjoint sum of interfaces.
+
+Maps a packet on `I₁` to the left summand of `sum I₁ I₂`.
+-/
+def inl (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB}) :
+    Hom I₁ (Interface.sum I₁ I₂) where
+  toFunA := Sum.inl
+  toFunB _ m := m
+
+/--
+Right inclusion into a disjoint sum of interfaces.
+
+Maps a packet on `I₂` to the right summand of `sum I₁ I₂`.
+-/
+def inr (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB}) :
+    Hom I₂ (Interface.sum I₁ I₂) where
+  toFunA := Sum.inr
+  toFunB _ m := m
+
+@[simp]
+theorem mapPacket_inl (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB})
+    (pkt : Packet I₁) :
+    mapPacket (inl I₁ I₂) pkt = ⟨Sum.inl pkt.1, pkt.2⟩ := rfl
+
+@[simp]
+theorem mapPacket_inr (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB})
+    (pkt : Packet I₂) :
+    mapPacket (inr I₁ I₂) pkt = ⟨Sum.inr pkt.1, pkt.2⟩ := rfl
+
 end Hom
 
 namespace QueryHom

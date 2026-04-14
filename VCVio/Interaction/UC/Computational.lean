@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.Interaction.UC.Emulates
 import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.Asymptotics.Negligible
+import VCVio.CryptoFoundations.Asymptotics.Security
 
 /-!
 # Computational observation layer for UC security
@@ -40,6 +41,10 @@ parameter with distributional advantage bounds.
   `Emulates` for the induced observation relation.
 * `CompUCSecure.toCompEmulates`: simulator-based security implies
   computational emulation when the simulator is the identity.
+* `ucDistGame`: constructs the `SecurityGame` whose advantage is the
+  UC distinguishing advantage.
+* `AsympCompEmulates.iff_secureAgainst`: `AsympCompEmulates` is
+  equivalent to security of the UC distinguishing game.
 -/
 
 universe u
@@ -243,6 +248,73 @@ theorem AsympCompEmulates.of_compEmulates
     AsympCompEmulates T sem real ideal Adv isPPT env :=
   fun A _ => negligible_of_le
     (fun n => ENNReal.ofReal_le_ofReal (hComp n (env A n))) hε
+
+/-! ## Bridge to `SecurityGame` -/
+
+/--
+The UC distinguishing game: a `SecurityGame` whose advantage at adversary
+`A` and security parameter `n` is the distributional distance between the
+real and ideal closed executions under the environment chosen by `A`.
+-/
+noncomputable def ucDistGame
+    (T : ℕ → OpenTheory.{u}) (sem : ∀ n, Semantics (T n))
+    {Δ : PortBoundary}
+    (real ideal : ∀ n, (T n).Obj Δ)
+    {Adv : Type*} (env : Adv → ∀ n, (T n).Plug Δ) : SecurityGame Adv where
+  advantage A n := ENNReal.ofReal <|
+    ProbComp.distAdvantage
+      ((sem n).run ((T n).close (real n) (env A n)))
+      ((sem n).run ((T n).close (ideal n) (env A n)))
+
+/--
+`AsympCompEmulates` is exactly `secureAgainst isPPT` for the UC
+distinguishing game. This is definitional.
+-/
+theorem AsympCompEmulates.iff_secureAgainst
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    {Δ : PortBoundary}
+    {real ideal : ∀ n, (T n).Obj Δ}
+    {Adv : Type*} {isPPT : Adv → Prop}
+    {env : Adv → ∀ n, (T n).Plug Δ} :
+    AsympCompEmulates T sem real ideal Adv isPPT env ↔
+      (ucDistGame T sem real ideal env).secureAgainst isPPT :=
+  Iff.rfl
+
+/--
+If real UC-emulates ideal, then the UC distinguishing game is secure against
+any adversary class. Uses the `SecurityGame.secureAgainst` vocabulary.
+-/
+theorem ucDistGame_secureAgainst_of_asympCompEmulates
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    {Δ : PortBoundary}
+    {real ideal : ∀ n, (T n).Obj Δ}
+    {Adv : Type*} {isPPT : Adv → Prop}
+    {env : Adv → ∀ n, (T n).Plug Δ}
+    (h : AsympCompEmulates T sem real ideal Adv isPPT env) :
+    (ucDistGame T sem real ideal env).secureAgainst isPPT :=
+  h
+
+/--
+UC security reduction: if security of `g₁` reduces to UC-emulation of
+`real` by `ideal`, then `g₁` is secure whenever UC-emulation holds.
+
+This bridges `SecurityGame.secureAgainst_of_reduction` to the UC setting:
+given a reduction from a standard security game to the UC distinguishing
+game, UC-emulation implies security of the original game.
+-/
+theorem SecurityGame.secureAgainst_of_ucEmulation
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    {Δ : PortBoundary}
+    {real ideal : ∀ n, (T n).Obj Δ}
+    {Adv Adv' : Type*} {isPPT : Adv → Prop} {isPPT' : Adv' → Prop}
+    {env : Adv' → ∀ n, (T n).Plug Δ}
+    {g : SecurityGame Adv} {reduce : Adv → Adv'}
+    (hreduce : ∀ A, isPPT A → isPPT' (reduce A))
+    (hbound : ∀ A n,
+      g.advantage A n ≤ (ucDistGame T sem real ideal env).advantage (reduce A) n)
+    (hUC : AsympCompEmulates T sem real ideal Adv' isPPT' env) :
+    g.secureAgainst isPPT :=
+  SecurityGame.secureAgainst_of_reduction hreduce hbound hUC
 
 end UC
 end Interaction
