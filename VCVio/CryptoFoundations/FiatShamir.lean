@@ -114,67 +114,6 @@ theorem map_construction
 
 end naturality
 
-section signCore
-
-variable (σ : SigmaProtocol X W PC SC Ω P p) (M : Type)
-
-variable {m : Type → Type u} [Monad m] [LawfulMonad m]
-  [MonadLiftT ProbComp m]
-variable {ω : Type} [AddMonoid ω]
-
-private lemma fst_map_sign_core
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    (do
-      let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (PC × SC))
-      let r ← runtime.impl (msg, a.1.1)
-      (fun z : P × Multiplicative ω => (a.1.1, z.1)) <$>
-        WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m P)) =
-    (do
-      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-      let r ← runtime.impl (msg, a.1)
-      Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) := by
-  change (do
-      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
-        AddWriterT ω m (PC × SC))
-      let r ← runtime.impl (msg, a.1.1)
-      (fun z : P × Multiplicative ω => (a.1.1, z.1)) <$>
-        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) : AddWriterT ω m P)) =
-    (do
-      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-      let r ← runtime.impl (msg, a.1)
-      Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P))
-  simp [bind_map_left]
-
-private lemma snd_map_sign_core_withAddCost
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (costFn : M × PC → ω)
-    (pk : X) (sk : W) (msg : M) :
-    (do
-      let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (PC × SC))
-      let r ← runtime.impl (msg, a.1.1)
-      (fun z : P × Multiplicative ω =>
-        a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
-        WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m P)) =
-    (do
-      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-      let r ← runtime.impl (msg, a.1)
-      (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
-        (monadLift (σ.respond pk sk a.2 r) : m P)) := by
-  change (do
-      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
-        AddWriterT ω m (PC × SC))
-      let r ← runtime.impl (msg, a.1.1)
-      (fun z : P × Multiplicative ω =>
-        a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
-        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) : AddWriterT ω m P)) =
-    (do
-      let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-      let r ← runtime.impl (msg, a.1)
-      (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
-        (monadLift (σ.respond pk sk a.2 r) : m P))
-  simp [bind_map_left]
-
-end signCore
-
 section costAccounting
 
 variable [SampleableType X] [SampleableType W]
@@ -183,32 +122,6 @@ variable (σ : SigmaProtocol X W PC SC Ω P p) (hr : GenerableRelation X W p)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
-
-private lemma sign_outputs_formula_withUnitCost
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    AddWriterT.outputs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-            (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
-          runtime) =
-      HasQuery.inRuntime
-        (fun [HasQuery (M × PC →ₒ Ω) m] =>
-          (FiatShamir (m := m) σ hr M).sign pk sk msg)
-        runtime := by
-  suffices h :
-      (do
-        let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
-        let r ← runtime.impl (msg, a.1.1)
-        (fun z : P × Multiplicative ℕ => (a.1.1, z.1)) <$>
-          WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
-      (do
-        let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-        let r ← runtime.impl (msg, a.1)
-        Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.outputs, FiatShamir,
-      QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
-      using h
-  exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
 
 private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M)
@@ -233,38 +146,15 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
         let r ← runtime.impl (msg, a.1)
         Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
     simpa [HasQuery.inRuntime, HasQuery.withAddCost, AddWriterT.outputs, FiatShamir,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell]
-      using h
-  exact fst_map_sign_core (σ := σ) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
-
-private lemma sign_costs_formula_withUnitCost
-    (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
-    AddWriterT.costs
-        (HasQuery.withUnitCost
-          (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-            (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
-          runtime) =
-      (fun _ ↦ 1) <$>
-        HasQuery.inRuntime
-          (fun [HasQuery (M × PC →ₒ Ω) m] =>
-            (FiatShamir (m := m) σ hr M).sign pk sk msg)
-          runtime := by
-  suffices h :
-      (do
-        let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ℕ m (PC × SC))
-        let r ← runtime.impl (msg, a.1.1)
-        (fun z : P × Multiplicative ℕ => a.2 * (Multiplicative.ofAdd 1 * z.2)) <$>
-          WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ℕ m P)) =
-      (do
-        let a ← (monadLift (σ.commit pk sk) : m (PC × SC))
-        let r ← runtime.impl (msg, a.1)
-        (fun _ ↦ Multiplicative.ofAdd 1) <$> (monadLift (σ.respond pk sk a.2 r) : m P)) by
-    simpa [HasQuery.inRuntime, HasQuery.withUnitCost, AddWriterT.costs, FiatShamir,
-      QueryRuntime.withUnitCost_impl, AddWriterT.addTell]
-      using h
-  exact snd_map_sign_core_withAddCost
-    (σ := σ) (runtime := runtime) (costFn := fun _ ↦ (1 : ℕ))
-    (pk := pk) (sk := sk) (msg := msg)
+      QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+  change (do
+      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
+        AddWriterT ω m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ω => (a.1.1, z.1)) <$>
+        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) :
+          AddWriterT ω m P)) = _
+  simp [bind_map_left]
 
 private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M)
@@ -292,11 +182,16 @@ private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
         (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
           (monadLift (σ.respond pk sk a.2 r) : m P)) by
     simpa [HasQuery.inRuntime, HasQuery.withAddCost, AddWriterT.costs, FiatShamir,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell]
-      using h
-  exact snd_map_sign_core_withAddCost
-    (σ := σ) (runtime := runtime) (costFn := costFn)
-    (pk := pk) (sk := sk) (msg := msg)
+      QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+  change (do
+      let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (PC × SC))) :
+        AddWriterT ω m (PC × SC))
+      let r ← runtime.impl (msg, a.1.1)
+      (fun z : P × Multiplicative ω =>
+        a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
+        WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m P)) :
+          AddWriterT ω m P)) = _
+  simp [bind_map_left]
 
 /-- Fiat-Shamir signing has query cost determined by its output: the signature `(c, s)` records
 the unique queried commitment `c`, so the total weighted query cost is exactly
@@ -360,17 +255,9 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
 theorem sign_usesExactlyOneQuery
     (runtime : QueryRuntime (M × PC →ₒ Ω) m) (pk : X) (sk : W) (msg : M) :
     Queries[ (FiatShamir σ hr M).sign pk sk msg in runtime ] = 1 := by
-  change Cost[
-    HasQuery.withUnitCost
-      (fun [HasQuery (M × PC →ₒ Ω) (AddWriterT ℕ m)] =>
-        (FiatShamir (m := AddWriterT ℕ m) σ hr M).sign pk sk msg)
-      runtime
-  ] = 1
-  rw [AddWriterT.HasCost, AddWriterT.CostsAs]
-  rw [sign_outputs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-    (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)]
-  exact sign_costs_formula_withUnitCost (σ := σ) (hr := hr) (M := M)
-    (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
+  simpa [HasQuery.withUnitCost] using
+    sign_usesCostAsQueryCost (σ := σ) (hr := hr) (M := M) (runtime := runtime)
+      (pk := pk) (sk := sk) (msg := msg) (costFn := fun _ ↦ (1 : ℕ))
 
 /-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
 random-oracle query on `(msg, sig.1)`. -/

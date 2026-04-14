@@ -129,137 +129,12 @@ noncomputable def runtime :
 
 end runtime
 
-section signAttemptCore
-
-variable (ids : IdenSchemeWithAbort S W W' St C Z p) (M : Type)
-
-variable {m : Type → Type u} [Monad m] [LawfulMonad m]
-  [MonadLiftT ProbComp m]
-variable {ω : Type} [AddMonoid ω]
-
-private lemma fst_map_signAttempt_core
-    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) :
-    (do
-      let a ← WriterT.run (monadLift (ids.commit pk sk) : AddWriterT ω m (W' × St))
-      let c ← runtime.impl (msg, a.1.1)
-      (fun z : Option Z × Multiplicative ω => (a.1.1, z.1)) <$>
-        WriterT.run (monadLift (ids.respond pk sk a.1.2 c) : AddWriterT ω m (Option Z))) =
-    (do
-      let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-      let c ← runtime.impl (msg, a.1)
-      Prod.mk a.1 <$> (monadLift (ids.respond pk sk a.2 c) : m (Option Z))) := by
-  change (do
-      let a ← WriterT.run (monadLift ((monadLift (ids.commit pk sk) : m (W' × St))) :
-        AddWriterT ω m (W' × St))
-      let c ← runtime.impl (msg, a.1.1)
-      (fun z : Option Z × Multiplicative ω => (a.1.1, z.1)) <$>
-        WriterT.run
-          (monadLift ((monadLift (ids.respond pk sk a.1.2 c) : m (Option Z))) :
-            AddWriterT ω m (Option Z))) =
-    (do
-      let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-      let c ← runtime.impl (msg, a.1)
-      Prod.mk a.1 <$> (monadLift (ids.respond pk sk a.2 c) : m (Option Z)))
-  simp [bind_map_left]
-
-private lemma snd_map_signAttempt_core_withAddCost
-    (runtime : QueryRuntime (M × W' →ₒ C) m) (costFn : M × W' → ω)
-    (pk : S) (sk : W) (msg : M) :
-    (do
-      let a ← WriterT.run (monadLift (ids.commit pk sk) : AddWriterT ω m (W' × St))
-      let c ← runtime.impl (msg, a.1.1)
-      (fun z : Option Z × Multiplicative ω =>
-        a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
-        WriterT.run (monadLift (ids.respond pk sk a.1.2 c) : AddWriterT ω m (Option Z))) =
-    (do
-      let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-      let c ← runtime.impl (msg, a.1)
-      (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
-        (monadLift (ids.respond pk sk a.2 c) : m (Option Z))) := by
-  change (do
-      let a ← WriterT.run (monadLift ((monadLift (ids.commit pk sk) : m (W' × St))) :
-        AddWriterT ω m (W' × St))
-      let c ← runtime.impl (msg, a.1.1)
-      (fun z : Option Z × Multiplicative ω =>
-        a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
-        WriterT.run
-          (monadLift ((monadLift (ids.respond pk sk a.1.2 c) : m (Option Z))) :
-            AddWriterT ω m (Option Z))) =
-    (do
-      let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-      let c ← runtime.impl (msg, a.1)
-      (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
-        (monadLift (ids.respond pk sk a.2 c) : m (Option Z)))
-  simp [bind_map_left]
-
-end signAttemptCore
-
 section costAccounting
 
 variable (ids : IdenSchemeWithAbort S W W' St C Z p) (M : Type)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
-
-private lemma signAttempt_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
-    (costFn : M × W' → ω) :
-    AddWriterT.outputs
-        (HasQuery.withAddCost
-          (fun [HasQuery (M × W' →ₒ C) (AddWriterT ω m)] =>
-            fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
-          runtime costFn) =
-      HasQuery.inRuntime
-        (fun [HasQuery (M × W' →ₒ C) m] =>
-          fsAbortSignAttempt (m := m) ids M pk sk msg)
-        runtime := by
-  suffices h :
-      (do
-        let a ← WriterT.run (monadLift (ids.commit pk sk) : AddWriterT ω m (W' × St))
-        let c ← runtime.impl (msg, a.1.1)
-        (fun z : Option Z × Multiplicative ω => (a.1.1, z.1)) <$>
-          WriterT.run (monadLift (ids.respond pk sk a.1.2 c) : AddWriterT ω m (Option Z))) =
-      (do
-        let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-        let c ← runtime.impl (msg, a.1)
-        Prod.mk a.1 <$> (monadLift (ids.respond pk sk a.2 c) : m (Option Z))) by
-    simpa [HasQuery.inRuntime, HasQuery.withAddCost, fsAbortSignAttempt, AddWriterT.outputs,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell]
-      using h
-  exact fst_map_signAttempt_core
-    (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg)
-
-private lemma signAttempt_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
-    (costFn : M × W' → ω) :
-    AddWriterT.costs
-        (HasQuery.withAddCost
-          (fun [HasQuery (M × W' →ₒ C) (AddWriterT ω m)] =>
-            fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
-          runtime costFn) =
-      (fun attempt ↦ costFn (msg, attempt.1)) <$>
-        HasQuery.inRuntime
-          (fun [HasQuery (M × W' →ₒ C) m] =>
-            fsAbortSignAttempt (m := m) ids M pk sk msg)
-          runtime := by
-  suffices h :
-      (do
-        let a ← WriterT.run (monadLift (ids.commit pk sk) : AddWriterT ω m (W' × St))
-        let c ← runtime.impl (msg, a.1.1)
-        (fun z : Option Z × Multiplicative ω =>
-          a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
-          WriterT.run (monadLift (ids.respond pk sk a.1.2 c) : AddWriterT ω m (Option Z))) =
-      (do
-        let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-        let c ← runtime.impl (msg, a.1)
-        (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
-          (monadLift (ids.respond pk sk a.2 c) : m (Option Z))) by
-    simpa [HasQuery.inRuntime, HasQuery.withAddCost, fsAbortSignAttempt, AddWriterT.costs,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell]
-      using h
-  exact snd_map_signAttempt_core_withAddCost
-    (ids := ids) (M := M) (runtime := runtime) (costFn := costFn)
-    (pk := pk) (sk := sk) (msg := msg)
 
 private lemma signAttempt_run_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
@@ -287,21 +162,46 @@ private lemma signAttempt_run_formula_withAddCost {ω : Type} [AddMonoid ω]
         let z ← (monadLift (ids.respond pk sk a.2 c) : m (Option Z))
         pure ((a.1, z), Multiplicative.ofAdd (costFn (msg, a.1)))) by
     simpa [HasQuery.inRuntime, HasQuery.withAddCost, fsAbortSignAttempt,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell]
-      using h
+      QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
   change (do
       let a ← WriterT.run (monadLift ((monadLift (ids.commit pk sk) : m (W' × St))) :
         AddWriterT ω m (W' × St))
       let c ← runtime.impl (msg, a.1.1)
       let z ← WriterT.run (monadLift ((monadLift (ids.respond pk sk a.1.2 c) : m (Option Z))) :
         AddWriterT ω m (Option Z))
-      pure ((a.1.1, z.1), a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2))) =
-    (do
-      let a ← (monadLift (ids.commit pk sk) : m (W' × St))
-      let c ← runtime.impl (msg, a.1)
-      let z ← (monadLift (ids.respond pk sk a.2 c) : m (Option Z))
-      pure ((a.1, z), Multiplicative.ofAdd (costFn (msg, a.1))))
+      pure ((a.1.1, z.1), a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2))) = _
   simp [bind_map_left]
+
+private lemma signAttempt_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (costFn : M × W' → ω) :
+    AddWriterT.outputs
+        (HasQuery.withAddCost
+          (fun [HasQuery (M × W' →ₒ C) (AddWriterT ω m)] =>
+            fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
+          runtime costFn) =
+      HasQuery.inRuntime
+        (fun [HasQuery (M × W' →ₒ C) m] =>
+          fsAbortSignAttempt (m := m) ids M pk sk msg)
+        runtime := by
+  rw [AddWriterT.outputs, signAttempt_run_formula_withAddCost, Functor.map_map]
+  simp
+
+private lemma signAttempt_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
+    (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M)
+    (costFn : M × W' → ω) :
+    AddWriterT.costs
+        (HasQuery.withAddCost
+          (fun [HasQuery (M × W' →ₒ C) (AddWriterT ω m)] =>
+            fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
+          runtime costFn) =
+      (fun attempt ↦ costFn (msg, attempt.1)) <$>
+        HasQuery.inRuntime
+          (fun [HasQuery (M × W' →ₒ C) m] =>
+            fsAbortSignAttempt (m := m) ids M pk sk msg)
+          runtime := by
+  simp only [AddWriterT.costs, signAttempt_run_formula_withAddCost, Functor.map_map,
+    toAdd_ofAdd]
 
 private lemma signAttempt_run_formula_withUnitCost
     (runtime : QueryRuntime (M × W' →ₒ C) m) (pk : S) (sk : W) (msg : M) :
