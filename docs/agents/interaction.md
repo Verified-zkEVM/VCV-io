@@ -272,6 +272,7 @@ import VCVio.Interaction.Concurrent.Process
 | `OpenProcess.lean` | `BoundaryAction`, `OpenNodeSemantics`, `OpenProcess` (open-world bridge) |
 | `OpenProcessModel.lean` | `openTheory` (concrete `OpenTheory` backed by `OpenProcess`), `IsLawfulMap` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
+| `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
 
 ## In-tree examples
 
