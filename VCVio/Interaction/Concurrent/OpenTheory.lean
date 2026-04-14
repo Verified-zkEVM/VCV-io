@@ -332,6 +332,7 @@ variable {T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}}
 /--
 Adapting along the identity boundary morphism leaves an open system unchanged.
 -/
+@[simp]
 theorem map_id
     [IsLawfulMap T]
     {Δ : PortBoundary.{uA, uB, uA, uB}}
@@ -355,12 +356,13 @@ theorem map_comp
 /--
 Mapping along the identity boundary equivalence does nothing.
 -/
+@[simp]
 theorem mapEquiv_refl
     [IsLawfulMap T]
     {Δ : PortBoundary.{uA, uB, uA, uB}}
     (W : T.Obj Δ) :
-    T.mapEquiv (PortBoundary.Equiv.refl Δ) W = W := by
-  simpa [OpenTheory.mapEquiv] using map_id (T := T) (Δ := Δ) W
+    T.mapEquiv (PortBoundary.Equiv.refl Δ) W = W :=
+  map_id (T := T) (Δ := Δ) W
 
 /--
 Mapping along a composite boundary equivalence is the same as mapping in two
@@ -450,7 +452,7 @@ theorem mapEquiv_wire
           W₁)
         (T.mapEquiv
           (PortBoundary.Equiv.tensorCongr
-          (PortBoundary.Equiv.refl (PortBoundary.swap Γ))
+            (PortBoundary.Equiv.refl (PortBoundary.swap Γ))
             e₂)
           W₂) := by
   simpa [OpenTheory.mapEquiv] using

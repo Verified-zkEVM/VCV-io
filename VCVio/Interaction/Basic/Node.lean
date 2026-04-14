@@ -285,7 +285,7 @@ other.
 -/
 inductive Prefix :
     {Γ Δ : Context.{u, v}} →
-    Schema Γ → Schema Δ → Type (max (u + 2) (v + 2)) where
+    Schema Γ → Schema Δ → Type (max (u + 1) (v + 1)) where
   /-- Every schema is a prefix of itself. -/
   | refl {Γ : Context.{u, v}} (S : Schema Γ) : Schema.Prefix S S
   /-- If `S` is a prefix of `T`, then it is also a prefix of any one-field

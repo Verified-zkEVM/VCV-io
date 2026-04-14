@@ -81,7 +81,7 @@ If a concurrent spec is not live, then its frontier type is empty.
 This packages the structural fact that `Spec.isLive` exactly decides whether a
 concurrent spec still exposes enabled frontier events.
 -/
-theorem isEmptyOfNotLive : {S : Spec} → S.isLive = false → Front S → False
+theorem isEmpty_of_not_live : {S : Spec} → S.isLive = false → Front S → False
   | .done, _, event => nomatch event
   | .node _ _, h, _ => by cases h
   | .par left right, h, event => by
@@ -94,8 +94,8 @@ theorem isEmptyOfNotLive : {S : Spec} → S.isLive = false → Front S → False
           match hRight : right.isLive with
           | true => simp [Spec.isLive, hLeft, hRight] at h
           | false =>
-              let leftEmpty : Front left → False := isEmptyOfNotLive hLeft
-              let rightEmpty : Front right → False := isEmptyOfNotLive hRight
+              let leftEmpty : Front left → False := isEmpty_of_not_live hLeft
+              let rightEmpty : Front right → False := isEmpty_of_not_live hRight
               exact match event with
               | .left event => leftEmpty event
               | .right event => rightEmpty event

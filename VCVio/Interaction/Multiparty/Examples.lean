@@ -53,8 +53,7 @@ At all other nodes, the result is `LocalView.observe`.
 This definition is written by pattern matching, rather than by equality tests,
 so that endpoint types reduce definitionally in examples.
 -/
-def resolveBroadcastFor (me owner : ThreeParty) : ∀ {X : Type u}, LocalView X
-  | _ =>
+def resolveBroadcastFor (me owner : ThreeParty) {X : Type u} : LocalView X :=
       match me, owner with
       | .prover, .prover => .active
       | .prover, .verifier => .observe
@@ -78,8 +77,7 @@ It returns:
 As in the broadcast model, this resolver is defined by pattern matching, so
 that local endpoint types unfold definitionally.
 -/
-def resolveDirectedFor (me src dst : ThreeParty) : ∀ {X : Type u}, LocalView X
-  | _ =>
+def resolveDirectedFor (me src dst : ThreeParty) {X : Type u} : LocalView X :=
       match me, src, dst with
       | .prover, .prover, _ => .active
       | .prover, _, .prover => .observe
@@ -146,6 +144,8 @@ example :
         ((_ : Decision) → m (m ((_ : ExtractedWit) × α)))))) := rfl
 
 end KnowledgeSoundnessBroadcast
+
+end BroadcastExamples
 
 section DirectedExamples
 
@@ -542,8 +542,6 @@ example :
     = ((target : CorruptionTarget) → m (m ((_ : Secret) → α))) := rfl
 
 end AdaptiveCorruptionExamples
-
-end BroadcastExamples
 
 end Multiparty
 end Interaction

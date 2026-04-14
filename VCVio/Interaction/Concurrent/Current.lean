@@ -44,12 +44,14 @@ namespace Current
 /-- The party currently controlling the next decision in the concurrent control
 tree. This is just `Control.current?`, re-exported here because the present
 module treats `Control` and `Profile` together as the current-step interface. -/
-abbrev controller? {Party : Type u} := @Control.current? Party
+abbrev controller? {Party : Type u} {S : Spec} (control : Control Party S) : Option Party :=
+  Control.current? control
 
 /-- The party currently controlling a genuine scheduling choice between two live
 concurrent components, when such a choice exists. This is just
 `Control.scheduler?`, re-exported here for the combined current-step interface. -/
-abbrev scheduler? {Party : Type u} := @Control.scheduler? Party
+abbrev scheduler? {Party : Type u} {S : Spec} (control : Control Party S) : Option Party :=
+  Control.scheduler? control
 
 /--
 If a concurrent control tree is not live, then its frontier type is empty.

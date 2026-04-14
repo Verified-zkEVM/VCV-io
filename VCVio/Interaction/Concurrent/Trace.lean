@@ -64,7 +64,7 @@ Construct the finished trace of a concurrent spec that is known to be
 quiescent.
 -/
 def doneOfNotLive {S : Spec} (h : S.isLive = false) : Trace S :=
-  .done (isEmptyOfNotLive h)
+  .done (isEmpty_of_not_live h)
 
 /-- The number of frontier events in a finite concurrent trace. -/
 def length : {S : Spec} → Trace S → Nat
@@ -83,8 +83,7 @@ theorem length_step {S : Spec} (event : Front S) (tail : Trace (residual event))
 length. -/
 theorem length_step_eq_add_one {S : Spec} (event : Front S)
     (tail : Trace (residual event)) :
-    length (Trace.step event tail) = tail.length + 1 := by
-  simp [length_step]
+    length (Trace.step event tail) = tail.length + 1 := rfl
 
 end Trace
 end Concurrent

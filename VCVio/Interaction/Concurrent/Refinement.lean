@@ -194,8 +194,7 @@ noncomputable def mapRun
     ProcessOver.Run spec.toProcess where
   state n := (sim.matchedState run hrel n).1
   transcript n := sim.matchedTranscript run hrel n
-  next_state n := by
-    rfl
+  next_state _ := rfl
 
 /--
 At every step index `n`, the mapped specification run remains related to the
@@ -273,9 +272,8 @@ theorem admissible_mapRun
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec)
     (hadm : ProcessOver.System.Admissible impl run) :
-    ProcessOver.System.Admissible spec (sim.mapRun run hrel) := by
-  intro n
-  exact sim.assumptions (sim.stateRel_mapRun run hrel n) (hadm n)
+    ProcessOver.System.Admissible spec (sim.mapRun run hrel) :=
+  fun n => sim.assumptions (sim.stateRel_mapRun run hrel n) (hadm n)
 
 /-- The first `n` steps of the mapped specification run match the first `n`
 implementation steps according to `matchStep`. -/
@@ -318,15 +316,12 @@ theorem currentControllersUpTo_mapRun {Party : Type u}
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec) (n : Nat) :
     Process.Run.currentControllersUpTo run n =
-      Process.Run.currentControllersUpTo (sim.mapRun run hrel) n := by
-  have hprefix :
-      Observation.Process.Run.RelUpTo Observation.Process.TranscriptRel.byController
-        run (sim.mapRun run hrel) n := by
-    exact Observation.Process.Run.relUpTo_of_pointwise
+      Process.Run.currentControllersUpTo (sim.mapRun run hrel) n :=
+  Observation.Process.Run.currentControllersUpTo_eq_of_relUpTo_byController
+    run (sim.mapRun run hrel)
+    (Observation.Process.Run.relUpTo_of_pointwise
       Observation.Process.TranscriptRel.byController
-      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n
-  exact Observation.Process.Run.currentControllersUpTo_eq_of_relUpTo_byController
-    run (sim.mapRun run hrel) hprefix
+      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n)
 
 /-- A controller-path-preserving simulation preserves the controller-path
 sequence of every finite run prefix. -/
@@ -337,15 +332,12 @@ theorem controllerPathsUpTo_mapRun {Party : Type u}
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec) (n : Nat) :
     Process.Run.controllerPathsUpTo run n =
-      Process.Run.controllerPathsUpTo (sim.mapRun run hrel) n := by
-  have hprefix :
-      Observation.Process.Run.RelUpTo Observation.Process.TranscriptRel.byPath
-        run (sim.mapRun run hrel) n := by
-    exact Observation.Process.Run.relUpTo_of_pointwise
+      Process.Run.controllerPathsUpTo (sim.mapRun run hrel) n :=
+  Observation.Process.Run.controllerPathsUpTo_eq_of_relUpTo_byPath
+    run (sim.mapRun run hrel)
+    (Observation.Process.Run.relUpTo_of_pointwise
       Observation.Process.TranscriptRel.byPath
-      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n
-  exact Observation.Process.Run.controllerPathsUpTo_eq_of_relUpTo_byPath
-    run (sim.mapRun run hrel) hprefix
+      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n)
 
 /-- An event-preserving simulation preserves the stable event sequence of every
 finite run prefix. -/
@@ -359,16 +351,12 @@ theorem eventsUpTo_mapRun {Party : Type u}
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec) (n : Nat) :
     Process.Run.eventsUpTo eventImpl run n =
-      Process.Run.eventsUpTo eventSpec (sim.mapRun run hrel) n := by
-  have hprefix :
-      Observation.Process.Run.RelUpTo
-        (Observation.Process.TranscriptRel.byEvent eventImpl eventSpec)
-        run (sim.mapRun run hrel) n := by
-    exact Observation.Process.Run.relUpTo_of_pointwise
+      Process.Run.eventsUpTo eventSpec (sim.mapRun run hrel) n :=
+  Observation.Process.Run.eventsUpTo_eq_of_relUpTo_byEvent
+    eventImpl eventSpec run (sim.mapRun run hrel)
+    (Observation.Process.Run.relUpTo_of_pointwise
       (Observation.Process.TranscriptRel.byEvent eventImpl eventSpec)
-      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n
-  exact Observation.Process.Run.eventsUpTo_eq_of_relUpTo_byEvent
-    eventImpl eventSpec run (sim.mapRun run hrel) hprefix
+      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n)
 
 /-- A ticket-preserving simulation preserves the stable ticket sequence of every
 finite run prefix. -/
@@ -382,16 +370,12 @@ theorem ticketsUpTo_mapRun {Party : Type u}
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec) (n : Nat) :
     Process.Run.ticketsUpTo ticketImpl run n =
-      Process.Run.ticketsUpTo ticketSpec (sim.mapRun run hrel) n := by
-  have hprefix :
-      Observation.Process.Run.RelUpTo
-        (Observation.Process.TranscriptRel.byTicket ticketImpl ticketSpec)
-        run (sim.mapRun run hrel) n := by
-    exact Observation.Process.Run.relUpTo_of_pointwise
+      Process.Run.ticketsUpTo ticketSpec (sim.mapRun run hrel) n :=
+  Observation.Process.Run.ticketsUpTo_eq_of_relUpTo_byTicket
+    ticketImpl ticketSpec run (sim.mapRun run hrel)
+    (Observation.Process.Run.relUpTo_of_pointwise
       (Observation.Process.TranscriptRel.byTicket ticketImpl ticketSpec)
-      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n
-  exact Observation.Process.Run.ticketsUpTo_eq_of_relUpTo_byTicket
-    ticketImpl ticketSpec run (sim.mapRun run hrel) hprefix
+      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n)
 
 /-- An observation-preserving simulation preserves one party's packed
 observations of every finite run prefix. -/
@@ -404,16 +388,12 @@ theorem observationsUpTo_mapRun {Party : Type u} [DecidableEq Party]
     {pSpec : spec.Proc}
     (hrel : sim.stateRel run.initial pSpec) (n : Nat) :
     Observation.Process.Run.observationsUpTo me run n =
-      Observation.Process.Run.observationsUpTo me (sim.mapRun run hrel) n := by
-  have hprefix :
-      Observation.Process.Run.RelUpTo
-        (Observation.Process.TranscriptRel.byObservation me)
-        run (sim.mapRun run hrel) n := by
-    exact Observation.Process.Run.relUpTo_of_pointwise
+      Observation.Process.Run.observationsUpTo me (sim.mapRun run hrel) n :=
+  Observation.Process.Run.observationsUpTo_eq_of_relUpTo_byObservation
+    me run (sim.mapRun run hrel)
+    (Observation.Process.Run.relUpTo_of_pointwise
       (Observation.Process.TranscriptRel.byObservation me)
-      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n
-  exact Observation.Process.Run.observationsUpTo_eq_of_relUpTo_byObservation
-    me run (sim.mapRun run hrel) hprefix
+      run (sim.mapRun run hrel) (sim.match_mapRun run hrel) n)
 
 /--
 If the specification system satisfies safety under some fairness assumption,

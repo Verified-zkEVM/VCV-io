@@ -72,10 +72,10 @@ abbrev Trace {Party : Type u} {Event : Type w}
 bisimilar while preserving the stable tickets attached to complete step
 transcripts.
 -/
-abbrev Ticket {Party : Type u} {Ticket : Type w}
+abbrev Ticket {Party : Type u} {TicketTy : Type w}
     (left right : Process.System Party)
-    (ticketLeft : left.toProcess.Tickets Ticket)
-    (ticketRight : right.toProcess.Tickets Ticket) :=
+    (ticketLeft : left.toProcess.Tickets TicketTy)
+    (ticketRight : right.toProcess.Tickets TicketTy) :=
   Refinement.Bisimulation left right
     (Observation.Process.TranscriptRel.byTicket ticketLeft ticketRight)
     (Observation.Process.TranscriptRel.byTicket

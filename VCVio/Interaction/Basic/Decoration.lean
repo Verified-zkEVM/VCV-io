@@ -315,35 +315,6 @@ def Decoration.equivOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w)
   cases x with
   | mk d r => exact Decoration.toOver_ofOver A spec d r
 
-/--
-Transport a one-step `Decoration.Over` layer across an equivalence on base
-decorations.
-
-This is the generic step used to turn `Decoration.equivOver` into a recursive
-schema-level decomposition theorem.
--/
-private def sigmaOverCongr {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type v)
-    {T : Type (max u v)} (spec : Spec) (e : Decoration Γ spec ≃ T) :
-    (Sigma fun d : Decoration Γ spec => Decoration.Over A spec d) ≃
-      (Sigma fun t : T => Decoration.Over A spec (e.symm t)) := by
-  refine
-    { toFun := ?_
-      invFun := ?_
-      left_inv := ?_
-      right_inv := ?_ }
-  · intro x
-    refine ⟨e x.1, cast (by simp) x.2⟩
-  · intro x
-    refine ⟨e.symm x.1, cast (by simp) x.2⟩
-  · intro x
-    cases x with
-    | mk d r =>
-        simp
-  · intro x
-    cases x with
-    | mk t r =>
-        simp
-
 namespace Decoration
 namespace Schema
 
@@ -405,7 +376,7 @@ def telescope :
   | _, .snoc S A, spec =>
       let recView := telescope S spec
       ⟨Sigma fun t : recView.1 => Decoration.Over A spec (recView.2.symm t),
-        (Decoration.equivOver A spec).trans (sigmaOverCongr A spec recView.2)⟩
+        (Decoration.equivOver A spec).trans recView.2.symm.sigmaCongrLeft.symm⟩
 
 /--
 `Decoration.Schema.View S spec` is the staged telescope view carried by the

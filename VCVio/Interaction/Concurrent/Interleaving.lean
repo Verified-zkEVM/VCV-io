@@ -44,9 +44,8 @@ This is the trace-level cast operation needed when two independent frontier
 events commute and therefore produce definitionally different but propositionally
 equal residual specs.
 -/
-def cast {S T : Spec} (h : S = T) : Trace S → Trace T := by
-  cases h
-  exact id
+def cast {S T : Spec} (h : S = T) (trace : Trace S) : Trace T :=
+  h ▸ trace
 
 @[simp, grind =]
 theorem cast_rfl {S : Spec} (trace : Trace S) :
