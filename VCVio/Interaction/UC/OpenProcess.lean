@@ -146,6 +146,45 @@ def embedInrTensor (Δ₁ : PortBoundary) {Δ₂ : PortBoundary} {X : Type w}
   isActivated := b.isActivated
   emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inr Δ₁.Out Δ₂.Out))
 
+/--
+Transform a boundary action on `tensor Δ₁ Γ` into one on `tensor Δ₁ Δ₂`
+by keeping only the left-summand (Δ₁) packets and re-injecting them
+into the left summand of the combined output. Right-summand (Γ) packets
+are dropped (they become internal traffic handled by the runtime).
+-/
+def wireLeft {Δ₁ Γ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
+    (b : BoundaryAction (PortBoundary.tensor Δ₁ Γ) X) :
+    BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
+  isActivated := b.isActivated
+  emit x := (b.emit x).filterMap fun
+    | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
+    | ⟨Sum.inr _, _⟩ => none
+
+/--
+Transform a boundary action on `tensor (swap Γ) Δ₂` into one on
+`tensor Δ₁ Δ₂` by keeping only the right-summand (Δ₂) packets and
+re-injecting them into the right summand of the combined output.
+Left-summand (swap Γ) packets are dropped (internal traffic).
+-/
+def wireRight (Δ₁ : PortBoundary) {Γ Δ₂ : PortBoundary} {X : Type w}
+    (b : BoundaryAction (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) X) :
+    BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
+  isActivated := b.isActivated
+  emit x := (b.emit x).filterMap fun
+    | ⟨Sum.inl _, _⟩ => none
+    | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩
+
+/--
+Close a boundary action by dropping all external traffic.
+
+The result lives on `PortBoundary.empty` and has no activation or emission.
+This is used by `plug` to internalize all boundary interactions.
+-/
+def closed {Δ : PortBoundary} {X : Type w}
+    (_b : BoundaryAction Δ X) :
+    BoundaryAction PortBoundary.empty X :=
+  .internal PortBoundary.empty X
+
 end BoundaryAction
 
 /--
@@ -290,6 +329,52 @@ def openStepContextInrTensor (Party : Type u)
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.embedInrTensor Δ₁
+  }
+
+/--
+Wire the left factor: transform `OpenStepContext Party (tensor Δ₁ Γ)` into
+`OpenStepContext Party (tensor Δ₁ Δ₂)` by filtering out internal (Γ) packets
+and keeping only external (Δ₁) packets.
+-/
+def openStepContextWireLeft (Party : Type u)
+    (Δ₁ Γ Δ₂ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenStepContext Party (PortBoundary.tensor Δ₁ Γ) : Spec.Node.Context.{w})
+      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+  fun _ ons => {
+    toNodeSemantics := ons.toNodeSemantics
+    boundary := ons.boundary.wireLeft Δ₂
+  }
+
+/--
+Wire the right factor: transform
+`OpenStepContext Party (tensor (swap Γ) Δ₂)` into
+`OpenStepContext Party (tensor Δ₁ Δ₂)` by filtering out internal
+(swap Γ) packets and keeping only external (Δ₂) packets.
+-/
+def openStepContextWireRight (Party : Type u)
+    (Δ₁ Γ Δ₂ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenStepContext Party (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) :
+        Spec.Node.Context.{w})
+      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+  fun _ ons => {
+    toNodeSemantics := ons.toNodeSemantics
+    boundary := ons.boundary.wireRight Δ₁
+  }
+
+/--
+Close the boundary: transform `OpenStepContext Party Δ` into
+`OpenStepContext Party empty` by dropping all boundary traffic.
+Used by `plug` to internalize all external interactions.
+-/
+def openStepContextClose (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenStepContext Party Δ : Spec.Node.Context.{w})
+      (OpenStepContext Party PortBoundary.empty : Spec.Node.Context.{w}) :=
+  fun _ ons => {
+    toNodeSemantics := ons.toNodeSemantics
+    boundary := ons.boundary.closed
   }
 
 /--
