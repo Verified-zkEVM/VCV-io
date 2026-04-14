@@ -150,13 +150,13 @@ instance [Monad m] [LawfulMonad m] : LawfulMonadLift m (FreeContT f m) where
   monadLift_pure := by
     intro α a
     dsimp [instMonadLift, instMonad]
-    funext r handleEff handlePure
+    funext r _ handlePure
     change ((Pure.pure a : m α) >>= handlePure) = handlePure a
     simp
   monadLift_bind := by
     intros α β ma g
     dsimp [instMonadLift, instMonad]
-    funext r handleEff handlePure
+    funext r _ handlePure
     change (ma >>= g) >>= handlePure = ma >>= fun x => g x >>= handlePure
     exact LawfulMonad.bind_assoc (m := m) (x := ma) (f := g) (g := handlePure)
 

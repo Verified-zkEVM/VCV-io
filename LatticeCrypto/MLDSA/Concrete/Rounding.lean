@@ -153,14 +153,14 @@ local instance : Zero Rq := Vector.instZero
 local instance : Sub Rq := Vector.instSub
 local instance : Neg Rq := Vector.instNeg
 
-theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 := by
+@[simp] theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 := by
   calc
     (0 : Rq).get i = (0 : Rq)[i.1] := by
       simp [Vector.get_eq_getElem]
       rfl
     _ = 0 := Vector.getElem_zero i.1 i.2
 
-theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
+@[simp] theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
     (a + b).get i = a.get i + b.get i := by
   calc
     (a + b).get i = (a + b)[i.1] := by
@@ -171,7 +171,7 @@ theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
       simp [Vector.get_eq_getElem]
       rfl
 
-theorem Rq.get_neg (a : Rq) (i : Fin ringDegree) :
+@[simp] theorem Rq.get_neg (a : Rq) (i : Fin ringDegree) :
     (-a).get i = -a.get i := by
   calc
     (-a).get i = (-a)[i.1] := by
@@ -182,7 +182,7 @@ theorem Rq.get_neg (a : Rq) (i : Fin ringDegree) :
       simp [Vector.get_eq_getElem]
       rfl
 
-theorem Rq.get_sub (a b : Rq) (i : Fin ringDegree) :
+@[simp] theorem Rq.get_sub (a b : Rq) (i : Fin ringDegree) :
     (a - b).get i = a.get i - b.get i := by
   calc
     (a - b).get i = (a - b)[i.1] := by

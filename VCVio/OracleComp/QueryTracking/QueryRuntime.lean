@@ -42,7 +42,7 @@ namespace QueryRuntime
 variable {ι : Type} {spec : OracleSpec ι} {m : Type → Type*}
 
 /-- View a bundled query runtime as the corresponding `HasQuery` capability. -/
-@[reducible] def toHasQuery (runtime : QueryRuntime spec m) : HasQuery spec m :=
+abbrev toHasQuery (runtime : QueryRuntime spec m) : HasQuery spec m :=
   runtime.impl.toHasQuery
 
 @[simp]
