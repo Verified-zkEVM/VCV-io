@@ -30,7 +30,7 @@ class HasEvalSPMF (m : Type u → Type v) [Monad m]
   toSet := MonadHom.comp {
     toFun := @SPMF.support
     toFun_pure' x := Set.ext fun _ => by simp
-    toFun_bind' p q := Set.ext fun _ => by simp
+    toFun_bind' p q := Set.ext fun x => by aesop
    } toSPMF
 
 /-- The resulting distribution of running the monadic computation `mx`.
@@ -297,7 +297,7 @@ macro_rules (kind := probEventBinding2)
   | `(Pr{$items*}[$t]) => `(probOutput (do $items:doSeqItem* return $t:term) True)
 
 /-- Tests for all the different probability notations. -/
-example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
+noncomputable example {m : Type → Type u} [Monad m] [HasEvalSPMF m] (mx : m ℕ) : Unit :=
   let _ := Pr[= 10 | mx]
   let _ := Pr[ fun x => x^2 + x < 10 | mx]
   let _ := Pr[ x^2 + x < 10 | x ← mx]

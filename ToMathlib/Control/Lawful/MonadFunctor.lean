@@ -46,13 +46,38 @@ instance {m n o} [Monad m] [Monad n] [Monad o] [MonadFunctor n o] [MonadFunctorT
     [LawfulMonadFunctor n o] [LawfulMonadFunctorT m n] : LawfulMonadFunctorT m o where
   monadMap_id := by
     intro α
-    simp only [instMonadFunctorTOfMonadFunctor, monadMap_id, LawfulMonadFunctor.monadMap_id]
+    change
+      @MonadFunctor.monadMap n o _ α
+          (fun {β} => @monadMap m n _ β (fun {γ} => (id : m γ → m γ))) = id
+    have hmn :
+        (fun {β} => @monadMap m n _ β (fun {γ} => (id : m γ → m γ))) =
+          fun {β} => (id : n β → n β) := by
+      funext β
+      exact LawfulMonadFunctorT.monadMap_id (m := m) (n := n) (α := β)
+    rw [hmn]
+    simpa using (LawfulMonadFunctor.monadMap_id (m := n) (n := o) (α := α))
   monadMap_comp := by
     intro α f g
-    simp only [instMonadFunctorTOfMonadFunctor, monadMap_comp, LawfulMonadFunctor.monadMap_comp]
+    change
+      (@MonadFunctor.monadMap n o _ α
+          (fun {β} => @monadMap m n _ β f)) ∘
+        (@MonadFunctor.monadMap n o _ α
+          (fun {β} => @monadMap m n _ β g)) =
+      @MonadFunctor.monadMap n o _ α
+        (fun {β} => @monadMap m n _ β (f ∘ g))
+    rw [LawfulMonadFunctor.monadMap_comp
+      (m := n) (n := o) (α := α)
+      (f := fun {β} => @monadMap m n _ β f)
+      (g := fun {β} => @monadMap m n _ β g)]
+    have hmn :
+        (fun {β} => (@monadMap m n _ β f) ∘ (@monadMap m n _ β g)) =
+          fun {β} => @monadMap m n _ β (f ∘ g) := by
+      funext β
+      exact LawfulMonadFunctorT.monadMap_comp (m := m) (n := n) (α := β) f g
+    rw [hmn]
 
 instance lawfulMonadFunctorRefl {m} [Monad m] : LawfulMonadFunctorT m m where
-  monadMap_id := by intro α; simp only [monadFunctorRefl]
-  monadMap_comp := by intro α f g; simp only [monadFunctorRefl]
+  monadMap_id := by intro α; rfl
+  monadMap_comp := by intro α f g; rfl
 
 instance {m n} [MonadFunctor m n] : MonadFunctorT m n := inferInstance

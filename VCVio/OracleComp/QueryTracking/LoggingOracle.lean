@@ -126,7 +126,7 @@ lemma run_simulateQ_loggingOracle_query_bind
         (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
           <$> (simulateQ loggingOracle (mx u)).run := by
   simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
-    Prod.map, Function.id_def]
+    Function.id_def]
 
 /-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of
 `(simulateQ loggingOracle oa).run` is identical to that of `oa` (each query passes through
@@ -191,8 +191,7 @@ theorem log_length_le_of_mem_support_run_simulateQ
             (query t : OracleComp spec _) >>= fun u =>
               pure (u, [⟨t, u⟩]) := by
           simp [loggingOracle, QueryImpl.withLogging_apply,
-            WriterT.run_bind', WriterT.run_monadLift', WriterT.run_tell,
-            map_pure, Prod.map]
+            WriterT.run_tell, map_pure]
         rw [hrun] at hqu
         simp only [support_bind, support_pure, Set.mem_iUnion,
           Set.mem_singleton_iff] at hqu

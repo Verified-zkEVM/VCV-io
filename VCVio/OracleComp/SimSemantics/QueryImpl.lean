@@ -149,7 +149,7 @@ end ofFn?
   .ofFn fun t : R => p.eval t
 
 /-- Implement a single oracle as the evaluation of an `MvPolynomial. -/
-@[reducible] def ofMvPolynomial {R σ} [CommSemiring R] (p : MvPolynomial σ R) :
+@[reducible] noncomputable def ofMvPolynomial {R σ} [CommSemiring R] (p : MvPolynomial σ R) :
     QueryImpl ((σ → R) →ₒ R) Id :=
   .ofFn fun t : σ → R => p.eval t
 

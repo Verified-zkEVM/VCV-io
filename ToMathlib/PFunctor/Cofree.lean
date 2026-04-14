@@ -70,6 +70,7 @@ def extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) : CofreeC 
   | _ a g =>
       cases a
       simp [extendF, extract, head]
+      rfl
 
 @[simp] theorem dest_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
     M.dest (extend t f) = (constProd F β).map (fun x => extend x f) (extendF f t) := by
@@ -78,6 +79,7 @@ def extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) : CofreeC 
 @[simp] theorem dest_extend_eq {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
     M.dest (extend t f) = ⟨(f t, (M.dest t).1.2), (fun x => extend x f) ∘ (M.dest t).2⟩ := by
   simp [extendF, PFunctor.map_eq]
+  rfl
 
 @[simp] theorem head_extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) :
     head (extend t f) = f t := by
@@ -88,6 +90,7 @@ def extend {β : Type u} (t : CofreeC F α) (f : CofreeC F α → β) : CofreeC 
   unfold tail
   rw [dest_extend]
   simp [extendF, PFunctor.map_eq]
+  rfl
 
 instance : Comonad (CofreeC F) where
   extract := extract
@@ -99,6 +102,7 @@ instance : Comonad (CofreeC F) where
     apply (M.corec_unique (P := constProd F α) (g := M.dest) (f := h))
     intro x
     simp [h, dest_extend (t := x) (f := extract)]
+    rfl
   have hid_corec : (id : CofreeC F α → CofreeC F α) = M.corec (F := constProd F α) M.dest := by
     apply (M.corec_unique (P := constProd F α) (g := M.dest) (f := id))
     intro x

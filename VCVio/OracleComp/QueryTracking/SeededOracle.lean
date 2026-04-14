@@ -332,7 +332,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
           Pr[= x | (simulateQ seededOracle (mx u)).run' s] from by
         rw [probOutput_bind_eq_tsum]; simp_rw [probOutput_liftComp]] at hih
       exact hih
-    · push_neg at hcount
+    · push Not at hcount
       -- All seeds in support have s t ≠ [], so pop = some.
       have hpop_some : ∀ s ∈ support (generateSeed spec₀ qc js),
           ∃ u s', s.pop t = some (u, s') := by
@@ -488,7 +488,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ v [] hlist]
           suffices Function.update (σ.addValue i v) i
-              ([] : List (spec₀.Range i)) = σ by rw [this]
+              ([] : List (spec₀.Range i)) = σ by rw [this]; rfl
           funext j; by_cases hj : j = i
           · subst hj; simp [hσi]
           · rw [Function.update_of_ne hj]
@@ -507,7 +507,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             simp [QuerySeed.addValue, QuerySeed.addValues, hσi]
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ (rest ++ [v]) hlist]
           suffices Function.update (σ.addValue i v) i (rest ++ [v]) =
-              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]
+              QuerySeed.addValue (Function.update σ i rest) i v by rw [this]; rfl
           funext j; by_cases hj : j = i
           · subst hj; simp [QuerySeed.addValue, QuerySeed.addValues]
           · simp [Function.update_of_ne hj, QuerySeed.addValue,
@@ -539,7 +539,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
             (QuerySeed.addValues_of_ne σ [_] hti).trans hσt
           rw [QuerySeed.pop_eq_some_of_cons _ _ u₀ rest hlist]
           suffices Function.update (σ.addValue i v) t rest =
-              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]
+              QuerySeed.addValue (Function.update σ t rest) i v by rw [this]; rfl
           change Function.update (Function.update σ i (σ i ++ [v])) t rest =
             Function.update (Function.update σ t rest) i
               ((Function.update σ t rest) i ++ [v])
@@ -666,7 +666,7 @@ lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
         rw [probOutput_bind_eq_tsum]; simp_rw [probOutput_liftComp]] at hih
       exact hih
     · -- Pop from the take'd seed gives some
-      push_neg at hpop_none
+      push Not at hpop_none
       obtain ⟨hcount_ne, htk⟩ := hpop_none
       have hcount : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
       -- Original seed always has non-empty list at t
@@ -901,7 +901,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
       congr 1; ext u; congr 1
       exact ih u qc js k h
     · -- Case 2+3: seed has entries at oracle t
-      push_neg at hcount_zero
+      push Not at hcount_zero
       have hcount : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
       have hpop_orig : ∀ s ∈ support (generateSeed spec₀ qc js),
           ∃ u s', s.pop t = some (u, s') := by

@@ -629,7 +629,7 @@ private lemma tsum_min_le_eRelWP
       probOutput_map_eq_tsum_ite c_spmf Prod.fst a]
     change ∑' z : α × α, (if a = z.1 then cf (some z) else 0) = P a
     rw [ENNReal.tsum_prod']; dsimp only [Prod.fst]
-    simp_rw [hite_tsum]
+    rw [tsum_congr fun a₁ => hite_tsum (a = a₁) (fun b => cf (some (a₁, b)))]
     rw [tsum_eq_single a (fun a' (ha' : a' ≠ a) => if_neg (Ne.symm ha'))]
     rw [if_pos rfl, hfst_sum]
   have hcpl_snd : Prod.snd <$> c_spmf = pb := by
@@ -638,7 +638,7 @@ private lemma tsum_min_le_eRelWP
       probOutput_map_eq_tsum_ite c_spmf Prod.snd b]
     change ∑' z : α × α, (if b = z.2 then cf (some z) else 0) = Q b
     rw [ENNReal.tsum_prod', ENNReal.tsum_comm]; dsimp only [Prod.snd]
-    simp_rw [hite_tsum]
+    rw [tsum_congr fun b₁ => hite_tsum (b = b₁) (fun a => cf (some (a, b₁)))]
     rw [tsum_eq_single b (fun b' (hb' : b' ≠ b) => if_neg (Ne.symm hb'))]
     rw [if_pos rfl, hsnd_sum]
   let c : SPMF.Coupling pa pb :=

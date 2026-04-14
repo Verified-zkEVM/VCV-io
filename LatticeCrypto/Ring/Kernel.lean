@@ -68,8 +68,8 @@ into a single computable bundle. Downstream scheme `Arithmetic.lean` modules
 this structure via `vectorNegacyclicRing` and then expose scheme-local type
 aliases (`Rq`, `Tq`, `RqVec`, etc.) that the rest of the scheme imports. -/
 structure NegacyclicRing (Coeff : Type u) [CommRing Coeff] where
-  backend : PolyBackend Coeff
-  kernel : PolyKernel Coeff backend
+  backend : PolyBackend.{u, v} Coeff
+  kernel : PolyKernel.{u, v} Coeff backend
   zero : backend.Poly
   add : backend.Poly → backend.Poly → backend.Poly
   sub : backend.Poly → backend.Poly → backend.Poly

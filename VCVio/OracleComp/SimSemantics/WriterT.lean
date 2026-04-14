@@ -34,13 +34,16 @@ lemma fst_map_writerT_run_simulateQ
   | query_bind t oa ih =>
     rw [simulateQ_bind, simulateQ_query, WriterT.run_bind, map_bind]
     have heq : ((query t).cont <$> so (query t).input) = so t := by
-      rw [OracleQuery.cont_query t, id_map]
-      simp only [OracleQuery.input_query]
+      simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query]
     rw [heq]
     refine (bind_congr fun x => ?_).trans (by rw [← bind_map_left, hso t])
-    rw [fst_map_prod_map]
-    simp only [Function.id_comp]
-    exact ih x.1
+    obtain ⟨a, w₁⟩ := x
+    dsimp only []
+    rw [← LawfulFunctor.comp_map]
+    have : Prod.fst ∘ (fun x : α × ω ↦ (x.1, w₁ * x.2)) = Prod.fst :=
+      funext fun ⟨_, _⟩ => rfl
+    rw [this]
+    exact ih a
 
 lemma probFailure_writerT_run_simulateQ [spec.Fintype] [spec.Inhabited]
     {so : QueryImpl spec (WriterT ω (OracleComp spec))}

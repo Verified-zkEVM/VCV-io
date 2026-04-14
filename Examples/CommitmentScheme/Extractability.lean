@@ -331,7 +331,7 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
         simulateQ_cachingOracle_cache_le (A.open_ aux) cache₁ _ hmem₂
       have hcache₁_none : cache₁ (m, s) = none := by
         by_contra h
-        push_neg at h
+        push Not at h
         obtain ⟨v, hv⟩ := Option.ne_none_iff_exists'.mp h
         have hno_cm : ∀ (t₀ : (CMOracle M S C).Domain) (v' : (CMOracle M S C).Range t₀),
             cache₁ t₀ = some v' → ¬HEq v' cm := by
@@ -373,7 +373,7 @@ private lemma extractability_rest_win_implies_fresh_cm {t : ℕ}
         hlog_cache entry hentry_mem
       have hcache₁_none : cache₁ (m, s) = none := by
         by_contra h
-        push_neg at h
+        push Not at h
         obtain ⟨v, hv⟩ := Option.ne_none_iff_exists'.mp h
         have hcache₂_ms := hcache_mono₁₂ hv
         simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get,

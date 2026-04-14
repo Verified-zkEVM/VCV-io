@@ -87,7 +87,7 @@ theorem centeredRepr_upper_bound (x : ZMod q) : centeredRepr x ≤ (q : ℤ) / 2
   simp only [centeredRepr]
   split_ifs with h
   · exact h
-  · push_neg at h
+  · push Not at h
     have hval := ZMod.val_lt x
     omega
 

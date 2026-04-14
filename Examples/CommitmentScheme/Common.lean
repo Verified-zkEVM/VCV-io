@@ -80,6 +80,7 @@ lemma probEvent_from_fresh_query_le_inv
       simp only [StateT.lift, bind_assoc, pure_bind,
         modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
         StateT.modifyGet, StateT.run]
+      rfl
     rw [hstep, bind_assoc]
     simp [OracleQuery.cont_query]
   rw [hrun, probEvent_bind_eq_tsum]

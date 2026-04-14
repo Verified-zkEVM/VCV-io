@@ -100,7 +100,8 @@ theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
           rw [tsum_fintype]
           refine Finset.sum_congr rfl ?_
           intro s hs
-          simp [probOutput_query, HidingAvgSpec]
+          rw [probOutput_query (spec := HidingAvgSpec M S C) (t := Sum.inl ()) (u := s)]
+          congr 1
     _ = (((Fintype.card S : ℝ≥0∞)⁻¹).toReal) *
           ∑ s : S, tvDist (hidingReal A s) (hidingSim A s) := by
           rw [← Finset.mul_sum]

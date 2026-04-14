@@ -13,7 +13,7 @@ package VCVio where
     ⟨`weak.linter.style.whitespace, true⟩
   ]
 
-require "leanprover-community" / "mathlib" @ git "v4.28.0"
+require "leanprover-community" / "mathlib" @ git "v4.29.0"
 
 /-- Main library. -/
 @[default_target] lean_lib VCVio

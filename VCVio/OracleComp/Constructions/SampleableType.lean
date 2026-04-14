@@ -182,7 +182,7 @@ lemma probEvent_uniformSample [Fintype α] (p : α → Prop) [DecidablePred p] :
 
 section instances
 
-def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
+@[reducible] def SampleableType.Fin (n : ℕ) : SampleableType (Fin (n + 1)) where
   selectElem := $[0..n]
   mem_support_selectElem := by simp
   probOutput_selectElem_eq := by simp
@@ -210,7 +210,8 @@ instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]
   probOutput_selectElem_eq x y := by simp
 
 /-- A type equivalent to a `SampleableType` is also `SampleableType`. -/
-def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) : SampleableType β where
+@[reducible] def SampleableType.ofEquiv {α β : Type} [SampleableType α] (e : α ≃ β) :
+    SampleableType β where
   selectElem := e <$> ($ᵗ α)
   mem_support_selectElem := fun x => by simp
   probOutput_selectElem_eq := fun x y => by grind
@@ -287,10 +288,12 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
   probOutput_selectElem_eq x y := by induction n with
   | zero => rw [show x = y by grind]
   | succ m ih =>
-      have hpush : Function.Injective2 (fun (xs : Vector α m) (x : α) => Vector.push xs x) := by
+      have hpush : Function.Injective2 (Vector.push (α := α) (n := m)) := by
         intro xs ys x y hxy; simp [Vector.push_eq_push.mp hxy]
-      rw [← Vector.push_pop_back x, ← Vector.push_pop_back y,
-        probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush x.pop x.back,
+      simp only [Nat.recAux]
+      rw [← Vector.push_pop_back x]
+      rw [← Vector.push_pop_back y]
+      erw [probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush x.pop x.back,
         probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush y.pop y.back,
         probOutput_uniformSample_inj, ih x.pop y.pop]
 
