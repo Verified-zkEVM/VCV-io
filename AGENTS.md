@@ -95,6 +95,14 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Query enforcement: `VCVio/OracleComp/QueryTracking/Enforcement.lean`
 - Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
+- Interaction spec and transcript: `VCVio/Interaction/Basic/Spec.lean`
+- Two-party roles and strategies: `VCVio/Interaction/TwoParty/Strategy.lean`
+- Two-party composition and factorization: `VCVio/Interaction/TwoParty/Compose.lean`
+- Multiparty local views: `VCVio/Interaction/Multiparty/Core.lean`
+- Concurrent specs and frontiers: `VCVio/Interaction/Concurrent/Spec.lean`, `VCVio/Interaction/Concurrent/Frontier.lean`
+- Concurrent processes and execution: `VCVio/Interaction/Concurrent/Process.lean`
+- Open systems (interfaces, composition): `VCVio/Interaction/Concurrent/OpenTheory.lean`
+- Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
 - ML-DSA proof-level IDS: `LatticeCrypto/MLDSA/Scheme.lean`
@@ -128,6 +136,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.28.0`). Files s
 
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
+- **Interaction framework (specs, roles, concurrency)**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
 - **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)
 - **Query tracking / weighted cost / expected runtime**: [`docs/agents/query-tracking.md`](docs/agents/query-tracking.md)
