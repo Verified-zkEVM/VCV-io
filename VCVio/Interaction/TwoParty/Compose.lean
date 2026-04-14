@@ -11,6 +11,8 @@ import VCVio.Interaction.TwoParty.Strategy
 import Mathlib.Control.Monad.Basic
 import ToMathlib.Control.Lawful.Basic
 
+open LawfulMonad
+
 /-!
 # Composing two-party protocols
 
