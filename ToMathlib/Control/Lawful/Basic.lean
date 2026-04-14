@@ -17,6 +17,8 @@ The lemmas in this file re-derive the laws with their statements written using `
 notation, so the elaborated `Bind` instance matches the one produced in proof goals.
 -/
 
+@[expose] public section
+
 namespace LawfulMonad
 
 universe u v
@@ -54,3 +56,5 @@ theorem do_bind_map_left {α β γ : Type u} (f : α → β) (x : m α) (g : β 
   bind_map_left f x g
 
 end LawfulMonad
+
+end
