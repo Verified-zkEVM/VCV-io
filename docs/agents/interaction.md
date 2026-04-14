@@ -163,13 +163,23 @@ observational comparisons.
 `Interface` (= `PFunctor`) and `PortBoundary` define typed I/O boundaries.
 The choice of `PFunctor` for interfaces keeps the kernel minimal while
 supporting `Packet`, `Query`, `Hom`, `comp` (Poly's composition product),
-`y` (composition unit), and boundary equivalences.
+`compUnit` (composition unit), and boundary equivalences.
 
 `OpenTheory` provides the compositional algebra: `map`, `par`, `wire`, `plug`.
 Lawfulness classes ensure functoriality and naturality.
 
-`OpenSyntax.Expr` is a tagless-final (Church-style) free model interpretable in
-any lawful `OpenTheory`, serving as the universal syntax for open compositions.
+`OpenSyntax` provides three layers for free open-system expressions:
+
+- `Raw` is an inductive syntax tree whose constructors mirror the `OpenTheory`
+  operations. It is pattern-matchable and suitable for inspection,
+  transformation, and visualization.
+- `Expr` is the quotient of `Raw` by the `OpenTheory` equations, yielding a
+  lawful `OpenTheory` instance by construction.
+- `Interp` is a tagless-final (Church-encoded) structure (final model) that
+  stores a universal interpretation function and carries a lawful `OpenTheory`
+  instance.
+
+`Expr.toInterp` embeds quotiented expressions into the lawful `Interp` model.
 
 ## Import guide
 
@@ -267,9 +277,11 @@ import VCVio.Interaction.Concurrent.Process
 
 | File | Purpose |
 |------|---------|
-| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`y`, tensor/swap |
+| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`compUnit`, tensor/swap |
 | `OpenTheory.lean` | `OpenTheory` algebra (`map`, `par`, `wire`, `plug`) |
-| `OpenSyntax.lean` | `Expr` (tagless-final free model) |
+| `OpenSyntax/Raw.lean` | `Raw` (inductive syntax tree), `Raw.interpret`, `Raw.Equiv`, `Raw.setoid` |
+| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), lawful `OpenTheory` instance |
+| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), lawful `OpenTheory` instance, `Expr.toInterp` |
 | `OpenProcess.lean` | `BoundaryAction`, `OpenNodeSemantics`, `OpenProcess` (open-world bridge) |
 | `OpenProcessModel.lean` | `openTheory` (concrete `OpenTheory` backed by `OpenProcess`), `IsLawfulMap` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |

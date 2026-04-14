@@ -106,7 +106,9 @@ import VCVio.Interaction.UC.Emulates
 import VCVio.Interaction.UC.Interface
 import VCVio.Interaction.UC.OpenProcess
 import VCVio.Interaction.UC.OpenProcessModel
-import VCVio.Interaction.UC.OpenSyntax
+import VCVio.Interaction.UC.OpenSyntax.Expr
+import VCVio.Interaction.UC.OpenSyntax.Interp
+import VCVio.Interaction.UC.OpenSyntax.Raw
 import VCVio.Interaction.UC.OpenTheory
 import VCVio.Interaction.UC.Runtime
 import VCVio.OracleComp.Coercions.Add
