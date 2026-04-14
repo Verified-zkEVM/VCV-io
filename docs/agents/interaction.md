@@ -2,14 +2,10 @@
 
 General-purpose protocol interaction theory: sequential specs, two-party roles,
 multiparty local views, and concurrent process semantics.
-Migrated from `ArkLib/Interaction/` to decouple core protocol abstractions from
-SNARK-specific reductions.
 
 ## Design philosophy
 
-The framework is organized around a few stable principles (see the ArkLib design
-notes `INTERACTION_BOUNDARIES.md`, `INTERACTION_CONCURRENT_SPEC.md`, and
-`INTERACTION_PROTOCOL_ROADMAP.md` for full rationale):
+The framework is organized around a few stable principles:
 
 - **Continuation-first semantics.**
   `Spec` is a W-type (dependent tree): each round's continuation type depends
