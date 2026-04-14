@@ -135,6 +135,8 @@ example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
 
 /-! ### Support-cut synthesis -/
 
+set_option maxHeartbeats 400000 in
+-- `vcstep` needs a bit more fuel here under Lean 4.29.
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
     ⦃1⦄ (do let x ← oa; f x) ⦃fun y => if y = true then 1 else 0⦄ := by

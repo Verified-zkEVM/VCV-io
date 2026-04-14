@@ -48,7 +48,7 @@ variable {κ : Type w'} {spec₃ : OracleSpec κ}
 
 /-- Transitivity for `SubSpec`: if `spec₁ ⊂ₒ spec₂` and `spec₂ ⊂ₒ spec₃`,
 then `spec₁ ⊂ₒ spec₃`. -/
-def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
+@[reducible] def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
   monadLift q := h₂.monadLift (h₁.monadLift q)
   liftM_map q f := by
     have h₁map := h₁.liftM_map (q := q) (f := f)
@@ -157,9 +157,7 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
     simp only [evalDist_eq_simulateQ (spec := superSpec), evalDist_eq_simulateQ (spec := spec),
       simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query, id_map]
     congr 1
-    simp only [simulateQ, PFunctor.FreeM.mapM.eq_def, bind_pure_comp, PMF.monad_map_eq_map]
-    exact PMF.uniformOfFintype_map_of_bijective _
-      (LawfulSubSpec.cont_bijective (spec := spec) (superSpec := superSpec) t)
+    exact LawfulSubSpec.evalDist_liftM_query t
 
 @[simp] lemma probOutput_liftComp (mx : OracleComp spec α) (x : α) :
     Pr[= x | liftComp mx superSpec] = Pr[= x | mx] :=

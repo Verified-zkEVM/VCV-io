@@ -86,8 +86,8 @@ private theorem wpProp_and (oa : OracleComp spec α) (p q : α → Prop) :
 /-- `Std.Do` `WP` instance for `OracleComp`, scoped to almost-sure correctness. -/
 noncomputable instance instWPOracleComp : Std.Do.WP (OracleComp spec) .pure where
   wp oa :=
-    { apply := fun Q => ⌜wpProp (spec := spec) oa (fun a => (Q.1 a).down)⌝
-      conjunctive := by
+    { trans := fun Q => ⌜wpProp (spec := spec) oa (fun a => (Q.1 a).down)⌝
+      conjunctiveRaw := by
         intro Q₁ Q₂
         apply SPred.pure_congr
         simp [wpProp_and] }
@@ -98,10 +98,13 @@ noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) 
   toWP := instWPOracleComp (spec := spec)
   wp_pure a := by
     ext Q
-    simp [Std.Do.WP.wp, wpProp_pure]
+    change wpProp (spec := spec) (pure a) (fun a => (Q.1 a).down) ↔ (Q.1 a).down
+    exact wpProp_pure a _
   wp_bind x f := by
     ext Q
-    simp [Std.Do.WP.wp, wpProp_bind]
+    change wpProp (spec := spec) (x >>= f) (fun b => (Q.1 b).down) ↔
+      wpProp x (fun a => wpProp (f a) (fun b => (Q.1 b).down))
+    exact wpProp_bind x f _
 
 namespace Spec
 
@@ -110,7 +113,7 @@ namespace Spec
     Std.Do.Triple (OracleComp.query t : OracleComp spec (spec.Range t))
       (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
       Q := by
-  simp [Std.Do.Triple, Std.Do.WP.wp]
+  simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
 
 /-- Bind-chain specification shape for `mspec`/`mvcgen` in OracleComp do-blocks. -/
 @[spec] theorem query_bind (t : spec.Domain) {f : spec.Range t → OracleComp spec α}
@@ -119,7 +122,7 @@ namespace Spec
       (⌜wpProp (spec := spec)
         ((OracleComp.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
       Q := by
-  simp [Std.Do.Triple, Std.Do.WP.wp]
+  simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
 
 end Spec
 

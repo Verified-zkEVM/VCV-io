@@ -26,7 +26,9 @@ open ENNReal
 
 @[simp, grind =]
 lemma support_map [HasEvalSet m] [LawfulMonad m] (f : α → β) (mx : m α) :
-    support (f <$> mx) = f '' support mx := by aesop (rule_sets := [UnfoldEvalDist])
+    support (f <$> mx) = f '' support mx := by
+  simp [map_eq_bind_pure_comp]
+  aesop
 
 @[simp, grind =]
 lemma finSupport_map [HasEvalSet m] [HasEvalFinset m] [LawfulMonad m]

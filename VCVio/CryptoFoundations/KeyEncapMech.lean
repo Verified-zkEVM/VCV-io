@@ -175,19 +175,31 @@ theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
   simp only [IND_CPA_Game, IND_CCA_Game, IND_CPA_Adversary.toIND_CCA,
     IND_CCA_preChallengeImpl, IND_CCA_postChallengeImpl]
   congr 1
-  simp only [← QueryImpl.simulateQ_compose]
-  have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec)),
-      ((HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + impl₂) ∘ₛ
-        (HasQuery.toQueryImpl (spec := spec) (m := OracleComp (spec + (C →ₒ Option K)))) =
-      QueryImpl.id' spec := by
-    intro impl₂
-    ext t
-    simp only [QueryImpl.compose, QueryImpl.id']
-    change simulateQ (QueryImpl.id' spec + impl₂)
-      (liftM (liftM (OracleQuery.query (spec := spec) t) :
-        OracleQuery (spec + (C →ₒ Option K)) _)) = _
-    simp [simulateQ_query]
-  simp only [h, simulateQ_id']
+  simp only [IND_CCA_oracleSpec] at *
+  have h : ∀ (impl₂ : QueryImpl (C →ₒ Option K) (OracleComp spec))
+      {α : Type} (oa : OracleComp spec α),
+      simulateQ ((HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)) + impl₂)
+        (simulateQ (HasQuery.toQueryImpl (spec := spec)
+          (m := OracleComp (spec + (C →ₒ Option K)))) oa) = oa := by
+    intro impl₂ α oa
+    rw [← QueryImpl.simulateQ_compose]
+    have : (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec) + impl₂) ∘ₛ
+        HasQuery.toQueryImpl (spec := spec) (m := OracleComp (spec + (C →ₒ Option K))) =
+        QueryImpl.id' spec := by
+      ext t
+      simp only [QueryImpl.compose, QueryImpl.id']
+      change simulateQ (QueryImpl.id' spec + impl₂)
+        (liftM (liftM (OracleQuery.query (spec := spec) t) :
+          OracleQuery (spec + (C →ₒ Option K)) _)) = _
+      simp [simulateQ_query]
+    rw [this, simulateQ_id']
+  conv_rhs =>
+    arg 2; ext x; arg 1; rw [h]
+  conv_rhs =>
+    arg 2; ext x
+    arg 2; ext st; arg 2; ext b
+    arg 2; ext y; arg 2; ext kRand
+    arg 1; rw [h]
 
 end IND_CCA
 

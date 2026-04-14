@@ -192,7 +192,7 @@ attribute [local instance] Set.monad
 
 /-- The set monad is commutative. This is not registered as an instance similar to how
   `Set.monad` is not registered as an instance. -/
-def Set.monadComm : Commutative Set where
+@[reducible] def Set.monadComm : Commutative Set where
   bind_comm := fun ma mb => by
     dsimp [CommutativeAt, Pure.pure, Bind.bind]
     aesop

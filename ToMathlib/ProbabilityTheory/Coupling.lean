@@ -66,7 +66,7 @@ theorem IsCoupling.pure_iff {α β : Type u} {a : α} {b : β} {c : SPMF (α × 
       | some p =>
         obtain ⟨x, y⟩ := p
         have hne : x ≠ a ∨ y ≠ b := by
-          by_contra h; push_neg at h; exact hx (by rw [h.1, h.2])
+          by_contra h; push Not at h; exact hx (by rw [h.1, h.2])
         cases hne with
         | inl hx => exact PMF.map_eq_pure_zero _ c _ h1 (some (x, y)) (by simp [hx])
         | inr hy => exact PMF.map_eq_pure_zero _ c _ h2 (some (x, y)) (by simp [hy])

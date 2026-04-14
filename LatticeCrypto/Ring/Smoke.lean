@@ -76,18 +76,22 @@ noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   zero_sound := by
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp [piBackend, piRing, Finset.sum_const_zero, map_zero]
+    rfl
   add_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_add_distrib, map_add]
+    rfl
   sub_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_sub_distrib, map_sub]
+    rfl
   neg_sound := by
     intro f
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_neg_distrib, map_neg]
+    rfl
   mul_sound := by
     intro f g
     exact negacyclicMulPure_sound (piBackend Coeff n) (piKernel Coeff n) f g

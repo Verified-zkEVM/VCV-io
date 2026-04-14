@@ -38,10 +38,7 @@ theorem probOutput_fresh_cachingOracle_query
     pure_bind]
   simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
     StateT.modifyGet, StateT.run]
-  rw [show (do let x ← PFunctor.FreeM.lift (query t); pure (x, cache₀.cacheQuery t x)) =
-    (fun x => (x, cache₀.cacheQuery t x)) <$> PFunctor.FreeM.lift (query t) from by
-      simp [Functor.map, bind_pure_comp]]
-  rw [probOutput_map_injective _ (fun a b hab => by exact Prod.ext_iff.mp hab |>.1)]
+  erw [probOutput_map_injective _ (fun a b hab => by exact Prod.ext_iff.mp hab |>.1)]
   exact probOutput_query t u
 
 omit [spec'.DecidableEq] in
@@ -127,7 +124,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
             gcongr
             exact_mod_cast Nat.sub_le n 1
     · -- Cache miss
-      push_neg at ht
+      push Not at ht
       have ht_none : cache₀ t = none := by
         cases h : cache₀ t with | none => rfl | some v => exact absurd h (ht v)
       have hrun : (simulateQ cachingOracle (liftM (query t) >>= mx)).run cache₀ =
@@ -143,6 +140,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
           simp only [StateT.lift, bind_assoc, pure_bind,
             modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
             StateT.modifyGet, StateT.run]
+          rfl
         rw [hstep, bind_assoc]; simp [pure_bind]
       rw [hrun]
       -- Decompose: ∑ u, Pr[=u|query t] * Pr[event | cont(u)]

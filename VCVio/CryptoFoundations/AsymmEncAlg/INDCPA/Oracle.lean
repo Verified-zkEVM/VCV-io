@@ -115,6 +115,14 @@ private def IND_CPA_countedChallengeOracle
       set (cache', st.2 + 1)
       return c
 
+private lemma IND_CPA_countedChallengeOracle_run_eq_of_select_eq
+    (pk : PK) (select₁ select₂ : ℕ → M × M → M) (mm : M × M)
+    (st : encAlg'.IND_CPA_CountedState)
+    (h : select₁ st.2 mm = select₂ st.2 mm) :
+    (IND_CPA_countedChallengeOracle (encAlg' := encAlg') pk select₁ mm).run st =
+      (IND_CPA_countedChallengeOracle (encAlg' := encAlg') pk select₂ mm).run st := by
+  simp only [IND_CPA_countedChallengeOracle, StateT.run_bind, StateT.run_get, pure_bind, h]
+
 /-- The real IND-CPA challenge oracle, but with an explicit counter that increments on cache
 misses. -/
 def IND_CPA_challengeOracle'_counted
@@ -168,7 +176,8 @@ lemma IND_CPA_queryImpl'_counted_counter_le_succ
   | inl tu =>
       simp only [IND_CPA_queryImpl'_counted, IND_CPA_queryImplFromChallenge,
         QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-        liftM, monadLift, StateT.instMonadLift] at hp
+        liftM, monadLift] at hp
+      change p ∈ support ((StateT.lift _).run st) at hp
       rw [StateT.run_lift, mem_support_bind_iff] at hp
       obtain ⟨a, _, ha⟩ := hp
       rw [mem_support_pure_iff] at ha
@@ -182,8 +191,7 @@ lemma IND_CPA_queryImpl'_counted_counter_le_succ
       rcases hcache : st.1 mm with _ | c <;> intro hp
       · simp only [IND_CPA_challengeOracle'_counted, IND_CPA_countedChallengeOracle, hcache,
           StateT.run_bind, StateT.run_get, pure_bind] at hp
-        rw [mem_support_iff] at hp
-        rw [← mem_support_iff] at hp
+        change (_ : (ofFn fun _ ↦ C).Range mm × encAlg'.IND_CPA_CountedState) ∈ _ at hp
         simp only [StateT.run_pure, support_bind, Set.mem_iUnion, support_pure,
           Set.mem_singleton_iff] at hp
         obtain ⟨c, _, ⟨i, hi, hp⟩⟩ := hp
@@ -193,7 +201,7 @@ lemma IND_CPA_queryImpl'_counted_counter_le_succ
         omega
       · simp only [IND_CPA_challengeOracle'_counted, IND_CPA_countedChallengeOracle, hcache,
           StateT.run_bind, StateT.run_get, pure_bind,
-          StateT.run_pure, mem_support_pure_iff] at hp
+          StateT.run_pure] at hp
         have := congrArg (fun x => x.2.2) hp
         simp at this
         omega
@@ -239,7 +247,10 @@ lemma IND_CPA_queryImpl'_counted_proj_eq_queryImpl'
       ((encAlg'.IND_CPA_queryImpl' pk b) t).run st.1 := by
   cases t with
   | inl tu =>
-      simp [IND_CPA_queryImpl'_counted, IND_CPA_queryImpl', IND_CPA_queryImplFromChallenge]
+      simp only [IND_CPA_queryImpl'_counted, IND_CPA_queryImpl', IND_CPA_queryImplFromChallenge,
+        QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply]
+      change Prod.map id Prod.fst <$> (StateT.lift _).run st = (StateT.lift _).run st.1
+      simp [StateT.run_lift, Prod.map, Functor.map_map]
   | inr mm =>
       simpa [IND_CPA_queryImpl'_counted, IND_CPA_queryImpl', IND_CPA_queryImplFromChallenge]
         using
@@ -258,8 +269,11 @@ lemma IND_CPA_queryImpl_hybridLR_counted_proj_eq_queryImpl'_false
       ((encAlg'.IND_CPA_queryImpl' pk false) t).run st.1 := by
   cases t with
   | inl tu =>
-      simp [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImpl',
-        IND_CPA_queryImplFromChallenge]
+      simp only [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImpl',
+        IND_CPA_queryImplFromChallenge,
+        QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply]
+      change Prod.map id Prod.fst <$> (StateT.lift _).run st = (StateT.lift _).run st.1
+      simp [StateT.run_lift, Prod.map, Functor.map_map]
   | inr mm =>
       simpa [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImpl',
         IND_CPA_queryImplFromChallenge] using
@@ -332,7 +346,8 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
         | inl tu =>
             simp only [IND_CPA_queryImpl'_counted, IND_CPA_queryImplFromChallenge,
               QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-              liftM, monadLift, StateT.instMonadLift] at hz
+              liftM, monadLift] at hz
+            change z ∈ support ((StateT.lift _).run st) at hz
             rw [StateT.run_lift, mem_support_bind_iff] at hz
             obtain ⟨a, _, ha⟩ := hz
             rw [mem_support_pure_iff] at ha
@@ -452,16 +467,22 @@ theorem IND_CPA_LR_hybridGame_q_evalDist_eq_left_of_MakesAtMostQueries
             simp [IND_CPA_queryImpl'_counted, IND_CPA_queryImpl_hybridLR_counted,
               IND_CPA_queryImplFromChallenge]
       | inr mm =>
+          have hcond' : st.2 < realUntil := by simpa using hcond
           rcases hcache : st.1 mm with _ | c
           · cases b <;>
-              simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
+              simp only [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
-                IND_CPA_queryImplFromChallenge, IND_CPA_countedChallengeOracle,
-                hcache, hcond]
+                IND_CPA_queryImplFromChallenge, QueryImpl.add_apply_inr,
+                Bool.false_eq_true, ite_true, ite_false] <;>
+              exact IND_CPA_countedChallengeOracle_run_eq_of_select_eq pk _ _ mm st
+                (by simp [hcond'])
           · cases b <;>
-              simp [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
+              simp only [IND_CPA_queryImpl'_counted, IND_CPA_challengeOracle'_counted,
                 IND_CPA_queryImpl_hybridLR_counted, IND_CPA_hybridChallengeOracleLR_counted,
-                IND_CPA_queryImplFromChallenge, IND_CPA_countedChallengeOracle, hcache])
+                IND_CPA_queryImplFromChallenge, QueryImpl.add_apply_inr,
+                Bool.false_eq_true, ite_true, ite_false] <;>
+              exact IND_CPA_countedChallengeOracle_run_eq_of_select_eq pk _ _ mm st
+                (by simp [hcond']))
     pk true q (adversary pk) q (hq pk) ∅ 0 (by omega)
 
 /-- The `leftUntil = 0` LR-hybrid has the same success probability as the all-right endpoint. -/
@@ -622,7 +643,8 @@ lemma IND_CPA_hybridLR_counted_counter_le
   | inl tu =>
       simp only [IND_CPA_queryImpl_hybridLR_counted, IND_CPA_queryImplFromChallenge,
         QueryImpl.add_apply_inl, QueryImpl.liftTarget_apply, QueryImpl.ofLift_apply,
-        liftM, monadLift, StateT.instMonadLift] at hp
+        liftM, monadLift] at hp
+      change p ∈ support ((StateT.lift _).run st) at hp
       rw [StateT.run_lift, mem_support_bind_iff] at hp
       obtain ⟨a, _, ha⟩ := hp
       rw [mem_support_pure_iff] at ha
@@ -638,8 +660,7 @@ lemma IND_CPA_hybridLR_counted_counter_le
       simp only [IND_CPA_hybridChallengeOracleLR_counted, IND_CPA_countedChallengeOracle]
       rcases hcache : st.1 mm with _ | c <;> intro hp
       · simp only [hcache, StateT.run_bind, StateT.run_get, pure_bind] at hp
-        rw [mem_support_iff] at hp
-        rw [← mem_support_iff] at hp
+        change (_ : (ofFn fun _ ↦ C).Range mm × encAlg'.IND_CPA_CountedState) ∈ _ at hp
         simp only [StateT.run_pure, support_bind, Set.mem_iUnion, support_pure,
           Set.mem_singleton_iff] at hp
         obtain ⟨c, _, ⟨i, hi, hp⟩⟩ := hp
@@ -648,7 +669,7 @@ lemma IND_CPA_hybridLR_counted_counter_le
         simp only [hp]
         omega
       · simp only [hcache, StateT.run_bind, StateT.run_get, pure_bind,
-          StateT.run_pure, mem_support_pure_iff] at hp
+          StateT.run_pure] at hp
         have := congrArg (fun x => x.2.2) hp
         simp at this
         omega

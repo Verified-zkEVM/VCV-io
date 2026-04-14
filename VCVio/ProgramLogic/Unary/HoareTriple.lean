@@ -67,7 +67,7 @@ noncomputable instance instMAlgOrdered :
     MAlgOrdered (OracleComp spec) ℝ≥0∞ where
   μ := μ (spec := spec)
   μ_pure x := by
-    classical
+    haveI : DecidableEq ℝ≥0∞ := Classical.decEq _
     simp [μ, probOutput_pure]
   μ_bind_mono f g hfg x := by
     rw [μ_bind_eq_tsum (oa := x) (ob := f), μ_bind_eq_tsum (oa := x) (ob := g)]
@@ -169,7 +169,7 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
   rw [μ_bind_eq_tsum]
   refine tsum_congr fun x => ?_
   have : μ (pure (post x) : OracleComp spec ℝ≥0∞) = post x := by
-    classical
+    haveI : DecidableEq ℝ≥0∞ := Classical.decEq _
     simp [μ, probOutput_pure]
   rw [this]
 

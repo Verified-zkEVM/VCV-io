@@ -41,13 +41,49 @@ namespace oneTimePad
 
 /-- Encryption and decryption are inverses for any OTP key. -/
 lemma complete : (oneTimePad).Complete := by
-  simp [oneTimePad, SymmEncAlg.Complete, SymmEncAlg.CompleteExp]
+  intro sp m
+  simp only [oneTimePad, simulateQ_id', SymmEncAlg.CompleteExp]
+  have hrun :
+      OptionT.run (do
+          let k ← liftM ($ᵗ BitVec sp)
+          let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
+          pure (k ^^^ σ) : OptionT ProbComp (BitVec sp)) =
+        (fun k => some (k ^^^ (k ^^^ m))) <$> ($ᵗ BitVec sp : ProbComp (BitVec sp)) := by
+    simp
+  have hxor : (fun k => some (k ^^^ (k ^^^ m))) = fun _ : BitVec sp => some m := by
+    funext k
+    simp
+  have hsupp : (support ($ᵗ BitVec sp : ProbComp (BitVec sp))).Nonempty := by
+    simp [support_uniformSample]
+  rw [probOutput_eq_one_iff]
+  constructor
+  · change Pr[⊥ | OptionT.run (do
+        let k ← liftM ($ᵗ BitVec sp)
+        let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
+        pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))] = 0
+    calc
+      Pr[⊥ | OptionT.run (do
+          let k ← liftM ($ᵗ BitVec sp)
+          let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
+          pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))] =
+          Pr[⊥ | (fun k => some (k ^^^ (k ^^^ m))) <$> ($ᵗ BitVec sp : ProbComp (BitVec sp))] := by
+            simp
+      _ = Pr[⊥ | ($ᵗ BitVec sp : ProbComp (BitVec sp))] := by
+            rw [probFailure_map]
+      _ = 0 := probFailure_uniformSample (α := BitVec sp)
+  · change support (OptionT.run (do
+        let k ← liftM ($ᵗ BitVec sp)
+        let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
+        pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))) = {some m}
+    simpa only [hrun, hxor] using
+      (support_map_const (mx := ($ᵗ BitVec sp : ProbComp (BitVec sp))) (y := some m) hsupp)
 
 lemma probOutput_cipher_uniform (sp : ℕ)
     (mgen : OracleComp oneTimePad.spec (BitVec sp)) (σ : BitVec sp) :
     Pr[= σ | oneTimePad.PerfectSecrecyCipherExp sp mgen] =
       (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
-  simpa [SymmEncAlg.PerfectSecrecyCipherExp, SymmEncAlg.PerfectSecrecyExp, oneTimePad] using
+  simpa [SymmEncAlg.PerfectSecrecyCipherExp_eq_bind, SymmEncAlg.PerfectSecrecyPriorExp,
+    SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_bind] using
     probOutput_cipher_from_pair_uniform sp (mx := simulateQ oneTimePad.impl mgen) σ
 
 /-- The one-time pad is perfectly secret in the canonical independence form. -/

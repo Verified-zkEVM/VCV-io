@@ -45,7 +45,7 @@ lemma run_simulateQ_loggingOracle_query_bind {α : Type}
           (p.1, (⟨t, u⟩ : (i : (CMOracle M S C).Domain) × (CMOracle M S C).Range i) :: p.2))
           <$> (simulateQ loggingOracle (mx u)).run := by
   simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
-    Prod.map, Function.id_def]
+    Function.id_def]
 
 omit [DecidableEq M] [DecidableEq C] [Fintype M] [Fintype C] [Inhabited M] [Inhabited S]
   [Inhabited C] in
@@ -789,6 +789,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               simp only [StateT.lift, bind_assoc, pure_bind,
                 modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
                 StateT.modifyGet, StateT.run]
+              rfl
             have hmiss_common :
                 (liftM (cachingOracle (spec := CMOracle M S C) t) :
                   StateT (QueryCache (CMOracle M S C))
@@ -804,6 +805,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               simp only [StateT.lift, bind_assoc, pure_bind,
                 modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
                 StateT.modifyGet, StateT.run]
+              rfl
             rw [hmiss_fresh, hmiss_common, OracleComp.ProgramLogic.wp_bind,
               OracleComp.ProgramLogic.wp_bind]
             simp_rw [OracleComp.ProgramLogic.wp_pure]
