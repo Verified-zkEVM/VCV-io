@@ -106,6 +106,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Concrete open-theory model: `VCVio/Interaction/UC/OpenProcessModel.lean`
 - UC emulation and security: `VCVio/Interaction/UC/Emulates.lean`
 - Computational UC observation layer: `VCVio/Interaction/UC/Computational.lean`
+- Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean`
 - Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`

@@ -162,7 +162,8 @@ observational comparisons.
 
 `Interface` (= `PFunctor`) and `PortBoundary` define typed I/O boundaries.
 The choice of `PFunctor` for interfaces keeps the kernel minimal while
-supporting `Packet`, `Query`, `Hom`, and boundary equivalences.
+supporting `Packet`, `Query`, `Hom`, `comp` (Poly's composition product),
+`y` (composition unit), and boundary equivalences.
 
 `OpenTheory` provides the compositional algebra: `map`, `par`, `wire`, `plug`.
 Lawfulness classes ensure functoriality and naturality.
@@ -266,13 +267,14 @@ import VCVio.Interaction.Concurrent.Process
 
 | File | Purpose |
 |------|---------|
-| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, tensor/swap |
+| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`y`, tensor/swap |
 | `OpenTheory.lean` | `OpenTheory` algebra (`map`, `par`, `wire`, `plug`) |
 | `OpenSyntax.lean` | `Expr` (tagless-final free model) |
 | `OpenProcess.lean` | `BoundaryAction`, `OpenNodeSemantics`, `OpenProcess` (open-world bridge) |
 | `OpenProcessModel.lean` | `openTheory` (concrete `OpenTheory` backed by `OpenProcess`), `IsLawfulMap` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 | `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
+| `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (monad-parametric), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |
 
 ## In-tree examples
 

@@ -73,10 +73,10 @@ def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
         semantics :=
           ⟨schedulerNode, fun
             | ⟨true⟩ => Interaction.Spec.Decoration.map
-                (openStepContextInlTensor Party Δ₁ Δ₂)
+                (OpenStepContext.inlTensor Party Δ₁ Δ₂)
                 step₁.spec step₁.semantics
             | ⟨false⟩ => Interaction.Spec.Decoration.map
-                (openStepContextInrTensor Party Δ₁ Δ₂)
+                (OpenStepContext.inrTensor Party Δ₁ Δ₂)
                 step₂.spec step₂.semantics⟩
         next := fun
           | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
@@ -98,10 +98,10 @@ def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
         semantics :=
           ⟨schedulerNode, fun
             | ⟨true⟩ => Interaction.Spec.Decoration.map
-                (openStepContextWireLeft Party Δ₁ Γ Δ₂)
+                (OpenStepContext.wireLeft Party Δ₁ Γ Δ₂)
                 step₁.spec step₁.semantics
             | ⟨false⟩ => Interaction.Spec.Decoration.map
-                (openStepContextWireRight Party Δ₁ Γ Δ₂)
+                (OpenStepContext.wireRight Party Δ₁ Γ Δ₂)
                 step₂.spec step₂.semantics⟩
         next := fun
           | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
@@ -123,10 +123,10 @@ def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
         semantics :=
           ⟨schedulerNode, fun
             | ⟨true⟩ => Interaction.Spec.Decoration.map
-                (openStepContextClose Party Δ)
+                (OpenStepContext.close Party Δ)
                 step₁.spec step₁.semantics
             | ⟨false⟩ => Interaction.Spec.Decoration.map
-                (openStepContextClose Party (PortBoundary.swap Δ))
+                (OpenStepContext.close Party (PortBoundary.swap Δ))
                 step₂.spec step₂.semantics⟩
         next := fun
           | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
@@ -137,7 +137,7 @@ instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
   map_id {Δ} W := by
     change W.mapBoundary (PortBoundary.Hom.id Δ) = W
     simp only [OpenProcess.mapBoundary]
-    rw [openStepContextMap_id]
+    rw [OpenStepContext.map_id]
     cases W with | mk Proc step =>
     simp only [ProcessOver.mapContext, StepOver.mapContext]
     congr 1; funext p
@@ -147,7 +147,7 @@ instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
     change W.mapBoundary (PortBoundary.Hom.comp g f) =
       (W.mapBoundary f).mapBoundary g
     simp only [OpenProcess.mapBoundary]
-    rw [← openStepContextMap_comp]
+    rw [← OpenStepContext.map_comp]
     cases W with | mk Proc step =>
     simp only [ProcessOver.mapContext, StepOver.mapContext]
     congr 1; funext p

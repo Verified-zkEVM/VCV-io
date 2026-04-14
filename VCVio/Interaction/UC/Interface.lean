@@ -22,19 +22,25 @@ environment, we also need a typed notion of:
 * how such open boundaries compose.
 
 The design here is intentionally minimal and purely structural.
+Every definition is an `abbrev` over existing `PFunctor` / chart / lens
+machinery, so the established theory is reused definitionally while
+presenting names that read naturally in the interaction setting.
 
-* `Interface` is just `PFunctor`, reused under a name that matches the
-  interaction setting.
-* `Interface.Packet Σ` is one concrete boundary message on interface `Σ`.
-* `Interface.Hom Σ Τ` is just `PFunctor.Chart Σ Τ`, reused under an
-  interaction-oriented name for *actual traffic*.
-* `Interface.Equiv Σ Τ` is the corresponding chart-level interface
-  isomorphism.
-* `Interface.QueryHom Σ Τ` is just `PFunctor.Lens Σ Τ`, reused under an
-  interface-oriented name for *query transport*.
+* `Interface` is `PFunctor`: ports `A` and per-port messages `B a`.
+* `Interface.Packet I` is one concrete boundary message on interface `I`.
+* `Interface.Hom I J` is `PFunctor.Chart I J` (forward packet transport,
+  covariant on both components).
+* `Interface.QueryHom I J` is `PFunctor.Lens I J` (query retargeting with
+  response pullback, contravariant on the fibre).
+* `Interface.Equiv I J` is the chart-level interface isomorphism.
+* `Interface.comp I J` is the composition monoidal product on polynomial
+  functors (`PFunctor.comp`), modelling sequential dependence where one
+  interface's response determines the next interface's port.
+* `Interface.compUnit` is the composition unit (the identity polynomial
+  functor: one port, one message).
 * `PortBoundary` is a directed pair of input and output interfaces.
-* `PortBoundary.swap`, `tensor`, `empty`, and `PortBoundary.Hom` are the basic
-  operations needed to talk about open composition.
+* `PortBoundary.swap`, `tensor`, `empty`, and `PortBoundary.Hom` are the
+  basic operations for open composition.
 
 The most important distinction in this file is:
 
@@ -44,6 +50,8 @@ The most important distinction in this file is:
 
 So `Hom` pushes traffic forward, while `QueryHom` retargets an interaction and
 pulls the eventual response back.
+The composition product is only functorial for `QueryHom` (lenses), not for
+`Hom` (charts), because the fibre-level map must be contravariant.
 
 This file also introduces the first equivalence layer:
 
@@ -55,14 +63,15 @@ These structures are the starting point for expressing tensor unit,
 associativity, and symmetry at the boundary level without hard-coding more
 primitive operations into `OpenTheory`.
 
-This layer intentionally uses `abbrev` over the existing `PFunctor` / chart /
-lens machinery rather than introducing fresh representations. The goal is to
-reuse the established theory definitionally while still presenting names that
-read naturally in the interaction setting.
-
 This file does **not** yet define open worlds, plugging, or runtime semantics.
 Those later layers should build on these typed boundary primitives rather than
 re-introducing their own packet/interface vocabulary.
+
+## References
+
+* Niu, Spivak (2024), Polynomial Functors: A Mathematical Theory of
+  Interaction — the composition product, charts, lenses, and monoidal
+  structures on polynomial functors used throughout this file
 -/
 
 universe uA uB vA vB wA wB
@@ -619,6 +628,80 @@ def sumAssoc
     Equiv (Interface.sum (Interface.sum I J) K)
       (Interface.sum I (Interface.sum J K)) :=
   PFunctor.Equiv.sumAssoc I J K
+
+end Equiv
+
+/--
+Composition product of interfaces (the composition monoidal product on
+polynomial functors; see Niu–Spivak 2024).
+
+A position of `comp I J` is a pair of:
+
+* a port `a : I.A` on the outer interface, and
+* for each response `m : I.B a` on that port, a port of the inner interface:
+  a function `I.B a → J.A`.
+
+A direction at a composed position `⟨a, f⟩` is a dependent pair `⟨u, v⟩`
+where `u : I.B a` is a response on port `a` and `v : J.B (f u)` is a
+response on the resulting inner port.
+
+This models sequential dependence: one interface's response determines which
+port of the next interface is activated.
+-/
+abbrev comp (I : Interface.{uA, uB}) (J : Interface.{vA, vB}) :
+    Interface.{max uA vA uB, max uB vB} :=
+  PFunctor.comp I J
+
+/--
+The monoidal unit for the composition product.
+
+This is the polynomial functor with one port carrying one message:
+`comp I compUnit ≃ I ≃ comp compUnit I`.
+-/
+abbrev compUnit : Interface :=
+  PFunctor.compUnit
+
+namespace QueryHom
+
+/--
+Bifunctorial action of query homs on the composition product.
+
+Given query homs `f₁ : QueryHom I₁ J₁` and `f₂ : QueryHom I₂ J₂`, produces
+a query hom on the composed interfaces.
+
+There is no corresponding `Hom.compMap` because charts (covariant on both
+components) are not functorial for the composition product; the composition
+product requires contravariance on B, which only lenses provide.
+-/
+abbrev compMap
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, vB}}
+    {J₁ : Interface.{wA, wB}} {J₂ : Interface}
+    (f₁ : QueryHom I₁ J₁) (f₂ : QueryHom I₂ J₂) :
+    QueryHom (Interface.comp I₁ I₂) (Interface.comp J₁ J₂) :=
+  PFunctor.Lens.compMap f₁ f₂
+
+end QueryHom
+
+namespace Equiv
+
+/-- The composition product is associative up to interface equivalence. -/
+abbrev compAssoc
+    (I : Interface.{uA, uB})
+    (J : Interface.{vA, vB})
+    (K : Interface.{wA, wB}) :
+    Equiv (Interface.comp (Interface.comp I J) K)
+      (Interface.comp I (Interface.comp J K)) :=
+  PFunctor.Equiv.compAssoc I J K
+
+/-- `compUnit` is a right unit for composition. -/
+abbrev compUnitRight (I : Interface.{uA, uB}) :
+    Equiv (Interface.comp I compUnit) I :=
+  PFunctor.Equiv.compX I
+
+/-- `compUnit` is a left unit for composition. -/
+abbrev compUnitLeft (I : Interface.{uA, uB}) :
+    Equiv (Interface.comp compUnit I) I :=
+  PFunctor.Equiv.XComp I
 
 end Equiv
 
