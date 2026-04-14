@@ -138,6 +138,31 @@ The `diamond` theorem proves independent events commute.
 `Machine` provides a state-indexed transition-system frontend that compiles
 to `Process` via `Machine.toProcess`.
 
+### Coalgebraic structure
+
+Both `ProcessOver` and `Machine` are instances of the `Coalgebra` typeclass
+defined in `ToMathlib/Control/Coalgebra.lean`.
+A `Coalgebra F S` is a type `S` together with `out : S → F S`,
+the categorical dual of `MonadAlgebra`.
+
+- `StepOver Γ` is a `Functor` (post-compose on `next`), and `LawfulFunctor`.
+- `ProcessOver Γ` is a `Coalgebra (StepOver Γ)` via its `step` field.
+- `Machine.StepFun` is a `Functor` and `LawfulFunctor`.
+- `Machine` is a `Coalgebra Machine.StepFun` via its `Enabled`/`step` fields.
+
+This reflects the Poly/ACT perspective: a process is a coalgebra for a
+polynomial endofunctor, with the step functor playing the role of the
+"interface polynomial."
+
+### Interleaving combinator
+
+`ProcessOver.interleave` factors out the binary-choice interleaving pattern
+shared by `par`, `wire`, and `plug` in `OpenProcessModel`.
+Given two processes `p₁ : ProcessOver Γ₁`, `p₂ : ProcessOver Γ₂`,
+context morphisms into a target context `Δ`, and a scheduler decoration,
+it produces a `ProcessOver Δ` with product state space
+`p₁.Proc × p₂.Proc`.
+
 ### Control and observation
 
 `Control Party S` assigns ownership of payload moves and scheduling decisions.
@@ -259,9 +284,9 @@ import VCVio.Interaction.Concurrent.Process
 | `Control.lean` | `Control`, `scheduler?`, `current?`, `controllers` |
 | `Profile.lean` | `Profile`, `observe`, `residual`, `frontierView` |
 | `Current.lean` | `view`, `observe`, `residualView` |
-| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems |
+| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalgebra` instance, `interleave` |
 | `Tree.lean` | Structural concurrent syntax → `Process` |
-| `Machine.lean` | `Machine`, `Machine.toProcess` |
+| `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalgebra` instance |
 | `Execution.lean` | `Trace`, `ObservedTrace` for processes |
 | `Run.lean` | `Prefix`, `Run` (infinite), controller/event extraction |
 | `Policy.lean` | `StepPolicy`, `respects`, combinators |

@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
 import VCVio.Interaction.Multiparty.Core
+import ToMathlib.Control.Coalgebra
 
 /-!
 # Dynamic concurrent processes
@@ -127,6 +128,17 @@ def mapContext
 
 end StepOver
 
+/-- `StepOver Γ` is functorial in the continuation type: `map f` post-composes `f` after
+the `next` continuation, preserving the interaction protocol and its decoration. -/
+instance {Γ : Interaction.Spec.Node.Context.{w, w₂}} : Functor (StepOver.{v, w, w₂} Γ) where
+  map f s := { spec := s.spec, semantics := s.semantics, next := f ∘ s.next }
+
+instance {Γ : Interaction.Spec.Node.Context.{w, w₂}} :
+    LawfulFunctor (StepOver.{v, w, w₂} Γ) where
+  id_map _ := rfl
+  comp_map _ _ _ := rfl
+  map_const := rfl
+
 /--
 `ProcessOver Γ` is a continuation-based concurrent process whose current step
 episodes are decorated by realized context `Γ`.
@@ -163,6 +175,46 @@ def mapContext
     (process : ProcessOver Γ) : ProcessOver Δ where
   Proc := process.Proc
   step p := (process.step p).mapContext f
+
+/-- Every `ProcessOver Γ` is a coalgebra for the `StepOver Γ` endofunctor. -/
+instance {Γ : Interaction.Spec.Node.Context.{w, w₂}} (p : ProcessOver.{v, w, w₂} Γ) :
+    Coalgebra (StepOver.{v, w, w₂} Γ) p.Proc := ⟨p.step⟩
+
+/--
+Binary-choice interleaving of two processes with different node contexts.
+
+Given processes `p₁` over `Γ₁` and `p₂` over `Γ₂`, context morphisms mapping
+each into a common target context `Δ`, and a scheduler decoration in `Δ` for
+the `ULift Bool` choice node, produce a single `ProcessOver Δ` whose state
+space is `p₁.Proc × p₂.Proc`.
+
+At each step, a scheduler node chooses left (`true`) or right (`false`), then
+the selected subprocess's step protocol runs with its decoration mapped into
+`Δ`. Only the selected component of the product state advances.
+-/
+def interleave
+    {Γ₁ : Interaction.Spec.Node.Context.{w, w₂}}
+    {Γ₂ : Interaction.Spec.Node.Context.{w, w₂}}
+    {Δ : Interaction.Spec.Node.Context.{w, w₂}}
+    (p₁ : ProcessOver.{v, w, w₂} Γ₁)
+    (p₂ : ProcessOver.{v, w, w₂} Γ₂)
+    (f₁ : Interaction.Spec.Node.ContextHom Γ₁ Δ)
+    (f₂ : Interaction.Spec.Node.ContextHom Γ₂ Δ)
+    (schedulerCtx : Δ (ULift.{w} Bool)) : ProcessOver.{v, w, w₂} Δ where
+  Proc := p₁.Proc × p₂.Proc
+  step := fun (s₁, s₂) =>
+    let step₁ := p₁.step s₁
+    let step₂ := p₂.step s₂
+    { spec := .node (ULift.{w} Bool) fun
+        | ⟨true⟩ => step₁.spec
+        | ⟨false⟩ => step₂.spec
+      semantics :=
+        ⟨schedulerCtx, fun
+          | ⟨true⟩ => Interaction.Spec.Decoration.map f₁ step₁.spec step₁.semantics
+          | ⟨false⟩ => Interaction.Spec.Decoration.map f₂ step₂.spec step₂.semantics⟩
+      next := fun
+        | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
+        | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
 
 /--
 A stable external label for each complete step transcript of a process.
