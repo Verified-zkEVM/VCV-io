@@ -21,12 +21,12 @@ The `IdenSchemeWithAbort` type parameters instantiate as follows for ML-DSA:
 
 | IdenSchemeWithAbort | ML-DSA meaning |
 |---|---|
-| `S` (statement) | `PublicKey` — `(ρ, t₁)` |
-| `W` (witness) | `SecretKey` — `(ρ, K, tr, s₁, s₂, t₀)` |
-| `W'` (commitment) | `Vector prims.High p.k` — `w₁ = HighBits(Ay)` |
-| `St` (state) | `SigningState` — `(y, w)` retained for the respond phase |
-| `C` (challenge) | `CommitHashBytes p` — the `λ/4`-byte hash `c̃` |
-| `Z` (response) | `RqVec p.l × Vector prims.Hint p.k` — `(z, h)` |
+| `Stmt` (statement) | `PublicKey` — `(ρ, t₁)` |
+| `Wit` (witness) | `SecretKey` — `(ρ, K, tr, s₁, s₂, t₀)` |
+| `Commit` (commitment) | `Vector prims.High p.k` — `w₁ = HighBits(Ay)` |
+| `PrvState` (state) | `SigningState` — `(y, w)` retained for the respond phase |
+| `Chal` (challenge) | `CommitHashBytes p` — the `λ/4`-byte hash `c̃` |
+| `Resp` (response) | `RqVec p.l × Vector prims.Hint p.k` — `(z, h)` |
 
 ## Separation from FIPS 204
 

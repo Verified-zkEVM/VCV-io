@@ -143,7 +143,7 @@ theorem schnorrSignature_complete (g : G) (hg : Function.Bijective (· • g : F
     (M : Type) [DecidableEq M] :
     SignatureAlg.PerfectlyComplete
       (schnorrSignature F G g hg M)
-      (FiatShamir.runtime (PC := G) (Ω := F) M) :=
+      (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (schnorrSigma_complete F G g)
 
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
@@ -159,11 +159,11 @@ theorem schnorrSignature_euf_cma (g : G) (hg : Function.Bijective (· • g : F 
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (schnorrSignature F G g hg M))
     (qBound : ℕ)
-    (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (PC := G) (Ω := F)
+    (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (Commit := G) (Chal := F)
       (oa := adv.main pk) qBound) :
     ∃ reduction : DLogAdversary F G,
-      adv.advantage (FiatShamir.runtime (PC := G) (Ω := F) M) *
-          (adv.advantage (FiatShamir.runtime (PC := G) (Ω := F) M) /
+      adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) *
+          (adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) /
             (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (schnorrSigma F G g) (dlogGenerable g hg) M

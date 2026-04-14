@@ -36,28 +36,29 @@ open OracleSpec OracleComp ENNReal
 
 namespace SigmaProtocol
 
-variable {X W PC SC Ω P : Type} {p : X → W → Bool}
+variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 
 section soundness
 
 /-- Special soundness immediately validates any witness returned by the Σ-protocol extractor from
 two accepting transcripts with the same statement and commitment and with distinct challenges. -/
 theorem extract_sound_of_speciallySoundAt
-    (σ : SigmaProtocol X W PC SC Ω P p) {x : X} (hss : σ.SpeciallySoundAt x)
-    {pc : PC} {ω₁ ω₂ : Ω} {p₁ p₂ : P} (hω : ω₁ ≠ ω₂)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) {x : Stmt}
+    (hss : σ.SpeciallySoundAt x)
+    {pc : Commit} {ω₁ ω₂ : Chal} {p₁ p₂ : Resp} (hω : ω₁ ≠ ω₂)
     (hv₁ : σ.verify x pc ω₁ p₁ = true) (hv₂ : σ.verify x pc ω₂ p₂ = true)
-    {w : W} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
-    p x w = true :=
+    {w : Wit} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
+    rel x w = true :=
   hss pc ω₁ ω₂ p₁ p₂ hω hv₁ hv₂ w hw
 
 /-- Global special soundness is the statement-level uniform version of
 [`SigmaProtocol.extract_sound_of_speciallySoundAt`]. -/
 theorem extract_sound_of_speciallySound
-    (σ : SigmaProtocol X W PC SC Ω P p) (hss : σ.SpeciallySound)
-    {x : X} {pc : PC} {ω₁ ω₂ : Ω} {p₁ p₂ : P} (hω : ω₁ ≠ ω₂)
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) (hss : σ.SpeciallySound)
+    {x : Stmt} {pc : Commit} {ω₁ ω₂ : Chal} {p₁ p₂ : Resp} (hω : ω₁ ≠ ω₂)
     (hv₁ : σ.verify x pc ω₁ p₁ = true) (hv₂ : σ.verify x pc ω₂ p₂ = true)
-    {w : W} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
-    p x w = true :=
+    {w : Wit} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
+    rel x w = true :=
   extract_sound_of_speciallySoundAt σ (hss x) hω hv₁ hv₂ hw
 
 end soundness
