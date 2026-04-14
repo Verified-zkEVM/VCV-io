@@ -3,7 +3,7 @@ Copyright (c) 2026 ArkLib Contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.Concurrent.Interface
+import VCVio.Interaction.UC.Interface
 
 /-!
 # Operations-first open composition
@@ -41,7 +41,7 @@ representation of composite worlds.
 universe u
 
 namespace Interaction
-namespace Concurrent
+namespace UC
 
 /--
 `OpenTheory` is a boundary-indexed algebra of open systems.
@@ -156,7 +156,7 @@ namespace OpenTheory
 This is the first law layer for `OpenTheory`, and the one we can state without
 committing to any further monoidal/coherence structure on boundaries.
 -/
-class IsLawfulMap (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+class IsLawfulMap (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop where
   /--
   Adapting a system along the identity boundary morphism does nothing.
@@ -184,7 +184,7 @@ This is the first structural law for `par` that does not require introducing a
 separate theory of boundary isomorphisms. Associativity and unit laws can be
 added later once that boundary-equivalence vocabulary is in place.
 -/
-class IsLawfulPar (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+class IsLawfulPar (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Mapping a side-by-side composite along a tensor boundary morphism is the same
@@ -210,7 +210,7 @@ Transporting the shared middle boundary itself is a subtler question because
 `PortBoundary.Hom.swap` is contravariant. The corresponding law should be
 stated later using boundary equivalences or a more symmetric vocabulary.
 -/
-class IsLawfulWire (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+class IsLawfulWire (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Partial wiring is natural in its still-exposed outer boundaries.
@@ -241,7 +241,7 @@ boundary adaptation.
 This is the first structural law for `plug`: adapting the open side before
 closure is equivalent to adapting the matching plug on the swapped boundary.
 -/
-class IsLawfulPlug (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+class IsLawfulPlug (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Boundary adaptation may be pushed across a plug by swapping the same
@@ -268,7 +268,7 @@ At this stage it only records:
 Unit, associativity, and symmetry laws for open composition should be added
 later, once the library settles on the right notion of boundary equivalence.
 -/
-class IsLawful (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+class IsLawful (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulPar T, IsLawfulWire T, IsLawfulPlug T
 
 /--
@@ -277,7 +277,7 @@ class IsLawful (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
 These are precisely the systems with no remaining exposed inputs or outputs.
 -/
 abbrev Closed
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
+    (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Type u :=
   T.Obj (PortBoundary.empty)
 
@@ -289,7 +289,7 @@ Such a context exposes the swapped boundary: it accepts what the open system
 emits, and emits what the open system accepts.
 -/
 abbrev Plug
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    (T : _root_.Interaction.UC.OpenTheory.{u})
     (Δ : PortBoundary) : Type u :=
   T.Obj (PortBoundary.swap Δ)
 
@@ -301,7 +301,7 @@ This is just the `plug` operation restated using the helper names `Closed` and
 than the raw swapped-boundary formulation.
 -/
 abbrev close
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    (T : _root_.Interaction.UC.OpenTheory.{u})
     {Δ : PortBoundary} :
     T.Obj Δ →
     T.Plug Δ →
@@ -318,7 +318,7 @@ drop empty boundary fragments once those facts have been expressed as
 `PortBoundary.Equiv`s.
 -/
 abbrev mapEquiv
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    (T : _root_.Interaction.UC.OpenTheory.{u})
     {Δ₁ Δ₂ : PortBoundary} :
     PortBoundary.Equiv Δ₁ Δ₂ →
     T.Obj Δ₁ →
@@ -327,7 +327,7 @@ abbrev mapEquiv
 
 section Laws
 
-variable {T : _root_.Interaction.Concurrent.OpenTheory.{u}}
+variable {T : _root_.Interaction.UC.OpenTheory.{u}}
 
 /--
 Adapting along the identity boundary morphism leaves an open system unchanged.
@@ -499,5 +499,5 @@ end Laws
 
 end OpenTheory
 
-end Concurrent
+end UC
 end Interaction

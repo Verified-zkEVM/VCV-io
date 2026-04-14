@@ -260,10 +260,18 @@ import VCVio.Interaction.Concurrent.Process
 | `Equivalence.lean` | Controller, trace, observational equivalences |
 | `Fairness.lean` | `WeakFair`, `StrongFair`, temporal predicates |
 | `Liveness.lean` | `Safe`, `Satisfies`, `Admissible`, state predicates |
+| `Examples.lean` | Worked examples: profiles, control, execution, policies |
+
+### `UC/`
+
+| File | Purpose |
+|------|---------|
 | `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, tensor/swap |
 | `OpenTheory.lean` | `OpenTheory` algebra (`map`, `par`, `wire`, `plug`) |
 | `OpenSyntax.lean` | `Expr` (tagless-final free model) |
-| `Examples.lean` | Worked examples: profiles, control, execution, policies |
+| `OpenProcess.lean` | `BoundaryAction`, `OpenNodeSemantics`, `OpenProcess` (open-world bridge) |
+| `OpenProcessModel.lean` | `openTheory` (concrete `OpenTheory` backed by `OpenProcess`), `IsLawfulMap` |
+| `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 
 ## In-tree examples
 

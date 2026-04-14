@@ -3,12 +3,12 @@ Copyright (c) 2026 ArkLib Contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.Concurrent.OpenTheory
+import VCVio.Interaction.UC.OpenTheory
 
 /-!
 # A free lawful model of open composition
 
-This module provides the first concrete realization of `Concurrent.OpenTheory`.
+This module provides the first concrete realization of `UC.OpenTheory`.
 
 The design choice is deliberately *final-tagless* rather than quoted.
 
@@ -41,7 +41,7 @@ inspection. Those future semantic models can still be added independently.
 universe u
 
 namespace Interaction
-namespace Concurrent
+namespace UC
 namespace OpenSyntax
 
 /--
@@ -360,5 +360,5 @@ instance lawful
 end Expr
 
 end OpenSyntax
-end Concurrent
+end UC
 end Interaction

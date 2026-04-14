@@ -8,7 +8,7 @@ import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Lens.Basic
 
 /-!
-# Concurrent interfaces and open boundaries
+# UC interfaces and open boundaries
 
 This file introduces the smallest structural layer for open concurrent systems.
 
@@ -68,7 +68,7 @@ re-introducing their own packet/interface vocabulary.
 universe uA uB vA vB wA wB
 
 namespace Interaction
-namespace Concurrent
+namespace UC
 
 /--
 `Interface` is the interaction-facing name for `PFunctor`.
@@ -936,5 +936,5 @@ theorem swap_swap (Δ : PortBoundary) : Δ.swap.swap = Δ := by
 
 end PortBoundary
 
-end Concurrent
+end UC
 end Interaction

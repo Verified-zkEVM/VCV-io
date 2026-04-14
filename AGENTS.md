@@ -101,7 +101,10 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Multiparty local views: `VCVio/Interaction/Multiparty/Core.lean`
 - Concurrent specs and frontiers: `VCVio/Interaction/Concurrent/Spec.lean`, `VCVio/Interaction/Concurrent/Frontier.lean`
 - Concurrent processes and execution: `VCVio/Interaction/Concurrent/Process.lean`
-- Open systems (interfaces, composition): `VCVio/Interaction/Concurrent/OpenTheory.lean`
+- Open systems (interfaces, composition): `VCVio/Interaction/UC/OpenTheory.lean`
+- Open processes (boundary traffic, UC bridge): `VCVio/Interaction/UC/OpenProcess.lean`
+- Concrete open-theory model: `VCVio/Interaction/UC/OpenProcessModel.lean`
+- UC emulation and security: `VCVio/Interaction/UC/Emulates.lean`
 - Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
