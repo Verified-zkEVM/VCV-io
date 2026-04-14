@@ -38,7 +38,7 @@ What matters here is the algebra of open composition, not the concrete
 representation of composite worlds.
 -/
 
-universe u uA uB
+universe u
 
 namespace Interaction
 namespace Concurrent
@@ -86,7 +86,7 @@ structure OpenTheory where
   The boundary is directed: `Δ.In` is what the surrounding context may send
   into the system, and `Δ.Out` is what the system may emit back out.
   -/
-  Obj : PortBoundary.{uA, uB, uA, uB} → Type u
+  Obj : PortBoundary → Type u
 
   /--
   Adapt the exposed boundary of an open system along a structural boundary
@@ -97,7 +97,7 @@ structure OpenTheory where
   interface adaptation `φ`.
   -/
   map :
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}} →
+    {Δ₁ Δ₂ : PortBoundary} →
     PortBoundary.Hom Δ₁ Δ₂ →
     Obj Δ₁ →
     Obj Δ₂
@@ -109,7 +109,7 @@ structure OpenTheory where
   world may interact independently with either side.
   -/
   par :
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}} →
+    {Δ₁ Δ₂ : PortBoundary} →
     Obj Δ₁ →
     Obj Δ₂ →
     Obj (PortBoundary.tensor Δ₁ Δ₂)
@@ -126,7 +126,7 @@ structure OpenTheory where
   incrementally without forcing immediate total closure.
   -/
   wire :
-    {Δ₁ Γ Δ₂ : PortBoundary.{uA, uB, uA, uB}} →
+    {Δ₁ Γ Δ₂ : PortBoundary} →
     Obj (PortBoundary.tensor Δ₁ Γ) →
     Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) →
     Obj (PortBoundary.tensor Δ₁ Δ₂)
@@ -143,10 +143,10 @@ structure OpenTheory where
   later if they are genuinely needed.
   -/
   plug :
-    {Δ : PortBoundary.{uA, uB, uA, uB}} →
+    {Δ : PortBoundary} →
     Obj Δ →
     Obj (PortBoundary.swap Δ) →
-    Obj (PortBoundary.empty.{uA, uB, uA, uB})
+    Obj (PortBoundary.empty)
 
 namespace OpenTheory
 
@@ -156,13 +156,13 @@ namespace OpenTheory
 This is the first law layer for `OpenTheory`, and the one we can state without
 committing to any further monoidal/coherence structure on boundaries.
 -/
-class IsLawfulMap (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+class IsLawfulMap (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Prop where
   /--
   Adapting a system along the identity boundary morphism does nothing.
   -/
   map_id :
-    ∀ {Δ : PortBoundary.{uA, uB, uA, uB}} (W : T.Obj Δ),
+    ∀ {Δ : PortBoundary} (W : T.Obj Δ),
       T.map (PortBoundary.Hom.id Δ) W = W
 
   /--
@@ -170,7 +170,7 @@ class IsLawfulMap (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
   successive steps.
   -/
   map_comp :
-    ∀ {Δ₁ Δ₂ Δ₃ : PortBoundary.{uA, uB, uA, uB}}
+    ∀ {Δ₁ Δ₂ Δ₃ : PortBoundary}
       (g : PortBoundary.Hom Δ₂ Δ₃)
       (f : PortBoundary.Hom Δ₁ Δ₂)
       (W : T.Obj Δ₁),
@@ -184,14 +184,14 @@ This is the first structural law for `par` that does not require introducing a
 separate theory of boundary isomorphisms. Associativity and unit laws can be
 added later once that boundary-equivalence vocabulary is in place.
 -/
-class IsLawfulPar (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+class IsLawfulPar (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Mapping a side-by-side composite along a tensor boundary morphism is the same
   as mapping each side independently before composing them in parallel.
   -/
   map_par :
-    ∀ {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    ∀ {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
       (f₁ : PortBoundary.Hom Δ₁ Δ₁')
       (f₂ : PortBoundary.Hom Δ₂ Δ₂')
       (W₁ : T.Obj Δ₁)
@@ -210,7 +210,7 @@ Transporting the shared middle boundary itself is a subtler question because
 `PortBoundary.Hom.swap` is contravariant. The corresponding law should be
 stated later using boundary equivalences or a more symmetric vocabulary.
 -/
-class IsLawfulWire (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+class IsLawfulWire (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Partial wiring is natural in its still-exposed outer boundaries.
@@ -220,7 +220,7 @@ class IsLawfulWire (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
   still capturing the most important structural behavior of `wire`.
   -/
   map_wire :
-    ∀ {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    ∀ {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
       (f₁ : PortBoundary.Hom Δ₁ Δ₁')
       (f₂ : PortBoundary.Hom Δ₂ Δ₂')
       (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
@@ -241,14 +241,14 @@ boundary adaptation.
 This is the first structural law for `plug`: adapting the open side before
 closure is equivalent to adapting the matching plug on the swapped boundary.
 -/
-class IsLawfulPlug (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+class IsLawfulPlug (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Prop extends IsLawfulMap T where
   /--
   Boundary adaptation may be pushed across a plug by swapping the same
   adaptation onto the context side.
   -/
   map_plug :
-    ∀ {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    ∀ {Δ₁ Δ₂ : PortBoundary}
       (f : PortBoundary.Hom Δ₁ Δ₂)
       (W : T.Obj Δ₁)
       (K : T.Obj (PortBoundary.swap Δ₂)),
@@ -268,7 +268,7 @@ At this stage it only records:
 Unit, associativity, and symmetry laws for open composition should be added
 later, once the library settles on the right notion of boundary equivalence.
 -/
-class IsLawful (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+class IsLawful (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Prop extends IsLawfulPar T, IsLawfulWire T, IsLawfulPlug T
 
 /--
@@ -277,9 +277,9 @@ class IsLawful (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
 These are precisely the systems with no remaining exposed inputs or outputs.
 -/
 abbrev Closed
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}) :
+    (T : _root_.Interaction.Concurrent.OpenTheory.{u}) :
     Type u :=
-  T.Obj (PortBoundary.empty.{uA, uB, uA, uB})
+  T.Obj (PortBoundary.empty)
 
 /--
 `Plug T Δ` is the type of contexts that can close a `Δ`-shaped open system in
@@ -289,8 +289,8 @@ Such a context exposes the swapped boundary: it accepts what the open system
 emits, and emits what the open system accepts.
 -/
 abbrev Plug
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB})
-    (Δ : PortBoundary.{uA, uB, uA, uB}) : Type u :=
+    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    (Δ : PortBoundary) : Type u :=
   T.Obj (PortBoundary.swap Δ)
 
 /--
@@ -301,8 +301,8 @@ This is just the `plug` operation restated using the helper names `Closed` and
 than the raw swapped-boundary formulation.
 -/
 abbrev close
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB})
-    {Δ : PortBoundary.{uA, uB, uA, uB}} :
+    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    {Δ : PortBoundary} :
     T.Obj Δ →
     T.Plug Δ →
     T.Closed :=
@@ -318,8 +318,8 @@ drop empty boundary fragments once those facts have been expressed as
 `PortBoundary.Equiv`s.
 -/
 abbrev mapEquiv
-    (T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB})
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}} :
+    (T : _root_.Interaction.Concurrent.OpenTheory.{u})
+    {Δ₁ Δ₂ : PortBoundary} :
     PortBoundary.Equiv Δ₁ Δ₂ →
     T.Obj Δ₁ →
     T.Obj Δ₂ :=
@@ -327,7 +327,7 @@ abbrev mapEquiv
 
 section Laws
 
-variable {T : _root_.Interaction.Concurrent.OpenTheory.{u, uA, uB}}
+variable {T : _root_.Interaction.Concurrent.OpenTheory.{u}}
 
 /--
 Adapting along the identity boundary morphism leaves an open system unchanged.
@@ -335,7 +335,7 @@ Adapting along the identity boundary morphism leaves an open system unchanged.
 @[simp]
 theorem map_id
     [IsLawfulMap T]
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ : PortBoundary}
     (W : T.Obj Δ) :
     T.map (PortBoundary.Hom.id Δ) W = W :=
   IsLawfulMap.map_id W
@@ -346,7 +346,7 @@ successive steps.
 -/
 theorem map_comp
     [IsLawfulMap T]
-    {Δ₁ Δ₂ Δ₃ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₂ Δ₃ : PortBoundary}
     (g : PortBoundary.Hom Δ₂ Δ₃)
     (f : PortBoundary.Hom Δ₁ Δ₂)
     (W : T.Obj Δ₁) :
@@ -359,7 +359,7 @@ Mapping along the identity boundary equivalence does nothing.
 @[simp]
 theorem mapEquiv_refl
     [IsLawfulMap T]
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ : PortBoundary}
     (W : T.Obj Δ) :
     T.mapEquiv (PortBoundary.Equiv.refl Δ) W = W :=
   map_id (T := T) (Δ := Δ) W
@@ -370,7 +370,7 @@ successive equivalence-guided steps.
 -/
 theorem mapEquiv_trans
     [IsLawfulMap T]
-    {Δ₁ Δ₂ Δ₃ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₂ Δ₃ : PortBoundary}
     (e₁ : PortBoundary.Equiv Δ₁ Δ₂)
     (e₂ : PortBoundary.Equiv Δ₂ Δ₃)
     (W : T.Obj Δ₁) :
@@ -382,7 +382,7 @@ theorem mapEquiv_trans
 /-- Parallel composition is natural with respect to boundary adaptation. -/
 theorem map_par
     [IsLawfulPar T]
-    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
     (f₁ : PortBoundary.Hom Δ₁ Δ₁')
     (f₂ : PortBoundary.Hom Δ₂ Δ₂')
     (W₁ : T.Obj Δ₁)
@@ -399,7 +399,7 @@ the left and right boundaries may be pushed inside `par`.
 -/
 theorem mapEquiv_par
     [IsLawfulPar T]
-    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
     (e₁ : PortBoundary.Equiv Δ₁ Δ₁')
     (e₂ : PortBoundary.Equiv Δ₂ Δ₂')
     (W₁ : T.Obj Δ₁)
@@ -414,7 +414,7 @@ Partial wiring is natural with respect to boundary adaptation.
 -/
 theorem map_wire
     [IsLawfulWire T]
-    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
     (f₁ : PortBoundary.Hom Δ₁ Δ₁')
     (f₂ : PortBoundary.Hom Δ₂ Δ₂')
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
@@ -440,7 +440,7 @@ primitive kernel of `OpenTheory`.
 -/
 theorem mapEquiv_wire
     [IsLawfulWire T]
-    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
     (e₁ : PortBoundary.Equiv Δ₁ Δ₁')
     (e₂ : PortBoundary.Equiv Δ₂ Δ₂')
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
@@ -463,7 +463,7 @@ Plugging is natural with respect to boundary adaptation.
 -/
 theorem map_plug
     [IsLawfulPlug T]
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₂ : PortBoundary}
     (f : PortBoundary.Hom Δ₁ Δ₂)
     (W : T.Obj Δ₁)
     (K : T.Obj (PortBoundary.swap Δ₂)) :
@@ -486,7 +486,7 @@ through a second equivalence wrapper.
 -/
 theorem mapEquiv_plug
     [IsLawfulPlug T]
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Δ₁ Δ₂ : PortBoundary}
     (e : PortBoundary.Equiv Δ₁ Δ₂)
     (W : T.Obj Δ₁)
     (K : T.Obj (PortBoundary.swap Δ₂)) :

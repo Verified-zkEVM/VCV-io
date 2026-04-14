@@ -417,8 +417,7 @@ example : Process.Run.initial trueRun = PUnit.unit := rfl
 example :
     Process.Run.ticketsUpTo loopTicketed.ticket trueRun 3 = [true, true, true] := by
   simp only [ProcessOver.Run.ticketsUpTo_succ, ProcessOver.Run.ticketsUpTo_zero,
-    List.cons.injEq, and_true]
-  exact ⟨rfl, ⟨rfl, rfl⟩⟩
+    ProcessOver.Run.ticket, ProcessOver.Run.tail, loopTicketed, trueRun]
 
 example :
     (Observation.Process.Run.observationsUpTo Party.adv trueRun 2).length = 2 := rfl

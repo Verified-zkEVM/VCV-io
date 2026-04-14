@@ -758,6 +758,7 @@ theorem tensor_comp
   cases g₁
   cases g₂
   simp [tensor, comp, Interface.Hom.sum_comp]
+  exact ⟨rfl, rfl⟩
 
 @[simp]
 theorem swap_id
@@ -866,8 +867,8 @@ theorem toHom_tensorCongr
     (e₁ : Equiv Δ₁ Δ₁') (e₂ : Equiv Δ₂ Δ₂') :
     (tensorCongr e₁ e₂).toHom = PortBoundary.Hom.tensor e₁.toHom e₂.toHom := by
   apply PortBoundary.Hom.ext
-  · simp [tensorCongr, PortBoundary.Hom.tensor]
-  · simp [tensorCongr, PortBoundary.Hom.tensor]
+  · exact Interface.Equiv.toHom_sumCongr e₁.onIn e₂.onIn
+  · exact Interface.Equiv.toHom_sumCongr e₁.onOut e₂.onOut
 
 /--
 Swapping the direction of boundaries preserves equivalence.

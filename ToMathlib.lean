@@ -2,6 +2,7 @@ import ToMathlib.Control.AlternativeMonad
 import ToMathlib.Control.Comonad.Basic
 import ToMathlib.Control.Comonad.Cofree
 import ToMathlib.Control.Comonad.Instances
+import ToMathlib.Control.Lawful.Basic
 import ToMathlib.Control.Lawful.MonadControl
 import ToMathlib.Control.Lawful.MonadFunctor
 import ToMathlib.Control.Lawful.MonadReader

@@ -38,7 +38,7 @@ representation we would use later for runtime execution or graph-like
 inspection. Those future semantic models can still be added independently.
 -/
 
-universe u uA uB
+universe u
 
 namespace Interaction
 namespace Concurrent
@@ -51,14 +51,12 @@ Unlike the fully polymorphic `PortBoundary` definition, this local alias fixes
 one shared pair of port/message universes, matching the current `OpenTheory`
 regime.
 -/
-abbrev Boundary : Type (max (uA + 1) (uB + 1)) :=
-  PortBoundary.{uA, uB, uA, uB}
+abbrev Boundary := PortBoundary
 
 /--
 The empty boundary in the ambient universe regime of this free model.
 -/
-abbrev empty : Boundary :=
-  PortBoundary.empty.{uA, uB, uA, uB}
+abbrev empty : Boundary := PortBoundary.empty
 
 /--
 Swap the direction of an ambient-universe boundary.
@@ -91,8 +89,8 @@ It validates the `OpenTheory` surface without forcing a raw syntax
 representation at this stage.
 -/
 structure Expr
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u)
-    (Δ : PortBoundary.{uA, uB, uA, uB}) where
+    (Atom : PortBoundary → Type u)
+    (Δ : PortBoundary) where
   /--
   Interpret the free expression in an arbitrary lawful target open theory.
 
@@ -101,9 +99,9 @@ structure Expr
   system of boundary `Δ`.
   -/
   run :
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB}) →
+    (T : OpenTheory.{max (u + 1) 3}) →
     OpenTheory.IsLawful T →
-    (∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) →
+    (∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) →
     T.Obj Δ
 
 namespace Expr
@@ -117,12 +115,12 @@ client code: a free expression is something that can be *interpreted* once an
 atom interpretation has been chosen.
 -/
 abbrev interpret
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary}
     (W : Expr Atom Δ)
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     T.Obj Δ :=
   W.run T hT interp
 
@@ -132,13 +130,13 @@ lawful target theory.
 -/
 @[ext]
 theorem ext
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary}
     {W₁ W₂ : Expr Atom Δ}
     (h :
-      ∀ (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+      ∀ (T : OpenTheory.{max (u + 1) 3})
         (hT : OpenTheory.IsLawful T)
-        (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ),
+        (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ),
           W₁.run T hT interp = W₂.run T hT interp) :
     W₁ = W₂ := by
   cases W₁
@@ -152,19 +150,19 @@ theorem ext
 Inject a primitive open component into the free lawful syntax.
 -/
 def atom
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}} :
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary} :
     Atom Δ → Expr Atom Δ
   | a => ⟨fun _ _ interp => interp a⟩
 
 @[simp]
 theorem interpret_atom
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary}
     (a : Atom Δ)
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (atom a).interpret T hT interp = interp a :=
   rfl
 
@@ -172,21 +170,21 @@ theorem interpret_atom
 Adapt the exposed boundary of a free open-system expression.
 -/
 def map
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Δ₂ : PortBoundary}
     (f : PortBoundary.Hom Δ₁ Δ₂) :
     Expr Atom Δ₁ → Expr Atom Δ₂
   | W => ⟨fun T hT interp => T.map f (W.run T hT interp)⟩
 
 @[simp]
 theorem interpret_map
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Δ₂ : PortBoundary}
     (f : PortBoundary.Hom Δ₁ Δ₂)
     (W : Expr Atom Δ₁)
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (map f W).interpret T hT interp = T.map f (W.interpret T hT interp) :=
   rfl
 
@@ -194,8 +192,8 @@ theorem interpret_map
 Place two free open-system expressions side by side.
 -/
 def par
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}} :
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Δ₂ : PortBoundary} :
     Expr Atom Δ₁ →
     Expr Atom Δ₂ →
     Expr Atom (PortBoundary.tensor Δ₁ Δ₂)
@@ -203,13 +201,13 @@ def par
 
 @[simp]
 theorem interpret_par
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Δ₂ : PortBoundary}
     (W₁ : Expr Atom Δ₁)
     (W₂ : Expr Atom Δ₂)
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (par W₁ W₂).interpret T hT interp =
       T.par (W₁.interpret T hT interp) (W₂.interpret T hT interp) :=
   rfl
@@ -218,8 +216,8 @@ theorem interpret_par
 Connect one shared boundary between two free open-system expressions.
 -/
 def wire
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Γ Δ₂ : PortBoundary.{uA, uB, uA, uB}} :
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Γ Δ₂ : PortBoundary} :
     Expr Atom (PortBoundary.tensor Δ₁ Γ) →
     Expr Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) →
     Expr Atom (PortBoundary.tensor Δ₁ Δ₂)
@@ -227,13 +225,13 @@ def wire
 
 @[simp]
 theorem interpret_wire
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ₁ Γ Δ₂ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ₁ Γ Δ₂ : PortBoundary}
     (W₁ : Expr Atom (PortBoundary.tensor Δ₁ Γ))
     (W₂ : Expr Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (wire W₁ W₂).interpret T hT interp =
       T.wire (W₁.interpret T hT interp) (W₂.interpret T hT interp) :=
   rfl
@@ -242,22 +240,22 @@ theorem interpret_wire
 Close a free open-system expression against a matching context.
 -/
 def plug
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}} :
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary} :
     Expr Atom Δ →
     Expr Atom (PortBoundary.swap Δ) →
-    Expr Atom (PortBoundary.empty.{uA, uB, uA, uB})
+    Expr Atom (PortBoundary.empty)
   | W, K => ⟨fun T hT interp => T.plug (W.run T hT interp) (K.run T hT interp)⟩
 
 @[simp]
 theorem interpret_plug
-    {Atom : PortBoundary.{uA, uB, uA, uB} → Type u}
-    {Δ : PortBoundary.{uA, uB, uA, uB}}
+    {Atom : PortBoundary → Type u}
+    {Δ : PortBoundary}
     (W : Expr Atom Δ)
     (K : Expr Atom (PortBoundary.swap Δ))
-    (T : OpenTheory.{max (u + 1) (uA + 2) (uB + 2), uA, uB})
+    (T : OpenTheory.{max (u + 1) 3})
     (hT : OpenTheory.IsLawful T)
-    (interp : ∀ {Δ : PortBoundary.{uA, uB, uA, uB}}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (plug W K).interpret T hT interp =
       T.plug (W.interpret T hT interp) (K.interpret T hT interp) :=
   rfl
@@ -266,8 +264,8 @@ theorem interpret_plug
 The free lawful `OpenTheory` generated by primitive components `Atom`.
 -/
 abbrev theory
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
-    OpenTheory.{max (u + 2) (uA + 3) (uB + 3), uA, uB} where
+    (Atom : PortBoundary → Type u) :
+    OpenTheory.{max (u + 2) 4} where
   Obj := Expr Atom
   map := Expr.map
   par := Expr.par
@@ -275,7 +273,7 @@ abbrev theory
   plug := Expr.plug
 
 instance lawfulMap
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
+    (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawfulMap (theory Atom) where
   map_id := by
     intro Δ W
@@ -284,8 +282,7 @@ instance lawfulMap
     refine Expr.ext ?_
     intro T hT interp
     let _ : OpenTheory.IsLawful T := hT
-    simpa [Expr.map] using
-      OpenTheory.map_id (T := T) (W := W.run T hT interp)
+    simp [Expr.map]
   map_comp := by
     intro Δ₁ Δ₂ Δ₃ g f W
     change Expr Atom Δ₁ at W
@@ -297,7 +294,7 @@ instance lawfulMap
       OpenTheory.map_comp (T := T) g f (W.run T hT interp)
 
 instance lawfulPar
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
+    (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawfulPar (theory Atom) where
   map_id := OpenTheory.IsLawfulMap.map_id (T := theory Atom)
   map_comp := OpenTheory.IsLawfulMap.map_comp (T := theory Atom)
@@ -315,7 +312,7 @@ instance lawfulPar
       OpenTheory.map_par (T := T) f₁ f₂ (W₁.run T hT interp) (W₂.run T hT interp)
 
 instance lawfulWire
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
+    (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawfulWire (theory Atom) where
   map_id := OpenTheory.IsLawfulMap.map_id (T := theory Atom)
   map_comp := OpenTheory.IsLawfulMap.map_comp (T := theory Atom)
@@ -339,7 +336,7 @@ instance lawfulWire
       OpenTheory.map_wire (T := T) f₁ f₂ (W₁.run T hT interp) (W₂.run T hT interp)
 
 instance lawfulPlug
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
+    (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawfulPlug (theory Atom) where
   map_id := OpenTheory.IsLawfulMap.map_id (T := theory Atom)
   map_comp := OpenTheory.IsLawfulMap.map_comp (T := theory Atom)
@@ -357,7 +354,7 @@ instance lawfulPlug
       OpenTheory.map_plug (T := T) f (W.run T hT interp) (K.run T hT interp)
 
 instance lawful
-    (Atom : PortBoundary.{uA, uB, uA, uB} → Type u) :
+    (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawful (theory Atom) where
 
 end Expr

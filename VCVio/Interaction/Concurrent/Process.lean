@@ -241,7 +241,7 @@ end TranscriptRel
 for each complete step transcript.
 -/
 structure Labeled (Γ : Interaction.Spec.Node.Context.{w, w₂}) where
-  toProcess : ProcessOver Γ
+  toProcess : ProcessOver.{v, w, w₂} Γ
   Event : Type w₃
   event : toProcess.EventMap Event
 
@@ -253,7 +253,7 @@ These tickets are the obligation identifiers used by the fairness and liveness
 layers.
 -/
 structure Ticketed (Γ : Interaction.Spec.Node.Context.{w, w₂}) where
-  toProcess : ProcessOver Γ
+  toProcess : ProcessOver.{v, w, w₂} Γ
   Ticket : Type w₃
   ticket : toProcess.Tickets Ticket
 
