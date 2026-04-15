@@ -264,15 +264,13 @@ theorem cipherGivenMsg_uniform_of_uniformKey_of_uniqueKey
   calc
     ∑' k : K, Pr[= k | keyExp] * Pr[= σ | encExp k] =
         Pr[= k0 | keyExp] * Pr[= σ | encExp k0] := by
-          refine (tsum_eq_single k0 ?_).trans ?_
-          · intro k hkne
+          exact tsum_eq_single k0 fun k hkne => by
             by_cases hkKey : k ∈ support keyExp
             · have hkEnc : σ ∉ support (encExp k) := by
                 intro hkEnc'
                 exact hkne <| hk0uniq k ⟨hkKey, hkEnc'⟩
               simp [probOutput_eq_zero_of_not_mem_support hkEnc]
             · simp [probOutput_eq_zero_of_not_mem_support hkKey]
-          · simp
     _ = invK := by
         have hk0_uniform : Pr[= k0 | keyExp] = invK := hKeyUniform k0
         simp [hk0_uniform, henc_one]

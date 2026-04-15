@@ -141,7 +141,7 @@ def runObs (base : QueryImpl spec m) (encode : Ev → ω)
 
 @[simp]
 lemma runObs_pure (base : QueryImpl spec m) (encode : Ev → ω) (x : α) :
-    runObs (Ev := Ev) base encode (pure x) = pure (x, 1) := by
+    runObs base encode (pure x) = pure (x, 1) := by
   simp [runObs]
 
 /-- Erasure theorem: projecting away the observation trace recovers the erased computation. -/

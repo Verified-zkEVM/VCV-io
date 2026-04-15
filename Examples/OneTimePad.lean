@@ -76,8 +76,7 @@ lemma perfectSecrecyAt (sp : ℕ) : (oneTimePad sp).perfectSecrecyAt := by
           rw [probOutput_cipher_uniform]
 
 /-- The one-time pad is perfectly secret for all security parameters. -/
-lemma perfectSecrecy : ∀ sp, (oneTimePad sp).perfectSecrecyAt :=
-  fun sp => perfectSecrecyAt sp
+lemma perfectSecrecy : ∀ sp, (oneTimePad sp).perfectSecrecyAt := perfectSecrecyAt
 
 /-! ### Relational proof of ciphertext uniformity
 

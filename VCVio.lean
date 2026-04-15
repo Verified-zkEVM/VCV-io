@@ -151,9 +151,9 @@ import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
+import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
-import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
