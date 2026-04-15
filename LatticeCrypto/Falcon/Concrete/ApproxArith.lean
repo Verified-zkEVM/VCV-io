@@ -78,14 +78,26 @@ theorem add_result_bounds (a b : F) :
     (1 - ε) * |self.interp a + self.interp b| ≤ |self.interp (FloatLike.add a b)| ∧
     |self.interp (FloatLike.add a b)| ≤
       (1 + ε) * |self.interp a + self.interp b| := by
-  sorry
+  have herr := self.add_error a b
+  constructor
+  · linarith [abs_sub_abs_le_abs_sub (self.interp a + self.interp b)
+      (self.interp (FloatLike.add a b)),
+      abs_sub_comm (self.interp a + self.interp b) (self.interp (FloatLike.add a b))]
+  · linarith [abs_sub_abs_le_abs_sub (self.interp (FloatLike.add a b))
+      (self.interp a + self.interp b)]
 
 /-- The result of a multiplication lies in `[(1-ε)(a·b), (1+ε)(a·b)]`. -/
 theorem mul_result_bounds (a b : F) :
     (1 - ε) * |self.interp a * self.interp b| ≤ |self.interp (FloatLike.mul a b)| ∧
     |self.interp (FloatLike.mul a b)| ≤
       (1 + ε) * |self.interp a * self.interp b| := by
-  sorry
+  have herr := self.mul_error a b
+  constructor
+  · linarith [abs_sub_abs_le_abs_sub (self.interp a * self.interp b)
+      (self.interp (FloatLike.mul a b)),
+      abs_sub_comm (self.interp a * self.interp b) (self.interp (FloatLike.mul a b))]
+  · linarith [abs_sub_abs_le_abs_sub (self.interp (FloatLike.mul a b))
+      (self.interp a * self.interp b)]
 
 /-! ### Compound Expression Error Bounds -/
 
@@ -96,7 +108,30 @@ theorem compound_add_mul_error (a b c d : F) :
       (self.interp a * self.interp b + self.interp c * self.interp d)| ≤
     (3 * ε + 3 * ε ^ 2 + ε ^ 3) *
       (|self.interp a * self.interp b| + |self.interp c * self.interp d|) := by
-  sorry
+  have h_mul_ab := self.mul_error a b
+  have h_mul_cd := self.mul_error c d
+  have h_add := self.add_error (FloatLike.mul a b) (FloatLike.mul c d)
+  have h_mul_ab_ub := (self.mul_result_bounds a b).2
+  have h_mul_cd_ub := (self.mul_result_bounds c d).2
+  have hε := self.ε_nonneg
+  set u := self.interp (FloatLike.mul a b) with hu
+  set v := self.interp (FloatLike.mul c d) with hv
+  set r := self.interp (FloatLike.add (FloatLike.mul a b) (FloatLike.mul c d)) with hr
+  set ab := self.interp a * self.interp b with hab
+  set cd := self.interp c * self.interp d with hcd
+  have h_eq : r - (ab + cd) = (r - (u + v)) + ((u - ab) + (v - cd)) := by ring
+  have h_tri : |r - (ab + cd)| ≤ |r - (u + v)| + |u - ab| + |v - cd| := by
+    rw [h_eq]; linarith [abs_add_le (r - (u + v)) ((u - ab) + (v - cd)),
+      abs_add_le (u - ab) (v - cd)]
+  have h_abs_ub : |u + v| ≤ (1 + ε) * |ab| + (1 + ε) * |cd| := by
+    linarith [abs_add_le u v]
+  have h_mid : |r - (ab + cd)| ≤ (2 * ε + ε ^ 2) * (|ab| + |cd|) := by
+    have := calc ε * |u + v| + ε * |ab| + ε * |cd|
+        ≤ ε * ((1 + ε) * |ab| + (1 + ε) * |cd|) + ε * |ab| + ε * |cd| := by nlinarith
+      _ = (2 * ε + ε ^ 2) * (|ab| + |cd|) := by ring
+    linarith
+  nlinarith [mul_nonneg hε (add_nonneg (abs_nonneg ab) (abs_nonneg cd)),
+    mul_nonneg (mul_nonneg hε hε) (add_nonneg (abs_nonneg ab) (abs_nonneg cd))]
 
 /-- Error bound for a Horner evaluation step `a * x + b`: the accumulated error is at
 most `2ε + ε²` relative to the exact value. -/
@@ -105,7 +140,25 @@ theorem horner_step_error (a x b : F) :
       (self.interp a * self.interp x + self.interp b)| ≤
     (2 * ε + ε ^ 2) *
       (|self.interp a * self.interp x| + |self.interp b|) := by
-  sorry
+  have h_mul := self.mul_error a x
+  have h_add := self.add_error (FloatLike.mul a x) b
+  have h_mul_ub := (self.mul_result_bounds a x).2
+  have hε := self.ε_nonneg
+  have h_tri : |self.interp (FloatLike.add (FloatLike.mul a x) b) -
+      (self.interp a * self.interp x + self.interp b)| ≤
+      |self.interp (FloatLike.add (FloatLike.mul a x) b) -
+        (self.interp (FloatLike.mul a x) + self.interp b)| +
+      |self.interp (FloatLike.mul a x) - self.interp a * self.interp x| := by
+    calc _ = |(self.interp (FloatLike.add (FloatLike.mul a x) b) -
+              (self.interp (FloatLike.mul a x) + self.interp b)) +
+              (self.interp (FloatLike.mul a x) - self.interp a * self.interp x)| := by
+            ring_nf
+      _ ≤ _ := abs_add_le _ _
+  have h_abs_ub : |self.interp (FloatLike.mul a x) + self.interp b| ≤
+      (1 + ε) * |self.interp a * self.interp x| + |self.interp b| := by
+    linarith [abs_add_le (self.interp (FloatLike.mul a x)) (self.interp b)]
+  nlinarith [abs_nonneg (self.interp a * self.interp x),
+    abs_nonneg (self.interp b)]
 
 /-- Error bound for one FFT butterfly step: given `a, b` and twiddle factor `w`,
 the output `a + w·b` has accumulated error at most `2ε + ε²`. -/
@@ -114,14 +167,57 @@ theorem butterfly_add_error (a b w : F) :
       (self.interp a + self.interp w * self.interp b)| ≤
     (2 * ε + ε ^ 2) *
       (|self.interp a| + |self.interp w * self.interp b|) := by
-  sorry
+  have h_mul := self.mul_error w b
+  have h_add := self.add_error a (FloatLike.mul w b)
+  have h_mul_ub := (self.mul_result_bounds w b).2
+  have hε := self.ε_nonneg
+  have h_tri : |self.interp (FloatLike.add a (FloatLike.mul w b)) -
+      (self.interp a + self.interp w * self.interp b)| ≤
+      |self.interp (FloatLike.add a (FloatLike.mul w b)) -
+        (self.interp a + self.interp (FloatLike.mul w b))| +
+      |self.interp (FloatLike.mul w b) - self.interp w * self.interp b| := by
+    calc _ = |(self.interp (FloatLike.add a (FloatLike.mul w b)) -
+              (self.interp a + self.interp (FloatLike.mul w b))) +
+              (self.interp (FloatLike.mul w b) - self.interp w * self.interp b)| := by
+            ring_nf
+      _ ≤ _ := abs_add_le _ _
+  have h_abs_ub : |self.interp a + self.interp (FloatLike.mul w b)| ≤
+      |self.interp a| + (1 + ε) * |self.interp w * self.interp b| := by
+    linarith [abs_add_le (self.interp a) (self.interp (FloatLike.mul w b))]
+  nlinarith [abs_nonneg (self.interp a), abs_nonneg (self.interp w * self.interp b)]
 
 theorem butterfly_sub_error (a b w : F) :
     |self.interp (FloatLike.sub a (FloatLike.mul w b)) -
       (self.interp a - self.interp w * self.interp b)| ≤
     (2 * ε + ε ^ 2) *
       (|self.interp a| + |self.interp w * self.interp b|) := by
-  sorry
+  have h_mul := self.mul_error w b
+  have h_sub := self.sub_error a (FloatLike.mul w b)
+  have h_mul_ub := (self.mul_result_bounds w b).2
+  have hε := self.ε_nonneg
+  have h_tri : |self.interp (FloatLike.sub a (FloatLike.mul w b)) -
+      (self.interp a - self.interp w * self.interp b)| ≤
+      |self.interp (FloatLike.sub a (FloatLike.mul w b)) -
+        (self.interp a - self.interp (FloatLike.mul w b))| +
+      |self.interp (FloatLike.mul w b) - self.interp w * self.interp b| := by
+    calc _ = |(self.interp (FloatLike.sub a (FloatLike.mul w b)) -
+              (self.interp a - self.interp (FloatLike.mul w b))) +
+              (-(self.interp (FloatLike.mul w b) - self.interp w * self.interp b))| := by
+            ring_nf
+      _ ≤ |self.interp (FloatLike.sub a (FloatLike.mul w b)) -
+            (self.interp a - self.interp (FloatLike.mul w b))| +
+          |-(self.interp (FloatLike.mul w b) - self.interp w * self.interp b)| :=
+            abs_add_le _ _
+      _ = _ := by rw [abs_neg]
+  have h_abs_ub : |self.interp a - self.interp (FloatLike.mul w b)| ≤
+      |self.interp a| + (1 + ε) * |self.interp w * self.interp b| := by
+    have h1 : |self.interp a - self.interp (FloatLike.mul w b)| ≤
+        |self.interp a| + |self.interp (FloatLike.mul w b)| := by
+      rw [show self.interp a - self.interp (FloatLike.mul w b) =
+        self.interp a + (-self.interp (FloatLike.mul w b)) from sub_eq_add_neg _ _]
+      exact le_trans (abs_add_le _ _) (by rw [abs_neg])
+    linarith
+  nlinarith [abs_nonneg (self.interp a), abs_nonneg (self.interp w * self.interp b)]
 
 end HasRealSemantics
 
@@ -143,7 +239,20 @@ open Falcon.Concrete.FPR in
 /-- FPR satisfies `HasRealSemantics` with machine epsilon `2^{-52}`.
 
 The `interp` denotation is `FPRBridge.toReal` (IEEE-754 bit interpretation).
-The per-operation error bounds come from `FPRBridge.lean`. -/
+The per-operation error bounds come from `FPRBridge.lean`.
+
+**Not provable as stated.** The four `sorry` fields (`interp_zero`, `interp_one`, `neg_exact`,
+`sub_error`) require reasoning about `FPRBridge.toReal`, which is defined via
+`Float.ofBits` and `Float.toRat0`. Both are opaque to the Lean kernel:
+
+- `Float.ofBits : UInt64 → Float` is an `extern` call into the runtime.
+- `Float.toRat0 : Float → Rat` roundtrips through hardware floats.
+
+To discharge these obligations we would need either:
+1. An axiomatized IEEE-754 model (`axiom float_ofBits_zero : Float.ofBits 0 = ...`), or
+2. A verified pure-Lean IEEE-754 decoder that replaces the opaque `Float` path.
+
+Until then, these remain axiomatic trust assumptions about the FPR encoding. -/
 instance : FloatLike.HasRealSemantics FPR ieee754_machineEpsilon where
   interp := Falcon.Concrete.FPRBridge.toReal
   ε_nonneg := le_of_lt ieee754_machineEpsilon_pos

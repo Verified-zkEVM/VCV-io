@@ -112,6 +112,13 @@ output `x`, `Pr[= x | my] ≥ Pr[= x | mx]^{a/(a-1)} / R`. -/
 theorem probOutput_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (mx my : m α)
     (R : ℝ≥0∞) (hR : renyiDiv a mx my ≤ R) (x : α) :
     Pr[= x | mx] ^ (a / (a - 1) : ℝ) / R ≤ Pr[= x | my] := by
-  sorry
+  simp only [probOutput, renyiDiv, SPMF.renyiDiv] at *
+  rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some]
+  calc ((evalDist mx).toPMF (some x)) ^ (a / (a - 1) : ℝ) / R
+      ≤ ((evalDist mx).toPMF (some x)) ^ (a / (a - 1) : ℝ) /
+          ((evalDist mx).toPMF.renyiDiv a (evalDist my).toPMF) :=
+        ENNReal.div_le_div_left hR _
+    _ ≤ (evalDist my).toPMF (some x) :=
+        PMF.renyiDiv_apply_bound a ha _ _ _
 
 end monadic
