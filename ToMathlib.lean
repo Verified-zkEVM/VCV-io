@@ -1,4 +1,5 @@
 import ToMathlib.Control.AlternativeMonad
+import ToMathlib.Control.Coalgebra
 import ToMathlib.Control.Comonad.Basic
 import ToMathlib.Control.Comonad.Cofree
 import ToMathlib.Control.Comonad.Instances
