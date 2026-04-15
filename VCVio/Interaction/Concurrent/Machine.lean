@@ -67,6 +67,7 @@ instance : Functor Machine.StepFun.{u, v} where
 instance : LawfulFunctor Machine.StepFun.{u, v} where
   id_map := fun ⟨_, _⟩ => rfl
   comp_map := fun _ _ ⟨_, _⟩ => rfl
+  map_const := rfl
 
 /-- Every `Machine` is an F-coalgebra for `Machine.StepFun`. -/
 instance (m : Machine.{u, v}) : Coalg Machine.StepFun m.State :=
