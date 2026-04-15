@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Mathlib.Data.FunLike.Basic
 
 /-!
 # F-coalgebras
@@ -69,12 +70,13 @@ namespace Coalg.Hom
 variable {F : Type u → Type v} [Functor F]
 variable {S₁ S₂ S₃ : Type u} [Coalg F S₁] [Coalg F S₂] [Coalg F S₃]
 
-instance : CoeFun (Coalg.Hom F S₁ S₂) (fun _ => S₁ → S₂) where
+instance : FunLike (Coalg.Hom F S₁ S₂) S₁ S₂ where
   coe := Coalg.Hom.toFun
+  coe_injective' f g h := by cases f; cases g; congr
 
 @[ext]
-theorem ext {f g : Coalg.Hom F S₁ S₂} (h : ∀ x, f x = g x) : f = g := by
-  cases f; cases g; congr; funext x; exact h x
+theorem ext {f g : Coalg.Hom F S₁ S₂} (h : ∀ x, f x = g x) : f = g :=
+  DFunLike.ext f g h
 
 variable [LawfulFunctor F]
 

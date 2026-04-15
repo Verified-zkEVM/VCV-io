@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.Interaction.UC.Notation
 import VCVioWidgets.OpenSyntax.Render
 import VCVioWidgets.OpenSyntax.Panel
 import VCVioWidgets.OpenSyntax.TreePanel
@@ -42,14 +43,14 @@ open Interaction.UC.OpenSyntax
 private abbrev bd : PortBoundary :=
   ⟨⟨Unit, fun _ => Unit⟩, ⟨Unit, fun _ => Unit⟩⟩
 
-private abbrev bd2 : PortBoundary := PortBoundary.tensor bd bd
+private abbrev bd2 : PortBoundary := bd ⊗ᵇ bd
 
 /--
 Protocol components for a DH key exchange in the UC paradigm.
 
 Each atom represents a functional block with a typed boundary.
 The communication structure emerges from the composition operators
-(`par`, `wire`, `plug`) applied to these atoms.
+(`∥`, `⊞`, `⊠`) applied to these atoms.
 -/
 inductive DHAtom : PortBoundary → Type where
   -- Protocol parties
@@ -84,7 +85,7 @@ private def renderDHAtom : ∀ {Δ : PortBoundary}, DHAtom Δ → String
 /-- Two directional channels running in parallel: Alice→Bob ∥ Bob→Alice. -/
 @[show_composition]
 def channels : Raw DHAtom bd2 :=
-  .par (.atom .channelAtoB) (.atom .channelBtoA)
+  .atom .channelAtoB ∥ .atom .channelBtoA
 
 /--
 Insecure network: the directional channels are wired through an adversary
@@ -96,7 +97,7 @@ wire(par(Channel A→B, Channel B→A), Adversary)
 -/
 @[show_composition]
 def insecureNetwork : Raw DHAtom bd2 :=
-  .wire channels (.atom .adversary)
+  channels ⊞ .atom .adversary
 
 -- ============================================================================
 -- § Real world
@@ -105,7 +106,7 @@ def insecureNetwork : Raw DHAtom bd2 :=
 /-- Protocol parties: Alice ∥ Bob. -/
 @[show_composition]
 def dhParties : Raw DHAtom bd2 :=
-  .par (.atom .alice) (.atom .bob)
+  .atom .alice ∥ .atom .bob
 
 /--
 Protocol execution: the parties are wired through the insecure network.
@@ -118,7 +119,7 @@ wire(par(Alice, Bob), wire(par(Ch A→B, Ch B→A), Adversary))
 -/
 @[show_composition]
 def protocolExecution : Raw DHAtom bd2 :=
-  .wire dhParties insecureNetwork
+  dhParties ⊞ insecureNetwork
 
 /--
 Real world: the protocol execution is closed against the environment,
@@ -130,7 +131,7 @@ plug(wire(par(Alice, Bob), insecureNetwork), Environment)
 -/
 @[show_composition]
 def realWorld : Raw DHAtom PortBoundary.empty :=
-  .plug protocolExecution (.atom .environment)
+  protocolExecution ⊠ .atom .environment
 
 -- ============================================================================
 -- § Ideal world
@@ -139,7 +140,7 @@ def realWorld : Raw DHAtom PortBoundary.empty :=
 /-- Ideal parties: the ideal key-exchange functionality ∥ the UC simulator. -/
 @[show_composition]
 def idealParties : Raw DHAtom bd2 :=
-  .par (.atom .idealKE) (.atom .simulator)
+  .atom .idealKE ∥ .atom .simulator
 
 /--
 Ideal world: the ideal functionality and simulator are wired through a
@@ -154,8 +155,7 @@ plug(wire(par(Ideal KE, Simulator), Dummy Channel), Environment)
 -/
 @[show_composition]
 def idealWorld : Raw DHAtom PortBoundary.empty :=
-  let connected : Raw DHAtom bd2 := .wire idealParties (.atom .dummyChannel)
-  .plug connected (.atom .environment)
+  idealParties ⊞ .atom .dummyChannel ⊠ .atom .environment
 
 -- ============================================================================
 -- § DOT output
