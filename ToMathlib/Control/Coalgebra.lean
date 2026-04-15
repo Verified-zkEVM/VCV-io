@@ -91,8 +91,7 @@ def comp (g : Coalg.Hom F S₂ S₃) (f : Coalg.Hom F S₁ S₂) :
   toFun := g.toFun ∘ f.toFun
   comm := by
     funext x
-    show (g.toFun ∘ f.toFun) <$> (out : S₁ → F S₁) x =
-      (out : S₃ → F S₃) (g.toFun (f.toFun x))
+    simp only [Function.comp_apply]
     have hf := congrFun f.comm x
     have hg := congrFun g.comm (f.toFun x)
     simp only [Function.comp_apply] at hf hg
