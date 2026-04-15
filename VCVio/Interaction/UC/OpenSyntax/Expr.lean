@@ -298,6 +298,15 @@ instance compactClosed (Atom : PortBoundary → Type u) :
     Quotient.inductionOn W₁ fun _ =>
       Quotient.sound Raw.Equiv.wire_idWire_right
   unit_eq := rfl
+  wire_par_superpose := fun W₁ W₂ W₃ =>
+    Quotient.inductionOn₃ W₁ W₂ W₃ fun _ _ _ =>
+      Quotient.sound Raw.Equiv.wire_par_superpose
+  wire_assoc := fun W₁ W₂ W₃ =>
+    Quotient.inductionOn₃ W₁ W₂ W₃ fun _ _ _ =>
+      Quotient.sound Raw.Equiv.wire_assoc
+  wire_comm := fun W₁ W₂ =>
+    Quotient.inductionOn₂ W₁ W₂ fun _ _ =>
+      Quotient.sound Raw.Equiv.wire_comm
 
 -- ============================================================================
 -- § Bridge: Expr → Interp

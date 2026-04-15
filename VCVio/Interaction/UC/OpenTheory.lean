@@ -325,6 +325,45 @@ class CompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
   unit_eq :
     unit = T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
       (idWire PortBoundary.empty)
+  /-- Wire associativity: sequential wiring can be reassociated.
+
+  Wiring `W₁` with `W₂` through `Γ₁` and then with `W₃` through `Γ₂`
+  equals wiring `W₂` with `W₃` through `Γ₂` first, then with `W₁`
+  through `Γ₁`. -/
+  wire_assoc :
+    ∀ {Δ₁ Γ₁ Γ₂ Δ₃ : PortBoundary}
+      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ₁))
+      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₁) Γ₂))
+      (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₂) Δ₃)),
+      T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃)
+  /-- Wire-par superposition (left): if the left factor of a parallel
+  composition does not share a boundary with the second wire argument,
+  it can be factored out of the wire. This is one of the axioms of
+  traced symmetric monoidal categories. -/
+  wire_par_superpose :
+    ∀ {Δ₁ Δ₂ Γ Δ₃ : PortBoundary}
+      (W₁ : T.Obj Δ₁)
+      (W₂ : T.Obj (PortBoundary.tensor Δ₂ Γ))
+      (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₃)),
+      T.wire
+        (T.map (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Γ).symm.toHom
+          (T.par W₁ W₂))
+        W₃ =
+      T.map (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).symm.toHom
+        (T.par W₁ (T.wire W₂ W₃))
+  /-- Wire commutativity: the roles of the two wire factors are
+  interchangeable up to boundary reshaping. -/
+  wire_comm :
+    ∀ {Δ₁ Γ Δ₂ : PortBoundary}
+      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
+      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
+      T.wire W₁ W₂ =
+        T.map (PortBoundary.Equiv.tensorComm Δ₂ Δ₁).toHom
+          (T.wire
+            (T.map
+              (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂).toHom
+              W₂)
+            (T.map (PortBoundary.Equiv.tensorComm Δ₁ Γ).toHom W₁))
 
 /--
 `Closed T` is the type of closed systems in the open-composition theory `T`.
@@ -636,27 +675,37 @@ theorem unit_eq
         (CompactClosed.idWire (T := T) PortBoundary.empty) :=
   CompactClosed.unit_eq
 
-/-! ### Derived wire algebra -/
+/-! ### Wire algebra -/
 
-/-- Wire associativity: sequential wiring can be reassociated.
+/-- Wire-par superposition: the left factor of a parallel composition
+can be moved outside a wire when it doesn't share the contracted
+boundary. -/
+theorem wire_par_superpose
+    [CompactClosed T]
+    {Δ₁ Δ₂ Γ Δ₃ : PortBoundary}
+    (W₁ : T.Obj Δ₁)
+    (W₂ : T.Obj (PortBoundary.tensor Δ₂ Γ))
+    (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₃)) :
+    T.wire
+      (T.mapEquiv (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Γ).symm
+        (T.par W₁ W₂))
+      W₃ =
+    T.mapEquiv (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).symm
+      (T.par W₁ (T.wire W₂ W₃)) :=
+  CompactClosed.wire_par_superpose W₁ W₂ W₃
 
-Wiring `W₁` with `W₂` through `Γ₁` and then with `W₃` through `Γ₂`
-equals wiring `W₂` with `W₃` through `Γ₂` first, then with `W₁`
-through `Γ₁`. -/
+/-- Wire associativity: sequential wiring can be reassociated. -/
 theorem wire_assoc
     [CompactClosed T]
     {Δ₁ Γ₁ Γ₂ Δ₃ : PortBoundary}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ₁))
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₁) Γ₂))
     (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₂) Δ₃)) :
-    T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃) := by
-  sorry
+    T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃) :=
+  CompactClosed.wire_assoc W₁ W₂ W₃
 
 /-- Wire commutativity: the roles of the two wire factors are
-interchangeable up to boundary reshaping.
-
-This follows from the braiding (`par_comm`) and the zig-zag identities;
-the formal proof is deferred. -/
+interchangeable up to boundary reshaping. -/
 theorem wire_comm
     [CompactClosed T]
     {Δ₁ Γ Δ₂ : PortBoundary}
@@ -667,8 +716,8 @@ theorem wire_comm
         (T.wire
           (T.mapEquiv
             (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂) W₂)
-          (T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Γ) W₁)) := by
-  sorry
+          (T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Γ) W₁)) :=
+  CompactClosed.wire_comm W₁ W₂
 
 end Laws
 

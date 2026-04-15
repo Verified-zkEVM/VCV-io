@@ -437,6 +437,27 @@ instance compactClosed
     intro T hT interp
     simp only [Interp.unit, Interp.map, Interp.idWire]
     exact OpenTheory.unit_eq (T := T)
+  wire_par_superpose := by
+    intro Δ₁ Δ₂ Γ Δ₃ W₁ W₂ W₃
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.wire, Interp.map, Interp.par]
+    exact OpenTheory.wire_par_superpose (T := T)
+      (W₁.run T hT interp) (W₂.run T hT interp) (W₃.run T hT interp)
+  wire_assoc := by
+    intro Δ₁ Γ₁ Γ₂ Δ₃ W₁ W₂ W₃
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.wire]
+    exact OpenTheory.wire_assoc (T := T)
+      (W₁.run T hT interp) (W₂.run T hT interp) (W₃.run T hT interp)
+  wire_comm := by
+    intro Δ₁ Γ Δ₂ W₁ W₂
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.wire, Interp.map]
+    exact OpenTheory.wire_comm (T := T)
+      (W₁.run T hT interp) (W₂.run T hT interp)
 
 end Interp
 
