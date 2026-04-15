@@ -163,7 +163,261 @@ theorem correct
       (FiatShamirWithAbort
         (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
         ids hr M maxAttempts) (runtime M) δ := by
-  sorry
+  intro msg
+  open scoped Classical in
+  let ro : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
+  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
+    (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
+  have hleft :
+      ∀ {α : Type} (oa : ProbComp α),
+        simulateQ (idImpl + ro) (OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) =
+          simulateQ idImpl oa := by
+    intro α oa
+    simpa using
+      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) oa)
+  have hrun :
+      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
+        (simulateQ idImpl oa).run s = (fun x => (x, s)) <$> oa := by
+    intro α oa
+    induction oa using OracleComp.inductionOn with
+    | pure x =>
+        intro s; simp
+    | query_bind t oa ih =>
+        intro s
+        change
+          (do
+            let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
+            (simulateQ idImpl (oa a)).run s) =
+            (do
+              let a ← liftM (query t)
+              (fun x => (x, s)) <$> oa a)
+        have hfun :
+            (fun a => (simulateQ idImpl (oa a)).run s) =
+              (fun a => (fun x => (x, s)) <$> oa a) := by
+          funext a; exact ih a s
+        simp [hfun]
+  have hrunLift :
+      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
+        (simulateQ (idImpl + ro) (liftM oa)).run s = (fun x => (x, s)) <$> oa := by
+    intro α oa s
+    rw [show simulateQ (idImpl + ro) (liftM oa) = simulateQ idImpl oa by
+      simpa using hleft oa]
+    simpa using hrun oa s
+  have hpeel : ∀ {α β : Type} (oa : ProbComp α)
+      (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
+      (s : (M × Commit →ₒ Chal).QueryCache),
+      (simulateQ (idImpl + ro) (liftM oa) >>= rest).run' s =
+        oa >>= fun x => (rest x).run' s := by
+    intro α β oa rest s
+    change Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
+      oa >>= fun x => Prod.fst <$> (rest x).run s
+    rw [StateT.run_bind, hrunLift]
+    simp [map_bind]
+  have hquery :
+      ∀ q : M × Commit,
+        HasQuery.query
+            (spec := (M × Commit →ₒ Chal))
+            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) q =
+          (query (spec := unifSpec + (M × Commit →ₒ Chal)) (Sum.inr q) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal) := by
+    intro q
+    exact congrArg
+      (fun z => (liftM z : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal))
+      (OracleQuery.liftM_add_right_query
+        (spec₁ := unifSpec) (spec₂ := (M × Commit →ₒ Chal)) q)
+  have hSimQuery : ∀ (q : M × Commit),
+      simulateQ (idImpl + ro) (HasQuery.query q) = ro q := by
+    intro q; rw [hquery]; simp [simulateQ_query]
+  set sigAlg := FiatShamirWithAbort
+    (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) ids hr M maxAttempts
+  set signVerify : Stmt → Wit → ProbComp Bool := fun pk sk =>
+    StateT.run' (simulateQ (idImpl + ro) (do
+      let sig ← sigAlg.sign pk sk msg
+      sigAlg.verify pk msg sig)) ∅
+  set signOnly : Stmt → Wit → ProbComp (Option (Commit × Resp)) := fun pk sk =>
+    StateT.run' (simulateQ (idImpl + ro) (sigAlg.sign pk sk msg)) ∅
+  suffices hRewrite :
+      (runtime M).evalDist (do
+        let (pk, sk) ← sigAlg.keygen
+        let sig ← sigAlg.sign pk sk msg
+        sigAlg.verify pk msg sig) =
+      evalDist (do
+        let (pk, sk) ← hr.gen
+        signVerify pk sk) by
+    rw [hRewrite]
+    suffices hPerKey : ∀ pk sk, (pk, sk) ∈ support hr.gen →
+        Pr[= true | signVerify pk sk] ≥ 1 - δ by
+      change Pr[= true | (hr.gen >>= fun x => signVerify x.1 x.2 : ProbComp Bool)] ≥ 1 - δ
+      rw [probOutput_bind_eq_tsum]
+      calc
+        ∑' x : Stmt × Wit, Pr[= x | hr.gen] * Pr[= true | signVerify x.1 x.2]
+          ≥ ∑' x : Stmt × Wit, Pr[= x | hr.gen] * (1 - δ) := by
+            refine ENNReal.tsum_le_tsum fun x => ?_
+            by_cases hx : x ∈ support hr.gen
+            · gcongr; exact hPerKey x.1 x.2 hx
+            · simp [probOutput_eq_zero_of_not_mem_support hx]
+        _ = (1 - δ) * ∑' x : Stmt × Wit, Pr[= x | hr.gen] := by
+            simp_rw [mul_comm]; exact ENNReal.tsum_mul_left
+        _ = 1 - δ := by
+            rw [HasEvalPMF.tsum_probOutput_eq_one, mul_one]
+    intro pk sk hmem
+    have hrel : rel pk sk = true := hr.gen_sound pk sk hmem
+    have habort := h_abort pk sk hrel msg
+    have habort' : Pr[= none | evalDist (signOnly pk sk)] ≤ δ := by
+      convert habort using 2
+    have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := HasEvalPMF.probFailure_eq_zero _
+    rw [show (1 : ENNReal) - δ = 1 - δ from rfl]
+    calc
+      Pr[= true | signVerify pk sk]
+        = 1 - Pr[= false | signVerify pk sk] := by
+          rw [probOutput_true_eq_sub, hnoFail, tsub_zero]
+      _ ≥ 1 - Pr[= none | evalDist (signOnly pk sk)] := by
+          apply tsub_le_tsub_left _ 1
+          set S := (simulateQ (idImpl + ro)
+            (sigAlg.sign pk sk msg)).run ∅
+          have hSV : signVerify pk sk = S >>= fun p =>
+              (simulateQ (idImpl + ro) (sigAlg.verify pk msg p.1)).run' p.2 := by
+            change (simulateQ (idImpl + ro) (do
+                let sig ← sigAlg.sign pk sk msg
+                sigAlg.verify pk msg sig)).run' ∅ = _
+            rw [simulateQ_bind]
+            change Prod.fst <$> ((simulateQ (idImpl + ro) (sigAlg.sign pk sk msg) >>=
+                fun sig => simulateQ (idImpl + ro) (sigAlg.verify pk msg sig)).run ∅) = _
+            rw [StateT.run_bind, map_bind]; rfl
+          have hSO : Pr[= none | evalDist (signOnly pk sk)] =
+              Pr[= none | Prod.fst <$> S] := by rfl
+          rw [hSV, probOutput_bind_eq_tsum, hSO, probOutput_map_eq_tsum]
+          refine ENNReal.tsum_le_tsum fun p => ?_
+          cases hp : p.1 with
+          | none =>
+              gcongr
+              rw [probOutput_pure_self]
+              exact probOutput_le_one
+          | some wz =>
+              by_cases hmem : p ∈ support S
+              · obtain ⟨w', z⟩ := wz
+                have hCacheInv : ∃ c₀ : Chal,
+                    p.2 (msg, w') = some c₀ ∧ ids.verify pk w' c₀ z = true := by
+                  suffices hLoop : ∀ (n : ℕ)
+                      (s₀ : (M × Commit →ₒ Chal).QueryCache)
+                      (w₀ : Commit) (z₀ : Resp)
+                      (s : (M × Commit →ₒ Chal).QueryCache),
+                      (some (w₀, z₀), s) ∈ support
+                        ((simulateQ (idImpl + ro)
+                          (fsAbortSignLoop ids M pk sk msg n)).run s₀) →
+                      ∃ c₀ : Chal, s (msg, w₀) = some c₀ ∧
+                        ids.verify pk w₀ c₀ z₀ = true by
+                    have hp' : (some (w', z), p.2) ∈ support S := by
+                      rwa [show p = (p.1, p.2) from rfl, hp] at hmem
+                    exact hLoop maxAttempts ∅ w' z p.2 hp'
+                  intro n
+                  induction n with
+                  | zero =>
+                      intro s₀ w₀ z₀ s hsup
+                      simp [fsAbortSignLoop, simulateQ_pure, StateT.run_pure,
+                        support_pure] at hsup
+                  | succ n ih =>
+                      intro s₀ w₀ z₀ s hsup
+                      simp only [fsAbortSignLoop, simulateQ_bind] at hsup
+                      rw [StateT.run_bind] at hsup
+                      obtain ⟨⟨⟨w_a, oz⟩, s₁⟩, h_attempt, h_rest⟩ :=
+                        (mem_support_bind_iff _ _ _).mp hsup
+                      cases oz with
+                      | none =>
+                          exact ih s₁ w₀ z₀ s (by simpa using h_rest)
+                      | some z_a =>
+                          have h_rest' : (some (w₀, z₀), s) =
+                              (some (w_a, z_a), s₁) := by
+                            simpa using h_rest
+                          obtain ⟨h1, hs⟩ := Prod.mk.inj h_rest'
+                          subst hs
+                          rw [Option.some.injEq] at h1
+                          obtain ⟨hw, hz⟩ := Prod.mk.inj h1
+                          subst hw; subst hz
+                          simp only [fsAbortSignAttempt, simulateQ_bind,
+                            hSimQuery, simulateQ_pure] at h_attempt
+                          rw [StateT.run_bind] at h_attempt
+                          obtain ⟨⟨⟨w_cm, st⟩, s_cm⟩, h_commit, h2⟩ :=
+                            (mem_support_bind_iff _ _ _).mp h_attempt
+                          rw [StateT.run_bind] at h2
+                          obtain ⟨⟨c_q, s_ro⟩, h_query, h3⟩ :=
+                            (mem_support_bind_iff _ _ _).mp h2
+                          rw [StateT.run_bind] at h3
+                          obtain ⟨⟨oz_r, s_resp⟩, h_respond, h4⟩ :=
+                            (mem_support_bind_iff _ _ _).mp h3
+                          simp only [StateT.run_pure, support_pure,
+                            Set.mem_singleton_iff, Prod.mk.injEq] at h4
+                          obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h4
+                          change _ ∈ support ((simulateQ (idImpl + ro)
+                            (liftM (ids.commit pk sk))).run s₀) at h_commit
+                          rw [hrunLift, support_map] at h_commit
+                          obtain ⟨⟨w_c, st_c⟩, h_cm_mem, h_cm_eq⟩ := h_commit
+                          simp only [Prod.mk.injEq] at h_cm_eq
+                          obtain ⟨⟨rfl, rfl⟩, rfl⟩ := h_cm_eq
+                          dsimp only [Prod.fst, Prod.snd] at h_query h_respond
+                          change _ ∈ support ((simulateQ (idImpl + ro)
+                            (liftM (ids.respond pk sk st_c c_q))).run s_ro) at h_respond
+                          rw [hrunLift, support_map] at h_respond
+                          obtain ⟨resp_val, h_rsp_mem, h_rsp_eq⟩ := h_respond
+                          simp only [Prod.mk.injEq] at h_rsp_eq
+                          obtain ⟨h_oz, h_s_eq⟩ := h_rsp_eq
+                          subst h_s_eq
+                          refine ⟨c_q, ?_, ?_⟩
+                          · simp only [ro, randomOracle, QueryImpl.withCaching_apply,
+                              StateT.run_bind, StateT.run_get, pure_bind] at h_query
+                            cases hs : s₀ (msg, w_c) with
+                            | some c_cached =>
+                                simp only [hs, StateT.run_pure, support_pure,
+                                  Set.mem_singleton_iff, Prod.mk.injEq] at h_query
+                                rw [h_query.2, hs, h_query.1]
+                            | none =>
+                                simp only [hs, StateT.run_bind] at h_query
+                                obtain ⟨⟨_, _⟩, _, h_cache⟩ :=
+                                  (mem_support_bind_iff _ _ _).mp h_query
+                                dsimp at h_cache
+                                obtain ⟨rfl, rfl⟩ := h_cache
+                                exact QueryCache.cacheQuery_self _ (msg, w_c) c_q
+                          · apply ids.verify_of_complete hc hrel
+                            rw [IdenSchemeWithAbort.honestExecution, support_bind]
+                            refine Set.mem_iUnion₂.mpr ⟨(w_c, st_c), h_cm_mem, ?_⟩
+                            rw [support_bind]
+                            refine Set.mem_iUnion₂.mpr ⟨c_q, mem_support_uniformSample _, ?_⟩
+                            rw [h_oz] at h_rsp_mem
+                            simp only [support_bind, Set.mem_iUnion₂,
+                              support_pure, Set.mem_singleton_iff]
+                            exact ⟨some z₀, h_rsp_mem, by simp [Option.map]⟩
+                obtain ⟨c₀, hcached, hverify⟩ := hCacheInv
+                have hVerifyTrue :
+                    Pr[= false | (simulateQ (idImpl + ro)
+                      (sigAlg.verify pk msg (some (w', z)))).run' p.2] = 0 := by
+                  suffices h : (simulateQ (idImpl + ro)
+                      (sigAlg.verify pk msg (some (w', z)))).run' p.2 =
+                      (pure true : ProbComp Bool) by
+                    rw [h]; simp [probOutput_pure]
+                  simp only [sigAlg, FiatShamirWithAbort, simulateQ_bind,
+                    hSimQuery, simulateQ_pure]
+                  change Prod.fst <$> ((ro (msg, w') >>=
+                    fun c => pure (ids.verify pk w' c z)).run p.2) = _
+                  rw [StateT.run_bind]
+                  simp only [ro, randomOracle, QueryImpl.withCaching_apply,
+                    StateT.run_bind, StateT.run_get, pure_bind, hcached,
+                    StateT.run_pure, map_pure, hverify]
+                simp only [probOutput_pure, reduceCtorEq, ↓reduceIte,
+                  hVerifyTrue, mul_zero, le_refl]
+              · simp [probOutput_eq_zero_of_not_mem_support hmem]
+      _ ≥ 1 - δ := by
+          exact tsub_le_tsub_left habort' 1
+  change evalDist ((simulateQ (idImpl + ro) (do
+      let (pk, sk) ← sigAlg.keygen
+      let sig ← sigAlg.sign pk sk msg
+      sigAlg.verify pk msg sig)).run' ∅) =
+    evalDist (do
+      let (pk, sk) ← hr.gen
+      signVerify pk sk)
+  simp only [sigAlg, signVerify, FiatShamirWithAbort, simulateQ_bind]
+  congr 1
+  rw [hpeel]
 
 end correctness
 

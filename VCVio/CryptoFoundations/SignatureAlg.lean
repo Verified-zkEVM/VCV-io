@@ -9,6 +9,7 @@ import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.Monad.Hom
 
@@ -186,5 +187,50 @@ noncomputable def eufNmaAdv.advantage
     (adv : eufNmaAdv sigAlg) : ℝ≥0∞ := Pr[= true | eufNmaExp runtime adv]
 
 end eufNma
+
+section managedRoNma
+
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} {M PK SK S : Type}
+
+/-- An EUF-NMA adversary with managed random oracle: the adversary returns a `QueryCache`
+alongside its forgery. The experiment verifies using `withCacheOverlay`, which resolves
+cached entries from the adversary's table and forwards misses to the real oracle.
+
+This supports compositional CMA-to-NMA reductions: the CMA-to-NMA reduction programs
+hash entries for signing simulation into the cache, while forwarding the inner adversary's
+hash queries to the external oracle. The forking lemma (`Fork.fork`) can then replay the
+external oracle queries via seeded simulation, while the programmed entries are preserved
+deterministically. -/
+structure managedRoNmaAdv (sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
+  main (pk : PK) : OracleComp spec ((M × S) × spec.QueryCache)
+
+/-- The managed-RO NMA experiment: generate a key pair, run the adversary to get a forgery
+and a `QueryCache`, then verify the forgery through `withCacheOverlay` so that programmed
+entries take priority over the real oracle. -/
+def managedRoNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adv : managedRoNmaAdv sigAlg) : SPMF Bool :=
+  runtime.evalDist do
+    let (pk, _) ← sigAlg.keygen
+    let result : (M × S) × spec.QueryCache ← adv.main pk
+    withCacheOverlay result.2 (sigAlg.verify pk result.1.1 result.1.2)
+
+/-- The success probability of a managed-RO NMA adversary. -/
+noncomputable def managedRoNmaAdv.advantage
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adv : managedRoNmaAdv sigAlg) : ℝ≥0∞ :=
+  Pr[= true | managedRoNmaExp runtime adv]
+
+/-- Embed a standard NMA adversary as a managed-RO NMA adversary with an empty cache.
+The empty cache means all queries fall through to the real oracle, recovering the
+standard NMA experiment. -/
+def eufNmaAdv.toManagedRoNmaAdv {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (adv : eufNmaAdv sigAlg) : managedRoNmaAdv sigAlg where
+  main pk := do
+    let forgery ← adv.main pk
+    return (forgery, ∅)
+
+end managedRoNma
 
 end SignatureAlg
