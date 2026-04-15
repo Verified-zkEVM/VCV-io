@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.Coercions.Add
+import VCVio.OracleComp.HasQuery
 
 /-!
 # Observation Oracle for Side-Channel Leakage Modeling
@@ -13,20 +14,31 @@ This file defines an observation oracle that emits side-channel events during co
 enabling formal reasoning about leakage properties such as constant-time execution and
 distributional trace independence.
 
-The core idea: model leakage instrumentation as an extra oracle family combined with the
-original oracle spec via `+`. Observation events are accumulated in a `WriterT ω` layer,
-reusing the `QueryImpl.withCost` infrastructure from `CountingOracle`.
+The API has two layers:
+
+**Layer 1 (generic, `HasQuery`-based):** observation as a monad capability. Any monad `m` with
+`HasQuery (ObsSpec Ev) m` can emit observation events. Two canonical `HasQuery` instances are
+provided: `obsDiscard` (silently drops events) and `obsAccumulate` (accumulates events in a
+`WriterT ω m` layer).
+
+**Layer 2 (`simulateQ`-based):** for reinterpreting concrete `OracleComp (spec + ObsSpec Ev) α`
+values. The definitions `eraseObs` and `runObs` are parameterized by a base oracle implementation
+`base : QueryImpl spec m`, so they work for any target monad, not just `OracleComp spec`.
 
 ## Main Definitions
 
 * `ObsSpec Ev`: oracle spec where each event type `Ev` maps to a `PUnit` response.
-* `observe`: emit an observation event into an instrumented computation.
-* `eraseObs`: strip observation queries from a computation, recovering the base behavior.
-* `runObs`: execute an observed computation, producing result paired with accumulated trace.
+* `observe`: emit an observation event, generic over any `[HasQuery (ObsSpec Ev) m]`.
+* `HasQuery.obsDiscard`: `HasQuery (ObsSpec Ev) m` instance that discards events.
+* `HasQuery.obsAccumulate`: `HasQuery (ObsSpec Ev) (WriterT ω m)` instance that accumulates.
+* `eraseObs`: strip observation queries via `simulateQ`, parameterized by base implementation.
+* `runObs`: execute observed computation with trace accumulation, parameterized by base.
 
 ## Main Results
 
 * `fst_map_runObs`: erasure theorem — projecting away the trace recovers `eraseObs`.
+* `probFailure_runObs`: observations do not change failure probability (`[HasEvalSPMF m]`).
+* `NeverFail_runObs_iff`: `NeverFail` is preserved by observation (`[HasEvalSPMF m]`).
 -/
 
 open OracleSpec OracleComp
@@ -40,47 +52,72 @@ variable {ι : Type u} {spec : OracleSpec ι} {Ev : Type u} {ω : Type u} {α β
 /-- Oracle spec for observation events: each event maps to a `PUnit` response.
 Observation queries carry no computational payload and exist purely for
 side-channel instrumentation. -/
-abbrev ObsSpec (Ev : Type u) : OracleSpec Ev := fun _ => PUnit
+abbrev ObsSpec (Ev : Type u) : OracleSpec.{u, u} Ev := fun _ => PUnit.{u + 1}
 
-/-- Emit an observation event into a computation with observation oracle access. -/
-def observe (e : Ev) : OracleComp (spec + ObsSpec Ev) PUnit :=
-  liftM (query (spec := ObsSpec Ev) e)
+/-! ### Layer 1: Generic HasQuery-Based Observation -/
 
-@[simp]
-lemma observe_eq_liftM_query (e : Ev) :
-    observe (spec := spec) e = liftM (query (spec := ObsSpec Ev) e) := rfl
+section HasQueryObs
 
-/-! ### Erasure -/
+variable {m : Type u → Type*} [Monad m]
 
-/-- Oracle implementation that handles `spec + ObsSpec Ev` by forwarding base queries
-and discarding observation events. -/
-def eraseObsImpl : QueryImpl (spec + ObsSpec Ev) (OracleComp spec) :=
-  fun t => match t with
-  | .inl t => liftM (query (spec := spec) t)
+/-- Emit an observation event into any monad with observation query capability. -/
+def observe [HasQuery (ObsSpec Ev) m] (e : Ev) : m PUnit :=
+  HasQuery.query (spec := ObsSpec Ev) e
+
+namespace HasQuery
+
+/-- `HasQuery` instance that silently discards all observation events.
+Use this to erase observations without changing the computation's behavior. -/
+@[reducible]
+def obsDiscard : HasQuery (ObsSpec Ev) m where
+  query _ := pure PUnit.unit
+
+/-- `HasQuery` instance that accumulates observation events in a `WriterT ω m` layer.
+Each event `e` is encoded as `encode e` and accumulated via `tell`. -/
+@[reducible]
+def obsAccumulate [Monoid ω] (encode : Ev → ω) : HasQuery (ObsSpec Ev) (WriterT ω m) where
+  query e := tell (encode e)
+
+end HasQuery
+
+end HasQueryObs
+
+/-! ### Layer 2: SimulateQ-Based Erasure and Trace Collection -/
+
+section SimulateQ
+
+variable {m : Type u → Type*} [Monad m]
+
+/-- Oracle implementation that handles `spec + ObsSpec Ev` by forwarding base queries to
+`base` and discarding observation events. Parameterized by the base implementation so it
+works for any target monad, not just `OracleComp spec`. -/
+def eraseObsImpl (base : QueryImpl spec m) : QueryImpl (spec + ObsSpec Ev) m
+  | .inl t => base t
   | .inr _ => pure PUnit.unit
 
 @[simp, grind =]
-lemma eraseObsImpl_inl (t : ι) :
-    eraseObsImpl (spec := spec) (Ev := Ev) (.inl t) = liftM (query (spec := spec) t) := rfl
+lemma eraseObsImpl_inl (base : QueryImpl spec m) (t : ι) :
+    eraseObsImpl (Ev := Ev) base (.inl t) = base t := rfl
 
 @[simp, grind =]
-lemma eraseObsImpl_inr (e : Ev) :
-    eraseObsImpl (spec := spec) (Sum.inr e) = (pure PUnit.unit : OracleComp spec PUnit) := rfl
+lemma eraseObsImpl_inr (base : QueryImpl spec m) (e : Ev) :
+    eraseObsImpl base (.inr e) = (pure PUnit.unit : m PUnit) := rfl
 
 /-- Strip observation queries from a computation, retaining only the base oracle queries.
 All `observe` calls become no-ops; the functional behavior of the computation is preserved. -/
-def eraseObs (oa : OracleComp (spec + ObsSpec Ev) α) : OracleComp spec α :=
-  simulateQ eraseObsImpl oa
+def eraseObs (base : QueryImpl spec m) (oa : OracleComp (spec + ObsSpec Ev) α) : m α :=
+  simulateQ (eraseObsImpl base) oa
 
 @[simp]
-lemma eraseObs_pure (x : α) :
-    eraseObs (spec := spec) (Ev := Ev) (pure x) = pure x := by
+lemma eraseObs_pure (base : QueryImpl spec m) (x : α) :
+    eraseObs (Ev := Ev) base (pure x) = pure x := by
   simp [eraseObs]
 
 @[simp]
-lemma eraseObs_bind (oa : OracleComp (spec + ObsSpec Ev) α)
+lemma eraseObs_bind [LawfulMonad m] (base : QueryImpl spec m)
+    (oa : OracleComp (spec + ObsSpec Ev) α)
     (ob : α → OracleComp (spec + ObsSpec Ev) β) :
-    eraseObs (oa >>= ob) = eraseObs oa >>= fun x => eraseObs (ob x) := by
+    eraseObs base (oa >>= ob) = eraseObs base oa >>= fun x => eraseObs base (ob x) := by
   simp [eraseObs]
 
 /-! ### Running Observed Computations -/
@@ -91,34 +128,46 @@ variable [Monoid ω]
 
 /-- Cost function for observation: base queries cost `1` (the monoid identity, so no trace
 contribution), observation events cost `encode e`. -/
-def obsCostFn (encode : Ev → ω) : (spec + ObsSpec Ev).Domain → ω :=
-  fun t => match t with
+def obsCostFn (encode : Ev → ω) : (spec + ObsSpec Ev).Domain → ω
   | .inl _ => 1
   | .inr e => encode e
 
 /-- Execute an observed computation, producing the result paired with the accumulated
-observation trace. Defined as `eraseObsImpl.withCost (obsCostFn encode)`, which reuses
-the `QueryImpl.withCost` infrastructure. -/
-def runObs (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
-    OracleComp spec (α × ω) :=
-  (simulateQ (eraseObsImpl.withCost (obsCostFn encode)) oa).run
+observation trace. Parameterized by a base oracle implementation `base : QueryImpl spec m`,
+so this works for any target monad. -/
+def runObs (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) : m (α × ω) :=
+  (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode)) oa).run
 
 @[simp]
-lemma runObs_pure (encode : Ev → ω) (x : α) :
-    runObs (spec := spec) (Ev := Ev) encode (pure x) = pure (x, 1) := by
+lemma runObs_pure (base : QueryImpl spec m) (encode : Ev → ω) (x : α) :
+    runObs (Ev := Ev) base encode (pure x) = pure (x, 1) := by
   simp [runObs]
 
-/-- Erasure theorem: projecting away the observation trace recovers the erased computation.
-This is the key compositionality property — adding observations does not change
-the computation's functional behavior.
+/-- Erasure theorem: projecting away the observation trace recovers the erased computation. -/
+theorem fst_map_runObs [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) :
+    (fun z : α × ω => z.1) <$> runObs base encode oa = eraseObs base oa := by
+  change Prod.fst <$> (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode)) oa).run =
+    simulateQ (eraseObsImpl base) oa
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa h => simp [h]
 
-For failure preservation and `NeverFail` results in monads that can fail,
-use `QueryImpl.probFailure_run_simulateQ_withCost` and
-`QueryImpl.NeverFail_run_simulateQ_withCost_iff` applied to
-`eraseObsImpl` and `obsCostFn` directly. These are trivial for `OracleComp`
-since it has `HasEvalPMF`. -/
-theorem fst_map_runObs (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
-    (fun z : α × ω => z.1) <$> runObs encode oa = eraseObs oa :=
-  QueryImpl.fst_map_run_withCost eraseObsImpl (obsCostFn encode) oa
+/-- Failure preservation: observations do not change the probability of failure. -/
+theorem probFailure_runObs [LawfulMonad m] [HasEvalSPMF m]
+    (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
+    Pr[⊥ | runObs base encode oa] = Pr[⊥ | eraseObs base oa] := by
+  rw [show Pr[⊥ | runObs base encode oa] =
+    Pr[⊥ | (fun z : α × ω => z.1) <$> runObs base encode oa] from
+    (probFailure_map _ _).symm, fst_map_runObs]
+
+/-- `NeverFail` is preserved by observation. -/
+theorem NeverFail_runObs_iff [LawfulMonad m] [HasEvalSPMF m]
+    (base : QueryImpl spec m) (encode : Ev → ω) (oa : OracleComp (spec + ObsSpec Ev) α) :
+    NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
+  simp only [HasEvalSPMF.neverFail_iff, probFailure_runObs]
 
 end runObs
+
+end SimulateQ
