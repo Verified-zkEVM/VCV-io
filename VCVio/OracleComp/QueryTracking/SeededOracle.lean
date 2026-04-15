@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.Constructions.GenerateSeed
 import VCVio.OracleComp.Coercions.SubSpec
@@ -26,134 +27,6 @@ open OracleComp OracleSpec
 universe u v w
 
 variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι]
-
-namespace OracleComp
-
-section generateSeedCounts
-
-variable {ι : Type} [DecidableEq ι] (spec : OracleSpec ι)
-  [∀ t : spec.Domain, SampleableType (spec.Range t)]
-
-/-- Generate a `QuerySeed` by explicit per-index counts.
-
-This is a “product” seed generator: for each `i ∈ is` (assumed duplicate-free), it samples
-`n i` i.i.d. uniform values of type `spec.Range i` and stores the resulting list at index `i`.
-For `i ∉ is`, the seed list is `[]`.
-
-Currently unused outside this section; retained as potential infrastructure for future work. -/
-def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.QuerySeed spec)
-  | [] => return ∅
-  | i :: is => do
-    let xs ← replicate (n i) ($ᵗ spec.Range i)
-    let rest ← generateSeedCounts n is
-    return Function.update rest i xs
-
-@[simp] lemma generateSeedCounts_nil (n : ι → ℕ) :
-    generateSeedCounts (spec := spec) n [] = return ∅ := rfl
-
-@[simp] lemma generateSeedCounts_cons (n : ι → ℕ) (i : ι) (is : List ι) :
-    generateSeedCounts (spec := spec) n (i :: is) = do
-      let xs ← replicate (n i) ($ᵗ spec.Range i)
-      let rest ← generateSeedCounts (spec := spec) n is
-      return Function.update rest i xs := rfl
-
-@[simp] lemma support_generateSeedCounts [spec.Fintype] (n : ι → ℕ) (is : List ι) :
-    support (generateSeedCounts (spec := spec) n is) =
-      {seed : QuerySeed spec | ∀ i, (seed i).length = if i ∈ is then n i else 0} := by
-  classical
-  induction is with
-  | nil =>
-    ext seed
-    simp only [generateSeedCounts, support_pure, Set.mem_singleton_iff, List.not_mem_nil,
-      ↓reduceIte, List.length_eq_zero_iff, Set.mem_setOf_eq]
-    constructor
-    · intro h
-      subst h
-      intro i
-      simp
-    · intro h
-      -- if all lists have length 0, the seed is empty
-      have hseed : seed = (∅ : QuerySeed spec) := by
-        funext i
-        have : (seed i).length = 0 := by simpa using h i
-        exact List.eq_nil_of_length_eq_zero this
-      subst hseed
-      simp
-  | cons i is ih =>
-    ext seed
-    simp only [generateSeedCounts_cons, Set.mem_setOf_eq]
-    rw [mem_support_bind_iff]
-    constructor
-    · rintro ⟨xs, hxs, hrest⟩
-      rw [mem_support_bind_iff] at hrest
-      rcases hrest with ⟨rest, hrest, hpure⟩
-      have hEq : Function.update rest i xs = seed := by
-        simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
-      have hlen_xs : xs.length = n i := by
-        have hxss : xs.length = n i ∧ ∀ x ∈ xs, x ∈ support ($ᵗ spec.Range i) := by
-          simpa [support_replicate (oa := ($ᵗ spec.Range i)) (n := n i)] using hxs
-        exact hxss.1
-      have hrest_len : ∀ j, (rest j).length = if j ∈ is then n j else 0 := by
-        simpa [ih, Set.mem_setOf_eq] using hrest
-      intro j
-      by_cases hj : j = i
-      · cases hj
-        have hseed_i : seed i = xs := by
-          have := congrArg (fun s => s i) hEq
-          simpa using this.symm
-        simp [hseed_i, List.mem_cons, hlen_xs]
-      · have hseed_j : seed j = rest j := by
-          have := congrArg (fun s => s j) hEq
-          simpa [Function.update_of_ne hj] using this.symm
-        have hlen_seed_j : (seed j).length = if j ∈ is then n j else 0 := by
-          simpa [hseed_j] using hrest_len j
-        -- membership in `i :: is` with `j ≠ i`
-        simp [List.mem_cons, hj, hlen_seed_j]
-    · intro h
-      let xs : List (spec.Range i) := seed i
-      let rest : QuerySeed spec :=
-        if hi : i ∈ is then seed else Function.update seed i ([] : List (spec.Range i))
-      have hxs_len : xs.length = n i := by
-        have := h i
-        simpa [xs, List.mem_cons] using this
-      refine ⟨xs, ?_, ?_⟩
-      · -- `xs` is supported by `replicate` just from its length (all outputs are supported)
-        rw [support_replicate (oa := ($ᵗ spec.Range i)) (n := n i)]
-        refine ⟨hxs_len, ?_⟩
-        intro x hx
-        simp [support_uniformSample]  -- `support ($ᵗ _) = univ`
-      · rw [mem_support_bind_iff]
-        refine ⟨rest, ?_, ?_⟩
-        · -- rest in support of tail generator
-          rw [ih, Set.mem_setOf_eq]
-          intro j
-          by_cases hj : j = i
-          · cases hj
-            by_cases hi : i ∈ is
-            · -- if `i ∈ is`, then `rest = seed` and we can read the needed length from `h`
-              simpa [rest, hi] using (h i)
-            · -- if `i ∉ is`, then `rest i = []`
-              simp [rest, hi]
-          · -- for `j ≠ i`, `rest j = seed j` and we read the length from `h`
-            have := h j
-            have : (seed j).length = if j ∈ is then n j else 0 := by
-              simpa [List.mem_cons, hj] using this
-            by_cases hi : i ∈ is
-            · simp [rest, hi, this]
-            · simp [rest, hi, Function.update_of_ne hj, this]
-        · -- and the pure update reconstructs `seed`
-          rw [support_pure, Set.mem_singleton_iff]
-          ext j
-          by_cases hj : j = i
-          · subst hj
-            simp [xs, rest]
-          · by_cases hi : i ∈ is
-            · simp [rest, hi, Function.update_of_ne hj]
-            · simp [rest, hi, Function.update_of_ne hj]
-
-end generateSeedCounts
-
-end OracleComp
 
 namespace QueryImpl
 
@@ -198,21 +71,6 @@ lemma probEvent_liftComp_uniformSample_eq_of_eq
       (↑(Fintype.card (spec.Range i)) : ENNReal)⁻¹ := by
   rw [probEvent_eq_eq_probOutput', probOutput_liftComp, probOutput_uniformSample]
 
-/-- Unused helper: deduplication equivalence for `generateSeed`. -/
-private lemma evalDist_generateSeed_eq_canonical
-    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
-    [∀ i, SampleableType (spec₀.Range i)] [spec₀.Fintype] [spec₀.Inhabited]
-    (qc : ι₀ → ℕ) (js : List ι₀) :
-    evalDist (generateSeed spec₀ qc js) =
-      evalDist (generateSeed spec₀ (fun i => qc i * js.count i) js.dedup) := by
-  refine OracleComp.evalDist_generateSeed_eq_of_countEq (spec := spec₀)
-    (qc := qc) (js := js)
-    (qc' := fun i => qc i * js.count i)
-    (js' := js.dedup) ?_
-  intro i
-  by_cases hi : i ∈ js
-  · simp [List.count_dedup, hi]
-  · simp [hi, List.count_eq_zero_of_not_mem]
 
 @[simp]
 lemma apply_eq (t : spec.Domain) :
@@ -235,23 +93,6 @@ lemma run_bind_query_eq_pop {α : Type u}
     simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
   | cons u us =>
     simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
-
-/-- Unused helper: variant of `run_bind_query_eq_pop` with inlined `StateT.mk`. -/
-lemma run_bind_query_eq_pop_bindform {α : Type u}
-    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :
-    (((StateT.mk fun seed =>
-        match seed t with
-        | u :: us => pure (u, Function.update seed t us)
-        | [] => liftM (query t) >>= pure ∘ fun x => (x, seed)) >>=
-      fun x => simulateQ seededOracle (mx x)) seed) =
-      match seed.pop t with
-      | none => do
-          let u ← liftM (query t)
-          (simulateQ seededOracle (mx u)).run seed
-      | some (u, seed') =>
-          (simulateQ seededOracle (mx u)).run seed' := by
-  simpa [map_eq_bind_pure_comp] using
-    (run_bind_query_eq_pop (spec := spec) (t := t) (mx := mx) seed)
 
 private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
@@ -1045,5 +886,164 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
         congr 1
         exact ih u₀ _ js.dedup k
           (fun σ => h (QuerySeed.prependValues σ [u₀]))
+
+section queryBounds
+
+variable {α : Type u}
+
+/-- If a pre-generated seed already supplies all but `residual t` of the answers allowed by the
+structural per-index query bound `qb`, then running `oa` against `seededOracle` can make at most
+those residual live queries.
+
+This theorem is the core replay-cost statement for seeded simulations: a large enough seed turns
+most oracle interactions into deterministic table lookups, leaving only the uncovered suffix of
+the computation as genuine oracle queries. -/
+theorem isPerIndexQueryBound_run'_of_seedCoverage
+    {oa : OracleComp spec α} {qb residual : ι → ℕ} {seed : QuerySeed spec}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t - residual t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle oa).run' seed) residual := by
+  revert qb residual seed
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      intro qb residual seed _ _
+      simp
+  | query_bind t mx ih =>
+      intro qb residual seed hqb hcover
+      rw [isPerIndexQueryBound_query_bind_iff] at hqb
+      have hrun' :
+          (do let r ← seededOracle t; simulateQ seededOracle (mx r) :
+            StateT (QuerySeed spec) (OracleComp spec) α).run' seed =
+          match seed.pop t with
+          | none => liftM (query t) >>= fun r => (simulateQ seededOracle (mx r)).run' seed
+          | some (r, seed') => (simulateQ seededOracle (mx r)).run' seed' := by
+        change Prod.fst <$> ((seededOracle t >>= fun r => simulateQ seededOracle (mx r)).run seed) =
+          _
+        rw [run_bind_query_eq_pop]
+        cases hpop : seed.pop t with
+        | none => simp [map_bind]
+        | some p => rfl
+      rw [show (simulateQ seededOracle (liftM (query t) >>= mx)).run' seed =
+          ((do let r ← seededOracle t; simulateQ seededOracle (mx r) :
+            StateT (QuerySeed spec) (OracleComp spec) α).run' seed) by
+            simp]
+      rw [hrun']
+      cases hpop : seed.pop t with
+      | none =>
+          rw [isPerIndexQueryBound_query_bind_iff]
+          have hres_pos : 0 < residual t := by
+            have hlen0 : (seed t).length = 0 := by
+              simpa [QuerySeed.pop_eq_none_iff] using hpop
+            have hcov_t : qb t - residual t ≤ 0 := by
+              simpa [hlen0] using hcover t
+            omega
+          refine ⟨hres_pos, ?_⟩
+          intro u
+          simpa using
+            (ih u
+              (qb := Function.update qb t (qb t - 1))
+              (residual := Function.update residual t (residual t - 1))
+              (seed := seed)
+              (hqb := hqb.2 u)
+              (by
+                intro j
+                have hcov_j := hcover j
+                by_cases hj : j = t
+                · subst hj
+                  have hsub :
+                      (qb j - 1) - (residual j - 1) = qb j - residual j := by
+                    omega
+                  simpa [Function.update_self, hsub] using hcov_j
+                · simpa [Function.update_of_ne hj, hj] using hcov_j))
+      | some p =>
+          rcases p with ⟨u, seed'⟩
+          simpa using
+            (ih u
+              (qb := Function.update qb t (qb t - 1))
+              (residual := residual)
+              (seed := seed')
+              (hqb := hqb.2 u)
+              (by
+                intro j
+                have hcov_j := hcover j
+                by_cases hj : j = t
+                · subst hj
+                  have hseedt : seed j = u :: seed' j := by
+                    simpa using (QuerySeed.cons_of_pop_eq_some seed j u seed' hpop).symm
+                  have hcov_j' : qb j - residual j ≤ (seed' j).length + 1 := by
+                    simpa [hseedt] using hcov_j
+                  simp [Function.update_self]
+                  by_cases hle : qb j ≤ residual j
+                  · omega
+                  · have hlt : residual j < qb j := Nat.lt_of_not_ge hle
+                    omega
+                · rcases QuerySeed.rest_eq_update_tail_of_pop_eq_some seed t u seed' hpop with hrest
+                  have hseed'_j : seed' j = seed j := by
+                    have := congrArg (fun s => s j) hrest
+                    simpa [Function.update_of_ne hj] using this
+                  simpa [Function.update_of_ne hj, hseed'_j, hj] using hcov_j))
+
+/-- A seed that covers the full structural query bound eliminates all live oracle queries. -/
+theorem isPerIndexQueryBound_run'_zero
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle oa).run' seed) 0 := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage (oa := oa) (qb := qb) (residual := 0)
+    (seed := seed) hqb ?_
+  intro t
+  simpa using hcover t
+
+/-- If the seed stores only the first `k` answers for oracle `i`, then the replay can make live
+queries only to `i`, and at most `qb i - k` of them remain.
+
+This is the structural query-bound form of the usual forking-lemma intuition: after rewinding to
+the `k`-th query to oracle `i`, every earlier answer is fixed by the prefix seed, so only the
+suffix after the fork point can still hit the live oracle. -/
+theorem isPerIndexQueryBound_run'_takeAtIndex
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec} {i : ι} {k : ℕ}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length)
+    (hk : k ≤ qb i) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle oa).run' (seed.takeAtIndex i k))
+      (Function.update 0 i (qb i - k)) := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage
+    (oa := oa) (qb := qb) (residual := Function.update 0 i (qb i - k))
+    (seed := seed.takeAtIndex i k) hqb ?_
+  intro t
+  by_cases ht : t = i
+  · subst ht
+    have hlen : qb t ≤ (seed t).length := hcover t
+    have hk' : k ≤ (seed t).length := le_trans hk hlen
+    rw [QuerySeed.takeAtIndex_apply_self, Function.update_self]
+    simp
+    omega
+  · simpa [Function.update_of_ne ht, QuerySeed.takeAtIndex_apply_of_ne _ _ _ _ ht] using hcover t
+
+/-- After rewinding to query index `s` and appending one fresh answer at oracle `i`, the replayed
+run can still make live queries only to `i`, with at most `qb i - (s + 1)` such queries left. -/
+theorem isPerIndexQueryBound_run'_takeAtIndex_addValue
+    {oa : OracleComp spec α} {qb : ι → ℕ} {seed : QuerySeed spec} {i : ι}
+    (hqb : IsPerIndexQueryBound oa qb)
+    (hcover : ∀ t, qb t ≤ (seed t).length)
+    (s : Fin (qb i + 1)) (u : spec.Range i) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle oa).run' ((seed.takeAtIndex i ↑s).addValue i u))
+      (Function.update 0 i (qb i - (↑s + 1))) := by
+  refine isPerIndexQueryBound_run'_of_seedCoverage
+    (oa := oa) (qb := qb) (residual := Function.update 0 i (qb i - (↑s + 1)))
+    (seed := (seed.takeAtIndex i ↑s).addValue i u) hqb ?_
+  intro t
+  by_cases ht : t = i
+  · subst ht
+    have hs0 : ↑s ≤ qb t := Nat.lt_succ_iff.mp s.2
+    have hlen : qb t ≤ (seed t).length := hcover t
+    have hs' : ↑s ≤ (seed t).length := le_trans hs0 hlen
+    simp [QuerySeed.addValue, QuerySeed.addValues]
+    omega
+  · simp [QuerySeed.addValue, QuerySeed.addValues, ht, hcover t]
+
+end queryBounds
 
 end seededOracle

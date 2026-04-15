@@ -38,6 +38,7 @@ Uses `AddWriterT` (defined in `ToMathlib.Control.WriterT`) for additive cost acc
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal
+open scoped BigOperators
 
 /-! ## Cost Model, Cost Oracle, Cost Distribution
 
@@ -349,62 +350,114 @@ theorem WorstCaseCostBound.toIsPerIndexQueryBound_unit
   intro z hz
   simpa [WorstCaseCostBound, costDist, instrumentedRun] using h z hz
 
+private lemma sum_update_pred_eq
+    [DecidableEq ι] [Fintype ι]
+    (qb : ι → ℕ) (t : ι) (ht : 0 < qb t) :
+    (∑ j, Function.update qb t (qb t - 1) j) + 1 = ∑ j, qb j := by
+  have hsum :
+      Finset.sum (Finset.univ.erase t) (fun j => Function.update qb t (qb t - 1) j) =
+        Finset.sum (Finset.univ.erase t) qb := by
+    refine Finset.sum_congr rfl ?_
+    intro x hx
+    simp [Function.update, Finset.mem_erase.mp hx |>.1]
+  calc
+    (∑ j, Function.update qb t (qb t - 1) j) + 1
+        = ((qb t - 1) +
+            Finset.sum (Finset.univ.erase t) (fun j => Function.update qb t (qb t - 1) j)) + 1 := by
+            rw [← Finset.add_sum_erase Finset.univ
+              (fun j => Function.update qb t (qb t - 1) j) (Finset.mem_univ t)]
+            simp [Function.update]
+    _ = ((qb t - 1) + Finset.sum (Finset.univ.erase t) qb) + 1 := by
+          rw [hsum]
+    _ = qb t + Finset.sum (Finset.univ.erase t) qb := by
+          omega
+    _ = ∑ j, qb j := by
+          simpa using Finset.add_sum_erase Finset.univ qb (Finset.mem_univ t)
+
+/-- If `main` makes at most `qb i` queries to each oracle `i`, then its total query count
+(under the unit cost model) is at most `∑ i, qb i` on every execution path. -/
+theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
+    [DecidableEq ι] [Fintype ι] [spec.Inhabited]
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb) :
+    WorstCaseCostBound oa CostModel.unit (∑ i, qb i) := by
+  have haux :
+      ∀ {oa : OracleComp spec α} {qb : ι → ℕ},
+        IsPerIndexQueryBound oa qb →
+          AddWriterT.QueryBoundedAboveBy (instrumentedRun oa CostModel.unit) (∑ i, qb i) := by
+    intro oa
+    induction oa using OracleComp.inductionOn with
+    | pure x =>
+        intro qb _
+        exact AddWriterT.queryBoundedAboveBy_mono
+          (by simpa [instrumentedRun] using
+            (AddWriterT.queryBoundedAboveBy_pure (m := OracleComp spec) x))
+          (Nat.zero_le _)
+    | query_bind t mx ih =>
+        intro qb hqb
+        rw [isPerIndexQueryBound_query_bind_iff] at hqb
+        have hquery :
+            AddWriterT.QueryBoundedAboveBy
+              (instrumentedRun
+                (liftM (query t) : OracleComp spec (spec.Range t))
+                CostModel.unit) 1 := by
+          change AddWriterT.QueryBoundedAboveBy
+            (HasQuery.withUnitCost
+              (fun [HasQuery spec (AddWriterT ℕ (OracleComp spec))] =>
+                HasQuery.query (spec := spec) (m := AddWriterT ℕ (OracleComp spec)) t)
+              (QueryRuntime.oracleCompRuntime (spec := spec)))
+            1
+          exact HasQuery.queryBoundedAboveBy_withUnitCost_query
+            (runtime := QueryRuntime.oracleCompRuntime (spec := spec)) t
+        have hcont :
+            ∀ u,
+              AddWriterT.QueryBoundedAboveBy
+                (instrumentedRun (mx u) CostModel.unit)
+                (∑ i, Function.update qb t (qb t - 1) i) := by
+          intro u
+          exact ih u (qb := Function.update qb t (qb t - 1)) (hqb.2 u)
+        have hbind :=
+          AddWriterT.queryBoundedAboveBy_bind
+            (oa := instrumentedRun
+              (liftM (query t) : OracleComp spec (spec.Range t))
+              CostModel.unit)
+            (f := fun u => instrumentedRun (mx u) CostModel.unit)
+            (n₁ := 1) (n₂ := ∑ i, Function.update qb t (qb t - 1) i)
+            hquery hcont
+        refine AddWriterT.queryBoundedAboveBy_mono
+          (oa := instrumentedRun (liftM (query t) >>= mx) CostModel.unit)
+          (n₁ := 1 + ∑ i, Function.update qb t (qb t - 1) i)
+          (n₂ := ∑ i, qb i)
+          ?_ ?_
+        · simpa [instrumentedRun, simulateQ_bind] using hbind
+        · have hsum := sum_update_pred_eq (qb := qb) (t := t) hqb.1
+          omega
+  exact haux h
+
+/-- Corollary: the expected total query count is also at most `∑ i, qb i`. Follows from the
+worst-case bound `toWorstCaseCostBound_unit_sum`. -/
+theorem IsPerIndexQueryBound.toExpectedCostBound_unit_sum
+    [DecidableEq ι] [Fintype ι] [spec.Fintype] [spec.Inhabited]
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb) :
+    ExpectedCostBound oa CostModel.unit (fun n ↦ (n : ENNReal)) (∑ i, qb i) := by
+  simpa using
+    (WorstCaseCostBound.toExpectedCostBound
+      (oa := oa) (cm := CostModel.unit) (bound := ∑ i, qb i)
+      (val := fun n ↦ (n : ENNReal))
+      (hstrict := IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum h)
+      (hval_mono := fun a b hle ↦ by
+        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+
 end UnitCostBridge
 
-/-! ## Polynomial-Time Predicates
+namespace OracleComp
 
-Asymptotic polynomial-time predicates for families of computations indexed by a
-security parameter `n : ℕ`. These connect the cost model to asymptotic complexity. -/
+/-- Run a `ProbComp` with unit-cost instrumentation: each call to the uniform-selection oracle
+is counted as cost 1. -/
+abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
+    AddWriterT ℕ ProbComp β :=
+  simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa
 
-section PolyTime
+end OracleComp
 
-variable [AddCommMonoid ω]
-variable [spec.Fintype] [spec.Inhabited]
-
-/-- All execution paths of `family n` have valued cost at most `p(n)` for some polynomial `p`.
-
-Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
-def WorstCasePolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
-    (val : ω → ℕ) : Prop :=
-  ∃ p : Polynomial ℕ, ∀ n z, z ∈ support (costDist (family n) cm) → val z.2 ≤ p.eval n
-
-/-- Expected valued cost of `family n` is at most `p(n)` for some polynomial `p`.
-
-Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
-def ExpectedPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
-    (val : ω → ℝ≥0∞) : Prop :=
-  ∃ p : Polynomial ℕ, ∀ n, expectedCost (family n) cm val ≤ ↑(p.eval n)
-
-/-- Strict polynomial time implies expected polynomial time.
-If every execution path's cost is bounded by `p(n)`, then the expected cost is also
-bounded by `p(n)` (since the expectation of a bounded random variable is at most the bound). -/
-theorem WorstCasePolyTime.toExpectedPolyTime (family : ℕ → OracleComp spec α)
-    (cm : CostModel spec ω) (val : ω → ℕ)
-    (h : WorstCasePolyTime family cm val) :
-    ExpectedPolyTime family cm (fun w => ↑(val w)) := by
-  obtain ⟨p, hp⟩ := h
-  exact ⟨p, fun n => expectedCost_le_of_support_bound _ _ _ _ fun z hz =>
-    Nat.cast_le.mpr (hp n z hz)⟩
-
-/-- Strict polynomial time under the unit cost model yields polynomial query bounds.
-The resulting per-index bound uses the same polynomial for every oracle index, since
-each individual query count is bounded by the total unit cost. -/
-noncomputable def WorstCasePolyTime.toPolyQueries_unit [DecidableEq ι]
-    (family : ℕ → OracleComp spec α)
-    (h : WorstCasePolyTime family CostModel.unit id) :
-    PolyQueries (ι := ι) (spec := fun _ => spec) (α := fun _ => PUnit) (β := fun _ => α)
-      (fun n _ => family n) := by
-  classical
-  let p : Polynomial ℕ := Classical.choose h
-  have hp := Classical.choose_spec h
-  refine ⟨fun _ => p, ?_⟩
-  intro n _
-  have hbound : WorstCaseCostBound (family n) CostModel.unit (p.eval n) := by
-    intro z hz
-    change Multiplicative.toAdd z.2 ≤ p.eval n
-    simpa [p] using hp n (z.1, Multiplicative.toAdd z.2)
-      (by simpa [costDist, instrumentedRun] using hz)
-  exact WorstCaseCostBound.toIsPerIndexQueryBound_unit
-    (oa := family n) (bound := p.eval n) hbound
-
-end PolyTime

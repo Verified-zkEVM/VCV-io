@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.Coercions.Add
 import ToMathlib.Data.ENNReal.SumSquares
 
@@ -16,28 +17,26 @@ The forking lemma is a key tool in provable security. Given an adversary that su
 some probability, the "fork" runs it twice with shared randomness up to a chosen query index,
 then re-samples one oracle response, bounding the probability that both runs succeed.
 
-## API changes from old version
-
-- `OracleComp` no longer has `Alternative`, so `guard`/`getM` are unavailable.
-  `fork` now returns `OracleComp spec (Option (α × α))` with explicit matching.
-- `seededOracle` uses `StateT` (not `ReaderT`), so `.run' seed` discards the final state.
-- Old probability notation `[= x | ...]` → `Pr[= x | ...]`, `[⊥ | ...]` → `Pr[= none | ...]`.
-- `generateSeed` returns `ProbComp`, lifted via `liftComp`.
+`fork` returns `OracleComp spec (Option (α × α))` with explicit matching on success/failure.
+The seeded replay uses `seededOracle` via `StateT`, and `generateSeed` produces the initial
+seed as a `ProbComp` lifted into `spec`.
 -/
 
-open OracleSpec OracleComp ENNReal Function Finset
+open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
 
 namespace OracleComp
 
-variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
-  [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
-  {α β γ : Type}
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} {α β γ : Type}
 
 /-- Bundles the inputs to the forking lemma. -/
 structure ForkInput (spec : OracleSpec ι) (α : Type) where
   main : OracleComp spec α
   queryBound : ι → ℕ
   js : List ι
+
+section forkDef
+
+variable [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
 
 /-- The forking operation: run `main` with a random seed, then re-run it with the seed modified
 at the `s`-th query to oracle `i` (where `s = cf x₁`), checking that both runs agree on `cf`.
@@ -68,8 +67,280 @@ def fork (main : OracleComp spec α)
       else
         return none
 
+/-- The deterministic core of `fork` with the random seed and replacement value already fixed.
+
+Runs `main` once against `seed`, checks whether the fork-index selector `cf` fires, and if so
+replays `main` against a modified seed where the `(cf x₁)`-th answer to oracle `i` is replaced
+by `u`. Returns the pair `(x₁, x₂)` when both runs agree on the fork index.
+
+The only remaining randomness comes from `main`'s own oracle queries that fall outside the
+seed (i.e. queries beyond the budget `qb`). -/
+def forkWithSeedValue (main : OracleComp spec α)
+    (qb : ι → ℕ) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    (seed : QuerySeed spec) (u : spec.Range i) :
+    OracleComp spec (Option (α × α)) := do
+  let x₁ ← (simulateQ seededOracle main).run' seed
+  match cf x₁ with
+  | none => return none
+  | some s =>
+    if (seed i)[↑s]? = some u then
+      return none
+    else
+      let seed' := (seed.takeAtIndex i ↑s).addValue i u
+      let x₂ ← (simulateQ seededOracle main).run' seed'
+      if cf x₂ = some s then
+        return some (x₁, x₂)
+      else
+        return none
+
+end forkDef
+
+/-- When the seed has at least `qb t` pre-generated answers for each oracle `t`, running `main`
+against the seed makes zero live oracle queries (every query is answered from the seed). -/
+theorem isPerIndexQueryBound_firstRun_seeded
+    (main : OracleComp spec α) (qb : ι → ℕ)
+    {seed : QuerySeed spec}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length) :
+    IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
+  seededOracle.isPerIndexQueryBound_run'_zero
+    (oa := main) (qb := qb) (seed := seed) hmain hseed
+
+/-- After truncating the seed at query index `s` for oracle `i` and inserting a fresh answer `u`,
+the replayed run can make at most `qb i - (s + 1)` live queries, all to oracle `i`.
+All other oracle families remain fully covered by the seed. -/
+theorem isPerIndexQueryBound_replayAfterFork
+    (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
+    {seed : QuerySeed spec} {u : spec.Range i}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length)
+    (s : Fin (qb i + 1)) :
+    IsPerIndexQueryBound
+      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
+      (Function.update 0 i (qb i - (↑s + 1))) :=
+  seededOracle.isPerIndexQueryBound_run'_takeAtIndex_addValue
+    (oa := main) (qb := qb) (seed := seed) (i := i) hmain hseed s u
+
+private lemma isPerIndexQueryBound_if_pure
+    {p : Prop} [Decidable p]
+    {oa : OracleComp spec α} {qb : ι → ℕ} {x : α}
+    (h : IsPerIndexQueryBound oa qb) :
+    IsPerIndexQueryBound (if p then pure x else oa) qb := by
+  by_cases hp : p
+  · simp [hp]
+  · simpa [hp] using h
+
+/-- `forkWithSeedValue` makes at most `qb i` live queries, all to oracle `i`.
+
+The first seeded run is query-free (covered by the seed); the replay after the fork point uses
+at most the remaining `i`-budget. The bound holds regardless of which fork index `cf` returns. -/
+theorem isPerIndexQueryBound_forkWithSeedValue_seeded
+    [spec.DecidableEq]
+    (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    {seed : QuerySeed spec} {u : spec.Range i}
+    (hmain : IsPerIndexQueryBound main qb)
+    (hseed : ∀ t, qb t ≤ (seed t).length) :
+    IsPerIndexQueryBound
+      (forkWithSeedValue main qb i cf seed u)
+      (Function.update 0 i (qb i)) := by
+  have hfirst :
+      IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
+    isPerIndexQueryBound_firstRun_seeded (main := main) (qb := qb) hmain hseed
+  let core : OracleComp spec (Option (α × α)) :=
+    ((simulateQ seededOracle main).run' seed) >>= fun x₁ =>
+      match cf x₁ with
+      | none => pure none
+      | some s =>
+        if (seed i)[↑s]? = some u then
+          pure none
+        else
+          let seed' := (seed.takeAtIndex i ↑s).addValue i u
+          (simulateQ seededOracle main).run' seed' >>= fun x₂ =>
+            if cf x₂ = some s then
+              pure (some (x₁, x₂))
+            else
+              pure none
+  have hbind :
+      IsPerIndexQueryBound
+        core
+        ((0 : QueryCount ι) + Function.update (0 : QueryCount ι) i (qb i)) := by
+    refine isPerIndexQueryBound_bind hfirst ?_
+    intro x₁
+    cases hcf : cf x₁ with
+    | none =>
+        exact isPerIndexQueryBound_pure (spec := spec) (x := (none : Option (α × α)))
+          (qb := Function.update 0 i (qb i))
+    | some s =>
+        let seed' := (seed.takeAtIndex i ↑s).addValue i u
+        have hreplay :
+            IsPerIndexQueryBound
+              ((simulateQ seededOracle main).run' seed')
+              (Function.update 0 i (qb i - (↑s + 1))) :=
+          isPerIndexQueryBound_replayAfterFork
+            (main := main) (qb := qb) (i := i) (seed := seed) (u := u)
+            hmain hseed s
+        have hreplay' :
+            IsPerIndexQueryBound
+              ((simulateQ seededOracle main).run' seed')
+              (Function.update 0 i (qb i)) :=
+          hreplay.mono <| by
+            intro j
+            by_cases hj : j = i
+            · subst hj
+              simp [Function.update]
+            · simp [Function.update, hj]
+        have hpost :
+            ∀ x₂ : α,
+              IsPerIndexQueryBound
+                (if cf x₂ = some s then
+                    (pure (some (x₁, x₂)) : OracleComp spec (Option (α × α)))
+                  else
+                    pure none)
+                0 := by
+          intro x₂
+          by_cases hx₂ : cf x₂ = some s <;> simp [hx₂]
+        have hcont :
+            IsPerIndexQueryBound
+              (((simulateQ seededOracle main).run' seed') >>= fun x₂ =>
+                if cf x₂ = some s then
+                  (pure (some (x₁, x₂)) : OracleComp spec (Option (α × α)))
+                else
+                  pure none)
+              (Function.update 0 i (qb i)) :=
+          isPerIndexQueryBound_bind hreplay' hpost
+        have hguarded :
+            IsPerIndexQueryBound
+              (if (seed i)[↑s]? = some u then
+                  (pure none : OracleComp spec (Option (α × α)))
+                else
+                  (((simulateQ seededOracle main).run' seed') >>= fun x₂ =>
+                    if cf x₂ = some s then
+                      (pure (some (x₁, x₂)) : OracleComp spec (Option (α × α)))
+                    else
+                      pure none))
+              (Function.update 0 i (qb i)) :=
+          isPerIndexQueryBound_if_pure (x := (none : Option (α × α))) hcont
+        simpa [seed'] using hguarded
+  have hbind' :
+      IsPerIndexQueryBound core (Function.update 0 i (qb i)) := by
+    simpa [Pi.zero_apply] using hbind
+  simpa [forkWithSeedValue, core] using hbind'
+
+section generateSeedCoverage
+
+variable [∀ i, SampleableType (spec.Range i)]
+
+/-- The expected unit-cost query count of `forkWithSeedValue`, averaged over the randomly
+sampled seed and replacement value, is at most `qb i`. -/
+theorem expectedQueryCount_forkWithSeedValue_le
+    [spec.DecidableEq]
+    [Finite ι] [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js) :
+    wp (generateSeed spec qb js)
+      (fun seed =>
+        wp ($ᵗ spec.Range i)
+          (fun u =>
+            expectedCost
+              (forkWithSeedValue main qb i cf seed u)
+              CostModel.unit
+              (fun n : ℕ ↦ (n : ENNReal))))
+      ≤ qb i := by
+  letI : Fintype ι := Fintype.ofFinite ι
+  rw [wp_eq_tsum]
+  calc
+    ∑' seed : QuerySeed spec,
+        Pr[= seed | generateSeed spec qb js] *
+          wp ($ᵗ spec.Range i)
+            (fun u =>
+              expectedCost
+                (forkWithSeedValue main qb i cf seed u)
+                CostModel.unit
+                (fun n : ℕ ↦ (n : ENNReal)))
+      ≤ ∑' seed : QuerySeed spec,
+          Pr[= seed | generateSeed spec qb js] * (qb i : ENNReal) := by
+            refine ENNReal.tsum_le_tsum ?_
+            intro seed
+            by_cases hseed : seed ∈ support (generateSeed spec qb js)
+            · refine mul_le_mul_of_nonneg_left ?_ (zero_le _)
+              have hseedCov := generateSeed_covers_queryBound (spec := spec) qb js hjs hseed
+              have hwp : wp ($ᵗ spec.Range i) (fun u =>
+                    expectedCost (forkWithSeedValue main qb i cf seed u)
+                      CostModel.unit (fun n : ℕ ↦ (n : ENNReal))) ≤
+                  wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) := by
+                refine wp_mono ($ᵗ spec.Range i) ?_
+                intro u
+                have hbound := isPerIndexQueryBound_forkWithSeedValue_seeded
+                  (main := main) (qb := qb) (i := i) (cf := cf) (u := u) hmain hseedCov
+                have hsum : ∑ j, Function.update (0 : QueryCount ι) i (qb i) j = qb i := by
+                  classical
+                  rw [← Finset.add_sum_erase Finset.univ
+                    (Function.update (0 : QueryCount ι) i (qb i)) (Finset.mem_univ i)]
+                  simp [Function.update]
+                simpa [ExpectedCostBound, hsum] using
+                  (WorstCaseCostBound.toExpectedCostBound
+                    (IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum hbound)
+                    (fun a b hle ↦ by
+                      simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+              exact le_trans hwp (le_of_eq (wp_const ($ᵗ spec.Range i) (qb i : ENNReal)))
+            · rw [probOutput_eq_zero_of_not_mem_support hseed]; simp
+    _ ≤ qb i := by
+          exact le_of_eq (by
+            rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul])
+
+section forkRuntime
+
+variable [spec.DecidableEq]
+variable [Finite ι] [spec.Fintype] [spec.Inhabited]
+
+/-- Total expected query work of one fork attempt. The LHS decomposes as three terms:
+
+1. **Seed generation**: `∑ j in js, qb j * sampleCost j` uniform-oracle calls to build the seed.
+2. **Replacement sample**: `sampleCost i` calls to sample one fresh value at the forked oracle `i`.
+3. **Replay queries**: at most `qb i` live queries during the replayed execution.
+
+The RHS is their sum: `(∑ j in js, qb j * sampleCost j) + sampleCost i + qb i`. -/
+theorem forkExpectedQueryWork_le
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j))
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js) :
+    AddWriterT.expectedCostNat (probCompUnitQueryRun (generateSeed spec qb js)) +
+      AddWriterT.expectedCostNat
+        (probCompUnitQueryRun ($ᵗ spec.Range i : ProbComp (spec.Range i))) +
+      wp (generateSeed spec qb js)
+        (fun seed =>
+          wp ($ᵗ spec.Range i)
+            (fun u =>
+              expectedCost
+                (forkWithSeedValue main qb i cf seed u)
+                CostModel.unit
+                (fun n : ℕ ↦ (n : ENNReal)))) ≤
+      ((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ENNReal) := by
+  have hgen := generateSeed_queryCostExactly (spec := spec) qb js sampleCost hSample
+  have hgen_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy hgen.toAbove
+  have hi_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSample i).toAbove
+  have hcore :=
+    expectedQueryCount_forkWithSeedValue_le
+      (main := main) (qb := qb) (js := js) (i := i) (cf := cf) hmain hjs
+  exact add_le_add (add_le_add hgen_le hi_le) hcore
+
+end forkRuntime
+
+end generateSeedCoverage
+
 variable (main : OracleComp spec α) (qb : ι → ℕ)
     (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
+    [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
     [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec]
 
 omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
