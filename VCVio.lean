@@ -126,6 +126,7 @@ import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.Enforcement
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.ObservationOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.RandomOracle
@@ -152,6 +153,7 @@ import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
+import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common

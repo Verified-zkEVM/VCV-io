@@ -346,6 +346,16 @@ theorem relTriple'_iff_relTriple
     RelTriple' oa ob R ↔ RelTriple oa ob R := by
   rw [relTriple'_iff_couplingPost, relTriple_iff_relWP, relWP_iff_couplingPost]
 
+/-- If a `RelTriple'` holds for `fun a b => f a = g b`, then mapping by `f` and `g`
+produces equal distributions. This is the eRHL-level version of
+`evalDist_map_eq_of_relTriple`. -/
+lemma evalDist_map_eq_of_relTriple' {σ : Type}
+    {f : α → σ} {g : β → σ}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (h : RelTriple' oa ob (fun a b => f a = g b)) :
+    evalDist (f <$> oa) = evalDist (g <$> ob) :=
+  evalDist_map_eq_of_relTriple (relTriple'_iff_relTriple.mp h)
+
 /-! ## eRHL rules -/
 
 /-- Pure rule for eRHL. -/
