@@ -315,6 +315,15 @@ lemma relTriple_map {R : RelPost γ δ}
     MAlgRelOrdered.relWP_map_left f oa (g <$> ob) _
   exact le_trans h (le_trans h1 h2)
 
+/-- If a relational triple holds for `fun a b => f a = g b`, then mapping by `f` and `g`
+produces equal distributions. Generalizes `evalDist_eq_of_relTriple_eqRel`. -/
+lemma evalDist_map_eq_of_relTriple {σ : Type}
+    {f : α → σ} {g : β → σ}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (h : RelTriple oa ob (fun a b => f a = g b)) :
+    evalDist (f <$> oa) = evalDist (g <$> ob) :=
+  evalDist_eq_of_relTriple_eqRel (relTriple_map (R := EqRel σ) h)
+
 private lemma list_eq_of_forall₂_eqRel {xs ys : List α}
     (hxy : List.Forall₂ (EqRel α) xs ys) : xs = ys := by
   induction hxy with

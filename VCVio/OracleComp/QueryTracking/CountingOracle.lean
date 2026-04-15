@@ -34,7 +34,22 @@ variable {ω : Type u} [Monoid ω]
 
 /-- Wrap an oracle implementation to accumulate cost in a `WriterT ω` layer.
 The cost function `costFn` assigns a cost value to each oracle query.
-Cost is accumulated before the implementation runs, so failed queries are still costed. -/
+Cost is accumulated before the implementation runs, so failed queries are still costed.
+
+**Side-channel trace instrumentation.**
+`withCost` doubles as automatic side-channel instrumentation: given any
+`OracleComp spec α` and a cost function `costFn : spec.Domain → ω`,
+`(simulateQ (base.withCost costFn) oa).run` produces `m (α × ω)` without
+modifying the computation's source code. The cost function encodes the
+observation model:
+
+* `fun _ => ()` (constant-time): every query looks identical to the observer.
+* `fun t => queryLabel t` (typed): the observer sees which oracle was queried
+  but not the arguments or results.
+
+This is the preferred approach when the observation model is "every oracle
+query is visible." For observations at non-query points (e.g. pure-computation
+timing), use the explicit `observe` / `runObs` API from `ObservationOracle`. -/
 def withCost (so : QueryImpl spec m) (costFn : spec.Domain → ω) :
     QueryImpl spec (WriterT ω m) :=
   fun t => do tell (costFn t); so t
@@ -64,6 +79,41 @@ lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) := by
   simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withCost]
+
+/-- When every query costs the monoid identity `1`, the trace is always `1`,
+so `withCost` is a no-op up to pairing with `1`. -/
+@[simp]
+lemma run_simulateQ_withCost_const_one [LawfulMonad m]
+    (so : QueryImpl spec m) (mx : OracleComp spec α) :
+    (simulateQ (so.withCost (fun _ => (1 : ω))) mx).run =
+      (·, 1) <$> simulateQ so mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih => simp [ih]
+
+/-! ### EvalDist Bridge for `withCost`
+
+These lemmas connect the result-marginal distribution of a `withCost`-instrumented
+computation to the distribution of the uninstrumented computation, enabling direct
+probability-level reasoning about traced computations. -/
+
+lemma evalDist_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    evalDist (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
+      evalDist (simulateQ so mx) :=
+  congrArg evalDist (fst_map_run_withCost so costFn mx)
+
+lemma probOutput_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
+    Pr[= x | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
+      Pr[= x | simulateQ so mx] := by
+  rw [fst_map_run_withCost]
+
+lemma support_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    support (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
+      support (simulateQ so mx) := by
+  rw [fst_map_run_withCost]
 
 end withCost
 
@@ -102,6 +152,35 @@ def countingOracle [DecidableEq ι] :
 
 lemma countingOracle_eq_costOracle [DecidableEq ι] :
     countingOracle (spec := spec) = costOracle (QueryCount.single ·) := rfl
+
+namespace costOracle
+
+variable {ω : Type u} [Monoid ω]
+
+@[simp]
+lemma fst_map_run_simulateQ (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (costOracle costFn) oa).run = oa := by
+  rw [costOracle, QueryImpl.fst_map_run_withCost, simulateQ_ofLift_eq_self]
+
+@[simp]
+lemma evalDist_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    evalDist (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = evalDist oa := by
+  rw [fst_map_run_simulateQ]
+
+@[simp]
+lemma probOutput_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) (x : α) :
+    Pr[= x | Prod.fst <$> (simulateQ (costOracle costFn) oa).run] = Pr[= x | oa] := by
+  rw [fst_map_run_simulateQ]
+
+@[simp]
+lemma support_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    support (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = support oa := by
+  rw [fst_map_run_simulateQ]
+
+end costOracle
 
 namespace countingOracle
 
