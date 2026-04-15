@@ -10,6 +10,7 @@ import Examples.CommitmentScheme.Hiding.LoggingBounds
 import Examples.CommitmentScheme.Hiding.LoggingBounds.Average
 import Examples.CommitmentScheme.Hiding.LoggingBounds.QuerySalt
 import Examples.CommitmentScheme.Hiding.Main
+import Examples.CompositionDiagram
 import Examples.ElGamal.Basic
 import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
