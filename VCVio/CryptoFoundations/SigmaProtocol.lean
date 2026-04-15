@@ -88,6 +88,25 @@ def SpeciallySoundAt (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 def SpeciallySound (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) : Prop :=
   ∀ x, SpeciallySoundAt σ x
 
+/-- Special soundness immediately validates any witness returned by the Σ-protocol extractor from
+two accepting transcripts with the same statement and commitment and with distinct challenges. -/
+theorem extract_sound_of_speciallySoundAt
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) {x : Stmt}
+    (hss : σ.SpeciallySoundAt x)
+    {pc : Commit} {ω₁ ω₂ : Chal} {p₁ p₂ : Resp} (hω : ω₁ ≠ ω₂)
+    (hv₁ : σ.verify x pc ω₁ p₁ = true) (hv₂ : σ.verify x pc ω₂ p₂ = true)
+    {w : Wit} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
+    rel x w = true :=
+  hss pc ω₁ ω₂ p₁ p₂ hω hv₁ hv₂ w hw
+
+theorem extract_sound_of_speciallySound
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) (hss : σ.SpeciallySound)
+    {x : Stmt} {pc : Commit} {ω₁ ω₂ : Chal} {p₁ p₂ : Resp} (hω : ω₁ ≠ ω₂)
+    (hv₁ : σ.verify x pc ω₁ p₁ = true) (hv₂ : σ.verify x pc ω₂ p₂ = true)
+    {w : Wit} (hw : w ∈ support (σ.extract ω₁ p₁ ω₂ p₂)) :
+    rel x w = true :=
+  extract_sound_of_speciallySoundAt σ (hss x) hω hv₁ hv₂ hw
+
 end speciallySound
 
 section hvzk

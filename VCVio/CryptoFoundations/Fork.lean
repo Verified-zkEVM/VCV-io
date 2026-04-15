@@ -104,6 +104,32 @@ def forkWithSeedValue (main : OracleComp spec α)
       else
         return none
 
+/-- Deterministic postprocessing of [`forkWithSeedValue`] that re-attaches the original query
+value at the chosen fork point, when that point lies within the sampled seed. -/
+def attachForkQueryValues
+    (qb : ι → ℕ) (i : ι) (cf : α → Option (Fin (qb i + 1)))
+    (seed : QuerySeed spec) (u : spec.Range i) :
+    Option (α × α) → Option (α × spec.Range i × α × spec.Range i)
+  | r => do
+      let (x₁, x₂) ← r
+      let s ← cf x₁
+      let u₀ ← (seed i)[↑s]?
+      return (x₁, u₀, x₂, u)
+
+/-- Forking wrapper that exposes the original and replacement values at the chosen fork point.
+
+Operationally this is the same fork core as [`fork`], with the same seed generation and replay
+pattern. The only difference is the return payload: on success it includes both the original
+seeded value and the fresh replacement value at the chosen oracle family `i`. -/
+def forkWithQueryValues (main : OracleComp spec α)
+    (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1))) :
+    OracleComp spec (Option (α × spec.Range i × α × spec.Range i)) := do
+  let seed ← liftComp (generateSeed spec qb js) spec
+  let u ← liftComp ($ᵗ spec.Range i) spec
+  let r ← forkWithSeedValue main qb i cf seed u
+  return attachForkQueryValues qb i cf seed u r
+
 end forkDef
 
 /-- If a seed already contains enough answers for every oracle family covered by `qb`, then the
@@ -275,366 +301,6 @@ lemma generateSeed_covers_queryBound
     OracleComp.le_length_of_mem_support_generateSeed_of_covers
       (spec := spec) (qc := qb) (js := js) seed t hseed hjs
 
-/-- If `main` satisfies structural query bound `qb` and `js` covers all positive entries of `qb`,
-then every seed sampled by `generateSeed spec qb js` makes the first seeded run of `main`
-oracle-free. -/
-theorem isPerIndexQueryBound_firstRun_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
-    {seed : QuerySeed spec}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
-  isPerIndexQueryBound_firstRun_seeded
-    (main := main) (qb := qb) hmain
-    (generateSeed_covers_queryBound (spec := spec) qb js hjs hseed)
-
-/-- If `main` satisfies structural query bound `qb` and `js` covers all positive entries of `qb`,
-then every seed sampled by `generateSeed spec qb js` yields the standard replay bound after
-rewinding at oracle `i` and resampling the `(s+1)`-st answer there. -/
-theorem isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1)) :
-    IsPerIndexQueryBound
-      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-      (Function.update 0 i (qb i - (↑s + 1))) :=
-  isPerIndexQueryBound_replayAfterFork
-    (main := main) (qb := qb) (i := i) (u := u) hmain
-    (generateSeed_covers_queryBound (spec := spec) qb js hjs hseed) s
-
-/-- If `seed` is sampled from `generateSeed spec qb js` and `js` covers all positive query
-budgets, then the fixed-seed fork core makes live queries only to the forked family `i`, with
-uniform budget `qb i`. -/
-theorem isPerIndexQueryBound_forkWithSeedValue_of_mem_support_generateSeed
-    [spec.DecidableEq]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    (cf : α → Option (Fin (qb i + 1)))
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    IsPerIndexQueryBound
-      (forkWithSeedValue main qb i cf seed u)
-      (Function.update 0 i (qb i)) :=
-  isPerIndexQueryBound_forkWithSeedValue_seeded
-    (main := main) (qb := qb) (i := i) (cf := cf) (u := u) hmain
-    (generateSeed_covers_queryBound (spec := spec) qb js hjs hseed)
-
-/-- Under the same coverage hypotheses as
-[`isPerIndexQueryBound_firstRun_of_mem_support_generateSeed`], the counting oracle records zero
-live queries on every reachable execution of the first seeded run. -/
-theorem firstRun_queryCount_eq_zero_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
-    {seed : QuerySeed spec} {z : α × QueryCount ι}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (hz : z ∈ support (countingOracle.simulate ((simulateQ seededOracle main).run' seed) 0)) :
-    z.2 = 0 := by
-  have hbound :
-      IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
-    isPerIndexQueryBound_firstRun_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) hmain hjs hseed
-  have hzle : z.2 ≤ 0 := hbound.counting_bounded hz
-  funext t
-  exact Nat.eq_zero_of_le_zero (hzle t)
-
-/-- Under the same coverage hypotheses as
-[`isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed`], every reachable execution
-of the replay after the fork point makes live queries only to `i`, and at most
-`qb i - (s + 1)` of them remain. -/
-theorem replayAfterFork_queryCount_le_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1))
-    (hz :
-      z ∈ support
-        (countingOracle.simulate
-          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
-    z.2 ≤ Function.update (0 : QueryCount ι) i (qb i - (↑s + 1)) := by
-  have hbound :
-      IsPerIndexQueryBound
-        ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-        (Function.update (0 : QueryCount ι) i (qb i - (↑s + 1))) :=
-    isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i) (u := u) hmain hjs hseed s
-  exact hbound.counting_bounded hz
-
-/-- In the replay after the fork point, the only live oracle family that can still be queried is
-the forked family `i`. -/
-theorem replayAfterFork_queryCount_eq_zero_of_ne_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1))
-    (hz :
-      z ∈ support
-        (countingOracle.simulate
-          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0))
-    {j : ι} (hj : j ≠ i) :
-    z.2 j = 0 := by
-  have hzle :=
-    replayAfterFork_queryCount_le_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i)
-      (u := u) (z := z) hmain hjs hseed s hz
-  exact Nat.eq_zero_of_le_zero (by simpa [Function.update_of_ne hj] using hzle j)
-
-/-- At the forked oracle family `i`, the replay after the fork point makes at most
-`qb i - (s + 1)` live queries. In the common single-oracle setting, this is the familiar
-`q - (s + 1)` replay bound. -/
-theorem replayAfterFork_queryCount_atFork_le_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1))
-    (hz :
-      z ∈ support
-        (countingOracle.simulate
-          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
-    z.2 i ≤ qb i - (↑s + 1) := by
-  have hzle :=
-    replayAfterFork_queryCount_le_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i)
-      (u := u) (z := z) hmain hjs hseed s hz
-  simpa using hzle i
-
-section singleOracle
-
-variable [Fintype ι]
-
-/-- The total number of live queries made by the replay after the fork point is at most
-`qb i - (s + 1)`.
-
-This is the textbook one-oracle replay-cost statement extracted from the more general
-per-index bound above. -/
-theorem replayAfterFork_totalQueryCount_le_of_mem_support_generateSeed
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i} {z : α × QueryCount ι}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1))
-    (hz :
-      z ∈ support
-        (countingOracle.simulate
-          ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u)) 0)) :
-    ∑ j, z.2 j ≤ qb i - (↑s + 1) := by
-  have hi :=
-    replayAfterFork_queryCount_atFork_le_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i)
-      (u := u) (z := z) hmain hjs hseed s hz
-  have hzero :
-      ∀ j, j ≠ i → z.2 j = 0 := by
-    intro j hj
-    exact replayAfterFork_queryCount_eq_zero_of_ne_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i)
-      (u := u) (z := z) hmain hjs hseed s hz hj
-  classical
-  rw [Finset.sum_eq_single i]
-  · exact hi
-  · intro j _ hj
-    simp [hzero j hj]
-  · intro hi_mem
-    exact (False.elim (hi_mem (Finset.mem_univ i)))
-
-end singleOracle
-
-section replayCostBounds
-
-/-- For any seed sampled from `generateSeed spec qb js`, the first seeded execution of `main`
-has zero live-query cost under the unit cost model.
-
-The seed already supplies all answers needed by the structural budget `qb`, so the first run is a
-pure table-lookup execution with no fallback to the ambient oracle. -/
-theorem firstRun_worstCaseQueryCountBound_of_mem_support_generateSeed
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
-    {seed : QuerySeed spec}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    WorstCaseCostBound
-      ((simulateQ seededOracle main).run' seed)
-      CostModel.unit
-      0 := by
-  letI : Fintype ι := Fintype.ofFinite ι
-  have hbound :
-      IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
-    isPerIndexQueryBound_firstRun_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) hmain hjs hseed
-  simpa using
-    (IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum (oa := _) hbound)
-
-/-- The first seeded execution also has expected live-query count `0` under the unit cost model. -/
-theorem firstRun_expectedQueryCountBound_of_mem_support_generateSeed
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι)
-    {seed : QuerySeed spec}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    ExpectedCostBound
-      ((simulateQ seededOracle main).run' seed)
-      CostModel.unit
-      (fun n ↦ (n : ENNReal))
-      0 := by
-  simpa using
-    (WorstCaseCostBound.toExpectedCostBound
-      (oa := (simulateQ seededOracle main).run' seed)
-      (cm := CostModel.unit)
-      (bound := 0)
-      (val := fun n : ℕ ↦ (n : ENNReal))
-      (hstrict :=
-        firstRun_worstCaseQueryCountBound_of_mem_support_generateSeed
-          (main := main) (qb := qb) (js := js) hmain hjs hseed)
-      (hval_mono := fun a b hle ↦ by
-        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
-
-/-- Once the seed is sampled from `generateSeed spec qb js`, the replay after the fork point has
-worst-case live-query cost at most `qb i - (s + 1)` under the unit cost model.
-
-Here "live query cost" means oracle queries that escape the seed and are answered by the ambient
-oracle during the replay. The first `s + 1` queries to the forked family are fixed by the seeded
-prefix, so only the remaining suffix can contribute to the unit-cost runtime. -/
-theorem replayAfterFork_worstCaseQueryCountBound_of_mem_support_generateSeed
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1)) :
-    WorstCaseCostBound
-      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-      CostModel.unit
-      (qb i - (↑s + 1)) := by
-  letI : Fintype ι := Fintype.ofFinite ι
-  have hbound :
-      IsPerIndexQueryBound
-        ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-        (Function.update (0 : QueryCount ι) i (qb i - (↑s + 1))) :=
-    isPerIndexQueryBound_replayAfterFork_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i) (u := u) hmain hjs hseed s
-  have hsum :
-      ∑ j, Function.update (0 : QueryCount ι) i (qb i - (↑s + 1)) j = qb i - (↑s + 1) := by
-    classical
-    rw [← Finset.add_sum_erase Finset.univ
-      (Function.update (0 : QueryCount ι) i (qb i - (↑s + 1))) (Finset.mem_univ i)]
-    simp [Function.update]
-  simpa [hsum] using
-    (IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum (oa := _) hbound)
-
-/-- The replay after the fork point also has expected live-query count at most
-`qb i - (s + 1)` under the unit cost model.
-
-This is the expectation-level replay-cost theorem corresponding to
-[`replayAfterFork_worstCaseQueryCountBound_of_mem_support_generateSeed`]. It bounds the expected
-number of live oracle queries made after rewinding, once the seed and new fork value are fixed. -/
-theorem replayAfterFork_expectedQueryCountBound_of_mem_support_generateSeed
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js))
-    (s : Fin (qb i + 1)) :
-    ExpectedCostBound
-      ((simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-      CostModel.unit
-      (fun n ↦ (n : ENNReal))
-      (qb i - (↑s + 1)) := by
-  simpa using
-    (WorstCaseCostBound.toExpectedCostBound
-      (oa := (simulateQ seededOracle main).run' ((seed.takeAtIndex i ↑s).addValue i u))
-      (cm := CostModel.unit)
-      (bound := qb i - (↑s + 1))
-      (val := fun n : ℕ ↦ (n : ENNReal))
-      (hstrict :=
-        replayAfterFork_worstCaseQueryCountBound_of_mem_support_generateSeed
-          (main := main) (qb := qb) (js := js) (i := i)
-          (u := u) hmain hjs hseed s)
-      (hval_mono := fun a b hle ↦ by
-        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
-
-/-- For a sampled seed and a fixed replacement value, the whole fork core has worst-case
-live-query count at most `qb i` under the unit cost model.
-
-This packages the first seeded run and the replay suffix into a single wrapper-level theorem:
-once the seed and fresh value are fixed, all live oracle traffic is confined to the replay after
-the fork point. -/
-theorem forkWithSeedValue_worstCaseQueryCountBound_of_mem_support_generateSeed
-    [spec.DecidableEq]
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    (cf : α → Option (Fin (qb i + 1)))
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    WorstCaseCostBound
-      (forkWithSeedValue main qb i cf seed u)
-      CostModel.unit
-      (qb i) := by
-  letI : Fintype ι := Fintype.ofFinite ι
-  have hbound :
-      IsPerIndexQueryBound
-        (forkWithSeedValue main qb i cf seed u)
-        (Function.update 0 i (qb i)) :=
-    isPerIndexQueryBound_forkWithSeedValue_of_mem_support_generateSeed
-      (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
-      (u := u) hmain hjs hseed
-  have hsum :
-      ∑ j, Function.update (0 : QueryCount ι) i (qb i) j = qb i := by
-    classical
-    rw [← Finset.add_sum_erase Finset.univ
-      (Function.update (0 : QueryCount ι) i (qb i)) (Finset.mem_univ i)]
-    simp [Function.update]
-  simpa [hsum] using
-    (IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum (oa := _) hbound)
-
-/-- Under the same hypotheses, the expected live-query count of the fixed-seed fork core is also
-at most `qb i`.
-
-This is the expectation-level wrapper theorem corresponding to
-[`forkWithSeedValue_worstCaseQueryCountBound_of_mem_support_generateSeed`]. -/
-theorem forkWithSeedValue_expectedQueryCountBound_of_mem_support_generateSeed
-    [spec.DecidableEq]
-    [Finite ι] [spec.Fintype] [spec.Inhabited]
-    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
-    (cf : α → Option (Fin (qb i + 1)))
-    {seed : QuerySeed spec} {u : spec.Range i}
-    (hmain : IsPerIndexQueryBound main qb)
-    (hjs : SeedListCovers qb js)
-    (hseed : seed ∈ support (generateSeed spec qb js)) :
-    ExpectedCostBound
-      (forkWithSeedValue main qb i cf seed u)
-      CostModel.unit
-      (fun n ↦ (n : ENNReal))
-      (qb i) := by
-  simpa using
-    (WorstCaseCostBound.toExpectedCostBound
-      (oa := forkWithSeedValue main qb i cf seed u)
-      (cm := CostModel.unit)
-      (bound := qb i)
-      (val := fun n : ℕ ↦ (n : ENNReal))
-      (hstrict :=
-        forkWithSeedValue_worstCaseQueryCountBound_of_mem_support_generateSeed
-          (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
-          (u := u) hmain hjs hseed)
-      (hval_mono := fun a b hle ↦ by
-        simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
-
 /-- Averaging the fixed-seed fork core over the sampled seed and the fresh replacement value
 preserves the bound `qb i` on expected live-query count.
 
@@ -658,6 +324,7 @@ theorem wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
               CostModel.unit
               (fun n : ℕ ↦ (n : ENNReal))))
       ≤ qb i := by
+  letI : Fintype ι := Fintype.ofFinite ι
   rw [wp_eq_tsum]
   calc
     ∑' seed : QuerySeed spec,
@@ -673,35 +340,138 @@ theorem wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
             refine ENNReal.tsum_le_tsum ?_
             intro seed
             by_cases hseed : seed ∈ support (generateSeed spec qb js)
-            · refine mul_le_mul_of_nonneg_left ?_ ?_
-              · have hwp :
-                    wp ($ᵗ spec.Range i)
-                      (fun u =>
-                        expectedCost
-                          (forkWithSeedValue main qb i cf seed u)
-                          CostModel.unit
-                          (fun n : ℕ ↦ (n : ENNReal))) ≤
-                    wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) := by
-                      refine wp_mono ($ᵗ spec.Range i) ?_
-                      intro u
-                      simpa [ExpectedCostBound] using
-                        (forkWithSeedValue_expectedQueryCountBound_of_mem_support_generateSeed
-                          (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
-                          (seed := seed) (u := u) hmain hjs hseed)
-                have hconst :
-                    wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) = qb i := by
-                  exact wp_const ($ᵗ spec.Range i) (qb i : ENNReal)
-                exact hconst ▸ hwp
-              · exact zero_le _
-            · have hp : Pr[= seed | generateSeed spec qb js] = 0 :=
-                probOutput_eq_zero_of_not_mem_support hseed
-              rw [hp]
-              simp
+            · refine mul_le_mul_of_nonneg_left ?_ (zero_le _)
+              have hseedCov := generateSeed_covers_queryBound (spec := spec) qb js hjs hseed
+              have hwp : wp ($ᵗ spec.Range i) (fun u =>
+                    expectedCost (forkWithSeedValue main qb i cf seed u)
+                      CostModel.unit (fun n : ℕ ↦ (n : ENNReal))) ≤
+                  wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) := by
+                refine wp_mono ($ᵗ spec.Range i) ?_
+                intro u
+                have hbound := isPerIndexQueryBound_forkWithSeedValue_seeded
+                  (main := main) (qb := qb) (i := i) (cf := cf) (u := u) hmain hseedCov
+                have hsum : ∑ j, Function.update (0 : QueryCount ι) i (qb i) j = qb i := by
+                  classical
+                  rw [← Finset.add_sum_erase Finset.univ
+                    (Function.update (0 : QueryCount ι) i (qb i)) (Finset.mem_univ i)]
+                  simp [Function.update]
+                simpa [ExpectedCostBound, hsum] using
+                  (WorstCaseCostBound.toExpectedCostBound
+                    (IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum hbound)
+                    (fun a b hle ↦ by
+                      simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+              exact le_trans hwp (le_of_eq (wp_const ($ᵗ spec.Range i) (qb i : ENNReal)))
+            · rw [probOutput_eq_zero_of_not_mem_support hseed]; simp
     _ ≤ qb i := by
           exact le_of_eq (by
             rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul])
 
-end replayCostBounds
+section forkRuntime
+
+variable [spec.DecidableEq]
+variable [Finite ι] [spec.Fintype] [spec.Inhabited]
+
+/-- Unit-cost instrumentation of a `ProbComp`, viewed as an `AddWriterT` computation whose cost
+tracks the number of calls to the underlying uniform-selection oracle. -/
+abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
+    AddWriterT ℕ ProbComp β :=
+  simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa
+
+omit [spec.DecidableEq] [Finite ι] [spec.Fintype] [spec.Inhabited] in
+private theorem queryCostExactly_replicate_probComp
+    {β : Type} (oa : ProbComp β) {k : ℕ}
+    (h : AddWriterT.QueryCostExactly (probCompUnitQueryRun oa) k) :
+    ∀ n : ℕ, AddWriterT.QueryCostExactly (probCompUnitQueryRun (oa.replicate n)) (n * k) := by
+  intro n
+  induction n with
+  | zero =>
+      simpa using (AddWriterT.queryCostExactly_pure ([] : List β))
+  | succ n ih =>
+      simpa [probCompUnitQueryRun, OracleComp.replicate_succ_bind, simulateQ_bind, simulateQ_pure,
+        simulateQ_map, Nat.succ_mul, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+        (AddWriterT.queryCostExactly_bind (n₁ := k) (n₂ := n * k)
+          (oa := probCompUnitQueryRun oa)
+          (f := fun a => List.cons a <$> probCompUnitQueryRun (oa.replicate n))
+          h
+          (fun a => AddWriterT.queryCostExactly_map (List.cons a) ih))
+
+omit [spec.DecidableEq] [Finite ι] [spec.Fintype] [spec.Inhabited] in
+private theorem generateSeed_queryCostExactly
+    (qc : ι → ℕ) (js : List ι) (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j)) :
+    AddWriterT.QueryCostExactly
+      (probCompUnitQueryRun (generateSeed spec qc js))
+      ((js.map fun j => qc j * sampleCost j).sum) := by
+  induction js with
+  | nil =>
+      simpa [probCompUnitQueryRun] using
+        (AddWriterT.queryCostExactly_pure (∅ : QuerySeed spec))
+  | cons j js ih =>
+      simpa [probCompUnitQueryRun, OracleComp.generateSeed_cons, simulateQ_bind, simulateQ_pure,
+        simulateQ_map, List.sum_cons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+        (AddWriterT.queryCostExactly_bind
+          (n₁ := qc j * sampleCost j)
+          (n₂ := (js.map fun j => qc j * sampleCost j).sum)
+          (oa := probCompUnitQueryRun (replicate (qc j) ($ᵗ spec.Range j)))
+          (f := fun xs =>
+            (fun rest : QuerySeed spec => rest.prependValues xs) <$>
+              probCompUnitQueryRun (generateSeed spec qc js))
+          (queryCostExactly_replicate_probComp ($ᵗ spec.Range j) (hSample j) (qc j))
+          (fun xs => AddWriterT.queryCostExactly_map (fun rest => rest.prependValues xs) ih))
+
+omit [spec.DecidableEq] [Finite ι] [spec.Fintype] [spec.Inhabited] in
+/-- Expected query count of `generateSeed spec qc js`, measured in the unit-cost `ProbComp`
+runtime, equals the sum of per-sample query costs over the seed schedule `js`. -/
+theorem generateSeed_expectedQueryCount_eq
+    (qc : ι → ℕ) (js : List ι) (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j)) :
+    AddWriterT.expectedCostNat (probCompUnitQueryRun (generateSeed spec qc js)) =
+      ((js.map fun j => qc j * sampleCost j).sum : ENNReal) :=
+  AddWriterT.expectedCostNat_eq_of_queryCostExactly
+    (generateSeed_queryCostExactly (spec := spec) qc js sampleCost hSample)
+
+/-- Total expected query work of the fork wrapper is bounded by:
+
+- the seed-generation cost, computed from the seed schedule `js`;
+- the cost of the one fresh replacement sample at the forked family `i`;
+- the live-query budget `qb i` of the seeded replay core. -/
+theorem forkExpectedQueryWork_le
+    (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
+    (cf : α → Option (Fin (qb i + 1)))
+    (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j))
+    (hmain : IsPerIndexQueryBound main qb)
+    (hjs : SeedListCovers qb js) :
+    AddWriterT.expectedCostNat (probCompUnitQueryRun (generateSeed spec qb js)) +
+      AddWriterT.expectedCostNat
+        (probCompUnitQueryRun ($ᵗ spec.Range i : ProbComp (spec.Range i))) +
+      wp (generateSeed spec qb js)
+        (fun seed =>
+          wp ($ᵗ spec.Range i)
+            (fun u =>
+              expectedCost
+                (forkWithSeedValue main qb i cf seed u)
+                CostModel.unit
+                (fun n : ℕ ↦ (n : ENNReal)))) ≤
+      ((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ENNReal) := by
+  have hgen := generateSeed_queryCostExactly (spec := spec) qb js sampleCost hSample
+  have hgen_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy hgen.toAbove
+  have hi_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSample i).toAbove
+  have hcore :=
+    wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
+      (main := main) (qb := qb) (js := js) (i := i) (cf := cf) hmain hjs
+  exact add_le_add (add_le_add hgen_le hi_le) hcore
+
+end forkRuntime
 
 end generateSeedCoverage
 

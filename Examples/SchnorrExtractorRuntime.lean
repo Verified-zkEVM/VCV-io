@@ -4,14 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.Schnorr
-import VCVio.CryptoFoundations.ForkValues
-import VCVio.CryptoFoundations.SigmaExtractorRuntime
+import VCVio.CryptoFoundations.Fork
 
 /-!
 # Fork-Extractor Runtime Bounds for Schnorr
 
-This file specializes the generic runtime bounds from
-`VCVio.CryptoFoundations.SigmaExtractorRuntime` to the textbook Schnorr setting.
+This file specializes the generic fork runtime bounds to the textbook Schnorr setting.
 
 There are two pieces:
 
@@ -25,7 +23,9 @@ The runtime statements intentionally account only for query work, matching the c
 runtime layer: challenge sampling plus live oracle traffic during replay.
 -/
 
-open OracleComp OracleSpec ENNReal
+open OracleComp OracleComp.ProgramLogic OracleSpec ENNReal
+
+namespace Schnorr
 
 section soundness
 
@@ -34,7 +34,7 @@ variable (G : Type) [AddCommGroup G] [Module F G]
 
 /-- The concrete Schnorr extractor formula is sound: from two accepting transcripts with the same
 commitment and distinct challenges, the extracted scalar is a valid discrete-log witness. -/
-theorem schnorrExtractFormula_sound (g : G) {pk R : G} {c₁ c₂ z₁ z₂ : F} (hc : c₁ ≠ c₂)
+theorem extractFormula_sound (g : G) {pk R : G} {c₁ c₂ z₁ z₂ : F} (hc : c₁ ≠ c₂)
     (hv₁ : z₁ • g = R + c₁ • pk)
     (hv₂ : z₂ • g = R + c₂ • pk) :
     (((z₁ - z₂) * (c₁ - c₂)⁻¹ : F) • g) = pk := by
@@ -57,94 +57,64 @@ variable (F : Type) [FinEnum F] [Inhabited F]
 variable {α : Type}
 
 /-- The single challenge family used by the Schnorr fork extractor. -/
-abbrev schnorrChallengeSpec : OracleSpec Unit := Unit →ₒ F
+abbrev challengeSpec : OracleSpec Unit := Unit →ₒ F
 
 /-- Structural query budget for the single Schnorr challenge family. -/
-abbrev schnorrChallengeBudget (q : ℕ) : QueryCount Unit :=
-  SigmaProtocol.singleFamilyBudget () q
+abbrev challengeBudget (q : ℕ) : QueryCount Unit :=
+  Function.update 0 () q
 
-private theorem finUniformSample_queryBoundedAboveBy_one
+private theorem finUniformSample_queryCostExactly_one
     (n : ℕ) [NeZero n] :
-    AddWriterT.QueryBoundedAboveBy
+    AddWriterT.QueryCostExactly
       (simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl)
         (uniformSample (Fin n) : ProbComp (Fin n)))
       1 := by
   cases n with
-  | zero =>
-      cases (NeZero.ne (n := 0) rfl)
+  | zero => cases (NeZero.ne (n := 0) rfl)
   | succ k =>
-      change AddWriterT.QueryBoundedAboveBy
+      change AddWriterT.QueryCostExactly
         (HasQuery.withUnitCost
           (fun [HasQuery unifSpec (AddWriterT ℕ ProbComp)] =>
             HasQuery.query (spec := unifSpec) (m := AddWriterT ℕ ProbComp) k)
           (QueryRuntime.oracleCompRuntime (spec := unifSpec)))
         1
-      exact HasQuery.queryBoundedAboveBy_withUnitCost_query
+      exact HasQuery.queryCostExactly_withUnitCost_query
         (runtime := QueryRuntime.oracleCompRuntime (spec := unifSpec))
         (t := k)
 
-private theorem finUniformSample_queryBoundedBelowBy_one
-    (n : ℕ) [NeZero n] :
-    AddWriterT.QueryBoundedBelowBy
-      (simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl)
-        (uniformSample (Fin n) : ProbComp (Fin n)))
-      1 := by
-  cases n with
-  | zero =>
-      cases (NeZero.ne (n := 0) rfl)
-  | succ k =>
-      change AddWriterT.QueryBoundedBelowBy
-        (HasQuery.withUnitCost
-          (fun [HasQuery unifSpec (AddWriterT ℕ ProbComp)] =>
-            HasQuery.query (spec := unifSpec) (m := AddWriterT ℕ ProbComp) k)
-          (QueryRuntime.oracleCompRuntime (spec := unifSpec)))
-        1
-      exact HasQuery.queryBoundedBelowBy_withUnitCost_query
-        (runtime := QueryRuntime.oracleCompRuntime (spec := unifSpec))
-        (t := k)
-
-private theorem schnorrChallengeSample_queryBoundedAboveBy_one :
-    AddWriterT.QueryBoundedAboveBy
-      (simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl)
-        ((letI : SampleableType F := FinEnum.SampleableType F
-          ($ᵗ F : ProbComp F))))
+private theorem challengeSample_queryCostExactly_one :
+    letI : SampleableType F := FinEnum.SampleableType F
+    AddWriterT.QueryCostExactly
+      (OracleComp.probCompUnitQueryRun ($ᵗ F : ProbComp F))
       1 := by
   letI : SampleableType F := FinEnum.SampleableType F
   haveI : NeZero (FinEnum.card F) := ⟨FinEnum.card_ne_zero (α := F)⟩
   simpa [uniformSample, SampleableType.ofEquiv, FinEnum.SampleableType, simulateQ_map] using
-    (AddWriterT.queryBoundedAboveBy_map (FinEnum.equiv (α := F)).symm
-      (finUniformSample_queryBoundedAboveBy_one (n := FinEnum.card F)))
+    (AddWriterT.queryCostExactly_map (FinEnum.equiv (α := F)).symm
+      (finUniformSample_queryCostExactly_one (n := FinEnum.card F)))
 
-private theorem schnorrChallengeSample_queryBoundedBelowBy_one :
-    AddWriterT.QueryBoundedBelowBy
-      (simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl)
-        ((letI : SampleableType F := FinEnum.SampleableType F
-          ($ᵗ F : ProbComp F))))
-      1 := by
-  letI : SampleableType F := FinEnum.SampleableType F
-  haveI : NeZero (FinEnum.card F) := ⟨FinEnum.card_ne_zero (α := F)⟩
-  simpa [uniformSample, SampleableType.ofEquiv, FinEnum.SampleableType, simulateQ_map] using
-    (AddWriterT.queryBoundedBelowBy_map (FinEnum.equiv (α := F)).symm
-      (finUniformSample_queryBoundedBelowBy_one (n := FinEnum.card F)))
+end runtime
 
 section extractorCandidate
 
-variable [Field F]
-variable (G : Type) [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
+variable (F : Type) [Field F] [DecidableEq F]
+variable (G : Type) [AddCommGroup G] [Module F G] [DecidableEq G]
 
 /-- Deterministic Schnorr witness extractor applied to the payload returned by
-[`OracleComp.forkWithQueryValues`]. It accepts exactly when the fork produced two accepting
+`OracleComp.forkWithQueryValues`. It accepts exactly when the fork produced two accepting
 transcripts with the same commitment and distinct challenges, and then returns the standard
-special-soundness witness formula. -/
-def schnorrExtractCandidateFromForkValues (g pk : G) :
+special-soundness witness formula.
+
+The verification check is inlined from `Schnorr.sigma` to avoid a `SampleableType G`
+dependency. -/
+def extractCandidate (g pk : G) :
     Option ((G × F) × F × (G × F) × F) → Option F
   | none => none
   | some ((R₁, z₁), c₁, (R₂, z₂), c₂) =>
       if _hR : R₁ = R₂ then
         if _hω : c₁ = c₂ then
           none
-        else if (schnorrSigma F G g).verify pk R₁ c₁ z₁ = true ∧
-            (schnorrSigma F G g).verify pk R₂ c₂ z₂ = true then
+        else if decide (z₁ • g = R₁ + c₁ • pk) ∧ decide (z₂ • g = R₂ + c₂ • pk) then
           some ((z₁ - z₂) * (c₁ - c₂)⁻¹)
         else
           none
@@ -157,92 +127,92 @@ discrete-log witness for `pk`.
 This theorem is phrased only in terms of the fork payload. It is therefore agnostic to the
 particular fork wrapper used to obtain that payload, and can be applied equally to seeded replay,
 value-carrying fork wrappers, or later Fiat-Shamir specializations. -/
-theorem schnorrExtractCandidateFromForkValues_sound (g pk : G)
+theorem extractCandidate_sound (g pk : G)
     {res : Option ((G × F) × F × (G × F) × F)}
     {sk : F}
-    (hsk : schnorrExtractCandidateFromForkValues (F := F) (G := G) g pk res = some sk) :
+    (hsk : extractCandidate (F := F) (G := G) g pk res = some sk) :
     sk • g = pk := by
   cases res with
   | none =>
-      simp [schnorrExtractCandidateFromForkValues] at hsk
+      simp [extractCandidate] at hsk
   | some data =>
       rcases data with ⟨⟨R₁, z₁⟩, c₁, ⟨R₂, z₂⟩, c₂⟩
       by_cases hR : R₁ = R₂
       · by_cases hω : c₁ = c₂
-        · simp [schnorrExtractCandidateFromForkValues, hR, hω] at hsk
+        · simp [extractCandidate, hR, hω] at hsk
         · have hsk' :
-              ((schnorrSigma F G g).verify pk R₂ c₁ z₁ = true ∧
-                (schnorrSigma F G g).verify pk R₂ c₂ z₂ = true) ∧
+              (decide (z₁ • g = R₂ + c₁ • pk) ∧ decide (z₂ • g = R₂ + c₂ • pk)) ∧
               (z₁ - z₂) * (c₁ - c₂)⁻¹ = sk := by
-            simpa [schnorrExtractCandidateFromForkValues, hR, hω] using hsk
-          rcases hsk' with ⟨hAnd, hskEq⟩
-          have hv₁ : z₁ • g = R₂ + c₁ • pk := by
-            simpa [schnorrSigma] using hAnd.1
-          have hv₂ : z₂ • g = R₂ + c₂ • pk := by
-            simpa [schnorrSigma] using hAnd.2
+            simpa [extractCandidate, hR, hω] using hsk
+          rcases hsk' with ⟨⟨hv₁, hv₂⟩, hskEq⟩
           have hv₁' : z₁ • g = R₁ + c₁ • pk := by
-            simpa [hR] using hv₁
+            simpa [hR] using of_decide_eq_true hv₁
           have hv₂' : z₂ • g = R₁ + c₂ • pk := by
-            simpa [hR] using hv₂
+            simpa [hR] using of_decide_eq_true hv₂
           have hsound :
               (((z₁ - z₂) * (c₁ - c₂)⁻¹ : F) • g) = pk :=
-            schnorrExtractFormula_sound (F := F) (G := G) g (hc := hω) hv₁' hv₂'
+            extractFormula_sound (F := F) (G := G) g (hc := hω) hv₁' hv₂'
           rwa [hskEq] at hsound
-      · simp [schnorrExtractCandidateFromForkValues, hR] at hsk
+      · simp [extractCandidate, hR] at hsk
 
 /-- Any witness in the support of the deterministic Schnorr postprocessing is valid.
 
 This support-level version is the right interface for later extractor wrappers: once a forking
 construction is known to produce payloads of the expected shape, witness soundness follows by
-mapping [`schnorrExtractCandidateFromForkValues`] over that output distribution. -/
-theorem schnorrExtractCandidateFromForkValues_sound_of_mem_support
+mapping `Schnorr.extractCandidate` over that output distribution. -/
+theorem extractCandidate_sound_of_mem_support
     (g pk : G)
     {m : Type → Type} [Monad m] [LawfulMonad m] [HasEvalSet m]
     {oa : m (Option ((G × F) × F × (G × F) × F))} {sk : F}
     (hsk :
-      some sk ∈ support (schnorrExtractCandidateFromForkValues (F := F) (G := G) g pk <$> oa)) :
+      some sk ∈ support (extractCandidate (F := F) (G := G) g pk <$> oa)) :
     sk • g = pk := by
   rw [support_map] at hsk
   rcases hsk with ⟨res, _, hres⟩
-  exact schnorrExtractCandidateFromForkValues_sound (F := F) (G := G) g pk (by simpa using hres)
+  exact extractCandidate_sound (F := F) (G := G) g pk (by simpa using hres)
 
 end extractorCandidate
 
-/-- In the standard single-family Schnorr setting, one fork-based extraction attempt has expected
-query work at most `2q + 1` whenever the adversary makes at most `q` challenge queries. -/
-theorem schnorrSingleRewindExpectedQueryWork_le
-    (main : OracleComp (schnorrChallengeSpec F) α) (q : ℕ)
-    (cf : α → Option (Fin (schnorrChallengeBudget q () + 1)))
-    (hmain : IsPerIndexQueryBound main (schnorrChallengeBudget q)) :
-    OracleComp.forkExpectedWrapperAndLiveQueries
-      main (schnorrChallengeBudget q) [()] () cf ≤
-      (2 * q + 1 : ENNReal) := by
-  letI : SampleableType F := FinEnum.SampleableType F
-  have hbound :=
-    SigmaProtocol.singleRewindExtractorExpectedQueryWork_le_singleFamily
-      (main := main) (i := ()) (q := q) (cf := cf) (sampleCost := fun _ => 1)
-      (hSampleUpper := fun _ => schnorrChallengeSample_queryBoundedAboveBy_one (F := F))
-      hmain
-  simpa [schnorrChallengeBudget, Nat.mul_one, two_mul, add_assoc, add_left_comm, add_comm] using
-    hbound
+section runtime
 
-/-- Repeating the standard Schnorr fork extractor `attempts` times multiplies the one-attempt
-bound, giving expected query work at most `attempts * (2q + 1)`. -/
-theorem schnorrRewindingExpectedQueryWork_le
-    (main : OracleComp (schnorrChallengeSpec F) α) (q attempts : ℕ)
-    (cf : α → Option (Fin (schnorrChallengeBudget q () + 1)))
-    (hmain : IsPerIndexQueryBound main (schnorrChallengeBudget q)) :
-    SigmaProtocol.rewindingExtractorExpectedQueryWork
-        main (schnorrChallengeBudget q) [()] () cf attempts ≤
-      (attempts : ENNReal) * (2 * q + 1 : ENNReal) := by
+variable (F : Type) [FinEnum F] [Inhabited F]
+variable {α : Type}
+
+/-- In the standard single-family Schnorr setting, one fork-based extraction attempt has expected
+query work at most `2q + 1` whenever the adversary makes at most `q` challenge queries.
+
+The bound decomposes as: `q` seed samples of cost `1` each, one fresh replacement sample of cost
+`1`, and at most `q` live oracle queries during the seeded replay. -/
+theorem forkExpectedQueryWork_le
+    (main : OracleComp (challengeSpec F) α) (q : ℕ)
+    (cf : α → Option (Fin (challengeBudget q () + 1)))
+    (hmain : IsPerIndexQueryBound main (challengeBudget q)) :
+    letI : SampleableType F := FinEnum.SampleableType F
+    AddWriterT.expectedCostNat
+        (OracleComp.probCompUnitQueryRun
+          (generateSeed (challengeSpec F) (challengeBudget q) [()])) +
+      AddWriterT.expectedCostNat
+        (OracleComp.probCompUnitQueryRun ($ᵗ F : ProbComp F)) +
+      wp (generateSeed (challengeSpec F) (challengeBudget q) [()])
+        (fun seed =>
+          wp ($ᵗ F : ProbComp F)
+            (fun u =>
+              expectedCost
+                (OracleComp.forkWithSeedValue main (challengeBudget q) () cf seed u)
+                CostModel.unit
+                (fun n : ℕ ↦ (n : ENNReal))))
+      ≤ (2 * q + 1 : ENNReal) := by
   letI : SampleableType F := FinEnum.SampleableType F
-  have hbound :=
-    SigmaProtocol.rewindingExtractorExpectedQueryWork_le_singleFamily
-      (main := main) (i := ()) (q := q) (attempts := attempts)
-      (cf := cf) (sampleCost := fun _ => 1)
-      (hSampleUpper := fun _ => schnorrChallengeSample_queryBoundedAboveBy_one (F := F))
-      hmain
-  simpa [schnorrChallengeBudget, Nat.mul_one, two_mul, add_assoc, add_left_comm, add_comm] using
+  have hjs : OracleComp.SeedListCovers (challengeBudget q) [()] := by
+    intro t ht; simp
+  have hbound := OracleComp.forkExpectedQueryWork_le
+    (main := main) (qb := challengeBudget q) (js := [()]) (i := ()) (cf := cf)
+    (sampleCost := fun _ => 1)
+    (fun _ => challengeSample_queryCostExactly_one (F := F))
+    hmain hjs
+  simpa [challengeBudget, Nat.mul_one, two_mul, add_assoc, add_left_comm, add_comm] using
     hbound
 
 end runtime
+
+end Schnorr
