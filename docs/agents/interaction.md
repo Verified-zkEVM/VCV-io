@@ -140,15 +140,15 @@ to `Process` via `Machine.toProcess`.
 
 ### Coalgebraic structure
 
-Both `ProcessOver` and `Machine` are instances of the `Coalgebra` typeclass
+Both `ProcessOver` and `Machine` are instances of the `Coalg` typeclass
 defined in `ToMathlib/Control/Coalgebra.lean`.
-A `Coalgebra F S` is a type `S` together with `out : S → F S`,
+An `Coalg F S` is a type `S` together with `out : S → F S`,
 the categorical dual of `MonadAlgebra`.
 
 - `StepOver Γ` is a `Functor` (post-compose on `next`), and `LawfulFunctor`.
-- `ProcessOver Γ` is a `Coalgebra (StepOver Γ)` via its `step` field.
+- `ProcessOver Γ` is an `Coalg (StepOver Γ)` via its `step` field.
 - `Machine.StepFun` is a `Functor` and `LawfulFunctor`.
-- `Machine` is a `Coalgebra Machine.StepFun` via its `Enabled`/`step` fields.
+- `Machine` is an `Coalg Machine.StepFun` via its `Enabled`/`step` fields.
 
 This reflects the Poly/ACT perspective: a process is a coalgebra for a
 polynomial endofunctor, with the step functor playing the role of the
@@ -296,9 +296,9 @@ import VCVio.Interaction.Concurrent.Process
 | `Control.lean` | `Control`, `scheduler?`, `current?`, `controllers` |
 | `Profile.lean` | `Profile`, `observe`, `residual`, `frontierView` |
 | `Current.lean` | `view`, `observe`, `residualView` |
-| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalgebra` instance, `interleave` |
+| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave` |
 | `Tree.lean` | Structural concurrent syntax → `Process` |
-| `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalgebra` instance |
+| `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalg` instance |
 | `Execution.lean` | `Trace`, `ObservedTrace` for processes |
 | `Run.lean` | `Prefix`, `Run` (infinite), controller/event extraction |
 | `Policy.lean` | `StepPolicy`, `respects`, combinators |

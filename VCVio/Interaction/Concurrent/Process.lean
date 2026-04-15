@@ -176,9 +176,9 @@ def mapContext
   Proc := process.Proc
   step p := (process.step p).mapContext f
 
-/-- Every `ProcessOver Γ` is a coalgebra for the `StepOver Γ` endofunctor. -/
+/-- Every `ProcessOver Γ` is an F-coalgebra for the `StepOver Γ` endofunctor. -/
 instance {Γ : Interaction.Spec.Node.Context.{w, w₂}} (p : ProcessOver.{v, w, w₂} Γ) :
-    Coalgebra (StepOver.{v, w, w₂} Γ) p.Proc := ⟨p.step⟩
+    Coalg (StepOver.{v, w, w₂} Γ) p.Proc := ⟨p.step⟩
 
 /--
 Binary-choice interleaving of two processes with different node contexts.

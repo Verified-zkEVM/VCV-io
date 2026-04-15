@@ -15,8 +15,8 @@ functor layer, a coalgebra *observes* one layer of structure from a state.
 
 ## Main definitions
 
-* `Coalgebra F S`: typeclass packaging `out : S → F S`.
-* `Coalgebra.Hom S₁ S₂`: a function `S₁ → S₂` that commutes with the structure
+* `Coalg F S`: typeclass packaging `out : S → F S`.
+* `Coalg.Hom S₁ S₂`: a function `S₁ → S₂` that commutes with the structure
   maps (`Functor.map f ∘ out = out ∘ f`). Equipped with coercion, `id`, `comp`.
 
 ## Relationship to Mathlib and Poly
@@ -33,14 +33,15 @@ universe u v
 
 /-- An `F`-coalgebra on `S` is a structure map `out : S → F S`.
 
+Named `Coalg` to avoid collision with `Mathlib.RingTheory.Coalgebra`.
 This is the dual of `MonadAlgebra`. No `[Functor F]` constraint is imposed on the
 class itself so that the definition applies to arbitrary type-level maps. -/
-class Coalgebra (F : Type u → Type v) (S : Type u) where
+class Coalg (F : Type u → Type v) (S : Type u) where
   out : S → F S
 
-export Coalgebra (out)
+export Coalg (out)
 
-/-! ## Coalgebra morphisms -/
+/-! ## Coalg morphisms -/
 
 /-- A coalgebra morphism between `F`-coalgebras on `S₁` and `S₂` is a function
 that commutes with the structure maps:
@@ -56,35 +57,35 @@ that commutes with the structure maps:
 ```
 In the interaction framework, coalgebra morphisms between processes correspond
 to forward simulations that preserve step structure. -/
-structure Coalgebra.Hom (F : Type u → Type v) [Functor F]
-    (S₁ : Type u) (S₂ : Type u) [Coalgebra F S₁] [Coalgebra F S₂] where
+structure Coalg.Hom (F : Type u → Type v) [Functor F]
+    (S₁ : Type u) (S₂ : Type u) [Coalg F S₁] [Coalg F S₂] where
   /-- The underlying function between state spaces. -/
   toFun : S₁ → S₂
   /-- The commutativity condition: `F.map f ∘ out = out ∘ f`. -/
   comm : Functor.map toFun ∘ (out : S₁ → F S₁) = (out : S₂ → F S₂) ∘ toFun
 
-namespace Coalgebra.Hom
+namespace Coalg.Hom
 
 variable {F : Type u → Type v} [Functor F]
-variable {S₁ S₂ S₃ : Type u} [Coalgebra F S₁] [Coalgebra F S₂] [Coalgebra F S₃]
+variable {S₁ S₂ S₃ : Type u} [Coalg F S₁] [Coalg F S₂] [Coalg F S₃]
 
-instance : CoeFun (Coalgebra.Hom F S₁ S₂) (fun _ => S₁ → S₂) where
-  coe := Coalgebra.Hom.toFun
+instance : CoeFun (Coalg.Hom F S₁ S₂) (fun _ => S₁ → S₂) where
+  coe := Coalg.Hom.toFun
 
 @[ext]
-theorem ext {f g : Coalgebra.Hom F S₁ S₂} (h : ∀ x, f x = g x) : f = g := by
+theorem ext {f g : Coalg.Hom F S₁ S₂} (h : ∀ x, f x = g x) : f = g := by
   cases f; cases g; congr; funext x; exact h x
 
 variable [LawfulFunctor F]
 
 /-- The identity coalgebra morphism. -/
-def id : Coalgebra.Hom F S₁ S₁ where
+def id : Coalg.Hom F S₁ S₁ where
   toFun := _root_.id
   comm := by funext x; simp [Function.comp, id_map]
 
 /-- Composition of coalgebra morphisms. -/
-def comp (g : Coalgebra.Hom F S₂ S₃) (f : Coalgebra.Hom F S₁ S₂) :
-    Coalgebra.Hom F S₁ S₃ where
+def comp (g : Coalg.Hom F S₂ S₃) (f : Coalg.Hom F S₁ S₂) :
+    Coalg.Hom F S₁ S₃ where
   toFun := g.toFun ∘ f.toFun
   comm := by
     funext x
@@ -95,4 +96,4 @@ def comp (g : Coalgebra.Hom F S₂ S₃) (f : Coalgebra.Hom F S₁ S₂) :
     simp only [Function.comp_apply] at hf hg
     rw [comp_map, hf, hg]
 
-end Coalgebra.Hom
+end Coalg.Hom
