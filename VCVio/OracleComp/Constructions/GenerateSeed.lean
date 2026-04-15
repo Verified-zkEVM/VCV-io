@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.CostModel
 
 /-!
 # Generating Random Seeds for Oracle Queries
@@ -522,5 +523,96 @@ lemma probOutput_generateSeed_prependValues [spec.Fintype] [spec.Inhabited]
     simp [(probOutput_eq_zero_iff _ _).2 hmem, (probOutput_eq_zero_iff _ _).2 hmem_red]
 
 end lemmas
+
+section coverage
+
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
+  [∀ t : spec.Domain, SampleableType (spec.Range t)]
+
+/-- `SeedListCovers qb js` means that every oracle family with positive query budget appears in
+the seed-generation list `js`.
+
+When this holds, any seed sampled from `generateSeed spec qb js` supplies enough pre-generated
+answers to cover one full execution of a computation satisfying the structural bound `qb`. -/
+def SeedListCovers (qb : ι → ℕ) (js : List ι) : Prop :=
+  ∀ t, 0 < qb t → t ∈ js
+
+/-- Any seed sampled from `generateSeed spec qb js` has at least `qb t` entries for each
+oracle `t`, provided `js` lists every oracle family with positive budget. -/
+lemma generateSeed_covers_queryBound
+    (qb : ι → ℕ) (js : List ι) {seed : QuerySeed spec}
+    (hjs : SeedListCovers qb js)
+    (hseed : seed ∈ support (generateSeed spec qb js)) :
+    ∀ t, qb t ≤ (seed t).length :=
+  fun t =>
+    le_length_of_mem_support_generateSeed_of_covers
+      (spec := spec) (qc := qb) (js := js) seed t hseed hjs
+
+end coverage
+
+section unitCost
+
+variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
+  [∀ t : spec.Domain, SampleableType (spec.Range t)]
+
+private theorem queryCostExactly_replicate_probComp
+    {β : Type} (oa : ProbComp β) {k : ℕ}
+    (h : AddWriterT.QueryCostExactly (probCompUnitQueryRun oa) k) :
+    ∀ n : ℕ, AddWriterT.QueryCostExactly (probCompUnitQueryRun (oa.replicate n)) (n * k) := by
+  intro n
+  induction n with
+  | zero =>
+      simpa using (AddWriterT.queryCostExactly_pure ([] : List β))
+  | succ n ih =>
+      simpa [probCompUnitQueryRun, OracleComp.replicate_succ_bind, simulateQ_bind, simulateQ_pure,
+        simulateQ_map, Nat.succ_mul, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+        (AddWriterT.queryCostExactly_bind (n₁ := k) (n₂ := n * k)
+          (oa := probCompUnitQueryRun oa)
+          (f := fun a => List.cons a <$> probCompUnitQueryRun (oa.replicate n))
+          h
+          (fun a => AddWriterT.queryCostExactly_map (List.cons a) ih))
+
+theorem generateSeed_queryCostExactly
+    (qc : ι → ℕ) (js : List ι) (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j)) :
+    AddWriterT.QueryCostExactly
+      (probCompUnitQueryRun (generateSeed spec qc js))
+      ((js.map fun j => qc j * sampleCost j).sum) := by
+  induction js with
+  | nil =>
+      simpa [probCompUnitQueryRun] using
+        (AddWriterT.queryCostExactly_pure (∅ : QuerySeed spec))
+  | cons j js ih =>
+      simpa [probCompUnitQueryRun, OracleComp.generateSeed_cons, simulateQ_bind, simulateQ_pure,
+        simulateQ_map, List.sum_cons, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
+        (AddWriterT.queryCostExactly_bind
+          (n₁ := qc j * sampleCost j)
+          (n₂ := (js.map fun j => qc j * sampleCost j).sum)
+          (oa := probCompUnitQueryRun (replicate (qc j) ($ᵗ spec.Range j)))
+          (f := fun xs =>
+            (fun rest : QuerySeed spec => rest.prependValues xs) <$>
+              probCompUnitQueryRun (generateSeed spec qc js))
+          (queryCostExactly_replicate_probComp ($ᵗ spec.Range j) (hSample j) (qc j))
+          (fun xs => AddWriterT.queryCostExactly_map (fun rest => rest.prependValues xs) ih))
+
+open ENNReal in
+/-- The expected number of uniform-oracle calls made by `generateSeed spec qc js` equals
+`∑ j in js, qc j * sampleCost j`, i.e. each of the `qc j` samples at oracle `j` costs
+`sampleCost j`. -/
+theorem generateSeed_expectedQueryCount_eq
+    (qc : ι → ℕ) (js : List ι) (sampleCost : ι → ℕ)
+    (hSample :
+      ∀ j, AddWriterT.QueryCostExactly
+        (probCompUnitQueryRun ($ᵗ spec.Range j : ProbComp (spec.Range j)))
+        (sampleCost j)) :
+    AddWriterT.expectedCostNat (probCompUnitQueryRun (generateSeed spec qc js)) =
+      ((js.map fun j => qc j * sampleCost j).sum : ENNReal) :=
+  AddWriterT.expectedCostNat_eq_of_queryCostExactly
+    (generateSeed_queryCostExactly (spec := spec) qc js sampleCost hSample)
+
+end unitCost
 
 end OracleComp

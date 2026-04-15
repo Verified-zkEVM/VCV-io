@@ -374,12 +374,8 @@ private lemma sum_update_pred_eq
     _ = ∑ j, qb j := by
           simpa using Finset.add_sum_erase Finset.univ qb (Finset.mem_univ t)
 
-/-- A structural per-index query bound yields a worst-case bound on total unit-cost query count by
-summing the coordinate budgets.
-
-This is the converse direction to [`WorstCaseCostBound.toIsPerIndexQueryBound_unit`]: the
-structural budget `qb` already controls each query family separately, so under the unit cost model
-every execution uses at most `∑ i, qb i` total queries. -/
+/-- If `main` makes at most `qb i` queries to each oracle `i`, then its total query count
+(under the unit cost model) is at most `∑ i, qb i` on every execution path. -/
 theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
     [DecidableEq ι] [Fintype ι] [spec.Inhabited]
     {oa : OracleComp spec α} {qb : ι → ℕ}
@@ -438,8 +434,8 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
           omega
   exact haux h
 
-/-- A structural per-index query bound also bounds the expected number of unit-cost queries by
-the sum of the coordinate budgets. -/
+/-- Corollary: the expected total query count is also at most `∑ i, qb i`. Follows from the
+worst-case bound `toWorstCaseCostBound_unit_sum`. -/
 theorem IsPerIndexQueryBound.toExpectedCostBound_unit_sum
     [DecidableEq ι] [Fintype ι] [spec.Fintype] [spec.Inhabited]
     {oa : OracleComp spec α} {qb : ι → ℕ}
@@ -454,4 +450,14 @@ theorem IsPerIndexQueryBound.toExpectedCostBound_unit_sum
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
 
 end UnitCostBridge
+
+namespace OracleComp
+
+/-- Run a `ProbComp` with unit-cost instrumentation: each call to the uniform-selection oracle
+is counted as cost 1. -/
+abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
+    AddWriterT ℕ ProbComp β :=
+  simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa
+
+end OracleComp
 

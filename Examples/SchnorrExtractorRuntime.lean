@@ -7,20 +7,28 @@ import Examples.Schnorr
 import VCVio.CryptoFoundations.Fork
 
 /-!
-# Fork-Extractor Runtime Bounds for Schnorr
+# Fork-Extractor Soundness and Query-Work Bounds for Schnorr
 
-This file specializes the generic fork runtime bounds to the textbook Schnorr setting.
+Specializes the generic fork framework to the textbook Schnorr identification scheme.
 
-There are two pieces:
+## Extraction soundness
 
-- a concrete extraction-soundness theorem saying that two accepting Schnorr transcripts with
-  the same commitment and distinct challenges yield a valid discrete-log witness;
-- concrete fork-runtime corollaries for a single challenge family `Unit →ₒ F`, where the
-  one-attempt and repeated-rewinding query-work bounds take the familiar forms `2q + 1` and
-  `attempts * (2q + 1)`.
+`extractFormula_sound` shows that the standard special-soundness formula
+`(z₁ - z₂) / (c₁ - c₂)` yields a valid discrete-log witness from two accepting transcripts
+with the same commitment and distinct challenges.
 
-The runtime statements intentionally account only for query work, matching the current fork
-runtime layer: challenge sampling plus live oracle traffic during replay.
+`extractCandidate` is a deterministic postprocessor that takes the raw fork output (a pair of
+transcripts with their challenge values) and applies this formula when the preconditions hold.
+`extractCandidate_sound` proves that any returned witness is valid.
+
+## Query-work bound
+
+`fork_expectedQueryWork_le` shows that one fork-based extraction attempt over a single
+challenge oracle `Unit →ₒ F` has expected query work at most `2q + 1`, where `q` is the
+adversary's query budget. The three cost components are:
+- `q` calls to sample the seed,
+- `1` call to sample the replacement challenge,
+- at most `q` live queries during the replayed execution.
 -/
 
 open OracleComp OracleComp.ProgramLogic OracleSpec ENNReal
@@ -59,10 +67,11 @@ variable {α : Type}
 /-- The single challenge family used by the Schnorr fork extractor. -/
 abbrev challengeSpec : OracleSpec Unit := Unit →ₒ F
 
-/-- Structural query budget for the single Schnorr challenge family. -/
+/-- Query budget assigning `q` queries to the single challenge oracle `()`. -/
 abbrev challengeBudget (q : ℕ) : QueryCount Unit :=
   Function.update 0 () q
 
+/-- Sampling `Fin n` uniformly costs exactly 1 in the unit-cost model. -/
 private theorem finUniformSample_queryCostExactly_one
     (n : ℕ) [NeZero n] :
     AddWriterT.QueryCostExactly
@@ -82,6 +91,7 @@ private theorem finUniformSample_queryCostExactly_one
         (runtime := QueryRuntime.oracleCompRuntime (spec := unifSpec))
         (t := k)
 
+/-- Sampling `F` uniformly (via its `FinEnum` encoding) costs exactly 1 in the unit-cost model. -/
 private theorem challengeSample_queryCostExactly_one :
     letI : SampleableType F := FinEnum.SampleableType F
     AddWriterT.QueryCostExactly
@@ -102,12 +112,18 @@ section extractorCandidate
 variable (F : Type) [Field F] [DecidableEq F]
 variable (G : Type) [AddCommGroup G] [Module F G] [DecidableEq G]
 
-/-- Deterministic Schnorr witness extractor for the value-carrying fork payload. It accepts
-exactly when the fork produced two accepting transcripts with the same commitment and distinct
-challenges, and then returns the standard special-soundness witness formula `(z₁ - z₂) / (c₁ - c₂)`.
+/-- Deterministic Schnorr witness extractor for the fork payload.
 
-The verification check is inlined from `Schnorr.sigma` to avoid a `SampleableType G`
-dependency. -/
+The input type `Option ((G × F) × F × (G × F) × F)` represents
+`Option ((R₁, z₁), c₁, (R₂, z₂), c₂)` where `Rᵢ` is the commitment, `zᵢ` the response,
+and `cᵢ` the challenge from the `i`-th fork run.
+
+Returns `some ((z₁ - z₂) * (c₁ - c₂)⁻¹)` when:
+- both commitments match (`R₁ = R₂`),
+- the challenges differ (`c₁ ≠ c₂`), and
+- both transcripts verify (`zᵢ • g = Rᵢ + cᵢ • pk`).
+
+Returns `none` otherwise. -/
 def extractCandidate (g pk : G) :
     Option ((G × F) × F × (G × F) × F) → Option F
   | none => none
@@ -122,12 +138,8 @@ def extractCandidate (g pk : G) :
       else
         none
 
-/-- If the deterministic Schnorr extractor postprocessing returns `some sk`, then `sk` is a valid
-discrete-log witness for `pk`.
-
-This theorem is phrased only in terms of the fork payload. It is therefore agnostic to the
-particular fork wrapper used to obtain that payload, and can be applied equally to seeded replay,
-value-carrying fork wrappers, or later Fiat-Shamir specializations. -/
+/-- If `extractCandidate` returns `some sk`, then `sk` is a valid discrete-log witness:
+`sk • g = pk`. -/
 theorem extractCandidate_sound (g pk : G)
     {res : Option ((G × F) × F × (G × F) × F)}
     {sk : F}
@@ -156,11 +168,8 @@ theorem extractCandidate_sound (g pk : G)
           rwa [hskEq] at hsound
       · simp [extractCandidate, hR] at hsk
 
-/-- Any witness in the support of the deterministic Schnorr postprocessing is valid.
-
-This support-level version is the right interface for later extractor wrappers: once a forking
-construction is known to produce payloads of the expected shape, witness soundness follows by
-mapping `Schnorr.extractCandidate` over that output distribution. -/
+/-- Monadic lifting of `extractCandidate_sound`: if `some sk` is in the support of
+`extractCandidate g pk <$> oa`, then `sk • g = pk`. -/
 theorem extractCandidate_sound_of_mem_support
     (g pk : G)
     {m : Type → Type} [Monad m] [LawfulMonad m] [HasEvalSet m]
@@ -179,11 +188,14 @@ section runtime
 variable (F : Type) [FinEnum F] [Inhabited F]
 variable {α : Type}
 
-/-- In the standard single-family Schnorr setting, one fork-based extraction attempt has expected
-query work at most `2q + 1` whenever the adversary makes at most `q` challenge queries.
+/-- One fork-based extraction attempt has expected query work at most `2q + 1`, where `q` is
+the adversary's challenge-query budget. The LHS has three terms:
 
-The bound decomposes as: `q` seed samples of cost `1` each, one fresh replacement sample of cost
-`1`, and at most `q` live oracle queries during the seeded replay. -/
+1. **Seed generation**: `q` uniform samples (cost 1 each) to build the seed = `q`.
+2. **Replacement sample**: 1 fresh challenge value = `1`.
+3. **Replay queries**: at most `q` live oracle queries during the replayed execution.
+
+Total: `q + 1 + q = 2q + 1`. -/
 theorem fork_expectedQueryWork_le
     (main : OracleComp (challengeSpec F) α) (q : ℕ)
     (cf : α → Option (Fin (challengeBudget q () + 1)))
