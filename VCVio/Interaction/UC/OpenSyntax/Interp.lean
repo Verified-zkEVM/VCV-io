@@ -41,18 +41,18 @@ structure Interp
     (Atom : PortBoundary → Type u)
     (Δ : PortBoundary) where
   /--
-  Interpret the free expression in an arbitrary lawful target open theory.
+  Interpret the free expression in an arbitrary compact closed target theory.
   -/
   run :
     (T : OpenTheory.{max (u + 1) 3}) →
-    OpenTheory.IsLawful T →
+    OpenTheory.IsCompactClosed T →
     (∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) →
     T.Obj Δ
 
 namespace Interp
 
 /--
-Interpret a tagless-final expression in a lawful target open theory.
+Interpret a tagless-final expression in a compact closed target theory.
 
 This is just the `run` field restated as a named eliminator.
 -/
@@ -61,7 +61,7 @@ abbrev interpret
     {Δ : PortBoundary}
     (W : Interp Atom Δ)
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     T.Obj Δ :=
   W.run T hT interp
@@ -77,7 +77,7 @@ theorem ext
     {W₁ W₂ : Interp Atom Δ}
     (h :
       ∀ (T : OpenTheory.{max (u + 1) 3})
-        (hT : OpenTheory.IsLawful T)
+        (hT : OpenTheory.IsCompactClosed T)
         (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ),
           W₁.run T hT interp = W₂.run T hT interp) :
     W₁ = W₂ := by
@@ -103,7 +103,7 @@ theorem interpret_atom
     {Δ : PortBoundary}
     (a : Atom Δ)
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (atom a).interpret T hT interp = interp a :=
   rfl
@@ -125,7 +125,7 @@ theorem interpret_map
     (f : PortBoundary.Hom Δ₁ Δ₂)
     (W : Interp Atom Δ₁)
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (map f W).interpret T hT interp = T.map f (W.interpret T hT interp) :=
   rfl
@@ -139,7 +139,8 @@ def par
     Interp Atom Δ₁ →
     Interp Atom Δ₂ →
     Interp Atom (PortBoundary.tensor Δ₁ Δ₂)
-  | W₁, W₂ => ⟨fun T hT interp => T.par (W₁.run T hT interp) (W₂.run T hT interp)⟩
+  | W₁, W₂ => ⟨fun T hT interp =>
+    T.par (W₁.run T hT interp) (W₂.run T hT interp)⟩
 
 @[simp]
 theorem interpret_par
@@ -148,7 +149,7 @@ theorem interpret_par
     (W₁ : Interp Atom Δ₁)
     (W₂ : Interp Atom Δ₂)
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (par W₁ W₂).interpret T hT interp =
       T.par (W₁.interpret T hT interp) (W₂.interpret T hT interp) :=
@@ -163,7 +164,8 @@ def wire
     Interp Atom (PortBoundary.tensor Δ₁ Γ) →
     Interp Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) →
     Interp Atom (PortBoundary.tensor Δ₁ Δ₂)
-  | W₁, W₂ => ⟨fun T hT interp => T.wire (W₁.run T hT interp) (W₂.run T hT interp)⟩
+  | W₁, W₂ => ⟨fun T hT interp =>
+    T.wire (W₁.run T hT interp) (W₂.run T hT interp)⟩
 
 @[simp]
 theorem interpret_wire
@@ -172,7 +174,7 @@ theorem interpret_wire
     (W₁ : Interp Atom (PortBoundary.tensor Δ₁ Γ))
     (W₂ : Interp Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (wire W₁ W₂).interpret T hT interp =
       T.wire (W₁.interpret T hT interp) (W₂.interpret T hT interp) :=
@@ -187,7 +189,8 @@ def plug
     Interp Atom Δ →
     Interp Atom (PortBoundary.swap Δ) →
     Interp Atom (PortBoundary.empty)
-  | W, K => ⟨fun T hT interp => T.plug (W.run T hT interp) (K.run T hT interp)⟩
+  | W, K => ⟨fun T hT interp =>
+    T.plug (W.run T hT interp) (K.run T hT interp)⟩
 
 @[simp]
 theorem interpret_plug
@@ -196,10 +199,48 @@ theorem interpret_plug
     (W : Interp Atom Δ)
     (K : Interp Atom (PortBoundary.swap Δ))
     (T : OpenTheory.{max (u + 1) 3})
-    (hT : OpenTheory.IsLawful T)
+    (hT : OpenTheory.IsCompactClosed T)
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (plug W K).interpret T hT interp =
       T.plug (W.interpret T hT interp) (K.interpret T hT interp) :=
+  rfl
+
+/--
+The monoidal unit (closed system with no boundary).
+-/
+def unit
+    {Atom : PortBoundary → Type u} :
+    Interp Atom PortBoundary.empty :=
+  ⟨fun _ hCC _ => OpenTheory.IsMonoidal.unit (self := hCC.toIsMonoidal)⟩
+
+@[simp]
+theorem interpret_unit
+    {Atom : PortBoundary → Type u}
+    (T : OpenTheory.{max (u + 1) 3})
+    (hT : OpenTheory.IsCompactClosed T)
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
+    (unit : Interp Atom _).interpret T hT interp =
+      OpenTheory.IsMonoidal.unit (T := T) :=
+  rfl
+
+/--
+The identity wire (coevaluation) on boundary `Γ`.
+-/
+def idWire
+    {Atom : PortBoundary → Type u}
+    (Γ : PortBoundary) :
+    Interp Atom (PortBoundary.tensor (PortBoundary.swap Γ) Γ) :=
+  ⟨fun _ hCC _ => OpenTheory.IsCompactClosed.idWire (self := hCC) Γ⟩
+
+@[simp]
+theorem interpret_idWire
+    {Atom : PortBoundary → Type u}
+    (Γ : PortBoundary)
+    (T : OpenTheory.{max (u + 1) 3})
+    (hT : OpenTheory.IsCompactClosed T)
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
+    (idWire Γ : Interp Atom _).interpret T hT interp =
+      OpenTheory.IsCompactClosed.idWire (T := T) Γ :=
   rfl
 
 /--
@@ -223,7 +264,7 @@ instance lawfulMap
     change Interp.map (PortBoundary.Hom.id Δ) W = W
     refine Interp.ext ?_
     intro T hT interp
-    let _ : OpenTheory.IsLawful T := hT
+    let _ : OpenTheory.IsLawful T := hT.toIsMonoidal.toIsLawful
     simp [Interp.map]
   map_comp := by
     intro Δ₁ Δ₂ Δ₃ g f W
@@ -231,7 +272,7 @@ instance lawfulMap
     change Interp.map (PortBoundary.Hom.comp g f) W = Interp.map g (Interp.map f W)
     refine Interp.ext ?_
     intro T hT interp
-    let _ : OpenTheory.IsLawful T := hT
+    let _ : OpenTheory.IsLawful T := hT.toIsMonoidal.toIsLawful
     simpa [Interp.map] using
       OpenTheory.map_comp (T := T) g f (W.run T hT interp)
 
@@ -249,7 +290,7 @@ instance lawfulPar
         Interp.par (Interp.map f₁ W₁) (Interp.map f₂ W₂)
     refine Interp.ext ?_
     intro T hT interp
-    let _ : OpenTheory.IsLawful T := hT
+    let _ : OpenTheory.IsLawful T := hT.toIsMonoidal.toIsLawful
     simpa [Interp.map, Interp.par] using
       OpenTheory.map_par (T := T) f₁ f₂ (W₁.run T hT interp) (W₂.run T hT interp)
 
@@ -273,7 +314,7 @@ instance lawfulWire
             W₂)
     refine Interp.ext ?_
     intro T hT interp
-    let _ : OpenTheory.IsLawful T := hT
+    let _ : OpenTheory.IsLawful T := hT.toIsMonoidal.toIsLawful
     simpa [Interp.map, Interp.wire] using
       OpenTheory.map_wire (T := T) f₁ f₂ (W₁.run T hT interp) (W₂.run T hT interp)
 
@@ -291,13 +332,94 @@ instance lawfulPlug
         Interp.plug W (Interp.map (PortBoundary.Hom.swap f) K)
     refine Interp.ext ?_
     intro T hT interp
-    let _ : OpenTheory.IsLawful T := hT
+    let _ : OpenTheory.IsLawful T := hT.toIsMonoidal.toIsLawful
     simpa [Interp.map, Interp.plug] using
       OpenTheory.map_plug (T := T) f (W.run T hT interp) (K.run T hT interp)
 
 instance lawful
     (Atom : PortBoundary → Type u) :
     OpenTheory.IsLawful (Interp.theory Atom) where
+
+instance monoidal
+    (Atom : PortBoundary → Type u) :
+    OpenTheory.IsMonoidal (Interp.theory Atom) where
+  unit := Interp.unit
+  par_assoc := by
+    intro Δ₁ Δ₂ Δ₃ W₁ W₂ W₃
+    change Interp Atom Δ₁ at W₁
+    change Interp Atom Δ₂ at W₂
+    change Interp Atom Δ₃ at W₃
+    change
+      Interp.map (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).toHom
+        (Interp.par (Interp.par W₁ W₂) W₃) =
+      Interp.par W₁ (Interp.par W₂ W₃)
+    refine Interp.ext ?_
+    intro T hT interp
+    let _ : OpenTheory.IsMonoidal T := hT.toIsMonoidal
+    simpa [Interp.map, Interp.par] using
+      OpenTheory.par_assoc (T := T) (W₁.run T hT interp)
+        (W₂.run T hT interp) (W₃.run T hT interp)
+  par_comm := by
+    intro Δ₁ Δ₂ W₁ W₂
+    change Interp Atom Δ₁ at W₁
+    change Interp Atom Δ₂ at W₂
+    change
+      Interp.map (PortBoundary.Equiv.tensorComm Δ₁ Δ₂).toHom
+        (Interp.par W₁ W₂) =
+      Interp.par W₂ W₁
+    refine Interp.ext ?_
+    intro T hT interp
+    let _ : OpenTheory.IsMonoidal T := hT.toIsMonoidal
+    simpa [Interp.map, Interp.par] using
+      OpenTheory.par_comm (T := T) (W₁.run T hT interp) (W₂.run T hT interp)
+  par_leftUnit := by
+    intro Δ W
+    change Interp Atom Δ at W
+    change
+      Interp.map (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
+        (Interp.par Interp.unit W) = W
+    refine Interp.ext ?_
+    intro T hT interp
+    let _ : OpenTheory.IsMonoidal T := hT.toIsMonoidal
+    simp [Interp.map, Interp.par, Interp.unit]
+  par_rightUnit := by
+    intro Δ W
+    change Interp Atom Δ at W
+    change
+      Interp.map (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
+        (Interp.par W Interp.unit) = W
+    refine Interp.ext ?_
+    intro T hT interp
+    let _ : OpenTheory.IsMonoidal T := hT.toIsMonoidal
+    simp [Interp.map, Interp.par, Interp.unit]
+
+instance compactClosed
+    (Atom : PortBoundary → Type u) :
+    OpenTheory.IsCompactClosed (Interp.theory Atom) where
+  idWire := Interp.idWire
+  plug_eq_wire := by
+    intro Δ W K
+    change Interp Atom Δ at W
+    change Interp Atom (PortBoundary.swap Δ) at K
+    change
+      Interp.plug W K =
+        Interp.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+          (Interp.wire
+            (Interp.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
+            (Interp.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ)).symm.toHom K))
+    refine Interp.ext ?_
+    intro T hT interp
+    simp [Interp.plug, Interp.map, Interp.wire,
+      OpenTheory.plug_eq_wire (T := T) (W.run T hT interp) (K.run T hT interp)]
+  wire_idWire := by
+    intro Γ Δ₂ W₂
+    change Interp Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) at W₂
+    change
+      Interp.wire (Interp.idWire Γ) W₂ = W₂
+    refine Interp.ext ?_
+    intro T hT interp
+    simp [Interp.wire, Interp.idWire]
 
 end Interp
 

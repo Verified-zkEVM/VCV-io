@@ -191,7 +191,19 @@ supporting `Packet`, `Query`, `Hom`, `comp` (Poly's composition product),
 `compUnit` (composition unit), and boundary equivalences.
 
 `OpenTheory` provides the compositional algebra: `map`, `par`, `wire`, `plug`.
-Lawfulness classes ensure functoriality and naturality.
+Lawfulness is stratified into a class hierarchy:
+
+- `IsLawfulMap` / `IsLawfulPar` / `IsLawfulWire` / `IsLawfulPlug`:
+  functoriality of `map` and naturality of combinators.
+- `IsLawful`: bundles all naturality laws.
+- `IsMonoidal`: symmetric monoidal coherence for `par` (associativity,
+  commutativity, left/right unit laws via a distinguished `unit` object).
+- `IsCompactClosed`: compact closed structure with `idWire` as coevaluation,
+  derivation of `plug` from `wire`, and a zig-zag identity (`wire_idWire`).
+
+`OpenProcessIso` (in `OpenProcess.lean`) provides a bisimulation-based
+equivalence for `OpenProcess`, used to state monoidal and compact closed laws
+for the concrete `openTheory` model up to isomorphism (see `OpenProcessModel.lean`).
 
 `OpenSyntax` provides three layers for free open-system expressions:
 
@@ -303,12 +315,12 @@ import VCVio.Interaction.Concurrent.Process
 | File | Purpose |
 |------|---------|
 | `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`compUnit`, tensor/swap |
-| `OpenTheory.lean` | `OpenTheory` algebra (`map`, `par`, `wire`, `plug`) |
-| `OpenSyntax/Raw.lean` | `Raw` (inductive syntax tree), `Raw.interpret`, `Raw.Equiv`, `Raw.setoid` |
-| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), lawful `OpenTheory` instance |
-| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), lawful `OpenTheory` instance, `Expr.toInterp` |
-| `OpenProcess.lean` | `BoundaryAction`, `OpenNodeSemantics`, `OpenProcess` (open-world bridge) |
-| `OpenProcessModel.lean` | `openTheory` (concrete `OpenTheory` backed by `OpenProcess`), `IsLawfulMap` |
+| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `IsMonoidal`, `IsCompactClosed` |
+| `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/CC equations) |
+| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), `IsMonoidal`/`IsCompactClosed` instances |
+| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), `IsMonoidal`/`IsCompactClosed` instances, `Expr.toInterp` |
+| `OpenProcess.lean` | `BoundaryAction`, `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
+| `OpenProcessModel.lean` | `openTheory` (concrete model), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 | `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
 | `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (monad-parametric), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |

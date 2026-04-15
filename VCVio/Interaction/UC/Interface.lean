@@ -499,6 +499,22 @@ theorem mapPacket_inr (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB})
     (pkt : Packet I₂) :
     mapPacket (inr I₁ I₂) pkt = ⟨Sum.inr pkt.1, pkt.2⟩ := rfl
 
+@[simp]
+theorem comp_sum_inl
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, uB}}
+    {J₁ : Interface.{wA, uB}} {J₂ : Interface.{wB, uB}}
+    (f₁ : Hom I₁ J₁) (f₂ : Hom I₂ J₂) :
+    comp (sum f₁ f₂) (inl I₁ I₂) = comp (inl J₁ J₂) f₁ := by
+  ext a <;> rfl
+
+@[simp]
+theorem comp_sum_inr
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, uB}}
+    {J₁ : Interface.{wA, uB}} {J₂ : Interface.{wB, uB}}
+    (f₁ : Hom I₁ J₁) (f₂ : Hom I₂ J₂) :
+    comp (sum f₁ f₂) (inr I₁ I₂) = comp (inr J₁ J₂) f₂ := by
+  ext a <;> rfl
+
 end Hom
 
 namespace QueryHom

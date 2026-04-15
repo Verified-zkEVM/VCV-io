@@ -185,6 +185,66 @@ def closed {Δ : PortBoundary} {X : Type w}
     BoundaryAction PortBoundary.empty X :=
   .internal PortBoundary.empty X
 
+@[simp]
+theorem mapBoundary_embedInlTensor
+    {Δ₁ Δ₁' : PortBoundary} {Δ₂ Δ₂' : PortBoundary} {X : Type w}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂')
+    (b : BoundaryAction Δ₁ X) :
+    (b.embedInlTensor Δ₂).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
+      (b.mapBoundary f₁).embedInlTensor Δ₂' := by
+  simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor, List.map_map]
+  congr 1
+
+@[simp]
+theorem mapBoundary_embedInrTensor
+    {Δ₁ Δ₁' : PortBoundary} {Δ₂ Δ₂' : PortBoundary} {X : Type w}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂')
+    (b : BoundaryAction Δ₂ X) :
+    (b.embedInrTensor Δ₁).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
+      (b.mapBoundary f₂).embedInrTensor Δ₁' := by
+  simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor, List.map_map]
+  congr 1
+
+@[simp]
+theorem closed_mapBoundary
+    {Δ₁ Δ₂ : PortBoundary} {X : Type w}
+    (φ : PortBoundary.Hom Δ₁ Δ₂)
+    (b : BoundaryAction Δ₁ X) :
+    (b.mapBoundary φ).closed = b.closed := rfl
+
+@[simp]
+theorem mapBoundary_wireLeft
+    {Δ₁ Δ₁' Γ : PortBoundary} {Δ₂ Δ₂' : PortBoundary} {X : Type w}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂')
+    (b : BoundaryAction (PortBoundary.tensor Δ₁ Γ) X) :
+    (b.wireLeft Δ₂).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
+      (b.mapBoundary
+        (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))).wireLeft Δ₂' := by
+  simp only [wireLeft, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
+  congr 1; funext x
+  rw [List.map_filterMap, List.filterMap_map]
+  congr 1; funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port with
+  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+
+@[simp]
+theorem mapBoundary_wireRight
+    {Δ₁ Δ₁' : PortBoundary} {Γ Δ₂ Δ₂' : PortBoundary} {X : Type w}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂')
+    (b : BoundaryAction (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) X) :
+    (b.wireRight Δ₁).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
+      (b.mapBoundary
+        (PortBoundary.Hom.tensor
+          (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)).wireRight Δ₁' := by
+  simp only [wireRight, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
+  congr 1; funext x
+  rw [List.map_filterMap, List.filterMap_map]
+  congr 1; funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port with
+  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+
 end BoundaryAction
 
 /--
@@ -379,6 +439,70 @@ def close (Party : Type u) (Δ : PortBoundary) :
     boundary := ons.boundary.closed
   }
 
+theorem map_tensor_comp_inlTensor (Party : Type u)
+    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂') :
+    Spec.Node.ContextHom.comp
+      (map.{u, w} Party (PortBoundary.Hom.tensor f₁ f₂))
+      (inlTensor Party Δ₁ Δ₂) =
+    Spec.Node.ContextHom.comp
+      (inlTensor Party Δ₁' Δ₂')
+      (map Party f₁) := by
+  funext X ons
+  simp [map, inlTensor, Spec.Node.ContextHom.comp,
+    OpenNodeSemantics.mapBoundary]
+
+theorem map_tensor_comp_inrTensor (Party : Type u)
+    {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂') :
+    Spec.Node.ContextHom.comp
+      (map.{u, w} Party (PortBoundary.Hom.tensor f₁ f₂))
+      (inrTensor Party Δ₁ Δ₂) =
+    Spec.Node.ContextHom.comp
+      (inrTensor Party Δ₁' Δ₂')
+      (map Party f₂) := by
+  funext X ons
+  simp [map, inrTensor, Spec.Node.ContextHom.comp,
+    OpenNodeSemantics.mapBoundary]
+
+theorem close_comp_map (Party : Type u)
+    {Δ₁ Δ₂ : PortBoundary}
+    (φ : PortBoundary.Hom Δ₁ Δ₂) :
+    Spec.Node.ContextHom.comp
+      (close.{u, w} Party Δ₂)
+      (map Party φ) =
+    close Party Δ₁ := by
+  funext X ons
+  simp [close, map, Spec.Node.ContextHom.comp,
+    OpenNodeSemantics.mapBoundary, BoundaryAction.closed]
+
+theorem map_tensor_comp_wireLeft (Party : Type u)
+    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂') :
+    Spec.Node.ContextHom.comp
+      (map.{u, w} Party (PortBoundary.Hom.tensor f₁ f₂))
+      (wireLeft Party Δ₁ Γ Δ₂) =
+    Spec.Node.ContextHom.comp
+      (wireLeft Party Δ₁' Γ Δ₂')
+      (map Party (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))) := by
+  funext X ons
+  simp [map, wireLeft, Spec.Node.ContextHom.comp,
+    OpenNodeSemantics.mapBoundary]
+
+theorem map_tensor_comp_wireRight (Party : Type u)
+    {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
+    (f₁ : PortBoundary.Hom Δ₁ Δ₁') (f₂ : PortBoundary.Hom Δ₂ Δ₂') :
+    Spec.Node.ContextHom.comp
+      (map.{u, w} Party (PortBoundary.Hom.tensor f₁ f₂))
+      (wireRight Party Δ₁ Γ Δ₂) =
+    Spec.Node.ContextHom.comp
+      (wireRight Party Δ₁' Γ Δ₂')
+      (map Party (PortBoundary.Hom.tensor
+        (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)) := by
+  funext X ons
+  simp [map, wireRight, Spec.Node.ContextHom.comp,
+    OpenNodeSemantics.mapBoundary]
+
 end OpenStepContext
 
 /--
@@ -449,6 +573,81 @@ predicates used throughout VCVio.
 -/
 abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
   ProcessOver.System (OpenStepContext Party Δ : Spec.Node.Context.{w})
+
+-- ============================================================================
+-- § OpenProcessIso: bisimulation equivalence for open processes
+-- ============================================================================
+
+/--
+Two open processes with the same boundary are bisimilar when there exists a
+relation on their state types that is a bisimulation: from any pair of related
+states, each side can match the other's transition while maintaining the
+relation on successor states.
+
+This is the appropriate equality notion for `openTheory` monoidal laws,
+where the internal scheduler structure differs (e.g., left-nested vs.
+right-nested interleaving) but the observable boundary traffic is the same.
+-/
+def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
+    (p₁ p₂ : OpenProcess.{u, v, w} Party Δ) : Prop :=
+  ∃ (rel : p₁.Proc → p₂.Proc → Prop),
+    (∀ s₁, ∃ s₂, rel s₁ s₂) ∧
+    (∀ s₂, ∃ s₁, rel s₁ s₂) ∧
+    (∀ s₁ s₂, rel s₁ s₂ →
+      ∀ tr₁ : (p₁.step s₁).spec.Transcript,
+        ∃ tr₂ : (p₂.step s₂).spec.Transcript,
+          rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂)) ∧
+    (∀ s₁ s₂, rel s₁ s₂ →
+      ∀ tr₂ : (p₂.step s₂).spec.Transcript,
+        ∃ tr₁ : (p₁.step s₁).spec.Transcript,
+          rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂))
+
+namespace OpenProcessIso
+
+variable {Party : Type u} {Δ : PortBoundary}
+
+/-- Every open process is bisimilar to itself. -/
+protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
+    OpenProcessIso p p :=
+  ⟨Eq, fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩,
+    fun s₁ _ h tr => by subst h; exact ⟨tr, rfl⟩,
+    fun s₁ _ h tr => by subst h; exact ⟨tr, rfl⟩⟩
+
+/-- Bisimilarity is symmetric. -/
+protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
+    (h : OpenProcessIso p₁ p₂) :
+    OpenProcessIso p₂ p₁ := by
+  obtain ⟨rel, htot, hsurj, hfwd, hbwd⟩ := h
+  exact ⟨fun s₂ s₁ => rel s₁ s₂, hsurj, htot,
+    fun s₂ s₁ hr tr₂ => hbwd s₁ s₂ hr tr₂,
+    fun s₂ s₁ hr tr₁ => hfwd s₁ s₂ hr tr₁⟩
+
+/-- Bisimilarity is transitive. -/
+protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w} Party Δ}
+    (h₁₂ : OpenProcessIso p₁ p₂)
+    (h₂₃ : OpenProcessIso p₂ p₃) :
+    OpenProcessIso p₁ p₃ := by
+  obtain ⟨rel₁₂, htot₁₂, hsurj₁₂, hfwd₁₂, hbwd₁₂⟩ := h₁₂
+  obtain ⟨rel₂₃, htot₂₃, hsurj₂₃, hfwd₂₃, hbwd₂₃⟩ := h₂₃
+  refine ⟨fun s₁ s₃ => ∃ s₂, rel₁₂ s₁ s₂ ∧ rel₂₃ s₂ s₃, ?_, ?_, ?_, ?_⟩
+  · intro s₁
+    obtain ⟨s₂, h₂⟩ := htot₁₂ s₁
+    obtain ⟨s₃, h₃⟩ := htot₂₃ s₂
+    exact ⟨s₃, s₂, h₂, h₃⟩
+  · intro s₃
+    obtain ⟨s₂, h₂⟩ := hsurj₂₃ s₃
+    obtain ⟨s₁, h₁⟩ := hsurj₁₂ s₂
+    exact ⟨s₁, s₂, h₁, h₂⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₁
+    obtain ⟨tr₂, hn₁₂⟩ := hfwd₁₂ s₁ s₂ hr₁₂ tr₁
+    obtain ⟨tr₃, hn₂₃⟩ := hfwd₂₃ s₂ s₃ hr₂₃ tr₂
+    exact ⟨tr₃, _, hn₁₂, hn₂₃⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₃
+    obtain ⟨tr₂, hn₂₃⟩ := hbwd₂₃ s₂ s₃ hr₂₃ tr₃
+    obtain ⟨tr₁, hn₁₂⟩ := hbwd₁₂ s₁ s₂ hr₁₂ tr₂
+    exact ⟨tr₁, _, hn₁₂, hn₂₃⟩
+
+end OpenProcessIso
 
 end UC
 end Interaction

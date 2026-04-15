@@ -6,36 +6,33 @@ Authors: Quang Dao
 import VCVio.Interaction.UC.Interface
 
 /-!
-# Operations-first open composition
+# Open composition algebra with monoidal coherence
 
-This module records the smallest algebraic interface currently needed for the
-UC-facing "open world" direction.
+This module defines `OpenTheory`, a boundary-indexed algebra of open systems,
+together with a hierarchy of lawfulness classes capturing increasingly strong
+equational properties.
 
-The key design choice is that we do **not** yet commit to a concrete
-representation of composite open systems. In particular, this file does not
-introduce a quoted syntax tree, wiring graph, or runtime semantics. Instead it
-isolates the boundary-indexed operations that any such representation should
-support:
+## Operations
 
-* `map` for structural interface adaptation,
-* `par` for side-by-side composition, and
-* `wire` for internalizing one shared boundary between two open systems.
+* `map` adapts how an exposed boundary is presented.
+* `par` places two open systems side by side (tensor of boundaries).
+* `wire` internalizes one shared boundary between two open systems.
+* `plug` closes an open system against a matching context on the swapped
+  boundary.
 
-It also keeps `plug` as the top-level closure operation against a matching
-external context. Conceptually, `wire` is the more local composition
-primitive, while `plug` is the fully closing special case that remains most
-convenient for contextual comparison.
+## Class hierarchy
 
-This is the operations-first "Option C2" shape from the current UC design
-notes. Later layers may realize `OpenTheory` by:
+* `IsLawfulMap`: functoriality of `map` (identity and composition).
+* `IsLawfulPar`/`IsLawfulWire`/`IsLawfulPlug`: naturality of each combinator
+  with respect to boundary adaptation.
+* `IsLawful`: bundles all naturality laws.
+* `IsMonoidal`: symmetric monoidal coherence for `par` (associativity,
+  commutativity, left and right unit laws via a distinguished `unit` object).
+* `IsCompactClosed`: compact closed structure (`idWire` as coevaluation,
+  `plug` derivable from `wire`, zig-zag identity for `wire_idWire`).
 
-* a direct family of open processes,
-* a free syntax of open-system expressions,
-* an explicit graph/network representation,
-* or another equivalent presentation.
-
-What matters here is the algebra of open composition, not the concrete
-representation of composite worlds.
+Concrete realizations include the free models (`Expr.theory`, `Interp.theory`)
+and the process-backed `openTheory` in `OpenProcessModel.lean`.
 -/
 
 universe u
@@ -59,25 +56,12 @@ primitive composition operations:
 * `plug` closes an open system against a matching context on the swapped
   boundary, yielding a closed system.
 
-This interface is intentionally smaller than a full syntax of open worlds.
-Its job is to state the semantic commitment we actually care about: a notion of
-open system equipped with compositional boundary operations.
+Lawfulness is stratified into three levels via the class hierarchy
+`IsLawful ≤ IsMonoidal ≤ IsCompactClosed` (see the module docstring).
 
-The first law layer is kept intentionally modest. This file bundles:
-
-* functoriality of `map`,
-* naturality of `par` with respect to boundary tensors, and
-* naturality of `wire` with respect to its still-exposed outer boundaries, and
-* naturality of `plug` with respect to swapped boundary adaptation.
-
-More ambitious coherence laws, such as associativity/unit/symmetry of open
-composition, should wait until the library settles on the right notion of
-boundary equivalence or open-system isomorphism.
-
-This first interface fixes one ambient pair of universes for ports and
-messages on both sides of every boundary. That keeps `PortBoundary.swap` inside
-the same family of objects. A more heterogeneous universe-polymorphic version
-can be added later if it becomes genuinely necessary.
+Universe polymorphism: one ambient pair of universes for ports and
+messages on both sides of every boundary, keeping `PortBoundary.swap` inside
+the same family of objects.
 -/
 structure OpenTheory where
   /--
@@ -270,6 +254,68 @@ later, once the library settles on the right notion of boundary equivalence.
 -/
 class IsLawful (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulPar T, IsLawfulWire T, IsLawfulPlug T
+
+/--
+`IsMonoidal T` extends `IsLawful T` with the symmetric monoidal coherence
+laws for `par`: a unit object, plus associativity, commutativity (braiding),
+and left/right unit laws up to boundary equivalence.
+
+Pentagon and hexagon coherence conditions are deferred: they are derivable
+in the free models and hold trivially for the concrete model up to process
+isomorphism.
+-/
+class IsMonoidal (T : _root_.Interaction.UC.OpenTheory.{u}) extends IsLawful T where
+  unit : T.Obj PortBoundary.empty
+  par_assoc :
+    ∀ {Δ₁ Δ₂ Δ₃ : PortBoundary}
+      (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) (W₃ : T.Obj Δ₃),
+      T.map (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).toHom
+        (T.par (T.par W₁ W₂) W₃) =
+      T.par W₁ (T.par W₂ W₃)
+  par_comm :
+    ∀ {Δ₁ Δ₂ : PortBoundary} (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂),
+      T.map (PortBoundary.Equiv.tensorComm Δ₁ Δ₂).toHom
+        (T.par W₁ W₂) =
+      T.par W₂ W₁
+  par_leftUnit :
+    ∀ {Δ : PortBoundary} (W : T.Obj Δ),
+      T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
+        (T.par unit W) = W
+  par_rightUnit :
+    ∀ {Δ : PortBoundary} (W : T.Obj Δ),
+      T.map (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
+        (T.par W unit) = W
+
+/--
+`IsCompactClosed T` extends `IsMonoidal T` with a coevaluation morphism
+(`idWire`) and laws that connect it to `wire` and `plug`.
+
+The `idWire Γ` process relays messages on the boundary `swap Γ ⊗ Γ`. The
+key property `wire_idWire` says that wiring any process against the identity
+wire leaves it unchanged (zig-zag identity). Together with `plug_eq_wire`,
+this characterizes the compact closed structure.
+-/
+class IsCompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
+    extends IsMonoidal T where
+  /-- The identity wire (coevaluation): a process on the boundary `swap Γ ⊗ Γ`
+  that relays messages bidirectionally. -/
+  idWire : ∀ (Γ : PortBoundary),
+    T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Γ)
+  /-- `plug` is derivable from `wire` plus boundary reshaping. -/
+  plug_eq_wire :
+    ∀ {Δ : PortBoundary}
+      (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)),
+      T.plug W K =
+        T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+          (T.wire
+            (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
+            (T.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ)).symm.toHom K))
+  /-- Wiring against the identity wire is a no-op (zig-zag identity). -/
+  wire_idWire :
+    ∀ (Γ : PortBoundary) {Δ₂ : PortBoundary}
+      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
+      T.wire (idWire Γ) W₂ = W₂
 
 /--
 `Closed T` is the type of closed systems in the open-composition theory `T`.
@@ -494,6 +540,74 @@ theorem mapEquiv_plug
       T.plug W (T.map (PortBoundary.Hom.swap e.toHom) K) := by
   simpa [OpenTheory.mapEquiv] using
     map_plug (T := T) e.toHom W K
+
+/--
+Reassociating a nested parallel composition of three open systems.
+-/
+theorem par_assoc
+    [IsMonoidal T]
+    {Δ₁ Δ₂ Δ₃ : PortBoundary}
+    (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) (W₃ : T.Obj Δ₃) :
+    T.mapEquiv (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃)
+      (T.par (T.par W₁ W₂) W₃) =
+    T.par W₁ (T.par W₂ W₃) :=
+  IsMonoidal.par_assoc W₁ W₂ W₃
+
+/--
+Swapping the components of a parallel composition along the tensor
+commutativity equivalence.
+-/
+theorem par_comm
+    [IsMonoidal T]
+    {Δ₁ Δ₂ : PortBoundary}
+    (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) :
+    T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Δ₂)
+      (T.par W₁ W₂) =
+    T.par W₂ W₁ :=
+  IsMonoidal.par_comm W₁ W₂
+
+/-- The monoidal unit is a left identity for parallel composition. -/
+@[simp]
+theorem par_leftUnit
+    [IsMonoidal T]
+    {Δ : PortBoundary}
+    (W : T.Obj Δ) :
+    T.mapEquiv (PortBoundary.Equiv.tensorEmptyLeft Δ)
+      (T.par (IsMonoidal.unit (T := T)) W) = W :=
+  IsMonoidal.par_leftUnit W
+
+/-- The monoidal unit is a right identity for parallel composition. -/
+@[simp]
+theorem par_rightUnit
+    [IsMonoidal T]
+    {Δ : PortBoundary}
+    (W : T.Obj Δ) :
+    T.mapEquiv (PortBoundary.Equiv.tensorEmptyRight Δ)
+      (T.par W (IsMonoidal.unit (T := T))) = W :=
+  IsMonoidal.par_rightUnit W
+
+/-- `plug` expressed via `wire` and boundary reshaping. -/
+theorem plug_eq_wire
+    [IsCompactClosed T]
+    {Δ : PortBoundary}
+    (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)) :
+    T.plug W K =
+      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (T.wire
+          (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
+          (T.map (PortBoundary.Equiv.tensorEmptyRight
+            (PortBoundary.swap Δ)).symm.toHom K)) :=
+  IsCompactClosed.plug_eq_wire W K
+
+/-- Wiring against the identity wire is a no-op (zig-zag identity). -/
+@[simp]
+theorem wire_idWire
+    [IsCompactClosed T]
+    (Γ : PortBoundary)
+    {Δ₂ : PortBoundary}
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
+    T.wire (IsCompactClosed.idWire (T := T) Γ) W₂ = W₂ :=
+  IsCompactClosed.wire_idWire Γ W₂
 
 end Laws
 

@@ -216,6 +216,89 @@ def interleave
         | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
         | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
 
+theorem mapContext_interleave
+    {Γ₁ Γ₂ Δ Δ' : Interaction.Spec.Node.Context.{w, w₂}}
+    (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
+    (f₁ : Interaction.Spec.Node.ContextHom Γ₁ Δ)
+    (f₂ : Interaction.Spec.Node.ContextHom Γ₂ Δ)
+    (sched : Δ (ULift.{w} Bool))
+    (g : Interaction.Spec.Node.ContextHom Δ Δ') :
+    (p₁.interleave p₂ f₁ f₂ sched).mapContext g =
+      p₁.interleave p₂
+        (Interaction.Spec.Node.ContextHom.comp g f₁)
+        (Interaction.Spec.Node.ContextHom.comp g f₂)
+        (g _ sched) := by
+  simp only [mapContext, interleave, StepOver.mapContext]
+  congr 1; funext ⟨s₁, s₂⟩; dsimp only []
+  congr 1
+  simp only [Interaction.Spec.Decoration.map]
+  congr 1; funext ⟨b⟩
+  cases b <;> dsimp
+  · exact Interaction.Spec.Decoration.map_comp g f₂ _ _
+  · exact Interaction.Spec.Decoration.map_comp g f₁ _ _
+
+theorem interleave_mapContext
+    {Γ₁ Γ₁' Γ₂ Γ₂' Δ : Interaction.Spec.Node.Context.{w, w₂}}
+    (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
+    (g₁ : Interaction.Spec.Node.ContextHom Γ₁ Γ₁')
+    (g₂ : Interaction.Spec.Node.ContextHom Γ₂ Γ₂')
+    (f₁ : Interaction.Spec.Node.ContextHom Γ₁' Δ)
+    (f₂ : Interaction.Spec.Node.ContextHom Γ₂' Δ)
+    (sched : Δ (ULift.{w} Bool)) :
+    (p₁.mapContext g₁).interleave (p₂.mapContext g₂) f₁ f₂ sched =
+      p₁.interleave p₂
+        (Interaction.Spec.Node.ContextHom.comp f₁ g₁)
+        (Interaction.Spec.Node.ContextHom.comp f₂ g₂)
+        sched := by
+  simp only [mapContext, interleave, StepOver.mapContext]
+  congr 1; funext ⟨s₁, s₂⟩; dsimp only []
+  congr 1
+  · congr 1; funext ⟨b⟩
+    cases b <;> dsimp
+    · exact Interaction.Spec.Decoration.map_comp f₂ g₂ _ _
+    · exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
+  · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
+
+theorem interleave_mapContext_left
+    {Γ₁ Γ₁' Γ₂ Δ : Interaction.Spec.Node.Context.{w, w₂}}
+    (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
+    (g₁ : Interaction.Spec.Node.ContextHom Γ₁ Γ₁')
+    (f₁ : Interaction.Spec.Node.ContextHom Γ₁' Δ)
+    (f₂ : Interaction.Spec.Node.ContextHom Γ₂ Δ)
+    (sched : Δ (ULift.{w} Bool)) :
+    (p₁.mapContext g₁).interleave p₂ f₁ f₂ sched =
+      p₁.interleave p₂
+        (Interaction.Spec.Node.ContextHom.comp f₁ g₁)
+        f₂
+        sched := by
+  simp only [mapContext, interleave, StepOver.mapContext]
+  congr 1; funext ⟨s₁, s₂⟩; dsimp only []
+  congr 1
+  · congr 1; funext ⟨b⟩
+    cases b <;> dsimp
+    exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
+  · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
+
+theorem interleave_mapContext_right
+    {Γ₁ Γ₂ Γ₂' Δ : Interaction.Spec.Node.Context.{w, w₂}}
+    (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
+    (g₂ : Interaction.Spec.Node.ContextHom Γ₂ Γ₂')
+    (f₁ : Interaction.Spec.Node.ContextHom Γ₁ Δ)
+    (f₂ : Interaction.Spec.Node.ContextHom Γ₂' Δ)
+    (sched : Δ (ULift.{w} Bool)) :
+    p₁.interleave (p₂.mapContext g₂) f₁ f₂ sched =
+      p₁.interleave p₂
+        f₁
+        (Interaction.Spec.Node.ContextHom.comp f₂ g₂)
+        sched := by
+  simp only [mapContext, interleave, StepOver.mapContext]
+  congr 1; funext ⟨s₁, s₂⟩; dsimp only []
+  congr 1
+  · congr 1; funext ⟨b⟩
+    cases b <;> dsimp
+    exact Interaction.Spec.Decoration.map_comp f₂ g₂ _ _
+  · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
+
 /--
 A stable external label for each complete step transcript of a process.
 

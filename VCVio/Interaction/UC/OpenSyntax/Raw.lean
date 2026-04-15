@@ -65,6 +65,11 @@ inductive Raw (Atom : PortBoundary → Type u) : PortBoundary → Type (u + 1) w
   /-- Close an open system against a matching context. -/
   | plug {Δ : PortBoundary} :
       Raw Atom Δ → Raw Atom (PortBoundary.swap Δ) → Raw Atom PortBoundary.empty
+  /-- The monoidal unit (closed system with no boundary). -/
+  | unit : Raw Atom PortBoundary.empty
+  /-- The identity wire (coevaluation) on boundary `Γ`. -/
+  | idWire (Γ : PortBoundary) :
+      Raw Atom (PortBoundary.tensor (PortBoundary.swap Γ) Γ)
 
 namespace Raw
 
@@ -80,70 +85,89 @@ def interpret
     {Δ : PortBoundary}
     (e : Raw Atom Δ)
     (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ)
+    (unitVal : T.Obj PortBoundary.empty)
+    (idWireVal : ∀ (Γ : PortBoundary),
+      T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Γ)) :
     T.Obj Δ :=
   match e with
   | .atom a => interp a
-  | .map f e => T.map f (e.interpret T interp)
-  | .par e₁ e₂ => T.par (e₁.interpret T interp) (e₂.interpret T interp)
-  | .wire e₁ e₂ => T.wire (e₁.interpret T interp) (e₂.interpret T interp)
-  | .plug e k => T.plug (e.interpret T interp) (k.interpret T interp)
+  | .map f e => T.map f (e.interpret T interp unitVal idWireVal)
+  | .par e₁ e₂ =>
+    T.par (e₁.interpret T interp unitVal idWireVal)
+      (e₂.interpret T interp unitVal idWireVal)
+  | .wire e₁ e₂ =>
+    T.wire (e₁.interpret T interp unitVal idWireVal)
+      (e₂.interpret T interp unitVal idWireVal)
+  | .plug e k =>
+    T.plug (e.interpret T interp unitVal idWireVal)
+      (k.interpret T interp unitVal idWireVal)
+  | .unit => unitVal
+  | .idWire Γ => idWireVal Γ
+
+variable {Atom : PortBoundary → Type u} {T : OpenTheory}
+    {interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ}
+    {unitVal : T.Obj PortBoundary.empty}
+    {idWireVal : ∀ (Γ : PortBoundary),
+      T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Γ)}
 
 @[simp]
 theorem interpret_atom
-    {Atom : PortBoundary → Type u}
     {Δ : PortBoundary}
-    (a : Atom Δ)
-    (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Raw.atom a).interpret T interp = interp a :=
+    (a : Atom Δ) :
+    (Raw.atom a).interpret T interp unitVal idWireVal = interp a :=
   rfl
 
 @[simp]
 theorem interpret_map
-    {Atom : PortBoundary → Type u}
     {Δ₁ Δ₂ : PortBoundary}
     (f : PortBoundary.Hom Δ₁ Δ₂)
-    (e : Raw Atom Δ₁)
-    (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Raw.map f e).interpret T interp = T.map f (e.interpret T interp) :=
+    (e : Raw Atom Δ₁) :
+    (Raw.map f e).interpret T interp unitVal idWireVal =
+      T.map f (e.interpret T interp unitVal idWireVal) :=
   rfl
 
 @[simp]
 theorem interpret_par
-    {Atom : PortBoundary → Type u}
     {Δ₁ Δ₂ : PortBoundary}
     (e₁ : Raw Atom Δ₁)
-    (e₂ : Raw Atom Δ₂)
-    (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Raw.par e₁ e₂).interpret T interp =
-      T.par (e₁.interpret T interp) (e₂.interpret T interp) :=
+    (e₂ : Raw Atom Δ₂) :
+    (Raw.par e₁ e₂).interpret T interp unitVal idWireVal =
+      T.par (e₁.interpret T interp unitVal idWireVal)
+        (e₂.interpret T interp unitVal idWireVal) :=
   rfl
 
 @[simp]
 theorem interpret_wire
-    {Atom : PortBoundary → Type u}
     {Δ₁ Γ Δ₂ : PortBoundary}
     (e₁ : Raw Atom (PortBoundary.tensor Δ₁ Γ))
-    (e₂ : Raw Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
-    (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Raw.wire e₁ e₂).interpret T interp =
-      T.wire (e₁.interpret T interp) (e₂.interpret T interp) :=
+    (e₂ : Raw Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
+    (Raw.wire e₁ e₂).interpret T interp unitVal idWireVal =
+      T.wire (e₁.interpret T interp unitVal idWireVal)
+        (e₂.interpret T interp unitVal idWireVal) :=
   rfl
 
 @[simp]
 theorem interpret_plug
-    {Atom : PortBoundary → Type u}
     {Δ : PortBoundary}
     (e : Raw Atom Δ)
-    (k : Raw Atom (PortBoundary.swap Δ))
-    (T : OpenTheory)
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Raw.plug e k).interpret T interp =
-      T.plug (e.interpret T interp) (k.interpret T interp) :=
+    (k : Raw Atom (PortBoundary.swap Δ)) :
+    (Raw.plug e k).interpret T interp unitVal idWireVal =
+      T.plug (e.interpret T interp unitVal idWireVal)
+        (k.interpret T interp unitVal idWireVal) :=
+  rfl
+
+@[simp]
+theorem interpret_unit :
+    (Raw.unit : Raw Atom PortBoundary.empty).interpret T interp unitVal idWireVal =
+      unitVal :=
+  rfl
+
+@[simp]
+theorem interpret_idWire
+    (Γ : PortBoundary) :
+    (Raw.idWire Γ : Raw Atom _).interpret T interp unitVal idWireVal =
+      idWireVal Γ :=
   rfl
 
 /--
@@ -198,6 +222,48 @@ inductive Equiv {Atom : PortBoundary → Type u} :
       Equiv
         (.plug (.map f e) k)
         (.plug e (.map (PortBoundary.Hom.swap f) k))
+  | par_assoc {Δ₁ Δ₂ Δ₃ : PortBoundary}
+      {e₁ : Raw Atom Δ₁}
+      {e₂ : Raw Atom Δ₂}
+      {e₃ : Raw Atom Δ₃} :
+      Equiv
+        (.map (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).toHom
+          (.par (.par e₁ e₂) e₃))
+        (.par e₁ (.par e₂ e₃))
+  | par_comm {Δ₁ Δ₂ : PortBoundary}
+      {e₁ : Raw Atom Δ₁}
+      {e₂ : Raw Atom Δ₂} :
+      Equiv
+        (.map (PortBoundary.Equiv.tensorComm Δ₁ Δ₂).toHom
+          (.par e₁ e₂))
+        (.par e₂ e₁)
+  | par_leftUnit {Δ : PortBoundary}
+      {e : Raw Atom Δ} :
+      Equiv
+        (.map (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
+          (.par .unit e))
+        e
+  | par_rightUnit {Δ : PortBoundary}
+      {e : Raw Atom Δ} :
+      Equiv
+        (.map (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
+          (.par e .unit))
+        e
+  | plug_eq_wire {Δ : PortBoundary}
+      {e : Raw Atom Δ}
+      {k : Raw Atom (PortBoundary.swap Δ)} :
+      Equiv
+        (.plug e k)
+        (.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+          (.wire
+            (.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom e)
+            (.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ)).symm.toHom k)))
+  | wire_idWire {Γ Δ₂ : PortBoundary}
+      {e₂ : Raw Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)} :
+      Equiv
+        (.wire (.idWire Γ) e₂)
+        e₂
   | congr_map {Δ₁ Δ₂ : PortBoundary}
       {f : PortBoundary.Hom Δ₁ Δ₂}
       {e₁ e₂ : Raw Atom Δ₁} :
@@ -227,9 +293,10 @@ theorem Equiv.interpret_eq
     {e₁ e₂ : Raw Atom Δ}
     (h : Equiv e₁ e₂)
     (T : OpenTheory)
-    [OpenTheory.IsLawful T]
+    [OpenTheory.IsCompactClosed T]
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    e₁.interpret T interp = e₂.interpret T interp := by
+    e₁.interpret T interp OpenTheory.IsMonoidal.unit OpenTheory.IsCompactClosed.idWire =
+      e₂.interpret T interp OpenTheory.IsMonoidal.unit OpenTheory.IsCompactClosed.idWire := by
   induction h with
   | refl => rfl
   | symm _ ih => exact ih.symm
@@ -239,6 +306,12 @@ theorem Equiv.interpret_eq
   | map_par => simp [interpret, OpenTheory.map_par]
   | map_wire => simp [interpret, OpenTheory.map_wire]
   | map_plug => simp [interpret, OpenTheory.map_plug]
+  | par_assoc => simp [interpret, OpenTheory.par_assoc]
+  | par_comm => simp [interpret, OpenTheory.par_comm]
+  | par_leftUnit => simp [interpret, OpenTheory.par_leftUnit]
+  | par_rightUnit => simp [interpret, OpenTheory.par_rightUnit]
+  | plug_eq_wire => simp [interpret, OpenTheory.plug_eq_wire]
+  | wire_idWire => simp [interpret, OpenTheory.wire_idWire]
   | congr_map _ ih => simp only [interpret_map]; rw [ih]
   | congr_par _ _ ih₁ ih₂ => simp only [interpret_par]; rw [ih₁, ih₂]
   | congr_wire _ _ ih₁ ih₂ => simp only [interpret_wire]; rw [ih₁, ih₂]
