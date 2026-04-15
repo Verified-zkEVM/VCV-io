@@ -89,7 +89,7 @@ private theorem challengeSample_queryCostExactly_one :
       1 := by
   letI : SampleableType F := FinEnum.SampleableType F
   haveI : NeZero (FinEnum.card F) := ⟨FinEnum.card_ne_zero (α := F)⟩
-  show AddWriterT.QueryCostExactly (probCompUnitQueryRun
+  change AddWriterT.QueryCostExactly (probCompUnitQueryRun
     (FinEnum.equiv (α := F).symm <$> ($ᵗ Fin (FinEnum.card F) : ProbComp _))) 1
   simp only [probCompUnitQueryRun, simulateQ_map]
   exact AddWriterT.queryCostExactly_map (FinEnum.equiv (α := F)).symm
@@ -102,10 +102,9 @@ section extractorCandidate
 variable (F : Type) [Field F] [DecidableEq F]
 variable (G : Type) [AddCommGroup G] [Module F G] [DecidableEq G]
 
-/-- Deterministic Schnorr witness extractor applied to the payload returned by
-`OracleComp.forkWithQueryValues`. It accepts exactly when the fork produced two accepting
-transcripts with the same commitment and distinct challenges, and then returns the standard
-special-soundness witness formula.
+/-- Deterministic Schnorr witness extractor for the value-carrying fork payload. It accepts
+exactly when the fork produced two accepting transcripts with the same commitment and distinct
+challenges, and then returns the standard special-soundness witness formula `(z₁ - z₂) / (c₁ - c₂)`.
 
 The verification check is inlined from `Schnorr.sigma` to avoid a `SampleableType G`
 dependency. -/
@@ -185,7 +184,7 @@ query work at most `2q + 1` whenever the adversary makes at most `q` challenge q
 
 The bound decomposes as: `q` seed samples of cost `1` each, one fresh replacement sample of cost
 `1`, and at most `q` live oracle queries during the seeded replay. -/
-theorem forkExpectedQueryWork_le
+theorem fork_expectedQueryWork_le
     (main : OracleComp (challengeSpec F) α) (q : ℕ)
     (cf : α → Option (Fin (challengeBudget q () + 1)))
     (hmain : IsPerIndexQueryBound main (challengeBudget q)) :

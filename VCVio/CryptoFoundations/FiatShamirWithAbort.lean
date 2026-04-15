@@ -298,8 +298,8 @@ theorem signAttempt_expectedQueryCost_eq_outputExpectation
           (HasQuery.withAddCost
             (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
               fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
-            runtime costFn)] * val (costFn (msg, attempt.1)) :=
-          HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
+            runtime costFn)] * val (costFn (msg, attempt.1)) := by
+          exact HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
             (oa := fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
               fsAbortSignAttempt (m := AddWriterT ω m) ids M pk sk msg)
             (runtime := runtime) (costFn := costFn) (f := fun attempt ↦ costFn (msg, attempt.1))
@@ -561,7 +561,8 @@ private lemma signLoop_inRuntime_succ
             HasQuery.inRuntime
               (fun [HasQuery (M × Commit →ₒ Chal) m] =>
                 fsAbortSignLoop (m := m) ids M pk sk msg n)
-              runtime) := rfl
+              runtime) := by
+  rfl
 
 section
 
@@ -609,13 +610,11 @@ private lemma signLoop_queryCountDist_succ
   intro attempt
   cases attempt.2 with
   | some z =>
-      simp only [WriterT.run_pure, map_pure, toAdd_one, add_zero]
+      simp
   | none =>
-      simp only [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
-        HasQuery.withAddCost, AddWriterT.costs]
-      rw [← LawfulMonad.map_map (m := m)]
-      exact map_congr fun a => by
-        simp [Nat.succ_eq_add_one, add_comm]
+      simp [HasQuery.queryCountDist, HasQuery.queryCostDist, HasQuery.withUnitCost,
+        HasQuery.withAddCost, AddWriterT.costs, add_comm]
+      rfl
 
 end
 
@@ -959,8 +958,8 @@ theorem sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow
         (fun [HasQuery (M × Commit →ₒ Chal) m] =>
           fsAbortSignLoop (m := m) ids M pk sk msg i)
         runtime] =
-      (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i :=
-  signLoop_probNone_eq_signAttemptAbortProbability_pow
+      (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+  exact signLoop_probNone_eq_signAttemptAbortProbability_pow
     (ids := ids) (M := M) (runtime := runtime) (pk := pk) (sk := sk) (msg := msg) i
 
 end
@@ -1045,8 +1044,8 @@ theorem sign_expectedQueries_eq_sum_abortPrefixProbabilities
           HasQuery.queryCountDist
             (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ℕ m)] =>
               (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg)
-            runtime] :=
-              sign_expectedQueries_eq_sum_reachedAttemptProbabilities
+            runtime] := by
+              exact sign_expectedQueries_eq_sum_reachedAttemptProbabilities
                 (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
                 (msg := msg) (maxAttempts := maxAttempts)
     _ = ∑ i ∈ Finset.range maxAttempts,
@@ -1080,8 +1079,8 @@ theorem sign_expectedQueries_eq_sum_signAttemptAbortProbability_powers
           HasQuery.inRuntime
             (fun [HasQuery (M × Commit →ₒ Chal) m] =>
               fsAbortSignLoop (m := m) ids M pk sk msg i)
-            runtime] :=
-              sign_expectedQueries_eq_sum_abortPrefixProbabilities
+            runtime] := by
+              exact sign_expectedQueries_eq_sum_abortPrefixProbabilities
                 (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
                 (msg := msg) (maxAttempts := maxAttempts)
     _ = ∑ i ∈ Finset.range maxAttempts,
@@ -1169,8 +1168,8 @@ theorem sign_expectedQueries_le_geometric_of_signAttemptAbortProbability_le
     ExpectedQueries[
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
     ] ≤
-      ∑' i : ℕ, (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i :=
-          sign_expectedQueries_le_tsum_signAttemptAbortProbability_powers
+      ∑' i : ℕ, (signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg) ^ i := by
+          exact sign_expectedQueries_le_tsum_signAttemptAbortProbability_powers
             (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
             (msg := msg) (maxAttempts := maxAttempts)
     _ ≤ ∑' i : ℕ, q ^ i := by
@@ -1186,8 +1185,8 @@ theorem sign_expectedQueries_le_geometric
     ExpectedQueries[
       (FiatShamirWithAbort ids hr M maxAttempts).sign pk sk msg in runtime
     ] ≤
-      (1 - signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg)⁻¹ :=
-  sign_expectedQueries_le_geometric_of_signAttemptAbortProbability_le
+      (1 - signAttemptAbortProbability (ids := ids) (M := M) runtime pk sk msg)⁻¹ := by
+  exact sign_expectedQueries_le_geometric_of_signAttemptAbortProbability_le
     (ids := ids) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
     (msg := msg) (maxAttempts := maxAttempts) le_rfl
 
@@ -1301,7 +1300,7 @@ and the query bounds `qS`, `qH`; it is captured here by `cmaToNmaLoss`.
 The scheme-specific reduction from NMA to computational assumptions (e.g., MLWE +
 SelfTargetMSIS for ML-DSA) is stated separately; see `MLDSA.nma_security` and
 `MLDSA.euf_cma_security`. -/
-theorem euf_cma_bound [DecidableEq Resp]
+theorem euf_cma_bound
     (hc : ids.Complete)
     (sim : Stmt → ProbComp (Option (Commit × Chal × Resp)))
     (ζ_zk : ℝ)
@@ -1328,7 +1327,7 @@ theorem euf_cma_bound [DecidableEq Resp]
 
 /-- Perfect-HVZK special case of `euf_cma_bound`, where the simulator contributes no
 `qS · ζ_zk` loss term. -/
-theorem euf_cma_bound_perfectHVZK [DecidableEq Resp]
+theorem euf_cma_bound_perfectHVZK
     (hc : ids.Complete)
     (sim : Stmt → ProbComp (Option (Commit × Chal × Resp)))
     (hhvzk : ids.PerfectHVZK sim)

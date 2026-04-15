@@ -55,8 +55,9 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Boo
 section semantics
 
 variable (M : Type)
-variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+variable [SampleableType Chal]
 
+open scoped Classical in
 /-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
 noncomputable def runtime :
     ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal))) where
@@ -362,15 +363,15 @@ variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+open scoped Classical in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
-theorem perfectlyCorrect [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+theorem perfectlyCorrect [SampleableType Chal]
     (hc : σ.PerfectlyComplete) :
     SignatureAlg.PerfectlyComplete
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)
       (runtime M) := by
   intro msg
-  classical
   let ro : QueryImpl (M × Commit →ₒ Chal)
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
   let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
@@ -569,7 +570,7 @@ additive loss.
 This step is independent of special soundness and the forking lemma; those are handled
 by `euf_nma_bound`. -/
 theorem euf_cma_to_nma
-    [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
+    [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (_hζ : 0 ≤ ζ_zk)
     (_hhvzk : σ.HVZK simTranscript ζ_zk)
@@ -584,7 +585,6 @@ theorem euf_cma_to_nma
         nmaAdv.advantage (runtime M) + ENNReal.ofReal (qS * ζ_zk) := by
   sorry
 
-set_option linter.unusedDecidableInType false
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any EUF-NMA adversary `B` making at most `qH` random-oracle queries, there exists a
@@ -592,11 +592,11 @@ witness-extraction reduction such that:
 
   `Adv^{EUF-NMA}(B) · (Adv^{EUF-NMA}(B) / (qH + 1) - 1/|Ω|) ≤ Pr[extraction succeeds]`
 
-The proof (future work) runs `B` twice with the same random tape but different random-oracle
-answers after a randomly chosen fork point. When both runs forge at the same hash query with
-distinct challenges, special soundness extracts a valid witness. -/
+Runs `B` twice with shared randomness up to a randomly chosen fork point, then re-samples the
+oracle answer. When both runs forge at the same hash query with distinct challenges, special
+soundness extracts a valid witness. -/
 theorem euf_nma_bound
-    [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
+    [SampleableType Chal]
     (_hss : σ.SpeciallySound)
     [Fintype Chal]
     (nmaAdv : SignatureAlg.eufNmaAdv
@@ -624,7 +624,7 @@ The combined bound is:
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
 the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
 theorem euf_cma_bound
-    [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
+    [SampleableType Chal]
     (hss : σ.SpeciallySound)
     [Fintype Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))

@@ -28,134 +28,6 @@ universe u v w
 
 variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι]
 
-namespace OracleComp
-
-section generateSeedCounts
-
-variable {ι : Type} [DecidableEq ι] (spec : OracleSpec ι)
-  [∀ t : spec.Domain, SampleableType (spec.Range t)]
-
-/-- Generate a `QuerySeed` by explicit per-index counts.
-
-This is a “product” seed generator: for each `i ∈ is` (assumed duplicate-free), it samples
-`n i` i.i.d. uniform values of type `spec.Range i` and stores the resulting list at index `i`.
-For `i ∉ is`, the seed list is `[]`.
-
-Currently unused outside this section; retained as potential infrastructure for future work. -/
-def generateSeedCounts (n : ι → ℕ) : List ι → ProbComp (OracleSpec.QuerySeed spec)
-  | [] => return ∅
-  | i :: is => do
-    let xs ← replicate (n i) ($ᵗ spec.Range i)
-    let rest ← generateSeedCounts n is
-    return Function.update rest i xs
-
-@[simp] lemma generateSeedCounts_nil (n : ι → ℕ) :
-    generateSeedCounts (spec := spec) n [] = return ∅ := rfl
-
-@[simp] lemma generateSeedCounts_cons (n : ι → ℕ) (i : ι) (is : List ι) :
-    generateSeedCounts (spec := spec) n (i :: is) = do
-      let xs ← replicate (n i) ($ᵗ spec.Range i)
-      let rest ← generateSeedCounts (spec := spec) n is
-      return Function.update rest i xs := rfl
-
-@[simp] lemma support_generateSeedCounts [spec.Fintype] (n : ι → ℕ) (is : List ι) :
-    support (generateSeedCounts (spec := spec) n is) =
-      {seed : QuerySeed spec | ∀ i, (seed i).length = if i ∈ is then n i else 0} := by
-  classical
-  induction is with
-  | nil =>
-    ext seed
-    simp only [generateSeedCounts, support_pure, Set.mem_singleton_iff, List.not_mem_nil,
-      ↓reduceIte, List.length_eq_zero_iff, Set.mem_setOf_eq]
-    constructor
-    · intro h
-      subst h
-      intro i
-      simp
-    · intro h
-      -- if all lists have length 0, the seed is empty
-      have hseed : seed = (∅ : QuerySeed spec) := by
-        funext i
-        have : (seed i).length = 0 := by simpa using h i
-        exact List.eq_nil_of_length_eq_zero this
-      subst hseed
-      simp
-  | cons i is ih =>
-    ext seed
-    simp only [generateSeedCounts_cons, Set.mem_setOf_eq]
-    rw [mem_support_bind_iff]
-    constructor
-    · rintro ⟨xs, hxs, hrest⟩
-      rw [mem_support_bind_iff] at hrest
-      rcases hrest with ⟨rest, hrest, hpure⟩
-      have hEq : Function.update rest i xs = seed := by
-        simpa [support_pure, Set.mem_singleton_iff] using hpure.symm
-      have hlen_xs : xs.length = n i := by
-        have hxss : xs.length = n i ∧ ∀ x ∈ xs, x ∈ support ($ᵗ spec.Range i) := by
-          simpa [support_replicate (oa := ($ᵗ spec.Range i)) (n := n i)] using hxs
-        exact hxss.1
-      have hrest_len : ∀ j, (rest j).length = if j ∈ is then n j else 0 := by
-        simpa [ih, Set.mem_setOf_eq] using hrest
-      intro j
-      by_cases hj : j = i
-      · cases hj
-        have hseed_i : seed i = xs := by
-          have := congrArg (fun s => s i) hEq
-          simpa using this.symm
-        simp [hseed_i, List.mem_cons, hlen_xs]
-      · have hseed_j : seed j = rest j := by
-          have := congrArg (fun s => s j) hEq
-          simpa [Function.update_of_ne hj] using this.symm
-        have hlen_seed_j : (seed j).length = if j ∈ is then n j else 0 := by
-          simpa [hseed_j] using hrest_len j
-        -- membership in `i :: is` with `j ≠ i`
-        simp [List.mem_cons, hj, hlen_seed_j]
-    · intro h
-      let xs : List (spec.Range i) := seed i
-      let rest : QuerySeed spec :=
-        if hi : i ∈ is then seed else Function.update seed i ([] : List (spec.Range i))
-      have hxs_len : xs.length = n i := by
-        have := h i
-        simpa [xs, List.mem_cons] using this
-      refine ⟨xs, ?_, ?_⟩
-      · -- `xs` is supported by `replicate` just from its length (all outputs are supported)
-        rw [support_replicate (oa := ($ᵗ spec.Range i)) (n := n i)]
-        refine ⟨hxs_len, ?_⟩
-        intro x hx
-        simp [support_uniformSample]  -- `support ($ᵗ _) = univ`
-      · rw [mem_support_bind_iff]
-        refine ⟨rest, ?_, ?_⟩
-        · -- rest in support of tail generator
-          rw [ih, Set.mem_setOf_eq]
-          intro j
-          by_cases hj : j = i
-          · cases hj
-            by_cases hi : i ∈ is
-            · -- if `i ∈ is`, then `rest = seed` and we can read the needed length from `h`
-              simpa [rest, hi] using (h i)
-            · -- if `i ∉ is`, then `rest i = []`
-              simp [rest, hi]
-          · -- for `j ≠ i`, `rest j = seed j` and we read the length from `h`
-            have := h j
-            have : (seed j).length = if j ∈ is then n j else 0 := by
-              simpa [List.mem_cons, hj] using this
-            by_cases hi : i ∈ is
-            · simp [rest, hi, this]
-            · simp [rest, hi, Function.update_of_ne hj, this]
-        · -- and the pure update reconstructs `seed`
-          rw [support_pure, Set.mem_singleton_iff]
-          ext j
-          by_cases hj : j = i
-          · subst hj
-            simp [xs, rest]
-          · by_cases hi : i ∈ is
-            · simp [rest, hi, Function.update_of_ne hj]
-            · simp [rest, hi, Function.update_of_ne hj]
-
-end generateSeedCounts
-
-end OracleComp
-
 namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
@@ -199,21 +71,6 @@ lemma probEvent_liftComp_uniformSample_eq_of_eq
       (↑(Fintype.card (spec.Range i)) : ENNReal)⁻¹ := by
   rw [probEvent_eq_eq_probOutput', probOutput_liftComp, probOutput_uniformSample]
 
-/-- Unused helper: deduplication equivalence for `generateSeed`. -/
-private lemma evalDist_generateSeed_eq_canonical
-    {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
-    [∀ i, SampleableType (spec₀.Range i)] [spec₀.Fintype] [spec₀.Inhabited]
-    (qc : ι₀ → ℕ) (js : List ι₀) :
-    evalDist (generateSeed spec₀ qc js) =
-      evalDist (generateSeed spec₀ (fun i => qc i * js.count i) js.dedup) := by
-  refine OracleComp.evalDist_generateSeed_eq_of_countEq (spec := spec₀)
-    (qc := qc) (js := js)
-    (qc' := fun i => qc i * js.count i)
-    (js' := js.dedup) ?_
-  intro i
-  by_cases hi : i ∈ js
-  · simp [List.count_dedup, hi]
-  · simp [hi, List.count_eq_zero_of_not_mem]
 
 @[simp]
 lemma apply_eq (t : spec.Domain) :
@@ -236,23 +93,6 @@ lemma run_bind_query_eq_pop {α : Type u}
     simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
   | cons u us =>
     simp [seededOracle.apply_eq, StateT.run_bind, QuerySeed.pop, hst]
-
-/-- Unused helper: variant of `run_bind_query_eq_pop` with inlined `StateT.mk`. -/
-lemma run_bind_query_eq_pop_bindform {α : Type u}
-    (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :
-    (((StateT.mk fun seed =>
-        match seed t with
-        | u :: us => pure (u, Function.update seed t us)
-        | [] => liftM (query t) >>= pure ∘ fun x => (x, seed)) >>=
-      fun x => simulateQ seededOracle (mx x)) seed) =
-      match seed.pop t with
-      | none => do
-          let u ← liftM (query t)
-          (simulateQ seededOracle (mx u)).run seed
-      | some (u, seed') =>
-          (simulateQ seededOracle (mx u)).run seed' := by
-  simpa [map_eq_bind_pure_comp] using
-    (run_bind_query_eq_pop (spec := spec) (t := t) (mx := mx) seed)
 
 private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]

@@ -13,11 +13,11 @@ import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.Monad.Hom
 
 /-!
-# Asymmetric Encryption Schemes.
+# Signature Algorithms
 
-This file defines a type `AsymmEncAlg spec σ M PK SK C` to represent an protocol
-for asymmetric encryption using oracles in `spec`, with message space `M`,
-public/secret keys `PK` and `SK`, and ciphertext space `C`.
+This file defines `SignatureAlg m M PK SK S`, a type representing a digital signature scheme
+with computations in the monad `m`, message space `M`, public/secret key spaces `PK`/`SK`,
+and signature space `S`.
 -/
 
 universe u v
@@ -97,7 +97,7 @@ def Complete (sigAlg : SignatureAlg m M PK SK S)
     sigAlg.verify pk msg sig] ≥ 1 - δ
 
 /-- Perfect completeness: the canonical keygen-sign-verify execution always accepts.
-This is the special case of `Correct` with zero error. -/
+This is the special case of `Complete` with zero error. -/
 def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S)
     (runtime : ProbCompRuntime m) : Prop :=
   ∀ msg : M, Pr[= true | runtime.evalDist do
@@ -130,9 +130,11 @@ structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) wh
 the adversary successfully forged a signature. The ambient oracle family is forwarded unchanged,
 the signing oracle is logged, and the final check requires both signature validity and that the
 forged message was never submitted to the signing oracle. -/
-def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+noncomputable def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : SPMF Bool :=
+  letI : DecidableEq M := Classical.decEq M
+  letI : DecidableEq S := Classical.decEq S
   runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))

@@ -17,13 +17,9 @@ The forking lemma is a key tool in provable security. Given an adversary that su
 some probability, the "fork" runs it twice with shared randomness up to a chosen query index,
 then re-samples one oracle response, bounding the probability that both runs succeed.
 
-## API changes from old version
-
-- `OracleComp` no longer has `Alternative`, so `guard`/`getM` are unavailable.
-  `fork` now returns `OracleComp spec (Option (α × α))` with explicit matching.
-- `seededOracle` uses `StateT` (not `ReaderT`), so `.run' seed` discards the final state.
-- Old probability notation `[= x | ...]` → `Pr[= x | ...]`, `[⊥ | ...]` → `Pr[= none | ...]`.
-- `generateSeed` returns `ProbComp`, lifted via `liftComp`.
+`fork` returns `OracleComp spec (Option (α × α))` with explicit matching on success/failure.
+The seeded replay uses `seededOracle` via `StateT`, and `generateSeed` produces the initial
+seed as a `ProbComp` lifted into `spec`.
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
@@ -103,32 +99,6 @@ def forkWithSeedValue (main : OracleComp spec α)
         return some (x₁, x₂)
       else
         return none
-
-/-- Deterministic postprocessing of [`forkWithSeedValue`] that re-attaches the original query
-value at the chosen fork point, when that point lies within the sampled seed. -/
-def attachForkQueryValues
-    (qb : ι → ℕ) (i : ι) (cf : α → Option (Fin (qb i + 1)))
-    (seed : QuerySeed spec) (u : spec.Range i) :
-    Option (α × α) → Option (α × spec.Range i × α × spec.Range i)
-  | r => do
-      let (x₁, x₂) ← r
-      let s ← cf x₁
-      let u₀ ← (seed i)[↑s]?
-      return (x₁, u₀, x₂, u)
-
-/-- Forking wrapper that exposes the original and replacement values at the chosen fork point.
-
-Operationally this is the same fork core as [`fork`], with the same seed generation and replay
-pattern. The only difference is the return payload: on success it includes both the original
-seeded value and the fresh replacement value at the chosen oracle family `i`. -/
-def forkWithQueryValues (main : OracleComp spec α)
-    (qb : ι → ℕ) (js : List ι) (i : ι)
-    (cf : α → Option (Fin (qb i + 1))) :
-    OracleComp spec (Option (α × spec.Range i × α × spec.Range i)) := do
-  let seed ← liftComp (generateSeed spec qb js) spec
-  let u ← liftComp ($ᵗ spec.Range i) spec
-  let r ← forkWithSeedValue main qb i cf seed u
-  return attachForkQueryValues qb i cf seed u r
 
 end forkDef
 
@@ -276,20 +246,6 @@ section generateSeedCoverage
 
 variable [∀ i, SampleableType (spec.Range i)]
 
-/-- If the seed-generation list `js` covers every oracle family with positive budget, then a seed
-sampled from `generateSeed spec qb js` satisfies the resulting coverage predicate with
-probability `1`. -/
-theorem probEvent_generateSeed_covers_queryBound_eq_one
-    (qb : ι → ℕ) (js : List ι) (hjs : SeedListCovers qb js) :
-    Pr[ fun seed : QuerySeed spec => ∀ t, qb t ≤ (seed t).length
-      | generateSeed spec qb js] = 1 := by
-  exact probEvent_eq_one
-    (mx := generateSeed spec qb js)
-    (p := fun seed : QuerySeed spec => ∀ t, qb t ≤ (seed t).length)
-    ⟨by simp, fun seed hseed t =>
-      OracleComp.le_length_of_mem_support_generateSeed_of_covers
-        (spec := spec) (qc := qb) (js := js) seed t hseed hjs⟩
-
 /-- A seed sampled from `generateSeed spec qb js` covers the full structural query bound `qb`
 whenever the seed-generation list `js` contains every oracle family with positive budget. -/
 lemma generateSeed_covers_queryBound
@@ -308,7 +264,7 @@ The two outer expectations match the randomness sampled by [`fork`], but they ar
 the costed computation. This isolates the live-oracle cost of the seeded replay core itself,
 without charging the wrapper's own randomness generation for the initial seed or the fresh
 replacement value. -/
-theorem wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
+theorem expectedQueryCount_forkWithSeedValue_le
     [spec.DecidableEq]
     [Finite ι] [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
@@ -467,7 +423,7 @@ theorem forkExpectedQueryWork_le
   have hgen_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy hgen.toAbove
   have hi_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSample i).toAbove
   have hcore :=
-    wp_generateSeed_uniform_forkWithSeedValue_expectedQueryCount_le
+    expectedQueryCount_forkWithSeedValue_le
       (main := main) (qb := qb) (js := js) (i := i) (cf := cf) hmain hjs
   exact add_le_add (add_le_add hgen_le hi_le) hcore
 
