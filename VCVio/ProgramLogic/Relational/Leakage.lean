@@ -166,20 +166,6 @@ theorem leakageBound_mono
 
 /-! ### Compositional Lemmas: Map -/
 
-private lemma snd_comp_map_snd {T W₁ W₂ : Type} (g : W₁ → W₂) :
-    Prod.snd ∘ Prod.map (id : T → T) g = g ∘ @Prod.snd T W₁ :=
-  funext fun ⟨_, _⟩ => rfl
-
-private lemma snd_map_map_id {T W₁ W₂ : Type}
-    {ι : Type _} {spec : OracleSpec ι} (g : W₁ → W₂)
-    (mx : OracleComp spec (T × W₁)) :
-    Prod.snd <$> (Prod.map id g <$> mx) = g <$> (Prod.snd <$> mx) := by
-  trans (Prod.snd ∘ Prod.map (id : T → T) g) <$> mx
-  · exact Functor.map_map _ _ _
-  trans (g ∘ @Prod.snd T W₁) <$> mx
-  · exact congrArg (· <$> mx) (snd_comp_map_snd g)
-  · exact (Functor.map_map Prod.snd g mx).symm
-
 /-- Mapping the result component preserves distributional trace independence. -/
 theorem probLeakFree_map_fst
     [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
@@ -216,7 +202,7 @@ theorem probLeakFree_map_snd
     (h : ProbLeakFree oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     ProbLeakFree (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
   unfold ProbLeakFree at *
-  simp only [snd_map_map_id, evalDist_map] at h ⊢
+  simp only [snd_map_prod_map_eq_map, evalDist_map] at h ⊢
   exact congrArg (Functor.map g) h
 
 /-- Mapping the trace component with the same function preserves approximate trace
@@ -227,7 +213,7 @@ theorem leakageBound_map_snd
     (h : LeakageBound ε oa₁ oa₂) {ω' : Type} (g : ω → ω') :
     LeakageBound ε (Prod.map id g <$> oa₁) (Prod.map id g <$> oa₂) := by
   unfold LeakageBound at *
-  simp only [snd_map_map_id, evalDist_map] at h ⊢
+  simp only [snd_map_prod_map_eq_map, evalDist_map] at h ⊢
   exact le_trans (SPMF.tvDist_map_le g _ _) h
 
 /-- Mapping the trace component with the same function preserves trace noninterference. -/

@@ -168,6 +168,62 @@ theorem NeverFail_runObs_iff [LawfulMonad m] [HasEvalSPMF m]
     NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
   simp only [HasEvalSPMF.neverFail_iff, probFailure_runObs]
 
+/-! ### Structural Lemmas for `runObs` -/
+
+@[simp]
+lemma runObs_bind [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) (ob : α → OracleComp (spec + ObsSpec Ev) β) :
+    runObs base encode (oa >>= ob) = do
+      let ⟨a, w₁⟩ ← runObs base encode oa
+      let ⟨b, w₂⟩ ← runObs base encode (ob a)
+      return (b, w₁ * w₂) := by
+  simp only [runObs, simulateQ_bind, WriterT.run_bind]
+  congr 1; ext ⟨a, w₁⟩
+  simp
+
+@[simp]
+lemma runObs_map [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) (f : α → β) :
+    runObs base encode (f <$> oa) = Prod.map f id <$> runObs base encode oa := by
+  simp only [runObs, simulateQ_map, WriterT.run_map']
+
+/-- `runObs` on a single base-spec query lifted into `spec + ObsSpec Ev`: the trace is `1`. -/
+@[simp]
+lemma runObs_liftM_query_inl [LawfulMonad m] (base : QueryImpl spec m)
+    (encode : Ev → ω) (t : spec.Domain) :
+    runObs base encode ((liftM (query t : OracleQuery spec _) :
+        OracleComp (spec + ObsSpec Ev) _)) = (·, 1) <$> base t := by
+  change (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode))
+    (liftM (liftM (query t : OracleQuery spec _) :
+      OracleQuery (spec + ObsSpec Ev) _))).run = _
+  simp [QueryImpl.withCost, eraseObsImpl, obsCostFn]
+
+/-- `runObs` on a lifted base-spec computation: the trace is `1` (monoid identity). -/
+@[simp]
+lemma runObs_liftComp [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp spec α) :
+    runObs base encode ((liftM oa : OracleComp (spec + ObsSpec Ev) α)) =
+      (·, 1) <$> simulateQ base oa := by
+  change runObs base encode (liftComp oa (spec + ObsSpec Ev)) = _
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih =>
+    simp only [liftComp_bind, liftComp_query, OracleQuery.cont_query,
+      id_map, OracleQuery.input_query, runObs_bind, runObs_liftM_query_inl,
+      simulateQ_bind, simulateQ_query, map_bind, bind_map_left, ih]
+    simp
+
+/-- `runObs` on `observe e`: the result is `PUnit.unit` with trace `encode e`. -/
+@[simp]
+lemma runObs_observe [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω) (e : Ev) :
+    runObs base encode (observe (Ev := Ev) e :
+        OracleComp (spec + ObsSpec Ev) PUnit) =
+      pure (PUnit.unit, encode e) := by
+  change (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode))
+    (liftM (liftM (query e : OracleQuery (ObsSpec Ev) _) :
+      OracleQuery (spec + ObsSpec Ev) _))).run = _
+  simp [QueryImpl.withCost, eraseObsImpl, obsCostFn]
+
 end runObs
 
 end SimulateQ
