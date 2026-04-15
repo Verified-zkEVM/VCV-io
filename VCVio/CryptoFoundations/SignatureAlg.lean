@@ -13,11 +13,11 @@ import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.Monad.Hom
 
 /-!
-# Asymmetric Encryption Schemes.
+# Signature Algorithms
 
-This file defines a type `AsymmEncAlg spec σ M PK SK C` to represent an protocol
-for asymmetric encryption using oracles in `spec`, with message space `M`,
-public/secret keys `PK` and `SK`, and ciphertext space `C`.
+This file defines `SignatureAlg m M PK SK S`, a type representing a digital signature scheme
+with computations in the monad `m`, message space `M`, public/secret key spaces `PK`/`SK`,
+and signature space `S`.
 -/
 
 universe u v
@@ -78,18 +78,45 @@ lemma map_verify (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
 
 end map
 
-section sound
+section correctness
 
 variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
 
-/-- Perfect completeness for a signature scheme: honestly generated signatures always verify. -/
-def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) : Prop :=
+/-- Completeness of a signature scheme with error `δ`: for every message, the canonical
+keygen-sign-verify execution accepts with probability at least `1 - δ`.
+
+The error `δ` captures all sources of failure, including both verification mismatches and
+signing failures (e.g., abort in schemes like Fiat-Shamir with aborts).
+
+`Complete sigAlg runtime 0` is equivalent to `PerfectlyComplete sigAlg runtime`. -/
+def Complete (sigAlg : SignatureAlg m M PK SK S)
+    (runtime : ProbCompRuntime m) (δ : ℝ≥0∞) : Prop :=
+  ∀ msg : M, Pr[= true | runtime.evalDist do
+    let (pk, sk) ← sigAlg.keygen
+    let sig ← sigAlg.sign pk sk msg
+    sigAlg.verify pk msg sig] ≥ 1 - δ
+
+/-- Perfect completeness: the canonical keygen-sign-verify execution always accepts.
+This is the special case of `Complete` with zero error. -/
+def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S)
+    (runtime : ProbCompRuntime m) : Prop :=
   ∀ msg : M, Pr[= true | runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let sig ← sigAlg.sign pk sk msg
     sigAlg.verify pk msg sig] = 1
 
-end sound
+lemma perfectlyComplete_iff_complete_zero
+    (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) :
+    sigAlg.PerfectlyComplete runtime ↔ sigAlg.Complete runtime 0 := by
+  simp [PerfectlyComplete, Complete]
+
+lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S}
+    {runtime : ProbCompRuntime m} {δ₁ δ₂ : ℝ≥0∞}
+    (h : sigAlg.Complete runtime δ₁) (hle : δ₁ ≤ δ₂) :
+    sigAlg.Complete runtime δ₂ :=
+  fun msg => le_trans (tsub_le_tsub_left hle 1) (h msg)
+
+end correctness
 
 section unforgeable
 
@@ -103,9 +130,11 @@ structure unforgeableAdv (_sigAlg : SignatureAlg (OracleComp spec) M PK SK S) wh
 the adversary successfully forged a signature. The ambient oracle family is forwarded unchanged,
 the signing oracle is logged, and the final check requires both signature validity and that the
 forged message was never submitted to the signing oracle. -/
-def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+noncomputable def unforgeableExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : SPMF Bool :=
+  letI : DecidableEq M := Classical.decEq M
+  letI : DecidableEq S := Classical.decEq S
   runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let impl : QueryImpl (spec + (M →ₒ S))

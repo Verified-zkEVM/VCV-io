@@ -181,7 +181,7 @@ The proof is a standard GPV argument:
    which directly yields a preimage-finding adversary.
 
 Reference: GPV08, Theorem 6.1; see also BDF+11 for the QROM extension. -/
-theorem euf_cma_bound [DecidableEq Domain] [SampleableType Domain]
+theorem euf_cma_bound [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
     ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
