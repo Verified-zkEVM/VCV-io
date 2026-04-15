@@ -42,10 +42,10 @@ at the abstract `OpenTheory` level.
 * `Emulates.plug_compose`: both protocol and environment emulation
   compose to yield observational equivalence of the closed systems.
 
-These rely on sorry'd structural factorization lemmas
+These rely on structural factorization lemmas
 (`close_par_left`, `close_par_right`, `close_wire_left`,
 `close_wire_right`, `plug_comm`) that capture monoidal coherence
-identities.
+identities, derived from the `CompactClosed` axioms.
 -/
 
 universe u
