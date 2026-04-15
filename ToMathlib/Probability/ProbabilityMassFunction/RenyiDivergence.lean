@@ -623,7 +623,7 @@ theorem renyiDiv_le_of_pointwise_le (a : ℝ) (ha : 1 < a) (p q : PMF α)
     _ = (1 + δ) ^ (1 : ℝ) := by congr 1; exact mul_inv_cancel₀ ham1.ne'
     _ = 1 + δ := ENNReal.rpow_one _
 
-/-! ### Max-Divergence to TV Distance -/
+/-! ### Divergence to TV Distance -/
 
 /-- Max-divergence bounds TV distance: `‖p - q‖_TV ≤ 1 - 1 / D_∞(p ‖ q)`.
 
@@ -634,5 +634,23 @@ theorem etvDist_le_of_maxDiv (p q : PMF α) :
   by_cases hD : p.maxDiv q = ⊤
   · rw [hD, ENNReal.inv_top, tsub_zero]; exact etvDist_le_one p q
   · sorry
+
+/-- Finite-order Rényi divergence bounds TV distance (squared form):
+`TV(p, q)² ≤ 1 - R_a(p ‖ q)⁻¹`.
+
+Proof sketch (not yet formalized):
+1. TV ≤ √(1 - BC²) where BC = ∑ √(p(x) q(x)) is the Bhattacharyya coefficient
+   (Hellinger–TV inequality, via Cauchy–Schwarz on `|√p - √q| · |√p + √q|`).
+2. BC = M_{1/2}(p ‖ q), the Rényi MGF at order 1/2.
+3. By log-convexity of α ↦ M_α (interpolating at 1/2, 1, α):
+   BC ≥ R_α^{-1/2}, so BC² ≥ R_α⁻¹, giving TV² ≤ 1 - R_α⁻¹.
+
+Formalizing this requires Hellinger distance and log-convexity of the Rényi MGF,
+neither of which is currently available.
+
+Compare `etvDist_le_of_maxDiv` (the analogous linear bound for max-divergence). -/
+theorem etvDist_sq_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (p q : PMF α) :
+    p.etvDist q ^ (2 : ℝ) ≤ 1 - (p.renyiDiv a q)⁻¹ := by
+  sorry
 
 end PMF
