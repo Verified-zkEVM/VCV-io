@@ -39,6 +39,7 @@ import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
+import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
 import ToMathlib.Probability.ProbabilityMassFunction.TailSums
 import ToMathlib.Probability.ProbabilityMassFunction.TotalVariation
 import ToMathlib.ProbabilityTheory.Coupling

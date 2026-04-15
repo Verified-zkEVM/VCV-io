@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Mathlib.Analysis.SpecialFunctions.Gaussian.GaussianIntegral
+import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Topology.Algebra.InfiniteSum.Real
 
 /-!
@@ -21,6 +22,8 @@ framework, Falcon) and masking (ML-DSA / Dilithium).
 - `discreteGaussianSum σ μ` — the normalizing constant `∑_{z ∈ ℤ} ρ_{σ,μ}(z)`.
 - `discreteGaussianPMF σ μ` — the probability mass function, defined as
   `ρ_{σ,μ}(z) / ∑_z ρ_{σ,μ}(z)`.
+- `discreteGaussianDist σ μ hσ` — the same distribution as a Mathlib `PMF ℤ`,
+  for use with `PMF.tvDist`, `PMF.renyiDiv`, etc.
 
 ## References
 
@@ -114,5 +117,39 @@ theorem discreteGaussianPMF_sum_eq_one (σ μ : ℝ) (hσ : 0 < σ) :
 theorem discreteGaussianPMF_pos (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
     0 < discreteGaussianPMF σ μ z :=
   div_pos (discreteGaussianWeight_pos σ μ z) (discreteGaussianSum_pos σ μ hσ)
+
+/-! ## Mathlib `PMF ℤ` Construction -/
+
+/-- The discrete Gaussian PMF is summable (as a real-valued function). -/
+theorem discreteGaussianPMF_summable (σ μ : ℝ) (hσ : 0 < σ) :
+    Summable (discreteGaussianPMF σ μ) := by
+  have h := discreteGaussianPMF_sum_eq_one σ μ hσ
+  by_contra hns
+  simp [tsum_eq_zero_of_not_summable hns] at h
+
+private theorem hasSum_ofReal_discreteGaussian (σ μ : ℝ) (hσ : 0 < σ) :
+    HasSum (fun z => ENNReal.ofReal (discreteGaussianPMF σ μ z)) 1 := by
+  rw [ENNReal.summable.hasSum_iff, ← ENNReal.ofReal_one,
+    ← discreteGaussianPMF_sum_eq_one σ μ hσ]
+  exact (ENNReal.ofReal_tsum_of_nonneg (discreteGaussianPMF_nonneg σ μ hσ)
+    (discreteGaussianPMF_summable σ μ hσ)).symm
+
+/-- The discrete Gaussian distribution as a Mathlib `PMF ℤ`. -/
+noncomputable def discreteGaussianDist (σ μ : ℝ) (hσ : 0 < σ) : PMF ℤ :=
+  ⟨fun z => ENNReal.ofReal (discreteGaussianPMF σ μ z),
+    hasSum_ofReal_discreteGaussian σ μ hσ⟩
+
+@[simp]
+theorem discreteGaussianDist_apply (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
+    (discreteGaussianDist σ μ hσ z).toReal = discreteGaussianPMF σ μ z :=
+  ENNReal.toReal_ofReal (discreteGaussianPMF_nonneg σ μ hσ z)
+
+theorem discreteGaussianDist_pos' (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
+    0 < discreteGaussianDist σ μ hσ z :=
+  ENNReal.ofReal_pos.mpr (discreteGaussianPMF_pos σ μ hσ z)
+
+theorem discreteGaussianDist_ne_zero (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
+    discreteGaussianDist σ μ hσ z ≠ 0 :=
+  ne_of_gt (discreteGaussianDist_pos' σ μ hσ z)
 
 end LatticeCrypto

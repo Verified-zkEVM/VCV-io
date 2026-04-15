@@ -1,5 +1,6 @@
 import LatticeCrypto.DiscreteGaussian
 import LatticeCrypto.Falcon.Arithmetic
+import LatticeCrypto.Falcon.Concrete.ApproxArith
 import LatticeCrypto.Falcon.Concrete.BigInt31
 import LatticeCrypto.Falcon.Concrete.Encoding
 import LatticeCrypto.Falcon.Concrete.FFI
