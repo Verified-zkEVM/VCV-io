@@ -91,6 +91,30 @@ lemma run_simulateQ_withCost_const_one [LawfulMonad m]
   | pure x => simp
   | query_bind t oa ih => simp [ih]
 
+/-! ### EvalDist Bridge for `withCost`
+
+These lemmas connect the result-marginal distribution of a `withCost`-instrumented
+computation to the distribution of the uninstrumented computation, enabling direct
+probability-level reasoning about traced computations. -/
+
+lemma evalDist_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    evalDist (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
+      evalDist (simulateQ so mx) :=
+  congrArg evalDist (fst_map_run_withCost so costFn mx)
+
+lemma probOutput_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
+    Pr[= x | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
+      Pr[= x | simulateQ so mx] := by
+  rw [fst_map_run_withCost]
+
+lemma support_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
+    (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
+    support (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
+      support (simulateQ so mx) := by
+  rw [fst_map_run_withCost]
+
 end withCost
 
 /-- Wrap an oracle implementation to count queries in a `WriterT (QueryCount ι)` layer.
@@ -128,6 +152,35 @@ def countingOracle [DecidableEq ι] :
 
 lemma countingOracle_eq_costOracle [DecidableEq ι] :
     countingOracle (spec := spec) = costOracle (QueryCount.single ·) := rfl
+
+namespace costOracle
+
+variable {ω : Type u} [Monoid ω]
+
+@[simp]
+lemma fst_map_run_simulateQ (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ (costOracle costFn) oa).run = oa := by
+  rw [costOracle, QueryImpl.fst_map_run_withCost, simulateQ_ofLift_eq_self]
+
+@[simp]
+lemma evalDist_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    evalDist (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = evalDist oa := by
+  rw [fst_map_run_simulateQ]
+
+@[simp]
+lemma probOutput_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) (x : α) :
+    Pr[= x | Prod.fst <$> (simulateQ (costOracle costFn) oa).run] = Pr[= x | oa] := by
+  rw [fst_map_run_simulateQ]
+
+@[simp]
+lemma support_run_simulateQ [spec.Fintype] [spec.Inhabited]
+    (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
+    support (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = support oa := by
+  rw [fst_map_run_simulateQ]
+
+end costOracle
 
 namespace countingOracle
 

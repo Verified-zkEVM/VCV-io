@@ -168,6 +168,33 @@ theorem NeverFail_runObs_iff [LawfulMonad m] [HasEvalSPMF m]
     NeverFail (runObs base encode oa) ↔ NeverFail (eraseObs base oa) := by
   simp only [HasEvalSPMF.neverFail_iff, probFailure_runObs]
 
+/-! ### EvalDist Bridge for `runObs`
+
+These lemmas connect the result-marginal distribution of `runObs` to the distribution
+of `eraseObs`, enabling direct probability-level reasoning about traces without needing
+to manually simplify the traced computation into its concrete form. -/
+
+lemma evalDist_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+    (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) :
+    evalDist ((fun z : α × ω => z.1) <$> runObs base encode oa) =
+      evalDist (eraseObs base oa) := by
+  rw [fst_map_runObs]
+
+lemma probOutput_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+    (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) (x : α) :
+    Pr[= x | (fun z : α × ω => z.1) <$> runObs base encode oa] =
+      Pr[= x | eraseObs base oa] := by
+  rw [fst_map_runObs]
+
+lemma support_fst_runObs [LawfulMonad m] [HasEvalSPMF m]
+    (base : QueryImpl spec m) (encode : Ev → ω)
+    (oa : OracleComp (spec + ObsSpec Ev) α) :
+    support ((fun z : α × ω => z.1) <$> runObs base encode oa) =
+      support (eraseObs base oa) := by
+  rw [fst_map_runObs]
+
 /-! ### Structural Lemmas for `runObs` -/
 
 @[simp]
