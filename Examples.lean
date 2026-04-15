@@ -16,7 +16,8 @@ import Examples.ElGamal.Common
 import Examples.ElGamal.Hash
 import Examples.ElGamal.ReductionCost
 import Examples.FrankingProtocol
-import Examples.OneTimePad
+import Examples.OneTimePad.Basic
+import Examples.OneTimePad.LeakageFree
 import Examples.PRFTagReader
 import Examples.PRGfromPRF
 import Examples.Pedersen

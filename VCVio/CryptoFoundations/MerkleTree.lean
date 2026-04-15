@@ -5,6 +5,7 @@ Authors: Quang Dao, Fawad Haider
 -/
 
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.HasQuery
 
 /-!
   # Merkle Trees as a vector commitment
@@ -44,9 +45,9 @@ section
 variable [DecidableEq α] [Inhabited α] [Fintype α]
 
 /-- Example: a single hash computation -/
-def singleHash (left : α) (right : α) : OracleComp (spec α) α := do
-  let out ← query (spec := spec α) ⟨left, right⟩
-  return out
+def singleHash {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    (left : α) (right : α) : m α :=
+  HasQuery.query (spec := spec α) ⟨left, right⟩
 
 /-- Cache for Merkle tree. Indexed by `j : Fin (n + 1)`, i.e. `j = 0, 1, ..., n`. -/
 def Cache (n : ℕ) := (layer : Fin (n + 1)) → List.Vector α (2 ^ layer.val)
@@ -78,21 +79,22 @@ lemma Cache.leaves_cons (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) (cache
   simp [Cache.leaves, Cache.cons]
 
 /-- Compute the next layer of the Merkle tree -/
-def buildLayer (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) :
-    OracleComp (spec α) (List.Vector α (2 ^ n)) := do
+def buildLayer {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    (n : ℕ) (leaves : List.Vector α (2 ^ (n + 1))) :
+    m (List.Vector α (2 ^ n)) := do
   let leaves : List.Vector α (2 ^ n * 2) := cast (by rw [pow_succ]) leaves
-  -- Pair up the leaves to form pairs
   let pairs : List.Vector (α × α) (2 ^ n) :=
     List.Vector.ofFn (fun i =>
       (leaves.get ⟨2 * i, by omega⟩, leaves.get ⟨2 * i + 1, by omega⟩))
-  -- Hash each pair to get the next layer
   let hashes : List.Vector α (2 ^ n) ←
-    List.Vector.mmap (fun ⟨left, right⟩ => query (spec := spec α) ⟨left, right⟩) pairs
+    List.Vector.mmap (fun ⟨left, right⟩ =>
+      HasQuery.query (spec := spec α) ⟨left, right⟩) pairs
   return hashes
 
 /-- Build the full Merkle tree, returning the cache -/
-def buildMerkleTree (α) (n : ℕ) (leaves : List.Vector α (2 ^ n)) :
-    OracleComp (spec α) (Cache α n) := do
+def buildMerkleTree (α) {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    (n : ℕ) (leaves : List.Vector α (2 ^ n)) :
+    m (Cache α n) := do
   match n with
   | 0 => do
     return fun j => (by
@@ -129,12 +131,14 @@ def findNeighbors {n : ℕ} (i : Fin (2 ^ n)) (layer : Fin n) :
 end
 
 @[simp, grind =]
-theorem getRoot_trivial (a : α) : getRoot α <$> (buildMerkleTree α 0 ⟨[a], rfl⟩) = pure a := by
+theorem getRoot_trivial {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasQuery (spec α) m]
+    (a : α) : getRoot α <$> (buildMerkleTree (m := m) α 0 ⟨[a], rfl⟩) = pure a := by
   simp [getRoot, buildMerkleTree, List.Vector.head]
 
 @[simp, grind =]
 theorem getRoot_single (a b : α) :
-    getRoot α <$> buildMerkleTree α 1 ⟨[a, b], rfl⟩ = (query (spec := spec α) (a, b)) := by
+    getRoot α <$> buildMerkleTree (m := OracleComp (spec α)) α 1 ⟨[a, b], rfl⟩ =
+      (query (spec := spec α) (a, b)) := by
   simp [buildMerkleTree, buildLayer, List.Vector.ofFn, List.Vector.get]
   rfl
 
@@ -185,33 +189,30 @@ returns the hash that would be the root of the tree if the proof was valid.
 i.e. the hash obtained by combining the leaf in sequence with each member of the proof,
 according to its index.
 -/
-def getPutativeRoot {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : List.Vector α n) :
-    OracleComp (spec α) α := do
+def getPutativeRoot {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (proof : List.Vector α n) :
+    m α := do
   match h : n with
   | 0 => do
-    -- When we have an empty proof, the root is just the leaf
     return leaf
   | n + 1 => do
-    -- Get the sign bit of `i`
     let signBit := i.val % 2
-    -- Show that `i / 2` is in `Fin (2 ^ (n - 1))`
     let i' : Fin (2 ^ n) := ⟨i.val / 2, by omega⟩
     if signBit = 0 then
-      -- `i` is a left child
-      let newLeaf ← query (spec := spec α) ⟨leaf, proof.head⟩
+      let newLeaf ← HasQuery.query (spec := spec α) ⟨leaf, proof.head⟩
       getPutativeRoot i' newLeaf proof.tail
     else
-      -- `i` is a right child
-      let newLeaf ← query (spec := spec α) ⟨proof.head, leaf⟩
+      let newLeaf ← HasQuery.query (spec := spec α) ⟨proof.head, leaf⟩
       getPutativeRoot i' newLeaf proof.tail
 
 /-- Verify a Merkle proof `proof` that a given `leaf` at index `i` is in the Merkle tree with given
   `root`.
   Works by computing the putative root based on the branch, and comparing that to the actual root.
   Outputs `failure` if the proof is invalid. -/
-def verifyProof {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (root : α) (proof : List.Vector α n) :
-    OptionT (OracleComp (spec α)) Unit := do
-  let putative_root ← getPutativeRoot α i leaf proof
+def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    {n : ℕ} (i : Fin (2 ^ n)) (leaf : α) (root : α) (proof : List.Vector α n) :
+    OptionT m Unit := do
+  let putative_root ← (getPutativeRoot α i leaf proof : m α)
   guard (putative_root = root)
 
 @[grind .]
@@ -306,7 +307,8 @@ lemma simulateQ_buildLayer_eq (f : QueryImpl (spec α) Id) (n : ℕ)
     simulateQ f (buildLayer α n leaves) =
       buildLayer_with_hash (α := α) n leaves f := by
   unfold buildLayer
-  simp_all only [range_def, bind_pure, simulateQ_listVector_mmap_query, domain_def]
+  simp only [HasQuery.instOfMonadLift_query]
+  simp_all only [bind_pure, simulateQ_listVector_mmap_query, domain_def]
   rfl
 
 omit [DecidableEq α] [Inhabited α] [Fintype α] in
@@ -428,7 +430,8 @@ theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
       simulateQ (randomOracle (spec := spec α)) (do
         let cache ← buildMerkleTree α n leaves
         let proof := generateProof α i cache
-        let _ ← verifyProof α i leaves[i] (getRoot α cache) proof)).run preexisting_cache) := by
+        let _ ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]
+          (getRoot α cache) proof))).run preexisting_cache) := by
   grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
 
 end

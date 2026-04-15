@@ -27,7 +27,7 @@ The README and large amounts of commented-out code use `++ₒ` for combining ora
 
 ### 5. Commented-out code uses OLD API patterns
 
-Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain large commented-out blocks that use obsolete patterns (`[= x | ...]`, `++ₒ`, `simulate'`, `getM`, `guard` via `Alternative`). **Only follow patterns in uncommented code.** Use `Examples/OneTimePad.lean` as the canonical reference.
+Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain large commented-out blocks that use obsolete patterns (`[= x | ...]`, `++ₒ`, `simulate'`, `getM`, `guard` via `Alternative`). **Only follow patterns in uncommented code.** Use `Examples/OneTimePad/Basic.lean` as the canonical reference.
 
 ## Type System
 

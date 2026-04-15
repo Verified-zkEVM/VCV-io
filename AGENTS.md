@@ -5,7 +5,7 @@ Formally verified cryptography proofs in Lean 4, built on Mathlib.
 ## Fast Start
 
 1. Run `lake exe cache get && lake build`.
-2. Read `Examples/OneTimePad.lean` for a compact modern proof (correctness and privacy).
+2. Read `Examples/OneTimePad/Basic.lean` for a compact modern proof (correctness and privacy).
 3. Choose the work area by task: use `VCVio/` for oracle/probability/program-logic work, `LatticeCrypto/` for lattice schemes and reductions, and `LatticeCryptoTest/` for vectors or differential tests.
 4. If probability lemmas fail unexpectedly, first check for `[spec.Fintype]` and `[spec.Inhabited]`.
 
@@ -67,7 +67,7 @@ Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`
 2. **`autoImplicit = false` is set globally in `lakefile.lean`**. Do not add `set_option autoImplicit false` in individual files. Every variable must be explicitly declared.
 3. **`evalDist` IS `simulateQ`** with uniform distributions. This is definitional (`rfl`).
 4. **`++ₒ` is dead** — use `+` for combining oracle specs.
-5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad.lean` as canonical reference.
+5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
 7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
 
@@ -81,7 +81,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 
 ## Canonical Examples
 
-- Compact modern crypto proof: `Examples/OneTimePad.lean`
+- Compact modern crypto proof: `Examples/OneTimePad/Basic.lean`
 - ElGamal IND-CPA via DDH (hybrid argument): `Examples/ElGamal/Basic.lean`
 - Schnorr sigma protocol (completeness, soundness, HVZK): `Examples/Schnorr.lean`
 - Oracle computation core: `VCVio/OracleComp/OracleComp.lean`

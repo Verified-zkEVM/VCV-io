@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.HasQuery
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import Mathlib.Data.Vector.Snoc
 
@@ -75,13 +76,15 @@ variable {α : Type _}
 
 /-- Example: a single hash computation -/
 @[simp, grind]
-def singleHash (left : α) (right : α) : OracleComp (spec α) α := do
-  let out ← query (spec := spec α) ⟨left, right⟩
+def singleHash {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    (left : α) (right : α) : m α := do
+  let out ← HasQuery.query (spec := spec α) ⟨left, right⟩
   return out
 
 /-- Build the full Merkle tree, returning the tree populated with data on all its nodes -/
 @[simp, grind]
-def buildMerkleTree {s} (leaf_tree : LeafData α s) : OracleComp (spec α) (FullData α s) :=
+def buildMerkleTree {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m]
+    {s} (leaf_tree : LeafData α s) : m (FullData α s) :=
   match leaf_tree with
   | LeafData.leaf a => do return (FullData.leaf a)
   | LeafData.internal left right => do
@@ -125,7 +128,7 @@ lemma simulateQ_buildMerkleTree {s} (leaf_data_tree : LeafData α s)
     match leaf_data_tree with
     | LeafData.internal left right =>
       simp only [buildMerkleTree, buildMerkleTreeWithHash, singleHash,
-        simulateQ_bind, simulateQ_pure]
+        HasQuery.instOfMonadLift_query, simulateQ_bind, simulateQ_pure]
       rw [left_ih left, right_ih right]; rfl
 
 /--
@@ -153,9 +156,9 @@ i.e. the hash obtained by combining the leaf in sequence with each member of the
 according to its index.
 -/
 @[simp, grind]
-def getPutativeRoot {s} :
+def getPutativeRoot {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m] {s} :
     (idx : BinaryTree.SkeletonLeafIndex s) → (leafValue : α) →
-      List.Vector α idx.depth → OracleComp (spec α) α
+      List.Vector α idx.depth → m α
   | BinaryTree.SkeletonLeafIndex.ofLeaf, leafValue, _ => do
       return leafValue
   | BinaryTree.SkeletonLeafIndex.ofLeft idxLeft, leafValue, proof => do
@@ -195,11 +198,13 @@ lemma simulateQ_getPutativeRoot {s} (idx : BinaryTree.SkeletonLeafIndex s)
   | ofLeaf =>
       rfl
   | ofLeft idxLeft ih =>
-      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash, simulateQ_bind]
+      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash,
+        HasQuery.instOfMonadLift_query, simulateQ_bind]
       rw [ih]
       rfl
   | ofRight idxRight ih =>
-      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash, simulateQ_bind]
+      simp only [getPutativeRoot, getPutativeRootWithHash, singleHash,
+        HasQuery.instOfMonadLift_query, simulateQ_bind]
       rw [ih]
       rfl
 
@@ -210,10 +215,10 @@ Works by computing the putative root based on the branch, and comparing that to 
 Outputs `failure` if the proof is invalid.
 -/
 @[simp, grind]
-def verifyProof [DecidableEq α] {s}
+def verifyProof {m : Type _ → Type _} [Monad m] [HasQuery (spec α) m] [DecidableEq α] {s}
     (idx : BinaryTree.SkeletonLeafIndex s) (leafValue : α) (rootValue : α)
-    (proof : List.Vector α idx.depth) : OptionT (OracleComp (spec α)) Unit := do
-  let putative_root ← getPutativeRoot idx leafValue proof
+    (proof : List.Vector α idx.depth) : OptionT m Unit := do
+  let putative_root ← (getPutativeRoot idx leafValue proof : m α)
   guard (putative_root = rootValue)
 
 /--
@@ -277,7 +282,8 @@ theorem completeness [DecidableEq α] [SampleableType α] {s}
     NeverFail ((simulateQ (randomOracle) (do
       let cache ← buildMerkleTree leaf_data_tree
       let proof := generateProof cache idx
-      let _ ← verifyProof idx (leaf_data_tree.get idx) (cache.getRootValue) proof
+      let _ ← (verifyProof (m := OracleComp (spec α)) idx (leaf_data_tree.get idx)
+        (cache.getRootValue) proof)
       )).run preexisting_cache) := by
   grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
 

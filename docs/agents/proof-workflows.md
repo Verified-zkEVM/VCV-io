@@ -74,7 +74,7 @@ Show that DDH-real corresponds to hybrid k and DDH-random corresponds to hybrid 
 
 ## Worked Example: OneTimePad Privacy
 
-From `Examples/OneTimePad.lean` — the canonical complete proof.
+From `Examples/OneTimePad/Basic.lean` — the canonical complete proof.
 
 **Setup**: OTP encrypts by XOR with a random key.
 
