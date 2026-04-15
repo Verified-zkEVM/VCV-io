@@ -246,6 +246,16 @@ theorem openTheory_plug_eq_wire_iso
               (PortBoundary.swap Δ)).symm.toHom K))) := by
   sorry
 
+/-- The monoidal unit equals the coevaluation at the trivial boundary,
+up to bisimilarity. -/
+theorem openTheory_unit_eq_iso :
+    OpenProcessIso
+      (openTheory_unit.{u, v, w} Party)
+      (OpenProcess.mapBoundary
+        (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (openTheory_idWire Party PortBoundary.empty)) := by
+  sorry
+
 end Model
 
 end UC

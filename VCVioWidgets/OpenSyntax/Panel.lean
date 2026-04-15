@@ -49,7 +49,6 @@ inductive CompTree where
 private def rawPrefix : Name := `Interaction.UC.OpenSyntax.Raw
 
 partial def extractCompTree (e : Expr) : MetaM CompTree := do
-  let e ← whnf e
   match e with
   | .mdata _ inner => extractCompTree inner
   | _ =>
@@ -57,39 +56,56 @@ partial def extractCompTree (e : Expr) : MetaM CompTree := do
   let args := e.getAppArgs
   match fn with
   | .const n _ =>
-      if n == rawPrefix ++ `atom && args.size >= 3 then
-        let atomExpr := args[2]!
-        let label ← do
-          let atomExpr ← whnf atomExpr
-          let atomFn := atomExpr.getAppFn
-          match atomFn with
-          | .const cn _ =>
-              match cn with
-              | .str _ s => pure s
-              | _ => pure (cn.toString false)
-          | _ => return .atom (← ppExpr atomExpr).pretty
-        return .atom label
-      else if n == rawPrefix ++ `map && args.size >= 5 then
-        let child ← extractCompTree args[4]!
-        return .mapNode child
-      else if n == rawPrefix ++ `par && args.size >= 5 then
-        let left ← extractCompTree args[3]!
-        let right ← extractCompTree args[4]!
-        return .par left right
-      else if n == rawPrefix ++ `wire && args.size >= 6 then
-        let left ← extractCompTree args[4]!
-        let right ← extractCompTree args[5]!
-        return .wire left right
-      else if n == rawPrefix ++ `plug && args.size >= 4 then
+      if n == rawPrefix ++ `plug && args.size >= 4 then
         let system ← extractCompTree args[2]!
         let context ← extractCompTree args[3]!
         return .plug system context
       else
+        let e ← whnf e
+        extractCompTreeCore e
+  | _ =>
+      let e ← whnf e
+      extractCompTreeCore e
+where
+  extractCompTreeCore (e : Expr) : MetaM CompTree := do
+    match e with
+    | .mdata _ inner => extractCompTree inner
+    | _ =>
+    let fn := e.getAppFn
+    let args := e.getAppArgs
+    match fn with
+    | .const n _ =>
+        if n == rawPrefix ++ `atom && args.size >= 3 then
+          let atomExpr := args[2]!
+          let label ← do
+            let atomExpr ← whnf atomExpr
+            let atomFn := atomExpr.getAppFn
+            match atomFn with
+            | .const cn _ =>
+                match cn with
+                | .str _ s => pure s
+                | _ => pure (cn.toString false)
+            | _ => return .atom (← ppExpr atomExpr).pretty
+          return .atom label
+        else if n == rawPrefix ++ `map && args.size >= 5 then
+          let child ← extractCompTree args[4]!
+          return .mapNode child
+        else if n == rawPrefix ++ `par && args.size >= 5 then
+          let left ← extractCompTree args[3]!
+          let right ← extractCompTree args[4]!
+          return .par left right
+        else if n == rawPrefix ++ `wire && args.size >= 6 then
+          let left ← extractCompTree args[4]!
+          let right ← extractCompTree args[5]!
+          return .wire left right
+        else if n == rawPrefix ++ `idWire && args.size >= 2 then
+          return .opaque "idWire"
+        else
+          let fmt ← ppExpr e
+          return .opaque fmt.pretty
+    | _ =>
         let fmt ← ppExpr e
         return .opaque fmt.pretty
-  | _ =>
-      let fmt ← ppExpr e
-      return .opaque fmt.pretty
 
 -- ============================================================================
 -- § Graph rendering (D3 force-directed via GraphDisplay)

@@ -420,6 +420,15 @@ instance compactClosed
     refine Interp.ext ?_
     intro T hT interp
     simp [Interp.wire, Interp.idWire]
+  unit_eq := by
+    change
+      Interp.unit = Interp.map
+        (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (Interp.idWire PortBoundary.empty)
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.unit, Interp.map, Interp.idWire]
+    exact OpenTheory.unit_eq (T := T)
 
 end Interp
 

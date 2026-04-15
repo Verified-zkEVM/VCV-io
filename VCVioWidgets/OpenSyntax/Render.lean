@@ -11,16 +11,18 @@ import VCVio.Interaction.UC.OpenSyntax.Raw
 This module provides `Raw.toDot`, which converts a raw open-system expression
 tree into a Graphviz DOT string suitable for visualization.
 
-Each constructor of `Raw` maps to a distinct visual element:
+Each native constructor of `Raw` maps to a distinct visual element:
 
 * `atom` becomes a rounded box node labeled by a user-supplied rendering
   function.
 * `par` becomes a dashed cluster containing both sub-expressions.
 * `wire` becomes a solid cluster with a bold edge connecting the shared
   boundary between its two children.
-* `plug` becomes a thick-bordered cluster with a bidirectional edge showing
-  full closure.
+* `idWire` becomes a small relay-style node.
 * `map` becomes a dotted cluster wrapping the adapted inner expression.
+
+Since `plug` and `unit` are derived abbreviations (expanding to `map`/`wire`
+combinations), they are rendered through their constituent parts.
 
 Boundaries (`PortBoundary`) are rendered structurally: the visualization shows
 the composition topology rather than individual port details, since port types
@@ -116,22 +118,13 @@ private def toDotAux
                       s!"{pad}{r₁.nodeRef} -> {r₂.nodeRef} " ++
                         s!"[color=\"#e45756\", style=bold, penwidth=2, " ++
                         s!"label=\"Γ\"];"] }
-  | .plug e k =>
-      let cid := nextId
-      let rE := toDotAux renderAtom e (cid + 1) (depth + 1)
-      let rK := toDotAux renderAtom k rE.nextId (depth + 1)
-      { nodeRef := rE.nodeRef,
-        nextId := rK.nextId,
-        lines := #[s!"{pad}subgraph cluster_{cid} {ob}",
-                    s!"{ipad}label=\"plug\";",
-                    s!"{ipad}style=solid;",
-                    s!"{ipad}color=\"#54a24b\";",
-                    s!"{ipad}penwidth=2;"]
-                 ++ rE.lines ++ rK.lines
-                 ++ #[s!"{pad}{cb}",
-                      s!"{pad}{rE.nodeRef} -> {rK.nodeRef} " ++
-                        s!"[color=\"#54a24b\", style=bold, dir=both, " ++
-                        s!"penwidth=2, label=\"Δ\"];"] }
+  | .idWire _Γ =>
+      let id := nextId
+      { nodeRef := s!"n{id}",
+        nextId := id + 1,
+        lines := #[s!"{pad}n{id} [shape=diamond, style=\"filled\", " ++
+          s!"fillcolor=\"#e8f0fe\", color=\"#888888\", " ++
+          s!"label=\"idWire\", fontsize=9];"] }
 
 /--
 Convert a `Raw` expression tree to a Graphviz DOT string.

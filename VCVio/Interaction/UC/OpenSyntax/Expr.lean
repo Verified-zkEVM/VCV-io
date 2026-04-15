@@ -96,26 +96,32 @@ def wire {Atom : PortBoundary → Type u} {Δ₁ Γ Δ₂ : PortBoundary}
     (fun _ _ _ _ h₁ h₂ => Quotient.sound (Raw.Equiv.congr_wire h₁ h₂))
 
 /--
-Close an open system against a matching context.
--/
-def plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
-    (e : Expr Atom Δ) (k : Expr Atom (PortBoundary.swap Δ)) :
-    Expr Atom PortBoundary.empty :=
-  Quotient.liftOn₂ e k (fun r₁ r₂ => mk (.plug r₁ r₂))
-    (fun _ _ _ _ h₁ h₂ => Quotient.sound (Raw.Equiv.congr_plug h₁ h₂))
-
-/--
-The monoidal unit (closed system with no boundary).
--/
-def unit {Atom : PortBoundary → Type u} : Expr Atom PortBoundary.empty :=
-  mk .unit
-
-/--
 The identity wire (coevaluation) on boundary `Γ`.
 -/
 def idWire {Atom : PortBoundary → Type u} (Γ : PortBoundary) :
     Expr Atom (PortBoundary.tensor (PortBoundary.swap Γ) Γ) :=
   mk (.idWire Γ)
+
+/--
+Close an open system against a matching context.
+Derived from `wire` and `map`, mirroring `Raw.plug`.
+-/
+def plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
+    (e : Expr Atom Δ) (k : Expr Atom (PortBoundary.swap Δ)) :
+    Expr Atom PortBoundary.empty :=
+  Expr.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+    (Expr.wire
+      (Expr.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom e)
+      (Expr.map (PortBoundary.Equiv.tensorEmptyRight
+        (PortBoundary.swap Δ)).symm.toHom k))
+
+/--
+The monoidal unit (closed system with no boundary).
+Derived from `idWire` and `map`, mirroring `Raw.unit`.
+-/
+def unit {Atom : PortBoundary → Type u} : Expr Atom PortBoundary.empty :=
+  Expr.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+    (Expr.idWire PortBoundary.empty)
 
 /--
 Interpret a quotiented expression in a compact closed target theory.
@@ -130,8 +136,7 @@ def interpret {Atom : PortBoundary → Type u} {Δ : PortBoundary}
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     T.Obj Δ :=
   Quotient.liftOn e
-    (fun r => r.interpret T interp OpenTheory.IsMonoidal.unit
-      OpenTheory.IsCompactClosed.idWire)
+    (fun r => r.interpret T interp OpenTheory.IsCompactClosed.idWire)
     (fun _ _ h => Raw.Equiv.interpret_eq h T interp)
 
 @[simp]
@@ -141,8 +146,7 @@ theorem interpret_mk {Atom : PortBoundary → Type u} {Δ : PortBoundary}
     [OpenTheory.IsCompactClosed T]
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
     (mk r).interpret T interp =
-      r.interpret T interp OpenTheory.IsMonoidal.unit
-        OpenTheory.IsCompactClosed.idWire :=
+      r.interpret T interp OpenTheory.IsCompactClosed.idWire :=
   rfl
 
 @[simp]
@@ -188,26 +192,6 @@ theorem interpret_wire {Atom : PortBoundary → Type u}
   Quotient.inductionOn₂ e₁ e₂ fun _ _ => rfl
 
 @[simp]
-theorem interpret_plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
-    (e : Expr Atom Δ)
-    (k : Expr Atom (PortBoundary.swap Δ))
-    (T : OpenTheory)
-    [OpenTheory.IsCompactClosed T]
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Expr.plug e k).interpret T interp =
-      T.plug (e.interpret T interp) (k.interpret T interp) :=
-  Quotient.inductionOn₂ e k fun _ _ => rfl
-
-@[simp]
-theorem interpret_unit {Atom : PortBoundary → Type u}
-    (T : OpenTheory)
-    [OpenTheory.IsCompactClosed T]
-    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    (Expr.unit : Expr Atom _).interpret T interp =
-      OpenTheory.IsMonoidal.unit (T := T) :=
-  rfl
-
-@[simp]
 theorem interpret_idWire {Atom : PortBoundary → Type u}
     (Γ : PortBoundary)
     (T : OpenTheory)
@@ -216,6 +200,28 @@ theorem interpret_idWire {Atom : PortBoundary → Type u}
     (Expr.idWire Γ : Expr Atom _).interpret T interp =
       OpenTheory.IsCompactClosed.idWire (T := T) Γ :=
   rfl
+
+@[simp]
+theorem interpret_plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
+    (e : Expr Atom Δ)
+    (k : Expr Atom (PortBoundary.swap Δ))
+    (T : OpenTheory)
+    [OpenTheory.IsCompactClosed T]
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
+    (Expr.plug e k).interpret T interp =
+      T.plug (e.interpret T interp) (k.interpret T interp) := by
+  simp only [Expr.plug, interpret_map, interpret_wire]
+  exact (OpenTheory.plug_eq_wire _ _).symm
+
+@[simp]
+theorem interpret_unit {Atom : PortBoundary → Type u}
+    (T : OpenTheory)
+    [OpenTheory.IsCompactClosed T]
+    (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
+    (Expr.unit : Expr Atom _).interpret T interp =
+      OpenTheory.IsMonoidal.unit (T := T) := by
+  simp only [Expr.unit, interpret_map]
+  exact OpenTheory.unit_eq.symm
 
 -- ============================================================================
 -- § Lawful OpenTheory instance
@@ -284,11 +290,11 @@ instance compactClosed (Atom : PortBoundary → Type u) :
     OpenTheory.IsCompactClosed (Expr.theory Atom) where
   idWire := Expr.idWire
   plug_eq_wire := fun W K =>
-    Quotient.inductionOn₂ W K fun _ _ =>
-      Quotient.sound Raw.Equiv.plug_eq_wire
+    Quotient.inductionOn₂ W K fun _ _ => rfl
   wire_idWire := fun _ _ W₂ =>
     Quotient.inductionOn W₂ fun _ =>
       Quotient.sound Raw.Equiv.wire_idWire
+  unit_eq := rfl
 
 -- ============================================================================
 -- § Bridge: Expr → Interp
@@ -306,7 +312,6 @@ def toInterp {Atom : PortBoundary → Type u} {Δ : PortBoundary}
   Quotient.liftOn e
     (fun r => ⟨fun T hCC interp =>
       r.interpret T interp
-        (OpenTheory.IsMonoidal.unit (self := hCC.toIsMonoidal))
         (OpenTheory.IsCompactClosed.idWire (self := hCC))⟩)
     (fun _ _ h => Interp.ext (fun T hCC interp =>
       @Raw.Equiv.interpret_eq _ _ _ _ h T hCC interp))
@@ -316,7 +321,6 @@ theorem toInterp_mk {Atom : PortBoundary → Type u} {Δ : PortBoundary}
     (r : Raw Atom Δ) :
     (mk r).toInterp = (⟨fun T hCC interp =>
       r.interpret T interp
-        (OpenTheory.IsMonoidal.unit (self := hCC.toIsMonoidal))
         (OpenTheory.IsCompactClosed.idWire (self := hCC))⟩ :
       Interp Atom Δ) :=
   rfl
@@ -348,21 +352,33 @@ theorem toInterp_wire {Atom : PortBoundary → Type u}
   Quotient.inductionOn₂ e₁ e₂ fun _ _ => Interp.ext fun _ _ _ => rfl
 
 @[simp]
-theorem toInterp_plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
-    (e : Expr Atom Δ) (k : Expr Atom (PortBoundary.swap Δ)) :
-    (Expr.plug e k).toInterp = Interp.plug e.toInterp k.toInterp :=
-  Quotient.inductionOn₂ e k fun _ _ => Interp.ext fun _ _ _ => rfl
-
-@[simp]
-theorem toInterp_unit {Atom : PortBoundary → Type u} :
-    (Expr.unit : Expr Atom _).toInterp = Interp.unit := by
-  ext T hT interp; rfl
-
-@[simp]
 theorem toInterp_idWire {Atom : PortBoundary → Type u}
     (Γ : PortBoundary) :
     (Expr.idWire Γ : Expr Atom _).toInterp = Interp.idWire Γ := by
   ext T hT interp; rfl
+
+@[simp]
+theorem toInterp_plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
+    (e : Expr Atom Δ) (k : Expr Atom (PortBoundary.swap Δ)) :
+    (Expr.plug e k).toInterp = Interp.plug e.toInterp k.toInterp :=
+  Quotient.inductionOn₂ e k fun r₁ r₂ =>
+    Interp.ext fun T hT interp => by
+      change (Raw.plug r₁ r₂).interpret T interp hT.idWire =
+        T.plug (r₁.interpret T interp hT.idWire) (r₂.interpret T interp hT.idWire)
+      simp only [Raw.interpret]
+      exact (OpenTheory.plug_eq_wire (T := T)
+        (r₁.interpret T interp hT.idWire) (r₂.interpret T interp hT.idWire)).symm
+
+@[simp]
+theorem toInterp_unit {Atom : PortBoundary → Type u} :
+    (Expr.unit : Expr Atom _).toInterp = Interp.unit := by
+  have h : (Expr.unit : Expr Atom _).toInterp =
+      (⟨fun T hCC interp => (Raw.unit (Atom := Atom)).interpret T interp
+          (OpenTheory.IsCompactClosed.idWire (self := hCC))⟩ :
+        Interp Atom _) := rfl
+  rw [h]
+  ext T hT interp
+  simp [Raw.interpret, Interp.unit, OpenTheory.unit_eq]
 
 end Expr
 

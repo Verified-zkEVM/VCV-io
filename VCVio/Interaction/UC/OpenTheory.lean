@@ -316,6 +316,10 @@ class IsCompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
     ∀ (Γ : PortBoundary) {Δ₂ : PortBoundary}
       (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
       T.wire (idWire Γ) W₂ = W₂
+  /-- The monoidal unit is the coevaluation at the trivial boundary. -/
+  unit_eq :
+    unit = T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+      (idWire PortBoundary.empty)
 
 /--
 `Closed T` is the type of closed systems in the open-composition theory `T`.
@@ -608,6 +612,14 @@ theorem wire_idWire
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
     T.wire (IsCompactClosed.idWire (T := T) Γ) W₂ = W₂ :=
   IsCompactClosed.wire_idWire Γ W₂
+
+/-- The monoidal unit is the coevaluation at the trivial boundary. -/
+theorem unit_eq
+    [IsCompactClosed T] :
+    IsMonoidal.unit (T := T) =
+      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (IsCompactClosed.idWire (T := T) PortBoundary.empty) :=
+  IsCompactClosed.unit_eq
 
 end Laws
 
