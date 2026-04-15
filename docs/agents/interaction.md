@@ -138,6 +138,31 @@ The `diamond` theorem proves independent events commute.
 `Machine` provides a state-indexed transition-system frontend that compiles
 to `Process` via `Machine.toProcess`.
 
+### Coalgebraic structure
+
+Both `ProcessOver` and `Machine` are instances of the `Coalg` typeclass
+defined in `ToMathlib/Control/Coalgebra.lean`.
+An `Coalg F S` is a type `S` together with `out : S → F S`,
+the categorical dual of `MonadAlgebra`.
+
+- `StepOver Γ` is a `Functor` (post-compose on `next`), and `LawfulFunctor`.
+- `ProcessOver Γ` is an `Coalg (StepOver Γ)` via its `step` field.
+- `Machine.StepFun` is a `Functor` and `LawfulFunctor`.
+- `Machine` is an `Coalg Machine.StepFun` via its `Enabled`/`step` fields.
+
+This reflects the Poly/ACT perspective: a process is a coalgebra for a
+polynomial endofunctor, with the step functor playing the role of the
+"interface polynomial."
+
+### Interleaving combinator
+
+`ProcessOver.interleave` factors out the binary-choice interleaving pattern
+shared by `par`, `wire`, and `plug` in `OpenProcessModel`.
+Given two processes `p₁ : ProcessOver Γ₁`, `p₂ : ProcessOver Γ₂`,
+context morphisms into a target context `Δ`, and a scheduler decoration,
+it produces a `ProcessOver Δ` with product state space
+`p₁.Proc × p₂.Proc`.
+
 ### Control and observation
 
 `Control Party S` assigns ownership of payload moves and scheduling decisions.
@@ -162,13 +187,36 @@ observational comparisons.
 
 `Interface` (= `PFunctor`) and `PortBoundary` define typed I/O boundaries.
 The choice of `PFunctor` for interfaces keeps the kernel minimal while
-supporting `Packet`, `Query`, `Hom`, and boundary equivalences.
+supporting `Packet`, `Query`, `Hom`, `comp` (Poly's composition product),
+`compUnit` (composition unit), and boundary equivalences.
 
 `OpenTheory` provides the compositional algebra: `map`, `par`, `wire`, `plug`.
-Lawfulness classes ensure functoriality and naturality.
+Lawfulness is stratified into a class hierarchy:
 
-`OpenSyntax.Expr` is a tagless-final (Church-style) free model interpretable in
-any lawful `OpenTheory`, serving as the universal syntax for open compositions.
+- `IsLawfulMap` / `IsLawfulPar` / `IsLawfulWire` / `IsLawfulPlug`:
+  functoriality of `map` and naturality of combinators.
+- `IsLawful`: bundles all naturality laws.
+- `Monoidal`: symmetric monoidal coherence for `par` (associativity,
+  commutativity, left/right unit laws via a distinguished `unit` object).
+- `CompactClosed`: compact closed structure with `idWire` as coevaluation,
+  derivation of `plug` from `wire`, and a zig-zag identity (`wire_idWire`).
+
+`OpenProcessIso` (in `OpenProcess.lean`) provides a bisimulation-based
+equivalence for `OpenProcess`, used to state monoidal and compact closed laws
+for the concrete `openTheory` model up to isomorphism (see `OpenProcessModel.lean`).
+
+`OpenSyntax` provides three layers for free open-system expressions:
+
+- `Raw` is an inductive syntax tree whose constructors mirror the `OpenTheory`
+  operations. It is pattern-matchable and suitable for inspection,
+  transformation, and visualization.
+- `Expr` is the quotient of `Raw` by the `OpenTheory` equations, yielding a
+  lawful `OpenTheory` instance by construction.
+- `Interp` is a tagless-final (Church-encoded) structure (final model) that
+  stores a universal interpretation function and carries a lawful `OpenTheory`
+  instance.
+
+`Expr.toInterp` embeds quotiented expressions into the lawful `Interp` model.
 
 ## Import guide
 
@@ -248,9 +296,9 @@ import VCVio.Interaction.Concurrent.Process
 | `Control.lean` | `Control`, `scheduler?`, `current?`, `controllers` |
 | `Profile.lean` | `Profile`, `observe`, `residual`, `frontierView` |
 | `Current.lean` | `view`, `observe`, `residualView` |
-| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems |
+| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave` |
 | `Tree.lean` | Structural concurrent syntax → `Process` |
-| `Machine.lean` | `Machine`, `Machine.toProcess` |
+| `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalg` instance |
 | `Execution.lean` | `Trace`, `ObservedTrace` for processes |
 | `Run.lean` | `Prefix`, `Run` (infinite), controller/event extraction |
 | `Policy.lean` | `StepPolicy`, `respects`, combinators |
@@ -260,10 +308,22 @@ import VCVio.Interaction.Concurrent.Process
 | `Equivalence.lean` | Controller, trace, observational equivalences |
 | `Fairness.lean` | `WeakFair`, `StrongFair`, temporal predicates |
 | `Liveness.lean` | `Safe`, `Satisfies`, `Admissible`, state predicates |
-| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, tensor/swap |
-| `OpenTheory.lean` | `OpenTheory` algebra (`map`, `par`, `wire`, `plug`) |
-| `OpenSyntax.lean` | `Expr` (tagless-final free model) |
 | `Examples.lean` | Worked examples: profiles, control, execution, policies |
+
+### `UC/`
+
+| File | Purpose |
+|------|---------|
+| `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`compUnit`, tensor/swap |
+| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `Monoidal`, `CompactClosed` |
+| `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/CC equations) |
+| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), `Monoidal`/`CompactClosed` instances |
+| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), `Monoidal`/`CompactClosed` instances, `Expr.toInterp` |
+| `OpenProcess.lean` | `BoundaryAction`, `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
+| `OpenProcessModel.lean` | `openTheory` (concrete model), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
+| `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
+| `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
+| `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (monad-parametric), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |
 
 ## In-tree examples
 

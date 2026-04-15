@@ -1,9 +1,10 @@
 /-
-Copyright (c) 2026 ArkLib Contributors. All rights reserved.
+Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Concurrent.Process
+import ToMathlib.Control.Coalgebra
 
 /-!
 # State-indexed concurrent machines
@@ -55,6 +56,22 @@ structure Machine where
   step : (σ : State) → Enabled σ → State
 
 namespace Machine
+
+/-- The step functor for `Machine`: at a state, the machine exposes an event type `E`
+together with a successor-state function `E → S`. -/
+def StepFun : Type v → Type (max (u + 1) v) := fun S => Σ (E : Type u), (E → S)
+
+instance : Functor Machine.StepFun.{u, v} where
+  map f := fun ⟨E, g⟩ => ⟨E, f ∘ g⟩
+
+instance : LawfulFunctor Machine.StepFun.{u, v} where
+  id_map := fun ⟨_, _⟩ => rfl
+  comp_map := fun _ _ ⟨_, _⟩ => rfl
+  map_const := rfl
+
+/-- Every `Machine` is an F-coalgebra for `Machine.StepFun`. -/
+instance (m : Machine.{u, v}) : Coalg Machine.StepFun m.State :=
+  ⟨fun σ => ⟨m.Enabled σ, m.step σ⟩⟩
 
 /--
 `EventMap` assigns a stable external label to each enabled machine event.

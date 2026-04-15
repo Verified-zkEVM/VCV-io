@@ -408,6 +408,28 @@ lemma symm_equivB_symm_apply (e : P ≃ₚ Q) (a : Q.A) (b : Q.B (e.equivA (e.eq
     _root_.cast (congrArg Q.B (e.equivA.apply_symm_apply a)) b
   simp
 
+/-- Forward roundtrip: applying `equivB` then `symm.equivB` gives a cast. -/
+lemma forward_equivB_roundtrip (e : P ≃ₚ Q) (a : P.A) (b : P.B a) :
+    e.symm.equivB (e.equivA a) (e.equivB a b) =
+      _root_.cast (congrArg P.B (e.equivA.symm_apply_apply a).symm) b := by
+  change (((_root_.Equiv.cast _).trans
+    (e.equivB (e.equivA.symm (e.equivA a))).symm) (e.equivB a b)) = _
+  simp only [_root_.Equiv.trans_apply]
+  exact equivB_symm_apply_of_eq e
+    (a := e.equivA.symm (e.equivA a)) (a' := a)
+    (ha := e.equivA.apply_symm_apply _) (b := b)
+
+/-- Reverse roundtrip: applying `symm.equivB` then `equivB` gives a cast. -/
+lemma reverse_equivB_roundtrip (e : P ≃ₚ Q) (a : Q.A)
+    (b : Q.B a) :
+    e.equivB (e.equivA.symm a) (e.symm.equivB a b) =
+      _root_.cast
+        (congrArg Q.B (e.equivA.apply_symm_apply a).symm) b := by
+  change ((e.equivB (e.equivA.symm a)))
+    (((_root_.Equiv.cast _).trans
+      (e.equivB (e.equivA.symm a)).symm) b) = _
+  simp [_root_.Equiv.trans_apply]
+
 end Equiv
 
 /-- A **lens** between two polynomial functors `P` and `Q` is a pair of a function:

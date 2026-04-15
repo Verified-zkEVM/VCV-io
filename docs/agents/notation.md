@@ -43,6 +43,33 @@
 | `⟪c₁ ≈[ε] c₂ \| R⟫` | Approximate coupling (`ApproxRelTriple ε c₁ c₂ R`) | `VCVio/ProgramLogic/Notation.lean` |
 | `⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` | eRHL triple (`eRelTriple f c₁ c₂ g`) | `VCVio/ProgramLogic/Notation.lean` |
 
+## UC Composition Notations
+
+Scoped to `Interaction.UC` (activated by `open Interaction.UC`).
+Defined in `VCVio/Interaction/UC/Notation.lean`.
+
+### Boundary-level
+
+| Notation | Meaning | Input method |
+|----------|---------|--------------|
+| `Δ₁ ⊗ᵇ Δ₂` | `PortBoundary.tensor Δ₁ Δ₂` | `\otimes ^b` |
+| `Δᵛ` | `PortBoundary.swap Δ` (dual/flip) | `\^v` |
+
+### Expression-level (typeclass-backed)
+
+Works for `Raw`, `Expr`, and `Interp` via `HasPar`/`HasWire`/`HasPlug` typeclasses.
+Each type has `@[simp]` bridge lemmas (e.g., `Raw.hasPar`) that normalize
+`HasPar.par e₁ e₂` back to `Raw.par e₁ e₂`, so existing simp lemmas
+(`interpret_par`, etc.) fire transparently.
+
+| Notation | Meaning | Prec | Input method |
+|----------|---------|------|--------------|
+| `e₁ ∥ e₂` | `HasPar.par e₁ e₂` (parallel) | 70r | `\parallel` |
+| `e₁ ⊞ e₂` | `HasWire.wire e₁ e₂` (wire) | 65r | `\boxplus` |
+| `e ⊠ k` | `HasPlug.plug e k` (plug/close) | 60r | `\boxtimes` |
+
+Precedence ensures `A ∥ B ⊞ C ⊠ K` parses as `((A ∥ B) ⊞ C) ⊠ K`.
+
 ## Legacy Notation (Do NOT Use)
 
 | Dead notation | Replacement |

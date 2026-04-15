@@ -1,5 +1,5 @@
 /-
-Copyright (c) 2026 ArkLib Contributors. All rights reserved.
+Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
@@ -8,7 +8,7 @@ import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Lens.Basic
 
 /-!
-# Concurrent interfaces and open boundaries
+# UC interfaces and open boundaries
 
 This file introduces the smallest structural layer for open concurrent systems.
 
@@ -22,19 +22,25 @@ environment, we also need a typed notion of:
 * how such open boundaries compose.
 
 The design here is intentionally minimal and purely structural.
+Every definition is an `abbrev` over existing `PFunctor` / chart / lens
+machinery, so the established theory is reused definitionally while
+presenting names that read naturally in the interaction setting.
 
-* `Interface` is just `PFunctor`, reused under a name that matches the
-  interaction setting.
-* `Interface.Packet Σ` is one concrete boundary message on interface `Σ`.
-* `Interface.Hom Σ Τ` is just `PFunctor.Chart Σ Τ`, reused under an
-  interaction-oriented name for *actual traffic*.
-* `Interface.Equiv Σ Τ` is the corresponding chart-level interface
-  isomorphism.
-* `Interface.QueryHom Σ Τ` is just `PFunctor.Lens Σ Τ`, reused under an
-  interface-oriented name for *query transport*.
+* `Interface` is `PFunctor`: ports `A` and per-port messages `B a`.
+* `Interface.Packet I` is one concrete boundary message on interface `I`.
+* `Interface.Hom I J` is `PFunctor.Chart I J` (forward packet transport,
+  covariant on both components).
+* `Interface.QueryHom I J` is `PFunctor.Lens I J` (query retargeting with
+  response pullback, contravariant on the fibre).
+* `Interface.Equiv I J` is the chart-level interface isomorphism.
+* `Interface.comp I J` is the composition monoidal product on polynomial
+  functors (`PFunctor.comp`), modelling sequential dependence where one
+  interface's response determines the next interface's port.
+* `Interface.compUnit` is the composition unit (the identity polynomial
+  functor: one port, one message).
 * `PortBoundary` is a directed pair of input and output interfaces.
-* `PortBoundary.swap`, `tensor`, `empty`, and `PortBoundary.Hom` are the basic
-  operations needed to talk about open composition.
+* `PortBoundary.swap`, `tensor`, `empty`, and `PortBoundary.Hom` are the
+  basic operations for open composition.
 
 The most important distinction in this file is:
 
@@ -44,6 +50,8 @@ The most important distinction in this file is:
 
 So `Hom` pushes traffic forward, while `QueryHom` retargets an interaction and
 pulls the eventual response back.
+The composition product is only functorial for `QueryHom` (lenses), not for
+`Hom` (charts), because the fibre-level map must be contravariant.
 
 This file also introduces the first equivalence layer:
 
@@ -55,20 +63,21 @@ These structures are the starting point for expressing tensor unit,
 associativity, and symmetry at the boundary level without hard-coding more
 primitive operations into `OpenTheory`.
 
-This layer intentionally uses `abbrev` over the existing `PFunctor` / chart /
-lens machinery rather than introducing fresh representations. The goal is to
-reuse the established theory definitionally while still presenting names that
-read naturally in the interaction setting.
-
 This file does **not** yet define open worlds, plugging, or runtime semantics.
 Those later layers should build on these typed boundary primitives rather than
 re-introducing their own packet/interface vocabulary.
+
+## References
+
+* Niu, Spivak (2024), Polynomial Functors: A Mathematical Theory of
+  Interaction — the composition product, charts, lenses, and monoidal
+  structures on polynomial functors used throughout this file
 -/
 
 universe uA uB vA vB wA wB
 
 namespace Interaction
-namespace Concurrent
+namespace UC
 
 /--
 `Interface` is the interaction-facing name for `PFunctor`.
@@ -460,6 +469,52 @@ theorem sum_comp
     sum (comp g₁ f₁) (comp g₂ f₂) = comp (sum g₁ g₂) (sum f₁ f₂) := by
   ext a <;> cases a <;> rfl
 
+/--
+Left inclusion into a disjoint sum of interfaces.
+
+Maps a packet on `I₁` to the left summand of `sum I₁ I₂`.
+-/
+def inl (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB}) :
+    Hom I₁ (Interface.sum I₁ I₂) where
+  toFunA := Sum.inl
+  toFunB _ m := m
+
+/--
+Right inclusion into a disjoint sum of interfaces.
+
+Maps a packet on `I₂` to the right summand of `sum I₁ I₂`.
+-/
+def inr (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB}) :
+    Hom I₂ (Interface.sum I₁ I₂) where
+  toFunA := Sum.inr
+  toFunB _ m := m
+
+@[simp]
+theorem mapPacket_inl (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB})
+    (pkt : Packet I₁) :
+    mapPacket (inl I₁ I₂) pkt = ⟨Sum.inl pkt.1, pkt.2⟩ := rfl
+
+@[simp]
+theorem mapPacket_inr (I₁ : Interface.{uA, uB}) (I₂ : Interface.{vA, uB})
+    (pkt : Packet I₂) :
+    mapPacket (inr I₁ I₂) pkt = ⟨Sum.inr pkt.1, pkt.2⟩ := rfl
+
+@[simp]
+theorem comp_sum_inl
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, uB}}
+    {J₁ : Interface.{wA, uB}} {J₂ : Interface.{wB, uB}}
+    (f₁ : Hom I₁ J₁) (f₂ : Hom I₂ J₂) :
+    comp (sum f₁ f₂) (inl I₁ I₂) = comp (inl J₁ J₂) f₁ := by
+  ext a <;> rfl
+
+@[simp]
+theorem comp_sum_inr
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, uB}}
+    {J₁ : Interface.{wA, uB}} {J₂ : Interface.{wB, uB}}
+    (f₁ : Hom I₁ J₁) (f₂ : Hom I₂ J₂) :
+    comp (sum f₁ f₂) (inr I₁ I₂) = comp (inr J₁ J₂) f₂ := by
+  ext a <;> rfl
+
 end Hom
 
 namespace QueryHom
@@ -589,6 +644,80 @@ def sumAssoc
     Equiv (Interface.sum (Interface.sum I J) K)
       (Interface.sum I (Interface.sum J K)) :=
   PFunctor.Equiv.sumAssoc I J K
+
+end Equiv
+
+/--
+Composition product of interfaces (the composition monoidal product on
+polynomial functors; see Niu–Spivak 2024).
+
+A position of `comp I J` is a pair of:
+
+* a port `a : I.A` on the outer interface, and
+* for each response `m : I.B a` on that port, a port of the inner interface:
+  a function `I.B a → J.A`.
+
+A direction at a composed position `⟨a, f⟩` is a dependent pair `⟨u, v⟩`
+where `u : I.B a` is a response on port `a` and `v : J.B (f u)` is a
+response on the resulting inner port.
+
+This models sequential dependence: one interface's response determines which
+port of the next interface is activated.
+-/
+abbrev comp (I : Interface.{uA, uB}) (J : Interface.{vA, vB}) :
+    Interface.{max uA vA uB, max uB vB} :=
+  PFunctor.comp I J
+
+/--
+The monoidal unit for the composition product.
+
+This is the polynomial functor with one port carrying one message:
+`comp I compUnit ≃ I ≃ comp compUnit I`.
+-/
+abbrev compUnit : Interface :=
+  PFunctor.compUnit
+
+namespace QueryHom
+
+/--
+Bifunctorial action of query homs on the composition product.
+
+Given query homs `f₁ : QueryHom I₁ J₁` and `f₂ : QueryHom I₂ J₂`, produces
+a query hom on the composed interfaces.
+
+There is no corresponding `Hom.compMap` because charts (covariant on both
+components) are not functorial for the composition product; the composition
+product requires contravariance on B, which only lenses provide.
+-/
+abbrev compMap
+    {I₁ : Interface.{uA, uB}} {I₂ : Interface.{vA, vB}}
+    {J₁ : Interface.{wA, wB}} {J₂ : Interface}
+    (f₁ : QueryHom I₁ J₁) (f₂ : QueryHom I₂ J₂) :
+    QueryHom (Interface.comp I₁ I₂) (Interface.comp J₁ J₂) :=
+  PFunctor.Lens.compMap f₁ f₂
+
+end QueryHom
+
+namespace Equiv
+
+/-- The composition product is associative up to interface equivalence. -/
+abbrev compAssoc
+    (I : Interface.{uA, uB})
+    (J : Interface.{vA, vB})
+    (K : Interface.{wA, wB}) :
+    Equiv (Interface.comp (Interface.comp I J) K)
+      (Interface.comp I (Interface.comp J K)) :=
+  PFunctor.Equiv.compAssoc I J K
+
+/-- `compUnit` is a right unit for composition. -/
+abbrev compUnitRight (I : Interface.{uA, uB}) :
+    Equiv (Interface.comp I compUnit) I :=
+  PFunctor.Equiv.compX I
+
+/-- `compUnit` is a left unit for composition. -/
+abbrev compUnitLeft (I : Interface.{uA, uB}) :
+    Equiv (Interface.comp compUnit I) I :=
+  PFunctor.Equiv.XComp I
 
 end Equiv
 
@@ -927,6 +1056,80 @@ abbrev swapSwap
     Equiv (PortBoundary.swap (PortBoundary.swap Δ)) Δ :=
   refl Δ
 
+private theorem eqRec_id_apply_codomain
+    {α : Sort*} {β : α → Sort*} {a₀ a₁ : α}
+    (h : a₀ = a₁) (x : β a₀) :
+    Eq.rec (motive := fun x _ => β a₀ → β x) id h x =
+      _root_.cast (congrArg β h) x := by
+  subst h; rfl
+
+private theorem chart_comp_symm_eq_id
+    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
+    PFunctor.Chart.comp e.symm.toChart e.toChart =
+      PFunctor.Chart.id P := by
+  refine PFunctor.Chart.ext _ _
+    (fun a => e.equivA.symm_apply_apply a) (fun a => ?_)
+  funext b
+  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
+    PFunctor.Equiv.toChart, Function.comp_apply]
+  change (((_root_.Equiv.cast _).trans
+    (e.equivB (e.equivA.symm (e.equivA a))).symm)
+    (e.equivB a b)) = _
+  simp only [_root_.Equiv.trans_apply]
+  trans _root_.cast
+    (congrArg P.B (e.equivA.symm_apply_apply a).symm) b
+  · exact PFunctor.Equiv.equivB_symm_apply_of_eq e
+      (e.equivA.apply_symm_apply (e.equivA a)) b
+  · exact (eqRec_id_apply_codomain
+      (e.equivA.symm_apply_apply a).symm b).symm
+
+private theorem chart_comp_inv_eq_id
+    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
+    PFunctor.Chart.comp e.toChart e.symm.toChart =
+      PFunctor.Chart.id Q := by
+  refine PFunctor.Chart.ext _ _
+    (fun a => e.equivA.apply_symm_apply a) (fun a => ?_)
+  funext b
+  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
+    PFunctor.Equiv.toChart, Function.comp_apply]
+  change ((e.equivB (e.equivA.symm a)))
+    (((_root_.Equiv.cast _).trans
+      (e.equivB (e.equivA.symm a)).symm) b) = _
+  simp only [_root_.Equiv.trans_apply,
+    _root_.Equiv.apply_symm_apply]
+  exact (eqRec_id_apply_codomain
+    (e.equivA.apply_symm_apply a).symm b).symm
+
+@[simp]
+theorem symm_toHom_comp_toHom
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂) :
+    Hom.comp e.symm.toHom e.toHom = Hom.id Δ₁ := by
+  apply Hom.ext
+  · exact chart_comp_inv_eq_id e.onIn
+  · exact chart_comp_symm_eq_id e.onOut
+
+@[simp]
+theorem toHom_comp_symm_toHom
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂) :
+    Hom.comp e.toHom e.symm.toHom = Hom.id Δ₂ := by
+  apply Hom.ext
+  · exact chart_comp_symm_eq_id e.onIn
+  · exact chart_comp_inv_eq_id e.onOut
+
+@[simp]
+theorem tensorComm_comp_tensorComm
+    (Δ₁ Δ₂ : PortBoundary) :
+    Hom.comp (tensorComm Δ₂ Δ₁).toHom (tensorComm Δ₁ Δ₂).toHom =
+    Hom.id _ := by
+  apply Hom.ext
+  all_goals {
+    refine PFunctor.Chart.ext _ _ (fun a => ?_) (fun a => ?_)
+    · cases a <;> rfl
+    · funext b; cases a <;> rfl
+  }
+
 end Equiv
 
 @[simp]
@@ -936,5 +1139,5 @@ theorem swap_swap (Δ : PortBoundary) : Δ.swap.swap = Δ := by
 
 end PortBoundary
 
-end Concurrent
+end UC
 end Interaction
