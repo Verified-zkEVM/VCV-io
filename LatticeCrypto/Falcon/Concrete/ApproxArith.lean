@@ -49,7 +49,7 @@ namespace FloatLike
 denotation `interp : F → ℝ` such that each operation satisfies a relative error bound.
 
 The machine epsilon for IEEE-754 binary64 is `2^{-52} ≈ 2.22 × 10^{-16}`. -/
-class HasRealSemantics (F : Type) [FloatLike F] (ε : ℝ) where
+class HasRealSemantics (F : Type) [FloatLike F] (ε : outParam ℝ) where
   interp : F → ℝ
   ε_nonneg : 0 ≤ ε
   ε_lt_one : ε < 1
@@ -235,8 +235,8 @@ theorem ieee754_machineEpsilon_lt_one : ieee754_machineEpsilon < 1 := by
   unfold ieee754_machineEpsilon
   norm_num
 
-open Falcon.Concrete.FPR in
-/-- FPR satisfies `HasRealSemantics` with machine epsilon `2^{-52}`.
+-- open Falcon.Concrete.FPR in
+/- FPR satisfies `HasRealSemantics` with machine epsilon `2^{-52}`.
 
 The `interp` denotation is `FPRBridge.toReal` (IEEE-754 bit interpretation).
 The per-operation error bounds come from `FPRBridge.lean`.
@@ -253,17 +253,17 @@ To discharge these obligations we would need either:
 2. A verified pure-Lean IEEE-754 decoder that replaces the opaque `Float` path.
 
 Until then, these remain axiomatic trust assumptions about the FPR encoding. -/
-instance : FloatLike.HasRealSemantics FPR ieee754_machineEpsilon where
-  interp := Falcon.Concrete.FPRBridge.toReal
-  ε_nonneg := le_of_lt ieee754_machineEpsilon_pos
-  ε_lt_one := ieee754_machineEpsilon_lt_one
-  interp_zero := by sorry
-  interp_one := by sorry
-  add_error := Falcon.Concrete.FPRBridge.add_error
-  mul_error := Falcon.Concrete.FPRBridge.mul_error
-  div_error := fun a b hb => Falcon.Concrete.FPRBridge.div_error a b hb
-  sqrt_error := fun a ha => Falcon.Concrete.FPRBridge.sqrt_error a ha
-  neg_exact := fun _ => by sorry
-  sub_error := fun _ _ => by sorry
+-- instance : FloatLike.HasRealSemantics FPR ieee754_machineEpsilon where
+--   interp := Falcon.Concrete.FPRBridge.toReal
+--   ε_nonneg := le_of_lt ieee754_machineEpsilon_pos
+--   ε_lt_one := ieee754_machineEpsilon_lt_one
+--   interp_zero := by sorry
+--   interp_one := by sorry
+--   add_error := Falcon.Concrete.FPRBridge.add_error
+--   mul_error := Falcon.Concrete.FPRBridge.mul_error
+--   div_error := fun a b hb => Falcon.Concrete.FPRBridge.div_error a b hb
+--   sqrt_error := fun a ha => Falcon.Concrete.FPRBridge.sqrt_error a ha
+--   neg_exact := fun _ => by sorry
+--   sub_error := fun _ _ => by sorry
 
 end

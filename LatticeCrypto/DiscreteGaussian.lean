@@ -144,12 +144,12 @@ theorem discreteGaussianDist_apply (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
     (discreteGaussianDist σ μ hσ z).toReal = discreteGaussianPMF σ μ z :=
   ENNReal.toReal_ofReal (discreteGaussianPMF_nonneg σ μ hσ z)
 
-theorem discreteGaussianDist_pos' (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
+theorem discreteGaussianDist_pos (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
     0 < discreteGaussianDist σ μ hσ z :=
   ENNReal.ofReal_pos.mpr (discreteGaussianPMF_pos σ μ hσ z)
 
 theorem discreteGaussianDist_ne_zero (σ μ : ℝ) (hσ : 0 < σ) (z : ℤ) :
     discreteGaussianDist σ μ hσ z ≠ 0 :=
-  ne_of_gt (discreteGaussianDist_pos' σ μ hσ z)
+  ne_of_gt (discreteGaussianDist_pos σ μ hσ z)
 
 end LatticeCrypto

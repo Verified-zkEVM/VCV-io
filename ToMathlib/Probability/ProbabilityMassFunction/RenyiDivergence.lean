@@ -623,12 +623,16 @@ theorem renyiDiv_le_of_pointwise_le (a : ℝ) (ha : 1 < a) (p q : PMF α)
     _ = (1 + δ) ^ (1 : ℝ) := by congr 1; exact mul_inv_cancel₀ ham1.ne'
     _ = 1 + δ := ENNReal.rpow_one _
 
-/-! ### Rényi to TV Distance -/
+/-! ### Max-Divergence to TV Distance -/
 
--- The correct Rényi-to-TV bound (van Erven–Harremoës 2014, Theorem 4) is:
---   `TV(P, Q) ≤ sqrt(1 - R_a(P ‖ Q)⁻¹)`
--- The previously stated linear bound `TV ≤ 1 - R_a⁻¹` is false for finite-order
--- Rényi divergence (counterexample: a = 2, P = (0.5,0.5), Q = (0.6,0.4)).
--- Formalizing the correct bound requires `ENNReal.sqrt` infrastructure not yet available.
+/-- Max-divergence bounds TV distance: `‖p - q‖_TV ≤ 1 - 1 / D_∞(p ‖ q)`.
+
+When `D = maxDiv p q = ⨆ x, p(x)/q(x)` is finite, we have `q(x) ≥ p(x)/D` pointwise,
+so `∑ min(p(x), q(x)) ≥ 1/D`, giving `TV(p,q) = 1 - ∑ min(p(x),q(x)) ≤ 1 - 1/D`. -/
+theorem etvDist_le_of_maxDiv (p q : PMF α) :
+    p.etvDist q ≤ 1 - (p.maxDiv q)⁻¹ := by
+  by_cases hD : p.maxDiv q = ⊤
+  · rw [hD, ENNReal.inv_top, tsub_zero]; exact etvDist_le_one p q
+  · sorry
 
 end PMF
