@@ -96,4 +96,11 @@ def comp (g : Coalg.Hom F S₂ S₃) (f : Coalg.Hom F S₁ S₂) :
     simp only [Function.comp_apply] at hf hg
     rw [comp_map, hf, hg]
 
+@[simp]
+theorem id_apply (x : S₁) : (Coalg.Hom.id : Coalg.Hom F S₁ S₁) x = x := rfl
+
+@[simp]
+theorem comp_apply (g : Coalg.Hom F S₂ S₃) (f : Coalg.Hom F S₁ S₂) (x : S₁) :
+    (Coalg.Hom.comp g f) x = g (f x) := rfl
+
 end Coalg.Hom

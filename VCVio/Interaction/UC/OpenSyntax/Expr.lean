@@ -328,9 +328,7 @@ requires).
 def toInterp {Atom : PortBoundary → Type u} {Δ : PortBoundary}
     (e : Expr Atom Δ) : Interp Atom Δ :=
   Quotient.liftOn e
-    (fun r => ⟨fun T hCC interp =>
-      r.interpret T interp
-        (OpenTheory.CompactClosed.idWire (self := hCC))⟩)
+    (fun r => ⟨fun T hCC interp => r.interpret T interp hCC.idWire⟩)
     (fun _ _ h => Interp.ext (fun T hCC interp =>
       @Raw.Equiv.interpret_eq _ _ _ _ h T hCC interp))
 
@@ -338,9 +336,7 @@ def toInterp {Atom : PortBoundary → Type u} {Δ : PortBoundary}
 theorem toInterp_mk {Atom : PortBoundary → Type u} {Δ : PortBoundary}
     (r : Raw Atom Δ) :
     (mk r).toInterp = (⟨fun T hCC interp =>
-      r.interpret T interp
-        (OpenTheory.CompactClosed.idWire (self := hCC))⟩ :
-      Interp Atom Δ) :=
+      r.interpret T interp hCC.idWire⟩ : Interp Atom Δ) :=
   rfl
 
 @[simp]
@@ -391,8 +387,8 @@ theorem toInterp_plug {Atom : PortBoundary → Type u} {Δ : PortBoundary}
 theorem toInterp_unit {Atom : PortBoundary → Type u} :
     (Expr.unit : Expr Atom _).toInterp = Interp.unit := by
   have h : (Expr.unit : Expr Atom _).toInterp =
-      (⟨fun T hCC interp => (Raw.unit (Atom := Atom)).interpret T interp
-          (OpenTheory.CompactClosed.idWire (self := hCC))⟩ :
+      (⟨fun T hCC interp =>
+        (Raw.unit (Atom := Atom)).interpret T interp hCC.idWire⟩ :
         Interp Atom _) := rfl
   rw [h]
   ext T hT interp

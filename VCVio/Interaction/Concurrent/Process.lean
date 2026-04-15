@@ -216,6 +216,8 @@ def interleave
         | ⟨⟨true⟩, tr⟩ => (step₁.next tr, s₂)
         | ⟨⟨false⟩, tr⟩ => (s₁, step₂.next tr) }
 
+/-- Post-composing `mapContext g` distributes over `interleave`: the result is
+the same interleaving with each injection pre-composed by `g`. -/
 theorem mapContext_interleave
     {Γ₁ Γ₂ Δ Δ' : Interaction.Spec.Node.Context.{w, w₂}}
     (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
@@ -237,6 +239,8 @@ theorem mapContext_interleave
   · exact Interaction.Spec.Decoration.map_comp g f₂ _ _
   · exact Interaction.Spec.Decoration.map_comp g f₁ _ _
 
+/-- Pre-composing both operands with `mapContext` distributes into the
+`interleave` injections via `ContextHom.comp`. -/
 theorem interleave_mapContext
     {Γ₁ Γ₁' Γ₂ Γ₂' Δ : Interaction.Spec.Node.Context.{w, w₂}}
     (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
@@ -259,6 +263,8 @@ theorem interleave_mapContext
     · exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
 
+/-- Specialization of `interleave_mapContext` when only the left operand
+is pre-composed with `mapContext`. -/
 theorem interleave_mapContext_left
     {Γ₁ Γ₁' Γ₂ Δ : Interaction.Spec.Node.Context.{w, w₂}}
     (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
@@ -279,6 +285,8 @@ theorem interleave_mapContext_left
     exact Interaction.Spec.Decoration.map_comp f₁ g₁ _ _
   · funext ⟨⟨b⟩, tr⟩; cases b <;> rfl
 
+/-- Specialization of `interleave_mapContext` when only the right operand
+is pre-composed with `mapContext`. -/
 theorem interleave_mapContext_right
     {Γ₁ Γ₂ Γ₂' Δ : Interaction.Spec.Node.Context.{w, w₂}}
     (p₁ : ProcessOver.{v, w, w₂} Γ₁) (p₂ : ProcessOver.{v, w, w₂} Γ₂)
