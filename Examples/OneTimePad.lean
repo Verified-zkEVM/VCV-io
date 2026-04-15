@@ -13,7 +13,7 @@ import Mathlib.Data.Vector.Zip
 # One Time Pad
 
 This file defines the one-time pad scheme, proves correctness, and proves perfect secrecy
-in the canonical independence form used by `SymmEncAlg.perfectSecrecy`.
+in the canonical independence form used by `SymmEncAlg.perfectSecrecyAt`.
 
 The file includes two proof styles:
 1. **Direct probability calculations** (`perfectSecrecyAt`): computes joint/marginal
@@ -28,85 +28,56 @@ show_panel_widgets [local VCVioWidgets.GameHop.GameHopPanel]
 open Mathlib OracleSpec OracleComp ENNReal BigOperators
 
 /-- The one-time pad symmetric encryption algorithm, using `BitVec`s as keys and messages.
-Encryption and decryption both just apply `BitVec.xor` with the key.
-The only oracles needed are `unifSpec`, which requires no implementation. -/
-@[simps!] def oneTimePad : SymmEncAlg ℕ
-    (M := BitVec) (K := BitVec) (C := BitVec) where
-  keygen n := do $ᵗ BitVec n -- Generate a key by choosing a random bit-vector
-  encrypt k m := return k ^^^ m -- encrypt by xor-ing with the key
-  decrypt k σ := return (k ^^^ σ) -- decrypt by xor-ing with the key
-  __ := unifSpec.defaultContext
+Encryption and decryption both just apply `BitVec.xor` with the key. -/
+def oneTimePad (sp : ℕ) :
+    SymmEncAlg ProbComp (BitVec sp) (BitVec sp) (BitVec sp) where
+  keygen := $ᵗ BitVec sp
+  encrypt k m := return k ^^^ m
+  decrypt k σ := return some (k ^^^ σ)
 
 namespace oneTimePad
 
 /-- Encryption and decryption are inverses for any OTP key. -/
-lemma complete : (oneTimePad).Complete := by
-  intro sp m
-  simp only [oneTimePad, simulateQ_id', SymmEncAlg.CompleteExp]
-  have hrun :
-      OptionT.run (do
-          let k ← liftM ($ᵗ BitVec sp)
-          let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
-          pure (k ^^^ σ) : OptionT ProbComp (BitVec sp)) =
-        (fun k => some (k ^^^ (k ^^^ m))) <$> ($ᵗ BitVec sp : ProbComp (BitVec sp)) := by
-    simp
-  have hxor : (fun k => some (k ^^^ (k ^^^ m))) = fun _ : BitVec sp => some m := by
-    funext k
-    simp
-  have hsupp : (support ($ᵗ BitVec sp : ProbComp (BitVec sp))).Nonempty := by
-    simp [support_uniformSample]
-  rw [probOutput_eq_one_iff]
-  constructor
-  · change Pr[⊥ | OptionT.run (do
-        let k ← liftM ($ᵗ BitVec sp)
-        let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
-        pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))] = 0
-    calc
-      Pr[⊥ | OptionT.run (do
-          let k ← liftM ($ᵗ BitVec sp)
-          let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
-          pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))] =
-          Pr[⊥ | (fun k => some (k ^^^ (k ^^^ m))) <$> ($ᵗ BitVec sp : ProbComp (BitVec sp))] := by
-            simp
-      _ = Pr[⊥ | ($ᵗ BitVec sp : ProbComp (BitVec sp))] := by
-            rw [probFailure_map]
-      _ = 0 := probFailure_uniformSample (α := BitVec sp)
-  · change support (OptionT.run (do
-        let k ← liftM ($ᵗ BitVec sp)
-        let σ ← liftM (pure (k ^^^ m) : ProbComp (BitVec sp))
-        pure (k ^^^ σ) : OptionT ProbComp (BitVec sp))) = {some m}
-    simpa only [hrun, hxor] using
-      (support_map_const (mx := ($ᵗ BitVec sp : ProbComp (BitVec sp))) (y := some m) hsupp)
+lemma complete (sp : ℕ) : (oneTimePad sp).Complete := by
+  intro msg
+  have hsimp : (oneTimePad sp).CompleteExp msg =
+      (fun _ : BitVec sp => (some msg : Option (BitVec sp))) <$>
+        ($ᵗ BitVec sp : ProbComp (BitVec sp)) := by
+    simp [SymmEncAlg.CompleteExp, oneTimePad, map_eq_bind_pure_comp, pure_bind, Function.comp]
+  rw [hsimp, probOutput_eq_one_iff]
+  exact ⟨HasEvalPMF.probFailure_eq_zero _,
+    support_map_const (mx := ($ᵗ BitVec sp : ProbComp (BitVec sp))) (y := some msg)
+      (by simp [support_uniformSample])⟩
 
 lemma probOutput_cipher_uniform (sp : ℕ)
-    (mgen : OracleComp oneTimePad.spec (BitVec sp)) (σ : BitVec sp) :
-    Pr[= σ | oneTimePad.PerfectSecrecyCipherExp sp mgen] =
+    (mgen : ProbComp (BitVec sp)) (σ : BitVec sp) :
+    Pr[= σ | (oneTimePad sp).PerfectSecrecyCipherExp mgen] =
       (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
-  simpa [SymmEncAlg.PerfectSecrecyCipherExp_eq_bind, SymmEncAlg.PerfectSecrecyPriorExp,
-    SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_bind] using
-    probOutput_cipher_from_pair_uniform sp (mx := simulateQ oneTimePad.impl mgen) σ
+  simpa [SymmEncAlg.PerfectSecrecyCipherExp, SymmEncAlg.PerfectSecrecyExp, oneTimePad,
+    map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+    probOutput_cipher_from_pair_uniform sp (mx := mgen) σ
 
 /-- The one-time pad is perfectly secret in the canonical independence form. -/
-lemma perfectSecrecyAt (sp : ℕ) : oneTimePad.perfectSecrecyAt sp := by
+lemma perfectSecrecyAt (sp : ℕ) : (oneTimePad sp).perfectSecrecyAt := by
   intro mgen msg σ
   have hpair :
-      Pr[= (msg, σ) | oneTimePad.PerfectSecrecyExp sp mgen] =
-        Pr[= msg | oneTimePad.PerfectSecrecyPriorExp sp mgen] *
+      Pr[= (msg, σ) | (oneTimePad sp).PerfectSecrecyExp mgen] =
+        Pr[= msg | (oneTimePad sp).PerfectSecrecyPriorExp mgen] *
           (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := by
-    simpa [SymmEncAlg.PerfectSecrecyExp, SymmEncAlg.PerfectSecrecyPriorExp, oneTimePad] using
-      probOutput_pair_xor_uniform sp (mx := simulateQ oneTimePad.impl mgen) msg σ
+    simpa [SymmEncAlg.PerfectSecrecyExp, SymmEncAlg.PerfectSecrecyPriorExp, oneTimePad,
+      bind_assoc, pure_bind] using
+      probOutput_pair_xor_uniform sp (mx := mgen) msg σ
   calc
-    Pr[= (msg, σ) | oneTimePad.PerfectSecrecyExp sp mgen] =
-        Pr[= msg | oneTimePad.PerfectSecrecyPriorExp sp mgen] *
+    Pr[= (msg, σ) | (oneTimePad sp).PerfectSecrecyExp mgen] =
+        Pr[= msg | (oneTimePad sp).PerfectSecrecyPriorExp mgen] *
           (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := hpair
-    _ = Pr[= msg | oneTimePad.PerfectSecrecyPriorExp sp mgen] *
-        Pr[= σ | oneTimePad.PerfectSecrecyCipherExp sp mgen] := by
+    _ = Pr[= msg | (oneTimePad sp).PerfectSecrecyPriorExp mgen] *
+        Pr[= σ | (oneTimePad sp).PerfectSecrecyCipherExp mgen] := by
           rw [probOutput_cipher_uniform]
 
 /-- The one-time pad is perfectly secret for all security parameters. -/
-lemma perfectSecrecy : oneTimePad.perfectSecrecy := by
-  intro sp
-  exact perfectSecrecyAt sp
+lemma perfectSecrecy : ∀ sp, (oneTimePad sp).perfectSecrecyAt :=
+  fun sp => perfectSecrecyAt sp
 
 /-! ### Relational proof of ciphertext uniformity
 
@@ -118,9 +89,9 @@ open OracleComp.ProgramLogic in
 proved via a bijection coupling. -/
 lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     GameEquiv
-      (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₀)
-      (oneTimePad.PerfectSecrecyCipherGivenMsgExp sp msg₁) := by
-  simp only [SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad, simulateQ_id']
+      ((oneTimePad sp).PerfectSecrecyCipherGivenMsgExp msg₀)
+      ((oneTimePad sp).PerfectSecrecyCipherGivenMsgExp msg₁) := by
+  simp only [SymmEncAlg.PerfectSecrecyCipherGivenMsgExp, oneTimePad]
   let c := msg₀ ^^^ msg₁
   have hxor : Function.Bijective (fun x : BitVec sp => x ^^^ c) :=
     Function.Involutive.bijective fun x => by
@@ -143,7 +114,7 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
 /-- The one-time pad has equal ciphertext rows: all messages yield the same
 ciphertext distribution. Derived from the relational `GameEquiv` proof above. -/
 @[game_hop_root]
-lemma ciphertextRowsEqual (sp : ℕ) : oneTimePad.ciphertextRowsEqualAt sp :=
+lemma ciphertextRowsEqual (sp : ℕ) : (oneTimePad sp).ciphertextRowsEqualAt :=
   fun msg₀ msg₁ σ => (cipherGivenMsg_equiv sp msg₀ msg₁).probOutput_eq σ
 
 end oneTimePad
