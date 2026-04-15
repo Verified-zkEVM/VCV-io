@@ -129,6 +129,44 @@ noncomputable def runtime :
 
 end runtime
 
+section correctness
+
+variable [SampleableType Stmt] [SampleableType Wit]
+variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
+  (hr : GenerableRelation Stmt Wit rel) (M : Type)
+
+/-- Correctness of the Fiat-Shamir with aborts signature scheme: the canonical
+keygen-sign-verify execution succeeds with probability at least `1 - δ`, where `δ` bounds
+the per-key probability that signing aborts (returns `none`).
+
+When the underlying IDS is complete, any non-aborting signature verifies correctly (by RO
+consistency and `IdenSchemeWithAbort.verify_of_complete`). So the only source of
+verification failure is signing abort, and the completeness error equals the abort probability.
+
+The hypothesis `h_abort` bounds the abort probability for each valid key pair separately.
+It can be discharged using `sign_abortPrefixProbability_eq_signAttemptAbortProbability_pow`,
+which gives `Pr[sign = none] = signAttemptAbortProbability ^ maxAttempts` for fixed keys.
+
+Unlike the CRYPTO 2023 paper and EasyCrypt formalization (which use an unbounded signing loop
+and do not state a correctness theorem), this formulation uses a bounded loop with
+`maxAttempts` iterations, matching FIPS 204 Algorithm 7 (ML-DSA.Sign_internal). -/
+theorem correct
+    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+    (hc : ids.Complete) (maxAttempts : ℕ) (δ : ENNReal)
+    (h_abort : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
+      ∀ msg : M,
+        Pr[= none | (runtime M).evalDist
+          ((FiatShamirWithAbort
+            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+            ids hr M maxAttempts).sign pk sk msg)] ≤ δ) :
+    SignatureAlg.Complete
+      (FiatShamirWithAbort
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
+        ids hr M maxAttempts) (runtime M) δ := by
+  sorry
+
+end correctness
+
 section costAccounting
 
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel) (M : Type)

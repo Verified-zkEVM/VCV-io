@@ -100,6 +100,26 @@ def Complete (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel) 
         | none => true
     ] = 1
 
+/-- Support-level consequence of completeness: any non-aborting honest transcript in the
+support has an accepting verification. -/
+lemma verify_of_complete (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
+    (hc : ids.Complete) {s : Stmt} {w : Wit} (hrel : rel s w = true)
+    {cm : Commit} {c : Chal} {z : Resp}
+    (h_mem : some (cm, c, z) ∈ support (ids.honestExecution s w)) :
+    ids.verify s cm c z = true := by
+  have h := hc s w hrel
+  rw [probOutput_eq_one_iff] at h
+  have hsup := h.2
+  have : ids.verify s cm c z ∈ support (do
+      let t? ← ids.honestExecution s w
+      return match t? with
+        | some (cm, c, z) => ids.verify s cm c z
+        | none => true) := by
+    rw [support_bind]
+    exact Set.mem_iUnion₂.mpr ⟨some (cm, c, z), h_mem, by simp⟩
+  rw [hsup] at this
+  simpa using this
+
 end Completeness
 
 section HVZK

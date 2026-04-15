@@ -78,18 +78,45 @@ lemma map_verify (F : m →ᵐ n) (sigAlg : SignatureAlg m M PK SK S)
 
 end map
 
-section sound
+section correctness
 
 variable {m : Type → Type v} [Monad m] {M PK SK S : Type}
 
-/-- Perfect completeness for a signature scheme: honestly generated signatures always verify. -/
-def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) : Prop :=
+/-- Completeness of a signature scheme with error `δ`: for every message, the canonical
+keygen-sign-verify execution accepts with probability at least `1 - δ`.
+
+The error `δ` captures all sources of failure, including both verification mismatches and
+signing failures (e.g., abort in schemes like Fiat-Shamir with aborts).
+
+`Complete sigAlg runtime 0` is equivalent to `PerfectlyComplete sigAlg runtime`. -/
+def Complete (sigAlg : SignatureAlg m M PK SK S)
+    (runtime : ProbCompRuntime m) (δ : ℝ≥0∞) : Prop :=
+  ∀ msg : M, Pr[= true | runtime.evalDist do
+    let (pk, sk) ← sigAlg.keygen
+    let sig ← sigAlg.sign pk sk msg
+    sigAlg.verify pk msg sig] ≥ 1 - δ
+
+/-- Perfect completeness: the canonical keygen-sign-verify execution always accepts.
+This is the special case of `Correct` with zero error. -/
+def PerfectlyComplete (sigAlg : SignatureAlg m M PK SK S)
+    (runtime : ProbCompRuntime m) : Prop :=
   ∀ msg : M, Pr[= true | runtime.evalDist do
     let (pk, sk) ← sigAlg.keygen
     let sig ← sigAlg.sign pk sk msg
     sigAlg.verify pk msg sig] = 1
 
-end sound
+lemma perfectlyComplete_iff_complete_zero
+    (sigAlg : SignatureAlg m M PK SK S) (runtime : ProbCompRuntime m) :
+    sigAlg.PerfectlyComplete runtime ↔ sigAlg.Complete runtime 0 := by
+  simp [PerfectlyComplete, Complete]
+
+lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S}
+    {runtime : ProbCompRuntime m} {δ₁ δ₂ : ℝ≥0∞}
+    (h : sigAlg.Complete runtime δ₁) (hle : δ₁ ≤ δ₂) :
+    sigAlg.Complete runtime δ₂ :=
+  fun msg => le_trans (tsub_le_tsub_left hle 1) (h msg)
+
+end correctness
 
 section unforgeable
 
