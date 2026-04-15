@@ -67,9 +67,21 @@ simp only [probEvent_eq_eq_probOutput]
 
 Use `return (b == b')` or `return decide (r x w)` instead. `guard` requires `OptionT` / `Alternative`.
 
+### 12. `do`-notation bind uses a different `Bind` instance (Lean 4.29+)
+
+Lean 4.29 changed `do`-block elaboration so the desugared bind may use a `Bind` instance
+that differs syntactically from `Monad.toBind`. This means `pure_bind`, `bind_assoc`, and
+`bind_pure` won't fire via `simp` or `rw` on goals produced by `do` notation.
+
+**Symptom**: `simp [pure_bind]` or `rw [bind_assoc]` does nothing on a `do`-block goal.
+
+**Fix**: Use the restated lemmas from `ToMathlib.Control.Lawful.Basic` (namespace `LawfulMonad`):
+`do_pure_bind`, `do_bind_pure`, `do_bind_assoc`, `do_bind_pure_comp`, `do_map_bind`,
+`do_bind_map_left`. All are `@[simp]`.
+
 ## Module Structure
 
-### 12. `EvalDist/` must never import from `OracleComp/`
+### 13. `EvalDist/` must never import from `OracleComp/`
 
 Check the module layering DAG before adding imports:
 ```
@@ -78,49 +90,49 @@ ToMathlib → Prelude → EvalDist/Defs → OracleComp core → EvalDist bridge
   → {ProgramLogic, CryptoFoundations} → Examples
 ```
 
-### 13. Preserve partial proof attempts with `stop`
+### 14. Preserve partial proof attempts with `stop`
 
 When a proof attempt is not finished or is currently broken, insert a local `stop` marker instead of deleting large proof blocks. This preserves search context for later agents.
 
-### 14. `OracleComp.inductionOn` is the canonical eliminator
+### 15. `OracleComp.inductionOn` is the canonical eliminator
 
 Pattern: `| pure x => ... | query_bind t oa ih => ...`. Use `simulateQ_bind`, `simulateQ_query`, `simulateQ_pure` simp lemmas in the `query_bind` case. See `simulateQ_id'` in `SimSemantics/SimulateQ.lean` for a clean example.
 
-### 15. Full cutover, no backward-compatibility shims
+### 16. Full cutover, no backward-compatibility shims
 
 When refactoring APIs, notations, or proof infrastructure, update all call sites in one
 pass. Do not add deprecated aliases, migration wrappers, or compatibility layers.
 
 ## Build and Tooling
 
-### 16. Always run `lake exe cache get` before `lake build`
+### 17. Always run `lake exe cache get` before `lake build`
 
 Building Mathlib from source takes hours. Always fetch the precompiled cache first.
 
-### 17. Do not disable linters to silence warnings
+### 18. Do not disable linters to silence warnings
 
 Do not add `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level
 `leanOptions` that turn lints off just to get a clean build. Treat linter failures as real
 problems and fix the underlying declaration, proof, naming, or formatting issue instead.
 
-### 18. After adding new `.lean` files, run `./scripts/update-lib.sh`
+### 19. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
 This regenerates root import files (`VCVio.lean`, `Examples.lean`, `ToMathlib.lean`). CI checks they're up to date.
 
-### 19. Lean toolchain and Mathlib version must stay in sync
+### 20. Lean toolchain and Mathlib version must stay in sync
 
 Both currently `v4.28.0`. When upgrading, update both `lean-toolchain` and `lakefile.lean`'s `require mathlib` line simultaneously.
 
-### 20. Use public references in shared docs
+### 21. Use public references in shared docs
 
 When a proof framework follows an external paper, cite the public paper by title, venue,
 or URL rather than pointing agents at a repo-local file path.
 
-### 21. Public reference papers are authoritative for design work
+### 22. Public reference papers are authoritative for design work
 
 For relational program logic, start with
 *A Quantitative Probabilistic Relational Hoare Logic* ([ERHL25](../../REFERENCES.md#erhl25)).
 
-### 22. Agent guidance files must be committed
+### 23. Agent guidance files must be committed
 
 Agents dispatched to `git worktree` clones need to read `AGENTS.md`, `docs/agents/`, and any other guidance files. Ensure these are committed so all worktrees see them.

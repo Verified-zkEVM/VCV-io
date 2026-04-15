@@ -25,14 +25,13 @@ namespace ENNReal
 lemma one_sub_one_sub_mul_one_sub {x y : ℝ≥0∞} (hx : x ≤ 1) (hy : y ≤ 1) :
     1 - (1 - x) * (1 - y) = x + y - x * y := by
   have hxy : x * y ≤ x + y := by
-    have hxy_le_x : x * y ≤ x := by
-      exact mul_le_of_le_one_right' hy
+    have hxy_le_x : x * y ≤ x := mul_le_of_le_one_right' hy
     have hxy_le_y : x * y ≤ y := by
       apply mul_le_of_le_one_left (by positivity) hx;
     exact le_trans hxy_le_x ( le_add_of_nonneg_right <| by positivity )
   have hxy' : (1 - x) * (1 - y) ≤ 1 := by
-    calc (1 - x) * (1 - y) ≤ 1 * 1 := by
-          exact mul_le_mul' (tsub_le_self) (tsub_le_self)
+    calc (1 - x) * (1 - y) ≤ 1 * 1 :=
+          mul_le_mul' (tsub_le_self) (tsub_le_self)
         _ = 1 := one_mul 1
   rw [← ENNReal.toReal_eq_toReal_iff' (by aesop) (by aesop),
     ENNReal.toReal_sub_of_le, ENNReal.toReal_mul, ENNReal.toReal_sub_of_le,
@@ -64,7 +63,105 @@ lemma toReal_sub_le_abs_toReal_sub (a b : ℝ≥0∞) :
       rw [tsub_eq_zero_of_le h']
       exact abs_nonneg _
 
+open Finset in
+/-- The Gauss sum `∑_{k=0}^{n-1} k/N ≤ n²/(2N)`, the arithmetic core of the birthday bound. -/
+lemma gauss_sum_inv_le (n : ℕ) (N : ℝ≥0∞) (_hN : 0 < N) :
+    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ ≤
+      (n ^ 2 : ℝ≥0∞) / (2 * N) := by
+  rw [← Finset.sum_mul]
+  have hnat : 2 * (∑ k ∈ range n, k) ≤ n ^ 2 := by
+    have := Finset.sum_range_id_mul_two n; nlinarith [Nat.sub_le n 1]
+  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 := by
+    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
+      simp [Nat.cast_sum]
+    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num,
+      show (n : ℝ≥0∞) ^ 2 = ((n ^ 2 : ℕ) : ℝ≥0∞) from by push_cast; ring,
+      ← Nat.cast_mul]
+    exact_mod_cast hnat
+  have hle : (∑ k ∈ range n, (k : ℝ≥0∞)) ≤ (n : ℝ≥0∞) ^ 2 / 2 := by
+    rw [ENNReal.le_div_iff_mul_le (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+    rwa [mul_comm]
+  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
+      ≤ ((n : ℝ≥0∞) ^ 2 / 2) * N⁻¹ := mul_le_mul_left hle N⁻¹
+    _ = (n : ℝ≥0∞) ^ 2 / (2 * N) := by
+        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
+          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+        ring
+
+open Finset in
+/-- Tight Gauss sum: `∑_{k=0}^{n-1} k/N = n*(n-1)/(2N)`. -/
+lemma gauss_sum_inv_eq (n : ℕ) (N : ℝ≥0∞) :
+    ∑ k ∈ range n, ((k : ℕ) : ℝ≥0∞) * N⁻¹ =
+      ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
+  rw [← Finset.sum_mul]
+  have hnat : (∑ k ∈ range n, k) * 2 = n * (n - 1) :=
+    Finset.sum_range_id_mul_two n
+  have henn : 2 * (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) := by
+    have hcast : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((∑ k ∈ range n, k : ℕ) : ℝ≥0∞) := by
+      simp [Nat.cast_sum]
+    rw [hcast, show (2 : ℝ≥0∞) = ((2 : ℕ) : ℝ≥0∞) from by norm_num, ← Nat.cast_mul]
+    congr 1; omega
+  have heq : (∑ k ∈ range n, (k : ℝ≥0∞)) = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 := by
+    rw [ENNReal.eq_div_iff (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+      (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)]
+    exact henn
+  calc (∑ k ∈ range n, (k : ℝ≥0∞)) * N⁻¹
+      = ((n * (n - 1) : ℕ) : ℝ≥0∞) / 2 * N⁻¹ := by rw [heq]
+    _ = ((n * (n - 1) : ℕ) : ℝ≥0∞) / (2 * N) := by
+        rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul,
+          ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+            (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤))]
+        ring
+
+/-- `a/(2N) + b/N = (a + 2b)/(2N)` for natural-number casts to `ℝ≥0∞`. -/
+lemma add_div_two_mul_nat (a b N : ℕ) :
+    ((a : ℕ) : ℝ≥0∞) / (2 * N) +
+      ((b : ℕ) : ℝ≥0∞) * (N : ℝ≥0∞)⁻¹ =
+    ((a + 2 * b : ℕ) : ℝ≥0∞) / (2 * N) := by
+  set D := (2 * (N : ℝ≥0∞))
+  rw [ENNReal.div_eq_inv_mul, ENNReal.div_eq_inv_mul]
+  rw [mul_comm (((b : ℕ) : ℝ≥0∞)) ((N : ℝ≥0∞)⁻¹)]
+  have hD_inv : (N : ℝ≥0∞)⁻¹ = D⁻¹ * 2 := by
+    simp only [D]
+    rw [ENNReal.mul_inv (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ 0))
+      (Or.inl (by norm_num : (2 : ℝ≥0∞) ≠ ⊤)),
+      mul_comm (2 : ℝ≥0∞)⁻¹ _, mul_assoc,
+      ENNReal.inv_mul_cancel (by norm_num : (2 : ℝ≥0∞) ≠ 0)
+        (by norm_num : (2 : ℝ≥0∞) ≠ ⊤), mul_one]
+  rw [hD_inv, mul_assoc, ← mul_add]
+  congr 1
+  push_cast
+  ring
+
 end ENNReal
+
+open Finset in
+/-- Updating one coordinate by `+1` increases the total sum by exactly one. -/
+lemma sum_update_succ_count {ι : Type} [Fintype ι] [DecidableEq ι]
+    (counts : ι → ℕ) (i : ι) :
+    ∑ j : ι, Function.update counts i (counts i + 1) j =
+      (∑ j : ι, counts j) + 1 := by
+  classical
+  calc
+    ∑ j : ι, Function.update counts i (counts i + 1) j =
+        Function.update counts i (counts i + 1) i +
+          Finset.sum (Finset.univ.erase i)
+            (fun j : ι => Function.update counts i (counts i + 1) j) := by
+          symm
+          exact Finset.univ.add_sum_erase
+            (f := fun j : ι => Function.update counts i (counts i + 1) j) (Finset.mem_univ i)
+    _ = counts i + 1 + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) := by
+          simp only [Function.update_self]
+          congr 1
+          refine Finset.sum_congr rfl ?_
+          intro j hj
+          rw [Function.update_of_ne (Finset.ne_of_mem_erase hj)]
+    _ = counts i + Finset.sum (Finset.univ.erase i) (fun j : ι => counts j) + 1 := by
+          omega
+    _ = (∑ j : ι, counts j) + 1 := by
+          rw [← Finset.univ.add_sum_erase (f := fun j : ι => counts j) (Finset.mem_univ i)]
 
 @[simp, grind =]
 lemma fst_map_prod_map {m : Type u → Type v} [Functor m] [LawfulFunctor m] {α β γ δ : Type u}
@@ -237,7 +334,7 @@ lemma List.countP_eq_sum_fin_ite {α : Type*} (xs : List α) (p : α → Bool) :
   | cons x xs h => {
     rw [List.countP_cons, ← h]
     refine (Fin.sum_univ_succ _).trans ((add_comm _ _).trans ?_)
-    simp
+    congr 1
   }
 
 lemma List.card_filter_getElem_eq {α : Type*} [DecidableEq α]
@@ -254,12 +351,8 @@ lemma List.countP_finRange_getElem {α : Type} (l : List α) (p : α → Bool) :
 
 lemma Fin.card_eq_countP_mem {n : ℕ} (s : Finset (Fin n)) :
     s.card = Fin.countP (· ∈ s) := by
-  rw [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter]
-  symm
-  rw [← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
-  congr
-  ext x
-  simp
+  simp [Fin.countP_eq_countP_map_finRange, List.countP_eq_length_filter,
+    ← List.toFinset_card_of_nodup ((List.nodup_finRange n).filter _)]
 
 lemma Array.card_eq_countP {α : Type} (as : Array α)
     (p : α → Prop) [DecidablePred p] :
@@ -606,3 +699,20 @@ theorem List.forIn_mprod_yield_eq_foldlM
     simp only [bind_assoc, pure_bind]
     congr 1; funext ⟨b', c'⟩
     exact ih b' c'
+
+section CrossTypeBind
+
+/-- If the first steps agree after projection, and continuations agree on matching inputs,
+    then the full bind computations agree. Generalizes `bind_congr` to different source types. -/
+theorem bind_eq_of_map_eq {m : Type → Type*} [Monad m] [LawfulMonad m]
+    {α₁ α₂ β : Type} {m₁ : m α₁} {m₂ : m α₂}
+    {f₁ : α₁ → m β} {f₂ : α₂ → m β}
+    (proj : α₁ → α₂)
+    (h_first : proj <$> m₁ = m₂)
+    (h_cont : ∀ a₁, f₁ a₁ = f₂ (proj a₁)) :
+    m₁ >>= f₁ = m₂ >>= f₂ := by
+  rw [← h_first, map_eq_bind_pure_comp, bind_assoc]
+  simp only [Function.comp, pure_bind]
+  exact bind_congr fun a₁ => h_cont a₁
+
+end CrossTypeBind

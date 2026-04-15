@@ -133,11 +133,11 @@ end zero
 @[simp, grind =]
 lemma toPMF_bind (p : SPMF α) (q : α → SPMF β) :
     (p >>= q).toPMF = Option.elimM p.toPMF (PMF.pure none) (fun x => (q x).toPMF) := by
-  simp [← run_eq_toPMF]
+  simp only [SPMF, ← run_eq_toPMF, OptionT.run_bind, PMF.monad_pure_eq_pure]
 
 @[simp, grind =]
 lemma toPMF_map (p : SPMF α) (f : α → β) : (f <$> p).toPMF = Option.map f <$> p.toPMF := by
-  simp [← run_eq_toPMF]
+  simp [SPMF, ← run_eq_toPMF]
 
 @[simp, grind =]
 lemma mk_pure_some (x : α) : SPMF.mk (PMF.pure (some x)) = pure x := rfl
@@ -253,7 +253,7 @@ end gap
 
 theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
     (p >>= f) = PMF.bind p (fun a => match a with | some a' => f a' | none => PMF.pure none) := by
-  simp [bind, OptionT.bind, PMF.instMonad, OptionT.mk]
+  simp [bind, OptionT.bind, OptionT.mk]
   rfl
 
 @[simp] lemma PMF.map_some_apply_some (p : PMF α) (x : α) : (some <$> p) (some x) = p x := by
@@ -261,7 +261,7 @@ theorem bind_eq_pmf_bind {p : SPMF α} {f : α → SPMF β} :
 
 /-- `pure a` in `SPMF` equals `PMF.pure (some a)` as a PMF on `Option α`. -/
 protected lemma pure_eq_pure_some (a : α) :
-    (pure a : SPMF α) = SPMF.mk (PMF.pure (some a)) := by rfl
+    (pure a : SPMF α) = SPMF.mk (PMF.pure (some a)) := rfl
 
 @[simp, grind =]
 lemma toPMF_inj (p q : SPMF α) : p.toPMF = q.toPMF ↔ p = q := by aesop

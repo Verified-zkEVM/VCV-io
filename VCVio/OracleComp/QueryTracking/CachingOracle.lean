@@ -104,6 +104,9 @@ lemma apply_eq (t : spec.Domain) : cachingOracle t =
           let u ← query t
           modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
 
+/-- Trivially true via `probFailure_eq_zero` since both sides are `OracleComp` computations.
+A generic `withCaching` version for arbitrary base monads would require a separate argument
+because caching changes the oracle semantics (cache hits skip the underlying oracle call). -/
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
@@ -111,6 +114,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
     Pr[⊥ | (simulateQ (cachingOracle (spec := spec₀)) oa).run cache] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
+/-- Trivially true via `probFailure_eq_zero`; see `probFailure_run_simulateQ`. -/
 @[simp]
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
@@ -119,4 +123,66 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
   rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
+@[simp]
+lemma simulateQ_query (t : spec.Domain) :
+    simulateQ cachingOracle (liftM (query t)) = cachingOracle t := by
+  simp [_root_.simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query]
+
 end cachingOracle
+
+namespace OracleComp
+
+variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+
+omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+/-- `simulateQ cachingOracle` only grows the cache: for any `oa`, if
+`z ∈ support ((simulateQ cachingOracle oa).run cache₀)` then `cache₀ ≤ z.2`. -/
+theorem simulateQ_cachingOracle_cache_le {α : Type u}
+    (oa : OracleComp spec α) (cache₀ : QueryCache spec)
+    (z : α × QueryCache spec)
+    (hmem : z ∈ support ((simulateQ cachingOracle oa).run cache₀)) :
+    cache₀ ≤ z.2 := by
+  induction oa using OracleComp.inductionOn generalizing cache₀ z with
+  | pure a =>
+      simp only [StateT.run, simulateQ_pure] at hmem
+      rw [hmem]
+  | query_bind t mx ih =>
+      simp only [simulateQ_query_bind, StateT.run_bind] at hmem
+      rw [support_bind] at hmem
+      simp only [Set.mem_iUnion] at hmem
+      obtain ⟨⟨u, cache_mid⟩, hmid, hrest⟩ := hmem
+      have hle_mid : cache₀ ≤ cache_mid := by
+        simp only [liftM, MonadLiftT.monadLift] at hmid
+        unfold cachingOracle at hmid
+        exact QueryImpl.withCaching_cache_le _ _ cache₀ _ hmid
+      exact le_trans hle_mid (ih _ cache_mid z hrest)
+
+omit [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] in
+/-- After running `cachingOracle` on a single query at `t`, the resulting cache
+maps `t` to the returned value. -/
+theorem cachingOracle_query_caches (t : spec.Domain)
+    (cache₀ : QueryCache spec)
+    (v : spec.Range t) (cache₁ : QueryCache spec)
+    (hmem : (v, cache₁) ∈ support ((cachingOracle t).run cache₀)) :
+    cache₁ t = some v := by
+  simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hmem
+  cases hc : cache₀ t with
+  | some u =>
+    simp only [hc, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hmem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
+    exact hc
+  | none =>
+    simp only [hc, StateT.run_bind] at hmem
+    rw [show (liftM (query t) :
+        StateT (QueryCache spec) (OracleComp spec) _).run cache₀ =
+        ((liftM (query t) : OracleComp _ _) >>= fun u =>
+          pure (u, cache₀)) from rfl] at hmem
+    rw [bind_assoc] at hmem; simp only [pure_bind] at hmem
+    rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
+    obtain ⟨u, _, hmem⟩ := hmem
+    simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
+      StateT.modifyGet, StateT.run, support_pure, Set.mem_singleton_iff] at hmem
+    obtain ⟨rfl, rfl⟩ := Prod.mk.inj hmem
+    exact QueryCache.cacheQuery_self cache₀ t v
+
+end OracleComp

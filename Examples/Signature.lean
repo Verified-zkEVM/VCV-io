@@ -116,27 +116,29 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
 
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
 
-The corrected statement includes:
-* an explicit bound on random-oracle queries by the adversary;
+The bound includes:
+* explicit bounds on signing-oracle and random-oracle queries by the adversary;
 * an explicit DLog reduction target;
-* the standard forking-lemma loss term `eps * (eps / (q + 1) - 1 / |F|)`.
+* the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`.
 
-This matches the intended Schnorr security theorem much more closely than the
-old placeholder `adv.advantage ≤ sorry`. -/
+Because Schnorr has perfect HVZK (`ζ_zk = 0`), the simulation loss vanishes and the
+CMA advantage coincides with the NMA advantage. -/
 theorem signature_euf_cma (g : G) (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g hg M))
-    (qBound : ℕ)
-    (hQ : ∀ pk, FiatShamir.hashQueryBound (M := M) (Commit := G) (Chal := F)
-      (oa := adv.main pk) qBound) :
+    (qS qH : ℕ)
+    (hQ : ∀ pk, FiatShamir.signHashQueryBound (M := M) (Commit := G) (Chal := F)
+      (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
-      adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) *
-          (adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) /
-            (qBound + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
+      let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
+        ENNReal.ofReal (qS * (0 : ℝ))
+      eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (Schnorr.sigma F G g) (dlogGenerable g hg) M
     (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
-    (Schnorr.sigma_hvzk F G g) adv qBound hQ
+    (ζ_zk := 0) le_rfl
+    ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
+    adv qS qH hQ
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
   simp only [hardRelationExp, dlogExp]
   rw [show Pr[= true | ($ᵗ G : ProbComp G) >>= fun pk =>

@@ -51,8 +51,7 @@ def piKernel (Coeff : Type*) [Zero Coeff] (n : Nat) :
     simp [piBackend]
   coeff_ofArray := by
     intro a h i
-    have hi : i.val < a.size := by
-      exact Nat.lt_of_lt_of_eq i.isLt h.symm
+    have hi : i.val < a.size := Nat.lt_of_lt_of_eq i.isLt h.symm
     simp [piBackend, hi]
   ofArray_toArray := by
     intro p
@@ -68,7 +67,7 @@ def piRing (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   add := fun f g i => f i + g i
   sub := fun f g i => f i - g i
   neg := fun f i => -f i
-  mul := schoolbookNegacyclicMul (piKernel Coeff n)
+  mul := negacyclicMulPure (piKernel Coeff n)
 
 /-- Quotient semantics for the function-backed negacyclic ring. -/
 noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
@@ -77,21 +76,25 @@ noncomputable def piSemantics (Coeff : Type*) [CommRing Coeff] (n : Nat) :
   zero_sound := by
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp [piBackend, piRing, Finset.sum_const_zero, map_zero]
+    rfl
   add_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_add_distrib, map_add]
+    rfl
   sub_sound := by
     intro f g
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_sub_distrib, map_sub]
+    rfl
   neg_sound := by
     intro f
     unfold NegacyclicQuotient.ofBackend NegacyclicQuotient.ofPolynomial PolyBackend.toPolynomial
     simp only [piBackend, piRing, Finset.sum_neg_distrib, map_neg]
+    rfl
   mul_sound := by
     intro f g
-    sorry
+    exact negacyclicMulPure_sound (piBackend Coeff n) (piKernel Coeff n) f g
 
 /-! ### Typecheck-only roundtrip exercises
 

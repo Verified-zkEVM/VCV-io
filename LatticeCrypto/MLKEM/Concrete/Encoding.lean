@@ -172,6 +172,7 @@ private theorem bitsToBytes_bytesToBits (bytes : ByteArray) :
       simpa using congrArg packByte hbitsEq
     rw [hpack, packByte_bitOf_byte]
     rw [ByteArray.getElem_eq_getElem_data]
+    rfl
 
 private theorem bytesToBits_getD_lt_two (bytes : ByteArray) (i : Nat) :
     (bytesToBits bytes).getD i 0 < 2 := by
@@ -305,8 +306,8 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
   apply Vector.ext
   intro i hi
   have hcoeffBound : ((f[i]'hi : Coeff).val) < 2 ^ d := hbound ⟨i, hi⟩
-  have hlenDigits : (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)).length = d := by
-    exact Nat.length_digitsAppend (by decide) d hcoeffBound
+  have hlenDigits : (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)).length = d :=
+    Nat.length_digitsAppend (by decide) d hcoeffBound
   have hcoeffBits :
       List.ofFn (fun j : Fin d =>
         (bytesToBits (byteEncode d f)).getD (i * d + j.val) 0)
@@ -344,19 +345,29 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
       simpa [hroundtripBitsLen] using hijBits
     have hleft :
         (bytesToBits (bitsToBytes bits)).getD (i * d + j.val) 0 =
-          (bytesToBits (bitsToBytes bits))[i * d + j.val] := by
-      exact array_getD_eq_getElem (a := bytesToBits (bitsToBytes bits)) (i := i * d + j.val)
+          (bytesToBits (bitsToBytes bits))[i * d + j.val] :=
+      array_getD_eq_getElem (a := bytesToBits (bitsToBytes bits)) (i := i * d + j.val)
         (fallback := 0) hijRound
     have hdigitElem :
         (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)).getD j.val 0 =
-          (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val))[j.val] := by
-      exact List.getD_eq_getElem _ _ (by
+          (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val))[j.val] :=
+      List.getD_eq_getElem _ _ (by
         rw [hlenDigits]
         exact j.isLt)
     have hbitPos :
         bits[i * d + j.val] =
           (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)).getD j.val 0 := by
-      simp [bits, hcoeffDiv, hcoeffMod, Nat.mod_eq_of_lt hcoeffBound]
+      have hcoeffModLt :
+          ((f[i]'hi : Coeff).val % 2 ^ d) = (f[i]'hi : Coeff).val := Nat.mod_eq_of_lt hcoeffBound
+      suffices
+          (Nat.digitsAppend 2 d (((f[i]'hi : Coeff).val % 2 ^ d))).getD j.val 0 =
+            (Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)).getD j.val 0 by
+        simpa [bits, hcoeffDiv, hcoeffMod] using this
+      have hdigitsMod :
+          Nat.digitsAppend 2 d (((f[i]'hi : Coeff).val % 2 ^ d)) =
+            Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val) := by
+        rw [hcoeffModLt]
+      exact congrArg (fun l => l[j.val]?.getD 0) hdigitsMod
     rw [hleft]
     exact hbitsRoundtrip.trans hbitPos |>.trans hdigitElem
   have hdigits :
@@ -366,7 +377,7 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
           exact j.isLt)) =
         Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val) := by
     simpa [hlenDigits] using
-      (List.ofFn_getElem (l := Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)))
+      (List.ofFn_getElem (xs := Nat.digitsAppend 2 d ((f[i]'hi : Coeff).val)))
   have hcoeffBitsInput :
       (List.ofFn fun j : Fin d => (bytesToBits (byteEncode d f))[i * d + j.val]?.getD 0) =
         List.ofFn (fun j : Fin d => (bytesToBits (byteEncode d f)).getD (i * d + j.val) 0) := by
@@ -392,8 +403,8 @@ private theorem byteDecode_byteEncode_of_bound {d : Nat} (hd : 0 < d) (f : Rq)
 
 private theorem byteDecode_one_coeff (bytes : ByteArray) (idx : Fin ringDegree) :
     ((byteDecode 1 bytes).get idx : Coeff).val = (bytesToBits bytes).getD idx.val 0 := by
-  have hbitMod : (bytesToBits bytes).getD idx.val 0 < modulus := by
-    exact lt_trans (bytesToBits_getD_lt_two bytes idx.val) (by decide)
+  have hbitMod : (bytesToBits bytes).getD idx.val 0 < modulus :=
+    lt_trans (bytesToBits_getD_lt_two bytes idx.val) (by decide)
   have hcast :
       (((bytesToBits bytes).getD idx.val 0 : Nat) : Coeff).val =
         (bytesToBits bytes).getD idx.val 0 :=
@@ -442,8 +453,8 @@ private def byteEncode12VecByte {k : Nat}
     (v : TqVec k) (idx : Fin (384 * k)) : UInt8 :=
   let poly := idx.val / 384
   let byte := idx.val % 384
-  have hpoly : poly < k := by
-    exact Nat.div_lt_of_lt_mul idx.isLt
+  have hpoly : poly < k :=
+    Nat.div_lt_of_lt_mul idx.isLt
   have hbyte : byte < 384 := Nat.mod_lt _ (by decide)
   byteEncode12PolyByte (v[poly]'hpoly) ⟨byte, hbyte⟩
 
@@ -502,8 +513,7 @@ private theorem getByteD_byteEncode12Poly (f : Tq) {j : Nat} (hj : j < 384) :
   simp [byteEncode12Poly]
 
 private theorem tq_getElem_eq_coeffs (f : Tq) {i : Nat} (hi : i < ringDegree) :
-    f[i] = f.coeffs[i] := by
-  rfl
+    f[i] = f.coeffs[i] := rfl
 
 /-- Encode a vector of `k` polynomials with 12-bit coefficients. -/
 def byteEncode12Vec {k : Nat} (v : TqVec k) : ByteArray :=
@@ -568,8 +578,8 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
       have hbMod : b % 16 < 16 := Nat.mod_lt _ (by decide)
       omega
     have hbDiv : b / 16 < 256 := by
-      have hb : b < 4096 := by
-        exact lt_trans (ZMod.val_lt _) (by decide)
+      have hb : b < 4096 :=
+        lt_trans (ZMod.val_lt _) (by decide)
       exact Nat.div_lt_of_lt_mul hb
     have hdiv0 : (3 * pair) / 3 = pair := by omega
     have hdiv1 : (3 * pair + 1) / 3 = pair := by omega
@@ -581,19 +591,22 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
         (getByteD (byteEncode12Poly f) (3 * pair)).toNat = a % 256 := by
       rw [getByteD_byteEncode12Poly (f := f) (j := 3 * pair) (by omega)]
       simp [byteEncode12PolyByte, a, hdiv0, hmod0]
+      rfl
     have hb1 :
         (getByteD (byteEncode12Poly f) (3 * pair + 1)).toNat = a / 256 + 16 * (b % 16) := by
       have hab' :
           ZMod.val f.coeffs[2 * pair] / 256 + 16 * (ZMod.val f.coeffs[2 * pair + 1] % 16) < 256 :=
         by simpa [a, b] using hab
       rw [getByteD_byteEncode12Poly (f := f) (j := 3 * pair + 1) (by omega)]
-      simpa [byteEncode12PolyByte, a, b, hdiv1, hmod1] using (Nat.mod_eq_of_lt hab')
+      simp only [byteEncode12PolyByte, a, b, hdiv1, hmod1]
+      exact Nat.mod_eq_of_lt hab'
     have hb2 :
         (getByteD (byteEncode12Poly f) (3 * pair + 2)).toNat = b / 16 := by
       have hbDiv' : ZMod.val f.coeffs[2 * pair + 1] / 16 < 256 := by
         simpa [b] using hbDiv
       rw [getByteD_byteEncode12Poly (f := f) (j := 3 * pair + 2) (by omega)]
-      simpa [byteEncode12PolyByte, b, hdiv2, hmod2] using (Nat.mod_eq_of_lt hbDiv')
+      simp only [byteEncode12PolyByte, b, hdiv2, hmod2]
+      exact Nat.mod_eq_of_lt hbDiv'
     by_cases hEven : idx.val % 2 = 0
     · have hidx : idx.val = 2 * pair := by
         dsimp [pair]
@@ -610,6 +623,7 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
               apply Fin.ext
               exact hidx
             simp [hidx', a]
+            rfl
     · have hmod : idx.val % 2 = 1 := by
         have hlt : idx.val % 2 < 2 := Nat.mod_lt _ (by decide)
         omega
@@ -628,6 +642,7 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
               apply Fin.ext
               exact hidx
             simp [hidx', b]
+            rfl
   apply LatticeCrypto.TransformPoly.ext
   apply Vector.toArray_inj.mp
   unfold byteDecode12Poly
@@ -643,8 +658,8 @@ private theorem byteDecode12Poly_byteEncode12Poly (f : Tq) :
           (((b0 + 256 * (b1 % 16) : Nat) : Coeff))
         else
           (((b1 / 16 + 16 * b2 : Nat) : Coeff)))
-        = Array.ofFn (fun idx : Fin ringDegree => f.coeffs[idx.val]) := by
-            exact congrArg Array.ofFn hfun
+        = Array.ofFn (fun idx : Fin ringDegree => f.coeffs[idx.val]) :=
+            congrArg Array.ofFn hfun
     _ = f.coeffs.toArray := by
       apply Array.ext
       · simp
@@ -732,8 +747,8 @@ private theorem byteDecode12Vec_byteEncode12Vec {k : Nat} (v : TqVec k) :
   rw [Vector.toArray_ofFn]
   calc
     Array.ofFn (fun idx : Fin k => byteDecode12VecPoly (byteEncode12Vec v) idx)
-        = Array.ofFn (fun idx : Fin k => v[idx.val]) := by
-            exact congrArg Array.ofFn hfun
+        = Array.ofFn (fun idx : Fin k => v[idx.val]) :=
+            congrArg Array.ofFn hfun
     _ = v.toArray := by
       apply Array.ext
       · simp
@@ -755,8 +770,8 @@ def byteEncodeVec (d : Nat) {k : Nat} (v : RqVec k) : ByteArray :=
       have hchunk : 0 < chunkSize := by
         dsimp [chunkSize]
         omega
-      have hpoly : poly < k := by
-        exact Nat.div_lt_of_lt_mul idx.isLt
+      have hpoly : poly < k :=
+        Nat.div_lt_of_lt_mul idx.isLt
       have hbyte : byte < chunkSize := Nat.mod_lt _ hchunk
       getByteD (byteEncode d (v[poly]'hpoly)) byte
 
@@ -822,8 +837,8 @@ private theorem byteDecodeVec_byteEncodeVec_of_bound {d k : Nat} (hd : 0 < d) (v
         simpa [byteEncode_size] using hj
       simp only [Array.getElem_ofFn]
       rw [getByteD_byteEncodeVec (hd := hd) (v := v) (poly := i) (j := j) hi hj]
-      rw [← ByteArray.getElem_eq_getElem_data (a := byteEncode d (v[i]'hi)) (h := hjEnc)]
-      rw [getByteD_eq_getElem hjEnc]
+      rw [getByteD_eq_getElem hjEnc, ByteArray.getElem_eq_getElem_data]
+      rfl
   simp only [byteDecodeVec, Vector.getElem_ofFn]
   rw [hbytes]
   exact byteDecode_byteEncode_of_bound hd (f := v[i]'hi) (hbound := hbound ⟨i, hi⟩)
@@ -869,8 +884,8 @@ private theorem compress_val_lt_pow {d : Nat} (hpow : (1 <<< d) < modulus) (x : 
     exact hmul
   have hmod : shifted % (1 <<< d) < (1 <<< d) := Nat.mod_lt _ hpowPos
   have hltMod : shifted % (1 <<< d) < modulus := lt_trans hmod hpow
-  have hval : (((shifted % (1 <<< d) : Nat) : Coeff)).val = shifted % (1 <<< d) := by
-    exact ZMod.val_cast_of_lt hltMod
+  have hval : (((shifted % (1 <<< d) : Nat) : Coeff)).val = shifted % (1 <<< d) :=
+    ZMod.val_cast_of_lt hltMod
   calc
     (compress d x : Coeff).val = shifted % (1 <<< d) := by
       simpa [compress, shifted] using hval
@@ -906,12 +921,12 @@ private def byteDecode1Msg (msg : Message) : Rq :=
 private theorem byteDecode1Msg_val (msg : Message) (idx : Fin ringDegree) :
     ((byteDecode1Msg msg).get idx : Coeff).val =
       (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 := by
-  have hbitMod : (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 < modulus := by
-    exact lt_trans (bytesToBits_getD_lt_two (ByteArray.mk msg.toArray) idx.val) (by decide)
+  have hbitMod : (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 < modulus :=
+    lt_trans (bytesToBits_getD_lt_two (ByteArray.mk msg.toArray) idx.val) (by decide)
   have hcast :
       ((((bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 : Nat) : Coeff).val) =
-        (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 := by
-    exact ZMod.val_cast_of_lt hbitMod
+        (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 :=
+    ZMod.val_cast_of_lt hbitMod
   unfold byteDecode1Msg
   simpa using hcast
 
@@ -924,6 +939,7 @@ private theorem messageToArray_ofByteArray (ba : ByteArray) (hsize : ba.size = 3
     have hi : i < ba.size := by simpa [hsize] using hi1
     rw [Array.getElem_ofFn]
     simp [hi, ByteArray.getElem_eq_getElem_data]
+    rfl
 
 private theorem toArray_byteEncode1Msg (f : Rq) :
     (byteEncode1Msg f).toArray = (byteEncode 1 f).data := by
@@ -988,12 +1004,12 @@ private theorem byteEncode1Msg_byteDecode1Msg (msg : Message) :
       let idx : Fin ringDegree := ⟨i, hi⟩
       rw [Array.getElem_ofFn]
       have hbitLt :
-          (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 < 2 := by
-        exact bytesToBits_getD_lt_two (ByteArray.mk msg.toArray) i
+          (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 < 2 :=
+        bytesToBits_getD_lt_two (ByteArray.mk msg.toArray) i
       have hget :
           (bytesToBits (ByteArray.mk msg.toArray)).getD i 0 =
-            (bytesToBits (ByteArray.mk msg.toArray))[i] := by
-        exact array_getD_eq_getElem
+            (bytesToBits (ByteArray.mk msg.toArray))[i] :=
+        array_getD_eq_getElem
           (a := bytesToBits (ByteArray.mk msg.toArray)) (i := i) (fallback := 0) hi2
       rw [byteDecode1Msg_val (msg := msg) idx, Nat.mod_eq_of_lt hbitLt, hget]
   apply Vector.toArray_inj.mp
@@ -1012,8 +1028,8 @@ private theorem byteDecode1Msg_byteEncode1Msg_of_bound (f : Rq)
     (hbound : ∀ idx : Fin ringDegree, ((f[idx.val] : Coeff).val) < 2) :
     byteDecode1Msg (byteEncode1Msg f) = f := by
   calc
-    byteDecode1Msg (byteEncode1Msg f) = byteDecode 1 (ByteArray.mk (byteEncode1Msg f).toArray) := by
-      exact byteDecode1Msg_eq_byteDecode1 (msg := byteEncode1Msg f)
+    byteDecode1Msg (byteEncode1Msg f) = byteDecode 1 (ByteArray.mk (byteEncode1Msg f).toArray) :=
+      byteDecode1Msg_eq_byteDecode1 (msg := byteEncode1Msg f)
     _ = byteDecode 1 (byteEncode 1 f) := by
       rw [byteArray_byteEncode1Msg (f := f)]
     _ = f := byteDecode_byteEncode_of_bound (d := 1) (by decide) f (by simpa using hbound)

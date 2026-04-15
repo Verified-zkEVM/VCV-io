@@ -87,7 +87,7 @@ theorem centeredRepr_upper_bound (x : ZMod q) : centeredRepr x ≤ (q : ℤ) / 2
   simp only [centeredRepr]
   split_ifs with h
   · exact h
-  · push_neg at h
+  · push Not at h
     have hval := ZMod.val_lt x
     omega
 
@@ -218,8 +218,8 @@ theorem cInfNorm_le_of_coeff_le {p : Poly (ZMod q) n} {b : ℕ}
   cInfNorm_le_iff.mpr h
 
 theorem coeff_le_cInfNorm (p : Poly (ZMod q) n) (i : Fin n) :
-    (centeredRepr (p.get i)).natAbs ≤ cInfNorm p := by
-  exact Finset.le_sup (f := fun i => (centeredRepr (p.get i)).natAbs) (Finset.mem_univ i)
+    (centeredRepr (p.get i)).natAbs ≤ cInfNorm p :=
+  Finset.le_sup (f := fun i => (centeredRepr (p.get i)).natAbs) (Finset.mem_univ i)
 
 /-- Every polynomial has centered infinity norm at most `q / 2`. -/
 theorem cInfNorm_le_halfq (p : Poly (ZMod q) n) : cInfNorm p ≤ q / 2 :=

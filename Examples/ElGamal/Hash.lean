@@ -422,8 +422,8 @@ theorem esIdeal_eq_half
         inner]
     _ = Pr[= true | do
           let hk ← ($ᵗ HK : ProbComp HK)
-          ($ᵗ Bool : ProbComp Bool)] := by
-      exact probOutput_bind_congr' ($ᵗ HK) true (fun hk => by
+          ($ᵗ Bool : ProbComp Bool)] :=
+      probOutput_bind_congr' ($ᵗ HK) true (fun hk => by
         simpa [probOutput_uniformSample] using hhalf hk)
     _ = 1 / 2 := by
       rw [probOutput_bind_eq_tsum]
@@ -482,8 +482,8 @@ theorem hashedElGamal_IND_CPA_bound
       |(Pr[= true | ddhExpReal g (ddhReduction (F := F) (hash := hash) adv)]).toReal -
           (Pr[= true | ddhExpRand g (ddhReduction (F := F) (hash := hash) adv)]).toReal| +
         |(Pr[= true | ddhExpRand g (ddhReduction (F := F) (hash := hash) adv)]).toReal -
-          (Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)]).toReal| := by
-      exact abs_sub_le _ _ _
+          (Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)]).toReal| :=
+      abs_sub_le _ _ _
     _ = ddhDistAdvantage g (ddhReduction (F := F) (hash := hash) adv) +
         |(Pr[= true |
           EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)]).toReal -

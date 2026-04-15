@@ -20,7 +20,7 @@ open ENNReal
 section pure
 
 @[simp, grind =] lemma support_pure [HasEvalSet m] (x : α) :
-    support (pure x : m α) = {x} := by aesop (rule_sets := [UnfoldEvalDist])
+    support (pure x : m α) = {x} := HasEvalSet.toSet.toFun_pure' x
 
 lemma mem_support_pure_iff [HasEvalSet m] (x y : α) :
     x ∈ support (pure y : m α) ↔ x = y := by grind
@@ -104,8 +104,8 @@ section bind
 
 @[simp, grind =]
 lemma support_bind [HasEvalSet m] (mx : m α) (my : α → m β) :
-    support (mx >>= my) = ⋃ x ∈ support mx, support (my x) := by
-  aesop (rule_sets := [UnfoldEvalDist])
+    support (mx >>= my) = ⋃ x ∈ support mx, support (my x) :=
+  HasEvalSet.toSet.toFun_bind' mx my
 
 @[grind =]
 lemma mem_support_bind_iff [HasEvalSet m] (mx : m α) (my : α → m β) (y : β) :
@@ -513,8 +513,8 @@ lemma probEvent_bind_le_add {mx : m α} {my : α → m β}
         split_ifs <;> simp
     _ = (∑' x, Pr[= x | mx]) * ε₂ + Pr[ fun x => ¬p x | mx] := by
         rw [ENNReal.tsum_add, ENNReal.tsum_mul_right, probEvent_eq_tsum_ite]
-    _ ≤ 1 * ε₂ + ε₁ := by
-        exact add_le_add (mul_le_mul' tsum_probOutput_le_one le_rfl) h₁
+    _ ≤ 1 * ε₂ + ε₁ :=
+        add_le_add (mul_le_mul' tsum_probOutput_le_one le_rfl) h₁
     _ = ε₁ + ε₂ := by ring
 
 /-- `probEvent` version of `probEvent_bind_mono` with additive error bound. -/
@@ -534,8 +534,8 @@ lemma probEvent_bind_congr_le_add {mx : m α} {my oc : α → m β}
     _ = (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ∑' x, Pr[= x | mx] * ε := ENNReal.tsum_add
     _ = (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + (∑' x, Pr[= x | mx]) * ε := by
         rw [ENNReal.tsum_mul_right]
-    _ ≤ (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ε := by
-        exact add_le_add le_rfl (mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one)
+    _ ≤ (∑' x, Pr[= x | mx] * Pr[ q | oc x]) + ε :=
+        add_le_add le_rfl (mul_le_of_le_one_left (zero_le _) tsum_probOutput_le_one)
 
 end congr_mono
 

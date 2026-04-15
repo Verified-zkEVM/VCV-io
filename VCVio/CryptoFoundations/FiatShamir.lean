@@ -233,8 +233,8 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
           (HasQuery.withAddCost
             (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
-            runtime costFn)] * val (costFn (msg, sig.1)) := by
-          exact HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
+            runtime costFn)] * val (costFn (msg, sig.1)) :=
+          HasQuery.expectedQueryCost_eq_tsum_outputs_of_usesCostAs
             (oa := fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
             (runtime := runtime) (costFn := costFn) (f := fun sig ↦ costFn (msg, sig.1))
@@ -284,8 +284,8 @@ theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [Ha
     (sig : Commit × Resp) (costFn : M × Commit → ω) (val : ω → ENNReal) (hval : Monotone val) :
     ExpectedQueryCost[
       (FiatShamir σ hr M).verify pk msg sig in runtime by costFn via val
-    ] = val (costFn (msg, sig.1)) := by
-  exact HasQuery.expectedQueryCost_eq_of_usesCostExactly
+    ] = val (costFn (msg, sig.1)) :=
+  HasQuery.expectedQueryCost_eq_of_usesCostExactly
     (verify_usesExactQueryCost
       (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (msg := msg)
       (sig := sig) (costFn := costFn))
@@ -321,6 +321,34 @@ def hashQueryBound {S' α : Type}
     (fun t b => match t with
       | .inl (.inl _) | .inr _ => b
       | .inl (.inr _) => b - 1)
+
+/-- Structural query bound for Fiat-Shamir EUF-CMA adversaries that tracks both
+signing-oracle queries (`qS`) and random-oracle queries (`qH`).
+Uniform-sampling queries are unrestricted. -/
+def signHashQueryBound {S' α : Type}
+    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α)
+    (qS qH : ℕ) : Prop :=
+  OracleComp.IsQueryBound oa (qS, qH)
+    (fun t b => match t, b with
+      | .inl (.inl _), _ => True
+      | .inl (.inr _), (_, qH') => 0 < qH'
+      | .inr _, (qS', _) => 0 < qS')
+    (fun t b => match t, b with
+      | .inl (.inl _), b' => b'
+      | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+      | .inr _, (qS', qH') => (qS' - 1, qH'))
+
+/-- Structural bound on random-oracle queries for an NMA adversary (no signing oracle).
+Uniform-sampling queries are unrestricted. -/
+def nmaHashQueryBound {α : Type}
+    (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
+  OracleComp.IsQueryBound oa Q
+    (fun t b => match t with
+      | .inl _ => True
+      | .inr _ => 0 < b)
+    (fun t b => match t with
+      | .inl _ => b
+      | .inr _ => b - 1)
 
 /-- Reciprocal of the finite challenge-space size. -/
 noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=
@@ -432,10 +460,10 @@ theorem perfectlyCorrect [DecidableEq M] [DecidableEq Commit] [SampleableType Ch
         (fun z => (liftM z : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal))
         (OracleQuery.liftM_add_right_query
           (spec₁ := unifSpec) (spec₂ := (M × Commit →ₒ Chal)) q)
-    simp_rw [hquery]
-    simp only [simulateQ_bind, simulateQ_pure, simulateQ_query,
-      QueryImpl.add_apply_inr,
-      OracleQuery.cont_query, OracleQuery.input_query, id_map]
+    have hSimQuery : ∀ (q : M × Commit),
+        simulateQ (idImpl + ro) (HasQuery.query q) = ro q := by
+      intro q; rw [hquery]; simp [simulateQ_query]
+    simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
     have hpeel : ∀ {α β : Type} (oa : ProbComp α)
         (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
         (s : (M × Commit →ₒ Chal).QueryCache),
@@ -526,36 +554,95 @@ theorem perfectlyCorrect [DecidableEq M] [DecidableEq Commit] [SampleableType Ch
             pure (σ.verify pk c r s))
           (post := fun y => if y = true then 1 else 0))
 
+/-- **CMA-to-NMA reduction via HVZK simulation.**
+
+For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
+random-oracle queries, there exists an NMA adversary `B` such that:
+
+  `Adv^{EUF-CMA}(A) ≤ Adv^{EUF-NMA}(B) + qS · ζ_zk`
+
+The NMA adversary `B` is constructed by replacing every signing-oracle answer with a
+simulated transcript produced by the HVZK simulator. Each replacement introduces at most
+`ζ_zk` total-variation distance, and a hybrid argument over `qS` queries yields the
+additive loss.
+
+This step is independent of special soundness and the forking lemma; those are handled
+by `euf_nma_bound`. -/
+theorem euf_cma_to_nma
+    [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk : ℝ) (_hζ : 0 ≤ ζ_zk)
+    (_hhvzk : σ.HVZK simTranscript ζ_zk)
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qS qH : ℕ)
+    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    ∃ nmaAdv : SignatureAlg.eufNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
+      adv.advantage (runtime M) ≤
+        nmaAdv.advantage (runtime M) + ENNReal.ofReal (qS * ζ_zk) := by
+  sorry
+
 set_option linter.unusedDecidableInType false
-/-- Pointcheval-Stern style Fiat-Shamir reduction statement.
+/-- **NMA-to-extraction via the forking lemma and special soundness.**
 
-To obtain a meaningful EUF-CMA theorem we need:
-* special soundness, to extract a witness from a successful fork;
-* a perfect HVZK simulator for the underlying Σ-protocol, to model signing without the witness;
-* a structural bound on hash-oracle queries.
+For any EUF-NMA adversary `B` making at most `qH` random-oracle queries, there exists a
+witness-extraction reduction such that:
 
-The intended conclusion is stated as the existence of a witness-finding
-reduction. The concrete Pointcheval-Stern reduction is not yet implemented in
-this file, so the proof below remains a placeholder.
+  `Adv^{EUF-NMA}(B) · (Adv^{EUF-NMA}(B) / (qH + 1) - 1/|Ω|) ≤ Pr[extraction succeeds]`
 
-THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT LOSS TERM
-FOR QUANTITATIVE HVZK. -/
-theorem euf_cma_bound
+The proof (future work) runs `B` twice with the same random tape but different random-oracle
+answers after a randomly chosen fork point. When both runs forge at the same hash query with
+distinct challenges, special soundness extracts a valid witness. -/
+theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
     (_hss : σ.SpeciallySound)
     [Fintype Chal]
+    (nmaAdv : SignatureAlg.eufNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qH : ℕ)
+    (_hQ : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := nmaAdv.main pk) qH) :
+    ∃ reduction : Stmt → ProbComp Wit,
+      (nmaAdv.advantage (runtime M) *
+          (nmaAdv.advantage (runtime M) / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
+        Pr[= true | hardRelationExp (r := rel) reduction] := by
+  sorry
+
+/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
+
+Composes `euf_cma_to_nma` and `euf_nma_bound`:
+
+1. Replace the signing oracle with the HVZK simulator, losing `qS · ζ_zk`.
+2. Apply the forking lemma to the resulting NMA adversary.
+
+The combined bound is:
+
+  `(ε - qS·ζ_zk) · ((ε - qS·ζ_zk) / (qH+1) - 1/|Ω|) ≤ Pr[extraction succeeds]`
+
+where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
+the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
+theorem euf_cma_bound
+    [DecidableEq M] [DecidableEq Commit] [DecidableEq Resp] [SampleableType Chal]
+    (hss : σ.SpeciallySound)
+    [Fintype Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (_hhvzk : σ.PerfectHVZK simTranscript)
+    (ζ_zk : ℝ) (hζ : 0 ≤ ζ_zk)
+    (hhvzk : σ.HVZK simTranscript ζ_zk)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qBound : ℕ)
-    (_hQ : ∀ pk, hashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (S' := Commit × Resp) (oa := adv.main pk) qBound) :
+    (qS qH : ℕ)
+    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
-      (adv.advantage (runtime M) *
-          (adv.advantage (runtime M) / (qBound + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
+      let eps := adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk)
+      (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp (r := rel) reduction] := by
-  -- TODO: implement the explicit Pointcheval-Stern reduction.
+  let _ := hss
+  let _ := hζ
+  let _ := hhvzk
+  let _ := hQ
   sorry
 
 end security

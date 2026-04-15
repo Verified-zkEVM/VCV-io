@@ -45,15 +45,15 @@ protected lemma liftM_def (q : OracleQuery spec α) :
 
 @[simp, grind .]
 lemma liftM_ne_pure (q : OracleQuery spec α) (x : α) :
-    liftM (n := OracleComp spec) q ≠ pure x := by aesop
+    liftM (n := OracleComp spec) q ≠ pure x := PFunctor.FreeM.lift_ne_pure q x
 
 @[simp, grind .]
 lemma pure_ne_liftM (x : α) (q : OracleQuery spec α) :
-    pure x ≠ liftM (n := OracleComp spec) q := by aesop
+    pure x ≠ liftM (n := OracleComp spec) q := PFunctor.FreeM.pure_ne_lift q x
 
 @[simp, grind =]
 protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
-    liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := by rfl
+    liftM (n := OracleComp spec) (f <$> q) = f <$> liftM q := rfl
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[inline]
@@ -201,14 +201,13 @@ lemma query_eq_pure_iff_false : (query t : OracleComp spec _) = pure u ↔ False
 end noConfusion
 
 /-- Given a computation `oa : OracleComp spec α`, construct a value `x : α`,
-by assuming each query returns the `default` value given by the `Inhabited` instance.
-Returns `none` if the default path would lead to failure. -/
-def defaultResult [spec.Inhabited] (oa : OracleComp spec α) : Option α :=
-  PFunctor.FreeM.mapM (fun _ => default) oa
+by assuming each query returns the `default` value given by the `Inhabited` instance. -/
+def defaultResult [spec.Inhabited] (oa : OracleComp spec α) : α :=
+  PFunctor.FreeM.mapM (m := Id) (fun _ => default) oa
 
 /-- Total number of queries in a computation across all possible execution paths.
 Can be a helpful alternative to `sizeOf` when proving recursive calls terminate. -/
-def totalQueries [spec.Fintype] [spec.Inhabited] {α : Type v} (oa : OracleComp spec α) : ℕ := by
+def totalQueries [spec.Fintype] {α : Type v} (oa : OracleComp spec α) : ℕ := by
   induction oa using OracleComp.construct with
   | pure x => exact 0
   | query_bind t oa rec_n => exact 1 + ∑ x, rec_n x
@@ -224,8 +223,7 @@ and the second computation does something pure with the result. -/
 @[simp] lemma bind_eq_pure_iff (oa : OracleComp spec α) (ob : α → OracleComp spec β) (y : β) :
     oa >>= ob = pure y ↔ ∃ x : α, oa = pure x ∧ ob x = pure y := by
   refine ⟨fun h ↦ ?_, fun h ↦ let ⟨x, ⟨h, h'⟩⟩ := h; h ▸ h'⟩
-  simp only [PFunctor.FreeM.monad_bind_def, OracleComp.pure_def] at h
-  rwa [PFunctor.FreeM.bind_eq_pure_iff] at h
+  exact (PFunctor.FreeM.bind_eq_pure_iff oa ob y).mp h
 
 /-- Binding two computations gives a pure operation iff the first computation is pure
 and the second computation does something pure with the result. -/

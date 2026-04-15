@@ -274,8 +274,8 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
               true)
     _ = Pr[= true | do
           let pk ← ($ᵗ G : ProbComp G)
-          ($ᵗ Bool : ProbComp Bool)] := by
-      exact probOutput_bind_congr' ($ᵗ G) true (fun pk => by
+          ($ᵗ Bool : ProbComp Bool)] :=
+      probOutput_bind_congr' ($ᵗ G) true (fun pk => by
         simpa [probOutput_uniformSample] using hhalf pk)
     _ = 1 / 2 := by
       rw [probOutput_bind_eq_tsum]
@@ -316,8 +316,8 @@ theorem elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
         Pr[= true | AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
           (encAlg := elGamalAsymmEnc F G gen) adv] =
         Pr[= true | DiffieHellman.ddhExpReal (F := F) gen
-          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] := by
-      exact probOutput_congr rfl (IND_CPA_OneTime_game_evalDist_eq_ddhExpReal adv)
+          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] :=
+      probOutput_congr rfl (IND_CPA_OneTime_game_evalDist_eq_ddhExpReal adv)
     simpa [AsymmEncAlg.IND_CPA_OneTime_signedAdvantageReal] using
       congrArg (fun p : ℝ≥0∞ => |p.toReal - 1 / 2|) hprob
   have h_rand : (1 : ℝ) / 2 =
@@ -348,8 +348,8 @@ theorem elGamal_IND_CPA_le_q_mul_ddh
     |AsymmEncAlg.IND_CPA_OneTime_signedAdvantageReal
         (encAlg := elGamalAsymmEnc F G gen) adv|
       = 2 * DiffieHellman.ddhGuessAdvantage gen
-          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) := by
-            exact elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
+          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv) :=
+            elGamal_oneTime_signedAdvantageReal_abs_eq_two_mul_ddhGuessAdvantage
               (F := F) (G := G) (gen := gen) hg adv
     _ ≤ 2 * ε := by
         linarith [hddh adv]

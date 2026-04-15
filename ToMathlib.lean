@@ -2,6 +2,7 @@ import ToMathlib.Control.AlternativeMonad
 import ToMathlib.Control.Comonad.Basic
 import ToMathlib.Control.Comonad.Cofree
 import ToMathlib.Control.Comonad.Instances
+import ToMathlib.Control.Lawful.Basic
 import ToMathlib.Control.Lawful.MonadControl
 import ToMathlib.Control.Lawful.MonadFunctor
 import ToMathlib.Control.Lawful.MonadReader
@@ -25,6 +26,9 @@ import ToMathlib.Control.StateT
 import ToMathlib.Control.WriterT
 import ToMathlib.Data.ENNReal.AbsDiff
 import ToMathlib.Data.ENNReal.SumSquares
+import ToMathlib.Data.IndexedBinaryTree.Basic
+import ToMathlib.Data.IndexedBinaryTree.Equiv
+import ToMathlib.Data.IndexedBinaryTree.Lemmas
 import ToMathlib.General
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic

@@ -139,8 +139,8 @@ lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
     rw [this]
     exact isClosed_iInter fun b => isClosed_eq (continuous_finset_sum _
       (fun a _ => continuous_apply _)) continuous_const
-  have h5 : IsClosed {c : Option (α × β) → ℝ | c none = 1 - (∑ z, c (some z))} := by
-    exact isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finset_sum _
+  have h5 : IsClosed {c : Option (α × β) → ℝ | c none = 1 - (∑ z, c (some z))} :=
+    isClosed_eq (continuous_apply _) (continuous_const.sub (continuous_finset_sum _
       (fun z _ => continuous_apply _)))
   exact (((h1.inter h2).inter h3).inter h4).inter h5
 
@@ -208,8 +208,8 @@ private lemma exists_coupling_of_mem_couplings_set {p : SPMF α} {q : SPMF β}
     {c : Option (α × β) → ℝ} (hc : c ∈ couplings_set p q) :
     ∃ c' : SPMF.Coupling p q, ∀ z, (c'.1.1 z).toReal = c z := by
   rcases hc with ⟨h_nonneg, _, h_row, h_col, h_none⟩
-  have h_total_real : ∑ z : Option (α × β), c z = 1 := by
-    exact sum_option_eq_one_of_none_eq_sub h_nonneg h_none
+  have h_total_real : ∑ z : Option (α × β), c z = 1 :=
+    sum_option_eq_one_of_none_eq_sub h_nonneg h_none
   have h_total :
       ∑ z : Option (α × β), ENNReal.ofReal (c z) = 1 := by
     calc
@@ -320,10 +320,10 @@ lemma SPMF.exists_max_coupling {p : SPMF α} {q : SPMF β}
   apply le_antisymm
   · refine iSup_le ?_
     intro c'
-    have hc'_in : (fun z => (c'.1.1 z).toReal) ∈ couplings_set p q := by
-      exact mem_couplings_set_of_isCoupling c'.1 c'.2
-    have hmax_real : F (fun z => (c'.1.1 z).toReal) ≤ F c_max := by
-      exact (isMaxOn_iff.mp hc_max_prop) _ hc'_in
+    have hc'_in : (fun z => (c'.1.1 z).toReal) ∈ couplings_set p q :=
+      mem_couplings_set_of_isCoupling c'.1 c'.2
+    have hmax_real : F (fun z => (c'.1.1 z).toReal) ≤ F c_max :=
+      (isMaxOn_iff.mp hc_max_prop) _ hc'_in
     have h_obj_left :
         (∑' z, c'.1.1 z * f z) = ENNReal.ofReal (F (fun z => (c'.1.1 z).toReal)) := by
       simpa [F] using (objective_eq_ofReal c'.1 f hf)

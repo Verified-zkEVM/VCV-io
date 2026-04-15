@@ -35,7 +35,24 @@ noncomputable instance (m : Type u → Type v) [Monad m] [HasEvalSet m] :
     HasEvalSet (OptionT m) where
   toSet.toFun α mx := some ⁻¹' (support (OptionT.run mx))
   toSet.toFun_pure' mx := Set.ext fun x => by simp
-  toSet.toFun_bind' mx my := Set.ext fun x => by simp [Option.elimM, Option.exists]
+  toSet.toFun_bind' mx my := Set.ext fun x => by
+    rw [Set.mem_preimage]
+    calc
+      some x ∈ support (OptionT.run (mx >>= my)) ↔
+          ∃ a ∈ support mx.run, some x ∈ support (a.elim (pure none) fun x => (my x).run) := by
+            rw [OptionT.run_bind, Option.elimM, mem_support_bind_iff]
+      _ ↔ ∃ a, some a ∈ support mx.run ∧ some x ∈ support (my a).run := by
+            constructor
+            · rintro ⟨a, ha, hx⟩
+              cases a with
+              | none =>
+                  simp at hx
+              | some a =>
+                  exact ⟨a, ha, by simpa using hx⟩
+            · rintro ⟨a, ha, hx⟩
+              exact ⟨some a, ha, by simpa using hx⟩
+      _ ↔ x ∈ ⋃ a ∈ some ⁻¹' support mx.run, some ⁻¹' support (my a).run := by
+            simp only [Set.mem_iUnion, Set.mem_preimage, exists_prop]
 
 variable [HasEvalSet m]
 

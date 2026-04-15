@@ -184,12 +184,12 @@ def coeffMatTransposeVecMul {rows cols : Nat}
   ops.unhatVec (ops.matTransposeVecMul A (ops.hatVec v))
 
 @[simp] theorem hatVec_get {k : Nat} (v : PolyVec ring.Poly k) (i : Fin k) :
-    (ops.hatVec v).get i = ops.toHat (v.get i) := by
-  exact Vector.get_map v ops.toHat i
+    (ops.hatVec v).get i = ops.toHat (v.get i) :=
+  Vector.get_map v ops.toHat i
 
 @[simp] theorem unhatVec_get {k : Nat} (v : PolyVec Hat k) (i : Fin k) :
-    (ops.unhatVec v).get i = ops.fromHat (v.get i) := by
-  exact Vector.get_map v ops.fromHat i
+    (ops.unhatVec v).get i = ops.fromHat (v.get i) :=
+  Vector.get_map v ops.fromHat i
 
 /-- Algebraic laws asserting that a `TransformOps` instance is a ring isomorphism.
 

@@ -174,7 +174,9 @@ end ExpectedCost
 
 /-! ## Worst-Case Cost Bounds -/
 
-/-- Every execution path of `oa` under `cm` has total cost at most `bound`. -/
+/-- Every execution path of `oa` under `cm` has total cost at most `bound`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def WorstCaseCostBound [AddCommMonoid ω] [Preorder ω]
     (oa : OracleComp spec α) (cm : CostModel spec ω) (bound : ω) : Prop :=
   AddWriterT.PathwiseCostAtMost (instrumentedRun oa cm) bound
@@ -194,7 +196,9 @@ section CostBounds
 variable [AddCommMonoid ω]
 variable [spec.Fintype] [spec.Inhabited]
 
-/-- The expected cost of `oa` under `cm` (valued by `val`) is at most `bound`. -/
+/-- The expected cost of `oa` under `cm` (valued by `val`) is at most `bound`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def ExpectedCostBound (oa : OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℝ≥0∞) (bound : ℝ≥0∞) : Prop :=
   expectedCost oa cm val ≤ bound
@@ -297,7 +301,7 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
       exact ⟨u, mem_support_query t u, by simp⟩
     simp [OracleQuery.cont_query, CostModel.unit]
   · rw [support_map]
-    exact ⟨z, hz, by ext <;> simp [Prod.map, Nat.add_comm]⟩
+    exact ⟨z, hz, by ext <;> simp [Nat.add_comm]⟩
 
 private theorem isPerIndexQueryBound_of_unit_support_bound
     [DecidableEq ι] [spec.Inhabited]
@@ -461,12 +465,16 @@ section PolyTime
 variable [AddCommMonoid ω]
 variable [spec.Fintype] [spec.Inhabited]
 
-/-- All execution paths of `family n` have valued cost at most `p(n)` for some polynomial `p`. -/
+/-- All execution paths of `family n` have valued cost at most `p(n)` for some polynomial `p`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def WorstCasePolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℕ) : Prop :=
   ∃ p : Polynomial ℕ, ∀ n z, z ∈ support (costDist (family n) cm) → val z.2 ≤ p.eval n
 
-/-- Expected valued cost of `family n` is at most `p(n)` for some polynomial `p`. -/
+/-- Expected valued cost of `family n` is at most `p(n)` for some polynomial `p`.
+
+Currently unused outside this file; retained as scaffolding for future asymptotic analyses. -/
 def ExpectedPolyTime (family : ℕ → OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℝ≥0∞) : Prop :=
   ∃ p : Polynomial ℕ, ∀ n, expectedCost (family n) cm val ≤ ↑(p.eval n)

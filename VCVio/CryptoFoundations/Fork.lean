@@ -617,8 +617,8 @@ private lemma probOutput_collision_given_seed_le (s : Fin (qb i + 1))
       ≤ Pr[= x₁ | (simulateQ seededOracle main).run' seed] *
           (Pr[= (some s : Option (Fin (qb i + 1))) |
             (pure (cf x₁) : OracleComp spec (Option (Fin (qb i + 1))))] *
-            (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹) := by
-          exact mul_le_mul' le_rfl hterm
+            (↑(Fintype.card (spec.Range i)) : ℝ≥0∞)⁻¹) :=
+          mul_le_mul' le_rfl hterm
     _ = Pr[= x₁ | (simulateQ seededOracle main).run' seed] *
           Pr[= (some s : Option (Fin (qb i + 1))) |
             (pure (cf x₁) : OracleComp spec (Option (Fin (qb i + 1))))] *
@@ -693,8 +693,8 @@ private lemma probOutput_collision_le_main_div (s : Fin (qb i + 1)) :
             cf <$> (simulateQ seededOracle main).run' seed] /
           ↑(Fintype.card (spec.Range i)))) =
       Pr[= (some s : Option (Fin (qb i + 1))) | cf <$> main] /
-        ↑(Fintype.card (spec.Range i)) := by
-    exact hStep2.trans <| hStep3.trans <| by rw [hSeed]
+        ↑(Fintype.card (spec.Range i)) :=
+    hStep2.trans <| hStep3.trans <| by rw [hSeed]
   exact hChain ▸ hStep1
 
 omit [spec.DecidableEq] in
@@ -1041,8 +1041,8 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                   if cf a_1.1 = some s then
                     pure (some (a.1, a_1.1))
                   else
-                    pure none) := by
-              exact if_neg hu''
+                    pure none) :=
+              if_neg hu''
             have hmono' :
                 Pr[= z |
                   (simulateQ seededOracle main).run ((seed.takeAtIndex i ↑s).addValue i u) >>=
@@ -1089,8 +1089,8 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
                     Pr[= (some s : Option (Fin (qb i + 1))) |
                       if (seed i)[↑s]? = some u then
                         (pure (some s) : OracleComp spec (Option (Fin (qb i + 1))))
-                      else pure none] := by
-              exact le_add_of_nonneg_right (zero_le _)
+                      else pure none] :=
+              le_add_of_nonneg_right (zero_le _)
             exact le_trans hmono' hadd
         · have hts' : (some t : Option (Fin (qb i + 1))) ≠ some s := by
             simpa using hts
@@ -1113,8 +1113,8 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
           exact zero_le _
   have hNoGuardMinusLeRhs :
       Pr[= z | noGuardComp] - Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] ≤
-        Pr[= z | f <$> fork main qb js i cf] := by
-    exact (tsub_le_iff_right).2 hNoGuardLeAdd
+        Pr[= z | f <$> fork main qb js i cf] :=
+    (tsub_le_iff_right).2 hNoGuardLeAdd
   have hNoGuardGeSquare :
       Pr[= s | cf <$> main] ^ 2 ≤ Pr[= z | noGuardComp] := by
     simpa [z, noGuardComp] using
@@ -1254,8 +1254,8 @@ theorem le_probEvent_isSome_fork :
           (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
            let h : ℝ≥0∞ := Fintype.card (spec.Range i)
            let q := qb i + 1
-           acc * (acc / q - h⁻¹)) ≤ 1 := by
-    exact (ENNReal.le_sub_iff_add_le_right hpre_ne_top hpre_le_one).1
+           acc * (acc / q - h⁻¹)) ≤ 1 :=
+    (ENNReal.le_sub_iff_add_le_right hpre_ne_top hpre_le_one).1
       (probOutput_none_fork_le (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
   exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
     (by simpa [add_comm] using hfork)

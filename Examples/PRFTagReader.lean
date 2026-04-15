@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.PRF
+import VCVio.OracleComp.SimSemantics.PreservesInv
 
 /-!
 # PRF Tag/Reader Protocol
@@ -481,12 +482,135 @@ theorem authExp_le_prfAdvantage_add_authIdeal
           (Digest := Digest) adversary]).toReal := by
   sorry
 
+omit [Nonempty TagId] in
 /-- In the ideal authentication world, a forged reader acceptance never occurs. -/
 theorem authIdealExp_eq_zero
     (adversary : AuthAdversary TagId Nonce Digest) :
     Pr[= true | authIdealExp (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) adversary] = 0 := by
-  sorry
+  let ForgedInv : AuthIdealState TagId Nonce Digest → Prop := fun st => st.readerForged = ∅
+  let CacheInv : AuthIdealState TagId Nonce Digest → Prop := fun st =>
+    ∀ tag nonce auth, st.responses (tag, nonce) = some auth →
+      (tag, ({ nonce := nonce, auth := auth } : TagTranscript Nonce Digest)) ∈ st.honestOutputs
+  have htagForged :
+      QueryImpl.PreservesInv
+        (authIdealTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+        ForgedInv := by
+    intro tag st hst z hz
+    unfold authIdealTagQueryImpl at hz
+    simp only [bind_pure_comp, pure_bind, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
+      monadLift_eq_self, bind_map_left, support_bind, support_uniformSample, Set.mem_univ,
+      Set.iUnion_true, Set.mem_iUnion] at hz
+    rcases hz with ⟨i, hz⟩
+    cases hresp : st.responses (tag, i) with
+    | none =>
+      simp only [hresp, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self, bind_pure_comp,
+        StateT.run_map, StateT.run_set, map_pure, Functor.map_map, support_map,
+        support_uniformSample, Set.image_univ, Set.mem_range] at hz
+      grind
+    | some out =>
+      simp only [hresp, StateT.run_map, StateT.run_set, map_pure, support_pure,
+        Set.mem_singleton_iff] at hz
+      grind
+  have htagCached :
+      QueryImpl.PreservesInv
+        (authIdealTagQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+        CacheInv := by
+    intro tag st hst z hz
+    unfold authIdealTagQueryImpl at hz
+    simp only [bind_pure_comp, pure_bind, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
+      monadLift_eq_self, bind_map_left, support_bind, support_uniformSample, Set.mem_univ,
+      Set.iUnion_true, Set.mem_iUnion] at hz
+    rcases hz with ⟨nonce, hz⟩
+    cases hresp : st.responses (tag, nonce) with
+    | none =>
+      simp only [hresp, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self, bind_pure_comp,
+        StateT.run_map, StateT.run_set, map_pure, Functor.map_map, support_map,
+        support_uniformSample, Set.image_univ, Set.mem_range] at hz
+      rcases hz with ⟨auth, rfl⟩
+      intro tag' nonce' auth' hlookup
+      by_cases hkey : (tag', nonce') = (tag, nonce)
+      · cases hkey
+        simp only [QueryCache.cacheQuery_self, Option.some.injEq] at hlookup
+        subst auth'
+        simp
+      · have hlookup' : st.responses (tag', nonce') = some auth' := by
+          simpa [QueryCache.cacheQuery_of_ne (cache := st.responses) auth hkey] using hlookup
+        exact Finset.mem_insert_of_mem (hst tag' nonce' auth' hlookup')
+    | some out =>
+      simp only [hresp, StateT.run_map, StateT.run_set, map_pure, support_pure,
+        Set.mem_singleton_iff] at hz
+      rcases hz with rfl
+      intro tag' nonce' auth' hlookup
+      exact Finset.mem_insert_of_mem (hst tag' nonce' auth' hlookup)
+  have hreaderForged :
+      ∀ transcript st, ForgedInv st ∧ CacheInv st →
+        ∀ z ∈
+            support
+              (((authIdealReaderQueryImpl
+                  (TagId := TagId) (Nonce := Nonce) (Digest := Digest)) transcript).run st),
+          ForgedInv z.2 := by
+    intro transcript st hst z hz
+    have hz' := hz
+    have hcached := hst.2
+    unfold authIdealReaderQueryImpl at hz'
+    simp only [bind_pure_comp, StateT.run_bind, StateT.run_get, StateT.run_map, StateT.run_set,
+      map_pure, support_pure, Set.mem_singleton_iff] at hz'
+    rcases hz' with rfl
+    unfold ForgedInv at *
+    have hnewForged :
+        ((Finset.univ.filter fun tag =>
+          st.responses (tag, transcript.nonce) = some transcript.auth).filter fun tag =>
+            (tag, transcript) ∉ st.honestOutputs) = ∅ := by
+      ext tag
+      constructor
+      · intro hmem
+        simp only [Finset.mem_filter, Finset.mem_univ, true_and] at hmem
+        rcases hmem with ⟨hmatch, hnotmem⟩
+        simpa using (False.elim (hnotmem (hcached tag transcript.nonce transcript.auth hmatch)))
+      · intro hmem
+        simp at hmem
+    rw [hst.1, hnewForged, Finset.image_empty, Finset.empty_union]
+  have hreaderCached :
+      QueryImpl.PreservesInv
+        (authIdealReaderQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+        CacheInv := by
+    intro transcript st hst z hz
+    unfold authIdealReaderQueryImpl at hz
+    simp only [bind_pure_comp, StateT.run_bind, StateT.run_get, StateT.run_map, StateT.run_set,
+      map_pure, support_pure, Set.mem_singleton_iff] at hz
+    rcases hz with rfl
+    exact hst
+  have himpl :
+      QueryImpl.PreservesInv
+        (authIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+        (fun st => ForgedInv st ∧ CacheInv st) := by
+    intro t st hst z hz
+    cases t with
+    | inl tag =>
+        exact (QueryImpl.PreservesInv.and htagForged htagCached) tag st hst z hz
+    | inr transcript =>
+        exact ⟨hreaderForged transcript st hst z hz, hreaderCached transcript st hst.2 z hz⟩
+  have hfinal :
+      ∀ z ∈
+          support
+            ((simulateQ
+                (authIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+                adversary).run AuthIdealState.init),
+        z.2.readerForged = ∅ := by
+    intro z hz
+    have hz' :=
+      OracleComp.simulateQ_run_preservesInv
+        (authIdealQueryImpl (TagId := TagId) (Nonce := Nonce) (Digest := Digest))
+        (fun st => ForgedInv st ∧ CacheInv st) himpl adversary AuthIdealState.init
+        (by simp [ForgedInv, CacheInv, AuthIdealState.init]) z hz
+    grind
+  refine (probOutput_eq_zero_iff
+    (mx := authIdealExp (TagId := TagId) (Nonce := Nonce) (Digest := Digest) adversary)
+    (x := true)).mpr ?_
+  intro hmem
+  rw [authIdealExp, mem_support_bind_iff] at hmem
+  grind
 
 /-- Unlinkability reduction statement: the multiple-vs-single gap is bounded by one PRF advantage
 for the multiple-session world, one PRF advantage for the single-session world, and the bad-event

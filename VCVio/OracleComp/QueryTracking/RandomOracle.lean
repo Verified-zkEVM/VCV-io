@@ -151,7 +151,7 @@ private lemma eagerRandomOracle_run'_cons {ι₀ : Type} [DecidableEq ι₀]
         | v :: vs => pure (v, Function.update seed t vs)
         | [] => (·, seed) <$> ($ᵗ spec₀.Range t)) = _
     rw [ht]
-  rw [h, pure_bind]; rfl
+  rw [h]; rfl
 
 /-- The eager random oracle, averaged over a uniformly sampled seed, matches the
 fresh independent-query semantics of `evalDist`. This is because the pre-sampled

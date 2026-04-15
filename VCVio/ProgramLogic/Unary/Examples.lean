@@ -71,7 +71,7 @@ example (x : ExceptT ε m α) (f : α → ExceptT ε m β) (post : β → L) :
 example [MAlgOrdered (OptionT m) L] (x : OptionT m α) (f : α → OptionT m β) (post : β → L) :
     MAlgOrdered.wp (m := OptionT m) (l := L) (x >>= f) post =
       MAlgOrdered.wp (m := OptionT m) (l := L) x
-        (fun a => MAlgOrdered.wp (m := OptionT m) (l := L) (f a) post) := by
-  exact (MAlgOrdered.wp_bind (m := OptionT m) (l := L) x f post)
+        (fun a => MAlgOrdered.wp (m := OptionT m) (l := L) (f a) post) :=
+  (MAlgOrdered.wp_bind (m := OptionT m) (l := L) x f post)
 
 end MAlgOrdered

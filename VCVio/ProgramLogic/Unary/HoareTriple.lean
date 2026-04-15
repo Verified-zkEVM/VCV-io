@@ -61,14 +61,13 @@ private lemma μ_bind_eq_tsum {α : Type}
           refine tsum_congr ?_
           intro y
           rw [mul_assoc]
-    _ = ∑' x, Pr[= x | oa] * μ (ob x) := by
-          rfl
+    _ = ∑' x, Pr[= x | oa] * μ (ob x) := rfl
 
 noncomputable instance instMAlgOrdered :
     MAlgOrdered (OracleComp spec) ℝ≥0∞ where
   μ := μ (spec := spec)
   μ_pure x := by
-    classical
+    haveI : DecidableEq ℝ≥0∞ := Classical.decEq _
     simp [μ, probOutput_pure]
   μ_bind_mono f g hfg x := by
     rw [μ_bind_eq_tsum (oa := x) (ob := f), μ_bind_eq_tsum (oa := x) (ob := g)]
@@ -170,7 +169,7 @@ theorem wp_eq_tsum (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
   rw [μ_bind_eq_tsum]
   refine tsum_congr fun x => ?_
   have : μ (pure (post x) : OracleComp spec ℝ≥0∞) = post x := by
-    classical
+    haveI : DecidableEq ℝ≥0∞ := Classical.decEq _
     simp [μ, probOutput_pure]
   rw [this]
 
@@ -286,8 +285,8 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
               simp [μ, probOutput_pure]
             have hprob :
                 Pr[= u | (liftM (query t) : OracleComp spec (spec.Range t))] =
-                  (1 / Fintype.card (spec.Range t) : ℝ≥0∞) := by
-              exact (probOutput_query_eq_div (spec := spec) t u)
+                  (1 / Fintype.card (spec.Range t) : ℝ≥0∞) :=
+              (probOutput_query_eq_div (spec := spec) t u)
             rw [hμ]
             simp [hprob]
 

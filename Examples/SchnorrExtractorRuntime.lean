@@ -89,9 +89,11 @@ private theorem challengeSample_queryCostExactly_one :
       1 := by
   letI : SampleableType F := FinEnum.SampleableType F
   haveI : NeZero (FinEnum.card F) := ⟨FinEnum.card_ne_zero (α := F)⟩
-  simpa [uniformSample, SampleableType.ofEquiv, FinEnum.SampleableType, simulateQ_map] using
-    (AddWriterT.queryCostExactly_map (FinEnum.equiv (α := F)).symm
-      (finUniformSample_queryCostExactly_one (n := FinEnum.card F)))
+  show AddWriterT.QueryCostExactly (probCompUnitQueryRun
+    (FinEnum.equiv (α := F).symm <$> ($ᵗ Fin (FinEnum.card F) : ProbComp _))) 1
+  simp only [probCompUnitQueryRun, simulateQ_map]
+  exact AddWriterT.queryCostExactly_map (FinEnum.equiv (α := F)).symm
+    (finUniformSample_queryCostExactly_one (n := FinEnum.card F))
 
 end runtime
 
