@@ -196,9 +196,9 @@ Lawfulness is stratified into a class hierarchy:
 - `IsLawfulMap` / `IsLawfulPar` / `IsLawfulWire` / `IsLawfulPlug`:
   functoriality of `map` and naturality of combinators.
 - `IsLawful`: bundles all naturality laws.
-- `IsMonoidal`: symmetric monoidal coherence for `par` (associativity,
+- `Monoidal`: symmetric monoidal coherence for `par` (associativity,
   commutativity, left/right unit laws via a distinguished `unit` object).
-- `IsCompactClosed`: compact closed structure with `idWire` as coevaluation,
+- `CompactClosed`: compact closed structure with `idWire` as coevaluation,
   derivation of `plug` from `wire`, and a zig-zag identity (`wire_idWire`).
 
 `OpenProcessIso` (in `OpenProcess.lean`) provides a bisimulation-based
@@ -315,10 +315,10 @@ import VCVio.Interaction.Concurrent.Process
 | File | Purpose |
 |------|---------|
 | `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`compUnit`, tensor/swap |
-| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `IsMonoidal`, `IsCompactClosed` |
+| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `Monoidal`, `CompactClosed` |
 | `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/CC equations) |
-| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), `IsMonoidal`/`IsCompactClosed` instances |
-| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), `IsMonoidal`/`IsCompactClosed` instances, `Expr.toInterp` |
+| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), `Monoidal`/`CompactClosed` instances |
+| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), `Monoidal`/`CompactClosed` instances, `Expr.toInterp` |
 | `OpenProcess.lean` | `BoundaryAction`, `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
 | `OpenProcessModel.lean` | `openTheory` (concrete model), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |

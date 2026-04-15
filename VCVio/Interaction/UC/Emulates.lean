@@ -144,7 +144,7 @@ end Emulates
 
 section Factorization
 
-variable [OpenTheory.IsCompactClosed T]
+variable [OpenTheory.CompactClosed T]
 
 /-- The effective plug for the left component of a parallel composition.
 
@@ -305,7 +305,7 @@ end Factorization
 
 namespace Emulates
 
-variable [OpenTheory.IsCompactClosed T]
+variable [OpenTheory.CompactClosed T]
 
 /-- Replacing the left component of a parallel composition preserves
 emulation, with the right component and environment held fixed. -/

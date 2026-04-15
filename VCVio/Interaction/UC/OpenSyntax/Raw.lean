@@ -278,10 +278,10 @@ theorem Equiv.interpret_eq
     {e₁ e₂ : Raw Atom Δ}
     (h : Equiv e₁ e₂)
     (T : OpenTheory)
-    [OpenTheory.IsCompactClosed T]
+    [OpenTheory.CompactClosed T]
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    e₁.interpret T interp OpenTheory.IsCompactClosed.idWire =
-      e₂.interpret T interp OpenTheory.IsCompactClosed.idWire := by
+    e₁.interpret T interp OpenTheory.CompactClosed.idWire =
+      e₂.interpret T interp OpenTheory.CompactClosed.idWire := by
   induction h with
   | refl => rfl
   | symm _ ih => exact ih.symm
@@ -309,6 +309,9 @@ theorem Equiv.interpret_eq
   | congr_map _ ih => simp only [interpret_map]; rw [ih]
   | congr_par _ _ ih₁ ih₂ => simp only [interpret_par]; rw [ih₁, ih₂]
   | congr_wire _ _ ih₁ ih₂ => simp only [interpret_wire]; rw [ih₁, ih₂]
+
+attribute [symm] Equiv.symm
+attribute [trans] Equiv.trans
 
 /--
 The `Setoid` on `Raw Atom Δ` induced by `Raw.Equiv`.

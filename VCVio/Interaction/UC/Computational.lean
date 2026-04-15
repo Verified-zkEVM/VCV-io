@@ -160,7 +160,7 @@ theorem mono {sem : Semantics T} {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
 
 /-- Replacing the left component of a parallel composition preserves the
 computational emulation bound. -/
-theorem par_left [OpenTheory.IsCompactClosed T]
+theorem par_left [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε : ℝ}
     {Δ₁ Δ₂ : PortBoundary}
     {real₁ ideal₁ : T.Obj Δ₁}
@@ -173,7 +173,7 @@ theorem par_left [OpenTheory.IsCompactClosed T]
 
 /-- Replacing the right component of a parallel composition preserves the
 computational emulation bound. -/
-theorem par_right [OpenTheory.IsCompactClosed T]
+theorem par_right [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε : ℝ}
     {Δ₁ Δ₂ : PortBoundary}
     (W₁ : T.Obj Δ₁)
@@ -185,7 +185,7 @@ theorem par_right [OpenTheory.IsCompactClosed T]
     exact h₂ _
 
 /-- **Computational UC composition for `par`**: advantages add. -/
-theorem par_compose [OpenTheory.IsCompactClosed T]
+theorem par_compose [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε₁ ε₂ : ℝ}
     {Δ₁ Δ₂ : PortBoundary}
     {real₁ ideal₁ : T.Obj Δ₁} {real₂ ideal₂ : T.Obj Δ₂}
@@ -196,7 +196,7 @@ theorem par_compose [OpenTheory.IsCompactClosed T]
 
 /-- Replacing the left factor of a wiring preserves the computational
 emulation bound. -/
-theorem wire_left [OpenTheory.IsCompactClosed T]
+theorem wire_left [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε : ℝ}
     {Δ₁ Γ Δ₂ : PortBoundary}
     {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
@@ -209,7 +209,7 @@ theorem wire_left [OpenTheory.IsCompactClosed T]
 
 /-- Replacing the right factor of a wiring preserves the computational
 emulation bound. -/
-theorem wire_right [OpenTheory.IsCompactClosed T]
+theorem wire_right [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε : ℝ}
     {Δ₁ Γ Δ₂ : PortBoundary}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
@@ -221,7 +221,7 @@ theorem wire_right [OpenTheory.IsCompactClosed T]
     exact h₂ _
 
 /-- **Computational UC composition for `wire`**: advantages add. -/
-theorem wire_compose [OpenTheory.IsCompactClosed T]
+theorem wire_compose [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε₁ ε₂ : ℝ}
     {Δ₁ Γ Δ₂ : PortBoundary}
     {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
@@ -234,7 +234,7 @@ theorem wire_compose [OpenTheory.IsCompactClosed T]
 /-- **Computational UC composition for `plug`**: when both the protocol
 and the environment emulate their ideals, the advantage of the closed
 real system vs. closed ideal system is bounded by the sum. -/
-theorem plug_compose [OpenTheory.IsCompactClosed T]
+theorem plug_compose [OpenTheory.CompactClosed T]
     {sem : Semantics T} {ε₁ ε₂ : ℝ}
     {Δ : PortBoundary}
     {real ideal : T.Obj Δ}
@@ -360,7 +360,7 @@ advantage is negligible, then the parallel composition also has negligible
 advantage. -/
 theorem AsympCompEmulates.par_compose
     {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
-    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    [∀ n, OpenTheory.CompactClosed (T n)]
     {Δ₁ Δ₂ : PortBoundary}
     {real₁ ideal₁ : ∀ n, (T n).Obj Δ₁}
     {real₂ ideal₂ : ∀ n, (T n).Obj Δ₂}
@@ -386,7 +386,7 @@ advantage is negligible, then the wired composition also has negligible
 advantage. -/
 theorem AsympCompEmulates.wire_compose
     {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
-    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    [∀ n, OpenTheory.CompactClosed (T n)]
     {Δ₁ Γ Δ₂ : PortBoundary}
     {real₁ ideal₁ : ∀ n, (T n).Obj (PortBoundary.tensor Δ₁ Γ)}
     {real₂ ideal₂ :
@@ -414,7 +414,7 @@ distinguishing advantage of the closed real vs. closed ideal system
 is negligible. -/
 theorem AsympCompEmulates.plug_compose
     {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
-    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    [∀ n, OpenTheory.CompactClosed (T n)]
     {Δ : PortBoundary}
     {real ideal : ∀ n, (T n).Obj Δ}
     {K_real K_ideal : ∀ n, (T n).Obj (PortBoundary.swap Δ)}
