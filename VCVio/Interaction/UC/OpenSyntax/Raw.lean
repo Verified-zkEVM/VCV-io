@@ -249,6 +249,11 @@ inductive Equiv {Atom : PortBoundary → Type u} :
       Equiv
         (.wire (.idWire Γ) e₂)
         e₂
+  | wire_idWire_right {Γ Δ₁ : PortBoundary}
+      {e₁ : Raw Atom (PortBoundary.tensor Δ₁ Γ)} :
+      Equiv
+        (.wire e₁ (.idWire Γ))
+        e₁
   | congr_map {Δ₁ Δ₂ : PortBoundary}
       {f : PortBoundary.Hom Δ₁ Δ₂}
       {e₁ e₂ : Raw Atom Δ₁} :
@@ -300,6 +305,7 @@ theorem Equiv.interpret_eq
     rw [← OpenTheory.unit_eq (T := T)]
     exact OpenTheory.par_rightUnit _
   | wire_idWire => simp [interpret, OpenTheory.wire_idWire]
+  | wire_idWire_right => simp [interpret, OpenTheory.wire_idWire_right]
   | congr_map _ ih => simp only [interpret_map]; rw [ih]
   | congr_par _ _ ih₁ ih₂ => simp only [interpret_par]; rw [ih₁, ih₂]
   | congr_wire _ _ ih₁ ih₂ => simp only [interpret_wire]; rw [ih₁, ih₂]

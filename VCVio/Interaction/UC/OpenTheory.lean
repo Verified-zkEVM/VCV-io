@@ -311,11 +311,16 @@ class IsCompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
             (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
             (T.map (PortBoundary.Equiv.tensorEmptyRight
               (PortBoundary.swap Δ)).symm.toHom K))
-  /-- Wiring against the identity wire is a no-op (zig-zag identity). -/
+  /-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
   wire_idWire :
     ∀ (Γ : PortBoundary) {Δ₂ : PortBoundary}
       (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
       T.wire (idWire Γ) W₂ = W₂
+  /-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
+  wire_idWire_right :
+    ∀ (Γ : PortBoundary) {Δ₁ : PortBoundary}
+      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)),
+      T.wire W₁ (idWire Γ) = W₁
   /-- The monoidal unit is the coevaluation at the trivial boundary. -/
   unit_eq :
     unit = T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
@@ -603,7 +608,7 @@ theorem plug_eq_wire
             (PortBoundary.swap Δ)).symm.toHom K)) :=
   IsCompactClosed.plug_eq_wire W K
 
-/-- Wiring against the identity wire is a no-op (zig-zag identity). -/
+/-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
 @[simp]
 theorem wire_idWire
     [IsCompactClosed T]
@@ -613,6 +618,16 @@ theorem wire_idWire
     T.wire (IsCompactClosed.idWire (T := T) Γ) W₂ = W₂ :=
   IsCompactClosed.wire_idWire Γ W₂
 
+/-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
+@[simp]
+theorem wire_idWire_right
+    [IsCompactClosed T]
+    (Γ : PortBoundary)
+    {Δ₁ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)) :
+    T.wire W₁ (IsCompactClosed.idWire (T := T) Γ) = W₁ :=
+  IsCompactClosed.wire_idWire_right Γ W₁
+
 /-- The monoidal unit is the coevaluation at the trivial boundary. -/
 theorem unit_eq
     [IsCompactClosed T] :
@@ -620,6 +635,40 @@ theorem unit_eq
       T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
         (IsCompactClosed.idWire (T := T) PortBoundary.empty) :=
   IsCompactClosed.unit_eq
+
+/-! ### Derived wire algebra -/
+
+/-- Wire associativity: sequential wiring can be reassociated.
+
+Wiring `W₁` with `W₂` through `Γ₁` and then with `W₃` through `Γ₂`
+equals wiring `W₂` with `W₃` through `Γ₂` first, then with `W₁`
+through `Γ₁`. -/
+theorem wire_assoc
+    [IsCompactClosed T]
+    {Δ₁ Γ₁ Γ₂ Δ₃ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ₁))
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₁) Γ₂))
+    (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₂) Δ₃)) :
+    T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃) := by
+  sorry
+
+/-- Wire commutativity: the roles of the two wire factors are
+interchangeable up to boundary reshaping.
+
+This follows from the braiding (`par_comm`) and the zig-zag identities;
+the formal proof is deferred. -/
+theorem wire_comm
+    [IsCompactClosed T]
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
+    T.wire W₁ W₂ =
+      T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₂ Δ₁)
+        (T.wire
+          (T.mapEquiv
+            (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂) W₂)
+          (T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Γ) W₁)) := by
+  sorry
 
 end Laws
 

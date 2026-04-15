@@ -294,6 +294,9 @@ instance compactClosed (Atom : PortBoundary → Type u) :
   wire_idWire := fun _ _ W₂ =>
     Quotient.inductionOn W₂ fun _ =>
       Quotient.sound Raw.Equiv.wire_idWire
+  wire_idWire_right := fun _ _ W₁ =>
+    Quotient.inductionOn W₁ fun _ =>
+      Quotient.sound Raw.Equiv.wire_idWire_right
   unit_eq := rfl
 
 -- ============================================================================

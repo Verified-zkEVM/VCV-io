@@ -159,7 +159,110 @@ theorem openTheory_par_assoc_iso
         (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).toHom
         ((openTheory Party).par ((openTheory Party).par W₁ W₂) W₃))
       ((openTheory Party).par W₁ ((openTheory Party).par W₂ W₃)) := by
-  sorry
+  simp only [openTheory]
+  refine ⟨fun ⟨⟨s₁, s₂⟩, s₃⟩ ⟨s₁', ⟨s₂', s₃'⟩⟩ => s₁ = s₁' ∧ s₂ = s₂' ∧ s₃ = s₃',
+    fun ⟨⟨s₁, s₂⟩, s₃⟩ => ⟨⟨s₁, ⟨s₂, s₃⟩⟩, rfl, rfl, rfl⟩,
+    fun ⟨s₁, ⟨s₂, s₃⟩⟩ => ⟨⟨⟨s₁, s₂⟩, s₃⟩, rfl, rfl, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨⟨s₁, s₂⟩, s₃⟩ ⟨s₁', ⟨s₂', s₃'⟩⟩ ⟨h1, h2, h3⟩
+  all_goals subst h1; subst h2; subst h3
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true =>
+      obtain ⟨⟨b'⟩, rest'⟩ := rest
+      match b' with
+      | true => exact .inl ⟨⟨⟨true⟩, rest'⟩, rfl, rfl, rfl⟩
+      | false => exact .inl ⟨⟨⟨false⟩, ⟨⟨true⟩, rest'⟩⟩, rfl, rfl, rfl⟩
+    | false => exact .inl ⟨⟨⟨false⟩, ⟨⟨false⟩, rest⟩⟩, rfl, rfl, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    rw [isSilentStep_mapBoundary_iff] at hvisible
+    match b with
+    | true =>
+      obtain ⟨⟨b'⟩, rest'⟩ := rest
+      match b' with
+      | true =>
+        refine ⟨⟨⟨true⟩, rest'⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+          Spec.Decoration.map] at h
+        refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+            ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+        all_goals intro X ons
+        all_goals simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+      | false =>
+        refine ⟨⟨⟨false⟩, ⟨⟨true⟩, rest'⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+          Spec.Decoration.map] at h
+        refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+            ((isSilentDecoration_iff_map _ ?_ _ _).mp
+              ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2)))⟩
+        all_goals intro X ons
+        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+    | false =>
+      refine ⟨⟨⟨false⟩, ⟨⟨false⟩, rest⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mp
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
+      all_goals intro X ons
+      all_goals simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨⟨⟨true⟩, ⟨⟨true⟩, rest⟩⟩, rfl, rfl, rfl⟩
+    | false =>
+      obtain ⟨⟨b'⟩, rest'⟩ := rest
+      match b' with
+      | true => exact .inl ⟨⟨⟨true⟩, ⟨⟨false⟩, rest'⟩⟩, rfl, rfl, rfl⟩
+      | false => exact .inl ⟨⟨⟨false⟩, rest'⟩, rfl, rfl, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    match b with
+    | true =>
+      refine ⟨⟨⟨true⟩, ⟨⟨true⟩, rest⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+      rw [isSilentStep_mapBoundary_iff] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mp
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
+      all_goals intro X ons
+      all_goals simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+    | false =>
+      obtain ⟨⟨b'⟩, rest'⟩ := rest
+      match b' with
+      | true =>
+        refine ⟨⟨⟨true⟩, ⟨⟨false⟩, rest'⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+        rw [isSilentStep_mapBoundary_iff] at h
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+          Spec.Decoration.map] at h
+        refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+            ((isSilentDecoration_iff_map _ ?_ _ _).mp
+              ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2)))⟩
+        all_goals intro X ons
+        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+      | false =>
+        refine ⟨⟨⟨false⟩, rest'⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
+        rw [isSilentStep_mapBoundary_iff] at h
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+        simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+          Spec.Decoration.map] at h
+        refine ⟨rfl, rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+            ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+        all_goals intro X ons
+        all_goals simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
 
 /-- Parallel composition of open processes is commutative up to bisimilarity. -/
 theorem openTheory_par_comm_iso
@@ -171,7 +274,63 @@ theorem openTheory_par_comm_iso
         (PortBoundary.Equiv.tensorComm Δ₁ Δ₂).toHom
         ((openTheory Party).par W₁ W₂))
       ((openTheory Party).par W₂ W₁) := by
-  sorry
+  simp only [openTheory]
+  refine ⟨fun ⟨s₁, s₂⟩ ⟨s₂', s₁'⟩ => s₁ = s₁' ∧ s₂ = s₂',
+    fun ⟨s₁, s₂⟩ => ⟨⟨s₂, s₁⟩, rfl, rfl⟩,
+    fun ⟨s₂, s₁⟩ => ⟨⟨s₁, s₂⟩, rfl, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨s₁, s₂⟩ ⟨s₂', s₁'⟩ ⟨h1, h2⟩
+  all_goals subst h1; subst h2
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨⟨⟨false⟩, rest⟩, rfl, rfl⟩
+    | false => exact .inl ⟨⟨⟨true⟩, rest⟩, rfl, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    rw [isSilentStep_mapBoundary_iff] at hvisible
+    match b with
+    | true =>
+      refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
+        ((isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
+    | false =>
+      refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
+        ((isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨⟨⟨false⟩, rest⟩, rfl, rfl⟩
+    | false => exact .inl ⟨⟨⟨true⟩, rest⟩, rfl, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    match b with
+    | true =>
+      refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
+      rw [isSilentStep_mapBoundary_iff] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
+        ((isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
+    | false =>
+      refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
+      rw [isSilentStep_mapBoundary_iff] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+        Spec.Decoration.map] at h
+      exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
+        ((isSilentDecoration_iff_map _ (fun X ons => by
+          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
 
 /-- The unit for parallel composition is the trivial process with no boundary
 and `PUnit` state. -/
@@ -192,7 +351,41 @@ theorem openTheory_par_leftUnit_iso
         (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
         ((openTheory Party).par (openTheory_unit Party) W))
       W := by
-  sorry
+  simp only [openTheory, openTheory_unit]
+  refine ⟨fun s₁ s₂ => s₁.2 = s₂, fun ⟨_, s⟩ => ⟨s, rfl⟩,
+    fun s => ⟨⟨⟨⟩, s⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨_, s⟩ s₂ heq
+  all_goals subst heq
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inr rfl
+    | false => exact .inl ⟨rest, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    rw [isSilentStep_mapBoundary_iff] at hvisible
+    match b with
+    | true =>
+      exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
+        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        OpenStepContext.map, OpenNodeSemantics.mapBoundary,
+        BoundaryAction.mapBoundary, BoundaryAction.internal]) hvisible
+    | false =>
+      refine ⟨rest, fun h => hvisible ?_, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
+      intro X ons
+      simp [OpenStepContext.inrTensor, OpenNodeSemantics.mapBoundary,
+        BoundaryAction.embedInrTensor]
+  · intro tr₂ _
+    exact .inl ⟨⟨⟨false⟩, tr₂⟩, rfl⟩
+  · intro tr₂ hvisible
+    refine ⟨⟨⟨false⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
+    rw [isSilentStep_mapBoundary_iff] at h
+    simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+      Spec.Decoration.map] at h
+    refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
+    intro X ons
+    simp [OpenStepContext.inrTensor, OpenNodeSemantics.mapBoundary,
+      BoundaryAction.embedInrTensor]
 
 /-- The monoidal unit is a right identity for parallel composition up to
 bisimilarity. -/
@@ -204,7 +397,41 @@ theorem openTheory_par_rightUnit_iso
         (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
         ((openTheory Party).par W (openTheory_unit Party)))
       W := by
-  sorry
+  simp only [openTheory, openTheory_unit]
+  refine ⟨fun s₁ s₂ => s₁.1 = s₂, fun ⟨s, _⟩ => ⟨s, rfl⟩,
+    fun s => ⟨⟨s, ⟨⟩⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨s, _⟩ s₂ heq
+  all_goals subst heq
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨rest, rfl⟩
+    | false => exact .inr rfl
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    rw [isSilentStep_mapBoundary_iff] at hvisible
+    match b with
+    | true =>
+      refine ⟨rest, fun h => hvisible ?_, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
+      intro X ons
+      simp [OpenStepContext.inlTensor, OpenNodeSemantics.mapBoundary,
+        BoundaryAction.embedInlTensor]
+    | false =>
+      exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
+        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        OpenStepContext.map, OpenNodeSemantics.mapBoundary,
+        BoundaryAction.mapBoundary, BoundaryAction.internal]) hvisible
+  · intro tr₂ _
+    exact .inl ⟨⟨⟨true⟩, tr₂⟩, rfl⟩
+  · intro tr₂ hvisible
+    refine ⟨⟨⟨true⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
+    rw [isSilentStep_mapBoundary_iff] at h
+    simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+      Spec.Decoration.map] at h
+    refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
+    intro X ons
+    simp [OpenStepContext.inlTensor, OpenNodeSemantics.mapBoundary,
+      BoundaryAction.embedInlTensor]
 
 /-- The identity wire (coevaluation) on boundary `Γ`: relays messages
 bidirectionally between `swap Γ` and `Γ`. -/
@@ -217,7 +444,8 @@ def openTheory_idWire (Γ : PortBoundary) :
       semantics := ⟨⟩
       next := fun _ => PUnit.unit }
 
-/-- Wiring against the identity wire is a no-op up to bisimilarity. -/
+/-- Left zig-zag: wiring the identity wire on the left is a no-op up to
+bisimilarity. -/
 theorem openTheory_wire_idWire_iso
     (Γ : PortBoundary)
     {Δ₂ : PortBoundary}
@@ -226,7 +454,77 @@ theorem openTheory_wire_idWire_iso
     OpenProcessIso
       ((openTheory Party).wire (openTheory_idWire Party Γ) W₂)
       W₂ := by
-  sorry
+  simp only [openTheory, openTheory_idWire]
+  refine ⟨fun s₁ s₂ => s₁.2 = s₂, fun ⟨_, s⟩ => ⟨s, rfl⟩,
+    fun s => ⟨⟨⟨⟩, s⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨_, s⟩ s₂ heq
+  all_goals subst heq
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inr rfl
+    | false => exact .inl ⟨rest, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    match b with
+    | true =>
+      exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
+        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        BoundaryAction.internal]) hvisible
+    | false =>
+      refine ⟨rest, fun h => hvisible ?_, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
+      intro X ons
+      simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+  · intro tr₂ _
+    exact .inl ⟨⟨⟨false⟩, tr₂⟩, rfl⟩
+  · intro tr₂ hvisible
+    refine ⟨⟨⟨false⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
+    simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+      Spec.Decoration.map] at h
+    refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
+    intro X ons
+    simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+
+/-- Right zig-zag: wiring the identity wire on the right is a no-op up to
+bisimilarity. -/
+theorem openTheory_wire_idWire_right_iso
+    (Γ : PortBoundary)
+    {Δ₁ : PortBoundary}
+    (W₁ : OpenProcess.{u, v, w} Party
+      (PortBoundary.tensor Δ₁ Γ)) :
+    OpenProcessIso
+      ((openTheory Party).wire W₁ (openTheory_idWire Party Γ))
+      W₁ := by
+  simp only [openTheory, openTheory_idWire]
+  refine ⟨fun s₁ s₂ => s₁.1 = s₂, fun ⟨s, _⟩ => ⟨s, rfl⟩,
+    fun s => ⟨⟨s, ⟨⟩⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro ⟨s, _⟩ s₂ heq
+  all_goals subst heq
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨rest, rfl⟩
+    | false => exact .inr rfl
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    match b with
+    | true =>
+      refine ⟨rest, fun h => hvisible ?_, rfl⟩
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
+      intro X ons
+      simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+    | false =>
+      exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
+        IsSilentDecoration, Spec.Decoration.map, schedulerNode,
+        BoundaryAction.internal]) hvisible
+  · intro tr₂ _
+    exact .inl ⟨⟨⟨true⟩, tr₂⟩, rfl⟩
+  · intro tr₂ hvisible
+    refine ⟨⟨⟨true⟩, tr₂⟩, fun h => hvisible ?_, rfl⟩
+    simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
+      Spec.Decoration.map] at h
+    refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
+    intro X ons
+    simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
 
 /-- `plug` is derivable from `wire` plus boundary reshaping, up to
 bisimilarity. -/
@@ -242,9 +540,64 @@ theorem openTheory_plug_eq_wire_iso
           (OpenProcess.mapBoundary
             (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
           (OpenProcess.mapBoundary
-            (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.Equiv.tensorEmptyRight
               (PortBoundary.swap Δ)).symm.toHom K))) := by
-  sorry
+  simp only [openTheory]
+  refine ⟨fun s₁ s₂ => s₁ = s₂,
+    fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩, ?_, ?_, ?_, ?_⟩
+  all_goals intro s₁ s₂ heq
+  all_goals subst heq
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨⟨⟨true⟩, rest⟩, rfl⟩
+    | false => exact .inl ⟨⟨⟨false⟩, rest⟩, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    match b with
+    | true =>
+      refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl⟩
+      rw [isSilentStep_mapBoundary_iff] at h
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mp
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+      · intro X ons
+        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+    | false =>
+      refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
+      rw [isSilentStep_mapBoundary_iff] at h
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mp
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+      · intro X ons
+        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+  · intro ⟨⟨b⟩, rest⟩ _
+    match b with
+    | true => exact .inl ⟨⟨⟨true⟩, rest⟩, rfl⟩
+    | false => exact .inl ⟨⟨⟨false⟩, rest⟩, rfl⟩
+  · intro ⟨⟨b⟩, rest⟩ hvisible
+    rw [isSilentStep_mapBoundary_iff] at hvisible
+    match b with
+    | true =>
+      refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl⟩
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+      · intro X ons; simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+      · intro X ons
+        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+    | false =>
+      refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
+      refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
+        ((isSilentDecoration_iff_map _ ?_ _ _).mpr
+          ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
+      · intro X ons; simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+      · intro X ons
+        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
 
 /-- The monoidal unit equals the coevaluation at the trivial boundary,
 up to bisimilarity. -/
@@ -253,8 +606,12 @@ theorem openTheory_unit_eq_iso :
       (openTheory_unit.{u, v, w} Party)
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-        (openTheory_idWire Party PortBoundary.empty)) := by
-  sorry
+        (openTheory_idWire Party PortBoundary.empty)) :=
+  ⟨fun _ _ => True, fun _ => ⟨PUnit.unit, trivial⟩, fun _ => ⟨PUnit.unit, trivial⟩,
+    fun _ _ _ _ _ => .inl ⟨PUnit.unit, trivial⟩,
+    fun _ _ _ _ hns => absurd trivial hns,
+    fun _ _ _ _ _ => .inl ⟨PUnit.unit, trivial⟩,
+    fun _ _ _ _ hns => absurd trivial hns⟩
 
 end Model
 

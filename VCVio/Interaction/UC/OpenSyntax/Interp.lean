@@ -420,6 +420,14 @@ instance compactClosed
     refine Interp.ext ?_
     intro T hT interp
     simp [Interp.wire, Interp.idWire]
+  wire_idWire_right := by
+    intro Γ Δ₁ W₁
+    change Interp Atom (PortBoundary.tensor Δ₁ Γ) at W₁
+    change
+      Interp.wire W₁ (Interp.idWire Γ) = W₁
+    refine Interp.ext ?_
+    intro T hT interp
+    simp [Interp.wire, Interp.idWire]
   unit_eq := by
     change
       Interp.unit = Interp.map

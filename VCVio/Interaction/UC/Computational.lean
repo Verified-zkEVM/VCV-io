@@ -37,10 +37,14 @@ parameter with distributional advantage bounds.
 * `CompEmulates.refl`: advantage zero against itself.
 * `CompEmulates.triangle`: transitivity with additive advantage bounds.
 * `CompEmulates.map_invariance`: boundary adaptation preserves the bound.
+* `CompEmulates.par_compose`, `wire_compose`, `plug_compose`:
+  advantages add under parallel, wired, and plugged composition.
 * `CompEmulates.toEmulates`: every `CompEmulates` yields an abstract
   `Emulates` for the induced observation relation.
 * `CompUCSecure.toCompEmulates`: simulator-based security implies
   computational emulation when the simulator is the identity.
+* `AsympCompEmulates.par_compose`, `wire_compose`, `plug_compose`:
+  asymptotic composition from pointwise negligible bounds.
 * `ucDistGame`: constructs the `SecurityGame` whose advantage is the
   UC distinguishing advantage.
 * `AsympCompEmulates.iff_secureAgainst`: `AsympCompEmulates` is
@@ -152,6 +156,106 @@ theorem mono {sem : Semantics T} {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
     CompEmulates sem ε₂ real ideal :=
   fun K => le_trans (h K) hε
 
+/-! ### Composition -/
+
+/-- Replacing the left component of a parallel composition preserves the
+computational emulation bound. -/
+theorem par_left [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε : ℝ}
+    {Δ₁ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : T.Obj Δ₁}
+    (h₁ : CompEmulates sem ε real₁ ideal₁)
+    (W₂ : T.Obj Δ₂) :
+    CompEmulates sem ε (T.par real₁ W₂) (T.par ideal₁ W₂) :=
+  fun K => by
+    rw [OpenTheory.close_par_left, OpenTheory.close_par_left]
+    exact h₁ _
+
+/-- Replacing the right component of a parallel composition preserves the
+computational emulation bound. -/
+theorem par_right [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε : ℝ}
+    {Δ₁ Δ₂ : PortBoundary}
+    (W₁ : T.Obj Δ₁)
+    {real₂ ideal₂ : T.Obj Δ₂}
+    (h₂ : CompEmulates sem ε real₂ ideal₂) :
+    CompEmulates sem ε (T.par W₁ real₂) (T.par W₁ ideal₂) :=
+  fun K => by
+    rw [OpenTheory.close_par_right, OpenTheory.close_par_right]
+    exact h₂ _
+
+/-- **Computational UC composition for `par`**: advantages add. -/
+theorem par_compose [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε₁ ε₂ : ℝ}
+    {Δ₁ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : T.Obj Δ₁} {real₂ ideal₂ : T.Obj Δ₂}
+    (h₁ : CompEmulates sem ε₁ real₁ ideal₁)
+    (h₂ : CompEmulates sem ε₂ real₂ ideal₂) :
+    CompEmulates sem (ε₁ + ε₂) (T.par real₁ real₂) (T.par ideal₁ ideal₂) :=
+  triangle (par_left h₁ real₂) (par_right ideal₁ h₂)
+
+/-- Replacing the left factor of a wiring preserves the computational
+emulation bound. -/
+theorem wire_left [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε : ℝ}
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
+    (h₁ : CompEmulates sem ε real₁ ideal₁)
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
+    CompEmulates sem ε (T.wire real₁ W₂) (T.wire ideal₁ W₂) :=
+  fun K => by
+    rw [OpenTheory.close_wire_left, OpenTheory.close_wire_left]
+    exact h₁ _
+
+/-- Replacing the right factor of a wiring preserves the computational
+emulation bound. -/
+theorem wire_right [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε : ℝ}
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
+    {real₂ ideal₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
+    (h₂ : CompEmulates sem ε real₂ ideal₂) :
+    CompEmulates sem ε (T.wire W₁ real₂) (T.wire W₁ ideal₂) :=
+  fun K => by
+    rw [OpenTheory.close_wire_right, OpenTheory.close_wire_right]
+    exact h₂ _
+
+/-- **Computational UC composition for `wire`**: advantages add. -/
+theorem wire_compose [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε₁ ε₂ : ℝ}
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
+    {real₂ ideal₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
+    (h₁ : CompEmulates sem ε₁ real₁ ideal₁)
+    (h₂ : CompEmulates sem ε₂ real₂ ideal₂) :
+    CompEmulates sem (ε₁ + ε₂) (T.wire real₁ real₂) (T.wire ideal₁ ideal₂) :=
+  triangle (wire_left h₁ real₂) (wire_right ideal₁ h₂)
+
+/-- **Computational UC composition for `plug`**: when both the protocol
+and the environment emulate their ideals, the advantage of the closed
+real system vs. closed ideal system is bounded by the sum. -/
+theorem plug_compose [OpenTheory.IsCompactClosed T]
+    {sem : Semantics T} {ε₁ ε₂ : ℝ}
+    {Δ : PortBoundary}
+    {real ideal : T.Obj Δ}
+    {K_real K_ideal : T.Obj (PortBoundary.swap Δ)}
+    (hProt : CompEmulates sem ε₁ real ideal)
+    (hEnv : CompEmulates sem ε₂ K_real K_ideal) :
+    (sem.run (T.close real K_real)).distAdvantage
+      (sem.run (T.close ideal K_ideal)) ≤ ε₁ + ε₂ := calc
+  (sem.run (T.close real K_real)).distAdvantage
+      (sem.run (T.close ideal K_ideal))
+    ≤ (sem.run (T.close real K_real)).distAdvantage
+        (sem.run (T.close ideal K_real)) +
+      (sem.run (T.close ideal K_real)).distAdvantage
+        (sem.run (T.close ideal K_ideal)) :=
+      ProbComp.distAdvantage_triangle _ _ _
+  _ ≤ ε₁ + ε₂ := by
+      apply add_le_add
+      · exact hProt K_real
+      · simp only [OpenTheory.close, OpenTheory.plug_comm ideal]
+        exact hEnv ideal
+
 end CompEmulates
 
 /-! ## Simulator-based computational UC security -/
@@ -248,6 +352,88 @@ theorem AsympCompEmulates.of_compEmulates
     AsympCompEmulates T sem real ideal Adv isPPT env :=
   fun A _ => negligible_of_le
     (fun n => ENNReal.ofReal_le_ofReal (hComp n (env A n))) hε
+
+/-! ### Asymptotic composition -/
+
+/-- **Asymptotic UC composition for `par`**: if each component's pointwise
+advantage is negligible, then the parallel composition also has negligible
+advantage. -/
+theorem AsympCompEmulates.par_compose
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    {Δ₁ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : ∀ n, (T n).Obj Δ₁}
+    {real₂ ideal₂ : ∀ n, (T n).Obj Δ₂}
+    {Adv : Type*} {isPPT : Adv → Prop}
+    {env : Adv → ∀ n, (T n).Plug (PortBoundary.tensor Δ₁ Δ₂)}
+    (ε₁ ε₂ : ℕ → ℝ)
+    (hε₁ : negligible (fun n => ENNReal.ofReal (ε₁ n)))
+    (hε₂ : negligible (fun n => ENNReal.ofReal (ε₂ n)))
+    (h₁ : ∀ n, CompEmulates (sem n) (ε₁ n) (real₁ n) (ideal₁ n))
+    (h₂ : ∀ n, CompEmulates (sem n) (ε₂ n) (real₂ n) (ideal₂ n)) :
+    AsympCompEmulates T sem
+      (fun n => (T n).par (real₁ n) (real₂ n))
+      (fun n => (T n).par (ideal₁ n) (ideal₂ n))
+      Adv isPPT env :=
+  of_compEmulates (fun n => ε₁ n + ε₂ n)
+    (negligible_of_le
+      (fun _ => ENNReal.ofReal_add_le)
+      (negligible_add hε₁ hε₂))
+    (fun n => CompEmulates.par_compose (h₁ n) (h₂ n))
+
+/-- **Asymptotic UC composition for `wire`**: if each factor's pointwise
+advantage is negligible, then the wired composition also has negligible
+advantage. -/
+theorem AsympCompEmulates.wire_compose
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    {real₁ ideal₁ : ∀ n, (T n).Obj (PortBoundary.tensor Δ₁ Γ)}
+    {real₂ ideal₂ :
+      ∀ n, (T n).Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
+    {Adv : Type*} {isPPT : Adv → Prop}
+    {env : Adv → ∀ n, (T n).Plug (PortBoundary.tensor Δ₁ Δ₂)}
+    (ε₁ ε₂ : ℕ → ℝ)
+    (hε₁ : negligible (fun n => ENNReal.ofReal (ε₁ n)))
+    (hε₂ : negligible (fun n => ENNReal.ofReal (ε₂ n)))
+    (h₁ : ∀ n, CompEmulates (sem n) (ε₁ n) (real₁ n) (ideal₁ n))
+    (h₂ : ∀ n, CompEmulates (sem n) (ε₂ n) (real₂ n) (ideal₂ n)) :
+    AsympCompEmulates T sem
+      (fun n => (T n).wire (real₁ n) (real₂ n))
+      (fun n => (T n).wire (ideal₁ n) (ideal₂ n))
+      Adv isPPT env :=
+  of_compEmulates (fun n => ε₁ n + ε₂ n)
+    (negligible_of_le
+      (fun _ => ENNReal.ofReal_add_le)
+      (negligible_add hε₁ hε₂))
+    (fun n => CompEmulates.wire_compose (h₁ n) (h₂ n))
+
+/-- **Asymptotic UC composition for `plug`**: if both the protocol and
+the environment have negligible pointwise advantages, then the
+distinguishing advantage of the closed real vs. closed ideal system
+is negligible. -/
+theorem AsympCompEmulates.plug_compose
+    {T : ℕ → OpenTheory.{u}} {sem : ∀ n, Semantics (T n)}
+    [∀ n, OpenTheory.IsCompactClosed (T n)]
+    {Δ : PortBoundary}
+    {real ideal : ∀ n, (T n).Obj Δ}
+    {K_real K_ideal : ∀ n, (T n).Obj (PortBoundary.swap Δ)}
+    (ε₁ ε₂ : ℕ → ℝ)
+    (hε₁ : negligible (fun n => ENNReal.ofReal (ε₁ n)))
+    (hε₂ : negligible (fun n => ENNReal.ofReal (ε₂ n)))
+    (hProt : ∀ n, CompEmulates (sem n) (ε₁ n) (real n) (ideal n))
+    (hEnv : ∀ n, CompEmulates (sem n) (ε₂ n) (K_real n) (K_ideal n)) :
+    negligible fun n =>
+      ENNReal.ofReal <|
+        ProbComp.distAdvantage
+          ((sem n).run ((T n).close (real n) (K_real n)))
+          ((sem n).run ((T n).close (ideal n) (K_ideal n))) :=
+  negligible_of_le
+    (fun n => ENNReal.ofReal_le_ofReal
+      (CompEmulates.plug_compose (hProt n) (hEnv n)))
+    (negligible_of_le
+      (fun _ => ENNReal.ofReal_add_le)
+      (negligible_add hε₁ hε₂))
 
 /-! ## Bridge to `SecurityGame` -/
 

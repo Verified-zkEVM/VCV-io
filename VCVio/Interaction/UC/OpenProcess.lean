@@ -181,9 +181,10 @@ The result lives on `PortBoundary.empty` and has no activation or emission.
 This is used by `plug` to internalize all boundary interactions.
 -/
 def closed {Δ : PortBoundary} {X : Type w}
-    (_b : BoundaryAction Δ X) :
-    BoundaryAction PortBoundary.empty X :=
-  .internal PortBoundary.empty X
+    (b : BoundaryAction Δ X) :
+    BoundaryAction PortBoundary.empty X where
+  isActivated := b.isActivated
+  emit _ := []
 
 @[simp]
 theorem mapBoundary_embedInlTensor
@@ -210,7 +211,8 @@ theorem closed_mapBoundary
     {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
     (b : BoundaryAction Δ₁ X) :
-    (b.mapBoundary φ).closed = b.closed := rfl
+    (b.mapBoundary φ).closed = b.closed := by
+  simp [closed, mapBoundary]
 
 @[simp]
 theorem mapBoundary_wireLeft
@@ -474,7 +476,7 @@ theorem close_comp_map (Party : Type u)
     close Party Δ₁ := by
   funext X ons
   simp [close, map, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary, BoundaryAction.closed]
+    OpenNodeSemantics.mapBoundary, BoundaryAction.closed, BoundaryAction.mapBoundary]
 
 theorem map_tensor_comp_wireLeft (Party : Type u)
     {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
@@ -575,18 +577,85 @@ abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
   ProcessOver.System (OpenStepContext Party Δ : Spec.Node.Context.{w})
 
 -- ============================================================================
--- § OpenProcessIso: bisimulation equivalence for open processes
+-- § Silent steps and weak bisimulation
+-- ============================================================================
+
+/-- A transcript path through a decorated open-process spec is **silent** when
+every visited node is not externally activated (`isActivated = false`).
+Checking only `isActivated` (rather than also requiring `emit x = []`)
+ensures the predicate is invariant under *all* context morphisms, including
+`wireLeft` / `wireRight` which filter shared-boundary packets via
+`List.filterMap`. -/
+def IsSilentDecoration {Party : Type u} {Δ : PortBoundary} :
+    {spec : Interaction.Spec.{w}} →
+    Interaction.Spec.Decoration (OpenStepContext.{u, w} Party Δ) spec →
+    spec.Transcript → Prop
+  | .done, _, _ => True
+  | .node _ _, ⟨ons, drest⟩, ⟨x, tr⟩ =>
+      ons.boundary.isActivated = false ∧ IsSilentDecoration (drest x) tr
+
+/-- A complete step of an open process is **silent** when every node along
+the chosen transcript path has boundary-internal semantics. -/
+def IsSilentStep {Party : Type u} {Δ : PortBoundary}
+    (p : OpenProcess.{u, v, w} Party Δ) (s : p.Proc)
+    (tr : (p.step s).spec.Transcript) : Prop :=
+  IsSilentDecoration (p.step s).semantics tr
+
+/-- `IsSilentDecoration` is invariant under context morphisms that preserve
+`isActivated`. All morphisms in the open-process framework (including
+`mapBoundary`, `embedInlTensor`, `embedInrTensor`, `wireLeft`, `wireRight`,
+and `closed`) preserve `isActivated`. -/
+theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+    (f : Spec.Node.ContextHom (OpenStepContext.{u, w} Party Δ₁)
+      (OpenStepContext.{u, w} Party Δ₂))
+    (hAct : ∀ (X : Type w) (ons : OpenStepContext Party Δ₁ X),
+      (f X ons).boundary.isActivated = ons.boundary.isActivated) :
+    {spec : Spec.{w}} → (d : Spec.Decoration (OpenStepContext Party Δ₁) spec) →
+    (tr : spec.Transcript) →
+    IsSilentDecoration (Spec.Decoration.map f spec d) tr ↔ IsSilentDecoration d tr
+  | .done, _, _ => Iff.rfl
+  | .node _ _, ⟨ons, drest⟩, ⟨x, tr⟩ => by
+    simp only [IsSilentDecoration, Spec.Decoration.map]
+    constructor
+    · rintro ⟨h1, h2⟩
+      exact ⟨by rwa [hAct] at h1,
+        (isSilentDecoration_iff_map f hAct (drest x) tr).mp h2⟩
+    · rintro ⟨h1, h2⟩
+      exact ⟨by rwa [hAct],
+        (isSilentDecoration_iff_map f hAct (drest x) tr).mpr h2⟩
+
+/-- `IsSilentStep` is invariant under `OpenProcess.mapBoundary`: remapping
+the boundary does not change which transcripts are silent, because all
+boundary maps preserve `isActivated`. -/
+theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+    (φ : PortBoundary.Hom Δ₁ Δ₂)
+    (p : OpenProcess.{u, v, w} Party Δ₁) (s : p.Proc)
+    (tr : (p.step s).spec.Transcript) :
+    IsSilentStep (p.mapBoundary φ) s tr ↔ IsSilentStep p s tr := by
+  apply isSilentDecoration_iff_map
+  intro X ons
+  simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+
+-- ============================================================================
+-- § OpenProcessIso: weak bisimulation equivalence for open processes
 -- ============================================================================
 
 /--
-Two open processes with the same boundary are bisimilar when there exists a
-relation on their state types that is a bisimulation: from any pair of related
-states, each side can match the other's transition while maintaining the
-relation on successor states.
+Two open processes with the same boundary are **weakly bisimilar** when there
+exists a relation on their state types satisfying:
+
+1. **Totality / surjectivity**: every state on each side has a related partner.
+2. **Silent forward/backward**: a silent step can either be matched by some step
+   on the other side (maintaining the relation), or absorbed (the other side
+   stays put and the relation is maintained with the successor).
+3. **Visible forward/backward**: a visible (non-silent) step must be matched by
+   a visible step on the other side that preserves the relation.
 
 This is the appropriate equality notion for `openTheory` monoidal laws,
 where the internal scheduler structure differs (e.g., left-nested vs.
 right-nested interleaving) but the observable boundary traffic is the same.
+The scheduler nodes introduced by `ProcessOver.interleave` are always silent,
+so they can be absorbed by the weak bisimulation.
 -/
 def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
     (p₁ p₂ : OpenProcess.{u, v, w} Party Δ) : Prop :=
@@ -594,42 +663,59 @@ def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
     (∀ s₁, ∃ s₂, rel s₁ s₂) ∧
     (∀ s₂, ∃ s₁, rel s₁ s₂) ∧
     (∀ s₁ s₂, rel s₁ s₂ →
-      ∀ tr₁ : (p₁.step s₁).spec.Transcript,
-        ∃ tr₂ : (p₂.step s₂).spec.Transcript,
+      ∀ tr₁ : (p₁.step s₁).spec.Transcript, IsSilentStep p₁ s₁ tr₁ →
+        (∃ tr₂ : (p₂.step s₂).spec.Transcript,
+          rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂)) ∨
+        rel ((p₁.step s₁).next tr₁) s₂) ∧
+    (∀ s₁ s₂, rel s₁ s₂ →
+      ∀ tr₁ : (p₁.step s₁).spec.Transcript, ¬ IsSilentStep p₁ s₁ tr₁ →
+        ∃ tr₂ : (p₂.step s₂).spec.Transcript, ¬ IsSilentStep p₂ s₂ tr₂ ∧
           rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂)) ∧
     (∀ s₁ s₂, rel s₁ s₂ →
-      ∀ tr₂ : (p₂.step s₂).spec.Transcript,
-        ∃ tr₁ : (p₁.step s₁).spec.Transcript,
+      ∀ tr₂ : (p₂.step s₂).spec.Transcript, IsSilentStep p₂ s₂ tr₂ →
+        (∃ tr₁ : (p₁.step s₁).spec.Transcript,
+          rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂)) ∨
+        rel s₁ ((p₂.step s₂).next tr₂)) ∧
+    (∀ s₁ s₂, rel s₁ s₂ →
+      ∀ tr₂ : (p₂.step s₂).spec.Transcript, ¬ IsSilentStep p₂ s₂ tr₂ →
+        ∃ tr₁ : (p₁.step s₁).spec.Transcript, ¬ IsSilentStep p₁ s₁ tr₁ ∧
           rel ((p₁.step s₁).next tr₁) ((p₂.step s₂).next tr₂))
 
 namespace OpenProcessIso
 
 variable {Party : Type u} {Δ : PortBoundary}
 
-/-- Every open process is bisimilar to itself. -/
+/-- Every open process is weakly bisimilar to itself. -/
 protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
     OpenProcessIso p p :=
   ⟨Eq, fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩,
-    fun s₁ _ h tr => by subst h; exact ⟨tr, rfl⟩,
-    fun s₁ _ h tr => by subst h; exact ⟨tr, rfl⟩⟩
+    fun s₁ _ h tr _ => by subst h; exact .inl ⟨tr, rfl⟩,
+    fun s₁ _ h tr hv => by subst h; exact ⟨tr, hv, rfl⟩,
+    fun s₁ _ h tr _ => by subst h; exact .inl ⟨tr, rfl⟩,
+    fun s₁ _ h tr hv => by subst h; exact ⟨tr, hv, rfl⟩⟩
 
-/-- Bisimilarity is symmetric. -/
+/-- Weak bisimilarity is symmetric. -/
 protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
     (h : OpenProcessIso p₁ p₂) :
     OpenProcessIso p₂ p₁ := by
-  obtain ⟨rel, htot, hsurj, hfwd, hbwd⟩ := h
+  obtain ⟨rel, htot, hsurj, hfs, hfv, hbs, hbv⟩ := h
   exact ⟨fun s₂ s₁ => rel s₁ s₂, hsurj, htot,
-    fun s₂ s₁ hr tr₂ => hbwd s₁ s₂ hr tr₂,
-    fun s₂ s₁ hr tr₁ => hfwd s₁ s₂ hr tr₁⟩
+    fun s₂ s₁ hr => hbs s₁ s₂ hr,
+    fun s₂ s₁ hr => hbv s₁ s₂ hr,
+    fun s₂ s₁ hr => hfs s₁ s₂ hr,
+    fun s₂ s₁ hr => hfv s₁ s₂ hr⟩
 
-/-- Bisimilarity is transitive. -/
+/-- Weak bisimilarity is transitive. The composite relation witnesses p₂ as
+an intermediate: `∃ s₂, r₁₂ s₁ s₂ ∧ r₂₃ s₂ s₃`. For silent steps, the
+intermediate state can advance or stay, using `Classical.em` to case-split
+on whether the intermediate step is itself silent. -/
 protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w} Party Δ}
     (h₁₂ : OpenProcessIso p₁ p₂)
     (h₂₃ : OpenProcessIso p₂ p₃) :
     OpenProcessIso p₁ p₃ := by
-  obtain ⟨rel₁₂, htot₁₂, hsurj₁₂, hfwd₁₂, hbwd₁₂⟩ := h₁₂
-  obtain ⟨rel₂₃, htot₂₃, hsurj₂₃, hfwd₂₃, hbwd₂₃⟩ := h₂₃
-  refine ⟨fun s₁ s₃ => ∃ s₂, rel₁₂ s₁ s₂ ∧ rel₂₃ s₂ s₃, ?_, ?_, ?_, ?_⟩
+  obtain ⟨r₁₂, htot₁₂, hsurj₁₂, hfs₁₂, hfv₁₂, hbs₁₂, hbv₁₂⟩ := h₁₂
+  obtain ⟨r₂₃, htot₂₃, hsurj₂₃, hfs₂₃, hfv₂₃, hbs₂₃, hbv₂₃⟩ := h₂₃
+  refine ⟨fun s₁ s₃ => ∃ s₂, r₁₂ s₁ s₂ ∧ r₂₃ s₂ s₃, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · intro s₁
     obtain ⟨s₂, h₂⟩ := htot₁₂ s₁
     obtain ⟨s₃, h₃⟩ := htot₂₃ s₂
@@ -638,14 +724,32 @@ protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w} Party Δ}
     obtain ⟨s₂, h₂⟩ := hsurj₂₃ s₃
     obtain ⟨s₁, h₁⟩ := hsurj₁₂ s₂
     exact ⟨s₁, s₂, h₁, h₂⟩
-  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₁
-    obtain ⟨tr₂, hn₁₂⟩ := hfwd₁₂ s₁ s₂ hr₁₂ tr₁
-    obtain ⟨tr₃, hn₂₃⟩ := hfwd₂₃ s₂ s₃ hr₂₃ tr₂
-    exact ⟨tr₃, _, hn₁₂, hn₂₃⟩
-  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₃
-    obtain ⟨tr₂, hn₂₃⟩ := hbwd₂₃ s₂ s₃ hr₂₃ tr₃
-    obtain ⟨tr₁, hn₁₂⟩ := hbwd₁₂ s₁ s₂ hr₁₂ tr₂
-    exact ⟨tr₁, _, hn₁₂, hn₂₃⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₁ hsilent₁
+    rcases hfs₁₂ s₁ s₂ hr₁₂ tr₁ hsilent₁ with ⟨tr₂, hn₁₂⟩ | hstay
+    · rcases Classical.em (IsSilentStep p₂ s₂ tr₂) with hsilent₂ | hvisible₂
+      · rcases hfs₂₃ s₂ s₃ hr₂₃ tr₂ hsilent₂ with ⟨tr₃, hn₂₃⟩ | hstay₂₃
+        · exact .inl ⟨tr₃, _, hn₁₂, hn₂₃⟩
+        · exact .inr ⟨_, hn₁₂, hstay₂₃⟩
+      · obtain ⟨tr₃, _, hn₂₃⟩ := hfv₂₃ s₂ s₃ hr₂₃ tr₂ hvisible₂
+        exact .inl ⟨tr₃, _, hn₁₂, hn₂₃⟩
+    · exact .inr ⟨s₂, hstay, hr₂₃⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₁ hvisible₁
+    obtain ⟨tr₂, hv₂, hn₁₂⟩ := hfv₁₂ s₁ s₂ hr₁₂ tr₁ hvisible₁
+    obtain ⟨tr₃, hv₃, hn₂₃⟩ := hfv₂₃ s₂ s₃ hr₂₃ tr₂ hv₂
+    exact ⟨tr₃, hv₃, _, hn₁₂, hn₂₃⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₃ hsilent₃
+    rcases hbs₂₃ s₂ s₃ hr₂₃ tr₃ hsilent₃ with ⟨tr₂, hn₂₃⟩ | hstay
+    · rcases Classical.em (IsSilentStep p₂ s₂ tr₂) with hsilent₂ | hvisible₂
+      · rcases hbs₁₂ s₁ s₂ hr₁₂ tr₂ hsilent₂ with ⟨tr₁, hn₁₂⟩ | hstay₁₂
+        · exact .inl ⟨tr₁, _, hn₁₂, hn₂₃⟩
+        · exact .inr ⟨_, hstay₁₂, hn₂₃⟩
+      · obtain ⟨tr₁, _, hn₁₂⟩ := hbv₁₂ s₁ s₂ hr₁₂ tr₂ hvisible₂
+        exact .inl ⟨tr₁, _, hn₁₂, hn₂₃⟩
+    · exact .inr ⟨s₂, hr₁₂, hstay⟩
+  · intro s₁ s₃ ⟨s₂, hr₁₂, hr₂₃⟩ tr₃ hvisible₃
+    obtain ⟨tr₂, hv₂, hn₂₃⟩ := hbv₂₃ s₂ s₃ hr₂₃ tr₃ hvisible₃
+    obtain ⟨tr₁, hv₁, hn₁₂⟩ := hbv₁₂ s₁ s₂ hr₁₂ tr₂ hv₂
+    exact ⟨tr₁, hv₁, _, hn₁₂, hn₂₃⟩
 
 end OpenProcessIso
 
