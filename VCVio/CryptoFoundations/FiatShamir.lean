@@ -749,7 +749,6 @@ The combined bound is:
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
 the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
 theorem euf_cma_bound
-    [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
     [Fintype Chal]
@@ -766,6 +765,8 @@ theorem euf_cma_bound
         ENNReal.ofReal (qS * ζ_zk + ζ_col)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp (r := rel) reduction] := by
+  haveI : DecidableEq M := Classical.decEq M
+  haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
     ζ_zk ζ_col hζ_zk hζ_col hhvzk adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss nmaAdv qH hBound
