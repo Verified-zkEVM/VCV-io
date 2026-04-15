@@ -38,13 +38,30 @@ structure SignatureAlg (m : Type → Type) (M PK SK S : Type)
 ### Sigma protocols (`SigmaProtocol`)
 
 ```lean
-structure SigmaProtocol (S W PC SC Ω P : Type) (p : S → W → Bool) where
-  commit (s : S) (w : W) : ProbComp (PC × SC)
-  respond (s : S) (w : W) (sc : SC) (ω : Ω) : ProbComp P
-  verify (s : S) (pc : PC) (ω : Ω) (p : P) : Bool
-  sim (s : S) : ProbComp PC
-  extract (ω₁ : Ω) (p₁ : P) (ω₂ : Ω) (p₂ : P) : ProbComp W
+structure SigmaProtocol
+    (Stmt Wit Commit PrvState Chal Resp : Type) (rel : Stmt → Wit → Bool) where
+  commit (stmt : Stmt) (wit : Wit) : ProbComp (Commit × PrvState)
+  respond (stmt : Stmt) (wit : Wit) (prvState : PrvState) (chal : Chal) : ProbComp Resp
+  verify (stmt : Stmt) (commit : Commit) (chal : Chal) (resp : Resp) : Bool
+  sim (stmt : Stmt) : ProbComp Commit
+  extract (chal₁ : Chal) (resp₁ : Resp) (chal₂ : Chal) (resp₂ : Resp) : ProbComp Wit
 ```
+
+Every `SigmaProtocol` coerces to `IdenSchemeWithAbort` via `toIdenSchemeWithAbort` (wraps `respond` with `some`).
+
+### Identification scheme with aborts (`IdenSchemeWithAbort`)
+
+```lean
+structure IdenSchemeWithAbort
+    (Stmt Wit Commit PrvState Chal Resp : Type) (rel : Stmt → Wit → Bool) where
+  commit (stmt : Stmt) (wit : Wit) : ProbComp (Commit × PrvState)
+  respond (stmt : Stmt) (wit : Wit) (prvState : PrvState) (chal : Chal) :
+    ProbComp (Option Resp)
+  verify (stmt : Stmt) (commit : Commit) (chal : Chal) (resp : Resp) : Bool
+```
+
+The key difference from `SigmaProtocol` is that `respond` returns `Option Resp` (abort on `none`).
+Used by ML-DSA and the Fiat-Shamir with Aborts transform.
 
 ### Key difference: `OracleContext` vs `ExecutionMethod`
 

@@ -42,12 +42,14 @@ verification is `g^z = R · pk^c`.
 
 open OracleSpec OracleComp SigmaProtocol
 
+namespace Schnorr
+
 variable (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable (G : Type) [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
 
 /-- Standard Schnorr Σ-protocol for knowledge of discrete log.
 Challenge space is the full scalar field `F`. -/
-def schnorrSigma (g : G) : SigmaProtocol G F G F F F
+def sigma (g : G) : SigmaProtocol G F G F F F
     (fun pk sk => decide (sk • g = pk)) where
   commit _pk _sk := do
     let r ← $ᵗ F
@@ -62,11 +64,11 @@ def schnorrSigma (g : G) : SigmaProtocol G F G F F F
 omit [Fintype F] [DecidableEq F] in
 /-- Completeness: an honest prover with valid witness always produces an accepting transcript.
 Follows from `add_smul` and `mul_smul`. -/
-theorem schnorrSigma_complete (g : G) :
-    PerfectlyComplete (schnorrSigma F G g) := by
+theorem sigma_complete (g : G) :
+    PerfectlyComplete (sigma F G g) := by
   intro pk sk h
   have h_eq : sk • g = pk := of_decide_eq_true h
-  simp only [schnorrSigma, pure_bind]
+  simp only [sigma, pure_bind]
   have hverify : ∀ (r c : F), (r + c * sk) • g = r • g + c • pk := by
     intro r c; rw [add_smul, mul_smul, h_eq]
   simp [hverify]
@@ -74,10 +76,10 @@ theorem schnorrSigma_complete (g : G) :
 omit [Fintype F] [DecidableEq F] in
 /-- Special soundness: from two accepting transcripts `(R, c₁, z₁)` and `(R, c₂, z₂)` with
 `c₁ ≠ c₂`, the extracted witness `(z₁ - z₂) * (c₁ - c₂)⁻¹` satisfies the relation. -/
-theorem schnorrSigma_speciallySound (g : G) :
-    SpeciallySound (schnorrSigma F G g) := by
+theorem sigma_speciallySound (g : G) :
+    SpeciallySound (sigma F G g) := by
   intro pk R c₁ c₂ z₁ z₂ h_ne h_v1 h_v2 w h_w
-  dsimp [schnorrSigma] at *
+  dsimp [sigma] at *
   simp only [support_pure, Set.mem_singleton_iff] at h_w
   subst h_w
   simp only [decide_eq_true_eq] at h_v1 h_v2 ⊢
@@ -92,7 +94,7 @@ theorem schnorrSigma_speciallySound (g : G) :
     _ = pk := one_smul F pk
 
 /-- Full transcript simulator: pick `c, z ← F`, compute commitment from verification equation. -/
-def schnorrSimTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
+def simTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
   let c ← $ᵗ F
   let z ← $ᵗ F
   return (z • g - c • pk, c, z)
@@ -101,8 +103,8 @@ omit [Fintype F] [DecidableEq F] in
 /-- Honest-verifier zero-knowledge: the real transcript distribution equals the simulated one.
 The proof swaps sampling order and uses uniformity of `F` to reindex via the bijection
 `r ↦ r + c * sk`. -/
-theorem schnorrSigma_hvzk (g : G) [Finite F] :
-    PerfectHVZK (schnorrSigma F G g) (schnorrSimTranscript F G g) := by
+theorem sigma_hvzk (g : G) [Finite F] :
+    PerfectHVZK (sigma F G g) (simTranscript F G g) := by
   let _ : Fintype F := Fintype.ofFinite F
   intro pk sk h_sk
   have h_eq : sk • g = pk := of_decide_eq_true h_sk
@@ -112,12 +114,12 @@ theorem schnorrSigma_hvzk (g : G) [Finite F] :
     let c ← ($ᵗ F : ProbComp F)
     let r ← ($ᵗ F : ProbComp F)
     pure (((r + c * sk) • g - c • pk, c, r + c * sk) : G × F × F)]
-  · simp only [SigmaProtocol.realTranscript, schnorrSigma]
+  · simp only [SigmaProtocol.realTranscript, sigma]
     vcstep rw
     simp [h_eq, add_smul, mul_smul, add_sub_cancel_right]
   · refine probOutput_bind_congr' ($ᵗ F : ProbComp F) t ?_
     intro c
-    simpa [schnorrSimTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+    simpa [simTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
       (probOutput_bind_bijective_uniform_cross
         (α := F) (β := F)
         (f := fun r => r + c * sk)
@@ -130,3 +132,5 @@ theorem schnorrSigma_hvzk (g : G) [Finite F] :
             simp [sub_eq_add_neg, add_left_comm, add_comm])
         (g := fun z => pure ((z • g - c • pk, c, z) : G × F × F))
         t)
+
+end Schnorr

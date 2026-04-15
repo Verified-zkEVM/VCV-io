@@ -800,6 +800,46 @@ lemma queryBoundedBelowBy_fin_mOfFn [LawfulMonad m] {n k : ℕ}
     QueryBoundedBelowBy (Fin.mOfFn n f) (n * k) :=
   pathwiseCostAtLeast_fin_mOfFn h
 
+/-- Pathwise exact cost for a unit-cost `AddWriterT` computation: every reachable execution
+carries exactly `n` unit queries. -/
+def QueryCostExactly (oa : AddWriterT ℕ m α) (n : ℕ) : Prop :=
+  PathwiseCostEqOnSupport oa n
+
+lemma QueryCostExactly.toAbove {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : QueryCostExactly oa n) : QueryBoundedAboveBy oa n := h.atMost
+
+lemma QueryCostExactly.toBelow {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : QueryCostExactly oa n) : QueryBoundedBelowBy oa n := h.atLeast
+
+lemma queryCostExactly_pure [LawfulMonad m] (x : α) :
+    QueryCostExactly (pure x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostEqOnSupport_pure (m := m) (ω := ℕ) x
+
+lemma queryCostExactly_monadLift [LawfulMonad m] (x : m α) :
+    QueryCostExactly (monadLift x : AddWriterT ℕ m α) 0 :=
+  pathwiseCostEqOnSupport_monadLift (m := m) (ω := ℕ) x
+
+lemma queryCostExactly_addTell [LawfulMonad m] (w : ℕ) :
+    QueryCostExactly (AddWriterT.addTell (M := m) w) w :=
+  pathwiseCostEqOnSupport_addTell (m := m) w
+
+lemma queryCostExactly_map [LawfulMonad m] {oa : AddWriterT ℕ m α} {n : ℕ}
+    (f : α → β) (h : QueryCostExactly oa n) :
+    QueryCostExactly (f <$> oa) n :=
+  pathwiseCostEqOnSupport_map f h
+
+lemma queryCostExactly_bind [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {f : α → AddWriterT ℕ m β} {n₁ n₂ : ℕ}
+    (h₁ : QueryCostExactly oa n₁) (h₂ : ∀ a, QueryCostExactly (f a) n₂) :
+    QueryCostExactly (oa >>= f) (n₁ + n₂) :=
+  pathwiseCostEqOnSupport_bind h₁ h₂
+
+lemma queryCostExactly_fin_mOfFn [LawfulMonad m] {n k : ℕ}
+    {f : Fin n → AddWriterT ℕ m α} (h : ∀ i, QueryCostExactly (f i) k) :
+    QueryCostExactly (Fin.mOfFn n f) (n * k) :=
+  ⟨queryBoundedAboveBy_fin_mOfFn (fun i => (h i).toAbove),
+    queryBoundedBelowBy_fin_mOfFn (fun i => (h i).toBelow)⟩
+
 end unitCostBounds
 
 section expectedUnitCost
@@ -831,6 +871,14 @@ lemma expectedCostNat_ge_of_queryBoundedBelowBy [LawfulMonad m]
       (oa := oa) (w := n) (val := fun k ↦ (k : ENNReal)) h
       (fun a b hle ↦ by
         simpa using (Nat.cast_le.mpr hle : (a : ENNReal) ≤ (b : ENNReal))))
+
+lemma expectedCostNat_eq_of_queryCostExactly [LawfulMonad m]
+    {oa : AddWriterT ℕ m α} {n : ℕ}
+    (h : QueryCostExactly oa n) :
+    expectedCostNat oa = n :=
+  le_antisymm
+    (expectedCostNat_le_of_queryBoundedAboveBy h.toAbove)
+    (expectedCostNat_ge_of_queryBoundedBelowBy h.toBelow)
 
 end expectedUnitCostPMF
 
@@ -917,6 +965,18 @@ lemma queryBoundedBelowBy_withUnitCost_query
   · exact AddWriterT.queryBoundedBelowBy_addTell 1
   · intro _
     exact AddWriterT.queryBoundedBelowBy_monadLift (runtime.impl t)
+
+lemma queryCostExactly_withUnitCost_query
+    [HasEvalSet m]
+    (runtime : QueryRuntime spec m) (t : spec.Domain) :
+    AddWriterT.QueryCostExactly
+      (HasQuery.withUnitCost
+        (fun [HasQuery spec (AddWriterT ℕ m)] =>
+          HasQuery.query (spec := spec) (m := AddWriterT ℕ m) t)
+        runtime)
+      1 :=
+  ⟨queryBoundedAboveBy_withUnitCost_query runtime t,
+    queryBoundedBelowBy_withUnitCost_query runtime t⟩
 
 end queryBounds
 
