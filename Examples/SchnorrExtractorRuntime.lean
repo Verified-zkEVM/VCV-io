@@ -111,8 +111,8 @@ def extractCandidate (g pk : G) :
     Option ((G × F) × F × (G × F) × F) → Option F
   | none => none
   | some ((R₁, z₁), c₁, (R₂, z₂), c₂) =>
-      if _hR : R₁ = R₂ then
-        if _hω : c₁ = c₂ then
+      if R₁ = R₂ then
+        if c₁ = c₂ then
           none
         else if decide (z₁ • g = R₁ + c₁ • pk) ∧ decide (z₂ • g = R₂ + c₂ • pk) then
           some ((z₁ - z₂) * (c₁ - c₂)⁻¹)
@@ -169,7 +169,7 @@ theorem extractCandidate_sound_of_mem_support
     sk • g = pk := by
   rw [support_map] at hsk
   rcases hsk with ⟨res, _, hres⟩
-  exact extractCandidate_sound (F := F) (G := G) g pk (by simpa using hres)
+  exact extractCandidate_sound (F := F) (G := G) g pk hres
 
 end extractorCandidate
 

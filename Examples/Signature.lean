@@ -98,7 +98,7 @@ theorem signatureExtractCandidate_sound_of_mem_support
   rw [support_map] at hsk
   rcases hsk with ⟨res, _, hres⟩
   exact signatureExtractCandidate_sound
-    (F := F) (G := G) (M := M) g pk (by simpa using hres)
+    (F := F) (G := G) (M := M) g pk hres
 
 end
 
