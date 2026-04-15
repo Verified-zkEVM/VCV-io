@@ -282,6 +282,35 @@ inductive Equiv {Atom : PortBoundary → Type u} :
             (.map (PortBoundary.Equiv.tensorComm
               (PortBoundary.swap Γ) Δ₂).toHom e₂)
             (.map (PortBoundary.Equiv.tensorComm Δ₁ Γ).toHom e₁)))
+  | plug_par_left {Δ₁ Δ₂ : PortBoundary}
+      {e₁ : Raw Atom Δ₁}
+      {e₂ : Raw Atom Δ₂}
+      {K : Raw Atom (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))} :
+      Equiv
+        (.plug (.par e₁ e₂) K)
+        (.plug e₁
+          (.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ₁)).toHom
+            (.wire
+              (Γ := PortBoundary.swap Δ₂)
+              (Δ₂ := PortBoundary.empty)
+              K
+              (.map (PortBoundary.Equiv.tensorEmptyRight Δ₂).symm.toHom
+                e₂))))
+  | plug_wire_left {Δ₁ Γ Δ₂ : PortBoundary}
+      {e₁ : Raw Atom (PortBoundary.tensor Δ₁ Γ)}
+      {e₂ : Raw Atom (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
+      {K : Raw Atom (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))} :
+      Equiv
+        (.plug (.wire e₁ e₂) K)
+        (.plug e₁
+          (.wire
+            (Δ₁ := PortBoundary.swap Δ₁)
+            (Γ := PortBoundary.swap Δ₂)
+            (Δ₂ := PortBoundary.swap Γ)
+            K
+            (.map (PortBoundary.Equiv.tensorComm
+              (PortBoundary.swap Γ) Δ₂).toHom e₂)))
   | congr_map {Δ₁ Δ₂ : PortBoundary}
       {f : PortBoundary.Hom Δ₁ Δ₂}
       {e₁ e₂ : Raw Atom Δ₁} :
@@ -341,6 +370,14 @@ theorem Equiv.interpret_eq
   | wire_comm =>
     simp only [interpret_wire, interpret_map]
     exact OpenTheory.wire_comm _ _
+  | plug_par_left =>
+    simp only [Raw.plug, interpret_map, interpret_wire, interpret_par]
+    rw [← OpenTheory.plug_eq_wire (T := T), ← OpenTheory.plug_eq_wire (T := T)]
+    exact OpenTheory.plug_par_left _ _ _
+  | plug_wire_left =>
+    simp only [Raw.plug, interpret_map, interpret_wire]
+    rw [← OpenTheory.plug_eq_wire (T := T), ← OpenTheory.plug_eq_wire (T := T)]
+    exact OpenTheory.plug_wire_left _ _ _
   | congr_map _ ih => simp only [interpret_map]; rw [ih]
   | congr_par _ _ ih₁ ih₂ => simp only [interpret_par]; rw [ih₁, ih₂]
   | congr_wire _ _ ih₁ ih₂ => simp only [interpret_wire]; rw [ih₁, ih₂]

@@ -364,6 +364,47 @@ class CompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
               (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂).toHom
               W₂)
             (T.map (PortBoundary.Equiv.tensorComm Δ₁ Γ).toHom W₁))
+  /-- Plug-par factorization (left): plugging a parallel composition against
+  a context factors into wiring the right component into the context, then
+  plugging the left component against the result.
+
+  This is the "vanishing tensor" axiom of traced monoidal categories: a full
+  contraction over a tensor boundary `Δ₁ ⊗ Δ₂` decomposes into two sequential
+  contractions, first over `Δ₂` and then over `Δ₁`. -/
+  plug_par_left :
+    ∀ {Δ₁ Δ₂ : PortBoundary}
+      (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂)
+      (K : T.Obj (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))),
+      T.plug (T.par W₁ W₂) K =
+        T.plug W₁
+          (T.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ₁)).toHom
+            (T.wire
+              (Γ := PortBoundary.swap Δ₂)
+              (Δ₂ := PortBoundary.empty)
+              K
+              (T.map (PortBoundary.Equiv.tensorEmptyRight Δ₂).symm.toHom
+                W₂)))
+  /-- Plug-wire factorization (left): closing a wired composition against
+  a context factors through the left wire component.
+
+  The right component `W₂` is wired into the context `K` through the `Δ₂`
+  boundary, producing a plug for `Δ₁ ⊗ Γ`, and then `W₁` is plugged against
+  the result. -/
+  plug_wire_left :
+    ∀ {Δ₁ Γ Δ₂ : PortBoundary}
+      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
+      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
+      (K : T.Obj (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))),
+      T.plug (T.wire W₁ W₂) K =
+        T.plug W₁
+          (T.wire
+            (Δ₁ := PortBoundary.swap Δ₁)
+            (Γ := PortBoundary.swap Δ₂)
+            (Δ₂ := PortBoundary.swap Γ)
+            K
+            (T.map (PortBoundary.Equiv.tensorComm
+              (PortBoundary.swap Γ) Δ₂).toHom W₂))
 
 /--
 `Closed T` is the type of closed systems in the open-composition theory `T`.
@@ -472,6 +513,28 @@ theorem mapEquiv_trans
       T.mapEquiv e₂ (T.mapEquiv e₁ W) := by
   simpa [OpenTheory.mapEquiv, PortBoundary.Equiv.trans] using
     map_comp (T := T) e₂.toHom e₁.toHom W
+
+@[simp]
+theorem mapEquiv_symm_cancel
+    [IsLawfulMap T]
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂)
+    (W : T.Obj Δ₁) :
+    T.mapEquiv e.symm (T.mapEquiv e W) = W := by
+  unfold OpenTheory.mapEquiv
+  rw [← map_comp]
+  simp [map_id]
+
+@[simp]
+theorem mapEquiv_cancel_symm
+    [IsLawfulMap T]
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂)
+    (W : T.Obj Δ₂) :
+    T.mapEquiv e (T.mapEquiv e.symm W) = W := by
+  unfold OpenTheory.mapEquiv
+  rw [← map_comp]
+  simp [map_id]
 
 /-- Parallel composition is natural with respect to boundary adaptation. -/
 theorem map_par
@@ -718,6 +781,46 @@ theorem wire_comm
             (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂) W₂)
           (T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Γ) W₁)) :=
   CompactClosed.wire_comm W₁ W₂
+
+/-- Plug-par factorization (left): plugging a parallel composition against a
+context factors through the left component.
+
+See `CompactClosed.plug_par_left` for the full docstring. -/
+theorem plug_par_left
+    [CompactClosed T]
+    {Δ₁ Δ₂ : PortBoundary}
+    (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂)
+    (K : T.Obj (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))) :
+    T.plug (T.par W₁ W₂) K =
+      T.plug W₁
+        (T.mapEquiv (PortBoundary.Equiv.tensorEmptyRight (PortBoundary.swap Δ₁))
+          (T.wire
+            (Γ := PortBoundary.swap Δ₂)
+            (Δ₂ := PortBoundary.empty)
+            K
+            (T.mapEquiv (PortBoundary.Equiv.tensorEmptyRight Δ₂).symm W₂))) :=
+  CompactClosed.plug_par_left W₁ W₂ K
+
+/-- Plug-wire factorization (left): closing a wired composition against a
+context factors through the left wire component.
+
+See `CompactClosed.plug_wire_left` for the full docstring. -/
+theorem plug_wire_left
+    [CompactClosed T]
+    {Δ₁ Γ Δ₂ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
+    (K : T.Obj (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))) :
+    T.plug (T.wire W₁ W₂) K =
+      T.plug W₁
+        (T.wire
+          (Δ₁ := PortBoundary.swap Δ₁)
+          (Γ := PortBoundary.swap Δ₂)
+          (Δ₂ := PortBoundary.swap Γ)
+          K
+          (T.mapEquiv (PortBoundary.Equiv.tensorComm
+            (PortBoundary.swap Γ) Δ₂) W₂)) :=
+  CompactClosed.plug_wire_left W₁ W₂ K
 
 end Laws
 

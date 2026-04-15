@@ -458,6 +458,20 @@ instance compactClosed
     simp only [Interp.wire, Interp.map]
     exact OpenTheory.wire_comm (T := T)
       (W₁.run T hT interp) (W₂.run T hT interp)
+  plug_par_left := by
+    intro Δ₁ Δ₂ W₁ W₂ K
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.plug, Interp.par, Interp.map, Interp.wire]
+    exact OpenTheory.plug_par_left (T := T)
+      (W₁.run T hT interp) (W₂.run T hT interp) (K.run T hT interp)
+  plug_wire_left := by
+    intro Δ₁ Γ Δ₂ W₁ W₂ K
+    refine Interp.ext ?_
+    intro T hT interp
+    simp only [Interp.plug, Interp.wire, Interp.map]
+    exact OpenTheory.plug_wire_left (T := T)
+      (W₁.run T hT interp) (W₂.run T hT interp) (K.run T hT interp)
 
 end Interp
 

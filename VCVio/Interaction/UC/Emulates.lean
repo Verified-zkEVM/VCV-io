@@ -188,8 +188,8 @@ theorem OpenTheory.close_par_left
     {Δ₁ Δ₂ : PortBoundary}
     (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂)
     (K : T.Plug (PortBoundary.tensor Δ₁ Δ₂)) :
-    T.close (T.par W₁ W₂) K = T.close W₁ (T.parContextLeft W₂ K) := by
-  sorry
+    T.close (T.par W₁ W₂) K = T.close W₁ (T.parContextLeft W₂ K) :=
+  OpenTheory.plug_par_left W₁ W₂ K
 
 /-- Closing a parallel composition factors through the right component. -/
 theorem OpenTheory.close_par_right
@@ -197,7 +197,11 @@ theorem OpenTheory.close_par_right
     (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂)
     (K : T.Plug (PortBoundary.tensor Δ₁ Δ₂)) :
     T.close (T.par W₁ W₂) K = T.close W₂ (T.parContextRight W₁ K) := by
-  sorry
+  simp only [OpenTheory.close]
+  rw [← OpenTheory.par_comm W₂ W₁, OpenTheory.map_plug, OpenTheory.plug_par_left]
+  unfold parContextRight
+  simp only [OpenTheory.mapEquiv]
+  congr 3
 
 /-- The effective plug for the left factor of a wiring.
 
@@ -247,8 +251,8 @@ theorem OpenTheory.close_wire_left
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
     (K : T.Plug (PortBoundary.tensor Δ₁ Δ₂)) :
     T.close (T.wire W₁ W₂) K =
-      T.close W₁ (T.wireContextLeft W₂ K) := by
-  sorry
+      T.close W₁ (T.wireContextLeft W₂ K) :=
+  OpenTheory.plug_wire_left W₁ W₂ K
 
 /-- Closing a wired composition factors through the right component. -/
 theorem OpenTheory.close_wire_right
@@ -258,7 +262,16 @@ theorem OpenTheory.close_wire_right
     (K : T.Plug (PortBoundary.tensor Δ₁ Δ₂)) :
     T.close (T.wire W₁ W₂) K =
       T.close W₂ (T.wireContextRight W₁ K) := by
-  sorry
+  simp only [OpenTheory.close]
+  rw [OpenTheory.wire_comm, OpenTheory.map_plug, OpenTheory.plug_wire_left,
+    OpenTheory.map_plug]
+  unfold wireContextRight
+  simp only [OpenTheory.mapEquiv]
+  congr 1
+  congr 1
+  rw [← OpenTheory.map_comp]
+  erw [PortBoundary.Equiv.tensorComm_comp_tensorComm Δ₁ Γ, OpenTheory.map_id]
+  rfl
 
 /-- `plug` is symmetric: the protocol and context roles are interchangeable.
 

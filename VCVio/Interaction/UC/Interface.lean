@@ -1056,6 +1056,80 @@ abbrev swapSwap
     Equiv (PortBoundary.swap (PortBoundary.swap Δ)) Δ :=
   refl Δ
 
+private theorem eqRec_id_apply_codomain
+    {α : Sort*} {β : α → Sort*} {a₀ a₁ : α}
+    (h : a₀ = a₁) (x : β a₀) :
+    Eq.rec (motive := fun x _ => β a₀ → β x) id h x =
+      _root_.cast (congrArg β h) x := by
+  subst h; rfl
+
+private theorem chart_comp_symm_eq_id
+    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
+    PFunctor.Chart.comp e.symm.toChart e.toChart =
+      PFunctor.Chart.id P := by
+  refine PFunctor.Chart.ext _ _
+    (fun a => e.equivA.symm_apply_apply a) (fun a => ?_)
+  funext b
+  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
+    PFunctor.Equiv.toChart, Function.comp_apply]
+  change (((_root_.Equiv.cast _).trans
+    (e.equivB (e.equivA.symm (e.equivA a))).symm)
+    (e.equivB a b)) = _
+  simp only [_root_.Equiv.trans_apply]
+  trans _root_.cast
+    (congrArg P.B (e.equivA.symm_apply_apply a).symm) b
+  · exact PFunctor.Equiv.equivB_symm_apply_of_eq e
+      (e.equivA.apply_symm_apply (e.equivA a)) b
+  · exact (eqRec_id_apply_codomain
+      (e.equivA.symm_apply_apply a).symm b).symm
+
+private theorem chart_comp_inv_eq_id
+    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
+    PFunctor.Chart.comp e.toChart e.symm.toChart =
+      PFunctor.Chart.id Q := by
+  refine PFunctor.Chart.ext _ _
+    (fun a => e.equivA.apply_symm_apply a) (fun a => ?_)
+  funext b
+  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
+    PFunctor.Equiv.toChart, Function.comp_apply]
+  change ((e.equivB (e.equivA.symm a)))
+    (((_root_.Equiv.cast _).trans
+      (e.equivB (e.equivA.symm a)).symm) b) = _
+  simp only [_root_.Equiv.trans_apply,
+    _root_.Equiv.apply_symm_apply]
+  exact (eqRec_id_apply_codomain
+    (e.equivA.apply_symm_apply a).symm b).symm
+
+@[simp]
+theorem symm_toHom_comp_toHom
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂) :
+    Hom.comp e.symm.toHom e.toHom = Hom.id Δ₁ := by
+  apply Hom.ext
+  · exact chart_comp_inv_eq_id e.onIn
+  · exact chart_comp_symm_eq_id e.onOut
+
+@[simp]
+theorem toHom_comp_symm_toHom
+    {Δ₁ Δ₂ : PortBoundary}
+    (e : PortBoundary.Equiv Δ₁ Δ₂) :
+    Hom.comp e.toHom e.symm.toHom = Hom.id Δ₂ := by
+  apply Hom.ext
+  · exact chart_comp_symm_eq_id e.onIn
+  · exact chart_comp_inv_eq_id e.onOut
+
+@[simp]
+theorem tensorComm_comp_tensorComm
+    (Δ₁ Δ₂ : PortBoundary) :
+    Hom.comp (tensorComm Δ₂ Δ₁).toHom (tensorComm Δ₁ Δ₂).toHom =
+    Hom.id _ := by
+  apply Hom.ext
+  all_goals {
+    refine PFunctor.Chart.ext _ _ (fun a => ?_) (fun a => ?_)
+    · cases a <;> rfl
+    · funext b; cases a <;> rfl
+  }
+
 end Equiv
 
 @[simp]
