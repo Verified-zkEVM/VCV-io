@@ -289,18 +289,16 @@ theorem openTheory_par_comm_iso
     match b with
     | true =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
           simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
           simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
     | false =>
       refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
           simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
@@ -314,9 +312,8 @@ theorem openTheory_par_comm_iso
     | true =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
       rw [isSilentStep_mapBoundary_iff] at h
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
           simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
@@ -324,9 +321,8 @@ theorem openTheory_par_comm_iso
     | false =>
       refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
       rw [isSilentStep_mapBoundary_iff] at h
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
-      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration,
-        Spec.Decoration.map] at h
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
+      simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
           simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
@@ -366,15 +362,13 @@ theorem openTheory_par_leftUnit_iso
     | true =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
         IsSilentDecoration, Spec.Decoration.map, schedulerNode,
-        OpenStepContext.map, OpenNodeSemantics.mapBoundary,
-        BoundaryAction.mapBoundary, BoundaryAction.internal]) hvisible
+        BoundaryAction.internal]) hvisible
     | false =>
       refine ⟨rest, fun h => hvisible ?_, rfl⟩
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.inrTensor, OpenNodeSemantics.mapBoundary,
-        BoundaryAction.embedInrTensor]
+      simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
   · intro tr₂ _
     exact .inl ⟨⟨⟨false⟩, tr₂⟩, rfl⟩
   · intro tr₂ hvisible
@@ -384,8 +378,7 @@ theorem openTheory_par_leftUnit_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.inrTensor, OpenNodeSemantics.mapBoundary,
-      BoundaryAction.embedInrTensor]
+    simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
 
 /-- The monoidal unit is a right identity for parallel composition up to
 bisimilarity. -/
@@ -414,13 +407,11 @@ theorem openTheory_par_rightUnit_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.inlTensor, OpenNodeSemantics.mapBoundary,
-        BoundaryAction.embedInlTensor]
+      simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
     | false =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
         IsSilentDecoration, Spec.Decoration.map, schedulerNode,
-        OpenStepContext.map, OpenNodeSemantics.mapBoundary,
-        BoundaryAction.mapBoundary, BoundaryAction.internal]) hvisible
+        BoundaryAction.internal]) hvisible
   · intro tr₂ _
     exact .inl ⟨⟨⟨true⟩, tr₂⟩, rfl⟩
   · intro tr₂ hvisible
@@ -430,8 +421,7 @@ theorem openTheory_par_rightUnit_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.inlTensor, OpenNodeSemantics.mapBoundary,
-      BoundaryAction.embedInlTensor]
+    simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
 
 /-- The identity wire (coevaluation) on boundary `Γ`: relays messages
 bidirectionally between `swap Γ` and `Γ`. -/
