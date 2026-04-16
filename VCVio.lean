@@ -18,7 +18,6 @@ import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
-import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
@@ -39,6 +38,7 @@ import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.ReplayFork
 import VCVio.CryptoFoundations.SecExp
+import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
@@ -165,7 +165,6 @@ import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
-import VCVio.ProgramLogic.Fork
 import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Relational.Basic
@@ -174,6 +173,7 @@ import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.ProgramLogic.Relational.SimulateQ
+import VCVio.ProgramLogic.SeededFork
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Tactics.Common.CompiledRules

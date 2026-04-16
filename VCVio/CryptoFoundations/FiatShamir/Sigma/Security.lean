@@ -8,7 +8,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 
 /-!
@@ -561,6 +561,7 @@ private noncomputable def eufNmaReduction
   simulateQ (QueryImpl.ofLift unifSpec ProbComp +
     (uniformSampleImpl (spec := (Unit →ₒ Chal)))) (eufNmaForkExtract σ hr M nmaAdv qH pk)
 
+omit [Fintype Chal] in
 /-- **Support invariant of the replay-fork first run.**
 
 Every `(x, log)` in the support of `replayFirstRun (Fork.runTrace σ hr M nmaAdv pk)`
@@ -580,6 +581,7 @@ private theorem forkSupportInvariant_of_mem_replayFirstRun
     forkSupportInvariant σ M qH pk x log := by
   sorry
 
+omit [Fintype Chal] in
 /-- **Target equality across two successful fork runs** sharing the same fork index.
 
 If both runs of `forkReplay (Fork.runTrace σ hr M nmaAdv pk)` select fork point `s`,

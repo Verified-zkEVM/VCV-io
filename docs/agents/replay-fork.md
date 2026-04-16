@@ -13,7 +13,7 @@ share arbitrary ambient `unifSpec` randomness.
 Add a parallel replay-based fork path that:
 
 - preserves the current seed-based API and proofs in
-  [`VCVio/CryptoFoundations/Fork.lean`](../../VCVio/CryptoFoundations/Fork.lean)
+  [`VCVio/CryptoFoundations/SeededFork.lean`](../../VCVio/CryptoFoundations/SeededFork.lean)
 - uses query logging from
   [`VCVio/OracleComp/QueryTracking/LoggingOracle.lean`](../../VCVio/OracleComp/QueryTracking/LoggingOracle.lean)
 - replays the first-run oracle transcript exactly up to the selected fork point
@@ -37,16 +37,16 @@ The current seed-based fork remains the canonical implementation for settings th
 Today the core fork path is built around pre-generated seeds:
 
 - `fork`
-- `forkWithSeedValue`
+- `seededForkWithSeedValue`
 - `generateSeed`
 - `QuerySeed.takeAtIndex`
 - `QuerySeed.addValue`
-- `le_probEvent_isSome_fork`
+- `le_probEvent_isSome_seededFork`
 
 The key operational idea is:
 
 ```lean
-def fork (main : OracleComp spec α)
+def seededFork (main : OracleComp spec α)
     (qb : ι → ℕ) (js : List ι) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
     OracleComp spec (Option (α × α)) := do
@@ -74,12 +74,12 @@ The proofs that should remain untouched include:
 
 | Current declaration | Role |
 | --- | --- |
-| `fork` | Public fork operation |
-| `forkWithSeedValue` | Deterministic core with fixed seed and replacement value |
-| `cf_eq_of_mem_support_fork` | Support-level characterization of successful forks |
-| `le_probOutput_fork` | Per-fork-point lower bound |
-| `probOutput_none_fork_le` | Aggregate failure bound |
-| `le_probEvent_isSome_fork` | Packaged success-event version of the forking lemma |
+| `seededFork` | Public seeded-fork operation |
+| `seededForkWithSeedValue` | Deterministic core with fixed seed and replacement value |
+| `cf_eq_of_mem_support_seededFork` | Support-level characterization of successful forks |
+| `le_probOutput_seededFork` | Per-fork-point lower bound |
+| `probOutput_none_seededFork_le` | Aggregate failure bound |
+| `le_probEvent_isSome_seededFork` | Packaged success-event version of the seeded forking lemma |
 
 The seed-based support lemmas also depend heavily on
 [`VCVio/OracleComp/QueryTracking/SeededOracle.lean`](../../VCVio/OracleComp/QueryTracking/SeededOracle.lean)
@@ -111,7 +111,7 @@ This is the semantic gap behind the current Fiat-Shamir proof bottleneck.
 The replay-based path should be additive, with a new parallel API.
 For now, the most natural future Lean file would be
 [`VCVio/CryptoFoundations/ReplayFork.lean`](../../VCVio/CryptoFoundations/ReplayFork.lean),
-leaving [`VCVio/CryptoFoundations/Fork.lean`](../../VCVio/CryptoFoundations/Fork.lean) unchanged.
+leaving [`VCVio/CryptoFoundations/SeededFork.lean`](../../VCVio/CryptoFoundations/SeededFork.lean) unchanged.
 
 Likely public declarations:
 
@@ -183,11 +183,11 @@ The replay-based path should mirror the existing theorem stack rather than mutat
 
 | Seed-based theorem | Replay-based analogue |
 | --- | --- |
-| `forkWithSeedValue` | `forkReplayWithTraceValue` |
-| `cf_eq_of_mem_support_fork` | support lemma for successful replay forks |
-| `le_probOutput_fork` | per-fork-point replay lower bound |
-| `probOutput_none_fork_le` | replay failure bound |
-| `le_probEvent_isSome_fork` | packaged replay success-event theorem |
+| `seededForkWithSeedValue` | `forkReplayWithTraceValue` |
+| `cf_eq_of_mem_support_seededFork` | support lemma for successful replay forks |
+| `le_probOutput_seededFork` | per-fork-point replay lower bound |
+| `probOutput_none_seededFork_le` | replay failure bound |
+| `le_probEvent_isSome_seededFork` | packaged replay success-event theorem |
 
 The most important new replay lemmas are likely:
 
@@ -199,7 +199,7 @@ The most important new replay lemmas are likely:
 4. Single-change lemma: the two runs differ only in the chosen distinguished oracle answer at the
    selected position.
 5. Replay runtime theorem: replay does not create uncontrolled pre-fork oracle behavior.
-6. Replay forking theorem: a replay analogue of `le_probEvent_isSome_fork`.
+6. Replay forking theorem: a replay analogue of `le_probEvent_isSome_seededFork`.
 
 The conceptual heart of the redesign is item 2.
 Unlike the seed-based path, replay gets to prove prefix agreement by explicit transcript matching,
@@ -230,7 +230,7 @@ If this design is implemented later, a clean additive split would be:
 
 | File | Purpose |
 | --- | --- |
-| `VCVio/CryptoFoundations/Fork.lean` | Existing seed-based fork, unchanged |
+| `VCVio/CryptoFoundations/SeededFork.lean` | Seed-based fork, unchanged by the replay path |
 | `VCVio/CryptoFoundations/ReplayFork.lean` | New replay-based fork API and theorem stack |
 | `VCVio/OracleComp/QueryTracking/LoggingOracle.lean` | Existing logging infrastructure, reused |
 | `VCVio/OracleComp/QueryTracking/Structures.lean` | Existing `QueryLog` and tracking structures, reused |

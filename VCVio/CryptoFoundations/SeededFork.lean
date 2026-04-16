@@ -11,15 +11,21 @@ import VCVio.OracleComp.Coercions.Add
 import ToMathlib.Data.ENNReal.SumSquares
 
 /-!
-# Forking Lemma
+# Seed-Based Forking Lemma (Bellare-Neven)
 
-The forking lemma is a key tool in provable security. Given an adversary that succeeds with
-some probability, the "fork" runs it twice with shared randomness up to a chosen query index,
-then re-samples one oracle response, bounding the probability that both runs succeed.
+The forking lemma is a key tool in provable security. The *seeded* variant in this file
+(`seededFork`) mechanizes the original Bellare-Neven construction (CCS 2006): pre-sample every
+oracle response into a `QuerySeed`, run the adversary deterministically against that seed, then
+re-run it against a seed that has been modified at the chosen fork point.
 
-`fork` returns `OracleComp spec (Option (α × α))` with explicit matching on success/failure.
-The seeded replay uses `seededOracle` via `StateT`, and `generateSeed` produces the initial
-seed as a `ProbComp` lifted into `spec`.
+`seededFork` returns `OracleComp spec (Option (α × α))` with explicit matching on
+success/failure. The seeded replay uses `seededOracle` via `StateT`, and `generateSeed`
+produces the initial seed as a `ProbComp` lifted into `spec`.
+
+The companion file `VCVio/CryptoFoundations/ReplayFork.lean` provides the *replay* variant,
+which only pre-samples the forked oracle family and answers ambient randomness live; it is the
+natural choice for reductions like Fiat-Shamir EUF-CMA whose adversaries make both kinds of
+queries.
 -/
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
@@ -29,7 +35,7 @@ namespace OracleComp
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} {α β γ : Type}
 
 /-- Bundles the inputs to the forking lemma. -/
-structure ForkInput (spec : OracleSpec ι) (α : Type) where
+structure SeededForkInput (spec : OracleSpec ι) (α : Type) where
   main : OracleComp spec α
   queryBound : ι → ℕ
   js : List ι
@@ -45,7 +51,7 @@ Returns `none` (failure) when:
 - `cf x₁ = none` (adversary did not choose a fork point)
 - the re-sampled oracle response equals the original (no useful fork)
 - `cf x₂ ≠ cf x₁` (the second run chose a different fork point) -/
-def fork (main : OracleComp spec α)
+def seededFork (main : OracleComp spec α)
     (qb : ι → ℕ) (js : List ι) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
     OracleComp spec (Option (α × α)) := do
@@ -67,7 +73,7 @@ def fork (main : OracleComp spec α)
       else
         return none
 
-/-- The deterministic core of `fork` with the random seed and replacement value already fixed.
+/-- The deterministic core of `seededFork` with the random seed and replacement value already fixed.
 
 Runs `main` once against `seed`, checks whether the fork-index selector `cf` fires, and if so
 replays `main` against a modified seed where the `(cf x₁)`-th answer to oracle `i` is replaced
@@ -75,7 +81,7 @@ by `u`. Returns the pair `(x₁, x₂)` when both runs agree on the fork index.
 
 The only remaining randomness comes from `main`'s own oracle queries that fall outside the
 seed (i.e. queries beyond the budget `qb`). -/
-def forkWithSeedValue (main : OracleComp spec α)
+def seededForkWithSeedValue (main : OracleComp spec α)
     (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
     (seed : QuerySeed spec) (u : spec.Range i) :
@@ -131,11 +137,11 @@ private lemma isPerIndexQueryBound_if_pure
   · simp [hp]
   · simpa [hp] using h
 
-/-- `forkWithSeedValue` makes at most `qb i` live queries, all to oracle `i`.
+/-- `seededForkWithSeedValue` makes at most `qb i` live queries, all to oracle `i`.
 
 The first seeded run is query-free (covered by the seed); the replay after the fork point uses
 at most the remaining `i`-budget. The bound holds regardless of which fork index `cf` returns. -/
-theorem isPerIndexQueryBound_forkWithSeedValue_seeded
+theorem isPerIndexQueryBound_seededForkWithSeedValue
     [spec.DecidableEq]
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -143,7 +149,7 @@ theorem isPerIndexQueryBound_forkWithSeedValue_seeded
     (hmain : IsPerIndexQueryBound main qb)
     (hseed : ∀ t, qb t ≤ (seed t).length) :
     IsPerIndexQueryBound
-      (forkWithSeedValue main qb i cf seed u)
+      (seededForkWithSeedValue main qb i cf seed u)
       (Function.update 0 i (qb i)) := by
   have hfirst :
       IsPerIndexQueryBound ((simulateQ seededOracle main).run' seed) 0 :=
@@ -226,15 +232,15 @@ theorem isPerIndexQueryBound_forkWithSeedValue_seeded
   have hbind' :
       IsPerIndexQueryBound core (Function.update 0 i (qb i)) := by
     simpa [Pi.zero_apply] using hbind
-  simpa [forkWithSeedValue, core] using hbind'
+  simpa [seededForkWithSeedValue, core] using hbind'
 
 section generateSeedCoverage
 
 variable [∀ i, SampleableType (spec.Range i)]
 
-/-- The expected unit-cost query count of `forkWithSeedValue`, averaged over the randomly
+/-- The expected unit-cost query count of `seededForkWithSeedValue`, averaged over the randomly
 sampled seed and replacement value, is at most `qb i`. -/
-theorem expectedQueryCount_forkWithSeedValue_le
+theorem expectedQueryCount_seededForkWithSeedValue_le
     [spec.DecidableEq]
     [Finite ι] [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
@@ -246,7 +252,7 @@ theorem expectedQueryCount_forkWithSeedValue_le
         wp ($ᵗ spec.Range i)
           (fun u =>
             expectedCost
-              (forkWithSeedValue main qb i cf seed u)
+              (seededForkWithSeedValue main qb i cf seed u)
               CostModel.unit
               (fun n : ℕ ↦ (n : ENNReal))))
       ≤ qb i := by
@@ -258,7 +264,7 @@ theorem expectedQueryCount_forkWithSeedValue_le
           wp ($ᵗ spec.Range i)
             (fun u =>
               expectedCost
-                (forkWithSeedValue main qb i cf seed u)
+                (seededForkWithSeedValue main qb i cf seed u)
                 CostModel.unit
                 (fun n : ℕ ↦ (n : ENNReal)))
       ≤ ∑' seed : QuerySeed spec,
@@ -269,12 +275,12 @@ theorem expectedQueryCount_forkWithSeedValue_le
             · refine mul_le_mul_of_nonneg_left ?_ (zero_le _)
               have hseedCov := generateSeed_covers_queryBound (spec := spec) qb js hjs hseed
               have hwp : wp ($ᵗ spec.Range i) (fun u =>
-                    expectedCost (forkWithSeedValue main qb i cf seed u)
+                    expectedCost (seededForkWithSeedValue main qb i cf seed u)
                       CostModel.unit (fun n : ℕ ↦ (n : ENNReal))) ≤
                   wp ($ᵗ spec.Range i) (fun _ : spec.Range i => (qb i : ENNReal)) := by
                 refine wp_mono ($ᵗ spec.Range i) ?_
                 intro u
-                have hbound := isPerIndexQueryBound_forkWithSeedValue_seeded
+                have hbound := isPerIndexQueryBound_seededForkWithSeedValue
                   (main := main) (qb := qb) (i := i) (cf := cf) (u := u) hmain hseedCov
                 have hsum : ∑ j, Function.update (0 : QueryCount ι) i (qb i) j = qb i := by
                   classical
@@ -304,7 +310,7 @@ variable [Finite ι] [spec.Fintype] [spec.Inhabited]
 3. **Replay queries**: at most `qb i` live queries during the replayed execution.
 
 The RHS is their sum: `(∑ j in js, qb j * sampleCost j) + sampleCost i + qb i`. -/
-theorem forkExpectedQueryWork_le
+theorem seededForkExpectedQueryWork_le
     (main : OracleComp spec α) (qb : ι → ℕ) (js : List ι) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
     (sampleCost : ι → ℕ)
@@ -322,7 +328,7 @@ theorem forkExpectedQueryWork_le
           wp ($ᵗ spec.Range i)
             (fun u =>
               expectedCost
-                (forkWithSeedValue main qb i cf seed u)
+                (seededForkWithSeedValue main qb i cf seed u)
                 CostModel.unit
                 (fun n : ℕ ↦ (n : ENNReal)))) ≤
       ((js.map fun j => qb j * sampleCost j).sum + sampleCost i + qb i : ENNReal) := by
@@ -330,7 +336,7 @@ theorem forkExpectedQueryWork_le
   have hgen_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy hgen.toAbove
   have hi_le := AddWriterT.expectedCostNat_le_of_queryBoundedAboveBy (hSample i).toAbove
   have hcore :=
-    expectedQueryCount_forkWithSeedValue_le
+    expectedQueryCount_seededForkWithSeedValue_le
       (main := main) (qb := qb) (js := js) (i := i) (cf := cf) hmain hjs
   exact add_le_add (add_le_add hgen_le hi_le) hcore
 
@@ -344,11 +350,11 @@ variable (main : OracleComp spec α) (qb : ι → ℕ)
     [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec]
 
 omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
-/-- If `fork` succeeds (returns `some`), both runs agree on the fork index. -/
-theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
-    (h : some (x₁, x₂) ∈ support (fork main qb js i cf)) :
+/-- If `seededFork` succeeds (returns `some`), both runs agree on the fork index. -/
+theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
+    (h : some (x₁, x₂) ∈ support (seededFork main qb js i cf)) :
       ∃ s, cf x₁ = some s ∧ cf x₂ = some s := by
-  simp only [fork] at h
+  simp only [seededFork] at h
   rw [mem_support_bind_iff] at h; obtain ⟨seed, -, h⟩ := h
   rw [mem_support_bind_iff] at h; obtain ⟨y₁, -, h⟩ := h
   rcases hcf : cf y₁ with _ | s
@@ -365,17 +371,18 @@ theorem cf_eq_of_mem_support_fork (x₁ x₂ : α)
       · simp_all
 
 omit [OracleSpec.LawfulSubSpec unifSpec spec] in
-/-- On `fork` support, first-projection success equals old pair-style success event. -/
-theorem probEvent_fork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
-    Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf] =
-      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] := by
+/-- On `seededFork` support, first-projection success equals old pair-style success event. -/
+theorem probEvent_seededFork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
+    Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | seededFork main qb js i cf] =
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) |
+          seededFork main qb js i cf] := by
   refine probEvent_ext ?_
   intro r hr
   rcases r with _ | ⟨x₁, x₂⟩
   · simp
-  · have hmem : some (x₁, x₂) ∈ support (fork main qb js i cf) := by
+  · have hmem : some (x₁, x₂) ∈ support (seededFork main qb js i cf) := by
       simpa using hr
-    rcases cf_eq_of_mem_support_fork (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
+    rcases cf_eq_of_mem_support_seededFork (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
       x₁ x₂ hmem with ⟨t, h₁, h₂⟩
     simp [h₁, h₂]
 
@@ -705,34 +712,35 @@ private lemma sq_probOutput_main_le_noGuardComp (s : Fin (qb i + 1)) :
 
 /-- Key bound of the forking lemma: the probability that both runs succeed with fork point `s`
 is at least `Pr[cf(main) = s]² - Pr[cf(main) = s] / |Range i|`. -/
-theorem le_probOutput_fork (s : Fin (qb i + 1)) :
+theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
     let h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
     Pr[= s | cf <$> main] ^ 2 - Pr[= s | cf <$> main] / h
       ≤ Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) |
-            fork main qb js i cf] := by
+            seededFork main qb js i cf] := by
   set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
-  -- Reduce to the old pair-style success event on `fork` outputs.
-  rw [probEvent_fork_fst_eq_probEvent_pair (main := main) (qb := qb) (js := js) (i := i) (cf := cf)]
+  -- Reduce to the old pair-style success event on `seededFork` outputs.
+  rw [probEvent_seededFork_fst_eq_probEvent_pair
+        (main := main) (qb := qb) (js := js) (i := i) (cf := cf)]
   let f : Option (α × α) → Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) :=
     fun r => r.map (Prod.map cf cf)
   let z : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) := some (some s, some s)
   have hRhsEq :
-      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf] =
-      Pr[= z | f <$> fork main qb js i cf] := by
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | seededFork main qb js i cf] =
+      Pr[= z | f <$> seededFork main qb js i cf] := by
     calc
-      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | fork main qb js i cf]
-        = Pr[ fun r => f r = z | fork main qb js i cf] := by
+      Pr[ fun r => r.map (Prod.map cf cf) = some (some s, some s) | seededFork main qb js i cf]
+        = Pr[ fun r => f r = z | seededFork main qb js i cf] := by
             simp [f, z]
-      _ = Pr[ fun x => x = z | f <$> fork main qb js i cf] := by
+      _ = Pr[ fun x => x = z | f <$> seededFork main qb js i cf] := by
             simpa [Function.comp] using
               (probEvent_map
-                (mx := fork main qb js i cf)
+                (mx := seededFork main qb js i cf)
                 (f := f)
                 (q := fun x : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) =>
                   x = z)).symm
-      _ = Pr[= z | f <$> fork main qb js i cf] := by
+      _ = Pr[= z | f <$> seededFork main qb js i cf] := by
             simp [probEvent_eq_eq_probOutput
-              (mx := f <$> fork main qb js i cf) (x := z)]
+              (mx := f <$> seededFork main qb js i cf) (x := z)]
   rw [hRhsEq]
   -- Guard-collision branch contributes at most `Pr[cf(main)=s] / h`.
   have hCollision :
@@ -777,14 +785,14 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
     let x₂ ← (simulateQ seededOracle main).run' seed'
     return some (cf x₁, cf x₂)
   change Pr[= s | cf <$> main] ^ 2 - Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] ≤
-      Pr[= z | f <$> fork main qb js i cf]
+      Pr[= z | f <$> seededFork main qb js i cf]
   have hNoGuardLeAdd :
       Pr[= z | noGuardComp] ≤
-        Pr[= z | f <$> fork main qb js i cf] +
+        Pr[= z | f <$> seededFork main qb js i cf] +
           Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] := by
     simp only [noGuardComp, collisionComp]
     simp only [liftComp_eq_liftM, StateT.run'_eq, bind_pure_comp, Functor.map_map, bind_map_left,
-      fork, Fin.getElem?_fin, map_bind, z, f]
+      seededFork, Fin.getElem?_fin, map_bind, z, f]
     refine (probOutput_bind_congr_le_add
       (mx := (liftComp (generateSeed spec qb js) spec : OracleComp spec (QuerySeed spec)))
       (y := z) (z₁ := z) (z₂ := (some s : Option (Fin (qb i + 1))))) ?_
@@ -976,7 +984,7 @@ theorem le_probOutput_fork (s : Fin (qb i + 1)) :
           exact zero_le _
   have hNoGuardMinusLeRhs :
       Pr[= z | noGuardComp] - Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp] ≤
-        Pr[= z | f <$> fork main qb js i cf] :=
+        Pr[= z | f <$> seededFork main qb js i cf] :=
     (tsub_le_iff_right).2 hNoGuardLeAdd
   have hNoGuardGeSquare :
       Pr[= s | cf <$> main] ^ 2 ≤ Pr[= z | noGuardComp] := by
@@ -991,19 +999,19 @@ omit [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- Sum of disjoint fork-success events is at most the total `some` probability. -/
 private lemma sum_probEvent_fork_le_tsum_some :
     ∑ s : Fin (qb i + 1),
-      Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | fork main qb js i cf]
-    ≤ ∑' (p : α × α), Pr[= some p | fork main qb js i cf] := by
+      Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | seededFork main qb js i cf]
+    ≤ ∑' (p : α × α), Pr[= some p | seededFork main qb js i cf] := by
   classical
   simp_rw [probEvent_eq_tsum_ite]
   have hsplit : ∀ s : Fin (qb i + 1),
       (∑' (r : Option (α × α)),
-        if r.map (cf ∘ Prod.fst) = some (some s) then Pr[= r | fork main qb js i cf] else 0)
+        if r.map (cf ∘ Prod.fst) = some (some s) then Pr[= r | seededFork main qb js i cf] else 0)
       = ∑' (p : α × α), if cf p.1 = some s then
-          Pr[= some p | fork main qb js i cf] else 0 := by
+          Pr[= some p | seededFork main qb js i cf] else 0 := by
     intro s
     have h := tsum_option (fun r : Option (α × α) =>
       if r.map (cf ∘ Prod.fst) = some (some s) then
-        Pr[= r | fork main qb js i cf] else 0) ENNReal.summable
+        Pr[= r | seededFork main qb js i cf] else 0) ENNReal.summable
     simp only [Option.map, comp_apply, reduceCtorEq, ite_false, zero_add,
       Option.some.injEq] at h
     exact h
@@ -1019,7 +1027,7 @@ private lemma sum_probEvent_fork_le_tsum_some :
 omit [DecidableEq ι] [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq]
   [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- The standard forking-lemma precondition is itself a valid probability bound. -/
-theorem fork_precondition_le_one :
+theorem seededFork_precondition_le_one :
     (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
@@ -1040,11 +1048,11 @@ theorem fork_precondition_le_one :
       hacc_le_one hq)
 
 /-- Main forking lemma: the failure probability is bounded by `1 - acc * (acc / q - 1/h)`. -/
-theorem probOutput_none_fork_le :
+theorem probOutput_none_seededFork_le :
     let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
     let q := qb i + 1
-    Pr[= none | fork main qb js i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
+    Pr[= none | seededFork main qb js i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
   simp only
   set ps : Fin (qb i + 1) → ℝ≥0∞ := fun s => Pr[= (some s : Option _) | cf <$> main]
   set acc := ∑ s, ps s
@@ -1052,21 +1060,21 @@ theorem probOutput_none_fork_le :
   have hacc_ne_top : acc ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top
       (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
-  have htotal := probOutput_none_add_tsum_some (mx := fork main qb js i cf)
+  have htotal := probOutput_none_add_tsum_some (mx := seededFork main qb js i cf)
   rw [HasEvalPMF.probFailure_eq_zero, tsub_zero] at htotal
-  have hne_top : (∑' p, Pr[= some p | fork main qb js i cf]) ≠ ⊤ :=
+  have hne_top : (∑' p, Pr[= some p | seededFork main qb js i cf]) ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top (htotal ▸ le_add_self)
-  have hPr_eq : Pr[= none | fork main qb js i cf] =
-      1 - ∑' p, Pr[= some p | fork main qb js i cf] :=
+  have hPr_eq : Pr[= none | seededFork main qb js i cf] =
+      1 - ∑' p, Pr[= some p | seededFork main qb js i cf] :=
     ENNReal.eq_sub_of_add_eq hne_top htotal
-  calc Pr[= none | fork main qb js i cf]
-    _ = 1 - ∑' p, Pr[= some p | fork main qb js i cf] := hPr_eq
+  calc Pr[= none | seededFork main qb js i cf]
+    _ = 1 - ∑' p, Pr[= some p | seededFork main qb js i cf] := hPr_eq
     _ ≤ 1 - ∑ s, Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) |
-            fork main qb js i cf] :=
+            seededFork main qb js i cf] :=
         tsub_le_tsub_left (sum_probEvent_fork_le_tsum_some main qb js i cf) 1
     _ ≤ 1 - ∑ s, (ps s ^ 2 - ps s / h) :=
         tsub_le_tsub_left (Finset.sum_le_sum fun s _ =>
-          le_probOutput_fork main qb js i cf s) 1
+          le_probOutput_seededFork main qb js i cf s) 1
     _ ≤ 1 - acc * (acc / ↑(qb i + 1) - h⁻¹) := by
         apply tsub_le_tsub_left _ 1
         have hcs := ENNReal.sq_sum_le_card_mul_sum_sq
@@ -1096,30 +1104,30 @@ theorem probOutput_none_fork_le :
                     Finset.sum_add_distrib
 
 /-- Forking-lemma lower bound, packaged directly as the success-event probability. -/
-theorem le_probEvent_isSome_fork :
+theorem le_probEvent_isSome_seededFork :
     (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤
-      Pr[ fun r : Option (α × α) => r.isSome | fork main qb js i cf] := by
-  rw [probEvent_isSome_eq_one_sub_probOutput_none (mx := fork main qb js i cf)]
-  have hpre_le_one := fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
+      Pr[ fun r : Option (α × α) => r.isSome | seededFork main qb js i cf] := by
+  rw [probEvent_isSome_eq_one_sub_probOutput_none (mx := seededFork main qb js i cf)]
+  have hpre_le_one := seededFork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
   have hpre_ne_top :
       (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
        let h : ℝ≥0∞ := Fintype.card (spec.Range i)
        let q := qb i + 1
        acc * (acc / q - h⁻¹)) ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top hpre_le_one
-  have hnone_ne_top : Pr[= none | fork main qb js i cf] ≠ ⊤ :=
+  have hnone_ne_top : Pr[= none | seededFork main qb js i cf] ≠ ⊤ :=
     ne_top_of_le_ne_top one_ne_top probOutput_le_one
   have hfork :
-      Pr[= none | fork main qb js i cf] +
+      Pr[= none | seededFork main qb js i cf] +
           (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
            let h : ℝ≥0∞ := Fintype.card (spec.Range i)
            let q := qb i + 1
            acc * (acc / q - h⁻¹)) ≤ 1 :=
     (ENNReal.le_sub_iff_add_le_right hpre_ne_top hpre_le_one).1
-      (probOutput_none_fork_le (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
+      (probOutput_none_seededFork_le (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
   exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
     (by simpa [add_comm] using hfork)
 

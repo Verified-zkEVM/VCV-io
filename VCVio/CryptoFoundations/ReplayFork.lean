@@ -3,14 +3,14 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.SeededFork
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 
 /-!
 # Replay-Based Forking
 
 This file adds an additive replay-based fork path beside the existing seed-based
-forking infrastructure in `VCVio.CryptoFoundations.Fork`.
+forking infrastructure in `VCVio.CryptoFoundations.SeededFork`.
 
 The key idea is to record a first-run `QueryLog`, then replay that transcript
 exactly up to a selected fork point while changing one distinguished oracle
@@ -232,7 +232,7 @@ def replayRunWithTraceValue [spec.DecidableEq] (main : OracleComp spec α) (i : 
 
 /-- Deterministic replay-fork core with the first-run output and transcript fixed.
 
-This mirrors `forkWithSeedValue`: the first-run result and replacement answer are
+This mirrors `seededForkWithSeedValue`: the first-run result and replacement answer are
 inputs, while the second run may still make live oracle calls after the fork
 point. -/
 def forkReplayWithTraceValue [spec.DecidableEq] (main : OracleComp spec α)
@@ -1100,7 +1100,7 @@ theorem cf_eq_of_mem_support_forkReplay
         · simp at h
 
 /-- On `forkReplay` support, first-projection success equals the pair-style success event.
-This mirrors `probEvent_fork_fst_eq_probEvent_pair` for the replay fork. -/
+This mirrors `probEvent_seededFork_fst_eq_probEvent_pair` for the replay fork. -/
 theorem probEvent_forkReplay_fst_eq_probEvent_pair
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (s : Fin (qb i + 1)) :
@@ -1118,7 +1118,7 @@ theorem probEvent_forkReplay_fst_eq_probEvent_pair
     simp [h₁, h₂]
 
 /-- Key pointwise replay lower bound. This is the replay analogue of
-`le_probOutput_fork`.
+`le_probOutput_seededFork`.
 
 The summed (aggregated) version is the replay analogue of Firsov-Janku's `pr_fork_success`
 in [fsec/proof/Forking.ec:1175](../../../fsec/proof/Forking.ec). The quantitative argument
@@ -1130,8 +1130,8 @@ decomposes into:
 4. `square_sum` [Forking.ec:1148]: Jensen / Cauchy-Schwarz `Σ aⱼ² ≥ (Σ aⱼ)² / Q`.
 
 In Lean the analogous pointwise bound corresponds to step (3) combined with (1) and is
-structurally similar to the seed-based `le_probOutput_fork` proof in
-`VCVio/CryptoFoundations/Fork.lean`, with `replayFirstRun`/`replayRunWithTraceValue` playing
+structurally similar to the seed-based `le_probOutput_seededFork` proof in
+`VCVio/CryptoFoundations/SeededFork.lean`, with `replayFirstRun`/`replayRunWithTraceValue` playing
 the role of `generateSeed`/`seededOracle` and `QueryLog.takeBeforeFork`-style slicing replacing
 `QuerySeed.takeAtIndex`. -/
 theorem le_probOutput_forkReplay
@@ -1145,7 +1145,7 @@ theorem le_probOutput_forkReplay
 
 omit [spec.DecidableEq] [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] in
 /-- The replay-fork precondition is itself bounded by `1`. This mirrors
-`fork_precondition_le_one`; the statement is independent of the fork mechanism. -/
+`seededFork_precondition_le_one`; the statement is independent of the fork mechanism. -/
 theorem forkReplay_precondition_le_one
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
@@ -1153,7 +1153,7 @@ theorem forkReplay_precondition_le_one
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤ 1 :=
-  fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
+  seededFork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
 
 /-- Sum of disjoint replay-fork success events is at most the total `some` probability.
 This mirrors `sum_probEvent_fork_le_tsum_some` in `Fork.lean`; the proof is purely
@@ -1188,7 +1188,7 @@ private lemma sum_probEvent_forkReplay_le_tsum_some
   · rw [Finset.sum_eq_single s₀ (by intro b _ hb; simp [Ne.symm hb]) (by simp)]
     simp
 
-/-- Replay fork failure probability bound. This mirrors `probOutput_none_fork_le`;
+/-- Replay fork failure probability bound. This mirrors `probOutput_none_seededFork_le`;
 the proof structure is identical, substituting the pointwise replay lower bound
 `le_probOutput_forkReplay` for its seed-based analogue. -/
 theorem probOutput_none_forkReplay_le
@@ -1249,9 +1249,9 @@ theorem probOutput_none_forkReplay_le
                     Finset.sum_add_distrib
 
 /-- Packaged replay forking theorem. This is the replay analogue of
-`le_probEvent_isSome_fork`, derived from `probOutput_none_forkReplay_le` and
+`le_probEvent_isSome_seededFork`, derived from `probOutput_none_forkReplay_le` and
 `forkReplay_precondition_le_one` by the same `1 - ·` conversion used in
-`le_probEvent_isSome_fork`. -/
+`le_probEvent_isSome_seededFork`. -/
 theorem le_probEvent_isSome_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :

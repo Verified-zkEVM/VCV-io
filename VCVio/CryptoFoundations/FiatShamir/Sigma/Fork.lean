@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 
 import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
-import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 
 /-!
@@ -219,6 +219,7 @@ noncomputable def advantage
     (qH : ℕ) : ENNReal :=
   Pr[= true | exp σ hr M nmaAdv qH]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
 `OracleComp (unifSpec + (Unit →ₒ Chal))` level.
 

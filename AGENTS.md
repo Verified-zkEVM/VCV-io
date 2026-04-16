@@ -93,7 +93,8 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Asymptotic security games: `VCVio/CryptoFoundations/Asymptotics/Security.lean`
 - Negligible function algebra: `VCVio/CryptoFoundations/Asymptotics/Negligible.lean`
 - Query enforcement: `VCVio/OracleComp/QueryTracking/Enforcement.lean`
-- Forking lemma research: `VCVio/CryptoFoundations/Fork.lean`
+- Seeded (Bellare-Neven) forking lemma: `VCVio/CryptoFoundations/SeededFork.lean`
+- Replay-based forking lemma: `VCVio/CryptoFoundations/ReplayFork.lean`
 - Fischlin transform: `VCVio/CryptoFoundations/Fischlin.lean`
 - Interaction spec and transcript: `VCVio/Interaction/Basic/Spec.lean`
 - Two-party roles and strategies: `VCVio/Interaction/TwoParty/Strategy.lean`

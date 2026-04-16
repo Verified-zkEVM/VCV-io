@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.Schnorr
-import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.SeededFork
 
 /-!
 # Fork-Extractor Soundness and Query-Work Bounds for Schnorr
@@ -211,14 +211,14 @@ theorem fork_expectedQueryWork_le
           wp ($ᵗ F : ProbComp F)
             (fun u =>
               expectedCost
-                (OracleComp.forkWithSeedValue main (challengeBudget q) () cf seed u)
+                (OracleComp.seededForkWithSeedValue main (challengeBudget q) () cf seed u)
                 CostModel.unit
                 (fun n : ℕ ↦ (n : ENNReal))))
       ≤ (2 * q + 1 : ENNReal) := by
   letI : SampleableType F := FinEnum.SampleableType F
   have hjs : OracleComp.SeedListCovers (challengeBudget q) [()] := by
     intro t ht; simp
-  have hbound := OracleComp.forkExpectedQueryWork_le
+  have hbound := OracleComp.seededForkExpectedQueryWork_le
     (main := main) (qb := challengeBudget q) (js := [()]) (i := ()) (cf := cf)
     (sampleCost := fun _ => 1)
     (fun _ => challengeSample_queryCostExactly_one (F := F))
