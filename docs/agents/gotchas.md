@@ -115,8 +115,8 @@ maintained by `./scripts/update-lib.sh` and used by CI, currently `VCVio.lean`,
 When a new top-level root is added, extend this list alongside it.
 
 **Not allowed**: umbrellas inside a subdirectory (e.g. a top-level
-`VCVio/CryptoFoundations/FiatShamir.lean` beside the `FiatShamir/` folder, or
-`VCVio/OracleComp.lean` beside the `OracleComp/` folder). Even if a module "feels
+`VCVio.CryptoFoundations.FiatShamir` umbrella beside the `VCVio/CryptoFoundations/FiatShamir/`
+folder, or a `VCVio.OracleComp` umbrella beside the `VCVio/OracleComp/` folder). Even if a module "feels
 cohesive", callers must import the specific submodule they use.
 
 ## Build and Tooling

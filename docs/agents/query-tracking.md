@@ -250,7 +250,7 @@ ExpectedQueries[ oa in runtime ]
 
 ### Fiat-Shamir
 
-See `VCVio/CryptoFoundations/FiatShamir.lean`.
+See `VCVio/CryptoFoundations/FiatShamir/Sigma.lean`.
 
 This is the clean “exact one query” example.
 
@@ -287,7 +287,10 @@ These illustrate:
 
 ### Fiat-Shamir with aborts
 
-See `VCVio/CryptoFoundations/FiatShamirWithAbort.lean`.
+See:
+
+- `VCVio/CryptoFoundations/FiatShamir/WithAbort/Cost.lean`
+- `VCVio/CryptoFoundations/FiatShamir/WithAbort/ExpectedCost.lean`
 
 This is the main stopping-time example.
 

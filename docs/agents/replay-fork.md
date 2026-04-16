@@ -4,7 +4,7 @@ This note sketches an additive replay-based fork design for `VCVio`.
 It is intended to live beside the existing seed-based fork infrastructure, not replace it.
 
 The immediate motivation is the Fiat-Shamir setting in
-[`VCVio/CryptoFoundations/FiatShamir.lean`](../../VCVio/CryptoFoundations/FiatShamir.lean),
+[`VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean`](../../VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean),
 where the current fork construction shares only the rewound challenge oracle and does not
 share arbitrary ambient `unifSpec` randomness.
 
@@ -208,7 +208,7 @@ not by arguing that both runs consume the same pre-generated seed.
 ## Fiat-Shamir Integration
 
 The replay design is especially useful for
-[`VCVio/CryptoFoundations/FiatShamir.lean`](../../VCVio/CryptoFoundations/FiatShamir.lean).
+[`VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean`](../../VCVio/CryptoFoundations/FiatShamir/Sigma/Fork.lean).
 
 The current forkable managed-RO NMA setup lets ambient `unifSpec` randomness stay live.
 That is fine operationally, but it does not fit the current seed-based fork proof.
