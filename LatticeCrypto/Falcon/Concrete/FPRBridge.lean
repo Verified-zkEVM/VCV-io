@@ -116,9 +116,6 @@ codec, public-key codec, and fast arithmetic kernels are related to their specif
 counterparts. The abstract verifier is instantiated with the same concrete verification fields. -/
 theorem concrete_verify_eq_verify
     (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) (hsbytelen : 0 < p.sbytelen)
-    (hverifyEmpty : ∀ (pkBytes : ByteArray) (salt : Bytes 40) (msg : List Byte),
-      Falcon.Concrete.concreteVerify p pkBytes msg
-        (Falcon.Concrete.sigEncode salt [] p.logn) = false)
     (hsigDecode : ∀ (salt : Bytes 40) (compSig : List Byte),
       compSig ≠ [] →
         Falcon.Concrete.sigDecode (Falcon.Concrete.sigEncode salt compSig p.logn) p.logn =
@@ -142,7 +139,11 @@ theorem concrete_verify_eq_verify
       simpa [hcomp] using hsbytelen
     have hdecomp : (verifyPrimitives p hn).decompress [] p.sbytelen = none := by
       simp [verifyPrimitives, Falcon.Concrete.decompress, hsbytelen]
-    have hleft := hverifyEmpty ((verifyPrimitives p hn).publicKeyBytes pk.h) sig.salt msg
+    have hleft :
+        Falcon.Concrete.concreteVerify p ((verifyPrimitives p hn).publicKeyBytes pk.h) msg
+          (Falcon.Concrete.sigEncode sig.salt [] p.logn) = false := by
+      exact Falcon.Concrete.concreteVerify_sigEncode_nil_eq_false p
+        ((verifyPrimitives p hn).publicKeyBytes pk.h) sig.salt msg
     have hright : Falcon.verify p (verifyPrimitives p hn) pk msg sig = false := by
       simp [Falcon.verify, hcomp, hdecomp]
     simpa [hcomp] using hleft.trans hright.symm

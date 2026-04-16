@@ -98,6 +98,11 @@ def concreteVerify (p : Params) (pk : ByteArray) (msg : List Byte)
         let s1 := c - negacyclicMulU32 s2 h
         return pairL2NormSqU32 s1 s2 ≤ p.betaSquared
 
+@[simp] theorem concreteVerify_sigEncode_nil_eq_false
+    (p : Params) (pk : ByteArray) (salt : Bytes 40) (msg : List Byte) :
+    concreteVerify p pk msg (sigEncode salt [] p.logn) = false := by
+  simp [concreteVerify]
+
 /-! ## Abstract primitives instance -/
 
 private def samplerSeedBytes : Nat := 56

@@ -236,9 +236,24 @@ def signAttempt (logn : Nat) (f g capF capG : Array Int32)
 
 /-! ### Full signing function -/
 
+private partial def concreteSignLoop (logn n dlen : Nat) (f g capF capG : Array Int32)
+    (pk : ByteArray) (msg : List Byte) (masterPRNG : PRNGState) : Option ByteArray := Id.run do
+  let (salt, prng1) := prngNextSalt masterPRNG
+  let (subSeedBA, prng2) := prngNextBytes prng1 56
+  let samplerPRNG := PRNGState.init subSeedBA
+  let hm := hashToPoint n salt pk msg
+  let hmArr := rqToUInt16Array hm
+  let (result, _) := signAttempt (F := F) logn f g capF capG hmArr samplerPRNG
+  if let some s2 := result then
+    let s2Poly : IntPoly n := Vector.ofFn fun ⟨i, _⟩ => s2.getD i 0
+    if let some compSig := compress n s2Poly dlen then
+      return some (sigEncode salt compSig logn)
+  return concreteSignLoop logn n dlen f g capF capG pk msg prng2
+
 /-- Full Falcon signing. On each iteration: generate a fresh salt and sampler seed, hash
 the message to a polynomial in `R_q`, attempt signing, and compress/encode on success.
-Retries up to 1000 times (expected: ~1–2 iterations for production parameters).
+The reference C loop retries until success; this Lean port now matches that behavior
+with a `partial` recursive loop instead of an arbitrary retry cap.
 
 Takes the secret key polynomials as `Array Int32`; use `int8ArrayToInt32` to convert from
 `Array Int8`. Returns the encoded signature: `header(1) ‖ salt(40) ‖ compressed_s₂`. -/
@@ -247,20 +262,7 @@ def concreteSign (logn : Nat) (f g capF capG : Array Int32)
   let n := 1 <<< logn
   let some dlen := sbytelenForLogn? logn
     | return none
-  let mut masterPRNG := PRNGState.init seed
-  for _ in [0:1000] do
-    let (salt, prng1) := prngNextSalt masterPRNG
-    let (subSeedBA, prng2) := prngNextBytes prng1 56
-    masterPRNG := prng2
-    let samplerPRNG := PRNGState.init subSeedBA
-    let hm := hashToPoint n salt pk msg
-    let hmArr := rqToUInt16Array hm
-    let (result, _) := signAttempt (F := F) logn f g capF capG hmArr samplerPRNG
-    if let some s2 := result then
-      let s2Poly : IntPoly n := Vector.ofFn fun ⟨i, _⟩ => s2.getD i 0
-      if let some compSig := compress n s2Poly dlen then
-        return some (sigEncode salt compSig logn)
-  return none
+  return concreteSignLoop (F := F) logn n dlen f g capF capG pk msg (PRNGState.init seed)
 
 end Generic
 
