@@ -54,6 +54,40 @@ lemma inputAt?_logQuery_self (log : QueryLog spec) (t : ι) (u : spec.Range t) :
   rw [List.getElem?_append_right (Nat.le_refl _)]
   simp
 
+/-- Decompose `getQ` across a `logQuery` step. -/
+lemma getQ_logQuery (log : QueryLog spec) (t : ι) (u : spec.Range t)
+    (p : ι → Prop) [DecidablePred p] :
+    (log.logQuery t u).getQ p = log.getQ p ++ (if p t then [⟨t, u⟩] else []) := by
+  simp [QueryLog.logQuery, QueryLog.singleton]
+
+/-- If `getQueryValue? log t n = some u`, then the `n`-th `t`-filtered entry of
+`log` is `⟨t, u⟩`. -/
+lemma getQ_getElem?_eq_of_getQueryValue?_eq_some [spec.DecidableEq]
+    (log : QueryLog spec) (t : ι) (n : Nat) (u : spec.Range t)
+    (h : getQueryValue? log t n = some u) :
+    (log.getQ (· = t))[n]? = some ⟨t, u⟩ := by
+  unfold getQueryValue? at h
+  generalize hlk : (log.getQ (· = t))[n]? = opt at h
+  match opt, hlk, h with
+  | none, _, h => simp at h
+  | some ⟨t', u'⟩, _, h =>
+      by_cases ht : t' = t
+      · subst ht
+        simp only [↓reduceDIte, Option.some.injEq] at h
+        subst h
+        rfl
+      · simp [ht] at h
+
+/-- Converse: if the `n`-th `t`-filtered entry is `⟨t, u⟩`, then
+`getQueryValue? log t n = some u`. -/
+lemma getQueryValue?_eq_some_of_getQ_getElem? [spec.DecidableEq]
+    (log : QueryLog spec) (t : ι) (n : Nat) (u : spec.Range t)
+    (h : (log.getQ (· = t))[n]? = some ⟨t, u⟩) :
+    getQueryValue? log t n = some u := by
+  unfold getQueryValue?
+  rw [h]
+  simp
+
 end QueryLog
 
 namespace OracleComp
@@ -585,6 +619,330 @@ lemma replayRunWithTraceValue_forkConsumed_imp_last_input [spec.DecidableEq]
     (main := main) (i := i) (trace := trace) (forkQuery := forkQuery)
     (replacement := replacement) hz (n := z.2.cursor - 1) (by omega)).trans htrace
 
+/-- The replay oracle never mutates the immutable parameters `forkQuery`, `replacement`,
+or `trace`. -/
+private lemma replayOracle_immutable_params [spec.DecidableEq]
+    (i : ι) (t : ι) {st : ReplayForkState spec i}
+    {z : spec.Range t × ReplayForkState spec i}
+    (hz : z ∈ support (((replayOracle i) t).run st :
+      OracleComp spec (spec.Range t × ReplayForkState spec i))) :
+    z.2.forkQuery = st.forkQuery ∧ z.2.replacement = st.replacement ∧
+      z.2.trace = st.trace := by
+  unfold replayOracle at hz
+  simp only [StateT.run_bind, StateT.run_get, pure_bind] at hz
+  by_cases hlive : st.forkConsumed || st.mismatch
+  · simp only [hlive, ↓reduceIte, bind_pure_comp, StateT.run_bind, StateT.run_monadLift,
+        monadLift_eq_self, StateT.run_map, StateT.run_set, map_pure, Functor.map_map,
+        support_map, support_liftM, OracleQuery.input_query, OracleQuery.cont_query,
+        Set.range_id, Set.image_univ, Set.mem_range] at hz
+    rcases hz with ⟨u, _, rfl⟩
+    simp [ReplayForkState.noteObserved]
+  · simp only [hlive, Bool.false_eq_true, ↓reduceIte, bind_pure_comp, dite_eq_ite] at hz
+    cases hnext : st.nextEntry? with
+    | none =>
+        simp only [hnext, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self,
+            bind_pure_comp, StateT.run_map, StateT.run_set, map_pure, Functor.map_map,
+            support_map, support_liftM, OracleQuery.input_query, OracleQuery.cont_query,
+            Set.range_id, Set.image_univ, Set.mem_range] at hz
+        rcases hz with ⟨u, _, rfl⟩
+        simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
+    | some entry =>
+        rcases entry with ⟨t', u'⟩
+        by_cases hsame : t = t'
+        · cases hsame
+          by_cases hti : t = i
+          · cases hti
+            by_cases hfork : st.distinguishedCount = st.forkQuery
+            · simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                  map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              exact ⟨rfl, rfl, rfl⟩
+            · simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                  map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              exact ⟨rfl, rfl, rfl⟩
+          · simp only [hnext, ↓reduceDIte, hti, StateT.run_map, StateT.run_set, map_pure,
+                support_pure, Set.mem_singleton_iff] at hz
+            rcases hz with rfl
+            exact ⟨rfl, rfl, rfl⟩
+        · simp only [hnext, hsame, ↓reduceDIte, StateT.run_bind, StateT.run_monadLift,
+              monadLift_eq_self, bind_pure_comp, StateT.run_map, StateT.run_set, map_pure,
+              Functor.map_map, support_map, support_liftM, OracleQuery.input_query,
+              OracleQuery.cont_query, Set.range_id, Set.image_univ, Set.mem_range] at hz
+          rcases hz with ⟨u, _, rfl⟩
+          simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
+
+private theorem replayRun_immutable_params [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (((simulateQ (replayOracle i) main).run st₀) :
+      OracleComp spec (α × ReplayForkState spec i))) :
+    z.2.forkQuery = st₀.forkQuery ∧ z.2.replacement = st₀.replacement ∧
+      z.2.trace = st₀.trace := by
+  induction main using OracleComp.inductionOn generalizing st₀ z with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      obtain ⟨rfl, rfl⟩ := Prod.mk.inj hz
+      exact ⟨rfl, rfl, rfl⟩
+  | query_bind t oa ih =>
+      rw [simulateQ_query_bind, StateT.run_bind] at hz
+      rw [support_bind] at hz
+      simp only [Set.mem_iUnion] at hz
+      obtain ⟨us, hus, hz⟩ := hz
+      have h₁ := replayOracle_immutable_params (i := i) (t := t) hus
+      have h₂ := ih (u := us.1) (st₀ := us.2) (z := z) hz
+      exact ⟨h₂.1.trans h₁.1, h₂.2.1.trans h₁.2.1, h₂.2.2.trans h₁.2.2⟩
+
+lemma replayRunWithTraceValue_forkQuery_eq [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
+    (forkQuery : Nat) (replacement : spec.Range i)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement)) :
+    z.2.forkQuery = forkQuery := by
+  unfold replayRunWithTraceValue at hz
+  simpa [ReplayForkState.init] using
+    (replayRun_immutable_params (main := main) (i := i)
+      (st₀ := ReplayForkState.init trace forkQuery replacement) hz).1
+
+lemma replayRunWithTraceValue_replacement_eq [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
+    (forkQuery : Nat) (replacement : spec.Range i)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement)) :
+    z.2.replacement = replacement := by
+  unfold replayRunWithTraceValue at hz
+  simpa [ReplayForkState.init] using
+    (replayRun_immutable_params (main := main) (i := i)
+      (st₀ := ReplayForkState.init trace forkQuery replacement) hz).2.1
+
+lemma replayRunWithTraceValue_trace_eq [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
+    (forkQuery : Nat) (replacement : spec.Range i)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement)) :
+    z.2.trace = trace := by
+  unfold replayRunWithTraceValue at hz
+  simpa [ReplayForkState.init] using
+    (replayRun_immutable_params (main := main) (i := i)
+      (st₀ := ReplayForkState.init trace forkQuery replacement) hz).2.2
+
+/-- Second replay invariant: once the fork has fired, the `forkQuery`-th entry among
+distinguished-oracle queries in the observed log is exactly the replacement value.
+
+Before the fork fires and before any mismatch, `distinguishedCount` exactly tracks the number
+of `i`-entries in `observed`. Once the fork fires, position `forkQuery` in the `i`-filtered
+observed log is permanently pinned to `replacement`. -/
+def ReplayReplacementInvariant [spec.DecidableEq] (i : ι) (st : ReplayForkState spec i) :
+    Prop :=
+  (st.forkConsumed = false → st.mismatch = false →
+    (st.observed.getQ (· = i)).length = st.distinguishedCount) ∧
+  (st.forkConsumed = true →
+    (st.observed.getQ (· = i))[st.forkQuery]?
+      = some (⟨i, st.replacement⟩ : (t : ι) × spec.Range t))
+
+namespace ReplayReplacementInvariant
+
+variable [spec.DecidableEq] {i : ι}
+
+lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i) :
+    ReplayReplacementInvariant i
+      (ReplayForkState.init trace forkQuery replacement) := by
+  refine ⟨?_, ?_⟩
+  · intro _ _
+    simp [ReplayForkState.init]
+  · intro hfork
+    simp [ReplayForkState.init] at hfork
+
+end ReplayReplacementInvariant
+
+private lemma replayOracle_preservesReplacementInvariant [spec.DecidableEq]
+    (i : ι) (t : ι) {st : ReplayForkState spec i}
+    (hInv : ReplayReplacementInvariant i st)
+    {z : spec.Range t × ReplayForkState spec i}
+    (hz : z ∈ support (((replayOracle i) t).run st :
+      OracleComp spec (spec.Range t × ReplayForkState spec i))) :
+    ReplayReplacementInvariant i z.2 := by
+  obtain ⟨hPre, hPost⟩ := hInv
+  unfold replayOracle at hz
+  simp only [StateT.run_bind, StateT.run_get, pure_bind] at hz
+  by_cases hlive : st.forkConsumed || st.mismatch
+  · -- Live / post-fork-or-post-mismatch branch: append a fresh sample to observed.
+    simp only [hlive, ↓reduceIte, bind_pure_comp, StateT.run_bind, StateT.run_monadLift,
+        monadLift_eq_self, StateT.run_map, StateT.run_set, map_pure, Functor.map_map,
+        support_map, support_liftM, OracleQuery.input_query, OracleQuery.cont_query,
+        Set.range_id, Set.image_univ, Set.mem_range] at hz
+    rcases hz with ⟨u, _, rfl⟩
+    dsimp only
+    refine ⟨?_, ?_⟩
+    · intro hfc hm
+      simp only [ReplayForkState.noteObserved] at hfc hm
+      rcases Bool.or_eq_true_iff.mp hlive with hfc' | hm'
+      · exact (Bool.eq_false_iff.mp hfc hfc').elim
+      · exact (Bool.eq_false_iff.mp hm hm').elim
+    · intro hfc
+      simp only [ReplayForkState.noteObserved] at hfc ⊢
+      have hfcPre : st.forkConsumed = true := hfc
+      have hPostApp := hPost hfcPre
+      -- `observed` grows by appending; the fork-query position is preserved.
+      rw [QueryLog.getQ_logQuery]
+      by_cases ht : t = i
+      · subst ht
+        simp only [if_true]
+        rw [List.getElem?_append_left]
+        · exact hPostApp
+        · have hlt : st.forkQuery < (st.observed.getQ (· = t)).length :=
+            List.getElem?_eq_some_iff.mp hPostApp |>.1
+          exact hlt
+      · simp only [if_neg ht, List.append_nil]
+        exact hPostApp
+  · simp only [hlive, Bool.false_eq_true, ↓reduceIte, bind_pure_comp, dite_eq_ite] at hz
+    have hflags : st.forkConsumed = false ∧ st.mismatch = false := by
+      rcases Bool.or_eq_false_iff.mp (by simpa using hlive) with ⟨hfc, hm⟩
+      exact ⟨hfc, hm⟩
+    cases hnext : st.nextEntry? with
+    | none =>
+        simp only [hnext, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self,
+            bind_pure_comp, StateT.run_map, StateT.run_set, map_pure, Functor.map_map,
+            support_map, support_liftM, OracleQuery.input_query, OracleQuery.cont_query,
+            Set.range_id, Set.image_univ, Set.mem_range] at hz
+        rcases hz with ⟨u, _, rfl⟩
+        dsimp only
+        refine ⟨?_, ?_⟩
+        · intro _ hm
+          exfalso
+          simp [ReplayForkState.markMismatch, ReplayForkState.noteObserved] at hm
+        · intro hfc
+          exfalso
+          simp [ReplayForkState.markMismatch, ReplayForkState.noteObserved, hflags.1] at hfc
+    | some entry =>
+        rcases entry with ⟨t', u'⟩
+        by_cases hsame : t = t'
+        · cases hsame
+          by_cases hti : t = i
+          · cases hti
+            by_cases hfork : st.distinguishedCount = st.forkQuery
+            · -- Fork fires: append `replacement`, set forkConsumed := true.
+              simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                  map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              dsimp only
+              refine ⟨?_, ?_⟩
+              · intro hfc' _
+                simp at hfc'
+              · intro _
+                have hPreApp := hPre hflags.1 hflags.2
+                rw [QueryLog.getQ_logQuery]
+                simp only [if_true]
+                rw [List.getElem?_append_right (by omega)]
+                simp [hPreApp, hfork]
+            · -- Matching i-query before the fork fires: append logged value,
+              -- increment distinguishedCount.
+              simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                  map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              dsimp only
+              refine ⟨?_, ?_⟩
+              · intro _ _
+                have hPreApp := hPre hflags.1 hflags.2
+                rw [QueryLog.getQ_logQuery]
+                simp only [if_true]
+                simp [hPreApp]
+              · intro hfc'
+                simp [hflags.1] at hfc'
+          · -- Matching non-i query.
+            simp only [hnext, ↓reduceDIte, hti, StateT.run_map, StateT.run_set, map_pure,
+                support_pure, Set.mem_singleton_iff] at hz
+            rcases hz with rfl
+            dsimp only
+            refine ⟨?_, ?_⟩
+            · intro _ _
+              have hPreApp := hPre hflags.1 hflags.2
+              rw [QueryLog.getQ_logQuery]
+              simp only [if_neg hti, List.append_nil]
+              exact hPreApp
+            · intro hfc'
+              simp [hflags.1] at hfc'
+        · simp only [hnext, hsame, ↓reduceDIte, StateT.run_bind, StateT.run_monadLift,
+              monadLift_eq_self, bind_pure_comp, StateT.run_map, StateT.run_set, map_pure,
+              Functor.map_map, support_map, support_liftM, OracleQuery.input_query,
+              OracleQuery.cont_query, Set.range_id, Set.image_univ, Set.mem_range] at hz
+          rcases hz with ⟨u, _, rfl⟩
+          dsimp only
+          refine ⟨?_, ?_⟩
+          · intro _ hm
+            exfalso
+            simp [ReplayForkState.markMismatch, ReplayForkState.noteObserved] at hm
+          · intro hfc
+            exfalso
+            simp [ReplayForkState.markMismatch, ReplayForkState.noteObserved, hflags.1] at hfc
+
+private theorem replayRun_preservesReplacementInvariant [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
+    (hInv : ReplayReplacementInvariant i st₀)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (((simulateQ (replayOracle i) main).run st₀) :
+      OracleComp spec (α × ReplayForkState spec i))) :
+    ReplayReplacementInvariant i z.2 := by
+  induction main using OracleComp.inductionOn generalizing st₀ z with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      obtain ⟨rfl, rfl⟩ := Prod.mk.inj hz
+      exact hInv
+  | query_bind t oa ih =>
+      rw [simulateQ_query_bind, StateT.run_bind] at hz
+      rw [support_bind] at hz
+      simp only [Set.mem_iUnion] at hz
+      obtain ⟨us, hus, hz⟩ := hz
+      have husInv := replayOracle_preservesReplacementInvariant (i := i) (t := t) hInv hus
+      exact ih (u := us.1) husInv hz
+
+/-- Every reachable replay state preserves the replacement invariant. -/
+theorem replayRunWithTraceValue_preservesReplacementInvariant [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
+    (forkQuery : Nat) (replacement : spec.Range i)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement)) :
+    ReplayReplacementInvariant i z.2 := by
+  unfold replayRunWithTraceValue at hz
+  exact replayRun_preservesReplacementInvariant
+    (main := main) (i := i)
+    (hInv := ReplayReplacementInvariant.init (i := i) trace forkQuery replacement) hz
+
+/-- If the replay has consumed the fork and the fork point is `forkQuery`, then the
+`forkQuery`-th distinguished-oracle entry in the observed log is exactly the replacement. -/
+lemma replayRunWithTraceValue_getQueryValue?_observed_eq_replacement [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
+    (forkQuery : Nat) (replacement : spec.Range i)
+    {z : α × ReplayForkState spec i}
+    (hz : z ∈ support (replayRunWithTraceValue main i trace forkQuery replacement))
+    (hfork : z.2.forkConsumed = true) :
+    QueryLog.getQueryValue? z.2.observed i forkQuery = some replacement := by
+  have hInv := replayRunWithTraceValue_preservesReplacementInvariant
+    (main := main) (i := i) (trace := trace) (forkQuery := forkQuery)
+    (replacement := replacement) hz
+  -- `forkQuery` stays equal to `z.2.forkQuery` — the replay oracle never mutates it.
+  -- We can read this from `ReplayForkState.init`, but easier: prove a preservation lemma
+  -- or note that the replayOracle never writes `forkQuery`.
+  have hfq : z.2.forkQuery = forkQuery := by
+    exact replayRunWithTraceValue_forkQuery_eq
+      (main := main) (i := i) (trace := trace) (forkQuery := forkQuery)
+      (replacement := replacement) hz
+  have hrep : z.2.replacement = replacement := by
+    exact replayRunWithTraceValue_replacement_eq
+      (main := main) (i := i) (trace := trace) (forkQuery := forkQuery)
+      (replacement := replacement) hz
+  have hPostApp := hInv.2 hfork
+  rw [hfq] at hPostApp
+  rw [hrep] at hPostApp
+  exact QueryLog.getQueryValue?_eq_some_of_getQ_getElem? _ _ _ _ hPostApp
+
 private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
     [spec.Fintype] [spec.Inhabited]
     (i : ι) (t : ι) {st : ReplayForkState spec i}
@@ -930,12 +1288,13 @@ second run is witnessed by a replay state whose observed log agrees with the fir
 replayed prefix.
 
 This mirrors Firsov-Janku's `success_log_props` at
-[fsec/proof/Forking.ec:1373](../../../fsec/proof/Forking.ec). The EC proof uses a head-tracking
-invariant `(head Log.log).1 = q0` maintained through the `while` loop plus `take_catl` and
-`take_take` list lemmas; the Lean analogue can use induction on `cursor` together with
-`replayRunWithTraceValue_prefix_input_eq` and a dedicated distinguished-query-count invariant
-extracting `getQueryValue? st.observed i st.forkQuery = some st.replacement` once the fork
-has fired. -/
+[fsec/proof/Forking.ec:1373](../../../fsec/proof/Forking.ec). The Lean proof is library-native:
+it unfolds `forkReplay` with `mem_support_bind_iff`, then consumes the already-proved
+support-level lemmas `replayRunWithTraceValue_mem_support_replayFirstRun`,
+`replayRunWithTraceValue_prefix_input_eq`, and
+`replayRunWithTraceValue_getQueryValue?_observed_eq_replacement`. No procedural while-loop
+invariant is needed; the replacement invariant `ReplayReplacementInvariant` is established
+pointwise by induction on the replay oracle. -/
 theorem forkReplay_success_log_props
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -954,7 +1313,64 @@ theorem forkReplay_success_log_props
         st.forkConsumed = true ∧
         (∀ n, n < st.cursor →
           QueryLog.inputAt? log₂ n = QueryLog.inputAt? log₁ n) := by
-  sorry
+  simp only [forkReplay] at h
+  rw [mem_support_bind_iff] at h
+  obtain ⟨first, hfirst, h⟩ := h
+  rcases hcf : cf first.1 with _ | s
+  · simp_all
+  · simp only [hcf] at h
+    rw [mem_support_bind_iff] at h
+    obtain ⟨u, -, h⟩ := h
+    simp only [forkReplayWithTraceValue, hcf] at h
+    rcases hq : QueryLog.getQueryValue? first.2 i ↑s with _ | logged
+    · simp_all
+    · simp only [hq] at h
+      split_ifs at h with heq
+      · simp_all
+      · rw [mem_support_bind_iff] at h
+        obtain ⟨z, hz, h⟩ := h
+        split_ifs at h with hbad hcf₂
+        · simp_all
+        · rw [mem_support_pure_iff] at h
+          obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj h)
+          -- `hbad : ¬(z.2.mismatch || !z.2.forkConsumed) = true`, so both components fail.
+          have hbad' : (z.2.mismatch || !z.2.forkConsumed) = false :=
+            Bool.not_eq_true _ |>.mp hbad
+          have hmismatch_false : z.2.mismatch = false :=
+            (Bool.or_eq_false_iff.mp hbad').1
+          have hforkConsumed : z.2.forkConsumed = true := by
+            have := (Bool.or_eq_false_iff.mp hbad').2
+            rcases hfc : z.2.forkConsumed with _ | _
+            · simp [hfc] at this
+            · rfl
+          have htrace : z.2.trace = first.2 :=
+            replayRunWithTraceValue_trace_eq (main := main) (i := i) (trace := first.2)
+              (forkQuery := ↑s) (replacement := u) hz
+          refine ⟨first.2, z.2.observed, s, ?_, ?_, hcf, hcf₂, ?_,
+            u, z.2, ?_, rfl, hmismatch_false, hforkConsumed, ?_⟩
+          · -- `(x₁, first.2) ∈ support (replayFirstRun main)`
+            simpa using hfirst
+          · -- `(x₂, z.2.observed) ∈ support (replayFirstRun main)`
+            exact replayRunWithTraceValue_mem_support_replayFirstRun
+              (main := main) (i := i) (trace := first.2) (forkQuery := ↑s)
+              (replacement := u) hz
+          · -- `getQueryValue? first.2 i s ≠ getQueryValue? z.2.observed i s`
+            have hrhs := replayRunWithTraceValue_getQueryValue?_observed_eq_replacement
+              (main := main) (i := i) (trace := first.2) (forkQuery := ↑s)
+              (replacement := u) hz hforkConsumed
+            rw [hq, hrhs]
+            intro habs
+            exact heq (Option.some.inj habs)
+          · -- `(x₂, z.2) ∈ support (replayRunWithTraceValue main i first.2 ↑s u)`
+            exact hz
+          · -- Prefix agreement on `[0, z.2.cursor)`
+            intro n hn
+            have := replayRunWithTraceValue_prefix_input_eq
+              (main := main) (i := i) (trace := first.2) (forkQuery := ↑s)
+              (replacement := u) hz hn
+            rw [htrace] at this
+            exact this
+        · simp at h
 
 /-- Replay property transfer: any postcondition that holds for every logged run of `main`
 holds for both outputs of a successful replay fork, together with the common selected fork index
