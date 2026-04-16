@@ -37,8 +37,6 @@ regardless of `i₀`. So the distribution of `s` alone reveals nothing about `i�
 Port of EasyCrypt's `PIR.ec`.
 -/
 
-set_option linter.unusedDecidableInType false
-
 open OracleComp OracleSpec ENNReal
 
 /-! ## Query generation -/
@@ -166,8 +164,7 @@ entries appearing in both query sets cancel out.
 The proof uses a loop invariant: after processing index `j`, the XOR of entries
 in `s` plus the XOR of entries in `s'` equals the sum of `a[k]` for all
 `k ≤ j` in the symmetric difference of `s` and `s'`, which is `{i₀} ∩ {0..j}`. -/
-theorem pir_correct [DecidableEq W]
-    (hchar : ∀ x : W, x + x = 0)
+theorem pir_correct (hchar : ∀ x : W, x + x = 0)
     (a : Fin N → W) (i₀ : Fin N) :
     Pr[= a i₀ | pirMain a i₀] = 1 := by
   -- Every output of pirMain a i₀ equals a i₀

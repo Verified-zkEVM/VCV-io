@@ -8,6 +8,7 @@ import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.Fork
+import VCVio.CryptoFoundations.ReplayFork
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.QueryRuntime
@@ -819,6 +820,59 @@ noncomputable def managedRoNmaForkAdvantage
     (qH : ℕ) : ENNReal :=
   Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH]
 
+/-- Managed-RO replay-fork convenience theorem at a fixed public key.
+
+This is the Fiat-Shamir-specific analogue of EasyCrypt's `forking_lemma_ro`:
+it packages the replay quantitative bound with same-target and postcondition-transfer facts for
+the wrapped managed random-oracle trace experiment. -/
+theorem managedRoNmaForkingLemmaReplay
+    [DecidableEq M] [DecidableEq Commit]
+    [DecidableEq Chal] [SampleableType Chal] [Fintype Chal]
+    (nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qH : ℕ) (pk : Stmt)
+    (P_out : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
+      QueryLog (unifSpec + (Unit →ₒ Chal)) → Prop)
+    (hP : ∀ {x log},
+      (x, log) ∈ support (replayFirstRun (managedRoNmaForkTraceComp σ hr M nmaAdv pk)) →
+      managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+        qH x ≠ none →
+      P_out x log) :
+    let wrappedMain := managedRoNmaForkTraceComp σ hr M nmaAdv pk
+    let cf := managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
+    let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
+    let wrappedMainProb : ProbComp
+        (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+      simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+        (uniformSampleImpl (spec := (Unit →ₒ Chal))))
+        wrappedMain
+    let wrappedForkProb : ProbComp
+        (Option
+          (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+            ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))) :=
+      simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+        (uniformSampleImpl (spec := (Unit →ₒ Chal))))
+        (forkReplay wrappedMain qb (Sum.inr ()) cf)
+    let acc := Pr[ fun x => (cf x).isSome | wrappedMainProb]
+    acc * (acc / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
+      Pr[
+        fun r : Option
+            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+          ∃ (x₁ x₂ :
+              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+            (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
+            r = some (x₁, x₂) ∧
+            cf x₁ = some s ∧
+            cf x₂ = some s ∧
+            x₁.target = x₂.target ∧
+            QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
+              QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
+            P_out x₁ log₁ ∧
+            P_out x₂ log₂
+        | wrappedForkProb] := by
+  sorry
+
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
@@ -1174,34 +1228,23 @@ theorem euf_nma_bound
         Pr[= true | hardRelationExp (r := rel) reduction] := by
   classical
   let chalSpec : OracleSpec Unit := Unit →ₒ Chal
-  let wrappedSpec := unifSpec + chalSpec
   -- Replay `nmaAdv` into a single-counted challenge oracle and record the rewindable trace.
-  let wrappedMain : Stmt → OracleComp wrappedSpec
+  let wrappedMain : Stmt → OracleComp (unifSpec + (Unit →ₒ Chal))
       (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
     managedRoNmaForkTraceComp σ hr M nmaAdv
   let cf : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
       Option (Fin (qH + 1)) :=
     managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
-  -- ─── Query bound + seed list ───
-  -- The budget and seed list for the wrapped spec.
-  -- Only the challenge oracle needs seeding (it is the forked index).
-  -- Uniform queries are left unseeded: `seededOracle` falls through to
-  -- fresh sampling, which matches the native `evalDist` semantics.
-  -- The forking lemma bound `le_probEvent_isSome_fork` holds for any `qb`/`js`.
+  -- ─── Replay-fork query budget ───
+  -- Only the single counted challenge oracle is forked.
   let qb : ℕ ⊕ Unit → ℕ := fun | .inl _ => 0 | .inr () => qH
-  let js : List (ℕ ⊕ Unit) := [Sum.inr ()]
-  -- Required instances for the wrapped spec
-  haveI : ∀ i, SampleableType (wrappedSpec.Range i) := fun i =>
-    match i with
-    | .inl n => SampleableType.Fin n
-    | .inr () => ‹SampleableType Chal›
-  -- ─── Fork and extract ───
-  -- Phase 1: Fork the wrapped adversary at the single challenge oracle,
+  -- ─── Replay-fork and extract ───
+  -- Phase 1: replay-fork the wrapped adversary at the single challenge oracle,
   -- then extract a witness via special soundness.
-  let forkExtract : Stmt → OracleComp wrappedSpec Wit := fun pk => do
-    let result ← fork (wrappedMain pk) qb js (Sum.inr ()) cf
+  let forkExtract : Stmt → OracleComp (unifSpec + (Unit →ₒ Chal)) Wit := fun pk => do
+    let result ← forkReplay (wrappedMain pk) qb (Sum.inr ()) cf
     match result with
-    | none => liftComp ($ᵗ Wit) wrappedSpec
+    | none => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
     | some (x₁, x₂) =>
       let ⟨m₁, (c₁, s₁)⟩ := x₁.forgery
       let ⟨m₂, (c₂, s₂)⟩ := x₂.forgery
@@ -1209,12 +1252,12 @@ theorem euf_nma_bound
         match x₁.roCache (m₁, c₁), x₂.roCache (m₂, c₂) with
         | some ω₁, some ω₂ =>
             if hω : ω₁ ≠ ω₂ then
-              liftComp (σ.extract ω₁ s₁ ω₂ s₂) wrappedSpec
+              liftComp (σ.extract ω₁ s₁ ω₂ s₂) (unifSpec + chalSpec)
             else
-              liftComp ($ᵗ Wit) wrappedSpec
-        | _, _ => liftComp ($ᵗ Wit) wrappedSpec
+              liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+        | _, _ => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
       else
-        liftComp ($ᵗ Wit) wrappedSpec
+        liftComp ($ᵗ Wit) (unifSpec + chalSpec)
   -- Phase 2: Convert to ProbComp by simulating the single challenge oracle
   -- with $ᵗ Chal (uniform challenge sampling).
   let reduction : Stmt → ProbComp Wit := fun pk =>
@@ -1231,23 +1274,20 @@ theorem euf_nma_bound
   --     smaller rewindable event that the forking lemma actually controls, without
   --     issuing any extra post-hoc verification query.
   --
-  -- (b) Apply `le_probEvent_isSome_fork` to obtain
-  --     `acc * (acc / (qH + 1) - |Chal|⁻¹) ≤ Pr[isSome | fork ...]`,
-  --     where `acc = managedRoNmaForkAdvantage σ hr M nmaAdv qH`.
-  --     Requires `IsPerIndexQueryBound wrappedMain qb` and `SeedListCovers qb js`.
+  -- (b) First apply the local managed-RO convenience theorem
+  --     `managedRoNmaForkingLemmaReplay`, once proved, at each public key.
+  --     This packages `le_probEvent_isSome_forkReplay`,
+  --     `forkReplay_success_log_props`, and `forkReplay_propertyTransfer`
+  --     into the RO-style event that the two replayed traces share the same
+  --     fork point and target but disagree on the selected challenge answer.
   --
-  -- (c) Connect fork success to extraction success. The current `forkExtract`
-  --     function only extracts from pairs whose forged commitments agree and
-  --     whose cached challenges are both present and distinct. The key local
-  --     lemma is therefore:
-  --       - `cf_eq_of_mem_support_fork` gives `cf x₁ = cf x₂ = some s`
-  --       - `managedRoNmaForkPoint_getElem?_eq_some_target` identifies the
-  --         selected query-log entry in each trace with that trace's forged
-  --         hash point
-  --       - the remaining fork-support argument shows those selected query-log
-  --         entries coincide across the two runs, so `c₁ = c₂` and `ω₁ ≠ ω₂`
-  --       - `_hss` then turns `σ.extract ω₁ s₁ ω₂ s₂` into a valid witness
-  --     This gives `Pr[isSome | fork ...] ≤ Pr[= true | hardRelationExp ...]`.
+  -- (c) Connect the packaged RO event to extraction success. The remaining
+  --     local bridge uses `managedRoNmaForkPoint_getElem?_eq_some_target` to
+  --     identify the selected query-log entry with each forgery target, then
+  --     links the differing wrapped-RO answers from
+  --     `managedRoNmaForkingLemmaReplay` to distinct cached challenges
+  --     `ω₁ ≠ ω₂`. Once `c₁ = c₂` and `ω₁ ≠ ω₂` are available, `_hss`
+  --     turns `σ.extract ω₁ s₁ ω₂ s₂` into a valid witness.
   --
   -- (d) Compose (a)-(c) with monotonicity of `· * (· / q - h⁻¹)`, then integrate
   --     over keygen to get the global bound.

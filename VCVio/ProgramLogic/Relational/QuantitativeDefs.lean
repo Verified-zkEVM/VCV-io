@@ -15,8 +15,6 @@ It is intentionally separated from the heavier coupling-development file so down
 that only need the interfaces and notation do not import the full theorem stack.
 -/
 
-set_option linter.style.openClassical false
-open scoped Classical
 open ENNReal OracleSpec OracleComp
 
 universe u
@@ -43,6 +41,7 @@ def eRelTriple (pre : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp 
 
 /-- Indicator postcondition: lifts a `Prop`-valued relation to an `ℝ≥0∞`-valued one. -/
 noncomputable def RelPost.indicator (R : RelPost α β) (a : α) (b : β) : ℝ≥0∞ :=
+  letI := Classical.dec (R a b)
   if R a b then 1 else 0
 
 /-- pRHL-style exact relational triple, defined via eRHL with indicator postcondition. -/

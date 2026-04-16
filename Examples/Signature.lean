@@ -36,7 +36,7 @@ open OracleComp OracleSpec DiffieHellman
 namespace Schnorr
 
 variable (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
-variable (G : Type) [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
+variable (G : Type) [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
 
 /-- Schnorr signature scheme: Fiat-Shamir applied to the Schnorr Σ-protocol
 with the discrete-log generable relation. -/
@@ -68,7 +68,7 @@ def signatureExtractCandidate (g pk : G) :
 
 section
 
-omit [Fintype G] [Fintype F] [SampleableType F] [SampleableType G]
+omit [Fintype F] [SampleableType F] [SampleableType G]
 
 /-- If the Schnorr-signature fork postprocessing returns `some sk`, then `sk` is a valid
 discrete-log witness for the public key `pk`. Follows from `Schnorr.extractCandidate_sound`. -/

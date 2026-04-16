@@ -37,9 +37,6 @@ The bad event is then reduced to the repo's trapdoor-preimage experiment
 bodies remain `sorry` for now.
 -/
 
-set_option linter.unusedDecidableInType false
-set_option linter.unusedFintypeInType false
-
 open OracleComp OracleSpec ENNReal OneWay
 
 namespace BR93
@@ -220,6 +217,7 @@ def inverter (tdp : TrapdoorPermutation PK SK Rand)
         | Sum.inr r => return r
     | none => return default
 
+omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- Up-to-bad step: replacing the challenge hash query with a fresh uniform mask changes the
 game by at most the bad-event probability. -/
 theorem cpaGame_gap_le_badEvent (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
@@ -228,6 +226,7 @@ theorem cpaGame_gap_le_badEvent (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M
       badEventProb tdp adv := by
   sorry
 
+omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- Uniform masking step: once the challenge hash output is replaced by a fresh uniform mask,
 adding either challenge message yields the same ciphertext distribution. -/
 theorem game1_eq_game2 (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
@@ -250,6 +249,7 @@ theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
   simpa [game2, f] using
     (probOutput_decide_eq_uniformBool_half f (by rfl))
 
+omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- The bad event is bounded by the trapdoor-preimage advantage of the inverter
 constructed from the adversary's random-oracle transcript. -/
 theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
@@ -257,6 +257,7 @@ theorem badEventProb_le_tdpAdvantage (adv : CPA_Adv (PK := PK) (Rand := Rand) (M
       (tdpAdvantage tdp (inverter tdp adv)).toReal := by
   sorry
 
+omit [Fintype Rand] [Fintype M] [DecidableEq M] in
 /-- Main BR93 bound for this file's custom one-time ROM CPA game: the distinguishing
 bias is bounded by the trapdoor-preimage advantage via the standard up-to-bad
 reduction. -/

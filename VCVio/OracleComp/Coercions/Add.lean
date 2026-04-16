@@ -241,15 +241,13 @@ end OracleQuery
 
 section tests
 
-set_option linter.unusedVariables false
-
 -- This set of examples serves as sort of a "unit test" for the coercions above
 variable (α : Type)
   {ι₁ ι₂ ι₃ ι₄ ι ι'}
   {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
   {spec₃ : OracleSpec ι₃} {spec₄ : OracleSpec ι₄}
   (coeSpec : OracleSpec ι) (coeSuperSpec : OracleSpec ι')
-  [coeSpec ⊂ₒ coeSuperSpec]
+  [_hSub : coeSpec ⊂ₒ coeSuperSpec]
 
 -- coerce a single oracle and then add extra oracles
 example (oa : OracleComp spec₁ α) :
