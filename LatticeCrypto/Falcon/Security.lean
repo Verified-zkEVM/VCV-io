@@ -104,8 +104,16 @@ theorem verify_sign_correct (pk : PublicKey p) (sk : SecretKey p)
     (hvalid : validKeyPair p pk sk = true)
     (msg : List Byte) (sig : Signature)
     (h_laws : Primitives.Laws prims)
-    (hsig : sig ∈ support (Falcon.sign p pk sk msg)) :
+    (hsig : sig ∈ support (Falcon.sign p prims pk sk msg)) :
     Falcon.verify p prims pk msg sig = true := by
+  -- The proof proceeds by unfolding `sign` and `verify`:
+  -- 1. `sign` produces (salt, compressedS2) where s₂ came from trapdoorSample
+  -- 2. `verify` decompresses s₂, recomputes c, checks the norm bound
+  -- Key steps:
+  -- (a) compress/decompress roundtrip (from h_laws.compress_decompress)
+  -- (b) PSF correctness: trapdoorSample output satisfies eval pk (s₁,s₂) = c
+  --     and isShort (s₁,s₂) = true
+  -- (c) The norm bound from (b) matches the verify check
   sorry
 
 /-! ### NTRU-SIS Hardness Assumption -/
@@ -188,12 +196,12 @@ structure SamplerQuality (pk : PublicKey p) (sk : SecretKey p) where
   /-- Rényi divergence bound: for every target `c`, the Rényi divergence of order `a`
   between the concrete sampler and the ideal Gaussian is at most `R`. -/
   quality : ∀ c : Rq p.n,
-    renyiDiv renyiOrder ((falconPSF p).trapdoorSample pk sk c) (idealSampler c) ≤ bound
+    renyiDiv renyiOrder ((falconPSF p prims).trapdoorSample pk sk c) (idealSampler c) ≤ bound
   /-- Ideal sampler correctness: the ideal Gaussian always produces valid short preimages.
   This follows from the lattice geometry when `σ ≥ η_ε(Λ^⊥) · ‖B̃‖_GS`. -/
   idealCorrect : ∀ c : Rq p.n,
     ∀ x ∈ support (idealSampler c),
-      (falconPSF p).eval pk x = c ∧ (falconPSF p).isShort x = true
+      (falconPSF p prims).eval pk x = c ∧ (falconPSF p prims).isShort x = true
 
 /-! ### EUF-CMA Security -/
 
@@ -237,7 +245,7 @@ theorem euf_cma_security
       (validKeyPair p))
     (qSign : ℕ)
     (adv : SignatureAlg.unforgeableAdv
-      (falconSignatureAlg p Salt hr)) :
+      (falconSignatureAlg p prims Salt hr)) :
     ∃ (sisReduction : SIS.Adversary (ntruSISProblem p))
       (samplerLoss : ENNReal),
       adv.advantage
@@ -246,6 +254,14 @@ theorem euf_cma_security
         SIS.advantage (ntruSISProblem p) sisReduction +
         GPVHashAndSign.collisionBound Salt qSign +
         samplerLoss := by
+  -- Step 1: Apply the generic GPV EUF-CMA bound to get a preimage-finding reduction.
+  -- This gives: Adv^{CMA}(A) ≤ Adv^{preimage}(B) + collisionBound
+  have hcorrect : (falconPSF p prims).Correct := by sorry
+  obtain ⟨preimageRed, hbound⟩ :=
+    GPVHashAndSign.euf_cma_bound (falconPSF p prims) hr (List Byte) Salt hcorrect qSign adv
+  -- Step 2: Reduce preimage finding to NTRU-SIS.
+  -- The PSF eval is (s₁, s₂) ↦ s₁ + s₂·h, which is exactly the NTRU-SIS map.
+  -- A preimage-finding adversary yields an NTRU-SIS adversary with the same advantage.
   sorry
 
 /-- Concrete instantiation of `euf_cma_security` with the Falcon-specified 40-byte
@@ -258,7 +274,7 @@ theorem euf_cma_security_bytes40
       (validKeyPair p))
     (qSign : ℕ)
     (adv : SignatureAlg.unforgeableAdv
-      (falconSignatureAlg p (Bytes 40) hr)) :
+      (falconSignatureAlg p prims (Bytes 40) hr)) :
     ∃ (sisReduction : SIS.Adversary (ntruSISProblem p))
       (samplerLoss : ENNReal),
       adv.advantage

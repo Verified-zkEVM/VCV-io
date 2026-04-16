@@ -106,7 +106,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 
 section mainDefinition
 
-  [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
 /-- The Fischlin transform applied to a Σ-protocol and a generable relation produces
@@ -837,7 +837,7 @@ end costAccounting
 
 section security
 
-  [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)

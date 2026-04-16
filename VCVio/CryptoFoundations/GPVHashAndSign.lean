@@ -205,13 +205,17 @@ giving the desired bound.
 the reduction internally simulates the CMA experiment for the adversary:
 
 1. Program a lazy random oracle, embedding `y` at a random position.
-2. Answer signing queries by sampling short preimages and programming the RO
-   (sign-then-hash strategy, using the PSF correctness).
-3. Run the adversary and extract the short preimage from any valid forgery.
+2. Answer signing queries using the sign-then-hash strategy: sample a short preimage
+   `s` via `trapdoorSample`, compute `c = psf.eval pk s`, and program the RO at
+   `(r, msg) := c`. Return `(r, s)` as the signature.
+3. Run the adversary and extract the short preimage from its forgery.
 
-This is defined abstractly as the composition of the adversary's logic with
-the simulation internals. The detailed simulation requires replaying the
-adversary's oracle interactions as `ProbComp` computations. -/
+The key insight is that in the sign-then-hash game, the reduction controls the entire
+RO table. If the adversary forges on a fresh `(r*, msg*)` pair, the RO value at that
+point was set by the reduction, and the forgery's `s*` is a valid short preimage.
+
+The detailed construction simulates the adversary's oracle interactions by maintaining
+a programmable RO state, using PSF correctness to ensure consistency. -/
 noncomputable def reduction [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :

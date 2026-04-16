@@ -82,20 +82,59 @@ variable {p : Params} (prims : Primitives p)
     Rq p.n :=
   prims.hashToPoint salt (prims.publicKeyBytes pk) msg
 
+/-- Split a vector of length `2 * 2^(k+1)` into two halves of length `2 * 2^k`
+in the FFT domain. This is the ℝ-level analogue of `fpolySplitFFT`.
+
+The split decomposes `f(x)` evaluated at `2n`-th roots of unity into even and odd
+parts `f₀, f₁` evaluated at `n`-th roots of unity, such that `f = f₀ + x · f₁`. -/
+noncomputable def splitFFT {k : ℕ}
+    (f : Vector ℝ (2 * 2 ^ (k + 1))) :
+    Vector ℝ (2 * 2 ^ k) × Vector ℝ (2 * 2 ^ k) := sorry
+
+/-- Merge two vectors of length `2 * 2^k` into a single vector of length `2 * 2^(k+1)`
+in the FFT domain. This is the ℝ-level analogue of `fpolyMergeFFT`.
+
+Inverse of `splitFFT`: given `(f₀, f₁)` evaluated at `n`-th roots of unity, produces
+`f = f₀ + x · f₁` evaluated at `2n`-th roots of unity. -/
+noncomputable def mergeFFT {k : ℕ}
+    (f₀ f₁ : Vector ℤ (2 * 2 ^ k)) :
+    Vector ℤ (2 * 2 ^ (k + 1)) := sorry
+
+/-- Pointwise multiplication of an ℝ-valued FFT polynomial by a difference vector
+`(t₁ - z₁)`, producing an adjustment to the target for the left subtree.
+
+This computes `ℓ · (t₁ - z₁)` in the FFT domain, which is pointwise multiplication
+of the LDL factor `ℓ` with the residual `(t₁ - z₁)` cast to reals. -/
+noncomputable def adjustTarget {k : ℕ}
+    (ℓ : RealFFTPoly k) (t₁ : Vector ℝ (2 * 2 ^ k))
+    (z₁ : Vector ℤ (2 * 2 ^ k)) :
+    Vector ℝ (2 * 2 ^ k) := sorry
+
 /-- `ffSampling(t, T)` (Algorithm 11): the fast Fourier sampling algorithm.
 
 Given a target vector `t = (t₀, t₁)` in FFT representation over `ℝ` and a Falcon tree `T`,
 produces an integer vector `z = (z₀, z₁)` such that `(t - z)` is short (bounded by the
 Gram-Schmidt norms encoded in the tree).
 
-The algorithm recurses on the tree:
-- At a leaf (n = 1): call `SamplerZ(t_i, σ_leaf)`.
-- At an internal node: split, recurse on each half using the LDL factor `ℓ`, recombine.
-
-This is the core trapdoor operation of Falcon: given the secret basis (encoded as the tree),
-it samples a lattice vector close to the target. -/
+The algorithm recurses on the tree structure:
+- **Leaf** (`κ = 0`): `t` has 2 components. Sample each independently via
+  `SamplerZ(tᵢ, σ_leaf)`.
+- **Node** (`κ + 1`): split `t` into `(t₀, t₁)`, sample `z₁ ← ffSampling(t₁, T_right)`,
+  adjust `t₀' = t₀ + ℓ · (t₁ - z₁)`, sample `z₀ ← ffSampling(t₀', T_left)`,
+  return `merge(z₀, z₁)`. -/
 noncomputable def ffSampling (κ : ℕ) (t : Vector ℝ (2 * 2 ^ κ))
-    (tree : FalconTree κ) : ProbComp (Vector ℤ (2 * 2 ^ κ)) := sorry
+    (tree : FalconTree κ) : ProbComp (Vector ℤ (2 * 2 ^ κ)) :=
+  match κ, t, tree with
+  | 0, t, .leaf σ => do
+    let z₀ ← prims.samplerZ (t.get ⟨0, by omega⟩) σ
+    let z₁ ← prims.samplerZ (t.get ⟨1, by omega⟩) σ
+    return Vector.ofFn (Fin.cons z₀ (Fin.cons z₁ Fin.elim0))
+  | k + 1, t, .node ℓ left right => do
+    let (t₀, t₁) := splitFFT t
+    let z₁ ← ffSampling k t₁ right
+    let t₀' := t₀ + adjustTarget ℓ t₁ z₁
+    let z₀ ← ffSampling k t₀' left
+    return mergeFFT z₀ z₁
 
 end Primitives
 

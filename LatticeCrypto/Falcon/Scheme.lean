@@ -121,6 +121,23 @@ noncomputable def keyGenFromSeed (_seed : List Byte) : PublicKey p × SecretKey 
 
 /-! ### GPV Bridge -/
 
+/-- Convert a target `c ∈ R_q` and the secret NTRU basis to an FFT-domain target vector
+for `ffSampling`.
+
+Given target `c`, the lattice target is `t = [[c, 0]] · B⁻¹` where
+`B = [[g, -f], [G, -F]]` is the NTRU basis from the secret key. The output is
+`t = (t₀, t₁)` in FFT representation, each of length `2^(logn)`. -/
+noncomputable def toFFTTarget (c : Rq p.n) (sk : SecretKey p) :
+    Vector ℝ (2 * 2 ^ p.logn) := sorry
+
+/-- Convert the ffSampling output back to a pair `(s₁, s₂) ∈ R_q × R_q`.
+
+Given the FFT-domain target `t` and the integer lattice point `z` from `ffSampling`,
+computes the short preimage `s = t - z` and converts to the coefficient representation
+in `R_q`. The result satisfies `s₁ + s₂ · h = c mod q` by construction. -/
+noncomputable def fromFFTPreimage (t : Vector ℝ (2 * 2 ^ p.logn))
+    (z : Vector ℤ (2 * 2 ^ p.logn)) : Rq p.n × Rq p.n := sorry
+
 /-- Falcon as a `PreimageSampleableFunction`.
 
 The PSF maps `(s₁, s₂) ↦ s₁ + s₂ · h mod q`, the "hash" in the hash-and-sign
@@ -133,13 +150,20 @@ shortness predicate checks the `ℓ₂` norm bound.
 | `trapdoorSample pk sk c` | `ffSampling(...)` producing short `(s₁, s₂)` |
 | `isShort (s₁, s₂)` | `‖(s₁, s₂)‖₂² ≤ ⌊β²⌋` |
 
-The trapdoor sampler abstracts the `ffSampling`-based preimage production. Its
-correctness obligation is: the output distribution is close (in Rényi divergence)
+The trapdoor sampler:
+1. Converts target `c` to an FFT-domain vector using the NTRU basis (`toFFTTarget`).
+2. Calls `ffSampling` with the Falcon tree to sample a nearby integer lattice point.
+3. Converts the result back to `(s₁, s₂) ∈ R_q²` (`fromFFTPreimage`).
+
+The correctness obligation is that the output distribution is close (in Rényi divergence)
 to the ideal discrete Gaussian over the NTRU lattice coset. -/
 noncomputable def falconPSF : PreimageSampleableFunction
     (PublicKey p) (SecretKey p) (Rq p.n × Rq p.n) (Rq p.n) where
   eval pk x := x.1 + negacyclicMul x.2 pk.h
-  trapdoorSample _pk _sk _c := sorry
+  trapdoorSample _pk sk c := do
+    let t := toFFTTarget p c sk
+    let z ← Primitives.ffSampling prims p.logn t sk.tree
+    return fromFFTPreimage p t z
   isShort x := decide (pairL2NormSq x.1 x.2 ≤ p.betaSquared)
 
 /-! ### One-Shot Signing -/
@@ -156,8 +180,8 @@ sampling quality target `falconPSF.trapdoorSample`, while the retry loop is hand
 by `sign`. -/
 noncomputable def signAttempt (pk : PublicKey p) (sk : SecretKey p) (c : Rq p.n) :
     ProbComp (Option (Rq p.n × Rq p.n)) := do
-  let x ← (falconPSF p).trapdoorSample pk sk c
-  if (falconPSF p).isShort x then
+  let x ← (falconPSF p prims).trapdoorSample pk sk c
+  if (falconPSF p prims).isShort x then
     return some x
   else
     return none
@@ -215,6 +239,6 @@ noncomputable def falconSignatureAlg
     SignatureAlg (OracleComp (unifSpec + (Salt × List Byte →ₒ Rq p.n)))
       (M := List Byte) (PK := PublicKey p) (SK := SecretKey p)
       (S := Salt × (Rq p.n × Rq p.n)) :=
-  GPVHashAndSign (falconPSF p) hr (List Byte) Salt
+  GPVHashAndSign (falconPSF p prims) hr (List Byte) Salt
 
 end Falcon
