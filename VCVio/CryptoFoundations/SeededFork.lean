@@ -1131,4 +1131,30 @@ theorem le_probEvent_isSome_seededFork :
   exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
     (by simpa [add_comm] using hfork)
 
+/-- Bellare-Neven seeded forking bound in its canonical `acc² / q − acc / h` shape, where
+`acc = ∑ₛ Pr[= some s | cf <$> main]`, `q = qb i + 1`, and `h = |spec.Range i|`.
+
+This is the aggregated bound that appears as Lemma 1 of Bellare-Neven (CCS'06): summing the
+per-index lower bound over all fork points and applying Cauchy-Schwarz reshapes the product
+form delivered by `le_probEvent_isSome_seededFork` into the familiar ratio form. Algebraically
+the two statements are equal (modulo `ENNReal.mul_sub` under the finiteness of `acc`); this
+lemma exposes the ratio form as a public API so that downstream callers can match the
+textbook presentation directly. -/
+theorem le_probEvent_isSome_seededFork_sq :
+    ((∑ s, Pr[= some s | cf <$> main]) ^ 2 / ((qb i + 1 : ℕ) : ℝ≥0∞)
+        - (∑ s, Pr[= some s | cf <$> main]) /
+            ((Fintype.card (spec.Range i) : ℕ) : ℝ≥0∞))
+      ≤ Pr[ fun r : Option (α × α) => r.isSome | seededFork main qb js i cf] := by
+  set acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main] with hacc_eq
+  set h : ℝ≥0∞ := ((Fintype.card (spec.Range i) : ℕ) : ℝ≥0∞) with hh_eq
+  have hacc_ne_top : acc ≠ ⊤ := ne_top_of_le_ne_top one_ne_top
+    (hacc_eq ▸ sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
+  calc acc ^ 2 / ((qb i + 1 : ℕ) : ℝ≥0∞) - acc / h
+    _ = acc * (acc / ((qb i + 1 : ℕ) : ℝ≥0∞) - h⁻¹) := by
+        rw [ENNReal.mul_sub (fun _ _ => hacc_ne_top), sq, mul_div_assoc,
+            div_eq_mul_inv (a := acc) (b := h)]
+    _ ≤ Pr[ fun r : Option (α × α) => r.isSome | seededFork main qb js i cf] :=
+        le_probEvent_isSome_seededFork
+          (main := main) (qb := qb) (js := js) (i := i) (cf := cf)
+
 end OracleComp
