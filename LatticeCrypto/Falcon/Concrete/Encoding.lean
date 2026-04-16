@@ -3,7 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Batteries.Data.ByteArray
 import LatticeCrypto.Falcon.Arithmetic
+import Mathlib.Data.Array.Extract
 
 /-!
 # Concrete Falcon Encoding
@@ -188,5 +190,15 @@ def sigDecode (d : ByteArray) (logn : ℕ) : Option (Bytes 40 × List UInt8) := 
   let salt : Bytes 40 := Vector.ofFn fun ⟨i, _⟩ => d[i + 1]!
   let comp := (d.extract 41 d.size).toList
   return some (salt, comp)
+
+@[simp] theorem sigDecode_sigEncode_nil (salt : Bytes 40) (logn : ℕ) :
+    sigDecode (sigEncode salt [] logn) logn = none := by
+  cases salt with
+  | mk xs hxs =>
+      have hsalt : ({ data := xs } : ByteArray).size = 40 := by
+        simpa using hxs
+      have hone : ({ data := #[48 + UInt8.ofNat logn] } : ByteArray).size = 1 := rfl
+      have hempty : ({ data := #[] } : ByteArray).size = 0 := rfl
+      simp [sigDecode, sigEncode, hsalt, hone, hempty]
 
 end Falcon.Concrete

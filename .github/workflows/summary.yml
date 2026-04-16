@@ -13,6 +13,8 @@ jobs:
       - uses: alexanderlhicks/lean-summary-workflow@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
+          api_key: ${{ secrets.GEMINI_API_KEY }}
+          provider: gemini
+          model: gemini-3.1-pro-preview
           github_repository: ${{ github.repository }}
           pr_number: ${{ github.event.pull_request.number }}

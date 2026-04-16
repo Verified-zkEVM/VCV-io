@@ -77,14 +77,206 @@ jobs:
             }
           ' <<< "$COMMENT_BODY"
         shell: bash
-      - uses: alexanderlhicks/lean-review-workflow@main
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
-          pr_number: ${{ github.event.issue.number || github.event.pull_request.number }}
-          external_refs: "${{ steps.get_args.outputs.external_refs }}"
-          repo_context_refs: "${{ steps.get_args.outputs.repo_context_refs }}"
-          additional_comments: "${{ steps.get_args.outputs.additional_comments }}"
+          fetch-depth: 0
+      - name: Checkout review action
+        uses: actions/checkout@v6.0.2
+        with:
+          repository: alexanderlhicks/lean-review-workflow
+          ref: main
+          path: .github/actions/lean-review-workflow
+      - name: Hotfix Gemini client initialization
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/actions/lean-review-workflow/llm_provider.py")
+          text = path.read_text()
+          buggy = "self.client = genai.Client(api_key=GEMINI_API_KEY)"
+          fixed = "self.client = genai.Client(api_key=api_key)"
+
+          if buggy in text:
+              path.write_text(text.replace(buggy, fixed))
+              print("Patched Gemini client initialization in review action.")
+          elif fixed in text:
+              print("Review action already has the Gemini client fix.")
+          else:
+              print("No Gemini client hotfix applied; upstream action layout changed.")
+          PY
+      - name: Copy action requirements
+        run: cp .github/actions/lean-review-workflow/requirements.txt ./action-requirements.txt
+        shell: bash
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: ./action-requirements.txt
+      - name: Set up Lean and Build
+        uses: leanprover/lean-action@v1.4.0
+        with:
+          build: true
+          test: false
+          lint: false
+      - name: Install dependencies
+        run: pip install -r ./action-requirements.txt
+        shell: bash
+      - name: Discover Related Files
+        id: discover_files
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          DEPENDENCY_DEPTH: 2
+        run: python .github/actions/lean-review-workflow/discover_files.py
+      - name: Extract Lean Toolchain Info
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          CHANGED_FILES: ${{ steps.discover_files.outputs.discovered_files }}
+          SUMMARY_FILES: ${{ steps.discover_files.outputs.summary_files }}
+          GITHUB_OUTPUT: ''
+        run: python .github/actions/lean-review-workflow/lean_info_extractor.py > lean_info_formatted.txt
+      - name: Prepare Lean Toolchain Info
+        id: lean_info
+        shell: bash
+        run: |
+          if [ -f lean_info_formatted.txt ]; then
+            lean_info=$(python -c 'from pathlib import Path; text = Path("lean_info_formatted.txt").read_text(); max_chars = 20000; suffix = "\n\n[workflow note] Lean toolchain info truncated to stay within GitHub Actions environment limits."; print(text if len(text) <= max_chars else text[:max_chars] + suffix, end="")')
+          else
+            lean_info="Lean toolchain analysis was unavailable for this run."
+          fi
+          EOF_MARKER=$(openssl rand -hex 8)
+          {
+            printf 'lean_info<<%s\n' "$EOF_MARKER"
+            printf '%s\n' "$lean_info"
+            printf '%s\n' "$EOF_MARKER"
+          } >> "$GITHUB_OUTPUT"
+      - name: Run AI Review Script
+        id: run_review
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PROVIDER: gemini
+          MODEL: gemini-3.1-pro-preview
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+          EXTERNAL_REFS: ${{ steps.get_args.outputs.external_refs }}
+          REPO_CONTEXT_REFS_INPUT: ${{ steps.get_args.outputs.repo_context_refs }}
+          DISCOVERED_FILES: ${{ steps.discover_files.outputs.discovered_files }}
+          SUMMARY_FILES: ${{ steps.discover_files.outputs.summary_files }}
+          LAKE_GRAPH: ${{ steps.discover_files.outputs.lake_graph }}
+          LEAN_INFO: ${{ steps.lean_info.outputs.lean_info }}
+          ADDITIONAL_COMMENTS: ${{ steps.get_args.outputs.additional_comments }}
+          THINKING_BUDGET: 10240
+        run: |
+          if [ -n "$REPO_CONTEXT_REFS_INPUT" ] && [ -n "$DISCOVERED_FILES" ]; then
+            REPO_CONTEXT_REFS="$REPO_CONTEXT_REFS_INPUT,$DISCOVERED_FILES"
+          elif [ -n "$REPO_CONTEXT_REFS_INPUT" ]; then
+            REPO_CONTEXT_REFS="$REPO_CONTEXT_REFS_INPUT"
+          else
+            REPO_CONTEXT_REFS="$DISCOVERED_FILES"
+          fi
+          EOF_MARKER=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 16)
+          echo "review_text<<$EOF_MARKER" >> "$GITHUB_OUTPUT"
+          python .github/actions/lean-review-workflow/review.py \
+            --pr-number "$PR_NUMBER" \
+            --external-refs "$EXTERNAL_REFS" \
+            --repo-context-refs "$REPO_CONTEXT_REFS" \
+            --additional-comments "$ADDITIONAL_COMMENTS" \
+            --provider "$PROVIDER" \
+            --model "$MODEL" \
+            --thinking-budget "$THINKING_BUDGET" >> "$GITHUB_OUTPUT"
+          echo "$EOF_MARKER" >> "$GITHUB_OUTPUT"
+      - name: Post Review
+        uses: actions/github-script@v8
+        env:
+          REVIEW_TEXT: ${{ steps.run_review.outputs.review_text }}
+          EXTERNAL_REFS: ${{ steps.get_args.outputs.external_refs }}
+          REPO_CONTEXT_REFS: ${{ steps.get_args.outputs.repo_context_refs }}
+          ADDITIONAL_COMMENTS: ${{ steps.get_args.outputs.additional_comments }}
+          PR_NUMBER: ${{ github.event.issue.number || github.event.pull_request.number }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          retries: 3
+          script: |
+            const fs = require('fs');
+            let headerText = '### 🤖 Initial AI review without external context';
+            if (process.env.EXTERNAL_REFS || process.env.REPO_CONTEXT_REFS || process.env.ADDITIONAL_COMMENTS) {
+              headerText = '### 🤖 AI Review (with external context)';
+            }
+            const header = headerText + '\n\n';
+            const reviewText = process.env.REVIEW_TEXT || '';
+            const body = reviewText.startsWith('### 🤖 ') ? reviewText : header + reviewText;
+            const { owner, repo } = context.repo;
+            const pr_number = parseInt(process.env.PR_NUMBER);
+
+            let annotations = [];
+            try {
+              if (fs.existsSync('review_annotations.json')) {
+                annotations = JSON.parse(fs.readFileSync('review_annotations.json', 'utf8'));
+              }
+            } catch (e) {
+              console.log('No annotations file found, posting as comment only.');
+            }
+
+            if (annotations.length > 0) {
+              try {
+                const pr = await github.rest.pulls.get({ owner, repo, pull_number: pr_number });
+                const commit_id = pr.data.head.sha;
+                const comments = annotations.slice(0, 50).map(a => ({
+                  path: a.path,
+                  line: a.line,
+                  side: a.side,
+                  body: a.body
+                }));
+
+                await github.rest.pulls.createReview({
+                  owner,
+                  repo,
+                  pull_number: pr_number,
+                  commit_id,
+                  body: body,
+                  event: 'COMMENT',
+                  comments
+                });
+                console.log(`Posted review with ${comments.length} line annotations.`);
+                return;
+              } catch (e) {
+                console.log(`Failed to post review with annotations: ${e.message}. Falling back to comment.`);
+              }
+            }
+
+            const issue_number = pr_number;
+            const existingComments = await github.rest.issues.listComments({
+              owner, repo, issue_number,
+            });
+
+            const botComment = existingComments.data.find(comment =>
+              comment.user.type === 'Bot' && (comment.body.includes('### 🤖 AI Review') || comment.body.includes('### 🤖 Initial AI review'))
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner, repo,
+                comment_id: botComment.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number, body
+              });
+            }
+      - name: Clean up review artifacts
+        if: always()
+        shell: bash
+        run: |
+          rm -f ./action-requirements.txt ./review_annotations.json lean_info_formatted.txt
       - name: Annotate AI review comment
         if: success()
         uses: actions/github-script@v8

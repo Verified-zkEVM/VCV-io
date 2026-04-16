@@ -323,9 +323,9 @@ variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
 variable (g : G)
 
-/-- The discrete log relation is generable when `· • g` is bijective:
-sample `sk ← $ᵗ F` and return `(sk • g, sk)`. -/
-def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
+/-- The discrete log relation is generable by sampling `sk ← $ᵗ F` and returning
+`(sk • g, sk)`. -/
+def dlogGenerable :
     GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
   gen := do let sk ← $ᵗ F; return (sk • g, sk)
   gen_sound := fun pk sk hmem => by
@@ -333,11 +333,6 @@ def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
     simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
                Prod.mk.injEq] at hmem
     obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
-  gen_uniform_right := fun pk => by
-    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]
-    exact probOutput_map_bijective_uniform_cross (α := F) (β := G) (· • g) hg pk
-  gen_uniform_left := fun sk => by
-    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind, bind_pure]
 
 end DLogGenerable
 

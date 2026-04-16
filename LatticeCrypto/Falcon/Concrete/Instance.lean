@@ -3,10 +3,17 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import Batteries.Data.Rat.Float
+import Mathlib.Algebra.Order.Floor.Ring
+import Mathlib.Analysis.SpecialFunctions.Exp
 import LatticeCrypto.Falcon.Primitives
+import LatticeCrypto.Falcon.Concrete.FloatLike
 import LatticeCrypto.Falcon.Concrete.NTT
 import LatticeCrypto.Falcon.Concrete.Encoding
+import LatticeCrypto.Falcon.Concrete.FXR
+import LatticeCrypto.Falcon.Concrete.SamplerZ
 import LatticeCrypto.Falcon.Concrete.Sampling
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Concrete Falcon Instance
@@ -22,9 +29,9 @@ function for testing.
    the testable surface.
 
 2. **`concretePrimitives`**: Fills the abstract `Primitives` structure with
-   concrete implementations for executable fields (`publicKeyBytes`,
-   `hashToPoint`, `compress`, `decompress`, `nttOps`) and a `sorry`'d ideal
-   discrete Gaussian for `samplerZ`. Used for the proof bridge, never executed.
+   concrete implementations for the executable fields and a concrete FXR-backed
+   bridge for the FFT conversion fields. Used to connect the proof-level Falcon
+   interface to the concrete packed FFT representation.
 -/
 
 
@@ -91,7 +98,84 @@ def concreteVerify (p : Params) (pk : ByteArray) (msg : List Byte)
         let s1 := c - negacyclicMulU32 s2 h
         return pairL2NormSqU32 s1 s2 ≤ p.betaSquared
 
+@[simp] theorem concreteVerify_sigEncode_nil_eq_false
+    (p : Params) (pk : ByteArray) (salt : Bytes 40) (msg : List Byte) :
+    concreteVerify p pk msg (sigEncode salt [] p.logn) = false := by
+  simp [concreteVerify]
+
 /-! ## Abstract primitives instance -/
+
+private def samplerSeedBytes : Nat := 56
+
+private noncomputable def realTwoPow (e : Int) : ℝ :=
+  if 0 ≤ e then
+    (2 : ℝ) ^ Int.toNat e
+  else
+    ((2 : ℝ) ^ Int.toNat (-e))⁻¹
+
+@[reducible] private noncomputable def realSamplerFloatLike : FloatLike ℝ where
+  zero := 0
+  one := 1
+  neg := Neg.neg
+  add := (· + ·)
+  sub := (· - ·)
+  mul := (· * ·)
+  div := (· / ·)
+  sqrt := Real.sqrt
+  ofInt i := (i.toInt : ℝ)
+  ofInt32 i := (i.toInt : ℝ)
+  scaled i sc := (i.toInt : ℝ) * realTwoPow sc.toInt
+  rint x := (round x).toInt64
+  floor_ x := (⌊x⌋).toInt64
+  expm_p63 x ccs :=
+    let y : ℝ := ((2 : ℝ) ^ 63) * ccs * Real.exp (-x)
+    if 0 ≤ y then
+      (⌊y⌋).toInt64.toUInt64
+    else
+      0
+  ofRawFPR x := ((Float.ofBits x).toRat0 : ℝ)
+
+private def sampleSamplerSeed : ProbComp ByteArray := do
+  let bytes ← ProbComp.sampleIID samplerSeedBytes ($ᵗ UInt8)
+  return ByteArray.mk <| Array.ofFn fun i : Fin samplerSeedBytes => bytes i
+
+private noncomputable def fxrScale : ℝ := (2 : ℝ) ^ (32 : Nat)
+
+/-- Interpret an `FXR` word as its signed 32.32 fixed-point real value. -/
+private noncomputable def fxrToReal (x : FXR.FXR) : ℝ :=
+  (x.toInt64.toInt : ℝ) / fxrScale
+
+/-- Encode a real number into Falcon's signed 32.32 fixed-point format by rounding
+to the nearest scaled integer. -/
+private noncomputable def realToFXR (x : ℝ) : FXR.FXR :=
+  (round (x * fxrScale)).toInt64.toUInt64
+
+/-- Convert an `R_q` polynomial to the coefficient array expected by the concrete FFT code. -/
+private def rqToInt32Array (p : Params) (f : Rq p.n) : Array Int32 :=
+  (Array.range p.n).map fun i => (ZMod.val (f.getD i 0)).toInt32
+
+/-- Convert an integer polynomial to the coefficient array expected by the concrete FFT code. -/
+private def intPolyToInt32Array (p : Params) (f : IntPoly p.n) : Array Int32 :=
+  (Array.range p.n).map fun i => (f.getD i 0).toInt32
+
+/-- Read Falcon's packed FXR FFT layout into the proof-level packed real vector. -/
+private noncomputable def fxrArrayToRealFFTPoly (p : Params) (f : Array FXR.FXR) :
+    RealFFTPoly p.fftDepth :=
+  Vector.ofFn fun i => fxrToReal (f.getD i.1 0)
+
+/-- Re-encode a proof-level packed FFT vector into Falcon's concrete FXR layout. -/
+private noncomputable def realFFTPolyToFXRArray (p : Params) (f : RealFFTPoly p.fftDepth) :
+    Array FXR.FXR :=
+  (Array.range p.n).map fun i =>
+    if h : i < 2 * 2 ^ p.fftDepth then
+      realToFXR (f.get ⟨i, h⟩)
+    else
+      0
+
+/-- Convert concrete FXR coefficients back to an integer polynomial via Falcon's
+reference fixed-point rounding rule. -/
+private def fxrArrayToIntPoly (p : Params) (f : Array FXR.FXR) : IntPoly p.n :=
+  Vector.ofFn fun i => (FXR.fxr_round (f.getD i.1 0)).toInt
 
 /-- Concrete Falcon primitive bundle used to connect the executable code to the abstract
 Falcon interfaces. -/
@@ -99,7 +183,18 @@ noncomputable def concretePrimitives (p : Params) (hn : p.n = 2 ^ p.logn) :
     Primitives p where
   publicKeyBytes := fun h => publicKeyBytes p.logn h
   hashToPoint := fun salt pkBytes msg => hashToPoint p.n salt pkBytes msg
-  samplerZ := fun _μ _σ => sorry
+  samplerZ := fun μ σ => do
+    let seed ← sampleSamplerSeed
+    let state := SamplerZ.PRNGState.init seed
+    letI : FloatLike ℝ := realSamplerFloatLike
+    let (z, _) := SamplerZ.samplerZ p.logn state μ σ⁻¹
+    return z.toInt
+  fftTarget := fun c =>
+    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (rqToInt32Array p c)
+  fftInt := fun f =>
+    fxrArrayToRealFFTPoly p <| FXR.vect_FFT p.logn <| FXR.vect_set p.logn (intPolyToInt32Array p f)
+  ifftRound := fun f =>
+    fxrArrayToIntPoly p <| FXR.vect_iFFT p.logn (realFFTPolyToFXRArray p f)
   compress := compress p.n
   decompress := decompress p.n
   nttOps := hn ▸ concreteNTTRingOps p.logn

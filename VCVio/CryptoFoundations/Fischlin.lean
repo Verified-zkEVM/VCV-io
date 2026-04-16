@@ -106,8 +106,7 @@ variable {Stmt Wit Commit PrvState Chal Resp : Type}
 
 section mainDefinition
 
-variable [SampleableType Stmt] [SampleableType Wit]
-  [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
 /-- The Fischlin transform applied to a Σ-protocol and a generable relation produces
@@ -419,8 +418,8 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
 section verifyCostAccounting
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [SampleableType Stmt] [SampleableType Wit]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
+variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
+  (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSet m]
 
 /-- Fischlin verification makes at most `ρ` random-oracle queries under unit-cost
@@ -526,8 +525,8 @@ end verifyCostAccounting
 section signCostAccounting
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [SampleableType Stmt] [SampleableType Wit]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
+variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
+  (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSet m]
 
 /-- Fischlin signing makes at most `ρ * |Ω|` random-oracle queries under unit-cost
@@ -758,8 +757,7 @@ end signCostAccounting
 section expectedWeightedQueryCost
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [SampleableType Stmt] [SampleableType Wit]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
+variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSPMF m]
 
@@ -788,8 +786,7 @@ end expectedWeightedQueryCost
 section expectedQueries
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [SampleableType Stmt] [SampleableType Wit]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
+variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalSPMF m]
 
@@ -813,8 +810,7 @@ end expectedQueries
 section expectedQueriesPMF
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-variable [SampleableType Stmt] [SampleableType Wit]
-  [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
+variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
   (hr : GenerableRelation Stmt Wit rel) (S : ℕ)
   [DecidableEq M] [HasEvalPMF m]
 
@@ -841,8 +837,7 @@ end costAccounting
 
 section security
 
-variable [SampleableType Stmt] [SampleableType Wit]
-  [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
+variable [DecidableEq Stmt] [DecidableEq Commit] [DecidableEq Chal] [DecidableEq Resp]
   [FinEnum Chal] [Inhabited Chal] [Inhabited Resp] [SampleableType Chal]
 
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)

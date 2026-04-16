@@ -60,11 +60,15 @@ def toReal (x : FPR) : ℝ := ((Float.ofBits x).toRat0 : ℝ)
 /-! ## Verification-only concrete primitives -/
 
 /-- Concrete primitive bundle restricted to the fields used by `Falcon.verify`.
-The sampler is a dummy placeholder because verification never invokes it. -/
+The sampler and FFT bridge fields are dummy placeholders because verification never
+invokes them. -/
 def verifyPrimitives (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) : Falcon.Primitives p where
   publicKeyBytes := fun h => Falcon.Concrete.publicKeyBytes p.logn h
   hashToPoint := fun salt pkBytes msg => Falcon.Concrete.hashToPoint p.n salt pkBytes msg
   samplerZ := fun _ _ => pure 0
+  fftTarget := fun _ => 0
+  fftInt := fun _ => 0
+  ifftRound := fun _ => 0
   compress := Falcon.Concrete.compress p.n
   decompress := Falcon.Concrete.decompress p.n
   nttOps := hn ▸ Falcon.Concrete.concreteNTTRingOps p.logn
@@ -112,9 +116,6 @@ codec, public-key codec, and fast arithmetic kernels are related to their specif
 counterparts. The abstract verifier is instantiated with the same concrete verification fields. -/
 theorem concrete_verify_eq_verify
     (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) (hsbytelen : 0 < p.sbytelen)
-    (hverifyEmpty : ∀ (pkBytes : ByteArray) (salt : Bytes 40) (msg : List Byte),
-      Falcon.Concrete.concreteVerify p pkBytes msg
-        (Falcon.Concrete.sigEncode salt [] p.logn) = false)
     (hsigDecode : ∀ (salt : Bytes 40) (compSig : List Byte),
       compSig ≠ [] →
         Falcon.Concrete.sigDecode (Falcon.Concrete.sigEncode salt compSig p.logn) p.logn =
@@ -138,7 +139,11 @@ theorem concrete_verify_eq_verify
       simpa [hcomp] using hsbytelen
     have hdecomp : (verifyPrimitives p hn).decompress [] p.sbytelen = none := by
       simp [verifyPrimitives, Falcon.Concrete.decompress, hsbytelen]
-    have hleft := hverifyEmpty ((verifyPrimitives p hn).publicKeyBytes pk.h) sig.salt msg
+    have hleft :
+        Falcon.Concrete.concreteVerify p ((verifyPrimitives p hn).publicKeyBytes pk.h) msg
+          (Falcon.Concrete.sigEncode sig.salt [] p.logn) = false := by
+      exact Falcon.Concrete.concreteVerify_sigEncode_nil_eq_false p
+        ((verifyPrimitives p hn).publicKeyBytes pk.h) sig.salt msg
     have hright : Falcon.verify p (verifyPrimitives p hn) pk msg sig = false := by
       simp [Falcon.verify, hcomp, hdecomp]
     simpa [hcomp] using hleft.trans hright.symm
