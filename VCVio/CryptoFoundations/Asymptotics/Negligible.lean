@@ -58,11 +58,11 @@ theorem negligible_const_mul {f : ℕ → ℝ≥0∞} (hf : negligible f)
   simp only [mul_zero] at h
   exact h.congr (fun n => by rw [mul_left_comm])
 
-set_option linter.unusedDecidableInType false in
 /-- A finite sum of negligible functions is negligible. -/
-theorem negligible_sum {ι : Type*} [DecidableEq ι] {s : Finset ι} {f : ι → ℕ → ℝ≥0∞}
+theorem negligible_sum {ι : Type*} {s : Finset ι} {f : ι → ℕ → ℝ≥0∞}
     (h : ∀ i ∈ s, negligible (f i)) :
     negligible (fun n => ∑ i ∈ s, f i n) := by
+  classical
   induction s using Finset.induction with
   | empty => exact negligible_of_zero (fun _ => by simp)
   | insert _ _ hnotin ih =>

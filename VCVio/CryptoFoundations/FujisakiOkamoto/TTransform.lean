@@ -7,7 +7,7 @@ import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.QueryRuntime
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 /-!

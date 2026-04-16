@@ -8,17 +8,24 @@ import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.HasQuery
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.ProgramLogic.Tactics.Unary
 
 /-!
-# Fiat-Shamir Transform
+# Fiat-Shamir transform for Σ-protocols
 
-This file defines a basic version of the Fiat-Shamir transform on sigma protocols.
-For simplicity we construct signature schemes rather than general proofs of knowledge.
+The classical (non-aborting) Fiat-Shamir transform: given a 3-round Σ-protocol
+and a generable relation, produce a signature scheme in the random-oracle
+model. The signing algorithm commits, queries the random oracle on
+`(message, commitment)`, and responds to the resulting challenge.
+
+This file contains the scheme definition, the random-oracle runtime bundle,
+the naturality theorem, cost accounting, and completeness. The forking-lemma
+bridge lives in `FiatShamir.Sigma.Fork` and the EUF-CMA reduction in
+`FiatShamir.Sigma.Security`.
 -/
 
 universe u v
@@ -26,7 +33,7 @@ universe u v
 open OracleComp OracleSpec
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
-    {rel : Stmt → Wit → Bool}
+    {rel : Stmt → Wit → Bool} [SampleableType Stmt] [SampleableType Wit]
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
@@ -71,6 +78,7 @@ end semantics
 
 section naturality
 
+variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -79,6 +87,7 @@ variable {m : Type → Type u} [Monad m]
   [MonadLiftT ProbComp m] [MonadLiftT ProbComp n]
   [HasQuery (M × Commit →ₒ Chal) m] [HasQuery (M × Commit →ₒ Chal) n]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir is natural in any oracle semantics morphism that preserves both random-oracle
 queries and public-randomness lifting.
 
@@ -116,12 +125,14 @@ end naturality
 
 section costAccounting
 
+variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 variable {m : Type → Type u} [Monad m] [LawfulMonad m]
   [MonadLiftT ProbComp m]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
@@ -155,6 +166,7 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
           AddWriterT ω m Resp)) = _
   simp [bind_map_left]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
     (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
@@ -192,6 +204,7 @@ private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
           AddWriterT ω m Resp)) = _
   simp [bind_map_left]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has query cost determined by its output: the signature `(c, s)` records
 the unique queried commitment `c`, so the total weighted query cost is exactly
 `costFn (msg, c)`. -/
@@ -210,6 +223,7 @@ theorem sign_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
     (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
     (msg := msg) (costFn := costFn)
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has expected weighted query cost equal to the expectation of the queried
 commitment cost over the output signature distribution. -/
 theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [HasEvalSPMF m]
@@ -250,6 +264,7 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
             (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
             (msg := msg) (costFn := costFn)]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
     (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
@@ -258,6 +273,7 @@ theorem sign_usesExactlyOneQuery
     sign_usesCostAsQueryCost (σ := σ) (hr := hr) (M := M) (runtime := runtime)
       (pk := pk) (sk := sk) (msg := msg) (costFn := fun _ ↦ (1 : ℕ))
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
 random-oracle query on `(msg, sig.1)`. -/
 theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
@@ -276,6 +292,7 @@ theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
   simp [HasQuery.withAddCost, FiatShamir, QueryRuntime.withAddCost_impl,
     AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification has expected weighted query cost equal to the weight of its single
 random-oracle query. -/
 theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
@@ -290,6 +307,7 @@ theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [Ha
       (sig := sig) (costFn := costFn))
     hval
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
@@ -305,64 +323,14 @@ attribute [simp] sign_usesExactlyOneQuery verify_usesExactlyOneQuery
 
 end costAccounting
 
-section bounds
+section correctness
 
-variable (M : Type)
-
-/-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
-EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
-def hashQueryBound {S' α : Type}
-    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => True
-      | .inl (.inr _) => 0 < b)
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => b
-      | .inl (.inr _) => b - 1)
-
-/-- Structural query bound for Fiat-Shamir EUF-CMA adversaries that tracks both
-signing-oracle queries (`qS`) and random-oracle queries (`qH`).
-Uniform-sampling queries are unrestricted. -/
-def signHashQueryBound {S' α : Type}
-    (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α)
-    (qS qH : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa (qS, qH)
-    (fun t b => match t, b with
-      | .inl (.inl _), _ => True
-      | .inl (.inr _), (_, qH') => 0 < qH'
-      | .inr _, (qS', _) => 0 < qS')
-    (fun t b => match t, b with
-      | .inl (.inl _), b' => b'
-      | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
-      | .inr _, (qS', qH') => (qS' - 1, qH'))
-
-/-- Structural bound on random-oracle queries for an NMA adversary (no signing oracle).
-Uniform-sampling queries are unrestricted. -/
-def nmaHashQueryBound {α : Type}
-    (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl _ => True
-      | .inr _ => 0 < b)
-    (fun t b => match t with
-      | .inl _ => b
-      | .inr _ => b - 1)
-
-/-- Reciprocal of the finite challenge-space size. -/
-noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=
-  (Fintype.card challenge : ENNReal)⁻¹
-
-end bounds
-
-section security
-
-variable [SampleableType Stmt]
+variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 open scoped Classical in
-omit [SampleableType Stmt] in
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect [SampleableType Chal]
@@ -373,45 +341,10 @@ theorem perfectlyCorrect [SampleableType Chal]
   intro msg
   let ro : QueryImpl (M × Commit →ₒ Chal)
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
-  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-    (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
-  have hleft :
-      ∀ {α : Type} (oa : ProbComp α),
-        simulateQ (idImpl + ro) (OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) =
-          simulateQ idImpl oa := by
-    intro α oa
-    simpa using
-      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) oa)
-  have hrun :
-      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ idImpl oa).run s = (fun x => (x, s)) <$> oa := by
-    intro α oa
-    induction oa using OracleComp.inductionOn with
-    | pure x =>
-        intro s
-        simp
-    | query_bind t oa ih =>
-        intro s
-        change
-          (do
-            let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
-            (simulateQ idImpl (oa a)).run s) =
-            (do
-              let a ← liftM (query t)
-              (fun x => (x, s)) <$> oa a)
-        have hfun :
-            (fun a => (simulateQ idImpl (oa a)).run s) =
-              (fun a => (fun x => (x, s)) <$> oa a) := by
-          funext a
-          exact ih a s
-        simp [hfun]
-  have hrunLift :
-      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ (idImpl + ro) (liftM oa)).run s = (fun x => (x, s)) <$> oa := by
-    intro α oa s
-    rw [show simulateQ (idImpl + ro) (liftM oa) = simulateQ idImpl oa by
-      simpa using hleft oa]
-    simpa using hrun oa s
+  let impl := unifFwdImpl (M × Commit →ₒ Chal) + ro
+  have hSimQuery : ∀ (q : M × Commit),
+      simulateQ impl (HasQuery.query q) = ro q :=
+    roSim.simulateQ_HasQuery_query ro
   change
     Pr[= true | (runtime M).evalDist (do
       let (pk, sk) ←
@@ -437,7 +370,7 @@ theorem perfectlyCorrect [SampleableType Chal]
           let r ← $ᵗ Chal
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
-    change evalDist (StateT.run' (simulateQ (idImpl + ro) (do
+    change evalDist (StateT.run' (simulateQ impl (do
         let (pk, sk) ←
           (FiatShamir
             (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
@@ -448,32 +381,13 @@ theorem perfectlyCorrect [SampleableType Chal]
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
             pk msg sig)) ∅) = _
     dsimp only [FiatShamir]
-    have hquery :
-        ∀ q : M × Commit,
-          HasQuery.query
-              (spec := (M × Commit →ₒ Chal))
-              (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) q =
-            (query (spec := unifSpec + (M × Commit →ₒ Chal)) (Sum.inr q) :
-              OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal) := by
-      intro q
-      exact congrArg
-        (fun z => (liftM z : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal))
-        (OracleQuery.liftM_add_right_query
-          (spec₁ := unifSpec) (spec₂ := (M × Commit →ₒ Chal)) q)
-    have hSimQuery : ∀ (q : M × Commit),
-        simulateQ (idImpl + ro) (HasQuery.query q) = ro q := by
-      intro q; rw [hquery]; simp [simulateQ_query]
     simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
     have hpeel : ∀ {α β : Type} (oa : ProbComp α)
         (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
         (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ (idImpl + ro) (liftM oa) >>= rest).run' s =
-          oa >>= fun x => (rest x).run' s := by
-      intro α β oa rest s
-      change Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
-        oa >>= fun x => Prod.fst <$> (rest x).run s
-      rw [StateT.run_bind, hrunLift]
-      simp [map_bind]
+        (simulateQ impl (liftM oa) >>= rest).run' s =
+          oa >>= fun x => (rest x).run' s :=
+      fun oa rest s => roSim.run'_liftM_bind ro oa rest s
     simp_rw [hpeel]
     have hlift : ∀ {α : Type} (x : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
         (liftM x : StateT _ ProbComp α).run s = x >>= fun a => pure (a, s) := by
@@ -554,96 +468,6 @@ theorem perfectlyCorrect [SampleableType Chal]
             pure (σ.verify pk c r s))
           (post := fun y => if y = true then 1 else 0))
 
-/-- **CMA-to-NMA reduction via HVZK simulation.**
-
-For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
-random-oracle queries, there exists an NMA adversary `B` such that:
-
-  `Adv^{EUF-CMA}(A) ≤ Adv^{EUF-NMA}(B) + qS · ζ_zk`
-
-The NMA adversary `B` is constructed by replacing every signing-oracle answer with a
-simulated transcript produced by the HVZK simulator. Each replacement introduces at most
-`ζ_zk` total-variation distance, and a hybrid argument over `qS` queries yields the
-additive loss.
-
-This step is independent of special soundness and the forking lemma; those are handled
-by `euf_nma_bound`. -/
-theorem euf_cma_to_nma
-    [SampleableType Chal]
-    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (ζ_zk : ℝ) (_hζ : 0 ≤ ζ_zk)
-    (_hhvzk : σ.HVZK simTranscript ζ_zk)
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qS qH : ℕ)
-    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    ∃ nmaAdv : SignatureAlg.eufNmaAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
-      adv.advantage (runtime M) ≤
-        nmaAdv.advantage (runtime M) + ENNReal.ofReal (qS * ζ_zk) := by
-  sorry
-
-/-- **NMA-to-extraction via the forking lemma and special soundness.**
-
-For any EUF-NMA adversary `B` making at most `qH` random-oracle queries, there exists a
-witness-extraction reduction such that:
-
-  `Adv^{EUF-NMA}(B) · (Adv^{EUF-NMA}(B) / (qH + 1) - 1/|Ω|) ≤ Pr[extraction succeeds]`
-
-Runs `B` twice with shared randomness up to a randomly chosen fork point, then re-samples the
-oracle answer. When both runs forge at the same hash query with distinct challenges, special
-soundness extracts a valid witness. -/
-theorem euf_nma_bound
-    [SampleableType Chal]
-    (_hss : σ.SpeciallySound)
-    [Fintype Chal]
-    (nmaAdv : SignatureAlg.eufNmaAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qH : ℕ)
-    (_hQ : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := nmaAdv.main pk) qH) :
-    ∃ reduction : Stmt → ProbComp Wit,
-      (nmaAdv.advantage (runtime M) *
-          (nmaAdv.advantage (runtime M) / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp hr reduction] := by
-  sorry
-
-/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
-
-Composes `euf_cma_to_nma` and `euf_nma_bound`:
-
-1. Replace the signing oracle with the HVZK simulator, losing `qS · ζ_zk`.
-2. Apply the forking lemma to the resulting NMA adversary.
-
-The combined bound is:
-
-  `(ε - qS·ζ_zk) · ((ε - qS·ζ_zk) / (qH+1) - 1/|Ω|) ≤ Pr[extraction succeeds]`
-
-where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
-the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
-theorem euf_cma_bound
-    [SampleableType Chal]
-    (hss : σ.SpeciallySound)
-    [Fintype Chal]
-    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (ζ_zk : ℝ) (hζ : 0 ≤ ζ_zk)
-    (hhvzk : σ.HVZK simTranscript ζ_zk)
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qS qH : ℕ)
-    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    ∃ reduction : Stmt → ProbComp Wit,
-      let eps := adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk)
-      (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp hr reduction] := by
-  let _ := hss
-  let _ := hζ
-  let _ := hhvzk
-  let _ := hQ
-  sorry
-
-end security
+end correctness
 
 end FiatShamir

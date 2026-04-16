@@ -7,24 +7,16 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.Constructions.GenerateSeed
 
 /-!
-# Random Oracle Implementations
+# Eager Random Oracle
 
-This file defines two oracle implementations built from uniform sampling:
+The eager random oracle serves answers from a pre-generated `QuerySeed`, consuming values
+sequentially and falling back to fresh uniform sampling when exhausted. Different calls to
+the same oracle consume different seed values. State: `QuerySeed`.
 
-* **`randomOracle`** (lazy, consistent): Samples a fresh uniform value on first query and caches
-  for future consistency. Same input always yields same output. State: `QueryCache`.
-  This is `uniformSampleImpl.withCaching`.
-
-* **`eagerRandomOracle`** (pre-seeded, independent): Serves answers from a pre-generated
-  `QuerySeed`, consuming values sequentially. Falls back to fresh uniform sampling when
-  exhausted. Different calls to the same oracle consume different seed values.
-  State: `QuerySeed`.
-
-These two models differ when an oracle is queried more than once: the lazy version returns
-the cached value (consistency), while the eager version consumes the next seed value
-(independence). When averaged over a uniformly sampled seed, the eager version matches
-the fresh independent-query semantics of `evalDist`; it does *not* coincide with the
-lazy cached `randomOracle` on repeated queries.
+This gives INDEPENDENT samples (each call consumes a different seed value), unlike
+`randomOracle` which gives CONSISTENT samples (same input → same output via caching).
+When averaged over a uniformly sampled seed, the eager version matches the fresh
+independent-query semantics of `evalDist`.
 -/
 
 open OracleComp OracleSpec
@@ -32,28 +24,6 @@ open OracleComp OracleSpec
 universe u v w
 
 variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
-
-/-- The (lazy) random oracle: uniform sampling with caching.
-On query `t`, returns the cached value if present, otherwise samples `$ᵗ spec.Range t`
-uniformly and caches the result. This ensures consistency: same input → same output. -/
-@[inline, reducible] def randomOracle {ι} [DecidableEq ι] {spec : OracleSpec ι}
-    [∀ t : spec.Domain, SampleableType (spec.Range t)] :
-    QueryImpl spec (StateT spec.QueryCache ProbComp) :=
-  uniformSampleImpl.withCaching
-
-namespace randomOracle
-
-variable {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec.{0, 0} ι₀}
-  [∀ t : spec₀.Domain, SampleableType (spec₀.Range t)]
-
-lemma apply_eq (t : spec₀.Domain) :
-    (randomOracle (spec := spec₀)) t = (do match (← get) t with
-    | Option.some u => return u
-    | Option.none =>
-        let u ← $ᵗ spec₀.Range t
-        modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
-
-end randomOracle
 
 /-- The eager random oracle: serves answers from a pre-generated `QuerySeed`, consuming
 seed values sequentially and falling back to fresh uniform sampling when exhausted.
@@ -186,8 +156,7 @@ theorem eagerRandomOracle_evalDist_generateSeed_bind {ι₀ : Type} [DecidableEq
         Pr[= x | (simulateQ eagerRandomOracle (f u)).run' seed] = Pr[= x | f u] := fun u => by
       rw [← probOutput_bind_eq_tsum]; exact congrFun (congrArg DFunLike.coe (ih u qc js)) x
     by_cases hcount : qc t * js.count t = 0
-    · -- Seed empty at t: fall back to uniform sampling
-      have hnil : ∀ seed ∈ support (generateSeed spec₀ qc js), seed t = [] :=
+    · have hnil : ∀ seed ∈ support (generateSeed spec₀ qc js), seed t = [] :=
         fun s hs => eq_nil_of_mem_support_generateSeed spec₀ qc js s t hs hcount
       have hstep : ∀ seed,
           Pr[= seed | generateSeed spec₀ qc js] *
@@ -206,8 +175,7 @@ theorem eagerRandomOracle_evalDist_generateSeed_bind {ι₀ : Type} [DecidableEq
       congr 1
       simp_rw [← ENNReal.tsum_mul_left (a := Pr[= _ | generateSeed _ _ _])]
       rw [ENNReal.tsum_comm]; congr 1; ext u; exact hih u
-    · -- Seed non-empty at t: consume head value
-      have hpos : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
+    · have hpos : 0 < qc t * js.count t := Nat.pos_of_ne_zero (by omega)
       have hstep : ∀ seed,
           Pr[= seed | generateSeed spec₀ qc js] *
             Pr[= x | (eagerRandomOracle t >>= fun u =>

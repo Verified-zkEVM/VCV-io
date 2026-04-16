@@ -66,25 +66,28 @@ lemma probOutput_map_bijective_uniformSample
   rw [probOutput_map_injective ($ᵗ α) hf.injective x']
   exact SampleableType.probOutput_selectElem_eq _ _
 
-set_option linter.unusedFintypeInType false in
 /-- Pushing forward uniform sampling along a bijection preserves output probabilities. -/
 lemma probOutput_map_bijective_uniform_cross
-    {β : Type} [SampleableType β] [Fintype α] [Fintype β]
+    {β : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (y : β) :
     Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by
+  classical
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofBijective f hf
   obtain ⟨x, rfl⟩ := hf.surjective y
   rw [probOutput_map_injective ($ᵗ α) hf.injective x,
       probOutput_uniformSample, probOutput_uniformSample,
       Fintype.card_of_bijective hf]
 
-set_option linter.unusedFintypeInType false in
 /-- Binding after pushing forward uniform sampling along a bijection preserves output
 probabilities. -/
 lemma probOutput_bind_bijective_uniform_cross
-    {β γ : Type} [SampleableType β] [Fintype α]
+    {β γ : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (g : β → ProbComp γ) (z : γ) :
     Pr[= z | ($ᵗ α : ProbComp α) >>= fun x => g (f x)] =
       Pr[= z | ($ᵗ β : ProbComp β) >>= fun y => g y] := by
+  classical
+  letI := Fintype.ofFinite α
   haveI := Fintype.ofBijective f hf
   have h : (($ᵗ α : ProbComp α) >>= fun x => g (f x)) =
       ((f <$> ($ᵗ α : ProbComp α)) >>= g) := by
@@ -145,10 +148,9 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
-set_option linter.unusedFintypeInType false
 /-- Pushing forward uniform sampling via a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
-    {β : Type} [SampleableType β] [Fintype α] [Fintype β]
+    {β : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) :
     evalDist (f <$> ($ᵗ α : ProbComp α)) = evalDist ($ᵗ β : ProbComp β) := by
   apply evalDist_ext
@@ -201,6 +203,13 @@ instance : SampleableType Bool where
   selectElem := $! #v[true, false]
   mem_support_selectElem x := by simp
   probOutput_selectElem_eq x y := by simp
+
+/-- A sum of oracle specs with sampleable ranges again has sampleable ranges. -/
+instance {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    [h : ∀ t, SampleableType (spec.Range t)] [h' : ∀ t, SampleableType (spec'.Range t)] :
+    ∀ t, SampleableType ((spec + spec').Range t)
+  | .inl t => h t
+  | .inr t => h' t
 
 /-- Select a uniform element from `α × β` by independently selecting from `α` and `β`. -/
 instance (α β : Type) [Fintype α] [Fintype β] [Inhabited α] [Inhabited β]

@@ -9,10 +9,15 @@ import VCVio.CryptoFoundations.Asymptotics.ReductionCost
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.DataEncapMech
-import VCVio.CryptoFoundations.FiatShamir
-import VCVio.CryptoFoundations.FiatShamirWithAbort
+import VCVio.CryptoFoundations.FiatShamir.QueryBounds
+import VCVio.CryptoFoundations.FiatShamir.Sigma
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
+import VCVio.CryptoFoundations.FiatShamir.WithAbort
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
-import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
@@ -23,6 +28,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 import VCVio.CryptoFoundations.HardnessAssumptions.EntropySmoothing
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
+import VCVio.CryptoFoundations.HashCommitment
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.InductiveMerkleTree
 import VCVio.CryptoFoundations.KEMDEM
@@ -31,7 +37,9 @@ import VCVio.CryptoFoundations.MacAlg
 import VCVio.CryptoFoundations.MerkleTree
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
+import VCVio.CryptoFoundations.ReplayFork
 import VCVio.CryptoFoundations.SecExp
+import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.SymmEncAlg
@@ -139,7 +147,9 @@ import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.ObservationOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.QueryRuntime
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
+import VCVio.OracleComp.QueryTracking.RandomOracle.Eager
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
@@ -156,7 +166,6 @@ import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
-import VCVio.ProgramLogic.Fork
 import VCVio.ProgramLogic.Notation
 import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Relational.Basic
@@ -165,6 +174,7 @@ import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.ProgramLogic.Relational.SimulateQ
+import VCVio.ProgramLogic.SeededFork
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Tactics.Common.CompiledRules

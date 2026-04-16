@@ -28,7 +28,7 @@ open Topology ENNReal NNReal Set
 
 universe u
 
-variable {α β : Type u} [Fintype α] [Fintype β]
+variable {α β : Type u} [Finite α] [Finite β]
 
 -- 1. Space of bounded non-negative real functions
 -- 2. Compactness
@@ -38,10 +38,12 @@ variable {α β : Type u} [Fintype α] [Fintype β]
 
 section Topology
 
-set_option linter.unusedFintypeInType false in
 lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
+    letI := Fintype.ofFinite β
     (Prod.fst <$> c) a = ∑ b, c (a, b) := by
   classical
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   erw [SPMF.fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
   have hsimp :
       ((if some a = Option.map Prod.fst (none : Option (α × β)) then c.gap else 0) +
@@ -62,10 +64,12 @@ lemma map_fst_eval (c : SPMF (α × β)) (a : α) :
       simp [ha'']
   simpa [hsimp] using hmain
 
-set_option linter.unusedFintypeInType false in
+open scoped Classical in
 lemma map_snd_eval (c : SPMF (α × β)) (b : β) :
+    letI := Fintype.ofFinite α
     (Prod.snd <$> c) b = ∑ a, c (a, b) := by
-  classical
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   erw [SPMF.fmap_eq_map, PMF.map_apply, tsum_fintype, Fintype.sum_option]
   have hsimp :
       ((if some b = Option.map Prod.snd (none : Option (α × β)) then c.gap else 0) +
@@ -89,17 +93,18 @@ lemma map_snd_eval (c : SPMF (α × β)) (b : β) :
       simp [hb'']
   simpa [hsimp] using hmain
 
-omit [Fintype α] [Fintype β] in
-private lemma pmf_none_eq {γ : Type u} [Fintype γ] (p : PMF (Option γ)) :
+private lemma pmf_none_eq {γ : Type u} [Finite γ] (p : PMF (Option γ)) :
+    letI := Fintype.ofFinite γ
     p none = 1 - ∑ x, p (some x) := by
   refine (SPMF.gap_eq_one_sub_tsum p).trans (congr_arg _ (tsum_eq_sum ?_))
   simp
 
-omit [Fintype α] [Fintype β] in
 private lemma spmf_ext {γ : Type u} {p q : SPMF γ}
     (h : ∀ x, p x = q x) : p = q := SPMF.ext h
 
 def couplings_set (p : SPMF α) (q : SPMF β) : Set (Option (α × β) → ℝ) :=
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   { c | (∀ z, 0 ≤ c z) ∧
         (∀ z, c z ≤ 1) ∧
         (∀ a, ∑ b, c (some (a, b)) = (p a).toReal) ∧
@@ -109,6 +114,8 @@ def couplings_set (p : SPMF α) (q : SPMF β) : Set (Option (α × β) → ℝ) 
 -- 2. Prove this set is closed and bounded
 lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
     IsClosed (couplings_set p q) := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   rw [show couplings_set p q =
       {c | ∀ z, 0 ≤ c z} ∩
       {c | ∀ z, c z ≤ 1} ∩
@@ -146,6 +153,8 @@ lemma isClosed_couplings_set (p : SPMF α) (q : SPMF β) :
 
 lemma isBounded_couplings_set (p : SPMF α) (q : SPMF β) :
     Bornology.IsBounded (couplings_set p q) := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   rw [Metric.isBounded_iff]
   use 1
   intro x hx y hy
@@ -159,12 +168,17 @@ lemma isBounded_couplings_set (p : SPMF α) (q : SPMF β) :
   exact abs_sub_le_iff.mpr ⟨by linarith, by linarith⟩
 
 lemma isCompact_couplings_set (p : SPMF α) (q : SPMF β) :
-    IsCompact (couplings_set p q) :=
-  Metric.isCompact_of_isClosed_isBounded (isClosed_couplings_set p q) (isBounded_couplings_set p q)
+    IsCompact (couplings_set p q) := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
+  exact Metric.isCompact_of_isClosed_isBounded (isClosed_couplings_set p q)
+    (isBounded_couplings_set p q)
 
 lemma mem_couplings_set_of_isCoupling {p : SPMF α} {q : SPMF β} (c : SPMF (α × β))
     (hc : SPMF.IsCoupling c p q) :
     (fun z => (c.toPMF z).toReal) ∈ couplings_set p q := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   simp only [couplings_set, mem_setOf_eq]
   refine ⟨fun z => ENNReal.toReal_nonneg, ?_, ?_, ?_, ?_⟩
   · intro z; exact ENNReal.toReal_mono (by exact ENNReal.one_ne_top) (PMF.coe_le_one c z)
@@ -192,7 +206,7 @@ lemma mem_couplings_set_of_isCoupling {p : SPMF α} {q : SPMF β} (c : SPMF (α 
     exact h_toReal
   · exact SPMF.toReal_gap_eq_one_sub_sum_toReal c
 
-omit [Fintype α] [Fintype β] in
+omit [Finite α] [Finite β] in
 private lemma sum_option_eq_one_of_none_eq_sub {γ : Type u} [Fintype γ]
     {c : Option γ → ℝ} (h_nonneg : ∀ z, 0 ≤ c z)
     (h_none : c none = 1 - ∑ z, c (some z)) :
@@ -207,6 +221,8 @@ private lemma sum_option_eq_one_of_none_eq_sub {γ : Type u} [Fintype γ]
 private lemma exists_coupling_of_mem_couplings_set {p : SPMF α} {q : SPMF β}
     {c : Option (α × β) → ℝ} (hc : c ∈ couplings_set p q) :
     ∃ c' : SPMF.Coupling p q, ∀ z, (c'.1.1 z).toReal = c z := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   rcases hc with ⟨h_nonneg, _, h_row, h_col, h_none⟩
   have h_total_real : ∑ z : Option (α × β), c z = 1 :=
     sum_option_eq_one_of_none_eq_sub h_nonneg h_none
@@ -278,7 +294,11 @@ private lemma exists_coupling_of_mem_couplings_set {p : SPMF α} {q : SPMF β}
 
 private lemma objective_eq_ofReal (c : SPMF (α × β))
     (f : Option (α × β) → ℝ≥0∞) (hf : ∀ z, f z ≠ ⊤) :
+    letI := Fintype.ofFinite α
+    letI := Fintype.ofFinite β
     (∑' z, c.1 z * f z) = ENNReal.ofReal (∑ z, (c.1 z).toReal * (f z).toReal) := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   rw [tsum_fintype]
   calc
     ∑ z : Option (α × β), c.1 z * f z
@@ -295,18 +315,18 @@ private lemma objective_eq_ofReal (c : SPMF (α × β))
               (f := fun z => (c.1 z).toReal * (f z).toReal)
               (fun z _ => mul_nonneg ENNReal.toReal_nonneg ENNReal.toReal_nonneg))
 
-set_option linter.unusedFintypeInType false in
--- 3. Attaining supremum
 lemma SPMF.exists_max_coupling {p : SPMF α} {q : SPMF β}
     (f : Option (α × β) → ℝ≥0∞) (hf : ∀ z, f z ≠ ⊤)
-    (h_nonempty : Nonempty (SPMF.Coupling p q)) :
+    (h_nonempty : Nonempty (SPMF.Coupling p q))
+    (h_comp : IsCompact (couplings_set p q)) :
     ∃ (c : SPMF.Coupling p q),
       (⨆ c' : SPMF.Coupling p q, ∑' (z : Option (α × β)), (c'.1.1 z) * f z) =
         ∑' (z : Option (α × β)), (c.1.1 z) * f z := by
+  letI := Fintype.ofFinite α
+  letI := Fintype.ofFinite β
   let F : (Option (α × β) → ℝ) → ℝ := fun c => ∑ z, c z * (f z).toReal
   have hF_cont : Continuous F := continuous_finset_sum _
     (fun z _ => (continuous_apply z).mul continuous_const)
-  have h_comp := isCompact_couplings_set p q
   -- Show set is nonempty
   obtain ⟨c0⟩ := h_nonempty
   have h_nonempty_set : (couplings_set p q).Nonempty := by

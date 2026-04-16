@@ -22,10 +22,6 @@ The proof outline follows the standard switching argument:
 3. Bound the remaining gap by the probability of a state collision.
 -/
 
-set_option linter.unusedSectionVars false
-set_option linter.unusedDecidableInType false
-set_option linter.unusedFintypeInType false
-
 open OracleComp OracleSpec ENNReal PRFScheme PRGScheme
 open List (Vector)
 
@@ -105,6 +101,9 @@ def idealCollisionExp (n : ℕ) : ProbComp Bool := do
 noncomputable def collisionProb (n : ℕ) : ℝ :=
   (Pr[= true | idealCollisionExp (S := S) (O := O) n]).toReal
 
+omit [Inhabited K] [Fintype K] [SampleableType K] [Inhabited S] [Fintype S]
+  [DecidableEq S] [SampleableType S] [Inhabited O] [Fintype O]
+  [DecidableEq O] [SampleableType O] in
 /-- Under the real PRF query implementation, querying the oracle `n` times produces the
 same outputs as the deterministic `streamOutputs`. -/
 private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
@@ -134,6 +133,8 @@ private lemma simulateQ_prfReal_oracleOutputs (k : K) (n : ℕ) (s : S) :
         rw [simulateQ_bind, ih']
         simp [h, so]
 
+omit [Inhabited K] [Fintype K] [SampleableType K] [Fintype S] [DecidableEq S]
+  [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
 /-- Applying the real PRF query implementation to the full reduction body simplifies to
 sampling a seed and running the adversary on deterministic output. -/
 private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
@@ -170,6 +171,7 @@ private lemma simulateQ_prfReal_reduction (k : K) (n : ℕ)
   intro s
   rw [simulateQ_bind, simulateQ_prfReal_oracleOutputs, pure_bind, hleft]
 
+omit [DecidableEq S] [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O] in
 /-- In the real world, the stream PRG experiment has the same output distribution as
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
@@ -185,6 +187,7 @@ theorem prgRealExp_eq_prfRealExp
   simp only [seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
   rw [evalDist_bind, evalDist_bind, hkey]
 
+omit [DecidableEq O] in
 /-- The gap between the ideal PRF and ideal PRG experiments is bounded by the
 collision probability. This follows from the fundamental lemma of game playing:
 when a lazy random function never receives the same input twice, its outputs are
@@ -210,6 +213,7 @@ theorem prfIdealGap_le_collisionProb (adv : PRGAdversary (List.Vector O n)) :
       collisionProb (S := S) (O := O) n := by
   sorry
 
+omit [DecidableEq O] in
 /-- Security of the stream PRG obtained from a PRF: PRG distinguishing advantage is
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
