@@ -138,7 +138,9 @@ theorem signature_euf_cma [Finite G] (g : G) (hg : Function.Bijective (· • g 
   haveI : Fintype G := Fintype.ofFinite G
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
     (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
-    (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
+    (Schnorr.sigma_speciallySound F G g)
+    (by intro ω₁ p₁ ω₂ p₂; simp [Schnorr.sigma])
+    (Schnorr.simTranscript F G g)
     (ζ_zk := 0) (ζ_col := 0) le_rfl le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ

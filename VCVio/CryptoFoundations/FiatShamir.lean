@@ -1411,7 +1411,8 @@ soundness, with `σ.extract` playing the role of EC's `extractor`. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
-    (_hss : σ.SpeciallySound)
+    (hss : σ.SpeciallySound)
+    (hss_nf : ∀ ω₁ p₁ ω₂ p₂, Pr[⊥ | σ.extract ω₁ p₁ ω₂ p₂] = 0)
     [Fintype Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -1482,9 +1483,34 @@ theorem euf_nma_bound
     simp only [bind_pure_comp, probEvent_map, probEvent_bind_eq_tsum,
       Function.comp_def]
     rfl
-  -- ── Step (b): per-pk forking bound via `managedRoNmaForkingLemmaReplay`.
-  -- For each `pk`, the per-pk acceptance-times-shortfall is at most the
-  -- structural success probability on `forkReplay`.
+  -- The strengthened per-run invariant `P_out pk x log`: when `cf x = some s`, the
+  -- cached RO value at the forgery target agrees with the logged challenge at index `s`,
+  -- and the forgery verifies under that challenge relative to `pk`. Pairing this across
+  -- both runs gives two accepting transcripts with the same commitment and distinct
+  -- challenges — exactly what special soundness needs.
+  let P_out : Stmt →
+      ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
+        QueryLog (unifSpec + (Unit →ₒ Chal)) → Prop :=
+    fun pk x log => ∀ s : Fin (qH + 1), cf x = some s →
+      ∃ ω : Chal,
+        QueryLog.getQueryValue? log (Sum.inr ()) (↑s : ℕ) = some ω ∧
+        x.roCache x.target = some ω ∧
+        σ.verify pk x.target.2 ω x.forgery.2.2 = true
+  -- Support invariant: `P_out pk` holds for every `(x, log)` in the support of the first
+  -- run at public key `pk`. This follows from the definition of `managedRoNmaForkTraceComp`:
+  -- whenever `cf x = some s` pins `x.target` to `x.queryLog[s]?` via
+  -- `managedRoNmaForkPoint_getElem?_eq_some_target`, the trace's internal RO simulation
+  -- guarantees `x.roCache x.target` matches the external `Sum.inr ()` oracle response at
+  -- index `s`, and the `verified` flag verifies that response against `pk`.
+  have hPinv : ∀ pk x log,
+      (x, log) ∈ support (replayFirstRun (wrappedMain pk)) → P_out pk x log := by
+    -- TODO(p6-support-invariant): prove the support invariant by induction on
+    -- `managedRoNmaForkTraceComp` — each counted-oracle query updates `roCache` and the
+    -- external log in lockstep, so their corresponding entries match, and `verified`
+    -- guarantees `σ.verify pk` succeeds at the cached challenge.
+    sorry
+  -- ── Step (b): per-pk forking bound via `managedRoNmaForkingLemmaReplay`, using the
+  -- strengthened `P_out pk` to pin each run's cached challenge to its outer log entry.
   have hPerPk : ∀ pk : Stmt,
       acc pk * (acc pk / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
         Pr[ fun r : Option
@@ -1498,18 +1524,28 @@ theorem euf_nma_bound
               cf x₂ = some s ∧
               QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
                 QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
-              True ∧ True  -- trivial `P_out` placeholder
+              P_out pk x₁ log₁ ∧
+              P_out pk x₂ log₂
             | forkReplay (wrappedMain pk) qb (Sum.inr ()) cf] := by
     intro pk
     exact managedRoNmaForkingLemmaReplay (σ := σ) (hr := hr) (M := M) nmaAdv qH pk
-      (P_out := fun _ _ => True)
-      (hP := fun _ => trivial)
-  -- ── Step (c): per-pk extraction bound. The structural fork event implies the
-  -- Σ-protocol extractor succeeds, by `managedRoNmaForkPoint_getElem?_eq_some_target`
-  -- (targets coincide at the fork index) plus `_hss` (special soundness) applied to
-  -- distinct cached challenges. This step needs a stronger `P_out` than the placeholder
-  -- used in step (b) — specifically one pinning each trace's RO cache to the outer log
-  -- at the fork index — but the logical structure is independent of that upgrade.
+      (P_out := P_out pk) (hP := fun h => hPinv pk _ _ h)
+  -- ── Step (c): per-pk extraction bound. The structural fork event plus target equality
+  -- (established by `hTargetEq` below) plus special soundness give witness extraction.
+  -- Target equality across the two fork runs: this holds because both runs share the
+  -- oracle responses up to the fork index, so the adversary's internal query-log prefix up
+  -- to index `s` is identical, and `managedRoNmaForkPoint_getElem?_eq_some_target` then
+  -- forces the targets to agree.
+  have hTargetEq : ∀ pk (x₁ x₂ :
+      ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+      (s : Fin (qH + 1)),
+      some (x₁, x₂) ∈ support (forkReplay (wrappedMain pk) qb (Sum.inr ()) cf) →
+      cf x₁ = some s → cf x₂ = some s →
+      x₁.target = x₂.target := by
+    -- TODO(p6-target-equality): derive from `forkReplay_success_log_props` (shared prefix of
+    -- `Sum.inr ()` responses up to index `s`) plus the managedRoNmaForkTraceComp invariant
+    -- that `queryLog[n]` is determined by the first `n` counted-oracle responses.
+    sorry
   have hExtract : ∀ pk : Stmt,
       Pr[ fun r : Option
           (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
@@ -1522,14 +1558,114 @@ theorem euf_nma_bound
             cf x₂ = some s ∧
             QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
               QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
-            True ∧ True
+            P_out pk x₁ log₁ ∧
+            P_out pk x₂ log₂
           | forkReplay (wrappedMain pk) qb (Sum.inr ()) cf] ≤
         Pr[ fun w : Wit => rel pk w = true | reduction pk] := by
-    -- TODO(p6-extract-witness): strengthen `P_out` to pin each trace's RO cache to the
-    -- outer challenge log at the fork index, then apply `_hss`. This uses
-    -- `managedRoNmaForkPoint_getElem?_eq_some_target` for target coincidence and
-    -- `extract_sound_of_speciallySoundAt` for witness validity.
-    sorry
+    intro pk
+    classical
+    -- Strip the simulator from `reduction pk = simulateQ _ (forkExtract pk)`.
+    rw [show Pr[fun w : Wit => rel pk w = true | reduction pk] =
+          Pr[fun w : Wit => rel pk w = true | forkExtract pk] from
+        probEvent_simulateQ_unifChalImpl (forkExtract pk) _]
+    -- Expand `forkExtract pk` as a bind over `forkReplay` followed by the case-match
+    -- extractor `branchFn`.
+    set branchFn : Option
+        (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+          ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) →
+        OracleComp (unifSpec + (Unit →ₒ Chal)) Wit :=
+      fun result => match result with
+      | none => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+      | some (x₁, x₂) =>
+        let ⟨m₁, (c₁, s₁)⟩ := x₁.forgery
+        let ⟨m₂, (c₂, s₂)⟩ := x₂.forgery
+        if _hc : c₁ = c₂ then
+          match x₁.roCache (m₁, c₁), x₂.roCache (m₂, c₂) with
+          | some ω₁, some ω₂ =>
+              if _hω : ω₁ ≠ ω₂ then
+                liftComp (σ.extract ω₁ s₁ ω₂ s₂) (unifSpec + chalSpec)
+              else
+                liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+          | _, _ => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+        else
+          liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+      with hbranchFn_def
+    have hforkExtract_eq :
+        forkExtract pk = forkReplay (wrappedMain pk) qb (Sum.inr ()) cf >>= branchFn := rfl
+    rw [hforkExtract_eq, probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
+    refine ENNReal.tsum_le_tsum fun r => ?_
+    -- Pointwise comparison: `(if E r then Pr[= r | mx] else 0) ≤ Pr[= r | mx] * Pr[rel | branchFn r]`.
+    by_cases hE :
+        ∃ (x₁ x₂ : ManagedRoNmaForkTrace
+            (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+          (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
+          r = some (x₁, x₂) ∧
+          cf x₁ = some s ∧
+          cf x₂ = some s ∧
+          QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
+            QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
+          P_out pk x₁ log₁ ∧
+          P_out pk x₂ log₂
+    swap
+    · rw [if_neg hE]; exact zero_le _
+    rw [if_pos hE]
+    by_cases hsupp : r ∈ support (forkReplay (wrappedMain pk) qb (Sum.inr ()) cf)
+    swap
+    · rw [probOutput_eq_zero_of_not_mem_support hsupp, zero_mul]
+    obtain ⟨x₁, x₂, s, log₁, log₂, hreq, hcf₁, hcf₂, hneq, hP₁, hP₂⟩ := hE
+    obtain ⟨ω₁, hlog₁, hcache₁, hverify₁⟩ := hP₁ s hcf₁
+    obtain ⟨ω₂, hlog₂, hcache₂, hverify₂⟩ := hP₂ s hcf₂
+    -- The two cached challenges are distinct because the outer-log entries are.
+    have hω_ne : ω₁ ≠ ω₂ := by
+      intro heq
+      apply hneq
+      rw [hlog₁, hlog₂, heq]
+    -- Targets coincide by the shared-prefix property of `forkReplay`.
+    have htarget : x₁.target = x₂.target :=
+      hTargetEq pk x₁ x₂ s (hreq ▸ hsupp) hcf₁ hcf₂
+    -- Name the projections of the forgery directly (no rcases).
+    set m₁ := x₁.forgery.1 with hm₁_def
+    set c₁ := x₁.forgery.2.1 with hc₁_def
+    set sr₁ := x₁.forgery.2.2 with hsr₁_def
+    set m₂ := x₂.forgery.1 with hm₂_def
+    set c₂ := x₂.forgery.2.1 with hc₂_def
+    set sr₂ := x₂.forgery.2.2 with hsr₂_def
+    -- `target = (forgery.1, forgery.2.1)`, so target equality forces `m`s and `c`s.
+    have htgt₁ : x₁.target = (m₁, c₁) := rfl
+    have htgt₂ : x₂.target = (m₂, c₂) := rfl
+    have htarget_eq : (m₁, c₁) = (m₂, c₂) := by rw [← htgt₁, ← htgt₂]; exact htarget
+    have hc_eq : c₁ = c₂ := (Prod.mk.inj htarget_eq).2
+    -- Specialize cache / verify to the projected form.
+    have hcache₁' : x₁.roCache (m₁, c₁) = some ω₁ := hcache₁
+    have hcache₂' : x₂.roCache (m₂, c₂) = some ω₂ := hcache₂
+    have hverify₁' : σ.verify pk c₁ ω₁ sr₁ = true := hverify₁
+    have hverify₂' : σ.verify pk c₂ ω₂ sr₂ = true := hverify₂
+    have hverify₂'' : σ.verify pk c₁ ω₂ sr₂ = true := by rw [hc_eq]; exact hverify₂'
+    -- Evaluate `branchFn r = liftComp (σ.extract ω₁ sr₁ ω₂ sr₂) _`.
+    have hbranch :
+        branchFn r = liftComp (σ.extract ω₁ sr₁ ω₂ sr₂) (unifSpec + chalSpec) := by
+      rw [hbranchFn_def, hreq]
+      change (if _hc : c₁ = c₂ then
+        match x₁.roCache (m₁, c₁), x₂.roCache (m₂, c₂) with
+        | some ω₁, some ω₂ =>
+            if _hω : ω₁ ≠ ω₂ then
+              liftComp (σ.extract ω₁ sr₁ ω₂ sr₂) (unifSpec + chalSpec)
+            else
+              liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+        | _, _ => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
+      else
+        liftComp ($ᵗ Wit) (unifSpec + chalSpec)) = _
+      rw [dif_pos hc_eq, hcache₁', hcache₂']
+      simp only [dif_pos hω_ne]
+    rw [hbranch, probEvent_liftComp]
+    -- Probability on the extracted branch: 1 via special soundness + no-failure.
+    have hrel_one :
+        Pr[fun w : Wit => rel pk w = true | σ.extract ω₁ sr₁ ω₂ sr₂] = 1 := by
+      rw [probEvent_eq_one_iff]
+      refine ⟨hss_nf ω₁ sr₁ ω₂ sr₂, fun w hw => ?_⟩
+      exact SigmaProtocol.extract_sound_of_speciallySoundAt σ (hss pk)
+        hω_ne hverify₁' hverify₂'' hw
+    rw [hrel_one, mul_one]
   -- ── Step (d): integrate (b)∘(c) over keygen using Cauchy-Schwarz / Jensen.
   -- Combining (b) and (c) gives the per-pk forking bound; integrating via
   -- `jensen_keygen_forking_bound` lifts it to the expected bound.
@@ -1595,6 +1731,7 @@ the bound is trivially satisfied when the simulation loss exceeds the advantage.
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
+    (hss_nf : ∀ ω₁ p₁ ω₂ p₂, Pr[⊥ | σ.extract ω₁ p₁ ω₂ p₂] = 0)
     [Fintype Chal] [Inhabited Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk ζ_col : ℝ) (hζ_zk : 0 ≤ ζ_zk) (hζ_col : 0 ≤ ζ_col)
@@ -1613,7 +1750,7 @@ theorem euf_cma_bound
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
     ζ_zk ζ_col hζ_zk hζ_col hhvzk adv qS qH hQ
-  obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss nmaAdv qH hBound
+  obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk + ζ_col) ≤
       managedRoNmaForkAdvantage σ hr M nmaAdv qH :=
