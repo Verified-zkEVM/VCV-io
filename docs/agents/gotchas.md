@@ -109,10 +109,10 @@ When splitting a file into a folder of submodules, do **not** add a sibling `X.l
 whose only content is a chain of `import X.A; import X.B`. Each caller imports the
 specific submodule it actually uses.
 
-**Allowed umbrellas** (strictly top-level roots only):
-`VCVio.lean`, `ToMathlib.lean`, `Examples.lean`, `LatticeCrypto.lean`,
-`LatticeCryptoTest.lean`. These are the auto-generated root imports maintained by
-`./scripts/update-lib.sh` and used by CI.
+**Allowed umbrellas** (strictly top-level roots only): the auto-generated root imports
+maintained by `./scripts/update-lib.sh` and used by CI, currently `VCVio.lean`,
+`ToMathlib.lean`, `Examples.lean`, `LatticeCrypto.lean`, `LatticeCryptoTest.lean`.
+When a new top-level root is added, extend this list alongside it.
 
 **Not allowed**: umbrellas inside a subdirectory (e.g. a top-level
 `VCVio/CryptoFoundations/FiatShamir.lean` beside the `FiatShamir/` folder, or
