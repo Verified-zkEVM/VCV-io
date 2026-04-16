@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import LatticeCrypto.MLDSA.Scheme
-import VCVio.CryptoFoundations.FiatShamirWithAbort
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import LatticeCrypto.HardnessAssumptions.ShortIntegerSolution
 import LatticeCrypto.HardnessAssumptions.LearningWithErrors
 

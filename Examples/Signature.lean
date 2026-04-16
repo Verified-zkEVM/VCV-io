@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import Examples.Schnorr
 import Examples.SchnorrExtractorRuntime
-import VCVio.CryptoFoundations.FiatShamir
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 
 /-!
@@ -36,7 +36,7 @@ open OracleComp OracleSpec DiffieHellman
 namespace Schnorr
 
 variable (F : Type) [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
-variable (G : Type) [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
+variable (G : Type) [AddCommGroup G] [Module F G] [SampleableType G] [DecidableEq G]
 
 /-- Schnorr signature scheme: Fiat-Shamir applied to the Schnorr Σ-protocol
 with the discrete-log generable relation. -/
@@ -68,7 +68,7 @@ def signatureExtractCandidate (g pk : G) :
 
 section
 
-omit [Fintype G] [Fintype F] [SampleableType F] [SampleableType G]
+omit [Fintype F] [SampleableType F] [SampleableType G]
 
 /-- If the Schnorr-signature fork postprocessing returns `some sk`, then `sk` is a valid
 discrete-log witness for the public key `pk`. Follows from `Schnorr.extractCandidate_sound`. -/
@@ -104,7 +104,7 @@ end
 
 end extractor
 
-omit [DecidableEq F] [Fintype F] [Fintype G] in
+omit [DecidableEq F] [Fintype F] in
 /-- Completeness of the Schnorr signature follows from completeness of the
 underlying Schnorr Σ-protocol via the generic Fiat-Shamir completeness theorem. -/
 theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G))
@@ -114,7 +114,6 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
 
-omit [Fintype G] in
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
 
 The bound includes:
@@ -124,7 +123,8 @@ The bound includes:
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the simulation loss vanishes and the
 CMA advantage coincides with the NMA advantage. -/
-theorem signature_euf_cma [Finite G] (g : G) (hg : Function.Bijective (· • g : F → G))
+theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
+    (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g hg M))
     (qS qH : ℕ)
@@ -138,10 +138,13 @@ theorem signature_euf_cma [Finite G] (g : G) (hg : Function.Bijective (· • g 
   haveI : Fintype G := Fintype.ofFinite G
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
     (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
-    (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
-    (ζ_zk := 0) le_rfl
+    (Schnorr.sigma_speciallySound F G g)
+    (by intro ω₁ p₁ ω₂ p₂; simp [Schnorr.sigma])
+    (Schnorr.simTranscript F G g)
+    (ζ_zk := 0) (ζ_col := 0) le_rfl le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ
+  simp only [mul_zero, add_zero] at hred ⊢
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
   rw [show Pr[= true | hardRelationExp (dlogGenerable (F := F) g) red] =
       Pr[= true | do

@@ -57,6 +57,28 @@ lemma sq_sum_le_card_mul_sum_sq {ι' : Type*}
           Finset.mul_sum]
     _ = 2 * (↑s.card * ∑ i ∈ s, f i ^ 2) := by rw [← two_mul]
 
+/-- Divided Cauchy-Schwarz: `(∑ i, f i)² / card ≤ ∑ i, (f i)²`. Derived from
+`sq_sum_le_card_mul_sum_sq` by dividing both sides by `s.card`. Holds unconditionally in
+`ℝ≥0∞`: when `s = ∅` the left-hand side reduces to `0 / 0 = 0`. -/
+lemma sq_sum_div_card_le_sum_sq {ι' : Type*}
+    (s : Finset ι') (f : ι' → ℝ≥0∞) :
+    (∑ i ∈ s, f i) ^ 2 / (s.card : ℝ≥0∞) ≤ ∑ i ∈ s, f i ^ 2 := by
+  rcases Nat.eq_zero_or_pos s.card with hcard | hcard
+  · have hs : s = ∅ := Finset.card_eq_zero.mp hcard
+    simp [hs]
+  · set N : ℝ≥0∞ := (s.card : ℝ≥0∞)
+    have hN_ne_zero : N ≠ 0 := by
+      simp only [N, Nat.cast_ne_zero]
+      exact Nat.pos_iff_ne_zero.mp hcard
+    have hN_ne_top : N ≠ ⊤ := by simp [N]
+    calc (∑ i ∈ s, f i) ^ 2 / N
+        = N⁻¹ * (∑ i ∈ s, f i) ^ 2 := by rw [div_eq_mul_inv, mul_comm]
+      _ ≤ N⁻¹ * (N * ∑ i ∈ s, f i ^ 2) := by
+          gcongr
+          exact sq_sum_le_card_mul_sum_sq s f
+      _ = ∑ i ∈ s, f i ^ 2 := by
+          rw [← mul_assoc, ENNReal.inv_mul_cancel hN_ne_zero hN_ne_top, one_mul]
+
 private lemma tsum_mul_tsum_eq {α : Type*} (g h : α → ℝ≥0∞) :
     (∑' a, g a) * (∑' b, h b) = ∑' a, ∑' b, g a * h b := by
   rw [← ENNReal.tsum_mul_right]; congr 1; ext a

@@ -36,8 +36,6 @@ indicator R      1-ε, indicator R    1, indicator(=)
 ```
 -/
 
-set_option linter.style.openClassical false
-open scoped Classical
 open ENNReal OracleSpec OracleComp
 
 universe u
@@ -98,12 +96,11 @@ private lemma nonempty_spmf_coupling
     rw [this]
     exact spmf_bind_const_of_no_failure hp q
 
-set_option linter.unusedDecidableInType false
--- TODO: move to ToMathlib
 private lemma Finset_sum_iSup_le_iSup_sum {ι : Type*} {J : ι → Type*}
-    [DecidableEq ι] [hne : ∀ i, Nonempty (J i)]
+    [hne : ∀ i, Nonempty (J i)]
     (g : (i : ι) → J i → ℝ≥0∞) (s : Finset ι) :
     ∑ i ∈ s, ⨆ j, g i j ≤ ⨆ (f : ∀ i, J i), ∑ i ∈ s, g i (f i) := by
+  letI : DecidableEq ι := Classical.decEq ι
   haveI : Nonempty (∀ i, J i) := ⟨fun i => (hne i).some⟩
   refine Finset.induction_on s (by simp) fun a s ha ih => ?_
   simp_rw [Finset.sum_insert ha]
@@ -222,7 +219,7 @@ theorem relTriple'_iff_couplingPost
         | some z =>
             by_cases hR : R z.1.1 z.2.1 <;> simp [fSub, RelPost.indicator, hR]
       obtain ⟨cMaxSub, hMaxSub⟩ := SPMF.exists_max_coupling
-        (p := pa) (q := pb) fSub hfSub hsub_nonempty
+        (p := pa) (q := pb) fSub hfSub hsub_nonempty (isCompact_couplings_set pa pb)
       have hsub_obj :
           ∀ c : SPMF.Coupling pa pb,
             (∑' z : Option (A × B), c.1.1 z * fSub z) =

@@ -130,6 +130,78 @@ lemma simulateQ_query (t : spec.Domain) :
 
 end cachingOracle
 
+section withCacheOverlay
+
+/-- Run an `OracleComp` with a `QueryCache` as a priority layer over the real oracle.
+Cached entries are returned directly (no oracle query), misses fall through to the real
+oracle and get cached for subsequent lookups within the same computation.
+
+This is the fundamental "programmable random oracle" primitive: pre-fill the cache with
+programmed entries, then run the computation. Concretely:
+
+  `withCacheOverlay cache oa = StateT.run' (simulateQ cachingOracle oa) cache`
+
+Key properties:
+- `withCacheOverlay ∅ oa` deduplicates queries but is otherwise equivalent to `oa`.
+- `withCacheOverlay cache (query t)` returns `v` without an external query when
+  `cache t = some v`, and queries the real oracle when `cache t = none`.
+
+TODO: generalize `FiatShamir.runtime` to `runtimeWithCache cache` with
+`runtime = runtimeWithCache ∅`, deriving `randomOracle` evaluation from
+`withCacheOverlay` + `evalDist`. -/
+def withCacheOverlay {α : Type u} (cache : spec.QueryCache) (oa : OracleComp spec α) :
+    OracleComp spec α :=
+  StateT.run' (simulateQ cachingOracle oa) cache
+
+@[simp]
+lemma withCacheOverlay_pure {α : Type u} (cache : spec.QueryCache) (a : α) :
+    withCacheOverlay cache (pure a : OracleComp spec α) = pure a := by
+  change Prod.fst <$> (pure (a, cache) : OracleComp spec _) = _; simp
+
+private lemma fst_map_cachingOracle_run_some (cache : spec.QueryCache) (t : spec.Domain)
+    (v : spec.Range t) (hv : cache t = some v) :
+    Prod.fst <$> (cachingOracle (spec := spec) t).run cache =
+      (pure v : OracleComp spec (spec.Range t)) := by
+  unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
+  simp only [StateT.run_bind,
+    show (get : StateT spec.QueryCache (OracleComp spec) _).run cache =
+      (pure (cache, cache) : OracleComp spec _) from rfl, pure_bind, hv,
+    show (pure v : StateT spec.QueryCache (OracleComp spec) _).run cache =
+      (pure (v, cache) : OracleComp spec _) from rfl, map_pure]
+
+private lemma fst_map_cachingOracle_run_none (cache : spec.QueryCache) (t : spec.Domain)
+    (hv : cache t = none) :
+    Prod.fst <$> (cachingOracle (spec := spec) t).run cache =
+      (query t : OracleComp spec (spec.Range t)) := by
+  unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
+  simp only [StateT.run_bind,
+    show (get : StateT spec.QueryCache (OracleComp spec) _).run cache =
+      (pure (cache, cache) : OracleComp spec _) from rfl, pure_bind, hv,
+    show (liftM (query t : OracleComp spec _) :
+        StateT _ (OracleComp spec) _).run cache =
+      ((query t : OracleComp spec _) >>= fun u => pure (u, cache)) from rfl,
+    bind_assoc, pure_bind,
+    show ∀ u, (modifyGet (fun c : QueryCache spec => (u, c.cacheQuery t u)) :
+        StateT _ (OracleComp spec) _).run cache =
+      (pure (u, cache.cacheQuery t u) : OracleComp spec _) from fun _ => rfl,
+    map_bind, map_pure, bind_pure]
+
+lemma withCacheOverlay_query_hit (cache : spec.QueryCache) (t : spec.Domain)
+    (v : spec.Range t) (hv : cache t = some v) :
+    withCacheOverlay cache (query t : OracleComp spec (spec.Range t)) = pure v := by
+  change Prod.fst <$> (simulateQ cachingOracle
+    (query t : OracleComp spec (spec.Range t))).run cache = _
+  rw [cachingOracle.simulateQ_query, fst_map_cachingOracle_run_some cache t v hv]
+
+lemma withCacheOverlay_query_miss (cache : spec.QueryCache) (t : spec.Domain)
+    (hv : cache t = none) :
+    withCacheOverlay cache (query t : OracleComp spec (spec.Range t)) = query t := by
+  change Prod.fst <$> (simulateQ cachingOracle
+    (query t : OracleComp spec (spec.Range t))).run cache = _
+  rw [cachingOracle.simulateQ_query, fst_map_cachingOracle_run_none cache t hv]
+
+end withCacheOverlay
+
 namespace OracleComp
 
 variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]

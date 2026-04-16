@@ -410,10 +410,11 @@ lemma probOutput_uniformSelectFinset [DecidableEq α] (x : α) :
     Pr[= x | $ s] = if x ∈ s then (s.card : ℝ≥0∞)⁻¹ else 0 := by
   aesop (add norm uniformSelectFinset_def)
 
-set_option linter.unusedDecidableInType false in
 @[simp, grind =]
-lemma probEvent_uniformSelectFinset [DecidableEq α] (p : α → Prop) [DecidablePred p] :
+lemma probEvent_uniformSelectFinset (p : α → Prop) [DecidablePred p] :
     Pr[ p | $ s] = {x ∈ s | p x}.card / s.card := by
+  classical
+  haveI : DecidableEq α := Classical.decEq α
   simp only [uniformSelectFinset_def, probEvent_uniformSelectList, List.countP_eq_length_filter,
     Finset.length_toList]
   congr 2

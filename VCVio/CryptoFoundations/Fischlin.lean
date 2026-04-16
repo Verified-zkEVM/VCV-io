@@ -8,7 +8,7 @@ import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.HasQuery
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.Coercions.Add

@@ -6,7 +6,7 @@ Authors: Quang Dao
 import LatticeCrypto.Falcon.Primitives
 import VCVio.CryptoFoundations.GPVHashAndSign
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.Coercions.Add
 
 /-!
