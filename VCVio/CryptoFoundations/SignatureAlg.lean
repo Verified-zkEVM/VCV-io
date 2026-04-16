@@ -117,6 +117,28 @@ lemma Complete.mono {sigAlg : SignatureAlg m M PK SK S}
     sigAlg.Complete runtime δ₂ :=
   fun msg => le_trans (tsub_le_tsub_left hle 1) (h msg)
 
+/-- If every key pair `(pk, sk)` in the support of a generator satisfies
+`Pr[= a | f pk sk] ≥ 1 - δ`, then the overall probability `Pr[= a | gen >>= f] ≥ 1 - δ`.
+This reduces a "for all keys" completeness statement to per-key bounds. -/
+lemma probOutput_bind_ge_of_forall_support
+    {α β : Type} {a : β} {δ : ℝ≥0∞}
+    (gen : ProbComp α)
+    (f : α → ProbComp β)
+    (h : ∀ x, x ∈ support gen → Pr[= a | f x] ≥ 1 - δ) :
+    Pr[= a | gen >>= f] ≥ 1 - δ := by
+  rw [probOutput_bind_eq_tsum]
+  calc
+    ∑' x, Pr[= x | gen] * Pr[= a | f x]
+      ≥ ∑' x, Pr[= x | gen] * (1 - δ) := by
+        refine ENNReal.tsum_le_tsum fun x => ?_
+        by_cases hx : x ∈ support gen
+        · gcongr; exact h x hx
+        · simp [probOutput_eq_zero_of_not_mem_support hx]
+    _ = (1 - δ) * ∑' x, Pr[= x | gen] := by
+        simp_rw [mul_comm]; exact ENNReal.tsum_mul_left
+    _ = 1 - δ := by
+        rw [HasEvalPMF.tsum_probOutput_eq_one, mul_one]
+
 end correctness
 
 section unforgeable
