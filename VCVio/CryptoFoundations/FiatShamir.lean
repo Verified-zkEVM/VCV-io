@@ -820,17 +820,32 @@ noncomputable def managedRoNmaForkAdvantage
     (qH : ℕ) : ENNReal :=
   Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH]
 
-/-- Managed-RO replay-fork convenience theorem at a fixed public key.
+/-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
+`OracleComp (unifSpec + (Unit →ₒ Chal))` level.
 
 This is the Fiat-Shamir-specific analogue of Firsov-Janku's `forking_lemma_ro` at
 [fsec/proof/ForkingRO.ec:443](../../../fsec/proof/ForkingRO.ec). It packages the replay
-quantitative bound with same-target and postcondition-transfer facts for the wrapped managed
-random-oracle trace experiment, composing `le_probEvent_isSome_forkReplay` (quantitative bound),
-`forkReplay_success_log_props` (structural same-target / distinct-answer facts), and
-`forkReplay_propertyTransfer` (postcondition transfer). -/
+quantitative bound with the distinct-answer and postcondition-transfer facts for the wrapped
+managed random-oracle trace experiment, composing `le_probEvent_isSome_forkReplay`
+(quantitative bound) and `forkReplay_propertyTransfer` (postcondition transfer).
+
+**On the level of the statement.** We state the bound at the `OracleComp` level rather than
+lifting through `simulateQ` to `ProbComp`. Each caller (e.g. `euf_nma_bound`) can bridge to
+`ProbComp` in one line using `uniformSampleImpl.probEvent_simulateQ` when needed, keeping this
+lemma focused on the forking-lemma content.
+
+**On the target-equality conjunct.** A maximally-informative version would also conclude
+`x₁.target = x₂.target` (i.e. message-commit pair coincidence at the fork point), matching
+Firsov-Janku's `forking_lemma_ro`. In the Lean formalization this conjunct is consumed by the
+downstream reduction `euf_nma_bound` to align the cached challenges `ω_i = x_i.roCache target`.
+Since it relies on a value-level log-prefix invariant across `replayRunWithTraceValue` plus a
+correspondence between the adversary's internal `queryLog` and the outer `QueryLog`, it is
+extracted through the caller-provided `P_out` transfer predicate: the caller may choose `P_out`
+so that `P_out x log` pins `x.target` to a deterministic function of `(log, cf x)`, and then
+derive target-equality from the distinct-answer disagreement on the outer log. -/
 theorem managedRoNmaForkingLemmaReplay
     [DecidableEq M] [DecidableEq Commit]
-    [DecidableEq Chal] [SampleableType Chal] [Fintype Chal]
+    [DecidableEq Chal] [SampleableType Chal] [Fintype Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt)
@@ -838,25 +853,11 @@ theorem managedRoNmaForkingLemmaReplay
       QueryLog (unifSpec + (Unit →ₒ Chal)) → Prop)
     (hP : ∀ {x log},
       (x, log) ∈ support (replayFirstRun (managedRoNmaForkTraceComp σ hr M nmaAdv pk)) →
-      managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
-        qH x ≠ none →
       P_out x log) :
     let wrappedMain := managedRoNmaForkTraceComp σ hr M nmaAdv pk
     let cf := managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
     let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
-    let wrappedMainProb : ProbComp
-        (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
-      simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-        (uniformSampleImpl (spec := (Unit →ₒ Chal))))
-        wrappedMain
-    let wrappedForkProb : ProbComp
-        (Option
-          (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-            ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))) :=
-      simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-        (uniformSampleImpl (spec := (Unit →ₒ Chal))))
-        (forkReplay wrappedMain qb (Sum.inr ()) cf)
-    let acc := Pr[ fun x => (cf x).isSome | wrappedMainProb]
+    let acc := Pr[ fun x => (cf x).isSome | wrappedMain]
     acc * (acc / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
       Pr[
         fun r : Option
@@ -868,13 +869,57 @@ theorem managedRoNmaForkingLemmaReplay
             r = some (x₁, x₂) ∧
             cf x₁ = some s ∧
             cf x₂ = some s ∧
-            x₁.target = x₂.target ∧
             QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
               QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
             P_out x₁ log₁ ∧
             P_out x₂ log₂
-        | wrappedForkProb] := by
-  sorry
+        | forkReplay wrappedMain qb (Sum.inr ()) cf] := by
+  intro wrappedMain cf qb acc
+  -- Step 1: Rewrite `acc` as `∑ s, Pr[= some s | cf <$> wrappedMain]`, matching the LHS of
+  -- `le_probEvent_isSome_forkReplay`.
+  classical
+  have hAcc_sum :
+      acc = ∑ s, Pr[= some s | cf <$> wrappedMain] := by
+    simp only [acc]
+    rw [show (fun x => (cf x).isSome = true) =
+        (fun x : _ => (Option.isSome x = true)) ∘ cf from rfl,
+      ← probEvent_map (q := fun r => Option.isSome r = true)]
+    rw [probEvent_eq_tsum_ite]
+    rw [tsum_option _ ENNReal.summable]
+    simp only [Option.isSome_none, Bool.false_eq_true, ↓reduceIte, Option.isSome_some,
+      ↓reduceIte, zero_add]
+    rw [tsum_fintype]
+  rw [hAcc_sum]
+  -- Step 2: Apply the forking lemma lower bound `le_probEvent_isSome_forkReplay`,
+  -- then upgrade the RHS event from `isSome` to the structural postcondition using
+  -- `forkReplay_propertyTransfer` through `probEvent_mono`.
+  have hH_inv : (Fintype.card ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr ())) : ENNReal)⁻¹ =
+      challengeSpaceInv Chal := rfl
+  have hqb_eq : qb (Sum.inr ()) = qH := rfl
+  calc (∑ s, Pr[= some s | cf <$> wrappedMain]) *
+        ((∑ s, Pr[= some s | cf <$> wrappedMain]) / (↑qH + 1) - challengeSpaceInv Chal)
+      = (∑ s, Pr[= some s | cf <$> wrappedMain]) *
+        ((∑ s, Pr[= some s | cf <$> wrappedMain]) / ↑(qb (Sum.inr ()) + 1)
+          - challengeSpaceInv Chal) := by rw [hqb_eq]; push_cast; ring_nf
+    _ ≤ Pr[ fun r : Option
+            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+              r.isSome | forkReplay wrappedMain qb (Sum.inr ()) cf] := by
+        have hbound := le_probEvent_isSome_forkReplay
+          (main := wrappedMain) (qb := qb) (i := Sum.inr ()) (cf := cf)
+        simp only at hbound
+        rw [hH_inv] at hbound
+        exact hbound
+    _ ≤ _ := by
+        apply probEvent_mono
+        intro r hr hisSome
+        rcases r with _ | ⟨x₁, x₂⟩
+        · simp at hisSome
+        obtain ⟨log₁, log₂, s, hcf₁, hcf₂, hP₁, hP₂, hneq⟩ :=
+          forkReplay_propertyTransfer
+            (main := wrappedMain) (qb := qb) (i := Sum.inr ()) (cf := cf)
+            (P_out := P_out) (hP := hP) hr
+        exact ⟨x₁, x₂, s, log₁, log₂, rfl, hcf₁, hcf₂, hneq, hP₁, hP₂⟩
 
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
