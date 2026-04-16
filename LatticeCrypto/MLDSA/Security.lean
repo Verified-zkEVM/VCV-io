@@ -159,8 +159,7 @@ end Properties
 section NMASecurity
 
 variable {M : Type}
-  [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
-  [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
+  [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
 open scoped Classical in
@@ -235,8 +234,7 @@ end CMAtoNMA
 section MainTheorem
 
 variable {M : Type}
-  [SampleableType (RqVec p.l)] [SampleableType (PublicKey p prims)]
-  [SampleableType (SecretKey p)] [SampleableType (CommitHashBytes p)]
+  [SampleableType (RqVec p.l)] [SampleableType (CommitHashBytes p)]
   [unifSpec.Fintype] [unifSpec.Inhabited]
 
 open scoped Classical in

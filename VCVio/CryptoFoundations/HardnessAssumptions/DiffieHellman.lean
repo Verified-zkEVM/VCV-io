@@ -333,11 +333,6 @@ def dlogGenerable (hg : Function.Bijective (· • g : F → G)) :
     simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
                Prod.mk.injEq] at hmem
     obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
-  gen_uniform_right := fun pk => by
-    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]
-    exact probOutput_map_bijective_uniform_cross (α := F) (β := G) (· • g) hg pk
-  gen_uniform_left := fun sk => by
-    simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind, bind_pure]
 
 end DLogGenerable
 

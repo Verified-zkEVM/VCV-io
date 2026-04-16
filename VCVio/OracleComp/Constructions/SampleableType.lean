@@ -297,6 +297,14 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
         probOutput_seq_map_eq_mul_of_injective2 _ _ _ hpush y.pop y.back,
         probOutput_uniformSample_inj, ih x.pop y.pop]
 
+/-- `Vector α n` is finite when `α` is finite, via the equivalence with `Fin n → α`. -/
+instance (α : Type) (n : ℕ) [Fintype α] : Fintype (Vector α n) :=
+  Fintype.ofEquiv (Fin n → α)
+    { toFun := Vector.ofFn
+      invFun := fun v i => v.get i
+      left_inv := fun f => funext fun i => by simp [Vector.get, Vector.ofFn]
+      right_inv := fun v => Vector.ext fun i hi => by simp [Vector.ofFn, Vector.get] }
+
 /-- A function from `Fin n` to a `SampleableType` is also `SampleableType`. -/
 instance instSampleableTypeFinFunc {n : ℕ} {α : Type} [SampleableType α] :
     SampleableType (Fin n → α) :=

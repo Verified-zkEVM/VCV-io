@@ -97,7 +97,6 @@ The type parameters are:
 def FiatShamirWithAbort
     {m : Type → Type v} [Monad m]
     (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
-    [SampleableType Stmt] [SampleableType Wit]
     (hr : GenerableRelation Stmt Wit rel) (M : Type)
     [MonadLiftT ProbComp m] [HasQuery (M × Commit →ₒ Chal) m]
     (maxAttempts : ℕ) :
@@ -131,7 +130,6 @@ end runtime
 
 section correctness
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -426,7 +424,6 @@ theorem fsAbortSignLoop_usesWeightedQueryCostAtMost
 
 section schemeCost
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (hr : GenerableRelation Stmt Wit rel)
 
 /-- Signing makes weighted query cost at most `maxAttempts • w` when each query costs at most
@@ -470,7 +467,6 @@ variable [HasEvalSPMF m]
 
 section schemeCost
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (hr : GenerableRelation Stmt Wit rel)
 
 /-- Tail-sum formula for the expected number of signing queries in Fiat-Shamir with aborts.
@@ -968,7 +964,6 @@ variable [LawfulMonad m]
 
 section schemeCost
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (hr : GenerableRelation Stmt Wit rel)
 
 /-- The probability that signing makes more than `i` random-oracle queries is exactly the
@@ -1230,7 +1225,7 @@ end expectedCostPMF
 
 section EUF_CMA
 
-variable [SampleableType Stmt] [SampleableType Wit]
+variable [SampleableType Stmt]
 variable [DecidableEq Commit] [SampleableType Chal]
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel)

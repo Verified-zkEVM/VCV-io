@@ -26,7 +26,7 @@ universe u v
 open OracleComp OracleSpec
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
-    {rel : Stmt → Wit → Bool} [SampleableType Stmt] [SampleableType Wit]
+    {rel : Stmt → Wit → Bool}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
@@ -71,7 +71,6 @@ end semantics
 
 section naturality
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -117,7 +116,6 @@ end naturality
 
 section costAccounting
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -359,7 +357,7 @@ end bounds
 
 section security
 
-variable [SampleableType Stmt] [SampleableType Wit]
+variable [SampleableType Stmt]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 

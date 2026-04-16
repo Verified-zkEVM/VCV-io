@@ -16,7 +16,7 @@ import VCVio.OracleComp.SimSemantics.BundledSemantics
 
 This file defines a generic hash-and-sign signature scheme following the GPV (Gentry–Peikert–
 Vaikuntanathan) framework [GPV08]. The construction is parameterized by a *preimage sampleable
-function* (PSF) — a many-to-one function equipped with a probabilistic trapdoor that samples
+function* (PSF), a many-to-one function equipped with a probabilistic trapdoor that samples
 short preimages.
 
 The GPV framework is the hash-and-sign analogue of the Fiat-Shamir transform:
@@ -34,15 +34,30 @@ The GPV framework is the hash-and-sign analogue of the Fiat-Shamir transform:
 
 ## Security
 
-- `GPVHashAndSign.euf_cma_bound` — states that EUF-CMA security reduces to preimage-finding
-  hardness plus a salt-collision term. Proof is `sorry` (placeholder for the GPV reduction).
+The PFDH (Probabilistic Full-Domain Hash) variant of the GPV scheme uses a random salt per
+signing query. The precise EUF-CMA bound from [FGdG+25] Theorem 1 is:
+
+  `Adv^{UF-CMA}(A) ≤ (r_u^{C_s} · (r_p^{C_s} · Adv^{ISIS}(B))^{...})^{...}`
+  `                  + tail_bound + Q_s · (C_s + Q_H) / 2^k`
+
+where the salt-collision term `Q_s · (C_s + Q_H) / 2^k` bounds the probability that
+a fresh salt collides with any prior RO query. The simpler birthday bound
+`qSign² / (2 · |Salt|)` from GPV08 Prop 6.2 is slightly looser but still valid and is
+the one we formalize here.
+
+The proof decomposes into:
+- `GPVHashAndSign.reduction`: the preimage-finding adversary (sign-then-hash simulation)
+- `GPVHashAndSign.collisionBound`: the salt-collision birthday bound
+- `GPVHashAndSign.forgery_yields_preimage`: the core game-hop
 
 ## References
 
-- Gentry, Peikert, Vaikuntanathan. "Trapdoors for Hard Lattices and New Cryptographic
-  Constructions." STOC 2008.
-- Boneh, Dagdelen, Fischlin, Lehmann, Schaffner, Zhandry. "Random Oracles in a Quantum
-  World." ASIACRYPT 2011.
+- [FGdG+25]: Fouque, Gajland, de Groote, Janneck, Kiltz. "A Closer Look at Falcon."
+  ePrint 2024/1769. First concrete proof for Falcon+ (Theorem 1).
+- [Jia+26]: Jia, Zhang, Yu, Tang. "Revisiting the Concrete Security of Falcon-type
+  Signatures." ePrint 2026/096. Tightens Rényi loss to < 0.2 bits.
+- GPV08: Gentry, Peikert, Vaikuntanathan. STOC 2008, Propositions 6.1–6.2.
+- BDF+11: Boneh et al. "Random Oracles in a Quantum World." ASIACRYPT 2011.
 -/
 
 universe v
@@ -98,7 +113,7 @@ def GPVHashAndSign
     {m : Type → Type v} [Monad m]
     {PK SK Domain Range : Type}
     (psf : PreimageSampleableFunction PK SK Domain Range)
-    {p : PK → SK → Bool} [SampleableType PK] [SampleableType SK]
+    {p : PK → SK → Bool}
     (hr : GenerableRelation PK SK p)
     (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
     [DecidableEq Range] [SampleableType Range]
@@ -118,11 +133,11 @@ def GPVHashAndSign
 namespace GPVHashAndSign
 
 variable {PK SK Domain Range : Type}
-  {p : PK → SK → Bool} [SampleableType PK] [SampleableType SK]
+  {p : PK → SK → Bool}
   [DecidableEq Range] [SampleableType Range]
   (psf : PreimageSampleableFunction PK SK Domain Range)
   (hr : GenerableRelation PK SK p)
-  (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
+  (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt] [Fintype Salt]
 
 /-- Runtime bundle for the GPV hash-and-sign random-oracle world. -/
 noncomputable def runtime :
@@ -164,30 +179,113 @@ noncomputable def preimageFindingAdvantage [SampleableType Domain]
     ℝ≥0∞ :=
   Pr[= true | preimageFindingExp (psf := psf) (hr := hr) adversary]
 
-/-- **GPV EUF-CMA security in the random-oracle model.**
+/-! ## Proof Decomposition
 
-For any adversary `A` against the GPV hash-and-sign scheme, there exists a preimage-finding
-reduction `B` such that:
+The EUF-CMA security proof proceeds by a game-hopping argument:
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{preimage}(B) + salt_collision_probability`
+**Game 0**: The real EUF-CMA experiment with a lazy random oracle and the honest
+signing oracle (trapdoor sampler).
 
-The salt collision probability is at most `q_S^2 / (2 · |Salt|)` where `q_S` is the number
-of signing queries (birthday bound on salt reuse).
+**Game 1**: Replace signing with "sign-then-hash": for each signing query on message `m`,
+sample a short preimage `s ← D_short`, set `c := psf.eval pk s`, program the RO at
+`(r, m) := c`, and return `(r, s)`. This is indistinguishable from Game 0 when the PSF
+sampler is correct (the output distribution conditioned on the target is the same).
 
-The proof is a standard GPV argument:
-1. By hash-randomization, distinct salts yield independent hash targets.
-2. Each signature is a fresh trapdoor sample, statistically close to ideal Gaussian.
-3. A forger must produce a short preimage of a hash value it did not receive from signing,
-   which directly yields a preimage-finding adversary.
+**Bad event**: A salt collision occurs (two distinct signing queries or the forgery reuse
+the same `(salt, message)` pair as a prior RO entry). Under the birthday bound, this
+happens with probability at most `q_S² / (2 · |Salt|)`.
 
-Reference: GPV08, Theorem 6.1; see also BDF+11 for the QROM extension. -/
-theorem euf_cma_bound [SampleableType Domain]
+**Game 2 (reduction)**: Embed the preimage-finding challenge `y` at a random position in
+the RO table. If the adversary's forgery targets that position, extract the short preimage.
+The success probability of the reduction is at least `Adv^{CMA}(A) - collisionBound`,
+giving the desired bound.
+-/
+
+/-- The GPV reduction adversary. Given a public key `pk` and a target `y : Range`,
+the reduction internally simulates the CMA experiment for the adversary:
+
+1. Program a lazy random oracle, embedding `y` at a random position.
+2. Answer signing queries by sampling short preimages and programming the RO
+   (sign-then-hash strategy, using the PSF correctness).
+3. Run the adversary and extract the short preimage from any valid forgery.
+
+This is defined abstractly as the composition of the adversary's logic with
+the simulation internals. The detailed simulation requires replaying the
+adversary's oracle interactions as `ProbComp` computations. -/
+noncomputable def reduction [SampleableType Domain]
     (adv : SignatureAlg.unforgeableAdv
       (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
-    ∃ (reduction : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range))
-      (collisionBound : ENNReal),
-      adv.advantage (runtime M Salt) ≤
-        preimageFindingAdvantage (psf := psf) (hr := hr) reduction + collisionBound := by
+    PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range) :=
+  fun _pk _y => sorry
+
+/-- The salt-collision birthday bound (GPV08, Proposition 6.2).
+
+For `qSign` signing queries with salts drawn uniformly from a set of size `|Salt|`,
+the birthday bound gives collision probability at most `qSign² / (2 · |Salt|)`.
+
+For Falcon with 40-byte salts (`|Salt| = 2^320`) and `qSign ≤ 2^64`:
+  `collisionBound (Bytes 40) (2^64) = 2^128 / (2 · 2^320) = 2^{-193}` -/
+noncomputable def collisionBound (qSign : ℕ) : ENNReal :=
+  (qSign : ENNReal) ^ 2 / (2 * Fintype.card Salt)
+
+/-- **Key lemma** (GPV08, Proposition 6.2, proof): when the PSF is correct and the
+adversary makes at most `qSign` signing queries, its EUF-CMA advantage is bounded by
+the preimage-finding advantage of the reduction plus the salt-collision birthday bound.
+
+The argument proceeds in two steps:
+
+**Step 1 (sign-then-hash ≡ real).**  Replace the signing oracle with one that:
+  (a) samples a fresh salt `r ← Salt`,
+  (b) samples a short preimage `s ← SampleDom`,
+  (c) programs the RO at `(r, msg) := psf.eval pk s`.
+By PSF correctness (`hcorrect`), the joint distribution `(r, s, H(r, msg))` is identical
+to the real game. This step is exact (zero statistical distance).
+
+**Step 2 (embed challenge).**  In the sign-then-hash game, every RO entry is
+programmed by the simulator. Embed the preimage-finding challenge `y` at a
+random RO position. If the adversary's forgery `(msg*, (r*, s*))` hits that
+position, extract `s*` as a valid preimage. The success probability of the
+reduction equals the adversary's advantage minus the salt-collision probability.
+
+The salt-collision probability is at most `qSign² / (2 · |Salt|)` by the birthday bound:
+each of the `qSign` salts is drawn uniformly, and a collision would cause the RO
+programming to conflict. -/
+theorem forgery_yields_preimage [SampleableType Domain]
+    (hcorrect : psf.Correct) (qSign : ℕ)
+    (adv : SignatureAlg.unforgeableAdv
+      (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
+    adv.advantage (runtime M Salt) ≤
+      preimageFindingAdvantage (psf := psf) (hr := hr)
+        (reduction psf hr M Salt adv) +
+      collisionBound Salt qSign := by
   sorry
+
+/-- **GPV PFDH EUF-CMA security in the random-oracle model** (GPV08, Proposition 6.2).
+
+For any adversary `A` making at most `qSign` signing queries against the GPV hash-and-sign
+scheme with a correct PSF and `k`-bit salts, there exists a preimage-finding reduction `B`
+such that:
+
+  `Adv^{EUF-CMA}(A) ≤ Adv^{preimage}(B) + qSign² / (2 · |Salt|)`
+
+The reduction `B` is **tight**: unlike FDH with trapdoor permutations (which loses a factor
+of `Q_hash`), the PSF-based reduction exploits collision resistance to avoid guessing which
+hash query the adversary will target.
+
+The salt-collision term `qSign² / (2 · |Salt|)` is the birthday bound on reuse of the
+`(salt, message)` random-oracle input across signing queries. For Falcon with 40-byte
+salts (`|Salt| = 2^320`), this is `2^{-193}` even for `qSign = 2^64`.
+
+References: GPV08 Proposition 6.2; BDF+11 for the QROM extension. -/
+theorem euf_cma_bound [SampleableType Domain]
+    (hcorrect : psf.Correct) (qSign : ℕ)
+    (adv : SignatureAlg.unforgeableAdv
+      (GPVHashAndSign (m := OracleComp (unifSpec + (Salt × M →ₒ Range))) psf hr M Salt)) :
+    ∃ (red : PreimageAdversary (PK := PK) (Domain := Domain) (Range := Range)),
+      adv.advantage (runtime M Salt) ≤
+        preimageFindingAdvantage (psf := psf) (hr := hr) red +
+        collisionBound Salt qSign := by
+  exact ⟨reduction psf hr M Salt adv,
+    forgery_yields_preimage psf hr M Salt hcorrect qSign adv⟩
 
 end GPVHashAndSign

@@ -77,6 +77,10 @@ instance {n : ℕ} : DecidableEq (Rq n) := by
   change DecidableEq (LatticeCrypto.Poly Coeff n)
   infer_instance
 
+instance {n : ℕ} : SampleableType (Rq n) := by
+  change SampleableType (LatticeCrypto.Poly Coeff n)
+  infer_instance
+
 instance {n : ℕ} : DecidableEq (Tq n) := by
   change DecidableEq (LatticeCrypto.TransformPoly (coeffRing n))
   infer_instance
