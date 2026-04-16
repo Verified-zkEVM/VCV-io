@@ -26,7 +26,7 @@ universe u v
 open OracleComp OracleSpec
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type}
-    {rel : Stmt → Wit → Bool} [SampleableType Stmt] [SampleableType Wit]
+    {rel : Stmt → Wit → Bool}
 
 /-- Given a Σ-protocol and a generable relation, the Fiat-Shamir transform produces a
 signature scheme. The signing algorithm commits, queries the random oracle on (message,
@@ -71,7 +71,6 @@ end semantics
 
 section naturality
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -117,7 +116,6 @@ end naturality
 
 section costAccounting
 
-variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
@@ -359,11 +357,12 @@ end bounds
 
 section security
 
-variable [SampleableType Stmt] [SampleableType Wit]
+variable [SampleableType Stmt]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
 open scoped Classical in
+omit [SampleableType Stmt] in
 /-- Completeness of the Fiat-Shamir signature scheme follows from completeness of the
 underlying Σ-protocol. -/
 theorem perfectlyCorrect [SampleableType Chal]
@@ -607,7 +606,7 @@ theorem euf_nma_bound
     ∃ reduction : Stmt → ProbComp Wit,
       (nmaAdv.advantage (runtime M) *
           (nmaAdv.advantage (runtime M) / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   sorry
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
@@ -638,7 +637,7 @@ theorem euf_cma_bound
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   let _ := hss
   let _ := hζ
   let _ := hhvzk

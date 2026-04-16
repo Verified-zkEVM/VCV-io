@@ -4,6 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
+import LatticeCrypto.Falcon.Concrete.FPR
+import LatticeCrypto.Falcon.Concrete.GMTable
+
 /-!
 # FXR: 64-bit Fixed-Point Arithmetic (32.32 format) for Key Generation
 
@@ -32,6 +35,8 @@ Division uses a bit-by-bit long-division algorithm.
 
 
 namespace Falcon.Concrete.FXR
+
+open Falcon.Concrete.GMTable
 
 abbrev FXR := UInt64
 
@@ -168,14 +173,19 @@ The table has 1024 entries of type `FXC` (re, im pairs), representing
 primitive 2048-th roots of unity in proper bit-reversed order for FFT.
 Each entry is a pair of `UInt64` values in 32.32 fixed-point format.
 
-Due to the large size (1024 × 2 = 2048 `UInt64` values), we use `sorry`
-here. In a complete build, these would be filled from the C reference
-`GM_TAB` in `kgen_fxp.c`. -/
+We derive the fixed-point table from the already imported floating-point
+twiddle table `gmRaw` by multiplying each entry by `2^32` and rounding to
+the nearest integer with the reference `FPR` arithmetic. This reproduces the
+constants from `kgen_fxp.c` without storing a second 1024-entry table. -/
 
-private def GM_TAB_DATA : Array (UInt64 × UInt64) := #[]
+@[inline] private def rawFPRToFXR (x : UInt64) : FXR :=
+  let scaled := Falcon.Concrete.FPR.mul x (Falcon.Concrete.FPR.scaled 1 32)
+  (Falcon.Concrete.FPR.rint scaled).toUInt64
 
+/-- Fixed-point twiddle-factor table used by the FXR FFT backend. -/
 def GM_TAB : Array FXC :=
-  GM_TAB_DATA.map fun (re, im) => ⟨re, im⟩
+  (Array.range 1024).map fun i =>
+    ⟨rawFPRToFXR (gmRaw.getD (2 * i) 0), rawFPRToFXR (gmRaw.getD (2 * i + 1) 0)⟩
 
 /-! ## FFT and inverse FFT on fixed-point polynomials
 

@@ -53,6 +53,7 @@ import VCVio.EvalDist.Monad.Map
 import VCVio.EvalDist.Monad.Seq
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
+import VCVio.EvalDist.RenyiDivergence
 import VCVio.EvalDist.TVDist
 import VCVio.Interaction.Basic.Append
 import VCVio.Interaction.Basic.BundledMonad
