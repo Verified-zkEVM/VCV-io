@@ -1300,6 +1300,87 @@ private lemma probOutput_simulateQ_unifChalImpl {α : Type}
 
 end evalDistBridge
 
+section jensenIntegration
+
+/-- **Keygen-indexed Cauchy-Schwarz / Jensen step for the forking lemma.**
+
+Given a per-element bound `acc x · (acc x / q - hinv) ≤ B x`, integrating over a
+probabilistic key-generator `gen : ProbComp X` yields the "lifted" bound:
+
+  `μ · (μ / q - hinv) ≤ 𝔼[B]`
+
+where `μ = 𝔼[acc] = ∑' x, Pr[= x | gen] · acc x`.
+
+The proof goes through the convexity identity `μ² ≤ 𝔼[acc²]` (Cauchy-Schwarz on the
+probability distribution `Pr[= · | gen]`), together with `ENNReal.mul_sub` to handle the
+truncated subtraction. -/
+private lemma jensen_keygen_forking_bound
+    {X : Type} (gen : ProbComp X)
+    (acc B : X → ENNReal) (q hinv : ENNReal)
+    (hinv_ne_top : hinv ≠ ⊤)
+    (hacc_le : ∀ x, acc x ≤ 1)
+    (hper : ∀ x, acc x * (acc x / q - hinv) ≤ B x) :
+    (∑' x, Pr[= x | gen] * acc x) *
+        ((∑' x, Pr[= x | gen] * acc x) / q - hinv) ≤
+      ∑' x, Pr[= x | gen] * B x := by
+  classical
+  set w : X → ENNReal := fun x => Pr[= x | gen] with hw_def
+  set μ : ENNReal := ∑' x, w x * acc x with hμ_def
+  have hw_tsum_le_one : ∑' x, w x ≤ 1 := tsum_probOutput_le_one
+  have hμ_le_one : μ ≤ 1 := by
+    calc μ = ∑' x, w x * acc x := rfl
+      _ ≤ ∑' x, w x * 1 := by gcongr with x; exact hacc_le x
+      _ = ∑' x, w x := by simp
+      _ ≤ 1 := hw_tsum_le_one
+  have hμ_ne_top : μ ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top hμ_le_one
+  -- The integrand `w x * acc x * hinv`, with total sum `μ * hinv`.
+  have hμ_hinv_ne_top : μ * hinv ≠ ⊤ := ENNReal.mul_ne_top hμ_ne_top hinv_ne_top
+  -- Cauchy-Schwarz: `μ² ≤ ∑' w * acc²`.
+  have hCS : μ ^ 2 ≤ ∑' x, w x * acc x ^ 2 :=
+    ENNReal.sq_tsum_le_tsum_sq w acc hw_tsum_le_one
+  -- Split off the key reverse-Jensen inequality as an intermediate calc.
+  -- Integrate the per-element bound.
+  calc μ * (μ / q - hinv)
+      = μ * (μ / q) - μ * hinv :=
+        ENNReal.mul_sub (fun _ _ => hμ_ne_top)
+    _ = μ ^ 2 / q - μ * hinv := by
+        rw [sq, mul_div_assoc]
+    _ ≤ (∑' x, w x * acc x ^ 2) / q - μ * hinv := by
+        gcongr
+    _ = (∑' x, w x * acc x ^ 2 / q) - ∑' x, w x * acc x * hinv := by
+        congr 1
+        · simp only [div_eq_mul_inv]
+          rw [ENNReal.tsum_mul_right]
+        · rw [hμ_def, ENNReal.tsum_mul_right]
+    _ ≤ ∑' x, (w x * acc x ^ 2 / q - w x * acc x * hinv) := by
+        -- Reverse-Jensen: `∑' f - ∑' g ≤ ∑' (f - g)` in ENNReal when `∑' g ≠ ⊤`.
+        set f : X → ENNReal := fun x => w x * acc x ^ 2 / q with hf_def
+        set g : X → ENNReal := fun x => w x * acc x * hinv with hg_def
+        have hg_sum_ne_top : ∑' x, g x ≠ ⊤ := by
+          show ∑' x, w x * acc x * hinv ≠ ⊤
+          rw [ENNReal.tsum_mul_right]; exact hμ_hinv_ne_top
+        have hfg : ∑' x, f x ≤ ∑' x, (f x - g x) + ∑' x, g x := by
+          calc ∑' x, f x ≤ ∑' x, ((f x - g x) + g x) := by
+                exact ENNReal.tsum_le_tsum fun x => le_tsub_add
+            _ = ∑' x, (f x - g x) + ∑' x, g x := ENNReal.tsum_add
+        exact tsub_le_iff_right.2 hfg
+    _ = ∑' x, w x * (acc x ^ 2 / q - acc x * hinv) := by
+        refine tsum_congr fun x => ?_
+        have hwx_ne_top : w x ≠ ⊤ :=
+          ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one
+        rw [ENNReal.mul_sub (fun _ _ => hwx_ne_top), mul_div_assoc, mul_assoc]
+    _ = ∑' x, w x * (acc x * (acc x / q - hinv)) := by
+        refine tsum_congr fun x => ?_
+        have hax_ne_top : acc x ≠ ⊤ :=
+          ne_top_of_le_ne_top ENNReal.one_ne_top (hacc_le x)
+        congr 1
+        rw [ENNReal.mul_sub (fun _ _ => hax_ne_top), sq, mul_div_assoc]
+    _ ≤ ∑' x, w x * B x := by
+        gcongr with x
+        exact hper x
+
+end jensenIntegration
+
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
@@ -1450,14 +1531,52 @@ theorem euf_nma_bound
     -- `extract_sound_of_speciallySoundAt` for witness validity.
     sorry
   -- ── Step (d): integrate (b)∘(c) over keygen using Cauchy-Schwarz / Jensen.
-  -- Combining (b) and (c) gives: for all pk,
-  --   `acc pk · (acc pk / q - h⁻¹) ≤ Pr[rel pk w | reduction pk]`.
-  -- Taking expectations over `keygen` and applying `(𝔼 X)² ≤ 𝔼 X²`:
-  --   `𝔼[acc] · (𝔼[acc] / q - h⁻¹) ≤ 𝔼[acc · (acc / q - h⁻¹)] ≤ 𝔼[Pr[rel pk w | reduction pk]]`
-  -- which by step (a) and unfolding `hardRelationExp` gives the desired bound.
-  -- TODO(p6-jensen-integrate): formalize the ENNReal Jensen step
-  --   `(𝔼 X)² ≤ 𝔼 X²` for bind-computed expectations over `keygen`.
-  sorry
+  -- Combining (b) and (c) gives the per-pk forking bound; integrating via
+  -- `jensen_keygen_forking_bound` lifts it to the expected bound.
+  have hPerPkFinal : ∀ pk : Stmt,
+      acc pk * (acc pk / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
+        Pr[ fun w : Wit => rel pk w = true | reduction pk] := fun pk =>
+    (hPerPk pk).trans (hExtract pk)
+  -- Rewrite the advantage as the expected acceptance over keygen (marginalized to `pk`).
+  have hAdv_eq_tsum :
+      managedRoNmaForkAdvantage σ hr M nmaAdv qH =
+        ∑' pkw : Stmt × Wit, Pr[= pkw | hr.gen] * acc pkw.1 := by
+    rw [hAdv_eq]
+    rw [probEvent_bind_eq_tsum]
+    refine tsum_congr fun pkw => ?_
+    rw [probOutput_liftComp]
+    congr 1
+    rcases pkw with ⟨pk, sk⟩
+    simp only [bind_pure_comp, probEvent_map, Function.comp_def, acc]
+  -- Rewrite the RHS (`Pr[= true | hardRelationExp]`) as a keygen-marginalized sum.
+  have hRHS_eq_tsum : Pr[= true | hardRelationExp hr reduction] =
+      ∑' pkw : Stmt × Wit, Pr[= pkw | hr.gen] *
+        Pr[ fun w : Wit => rel pkw.1 w = true | reduction pkw.1] := by
+    unfold hardRelationExp
+    rw [← probEvent_eq_eq_probOutput]
+    simp only [bind_pure_comp, probEvent_bind_eq_tsum]
+    refine tsum_congr fun pkw => ?_
+    rcases pkw with ⟨pk, sk⟩
+    congr 1
+    rw [probEvent_map]
+    rfl
+  rw [hAdv_eq_tsum, hRHS_eq_tsum]
+  -- Instantiate `jensen_keygen_forking_bound` with the keygen distribution.
+  have hinv_le : challengeSpaceInv Chal ≤ 1 := by
+    unfold challengeSpaceInv
+    have hcard : (1 : ENNReal) ≤ (Fintype.card Chal : ENNReal) := by
+      exact_mod_cast Fintype.card_pos
+    exact ENNReal.inv_le_one.2 hcard
+  have hinv_ne_top : challengeSpaceInv Chal ≠ ⊤ :=
+    ne_top_of_le_ne_top ENNReal.one_ne_top hinv_le
+  have hacc_le : ∀ pkw : Stmt × Wit, acc pkw.1 ≤ 1 := fun _ =>
+    probEvent_le_one
+  exact jensen_keygen_forking_bound (gen := hr.gen)
+    (acc := fun pkw => acc pkw.1)
+    (B := fun pkw => Pr[ fun w : Wit => rel pkw.1 w = true | reduction pkw.1])
+    (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
+    hinv_ne_top hacc_le
+    (fun pkw => hPerPkFinal pkw.1)
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
 
