@@ -5,7 +5,6 @@ Authors: XC0R
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
-import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Collision-Resistant Hash Functions
@@ -34,6 +33,14 @@ protocol parameter.
 - `KeyedCRAdversary K X` — an adversary for the keyed variant.
 - `keyedCRExp` — the keyed collision-resistance experiment.
 - `keyedCRAdvantage` — the advantage of a keyed CR adversary.
+
+## See also
+
+- `VCVio/CryptoFoundations/CommitmentScheme.lean` — binding for commitment
+  schemes; collision resistance of the underlying hash is the standard-model
+  source of binding for hash-based commitments.
+- `VCVio/OracleComp/QueryTracking/Collision.lean` — `CacheHasCollision`
+  predicates and birthday bounds used to bound ROM-level collision probability.
 -/
 
 
