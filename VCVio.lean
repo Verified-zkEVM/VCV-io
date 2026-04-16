@@ -10,7 +10,14 @@ import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.FiatShamir
-import VCVio.CryptoFoundations.FiatShamirWithAbort
+import VCVio.CryptoFoundations.FiatShamir.QueryBounds
+import VCVio.CryptoFoundations.FiatShamir.Sigma
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
+import VCVio.CryptoFoundations.FiatShamir.WithAbort
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
+import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
 import VCVio.CryptoFoundations.Fork
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
