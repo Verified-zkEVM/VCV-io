@@ -640,7 +640,7 @@ theorem perfectlyCorrect [SampleableType Chal]
           (post := fun y => if y = true then 1 else 0))
 
 /-- Trace used by the Fiat-Shamir forking reduction for managed-RO NMA adversaries. -/
-structure ManagedRoNmaForkTrace where
+structure ForkTrace where
   forgery : M × (Commit × Resp)
   advCache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache
   roCache : (M × Commit →ₒ Chal).QueryCache
@@ -648,17 +648,17 @@ structure ManagedRoNmaForkTrace where
   verified : Bool
 
 /-- The hash point corresponding to the final forgery recorded in a fork trace. -/
-def ManagedRoNmaForkTrace.target
-    (trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
+def ForkTrace.target
+    (trace : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
     M × Commit :=
   (trace.forgery.1, trace.forgery.2.1)
 
 /-- Rewinding point extracted from a managed-RO fork trace. The fork is usable exactly when
 the final forgery verifies and its hash point appears in the live query log. -/
-def managedRoNmaForkPoint
+def forkPoint
     [DecidableEq M] [DecidableEq Commit]
     (qH : ℕ)
-    (trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
+    (trace : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
     Option (Fin (qH + 1)) := by
   if hverified : trace.verified then
     let target := trace.target
@@ -673,54 +673,54 @@ def managedRoNmaForkPoint
   else
     exact none
 
-lemma managedRoNmaForkPoint_some_imp_verified
+lemma forkPoint_some_imp_verified
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
-    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {trace : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {s : Fin (qH + 1)}
-    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+    (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.verified = true := by
-  unfold managedRoNmaForkPoint at hs
+  unfold forkPoint at hs
   by_cases hverified : trace.verified
   · exact hverified
   · simp [hverified] at hs
 
-lemma managedRoNmaForkPoint_some_imp_mem
+lemma forkPoint_some_imp_mem
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
-    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {trace : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {s : Fin (qH + 1)}
-    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+    (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.target ∈ trace.queryLog := by
-  unfold managedRoNmaForkPoint at hs
+  unfold forkPoint at hs
   by_cases hverified : trace.verified
   · have hs' :
         trace.target ∈ trace.queryLog ∧
           ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
             (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
               Fin (qH + 1)) = s := by
-        simpa [hverified, ManagedRoNmaForkTrace.target] using hs
+        simpa [hverified, ForkTrace.target] using hs
     exact hs'.1
   · simp [hverified] at hs
 
-lemma managedRoNmaForkPoint_getElem?_eq_some_target
+lemma forkPoint_getElem?_eq_some_target
     [DecidableEq M] [DecidableEq Commit]
     {qH : ℕ}
-    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {trace : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {s : Fin (qH + 1)}
-    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+    (hs : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH trace = some s) :
     trace.queryLog[↑s]? = some trace.target := by
-  unfold managedRoNmaForkPoint at hs
+  unfold forkPoint at hs
   by_cases hverified : trace.verified
   · have hs' :
         trace.target ∈ trace.queryLog ∧
           ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
             (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
               Fin (qH + 1)) = s := by
-        simpa [hverified, ManagedRoNmaForkTrace.target] using hs
+        simpa [hverified, ForkTrace.target] using hs
     rcases hs' with ⟨hmem, ⟨hidx, hs'⟩⟩
     have hlt : trace.queryLog.findIdx (· == trace.target) < trace.queryLog.length := by
       exact List.findIdx_lt_length_of_exists ⟨trace.target, hmem, by simp⟩
@@ -731,7 +731,7 @@ lemma managedRoNmaForkPoint_getElem?_eq_some_target
       (x := trace.target)
       hlt).mp <|
       by
-        simpa [ManagedRoNmaForkTrace.target] using
+        simpa [ForkTrace.target] using
           (List.findIdx_getElem (xs := trace.queryLog) (p := fun x => x == trace.target)
             (w := hlt))
   · simp [hverified] at hs
@@ -743,14 +743,14 @@ The `verified` flag is computed only from challenge values already present in on
 two caches. In particular, this trace does not perform a fresh post-hoc verification query;
 it records exactly the executions whose forgery is already determined by the adversary's
 managed view of the random oracle. -/
-noncomputable def managedRoNmaForkTraceComp
+noncomputable def runForkTrace
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (pk : Stmt) :
     OracleComp (unifSpec + (Unit →ₒ Chal))
-      (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := by
+      (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := by
   let origSpec := unifSpec + (M × Commit →ₒ Chal)
   let chalSpec : OracleSpec Unit := Unit →ₒ Chal
   let wrappedSpec := unifSpec + chalSpec
@@ -796,7 +796,7 @@ noncomputable def managedRoNmaForkTraceComp
 
 /-- Forkable managed-RO NMA experiment. Success means the final forged transcript verifies and
 the corresponding hash point appears in the live query log, so the forking lemma can rewind it. -/
-noncomputable def managedRoNmaForkExp
+noncomputable def forkExp
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
@@ -807,18 +807,18 @@ noncomputable def managedRoNmaForkExp
     (uniformSampleImpl (spec := chalSpec))) (do
       let (pk, _) ←
         OracleComp.liftComp hr.gen (unifSpec + chalSpec)
-      let trace ← managedRoNmaForkTraceComp σ hr M nmaAdv pk
-      pure (managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      let trace ← runForkTrace σ hr M nmaAdv pk
+      pure (forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
         qH trace).isSome)
 
 /-- The forkable success probability of a managed-RO NMA adversary. -/
-noncomputable def managedRoNmaForkAdvantage
+noncomputable def forkAdvantage
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) : ENNReal :=
-  Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH]
+  Pr[= true | forkExp σ hr M nmaAdv qH]
 
 /-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
 `OracleComp (unifSpec + (Unit →ₒ Chal))` level.
@@ -843,28 +843,28 @@ correspondence between the adversary's internal `queryLog` and the outer `QueryL
 extracted through the caller-provided `P_out` transfer predicate: the caller may choose `P_out`
 so that `P_out x log` pins `x.target` to a deterministic function of `(log, cf x)`, and then
 derive target-equality from the distinct-answer disagreement on the outer log. -/
-theorem managedRoNmaForkingLemmaReplay
+theorem replayForkingBound
     [DecidableEq M] [DecidableEq Commit]
     [DecidableEq Chal] [SampleableType Chal] [Fintype Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt)
-    (P_out : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
+    (P_out : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
       QueryLog (unifSpec + (Unit →ₒ Chal)) → Prop)
     (hP : ∀ {x log},
-      (x, log) ∈ support (replayFirstRun (managedRoNmaForkTraceComp σ hr M nmaAdv pk)) →
+      (x, log) ∈ support (replayFirstRun (runForkTrace σ hr M nmaAdv pk)) →
       P_out x log) :
-    let wrappedMain := managedRoNmaForkTraceComp σ hr M nmaAdv pk
-    let cf := managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
+    let wrappedMain := runForkTrace σ hr M nmaAdv pk
+    let cf := forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
     let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
     let acc := Pr[ fun x => (cf x).isSome | wrappedMain]
     acc * (acc / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
       Pr[
         fun r : Option
-            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+            (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
           ∃ (x₁ x₂ :
-              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+              ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
             (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
             r = some (x₁, x₂) ∧
             cf x₁ = some s ∧
@@ -902,8 +902,8 @@ theorem managedRoNmaForkingLemmaReplay
         ((∑ s, Pr[= some s | cf <$> wrappedMain]) / ↑(qb (Sum.inr ()) + 1)
           - challengeSpaceInv Chal) := by rw [hqb_eq]; push_cast; ring_nf
     _ ≤ Pr[ fun r : Option
-            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+            (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
               r.isSome | forkReplay wrappedMain qb (Sum.inr ()) cf] := by
         have hbound := le_probEvent_isSome_forkReplay
           (main := wrappedMain) (qb := qb) (i := Sum.inr ()) (cf := cf)
@@ -963,7 +963,7 @@ theorem euf_cma_to_nma
       (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
         (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
-        managedRoNmaForkAdvantage σ hr M nmaAdv qH +
+        forkAdvantage σ hr M nmaAdv qH +
           ENNReal.ofReal (qS * ζ_zk + ζ_col) := by
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
@@ -1235,7 +1235,7 @@ theorem euf_cma_to_nma
     --          Needs `tvDist_bind_left_le` and per-query HVZK bounds.
     --
     --     (3b) hybrid → fork-NMA: relate successful fresh forgeries to the forkable
-    --          experiment `managedRoNmaForkExp`. The reduction now serves `A`'s live
+    --          experiment `forkExp`. The reduction now serves `A`'s live
     --          hash queries through the same managed cache it eventually returns, and
     --          `sigSim` preserves any pre-existing cache entry instead of overwriting it.
     --          The remaining discrepancy is exactly the late-programming collision event
@@ -1396,17 +1396,17 @@ extracts only from fork outputs whose two forged transcripts share a commitment 
 cached challenges are distinct. The remaining proof obligation is to show that successful
 forks satisfy exactly those compatibility checks, after which special soundness applies.
 
-Here `Adv^{fork-NMA}_{qH}(B)` is `managedRoNmaForkAdvantage`: it counts exactly the
+Here `Adv^{fork-NMA}_{qH}(B)` is `forkAdvantage`: it counts exactly the
 managed-RO executions whose forgery already verifies from challenge values present in the
 adversary's managed cache or in the live hash-query log recorded by
-`managedRoNmaForkTraceComp`. This is the precise success event that the forking lemma can
+`runForkTrace`. This is the precise success event that the forking lemma can
 rewind.
 
 This matches Firsov-Janku's `schnorr_koa_secure` at
 [fsec/proof/Schnorr.ec:448](../../../fsec/proof/Schnorr.ec), which applies `forking_lemma_ro`
 with the single-run postcondition `verify` plus the extractor correctness lemma
 `extractor_corr` at [fsec/proof/Schnorr.ec:87](../../../fsec/proof/Schnorr.ec). Our version
-uses `managedRoNmaForkingLemmaReplay` for the RO-level packaging and `_hss` for special
+uses `replayForkingBound` for the RO-level packaging and `_hss` for special
 soundness, with `σ.extract` playing the role of EC's `extractor`. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
@@ -1420,19 +1420,19 @@ theorem euf_nma_bound
     (_hQ : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := nmaAdv.main pk) qH) :
     ∃ reduction : Stmt → ProbComp Wit,
-      (managedRoNmaForkAdvantage σ hr M nmaAdv qH *
-          (managedRoNmaForkAdvantage σ hr M nmaAdv qH / (qH + 1 : ENNReal) -
+      (forkAdvantage σ hr M nmaAdv qH *
+          (forkAdvantage σ hr M nmaAdv qH / (qH + 1 : ENNReal) -
             challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp hr reduction] := by
   classical
   let chalSpec : OracleSpec Unit := Unit →ₒ Chal
   -- Replay `nmaAdv` into a single-counted challenge oracle and record the rewindable trace.
   let wrappedMain : Stmt → OracleComp (unifSpec + (Unit →ₒ Chal))
-      (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
-    managedRoNmaForkTraceComp σ hr M nmaAdv
-  let cf : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
+      (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+    runForkTrace σ hr M nmaAdv
+  let cf : ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
       Option (Fin (qH + 1)) :=
-    managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
+    forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
   -- ─── Replay-fork query budget ───
   -- Only the single counted challenge oracle is forked.
   let qb : ℕ ⊕ Unit → ℕ := fun | .inl _ => 0 | .inr () => qH
@@ -1466,19 +1466,19 @@ theorem euf_nma_bound
   --
   -- Define the per-public-key acceptance probability used throughout.
   let acc : Stmt → ENNReal := fun pk => Pr[ fun x => (cf x).isSome | wrappedMain pk]
-  -- ── Step (a): rewrite `managedRoNmaForkAdvantage` as the expected per-pk
+  -- ── Step (a): rewrite `forkAdvantage` as the expected per-pk
   -- acceptance `Pr[isSome ∘ cf | keygen >>= wrappedMain]`. This unfolds the
   -- `simulateQ` wrapping around the sum spec via `uniformSampleImpl.probEvent_simulateQ`
   -- and applies `probEvent_map` for the final `(·.isSome)` event.
-  have hAdv_eq : managedRoNmaForkAdvantage σ hr M nmaAdv qH =
-      Pr[ fun (pt : Stmt × ManagedRoNmaForkTrace
+  have hAdv_eq : forkAdvantage σ hr M nmaAdv qH =
+      Pr[ fun (pt : Stmt × ForkTrace
           (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
             (cf pt.2).isSome | do
           let (pk, _) ← OracleComp.liftComp hr.gen (unifSpec + chalSpec)
           let trace ← wrappedMain pk
           pure (pk, trace)] := by
-    change Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH] = _
-    unfold managedRoNmaForkExp
+    change Pr[= true | forkExp σ hr M nmaAdv qH] = _
+    unfold forkExp
     rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl]
     simp only [bind_pure_comp, probEvent_map, probEvent_bind_eq_tsum,
       Function.comp_def]
@@ -1489,7 +1489,7 @@ theorem euf_nma_bound
   -- both runs gives two accepting transcripts with the same commitment and distinct
   -- challenges — exactly what special soundness needs.
   let P_out : Stmt →
-      ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
+      ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
         QueryLog (unifSpec + (Unit →ₒ Chal)) → Prop :=
     fun pk x log => ∀ s : Fin (qH + 1), cf x = some s →
       ∃ ω : Chal,
@@ -1497,27 +1497,27 @@ theorem euf_nma_bound
         x.roCache x.target = some ω ∧
         σ.verify pk x.target.2 ω x.forgery.2.2 = true
   -- Support invariant: `P_out pk` holds for every `(x, log)` in the support of the first
-  -- run at public key `pk`. This follows from the definition of `managedRoNmaForkTraceComp`:
+  -- run at public key `pk`. This follows from the definition of `runForkTrace`:
   -- whenever `cf x = some s` pins `x.target` to `x.queryLog[s]?` via
-  -- `managedRoNmaForkPoint_getElem?_eq_some_target`, the trace's internal RO simulation
+  -- `forkPoint_getElem?_eq_some_target`, the trace's internal RO simulation
   -- guarantees `x.roCache x.target` matches the external `Sum.inr ()` oracle response at
   -- index `s`, and the `verified` flag verifies that response against `pk`.
   have hPinv : ∀ pk x log,
       (x, log) ∈ support (replayFirstRun (wrappedMain pk)) → P_out pk x log := by
     -- TODO(p6-support-invariant): prove the support invariant by induction on
-    -- `managedRoNmaForkTraceComp` — each counted-oracle query updates `roCache` and the
+    -- `runForkTrace` — each counted-oracle query updates `roCache` and the
     -- external log in lockstep, so their corresponding entries match, and `verified`
     -- guarantees `σ.verify pk` succeeds at the cached challenge.
     sorry
-  -- ── Step (b): per-pk forking bound via `managedRoNmaForkingLemmaReplay`, using the
+  -- ── Step (b): per-pk forking bound via `replayForkingBound`, using the
   -- strengthened `P_out pk` to pin each run's cached challenge to its outer log entry.
   have hPerPk : ∀ pk : Stmt,
       acc pk * (acc pk / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
         Pr[ fun r : Option
-            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+            (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
             ∃ (x₁ x₂ :
-                ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+                ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
               (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
               r = some (x₁, x₂) ∧
               cf x₁ = some s ∧
@@ -1528,30 +1528,30 @@ theorem euf_nma_bound
               P_out pk x₂ log₂
             | forkReplay (wrappedMain pk) qb (Sum.inr ()) cf] := by
     intro pk
-    exact managedRoNmaForkingLemmaReplay (σ := σ) (hr := hr) (M := M) nmaAdv qH pk
+    exact replayForkingBound (σ := σ) (hr := hr) (M := M) nmaAdv qH pk
       (P_out := P_out pk) (hP := fun h => hPinv pk _ _ h)
   -- ── Step (c): per-pk extraction bound. The structural fork event plus target equality
   -- (established by `hTargetEq` below) plus special soundness give witness extraction.
   -- Target equality across the two fork runs: this holds because both runs share the
   -- oracle responses up to the fork index, so the adversary's internal query-log prefix up
-  -- to index `s` is identical, and `managedRoNmaForkPoint_getElem?_eq_some_target` then
+  -- to index `s` is identical, and `forkPoint_getElem?_eq_some_target` then
   -- forces the targets to agree.
   have hTargetEq : ∀ pk (x₁ x₂ :
-      ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+      ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
       (s : Fin (qH + 1)),
       some (x₁, x₂) ∈ support (forkReplay (wrappedMain pk) qb (Sum.inr ()) cf) →
       cf x₁ = some s → cf x₂ = some s →
       x₁.target = x₂.target := by
     -- TODO(p6-target-equality): derive from `forkReplay_success_log_props` (shared prefix of
-    -- `Sum.inr ()` responses up to index `s`) plus the managedRoNmaForkTraceComp invariant
+    -- `Sum.inr ()` responses up to index `s`) plus the runForkTrace invariant
     -- that `queryLog[n]` is determined by the first `n` counted-oracle responses.
     sorry
   have hExtract : ∀ pk : Stmt,
       Pr[ fun r : Option
-          (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-            ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+          (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+            ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
           ∃ (x₁ x₂ :
-              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+              ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
             (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
             r = some (x₁, x₂) ∧
             cf x₁ = some s ∧
@@ -1571,8 +1571,8 @@ theorem euf_nma_bound
     -- Expand `forkExtract pk` as a bind over `forkReplay` followed by the case-match
     -- extractor `branchFn`.
     set branchFn : Option
-        (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
-          ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) →
+        (ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+          ForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) →
         OracleComp (unifSpec + (Unit →ₒ Chal)) Wit :=
       fun result => match result with
       | none => liftComp ($ᵗ Wit) (unifSpec + chalSpec)
@@ -1597,7 +1597,7 @@ theorem euf_nma_bound
     -- Pointwise comparison:
     -- `(if E r then Pr[= r | mx] else 0) ≤ Pr[= r | mx] * Pr[rel | branchFn r]`.
     by_cases hE :
-        ∃ (x₁ x₂ : ManagedRoNmaForkTrace
+        ∃ (x₁ x₂ : ForkTrace
             (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
           (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
           r = some (x₁, x₂) ∧
@@ -1676,7 +1676,7 @@ theorem euf_nma_bound
     (hPerPk pk).trans (hExtract pk)
   -- Rewrite the advantage as the expected acceptance over keygen (marginalized to `pk`).
   have hAdv_eq_tsum :
-      managedRoNmaForkAdvantage σ hr M nmaAdv qH =
+      forkAdvantage σ hr M nmaAdv qH =
         ∑' pkw : Stmt × Wit, Pr[= pkw | hr.gen] * acc pkw.1 := by
     rw [hAdv_eq]
     rw [probEvent_bind_eq_tsum]
@@ -1754,7 +1754,7 @@ theorem euf_cma_bound
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk + ζ_col) ≤
-      managedRoNmaForkAdvantage σ hr M nmaAdv qH :=
+      forkAdvantage σ hr M nmaAdv qH :=
     tsub_le_iff_left.mpr (by rwa [add_comm])
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)
 

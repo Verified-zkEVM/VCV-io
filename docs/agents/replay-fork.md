@@ -91,7 +91,7 @@ and
 The current Fiat-Shamir fork setup uses:
 
 - `nmaHashQueryBound`, which bounds only hash queries and leaves `.inl` `unifSpec` queries unrestricted
-- `managedRoNmaForkTraceComp`, which forwards `.inl` `unifSpec` queries live
+- `FiatShamir.runForkTrace`, which forwards `.inl` `unifSpec` queries live
 - `fork`, which currently shares only the seeded distinguished oracle family
 
 So the present proof attempt implicitly wants the following implication:
@@ -221,7 +221,7 @@ Replay would let the Fiat-Shamir reduction keep that ambient randomness model:
 - successful replay gives the exact prefix-sharing fact needed to justify “same target, different
   challenge”
 
-This is the intended repair path for `managedRoNmaForkTraceComp` and `euf_nma_bound`, while keeping
+This is the intended repair path for `FiatShamir.runForkTrace` and `euf_nma_bound`, while keeping
 the current seed-based fork available for simpler settings.
 
 ## Suggested Future File Split
