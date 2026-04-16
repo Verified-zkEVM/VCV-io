@@ -822,9 +822,12 @@ noncomputable def managedRoNmaForkAdvantage
 
 /-- Managed-RO replay-fork convenience theorem at a fixed public key.
 
-This is the Fiat-Shamir-specific analogue of EasyCrypt's `forking_lemma_ro`:
-it packages the replay quantitative bound with same-target and postcondition-transfer facts for
-the wrapped managed random-oracle trace experiment. -/
+This is the Fiat-Shamir-specific analogue of Firsov-Janku's `forking_lemma_ro` at
+[fsec/proof/ForkingRO.ec:443](../../../fsec/proof/ForkingRO.ec). It packages the replay
+quantitative bound with same-target and postcondition-transfer facts for the wrapped managed
+random-oracle trace experiment, composing `le_probEvent_isSome_forkReplay` (quantitative bound),
+`forkReplay_success_log_props` (structural same-target / distinct-answer facts), and
+`forkReplay_propertyTransfer` (postcondition transfer). -/
 theorem managedRoNmaForkingLemmaReplay
     [DecidableEq M] [DecidableEq Commit]
     [DecidableEq Chal] [SampleableType Chal] [Fintype Chal]
@@ -890,7 +893,15 @@ Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation 
 The `ζ_col` term accounts for collisions where `A` queries a hash that `B` later programs.
 
 This step is independent of special soundness and the forking lemma; those are handled
-by `euf_nma_bound`. -/
+by `euf_nma_bound`.
+
+The Lean bound matches Firsov-Janku's `pr_koa_cma` at
+[fsec/proof/Schnorr.ec:943](../../../fsec/proof/Schnorr.ec): the CMA-to-KOA reduction uses
+`eq_except (signed qs) LRO.m{1} LRO.m{2}` as the RO-cache invariant, swaps real signing with
+`simulator_equiv` (per-query HVZK cost), handles RO reprogramming via `lro_redo_inv` +
+`ro_get_eq_except`, and absorbs the late-programming collision event through the `bad` flag,
+bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) as
+`QS · (QS+QR) / |Ω|`, matching our `ζ_col`. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -1210,7 +1221,14 @@ Here `Adv^{fork-NMA}_{qH}(B)` is `managedRoNmaForkAdvantage`: it counts exactly 
 managed-RO executions whose forgery already verifies from challenge values present in the
 adversary's managed cache or in the live hash-query log recorded by
 `managedRoNmaForkTraceComp`. This is the precise success event that the forking lemma can
-rewind. -/
+rewind.
+
+This matches Firsov-Janku's `schnorr_koa_secure` at
+[fsec/proof/Schnorr.ec:448](../../../fsec/proof/Schnorr.ec), which applies `forking_lemma_ro`
+with the single-run postcondition `verify` plus the extractor correctness lemma
+`extractor_corr` at [fsec/proof/Schnorr.ec:87](../../../fsec/proof/Schnorr.ec). Our version
+uses `managedRoNmaForkingLemmaReplay` for the RO-level packaging and `_hss` for special
+soundness, with `σ.extract` playing the role of EC's `extractor`. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]

@@ -592,7 +592,49 @@ private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
     (hz : z ∈ support (((replayOracle i) t).run st :
       OracleComp spec (spec.Range t × ReplayForkState spec i))) :
     z.2.observed = st.observed.logQuery t z.1 := by
-  sorry
+  unfold replayOracle at hz
+  simp only [StateT.run_bind, StateT.run_get, pure_bind] at hz
+  by_cases hlive : st.forkConsumed || st.mismatch
+  · simp only [hlive, ↓reduceIte, bind_pure_comp, StateT.run_bind, StateT.run_monadLift,
+      monadLift_eq_self, StateT.run_map, StateT.run_set, map_pure, Functor.map_map, support_map,
+      support_liftM, OracleQuery.input_query, OracleQuery.cont_query, Set.range_id,
+      Set.image_univ, Set.mem_range] at hz
+    rcases hz with ⟨u, _, rfl⟩
+    simp [ReplayForkState.noteObserved]
+  · simp only [hlive, Bool.false_eq_true, ↓reduceIte, bind_pure_comp, dite_eq_ite] at hz
+    cases hnext : st.nextEntry? with
+    | none =>
+        simp only [hnext, StateT.run_bind, StateT.run_monadLift, monadLift_eq_self,
+            bind_pure_comp, StateT.run_map, StateT.run_set, map_pure, Functor.map_map,
+            support_map, support_liftM, OracleQuery.input_query, OracleQuery.cont_query,
+            Set.range_id, Set.image_univ, Set.mem_range] at hz
+        rcases hz with ⟨u, _, rfl⟩
+        simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
+    | some entry =>
+        rcases entry with ⟨t', u'⟩
+        by_cases hsame : t = t'
+        · cases hsame
+          by_cases hti : t = i
+          · cases hti
+            by_cases hfork : st.distinguishedCount = st.forkQuery
+            · simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              rfl
+            · simp only [hnext, ↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure, support_pure, Set.mem_singleton_iff] at hz
+              rcases hz with rfl
+              rfl
+          · simp only [hnext, ↓reduceDIte, hti, StateT.run_map, StateT.run_set, map_pure,
+              support_pure, Set.mem_singleton_iff] at hz
+            rcases hz with rfl
+            rfl
+        · simp only [hnext, hsame, ↓reduceDIte, StateT.run_bind, StateT.run_monadLift,
+            monadLift_eq_self, bind_pure_comp, StateT.run_map, StateT.run_set, map_pure,
+            Functor.map_map, support_map, support_liftM, OracleQuery.input_query,
+            OracleQuery.cont_query, Set.range_id, Set.image_univ, Set.mem_range] at hz
+          rcases hz with ⟨u, _, rfl⟩
+          simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
 
 private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
     [spec.Fintype] [spec.Inhabited]
@@ -656,7 +698,11 @@ variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 variable [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec]
 
 /-- Replay does not increase the total number of oracle queries. This is the runtime-control
-placeholder needed before the full quantitative replay forking argument. -/
+placeholder needed before the full quantitative replay forking argument.
+
+This runtime bound is off the critical path for the quantitative forking bound and has no direct
+counterpart in Firsov-Janku's `fsec`. It is deferred until downstream users actually need an
+expected-cost or pathwise bound on replay forks. -/
 theorem isTotalQueryBound_replayRunWithTraceValue
     (main : OracleComp spec α) (n : ℕ)
     (hmain : IsTotalQueryBound main n)
@@ -714,7 +760,22 @@ theorem probEvent_forkReplay_fst_eq_probEvent_pair
     simp [h₁, h₂]
 
 /-- Key pointwise replay lower bound. This is the replay analogue of
-`le_probOutput_fork`. -/
+`le_probOutput_fork`.
+
+The summed (aggregated) version is the replay analogue of Firsov-Janku's `pr_fork_success`
+in [fsec/proof/Forking.ec:1175](../../../fsec/proof/Forking.ec). The quantitative argument
+decomposes into:
+
+1. `pr_split` [Forking.ec:410]: factor out the `acc · h⁻¹` collision term.
+2. `pr_succ_resp_eq` [Forking.ec:480]: exchange symmetry of the two replay answers.
+3. `pr_fork_specific` [Forking.ec:1115]: pointwise `Pr[success at s]² ≤ Pr[fork at s]`.
+4. `square_sum` [Forking.ec:1148]: Jensen / Cauchy-Schwarz `Σ aⱼ² ≥ (Σ aⱼ)² / Q`.
+
+In Lean the analogous pointwise bound corresponds to step (3) combined with (1) and is
+structurally similar to the seed-based `le_probOutput_fork` proof in
+`VCVio/CryptoFoundations/Fork.lean`, with `replayFirstRun`/`replayRunWithTraceValue` playing
+the role of `generateSeed`/`seededOracle` and `QueryLog.takeBeforeFork`-style slicing replacing
+`QuerySeed.takeAtIndex`. -/
 theorem le_probOutput_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (s : Fin (qb i + 1)) :
@@ -866,7 +927,15 @@ theorem le_probEvent_isSome_forkReplay
 /-- Structural success facts for `forkReplay`: both outputs come from logged runs of `main`,
 share the same selected fork index, differ at the selected distinguished-oracle answer, and the
 second run is witnessed by a replay state whose observed log agrees with the first-run log on the
-replayed prefix. This mirrors EasyCrypt's `success_log_props` layer. -/
+replayed prefix.
+
+This mirrors Firsov-Janku's `success_log_props` at
+[fsec/proof/Forking.ec:1373](../../../fsec/proof/Forking.ec). The EC proof uses a head-tracking
+invariant `(head Log.log).1 = q0` maintained through the `while` loop plus `take_catl` and
+`take_take` list lemmas; the Lean analogue can use induction on `cursor` together with
+`replayRunWithTraceValue_prefix_input_eq` and a dedicated distinguished-query-count invariant
+extracting `getQueryValue? st.observed i st.forkQuery = some st.replacement` once the fork
+has fired. -/
 theorem forkReplay_success_log_props
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -889,8 +958,11 @@ theorem forkReplay_success_log_props
 
 /-- Replay property transfer: any postcondition that holds for every logged run of `main`
 holds for both outputs of a successful replay fork, together with the common selected fork index
-and the fact that the distinguished answers differ at that index. This mirrors EasyCrypt's
-`property_transfer` convenience layer. -/
+and the fact that the distinguished answers differ at that index.
+
+This mirrors Firsov-Janku's `property_transfer` at
+[fsec/proof/Forking.ec:1351](../../../fsec/proof/Forking.ec), combining `fst_run_prop` with
+the shared-prefix facts established by `success_log_props`. -/
 theorem forkReplay_propertyTransfer
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
