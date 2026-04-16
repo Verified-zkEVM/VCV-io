@@ -1267,7 +1267,7 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
         OracleQuery.input_query, QueryImpl.add_apply_inl, QueryImpl.ofLift_apply,
         id_map, evalDist_bind, ih]
       apply bind_congr
-      simp [evalDist_query]
+      simp
     · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
         OracleQuery.input_query, QueryImpl.add_apply_inr, uniformSampleImpl,
         id_map, evalDist_bind, ih]
@@ -1357,7 +1357,7 @@ private lemma jensen_keygen_forking_bound
         set f : X → ENNReal := fun x => w x * acc x ^ 2 / q with hf_def
         set g : X → ENNReal := fun x => w x * acc x * hinv with hg_def
         have hg_sum_ne_top : ∑' x, g x ≠ ⊤ := by
-          show ∑' x, w x * acc x * hinv ≠ ⊤
+          change ∑' x, w x * acc x * hinv ≠ ⊤
           rw [ENNReal.tsum_mul_right]; exact hμ_hinv_ne_top
         have hfg : ∑' x, f x ≤ ∑' x, (f x - g x) + ∑' x, g x := by
           calc ∑' x, f x ≤ ∑' x, ((f x - g x) + g x) := by
@@ -1477,7 +1477,7 @@ theorem euf_nma_bound
           let (pk, _) ← OracleComp.liftComp hr.gen (unifSpec + chalSpec)
           let trace ← wrappedMain pk
           pure (pk, trace)] := by
-    show Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH] = _
+    change Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH] = _
     unfold managedRoNmaForkExp
     rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl]
     simp only [bind_pure_comp, probEvent_map, probEvent_bind_eq_tsum,
@@ -1594,7 +1594,8 @@ theorem euf_nma_bound
         forkExtract pk = forkReplay (wrappedMain pk) qb (Sum.inr ()) cf >>= branchFn := rfl
     rw [hforkExtract_eq, probEvent_bind_eq_tsum, probEvent_eq_tsum_ite]
     refine ENNReal.tsum_le_tsum fun r => ?_
-    -- Pointwise comparison: `(if E r then Pr[= r | mx] else 0) ≤ Pr[= r | mx] * Pr[rel | branchFn r]`.
+    -- Pointwise comparison:
+    -- `(if E r then Pr[= r | mx] else 0) ≤ Pr[= r | mx] * Pr[rel | branchFn r]`.
     by_cases hE :
         ∃ (x₁ x₂ : ManagedRoNmaForkTrace
             (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
