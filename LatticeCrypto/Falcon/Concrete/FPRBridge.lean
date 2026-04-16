@@ -60,11 +60,15 @@ def toReal (x : FPR) : ℝ := ((Float.ofBits x).toRat0 : ℝ)
 /-! ## Verification-only concrete primitives -/
 
 /-- Concrete primitive bundle restricted to the fields used by `Falcon.verify`.
-The sampler is a dummy placeholder because verification never invokes it. -/
+The sampler and FFT bridge fields are dummy placeholders because verification never
+invokes them. -/
 def verifyPrimitives (p : Falcon.Params) (hn : p.n = 2 ^ p.logn) : Falcon.Primitives p where
   publicKeyBytes := fun h => Falcon.Concrete.publicKeyBytes p.logn h
   hashToPoint := fun salt pkBytes msg => Falcon.Concrete.hashToPoint p.n salt pkBytes msg
   samplerZ := fun _ _ => pure 0
+  fftTarget := fun _ => 0
+  fftInt := fun _ => 0
+  ifftRound := fun _ => 0
   compress := Falcon.Concrete.compress p.n
   decompress := Falcon.Concrete.decompress p.n
   nttOps := hn ▸ Falcon.Concrete.concreteNTTRingOps p.logn

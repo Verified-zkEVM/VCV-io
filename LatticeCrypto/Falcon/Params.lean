@@ -55,6 +55,12 @@ def Params.logn (p : Params) : ℕ := Nat.log2 p.n
 
 namespace Params
 
+/-- The depth of Falcon's recursive FFT tree.
+
+Falcon's packed FFT polynomials of degree `n = 2^logn` have length `n`, and the recursive
+sampler stops at `logn = 1` (packed length `2`). Thus the tree depth is `logn - 1`. -/
+def fftDepth (p : Params) : ℕ := p.logn - 1
+
 /-- Size of the public key in bytes: 1 (header) + 14 · n / 8 bits per coefficient of `h`,
 since `q = 12289 < 2^14`. -/
 def publicKeyBytes (p : Params) : ℕ := 1 + 14 * p.n / 8

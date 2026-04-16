@@ -64,14 +64,15 @@ noncomputable instance : DecidableEq (PublicKey p) := by
 /-- The Falcon secret key: the short NTRU basis polynomials `(f, g, F, G)` over `ℤ`,
 plus the precomputed Falcon tree for efficient signing.
 
-The log-degree `logn` is `Nat.log2 p.n`. The tree encodes the normalized LDL decomposition
-of the Gram matrix `[[g, -f], [G, -F]]^T · [[g, -f], [G, -F]]` in FFT representation. -/
+The FFT recursion depth is `p.fftDepth = p.logn - 1`. The tree encodes the normalized
+LDL decomposition of the Gram matrix `[[g, -f], [G, -F]]^T · [[g, -f], [G, -F]]`
+in packed FFT representation. -/
 structure SecretKey where
   f : IntPoly p.n
   g : IntPoly p.n
   capF : IntPoly p.n
   capG : IntPoly p.n
-  tree : FalconTree p.logn
+  tree : FalconTree p.fftDepth
 
 /-- A Falcon signature: a 40-byte random salt `r` paired with the compressed
 representation of the short polynomial `s₂`. -/
@@ -124,19 +125,42 @@ noncomputable def keyGenFromSeed (_seed : List Byte) : PublicKey p × SecretKey 
 /-- Convert a target `c ∈ R_q` and the secret NTRU basis to an FFT-domain target vector
 for `ffSampling`.
 
-Given target `c`, the lattice target is `t = [[c, 0]] · B⁻¹` where
-`B = [[g, -f], [G, -F]]` is the NTRU basis from the secret key. The output is
-`t = (t₀, t₁)` in FFT representation, each of length `2^(logn)`. -/
+This follows Falcon's `fpoly_apply_basis`: interpret `c` as the integer target polynomial
+`hm`, take its packed FFT, and form
+
+- `t₀ = (1/q) · FFT(hm) · FFT(-F)`
+- `t₁ = (-1/q) · FFT(-f) · FFT(hm)`
+
+where `(f, F)` come from the secret basis `[[g, -f], [G, -F]]`. -/
 noncomputable def toFFTTarget (c : Rq p.n) (sk : SecretKey p) :
-    Vector ℝ (2 * 2 ^ p.logn) := sorry
+    FFTPair p.fftDepth :=
+  let hmFFT := prims.fftTarget c
+  let b01 := prims.fftInt (-sk.f)
+  let b11 := prims.fftInt (-sk.capF)
+  let invQ : ℝ := (1 : ℝ) / (modulus : ℝ)
+  let t₀ := Primitives.scaleFFT invQ (Primitives.mulFFT hmFFT b11)
+  let t₁ := Primitives.scaleFFT (-invQ) (Primitives.mulFFT b01 hmFFT)
+  (t₀, t₁)
 
 /-- Convert the ffSampling output back to a pair `(s₁, s₂) ∈ R_q × R_q`.
 
-Given the FFT-domain target `t` and the integer lattice point `z` from `ffSampling`,
-computes the short preimage `s = t - z` and converts to the coefficient representation
-in `R_q`. The result satisfies `s₁ + s₂ · h = c mod q` by construction. -/
-noncomputable def fromFFTPreimage (t : Vector ℝ (2 * 2 ^ p.logn))
-    (z : Vector ℤ (2 * 2 ^ p.logn)) : Rq p.n × Rq p.n := sorry
+Given the hash target `c`, the secret basis, and the sampled FFT-domain vector `z`, this
+reconstructs the lattice point `v = z · [[g, -f], [G, -F]]`, inverse-transforms and rounds
+it to coefficients, then returns
+
+- `s₁ = c - v₀`
+- `s₂ = -v₁`
+
+This matches the post-sampling basis application in Falcon's reference signing flow. -/
+noncomputable def fromFFTPreimage (c : Rq p.n) (sk : SecretKey p)
+    (z : FFTPair p.fftDepth) : Rq p.n × Rq p.n :=
+  let v₀FFT := Primitives.mulFFT z.1 (prims.fftInt sk.g) +
+    Primitives.mulFFT z.2 (prims.fftInt sk.capG)
+  let v₁FFT := -(Primitives.mulFFT z.1 (prims.fftInt sk.f) +
+    Primitives.mulFFT z.2 (prims.fftInt sk.capF))
+  let v₀ := IntPoly.toRq (prims.ifftRound v₀FFT)
+  let v₁ := IntPoly.toRq (prims.ifftRound v₁FFT)
+  (c - v₀, -v₁)
 
 /-- Falcon as a `PreimageSampleableFunction`.
 
@@ -161,9 +185,9 @@ noncomputable def falconPSF : PreimageSampleableFunction
     (PublicKey p) (SecretKey p) (Rq p.n × Rq p.n) (Rq p.n) where
   eval pk x := x.1 + negacyclicMul x.2 pk.h
   trapdoorSample _pk sk c := do
-    let t := toFFTTarget p c sk
-    let z ← Primitives.ffSampling prims p.logn t sk.tree
-    return fromFFTPreimage p t z
+    let t := toFFTTarget p prims c sk
+    let z ← Primitives.ffSampling prims p.fftDepth t sk.tree
+    return fromFFTPreimage p prims c sk z
   isShort x := decide (pairL2NormSq x.1 x.2 ≤ p.betaSquared)
 
 /-! ### One-Shot Signing -/
