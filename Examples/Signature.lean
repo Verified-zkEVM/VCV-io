@@ -136,9 +136,10 @@ theorem signature_euf_cma (g : G) (hg : Function.Bijective (· • g : F → G))
         Pr[= true | dlogExp g reduction] := by
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (Schnorr.sigma F G g) (dlogGenerable g hg) M
     (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
-    (ζ_zk := 0) le_rfl
+    (ζ_zk := 0) (ζ_col := 0) le_rfl le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ
+  simp only [mul_zero, add_zero] at hred ⊢
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
   simp only [hardRelationExp, dlogExp]
   rw [show Pr[= true | ($ᵗ G : ProbComp G) >>= fun pk =>
