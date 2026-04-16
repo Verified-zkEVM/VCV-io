@@ -133,7 +133,7 @@ section correctness
 variable (ids : IdenSchemeWithAbort Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
-omit hr [SampleableType Stmt] [SampleableType Wit] in
+omit hr in
 variable [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 /-- When the simulated signing loop produces `some (w, z)`, the random-oracle cache
 contains a challenge `c` at `(msg, w)` satisfying `ids.verify pk w c z = true`.

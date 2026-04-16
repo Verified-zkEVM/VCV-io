@@ -1247,6 +1247,59 @@ theorem euf_cma_to_nma
     --     Use `abs_probOutput_toReal_sub_le_tvDist` to convert TV distance to ENNReal bound.
     sorry
 
+section evalDistBridge
+
+variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+
+/-- The `ofLift + uniformSampleImpl` simulation on `unifSpec + (Unit →ₒ Chal)` preserves
+`evalDist`. Both oracle components sample uniformly from their range (the `unifSpec`
+side via `liftM (query n) : ProbComp (Fin (n+1))`, the challenge side via `$ᵗ Chal`),
+so the simulated computation has the same distribution as the source. -/
+private lemma evalDist_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
+    evalDist (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalDist oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx ih =>
+    rcases t with n | u
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+        OracleQuery.input_query, QueryImpl.add_apply_inl, QueryImpl.ofLift_apply,
+        id_map, evalDist_bind, ih]
+      apply bind_congr
+      simp [evalDist_query]
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+        OracleQuery.input_query, QueryImpl.add_apply_inr, uniformSampleImpl,
+        id_map, evalDist_bind, ih]
+      have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
+            SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
+          (evalDist (liftM (query (Sum.inr u)) :
+            OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
+            SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
+        rw [evalDist_uniformSample, evalDist_query]; rfl
+      exact heq ▸ rfl
+
+/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probEvent_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
+    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  simp only [probEvent_eq_tsum_indicator]
+  refine tsum_congr fun x => ?_
+  unfold Set.indicator
+  split_ifs with hpx
+  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+  · rfl
+
+/-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probOutput_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
+    Pr[= x | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
+  congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+
+end evalDistBridge
+
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
@@ -1278,7 +1331,7 @@ theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
     (_hss : σ.SpeciallySound)
-    [Fintype Chal]
+    [Fintype Chal] [Inhabited Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ)
@@ -1327,33 +1380,83 @@ theorem euf_nma_bound
     simulateQ (QueryImpl.ofLift unifSpec ProbComp +
       (uniformSampleImpl (spec := chalSpec))) (forkExtract pk)
   refine ⟨reduction, ?_⟩
-  -- Phase 3: The probability bound.
+  -- Phase 3: The probability bound, decomposed into four named steps (a)-(d).
   --
-  -- Proof outline:
-  --
-  -- (a) Unfold `managedRoNmaForkAdvantage`: by definition it is the probability
-  --     that `cf <$> wrappedMain pk` returns `some _` after key generation.
-  --     This avoids the earlier mismatch between full managed-RO success and the
-  --     smaller rewindable event that the forking lemma actually controls, without
-  --     issuing any extra post-hoc verification query.
-  --
-  -- (b) First apply the local managed-RO convenience theorem
-  --     `managedRoNmaForkingLemmaReplay`, once proved, at each public key.
-  --     This packages `le_probEvent_isSome_forkReplay`,
-  --     `forkReplay_success_log_props`, and `forkReplay_propertyTransfer`
-  --     into the RO-style event that the two replayed traces share the same
-  --     fork point and target but disagree on the selected challenge answer.
-  --
-  -- (c) Connect the packaged RO event to extraction success. The remaining
-  --     local bridge uses `managedRoNmaForkPoint_getElem?_eq_some_target` to
-  --     identify the selected query-log entry with each forgery target, then
-  --     links the differing wrapped-RO answers from
-  --     `managedRoNmaForkingLemmaReplay` to distinct cached challenges
-  --     `ω₁ ≠ ω₂`. Once `c₁ = c₂` and `ω₁ ≠ ω₂` are available, `_hss`
-  --     turns `σ.extract ω₁ s₁ ω₂ s₂` into a valid witness.
-  --
-  -- (d) Compose (a)-(c) with monotonicity of `· * (· / q - h⁻¹)`, then integrate
-  --     over keygen to get the global bound.
+  -- Define the per-public-key acceptance probability used throughout.
+  let acc : Stmt → ENNReal := fun pk => Pr[ fun x => (cf x).isSome | wrappedMain pk]
+  -- ── Step (a): rewrite `managedRoNmaForkAdvantage` as the expected per-pk
+  -- acceptance `Pr[isSome ∘ cf | keygen >>= wrappedMain]`. This unfolds the
+  -- `simulateQ` wrapping around the sum spec via `uniformSampleImpl.probEvent_simulateQ`
+  -- and applies `probEvent_map` for the final `(·.isSome)` event.
+  have hAdv_eq : managedRoNmaForkAdvantage σ hr M nmaAdv qH =
+      Pr[ fun (pt : Stmt × ManagedRoNmaForkTrace
+          (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+            (cf pt.2).isSome | do
+          let (pk, _) ← OracleComp.liftComp hr.gen (unifSpec + chalSpec)
+          let trace ← wrappedMain pk
+          pure (pk, trace)] := by
+    show Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH] = _
+    unfold managedRoNmaForkExp
+    rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl]
+    simp only [bind_pure_comp, probEvent_map, probEvent_bind_eq_tsum,
+      Function.comp_def]
+    rfl
+  -- ── Step (b): per-pk forking bound via `managedRoNmaForkingLemmaReplay`.
+  -- For each `pk`, the per-pk acceptance-times-shortfall is at most the
+  -- structural success probability on `forkReplay`.
+  have hPerPk : ∀ pk : Stmt,
+      acc pk * (acc pk / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
+        Pr[ fun r : Option
+            (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+            ∃ (x₁ x₂ :
+                ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+              (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
+              r = some (x₁, x₂) ∧
+              cf x₁ = some s ∧
+              cf x₂ = some s ∧
+              QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
+                QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
+              True ∧ True  -- trivial `P_out` placeholder
+            | forkReplay (wrappedMain pk) qb (Sum.inr ()) cf] := by
+    intro pk
+    exact managedRoNmaForkingLemmaReplay (σ := σ) (hr := hr) (M := M) nmaAdv qH pk
+      (P_out := fun _ _ => True)
+      (hP := fun _ => trivial)
+  -- ── Step (c): per-pk extraction bound. The structural fork event implies the
+  -- Σ-protocol extractor succeeds, by `managedRoNmaForkPoint_getElem?_eq_some_target`
+  -- (targets coincide at the fork index) plus `_hss` (special soundness) applied to
+  -- distinct cached challenges. This step needs a stronger `P_out` than the placeholder
+  -- used in step (b) — specifically one pinning each trace's RO cache to the outer log
+  -- at the fork index — but the logical structure is independent of that upgrade.
+  have hExtract : ∀ pk : Stmt,
+      Pr[ fun r : Option
+          (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) ×
+            ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) =>
+          ∃ (x₁ x₂ :
+              ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+            (s : Fin (qH + 1)) (log₁ log₂ : QueryLog (unifSpec + (Unit →ₒ Chal))),
+            r = some (x₁, x₂) ∧
+            cf x₁ = some s ∧
+            cf x₂ = some s ∧
+            QueryLog.getQueryValue? log₁ (Sum.inr ()) ↑s ≠
+              QueryLog.getQueryValue? log₂ (Sum.inr ()) ↑s ∧
+            True ∧ True
+          | forkReplay (wrappedMain pk) qb (Sum.inr ()) cf] ≤
+        Pr[ fun w : Wit => rel pk w = true | reduction pk] := by
+    -- TODO(p6-extract-witness): strengthen `P_out` to pin each trace's RO cache to the
+    -- outer challenge log at the fork index, then apply `_hss`. This uses
+    -- `managedRoNmaForkPoint_getElem?_eq_some_target` for target coincidence and
+    -- `extract_sound_of_speciallySoundAt` for witness validity.
+    sorry
+  -- ── Step (d): integrate (b)∘(c) over keygen using Cauchy-Schwarz / Jensen.
+  -- Combining (b) and (c) gives: for all pk,
+  --   `acc pk · (acc pk / q - h⁻¹) ≤ Pr[rel pk w | reduction pk]`.
+  -- Taking expectations over `keygen` and applying `(𝔼 X)² ≤ 𝔼 X²`:
+  --   `𝔼[acc] · (𝔼[acc] / q - h⁻¹) ≤ 𝔼[acc · (acc / q - h⁻¹)] ≤ 𝔼[Pr[rel pk w | reduction pk]]`
+  -- which by step (a) and unfolding `hardRelationExp` gives the desired bound.
+  -- TODO(p6-jensen-integrate): formalize the ENNReal Jensen step
+  --   `(𝔼 X)² ≤ 𝔼 X²` for bind-computed expectations over `keygen`.
   sorry
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
@@ -1373,7 +1476,7 @@ the bound is trivially satisfied when the simulation loss exceeds the advantage.
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
-    [Fintype Chal]
+    [Fintype Chal] [Inhabited Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk ζ_col : ℝ) (hζ_zk : 0 ≤ ζ_zk) (hζ_col : 0 ≤ ζ_col)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
