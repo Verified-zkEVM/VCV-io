@@ -103,36 +103,51 @@ Pattern: `| pure x => ... | query_bind t oa ih => ...`. Use `simulateQ_bind`, `s
 When refactoring APIs, notations, or proof infrastructure, update all call sites in one
 pass. Do not add deprecated aliases, migration wrappers, or compatibility layers.
 
+### 17. Module organization: prefer direct imports, allow top-level umbrellas per significant module
+
+When splitting a file into a folder of submodules, do **not** reflexively add a top-level
+`X.lean` whose only content is a chain of `import X.A; import X.B`. Each caller should
+import the specific submodule it actually uses.
+
+**Allowed**: top-level import files for each significant module (for example
+`VCVio/CryptoFoundations/FiatShamir.lean`, `ToMathlib.lean`, `Examples.lean`,
+`VCVio.lean`). These are legitimate entry points when a module forms a cohesive API that
+callers consume as a unit, and for the auto-generated root import file checked by CI.
+
+**Not allowed**: thin re-export files inside a submodule folder that exist solely to
+re-export siblings for code organization. If callers only need a specific submodule, they
+should import it directly.
+
 ## Build and Tooling
 
-### 17. Always run `lake exe cache get` before `lake build`
+### 18. Always run `lake exe cache get` before `lake build`
 
 Building Mathlib from source takes hours. Always fetch the precompiled cache first.
 
-### 18. Do not disable linters to silence warnings
+### 19. Do not disable linters to silence warnings
 
 Do not add `set_option linter.* false`, `set_option weak.linter.* false`, or repo-level
 `leanOptions` that turn lints off just to get a clean build. Treat linter failures as real
 problems and fix the underlying declaration, proof, naming, or formatting issue instead.
 
-### 19. After adding new `.lean` files, run `./scripts/update-lib.sh`
+### 20. After adding new `.lean` files, run `./scripts/update-lib.sh`
 
 This regenerates root import files (`VCVio.lean`, `Examples.lean`, `ToMathlib.lean`). CI checks they're up to date.
 
-### 20. Lean toolchain and Mathlib version must stay in sync
+### 21. Lean toolchain and Mathlib version must stay in sync
 
 Both currently `v4.28.0`. When upgrading, update both `lean-toolchain` and `lakefile.lean`'s `require mathlib` line simultaneously.
 
-### 21. Use public references in shared docs
+### 22. Use public references in shared docs
 
 When a proof framework follows an external paper, cite the public paper by title, venue,
 or URL rather than pointing agents at a repo-local file path.
 
-### 22. Public reference papers are authoritative for design work
+### 23. Public reference papers are authoritative for design work
 
 For relational program logic, start with
 *A Quantitative Probabilistic Relational Hoare Logic* ([ERHL25](../../REFERENCES.md#erhl25)).
 
-### 23. Agent guidance files must be committed
+### 24. Agent guidance files must be committed
 
 Agents dispatched to `git worktree` clones need to read `AGENTS.md`, `docs/agents/`, and any other guidance files. Ensure these are committed so all worktrees see them.
