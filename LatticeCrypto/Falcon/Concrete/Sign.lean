@@ -73,27 +73,18 @@ def sbytelenForLogn? (logn : Nat) : Option Nat :=
   | 10 => some 1239
   | _  => none
 
-/-! ## PRNG helpers -/
+/-! ## Retry randomness helpers -/
 
-/-- Generate `len` random bytes from the PRNG state. -/
-def prngNextBytes (s : PRNGState) (len : Nat) : ByteArray × PRNGState := Id.run do
-  let mut st := s
-  let mut bytes := ByteArray.empty
-  for _ in [0:len] do
-    let (b, s') := st.nextByte
-    bytes := bytes.push b
-    st := s'
-  return (bytes, st)
+@[inline] private def signLoopCounterBytes (counter : UInt32) : ByteArray :=
+  ByteArray.mk #[
+    counter.toUInt8,
+    (counter >>> 8).toUInt8,
+    (counter >>> 16).toUInt8,
+    (counter >>> 24).toUInt8
+  ]
 
-/-- Generate a 40-byte salt (nonce) from the PRNG state. -/
-def prngNextSalt (s : PRNGState) : Bytes 40 × PRNGState := Id.run do
-  let mut st := s
-  let mut bytes : Array UInt8 := Array.mkEmpty 40
-  for _ in [0:40] do
-    let (b, s') := st.nextByte
-    bytes := bytes.push b
-    st := s'
-  return (Vector.ofFn fun ⟨i, _⟩ => bytes.getD i 0, st)
+@[inline] private def signLoopRandomBytes (seed : ByteArray) (counter : UInt32) : ByteArray :=
+  FFI.Hashing.shake256 (seed ++ signLoopCounterBytes counter) 96
 
 /-! ## Type conversions -/
 
@@ -237,9 +228,11 @@ def signAttempt (logn : Nat) (f g capF capG : Array Int32)
 /-! ### Full signing function -/
 
 private partial def concreteSignLoop (logn n dlen : Nat) (f g capF capG : Array Int32)
-    (pk : ByteArray) (msg : List Byte) (masterPRNG : PRNGState) : Option ByteArray := Id.run do
-  let (salt, prng1) := prngNextSalt masterPRNG
-  let (subSeedBA, prng2) := prngNextBytes prng1 56
+    (pk : ByteArray) (msg : List Byte) (seed : ByteArray) (counter : UInt32) :
+    Option ByteArray := Id.run do
+  let rndbuf := signLoopRandomBytes seed counter
+  let salt : Bytes 40 := Vector.ofFn fun i => rndbuf[i.1]!
+  let subSeedBA := rndbuf.extract 40 96
   let samplerPRNG := PRNGState.init subSeedBA
   let hm := hashToPoint n salt pk msg
   let hmArr := rqToUInt16Array hm
@@ -248,12 +241,13 @@ private partial def concreteSignLoop (logn n dlen : Nat) (f g capF capG : Array 
     let s2Poly : IntPoly n := Vector.ofFn fun ⟨i, _⟩ => s2.getD i 0
     if let some compSig := compress n s2Poly dlen then
       return some (sigEncode salt compSig logn)
-  return concreteSignLoop logn n dlen f g capF capG pk msg prng2
+  return concreteSignLoop logn n dlen f g capF capG pk msg seed (counter + 1)
 
 /-- Full Falcon signing. On each iteration: generate a fresh salt and sampler seed, hash
 the message to a polynomial in `R_q`, attempt signing, and compress/encode on success.
 The reference C loop retries until success; this Lean port now matches that behavior
-with a `partial` recursive loop instead of an arbitrary retry cap.
+with a `partial` recursive loop and per-attempt randomness derived from
+`SHAKE256(seed || counter_le32)`.
 
 Takes the secret key polynomials as `Array Int32`; use `int8ArrayToInt32` to convert from
 `Array Int8`. Returns the encoded signature: `header(1) ‖ salt(40) ‖ compressed_s₂`. -/
@@ -262,7 +256,7 @@ def concreteSign (logn : Nat) (f g capF capG : Array Int32)
   let n := 1 <<< logn
   let some dlen := sbytelenForLogn? logn
     | return none
-  return concreteSignLoop (F := F) logn n dlen f g capF capG pk msg (PRNGState.init seed)
+  return concreteSignLoop (F := F) logn n dlen f g capF capG pk msg seed 0
 
 end Generic
 
