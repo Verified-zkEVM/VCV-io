@@ -724,16 +724,17 @@ theorem le_probOutput_forkReplay
           forkReplay main qb i cf] := by
   sorry
 
+omit [spec.DecidableEq] [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec] in
 /-- The replay-fork precondition is itself bounded by `1`. This mirrors
-`fork_precondition_le_one`. -/
+`fork_precondition_le_one`; the statement is independent of the fork mechanism. -/
 theorem forkReplay_precondition_le_one
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
     (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
      let h : ℝ≥0∞ := Fintype.card (spec.Range i)
      let q := qb i + 1
-     acc * (acc / q - h⁻¹)) ≤ 1 := by
-  sorry
+     acc * (acc / q - h⁻¹)) ≤ 1 :=
+  fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
 
 /-- Replay fork failure probability bound. This mirrors `probOutput_none_fork_le`. -/
 theorem probOutput_none_forkReplay_le
@@ -746,8 +747,9 @@ theorem probOutput_none_forkReplay_le
   sorry
 
 /-- Packaged replay forking theorem. This is the replay analogue of
-`le_probEvent_isSome_fork`, and it is the main quantitative theorem still needed by
-`FiatShamir.euf_nma_bound`. -/
+`le_probEvent_isSome_fork`, derived from `probOutput_none_forkReplay_le` and
+`forkReplay_precondition_le_one` by the same `1 - ·` conversion used in
+`le_probEvent_isSome_fork`. -/
 theorem le_probEvent_isSome_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
@@ -756,7 +758,27 @@ theorem le_probEvent_isSome_forkReplay
      let q := qb i + 1
      acc * (acc / q - h⁻¹)) ≤
       Pr[ fun r : Option (α × α) => r.isSome | forkReplay main qb i cf] := by
-  sorry
+  rw [probEvent_isSome_eq_one_sub_probOutput_none (mx := forkReplay main qb i cf)]
+  have hpre_le_one :=
+    forkReplay_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
+  have hpre_ne_top :
+      (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+       let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+       let q := qb i + 1
+       acc * (acc / q - h⁻¹)) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top hpre_le_one
+  have hnone_ne_top : Pr[= none | forkReplay main qb i cf] ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top probOutput_le_one
+  have hfork :
+      Pr[= none | forkReplay main qb i cf] +
+          (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]
+           let h : ℝ≥0∞ := Fintype.card (spec.Range i)
+           let q := qb i + 1
+           acc * (acc / q - h⁻¹)) ≤ 1 :=
+    (ENNReal.le_sub_iff_add_le_right hpre_ne_top hpre_le_one).1
+      (probOutput_none_forkReplay_le (main := main) (qb := qb) (i := i) (cf := cf))
+  exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
+    (by simpa [add_comm] using hfork)
 
 /-- Structural success facts for `forkReplay`: both outputs come from logged runs of `main`,
 share the same selected fork index, differ at the selected distinguished-oracle answer, and the

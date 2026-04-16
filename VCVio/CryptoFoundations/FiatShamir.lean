@@ -1225,7 +1225,7 @@ theorem euf_nma_bound
       (managedRoNmaForkAdvantage σ hr M nmaAdv qH *
           (managedRoNmaForkAdvantage σ hr M nmaAdv qH / (qH + 1 : ENNReal) -
             challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   classical
   let chalSpec : OracleSpec Unit := Unit →ₒ Chal
   -- Replay `nmaAdv` into a single-counted challenge oracle and record the rewindable trace.
@@ -1323,7 +1323,7 @@ theorem euf_cma_bound
       let eps := adv.advantage (runtime M) -
         ENNReal.ofReal (qS * ζ_zk + ζ_col)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
