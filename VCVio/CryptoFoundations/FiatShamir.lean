@@ -352,6 +352,142 @@ def nmaHashQueryBound {α : Type}
       | .inl _ => b
       | .inr _ => b - 1)
 
+@[simp]
+lemma nmaHashQueryBound_query_bind_iff {α : Type}
+    (t : (unifSpec + (M × Commit →ₒ Chal)).Domain)
+    (oa : (unifSpec + (M × Commit →ₒ Chal)).Range t →
+      OracleComp (unifSpec + (M × Commit →ₒ Chal)) α)
+    (Q : ℕ) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := liftM (query (spec := unifSpec + (M × Commit →ₒ Chal)) t) >>= oa) Q ↔
+      (match t with
+      | .inl _ => True
+      | .inr _ => 0 < Q) ∧
+      ∀ u,
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := oa u) (match t with
+            | .inl _ => Q
+            | .inr _ => Q - 1) := by
+  cases t with
+  | inl n =>
+      simpa [nmaHashQueryBound] using
+        (OracleComp.isQueryBound_query_bind_iff
+          (spec := unifSpec + (M × Commit →ₒ Chal))
+          (α := α) (t := Sum.inl n) (mx := oa) (b := Q)
+          (canQuery := fun t b => match t with
+            | .inl _ => True
+            | .inr _ => 0 < b)
+          (cost := fun t b => match t with
+            | .inl _ => b
+            | .inr _ => b - 1))
+  | inr mc =>
+      simpa [nmaHashQueryBound] using
+        (OracleComp.isQueryBound_query_bind_iff
+          (spec := unifSpec + (M × Commit →ₒ Chal))
+          (α := α) (t := Sum.inr mc) (mx := oa) (b := Q)
+          (canQuery := fun t b => match t with
+            | .inl _ => True
+            | .inr _ => 0 < b)
+          (cost := fun t b => match t with
+            | .inl _ => b
+            | .inr _ => b - 1))
+
+@[simp]
+lemma nmaHashQueryBound_query_iff
+    (t : (unifSpec + (M × Commit →ₒ Chal)).Domain) (Q : ℕ) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := liftM (query (spec := unifSpec + (M × Commit →ₒ Chal)) t)) Q ↔
+      match t with
+      | .inl _ => True
+      | .inr _ => 0 < Q := by
+  cases t with
+  | inl n =>
+      simpa [nmaHashQueryBound] using
+        (OracleComp.isQueryBound_query_iff
+          (spec := unifSpec + (M × Commit →ₒ Chal))
+          (t := Sum.inl n) (b := Q)
+          (canQuery := fun t b => match t with
+            | .inl _ => True
+            | .inr _ => 0 < b)
+          (cost := fun t b => match t with
+            | .inl _ => b
+            | .inr _ => b - 1))
+  | inr mc =>
+      simpa [nmaHashQueryBound] using
+        (OracleComp.isQueryBound_query_iff
+          (spec := unifSpec + (M × Commit →ₒ Chal))
+          (t := Sum.inr mc) (b := Q)
+          (canQuery := fun t b => match t with
+            | .inl _ => True
+            | .inr _ => 0 < b)
+          (cost := fun t b => match t with
+            | .inl _ => b
+            | .inr _ => b - 1))
+
+lemma nmaHashQueryBound_mono {α : Type}
+    {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
+    (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
+    (hQ : Q₁ ≤ Q₂) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ := by
+  induction oa using OracleComp.inductionOn generalizing Q₁ Q₂ with
+  | pure _ =>
+      trivial
+  | query_bind t mx ih =>
+      rw [nmaHashQueryBound_query_bind_iff] at h ⊢
+      cases t with
+      | inl n =>
+          exact ⟨trivial, fun u => ih u (h.2 u) hQ⟩
+      | inr mc =>
+          exact ⟨Nat.lt_of_lt_of_le h.1 hQ, fun u => ih u (h.2 u) (Nat.sub_le_sub_right hQ 1)⟩
+
+lemma nmaHashQueryBound_bind {α β : Type}
+    {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
+    {ob : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β}
+    {Q₁ Q₂ : ℕ}
+    (h1 : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
+    (h2 : ∀ x,
+      nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := ob x) Q₂) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := oa >>= ob) (Q₁ + Q₂) := by
+  induction oa using OracleComp.inductionOn generalizing Q₁ with
+  | pure x =>
+      simpa [pure_bind] using
+        (nmaHashQueryBound_mono (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := ob x) (Q₁ := Q₂) (Q₂ := Q₁ + Q₂) (h := h2 x) (hQ := by omega))
+  | query_bind t mx ih =>
+      rw [nmaHashQueryBound_query_bind_iff] at h1
+      rw [bind_assoc, nmaHashQueryBound_query_bind_iff]
+      cases t with
+      | inl n =>
+          refine ⟨trivial, fun u => ?_⟩
+          simpa using ih u (h1.2 u)
+      | inr mc =>
+          refine ⟨Nat.add_pos_left h1.1 _, fun u => ?_⟩
+          have h3 := ih u (h1.2 u)
+          have hEq : (Q₁ - 1) + Q₂ = Q₁ + Q₂ - 1 := by omega
+          simpa [hEq] using h3
+
+lemma nmaHashQueryBound_liftComp_zero {α : Type}
+    (oa : ProbComp α) :
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      trivial
+  | query_bind t mx ih =>
+      rw [OracleComp.liftComp_bind]
+      refine nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+        (oa := OracleComp.liftComp
+          (liftM (query (spec := unifSpec) t) : OracleComp unifSpec _)
+          (unifSpec + (M × Commit →ₒ Chal)))
+        (ob := fun u => OracleComp.liftComp (mx u) (unifSpec + (M × Commit →ₒ Chal)))
+        (Q₁ := 0) (Q₂ := 0) ?_ ?_
+      · simpa using
+          (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+            (.inl t) 0).2 trivial
+      · intro u
+        exact ih u
+
 /-- Reciprocal of the finite challenge-space size. -/
 noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=
   (Fintype.card challenge : ENNReal)⁻¹
@@ -502,12 +638,193 @@ theorem perfectlyCorrect [SampleableType Chal]
             pure (σ.verify pk c r s))
           (post := fun y => if y = true then 1 else 0))
 
+/-- Trace used by the Fiat-Shamir forking reduction for managed-RO NMA adversaries. -/
+structure ManagedRoNmaForkTrace where
+  forgery : M × (Commit × Resp)
+  advCache : (unifSpec + (M × Commit →ₒ Chal)).QueryCache
+  roCache : (M × Commit →ₒ Chal).QueryCache
+  queryLog : List (M × Commit)
+  verified : Bool
+
+/-- The hash point corresponding to the final forgery recorded in a fork trace. -/
+def ManagedRoNmaForkTrace.target
+    (trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
+    M × Commit :=
+  (trace.forgery.1, trace.forgery.2.1)
+
+/-- Rewinding point extracted from a managed-RO fork trace. The fork is usable exactly when
+the final forgery verifies and its hash point appears in the live query log. -/
+def managedRoNmaForkPoint
+    [DecidableEq M] [DecidableEq Commit]
+    (qH : ℕ)
+    (trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :
+    Option (Fin (qH + 1)) := by
+  if hverified : trace.verified then
+    let target := trace.target
+    if hmem : target ∈ trace.queryLog then
+      let idx := trace.queryLog.findIdx (· == target)
+      if hidx : idx < qH + 1 then
+        exact some ⟨idx, hidx⟩
+      else
+        exact none
+    else
+      exact none
+  else
+    exact none
+
+lemma managedRoNmaForkPoint_some_imp_verified
+    [DecidableEq M] [DecidableEq Commit]
+    {qH : ℕ}
+    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {s : Fin (qH + 1)}
+    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      qH trace = some s) :
+    trace.verified = true := by
+  unfold managedRoNmaForkPoint at hs
+  by_cases hverified : trace.verified
+  · exact hverified
+  · simp [hverified] at hs
+
+lemma managedRoNmaForkPoint_some_imp_mem
+    [DecidableEq M] [DecidableEq Commit]
+    {qH : ℕ}
+    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {s : Fin (qH + 1)}
+    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      qH trace = some s) :
+    trace.target ∈ trace.queryLog := by
+  unfold managedRoNmaForkPoint at hs
+  by_cases hverified : trace.verified
+  · have hs' :
+        trace.target ∈ trace.queryLog ∧
+          ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
+            (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
+              Fin (qH + 1)) = s := by
+        simpa [hverified, ManagedRoNmaForkTrace.target] using hs
+    exact hs'.1
+  · simp [hverified] at hs
+
+lemma managedRoNmaForkPoint_getElem?_eq_some_target
+    [DecidableEq M] [DecidableEq Commit]
+    {qH : ℕ}
+    {trace : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
+    {s : Fin (qH + 1)}
+    (hs : managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      qH trace = some s) :
+    trace.queryLog[↑s]? = some trace.target := by
+  unfold managedRoNmaForkPoint at hs
+  by_cases hverified : trace.verified
+  · have hs' :
+        trace.target ∈ trace.queryLog ∧
+          ∃ h : trace.queryLog.findIdx (· == trace.target) ≤ qH,
+            (⟨trace.queryLog.findIdx (· == trace.target), Nat.lt_succ_of_le h⟩ :
+              Fin (qH + 1)) = s := by
+        simpa [hverified, ManagedRoNmaForkTrace.target] using hs
+    rcases hs' with ⟨hmem, ⟨hidx, hs'⟩⟩
+    have hlt : trace.queryLog.findIdx (· == trace.target) < trace.queryLog.length := by
+      exact List.findIdx_lt_length_of_exists ⟨trace.target, hmem, by simp⟩
+    subst s
+    exact (List.getElem_eq_iff
+      (l := trace.queryLog)
+      (i := trace.queryLog.findIdx (· == trace.target))
+      (x := trace.target)
+      hlt).mp <|
+      by
+        simpa [ManagedRoNmaForkTrace.target] using
+          (List.findIdx_getElem (xs := trace.queryLog) (p := fun x => x == trace.target)
+            (w := hlt))
+  · simp [hverified] at hs
+
+/-- Replay a managed-RO NMA adversary against a single counted challenge oracle, keeping both
+the adversary-returned cache and the live query log that the forking lemma can rewind.
+
+The `verified` flag is computed only from challenge values already present in one of those
+two caches. In particular, this trace does not perform a fresh post-hoc verification query;
+it records exactly the executions whose forgery is already determined by the adversary's
+managed view of the random oracle. -/
+noncomputable def managedRoNmaForkTraceComp
+    [DecidableEq M] [DecidableEq Commit]
+    [SampleableType Chal]
+    (nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (pk : Stmt) :
+    OracleComp (unifSpec + (Unit →ₒ Chal))
+      (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := by
+  let origSpec := unifSpec + (M × Commit →ₒ Chal)
+  let chalSpec : OracleSpec Unit := Unit →ₒ Chal
+  let wrappedSpec := unifSpec + chalSpec
+  let simSt := (M × Commit →ₒ Chal).QueryCache × List (M × Commit)
+  let unifFwd : QueryImpl unifSpec
+      (StateT simSt (OracleComp wrappedSpec)) :=
+    fun n => monadLift
+      (liftM (query (spec := wrappedSpec) (Sum.inl n)) :
+        OracleComp wrappedSpec _)
+  let roImpl : QueryImpl (M × Commit →ₒ Chal)
+      (StateT simSt (OracleComp wrappedSpec)) :=
+    fun mc => do
+      let (cache, log) ← get
+      match cache mc with
+      | some v => pure v
+      | none =>
+          let v : Chal ← monadLift
+            (liftM (query (spec := wrappedSpec) (Sum.inr ())) :
+              OracleComp wrappedSpec Chal)
+          set ((cache.cacheQuery mc v : (M × Commit →ₒ Chal).QueryCache),
+            log ++ [mc])
+          pure v
+  exact do
+    let ((forgery, advCache), st) ←
+      StateT.run (simulateQ (unifFwd + roImpl) (nmaAdv.main pk)) (∅, [])
+    let verified :=
+      match forgery with
+      | (msg, (c, s)) =>
+          match advCache (Sum.inr (msg, c)) with
+          | some ω => σ.verify pk c ω s
+          | none =>
+              match st.1 (msg, c) with
+              | some ω => σ.verify pk c ω s
+              | none => false
+    let (roCache, queryLog) := st
+    pure {
+      forgery := forgery
+      advCache := advCache
+      roCache := roCache
+      queryLog := queryLog
+      verified := verified
+    }
+
+/-- Forkable managed-RO NMA experiment. Success means the final forged transcript verifies and
+the corresponding hash point appears in the live query log, so the forking lemma can rewind it. -/
+noncomputable def managedRoNmaForkExp
+    [DecidableEq M] [DecidableEq Commit]
+    [SampleableType Chal]
+    (nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qH : ℕ) : ProbComp Bool :=
+  let chalSpec : OracleSpec Unit := Unit →ₒ Chal
+  simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+    (uniformSampleImpl (spec := chalSpec))) (do
+      let (pk, _) ←
+        OracleComp.liftComp hr.gen (unifSpec + chalSpec)
+      let trace ← managedRoNmaForkTraceComp σ hr M nmaAdv pk
+      pure (managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+        qH trace).isSome)
+
+/-- The forkable success probability of a managed-RO NMA adversary. -/
+noncomputable def managedRoNmaForkAdvantage
+    [DecidableEq M] [DecidableEq Commit]
+    [SampleableType Chal]
+    (nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qH : ℕ) : ENNReal :=
+  Pr[= true | managedRoNmaForkExp σ hr M nmaAdv qH]
+
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
 random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{managed-NMA}(B) + qS · ζ_zk + ζ_col`
+  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + ζ_col`
 
 The NMA adversary `B` is constructed by:
 - Forwarding `A`'s hash queries to the external oracle (visible to `Fork.fork`)
@@ -536,31 +853,288 @@ theorem euf_cma_to_nma
       (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
         (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
-        nmaAdv.advantage (runtime M) +
+        managedRoNmaForkAdvantage σ hr M nmaAdv qH +
           ENNReal.ofReal (qS * ζ_zk + ζ_col) := by
   let spec := unifSpec + (M × Commit →ₒ Chal)
-  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
-      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
-    let (c, ω, s) ← (monadLift (simTranscript pk) :
-      StateT spec.QueryCache (OracleComp spec) (Commit × Chal × Resp))
-    modify fun cache => cache.cacheQuery (.inr (msg, c)) ω
-    pure (c, s)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  refine ⟨⟨fun pk => (simulateQ (fwd + sigSim pk) (adv.main pk)).run ∅⟩, ?_, ?_⟩
+  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+    fun n => fwd (.inl n)
+  let roSim : QueryImpl (M × Commit →ₒ Chal)
+      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+    let cache ← get
+    match cache (.inr mc) with
+    | some v => pure v
+    | none =>
+        let v ← fwd (.inr mc)
+        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    unifSim + roSim
+  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
+      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
+    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
+    modifyGet fun cache =>
+      match cache (.inr (msg, c)) with
+      | some _ => ((c, s), cache)
+      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
+  refine ⟨⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩, ?_, ?_⟩
   · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
     -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
     -- `sigSim` handles signing queries via `simTranscript` + cache programming,
     -- generating zero hash queries (only uniform queries from `simTranscript`).
     -- Requires a general `IsQueryBound` transfer lemma for `simulateQ` + `StateT.run`.
-    sorry
-  · -- Advantage bound: `adv.advantage ≤ nmaAdv.advantage + qS * ζ_zk + ζ_col`.
-    -- Hybrid argument: replace signing queries one-by-one with the HVZK simulator.
-    -- Each replacement incurs at most `ζ_zk` total-variation distance (from `_hhvzk`).
-    -- The `ζ_col` accounts for collisions where the adversary queries a hash that
-    -- the simulator later programs into the cache.
-    -- Requires unfolding `advantage`, `unforgeableExp`, `managedRoNmaExp`, and
-    -- relating the two experiments via a `qS`-step hybrid argument with `tvDist`.
+    intro pk
+    let stepBudget :
+        (spec + (M →ₒ (Commit × Resp))).Domain → ℕ × ℕ → ℕ := fun t _ =>
+      match t with
+      | .inl (.inl _) => 0
+      | .inl (.inr _) => 1
+      | .inr _ => 0
+    have hbind :
+        ∀ {α β : Type} {oa : OracleComp spec α} {ob : α → OracleComp spec β} {Q₁ Q₂ : ℕ},
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁ →
+          (∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := ob x) Q₂) →
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := oa >>= ob) (Q₁ + Q₂) := by
+      intro α β oa ob Q₁ Q₂ h1 h2
+      exact nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal) h1 h2
+    have hfwd :
+        ∀ (t : spec.Domain) (s : spec.QueryCache),
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := (fwd t).run s) (match t with
+              | .inl _ => 0
+              | .inr _ => 1) := by
+      intro t s
+      cases t with
+      | inl n =>
+          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+            OracleComp.liftM_run_StateT] using
+            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := liftM (query (spec := spec) (.inl n))) 0 by
+                  exact
+                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+                      (.inl n) 0).2 trivial)
+              (fun u =>
+                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := pure (u, s)) 0 by
+                    trivial))
+      | inr mc =>
+          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+            OracleComp.liftM_run_StateT] using
+            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := liftM (query (spec := spec) (.inr mc))) 1 by
+                  exact
+                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+                      (.inr mc) 1).2 (Nat.succ_pos 0))
+              (fun u =>
+                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := pure (u, s)) 0 by
+                    trivial))
+    have hro :
+        ∀ (mc : M × Commit) (s : spec.QueryCache),
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := (roSim mc).run s) 1 := by
+      intro mc s
+      cases hs : s (.inr mc) with
+      | some v =>
+          simp [roSim, hs, nmaHashQueryBound]
+      | none =>
+          simpa [roSim, hs] using
+            ((OracleComp.isQueryBound_map_iff
+                (oa := (fwd (.inr mc)).run s)
+                (f := fun a : Chal × spec.QueryCache =>
+                  (a.1, a.2.cacheQuery (.inr mc) a.1))
+                (b := 1)
+                (canQuery := fun t b => match t with
+                  | .inl _ => True
+                  | .inr _ => 0 < b)
+                (cost := fun t b => match t with
+                  | .inl _ => b
+                  | .inr _ => b - 1)).2
+              (hfwd (.inr mc) s))
+    have hsig :
+        ∀ (msg : M) (s : spec.QueryCache),
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := (sigSim pk msg).run s) 0 := by
+      intro msg s
+      have hsource : OracleComp.IsQueryBound
+          (simTranscript pk) () (fun _ _ => True) (fun _ _ => ()) := by
+        induction simTranscript pk using OracleComp.inductionOn with
+        | pure x =>
+            trivial
+        | query_bind t mx ih =>
+            simp [OracleComp.isQueryBound_query_bind_iff, ih]
+      have htranscript :
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
+        simpa [nmaHashQueryBound] using
+          (OracleComp.IsQueryBound.simulateQ_run_of_step
+            (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
+            (stepBudget := fun _ _ => 0) (impl := unifSim)
+            (hbind := by
+              intro γ δ oa' ob b₁ b₂ h1 h2
+              have h1' :
+                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                    (oa := oa') b₁ := by
+                simpa [nmaHashQueryBound] using h1
+              have h2' : ∀ x,
+                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                    (oa := ob x) b₂ := by
+                intro x
+                simpa [nmaHashQueryBound] using h2 x
+              simpa [nmaHashQueryBound] using
+                (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
+            )
+            (hstep := by
+              intro t b s' ht
+              simpa [unifSim] using hfwd (.inl t) s')
+            (hcombine := by
+              intro t b ht
+              simp)
+            (s := s))
+      simpa [sigSim, nmaHashQueryBound] using
+        ((OracleComp.isQueryBound_map_iff
+            (oa := (simulateQ unifSim (simTranscript pk)).run s)
+            (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
+              match a.2 (.inr (msg, a.1.1)) with
+              | some _ => ((a.1.1, a.1.2.2), a.2)
+              | none =>
+                  ((a.1.1, a.1.2.2),
+                    QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
+            (b := 0)
+            (canQuery := fun t b => match t with
+              | .inl _ => True
+              | .inr _ => 0 < b)
+            (cost := fun t b => match t with
+              | .inl _ => b
+              | .inr _ => b - 1)).2 htranscript)
+    have hstep :
+        ∀ t b s,
+          (match t, b with
+            | .inl (.inl _), _ => True
+            | .inl (.inr _), (_, qH') => 0 < qH'
+            | .inr _, (qS', _) => 0 < qS') →
+          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (oa := ((baseSim + sigSim pk) t).run s) (stepBudget t b) := by
+      intro t b s ht
+      rcases b with ⟨qS', qH'⟩
+      cases t with
+      | inl t =>
+          cases t with
+          | inl n =>
+              simpa [baseSim, stepBudget] using hfwd (.inl n) s
+          | inr mc =>
+              simpa [baseSim, stepBudget] using hro mc s
+      | inr msg =>
+          simpa [stepBudget] using hsig msg s
+    have hcombine :
+        ∀ t b,
+          (match t, b with
+            | .inl (.inl _), _ => True
+            | .inl (.inr _), (_, qH') => 0 < qH'
+            | .inr _, (qS', _) => 0 < qS') →
+          Nat.add (stepBudget t b)
+            (Prod.snd (match t, b with
+              | .inl (.inl _), b' => b'
+              | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+              | .inr _, (qS', qH') => (qS' - 1, qH'))) =
+            Prod.snd b := by
+      intro t b ht
+      rcases b with ⟨qS', qH'⟩
+      cases t with
+      | inl t =>
+          cases t with
+          | inl n =>
+              simp [stepBudget]
+          | inr mc =>
+              simp [stepBudget] at ht ⊢
+              omega
+      | inr msg =>
+          simp [stepBudget]
+    simpa [nmaHashQueryBound, signHashQueryBound] using
+      (OracleComp.IsQueryBound.simulateQ_run_of_step
+        (h := _hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
+        (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
+        (hbind := by
+          intro γ δ oa' ob b₁ b₂ h1 h2
+          have h1' :
+              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := oa') b₁ := by
+            simpa [nmaHashQueryBound] using h1
+          have h2' : ∀ x,
+              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := ob x) b₂ := by
+            intro x
+            simpa [nmaHashQueryBound] using h2 x
+          simpa [nmaHashQueryBound] using
+            (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
+        )
+        (hstep := by
+          intro t b s ht
+          rcases b with ⟨qS', qH'⟩
+          cases t with
+          | inl t =>
+              cases t with
+              | inl n =>
+                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
+              | inr mc =>
+                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
+          | inr msg =>
+              simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
+        (hcombine := by
+          intro t b ht
+          rcases b with ⟨qS', qH'⟩
+          cases t with
+          | inl t =>
+              cases t with
+              | inl n =>
+                  simp [stepBudget]
+              | inr mc =>
+                  simp [stepBudget] at ht ⊢
+                  omega
+          | inr msg =>
+              simp [stepBudget])
+        (s := ∅))
+  · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv) + qS * ζ_zk + ζ_col`.
+    --
+    -- Proof plan:
+    --
+    -- (1) Drop freshness: `!log.wasQueried msg && verified ≤ verified`, so
+    --     `adv.advantage ≤ Pr[verified | CMA signing, real RO verification]`.
+    --     Use `probEvent_mono` or `probOutput_map_le` after unfolding `unforgeableExp`.
+    --
+    -- (2) Intermediate game: define `CMA-no-freshness` that uses the real signing
+    --     oracle but returns only the verification bit. Both the CMA-no-freshness
+    --     and NMA experiments can be expressed as
+    --       `(runtime M).evalDist (keygen >>= fun (pk, sk) => game_X pk sk)`
+    --     where `game_X` runs `adv.main pk` with oracle `impl_X` and then verifies.
+    --
+    -- (3) TV distance decomposition (triangle inequality):
+    --     `tvDist(CMA-no-fresh, NMA) ≤ tvDist(CMA-no-fresh, hybrid) + tvDist(hybrid, NMA)`
+    --     where `hybrid` uses the simulated signing oracle but verifies with the real RO
+    --     (no cache overlay).
+    --
+    --     (3a) CMA-no-fresh → hybrid: signing oracle replacement.
+    --          Each of `qS` signing queries changes from real signing (commit, hash, respond)
+    --          to simulated signing (simTranscript, cache program). Per query, HVZK gives
+    --          `ζ_zk` TV distance. Total: `qS * ζ_zk`.
+    --          Needs `tvDist_bind_left_le` and per-query HVZK bounds.
+    --
+    --     (3b) hybrid → fork-NMA: relate successful fresh forgeries to the forkable
+    --          experiment `managedRoNmaForkExp`. The reduction now serves `A`'s live
+    --          hash queries through the same managed cache it eventually returns, and
+    --          `sigSim` preserves any pre-existing cache entry instead of overwriting it.
+    --          The remaining discrepancy is exactly the late-programming collision event
+    --          absorbed by the slack term `ζ_col`.
+    --
+    -- (4) Conclude:
+    --       `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
+    --          + ENNReal.ofReal (qS * ζ_zk + ζ_col)`.
+    --     Use `abs_probOutput_toReal_sub_le_tvDist` to convert TV distance to ENNReal bound.
     sorry
 
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
@@ -568,14 +1142,21 @@ theorem euf_cma_to_nma
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
 exists a witness-extraction reduction such that:
 
-  `Adv^{managed-NMA}(B) · (Adv^{managed-NMA}(B) / (qH + 1) - 1/|Ω|)
+  `Adv^{fork-NMA}_{qH}(B) · (Adv^{fork-NMA}_{qH}(B) / (qH + 1) - 1/|Ω|)
       ≤ Pr[extraction succeeds]`
 
 Runs `B.main pk` twice with shared randomness up to a randomly chosen fork point, then
 re-samples the oracle answer. Programmed cache entries are part of `B`'s deterministic
-computation given the seed, so they are identical across both fork runs. When the fork
-changes one hash oracle answer, two forgeries with distinct challenges at the same
-commitment are produced, and special soundness extracts a valid witness. -/
+computation given the seed, so they are identical across both fork runs. The reduction
+extracts only from fork outputs whose two forged transcripts share a commitment and whose
+cached challenges are distinct. The remaining proof obligation is to show that successful
+forks satisfy exactly those compatibility checks, after which special soundness applies.
+
+Here `Adv^{fork-NMA}_{qH}(B)` is `managedRoNmaForkAdvantage`: it counts exactly the
+managed-RO executions whose forgery already verifies from challenge values present in the
+adversary's managed cache or in the live hash-query log recorded by
+`managedRoNmaForkTraceComp`. This is the precise success event that the forking lemma can
+rewind. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -587,57 +1168,20 @@ theorem euf_nma_bound
     (_hQ : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := nmaAdv.main pk) qH) :
     ∃ reduction : Stmt → ProbComp Wit,
-      (nmaAdv.advantage (runtime M) *
-          (nmaAdv.advantage (runtime M) / (qH + 1 : ENNReal) -
+      (managedRoNmaForkAdvantage σ hr M nmaAdv qH *
+          (managedRoNmaForkAdvantage σ hr M nmaAdv qH / (qH + 1 : ENNReal) -
             challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp (r := rel) reduction] := by
   classical
-  let origSpec := unifSpec + (M × Commit →ₒ Chal)
-  -- ─── Wrapped oracle spec ───
-  -- Route all (M × Commit →ₒ Chal) queries through a single counted oracle,
-  -- so Fork.fork can target one index with budget qH.
   let chalSpec : OracleSpec Unit := Unit →ₒ Chal
   let wrappedSpec := unifSpec + chalSpec
-  -- Simulation state: RO cache + ordered query log
-  let simSt := (M × Commit →ₒ Chal).QueryCache × List (M × Commit)
-  -- ─── Query implementations ───
-  -- Hash queries: cache lookup, then fresh query to the single challenge oracle
-  let roImpl : QueryImpl (M × Commit →ₒ Chal)
-      (StateT simSt (OracleComp wrappedSpec)) :=
-    fun mc => do
-      let (cache, log) ← get
-      match cache mc with
-      | some v => pure v
-      | none =>
-        let v : Chal ← monadLift
-          (liftM (query (spec := wrappedSpec) (Sum.inr ())) :
-            OracleComp wrappedSpec Chal)
-        set ((cache.cacheQuery mc v : (M × Commit →ₒ Chal).QueryCache),
-          log ++ [mc])
-        pure v
-  -- Uniform queries: forward to the left summand
-  let unifFwd : QueryImpl unifSpec
-      (StateT simSt (OracleComp wrappedSpec)) :=
-    fun n => monadLift
-      (liftM (query (spec := wrappedSpec) (Sum.inl n)) :
-        OracleComp wrappedSpec _)
-  -- ─── Wrapped adversary ───
+  -- Replay `nmaAdv` into a single-counted challenge oracle and record the rewindable trace.
   let wrappedMain : Stmt → OracleComp wrappedSpec
-      (((M × (Commit × Resp)) × origSpec.QueryCache) × simSt) :=
-    fun pk => StateT.run
-      (simulateQ (unifFwd + roImpl) (nmaAdv.main pk)) (∅, [])
-  -- ─── Fork-point selector ───
-  -- Returns the position of the forgery's hash query in the sequential log.
-  -- Returns none when the managed cache programmed the forgery's challenge
-  -- (since the fork cannot change a programmed entry).
-  let cf : ((M × (Commit × Resp)) × origSpec.QueryCache) × simSt →
+      (ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+    managedRoNmaForkTraceComp σ hr M nmaAdv
+  let cf : ManagedRoNmaForkTrace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) →
       Option (Fin (qH + 1)) :=
-    fun ⟨⟨(m, (c, _)), advCache⟩, (_, queryLog)⟩ =>
-      match advCache (Sum.inr (m, c)) with
-      | some _ => none
-      | none =>
-        let idx := queryLog.findIdx (· == (m, c))
-        if h : idx < qH + 1 then some ⟨idx, h⟩ else none
+    managedRoNmaForkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH
   -- ─── Query bound + seed list ───
   -- The budget and seed list for the wrapped spec.
   -- Only the challenge oracle needs seeding (it is the forked index).
@@ -659,12 +1203,18 @@ theorem euf_nma_bound
     match result with
     | none => liftComp ($ᵗ Wit) wrappedSpec
     | some (x₁, x₂) =>
-      let ⟨⟨(m₁, (c₁, s₁)), _⟩, (roCache₁, _)⟩ := x₁
-      let ⟨⟨(m₂, (c₂, s₂)), _⟩, (roCache₂, _)⟩ := x₂
-      match roCache₁ (m₁, c₁), roCache₂ (m₂, c₂) with
-      | some ω₁, some ω₂ =>
-        liftComp (σ.extract ω₁ s₁ ω₂ s₂) wrappedSpec
-      | _, _ => liftComp ($ᵗ Wit) wrappedSpec
+      let ⟨m₁, (c₁, s₁)⟩ := x₁.forgery
+      let ⟨m₂, (c₂, s₂)⟩ := x₂.forgery
+      if hc : c₁ = c₂ then
+        match x₁.roCache (m₁, c₁), x₂.roCache (m₂, c₂) with
+        | some ω₁, some ω₂ =>
+            if hω : ω₁ ≠ ω₂ then
+              liftComp (σ.extract ω₁ s₁ ω₂ s₂) wrappedSpec
+            else
+              liftComp ($ᵗ Wit) wrappedSpec
+        | _, _ => liftComp ($ᵗ Wit) wrappedSpec
+      else
+        liftComp ($ᵗ Wit) wrappedSpec
   -- Phase 2: Convert to ProbComp by simulating the single challenge oracle
   -- with $ᵗ Chal (uniform challenge sampling).
   let reduction : Stmt → ProbComp Wit := fun pk =>
@@ -675,20 +1225,32 @@ theorem euf_nma_bound
   --
   -- Proof outline:
   --
-  -- (a) Relate `nmaAdv.advantage` to `∑ s, Pr[= some s | cf <$> wrappedMain stmt]`.
-  --     The wrapping preserves the output distribution, so the NMA advantage
-  --     (probability of a valid forgery targeting a non-programmed hash query)
-  --     is at most this sum.
+  -- (a) Unfold `managedRoNmaForkAdvantage`: by definition it is the probability
+  --     that `cf <$> wrappedMain pk` returns `some _` after key generation.
+  --     This avoids the earlier mismatch between full managed-RO success and the
+  --     smaller rewindable event that the forking lemma actually controls, without
+  --     issuing any extra post-hoc verification query.
   --
   -- (b) Apply `le_probEvent_isSome_fork` to obtain
-  --     `acc * (acc / (qH + 1) - |Chal|⁻¹) ≤ Pr[isSome | fork ...]`.
+  --     `acc * (acc / (qH + 1) - |Chal|⁻¹) ≤ Pr[isSome | fork ...]`,
+  --     where `acc = managedRoNmaForkAdvantage σ hr M nmaAdv qH`.
+  --     Requires `IsPerIndexQueryBound wrappedMain qb` and `SeedListCovers qb js`.
   --
-  -- (c) Connect fork success to extraction success: when fork returns
-  --     `some (x₁, x₂)`, the collision guard ensures distinct challenges at
-  --     the same commitment, and `_hss` (special soundness) extracts a valid
-  --     witness. This gives `Pr[isSome | fork ...] ≤ Pr[= true | hardRelationExp ...]`.
+  -- (c) Connect fork success to extraction success. The current `forkExtract`
+  --     function only extracts from pairs whose forged commitments agree and
+  --     whose cached challenges are both present and distinct. The key local
+  --     lemma is therefore:
+  --       - `cf_eq_of_mem_support_fork` gives `cf x₁ = cf x₂ = some s`
+  --       - `managedRoNmaForkPoint_getElem?_eq_some_target` identifies the
+  --         selected query-log entry in each trace with that trace's forged
+  --         hash point
+  --       - the remaining fork-support argument shows those selected query-log
+  --         entries coincide across the two runs, so `c₁ = c₂` and `ω₁ ≠ ω₂`
+  --       - `_hss` then turns `σ.extract ω₁ s₁ ω₂ s₂` into a valid witness
+  --     This gives `Pr[isSome | fork ...] ≤ Pr[= true | hardRelationExp ...]`.
   --
-  -- (d) Compose (a)-(c) with monotonicity of `· * (· / q - h⁻¹)`.
+  -- (d) Compose (a)-(c) with monotonicity of `· * (· / q - h⁻¹)`, then integrate
+  --     over keygen to get the global bound.
   sorry
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
@@ -696,7 +1258,7 @@ theorem euf_nma_bound
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
 
 1. Replace the signing oracle with the HVZK simulator, losing `qS · ζ_zk + ζ_col`.
-2. Apply the forking lemma to the resulting managed-RO NMA adversary.
+2. Apply the forking lemma to the resulting forkable managed-RO NMA experiment.
 
 The combined bound is:
 
@@ -729,7 +1291,7 @@ theorem euf_cma_bound
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk + ζ_col) ≤
-      nmaAdv.advantage (runtime M) :=
+      managedRoNmaForkAdvantage σ hr M nmaAdv qH :=
     tsub_le_iff_left.mpr (by rwa [add_comm])
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)
 

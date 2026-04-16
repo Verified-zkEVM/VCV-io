@@ -117,6 +117,46 @@ lemma isQueryBound_congr
     oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ :=
   isQueryBound_congr_aux oa canQuery₁ canQuery₂ cost₁ cost₂ hcan hcost
 
+/-- Transfer a structural query bound through `simulateQ` into a stateful target semantics,
+provided each simulated source query has a target-side step bound and the target-side bind
+rule composes those step budgets with the recursive continuation budget. -/
+theorem IsQueryBound.simulateQ_run_of_step
+    {ι' : Type u} {spec' : OracleSpec ι'} {σ : Type u} {B' : Type*}
+    {canQuery : ι → B → Prop} {cost : ι → B → B}
+    {canQuery' : ι' → B' → Prop} {cost' : ι' → B' → B'}
+    {combine : B' → B' → B'} {mapBudget : B → B'} {stepBudget : ι → B → B'}
+    {impl : QueryImpl spec (StateT σ (OracleComp spec'))}
+    {oa : OracleComp spec α} {budget : B}
+    (h : IsQueryBound oa budget canQuery cost)
+    (hbind : ∀ {γ δ : Type u} {oa' : OracleComp spec' γ} {ob : γ → OracleComp spec' δ}
+        {b₁ b₂ : B'},
+      IsQueryBound oa' b₁ canQuery' cost' →
+      (∀ x, IsQueryBound (ob x) b₂ canQuery' cost') →
+      IsQueryBound (oa' >>= ob) (combine b₁ b₂) canQuery' cost')
+    (hstep : ∀ t b s, canQuery t b →
+      IsQueryBound ((impl t).run s) (stepBudget t b) canQuery' cost')
+    (hcombine : ∀ t b, canQuery t b →
+      combine (stepBudget t b) (mapBudget (cost t b)) = mapBudget b)
+    (s : σ) :
+    IsQueryBound ((simulateQ impl oa).run s) (mapBudget budget) canQuery' cost' := by
+  induction oa using OracleComp.inductionOn generalizing budget s with
+  | pure x =>
+      simp [simulateQ_pure]
+  | query_bind t mx ih =>
+      rw [isQueryBound_query_bind_iff] at h
+      rw [simulateQ_query_bind, StateT.run_bind]
+      have hstep' :
+          IsQueryBound
+            ((liftM (impl t) : StateT σ (OracleComp spec') (spec.Range t)).run s)
+            (stepBudget t budget) canQuery' cost' := by
+        simpa [OracleComp.liftM_run_StateT, MonadLift.monadLift] using
+          hstep t budget s h.1
+      have hrest : ∀ p : spec.Range t × σ,
+          IsQueryBound ((simulateQ impl (mx p.1)).run p.2)
+            (mapBudget (cost t budget)) canQuery' cost' :=
+        fun p => ih p.1 (h.2 p.1) p.2
+      simpa [hcombine t budget h.1] using hbind hstep' hrest
+
 end IsQueryBound
 
 section IsPerIndexQueryBound
