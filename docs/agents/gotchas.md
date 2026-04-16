@@ -103,20 +103,21 @@ Pattern: `| pure x => ... | query_bind t oa ih => ...`. Use `simulateQ_bind`, `s
 When refactoring APIs, notations, or proof infrastructure, update all call sites in one
 pass. Do not add deprecated aliases, migration wrappers, or compatibility layers.
 
-### 17. Module organization: prefer direct imports, allow top-level umbrellas per significant module
+### 17. Module organization: no thin re-export umbrellas except at the repository top level
 
-When splitting a file into a folder of submodules, do **not** reflexively add a top-level
-`X.lean` whose only content is a chain of `import X.A; import X.B`. Each caller should
-import the specific submodule it actually uses.
+When splitting a file into a folder of submodules, do **not** add a sibling `X.lean`
+whose only content is a chain of `import X.A; import X.B`. Each caller imports the
+specific submodule it actually uses.
 
-**Allowed**: top-level import files for each significant module (for example
-`VCVio/CryptoFoundations/FiatShamir.lean`, `ToMathlib.lean`, `Examples.lean`,
-`VCVio.lean`). These are legitimate entry points when a module forms a cohesive API that
-callers consume as a unit, and for the auto-generated root import file checked by CI.
+**Allowed umbrellas** (strictly top-level roots only):
+`VCVio.lean`, `ToMathlib.lean`, `Examples.lean`, `LatticeCrypto.lean`,
+`LatticeCryptoTest.lean`. These are the auto-generated root imports maintained by
+`./scripts/update-lib.sh` and used by CI.
 
-**Not allowed**: thin re-export files inside a submodule folder that exist solely to
-re-export siblings for code organization. If callers only need a specific submodule, they
-should import it directly.
+**Not allowed**: umbrellas inside a subdirectory (e.g. a top-level
+`VCVio/CryptoFoundations/FiatShamir.lean` beside the `FiatShamir/` folder, or
+`VCVio/OracleComp.lean` beside the `OracleComp/` folder). Even if a module "feels
+cohesive", callers must import the specific submodule they use.
 
 ## Build and Tooling
 

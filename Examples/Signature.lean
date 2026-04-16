@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import Examples.Schnorr
 import Examples.SchnorrExtractorRuntime
-import VCVio.CryptoFoundations.FiatShamir
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
 
 /-!

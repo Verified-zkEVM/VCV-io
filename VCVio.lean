@@ -9,7 +9,6 @@ import VCVio.CryptoFoundations.Asymptotics.ReductionCost
 import VCVio.CryptoFoundations.Asymptotics.Security
 import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.DataEncapMech
-import VCVio.CryptoFoundations.FiatShamir
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
