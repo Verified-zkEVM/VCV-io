@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.HasQuery
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import Mathlib.Data.Vector.Snoc

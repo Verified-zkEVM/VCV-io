@@ -9,7 +9,7 @@ import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.Fork
 import VCVio.OracleComp.HasQuery
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -375,45 +375,10 @@ theorem perfectlyCorrect [SampleableType Chal]
   intro msg
   let ro : QueryImpl (M × Commit →ₒ Chal)
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
-  let idImpl := (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
-    (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
-  have hleft :
-      ∀ {α : Type} (oa : ProbComp α),
-        simulateQ (idImpl + ro) (OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) =
-          simulateQ idImpl oa := by
-    intro α oa
-    simpa using
-      (QueryImpl.simulateQ_add_liftComp_left (impl₁' := idImpl) (impl₂' := ro) oa)
-  have hrun :
-      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ idImpl oa).run s = (fun x => (x, s)) <$> oa := by
-    intro α oa
-    induction oa using OracleComp.inductionOn with
-    | pure x =>
-        intro s
-        simp
-    | query_bind t oa ih =>
-        intro s
-        change
-          (do
-            let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
-            (simulateQ idImpl (oa a)).run s) =
-            (do
-              let a ← liftM (query t)
-              (fun x => (x, s)) <$> oa a)
-        have hfun :
-            (fun a => (simulateQ idImpl (oa a)).run s) =
-              (fun a => (fun x => (x, s)) <$> oa a) := by
-          funext a
-          exact ih a s
-        simp [hfun]
-  have hrunLift :
-      ∀ {α : Type} (oa : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ (idImpl + ro) (liftM oa)).run s = (fun x => (x, s)) <$> oa := by
-    intro α oa s
-    rw [show simulateQ (idImpl + ro) (liftM oa) = simulateQ idImpl oa by
-      simpa using hleft oa]
-    simpa using hrun oa s
+  let impl := unifFwdImpl (M × Commit →ₒ Chal) + ro
+  have hSimQuery : ∀ (q : M × Commit),
+      simulateQ impl (HasQuery.query q) = ro q :=
+    roSim.simulateQ_HasQuery_query ro
   change
     Pr[= true | (runtime M).evalDist (do
       let (pk, sk) ←
@@ -439,7 +404,7 @@ theorem perfectlyCorrect [SampleableType Chal]
           let r ← $ᵗ Chal
           let s ← σ.respond pk sk e r
           pure (σ.verify pk c r s)) by
-    change evalDist (StateT.run' (simulateQ (idImpl + ro) (do
+    change evalDist (StateT.run' (simulateQ impl (do
         let (pk, sk) ←
           (FiatShamir
             (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).keygen
@@ -450,32 +415,13 @@ theorem perfectlyCorrect [SampleableType Chal]
           (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
             pk msg sig)) ∅) = _
     dsimp only [FiatShamir]
-    have hquery :
-        ∀ q : M × Commit,
-          HasQuery.query
-              (spec := (M × Commit →ₒ Chal))
-              (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) q =
-            (query (spec := unifSpec + (M × Commit →ₒ Chal)) (Sum.inr q) :
-              OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal) := by
-      intro q
-      exact congrArg
-        (fun z => (liftM z : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal))
-        (OracleQuery.liftM_add_right_query
-          (spec₁ := unifSpec) (spec₂ := (M × Commit →ₒ Chal)) q)
-    have hSimQuery : ∀ (q : M × Commit),
-        simulateQ (idImpl + ro) (HasQuery.query q) = ro q := by
-      intro q; rw [hquery]; simp [simulateQ_query]
     simp only [simulateQ_bind, simulateQ_pure, hSimQuery]
     have hpeel : ∀ {α β : Type} (oa : ProbComp α)
         (rest : α → StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp β)
         (s : (M × Commit →ₒ Chal).QueryCache),
-        (simulateQ (idImpl + ro) (liftM oa) >>= rest).run' s =
-          oa >>= fun x => (rest x).run' s := by
-      intro α β oa rest s
-      change Prod.fst <$> ((simulateQ (idImpl + ro) (liftM oa) >>= rest).run s) =
-        oa >>= fun x => Prod.fst <$> (rest x).run s
-      rw [StateT.run_bind, hrunLift]
-      simp [map_bind]
+        (simulateQ impl (liftM oa) >>= rest).run' s =
+          oa >>= fun x => (rest x).run' s :=
+      fun oa rest s => roSim.run'_liftM_bind ro oa rest s
     simp_rw [hpeel]
     have hlift : ∀ {α : Type} (x : ProbComp α) (s : (M × Commit →ₒ Chal).QueryCache),
         (liftM x : StateT _ ProbComp α).run s = x >>= fun a => pure (a, s) := by

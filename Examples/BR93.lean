@@ -9,7 +9,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.OneWay
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append
 
 /-!

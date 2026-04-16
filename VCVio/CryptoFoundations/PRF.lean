@@ -8,7 +8,7 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.SubSpec
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append
 
 /-!

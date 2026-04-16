@@ -8,7 +8,7 @@ import VCVio.CryptoFoundations.SecExp
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.Constructions.SampleableType
-import VCVio.OracleComp.QueryTracking.RandomOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.Coercions.Add
 import Mathlib.LinearAlgebra.Matrix.DotProduct
