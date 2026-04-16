@@ -138,16 +138,12 @@ structure BoundedROMCRAdversary (X Y : Type) (t : ℕ) where
   /-- The adversary makes at most `t` total queries. -/
   queryBound : IsTotalQueryBound run t
 
-section ROMCR
-
-variable {X Y : Type}
-  [DecidableEq X] [DecidableEq Y] [Fintype Y] [Inhabited X] [Inhabited Y]
-
 /-- ROM collision-resistance experiment: run the adversary inside
 `cachingOracle` from the empty cache, then query the random oracle on both
 candidate inputs (verification queries share the cache). Win iff the inputs
 are distinct and the queried outputs coincide. -/
-def romCRExp {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
+def romCRExp [DecidableEq X] [DecidableEq Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     OracleComp (ROMHashSpec X Y) (Bool × QueryCache (ROMHashSpec X Y)) :=
   (simulateQ cachingOracle (do
     let (x, x') ← A.run
@@ -157,25 +153,28 @@ def romCRExp {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
 
 /-- ROM collision-resistance advantage: probability that the adversary
 produces a valid collision under the random oracle. -/
-noncomputable def romCRAdvantage {t : ℕ} (A : BoundedROMCRAdversary X Y t) : ℝ≥0∞ :=
+noncomputable def romCRAdvantage [DecidableEq X] [DecidableEq Y]
+    [Fintype Y] [Inhabited Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) : ℝ≥0∞ :=
   Pr[fun z => z.1 = true | romCRExp A]
 
 /-- The inner oracle computation of `romCRExp`, before `simulateQ`. -/
-private def romCRInner {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
+private def romCRInner [DecidableEq X] [DecidableEq Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     OracleComp (ROMHashSpec X Y) Bool := do
   let (x, x') ← A.run
   let y ← query (spec := ROMHashSpec X Y) x
   let y' ← query (spec := ROMHashSpec X Y) x'
   return decide (x ≠ x' ∧ y = y')
 
-omit [Fintype Y] [Inhabited X] [Inhabited Y] in
-private lemma romCRExp_eq {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
+private lemma romCRExp_eq [DecidableEq X] [DecidableEq Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     romCRExp A = (simulateQ cachingOracle (romCRInner A)).run ∅ := rfl
 
-omit [Fintype Y] [Inhabited X] [Inhabited Y] in
 /-- The total query bound on `romCRInner` is `t + 2` — `t` from the adversary
 plus the two verification queries. -/
-private lemma romCRInner_totalBound {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
+private lemma romCRInner_totalBound [DecidableEq X] [DecidableEq Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     IsTotalQueryBound (romCRInner A) (t + 2) := by
   apply isTotalQueryBound_bind A.queryBound
   intro ⟨_x, _x'⟩
@@ -185,11 +184,11 @@ private lemma romCRInner_totalBound {t : ℕ} (A : BoundedROMCRAdversary X Y t) 
   rw [isTotalQueryBound_query_bind_iff]
   exact ⟨Nat.one_pos, fun _ => trivial⟩
 
-omit [Fintype Y] [Inhabited X] [Inhabited Y] in
 /-- A win in the ROM-CR experiment implies a collision in the final cache:
 the verification queries cache `x ↦ y` and `x' ↦ y'` with `x ≠ x'` and
 `y = y'`, which is exactly `CacheHasCollision`. -/
-private lemma romCRWin_implies_collision {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
+private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y]
+    {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     ∀ z ∈ support ((simulateQ cachingOracle (romCRInner A)).run ∅),
       z.1 = true → CacheHasCollision z.2 := by
   intro z hz hwin
@@ -228,7 +227,8 @@ private lemma romCRWin_implies_collision {t : ℕ} (A : BoundedROMCRAdversary X 
 adversary `A` over a hash range of cardinality `|Y| > 0`, the advantage is
 bounded by `(t+2) * (t+1) / (2 * |Y|)`. The two extra queries account for the
 experiment's verification queries, which share the adversary's cache. -/
-theorem romCRAdvantage_le_birthday {t : ℕ}
+theorem romCRAdvantage_le_birthday [DecidableEq X] [DecidableEq Y]
+    [Fintype Y] [Inhabited X] [Inhabited Y] {t : ℕ}
     (hY : 0 < Fintype.card Y)
     (A : BoundedROMCRAdversary X Y t) :
     romCRAdvantage A ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card Y) := by
@@ -245,7 +245,5 @@ theorem romCRAdvantage_le_birthday {t : ℕ}
         probEvent_cacheCollision_le_birthday_total_tight
           (spec := ROMHashSpec X Y) (romCRInner A) (t + 2)
           (romCRInner_totalBound A) hY hrange
-
-end ROMCR
 
 end CollisionResistance
