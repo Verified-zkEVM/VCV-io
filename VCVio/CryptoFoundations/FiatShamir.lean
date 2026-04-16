@@ -548,8 +548,20 @@ theorem euf_cma_to_nma
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
   refine ⟨⟨fun pk => (simulateQ (fwd + sigSim pk) (adv.main pk)).run ∅⟩, ?_, ?_⟩
-  · sorry
-  · sorry
+  · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
+    -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
+    -- `sigSim` handles signing queries via `simTranscript` + cache programming,
+    -- generating zero hash queries (only uniform queries from `simTranscript`).
+    -- Requires a general `IsQueryBound` transfer lemma for `simulateQ` + `StateT.run`.
+    sorry
+  · -- Advantage bound: `adv.advantage ≤ nmaAdv.advantage + qS * ζ_zk + ζ_col`.
+    -- Hybrid argument: replace signing queries one-by-one with the HVZK simulator.
+    -- Each replacement incurs at most `ζ_zk` total-variation distance (from `_hhvzk`).
+    -- The `ζ_col` accounts for collisions where the adversary queries a hash that
+    -- the simulator later programs into the cache.
+    -- Requires unfolding `advantage`, `unforgeableExp`, `managedRoNmaExp`, and
+    -- relating the two experiments via a `qS`-step hybrid argument with `tvDist`.
+    sorry
 
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
@@ -628,11 +640,12 @@ theorem euf_nma_bound
         if h : idx < qH + 1 then some ⟨idx, h⟩ else none
   -- ─── Query bound + seed list ───
   -- The budget and seed list for the wrapped spec.
-  -- unifSpec indices get a budget derived from _hQ; the single challenge
-  -- oracle gets qH. Converting the IsQueryBound on origSpec to
-  -- IsPerIndexQueryBound on wrappedSpec requires additional infrastructure.
-  let qb : ℕ ⊕ Unit → ℕ := fun | .inl _ => sorry | .inr () => qH
-  let js : List (ℕ ⊕ Unit) := sorry
+  -- Only the challenge oracle needs seeding (it is the forked index).
+  -- Uniform queries are left unseeded: `seededOracle` falls through to
+  -- fresh sampling, which matches the native `evalDist` semantics.
+  -- The forking lemma bound `le_probEvent_isSome_fork` holds for any `qb`/`js`.
+  let qb : ℕ ⊕ Unit → ℕ := fun | .inl _ => 0 | .inr () => qH
+  let js : List (ℕ ⊕ Unit) := [Sum.inr ()]
   -- Required instances for the wrapped spec
   haveI : ∀ i, SampleableType (wrappedSpec.Range i) := fun i =>
     match i with
@@ -660,24 +673,22 @@ theorem euf_nma_bound
   refine ⟨reduction, ?_⟩
   -- Phase 3: The probability bound.
   --
-  -- The proof connects the success probability of `hardRelationExp reduction`
-  -- to the forking lemma bound `le_probEvent_isSome_fork`:
+  -- Proof outline:
   --
-  --   acc * (acc / q - h⁻¹) ≤ Pr[isSome | fork ...]
+  -- (a) Relate `nmaAdv.advantage` to `∑ s, Pr[= some s | cf <$> wrappedMain stmt]`.
+  --     The wrapping preserves the output distribution, so the NMA advantage
+  --     (probability of a valid forgery targeting a non-programmed hash query)
+  --     is at most this sum.
   --
-  -- where:
-  --   • acc = ∑ s, Pr[= some s | cf <$> wrappedMain stmt]
-  --           relates to `nmaAdv.advantage (runtime M)` via the managed-RO
-  --           NMA experiment (the wrapping preserves the output distribution).
-  --   • q = qH + 1 (total hash query budget plus one).
-  --   • h = Fintype.card Chal (challenge space size).
+  -- (b) Apply `le_probEvent_isSome_fork` to obtain
+  --     `acc * (acc / (qH + 1) - |Chal|⁻¹) ≤ Pr[isSome | fork ...]`.
   --
-  -- When the fork succeeds with `some (x₁, x₂)`:
-  --   • cf x₁ = cf x₂ = some s, so both forgeries use the s-th hash query.
-  --   • The collision guard in `fork` ensures the resampled challenge differs.
-  --   • Both transcripts share the same commitment (identical up to fork point).
-  --   • Special soundness (`_hss`) extracts a valid witness from two accepting
-  --     transcripts with the same commitment and distinct challenges.
+  -- (c) Connect fork success to extraction success: when fork returns
+  --     `some (x₁, x₂)`, the collision guard ensures distinct challenges at
+  --     the same commitment, and `_hss` (special soundness) extracts a valid
+  --     witness. This gives `Pr[isSome | fork ...] ≤ Pr[= true | hardRelationExp ...]`.
+  --
+  -- (d) Compose (a)-(c) with monotonicity of `· * (· / q - h⁻¹)`.
   sorry
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
