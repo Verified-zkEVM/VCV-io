@@ -104,7 +104,7 @@ end
 
 end extractor
 
-omit [DecidableEq F] in
+omit [DecidableEq F] [Fintype F] [Fintype G] in
 /-- Completeness of the Schnorr signature follows from completeness of the
 underlying Schnorr Σ-protocol via the generic Fiat-Shamir completeness theorem. -/
 theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G))
@@ -114,6 +114,7 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
 
+omit [Fintype G] in
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
 
 The bound includes:
@@ -123,7 +124,7 @@ The bound includes:
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the simulation loss vanishes and the
 CMA advantage coincides with the NMA advantage. -/
-theorem signature_euf_cma (g : G) (hg : Function.Bijective (· • g : F → G))
+theorem signature_euf_cma [Finite G] (g : G) (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g hg M))
     (qS qH : ℕ)
@@ -134,6 +135,7 @@ theorem signature_euf_cma (g : G) (hg : Function.Bijective (· • g : F → G))
         ENNReal.ofReal (qS * (0 : ℝ))
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
+  let _ : Fintype G := Fintype.ofFinite G
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (Schnorr.sigma F G g) (dlogGenerable g hg) M
     (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
     (ζ_zk := 0) le_rfl

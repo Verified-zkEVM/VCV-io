@@ -87,6 +87,25 @@ jobs:
           repository: alexanderlhicks/lean-review-workflow
           ref: main
           path: .github/actions/lean-review-workflow
+      - name: Hotfix Gemini client initialization
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path(".github/actions/lean-review-workflow/llm_provider.py")
+          text = path.read_text()
+          buggy = "self.client = genai.Client(api_key=GEMINI_API_KEY)"
+          fixed = "self.client = genai.Client(api_key=api_key)"
+
+          if buggy in text:
+              path.write_text(text.replace(buggy, fixed))
+              print("Patched Gemini client initialization in review action.")
+          elif fixed in text:
+              print("Review action already has the Gemini client fix.")
+          else:
+              print("No Gemini client hotfix applied; upstream action layout changed.")
+          PY
       - name: Copy action requirements
         run: cp .github/actions/lean-review-workflow/requirements.txt ./action-requirements.txt
         shell: bash
