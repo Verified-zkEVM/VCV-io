@@ -116,20 +116,31 @@ theorem maxDiv_self (p : PMF α) : p.maxDiv p = 1 := by
   · obtain ⟨x, hx⟩ := p.support_nonempty
     exact le_iSup_of_le x ((ENNReal.div_self hx (PMF.apply_ne_top p x)).ge)
 
-theorem maxDiv_one_le (p q : PMF α) (hq : ∀ x, p x ≠ 0 → q x ≠ 0) :
+theorem maxDiv_one_le (p q : PMF α) :
     1 ≤ p.maxDiv q := by
-  unfold PMF.maxDiv
-  calc (1 : ℝ≥0∞) = ∑' x, p x := p.tsum_coe.symm
-    _ = ∑' x, (p x / q x) * q x := by
-        congr 1; ext x
-        by_cases hpx : p x = 0
-        · simp [hpx]
-        · rw [ENNReal.div_mul_cancel (hq x hpx) (PMF.apply_ne_top q x)]
-    _ ≤ ∑' x, (⨆ y, p y / q y) * q x :=
-        ENNReal.tsum_le_tsum fun x => by
-          gcongr; exact le_iSup (fun y => p y / q y) x
-    _ = (⨆ y, p y / q y) * ∑' x, q x := ENNReal.tsum_mul_left
-    _ = ⨆ y, p y / q y := by rw [q.tsum_coe, mul_one]
+  by_cases hq : ∀ x, p x ≠ 0 → q x ≠ 0
+  · unfold PMF.maxDiv
+    calc (1 : ℝ≥0∞) = ∑' x, p x := p.tsum_coe.symm
+      _ = ∑' x, (p x / q x) * q x := by
+          congr 1; ext x
+          by_cases hpx : p x = 0
+          · simp [hpx]
+          · rw [ENNReal.div_mul_cancel (hq x hpx) (PMF.apply_ne_top q x)]
+      _ ≤ ∑' x, (⨆ y, p y / q y) * q x :=
+          ENNReal.tsum_le_tsum fun x => by
+            gcongr; exact le_iSup (fun y => p y / q y) x
+      _ = (⨆ y, p y / q y) * ∑' x, q x := ENNReal.tsum_mul_left
+      _ = ⨆ y, p y / q y := by rw [q.tsum_coe, mul_one]
+  · simp only [not_forall] at hq
+    rcases hq with ⟨x, hpx, hqx⟩
+    have hqx0 : q x = 0 := by simpa using hqx
+    calc
+      (1 : ℝ≥0∞) ≤ p x / q x := by
+        rw [hqx0, ENNReal.div_zero hpx]
+        simp
+      _ ≤ p.maxDiv q := by
+        unfold PMF.maxDiv
+        exact le_iSup (fun y => p y / q y) x
 
 /-! ### Data Processing Inequality -/
 

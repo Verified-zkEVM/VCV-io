@@ -21,7 +21,8 @@ This file states the high-level security theorems for the Falcon signature schem
 
 ## EUF-CMA Security
 
-The main security theorem reduces EUF-CMA to the NTRU-SIS problem. The precise
+The main security theorem reduces EUF-CMA to a Falcon-PSF collision problem sampled
+from the same key distribution as the scheme. The precise
 bound follows [FGdG+25] Theorem 1 (first concrete proof for Falcon+), refined by
 [Jia+26] (basis-specific Rényi analysis that eliminates the 7-bit security loss).
 
@@ -134,6 +135,26 @@ noncomputable def ntruSISProblem [SampleableType (Rq p.n)] :
     decide (pairL2NormSq x.1 x.2 ≤ p.betaSquared) &&
     decide (x.1 + negacyclicMul x.2 h = 0)
 
+/-- The direct Falcon PSF collision problem induced by the generic GPV reduction.
+
+The challenger samples a Falcon public key from the same key distribution used by the
+signature scheme, and the adversary must produce two distinct short preimages with the
+same image under the Falcon PSF `(s₁, s₂) ↦ s₁ + s₂ · h`.
+
+This is the immediate hardness target of the collision-style GPV bound before any further
+translation to a kernel-vector NTRU-SIS formulation. -/
+noncomputable def ntruPSFCollisionProblem
+    (hr : GenerableRelation (PublicKey p) (SecretKey p) (validKeyPair p)) :
+    SIS.Problem (PublicKey p) ((Rq p.n × Rq p.n) × (Rq p.n × Rq p.n)) where
+  sampleChallenge := do
+    let (pk, _) ← hr.gen
+    pure pk
+  isValid pk xs :=
+    decide (xs.1 ≠ xs.2) &&
+    decide ((falconPSF p prims).eval pk xs.1 = (falconPSF p prims).eval pk xs.2) &&
+    (falconPSF p prims).isShort xs.1 &&
+    (falconPSF p prims).isShort xs.2
+
 /-! ### Sampler Quality Hypotheses -/
 
 /-- The trapdoor sampler quality hypothesis: the Rényi divergence of order `a > 1`
@@ -216,25 +237,39 @@ def HasUniformSamplerLoss (samplerLoss : ENNReal) : Prop :=
 /-- **EUF-CMA security of Falcon** ([FGdG+25] Theorem 1 + [Jia+26] refined bounds),
 generic in the salt type `Salt`.
 
-For any EUF-CMA adversary `A` making at most `qSign` signing queries against the Falcon+
-signature scheme with salt type `Salt`, and any externally supplied bound `ε_sampler`
-that upper-bounds `SamplerQuality.bound` for every valid Falcon key pair, there exists
-an NTRU-SIS adversary `B` such that:
+For any EUF-CMA adversary `A` making at most `qSign` signing queries and `qHash`
+random-oracle queries against the Falcon+ signature scheme with salt type `Salt`, and
+any externally supplied bound `ε_sampler` that upper-bounds `SamplerQuality.bound` for
+every valid Falcon key pair, there exist:
 
-  `Adv^{EUF-CMA}_{Falcon+}(A) ≤ Adv^{NTRU-SIS}(B) + qSign² / (2 · |Salt|) + ε_sampler`
+- a collision reduction `B_coll` for the distinct-preimage branch,
+- a programmed-preimage replay reduction `B_exact` for the exact-match branch,
+
+such that:
+
+  `Adv^{EUF-CMA}_{Falcon+}(A)`
+  `  ≤ Adv^{collision}_{Falcon-PSF}(B_coll)`
+  `    + (qSign + qHash) · Adv^{exact-match}_{Falcon-PSF}(B_exact)`
+  `    + qSign² / (2 · |Salt|) + ε_sampler`
 
 ### Error terms
 
-**Term 1: `Adv^{NTRU-SIS}(B)`.**
-The GPV reduction is tight: `B` runs `A` internally with a simulated signing oracle
-(sign-then-hash strategy) and extracts a short NTRU preimage from any valid forgery.
-There is no `Q_hash` loss factor.
+**Term 1: `Adv^{collision}_{Falcon-PSF}(B)`.**
+The GPV reduction is tight on the distinct-preimage branch: `B` runs `A` internally with
+a simulated signing oracle (sign-then-hash strategy) and extracts two distinct short
+Falcon preimages for the same programmed random-oracle value. There is no `Q_hash` loss
+factor in this collision-style target.
 
-**Term 2: `qSign² / (2 · |Salt|)`.**
+**Term 2: `(qSign + qHash) · Adv^{exact-match}_{Falcon-PSF}(B_exact)`.**
+The explicit multi-target loss for the exact-match branch. The reduction guesses one of
+the programmed random-oracle entries and tries to show that reproducing the simulator's
+hidden short preimage there is hard.
+
+**Term 3: `qSign² / (2 · |Salt|)`.**
 Salt collision probability, bounded by the birthday paradox. This is a simplified form
 of the `Q_s · (C_s + Q_H) / 2^k` term from [FGdG+25] Theorem 1.
 
-**Term 3: `ε_sampler`.**
+**Term 4: `ε_sampler`.**
 The Rényi divergence-based sampler loss. The full [FGdG+25] bound has the structure
 `r_u^{C_s} · (r_p^{C_s} · Adv^{ISIS})^{...}`, where `r_p` and `r_u` are the per-query
 Rényi divergences for the sampler and RO simulation respectively.
@@ -244,39 +279,45 @@ With exact arithmetic (infinite precision), `r_p = 1` and the sampler loss vanis
 
 ### Proof structure
 
-1. The generic GPV reduction (`GPVHashAndSign.euf_cma_bound`) which reduces EUF-CMA to
-   preimage finding with a birthday collision term.
-2. A further reduction from preimage finding to NTRU-SIS (the PSF `eval` is exactly
-   the SIS map `(s₁, s₂) ↦ s₁ + s₂ · h mod q`).
-3. The sampler quality hypothesis to account for the finite-precision gap. -/
+1. The generic GPV split bound (`GPVHashAndSign.euf_cma_split_bound`) which reduces EUF-CMA to
+   a collision branch, an exact-match replay branch with explicit factor `qSign + qHash`,
+   and a birthday collision term.
+2. Reinterpret the collision branch as an adversary for the Falcon PSF collision problem
+   sampled from the same key distribution.
+3. Leave the exact-match branch explicit in the theorem statement until it is discharged by
+   a Falcon-specific min-entropy / one-way lemma.
+4. Account for finite-precision via the sampler quality hypothesis. -/
 theorem euf_cma_security
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt] [Fintype Salt]
     [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
-    (qSign : ℕ)
+    (qSign qHash : ℕ)
     (samplerLoss : ENNReal)
     (hSamplerLoss : HasUniformSamplerLoss p prims samplerLoss)
     (adv : SignatureAlg.unforgeableAdv
-      (falconSignatureAlg p prims Salt hr)) :
-    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p)),
+      (falconSignatureAlg p prims Salt hr))
+    (hQ : ∀ pk, GPVHashAndSign.signHashQueryBound
+      (M := List Byte) (Salt := Salt) (Range := Rq p.n)
+      (S' := Salt × (Rq p.n × Rq p.n))
+      (α := List Byte × (Salt × (Rq p.n × Rq p.n))) (oa := adv.main pk)
+      (qSign := qSign) (qHash := qHash)) :
+    ∃ (collisionReduction : SIS.Adversary (ntruPSFCollisionProblem p prims hr))
+      (exactMatchReduction : GPVHashAndSign.ProgrammedPreimageAdversary
+        (PK := PublicKey p) (Domain := Rq p.n × Rq p.n) (Range := Rq p.n)),
       adv.advantage
           (GPVHashAndSign.runtime
             (Range := Rq p.n) (List Byte) Salt) ≤
-        SIS.advantage (ntruSISProblem p) sisReduction +
+        SIS.advantage (ntruPSFCollisionProblem p prims hr) collisionReduction +
+        ((qSign + qHash : ℕ) : ENNReal) *
+          GPVHashAndSign.programmedPreimageAdvantage
+            (falconPSF p prims) hr exactMatchReduction +
         GPVHashAndSign.collisionBound Salt qSign +
         samplerLoss := by
-  -- Step 1: Apply the generic GPV EUF-CMA bound to get a preimage-finding reduction.
-  -- This gives: Adv^{CMA}(A) ≤ Adv^{preimage}(B) + collisionBound
-  have hcorrect : (falconPSF p prims).Correct := by sorry
-  obtain ⟨preimageRed, hbound⟩ :=
-    GPVHashAndSign.euf_cma_bound (falconPSF p prims) hr (List Byte) Salt hcorrect qSign adv
-  -- Step 2: Reduce preimage finding to NTRU-SIS.
-  -- The PSF eval is (s₁, s₂) ↦ s₁ + s₂·h, which is exactly the NTRU-SIS map.
-  -- A preimage-finding adversary yields an NTRU-SIS adversary with the same advantage.
+  let _ := qSign
+  let _ := qHash
   let _ := hSamplerLoss
-  let _ := preimageRed
-  let _ := hbound
+  let _ := hQ
   sorry
 
 /-- Concrete instantiation of `euf_cma_security` with the Falcon-specified 40-byte
@@ -288,18 +329,28 @@ theorem euf_cma_security_bytes40
     [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
-    (qSign : ℕ)
+    (qSign qHash : ℕ)
     (samplerLoss : ENNReal)
     (hSamplerLoss : HasUniformSamplerLoss p prims samplerLoss)
     (adv : SignatureAlg.unforgeableAdv
-      (falconSignatureAlg p prims (Bytes 40) hr)) :
-    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p)),
+      (falconSignatureAlg p prims (Bytes 40) hr))
+    (hQ : ∀ pk, GPVHashAndSign.signHashQueryBound
+      (M := List Byte) (Salt := Bytes 40) (Range := Rq p.n)
+      (S' := Bytes 40 × (Rq p.n × Rq p.n))
+      (α := List Byte × (Bytes 40 × (Rq p.n × Rq p.n))) (oa := adv.main pk)
+      (qSign := qSign) (qHash := qHash)) :
+    ∃ (collisionReduction : SIS.Adversary (ntruPSFCollisionProblem p prims hr))
+      (exactMatchReduction : GPVHashAndSign.ProgrammedPreimageAdversary
+        (PK := PublicKey p) (Domain := Rq p.n × Rq p.n) (Range := Rq p.n)),
       adv.advantage
           (GPVHashAndSign.runtime
             (Range := Rq p.n) (List Byte) (Bytes 40)) ≤
-        SIS.advantage (ntruSISProblem p) sisReduction +
+        SIS.advantage (ntruPSFCollisionProblem p prims hr) collisionReduction +
+        ((qSign + qHash : ℕ) : ENNReal) *
+          GPVHashAndSign.programmedPreimageAdvantage
+            (falconPSF p prims) hr exactMatchReduction +
         GPVHashAndSign.collisionBound (Bytes 40) qSign +
         samplerLoss :=
-  euf_cma_security p prims (Bytes 40) hr qSign samplerLoss hSamplerLoss adv
+  euf_cma_security p prims (Bytes 40) hr qSign qHash samplerLoss hSamplerLoss adv hQ
 
 end Falcon
