@@ -77,6 +77,14 @@ instance {n : ℕ} : DecidableEq (Rq n) := by
   change DecidableEq (LatticeCrypto.Poly Coeff n)
   infer_instance
 
+instance {n : ℕ} : Fintype (Rq n) := by
+  change Fintype (LatticeCrypto.Poly Coeff n)
+  infer_instance
+
+instance {n : ℕ} : Inhabited (Rq n) := by
+  change Inhabited (LatticeCrypto.Poly Coeff n)
+  infer_instance
+
 instance {n : ℕ} : SampleableType (Rq n) := by
   change SampleableType (LatticeCrypto.Poly Coeff n)
   infer_instance

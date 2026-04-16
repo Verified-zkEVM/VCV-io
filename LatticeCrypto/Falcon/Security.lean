@@ -6,6 +6,7 @@ Authors: Quang Dao
 import LatticeCrypto.Falcon.Scheme
 import LatticeCrypto.HardnessAssumptions.ShortIntegerSolution
 import VCVio.EvalDist.RenyiDivergence
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Falcon Security
@@ -104,7 +105,7 @@ theorem verify_sign_correct (pk : PublicKey p) (sk : SecretKey p)
     (hvalid : validKeyPair p pk sk = true)
     (msg : List Byte) (sig : Signature)
     (h_laws : Primitives.Laws prims)
-    (hsig : sig ∈ support (Falcon.sign p prims pk sk msg)) :
+    (hsig : sig ∈ support (Falcon.sign p pk sk msg)) :
     Falcon.verify p prims pk msg sig = true := by
   -- The proof proceeds by unfolding `sign` and `verify`:
   -- 1. `sign` produces (salt, compressedS2) where s₂ came from trapdoorSample
@@ -241,6 +242,7 @@ With exact arithmetic (infinite precision), `r_p = 1` and the sampler loss vanis
 3. The sampler quality hypothesis to account for the finite-precision gap. -/
 theorem euf_cma_security
     (Salt : Type) [DecidableEq Salt] [SampleableType Salt] [Fintype Salt]
+    [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign : ℕ)
@@ -270,6 +272,7 @@ theorem euf_cma_security
 The collision term specializes to `qSign² / (2 · 2^320)`. For the Falcon-specified
 maximum of `qSign = 2^64` signing queries, this is `≤ 2^{-193}`. -/
 theorem euf_cma_security_bytes40
+    [SampleableType (Rq p.n)] [DecidableEq (Rq p.n)]
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign : ℕ)
@@ -283,6 +286,6 @@ theorem euf_cma_security_bytes40
         SIS.advantage (ntruSISProblem p) sisReduction +
         GPVHashAndSign.collisionBound (Bytes 40) qSign +
         samplerLoss :=
-  euf_cma_security p (Bytes 40) hr qSign adv
+  euf_cma_security p prims (Bytes 40) hr qSign adv
 
 end Falcon
