@@ -606,7 +606,7 @@ theorem euf_nma_bound
     ∃ reduction : Stmt → ProbComp Wit,
       (nmaAdv.advantage (runtime M) *
           (nmaAdv.advantage (runtime M) / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   sorry
 
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
@@ -637,7 +637,7 @@ theorem euf_cma_bound
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] := by
+        Pr[= true | hardRelationExp hr reduction] := by
   let _ := hss
   let _ := hζ
   let _ := hhvzk

@@ -102,11 +102,11 @@ theorem mul_result_bounds (a b : F) :
 /-! ### Compound Expression Error Bounds -/
 
 /-- Error bound for `a * b + c * d`: the accumulated relative error is at most
-`3ε + 3ε² + ε³`, which is `≤ 4ε` when `ε ≤ 1/2`. -/
+`2ε + ε²`, the standard depth-2 relative-error bound `(1 + ε)^2 - 1`. -/
 theorem compound_add_mul_error (a b c d : F) :
     |self.interp (FloatLike.add (FloatLike.mul a b) (FloatLike.mul c d)) -
       (self.interp a * self.interp b + self.interp c * self.interp d)| ≤
-    (3 * ε + 3 * ε ^ 2 + ε ^ 3) *
+    (2 * ε + ε ^ 2) *
       (|self.interp a * self.interp b| + |self.interp c * self.interp d|) := by
   have h_mul_ab := self.mul_error a b
   have h_mul_cd := self.mul_error c d
@@ -130,8 +130,7 @@ theorem compound_add_mul_error (a b c d : F) :
         ≤ ε * ((1 + ε) * |ab| + (1 + ε) * |cd|) + ε * |ab| + ε * |cd| := by nlinarith
       _ = (2 * ε + ε ^ 2) * (|ab| + |cd|) := by ring
     linarith
-  nlinarith [mul_nonneg hε (add_nonneg (abs_nonneg ab) (abs_nonneg cd)),
-    mul_nonneg (mul_nonneg hε hε) (add_nonneg (abs_nonneg ab) (abs_nonneg cd))]
+  exact h_mid
 
 /-- Error bound for a Horner evaluation step `a * x + b`: the accumulated error is at
 most `2ε + ε²` relative to the exact value. -/

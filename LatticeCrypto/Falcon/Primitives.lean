@@ -124,10 +124,10 @@ variable {p : Params} (prims : Primitives p)
 
 /-- The canonical split angle for the proof-level Falcon FFT specification.
 
-For `splitFFT` on a polynomial of packed length `2 * 2^(k+1)`, we use the clean root
-ordering `ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)`. The concrete C implementation stores the
-same roots in bit-reversed order, but this higher-level specification keeps the natural
-mathematical ordering. -/
+For `splitFFT` on a packed Falcon FFT polynomial of length `2 * 2^(k+1)`, we follow the
+implementation order used by Falcon's `fpoly_split_fft` and `fpoly_merge_fft`: the adjacent
+packed coordinates `(2i, 2i+1)` form the pair `f(ωᵢ), f(-ωᵢ)` where
+`ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)`. -/
 @[inline] noncomputable def splitAngle {k : ℕ} (i : Fin (2 ^ k)) : ℝ :=
   (((2 * i.1 + 1 : ℕ) : ℝ) * Real.pi) / (((2 ^ (k + 2) : ℕ) : ℝ))
 
@@ -152,7 +152,8 @@ def mulFFT {k : ℕ} (a b : RealFFTPoly k) : RealFFTPoly k :=
 
 /-- Split a packed Falcon FFT polynomial into its even and odd parts.
 
-If `f = f₀(x²) + x · f₁(x²)` and `a = f(ωᵢ)`, `b = f(-ωᵢ)` for the canonical roots
+If `f = f₀(x²) + x · f₁(x²)` and the adjacent packed coordinates of `f` encode
+`a = f(ωᵢ)`, `b = f(-ωᵢ)` for the canonical implementation-order roots
 `ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)`, then
 
 - `f₀(ωᵢ²) = (a + b) / 2`
@@ -195,8 +196,8 @@ noncomputable def splitFFT {k : ℕ}
 
 /-- Merge two half-size Falcon FFT polynomials into a full-size one.
 
-This inverts `splitFFT`: if `f = f₀(x²) + x · f₁(x²)`, then at each canonical root
-`ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)` we reconstruct the pair of values
+This inverts `splitFFT`: if `f = f₀(x²) + x · f₁(x²)`, then for each implementation-order
+root `ωᵢ = exp(((2i + 1)π / 2^(k+2)) · I)` we reconstruct the adjacent packed pair
 
 - `f(ωᵢ) = f₀(ωᵢ²) + ωᵢ · f₁(ωᵢ²)`
 - `f(-ωᵢ) = f₀(ωᵢ²) - ωᵢ · f₁(ωᵢ²)` -/

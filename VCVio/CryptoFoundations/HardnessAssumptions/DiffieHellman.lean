@@ -323,9 +323,9 @@ variable {F : Type} [Field F] [Fintype F] [DecidableEq F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G] [DecidableEq G]
 variable (g : G)
 
-/-- The discrete log relation is generable when `· • g` is bijective:
-sample `sk ← $ᵗ F` and return `(sk • g, sk)`. -/
-def dlogGenerable (_hg : Function.Bijective (· • g : F → G)) :
+/-- The discrete log relation is generable by sampling `sk ← $ᵗ F` and returning
+`(sk • g, sk)`. -/
+def dlogGenerable :
     GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
   gen := do let sk ← $ᵗ F; return (sk • g, sk)
   gen_sound := fun pk sk hmem => by

@@ -298,7 +298,7 @@ instance (α : Type) (n : ℕ) [SampleableType α] : SampleableType (Vector α n
         probOutput_uniformSample_inj, ih x.pop y.pop]
 
 /-- `Vector α n` is finite when `α` is finite, via the equivalence with `Fin n → α`. -/
-instance (α : Type) (n : ℕ) [Fintype α] : Fintype (Vector α n) :=
+instance instFintypeVector (α : Type u) (n : ℕ) [Fintype α] : Fintype (Vector α n) :=
   Fintype.ofEquiv (Fin n → α)
     { toFun := Vector.ofFn
       invFun := fun v i => v.get i

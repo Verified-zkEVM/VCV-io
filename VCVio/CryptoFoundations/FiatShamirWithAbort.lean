@@ -1311,7 +1311,7 @@ theorem euf_cma_bound
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       adv.advantage (runtime M) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] +
+        Pr[= true | hardRelationExp hr reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort ζ_zk δ hp) := by
   let _ := hc
   let _ := hζ
@@ -1336,7 +1336,7 @@ theorem euf_cma_bound_perfectHVZK
       (S' := Option (Commit × Resp)) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       adv.advantage (runtime M) ≤
-        Pr[= true | hardRelationExp (r := rel) reduction] +
+        Pr[= true | hardRelationExp hr reduction] +
           ENNReal.ofReal (cmaToNmaLoss qS qH ε p_abort 0 δ hp) := by
   simpa using
     (euf_cma_bound (ids := ids) (M := M) (maxAttempts := maxAttempts)

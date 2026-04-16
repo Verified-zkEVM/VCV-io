@@ -40,11 +40,11 @@ variable (G : Type) [AddCommGroup G] [Module F G] [Fintype G] [SampleableType G]
 
 /-- Schnorr signature scheme: Fiat-Shamir applied to the Schnorr Σ-protocol
 with the discrete-log generable relation. -/
-def signature (g : G) (hg : Function.Bijective (· • g : F → G))
+def signature (g : G) (_hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M] :
     SignatureAlg (OracleComp (unifSpec + (M × G →ₒ F)))
       (M := M) (PK := G) (SK := F) (S := G × F) :=
-  FiatShamir (Schnorr.sigma F G g) (dlogGenerable g hg) M
+  FiatShamir (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
 
 section extractor
 
@@ -135,23 +135,20 @@ theorem signature_euf_cma [Finite G] (g : G) (hg : Function.Bijective (· • g 
         ENNReal.ofReal (qS * (0 : ℝ))
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
-  let _ : Fintype G := Fintype.ofFinite G
-  obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound (Schnorr.sigma F G g) (dlogGenerable g hg) M
+  haveI : Fintype G := Fintype.ofFinite G
+  obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
+    (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
     (Schnorr.sigma_speciallySound F G g) (Schnorr.simTranscript F G g)
     (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
-  simp only [hardRelationExp, dlogExp]
-  rw [show Pr[= true | ($ᵗ G : ProbComp G) >>= fun pk =>
-        red pk >>= fun sk => pure (decide (sk • g = pk))] =
-      Pr[= true | ((· • g) <$> ($ᵗ F : ProbComp F)) >>= fun pk =>
-        red pk >>= fun sk => pure (decide (sk • g = pk))] from by
-    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
-    congr 1; ext pk; congr 1
-    exact (probOutput_map_bijective_uniform_cross F (· • g) hg pk).symm,
-    map_eq_bind_pure_comp, bind_assoc]
-  simp only [Function.comp, pure_bind]
+  rw [show Pr[= true | hardRelationExp (dlogGenerable (F := F) g) red] =
+      Pr[= true | do
+        let x ← $ᵗ F
+        let w ← red (x • g)
+        pure (decide (w • g = x • g))] by
+    simp [hardRelationExp, dlogGenerable]]
   exact probOutput_bind_congr' _ true fun x =>
     probOutput_bind_congr' _ true fun sk => by simp [hg.1.eq_iff]
 

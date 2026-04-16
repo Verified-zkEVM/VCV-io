@@ -125,12 +125,12 @@ private noncomputable def realTwoPow (e : Int) : ℝ :=
   ofInt i := (i.toInt : ℝ)
   ofInt32 i := (i.toInt : ℝ)
   scaled i sc := (i.toInt : ℝ) * realTwoPow sc.toInt
-  rint x := Int64.ofInt (round x)
-  floor_ x := Int64.ofInt ⌊x⌋
+  rint x := (round x).toInt64
+  floor_ x := (⌊x⌋).toInt64
   expm_p63 x ccs :=
     let y : ℝ := ((2 : ℝ) ^ 63) * ccs * Real.exp (-x)
     if 0 ≤ y then
-      UInt64.ofInt ⌊y⌋
+      (⌊y⌋).toInt64.toUInt64
     else
       0
   ofRawFPR x := ((Float.ofBits x).toRat0 : ℝ)
@@ -148,7 +148,7 @@ private noncomputable def fxrToReal (x : FXR.FXR) : ℝ :=
 /-- Encode a real number into Falcon's signed 32.32 fixed-point format by rounding
 to the nearest scaled integer. -/
 private noncomputable def realToFXR (x : ℝ) : FXR.FXR :=
-  (Int64.ofInt (round (x * fxrScale))).toUInt64
+  (round (x * fxrScale)).toInt64.toUInt64
 
 /-- Convert an `R_q` polynomial to the coefficient array expected by the concrete FFT code. -/
 private def rqToInt32Array (p : Params) (f : Rq p.n) : Array Int32 :=

@@ -204,13 +204,22 @@ structure SamplerQuality (pk : PublicKey p) (sk : SecretKey p) where
     ∀ x ∈ support (idealSampler c),
       (falconPSF p prims).eval pk x = c ∧ (falconPSF p prims).isShort x = true
 
+/-- A concrete upper bound on the finite-precision sampler loss that is uniform over
+all valid Falcon key pairs. This keeps the theorem statement non-vacuous while still
+letting later work plug in sharper bounds from `SamplerQuality`. -/
+def HasUniformSamplerLoss (samplerLoss : ENNReal) : Prop :=
+  ∀ pk sk, validKeyPair p pk sk = true →
+    ∃ quality : SamplerQuality p prims pk sk, quality.bound ≤ samplerLoss
+
 /-! ### EUF-CMA Security -/
 
 /-- **EUF-CMA security of Falcon** ([FGdG+25] Theorem 1 + [Jia+26] refined bounds),
 generic in the salt type `Salt`.
 
 For any EUF-CMA adversary `A` making at most `qSign` signing queries against the Falcon+
-signature scheme with salt type `Salt`, there exists an NTRU-SIS adversary `B` such that:
+signature scheme with salt type `Salt`, and any externally supplied bound `ε_sampler`
+that upper-bounds `SamplerQuality.bound` for every valid Falcon key pair, there exists
+an NTRU-SIS adversary `B` such that:
 
   `Adv^{EUF-CMA}_{Falcon+}(A) ≤ Adv^{NTRU-SIS}(B) + qSign² / (2 · |Salt|) + ε_sampler`
 
@@ -246,10 +255,11 @@ theorem euf_cma_security
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign : ℕ)
+    (samplerLoss : ENNReal)
+    (hSamplerLoss : HasUniformSamplerLoss p prims samplerLoss)
     (adv : SignatureAlg.unforgeableAdv
       (falconSignatureAlg p prims Salt hr)) :
-    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p))
-      (samplerLoss : ENNReal),
+    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p)),
       adv.advantage
           (GPVHashAndSign.runtime
             (Range := Rq p.n) (List Byte) Salt) ≤
@@ -264,6 +274,9 @@ theorem euf_cma_security
   -- Step 2: Reduce preimage finding to NTRU-SIS.
   -- The PSF eval is (s₁, s₂) ↦ s₁ + s₂·h, which is exactly the NTRU-SIS map.
   -- A preimage-finding adversary yields an NTRU-SIS adversary with the same advantage.
+  let _ := hSamplerLoss
+  let _ := preimageRed
+  let _ := hbound
   sorry
 
 /-- Concrete instantiation of `euf_cma_security` with the Falcon-specified 40-byte
@@ -276,16 +289,17 @@ theorem euf_cma_security_bytes40
     (hr : GenerableRelation (PublicKey p) (SecretKey p)
       (validKeyPair p))
     (qSign : ℕ)
+    (samplerLoss : ENNReal)
+    (hSamplerLoss : HasUniformSamplerLoss p prims samplerLoss)
     (adv : SignatureAlg.unforgeableAdv
       (falconSignatureAlg p prims (Bytes 40) hr)) :
-    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p))
-      (samplerLoss : ENNReal),
+    ∃ (sisReduction : SIS.Adversary (ntruSISProblem p)),
       adv.advantage
           (GPVHashAndSign.runtime
             (Range := Rq p.n) (List Byte) (Bytes 40)) ≤
         SIS.advantage (ntruSISProblem p) sisReduction +
         GPVHashAndSign.collisionBound (Bytes 40) qSign +
         samplerLoss :=
-  euf_cma_security p prims (Bytes 40) hr qSign adv
+  euf_cma_security p prims (Bytes 40) hr qSign samplerLoss hSamplerLoss adv
 
 end Falcon
