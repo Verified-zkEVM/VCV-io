@@ -736,7 +736,42 @@ theorem forkReplay_precondition_le_one
      acc * (acc / q - h⁻¹)) ≤ 1 :=
   fork_precondition_le_one (main := main) (qb := qb) (i := i) (cf := cf)
 
-/-- Replay fork failure probability bound. This mirrors `probOutput_none_fork_le`. -/
+/-- Sum of disjoint replay-fork success events is at most the total `some` probability.
+This mirrors `sum_probEvent_fork_le_tsum_some` in `Fork.lean`; the proof is purely
+algebraic on the underlying distribution and does not depend on the fork mechanism. -/
+private lemma sum_probEvent_forkReplay_le_tsum_some
+    (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
+    (cf : α → Option (Fin (qb i + 1))) :
+    ∑ s : Fin (qb i + 1),
+      Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | forkReplay main qb i cf]
+    ≤ ∑' (p : α × α), Pr[= some p | forkReplay main qb i cf] := by
+  classical
+  simp_rw [probEvent_eq_tsum_ite]
+  have hsplit : ∀ s : Fin (qb i + 1),
+      (∑' (r : Option (α × α)),
+        if r.map (cf ∘ Prod.fst) = some (some s) then
+          Pr[= r | forkReplay main qb i cf] else 0)
+      = ∑' (p : α × α),
+          if cf p.1 = some s then Pr[= some p | forkReplay main qb i cf] else 0 := by
+    intro s
+    have h := tsum_option (fun r : Option (α × α) =>
+      if r.map (cf ∘ Prod.fst) = some (some s) then
+        Pr[= r | forkReplay main qb i cf] else 0) ENNReal.summable
+    simp only [Option.map, comp_apply, reduceCtorEq, ite_false, zero_add,
+      Option.some.injEq] at h
+    exact h
+  simp_rw [hsplit]
+  rw [← tsum_fintype (L := .unconditional _), ENNReal.tsum_comm]
+  refine ENNReal.tsum_le_tsum fun p => ?_
+  rw [tsum_fintype (L := .unconditional _)]
+  rcases hcf : cf p.1 with _ | s₀
+  · simp
+  · rw [Finset.sum_eq_single s₀ (by intro b _ hb; simp [Ne.symm hb]) (by simp)]
+    simp
+
+/-- Replay fork failure probability bound. This mirrors `probOutput_none_fork_le`;
+the proof structure is identical, substituting the pointwise replay lower bound
+`le_probOutput_forkReplay` for its seed-based analogue. -/
 theorem probOutput_none_forkReplay_le
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) :
@@ -744,7 +779,55 @@ theorem probOutput_none_forkReplay_le
     let h : ℝ≥0∞ := Fintype.card (spec.Range i)
     let q := qb i + 1
     Pr[= none | forkReplay main qb i cf] ≤ 1 - acc * (acc / q - h⁻¹) := by
-  sorry
+  simp only
+  set ps : Fin (qb i + 1) → ℝ≥0∞ := fun s => Pr[= (some s : Option _) | cf <$> main]
+  set acc := ∑ s, ps s
+  set h : ℝ≥0∞ := ↑(Fintype.card (spec.Range i))
+  have hacc_ne_top : acc ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top
+      (sum_probOutput_some_le_one (mx := cf <$> main) (α := Fin (qb i + 1)))
+  have htotal := probOutput_none_add_tsum_some (mx := forkReplay main qb i cf)
+  rw [HasEvalPMF.probFailure_eq_zero, tsub_zero] at htotal
+  have hne_top : (∑' p, Pr[= some p | forkReplay main qb i cf]) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top (htotal ▸ le_add_self)
+  have hPr_eq : Pr[= none | forkReplay main qb i cf] =
+      1 - ∑' p, Pr[= some p | forkReplay main qb i cf] :=
+    ENNReal.eq_sub_of_add_eq hne_top htotal
+  calc Pr[= none | forkReplay main qb i cf]
+    _ = 1 - ∑' p, Pr[= some p | forkReplay main qb i cf] := hPr_eq
+    _ ≤ 1 - ∑ s, Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) |
+            forkReplay main qb i cf] :=
+        tsub_le_tsub_left (sum_probEvent_forkReplay_le_tsum_some main qb i cf) 1
+    _ ≤ 1 - ∑ s, (ps s ^ 2 - ps s / h) :=
+        tsub_le_tsub_left (Finset.sum_le_sum fun s _ =>
+          le_probOutput_forkReplay main qb i cf s) 1
+    _ ≤ 1 - acc * (acc / ↑(qb i + 1) - h⁻¹) := by
+        apply tsub_le_tsub_left _ 1
+        have hcs := ENNReal.sq_sum_le_card_mul_sum_sq
+          (Finset.univ : Finset (Fin (qb i + 1))) ps
+        simp only [Finset.card_univ, Fintype.card_fin] at hcs
+        calc acc * (acc / ↑(qb i + 1) - h⁻¹)
+          _ = acc * (acc / ↑(qb i + 1)) - acc * h⁻¹ :=
+              ENNReal.mul_sub (fun _ _ => hacc_ne_top)
+          _ = acc ^ 2 / ↑(qb i + 1) - acc / h := by
+              rw [div_eq_mul_inv, div_eq_mul_inv, ← mul_assoc, sq, div_eq_mul_inv]
+          _ ≤ (∑ s, ps s ^ 2) - acc / h := by
+              gcongr; rw [div_eq_mul_inv]
+              have hn : ((qb i + 1 : ℕ) : ℝ≥0∞) ≠ 0 := by simp
+              calc acc ^ 2 * (↑(qb i + 1))⁻¹
+                  _ ≤ (↑(qb i + 1) * ∑ s, ps s ^ 2) * (↑(qb i + 1))⁻¹ := by gcongr
+                  _ = ∑ s, ps s ^ 2 := by
+                      rw [mul_assoc, mul_comm (∑ s, ps s ^ 2) _, ← mul_assoc,
+                        ENNReal.mul_inv_cancel hn (by simp), one_mul]
+          _ ≤ (∑ s, ps s ^ 2) - ∑ s, ps s / h := by
+              gcongr; simp_rw [div_eq_mul_inv]; rw [← Finset.sum_mul]
+          _ ≤ ∑ s, (ps s ^ 2 - ps s / h) := by
+              rw [tsub_le_iff_right]
+              calc ∑ s, ps s ^ 2
+                ≤ ∑ s, ((ps s ^ 2 - ps s / h) + ps s / h) :=
+                    Finset.sum_le_sum fun s _ => le_tsub_add
+                _ = ∑ s, (ps s ^ 2 - ps s / h) + ∑ s, ps s / h :=
+                    Finset.sum_add_distrib
 
 /-- Packaged replay forking theorem. This is the replay analogue of
 `le_probEvent_isSome_fork`, derived from `probOutput_none_forkReplay_le` and
