@@ -174,6 +174,53 @@ theorem relTriple_simulateQ_run_writerT
     rintro ⟨a, v₁⟩ ⟨b, v₂⟩ ⟨hab, hv⟩
     exact ⟨hab, hR_mul _ _ _ _ hw hv⟩
 
+/-- `WriterT` analogue of `relTriple_simulateQ_run_of_impl_eq_preservesInv`.
+
+If two writer-transformed oracle implementations agree pointwise on
+`.run` (i.e. every per-query increment is identical as an `OracleComp`),
+then the whole simulations yield identical `(output, accumulator)`
+distributions.
+
+`WriterT` handlers are stateless (`.run` takes no argument), so the
+hypothesis is a plain equality rather than an invariant-gated
+implication. The postcondition is strict equality on `α × ω`. -/
+theorem relTriple_simulateQ_run_writerT_of_impl_eq
+    {ι₁ : Type u}
+    {spec₁ : OracleSpec ι₁} [spec₁.Fintype] [spec₁.Inhabited]
+    {ω : Type} [Monoid ω]
+    (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
+    (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
+    (oa : OracleComp spec α) :
+    RelTriple
+      (simulateQ impl₁ oa).run
+      (simulateQ impl₂ oa).run
+      (EqRel (α × ω)) := by
+  have hpair : RelTriple
+      (simulateQ impl₁ oa).run
+      (simulateQ impl₂ oa).run
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ Eq p₁.2 p₂.2) := by
+    refine relTriple_simulateQ_run_writerT (spec₁ := spec₁) (spec₂ := spec₁)
+      impl₁ impl₂ (fun (w₁ w₂ : ω) => w₁ = w₂) rfl ?_ oa ?_
+    · rintro w₁ w₁' w₂ w₂' rfl rfl; rfl
+    · intro t
+      rw [himpl_eq t]
+      apply (relTriple_iff_relWP
+        (oa := (impl₂ t).run) (ob := (impl₂ t).run)
+        (R := fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2)).2
+      refine ⟨_root_.SPMF.Coupling.refl (evalDist ((impl₂ t).run)), ?_⟩
+      intro z hz
+      rcases (mem_support_bind_iff
+        (evalDist ((impl₂ t).run))
+        (fun a => (pure (a, a) : SPMF ((spec.Range t × ω) × (spec.Range t × ω)))) z).1 hz with
+        ⟨a, _ha, hz'⟩
+      have hzEq : z = (a, a) := by
+        simpa [support_pure, Set.mem_singleton_iff] using hz'
+      subst hzEq
+      exact ⟨rfl, rfl⟩
+  refine relTriple_post_mono hpair ?_
+  rintro ⟨a₁, w₁⟩ ⟨a₂, w₂⟩ ⟨ha, hw⟩
+  exact Prod.ext ha hw
+
 /-- Projection of `relTriple_simulateQ_run_writerT` onto the output component. -/
 theorem relTriple_simulateQ_run_writerT'
     {ι₁ : Type u} {ι₂ : Type u}
