@@ -606,7 +606,7 @@ private theorem forkSupportInvariant_of_mem_replayFirstRun
   rw [hωeq]
   exact hverify
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] [Inhabited Chal] in
 /-- **Target equality across two successful fork runs** sharing the same fork index.
 
 If both runs of `forkReplay (Fork.runTrace σ hr M nmaAdv pk)` select fork point `s`,
@@ -809,6 +809,7 @@ private theorem target_eq_of_mem_forkReplay
     rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
   exact Option.some.inj this
 
+omit [SampleableType Stmt] in
 /-- **Per-pk extraction bound.** Given the structural forking event on `pk` (two fork
 runs selecting the same index, with distinct counted-oracle responses, both satisfying
 `forkSupportInvariant`), the NMA reduction recovers a valid witness with probability at
@@ -956,6 +957,7 @@ private theorem perPk_extraction_bound
 
 end eufNmaHelpers
 
+omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
@@ -982,7 +984,11 @@ This matches Firsov-Janku's `schnorr_koa_secure` at
 with the single-run postcondition `verify` plus the extractor correctness lemma
 `extractor_corr` at [fsec/proof/Schnorr.ec:87](../../../fsec/proof/Schnorr.ec). Our version
 uses `Fork.replayForkingBound` for the RO-level packaging and `_hss` for special
-soundness, with `σ.extract` playing the role of EC's `extractor`. -/
+soundness, with `σ.extract` playing the role of EC's `extractor`.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**
+(ReplayFork.lean): the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`
+is still a `sorry`, so this theorem is not yet unconditionally proved end-to-end. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -1095,7 +1101,13 @@ The combined bound is:
       ≤ Pr[extraction succeeds]`
 
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
-the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
+the bound is trivially satisfied when the simulation loss exceeds the advantage.
+
+**Currently conditional on two open obligations**:
+1. `euf_cma_to_nma` (this file, still `sorry`): CMA-to-NMA reduction via HVZK simulator.
+2. `sq_probOutput_main_le_noGuardReplayComp` (ReplayFork.lean, still `sorry`):
+   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`, transitively inherited
+   from `euf_nma_bound`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
