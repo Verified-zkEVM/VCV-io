@@ -16,8 +16,7 @@ open OracleComp OracleSpec ENNReal
 
 namespace ElGamalExamples
 
-variable {A M : Type}
-variable [AddGroup M] [SampleableType M]
+variable {A M : Type} [AddGroup M] [SampleableType M]
 
 /-- A fixed header plus a uniform additive mask hides which payload was chosen, even after an
 arbitrary continuation from ciphertexts. -/
