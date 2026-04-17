@@ -38,6 +38,7 @@ import VCVio.CryptoFoundations.MerkleTree
 import VCVio.CryptoFoundations.PRF
 import VCVio.CryptoFoundations.PRG
 import VCVio.CryptoFoundations.ReplayFork
+import VCVio.CryptoFoundations.ReplayForkStdDo
 import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.SigmaProtocol
