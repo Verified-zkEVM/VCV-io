@@ -1998,41 +1998,85 @@ private lemma probOutput_collisionReplay_le_main_div
           ↑(Fintype.card (spec.Range i)) := by
             rw [div_eq_mul_inv]
 
+/-- **Replay-side prefix-faithfulness (key distributional claim for B1).**
+
+Averaging the uniform substitution `u`, the second run's output distribution depends on
+the trace `log` only through its prefix `QueryLog.takeBeforeForkAt log i s`.
+
+Operationally: the replay oracle consumes `log` entry by entry until the fork fires at
+the `s`-th `i`-query (substituting `u`), after which it goes live. If we truncate `log`
+to `QueryLog.takeBeforeForkAt log i s` (which has at most `s` `i`-entries), the replay
+instead hits `nextEntry? = none` at the fork position and falls through to a live
+sample, which is uniform, just like averaging over `u`.
+
+This lemma encodes that operational equivalence as a distributional equality. It is
+the replay analogue of `evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue`.
+
+Proof sketch (deferred): induction on `main`, tracking the replay-oracle state, case
+splitting on whether the current query's index matches `i`, is a non-fork consumer,
+or is the fork query. The pre-fork portion matches the prefix so both sides trace the
+same path; at the fork, both sides produce a uniform sample (substituted `u` on the
+left, live on the right). Post-fork, both sides are fully live. -/
+private lemma evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) :
+    evalDist (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      Prod.fst <$> replayRunWithTraceValue main i log s u : OracleComp spec α) =
+    evalDist (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      Prod.fst <$> replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) := by
+  sorry
+
+/-- Probability form of the prefix-faithfulness claim: averaging over `u`, the probability
+that the second run produces any fixed output `x` depends on the trace only through its
+prefix `QueryLog.takeBeforeForkAt log i s`.
+
+This is the direct consequence of
+`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`, restated at the
+`probOutput` level for convenient use in tsum manipulations. -/
+private lemma probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) (x : α) :
+    Pr[= x | Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i log s u : OracleComp spec (α × _))] =
+    Pr[= x | Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u)] := by
+  have h := evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    main i log s
+  have hcomm₁ : (Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i log s u) : OracleComp spec α) =
+      (do let u ← liftComp ($ᵗ spec.Range i) spec
+          Prod.fst <$> replayRunWithTraceValue main i log s u) := by
+    simp only [map_bind]
+  have hcomm₂ : (Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) :
+        OracleComp spec α) =
+      (do let u ← liftComp ($ᵗ spec.Range i) spec
+          Prod.fst <$> replayRunWithTraceValue main i
+            (QueryLog.takeBeforeForkAt log i s) s u) := by
+    simp only [map_bind]
+  rw [hcomm₁, hcomm₂]
+  exact congrFun (congrArg DFunLike.coe h) x
+
 /-- Replay-side Jensen / Cauchy-Schwarz step. Squaring the probability that the first
 run satisfies `cf x₁ = some s` is bounded by the joint probability that *both* the
 first run and the second (substituted) run satisfy `cf · = some s`.
 
-This is the replay analogue of `sq_probOutput_main_le_noGuardComp` for the seeded fork.
-The seeded version factors `noGuardComp`'s success probability as
-`∑_seed P(seed) · P(cf x₁ = s | seed) · P(cf x₂ = s | seed.takeAtIndex i s)` and applies
-ENNReal Cauchy-Schwarz `(∑ w·a)² ≤ (∑ w) · (∑ w·a²) ≤ ∑ w·a²` (since ∑ w ≤ 1) after
-showing the cross term equals `Pr[cf <$> main = s]²` via a `takeAtIndex` rewrite.
+This is the replay analogue of `sq_probOutput_main_le_noGuardComp`. The proof reduces
+to two replay-specific ingredients:
 
-The seeded factorization relies on two structural lemmas about `generateSeed` /
-`takeAtIndex`:
+* Pointwise prefix-faithfulness
+  (`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`): the
+  second-run output distribution, averaged over `u`, depends on the log only through
+  its prefix `takeBeforeForkAt log i s`.
+* A Jensen / change-of-variable step over the `τ`-marginal that derives
+  `(Pr[cf main = s])² ≤ Pr[z | noGuardReplayComp]` from the pointwise faithfulness.
 
-* `evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue`: averaging the
-  appended value `u` makes a truncated-then-extended seed equivalent to the truncated
-  seed alone.
-* `tsum_probOutput_generateSeed_weight_takeAtIndex`: weighting by an arbitrary
-  function of the truncated seed, the full-seed and truncated-seed simulations have
-  the same distribution.
-
-**Replay-side gap.** The replay analogue requires the same conceptual decomposition
-but operates on `replayFirstRun main` (a logged run) instead of `generateSeed`. It
-needs:
-
-* A truncation operator `QueryLog.takeBeforeForkAt log i s` returning the prefix of
-  `log` up to (but not including) the `s`-th `i`-query.
-* A "run-from-prefix" operator that runs `main` against the prefix replay trace
-  followed by live oracle answers, and a lemma relating it to `replayRunWithTraceValue`
-  averaged over the substituted `u`.
-* A weighted averaging lemma analogous to
-  `tsum_probOutput_generateSeed_weight_takeAtIndex` saying that averaging
-  `Pr[= log | replayFirstRun main]` against any function of the truncated log equals
-  averaging the same function against the truncated-log distribution.
-
-These ingredients are deferred. -/
+Given these, the identification with `noGuardReplayComp` is straightforward. -/
 private lemma sq_probOutput_main_le_noGuardReplayComp
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (s : Fin (qb i + 1)) :
