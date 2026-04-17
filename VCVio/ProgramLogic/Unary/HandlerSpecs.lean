@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.StdDoBridge
+import VCVio.ProgramLogic.Unary.WriterTBridge
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
@@ -22,12 +23,12 @@ Connects the oracle-simulation handlers (`cachingOracle`, `seededOracle`,
 The bridge is two-layered:
 
 * *Per-query (leaf) specs* are proven once. Modern handlers (`cachingOracle`,
-  `loggingOracleStateT`, `cachingLoggingOracle`) are written in `do` notation
-  with `get` / `match` / `query` / `modify`, and their `_triple` lemmas use
-  `mvcgen` directly to walk the body. Each `query` step is bridged to a
-  support-based statement via `wpProp_iff_forall_support`; this is the only
-  point where the proof leaves pure `Std.Do.Triple` reasoning. Older
-  handlers (`seededOracle`) are still proved via
+  `loggingOracle`, `cachingLoggingOracle`) are written in `do` notation
+  with `get` / `match` / `query` / `modify` / `tell`, and their `_triple`
+  lemmas use `mvcgen` directly to walk the body. Each `query` step is
+  bridged to a support-based statement via `wpProp_iff_forall_support`;
+  this is the only point where the proof leaves pure `Std.Do.Triple`
+  reasoning. Older handlers (`seededOracle`) are still proved via
   `triple_stateT_iff_forall_support` because their `StateT.mk`-style body
   doesn't reduce under `mvcgen`. Specs admitting a single canonical
   postcondition are `@[spec]`-tagged.
@@ -36,6 +37,12 @@ The bridge is two-layered:
   and the tactic walks the bind tree, instantiating the leaf spec at each
   occurrence and discharging side conditions. No per-program induction is
   required from the user.
+
+`loggingOracle` is the original `WriterT (QueryLog spec) (OracleComp spec)`
+implementation in `VCVio/OracleComp/QueryTracking/LoggingOracle.lean`.
+The bridge `WriterTBridge.lean` interprets the writer log `ω = QueryLog spec`
+as a state component of `Std.Do`'s `(.arg ω .pure)` post-shape, so the
+`mvcgen` workflow for `WriterT` and `StateT` handlers is identical.
 
 For whole-`simulateQ` results, the structural recursion on `OracleComp` is
 isolated in the single helper `simulateQ_triple_preserves_invariant`. A
@@ -56,8 +63,8 @@ registrations, but the underlying `WPMonad` synthesis remains expensive.
   for `simulateQ`; lifts per-handler invariant triples to whole-program
   triples.
 * `cachingOracle_triple`, `seededOracle_triple`, `seededOracle_triple_of_cons`,
-  `seededOracle_triple_of_nil`, `loggingOracleStateT_triple`,
-  `loggingOracleStateT_triple_prefix` - per-handler specifications
+  `seededOracle_triple_of_nil`, `loggingOracle_triple`,
+  `loggingOracle_triple_prefix` - per-handler specifications
   consumable by `mvcgen`.
 * `simulateQ_cachingOracle_preserves_cache_le` - worked whole-program
   example lifting `cachingOracle_triple`.
@@ -115,9 +122,6 @@ are in `VCVio.CryptoFoundations.ReplayForkStdDo`.
   Both are upstream `Std.Do` issues worth filing; the support fallback
   is a one-shot escape hatch and downstream consumers stay in the
   `Std.Do` world.
-* The `WriterT`-based `loggingOracle` is not directly usable: core Lean has
-  no `WP (WriterT ω m) (.arg ω ps)` instance. `loggingOracleStateT` in this
-  file is the `Std.Do`-friendly reformulation.
 * `seededOracle`'s leaf specs (`seededOracle_triple`,
   `seededOracle_triple_of_cons`, `seededOracle_triple_of_nil`) still
   bail out to support-based reasoning. The `StateT.mk`-style definition
@@ -323,9 +327,9 @@ The call consumes at most one value at index `t`: either the seed was empty at
 `seededOracle` is defined via `StateT.mk`, so we open the structure with
 `triple_stateT_iff_forall_support` to bring the `match`-on-seed under
 support reasoning, then close each branch directly. The other handlers
-(`cachingOracle`, `loggingOracleStateT`, `cachingLoggingOracle`) are
-defined in `do`-notation form and admit pure `mvcgen` proofs; this one
-follows the same pattern only after the `StateT.mk` is unfolded. -/
+(`cachingOracle`, `loggingOracle`, `cachingLoggingOracle`) are defined in
+`do`-notation form and admit pure `mvcgen` proofs; this one follows the
+same pattern only after the `StateT.mk` is unfolded. -/
 @[spec]
 theorem seededOracle_triple (t : spec.Domain) (seed₀ : QuerySeed spec) :
     Std.Do.Triple
@@ -403,40 +407,24 @@ end seededOracle
 
 section loggingOracle
 
-/-- `StateT`-based reformulation of `loggingOracle` for direct integration with
-`Std.Do.WP` on `StateT` (core Lean has no `WP` instance for `WriterT`).
+/-- Spec for `loggingOracle t` over `WriterT (QueryLog spec) (OracleComp spec)`:
+the writer log accumulates the query / response pair `⟨t, v⟩`. Proved purely
+with `mvcgen` plus a single bridging step to bring the residual
+`wpProp (liftM (query t))` goal to support form so the universally-quantified
+obligation can be discharged by a second `mvcgen`.
 
-Each call appends the query / response pair to the running log and returns a
-fresh uniform sample from the underlying oracle. Equivalent to the existing
-`loggingOracle` over `WriterT (QueryLog spec)` when the input log is empty.
-
-Defined via `do` notation with `modify` so that `mvcgen` can walk through the
-body. The two `mvcgen`-blocking issues with `MonadLift.monadLift (query t)`
-inside a `do` block (the spurious `OracleComp → OracleComp` lift, and the
-discrimination-tree key mismatch between `Spec.query`'s `liftM` form and the
-`MonadLift.monadLift` form `mvcgen` actually produces) are addressed in
-`StdDoBridge.lean` by registering `OracleComp.monadLift_eq_self` and
-`Spec.monadLift_query` as `@[spec]`. -/
-def loggingOracleStateT :
-    QueryImpl spec (StateT (QueryLog spec) (OracleComp spec)) :=
-  fun t => do
-    let u ← (OracleComp.query t : OracleComp spec _)
-    modify (· ++ [⟨t, u⟩])
-    pure u
-
-/-- Spec for `loggingOracleStateT t`: the new log is the old log with a single
-entry for `t` and the returned value appended. Proved purely with `mvcgen`
-plus a single bridging step to bring the residual `wpProp (liftM (query t))`
-goal to support form so the universally-quantified obligation can be
-discharged by a second `mvcgen`. -/
+Note: the writer log `ω = QueryLog spec` is interpreted by
+`WriterTBridge.lean` as a state component (post-shape `(.arg ω .pure)`),
+so the precondition / postcondition shape is identical to that of the
+`StateT`-based reformulation. -/
 @[spec]
-theorem loggingOracleStateT_triple (t : spec.Domain) (log₀ : QueryLog spec) :
+theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
     Std.Do.Triple
-      (loggingOracleStateT t :
-        StateT (QueryLog spec) (OracleComp spec) (spec.Range t))
+      (loggingOracle t :
+        WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ v log' => ⌜log' = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold loggingOracleStateT
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq
@@ -446,15 +434,14 @@ theorem loggingOracleStateT_triple (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
 
 /-- Log-monotonicity corollary: the log only grows (as a list-prefix). Derived
-directly from `loggingOracleStateT_triple` via `mvcgen` (no support-layer
-escape). -/
-theorem loggingOracleStateT_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
+directly from `loggingOracle_triple` via `mvcgen` (no support-layer escape). -/
+theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
     Std.Do.Triple
-      (loggingOracleStateT t :
-        StateT (QueryLog spec) (OracleComp spec) (spec.Range t))
+      (loggingOracle t :
+        WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ _ log' => ⌜log₀ <+: log'⌝) := by
-  unfold loggingOracleStateT
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq
@@ -465,15 +452,15 @@ theorem loggingOracleStateT_triple_prefix (t : spec.Domain) (log₀ : QueryLog s
   exact ⟨[⟨t, a⟩], rfl⟩
 
 /-- `mvcgen` example: two consecutive logged queries extend the log with
-both entries in order. The full proof is `mvcgen [loggingOracleStateT_triple]`
+both entries in order. The full proof is `mvcgen [loggingOracle_triple]`
 plus a `grind` to close the trivial list-append side condition. -/
 example (t₁ t₂ : spec.Domain) (log₀ : QueryLog spec) :
     Std.Do.Triple
-      (do let u₁ ← loggingOracleStateT t₁; let u₂ ← loggingOracleStateT t₂; pure (u₁, u₂) :
-        StateT (QueryLog spec) (OracleComp spec) (spec.Range t₁ × spec.Range t₂))
+      (do let u₁ ← loggingOracle t₁; let u₂ ← loggingOracle t₂; pure (u₁, u₂) :
+        WriterT (QueryLog spec) (OracleComp spec) (spec.Range t₁ × spec.Range t₂))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ p log' => ⌜log' = log₀ ++ [⟨t₁, p.1⟩, ⟨t₂, p.2⟩]⌝) := by
-  mvcgen [loggingOracleStateT_triple]
+  mvcgen [loggingOracle_triple]
   all_goals grind
 
 end loggingOracle

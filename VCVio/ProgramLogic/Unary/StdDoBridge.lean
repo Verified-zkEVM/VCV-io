@@ -148,9 +148,10 @@ contexts. The two should be unified once core `mvcgen` normalizes
 /-!
 ## Architectural note: `mvcgen` for stateful handlers over `OracleComp`
 
-Stateful handlers like `loggingOracleStateT` and `cachingOracle` are defined
-as `QueryImpl spec (StateT σ (OracleComp spec))`. `mvcgen` walks their bodies
-cleanly thanks to:
+Stateful handlers like `cachingOracle` (`StateT`) and `loggingOracle`
+(`WriterT`) are defined as `QueryImpl spec (T (OracleComp spec))` for some
+state-tracking transformer `T`. `mvcgen` walks their bodies cleanly thanks
+to:
 
 1. The low-priority `MonadLift (OracleComp spec) (OracleComp superSpec)`
    instance in `Coercions/SubSpec.lean`. By being lower priority than Lean's
