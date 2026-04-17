@@ -142,6 +142,22 @@ theorem run_link {α : Type v}
   rw [simulateQ_link_run, StateT.run'_eq, ← Functor.map_map]
   simp [linkReshape]
 
+/-- Specialization of `run_link` when only the *outer* (left) package is stateless. The
+`PUnit` factor on the outer side collapses, leaving only the inner package's state to thread.
+
+This is the key reduction lemma for SSP-style proofs where the reduction package is stateless
+but the underlying game package carries non-trivial state (such as a lazily sampled secret
+key or a cached oracle output). -/
+theorem run_link_left_ofStateless {α : Type v}
+    (hP : QueryImpl E (OracleComp M)) (Q : Package I M σ₂) (A : OracleComp E α) :
+    ((Package.ofStateless hP).link Q).run A =
+      (Prod.fst : α × σ₂ → α) <$>
+        (simulateQ Q.impl (simulateQ hP A)).run Q.init := by
+  rw [run_link]
+  have h1 : (simulateQ (Package.ofStateless hP).impl A).run (Package.ofStateless hP).init
+      = (·, PUnit.unit.{v + 1}) <$> simulateQ hP A := runState_ofStateless hP A
+  rw [h1, simulateQ_map, StateT.run'_eq, StateT.run_map, Functor.map_map, Functor.map_map]
+
 /-- Specialization of `run_link` for two stateless packages. The link of two `ofStateless`
 packages reduces to nested `simulateQ` calls without any state to thread. -/
 @[simp]

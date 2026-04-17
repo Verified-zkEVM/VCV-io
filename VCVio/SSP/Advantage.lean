@@ -120,6 +120,27 @@ lemma simulateQ_evalDist_congr {α : Type}
     refine bind_congr fun u => ?_
     exact ih u
 
+/-- Stateful generalization of `simulateQ_evalDist_congr`: two `StateT σ ProbComp`-valued query
+implementations that agree on every (input, state) pair *under `evalDist`* yield identical
+evaluations of `(simulateQ _ A).run s` for every starting state `s`.
+
+This is the lemma to use when both sides of a game equivalence are stateful packages with the
+same internal state type and only their per-query handlers differ up to distribution (e.g., a
+`dhTripleReal`-vs-`dhTripleRand` swap propagated through a stateless reduction). -/
+lemma simulateQ_StateT_evalDist_congr {α : Type}
+    {h₁ h₂ : QueryImpl E (StateT σ ProbComp)}
+    (hh : ∀ (q : E.Domain) (s : σ), evalDist ((h₁ q).run s) = evalDist ((h₂ q).run s))
+    (A : OracleComp E α) (s : σ) :
+    evalDist ((simulateQ h₁ A).run s) = evalDist ((simulateQ h₂ A).run s) := by
+  induction A using OracleComp.inductionOn generalizing s with
+  | pure x => simp [simulateQ_pure, StateT.run_pure]
+  | query_bind t k ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
+      id_map, StateT.run_bind, evalDist_bind]
+    rw [hh t s]
+    refine bind_congr fun p => ?_
+    exact ih p.1 p.2
+
 end Package
 
 end VCVio.SSP
