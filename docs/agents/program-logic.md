@@ -292,8 +292,16 @@ state-transformer and writer-transformer models:
 |------------|-------|---------|
 | `QueryImpl.PreservesInv` | `σ → Prop` | every `(impl t).run σ₀` keeps the state invariant |
 | `QueryImpl.WriterPreservesInv` | `ω → Prop` under `[Monoid ω]` | every `(impl t).run` step keeps `s₀ * w` satisfying `Inv` |
+| `QueryImpl.WriterPreservesInv.of_mul_closed` | — | canonical builder: `Q` closed under `*` and holding on per-query increments yields `WriterPreservesInv` |
 | `OracleComp.simulateQ_run_preservesInv` | — | lift per-query `PreservesInv` to whole simulation |
 | `OracleComp.simulateQ_run_writerPreservesInv` | — | writer analogue |
+
+`Std.Do.Triple`-fronted whole-program lifts (`Unary/HandlerSpecs.lean`):
+
+| Theorem | Shape |
+|---------|-------|
+| `simulateQ_triple_preserves_invariant` | `StateT` version |
+| `simulateQ_writerT_triple_preserves_invariant` | `WriterT` (monoid) version |
 
 `WriterPreservesInv` is the canonical invariant-preservation API for
 writer-based handlers like `countingOracle`/`costOracle`. Typical use:

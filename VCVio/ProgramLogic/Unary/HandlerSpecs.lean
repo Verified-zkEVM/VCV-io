@@ -11,6 +11,7 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.SimSemantics.PreservesInv
 
 /-!
 # `Std.Do` handler specifications for `OracleComp` simulators
@@ -210,6 +211,38 @@ theorem simulateQ_triple_of_state_and_invariant {σ α : Type}
   have hbase := simulateQ_triple_preserves_invariant handler I hhandler oa
   rw [triple_stateT_iff_forall_support] at hbase
   exact hbase s₀ hI a s' hmem
+
+/-- `WriterT` analogue of `simulateQ_triple_preserves_invariant`.
+
+If every per-query handler call preserves an invariant `I` on the
+accumulated writer (stated as a `Std.Do.Triple`), then the whole
+simulation `simulateQ handler oa` preserves `I` across the accumulated
+writer output.
+
+Bridges through `triple_writerT_iff_forall_support_monoid` and
+`OracleComp.simulateQ_run_writerPreservesInv`, mirroring the `StateT`
+helper above. Typical `handler` values are `countingOracle` and
+`costOracle costFn`. -/
+theorem simulateQ_writerT_triple_preserves_invariant {ω α : Type} [Monoid ω]
+    (handler : QueryImpl spec (WriterT ω (OracleComp spec)))
+    (I : ω → Prop)
+    (hhandler : ∀ t : spec.Domain, Std.Do.Triple (handler t)
+      (spred(fun s => ⌜I s⌝))
+      (⇓ _ s' => ⌜I s'⌝))
+    (oa : OracleComp spec α) :
+    Std.Do.Triple
+      (simulateQ handler oa : WriterT ω (OracleComp spec) α)
+      (spred(fun s => ⌜I s⌝))
+      (⇓ _ s' => ⌜I s'⌝) := by
+  rw [triple_writerT_iff_forall_support_monoid]
+  intro s hs a w hmem
+  have hpres : QueryImpl.WriterPreservesInv handler I := by
+    intro t s₀ hs₀ z hz
+    have hh := hhandler t
+    rw [triple_writerT_iff_forall_support_monoid] at hh
+    exact hh s₀ hs₀ z.1 z.2 hz
+  exact
+    OracleComp.simulateQ_run_writerPreservesInv handler I hpres oa s hs (a, w) hmem
 
 section cachingOracle
 
