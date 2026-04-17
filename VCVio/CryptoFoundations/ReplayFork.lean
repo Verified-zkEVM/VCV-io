@@ -268,6 +268,35 @@ lemma getQueryValue?_takeBeforeForkAt_self [spec.DecidableEq]
     exact h
   rw [hnone]
 
+/-- If `log` has at most `s` entries of type `i`, then truncating `log` at position `s`
+leaves it unchanged: there is no `s`-th `i`-entry to truncate before. -/
+lemma takeBeforeForkAt_of_getQ_length_le [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ)
+    (h : (log.getQ (· = i)).length ≤ s) :
+    takeBeforeForkAt log i s = log := by
+  induction log generalizing s with
+  | nil => simp
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases ht : t = i
+      · subst ht
+        cases s with
+        | zero =>
+            simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons, Nat.le_zero] at h
+            omega
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            have h' : (QueryLog.getQ tl (· = t)).length ≤ s := by
+              simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons] at h
+              omega
+            rw [ih s h']
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ ht]
+        have h' : (QueryLog.getQ tl (· = i)).length ≤ s := by
+          simp only [QueryLog.getQ_cons] at h
+          rw [if_neg ht] at h
+          exact h
+        rw [ih s h']
+
 end QueryLog
 
 namespace OracleComp
