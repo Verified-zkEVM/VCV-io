@@ -17,12 +17,17 @@ Bridge code is in place:
   (Interop.Rust.RustOracleComp spec)` instance, four `rfl`-level
   `@[simp]` commutation lemmas (`liftRustM_{ok,fail,div,pure}`), and
   the compositional `Triple`-level boundary lemma `triple_liftRustM`.
-- `Examples.lean` — end-to-end demo: a checked-addition `RustM`
-  function, two equality-level specs, a `Std.Do.Triple` spec driven by
-  `mvcgen` (`addOrPanicLifted_triple`), an oracle-composed
+- `Examples.lean` — hand-crafted end-to-end demo: a checked-addition
+  `RustM` function, two equality-level specs, a `Std.Do.Triple` spec
+  driven by `mvcgen` (`addOrPanicLifted_triple`), an oracle-composed
   `RustOracleComp` program (`oracleThenAdd`), and a `Triple` spec on
   the oracle-composed program (`oracleThenAdd_triple`) that mixes a
   real `query` with a lifted `RustM` call.
+- `Computation.lean` — first example where the `RustM` side is real
+  hax output, not a hand-crafted `RustM` definition. Lifts and proves
+  a spec for `const fn computation(x: u32) -> u32 { x + x + 1 }` (from
+  hax's `tests/lean-tests/src/constants.rs`), using hax's own
+  `UInt32.haxAdd_spec` and the `triple_liftRustM` boundary lemma.
 
 `lake build Interop` succeeds across all of the above.
 
@@ -138,6 +143,58 @@ lifted `RustM` tail. The oracle query is lifted through the derived
 peel it via the standard `Spec.monadLift_{OptionT,ExceptT}` rules
 rather than short-circuiting on a hand-written instance.
 
+## Real hax output: `Computation.lean`
+
+`Interop/Hax/Computation.lean` is the first example where the `RustM`
+side is not a hand-crafted toy but real hax output. The Rust source
+comes from hax's test suite
+(`tests/lean-tests/src/constants.rs`):
+
+```rust
+const fn computation(x: u32) -> u32 {
+    x + x + 1
+}
+```
+
+hax compiles it (verbatim, modulo the enclosing namespace) into the
+`RustM` monad:
+
+```lean
+@[spec]
+def computation (x : u32) : RustM u32 := do ((← (x +? x)) +? (1 : u32))
+```
+
+We reproduce the emitted definition, prove a `Std.Do` Triple on the
+`RustM` side using hax's own `UInt32.haxAdd_spec`:
+
+```lean
+theorem computation_triple (x : u32) :
+    ⦃⌜2 * x.toNat + 1 < 2 ^ 32⌝⦄
+    (computation x)
+    ⦃⇓ r => ⌜r.toNat = 2 * x.toNat + 1⌝⦄
+```
+
+and transport it to `RustOracleComp` in one step via the boundary
+lemma:
+
+```lean
+theorem computationLifted_triple [spec.Fintype] [spec.Inhabited]
+    (x : u32) :
+    ⦃⌜2 * x.toNat + 1 < 2 ^ 32⌝⦄
+    (computationLifted (spec := spec) x)
+    ⦃⇓ r => ⌜r.toNat = 2 * x.toNat + 1⌝⦄ := by
+  unfold computationLifted
+  apply triple_liftRustM
+  exact computation_triple x
+```
+
+This is the intended workflow: hax emits the function and its
+`@[spec]` lemmas in the `RustM` / `Hax` world; we prove the hax-side
+Triple with hax's tactics and spec library; `triple_liftRustM` moves
+the result to the oracle-aware target without reproof. The
+`errorOfHax` rebrand inside `triple_liftRustM` is invisible here
+because the precondition rules out the panic branch.
+
 ## Risks
 
 - `_root_.Error` (hax) is namespace-collision-prone with anything else
@@ -155,10 +212,15 @@ rather than short-circuiting on a hand-written instance.
 - Wire `triple_liftRustM` into a `@[spec]` attribute (currently a plain
   theorem) once we have a concrete hax example whose pre/post shapes
   let `mvcgen` index it cleanly.
-- Port a non-trivial hax `@[spec]` fact and apply `triple_liftRustM` to
-  it, verifying the rebrand of the error handler composes as expected
-  with hax's own `_root_.Error` enum beyond the single
-  `integerOverflow` constructor exercised in `Examples.lean`.
+- Port a larger hax example that exercises more of the `_root_.Error`
+  enum (e.g. `divisionByZero`, `arrayOutOfBounds`) so the full
+  `errorOfHax` rebrand is tested end-to-end. `Computation.lean` only
+  exercises the `integerOverflow` branch, and only indirectly (the
+  precondition rules it out).
+- Exercise `hax_mvcgen` on a larger hax-emitted function. `Computation`
+  is small enough that plain `mvcgen` + `omega` closes it; the
+  `lean_adc` example with `hax_mvcgen [..] <;> bv_decide` is the
+  natural next step for stressing the tactic interaction.
 - State `liftRustM` as a more general `MonadHom` / `MonadMorphism` so
   that it transports any hax-side `Pr[_]`-style probabilistic spec, not
   just Hoare `Triple`s. Only needed once we have a probabilistic hax
