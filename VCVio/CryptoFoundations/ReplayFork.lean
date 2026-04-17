@@ -2041,11 +2041,16 @@ sample, which is uniform, just like averaging over `u`.
 This lemma encodes that operational equivalence as a distributional equality. It is
 the replay analogue of `evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue`.
 
-Proof sketch (deferred): induction on `main`, tracking the replay-oracle state, case
-splitting on whether the current query's index matches `i`, is a non-fork consumer,
-or is the fork query. The pre-fork portion matches the prefix so both sides trace the
-same path; at the fork, both sides produce a uniform sample (substituted `u` on the
-left, live on the right). Post-fork, both sides are fully live. -/
+Proof structure:
+- **Trivial case** (`(log.getQ (· = i)).length ≤ s`): the fork never fires on either side
+  because `log` has fewer than `s + 1` `i`-entries, so `takeBeforeForkAt log i s = log`
+  (`takeBeforeForkAt_of_getQ_length_le`) and the equality is immediate.
+- **Nontrivial case** (`s < (log.getQ (· = i)).length`): fork fires on the left at the
+  `s`-th `i`-entry (substituting `u`), and on the right the prefix is exhausted right
+  before that entry, so `nextEntry? = none` triggers `markMismatch` and a live sample.
+  Both sides trace identical pre-fork behaviour, produce a uniform sample at the fork
+  position, and then continue in live (mismatch) mode. Proved by induction on `main`
+  tracking the replay-oracle state. -/
 private lemma evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
     [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) :
@@ -2055,7 +2060,12 @@ private lemma evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
     evalDist (do
       let u ← liftComp ($ᵗ spec.Range i) spec
       Prod.fst <$> replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) := by
-  sorry
+  classical
+  by_cases hlen : (log.getQ (· = i)).length ≤ s
+  · rw [QueryLog.takeBeforeForkAt_of_getQ_length_le log i s hlen]
+  · -- Nontrivial case: `s < (log.getQ (· = i)).length`. Proof deferred to induction on `main`.
+    push Not at hlen
+    sorry
 
 /-- Probability form of the prefix-faithfulness claim: averaging over `u`, the probability
 that the second run produces any fixed output `x` depends on the trace only through its
@@ -2104,11 +2114,25 @@ first- and second-run outputs are exchangeable with identical marginals given by
 replay computation `replayRunWithTraceValue main i (takeBeforeForkAt ..) s u` on a
 fresh uniform `u`.
 
-Proof sketch (deferred): induction on `main`, jointly tracking the logging oracle
-(that feeds `replayFirstRun`) and the replay-with-truncated-log oracle on the RHS.
-At each query step, both sides consume the matching log entry or fall through to a
-live sample in synchronized fashion; at the `(s+1)`-th `i`-query, both sides go
-live, delivering the same conditional marginal. -/
+Proof plan:
+1. Rewrite both sides as tsums over the truncated log `τ` by pushing the
+   `trunc p.2`-dependence through with `tsum_congr` and the `takeBeforeForkAt`
+   "equal or short" characterisation of the fibres of
+   `p ↦ takeBeforeForkAt p.2 i s`.
+2. For each fixed `τ`, the two inner tsums over `p` with `takeBeforeForkAt p.2 i s = τ`
+   have a joint-marginal interpretation: they average `[cf p.1 = y]` vs. the replay
+   marginal over the remaining (post-`τ`) randomness of `main`.
+3. Proceed by induction on `main`, mirroring the seeded analogue structurally.
+   The logging-oracle on the LHS extends the log with whatever `main` produces;
+   the replay-oracle on the RHS starts from the truncated prefix.  Pre-fork, both
+   sides consume matching entries; at the truncation boundary both go live with a
+   fresh uniform (this is what `B1a`, encoded as
+   `probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`,
+   captures); post-fork, both sides are in live mode and the two marginal distributions
+   coincide.
+
+Deferred as a large structural induction (cf. the ~150-line seeded
+`tsum_probOutput_generateSeed_weight_takeAtIndex`). -/
 private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
     {β : Type} (main : OracleComp spec α) (i : ι) (s : ℕ)
     (f : α → β) (y : β) (h : QueryLog spec → ℝ≥0∞) :
