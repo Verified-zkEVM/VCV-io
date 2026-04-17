@@ -642,7 +642,7 @@ private theorem target_eq_of_mem_forkReplay
   -- Abbreviations for readability.
   set main : OracleComp (Fork.wrappedSpec Chal)
       (Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
-    Fork.runTrace σ hr M nmaAdv pk with hmain
+    Fork.runTrace σ hr M nmaAdv pk
   -- Immutable replay parameters.
   have htrace_eq : st.trace = log₁ :=
     replayRunWithTraceValue_trace_eq
@@ -915,12 +915,12 @@ private theorem perPk_extraction_bound
   -- Targets coincide by the shared-prefix property of `forkReplay`.
   have htarget : x₁.target = x₂.target :=
     target_eq_of_mem_forkReplay σ hr M nmaAdv qH pk x₁ x₂ s (hreq ▸ hsupp) hcf₁ hcf₂
-  set m₁ := x₁.forgery.1 with hm₁_def
-  set c₁ := x₁.forgery.2.1 with hc₁_def
-  set sr₁ := x₁.forgery.2.2 with hsr₁_def
-  set m₂ := x₂.forgery.1 with hm₂_def
-  set c₂ := x₂.forgery.2.1 with hc₂_def
-  set sr₂ := x₂.forgery.2.2 with hsr₂_def
+  set m₁ := x₁.forgery.1
+  set c₁ := x₁.forgery.2.1
+  set sr₁ := x₁.forgery.2.2
+  set m₂ := x₂.forgery.1
+  set c₂ := x₂.forgery.2.1
+  set sr₂ := x₂.forgery.2.2
   have htgt₁ : x₁.target = (m₁, c₁) := rfl
   have htgt₂ : x₂.target = (m₂, c₂) := rfl
   have htarget_eq : (m₁, c₁) = (m₂, c₂) := by rw [← htgt₁, ← htgt₂]; exact htarget
