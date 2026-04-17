@@ -17,11 +17,19 @@ can walk through any `do`-block in `WriterT ω m`, treating the writer
 log `ω` as a state component (post-shape `(.arg ω ps)` where `ps` is the
 inner monad's post-shape).
 
-The bridge supports the `[EmptyCollection ω] [Append ω] [LawfulAppend ω]`
-parameterization, which is what `loggingOracle` (over
-`WriterT (QueryLog spec) (OracleComp spec)`) needs because `QueryLog spec`
-unfolds to `List _`. The dual `[Monoid ω]` parameterization can be added
-in the same shape if and when needed.
+The bridge supports two parameterizations in parallel:
+
+* `[EmptyCollection ω] [Append ω] [LawfulAppend ω]`, which is what
+  `loggingOracle` (over `WriterT (QueryLog spec) (OracleComp spec)`) needs
+  because `QueryLog spec` unfolds to `List _`.
+* `[Monoid ω]`, which is what `countingOracle`/`costOracle` (over
+  `WriterT (QueryCount ι) (OracleComp spec)`) need because `QueryCount ι`
+  unfolds to `ι → ℕ` and carries a `Monoid` instance (with `1 = 0` and
+  `* = +`) rather than `Append`.
+
+The two `WP` / `WPMonad` instances live side-by-side and do not overlap on
+the common target types (`List _` has no `Monoid` instance; `ι → ℕ` has no
+`Append` instance).
 
 ## Implementation
 
@@ -102,13 +110,83 @@ instance instWPMonadAppend {m : Type u → Type v} {ω : Type u} {ps : PostShape
     funext z
     rw [LawfulAppend.append_assoc]
 
+/-! ## `Monoid`-based `WP` interpretation
+
+The dual parameterization: the writer log `ω` carries `[Monoid ω]`
+(e.g. `QueryCount ι = ι → ℕ` with `1 = 0` and `* = +`). The
+interpretation is the same as `wpAppend` but with `1` / `*` in place
+of `∅` / `++`. The monoid laws `mul_one`, `one_mul`, `mul_assoc` play
+the role of `LawfulAppend.append_empty`, `empty_append`, `append_assoc`. -/
+
+/-- The underlying predicate-transformer interpretation of a `WriterT ω m`
+computation when `ω` is a (multiplicative) monoid. Analogous to
+`wpAppend` but with `*` / `1` in place of `++` / `∅`. -/
+def wpMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}} {α : Type u}
+    [Monad m] [WP m ps] [Monoid ω]
+    (x : WriterT ω m α) : PredTrans (.arg ω ps) α :=
+  PredTrans.pushArg (fun (s : ω) =>
+    (fun (z : α × ω) => (z.1, s * z.2)) <$> wp (WriterT.run x))
+
+/-- `WP` instance for `WriterT ω m` under the `[Monoid ω]` parameterization.
+The writer log is threaded through as state and accumulated via `*` with
+identity `1`. Does not conflict with `instWPAppend` because the target
+types they fire on are disjoint (`List _` has no `Monoid`, `ι → ℕ` has
+no `Append`). -/
+instance instWPMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    [Monad m] [WP m ps] [Monoid ω] :
+    WP (WriterT ω m) (.arg ω ps) where
+  wp x := WriterT.wpMonoid x
+
+/-- `WP` on `WriterT ω m` (monoid variant) is a monad morphism: it
+preserves `pure` and `bind`, using the `Monoid` laws. -/
+instance instWPMonadMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω] :
+    WPMonad (WriterT ω m) (.arg ω ps) where
+  toLawfulMonad := inferInstance
+  toWP := instWPMonoid
+  wp_pure {α} a := by
+    apply PredTrans.ext
+    intro Q
+    change (WriterT.wpMonoid (pure a : WriterT ω m α)).apply Q
+        = (Pure.pure a : PredTrans (.arg ω ps) α).apply Q
+    simp only [WriterT.wpMonoid,
+      show (pure a : WriterT ω m α).run = pure (a, (1 : ω)) from rfl,
+      WPMonad.wp_pure, PredTrans.apply_pushArg, PredTrans.apply_Functor_map,
+      PredTrans.apply_Pure_pure, mul_one]
+  wp_bind {α β} x f := by
+    apply PredTrans.ext
+    intro Q
+    change (WriterT.wpMonoid (x >>= f)).apply Q
+        = ((WriterT.wpMonoid x : PredTrans (.arg ω ps) α) >>=
+            fun a => WriterT.wpMonoid (f a)).apply Q
+    have hbind :
+        (x >>= f : WriterT ω m β).run
+          = x.run >>= fun (a, w₁) =>
+              (fun (b, w₂) => (b, w₁ * w₂)) <$> (f a).run := rfl
+    simp only [WriterT.wpMonoid, hbind, WPMonad.wp_bind,
+      WPMonad.wp_map, PredTrans.apply_pushArg,
+      PredTrans.apply_Functor_map, PredTrans.apply_Bind_bind]
+    funext s
+    congr 1
+    refine Prod.mk.injEq .. |>.mpr ⟨?_, rfl⟩
+    funext aw
+    congr 1
+    refine Prod.mk.injEq .. |>.mpr ⟨?_, rfl⟩
+    funext z
+    rw [mul_assoc]
+
 end WriterT
 
 /-! ## `wp` simp lemmas for `WriterT` operations
 
 These rewrite `wp⟦x⟧ Q` for common `WriterT` operations (`tell`,
 `monadLift`) into simpler forms involving the inner monad's `wp`. They are
-analogous to `Std.Do.WP.monadLift_StateT`, etc. -/
+analogous to `Std.Do.WP.monadLift_StateT`, etc.
+
+Each simp lemma is provided in two parallel variants matching the two
+`WP` instances for `WriterT`: the `Append`-based one (suffix `_append`,
+exposed as the default under the original name for backward
+compatibility) and the `Monoid`-based one (suffix `_monoid`). -/
 
 namespace Std.Do.WP
 
@@ -134,6 +212,29 @@ theorem monadLift_WriterT {m : Type u → Type v} {ω : Type u} {ps : PostShape.
     WriterT.run_mk, WPMonad.wp_map,
     PredTrans.apply_pushArg, PredTrans.apply_Functor_map,
     LawfulAppend.append_empty]
+
+@[simp]
+theorem tell_WriterT_monoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω]
+    (w : ω) (Q : PostCond PUnit (.arg ω ps)) :
+    wp⟦MonadWriter.tell w : WriterT ω m PUnit⟧ Q = fun s => Q.1 ⟨⟩ (s * w) := by
+  simp only [WP.wp, WriterT.wpMonoid, WriterT.run_tell, WPMonad.wp_pure,
+    PredTrans.apply_pushArg, PredTrans.apply_Functor_map,
+    PredTrans.apply_Pure_pure]
+
+@[simp]
+theorem monadLift_WriterT_monoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    {α : Type u}
+    [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω]
+    (x : m α) (Q : PostCond α (.arg ω ps)) :
+    wp⟦MonadLift.monadLift x : WriterT ω m α⟧ Q
+        = fun s => wp⟦x⟧ (fun a => Q.1 a s, Q.2) := by
+  have hlift :
+      (MonadLift.monadLift x : WriterT ω m α)
+        = WriterT.mk ((fun a => (a, (1 : ω))) <$> x) := rfl
+  simp only [WP.wp, WriterT.wpMonoid, hlift,
+    WriterT.run_mk, WPMonad.wp_map,
+    PredTrans.apply_pushArg, PredTrans.apply_Functor_map, mul_one]
 
 end Std.Do.WP
 
@@ -169,6 +270,30 @@ theorem monadLift_WriterT {m : Type u → Type v} {ω : Type u} {ps : PostShape.
     {α : Type u}
     [Monad m] [LawfulMonad m] [WPMonad m ps]
     [EmptyCollection ω] [Append ω] [LawfulAppend ω]
+    (x : m α) {Q : PostCond α (.arg ω ps)} :
+    Triple (m := WriterT ω m) (MonadLift.monadLift x)
+      (spred(fun s => wp⟦x⟧ (fun a => Q.1 a s, Q.2)))
+      Q := by
+  simp [Triple.iff, SPred.entails.refl]
+
+/-- `Monoid`-variant spec for `MonadWriter.tell`. The postcondition holds
+at the new state `s * w`, where `*` is the monoid operation on `ω`. -/
+@[spec]
+theorem tell_WriterT_monoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω]
+    (w : ω) {Q : PostCond PUnit (.arg ω ps)} :
+    Triple (m := WriterT ω m) (MonadWriter.tell w)
+      (spred(fun s => Q.1 ⟨⟩ (s * w)))
+      Q := by
+  simp [Triple.iff, SPred.entails.refl]
+
+/-- `Monoid`-variant spec for `MonadLift.monadLift`. The lifted
+computation runs with the writer state unchanged (the lift writes `1`
+and `s * 1 = s`). -/
+@[spec]
+theorem monadLift_WriterT_monoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+    {α : Type u}
+    [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω]
     (x : m α) {Q : PostCond α (.arg ω ps)} :
     Triple (m := WriterT ω m) (MonadLift.monadLift x)
       (spred(fun s => wp⟦x⟧ (fun a => Q.1 a s, Q.2)))

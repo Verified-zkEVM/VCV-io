@@ -167,6 +167,31 @@ theorem triple_writerT_iff_forall_support {ω α : Type}
   · intro h a w hmem; exact h (a, w) hmem
   · intro h p hmem; exact h p.1 p.2 hmem
 
+/-- `Monoid`-variant of `triple_writerT_iff_forall_support`.
+
+For `WriterT ω (OracleComp spec)` where the log `ω` is a (multiplicative)
+monoid, a triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, w)` in the support
+of `mx.run` satisfies `Q.1 a (s * w)` for every starting log `s` satisfying
+`P`. This is the dual of the `Append`-based characterization and is what
+`countingOracle` / `costOracle` proofs use. -/
+theorem triple_writerT_iff_forall_support_monoid {ω α : Type} [Monoid ω]
+    (mx : WriterT ω (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg ω .pure)) (Q : Std.Do.PostCond α (.arg ω .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : ω, (P s).down →
+        ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s * w)).down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) mx.run
+      (fun p => (Q.1 p.1 (s * p.2)).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a w hmem; exact h (a, w) hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
 end StatefulBridges
 
 namespace Spec

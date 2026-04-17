@@ -8,6 +8,7 @@ import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.WriterTBridge
 import VCVio.OracleComp.QueryTracking.CachingOracle
+import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 
@@ -439,6 +440,103 @@ example (t₁ t₂ : spec.Domain) (log₀ : QueryLog spec) :
   all_goals grind
 
 end loggingOracle
+
+section countingOracle
+
+variable [DecidableEq ι]
+
+/-- Spec for `countingOracle t` over `WriterT (QueryCount ι) (OracleComp spec)`:
+the query count is incremented by `QueryCount.single t` (i.e., `+1` at index
+`t`, `+0` elsewhere). Uses the `[Monoid (QueryCount ι)]` parameterization of
+`WriterTBridge`, so the post-state is `s * QueryCount.single t`, which is
+`s + QueryCount.single t` by `QueryCount.monoid_mul_def`.
+
+Proved via `mvcgen` plus a single bridging step for the lifted `query t` leaf:
+the tactic walks the body `do tell (...); liftM (query t)`, consumes the
+`tell`-spec (Monoid variant), and `wpProp_iff_forall_support` discharges the
+`query t` residual. -/
+@[spec]
+theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
+    Std.Do.Triple
+      (countingOracle t :
+        WriterT (QueryCount ι) (OracleComp spec) (spec.Range t))
+      (spred(fun qc => ⌜qc = qc₀⌝))
+      (⇓ _ qc' => ⌜qc' = qc₀ + QueryCount.single t⌝) := by
+  rw [triple_writerT_iff_forall_support_monoid]
+  intro qc hqc v w hmem
+  subst hqc
+  -- Reduce the run to `(fun x => (x, QueryCount.single t * 1)) <$> query t`.
+  have hrun : (countingOracle t :
+      WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run =
+        (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
+          (OracleComp.query t : OracleComp spec _) := by
+    change (_ >>= _ : OracleComp _ _) = _
+    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+  rw [hrun] at hmem
+  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
+    Prod.mk.injEq] at hmem
+  obtain ⟨_, _, hw⟩ := hmem
+  subst hw
+  -- After `subst` the state is `qc * (QueryCount.single t * 1)` which simps
+  -- to `qc + QueryCount.single t` via `QueryCount.monoid_mul_def`.
+  simp
+
+/-- `mvcgen` example: two consecutive `countingOracle` calls increment the
+count by `QueryCount.single t₁ + QueryCount.single t₂`, in that order.
+`mvcgen` composes the per-call specs automatically. -/
+example (t₁ t₂ : spec.Domain) (qc₀ : QueryCount ι) :
+    Std.Do.Triple
+      (do let _ ← countingOracle t₁; countingOracle t₂ :
+        WriterT (QueryCount ι) (OracleComp spec) (spec.Range t₂))
+      (spred(fun qc => ⌜qc = qc₀⌝))
+      (⇓ _ qc' =>
+        ⌜qc' = qc₀ + QueryCount.single t₁ + QueryCount.single t₂⌝) := by
+  mvcgen [countingOracle_triple]
+  all_goals grind
+
+end countingOracle
+
+section costOracle
+
+variable {ω : Type} [Monoid ω]
+
+/-- Spec for `costOracle costFn t` over `WriterT ω (OracleComp spec)`:
+the cost accumulates by exactly `costFn t`. Generalises
+`countingOracle_triple` to arbitrary monoidal cost functions. -/
+@[spec]
+theorem costOracle_triple (costFn : spec.Domain → ω)
+    (t : spec.Domain) (s₀ : ω) :
+    Std.Do.Triple
+      (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t))
+      (spred(fun s => ⌜s = s₀⌝))
+      (⇓ _ s' => ⌜s' = s₀ * costFn t⌝) := by
+  rw [triple_writerT_iff_forall_support_monoid]
+  intro s hs v w hmem
+  have hrun : (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run =
+      (fun x => (x, costFn t * (1 : ω))) <$>
+        (OracleComp.query t : OracleComp spec _) := by
+    change (_ >>= _ : OracleComp _ _) = _
+    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+  rw [hrun] at hmem
+  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
+    Prod.mk.injEq] at hmem
+  obtain ⟨_, _, hw⟩ := hmem
+  subst hw
+  change s * (costFn t * (1 : ω)) = s₀ * costFn t
+  rw [hs, mul_one]
+
+/-- `mvcgen` example: two consecutive `costOracle` calls accumulate costs
+`costFn t₁ * costFn t₂` in order. -/
+example (costFn : spec.Domain → ω) (t₁ t₂ : spec.Domain) (s₀ : ω) :
+    Std.Do.Triple
+      (do let _ ← costOracle costFn t₁; costOracle costFn t₂ :
+        WriterT ω (OracleComp spec) (spec.Range t₂))
+      (spred(fun s => ⌜s = s₀⌝))
+      (⇓ _ s' => ⌜s' = s₀ * costFn t₁ * costFn t₂⌝) := by
+  mvcgen [costOracle_triple]
+  all_goals grind
+
+end costOracle
 
 /-! ## Stacked handlers
 
