@@ -109,6 +109,14 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
             (impl₁' := hidingAvgLeftImpl) (impl₂' := hidingAvgRightImpl)
             (hidingOa A s))]
   rw [run_simulateQ_hidingAvgRightImpl_eq_liftComp]
+  change
+    ((fun a : Bool × HidingCountState M S C => ((s, a.1), a.2)) <$>
+      (((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0)).liftComp
+        (HidingAvgSpec M S C))) =
+    ((fun a : Bool × HidingCountState M S C => ((s, a.1), a.2)) <$>
+      (((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0)).liftComp
+        (HidingAvgSpec M S C)))
+  rfl
 
 omit [DecidableEq C] [Fintype M] in
 /-- Averaged-mass bridge for hiding.
