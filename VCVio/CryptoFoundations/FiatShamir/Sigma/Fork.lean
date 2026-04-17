@@ -1416,7 +1416,7 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 internal `queryLog`, so the trace's logical fork index `s` (an offset into
 `trace.queryLog`) always corresponds to a real outer-log query at the same position. -/
 theorem runTrace_forkPoint_CfReachable
-    [DecidableEq Chal] [SampleableType Chal] [Inhabited Chal]
+    [DecidableEq Chal] [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt) :
