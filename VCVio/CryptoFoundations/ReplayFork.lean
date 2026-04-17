@@ -147,6 +147,127 @@ lemma getQueryValue?_cons_self_succ [spec.DecidableEq]
   rw [QueryLog.getQ_cons]
   simp
 
+/-- The prefix of `log` up to (but not including) the `s`-th `i`-query.
+
+If `log` has fewer than `s + 1` queries to `i`, this returns the entire `log`. This is
+the replay analogue of `QuerySeed.takeAtIndex` and is the key slicing operator used in
+the Cauchy-Schwarz step of the replay forking bound. -/
+def takeBeforeForkAt [spec.DecidableEq] :
+    QueryLog spec → ι → ℕ → QueryLog spec
+  | [], _, _ => []
+  | ⟨t, u⟩ :: tl, i, 0 =>
+      if t = i then [] else ⟨t, u⟩ :: takeBeforeForkAt tl i 0
+  | ⟨t, u⟩ :: tl, i, s + 1 =>
+      if t = i then ⟨t, u⟩ :: takeBeforeForkAt tl i s
+      else ⟨t, u⟩ :: takeBeforeForkAt tl i (s + 1)
+
+@[simp]
+lemma takeBeforeForkAt_nil [spec.DecidableEq] (i : ι) (s : ℕ) :
+    takeBeforeForkAt ([] : QueryLog spec) i s = [] := rfl
+
+lemma takeBeforeForkAt_cons_of_ne [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) (i : ι) (s : ℕ) (h : t ≠ i) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) i s = ⟨t, u⟩ :: takeBeforeForkAt tl i s := by
+  cases s with
+  | zero => simp [takeBeforeForkAt, h]
+  | succ s => simp [takeBeforeForkAt, h]
+
+lemma takeBeforeForkAt_cons_self_zero [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) t 0 = [] := by
+  simp [takeBeforeForkAt]
+
+lemma takeBeforeForkAt_cons_self_succ [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) (s : ℕ) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) t (s + 1) = ⟨t, u⟩ :: takeBeforeForkAt tl t s := by
+  simp [takeBeforeForkAt]
+
+/-- The prefix `takeBeforeForkAt log i s` has at most `s` queries to `i`. -/
+lemma countQ_takeBeforeForkAt_le [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    (takeBeforeForkAt log i s).countQ (· = i) ≤ s := by
+  induction log generalizing s with
+  | nil => simp [QueryLog.countQ]
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases h : t = i
+      · subst h
+        cases s with
+        | zero => rw [takeBeforeForkAt_cons_self_zero]; simp [QueryLog.countQ]
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            simp only [QueryLog.countQ, QueryLog.getQ_cons, ↓reduceIte, List.length_cons]
+            have := ih s
+            simp only [QueryLog.countQ] at this
+            omega
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ h]
+        simp only [QueryLog.countQ, QueryLog.getQ_cons]
+        rw [if_neg h]
+        simpa [QueryLog.countQ] using ih s
+
+/-- If `log` contains at least `s + 1` queries to `i`, then `takeBeforeForkAt log i s` has
+exactly `s` queries to `i`. -/
+lemma countQ_takeBeforeForkAt_eq [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ)
+    (h : s < (log.getQ (· = i)).length) :
+    (takeBeforeForkAt log i s).countQ (· = i) = s := by
+  induction log generalizing s with
+  | nil => simp [QueryLog.getQ] at h
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases ht : t = i
+      · subst ht
+        cases s with
+        | zero => rw [takeBeforeForkAt_cons_self_zero]; simp [QueryLog.countQ, QueryLog.getQ]
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            simp only [QueryLog.countQ, QueryLog.getQ_cons, ↓reduceIte, List.length_cons]
+            have h' : s < (QueryLog.getQ tl (· = t)).length := by
+              simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons] at h
+              omega
+            have := ih s h'
+            simp only [QueryLog.countQ] at this
+            omega
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ ht]
+        simp only [QueryLog.countQ, QueryLog.getQ_cons]
+        rw [if_neg ht]
+        simp only [QueryLog.getQ_cons] at h
+        rw [if_neg ht] at h
+        simpa [QueryLog.countQ] using ih s h
+
+/-- `takeBeforeForkAt log i s` is a prefix of `log`. -/
+lemma takeBeforeForkAt_prefix [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    (takeBeforeForkAt log i s) <+: log := by
+  induction log generalizing s with
+  | nil => simp
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases h : t = i
+      · subst h
+        cases s with
+        | zero =>
+            rw [takeBeforeForkAt_cons_self_zero]
+            exact List.nil_prefix
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            exact List.cons_prefix_cons.mpr ⟨rfl, ih s⟩
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ h]
+        exact List.cons_prefix_cons.mpr ⟨rfl, ih s⟩
+
+/-- `getQueryValue?` on the truncation at index `i` position `s` is `none`: the prefix
+has fewer than `s + 1` entries at oracle `i`. -/
+lemma getQueryValue?_takeBeforeForkAt_self [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    getQueryValue? (takeBeforeForkAt log i s) i s = none := by
+  unfold getQueryValue?
+  have h := countQ_takeBeforeForkAt_le log i s
+  simp only [QueryLog.countQ] at h
+  have hnone : ((takeBeforeForkAt log i s).getQ (· = i))[s]? = none := by
+    rw [List.getElem?_eq_none_iff]
+    exact h
+  rw [hnone]
+
 end QueryLog
 
 namespace OracleComp
