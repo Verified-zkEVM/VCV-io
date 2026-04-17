@@ -288,6 +288,20 @@ lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} {ω : Type} [Mon
     WriterPreservesInv impl (fun s => P s ∧ Q s) :=
   fun t s₀ ⟨hp, hq⟩ z hz => ⟨hP t s₀ hp z hz, hQ t s₀ hq z hz⟩
 
+/-- `WriterPreservesInv` from a multiplicatively-closed predicate.
+
+If `Q` holds on every writer increment `z.2` produced by a single query
+(`hquery`) and is closed under `*` (`hmul`), then `Q` is preserved across
+the whole simulation. This is the canonical builder for writer
+invariants: pick a submonoid-like predicate, show every per-query
+increment lands in it, and you're done. -/
+lemma WriterPreservesInv.of_mul_closed {ι : Type} {spec : OracleSpec ι} {ω : Type} [Monoid ω]
+    {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Q : ω → Prop}
+    (hmul : ∀ a b, Q a → Q b → Q (a * b))
+    (hquery : ∀ t z, z ∈ support (impl t).run → Q z.2) :
+    WriterPreservesInv impl Q :=
+  fun t s₀ hs₀ z hz => hmul s₀ z.2 hs₀ (hquery t z hz)
+
 end QueryImpl
 
 namespace OracleComp
