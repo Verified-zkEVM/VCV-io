@@ -277,3 +277,34 @@ theorem binding_bound {t : ℕ} (A : BindingAdversary M S C t) :
     _ = ((t * (t - 1) + 2 : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
         simpa [Nat.mul_one, Nat.add_comm, Nat.add_left_comm, Nat.add_assoc] using
           add_div_two_mul_nat (t * (t - 1)) 1 (Fintype.card C)
+
+/- **Binding bound via CR chain (looser).**
+
+Same `(t+2)(t+1) / (2|C|)` bound that the layered chain
+`binding ≤ keyed-CR ≤ birthday` of [#284] T1 + T2 produces. Derived by treating
+the `t+2` total queries of the binding game as a single ROM-CR experiment: a
+binding-game win implies a collision in the final cache
+(`binding_win_implies_collision`), and the inner game makes at most `t+2` total
+queries (`bindingInner_totalBound`); apply
+`probEvent_cacheCollision_le_birthday_total_tight` at `n = t+2`. This is the
+same proof shape as `romCRAdvantage_le_birthday` (see
+`VCVio/CryptoFoundations/HardnessAssumptions/CollisionResistance.lean`).
+
+Looser than the tight `binding_bound` above by roughly `(t+2)(t+1) / (t(t-1)+2)`
+— about `1 + 4/t²` for large `t` — but composes directly out of the standard-model
+binding-to-CR reduction (`bindingAdvantage_toCommitment_le_keyedCRAdvantage` in
+`VCVio/CryptoFoundations/HashCommitment.lean`) and the ROM CR birthday bound
+(`romCRAdvantage_le_birthday`). -/
+omit [Fintype M] [Fintype S] in
+theorem binding_bound_via_cr_chain {t : ℕ} (A : BindingAdversary M S C t) :
+    Pr[fun z => z.1 = true | bindingGame A] ≤
+    (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) := by
+  rw [bindingGame_eq]
+  calc Pr[fun z => z.1 = true | (simulateQ cachingOracle (bindingInner A)).run ∅]
+      ≤ Pr[fun z => CacheHasCollision z.2 |
+          (simulateQ cachingOracle (bindingInner A)).run ∅] :=
+        probEvent_mono (binding_win_implies_collision A)
+    _ ≤ (((t + 2) * (t + 1) : ℕ) : ℝ≥0∞) / (2 * Fintype.card C) :=
+        probEvent_cacheCollision_le_birthday_total_tight
+          (spec := CMOracle M S C) (bindingInner A) (t + 2)
+          (bindingInner_totalBound A) Fintype.card_pos (fun _ => le_refl _)
