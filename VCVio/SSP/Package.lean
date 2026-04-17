@@ -70,9 +70,12 @@ variable {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
   {σ : Type v}
 
 /-- The identity package on `E`: each export query is forwarded as the corresponding import
-query, with no private state. -/
+query, with no private state.
+
+Marked `protected` to prevent this name from shadowing `_root_.id` inside `namespace Package`;
+outside the namespace it is always written `Package.id`. -/
 @[simps]
-def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} where
+protected def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} where
   init := PUnit.unit
   impl t :=
     (liftM (query t : OracleComp E (E.Range t)) : StateT PUnit.{v + 1} (OracleComp E) _)

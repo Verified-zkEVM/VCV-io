@@ -3,7 +3,6 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import Examples.ElGamal.Common
 import VCVio.SSP.Hybrid
 
 /-!
@@ -417,8 +416,8 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun b => ?_
-        exact ElGamalExamples.evalDist_bind_bijective_add_eq
-          (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
+        exact evalDist_bind_bijective_add_right_eq
+          (α := F) (β := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
     | some a =>
         simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
@@ -433,13 +432,13 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun b => ?_
-        exact ElGamalExamples.evalDist_bind_bijective_add_eq
-          (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
+        exact evalDist_bind_bijective_add_right_eq
+          (α := F) (β := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
 
 /-- Hop #3: under the DDH-random package, the left- and right-message reductions produce the
 same output distribution against any adversary. The proof lifts the per-query uniform-masking
-argument `evalDist_bind_bijective_add_eq` across the full adversary via
+argument `evalDist_bind_bijective_add_right_eq` across the full adversary via
 `Package.simulateQ_StateT_evalDist_congr`. -/
 theorem evalDist_runProb_dhToLR_link_rand_swap
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))

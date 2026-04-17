@@ -131,6 +131,25 @@ lemma probOutput_bind_add_left_uniform [AddGroup α] {β : Type}
   refine tsum_congr fun y => ?_
   rw [probOutput_add_left_uniform (α := α) m y]
 
+/-- Right-translation analogue of `probOutput_add_left_uniform`: right-adding a constant to a
+uniform sample in `AddGroup α` preserves the output distribution, since `(· + m)` is a bijection
+on `α` with inverse `(· + (-m))`. -/
+lemma probOutput_add_right_uniform [AddGroup α] (m x : α) :
+    Pr[= x | ((· + m) : α → α) <$> ($ᵗ α)] = Pr[= x | $ᵗ α] :=
+  probOutput_map_bijective_uniformSample α (hf := AddGroup.addRight_bijective m) x
+
+lemma probOutput_bind_add_right_uniform [AddGroup α] {β : Type}
+    (m : α) (f : α → ProbComp β) (z : β) :
+    Pr[= z | (do let y ← $ᵗ α; f (y + m))] =
+      Pr[= z | (do let y ← $ᵗ α; f y)] := by
+  have hright :
+      (do let y ← $ᵗ α; f (y + m)) =
+        (((fun y : α => y + m) <$> ($ᵗ α)) >>= fun y => f y) := by
+    simp [map_eq_bind_pure_comp, bind_assoc]
+  rw [hright, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+  refine tsum_congr fun y => ?_
+  rw [probOutput_add_right_uniform (α := α) m y]
+
 /-- Translating a uniform additive sample preserves the full evaluation distribution. -/
 @[simp]
 lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
@@ -148,6 +167,24 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
+/-- Right-translation analogue of `evalDist_add_left_uniform`: right-adding a constant to a
+uniform sample in `AddGroup α` preserves the full evaluation distribution. -/
+@[simp]
+lemma evalDist_add_right_uniform [AddGroup α] (m : α) :
+    evalDist (((· + m) : α → α) <$> ($ᵗ α : ProbComp α)) =
+      evalDist ($ᵗ α : ProbComp α) := by
+  apply evalDist_ext
+  intro x
+  exact probOutput_add_right_uniform (α := α) m x
+
+/-- Two right-translations of a uniform sample have the same evaluation distribution. -/
+lemma evalDist_add_right_uniform_eq [AddGroup α] (m₁ m₂ : α) :
+    evalDist (((· + m₁) : α → α) <$> ($ᵗ α : ProbComp α)) =
+      evalDist (((· + m₂) : α → α) <$> ($ᵗ α : ProbComp α)) := by
+  trans evalDist ($ᵗ α : ProbComp α)
+  · exact evalDist_add_right_uniform (α := α) m₁
+  · exact (evalDist_add_right_uniform (α := α) m₂).symm
+
 /-- Pushing forward uniform sampling via a bijection preserves the full evaluation distribution. -/
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Finite α]
@@ -156,6 +193,41 @@ lemma evalDist_map_bijective_uniform_cross
   apply evalDist_ext
   intro y
   exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
+
+/-- **Bijective uniform + right-translation gives uniform.** Sampling `x ← $ᵗ α`, transporting
+through a bijection `f : α → β`, and right-adding any fixed `m : β` yields the same distribution
+as sampling `y ← $ᵗ β` directly, as observed by any continuation `cont : β → ProbComp γ`.
+
+This is the "one-time pad" fact underlying many cryptographic reductions: bijective transport
+makes `f x` uniform on `β`, and in any `AddGroup β` right-translation `(· + m)` is a bijection
+on the uniform measure, so the sum is again uniform. -/
+lemma evalDist_bind_bijective_add_right_uniform {β γ : Type}
+    [AddGroup β] [SampleableType β] [Finite α]
+    (f : α → β) (hf : Function.Bijective f) (m : β) (cont : β → ProbComp γ) :
+    evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m)) =
+      evalDist (do let y ← ($ᵗ β : ProbComp β); cont y) := by
+  have hbind :
+      (do let x ← ($ᵗ α : ProbComp α); cont (f x + m)) =
+        (f <$> ($ᵗ α : ProbComp α)) >>= fun y => cont (y + m) := by
+    simp [map_eq_bind_pure_comp, bind_assoc]
+  rw [hbind, evalDist_bind,
+      evalDist_map_bijective_uniform_cross (α := α) (β := β) f hf, ← evalDist_bind]
+  have hshift :
+      (do let y ← ($ᵗ β : ProbComp β); cont (y + m)) =
+        (((· + m) : β → β) <$> ($ᵗ β : ProbComp β)) >>= cont := by
+    simp [map_eq_bind_pure_comp, bind_assoc]
+  rw [hshift, evalDist_bind, evalDist_add_right_uniform (α := β) m, ← evalDist_bind]
+
+/-- Constant-irrelevance form of `evalDist_bind_bijective_add_right_uniform`: sampling through a
+bijection and right-adding a constant has a distribution independent of the constant. Any two
+offsets produce the same evaluation distribution. -/
+lemma evalDist_bind_bijective_add_right_eq {β γ : Type}
+    [AddGroup β] [SampleableType β] [Finite α]
+    (f : α → β) (hf : Function.Bijective f) (m₁ m₂ : β) (cont : β → ProbComp γ) :
+    evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m₁)) =
+      evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m₂)) := by
+  rw [evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₁ cont,
+      ← evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₂ cont]
 
 lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 := by aesop
 

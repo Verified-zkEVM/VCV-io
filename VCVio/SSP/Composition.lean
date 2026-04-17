@@ -50,9 +50,12 @@ variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
 
 /-- The `Prod` reshape `(α × s₁) × s₂ → α × (s₁ × s₂)` used by the linked package's handler to
 splice the outer state onto the left of the inner state. All three type arguments are implicit
-so that the pointfree `linkReshape <$> _` reads cleanly at use sites. -/
+so that the pointfree `linkReshape <$> _` reads cleanly at use sites.
+
+`private` because this function is a purely internal gadget used by `link` and its reduction
+lemmas; external callers should use `Package.link` / `Package.run_link` directly. -/
 @[reducible]
-def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
+private def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
     (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))
 
 /-- Sequential composition of two packages: `outer ∘ inner`.
@@ -237,9 +240,9 @@ def par (p₁ : Package I₁ E₁ σ₁) (p₂ : Package I₂ E₂ σ₂) :
   init := (p₁.init, p₂.init)
   impl
     | .inl t => StateT.mk fun (s₁, s₂) =>
-        (Prod.map _root_.id (·, s₂)) <$> liftComp ((p₁.impl t).run s₁) (I₁ + I₂)
+        (Prod.map id (·, s₂)) <$> liftComp ((p₁.impl t).run s₁) (I₁ + I₂)
     | .inr t => StateT.mk fun (s₁, s₂) =>
-        (Prod.map _root_.id (s₁, ·)) <$> liftComp ((p₂.impl t).run s₂) (I₁ + I₂)
+        (Prod.map id (s₁, ·)) <$> liftComp ((p₂.impl t).run s₂) (I₁ + I₂)
 
 @[simp]
 lemma par_init (p₁ : Package I₁ E₁ σ₁) (p₂ : Package I₂ E₂ σ₂) :
