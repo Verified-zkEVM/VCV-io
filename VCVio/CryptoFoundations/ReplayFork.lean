@@ -1469,7 +1469,12 @@ placeholder needed before the full quantitative replay forking argument.
 
 This runtime bound is off the critical path for the quantitative forking bound and has no direct
 counterpart in Firsov-Janku's `fsec`. It is deferred until downstream users actually need an
-expected-cost or pathwise bound on replay forks. -/
+expected-cost or pathwise bound on replay forks.
+
+Proof plan (deferred): each step of `replayOracle` performs at most one oracle query. In
+the live/mismatch branch and the non-matching-type fallback it does exactly one live query
+(`liftM (query t)`); in the matched-consumption and fork-substitution branches it does
+zero. Reduce to `IsTotalQueryBound.simulateQ_run_of_step` with the per-step 1-bound. -/
 theorem isTotalQueryBound_replayRunWithTraceValue
     (main : OracleComp spec α) (n : ℕ)
     (hmain : IsTotalQueryBound main n)
