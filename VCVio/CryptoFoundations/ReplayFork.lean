@@ -1464,23 +1464,73 @@ variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 variable [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec]
 variable [OracleSpec.LawfulSubSpec unifSpec spec]
 
-/-- Replay does not increase the total number of oracle queries. This is the runtime-control
-placeholder needed before the full quantitative replay forking argument.
+omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- Each step of `replayOracle` makes at most one oracle query. Either the oracle returns
+pure (matched-consumption or fork substitution), or it invokes `liftM (query t)` exactly
+once (live post-fork, mismatch, missing-entry, or mismatched-type fallback). -/
+private lemma replayOracle_step_isTotalQueryBound
+    (i : ι) (t : ι) (st : ReplayForkState spec i) :
+    IsTotalQueryBound (((replayOracle (spec := spec) i) t).run st) 1 := by
+  classical
+  -- 1-query block: `liftM (query t) >>= (fun u => pure (u, upd u))`.
+  have hquery : ∀ (upd : spec.Range t → ReplayForkState spec i),
+      IsTotalQueryBound (liftM (query (spec := spec) t) >>= fun u =>
+        (pure (u, upd u) : OracleComp spec (spec.Range t × ReplayForkState spec i))) 1 := by
+    intro upd
+    rw [isTotalQueryBound_query_bind_iff]
+    exact ⟨Nat.one_pos, fun _ => trivial⟩
+  unfold replayOracle
+  simp only [StateT.run_bind, StateT.run_get, pure_bind]
+  by_cases hlive : st.forkConsumed || st.mismatch
+  · -- Live branch: 1 query.
+    simp only [hlive, ↓reduceIte, bind_pure_comp, StateT.run_bind, StateT.run_monadLift,
+      monadLift_eq_self, StateT.run_map, StateT.run_set, map_pure, Functor.map_map]
+    exact hquery (fun u => st.noteObserved t u)
+  · simp only [hlive, Bool.false_eq_true, ↓reduceIte, bind_pure_comp, dite_eq_ite]
+    cases hnext : st.nextEntry? with
+    | none =>
+        simp only [StateT.run_bind, StateT.run_monadLift, monadLift_eq_self,
+          bind_pure_comp, StateT.run_map, StateT.run_set, map_pure, Functor.map_map]
+        exact hquery (fun u => (st.markMismatch).noteObserved t u)
+    | some entry =>
+        rcases entry with ⟨t', u'⟩
+        by_cases hsame : t = t'
+        · cases hsame
+          by_cases hti : t = i
+          · cases hti
+            by_cases hfork : st.distinguishedCount = st.forkQuery
+            · -- Fork substitution: 0 queries.
+              simp only [↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure]
+              exact trivial
+            · simp only [↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure]
+              exact trivial
+          · simp only [↓reduceDIte, hti, StateT.run_map, StateT.run_set, map_pure]
+            exact trivial
+        · -- Mismatched type: 1 query.
+          simp only [↓reduceDIte, hsame, StateT.run_bind, StateT.run_monadLift,
+            monadLift_eq_self, bind_pure_comp, StateT.run_map, StateT.run_set, map_pure,
+            Functor.map_map]
+          exact hquery (fun u => (st.markMismatch).noteObserved t u)
 
-This runtime bound is off the critical path for the quantitative forking bound and has no direct
-counterpart in Firsov-Janku's `fsec`. It is deferred until downstream users actually need an
-expected-cost or pathwise bound on replay forks.
+omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- Replay does not increase the total number of oracle queries. If `main` makes at most
+`n` queries, then `replayRunWithTraceValue main i trace forkQuery replacement` also makes
+at most `n` queries.
 
-Proof plan (deferred): each step of `replayOracle` performs at most one oracle query. In
-the live/mismatch branch and the non-matching-type fallback it does exactly one live query
-(`liftM (query t)`); in the matched-consumption and fork-substitution branches it does
-zero. Reduce to `IsTotalQueryBound.simulateQ_run_of_step` with the per-step 1-bound. -/
+Reduces to `IsTotalQueryBound.simulateQ_run_of_step` with
+`replayOracle_step_isTotalQueryBound` supplying the per-step bound of `1`. -/
 theorem isTotalQueryBound_replayRunWithTraceValue
     (main : OracleComp spec α) (n : ℕ)
     (hmain : IsTotalQueryBound main n)
     (i : ι) (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i) :
     IsTotalQueryBound (replayRunWithTraceValue main i trace forkQuery replacement) n := by
-  sorry
+  unfold replayRunWithTraceValue
+  exact IsTotalQueryBound.simulateQ_run_of_step (impl := replayOracle i) hmain
+    (fun t s => replayOracle_step_isTotalQueryBound i t s) _
 
 omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- If `forkReplay` succeeds, both runs agree on the selected fork index. -/
