@@ -52,18 +52,32 @@ into. The actual `MonadLift` instances from hax/aeneas live in `Hax/` and
 
 ## Git-pinned Backend Requires
 
-`lakefile.lean` carries explicit, commented-out git pins for both backends.
-Flip on whichever backend you need:
+`lakefile.lean` carries explicit git pins for both backends. Current state:
 
 ```lean
--- Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0)
+-- Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Enabled.
 require Hax from git
-  "https://github.com/cryspen/hax" @ "492a34e3..." / "hax-lib/proof-libs/lean"
+  "https://github.com/cryspen/hax" @ "492a34e3" / "hax-lib/proof-libs/lean"
 
--- Aeneas: currently Lean 4.28.0-rc1 — needs upstream bump before it links.
--- require Aeneas from git
---   "https://github.com/AeneasVerif/aeneas" @ "ba600392..." / "backends/lean"
+-- Aeneas: upstream still on Lean 4.28.0-rc1. Disabled; three source
+-- regressions against v4.29 (see `Interop/Aeneas/README.md`).
+-- require aeneas from git
+--   "https://github.com/AeneasVerif/aeneas" @ "ba600392" / "backends/lean"
 ```
 
-We git-pin by default so reproducible builds are guaranteed. Bumping a pin
-is a deliberate one-line change reviewed alongside any TCB delta.
+Hax was empirically verified on 2026-04-17: `lake build Hax` succeeds (91
+jobs), and Interop rebuilds incrementally with hax in scope. Aeneas at
+`ba600392` fails three files under Lean/Mathlib v4.29 including the one
+we need (`Aeneas/Std/Primitives.lean`); see `Interop/Aeneas/README.md`
+for exact diagnostics.
+
+### Require order matters
+
+`require Hax` must appear **before** `require "leanprover-community" /
+"mathlib"`. Hax transitively pins `Qq` at `v4.29.0-rc1`, Mathlib pins it
+at the final release; Lake's conflict resolver takes the **last**
+`require` of each dependency, so mathlib goes last to win. Wrong order
+produces `mathlib: failed to fetch cache` on `lake update`.
+
+We git-pin by default so reproducible builds are guaranteed. Bumping a
+pin is a deliberate one-line change reviewed alongside any TCB delta.

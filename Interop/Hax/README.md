@@ -5,9 +5,18 @@ to VCVio's `RustOracleComp`.
 
 ## Status
 
-Scaffolded but **not yet wired**. The hax `require` is commented out in
-`lakefile.lean` (see top-level `Interop/README.md` for the exact line and
-the rationale).
+`require Hax` is **active** in `lakefile.lean`, pinned to commit
+`492a34e3` (hax `main` as of 2026-04-16). Hax compiles cleanly against our
+Lean v4.29.0 / Mathlib v4.29.0 stack: `lake build Hax` succeeds in 91 jobs
+with 2 harmless `@[reducible]` warnings in hax's own
+`rust_primitives/USize64.lean`. No bridge code yet — the `MonadLift`
+instance and boundary lemmas below are the next step.
+
+Note: `require Hax` must appear *before* `require "leanprover-community" /
+"mathlib"` in `lakefile.lean`. Mathlib's transitive pin of `Qq` has to win
+over hax's `v4.29.0-rc1` pin, and Lake's conflict resolution takes the
+**last** `require` of each dependency. `lake update` warns explicitly if
+the order is wrong.
 
 ## Plan
 

@@ -5,16 +5,35 @@ Bridge from [aeneas](https://github.com/AeneasVerif/aeneas)'s Lean backend
 
 ## Status
 
-Scaffolded but **blocked on toolchain**. Aeneas `main`
-(`ba600392`, `build-2026.04.17.152554-...`) is on `leanprover/lean4:v4.28.0-rc1`,
-while VCVio is on `v4.29.0`. The require is therefore commented out in
-`lakefile.lean` — `lake update` against this pin would fail until aeneas
-ships a 4.29 build.
+Scaffolded but **blocked on upstream regressions**. Empirically verified
+on 2026-04-17 against aeneas `main` (`ba600392`): Lake happily resolves
+aeneas with our root Mathlib v4.29.0 and Lean v4.29.0 pins overriding
+aeneas's `v4.28.0-rc1` manifest entries, but aeneas's source has **three
+real regressions** against the v4.29 stack, and one of them is inside the
+single file we need:
 
-When that happens, the pin gets bumped (one line) and `Bridge.lean` is added
-here.
+1. `Aeneas/Std/Primitives.lean:168:44` — kernel type mismatch in
+   `CCPO (Result α) := inferInstanceAs (CCPO (FlatOrder .div))`. The
+   `FlatOrder` / `CCPO` / `chain` / `is_sup` API changed between v4.28
+   and v4.29. `Result α` itself still parses, but its `CCPO`/`MonoBind`
+   instances do not elaborate, so we cannot import `Aeneas.Std.Primitives`
+   at all.
+2. `Aeneas/Tactic/Simproc/ReduceZMod/ReduceZMod.lean:83:10` —
+   `Unknown constant Monoid.toNatPow` (renamed/removed in Mathlib v4.29).
+3. `Aeneas/Tactic/Simp/RingEqNF/Tests.lean:113:11` — `ring_nf` leaves a
+   different normal form under Mathlib v4.29, so a test's `exact h`
+   mismatches. Tests only, not the main library.
 
-## Plan
+Build coverage on the compatibility attempt was 1625/1662 jobs before the
+three failures propagated. The require is therefore **commented out** in
+`lakefile.lean`. Unblock by either:
+
+- Waiting for upstream to bump aeneas to Lean v4.29 (a one-line `require`
+  flip afterwards); or
+- Maintaining a short patch series on a fork pinning the above three
+  files and using that fork as the git source.
+
+## Plan (applies once upstream ships a v4.29 build)
 
 ```lean
 import Aeneas.Std.Primitives

@@ -67,35 +67,59 @@ oracle-aware Rust target monad for both backends.
 
 ## Git-pinned Backend Requires
 
-`lakefile.lean` carries explicit, **commented-out** git pins for both
-backends. Flip on whichever you need:
+`lakefile.lean` carries explicit git pins for both backends. Current
+state:
 
 ```lean
+-- Enabled (verified compatible against our v4.29.0 stack).
 require Hax from git
   "https://github.com/cryspen/hax" @
   "492a34e3" / "hax-lib/proof-libs/lean"
 
-require Aeneas from git
-  "https://github.com/AeneasVerif/aeneas" @
-  "ba600392" / "backends/lean"
+-- Disabled (three source regressions under v4.29; see below).
+-- require aeneas from git
+--   "https://github.com/AeneasVerif/aeneas" @
+--   "ba600392" / "backends/lean"
 ```
 
-We git-pin by default so reproducible builds are guaranteed; bumping a
-pin is a deliberate one-line change reviewed alongside any TCB delta. The
+Git-pin by default so reproducible builds are guaranteed; bumping a pin
+is a deliberate one-line change reviewed alongside any TCB delta. The
 isolation check runs regardless of whether the requires are active, so
 the contract holds even mid-experiment.
 
-## Toolchain Status (as of 2026-04-17)
+**Require-order rule.** `require Hax` (and any future backend require)
+must appear *before* `require "leanprover-community" / "mathlib"`. Hax
+transitively pins `Qq` at `v4.29.0-rc1`, Mathlib pins it at the final
+release. Lake's conflict resolver takes the *last* `require` of each
+package, so Mathlib must be last. Wrong order produces
+`mathlib: failed to fetch cache` on `lake update`, with a clear warning
+from Lake.
 
-- **VCVio**: `leanprover/lean4:v4.29.0`.
-- **hax `492a34e3`**: `v4.29.0-rc1` — close enough that Lake can rebuild
-  hax against our toolchain; expected to work with minor friction.
-- **aeneas `ba600392`**: `v4.28.0-rc1` — **one minor version behind**. A
-  `lake update` would currently fail; the require is commented out until
-  upstream ships a 4.29 build (or we maintain a fork).
+## Toolchain Status (empirical, as of 2026-04-17)
 
-Bump the pins by editing the two `require` lines in `lakefile.lean` and
-running `lake update Hax` (resp. `Aeneas`).
+- **VCVio**: `leanprover/lean4:v4.29.0` + Mathlib `v4.29.0`.
+- **hax `492a34e3`** (upstream: `v4.29.0-rc1`): `lake build Hax`
+  succeeds in 91 jobs. Two harmless `@[reducible]` warnings in
+  `Hax/rust_primitives/USize64.lean`; nothing blocks us.
+- **aeneas `ba600392`** (upstream: `v4.28.0-rc1`): `lake update` resolves
+  cleanly under our root Mathlib/Lean pins, but `lake build Aeneas`
+  reaches only 1625/1662 jobs before **three** source-level regressions
+  propagate:
+  - `Aeneas/Std/Primitives.lean:168:44` — kernel type mismatch in
+    `CCPO (Result α) := inferInstanceAs (CCPO (FlatOrder .div))`. This is
+    inside the one file we need.
+  - `Aeneas/Tactic/Simproc/ReduceZMod/ReduceZMod.lean:83:10` — Mathlib
+    removed / renamed `Monoid.toNatPow` in v4.29.
+  - `Aeneas/Tactic/Simp/RingEqNF/Tests.lean:113:11` — `ring_nf`
+    normalization differs; tests-only.
+
+  Because regression #1 is the file that defines `Result α`, there is no
+  partial-import workaround. Unblock by waiting for upstream to ship a
+  v4.29 build, or by maintaining a short patch series on a fork.
+
+Bump the hax pin (or un-comment aeneas once fixed) by editing the
+`require` line(s) in `lakefile.lean` and running `lake update Hax`
+(resp. `aeneas`).
 
 ## Bridge Design (Reference)
 
