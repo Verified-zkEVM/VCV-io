@@ -255,6 +255,155 @@ section Coupling
 
 variable [DecidableEq M] [DecidableEq Commit]
 
+/-! ### Per-step support characterizations
+
+Two thin lemmas that describe the support of a single step of the layered simulation
+`(simulateQ loggingOracle (((unifFwd + roImpl) t).run (c₀, l₀))).run`. Used by the
+1-state and 2-state preservation helpers below to do *all* per-step case analysis in
+one place. The `Sum.inl` step always issues a forwarded uniform query and logs it; the
+`Sum.inr` step branches on whether the cache already contains the asked hash point. -/
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Support of one `Sum.inl n` step: forward the uniform query, log it, leave the
+simulator state unchanged. -/
+private lemma support_step_inl
+    (n : ℕ) (s : simSt M Commit Chal)
+    (z : ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inl n) × simSt M Commit Chal) ×
+      QueryLog (wrappedSpec Chal)) :
+    z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      (((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run s)).run) ↔
+    ∃ u : (unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inl n),
+      z = ((u, s), [⟨Sum.inl n, u⟩]) := by
+  obtain ⟨c₀, l₀⟩ := s
+  have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run (c₀, l₀) =
+      (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+        fun u => pure (u, (c₀, l₀)) := by
+    simp [QueryImpl.add_apply_inl, unifFwd]
+  rw [hrun]
+  change z ∈ support (simulateQ loggingOracle
+      ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+        fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run ↔ _
+  rw [OracleComp.run_simulateQ_loggingOracle_query_bind
+    (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))]
+  simp only [support_bind, support_map, support_query, Set.mem_univ,
+    simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
+    Set.iUnion_const]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨_, ⟨u, rfl⟩, hzeq⟩; exact ⟨u, hzeq⟩
+  · rintro ⟨u, rfl⟩; exact ⟨_, ⟨u, rfl⟩, rfl⟩
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Support of one `Sum.inr mc` step: cache hit returns the cached value with no outer
+log entry; cache miss issues a `Sum.inr ()` query, logs it, caches the response, and
+appends `mc` to the trace's internal `queryLog`. -/
+private lemma support_step_inr
+    (mc : M × Commit) (s : simSt M Commit Chal)
+    (z : ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr mc) × simSt M Commit Chal) ×
+      QueryLog (wrappedSpec Chal)) :
+    z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      (((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run s)).run) ↔
+    (∃ v, s.1 mc = some v ∧ z = ((v, s), [])) ∨
+    (s.1 mc = none ∧ ∃ v,
+      z = ((v, (s.1.cacheQuery mc v, s.2 ++ [mc])), [⟨Sum.inr (), v⟩])) := by
+  obtain ⟨c₀, l₀⟩ := s
+  by_cases hcache : c₀ mc = none
+  · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run (c₀, l₀) =
+        (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+          fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
+      simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
+        StateT.run_set, hcache]
+    rw [hrun]
+    change z ∈ support (simulateQ loggingOracle
+        ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+          fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
+            OracleComp _ _))).run ↔ _
+    rw [OracleComp.run_simulateQ_loggingOracle_query_bind
+      (spec := wrappedSpec Chal) (Sum.inr ())
+      (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))]
+    simp only [support_bind, support_map, support_query, Set.mem_univ,
+      simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
+      Set.iUnion_const]
+    refine ⟨?_, ?_⟩
+    · rintro ⟨_, ⟨v, rfl⟩, hzeq⟩
+      exact Or.inr ⟨hcache, v, hzeq⟩
+    · rintro (⟨v, hv, _⟩ | ⟨_, v, hzeq⟩)
+      · exact absurd hv.symm (hcache ▸ Option.some_ne_none v)
+      · exact ⟨_, ⟨v, rfl⟩, hzeq⟩
+  · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
+    have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run (c₀, l₀) =
+        pure (v, (c₀, l₀)) := by
+      simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
+    rw [hrun]
+    change z ∈ support (simulateQ loggingOracle
+        (pure (v, (c₀, l₀)) : OracleComp _ _)).run ↔ _
+    simp only [simulateQ_pure, WriterT.run_pure', support_pure]
+    refine ⟨?_, ?_⟩
+    · rintro rfl; exact Or.inl ⟨v, hv.symm, rfl⟩
+    · rintro (⟨v', hv', hzeq⟩ | ⟨h0, _⟩)
+      · have hvv : v = v' := by rw [← hv] at hv'; exact (Option.some_inj.mp hv'.symm).symm
+        rw [hzeq, hvv]; rfl
+      · exact absurd h0 (Option.ne_none_iff_exists.mpr ⟨v, hv⟩)
+
+/-! ### Layered preservation helpers
+
+Two skeletons that capture the entire structural induction `OracleComp.inductionOn`
+on `Y` for the layered simulation. All five Coupling lemmas below boil down to writing
+the per-step preservation in *three* concrete cases (Sum.inl, Sum.inr cache hit, Sum.inr
+cache miss) using the support characterizations above; the inductive bookkeeping is
+factored out once. -/
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Generic 1-state preservation for the "stateful inner simulation, then outer logging"
+pattern. Given a per-step preservation `hstep`, lift it to the whole layered simulation. -/
+private theorem preservesInv_layered
+    {γ : Type}
+    (Inv : simSt M Commit Chal → QueryLog (wrappedSpec Chal) → Prop)
+    (hstep : ∀ t (s : simSt M Commit Chal) (w : QueryLog (wrappedSpec Chal)),
+      Inv s w →
+      ∀ z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+        (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run s)).run),
+      Inv z.1.2 (w ++ z.2))
+    (Y : OracleComp (unifSpec + (M × Commit →ₒ Chal)) γ)
+    (s₀ : simSt M Commit Chal) (w₀ : QueryLog (wrappedSpec Chal))
+    (hinit : Inv s₀ w₀)
+    {z : (γ × simSt M Commit Chal) × QueryLog (wrappedSpec Chal)}
+    (hz : z ∈ support
+      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+        ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run s₀)).run)) :
+    Inv z.1.2 (w₀ ++ z.2) := by
+  classical
+  induction Y using OracleComp.inductionOn generalizing s₀ w₀ z with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, WriterT.run_pure',
+        support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      simpa using hinit
+  | query_bind t oa ih =>
+      have hY : (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
+            ((liftM (query t) : OracleComp _ _) >>= oa)).run s₀ =
+          (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run s₀) >>= fun us =>
+            (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
+        simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
+          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
+      rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
+      simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
+      obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
+      have hpres : Inv us_w.1.2 (w₀ ++ us_w.2) := hstep t s₀ w₀ hinit us_w hus_w
+      have hpw_split : (pw.1, pw.2) ∈ support
+          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
+              (oa us_w.1.1)).run us_w.1.2)).run) := hpw
+      have hih := ih (us_w.1.1) (s₀ := us_w.1.2) (w₀ := w₀ ++ us_w.2)
+        hpres (z := pw) hpw_split
+      have hz_eq' : z = (pw.1, us_w.2 ++ pw.2) := by
+        have h_eq : (pw.1, us_w.2 ++ pw.2) =
+            Prod.map id (us_w.2 ++ ·) pw := rfl
+        rw [h_eq]; exact hz_eq.symm
+      rw [hz_eq']
+      change Inv pw.1.2 (w₀ ++ (us_w.2 ++ pw.2))
+      rw [← List.append_assoc]
+      exact hih
+
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Coupling invariant for `runTrace`'s inner simulation: the trace's internal `queryLog`
 grows by exactly the number of `Sum.inr ()` queries issued to the outer wrapped spec.
@@ -271,105 +420,30 @@ private theorem queryLog_length_eq_outer_inr_count
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run)) :
     z.2.2.length = l₀.length + outerLog.countQ (· = Sum.inr ()) := by
-  classical
-  induction Y using OracleComp.inductionOn generalizing c₀ l₀ z outerLog with
-  | pure x =>
-      simp only [simulateQ_pure, StateT.run_pure, simulateQ_pure, WriterT.run_pure',
-        support_pure, Set.mem_singleton_iff, Prod.mk.injEq] at hz
-      obtain ⟨hz_eq, hlog_eq⟩ := hz
-      subst hz_eq
-      subst hlog_eq
-      simp [QueryLog.countQ]
-  | query_bind t oa ih =>
-      have hY :
-          (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-            ((liftM (query t) : OracleComp _ _) >>= oa)).run (c₀, l₀) =
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀)) >>= fun us =>
-              (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (oa us.1)).run us.2 := by
-        simp [simulateQ_bind, simulateQ_query, StateT.run_bind,
-          map_eq_bind_pure_comp, OracleQuery.cont_query, OracleQuery.input_query]
-      rw [hY, simulateQ_bind, WriterT.run_bind', support_bind] at hz
-      simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
-      obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
-      have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
-            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
-              (oa us_w.1.1)).run us_w.1.2)).run) := by
-        change pw ∈ support _
-        exact hpw
-      have hih :
-          pw.1.2.2.length = us_w.1.2.2.length + pw.2.countQ (· = Sum.inr ()) :=
-        ih (u := us_w.1.1) (c₀ := us_w.1.2.1) (l₀ := us_w.1.2.2)
-          (z := pw.1) (outerLog := pw.2) hpw_split
-      have hz_eq' : (pw.1, us_w.2 ++ pw.2) = (z, outerLog) := by
-        rw [show ((pw.1, us_w.2 ++ pw.2) : _ × QueryLog (wrappedSpec Chal)) =
-              Prod.map id (fun x => us_w.2 ++ x) pw from rfl]
-        exact hz_eq
-      obtain ⟨hz_eq1, hz_eq2⟩ := Prod.mk.inj hz_eq'
-      rw [← hz_eq1, ← hz_eq2]
-      have houter : us_w ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
-            (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w
-      -- We will show: ∃ u, us_w = ((u, st'), w₁) where w₁ is determined by the case,
-      -- and st' is determined by the case.
-      cases t with
-      | inl n =>
-          have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run (c₀, l₀) =
-              (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => pure (u, (c₀, l₀)) := by
-            simp [QueryImpl.add_apply_inl, unifFwd]
-          rw [hrun] at houter
-          change us_w ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
-                fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter
-          rw [OracleComp.run_simulateQ_loggingOracle_query_bind
-            (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter
-          rw [support_bind] at houter
-          simp only [support_map, support_query, Set.mem_univ,
-            simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-            Set.iUnion_const] at houter
-          obtain ⟨_, ⟨u, hu_eq⟩, hus_w_in_u⟩ := houter
-          subst hu_eq
-          rw [Set.mem_singleton_iff] at hus_w_in_u
-          rw [hih, hus_w_in_u]
-          simp [QueryLog.countQ, QueryLog.getQ]
-      | inr mc =>
-          by_cases hcache : c₀ mc = none
-          · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
-                (c₀, l₀) =
-                (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
-                  fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
-              simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
-                StateT.run_set, hcache]
-            rw [hrun] at houter
-            change us_w ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
-                  fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
-                    OracleComp _ _))).run at houter
-            rw [OracleComp.run_simulateQ_loggingOracle_query_bind
-              (spec := wrappedSpec Chal) (Sum.inr ())
-              (fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])))] at houter
-            rw [support_bind] at houter
-            simp only [support_map, support_query, Set.mem_univ,
-              simulateQ_pure, WriterT.run_pure', support_pure, Set.image_singleton,
-              Set.iUnion_const] at houter
-            obtain ⟨_, ⟨v, hv_eq⟩, hus_w_in_u⟩ := houter
-            subst hv_eq
-            rw [Set.mem_singleton_iff] at hus_w_in_u
-            rw [hih]
-            subst hus_w_in_u
+  -- The invariant is `s.2.length = l₀.length + w.countQ Sum.inr ()`. Each step preserves
+  -- it: `Sum.inl` does not touch either side; `Sum.inr` cache hits leave both unchanged;
+  -- `Sum.inr` cache misses grow both sides by one.
+  have h := preservesInv_layered (M := M) (Commit := Commit) (Chal := Chal)
+    (Inv := fun s w => s.2.length = l₀.length + w.countQ (· = Sum.inr ()))
+    (hstep := ?_) Y (c₀, l₀) [] (by simp [QueryLog.countQ]) hz
+  · simpa [List.nil_append] using h
+  · intro t s w hI z hz
+    cases t with
+    | inl n =>
+        rw [support_step_inl] at hz
+        obtain ⟨u, rfl⟩ := hz
+        simp only [QueryLog.countQ_append]
+        simpa [QueryLog.countQ, QueryLog.getQ] using hI
+    | inr mc =>
+        rw [support_step_inr] at hz
+        rcases hz with ⟨v, _, rfl⟩ | ⟨_, v, rfl⟩
+        · simpa using hI
+        · simp only [List.length_append, List.length_singleton, QueryLog.countQ_append]
+          have h1 : QueryLog.countQ (spec := wrappedSpec Chal)
+              [⟨Sum.inr (), v⟩] (· = Sum.inr ()) = 1 := by
             simp [QueryLog.countQ, QueryLog.getQ]
-            omega
-          · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
-            have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
-                (c₀, l₀) = pure (v, (c₀, l₀)) := by
-              simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get, ← hv]
-            rw [hrun] at houter
-            change us_w ∈ support (simulateQ loggingOracle
-                ((pure (v, (c₀, l₀)) : OracleComp _ _) : OracleComp _ _)).run at houter
-            simp only [simulateQ_pure, WriterT.run_pure', support_pure] at houter
-            subst houter
-            exact hih
+          rw [h1, hI]
+          ring
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Lockstep value invariant for `runTrace`'s inner simulation. Three coupled invariants
