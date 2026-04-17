@@ -2574,11 +2574,13 @@ in the replay setting, `cf` is computed from `x` independently from the actual q
 made by the run that produced it. The hypothesis captures the natural condition that the
 fork point `s` chosen by `cf` always corresponds to a query that was actually issued.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**: this theorem
-invokes the Jensen/Cauchy-Schwarz step as a helper, and that helper is still a `sorry`.
+**Currently conditional on the two prefix-faithfulness `sorry`s** feeding
+`sq_probOutput_main_le_noGuardReplayComp`:
+`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` (induction on `main`)
+and `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` (weighted-averaging induction).
 Downstream consumers (`probOutput_none_forkReplay_le`, `le_probEvent_isSome_forkReplay`,
 `Fork.replayForkingBound`, `euf_nma_bound`, `euf_cma_bound`) inherit this conditionality
-until the step is discharged. -/
+until both faithfulness lemmas are discharged. -/
 theorem le_probOutput_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -2683,8 +2685,8 @@ the proof structure is identical, substituting the pointwise replay lower bound
 `le_probOutput_forkReplay` for its seed-based analogue. The `hreach` hypothesis is
 threaded through from `le_probOutput_forkReplay`.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
-`le_probOutput_forkReplay`). -/
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
+`le_probOutput_forkReplay` → `sq_probOutput_main_le_noGuardReplayComp`). -/
 theorem probOutput_none_forkReplay_le
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :
@@ -2747,8 +2749,9 @@ theorem probOutput_none_forkReplay_le
 `forkReplay_precondition_le_one` by the same `1 - ·` conversion used in
 `le_probEvent_isSome_seededFork`. The `hreach` hypothesis is threaded through.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
-`probOutput_none_forkReplay_le`). -/
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
+`probOutput_none_forkReplay_le` → `le_probOutput_forkReplay`
+→ `sq_probOutput_main_le_noGuardReplayComp`). -/
 theorem le_probEvent_isSome_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :

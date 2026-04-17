@@ -1374,8 +1374,16 @@ queries: each cache miss in `roImpl` appends to both simultaneously, so a logica
 into the trace's list corresponds to the same physical position in the outer log. Callers
 discharge `hreach` by establishing this correspondence at the level of `runTrace`.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
-`le_probEvent_isSome_forkReplay`). -/
+**On typeclass requirements.** The `wrappedSpec Chal` oracle space is
+`unifSpec + (Unit →ₒ Chal)`, and the quantitative section of `ReplayFork.lean` requires the
+typeclass `[OracleSpec.LawfulSubSpec unifSpec spec]` (to factor `probOutput_uniformSample`
+through `liftComp` on the `forkReplay` side). This instance is discharged by Mathlib
+automation at this call site.
+
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
+`le_probEvent_isSome_forkReplay` → `sq_probOutput_main_le_noGuardReplayComp`
+→ `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`
+and `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`). -/
 theorem replayForkingBound
     [DecidableEq M] [DecidableEq Commit]
     [DecidableEq Chal] [SampleableType Chal] [Fintype Chal] [Inhabited Chal]

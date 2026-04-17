@@ -986,9 +986,10 @@ with the single-run postcondition `verify` plus the extractor correctness lemma
 uses `Fork.replayForkingBound` for the RO-level packaging and `_hss` for special
 soundness, with `σ.extract` playing the role of EC's `extractor`.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**
-(ReplayFork.lean): the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`
-is still a `sorry`, so this theorem is not yet unconditionally proved end-to-end. -/
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s**
+(`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean),
+which feed the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -1105,8 +1106,10 @@ the bound is trivially satisfied when the simulation loss exceeds the advantage.
 
 **Currently conditional on two open obligations**:
 1. `euf_cma_to_nma` (this file, still `sorry`): CMA-to-NMA reduction via HVZK simulator.
-2. `sq_probOutput_main_le_noGuardReplayComp` (ReplayFork.lean, still `sorry`):
-   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`, transitively inherited
+2. The two B1 prefix-faithfulness `sorry`s in ReplayFork.lean
+   (`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
+   `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`), which feed the
+   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`; transitively inherited
    from `euf_nma_bound`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
