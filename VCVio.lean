@@ -173,6 +173,7 @@ import VCVio.ProgramLogic.NotationCore
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.FromUnary
+import VCVio.ProgramLogic.Relational.HandlerFromUnary
 import VCVio.ProgramLogic.Relational.Leakage
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
