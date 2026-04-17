@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.ProgramLogic.Unary.WriterTBridge
 import VCVio.OracleComp.Coercions.SubSpec
 
 /-!
@@ -106,6 +107,67 @@ noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) 
     change wpProp (spec := spec) (x >>= f) (fun b => (Q.1 b).down) ↔
       wpProp x (fun a => wpProp (f a) (fun b => (Q.1 b).down))
     exact wpProp_bind x f _
+
+/-! ## Support-based bridge for stateful transformers over `OracleComp`
+
+The two lemmas below reduce `Std.Do.Triple` for `StateT σ (OracleComp spec)` and
+`WriterT ω (OracleComp spec)` to support-based statements about the underlying
+`OracleComp` distribution. They are the canonical "escape hatch" used whenever a
+handler proof needs to leave `mvcgen` (e.g. to perform a structural induction on
+`OracleComp`) without abandoning the `Std.Do` proof mode entirely. -/
+
+section StatefulBridges
+
+variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+
+/-- Support characterization of `Std.Do.Triple` on `StateT σ (OracleComp spec)`.
+
+A triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, s')` in the support of
+`mx.run s` satisfies the postcondition `Q.1 a s'`, whenever the starting state
+`s` satisfies the precondition `P`. -/
+theorem triple_stateT_iff_forall_support {σ α : Type}
+    (mx : StateT σ (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg σ .pure)) (Q : Std.Do.PostCond α (.arg σ .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : σ, (P s).down →
+        ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) (mx.run s) (fun p => (Q.1 p.1 p.2).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a s' hmem; exact h (a, s') hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
+/-- Support characterization of `Std.Do.Triple` on `WriterT ω (OracleComp spec)`.
+
+A triple `⦃P⦄ mx ⦃Q⦄` over the writer log holds iff every outcome `(a, w)` in
+the support of `mx.run` satisfies `Q.1 a (s ++ w)` for every starting log `s`
+satisfying `P`. The starting log `s` is threaded through `mx` as a pure prefix
+because `WriterT.run` always begins from `∅` and accumulates via `++`. -/
+theorem triple_writerT_iff_forall_support {ω α : Type}
+    [EmptyCollection ω] [Append ω] [LawfulAppend ω]
+    (mx : WriterT ω (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg ω .pure)) (Q : Std.Do.PostCond α (.arg ω .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : ω, (P s).down →
+        ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s ++ w)).down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) mx.run
+      (fun p => (Q.1 p.1 (s ++ p.2)).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a w hmem; exact h (a, w) hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
+end StatefulBridges
 
 namespace Spec
 

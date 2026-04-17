@@ -57,8 +57,6 @@ registrations, but the underlying `WPMonad` synthesis remains expensive.
 
 ## Main results
 
-* `triple_stateT_iff_forall_support` - bridge lemma reducing `Std.Do.Triple`
-  on `StateT σ (OracleComp spec)` to support-based reasoning.
 * `simulateQ_triple_preserves_invariant` - generic invariant-preservation
   for `simulateQ`; lifts per-handler invariant triples to whole-program
   triples.
@@ -139,29 +137,6 @@ namespace OracleComp.ProgramLogic.StdDo
 
 variable {ι : Type}
 variable {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
-
-/-- Support characterization of `Std.Do.Triple` on `StateT σ (OracleComp spec)`.
-
-A triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, s')` in the support of
-`mx.run s` satisfies the postcondition `Q.1 a s'`, whenever the starting
-state `s` satisfies the precondition `P`. -/
-theorem triple_stateT_iff_forall_support {σ α : Type}
-    (mx : StateT σ (OracleComp spec) α)
-    (P : Assertion (.arg σ .pure)) (Q : PostCond α (.arg σ .pure)) :
-    Std.Do.Triple mx P Q ↔
-      ∀ s : σ, (P s).down →
-        ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down := by
-  classical
-  rw [Triple.iff]
-  simp only [SPred.entails_1]
-  refine forall_congr' (fun s => ?_)
-  refine imp_congr_right (fun _hP => ?_)
-  -- Goal: (wp⟦mx⟧ Q s).down ↔ ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down
-  change wpProp (spec := spec) (mx.run s) (fun p => (Q.1 p.1 p.2).down) ↔ _
-  rw [wpProp_iff_forall_support]
-  constructor
-  · intro h a s' hmem; exact h (a, s') hmem
-  · intro h p hmem; exact h p.1 p.2 hmem
 
 /-! ## Generic invariant-preservation for `simulateQ` -/
 
