@@ -188,6 +188,7 @@ import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Unary
 import VCVio.ProgramLogic.Tactics.Unary.Internals
 import VCVio.ProgramLogic.Unary.Examples
+import VCVio.ProgramLogic.Unary.HandlerSpecs
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
