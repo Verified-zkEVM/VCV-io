@@ -264,6 +264,102 @@ relTriple_simulateQ_run :
     (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2)
 ```
 
+### Handler `@[spec]` catalog (`Unary/HandlerSpecs.lean`)
+
+Per-call `Std.Do.Triple` specs, all tagged `@[spec]` so `mvcgen` can
+compose them automatically through multi-query handler programs:
+
+| Handler | Spec | Postcondition |
+|---------|------|---------------|
+| `cachingOracle` | `cachingOracle_triple` | `cache₀ ≤ cache' ∧ cache' t = some v` (shared live-query + cache-monotonicity) |
+| `seededOracle` | `seededOracle_triple` | branch on `seed t`: `nil → no-op`, `cons u us → pop head` |
+| `loggingOracle` | `loggingOracle_triple` | `log' = log₀ ++ [⟨t, v⟩]` (always extend the log) |
+| `countingOracle` | `countingOracle_triple` | `qc' = qc₀ + QueryCount.single t` (monoid variant of `WriterT` bridge) |
+| `costOracle` | `costOracle_triple` | `s' = s₀ * costFn t` for arbitrary `[Monoid ω]` |
+
+The `WriterT`-based handlers come in both `Append`-parameterized
+(`loggingOracle`) and `Monoid`-parameterized (`countingOracle`,
+`costOracle`) flavors; the corresponding bridge lemmas
+`triple_writerT_iff_forall_support` and
+`triple_writerT_iff_forall_support_monoid` live in `Unary/StdDoBridge.lean`.
+
+### Whole-program invariant preservation (`SimSemantics/PreservesInv.lean`)
+
+Support-based invariant-preservation over `simulateQ`, for both the
+state-transformer and writer-transformer models:
+
+| Definition | Shape | Meaning |
+|------------|-------|---------|
+| `QueryImpl.PreservesInv` | `σ → Prop` | every `(impl t).run σ₀` keeps the state invariant |
+| `QueryImpl.WriterPreservesInv` | `ω → Prop` under `[Monoid ω]` | every `(impl t).run` step keeps `s₀ * w` satisfying `Inv` |
+| `QueryImpl.WriterPreservesInv.of_mul_closed` | — | canonical builder: `Q` closed under `*` and holding on per-query increments yields `WriterPreservesInv` |
+| `OracleComp.simulateQ_run_preservesInv` | — | lift per-query `PreservesInv` to whole simulation |
+| `OracleComp.simulateQ_run_writerPreservesInv` | — | writer analogue |
+
+`Std.Do.Triple`-fronted whole-program lifts (`Unary/HandlerSpecs.lean`):
+
+| Theorem | Shape |
+|---------|-------|
+| `simulateQ_triple_preserves_invariant` | `StateT` version |
+| `simulateQ_writerT_triple_preserves_invariant` | `WriterT` (monoid) version |
+
+`WriterPreservesInv` is the canonical invariant-preservation API for
+writer-based handlers like `countingOracle`/`costOracle`. Typical use:
+pick `Inv s := s ≤ B` (cost-budget) or `Inv s := s ∈ Submonoid.S` (stays
+in a submonoid).
+
+Worked examples in `HandlerSpecs.lean`:
+
+| Example | What it shows |
+|---------|---------------|
+| `simulateQ_cachingOracle_preserves_cache_le` | Whole-simulation cache monotonicity for `cachingOracle` (`StateT`) |
+| `simulateQ_cachingLoggingOracle_preserves_cache_le` / `..._log_prefix` | Stacked `StateT` handler preserves each component's invariant |
+| `simulateQ_countingOracle_preserves_ge` | Whole-simulation count monotonicity for `countingOracle` via the `WriterT` lift with `I qc := qc₀ ≤ qc` |
+| `simulateQ_costOracle_preserves_submonoid` | Submonoid closure: if `costFn t ∈ S` for every `t`, the accumulated cost stays in `S` |
+
+### Unary-to-relational handler lift (`Relational/HandlerFromUnary.lean`)
+
+If each handler has a `Std.Do.Triple` spec (produced by `mvcgen` or a
+`@[spec]` lemma), you do not have to assemble per-call `RelTriple`s by
+hand. The lift converts unary handler specs plus a synchronization
+condition into a whole-program `RelTriple`:
+
+```lean
+relTriple_simulateQ_run_of_triples :
+  (∀ t s, Triple (impl₁ t) ⌜· = s⌝ (⇓a s' => ⌜Q₁ t s a s'⌝)) →
+  (∀ t s, Triple (impl₂ t) ⌜· = s⌝ (⇓a s' => ⌜Q₂ t s a s'⌝)) →
+  (hsync : Q₁ ∧ Q₂ ⇒ output equality + R_state preservation) →
+  R_state s₁ s₂ →
+  RelTriple ((simulateQ impl₁ oa).run s₁) ((simulateQ impl₂ oa).run s₂)
+    (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2)
+```
+
+Projection and bridge variants:
+
+| Variant | Use when |
+|---------|----------|
+| `relTriple_simulateQ_run_of_triples` | Full `(value, state)` postcondition (`StateT`) |
+| `relTriple_simulateQ_run'_of_triples` | Only `EqRel α` on projected outputs (`StateT`) |
+| `relTriple_simulateQ_run_of_impl_eq_triple` | Two handlers agreeing on `Inv`; preservation spec is a `Std.Do.Triple`; conclude `EqRel (α × σ)` |
+| `relTriple_simulateQ_run_writerT` | Whole-program `WriterT` coupling from per-query `RelTriple`s plus a monoid-congruence hypothesis on the accumulated writers |
+| `relTriple_simulateQ_run_writerT'` | Output-projection of `relTriple_simulateQ_run_writerT` (drops the writer component, yielding `EqRel α` on outputs) |
+| `relTriple_simulateQ_run_writerT_of_impl_eq` | `WriterT` analogue of `relTriple_simulateQ_run_of_impl_eq_preservesInv`: two handlers with identical `.run` outputs yield `EqRel (α × ω)` on whole simulations |
+| `probOutput_simulateQ_run_writerT_eq_of_impl_eq` | Output-probability projection of `relTriple_simulateQ_run_writerT_of_impl_eq` |
+| `evalDist_simulateQ_run_writerT_eq_of_impl_eq` | `evalDist` equality projection of `relTriple_simulateQ_run_writerT_of_impl_eq` |
+| `relTriple_simulateQ_run_writerT_of_triples` | `WriterT` handler-level whole-program lift from unary triples (monoid variant) |
+| `relTriple_simulateQ_run_writerT'_of_triples` | Output-projection of `relTriple_simulateQ_run_writerT_of_triples` |
+| `relTriple_run_of_triple` | Per-call product coupling for `StateT` |
+| `relTriple_run_writerT_of_triple` | Per-call product coupling for `WriterT` (`Append` variant, e.g. `loggingOracle`) |
+| `relTriple_run_writerT_of_triple_monoid` | Per-call product coupling for `WriterT` (`Monoid` variant, e.g. `countingOracle`, `costOracle`) |
+| `support_preservesInv_of_triple` | Convert `Std.Do.Triple` preservation into `support`-based preservation consumed by `SimulateQ.lean` (`StateT`) |
+| `writerPreservesInv_of_triple` | `WriterT` analogue: produces `QueryImpl.WriterPreservesInv impl Inv` from a per-query `Std.Do.Triple` |
+
+Whenever the handler's invariant-preservation proof already lives as a
+`Std.Do.Triple`, prefer `relTriple_simulateQ_run_of_impl_eq_triple` over
+the raw `relTriple_simulateQ_run_of_impl_eq_preservesInv` — the bridge
+saves you from re-expressing the preservation as a `support`-based
+quantifier.
+
 ### Identical Until Bad
 
 ```lean

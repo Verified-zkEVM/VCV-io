@@ -315,7 +315,14 @@ lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i
 
 end ReplayPrefixInvariant
 
-private lemma replayOracle_preservesPrefixInvariant [spec.DecidableEq]
+/-- Per-query preservation of the replay prefix invariant: a single
+`replayOracle i t` step starting from any state satisfying
+`ReplayPrefixInvariant` produces a state still satisfying it.
+
+Made `protected` (formerly `private`) so the `Std.Do.Triple` bridge in
+`VCVio/CryptoFoundations/ReplayForkStdDo.lean` can lift this to a per-query
+spec consumable by `mvcgen`. -/
+protected lemma replayOracle_preservesPrefixInvariant [spec.DecidableEq]
     (i t : ι) {st : ReplayForkState spec i}
     {z : spec.Range t × ReplayForkState spec i}
     (hInv : ReplayPrefixInvariant i st)
@@ -571,7 +578,8 @@ private theorem replayRun_preservesPrefixInvariant [spec.DecidableEq]
       rw [support_bind] at hz
       simp only [Set.mem_iUnion] at hz
       obtain ⟨us, hus, hz⟩ := hz
-      have husInv := replayOracle_preservesPrefixInvariant (i := i) (t := t) hInv hus
+      have husInv :=
+        OracleComp.replayOracle_preservesPrefixInvariant (i := i) (t := t) hInv hus
       exact ih (u := us.1) husInv hz
 
 /-- Every reachable replay state preserves the logged query-input prefix up to `cursor`. -/
@@ -620,8 +628,12 @@ lemma replayRunWithTraceValue_forkConsumed_imp_last_input [spec.DecidableEq]
     (replacement := replacement) hz (n := z.2.cursor - 1) (by omega)).trans htrace
 
 /-- The replay oracle never mutates the immutable parameters `forkQuery`, `replacement`,
-or `trace`. -/
-private lemma replayOracle_immutable_params [spec.DecidableEq]
+or `trace`.
+
+Made `protected` (formerly `private`) so the `Std.Do.Triple` bridge in
+`VCVio/CryptoFoundations/ReplayForkStdDo.lean` can lift this to a per-query
+spec consumable by `mvcgen`. -/
+protected lemma replayOracle_immutable_params [spec.DecidableEq]
     (i : ι) (t : ι) {st : ReplayForkState spec i}
     {z : spec.Range t × ReplayForkState spec i}
     (hz : z ∈ support (((replayOracle i) t).run st :
@@ -690,7 +702,7 @@ private theorem replayRun_immutable_params [spec.DecidableEq]
       rw [support_bind] at hz
       simp only [Set.mem_iUnion] at hz
       obtain ⟨us, hus, hz⟩ := hz
-      have h₁ := replayOracle_immutable_params (i := i) (t := t) hus
+      have h₁ := OracleComp.replayOracle_immutable_params (i := i) (t := t) hus
       have h₂ := ih (u := us.1) (st₀ := us.2) (z := z) hz
       exact ⟨h₂.1.trans h₁.1, h₂.2.1.trans h₁.2.1, h₂.2.2.trans h₁.2.2⟩
 
@@ -759,7 +771,12 @@ lemma init (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i
 
 end ReplayReplacementInvariant
 
-private lemma replayOracle_preservesReplacementInvariant [spec.DecidableEq]
+/-- Per-query preservation of the replay replacement invariant.
+
+Made `protected` (formerly `private`) so the `Std.Do.Triple` bridge in
+`VCVio/CryptoFoundations/ReplayForkStdDo.lean` can lift this to a per-query
+spec consumable by `mvcgen`. -/
+protected lemma replayOracle_preservesReplacementInvariant [spec.DecidableEq]
     (i : ι) (t : ι) {st : ReplayForkState spec i}
     (hInv : ReplayReplacementInvariant i st)
     {z : spec.Range t × ReplayForkState spec i}
@@ -898,7 +915,8 @@ private theorem replayRun_preservesReplacementInvariant [spec.DecidableEq]
       rw [support_bind] at hz
       simp only [Set.mem_iUnion] at hz
       obtain ⟨us, hus, hz⟩ := hz
-      have husInv := replayOracle_preservesReplacementInvariant (i := i) (t := t) hInv hus
+      have husInv :=
+        OracleComp.replayOracle_preservesReplacementInvariant (i := i) (t := t) hInv hus
       exact ih (u := us.1) husInv hz
 
 /-- Every reachable replay state preserves the replacement invariant. -/
