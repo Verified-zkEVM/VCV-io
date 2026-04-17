@@ -17,6 +17,7 @@ import Examples.ElGamal.Hash
 import Examples.ElGamal.ReductionCost
 import Examples.ElGamal.SSP
 import Examples.FrankingProtocol
+import Examples.MvcgenMWE.SpecAndMonadLift
 import Examples.OneTimePad.Basic
 import Examples.OneTimePad.LeakageFree
 import Examples.PRFTagReader
