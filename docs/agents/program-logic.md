@@ -264,6 +264,40 @@ relTriple_simulateQ_run :
     (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2)
 ```
 
+### Unary-to-relational handler lift (`Relational/HandlerFromUnary.lean`)
+
+If each handler has a `Std.Do.Triple` spec (produced by `mvcgen` or a
+`@[spec]` lemma), you do not have to assemble per-call `RelTriple`s by
+hand. The lift converts unary handler specs plus a synchronization
+condition into a whole-program `RelTriple`:
+
+```lean
+relTriple_simulateQ_run_of_triples :
+  (∀ t s, Triple (impl₁ t) ⌜· = s⌝ (⇓a s' => ⌜Q₁ t s a s'⌝)) →
+  (∀ t s, Triple (impl₂ t) ⌜· = s⌝ (⇓a s' => ⌜Q₂ t s a s'⌝)) →
+  (hsync : Q₁ ∧ Q₂ ⇒ output equality + R_state preservation) →
+  R_state s₁ s₂ →
+  RelTriple ((simulateQ impl₁ oa).run s₁) ((simulateQ impl₂ oa).run s₂)
+    (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_state p₁.2 p₂.2)
+```
+
+Projection and bridge variants:
+
+| Variant | Use when |
+|---------|----------|
+| `relTriple_simulateQ_run_of_triples` | Full `(value, state)` postcondition |
+| `relTriple_simulateQ_run'_of_triples` | Only `EqRel α` on projected outputs |
+| `relTriple_simulateQ_run_of_impl_eq_triple` | Two handlers agreeing on `Inv`; preservation spec is a `Std.Do.Triple`; conclude `EqRel (α × σ)` |
+| `relTriple_run_of_triple` | Per-call product coupling for `StateT` |
+| `relTriple_run_writerT_of_triple` | Per-call product coupling for `WriterT` |
+| `support_preservesInv_of_triple` | Convert `Std.Do.Triple` preservation into `support`-based preservation consumed by `SimulateQ.lean` |
+
+Whenever the handler's invariant-preservation proof already lives as a
+`Std.Do.Triple`, prefer `relTriple_simulateQ_run_of_impl_eq_triple` over
+the raw `relTriple_simulateQ_run_of_impl_eq_preservesInv` — the bridge
+saves you from re-expressing the preservation as a `support`-based
+quantifier.
+
 ### Identical Until Bad
 
 ```lean

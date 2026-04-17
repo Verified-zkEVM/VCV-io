@@ -33,6 +33,12 @@ handlers*. It bridges the gap between
   per-call unary triples on two simulator handlers with a synchronization
   condition relating their postconditions, yielding a `RelTriple` for the
   entire `simulateQ`-driven simulation.
+* `relTriple_simulateQ_run_of_impl_eq_triple` — *identical-up-to-invariant
+  lift*: takes a unary invariant-preservation `Std.Do.Triple` on one
+  handler plus pointwise-equality-on-Inv with the other, and yields an
+  `EqRel` whole-program coupling. This is the direct bridge from the
+  `mvcgen` proof style to the support-based
+  `relTriple_simulateQ_run_of_impl_eq_preservesInv`.
 
 The `hsync` argument is what bridges product (independent) reasoning to
 the synchronized coupling expected by `relTriple_simulateQ_run`: even if
@@ -215,6 +221,67 @@ theorem relTriple_simulateQ_run'_of_triples
     apply relTriple_post_mono hfull
     intro _ _ hp; exact hp.1
   exact relTriple_map hweak
+
+/-! ### Bridge to support-based simulation lemmas
+
+The lemmas below convert `Std.Do.Triple` invariant specs produced by
+`mvcgen` into the `support`-based hypotheses that the existing
+`Relational/SimulateQ.lean` infrastructure consumes. They're the
+recommended entry point from the `mvcgen` proof style into whole-program
+relational reasoning. -/
+
+/-- Convert a unary `Std.Do.Triple` invariant-preservation spec into the
+`support`-based preservation hypothesis consumed by
+`relTriple_simulateQ_run_of_impl_eq_preservesInv` and friends.
+
+The `mvcgen` proof style produces invariant-preservation specs as
+`Std.Do.Triple` judgments; most of the existing `SimulateQ.lean`
+relational infrastructure is phrased in terms of `support`. This lemma
+is the direct translator, lifting over `triple_stateT_iff_forall_support`. -/
+theorem support_preservesInv_of_triple
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type}
+    (impl : QueryImpl spec (StateT σ (OracleComp spec₁)))
+    (Inv : σ → Prop)
+    (h : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl t : StateT σ (OracleComp spec₁) (spec.Range t))
+      (spred(fun s' => ⌜Inv s'⌝))
+      (⇓_ s' => ⌜Inv s'⌝)) :
+    ∀ (t : spec.Domain) (s : σ), Inv s →
+      ∀ z ∈ support ((impl t).run s), Inv z.2 := by
+  intro t s hs z hz
+  have htriple := h t
+  rw [OracleComp.ProgramLogic.StdDo.triple_stateT_iff_forall_support] at htriple
+  rcases z with ⟨a, s'⟩
+  exact htriple s hs a s' hz
+
+/-- Whole-program equality coupling when two handlers agree pointwise on
+an invariant `Inv` and the target handler preserves `Inv`. This is the
+`Std.Do.Triple`-fronted version of
+`relTriple_simulateQ_run_of_impl_eq_preservesInv`: the preservation
+hypothesis is supplied via `mvcgen`-style `Std.Do.Triple`s rather than a
+`support`-based quantifier. -/
+theorem relTriple_simulateQ_run_of_impl_eq_triple
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {σ : Type}
+    (impl₁ impl₂ : QueryImpl spec (StateT σ ProbComp))
+    (Inv : σ → Prop)
+    (oa : OracleComp spec α)
+    (himpl_eq : ∀ (t : spec.Domain) (s : σ), Inv s → (impl₁ t).run s = (impl₂ t).run s)
+    (hpres₂ : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl₂ t : StateT σ ProbComp (spec.Range t))
+      (spred(fun s' => ⌜Inv s'⌝))
+      (⇓_ s' => ⌜Inv s'⌝))
+    (s : σ) (hs : Inv s) :
+    RelTriple
+      ((simulateQ impl₁ oa).run s)
+      ((simulateQ impl₂ oa).run s)
+      (EqRel (α × σ)) :=
+  relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
+    impl₁ impl₂ Inv oa himpl_eq
+    (support_preservesInv_of_triple (spec₁ := unifSpec)
+      (σ := σ) (impl := impl₂) (Inv := Inv) hpres₂)
+    s hs
 
 /-! ## Smoke tests -/
 
