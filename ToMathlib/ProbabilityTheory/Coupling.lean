@@ -142,6 +142,60 @@ theorem IsCoupling.refl (p : SPMF α) :
 noncomputable def Coupling.refl (p : SPMF α) : Coupling p p :=
   ⟨p >>= fun a => pure (a, a), IsCoupling.refl p⟩
 
+/-- Binding against a constant `q` collapses to `q` when the scrutinee has no failure mass. -/
+theorem bind_const_of_toPMF_none_eq_zero {p : SPMF α} (hp : p.toPMF none = 0) (q : SPMF β) :
+    (p >>= fun _ => q) = q := by
+  have h := SPMF.tsum_run_some_eq_one_sub (p := p)
+  rw [hp, tsub_zero] at h
+  apply SPMF.ext; intro y
+  rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some, SPMF.toPMF_bind]
+  simp only [Option.elimM, PMF.monad_bind_eq_bind, PMF.bind_apply]
+  calc
+    ∑' a, p.toPMF a * (a.elim (PMF.pure none) (fun _ => q.toPMF)) (some y)
+        = ∑' a : α, p.toPMF (some a) * q.toPMF (some y) := by
+          rw [tsum_option _ ENNReal.summable]
+          simp [hp]
+    _ = (∑' a : α, p.toPMF (some a)) * q.toPMF (some y) := ENNReal.tsum_mul_right
+    _ = q.toPMF (some y) := by rw [h, one_mul]
+
+/-- Product coupling: when both distributions have no failure mass, their independent
+product forms a coupling.
+
+This is the core coupling result for reasoning about pairs of computations that never
+fail individually (e.g., `OracleComp spec α` via `HasEvalPMF`): the product distribution
+`do let a ← p; let b ← q; pure (a, b)` witnesses that the pair has marginals `(p, q)`. -/
+theorem IsCoupling.prod {α β : Type u} {p : SPMF α} {q : SPMF β}
+    (hp : p.toPMF none = 0) (hq : q.toPMF none = 0) :
+    IsCoupling (p >>= fun a => q >>= fun b => pure (a, b)) p q := by
+  refine ⟨?_, ?_⟩
+  · calc
+      Prod.fst <$> (p >>= fun a => q >>= fun b => pure (a, b))
+          = p >>= fun a => Prod.fst <$> (q >>= fun b => pure (a, b)) := by
+            rw [map_bind]
+      _ = p >>= fun a => q >>= fun b => Prod.fst <$> (pure (a, b) : SPMF _) := by
+            congr 1; funext a; rw [map_bind]
+      _ = p >>= fun a => q >>= fun _ => pure a := by
+            congr 1; funext a; congr 1; funext b; rw [map_pure]
+      _ = p >>= fun a => pure a := by
+            congr 1; funext a; exact bind_const_of_toPMF_none_eq_zero hq (pure a)
+      _ = p := bind_pure p
+  · calc
+      Prod.snd <$> (p >>= fun a => q >>= fun b => pure (a, b))
+          = p >>= fun a => Prod.snd <$> (q >>= fun b => pure (a, b)) := by
+            rw [map_bind]
+      _ = p >>= fun a => q >>= fun b => Prod.snd <$> (pure (a, b) : SPMF _) := by
+            congr 1; funext a; rw [map_bind]
+      _ = p >>= fun _ => q >>= fun b => pure b := by
+            congr 1; funext a; congr 1; funext b; rw [map_pure]
+      _ = p >>= fun _ => q := by
+            congr 1; funext a; rw [bind_pure]
+      _ = q := bind_const_of_toPMF_none_eq_zero hp q
+
+/-- Product coupling witness. -/
+noncomputable def Coupling.prod {α β : Type u} {p : SPMF α} {q : SPMF β}
+    (hp : p.toPMF none = 0) (hq : q.toPMF none = 0) : Coupling p q :=
+  ⟨p >>= fun a => q >>= fun b => pure (a, b), IsCoupling.prod hp hq⟩
+
 end SPMF
 
 end

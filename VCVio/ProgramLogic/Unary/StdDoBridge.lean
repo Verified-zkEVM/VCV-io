@@ -6,6 +6,8 @@ Authors: Quang Dao
 
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.ProgramLogic.Unary.WriterTBridge
+import VCVio.OracleComp.Coercions.SubSpec
 
 /-!
 # `Std.Do` / `mvcgen` bridge for `OracleComp`
@@ -106,6 +108,99 @@ noncomputable instance instWPMonadOracleComp : Std.Do.WPMonad (OracleComp spec) 
       wpProp x (fun a => wpProp (f a) (fun b => (Q.1 b).down))
     exact wpProp_bind x f _
 
+/-! ## Support-based bridge for stateful transformers over `OracleComp`
+
+The two lemmas below reduce `Std.Do.Triple` for `StateT σ (OracleComp spec)` and
+`WriterT ω (OracleComp spec)` to support-based statements about the underlying
+`OracleComp` distribution. They are the canonical "escape hatch" used whenever a
+handler proof needs to leave `mvcgen` (e.g. to perform a structural induction on
+`OracleComp`) without abandoning the `Std.Do` proof mode entirely. -/
+
+section StatefulBridges
+
+variable {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+
+/-- Support characterization of `Std.Do.Triple` on `StateT σ (OracleComp spec)`.
+
+A triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, s')` in the support of
+`mx.run s` satisfies the postcondition `Q.1 a s'`, whenever the starting state
+`s` satisfies the precondition `P`. -/
+theorem triple_stateT_iff_forall_support {σ α : Type}
+    (mx : StateT σ (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg σ .pure)) (Q : Std.Do.PostCond α (.arg σ .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : σ, (P s).down →
+        ∀ a s', (a, s') ∈ support (mx.run s) → (Q.1 a s').down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) (mx.run s) (fun p => (Q.1 p.1 p.2).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a s' hmem; exact h (a, s') hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
+/-- Support characterization of `Std.Do.Triple` on `WriterT ω (OracleComp spec)`.
+
+A triple `⦃P⦄ mx ⦃Q⦄` over the writer log holds iff every outcome `(a, w)` in
+the support of `mx.run` satisfies `Q.1 a (s ++ w)` for every starting log `s`
+satisfying `P`. The starting log `s` threads through the WP interpretation
+itself, not through `mx`: `WriterT.run mx` always begins from `∅` and produces
+pairs `(a, w)`, and the WP transformer defined in
+`VCVio.ProgramLogic.Unary.WriterTBridge` then prepends `s` via `s ++ _` before
+applying the postcondition. This is why `s` appears only in `Q.1 a (s ++ w)`
+on the right-hand side. -/
+theorem triple_writerT_iff_forall_support {ω α : Type}
+    [EmptyCollection ω] [Append ω] [LawfulAppend ω]
+    (mx : WriterT ω (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg ω .pure)) (Q : Std.Do.PostCond α (.arg ω .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : ω, (P s).down →
+        ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s ++ w)).down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) mx.run
+      (fun p => (Q.1 p.1 (s ++ p.2)).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a w hmem; exact h (a, w) hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
+/-- `Monoid`-variant of `triple_writerT_iff_forall_support`.
+
+For `WriterT ω (OracleComp spec)` where the log `ω` is a (multiplicative)
+monoid, a triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, w)` in the support
+of `mx.run` satisfies `Q.1 a (s * w)` for every starting log `s` satisfying
+`P`. As in the `Append`-based variant, the starting log `s` threads through
+the WP interpretation (`s * _`), not through `mx`. This is the dual of the
+`Append`-based characterization and is what `countingOracle` / `costOracle`
+proofs use (where `QueryCount ι = ι → ℕ` has a `Monoid` instance but no
+`Append`). -/
+theorem triple_writerT_iff_forall_support_monoid {ω α : Type} [Monoid ω]
+    (mx : WriterT ω (OracleComp spec) α)
+    (P : Std.Do.Assertion (.arg ω .pure)) (Q : Std.Do.PostCond α (.arg ω .pure)) :
+    Std.Do.Triple mx P Q ↔
+      ∀ s : ω, (P s).down →
+        ∀ a w, (a, w) ∈ support mx.run → (Q.1 a (s * w)).down := by
+  classical
+  rw [Std.Do.Triple.iff]
+  simp only [SPred.entails_1]
+  refine forall_congr' (fun s => ?_)
+  refine imp_congr_right (fun _hP => ?_)
+  change wpProp (spec := spec) mx.run
+      (fun p => (Q.1 p.1 (s * p.2)).down) ↔ _
+  rw [wpProp_iff_forall_support]
+  constructor
+  · intro h a w hmem; exact h (a, w) hmem
+  · intro h p hmem; exact h p.1 p.2 hmem
+
+end StatefulBridges
+
 namespace Spec
 
 /-- Query specification for `mspec`/`mvcgen` in the `.pure` `Std.Do` view. -/
@@ -123,6 +218,60 @@ namespace Spec
         ((OracleComp.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
       Q := by
   simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
+
+/-- Explicit-head spec for the `MonadLift OracleQuery OracleComp`-form of `query`.
+
+When `query t` appears inside a `do` block, Lean's elaborator inserts a single
+`MonadLift.monadLift _ (OracleQuery.query t)` (no `MonadLiftT` wrapper). The
+ascription form `(OracleComp.query t : OracleComp spec _)` instead elaborates
+to `liftM (instMonadLiftTOfMonadLift _ _) (OracleQuery.query t)`. The two are
+definitionally equal but syntactically distinct, and
+`Lean.Elab.Tactic.Do.Spec.findSpec` matches keys syntactically against a
+`DiscrTree`. This lemma re-states the content of `Spec.query` with the
+explicit `MonadLift.monadLift` head so `mvcgen` finds a match in `do`-block
+contexts. The two should be unified once core `mvcgen` normalizes
+`liftM`/`MonadLiftT` chains in its discrimination-tree key construction
+(upstream issue). -/
+@[spec] theorem monadLift_query (t : spec.Domain)
+    {Q : Std.Do.PostCond (spec.Range t) .pure} :
+    Std.Do.Triple
+      (MonadLift.monadLift (OracleQuery.query t) : OracleComp spec (spec.Range t))
+      (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
+      Q := Spec.query t
+
+/-!
+## Architectural note: `mvcgen` for stateful handlers over `OracleComp`
+
+Stateful handlers like `cachingOracle` (`StateT`) and `loggingOracle`
+(`WriterT`) are defined as `QueryImpl spec (T (OracleComp spec))` for some
+state-tracking transformer `T`. `mvcgen` walks their bodies cleanly thanks
+to:
+
+1. The low-priority `MonadLift (OracleComp spec) (OracleComp superSpec)`
+   instance in `Coercions/SubSpec.lean`. By being lower priority than Lean's
+   built-in reflexive `MonadLiftT.refl`, the self-lift case
+   (`spec = superSpec`) is solved by `MonadLiftT.refl` rather than this
+   parametric instance, and `monadLift mx : OracleComp spec α` reduces to
+   `id mx = mx` definitionally. This is what
+   `Std.Do.Spec.UnfoldLift.monadLift_refl` (a `rfl`-based lemma) needs in
+   order to peel off the spurious self-lifts the parametric instance would
+   otherwise leave behind around every nested oracle query. By being lower
+   priority than the built-in `MonadLift (OracleQuery superSpec) (OracleComp
+   superSpec)`, single-query lifts also resolve via the standard "lift query
+   then embed" path and avoid spurious walks through `liftComp`.
+
+2. The `Spec.monadLift_query` lemma below, which provides a
+   `DiscrTree`-friendly `@[spec]` keyed by the explicit
+   `MonadLift.monadLift _ (OracleQuery.query t)` head that `do`-block
+   elaboration produces. The plain `Spec.query` above keys on a different
+   syntactic head and doesn't fire inside `do` blocks.
+
+The first is now structural in VCVio with no special override needed. The
+second is a workaround for a discrimination-tree-key normalisation gap in
+upstream `mvcgen` and can be removed once
+`Lean.Elab.Tactic.Do.Spec.findSpec` and `Lean.Elab.Tactic.Do.Attr.mkSpecTheorem`
+canonicalise `liftM`/`MonadLiftT` chains.
+-/
 
 end Spec
 
