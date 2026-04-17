@@ -393,7 +393,6 @@ theorem perfectlyCorrect [SampleableType Chal]
         (liftM x : StateT _ ProbComp α).run s = x >>= fun a => pure (a, s) := by
       intro α x s
       simp only [liftM, MonadLiftT.monadLift,
-        show OracleComp.liftComp x unifSpec = x from monadLift_eq_self x,
         MonadLift.monadLift, StateT.run_lift]
     have hmod : ∀ {α : Type}
         (f : (M × Commit →ₒ Chal).QueryCache → α × (M × Commit →ₒ Chal).QueryCache)

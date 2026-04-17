@@ -171,9 +171,29 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
 
 end liftComp_evalDist
 
-/-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`. -/
-instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
-    MonadLiftT (OracleComp spec) (OracleComp superSpec) where
+/-- Extend a lifting on `OracleQuery` to a lifting on `OracleComp`.
+
+Registered as a low-priority `MonadLift` (not `MonadLiftT`) so that:
+
+* For `spec = superSpec`, Lean's built-in `MonadLiftT.refl` (which is
+  definitionally `id`) wins typeclass resolution. This is what
+  `Std.Do.Spec.UnfoldLift.monadLift_refl` (a `rfl`-based lemma) needs in
+  order to peel off spurious self-lifts inside `mvcgen`-elaborated terms.
+
+* For `MonadLiftT (OracleQuery spec) (OracleComp superSpec)`, the built-in
+  high-priority `MonadLift (OracleQuery superSpec) (OracleComp superSpec)` is
+  tried first by `monadLiftTrans` and succeeds via the `SubSpec` chain on
+  `OracleQuery`, never reaching this instance. Single-query lifts therefore
+  go through the standard "lift query then embed" path with no spurious
+  walk through `liftComp`.
+
+* For `MonadLiftT (OracleComp spec) (OracleComp superSpec)` with
+  `spec ≠ superSpec`, the high-priority built-in fails (no
+  `MonadLiftT (OracleComp _) (OracleQuery _)`), Lean backtracks to this
+  low-priority instance, and the recursive subgoal collapses via
+  `MonadLiftT.refl`. The result is a single `liftComp mx superSpec`. -/
+instance (priority := low) [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLift (OracleComp spec) (OracleComp superSpec) where
   monadLift mx := liftComp mx superSpec
 
 /-- We choose to actively rewrite `liftComp` as `liftM` to enable `LawfulMonadLift` lemmas. -/
@@ -181,15 +201,35 @@ instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
 lemma liftComp_eq_liftM [MonadLift (OracleQuery spec) (OracleQuery superSpec)]
     (mx : OracleComp spec α) : liftComp mx superSpec = (liftM mx : OracleComp superSpec α) := rfl
 
-instance [MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
-    LawfulMonadLiftT (OracleComp spec) (OracleComp superSpec) where
+instance [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    LawfulMonadLift (OracleComp spec) (OracleComp superSpec) where
   monadLift_pure x := liftComp_pure superSpec x
   monadLift_bind mx my := liftComp_bind superSpec mx my
 
+/-- Self-lift on `OracleComp` is definitionally `id`, supplied by Lean's
+built-in `MonadLiftT.refl` thanks to the low-priority `MonadLift` instance
+above (which causes the parametric path to lose typeclass resolution to
+`MonadLiftT.refl` when `spec = superSpec`). -/
 @[simp]
 lemma monadLift_eq_self {α} (mx : OracleComp spec α) :
-    (monadLift mx : OracleComp spec α) = mx :=
-  simulateQ_ofLift_eq_self mx
+    (monadLift mx : OracleComp spec α) = mx := rfl
+
+/-! Regression smoke-tests for the instance-priority invariants above. The
+`rfl` proofs are the load-bearing signal: if priority drifts so that the
+parametric `MonadLift` beats `MonadLiftT.refl`, the self-lift stops being
+definitionally `id` and the `rfl` below breaks. Similarly, the
+`MonadLiftT` synthesis check guards against future refactors that would
+remove the transitive lift chain. -/
+
+example (mx : OracleComp spec Nat) :
+    (monadLift mx : OracleComp spec Nat) = mx := rfl
+
+example : MonadLiftT (OracleComp spec) (OracleComp spec) :=
+  inferInstance
+
+example [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLiftT (OracleComp spec) (OracleComp superSpec) :=
+  inferInstance
 
 -- NOTE: With constant universal levels it is fairly easy to abstract the below in a class
 -- Getting a similar level of generality as the manual instances below would be useful,
@@ -243,9 +283,6 @@ lemma monadLift_liftM_OptionT [MonadLift (OracleQuery spec) (OracleQuery superSp
   erw [simulateQ_bind]
   simp only [simulateQ_pure, ← map_eq_pure_bind]
   congr 1
-  rw [show mx.liftComp spec = mx from simulateQ_ofLift_eq_self mx]
-  change liftM mx = liftComp mx superSpec
-  rw [liftComp_eq_liftM]
 
 end OptionT
 
