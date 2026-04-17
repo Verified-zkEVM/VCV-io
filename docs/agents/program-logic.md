@@ -308,6 +308,15 @@ writer-based handlers like `countingOracle`/`costOracle`. Typical use:
 pick `Inv s := s ≤ B` (cost-budget) or `Inv s := s ∈ Submonoid.S` (stays
 in a submonoid).
 
+Worked examples in `HandlerSpecs.lean`:
+
+| Example | What it shows |
+|---------|---------------|
+| `simulateQ_cachingOracle_preserves_cache_le` | Whole-simulation cache monotonicity for `cachingOracle` (`StateT`) |
+| `simulateQ_cachingLoggingOracle_preserves_cache_le` / `..._log_prefix` | Stacked `StateT` handler preserves each component's invariant |
+| `simulateQ_countingOracle_preserves_ge` | Whole-simulation count monotonicity for `countingOracle` via the `WriterT` lift with `I qc := qc₀ ≤ qc` |
+| `simulateQ_costOracle_preserves_submonoid` | Submonoid closure: if `costFn t ∈ S` for every `t`, the accumulated cost stays in `S` |
+
 ### Unary-to-relational handler lift (`Relational/HandlerFromUnary.lean`)
 
 If each handler has a `Std.Do.Triple` spec (produced by `mvcgen` or a
