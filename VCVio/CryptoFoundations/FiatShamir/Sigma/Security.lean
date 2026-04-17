@@ -606,7 +606,7 @@ private theorem forkSupportInvariant_of_mem_replayFirstRun
   rw [hωeq]
   exact hverify
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] [Inhabited Chal] in
 /-- **Target equality across two successful fork runs** sharing the same fork index.
 
 If both runs of `forkReplay (Fork.runTrace σ hr M nmaAdv pk)` select fork point `s`,
@@ -799,16 +799,14 @@ private theorem target_eq_of_mem_forkReplay
     push Not at hge
     rw [List.getElem?_eq_none hge] at htgt₂
     exact (Option.some_ne_none _ htgt₂.symm).elim
-  have hgetElem₁ : (x₁.queryLog.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = x₁.queryLog[(↑s : ℕ)]? := by
-    rw [List.getElem?_take]
-    split_ifs with h; · rfl
-    · exact absurd (Nat.lt_succ_self _) h
-  have hgetElem₂ : (x₂.queryLog.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = x₂.queryLog[(↑s : ℕ)]? := by
+  have hgetElem_take :
+      ∀ l : List (M × Commit),
+        (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? := fun l => by
     rw [List.getElem?_take]
     split_ifs with h; · rfl
     · exact absurd (Nat.lt_succ_self _) h
   have : some x₁.target = some x₂.target := by
-    rw [← htgt₁, ← htgt₂, ← hgetElem₁, ← hgetElem₂, htakeEq]
+    rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
   exact Option.some.inj this
 
 omit [SampleableType Stmt] in
@@ -986,7 +984,11 @@ This matches Firsov-Janku's `schnorr_koa_secure` at
 with the single-run postcondition `verify` plus the extractor correctness lemma
 `extractor_corr` at [fsec/proof/Schnorr.ec:87](../../../fsec/proof/Schnorr.ec). Our version
 uses `Fork.replayForkingBound` for the RO-level packaging and `_hss` for special
-soundness, with `σ.extract` playing the role of EC's `extractor`. -/
+soundness, with `σ.extract` playing the role of EC's `extractor`.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**
+(ReplayFork.lean): the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`
+is still a `sorry`, so this theorem is not yet unconditionally proved end-to-end. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -1099,7 +1101,13 @@ The combined bound is:
       ≤ Pr[extraction succeeds]`
 
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
-the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
+the bound is trivially satisfied when the simulation loss exceeds the advantage.
+
+**Currently conditional on two open obligations**:
+1. `euf_cma_to_nma` (this file, still `sorry`): CMA-to-NMA reduction via HVZK simulator.
+2. `sq_probOutput_main_le_noGuardReplayComp` (ReplayFork.lean, still `sorry`):
+   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`, transitively inherited
+   from `euf_nma_bound`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)

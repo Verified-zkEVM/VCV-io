@@ -115,7 +115,7 @@ lemma getQueryValue?_isSome_of_lt [spec.DecidableEq] (log : QueryLog spec) (t : 
   have hentry := List.getElem_mem h (l := log.getQ (· = t))
   have ht' : ((log.getQ (· = t))[n]'h).1 = t := getQ_eq_mem log t hentry
   rw [hopt]
-  set entry := (log.getQ (· = t))[n]'h with hentry_def
+  set entry := (log.getQ (· = t))[n]'h
   obtain ⟨t', u'⟩ := entry
   simp only at ht'
   subst ht'
@@ -1081,7 +1081,6 @@ private lemma replayOracle_immutable_params [spec.DecidableEq]
           simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
 
 private theorem replayRun_immutable_params [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
     {z : α × ReplayForkState spec i}
     (hz : z ∈ support (((simulateQ (replayOracle i) main).run st₀) :
@@ -1103,7 +1102,6 @@ private theorem replayRun_immutable_params [spec.DecidableEq]
       exact ⟨h₂.1.trans h₁.1, h₂.2.1.trans h₁.2.1, h₂.2.2.trans h₁.2.2⟩
 
 lemma replayRunWithTraceValue_forkQuery_eq [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -1115,7 +1113,6 @@ lemma replayRunWithTraceValue_forkQuery_eq [spec.DecidableEq]
       (st₀ := ReplayForkState.init trace forkQuery replacement) hz).1
 
 lemma replayRunWithTraceValue_replacement_eq [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -1127,7 +1124,6 @@ lemma replayRunWithTraceValue_replacement_eq [spec.DecidableEq]
       (st₀ := ReplayForkState.init trace forkQuery replacement) hz).2.1
 
 lemma replayRunWithTraceValue_trace_eq [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -1289,7 +1285,6 @@ private lemma replayOracle_preservesReplacementInvariant [spec.DecidableEq]
             simp [ReplayForkState.markMismatch, ReplayForkState.noteObserved, hflags.1] at hfc
 
 private theorem replayRun_preservesReplacementInvariant [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
     (hInv : ReplayReplacementInvariant i st₀)
     {z : α × ReplayForkState spec i}
@@ -1311,7 +1306,6 @@ private theorem replayRun_preservesReplacementInvariant [spec.DecidableEq]
 
 /-- Every reachable replay state preserves the replacement invariant. -/
 theorem replayRunWithTraceValue_preservesReplacementInvariant [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -1325,7 +1319,6 @@ theorem replayRunWithTraceValue_preservesReplacementInvariant [spec.DecidableEq]
 /-- If the replay has consumed the fork and the fork point is `forkQuery`, then the
 `forkQuery`-th distinguished-oracle entry in the observed log is exactly the replacement. -/
 lemma replayRunWithTraceValue_getQueryValue?_observed_eq_replacement [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -1352,7 +1345,6 @@ lemma replayRunWithTraceValue_getQueryValue?_observed_eq_replacement [spec.Decid
   exact QueryLog.getQueryValue?_eq_some_of_getQ_getElem? _ _ _ _ hPostApp
 
 private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (i : ι) (t : ι) {st : ReplayForkState spec i}
     {z : spec.Range t × ReplayForkState spec i}
     (hz : z ∈ support (((replayOracle i) t).run st :
@@ -1403,7 +1395,6 @@ private lemma replayOracle_observed_eq_logQuery [spec.DecidableEq]
           simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]
 
 private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) {st₀ : ReplayForkState spec i}
     {z : α × ReplayForkState spec i}
     (hz : z ∈ support (((simulateQ (replayOracle i) main).run st₀) :
@@ -1442,7 +1433,6 @@ private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
 
 /-- Every replay run can be realized as a logged run with the same observed transcript. -/
 theorem replayRunWithTraceValue_mem_support_replayFirstRun [spec.DecidableEq]
-    [spec.Fintype] [spec.Inhabited]
     (main : OracleComp spec α) (i : ι) (trace : QueryLog spec)
     (forkQuery : Nat) (replacement : spec.Range i)
     {z : α × ReplayForkState spec i}
@@ -2582,7 +2572,13 @@ The `hreach` hypothesis (`CfReachable`) is needed because, unlike the seed-based
 (where `cf x = some s` always implies the `s`-th query value is well-defined in the seed),
 in the replay setting, `cf` is computed from `x` independently from the actual queries
 made by the run that produced it. The hypothesis captures the natural condition that the
-fork point `s` chosen by `cf` always corresponds to a query that was actually issued. -/
+fork point `s` chosen by `cf` always corresponds to a query that was actually issued.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**: this theorem
+invokes the Jensen/Cauchy-Schwarz step as a helper, and that helper is still a `sorry`.
+Downstream consumers (`probOutput_none_forkReplay_le`, `le_probEvent_isSome_forkReplay`,
+`Fork.replayForkingBound`, `euf_nma_bound`, `euf_cma_bound`) inherit this conditionality
+until the step is discharged. -/
 theorem le_probOutput_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -2685,7 +2681,10 @@ private lemma sum_probEvent_forkReplay_le_tsum_some
 /-- Replay fork failure probability bound. This mirrors `probOutput_none_seededFork_le`;
 the proof structure is identical, substituting the pointwise replay lower bound
 `le_probOutput_forkReplay` for its seed-based analogue. The `hreach` hypothesis is
-threaded through from `le_probOutput_forkReplay`. -/
+threaded through from `le_probOutput_forkReplay`.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
+`le_probOutput_forkReplay`). -/
 theorem probOutput_none_forkReplay_le
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :
@@ -2746,7 +2745,10 @@ theorem probOutput_none_forkReplay_le
 /-- Packaged replay forking theorem. This is the replay analogue of
 `le_probEvent_isSome_seededFork`, derived from `probOutput_none_forkReplay_le` and
 `forkReplay_precondition_le_one` by the same `1 - ·` conversion used in
-`le_probEvent_isSome_seededFork`. The `hreach` hypothesis is threaded through. -/
+`le_probEvent_isSome_seededFork`. The `hreach` hypothesis is threaded through.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
+`probOutput_none_forkReplay_le`). -/
 theorem le_probEvent_isSome_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :
@@ -2777,7 +2779,7 @@ theorem le_probEvent_isSome_forkReplay
   exact (ENNReal.le_sub_iff_add_le_right hnone_ne_top probOutput_le_one).2
     (by simpa [add_comm] using hfork)
 
-omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- Structural success facts for `forkReplay`: both outputs come from logged runs of `main`,
 share the same selected fork index, differ at the selected distinguished-oracle answer, and the
 second run is witnessed by a replay state whose observed log agrees with the first-run log on the
@@ -2868,7 +2870,7 @@ theorem forkReplay_success_log_props
             exact this
         · simp at h
 
-omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- Replay property transfer: any postcondition that holds for every logged run of `main`
 holds for both outputs of a successful replay fork, together with the common selected fork index
 and the fact that the distinguished answers differ at that index.
