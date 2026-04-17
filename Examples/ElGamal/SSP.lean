@@ -99,7 +99,7 @@ under the secret bit. The adversary may interleave calls to both oracles in any 
 @[reducible] def dhSpec (G : Type) : OracleSpec (Unit ⊕ Unit) :=
   (Unit →ₒ G) + (Unit →ₒ (G × G))
 
-variable {F : Type} [Field F] [SampleableType F]
+variable {F : Type} [CommRing F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G]
 
 /-! ### DDH triple packages -/
@@ -417,7 +417,7 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun b => ?_
-        exact ElGamalExamples.evalDist_bind_bijectiveSmul_add_eq
+        exact ElGamalExamples.evalDist_bind_bijective_add_eq
           (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
     | some a =>
@@ -433,15 +433,15 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun b => ?_
-        exact ElGamalExamples.evalDist_bind_bijectiveSmul_add_eq
+        exact ElGamalExamples.evalDist_bind_bijective_add_eq
           (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
 
 /-- Hop #3: under the DDH-random package, the left- and right-message reductions produce the
 same output distribution against any adversary. The proof lifts the per-query uniform-masking
-argument `evalDist_bind_bijectiveSmul_add_eq` across the full adversary via
+argument `evalDist_bind_bijective_add_eq` across the full adversary via
 `Package.simulateQ_StateT_evalDist_congr`. -/
-theorem evalDist_runProb_dhToLR_left_link_rand_eq_dhToLR_right_link_rand
+theorem evalDist_runProb_dhToLR_link_rand_swap
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     {α : Type} (A : OracleComp (lrSpec G) α) :
     evalDist ((dhToLR_left.link (dhTripleRand (F := F) gen)).runProb A) =
@@ -490,7 +490,7 @@ theorem elgamalLR_left_advantage_right_le
   -- Hop #3: G₂.advantage G₃ A = 0
   have h3 : G₂.advantage G₃ A = 0 := by
     rw [hG₂, hG₃, Package.advantage_eq_of_evalDist_runProb_eq_right
-      (evalDist_runProb_dhToLR_left_link_rand_eq_dhToLR_right_link_rand (F := F) gen hg A).symm]
+      (evalDist_runProb_dhToLR_link_rand_swap (F := F) gen hg A).symm]
     exact Package.advantage_self _ _
   -- Hop #5: G₄.advantage elgamalLR_right A = 0
   have h5 : G₄.advantage (elgamalLR_right (F := F) gen) A = 0 := by

@@ -71,7 +71,7 @@ variable {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
 
 /-- The identity package on `E`: each export query is forwarded as the corresponding import
 query, with no private state. -/
-@[simps!]
+@[simps]
 def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} where
   init := PUnit.unit
   impl t :=
@@ -121,8 +121,8 @@ lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I)) (A : O
     have hu : ((Package.ofStateless h).runState (k u)) = (·, PUnit.unit) <$> simulateQ h (k u) :=
       ih u
     simp only [Package.runState] at hu
-    cases (PUnit.unit : PUnit.{v + 1})
-    cases s
+    -- `s : PUnit` is forced to `PUnit.unit`, matching `(Package.ofStateless h).init` used in `hu`.
+    obtain rfl : s = PUnit.unit := Subsingleton.elim _ _
     exact hu
 
 @[simp]

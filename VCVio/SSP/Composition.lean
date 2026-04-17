@@ -48,6 +48,13 @@ variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
 
 /-! ### Sequential composition (`link`) -/
 
+/-- The `Prod` reshape `(α × s₁) × s₂ → α × (s₁ × s₂)` used by the linked package's handler to
+splice the outer state onto the left of the inner state. All three type arguments are implicit
+so that the pointfree `linkReshape <$> _` reads cleanly at use sites. -/
+@[reducible]
+def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
+    (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))
+
 /-- Sequential composition of two packages: `outer ∘ inner`.
 
 The outer package exports `E` and imports `M`. The inner package exports `M` and imports `I`.
@@ -62,21 +69,17 @@ def link (outer : Package M E σ₁) (inner : Package I M σ₂) : Package I E (
     let outerStep : OracleComp M (E.Range t × σ₁) := (outer.impl t).run s₁
     let innerStep : OracleComp I ((E.Range t × σ₁) × σ₂) :=
       (simulateQ inner.impl outerStep).run s₂
-    (fun (p : (E.Range t × σ₁) × σ₂) => (p.1.1, (p.1.2, p.2))) <$> innerStep
+    linkReshape <$> innerStep
 
 /-- Sanity check: linking with the identity package on the right keeps the outer state, with
 a `PUnit` placeholder on the right. The full state-isomorphism `σ × PUnit ≃ σ` is left to
 follow-up files; this lemma only requires the `Package`'s import / export range universes to
 agree with the identity package's range universe. -/
-example {ι : Type uₘ} (M' : OracleSpec.{uₘ, v} ι) (P : Package M' E σ₁) :
+@[simp]
+lemma link_id_init {ι : Type uₘ} (M' : OracleSpec.{uₘ, v} ι) (P : Package M' E σ₁) :
     (P.link (Package.id M')).init = (P.init, PUnit.unit) := rfl
 
 /-! ### `link` reduction lemmas -/
-
-/-- The `Prod` reshaping used in the linked package's handler. -/
-@[reducible]
-def linkReshape (α : Type v) (s₁ : Type v) (s₂ : Type v) :
-    (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))
 
 /-- Structural fact: running `(P.link Q).impl` is the same as nesting the simulations,
 threaded through both states. This is the unbundled form from which the SSP reduction
@@ -89,13 +92,13 @@ theorem simulateQ_link_run {α : Type v}
     (P : Package M E σ₁) (Q : Package I M σ₂)
     (A : OracleComp E α) (s₁ : σ₁) (s₂ : σ₂) :
     (simulateQ (P.link Q).impl A).run (s₁, s₂) =
-      (linkReshape α σ₁ σ₂) <$>
+      linkReshape <$>
         (simulateQ Q.impl ((simulateQ P.impl A).run s₁)).run s₂ := by
   induction A using OracleComp.inductionOn generalizing s₁ s₂ with
   | pure x =>
     -- Both sides reduce to `pure (x, (s₁, s₂)) : OracleComp I _`.
     change (pure (x, (s₁, s₂)) : OracleComp I (α × (σ₁ × σ₂))) =
-      linkReshape α σ₁ σ₂ <$> (simulateQ Q.impl (pure (x, s₁))).run s₂
+      linkReshape <$> (simulateQ Q.impl (pure (x, s₁))).run s₂
     rw [simulateQ_pure, StateT.run_pure, map_pure]
   | query_bind t k ih =>
     -- Step 1: rewrite LHS using the definition of `(P.link Q).impl t` and StateT bind.
@@ -107,7 +110,7 @@ theorem simulateQ_link_run {α : Type v}
         OracleQuery.input_query, id_map]
       change ((P.link Q).impl t >>= fun a => simulateQ (P.link Q).impl (k a)).run (s₁, s₂) = _
       rw [StateT.run_bind]
-      change (linkReshape (E.Range t) σ₁ σ₂ <$>
+      change (linkReshape <$>
           (simulateQ Q.impl ((P.impl t).run s₁)).run s₂) >>= _ = _
       rw [bind_map_left]
     -- Step 2: rewrite RHS using simulateQ_bind for both monads and StateT bind.
@@ -147,7 +150,10 @@ theorem run_link {α : Type v}
 
 This is the key reduction lemma for SSP-style proofs where the reduction package is stateless
 but the underlying game package carries non-trivial state (such as a lazily sampled secret
-key or a cached oracle output). -/
+key or a cached oracle output).
+
+Not marked `@[simp]`: the data premise `hP : QueryImpl E (OracleComp M)` cannot be pattern-
+matched on, so a `@[simp]` tag here would loop with `run_link`. Use explicitly. -/
 theorem run_link_left_ofStateless {α : Type v}
     (hP : QueryImpl E (OracleComp M)) (Q : Package I M σ₂) (A : OracleComp E α) :
     ((Package.ofStateless hP).link Q).run A =

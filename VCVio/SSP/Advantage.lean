@@ -51,12 +51,22 @@ a `ProbComp`, ready to be measured with `Pr[= true | _]` and `boolDistAdvantage`
 def runProb {α : Type} (P : Package unifSpec E σ) (A : OracleComp E α) : ProbComp α :=
   P.run A
 
+/-- `runProb` unfolds to `run` definitionally; exposed as a simp lemma so that SSP-facing
+lemmas phrased in terms of `runProb` rewrite cleanly against `run`-phrased ones in
+`VCVio.SSP.Composition`. -/
+@[simp]
+lemma runProb_eq_run {α : Type} (P : Package unifSpec E σ) (A : OracleComp E α) :
+    P.runProb A = P.run A := rfl
+
 /-! ### Advantage and triangle inequality -/
 
 /-- The Boolean distinguishing advantage between two probability-only packages, against a
 single Boolean-valued adversary. The internal state types `σ₀, σ₁` of the two games are
 independent: from the adversary's point of view only the export interface and the resulting
-output distribution matter. -/
+output distribution matter.
+
+This quantity is always nonnegative and symmetric in its first two arguments (see
+`advantage_symm`), so it should be read as an *unsigned* gap rather than a signed quantity. -/
 noncomputable def advantage {σ₀ σ₁ : Type}
     (G₀ : Package unifSpec E σ₀) (G₁ : Package unifSpec E σ₁)
     (A : OracleComp E Bool) : ℝ :=

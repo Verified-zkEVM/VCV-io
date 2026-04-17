@@ -32,9 +32,13 @@ inequality.
 
 `Package.shiftLeft` and `Package.run_link_eq_run_shiftLeft` are program-level statements and
 are kept fully universe-polymorphic in the indices `uᵢ, uₘ, uₑ`, the import range universe
-`vᵢ`, and the export range / state / result universe `v` (matching `Composition.lean`). The
-hybrid theorem and the advantage-level reduction live in the `Type 0` world (forced by
-`ProbComp` and `Bool`); their export indices remain free in `uₑ`. -/
+`vᵢ`, and the export range / state / result universe `v` (matching `Composition.lean`). Note
+that `vᵢ` does not appear in `shiftLeft`'s own signature: `shiftLeft` produces an
+`OracleComp M α`, which is oblivious to the import spec. `vᵢ` only enters through the inner
+package `Q : Package I M σ₂` in `run_link_eq_run_shiftLeft`, whose import range can live in
+an arbitrary universe independent from `v`. The hybrid theorem and the advantage-level
+reduction live in the `Type 0` world (forced by `ProbComp` and `Bool`); their export indices
+remain free in `uₑ`. -/
 
 universe uᵢ uₘ uₑ vᵢ v
 
@@ -151,6 +155,15 @@ example {ιₘ : Type uₘ} {ιₑ : Type uₑ}
     {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
     {σ₁ : Type v} (P : Package M E σ₁) {α : Type v} (A : OracleComp E α) :
     OracleComp M α := P.shiftLeft A
+
+/-- `run_link_eq_run_shiftLeft` also retains an independent import range universe `vᵢ` via
+the inner package `Q`. This sanity check catches accidental loss of that polymorphism. -/
+example {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
+    {σ₁ σ₂ : Type v} (P : Package M E σ₁) (Q : Package I M σ₂)
+    {α : Type v} (A : OracleComp E α) :
+    (P.link Q).run A = Q.run (P.shiftLeft A) :=
+  Package.run_link_eq_run_shiftLeft P Q A
 
 end UniverseTests
 

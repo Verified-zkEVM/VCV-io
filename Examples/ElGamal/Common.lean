@@ -17,6 +17,9 @@ open OracleComp OracleSpec ENNReal
 namespace ElGamalExamples
 
 variable {A M : Type}
+
+section AddGroup
+
 variable [AddGroup M] [SampleableType M]
 
 /-- A fixed header plus a uniform additive mask hides which payload was chosen, even after an
@@ -39,11 +42,10 @@ lemma uniformMaskedCipher_bind_dist_indep {β : Type}
   simpa [map_eq_bind_pure_comp, Function.comp, evalDist_bind, bind_assoc] using
     congrArg (fun p => p >>= fun c => evalDist (cont c)) hmask
 
-end ElGamalExamples
+end AddGroup
 
-namespace ElGamalExamples
+section AddCommGroup
 
-variable {A M : Type}
 variable [AddCommGroup M] [SampleableType M]
 
 /-- Uniform additive masking via a bijective pushforward: if `f : α → M` is a bijection out of
@@ -51,7 +53,7 @@ a finite uniformly sampleable type `α`, then `f x + m` with `x ← $ᵗ α` has
 for any two offsets `m`. Generalizes `uniformMaskedCipher_bind_dist_indep` to the case where the
 mask is sampled in a different space and transported to `M` by a bijection (as in ElGamal, where
 randomness lives in the scalar field and the ciphertext lives in the module). -/
-lemma evalDist_bind_bijectiveSmul_add_eq {α β : Type}
+lemma evalDist_bind_bijective_add_eq {α β : Type}
     [Finite α] [SampleableType α]
     (f : α → M) (hf : Function.Bijective f)
     (m₁ m₂ : M) (cont : M → ProbComp β) :
@@ -77,5 +79,7 @@ lemma evalDist_bind_bijectiveSmul_add_eq {α β : Type}
       simp [map_eq_bind_pure_comp, bind_assoc, add_comm]
     rw [hshift, evalDist_bind, evalDist_add_left_uniform (α := M) m, ← evalDist_bind]
   rw [bridge m₁, bridge m₂]
+
+end AddCommGroup
 
 end ElGamalExamples
