@@ -15,6 +15,30 @@ package VCVio where
 
 require "leanprover-community" / "mathlib" @ git "v4.29.0"
 
+/-
+Interop backends — pinned to explicit git revisions so reproducible builds are
+guaranteed and bumping a pin is a deliberate, reviewed change. Both pins are
+**commented out by default** so a fresh clone builds without pulling in the
+Rust verification toolchains' TCB. Flip on whichever backend you need; the CI
+TCB-isolation check (`scripts/check-interop-isolation.sh`) protects against
+accidental cross-imports regardless of whether the requires are active.
+
+Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Latest `main` as of
+2026-04-16. Subdirectory: `hax-lib/proof-libs/lean`.
+-/
+-- require Hax from git
+--   "https://github.com/cryspen/hax" @
+--   "492a34e3" / "hax-lib/proof-libs/lean"
+
+/-
+Aeneas: currently Lean 4.28.0-rc1 — a `lake update` would fail until upstream
+ships a 4.29 build. Latest `main` as of 2026-04-17 (also tagged
+`build-2026.04.17.152554-...`). Subdirectory: `backends/lean`.
+-/
+-- require Aeneas from git
+--   "https://github.com/AeneasVerif/aeneas" @
+--   "ba600392" / "backends/lean"
+
 /-- Main library. -/
 @[default_target] lean_lib VCVio
 
@@ -30,6 +54,11 @@ lean_lib Examples
 lean_lib VCVioWidgets
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib
+
+/-- Interop bridges to Rust verification frontends (hax, aeneas).
+Strict TCB isolation: no other `lean_lib` may import from `Interop`. See
+`Interop/README.md` and `docs/agents/interop.md`. -/
+lean_lib Interop
 
 -- Compile the shared FIPS 202 (SHA-3/SHAKE) FFI wrapper.
 -- Uses mlkem-native's FIPS 202 headers for the underlying implementation.

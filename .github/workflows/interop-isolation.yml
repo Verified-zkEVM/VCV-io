@@ -1,0 +1,33 @@
+name: Interop TCB Isolation
+
+# Enforces the contract documented in `Interop/README.md` and
+# `docs/agents/interop.md`: core VCVio libraries must not import from
+# `Interop.…`, `Hax.…`, or `Aeneas.…`, and `Interop/**` must not depend on
+# downstream libraries (`LatticeCrypto`, `Examples`, `LatticeCryptoTest`,
+# `FFI`, `VCVioWidgets`, `VCVioTest`).
+#
+# Runs on every PR and on pushes to `main` / `master`. The check is fast
+# (a handful of `rg` invocations) and runs without a Lean toolchain.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolation:
+    name: Check Interop TCB Isolation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Run isolation check
+        run: bash scripts/check-interop-isolation.sh

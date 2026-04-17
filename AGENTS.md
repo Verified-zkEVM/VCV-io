@@ -34,6 +34,7 @@ The repo also includes a first-class lattice cryptography library under `Lattice
 - `LatticeCrypto/`: lattice-specific algebra, hardness assumptions, scheme definitions, security theorems, and concrete implementations.
 - `LatticeCryptoTest/`: ACVP vectors, executable regression tests, and cross-checks against native backends.
 - `Examples/`: compact framework examples such as OneTimePad, ElGamal, and Schnorr.
+- `Interop/`: experimental bridges to Rust verification frontends (hax, aeneas). **Strict TCB isolation**: nothing in core VCVio depends on it. See `docs/agents/interop.md`.
 - `csrc/`: C FFI shims used for differential testing against native ML-DSA, ML-KEM, and Falcon code.
 - `third_party/`: vendored native backends used by the FFI and test harnesses.
 
@@ -61,6 +62,18 @@ For `LatticeCrypto/`, the rough dependency direction is:
 
 Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`, but not the other way around.
 
+For `Interop/`, the dependency contract is one-way:
+
+```
+Interop/{Hax,Aeneas,Rust}/  →  VCVio/, ToMathlib/, (Hax.…), (Aeneas.…)
+```
+
+`Interop/**` may **never** be imported from `VCVio/`, `LatticeCrypto/`,
+`LatticeCryptoTest/`, `Examples/`, `ToMathlib/`, `FFI/`, `VCVioWidgets/`,
+or `VCVioTest/`. This contract is enforced by
+`scripts/check-interop-isolation.sh` and the
+`Interop TCB Isolation` GitHub workflow on every PR.
+
 ## Critical Gotchas
 
 1. **`[spec.Fintype]` and `[spec.Inhabited]`** are required for probability reasoning (`evalDist`, `Pr[...]`).
@@ -70,6 +83,7 @@ Scheme-specific code in `LatticeCrypto/` may depend on `VCVio/CryptoFoundations`
 5. **Commented-out code is legacy** — follow only uncommented code. Use `Examples/OneTimePad/Basic.lean` as canonical reference.
 6. **Preserve partial proofs** with `stop` instead of deleting large proof blocks.
 7. **Do not disable linters to silence errors**. Do not use `set_option linter.* false`, `set_option weak.linter.* false`, or add repo-level `leanOptions` that turn lints off. Fix the root cause instead.
+8. **Interop TCB isolation is mandatory**. Core VCVio (`VCVio/`, `ToMathlib/`, `LatticeCrypto/`, `Examples/`, `LatticeCryptoTest/`, `FFI/`, `VCVioWidgets/`, `VCVioTest/`) must never `import Interop.…`, `import Hax.…`, or `import Aeneas.…`. CI fails the PR if it does. See `docs/agents/interop.md`.
 
 For the full list, see `docs/agents/gotchas.md`.
 
@@ -118,6 +132,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Falcon GPV instantiation: `LatticeCrypto/Falcon/Scheme.lean`
 - Lattice hardness assumptions: `LatticeCrypto/HardnessAssumptions/LearningWithErrors.lean`, `LatticeCrypto/HardnessAssumptions/ShortIntegerSolution.lean`
 - Differential and vector tests: `LatticeCryptoTest/`
+- Rust verification interop (hax / aeneas): `Interop/Rust/Common.lean`, `Interop/README.md`, `scripts/check-interop-isolation.sh`
 
 ## Program Logic Tactics
 
@@ -143,6 +158,7 @@ Lean toolchain and Mathlib must stay in sync (both currently `v4.28.0`). Files s
 Before working in a specific area, read the relevant guide in `docs/agents/`:
 
 - **Interaction framework (specs, roles, concurrency)**: [`docs/agents/interaction.md`](docs/agents/interaction.md)
+- **Interop with Rust verification frontends (hax, aeneas)**: [`docs/agents/interop.md`](docs/agents/interop.md)
 - **LatticeCrypto layout and workflows**: [`docs/agents/lattice.md`](docs/agents/lattice.md)
 - **OracleComp / SubSpec / SimSemantics**: [`docs/agents/oracle-comp.md`](docs/agents/oracle-comp.md)
 - **Query tracking / weighted cost / expected runtime**: [`docs/agents/query-tracking.md`](docs/agents/query-tracking.md)
