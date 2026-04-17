@@ -494,6 +494,97 @@ lemma forkReplayWithTraceValue_eq_none_of_cf_none
     forkReplayWithTraceValue main qb i cf first u = pure none := by
   simp [forkReplayWithTraceValue, h]
 
+/-!
+### Live-mode α-marginal
+
+Once the replay oracle has transitioned into "live mode" (either `forkConsumed = true`
+after the fork fired, or `mismatch = true` after a trace mismatch or exhaustion), every
+subsequent query simply falls through to the ambient `query t` and records the answer in
+`observed`. In particular, the α-component of the simulated computation coincides with
+`main` itself: the state only records observations and does not influence the output.
+
+These lemmas are used in the B1 faithfulness proofs (`evalDist_uniform_bind_fst_replay
+RunWithTraceValue_takeBeforeForkAt` and `tsum_probOutput_replayFirstRun_weight_take
+BeforeForkAt`): after the fork point on either side (full log vs. truncated log), both
+computations enter live mode, and the α-marginal collapses to `evalDist main`.
+-/
+
+/-- Live mode is preserved by `noteObserved`: neither `forkConsumed` nor `mismatch` is
+touched by recording an observation. -/
+lemma ReplayForkState.noteObserved_live_iff {i : ι}
+    (st : ReplayForkState spec i) (t : ι) (u : spec.Range t) :
+    (st.noteObserved t u).forkConsumed = st.forkConsumed ∧
+      (st.noteObserved t u).mismatch = st.mismatch := by
+  simp [ReplayForkState.noteObserved]
+
+/-- **Live-mode α-marginal.** Starting from a replay state in live mode
+(`forkConsumed = true` or `mismatch = true`), the α-component of running the replay
+oracle on `main` equals `main` itself. The state only accumulates observations; it has
+no effect on the α-distribution. -/
+lemma fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
+    (i : ι) (main : OracleComp spec α) :
+    ∀ (st : ReplayForkState spec i),
+      (st.forkConsumed = true ∨ st.mismatch = true) →
+      (Prod.fst <$> (simulateQ (replayOracle i) main).run st :
+        OracleComp spec α) = main := by
+  induction main using OracleComp.inductionOn with
+  | pure x => intro st _; simp
+  | query_bind t oa ih =>
+    intro st hst
+    have hlive : (st.forkConsumed || st.mismatch) = true := by
+      rcases hst with h | h <;> simp [h]
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+      OracleQuery.input_query, id_map, StateT.run_bind]
+    -- Unfold the oracle at `t` using the live branch.
+    have hstep : (replayOracle (spec := spec) i t).run st =
+        (do
+          let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+          pure (u, st.noteObserved t u)) := by
+      unfold replayOracle
+      simp only [StateT.run_bind, StateT.run_get, pure_bind, hlive, if_true,
+        bind_pure_comp, StateT.run_monadLift, monadLift_eq_self, StateT.run_map,
+        StateT.run_set, map_pure]
+      rfl
+    rw [hstep]
+    simp only [bind_pure_comp, map_bind, monadLift_eq_self, bind_map_left]
+    -- `Prod.fst <$> (do u ← query t; let st' := noteObserved; (simulateQ ...).run st')`
+    --   = `do u ← query t; Prod.fst <$> (simulateQ ...).run (noteObserved st u)`
+    -- By IH applied to `noteObserved st u` (still in live mode), the inner
+    -- `Prod.fst <$> ...` equals `oa u`.
+    have hst' : ∀ u : spec.Range t,
+        (st.noteObserved t u).forkConsumed = true ∨
+          (st.noteObserved t u).mismatch = true := by
+      intro u
+      rcases hst with h | h
+      · left; simpa [ReplayForkState.noteObserved] using h
+      · right; simpa [ReplayForkState.noteObserved] using h
+    calc (Prod.fst <$> (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            (simulateQ (replayOracle i) (oa u)).run (st.noteObserved t u))
+            : OracleComp spec α)
+        = (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            Prod.fst <$> (simulateQ (replayOracle i) (oa u)).run
+              (st.noteObserved t u)) := by
+          simp [map_bind]
+      _ = (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            oa u) := by
+          refine bind_congr fun u => ?_
+          exact ih u (st.noteObserved t u) (hst' u)
+      _ = (liftM (query t) >>= fun u => oa u : OracleComp spec α) := rfl
+
+/-- α-marginal form of `fst_map_simulateQ_replayOracle_of_live`, specialized to the
+`evalDist` level. Once in live mode, the α-output distribution of the replay run is
+`evalDist main`. -/
+lemma evalDist_fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (i : ι) (main : OracleComp spec α) (st : ReplayForkState spec i)
+    (hst : st.forkConsumed = true ∨ st.mismatch = true) :
+    evalDist (Prod.fst <$> (simulateQ (replayOracle i) main).run st :
+      OracleComp spec α) = evalDist main := by
+  rw [fst_map_simulateQ_replayOracle_of_live i main st hst]
+
 section support
 
 /-- Prefix-style replay invariant: the consumed prefix of `observed` matches the consumed prefix of
