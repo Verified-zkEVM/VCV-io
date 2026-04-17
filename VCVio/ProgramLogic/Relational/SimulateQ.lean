@@ -221,6 +221,22 @@ theorem relTriple_simulateQ_run_writerT_of_impl_eq
   rintro ⟨a₁, w₁⟩ ⟨a₂, w₂⟩ ⟨ha, hw⟩
   exact Prod.ext ha hw
 
+/-- Output-probability projection of
+`relTriple_simulateQ_run_writerT_of_impl_eq`: two `WriterT` handlers with
+pointwise-equal `.run` yield identical `(output, accumulator)` probability
+distributions. -/
+theorem probOutput_simulateQ_run_writerT_eq_of_impl_eq
+    {ι₁ : Type u}
+    {spec₁ : OracleSpec ι₁} [spec₁.Fintype] [spec₁.Inhabited]
+    {ω : Type} [Monoid ω]
+    (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
+    (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
+    (oa : OracleComp spec α) (z : α × ω) :
+    Pr[= z | (simulateQ impl₁ oa).run] =
+      Pr[= z | (simulateQ impl₂ oa).run] :=
+  probOutput_eq_of_relTriple_eqRel
+    (relTriple_simulateQ_run_writerT_of_impl_eq impl₁ impl₂ himpl_eq oa) z
+
 /-- Projection of `relTriple_simulateQ_run_writerT` onto the output component. -/
 theorem relTriple_simulateQ_run_writerT'
     {ι₁ : Type u} {ι₂ : Type u}

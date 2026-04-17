@@ -621,6 +621,22 @@ private example {ω : Type} [Monoid ω]
   simp only [EqRel, Prod.mk.injEq] at heq
   exact heq
 
+/-- Smoke test: `relTriple_simulateQ_run_writerT_of_impl_eq` gives a
+trivial, single-line proof of diagonal coupling when the two handlers
+are literally equal. This is the cleanest path to output+writer equality
+for same-handler simulations. -/
+private example {α : Type} (oa : OracleComp spec α) :
+    RelTriple
+      (simulateQ
+        (countingOracle :
+          QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec))) oa).run
+      (simulateQ
+        (countingOracle :
+          QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec))) oa).run
+      (EqRel (α × QueryCount ι)) :=
+  relTriple_simulateQ_run_writerT_of_impl_eq (spec₁ := spec)
+    countingOracle countingOracle (fun _ => rfl) oa
+
 end SmokeTests
 
 end OracleComp.ProgramLogic.Relational
