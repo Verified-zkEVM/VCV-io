@@ -799,16 +799,14 @@ private theorem target_eq_of_mem_forkReplay
     push Not at hge
     rw [List.getElem?_eq_none hge] at htgt₂
     exact (Option.some_ne_none _ htgt₂.symm).elim
-  have hgetElem₁ : (x₁.queryLog.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = x₁.queryLog[(↑s : ℕ)]? := by
-    rw [List.getElem?_take]
-    split_ifs with h; · rfl
-    · exact absurd (Nat.lt_succ_self _) h
-  have hgetElem₂ : (x₂.queryLog.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = x₂.queryLog[(↑s : ℕ)]? := by
+  have hgetElem_take :
+      ∀ l : List (M × Commit),
+        (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? := fun l => by
     rw [List.getElem?_take]
     split_ifs with h; · rfl
     · exact absurd (Nat.lt_succ_self _) h
   have : some x₁.target = some x₂.target := by
-    rw [← htgt₁, ← htgt₂, ← hgetElem₁, ← hgetElem₂, htakeEq]
+    rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
   exact Option.some.inj this
 
 /-- **Per-pk extraction bound.** Given the structural forking event on `pk` (two fork
