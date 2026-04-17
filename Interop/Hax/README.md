@@ -14,14 +14,17 @@ with 2 harmless `@[reducible]` warnings in hax's own
 Bridge code is in place:
 
 - `Bridge.lean` — `errorOfHax`, `liftRustM`, the `MonadLift RustM
-  (Interop.Rust.RustOracleComp spec)` instance, and four `rfl`-level
-  `@[simp]` commutation lemmas (`liftRustM_{ok,fail,div,pure}`).
-- `Examples.lean` — tiny end-to-end demo: a checked-addition `RustM`
-  function, two equality-level specs, one `Std.Do.Triple` spec driven
-  by `mvcgen`, and an oracle-composed `RustOracleComp` program mixing
-  a `query` with a lifted `RustM` call.
+  (Interop.Rust.RustOracleComp spec)` instance, four `rfl`-level
+  `@[simp]` commutation lemmas (`liftRustM_{ok,fail,div,pure}`), and
+  the compositional `Triple`-level boundary lemma `triple_liftRustM`.
+- `Examples.lean` — end-to-end demo: a checked-addition `RustM`
+  function, two equality-level specs, a `Std.Do.Triple` spec driven by
+  `mvcgen` (`addOrPanicLifted_triple`), an oracle-composed
+  `RustOracleComp` program (`oracleThenAdd`), and a `Triple` spec on
+  the oracle-composed program (`oracleThenAdd_triple`) that mixes a
+  real `query` with a lifted `RustM` call.
 
-`lake build Interop` succeeds across all of the above (2625 jobs).
+`lake build Interop` succeeds across all of the above.
 
 ### `require` order
 
@@ -82,6 +85,59 @@ The `[spec.Fintype] [spec.Inhabited]` constraints are inherited from
 VCVio's `WP (OracleComp spec) .pure` and are the only additional
 obligation the oracle layer imposes.
 
+## Compositional boundary lemma
+
+`triple_liftRustM` in `Bridge.lean` transports a hax-side `Triple`
+through the lift in one step:
+
+```lean
+theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
+    (x : RustM α)
+    {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}
+    {P : Assertion (.except Interop.Rust.Error (.except PUnit .pure))}
+    (h : Std.Do.Triple (ps := .except _root_.Error (.except PUnit .pure)) x P
+          (Q.1, fun e => Q.2.1 (errorOfHax e), Q.2.2)) :
+    Std.Do.Triple
+      (liftRustM (spec := spec) x : Interop.Rust.RustOracleComp spec α)
+      P Q
+```
+
+The only move from the hax-side post-condition is rebranding the error
+handler: `Q.2.1 ∘ errorOfHax` instead of `Q.2.1`. The success handler
+(`Q.1`) and divergence handler (`Q.2.2`) are shared verbatim, which
+reflects that `liftRustM` is the identity on those cases modulo the
+transformer encoding. This lemma is what lets us reuse hax's own
+`@[spec]` library downstream without reproving lifts pointwise.
+
+## Oracle-composed Triple spec
+
+`oracleThenAdd_triple` in `Examples.lean` is the "genuine" boundary
+example: a `RustOracleComp`-shaped `Triple` on a program that both
+issues an oracle query and invokes a hax-style `RustM` function.
+
+```lean
+def oracleThenAdd (x : Nat) (t : ι) (coe : spec.Range t → Nat) :
+    Interop.Rust.RustOracleComp spec Nat := do
+  let y ← (liftM (query t) : OracleComp spec _)
+  liftRustM (addOrPanic x (coe y))
+
+theorem oracleThenAdd_triple (x : Nat) (t : ι) (coe : spec.Range t → Nat)
+    [spec.Fintype] [spec.Inhabited]
+    (hbound : ∀ y : spec.Range t, x + coe y < 2 ^ 32) :
+    ⦃⌜True⌝⦄
+    (oracleThenAdd (spec := spec) x t coe)
+    ⦃⇓ r => ⌜x ≤ r⌝⦄
+```
+
+The proof is `mvcgen` + the `wpProp`-to-`support` bridge from VCVio's
+`StdDoBridge` for the single oracle step, then `simp` closes the
+lifted `RustM` tail. The oracle query is lifted through the derived
+`MonadLiftT (OracleComp spec) (RustOracleComp spec)` chain
+(`OptionT.lift` composed with `ExceptT.lift`), not a direct
+`MonadLift` instance; keeping the chain derived ensures `mvcgen` can
+peel it via the standard `Spec.monadLift_{OptionT,ExceptT}` rules
+rather than short-circuiting on a hand-written instance.
+
 ## Risks
 
 - `_root_.Error` (hax) is namespace-collision-prone with anything else
@@ -96,11 +152,14 @@ obligation the oracle layer imposes.
 
 ## Next steps
 
-- **Compositional** `Triple`-level boundary lemma: a transport of the
-  form "`Triple x P Q` on `RustM` gives `Triple (liftRustM x) P Q'` on
-  `RustOracleComp spec`, where `Q'.2.1 = Q.2.1 ∘ errorOfHax`". Useful
-  for porting hax's own `@[spec]` library wholesale. Not yet needed for
-  concrete programs since `mvcgen` + the `@[simp]` lemmas handle them.
-- A bigger example that actually exercises oracle queries under a
-  `RustOracleComp`-shaped spec (the current `oracleThenAdd` has no
-  spec attached).
+- Wire `triple_liftRustM` into a `@[spec]` attribute (currently a plain
+  theorem) once we have a concrete hax example whose pre/post shapes
+  let `mvcgen` index it cleanly.
+- Port a non-trivial hax `@[spec]` fact and apply `triple_liftRustM` to
+  it, verifying the rebrand of the error handler composes as expected
+  with hax's own `_root_.Error` enum beyond the single
+  `integerOverflow` constructor exercised in `Examples.lean`.
+- State `liftRustM` as a more general `MonadHom` / `MonadMorphism` so
+  that it transports any hax-side `Pr[_]`-style probabilistic spec, not
+  just Hoare `Triple`s. Only needed once we have a probabilistic hax
+  workflow.

@@ -124,21 +124,59 @@ end TripleSpec
 
 The whole point of the lift is that `RustOracleComp spec` admits `bind`
 with a genuine oracle query on the `OracleComp spec` layer, which
-`RustM` cannot. The `MonadLift (OracleComp spec) (RustOracleComp spec)`
-instance from `Interop.Rust.Common` turns a single `query` into a
-lifted `RustOracleComp` step, and the hax lift composes with it. -/
+`RustM` cannot. Lean derives `MonadLiftT (OracleComp spec)
+(RustOracleComp spec)` automatically by chaining
+`MonadLift (OracleComp spec) (OptionT (OracleComp spec))` with
+`MonadLift (OptionT ..) (ExceptT .. (OptionT ..))`; this keeps `mvcgen`
+compositional (each layer is covered by a standard `@[spec]` rule). -/
 
 /-- Query a uniform oracle for a value, convert it to `Nat`, then run
 `addOrPanic` on it. Models a hybrid harness where the input to a
 hax-generated function comes from randomness rather than a literal.
 
 The do-block binds in `RustOracleComp spec`; the oracle query is
-lifted via `MonadLift (OracleQuery spec) (OracleComp spec)` composed
-with `MonadLift (OracleComp spec) (RustOracleComp spec)`, and the
-`liftRustM` call in the tail is the hax bridge. -/
+lifted via the derived `MonadLiftT (OracleComp spec)
+(RustOracleComp spec)` chain, and the `liftRustM` call in the tail is
+the hax bridge. -/
 def oracleThenAdd (x : Nat) (t : ι) (coe : spec.Range t → Nat) :
     Interop.Rust.RustOracleComp spec Nat := do
   let y ← (liftM (query t) : OracleComp spec _)
   liftRustM (addOrPanic x (coe y))
+
+/-! ### Triple-level spec on the oracle-composed program
+
+The "genuine" boundary example: a `RustOracleComp`-shaped `Triple` on a
+program that both queries an oracle and invokes a hax-style `RustM`
+function. Under a universal no-overflow hypothesis on the oracle
+response, the composed program always returns a value ≥ `x`. The proof
+uses `mvcgen` to peel the transformer stack, the support-level
+`wpProp` bridge for the single oracle query, and the equality-level
+`addOrPanicLifted_ok_of_lt` to close the `liftRustM` tail. -/
+
+section OracleTripleSpec
+
+set_option mvcgen.warning false
+
+variable [spec.Fintype] [spec.Inhabited]
+
+/-- If the oracle's response can never push `x + coe y` above `2^32`,
+then `oracleThenAdd` always returns a value `≥ x`. The interesting part
+is that the precondition mentions the oracle response `y`, which is
+universally quantified at the spec level because a well-typed spec on
+`RustOracleComp spec` must hold for any oracle outcome. -/
+theorem oracleThenAdd_triple (x : Nat) (t : ι) (coe : spec.Range t → Nat)
+    (hbound : ∀ y : spec.Range t, x + coe y < 2 ^ 32) :
+    ⦃⌜True⌝⦄
+    (oracleThenAdd (spec := spec) x t coe)
+    ⦃⇓ r => ⌜x ≤ r⌝⦄ := by
+  mvcgen [oracleThenAdd, addOrPanic]
+  rw [OracleComp.ProgramLogic.StdDo.wpProp_iff_forall_support]
+  intro y _
+  have hy : x + coe y < 4294967296 := hbound y
+  rw [if_pos hy]
+  simp only [liftRustM_pure, WPMonad.wp_pure, PostCond.noThrow]
+  exact Nat.le_add_right x (coe y)
+
+end OracleTripleSpec
 
 end Interop.Hax.Examples

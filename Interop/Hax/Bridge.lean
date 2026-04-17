@@ -105,4 +105,63 @@ theorem liftRustM_pure (v : α) :
       pure v :=
   rfl
 
+/-! ### `Triple`-level boundary transport
+
+The following theorem is the main compositional content of the bridge: any
+`Std.Do` `Triple` for `x : RustM α` induces a `Triple` for
+`liftRustM x : RustOracleComp spec α`, with the postcondition transported
+only through `errorOfHax` on the exception component. The precondition and
+the success / divergence components are reused verbatim because both
+monads have the same post-shape `.except _ (.except PUnit .pure)` and both
+`Assertion` types reduce to `ULift Prop`.
+
+This is the lemma that lets one port hax's upstream `@[spec]` library
+into `RustOracleComp` wholesale: apply the lemma, then supply the hax
+spec as the hypothesis. For concrete constructor-level programs the
+`@[simp]` commutation lemmas above still do the job directly. -/
+
+theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
+    (x : RustM α)
+    {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}
+    {P : Assertion (.except Interop.Rust.Error (.except PUnit .pure))}
+    (h : Std.Do.Triple (ps := .except _root_.Error (.except PUnit .pure)) x P
+          (Q.1, fun e => Q.2.1 (errorOfHax e), Q.2.2)) :
+    Std.Do.Triple
+      (liftRustM (spec := spec) x : Interop.Rust.RustOracleComp spec α)
+      P Q := by
+  match x with
+  | RustM.ok v =>
+    rw [Triple.iff] at h ⊢
+    simpa [liftRustM_ok, Interop.Rust.RustOracleComp.ok,
+      WPMonad.wp_pure] using h
+  | RustM.fail e =>
+    rw [Triple.iff] at h ⊢
+    simpa [liftRustM_fail, Interop.Rust.RustOracleComp.fail, RustM.fail] using h
+  | RustM.div =>
+    rw [Triple.iff] at h ⊢
+    change P ⊢ₛ wp⟦(Interop.Rust.RustOracleComp.div : Interop.Rust.RustOracleComp spec α)⟧ Q
+    -- Both wps reduce to the divergence branch: `Q.2.2.1 ⟨⟩`.
+    -- Use `WPMonad.wp_pure` on the inner `OracleComp` layer to eliminate the
+    -- residual `⌜(Q.2.2.1 ⟨⟩).down⌝` wrapping VCVio's WP introduces, then
+    -- match the RustM side which is structurally the same
+    -- `pushOption ∘ pushExcept` with the inner `Id` instead of
+    -- `OracleComp spec`.
+    have hgoal :
+        wp⟦(Interop.Rust.RustOracleComp.div : Interop.Rust.RustOracleComp spec α)⟧ Q
+          = Q.2.2.1 ⟨⟩ := by
+      change (PredTrans.pushExcept (PredTrans.pushOption
+        (WP.wp (pure none :
+          OracleComp spec (Option (Except Interop.Rust.Error α)))))).apply Q
+            = _
+      rw [WPMonad.wp_pure]
+      rfl
+    have hh :
+        wp⟦(RustM.div : RustM α)⟧
+            ((Q.1, fun e => Q.2.1 (errorOfHax e), Q.2.2) :
+              PostCond α (.except _root_.Error (.except PUnit .pure)))
+          = Q.2.2.1 ⟨⟩ := rfl
+    rw [hgoal]
+    rw [hh] at h
+    exact h
+
 end Interop.Hax

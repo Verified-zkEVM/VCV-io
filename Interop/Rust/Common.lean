@@ -95,13 +95,17 @@ def div : RustOracleComp spec α :=
 /-- Lift an oracle computation into the Rust target by treating it as a
 total, panic-free Rust value. This is the `pure`/`some` chain through both
 transformers and is what every oracle query reduces to inside the Rust
-target. -/
+target.
+
+Defined as the two-step `ExceptT.lift ∘ OptionT.lift` so `mvcgen` can
+peel the `MonadLiftT (OracleComp spec) (RustOracleComp spec)` chain via
+the standard `@[spec]` rules `Spec.monadLift_OptionT` and
+`Spec.monadLift_ExceptT`. A direct `MonadLift (OracleComp spec)
+(RustOracleComp spec)` instance would short-circuit that chain and leave
+mvcgen with no spec rule to apply. -/
 @[reducible]
 def liftOracleComp (oa : OracleComp spec α) : RustOracleComp spec α :=
   ExceptT.lift (OptionT.lift oa)
-
-instance : MonadLift (OracleComp spec) (RustOracleComp spec) where
-  monadLift := liftOracleComp
 
 end RustOracleComp
 
