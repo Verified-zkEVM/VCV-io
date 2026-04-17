@@ -24,7 +24,7 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 
 ## What This Project Is
 
-VCV-io provides `OracleComp spec α`, a monadic type for oracle-access computations (free monad over `OracleSpec`), with `simulateQ` for operational semantics and `evalDist` for denotational semantics (probability distributions). `ProbComp α` is the abbreviation for `OracleComp unifSpec α`.
+VCVio is a framework for formal cryptographic proofs built around `OracleComp spec α`, the free monad on the polynomial functor induced by an oracle signature `OracleSpec ι := ι → Type`. Its universal fold `simulateQ impl : OracleComp spec α → r α` is the unique monad morphism extending any `impl : QueryImpl spec r` to the free monad, and the distribution semantics `evalDist` (with `support`, `probOutput`, `Pr[…]`) are *definitionally* `simulateQ` into `PMF` / `SetM` / … with queries interpreted as uniform sampling. `ProbComp α := OracleComp unifSpec α` specializes to computations whose only oracle is uniform selection.
 
 The repo also includes a first-class lattice cryptography library under `LatticeCrypto/`, built on top of the `VCVio` framework. That layer contains generic lattice algebra plus ML-DSA, ML-KEM, and Falcon specifications, security statements, concrete implementations, FFI bridges, and tests.
 
@@ -136,7 +136,7 @@ lake exe cache get && lake build
 
 After adding new `.lean` files: `./scripts/update-lib.sh`
 
-Lean toolchain and Mathlib must stay in sync (both currently `v4.28.0`). Files should stay under 1500 lines.
+Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files should stay under 1500 lines.
 
 ## Further Reading
 

@@ -8,6 +8,8 @@ An oracle specification maps index types to response types:
 def OracleSpec (ι : Type u) : Type _ := ι → Type v
 ```
 
+Concretely, `spec t` is the response type at query index `t : ι`. `OracleSpec ι` is the `B`-component of a polynomial functor with position type `A := ι`; `spec.toPFunctor` packages the two together, and `OracleSpec.ofPFunctor` is its inverse (both `rfl`-invertible). This is the connection that makes `OracleComp` a free monad: see [`OracleComp`](#oraclecomp) below.
+
 | Constructor | Notation | Example |
 |-------------|----------|---------|
 | Singleton spec | `A →ₒ B` | `Bool →ₒ Fin 6` |
@@ -119,6 +121,15 @@ Substitutes every `query t` in a computation with `impl t`:
 def simulateQ [Monad r] (impl : QueryImpl spec r) (mx : OracleComp spec α) : r α
 ```
 
+**Universal property.** `simulateQ impl` is the *unique* monad morphism `OracleComp spec →ᵐ r` that agrees with `impl` on queries. Internally it is `PFunctor.FreeM.mapM impl`, i.e. the fold of the free-monad syntax tree into `r`. Every way of "running" an `OracleComp` factors through `simulateQ`; there is no other primitive interpreter.
+
+**Handler vs denotation.** The target monad `r` determines how `simulateQ impl` reads:
+
+- `r` effectful (`StateT`, `WriterT`, `OptionT`, another `OracleComp`, `IO`, …) — `simulateQ impl` is an **effect handler**: caching, logging, query counting, lazy sampling, simulating a hash oracle, embedding one game in a richer oracle context.
+- `r` semantic (`PMF`, `SPMF`, `Set`, `Finset`) — `simulateQ impl` is a **denotation**. `evalDist` and `support` are both `simulateQ` into a semantic monad (see [evalDist IS simulateQ](#evaldist-is-simulateq) below).
+
+So "operational vs denotational" is not a primitive split; both are `simulateQ` parameterized by the target monad.
+
 ### Key lemmas (all `@[simp, grind =]`)
 
 | Lemma | Statement |
@@ -142,14 +153,23 @@ Key lemma: `simulateQ (so' ∘ₛ so) oa = simulateQ so' (simulateQ so oa)`
 
 ### evalDist IS simulateQ
 
-`evalDist` is literally `simulateQ` with uniform distributions as the oracle implementation. This is definitional (`rfl`). The implementation is `uniformSampleImpl`:
+`evalDist : OracleComp spec α → PMF α` is *definitionally* (`rfl`) `simulateQ` into `PMF`, with each query interpreted as the uniform distribution over its response type. The `HasEvalPMF` instance at `VCVio/OracleComp/EvalDist.lean:153-154` reads:
+
+```lean
+noncomputable instance : HasEvalPMF (OracleComp spec) where
+  toPMF := simulateQ' fun t => PMF.uniformOfFintype (spec.Range t)
+```
+
+(requires `[spec.Fintype] [spec.Inhabited]`). `support : OracleComp spec α → Set α` has the same shape but target `SetM` with `impl _ := Set.univ`. Both are instances of the same universal fold, not separate primitives.
+
+Distinct from the `PMF`-target `evalDist`, there is also a *syntactic* uniform-sampling handler that rewrites queries into `ProbComp` (i.e. target `OracleComp unifSpec`, not `PMF`):
 
 ```lean
 def uniformSampleImpl [∀ i, SampleableType (spec.Range i)] :
     QueryImpl spec ProbComp := fun t => $ᵗ spec.Range t
 ```
 
-Key simp lemmas: `evalDist_simulateQ`, `probOutput_simulateQ`, `probEvent_simulateQ` (all with `uniformSampleImpl`).
+Preservation of `evalDist` through `uniformSampleImpl` is a **lemma**, not definitional: `uniformSampleImpl.evalDist_simulateQ : evalDist (simulateQ uniformSampleImpl oa) = evalDist oa` (`VCVio/OracleComp/SimSemantics/Constructions.lean:63-68`). Companion lemmas `probOutput_simulateQ`, `probEvent_simulateQ`, `support_simulateQ`, `finSupport_simulateQ` live in the same namespace and are what you reach for when you want to stay inside `ProbComp` rather than drop to `PMF`.
 
 ## Enforcement Oracle
 
