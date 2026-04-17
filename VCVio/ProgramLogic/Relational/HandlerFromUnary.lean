@@ -215,6 +215,95 @@ theorem relTriple_simulateQ_run_of_triples
   rintro ⟨a₁, s₁''⟩ ⟨a₂, s₂''⟩ ⟨hQ₁, hQ₂⟩
   exact hsync t s₁' s₂' hs' a₁ s₁'' a₂ s₂'' hQ₁ hQ₂
 
+/-- `WriterT` analogue of `relTriple_simulateQ_run_of_triples` (monoid variant).
+
+Given matching unary `Std.Do.Triple` specs for two `WriterT`-based
+handlers, a monoid-congruent writer relation `R_writer` (via `hR_one` and
+`hR_mul`), and a synchronization condition on per-query postconditions,
+derive a whole-program `RelTriple` on the full `(output, writer)` outputs
+of the two simulations.
+
+The per-query triples are specialized to starting writer `1`
+(which corresponds to `WriterT.run`-style entry); their postconditions
+are evaluated at the resulting step writer. Typical instantiations are
+`countingOracle_triple` and `costOracle_triple` with `qc₀ = 0` /
+`s₀ = 1`. -/
+theorem relTriple_simulateQ_run_writerT_of_triples
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
+    (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
+    (R_writer : ω₁ → ω₂ → Prop)
+    (hR_one : R_writer 1 1)
+    (hR_mul : ∀ w₁ w₁' w₂ w₂', R_writer w₁ w₂ → R_writer w₁' w₂' →
+      R_writer (w₁ * w₁') (w₂ * w₂'))
+    (oa : OracleComp spec α)
+    (Q₁ : ∀ (t : spec.Domain), spec.Range t → ω₁ → Prop)
+    (Q₂ : ∀ (t : spec.Domain), spec.Range t → ω₂ → Prop)
+    (h₁ : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl₁ t : WriterT ω₁ (OracleComp spec₁) (spec.Range t))
+      (spred(fun s => ⌜s = 1⌝))
+      (⇓a s' => ⌜Q₁ t a s'⌝))
+    (h₂ : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl₂ t : WriterT ω₂ (OracleComp spec₂) (spec.Range t))
+      (spred(fun s => ⌜s = 1⌝))
+      (⇓a s' => ⌜Q₂ t a s'⌝))
+    (hsync : ∀ (t : spec.Domain) a₁ w₁ a₂ w₂,
+      Q₁ t a₁ w₁ → Q₂ t a₂ w₂ → a₁ = a₂ ∧ R_writer w₁ w₂) :
+    RelTriple
+      (simulateQ impl₁ oa).run
+      (simulateQ impl₂ oa).run
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_writer p₁.2 p₂.2) := by
+  refine relTriple_simulateQ_run_writerT
+    impl₁ impl₂ R_writer hR_one hR_mul oa ?_
+  intro t
+  have hcombine := relTriple_run_writerT_of_triple_monoid
+    (mx₁ := impl₁ t) (mx₂ := impl₂ t)
+    (s₁ := (1 : ω₁)) (s₂ := (1 : ω₂))
+    (P₁ := fun s => s = 1) (P₂ := fun s => s = 1)
+    (Q₁ := Q₁ t) (Q₂ := Q₂ t)
+    rfl rfl (h₁ t) (h₂ t)
+  refine relTriple_post_mono hcombine ?_
+  rintro ⟨a₁, w₁⟩ ⟨a₂, w₂⟩ ⟨hQ₁, hQ₂⟩
+  rw [one_mul] at hQ₁ hQ₂
+  exact hsync t a₁ w₁ a₂ w₂ hQ₁ hQ₂
+
+/-- Output-projection variant of `relTriple_simulateQ_run_writerT_of_triples`.
+
+Drops the writer component, leaving only `EqRel α` on outputs. -/
+theorem relTriple_simulateQ_run_writerT'_of_triples
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
+    (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
+    (R_writer : ω₁ → ω₂ → Prop)
+    (hR_one : R_writer 1 1)
+    (hR_mul : ∀ w₁ w₁' w₂ w₂', R_writer w₁ w₂ → R_writer w₁' w₂' →
+      R_writer (w₁ * w₁') (w₂ * w₂'))
+    (oa : OracleComp spec α)
+    (Q₁ : ∀ (t : spec.Domain), spec.Range t → ω₁ → Prop)
+    (Q₂ : ∀ (t : spec.Domain), spec.Range t → ω₂ → Prop)
+    (h₁ : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl₁ t : WriterT ω₁ (OracleComp spec₁) (spec.Range t))
+      (spred(fun s => ⌜s = 1⌝))
+      (⇓a s' => ⌜Q₁ t a s'⌝))
+    (h₂ : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl₂ t : WriterT ω₂ (OracleComp spec₂) (spec.Range t))
+      (spred(fun s => ⌜s = 1⌝))
+      (⇓a s' => ⌜Q₂ t a s'⌝))
+    (hsync : ∀ (t : spec.Domain) a₁ w₁ a₂ w₂,
+      Q₁ t a₁ w₁ → Q₂ t a₂ w₂ → a₁ = a₂ ∧ R_writer w₁ w₂) :
+    RelTriple
+      (Prod.fst <$> (simulateQ impl₁ oa).run)
+      (Prod.fst <$> (simulateQ impl₂ oa).run)
+      (EqRel α) := by
+  have hfull := relTriple_simulateQ_run_writerT_of_triples
+    impl₁ impl₂ R_writer hR_one hR_mul oa Q₁ Q₂ h₁ h₂ hsync
+  have hweak : RelTriple (simulateQ impl₁ oa).run (simulateQ impl₂ oa).run
+      (fun p₁ p₂ => (EqRel α) p₁.1 p₂.1) :=
+    relTriple_post_mono hfull (fun _ _ hp => hp.1)
+  exact relTriple_map hweak
+
 /-- Output-projection variant of `relTriple_simulateQ_run_of_triples`.
 
 Drops the final state from both sides, leaving only a relational equality
