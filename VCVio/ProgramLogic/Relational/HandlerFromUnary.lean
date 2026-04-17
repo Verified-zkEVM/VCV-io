@@ -134,6 +134,39 @@ theorem relTriple_run_writerT_of_triple
   · rintro ⟨b, w⟩ hmem
     exact h₂ s₂ hP₂ b w hmem
 
+/-- `Monoid`-variant of `relTriple_run_writerT_of_triple`.
+
+For `WriterT ωᵢ (OracleComp specᵢ)` with `[Monoid ωᵢ]`, two unary
+`Std.Do.Triple`s lift to a product coupling on the `(value,
+accumulated_log)` pairs where each postcondition is read at
+`Q₁ a (s₁ * w)` / `Q₂ b (s₂ * w)` (monoid multiplication). Used by
+`countingOracle` / `costOracle` reasoning. -/
+theorem relTriple_run_writerT_of_triple_monoid
+    {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
+    (mx₁ : WriterT ω₁ (OracleComp spec₁) α)
+    (mx₂ : WriterT ω₂ (OracleComp spec₂) β)
+    (s₁ : ω₁) (s₂ : ω₂)
+    (P₁ : ω₁ → Prop) (P₂ : ω₂ → Prop)
+    (Q₁ : α → ω₁ → Prop) (Q₂ : β → ω₂ → Prop)
+    (hP₁ : P₁ s₁) (hP₂ : P₂ s₂)
+    (h₁ : Std.Do.Triple mx₁
+      (spred(fun s => ⌜P₁ s⌝))
+      (⇓a s' => ⌜Q₁ a s'⌝))
+    (h₂ : Std.Do.Triple mx₂
+      (spred(fun s => ⌜P₂ s⌝))
+      (⇓b s' => ⌜Q₂ b s'⌝)) :
+    RelTriple mx₁.run mx₂.run
+      (fun p₁ p₂ => Q₁ p₁.1 (s₁ * p₁.2) ∧ Q₂ p₂.1 (s₂ * p₂.2)) := by
+  rw [OracleComp.ProgramLogic.StdDo.triple_writerT_iff_forall_support_monoid] at h₁ h₂
+  refine relTriple_prod
+    (P := fun (p : α × ω₁) => Q₁ p.1 (s₁ * p.2))
+    (Q := fun (p : β × ω₂) => Q₂ p.1 (s₂ * p.2))
+    ?_ ?_
+  · rintro ⟨a, w⟩ hmem
+    exact h₁ s₁ hP₁ a w hmem
+  · rintro ⟨b, w⟩ hmem
+    exact h₂ s₂ hP₂ b w hmem
+
 /-- Whole-program handler lift: given matching unary handler triples on
 two simulators with parametric pre/postconditions and a synchronization
 condition relating the postconditions, derive a `RelTriple` on the entire
@@ -366,6 +399,60 @@ private example
     rfl rfl ?_ ?_
   · exact OracleComp.ProgramLogic.StdDo.loggingOracle_triple t log_a
   · exact OracleComp.ProgramLogic.StdDo.loggingOracle_triple t log_b
+
+/-- Smoke test: independent product coupling for two `countingOracle`
+runs. Each side's count increments by `QueryCount.single t` via
+`countingOracle_triple`; the returned values are not synced (fresh
+`query` on each side). -/
+private example
+    (t : spec.Domain) (qc_a qc_b : QueryCount ι) :
+    RelTriple
+      (countingOracle t :
+        WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run
+      (countingOracle t :
+        WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run
+      (fun p₁ p₂ =>
+        (qc_a : QueryCount ι) + p₁.2 = qc_a + QueryCount.single t ∧
+        (qc_b : QueryCount ι) + p₂.2 = qc_b + QueryCount.single t) := by
+  have hmul : ∀ x y : QueryCount ι,
+      (@HMul.hMul (QueryCount ι) (QueryCount ι) (QueryCount ι)
+        (@instHMul _ (Monoid.toMulOneClass.toMul)) x y) = x + y := fun _ _ => rfl
+  refine relTriple_post_mono
+    (relTriple_run_writerT_of_triple_monoid
+      (mx₁ := (countingOracle t : WriterT _ (OracleComp spec) _))
+      (mx₂ := (countingOracle t : WriterT _ (OracleComp spec) _))
+      (s₁ := qc_a) (s₂ := qc_b)
+      (P₁ := fun qc => qc = qc_a) (P₂ := fun qc => qc = qc_b)
+      (Q₁ := fun _v qc' => qc' = qc_a + QueryCount.single t)
+      (Q₂ := fun _v qc' => qc' = qc_b + QueryCount.single t)
+      rfl rfl
+      (OracleComp.ProgramLogic.StdDo.countingOracle_triple t qc_a)
+      (OracleComp.ProgramLogic.StdDo.countingOracle_triple t qc_b))
+    ?_
+  rintro ⟨_, w₁⟩ ⟨_, w₂⟩ ⟨h₁, h₂⟩
+  exact ⟨(hmul qc_a w₁).symm.trans h₁, (hmul qc_b w₂).symm.trans h₂⟩
+
+/-- Smoke test: independent product coupling for two `costOracle` runs
+with the same cost function `costFn`. Each side's accumulator multiplies
+by `costFn t` via `costOracle_triple`; values are not synced. -/
+private example {ω : Type} [Monoid ω]
+    (costFn : spec.Domain → ω) (t : spec.Domain) (s_a s_b : ω) :
+    RelTriple
+      (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run
+      (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run
+      (fun p₁ p₂ =>
+        s_a * p₁.2 = s_a * costFn t ∧
+        s_b * p₂.2 = s_b * costFn t) := by
+  refine relTriple_run_writerT_of_triple_monoid
+    (mx₁ := (costOracle costFn t : WriterT _ (OracleComp spec) _))
+    (mx₂ := (costOracle costFn t : WriterT _ (OracleComp spec) _))
+    (s₁ := s_a) (s₂ := s_b)
+    (P₁ := fun s => s = s_a) (P₂ := fun s => s = s_b)
+    (Q₁ := fun _v s' => s' = s_a * costFn t)
+    (Q₂ := fun _v s' => s' = s_b * costFn t)
+    rfl rfl ?_ ?_
+  · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_a
+  · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_b
 
 end SmokeTests
 
