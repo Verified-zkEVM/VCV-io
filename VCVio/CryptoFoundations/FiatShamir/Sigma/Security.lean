@@ -561,52 +561,255 @@ private noncomputable def eufNmaReduction
   simulateQ (QueryImpl.ofLift unifSpec ProbComp +
     (uniformSampleImpl (spec := (Unit →ₒ Chal)))) (eufNmaForkExtract σ hr M nmaAdv qH pk)
 
-omit [Fintype Chal] in
+omit [SampleableType Stmt] [SampleableType Wit] [Inhabited Chal] [Fintype Chal] in
 /-- **Support invariant of the replay-fork first run.**
 
 Every `(x, log)` in the support of `replayFirstRun (Fork.runTrace σ hr M nmaAdv pk)`
 satisfies the per-run invariant `forkSupportInvariant`: at a valid fork point, the cached
-RO challenge matches the outer log entry and the forgery verifies.
-
-TODO(p6-support-invariant): prove by induction on `Fork.runTrace` — each counted-oracle
-query updates `roCache` and the external log in lockstep, so their corresponding entries
-match, and `verified` guarantees `σ.verify pk` succeeds at the cached challenge. -/
+RO challenge matches the outer log entry and the forgery verifies. -/
 private theorem forkSupportInvariant_of_mem_replayFirstRun
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt)
     {x : Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)}
     {log : QueryLog (unifSpec + (Unit →ₒ Chal))}
-    (_h : (x, log) ∈ support (replayFirstRun (Fork.runTrace σ hr M nmaAdv pk))) :
+    (h : (x, log) ∈ support (replayFirstRun (Fork.runTrace σ hr M nmaAdv pk))) :
     forkSupportInvariant σ M qH pk x log := by
-  sorry
+  classical
+  intro s hs
+  have htarget : x.queryLog[(↑s : ℕ)]? = some x.target :=
+    Fork.forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) hs
+  have hverified : x.verified = true :=
+    Fork.forkPoint_some_imp_verified (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) hs
+  have hslt : (↑s : ℕ) < x.queryLog.length := by
+    by_contra hge
+    push Not at hge
+    have hnone : x.queryLog[(↑s : ℕ)]? = none := List.getElem?_eq_none hge
+    rw [hnone] at htarget
+    exact (Option.some_ne_none x.target htarget.symm).elim
+  obtain ⟨ω, hcache_idx, hlog⟩ :=
+    Fork.runTrace_cache_outer_lockstep σ hr M nmaAdv pk h (↑s : ℕ) hslt
+  have htgt_eq : x.queryLog[(↑s : ℕ)]'hslt = x.target := by
+    have h1 : x.queryLog[(↑s : ℕ)]? = some (x.queryLog[(↑s : ℕ)]'hslt) :=
+      List.getElem?_eq_getElem hslt
+    rw [h1] at htarget
+    exact Option.some.inj htarget
+  rw [htgt_eq] at hcache_idx
+  obtain ⟨ω', hcache', hverify⟩ :=
+    Fork.runTrace_verified_imp_verify σ hr M nmaAdv pk h hverified
+  have hωeq : ω = ω' := by
+    rw [hcache_idx] at hcache'
+    exact Option.some.inj hcache'
+  refine ⟨ω, hlog, hcache_idx, ?_⟩
+  rw [hωeq]
+  exact hverify
 
-omit [Fintype Chal] in
+omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] [Inhabited Chal] in
 /-- **Target equality across two successful fork runs** sharing the same fork index.
 
 If both runs of `forkReplay (Fork.runTrace σ hr M nmaAdv pk)` select fork point `s`,
-their forgery targets agree, because the two runs share all counted-oracle responses
-strictly before `s` and the `Fork.runTrace` invariant forces `queryLog[n]` to be
-determined by the first `n` counted-oracle responses.
-
-TODO(p6-target-equality): derive from `forkReplay_success_log_props` together with the
-`Fork.runTrace` determinism invariant. -/
+their forgery targets agree. The two runs share all counted-oracle responses strictly
+before the fork index, and the replay-determinism lemma `Fork.runTrace_queryLog_take_eq`
+then forces their internal `queryLog`s to coincide on the first `s + 1` entries, so
+`forkPoint_getElem?_eq_some_target` pins both targets to the same value. -/
 private theorem target_eq_of_mem_forkReplay
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ) (pk : Stmt)
     (x₁ x₂ : Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
     (s : Fin (qH + 1))
-    (_hsup : some (x₁, x₂) ∈ support (forkReplay (Fork.runTrace σ hr M nmaAdv pk)
+    (hsup : some (x₁, x₂) ∈ support (forkReplay (Fork.runTrace σ hr M nmaAdv pk)
       (nmaForkBudget qH) (Sum.inr ())
       (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)))
-    (_h₁ : Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+    (h₁ : Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH x₁ = some s)
-    (_h₂ : Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+    (h₂ : Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
       qH x₂ = some s) :
     x₁.target = x₂.target := by
-  sorry
+  classical
+  -- Unpack the replay-fork success structure.
+  obtain ⟨log₁, log₂, s', hx₁, hx₂, hcf₁, hcf₂, _hneq, replacement, st, hz, hlog₂, _hmismatch,
+    hfork, _hprefix⟩ := forkReplay_success_log_props
+      (main := Fork.runTrace σ hr M nmaAdv pk)
+      (qb := nmaForkBudget qH) (i := Sum.inr ())
+      (cf := Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)
+      hsup
+  -- `s = s'` via `hcf₁` and `h₁`.
+  have hs_eq : s' = s := by rw [hcf₁] at h₁; exact Option.some.inj h₁
+  cases hs_eq
+  -- Abbreviations for readability.
+  set main : OracleComp (Fork.wrappedSpec Chal)
+      (Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+    Fork.runTrace σ hr M nmaAdv pk
+  -- Immutable replay parameters.
+  have htrace_eq : st.trace = log₁ :=
+    replayRunWithTraceValue_trace_eq
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  have hforkq : st.forkQuery = (↑s : ℕ) :=
+    replayRunWithTraceValue_forkQuery_eq
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  -- Key facts about `st.cursor`.
+  obtain ⟨hcur_pos, htrace_in, hobs_in⟩ :=
+    replayRunWithTraceValue_forkConsumed_imp_last_input
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz hfork
+  change 0 < st.cursor at hcur_pos
+  change QueryLog.inputAt? st.trace (st.cursor - 1) = some (Sum.inr ()) at htrace_in
+  change QueryLog.inputAt? st.observed (st.cursor - 1) = some (Sum.inr ()) at hobs_in
+  rw [htrace_eq] at htrace_in
+  rw [hlog₂] at hobs_in
+  have hInv := replayRunWithTraceValue_preservesPrefixInvariant
+    (main := main) (i := Sum.inr ())
+    (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  have hcur_trace : st.cursor ≤ log₁.length := by rw [← htrace_eq]; exact hInv.1
+  have hcur_obs : st.cursor ≤ log₂.length := by rw [← hlog₂]; exact hInv.2.1
+  have hc1_lt_t : st.cursor - 1 < log₁.length := by omega
+  have hc1_lt_o : st.cursor - 1 < log₂.length := by omega
+  -- Count identity: `(log₂.take (c-1)).getQ (· = Sum.inr ()).length = s`.
+  have hcount_obs :=
+    replayRunWithTraceValue_forkConsumed_imp_prefix_count
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz hfork
+  change (QueryLog.getQ (st.observed.take (st.cursor - 1))
+    (· = Sum.inr ())).length = st.forkQuery at hcount_obs
+  rw [hforkq, hlog₂] at hcount_obs
+  -- Value-level prefix equality `log₁.take (c-1) = log₂.take (c-1)`.
+  have htake_len₁ : (log₁.take (st.cursor - 1)).length = st.cursor - 1 :=
+    List.length_take_of_le (by omega)
+  have htake_len₂ : (log₂.take (st.cursor - 1)).length = st.cursor - 1 :=
+    List.length_take_of_le (by omega)
+  have hprefix_val : log₁.take (st.cursor - 1) = log₂.take (st.cursor - 1) := by
+    apply List.ext_getElem?
+    intro n
+    by_cases hn : n < st.cursor - 1
+    · have hgetEq : st.observed[n]? = st.trace[n]? :=
+        replayRunWithTraceValue_prefix_getElem?_eq
+          (main := main) (i := Sum.inr ())
+          (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+          (n := n) (by rw [if_pos hfork]; exact hn)
+      rw [hlog₂, htrace_eq] at hgetEq
+      have hn_t : n < log₁.length := by omega
+      have hn_o : n < log₂.length := by omega
+      have hlen₁ : n < (log₁.take (st.cursor - 1)).length := by rw [htake_len₁]; exact hn
+      have hlen₂ : n < (log₂.take (st.cursor - 1)).length := by rw [htake_len₂]; exact hn
+      rw [List.getElem?_eq_getElem hlen₁, List.getElem?_eq_getElem hlen₂,
+        List.getElem_take, List.getElem_take,
+        ← List.getElem?_eq_getElem hn_t, ← List.getElem?_eq_getElem hn_o]
+      exact hgetEq.symm
+    · push Not at hn
+      have hlen₁ : (log₁.take (st.cursor - 1)).length ≤ n := by rw [htake_len₁]; exact hn
+      have hlen₂ : (log₂.take (st.cursor - 1)).length ≤ n := by rw [htake_len₂]; exact hn
+      rw [List.getElem?_eq_none hlen₁, List.getElem?_eq_none hlen₂]
+  -- Extract the distinguished entries at position `c-1` as `⟨Sum.inr (), v_i⟩`.
+  have hget₁ : log₁[st.cursor - 1]? = some (log₁[st.cursor - 1]'hc1_lt_t) :=
+    List.getElem?_eq_getElem hc1_lt_t
+  have hget₂ : log₂[st.cursor - 1]? = some (log₂[st.cursor - 1]'hc1_lt_o) :=
+    List.getElem?_eq_getElem hc1_lt_o
+  have hfst₁ : (log₁[st.cursor - 1]'hc1_lt_t).1 = Sum.inr () := by
+    have := htrace_in
+    unfold QueryLog.inputAt? at this
+    rw [hget₁] at this
+    simpa using this
+  have hfst₂ : (log₂[st.cursor - 1]'hc1_lt_o).1 = Sum.inr () := by
+    have := hobs_in
+    unfold QueryLog.inputAt? at this
+    rw [hget₂] at this
+    simpa using this
+  -- Destructure `log_i[c-1]` as `⟨Sum.inr (), v_i⟩` for some `v_i : Chal`.
+  obtain ⟨v₁, hv₁⟩ : ∃ v : Chal, log₁[st.cursor - 1]'hc1_lt_t =
+      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) := by
+    rcases hsig : log₁[st.cursor - 1]'hc1_lt_t with ⟨i, v⟩
+    rw [hsig] at hfst₁
+    cases i with
+    | inl n => cases hfst₁
+    | inr u => cases u; exact ⟨v, rfl⟩
+  obtain ⟨v₂, hv₂⟩ : ∃ v : Chal, log₂[st.cursor - 1]'hc1_lt_o =
+      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) := by
+    rcases hsig : log₂[st.cursor - 1]'hc1_lt_o with ⟨i, v⟩
+    rw [hsig] at hfst₂
+    cases i with
+    | inl n => cases hfst₂
+    | inr u => cases u; exact ⟨v, rfl⟩
+  -- `c - 1 + 1 = c` using `0 < c`.
+  have hcsub : st.cursor - 1 + 1 = st.cursor := by omega
+  -- Decompose `log_i = log_i.take (c-1) ++ ⟨Sum.inr (), v_i⟩ :: log_i.drop c`.
+  have hdec₁ : log₁ = log₁.take (st.cursor - 1) ++
+      ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) ::
+        log₁.drop st.cursor) := by
+    have hdrop :
+        log₁.drop (st.cursor - 1) =
+          (log₁[st.cursor - 1]'hc1_lt_t) :: log₁.drop (st.cursor - 1 + 1) :=
+      List.drop_eq_getElem_cons hc1_lt_t
+    rw [hcsub] at hdrop
+    rw [hv₁] at hdrop
+    calc log₁ = log₁.take (st.cursor - 1) ++ log₁.drop (st.cursor - 1) :=
+        (List.take_append_drop _ _).symm
+      _ = log₁.take (st.cursor - 1) ++
+          ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) ::
+            log₁.drop st.cursor) := by rw [hdrop]
+  have hdec₂ : log₂ = log₁.take (st.cursor - 1) ++
+      ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) ::
+        log₂.drop st.cursor) := by
+    have hdrop :
+        log₂.drop (st.cursor - 1) =
+          (log₂[st.cursor - 1]'hc1_lt_o) :: log₂.drop (st.cursor - 1 + 1) :=
+      List.drop_eq_getElem_cons hc1_lt_o
+    rw [hcsub] at hdrop
+    rw [hv₂] at hdrop
+    calc log₂ = log₂.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) :=
+        (List.take_append_drop _ _).symm
+      _ = log₁.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) := by rw [hprefix_val]
+      _ = log₁.take (st.cursor - 1) ++
+          ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (Fork.wrappedSpec Chal).Range i) ::
+            log₂.drop st.cursor) := by rw [hdrop]
+  -- Count: the common prefix `p = log₁.take (c-1)` has exactly `s` `Sum.inr ()` entries.
+  have hpref_count :
+      QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) = (↑s : ℕ) := by
+    unfold QueryLog.countQ
+    rw [hprefix_val]
+    exact hcount_obs
+  -- Apply `runTrace_queryLog_take_eq` to get `x₁.queryLog.take (s+1) = x₂.queryLog.take (s+1)`.
+  have htakeEq :
+      x₁.queryLog.take (QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) + 1) =
+        x₂.queryLog.take
+          (QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) + 1) :=
+    Fork.runTrace_queryLog_take_eq σ hr M (Resp := Resp) nmaAdv pk
+      (x₁ := x₁) (x₂ := x₂) (outerLog₁ := log₁) (outerLog₂ := log₂) hx₁ hx₂
+      (p := log₁.take (st.cursor - 1)) (v₁ := v₁) (v₂ := v₂)
+      (rest₁ := log₁.drop st.cursor) (rest₂ := log₂.drop st.cursor) hdec₁ hdec₂
+  rw [hpref_count] at htakeEq
+  -- Both sides yield `x_i.queryLog[s]? = some x_i.target`; thus targets agree.
+  have htgt₁ : x₁.queryLog[(↑s : ℕ)]? = some x₁.target :=
+    Fork.forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) h₁
+  have htgt₂ : x₂.queryLog[(↑s : ℕ)]? = some x₂.target :=
+    Fork.forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) h₂
+  have hs_lt₁ : (↑s : ℕ) < x₁.queryLog.length := by
+    by_contra hge
+    push Not at hge
+    rw [List.getElem?_eq_none hge] at htgt₁
+    exact (Option.some_ne_none _ htgt₁.symm).elim
+  have hs_lt₂ : (↑s : ℕ) < x₂.queryLog.length := by
+    by_contra hge
+    push Not at hge
+    rw [List.getElem?_eq_none hge] at htgt₂
+    exact (Option.some_ne_none _ htgt₂.symm).elim
+  have hgetElem_take :
+      ∀ l : List (M × Commit),
+        (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? := fun l => by
+    rw [List.getElem?_take]
+    split_ifs with h; · rfl
+    · exact absurd (Nat.lt_succ_self _) h
+  have : some x₁.target = some x₂.target := by
+    rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
+  exact Option.some.inj this
 
+omit [SampleableType Stmt] in
 /-- **Per-pk extraction bound.** Given the structural forking event on `pk` (two fork
 runs selecting the same index, with distinct counted-oracle responses, both satisfying
 `forkSupportInvariant`), the NMA reduction recovers a valid witness with probability at
@@ -711,12 +914,12 @@ private theorem perPk_extraction_bound
   -- Targets coincide by the shared-prefix property of `forkReplay`.
   have htarget : x₁.target = x₂.target :=
     target_eq_of_mem_forkReplay σ hr M nmaAdv qH pk x₁ x₂ s (hreq ▸ hsupp) hcf₁ hcf₂
-  set m₁ := x₁.forgery.1 with hm₁_def
-  set c₁ := x₁.forgery.2.1 with hc₁_def
-  set sr₁ := x₁.forgery.2.2 with hsr₁_def
-  set m₂ := x₂.forgery.1 with hm₂_def
-  set c₂ := x₂.forgery.2.1 with hc₂_def
-  set sr₂ := x₂.forgery.2.2 with hsr₂_def
+  set m₁ := x₁.forgery.1
+  set c₁ := x₁.forgery.2.1
+  set sr₁ := x₁.forgery.2.2
+  set m₂ := x₂.forgery.1
+  set c₂ := x₂.forgery.2.1
+  set sr₂ := x₂.forgery.2.2
   have htgt₁ : x₁.target = (m₁, c₁) := rfl
   have htgt₂ : x₂.target = (m₂, c₂) := rfl
   have htarget_eq : (m₁, c₁) = (m₂, c₂) := by rw [← htgt₁, ← htgt₂]; exact htarget
@@ -754,6 +957,7 @@ private theorem perPk_extraction_bound
 
 end eufNmaHelpers
 
+omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
@@ -780,7 +984,11 @@ This matches Firsov-Janku's `schnorr_koa_secure` at
 with the single-run postcondition `verify` plus the extractor correctness lemma
 `extractor_corr` at [fsec/proof/Schnorr.ec:87](../../../fsec/proof/Schnorr.ec). Our version
 uses `Fork.replayForkingBound` for the RO-level packaging and `_hss` for special
-soundness, with `σ.extract` playing the role of EC's `extractor`. -/
+soundness, with `σ.extract` playing the role of EC's `extractor`.
+
+**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**
+(ReplayFork.lean): the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`
+is still a `sorry`, so this theorem is not yet unconditionally proved end-to-end. -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -856,6 +1064,8 @@ theorem euf_nma_bound
     Fork.replayForkingBound (σ := σ) (hr := hr) (M := M) nmaAdv qH pk
       (P_out := forkSupportInvariant σ M qH pk)
       (hP := fun h => forkSupportInvariant_of_mem_replayFirstRun σ hr M nmaAdv qH pk h)
+      (hreach := Fork.runTrace_forkPoint_CfReachable
+        (σ := σ) (hr := hr) (M := M) nmaAdv qH pk)
   -- ── Step (d): compose (c) with `perPk_extraction_bound`, then integrate over keygen
   -- via `jensen_keygen_forking_bound`.
   have hPerPkFinal : ∀ pk : Stmt,
@@ -891,7 +1101,13 @@ The combined bound is:
       ≤ Pr[extraction succeeds]`
 
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
-the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
+the bound is trivially satisfied when the simulation loss exceeds the advantage.
+
+**Currently conditional on two open obligations**:
+1. `euf_cma_to_nma` (this file, still `sorry`): CMA-to-NMA reduction via HVZK simulator.
+2. `sq_probOutput_main_le_noGuardReplayComp` (ReplayFork.lean, still `sorry`):
+   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`, transitively inherited
+   from `euf_nma_bound`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
