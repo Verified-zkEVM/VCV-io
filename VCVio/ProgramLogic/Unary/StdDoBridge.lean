@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.OracleComp.Coercions.SubSpec
 
 /-!
 # `Std.Do` / `mvcgen` bridge for `OracleComp`
@@ -123,6 +124,59 @@ namespace Spec
         ((OracleComp.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
       Q := by
   simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
+
+/-- Explicit-head spec for the `MonadLift OracleQuery OracleComp`-form of `query`.
+
+When `query t` appears inside a `do` block, Lean's elaborator inserts a single
+`MonadLift.monadLift _ (OracleQuery.query t)` (no `MonadLiftT` wrapper). The
+ascription form `(OracleComp.query t : OracleComp spec _)` instead elaborates
+to `liftM (instMonadLiftTOfMonadLift _ _) (OracleQuery.query t)`. The two are
+definitionally equal but syntactically distinct, and
+`Lean.Elab.Tactic.Do.Spec.findSpec` matches keys syntactically against a
+`DiscrTree`. This lemma re-states the content of `Spec.query` with the
+explicit `MonadLift.monadLift` head so `mvcgen` finds a match in `do`-block
+contexts. The two should be unified once core `mvcgen` normalizes
+`liftM`/`MonadLiftT` chains in its discrimination-tree key construction
+(upstream issue). -/
+@[spec] theorem monadLift_query (t : spec.Domain)
+    {Q : Std.Do.PostCond (spec.Range t) .pure} :
+    Std.Do.Triple
+      (MonadLift.monadLift (OracleQuery.query t) : OracleComp spec (spec.Range t))
+      (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
+      Q := Spec.query t
+
+/-!
+## Architectural note: `mvcgen` for stateful handlers over `OracleComp`
+
+Stateful handlers like `loggingOracleStateT` and `cachingOracle` are defined
+as `QueryImpl spec (StateT σ (OracleComp spec))`. `mvcgen` walks their bodies
+cleanly thanks to:
+
+1. The low-priority `MonadLift (OracleComp spec) (OracleComp superSpec)`
+   instance in `Coercions/SubSpec.lean`. By being lower priority than Lean's
+   built-in reflexive `MonadLiftT.refl`, the self-lift case
+   (`spec = superSpec`) is solved by `MonadLiftT.refl` rather than this
+   parametric instance, and `monadLift mx : OracleComp spec α` reduces to
+   `id mx = mx` definitionally. This is what
+   `Std.Do.Spec.UnfoldLift.monadLift_refl` (a `rfl`-based lemma) needs in
+   order to peel off the spurious self-lifts the parametric instance would
+   otherwise leave behind around every nested oracle query. By being lower
+   priority than the built-in `MonadLift (OracleQuery superSpec) (OracleComp
+   superSpec)`, single-query lifts also resolve via the standard "lift query
+   then embed" path and avoid spurious walks through `liftComp`.
+
+2. The `Spec.monadLift_query` lemma below, which provides a
+   `DiscrTree`-friendly `@[spec]` keyed by the explicit
+   `MonadLift.monadLift _ (OracleQuery.query t)` head that `do`-block
+   elaboration produces. The plain `Spec.query` above keys on a different
+   syntactic head and doesn't fire inside `do` blocks.
+
+The first is now structural in VCVio with no special override needed. The
+second is a workaround for a discrimination-tree-key normalisation gap in
+upstream `mvcgen` and can be removed once
+`Lean.Elab.Tactic.Do.Spec.findSpec` and `Lean.Elab.Tactic.Do.Attr.mkSpecTheorem`
+canonicalise `liftM`/`MonadLiftT` chains.
+-/
 
 end Spec
 

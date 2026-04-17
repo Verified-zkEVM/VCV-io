@@ -235,9 +235,13 @@ lemma runObs_liftComp [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev →
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t oa ih =>
-    simp only [liftComp_bind, liftComp_query, OracleQuery.cont_query,
-      id_map, OracleQuery.input_query, runObs_bind, runObs_liftM_query_inl,
+    simp only [OracleComp.liftComp_bind, OracleComp.liftComp_query,
+      OracleQuery.cont_query, id_map, OracleQuery.input_query, runObs_bind,
       simulateQ_bind, simulateQ_query, map_bind, bind_map_left, ih]
+    have hquery : runObs base encode
+        ((liftM (query t : OracleQuery spec _) : OracleComp (spec + ObsSpec Ev) _)) =
+        (·, 1) <$> base t := runObs_liftM_query_inl base encode t
+    rw [hquery]
     simp
 
 /-- `runObs` on `observe e`: the result is `PUnit.unit` with trace `encode e`. -/
