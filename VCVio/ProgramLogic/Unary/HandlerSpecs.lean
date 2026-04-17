@@ -527,6 +527,30 @@ example (t₁ t₂ : spec.Domain) (qc₀ : QueryCount ι) :
   mvcgen [countingOracle_triple]
   all_goals grind
 
+/-- Whole-program monotonicity for `countingOracle`: the accumulated query
+count under `simulateQ countingOracle oa` only ever grows. Derived from the
+generic `simulateQ_writerT_triple_preserves_invariant` with invariant
+`I qc := qc₀ ≤ qc`. -/
+theorem simulateQ_countingOracle_preserves_ge {α : Type}
+    (qc₀ : QueryCount ι) (oa : OracleComp spec α) :
+    Std.Do.Triple
+      (simulateQ countingOracle oa :
+        WriterT (QueryCount ι) (OracleComp spec) α)
+      (spred(fun qc => ⌜qc₀ ≤ qc⌝))
+      (⇓ _ qc' => ⌜qc₀ ≤ qc'⌝) := by
+  refine simulateQ_writerT_triple_preserves_invariant countingOracle
+    (fun qc => qc₀ ≤ qc) ?_ oa
+  intro t
+  rw [triple_writerT_iff_forall_support_monoid]
+  intro qc hqc _ w hmem
+  have hh := countingOracle_triple t qc
+  rw [triple_writerT_iff_forall_support_monoid] at hh
+  have := hh qc rfl _ w hmem
+  -- `this : qc * w = qc + QueryCount.single t` (`QueryCount` is additive).
+  rw [this]
+  intro i
+  exact (hqc i).trans (Nat.le_add_right _ _)
+
 end countingOracle
 
 section costOracle
@@ -568,6 +592,30 @@ example (costFn : spec.Domain → ω) (t₁ t₂ : spec.Domain) (s₀ : ω) :
       (⇓ _ s' => ⌜s' = s₀ * costFn t₁ * costFn t₂⌝) := by
   mvcgen [costOracle_triple]
   all_goals grind
+
+/-- Whole-program submonoid closure for `costOracle`: if `costFn t ∈ S`
+for every query `t` (where `S : Submonoid ω`), then the accumulated cost
+of `simulateQ (costOracle costFn) oa` stays in `S` starting from any
+`s₀ ∈ S`. Derived from the generic
+`simulateQ_writerT_triple_preserves_invariant` with `I s := s ∈ S`. -/
+theorem simulateQ_costOracle_preserves_submonoid {α : Type}
+    (costFn : spec.Domain → ω) (S : Submonoid ω)
+    (hcost : ∀ t, costFn t ∈ S)
+    (oa : OracleComp spec α) :
+    Std.Do.Triple
+      (simulateQ (costOracle costFn) oa : WriterT ω (OracleComp spec) α)
+      (spred(fun s => ⌜s ∈ S⌝))
+      (⇓ _ s' => ⌜s' ∈ S⌝) := by
+  refine simulateQ_writerT_triple_preserves_invariant (costOracle costFn)
+    (fun s => s ∈ S) ?_ oa
+  intro t
+  rw [triple_writerT_iff_forall_support_monoid]
+  intro s hs _ w hmem
+  have hh := costOracle_triple costFn t s
+  rw [triple_writerT_iff_forall_support_monoid] at hh
+  have := hh s rfl _ w hmem
+  rw [this]
+  exact S.mul_mem hs (hcost t)
 
 end costOracle
 

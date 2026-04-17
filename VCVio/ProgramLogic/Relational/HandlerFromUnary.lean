@@ -377,6 +377,29 @@ theorem support_preservesInv_of_triple
   rcases z with ⟨a, s'⟩
   exact htriple s hs a s' hz
 
+/-- `WriterT` analogue of `support_preservesInv_of_triple`. Converts a
+unary `Std.Do.Triple` invariant-preservation spec for a `WriterT`-based
+handler (with `[Monoid ω]`) into the `WriterPreservesInv` hypothesis
+consumed by `OracleComp.simulateQ_run_writerPreservesInv`.
+
+Use this whenever a writer-invariant-preservation proof is available as
+an `mvcgen`-style `Std.Do.Triple`, and the downstream consumer is a
+`support`-based whole-program lemma. -/
+theorem writerPreservesInv_of_triple
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
+    {ω : Type} [Monoid ω]
+    (impl : QueryImpl spec (WriterT ω (OracleComp spec)))
+    (Inv : ω → Prop)
+    (h : ∀ (t : spec.Domain), Std.Do.Triple
+      (impl t : WriterT ω (OracleComp spec) (spec.Range t))
+      (spred(fun s => ⌜Inv s⌝))
+      (⇓_ s' => ⌜Inv s'⌝)) :
+    QueryImpl.WriterPreservesInv impl Inv := by
+  intro t s₀ hs₀ z hz
+  have htriple := h t
+  rw [OracleComp.ProgramLogic.StdDo.triple_writerT_iff_forall_support_monoid] at htriple
+  exact htriple s₀ hs₀ z.1 z.2 hz
+
 /-- Whole-program equality coupling when two handlers agree pointwise on
 an invariant `Inv` and the target handler preserves `Inv`. This is the
 `Std.Do.Triple`-fronted version of
