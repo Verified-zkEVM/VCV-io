@@ -147,6 +147,156 @@ lemma getQueryValue?_cons_self_succ [spec.DecidableEq]
   rw [QueryLog.getQ_cons]
   simp
 
+/-- The prefix of `log` up to (but not including) the `s`-th `i`-query.
+
+If `log` has fewer than `s + 1` queries to `i`, this returns the entire `log`. This is
+the replay analogue of `QuerySeed.takeAtIndex` and is the key slicing operator used in
+the Cauchy-Schwarz step of the replay forking bound. -/
+def takeBeforeForkAt [spec.DecidableEq] :
+    QueryLog spec → ι → ℕ → QueryLog spec
+  | [], _, _ => []
+  | ⟨t, u⟩ :: tl, i, 0 =>
+      if t = i then [] else ⟨t, u⟩ :: takeBeforeForkAt tl i 0
+  | ⟨t, u⟩ :: tl, i, s + 1 =>
+      if t = i then ⟨t, u⟩ :: takeBeforeForkAt tl i s
+      else ⟨t, u⟩ :: takeBeforeForkAt tl i (s + 1)
+
+@[simp]
+lemma takeBeforeForkAt_nil [spec.DecidableEq] (i : ι) (s : ℕ) :
+    takeBeforeForkAt ([] : QueryLog spec) i s = [] := rfl
+
+lemma takeBeforeForkAt_cons_of_ne [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) (i : ι) (s : ℕ) (h : t ≠ i) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) i s = ⟨t, u⟩ :: takeBeforeForkAt tl i s := by
+  cases s with
+  | zero => simp [takeBeforeForkAt, h]
+  | succ s => simp [takeBeforeForkAt, h]
+
+lemma takeBeforeForkAt_cons_self_zero [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) t 0 = [] := by
+  simp [takeBeforeForkAt]
+
+lemma takeBeforeForkAt_cons_self_succ [spec.DecidableEq]
+    (t : ι) (u : spec.Range t) (tl : QueryLog spec) (s : ℕ) :
+    takeBeforeForkAt (⟨t, u⟩ :: tl) t (s + 1) = ⟨t, u⟩ :: takeBeforeForkAt tl t s := by
+  simp [takeBeforeForkAt]
+
+/-- The prefix `takeBeforeForkAt log i s` has at most `s` queries to `i`. -/
+lemma countQ_takeBeforeForkAt_le [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    (takeBeforeForkAt log i s).countQ (· = i) ≤ s := by
+  induction log generalizing s with
+  | nil => simp [QueryLog.countQ]
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases h : t = i
+      · subst h
+        cases s with
+        | zero => rw [takeBeforeForkAt_cons_self_zero]; simp [QueryLog.countQ]
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            simp only [QueryLog.countQ, QueryLog.getQ_cons, ↓reduceIte, List.length_cons]
+            have := ih s
+            simp only [QueryLog.countQ] at this
+            omega
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ h]
+        simp only [QueryLog.countQ, QueryLog.getQ_cons]
+        rw [if_neg h]
+        simpa [QueryLog.countQ] using ih s
+
+/-- If `log` contains at least `s + 1` queries to `i`, then `takeBeforeForkAt log i s` has
+exactly `s` queries to `i`. -/
+lemma countQ_takeBeforeForkAt_eq [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ)
+    (h : s < (log.getQ (· = i)).length) :
+    (takeBeforeForkAt log i s).countQ (· = i) = s := by
+  induction log generalizing s with
+  | nil => simp [QueryLog.getQ] at h
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases ht : t = i
+      · subst ht
+        cases s with
+        | zero => rw [takeBeforeForkAt_cons_self_zero]; simp [QueryLog.countQ, QueryLog.getQ]
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            simp only [QueryLog.countQ, QueryLog.getQ_cons, ↓reduceIte, List.length_cons]
+            have h' : s < (QueryLog.getQ tl (· = t)).length := by
+              simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons] at h
+              omega
+            have := ih s h'
+            simp only [QueryLog.countQ] at this
+            omega
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ ht]
+        simp only [QueryLog.countQ, QueryLog.getQ_cons]
+        rw [if_neg ht]
+        simp only [QueryLog.getQ_cons] at h
+        rw [if_neg ht] at h
+        simpa [QueryLog.countQ] using ih s h
+
+/-- `takeBeforeForkAt log i s` is a prefix of `log`. -/
+lemma takeBeforeForkAt_prefix [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    (takeBeforeForkAt log i s) <+: log := by
+  induction log generalizing s with
+  | nil => simp
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases h : t = i
+      · subst h
+        cases s with
+        | zero =>
+            rw [takeBeforeForkAt_cons_self_zero]
+            exact List.nil_prefix
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            exact List.cons_prefix_cons.mpr ⟨rfl, ih s⟩
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ h]
+        exact List.cons_prefix_cons.mpr ⟨rfl, ih s⟩
+
+/-- `getQueryValue?` on the truncation at index `i` position `s` is `none`: the prefix
+has fewer than `s + 1` entries at oracle `i`. -/
+lemma getQueryValue?_takeBeforeForkAt_self [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ) :
+    getQueryValue? (takeBeforeForkAt log i s) i s = none := by
+  unfold getQueryValue?
+  have h := countQ_takeBeforeForkAt_le log i s
+  simp only [QueryLog.countQ] at h
+  have hnone : ((takeBeforeForkAt log i s).getQ (· = i))[s]? = none := by
+    rw [List.getElem?_eq_none_iff]
+    exact h
+  rw [hnone]
+
+/-- If `log` has at most `s` entries of type `i`, then truncating `log` at position `s`
+leaves it unchanged: there is no `s`-th `i`-entry to truncate before. -/
+lemma takeBeforeForkAt_of_getQ_length_le [spec.DecidableEq]
+    (log : QueryLog spec) (i : ι) (s : ℕ)
+    (h : (log.getQ (· = i)).length ≤ s) :
+    takeBeforeForkAt log i s = log := by
+  induction log generalizing s with
+  | nil => simp
+  | cons entry tl ih =>
+      obtain ⟨t, u⟩ := entry
+      by_cases ht : t = i
+      · subst ht
+        cases s with
+        | zero =>
+            simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons, Nat.le_zero] at h
+            omega
+        | succ s =>
+            rw [takeBeforeForkAt_cons_self_succ]
+            have h' : (QueryLog.getQ tl (· = t)).length ≤ s := by
+              simp only [QueryLog.getQ_cons, ↓reduceIte, List.length_cons] at h
+              omega
+            rw [ih s h']
+      · rw [takeBeforeForkAt_cons_of_ne _ _ _ _ _ ht]
+        have h' : (QueryLog.getQ tl (· = i)).length ≤ s := by
+          simp only [QueryLog.getQ_cons] at h
+          rw [if_neg ht] at h
+          exact h
+        rw [ih s h']
+
 end QueryLog
 
 namespace OracleComp
@@ -343,6 +493,97 @@ lemma forkReplayWithTraceValue_eq_none_of_cf_none
     (h : cf first.1 = none) :
     forkReplayWithTraceValue main qb i cf first u = pure none := by
   simp [forkReplayWithTraceValue, h]
+
+/-!
+### Live-mode α-marginal
+
+Once the replay oracle has transitioned into "live mode" (either `forkConsumed = true`
+after the fork fired, or `mismatch = true` after a trace mismatch or exhaustion), every
+subsequent query simply falls through to the ambient `query t` and records the answer in
+`observed`. In particular, the α-component of the simulated computation coincides with
+`main` itself: the state only records observations and does not influence the output.
+
+These lemmas are used in the B1 faithfulness proofs (`evalDist_uniform_bind_fst_replay
+RunWithTraceValue_takeBeforeForkAt` and `tsum_probOutput_replayFirstRun_weight_take
+BeforeForkAt`): after the fork point on either side (full log vs. truncated log), both
+computations enter live mode, and the α-marginal collapses to `evalDist main`.
+-/
+
+/-- Live mode is preserved by `noteObserved`: neither `forkConsumed` nor `mismatch` is
+touched by recording an observation. -/
+lemma ReplayForkState.noteObserved_live_iff {i : ι}
+    (st : ReplayForkState spec i) (t : ι) (u : spec.Range t) :
+    (st.noteObserved t u).forkConsumed = st.forkConsumed ∧
+      (st.noteObserved t u).mismatch = st.mismatch := by
+  simp [ReplayForkState.noteObserved]
+
+/-- **Live-mode α-marginal.** Starting from a replay state in live mode
+(`forkConsumed = true` or `mismatch = true`), the α-component of running the replay
+oracle on `main` equals `main` itself. The state only accumulates observations; it has
+no effect on the α-distribution. -/
+lemma fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
+    (i : ι) (main : OracleComp spec α) :
+    ∀ (st : ReplayForkState spec i),
+      (st.forkConsumed = true ∨ st.mismatch = true) →
+      (Prod.fst <$> (simulateQ (replayOracle i) main).run st :
+        OracleComp spec α) = main := by
+  induction main using OracleComp.inductionOn with
+  | pure x => intro st _; simp
+  | query_bind t oa ih =>
+    intro st hst
+    have hlive : (st.forkConsumed || st.mismatch) = true := by
+      rcases hst with h | h <;> simp [h]
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+      OracleQuery.input_query, id_map, StateT.run_bind]
+    -- Unfold the oracle at `t` using the live branch.
+    have hstep : (replayOracle (spec := spec) i t).run st =
+        (do
+          let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+          pure (u, st.noteObserved t u)) := by
+      unfold replayOracle
+      simp only [StateT.run_bind, StateT.run_get, pure_bind, hlive, if_true,
+        bind_pure_comp, StateT.run_monadLift, monadLift_eq_self, StateT.run_map,
+        StateT.run_set, map_pure]
+      rfl
+    rw [hstep]
+    simp only [bind_pure_comp, map_bind, monadLift_eq_self, bind_map_left]
+    -- `Prod.fst <$> (do u ← query t; let st' := noteObserved; (simulateQ ...).run st')`
+    --   = `do u ← query t; Prod.fst <$> (simulateQ ...).run (noteObserved st u)`
+    -- By IH applied to `noteObserved st u` (still in live mode), the inner
+    -- `Prod.fst <$> ...` equals `oa u`.
+    have hst' : ∀ u : spec.Range t,
+        (st.noteObserved t u).forkConsumed = true ∨
+          (st.noteObserved t u).mismatch = true := by
+      intro u
+      rcases hst with h | h
+      · left; simpa [ReplayForkState.noteObserved] using h
+      · right; simpa [ReplayForkState.noteObserved] using h
+    calc (Prod.fst <$> (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            (simulateQ (replayOracle i) (oa u)).run (st.noteObserved t u))
+            : OracleComp spec α)
+        = (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            Prod.fst <$> (simulateQ (replayOracle i) (oa u)).run
+              (st.noteObserved t u)) := by
+          simp [map_bind]
+      _ = (do
+            let u : spec.Range t ← monadLift (query t : OracleComp spec (spec.Range t))
+            oa u) := by
+          refine bind_congr fun u => ?_
+          exact ih u (st.noteObserved t u) (hst' u)
+      _ = (liftM (query t) >>= fun u => oa u : OracleComp spec α) := rfl
+
+/-- α-marginal form of `fst_map_simulateQ_replayOracle_of_live`, specialized to the
+`evalDist` level. Once in live mode, the α-output distribution of the replay run is
+`evalDist main`. -/
+lemma evalDist_fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
+    [spec.Fintype] [spec.Inhabited]
+    (i : ι) (main : OracleComp spec α) (st : ReplayForkState spec i)
+    (hst : st.forkConsumed = true ∨ st.mismatch = true) :
+    evalDist (Prod.fst <$> (simulateQ (replayOracle i) main).run st :
+      OracleComp spec α) = evalDist main := by
+  rw [fst_map_simulateQ_replayOracle_of_live i main st hst]
 
 section support
 
@@ -1322,18 +1563,73 @@ variable [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
 variable [∀ i, SampleableType (spec.Range i)] [unifSpec ⊂ₒ spec]
 variable [OracleSpec.LawfulSubSpec unifSpec spec]
 
-/-- Replay does not increase the total number of oracle queries. This is the runtime-control
-placeholder needed before the full quantitative replay forking argument.
+omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- Each step of `replayOracle` makes at most one oracle query. Either the oracle returns
+pure (matched-consumption or fork substitution), or it invokes `liftM (query t)` exactly
+once (live post-fork, mismatch, missing-entry, or mismatched-type fallback). -/
+private lemma replayOracle_step_isTotalQueryBound
+    (i : ι) (t : ι) (st : ReplayForkState spec i) :
+    IsTotalQueryBound (((replayOracle (spec := spec) i) t).run st) 1 := by
+  classical
+  -- 1-query block: `liftM (query t) >>= (fun u => pure (u, upd u))`.
+  have hquery : ∀ (upd : spec.Range t → ReplayForkState spec i),
+      IsTotalQueryBound (liftM (query (spec := spec) t) >>= fun u =>
+        (pure (u, upd u) : OracleComp spec (spec.Range t × ReplayForkState spec i))) 1 := by
+    intro upd
+    rw [isTotalQueryBound_query_bind_iff]
+    exact ⟨Nat.one_pos, fun _ => trivial⟩
+  unfold replayOracle
+  simp only [StateT.run_bind, StateT.run_get, pure_bind]
+  by_cases hlive : st.forkConsumed || st.mismatch
+  · -- Live branch: 1 query.
+    simp only [hlive, ↓reduceIte, bind_pure_comp, StateT.run_bind, StateT.run_monadLift,
+      monadLift_eq_self, StateT.run_map, StateT.run_set, map_pure, Functor.map_map]
+    exact hquery (fun u => st.noteObserved t u)
+  · simp only [hlive, Bool.false_eq_true, ↓reduceIte, bind_pure_comp, dite_eq_ite]
+    cases hnext : st.nextEntry? with
+    | none =>
+        simp only [StateT.run_bind, StateT.run_monadLift, monadLift_eq_self,
+          bind_pure_comp, StateT.run_map, StateT.run_set, map_pure, Functor.map_map]
+        exact hquery (fun u => (st.markMismatch).noteObserved t u)
+    | some entry =>
+        rcases entry with ⟨t', u'⟩
+        by_cases hsame : t = t'
+        · cases hsame
+          by_cases hti : t = i
+          · cases hti
+            by_cases hfork : st.distinguishedCount = st.forkQuery
+            · -- Fork substitution: 0 queries.
+              simp only [↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure]
+              exact trivial
+            · simp only [↓reduceDIte, hfork, ↓reduceIte, StateT.run_map, StateT.run_set,
+                map_pure]
+              exact trivial
+          · simp only [↓reduceDIte, hti, StateT.run_map, StateT.run_set, map_pure]
+            exact trivial
+        · -- Mismatched type: 1 query.
+          simp only [↓reduceDIte, hsame, StateT.run_bind, StateT.run_monadLift,
+            monadLift_eq_self, bind_pure_comp, StateT.run_map, StateT.run_set, map_pure,
+            Functor.map_map]
+          exact hquery (fun u => (st.markMismatch).noteObserved t u)
 
-This runtime bound is off the critical path for the quantitative forking bound and has no direct
-counterpart in Firsov-Janku's `fsec`. It is deferred until downstream users actually need an
-expected-cost or pathwise bound on replay forks. -/
+omit [spec.Fintype] [spec.Inhabited] [∀ i, SampleableType (spec.Range i)]
+    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+/-- Replay does not increase the total number of oracle queries. If `main` makes at most
+`n` queries, then `replayRunWithTraceValue main i trace forkQuery replacement` also makes
+at most `n` queries.
+
+Reduces to `IsTotalQueryBound.simulateQ_run_of_step` with
+`replayOracle_step_isTotalQueryBound` supplying the per-step bound of `1`. -/
 theorem isTotalQueryBound_replayRunWithTraceValue
     (main : OracleComp spec α) (n : ℕ)
     (hmain : IsTotalQueryBound main n)
     (i : ι) (trace : QueryLog spec) (forkQuery : Nat) (replacement : spec.Range i) :
     IsTotalQueryBound (replayRunWithTraceValue main i trace forkQuery replacement) n := by
-  sorry
+  unfold replayRunWithTraceValue
+  exact IsTotalQueryBound.simulateQ_run_of_step (impl := replayOracle i) hmain
+    (fun t s => replayOracle_step_isTotalQueryBound i t s) _
 
 omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- If `forkReplay` succeeds, both runs agree on the selected fork index. -/
@@ -1885,41 +2181,146 @@ private lemma probOutput_collisionReplay_le_main_div
           ↑(Fintype.card (spec.Range i)) := by
             rw [div_eq_mul_inv]
 
+/-- **Replay-side prefix-faithfulness (key distributional claim for B1).**
+
+Averaging the uniform substitution `u`, the second run's output distribution depends on
+the trace `log` only through its prefix `QueryLog.takeBeforeForkAt log i s`.
+
+Operationally: the replay oracle consumes `log` entry by entry until the fork fires at
+the `s`-th `i`-query (substituting `u`), after which it goes live. If we truncate `log`
+to `QueryLog.takeBeforeForkAt log i s` (which has at most `s` `i`-entries), the replay
+instead hits `nextEntry? = none` at the fork position and falls through to a live
+sample, which is uniform, just like averaging over `u`.
+
+This lemma encodes that operational equivalence as a distributional equality. It is
+the replay analogue of `evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue`.
+
+Proof structure:
+- **Trivial case** (`(log.getQ (· = i)).length ≤ s`): the fork never fires on either side
+  because `log` has fewer than `s + 1` `i`-entries, so `takeBeforeForkAt log i s = log`
+  (`takeBeforeForkAt_of_getQ_length_le`) and the equality is immediate.
+- **Nontrivial case** (`s < (log.getQ (· = i)).length`): fork fires on the left at the
+  `s`-th `i`-entry (substituting `u`), and on the right the prefix is exhausted right
+  before that entry, so `nextEntry? = none` triggers `markMismatch` and a live sample.
+  Both sides trace identical pre-fork behaviour, produce a uniform sample at the fork
+  position, and then continue in live (mismatch) mode. Proved by induction on `main`
+  tracking the replay-oracle state. -/
+private lemma evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited]
+    (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) :
+    evalDist (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      Prod.fst <$> replayRunWithTraceValue main i log s u : OracleComp spec α) =
+    evalDist (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      Prod.fst <$> replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) := by
+  classical
+  by_cases hlen : (log.getQ (· = i)).length ≤ s
+  · rw [QueryLog.takeBeforeForkAt_of_getQ_length_le log i s hlen]
+  · -- Nontrivial case: `s < (log.getQ (· = i)).length`. Proof deferred to induction on `main`.
+    push Not at hlen
+    sorry
+
+/-- Probability form of the prefix-faithfulness claim: averaging over `u`, the probability
+that the second run produces any fixed output `x` depends on the trace only through its
+prefix `QueryLog.takeBeforeForkAt log i s`.
+
+This is the direct consequence of
+`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`, restated at the
+`probOutput` level for convenient use in tsum manipulations. -/
+private lemma probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) (x : α) :
+    Pr[= x | Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i log s u : OracleComp spec (α × _))] =
+    Pr[= x | Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u)] := by
+  have h := evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+    main i log s
+  have hcomm₁ : (Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i log s u) : OracleComp spec α) =
+      (do let u ← liftComp ($ᵗ spec.Range i) spec
+          Prod.fst <$> replayRunWithTraceValue main i log s u) := by
+    simp only [map_bind]
+  have hcomm₂ : (Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) :
+        OracleComp spec α) =
+      (do let u ← liftComp ($ᵗ spec.Range i) spec
+          Prod.fst <$> replayRunWithTraceValue main i
+            (QueryLog.takeBeforeForkAt log i s) s u) := by
+    simp only [map_bind]
+  rw [hcomm₁, hcomm₂]
+  exact congrFun (congrArg DFunLike.coe h) x
+
+/-- **Weighted replay prefix-faithfulness (second key distributional claim for B1).**
+
+Averaging the first-run output `p = (x₁, log)` with any `h`-weight depending only on
+the truncated log `QueryLog.takeBeforeForkAt log i s`, the indicator that the
+first-run output satisfies `f x₁ = y` may be replaced with the replay-marginal
+probability that the *second run* satisfies `f x₂ = y`, without changing the total.
+
+This is the replay analogue of `tsum_probOutput_generateSeed_weight_takeAtIndex`:
+a joint-distribution identity stating that, conditional on the truncated log, the
+first- and second-run outputs are exchangeable with identical marginals given by the
+replay computation `replayRunWithTraceValue main i (takeBeforeForkAt ..) s u` on a
+fresh uniform `u`.
+
+Proof plan:
+1. Rewrite both sides as tsums over the truncated log `τ` by pushing the
+   `trunc p.2`-dependence through with `tsum_congr` and the `takeBeforeForkAt`
+   "equal or short" characterisation of the fibres of
+   `p ↦ takeBeforeForkAt p.2 i s`.
+2. For each fixed `τ`, the two inner tsums over `p` with `takeBeforeForkAt p.2 i s = τ`
+   have a joint-marginal interpretation: they average `[cf p.1 = y]` vs. the replay
+   marginal over the remaining (post-`τ`) randomness of `main`.
+3. Proceed by induction on `main`, mirroring the seeded analogue structurally.
+   The logging-oracle on the LHS extends the log with whatever `main` produces;
+   the replay-oracle on the RHS starts from the truncated prefix.  Pre-fork, both
+   sides consume matching entries; at the truncation boundary both go live with a
+   fresh uniform (this is what `B1a`, encoded as
+   `probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`,
+   captures); post-fork, both sides are in live mode and the two marginal distributions
+   coincide.
+
+Deferred as a large structural induction (cf. the ~150-line seeded
+`tsum_probOutput_generateSeed_weight_takeAtIndex`). -/
+private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
+    {β : Type} (main : OracleComp spec α) (i : ι) (s : ℕ)
+    (f : α → β) (y : β) (h : QueryLog spec → ℝ≥0∞) :
+    ∑' p, Pr[= p | replayFirstRun main] *
+      (h (QueryLog.takeBeforeForkAt p.2 i s) *
+        Pr[= y | (f <$> (pure p.1 : OracleComp spec α) : OracleComp spec β)]) =
+    ∑' p, Pr[= p | replayFirstRun main] *
+      (h (QueryLog.takeBeforeForkAt p.2 i s) *
+        Pr[= y | f <$> Prod.fst <$> (do
+          let u ← liftComp ($ᵗ spec.Range i) spec
+          replayRunWithTraceValue main i
+            (QueryLog.takeBeforeForkAt p.2 i s) s u :
+              OracleComp spec (α × _))]) := by
+  sorry
+
 /-- Replay-side Jensen / Cauchy-Schwarz step. Squaring the probability that the first
 run satisfies `cf x₁ = some s` is bounded by the joint probability that *both* the
 first run and the second (substituted) run satisfy `cf · = some s`.
 
-This is the replay analogue of `sq_probOutput_main_le_noGuardComp` for the seeded fork.
-The seeded version factors `noGuardComp`'s success probability as
-`∑_seed P(seed) · P(cf x₁ = s | seed) · P(cf x₂ = s | seed.takeAtIndex i s)` and applies
-ENNReal Cauchy-Schwarz `(∑ w·a)² ≤ (∑ w) · (∑ w·a²) ≤ ∑ w·a²` (since ∑ w ≤ 1) after
-showing the cross term equals `Pr[cf <$> main = s]²` via a `takeAtIndex` rewrite.
+This is the replay analogue of `sq_probOutput_main_le_noGuardComp`. The proof has the
+same structure as the seeded version, relying on two replay-specific distributional
+identities:
 
-The seeded factorization relies on two structural lemmas about `generateSeed` /
-`takeAtIndex`:
+* **Pointwise prefix-faithfulness**
+  (`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`): the
+  second-run output distribution, averaged over `u`, depends on the log only through
+  its prefix `takeBeforeForkAt log i s`.
+* **Weighted prefix-faithfulness**
+  (`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`): averaging the
+  first-run output `p` with an `h`-weight depending on the truncated log, the
+  indicator `[cf x₁ = y]` may be replaced by the replay marginal with the same
+  truncated log.
 
-* `evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue`: averaging the
-  appended value `u` makes a truncated-then-extended seed equivalent to the truncated
-  seed alone.
-* `tsum_probOutput_generateSeed_weight_takeAtIndex`: weighting by an arbitrary
-  function of the truncated seed, the full-seed and truncated-seed simulations have
-  the same distribution.
-
-**Replay-side gap.** The replay analogue requires the same conceptual decomposition
-but operates on `replayFirstRun main` (a logged run) instead of `generateSeed`. It
-needs:
-
-* A truncation operator `QueryLog.takeBeforeForkAt log i s` returning the prefix of
-  `log` up to (but not including) the `s`-th `i`-query.
-* A "run-from-prefix" operator that runs `main` against the prefix replay trace
-  followed by live oracle answers, and a lemma relating it to `replayRunWithTraceValue`
-  averaged over the substituted `u`.
-* A weighted averaging lemma analogous to
-  `tsum_probOutput_generateSeed_weight_takeAtIndex` saying that averaging
-  `Pr[= log | replayFirstRun main]` against any function of the truncated log equals
-  averaging the same function against the truncated-log distribution.
-
-These ingredients are deferred. -/
+With these, the Cauchy-Schwarz chain runs exactly as in the seeded case. -/
 private lemma sq_probOutput_main_le_noGuardReplayComp
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (s : Fin (qb i + 1)) :
@@ -1927,7 +2328,166 @@ private lemma sq_probOutput_main_le_noGuardReplayComp
       Pr[= (some (some s, some s) : Option
             (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1)))) |
           noGuardReplayComp main qb i cf s] := by
-  sorry
+  classical
+  set y : Option (Fin (qb i + 1)) := some s with hy_def
+  set z : Option (Option (Fin (qb i + 1)) × Option (Fin (qb i + 1))) := some (y, y) with hz_def
+  -- Shorthand for the replay-marginal probability as a function of a log prefix.
+  let Q : QueryLog spec → ℝ≥0∞ := fun τ =>
+    Pr[= y | cf <$> Prod.fst <$> (do
+      let u ← liftComp ($ᵗ spec.Range i) spec
+      replayRunWithTraceValue main i τ ↑s u : OracleComp spec (α × _))]
+  -- Shorthand for the indicator-as-probOutput and the first-run marginal.
+  let I : α → ℝ≥0∞ := fun x =>
+    Pr[= y | (cf <$> (pure x : OracleComp spec α) :
+      OracleComp spec (Option (Fin (qb i + 1))))]
+  let w : α × QueryLog spec → ℝ≥0∞ := fun p => Pr[= p | replayFirstRun main]
+  have hw_le_one : ∑' p, w p ≤ 1 := tsum_probOutput_le_one
+  -- `hMain`: expand `Pr[= y | cf <$> main]` as an expectation over `p`.
+  have hMain : (Pr[= y | cf <$> main] : ℝ≥0∞) = ∑' p, w p * I p.1 := by
+    have h1 : (cf <$> main : OracleComp spec (Option (Fin (qb i + 1)))) =
+        (fun p : α × QueryLog spec => cf p.1) <$> replayFirstRun main := by
+      conv_lhs => rw [show main = Prod.fst <$> replayFirstRun main from
+        (fst_map_replayFirstRun main).symm]
+      simp only [Functor.map_map]
+    rw [h1, probOutput_map_eq_tsum]
+    refine tsum_congr fun p => ?_
+    simp only [w, I, map_pure]
+  -- `hMainTake`: the same expectation with `Q(trunc_p)` instead of the indicator.
+  have hMainTake : (Pr[= y | cf <$> main] : ℝ≥0∞) =
+      ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := by
+    have hB1h := tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
+      (main := main) (i := i) (s := (↑s : ℕ)) (f := cf) (y := y) (h := fun _ => (1 : ℝ≥0∞))
+    simp only [one_mul] at hB1h
+    calc (Pr[= y | cf <$> main] : ℝ≥0∞)
+        = ∑' p, w p * I p.1 := hMain
+      _ = ∑' p, Pr[= p | replayFirstRun main] *
+            Pr[= y | (cf <$> (pure p.1 : OracleComp spec α) :
+              OracleComp spec (Option (Fin (qb i + 1))))] := by
+              refine tsum_congr fun p => ?_; rfl
+      _ = ∑' p, Pr[= p | replayFirstRun main] *
+            Pr[= y | cf <$> Prod.fst <$> (do
+              let u ← liftComp ($ᵗ spec.Range i) spec
+              replayRunWithTraceValue main i
+                (QueryLog.takeBeforeForkAt p.2 i ↑s) ↑s u :
+                  OracleComp spec (α × _))] := hB1h
+      _ = ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := by
+              refine tsum_congr fun p => ?_; rfl
+  -- `hEq`: the two expansions of `Pr[= y | cf <$> main]` coincide.
+  have hEq : ∑' p, w p * I p.1 =
+      ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := hMain.symm.trans hMainTake
+  -- `hJensen`: Cauchy-Schwarz with weights `w`.
+  have hJensen :
+      (∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) ^ 2 ≤
+      ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2 :=
+    ENNReal.sq_tsum_le_tsum_sq w (fun p => Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) hw_le_one
+  -- `hEq2`: `E[Q²] = E[Q * I]` via weighted faithfulness with `h = Q`.
+  have hEq2 :
+      ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2 =
+      ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := by
+    have hB1h := tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
+      (main := main) (i := i) (s := (↑s : ℕ)) (f := cf) (y := y) (h := Q)
+    -- `hB1h`: ∑ w p * (Q(trunc) * I p.1) = ∑ w p * (Q(trunc) * Q(trunc))
+    -- So `hB1h.symm`: ∑ w p * (Q(trunc) * Q(trunc)) = ∑ w p * (Q(trunc) * I p.1).
+    -- Rewrite `Q(trunc)^2 = Q(trunc) * Q(trunc)` to match, then apply hB1h.symm.
+    have hsq_eq : ∀ p : α × QueryLog spec,
+        w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2 =
+        Pr[= p | replayFirstRun main] *
+          (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) *
+            Pr[= y | cf <$> Prod.fst <$> (do
+              let u ← liftComp ($ᵗ spec.Range i) spec
+              replayRunWithTraceValue main i
+                (QueryLog.takeBeforeForkAt p.2 i ↑s) ↑s u :
+                  OracleComp spec (α × _))]) := fun p => by
+      simp only [sq, w, Q]
+    calc ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2
+        = ∑' p, Pr[= p | replayFirstRun main] *
+            (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) *
+              Pr[= y | cf <$> Prod.fst <$> (do
+                let u ← liftComp ($ᵗ spec.Range i) spec
+                replayRunWithTraceValue main i
+                  (QueryLog.takeBeforeForkAt p.2 i ↑s) ↑s u :
+                    OracleComp spec (α × _))]) := by
+            refine tsum_congr fun p => ?_; exact hsq_eq p
+      _ = ∑' p, Pr[= p | replayFirstRun main] *
+            (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) *
+              Pr[= y | (cf <$> (pure p.1 : OracleComp spec α) :
+                OracleComp spec (Option (Fin (qb i + 1))))]) := hB1h.symm
+      _ = ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := by
+            refine tsum_congr fun p => ?_; rfl
+  -- `hFactor`: expand `Pr[= z | noGuardReplayComp]` as `E[I p.1 * Q(p.2)]`.
+  have hFactor : Pr[= z | noGuardReplayComp main qb i cf s] =
+      ∑' p, w p * (I p.1 * Q p.2) := by
+    simp only [noGuardReplayComp, z, hz_def, y]
+    rw [probOutput_bind_eq_tsum]
+    refine tsum_congr fun p => ?_
+    -- Show: Pr[= some (some s, some s) | (do u; q; return some (cf p.1, cf q.1))]
+    --       = I p.1 * Q p.2
+    congr 1
+    -- Rewrite the inner computation.
+    have hinner :
+        (do
+          let u ← liftComp ($ᵗ spec.Range i) spec
+          let q ← replayRunWithTraceValue main i p.2 ↑s u
+          return some (cf p.1, cf q.1) :
+            OracleComp spec (Option (Option (Fin (qb i + 1)) ×
+              Option (Fin (qb i + 1))))) =
+        some <$> ((cf p.1, ·) <$> (cf <$> Prod.fst <$> (do
+          let u ← liftComp ($ᵗ spec.Range i) spec
+          replayRunWithTraceValue main i p.2 ↑s u))) := by
+      simp [map_eq_bind_pure_comp, Function.comp]
+    rw [hinner, probOutput_some_map_some, probOutput_prod_mk_snd_map]
+    -- Goal: (if (some s, some s).1 = cf p.1 then Pr[= (some s, some s).2 | ...] else 0)
+    --       = I p.1 * Q p.2
+    change (if (some s, some s).1 = cf p.1 then
+        Pr[= (some s, some s).2 | (cf <$> Prod.fst <$> (do
+          let u ← liftComp ($ᵗ spec.Range i) spec
+          replayRunWithTraceValue main i p.2 ↑s u) :
+            OracleComp spec (Option (Fin (qb i + 1))))] else 0) =
+      I p.1 * Q p.2
+    classical
+    by_cases hp : cf p.1 = y
+    · have h_eq : y = cf p.1 := hp.symm
+      rw [if_pos h_eq]
+      have hI : I p.1 = 1 := by
+        simp only [I, map_pure, probOutput_pure]
+        rw [if_pos hp.symm]
+      rw [hI, one_mul]
+    · have h_ne : y ≠ cf p.1 := fun h => hp h.symm
+      rw [if_neg h_ne]
+      have hI : I p.1 = 0 := by
+        simp only [I, map_pure, probOutput_pure]
+        rw [if_neg (fun h => hp h.symm)]
+      rw [hI, zero_mul]
+  -- `hFactorTrunc`: use B1a to replace `Q p.2` by `Q (trunc p.2)`.
+  have hFactorTrunc : Pr[= z | noGuardReplayComp main qb i cf s] =
+      ∑' p, w p * (I p.1 * Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) := by
+    rw [hFactor]
+    refine tsum_congr fun p => ?_
+    congr 1
+    congr 1
+    -- `Q p.2 = Q (trunc p.2)` by B1a (probOutput form, composed with cf).
+    simp only [Q]
+    have hB1a := probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
+      (main := main) (i := i) (log := p.2) (s := (↑s : ℕ))
+    rw [probOutput_map_eq_tsum, probOutput_map_eq_tsum]
+    refine tsum_congr fun a => ?_
+    rw [hB1a]
+  -- Chain the inequalities.
+  have hfinal : (Pr[= y | cf <$> main] : ℝ≥0∞) ^ 2 ≤
+      Pr[= z | noGuardReplayComp main qb i cf s] := by
+    calc (Pr[= y | cf <$> main] : ℝ≥0∞) ^ 2
+        = (∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) ^ 2 := by rw [hMainTake]
+      _ ≤ ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2 := hJensen
+      _ = ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := hEq2
+      _ = ∑' p, w p * (I p.1 * Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) := by
+            refine tsum_congr fun p => ?_
+            ring
+      _ = Pr[= z | noGuardReplayComp main qb i cf s] := hFactorTrunc.symm
+  change (Pr[= s | cf <$> main] : ℝ≥0∞) ^ 2 ≤ Pr[= z | noGuardReplayComp main qb i cf s]
+  have : (Pr[= s | cf <$> main] : ℝ≥0∞) = Pr[= y | cf <$> main] := by
+    simp [y]
+  rw [this]
+  exact hfinal
 
 omit [OracleSpec.LawfulSubSpec unifSpec spec] in
 /-- Structural replay inequality: the no-guard composition's joint success event is
@@ -2123,11 +2683,13 @@ in the replay setting, `cf` is computed from `x` independently from the actual q
 made by the run that produced it. The hypothesis captures the natural condition that the
 fork point `s` chosen by `cf` always corresponds to a query that was actually issued.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`**: this theorem
-invokes the Jensen/Cauchy-Schwarz step as a helper, and that helper is still a `sorry`.
+**Currently conditional on the two prefix-faithfulness `sorry`s** feeding
+`sq_probOutput_main_le_noGuardReplayComp`:
+`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` (induction on `main`)
+and `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` (weighted-averaging induction).
 Downstream consumers (`probOutput_none_forkReplay_le`, `le_probEvent_isSome_forkReplay`,
 `Fork.replayForkingBound`, `euf_nma_bound`, `euf_cma_bound`) inherit this conditionality
-until the step is discharged. -/
+until both faithfulness lemmas are discharged. -/
 theorem le_probOutput_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1)))
@@ -2232,8 +2794,8 @@ the proof structure is identical, substituting the pointwise replay lower bound
 `le_probOutput_forkReplay` for its seed-based analogue. The `hreach` hypothesis is
 threaded through from `le_probOutput_forkReplay`.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
-`le_probOutput_forkReplay`). -/
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
+`le_probOutput_forkReplay` → `sq_probOutput_main_le_noGuardReplayComp`). -/
 theorem probOutput_none_forkReplay_le
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :
@@ -2296,8 +2858,9 @@ theorem probOutput_none_forkReplay_le
 `forkReplay_precondition_le_one` by the same `1 - ·` conversion used in
 `le_probEvent_isSome_seededFork`. The `hreach` hypothesis is threaded through.
 
-**Currently conditional on `sq_probOutput_main_le_noGuardReplayComp`** (transitively via
-`probOutput_none_forkReplay_le`). -/
+**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
+`probOutput_none_forkReplay_le` → `le_probOutput_forkReplay`
+→ `sq_probOutput_main_le_noGuardReplayComp`). -/
 theorem le_probEvent_isSome_forkReplay
     (main : OracleComp spec α) (qb : ι → ℕ) (i : ι)
     (cf : α → Option (Fin (qb i + 1))) (hreach : CfReachable main qb i cf) :
