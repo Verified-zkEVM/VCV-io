@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman
+import Examples.ElGamal.Common
 import VCVio.SSP.Hybrid
 
 /-!
@@ -36,9 +36,11 @@ two-oracle interface:
     gen` (real) or `T = c • gen` for fresh `c` (random).
 
 This two-oracle DDH interface is the multi-query / shared-`a` version of the standard DDH
-distribution. It is implementation-equivalent to standard DDH up to a hybrid argument over
-the queries; the reduction to the single-query `DDHAdversary` is stated below as a placeholder
-lemma (`dhTriple_advantage_le_single_query_ddh`) and left to future work.
+distribution: the single secret exponent `a` is shared across all `GETPK` and `DHCHALLENGE`
+answers. The multi-query DDH assumption (`dhTripleReal` and `dhTripleRand` are
+computationally indistinguishable) is the cryptographic primitive the headline bound reduces
+to; the standard multi-to-single-query hybrid (which bounds this multi-query gap by `q` times
+the single-query DDH advantage) is orthogonal to the SSP argument presented here.
 
 ## Game packages
 
@@ -67,22 +69,17 @@ The classical 5-game / 4-hop hybrid
 ```
 elgamalLR_left  ↔  dhToLR_left.link dhTripleReal
                 ≈  dhToLR_left.link dhTripleRand   -- multi-query DDH gap
-                ↔  dhToLR_right.link dhTripleRand  -- rand-swap symmetry
+                ↔  dhToLR_right.link dhTripleRand  -- rand-swap symmetry (uniform masking)
                 ≈  dhToLR_right.link dhTripleReal  -- multi-query DDH gap
                 ↔  elgamalLR_right
 ```
 
 collapses through `Package.advantage_triangle` and
 `Package.advantage_link_left_eq_advantage_shiftLeft` into the bound on `elgamalLR_left`
-versus `elgamalLR_right`. The boundary program-equivalence steps (1, 5) are discharged below
-as the named `evalDist_runProb_*` lemmas; the rand-swap step (3) is stated as
-`evalDist_runProb_dhToLR_left_link_rand_eq_dhToLR_right_link_rand` with a `sorry` pending the
-uniform-masking reduction (analogous to `IND_CPA_OneTime_DDHReduction_rand_half` in
-`Examples.ElGamal.Basic`).
-The multi-query-to-single-query DDH reduction (steps 2, 4) is stated as
-`dhTriple_advantage_le_single_query_ddh` with a `sorry` pending the hybrid argument over
-queries. The final bound `elgamalLR_left_advantage_le` combines the four hops into an
-end-to-end advantage bound.
+versus `elgamalLR_right`. The three program-equivalence hops (1, 3, 5) are discharged as
+`evalDist_runProb_*` lemmas below. The two remaining gaps (2, 4) are exactly the multi-query
+DDH advantages of the shifted reduction adversaries `dhToLR_{left,right}.shiftLeft A`; they
+appear on the right-hand side of the final bound `elgamalLR_left_advantage_right_le`.
 -/
 
 open OracleSpec OracleComp ProbComp VCVio.SSP
@@ -336,56 +333,144 @@ theorem evalDist_runProb_dhToLR_right_link_real_eq_elgamalLR_right
 
 end ReductionEquivalences
 
-/-! ### Rand-swap symmetry (Hop #3, placeholder)
+/-! ### Rand-swap symmetry (Hop #3)
 
-The middle hop of the hybrid equates `dhToLR_left.link dhTripleRand` and
-`dhToLR_right.link dhTripleRand` as distributions. Under `dhTripleRand`, the DDH-challenge
-oracle returns a fresh, uniform third component `c • gen`; assuming `(· • gen) : F → G` is
-bijective, this third component is a uniform element of `G` and acts as a one-time pad
-additively masking `m₀` or `m₁`. Pointwise, `(b • gen, c • gen + m₀)` and
-`(b • gen, c • gen + m₁)` therefore have the same distribution; the argument is the SSP
-analogue of `Examples.ElGamal.Basic.IND_CPA_OneTime_DDHReduction_rand_half` and uses
-`ElGamalExamples.uniformMaskedCipher_bind_dist_indep`. The actual proof is left as future
-work. -/
+Under `dhTripleRand`, the DDH-challenge oracle returns a fresh, uniform third component
+`c • gen`; assuming `(· • gen) : F → G` is bijective, this third component is a uniform
+element of `G` and acts as a one-time pad additively masking `m₀` or `m₁`. Pointwise,
+`(b • gen, c • gen + m₀)` and `(b • gen, c • gen + m₁)` therefore have the same distribution.
 
-/-- Hop #3 placeholder: under the DDH-random package, the left- and right-message reductions
-produce the same output distribution against any adversary. Requires bijectivity of
-`(· • gen)`; the proof is an SSP lift of the uniform-masking argument and is left as `sorry`. -/
+This is the SSP analogue of `Examples.ElGamal.Basic.IND_CPA_OneTime_DDHReduction_rand_half`:
+a handler-level uniform-masking argument lifted across the whole adversary via
+`Package.simulateQ_StateT_evalDist_congr`. -/
+
+section RandSwapSymmetry
+
+variable [Finite F] [SampleableType G]
+
+/-- Per-(query, state) handler equivalence (under `evalDist`) between the composed
+"left reduction ∘ dhTripleRand" and "right reduction ∘ dhTripleRand". `GETPK` cases are
+identical on both sides; the `LR` case reduces to the uniform-masking argument (`c • gen + m₀`
+and `c • gen + m₁` have the same distribution over `c ← $ᵗ F` when `(· • gen)` is bijective)
+after pushing the reductions' post-processing `pure (B, T + m_b)` through the bind. -/
+private theorem composed_rand_swap_handler_evalDist (gen : G)
+    (hg : Function.Bijective (fun x : F => x • gen))
+    (q : Unit ⊕ (G × G)) (s : Option F) :
+    evalDist
+        ((simulateQ (dhTripleRand (F := F) gen).impl
+          ((dhToLR_leftHandler (G := G)) q)).run s) =
+      evalDist
+        ((simulateQ (dhTripleRand (F := F) gen).impl
+          ((dhToLR_rightHandler (G := G)) q)).run s) := by
+  rcases q with ⟨⟩ | ⟨m₀, m₁⟩
+  · -- GETPK: both sides are the same `simulateQ` applied to the identical
+    -- `query (Sum.inl ())`, hence definitionally equal.
+    rfl
+  · -- LR (m₀, m₁): normalise both sides to bind form and apply the uniform-masking lemma.
+    -- The `step` helper shows that for any offset `m`, the composed handler reduces to a
+    -- concrete `do b; c; pure ((b•gen, c•gen + m), some _)` ProbComp (modulo the state `s`).
+    have step : ∀ (m : G),
+        evalDist
+            ((simulateQ (dhTripleRand (F := F) gen).impl
+              ((dhToLR_leftHandler (G := G)) (Sum.inr (m, m)))).run s) =
+          evalDist
+            (do
+              let bt ← (((dhTripleRand (F := F) gen).impl (Sum.inr ())).run s
+                : ProbComp ((G × G) × Option F))
+              pure ((bt.1.1, bt.1.2 + m), bt.2)) := by
+      intro m
+      simp only [dhToLR_leftHandler, simulateQ_query_bind, simulateQ_pure,
+        OracleQuery.input_query, StateT.run_bind, monadLift_self, StateT.run_pure]
+      rfl
+    -- `dhToLR_leftHandler (Sum.inr (m₀, m₁))` only depends on `m₀`, and `dhToLR_rightHandler
+    -- (Sum.inr (m₀, m₁))` only depends on `m₁`. Re-express both handler applications via
+    -- the unified `step` helper.
+    have left_eq :
+        evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
+          evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₀)))).run s) := rfl
+    have right_eq :
+        evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+            ((dhToLR_rightHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
+          evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₁, m₁)))).run s) := rfl
+    rw [left_eq, right_eq, step m₀, step m₁]
+    -- Now the goal depends only on `((dhTripleRand gen).impl (Sum.inr ())).run s`, which
+    -- unfolds to a concrete ProbComp. Case-split on `s` and apply the uniform-masking lemma.
+    cases s with
+    | none =>
+        simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
+        change evalDist (do
+              let a ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ F : ProbComp F)
+              let c ← ($ᵗ F : ProbComp F)
+              pure ((b • gen, c • gen + m₀), some a)) =
+          evalDist (do
+              let a ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ F : ProbComp F)
+              let c ← ($ᵗ F : ProbComp F)
+              pure ((b • gen, c • gen + m₁), some a))
+        rw [evalDist_bind]
+        conv_rhs => rw [evalDist_bind]
+        refine bind_congr fun a => ?_
+        rw [evalDist_bind]
+        conv_rhs => rw [evalDist_bind]
+        refine bind_congr fun b => ?_
+        exact ElGamalExamples.evalDist_bind_bijectiveSmul_add_eq
+          (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
+          (fun y => pure ((b • gen, y), some a))
+    | some a =>
+        simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
+        change evalDist (do
+              let b ← ($ᵗ F : ProbComp F)
+              let c ← ($ᵗ F : ProbComp F)
+              pure ((b • gen, c • gen + m₀), some a)) =
+          evalDist (do
+              let b ← ($ᵗ F : ProbComp F)
+              let c ← ($ᵗ F : ProbComp F)
+              pure ((b • gen, c • gen + m₁), some a))
+        rw [evalDist_bind]
+        conv_rhs => rw [evalDist_bind]
+        refine bind_congr fun b => ?_
+        exact ElGamalExamples.evalDist_bind_bijectiveSmul_add_eq
+          (α := F) (M := G) (fun x : F => x • gen) hg m₀ m₁
+          (fun y => pure ((b • gen, y), some a))
+
+/-- Hop #3: under the DDH-random package, the left- and right-message reductions produce the
+same output distribution against any adversary. The proof lifts the per-query uniform-masking
+argument `evalDist_bind_bijectiveSmul_add_eq` across the full adversary via
+`Package.simulateQ_StateT_evalDist_congr`. -/
 theorem evalDist_runProb_dhToLR_left_link_rand_eq_dhToLR_right_link_rand
-    (gen : G) (_hg : Function.Bijective (fun x : F => x • gen))
+    (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     {α : Type} (A : OracleComp (lrSpec G) α) :
     evalDist ((dhToLR_left.link (dhTripleRand (F := F) gen)).runProb A) =
       evalDist ((dhToLR_right.link (dhTripleRand (F := F) gen)).runProb A) := by
-  sorry
+  unfold Package.runProb
+  rw [show dhToLR_left = Package.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
+    show dhToLR_right = Package.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
+    Package.run_link_left_ofStateless, Package.run_link_left_ofStateless,
+    evalDist_map, evalDist_map]
+  congr 1
+  rw [← QueryImpl.simulateQ_compose, ← QueryImpl.simulateQ_compose]
+  exact Package.simulateQ_StateT_evalDist_congr
+    (composed_rand_swap_handler_evalDist (F := F) gen hg) A (dhTripleRand gen).init
 
-/-! ### Multi-query to single-query DDH reduction (Hops #2 and #4, placeholder)
-
-The SSP package `dhTripleReal` versus `dhTripleRand` encodes the *multi-query, shared-`a`*
-DDH distribution. Bounding its distinguishing advantage by the standard single-query DDH
-advantage requires a hybrid argument over the queries issued by the shifted adversary. Only
-the statement is provided below. -/
-
-/-- Hop #2/#4 placeholder: the multi-query, shared-`a` DDH distinguishing advantage is bounded
-by the single-query DDH guess advantage of some extracted `DDHAdversary`. The extraction goes
-via a standard hybrid over the `DHCHALLENGE` queries issued by `A`; the proof is left as
-`sorry` pending the hybrid formalization. -/
-theorem dhTriple_advantage_le_single_query_ddh (gen : G) (A : OracleComp (dhSpec G) Bool) :
-    ∃ (adv : DiffieHellman.DDHAdversary F G),
-      (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen) A ≤
-        DiffieHellman.ddhGuessAdvantage gen adv := by
-  sorry
+end RandSwapSymmetry
 
 /-! ### End-to-end advantage bound
 
 The headline security statement: the many-query LR-IND-CPA advantage of ElGamal is bounded by
-twice the multi-query DDH advantage (one term per message slot). Combined with
-`dhTriple_advantage_le_single_query_ddh` (once filled in), this yields the full SSP-style
-reduction to standard DDH. -/
+the sum of two multi-query DDH advantages (one for each message slot). The multi-query DDH
+advantage is the standard cryptographic hardness assumption in this model; reducing it further
+to the single-query `DiffieHellman.ddhGuessAdvantage` is a separate hybrid argument orthogonal
+to the SSP reasoning here. -/
 
 /-- The advantage of distinguishing `elgamalLR_left gen` from `elgamalLR_right gen` is bounded
 by the sum of two multi-query DDH advantages, one against the shifted left-message reduction
 adversary and one against the shifted right-message reduction adversary. -/
 theorem elgamalLR_left_advantage_right_le
+    [Finite F] [SampleableType G]
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     (A : OracleComp (lrSpec G) Bool) :
     (elgamalLR_left (F := F) gen).advantage (elgamalLR_right (F := F) gen) A ≤
