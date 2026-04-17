@@ -146,8 +146,12 @@ theorem triple_stateT_iff_forall_support {σ α : Type}
 
 A triple `⦃P⦄ mx ⦃Q⦄` over the writer log holds iff every outcome `(a, w)` in
 the support of `mx.run` satisfies `Q.1 a (s ++ w)` for every starting log `s`
-satisfying `P`. The starting log `s` is threaded through `mx` as a pure prefix
-because `WriterT.run` always begins from `∅` and accumulates via `++`. -/
+satisfying `P`. The starting log `s` threads through the WP interpretation
+itself, not through `mx`: `WriterT.run mx` always begins from `∅` and produces
+pairs `(a, w)`, and the WP transformer defined in
+`VCVio.ProgramLogic.Unary.WriterTBridge` then prepends `s` via `s ++ _` before
+applying the postcondition. This is why `s` appears only in `Q.1 a (s ++ w)`
+on the right-hand side. -/
 theorem triple_writerT_iff_forall_support {ω α : Type}
     [EmptyCollection ω] [Append ω] [LawfulAppend ω]
     (mx : WriterT ω (OracleComp spec) α)
@@ -172,8 +176,11 @@ theorem triple_writerT_iff_forall_support {ω α : Type}
 For `WriterT ω (OracleComp spec)` where the log `ω` is a (multiplicative)
 monoid, a triple `⦃P⦄ mx ⦃Q⦄` holds iff every outcome `(a, w)` in the support
 of `mx.run` satisfies `Q.1 a (s * w)` for every starting log `s` satisfying
-`P`. This is the dual of the `Append`-based characterization and is what
-`countingOracle` / `costOracle` proofs use. -/
+`P`. As in the `Append`-based variant, the starting log `s` threads through
+the WP interpretation (`s * _`), not through `mx`. This is the dual of the
+`Append`-based characterization and is what `countingOracle` / `costOracle`
+proofs use (where `QueryCount ι = ι → ℕ` has a `Monoid` instance but no
+`Append`). -/
 theorem triple_writerT_iff_forall_support_monoid {ω α : Type} [Monoid ω]
     (mx : WriterT ω (OracleComp spec) α)
     (P : Std.Do.Assertion (.arg ω .pure)) (Q : Std.Do.PostCond α (.arg ω .pure)) :

@@ -133,10 +133,24 @@ are in `VCVio.CryptoFoundations.ReplayForkStdDo`.
 
 open Std.Do OracleSpec OracleComp
 
+/- File-scoped because nearly every `mvcgen` usage below currently trips the
+"implicit spec lookup fallback" warning whose root cause is the upstream
+`DiscrTree` / `MonadLiftT.monadLift` key-normalisation gap documented in
+`StdDoBridge.lean`. Once that upstream issue is fixed we can remove this
+option and fall back to per-example scoping. -/
 set_option mvcgen.warning false
 
 namespace OracleComp.ProgramLogic.StdDo
 
+/- Universe restriction `OracleSpec.{0, 0}` tracks the universe of the
+index `ι` and the common `Range t` universe used by `OracleComp`. We pin
+both to `Type 0` here because the downstream `Std.Do` bridge `wpProp` in
+`StdDoBridge.lean` is instantiated at `Type` and all handlers we need
+(`cachingOracle`, `seededOracle`, `loggingOracle`, `countingOracle`,
+`costOracle`, `cachingLoggingOracle`) are `Type 0`-valued. Generalising
+to a polymorphic universe would require polymorphising the entire
+`wpProp` bridge, which the whole `ProgramLogic.Unary.*` stack is not yet
+set up to support. -/
 variable {ι : Type}
 variable {spec : OracleSpec.{0, 0} ι} [spec.Fintype] [spec.Inhabited]
 
@@ -368,7 +382,16 @@ theorem seededOracle_triple (t : spec.Domain) (seed₀ : QuerySeed spec) :
     exact ⟨us, rfl, hseed'⟩
 
 /-- Specialized spec: if the seed has at least one value at `t`, `seededOracle t`
-deterministically pops the head and updates the state. -/
+deterministically pops the head and updates the state.
+
+Note: neither `seededOracle_triple_of_cons` nor `seededOracle_triple_of_nil`
+is tagged `@[spec]`. `mvcgen`'s `DiscrTree` cannot discriminate between them
+based on the numerical residue of `seed t` — they share a head symbol
+(`seededOracle`), and their preconditions differ only by an unrelated
+equation about the seed. Registering both would cause `findSpec` to fire
+one arbitrarily and drop the other, producing obscure goals. Instead, we
+leave the disjunction-shaped `seededOracle_triple` as the `@[spec]`-tagged
+version and derive both specialised forms by case-analysis when needed. -/
 theorem seededOracle_triple_of_cons (t : spec.Domain)
     (u : spec.Range t) (us : List (spec.Range t)) (seed₀ : QuerySeed spec)
     (h : seed₀ t = u :: us) :

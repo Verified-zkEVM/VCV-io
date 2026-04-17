@@ -214,6 +214,23 @@ above (which causes the parametric path to lose typeclass resolution to
 lemma monadLift_eq_self {α} (mx : OracleComp spec α) :
     (monadLift mx : OracleComp spec α) = mx := rfl
 
+/-! Regression smoke-tests for the instance-priority invariants above. The
+`rfl` proofs are the load-bearing signal: if priority drifts so that the
+parametric `MonadLift` beats `MonadLiftT.refl`, the self-lift stops being
+definitionally `id` and the `rfl` below breaks. Similarly, the
+`MonadLiftT` synthesis check guards against future refactors that would
+remove the transitive lift chain. -/
+
+example (mx : OracleComp spec Nat) :
+    (monadLift mx : OracleComp spec Nat) = mx := rfl
+
+example : MonadLiftT (OracleComp spec) (OracleComp spec) :=
+  inferInstance
+
+example [MonadLift (OracleQuery spec) (OracleQuery superSpec)] :
+    MonadLiftT (OracleComp spec) (OracleComp superSpec) :=
+  inferInstance
+
 -- NOTE: With constant universal levels it is fairly easy to abstract the below in a class
 -- Getting a similar level of generality as the manual instances below would be useful,
 --    might require some more general framework about monad transformers.

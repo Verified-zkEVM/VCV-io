@@ -177,7 +177,7 @@ private abbrev trivCtx : Interaction.Spec.Node.Context.{0, 0} := fun _ => PUnit
 
 /-- Always-increment process: each step has no moves and bumps the
 counter by one. -/
-private noncomputable def incrementProcess : ProcessOver trivCtx where
+private def incrementProcess : ProcessOver trivCtx where
   Proc := ℕ
   step p :=
     { spec := .done
@@ -203,15 +203,18 @@ private theorem incrementProcess_step_triple (p₀ p : ℕ) :
   intro hp; omega
 
 /-- Smoke-test corollary: `runSteps` over `incrementProcess` never
-decreases the counter. -/
-private example (p₀ : ℕ) (n : ℕ) :
+decreases the counter, starting from any `s₀ ≥ p₀`. The precondition is
+the non-trivial `⌜p₀ ≤ s₀⌝` (as opposed to `⌜p₀ ≤ p₀⌝`), so the test
+actually exercises the `Triple.bind` threading of the invariant through
+the `runSteps` unfolding. -/
+private example (p₀ s₀ n : ℕ) :
     Std.Do.Triple
-      (incrementProcess.runSteps trivSampler n p₀ : ProbComp ℕ)
-      (spred(⌜p₀ ≤ p₀⌝))
+      (incrementProcess.runSteps trivSampler n s₀ : ProbComp ℕ)
+      (spred(⌜p₀ ≤ s₀⌝))
       (⇓ p' => ⌜p₀ ≤ p'⌝) :=
   runSteps_triple_preserves_invariant (m := ProbComp)
     incrementProcess trivSampler (fun s => p₀ ≤ s)
-    (fun p => incrementProcess_step_triple p₀ p) n p₀
+    (fun p => incrementProcess_step_triple p₀ p) n s₀
 
 end Example
 

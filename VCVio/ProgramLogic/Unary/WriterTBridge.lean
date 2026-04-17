@@ -23,13 +23,18 @@ The bridge supports two parameterizations in parallel:
   `loggingOracle` (over `WriterT (QueryLog spec) (OracleComp spec)`) needs
   because `QueryLog spec` unfolds to `List _`.
 * `[Monoid ω]`, which is what `countingOracle`/`costOracle` (over
-  `WriterT (QueryCount ι) (OracleComp spec)`) need because `QueryCount ι`
-  unfolds to `ι → ℕ` and carries a `Monoid` instance (with `1 = 0` and
-  `* = +`) rather than `Append`.
+  `WriterT (QueryCount ι) (OracleComp spec)`) need. `QueryCount ι` unfolds
+  to `ι → ℕ`, and the effective monoid on it is the *additive* one
+  repackaged as a multiplicative `Monoid` (so `1` represents the all-zero
+  function and `*` represents pointwise `+`). `ι → ℕ` has no `Append`
+  instance, so only the `[Monoid ω]` parameterization applies there.
 
 The two `WP` / `WPMonad` instances live side-by-side and do not overlap on
-the common target types (`List _` has no `Monoid` instance; `ι → ℕ` has no
-`Append` instance).
+any currently used target type (`List _` has no `Monoid` instance;
+`ι → ℕ` has no `Append` instance). To defensively guard against future
+overlap on a type carrying both `Append` and `Monoid`, the `Monoid`
+variants are registered at `low` priority so the `Append` variants win
+typeclass resolution whenever both apply.
 
 ## Implementation
 
@@ -131,15 +136,20 @@ def wpMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}} {α : Ty
 The writer log is threaded through as state and accumulated via `*` with
 identity `1`. Does not conflict with `instWPAppend` because the target
 types they fire on are disjoint (`List _` has no `Monoid`, `ι → ℕ` has
-no `Append`). -/
-instance instWPMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+no `Append`). The priority is set `low` so that, on a hypothetical `ω`
+carrying *both* `Append` and `Monoid`, `instWPAppend` wins typeclass
+resolution and no WP diamond arises. -/
+instance (priority := low) instWPMonoid
+    {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
     [Monad m] [WP m ps] [Monoid ω] :
     WP (WriterT ω m) (.arg ω ps) where
   wp x := WriterT.wpMonoid x
 
 /-- `WP` on `WriterT ω m` (monoid variant) is a monad morphism: it
-preserves `pure` and `bind`, using the `Monoid` laws. -/
-instance instWPMonadMonoid {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
+preserves `pure` and `bind`, using the `Monoid` laws. Registered at `low`
+priority for the same reason as `instWPMonoid`. -/
+instance (priority := low) instWPMonadMonoid
+    {m : Type u → Type v} {ω : Type u} {ps : PostShape.{u}}
     [Monad m] [LawfulMonad m] [WPMonad m ps] [Monoid ω] :
     WPMonad (WriterT ω m) (.arg ω ps) where
   toLawfulMonad := inferInstance
@@ -247,6 +257,10 @@ projection. -/
 
 namespace Std.Do.Spec
 
+/- `WriterT.run` is registered as a `@[spec]` so that `mvcgen` unfolds the
+underlying projection when no more specific spec fires. This mirrors the
+upstream pattern in `Std.Do.Triple.SpecLemmas`, which does the same for
+`ReaderT.run` and `StateT.run`. -/
 attribute [spec] WriterT.run
 
 /-- Spec for `MonadWriter.tell` in `WriterT ω m`. The precondition is

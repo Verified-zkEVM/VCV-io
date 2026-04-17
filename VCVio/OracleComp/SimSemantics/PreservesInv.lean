@@ -288,19 +288,39 @@ lemma WriterPreservesInv.and {ι : Type} {spec : OracleSpec ι} {ω : Type} [Mon
     WriterPreservesInv impl (fun s => P s ∧ Q s) :=
   fun t s₀ ⟨hp, hq⟩ z hz => ⟨hP t s₀ hp z hz, hQ t s₀ hq z hz⟩
 
+/-- `WriterPreservesInv` from an unconditional per-query witness. Analogous
+to `PreservesInv.of_forall`: if every reachable increment `z.2` satisfies
+`Inv (s₀ * z.2)` for *any* starting `s₀` regardless of whether `Inv s₀`
+holds, then `Inv` is preserved. -/
+lemma WriterPreservesInv.of_forall
+    {ι : Type} {spec : OracleSpec ι} {ω : Type} [Monoid ω]
+    {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Inv : ω → Prop}
+    (h : ∀ t s₀ z, z ∈ support (impl t).run → Inv (s₀ * z.2)) :
+    WriterPreservesInv impl Inv :=
+  fun t s₀ _ z hz => h t s₀ z hz
+
 /-- `WriterPreservesInv` from a multiplicatively-closed predicate.
 
-If `Q` holds on every writer increment `z.2` produced by a single query
-(`hquery`) and is closed under `*` (`hmul`), then `Q` is preserved across
-the whole simulation. This is the canonical builder for writer
-invariants: pick a submonoid-like predicate, show every per-query
+If `Inv` holds on every writer increment `w` produced by a single query
+(`hPerQuery`) and is closed under `*` (`hClosed`), then `Inv` is
+preserved across the whole simulation. This is the canonical builder for
+writer invariants: pick a submonoid-like predicate, show every per-query
 increment lands in it, and you're done. -/
 lemma WriterPreservesInv.of_mul_closed {ι : Type} {spec : OracleSpec ι} {ω : Type} [Monoid ω]
-    {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Q : ω → Prop}
-    (hmul : ∀ a b, Q a → Q b → Q (a * b))
-    (hquery : ∀ t z, z ∈ support (impl t).run → Q z.2) :
-    WriterPreservesInv impl Q :=
-  fun t s₀ hs₀ z hz => hmul s₀ z.2 hs₀ (hquery t z hz)
+    {impl : QueryImpl spec (WriterT ω (OracleComp spec))} {Inv : ω → Prop}
+    (hClosed : ∀ a b, Inv a → Inv b → Inv (a * b))
+    (hPerQuery : ∀ t z, z ∈ support (impl t).run → Inv z.2) :
+    WriterPreservesInv impl Inv :=
+  fun t s₀ hs₀ z hz => hClosed s₀ z.2 hs₀ (hPerQuery t z hz)
+
+/-! Note on composition. Unlike `PreservesInv.compose`, we do not provide a
+compose analogue for `WriterPreservesInv`: the definition is keyed to a
+single `spec` appearing both as the source of queries and as the inner
+`OracleComp spec` monad of the writer. Composition via `∘ₛ` changes the
+query spec but not the inner writer monad, so the composite signature no
+longer matches `WriterPreservesInv`'s. The intended idiom is to compose
+on the underlying `OracleComp` layer (e.g. via `simulateQ_compose`) and
+then apply `simulateQ_run_writerPreservesInv` to the composite computation. -/
 
 end QueryImpl
 

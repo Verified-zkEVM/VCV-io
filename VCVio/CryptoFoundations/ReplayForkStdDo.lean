@@ -41,6 +41,11 @@ The whole-program lemmas reproduce the three public theorems
 
 open Std.Do OracleSpec OracleComp
 
+/- File-scoped for the same reason as in
+`VCVio.ProgramLogic.Unary.HandlerSpecs`: `mvcgen` currently warns on lifted
+`OracleQuery.query` heads even though our `@[spec]` fall-throughs close the
+goal. Once the upstream `DiscrTree` / `MonadLiftT.monadLift` key
+normalisation lands (tracked in `StdDoBridge.lean`), this can be removed. -/
 set_option mvcgen.warning false
 
 namespace OracleComp.ProgramLogic.StdDo
@@ -57,12 +62,16 @@ variable {i : ι}
 /-- Triple form of `OracleComp.replayOracle_preservesPrefixInvariant`:
 each `replayOracle i t` step preserves the replay prefix invariant.
 
-Not marked `@[spec]` because `replayOracle i t` admits several distinct
-useful invariants (prefix / replacement / immutable parameters) and
-having more than one of them as a globally registered spec for the same
-head symbol would force `mvcgen` to commit to one before seeing the
-goal. Pass the relevant invariant explicitly,
-`mvcgen [replayOracle_triple_prefix]`. -/
+Not marked `@[spec]`. `replayOracle i t` admits three distinct useful
+invariants (prefix / replacement / immutable parameters). `mvcgen`'s
+`findSpec` is keyed by the syntactic head of the computation, not by the
+shape of the assertion, so if more than one of these were registered as
+`@[spec]` for the same head (`replayOracle i t`) the tactic would pick
+an arbitrary one and silently drop the others. Instead, we leave all
+three as plain theorems and ask the caller to pass the relevant one
+explicitly, e.g. `mvcgen [replayOracle_triple_prefix]`. The same pattern
+applies to `replayOracle_triple_replacement` and
+`replayOracle_triple_immutable` below. -/
 theorem replayOracle_triple_prefix (i t : ι) :
     Std.Do.Triple
       (replayOracle i t :
