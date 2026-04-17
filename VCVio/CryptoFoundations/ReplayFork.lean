@@ -115,7 +115,7 @@ lemma getQueryValue?_isSome_of_lt [spec.DecidableEq] (log : QueryLog spec) (t : 
   have hentry := List.getElem_mem h (l := log.getQ (· = t))
   have ht' : ((log.getQ (· = t))[n]'h).1 = t := getQ_eq_mem log t hentry
   rw [hopt]
-  set entry := (log.getQ (· = t))[n]'h with hentry_def
+  set entry := (log.getQ (· = t))[n]'h
   obtain ⟨t', u'⟩ := entry
   simp only at ht'
   subst ht'
