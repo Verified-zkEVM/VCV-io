@@ -123,6 +123,7 @@ import VCVio.Interaction.UC.OpenSyntax.Interp
 import VCVio.Interaction.UC.OpenSyntax.Raw
 import VCVio.Interaction.UC.OpenTheory
 import VCVio.Interaction.UC.Runtime
+import VCVio.Interaction.UC.StdDoBridge
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.Constructions.BitVec
