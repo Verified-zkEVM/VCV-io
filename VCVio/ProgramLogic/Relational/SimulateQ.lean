@@ -9,6 +9,7 @@ import VCVio.EvalDist.TVDist
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.SimSemantics.StateT
+import VCVio.OracleComp.SimSemantics.WriterT
 
 /-!
 # Relational `simulateQ` Rules
@@ -122,6 +123,82 @@ theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
   intro t s₁ s₂ hs'
   cases hs'
   exact relTriple_of_evalDist_eq (himpl t s₁) (fun _ => ⟨rfl, rfl⟩)
+
+/-! ### `WriterT` analogue -/
+
+/-- `WriterT` analogue of `relTriple_simulateQ_run`.
+
+If two writer-transformed oracle implementations produce outputs related by a reflexive-and-closed
+relation `R_writer` on the accumulated logs, then the full simulation preserves output equality
+together with the accumulated-log relation.
+
+`hR_one` witnesses reflexivity at the empty accumulator (the run-start value), and `hR_mul`
+closes `R_writer` under the monoid multiplication used by `WriterT`'s bind. Together these make
+`R_writer` a *monoid congruence* on the two writer spaces, which is precisely the structural
+requirement for whole-program accumulation. -/
+theorem relTriple_simulateQ_run_writerT
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
+    (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
+    (R_writer : ω₁ → ω₂ → Prop)
+    (hR_one : R_writer 1 1)
+    (hR_mul : ∀ w₁ w₁' w₂ w₂', R_writer w₁ w₂ → R_writer w₁' w₂' →
+      R_writer (w₁ * w₁') (w₂ * w₂'))
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain),
+      RelTriple ((impl₁ t).run) ((impl₂ t).run)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_writer p₁.2 p₂.2)) :
+    RelTriple
+      (simulateQ impl₁ oa).run
+      (simulateQ impl₂ oa).run
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_writer p₁.2 p₂.2) := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+    simp only [simulateQ_pure, WriterT.run_pure, relTriple_iff_relWP,
+      MAlgRelOrdered.relWP_pure, true_and]
+    exact hR_one
+  | query_bind t _ ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+      OracleQuery.cont_query, id_map, WriterT.run_bind, relTriple_iff_relWP,
+      relWP_iff_couplingPost]
+    refine (relTriple_bind (himpl t) (fun ⟨u₁, w₁⟩ ⟨u₂, w₂⟩ ⟨eq_u, hw⟩ => ?_)) trivial
+    dsimp at eq_u hw ⊢
+    subst eq_u
+    have h_ih := ih u₁
+    refine relTriple_map
+      (R := fun (p₁ : α × ω₁) (p₂ : α × ω₂) => p₁.1 = p₂.1 ∧ R_writer p₁.2 p₂.2) ?_
+    refine relTriple_post_mono h_ih ?_
+    rintro ⟨a, v₁⟩ ⟨b, v₂⟩ ⟨hab, hv⟩
+    exact ⟨hab, hR_mul _ _ _ _ hw hv⟩
+
+/-- Projection of `relTriple_simulateQ_run_writerT` onto the output component. -/
+theorem relTriple_simulateQ_run_writerT'
+    {ι₁ : Type u} {ι₂ : Type u}
+    {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
+    {ω₁ ω₂ : Type} [Monoid ω₁] [Monoid ω₂]
+    (impl₁ : QueryImpl spec (WriterT ω₁ (OracleComp spec₁)))
+    (impl₂ : QueryImpl spec (WriterT ω₂ (OracleComp spec₂)))
+    (R_writer : ω₁ → ω₂ → Prop)
+    (hR_one : R_writer 1 1)
+    (hR_mul : ∀ w₁ w₁' w₂ w₂', R_writer w₁ w₂ → R_writer w₁' w₂' →
+      R_writer (w₁ * w₁') (w₂ * w₂'))
+    (oa : OracleComp spec α)
+    (himpl : ∀ (t : spec.Domain),
+      RelTriple ((impl₁ t).run) ((impl₂ t).run)
+        (fun p₁ p₂ => p₁.1 = p₂.1 ∧ R_writer p₁.2 p₂.2)) :
+    RelTriple
+      (Prod.fst <$> (simulateQ impl₁ oa).run)
+      (Prod.fst <$> (simulateQ impl₂ oa).run)
+      (EqRel α) := by
+  have h := relTriple_simulateQ_run_writerT impl₁ impl₂ R_writer hR_one hR_mul oa himpl
+  have hweak : RelTriple (simulateQ impl₁ oa).run (simulateQ impl₂ oa).run
+      (fun p₁ p₂ => (EqRel α) p₁.1 p₂.1) :=
+    relTriple_post_mono h (fun _ _ hp => hp.1)
+  exact relTriple_map hweak
 
 /-- If two stateful oracle implementations agree on every query while `Inv` holds, and the
 second implementation preserves `Inv`, then the full simulations have identical `(output, state)`

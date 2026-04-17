@@ -324,6 +324,8 @@ Projection and bridge variants:
 | `relTriple_simulateQ_run_of_triples` | Full `(value, state)` postcondition |
 | `relTriple_simulateQ_run'_of_triples` | Only `EqRel α` on projected outputs |
 | `relTriple_simulateQ_run_of_impl_eq_triple` | Two handlers agreeing on `Inv`; preservation spec is a `Std.Do.Triple`; conclude `EqRel (α × σ)` |
+| `relTriple_simulateQ_run_writerT` | Whole-program `WriterT` coupling from per-query `RelTriple`s plus a monoid-congruence hypothesis on the accumulated writers |
+| `relTriple_simulateQ_run_writerT'` | Output-projection of `relTriple_simulateQ_run_writerT` (drops the writer component, yielding `EqRel α` on outputs) |
 | `relTriple_run_of_triple` | Per-call product coupling for `StateT` |
 | `relTriple_run_writerT_of_triple` | Per-call product coupling for `WriterT` (`Append` variant, e.g. `loggingOracle`) |
 | `relTriple_run_writerT_of_triple_monoid` | Per-call product coupling for `WriterT` (`Monoid` variant, e.g. `countingOracle`, `costOracle`) |

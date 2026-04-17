@@ -454,6 +454,61 @@ private example {ω : Type} [Monoid ω]
   · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_a
   · exact OracleComp.ProgramLogic.StdDo.costOracle_triple costFn t s_b
 
+/-! ### Whole-program `WriterT` smoke tests -/
+
+/-- Smoke test: two `countingOracle` simulations on the same program `oa`
+agree on outputs and on accumulated counts under the diagonal coupling.
+Uses `relTriple_simulateQ_run_writerT` with `R_writer = Eq`, which is
+trivially reflexive and closed under the monoid operation. The per-query
+triple is supplied by `relTriple_refl`. -/
+private example {α : Type} (oa : OracleComp spec α) :
+    RelTriple
+      (simulateQ
+        (countingOracle :
+          QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec))) oa).run
+      (simulateQ
+        (countingOracle :
+          QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec))) oa).run
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2) := by
+  refine relTriple_simulateQ_run_writerT
+    (impl₁ := countingOracle) (impl₂ := countingOracle)
+    (R_writer := fun (w₁ w₂ : QueryCount ι) => w₁ = w₂)
+    rfl (by rintro _ _ _ _ rfl rfl; rfl) oa ?_
+  intro t
+  refine relTriple_post_mono
+    (relTriple_refl (spec₁ := spec)
+      (oa := (countingOracle t :
+        WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run)) ?_
+  rintro ⟨a, w⟩ ⟨b, w'⟩ heq
+  simp only [EqRel, Prod.mk.injEq] at heq
+  exact heq
+
+/-- Smoke test: two `costOracle` simulations on the same program `oa`
+with the same cost function agree on outputs and on accumulated costs
+under the diagonal coupling. -/
+private example {ω : Type} [Monoid ω]
+    (costFn : spec.Domain → ω) {α : Type} (oa : OracleComp spec α) :
+    RelTriple
+      (simulateQ
+        (costOracle costFn :
+          QueryImpl spec (WriterT ω (OracleComp spec))) oa).run
+      (simulateQ
+        (costOracle costFn :
+          QueryImpl spec (WriterT ω (OracleComp spec))) oa).run
+      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2) := by
+  refine relTriple_simulateQ_run_writerT
+    (impl₁ := costOracle costFn) (impl₂ := costOracle costFn)
+    (R_writer := fun (w₁ w₂ : ω) => w₁ = w₂)
+    rfl (by rintro _ _ _ _ rfl rfl; rfl) oa ?_
+  intro t
+  refine relTriple_post_mono
+    (relTriple_refl (spec₁ := spec)
+      (oa := (costOracle costFn t :
+        WriterT ω (OracleComp spec) (spec.Range t)).run)) ?_
+  rintro ⟨a, w⟩ ⟨b, w'⟩ heq
+  simp only [EqRel, Prod.mk.injEq] at heq
+  exact heq
+
 end SmokeTests
 
 end OracleComp.ProgramLogic.Relational
