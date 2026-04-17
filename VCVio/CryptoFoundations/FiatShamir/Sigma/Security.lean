@@ -811,6 +811,7 @@ private theorem target_eq_of_mem_forkReplay
     rw [← htgt₁, ← htgt₂, ← hgetElem₁, ← hgetElem₂, htakeEq]
   exact Option.some.inj this
 
+omit [SampleableType Stmt] in
 /-- **Per-pk extraction bound.** Given the structural forking event on `pk` (two fork
 runs selecting the same index, with distinct counted-oracle responses, both satisfying
 `forkSupportInvariant`), the NMA reduction recovers a valid witness with probability at
@@ -958,6 +959,7 @@ private theorem perPk_extraction_bound
 
 end eufNmaHelpers
 
+omit [SampleableType Stmt] in
 /-- **NMA-to-extraction via the forking lemma and special soundness.**
 
 For any managed-RO NMA adversary `B` making at most `qH` random-oracle queries, there
