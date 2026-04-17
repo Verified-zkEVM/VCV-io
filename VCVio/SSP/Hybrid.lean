@@ -27,9 +27,16 @@ This file collects two staple SSP results, phrased at the package level:
 These two ingredients together justify the standard SSP game-hopping pattern: produce a chain
 of intermediate games related by `link`-ed reductions, then collapse the chain via the hybrid
 inequality.
--/
 
-universe u v w
+## Universe layout
+
+`Package.shiftLeft` and `Package.run_link_eq_run_shiftLeft` are program-level statements and
+are kept fully universe-polymorphic in the indices `uᵢ, uₘ, uₑ`, the import range universe
+`vᵢ`, and the export range / state / result universe `v` (matching `Composition.lean`). The
+hybrid theorem and the advantage-level reduction live in the `Type 0` world (forced by
+`ProbComp` and `Bool`); their export indices remain free in `uₑ`. -/
+
+universe uᵢ uₘ uₑ vᵢ v
 
 open OracleSpec OracleComp ProbComp
 
@@ -37,10 +44,11 @@ namespace VCVio.SSP
 
 namespace Package
 
-variable {ιᵢ ιₘ ιₑ : Type}
-  {I : OracleSpec ιᵢ} {M : OracleSpec ιₘ} {E : OracleSpec ιₑ}
-
 /-! ### Iterated triangle inequality (hybrid argument) -/
+
+section Hybrid
+
+variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- **Hybrid lemma.** For any sequence of games `G 0, G 1, ..., G n` and any single Boolean
 adversary `A`, the distinguishing advantage between the endpoints is bounded by the sum of
@@ -64,9 +72,15 @@ theorem advantage_hybrid {σ : ℕ → Type} (G : (i : ℕ) → Package unifSpec
       _ = ∑ i ∈ Finset.range (n + 1), (G i).advantage (G (i + 1)) A := by
           rw [Finset.sum_range_succ]
 
+end Hybrid
+
 /-! ### Shifted adversary and the SSP reduction lemma -/
 
-variable {σ₁ σ₂ : Type}
+section ShiftLeft
+
+variable {ιₘ : Type uₘ} {ιₑ : Type uₑ}
+  {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
+  {σ₁ : Type v}
 
 /-- The **shifted adversary** obtained by absorbing the outer reduction package `P` into the
 adversary. Given an outer reduction `P : Package M E σ₁` and an external adversary
@@ -76,14 +90,16 @@ final outer state.
 
 This is the SSP "reduction-to-the-distinguisher" move: the outer package becomes part of the
 adversary, so a fresh round of analysis only needs to consider the inner game. -/
-def shiftLeft (P : Package M E σ₁) {α : Type} (A : OracleComp E α) :
+def shiftLeft (P : Package M E σ₁) {α : Type v} (A : OracleComp E α) :
     OracleComp M α :=
   Prod.fst <$> (simulateQ P.impl A).run P.init
 
 @[simp]
-lemma shiftLeft_pure (P : Package M E σ₁) {α : Type} (x : α) :
+lemma shiftLeft_pure (P : Package M E σ₁) {α : Type v} (x : α) :
     P.shiftLeft (pure x) = pure x := by
   simp [shiftLeft, simulateQ_pure, StateT.run_pure]
+
+variable {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {σ₂ : Type v}
 
 /-- **SSP reduction (program form).** Running the linked game `(P.link Q)` against adversary
 `A` produces the same `OracleComp` distribution as running the inner game `Q` against the
@@ -92,7 +108,7 @@ lemma shiftLeft_pure (P : Package M E σ₁) {α : Type} (x : α) :
 This is the equational form of the "swap the outer reduction into the adversary" step. The
 advantage-level corollary `advantage_link_left_eq_advantage_shiftLeft` follows by rewriting
 both sides under `boolDistAdvantage`. -/
-theorem run_link_eq_run_shiftLeft {α : Type}
+theorem run_link_eq_run_shiftLeft {α : Type v}
     (P : Package M E σ₁) (Q : Package I M σ₂) (A : OracleComp E α) :
     (P.link Q).run A = Q.run (P.shiftLeft A) := by
   -- Both sides reduce to `(fun p => p.1.1) <$> (simulateQ Q.impl X).run Q.init`,
@@ -100,6 +116,14 @@ theorem run_link_eq_run_shiftLeft {α : Type}
   rw [run_link]
   simp only [shiftLeft, Package.run, simulateQ_map, StateT.run'_eq, StateT.run_map,
     Functor.map_map]
+
+end ShiftLeft
+
+/-! ### Advantage-form reduction -/
+
+variable {ιₘ : Type uₘ} {ιₑ : Type uₑ}
+  {M : OracleSpec.{uₘ, 0} ιₘ} {E : OracleSpec.{uₑ, 0} ιₑ}
+  {σ₁ : Type}
 
 /-- **SSP reduction (advantage form).** With the same outer reduction package
 `P : Package M E σ₁` linked to two candidate inner games `Q₀, Q₁` exporting `M`, the
@@ -116,5 +140,18 @@ theorem advantage_link_left_eq_advantage_shiftLeft {σ_Q₀ σ_Q₁ : Type}
   rw [run_link_eq_run_shiftLeft, run_link_eq_run_shiftLeft]
 
 end Package
+
+/-! ### Universe-polymorphism sanity checks -/
+
+section UniverseTests
+
+/-- `shiftLeft` is fully universe-polymorphic in the export / intermediate index and range
+universes (and the result type). -/
+example {ιₘ : Type uₘ} {ιₑ : Type uₑ}
+    {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
+    {σ₁ : Type v} (P : Package M E σ₁) {α : Type v} (A : OracleComp E α) :
+    OracleComp M α := P.shiftLeft A
+
+end UniverseTests
 
 end VCVio.SSP

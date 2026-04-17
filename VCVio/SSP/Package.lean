@@ -28,7 +28,19 @@ Composition of packages (sequential `link` and parallel `par`) and the bridge to
 distributions live in sibling files `VCVio.SSP.Composition` and `VCVio.SSP.Advantage`.
 -/
 
-universe u v w
+/-!
+## Universe layout
+
+A `Package I E σ` lets the indices `ιᵢ` and `ιₑ` of the import / export specs live in
+*independent* universes (`uᵢ`, `uₑ`), and similarly the import / export ranges live in
+independent universes (`vᵢ` for `I.Range`, `v` for `E.Range`). The state `σ` and the result
+type `α` of any computation run against the package both live in `Type v` (i.e. the same
+universe as the export ranges); this constraint is forced by `simulateQ` operating on
+`StateT σ (OracleComp I) (E.Range x)`. The import range universe `vᵢ` is unconstrained: an
+`OracleComp I` can produce values in `Type v` regardless of where `I.Range` lives.
+-/
+
+universe uᵢ uₑ vᵢ v
 
 open OracleSpec OracleComp
 
@@ -38,9 +50,14 @@ namespace VCVio.SSP
 `I`, maintaining a private state of type `σ`.
 
 The handler `impl` interprets each export query as a stateful `OracleComp I` computation. The
-field `init` is the initial state. -/
-structure Package {ιᵢ ιₑ : Type u}
-    (I : OracleSpec.{u, v} ιᵢ) (E : OracleSpec.{u, v} ιₑ) (σ : Type v) where
+field `init` is the initial state.
+
+Universe parameters: the index universes `uᵢ, uₑ` for the import and export specs are
+independent, as are the range universes `vᵢ` (for `I`) and `v` (for `E`). The state `σ` lives
+in the same universe `v` as the export ranges, since the handler must produce values of type
+`StateT σ (OracleComp I) (E.Range x)`. -/
+structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) where
   /-- Initial value of the package's private state. -/
   init : σ
   /-- Implementation of each export query as a stateful `OracleComp I` computation. -/
@@ -48,13 +65,14 @@ structure Package {ιᵢ ιₑ : Type u}
 
 namespace Package
 
-variable {ιᵢ ιₑ : Type u} {I : OracleSpec.{u, v} ιᵢ} {E : OracleSpec.{u, v} ιₑ}
+variable {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, v} ιₑ}
   {σ : Type v}
 
 /-- The identity package on `E`: each export query is forwarded as the corresponding import
 query, with no private state. -/
 @[simps!]
-def id (E : OracleSpec.{u, v} ιₑ) : Package E E PUnit.{v + 1} where
+def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} where
   init := PUnit.unit
   impl t :=
     (liftM (query t : OracleComp E (E.Range t)) : StateT PUnit.{v + 1} (OracleComp E) _)
@@ -95,7 +113,7 @@ lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I)) (A : O
         : StateT PUnit.{v + 1} (OracleComp I) (E.Range t)) = liftM (h t) :=
       monadLift_self _
     rw [houter, StateT.run_monadLift]
-    simp only [bind_assoc, pure_bind, map_bind, monadLift_eq_self]
+    simp only [bind_assoc, pure_bind, map_bind]
     refine bind_congr fun u => ?_
     -- After this, the goal mentions `simulateQ` again; we need the IH for `k u`. Note that
     -- because the outer state is `PUnit`, we can drop the `s ↦ ...` quantification: the
@@ -125,11 +143,30 @@ lemma runState_pure {α : Type v} (P : Package I E σ) (x : α) :
   simp [runState, simulateQ_pure, StateT.run_pure]
 
 @[simp]
-lemma run_bind {α β : Type v} (P : Package I E σ) (A : OracleComp E α) (f : α → OracleComp E β) :
+lemma runState_bind {α β : Type v}
+    (P : Package I E σ) (A : OracleComp E α) (f : α → OracleComp E β) :
     P.runState (A >>= f) =
       P.runState A >>= fun (a, s) => (simulateQ P.impl (f a)).run s := by
   simp [runState, simulateQ_bind, StateT.run_bind]
 
 end Package
+
+/-! ### Universe-polymorphism sanity checks
+
+The examples below exercise the four independent universe parameters of `Package`. They are
+purely typechecking tests: they ensure that the import / export index universes (`uᵢ`, `uₑ`)
+and the import / export range universes (`vᵢ`, `v`) all remain independent of each other. -/
+
+section UniverseTests
+
+example {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) :
+    Type _ := Package I E σ
+
+example {ιᵢ : Type 0} {ιₑ : Type 1}
+    (I : OracleSpec.{0, 2} ιᵢ) (E : OracleSpec.{1, 0} ιₑ) (σ : Type) :
+    Type _ := Package I E σ
+
+end UniverseTests
 
 end VCVio.SSP
