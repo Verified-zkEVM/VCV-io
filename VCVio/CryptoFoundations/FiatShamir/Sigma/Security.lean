@@ -401,54 +401,69 @@ theorem euf_cma_to_nma
       rcases p with ⟨b1, b2⟩
       simp only [Function.comp_apply, Bool.and_eq_true, Bool.not_eq_true'] at hp ⊢
       exact hp.2
-    -- **Game 2 (HVZK-swapped)**: Game 1 with each real signing call replaced by
-    -- `sigSim pk`. This is structurally the inner block of `managedRoNmaExp nmaAdv`,
-    -- where `nmaAdv.main pk = (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅`.
-    set game2Block : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Bool :=
-      letI : DecidableEq M := Classical.decEq M
-      letI : DecidableEq (Commit × Resp) := Classical.decEq _
-      do
-        let (pk, _sk) ← sigAlg.keygen
-        let ((msg, σ_fg), advCache) ←
-          (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅
-        withCacheOverlay advCache (sigAlg.verify pk msg σ_fg) with hgame2Block_def
+    -- **Game 2 (HVZK-swapped)**: the managed-RO NMA experiment with our `nmaAdv`
+    -- (which replaces each real signing query with `sigSim pk` + advCache programming).
+    -- This is literally `managedRoNmaExp` applied to `nmaAdv`, serving as the pivot
+    -- distribution between the CMA side (Phase C) and the fork side (Phase D).
+    set nmaAdv : SignatureAlg.managedRoNmaAdv sigAlg :=
+      ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ with hnmaAdv_def
     -- **Phase C (HVZK hybrid)**: swap real signing for `sigSim`, paying `qS·ζ_zk` in
-    -- total variation. Each of the up to `qS` signing queries the adversary makes
-    -- advances by one HVZK step (triangle inequality over the transcript-sampling
-    -- and cache-programming steps), bounded by `ζ_zk` per step (`_hhvzk` applied
-    -- at `pk, sk` after the cache state is preserved by the unwind of `sigSim`).
-    -- The resulting per-query TV bound composes additively via
-    -- `tvDist_bind_{left,right}_le` into a total `qS·ζ_zk` slack, once a pending
-    -- "no-collision" event is carried through the induction.
+    -- total variation. Proof sketch (to be formalized):
+    --
+    --   (i) Observe both `commonBlock` (real signing side) and `managedRoNmaExp nmaAdv`
+    --       (simulated side) share the same `keygen` + `adv.main` + verify shell; they
+    --       differ only in how signing queries are intercepted. Concretely, set
+    --         `realImpl    = baseSim + sigAlg.signingOracle pk sk` (real signer),
+    --         `simImpl     = baseSim + sigSim pk` (HVZK simulator).
+    --   (ii) For each `msg : M` and entry RO state `s`, the per-query TV distance between
+    --       the real signing branch (sample transcript via `σ.commit`+`query`+`σ.respond`)
+    --       and the simulated branch (sample from `simTranscript pk` and program the cache)
+    --       is at most `ζ_zk`, conditional on the no-collision event (sigSim programming
+    --       succeeds). The hypothesis `_hhvzk` gives this per-query bound at `pk, sk`.
+    --  (iii) By `tvDist_bind_{left,right}_le` accumulation over the adversary's computation
+    --       tree, the total TV distance between the two simulateQ runs is bounded by
+    --       `qS · ζ_zk`, where `qS` caps the number of signing queries by hypothesis `_hQ`.
+    --   (iv) The map `verify` and the `keygen`-marginalization commute with tvDist
+    --       (monotonicity + 1-Lipschitz post-composition), producing the final bound.
+    --
+    -- A faithful Lean proof must carry an invariant relating the two cache states
+    -- (EC's `eq_except (signed qs) LRO.m{1} LRO.m{2}`) through the induction.
     have hPhaseC :
         Pr[= true | Prod.snd <$> (runtime M).evalDist commonBlock] ≤
-          Pr[= true | (runtime M).evalDist game2Block] +
+          SignatureAlg.managedRoNmaAdv.advantage (runtime M) nmaAdv +
             ENNReal.ofReal (qS * ζ_zk) := by
       sorry
-    -- **Phase D (fork bridge)**: Game 2's verification goes through
-    -- `withCacheOverlay advCache (...)`, whereas `Fork.exp` checks against the *live*
-    -- `roCache` and also demands the target hash point be in the live query log.
-    -- The gap is the "programming collision" event where the live-and-cached
-    -- challenges disagree for some `(msg, c)` produced during signing; an
-    -- identical-until-bad argument bounds the gap by the birthday term
-    -- `collisionSlack qS qH Chal = qS * (qS + qH) / card Chal`.
+    -- **Phase D (fork bridge)**: `managedRoNmaExp nmaAdv` verifies via
+    -- `withCacheOverlay advCache (verify pk msg σ)`, while `Fork.advantage nmaAdv qH`
+    -- counts the (strictly smaller) event that `trace.verified` holds via the *live*
+    -- `roCache` lookup AND `target ∈ queryLog`. The gap is bounded by the sum of:
+    --
+    -- - "Programmed-only forgery" event: the adversary forges on a target `(msg, c)`
+    --   that `sigSim` programmed but `adv.main` never live-queried; Game 2's overlay
+    --   returns the programmed value while `Fork.runTrace`'s `roCache` has nothing.
+    --   Under freshness (not dropped here, carried through Phase B), each such case
+    --   requires `sigSim` to have picked `c_i = c` for the forged message, which
+    --   happens with probability `1/|Chal|` per signing query.
+    -- - "Collision" event: `sigSim` programs `(msg_i, c_i)` to ω_i while the adversary
+    --   subsequently live-queries `(msg_i, c_i)` and gets a different ω' ≠ ω_i from
+    --   the outer RO. Under the identical-until-bad argument, the games coincide on
+    --   the complement; the probability of the bad event is bounded by the birthday
+    --   term `qS · (qS + qH) / |Chal|` (union bound over signing × {prior queries}).
+    --
+    -- The combined bound is `collisionSlack qS qH Chal = qS · (qS + qH) / |Chal|`,
+    -- matching EC's `pr_bad_game` at fsec/proof/Schnorr.ec:793.
     have hPhaseD :
-        Pr[= true | (runtime M).evalDist game2Block] ≤
-          Fork.advantage σ hr M
-              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
-            collisionSlack qS qH Chal := by
+        SignatureAlg.managedRoNmaAdv.advantage (runtime M) nmaAdv ≤
+          Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal := by
       sorry
     -- Chain Phase C + Phase D into the full CMA-to-Fork bound.
     calc adv.advantage (runtime M)
         ≤ Pr[= true | Prod.snd <$> (runtime M).evalDist commonBlock] := hPhaseB
-      _ ≤ Pr[= true | (runtime M).evalDist game2Block] +
+      _ ≤ SignatureAlg.managedRoNmaAdv.advantage (runtime M) nmaAdv +
             ENNReal.ofReal (qS * ζ_zk) := hPhaseC
-      _ ≤ (Fork.advantage σ hr M
-              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
-            collisionSlack qS qH Chal) + ENNReal.ofReal (qS * ζ_zk) := by
-            exact add_le_add hPhaseD le_rfl
-      _ = Fork.advantage σ hr M
-              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
+      _ ≤ (Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal) +
+            ENNReal.ofReal (qS * ζ_zk) := add_le_add hPhaseD le_rfl
+      _ = Fork.advantage σ hr M nmaAdv qH +
             ENNReal.ofReal (qS * ζ_zk) +
             collisionSlack qS qH Chal := by ring
 section evalDistBridge
