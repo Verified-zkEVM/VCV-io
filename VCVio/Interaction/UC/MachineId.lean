@@ -27,30 +27,39 @@ unchanged. New work that needs session-aware identity (forward security,
 post-compromise security, multi-session composition) instantiates
 `Party := MachineId Sid Pid` and uses the helpers below.
 
-## Status of related layers (deferred follow-ups)
+## Per-process access control and subroutine respecting
 
-The full CJSV22 access-control story requires three additional pieces that are
-deliberately *not* introduced here, because each one carries a non-trivial
-cross-cutting design choice and they ship together as a coherent unit:
+This file also introduces the access-control vocabulary required by the
+CJSV22 *subroutine respecting* condition:
 
-* **`Interface.Packet.sender : MachineId`.** A packet currently carries only a
-  recipient port. Adding a sender field is invasive (every existing packet
-  construction site needs updating). Without it, the framework cannot tell
-  which machine sent an inbound packet, so any access-control predicate has
-  nothing concrete to inspect.
-* **`HasAccessControl` typeclass.** Per-process predicate
-  `allowed : MachineId → Packet → Bool` consulted by
-  `BoundaryAction.inputDecode` to drop ill-addressed packets. Depends on
-  `Packet.sender` to be expressible.
-* **`subroutineRespecting : MachineProcess Sid Pid Δ → Prop`.** A decidable,
-  structural predicate that recovers what an explicit scope policy would
-  otherwise enforce: a machine `(s, p)` only emits to and accepts packets
-  tagged with session `s`. Defining it cleanly requires `Packet.sender` so
-  the predicate has something concrete to read off the boundary action.
+* **`HasAccessControl P`.** A typeclass over `OpenProcess Party Δ`
+  carrying `allowed : Interface.RoutedPacket Δ.In Party → Bool`. The
+  default-open instance `HasAccessControl.allowAll` is provided for
+  protocols whose security is not sensitive to per-machine input
+  filtering.
+* **`MachineProcess.allowSameSession owner P`.** The canonical CJSV22
+  filter on a `MachineProcess`: admit a routed packet iff its sender
+  shares a session with `owner` (per `MachineId.sameSession`).
+* **`MachineProcess.SubroutineRespectingAt sid P`.** A `Prop`-valued
+  property saying every reachable step's decoration only attributes
+  controllers in session `sid`. Built recursively over `Spec.Decoration`
+  via `OpenNodeSemantics.SessionCoherentAtMove` and
+  `DecorationSessionCoherentAt`.
 
-These three are tracked together as the next slice of the F1 plan; see
-`Notes/vcvio-signal-uc-foundation-cjsv22.md` §6.10.1 and the F1 phase
-description for the proposed naming and the broader composition story.
+These three pieces are *additive* on top of the existing `OpenProcess`
+surface: no existing construction site is touched, and the predicate
+`SubroutineRespectingAt` reads off the controller annotations already
+carried by `OpenNodeContext`.
+
+## Deferred follow-up
+
+The runtime integration that consults `HasAccessControl` from
+`BoundaryAction.inputDecode` is deliberately deferred to the F2
+corruption layer, which already needs to touch the boundary surface for
+`EnvAction` dispatch. Until that integration lands, `HasAccessControl`
+is a *declarative* contract that downstream constructions thread by
+hand. See `Notes/vcvio-signal-uc-foundation-cjsv22.md` §6.10.1 and the
+F2 design memo for the integration plan.
 -/
 
 universe u v w
