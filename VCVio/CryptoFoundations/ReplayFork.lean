@@ -1524,7 +1524,7 @@ private theorem replayRun_mem_support_replayFirstRun_append [spec.DecidableEq]
       obtain ⟨us, hus, hzcont⟩ := hz
       have hus' : us ∈ support (((replayOracle i) t).run st₀ :
           OracleComp spec (spec.Range t × ReplayForkState spec i)) := by
-        simpa [simulateQ_query, OracleQuery.query_def] using hus
+        simpa [simulateQ_query, OracleSpec.query_def] using hus
       rcases ih (u := us.1) (st₀ := us.2) (z := z) hzcont with ⟨log, hlog, hobs⟩
       refine ⟨⟨t, us.1⟩ :: log, ?_, ?_⟩
       · rw [replayFirstRun, OracleComp.run_simulateQ_loggingOracle_query_bind]
@@ -1781,7 +1781,7 @@ private theorem replayRun_preservesConsumed
       obtain ⟨us, hus, hzcont⟩ := hz
       have hus' : us ∈ support (((replayOracle idx) t).run st₀ :
           OracleComp spec (spec.Range t × ReplayForkState spec idx)) := by
-        simpa [simulateQ_query, OracleQuery.query_def] using hus
+        simpa [simulateQ_query, OracleSpec.query_def] using hus
       have ⟨h_consumed', h_mismatch'⟩ :=
         replayOracle_preservesConsumed (i := idx) (t := t) h_consumed h_mismatch hus'
       exact ih (u := us.1) (st₀ := us.2) h_consumed' h_mismatch' hzcont
@@ -1864,7 +1864,7 @@ private theorem replayRun_state_correct_aux
       obtain ⟨us, hus, hzcont⟩ := hz
       have hus' : us ∈ support (((replayOracle idx) t).run st₀ :
           OracleComp spec (spec.Range t × ReplayForkState spec idx)) := by
-        simpa [simulateQ_query, OracleQuery.query_def] using hus
+        simpa [simulateQ_query, OracleSpec.query_def] using hus
       -- Analyze the per-step semantics of `replayOracle` at this state.
       unfold replayOracle at hus'
       simp only [StateT.run_bind, StateT.run_get, pure_bind] at hus'

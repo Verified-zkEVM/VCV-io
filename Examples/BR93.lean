@@ -130,7 +130,7 @@ def cpaGame (tdp : TrapdoorPermutation PK SK Rand)
     let (pk, _sk) ← liftProbComp tdp.keygen
     let (m₁, m₂, st) ← adv.choose pk
     let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-    let h : M ← query (spec := RO_Spec Rand M) (Sum.inr r)
+    let h : M ← (RO_Spec Rand M).query (Sum.inr r)
     let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
     let b' ← adv.guess st c
     return (b == b'))).run' ∅

@@ -15,7 +15,7 @@ either `OracleSpec.add` or `OracleSpec.sigma`.
 TODO: document the "canonical forms" that work well with this
 -/
 
-open OracleQuery Sum
+open OracleSpec
 
 namespace OracleQuery
 

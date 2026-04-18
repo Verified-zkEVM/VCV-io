@@ -164,9 +164,7 @@ abbrev simSt (M Commit Chal : Type) [DecidableEq M] [DecidableEq Commit] : Type 
 touching the simulator state. -/
 noncomputable def unifFwd (M Commit Chal : Type) [DecidableEq M] [DecidableEq Commit] :
     QueryImpl unifSpec (StateT (simSt M Commit Chal) (OracleComp (wrappedSpec Chal))) :=
-  fun n => monadLift
-    (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) :
-      OracleComp (wrappedSpec Chal) _)
+  fun n => (wrappedSpec Chal).query (Sum.inl n)
 
 /-- Caching random-oracle implementation: on a cache hit the recorded answer is returned,
 on a cache miss a fresh `Sum.inr ()` query is issued, the answer is cached, and the

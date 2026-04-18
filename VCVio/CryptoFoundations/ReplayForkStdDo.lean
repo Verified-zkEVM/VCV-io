@@ -43,7 +43,7 @@ open Std.Do OracleSpec OracleComp
 
 /- File-scoped for the same reason as in
 `VCVio.ProgramLogic.Unary.HandlerSpecs`: `mvcgen` currently warns on lifted
-`OracleQuery.query` heads even though our `@[spec]` fall-throughs close the
+`OracleSpec.query` heads even though our `@[spec]` fall-throughs close the
 goal. Once the upstream `DiscrTree` / `MonadLiftT.monadLift` key
 normalisation lands (tracked in `StdDoBridge.lean`), this can be removed. -/
 set_option mvcgen.warning false
