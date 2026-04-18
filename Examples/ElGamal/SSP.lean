@@ -203,17 +203,17 @@ to `GETPK` on `dh`, and forwards `LR (m₀, _)` to `DHCHALLENGE` on `dh`, return
 `(B, T + m₀)` from the DDH challenge `(B, T)`. -/
 def dhToLR_leftHandler {G : Type} [Add G] :
     QueryImpl (lrSpec G) (OracleComp (dhSpec G))
-  | Sum.inl _ => (query (spec := dhSpec G) (Sum.inl ()) : OracleComp (dhSpec G) G)
+  | Sum.inl _ => ((dhSpec G).query (Sum.inl ()) : OracleComp (dhSpec G) G)
   | Sum.inr (m₀, _) => do
-      let bt ← (query (spec := dhSpec G) (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
+      let bt ← ((dhSpec G).query (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
       pure (bt.1, bt.2 + m₀)
 
 /-- Stateless reduction handler encrypting the *right* message. -/
 def dhToLR_rightHandler {G : Type} [Add G] :
     QueryImpl (lrSpec G) (OracleComp (dhSpec G))
-  | Sum.inl _ => (query (spec := dhSpec G) (Sum.inl ()) : OracleComp (dhSpec G) G)
+  | Sum.inl _ => ((dhSpec G).query (Sum.inl ()) : OracleComp (dhSpec G) G)
   | Sum.inr (_, m₁) => do
-      let bt ← (query (spec := dhSpec G) (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
+      let bt ← ((dhSpec G).query (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
       pure (bt.1, bt.2 + m₁)
 
 /-- DDH-to-LR reduction encrypting the left message, packaged as a stateless `Package`. -/

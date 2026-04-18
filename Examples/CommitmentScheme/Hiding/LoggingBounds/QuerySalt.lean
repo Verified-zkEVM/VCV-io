@@ -668,7 +668,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
       change
         OracleComp.ProgramLogic.wp
           ((simulateQ cachingOracle
-            ((liftM (query (spec := CMOracle M S C) t)) >>= fun u =>
+            ((liftM ((CMOracle M S C).query t)) >>= fun u =>
               (fun p : α × QueryLog (CMOracle M S C) =>
                 (p.1,
                   (⟨t, u⟩ :
@@ -680,7 +680,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               (0 < QueryLog.countQ z.1.2 (fun t' : (CMOracle M S C).Domain => t'.2 = s))) =
         OracleComp.ProgramLogic.wp
           ((simulateQ cachingOracle
-            ((liftM (query (spec := CMOracle M S C) t)) >>= fun u =>
+            ((liftM ((CMOracle M S C).query t)) >>= fun u =>
               (fun p : α × QueryLog (CMOracle M S C) =>
                 (p.1,
                   (⟨t, u⟩ :
@@ -778,13 +778,13 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run
                     (cache₀.cacheQuery (m, s) cm) =
-                  (liftM (query (spec := CMOracle M S C) t) >>= fun u =>
+                  (liftM ((CMOracle M S C).query t) >>= fun u =>
                     pure (u, (cache₀.cacheQuery (m, s) cm).cacheQuery t u) :
                       OracleComp (CMOracle M S C) (C × QueryCache (CMOracle M S C))) := by
               simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
                 StateT.run_bind, StateT.run_get, pure_bind, hcache_none]
               change (StateT.lift
-                  (PFunctor.FreeM.lift (query (spec := CMOracle M S C) t))
+                  (PFunctor.FreeM.lift ((CMOracle M S C).query t))
                   (cache₀.cacheQuery (m, s) cm) >>= _) = _
               simp only [StateT.lift, bind_assoc, pure_bind,
                 modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
@@ -794,13 +794,13 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
                 (liftM (cachingOracle (spec := CMOracle M S C) t) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run cache₀ =
-                  (liftM (query (spec := CMOracle M S C) t) >>= fun u =>
+                  (liftM ((CMOracle M S C).query t) >>= fun u =>
                     pure (u, cache₀.cacheQuery t u) :
                       OracleComp (CMOracle M S C) (C × QueryCache (CMOracle M S C))) := by
               simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
                 StateT.run_bind, StateT.run_get, pure_bind, ht]
               change (StateT.lift
-                (PFunctor.FreeM.lift (query (spec := CMOracle M S C) t))
+                (PFunctor.FreeM.lift ((CMOracle M S C).query t))
                 cache₀ >>= _) = _
               simp only [StateT.lift, bind_assoc, pure_bind,
                 modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
@@ -882,7 +882,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
   let freshTerm : S → ℝ≥0∞ := fun s =>
     OracleComp.ProgramLogic.propInd (qchoose.2.2 s = 0) *
       OracleComp.ProgramLogic.wp
-        (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+        (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
           OracleComp (CMOracle M S C) C)
         (fun cm =>
           OracleComp.ProgramLogic.wp
@@ -894,7 +894,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
   let logTerm : S → ℝ≥0∞ := fun s =>
     OracleComp.ProgramLogic.propInd (qchoose.2.2 s = 0) *
       OracleComp.ProgramLogic.wp
-        (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+        (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
           OracleComp (CMOracle M S C) C)
         (fun cm =>
           OracleComp.ProgramLogic.wp
@@ -910,7 +910,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
     · dsimp [freshTerm, logTerm]
       simp only [hzero, OracleComp.ProgramLogic.propInd_true, one_mul]
       refine OracleComp.ProgramLogic.wp_mono
-        (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+        (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
           OracleComp (CMOracle M S C) C) ?_
       intro cm
       refine le_trans
@@ -927,7 +927,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
       ≤
       (∑ s : S,
         OracleComp.ProgramLogic.wp
-          (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+          (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
             OracleComp (CMOracle M S C) C)
           (fun cm =>
             OracleComp.ProgramLogic.wp
@@ -956,7 +956,7 @@ lemma sum_wp_freshDistinguishIncrement_le_queryResidual_of_choose_support
   calc
     (∑ s : S,
       OracleComp.ProgramLogic.wp
-        (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+        (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
           OracleComp (CMOracle M S C) C)
         (fun cm => G s cm))
       = ∑ s : S, ∑ cm : C, (Fintype.card C : ℝ≥0∞)⁻¹ * G s cm := by

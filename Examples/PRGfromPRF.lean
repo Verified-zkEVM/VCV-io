@@ -51,7 +51,7 @@ def oracleOutputs :
     (n : ℕ) → S → OracleComp (PRFScheme.PRFOracleSpec S (S × O)) (List.Vector O n)
   | 0, _ => pure .nil
   | n + 1, s => do
-      let (s', out) ← query (spec := PRFScheme.PRFOracleSpec S (S × O)) (Sum.inr s)
+      let (s', out) ← (PRFScheme.PRFOracleSpec S (S × O)).query (Sum.inr s)
       let rest ← oracleOutputs n s'
       pure (out ::ᵥ rest)
 
@@ -61,7 +61,7 @@ def oracleVisitedStates :
     (n : ℕ) → S → OracleComp (PRFScheme.PRFOracleSpec S (S × O)) (List.Vector S n)
   | 0, _ => pure .nil
   | n + 1, s => do
-      let (s', _) ← query (spec := PRFScheme.PRFOracleSpec S (S × O)) (Sum.inr s)
+      let (s', _) ← (PRFScheme.PRFOracleSpec S (S × O)).query (Sum.inr s)
       let rest ← oracleVisitedStates n s'
       pure (s ::ᵥ rest)
 
