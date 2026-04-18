@@ -55,14 +55,18 @@ Fields:
 
 * `isActivated` flags whether this node is driven by external boundary
   input (`true`) or by the internal protocol dynamics (`false`).
+* `inputDecode` interprets a single inbound packet on `Δ.In` as an
+  optional node move; nodes that ignore the packet payload (or that are
+  internally driven) return `none` for every input.
 * `emit` maps each chosen move to the list of outbound packets it
   contributes on `Δ.Out`.
 
-The activation flag is a structural marker. The query-level information
-about *how* an input message determines the node's move belongs in the
-runtime/execution layer: charts (used by `PortBoundary.Hom`) can map
-packets but cannot map queries, so the structural boundary action records
-only the fact of activation, not the decoding.
+The activation flag is a structural marker. The packet-level decoder
+`inputDecode` lets a node's move type `X` actually depend on the
+incoming packet on `Δ.In`. This is sufficient because the decoder's
+output type `X` does not vary along the boundary (so a chart on inputs
+suffices for functoriality); a richer query-level decoding whose
+response type changes would still belong to the runtime layer.
 
 The `emit` field records only the protocol's own direct output. Runtime-level
 concerns (buffering, duplication, scheduling, delivery) belong in a separate
@@ -70,6 +74,7 @@ concerns (buffering, duplication, scheduling, delivery) belong in a separate
 -/
 structure BoundaryAction (Δ : PortBoundary) (X : Type w) where
   isActivated : Bool := false
+  inputDecode : Interface.Packet Δ.In → Option X := fun _ => none
   emit : X → List (Interface.Packet Δ.Out) := fun _ => []
 
 namespace BoundaryAction
@@ -95,16 +100,28 @@ def outputOnly {Δ : PortBoundary} {X : Type w}
   emit := e
 
 /--
+A boundary-activated node whose move is determined by a decoded input
+packet, with no outbound emissions.
+-/
+def inputOnly {Δ : PortBoundary} {X : Type w}
+    (d : Interface.Packet Δ.In → Option X) : BoundaryAction Δ X where
+  isActivated := true
+  inputDecode := d
+
+/--
 Transform a boundary action along a boundary adaptation.
 
 The activation flag is preserved (it does not depend on the boundary
-presentation). The emitted packets are translated forward along
-`φ.onOut`.
+presentation). Inbound packets on `Δ₂.In` are pulled back to `Δ₁.In`
+along `φ.onIn` (which has the contravariant input direction of a
+`PortBoundary.Hom`) and then fed into the original decoder. Emitted
+packets are translated forward along `φ.onOut`.
 -/
 def mapBoundary {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂) (b : BoundaryAction Δ₁ X) :
     BoundaryAction Δ₂ X where
   isActivated := b.isActivated
+  inputDecode pkt := b.inputDecode (Interface.Hom.mapPacket φ.onIn pkt)
   emit x := (b.emit x).map (Interface.Hom.mapPacket φ.onOut)
 
 @[simp]
@@ -126,24 +143,36 @@ theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
 Embed a boundary action on the left factor into the tensor boundary.
 
 Emitted packets are injected into the left summand of the combined output
-interface. The activation flag is preserved.
+interface. Inbound packets on the left summand of the combined input are
+forwarded to the original decoder; inbound packets on the right summand
+do not concern this side and decode to `none`. The activation flag is
+preserved.
 -/
 def embedInlTensor {Δ₁ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction Δ₁ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
+  inputDecode := fun
+    | ⟨Sum.inl a, m⟩ => b.inputDecode ⟨a, m⟩
+    | ⟨Sum.inr _, _⟩ => none
   emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inl Δ₁.Out Δ₂.Out))
 
 /--
 Embed a boundary action on the right factor into the tensor boundary.
 
 Emitted packets are injected into the right summand of the combined output
-interface. The activation flag is preserved.
+interface. Inbound packets on the right summand of the combined input are
+forwarded to the original decoder; inbound packets on the left summand
+do not concern this side and decode to `none`. The activation flag is
+preserved.
 -/
 def embedInrTensor (Δ₁ : PortBoundary) {Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ₂ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
+  inputDecode := fun
+    | ⟨Sum.inl _, _⟩ => none
+    | ⟨Sum.inr a, m⟩ => b.inputDecode ⟨a, m⟩
   emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inr Δ₁.Out Δ₂.Out))
 
 /--
@@ -151,11 +180,21 @@ Transform a boundary action on `tensor Δ₁ Γ` into one on `tensor Δ₁ Δ₂
 by keeping only the left-summand (Δ₁) packets and re-injecting them
 into the left summand of the combined output. Right-summand (Γ) packets
 are dropped (they become internal traffic handled by the runtime).
+
+The decoder behaves symmetrically on inputs: only Δ₁ inputs are
+forwarded to the original decoder; Δ₂ inputs do not concern this side
+post-wire (they are routed to the right factor) and decode to `none`.
+Inputs originally on the wired-away Γ side are no longer visible from
+the post-wire boundary; their delivery is the responsibility of the
+runtime layer.
 -/
 def wireLeft {Δ₁ Γ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor Δ₁ Γ) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
+  inputDecode := fun
+    | ⟨Sum.inl a₁, m⟩ => b.inputDecode ⟨Sum.inl a₁, m⟩
+    | ⟨Sum.inr _, _⟩ => none
   emit x := (b.emit x).filterMap fun
     | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
     | ⟨Sum.inr _, _⟩ => none
@@ -165,11 +204,20 @@ Transform a boundary action on `tensor (swap Γ) Δ₂` into one on
 `tensor Δ₁ Δ₂` by keeping only the right-summand (Δ₂) packets and
 re-injecting them into the right summand of the combined output.
 Left-summand (swap Γ) packets are dropped (internal traffic).
+
+The decoder behaves symmetrically on inputs: only Δ₂ inputs are
+forwarded to the original decoder; Δ₁ inputs do not concern this side
+post-wire and decode to `none`. Inputs originally on the wired-away
+swap-Γ side are no longer visible from the post-wire boundary; their
+delivery is the responsibility of the runtime layer.
 -/
 def wireRight (Δ₁ : PortBoundary) {Γ Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
+  inputDecode := fun
+    | ⟨Sum.inl _, _⟩ => none
+    | ⟨Sum.inr a₂, m⟩ => b.inputDecode ⟨Sum.inr a₂, m⟩
   emit x := (b.emit x).filterMap fun
     | ⟨Sum.inl _, _⟩ => none
     | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩
@@ -179,11 +227,16 @@ Close a boundary action by dropping all external traffic.
 
 The result lives on `PortBoundary.empty` and has no activation or emission.
 This is used by `plug` to internalize all boundary interactions.
+
+The decoder is uniformly `none`; this is forced by the empty input
+interface, but stating it as a default makes the closure functorial
+without further case analysis.
 -/
 def closed {Δ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ X) :
     BoundaryAction PortBoundary.empty X where
   isActivated := b.isActivated
+  inputDecode _ := none
   emit _ := []
 
 @[simp]
@@ -195,6 +248,10 @@ theorem mapBoundary_embedInlTensor
       (b.mapBoundary f₁).embedInlTensor Δ₂' := by
   simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor, List.map_map]
   congr 1
+  funext ⟨a, m⟩
+  cases a with
+  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
 
 @[simp]
 theorem mapBoundary_embedInrTensor
@@ -205,6 +262,10 @@ theorem mapBoundary_embedInrTensor
       (b.mapBoundary f₂).embedInrTensor Δ₁' := by
   simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor, List.map_map]
   congr 1
+  funext ⟨a, m⟩
+  cases a with
+  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
 
 @[simp]
 theorem closed_mapBoundary
@@ -223,12 +284,17 @@ theorem mapBoundary_wireLeft
       (b.mapBoundary
         (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))).wireLeft Δ₂' := by
   simp only [wireLeft, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  · funext ⟨a, m⟩
+    cases a with
+    | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+    | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  · funext x
+    rw [List.map_filterMap, List.filterMap_map]
+    congr 1; funext ⟨pkt_port, pkt_msg⟩
+    cases pkt_port with
+    | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+    | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
 
 @[simp]
 theorem mapBoundary_wireRight
@@ -240,12 +306,17 @@ theorem mapBoundary_wireRight
         (PortBoundary.Hom.tensor
           (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)).wireRight Δ₁' := by
   simp only [wireRight, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  · funext ⟨a, m⟩
+    cases a with
+    | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+    | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  · funext x
+    rw [List.map_filterMap, List.filterMap_map]
+    congr 1; funext ⟨pkt_port, pkt_msg⟩
+    cases pkt_port with
+    | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+    | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
 
 end BoundaryAction
 
