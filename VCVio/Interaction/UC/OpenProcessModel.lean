@@ -63,25 +63,25 @@ def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
   map φ p := p.mapBoundary φ
   par {Δ₁} {Δ₂} p₁ p₂ :=
     p₁.interleave p₂
-      (OpenStepContext.inlTensor Party Δ₁ Δ₂)
-      (OpenStepContext.inrTensor Party Δ₁ Δ₂)
+      (OpenNodeContext.inlTensor Party Δ₁ Δ₂)
+      (OpenNodeContext.inrTensor Party Δ₁ Δ₂)
       (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))
   wire {Δ₁} {Γ} {Δ₂} p₁ p₂ :=
     p₁.interleave p₂
-      (OpenStepContext.wireLeft Party Δ₁ Γ Δ₂)
-      (OpenStepContext.wireRight Party Δ₁ Γ Δ₂)
+      (OpenNodeContext.wireLeft Party Δ₁ Γ Δ₂)
+      (OpenNodeContext.wireRight Party Δ₁ Γ Δ₂)
       (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))
   plug {Δ} p k :=
     p.interleave k
-      (OpenStepContext.close Party Δ)
-      (OpenStepContext.close Party (PortBoundary.swap Δ))
+      (OpenNodeContext.close Party Δ)
+      (OpenNodeContext.close Party (PortBoundary.swap Δ))
       (schedulerNode Party PortBoundary.empty)
 
 instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
   map_id {Δ} W := by
     change W.mapBoundary (PortBoundary.Hom.id Δ) = W
     simp only [OpenProcess.mapBoundary]
-    rw [OpenStepContext.map_id]
+    rw [OpenNodeContext.map_id]
     cases W with | mk Proc step =>
     simp only [ProcessOver.mapContext, StepOver.mapContext]
     congr 1; funext p
@@ -91,7 +91,7 @@ instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
     change W.mapBoundary (PortBoundary.Hom.comp g f) =
       (W.mapBoundary f).mapBoundary g
     simp only [OpenProcess.mapBoundary]
-    rw [← OpenStepContext.map_comp]
+    rw [← OpenNodeContext.map_comp]
     cases W with | mk Proc step =>
     simp only [ProcessOver.mapContext, StepOver.mapContext]
     congr 1; funext p
@@ -115,8 +115,8 @@ instance : OpenTheory.IsLawfulPar (openTheory.{u, v, w} Party) where
     simp only [OpenProcess.mapBoundary]
     rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext]
     congr 1
-    · exact OpenStepContext.map_tensor_comp_inlTensor Party f₁ f₂
-    · exact OpenStepContext.map_tensor_comp_inrTensor Party f₁ f₂
+    · exact OpenNodeContext.map_tensor_comp_inlTensor Party f₁ f₂
+    · exact OpenNodeContext.map_tensor_comp_inrTensor Party f₁ f₂
 
 instance : OpenTheory.IsLawfulWire (openTheory.{u, v, w} Party) where
   map_wire {Δ₁} {Δ₁'} {Γ} {Δ₂} {Δ₂'} f₁ f₂ W₁ W₂ := by
@@ -129,8 +129,8 @@ instance : OpenTheory.IsLawfulWire (openTheory.{u, v, w} Party) where
     simp only [OpenProcess.mapBoundary]
     rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext]
     congr 1
-    · exact OpenStepContext.map_tensor_comp_wireLeft Party f₁ f₂
-    · exact OpenStepContext.map_tensor_comp_wireRight Party f₁ f₂
+    · exact OpenNodeContext.map_tensor_comp_wireLeft Party f₁ f₂
+    · exact OpenNodeContext.map_tensor_comp_wireRight Party f₁ f₂
 
 instance : OpenTheory.IsLawfulPlug (openTheory.{u, v, w} Party) where
   map_plug {Δ₁} {Δ₂} f W K := by
@@ -188,7 +188,7 @@ theorem openTheory_par_assoc_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
         all_goals intro X ons
-        all_goals simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+        all_goals simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
       | false =>
         refine ⟨⟨⟨false⟩, ⟨⟨true⟩, rest'⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
         simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
@@ -199,10 +199,10 @@ theorem openTheory_par_assoc_iso
             ((isSilentDecoration_iff_map _ ?_ _ _).mp
               ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2)))⟩
         all_goals intro X ons
-        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
-        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
-        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
-        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
     | false =>
       refine ⟨⟨⟨false⟩, ⟨⟨false⟩, rest⟩⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
@@ -212,7 +212,7 @@ theorem openTheory_par_assoc_iso
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
       all_goals intro X ons
-      all_goals simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+      all_goals simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
   · intro ⟨⟨b⟩, rest⟩ _
     match b with
     | true => exact .inl ⟨⟨⟨true⟩, ⟨⟨true⟩, rest⟩⟩, rfl, rfl, rfl⟩
@@ -233,7 +233,7 @@ theorem openTheory_par_assoc_iso
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2))⟩
       all_goals intro X ons
-      all_goals simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+      all_goals simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
     | false =>
       obtain ⟨⟨b'⟩, rest'⟩ := rest
       match b' with
@@ -248,10 +248,10 @@ theorem openTheory_par_assoc_iso
             ((isSilentDecoration_iff_map _ ?_ _ _).mp
               ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2.2)))⟩
         all_goals intro X ons
-        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
-        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
-        · simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
-        · simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
+        · simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
+        · simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
       | false =>
         refine ⟨⟨⟨false⟩, rest'⟩, fun h => hvisible ?_, rfl, rfl, rfl⟩
         rw [isSilentStep_mapBoundary_iff] at h
@@ -262,7 +262,7 @@ theorem openTheory_par_assoc_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mpr
             ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
         all_goals intro X ons
-        all_goals simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+        all_goals simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
 
 /-- Parallel composition of open processes is commutative up to bisimilarity. -/
 theorem openTheory_par_comm_iso
@@ -292,17 +292,17 @@ theorem openTheory_par_comm_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
+          simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
+          simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
     | false =>
       refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
+          simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
+          simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
   · intro ⟨⟨b⟩, rest⟩ _
     match b with
     | true => exact .inl ⟨⟨⟨false⟩, rest⟩, rfl, rfl⟩
@@ -315,18 +315,18 @@ theorem openTheory_par_comm_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
+          simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
+          simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mp h.2)⟩
     | false =>
       refine ⟨⟨⟨true⟩, rest⟩, fun h => hvisible ?_, rfl, rfl⟩
       rw [isSilentStep_mapBoundary_iff] at h
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration]
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration] at h
       exact ⟨rfl, (isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
+          simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]) _ _).mpr
         ((isSilentDecoration_iff_map _ (fun X ons => by
-          simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
+          simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
 
 /-- The unit for parallel composition is the trivial process with no boundary
 and `PUnit` state. -/
@@ -368,7 +368,7 @@ theorem openTheory_par_leftUnit_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+      simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
   · intro tr₂ _
     exact .inl ⟨⟨⟨false⟩, tr₂⟩, rfl⟩
   · intro tr₂ hvisible
@@ -378,7 +378,7 @@ theorem openTheory_par_leftUnit_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.inrTensor, BoundaryAction.embedInrTensor]
+    simp [OpenNodeContext.inrTensor, BoundaryAction.embedInrTensor]
 
 /-- The monoidal unit is a right identity for parallel composition up to
 bisimilarity. -/
@@ -407,7 +407,7 @@ theorem openTheory_par_rightUnit_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+      simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
     | false =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
         IsSilentDecoration, Spec.Decoration.map, schedulerNode,
@@ -421,7 +421,7 @@ theorem openTheory_par_rightUnit_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.inlTensor, BoundaryAction.embedInlTensor]
+    simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]
 
 /-- The identity wire (coevaluation) on boundary `Γ`: relays messages
 bidirectionally between `swap Γ` and `Γ`. -/
@@ -464,7 +464,7 @@ theorem openTheory_wire_idWire_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+      simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
   · intro tr₂ _
     exact .inl ⟨⟨⟨false⟩, tr₂⟩, rfl⟩
   · intro tr₂ hvisible
@@ -473,7 +473,7 @@ theorem openTheory_wire_idWire_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+    simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
 
 /-- Right zig-zag: wiring the identity wire on the right is a no-op up to
 bisimilarity. -/
@@ -501,7 +501,7 @@ theorem openTheory_wire_idWire_right_iso
       simp only [IsSilentStep, ProcessOver.interleave, IsSilentDecoration, Spec.Decoration.map]
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr h⟩
       intro X ons
-      simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+      simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
     | false =>
       exact absurd (by simp [IsSilentStep, ProcessOver.interleave,
         IsSilentDecoration, Spec.Decoration.map, schedulerNode,
@@ -514,7 +514,7 @@ theorem openTheory_wire_idWire_right_iso
       Spec.Decoration.map] at h
     refine (isSilentDecoration_iff_map _ ?_ _ _).mp h.2
     intro X ons
-    simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+    simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
 
 /-- `plug` is derivable from `wire` plus boundary reshaping, up to
 bisimilarity. -/
@@ -549,20 +549,20 @@ theorem openTheory_plug_eq_wire_iso
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
-      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+      · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
       · intro X ons
-        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
-      · intro X ons; simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
     | false =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
       rw [isSilentStep_mapBoundary_iff] at h
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mp
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
-      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+      · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
       · intro X ons
-        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
-      · intro X ons; simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
   · intro ⟨⟨b⟩, rest⟩ _
     match b with
     | true => exact .inl ⟨⟨⟨true⟩, rest⟩, rfl⟩
@@ -575,19 +575,19 @@ theorem openTheory_plug_eq_wire_iso
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
-      · intro X ons; simp [OpenStepContext.wireLeft, BoundaryAction.wireLeft]
+      · intro X ons; simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
       · intro X ons
-        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
-      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
     | false =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
       refine ⟨rfl, (isSilentDecoration_iff_map _ ?_ _ _).mpr
         ((isSilentDecoration_iff_map _ ?_ _ _).mpr
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
-      · intro X ons; simp [OpenStepContext.wireRight, BoundaryAction.wireRight]
+      · intro X ons; simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
       · intro X ons
-        simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
-      · intro X ons; simp [OpenStepContext.close, BoundaryAction.closed]
+        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+      · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
 
 /-- The monoidal unit equals the coevaluation at the trivial boundary,
 up to bisimilarity. -/

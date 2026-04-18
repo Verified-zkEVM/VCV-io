@@ -115,6 +115,7 @@ import VCVio.Interaction.TwoParty.Swap
 import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.Emulates
 import VCVio.Interaction.UC.Interface
+import VCVio.Interaction.UC.MachineId
 import VCVio.Interaction.UC.Notation
 import VCVio.Interaction.UC.OpenProcess
 import VCVio.Interaction.UC.OpenProcessModel
