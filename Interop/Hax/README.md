@@ -195,6 +195,58 @@ the result to the oracle-aware target without reproof. The
 `errorOfHax` rebrand inside `triple_liftRustM` is invisible here
 because the precondition rules out the panic branch.
 
+## Probabilistic spec: genuine VCVio-side content
+
+Every spec above is a `Std.Do.Triple`, which is universal over oracle
+outcomes and contains no probabilistic content; effectively we have
+just been wrapping the `RustM` spec. The payoff of dropping `Hax.RustM`
+into `Interop.Rust.RustOracleComp` is that the underlying `OracleComp`
+layer carries `HasEvalSPMF` (via the `ExceptT` and `OptionT` instances
+in `VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so claims like
+`Pr[panic] = 1/2` become well-defined and provable. Those claims
+cannot be stated at the hax level: `Hax.RustM` has no oracle to sample
+at all, and the `Triple` layer has no way to talk about probability.
+
+`Examples.lean` closes the loop with a minimal probabilistic harness,
+`tossedAdd`, that flips a uniform bit `b ∈ Fin 2` from `unifSpec`, then
+dispatches to either `addOrPanicLifted 0 0` (always returns `0`) or
+`addOrPanicLifted (2^32) 0` (always overflows):
+
+```lean
+def tossedAdd : Interop.Rust.RustOracleComp unifSpec Nat := do
+  let b ← ($[0..1] : ProbComp (Fin 2))
+  if b = 0 then addOrPanicLifted 0 0
+  else addOrPanicLifted (2 ^ 32) 0
+```
+
+The proof is driven by a transformer-stack peel that exposes the
+canonical `OracleComp spec (Option (Except ε α))` form,
+
+```lean
+theorem tossedAdd_run_run :
+    tossedAdd.run.run =
+      ($[0..1] >>= fun b : Fin 2 =>
+        pure (some (if b = 0 then
+          (Except.ok 0 : Except Interop.Rust.Error Nat)
+          else Except.error .integerOverflow)) :
+            OracleComp unifSpec (Option (Except Interop.Rust.Error Nat)))
+```
+
+after which the panic probability follows by a one-liner sum over
+`Fin 2` using `HasEvalSPMF.probOutput_bind_eq_sum_fintype` and
+`ProbComp.probOutput_uniformFin`:
+
+```lean
+theorem tossedAdd_panic_prob :
+    Pr[= some (Except.error Interop.Rust.Error.integerOverflow) |
+        tossedAdd.run.run] = 2⁻¹
+```
+
+The peel lemma is the reusable piece: once a `RustOracleComp` program
+reaches the form `($sample) >>= fun x => pure (some (.ok _ / .error
+_))`, every `Pr[=]`, `support`, and `evalDist` lemma in VCVio applies
+without detour through the transformer stack.
+
 ## Risks
 
 - `_root_.Error` (hax) is namespace-collision-prone with anything else
@@ -225,3 +277,7 @@ because the precondition rules out the panic branch.
   that it transports any hax-side `Pr[_]`-style probabilistic spec, not
   just Hoare `Triple`s. Only needed once we have a probabilistic hax
   workflow.
+- Generalize the `tossedAdd_run_run` peel into a reusable lemma of the
+  form `(liftM oa >>= k).run.run = oa >>= fun x => (k x).run.run`; this
+  is the shape `mvcgen`/`simp` needs for any `RustOracleComp` program
+  that interleaves oracle queries with lifted `RustM` calls.

@@ -5,17 +5,28 @@ Authors: Quang Dao
 -/
 
 import Interop.Hax.Bridge
+import VCVio.OracleComp.ProbComp
+import VCVio.EvalDist.Instances.ErrorT
+import VCVio.EvalDist.Instances.OptionT
+import VCVio.EvalDist.Fintype
 
 /-!
 # Small end-to-end examples of the hax → VCVio bridge
 
 A tiny `RustM`-style Rust function, lifted into `RustOracleComp`, plus
-a one-oracle-query composition. The goal is a sanity check: the four
-`@[simp]` boundary lemmas in `Interop.Hax.Bridge`
-(`liftRustM_{ok,fail,div,pure}`) should be enough for `simp` to collapse
-concrete lifted Rust programs to pure `RustOracleComp` terms, and the
-composed `WP` shape from `Std.Do`'s `ExceptT.instWP` / `OptionT.instWP`
-over `WP (OracleComp spec) .pure` should be what the user expects.
+a one-oracle-query composition and a probabilistic harness. The goals
+are:
+
+* the four `@[simp]` boundary lemmas in `Interop.Hax.Bridge`
+  (`liftRustM_{ok,fail,div,pure}`) plus the composed `Std.Do` `WP` stack
+  (`ExceptT.instWP` / `OptionT.instWP` over VCVio's
+  `WP (OracleComp spec) .pure`) should suffice for `Triple`-level
+  specs on lifted Rust programs,
+* `RustOracleComp`'s `OracleComp`-layer also carries probabilistic
+  content (`Pr[=]`, `support`, `evalDist`) that has no counterpart on
+  `Hax.RustM`; `tossedAdd_panic_prob` demonstrates a panic probability
+  of exactly `1/2`, a statement that only makes sense on the bridged
+  monad.
 -/
 
 open Std.Do OracleSpec OracleComp
@@ -178,5 +189,93 @@ theorem oracleThenAdd_triple (x : Nat) (t : ι) (coe : spec.Range t → Nat)
   exact Nat.le_add_right x (coe y)
 
 end OracleTripleSpec
+
+/-! ### Probabilistic spec via the `OracleComp` layer
+
+Everything so far was a `Triple`: universal over oracle outcomes, with
+no probabilistic content. The point of dropping `Hax.RustM` into
+`RustOracleComp spec` is that the `OracleComp spec` layer also carries
+`HasEvalSPMF` (via the `ExceptT` / `OptionT` instances in
+`VCVio.EvalDist.Instances.{ErrorT,OptionT}`), so quantitative claims
+like `Pr[= some (.error e) | tossedAdd.run.run] = 1/2` are well-defined
+and provable.
+
+`tossedAdd` below is the minimum interesting example: a uniform bit
+decides between a safe lifted `addOrPanic` call and one that is
+guaranteed to overflow. Neither the hax Hoare spec nor the bridge
+transport lemma `triple_liftRustM` can make the resulting probability
+claim; it is a genuine VCVio-side addition on top of the bridge. -/
+
+section ProbabilisticSpec
+
+/-- Probabilistic harness: flip a uniform bit `b ∈ Fin 2` from
+`unifSpec`, then dispatch to either `addOrPanicLifted 0 0` (always
+returns `0`) or `addOrPanicLifted (2^32) 0` (always panics with
+`Error.integerOverflow`). -/
+def tossedAdd : Interop.Rust.RustOracleComp unifSpec Nat := do
+  let b ← ($[0..1] : ProbComp (Fin 2))
+  if b = 0 then addOrPanicLifted 0 0
+  else addOrPanicLifted (2 ^ 32) 0
+
+/-- Transformer-stack peel for `tossedAdd`: after running the `ExceptT`
+and `OptionT` layers we land at the `OracleComp unifSpec` level with a
+`bind` on `$[0..1]` whose continuation is a deterministic `pure`.
+
+This is the canonical intermediate form for probability claims on
+`RustOracleComp`: once we reach `OracleComp spec (Option (Except ε α))`
+every `Pr[=]`, `support`, and `evalDist` lemma from VCVio applies
+directly.
+
+Proof sketch: the lift of `$[0..1]` is `ExceptT.lift ∘ OptionT.lift`,
+so `ExceptT.run_bind_lift` and `OptionT.run_bind_lift` peel each layer
+around the bind; the `then`/`else` branches reduce to
+`RustOracleComp.ok 0` and `RustOracleComp.fail .integerOverflow` via
+`addOrPanicLifted_ok_of_lt` / `addOrPanicLifted_fail_of_ge`, whose
+`.run` values are, respectively, `pure (.ok 0)` and
+`pure (.error .integerOverflow)` in the inner monad. -/
+theorem tossedAdd_run_run :
+    tossedAdd.run.run =
+      ($[0..1] >>= fun b : Fin 2 =>
+        pure (some (if b = 0 then
+          (Except.ok 0 : Except Interop.Rust.Error Nat)
+          else Except.error .integerOverflow)) :
+            OracleComp unifSpec (Option (Except Interop.Rust.Error Nat))) := by
+  have h_ok : (addOrPanicLifted 0 0 : Interop.Rust.RustOracleComp unifSpec Nat)
+      = pure 0 := by
+    have := addOrPanicLifted_ok_of_lt (spec := unifSpec) 0 0 (by decide)
+    simpa using this
+  have h_fail : (addOrPanicLifted (2^32) 0 : Interop.Rust.RustOracleComp unifSpec Nat)
+      = throw .integerOverflow :=
+    addOrPanicLifted_fail_of_ge (spec := unifSpec) (2^32) 0 (by decide)
+  unfold tossedAdd
+  simp only [h_ok, h_fail]
+  -- The `liftM $[0..1]` on the RHS is definitionally `ExceptT.lift (OptionT.lift $[0..1])`
+  -- via the `MonadLift` chain; `change` pins this down so the `run_bind_lift` lemmas fire.
+  change (ExceptT.run ((ExceptT.lift (OptionT.lift ($[0..1] : OracleComp unifSpec _)) :
+      Interop.Rust.RustOracleComp unifSpec (Fin 2)) >>= fun b =>
+      if b = 0 then (pure 0 : Interop.Rust.RustOracleComp unifSpec Nat)
+      else throw .integerOverflow)).run = _
+  simp only [ExceptT.run_bind_lift, apply_ite ExceptT.run, ExceptT.run_pure, ExceptT.run_throw,
+    OptionT.run_bind_lift, apply_ite OptionT.run, OptionT.run_pure, apply_ite some,
+    apply_ite (pure (f := OracleComp unifSpec))]
+
+/-- Panic probability of `tossedAdd` is exactly `1/2`. This is the core
+claim only statable on the VCVio side: the hax `Triple` layer is
+universal over oracle outcomes and says nothing about probability, and
+the `Hax.RustM` level has no oracle to sample at all. -/
+theorem tossedAdd_panic_prob :
+    Pr[= some (Except.error Interop.Rust.Error.integerOverflow) |
+        tossedAdd.run.run] = 2⁻¹ := by
+  rw [tossedAdd_run_run, HasEvalSPMF.probOutput_bind_eq_sum_fintype]
+  -- ∑ x : Fin 2, Pr[= x | $[0..1]] * (if ... then 1 else 0).
+  -- Both `Pr[= · | $[0..1]]` factors collapse to `(1 + 1 : ℝ≥0∞)⁻¹`, then the
+  -- `x = 0` branch contributes `0` and the `x = 1` branch contributes the
+  -- integer-overflow coefficient `1`, leaving `(1 + 1)⁻¹ = 2⁻¹`.
+  simp only [ProbComp.probOutput_uniformFin]
+  have h1 : ((1 : Fin 2) = 0) ↔ False := by decide
+  simp [h1]
+  norm_num
+
+end ProbabilisticSpec
 
 end Interop.Hax.Examples
