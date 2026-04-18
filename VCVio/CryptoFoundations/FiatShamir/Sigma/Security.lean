@@ -424,8 +424,10 @@ The phase decomposes into six small sublemmas plus two thin compositions:
   against `simCommitPredictability`, summed across the `qS` signing queries.
 * **C7 `probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage`** —
   state-projection alignment between `simPhaseCExp` and
-  `managedRoNmaExp (nmaAdvFromHVZK)`; on the `freshSuccess` event the extra
-  `signLog`/`bad` bookkeeping is irrelevant.
+  `managedRoNmaExp (nmaAdvFromHVZK)`; on the `!wasSigned` event the extra
+  `signLog`/`bad` bookkeeping aligns the cache-projected hash distributions and
+  monotonicity drops the freshness filter to expose the unconditioned `verified`
+  marginal of the managed-RO experiment.
 
 `phaseC_real_le_sim_bad_or_fresh` and
 `phaseC_sim_bad_or_fresh_le_managedRo_plus_collision` are then thin `calc`
@@ -517,46 +519,50 @@ private lemma probEvent_bad_simPhaseCExp_le_collisionSlack
       collisionSlack qS qH β := by
   sorry
 
-omit [Fintype Chal] [SampleableType Chal] [SampleableType Stmt] [SampleableType Wit]
-  [DecidableEq M] [DecidableEq Commit] in
-/-- **C7a.** `freshSuccess ⇒ verified` is a pointwise event implication, so the
-`freshSuccess` mass is bounded by the `verified` marginal of the same SPMF. -/
-private lemma probEvent_freshSuccess_le_verified
-    (m : SPMF PhaseCResult) :
-    Pr[= true | PhaseCResult.freshSuccess <$> m] ≤
-      Pr[= true | (·.verified) <$> m] := by
-  rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
-    probEvent_map, probEvent_map]
-  refine probEvent_mono fun r _ hfresh => ?_
-  simp only [Function.comp_apply, PhaseCResult.freshSuccess,
-    Bool.and_eq_true, Bool.not_eq_true'] at hfresh
-  exact hfresh.2
+/-!
+**C7 sub-decomposition (corrected).**
+
+Earlier the lemma `probEvent_verified_simPhaseCExp_le_managedRoAdvantage`
+(unconditional `verified` marginal of `simPhaseCExp` bounded by the managed-RO
+advantage) was wrongly proposed: on adversaries that re-output a signed message
+as the forgery, `simPhaseCExp.verified` is `1` (programmed transcript verifies
+deterministically) while `managedRoNmaExp.verified` is only `~1/|Chal|` (fresh
+random-oracle sample at the verification query). Dropping the `!wasSigned`
+filter therefore loses essential information.
+
+The corrected decomposition keeps the freshness filter through the alignment
+step:
+
+* **C7-i `nmaAdvFromHVZK_advantage_eq_freshSuccess_managedRoExtended`** —
+  define an "extended" managed-RO experiment that mirrors `simPhaseCExp` on
+  `(wasSigned, verified)` for the projected state. On the `!wasSigned` branch
+  `phaseCHashImpl` reduces to the `roSimImpl` cache lookup (by
+  `phaseCOverlayInvariant.agreesAwayFromSigned`), so the joint `(wasSigned,
+  verified)` distribution agrees with that of `nmaAdvFromHVZK`'s managed-RO
+  trace augmented with a parallel `signLog`. This step does the heavy
+  state-projection work via `relTriple_simulateQ_run_of_impl_eq_preservesInv`.
+* **C7-ii `freshSuccess_managedRoExtended_le_verified_managedRo`** — drop the
+  `!wasSigned` filter, monotonicity. The augmented experiment's `verified`
+  marginal equals the unaugmented one.
+
+`probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage` then composes the
+two, replacing the old C7a/C7b chain. -/
 
 omit [Fintype Chal] in
-/-- **C7b.** Project away the extra Phase C bookkeeping (`signLog`, `bad`):
-the `verified` marginal of `simPhaseCExp` equals the success probability of
-`managedRoNmaExp (nmaAdvFromHVZK σ hr M simTranscript adv)`. The latter is
-literally `simulateQ (baseSimImpl + sigSimImpl simTranscript pk) (adv.main pk)`
-followed by live verification; the extra Phase C state (`signLog`, `bad`) is
-irrelevant to the `(msg, sig, verified)` marginal once we project `PhaseCState`
-down to `overlayCache : QueryCache`. -/
-private lemma probEvent_verified_simPhaseCExp_le_managedRoAdvantage :
-    Pr[= true | (·.verified) <$> simPhaseCExp σ hr M simTranscript adv] ≤
-      SignatureAlg.managedRoNmaAdv.advantage (runtime M)
-        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
-  sorry
-
-omit [Fintype Chal] in
-/-- **C7.** Composition of C7a and C7b: on the `freshSuccess` event the
-`simPhaseCExp` distribution is bounded by the canonical managed-RO NMA
-experiment for `nmaAdvFromHVZK`. -/
+/-- **C7.** State-projection alignment between `simPhaseCExp` and
+`managedRoNmaExp (nmaAdvFromHVZK)` on the `freshSuccess = !wasSigned ∧ verified`
+event. On the `!wasSigned` branch, `phaseCHashImpl` reduces to a plain cache
+lookup against the `overlayCache`-projected state (by
+`phaseCAgreesAwayFromSigned`), so sim's verify behaviour agrees with managed's
+verify behaviour in distribution. Dropping the freshness filter on the managed
+side gives the unconditioned `verified` marginal, which is exactly
+`managedRoNmaAdv.advantage`. -/
 private lemma probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage :
     Pr[= true |
         PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
-        (nmaAdvFromHVZK σ hr M simTranscript adv) :=
-  (probEvent_freshSuccess_le_verified _).trans
-    (probEvent_verified_simPhaseCExp_le_managedRoAdvantage σ hr M simTranscript adv)
+        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
+  sorry
 
 omit [Fintype Chal] in
 /-- **C4.** Phase C hybrid step (composition of C1, C3, C2): the EUF-CMA
