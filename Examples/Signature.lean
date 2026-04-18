@@ -115,6 +115,7 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
 
+omit [DecidableEq F] [Fintype F] [DecidableEq G] in
 /-- The Schnorr simulator's commitment marginal is uniform over `G`, giving
 predictability `1 / |G|`. Since `|G| = |F|` (via the bijection `hg`), this equals
 `1 / |F|`.
@@ -127,7 +128,53 @@ theorem simTranscript_commitPredictability [Fintype G] (g : G)
     SigmaProtocol.simCommitPredictability (Commit := G) (Chal := F) (Resp := F)
       (simTranscript F G g)
       (1 / Fintype.card G : ℝ≥0∞) := by
-  sorry
+  letI : Finite F := Finite.of_injective (· • g : F → G) hg.injective
+  letI : Fintype F := Fintype.ofFinite F
+  intro pk c₀
+  have hEq :
+      Pr[= c₀ | Prod.fst <$> simTranscript F G g pk] =
+        (1 / Fintype.card G : ℝ≥0∞) := by
+    calc
+      Pr[= c₀ | Prod.fst <$> simTranscript F G g pk]
+          = Pr[= c₀ | do
+              let c ← ($ᵗ F : ProbComp F)
+              let z ← ($ᵗ F : ProbComp F)
+              pure (z • g - c • pk : G)] := by
+            simp [simTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind]
+      _ = Pr[= c₀ | do
+            let c ← ($ᵗ F : ProbComp F)
+            ($ᵗ G : ProbComp G)] := by
+            refine probOutput_bind_congr' ($ᵗ F : ProbComp F) c₀ ?_
+            intro c
+            calc
+              Pr[= c₀ | do
+                  let z ← ($ᵗ F : ProbComp F)
+                  pure (z • g - c • pk : G)]
+                  = Pr[= c₀ | do
+                      let y ← ($ᵗ G : ProbComp G)
+                      pure (y - c • pk : G)] := by
+                        simpa [map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+                          (probOutput_bind_bijective_uniform_cross
+                            (α := F) (β := G)
+                            (f := (· • g : F → G))
+                            (hf := hg)
+                            (g := fun y => pure (y - c • pk : G))
+                            c₀)
+              _ = Pr[= c₀ | ($ᵗ G : ProbComp G)] := by
+                    simpa [sub_eq_add_neg, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
+                      (probOutput_map_bijective_uniformSample
+                        (α := G)
+                        (f := fun y => y + -(c • pk))
+                        (hf := AddGroup.addRight_bijective (-(c • pk)))
+                        c₀)
+      _ = Pr[= c₀ | ($ᵗ G : ProbComp G)] := by
+            rw [probOutput_bind_const]
+            simp
+      _ = (Fintype.card G : ℝ≥0∞)⁻¹ := by
+            simp [probOutput_uniformSample]
+      _ = (1 / Fintype.card G : ℝ≥0∞) := by
+            simp [one_div]
+  exact le_of_eq hEq
 
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
 

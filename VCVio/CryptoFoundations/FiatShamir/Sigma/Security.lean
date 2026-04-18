@@ -214,10 +214,12 @@ Phase C replaces each real signing call inside `cmaCommonBlock` with the HVZK si
 and paying `qS · ζ_zk` overall.
 -/
 
-omit [Fintype Chal] in
-/-- **Phase C (HVZK hybrid).**
-Game 1 (freshness-dropped CMA) is bounded above by Game 2 (the managed-RO-NMA
-experiment for `nmaAdvFromHVZK`) plus `qS · ζ_zk`.
+/-!
+#### Phase C: HVZK hybrid (scoped `sorry`)
+
+Phase C replaces each real signing call inside `cmaCommonBlock` with the HVZK simulator
+`sigSimImpl`, accumulating at most `ζ_zk` total-variation distance per signing query
+and paying `qS · ζ_zk` overall.
 
 Proof outline (to be completed in a follow-up):
 
@@ -235,7 +237,39 @@ Proof outline (to be completed in a follow-up):
 3. **Post-composition.** `keygen`-marginalization and `verify` post-composition are
    1-Lipschitz under TV, preserving the bound.
 4. **Pr lift.** Total-variation distance bounds the absolute difference of
-   `Pr[= true | ...]` under any event, giving the final inequality. -/
+   `Pr[= true | ...]` under any event, giving the final inequality.
+-/
+
+omit [Fintype Chal] in
+/-- TV distance between Game 1 (real signing via `cmaCommonBlock`) and Game 2
+(simulated signing via `nmaAdvFromHVZK`), as observed through the verification bit.
+
+The two games agree on hash queries (both forward to the outer oracle) and differ
+on signing queries: Game 1 uses `σ.commit / query H / σ.respond`, while Game 2
+samples from `simTranscript pk` and programs the cache. The HVZK assumption gives
+per-query TV distance `≤ ζ_zk`; accumulating over `qS` signing queries via
+`tvDist_bind_left_le` and induction on the `OracleComp` tree gives the total
+bound `qS · ζ_zk`. -/
+lemma tvDist_game1_game2_le
+    (_hhvzk : σ.HVZK simTranscript ζ_zk)
+    (qS qH : ℕ)
+    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    tvDist
+      (Prod.snd <$> (runtime M).evalDist (cmaCommonBlock σ hr M adv))
+      (SignatureAlg.managedRoNmaExp (runtime M)
+        (nmaAdvFromHVZK σ hr M simTranscript adv)) ≤
+      qS * ζ_zk := by
+  sorry
+
+omit [Fintype Chal] in
+/-- **Phase C (HVZK hybrid).**
+Game 1 (freshness-dropped CMA) is bounded above by Game 2 (the managed-RO-NMA
+experiment for `nmaAdvFromHVZK`) plus `qS · ζ_zk`.
+
+Uses `tvDist_game1_game2_le` for the TV distance bound, then
+`abs_probOutput_toReal_sub_le_tvDist` to transfer to `Pr[= true]`, and
+finally `ENNReal.ofReal_le_ofReal` + `ENNReal.ofReal_add_le` to lift to `ℝ≥0∞`. -/
 lemma hybrid_sign_le
     (_hζ_zk : 0 ≤ ζ_zk) (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (qS qH : ℕ)
@@ -245,7 +279,22 @@ lemma hybrid_sign_le
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
           (nmaAdvFromHVZK σ hr M simTranscript adv) +
         ENNReal.ofReal (qS * ζ_zk) := by
-  sorry
+  set g₁ := Prod.snd <$> (runtime M).evalDist (cmaCommonBlock σ hr M adv)
+  set g₂ := SignatureAlg.managedRoNmaExp (runtime M)
+    (nmaAdvFromHVZK σ hr M simTranscript adv)
+  have htv := tvDist_game1_game2_le σ hr M simTranscript ζ_zk adv _hhvzk qS qH _hQ
+  have habs := abs_probOutput_toReal_sub_le_tvDist g₁ g₂
+  have hreal : Pr[= true | g₁].toReal ≤ Pr[= true | g₂].toReal + (qS * ζ_zk) := by
+    linarith [le_abs_self (Pr[= true | g₁].toReal - Pr[= true | g₂].toReal)]
+  calc Pr[= true | g₁]
+      = ENNReal.ofReal (Pr[= true | g₁].toReal) :=
+        (ENNReal.ofReal_toReal probOutput_ne_top).symm
+    _ ≤ ENNReal.ofReal (Pr[= true | g₂].toReal + (qS * ζ_zk)) :=
+        ENNReal.ofReal_le_ofReal hreal
+    _ ≤ ENNReal.ofReal (Pr[= true | g₂].toReal) + ENNReal.ofReal (qS * ζ_zk) :=
+        ENNReal.ofReal_add_le
+    _ = Pr[= true | g₂] + ENNReal.ofReal (qS * ζ_zk) := by
+        rw [ENNReal.ofReal_toReal probOutput_ne_top]
 
 /-!
 #### Phase D: fork bridge (scoped `sorry`)
@@ -276,15 +325,40 @@ Proof outline (to be completed):
    event `bad`, showing the two experiments coincide on the complement.
 4. Combine 2 + 3 to obtain the Phase D bound. -/
 omit [Fintype Chal] in
+/-- The managed-RO NMA experiment and `Fork.exp` agree on verification semantics:
+both use the same adversary, both implement a consistent random oracle, and both
+perform live verification. `Fork.exp` additionally checks `forkPoint`, which
+requires verification AND the hash point appearing in the query log within the
+first `qH + 1` entries. Under the hash-query bound (at most `qH` adversary hash
+queries), `runTrace`'s explicit final query ensures the hash point is always
+logged, so `forkPoint` succeeds whenever verification does.
+
+This gives `managedRoNmaAdv.advantage ≤ Fork.advantage`, making Phase D trivially
+true with `collisionSlack` as free slack. -/
+lemma nma_advantage_le_fork_advantage (qH : ℕ)
+    (hBound : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (nmaAdvFromHVZK σ hr M simTranscript adv).main pk) qH) :
+    SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+        (nmaAdvFromHVZK σ hr M simTranscript adv) ≤
+      Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH := by
+  sorry
+
+omit [Fintype Chal] in
 lemma game2_le_fork_advantage_plus_collision (β : ℝ≥0∞)
     (_hβ : SigmaProtocol.simCommitPredictability simTranscript β) (qS qH : ℕ)
-    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    (hNmaBound : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (nmaAdvFromHVZK σ hr M simTranscript adv).main pk) qH) :
     SignatureAlg.managedRoNmaAdv.advantage (runtime M)
         (nmaAdvFromHVZK σ hr M simTranscript adv) ≤
       Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
         collisionSlack qS qH β := by
-  sorry
+  calc SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+          (nmaAdvFromHVZK σ hr M simTranscript adv)
+      ≤ Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH :=
+          nma_advantage_le_fork_advantage σ hr M simTranscript adv qH hNmaBound
+    _ ≤ Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
+          collisionSlack qS qH β :=
+          le_add_right le_rfl
 
 end NmaPhases
 
@@ -374,8 +448,9 @@ theorem euf_cma_to_nma
       match cache (.inr (msg, c)) with
       | some _ => ((c, s), cache)
       | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
-  refine ⟨nmaAdvFromHVZK σ hr M simTranscript adv, ?_, ?_⟩
-  · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
+  have hNmaBound : ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (nmaAdvFromHVZK σ hr M simTranscript adv).main pk) qH := by
+    -- Query bound: show the NMA adversary makes at most `qH` hash queries.
     -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
     -- `sigSim` handles signing queries via `simTranscript` + cache programming,
     -- generating zero hash queries (only uniform queries from `simTranscript`).
@@ -596,27 +671,29 @@ theorem euf_cma_to_nma
           | inr msg =>
               simp [stepBudget])
         (s := ∅))
-  · -- Advantage bound: chain the three phase lemmas.
-    --   `adv.advantage`
-    --       ≤ `Pr[= true | Game 1]`                     (Phase B: freshness drop)
-    --       ≤ `Pr[= true | Game 2] + qS · ζ_zk`         (Phase C: HVZK hybrid)
-    --       ≤ `Fork.advantage + qS · ζ_zk + collisionSlack`  (Phase D: fork bridge)
-    calc adv.advantage (runtime M)
-        ≤ Pr[= true | Prod.snd <$>
-              (runtime M).evalDist (cmaCommonBlock σ hr M adv)] :=
-          adv_advantage_le_game1 σ hr M adv
-      _ ≤ SignatureAlg.managedRoNmaAdv.advantage (runtime M)
-              (nmaAdvFromHVZK σ hr M simTranscript adv) +
-            ENNReal.ofReal (qS * ζ_zk) :=
-          hybrid_sign_le σ hr M simTranscript ζ_zk adv _hζ_zk _hhvzk qS qH _hQ
-      _ ≤ (Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
-              collisionSlack qS qH β) + ENNReal.ofReal (qS * ζ_zk) :=
-          add_le_add
-            (game2_le_fork_advantage_plus_collision σ hr M simTranscript adv β _hβ qS qH _hQ)
-            le_rfl
-      _ = Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
-            ENNReal.ofReal (qS * ζ_zk) +
-            collisionSlack qS qH β := by ring
+  refine ⟨nmaAdvFromHVZK σ hr M simTranscript adv, hNmaBound, ?_⟩
+  -- Advantage bound: chain the three phase lemmas.
+  --   `adv.advantage`
+  --       ≤ `Pr[= true | Game 1]`                     (Phase B: freshness drop)
+  --       ≤ `Pr[= true | Game 2] + qS · ζ_zk`         (Phase C: HVZK hybrid)
+  --       ≤ `Fork.advantage + qS · ζ_zk + collisionSlack`  (Phase D: fork bridge)
+  calc adv.advantage (runtime M)
+      ≤ Pr[= true | Prod.snd <$>
+            (runtime M).evalDist (cmaCommonBlock σ hr M adv)] :=
+        adv_advantage_le_game1 σ hr M adv
+    _ ≤ SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+            (nmaAdvFromHVZK σ hr M simTranscript adv) +
+          ENNReal.ofReal (qS * ζ_zk) :=
+        hybrid_sign_le σ hr M simTranscript ζ_zk adv _hζ_zk _hhvzk qS qH _hQ
+    _ ≤ (Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
+            collisionSlack qS qH β) + ENNReal.ofReal (qS * ζ_zk) :=
+        add_le_add
+          (game2_le_fork_advantage_plus_collision σ hr M simTranscript adv β _hβ qS qH hNmaBound)
+          le_rfl
+    _ = Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
+          ENNReal.ofReal (qS * ζ_zk) +
+          collisionSlack qS qH β := by ring
+
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
