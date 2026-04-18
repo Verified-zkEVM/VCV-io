@@ -84,11 +84,20 @@ abbrev Ciphertext : Type := List (BitVec 8)
 /-! ### Per-party session state
 
 The fields cover the symmetric-ratchet bookkeeping (root key, sending
-and receiving chain keys, send/receive message counters) plus the
+and receiving chain keys, send/receive message counters), the
 asymmetric ratchet state (the locally held DH secret and the most
-recent peer DH public key). All fields are `Option`-typed so that an
-uninitialized session is representable; initialization occurs when
-the application boundary receives a session-setup command.
+recent peer DH public key), and a protocol-local corruption flag.
+All cryptographic fields are `Option`-typed so that an uninitialized
+session is representable; initialization occurs when the application
+boundary receives a session-setup command.
+
+The `corrupted` flag is local protocol state: it records whether the
+adversary has previously asked for a leak through the `AdvIn.corrupt`
+port. A framework-level `CorruptionPolicy` (which would centralize
+the same information across multiple functionalities and across
+composed sub-protocols) is deferred to a later phase; until then,
+each functionality tracks its own corruption status in its residual
+state.
 -/
 
 /-- The Double-Ratchet state held by a single party. -/
@@ -109,6 +118,9 @@ structure SessionState where
   ourDHSec : Option DHSec := none
   /-- The peer's most recently advertised DH public key. -/
   peerDHPub : Option DHPub := none
+  /-- Whether this party has been corrupted by the adversary (a
+  state-leak request has been observed). -/
+  corrupted : Bool := false
   deriving Inhabited
 
 end Signal
