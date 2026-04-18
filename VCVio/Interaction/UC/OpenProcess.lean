@@ -25,11 +25,11 @@ The design follows the layered approach from the UC design notes:
   chosen move contributes.
 * `OpenNodeSemantics Party Δ X` extends the existing `NodeSemantics Party X`
   by one `BoundaryAction` field.
-* `OpenStepContext Party Δ` is the resulting realized node context.
+* `OpenNodeContext Party Δ` is the resulting realized node context.
 * `OpenProcess Party Δ` specializes `ProcessOver` to that open context.
 
 The closed-world layer is recovered by the canonical forgetful projection
-`openStepContextForget`, which drops the boundary action and retains only
+`OpenNodeContext.forget`, which drops the boundary action and retains only
 the `NodeSemantics`. This means every `OpenProcess` can be viewed as a plain
 closed `Process` by `ProcessOver.mapContext`.
 
@@ -307,10 +307,10 @@ At a node with move space `X`, the context value is
 `OpenNodeSemantics Party Δ X`: the usual controller-path and local-view data,
 plus a `BoundaryAction` describing the node's external traffic.
 -/
-abbrev OpenStepContext (Party : Type u) (Δ : PortBoundary) :=
+abbrev OpenNodeContext (Party : Type u) (Δ : PortBoundary) :=
   fun (X : Type w) => OpenNodeSemantics Party Δ X
 
-namespace OpenStepContext
+namespace OpenNodeContext
 
 /--
 The forgetful map from the open-world context to the closed-world context.
@@ -320,7 +320,7 @@ This drops the `BoundaryAction` and retains only the `NodeSemantics`
 -/
 def forget (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party Δ : Spec.Node.Context.{w})
+      (OpenNodeContext Party Δ : Spec.Node.Context.{w})
       (StepContext Party) :=
   fun _ ons => ons.toNodeSemantics
 
@@ -332,7 +332,7 @@ This marks every node as purely internal (no boundary traffic).
 def embed (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
       (StepContext Party)
-      (OpenStepContext Party Δ : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party Δ : Spec.Node.Context.{w}) :=
   fun _ ns => .ofClosed ns
 
 /--
@@ -344,13 +344,13 @@ the closed-world node semantics.
 def map (Party : Type u) {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂) :
     Spec.Node.ContextHom
-      (OpenStepContext Party Δ₁ : Spec.Node.Context.{w})
-      (OpenStepContext Party Δ₂ : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party Δ₁ : Spec.Node.Context.{w})
+      (OpenNodeContext Party Δ₂ : Spec.Node.Context.{w}) :=
   fun _ ons => ons.mapBoundary φ
 
 @[simp]
 theorem map_id (Party : Type u) (Δ : PortBoundary) :
-    OpenStepContext.map.{u, w} Party (PortBoundary.Hom.id Δ) =
+    OpenNodeContext.map.{u, w} Party (PortBoundary.Hom.id Δ) =
       Spec.Node.ContextHom.id _ := by
   funext X ons; simp [map, Spec.Node.ContextHom.id]
 
@@ -358,8 +358,8 @@ theorem map_comp (Party : Type u)
     {Δ₁ Δ₂ Δ₃ : PortBoundary}
     (g : PortBoundary.Hom Δ₂ Δ₃) (f : PortBoundary.Hom Δ₁ Δ₂) :
     Spec.Node.ContextHom.comp
-      (OpenStepContext.map.{u, w} Party g) (OpenStepContext.map Party f) =
-      OpenStepContext.map Party (PortBoundary.Hom.comp g f) := by
+      (OpenNodeContext.map.{u, w} Party g) (OpenNodeContext.map Party f) =
+      OpenNodeContext.map Party (PortBoundary.Hom.comp g f) := by
   funext X ons; simp [map, Spec.Node.ContextHom.comp,
     OpenNodeSemantics.mapBoundary_comp]
 
@@ -372,8 +372,8 @@ interface while preserving the closed-world node semantics.
 def inlTensor (Party : Type u)
     (Δ₁ : PortBoundary) (Δ₂ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party Δ₁ : Spec.Node.Context.{w})
-      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party Δ₁ : Spec.Node.Context.{w})
+      (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.embedInlTensor Δ₂
@@ -388,23 +388,23 @@ interface while preserving the closed-world node semantics.
 def inrTensor (Party : Type u)
     (Δ₁ : PortBoundary) (Δ₂ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party Δ₂ : Spec.Node.Context.{w})
-      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party Δ₂ : Spec.Node.Context.{w})
+      (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.embedInrTensor Δ₁
   }
 
 /--
-Wire the left factor: transform `OpenStepContext Party (tensor Δ₁ Γ)` into
-`OpenStepContext Party (tensor Δ₁ Δ₂)` by filtering out internal (Γ) packets
+Wire the left factor: transform `OpenNodeContext Party (tensor Δ₁ Γ)` into
+`OpenNodeContext Party (tensor Δ₁ Δ₂)` by filtering out internal (Γ) packets
 and keeping only external (Δ₁) packets.
 -/
 def wireLeft (Party : Type u)
     (Δ₁ Γ Δ₂ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party (PortBoundary.tensor Δ₁ Γ) : Spec.Node.Context.{w})
-      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party (PortBoundary.tensor Δ₁ Γ) : Spec.Node.Context.{w})
+      (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.wireLeft Δ₂
@@ -412,30 +412,30 @@ def wireLeft (Party : Type u)
 
 /--
 Wire the right factor: transform
-`OpenStepContext Party (tensor (swap Γ) Δ₂)` into
-`OpenStepContext Party (tensor Δ₁ Δ₂)` by filtering out internal
+`OpenNodeContext Party (tensor (swap Γ) Δ₂)` into
+`OpenNodeContext Party (tensor Δ₁ Δ₂)` by filtering out internal
 (swap Γ) packets and keeping only external (Δ₂) packets.
 -/
 def wireRight (Party : Type u)
     (Δ₁ Γ Δ₂ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) :
+      (OpenNodeContext Party (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) :
         Spec.Node.Context.{w})
-      (OpenStepContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.wireRight Δ₁
   }
 
 /--
-Close the boundary: transform `OpenStepContext Party Δ` into
-`OpenStepContext Party empty` by dropping all boundary traffic.
+Close the boundary: transform `OpenNodeContext Party Δ` into
+`OpenNodeContext Party empty` by dropping all boundary traffic.
 Used by `plug` to internalize all external interactions.
 -/
 def close (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
-      (OpenStepContext Party Δ : Spec.Node.Context.{w})
-      (OpenStepContext Party PortBoundary.empty : Spec.Node.Context.{w}) :=
+      (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+      (OpenNodeContext Party PortBoundary.empty : Spec.Node.Context.{w}) :=
   fun _ ons => {
     toNodeSemantics := ons.toNodeSemantics
     boundary := ons.boundary.closed
@@ -505,7 +505,7 @@ theorem map_tensor_comp_wireRight (Party : Type u)
   simp [map, wireRight, Spec.Node.ContextHom.comp,
     OpenNodeSemantics.mapBoundary]
 
-end OpenStepContext
+end OpenNodeContext
 
 /--
 The open-world specialization of `StepOver`.
@@ -515,7 +515,7 @@ records both the usual controller/view data and its boundary traffic against
 `Δ`.
 -/
 abbrev OpenStep (Party : Type u) (Δ : PortBoundary) (P : Type v) :=
-  StepOver (OpenStepContext Party Δ : Spec.Node.Context.{w}) P
+  StepOver (OpenNodeContext Party Δ : Spec.Node.Context.{w}) P
 
 /--
 The open-world specialization of `ProcessOver`.
@@ -525,10 +525,10 @@ decorated by `OpenNodeSemantics Party Δ`. It exposes the directed boundary
 `Δ` to an external context.
 
 The closed-world `Process Party` is recovered by
-`ProcessOver.mapContext (OpenStepContext.forget Party Δ)`.
+`ProcessOver.mapContext (OpenNodeContext.forget Party Δ)`.
 -/
 abbrev OpenProcess (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver (OpenStepContext Party Δ : Spec.Node.Context.{w})
+  ProcessOver (OpenNodeContext Party Δ : Spec.Node.Context.{w})
 
 namespace OpenProcess
 
@@ -542,7 +542,7 @@ local views.
 -/
 def toClosed {Party : Type u} {Δ : PortBoundary}
     (op : OpenProcess.{u, v, w} Party Δ) : Process Party :=
-  op.mapContext (OpenStepContext.forget Party Δ)
+  op.mapContext (OpenNodeContext.forget Party Δ)
 
 /--
 Embed a closed-world process as an open process with no boundary traffic.
@@ -552,7 +552,7 @@ produces no packets.
 -/
 def ofClosed {Party : Type u} {Δ : PortBoundary}
     (p : Process.{u, v, w} Party) : OpenProcess Party Δ :=
-  p.mapContext (OpenStepContext.embed Party Δ)
+  p.mapContext (OpenNodeContext.embed Party Δ)
 
 /--
 Adapt the exposed boundary of an open process along a structural boundary
@@ -565,7 +565,7 @@ and closed-world node semantics unchanged.
 def mapBoundary {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂) (op : OpenProcess.{u, v, w} Party Δ₁) :
     OpenProcess Party Δ₂ :=
-  op.mapContext (OpenStepContext.map Party φ)
+  op.mapContext (OpenNodeContext.map Party φ)
 
 end OpenProcess
 
@@ -574,7 +574,7 @@ end OpenProcess
 predicates used throughout VCVio.
 -/
 abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver.System (OpenStepContext Party Δ : Spec.Node.Context.{w})
+  ProcessOver.System (OpenNodeContext Party Δ : Spec.Node.Context.{w})
 
 -- ============================================================================
 -- § Silent steps and weak bisimulation
@@ -588,7 +588,7 @@ ensures the predicate is invariant under *all* context morphisms, including
 `List.filterMap`. -/
 def IsSilentDecoration {Party : Type u} {Δ : PortBoundary} :
     {spec : Interaction.Spec.{w}} →
-    Interaction.Spec.Decoration (OpenStepContext.{u, w} Party Δ) spec →
+    Interaction.Spec.Decoration (OpenNodeContext.{u, w} Party Δ) spec →
     spec.Transcript → Prop
   | .done, _, _ => True
   | .node _ _, ⟨ons, drest⟩, ⟨x, tr⟩ =>
@@ -606,11 +606,11 @@ def IsSilentStep {Party : Type u} {Δ : PortBoundary}
 `mapBoundary`, `embedInlTensor`, `embedInrTensor`, `wireLeft`, `wireRight`,
 and `closed`) preserve `isActivated`. -/
 theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
-    (f : Spec.Node.ContextHom (OpenStepContext.{u, w} Party Δ₁)
-      (OpenStepContext.{u, w} Party Δ₂))
-    (hAct : ∀ (X : Type w) (ons : OpenStepContext Party Δ₁ X),
+    (f : Spec.Node.ContextHom (OpenNodeContext.{u, w} Party Δ₁)
+      (OpenNodeContext.{u, w} Party Δ₂))
+    (hAct : ∀ (X : Type w) (ons : OpenNodeContext Party Δ₁ X),
       (f X ons).boundary.isActivated = ons.boundary.isActivated) :
-    {spec : Spec.{w}} → (d : Spec.Decoration (OpenStepContext Party Δ₁) spec) →
+    {spec : Spec.{w}} → (d : Spec.Decoration (OpenNodeContext Party Δ₁) spec) →
     (tr : spec.Transcript) →
     IsSilentDecoration (Spec.Decoration.map f spec d) tr ↔ IsSilentDecoration d tr
   | .done, _, _ => Iff.rfl
@@ -634,7 +634,7 @@ theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundar
     IsSilentStep (p.mapBoundary φ) s tr ↔ IsSilentStep p s tr := by
   apply isSilentDecoration_iff_map
   intro X ons
-  simp [OpenStepContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+  simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
 
 -- ============================================================================
 -- § OpenProcessIso: weak bisimulation equivalence for open processes
