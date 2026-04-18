@@ -178,7 +178,7 @@ noncomputable def roImpl (M Commit Chal : Type) [DecidableEq M] [DecidableEq Com
     | some v => pure v
     | none =>
         let v : Chal ← monadLift
-          (liftM ((wrappedSpec Chal).query (Sum.inr ())) :
+          ((wrappedSpec Chal).query (Sum.inr ()) :
             OracleComp (wrappedSpec Chal) Chal)
         set ((cache.cacheQuery mc v : (M × Commit →ₒ Chal).QueryCache),
           log ++ [mc])

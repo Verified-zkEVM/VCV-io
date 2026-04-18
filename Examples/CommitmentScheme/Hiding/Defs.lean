@@ -53,7 +53,7 @@ structure HidingAdversary (M : Type) (S : Type) (C : Type) (AUX : Type) (t : ℕ
   totalBound : ∀ s : S, IsTotalQueryBound
     (choose >>= fun x =>
       let (m, aux) := x
-      (liftM ((CMOracle M S C).query (m, s)) >>= fun cm =>
+      ((CMOracle M S C).query (m, s) >>= fun cm =>
         distinguish aux cm))
     (t + 1)
 
@@ -102,7 +102,7 @@ def hidingImpl₁ (s : S) :
     match cache ms with
     | some u => return u
     | none => do
-      let u ← (liftM ((CMOracle M S C).query ms) :
+      let u ← ((CMOracle M S C).query ms :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')
@@ -118,7 +118,7 @@ def hidingImplCountAll :
     match cache ms with
     | some u => return u
     | none => do
-      let u ← (liftM ((CMOracle M S C).query ms) :
+      let u ← ((CMOracle M S C).query ms :
         StateT (QueryCache (CMOracle M S C) × (S → ℕ)) (OracleComp (CMOracle M S C)) C)
       let counts' := Function.update counts ms.2 (counts ms.2 + 1)
       set (cache.cacheQuery ms u, counts')
@@ -142,10 +142,10 @@ lemma hidingImpl₁_step_totalBound (s : S) (ms : M × S)
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound
-              (((liftM ((CMOracle M S C).query ms) :
+              (((CMOracle M S C).query ms :
                   OracleComp (CMOracle M S C) C) >>= fun u =>
                 pure (u, (cache.cacheQuery ms u,
-                  if ms.2 == s then cnt + 1 else cnt))))
+                  if ms.2 == s then cnt + 1 else cnt)))
               1 from by
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
@@ -169,10 +169,10 @@ lemma hidingImplCountAll_step_totalBound (ms : M × S)
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound
-              (((liftM ((CMOracle M S C).query ms) :
+              (((CMOracle M S C).query ms :
                   OracleComp (CMOracle M S C) C) >>= fun u =>
                 pure (u, (cache.cacheQuery ms u,
-                  Function.update counts ms.2 (counts ms.2 + 1)))))
+                  Function.update counts ms.2 (counts ms.2 + 1))))
               1 from by
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
@@ -252,7 +252,7 @@ def hidingImpl₂ (s : S) :
     | none => do
       -- When bad (cnt ≥ 2) and salt matches, redirect query
       let queryPoint := if (decide (cnt ≥ 2)) && (ms.2 == s) then (default, default) else ms
-      let u ← (liftM ((CMOracle M S C).query queryPoint) :
+      let u ← ((CMOracle M S C).query queryPoint :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')
@@ -278,7 +278,7 @@ def hidingImplSim (s : S) :
     | none => do
       -- Redirect ALL salt-s cache misses to (default, default)
       let queryPoint := if ms.2 == s then (default, default) else ms
-      let u ← (liftM ((CMOracle M S C).query queryPoint) :
+      let u ← ((CMOracle M S C).query queryPoint :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')

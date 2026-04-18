@@ -1162,7 +1162,7 @@ lemma sum_wp_freshDistinguishIncrement_eq_query
       ∑ s : S,
         OracleComp.ProgramLogic.propInd (qchoose.2.2 s = 0) *
           OracleComp.ProgramLogic.wp
-            (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
+            ((CMOracle M S C).query (qchoose.1.1, s) :
               OracleComp (CMOracle M S C) C)
             (fun cm =>
               OracleComp.ProgramLogic.wp

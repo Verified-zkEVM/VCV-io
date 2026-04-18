@@ -456,7 +456,7 @@ lemma wp_fresh_challenge_branch_eq
       F
     =
     OracleComp.ProgramLogic.wp
-      (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
+      ((CMOracle M S C).query (qchoose.1.1, s) :
         OracleComp (CMOracle M S C) C)
       (fun cm =>
         F (cm, (qchoose.2.1.cacheQuery (qchoose.1.1, s) cm,
@@ -487,7 +487,7 @@ lemma wp_freshDistinguishIncrement_eq
               (qchoose.2.2 s = 0 ∧ qch.2.2 s < z.2.2 s))) =
       OracleComp.ProgramLogic.propInd (qchoose.2.2 s = 0) *
         OracleComp.ProgramLogic.wp
-          (liftM ((CMOracle M S C).query (qchoose.1.1, s)) :
+          ((CMOracle M S C).query (qchoose.1.1, s) :
             OracleComp (CMOracle M S C) C)
           (fun cm =>
             OracleComp.ProgramLogic.wp
@@ -742,7 +742,7 @@ lemma exists_counting_support_of_mem_support_run_hidingImplCountAll
       have hqc :
           (z.1, qc) ∈ support
             (countingOracle.simulate
-              (((liftM ((CMOracle M S C).query t)) : OracleComp (CMOracle M S C) _) >>=
+              (((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>=
                 mx) 0) := by
         rw [countingOracle.mem_support_simulate_queryBind_iff]
         refine ⟨by simp [qc], qu.1, ?_⟩
@@ -791,7 +791,7 @@ lemma exists_counting_support_of_mem_support_run_hidingImplCountAll_coord
       have hqc :
           (z.1, qc) ∈ support
             (countingOracle.simulate
-              (((liftM ((CMOracle M S C).query t)) : OracleComp (CMOracle M S C) _) >>=
+              (((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>=
                 mx) 0) := by
         rw [countingOracle.mem_support_simulate_queryBind_iff]
         refine ⟨by simp [qc], qu.1, ?_⟩
