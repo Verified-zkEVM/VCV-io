@@ -293,6 +293,118 @@ theorem mapPacket_comp
 
 end Hom
 
+/--
+`RoutedPacket I M` is an `Interface.Packet I` together with the identity
+`M` of the machine that emitted it.
+
+`RoutedPacket` is the standard wire-level vocabulary for traffic that
+needs to remember its origin while flowing through composition operators.
+The sender type `M` is left abstract: the canonical instantiation is
+`M := MachineId Sid Pid` (CJSV22 §2.1), but the same wrapper supports
+other identity schemes (`Unit` for purely internal traffic, or any future
+protocol-descriptor variant).
+
+For a packet that has just been produced by a single machine, `sender` is
+that machine's identity. After the packet has been routed through several
+composition layers, `sender` still refers to the *original* emitter, not
+to whichever intermediate node the packet most recently passed through.
+
+`RoutedPacket` is purely additive over the existing `Packet` definition:
+all framework primitives that already operate on `Packet I` continue to
+do so. Only consumers that need access control or sender-aware dispatch
+opt into `RoutedPacket I M`.
+-/
+structure RoutedPacket (I : Interface.{uA, uB}) (M : Type wA) :
+    Type (max uA uB wA) where
+  sender : M
+  packet : Packet I
+
+namespace RoutedPacket
+
+@[ext]
+theorem ext
+    {I : Interface.{uA, uB}} {M : Type wA}
+    {rp₁ rp₂ : RoutedPacket I M}
+    (hsender : rp₁.sender = rp₂.sender)
+    (hpacket : rp₁.packet = rp₂.packet) :
+    rp₁ = rp₂ := by
+  cases rp₁; cases rp₂; congr
+
+/--
+Translate the packet component along an interface morphism, leaving the
+sender identity untouched.
+
+This is the routed analogue of `Hom.mapPacket`: the sender's identity
+survives interface adaptation because composition operators only ever
+relabel ports, never re-attribute origin.
+-/
+def mapPacket
+    {I : Interface.{uA, uB}} {J : Interface.{vA, vB}} {M : Type wA}
+    (f : Hom I J) (rp : RoutedPacket I M) : RoutedPacket J M where
+  sender := rp.sender
+  packet := Hom.mapPacket f rp.packet
+
+/--
+Translate the sender identity along a function, leaving the packet
+untouched.
+
+This is the routed analogue of pushing the packet through an identity
+relabelling on senders. The two transformations commute, see
+`mapPacket_mapSender`.
+-/
+def mapSender
+    {I : Interface.{uA, uB}} {M N : Type wA}
+    (g : M → N) (rp : RoutedPacket I M) : RoutedPacket I N where
+  sender := g rp.sender
+  packet := rp.packet
+
+@[simp]
+theorem mapPacket_id
+    {I : Interface.{uA, uB}} {M : Type wA}
+    (rp : RoutedPacket I M) :
+    mapPacket (Hom.id I) rp = rp := by
+  cases rp
+  simp [mapPacket]
+
+@[simp]
+theorem mapPacket_comp
+    {I : Interface.{uA, uB}}
+    {J : Interface.{vA, vB}}
+    {K : Interface.{wA, wB}}
+    {M : Type wA}
+    (g : Hom J K) (f : Hom I J) (rp : RoutedPacket I M) :
+    mapPacket g (mapPacket f rp) = mapPacket (Hom.comp g f) rp := by
+  cases rp
+  simp [mapPacket, Hom.mapPacket_comp]
+
+@[simp]
+theorem mapSender_id
+    {I : Interface.{uA, uB}} {M : Type wA}
+    (rp : RoutedPacket I M) :
+    mapSender (id : M → M) rp = rp := by
+  cases rp; rfl
+
+@[simp]
+theorem mapSender_comp
+    {I : Interface.{uA, uB}} {M N O : Type wA}
+    (h : N → O) (g : M → N) (rp : RoutedPacket I M) :
+    mapSender h (mapSender g rp) = mapSender (h ∘ g) rp := by
+  cases rp; rfl
+
+theorem mapPacket_mapSender
+    {I : Interface.{uA, uB}} {J : Interface.{vA, vB}} {M N : Type wA}
+    (f : Hom I J) (g : M → N) (rp : RoutedPacket I M) :
+    mapPacket f (mapSender g rp) = mapSender g (mapPacket f rp) := by
+  cases rp; rfl
+
+theorem mapSender_mapPacket
+    {I : Interface.{uA, uB}} {J : Interface.{vA, vB}} {M N : Type wA}
+    (g : M → N) (f : Hom I J) (rp : RoutedPacket I M) :
+    mapSender g (mapPacket f rp) = mapPacket f (mapSender g rp) := by
+  cases rp; rfl
+
+end RoutedPacket
+
 namespace QueryHom
 
 /--
