@@ -61,6 +61,10 @@ The NMA adversary `B` is constructed by:
   simulated challenge into the cache
 - Returning `A`'s forgery together with the accumulated `QueryCache`
 
+Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
+the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
+hash that `B` later programs.
+
 The bound decomposes into three phases, chained in the final `calc`:
 
 - **Phase B** (PROVEN, freshness drop): `Adv^{EUF-CMA}(A) ≤ Pr[verify succeeds | Game 1]`.
@@ -352,7 +356,8 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of game hops:
+    -- Chain of game hops (see `adv_advantage_le_game1`, `tvDist_hybrid_sign_le`,
+    -- and `game2_le_fork_advantage_plus_collision` further below in this file):
     --
     --   adv.advantage
     --       ≤ Pr[= true | Game 1]                              -- freshness drop (Phase B)
@@ -360,9 +365,10 @@ theorem euf_cma_to_nma
     --       ≤ Fork.advantage + ofReal (qS * ζ_zk) + collisionSlack
     --                                                          -- collision event (Phase D)
     --
-    -- where Game 1 drops the freshness check (`!log.wasQueried msg`) from the CMA
-    -- experiment (monotone as `!b && v ≤ v`) and Game 2 is `managedRoNmaExp nmaAdv`
-    -- where each real signing query has been replaced by the HVZK simulator.
+    -- where Game 1 is the CMA experiment without the freshness check and Game 2 is
+    -- exactly `managedRoNmaExp` for the constructed `nmaAdv`. Phase B (freshness
+    -- drop via `probEvent_mono`) is proven; Phases C and D remain as scoped
+    -- `sorry`s, each aligned with existing library infrastructure.
     -- **Common trace**: the CMA experiment with the final `return` deferred to `pure
     -- (log.wasQueried msg, verified)`, so Game 0 (`unforgeableExp`) and Game 1 (below)
     -- are both expressible as a `<$>` on this shared computation. The internal
