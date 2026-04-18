@@ -35,12 +35,26 @@ move the shared piece into `VCVio/` first.
 
 ```
 Interop/
-├── README.md          ← this file
-├── Rust/              ← framework-side Rust target monad (`RustOracleComp`)
-│   └── Common.lean    ← `RustOracleComp`, mirrored `Error`, `Std.Do.WP` glue
-├── Hax/               ← bridge to `Hax.RustM` (gated on hax require)
-│   └── README.md
-└── Aeneas/            ← bridge to `Aeneas.Std.Result` (gated on aeneas require)
+├── README.md             ← this file
+├── Rust/                 ← framework-side Rust target monad (`RustOracleComp`)
+│   ├── Common.lean       ← `RustOracleComp`, mirrored `Error`, `Std.Do.WP` glue
+│   └── Run.lean          ← reusable `.run.run` peel lemmas for the
+│                           `ExceptT / OptionT / OracleComp` stack, used
+│                           by probabilistic proofs downstream
+├── Hax/                  ← bridge to `Hax.RustM` (gated on hax require)
+│   ├── README.md
+│   ├── Bridge.lean       ← `liftRustM`, `errorOfHax`,
+│   │                       `@[spec] triple_liftRustM`, `LawfulMonadLift`
+│   │                       instance, bundled `MonadHom` (`liftRustMHom`)
+│   ├── Examples.lean     ← hand-crafted demo: `addOrPanicLifted`,
+│   │                       oracle-composed `oracleThenAdd`, probabilistic
+│   │                       `tossedAdd` with `Pr[panic] = 1/2`
+│   ├── Computation.lean  ← hax-emitted `x + x + 1` (first real hax source)
+│   ├── Division.lean     ← hax-emitted `/?`: `.divisionByZero` end-to-end
+│   └── Adc.lean          ← hax `lean_adc`: 32-bit ADC via
+│                           `hax_mvcgen <;> bv_decide`, transported by
+│                           one application of `triple_liftRustM`
+└── Aeneas/               ← bridge to `Aeneas.Std.Result` (currently disabled)
     └── README.md
 ```
 

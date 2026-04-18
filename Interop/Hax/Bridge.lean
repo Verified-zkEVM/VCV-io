@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import Hax.rust_primitives.RustM
 import Interop.Rust.Common
+import ToMathlib.Control.Monad.Hom
 
 /-!
 # Bridge from `Hax.RustM` to `Interop.Rust.RustOracleComp`
@@ -93,17 +94,61 @@ theorem liftRustM_div :
 
 /-! ### Monadic structure
 
-`liftRustM` is a monad morphism: it preserves `pure` and `bind` up to the
-`Error` rebrand. We state the `pure` case explicitly (`RustM.pure = RustM.ok`
-is `rfl`); the `bind` case follows from the fact that `RustM` and
-`RustOracleComp spec` are both `ExceptT`-over-some-`Option`-layer and the
-lift is a nested `pure` on both layers. -/
+`liftRustM` is a monad morphism: it preserves `pure` and `bind` up to
+the `Error` rebrand. We state the `pure` case explicitly
+(`RustM.pure = RustM.ok` is `rfl`). The `bind` case follows by case
+analysis on the `RustM` constructor, relying on the fact that the three
+`RustOracleComp` constructor forms (`ok`, `fail`, `div`) absorb `bind`
+the same way their `RustM` counterparts do.
+
+We bundle the result in two ways:
+
+* `LawfulMonadLift RustM (RustOracleComp spec)` — the lightweight,
+  typeclass-driven path used by Lean's generic `liftM` tactics and by
+  `Std.Do.WP` machinery under the hood.
+* `MonadHom RustM (RustOracleComp spec)` — the bundled morphism from
+  `ToMathlib.Control.Monad.Hom`, which transports arbitrary
+  pure/bind-preserving properties (not only Hoare triples). In
+  particular `triple_liftRustM` is one instance of the general
+  pull-back-through-`MonadHom` pattern. -/
 
 @[simp]
 theorem liftRustM_pure (v : α) :
     (liftRustM (pure v : RustM α) : Interop.Rust.RustOracleComp spec α) =
       pure v :=
   rfl
+
+/-- `liftRustM` commutes with `bind`: the lift of a sequenced Rust
+program equals the sequenced lift, where the `fail`/`div` branches
+short-circuit identically on both sides. -/
+@[simp]
+theorem liftRustM_bind {β : Type} (x : RustM α) (k : α → RustM β) :
+    (liftRustM (x >>= k) : Interop.Rust.RustOracleComp spec β) =
+      liftRustM x >>= fun a => liftRustM (k a) := by
+  match x with
+  | RustM.ok v   => rfl
+  | RustM.fail e => rfl
+  | RustM.div    => rfl
+
+/-- `liftRustM` is a `LawfulMonadLift`: it preserves `pure` and `bind`.
+This is the typeclass-level statement and is picked up automatically by
+the generic `liftM` / `Std.Do.WP` machinery. -/
+instance instLawfulMonadLiftRustM :
+    LawfulMonadLift RustM (Interop.Rust.RustOracleComp spec) where
+  monadLift_pure v := liftRustM_pure v
+  monadLift_bind x k := liftRustM_bind x k
+
+/-- `liftRustM` bundled as a monad morphism
+`RustM →ᵐ RustOracleComp spec`. Equivalent in content to the
+`LawfulMonadLift` instance above, but exposes the lift as a term-level
+map so arbitrary `MonadHom`-indexed lemmas (e.g. `mmap_map`,
+`mmap_seq`) transport along the bridge. -/
+def liftRustMHom : RustM →ᵐ Interop.Rust.RustOracleComp spec :=
+  MonadHom.ofLift _ _
+
+@[simp]
+theorem liftRustMHom_apply (x : RustM α) :
+    (liftRustMHom (spec := spec)) x = liftRustM x := rfl
 
 /-! ### `Triple`-level boundary transport
 
@@ -120,6 +165,7 @@ into `RustOracleComp` wholesale: apply the lemma, then supply the hax
 spec as the hypothesis. For concrete constructor-level programs the
 `@[simp]` commutation lemmas above still do the job directly. -/
 
+@[spec]
 theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
     (x : RustM α)
     {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}

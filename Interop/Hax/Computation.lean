@@ -115,7 +115,6 @@ theorem computationLifted_triple [spec.Fintype] [spec.Inhabited] (x : u32) :
     (computationLifted (spec := spec) x)
     ⦃⇓ r => ⌜r.toNat = 2 * x.toNat + 1⌝⦄ := by
   unfold computationLifted
-  apply triple_liftRustM
-  exact computation_triple x
+  exact triple_liftRustM _ (computation_triple x)
 
 end Interop.Hax.Examples.Computation

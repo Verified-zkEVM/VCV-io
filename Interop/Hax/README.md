@@ -14,20 +14,39 @@ with 2 harmless `@[reducible]` warnings in hax's own
 Bridge code is in place:
 
 - `Bridge.lean` — `errorOfHax`, `liftRustM`, the `MonadLift RustM
-  (Interop.Rust.RustOracleComp spec)` instance, four `rfl`-level
-  `@[simp]` commutation lemmas (`liftRustM_{ok,fail,div,pure}`), and
-  the compositional `Triple`-level boundary lemma `triple_liftRustM`.
+  (Interop.Rust.RustOracleComp spec)` instance, five `rfl`-level
+  `@[simp]` commutation lemmas (`liftRustM_{ok,fail,div,pure,bind}`),
+  a `LawfulMonadLift` instance and a bundled `MonadHom`
+  (`liftRustMHom`) that witnesses `liftRustM` as a monad morphism, and
+  the compositional `Triple`-level boundary lemma `triple_liftRustM`,
+  which is now registered as `@[spec]` so `mvcgen` auto-peels it.
 - `Examples.lean` — hand-crafted end-to-end demo: a checked-addition
   `RustM` function, two equality-level specs, a `Std.Do.Triple` spec
-  driven by `mvcgen` (`addOrPanicLifted_triple`), an oracle-composed
-  `RustOracleComp` program (`oracleThenAdd`), and a `Triple` spec on
-  the oracle-composed program (`oracleThenAdd_triple`) that mixes a
-  real `query` with a lifted `RustM` call.
+  closed in a single `mvcgen` call thanks to `@[spec] triple_liftRustM`
+  (`addOrPanicLifted_triple`), an oracle-composed `RustOracleComp`
+  program (`oracleThenAdd`), a `Triple` spec on the oracle-composed
+  program (`oracleThenAdd_triple`) that mixes a real `query` with a
+  lifted `RustM` call, and a probabilistic `tossedAdd` harness whose
+  panic probability (`1/2`) is proven via the reusable `.run.run`
+  peel lemmas in `Interop/Rust/Run.lean`.
 - `Computation.lean` — first example where the `RustM` side is real
   hax output, not a hand-crafted `RustM` definition. Lifts and proves
   a spec for `const fn computation(x: u32) -> u32 { x + x + 1 }` (from
   hax's `tests/lean-tests/src/constants.rs`), using hax's own
   `UInt32.haxAdd_spec` and the `triple_liftRustM` boundary lemma.
+- `Division.lean` — second real-hax-output example, exercising the
+  `.divisionByZero` branch of `errorOfHax` both at the Triple level
+  (precondition-gated, via `UInt32.haxDiv_spec`) and at the equality
+  level (`checkedDivLifted_fail_of_zero`), plus a probabilistic
+  `randomDiv` whose panic probability (`1/2`, on `.divisionByZero`
+  rather than `.integerOverflow`) is proven with the same peel lemmas.
+- `Adc.lean` — flagship stress test: the `lean_adc` example from hax's
+  own test suite (32-bit ADC with a `u64` intermediate), proved with
+  `hax_mvcgen [adc_u32] <;> bv_decide` on the `RustM` side and lifted
+  by `triple_liftRustM` to `RustOracleComp`. This is the high-
+  automation end of the bridge: no user arithmetic, no transformer
+  plumbing; once the Rust-side proof closes, the lifted proof is one
+  line.
 
 `lake build Interop` succeeds across all of the above.
 
@@ -80,11 +99,12 @@ theorem addOrPanicLifted_triple (x y : Nat)
     (addOrPanicLifted (spec := spec) x y)
     ⦃⇓ r => ⌜r = x + y⌝⦄ := by
   mvcgen [addOrPanicLifted, addOrPanic]
-  intro h
-  have h' : x + y < 4294967296 := h
-  rw [if_pos h']
-  simp [liftRustM_pure]
 ```
+
+With `@[spec] triple_liftRustM` registered in the `mvcgen` index,
+`mvcgen` now peels the `liftRustM` boundary automatically, walks into
+the `RustM` body of `addOrPanic`, and closes the residual vc in a
+single tactic call.
 
 The `[spec.Fintype] [spec.Inhabited]` constraints are inherited from
 VCVio's `WP (OracleComp spec) .pure` and are the only additional
@@ -96,6 +116,7 @@ obligation the oracle layer imposes.
 through the lift in one step:
 
 ```lean
+@[spec]
 theorem triple_liftRustM [spec.Fintype] [spec.Inhabited]
     (x : RustM α)
     {Q : PostCond α (.except Interop.Rust.Error (.except PUnit .pure))}
@@ -113,6 +134,33 @@ handler: `Q.2.1 ∘ errorOfHax` instead of `Q.2.1`. The success handler
 reflects that `liftRustM` is the identity on those cases modulo the
 transformer encoding. This lemma is what lets us reuse hax's own
 `@[spec]` library downstream without reproving lifts pointwise.
+
+### `@[spec]` indexing
+
+`triple_liftRustM` is tagged `@[spec]`, so hax's `hax_mvcgen` and
+VCVio's `mvcgen` both index it automatically: whenever they encounter
+a goal whose program starts with `liftRustM x`, they apply this lemma
+and reduce the obligation to the hax-side `Triple` on `x`, shunting
+the error-post through `errorOfHax`. In the concrete examples below
+this means that `mvcgen [addOrPanicLifted, addOrPanic]` closes the
+whole lifted Triple in one tactic call (see `Examples.lean`), and
+`Computation.lean` / `Division.lean` / `Adc.lean` all transport their
+respective hax-side specs to the oracle side in one line of proof.
+
+### `LawfulMonadLift` / `MonadHom` statements
+
+`liftRustM` is also bundled as a monad morphism in two equivalent
+ways:
+
+* `instLawfulMonadLiftRustM : LawfulMonadLift RustM (RustOracleComp spec)` —
+  the typeclass form, picked up automatically by generic `liftM`
+  lemmas.
+* `liftRustMHom : RustM →ᵐ RustOracleComp spec` — the bundled
+  `MonadHom` from `ToMathlib.Control.Monad.Hom`, which immediately
+  gives `mmap_pure`, `mmap_bind`, `mmap_map`, `mmap_seq`, etc. on the
+  lift. This is the mechanism by which arbitrary pure/bind-preserving
+  properties transport across the bridge, not just Hoare triples:
+  `triple_liftRustM` is one instantiation of the general pattern.
 
 ## Oracle-composed Triple spec
 
@@ -184,8 +232,7 @@ theorem computationLifted_triple [spec.Fintype] [spec.Inhabited]
     (computationLifted (spec := spec) x)
     ⦃⇓ r => ⌜r.toNat = 2 * x.toNat + 1⌝⦄ := by
   unfold computationLifted
-  apply triple_liftRustM
-  exact computation_triple x
+  exact triple_liftRustM _ (computation_triple x)
 ```
 
 This is the intended workflow: hax emits the function and its
@@ -194,6 +241,88 @@ Triple with hax's tactics and spec library; `triple_liftRustM` moves
 the result to the oracle-aware target without reproof. The
 `errorOfHax` rebrand inside `triple_liftRustM` is invisible here
 because the precondition rules out the panic branch.
+
+## Second hax example: `Division.lean`
+
+`Interop/Hax/Division.lean` complements `Computation.lean` by
+exercising the `.divisionByZero` branch of `errorOfHax` end-to-end.
+The Rust side is hax's own `/?` operator on `u32`, which reduces to
+`if y = 0 then .fail .divisionByZero else pure (x / y)`:
+
+```lean
+@[spec]
+def checkedDiv (x y : u32) : RustM u32 := x /? y
+
+theorem checkedDiv_triple (x y : u32) (h : y ≠ 0) :
+    ⦃⌜True⌝⦄ (checkedDiv x y) ⦃⇓ r => ⌜r.toNat = x.toNat / y.toNat⌝⦄ := by
+  unfold checkedDiv
+  exact UInt32.haxDiv_spec x y h
+
+theorem checkedDivLifted_triple [spec.Fintype] [spec.Inhabited]
+    (x y : u32) (h : y ≠ 0) :
+    ⦃⌜True⌝⦄
+    (checkedDivLifted (spec := spec) x y)
+    ⦃⇓ r => ⌜r.toNat = x.toNat / y.toNat⌝⦄ := by
+  unfold checkedDivLifted
+  exact triple_liftRustM _ (checkedDiv_triple x y h)
+```
+
+Two further equality-level lemmas (`checkedDivLifted_ok_of_ne_zero`
+and `checkedDivLifted_fail_of_zero`) directly witness the
+`errorOfHax .divisionByZero = .divisionByZero` rebrand when the
+precondition does not rule out the panic branch. This is the concrete
+test that the `Error` translation preserves the constructor.
+
+## Flagship hax example: `Adc.lean`
+
+`Interop/Hax/Adc.lean` reproduces hax's own `lean_adc` demo inside
+the bridge. The Rust source is
+
+```rust
+pub fn adc_u32(a: u32, b: u32, carry_in: u32) -> (u32, u32) {
+    let wide: u64 = a as u64 + b as u64 + carry_in as u64;
+    let sum: u32 = wide as u32;
+    let carry_out: u32 = (wide >> 32u64) as u32;
+    (sum, carry_out)
+}
+```
+
+hax's `#[hax_lib::lean::after(...)]` attribute embeds the canonical
+ADC Triple in the source; we reproduce it verbatim and close it with
+hax's heavyweight proof stack:
+
+```lean
+set_option maxHeartbeats 1000000 in
+set_option hax_mvcgen.specset "bv" in
+theorem adc_u32_spec (a b carry_in : u32) :
+    ⦃⌜carry_in ≤ 1⌝⦄
+    adc_u32 a b carry_in
+    ⦃⇓ ⟨sum, carry_out⟩ =>
+      ⌜carry_out ≤ 1 ∧
+        UInt32.toUInt64 a + UInt32.toUInt64 b + UInt32.toUInt64 carry_in =
+          UInt32.toUInt64 sum + (UInt32.toUInt64 carry_out <<< (32 : UInt64))⌝⦄ := by
+  hax_mvcgen [adc_u32]
+    <;> bv_decide (timeout := 90)
+```
+
+Transport to `RustOracleComp` is still one line:
+
+```lean
+theorem adc_u32_Lifted_spec [spec.Fintype] [spec.Inhabited]
+    (a b carry_in : u32) :
+    ⦃⌜carry_in ≤ 1⌝⦄
+    (adc_u32_Lifted (spec := spec) a b carry_in)
+    ⦃⇓ ⟨sum, carry_out⟩ =>
+      ⌜carry_out ≤ 1 ∧
+        UInt32.toUInt64 a + UInt32.toUInt64 b + UInt32.toUInt64 carry_in =
+          UInt32.toUInt64 sum + (UInt32.toUInt64 carry_out <<< (32 : UInt64))⌝⦄ := by
+  unfold adc_u32_Lifted
+  exact triple_liftRustM _ (adc_u32_spec a b carry_in)
+```
+
+This is the full intended workflow: a real hax-emitted function,
+a bit-blasted proof closed entirely by `hax_mvcgen <;> bv_decide`, and
+a one-line transport to the oracle-aware target.
 
 ## Probabilistic spec: genuine VCVio-side content
 
@@ -259,25 +388,40 @@ without detour through the transformer stack.
   `Interop.Hax.Bridge` tactic-free.
 - See `docs/agents/interop.md` for the full risk list.
 
-## Next steps
+## Completed follow-ups
 
-- Wire `triple_liftRustM` into a `@[spec]` attribute (currently a plain
-  theorem) once we have a concrete hax example whose pre/post shapes
-  let `mvcgen` index it cleanly.
-- Port a larger hax example that exercises more of the `_root_.Error`
-  enum (e.g. `divisionByZero`, `arrayOutOfBounds`) so the full
-  `errorOfHax` rebrand is tested end-to-end. `Computation.lean` only
-  exercises the `integerOverflow` branch, and only indirectly (the
-  precondition rules it out).
-- Exercise `hax_mvcgen` on a larger hax-emitted function. `Computation`
-  is small enough that plain `mvcgen` + `omega` closes it; the
-  `lean_adc` example with `hax_mvcgen [..] <;> bv_decide` is the
-  natural next step for stressing the tactic interaction.
-- State `liftRustM` as a more general `MonadHom` / `MonadMorphism` so
-  that it transports any hax-side `Pr[_]`-style probabilistic spec, not
-  just Hoare `Triple`s. Only needed once we have a probabilistic hax
-  workflow.
-- Generalize the `tossedAdd_run_run` peel into a reusable lemma of the
-  form `(liftM oa >>= k).run.run = oa >>= fun x => (k x).run.run`; this
-  is the shape `mvcgen`/`simp` needs for any `RustOracleComp` program
-  that interleaves oracle queries with lifted `RustM` calls.
+The previous round of TODOs (as of PR #292) is now resolved:
+
+- `triple_liftRustM` is `@[spec]`-tagged; `mvcgen` auto-applies it,
+  collapsing `addOrPanicLifted_triple` to a one-tactic proof and
+  reducing every downstream `*_Lifted_spec` to
+  `triple_liftRustM _ (hax_side_spec …)`.
+- `Division.lean` exercises the `.divisionByZero` constructor of
+  `errorOfHax` end-to-end, both at the Triple level and via the
+  equality-level `checkedDivLifted_fail_of_zero` witness.
+- `Adc.lean` runs `hax_mvcgen [..] <;> bv_decide` on the canonical
+  `adc_u32` ADC function and transports the result over the bridge.
+- `liftRustM` is bundled as a `LawfulMonadLift` instance and a
+  `MonadHom` (`liftRustMHom`), so any monad-morphism-indexed property
+  (`mmap_pure`, `mmap_bind`, `mmap_map`, `mmap_seq`, …) transports
+  automatically across the lift — not just Hoare triples.
+- The `tossedAdd_run_run` proof idiom is generalized into reusable
+  `@[simp]` peel lemmas in `Interop/Rust/Run.lean`
+  (`run_run_bind_liftM`, `run_run_liftM`, `run_run_pure`,
+  `run_run_throw`, `run_run_div`, `run_run_fail`, `run_run_ok`), which
+  drive the probabilistic proofs in both `Examples.lean` and
+  `Division.lean`.
+
+## Remaining open questions
+
+- A probabilistic hax-side spec library does not exist yet, so the
+  `MonadHom` is currently used only structurally. If hax ever ships a
+  `Pr[_]`-style spec layer, `mmap_pure` / `mmap_bind` on
+  `liftRustMHom` will transport those specs without any additional
+  infrastructure.
+- `Adc.lean` bumps `maxHeartbeats` to 1M; reducing this (e.g. by a
+  more targeted specset than `"bv"`) is a worthwhile but non-urgent
+  optimization.
+- A genuinely oracle-using hax function (e.g. a randomized
+  construction compiled by hax) remains the natural next milestone:
+  every hax example we can currently find is deterministic.

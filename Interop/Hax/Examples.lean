@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import Interop.Hax.Bridge
+import Interop.Rust.Run
 import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.Instances.ErrorT
 import VCVio.EvalDist.Instances.OptionT
@@ -124,10 +125,6 @@ theorem addOrPanicLifted_triple (x y : Nat) :
     (addOrPanicLifted (spec := spec) x y)
     ⦃⇓ r => ⌜r = x + y⌝⦄ := by
   mvcgen [addOrPanicLifted, addOrPanic]
-  intro h
-  have h' : x + y < 4294967296 := h
-  rw [if_pos h']
-  simp [liftRustM_pure]
 
 end TripleSpec
 
@@ -226,13 +223,10 @@ This is the canonical intermediate form for probability claims on
 every `Pr[=]`, `support`, and `evalDist` lemma from VCVio applies
 directly.
 
-Proof sketch: the lift of `$[0..1]` is `ExceptT.lift ∘ OptionT.lift`,
-so `ExceptT.run_bind_lift` and `OptionT.run_bind_lift` peel each layer
-around the bind; the `then`/`else` branches reduce to
-`RustOracleComp.ok 0` and `RustOracleComp.fail .integerOverflow` via
-`addOrPanicLifted_ok_of_lt` / `addOrPanicLifted_fail_of_ge`, whose
-`.run` values are, respectively, `pure (.ok 0)` and
-`pure (.error .integerOverflow)` in the inner monad. -/
+The proof is a one-liner thanks to the reusable peel lemmas in
+`Interop.Rust.Run`: `run_run_bind_liftM` peels the `liftM $[0..1]`
+bind, and `run_run_{pure,throw}` (via the constructor equations on the
+two branches) handle the `then`/`else` tails. -/
 theorem tossedAdd_run_run :
     tossedAdd.run.run =
       ($[0..1] >>= fun b : Fin 2 =>
@@ -248,16 +242,12 @@ theorem tossedAdd_run_run :
       = throw .integerOverflow :=
     addOrPanicLifted_fail_of_ge (spec := unifSpec) (2^32) 0 (by decide)
   unfold tossedAdd
-  simp only [h_ok, h_fail]
-  -- The `liftM $[0..1]` on the RHS is definitionally `ExceptT.lift (OptionT.lift $[0..1])`
-  -- via the `MonadLift` chain; `change` pins this down so the `run_bind_lift` lemmas fire.
-  change (ExceptT.run ((ExceptT.lift (OptionT.lift ($[0..1] : OracleComp unifSpec _)) :
-      Interop.Rust.RustOracleComp unifSpec (Fin 2)) >>= fun b =>
-      if b = 0 then (pure 0 : Interop.Rust.RustOracleComp unifSpec Nat)
-      else throw .integerOverflow)).run = _
-  simp only [ExceptT.run_bind_lift, apply_ite ExceptT.run, ExceptT.run_pure, ExceptT.run_throw,
-    OptionT.run_bind_lift, apply_ite OptionT.run, OptionT.run_pure, apply_ite some,
-    apply_ite (pure (f := OracleComp unifSpec))]
+  simp only [h_ok, h_fail,
+    Interop.Rust.RustOracleComp.run_run_bind_liftM,
+    apply_ite (f := fun x : Interop.Rust.RustOracleComp unifSpec Nat => x.run.run),
+    Interop.Rust.RustOracleComp.run_run_pure,
+    Interop.Rust.RustOracleComp.run_run_throw,
+    apply_ite (pure (f := OracleComp unifSpec)), apply_ite some]
 
 /-- Panic probability of `tossedAdd` is exactly `1/2`. This is the core
 claim only statable on the VCVio side: the hax `Triple` layer is
