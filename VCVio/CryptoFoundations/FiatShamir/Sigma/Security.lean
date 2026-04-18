@@ -517,20 +517,46 @@ private lemma probEvent_bad_simPhaseCExp_le_collisionSlack
       collisionSlack qS qH β := by
   sorry
 
+omit [Fintype Chal] [SampleableType Chal] [SampleableType Stmt] [SampleableType Wit]
+  [DecidableEq M] [DecidableEq Commit] in
+/-- **C7a.** `freshSuccess ⇒ verified` is a pointwise event implication, so the
+`freshSuccess` mass is bounded by the `verified` marginal of the same SPMF. -/
+private lemma probEvent_freshSuccess_le_verified
+    (m : SPMF PhaseCResult) :
+    Pr[= true | PhaseCResult.freshSuccess <$> m] ≤
+      Pr[= true | (·.verified) <$> m] := by
+  rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
+    probEvent_map, probEvent_map]
+  refine probEvent_mono fun r _ hfresh => ?_
+  simp only [Function.comp_apply, PhaseCResult.freshSuccess,
+    Bool.and_eq_true, Bool.not_eq_true'] at hfresh
+  exact hfresh.2
+
 omit [Fintype Chal] in
-/-- **C7.** Project away the extra Phase C bookkeeping (`signLog`, `bad`):
-on the `freshSuccess` event the `simPhaseCExp` distribution agrees with
-`managedRoNmaExp (nmaAdvFromHVZK σ hr M simTranscript adv)`, since the latter is
+/-- **C7b.** Project away the extra Phase C bookkeeping (`signLog`, `bad`):
+the `verified` marginal of `simPhaseCExp` equals the success probability of
+`managedRoNmaExp (nmaAdvFromHVZK σ hr M simTranscript adv)`. The latter is
 literally `simulateQ (baseSimImpl + sigSimImpl simTranscript pk) (adv.main pk)`
-followed by live verification, and the extra Phase C state is irrelevant to the
-`(msg, sig, verified)` marginal. The `freshSuccess` event implies `verified`,
-matching the managed-RO experiment's success predicate. -/
+followed by live verification; the extra Phase C state (`signLog`, `bad`) is
+irrelevant to the `(msg, sig, verified)` marginal once we project `PhaseCState`
+down to `overlayCache : QueryCache`. -/
+private lemma probEvent_verified_simPhaseCExp_le_managedRoAdvantage :
+    Pr[= true | (·.verified) <$> simPhaseCExp σ hr M simTranscript adv] ≤
+      SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
+  sorry
+
+omit [Fintype Chal] in
+/-- **C7.** Composition of C7a and C7b: on the `freshSuccess` event the
+`simPhaseCExp` distribution is bounded by the canonical managed-RO NMA
+experiment for `nmaAdvFromHVZK`. -/
 private lemma probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage :
     Pr[= true |
         PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
-        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
-  sorry
+        (nmaAdvFromHVZK σ hr M simTranscript adv) :=
+  (probEvent_freshSuccess_le_verified _).trans
+    (probEvent_verified_simPhaseCExp_le_managedRoAdvantage σ hr M simTranscript adv)
 
 omit [Fintype Chal] in
 /-- **C4.** Phase C hybrid step (composition of C1, C3, C2): the EUF-CMA
