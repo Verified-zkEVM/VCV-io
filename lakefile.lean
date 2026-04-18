@@ -15,11 +15,12 @@ package VCVio where
 
 /-
 Interop backends — pinned to explicit git revisions so reproducible builds are
-guaranteed and bumping a pin is a deliberate, reviewed change. Both pins are
-**commented out by default** so a fresh clone builds without pulling in the
-Rust verification toolchains' TCB. Flip on whichever backend you need; the CI
-TCB-isolation check (`scripts/check-interop-isolation.sh`) protects against
-accidental cross-imports regardless of whether the requires are active.
+guaranteed and bumping a pin is a deliberate, reviewed change. The current
+branch keeps **Hax enabled by default** because `Interop.lean` imports the
+Hax-backed bridge and examples; Aeneas stays commented out until upstream
+ships a Lean v4.29-compatible release. The CI TCB-isolation check
+(`scripts/check-interop-isolation.sh`) still protects against accidental
+cross-imports regardless of which backend requires are active.
 
 Important: `require mathlib` must come **after** any Interop backend `require`s
 so Mathlib's transitive pins (in particular `Qq`) win over the backends'. Lake

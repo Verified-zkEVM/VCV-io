@@ -87,6 +87,7 @@ set_option maxHeartbeats 1000000 in
 -- `bv_decide` over the full 64-bit ADC equation is the heaviest proof
 -- in the bridge; mirrors hax's own `lean_adc` example which also bumps
 -- the heartbeats limit.
+set_option mvcgen.warning false in
 set_option hax_mvcgen.specset "bv" in
 theorem adc_u32_spec (a b carry_in : u32) :
     ⦃⌜carry_in ≤ 1⌝⦄

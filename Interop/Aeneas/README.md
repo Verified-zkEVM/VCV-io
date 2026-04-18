@@ -46,12 +46,14 @@ namespace Interop.Aeneas
     `ok v → RustOracleComp.pure v`,
     `fail e → RustOracleComp.fail (errorOfAeneas e)`,
     `div   → RustOracleComp.div`. -/
+def errorOfAeneas : Aeneas.Std.Error → Interop.Rust.Error := ...
+
 def ofResult {ι : Type} {spec : OracleSpec ι} {α : Type}
     (r : Aeneas.Std.Result α) : Interop.Rust.RustOracleComp spec α :=
   match r with
   | .ok v   => pure v
-  | .fail e => Interop.Rust.fail (Interop.Rust.Error.ofAeneas e)
-  | .div    => Interop.Rust.div
+  | .fail e => Interop.Rust.RustOracleComp.fail (errorOfAeneas e)
+  | .div    => Interop.Rust.RustOracleComp.div
 
 instance {ι : Type} {spec : OracleSpec ι} :
     MonadLift Aeneas.Std.Result (Interop.Rust.RustOracleComp spec) where

@@ -123,7 +123,7 @@ Bump the hax pin (or un-comment aeneas once fixed) by editing the
 
 ## Bridge Design (Reference)
 
-When you flip on the hax require, add `Interop/Hax/Bridge.lean`:
+With the hax require enabled, `Interop/Hax/Bridge.lean` begins:
 
 ```lean
 import Hax.rust_primitives.RustM
@@ -144,16 +144,18 @@ exactly that PostShape.
 For aeneas, `Interop/Aeneas/Bridge.lean` will pattern-match on `Result`:
 
 ```lean
+def errorOfAeneas : Aeneas.Std.Error → Interop.Rust.Error := ...
+
 def ofResult {ι : Type} {spec : OracleSpec ι} {α : Type}
     (r : Aeneas.Std.Result α) : Interop.Rust.RustOracleComp spec α :=
   match r with
   | .ok v   => pure v
-  | .fail e => Interop.Rust.RustOracleComp.fail (Interop.Rust.Error.ofAeneas e)
+  | .fail e => Interop.Rust.RustOracleComp.fail (errorOfAeneas e)
   | .div    => Interop.Rust.RustOracleComp.div
 ```
 
-with `Interop.Rust.Error.ofAeneas` (and `.ofHax`) being constructor-by-
-constructor maps from the upstream isomorphic enum.
+with `errorOfAeneas` (and `errorOfHax`) being constructor-by-constructor
+maps from the upstream isomorphic enum.
 
 ## Risks and Open Questions
 

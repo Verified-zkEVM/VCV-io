@@ -119,6 +119,7 @@ jobs:
             --path-prefix FFI/ \
             --path-prefix Examples/ \
             --path-prefix Interop/ \
+            --path-prefix Interop.lean \
             --exclude-substring 'declaration uses `sorry`' \
             --label 'repository non-sorry warnings'
       - name: Time warm rebuild

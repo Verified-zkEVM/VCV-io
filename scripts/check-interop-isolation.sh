@@ -40,11 +40,13 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-# Pick the fastest available searcher. `rg` uses its default regex flavor;
-# `grep` needs `-E` (POSIX ERE) to support `(a|b|c)` alternation. Both
-# variants treat the pattern argument identically.
+# Pick the fastest available searcher. Keep the `rg` and `grep` branches on
+# the same surface area by restricting both to `*.lean` files; otherwise the
+# `rg` path would scan Markdown and could flag documentation snippets that the
+# fallback ignores. `grep` also needs `-E` (POSIX ERE) to support `(a|b|c)`
+# alternation. Both variants treat the pattern argument identically.
 if command -v rg >/dev/null 2>&1; then
-  SEARCH=(rg --no-heading --line-number --color=never)
+  SEARCH=(rg --no-heading --line-number --color=never --glob '*.lean')
 else
   SEARCH=(grep -RHn -E --include='*.lean')
 fi
