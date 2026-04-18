@@ -352,22 +352,105 @@ theorem euf_cma_to_nma
     -- where Game 1 drops the freshness check (`!log.wasQueried msg`) from the CMA
     -- experiment (monotone as `!b && v ≤ v`) and Game 2 is `managedRoNmaExp nmaAdv`
     -- where each real signing query has been replaced by the HVZK simulator.
-    --
-    -- Infrastructure supplied by this file:
-    --   • `FiatShamir.collisionSlack qS qH Chal` — concrete birthday term.
-    --   • `SPMFSemantics.withStateOracle_evalDist_{map,bind_pure}` — pushes `<$>` and
-    --     `>>= pure ∘ f` through `(runtime M).evalDist` for `probEvent_mono` + Phase B.
-    --   • `euf_nma_bound` (forking-lemma side) — closes Phase D downstream together
-    --     with `Fork.replayForkingBound` and special soundness.
-    --
-    -- Phase B is a short monotonicity argument using `probEvent_mono` applied to the
-    -- Boolean map `fun p => !p.1 && p.2` vs. `Prod.snd`, after refactoring the CMA
-    -- experiment as a common trace `⟨log.wasQueried msg, verified⟩` under the map
-    -- lemmas above. Phases C + D require an inductive TV accumulation over the `qS`
-    -- signing queries (one HVZK application per query) and an identical-until-bad
-    -- argument against the `(msg, c)`-collision event, bounded by `collisionSlack`.
-    -- These together constitute the remaining proof obligation of this theorem.
-    sorry
+    -- **Common trace**: the CMA experiment with the final `return` deferred to `pure
+    -- (log.wasQueried msg, verified)`, so Game 0 (`unforgeableExp`) and Game 1 (below)
+    -- are both expressible as a `<$>` on this shared computation. The internal
+    -- `letI`s use `Classical.decEq` so the `QueryLog.wasQueried` dictionary matches
+    -- `SignatureAlg.unforgeableExp` verbatim (it uses the same pattern).
+    let sigAlg : SignatureAlg (OracleComp (unifSpec + (M × Commit →ₒ Chal))) M Stmt Wit
+        (Commit × Resp) :=
+      FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M
+    set commonBlock : OracleComp (unifSpec + (M × Commit →ₒ Chal)) (Bool × Bool) :=
+      letI : DecidableEq M := Classical.decEq M
+      letI : DecidableEq (Commit × Resp) := Classical.decEq _
+      do
+        let (pk, sk) ← sigAlg.keygen
+        let impl : QueryImpl (unifSpec + (M × Commit →ₒ Chal) + (M →ₒ (Commit × Resp)))
+            (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+              (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
+          (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+            (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))).liftTarget
+              (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+                (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) +
+            sigAlg.signingOracle pk sk
+        let sim_adv : WriterT (QueryLog (M →ₒ (Commit × Resp)))
+            (OracleComp (unifSpec + (M × Commit →ₒ Chal))) (M × Commit × Resp) :=
+          simulateQ impl (adv.main pk)
+        let ((msg, σ_fg), log) ← sim_adv.run
+        let verified ← sigAlg.verify pk msg σ_fg
+        pure (log.wasQueried msg, verified) with hcommonBlock_def
+    -- **Phase B**: `adv.advantage ≤ Pr[= true | Prod.snd <$> runtime.evalDist commonBlock]`.
+    -- The CMA experiment is `(fun p => !p.1 && p.2) <$> commonBlock`, and the implication
+    -- `!p.1 && p.2 = true → p.2 = true` gives monotonicity.
+    have hCma_eq :
+        SignatureAlg.unforgeableExp (runtime M) adv =
+          (fun p : Bool × Bool => !p.1 && p.2) <$>
+            (runtime M).evalDist commonBlock := by
+      rw [← runtime_evalDist_map]
+      change (runtime M).evalDist _ = (runtime M).evalDist _
+      congr 1
+      simp only [hcommonBlock_def, map_eq_bind_pure_comp,
+        bind_assoc, pure_bind, Function.comp_def, sigAlg]
+    have hPhaseB :
+        adv.advantage (runtime M) ≤
+          Pr[= true | Prod.snd <$> (runtime M).evalDist commonBlock] := by
+      unfold SignatureAlg.unforgeableAdv.advantage
+      rw [hCma_eq, ← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
+        probEvent_map, probEvent_map]
+      refine probEvent_mono (fun p _ hp => ?_)
+      rcases p with ⟨b1, b2⟩
+      simp only [Function.comp_apply, Bool.and_eq_true, Bool.not_eq_true'] at hp ⊢
+      exact hp.2
+    -- **Game 2 (HVZK-swapped)**: Game 1 with each real signing call replaced by
+    -- `sigSim pk`. This is structurally the inner block of `managedRoNmaExp nmaAdv`,
+    -- where `nmaAdv.main pk = (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅`.
+    set game2Block : OracleComp (unifSpec + (M × Commit →ₒ Chal)) Bool :=
+      letI : DecidableEq M := Classical.decEq M
+      letI : DecidableEq (Commit × Resp) := Classical.decEq _
+      do
+        let (pk, _sk) ← sigAlg.keygen
+        let ((msg, σ_fg), advCache) ←
+          (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅
+        withCacheOverlay advCache (sigAlg.verify pk msg σ_fg) with hgame2Block_def
+    -- **Phase C (HVZK hybrid)**: swap real signing for `sigSim`, paying `qS·ζ_zk` in
+    -- total variation. Each of the up to `qS` signing queries the adversary makes
+    -- advances by one HVZK step (triangle inequality over the transcript-sampling
+    -- and cache-programming steps), bounded by `ζ_zk` per step (`_hhvzk` applied
+    -- at `pk, sk` after the cache state is preserved by the unwind of `sigSim`).
+    -- The resulting per-query TV bound composes additively via
+    -- `tvDist_bind_{left,right}_le` into a total `qS·ζ_zk` slack, once a pending
+    -- "no-collision" event is carried through the induction.
+    have hPhaseC :
+        Pr[= true | Prod.snd <$> (runtime M).evalDist commonBlock] ≤
+          Pr[= true | (runtime M).evalDist game2Block] +
+            ENNReal.ofReal (qS * ζ_zk) := by
+      sorry
+    -- **Phase D (fork bridge)**: Game 2's verification goes through
+    -- `withCacheOverlay advCache (...)`, whereas `Fork.exp` checks against the *live*
+    -- `roCache` and also demands the target hash point be in the live query log.
+    -- The gap is the "programming collision" event where the live-and-cached
+    -- challenges disagree for some `(msg, c)` produced during signing; an
+    -- identical-until-bad argument bounds the gap by the birthday term
+    -- `collisionSlack qS qH Chal = qS * (qS + qH) / card Chal`.
+    have hPhaseD :
+        Pr[= true | (runtime M).evalDist game2Block] ≤
+          Fork.advantage σ hr M
+              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
+            collisionSlack qS qH Chal := by
+      sorry
+    -- Chain Phase C + Phase D into the full CMA-to-Fork bound.
+    calc adv.advantage (runtime M)
+        ≤ Pr[= true | Prod.snd <$> (runtime M).evalDist commonBlock] := hPhaseB
+      _ ≤ Pr[= true | (runtime M).evalDist game2Block] +
+            ENNReal.ofReal (qS * ζ_zk) := hPhaseC
+      _ ≤ (Fork.advantage σ hr M
+              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
+            collisionSlack qS qH Chal) + ENNReal.ofReal (qS * ζ_zk) := by
+            exact add_le_add hPhaseD le_rfl
+      _ = Fork.advantage σ hr M
+              ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩ qH +
+            ENNReal.ofReal (qS * ζ_zk) +
+            collisionSlack qS qH Chal := by ring
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]

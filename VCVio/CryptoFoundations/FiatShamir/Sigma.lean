@@ -74,6 +74,25 @@ noncomputable def runtime :
     ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
+/-- The Fiat-Shamir runtime commutes with `<$>`: mapping a function over the surface
+computation is the same as mapping it over the observed `SPMF`. A direct corollary of
+`SPMFSemantics.withStateOracle_evalDist_map`. -/
+lemma runtime_evalDist_map
+    {α β : Type} (f : α → β)
+    (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
+    (runtime M).evalDist (f <$> mx) = f <$> (runtime M).evalDist mx :=
+  SPMFSemantics.withStateOracle_evalDist_map _ _ _ _
+
+/-- The Fiat-Shamir runtime commutes with `>>= pure ∘ f`. A direct corollary of
+`runtime_evalDist_map`. -/
+lemma runtime_evalDist_bind_pure
+    {α β : Type} (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (f : α → β) :
+    (runtime M).evalDist (mx >>= fun x => pure (f x)) =
+      f <$> (runtime M).evalDist mx := by
+  have heq : (mx >>= fun x => pure (f x)) = f <$> mx := by
+    rw [map_eq_bind_pure_comp]; rfl
+  rw [heq, runtime_evalDist_map]
+
 end semantics
 
 section naturality
