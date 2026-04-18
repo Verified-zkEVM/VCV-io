@@ -215,14 +215,14 @@ section managedRoNma
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec ι} {M PK SK S : Type}
 
 /-- An EUF-NMA adversary with managed random oracle: the adversary returns a `QueryCache`
-alongside its forgery. The experiment verifies using `withCacheOverlay`, which resolves
-cached entries from the adversary's table and forwards misses to the real oracle.
+alongside its forgery. The cache is auxiliary reduction state, not part of the core
+experiment semantics: `managedRoNmaExp` still verifies against the live oracle.
 
-This supports compositional CMA-to-NMA reductions: the CMA-to-NMA reduction programs
-hash entries for signing simulation into the cache, while forwarding the inner adversary's
-hash queries to the external oracle. The forking lemma (`Fork.fork`) can then replay the
-external oracle queries via seeded simulation, while the programmed entries are preserved
-deterministically. -/
+This supports compositional CMA-to-NMA reductions that need to remember locally
+programmed entries while forwarding visible oracle queries to the external random
+oracle. The KOA-style forking wrapper is aligned to the same live-verification
+semantics. Reductions that need overlay-style reasoning should introduce that as a
+separate auxiliary game, for example via `withCacheOverlay`. -/
 structure managedRoNmaAdv (sigAlg : SignatureAlg (OracleComp spec) M PK SK S) where
   main (pk : PK) : OracleComp spec ((M × S) × spec.QueryCache)
 
