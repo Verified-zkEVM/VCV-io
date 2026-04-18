@@ -2397,6 +2397,8 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
     -- Simplify both sides to the one-step + suffix form.
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
       OracleQuery.input_query, id_map, StateT.run_bind]
+    -- Abbreviate `d := forkQuery - distinguishedCount` for the truncation position.
+    set d := stL.forkQuery - stL.distinguishedCount with hd_def
     -- Case-split on `stL.trace.drop stL.cursor`. Case `nil` is ruled out by `h_len`
     -- (it would force `d < 0`). The non-nil case then further splits on whether the
     -- head is an `i`-entry and on whether `d = 0`, matching Cases A/B/C above.
@@ -2405,11 +2407,42 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
       exfalso
       rw [hL] at h_len
       simp [QueryLog.getQ] at h_len
-    · -- `L_tail = ⟨t₀, u'₀⟩ :: L_tail'`. Remaining cases to discharge:
-      --   * Case A (t₀ ≠ i): lockstep (t = t₀) or live-mismatch (t ≠ t₀).
-      --   * Case B (t₀ = i, d = 0): fork-fires (t = i) or live-mismatch (t ≠ i).
-      --   * Case C (t₀ = i, d ≥ 1): lockstep (t = i) or live-mismatch (t ≠ i).
-      sorry
+    · -- `L_tail = ⟨t₀, u'₀⟩ :: L_tail'`. From this we derive the corresponding
+      -- `stL.nextEntry? = some ⟨t₀, u'₀⟩` and similarly for the RHS via `h_trace`.
+      have hL_cursor_lt : stL.cursor < stL.trace.length := by
+        by_contra hge; push Not at hge
+        rw [List.drop_of_length_le hge] at hL
+        exact List.cons_ne_nil _ _ hL.symm
+      have hL_next : stL.nextEntry? = some ⟨t₀, u'₀⟩ := by
+        unfold ReplayForkState.nextEntry?
+        have h0 : stL.trace[stL.cursor]? = (stL.trace.drop stL.cursor)[0]? := by
+          rw [List.getElem?_drop]; simp
+        rw [h0, hL]; rfl
+      -- The structure of `stR.nextEntry?` depends on whether `t₀ = i` and `d = 0`.
+      -- This is the three-way dispatch Case A / Case B / Case C described above.
+      by_cases h_t₀ : t₀ = i
+      · -- Cases B and C: `t₀ = i`. Further split on `d = 0` vs `d ≥ 1`.
+        subst h_t₀
+        by_cases hd0 : d = 0
+        · -- Case B: `t₀ = i`, `d = 0`. `R_tail = []`, `stR.nextEntry? = none`.
+          have hR_trace : stR.trace.drop stR.cursor = [] := by
+            rw [h_trace, hL, hd0, QueryLog.takeBeforeForkAt_cons_self_zero]
+          have hR_next : stR.nextEntry? = none := by
+            unfold ReplayForkState.nextEntry?
+            have h0 : stR.trace[stR.cursor]? = (stR.trace.drop stR.cursor)[0]? := by
+              rw [List.getElem?_drop]; simp
+            rw [h0, hR_trace]; rfl
+          -- Sub-cases on `t = i` (fork fires on LHS, RHS goes live) vs `t ≠ i`
+          -- (both go live). Both require the averaging argument / `fst_map_..._of_live`.
+          sorry
+        · -- Case C: `t₀ = i`, `d ≥ 1`. `R_tail = ⟨i, u'₀⟩ :: takeBeforeForkAt L_tail' i (d - 1)`.
+          -- `stR.nextEntry? = some ⟨i, u'₀⟩`. Sub-cases on `t = i` (both lockstep) or
+          -- `t ≠ i` (both go live via type mismatch).
+          sorry
+      · -- Case A: `t₀ ≠ i`. `R_tail = ⟨t₀, u'₀⟩ :: takeBeforeForkAt L_tail' i d`.
+        -- `stR.nextEntry? = some ⟨t₀, u'₀⟩`. Sub-cases on `t = t₀` (both lockstep, `t ≠ i`)
+        -- or `t ≠ t₀` (both go live via type mismatch).
+        sorry
 
 /-- **Replay-side prefix-faithfulness (key distributional claim for B1).**
 
