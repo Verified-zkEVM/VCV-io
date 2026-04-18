@@ -154,10 +154,13 @@ Triple collapses to the single BitVec assertion about the returned
 value. -/
 
 set_option mvcgen.warning false in
+set_option maxHeartbeats 1_000_000 in
 -- Bit-blasting a 64-bit intermediate with a 32-bit final result across
 -- five checked arithmetic ops needs substantially more heartbeats than
--- the default; this matches hax's upstream `lean_barrett` demo.
-set_option maxHeartbeats 1_000_000 in
+-- the default; this matches hax's upstream `lean_barrett` demo. The
+-- SAT timeout is bumped to 300 seconds (vs hax's upstream 90) because
+-- CI runners are substantially slower than developer laptops on this
+-- particular bit-blast; locally 90 suffices.
 theorem barrett_reduce_spec (value : i32) :
     ⦃⌜value.toInt64 ≥ -(4194304 : Int64) ∧
        value.toInt64 ≤ (4194304 : Int64)⌝⦄
@@ -167,7 +170,7 @@ theorem barrett_reduce_spec (value : i32) :
        r = value % (3329 : Int32) + (3329 : Int32) ∨
        r = value % (3329 : Int32) - (3329 : Int32))⌝⦄ := by
   unfold barrett_reduce FIELD_MODULUS BARRETT_R BARRETT_MULTIPLIER BARRETT_SHIFT
-  hax_bv_decide (timeout := 90)
+  hax_bv_decide (timeout := 300)
 
 /-! ### Oracle-lifted Barrett
 
