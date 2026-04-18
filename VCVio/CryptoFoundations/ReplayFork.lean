@@ -2933,25 +2933,76 @@ first- and second-run outputs are exchangeable with identical marginals given by
 replay computation `replayRunWithTraceValue main i (takeBeforeForkAt ..) s u` on a
 fresh uniform `u`.
 
-Proof plan:
-1. Rewrite both sides as tsums over the truncated log `τ` by pushing the
-   `trunc p.2`-dependence through with `tsum_congr` and the `takeBeforeForkAt`
-   "equal or short" characterisation of the fibres of
-   `p ↦ takeBeforeForkAt p.2 i s`.
-2. For each fixed `τ`, the two inner tsums over `p` with `takeBeforeForkAt p.2 i s = τ`
-   have a joint-marginal interpretation: they average `[cf p.1 = y]` vs. the replay
-   marginal over the remaining (post-`τ`) randomness of `main`.
-3. Proceed by induction on `main`, mirroring the seeded analogue structurally.
-   The logging-oracle on the LHS extends the log with whatever `main` produces;
-   the replay-oracle on the RHS starts from the truncated prefix.  Pre-fork, both
-   sides consume matching entries; at the truncation boundary both go live with a
-   fresh uniform (this is what `B1a`, encoded as
-   `probOutput_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`,
-   captures); post-fork, both sides are in live mode and the two marginal distributions
-   coincide.
+### Proof strategy (structural induction on `main`)
 
-Deferred as a large structural induction (cf. the ~150-line seeded
-`tsum_probOutput_generateSeed_weight_takeAtIndex`). -/
+Setting `P(main,s,h) := LHS` and `Q(main,s,h) := RHS`, the identity is equivalent to
+"conditional on `takeBeforeForkAt log_A i s = τ`, the first-run output `x_A` has the
+same distribution as a fresh replay run from state `(τ, s, u)` with `u ← $ᵗ`".
+This is proven by induction on `main`.
+
+**Pure case** (`main = pure a`). `replayFirstRun (pure a) = pure (a, [])`, and
+`replayRunWithTraceValue (pure a) i τ s u = pure (a, init τ s u)`. Both sides
+collapse to `h [] * [y = f a]` (the `$ᵗ` on the RHS averages to a constant since
+`Pr[⊥ | $ᵗ] = 0` and the output does not depend on `u`).
+
+**query_bind case** (`main = liftM (query t) >>= mx`). Using
+`run_simulateQ_loggingOracle_query_bind`, rewrite
+
+  `replayFirstRun (query t >>= mx) = query t >>= fun u =>
+      (fun p => (p.1, ⟨t,u⟩ :: p.2)) <$> replayFirstRun (mx u)`.
+
+This lets us change variables `p ↦ (p'.1, ⟨t,u⟩ :: p'.2)` via
+`Function.Injective.tsum_eq`, so both LHS and RHS become a double tsum
+
+  `∑' u, Pr[u | $ᵗ] * ∑' p', Pr[p' | FR (mx u)] * (h (trunc (⟨t,u⟩ :: p'.2) i s) * _)`
+
+where the inner `_` is `[y = f p'.1]` on the LHS and
+`Pr[y | f <$> fst <$> (v ← $ᵗ; replayRun(main, i, trunc (⟨t,u⟩ :: p'.2) i s, s, v))]`
+on the RHS. Case-split on `t vs i` and `s`:
+
+* **Case t ≠ i.** By `takeBeforeForkAt_cons_of_ne`,
+  `trunc (⟨t,u⟩ :: p'.2) i s = ⟨t,u⟩ :: trunc p'.2 i s`. Setting
+  `h'(τ) := h(⟨t,u⟩ :: τ)` and using `replayOracle_run_lockstep_ne_i` to advance
+  the replay past the `⟨t,u⟩` entry (which matches on type `t` since `t ≠ i` forces
+  the lockstep branch), the RHS inner reduces (via state-equivalence) to
+  `M_{mx u}(trunc p'.2 i s, s)`. Apply IH to `(mx u, i, s, h')`.
+
+* **Case t = i, s = 0.** By `takeBeforeForkAt_cons_self_zero`,
+  `trunc (⟨i,u⟩ :: p'.2) i 0 = []`. So `h(trunc _) = h([])` is constant.
+  The RHS inner is `M_main([], 0)`: starting from `init [] 0 u'`, the replay has
+  `nextEntry? = none` and fires live via `replayOracle_run_nextEntry_none`,
+  after which `fst_map_simulateQ_replayOracle_of_live` collapses the rest to
+  `main`. So `M_main([], 0) = Pr[y | f <$> main]`. The LHS inner, integrated
+  over `(x, p') ~ FR (mx u)`, gives `Pr[y | f <$> mx u]` (by
+  `fst_map_replayFirstRun`). Summed over `u ← $ᵗ` and paired with `h([])`, both
+  sides equal `h([]) * Pr[y | f <$> main]`.
+
+* **Case t = i, s = k+1.** By `takeBeforeForkAt_cons_self_succ`,
+  `trunc (⟨i,u⟩ :: p'.2) i (k+1) = ⟨i,u⟩ :: trunc p'.2 i k`. Setting
+  `h'(τ) := h(⟨i,u⟩ :: τ)` and using `replayOracle_run_lockstep_i_pre_fork` (since
+  `distinguishedCount = 0 ≠ k+1 = forkQuery`) to advance past the `⟨i,u⟩` entry,
+  the RHS inner reduces (via state-equivalence) to `M_{mx u}(trunc p'.2 i k, k)`.
+  Apply IH to `(mx u, i, k, h')`.
+
+### State-equivalence sub-lemma
+
+In the two lockstep cases we need: `fst <$> (simulateQ (replayOracle i) (mx u)).run st₁`
+has the same distribution as `fst <$> replayRunWithTraceValue (mx u) i τ' s' u'`,
+where `st₁` is the post-lockstep state (cursor = 1, trace = `⟨t,u⟩ :: τ'`, dc = 0 or
+1, fq = s, observed = `[⟨t,u⟩]`) and the RHS starts from `init τ' s' u'` (cursor = 0,
+trace = τ', dc = 0, fq = s', observed = []), with `s' = fq - dc`. The two states
+agree on the structural fields read by `replayOracle` (trace.drop cursor = τ',
+fq - dc = s', forkConsumed = false, mismatch = false, replacement = u'); the
+differing fields (cursor, trace.take cursor, observed) are write-only. This can be
+proven by a parallel structural induction on `mx u`, dispatching on the same
+per-step cases as B1a aux.
+
+For the "short log" specialization of this state-equivalence
+(when `τ'.getQ (· = i) |>.length ≤ s'`), it follows directly from
+`takeBeforeForkAt_of_getQ_length_le` plus the fact that in this regime the
+`takeBeforeForkAt` truncation is a no-op and `B1a aux` collapses to a reflexive
+statement. The general case is a write-only-field-irrelevance argument analogous
+to the proof structure of B1a aux. -/
 private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
     {β : Type} (main : OracleComp spec α) (i : ι) (s : ℕ)
     (f : α → β) (y : β) (h : QueryLog spec → ℝ≥0∞) :
