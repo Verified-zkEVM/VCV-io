@@ -102,7 +102,7 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
   intro s
   rw [simulateQ_bind, StateT.run_bind]
   rw [show simulateQ hidingAvgQueryImpl
-      ((hidingOa A s : OracleComp (CMOracle M S C) Bool).liftComp (HidingAvgSpec M S C)) =
+      ((hidingOa A s).liftComp (HidingAvgSpec M S C)) =
         simulateQ hidingAvgRightImpl (hidingOa A s) by
         simpa [hidingAvgQueryImpl, OracleComp.liftComp_eq_liftM] using
           (QueryImpl.simulateQ_add_liftComp_right
