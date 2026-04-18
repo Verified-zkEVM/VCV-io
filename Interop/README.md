@@ -51,9 +51,19 @@ Interop/
 │   │                       `tossedAdd` with `Pr[panic] = 1/2`
 │   ├── Computation.lean  ← hax-emitted `x + x + 1` (first real hax source)
 │   ├── Division.lean     ← hax-emitted `/?`: `.divisionByZero` end-to-end
-│   └── Adc.lean          ← hax `lean_adc`: 32-bit ADC via
-│                           `hax_mvcgen <;> bv_decide`, transported by
-│                           one application of `triple_liftRustM`
+│   ├── Adc.lean          ← hax `lean_adc`: 32-bit ADC via
+│   │                       `hax_mvcgen <;> bv_decide`, transported by
+│   │                       one application of `triple_liftRustM`
+│   ├── Barrett.lean      ← hax `lean_barrett`: signed 32-bit Barrett
+│   │                       reduction mod 3329, proven in-range via
+│   │                       `hax_bv_decide` (bit-blast, 300s timeout)
+│   └── CenteredBinomial.lean
+│                         ← CBD(η = 1) sampler from `third_party/hax-cbd`;
+│                           first randomized hax source. Deterministic
+│                           `{-1, 0, 1}` range over all `u8` by
+│                           `native_decide`; exact distribution
+│                           `Pr[0] = 1/2`, `Pr[±1] = 1/4` on
+│                           `sampleRandomCbd1 : RustOracleComp unifSpec i32`
 └── Aeneas/               ← bridge to `Aeneas.Std.Result` (currently disabled)
     └── README.md
 ```
