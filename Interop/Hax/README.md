@@ -47,6 +47,18 @@ Bridge code is in place:
   automation end of the bridge: no user arithmetic, no transformer
   plumbing; once the Rust-side proof closes, the lifted proof is one
   line.
+- `Barrett.lean` — first genuinely lattice-cryptographic hax example:
+  the signed Barrett reduction `barrett_reduce` from hax's
+  `examples/lean_barrett` (the ML-KEM / Kyber modular reduction by
+  `q = 3329`). Proved with `hax_bv_decide (timeout := 90)` on the
+  `RustM` side over five chained checked operations (`*?` / `+?` /
+  `-?` / `>>>?`) and two cross-width casts (`i32 ↔ i64`); lifted to
+  `RustOracleComp` in one line. Also bundles `oracleThenBarrett`, an
+  oracle-composed version that samples a field coefficient, reduces
+  it, and proves (via `wpProp_iff_forall_support` plus
+  `Triple.entails_wp_of_post` on `barrett_reduce_Lifted_spec`) that
+  the result always lands in the representative window
+  `(-FIELD_MODULUS, FIELD_MODULUS)`.
 
 `lake build Interop` succeeds across all of the above.
 
@@ -324,6 +336,122 @@ This is the full intended workflow: a real hax-emitted function,
 a bit-blasted proof closed entirely by `hax_mvcgen <;> bv_decide`, and
 a one-line transport to the oracle-aware target.
 
+## First lattice-crypto primitive: `Barrett.lean`
+
+`Interop/Hax/Barrett.lean` is the first hax example in the bridge that
+is actually used in production lattice cryptography. The Rust source
+is hax's `examples/lean_barrett/src/lib.rs`:
+
+```rust
+pub(crate) type FieldElement = i32;
+
+const BARRETT_R: i64 = 0x400000;
+const BARRETT_SHIFT: i64 = 26;
+const BARRETT_MULTIPLIER: i64 = 20159;
+pub(crate) const FIELD_MODULUS: i32 = 3329;
+
+pub fn barrett_reduce(value: FieldElement) -> FieldElement {
+    let t = i64::from(value) * BARRETT_MULTIPLIER;
+    let t = t + (BARRETT_R >> 1);
+    let quotient = t >> BARRETT_SHIFT;
+    let quotient = quotient as i32;
+    let sub = quotient * FIELD_MODULUS;
+    value - sub
+}
+```
+
+This is the *modular reduction by `q = 3329`* used by ML-KEM / Kyber on
+every polynomial coefficient; the same routine, with `q = 8380417`, is
+used by ML-DSA. It is the smallest piece of lattice cryptography that
+is both self-contained and realistic.
+
+### Hax-side spec: `hax_bv_decide`
+
+The `RustM` function is a five-op chain of checked arithmetic
+(`*? / +? / -? / >>>?`) with two cross-width casts via
+`rust_primitives.hax.cast_op`. We state the standard Barrett window
+property directly on signed machine integers (no `.toInt`-style
+lifting, which would turn the goal into a mixed `Int`/`BitVec`
+problem that `bv_decide` cannot close) and let hax's upstream bit-
+blasting stack do all the work:
+
+```lean
+set_option maxHeartbeats 1_000_000 in
+theorem barrett_reduce_spec (value : i32) :
+    ⦃⌜value.toInt64 ≥ -(4194304 : Int64) ∧
+       value.toInt64 ≤ (4194304 : Int64)⌝⦄
+    (barrett_reduce value)
+    ⦃⇓ r => ⌜r > -(3329 : Int32) ∧ r < (3329 : Int32) ∧
+      (r = value % (3329 : Int32) ∨
+       r = value % (3329 : Int32) + (3329 : Int32) ∨
+       r = value % (3329 : Int32) - (3329 : Int32))⌝⦄ := by
+  unfold barrett_reduce FIELD_MODULUS BARRETT_R
+    BARRETT_MULTIPLIER BARRETT_SHIFT
+  hax_bv_decide (timeout := 90)
+```
+
+The precondition `|value| ≤ BARRETT_R = 2^22` holds on every
+coefficient ML-KEM / ML-DSA ever passes through Barrett. The
+post-condition is the canonical window property: `r` is in the
+representative set `(-q, q)` and is congruent to `value` modulo `q`.
+The three disjuncts spell out the signed representative rather than
+hiding behind a single `mod` operator, because that form is what
+`bv_decide` can mechanically check at the bit level.
+
+Unfolding `FIELD_MODULUS` in the proof is required: without it,
+`bv_decide` treats it as an opaque constant and fails with an
+abstraction warning.
+
+### One-line transport to `RustOracleComp`
+
+```lean
+def barrett_reduce_Lifted (value : i32) :
+    Interop.Rust.RustOracleComp spec i32 :=
+  liftRustM (barrett_reduce value)
+
+theorem barrett_reduce_Lifted_spec [spec.Fintype] [spec.Inhabited]
+    (value : i32) :
+    ⦃⌜value.toInt64 ≥ -(4194304 : Int64) ∧
+       value.toInt64 ≤ (4194304 : Int64)⌝⦄
+    (barrett_reduce_Lifted (spec := spec) value)
+    ⦃⇓ r => ⌜r > -(3329 : Int32) ∧ r < (3329 : Int32) ∧
+      (r = value % (3329 : Int32) ∨
+       r = value % (3329 : Int32) + (3329 : Int32) ∨
+       r = value % (3329 : Int32) - (3329 : Int32))⌝⦄ := by
+  unfold barrett_reduce_Lifted
+  exact triple_liftRustM _ (barrett_reduce_spec value)
+```
+
+### Oracle composition: `oracleThenBarrett`
+
+The minimum demonstration that `RustOracleComp` composes a lifted
+lattice primitive with a real oracle query:
+
+```lean
+def oracleThenBarrett (t : ι) (coe : spec.Range t → i32) :
+    Interop.Rust.RustOracleComp spec i32 := do
+  let y ← (liftM (query t) : OracleComp spec _)
+  barrett_reduce_Lifted (coe y)
+
+theorem oracleThenBarrett_triple
+    [spec.Fintype] [spec.Inhabited]
+    (t : ι) (coe : spec.Range t → i32)
+    (hbound : ∀ y : spec.Range t,
+      (coe y).toInt64 ≥ -(4194304 : Int64) ∧
+      (coe y).toInt64 ≤ (4194304 : Int64)) :
+    ⦃⌜True⌝⦄
+    (oracleThenBarrett (spec := spec) t coe)
+    ⦃⇓ r => ⌜r > -(3329 : Int32) ∧ r < (3329 : Int32)⌝⦄
+```
+
+The proof is `mvcgen` + the `wpProp_iff_forall_support` bridge for the
+single oracle step, then `Triple.entails_wp_of_post` weakens
+`barrett_reduce_Lifted_spec`'s postcondition to the window property
+alone (the modular-equivalence disjunct is dropped because it mentions
+the oracle outcome `y`). This is exactly the shape you would need to
+verify an ML-KEM coefficient-sampling loop: an oracle draws noise,
+Barrett reduces it, the result stays in the field.
+
 ## Probabilistic spec: genuine VCVio-side content
 
 Every spec above is a `Std.Do.Triple`, which is universal over oracle
@@ -419,9 +547,86 @@ The previous round of TODOs (as of PR #292) is now resolved:
   `Pr[_]`-style spec layer, `mmap_pure` / `mmap_bind` on
   `liftRustMHom` will transport those specs without any additional
   infrastructure.
-- `Adc.lean` bumps `maxHeartbeats` to 1M; reducing this (e.g. by a
-  more targeted specset than `"bv"`) is a worthwhile but non-urgent
-  optimization.
+- `Adc.lean` and `Barrett.lean` both bump `maxHeartbeats` to 1M;
+  reducing this (e.g. by a more targeted specset than `"bv"`) is a
+  worthwhile but non-urgent optimization.
 - A genuinely oracle-using hax function (e.g. a randomized
   construction compiled by hax) remains the natural next milestone:
   every hax example we can currently find is deterministic.
+
+## Lattice-crypto outlook
+
+`Barrett.lean` is the first real lattice-crypto primitive in the
+bridge. The natural next targets, in rough order of effort:
+
+### Plausible next: the rest of the `lean_barrett` surface
+
+hax's `examples/lean_barrett` is not just `barrett_reduce`; it also
+ships `montgomery_reduce`, `fe_add`, `fe_sub`, NTT helpers, and a
+polynomial wrapper. All of these have the same proof shape:
+`hax_bv_decide`-provable on the `RustM` side, transported by one
+line of `triple_liftRustM`. Adding them is a matter of
+transcription; the proof technique does not need to change.
+
+### Medium lift: ML-KEM inner loop
+
+The ML-KEM key generation / encryption / decryption pipeline at the
+coefficient level is: sample from a distribution → NTT → pointwise
+multiply → inverse NTT → compress/decompress, where every
+coefficient-level operation bottoms out at a `barrett_reduce` or
+`montgomery_reduce` call. Lifting the full pipeline to
+`RustOracleComp` needs:
+
+1. A polynomial representation (`Vector i32 256`) and its NTT /
+   inverse-NTT routines with `hax_bv_decide` specs.
+2. A sampler lifted from an oracle (the Kyber spec's
+   `SampleNTT` / `SamplePolyCBD`), which is the first hax example
+   that genuinely uses the `OracleComp` layer rather than just
+   sitting on top of it.
+3. A compositional `Triple` spec tying the pipeline together.
+
+`hax` has a partial port of this pipeline in its `proofs/` tree
+(`libcrux-ml-kem`), but as of hax `main@492a34e3` it is not wired
+into `examples/`. The proof cost is dominated by the NTT (256
+coefficients, one `barrett_reduce` per multiplication), but every
+step is a `bv_decide`-sized obligation. Realistic budget: multiple
+weeks of focused work, most of it driven by hax's upstream proof
+stack.
+
+### Falcon: why this is infeasible right now
+
+Falcon (FIPS 206) is structurally harder than ML-KEM / ML-DSA:
+
+- Falcon's signing is *floating-point*. Pornin's reference C
+  implementation (`falcon-impl`) uses IEEE-754 double precision
+  for FFT-based trapdoor sampling (`ffSampling`). Neither hax nor
+  VCVio have a verified IEEE-754 story; hax's `lean` backend emits
+  `f64` as an opaque type with no `bv_decide`-style automation.
+- Falcon's security proof relies on *discrete Gaussian sampling*,
+  which VCVio has a partial spec for (`LatticeCrypto/
+  DiscreteGaussian.lean`) but which is not yet tied to a
+  constant-time Rust implementation.
+- The published Rust port of Falcon (`pornin/falcon-rs`) is a
+  translation of the C reference and shares the floating-point
+  dependency. `hax` cannot currently extract it.
+
+A realistic path is *post-Falcon*: wait for a Rust port of a
+lattice signature scheme that avoids floating point entirely
+(e.g. HAWK, FN-DSA in its "G+G" form, or a future revision of
+Falcon based on integer FFT), then reuse the Barrett-style
+bit-blasting proofs. Until then, ML-KEM / ML-DSA (Kyber /
+Dilithium) are the realistic targets.
+
+### Rough order of operations
+
+1. ~~`barrett_reduce` port (this PR)~~.
+2. Complete the `lean_barrett` example (other `fe_*` operations,
+   NTT helpers). Low proof risk, still `bv_decide`-sized.
+3. Lift a genuinely randomized hax function (e.g. `SamplePolyCBD`
+   from libcrux-ml-kem) to exercise the `OracleComp` layer for
+   real.
+4. Scale up to a full ML-KEM / ML-DSA pipeline spec, with
+   coefficient-level correctness (per-Barrett) composed into a
+   polynomial-level correctness theorem.
+5. Revisit Falcon when a floating-point-free lattice signature
+   scheme is Rust-available.
