@@ -666,9 +666,9 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
       -- ε₁ = Pr[CacheHasCollision (cache₀.cacheQuery t u) | u ← query t] ≤ k * C⁻¹
       -- ε₂ = Pr[CacheHasCollision final | continuation, given no collision] by IH
       have hε₁ : Pr[fun u => CacheHasCollision (cache₀.cacheQuery t u) |
-          (liftM (query t) : OracleComp spec _)] ≤ (k : ℝ≥0∞) * C⁻¹ := by
+          (spec.query t : OracleComp spec _)] ≤ (k : ℝ≥0∞) * C⁻¹ := by
         open Classical in
-        rw [show (liftM (query t) : OracleComp spec _) = (query t : OracleComp spec _) from rfl,
+        rw [show (spec.query t : OracleComp spec _) = (query t : OracleComp spec _) from rfl,
             probEvent_query]
         -- Goal: ↑|{u | CacheHasCollision (cache₀.cacheQuery t u)}| / ↑|Range t| ≤ k * C⁻¹
         -- Bound the bad set cardinality by k
@@ -747,7 +747,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
         calc (Finset.univ.filter (fun u => CacheHasCollision (cache₀.cacheQuery t u))).card
             ≤ S.card := Finset.card_le_card_of_injOn f hf_maps hf_inj
           _ ≤ k := hScard
-      have hε₂ : ∀ u ∈ support (liftM (query t) : OracleComp spec _),
+      have hε₂ : ∀ u ∈ support (spec.query t : OracleComp spec _),
           ¬CacheHasCollision (cache₀.cacheQuery t u) →
           Pr[fun z => CacheHasCollision z.2 |
             (simulateQ cachingOracle (mx u)).run (cache₀.cacheQuery t u)] ≤
@@ -765,7 +765,7 @@ theorem probEvent_cacheCollision_le_birthday_total_tight {α : Type}
               exact Finset.mem_insert_of_mem (hSmem t' ht')⟩
       -- Combine via probEvent_bind_le_add
       have hcombine := probEvent_bind_le_add
-        (mx := (liftM (query t) : OracleComp spec _))
+        (mx := (spec.query t : OracleComp spec _))
         (my := fun u => (simulateQ cachingOracle (mx u)).run (cache₀.cacheQuery t u))
         (p := fun u => ¬CacheHasCollision (cache₀.cacheQuery t u))
         (q := fun z => ¬CacheHasCollision z.2)

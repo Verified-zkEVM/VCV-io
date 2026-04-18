@@ -2265,7 +2265,7 @@ private lemma replayOracle_run_nextEntry_none [spec.DecidableEq]
     (h_con : st.forkConsumed = false) (h_mis : st.mismatch = false)
     (h_next : st.nextEntry? = none) :
     (replayOracle i t).run st =
-      ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u =>
+      ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u =>
         pure (u, (st.markMismatch).noteObserved t u)) := by
   unfold replayOracle
   have hlive : (st.forkConsumed || st.mismatch) = false := by simp [h_con, h_mis]
@@ -2284,7 +2284,7 @@ private lemma replayOracle_run_mismatch_ne [spec.DecidableEq]
     (h_con : st.forkConsumed = false) (h_mis : st.mismatch = false)
     (h_next : st.nextEntry? = some ⟨t', u'⟩) (h_tt : t ≠ t') :
     (replayOracle i t).run st =
-      ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u =>
+      ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u =>
         pure (u, (st.markMismatch).noteObserved t u)) := by
   unfold replayOracle
   have hlive : (st.forkConsumed || st.mismatch) = false := by simp [h_con, h_mis]
@@ -2486,7 +2486,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
             -- Goal: `Pr[= a | do u ← liftComp ($ᵗ); oa u] = Pr[= a | liftM (query t) >>= oa]`.
             -- Use `evalDist_liftComp + evalDist_uniformSample = evalDist_query`.
             have heq : evalDist (liftComp ($ᵗ spec.Range t) spec >>= oa) =
-                evalDist ((liftM (query t) : OracleComp spec (spec.Range t)) >>= oa) := by
+                evalDist ((spec.query t : OracleComp spec (spec.Range t)) >>= oa) := by
               rw [evalDist_bind, evalDist_bind, evalDist_liftComp, evalDist_uniformSample,
                 evalDist_query]
             exact congrFun (congrArg DFunLike.coe heq) a
@@ -2748,14 +2748,14 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
         · -- Sub-case A.2: `t ≠ t₀`. Both sides go live via type mismatch.
           have hstepL : ∀ u : spec.Range i,
               (replayOracle i t).run ({stL with replacement := u} : ReplayForkState spec i) =
-              ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u' =>
+              ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u' =>
                 pure (u', (({stL with replacement := u}).markMismatch).noteObserved t u')) := by
             intro u
             exact replayOracle_run_mismatch_ne i t t₀ u'₀
               {stL with replacement := u} h_Lcon h_Lmis hL_next h_tt₀
           have hstepR : ∀ u : spec.Range i,
               (replayOracle i t).run ({stR with replacement := u} : ReplayForkState spec i) =
-              ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u' =>
+              ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u' =>
                 pure (u', (({stR with replacement := u}).markMismatch).noteObserved t u')) := by
             intro u
             exact replayOracle_run_mismatch_ne i t t₀ u'₀
@@ -2767,7 +2767,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
           -- By `fst_map_simulateQ_replayOracle_of_live`, each side reduces to
           -- `do u ← $ᵗ; liftM (query t) >>= oa`, which is independent of `u`.
           have hliveL : ∀ u : spec.Range i,
-              (Prod.fst <$> ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u' =>
+              (Prod.fst <$> ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u' =>
                 (simulateQ (replayOracle i) (oa u')).run
                   ((({stL with replacement := u}).markMismatch).noteObserved t u')) :
                 OracleComp spec α) = (liftM (query t) >>= oa : OracleComp spec α) := by
@@ -2779,7 +2779,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
               (Or.inr (by
                 simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]))
           have hliveR : ∀ u : spec.Range i,
-              (Prod.fst <$> ((liftM (query t) : OracleComp spec (spec.Range t)) >>= fun u' =>
+              (Prod.fst <$> ((spec.query t : OracleComp spec (spec.Range t)) >>= fun u' =>
                 (simulateQ (replayOracle i) (oa u')).run
                   ((({stR with replacement := u}).markMismatch).noteObserved t u')) :
                 OracleComp spec α) = (liftM (query t) >>= oa : OracleComp spec α) := by
@@ -3063,7 +3063,7 @@ private theorem fst_map_replayRunWithTraceValue_query_bind_cons_ne [spec.Decidab
     (oa : spec.Range t → OracleComp spec α)
     (u : spec.Range t) (τ : QueryLog spec) (s : ℕ) (u' : spec.Range i) :
     (Prod.fst <$> replayRunWithTraceValue
-        ((liftM (query t) : OracleComp spec _) >>= oa)
+        ((spec.query t : OracleComp spec _) >>= oa)
         i (⟨t, u⟩ :: τ) s u' : OracleComp spec α) =
     Prod.fst <$> replayRunWithTraceValue (oa u) i τ s u' := by
   unfold replayRunWithTraceValue
@@ -3112,7 +3112,7 @@ private theorem fst_map_replayRunWithTraceValue_query_bind_cons_self_succ
     (i : ι) (oa : spec.Range i → OracleComp spec α)
     (u : spec.Range i) (τ : QueryLog spec) (k : ℕ) (u' : spec.Range i) :
     (Prod.fst <$> replayRunWithTraceValue
-        ((liftM (query i) : OracleComp spec _) >>= oa)
+        ((spec.query i : OracleComp spec _) >>= oa)
         i (⟨i, u⟩ :: τ) (k + 1) u' : OracleComp spec α) =
     Prod.fst <$> replayRunWithTraceValue (oa u) i τ k u' := by
   unfold replayRunWithTraceValue
@@ -3440,7 +3440,7 @@ private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
   | query_bind t mx ih =>
     intro s h
     -- Shorthand for the `query_bind` computation.
-    set main : OracleComp spec α := (liftM (query t) : OracleComp spec _) >>= mx with hmain_def
+    set main : OracleComp spec α := (spec.query t : OracleComp spec _) >>= mx with hmain_def
     -- Step 1: unfold `replayFirstRun main` via the logging-oracle step equation.
     have hFR : (replayFirstRun main : OracleComp spec (α × QueryLog spec)) =
         (query t : OracleComp spec _) >>= fun u =>

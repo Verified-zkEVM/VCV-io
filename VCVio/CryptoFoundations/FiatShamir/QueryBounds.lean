@@ -197,7 +197,7 @@ lemma nmaHashQueryBound_liftComp_zero {α : Type}
       rw [OracleComp.liftComp_bind]
       refine nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
         (oa := OracleComp.liftComp
-          (unifSpec.query t : OracleComp unifSpec _)
+          ($[0..t])
           (unifSpec + (M × Commit →ₒ Chal)))
         (ob := fun u => OracleComp.liftComp (mx u) (unifSpec + (M × Commit →ₒ Chal)))
         (Q₁ := 0) (Q₂ := 0) ?_ ?_
