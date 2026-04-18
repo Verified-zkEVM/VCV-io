@@ -1454,10 +1454,10 @@ typeclass `[OracleSpec.LawfulSubSpec unifSpec spec]` (to factor `probOutput_unif
 through `liftComp` on the `forkReplay` side). This instance is discharged by Mathlib
 automation at this call site.
 
-**Currently conditional on the two B1 prefix-faithfulness `sorry`s** (transitively via
-`le_probEvent_isSome_forkReplay` → `sq_probOutput_main_le_noGuardReplayComp`
-→ `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt`
-and `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`). -/
+The proof composes `le_probEvent_isSome_forkReplay` (transitively via
+`sq_probOutput_main_le_noGuardReplayComp` with the two prefix-faithfulness building
+blocks `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`). -/
 theorem replayForkingBound
     [DecidableEq M] [DecidableEq Commit]
     [DecidableEq Chal] [SampleableType Chal] [Fintype Chal] [Inhabited Chal]
