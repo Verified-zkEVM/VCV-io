@@ -61,9 +61,20 @@ The NMA adversary `B` is constructed by:
   simulated challenge into the cache
 - Returning `A`'s forgery together with the accumulated `QueryCache`
 
-Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
-the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
-hash that `B` later programs.
+The bound decomposes into three phases, chained in the final `calc`:
+
+- **Phase B** (PROVEN, freshness drop): `Adv^{EUF-CMA}(A) ≤ Pr[verify succeeds | Game 1]`.
+  The CMA experiment is `(fun (wasQueried, verified) => !wasQueried && verified)
+  <\$> commonBlock`; dropping the freshness conjunct yields `_ ≤ verified` by monotonicity.
+- **Phase C** (scoped `sorry`, HVZK hybrid): `Pr[verify | Game 1]
+    ≤ Adv^{managed-RO-NMA}(B) + qS · ζ_zk`. Per-query triangle bound via `_hhvzk`,
+  accumulated by induction on the adversary's queries carrying the cache-agreement
+  invariant `eq_except`.
+- **Phase D** (scoped `sorry`, fork bridge): `Adv^{managed-RO-NMA}(B)
+    ≤ Adv^{fork-NMA}_{qH}(B) + qS · (qS + qH) / |Chal|`. Identical-until-bad
+  application of `tvDist_simulateQ_le_probEvent_bad` with the programmed-only-forgery
+  and live/cache-disagreement events as the bad flag; the birthday union bound
+  yields `collisionSlack`.
 
 This step is independent of special soundness and the forking lemma; those are handled
 by `euf_nma_bound`.
