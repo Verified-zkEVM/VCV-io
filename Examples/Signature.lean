@@ -119,10 +119,11 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
 The bound includes:
 * explicit bounds on signing-oracle and random-oracle queries by the adversary;
 * an explicit DLog reduction target;
-* the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`.
+* the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`;
+* the birthday-style late-programming collision term `collisionSlack qS qH F`.
 
-Because Schnorr has perfect HVZK (`ζ_zk = 0`), the simulation loss vanishes and the
-CMA advantage coincides with the NMA advantage. -/
+Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss vanishes
+and only the collision slack remains as simulation overhead. -/
 theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
@@ -132,7 +133,7 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
       (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
       let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
-        ENNReal.ofReal (qS * (0 : ℝ))
+        FiatShamir.collisionSlack qS qH F
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   haveI : Fintype G := Fintype.ofFinite G
@@ -141,10 +142,10 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (Schnorr.sigma_speciallySound F G g)
     (by intro ω₁ p₁ ω₂ p₂; simp [Schnorr.sigma])
     (Schnorr.simTranscript F G g)
-    (ζ_zk := 0) (ζ_col := 0) le_rfl le_rfl
+    (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ
-  simp only [mul_zero, add_zero] at hred ⊢
+  simp only [mul_zero, ENNReal.ofReal_zero, zero_add] at hred ⊢
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
   rw [show Pr[= true | hardRelationExp (dlogGenerable (F := F) g) red] =
       Pr[= true | do
