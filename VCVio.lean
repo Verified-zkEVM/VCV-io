@@ -114,6 +114,9 @@ import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
 import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.Emulates
+import VCVio.Interaction.UC.Examples.Signal.Atoms
+import VCVio.Interaction.UC.Examples.Signal.Boundaries
+import VCVio.Interaction.UC.Examples.Signal.Functionality.DoubleRatchet
 import VCVio.Interaction.UC.Interface
 import VCVio.Interaction.UC.Notation
 import VCVio.Interaction.UC.OpenProcess
