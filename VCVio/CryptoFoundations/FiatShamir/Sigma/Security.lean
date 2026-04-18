@@ -400,27 +400,142 @@ lemma adv_advantage_le_game1 :
   exact hp.2
 
 /-!
-#### Phase C: freshness-aware hybrid (scoped `sorry`)
+#### Phase C: freshness-aware hybrid
 
-Phase C now keeps the EUF-CMA freshness bit all the way through the simulator
+Phase C keeps the EUF-CMA freshness bit all the way through the simulator
 replacement. The real experiment is re-expressed as `realPhaseCExp`, while the
 simulated experiment is `simPhaseCExp`, which additionally exposes the bad
 branch where the simulator attempts to program a pre-existing target point.
 
-Proof outline (to be completed in a follow-up):
+The phase decomposes into six small sublemmas plus two thin compositions:
 
-1. **Real-to-sim hybrid.** Show that the EUF-CMA success event is bounded by the
-   simulated `bad ∨ freshSuccess` event, paying at most `qS · ζ_zk` across the
-   signing queries.
-2. **Bad-event bridge.** Show that `bad ∨ freshSuccess` in the simulated game is
-   bounded by the canonical live managed-RO experiment plus `collisionSlack`.
-3. **Post-composition.** Combine the two inequalities into the direct Phase C
-   bound consumed by `euf_cma_to_nma`.
+* **C1 `adv_advantage_eq_freshSuccess_realPhaseCExp`** — the CMA advantage
+  is exactly the `freshSuccess` mass of `realPhaseCExp`. Pure repackaging of
+  `unforgeableExp` through `(runtime M).evalDist`.
+* **C2 `probEvent_badOrFreshSuccess_realPhaseCExp_le`** — the HVZK hybrid:
+  `Pr[badOrFreshSuccess | realPhaseCExp] ≤ Pr[badOrFreshSuccess | simPhaseCExp]
+  + qS · ζ_zk`. Per-query identical-until-bad coupling charged against
+  `signHashQueryBound`.
+* **C3 `probEvent_freshSuccess_le_badOrFreshSuccess`** — pointwise event
+  monotonicity, `freshSuccess ⇒ badOrFreshSuccess`.
+* **C5 `probEvent_badOrFreshSuccess_le_bad_add_fresh`** — union split,
+  `Pr[bad ∨ freshSuccess] ≤ Pr[bad] + Pr[freshSuccess]`.
+* **C6 `probEvent_bad_simPhaseCExp_le_collisionSlack`** — birthday bound
+  against `simCommitPredictability`, summed across the `qS` signing queries.
+* **C7 `probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage`** —
+  state-projection alignment between `simPhaseCExp` and
+  `managedRoNmaExp (nmaAdvFromHVZK)`; on the `freshSuccess` event the extra
+  `signLog`/`bad` bookkeeping is irrelevant.
+
+`phaseC_real_le_sim_bad_or_fresh` and
+`phaseC_sim_bad_or_fresh_le_managedRo_plus_collision` are then thin `calc`
+compositions consumed by `hybrid_sign_le`.
 -/
 
 omit [Fintype Chal] in
-/-- Phase C hybrid step: replace honest signing with the HVZK simulator while
-keeping both the freshness bit and the bad branch visible in the target event. -/
+/-- **C1.** The CMA-EUF advantage of `adv` equals the `freshSuccess` mass of
+`realPhaseCExp`: `unforgeableExp` runs the same simulator-free signing path that
+`realPhaseCExp` exposes, and its success bit `!log.wasQueried msg && verified`
+matches `freshSuccess` after `phaseCResultOf`. -/
+private lemma adv_advantage_eq_freshSuccess_realPhaseCExp :
+    adv.advantage (runtime M) =
+      Pr[= true | PhaseCResult.freshSuccess <$> realPhaseCExp σ hr M adv] := by
+  sorry
+
+omit [Fintype Chal] in
+/-- **C2.** Phase C HVZK hybrid in the form ultimately consumed by
+`phaseC_real_le_sim_bad_or_fresh`. The real and simulated Phase C experiments
+agree pointwise outside the `bad` flag (per-query coupling), and inside the bad
+branch the per-query gap is bounded by `tvDist (realTranscript) (simTranscript)
+≤ ζ_zk`. Summed across at most `qS` signing queries this contributes
+`qS · ζ_zk` of total-variation slack on `badOrFreshSuccess`. -/
+private lemma probEvent_badOrFreshSuccess_realPhaseCExp_le
+    (_hζ_zk : 0 ≤ ζ_zk) (_hhvzk : σ.HVZK simTranscript ζ_zk)
+    (qS qH : ℕ)
+    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    Pr[= true | PhaseCResult.badOrFreshSuccess <$> realPhaseCExp σ hr M adv] ≤
+      Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+          simPhaseCExp σ hr M simTranscript adv] +
+        ENNReal.ofReal (qS * ζ_zk) := by
+  sorry
+
+omit [Fintype Chal] [SampleableType Chal] [SampleableType Stmt] [SampleableType Wit]
+  [DecidableEq M] [DecidableEq Commit] in
+/-- **C3.** Pointwise event monotonicity: `freshSuccess ⇒ badOrFreshSuccess`. -/
+private lemma probEvent_freshSuccess_le_badOrFreshSuccess
+    (m : SPMF PhaseCResult) :
+    Pr[= true | PhaseCResult.freshSuccess <$> m] ≤
+      Pr[= true | PhaseCResult.badOrFreshSuccess <$> m] := by
+  rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
+    probEvent_map, probEvent_map]
+  refine probEvent_mono fun r _ hfresh => ?_
+  simp only [Function.comp_apply, PhaseCResult.badOrFreshSuccess,
+    PhaseCResult.freshSuccess, Bool.or_eq_true] at hfresh ⊢
+  exact Or.inr hfresh
+
+omit [Fintype Chal] [SampleableType Chal] [SampleableType Stmt] [SampleableType Wit]
+  [DecidableEq M] [DecidableEq Commit] in
+/-- **C5.** Union split of the `badOrFreshSuccess` event: the probability is at
+most the sum of the `bad` and `freshSuccess` marginals. -/
+private lemma probEvent_badOrFreshSuccess_le_bad_add_fresh
+    (m : SPMF PhaseCResult) :
+    Pr[= true | PhaseCResult.badOrFreshSuccess <$> m] ≤
+      Pr[= true | (·.bad) <$> m] +
+        Pr[= true | PhaseCResult.freshSuccess <$> m] := by
+  have hLHS :
+      Pr[= true | PhaseCResult.badOrFreshSuccess <$> m] =
+        Pr[fun r : PhaseCResult => r.bad = true ∨ r.freshSuccess = true | m] := by
+    rw [← probEvent_eq_eq_probOutput', probEvent_map]
+    refine probEvent_ext fun r _ => ?_
+    simp [Function.comp_apply, PhaseCResult.badOrFreshSuccess, Bool.or_eq_true]
+  have hBad :
+      Pr[= true | (·.bad) <$> m] = Pr[fun r : PhaseCResult => r.bad = true | m] := by
+    rw [← probEvent_eq_eq_probOutput', probEvent_map]
+    refine probEvent_ext fun r _ => ?_
+    exact ⟨fun h => h.symm, fun h => h.symm⟩
+  have hFresh :
+      Pr[= true | PhaseCResult.freshSuccess <$> m] =
+        Pr[fun r : PhaseCResult => r.freshSuccess = true | m] := by
+    rw [← probEvent_eq_eq_probOutput', probEvent_map]
+    refine probEvent_ext fun r _ => ?_
+    exact ⟨fun h => h.symm, fun h => h.symm⟩
+  rw [hLHS, hBad, hFresh]
+  exact probEvent_or_le m _ _
+
+omit [Fintype Chal] in
+/-- **C6.** The simulator's `bad` flag fires only when one of the (at most `qS`)
+HVZK transcripts programs a `(msg, c)` point that already lives in the cache.
+Per query the predictability hypothesis bounds the chance by `(qS + qH) · β`,
+and the union bound across `qS` queries gives `collisionSlack qS qH β`. -/
+private lemma probEvent_bad_simPhaseCExp_le_collisionSlack
+    (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
+    (qS qH : ℕ)
+    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    Pr[= true | (·.bad) <$> simPhaseCExp σ hr M simTranscript adv] ≤
+      collisionSlack qS qH β := by
+  sorry
+
+omit [Fintype Chal] in
+/-- **C7.** Project away the extra Phase C bookkeeping (`signLog`, `bad`):
+on the `freshSuccess` event the `simPhaseCExp` distribution agrees with
+`managedRoNmaExp (nmaAdvFromHVZK σ hr M simTranscript adv)`, since the latter is
+literally `simulateQ (baseSimImpl + sigSimImpl simTranscript pk) (adv.main pk)`
+followed by live verification, and the extra Phase C state is irrelevant to the
+`(msg, sig, verified)` marginal. The `freshSuccess` event implies `verified`,
+matching the managed-RO experiment's success predicate. -/
+private lemma probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage :
+    Pr[= true |
+        PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
+      SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
+  sorry
+
+omit [Fintype Chal] in
+/-- **C4.** Phase C hybrid step (composition of C1, C3, C2): the EUF-CMA
+advantage is bounded by the simulated `badOrFreshSuccess` event, plus the HVZK
+loss `qS · ζ_zk`. -/
 lemma phaseC_real_le_sim_bad_or_fresh
     (_hζ_zk : 0 ≤ ζ_zk) (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (qS qH : ℕ)
@@ -430,11 +545,21 @@ lemma phaseC_real_le_sim_bad_or_fresh
       Pr[= true | PhaseCResult.badOrFreshSuccess <$>
         (simPhaseCExp σ hr M simTranscript adv)] +
         ENNReal.ofReal (qS * ζ_zk) := by
-  sorry
+  calc adv.advantage (runtime M)
+      = Pr[= true | PhaseCResult.freshSuccess <$> realPhaseCExp σ hr M adv] :=
+        adv_advantage_eq_freshSuccess_realPhaseCExp σ hr M adv
+    _ ≤ Pr[= true | PhaseCResult.badOrFreshSuccess <$> realPhaseCExp σ hr M adv] :=
+        probEvent_freshSuccess_le_badOrFreshSuccess _
+    _ ≤ Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+            simPhaseCExp σ hr M simTranscript adv] +
+          ENNReal.ofReal (qS * ζ_zk) :=
+        probEvent_badOrFreshSuccess_realPhaseCExp_le σ hr M simTranscript ζ_zk adv
+          _hζ_zk _hhvzk qS qH _hQ
 
 omit [Fintype Chal] in
-/-- Phase C bad-event bridge: the simulator's `bad ∨ freshSuccess` event is
-bounded by the live managed-RO experiment plus the collision slack. -/
+/-- **C8.** Phase C bad-event bridge (composition of C5, C6, C7): the
+simulator's `bad ∨ freshSuccess` event is bounded by the live managed-RO
+experiment plus the collision slack. -/
 lemma phaseC_sim_bad_or_fresh_le_managedRo_plus_collision
     (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (qS qH : ℕ)
@@ -445,7 +570,23 @@ lemma phaseC_sim_bad_or_fresh_le_managedRo_plus_collision
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
           (nmaAdvFromHVZK σ hr M simTranscript adv) +
         collisionSlack qS qH β := by
-  sorry
+  calc Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+            simPhaseCExp σ hr M simTranscript adv]
+      ≤ Pr[= true | (·.bad) <$> simPhaseCExp σ hr M simTranscript adv] +
+          Pr[= true | PhaseCResult.freshSuccess <$>
+            simPhaseCExp σ hr M simTranscript adv] :=
+        probEvent_badOrFreshSuccess_le_bad_add_fresh _
+    _ ≤ collisionSlack qS qH β +
+          SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+            (nmaAdvFromHVZK σ hr M simTranscript adv) :=
+        add_le_add
+          (probEvent_bad_simPhaseCExp_le_collisionSlack σ hr M simTranscript adv
+            β _hβ qS qH _hQ)
+          (probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage σ hr M
+            simTranscript adv)
+    _ = SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+          (nmaAdvFromHVZK σ hr M simTranscript adv) + collisionSlack qS qH β := by
+        rw [add_comm]
 
 omit [Fintype Chal] in
 /-- **Phase C (freshness-aware hybrid + live bridge).**
