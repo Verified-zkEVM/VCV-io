@@ -13,6 +13,38 @@ package VCVio where
     ⟨`weak.linter.style.whitespace, true⟩
   ]
 
+/-
+Interop backends — pinned to explicit git revisions so reproducible builds are
+guaranteed and bumping a pin is a deliberate, reviewed change. The current
+branch keeps **Hax enabled by default** because `Interop.lean` imports the
+Hax-backed bridge and examples; Aeneas stays commented out until upstream
+ships a Lean v4.29-compatible release. The CI TCB-isolation check
+(`scripts/check-interop-isolation.sh`) still protects against accidental
+cross-imports regardless of which backend requires are active.
+
+Important: `require mathlib` must come **after** any Interop backend `require`s
+so Mathlib's transitive pins (in particular `Qq`) win over the backends'. Lake
+warns and `lake exe cache get` fails otherwise.
+
+Hax: Lean 4.29.0-rc1 (compatible with our 4.29.0). Latest `main` as of
+2026-04-16. Subdirectory: `hax-lib/proof-libs/lean`.
+-/
+require Hax from git
+  "https://github.com/cryspen/hax" @
+  "492a34e3" / "hax-lib/proof-libs/lean"
+
+/-
+Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against
+our root Mathlib v4.29.0 and Lean v4.29.0, but aeneas's source has three
+real regressions under that stack — see `Interop/Aeneas/README.md` for the
+exact diagnostics. Leave this commented until upstream ships a v4.29 build
+(or pin to a patched fork). Latest upstream `main` as of 2026-04-17 is
+`ba600392`; subdirectory `backends/lean`.
+-/
+-- require aeneas from git
+--   "https://github.com/AeneasVerif/aeneas" @
+--   "ba600392" / "backends/lean"
+
 require "leanprover-community" / "mathlib" @ git "v4.29.0"
 
 /-- Main library. -/
@@ -30,6 +62,11 @@ lean_lib Examples
 lean_lib VCVioWidgets
 /-- Seperate section of the project for things that should be ported. -/
 lean_lib ToMathlib
+
+/-- Interop bridges to Rust verification frontends (hax, aeneas).
+Strict TCB isolation: no other `lean_lib` may import from `Interop`. See
+`Interop/README.md` and `docs/agents/interop.md`. -/
+lean_lib Interop
 
 -- Compile the shared FIPS 202 (SHA-3/SHAKE) FFI wrapper.
 -- Uses mlkem-native's FIPS 202 headers for the underlying implementation.

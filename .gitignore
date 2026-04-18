@@ -3,6 +3,14 @@
 /.ignore/
 /.gauss/
 
+# Cargo build artifacts for the `third_party/` hax demo crates. These
+# are regenerable from the Rust source + `cargo hax into lean`; only the
+# source (`Cargo.toml`, `src/`) and the emitted Lean
+# (`proofs/lean/extraction/*.lean`) are tracked. Mirrors hax's own
+# `.gitignore` convention in `.lake/packages/Hax/.gitignore`.
+third_party/**/target/
+third_party/**/Cargo.lock
+
 # LaTeX compilation files
 *.aux
 *.paux
