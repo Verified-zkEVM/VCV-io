@@ -341,8 +341,7 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of game hops (see `adv_advantage_le_game1`, `tvDist_hybrid_sign_le`,
-    -- and `game2_le_fork_advantage_plus_collision` further below in this file):
+    -- Chain of game hops:
     --
     --   adv.advantage
     --       ≤ Pr[= true | Game 1]                              -- freshness drop (Phase B)
@@ -350,11 +349,24 @@ theorem euf_cma_to_nma
     --       ≤ Fork.advantage + ofReal (qS * ζ_zk) + collisionSlack
     --                                                          -- collision event (Phase D)
     --
-    -- where Game 1 is the CMA experiment without the freshness check and Game 2 is
-    -- exactly `managedRoNmaExp` for the constructed `nmaAdv`. Only the Phase D step
-    -- remains as a scoped `sorry` in this Stage 1 milestone; it is discharged by a
-    -- `tvDist_simulateQ_le_probEvent_bad_dist`-style identical-until-bad argument
-    -- combined with a birthday-bound argument on `(msg, c)` collisions.
+    -- where Game 1 drops the freshness check (`!log.wasQueried msg`) from the CMA
+    -- experiment (monotone as `!b && v ≤ v`) and Game 2 is `managedRoNmaExp nmaAdv`
+    -- where each real signing query has been replaced by the HVZK simulator.
+    --
+    -- Infrastructure supplied by this file:
+    --   • `FiatShamir.collisionSlack qS qH Chal` — concrete birthday term.
+    --   • `SPMFSemantics.withStateOracle_evalDist_{map,bind_pure}` — pushes `<$>` and
+    --     `>>= pure ∘ f` through `(runtime M).evalDist` for `probEvent_mono` + Phase B.
+    --   • `euf_nma_bound` (forking-lemma side) — closes Phase D downstream together
+    --     with `Fork.replayForkingBound` and special soundness.
+    --
+    -- Phase B is a short monotonicity argument using `probEvent_mono` applied to the
+    -- Boolean map `fun p => !p.1 && p.2` vs. `Prod.snd`, after refactoring the CMA
+    -- experiment as a common trace `⟨log.wasQueried msg, verified⟩` under the map
+    -- lemmas above. Phases C + D require an inductive TV accumulation over the `qS`
+    -- signing queries (one HVZK application per query) and an identical-until-bad
+    -- argument against the `(msg, c)`-collision event, bounded by `collisionSlack`.
+    -- These together constitute the remaining proof obligation of this theorem.
     sorry
 section evalDistBridge
 
