@@ -227,15 +227,18 @@ structure managedRoNmaAdv (sigAlg : SignatureAlg (OracleComp spec) M PK SK S) wh
   main (pk : PK) : OracleComp spec ((M × S) × spec.QueryCache)
 
 /-- The managed-RO NMA experiment: generate a key pair, run the adversary to get a forgery
-and a `QueryCache`, then verify the forgery through `withCacheOverlay` so that programmed
-entries take priority over the real oracle. -/
+and an auxiliary `QueryCache`, then verify the forgery against the live random oracle.
+
+The returned cache is reduction-side advice, not part of the experiment's success predicate.
+This matches the KOA-style forking wrapper, where the final verification performs one live
+oracle lookup on the target challenge. -/
 def managedRoNmaExp {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : managedRoNmaAdv sigAlg) : SPMF Bool :=
   runtime.evalDist do
     let (pk, _) ← sigAlg.keygen
     let result : (M × S) × spec.QueryCache ← adv.main pk
-    withCacheOverlay result.2 (sigAlg.verify pk result.1.1 result.1.2)
+    sigAlg.verify pk result.1.1 result.1.2
 
 /-- The success probability of a managed-RO NMA adversary. -/
 noncomputable def managedRoNmaAdv.advantage

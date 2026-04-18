@@ -27,6 +27,7 @@ End-to-end security reduction, packaged as three theorems:
 universe u v
 
 open OracleComp OracleSpec
+open scoped ENNReal
 
 namespace FiatShamir
 
@@ -37,16 +38,17 @@ variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
 
 /-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
 
-For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
-probability that the HVZK simulator tries to program a cache entry `(msg, c)` already
-populated by a prior adversary query is bounded by `qS · (qS + qH) / |Chal|` via the
-birthday/union bound over commitments.
+For `qS` signing queries, `qH` random-oracle queries, and simulator commitment
+predictability `β` (i.e. `∀ c₀, Pr[commit = c₀] ≤ β`), the probability that the HVZK
+simulator tries to program a cache entry `(msg, c)` already populated by a prior query
+is bounded by `qS · (qS + qH) · β` via the birthday/union bound.
 
 Matches EasyCrypt's `pr_bad_game` at
-[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`) and
-plays the same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
-noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
-  ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`
+with `β = 1/|Ω|` for Schnorr) and plays the same role as `GPVHashAndSign.collisionBound`
+for the PSF construction. -/
+noncomputable def collisionSlack (qS qH : ℕ) (β : ℝ≥0∞) : ℝ≥0∞ :=
+  (qS * (qS + qH) : ℕ) * β
 
 /-!
 ### Components of the CMA-to-NMA simulator
@@ -260,26 +262,28 @@ they differ on two bad events:
   adversary subsequently live-queries `(msg_i, c_i)` and receives a fresh value
   `ω' ≠ ω_i` from the outer RO. The two games then diverge.
 
-Both events are absorbed into `collisionSlack qS qH Chal = qS · (qS + qH) / |Chal|`
-via the birthday/union bound (`qS` signing × `qS + qH` pending cache slots).
+Both events are absorbed into `collisionSlack qS qH β` via the birthday/union bound
+(`qS` signing steps × `qS + qH` cache slots × `β` predictability per entry).
 
 Proof outline (to be completed):
 
 1. **Bad-event definition.** Formalise the indicator `bad : TraceLog → Bool` that
    fires on either of the two events above.
-2. **Bad-event bound.** Prove `Pr[bad | managedRoNmaExp nmaAdv] ≤ collisionSlack qS qH Chal`
-   by union-bounding over signing indices and prior cache slots, using the fact that
-   each `sigSim` sample draws a uniformly random `c ∈ Chal`.
+2. **Bad-event bound.** Prove `Pr[bad | managedRoNmaExp nmaAdv] ≤ collisionSlack qS qH β`
+   by union-bounding over signing indices and prior cache slots, using `simCommitPredictability`
+   to bound the per-entry collision probability of commitments.
 3. **Identical-until-bad.** Apply `tvDist_simulateQ_le_probEvent_bad` with the bad
    event `bad`, showing the two experiments coincide on the complement.
 4. Combine 2 + 3 to obtain the Phase D bound. -/
-lemma game2_le_fork_advantage_plus_collision (qS qH : ℕ)
+omit [Fintype Chal] in
+lemma game2_le_fork_advantage_plus_collision (β : ℝ≥0∞)
+    (_hβ : SigmaProtocol.simCommitPredictability simTranscript β) (qS qH : ℕ)
     (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     SignatureAlg.managedRoNmaAdv.advantage (runtime M)
         (nmaAdvFromHVZK σ hr M simTranscript adv) ≤
       Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
-        collisionSlack qS qH Chal := by
+        collisionSlack qS qH β := by
   sorry
 
 end NmaPhases
@@ -289,7 +293,10 @@ end NmaPhases
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
 random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + qS · (qS + qH) / |Chal|`
+  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + qS · (qS + qH) · β`
+
+where `β` is the predictability of the simulator's commitment marginal (see
+`SigmaProtocol.simCommitPredictability`).
 
 The NMA adversary `B` is constructed by:
 - Forwarding `A`'s hash queries to the external oracle (visible to `Fork.fork`)
@@ -298,7 +305,7 @@ The NMA adversary `B` is constructed by:
 - Returning `A`'s forgery together with the accumulated `QueryCache`
 
 Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
-the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
+the birthday term `collisionSlack qS qH β` absorbs collisions where `A` queries a
 hash that `B` later programs.
 
 The bound decomposes into three phases, each extracted as its own lemma and
@@ -313,25 +320,23 @@ chained in the final `calc`:
   triangle bound via `_hhvzk`, accumulated by induction on the adversary's
   queries carrying the cache-agreement invariant `eq_except`.
 - `game2_le_fork_advantage_plus_collision` (**Phase D**, scoped `sorry`, fork bridge):
-  `Adv^{managed-RO-NMA}(B) ≤ Adv^{fork-NMA}_{qH}(B) + qS · (qS + qH) / |Chal|`.
-  Identical-until-bad application of `tvDist_simulateQ_le_probEvent_bad` with
-  the programmed-only-forgery and live/cache-disagreement events as the bad
-  flag; the birthday union bound yields `collisionSlack`.
+  `Adv^{managed-RO-NMA}(B) ≤ Adv^{fork-NMA}_{qH}(B) + qS · (qS + qH) · β`.
+  Identical-until-bad using `simCommitPredictability` to bound the collision probability,
+  yielding `collisionSlack qS qH β`.
 
 This step is independent of special soundness and the forking lemma; those are handled
 by `euf_nma_bound`.
 
-The Lean bound matches Firsov-Janku's `pr_koa_cma` at
-[fsec/proof/Schnorr.ec:943](../../../fsec/proof/Schnorr.ec): the CMA-to-KOA reduction uses
-`eq_except (signed qs) LRO.m{1} LRO.m{2}` as the RO-cache invariant, swaps real signing with
-`simulator_equiv` (per-query HVZK cost), handles RO reprogramming via `lro_redo_inv` +
-`ro_get_eq_except`, and absorbs the late-programming collision event through the `bad` flag,
-bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) as
-`QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH Chal`. -/
+The Lean bound generalizes Firsov-Janku's `pr_koa_cma` at
+[fsec/proof/Schnorr.ec:943](../../../fsec/proof/Schnorr.ec): EasyCrypt inlines the Schnorr
+simulator to obtain `β = 1/|Ω|`; we instead take `β` as a hypothesis
+(`SigmaProtocol.simCommitPredictability`), making the theorem generic over all Sigma protocols
+with bounded commitment predictability. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
     [Fintype Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
     (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (adv : SignatureAlg.unforgeableAdv
@@ -346,7 +351,7 @@ theorem euf_cma_to_nma
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
           ENNReal.ofReal (qS * ζ_zk) +
-          collisionSlack qS qH Chal := by
+          collisionSlack qS qH β := by
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
@@ -605,13 +610,13 @@ theorem euf_cma_to_nma
             ENNReal.ofReal (qS * ζ_zk) :=
           hybrid_sign_le σ hr M simTranscript ζ_zk adv _hζ_zk _hhvzk qS qH _hQ
       _ ≤ (Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
-              collisionSlack qS qH Chal) + ENNReal.ofReal (qS * ζ_zk) :=
+              collisionSlack qS qH β) + ENNReal.ofReal (qS * ζ_zk) :=
           add_le_add
-            (game2_le_fork_advantage_plus_collision σ hr M simTranscript adv qS qH _hQ)
+            (game2_le_fork_advantage_plus_collision σ hr M simTranscript adv β _hβ qS qH _hQ)
             le_rfl
       _ = Fork.advantage σ hr M (nmaAdvFromHVZK σ hr M simTranscript adv) qH +
             ENNReal.ofReal (qS * ζ_zk) +
-            collisionSlack qS qH Chal := by ring
+            collisionSlack qS qH β := by ring
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
@@ -1346,32 +1351,25 @@ theorem euf_nma_bound
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
 
 1. Replace the signing oracle with the HVZK simulator, losing
-   `qS · ζ_zk + collisionSlack qS qH Chal`.
+   `qS · ζ_zk + collisionSlack qS qH β`.
 2. Apply the forking lemma to the resulting forkable managed-RO NMA experiment.
 
 The combined bound is:
 
-  `(ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) ·
-      ((ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) / (qH+1) - 1/|Ω|)
+  `(ε - qS·ζ_zk - qS·(qS+qH)·β) ·
+      ((ε - qS·ζ_zk - qS·(qS+qH)·β) / (qH+1) - 1/|Ω|)
     ≤ Pr[extraction succeeds]`
 
-where `ε = Adv^{EUF-CMA}(A)` and the concrete slack `qS·(qS+qH)/|Ω|` is the
-`collisionSlack qS qH Chal` birthday term. The ENNReal subtraction truncates at
-zero, so the bound is trivially satisfied when the simulation loss exceeds the
-advantage.
-
-The forking-lemma side (the two B1 prefix-faithfulness identities
-`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
-discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. Conditional only on the scoped `sorry` inside
-`euf_cma_to_nma` for the Phase D collision-event reduction. -/
+where `ε = Adv^{EUF-CMA}(A)` and `β` is the commitment predictability
+(see `SigmaProtocol.simCommitPredictability`). The ENNReal subtraction truncates at zero,
+so the bound is trivially satisfied when the simulation loss exceeds the advantage. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
     (hss_nf : ∀ ω₁ p₁ ω₂ p₂, Pr[⊥ | σ.extract ω₁ p₁ ω₂ p₂] = 0)
     [Fintype Chal] [Inhabited Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (β : ℝ≥0∞) (hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
     (adv : SignatureAlg.unforgeableAdv
@@ -1381,17 +1379,17 @@ theorem euf_cma_bound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) -
-        (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal)
+        (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH β)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
-    ζ_zk hζ_zk hhvzk adv qS qH hQ
+    β hβ ζ_zk hζ_zk hhvzk adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) -
-      (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal) ≤
+      (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH β) ≤
       Fork.advantage σ hr M nmaAdv qH :=
     tsub_le_iff_right.mpr (by rw [← add_assoc]; exact hAdv)
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)

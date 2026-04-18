@@ -32,6 +32,7 @@ Given `Module F G`, a generator `g : G`, and a bijection proof
 
 
 open OracleComp OracleSpec DiffieHellman
+open scoped ENNReal
 
 namespace Schnorr
 
@@ -114,17 +115,31 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
 
+/-- The Schnorr simulator's commitment marginal is uniform over `G`, giving
+predictability `1 / |G|`. Since `|G| = |F|` (via the bijection `hg`), this equals
+`1 / |F|`.
+
+For any fixed challenge `c`, the map `z ↦ z • g - c • pk` is a bijection on `G`
+(composition of the bijection `z ↦ z • g` with translation), so the commitment
+is uniform over `G`. -/
+theorem simTranscript_commitPredictability [Fintype G] (g : G)
+    (hg : Function.Bijective (· • g : F → G)) :
+    SigmaProtocol.simCommitPredictability (Commit := G) (Chal := F) (Resp := F)
+      (simTranscript F G g)
+      (1 / Fintype.card G : ℝ≥0∞) := by
+  sorry
+
 /-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
 
 The bound includes:
 * explicit bounds on signing-oracle and random-oracle queries by the adversary;
 * an explicit DLog reduction target;
 * the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`;
-* the birthday-style late-programming collision term `collisionSlack qS qH F`.
+* the birthday-style collision term `collisionSlack qS qH (1 / |G|)`.
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss vanishes
 and only the collision slack remains as simulation overhead. -/
-theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
+theorem signature_euf_cma [Fintype G] [Inhabited F] (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
     (adv : SignatureAlg.unforgeableAdv (signature F G g hg M))
@@ -133,15 +148,16 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
       (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
       let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
-        FiatShamir.collisionSlack qS qH F
+        FiatShamir.collisionSlack qS qH (1 / Fintype.card G)
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
-  haveI : Fintype G := Fintype.ofFinite G
   obtain ⟨red, hred⟩ := FiatShamir.euf_cma_bound
     (Schnorr.sigma F G g) (dlogGenerable (F := F) g) M
     (Schnorr.sigma_speciallySound F G g)
     (by intro ω₁ p₁ ω₂ p₂; simp [Schnorr.sigma])
     (Schnorr.simTranscript F G g)
+    (β := 1 / Fintype.card G)
+    (simTranscript_commitPredictability F G g hg)
     (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
     adv qS qH hQ

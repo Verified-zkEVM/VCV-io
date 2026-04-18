@@ -189,16 +189,13 @@ noncomputable def roImpl (M Commit Chal : Type) [DecidableEq M] [DecidableEq Com
 /-- Replay a managed-RO NMA adversary against a single counted challenge oracle, keeping both
 the adversary-returned cache and the live query log that the forking lemma can rewind.
 
-The `verified` flag is computed strictly from the live `roCache` so that a successful
-`forkPoint` extraction always pins the verifying challenge to the live random-oracle
-answer at the corresponding outer-log position. Forgeries whose verification depends only
-on programmed entries the adversary supplies in `advCache` are not counted: this is a
-strict strengthening over an `advCache`-fallback variant and strictly shrinks
-`Fork.advantage`. The residual obligation, "every `advCache`-only forgery that would have
-verified also has a corresponding live RO query", is a caller-side invariant that must be
-discharged by the managed-RO CMA→NMA reduction. Downstream, this is the role of
-`euf_cma_to_nma` in `FiatShamir/Sigma/Security.lean`, whose sigma→NMA simulation ensures
-that every `advCache` programming step is mirrored by a live query into `roCache`. -/
+After the adversary returns a forgery, `runTrace` performs the *same live verification query*
+as the KOA-style experiment: it looks up the target `(msg, commit)` through `roImpl`, issuing
+one final counted-oracle query on a cache miss and then checking `σ.verify`.
+
+This makes the trace semantics line up with `SignatureAlg.managedRoNmaExp`: both use the live
+random oracle for the terminal verification step, while `advCache` remains purely auxiliary
+reduction state. -/
 noncomputable def runTrace
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -207,15 +204,20 @@ noncomputable def runTrace
     (pk : Stmt) :
     OracleComp (wrappedSpec Chal)
       (Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := do
-  let ((forgery, advCache), st) ←
-    StateT.run (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (nmaAdv.main pk))
+  let wrappedMain :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal))
+        (((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) := do
+    let result@(forgery, _) ← nmaAdv.main pk
+    match forgery with
+    | (msg, (c, _)) =>
+        let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+        pure (result, ω)
+  let ((((forgery, advCache), ω), st)) ←
+    StateT.run (simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) wrappedMain)
       (∅, [])
   let verified :=
     match forgery with
-    | (msg, (c, s)) =>
-        match st.1 (msg, c) with
-        | some ω => σ.verify pk c ω s
-        | none => false
+    | (_, (c, s)) => σ.verify pk c ω s
   let (roCache, queryLog) := st
   pure {
     forgery := forgery
@@ -1228,6 +1230,14 @@ lemma runTrace_queryLog_length_eq
   unfold replayFirstRun runTrace at hx
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at hx
   obtain ⟨a, ha_mem, ha_eq⟩ := hx
+  let wrappedMain :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal))
+        (((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) := do
+    let result@(forgery, _) ← nmaAdv.main pk
+    match forgery with
+    | (msg, (c, _)) =>
+        let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+        pure (result, ω)
   have hxqueryLog : x.queryLog = a.1.2.2 := by
     have := congrArg Prod.fst ha_eq
     have h2 := congrArg Trace.queryLog this
@@ -1237,8 +1247,8 @@ lemma runTrace_queryLog_length_eq
     simpa [Prod.map_apply] using this
   rw [hxqueryLog, ← hlog_eq]
   have h := queryLog_length_eq_outer_inr_count (M := M) (Commit := Commit) (Chal := Chal)
-    (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
-    (nmaAdv.main pk) ∅ [] (z := a.1) (outerLog := a.2) ha_mem
+    (γ := ((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal)
+    wrappedMain ∅ [] (z := a.1) (outerLog := a.2) ha_mem
   simpa using h
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -1260,6 +1270,14 @@ lemma runTrace_cache_outer_lockstep
   unfold replayFirstRun runTrace at hx
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at hx
   obtain ⟨a, ha_mem, ha_eq⟩ := hx
+  let wrappedMain :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal))
+        (((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) := do
+    let result@(forgery, _) ← nmaAdv.main pk
+    match forgery with
+    | (msg, (c, _)) =>
+        let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+        pure (result, ω)
   have hxqueryLog : x.queryLog = a.1.2.2 := by
     have := congrArg Prod.fst ha_eq
     have h2 := congrArg Trace.queryLog this
@@ -1275,8 +1293,8 @@ lemma runTrace_cache_outer_lockstep
   have h_hi' : i < a.1.2.2.length := by rw [← hxqueryLog]; exact h_hi
   obtain ⟨_, _, hlock⟩ :=
     queryLog_cache_outer_lockstep (M := M) (Commit := Commit) (Chal := Chal)
-      (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
-      (nmaAdv.main pk) ∅ [] (z := a.1) (outerLog := a.2) ha_mem
+      (γ := ((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal)
+      wrappedMain ∅ [] (z := a.1) (outerLog := a.2) ha_mem
   obtain ⟨ω, hcache, hlog⟩ := hlock i (Nat.zero_le _) h_hi'
   refine ⟨ω, ?_, ?_⟩
   · rw [hxroCache]
@@ -1305,29 +1323,101 @@ lemma runTrace_verified_imp_verify
   classical
   unfold replayFirstRun runTrace at hx
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at hx
-  obtain ⟨a, _, ha_eq⟩ := hx
-  obtain ⟨⟨⟨forgery, advCache⟩, ⟨roCache, queryLog⟩⟩, log_a⟩ := a
-  obtain ⟨msg, c, s⟩ := forgery
+  obtain ⟨a, ha_mem, ha_eq⟩ := hx
+  rcases a with ⟨a, log_a⟩
+  rcases a with ⟨a, st⟩
+  rcases a with ⟨a, ω⟩
+  rcases a with ⟨forgery, advCache⟩
+  rcases st with ⟨roCache, queryLog⟩
   have hxeq : x =
-      ({ forgery := (msg, c, s),
+      ({ forgery := forgery,
          advCache := advCache,
          roCache := roCache,
          queryLog := queryLog,
-         verified :=
-           match roCache (msg, c) with
-           | some ω => σ.verify pk c ω s
-           | none => false } :
+         verified := σ.verify pk forgery.2.1 ω forgery.2.2 } :
         Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) := by
     have := congrArg Prod.fst ha_eq
     simpa using this.symm
-  rw [hxeq]
-  rw [hxeq] at hv
+  rw [hxeq] at hv ⊢
   simp only [Trace.target] at *
-  match hcase : roCache (msg, c), hv with
-  | none, hv => simp at hv
-  | some ω, hv =>
-      refine ⟨ω, rfl, ?_⟩
-      simpa using hv
+  refine ⟨ω, ?_, ?_⟩
+  · have hinner :
+        (((forgery, advCache), ω), (roCache, queryLog)) ∈
+          support
+            ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (do
+                let result@(forgery, _) ← nmaAdv.main pk
+                match forgery with
+                | (msg, (c, _)) =>
+                    let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+                    pure (result, ω))).run (∅, [])) := by
+      let oa :
+          OracleComp (wrappedSpec Chal)
+            ((((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) ×
+              simSt M Commit Chal) :=
+        ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) (do
+            let result@(forgery, _) ← nmaAdv.main pk
+            match forgery with
+            | (msg, (c, _)) =>
+                let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+                pure (result, ω))).run (∅, []))
+      have hfst :
+          (((forgery, advCache), ω), (roCache, queryLog)) ∈
+            support
+              (Prod.fst <$> (simulateQ (loggingOracle (spec := wrappedSpec Chal)) oa).run) := by
+        rw [support_map]
+        exact ⟨((((forgery, advCache), ω), (roCache, queryLog)), log_a), ha_mem, rfl⟩
+      rw [loggingOracle.fst_map_run_simulateQ] at hfst
+      simpa [oa] using hfst
+    simp only [simulateQ_bind, StateT.run_bind] at hinner
+    rw [mem_support_bind_iff] at hinner
+    obtain ⟨z, hz, hzω⟩ := hinner
+    rcases z with ⟨res, st⟩
+    rcases res with ⟨forgery', advCache'⟩
+    rw [mem_support_bind_iff] at hzω
+    obtain ⟨ω', hω', hfinal⟩ := hzω
+    rcases st with ⟨cache, log⟩
+    rcases ω' with ⟨ω', st'⟩
+    rcases st' with ⟨cache', log'⟩
+    have hfinal_eq :
+        (((forgery, advCache), ω), (roCache, queryLog)) =
+          (((forgery', advCache'), ω'), (cache', log')) := by
+      simpa [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] using hfinal
+    have hfg : forgery = forgery' := by
+      have := congrArg (fun p => p.1.1.1) hfinal_eq
+      simpa using this
+    have hadv : advCache = advCache' := by
+      have := congrArg (fun p => p.1.1.2) hfinal_eq
+      simpa using this
+    have hωeq : ω = ω' := by
+      have := congrArg (fun p => p.1.2) hfinal_eq
+      simpa using this
+    have hcacheEq : roCache = cache' := by
+      have := congrArg (fun p => p.2.1) hfinal_eq
+      simpa using this
+    have hlogEq : queryLog = log' := by
+      have := congrArg (fun p => p.2.2) hfinal_eq
+      simpa using this
+    subst hfg hadv hωeq hcacheEq hlogEq
+    have hstep :
+        (ω, (roCache, queryLog)) ∈
+          support ((roImpl M Commit Chal (forgery.1, forgery.2.1)).run (cache, log)) := by
+      simpa [simulateQ_query, QueryImpl.add_apply_inr] using hω'
+    by_cases hcache : cache (forgery.1, forgery.2.1) = none
+    · simp only [roImpl, bind_pure_comp, StateT.run_bind, StateT.run_get, pure_bind, hcache,
+      StateT.run_monadLift, monadLift_self, StateT.run_map, StateT.run_set, map_pure,
+      Functor.map_map, support_map, support_liftM, OracleQuery.input_query, add_apply_inr,
+      OracleQuery.cont_query, Set.range_id, Set.image_univ, Set.mem_range, Prod.mk.injEq,
+      exists_eq_left] at hstep
+      rcases hstep with ⟨hro, _hlog⟩
+      rw [← hro]
+      simp
+    · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
+      have hhit : (ω, roCache, queryLog) = (v, cache, log) := by
+        simpa [roImpl, StateT.run_bind, StateT.run_get, hv.symm, support_pure,
+          Set.mem_singleton_iff] using hstep
+      cases hhit
+      simp [hv]
+  · simpa using hv
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- The `forkPoint`-based reachability invariant for `runTrace`: whenever
@@ -1388,6 +1478,14 @@ lemma runTrace_queryLog_take_eq
   simp only [bind_pure_comp, simulateQ_map, WriterT.run_map', support_map] at h₁ h₂
   obtain ⟨a₁, ha_mem₁, ha_eq₁⟩ := h₁
   obtain ⟨a₂, ha_mem₂, ha_eq₂⟩ := h₂
+  let wrappedMain :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal))
+        (((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) := do
+    let result@(forgery, _) ← nmaAdv.main pk
+    match forgery with
+    | (msg, (c, _)) =>
+        let ω ← query (spec := unifSpec + (M × Commit →ₒ Chal)) (.inr (msg, c))
+        pure (result, ω)
   have hxqL₁ : x₁.queryLog = a₁.1.2.2 := by
     have := congrArg Prod.fst ha_eq₁
     have h3 := congrArg Trace.queryLog this
@@ -1404,8 +1502,8 @@ lemma runTrace_queryLog_take_eq
     simpa [Prod.map_apply] using this
   rw [hxqL₁, hxqL₂]
   have hdet := inner_prefix_det_one_more_inr (M := M) (Commit := Commit) (Chal := Chal)
-    (γ := (M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache)
-    (nmaAdv.main pk) ∅ []
+    (γ := ((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal)
+    wrappedMain ∅ []
     (z₁ := a₁.1) (z₂ := a₂.1)
     (outerLog₁ := a₁.2) (outerLog₂ := a₂.2)
     ha_mem₁ ha_mem₂ p (v₁ := v₁) (v₂ := v₂)
