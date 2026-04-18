@@ -103,7 +103,7 @@ lemma simulateQ_HasQuery_query (q : hashSpec.Domain) :
         (m := OracleComp (unifSpec + hashSpec)) q) =
       ro q := by
   change simulateQ (unifFwdImpl hashSpec + ro)
-    (liftM (liftM (OracleSpec.query (spec := hashSpec) q) :
+    (liftM (liftM (hashSpec.query q) :
       OracleQuery (unifSpec + hashSpec) _)) = _
   simp [simulateQ_query]
 

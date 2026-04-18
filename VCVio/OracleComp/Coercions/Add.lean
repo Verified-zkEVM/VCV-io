@@ -221,7 +221,7 @@ instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
 
 @[simp] lemma liftM_sigma_query (j : σ) (t : (specs j).Domain) :
     (liftM (query t) : OracleQuery (OracleSpec.sigma specs) ((specs j).Range t)) =
-      query (spec := OracleSpec.sigma specs) ⟨j, t⟩ := rfl
+      (OracleSpec.sigma specs).query ⟨j, t⟩ := rfl
 
 instance lawfulSubSpec_sigma (j : σ) :
     OracleSpec.LawfulSubSpec (specs j) (OracleSpec.sigma specs) where

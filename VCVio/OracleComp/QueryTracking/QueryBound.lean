@@ -55,14 +55,14 @@ lemma isQueryBound_pure (x : α) (b : B)
 
 lemma isQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
     (b : B) (canQuery : ι → B → Prop) (cost : ι → B → B) :
-    IsQueryBound (liftM (query (spec := spec) t) >>= mx) b canQuery cost ↔
+    IsQueryBound (liftM (spec.query t) >>= mx) b canQuery cost ↔
       canQuery t b ∧ ∀ u, IsQueryBound (mx u) (cost t b) canQuery cost :=
   Iff.rfl
 
 @[simp]
 lemma isQueryBound_query_iff (t : ι) (b : B)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
-    IsQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) b canQuery cost ↔
+    IsQueryBound (liftM (spec.query t) : OracleComp spec _) b canQuery cost ↔
     canQuery t b := by
   simp [IsQueryBound]
 
@@ -174,13 +174,13 @@ lemma isPerIndexQueryBound_pure (x : α) (qb : ι → ℕ) :
 
 lemma isPerIndexQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
     (qb : ι → ℕ) :
-    IsPerIndexQueryBound (liftM (query (spec := spec) t) >>= mx) qb ↔
+    IsPerIndexQueryBound (liftM (spec.query t) >>= mx) qb ↔
       0 < qb t ∧ ∀ u, IsPerIndexQueryBound (mx u) (Function.update qb t (qb t - 1)) :=
   Iff.rfl
 
 @[simp]
 lemma isPerIndexQueryBound_query_iff (t : ι) (qb : ι → ℕ) :
-    IsPerIndexQueryBound (liftM (query (spec := spec) t) : OracleComp spec _) qb ↔
+    IsPerIndexQueryBound (liftM (spec.query t) : OracleComp spec _) qb ↔
     0 < qb t := by
   simp [IsPerIndexQueryBound]
 
@@ -332,7 +332,7 @@ lemma not_isTotalQueryBound_bind_query_prefix_zero
     {next : α → spec.Domain}
     {ob : ∀ x, spec.Range (next x) → OracleComp spec β} :
     ¬ IsTotalQueryBound
-        (oa >>= fun x => (liftM (query (spec := spec) (next x)) >>= ob x))
+        (oa >>= fun x => liftM (spec.query (next x)) >>= ob x)
         0 := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
@@ -351,7 +351,7 @@ lemma IsTotalQueryBound.of_bind_query_prefix [spec.Inhabited]
     {n : ℕ}
     (h :
       IsTotalQueryBound
-        (oa >>= fun x => (liftM (query (spec := spec) (next x)) >>= ob x))
+        (oa >>= fun x => liftM (spec.query (next x)) >>= ob x)
         (n + 1)) :
     IsTotalQueryBound oa n := by
   induction oa using OracleComp.inductionOn generalizing n with
@@ -369,7 +369,7 @@ lemma IsTotalQueryBound.of_bind_query_prefix [spec.Inhabited]
       refine ⟨hn, fun u => ?_⟩
       have hn_succ : n = (n - 1) + 1 := by omega
       have hu : IsTotalQueryBound
-          (mx u >>= fun x => (liftM (query (spec := spec) (next x)) >>= ob x))
+          (mx u >>= fun x => liftM (spec.query (next x)) >>= ob x)
           ((n - 1) + 1) := by
         rw [← hn_succ]
         exact h.2 u

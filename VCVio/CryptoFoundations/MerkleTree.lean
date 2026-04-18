@@ -138,7 +138,7 @@ theorem getRoot_trivial {m : Type _ → Type _} [Monad m] [LawfulMonad m] [HasQu
 @[simp, grind =]
 theorem getRoot_single (a b : α) :
     getRoot α <$> buildMerkleTree (m := OracleComp (spec α)) α 1 ⟨[a, b], rfl⟩ =
-      (query (spec := spec α) (a, b)) := by
+      ((spec α).query (a, b)) := by
   simp [buildMerkleTree, buildLayer, List.Vector.ofFn, List.Vector.get]
   rfl
 

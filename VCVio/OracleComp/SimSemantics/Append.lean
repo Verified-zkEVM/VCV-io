@@ -57,18 +57,18 @@ variable {ι₁' : Type} {ι₂' : Type}
 
 private lemma simulateQ_add_liftM_left (t : spec₁'.Domain) :
     simulateQ (impl₁' + impl₂')
-      (liftM (OracleSpec.query (spec := spec₁') t) : OracleComp (spec₁' + spec₂') _) =
+      (liftM (spec₁'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₁' t := by
   change simulateQ (impl₁' + impl₂')
-    (liftM (liftM (OracleSpec.query (spec := spec₁') t) : OracleQuery (spec₁' + spec₂') _)) = _
+    (liftM (liftM (spec₁'.query t) : OracleQuery (spec₁' + spec₂') _)) = _
   simp [simulateQ_query]
 
 private lemma simulateQ_add_liftM_right (t : spec₂'.Domain) :
     simulateQ (impl₁' + impl₂')
-      (liftM (OracleSpec.query (spec := spec₂') t) : OracleComp (spec₁' + spec₂') _) =
+      (liftM (spec₂'.query t) : OracleComp (spec₁' + spec₂') _) =
     impl₂' t := by
   change simulateQ (impl₁' + impl₂')
-    (liftM (liftM (OracleSpec.query (spec := spec₂') t) : OracleQuery (spec₁' + spec₂') _)) = _
+    (liftM (liftM (spec₂'.query t) : OracleQuery (spec₁' + spec₂') _)) = _
   simp [simulateQ_query]
 
 @[simp]

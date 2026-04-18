@@ -60,10 +60,10 @@ protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[inline]
-def coin : OracleComp coinSpec Bool := query (spec := coinSpec) ()
+def coin : OracleComp coinSpec Bool := coinSpec.query ()
 
 @[grind =, aesop unsafe norm]
-lemma coin_def : coin = query (spec := coinSpec) () := rfl
+lemma coin_def : coin = coinSpec.query () := rfl
 
 protected lemma pure_def (x : α) :
     (pure x : OracleComp spec α) = PFunctor.FreeM.pure x := rfl

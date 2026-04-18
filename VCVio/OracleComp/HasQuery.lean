@@ -60,7 +60,7 @@ instance instOracleQuery : HasQuery spec (OracleQuery spec) where
 @[simp]
 lemma instOracleQuery_query (t : spec.Domain) :
     HasQuery.query (spec := spec) (m := OracleQuery spec) t =
-      OracleSpec.query (spec := spec) t :=
+      spec.query t :=
   rfl
 
 /-- Repackage `HasQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
@@ -76,12 +76,12 @@ lemma toQueryImpl_apply [HasQuery spec m] (t : spec.Domain) :
 main bridge that makes `HasQuery` compose with `SubSpec` lifts and standard transformer lifts. -/
 instance (priority := low) instOfMonadLift [MonadLiftT (OracleQuery spec) m] :
     HasQuery spec m where
-  query t := liftM (OracleSpec.query (spec := spec) t)
+  query t := liftM (spec.query t)
 
 @[simp]
 lemma instOfMonadLift_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
     HasQuery.query (spec := spec) (m := m) t =
-      liftM (OracleSpec.query (spec := spec) t) :=
+      liftM (spec.query t) :=
   rfl
 
 section Morphisms

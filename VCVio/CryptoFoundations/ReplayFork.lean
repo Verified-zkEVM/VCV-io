@@ -1574,7 +1574,7 @@ private lemma replayOracle_step_isTotalQueryBound
   classical
   -- 1-query block: `liftM (query t) >>= (fun u => pure (u, upd u))`.
   have hquery : ∀ (upd : spec.Range t → ReplayForkState spec i),
-      IsTotalQueryBound (liftM (query (spec := spec) t) >>= fun u =>
+      IsTotalQueryBound (liftM (spec.query t) >>= fun u =>
         (pure (u, upd u) : OracleComp spec (spec.Range t × ReplayForkState spec i))) 1 := by
     intro upd
     rw [isTotalQueryBound_query_bind_iff]

@@ -50,7 +50,7 @@ private def IND_CPA_stepPrefix
       cases t with
       | inl tu =>
           exact do
-            let u ← liftM (query (spec := unifSpec) tu)
+            let u ← liftM (unifSpec.query tu)
             rec u
       | inr mm =>
           exact do
@@ -101,9 +101,9 @@ private lemma IND_CPA_stepPrefix_query_inl (pk : PK) (k : ℕ) {α : Type}
     (mx : encAlg'.IND_CPA_oracleSpec.Range (Sum.inl tu) →
       OracleComp encAlg'.IND_CPA_oracleSpec α) :
     IND_CPA_stepPrefix (encAlg' := encAlg') pk k
-        (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (Sum.inl tu)) >>= mx) =
+        (liftM (encAlg'.IND_CPA_oracleSpec.query (Sum.inl tu)) >>= mx) =
       (do
-        let u ← liftM (query (spec := unifSpec) tu)
+        let u ← liftM (unifSpec.query tu)
         IND_CPA_stepPrefix (encAlg' := encAlg') pk k (mx u)) := by
   simp [IND_CPA_stepPrefix]
 
@@ -113,7 +113,7 @@ private lemma IND_CPA_stepPrefix_query_inr (pk : PK) (k : ℕ) {α : Type}
     (mx : encAlg'.IND_CPA_oracleSpec.Range (Sum.inr mm) →
       OracleComp encAlg'.IND_CPA_oracleSpec α) :
     IND_CPA_stepPrefix (encAlg' := encAlg') pk k
-        (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (Sum.inr mm)) >>= mx) =
+        (liftM (encAlg'.IND_CPA_oracleSpec.query (Sum.inr mm)) >>= mx) =
       (do
         let st ← get
         match st.1 mm with
@@ -195,7 +195,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
           have hquery :
               (simulateQ
                 (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-                (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inl tu)) >>= oa)).run' st =
+                (liftM (encAlg'.IND_CPA_oracleSpec.query (.inl tu)) >>= oa)).run' st =
               (do
                 let u ← ($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu))
                 (simulateQ
@@ -204,7 +204,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
             have hrun :
                 (simulateQ
                   (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-                  (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inl tu)) >>= oa)).run st =
+                  (liftM (encAlg'.IND_CPA_oracleSpec.query (.inl tu)) >>= oa)).run st =
                 (($ᵗ (unifSpec.Range tu) : ProbComp (unifSpec.Range tu)) >>= fun u =>
                   (simulateQ
                     (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
@@ -286,7 +286,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
               have hquery :
                   (simulateQ
                     (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                    (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run'
                       st =
                   (do
                     let c ← encAlg'.encrypt pk
@@ -299,7 +299,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                     (simulateQ
                       (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
                         (if branch then k + 1 else k))
-                      (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                      (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run
                         st =
                     (do
                       let c ← encAlg'.encrypt pk
@@ -390,7 +390,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
               have hquery :
                   (simulateQ
                     (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                    (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run'
                       st =
                   (do
                     let c ← encAlg'.encrypt pk
@@ -403,7 +403,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                     (simulateQ
                       (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
                         (if branch then k + 1 else k))
-                      (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                      (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run
                         st =
                     (do
                       let c ← encAlg'.encrypt pk
@@ -497,7 +497,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
             have hquery :
                 (simulateQ
                   (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-                  (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run'
+                  (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run'
                     st =
                 (simulateQ
                   (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
@@ -506,7 +506,7 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
                   (simulateQ
                     (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
                       (if branch then k + 1 else k))
-                    (liftM (query (spec := encAlg'.IND_CPA_oracleSpec) (.inr mm)) >>= oa)).run
+                    (liftM (encAlg'.IND_CPA_oracleSpec.query (.inr mm)) >>= oa)).run
                       st =
                   (simulateQ
                     (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk
