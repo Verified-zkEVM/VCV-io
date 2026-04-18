@@ -131,6 +131,7 @@ shift, cast, and subtraction all reduce. -/
 @[simp] theorem sample_cbd1_val_3 :
     sample_cbd1 (3 : u8) = (RustM.ok (0 : i32)) := by decide
 
+set_option linter.style.nativeDecide false in
 /-- Total-correctness statement: every `u8` input yields an `ok`
 output in `{-1, 0, 1}`. Proved by `native_decide` exhausting the 256
 `u8` values (pure `decide` exceeds Lean's default recursion depth on
