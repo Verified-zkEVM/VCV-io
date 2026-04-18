@@ -986,10 +986,10 @@ with the single-run postcondition `verify` plus the extractor correctness lemma
 uses `Fork.replayForkingBound` for the RO-level packaging and `_hss` for special
 soundness, with `σ.extract` playing the role of EC's `extractor`.
 
-**Currently conditional on the two B1 prefix-faithfulness `sorry`s**
+The Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound` rests on the two
+prefix-faithfulness identities
 (`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean),
-which feed the Jensen/Cauchy-Schwarz step that powers `Fork.replayForkingBound`. -/
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean). -/
 theorem euf_nma_bound
     [DecidableEq M] [DecidableEq Commit]
     [SampleableType Chal]
@@ -1104,13 +1104,13 @@ The combined bound is:
 where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
 the bound is trivially satisfied when the simulation loss exceeds the advantage.
 
-**Currently conditional on two open obligations**:
-1. `euf_cma_to_nma` (this file, still `sorry`): CMA-to-NMA reduction via HVZK simulator.
-2. The two B1 prefix-faithfulness `sorry`s in ReplayFork.lean
-   (`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-   `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt`), which feed the
-   Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`; transitively inherited
-   from `euf_nma_bound`. -/
+**Currently conditional on one open obligation**:
+`euf_cma_to_nma` (this file, still `sorry`): the CMA-to-NMA reduction via the HVZK
+simulator. The forking-lemma side (the two B1 prefix-faithfulness identities
+`evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
+discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
+used by `euf_nma_bound`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
