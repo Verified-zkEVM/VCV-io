@@ -2344,14 +2344,72 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
     simp only [simulateQ_pure, StateT.run_pure, map_pure]
   | query_bind t oa ih =>
     intro stL stR h_Lcon h_Lmis h_Rcon h_Rmis h_obs h_fq h_dc h_dcle h_trace h_len
-    -- The two simulated expressions become:
-    --   `do u ← $ᵗ; (replayOracle i t).run {stX with replacement := u} >>= fun (v, st') =>
-    --        Prod.fst <$> (simulateQ (replayOracle i) (oa v)).run st'`.
-    -- We case-split on `L_tail := stL.trace.drop stL.cursor` (controlling the LHS next
-    -- entry). The RHS next entry is determined via `h_trace = takeBeforeForkAt L_tail i d`
-    -- where `d := stL.forkQuery - stL.distinguishedCount`.
-    -- TODO(B1a): complete the six-way case analysis (cf. helper lemmas above).
-    sorry
+    -- Proof outline (to be filled in):
+    --   Let `d := stL.forkQuery - stL.distinguishedCount`,
+    --       `L_tail := stL.trace.drop stL.cursor`.
+    -- From `h_trace`, `stR.trace.drop stR.cursor = takeBeforeForkAt L_tail i d`.
+    -- Simplify both sides at the `simulateQ` / `.run` level:
+    --   `(simulateQ (replayOracle i) (liftM (query t) >>= oa)).run stX`
+    --   = `(replayOracle i t).run stX >>= fun ⟨v, st'⟩ =>
+    --        (simulateQ (replayOracle i) (oa v)).run st'`.
+    -- Case-split on `L_tail`:
+    -- 1. `L_tail = []`: impossible (contradicts `h_len`, which requires
+    --    `d < (L_tail.getQ (· = i)).length`, i.e., at least one `i`-entry remaining).
+    -- 2. `L_tail = ⟨t₀, u'₀⟩ :: L_tail'`:
+    --    * Case A: `t₀ ≠ i`. Then `takeBeforeForkAt_cons_of_ne` preserves the entry on the
+    --      RHS, so both `stL.nextEntry? = stR.nextEntry? = some ⟨t₀, u'₀⟩`. Sub-case on the
+    --      query type `t`:
+    --      - `t = t₀` (hence `t ≠ i`): both sides lockstep via
+    --        `replayOracle_run_lockstep_ne_i`, returning `u'₀` and advancing cursor. The
+    --        updated states satisfy the same invariants (`L_tail'`, `R_tail'` related by
+    --        `takeBeforeForkAt` at the same `d`; `#i`-queries preserved since `t₀ ≠ i`).
+    --        Recurse via `ih u'₀`.
+    --      - `t ≠ t₀`: both sides go live via `replayOracle_run_mismatch_ne`. After this
+    --        step both states satisfy `mismatch = true`, so
+    --        `fst_map_simulateQ_replayOracle_of_live` collapses the α-marginal to
+    --        `evalDist (oa u_live)`, which coincides on both sides.
+    --    * Case B: `t₀ = i` and `d = 0`. Then `takeBeforeForkAt_cons_self_zero` gives
+    --      `R_tail = []`, so `stR.nextEntry? = none`. Sub-case:
+    --      - `t = i`: LHS fires the fork (`replayOracle_run_fork_fires`, using the outer
+    --        uniform `u` as the replacement), moving to `forkConsumed = true`. RHS goes
+    --        live via `replayOracle_run_nextEntry_none`, sampling a fresh uniform via
+    --        `liftM (query i)`. After one step both sides are in live mode, so
+    --        `fst_map_simulateQ_replayOracle_of_live` applies. The LHS α-marginal after
+    --        averaging over `u` becomes `do u ← $ᵗ; evalDist (oa u)`; the RHS becomes
+    --        `do u_live ← liftM (query i); evalDist (oa u_live)`. These coincide because
+    --        `liftM (query i)` is distributionally equal to `$ᵗ (spec.Range i)` under
+    --        the `[spec.Fintype] [spec.Inhabited]` assumptions.
+    --      - `t ≠ i`: LHS goes live (type mismatch) via `replayOracle_run_mismatch_ne`;
+    --        RHS goes live via `replayOracle_run_nextEntry_none`. Both sides transition to
+    --        `mismatch = true`; `fst_map_simulateQ_replayOracle_of_live` collapses both
+    --        α-marginals to `evalDist (oa u_live)`.
+    --    * Case C: `t₀ = i` and `d ≥ 1`. Then `takeBeforeForkAt_cons_self_succ` gives
+    --      `R_tail = ⟨i, u'₀⟩ :: takeBeforeForkAt L_tail' i (d - 1)`, so both
+    --      `stL.nextEntry? = stR.nextEntry? = some ⟨i, u'₀⟩`. Sub-case on `t`:
+    --      - `t = i`: both sides lockstep via `replayOracle_run_lockstep_i_pre_fork`
+    --        (since `distinguishedCount ≠ forkQuery`, because `d = fq - dc ≥ 1`). Returns
+    --        `u'₀`, advances cursor, and increments `distinguishedCount`. The updated
+    --        states satisfy the invariants at `d - 1`: `L_tail'` has one fewer `i`-entry,
+    --        `R_tail' = takeBeforeForkAt L_tail' i (d - 1)`, `h_len'` preserved. Recurse
+    --        via `ih u'₀`.
+    --      - `t ≠ i`: both sides go live (type mismatch) via
+    --        `replayOracle_run_mismatch_ne`. Same as Case A live sub-case.
+    -- Simplify both sides to the one-step + suffix form.
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+      OracleQuery.input_query, id_map, StateT.run_bind]
+    -- Case-split on `stL.trace.drop stL.cursor`. Case `nil` is ruled out by `h_len`
+    -- (it would force `d < 0`). The non-nil case then further splits on whether the
+    -- head is an `i`-entry and on whether `d = 0`, matching Cases A/B/C above.
+    rcases hL : stL.trace.drop stL.cursor with _ | ⟨⟨t₀, u'₀⟩, L_tail'⟩
+    · -- `L_tail = []`: contradicts `h_len`.
+      exfalso
+      rw [hL] at h_len
+      simp [QueryLog.getQ] at h_len
+    · -- `L_tail = ⟨t₀, u'₀⟩ :: L_tail'`. Remaining cases to discharge:
+      --   * Case A (t₀ ≠ i): lockstep (t = t₀) or live-mismatch (t ≠ t₀).
+      --   * Case B (t₀ = i, d = 0): fork-fires (t = i) or live-mismatch (t ≠ i).
+      --   * Case C (t₀ = i, d ≥ 1): lockstep (t = i) or live-mismatch (t ≠ i).
+      sorry
 
 /-- **Replay-side prefix-faithfulness (key distributional claim for B1).**
 
