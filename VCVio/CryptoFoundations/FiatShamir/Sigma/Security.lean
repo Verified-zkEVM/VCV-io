@@ -269,90 +269,106 @@ private noncomputable def phaseCBaseImpl :
   phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
     phaseCHashImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
 
-private noncomputable def realCmaCommonBlock :
-    OracleComp PhaseCOuterSpec (Bool × Bool) := do
-  let sigAlg : SignatureAlg (OracleComp PhaseCOuterSpec) M Stmt Wit (Commit × Resp) :=
-    FiatShamir (m := OracleComp PhaseCOuterSpec) σ hr M
-  let (pk, sk) ← sigAlg.keygen
-  let realImpl : QueryImpl PhaseCFullSpec
+private noncomputable def phaseCHit
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (mc : M × Commit) : Bool :=
+  match phaseCHashLookup (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st mc with
+  | some _ => true
+  | none => false
+
+private structure PhaseCResult where
+  bad : Bool
+  wasSigned : Bool
+  verified : Bool
+
+private def PhaseCResult.freshSuccess (r : PhaseCResult) : Bool :=
+  !r.wasSigned && r.verified
+
+private def PhaseCResult.badOrFreshSuccess (r : PhaseCResult) : Bool :=
+  r.bad || r.freshSuccess
+
+private noncomputable def phaseCResultOf
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (msg : M) (verified : Bool) : PhaseCResult :=
+  { bad := st.bad
+    wasSigned := phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st msg
+    verified := verified }
+
+private noncomputable def phaseCRealSignImpl (pk : Stmt) (sk : Wit) :
+    QueryImpl (M →ₒ (Commit × Resp))
       (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
         (OracleComp PhaseCOuterSpec)) :=
-    phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
-      (show QueryImpl (M →ₒ (Commit × Resp))
-          (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-            (OracleComp PhaseCOuterSpec)) from
-        fun msg => do
-          let (c, e) ← simulateQ
-            (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-            (σ.commit pk sk)
-          let ω ←
-            phaseCHashImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (msg, c)
-          let s ← simulateQ
-            (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-            (σ.respond pk sk e ω)
-          modify fun st =>
-            { st with
-                overlayCache := st.overlayCache.cacheQuery (.inr (msg, c)) ω
-                signLog := st.signLog.logQuery msg (c, s) }
-          pure (c, s))
-  let ((msg, sig), st) ←
-    (simulateQ realImpl (adv.main pk)).run
-      (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-  let verified ← (simulateQ
-    (phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-    (sigAlg.verify pk msg sig)).run' st
-  pure (phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st msg, verified)
+  fun msg => do
+    let (c, e) ← simulateQ
+      (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (σ.commit pk sk)
+    let st ← get
+    let hit := phaseCHit (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st (msg, c)
+    let ω ← phaseCHashImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (msg, c)
+    let s ← simulateQ
+      (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (σ.respond pk sk e ω)
+    modify fun st =>
+      { st with
+          overlayCache := st.overlayCache.cacheQuery (.inr (msg, c)) ω
+          signLog := st.signLog.logQuery msg (c, s)
+          bad := st.bad || hit }
+    pure (c, s)
 
-private noncomputable def simCmaCommonBlock :
-    OracleComp PhaseCOuterSpec (Bool × Bool) := do
-  let sigAlg : SignatureAlg (OracleComp PhaseCOuterSpec) M Stmt Wit (Commit × Resp) :=
-    FiatShamir (m := OracleComp PhaseCOuterSpec) σ hr M
-  let (pk, _) ← sigAlg.keygen
-  let idealImpl : QueryImpl PhaseCFullSpec
+private noncomputable def phaseCSimSignImpl (pk : Stmt) :
+    QueryImpl (M →ₒ (Commit × Resp))
       (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
         (OracleComp PhaseCOuterSpec)) :=
-    phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
-      (show QueryImpl (M →ₒ (Commit × Resp))
-          (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-            (OracleComp PhaseCOuterSpec)) from
-        fun msg => do
-          let (c, ω, s) ← simulateQ
-            (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-            (simTranscript pk)
-          modify fun st =>
-            let hit :=
-              match phaseCHashLookup
-                  (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st (msg, c) with
-              | some _ => true
-              | none => false
-            { st with
-                overlayCache := st.overlayCache.cacheQuery (.inr (msg, c)) ω
-                signLog := st.signLog.logQuery msg (c, s)
-                bad := st.bad || hit }
-          pure (c, s))
-  let ((msg, sig), st) ←
-    (simulateQ idealImpl (adv.main pk)).run
-      (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-  let verified ← (simulateQ
-    (phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
-    (sigAlg.verify pk msg sig)).run' st
-  pure (phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st msg, verified)
+  fun msg => do
+    let (c, ω, s) ← simulateQ
+      (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (simTranscript pk)
+    let st ← get
+    let hit := phaseCHit (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st (msg, c)
+    modify fun st =>
+      { st with
+          overlayCache := st.overlayCache.cacheQuery (.inr (msg, c)) ω
+          signLog := st.signLog.logQuery msg (c, s)
+          bad := st.bad || hit }
+    pure (c, s)
 
-omit [Fintype Chal] in
-/-- Idealized Game 2 for Phase C: run the HVZK-based managed-RO adversary and perform the
-final verification against the adversary-returned cache via `withCacheOverlay`.
-
-This is the programmed-cache game that matches the simulator's local semantics exactly.
-The bridge back to the canonical live `managedRoNmaExp` is handled separately by
-`game2Ideal_le_game2_plus_collision`. -/
-noncomputable def managedRoNmaIdealExp : SPMF Bool :=
-  let sigAlg : SignatureAlg (OracleComp (unifSpec + (M × Commit →ₒ Chal))) M Stmt Wit
-      (Commit × Resp) :=
-    FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M
+private noncomputable def realPhaseCExp : SPMF PhaseCResult :=
   (runtime M).evalDist do
+    let sigAlg : SignatureAlg (OracleComp PhaseCOuterSpec) M Stmt Wit (Commit × Resp) :=
+      FiatShamir (m := OracleComp PhaseCOuterSpec) σ hr M
+    let (pk, sk) ← sigAlg.keygen
+    let realImpl : QueryImpl PhaseCFullSpec
+        (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          (OracleComp PhaseCOuterSpec)) :=
+      phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        phaseCRealSignImpl (σ := σ) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk
+    let ((msg, sig), st) ←
+      (simulateQ realImpl (adv.main pk)).run
+        (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    let verified ← (simulateQ
+      (phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (sigAlg.verify pk msg sig)).run' st
+    pure (phaseCResultOf (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st msg verified)
+
+private noncomputable def simPhaseCExp : SPMF PhaseCResult :=
+  (runtime M).evalDist do
+    let sigAlg : SignatureAlg (OracleComp PhaseCOuterSpec) M Stmt Wit (Commit × Resp) :=
+      FiatShamir (m := OracleComp PhaseCOuterSpec) σ hr M
     let (pk, _) ← sigAlg.keygen
-    let ((msg, sig_fg), cache) ← (nmaAdvFromHVZK σ hr M simTranscript adv).main pk
-    withCacheOverlay cache (sigAlg.verify pk msg sig_fg)
+    let simImpl : QueryImpl PhaseCFullSpec
+        (StateT (PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          (OracleComp PhaseCOuterSpec)) :=
+      phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        phaseCSimSignImpl (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) simTranscript pk
+    let ((msg, sig), st) ←
+      (simulateQ simImpl (adv.main pk)).run
+        (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    let verified ← (simulateQ
+      (phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (sigAlg.verify pk msg sig)).run' st
+    pure (phaseCResultOf (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st msg verified)
 
 omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] in
 /-- **Phase B (freshness drop).**
@@ -384,140 +400,88 @@ lemma adv_advantage_le_game1 :
   exact hp.2
 
 /-!
-#### Phase C: HVZK hybrid (scoped `sorry`)
+#### Phase C: freshness-aware hybrid (scoped `sorry`)
 
-Phase C replaces each real signing call inside `cmaCommonBlock` with the HVZK simulator
-`sigSimImpl`, accumulating at most `ζ_zk` total-variation distance per signing query
-and paying `qS · ζ_zk` overall.
+Phase C now keeps the EUF-CMA freshness bit all the way through the simulator
+replacement. The real experiment is re-expressed as `realPhaseCExp`, while the
+simulated experiment is `simPhaseCExp`, which additionally exposes the bad
+branch where the simulator attempts to program a pre-existing target point.
 
 Proof outline (to be completed in a follow-up):
 
-1. **Overlay-style coupled state.** Introduce the EasyCrypt-style simulator state
-   consisting of the visible random-oracle cache together with a "programmed"
-   overlay cache and a bad flag. The invariant is not plain cache equality: it is
-   the overlay relation saying that the programmed cache extends the visible cache
-   and agrees with it away from points attached to signed messages
-   (EasyCrypt's `overlay LRO.m{2} Red_CMA_KOA.m{2} signed`).
-2. **Per-query sign step.** For a signing query, couple the honest signer and the
-   HVZK transcript sampler so that, on the coupled equality branch, both produce the
-   same `(msg, c, ω, s)` point. When this point is fresh in the overlay cache, the
-   two oracle steps agree exactly and preserve the overlay invariant; when it is
-   already present, the simulator sets the bad flag. The transcript-mismatch branch
-   contributes the `ζ_zk` loss.
-3. **Accumulation.** Inductively over the adversary's `OracleComp` tree, using the
-   sign/hash query bound to spend one `ζ_zk` unit per signing query while carrying the
-   overlay invariant and monotonicity of the bad flag through hash and signing steps.
-   This is the place where the eventual `collisionSlack` bridge must read the bad flag
-   rather than compare caches pointwise.
-4. **Post-composition.** `keygen`-marginalization and `verify` post-composition are
-   1-Lipschitz under TV, preserving the bound.
-5. **Pr lift.** Total-variation distance bounds the absolute difference of
-   `Pr[= true | ...]` under any event, giving the final inequality.
+1. **Real-to-sim hybrid.** Show that the EUF-CMA success event is bounded by the
+   simulated `bad ∨ freshSuccess` event, paying at most `qS · ζ_zk` across the
+   signing queries.
+2. **Bad-event bridge.** Show that `bad ∨ freshSuccess` in the simulated game is
+   bounded by the canonical live managed-RO experiment plus `collisionSlack`.
+3. **Post-composition.** Combine the two inequalities into the direct Phase C
+   bound consumed by `euf_cma_to_nma`.
 -/
 
 omit [Fintype Chal] in
-/-- TV distance between Game 1 (real signing via `cmaCommonBlock`) and the idealized
-Game 2 where signing is simulated by `nmaAdvFromHVZK` and the terminal verification
-consults the adversary-returned cache through `withCacheOverlay`.
-
-The two games agree on hash queries (both forward to the outer oracle) and differ
-on signing queries: Game 1 uses `σ.commit / query H / σ.respond`, while Game 2
-samples from `simTranscript pk` and programs the cache. The HVZK assumption gives
-per-query TV distance `≤ ζ_zk`; accumulating over `qS` signing queries via
-`tvDist_bind_left_le` and induction on the `OracleComp` tree gives the total
-bound `qS · ζ_zk`.
-
-The subsequent bridge from this ideal cache-programmed game back to the canonical
-live `managedRoNmaExp` is handled by `game2Ideal_le_game2_plus_collision`. -/
-lemma tvDist_game1_game2_le
-    (_hhvzk : σ.HVZK simTranscript ζ_zk)
+/-- Phase C hybrid step: replace honest signing with the HVZK simulator while
+keeping both the freshness bit and the bad branch visible in the target event. -/
+lemma phaseC_real_le_sim_bad_or_fresh
+    (_hζ_zk : 0 ≤ ζ_zk) (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (qS qH : ℕ)
     (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    tvDist
-      (Prod.snd <$> (runtime M).evalDist (cmaCommonBlock σ hr M adv))
-      (managedRoNmaIdealExp (σ := σ) (hr := hr) (M := M)
-        (simTranscript := simTranscript) (adv := adv)) ≤
-      qS * ζ_zk := by
+    adv.advantage (runtime M) ≤
+      Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+        (simPhaseCExp σ hr M simTranscript adv)] +
+        ENNReal.ofReal (qS * ζ_zk) := by
   sorry
 
 omit [Fintype Chal] in
-/-- **Phase C (overlay-to-live bridge).**
-Bridge the idealized cache-programmed Game 2 back to the canonical live
-`managedRoNmaExp`. The two games differ only when a simulator-programmed entry
-for the final target has not been mirrored into the live random oracle; the
-predictability hypothesis bounds this late-programming event by
-`collisionSlack qS qH β`.
-
-This is the point where the `β`-dependent slack enters the CMA-to-NMA bound; the
-later Phase D fork bridge stays entirely live. -/
-lemma game2Ideal_le_game2_plus_collision
+/-- Phase C bad-event bridge: the simulator's `bad ∨ freshSuccess` event is
+bounded by the live managed-RO experiment plus the collision slack. -/
+lemma phaseC_sim_bad_or_fresh_le_managedRo_plus_collision
     (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (qS qH : ℕ)
     (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    Pr[= true | managedRoNmaIdealExp (σ := σ) (hr := hr) (M := M)
-        (simTranscript := simTranscript) (adv := adv)] ≤
+    Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+      (simPhaseCExp σ hr M simTranscript adv)] ≤
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
           (nmaAdvFromHVZK σ hr M simTranscript adv) +
         collisionSlack qS qH β := by
   sorry
 
 omit [Fintype Chal] in
-/-- **Phase C (HVZK hybrid + live bridge).**
-Game 1 (freshness-dropped CMA) is bounded above by the canonical live managed-RO
-NMA experiment for `nmaAdvFromHVZK`, plus the HVZK loss `qS · ζ_zk` and the
-late-programming slack `collisionSlack qS qH β`.
-
-Uses `tvDist_game1_game2_le` for the HVZK TV bound,
-`game2Ideal_le_game2_plus_collision` for the cache-to-live bridge, then
-`abs_probOutput_toReal_sub_le_tvDist` to transfer to `Pr[= true]` and
-`ENNReal.ofReal_le_ofReal` + `ENNReal.ofReal_add_le` to lift the real-valued
-TV term into `ℝ≥0∞`. -/
+/-- **Phase C (freshness-aware hybrid + live bridge).**
+The EUF-CMA success probability is bounded by the canonical live managed-RO NMA
+experiment for `nmaAdvFromHVZK`, plus the HVZK loss `qS · ζ_zk` and the
+late-programming slack `collisionSlack qS qH β`. -/
 lemma hybrid_sign_le
     (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (_hζ_zk : 0 ≤ ζ_zk) (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (qS qH : ℕ)
     (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    Pr[= true | Prod.snd <$> (runtime M).evalDist (cmaCommonBlock σ hr M adv)] ≤
+    adv.advantage (runtime M) ≤
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
           (nmaAdvFromHVZK σ hr M simTranscript adv) +
         ENNReal.ofReal (qS * ζ_zk) +
         collisionSlack qS qH β := by
-  set g₁ := Prod.snd <$> (runtime M).evalDist (cmaCommonBlock σ hr M adv)
-  set g₂ideal := managedRoNmaIdealExp (σ := σ) (hr := hr) (M := M)
-    (simTranscript := simTranscript) (adv := adv)
-  set g₂ := SignatureAlg.managedRoNmaExp (runtime M)
-    (nmaAdvFromHVZK σ hr M simTranscript adv)
-  have htv := tvDist_game1_game2_le σ hr M simTranscript ζ_zk adv _hhvzk qS qH _hQ
-  have habs := abs_probOutput_toReal_sub_le_tvDist g₁ g₂ideal
-  have hreal :
-      Pr[= true | g₁].toReal ≤ Pr[= true | g₂ideal].toReal + (qS * ζ_zk) := by
-    linarith [le_abs_self (Pr[= true | g₁].toReal - Pr[= true | g₂ideal].toReal)]
-  have hideal :
-      Pr[= true | g₂ideal] ≤ Pr[= true | g₂] + collisionSlack qS qH β := by
-    simpa [g₂ideal, g₂, SignatureAlg.managedRoNmaAdv.advantage] using
-      game2Ideal_le_game2_plus_collision (σ := σ) (hr := hr) (M := M)
-        (simTranscript := simTranscript) (adv := adv) β _hβ qS qH _hQ
-  calc Pr[= true | g₁]
-      = ENNReal.ofReal (Pr[= true | g₁].toReal) :=
-        (ENNReal.ofReal_toReal probOutput_ne_top).symm
-    _ ≤ ENNReal.ofReal (Pr[= true | g₂ideal].toReal + (qS * ζ_zk)) :=
-        ENNReal.ofReal_le_ofReal hreal
-    _ ≤ ENNReal.ofReal (Pr[= true | g₂ideal].toReal) + ENNReal.ofReal (qS * ζ_zk) :=
-        ENNReal.ofReal_add_le
-    _ = Pr[= true | g₂ideal] + ENNReal.ofReal (qS * ζ_zk) := by
-        rw [ENNReal.ofReal_toReal probOutput_ne_top]
-    _ ≤ (Pr[= true | g₂] + collisionSlack qS qH β) + ENNReal.ofReal (qS * ζ_zk) := by
+  calc adv.advantage (runtime M)
+      ≤ Pr[= true | PhaseCResult.badOrFreshSuccess <$>
+            (simPhaseCExp σ hr M simTranscript adv)] +
+          ENNReal.ofReal (qS * ζ_zk) :=
+        phaseC_real_le_sim_bad_or_fresh σ hr M simTranscript ζ_zk adv
+          _hζ_zk _hhvzk qS qH _hQ
+    _ ≤ (SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+            (nmaAdvFromHVZK σ hr M simTranscript adv) +
+          collisionSlack qS qH β) +
+          ENNReal.ofReal (qS * ζ_zk) := by
         simpa [add_assoc, add_comm, add_left_comm] using
-          add_le_add_right hideal (ENNReal.ofReal (qS * ζ_zk))
-    _ = Pr[= true | g₂] + ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH β := by
-        rw [add_assoc, add_comm (collisionSlack qS qH β), ← add_assoc]
+          add_le_add_right
+            (phaseC_sim_bad_or_fresh_le_managedRo_plus_collision σ hr M simTranscript adv
+              β _hβ qS qH _hQ)
+            (ENNReal.ofReal (qS * ζ_zk))
     _ = SignatureAlg.managedRoNmaAdv.advantage (runtime M)
           (nmaAdvFromHVZK σ hr M simTranscript adv) +
         ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH β := by
-        simp [g₂, SignatureAlg.managedRoNmaAdv.advantage]
+        simp [add_comm, add_left_comm, mul_comm]
 
 omit [Fintype Chal] [SampleableType Chal] in
 private def wrappedHashQueryBound {α : Type}
@@ -1683,17 +1647,14 @@ Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation 
 the birthday term `collisionSlack qS qH β` absorbs collisions where `A` queries a
 hash that `B` later programs.
 
-The bound decomposes into three phases, each extracted as its own lemma and
-chained in the final `calc`:
+The bound decomposes into two live-facing phases, each extracted as its own
+lemma and chained in the final `calc`:
 
-- `adv_advantage_le_game1` (**Phase B**, PROVEN, freshness drop):
-  `Adv^{EUF-CMA}(A) ≤ Pr[verify succeeds | Game 1]`. The CMA experiment is
-  `(fun (wasQueried, verified) => !wasQueried && verified) <$> cmaCommonBlock`;
-  dropping the freshness conjunct yields `_ ≤ verified` by monotonicity.
 - `hybrid_sign_le` (**Phase C**, remaining proof obligation):
-  `Pr[verify | Game 1] ≤ Adv^{managed-RO-NMA}(B) + qS · ζ_zk + collisionSlack qS qH β`.
-  The transcript-simulation loss and the cache-to-live bridge are combined before
-  the live fork argument.
+  `Adv^{EUF-CMA}(A) ≤ Adv^{managed-RO-NMA}(B) + qS · ζ_zk + collisionSlack qS qH β`.
+  Internally this keeps the freshness bit through the HVZK replacement and pays
+  `collisionSlack` only when bridging the simulator's `bad ∨ freshSuccess` event
+  back to the canonical live managed-RO experiment.
 - `nma_advantage_le_fork_advantage` (**Phase D**, live fork bridge):
   `Adv^{managed-RO-NMA}(B) ≤ Adv^{fork-NMA}_{qH}(B)`.
   Once Phase C has already paid for the programmed-cache mismatch, the remaining
@@ -1970,15 +1931,12 @@ theorem euf_cma_to_nma
   -- Advantage bound: chain the three phase lemmas.
   --   `adv.advantage`
   --       ≤ `Pr[= true | Game 1]`                     (Phase B: freshness drop)
-  --       ≤ `Pr[= true | Game 2] + qS · ζ_zk + collisionSlack`
-  --                                                 (Phase C: HVZK hybrid + live bridge)
+  --       ≤ `managedRoNmaAdvantage + qS · ζ_zk + collisionSlack`
+  --                                   (Phase C: freshness-aware hybrid + bridge)
   --       ≤ `Fork.advantage + qS · ζ_zk + collisionSlack`
   --                                                 (Phase D: live fork bridge)
   calc adv.advantage (runtime M)
-      ≤ Pr[= true | Prod.snd <$>
-            (runtime M).evalDist (cmaCommonBlock σ hr M adv)] :=
-        adv_advantage_le_game1 σ hr M adv
-    _ ≤ SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+      ≤ SignatureAlg.managedRoNmaAdv.advantage (runtime M)
             (nmaAdvFromHVZK σ hr M simTranscript adv) +
           ENNReal.ofReal (qS * ζ_zk) +
           collisionSlack qS qH β :=
