@@ -536,6 +536,76 @@ theorem run'_simulateQ_eq_of_query_map_eq'
   have hmap := congrArg (fun p => Prod.fst <$> p) hrun
   simpa [StateT.run'] using hmap
 
+/-- Invariant-gated state-projection theorem: if `proj` commutes with each oracle
+step *under* a state invariant `inv` that is preserved by every step, then it
+commutes with the full simulation starting from any state satisfying `inv`. This
+is the natural strengthening of `map_run_simulateQ_eq_of_query_map_eq'` for
+projections that only agree on a reachable subset of states. -/
+theorem map_run_simulateQ_eq_of_query_map_eq_inv'
+    {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
+    (inv : σ₁ → Prop) (proj : σ₁ → σ₂)
+    (hinv : ∀ t s, inv s →
+      ∀ y ∈ support (m := OracleComp spec') ((impl₁ t).run s), inv y.2)
+    (hproj : ∀ t s, inv s →
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) (hs : inv s) :
+    Prod.map id proj <$> (simulateQ impl₁ oa).run s =
+      (simulateQ impl₂ oa).run (proj s) := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x => simp
+  | query_bind t oa ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, map_bind]
+      have hbind :
+          (do
+              let x ← (impl₁ t).run s
+              Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2 :
+                OracleComp spec' (α × σ₂)) =
+            (do
+              let x ← (impl₁ t).run s
+              (simulateQ impl₂ (oa x.1)).run (proj x.2)) :=
+        bind_congr_of_forall_mem_support
+          (mx := ((impl₁ t).run s : OracleComp spec' (spec.Range t × σ₁)))
+          (fun x hx => ih x.1 x.2 (hinv t s hs x hx))
+      calc
+        ((impl₁ t).run s >>= fun x =>
+            Prod.map id proj <$> (simulateQ impl₁ (oa x.1)).run x.2)
+            =
+            ((impl₁ t).run s >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run (proj x.2)) := hbind
+        _ =
+            ((Prod.map id proj <$> (impl₁ t).run s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  exact
+                    (bind_map_left (m := OracleComp spec') (Prod.map id proj)
+                      ((impl₁ t).run s)
+                      (fun y => (simulateQ impl₂ (oa y.1)).run y.2)).symm
+        _ =
+            ((impl₂ t).run (proj s) >>= fun x =>
+              (simulateQ impl₂ (oa x.1)).run x.2) := by
+                  rw [hproj t s hs]
+
+/-- `run'` projection corollary of `map_run_simulateQ_eq_of_query_map_eq_inv'`. -/
+theorem run'_simulateQ_eq_of_query_map_eq_inv'
+    {ι ι' : Type} {spec : OracleSpec ι} {spec' : OracleSpec ι'}
+    {σ₁ σ₂ : Type _}
+    (impl₁ : QueryImpl spec (StateT σ₁ (OracleComp spec')))
+    (impl₂ : QueryImpl spec (StateT σ₂ (OracleComp spec')))
+    (inv : σ₁ → Prop) (proj : σ₁ → σ₂)
+    (hinv : ∀ t s, inv s →
+      ∀ y ∈ support (m := OracleComp spec') ((impl₁ t).run s), inv y.2)
+    (hproj : ∀ t s, inv s →
+      Prod.map id proj <$> (impl₁ t).run s = (impl₂ t).run (proj s))
+    (oa : OracleComp spec α) (s : σ₁) (hs : inv s) :
+    (simulateQ impl₁ oa).run' s = (simulateQ impl₂ oa).run' (proj s) := by
+  have hrun :=
+    map_run_simulateQ_eq_of_query_map_eq_inv' impl₁ impl₂ inv proj hinv hproj oa s hs
+  have hmap := congrArg (fun p => Prod.fst <$> p) hrun
+  simpa [StateT.run'] using hmap
+
 /-! ## "Identical until bad" fundamental lemma -/
 
 variable [spec.Fintype] [spec.Inhabited]
