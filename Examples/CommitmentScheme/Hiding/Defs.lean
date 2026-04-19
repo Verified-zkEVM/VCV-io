@@ -231,7 +231,7 @@ theorem run_hidingImplCountAll_proj_eq_cachingOracle
     Prod.map id Prod.fst <$> (simulateQ hidingImplCountAll oa).run st =
       (simulateQ cachingOracle oa).run st.1 := by
   simpa using
-    (OracleComp.ProgramLogic.Relational.map_run_simulateQ_eq_of_query_map_eq'
+    (OracleComp.map_run_simulateQ_eq_of_query_map_eq'
       hidingImplCountAll cachingOracle (fun st => st.1)
       (fun ms st => by
         simpa [Prod.map] using

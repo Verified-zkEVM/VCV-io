@@ -153,6 +153,7 @@ import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.Enforcement
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.ObservationOracle
+import VCVio.OracleComp.QueryTracking.ProgrammingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.QueryRuntime
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
@@ -170,6 +171,7 @@ import VCVio.OracleComp.SimSemantics.PreservesInv
 import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.ReaderT
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import VCVio.OracleComp.SimSemantics.StateProjection
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
