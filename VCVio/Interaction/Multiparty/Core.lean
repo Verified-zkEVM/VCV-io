@@ -71,10 +71,11 @@ universal* form: any `LocalView` collapses to a kernel, and protocols that
 need only the observation can build kernels directly.
 
 This file does **not** carry authorship-of-move information; that lives in
-`Concurrent.NodeAuthority.controllers : Party → Bool`. In particular, the
-choice between `LocalView.active` and `LocalView.observe` is a *node shape*
-decision (effectful Σ-of-X vs function-from-X), not the canonical predicate
-for "this party authors the move".
+`Concurrent.NodeAuthority.controllers : X → List Party`, which credits each
+possible move `x : X` with the (possibly multiple) parties responsible for
+choosing it. In particular, the choice between `LocalView.active` and
+`LocalView.observe` is a *node shape* decision (effectful Σ-of-X vs
+function-from-X), not the canonical authorship attribution.
 
 ## Literature
 
@@ -135,10 +136,11 @@ These four constructors carry information along **two separate axes**:
   `X → Obs` packaged with its codomain (see `LocalView.Kernel`).
 
 The operational distinction between `active` and `observe` is **not** a
-canonical authorship predicate. Authorship-of-move is recorded by
-`Concurrent.NodeAuthority.controllers : Party → Bool`. `LocalView.active`
-indicates that a participant chooses *locally* in its endpoint type; whether
-it is the protocol-level controller is recorded separately.
+canonical authorship attribution. Authorship-of-move is recorded by
+`Concurrent.NodeAuthority.controllers : X → List Party`, a *per-move* and
+possibly *multi-controller* assignment. `LocalView.active` indicates only
+that a participant chooses *locally* in its endpoint type; whether it is the
+protocol-level controller of a particular move is recorded separately.
 
 `LocalView` is intentionally local. It does not describe the global
 communication discipline that produced it, nor who else sees the move.

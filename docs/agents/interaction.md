@@ -215,10 +215,11 @@ into the universal `.quotient` constructor); on the operational side,
 `LocalView.Action (.quotient ..) = Kernel.Action ⟨..⟩` definitionally.
 
 Note that the operational distinction `.active` vs `.observe` is **not** the
-canonical authorship predicate. Authorship-of-move is recorded by
-`Concurrent.NodeAuthority.controllers : Party → Bool`. `LocalView.active`
-indicates only that the participant chooses *locally* in its endpoint; the
-protocol-level controller is recorded separately.
+canonical authorship attribution. Authorship-of-move is recorded by
+`Concurrent.NodeAuthority.controllers : X → List Party` (move-dependent,
+possibly multi-controller). `LocalView.active` indicates only that the
+participant chooses *locally* in its endpoint; the protocol-level controllers
+of a given move are recorded separately.
 
 ### Literature
 
