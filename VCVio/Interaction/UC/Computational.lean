@@ -11,9 +11,16 @@ import VCVio.CryptoFoundations.Asymptotics.Security
 /-!
 # Computational observation layer for UC security
 
-This file bridges the abstract UC judgments (`Emulates`, `UCSecure`) to
-concrete computational indistinguishability by instantiating the `ObsEq`
-parameter with distributional advantage bounds.
+This file gives a concrete computational reading of the abstract UC
+judgments (`Emulates`, `UCSecure`) in terms of distributional
+distinguishing advantage. It deliberately keeps the fixed-`ε` notion
+`CompEmulates` separate from the abstract `Emulates`-as-equivalence
+judgment, because the relation
+`fun c₁ c₂ => distAdvantage (sem c₁) (sem c₂) ≤ ε` is not transitive at
+fixed `ε` (the triangle inequality only gives `2ε`) and therefore cannot
+be packaged as `Observation T`. The principled bridge to abstract
+`Emulates` lives at the asymptotic level (`AsympCompEmulates`), where
+sums of negligibles are still negligible.
 
 ## Main definitions
 
@@ -39,8 +46,6 @@ parameter with distributional advantage bounds.
 * `CompEmulates.map_invariance`: boundary adaptation preserves the bound.
 * `CompEmulates.par_compose`, `wire_compose`, `plug_compose`:
   advantages add under parallel, wired, and plugged composition.
-* `CompEmulates.toEmulates`: every `CompEmulates` yields an abstract
-  `Emulates` for the induced observation relation.
 * `CompUCSecure.toCompEmulates`: simulator-based security implies
   computational emulation when the simulator is the identity.
 * `AsympCompEmulates.par_compose`, `wire_compose`, `plug_compose`:
@@ -84,25 +89,7 @@ def CompEmulates (sem : Semantics T) (ε : ℝ)
   ∀ K : T.Plug Δ,
     (sem.run (T.close real K)).distAdvantage (sem.run (T.close ideal K)) ≤ ε
 
-/--
-The observation relation on closed systems induced by a semantics and
-an advantage bound: two closed systems are related when their
-distinguishing advantage is at most `ε`.
--/
-def compObsEq (sem : Semantics T) (ε : ℝ) : T.Closed → T.Closed → Prop :=
-  fun c₁ c₂ => (sem.run c₁).distAdvantage (sem.run c₂) ≤ ε
-
 namespace CompEmulates
-
-/--
-`CompEmulates` is an instance of abstract `Emulates` for the observation
-relation `compObsEq sem ε`.
--/
-theorem toEmulates {sem : Semantics T} {ε : ℝ}
-    {Δ : PortBoundary} {real ideal : T.Obj Δ}
-    (h : CompEmulates sem ε real ideal) :
-    Emulates real ideal (compObsEq sem ε) :=
-  ⟨h⟩
 
 /--
 Every system computationally emulates itself with advantage zero.

@@ -35,12 +35,25 @@ variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+/-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
+
+For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
+probability that the HVZK simulator tries to program a cache entry `(msg, c)` already
+populated by a prior adversary query is bounded by `qS · (qS + qH) / |Chal|` via the
+birthday/union bound over commitments.
+
+Matches EasyCrypt's `pr_bad_game` at
+[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`) and
+plays the same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
+noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
+  ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
 random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + ζ_col`
+  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + qS · (qS + qH) / |Chal|`
 
 The NMA adversary `B` is constructed by:
 - Forwarding `A`'s hash queries to the external oracle (visible to `Fork.fork`)
@@ -48,8 +61,9 @@ The NMA adversary `B` is constructed by:
   simulated challenge into the cache
 - Returning `A`'s forgery together with the accumulated `QueryCache`
 
-Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance.
-The `ζ_col` term accounts for collisions where `A` queries a hash that `B` later programs.
+Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
+the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
+hash that `B` later programs.
 
 This step is independent of special soundness and the forking lemma; those are handled
 by `euf_nma_bound`.
@@ -60,12 +74,12 @@ The Lean bound matches Firsov-Janku's `pr_koa_cma` at
 `simulator_equiv` (per-query HVZK cost), handles RO reprogramming via `lro_redo_inv` +
 `ro_get_eq_except`, and absorbs the late-programming collision event through the `bad` flag,
 bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) as
-`QS · (QS+QR) / |Ω|`, matching our `ζ_col`. -/
+`QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH Chal`. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
-    [SampleableType Chal]
+    [Fintype Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (ζ_zk ζ_col : ℝ) (_hζ_zk : 0 ≤ ζ_zk) (_hζ_col : 0 ≤ ζ_col)
+    (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
     (_hhvzk : σ.HVZK simTranscript ζ_zk)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -78,7 +92,8 @@ theorem euf_cma_to_nma
         (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
-          ENNReal.ofReal (qS * ζ_zk + ζ_col) := by
+          ENNReal.ofReal (qS * ζ_zk) +
+          collisionSlack qS qH Chal := by
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
@@ -323,42 +338,23 @@ theorem euf_cma_to_nma
           | inr msg =>
               simp [stepBudget])
         (s := ∅))
-  · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv) + qS * ζ_zk + ζ_col`.
+  · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
+    --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Proof plan:
+    -- Chain of game hops (see `adv_advantage_le_game1`, `tvDist_hybrid_sign_le`,
+    -- and `game2_le_fork_advantage_plus_collision` further below in this file):
     --
-    -- (1) Drop freshness: `!log.wasQueried msg && verified ≤ verified`, so
-    --     `adv.advantage ≤ Pr[verified | CMA signing, real RO verification]`.
-    --     Use `probEvent_mono` or `probOutput_map_le` after unfolding `unforgeableExp`.
+    --   adv.advantage
+    --       ≤ Pr[= true | Game 1]                              -- freshness drop (Phase B)
+    --       ≤ Pr[= true | Game 2] + ofReal (qS * ζ_zk)         -- HVZK hybrid (Phase C)
+    --       ≤ Fork.advantage + ofReal (qS * ζ_zk) + collisionSlack
+    --                                                          -- collision event (Phase D)
     --
-    -- (2) Intermediate game: define `CMA-no-freshness` that uses the real signing
-    --     oracle but returns only the verification bit. Both the CMA-no-freshness
-    --     and NMA experiments can be expressed as
-    --       `(runtime M).evalDist (keygen >>= fun (pk, sk) => game_X pk sk)`
-    --     where `game_X` runs `adv.main pk` with oracle `impl_X` and then verifies.
-    --
-    -- (3) TV distance decomposition (triangle inequality):
-    --     `tvDist(CMA-no-fresh, NMA) ≤ tvDist(CMA-no-fresh, hybrid) + tvDist(hybrid, NMA)`
-    --     where `hybrid` uses the simulated signing oracle but verifies with the real RO
-    --     (no cache overlay).
-    --
-    --     (3a) CMA-no-fresh → hybrid: signing oracle replacement.
-    --          Each of `qS` signing queries changes from real signing (commit, hash, respond)
-    --          to simulated signing (simTranscript, cache program). Per query, HVZK gives
-    --          `ζ_zk` TV distance. Total: `qS * ζ_zk`.
-    --          Needs `tvDist_bind_left_le` and per-query HVZK bounds.
-    --
-    --     (3b) hybrid → fork-NMA: relate successful fresh forgeries to the forkable
-    --          experiment `Fork.exp`. The reduction now serves `A`'s live
-    --          hash queries through the same managed cache it eventually returns, and
-    --          `sigSim` preserves any pre-existing cache entry instead of overwriting it.
-    --          The remaining discrepancy is exactly the late-programming collision event
-    --          absorbed by the slack term `ζ_col`.
-    --
-    -- (4) Conclude:
-    --       `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
-    --          + ENNReal.ofReal (qS * ζ_zk + ζ_col)`.
-    --     Use `abs_probOutput_toReal_sub_le_tvDist` to convert TV distance to ENNReal bound.
+    -- where Game 1 is the CMA experiment without the freshness check and Game 2 is
+    -- exactly `managedRoNmaExp` for the constructed `nmaAdv`. Only the Phase D step
+    -- remains as a scoped `sorry` in this Stage 1 milestone; it is discharged by a
+    -- `tvDist_simulateQ_le_probEvent_bad_dist`-style identical-until-bad argument
+    -- combined with a birthday-bound argument on `(msg, c)` collisions.
     sorry
 section evalDistBridge
 
@@ -1093,31 +1089,34 @@ theorem euf_nma_bound
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
 
-1. Replace the signing oracle with the HVZK simulator, losing `qS · ζ_zk + ζ_col`.
+1. Replace the signing oracle with the HVZK simulator, losing
+   `qS · ζ_zk + collisionSlack qS qH Chal`.
 2. Apply the forking lemma to the resulting forkable managed-RO NMA experiment.
 
 The combined bound is:
 
-  `(ε - qS·ζ_zk - ζ_col) · ((ε - qS·ζ_zk - ζ_col) / (qH+1) - 1/|Ω|)
-      ≤ Pr[extraction succeeds]`
+  `(ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) ·
+      ((ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) / (qH+1) - 1/|Ω|)
+    ≤ Pr[extraction succeeds]`
 
-where `ε = Adv^{EUF-CMA}(A)`. The ENNReal subtraction truncates at zero, so
-the bound is trivially satisfied when the simulation loss exceeds the advantage.
+where `ε = Adv^{EUF-CMA}(A)` and the concrete slack `qS·(qS+qH)/|Ω|` is the
+`collisionSlack qS qH Chal` birthday term. The ENNReal subtraction truncates at
+zero, so the bound is trivially satisfied when the simulation loss exceeds the
+advantage.
 
-**Currently conditional on one open obligation**:
-`euf_cma_to_nma` (this file, still `sorry`): the CMA-to-NMA reduction via the HVZK
-simulator. The forking-lemma side (the two B1 prefix-faithfulness identities
+The forking-lemma side (the two B1 prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
 `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
 discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. -/
+used by `euf_nma_bound`. Conditional only on the scoped `sorry` inside
+`euf_cma_to_nma` for the Phase D collision-event reduction. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
     (hss_nf : ∀ ω₁ p₁ ω₂ p₂, Pr[⊥ | σ.extract ω₁ p₁ ω₂ p₂] = 0)
     [Fintype Chal] [Inhabited Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (ζ_zk ζ_col : ℝ) (hζ_zk : 0 ≤ ζ_zk) (hζ_col : 0 ≤ ζ_col)
+    (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -1126,18 +1125,19 @@ theorem euf_cma_bound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) -
-        ENNReal.ofReal (qS * ζ_zk + ζ_col)
+        (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
-    ζ_zk ζ_col hζ_zk hζ_col hhvzk adv qS qH hQ
+    ζ_zk hζ_zk hhvzk adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
-  have hle : adv.advantage (runtime M) - ENNReal.ofReal (qS * ζ_zk + ζ_col) ≤
+  have hle : adv.advantage (runtime M) -
+      (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal) ≤
       Fork.advantage σ hr M nmaAdv qH :=
-    tsub_le_iff_left.mpr (by rwa [add_comm])
+    tsub_le_iff_right.mpr (by rw [← add_assoc]; exact hAdv)
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)
 
 end FiatShamir

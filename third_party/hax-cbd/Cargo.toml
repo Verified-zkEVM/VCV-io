@@ -1,0 +1,20 @@
+[package]
+name = "hax_cbd"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+description = """
+Minimal Rust crate exporting one centered-binomial-distribution
+sampler, intended for the VCV-io/hax interop bridge to demonstrate
+an end-to-end randomized extraction. The function is identical in
+shape to ML-KEM's inner noise sampler (SamplePolyCBD, η = 1, single
+coefficient) and is what VCV-io lifts into `RustOracleComp` in
+`Interop/Hax/CBD.lean`.
+"""
+
+[dependencies]
+hax-lib = { path = "../../.lake/packages/Hax/hax-lib" }
+
+[lib]
+crate-type = ["rlib"]
