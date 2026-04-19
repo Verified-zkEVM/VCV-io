@@ -11,6 +11,7 @@ import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.ProgramLogic.Relational.SimulateQ
 import ToMathlib.Control.StateT
+import ToMathlib.Data.ENNReal.Gauss
 
 /-!
 # Asymmetric Encryption Schemes: IND-CPA Oracle Games

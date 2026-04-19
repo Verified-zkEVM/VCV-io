@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: James Waters
 -/
 import Examples.CommitmentScheme.Common
+import ToMathlib.Data.ENNReal.Gauss
 
 open OracleSpec OracleComp ENNReal
 
