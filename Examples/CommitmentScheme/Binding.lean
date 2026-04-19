@@ -119,8 +119,8 @@ private lemma binding_rest_noCollision_le_inv
     (hno : ¬ CacheHasCollision cache₁) :
     Pr[fun z => z.1 = true |
       (simulateQ cachingOracle
-        ((liftM ((CMOracle M S C).query (m₀, s₀))) >>= fun c₀ =>
-          (liftM ((CMOracle M S C).query (m₁, s₁))) >>= fun c₁ =>
+        (((CMOracle M S C).query (m₀, s₀) : OracleComp (CMOracle M S C) _) >>= fun c₀ =>
+          ((CMOracle M S C).query (m₁, s₁) : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
           pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run cache₁] ≤
       (Fintype.card C : ℝ≥0∞)⁻¹ := by
   by_cases hneq : m₀ ≠ m₁
@@ -133,7 +133,7 @@ private lemma binding_rest_noCollision_le_inv
     · simpa [q₀, q₁] using probEvent_from_fresh_query_le_inv
         (t := q₀) (target := c) (cache₀ := cache₁) hq₀_none
         (cont := fun u =>
-          (liftM ((CMOracle M S C).query q₁)) >>= fun c₁ =>
+          ((CMOracle M S C).query q₁ : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
             pure (decide (m₀ ≠ m₁) && (u == c) && (c₁ == c))) (by
           intro u hu
           apply probEvent_eq_zero
@@ -149,11 +149,11 @@ private lemma binding_rest_noCollision_le_inv
     · rcases Option.ne_none_iff_exists'.mp hq₀_none with ⟨v₀, hq₀⟩
       have hrun₀ :
           (simulateQ cachingOracle
-            ((liftM ((CMOracle M S C).query q₀)) >>= fun c₀ =>
-              (liftM ((CMOracle M S C).query q₁)) >>= fun c₁ =>
+            (((CMOracle M S C).query q₀ : OracleComp (CMOracle M S C) _) >>= fun c₀ =>
+              ((CMOracle M S C).query q₁ : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
               pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run cache₁ =
           (simulateQ cachingOracle
-            ((liftM ((CMOracle M S C).query q₁)) >>= fun c₁ =>
+            (((CMOracle M S C).query q₁ : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
               pure (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c)))).run cache₁ := by
         simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
         have hcache :
@@ -182,7 +182,7 @@ private lemma binding_rest_noCollision_le_inv
               ⟨v₁, hq₁, heq_of_eq hv₁⟩
           have hrun₁ :
               (simulateQ cachingOracle
-                ((liftM ((CMOracle M S C).query q₁)) >>= fun c₁ =>
+                (((CMOracle M S C).query q₁ : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
                   pure (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c)))).run cache₁ =
               pure (decide (m₀ ≠ m₁) && (v₀ == c) && (v₁ == c), cache₁) := by
             simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
@@ -239,8 +239,8 @@ private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
     (Fintype.card C : ℝ≥0∞)⁻¹ := by
   let restPart : (C × M × S × M × S) → OracleComp (CMOracle M S C) Bool
     | (c, m₀, s₀, m₁, s₁) =>
-        (liftM ((CMOracle M S C).query (m₀, s₀))) >>= fun c₀ =>
-          (liftM ((CMOracle M S C).query (m₁, s₁))) >>= fun c₁ =>
+        ((CMOracle M S C).query (m₀, s₀) : OracleComp (CMOracle M S C) _) >>= fun c₀ =>
+          ((CMOracle M S C).query (m₁, s₁) : OracleComp (CMOracle M S C) _) >>= fun c₁ =>
           pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))
   have hdecomp : bindingInner A = A.run >>= restPart := by
     simp [bindingInner, restPart]

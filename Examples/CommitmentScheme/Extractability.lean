@@ -285,7 +285,7 @@ private def extractabilityRestOa {t : ℕ}
     (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C)) :
     OracleComp (CMOracle M S C) Bool :=
   A.open_ aux >>= fun (m, s) =>
-    (liftM ((CMOracle M S C).query (m, s))) >>= fun c =>
+    ((CMOracle M S C).query (m, s) : OracleComp (CMOracle M S C) _) >>= fun c =>
     let extracted := CMExtract cm tr
     pure (match extracted with
       | some (m', s') => (c == cm) && decide ((m', s') ≠ (m, s))

@@ -98,7 +98,7 @@ lemma hiding_distinguish_totalBound_of_choose_count_support
   haveI : Fintype C := Fintype.ofFinite C
   have hres :
       IsTotalQueryBound
-        ((liftM ((CMOracle M S C).query (x.1.1, default))) >>= fun cm =>
+        (((CMOracle M S C).query (x.1.1, default) : OracleComp (CMOracle M S C) _) >>= fun cm =>
           A.distinguish x.1.2 cm)
         ((t + 1) - (∑ s : S, x.2.2 s)) := by
     simpa [hidingOa] using
@@ -106,7 +106,7 @@ lemma hiding_distinguish_totalBound_of_choose_count_support
         (spec := CMOracle M S C)
         (oa := A.choose)
         (ob := fun a =>
-          (liftM ((CMOracle M S C).query (a.1, default))) >>= fun cm =>
+          ((CMOracle M S C).query (a.1, default) : OracleComp (CMOracle M S C) _) >>= fun cm =>
             A.distinguish a.2 cm)
         (n := t + 1)
         (impl := hidingImplCountAll)
