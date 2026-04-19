@@ -183,6 +183,7 @@ import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.FromUnary
 import VCVio.ProgramLogic.Relational.HandlerFromUnary
 import VCVio.ProgramLogic.Relational.Leakage
+import VCVio.ProgramLogic.Relational.ProgrammingOracle
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.ProgramLogic.Relational.SimulateQ
