@@ -576,9 +576,7 @@ predicates used throughout VCVio.
 abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
   ProcessOver.System (OpenNodeContext Party Δ : Spec.Node.Context.{w})
 
--- ============================================================================
--- § Silent steps and weak bisimulation
--- ============================================================================
+/-! ## Silent steps and weak bisimulation -/
 
 /-- A transcript path through a decorated open-process spec is **silent** when
 every visited node is not externally activated (`isActivated = false`).
@@ -636,9 +634,7 @@ theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundar
   intro X ons
   simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
 
--- ============================================================================
--- § OpenProcessIso: weak bisimulation equivalence for open processes
--- ============================================================================
+/-! ## OpenProcessIso: weak bisimulation equivalence for open processes -/
 
 /--
 Two open processes with the same boundary are **weakly bisimilar** when there

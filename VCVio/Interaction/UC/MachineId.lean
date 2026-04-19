@@ -145,9 +145,7 @@ need session-aware identity instantiate this abbreviation.
 abbrev MachineProcess (Sid Pid : Type u) (Δ : PortBoundary) :=
   OpenProcess.{u, v, w} (MachineId Sid Pid) Δ
 
--- ============================================================================
--- § Per-process access control
--- ============================================================================
+/-! ## Per-process access control -/
 
 /--
 `HasAccessControl P` is the per-process predicate deciding which routed
@@ -227,9 +225,7 @@ theorem MachineProcess.allowed_allowSameSession
     (MachineProcess.allowSameSession owner P).allowed rp =
       rp.sender.sameSession owner := rfl
 
--- ============================================================================
--- § Subroutine respecting predicate
--- ============================================================================
+/-! ## Subroutine respecting predicate -/
 
 /--
 A node semantics is **session-coherent at** `sid` for a chosen move `x`

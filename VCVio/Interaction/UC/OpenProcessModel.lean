@@ -142,9 +142,7 @@ instance : OpenTheory.IsLawfulPlug (openTheory.{u, v, w} Party) where
 
 instance : OpenTheory.IsLawful (openTheory.{u, v, w} Party) where
 
--- ============================================================================
--- § Monoidal and compact closed laws up to bisimilarity
--- ============================================================================
+/-! ## Monoidal and compact closed laws up to bisimilarity -/
 
 /-- Parallel composition of open processes is associative up to bisimilarity:
 reassociating the internal scheduler nesting does not change the observable

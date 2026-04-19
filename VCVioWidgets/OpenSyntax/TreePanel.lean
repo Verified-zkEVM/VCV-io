@@ -29,9 +29,7 @@ top-down tree layout algorithm. No physics simulation; the diagram is
 stable and hierarchical.
 -/
 
--- ============================================================================
--- § Tree layout computation
--- ============================================================================
+/-! ## Tree layout computation -/
 
 private structure LayoutNode where
   id : Nat
@@ -129,9 +127,7 @@ private partial def layoutTree (tree : CompTree) (depth : Float) (st : LayoutSta
         nodes := st.nodes.push node
         edges := st.edges.push edge })
 
--- ============================================================================
--- § SVG rendering via Html.element
--- ============================================================================
+/-! ## SVG rendering via Html.element -/
 
 private def findNode (nodes : Array LayoutNode) (id : Nat) : Option LayoutNode :=
   nodes.find? (·.id == id)
@@ -242,9 +238,7 @@ private def renderTreeSvg (tree : CompTree) : Html :=
     ("height", Json.str svgH)]
     (#[defs] ++ edgeElems ++ nodeElems)
 
--- ============================================================================
--- § Panel widget
--- ============================================================================
+/-! ## Panel widget -/
 
 private def css (entries : List (String × String)) : Json :=
   Json.mkObj <| entries.map fun (k, v) => (k, Json.str v)

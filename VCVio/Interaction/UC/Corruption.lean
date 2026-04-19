@@ -74,9 +74,7 @@ universe w w₂
 namespace Interaction
 namespace UC
 
--- ============================================================================
--- § Corruption alphabet and epoch
--- ============================================================================
+/-! ## Corruption alphabet and epoch -/
 
 /--
 The standard CJSV22 corruption alphabet for a fixed `(Sid, Pid)`
@@ -134,9 +132,7 @@ own `Epoch`-isomorphic type; the framework only requires
 -/
 abbrev Epoch : Type := ℕ
 
--- ============================================================================
--- § Corruption state
--- ============================================================================
+/-! ## Corruption state -/
 
 /--
 `CorruptionState Sid Pid` packages the two-flag corruption tracking
@@ -321,9 +317,7 @@ theorem compromised_applyCompromise_of_compromised
 
 end CorruptionState
 
--- ============================================================================
--- § Leakable state (equivocability obligation)
--- ============================================================================
+/-! ## Leakable state (equivocability obligation) -/
 
 /--
 `LeakableState State Leakage` exposes an extraction function that
@@ -356,9 +350,7 @@ class LeakableState
     (Leakage : outParam Type) where
   leak : State → MachineId Sid Pid → Leakage
 
--- ============================================================================
--- § Corruption policy
--- ============================================================================
+/-! ## Corruption policy -/
 
 open Interaction.Concurrent
 

@@ -190,9 +190,7 @@ theorem plug_invariance
 
 end Emulates
 
--- ============================================================================
--- § Structural factorization of `close` under composition
--- ============================================================================
+/-! ## Structural factorization of `close` under composition -/
 
 section Factorization
 
@@ -364,9 +362,7 @@ theorem OpenTheory.plug_comm
 
 end Factorization
 
--- ============================================================================
--- § UC composition theorems
--- ============================================================================
+/-! ## UC composition theorems -/
 
 namespace Emulates
 
