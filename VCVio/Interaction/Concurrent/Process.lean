@@ -102,6 +102,20 @@ request/response exchange treated as one logical concurrent transition.
 So `StepOver` is the right object when the concurrency layer should expose
 finite sequential structure inside each global step, rather than flattening
 everything into atomic transitions.
+
+## Polynomial reading
+
+`StepOver Γ P` is the application to `P` of the polynomial functor
+`StepOver.toPFunctor Γ` whose positions are `Γ`-decorated specs and whose
+directions over a position are transcripts of its underlying spec. The
+`Equiv` `StepOver.equivObj` exhibits this on the nose by regrouping the
+`(spec, semantics, next)` fields. The position type is itself equivalent to
+`Interaction.Spec.DecoratedSpec Γ` via `Interaction.Spec.decoratedSpecEquiv`,
+identifying `StepOver` as a polynomial substrate built directly on top of
+`Γ.toPFunctor`. The structure form is preserved as the working API because
+its named fields support clean `{ spec := ..., semantics := ..., next := ... }`
+construction at every call site, and projections such as `(mapContext f s).spec`
+are definitionally equal to `s.spec`.
 -/
 structure StepOver (Γ : Interaction.Spec.Node.Context.{w, w₂}) (P : Type v) where
   spec : Interaction.Spec.{w}
@@ -138,6 +152,63 @@ instance {Γ : Interaction.Spec.Node.Context.{w, w₂}} :
   id_map _ := rfl
   comp_map _ _ _ := rfl
   map_const := rfl
+
+namespace StepOver
+
+/-! ### Polynomial bridge
+
+`StepOver Γ P` is the application to `P` of the polynomial functor
+`StepOver.toPFunctor Γ` whose positions are `Γ`-decorated specs and whose
+direction family at each position is the type of complete transcripts of
+the underlying spec. The `Equiv` `StepOver.equivObj` regroups the
+`(spec, semantics, next)` fields into the polynomial form
+`(position, continuation)`; both roundtrips are definitionally `rfl`.
+
+The position type `Σ spec, Decoration Γ spec` is itself equivalent to
+`Interaction.Spec.DecoratedSpec Γ` via `Interaction.Spec.decoratedSpecEquiv`,
+which is the free monad on `Γ.toPFunctor` at the unit payload. This bridge
+identifies `StepOver` as a polynomial substrate sitting directly on top of
+`Γ.toPFunctor` while preserving the structure form's ergonomic call sites
+and definitional projection equalities. -/
+
+/-- The polynomial functor whose application to `P` is `StepOver Γ P`.
+
+A position is a `Γ`-decorated spec — a pair of an interaction shape
+`spec : Spec` and a `Decoration Γ spec` of per-node `Γ`-metadata on it.
+A direction over such a position is a complete transcript of `spec`.
+
+Up to `Interaction.Spec.decoratedSpecEquiv`, positions are exactly
+`Interaction.Spec.DecoratedSpec Γ`, the free term of `Γ.toPFunctor` at the
+unit payload. -/
+@[reducible]
+def toPFunctor (Γ : Interaction.Spec.Node.Context.{w, w₂}) :
+    PFunctor.{max (w+1) w₂, w} where
+  A := Σ spec : Interaction.Spec.{w}, Interaction.Spec.Decoration Γ spec
+  B := fun p => Interaction.Spec.Transcript p.1
+
+/-- `StepOver Γ P` is exactly `(StepOver.toPFunctor Γ).Obj P`, exhibiting
+the step-over structure as a polynomial application.
+
+The forward direction regroups the `(spec, semantics, next)` fields into
+the polynomial form `(position, continuation)`, and the inverse unpacks
+them again. Both roundtrips are definitionally `rfl`. -/
+@[simps]
+def equivObj {Γ : Interaction.Spec.Node.Context.{w, w₂}} {P : Type v} :
+    StepOver.{v, w, w₂} Γ P ≃ (StepOver.toPFunctor Γ).Obj P where
+  toFun s := ⟨⟨s.spec, s.semantics⟩, s.next⟩
+  invFun := fun ⟨⟨spec, semantics⟩, next⟩ => ⟨spec, semantics, next⟩
+  left_inv _ := rfl
+  right_inv := fun ⟨⟨_, _⟩, _⟩ => rfl
+
+/-- The position type of `StepOver.toPFunctor Γ` is the same data as a
+`Γ`-decorated spec, via `Interaction.Spec.decoratedSpecEquiv`. This is the
+bridge that identifies the `StepOver` polynomial as a substrate built on
+top of `Γ.toPFunctor`. -/
+def equivPositions (Γ : Interaction.Spec.Node.Context.{w, w₂}) :
+    (StepOver.toPFunctor Γ).A ≃ Interaction.Spec.DecoratedSpec Γ :=
+  Interaction.Spec.decoratedSpecEquiv.symm
+
+end StepOver
 
 /--
 `ProcessOver Γ` is a continuation-based concurrent process whose current step
