@@ -44,7 +44,7 @@ variable (Party : Type u)
 
 /-- The hidden scheduler node shared by `par`, `wire`, and `plug`. -/
 private def schedulerNode (Δ : PortBoundary) :
-    OpenNodeSemantics Party Δ (ULift.{w} Bool) where
+    OpenNodeProfile Party Δ (ULift.{w} Bool) where
   controllers := fun _ => []
   views := fun _ => .hidden
   boundary := .internal Δ _
@@ -103,7 +103,7 @@ private theorem schedulerNode_mapBoundary
     (φ : PortBoundary.Hom Δ₁ Δ₂) :
     (schedulerNode.{u, w} Party Δ₁).mapBoundary φ =
       schedulerNode Party Δ₂ := by
-  simp [schedulerNode, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary,
+  simp [schedulerNode, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary,
     BoundaryAction.internal]
 
 instance : OpenTheory.IsLawfulPar (openTheory.{u, v, w} Party) where
@@ -549,7 +549,7 @@ theorem openTheory_plug_eq_wire_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
       · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
       · intro X ons
-        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+        simp [OpenNodeContext.map, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary]
       · intro X ons; simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
     | false =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
@@ -559,7 +559,7 @@ theorem openTheory_plug_eq_wire_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
       · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
       · intro X ons
-        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+        simp [OpenNodeContext.map, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary]
       · intro X ons; simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
   · intro ⟨⟨b⟩, rest⟩ _
     match b with
@@ -575,7 +575,7 @@ theorem openTheory_plug_eq_wire_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
       · intro X ons; simp [OpenNodeContext.wireLeft, BoundaryAction.wireLeft]
       · intro X ons
-        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+        simp [OpenNodeContext.map, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary]
       · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
     | false =>
       refine ⟨⟨⟨false⟩, rest⟩, fun h => hvisible ?_, rfl⟩
@@ -584,7 +584,7 @@ theorem openTheory_plug_eq_wire_iso
           ((isSilentDecoration_iff_map _ ?_ _ _).mp h.2))⟩
       · intro X ons; simp [OpenNodeContext.wireRight, BoundaryAction.wireRight]
       · intro X ons
-        simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+        simp [OpenNodeContext.map, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary]
       · intro X ons; simp [OpenNodeContext.close, BoundaryAction.closed]
 
 /-- The monoidal unit equals the coevaluation at the trivial boundary,

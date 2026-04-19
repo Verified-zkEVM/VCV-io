@@ -43,7 +43,7 @@ CJSV22 *subroutine respecting* condition:
 * **`MachineProcess.SubroutineRespectingAt sid P`.** A `Prop`-valued
   property saying every reachable step's decoration only attributes
   controllers in session `sid`. Built recursively over `Spec.Decoration`
-  via `OpenNodeSemantics.SessionCoherentAtMove` and
+  via `OpenNodeProfile.SessionCoherentAtMove` and
   `DecorationSessionCoherentAt`.
 
 These three pieces are *additive* on top of the existing `OpenProcess`
@@ -239,9 +239,9 @@ This is the per-move check used by `DecorationSessionCoherentAt`: at the
 node where `x` is chosen, every machine credited as a controller of `x`
 must share the protocol's session identifier.
 -/
-def OpenNodeSemantics.SessionCoherentAtMove
+def OpenNodeProfile.SessionCoherentAtMove
     {Sid Pid : Type u} {Δ : PortBoundary} {X : Type w}
-    (sid : Sid) (ons : OpenNodeSemantics (MachineId Sid Pid) Δ X)
+    (sid : Sid) (ons : OpenNodeProfile (MachineId Sid Pid) Δ X)
     (x : X) : Prop :=
   ∀ m ∈ ons.controllers x, m.sid = sid
 
@@ -251,7 +251,7 @@ transcript iff every visited node attributes only controllers in
 session `sid`.
 
 This is the recursive companion to
-`OpenNodeSemantics.SessionCoherentAtMove`, modeled directly on
+`OpenNodeProfile.SessionCoherentAtMove`, modeled directly on
 `IsSilentDecoration`: the predicate walks the same transcript path
 through the decoration tree and accumulates the per-node coherence
 checks.

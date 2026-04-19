@@ -72,7 +72,7 @@ events use `pure ∘ update` and pay no extra cost.
 ## Additive design
 
 `EnvAction` is intentionally **standalone**: it is *not* threaded
-into `OpenNodeSemantics`. Existing `OpenProcess Party Δ`
+into `OpenNodeProfile`. Existing `OpenProcess Party Δ`
 constructions are unaffected, and protocols that do not need
 environment-driven events incur zero cost. The corruption-aware
 wrapper that pairs an `OpenProcess` with a state-indexed
