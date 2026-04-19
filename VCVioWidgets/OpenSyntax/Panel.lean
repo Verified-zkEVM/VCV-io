@@ -34,9 +34,7 @@ the panel with
 to see the composition diagram.
 -/
 
--- ============================================================================
--- § Intermediate tree representation
--- ============================================================================
+/-! ## Intermediate tree representation -/
 
 inductive CompTree where
   | atom (label : String)
@@ -47,9 +45,7 @@ inductive CompTree where
   | opaque (label : String)
   deriving Inhabited
 
--- ============================================================================
--- § Meta-level expression extraction
--- ============================================================================
+/-! ## Meta-level expression extraction -/
 
 private def rawPrefix : Name := `Interaction.UC.OpenSyntax.Raw
 
@@ -112,9 +108,7 @@ where
         let fmt ← ppExpr e
         return .opaque fmt.pretty
 
--- ============================================================================
--- § Graph rendering (D3 force-directed via GraphDisplay)
--- ============================================================================
+/-! ## Graph rendering (D3 force-directed via GraphDisplay) -/
 
 private structure GraphState where
   vertices : Array GraphDisplay.Vertex
@@ -285,9 +279,7 @@ private def compTreeToGraph (tree : CompTree) : GraphDisplay.Props :=
     showDetails := true
   }
 
--- ============================================================================
--- § Attribute registry
--- ============================================================================
+/-! ## Attribute registry -/
 
 structure RegisteredComp where
   modName : Name
@@ -323,9 +315,7 @@ def getRegisteredCompositions (modName : Name) : CoreM (Array Name) := do
     | some names => names
     | none => #[]
 
--- ============================================================================
--- § Panel widget
--- ============================================================================
+/-! ## Panel widget -/
 
 private def css (entries : List (String × String)) : Json :=
   Json.mkObj <| entries.map fun (k, v) => (k, Json.str v)
