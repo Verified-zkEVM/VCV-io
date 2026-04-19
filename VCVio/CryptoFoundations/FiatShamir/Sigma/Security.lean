@@ -344,42 +344,43 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of three game hops:
+    -- Chain of game hops:
     --
     --   adv.advantage (runtime M)
     --       ≤ g1                                              -- fresh_preserved (Phase B) ✓
-    --       ≤ g2 + ENNReal.ofReal (qS * ζ_zk)                 -- hvzk_swap     (Phase C)
-    --       ≤ Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal
-    --                                                         -- collision_bound (Phase D)
+    --       ≤ Fork.advantage + collisionSlack + qS·ζ_zk       -- hvzk_collision_swap (Phases C+D)
     --
-    -- where:
-    --   `g1` = `Pr[= true | unforgeableExpNoFresh (runtime M) adv]`,
-    --   `g2` = `Pr[= true | <CMA experiment with HVZK-simulated signing>]`
-    --        = `managedRoNmaExp` for the constructed `nmaAdv`.
+    -- where `g1` = `Pr[= true | unforgeableExpNoFresh (runtime M) adv]`.
     --
-    -- Phase B is discharged via `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh`,
-    -- instantiated with `FiatShamir.runtime_evalDist_bind_pure` (the FS runtime commutes
-    -- with `_ >>= pure ∘ f`). The remaining two phases are scoped sub-`sorry`s:
-    --   - `hvzk_swap`        : per-query HVZK hybrid (Phase C);
-    --   - `collision_bound`  : `identical_until_bad_with_flag` + birthday union (Phase D).
+    -- Phase B (freshness drop) is discharged via
+    -- `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh`, instantiated with
+    -- `FiatShamir.runtime_evalDist_bind_pure` (the FS runtime commutes with `_ >>= pure ∘ f`).
+    --
+    -- The combined `hvzk_collision_swap` step folds the HVZK simulator swap and the
+    -- programming-collision bound into one inequality. A clean two-phase decomposition
+    -- (independent `g2` between the HVZK and collision steps) is not algebraically
+    -- realizable without introducing a *new* intermediate experiment: any `g2` satisfying
+    -- `g1 ≤ g2 + qS·ζ_zk` *and* `g2 ≤ Fork.advantage + collisionSlack` collapses one of the
+    -- two sub-bounds to the trivial step (e.g. `g2 := Fork.advantage + collisionSlack`
+    -- makes the second `le_refl`). Splitting honestly requires either:
+    --   (a) a per-query ε-perturbed identical-until-bad lemma in
+    --       `VCVio/ProgramLogic/Relational/SimulateQ.lean` (ε per step + bad event),
+    --       which is *not yet* in the codebase; or
+    --   (b) defining a no-overlay intermediate experiment `unforgeableExpNoFresh_sim`
+    --       that runs `adv.main` with `sigSim` substituted for the real signing oracle,
+    --       and then bridging it to `Fork.advantage` via overlay accounting.
+    -- See §D.10.4 of `Notes/vcvio-fs-schnorr-clean-chain.md`. The single sorry below tracks
+    -- this combined obligation; the freshness-drop hop (Phase B) is already discharged and
+    -- the structural framework (pk/sk binding, `nmaAdv` construction, query bounds) above
+    -- is sorry-free.
     set g1 : ENNReal := Pr[= true | SignatureAlg.unforgeableExpNoFresh (runtime M) adv] with hg1
     have fresh_preserved : adv.advantage (runtime M) ≤ g1 :=
       SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
         (runtime M) (fun f mx => runtime_evalDist_bind_pure M mx f) adv
-    obtain ⟨g2, hvzk_swap⟩ : ∃ g2 : ENNReal,
-        g1 ≤ g2 + ENNReal.ofReal (qS * ζ_zk) := by
+    have hvzk_collision_swap : g1 ≤ Fork.advantage σ hr M nmaAdv qH +
+        ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal := by
       sorry
-    have collision_bound : g2 ≤ Fork.advantage σ hr M nmaAdv qH +
-        collisionSlack qS qH Chal := by
-      sorry
-    calc adv.advantage (runtime M)
-        ≤ g1 := fresh_preserved
-      _ ≤ g2 + ENNReal.ofReal (qS * ζ_zk) := hvzk_swap
-      _ ≤ (Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal) +
-            ENNReal.ofReal (qS * ζ_zk) := by gcongr
-      _ = Fork.advantage σ hr M nmaAdv qH + ENNReal.ofReal (qS * ζ_zk) +
-            collisionSlack qS qH Chal := by
-          rw [add_assoc, add_comm (collisionSlack qS qH Chal), ← add_assoc]
+    exact fresh_preserved.trans hvzk_collision_swap
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
@@ -1134,8 +1135,10 @@ The forking-lemma side (the two B1 prefix-faithfulness identities
 discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
 used by `euf_nma_bound`. The Phase B freshness-drop hop is discharged via
 `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated with
-`runtime_evalDist_bind_pure`. Conditional only on the scoped `sorry`s inside
-`euf_cma_to_nma` for the Phase C HVZK swap and Phase D collision-event reduction. -/
+`runtime_evalDist_bind_pure`. Conditional only on the single combined `hvzk_collision_swap`
+sorry inside `euf_cma_to_nma` (HVZK simulator swap and programming-collision bound merged
+into one inequality; see the comment there for the algebraic reason a clean two-phase
+decomposition is not realizable without new infrastructure). -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
