@@ -164,6 +164,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.Tracing
 import VCVio.OracleComp.QueryTracking.Unpredictability
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append

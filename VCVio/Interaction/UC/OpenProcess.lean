@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import ToMathlib.PFunctor.Trace
 import VCVio.Interaction.Concurrent.Process
 import VCVio.Interaction.UC.Interface
 
@@ -38,6 +39,14 @@ Boundary actions are structurally mappable along `PortBoundary.Hom` via
 boundary adaptation (only `emit` transforms), which ensures functoriality.
 The query-level decoding of how input messages determine node moves belongs
 in the runtime/execution layer, not the structural boundary action.
+
+The `emit` field is presented as a `PFunctor.Trace Δ.Out X` (the free-monoid
+trace on `Δ.Out`-events indexed by the node's move space `X`). This makes the
+structural boundary operations land directly in the generic `Trace` API:
+`mapBoundary` is `Trace.mapChart` on the output chart, and `wireLeft` /
+`wireRight` are `Trace.mapPartial` on the appropriate sum projections. The
+empty-emission default is the trace-monoid unit `1`, which is definitionally
+the constant-`[]` trace.
 -/
 
 universe u v w
@@ -55,8 +64,10 @@ Fields:
 
 * `isActivated` flags whether this node is driven by external boundary
   input (`true`) or by the internal protocol dynamics (`false`).
-* `emit` maps each chosen move to the list of outbound packets it
-  contributes on `Δ.Out`.
+* `emit` is the `PFunctor.Trace Δ.Out X` recording, for each chosen move
+  `x : X`, the finite ordered list of outbound packets contributed on
+  `Δ.Out`. The default is the monoid unit `1`, which is definitionally
+  the constant-`[]` trace.
 
 The activation flag is a structural marker. The query-level information
 about *how* an input message determines the node's move belongs in the
@@ -70,7 +81,7 @@ concerns (buffering, duplication, scheduling, delivery) belong in a separate
 -/
 structure BoundaryAction (Δ : PortBoundary) (X : Type w) where
   isActivated : Bool := false
-  emit : X → List (Interface.Packet Δ.Out) := fun _ => []
+  emit : PFunctor.Trace Δ.Out X := 1
 
 namespace BoundaryAction
 
@@ -79,7 +90,7 @@ A purely internal node: not externally activated and no outbound packets.
 -/
 def internal (Δ : PortBoundary) (X : Type w) : BoundaryAction Δ X where
   isActivated := false
-  emit := fun _ => []
+  emit := 1
 
 /--
 A boundary-activated node that emits no outbound packets.
@@ -91,27 +102,27 @@ def activated (Δ : PortBoundary) (X : Type w) : BoundaryAction Δ X where
 An internally driven node that emits outbound packets.
 -/
 def outputOnly {Δ : PortBoundary} {X : Type w}
-    (e : X → List (Interface.Packet Δ.Out)) : BoundaryAction Δ X where
+    (e : PFunctor.Trace Δ.Out X) : BoundaryAction Δ X where
   emit := e
 
 /--
 Transform a boundary action along a boundary adaptation.
 
 The activation flag is preserved (it does not depend on the boundary
-presentation). The emitted packets are translated forward along
-`φ.onOut`.
+presentation). The emitted-trace is pushed forward along the output chart
+`φ.onOut` via `PFunctor.Trace.mapChart`.
 -/
 def mapBoundary {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂) (b : BoundaryAction Δ₁ X) :
     BoundaryAction Δ₂ X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket φ.onOut)
+  emit := PFunctor.Trace.mapChart φ.onOut b.emit
 
 @[simp]
 theorem mapBoundary_id {Δ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ X) :
     mapBoundary (PortBoundary.Hom.id Δ) b = b := by
-  simp [mapBoundary, PortBoundary.Hom.id, Interface.Hom.mapPacket_id]
+  simp [mapBoundary, PortBoundary.Hom.id, Interface.Hom.id]
 
 @[simp]
 theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
@@ -119,72 +130,88 @@ theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ₁ X) :
     mapBoundary g (mapBoundary f b) =
       mapBoundary (PortBoundary.Hom.comp g f) b := by
-  simp [mapBoundary, PortBoundary.Hom.comp, List.map_map,
-    Interface.Hom.mapPacket_comp]
+  simp [mapBoundary, PortBoundary.Hom.comp, Interface.Hom.comp,
+    PFunctor.Trace.mapChart_comp]
 
 /--
 Embed a boundary action on the left factor into the tensor boundary.
 
-Emitted packets are injected into the left summand of the combined output
-interface. The activation flag is preserved.
+The trace is pushed forward along the left-injection chart
+`Interface.Hom.inl Δ₁.Out Δ₂.Out` via `PFunctor.Trace.mapChart`. The
+activation flag is preserved.
 -/
 def embedInlTensor {Δ₁ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction Δ₁ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inl Δ₁.Out Δ₂.Out))
+  emit := PFunctor.Trace.mapChart (Interface.Hom.inl Δ₁.Out Δ₂.Out) b.emit
 
 /--
 Embed a boundary action on the right factor into the tensor boundary.
 
-Emitted packets are injected into the right summand of the combined output
-interface. The activation flag is preserved.
+The trace is pushed forward along the right-injection chart
+`Interface.Hom.inr Δ₁.Out Δ₂.Out` via `PFunctor.Trace.mapChart`. The
+activation flag is preserved.
 -/
 def embedInrTensor (Δ₁ : PortBoundary) {Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ₂ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inr Δ₁.Out Δ₂.Out))
+  emit := PFunctor.Trace.mapChart (Interface.Hom.inr Δ₁.Out Δ₂.Out) b.emit
 
 /--
 Transform a boundary action on `tensor Δ₁ Γ` into one on `tensor Δ₁ Δ₂`
 by keeping only the left-summand (Δ₁) packets and re-injecting them
 into the left summand of the combined output. Right-summand (Γ) packets
 are dropped (they become internal traffic handled by the runtime).
+
+Implemented as `PFunctor.Trace.mapPartial` on the appropriate index-level
+partial map.
 -/
 def wireLeft {Δ₁ Γ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor Δ₁ Γ) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).filterMap fun
-    | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
-    | ⟨Sum.inr _, _⟩ => none
+  emit := PFunctor.Trace.mapPartial
+    (P := (PortBoundary.tensor Δ₁ Γ).Out)
+    (Q := (PortBoundary.tensor Δ₁ Δ₂).Out)
+    (fun
+      | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
+      | ⟨Sum.inr _, _⟩ => none) b.emit
 
 /--
 Transform a boundary action on `tensor (swap Γ) Δ₂` into one on
 `tensor Δ₁ Δ₂` by keeping only the right-summand (Δ₂) packets and
 re-injecting them into the right summand of the combined output.
 Left-summand (swap Γ) packets are dropped (internal traffic).
+
+Implemented as `PFunctor.Trace.mapPartial` on the appropriate index-level
+partial map.
 -/
 def wireRight (Δ₁ : PortBoundary) {Γ Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).filterMap fun
-    | ⟨Sum.inl _, _⟩ => none
-    | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩
+  emit := PFunctor.Trace.mapPartial
+    (P := (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂).Out)
+    (Q := (PortBoundary.tensor Δ₁ Δ₂).Out)
+    (fun
+      | ⟨Sum.inl _, _⟩ => none
+      | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩) b.emit
 
 /--
 Close a boundary action by dropping all external traffic.
 
 The result lives on `PortBoundary.empty` and has no activation or emission.
-This is used by `plug` to internalize all boundary interactions.
+This is used by `plug` to internalize all boundary interactions. The
+emitted-trace is the monoid unit `1`, which is definitionally the constant-`[]`
+trace.
 -/
 def closed {Δ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ X) :
     BoundaryAction PortBoundary.empty X where
   isActivated := b.isActivated
-  emit _ := []
+  emit := 1
 
 @[simp]
 theorem mapBoundary_embedInlTensor
@@ -193,8 +220,11 @@ theorem mapBoundary_embedInlTensor
     (b : BoundaryAction Δ₁ X) :
     (b.embedInlTensor Δ₂).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
       (b.mapBoundary f₁).embedInlTensor Δ₂' := by
-  simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor, List.map_map]
+  simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor]
   congr 1
+  rw [← PFunctor.Trace.mapChart_comp, ← PFunctor.Trace.mapChart_comp]
+  exact congrArg (PFunctor.Trace.mapChart · b.emit)
+    (Interface.Hom.comp_sum_inl f₁.onOut f₂.onOut)
 
 @[simp]
 theorem mapBoundary_embedInrTensor
@@ -203,16 +233,18 @@ theorem mapBoundary_embedInrTensor
     (b : BoundaryAction Δ₂ X) :
     (b.embedInrTensor Δ₁).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
       (b.mapBoundary f₂).embedInrTensor Δ₁' := by
-  simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor, List.map_map]
+  simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor]
   congr 1
+  rw [← PFunctor.Trace.mapChart_comp, ← PFunctor.Trace.mapChart_comp]
+  exact congrArg (PFunctor.Trace.mapChart · b.emit)
+    (Interface.Hom.comp_sum_inr f₁.onOut f₂.onOut)
 
 @[simp]
 theorem closed_mapBoundary
     {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
     (b : BoundaryAction Δ₁ X) :
-    (b.mapBoundary φ).closed = b.closed := by
-  simp [closed, mapBoundary]
+    (b.mapBoundary φ).closed = b.closed := rfl
 
 @[simp]
 theorem mapBoundary_wireLeft
@@ -223,12 +255,13 @@ theorem mapBoundary_wireLeft
       (b.mapBoundary
         (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))).wireLeft Δ₂' := by
   simp only [wireLeft, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  funext x
+  simp only [PFunctor.Trace.mapChart_apply, PFunctor.Trace.mapPartial_apply,
+    List.filterMap_filterMap]
+  congr 1
+  funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port <;> rfl
 
 @[simp]
 theorem mapBoundary_wireRight
@@ -240,12 +273,13 @@ theorem mapBoundary_wireRight
         (PortBoundary.Hom.tensor
           (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)).wireRight Δ₁' := by
   simp only [wireRight, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  funext x
+  simp only [PFunctor.Trace.mapChart_apply, PFunctor.Trace.mapPartial_apply,
+    List.filterMap_filterMap]
+  congr 1
+  funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port <;> rfl
 
 end BoundaryAction
 

@@ -456,7 +456,7 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ v log' => ⌜log' = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.ofLift
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq
@@ -473,7 +473,7 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
         WriterT (QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun log => ⌜log = log₀⌝))
       (⇓ _ log' => ⌜log₀ <+: log'⌝) := by
-  unfold loggingOracle QueryImpl.withLogging QueryImpl.ofLift
+  unfold loggingOracle QueryImpl.withLogging QueryImpl.withTraceAppend QueryImpl.ofLift
   mvcgen
   rename_i s _ heq
   subst heq
