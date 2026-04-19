@@ -38,11 +38,6 @@ shape of a stateless effectful Mealy machine in the `List`-Writer Kleisli
 category.  Stateful executors (e.g. running over an `OracleComp`) are handled
 separately in `VCVio/OracleComp/QueryTracking/`.
 
-## Companion bridge
-
-`Chart.mapIdx` is added here as the small helper that lifts a polynomial
-chart `P → Q` to a function `Idx P → Idx Q`.  It is the `Idx`-level avatar of
-`PFunctor.Chart` and underlies `Trace.mapChart`.
 
 ## References
 
@@ -59,22 +54,6 @@ chart `P → Q` to a function `Idx P → Idx Q`.  It is the `Idx`-level avatar o
 universe uA uB uA₁ uB₁ uA₂ uB₂ uA₃ uB₃ v w
 
 namespace PFunctor
-
-namespace Chart
-
-variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
-  {R : PFunctor.{uA₃, uB₃}}
-
-/-- Push an `Idx P` along a chart `P → Q` to an `Idx Q`. -/
-def mapIdx (φ : Chart P Q) (i : Idx P) : Idx Q :=
-  ⟨φ.toFunA i.1, φ.toFunB i.1 i.2⟩
-
-@[simp] theorem mapIdx_id (i : Idx P) : mapIdx (Chart.id P) i = i := rfl
-
-@[simp] theorem mapIdx_comp (g : Chart Q R) (f : Chart P Q) (i : Idx P) :
-    mapIdx (g ∘c f) i = mapIdx g (mapIdx f i) := rfl
-
-end Chart
 
 /--
 The free monoid on `P`-events.  Definitionally `FreeMonoid (Idx P)`, which

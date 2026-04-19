@@ -104,6 +104,24 @@ theorem ext {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} (c₁ c�
   subst hB
   rfl
 
+/-! ### Action on indices
+
+A chart `φ : P → Q` acts on `Idx P = Σ a : P.A, P.B a` by sending
+`⟨a, b⟩ ↦ ⟨φ.toFunA a, φ.toFunB a b⟩`. This is the underlying function on
+positions; `Trace.mapChart` (in `ToMathlib.PFunctor.Trace`) uses it to push
+event traces along charts. -/
+
+variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}} {R : PFunctor.{uA₃, uB₃}}
+
+/-- Push an `Idx P` along a chart `P → Q` to an `Idx Q`. -/
+def mapIdx (φ : Chart P Q) (i : Idx P) : Idx Q :=
+  ⟨φ.toFunA i.1, φ.toFunB i.1 i.2⟩
+
+@[simp] theorem mapIdx_id (i : Idx P) : mapIdx (Chart.id P) i = i := rfl
+
+@[simp] theorem mapIdx_comp (g : Chart Q R) (f : Chart P Q) (i : Idx P) :
+    mapIdx (g ∘c f) i = mapIdx g (mapIdx f i) := rfl
+
 end Chart
 
 namespace Equiv
