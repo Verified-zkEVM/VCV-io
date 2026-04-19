@@ -306,11 +306,88 @@ The open-world node context for processes with boundary `Δ`.
 At a node with move space `X`, the context value is
 `OpenNodeSemantics Party Δ X`: the usual controller-path and local-view data,
 plus a `BoundaryAction` describing the node's external traffic.
+
+## Polynomial reading
+
+`OpenNodeContext Party Δ` is, up to the named-field-vs-pair identification
+exhibited by `OpenNodeContext.equivProductView`, the non-dependent context
+product
+
+```
+Spec.Node.Context.prod (StepContext Party) (fun X => BoundaryAction Δ X)
+```
+
+That is, the open node context is the polynomial product of the closed
+`StepContext Party` and the boundary-action context `fun X => BoundaryAction Δ X`,
+with both factors carried independently at each move space `X`. The
+hand-rolled context-homs below (`forget`, `embed`, `map`, `inlTensor`,
+`inrTensor`, `wireLeft`, `wireRight`, `close`) are concrete instances of
+the universal projection / pairing maps for this product, specialized to
+the particular boundary-action transformations they perform. The structure
+form `OpenNodeSemantics extends NodeSemantics` is preserved as the working
+API because it gives clean `{ toNodeSemantics := ..., boundary := ... }`
+construction sites and definitional projections used pervasively below.
 -/
 abbrev OpenNodeContext (Party : Type u) (Δ : PortBoundary) :=
   fun (X : Type w) => OpenNodeSemantics Party Δ X
 
 namespace OpenNodeContext
+
+/-! ### Polynomial-product bridge
+
+Exhibit `OpenNodeContext Party Δ` as the non-dependent polynomial product
+of the closed `StepContext Party` and the boundary-action context, and
+prove that the bridge is a definitional isomorphism (round trips reduce
+to `rfl` by `Prod.mk.eta` and structure eta). The product view lets one
+phrase universal-property arguments without repeatedly pattern-matching
+on `OpenNodeSemantics` literals; the structural API below is the working
+form. -/
+
+/-- The polynomial-product view of `OpenNodeContext`. Lives in the same
+universes as `OpenNodeContext Party Δ` itself: the first universe is the
+move-space universe `w`, and the second is whatever Lean infers for
+`NodeSemantics Party X × BoundaryAction Δ X`. -/
+abbrev productView (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.Context.{w} :=
+  Spec.Node.Context.prod (StepContext Party)
+    (fun X : Type w => BoundaryAction Δ X)
+
+/--
+Forward direction of the polynomial-product bridge: read off the
+`(NodeSemantics, BoundaryAction)` pair from an `OpenNodeSemantics`. -/
+def toProductView (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.ContextHom
+      (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+      (productView.{u, w} Party Δ) :=
+  fun _ ons => (ons.toNodeSemantics, ons.boundary)
+
+/--
+Inverse direction of the polynomial-product bridge: reassemble an
+`OpenNodeSemantics` from a `(NodeSemantics, BoundaryAction)` pair. -/
+def ofProductView (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.ContextHom
+      (productView.{u, w} Party Δ)
+      (OpenNodeContext Party Δ : Spec.Node.Context.{w}) :=
+  fun _ p => { toNodeSemantics := p.1, boundary := p.2 }
+
+@[simp]
+theorem toProductView_ofProductView (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.ContextHom.comp
+        (toProductView.{u, w} Party Δ) (ofProductView Party Δ) =
+      Spec.Node.ContextHom.id (productView Party Δ) := by
+  funext X p
+  cases p
+  rfl
+
+@[simp]
+theorem ofProductView_toProductView (Party : Type u) (Δ : PortBoundary) :
+    Spec.Node.ContextHom.comp
+        (ofProductView.{u, w} Party Δ) (toProductView Party Δ) =
+      Spec.Node.ContextHom.id (OpenNodeContext Party Δ) := by
+  funext X ons
+  cases ons
+  simp [Spec.Node.ContextHom.comp, Spec.Node.ContextHom.id,
+    toProductView, ofProductView]
 
 /--
 The forgetful map from the open-world context to the closed-world context.
@@ -504,6 +581,50 @@ theorem map_tensor_comp_wireRight (Party : Type u)
   funext X ons
   simp [map, wireRight, Spec.Node.ContextHom.comp,
     OpenNodeSemantics.mapBoundary]
+
+/-! #### Existing context-homs as polynomial-product operations
+
+The following identities exhibit the hand-rolled `OpenNodeContext`
+context-homs above as concrete instances of the universal projections,
+pairing maps, and product maps for the polynomial product `productView`.
+They are documentation rather than a refactor: the named API forms remain
+the working surface, and the equalities below let one switch between the
+two presentations on demand. -/
+
+/-- `forget` is the first projection of the polynomial product, postcomposed
+with the bridge `toProductView`. -/
+theorem forget_eq_prodFst_comp_toProductView
+    (Party : Type u) (Δ : PortBoundary) :
+    forget.{u, w} Party Δ =
+      Spec.Node.ContextHom.comp
+        (Spec.Node.Context.prodFst (StepContext Party)
+          (fun X : Type w => BoundaryAction Δ X))
+        (toProductView Party Δ) := rfl
+
+/-- `embed` is the pairing of the identity on `StepContext` with the
+constant `internal` boundary action, transported back along the bridge. -/
+theorem embed_eq_ofProductView_comp_prodPair
+    (Party : Type u) (Δ : PortBoundary) :
+    embed.{u, w} Party Δ =
+      Spec.Node.ContextHom.comp
+        (ofProductView Party Δ)
+        (Spec.Node.Context.prodPair
+          (Spec.Node.ContextHom.id (StepContext Party))
+          (fun X _ => BoundaryAction.internal Δ X)) := rfl
+
+/-- `map φ` factors as the polynomial-product map of the identity on
+`StepContext` and the boundary-action transport
+`fun X => BoundaryAction.mapBoundary φ`. -/
+theorem map_eq_ofProductView_comp_prodMap_comp_toProductView
+    (Party : Type u) {Δ₁ Δ₂ : PortBoundary} (φ : PortBoundary.Hom Δ₁ Δ₂) :
+    map.{u, w} Party φ =
+      Spec.Node.ContextHom.comp
+        (Spec.Node.ContextHom.comp
+          (ofProductView Party Δ₂)
+          (Spec.Node.Context.prodMap
+            (Spec.Node.ContextHom.id (StepContext Party))
+            (fun X (b : BoundaryAction Δ₁ X) => b.mapBoundary φ)))
+        (toProductView Party Δ₁) := rfl
 
 end OpenNodeContext
 
