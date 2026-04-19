@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.UC.EnvAction
+import VCVio.Interaction.UC.EnvOpenProcess
 import VCVio.Interaction.UC.MachineId
 import VCVio.Interaction.Concurrent.Policy
 
@@ -35,6 +36,12 @@ Composable End-to-End Secure Messaging*, CRYPTO 2022 §3.2):
 * **`CorruptionPolicy`** — a `StepPolicy` specialization keyed on the
   corruption alphabet, reusing the existing `inter` / `top` /
   `byController` combinators from `Interaction.Concurrent.Policy`.
+* **`CorruptionProcess Sid Pid Δ`** — the canonical instantiation of
+  the generic `EnvOpenProcess` wrapper to the CJSV22 corruption
+  alphabet and state.
+* **`MachineProcess.withCorruption`** — the standard wrap that pairs a
+  `MachineProcess` with `envActionBase` to produce a
+  `CorruptionProcess`.
 
 ## Universe constraint
 
@@ -49,8 +56,18 @@ types (`ℕ`, `String`, etc.) all satisfy this bound.
 Like `EnvAction`, `CorruptionState` is **standalone**: it is *not*
 threaded into `OpenNodeSemantics` here. Existing `OpenProcess`
 constructions are untouched. The corruption-aware composition wrapper
-that pairs a `MachineProcess` with a state-indexed `EnvAction` (and
-hosts the four `*.corrupt` forwarding lemmas) is a follow-up slice.
+`CorruptionProcess` (defined at the bottom of this file) is the
+canonical inhabitant of the generic
+`Interaction.UC.EnvOpenProcess Party Δ Event State` paired with the
+corruption alphabet and state.
+
+The four `*.corrupt` forwarding lemmas (CJSV22 §4.2) for `par` /
+`wire` / `plug` are deferred to a follow-up slice: they require an
+explicit choice of *combination strategy* (broadcast vs targeted vs
+Kleisli-sequential) on the env channel of composites, and the
+targeted-routing variant also needs `HasAccessControl` integration
+which is currently still declarative. See the F2 design memo for the
+full roadmap.
 
 ## Why `LeakableState` is a typeclass
 
@@ -69,7 +86,7 @@ from `[DecidableEq Sid] [DecidableEq Pid]`) and over `Epoch = ℕ`.
 provides decidable equality on the identity type parameters.
 -/
 
-universe w w₂
+universe v w w₂
 
 namespace Interaction
 namespace UC
@@ -401,6 +418,83 @@ abbrev inter (left right : CorruptionPolicy process) :
   ProcessOver.StepPolicy.inter left right
 
 end CorruptionPolicy
+
+/-! ## Canonical corruption-aware open process -/
+
+/--
+`CorruptionProcess Sid Pid Δ` is the canonical CJSV22-flavoured
+instantiation of `EnvOpenProcess`: a `MachineProcess Sid Pid Δ` paired
+with the corruption-event channel
+`EnvAction (CorruptionAlphabet Sid Pid) (CorruptionState Sid Pid)`.
+
+This is one consumer of the generic `EnvOpenProcess` wrapper. Other
+environment-driven channels (broadcast resets, time advance,
+simulator-controlled reseed, side-channel leakage) reuse the same
+wrapper with different `(Event, State)` pairs; nothing in
+`EnvOpenProcess` is corruption-specific. The wrapper-level genericity
+lets us defer revisiting the (currently Signal-flavoured)
+`CorruptionAlphabet` and `CorruptionState` themselves to a later
+generalization pass without re-cutting the env-channel foundation.
+
+The two `OpenProcess` universe parameters `v` (process state) and `w`
+(move spaces) are exposed; the participant universe is fixed to `0`
+because `MachineId Sid Pid : Type 0` (`Sid Pid : Type`).
+-/
+abbrev CorruptionProcess (Sid Pid : Type) (Δ : PortBoundary) :=
+  EnvOpenProcess.{0, 0, v, w} (MachineId Sid Pid) Δ
+    (CorruptionAlphabet Sid Pid) (CorruptionState Sid Pid)
+
+/--
+Wrap a `MachineProcess Sid Pid Δ` with the canonical CJSV22 corruption
+env channel `envActionBase`, yielding a `CorruptionProcess`.
+
+This is the **standard inhabitant** of `CorruptionProcess`:
+`compromise(m)` snapshots `m`'s current epoch into the adversary's
+view (sets `corrupted m` and `compromised m (epoch m)`), and
+`refresh(m)` advances `m`'s epoch counter and clears `corrupted m`.
+
+Protocols that need richer per-event behaviour (e.g.
+simulator-controlled randomization on `compromise`, or a non-trivial
+leakage function that depends on the protocol state) build their
+`EnvOpenProcess` directly with a bespoke `EnvAction` rather than going
+through `withCorruption`.
+-/
+def MachineProcess.withCorruption
+    {Sid Pid : Type} {Δ : PortBoundary}
+    [DecidableEq Sid] [DecidableEq Pid]
+    (P : MachineProcess.{0, v, w} Sid Pid Δ) :
+    CorruptionProcess.{v, w} Sid Pid Δ where
+  process := P
+  envAction := CorruptionState.envActionBase
+
+namespace MachineProcess
+
+variable {Sid Pid : Type} {Δ : PortBoundary}
+  [DecidableEq Sid] [DecidableEq Pid]
+
+@[simp]
+theorem process_withCorruption (P : MachineProcess.{0, v, w} Sid Pid Δ) :
+    P.withCorruption.process = P := rfl
+
+@[simp]
+theorem envAction_withCorruption (P : MachineProcess.{0, v, w} Sid Pid Δ) :
+    P.withCorruption.envAction = CorruptionState.envActionBase := rfl
+
+@[simp]
+theorem react_withCorruption_compromise
+    (P : MachineProcess.{0, v, w} Sid Pid Δ)
+    (m : MachineId Sid Pid) (cs : CorruptionState Sid Pid) :
+    P.withCorruption.react (.compromise m) cs =
+      pure (CorruptionState.applyCompromise m cs) := rfl
+
+@[simp]
+theorem react_withCorruption_refresh
+    (P : MachineProcess.{0, v, w} Sid Pid Δ)
+    (m : MachineId Sid Pid) (cs : CorruptionState Sid Pid) :
+    P.withCorruption.react (.refresh m) cs =
+      pure (CorruptionState.applyRefresh m cs) := rfl
+
+end MachineProcess
 
 end UC
 end Interaction
