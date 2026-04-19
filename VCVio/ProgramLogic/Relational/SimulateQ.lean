@@ -901,14 +901,15 @@ entries). The total reduction loss is `qS·ε + Pr[collision]`. -/
 
 section IdenticalUntilBadEpsilon
 
-variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 variable {α : Type} {σ : Type}
 
-omit [spec.Fintype] [spec.Inhabited] in
+omit [spec'.Fintype] [spec'.Inhabited] in
 /-- "Bad propagation": starting from a bad state, every output of the simulation has the
 bad flag set. This generalizes the per-step `h_mono` hypothesis to the full simulation. -/
 private lemma mem_support_simulateQ_run_of_bad
-    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl t).run p), z.2.2 = true)
     (oa : OracleComp spec α) (p : σ × Bool) (hp : p.2 = true) :
@@ -931,7 +932,7 @@ private lemma mem_support_simulateQ_run_of_bad
 /-- Under bad-monotonicity, a simulation started from a bad state has bad output probability
 exactly `1` (using `OracleComp.HasEvalPMF` to ensure no failure mass). -/
 private lemma probEvent_simulateQ_run_bad_eq_one_of_bad
-    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl t).run p), z.2.2 = true)
     (oa : OracleComp spec α) (p : σ × Bool) (hp : p.2 = true) :
@@ -946,7 +947,7 @@ private lemma probEvent_simulateQ_run_bad_eq_one_of_bad
 given that each summand is bounded by `p_z * (c + Pr[bad | f₁ z])`. The constant `c`
 is intended to be `(q - 1) · ε` from the inductive hypothesis. -/
 private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
-    {β : Type} (mx : OracleComp spec β) (f₁ f₂ : β → OracleComp spec (α × σ × Bool))
+    {β : Type} (mx : OracleComp spec' β) (f₁ f₂ : β → OracleComp spec' (α × σ × Bool))
     {c : ℝ} (hc : 0 ≤ c)
     (h_summand_le : ∀ z : β,
       Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤
@@ -1045,7 +1046,7 @@ private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
 (parameterized by `q - 1`), combine the triangle inequality, the two `tvDist_bind_*_le`
 bounds, and the algebraic distribution to get the `q · ε + Pr[bad]` bound. -/
 private theorem tvDist_simulateQ_run_query_bind_le
-    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (h_step_tv : ∀ (t : spec.Domain) (s : σ),
       tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
@@ -1061,23 +1062,23 @@ private theorem tvDist_simulateQ_run_query_bind_le
         ((simulateQ impl₂ (query t >>= cont)).run (s, false))
       ≤ ↑q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
           (simulateQ impl₁ (query t >>= cont)).run (s, false)].toReal := by
-  set sim₁ : OracleComp spec (α × σ × Bool) :=
+  set sim₁ : OracleComp spec' (α × σ × Bool) :=
     (simulateQ impl₁ (query t >>= cont)).run (s, false) with hsim₁_def
-  set sim₂ : OracleComp spec (α × σ × Bool) :=
+  set sim₂ : OracleComp spec' (α × σ × Bool) :=
     (simulateQ impl₂ (query t >>= cont)).run (s, false) with hsim₂_def
-  set f₁ : spec.Range t × σ × Bool → OracleComp spec (α × σ × Bool) :=
+  set f₁ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
     fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
-  set f₂ : spec.Range t × σ × Bool → OracleComp spec (α × σ × Bool) :=
+  set f₂ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
     fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
-  set mx : OracleComp spec (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
-  set my : OracleComp spec (spec.Range t × σ × Bool) := (impl₂ t).run (s, false) with hmy_def
+  set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
+  set my : OracleComp spec' (spec.Range t × σ × Bool) := (impl₂ t).run (s, false) with hmy_def
   have hsim₁_eq : sim₁ = mx >>= f₁ := by
     simp [hsim₁_def, hmx_def, hf₁_def, simulateQ_bind, simulateQ_query,
       OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
   have hsim₂_eq : sim₂ = my >>= f₂ := by
     simp [hsim₂_def, hmy_def, hf₂_def, simulateQ_bind, simulateQ_query,
       OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
-  set mid : OracleComp spec (α × σ × Bool) := mx >>= f₂ with hmid_def
+  set mid : OracleComp spec' (α × σ × Bool) := mx >>= f₂ with hmid_def
   have h_tri : tvDist sim₁ sim₂ ≤ tvDist sim₁ mid + tvDist mid sim₂ :=
     tvDist_triangle _ _ _
   have h_second : tvDist mid sim₂ ≤ ε := by
@@ -1127,7 +1128,7 @@ The proof inducts on `oa`:
   - `true`: by bad-monotonicity, `Pr[bad | sim₁] = 1`, and `tvDist ≤ 1` always.
   - `false`: see `tvDist_simulateQ_run_query_bind_le`. -/
 private theorem tvDist_simulateQ_run_le_qeps_plus_probEvent_output_bad_aux
-    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (h_step_tv : ∀ (t : spec.Domain) (s : σ),
       tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
@@ -1183,7 +1184,7 @@ The `ε = 0` case recovers the existing identical-until-bad bound (modulo the up
 agreement hypothesis from definitional equality to TV-distance equality, which is
 equivalent for distributions over the same type). -/
 theorem tvDist_simulateQ_le_qeps_plus_probEvent_output_bad
-    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (h_step_tv : ∀ (t : spec.Domain) (s : σ),
       tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
@@ -1207,7 +1208,7 @@ theorem tvDist_simulateQ_le_qeps_plus_probEvent_output_bad
         ≤ tvDist ((simulateQ impl₁ oa).run (s₀, false))
             ((simulateQ impl₂ oa).run (s₀, false)) := by
     simpa [StateT.run'] using
-      (tvDist_map_le (m := OracleComp spec) (α := α × σ × Bool) (β := α) Prod.fst
+      (tvDist_map_le (m := OracleComp spec') (α := α × σ × Bool) (β := α) Prod.fst
         ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false)))
   exact le_trans h_map h_joint
 
