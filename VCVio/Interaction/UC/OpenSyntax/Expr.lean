@@ -223,9 +223,7 @@ theorem interpret_unit {Atom : PortBoundary → Type u}
   simp only [Expr.unit, interpret_map]
   exact OpenTheory.unit_eq.symm
 
--- ============================================================================
--- § Lawful OpenTheory instance
--- ============================================================================
+/-! ## Lawful OpenTheory instance -/
 
 /--
 The free lawful `OpenTheory` whose objects are quotiented expressions over
@@ -314,9 +312,7 @@ instance compactClosed (Atom : PortBoundary → Type u) :
     Quotient.inductionOn₃ W₁ W₂ K fun _ _ _ =>
       Quotient.sound Raw.Equiv.plug_wire_left
 
--- ============================================================================
--- § Bridge: Expr → Interp
--- ============================================================================
+/-! ## Bridge: Expr → Interp -/
 
 /--
 Embed a quotiented expression into the tagless-final representation.

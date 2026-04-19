@@ -78,9 +78,7 @@ private def renderDHAtom : ∀ {Δ : PortBoundary}, DHAtom Δ → String
   | _, .simulator => "Simulator"
   | _, .dummyChannel => "Dummy Channel"
 
--- ============================================================================
--- § Communication infrastructure
--- ============================================================================
+/-! ## Communication infrastructure -/
 
 /-- Two directional channels running in parallel: Alice→Bob ∥ Bob→Alice. -/
 @[show_composition]
@@ -99,9 +97,7 @@ wire(par(Channel A→B, Channel B→A), Adversary)
 def insecureNetwork : Raw DHAtom bd2 :=
   channels ⊞ .atom .adversary
 
--- ============================================================================
--- § Real world
--- ============================================================================
+/-! ## Real world -/
 
 /-- Protocol parties: Alice ∥ Bob. -/
 @[show_composition]
@@ -133,9 +129,7 @@ plug(wire(par(Alice, Bob), insecureNetwork), Environment)
 def realWorld : Raw DHAtom PortBoundary.empty :=
   protocolExecution ⊠ .atom .environment
 
--- ============================================================================
--- § Ideal world
--- ============================================================================
+/-! ## Ideal world -/
 
 /-- Ideal parties: the ideal key-exchange functionality ∥ the UC simulator. -/
 @[show_composition]
@@ -157,9 +151,7 @@ plug(wire(par(Ideal KE, Simulator), Dummy Channel), Environment)
 def idealWorld : Raw DHAtom PortBoundary.empty :=
   idealParties ⊞ .atom .dummyChannel ⊠ .atom .environment
 
--- ============================================================================
--- § DOT output
--- ============================================================================
+/-! ## DOT output -/
 
 #eval IO.println "=== Real World ==="
 #eval IO.println (Raw.toDot renderDHAtom realWorld)
