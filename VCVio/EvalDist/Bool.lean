@@ -12,7 +12,7 @@ import VCVio.EvalDist.Defs.NeverFails
 Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
 -/
 
-variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α : Type _}
+variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α β : Type _}
 
 @[simp]
 lemma probOutput_true_add_false (mx : m Bool) :
@@ -45,14 +45,22 @@ lemma probOutput_not_map' [LawfulMonad m] (mx : m Bool) :
     Pr[= false | (! ·) <$> mx] = Pr[= true | mx] :=
   probOutput_map_injective mx (fun a b h => by cases a <;> cases b <;> simp_all) true
 
-@[simp]
+@[grind =]
 lemma probOutput_true_add_false_of_neverFail {mx : m Bool} [NeverFail mx] :
     Pr[= true | mx] + Pr[= false | mx] = 1 := by simp
 
-@[simp]
+@[simp, grind =]
 lemma probEvent_true_eq_probOutput (mx : m Bool) :
     Pr[ (· = true) | mx] = Pr[= true | mx] := probEvent_eq_eq_probOutput mx true
 
-@[simp]
+@[simp, grind =]
 lemma probEvent_not_eq_probOutput (mx : m Bool) :
     Pr[ (· = false) | mx] = Pr[= false | mx] := probEvent_eq_eq_probOutput mx false
+
+lemma probOutput_true_bind_map_eq_probEvent [LawfulMonad m]
+    (mx : m α) (my : α → m β) (p : α → β → Bool) :
+    Pr[= true | mx >>= fun x => p x <$> my x] =
+      Pr[fun (x, y) => p x y | do let x ← mx; return (x, ← my x)] := by
+  simp only [probOutput_bind_eq_tsum, probOutput_map_eq_tsum_ite, Bool.true_eq, bind_pure_comp,
+    probEvent_bind_eq_tsum, probEvent_map]
+  grind
