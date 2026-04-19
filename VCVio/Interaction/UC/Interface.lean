@@ -257,12 +257,14 @@ abbrev comp
 
 /--
 Translate one concrete packet along an interface morphism.
+
+Boundary-oriented alias for `PFunctor.Chart.mapIdx`.
 -/
-def mapPacket
+abbrev mapPacket
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : Hom I J) : Packet I → Packet J
-  | ⟨a, m⟩ => ⟨f.onPort a, f.onMsg m⟩
+    (f : Hom I J) : Packet I → Packet J :=
+  PFunctor.Chart.mapIdx f
 
 @[simp]
 theorem id_comp
@@ -292,10 +294,8 @@ theorem comp_assoc
 @[simp]
 theorem mapPacket_id
     {I : Interface.{uA, uB}} :
-    mapPacket (id I) = fun p => p := by
-  funext p
-  cases p
-  rfl
+    mapPacket (id I) = fun p => p :=
+  funext (PFunctor.Chart.mapIdx_id (P := I))
 
 @[simp]
 theorem mapPacket_comp
@@ -303,10 +303,8 @@ theorem mapPacket_comp
     {J : Interface.{vA, vB}}
     {K : Interface.{wA, wB}}
     (g : Hom J K) (f : Hom I J) :
-    mapPacket (comp g f) = mapPacket g ∘ mapPacket f := by
-  funext p
-  cases p
-  rfl
+    mapPacket (comp g f) = mapPacket g ∘ mapPacket f :=
+  funext (PFunctor.Chart.mapIdx_comp g f)
 
 end Hom
 
@@ -392,7 +390,7 @@ theorem mapPacket_comp
     (g : Hom J K) (f : Hom I J) (rp : RoutedPacket I M) :
     mapPacket g (mapPacket f rp) = mapPacket (Hom.comp g f) rp := by
   cases rp
-  simp [mapPacket, Hom.mapPacket_comp]
+  simp [mapPacket]
 
 @[simp]
 theorem mapSender_id
@@ -1185,58 +1183,14 @@ abbrev swapSwap
     Equiv (PortBoundary.swap (PortBoundary.swap Δ)) Δ :=
   refl Δ
 
-private theorem eqRec_id_apply_codomain
-    {α : Sort*} {β : α → Sort*} {a₀ a₁ : α}
-    (h : a₀ = a₁) (x : β a₀) :
-    Eq.rec (motive := fun x _ => β a₀ → β x) id h x =
-      _root_.cast (congrArg β h) x := by
-  subst h; rfl
-
-private theorem chart_comp_symm_eq_id
-    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
-    PFunctor.Chart.comp e.symm.toChart e.toChart =
-      PFunctor.Chart.id P := by
-  refine PFunctor.Chart.ext _ _
-    (fun a => e.equivA.symm_apply_apply a) (fun a => ?_)
-  funext b
-  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
-    PFunctor.Equiv.toChart, Function.comp_apply]
-  change (((_root_.Equiv.cast _).trans
-    (e.equivB (e.equivA.symm (e.equivA a))).symm)
-    (e.equivB a b)) = _
-  simp only [_root_.Equiv.trans_apply]
-  trans _root_.cast
-    (congrArg P.B (e.equivA.symm_apply_apply a).symm) b
-  · exact PFunctor.Equiv.equivB_symm_apply_of_eq e
-      (e.equivA.apply_symm_apply (e.equivA a)) b
-  · exact (eqRec_id_apply_codomain
-      (e.equivA.symm_apply_apply a).symm b).symm
-
-private theorem chart_comp_inv_eq_id
-    {P : PFunctor} {Q : PFunctor} (e : PFunctor.Equiv P Q) :
-    PFunctor.Chart.comp e.toChart e.symm.toChart =
-      PFunctor.Chart.id Q := by
-  refine PFunctor.Chart.ext _ _
-    (fun a => e.equivA.apply_symm_apply a) (fun a => ?_)
-  funext b
-  simp only [PFunctor.Chart.comp, PFunctor.Chart.id,
-    PFunctor.Equiv.toChart, Function.comp_apply]
-  change ((e.equivB (e.equivA.symm a)))
-    (((_root_.Equiv.cast _).trans
-      (e.equivB (e.equivA.symm a)).symm) b) = _
-  simp only [_root_.Equiv.trans_apply,
-    _root_.Equiv.apply_symm_apply]
-  exact (eqRec_id_apply_codomain
-    (e.equivA.apply_symm_apply a).symm b).symm
-
 @[simp]
 theorem symm_toHom_comp_toHom
     {Δ₁ Δ₂ : PortBoundary}
     (e : PortBoundary.Equiv Δ₁ Δ₂) :
     Hom.comp e.symm.toHom e.toHom = Hom.id Δ₁ := by
   apply Hom.ext
-  · exact chart_comp_inv_eq_id e.onIn
-  · exact chart_comp_symm_eq_id e.onOut
+  · exact PFunctor.Equiv.toChart_comp_symm_toChart e.onIn
+  · exact PFunctor.Equiv.symm_toChart_comp_toChart e.onOut
 
 @[simp]
 theorem toHom_comp_symm_toHom
@@ -1244,8 +1198,8 @@ theorem toHom_comp_symm_toHom
     (e : PortBoundary.Equiv Δ₁ Δ₂) :
     Hom.comp e.toHom e.symm.toHom = Hom.id Δ₂ := by
   apply Hom.ext
-  · exact chart_comp_symm_eq_id e.onIn
-  · exact chart_comp_inv_eq_id e.onOut
+  · exact PFunctor.Equiv.symm_toChart_comp_toChart e.onIn
+  · exact PFunctor.Equiv.toChart_comp_symm_toChart e.onOut
 
 @[simp]
 theorem tensorComm_comp_tensorComm
