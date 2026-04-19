@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Concurrent.Current
 import VCVio.Interaction.Concurrent.Execution
+import VCVio.Interaction.Concurrent.Trace
 
 /-!
 # Structural-tree frontend for dynamic processes

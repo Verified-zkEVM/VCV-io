@@ -3,8 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.Interaction.Concurrent.Trace
 import VCVio.Interaction.Multiparty.Core
+import VCVio.Interaction.Concurrent.Frontier
 
 /-!
 # Per-party observation profiles for concurrent interaction

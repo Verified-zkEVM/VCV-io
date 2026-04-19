@@ -1,6 +1,44 @@
 {"ignoreImport":
  ["Examples"],
  "ignoreAll":
- [],
+ ["VCVio.Interaction.Basic.Spec",
+  "VCVio.Interaction.Basic.BundledMonad",
+  "VCVio.Interaction.TwoParty.Role"],
  "ignore":
- {}}
+ {"VCVio.Prelude":
+   ["ToMathlib.General"],
+  "VCVio.EvalDist.Defs.Support":
+   ["VCVio.Prelude", "ToMathlib.ProbabilityTheory.SPMF"],
+  "VCVio.OracleComp.SimSemantics.SimulateQ":
+   ["VCVio.Prelude", "ToMathlib.Control.OptionT"],
+  "VCVio.OracleComp.Coercions.Add":
+   ["VCVio.OracleComp.ProbComp"],
+  "VCVio.OracleComp.QueryTracking.Structures":
+   ["VCVio.OracleComp.SimSemantics.SimulateQ", "ToMathlib.Control.WriterT"],
+  "VCVio.OracleComp.QueryTracking.RandomOracle.Simulation":
+   ["VCVio.OracleComp.QueryTracking.RandomOracle.Basic"],
+  "VCVio.ProgramLogic.Tactics.Common.Core":
+   ["Init", "Lean.Elab.Tactic", "Lean.Meta.Match.MatcherApp",
+    "VCVio.OracleComp.Constructions.Replicate", "VCVio.ProgramLogic.NotationCore"],
+  "VCVio.ProgramLogic.Tactics.Common.Suggestions":
+   ["Init"],
+  "VCVio.ProgramLogic.Tactics.Relational.Internals":
+   ["VCVio.ProgramLogic.Relational.Quantitative",
+    "VCVio.ProgramLogic.Relational.SimulateQ",
+    "VCVio.ProgramLogic.Tactics.Common"],
+  "VCVio.CryptoFoundations.FiatShamir.Sigma":
+   ["VCVio.ProgramLogic.Tactics.Unary"],
+  "VCVio.CryptoFoundations.SymmEncAlg":
+   ["VCVio.OracleComp.ProbComp"],
+  "VCVio.Interaction.Basic.Node":
+   ["Init"],
+  "VCVio.Interaction.Concurrent.Examples":
+   ["VCVio.Interaction.Concurrent.Equivalence",
+    "VCVio.Interaction.Concurrent.Fairness",
+    "VCVio.Interaction.Concurrent.Interleaving"],
+  "VCVio.Interaction.TwoParty.Examples":
+   ["VCVio.Interaction.TwoParty.Strategy"],
+  "VCVio.ProgramLogic.Relational.HandlerFromUnary":
+   ["VCVio.ProgramLogic.Unary.HandlerSpecs"],
+  "VCVio.OracleComp.QueryTracking.ObservationOracle":
+   ["ToMathlib.Control.WriterT"]}}

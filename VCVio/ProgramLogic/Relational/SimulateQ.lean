@@ -9,7 +9,6 @@ import VCVio.EvalDist.TVDist
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.SimSemantics.StateT
-import VCVio.OracleComp.SimSemantics.WriterT
 
 /-!
 # Relational `simulateQ` Rules

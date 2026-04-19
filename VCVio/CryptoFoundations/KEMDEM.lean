@@ -4,9 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA
 import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.KeyEncapMech
+import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.OneTime
 
 /-!
 # KEM + DEM Composition

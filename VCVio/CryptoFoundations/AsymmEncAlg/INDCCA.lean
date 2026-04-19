@@ -9,6 +9,7 @@ import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.SimSemantics.Append
+import VCVio.CryptoFoundations.SecExp
 
 /-!
 # Asymmetric Encryption Schemes: IND-CCA

@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.CryptoFoundations.SecExp
+import VCVio.EvalDist.Defs.Instances
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp

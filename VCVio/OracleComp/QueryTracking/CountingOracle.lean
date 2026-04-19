@@ -4,8 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.Structures
-import VCVio.OracleComp.SimSemantics.WriterT
-import VCVio.OracleComp.SimSemantics.Constructions
+import VCVio.OracleComp.EvalDist
 
 /-!
 # Counting Queries Made by a Computation

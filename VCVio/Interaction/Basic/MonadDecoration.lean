@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.BundledMonad
 import VCVio.Interaction.Basic.Decoration
-import VCVio.Interaction.Basic.Strategy
 
 /-!
 # Per-node monad decorations

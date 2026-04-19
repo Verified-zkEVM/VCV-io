@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
 import VCVio.Interaction.Basic.Syntax
-import VCVio.Interaction.Basic.Shape
 
 /-!
 # Generic local execution laws over interaction trees

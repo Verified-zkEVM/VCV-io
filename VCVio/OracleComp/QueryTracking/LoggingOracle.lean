@@ -3,10 +3,9 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.SimSemantics.WriterT
-import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
+import ToMathlib.Control.WriterT
 
 /-!
 # Logging Queries Made by a Computation

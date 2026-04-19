@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
-import VCVio.Interaction.Basic.Append
 import VCVio.Interaction.Basic.MonadDecoration
 import VCVio.Interaction.TwoParty.Role
 

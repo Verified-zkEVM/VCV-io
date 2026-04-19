@@ -8,7 +8,6 @@ import VCVio.CryptoFoundations.AsymmEncAlg.Defs
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
-import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
 

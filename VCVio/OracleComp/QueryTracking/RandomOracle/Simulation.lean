@@ -3,9 +3,9 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.QueryTracking.Structures
 
 /-!
 # Random-Oracle Simulation Helpers

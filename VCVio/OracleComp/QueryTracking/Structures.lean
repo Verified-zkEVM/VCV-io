@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
-import ToMathlib.Control.WriterT
 
 /-!
 # Structures For Tracking a Computation's Oracle Queries
