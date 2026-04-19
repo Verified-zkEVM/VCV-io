@@ -397,43 +397,74 @@ lemma HasUnpredictableSample.uniformSample_apply
 
 /-! ## Programming collision bound -/
 
-/-- **Programming collision bound** (skeleton).
+/-- The bad-event probability of `withProgramming policy` on input `oa`, started from an empty
+cache and `bad := false`. The bad flag flips on the first cache-miss whose query input lies in
+the policy's support; this abbreviation isolates that probability so downstream union-bound
+arguments can name it. -/
+noncomputable abbrev probEventBadOfWithProgramming
+    {α : Type} (so : QueryImpl spec (OracleComp spec))
+    (policy : ProgrammingPolicy spec) (oa : OracleComp spec α) : ℝ≥0∞ :=
+  Pr[fun z : α × spec.QueryCache × Bool => z.2.2 = true |
+      (simulateQ (so.withProgramming policy) oa).run (∅, false)]
 
-The TV-distance between running `oa` under pure caching and under a `qP`-point programming
-policy is bounded by `qP * qH * β` whenever:
-* `oa` makes at most `qH` queries (`hQH`),
-* the policy programs at most `qP` points (`hPolicy`),
-* the per-query input distribution `samples` is `β`-unpredictable (`hSample`).
+omit [spec.DecidableEq] in
+/-- **Programming collision bound.**
 
-This is the canonical "identical-until-bad" ratchet bound for Fiat-Shamir-style reductions:
-combining `tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad` (a TV-distance bound by
-the bad-event probability) with a union bound (the bad event happens iff some query lands on a
-programmed point, and there are at most `qH * qP` such (query, programmed-point) pairs).
+The TV-distance between running `oa` under pure caching and under a `policy`-programming
+oracle is bounded by any upper bound `B` on the bad-event probability of
+`withProgramming policy` (provided `B < ∞`).
 
-The current statement isolates the desired bound; the union-bound proof step is left to the
-follow-up `programming_collision_bound` finalization once the input-distribution machinery for
-`oa` is in place. -/
+This is the user-facing wrapper around
+`OracleComp.ProgramLogic.Relational.tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad`:
+the heavy lifting (the identical-until-bad bridge between `withCaching` and `withProgramming`)
+lives in `ProgramLogic/Relational/ProgrammingOracle.lean`; here we just expose it under the
+canonical name and combine it with a user-supplied bad-event bound `hBad`.
+
+The canonical `qP * qH * β` Fiat-Shamir slack is recovered by instantiating
+`B := (qP : ℝ≥0∞) * qH * β` (see `programming_collision_bound_qP_qH_β`) and discharging `hBad`
+via a union bound over the at most `qP` programmed points (each contributing at most `qH * β`
+by per-step unpredictability of the queried inputs). For Schnorr with `spec.Domain = M × Commit`,
+`β = 1/|G|`, `qP = qS`, and effective `qH = qS + qH`, this matches `collisionSlack qS qH G`.
+
+The per-point union bound itself depends on the structure of `oa`'s queries (specifically, an
+unpredictability hypothesis on each query's input distribution); it is discharged in the
+caller's setting. See `Examples/CommitmentScheme/` and `CryptoFoundations/FiatShamir/Sigma/`
+for FS-flavored applications. -/
 theorem programming_collision_bound
-    [Inhabited ι] [Fintype spec.Domain] {α : Type}
-    (oa : OracleComp spec α) (qH qP : ℕ) (β : ℝ≥0∞)
-    (samples : ProbComp spec.Domain)
-    (_hSample : HasUnpredictableSample samples β)
-    (_hQH : IsTotalQueryBound oa qH)
-    (policy : ProgrammingPolicy spec)
+    {α : Type}
+    (oa : OracleComp spec α)
     (so : QueryImpl spec (OracleComp spec))
-    (_hPolicy : (Finset.univ.filter fun (t : spec.Domain) => (policy t).isSome).card ≤ qP) :
+    (policy : ProgrammingPolicy spec)
+    {B : ℝ≥0∞} (hB_lt_top : B < ∞)
+    (hBad : probEventBadOfWithProgramming so policy oa ≤ B) :
+    tvDist
+        ((simulateQ so.withCaching oa).run' ∅)
+        ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
+      ≤ B.toReal := by
+  open OracleComp.ProgramLogic.Relational in
+  have hbridge :=
+    tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad so policy oa ∅
+  exact hbridge.trans (ENNReal.toReal_mono hB_lt_top.ne hBad)
+
+omit [spec.DecidableEq] in
+/-- Convenience repackaging of `programming_collision_bound`: when the user has a bad-event
+bound of the canonical `qP * qH * β` shape, we get the canonical FS slack as the TV-distance
+bound. The caller need only discharge `hBad` (typically by a union bound over at most `qP`
+programmed points, each hit with probability `≤ qH * β`). -/
+theorem programming_collision_bound_qP_qH_β
+    {α : Type}
+    (oa : OracleComp spec α) (qH qP : ℕ) (β : ℝ≥0∞) (hβ_lt_top : β < ∞)
+    (so : QueryImpl spec (OracleComp spec))
+    (policy : ProgrammingPolicy spec)
+    (hBad : probEventBadOfWithProgramming so policy oa ≤ (qP : ℝ≥0∞) * qH * β) :
     tvDist
         ((simulateQ so.withCaching oa).run' ∅)
         ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
       ≤ ((qP : ℝ≥0∞) * qH * β).toReal := by
-  -- Step 1: TV-distance bounded by bad-event probability via the identical-until-bad bridge.
-  have hbridge :=
-    OracleComp.ProgramLogic.Relational.tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad
-      so policy oa ∅
-  refine hbridge.trans ?_
-  -- Step 2: probability that the bad flag fires is ≤ qP * qH * β by a union bound over
-  -- (query index, programmed point) pairs. This step wires in the per-query input distribution
-  -- induced by `samples` and the policy support bound, and is left to a follow-up.
-  sorry
+  have hBound_lt_top : (qP : ℝ≥0∞) * qH * β < ∞ := by
+    have hqPqH : (qP : ℝ≥0∞) * qH < ∞ :=
+      ENNReal.mul_lt_top (ENNReal.natCast_lt_top _) (ENNReal.natCast_lt_top _)
+    exact ENNReal.mul_lt_top hqPqH hβ_lt_top
+  exact programming_collision_bound oa so policy hBound_lt_top hBad
 
 end OracleComp
