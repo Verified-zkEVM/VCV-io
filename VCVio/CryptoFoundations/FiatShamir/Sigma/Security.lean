@@ -11,7 +11,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 
-set_option linter.style.longFile 3200
+set_option linter.style.longFile 4000
 
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
@@ -237,6 +237,293 @@ private noncomputable def phaseCOverlayInvariant
     (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) : Prop :=
   st.visibleCache ≤ st.overlayCache ∧
     phaseCAgreesAwayFromSigned (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st
+
+/-- The "weak" Phase C invariant: every visible-cache key also appears in the
+overlay cache (as an `Option`-domain inclusion, not value match), and
+`agreesAwayFromSigned` holds.
+
+Unlike `phaseCOverlayInvariant`, this DOES NOT require value match on overlapping
+keys, so it survives `phaseCSimSignImpl` overwrites: when the simulator overwrites
+`overlay (msg, c)` from `some v` to `some ω_new`, the key-domain inclusion is
+preserved (the overlay key is still there), even though `visibleCache ≤
+overlayCache` fails.
+
+The weak invariant is sufficient to prove
+`phaseCHashLookup_eq_overlayCache_of_weak`: when overlay is `none`, the key-domain
+inclusion forces visible to also be `none`, so the wasSigned-true fallback to
+`visibleCache` returns `none` and matches `overlayCache`. When overlay is `some
+v`, the overlay branch returns `some v` directly. The unsigned branch is handled
+by `agreesAwayFromSigned`.
+
+This invariant is the right basis for an unconditional state-projection step
+in C7a (`probEvent_freshSuccess_simPhaseCExp_le_ext`): the per-step
+commutation of `phaseCBaseImpl + phaseCSimSignImpl` with `baseSimImplExt +
+sigSimImplExt` under `phaseCToExtProj` only requires `phaseCHashLookup =
+overlayCache`, which the weak invariant provides without splitting on the
+`bad` flag. -/
+private noncomputable def phaseCWeakInvariant
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) : Prop :=
+  (∀ t, st.overlayCache t = none → st.visibleCache t = none) ∧
+    phaseCAgreesAwayFromSigned (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] [Fintype Chal]
+    [SampleableType Chal] in
+/-- The weak invariant is implied by the (stronger) overlay invariant. -/
+private lemma phaseCWeakInvariant_of_overlayInvariant
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (h : phaseCOverlayInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st) :
+    phaseCWeakInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st := by
+  refine ⟨?_, h.2⟩
+  intro t hov
+  cases hvis : st.visibleCache t with
+  | none => rfl
+  | some u =>
+    have hov' := h.1 hvis
+    rw [hov] at hov'
+    exact absurd hov' (by simp)
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] [Fintype Chal]
+    [SampleableType Chal] in
+/-- The initial Phase C state satisfies the weak invariant. -/
+private lemma phaseCWeakInvariant_phaseCInitState :
+    phaseCWeakInvariant
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) := by
+  refine ⟨?_, ?_⟩
+  · intro _ _; rfl
+  · intro msg c _; rfl
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] [Fintype Chal]
+    [SampleableType Chal] in
+/-- Under the weak invariant, `phaseCHashLookup` collapses to a direct overlay
+lookup.
+
+The argument is uniform in `phaseCWasSigned`: the unsigned branch returns
+`visibleCache` which equals `overlayCache` by `agreesAwayFromSigned`; the signed
+branch returns `overlayCache` if it is `some`, otherwise falls through to
+`visibleCache` which (by the key-subset condition `overlay = none → visible =
+none`) is also `none`, matching `overlayCache`. -/
+private lemma phaseCHashLookup_eq_overlayCache_of_weak
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (h : phaseCWeakInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st)
+    (mc : M × Commit) :
+    phaseCHashLookup (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st mc =
+      st.overlayCache (.inr mc) := by
+  unfold phaseCHashLookup
+  by_cases hsigned : phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) st mc.1 = true
+  · simp only [hsigned, if_true]
+    cases hov : st.overlayCache (.inr mc) with
+    | some _ => rfl
+    | none =>
+      have hvis := h.1 (.inr mc) hov
+      rw [hvis]
+  · simp only [Bool.not_eq_true] at hsigned
+    simp only [hsigned, Bool.false_eq_true, if_false]
+    exact (h.2 mc.1 mc.2 hsigned).symm
+
+omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] [SampleableType Chal] in
+/-- The weak invariant is preserved by `phaseCRecordHash`: both caches receive
+the same key with the same value, so the key-domain inclusion is preserved, and
+the `agreesAwayFromSigned` argument is identical to the strong-invariant case. -/
+private lemma phaseCWeakInvariant_phaseCRecordHash
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (h : phaseCWeakInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st)
+    (mc : M × Commit) (ω : Chal) :
+    phaseCWeakInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st mc ω) := by
+  classical
+  refine ⟨?_, ?_⟩
+  · intro t hov
+    change (st.visibleCache.cacheQuery (.inr mc) ω) t = none
+    change (st.overlayCache.cacheQuery (.inr mc) ω) t = none at hov
+    by_cases ht : t = .inr mc
+    · subst ht
+      rw [QueryCache.cacheQuery_self] at hov
+      exact absurd hov (by simp)
+    · rw [QueryCache.cacheQuery_of_ne _ _ ht] at hov
+      rw [QueryCache.cacheQuery_of_ne _ _ ht]
+      exact h.1 t hov
+  · intro msg c hsigned
+    have hsigned' : phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) st msg = false := hsigned
+    change (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        st mc ω).overlayCache (.inr (msg, c)) =
+      (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        st mc ω).visibleCache (.inr (msg, c))
+    unfold phaseCRecordHash
+    by_cases hkey : (msg, c) = mc
+    · subst hkey
+      simp only [QueryCache.cacheQuery_self]
+    · have hne : (Sum.inr (msg, c) :
+          (unifSpec + (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr mc := by
+        intro heq
+        exact hkey (Sum.inr.inj heq)
+      change (st.overlayCache.cacheQuery (.inr mc) ω) (.inr (msg, c)) =
+        (st.visibleCache.cacheQuery (.inr mc) ω) (.inr (msg, c))
+      rw [QueryCache.cacheQuery_of_ne _ _ hne, QueryCache.cacheQuery_of_ne _ _ hne]
+      exact h.2 msg c hsigned'
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Chal] in
+/-- The weak invariant is preserved by a single `phaseCSimSignImpl pk msg₀` step:
+the simulator only writes to `overlayCache` (preserving the visible-key-subset
+condition) and adds `msg₀` to the sign log (making `agreesAwayFromSigned` vacuous
+at any key with first coordinate `msg₀`, while leaving it unchanged at all other
+messages, where neither cache is touched). -/
+private lemma phaseCWeakInvariant_phaseCSimSignImpl
+    (msg₀ : M)
+    (s : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (hs : phaseCWeakInvariant
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s)
+    (c : Commit) (ω : Chal) (sresp : Resp) (b' : Bool) :
+    phaseCWeakInvariant
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      { s with
+          overlayCache := s.overlayCache.cacheQuery (.inr (msg₀, c)) ω
+          signLog := s.signLog.logQuery msg₀ (c, sresp)
+          bad := b' } := by
+  classical
+  letI : DecidableEq (Commit × Resp) := Classical.decEq _
+  refine ⟨?_, ?_⟩
+  · intro t hov
+    change (s.overlayCache.cacheQuery (.inr (msg₀, c)) ω) t = none at hov
+    by_cases ht : t = .inr (msg₀, c)
+    · subst ht
+      rw [QueryCache.cacheQuery_self] at hov
+      exact absurd hov (by simp)
+    · rw [QueryCache.cacheQuery_of_ne _ _ ht] at hov
+      exact hs.1 t hov
+  · -- agrees-away preservation: identical proof shape to
+    -- `phaseCAgreesAwayFromSigned_phaseCSimSignImpl` (defined later in the file).
+    intro msg' c' hsigned'
+    have hsigned_list :
+        (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') = [] := by
+      have h := hsigned'
+      unfold phaseCWasSigned at h
+      simp only [QueryLog.wasQueried, ne_eq,
+        decide_eq_false_iff_not, Decidable.not_not] at h
+      by_cases hl : (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') = []
+      · exact hl
+      · exfalso
+        have : ((s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') ≠ []) := hl
+        simp [this] at h
+    have hsplit :
+        (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') =
+          s.signLog.getQ (· = msg') ++
+            (QueryLog.singleton (spec := M →ₒ (Commit × Resp)) msg₀ (c, sresp)).getQ
+              (· = msg') := by
+      simp [QueryLog.logQuery]
+    rw [hsplit] at hsigned_list
+    rw [QueryLog.getQ_singleton] at hsigned_list
+    have hsing_empty :
+        (if msg₀ = msg' then [⟨msg₀, (c, sresp)⟩] else
+          ([] : List ((t : (M →ₒ (Commit × Resp)).Domain) ×
+            (M →ₒ (Commit × Resp)).Range t))) = [] :=
+      (List.append_eq_nil_iff.mp hsigned_list).2
+    have hne : msg' ≠ msg₀ := by
+      intro heq
+      subst heq
+      simp at hsing_empty
+    have hold_empty : s.signLog.getQ (· = msg') = [] :=
+      (List.append_eq_nil_iff.mp hsigned_list).1
+    have hsigned_old : phaseCWasSigned
+        (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s msg' = false := by
+      unfold phaseCWasSigned QueryLog.wasQueried
+      simp [hold_empty]
+    have hkey : (Sum.inr (msg', c') :
+        (unifSpec + (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr (msg₀, c) := by
+      intro heq
+      have hmc : (msg', c') = (msg₀, c) := Sum.inr.inj heq
+      exact hne (Prod.mk.inj hmc).1
+    change (s.overlayCache.cacheQuery (.inr (msg₀, c)) ω) (.inr (msg', c')) =
+      s.visibleCache (.inr (msg', c'))
+    rw [QueryCache.cacheQuery_of_ne _ _ hkey]
+    exact hs.2 msg' c' hsigned_old
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] [Fintype Chal]
+    [SampleableType Chal] in
+/-- The initial Phase C state satisfies the overlay invariant: both caches are
+empty and the sign log is empty, so `visibleCache ≤ overlayCache` holds trivially
+and `agreesAwayFromSigned` holds vacuously. -/
+private lemma phaseCOverlayInvariant_phaseCInitState :
+    phaseCOverlayInvariant
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) := by
+  refine ⟨le_refl _, ?_⟩
+  intro msg c _
+  rfl
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit] [Fintype Chal]
+    [SampleableType Chal] in
+/-- Under the overlay invariant, the `phaseCHashLookup` collapses to a direct
+lookup in `overlayCache`. This is the key fact that lets `phaseCHashImpl` mirror
+`roSimImplExt` (with `cache := overlayCache`) when the invariant holds. -/
+private lemma phaseCHashLookup_eq_overlayCache_of_invariant
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (h : phaseCOverlayInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st)
+    (mc : M × Commit) :
+    phaseCHashLookup (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st mc =
+      st.overlayCache (.inr mc) := by
+  unfold phaseCHashLookup
+  by_cases hsigned : phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) st mc.1 = true
+  · simp only [hsigned, if_true]
+    cases hov : st.overlayCache (.inr mc) with
+    | some _ => rfl
+    | none =>
+      cases hvis : st.visibleCache (.inr mc) with
+      | none => rfl
+      | some u =>
+        have := h.1 (t := .inr mc) (u := u) hvis
+        rw [hov] at this
+        exact this.symm
+  · simp only [Bool.not_eq_true] at hsigned
+    simp only [hsigned, Bool.false_eq_true, if_false]
+    exact (h.2 mc.1 mc.2 hsigned).symm
+
+omit [SampleableType Stmt] [SampleableType Wit] [Fintype Chal] [SampleableType Chal] in
+/-- The overlay invariant is preserved by `phaseCRecordHash`: both caches are
+updated identically at the new key (preserving `visible ≤ overlay`) and the new
+key either coincides with an already-signed message (vacuously satisfying
+`agreesAwayFromSigned`) or genuinely extends both caches with the same value. -/
+private lemma phaseCOverlayInvariant_phaseCRecordHash
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (h : phaseCOverlayInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st)
+    (mc : M × Commit) (ω : Chal) :
+    phaseCOverlayInvariant (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st mc ω) := by
+  refine ⟨?_, ?_⟩
+  · classical
+    intro t u hu
+    change (st.visibleCache.cacheQuery (.inr mc) ω) t = some u at hu
+    change (st.overlayCache.cacheQuery (.inr mc) ω) t = some u
+    by_cases ht : t = .inr mc
+    · subst ht
+      simp only [QueryCache.cacheQuery_self] at hu ⊢
+      exact hu
+    · rw [QueryCache.cacheQuery_of_ne _ _ ht] at hu
+      rw [QueryCache.cacheQuery_of_ne _ _ ht]
+      exact h.1 hu
+  · classical
+    intro msg c hsigned
+    have hsigned' : phaseCWasSigned (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) st msg = false := hsigned
+    change (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        st mc ω).overlayCache (.inr (msg, c)) =
+      (phaseCRecordHash (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        st mc ω).visibleCache (.inr (msg, c))
+    unfold phaseCRecordHash
+    by_cases hkey : (msg, c) = mc
+    · subst hkey
+      simp only [QueryCache.cacheQuery_self]
+    · have hne : (Sum.inr (msg, c) :
+          (unifSpec + (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr mc := by
+        intro heq
+        exact hkey (Sum.inr.inj heq)
+      change (st.overlayCache.cacheQuery (.inr mc) ω) (.inr (msg, c)) =
+        (st.visibleCache.cacheQuery (.inr mc) ω) (.inr (msg, c))
+      rw [QueryCache.cacheQuery_of_ne _ _ hne, QueryCache.cacheQuery_of_ne _ _ hne]
+      exact h.2 msg c hsigned'
 
 private def phaseCBad
     (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) : Prop :=
@@ -630,23 +917,402 @@ private noncomputable def managedRoNmaExpExt : SPMF (Bool × Bool) :=
        st.extSignLog.wasQueried msg)
     pure (wasSigned, verified)
 
-omit [Fintype Chal] in
+/-- Projection from the rich Phase C state down to the extended managed-RO state:
+drop the visible cache and the `bad` flag, retaining only the overlay cache (which
+becomes the live cache) and the sign log (which becomes the extended sign log).
+
+Under `phaseCOverlayInvariant`, the visible cache is dominated by the overlay cache
+and they agree away from signed messages, so the dropped fields contribute no
+observable behaviour to the `(wasSigned, verified)` marginal. -/
+private def phaseCToExtProj
+    (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) :
+    ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) :=
+  ⟨st.overlayCache, st.signLog⟩
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Wit]
+    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
+/-- The projection sends `phaseCInitState` to the initial state of
+`managedRoNmaExpExt`. -/
+private lemma phaseCToExtProj_phaseCInitState :
+    phaseCToExtProj (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        (phaseCInitState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) =
+      ⟨∅, []⟩ := rfl
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Chal] in
+/-- The Phase C signing-simulator implementation preserves
+`phaseCAgreesAwayFromSigned` across a single `phaseCSimSignImpl pk msg` step.
+The new sign log marks `msg` as signed, so `agreesAwayFromSigned` becomes
+vacuous at any key `(msg, c')`. For every other message `msg' ≠ msg` the
+overlay cache is unchanged at all keys `(msg', c')` and the visible cache is
+unchanged everywhere, so the equation transports from the input state.
+
+(The stronger `visibleCache ≤ overlayCache` part of `phaseCOverlayInvariant`
+is NOT preserved by the simulator: when the simulator's freshly sampled `ω`
+collides with a prior visible-cache entry at `(msg, c)`, the overlay is
+overwritten to `ω` while the visible cache retains the old value. This
+collision is exactly the `bad` event tracked by `phaseCSimSignImpl` and
+bounded by `probEvent_bad_simPhaseCExp_le_collisionSlack` (C6).) -/
+private lemma phaseCAgreesAwayFromSigned_phaseCSimSignImpl
+    (msg₀ : M)
+    (s : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (hs : phaseCAgreesAwayFromSigned
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s)
+    (c : Commit) (ω : Chal) (sresp : Resp) (b' : Bool) :
+    phaseCAgreesAwayFromSigned
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      { s with
+          overlayCache := s.overlayCache.cacheQuery (.inr (msg₀, c)) ω
+          signLog := s.signLog.logQuery msg₀ (c, sresp)
+          bad := b' } := by
+  classical
+  letI : DecidableEq (Commit × Resp) := Classical.decEq _
+  intro msg' c' hsigned'
+  -- Unfold `phaseCWasSigned` and `wasQueried` in `hsigned'` to expose the list.
+  have hsigned_list :
+      (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') = [] := by
+    have h := hsigned'
+    unfold phaseCWasSigned at h
+    simp only [QueryLog.wasQueried, ne_eq,
+      decide_eq_false_iff_not, Decidable.not_not] at h
+    -- After simp, `h` should yield the list emptiness.
+    -- Fall back: case-split on Bool form.
+    by_cases hl : (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') = []
+    · exact hl
+    · exfalso
+      have : ((s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') ≠ []) := hl
+      simp [this] at h
+  -- From the list emptiness, derive `msg' ≠ msg₀` and old emptiness.
+  have hsplit :
+      (s.signLog.logQuery msg₀ (c, sresp)).getQ (· = msg') =
+        s.signLog.getQ (· = msg') ++
+          (QueryLog.singleton (spec := M →ₒ (Commit × Resp)) msg₀ (c, sresp)).getQ
+            (· = msg') := by
+    simp [QueryLog.logQuery]
+  rw [hsplit] at hsigned_list
+  rw [QueryLog.getQ_singleton] at hsigned_list
+  have hsing_empty :
+      (if msg₀ = msg' then [⟨msg₀, (c, sresp)⟩] else
+        ([] : List ((t : (M →ₒ (Commit × Resp)).Domain) ×
+          (M →ₒ (Commit × Resp)).Range t))) = [] := by
+    have := List.append_eq_nil_iff.mp hsigned_list
+    exact this.2
+  have hne : msg' ≠ msg₀ := by
+    intro heq
+    subst heq
+    simp at hsing_empty
+  have hold_empty : s.signLog.getQ (· = msg') = [] :=
+    (List.append_eq_nil_iff.mp hsigned_list).1
+  have hsigned_old : phaseCWasSigned
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s msg' = false := by
+    unfold phaseCWasSigned QueryLog.wasQueried
+    simp [hold_empty]
+  have hkey : (Sum.inr (msg', c') :
+      (unifSpec + (M × Commit →ₒ Chal)).Domain) ≠ Sum.inr (msg₀, c) := by
+    intro heq
+    have hmc : (msg', c') = (msg₀, c) := Sum.inr.inj heq
+    exact hne (Prod.mk.inj hmc).1
+  change (s.overlayCache.cacheQuery (.inr (msg₀, c)) ω) (.inr (msg', c')) =
+    s.visibleCache (.inr (msg', c'))
+  rw [QueryCache.cacheQuery_of_ne _ _ hkey]
+  exact hs msg' c' hsigned_old
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Chal] in
+/-- The Phase C implementation projects under `phaseCToExtProj` to the extended
+managed-RO implementation, starting from a state satisfying `phaseCWeakInvariant`.
+
+* `phaseCUnifImpl` and `unifSimImplExt` are pure forwarders, hence unconditional.
+* `phaseCHashImpl` and `roSimImplExt` agree on the cached value because, by
+  `phaseCHashLookup_eq_overlayCache_of_weak`, `phaseCHashLookup` collapses to a
+  direct overlay-cache lookup under the weak invariant; on a cache miss both
+  sides forward to the same outer query and store at the same key.
+* `phaseCSimSignImpl` and `sigSimImplExt` derive `(c, ω, sresp)` from the same
+  inner `simulateQ ... (simTranscript pk)`, then update the overlay/cache and
+  sign log identically. The `bad` flag and the `visibleCache` updates of
+  `phaseCSimSignImpl` are dropped by `phaseCToExtProj`. -/
+private lemma phaseCImpl_proj_eq_of_weak (pk : Stmt)
+    (t : (PhaseCOuterSpec + (M →ₒ (Commit × Resp))).Domain)
+    (s : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (hs : phaseCWeakInvariant
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s) :
+    Prod.map id (phaseCToExtProj M
+        (Commit := Commit) (Chal := Chal) (Resp := Resp)) <$>
+      ((phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        phaseCSimSignImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk) t).run s =
+      ((baseSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        sigSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk) t).run
+        (phaseCToExtProj M (Commit := Commit) (Chal := Chal) (Resp := Resp) s) := by
+  classical
+  -- Per-query commutation of `phaseCUnifImpl` and `unifSimImplExt` with the projection.
+  have hUnif : ∀ (n : ℕ)
+      (st : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)),
+      Prod.map id (phaseCToExtProj M) <$>
+        (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) n).run st =
+        (unifSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) n).run
+          (phaseCToExtProj M st) := by
+    intro n st
+    -- Both `phaseCUnifImpl n` and `unifSimImplExt n` are
+    -- `liftM (query (.inl n))` over their respective state types, so
+    -- their runs are `query >>= fun a => pure (a, state)`. The projection
+    -- factors through.
+    change Prod.map id (phaseCToExtProj M) <$>
+      ((liftM (query (spec := PhaseCOuterSpec) (.inl n)) :
+          OracleComp PhaseCOuterSpec _) >>= fun a => pure (a, st)) =
+      ((liftM (query (spec := PhaseCOuterSpec) (.inl n)) :
+          OracleComp PhaseCOuterSpec _) >>= fun a => pure (a, phaseCToExtProj M st))
+    simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def,
+      Prod.map_apply, id_eq]
+  match t with
+  | .inl (.inl n) =>
+      simp only [QueryImpl.add_apply_inl, phaseCBaseImpl, baseSimImplExt]
+      exact hUnif n s
+  | .inl (.inr mc) =>
+      simp only [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr,
+        phaseCBaseImpl, baseSimImplExt]
+      change Prod.map id (phaseCToExtProj M) <$>
+          (phaseCHashImpl
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) mc).run s =
+          (roSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) mc).run
+            (phaseCToExtProj M s)
+      simp only [phaseCHashImpl, roSimImplExt, StateT.run_bind, StateT.run_get,
+        pure_bind]
+      have hlookup := phaseCHashLookup_eq_overlayCache_of_weak
+        (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s hs mc
+      have hproj : (phaseCToExtProj M (Commit := Commit) (Chal := Chal)
+              (Resp := Resp) s).cache (.inr mc) = s.overlayCache (.inr mc) := rfl
+      rw [hlookup, hproj]
+      cases hov : s.overlayCache (.inr mc) with
+      | some ω =>
+          simp [StateT.run_pure, Prod.map_apply]
+      | none =>
+          -- Both sides reduce to:
+          -- `liftM (query (.inr mc)) >>= fun ω =>
+          --   pure (ω, ⟨s.overlayCache.cacheQuery (.inr mc) ω, s.signLog⟩)`.
+          change Prod.map id (phaseCToExtProj M) <$>
+            ((liftM (query (spec := PhaseCOuterSpec) (.inr mc)) :
+                OracleComp PhaseCOuterSpec _) >>= fun ω =>
+              pure (ω, phaseCRecordHash M s mc ω)) =
+            ((liftM (query (spec := PhaseCOuterSpec) (.inr mc)) :
+                OracleComp PhaseCOuterSpec _) >>= fun ω =>
+              pure (ω, ⟨(phaseCToExtProj M s).cache.cacheQuery (.inr mc) ω,
+                (phaseCToExtProj M s).extSignLog⟩))
+          simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def,
+            Prod.map_apply, id_eq]
+          rfl
+  | .inr msg =>
+      simp only [QueryImpl.add_apply_inr]
+      change Prod.map id (phaseCToExtProj M) <$>
+          (phaseCSimSignImpl
+              (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+              simTranscript pk msg).run s =
+        (sigSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk msg).run (phaseCToExtProj M s)
+      simp only [phaseCSimSignImpl, sigSimImplExt, StateT.run_bind,
+        StateT.run_modify, StateT.run_pure, StateT.run_get, pure_bind,
+        map_eq_bind_pure_comp, bind_assoc, Function.comp_def]
+      have hinner :=
+        OracleComp.ProgramLogic.Relational.map_run_simulateQ_eq_of_query_map_eq'
+          (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          (unifSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          (phaseCToExtProj M (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          hUnif (simTranscript pk) s
+      rw [← hinner]
+      simp only [map_eq_bind_pure_comp, bind_assoc, pure_bind, Function.comp_def]
+      apply bind_congr
+      intro ⟨cωs, s'⟩
+      rfl
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Chal] in
+/-- The weak invariant is preserved by every step of the Phase C implementation.
+
+* Unif queries do not modify the state, so the invariant survives trivially.
+* Hash queries modify the state via `phaseCRecordHash` on a cache miss; this is
+  exactly `phaseCWeakInvariant_phaseCRecordHash`.
+* Sign queries modify the state with the same shape as
+  `phaseCWeakInvariant_phaseCSimSignImpl`. -/
+private lemma phaseCWeakInvariant_phaseCImpl (pk : Stmt)
+    (t : (PhaseCOuterSpec + (M →ₒ (Commit × Resp))).Domain)
+    (s : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    (hs : phaseCWeakInvariant
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s) :
+    ∀ y ∈ support (m := OracleComp PhaseCOuterSpec)
+      (((phaseCBaseImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        phaseCSimSignImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk) t).run s),
+    phaseCWeakInvariant
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) y.2 := by
+  classical
+  match t with
+  | .inl (.inl n) =>
+      intro y hy
+      have hy' : y ∈ support (m := OracleComp PhaseCOuterSpec)
+          ((phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) n).run s) :=
+        by simpa [QueryImpl.add_apply_inl, phaseCBaseImpl] using hy
+      -- `phaseCUnifImpl n` is `StateT.lift (liftM (query (.inl n)))`, so
+      -- its run on `s` does not change the state.
+      change y ∈ support
+        ((liftM (m := OracleComp PhaseCOuterSpec)
+          (query (spec := PhaseCOuterSpec) (.inl n))) >>= fun a => pure (a, s)) at hy'
+      rcases (mem_support_bind_iff _ _ _).1 hy' with ⟨a, _, hv⟩
+      have hv' : y = (a, s) := by
+        simpa using hv
+      subst hv'
+      exact hs
+  | .inl (.inr mc) =>
+      intro y hy
+      have hy' : y ∈ support (m := OracleComp PhaseCOuterSpec)
+          ((phaseCHashImpl
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) mc).run s) := by
+        simpa [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr,
+          phaseCBaseImpl] using hy
+      simp only [phaseCHashImpl, StateT.run_bind, StateT.run_get, pure_bind] at hy'
+      cases hlk : phaseCHashLookup
+          (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s mc with
+      | some ω =>
+          rw [hlk] at hy'
+          simp only [StateT.run_pure, support_pure] at hy'
+          subst hy'
+          exact hs
+      | none =>
+          rw [hlk] at hy'
+          -- `do let v ← liftM (query (.inr mc)); set (phaseCRecordHash s mc v); pure v`
+          change y ∈ support
+            ((liftM (m := OracleComp PhaseCOuterSpec)
+              (query (spec := PhaseCOuterSpec) (.inr mc))) >>= fun v =>
+                pure (v, phaseCRecordHash M s mc v)) at hy'
+          rcases (mem_support_bind_iff _ _ _).1 hy' with ⟨v, _, hv⟩
+          have hv' : y = (v, phaseCRecordHash M s mc v) := by
+            simpa using hv
+          subst hv'
+          exact phaseCWeakInvariant_phaseCRecordHash
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s hs mc v
+  | .inr msg =>
+      intro y hy
+      have hy' : y ∈ support (m := OracleComp PhaseCOuterSpec)
+          ((phaseCSimSignImpl
+              (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+              simTranscript pk msg).run s) := by
+        simpa [QueryImpl.add_apply_inr] using hy
+      -- The body unfolds to `simulateQ phaseCUnifImpl (simTranscript pk) s`
+      -- followed by a state update.
+      change y ∈ support (do
+        let p ← (simulateQ
+            (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+            (simTranscript pk)).run s
+        let st := p.2
+        let hit := phaseCHit
+            (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) st (msg, p.1.1)
+        pure ((p.1.1, p.1.2.2),
+          { st with
+              overlayCache := st.overlayCache.cacheQuery (.inr (msg, p.1.1)) p.1.2.1
+              signLog := st.signLog.logQuery msg (p.1.1, p.1.2.2)
+              bad := st.bad || hit })) at hy'
+      rcases (mem_support_bind_iff _ _ _).1 hy' with ⟨⟨⟨c, ω, sresp⟩, s'⟩, hsim, hpost⟩
+      have hpost' : y = ((c, sresp),
+          { s' with
+              overlayCache := s'.overlayCache.cacheQuery (.inr (msg, c)) ω
+              signLog := s'.signLog.logQuery msg (c, sresp)
+              bad := s'.bad ||
+                phaseCHit
+                  (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) s' (msg, c) }) := by
+        simpa using hpost
+      subst hpost'
+      -- `simulateQ phaseCUnifImpl _` is state-preserving, so `s' = s`.
+      have hs' : s' = s := by
+        have hpres : ∀ (oa : ProbComp (Commit × Chal × Resp))
+            (σ0 : PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+            (z : (Commit × Chal × Resp) ×
+              PhaseCState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)),
+            z ∈ support (m := OracleComp PhaseCOuterSpec)
+              ((simulateQ
+                  (phaseCUnifImpl
+                    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+                  oa).run σ0) → z.2 = σ0 := by
+          intro oa
+          induction oa using OracleComp.inductionOn with
+          | pure a =>
+              intro σ0 z hz
+              simp only [simulateQ_pure, StateT.run_pure,
+                support_pure, Set.mem_singleton_iff] at hz
+              exact congrArg Prod.snd hz
+          | query_bind t oa ih =>
+              intro σ0 z hz
+              have hz' :
+                  z ∈ support (m := OracleComp PhaseCOuterSpec)
+                    (((simulateQ
+                        (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
+                          (Resp := Resp))
+                        (liftM (OracleQuery.query t) :
+                          ProbComp (unifSpec.Range t))).run σ0) >>=
+                      fun us => (simulateQ
+                        (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
+                          (Resp := Resp)) (oa us.1)).run us.2) := by
+                simpa [simulateQ_bind, OracleComp.liftM_def] using hz
+              rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hcont⟩
+              have husrun :
+                  (simulateQ
+                      (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
+                        (Resp := Resp))
+                      (liftM (OracleQuery.query t) :
+                        ProbComp (unifSpec.Range t))).run σ0 =
+                    ((phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
+                      (Resp := Resp)) t).run σ0 := by
+                simp [OracleQuery.query_def, simulateQ_query]
+              rw [husrun] at hus
+              -- `phaseCUnifImpl t = StateT.lift _`, so `us.2 = σ0`.
+              have hphase : us.2 = σ0 := by
+                change us ∈ support
+                  ((liftM (m := OracleComp PhaseCOuterSpec)
+                    (query (spec := PhaseCOuterSpec) (.inl t))) >>=
+                    fun a => pure (a, σ0)) at hus
+                rcases (mem_support_bind_iff _ _ _).1 hus with ⟨a, _, husc⟩
+                have husc' : us = (a, σ0) := by
+                  simpa using husc
+                exact congrArg Prod.snd husc'
+              have := ih us.1 us.2 z hcont
+              rw [this, hphase]
+        exact hpres (simTranscript pk) s ((c, ω, sresp), s') hsim
+      subst s'
+      exact phaseCWeakInvariant_phaseCSimSignImpl
+        (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+        msg s hs c ω sresp _
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Wit] in
 /-- **C7a.** The `freshSuccess` probability of `simPhaseCExp` is at most the
 `!wasSigned && verified` probability in the extended managed-RO experiment.
 
-The core state-projection step: under `phaseCOverlayInvariant`, the hash
-behaviour of `phaseCHashImpl` agrees with `roSimImpl` via the projection
-`st ↦ st.overlayCache`. The signing simulators agree on `(c, s)` output
-and both record `(msg, c) ↦ ω`. For unsigned messages, verification through
-`phaseCBaseImpl` reduces to the same outer-oracle lookup as direct verification.
+This is the deepest state-projection step in the Phase C bridge. The
+infrastructure in place factors the proof into two layers:
 
-The proof should proceed by:
-1. Defining the state relation `R st extSt` connecting `PhaseCState` to
-   `ManagedRoExtState` (overlayCache = cache, signLog = extSignLog, invariant holds)
-2. Showing each query implementation preserves `R` and produces the same output
-3. Applying `relTriple_simulateQ_run` (or a direct induction) to transport
-   the output equality through the full simulation
-4. Showing verification agrees on the `!wasSigned` branch -/
+1. **Adversary-phase projection** (built):
+   `phaseCImpl_proj_eq_of_weak` shows that
+   `phaseCBaseImpl + phaseCSimSignImpl simTranscript pk` projects via
+   `phaseCToExtProj : PhaseCState → ManagedRoExtState` to
+   `baseSimImplExt + sigSimImplExt simTranscript pk`, *under* the weak invariant
+   `phaseCWeakInvariant`. `phaseCWeakInvariant_phaseCImpl` shows the invariant
+   is preserved across each query type. Combined with
+   `map_run_simulateQ_eq_of_query_map_eq_inv'` from `ProgramLogic.Relational`,
+   this yields a state-projected equality
+   `Prod.map id phaseCToExtProj <$> (simulateQ realImpl (adv.main pk)).run init
+     = (simulateQ extImpl (adv.main pk)).run (phaseCToExtProj init)`
+   inside the inner `OracleComp PhaseCOuterSpec`.
+
+2. **Verify-side cache transparency** (still missing):
+   After step 1, the only remaining gap between LHS and RHS is the verify step.
+   `simPhaseCExp` runs `(simulateQ phaseCBaseImpl (verify pk msg sig)).run' st`
+   while `managedRoNmaExpExt` runs `verify pk msg sig` directly. On the
+   `!wasSigned msg` branch, `phaseCHashLookup_eq_overlayCache_of_weak` collapses
+   the LHS verify's hash lookup to `overlayCache (.inr (msg, sig.1))`, which
+   under the projection equals `(phaseCToExtProj st).cache (.inr (msg, sig.1))`.
+   This is the explicit cache that mirrors the outer random oracle's cache
+   inside `(runtime M).evalDist`. The remaining argument requires a
+   "cache transparency" lemma stating that, when the explicit cache state
+   matches the outer RO's cache, an explicit cache lookup is observationally
+   equivalent to a fresh outer query. This is naturally a property of the
+   `runtime M` semantics (`SPMFSemantics.withStateOracle` of `randomOracle`)
+   and would live in `ProgramLogic.Relational` or
+   `OracleComp.SimSemantics.BundledSemantics`. -/
 private lemma probEvent_freshSuccess_simPhaseCExp_le_ext :
     Pr[= true |
         PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
@@ -755,7 +1421,7 @@ private lemma probEvent_ext_le_managedRoAdvantage :
           (fun t s => extImpl_proj_eq M simTranscript pk t s)
           (adv.main pk) _
 
-omit [Fintype Chal] in
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Wit] in
 /-- **C7.** State-projection alignment between `simPhaseCExp` and
 `managedRoNmaExp (nmaAdvFromHVZK)` on the `freshSuccess = !wasSigned ∧ verified`
 event. Composes C7a (state-projection) and C7b (event monotonicity + state erasure). -/
