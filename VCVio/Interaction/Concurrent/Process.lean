@@ -7,6 +7,7 @@ import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
 import VCVio.Interaction.Multiparty.Core
 import ToMathlib.Control.Coalgebra
+import Mathlib.Data.PFunctor.Univariate.M
 
 /-!
 # Dynamic concurrent processes
@@ -480,6 +481,98 @@ structure System (Γ : Interaction.Spec.Node.Context.{w, w₂}) extends toProces
   assumptions : Proc → Prop := fun _ => True
   safe : Proc → Prop := fun _ => True
   inv : Proc → Prop := fun _ => True
+
+/-! ### Polynomial-coalgebra behavior
+
+`StepOver.toPFunctor Γ` (from S3) exhibits one episode of `Γ`-decorated
+interaction as a polynomial functor. Its terminal coalgebra is the M-type
+`PFunctor.M (StepOver.toPFunctor Γ)`: the type of all possibly-infinite
+trees of step protocols.
+
+Every `ProcessOver Γ` is canonically a coalgebra for this polynomial
+functor (`process.step` composed with the polynomial bridge `equivObj`),
+so the universal property of M-types gives a unique coalgebra
+homomorphism `behavior : process.Proc → M (StepOver.toPFunctor Γ)`. This
+function records, at each residual state, the observable infinite tree
+of step protocols obtained by repeatedly running `process.step`.
+
+The universal property is concretely the "bisimulation by uniqueness"
+principle: any candidate behavior function that respects the coalgebra
+structure must equal the canonical one. Equality of behavior trees is
+therefore the canonical observational equivalence on residual states,
+agreeing on the nose with any relational bisimulation witness one might
+construct via `Concurrent.Refinement.Bisimulation`. -/
+
+/-- The terminal coalgebra of `StepOver.toPFunctor Γ`: the type of
+possibly-infinite trees of `Γ`-decorated step protocols. Each such tree
+records one complete observable behavior of a `ProcessOver Γ` from a
+chosen seed state. -/
+abbrev Behavior (Γ : Interaction.Spec.Node.Context.{w, w₂}) :
+    Type (max (w + 1) w₂) :=
+  PFunctor.M (StepOver.toPFunctor Γ)
+
+/-- The unique coalgebra homomorphism from `process` into the terminal
+`StepOver.toPFunctor Γ`-coalgebra. Each residual state is mapped to its
+observable behavior tree. -/
+def behavior {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    (process : ProcessOver.{v, w, w₂} Γ) :
+    process.Proc → Behavior.{w, w₂} Γ :=
+  PFunctor.M.corec (fun p => StepOver.equivObj (process.step p))
+
+/-- The defining equation of `behavior`: destructing the behavior tree at a
+state recovers one step protocol from `process.step`, with each subtree
+obtained by applying `behavior` to the corresponding continuation. -/
+@[simp]
+theorem dest_behavior {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    (process : ProcessOver.{v, w, w₂} Γ) (p : process.Proc) :
+    PFunctor.M.dest (process.behavior p) =
+      (StepOver.toPFunctor Γ).map process.behavior
+        (StepOver.equivObj (process.step p)) :=
+  PFunctor.M.dest_corec _ _
+
+/-- **Bisimulation by uniqueness.** Any function `f : process.Proc → Behavior Γ`
+that commutes with the coalgebra structure (i.e., that satisfies the
+coalgebra-homomorphism diagram for the M-type) agrees with `process.behavior`
+on the nose. This is the universal property of `M (StepOver.toPFunctor Γ)`
+as the terminal `StepOver.toPFunctor Γ`-coalgebra. -/
+theorem behavior_unique {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    (process : ProcessOver.{v, w, w₂} Γ)
+    (f : process.Proc → Behavior.{w, w₂} Γ)
+    (hf : ∀ p, PFunctor.M.dest (f p) =
+      (StepOver.toPFunctor Γ).map f (StepOver.equivObj (process.step p))) :
+    f = process.behavior :=
+  PFunctor.M.corec_unique _ f hf
+
+/-- Two residual states (possibly in different processes over the same
+context) are **observationally equivalent** when their behavior trees are
+equal. By `behavior_unique`, this is the strongest equivalence preserved
+by every `StepOver Γ`-coalgebra homomorphism. -/
+def ObsEq {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    (process₁ process₂ : ProcessOver.{v, w, w₂} Γ)
+    (p₁ : process₁.Proc) (p₂ : process₂.Proc) : Prop :=
+  process₁.behavior p₁ = process₂.behavior p₂
+
+/-- Observational equivalence is reflexive (within a fixed process). -/
+@[refl]
+theorem ObsEq.refl {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    (process : ProcessOver.{v, w, w₂} Γ) (p : process.Proc) :
+    ObsEq process process p p := rfl
+
+/-- Observational equivalence is symmetric. -/
+@[symm]
+theorem ObsEq.symm {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    {process₁ process₂ : ProcessOver.{v, w, w₂} Γ}
+    {p₁ : process₁.Proc} {p₂ : process₂.Proc}
+    (h : ObsEq process₁ process₂ p₁ p₂) :
+    ObsEq process₂ process₁ p₂ p₁ := Eq.symm h
+
+/-- Observational equivalence is transitive. -/
+theorem ObsEq.trans {Γ : Interaction.Spec.Node.Context.{w, w₂}}
+    {process₁ process₂ process₃ : ProcessOver.{v, w, w₂} Γ}
+    {p₁ : process₁.Proc} {p₂ : process₂.Proc} {p₃ : process₃.Proc}
+    (h₁₂ : ObsEq process₁ process₂ p₁ p₂)
+    (h₂₃ : ObsEq process₂ process₃ p₂ p₃) :
+    ObsEq process₁ process₃ p₁ p₃ := Eq.trans h₁₂ h₂₃
 
 end ProcessOver
 
