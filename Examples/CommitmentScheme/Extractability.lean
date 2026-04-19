@@ -284,12 +284,12 @@ private def extractabilityRestOa {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C)) :
     OracleComp (CMOracle M S C) Bool :=
-  A.open_ aux >>= fun (m, s) =>
-    ((CMOracle M S C).query (m, s) : OracleComp (CMOracle M S C) _) >>= fun c =>
+  A.open_ aux >>= fun (m, s) => do
+    let c ← (CMOracle M S C).query (m, s)
     let extracted := CMExtract cm tr
-    pure (match extracted with
+    return match extracted with
       | some (m', s') => (c == cm) && decide ((m', s') ≠ (m, s))
-      | none => (c == cm))
+      | none => (c == cm)
 
 set_option maxHeartbeats 400000 in
 /- Under a collision-free commit cache, any extractability win must create a fresh

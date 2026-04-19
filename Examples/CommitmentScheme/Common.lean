@@ -59,21 +59,25 @@ lemma probEvent_from_fresh_query_le_inv
       Pr[ fun z => z.1 = true |
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)] = 0) :
     Pr[fun z => z.1 = true |
-      (simulateQ cachingOracle
-        (((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>= cont)).run cache₀] ≤
+      (simulateQ (CMOracle M S C).cachingOracle do
+        let u ← (CMOracle M S C).query t
+        cont u).run cache₀] ≤
       (Fintype.card C : ℝ≥0∞)⁻¹ := by
   have hrun :
-      (simulateQ cachingOracle
-        (((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>= cont)).run cache₀ =
-      (((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>= fun u =>
+      (simulateQ (CMOracle M S C).cachingOracle do
+        let u ← (CMOracle M S C).query t
+        cont u).run cache₀ =
+      (do
+        let u ← (CMOracle M S C).query t
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)) := by
     simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
     have hstep :
         (liftM ((CMOracle M S C).cachingOracle t) :
           StateT (QueryCache (CMOracle M S C))
             (OracleComp (CMOracle M S C)) _).run cache₀ =
-        ((CMOracle M S C).query t : OracleComp (CMOracle M S C) _) >>= fun u =>
-          pure (u, cache₀.cacheQuery t u) := by
+        (do
+          let u ← (CMOracle M S C).query t
+          pure (u, cache₀.cacheQuery t u)) := by
       simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
         StateT.run_bind, StateT.run_get, pure_bind, hfresh]
       change (StateT.lift (PFunctor.FreeM.lift ((CMOracle M S C).query t)) cache₀ >>= _) = _
