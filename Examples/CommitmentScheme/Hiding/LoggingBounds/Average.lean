@@ -314,7 +314,7 @@ theorem hidingReal_eq_impl₁ {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) (s : S) :
     hidingReal A s = (simulateQ (hidingImpl₁ s) (hidingOa A s)).run' (∅, 0) := by
   rw [hidingReal_eq A s]
-  exact (OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq'
+  exact (OracleComp.run'_simulateQ_eq_of_query_map_eq'
     (hidingImpl₁ s) cachingOracle Prod.fst (fun ms st => by
       obtain ⟨cache, cnt⟩ := st
       simp only [hidingImpl₁, cachingOracle, QueryImpl.withCaching_apply,

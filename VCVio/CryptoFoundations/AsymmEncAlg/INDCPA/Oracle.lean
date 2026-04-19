@@ -372,7 +372,7 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
         (cache, n)) =
       evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache) := by
     simpa using congrArg evalDist
-      (OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq
+      (OracleComp.run'_simulateQ_eq_of_query_map_eq
         (impl₁ := encAlg'.IND_CPA_queryImpl'_counted pk b)
         (impl₂ := encAlg'.IND_CPA_queryImpl' pk b)
         (proj := Prod.fst)
@@ -437,7 +437,7 @@ theorem IND_CPA_LR_hybridGame_zero_evalDist_eq_right
   congr 1
   funext ⟨pk, _sk⟩
   simpa using congrArg evalDist
-    (OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq
+    (OracleComp.run'_simulateQ_eq_of_query_map_eq
       (impl₁ := encAlg'.IND_CPA_queryImpl_hybridLR_counted pk 0)
       (impl₂ := encAlg'.IND_CPA_queryImpl' pk false)
       (proj := Prod.fst)
