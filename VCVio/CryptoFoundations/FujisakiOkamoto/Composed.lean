@@ -54,8 +54,8 @@ def singleROOracleImpl {PKHash M R K : Type}
   match cache inp with
   | some out => return out
   | none =>
-      let r ← liftM ($ᵗ R : ProbComp R)
-      let k ← liftM ($ᵗ K : ProbComp K)
+      let r ← ($ᵗ R : ProbComp R)
+      let k ← ($ᵗ K : ProbComp K)
       let out : R × K := (r, k)
       set (cache.cacheQuery inp out)
       return out

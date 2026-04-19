@@ -61,8 +61,8 @@ section HasQueryObs
 variable {m : Type u → Type*} [Monad m]
 
 /-- Emit an observation event into any monad with observation query capability. -/
-def observe [HasQuery (ObsSpec Ev) m] (e : Ev) : m PUnit :=
-  HasQuery.query (spec := ObsSpec Ev) e
+def observe [MonadLiftT (OracleQuery (ObsSpec Ev)) m] (e : Ev) : m PUnit :=
+  (ObsSpec Ev).query e
 
 namespace HasQuery
 

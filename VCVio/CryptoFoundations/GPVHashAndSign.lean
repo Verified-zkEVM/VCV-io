@@ -6,7 +6,6 @@ Authors: Quang Dao
 
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
@@ -119,17 +118,17 @@ def GPVHashAndSign
     (hr : GenerableRelation PK SK p)
     (M Salt : Type) [DecidableEq M] [DecidableEq Salt] [SampleableType Salt]
     [DecidableEq Range] [SampleableType Range]
-    [MonadLiftT ProbComp m] [HasQuery (Salt × M →ₒ Range) m] :
+    [MonadLiftT ProbComp m] [MonadLiftT (OracleQuery (Salt × M →ₒ Range)) m] :
     SignatureAlg m
       (M := M) (PK := PK) (SK := SK) (S := Salt × Domain) where
   keygen := liftM hr.gen
   sign := fun pk sk msg => do
     let r ← ($ᵗ Salt : ProbComp Salt)
-    let c ← HasQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
+    let c ← (Salt × M →ₒ Range).query (r, msg)
     let s ← psf.trapdoorSample pk sk c
     pure (r, s)
   verify := fun pk msg (r, s) => do
-    let c ← HasQuery.query (spec := (Salt × M →ₒ Range)) (r, msg)
+    let c ← (Salt × M →ₒ Range).query (r, msg)
     pure (decide (psf.eval pk s = c) && psf.isShort s)
 
 namespace GPVHashAndSign

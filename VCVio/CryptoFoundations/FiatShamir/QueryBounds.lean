@@ -78,7 +78,7 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
       OracleComp (unifSpec + (M × Commit →ₒ Chal)) α)
     (Q : ℕ) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := liftM (query (spec := unifSpec + (M × Commit →ₒ Chal)) t) >>= oa) Q ↔
+      (oa := liftM ((unifSpec + (M × Commit →ₒ Chal)).query t) >>= oa) Q ↔
       (match t with
       | .inl _ => True
       | .inr _ => 0 < Q) ∧
@@ -115,7 +115,7 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
 lemma nmaHashQueryBound_query_iff
     (t : (unifSpec + (M × Commit →ₒ Chal)).Domain) (Q : ℕ) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := liftM (query (spec := unifSpec + (M × Commit →ₒ Chal)) t)) Q ↔
+      (oa := liftM ((unifSpec + (M × Commit →ₒ Chal)).query t)) Q ↔
       match t with
       | .inl _ => True
       | .inr _ => 0 < Q := by
@@ -197,7 +197,7 @@ lemma nmaHashQueryBound_liftComp_zero {α : Type}
       rw [OracleComp.liftComp_bind]
       refine nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
         (oa := OracleComp.liftComp
-          (liftM (query (spec := unifSpec) t) : OracleComp unifSpec _)
+          ($[0..t])
           (unifSpec + (M × Commit →ₒ Chal)))
         (ob := fun u => OracleComp.liftComp (mx u) (unifSpec + (M × Commit →ₒ Chal)))
         (Q₁ := 0) (Q₂ := 0) ?_ ?_

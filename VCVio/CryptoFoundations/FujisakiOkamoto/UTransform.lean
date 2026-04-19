@@ -122,7 +122,7 @@ def coinOracleImpl {M R KD K : Type} [DecidableEq M] [SampleableType R] :
   match st.1 msg with
   | some r => return r
   | none =>
-      let r ← liftM ($ᵗ R : ProbComp R)
+      let r ← ($ᵗ R : ProbComp R)
       set (st.1.cacheQuery msg r, st.2)
       return r
 
@@ -133,7 +133,7 @@ def keyOracleImpl {M R KD K : Type} [DecidableEq KD] [SampleableType K] :
   match st.2 kd with
   | some k => return k
   | none =>
-      let k ← liftM ($ᵗ K : ProbComp K)
+      let k ← ($ᵗ K : ProbComp K)
       set (st.1, st.2.cacheQuery kd k)
       return k
 

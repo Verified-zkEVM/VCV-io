@@ -204,24 +204,24 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
       -- Summing: ≤ C⁻¹ + (n-1)*C⁻¹ = n*C⁻¹
       -- Key: the "match" terms sum to ≤ C⁻¹ because Pr[=u|query t] ≤ 1/|Range t| ≤ C⁻¹
       -- and at most one u satisfies HEq u v₀ (when types match).
-      calc ∑' u, Pr[= u | (liftM (query t) : OracleComp spec _)] *
+      calc ∑' u, Pr[= u | (spec.query t : OracleComp spec _)] *
             Pr[fun z => ∃ t₀ v, z.2 t₀ = some v ∧ cache₀ t₀ = none ∧ HEq v v₀ |
               (simulateQ cachingOracle (mx u)).run (cache₀.cacheQuery t u)]
           ≤ ∑' u, ((if HEq u v₀ then C⁻¹ else 0) +
-              Pr[= u | (liftM (query t) : OracleComp spec _)] *
+              Pr[= u | (spec.query t : OracleComp spec _)] *
                 (((n - 1 : ℕ) : ℝ≥0∞) * C⁻¹)) := by
             refine ENNReal.tsum_le_tsum fun u => ?_
             by_cases h : HEq u v₀
             · -- Match: Pr[=u] * inner ≤ Pr[=u] ≤ C⁻¹ ≤ C⁻¹ + rest
               simp only [h, ite_true]
-              calc Pr[= u | (liftM (query t) : OracleComp spec _)] *
+              calc Pr[= u | (spec.query t : OracleComp spec _)] *
                     Pr[fun z => ∃ t₀ v, z.2 t₀ = some v ∧ cache₀ t₀ = none ∧ HEq v v₀ |
                       (simulateQ cachingOracle (mx u)).run (cache₀.cacheQuery t u)]
-                  ≤ Pr[= u | (liftM (query t) : OracleComp spec _)] * 1 :=
+                  ≤ Pr[= u | (spec.query t : OracleComp spec _)] * 1 :=
                     mul_le_mul' le_rfl probEvent_le_one
-                _ = Pr[= u | (liftM (query t) : OracleComp spec _)] := mul_one _
+                _ = Pr[= u | (spec.query t : OracleComp spec _)] := mul_one _
                 _ ≤ (Fintype.card (spec.Range t) : ℝ≥0∞)⁻¹ := by
-                    rw [show (liftM (query t) : OracleComp spec _) =
+                    rw [show (spec.query t : OracleComp spec _) =
                       (query t : OracleComp spec _) from rfl]
                     exact le_of_eq (probOutput_query t u)
                 _ ≤ C⁻¹ := ENNReal.inv_le_inv.mpr (Nat.cast_le.mpr (hrange t))
@@ -230,7 +230,7 @@ theorem probEvent_cache_has_value_le_of_unique_preimage {α : Type}
               simp only [h, ite_false, zero_add]
               exact mul_le_mul' le_rfl (hih u h)
         _ = (∑' u, (if HEq u v₀ then C⁻¹ else 0)) +
-            (∑' u, Pr[= u | (liftM (query t) : OracleComp spec _)]) *
+            (∑' u, Pr[= u | (spec.query t : OracleComp spec _)]) *
               (((n - 1 : ℕ) : ℝ≥0∞) * C⁻¹) := by
             rw [ENNReal.tsum_add, ENNReal.tsum_mul_right]
         _ ≤ C⁻¹ + 1 * (((n - 1 : ℕ) : ℝ≥0∞) * C⁻¹) := by

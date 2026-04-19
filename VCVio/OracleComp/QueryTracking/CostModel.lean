@@ -258,7 +258,7 @@ end CostModel
 private lemma addCostOracle_unit_run_apply (t : spec.Domain) :
     (addCostOracle CostModel.unit.queryCost t).run =
       (fun u => (u, Multiplicative.ofAdd 1)) <$>
-        (liftM (query t) : OracleComp spec (spec.Range t)) := by
+        (spec.query t : OracleComp spec (spec.Range t)) := by
   simp [CostModel.unit, addCostOracle, QueryRuntime.withAddCost,
     QueryRuntime.oracleCompRuntime_impl_eq_ofLift, QueryImpl.withCost]
 
@@ -291,7 +291,7 @@ private lemma mem_support_costDist_unit_query_bind_of_mem_support
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (u : spec.Range t)
     {z : α × Multiplicative ℕ} (hz : z ∈ support (costDist (mx u) CostModel.unit)) :
     (z.1, Multiplicative.ofAdd (Multiplicative.toAdd z.2 + 1)) ∈ support
-      (costDist ((liftM (query t) : OracleComp spec (spec.Range t)) >>= mx) CostModel.unit) := by
+      (costDist ((spec.query t : OracleComp spec (spec.Range t)) >>= mx) CostModel.unit) := by
   rw [costDist, instrumentedRun, simulateQ_bind, simulateQ_query, WriterT.run_bind]
   refine (mem_support_bind_iff _ _ _).2 ?_
   refine ⟨(u, (Multiplicative.ofAdd 1 : Multiplicative ℕ)), ?_, ?_⟩
@@ -399,7 +399,7 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
         have hquery :
             AddWriterT.QueryBoundedAboveBy
               (instrumentedRun
-                (liftM (query t) : OracleComp spec (spec.Range t))
+                (spec.query t : OracleComp spec (spec.Range t))
                 CostModel.unit) 1 := by
           change AddWriterT.QueryBoundedAboveBy
             (HasQuery.withUnitCost
@@ -419,7 +419,7 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
         have hbind :=
           AddWriterT.queryBoundedAboveBy_bind
             (oa := instrumentedRun
-              (liftM (query t) : OracleComp spec (spec.Range t))
+              (spec.query t : OracleComp spec (spec.Range t))
               CostModel.unit)
             (f := fun u => instrumentedRun (mx u) CostModel.unit)
             (n₁ := 1) (n₂ := ∑ i, Function.update qb t (qb t - 1) i)

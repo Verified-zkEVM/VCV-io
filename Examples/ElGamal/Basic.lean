@@ -96,7 +96,7 @@ def IND_CPA_OneTime_DDHReduction
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)) :
     DiffieHellman.DDHAdversary F G := fun _ A B T => do
   let (m₁, m₂, st) ← adv.chooseMessages A
-  let bit ← ($ᵗ Bool : ProbComp Bool)
+  let bit ← ($ᵗ Bool)
   let c : G × G := (B, T + if bit then m₁ else m₂)
   let bit' ← adv.distinguish st c
   pure (bit == bit')
@@ -149,16 +149,16 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
     Pr[= true | DiffieHellman.ddhExpRand (F := F) gen
       (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] = 1 / 2 := by
   let inner : G → ProbComp Bool := fun pk => do
-    let head ← ($ᵗ G : ProbComp G)
-    let mask ← ($ᵗ G : ProbComp G)
+    let head ← ($ᵗ G)
+    let mask ← ($ᵗ G)
     let (m₁, m₂, st) ← adv.chooseMessages pk
-    let bit ← ($ᵗ Bool : ProbComp Bool)
+    let bit ← ($ᵗ Bool)
     let bit' ← adv.distinguish st (head, mask + if bit then m₁ else m₂)
     pure (decide (bit = bit'))
   let f : G → Bool → ProbComp Bool := fun pk bit => do
-    let head ← ($ᵗ G : ProbComp G)
+    let head ← ($ᵗ G)
     let (m₁, m₂, st) ← adv.chooseMessages pk
-    let mask ← ($ᵗ G : ProbComp G)
+    let mask ← ($ᵗ G)
     adv.distinguish st (head, mask + if bit then m₁ else m₂)
   have hf : ∀ pk, evalDist (f pk true) = evalDist (f pk false) := by
     intro pk
@@ -175,25 +175,25 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
         (head := head) (m₁ := m₁) (m₂ := m₂) (cont := adv.distinguish st)
   have hrepr : ∀ pk, Pr[= true | inner pk] =
       Pr[= true | do
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let bit' ← f pk bit
         pure (decide (bit = bit'))] := by
     intro pk
     trans Pr[= true | do
-      let head ← ($ᵗ G : ProbComp G)
+      let head ← ($ᵗ G)
       let x ← adv.chooseMessages pk
-      let bit ← ($ᵗ Bool : ProbComp Bool)
-      let mask ← ($ᵗ G : ProbComp G)
+      let bit ← ($ᵗ Bool)
+      let mask ← ($ᵗ G)
       let bit' ← adv.distinguish x.2.2 (head, mask + if bit then x.1 else x.2.1)
       pure (decide (bit = bit'))]
-    · refine probOutput_bind_congr' ($ᵗ G : ProbComp G) true ?_
+    · refine probOutput_bind_congr' ($ᵗ G) true ?_
       intro head
       simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
         (probOutput_bind_bind_swap
-          ($ᵗ G : ProbComp G)
+          ($ᵗ G)
           (do
             let x ← adv.chooseMessages pk
-            let bit ← ($ᵗ Bool : ProbComp Bool)
+            let bit ← ($ᵗ Bool)
             pure (x, bit))
           (fun mask ⟨x, bit⟩ => do
             let bit' ← adv.distinguish x.2.2 (head, mask + if bit then x.1 else x.2.1)
@@ -202,12 +202,12 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
     · simpa [f, bind_assoc, map_eq_bind_pure_comp] using
         (probOutput_bind_bind_swap
           (do
-            let head ← ($ᵗ G : ProbComp G)
+            let head ← ($ᵗ G)
             let x ← adv.chooseMessages pk
             pure (head, x))
-          ($ᵗ Bool : ProbComp Bool)
+          ($ᵗ Bool)
           (fun ⟨head, x⟩ bit => do
-            let mask ← ($ᵗ G : ProbComp G)
+            let mask ← ($ᵗ G)
             let bit' ← adv.distinguish x.2.2 (head, mask + if bit then x.1 else x.2.1)
             pure (decide (bit = bit')))
           true)
@@ -219,14 +219,14 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
     Pr[= true | DiffieHellman.ddhExpRand (F := F) gen
       (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] =
         Pr[= true | do
-          let pk ← ($ᵗ G : ProbComp G)
+          let pk ← ($ᵗ G)
           inner pk] := by
       trans Pr[= true | do
-        let pk ← ($ᵗ G : ProbComp G)
-        let b ← ($ᵗ F : ProbComp F)
-        let c ← ($ᵗ F : ProbComp F)
+        let pk ← ($ᵗ G)
+        let b ← ($ᵗ F)
+        let c ← ($ᵗ F)
         let (m₁, m₂, st) ← adv.chooseMessages pk
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let bit' ← adv.distinguish st (b • gen, c • gen + if bit then m₁ else m₂)
         pure (decide (bit = bit'))]
       · simpa [DiffieHellman.ddhExpRand, IND_CPA_OneTime_DDHReduction, bind_assoc,
@@ -235,62 +235,62 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
           (probOutput_bind_bijective_uniform_cross
             (α := F) (β := G) (f := (· • gen)) hg
             (g := fun pk => do
-              let b ← ($ᵗ F : ProbComp F)
-              let c ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ F)
+              let c ← ($ᵗ F)
               let (m₁, m₂, st) ← adv.chooseMessages pk
-              let bit ← ($ᵗ Bool : ProbComp Bool)
+              let bit ← ($ᵗ Bool)
               let bit' ← adv.distinguish st (b • gen, c • gen + if bit then m₁ else m₂)
               pure (decide (bit = bit')))
             true)
-      · refine probOutput_bind_congr' ($ᵗ G : ProbComp G) true ?_
+      · refine probOutput_bind_congr' ($ᵗ G) true ?_
         intro pk
         trans Pr[= true | do
-          let head ← ($ᵗ G : ProbComp G)
-          let c ← ($ᵗ F : ProbComp F)
+          let head ← ($ᵗ G)
+          let c ← ($ᵗ F)
           let (m₁, m₂, st) ← adv.chooseMessages pk
-          let bit ← ($ᵗ Bool : ProbComp Bool)
+          let bit ← ($ᵗ Bool)
           let bit' ← adv.distinguish st (head, c • gen + if bit then m₁ else m₂)
           pure (decide (bit = bit'))]
         · simpa [bind_assoc, map_eq_bind_pure_comp] using
             (probOutput_bind_bijective_uniform_cross
               (α := F) (β := G) (f := (· • gen)) hg
               (g := fun head => do
-                let c ← ($ᵗ F : ProbComp F)
+                let c ← ($ᵗ F)
                 let (m₁, m₂, st) ← adv.chooseMessages pk
-                let bit ← ($ᵗ Bool : ProbComp Bool)
+                let bit ← ($ᵗ Bool)
                 let bit' ← adv.distinguish st (head, c • gen + if bit then m₁ else m₂)
                 pure (decide (bit = bit')))
               true)
-        · refine probOutput_bind_congr' ($ᵗ G : ProbComp G) true ?_
+        · refine probOutput_bind_congr' ($ᵗ G) true ?_
           intro head
           simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
             (probOutput_bind_bijective_uniform_cross
               (α := F) (β := G) (f := (· • gen)) hg
               (g := fun mask => do
                 let (m₁, m₂, st) ← adv.chooseMessages pk
-                let bit ← ($ᵗ Bool : ProbComp Bool)
+                let bit ← ($ᵗ Bool)
                 let bit' ← adv.distinguish st (head, mask + if bit then m₁ else m₂)
                 pure (decide (bit = bit')))
               true)
     _ = Pr[= true | do
-          let pk ← ($ᵗ G : ProbComp G)
-          ($ᵗ Bool : ProbComp Bool)] :=
+          let pk ← ($ᵗ G)
+          ($ᵗ Bool)] :=
       probOutput_bind_congr' ($ᵗ G) true (fun pk => by
         simpa [probOutput_uniformSample] using hhalf pk)
     _ = 1 / 2 := by
       rw [probOutput_bind_eq_tsum]
-      have hbool : Pr[= true | ($ᵗ Bool : ProbComp Bool)] = (1 / 2 : ℝ≥0∞) := by
+      have hbool : Pr[= true | ($ᵗ Bool)] = (1 / 2 : ℝ≥0∞) := by
         simp [probOutput_uniformSample]
       simp_rw [hbool]
-      have hsum : ∑' x : G, Pr[= x | ($ᵗ G : ProbComp G)] = 1 :=
-        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ G : ProbComp G)
+      have hsum : ∑' x : G, Pr[= x | ($ᵗ G)] = 1 :=
+        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ G)
       calc
-        ∑' x, Pr[= x | ($ᵗ G : ProbComp G)] * (1 / 2 : ℝ≥0∞) =
-            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ G : ProbComp G)] := by
+        ∑' x, Pr[= x | ($ᵗ G)] * (1 / 2 : ℝ≥0∞) =
+            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ G)] := by
               refine tsum_congr ?_
               intro x
               rw [mul_comm]
-        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ G : ProbComp G)] := by
+        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ G)] := by
               rw [ENNReal.tsum_mul_left]
         _ = (1 / 2 : ℝ≥0∞) * 1 := by rw [hsum]
         _ = 1 / 2 := by simp

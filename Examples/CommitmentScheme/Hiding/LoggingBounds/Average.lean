@@ -26,7 +26,7 @@ adversary's guess bit. -/
 def hidingAvgComp {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp (HidingAvgSpec M S C) (S × Bool) := do
-  let s ← query (spec := HidingAvgSpec M S C) (Sum.inl ())
+  let s ← (HidingAvgSpec M S C).query (Sum.inl ())
   let b ← OracleComp.liftComp (hidingOa A s) (HidingAvgSpec M S C)
   pure (s, b)
 
@@ -35,7 +35,7 @@ experiment, then the real hiding game for that salt is run. -/
 def hidingMixedReal {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp (HidingAvgSpec M S C) Bool := do
-  let s ← query (spec := HidingAvgSpec M S C) (Sum.inl ())
+  let s ← (HidingAvgSpec M S C).query (Sum.inl ())
   OracleComp.liftComp (hidingReal A s) (HidingAvgSpec M S C)
 
 /-- Textbook-facing bounded simulator experiment: sample the hidden salt internally, then run the
@@ -43,7 +43,7 @@ corresponding per-salt simulator game. -/
 def hidingMixedSim {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     OracleComp (HidingAvgSpec M S C) Bool := do
-  let s ← query (spec := HidingAvgSpec M S C) (Sum.inl ())
+  let s ← (HidingAvgSpec M S C).query (Sum.inl ())
   OracleComp.liftComp (hidingSim A s) (HidingAvgSpec M S C)
 
 omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
@@ -80,21 +80,21 @@ omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited C] in
 lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
     (A : HidingAdversary M S C AUX t) :
     (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0) =
-      (liftM (query (spec := Unit →ₒ S) ()) >>= fun s =>
+      (liftM ((Unit →ₒ S).query ()) >>= fun s =>
         Prod.map (fun b => (s, b)) id <$>
           OracleComp.liftComp
             ((simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0))
             (HidingAvgSpec M S C)) := by
   have hleftrun :
       (simulateQ hidingAvgQueryImpl
-          (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+          ((HidingAvgSpec M S C).query (Sum.inl ()) :
             OracleComp (HidingAvgSpec M S C) S)).run
           (∅, fun _ => 0) =
-        (liftM (query (spec := Unit →ₒ S) ()) >>= fun s => pure (s, (∅, fun _ => 0))) := by
+        (liftM ((Unit →ₒ S).query ()) >>= fun s => pure (s, (∅, fun _ => 0))) := by
     simp [hidingAvgQueryImpl, hidingAvgLeftImpl, simulateQ_query]
   rw [hidingAvgComp, simulateQ_bind, StateT.run_bind, hleftrun]
   change
-    (liftM (query (spec := Unit →ₒ S) ()) >>= fun s =>
+    (liftM ((Unit →ₒ S).query ()) >>= fun s =>
       (simulateQ hidingAvgQueryImpl (do
           let b ← (hidingOa A s).liftComp (HidingAvgSpec M S C)
           pure (s, b))).run (∅, fun _ => 0)) = _
@@ -102,7 +102,7 @@ lemma run_simulateQ_hidingAvgComp_eq_bind {AUX : Type} {t : ℕ}
   intro s
   rw [simulateQ_bind, StateT.run_bind]
   rw [show simulateQ hidingAvgQueryImpl
-      ((hidingOa A s : OracleComp (CMOracle M S C) Bool).liftComp (HidingAvgSpec M S C)) =
+      ((hidingOa A s).liftComp (HidingAvgSpec M S C)) =
         simulateQ hidingAvgRightImpl (hidingOa A s) by
         simpa [hidingAvgQueryImpl, OracleComp.liftComp_eq_liftM] using
           (QueryImpl.simulateQ_add_liftComp_right
@@ -139,12 +139,12 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
   have hprob :
       Pr[fun z : ((S × Bool) × HidingCountState M S C) => 2 ≤ z.2.2 z.1.1 |
           (simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0)] =
-        ∑ s : S, Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] * P s := by
+        ∑ s : S, Pr[= s | ((Unit →ₒ S).query () : OracleComp (Unit →ₒ S) S)] * P s := by
     rw [hrun, probEvent_bind_eq_tsum, tsum_fintype]
     refine Finset.sum_congr rfl ?_
     intro s hs
     have hsprob :
-        Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] =
+        Pr[= s | ((Unit →ₒ S).query () : OracleComp (Unit →ₒ S) S)] =
           (Fintype.card S : ℝ≥0∞)⁻¹ := by
       simp
     rw [probEvent_map, probEvent_liftComp, hsprob]
@@ -171,7 +171,7 @@ theorem sum_probEvent_hidingBad_eq_avg_bad_mass {AUX : Type} {t : ℕ}
     _ = (Fintype.card S : ℝ≥0∞) * ∑ s : S, (Fintype.card S : ℝ≥0∞)⁻¹ * P s := by
           rw [Finset.mul_sum]
     _ = (Fintype.card S : ℝ≥0∞) * ∑ s : S,
-          Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] * P s := by
+          Pr[= s | ((Unit →ₒ S).query () : OracleComp (Unit →ₒ S) S)] * P s := by
           simp_rw [probOutput_query]
     _ = (Fintype.card S : ℝ≥0∞) *
           Pr[fun z : ((S × Bool) × HidingCountState M S C) => 2 ≤ z.2.2 z.1.1 |
@@ -224,7 +224,7 @@ lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
           ((simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0))
           (fun z : ((S × Bool) × HidingCountState M S C) => (z.2.2 z.1.1 - 1 : ℝ≥0∞)) =
         ∑ s : S,
-          Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] * Q s := by
+          Pr[= s | ((Unit →ₒ S).query () : OracleComp (Unit →ₒ S) S)] * Q s := by
     rw [run_simulateQ_hidingAvgComp_eq_bind, OracleComp.ProgramLogic.wp_bind,
       OracleComp.ProgramLogic.wp_eq_tsum, tsum_fintype]
     refine Finset.sum_congr rfl ?_
@@ -239,7 +239,7 @@ lemma card_mul_wp_hidingAvg_selectedCountPred_eq_sum_wp_countPred
           ((simulateQ hidingAvgQueryImpl (hidingAvgComp A)).run (∅, fun _ => 0))
           (fun z : ((S × Bool) × HidingCountState M S C) => (z.2.2 z.1.1 - 1 : ℝ≥0∞))
       = (Fintype.card S : ℝ≥0∞) * ∑ s : S,
-          Pr[= s | (query (spec := Unit →ₒ S) () : OracleComp (Unit →ₒ S) S)] * Q s := by
+          Pr[= s | ((Unit →ₒ S).query () : OracleComp (Unit →ₒ S) S)] * Q s := by
             rw [hwp]
     _ = (Fintype.card S : ℝ≥0∞) * ∑ s : S,
           (Fintype.card S : ℝ≥0∞)⁻¹ * Q s := by
@@ -1162,7 +1162,7 @@ lemma sum_wp_freshDistinguishIncrement_eq_query
       ∑ s : S,
         OracleComp.ProgramLogic.propInd (qchoose.2.2 s = 0) *
           OracleComp.ProgramLogic.wp
-            (liftM (query (spec := CMOracle M S C) (qchoose.1.1, s)) :
+            ((CMOracle M S C).query (qchoose.1.1, s) :
               OracleComp (CMOracle M S C) C)
             (fun cm =>
               OracleComp.ProgramLogic.wp
