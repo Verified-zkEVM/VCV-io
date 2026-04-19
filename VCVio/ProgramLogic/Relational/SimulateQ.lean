@@ -885,4 +885,332 @@ theorem identical_until_bad_with_flag
           (simulateQ impl₁ oa).run (s₀, false)].toReal :=
   tvDist_simulateQ_le_probEvent_output_bad impl₁ impl₂ oa s₀ h_agree_good h_mono₁ h_mono₂
 
+/-! ## ε-perturbed "identical until bad" with output bad flag
+
+These lemmas generalize `tvDist_simulateQ_le_probEvent_output_bad` from EXACT agreement on
+the no-bad path to ε-CLOSE agreement: the per-step TV distance between the two oracle
+implementations may be at most `ε` (instead of zero) on the no-bad path. Combined with a
+query bound `q` on the computation, the total bound becomes `q*ε + Pr[bad]`.
+
+The standard "identical until bad" bound (`Pr[bad]`) is recovered as the special case `ε = 0`.
+
+**Application**: HVZK simulation in Fiat-Shamir, where the simulated transcript is only
+`ε`-close to the real transcript per query (not exactly equal), but a "programming
+collision" event captures the catastrophic failure mode (collision between programmed hash
+entries). The total reduction loss is `qS·ε + Pr[collision]`. -/
+
+section IdenticalUntilBadEpsilon
+
+variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+variable {α : Type} {σ : Type}
+
+omit [spec.Fintype] [spec.Inhabited] in
+/-- "Bad propagation": starting from a bad state, every output of the simulation has the
+bad flag set. This generalizes the per-step `h_mono` hypothesis to the full simulation. -/
+private lemma mem_support_simulateQ_run_of_bad
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) (p : σ × Bool) (hp : p.2 = true) :
+    ∀ z ∈ support ((simulateQ impl oa).run p), z.2.2 = true := by
+  induction oa using OracleComp.inductionOn generalizing p with
+  | pure x =>
+      intro z hz
+      simp only [simulateQ_pure, StateT.run_pure, support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      exact hp
+  | query_bind t cont ih =>
+      intro z hz
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, support_bind, Set.mem_iUnion,
+        exists_prop] at hz
+      obtain ⟨⟨u, p'⟩, h_mem, h_z⟩ := hz
+      have hp' : p'.2 = true := h_mono t p hp (u, p') h_mem
+      exact ih u p' hp' z h_z
+
+/-- Under bad-monotonicity, a simulation started from a bad state has bad output probability
+exactly `1` (using `OracleComp.HasEvalPMF` to ensure no failure mass). -/
+private lemma probEvent_simulateQ_run_bad_eq_one_of_bad
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (h_mono : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) (p : σ × Bool) (hp : p.2 = true) :
+    Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl oa).run p] = 1 := by
+  rw [probEvent_eq_one_iff]
+  refine ⟨by simp, ?_⟩
+  exact mem_support_simulateQ_run_of_bad impl h_mono oa p hp
+
+/-! ### ε-perturbed identical-until-bad: helper lemmas (in dependency order) -/
+
+/-- Bound `∑' z, p_z.toReal * tvDist (f₁ z) (f₂ z)` by `c + Pr[bad | mx >>= f₁]`,
+given that each summand is bounded by `p_z * (c + Pr[bad | f₁ z])`. The constant `c`
+is intended to be `(q - 1) · ε` from the inductive hypothesis. -/
+private theorem tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
+    {β : Type} (mx : OracleComp spec β) (f₁ f₂ : β → OracleComp spec (α × σ × Bool))
+    {c : ℝ} (hc : 0 ≤ c)
+    (h_summand_le : ∀ z : β,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤
+        Pr[= z | mx].toReal * (c +
+          Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal)) :
+    (∑' z : β, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
+      ≤ c + Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁].toReal := by
+  have h_p_sum_le_one : (∑' z : β, Pr[= z | mx]) ≤ 1 := tsum_probOutput_le_one
+  have h_p_sum_ne_top : (∑' z : β, Pr[= z | mx]) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top h_p_sum_le_one
+  have h_p_summable : Summable (fun z : β => Pr[= z | mx].toReal) :=
+    ENNReal.summable_toReal h_p_sum_ne_top
+  have h_lhs_summand_nn : ∀ z : β, 0 ≤ Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
+    fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+  have h_lhs_summand_le : ∀ z : β,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤ Pr[= z | mx].toReal :=
+    fun z => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
+  have h_lhs_summable : Summable
+      (fun z : β => Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) :=
+    Summable.of_nonneg_of_le h_lhs_summand_nn h_lhs_summand_le h_p_summable
+  have h_b_z_le_one : ∀ z : β,
+      Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal ≤ 1 := fun z => by
+    simpa using ENNReal.toReal_mono one_ne_top probEvent_le_one
+  have h_rhs_summand_nn : ∀ z : β, 0 ≤ Pr[= z | mx].toReal *
+      (c + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal) :=
+    fun z => mul_nonneg ENNReal.toReal_nonneg
+      (add_nonneg hc ENNReal.toReal_nonneg)
+  have h_rhs_summand_le : ∀ z : β,
+      Pr[= z | mx].toReal * (c + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal) ≤
+      Pr[= z | mx].toReal * (c + 1) := fun z => by
+    apply mul_le_mul_of_nonneg_left _ ENNReal.toReal_nonneg
+    linarith [h_b_z_le_one z]
+  have h_rhs_summable : Summable (fun z : β => Pr[= z | mx].toReal *
+      (c + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal)) :=
+    Summable.of_nonneg_of_le h_rhs_summand_nn h_rhs_summand_le
+      (h_p_summable.mul_right (c + 1))
+  have h_le_rhs :
+      (∑' z : β, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
+        ≤ ∑' z : β, Pr[= z | mx].toReal *
+          (c + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal) :=
+    Summable.tsum_le_tsum h_summand_le h_lhs_summable h_rhs_summable
+  refine le_trans h_le_rhs ?_
+  have h_distrib_summable_a : Summable
+      (fun z : β => Pr[= z | mx].toReal * c) :=
+    h_p_summable.mul_right _
+  have h_distrib_summable_b : Summable
+      (fun z : β => Pr[= z | mx].toReal *
+        Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal) :=
+    Summable.of_nonneg_of_le
+      (fun z => mul_nonneg ENNReal.toReal_nonneg ENNReal.toReal_nonneg)
+      (fun z => mul_le_of_le_one_right ENNReal.toReal_nonneg (h_b_z_le_one z))
+      h_p_summable
+  have h_split :
+      (∑' z : β, Pr[= z | mx].toReal *
+        (c + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal))
+        = (∑' z : β, Pr[= z | mx].toReal * c) +
+          (∑' z : β, Pr[= z | mx].toReal *
+            Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal) := by
+    rw [← Summable.tsum_add h_distrib_summable_a h_distrib_summable_b]
+    refine tsum_congr fun z => ?_
+    ring
+  rw [h_split]
+  have h_first_sum :
+      (∑' z : β, Pr[= z | mx].toReal * c) = c := by
+    rw [tsum_mul_right]
+    have h_one : (∑' z : β, Pr[= z | mx].toReal) = 1 := by
+      rw [show (∑' z : β, Pr[= z | mx].toReal) = ((∑' z : β, Pr[= z | mx])).toReal from
+        (ENNReal.tsum_toReal_eq fun z => by
+          have h := probOutput_le_one (mx := mx) (x := z)
+          exact ne_top_of_le_ne_top one_ne_top h).symm]
+      rw [HasEvalPMF.tsum_probOutput_eq_one]
+      simp
+    rw [h_one, one_mul]
+  have h_second_sum :
+      (∑' z : β, Pr[= z | mx].toReal *
+        Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z].toReal)
+        = Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁].toReal := by
+    have h_term_ne_top : ∀ z : β, Pr[= z | mx] *
+        Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z] ≠ ⊤ := fun z => by
+      have h₁ : Pr[= z | mx] ≤ 1 := probOutput_le_one
+      have h₂ : Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z] ≤ 1 := probEvent_le_one
+      have h_le : Pr[= z | mx] * Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z] ≤ 1 :=
+        mul_le_one' h₁ h₂
+      exact ne_top_of_le_ne_top one_ne_top h_le
+    rw [show
+      Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁] =
+        ∑' z : β, Pr[= z | mx] *
+          Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z] from
+        probEvent_bind_eq_tsum mx f₁ _,
+      ENNReal.tsum_toReal_eq h_term_ne_top]
+    refine tsum_congr fun z => ?_
+    exact ENNReal.toReal_mul.symm
+  rw [h_first_sum, h_second_sum]
+
+/-- The `query_bind` (`p.2 = false`) inductive step: given the per-continuation IH bound
+(parameterized by `q - 1`), combine the triangle inequality, the two `tvDist_bind_*_le`
+bounds, and the algebraic distribution to get the `q · ε + Pr[bad]` bound. -/
+private theorem tvDist_simulateQ_run_query_bind_le
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (h_step_tv : ∀ (t : spec.Domain) (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (t : spec.Domain) (cont : spec.Range t → OracleComp spec α)
+    {q : ℕ} (hq_pos : 0 < q)
+    (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
+      tvDist ((simulateQ impl₁ (cont u)).run p')
+          ((simulateQ impl₂ (cont u)).run p')
+        ≤ ↑(q - 1) * ε + Pr[ fun w : α × σ × Bool => w.2.2 = true |
+            (simulateQ impl₁ (cont u)).run p'].toReal)
+    (s : σ) :
+    tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false))
+      ≤ ↑q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ (query t >>= cont)).run (s, false)].toReal := by
+  set sim₁ : OracleComp spec (α × σ × Bool) :=
+    (simulateQ impl₁ (query t >>= cont)).run (s, false) with hsim₁_def
+  set sim₂ : OracleComp spec (α × σ × Bool) :=
+    (simulateQ impl₂ (query t >>= cont)).run (s, false) with hsim₂_def
+  set f₁ : spec.Range t × σ × Bool → OracleComp spec (α × σ × Bool) :=
+    fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
+  set f₂ : spec.Range t × σ × Bool → OracleComp spec (α × σ × Bool) :=
+    fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
+  set mx : OracleComp spec (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
+  set my : OracleComp spec (spec.Range t × σ × Bool) := (impl₂ t).run (s, false) with hmy_def
+  have hsim₁_eq : sim₁ = mx >>= f₁ := by
+    simp [hsim₁_def, hmx_def, hf₁_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have hsim₂_eq : sim₂ = my >>= f₂ := by
+    simp [hsim₂_def, hmy_def, hf₂_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  set mid : OracleComp spec (α × σ × Bool) := mx >>= f₂ with hmid_def
+  have h_tri : tvDist sim₁ sim₂ ≤ tvDist sim₁ mid + tvDist mid sim₂ :=
+    tvDist_triangle _ _ _
+  have h_second : tvDist mid sim₂ ≤ ε := by
+    rw [hmid_def, hsim₂_eq]
+    exact le_trans (tvDist_bind_right_le _ _ _) (h_step_tv t s)
+  have h_first_raw :
+      tvDist sim₁ mid ≤ ∑' z : spec.Range t × σ × Bool,
+        Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) := by
+    rw [hsim₁_eq, hmid_def]
+    exact tvDist_bind_left_le _ _ _
+  have h_summand_le : ∀ z : spec.Range t × σ × Bool,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤
+        Pr[= z | mx].toReal * (↑(q - 1) * ε + Pr[fun w : α × σ × Bool => w.2.2 = true |
+            f₁ z].toReal) := fun z => by
+    apply mul_le_mul_of_nonneg_left _ ENNReal.toReal_nonneg
+    simpa [hf₁_def, hf₂_def] using ih z.1 z.2
+  have h_const_nonneg : (0 : ℝ) ≤ ↑(q - 1) * ε := mul_nonneg (Nat.cast_nonneg _) hε
+  have h_first :
+      tvDist sim₁ mid ≤ ↑(q - 1) * ε +
+        Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal := by
+    refine le_trans h_first_raw ?_
+    have h_helper := tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
+      (mx := mx) (f₁ := f₁) (f₂ := f₂) (c := ↑(q - 1) * ε) h_const_nonneg h_summand_le
+    rw [hsim₁_eq]
+    exact h_helper
+  have hq_arith : ((q - 1 : ℕ) : ℝ) + 1 = (q : ℝ) := by
+    have h1 : 1 ≤ q := hq_pos
+    have h2 : ((q - 1 : ℕ) + 1 : ℕ) = q := Nat.sub_add_cancel h1
+    have h3 : (((q - 1 : ℕ) + 1 : ℕ) : ℝ) = (q : ℝ) := by exact_mod_cast h2
+    simpa using h3
+  calc tvDist sim₁ sim₂
+      ≤ tvDist sim₁ mid + tvDist mid sim₂ := h_tri
+    _ ≤ (↑(q - 1) * ε + Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal) + ε :=
+        add_le_add h_first h_second
+    _ = (↑(q - 1) + 1) * ε + Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal := by
+        ring
+    _ = ↑q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal := by
+        rw [hq_arith]
+
+/-- Auxiliary inductive lemma for `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`. Bounds
+the TV distance on the **joint** (state-included) distribution, for arbitrary starting state
+`p` (whether the bad flag is set or not).
+
+The proof inducts on `oa`:
+- `pure x`: both simulations equal `pure (x, p)`, so `tvDist = 0` and the RHS is non-negative.
+- `query t >>= cont`: case on `p.2`.
+  - `true`: by bad-monotonicity, `Pr[bad | sim₁] = 1`, and `tvDist ≤ 1` always.
+  - `false`: see `tvDist_simulateQ_run_query_bind_le`. -/
+private theorem tvDist_simulateQ_run_le_qeps_plus_probEvent_output_bad_aux
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (h_step_tv : ∀ (t : spec.Domain) (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {q : ℕ}
+    (h_qb : OracleComp.IsTotalQueryBound oa q) (p : σ × Bool) :
+    tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p)
+      ≤ q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run p].toReal := by
+  induction oa using OracleComp.inductionOn generalizing q p with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, tvDist_self]
+      exact add_nonneg (mul_nonneg (Nat.cast_nonneg _) hε) ENNReal.toReal_nonneg
+  | query_bind t cont ih =>
+      rcases p with ⟨s, b⟩
+      cases b with
+      | true =>
+          have h_bad₁ : Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ (query t >>= cont)).run (s, true)] = 1 :=
+            probEvent_simulateQ_run_bad_eq_one_of_bad impl₁ h_mono₁
+              (query t >>= cont) (s, true) rfl
+          have h_tv_le_one :
+              tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, true))
+                  ((simulateQ impl₂ (query t >>= cont)).run (s, true)) ≤ 1 :=
+            tvDist_le_one _ _
+          have h_target_ge_one :
+              (1 : ℝ) ≤ ↑q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+                (simulateQ impl₁ (query t >>= cont)).run (s, true)].toReal := by
+            rw [h_bad₁]
+            simp only [ENNReal.toReal_one]
+            have hqε : (0 : ℝ) ≤ ↑q * ε := mul_nonneg (Nat.cast_nonneg _) hε
+            linarith
+          exact le_trans h_tv_le_one h_target_ge_one
+      | false =>
+          have hq_pos : 0 < q := h_qb.1
+          have hq_cont : ∀ u, OracleComp.IsTotalQueryBound (cont u) (q - 1) := h_qb.2
+          exact tvDist_simulateQ_run_query_bind_le impl₁ impl₂ hε h_step_tv t cont hq_pos
+            (fun u p' => ih u (hq_cont u) p') s
+
+/-- **ε-perturbed identical-until-bad with output bad flag.**
+
+If two stateful oracle implementations are ε-CLOSE in TV distance per step on the no-bad
+path (instead of exactly equal as in `tvDist_simulateQ_le_probEvent_output_bad`), and the
+computation makes at most `q` queries, then the TV distance between the two simulations
+is bounded by `q*ε + Pr[bad]`.
+
+Only `impl₁` requires bad-flag monotonicity (since the bound uses `Pr[bad | sim₁]`); the
+"true" branch in the inductive proof exploits monotonicity to push `Pr[bad | sim₁] = 1`
+which dominates the trivial `tvDist ≤ 1` bound.
+
+The `ε = 0` case recovers the existing identical-until-bad bound (modulo the upgraded
+agreement hypothesis from definitional equality to TV-distance equality, which is
+equivalent for distributions over the same type). -/
+theorem tvDist_simulateQ_le_qeps_plus_probEvent_output_bad
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (h_step_tv : ∀ (t : spec.Domain) (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {q : ℕ}
+    (h_qb : OracleComp.IsTotalQueryBound oa q) (s₀ : σ) :
+    tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+        ((simulateQ impl₂ oa).run' (s₀, false))
+      ≤ q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run (s₀, false)].toReal := by
+  have h_joint :
+      tvDist ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false))
+        ≤ q * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+            (simulateQ impl₁ oa).run (s₀, false)].toReal :=
+    tvDist_simulateQ_run_le_qeps_plus_probEvent_output_bad_aux
+      impl₁ impl₂ hε h_step_tv h_mono₁ oa h_qb (s₀, false)
+  have h_map :
+      tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+          ((simulateQ impl₂ oa).run' (s₀, false))
+        ≤ tvDist ((simulateQ impl₁ oa).run (s₀, false))
+            ((simulateQ impl₂ oa).run (s₀, false)) := by
+    simpa [StateT.run'] using
+      (tvDist_map_le (m := OracleComp spec) (α := α × σ × Bool) (β := α) Prod.fst
+        ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false)))
+  exact le_trans h_map h_joint
+
+end IdenticalUntilBadEpsilon
+
 end OracleComp.ProgramLogic.Relational
