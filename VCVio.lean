@@ -113,12 +113,14 @@ import VCVio.Interaction.TwoParty.Role
 import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
 import VCVio.Interaction.UC.Computational
-import VCVio.Interaction.UC.Corruption
+import VCVio.Interaction.UC.CorruptionModel
 import VCVio.Interaction.UC.Emulates
 import VCVio.Interaction.UC.EnvAction
 import VCVio.Interaction.UC.EnvOpenProcess
 import VCVio.Interaction.UC.Interface
+import VCVio.Interaction.UC.Leakage
 import VCVio.Interaction.UC.MachineId
+import VCVio.Interaction.UC.MomentaryCorruption
 import VCVio.Interaction.UC.Notation
 import VCVio.Interaction.UC.OpenProcess
 import VCVio.Interaction.UC.OpenProcessModel

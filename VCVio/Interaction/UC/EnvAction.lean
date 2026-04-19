@@ -72,10 +72,10 @@ Two concrete instantiations matter here:
 * `EnvAction Empty X` — the trivial alphabet, used by every protocol
   that doesn't participate in environment-driven corruption. Costs
   nothing; the canonical inhabitant is `EnvAction.empty`.
-* `EnvAction (CorruptionAlphabet Sid Pid) (CorruptionState Sid Pid)` —
-  the canonical CJSV22 instantiation. See
-  `VCVio.Interaction.UC.Corruption` for the alphabet and state
-  definitions.
+* `EnvAction (MomentaryCorruption.Alphabet Sid Pid)
+  (MomentaryCorruption.State Sid Pid)` — the canonical CJSV22
+  instantiation. See `VCVio.Interaction.UC.MomentaryCorruption` for
+  the alphabet and state definitions.
 
 The structure is independent of the boundary `Δ` so that environment
 events are *not* keyed by port: an environment event acts on whatever
@@ -134,9 +134,9 @@ with a re-installation `ι : X → Y → Y` that re-installs the updated
 by reacting on the `X`-slice and re-installing the result.
 
 This is the structural lift used when corruption-aware reactions need
-to thread through richer per-step states; the `Corruption` layer uses
-it to lift the canonical `CorruptionState.react` over state-bundled
-`MachineProcess`es.
+to thread through richer per-step states; the `MomentaryCorruption`
+layer uses it to lift the canonical `MomentaryCorruption.react` over
+state-bundled `MachineProcess`es.
 -/
 def liftState {Event : Type u} {X Y : Type}
     (π : Y → X) (ι : X → Y → Y) (e : EnvAction Event X) :

@@ -22,7 +22,8 @@ The two channels are kept structurally orthogonal, matching CJSV22 §3.2
 where corruption events flow from the environment rather than from the
 adversary's port boundary. The wrapper is intentionally **generic in
 `Event` and `State`**: the canonical CJSV22 instantiation
-(`Event := CorruptionAlphabet Sid Pid`, `State := CorruptionState Sid Pid`)
+(`Event := MomentaryCorruption.Alphabet Sid Pid`,
+`State := MomentaryCorruption.State Sid Pid`)
 is one consumer, but every other environment-driven effect (broadcast
 resets, time advance, side-channel reseed, environment-controlled
 randomness oracle) reuses the same wrapper.
@@ -69,8 +70,9 @@ This file ships the **wrapper data layer** only:
   `Runtime.lean`).
 
 See `Notes/vcvio-uc-f2-corruption-design.md` for the full F2 roadmap
-and `VCVio/Interaction/UC/Corruption.lean` for the canonical Signal
-instantiation `CorruptionProcess`.
+and `VCVio/Interaction/UC/MomentaryCorruption.lean` for the canonical
+CJSV22 instantiation `MomentaryCorruption.Process` (and the
+`MomentaryCorruption.model : CorruptionModel` value).
 -/
 
 universe u uE v w
@@ -98,8 +100,8 @@ The state type `State` is constrained to `Type` (universe 0) because
 Existing `OpenProcess` consumers are unaffected: nothing here is
 threaded into `OpenNodeSemantics`. The wrapper is the structural
 foundation for corruption-aware composition (a subsequent slice) and
-for the canonical Signal instantiation `CorruptionProcess` in
-`Corruption.lean`.
+for the canonical CJSV22 instantiation `MomentaryCorruption.Process`
+in `MomentaryCorruption.lean`.
 -/
 @[ext]
 structure EnvOpenProcess
@@ -208,8 +210,8 @@ The new wrapper accepts events of type `Event`; each such event `e` is
 routed through `g` to obtain `g e : Event'` and passed to the original
 env action. This is the contravariant action on the alphabet that lets
 coarser alphabets be embedded into finer ones (e.g. lift a
-`CorruptionAlphabet` into a richer alphabet that also tracks broadcast
-events).
+`MomentaryCorruption.Alphabet` into a richer alphabet that also
+tracks broadcast events).
 
 The underlying open process is unchanged.
 -/
@@ -250,8 +252,8 @@ Replace the env action wholesale, retargeting the wrapper to a new
 `(Event', State')` pair. The underlying open process is unchanged.
 
 Used when the same open process needs to be paired with a different env
-channel (e.g. lifting from the canonical `CorruptionState` reaction to a
-richer simulator-controlled reaction with its own state).
+channel (e.g. lifting from the canonical `MomentaryCorruption.react`
+reaction to a richer simulator-controlled reaction with its own state).
 -/
 def withEnvAction {Event' : Type uE} {State' : Type}
     (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
