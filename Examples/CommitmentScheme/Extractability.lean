@@ -152,7 +152,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
   -- Cache monotonicity: cache₂ ≤ cache₃
   have hcache_mono₂₃ : cache₂ ≤ cache₃ := by
     have hmem₃_co : (c, cache₃) ∈ support
-        ((cachingOracle (spec := CMOracle M S C) (m, s)).run cache₂) := hmem₃
+        (((CMOracle M S C).cachingOracle (m, s)).run cache₂) := hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
       (QueryImpl.ofLift (CMOracle M S C) (OracleComp (CMOracle M S C)))

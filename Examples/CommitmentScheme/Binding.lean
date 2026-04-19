@@ -84,7 +84,7 @@ private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S 
   -- Cache monotonicity: cache₂ ≤ cache₃, so cache₃ also has (m₀, s₀) ↦ c₀
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (c₁, cache₃) ∈ support
-        ((cachingOracle (spec := CMOracle M S C) (m₁, s₁)).run cache₂) := by
+        (((CMOracle M S C).cachingOracle (m₁, s₁)).run cache₂) := by
       simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
@@ -157,7 +157,7 @@ private lemma binding_rest_noCollision_le_inv
               pure (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c)))).run cache₁ := by
         simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
         have hcache :
-            (liftM (cachingOracle (spec := CMOracle M S C) q₀) :
+            (liftM ((CMOracle M S C).cachingOracle q₀) :
               StateT (QueryCache (CMOracle M S C))
                 (OracleComp (CMOracle M S C)) _).run cache₁ =
             pure (v₀, cache₁) := by
@@ -187,7 +187,7 @@ private lemma binding_rest_noCollision_le_inv
               pure (decide (m₀ ≠ m₁) && (v₀ == c) && (v₁ == c), cache₁) := by
             simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
             have hcache :
-                (liftM (cachingOracle (spec := CMOracle M S C) q₁) :
+                (liftM ((CMOracle M S C).cachingOracle q₁) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run cache₁ =
                 pure (v₁, cache₁) := by

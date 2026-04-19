@@ -211,7 +211,7 @@ theorem hidingImplCountAll_proj_eq_cachingOracle
     (st : QueryCache (CMOracle M S C) × (S → ℕ)) :
     Prod.map id Prod.fst <$>
         (hidingImplCountAll (M := M) (S := S) (C := C) ms).run st =
-      (cachingOracle (spec := CMOracle M S C) ms).run st.1 := by
+      ((CMOracle M S C).cachingOracle ms).run st.1 := by
   rcases st with ⟨cache, counts⟩
   cases hcache : cache ms with
   | some u =>

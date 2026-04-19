@@ -69,7 +69,7 @@ lemma probEvent_from_fresh_query_le_inv
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)) := by
     simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
     have hstep :
-        (liftM (cachingOracle (spec := CMOracle M S C) t) :
+        (liftM ((CMOracle M S C).cachingOracle t) :
           StateT (QueryCache (CMOracle M S C))
             (OracleComp (CMOracle M S C)) _).run cache₀ =
         liftM ((CMOracle M S C).query t) >>= fun u =>

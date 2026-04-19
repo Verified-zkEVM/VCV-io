@@ -197,7 +197,7 @@ lemma log_length_le_of_mem_support_run_cached_logging
   have hstep :
       ∀ t : (CMOracle M S C).Domain, ∀ st : QueryCache (CMOracle M S C),
         ∀ x : (CMOracle M S C).Range t × QueryCache (CMOracle M S C),
-          x ∈ support ((cachingOracle (spec := CMOracle M S C) t).run st) →
+          x ∈ support (((CMOracle M S C).cachingOracle t).run st) →
             cost x.2 ≤ cost st + 1 := by
     intro t st x hx
     simp [cost]
@@ -753,7 +753,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
             have hcache_hit : (cache₀.cacheQuery (m, s) cm) t = some u := by
               rw [hcache_eq, ht]
             have hcache_fresh_run :
-                (liftM (cachingOracle (spec := CMOracle M S C) t) :
+                (liftM ((CMOracle M S C).cachingOracle t) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run
                     (cache₀.cacheQuery (m, s) cm) =
@@ -761,7 +761,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
               simp [liftM, MonadLiftT.monadLift, MonadLift.monadLift,
                 StateT.run_bind, StateT.run_get, hcache_hit, pure_bind, StateT.run_pure]
             have hcache_common_run :
-                (liftM (cachingOracle (spec := CMOracle M S C) t) :
+                (liftM ((CMOracle M S C).cachingOracle t) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run cache₀ =
                   pure (u, cache₀) := by
@@ -774,7 +774,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
             have hcache_none : (cache₀.cacheQuery (m, s) cm) t = none := by
               rw [hcache_eq, ht]
             have hmiss_fresh :
-                (liftM (cachingOracle (spec := CMOracle M S C) t) :
+                (liftM ((CMOracle M S C).cachingOracle t) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run
                     (cache₀.cacheQuery (m, s) cm) =
@@ -791,7 +791,7 @@ lemma wp_querySaltIndicator_cached_logging_cacheQuery_eq_of_no_other_salt_entrie
                 StateT.modifyGet, StateT.run]
               rfl
             have hmiss_common :
-                (liftM (cachingOracle (spec := CMOracle M S C) t) :
+                (liftM ((CMOracle M S C).cachingOracle t) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run cache₀ =
                   ((CMOracle M S C).query t >>= fun u =>
