@@ -6,6 +6,7 @@ Authors: Quang Dao
 module
 
 public import ToMathlib.PFunctor.Basic
+public import ToMathlib.PFunctor.Equiv.Basic
 
 /-!
 # Charts between polynomial functors
@@ -346,6 +347,12 @@ theorem sumPair_inl_inr :
     Chart.sumPair Chart.inl Chart.inr = Chart.id.{max uA₁ uA₂, uB} (P + Q) := by
   ext a <;> rcases a <;> rfl
 
+theorem sumMap_comp_sumMap {S : PFunctor.{uA₅, uB₅}} {T : PFunctor.{uA₆, uB₅}}
+    (c₁ : Chart P R) (c₂ : Chart Q W)
+    (c₁' : Chart R S) (c₂' : Chart W T) :
+    (c₁' ⊎c c₂') ∘c (c₁ ⊎c c₂) = (c₁' ∘c c₁) ⊎c (c₂' ∘c c₂) := by
+  ext a <;> rcases a <;> rfl
+
 namespace Equiv
 
 /-- Commutativity of coproduct -/
@@ -406,6 +413,18 @@ def zeroSum :
     · rfl
   right_inv := by ext <;> rfl
 
+/-- Coproduct preserves equivalences: `P ≃c P' → Q ≃c Q' → P + Q ≃c P' + Q'`. -/
+def sumCongr {P : PFunctor.{uA₁, uB}} {Q : PFunctor.{uA₂, uB}}
+    {P' : PFunctor.{uA₃, uB}} {Q' : PFunctor.{uA₄, uB}}
+    (e₁ : P ≃c P') (e₂ : Q ≃c Q') :
+    Chart.Equiv.{max uA₁ uA₂, uB, max uA₃ uA₄, uB} (P + Q) (P' + Q') where
+  toChart := e₁.toChart ⊎c e₂.toChart
+  invChart := e₁.invChart ⊎c e₂.invChart
+  left_inv := by
+    rw [Chart.sumMap_comp_sumMap, e₁.left_inv, e₂.left_inv, Chart.sumMap_id]
+  right_inv := by
+    rw [Chart.sumMap_comp_sumMap, e₁.right_inv, e₂.right_inv, Chart.sumMap_id]
+
 end Equiv
 
 end Sum
@@ -453,6 +472,11 @@ theorem tensorMap_comp
     {P' : PFunctor.{uA₅, uB₅}} {Q' : PFunctor.{uA₆, uB₆}}
     (c₁ : Chart P P') (c₂ : Chart Q Q') (c₁' : Chart P' R) (c₂' : Chart Q' W) :
     (c₁' ∘c c₁) ⊗c (c₂' ∘c c₂) = (c₁' ⊗c c₂') ∘c (c₁ ⊗c c₂) := rfl
+
+theorem tensorMap_comp_tensorMap
+    {P' : PFunctor.{uA₅, uB₅}} {Q' : PFunctor.{uA₆, uB₆}}
+    (c₁ : Chart P R) (c₂ : Chart Q W) (c₁' : Chart R P') (c₂' : Chart W Q') :
+    (c₁' ⊗c c₂') ∘c (c₁ ⊗c c₂) = (c₁' ∘c c₁) ⊗c (c₂' ∘c c₂) := rfl
 
 @[simp]
 theorem tensorPair_fst_snd : Chart.tensorPair Chart.fst Chart.snd =
@@ -510,11 +534,89 @@ def tensorZero : P ⊗ 0 ≃c 0 where
   left_inv := by ext ⟨_, b⟩ <;> exact PEmpty.elim b
   right_inv := by ext a <;> exact PEmpty.elim a
 
+/-- Tensor product preserves equivalences: `P ≃c P' → Q ≃c Q' → P ⊗ Q ≃c P' ⊗ Q'`. -/
+def tensorCongr {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
+    {P' : PFunctor.{uA₃, uB₃}} {Q' : PFunctor.{uA₄, uB₄}}
+    (e₁ : P ≃c P') (e₂ : Q ≃c Q') :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₃ uA₄, max uB₃ uB₄}
+      (P ⊗ Q) (P' ⊗ Q') where
+  toChart := e₁.toChart ⊗c e₂.toChart
+  invChart := e₁.invChart ⊗c e₂.invChart
+  left_inv := by
+    rw [Chart.tensorMap_comp_tensorMap, e₁.left_inv, e₂.left_inv,
+      Chart.tensorMap_id]
+  right_inv := by
+    rw [Chart.tensorMap_comp_tensorMap, e₁.right_inv, e₂.right_inv,
+      Chart.tensorMap_id]
+
+/-- Left distributivity of tensor product over coproduct.
+
+`P ⊗ (Q + R) ≃c (P ⊗ Q) + (P ⊗ R)`. -/
+def tensorSumDistrib {P : PFunctor.{uA₁, uB₁}} {Q R : PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂}
+      (P ⊗ (Q + R)) ((P ⊗ Q) + (P ⊗ R)) where
+  toChart :=
+    (fun ⟨p, qr⟩ => match qr with
+      | Sum.inl q => Sum.inl (p, q)
+      | Sum.inr r => Sum.inr (p, r)) ⇉
+    (fun ⟨_, qr⟩ pb => match qr with
+      | Sum.inl _ => pb
+      | Sum.inr _ => pb)
+  invChart :=
+    (Sum.elim
+      (fun ⟨p, q⟩ => (p, Sum.inl q))
+      (fun ⟨p, r⟩ => (p, Sum.inr r))) ⇉
+    (fun pqpr pb => match pqpr with
+      | Sum.inl _ => pb
+      | Sum.inr _ => pb)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a with ⟨_, _ | _⟩ <;> rfl
+    · intro a; funext _; rcases a with ⟨_, _ | _⟩ <;> rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a <;> rfl
+    · intro a; funext _; rcases a <;> rfl
+
+/-- Right distributivity of tensor product over coproduct.
+
+`(Q + R) ⊗ P ≃c (Q ⊗ P) + (R ⊗ P)`. -/
+def sumTensorDistrib {P : PFunctor.{uA₁, uB₁}} {Q R : PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂}
+      ((Q + R) ⊗ P) ((Q ⊗ P) + (R ⊗ P)) where
+  toChart :=
+    (fun ⟨qr, p⟩ => match qr with
+      | Sum.inl q => Sum.inl (q, p)
+      | Sum.inr r => Sum.inr (r, p)) ⇉
+    (fun ⟨qr, _⟩ pb => match qr with
+      | Sum.inl _ => pb
+      | Sum.inr _ => pb)
+  invChart :=
+    (Sum.elim
+      (fun ⟨q, p⟩ => (Sum.inl q, p))
+      (fun ⟨r, p⟩ => (Sum.inr r, p))) ⇉
+    (fun qprp pb => match qprp with
+      | Sum.inl _ => pb
+      | Sum.inr _ => pb)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a with ⟨_ | _, _⟩ <;> rfl
+    · intro a; funext _; rcases a with ⟨_ | _, _⟩ <;> rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a <;> rfl
+    · intro a; funext _; rcases a <;> rfl
+
 end Equiv
 
 end Tensor
 
-/-! ### Polynomial-product coherence -/
+/-! ### Polynomial-product coherence
+
+Even though `*` is *not* the categorical product in the chart category, it
+is still a functor and admits coherent equivalences (commutativity,
+associativity, units, zeros, congruence, distributivity over `+`). These
+mirror the `PFunctor.Equiv.prod*` lemmas. -/
 
 section Prod
 
@@ -527,6 +629,149 @@ theorem prodMap_id :
   ext _ x
   · rfl
   · cases x <;> rfl
+
+theorem prodMap_comp_prodMap {S : PFunctor.{uA₅, uB₅}} {T : PFunctor.{uA₆, uB₆}}
+    (c₁ : Chart P R) (c₂ : Chart Q W) (c₁' : Chart R S) (c₂' : Chart W T) :
+    (c₁' ×c c₂') ∘c (c₁ ×c c₂) = (c₁' ∘c c₁) ×c (c₂' ∘c c₂) := by
+  refine Chart.ext _ _ ?_ ?_
+  · intro _; rfl
+  · intro _; funext psum; rcases psum <;> rfl
+
+namespace Equiv
+
+/-- Polynomial-product preserves equivalences: `P ≃c P' → Q ≃c Q' → P * Q ≃c P' * Q'`. -/
+def prodCongr {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
+    {P' : PFunctor.{uA₃, uB₃}} {Q' : PFunctor.{uA₄, uB₄}}
+    (e₁ : P ≃c P') (e₂ : Q ≃c Q') :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₃ uA₄, max uB₃ uB₄}
+      (P * Q) (P' * Q') where
+  toChart := e₁.toChart ×c e₂.toChart
+  invChart := e₁.invChart ×c e₂.invChart
+  left_inv := by
+    rw [Chart.prodMap_comp_prodMap, e₁.left_inv, e₂.left_inv, Chart.prodMap_id]
+  right_inv := by
+    rw [Chart.prodMap_comp_prodMap, e₁.right_inv, e₂.right_inv, Chart.prodMap_id]
+
+/-- Commutativity of the polynomial product. -/
+def prodComm (P : PFunctor.{uA₁, uB₁}) (Q : PFunctor.{uA₂, uB₂}) :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂} (P * Q) (Q * P) where
+  toChart := Prod.swap ⇉ (fun _ d => d.swap)
+  invChart := Prod.swap ⇉ (fun _ d => d.swap)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro _; rfl
+    · intro _; funext d; rcases d <;> rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro _; rfl
+    · intro _; funext d; rcases d <;> rfl
+
+/-- Associativity of the polynomial product. -/
+def prodAssoc :
+    Chart.Equiv.{max uA₁ uA₂ uA₃, max uB₁ uB₂ uB₃, max uA₁ uA₂ uA₃, max uB₁ uB₂ uB₃}
+      ((P * Q) * R) (P * (Q * R)) where
+  toChart := (_root_.Equiv.prodAssoc _ _ _).toFun ⇉
+    (fun _ d => (_root_.Equiv.sumAssoc _ _ _).toFun d)
+  invChart := (_root_.Equiv.prodAssoc _ _ _).invFun ⇉
+    (fun _ d => (_root_.Equiv.sumAssoc _ _ _).invFun d)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro _; rfl
+    · intro _; funext d; rcases d with d | d
+      · rcases d with d | d <;> rfl
+      · rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro _; rfl
+    · intro _; funext d; rcases d with d | d
+      · rfl
+      · rcases d with d | d <;> rfl
+
+/-- Polynomial-product with `0` is `0` (right). -/
+def prodZero : P * 0 ≃c 0 where
+  toChart := (fun a => PEmpty.elim a.2) ⇉ (fun a _ => PEmpty.elim a.2)
+  invChart := PEmpty.elim ⇉ (fun a _ => PEmpty.elim a)
+  left_inv := by ext ⟨_, b⟩ <;> exact PEmpty.elim b
+  right_inv := by ext a <;> exact PEmpty.elim a
+
+/-- Polynomial-product with `0` is `0` (left). -/
+def zeroProd : 0 * P ≃c 0 where
+  toChart := (fun a => PEmpty.elim a.1) ⇉ (fun a _ => PEmpty.elim a.1)
+  invChart := PEmpty.elim ⇉ (fun a _ => PEmpty.elim a)
+  left_inv := by ext ⟨a, _⟩ <;> exact PEmpty.elim a
+  right_inv := by ext a <;> exact PEmpty.elim a
+
+/-- Left distributivity of polynomial product over coproduct.
+
+`P * (Q + R) ≃c (P * Q) + (P * R)`. -/
+def prodSumDistrib {P : PFunctor.{uA₁, uB₁}} {Q R : PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂}
+      (P * (Q + R)) ((P * Q) + (P * R)) where
+  toChart :=
+    (fun ⟨p, qr⟩ => match qr with
+      | Sum.inl q => Sum.inl (p, q)
+      | Sum.inr r => Sum.inr (p, r)) ⇉
+    (fun ⟨_, qr⟩ d => match qr, d with
+      | Sum.inl _, Sum.inl pb => Sum.inl pb
+      | Sum.inl _, Sum.inr qb => Sum.inr qb
+      | Sum.inr _, Sum.inl pb => Sum.inl pb
+      | Sum.inr _, Sum.inr rb => Sum.inr rb)
+  invChart :=
+    (Sum.elim
+      (fun ⟨p, q⟩ => (p, Sum.inl q))
+      (fun ⟨p, r⟩ => (p, Sum.inr r))) ⇉
+    (fun pqpr d => match pqpr, d with
+      | Sum.inl _, Sum.inl pb => Sum.inl pb
+      | Sum.inl _, Sum.inr qb => Sum.inr qb
+      | Sum.inr _, Sum.inl pb => Sum.inl pb
+      | Sum.inr _, Sum.inr rb => Sum.inr rb)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a with ⟨_, _ | _⟩ <;> rfl
+    · intro a; funext d
+      rcases a with ⟨_, _ | _⟩ <;> rcases d <;> rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a <;> rfl
+    · intro a; funext d
+      rcases a <;> rcases d <;> rfl
+
+/-- Right distributivity of polynomial product over coproduct.
+
+`(Q + R) * P ≃c (Q * P) + (R * P)`. -/
+def sumProdDistrib {P : PFunctor.{uA₁, uB₁}} {Q R : PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂, max uB₁ uB₂, max uA₁ uA₂, max uB₁ uB₂}
+      ((Q + R) * P) ((Q * P) + (R * P)) where
+  toChart :=
+    (fun ⟨qr, p⟩ => match qr with
+      | Sum.inl q => Sum.inl (q, p)
+      | Sum.inr r => Sum.inr (r, p)) ⇉
+    (fun ⟨qr, _⟩ d => match qr, d with
+      | Sum.inl _, Sum.inl qb => Sum.inl qb
+      | Sum.inl _, Sum.inr pb => Sum.inr pb
+      | Sum.inr _, Sum.inl rb => Sum.inl rb
+      | Sum.inr _, Sum.inr pb => Sum.inr pb)
+  invChart :=
+    (Sum.elim
+      (fun ⟨q, p⟩ => (Sum.inl q, p))
+      (fun ⟨r, p⟩ => (Sum.inr r, p))) ⇉
+    (fun qprp d => match qprp, d with
+      | Sum.inl _, Sum.inl qb => Sum.inl qb
+      | Sum.inl _, Sum.inr pb => Sum.inr pb
+      | Sum.inr _, Sum.inl rb => Sum.inl rb
+      | Sum.inr _, Sum.inr pb => Sum.inr pb)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a with ⟨_ | _, _⟩ <;> rfl
+    · intro a; funext d
+      rcases a with ⟨_ | _, _⟩ <;> rcases d <;> rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro a; rcases a <;> rfl
+    · intro a; funext d
+      rcases a <;> rcases d <;> rfl
+
+end Equiv
 
 end Prod
 
@@ -549,11 +794,153 @@ namespace Equiv
 
 variable {P : PFunctor.{uA₁, uB₁}} {Q : PFunctor.{uA₂, uB₂}}
 
-/-- Convert an equivalence between two polynomial functors `P` and `Q` to a chart equivalence. -/
+/-- Convert an equivalence between two polynomial functors `P` and `Q` to a chart. -/
 def toChart (e : P ≃ₚ Q) : Chart P Q where
   toFunA := e.equivA
   toFunB := fun a => e.equivB a
 
+/-! ### Bridge `PFunctor.Equiv → Chart.Equiv`
+
+Every polynomial-functor equivalence yields a chart equivalence: the forward
+chart uses `e.equivA` / `e.equivB`, and the inverse chart uses their symmetric
+counterparts. The proofs of `left_inv` / `right_inv` need the cast
+machinery from `forward_equivB_roundtrip` / `reverse_equivB_roundtrip` because
+`e.symm.equivA (e.equivA a)` and `a` are only propositionally equal.
+
+This is the chart analogue of `Equiv.toLensEquiv` and is the standard way to
+derive sigma / distributivity equivalences from their `PFunctor.Equiv`
+counterparts. -/
+
+private theorem eqRec_id_apply_codomain
+    {α : Sort*} {β : α → Sort*} {a₀ a₁ : α}
+    (h : a₀ = a₁) (x : β a₀) :
+    Eq.rec (motive := fun x _ => β a₀ → β x) id h x =
+      _root_.cast (congrArg β h) x := by
+  subst h; rfl
+
+@[simp]
+theorem symm_toChart_comp_toChart (e : P ≃ₚ Q) :
+    e.symm.toChart ∘c e.toChart = Chart.id P := by
+  refine Chart.ext _ _ (fun a => e.equivA.symm_apply_apply a) (fun a => ?_)
+  funext b
+  simp only [Chart.comp, Chart.id, toChart, Function.comp_apply]
+  rw [forward_equivB_roundtrip]
+  exact (eqRec_id_apply_codomain (e.equivA.symm_apply_apply a).symm b).symm
+
+@[simp]
+theorem toChart_comp_symm_toChart (e : P ≃ₚ Q) :
+    e.toChart ∘c e.symm.toChart = Chart.id Q := by
+  refine Chart.ext _ _ (fun a => e.equivA.apply_symm_apply a) (fun a => ?_)
+  funext b
+  simp only [Chart.comp, Chart.id, toChart, Function.comp_apply]
+  change e.equivB (e.equivA.symm a) (e.symm.equivB a b) = _
+  rw [reverse_equivB_roundtrip]
+  exact (eqRec_id_apply_codomain (e.equivA.apply_symm_apply a).symm b).symm
+
+/-- Convert an equivalence between two polynomial functors to a chart equivalence.
+
+Chart-side analogue of `Equiv.toLensEquiv`. Together with `Chart.Equiv.refl`,
+`symm`, and `trans`, this establishes a faithful functor
+`PFunctor.Equiv → Chart.Equiv`. -/
+def toChartEquiv (e : P ≃ₚ Q) : P ≃c Q where
+  toChart := e.toChart
+  invChart := e.symm.toChart
+  left_inv := symm_toChart_comp_toChart e
+  right_inv := toChart_comp_symm_toChart e
+
 end Equiv
+
+/-! ### Sigma equivalences
+
+These are derived from `PFunctor.Equiv.toChartEquiv` applied to the
+corresponding `PFunctor.Equiv` constructions. They mirror the
+`PFunctor.Lens.Equiv.sigma*` family. -/
+
+namespace Chart.Equiv
+
+variable {I : Type v}
+
+/-- Sigma of an empty family is the zero functor. -/
+def sigmaEmpty [IsEmpty I] {F : I → PFunctor.{uA, uB}} : sigma F ≃c 0 :=
+  PFunctor.Equiv.toChartEquiv (PFunctor.Equiv.emptySigma (F := F))
+
+/-- Sigma of a `PUnit`-indexed family is equivalent to the functor itself
+    (up to `ulift`). -/
+def sigmaUnit {F : PUnit → PFunctor.{uA, uB}} : sigma F ≃c (F PUnit.unit).ulift :=
+  PFunctor.Equiv.toChartEquiv
+    (PFunctor.Equiv.trans
+      (PFunctor.Equiv.punitSigma (F := F))
+      (PFunctor.Equiv.uliftEquiv (P := F PUnit.unit)))
+
+/-- Sigma of a unique-indexed family is equivalent to the default fiber
+    (up to `ulift`). -/
+def sigmaOfUnique [Unique I] {F : I → PFunctor.{uA, uB}} : sigma F ≃c (F default).ulift :=
+  PFunctor.Equiv.toChartEquiv
+    (PFunctor.Equiv.trans
+      (PFunctor.Equiv.uniqueSigma (F := F))
+      (PFunctor.Equiv.uliftEquiv (P := F default)))
+
+/-- Left distributivity of polynomial product over sigma. -/
+def prodSigmaDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂ v, max uB₁ uB₂, max uA₁ uA₂ v, max uB₁ uB₂}
+      (P * sigma F) (sigma (fun i => (P * F i : PFunctor.{max uA₁ uA₂, max uB₁ uB₂}))) :=
+  PFunctor.Equiv.toChartEquiv (PFunctor.Equiv.prodSigmaDistrib (P := P) (F := F))
+
+/-- Right distributivity of polynomial product over sigma. -/
+def sigmaProdDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    Chart.Equiv.{max uA₁ uA₂ v, max uB₁ uB₂, max uA₁ uA₂ v, max uB₁ uB₂}
+      (sigma F * P) (sigma (fun i => (F i * P : PFunctor.{max uA₁ uA₂, max uB₁ uB₂}))) :=
+  PFunctor.Equiv.toChartEquiv (PFunctor.Equiv.sigmaProdDistrib (P := P) (F := F))
+
+/-- Left distributivity of tensor product over sigma. -/
+def tensorSigmaDistrib {P : PFunctor.{uA₁, uB₁}} {F : I → PFunctor.{uA₂, uB₂}} :
+    P ⊗ sigma F ≃c sigma (fun i => P ⊗ F i) :=
+  PFunctor.Equiv.toChartEquiv (PFunctor.Equiv.tensorSigmaDistrib (P := P) (F := F))
+
+/-- Right distributivity of tensor product over sigma. -/
+def sigmaTensorDistrib {P : PFunctor.{uA₂, uB₂}} {F : I → PFunctor.{uA₁, uB₁}} :
+    sigma F ⊗ P ≃c sigma (fun i => F i ⊗ P) :=
+  PFunctor.Equiv.toChartEquiv (PFunctor.Equiv.sigmaTensorDistrib (F := F) (P := P))
+
+/-! ### Pi equivalences
+
+`piMap` lives in the operations section, but unlike lenses, charts admit
+no `piForall` (Pi-elimination requires direction-contravariance). What we
+get cleanly here is `piUnit` and `piZero`. -/
+
+/-- Pi over a `PUnit`-indexed family is equivalent to the functor itself. -/
+def piUnit {P : PFunctor.{uA, uB}} : pi (fun (_ : PUnit) => P) ≃c P where
+  toChart := (fun f => f PUnit.unit) ⇉ (fun _ s => s.2)
+  invChart := (fun pa _ => pa) ⇉ (fun _ pb => ⟨PUnit.unit, pb⟩)
+  left_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro f; funext u; cases u; rfl
+    · intro f; funext ⟨u, pb⟩; cases u; rfl
+  right_inv := by
+    refine Chart.ext _ _ ?_ ?_
+    · intro _; rfl
+    · intro _; funext _; rfl
+
+/-- Pi of a family of zero functors over an inhabited type is the zero functor. -/
+def piZero [Inhabited I] {F : I → PFunctor.{uA, uB}} (F_zero : ∀ i, F i = 0) :
+    pi F ≃c 0 := by
+  letI : IsEmpty (pi F).A := by
+    refine ⟨fun f => ?_⟩
+    have : PEmpty := by
+      simpa [F_zero (default : I)] using (f default)
+    exact this.elim
+  refine
+    { toChart := isEmptyElim ⇉ (fun a _ => isEmptyElim a)
+      invChart := PEmpty.elim ⇉ (fun a _ => PEmpty.elim a)
+      left_inv := by
+        refine Chart.ext _ _ ?_ ?_
+        · intro a; exact isEmptyElim a
+        · intro a; exact isEmptyElim a
+      right_inv := by
+        refine Chart.ext _ _ ?_ ?_
+        · intro a; exact PEmpty.elim a
+        · intro a; exact PEmpty.elim a }
+
+end Chart.Equiv
 
 end PFunctor
