@@ -116,6 +116,7 @@ import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.Corruption
 import VCVio.Interaction.UC.Emulates
 import VCVio.Interaction.UC.EnvAction
+import VCVio.Interaction.UC.EnvOpenProcess
 import VCVio.Interaction.UC.Interface
 import VCVio.Interaction.UC.MachineId
 import VCVio.Interaction.UC.Notation
