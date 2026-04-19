@@ -23,14 +23,14 @@ arbitrary continuation from ciphertexts. -/
 lemma uniformMaskedCipher_bind_dist_indep {β : Type}
     (head : A) (m₁ m₂ : M) (cont : A × M → ProbComp β) :
     evalDist (do
-      let y ← ($ᵗ M : ProbComp M)
+      let y ← ($ᵗ M)
       cont (head, m₁ + y)) =
     evalDist (do
-      let y ← ($ᵗ M : ProbComp M)
+      let y ← ($ᵗ M)
       cont (head, m₂ + y)) := by
   have hmask :
-      evalDist (((fun y : M => (head, m₁ + y)) <$> ($ᵗ M : ProbComp M))) =
-        evalDist (((fun y : M => (head, m₂ + y)) <$> ($ᵗ M : ProbComp M))) := by
+      evalDist (((fun y : M => (head, m₁ + y)) <$> ($ᵗ M))) =
+        evalDist (((fun y : M => (head, m₂ + y)) <$> ($ᵗ M))) := by
     simpa using
       evalDist_map_eq_of_evalDist_eq
         (h := evalDist_add_left_uniform_eq (α := M) m₁ m₂)

@@ -110,13 +110,13 @@ theorem sigma_hvzk (g : G) [Finite F] :
   apply evalDist_ext
   intro t
   trans Pr[= t | do
-    let c ← ($ᵗ F : ProbComp F)
-    let r ← ($ᵗ F : ProbComp F)
+    let c ← ($ᵗ F)
+    let r ← ($ᵗ F)
     pure (((r + c * sk) • g - c • pk, c, r + c * sk) : G × F × F)]
   · simp only [SigmaProtocol.realTranscript, sigma]
     vcstep rw
     simp [h_eq, add_smul, mul_smul, add_sub_cancel_right]
-  · refine probOutput_bind_congr' ($ᵗ F : ProbComp F) t ?_
+  · refine probOutput_bind_congr' ($ᵗ F) t ?_
     intro c
     simpa [simTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
       (probOutput_bind_bijective_uniform_cross

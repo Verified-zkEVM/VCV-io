@@ -551,13 +551,13 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
         (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)) =
       evalDist
         (do
-          let bit ← ($ᵗ Bool : ProbComp Bool)
+          let bit ← ($ᵗ Bool)
           let z ← if bit then encAlg'.IND_CPA_LR_hybridGame adversary (k + 1)
                    else encAlg'.IND_CPA_LR_hybridGame adversary k
           pure (bit == z)) := by
   apply evalDist_ext
   intro x
-  refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) x ?_
+  refine probOutput_bind_congr' ($ᵗ Bool) x ?_
   intro bit
   change Pr[= x | do
       let (pk, _sk) ← encAlg'.keygen
@@ -632,7 +632,7 @@ theorem IND_CPA_stepAdversary_signedAdvantageReal_eq_hybridDiff_half
       (Pr[= true | IND_CPA_OneTime_Game_ProbComp (encAlg := encAlg')
         (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)]).toReal =
       (Pr[= true | do
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let z ← if bit then encAlg'.IND_CPA_LR_hybridGame adversary (k + 1)
                  else encAlg'.IND_CPA_LR_hybridGame adversary k
         pure (bit == z)]).toReal from by

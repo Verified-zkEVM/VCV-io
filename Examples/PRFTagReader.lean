@@ -634,7 +634,7 @@ theorem unlinkBadExp_le_sessionCollisionBound
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ)
     (hmax : ∀ nonce : Nonce,
-      (Pr[= nonce | ($ᵗ Nonce : ProbComp Nonce)]).toReal ≤ maxNonceProb) :
+      (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ maxNonceProb) :
     (Pr[= true | unlinkBadExp (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary]).toReal ≤
       ((sessionsPerTag ^ 2 * Fintype.card TagId : ℕ) : ℝ) * maxNonceProb := by
@@ -646,7 +646,7 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ)
     (hmax : ∀ nonce : Nonce,
-      (Pr[= nonce | ($ᵗ Nonce : ProbComp Nonce)]).toReal ≤ maxNonceProb) :
+      (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ maxNonceProb) :
     ∃ multiAdv : PRFScheme.PRFAdversary (TagId × Nonce) Digest,
       ∃ singleAdv : PRFScheme.PRFAdversary ((TagId × Fin sessionsPerTag) × Nonce) Digest,
         unlinkabilityAdvantage (TagId := TagId) (Nonce := Nonce) (Digest := Digest)

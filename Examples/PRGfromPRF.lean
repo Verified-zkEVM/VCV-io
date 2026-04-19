@@ -82,7 +82,7 @@ def prfReduction (n : ℕ) (adv : PRGAdversary (List.Vector O n)) : PRFAdversary
   show OracleComp (unifSpec + (S →ₒ S × O)) Bool from do
     let seed ← OracleComp.liftComp (spec := unifSpec)
       (superSpec := unifSpec + (S →ₒ S × O))
-      ($ᵗ S : ProbComp S)
+      ($ᵗ S)
     let outputs ← oracleOutputs n seed
     OracleComp.liftComp (spec := unifSpec)
       (superSpec := unifSpec + (S →ₒ S × O))
@@ -176,7 +176,7 @@ omit [DecidableEq S] [Inhabited O] [Fintype O] [DecidableEq O] [SampleableType O
 the real PRF experiment for the reduction adversary, provided the PRF key
 distribution is uniform. -/
 theorem prgRealExp_eq_prfRealExp
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (hkey : evalDist prf.keygen = evalDist ($ᵗ K))
     (adv : PRGAdversary (List.Vector O n)) :
     evalDist (PRGScheme.prgRealExp (streamPRG prf n) adv) =
       evalDist (PRFScheme.prfRealExp prf (prfReduction (S := S) (O := O) n adv)) := by
@@ -218,7 +218,7 @@ omit [DecidableEq O] in
 bounded by the PRF advantage of the reduction plus the collision probability in the
 ideal random-function world. -/
 theorem security
-    (hkey : evalDist prf.keygen = evalDist ($ᵗ K : ProbComp K))
+    (hkey : evalDist prf.keygen = evalDist ($ᵗ K))
     (adv : PRGAdversary (List.Vector O n)) :
     PRGScheme.prgAdvantage (streamPRG prf n) adv ≤
       PRFScheme.prfAdvantage prf (prfReduction (S := S) (O := O) n adv) +

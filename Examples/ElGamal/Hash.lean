@@ -120,10 +120,10 @@ Given `(hk, v)` where `v` is either `hash hk (z • g)` or random:
 def esReduction (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     HK × M → ProbComp Bool :=
   fun (hk, v) => do
-    let sk ← ($ᵗ F : ProbComp F)
+    let sk ← ($ᵗ F)
     let (m₁, m₂, st) ← adv.chooseMessages (hk, sk • g)
     let b ← $ᵗ Bool
-    let y ← ($ᵗ F : ProbComp F)
+    let y ← ($ᵗ F)
     let c : G × M := (y • g, v + (if b then m₁ else m₂))
     let b' ← adv.distinguish st c
     return (b == b')
@@ -138,20 +138,20 @@ theorem cpaGame_eq_ddhReal
       (encAlg := hashedElGamal F g hash) adv] =
     Pr[= true | ddhExpReal g (ddhReduction (F := F) (hash := hash) adv)] := by
   let cpaCanonical : ProbComp Bool := do
-    let b ← ($ᵗ Bool : ProbComp Bool)
-    let hk ← ($ᵗ HK : ProbComp HK)
-    let a ← ($ᵗ F : ProbComp F)
+    let b ← ($ᵗ Bool)
+    let hk ← ($ᵗ HK)
+    let a ← ($ᵗ F)
     let x ← adv.chooseMessages (hk, a • g)
-    let y ← ($ᵗ F : ProbComp F)
+    let y ← ($ᵗ F)
     let b' ← adv.distinguish x.2.2
       (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
     pure (b == b')
   let ddhCanonical : ProbComp Bool := do
-    let hk ← ($ᵗ HK : ProbComp HK)
-    let a ← ($ᵗ F : ProbComp F)
+    let hk ← ($ᵗ HK)
+    let a ← ($ᵗ F)
     let x ← adv.chooseMessages (hk, a • g)
-    let b ← ($ᵗ Bool : ProbComp Bool)
-    let y ← ($ᵗ F : ProbComp F)
+    let b ← ($ᵗ Bool)
+    let y ← ($ᵗ F)
     let b' ← adv.distinguish x.2.2
       (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
     pure (b == b')
@@ -166,14 +166,14 @@ theorem cpaGame_eq_ddhReal
       Pr[= true | ddhCanonical] := by
     simpa [cpaCanonical, ddhCanonical, bind_assoc, map_eq_bind_pure_comp] using
       (probOutput_bind_bind_swap
-        ($ᵗ Bool : ProbComp Bool)
+        ($ᵗ Bool)
         (do
-          let hk ← ($ᵗ HK : ProbComp HK)
-          let a ← ($ᵗ F : ProbComp F)
+          let hk ← ($ᵗ HK)
+          let a ← ($ᵗ F)
           let x ← adv.chooseMessages (hk, a • g)
           pure (hk, a, x))
         (fun b ⟨hk, a, x⟩ => do
-          let y ← ($ᵗ F : ProbComp F)
+          let y ← ($ᵗ F)
           let b' ← adv.distinguish x.2.2
             (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
           pure (b == b'))
@@ -182,24 +182,24 @@ theorem cpaGame_eq_ddhReal
       Pr[= true | ddhExpReal g (ddhReduction (F := F) (hash := hash) adv)] =
       Pr[= true | ddhCanonical] := by
     trans Pr[= true | do
-      let a ← ($ᵗ F : ProbComp F)
-      let hk ← ($ᵗ HK : ProbComp HK)
+      let a ← ($ᵗ F)
+      let hk ← ($ᵗ HK)
       let x ← adv.chooseMessages (hk, a • g)
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let y ← ($ᵗ F : ProbComp F)
+      let b ← ($ᵗ Bool)
+      let y ← ($ᵗ F)
       let b' ← adv.distinguish x.2.2
         (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
       pure (b == b')]
     · simpa [ddhExpReal, ddhReduction, bind_assoc, map_eq_bind_pure_comp,
         smul_smul, mul_comm] using
-        (probOutput_bind_congr' ($ᵗ F : ProbComp F) true (fun a => by
+        (probOutput_bind_congr' ($ᵗ F) true (fun a => by
           simpa [bind_assoc, map_eq_bind_pure_comp, smul_smul, mul_comm] using
             (probOutput_bind_bind_swap
-              ($ᵗ F : ProbComp F)
+              ($ᵗ F)
               (do
-                let hk ← ($ᵗ HK : ProbComp HK)
+                let hk ← ($ᵗ HK)
                 let x ← adv.chooseMessages (hk, a • g)
-                let b ← ($ᵗ Bool : ProbComp Bool)
+                let b ← ($ᵗ Bool)
                 pure (hk, x, b))
               (fun y ⟨hk, x, b⟩ => do
                 let b' ← adv.distinguish x.2.2
@@ -208,12 +208,12 @@ theorem cpaGame_eq_ddhReal
               true)))
     · simpa [ddhCanonical, bind_assoc, map_eq_bind_pure_comp] using
         (probOutput_bind_bind_swap
-          ($ᵗ F : ProbComp F)
-          ($ᵗ HK : ProbComp HK)
+          ($ᵗ F)
+          ($ᵗ HK)
           (fun a hk => do
             let x ← adv.chooseMessages (hk, a • g)
-            let b ← ($ᵗ Bool : ProbComp Bool)
-            let y ← ($ᵗ F : ProbComp F)
+            let b ← ($ᵗ Bool)
+            let y ← ($ᵗ F)
             let b' ← adv.distinguish x.2.2
               (y • g, hash hk (y • (a • g)) + if b then x.1 else x.2.1)
             pure (b == b'))
@@ -227,12 +227,12 @@ theorem ddhRand_eq_esReal
     Pr[= true | ddhExpRand g (ddhReduction (F := F) (hash := hash) adv)] =
     Pr[= true | EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)] := by
   let canonical : ProbComp Bool := do
-    let hk ← ($ᵗ HK : ProbComp HK)
-    let a ← ($ᵗ F : ProbComp F)
+    let hk ← ($ᵗ HK)
+    let a ← ($ᵗ F)
     let x ← adv.chooseMessages (hk, a • g)
-    let b ← ($ᵗ Bool : ProbComp Bool)
-    let z ← ($ᵗ F : ProbComp F)
-    let y ← ($ᵗ F : ProbComp F)
+    let b ← ($ᵗ Bool)
+    let z ← ($ᵗ F)
+    let y ← ($ᵗ F)
     let b' ← adv.distinguish x.2.2
       (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
     pure (b == b')
@@ -240,25 +240,25 @@ theorem ddhRand_eq_esReal
       Pr[= true | ddhExpRand g (ddhReduction (F := F) (hash := hash) adv)] =
       Pr[= true | canonical] := by
     trans Pr[= true | do
-      let a ← ($ᵗ F : ProbComp F)
-      let z ← ($ᵗ F : ProbComp F)
-      let hk ← ($ᵗ HK : ProbComp HK)
+      let a ← ($ᵗ F)
+      let z ← ($ᵗ F)
+      let hk ← ($ᵗ HK)
       let x ← adv.chooseMessages (hk, a • g)
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let y ← ($ᵗ F : ProbComp F)
+      let b ← ($ᵗ Bool)
+      let y ← ($ᵗ F)
       let b' ← adv.distinguish x.2.2
         (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
       pure (b == b')]
     · simpa [ddhExpRand, ddhReduction, bind_assoc, map_eq_bind_pure_comp] using
-        (probOutput_bind_congr' ($ᵗ F : ProbComp F) true (fun a => by
+        (probOutput_bind_congr' ($ᵗ F) true (fun a => by
           simpa [bind_assoc, map_eq_bind_pure_comp] using
             (probOutput_bind_bind_swap
-              ($ᵗ F : ProbComp F)
+              ($ᵗ F)
               (do
-                let z ← ($ᵗ F : ProbComp F)
-                let hk ← ($ᵗ HK : ProbComp HK)
+                let z ← ($ᵗ F)
+                let hk ← ($ᵗ HK)
                 let x ← adv.chooseMessages (hk, a • g)
-                let b ← ($ᵗ Bool : ProbComp Bool)
+                let b ← ($ᵗ Bool)
                 pure (z, hk, x, b))
               (fun y ⟨z, hk, x, b⟩ => do
                 let b' ← adv.distinguish x.2.2
@@ -266,40 +266,40 @@ theorem ddhRand_eq_esReal
                 pure (b == b'))
               true)))
     · trans Pr[= true | do
-          let a ← ($ᵗ F : ProbComp F)
-          let hk ← ($ᵗ HK : ProbComp HK)
+          let a ← ($ᵗ F)
+          let hk ← ($ᵗ HK)
           let x ← adv.chooseMessages (hk, a • g)
-          let b ← ($ᵗ Bool : ProbComp Bool)
-          let z ← ($ᵗ F : ProbComp F)
-          let y ← ($ᵗ F : ProbComp F)
+          let b ← ($ᵗ Bool)
+          let z ← ($ᵗ F)
+          let y ← ($ᵗ F)
           let b' ← adv.distinguish x.2.2
             (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
           pure (b == b')]
       · simpa [bind_assoc, map_eq_bind_pure_comp] using
-          (probOutput_bind_congr' ($ᵗ F : ProbComp F) true (fun a => by
+          (probOutput_bind_congr' ($ᵗ F) true (fun a => by
             simpa [bind_assoc, map_eq_bind_pure_comp] using
               (probOutput_bind_bind_swap
-                ($ᵗ F : ProbComp F)
+                ($ᵗ F)
                 (do
-                  let hk ← ($ᵗ HK : ProbComp HK)
+                  let hk ← ($ᵗ HK)
                   let x ← adv.chooseMessages (hk, a • g)
-                  let b ← ($ᵗ Bool : ProbComp Bool)
+                  let b ← ($ᵗ Bool)
                   pure (hk, x, b))
                 (fun z ⟨hk, x, b⟩ => do
-                  let y ← ($ᵗ F : ProbComp F)
+                  let y ← ($ᵗ F)
                   let b' ← adv.distinguish x.2.2
                     (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
                   pure (b == b'))
                 true)))
       · simpa [canonical, bind_assoc, map_eq_bind_pure_comp] using
           (probOutput_bind_bind_swap
-            ($ᵗ F : ProbComp F)
-            ($ᵗ HK : ProbComp HK)
+            ($ᵗ F)
+            ($ᵗ HK)
             (fun a hk => do
               let x ← adv.chooseMessages (hk, a • g)
-              let b ← ($ᵗ Bool : ProbComp Bool)
-              let z ← ($ᵗ F : ProbComp F)
-              let y ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ Bool)
+              let z ← ($ᵗ F)
+              let y ← ($ᵗ F)
               let b' ← adv.distinguish x.2.2
                 (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
               pure (b == b'))
@@ -307,19 +307,19 @@ theorem ddhRand_eq_esReal
   have hright :
       Pr[= true | EntropySmoothing.realExp F g hash (esReduction (F := F) (g := g) adv)] =
       Pr[= true | canonical] := by
-    refine probOutput_bind_congr' ($ᵗ HK : ProbComp HK) true ?_
+    refine probOutput_bind_congr' ($ᵗ HK) true ?_
     intro hk
     simpa [EntropySmoothing.realExp, esReduction, canonical, bind_assoc,
       map_eq_bind_pure_comp] using
       (probOutput_bind_bind_swap
-        ($ᵗ F : ProbComp F)
+        ($ᵗ F)
         (do
-          let a ← ($ᵗ F : ProbComp F)
+          let a ← ($ᵗ F)
           let x ← adv.chooseMessages (hk, a • g)
-          let b ← ($ᵗ Bool : ProbComp Bool)
+          let b ← ($ᵗ Bool)
           pure (a, x, b))
         (fun z ⟨a, x, b⟩ => do
-          let y ← ($ᵗ F : ProbComp F)
+          let y ← ($ᵗ F)
           let b' ← adv.distinguish x.2.2
             (y • g, hash hk (z • g) + if b then x.1 else x.2.1)
           pure (b == b'))
@@ -333,18 +333,18 @@ theorem esIdeal_eq_half
     (adv : AsymmEncAlg.IND_CPA_Adv (hashedElGamal F g hash)) :
     Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)] = 1 / 2 := by
   let inner : HK → ProbComp Bool := fun hk => do
-    let h ← ($ᵗ M : ProbComp M)
-    let sk ← ($ᵗ F : ProbComp F)
+    let h ← ($ᵗ M)
+    let sk ← ($ᵗ F)
     let (m₁, m₂, st) ← adv.chooseMessages (hk, sk • g)
-    let b ← ($ᵗ Bool : ProbComp Bool)
-    let y ← ($ᵗ F : ProbComp F)
+    let b ← ($ᵗ Bool)
+    let y ← ($ᵗ F)
     let b' ← adv.distinguish st (y • g, h + if b then m₁ else m₂)
     pure (decide (b = b'))
   let f : HK → Bool → ProbComp Bool := fun hk b => do
-    let sk ← ($ᵗ F : ProbComp F)
+    let sk ← ($ᵗ F)
     let (m₁, m₂, st) ← adv.chooseMessages (hk, sk • g)
-    let y ← ($ᵗ F : ProbComp F)
-    let h ← ($ᵗ M : ProbComp M)
+    let y ← ($ᵗ F)
+    let h ← ($ᵗ M)
     adv.distinguish st (y • g, h + if b then m₁ else m₂)
   have hf : ∀ hk, evalDist (f hk true) = evalDist (f hk false) := by
     intro hk
@@ -365,45 +365,45 @@ theorem esIdeal_eq_half
   have hrepr : ∀ hk,
       Pr[= true | inner hk] =
         Pr[= true | do
-          let b ← ($ᵗ Bool : ProbComp Bool)
+          let b ← ($ᵗ Bool)
           let b' ← f hk b
           pure (decide (b = b'))] := by
     intro hk
     trans Pr[= true | do
-      let sk ← ($ᵗ F : ProbComp F)
+      let sk ← ($ᵗ F)
       let x ← adv.chooseMessages (hk, sk • g)
-      let b ← ($ᵗ Bool : ProbComp Bool)
-      let y ← ($ᵗ F : ProbComp F)
-      let h ← ($ᵗ M : ProbComp M)
+      let b ← ($ᵗ Bool)
+      let y ← ($ᵗ F)
+      let h ← ($ᵗ M)
       let b' ← adv.distinguish x.2.2 (y • g, h + if b then x.1 else x.2.1)
       pure (decide (b = b'))]
     · simpa [inner, bind_assoc, map_eq_bind_pure_comp] using
         (probOutput_bind_bind_swap
-          ($ᵗ M : ProbComp M)
+          ($ᵗ M)
           (do
-            let sk ← ($ᵗ F : ProbComp F)
+            let sk ← ($ᵗ F)
             let x ← adv.chooseMessages (hk, sk • g)
-            let b ← ($ᵗ Bool : ProbComp Bool)
-            let y ← ($ᵗ F : ProbComp F)
+            let b ← ($ᵗ Bool)
+            let y ← ($ᵗ F)
             pure (sk, x, b, y))
           (fun h ⟨_sk, x, b, y⟩ => do
             let b' ← adv.distinguish x.2.2 (y • g, h + if b then x.1 else x.2.1)
             pure (decide (b = b')))
           true)
     · trans Pr[= true | do
-          let b ← ($ᵗ Bool : ProbComp Bool)
+          let b ← ($ᵗ Bool)
           let b' ← f hk b
           pure (decide (b = b'))]
       · simpa [f, bind_assoc, map_eq_bind_pure_comp] using
           (probOutput_bind_bind_swap
             (do
-              let sk ← ($ᵗ F : ProbComp F)
+              let sk ← ($ᵗ F)
               let x ← adv.chooseMessages (hk, sk • g)
               pure (sk, x))
-            ($ᵗ Bool : ProbComp Bool)
+            ($ᵗ Bool)
             (fun ⟨_sk, x⟩ b => do
-              let y ← ($ᵗ F : ProbComp F)
-              let h ← ($ᵗ M : ProbComp M)
+              let y ← ($ᵗ F)
+              let h ← ($ᵗ M)
               let b' ← adv.distinguish x.2.2 (y • g, h + if b then x.1 else x.2.1)
               pure (decide (b = b')))
             true)
@@ -415,30 +415,30 @@ theorem esIdeal_eq_half
   calc
     Pr[= true | EntropySmoothing.idealExp (esReduction (F := F) (g := g) adv)] =
         Pr[= true | do
-          let hk ← ($ᵗ HK : ProbComp HK)
+          let hk ← ($ᵗ HK)
           inner hk] := by
       simp [EntropySmoothing.idealExp, esReduction,
         show ∀ a b : Bool, (a == b) = decide (a = b) from by decide,
         inner]
     _ = Pr[= true | do
-          let hk ← ($ᵗ HK : ProbComp HK)
-          ($ᵗ Bool : ProbComp Bool)] :=
+          let hk ← ($ᵗ HK)
+          ($ᵗ Bool)] :=
       probOutput_bind_congr' ($ᵗ HK) true (fun hk => by
         simpa [probOutput_uniformSample] using hhalf hk)
     _ = 1 / 2 := by
       rw [probOutput_bind_eq_tsum]
-      have hbool : Pr[= true | ($ᵗ Bool : ProbComp Bool)] = (1 / 2 : ℝ≥0∞) := by
+      have hbool : Pr[= true | ($ᵗ Bool)] = (1 / 2 : ℝ≥0∞) := by
         simp [probOutput_uniformSample]
       simp_rw [hbool]
-      have hsum : ∑' x : HK, Pr[= x | ($ᵗ HK : ProbComp HK)] = 1 :=
-        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ HK : ProbComp HK)
+      have hsum : ∑' x : HK, Pr[= x | ($ᵗ HK)] = 1 :=
+        HasEvalPMF.tsum_probOutput_eq_one ($ᵗ HK)
       calc
-        ∑' x, Pr[= x | ($ᵗ HK : ProbComp HK)] * (1 / 2 : ℝ≥0∞) =
-            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ HK : ProbComp HK)] := by
+        ∑' x, Pr[= x | ($ᵗ HK)] * (1 / 2 : ℝ≥0∞) =
+            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ HK)] := by
               refine tsum_congr ?_
               intro x
               rw [mul_comm]
-        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ HK : ProbComp HK)] := by
+        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ HK)] := by
               rw [ENNReal.tsum_mul_left]
         _ = (1 / 2 : ℝ≥0∞) * 1 := by rw [hsum]
         _ = 1 / 2 := by simp

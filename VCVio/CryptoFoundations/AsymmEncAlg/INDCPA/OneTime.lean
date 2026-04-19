@@ -62,7 +62,7 @@ variable {encAlg : AsymmEncAlg ProbComp M PK SK C}
 /-- `ProbComp` specialization of the one-time IND-CPA game. -/
 abbrev IND_CPA_OneTime_Game_ProbComp (adv : IND_CPA_Adv encAlg) : ProbComp Bool :=
   do
-    let b ← ($ᵗ Bool : ProbComp Bool)
+    let b ← ($ᵗ Bool)
     let (pk, _sk) ← encAlg.keygen
     let (m₁, m₂, state) ← adv.chooseMessages pk
     let c ← encAlg.encrypt pk (if b then m₁ else m₂)
