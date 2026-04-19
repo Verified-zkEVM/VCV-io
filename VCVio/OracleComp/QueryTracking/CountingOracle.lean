@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.Tracing
 import VCVio.OracleComp.EvalDist
 
 /-!
@@ -15,6 +16,11 @@ counts, allowing each oracle to be tracked individually.
 
 Tracking individually is not necessary, but gives tighter security bounds in some cases.
 It also allows for generating things like seed values for a computation more tightly.
+
+`QueryImpl.withCost` and `QueryImpl.withCounting` are response-independent traces, defined as
+specialisations of `QueryImpl.withTraceBefore` (see `Tracing.lean`): the cost is accumulated
+*before* the underlying handler runs, so failed queries still incur their cost. The counting
+case picks `QueryCount.single` as the trace function.
 -/
 
 open OracleSpec OracleComp
@@ -33,7 +39,10 @@ variable {ω : Type u} [Monoid ω]
 
 /-- Wrap an oracle implementation to accumulate cost in a `WriterT ω` layer.
 The cost function `costFn` assigns a cost value to each oracle query.
-Cost is accumulated before the implementation runs, so failed queries are still costed.
+Cost is accumulated *before* the implementation runs, so failed queries are still costed.
+
+This is the response-independent specialisation of `QueryImpl.withTraceBefore`:
+the trace value depends only on the query, not on the response.
 
 **Side-channel trace instrumentation.**
 `withCost` doubles as automatic side-channel instrumentation: given any
@@ -51,7 +60,10 @@ query is visible." For observations at non-query points (e.g. pure-computation
 timing), use the explicit `observe` / `runObs` API from `ObservationOracle`. -/
 def withCost (so : QueryImpl spec m) (costFn : spec.Domain → ω) :
     QueryImpl spec (WriterT ω m) :=
-  fun t => do tell (costFn t); so t
+  so.withTraceBefore costFn
+
+lemma withCost_eq_withTraceBefore (so : QueryImpl spec m) (costFn : spec.Domain → ω) :
+    so.withCost costFn = so.withTraceBefore costFn := rfl
 
 @[simp, grind =]
 lemma withCost_apply (so : QueryImpl spec m) (costFn : spec.Domain → ω)
@@ -60,24 +72,20 @@ lemma withCost_apply (so : QueryImpl spec m) (costFn : spec.Domain → ω)
 
 lemma fst_map_run_withCost [LawfulMonad m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (so.withCost costFn) mx).run = simulateQ so mx := by
-  induction mx using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => simp [h]
+    Prod.fst <$> (simulateQ (so.withCost costFn) mx).run = simulateQ so mx :=
+  fst_map_run_withTraceBefore so costFn mx
 
 /-- Cost-tracking preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
 wrapping an oracle implementation with `withCost` does not change the probability of failure. -/
 lemma probFailure_run_simulateQ_withCost [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] = Pr[⊥ | simulateQ so mx] := by
-  rw [show Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] =
-    Pr[⊥ | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] from
-    (probFailure_map _ _).symm, fst_map_run_withCost]
+    Pr[⊥ | (simulateQ (so.withCost costFn) mx).run] = Pr[⊥ | simulateQ so mx] :=
+  probFailure_run_simulateQ_withTraceBefore so costFn mx
 
 lemma NeverFail_run_simulateQ_withCost_iff [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withCost]
+    NeverFail (simulateQ (so.withCost costFn) mx).run ↔ NeverFail (simulateQ so mx) :=
+  NeverFail_run_simulateQ_withTraceBefore_iff so costFn mx
 
 /-- When every query costs the monoid identity `1`, the trace is always `1`,
 so `withCost` is a no-op up to pairing with `1`. -/
@@ -85,10 +93,8 @@ so `withCost` is a no-op up to pairing with `1`. -/
 lemma run_simulateQ_withCost_const_one [LawfulMonad m]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
     (simulateQ (so.withCost (fun _ => (1 : ω))) mx).run =
-      (·, 1) <$> simulateQ so mx := by
-  induction mx using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa ih => simp [ih]
+      (·, 1) <$> simulateQ so mx :=
+  run_simulateQ_withTraceBefore_const_one so mx
 
 /-! ### EvalDist Bridge for `withCost`
 
@@ -100,19 +106,19 @@ lemma evalDist_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     evalDist (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
       evalDist (simulateQ so mx) :=
-  congrArg evalDist (fst_map_run_withCost so costFn mx)
+  evalDist_fst_run_withTraceBefore so costFn mx
 
 lemma probOutput_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) (x : α) :
     Pr[= x | Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
-      Pr[= x | simulateQ so mx] := by
-  rw [fst_map_run_withCost]
+      Pr[= x | simulateQ so mx] :=
+  probOutput_fst_run_withTraceBefore so costFn mx x
 
 lemma support_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
     support (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
-      support (simulateQ so mx) := by
-  rw [fst_map_run_withCost]
+      support (simulateQ so mx) :=
+  support_fst_run_withTraceBefore so costFn mx
 
 end withCost
 

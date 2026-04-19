@@ -249,7 +249,16 @@ end QueryCount
 
 /-- Log of queries represented by a list of dependent product's tagging the oracle's index.
 `(t : spec.Domain) × (spec.Range t)` is slightly more restricted as it doesn't
-keep track of query ordering between different oracles. -/
+keep track of query ordering between different oracles.
+
+A `QueryLog spec` is morally a free monoid on `Idx spec.toPFunctor`, with
+identity `[]` and product `(++)`. We do *not* declare a global
+`Monoid (QueryLog spec)` instance: doing so would conflict with the
+`[EmptyCollection ω] [Append ω] → Monad (WriterT ω M)` instance Mathlib
+already provides for `WriterT (QueryLog spec) M`, which the existing
+`WriterTBridge`/`mvcgen` proof infrastructure relies on. The
+`QueryImpl.withTrace`/`withLogging` API instead uses the Append-based
+`Monad (WriterT _ _)` directly via `QueryImpl.withTraceAppend`. -/
 @[reducible] def QueryLog (spec : OracleSpec.{u, v} ι) : Type (max u v) :=
   List ((t : spec.Domain) × spec.Range t)
 
