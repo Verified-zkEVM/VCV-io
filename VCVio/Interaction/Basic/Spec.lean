@@ -100,7 +100,7 @@ This is the canonical representation of "an interactive node where the
 participant chooses a value of some move type, and the continuation is
 selected by that value". It is independent of payload data, controller
 attribution, and execution semantics; those layers refine the same
-polynomial via `Decoration`, `NodeSemantics`, and `StepOver`. -/
+polynomial via `Decoration`, `NodeProfile`, and `StepOver`. -/
 @[reducible]
 def basePFunctor : PFunctor.{u+1, u} where
   A := Type u
