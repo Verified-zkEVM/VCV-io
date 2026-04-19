@@ -66,7 +66,7 @@ def prfIdealQueryImpl [DecidableEq D] [SampleableType R] :
     QueryImpl (PRFOracleSpec D R) (StateT ((D →ₒ R).QueryCache) ProbComp) :=
   (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
     (StateT ((D →ₒ R).QueryCache) ProbComp) +
-    randomOracle (spec := (D →ₒ R))
+    (D →ₒ R).randomOracle
 
 /-- Real PRF experiment: sample a key, let the adversary query `prf.eval k`. -/
 def prfRealExp (prf : PRFScheme K D R) (adversary : PRFAdversary D R) :

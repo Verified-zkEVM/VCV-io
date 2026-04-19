@@ -146,12 +146,12 @@ def costOracle {ω : Type u} [Monoid ω] (costFn : spec.Domain → ω) :
 
 /-- Oracle for counting the number of queries made by a computation. The count is stored as a
 function from oracle indices to counts, to give finer grained information about the count. -/
-def countingOracle [DecidableEq ι] :
+def OracleSpec.countingOracle [DecidableEq ι] :
     QueryImpl spec (WriterT (QueryCount ι) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withCounting
 
 lemma countingOracle_eq_costOracle [DecidableEq ι] :
-    countingOracle (spec := spec) = costOracle (QueryCount.single ·) := rfl
+    spec.countingOracle = costOracle (QueryCount.single ·) := rfl
 
 namespace costOracle
 
@@ -200,7 +200,7 @@ lemma run_simulateQ_bind_fst (oa : OracleComp spec α) (ob : α → OracleComp s
 @[simp]
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type} (oa : OracleComp spec₀ α) :
-    Pr[⊥ | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[⊥ | oa] := by
+    Pr[⊥ | (simulateQ (spec₀.countingOracle) oa).run] = Pr[⊥ | oa] := by
   simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
     QueryImpl.probFailure_run_simulateQ_withCost, simulateQ_ofLift_eq_self]
 
@@ -209,7 +209,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) :
-    NeverFail (simulateQ (countingOracle (spec := spec₀)) oa).run ↔ NeverFail oa := by
+    NeverFail (simulateQ (spec₀.countingOracle) oa).run ↔ NeverFail oa := by
   simp only [countingOracle, QueryImpl.withCounting_eq_withCost,
     QueryImpl.NeverFail_run_simulateQ_withCost_iff, simulateQ_ofLift_eq_self]
 
@@ -217,7 +217,7 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (p : α → Prop) :
-    Pr[ fun z => p z.1 | (simulateQ (countingOracle (spec := spec₀)) oa).run] = Pr[ p | oa] := by
+    Pr[ fun z => p z.1 | (simulateQ (spec₀.countingOracle) oa).run] = Pr[ p | oa] := by
   rw [show (fun z : α × QueryCount ι₀ => p z.1) = p ∘ Prod.fst from rfl,
     ← probEvent_map, fst_map_run_simulateQ]
 
@@ -225,7 +225,7 @@ lemma probEvent_fst_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 lemma probOutput_fst_map_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (x : α) :
-    Pr[= x | Prod.fst <$> (simulateQ (countingOracle (spec := spec₀)) oa).run] =
+    Pr[= x | Prod.fst <$> (simulateQ (spec₀.countingOracle) oa).run] =
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 

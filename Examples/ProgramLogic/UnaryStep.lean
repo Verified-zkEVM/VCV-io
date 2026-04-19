@@ -59,7 +59,7 @@ example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
   vcstep
 
 example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
-    wp⟦(liftM (query t) : OracleComp spec (spec.Range t))⟧ post =
+    wp⟦(query t : OracleComp spec (spec.Range t))⟧ post =
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
   vcstep
 
@@ -79,7 +79,7 @@ example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
 
 example (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
-      evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
+      evalDist (impl t) = evalDist (query t : OracleComp spec (spec.Range t)))
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp⟦simulateQ impl oa⟧ post = wp⟦oa⟧ post := by
   simpa using OracleComp.ProgramLogic.wp_simulateQ_eq impl hImpl oa post

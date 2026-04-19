@@ -120,7 +120,7 @@ private def loggingROQueryImpl :
 
 /-- Lift a `ProbComp` computation into the BR93 random-oracle world. -/
 private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
-  OracleComp.liftComp (spec := unifSpec) (superSpec := RO_Spec Rand M) px
+  px
 
 /-- Real one-time CPA game in the random-oracle model. -/
 def cpaGame (tdp : TrapdoorPermutation PK SK Rand)

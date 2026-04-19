@@ -61,7 +61,7 @@ end QueryImpl
 /-- Simulation oracle for tracking the quries in a `QueryLog`, without modifying the actual
 behavior of the oracle. Requires decidable equality of the indexing set to determine
 which list to update when queries come in. -/
-def loggingOracle {spec : OracleSpec ι} :
+def OracleSpec.loggingOracle {spec : OracleSpec ι} :
     QueryImpl spec (WriterT (QueryLog spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withLogging
 
@@ -74,20 +74,20 @@ lemma probFailure_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
     Pr[⊥ | (WriterT.run
-        (simulateQ (loggingOracle (spec := spec)) oa) :
+        (simulateQ spec.loggingOracle oa) :
           OracleComp spec (α × spec.QueryLog))] = Pr[⊥ | oa] := by
   rw [loggingOracle, QueryImpl.probFailure_run_simulateQ_withLogging, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     (oa : OracleComp spec α) :
-    Prod.fst <$> (simulateQ (loggingOracle (spec := spec)) oa).run = oa := by
+    Prod.fst <$> (simulateQ spec.loggingOracle oa).run = oa := by
   rw [loggingOracle, QueryImpl.fst_map_run_withLogging, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma run_simulateQ_bind_fst {spec : OracleSpec.{0, 0} ι} {α β : Type}
     (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
-    ((simulateQ (loggingOracle (spec := spec)) oa).run >>= fun x => ob x.1) = oa >>= ob := by
+    ((simulateQ spec.loggingOracle oa).run >>= fun x => ob x.1) = oa >>= ob := by
   rw [← bind_map_left Prod.fst, fst_map_run_simulateQ]
 
 /-- Specialization of `QueryImpl.NeverFail_run_simulateQ_withLogging_iff` to `loggingOracle`. -/
@@ -95,14 +95,14 @@ lemma run_simulateQ_bind_fst {spec : OracleSpec.{0, 0} ι} {α β : Type}
 lemma NeverFail_run_simulateQ_iff {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) :
-    NeverFail (simulateQ (loggingOracle (spec := spec)) oa).run ↔ NeverFail oa := by
+    NeverFail (simulateQ spec.loggingOracle oa).run ↔ NeverFail oa := by
   rw [loggingOracle, QueryImpl.NeverFail_run_simulateQ_withLogging_iff, simulateQ_ofLift_eq_self]
 
 @[simp]
 lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (p : α → Prop) :
-    Pr[ fun z => p z.1 | (simulateQ (loggingOracle (spec := spec)) oa).run] = Pr[ p | oa] := by
+    Pr[ fun z => p z.1 | (simulateQ spec.loggingOracle oa).run] = Pr[ p | oa] := by
   rw [show (fun z : α × spec.QueryLog => p z.1) = p ∘ Prod.fst from rfl,
     ← probEvent_map, fst_map_run_simulateQ]
 
@@ -110,7 +110,7 @@ lemma probEvent_fst_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
 lemma probOutput_fst_map_run_simulateQ {spec : OracleSpec.{0, 0} ι} {α : Type}
     [spec.Fintype] [spec.Inhabited]
     (oa : OracleComp spec α) (x : α) :
-    Pr[= x | Prod.fst <$> (simulateQ (loggingOracle (spec := spec)) oa).run] =
+    Pr[= x | Prod.fst <$> (simulateQ spec.loggingOracle oa).run] =
       Pr[= x | oa] := by
   rw [fst_map_run_simulateQ]
 
@@ -187,7 +187,7 @@ theorem log_length_le_of_mem_support_run_simulateQ
       obtain ⟨z', hz', rfl⟩ := hz
       have hqu_log : qu.2.length = 1 := by
         simp only [OracleQuery.cont_query, id_map, OracleQuery.input_query] at hqu
-        have hrun : (loggingOracle (spec := spec) t).run =
+        have hrun : (spec.loggingOracle t).run =
             (query t : OracleComp spec _) >>= fun u =>
               pure (u, [⟨t, u⟩]) := by
           simp [loggingOracle, QueryImpl.withLogging_apply,

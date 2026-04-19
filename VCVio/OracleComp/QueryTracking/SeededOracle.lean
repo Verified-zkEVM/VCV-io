@@ -53,7 +53,7 @@ end QueryImpl
 
 /-- Use pregenerated oracle responses for queries, falling back to the real oracle
 when the seed is exhausted. Seed consumption is tracked via `StateT`. -/
-def seededOracle :
+def OracleSpec.seededOracle :
     QueryImpl spec (StateT (QuerySeed spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 

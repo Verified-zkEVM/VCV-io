@@ -259,13 +259,13 @@ noncomputable def IND_CPA_OneTime_DDHReduction_openProfiled
     AddWriterT (ResourceProfile ω κ) ProbComp Bool := do
   AddWriterT.addTell (ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
   AddWriterT.addTell (profile OneTimeINDCPACapability.chooseMessages)
-  let (m₁, m₂, st) ← monadLift <|
+  let (m₁, m₂, st) ←
     HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
       (.chooseMessages A)
-  let bit ← monadLift ($ᵗ Bool : ProbComp Bool)
+  let bit ← ($ᵗ Bool : ProbComp Bool)
   let c : G × G := (B, T + if bit then m₁ else m₂)
   AddWriterT.addTell (profile OneTimeINDCPACapability.distinguish)
-  let bit' ← monadLift <|
+  let bit' ←
     HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
       (.distinguish st c)
   pure (bit == bit')
@@ -324,13 +324,13 @@ lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
         ((do
           AddWriterT.addTell (ResourceProfile.ofIntrinsic (κ := κ) intrinsic)
           AddWriterT.addTell (profile OneTimeINDCPACapability.chooseMessages)
-          let (m₁, m₂, st) ← monadLift <|
+          let (m₁, m₂, st) ←
             HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
               (.chooseMessages A)
-          let bit ← monadLift ($ᵗ Bool : ProbComp Bool)
+          let bit ← ($ᵗ Bool : ProbComp Bool)
           let c : G × G := (B, T + if bit then m₁ else m₂)
           AddWriterT.addTell (profile OneTimeINDCPACapability.distinguish)
-          let bit' ← monadLift <|
+          let bit' ←
             HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G)) (m := ProbComp)
               (.distinguish st c)
           pure (bit == bit')) :

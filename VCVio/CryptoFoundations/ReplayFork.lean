@@ -411,7 +411,7 @@ def replayOracle [spec.DecidableEq] (i : ι) :
 /-- Run `main` with query logging. This is the first-run object for replay forks. -/
 @[reducible]
 def replayFirstRun (main : OracleComp spec α) : OracleComp spec (α × QueryLog spec) :=
-  (simulateQ (loggingOracle (spec := spec)) main).run
+  (simulateQ spec.loggingOracle main).run
 
 @[simp]
 lemma fst_map_replayFirstRun (main : OracleComp spec α) :
