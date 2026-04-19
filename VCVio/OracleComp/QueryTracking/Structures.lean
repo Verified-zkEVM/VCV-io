@@ -210,7 +210,13 @@ end QueryCache
 
 /-- Simple wrapper in order to introduce the `Monoid` structure for `countingOracle`.
 Marked as reducible and can generally be treated as just a function.
-`idx` gives the "index" for a given input -/
+`idx` gives the "index" for a given input.
+
+A `QueryCount ι` is a commutative monoid under pointwise addition; it is
+exactly the trace-monoid value type used by `QueryImpl.withCost`, which
+attaches a `WriterT (QueryCount ι) m` writer effect via the generic
+`QueryImpl.withTraceBefore` primitive in
+`VCVio/OracleComp/QueryTracking/Tracing.lean`. -/
 @[reducible] def QueryCount (ι : Type*) := ι → ℕ
 
 namespace QueryCount
@@ -252,11 +258,16 @@ end QueryCount
 keep track of query ordering between different oracles.
 
 A `QueryLog spec` is morally a free monoid on `Idx spec.toPFunctor`, with
-identity `[]` and product `(++)`. We do *not* declare a global
-`Monoid (QueryLog spec)` instance: doing so would conflict with the
-`[EmptyCollection ω] [Append ω] → Monad (WriterT ω M)` instance Mathlib
-already provides for `WriterT (QueryLog spec) M`, which the existing
-`WriterTBridge`/`mvcgen` proof infrastructure relies on. The
+identity `[]` and product `(++)`. By Mathlib reducibility this is exactly
+`FreeMonoid (Idx spec.toPFunctor) = TraceList spec.toPFunctor`, so a
+trace-valued boundary description such as `BoundaryAction.emit` (in
+`VCVio/Interaction/UC/OpenProcess.lean`) and a per-call `QueryLog`-valued
+writer share the same underlying free-monoid carrier.
+
+We do *not* declare a global `Monoid (QueryLog spec)` instance: doing so
+would conflict with the `[EmptyCollection ω] [Append ω] → Monad (WriterT ω M)`
+instance Mathlib already provides for `WriterT (QueryLog spec) M`, which the
+existing `WriterTBridge`/`mvcgen` proof infrastructure relies on. The
 `QueryImpl.withTrace`/`withLogging` API instead uses the Append-based
 `Monad (WriterT _ _)` directly via `QueryImpl.withTraceAppend`. -/
 @[reducible] def QueryLog (spec : OracleSpec.{u, v} ι) : Type (max u v) :=

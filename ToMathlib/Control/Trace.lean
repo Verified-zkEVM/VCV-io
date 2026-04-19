@@ -28,6 +28,8 @@ Many bookkeeping / observation patterns share this exact shape:
                                  pointwise addition,
 * `QueryCache spec`           — `ω = (t : spec.Domain) → Option (spec.Range t)`
                                  with at-most-once write semigroup,
+* `BoundaryAction.emit`       — `ω = TraceList Δ.Out` (the polynomial-trace
+                                 specialisation in `PFunctor/Trace.lean`),
 * abstract cost functions     — `ω` any commutative monoid (e.g. `ℝ≥0`).
 
 The monoid axioms are exactly what is needed to turn "one contribution per
