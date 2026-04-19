@@ -54,12 +54,15 @@ carried by `OpenNodeContext`.
 ## Deferred follow-up
 
 The runtime integration that consults `HasAccessControl` from
-`BoundaryAction.inputDecode` is deliberately deferred to the F2
-corruption layer, which already needs to touch the boundary surface for
-`EnvAction` dispatch. Until that integration lands, `HasAccessControl`
-is a *declarative* contract that downstream constructions thread by
-hand. See `Notes/vcvio-signal-uc-foundation-cjsv22.md` §6.10.1 and the
-F2 design memo for the integration plan.
+`BoundaryAction.inputDecode` is deliberately deferred to the
+corruption layer, which already needs to touch the boundary surface
+for `EnvAction` dispatch. Until that integration lands,
+`HasAccessControl` is a *declarative* contract that downstream
+constructions thread by hand: the typeclass exposes the per-process
+`allowed` predicate, but no construction in this file enforces it
+against the runtime. Consumers that need the contract enforced should
+filter incoming routed packets explicitly through `allowed` at the
+appropriate boundary surface.
 -/
 
 universe u v w

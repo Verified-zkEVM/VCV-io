@@ -69,8 +69,9 @@ The model is **standalone**: nothing here is threaded into
 `OpenNodeSemantics`. Existing `OpenProcess` constructions are
 untouched. The corruption-aware composition operators (par / wire /
 plug lifted from `OpenTheory`) and the four `*.corrupt` forwarding
-lemmas (CJSV22 §4.2) are deferred to a follow-up slice; see the F2
-design memo for the full roadmap.
+lemmas (CJSV22 §4.2) live in a downstream layer that consumes
+`Process` and the model's bundled `envAction`; this file ships only
+the data and the per-event reactions.
 
 ## Decidability
 

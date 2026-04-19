@@ -8,43 +8,77 @@ import VCVio.OracleComp.ProbComp
 /-!
 # Environment-driven action alphabets
 
-This file introduces `EnvAction Event X`, a standalone alphabet of
-environment-driven events that may act on a per-step state of type `X`.
-The alphabet `Event` is the user-supplied event set (typically a sum
-type with one constructor per environment event: `compromise`,
-`refresh`, `setEpochParam`, etc.); the `react` function specifies how
-the state evolves on each event.
+This file introduces `EnvAction Event X`, a typed channel for
+environment-fired events that update a per-step state.
 
-This vocabulary is the foundation for CJSV22-style adaptive momentary
-corruption (Canetti, Jain, Swanberg, Varia, *Universally Composable
-End-to-End Secure Messaging*, CRYPTO 2022 §3.2). In CJSV22 the
-environment is the privileged source of `Corrupt`-type events, distinct
-from the adversary boundary (which carries port traffic). `EnvAction`
-gives the same separation a typed home in VCVio: corruption events flow
-through `EnvAction`, port traffic flows through `BoundaryAction`, and
-the two channels are kept structurally orthogonal.
+## Why a separate channel from `BoundaryAction`
+
+`OpenProcess Party Δ` already has one effect channel: the
+**boundary**, carrying port traffic *between participants* (Alice
+sends a packet to the network, the network delivers to Bob). That
+channel is the natural home for everything routed through ports.
+
+But the environment can also act on a process directly, *without
+going through any port*. In CJSV22 §3.2 the canonical example is
+corruption: the environment may fire `compromise(m)` or
+`refresh(m)` for a machine `m`, and crucially the adversary cannot
+trigger this through Alice's input port. The same shape recurs
+elsewhere: a global broadcast reset, a time-advance pulse, an
+environment-controlled randomness reseed. None of these are
+port-routed; all of them update bookkeeping state that the
+adversary then observes.
+
+`EnvAction` gives that pattern a typed home:
+
+* `Event` is the alphabet of things the environment can fire (a
+  user-supplied sum type, e.g.
+  `compromise(m) | refresh(m) | broadcastReset`).
+* `X` is the bookkeeping state the events mutate (corruption flags,
+  epoch counters, broadcast clocks).
+* `react : Event → X → ProbComp X` is the per-event reaction.
+
+Pairing an `OpenProcess` with an `EnvAction` then keeps the two
+channels structurally orthogonal: port traffic through
+`BoundaryAction`, environment effects through `EnvAction`. The
+pairing is `EnvOpenProcess` in `EnvOpenProcess.lean`.
+
+## "Env" vs "Event"
+
+The naming `EnvAction Event X` is asymmetric on purpose:
+
+* **`Env`** (in the type name) names *who* fires the action — the
+  environment, in the UC sense (one level above the adversary in
+  the CJSV22 universe; not adversary-accessible directly).
+* **`Event`** (the alphabet parameter) names *what* they fire.
+
+So `EnvAction Event X` reads as "actions fired by the environment,
+drawn from the `Event` alphabet, mutating state of type `X`". The
+two are not redundant: `Env` carries security-relevant routing info
+(env-only, not adversary-accessible), `Event` is just the algebra
+of messages.
 
 The alphabet parameter is named `Event` rather than the CJSV22-style
 `Σ` because `Σ` is a reserved Lean keyword (sigma types). The CSP /
 π-calculus convention "events" is also a more literal description of
 what the alphabet contains than the bare letter `Σ`.
 
-## Additive design
-
-`EnvAction` is intentionally **standalone**: it is *not* threaded into
-`OpenNodeSemantics` in this slice. Existing `OpenProcess Party Δ`
-constructions are unaffected, and protocols that do not need
-environment-driven events incur zero cost. A subsequent slice will
-build a corruption-aware wrapper that pairs an `OpenProcess` with a
-state-indexed `EnvAction`; the four `*.corrupt` forwarding lemmas
-(CJSV22 §4.2) live on that wrapper.
-
 ## Probabilistic reactions
 
-`react` is `ProbComp`-valued, so corruption-driven state transitions
-can themselves be probabilistic (e.g. simulator-controlled
-randomization on `compromise`). Deterministic events use
-`pure ∘ update` and pay no extra cost.
+`react` is `ProbComp`-valued, so environment-driven state
+transitions can themselves be probabilistic (e.g.
+simulator-controlled randomization on `compromise`). Deterministic
+events use `pure ∘ update` and pay no extra cost.
+
+## Additive design
+
+`EnvAction` is intentionally **standalone**: it is *not* threaded
+into `OpenNodeSemantics`. Existing `OpenProcess Party Δ`
+constructions are unaffected, and protocols that do not need
+environment-driven events incur zero cost. The corruption-aware
+wrapper that pairs an `OpenProcess` with a state-indexed
+`EnvAction` lives in `EnvOpenProcess.lean`; the canonical CJSV22
+instantiation (corruption with refresh-based healing) lives in
+`MomentaryCorruption.lean`.
 -/
 
 /-

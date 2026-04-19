@@ -9,42 +9,52 @@ import VCVio.Interaction.UC.EnvAction
 /-!
 # Open processes paired with an environment-event channel
 
-This file introduces `EnvOpenProcess Party Δ Event State`, the structural
-pairing of an `OpenProcess Party Δ` with an `EnvAction Event State`. The
-wrapper carries two orthogonal effect channels:
+This file introduces `EnvOpenProcess Party Δ Event State`, the
+structural pairing of an `OpenProcess Party Δ` (port-routed
+boundary channel) with an `EnvAction Event State` (environment-fired
+event channel). See `EnvAction.lean` for the motivation behind the
+two-channel split (port traffic through `BoundaryAction`,
+environment effects through `EnvAction`).
 
-* the underlying `OpenProcess`'s **boundary channel** (port traffic
-  between participants);
-* a separate **environment channel** through which the environment fires
-  events drawn from `Event` that act on a per-step state of type `State`.
+## What the wrapper adds beyond `OpenProcess + EnvAction`
 
-The two channels are kept structurally orthogonal, matching CJSV22 §3.2
-where corruption events flow from the environment rather than from the
-adversary's port boundary. The wrapper is intentionally **generic in
-`Event` and `State`**: the canonical CJSV22 instantiation
+The wrapper does two concrete jobs that an ad-hoc tuple does not:
+
+1. **Bundling.** A "process that has an environment channel" is a
+   *single value* you can pass around, return from a function, store
+   in a structure. Without the wrapper, every consumer would have
+   to re-tuple `(P : OpenProcess _ _, ea : EnvAction _ _)` at every
+   call site. Composition operators, runtime scheduling, security
+   games — they all need the pair to travel together.
+
+2. **An opt-in surface.** Existing `OpenProcess` values are
+   unchanged. A consumer that doesn't care about environment
+   actions never imports this file. A consumer that does, gets the
+   pair as a structure with a typed `react` projection. The env
+   channel is **additive** above `OpenProcess` and never threaded
+   into `OpenNodeSemantics`, so adding it costs zero in the rest of
+   the framework.
+
+The alternative, threading the env-event alphabet `Σ` (with
+`Σ := Empty` default) directly through `OpenNodeSemantics`, would
+touch every existing constructor and every `_iso` lemma in
+`OpenProcessModel.lean`. The wrapper achieves the same expressive
+power additively, with zero invasion.
+
+## Genericity
+
+The wrapper is intentionally **generic in `Event` and `State`**:
+the canonical CJSV22 instantiation
 (`Event := MomentaryCorruption.Alphabet Sid Pid`,
 `State := MomentaryCorruption.State Sid Pid`)
-is one consumer, but every other environment-driven effect (broadcast
-resets, time advance, side-channel reseed, environment-controlled
-randomness oracle) reuses the same wrapper.
+is one consumer, but every other environment-driven effect
+(broadcast resets, time advance, side-channel reseed,
+environment-controlled randomness oracle) reuses the same wrapper
+with different `(Event, State)` instantiations.
 
-## Why a separate wrapper instead of threading `Σ` into `OpenNodeSemantics`
+## What this file ships
 
-The original F2 design memo (`vcvio-uc-f2-corruption-design.md` §3.1
-Design A) proposed adding an `envAction : EnvAction Σ Δ X` field directly
-on `OpenNodeSemantics`. That would force every existing `OpenProcess`
-construction site to thread an additional universe and parameter, even
-when `Σ := Empty`. The wrapper here ships the same expressive power
-**additively**: existing `OpenProcess` consumers are unchanged, and the
-env channel only appears for processes that explicitly opt in.
-
-The wrapper is the structural ancestor of the corruption-aware
-composition operators, scope policies, and forwarding lemmas (CJSV22
-§4.2) that follow in subsequent slices.
-
-## Slicing
-
-This file ships the **wrapper data layer** only:
+The **wrapper data layer** only:
 
 * `EnvOpenProcess` structure with `@[ext]`;
 * projections `toOpenProcess`, `react`;
@@ -53,26 +63,20 @@ This file ships the **wrapper data layer** only:
 * alphabet adaptation `comapEvent`, env-action replacement
   `withEnvAction`, boundary adaptation `mapBoundary`.
 
-**Deferred to a follow-up slice:**
+The composition operators (`par` / `wire` / `plug` lifted from
+`OpenTheory`) are intentionally **not** here: lifting them requires
+an explicit *combination strategy* for the env channels of the two
+sub-wrappers (broadcast vs targeted vs Kleisli-sequential), which is
+application-specific (Signal uses targeted routing keyed by
+`MachineId`; broadcast resets use product). The operators are best
+parameterized by the strategy rather than baked in. Composition,
+forwarding lemmas decomposing env reactions on composites, and the
+runtime integration that schedules env events alongside boundary
+ticks all live in subsequent files.
 
-* Composition operators `par` / `wire` / `plug` lifted from
-  `OpenTheory`. These require an explicit *combination strategy* for
-  the env channels of the two sub-wrappers (broadcast vs targeted vs
-  Kleisli-sequential). The strategy is application-specific (Signal
-  uses targeted routing keyed by `MachineId`; broadcast resets use
-  product), so the operators are best parameterized by the strategy
-  rather than baked in here.
-* The four `*.corrupt` forwarding lemmas (CJSV22 §4.2) and their
-  generic `*.envReact` analogues, which decompose env reactions on
-  composites in terms of reactions on the components.
-* The runtime integration that schedules env events alongside boundary
-  ticks (a small extension to `processSemanticsOracle` in
-  `Runtime.lean`).
-
-See `Notes/vcvio-uc-f2-corruption-design.md` for the full F2 roadmap
-and `VCVio/Interaction/UC/MomentaryCorruption.lean` for the canonical
-CJSV22 instantiation `MomentaryCorruption.Process` (and the
-`MomentaryCorruption.model : CorruptionModel` value).
+The canonical CJSV22 instantiation `MomentaryCorruption.Process`
+(and the bundled `MomentaryCorruption.model : CorruptionModel`
+value) lives in `MomentaryCorruption.lean`.
 -/
 
 universe u uE v w
@@ -99,9 +103,9 @@ The state type `State` is constrained to `Type` (universe 0) because
 
 Existing `OpenProcess` consumers are unaffected: nothing here is
 threaded into `OpenNodeSemantics`. The wrapper is the structural
-foundation for corruption-aware composition (a subsequent slice) and
-for the canonical CJSV22 instantiation `MomentaryCorruption.Process`
-in `MomentaryCorruption.lean`.
+foundation for corruption-aware composition and for the canonical
+CJSV22 instantiation `MomentaryCorruption.Process` in
+`MomentaryCorruption.lean`.
 -/
 @[ext]
 structure EnvOpenProcess
