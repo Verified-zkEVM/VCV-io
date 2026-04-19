@@ -146,9 +146,9 @@ Key properties:
 - `withCacheOverlay cache (query t)` returns `v` without an external query when
   `cache t = some v`, and queries the real oracle when `cache t = none`.
 
-TODO: generalize `FiatShamir.runtime` to `runtimeWithCache cache` with
-`runtime = runtimeWithCache ∅`, deriving `randomOracle` evaluation from
-`withCacheOverlay` + `evalDist`. -/
+The cache-parametric runtime built on top of this combinator lives in
+`VCVio.CryptoFoundations.FiatShamir.Sigma` as `FiatShamir.runtimeWithCache cache`, with
+`FiatShamir.runtime` defined as `runtimeWithCache ∅`. -/
 def OracleSpec.withCacheOverlay {α : Type u} (cache : spec.QueryCache) (oa : OracleComp spec α) :
     OracleComp spec α :=
   StateT.run' (simulateQ spec.cachingOracle oa) cache
