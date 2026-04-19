@@ -5,13 +5,12 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Append
 import VCVio.Interaction.Basic.Replicate
-import VCVio.Interaction.Basic.Chain
 import VCVio.Interaction.TwoParty.Decoration
 import VCVio.Interaction.TwoParty.Strategy
 import Mathlib.Control.Monad.Basic
 import ToMathlib.Control.Lawful.Basic
-
-open LawfulMonad
+import Mathlib.Data.Sigma.Basic
+import VCVio.Interaction.Basic.StateChain
 
 /-!
 # Composing two-party protocols
@@ -24,6 +23,8 @@ For binary composition, `compWithRoles` and `Counterpart.append` use `Transcript
 for the output type (factored form). The flat variants (`compWithRolesFlat`,
 `Counterpart.appendFlat`) take a single output family on the combined transcript.
 -/
+
+open LawfulMonad
 
 universe u v
 

@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Relational.Basic
-import ToMathlib.ProbabilityTheory.OptimalCoupling
 
 /-!
 # Core eRHL Definitions

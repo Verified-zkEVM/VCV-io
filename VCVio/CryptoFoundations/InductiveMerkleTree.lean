@@ -6,7 +6,6 @@ Authors: Quang Dao
 
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import ToMathlib.Data.IndexedBinaryTree.Basic
-import Mathlib.Data.Vector.Snoc
 
 /-!
 # Inductive Merkle Trees

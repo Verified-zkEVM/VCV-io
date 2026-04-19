@@ -6,7 +6,6 @@ Authors: Devon Tuma, Quang Dao
 import ToMathlib.Control.OptionT
 import VCVio.EvalDist.Option
 import VCVio.EvalDist.Defs.AlternativeMonad
-import VCVio.EvalDist.Defs.Instances
 
 /-!
 # Probability Distributions on Potentially Failing Computations

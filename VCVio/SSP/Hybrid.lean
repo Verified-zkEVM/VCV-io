@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.SSP.Advantage
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
+import VCVio.SSP.Composition
 
 /-!
 # State-Separating Proofs: Hybrid arguments and the linked-game reduction

@@ -7,7 +7,6 @@ Authors: Quang Dao
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.WriterTBridge
-import VCVio.OracleComp.Coercions.SubSpec
 
 /-!
 # `Std.Do` / `mvcgen` bridge for `OracleComp`

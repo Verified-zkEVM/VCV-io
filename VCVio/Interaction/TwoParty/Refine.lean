@@ -5,10 +5,10 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Append
 import VCVio.Interaction.Basic.Replicate
-import VCVio.Interaction.Basic.Chain
 import VCVio.Interaction.TwoParty.Role
 import VCVio.Interaction.TwoParty.Decoration
 import Mathlib.Logic.Equiv.Defs
+import VCVio.Interaction.Basic.StateChain
 
 /-!
 # Role-aware refinement and bridge to `Decoration.Over`

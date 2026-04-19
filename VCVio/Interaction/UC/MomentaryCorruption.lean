@@ -66,7 +66,7 @@ universes `(v, w)` are exposed.
 ## Additive design
 
 The model is **standalone**: nothing here is threaded into
-`OpenNodeSemantics`. Existing `OpenProcess` constructions are
+`OpenNodeProfile`. Existing `OpenProcess` constructions are
 untouched. The corruption-aware composition operators (par / wire /
 plug lifted from `OpenTheory`) and the four `*.corrupt` forwarding
 lemmas (CJSV22 §4.2) live in a downstream layer that consumes

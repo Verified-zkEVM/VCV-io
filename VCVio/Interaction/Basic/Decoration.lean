@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Node
-import Mathlib.Data.Sigma.Basic
-import Mathlib.Logic.Equiv.Basic
+import VCVio.Interaction.Basic.Spec
+import Mathlib.Logic.Equiv.Defs
 
 /-!
 # Decorations and dependent decorations (`Over`)

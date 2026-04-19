@@ -23,14 +23,14 @@ The design follows the layered approach from the UC design notes:
 * `BoundaryAction Δ X` records, at one protocol node with move space `X`,
   whether the node is externally activated and what outbound packets the
   chosen move contributes.
-* `OpenNodeSemantics Party Δ X` extends the existing `NodeSemantics Party X`
+* `OpenNodeProfile Party Δ X` extends the existing `NodeProfile Party X`
   by one `BoundaryAction` field.
 * `OpenNodeContext Party Δ` is the resulting realized node context.
 * `OpenProcess Party Δ` specializes `ProcessOver` to that open context.
 
 The closed-world layer is recovered by the canonical forgetful projection
 `OpenNodeContext.forget`, which drops the boundary action and retains only
-the `NodeSemantics`. This means every `OpenProcess` can be viewed as a plain
+the `NodeProfile`. This means every `OpenProcess` can be viewed as a plain
 closed `Process` by `ProcessOver.mapContext`.
 
 Boundary actions are structurally mappable along `PortBoundary.Hom` via
@@ -250,7 +250,7 @@ theorem mapBoundary_wireRight
 end BoundaryAction
 
 /--
-`OpenNodeSemantics Party Δ X` extends `NodeSemantics Party X` with one
+`OpenNodeProfile Party Δ X` extends `NodeProfile Party X` with one
 `BoundaryAction Δ X` recording the node's interaction with an external
 boundary.
 
@@ -259,33 +259,33 @@ one: the closed part (`controllers`, `views`) describes internal control and
 observation, while `boundary` describes the node's interface with the outside
 world.
 -/
-structure OpenNodeSemantics (Party : Type u) (Δ : PortBoundary) (X : Type w)
-    extends NodeSemantics Party X where
+structure OpenNodeProfile (Party : Type u) (Δ : PortBoundary) (X : Type w)
+    extends NodeProfile Party X where
   boundary : BoundaryAction Δ X := .internal Δ X
 
-namespace OpenNodeSemantics
+namespace OpenNodeProfile
 
 /--
-Build an `OpenNodeSemantics` from a closed `NodeSemantics` by marking the node
+Build an `OpenNodeProfile` from a closed `NodeProfile` by marking the node
 as purely internal (no boundary traffic).
 -/
 def ofClosed {Party : Type u} {Δ : PortBoundary} {X : Type w}
-    (ns : NodeSemantics Party X) : OpenNodeSemantics Party Δ X where
-  toNodeSemantics := ns
+    (ns : NodeProfile Party X) : OpenNodeProfile Party Δ X where
+  toNodeProfile := ns
 
 /--
-Transform the boundary action of an open node semantics along a boundary
-adaptation, preserving the closed-world node semantics.
+Transform the boundary action of an open node profile along a boundary
+adaptation, preserving the closed-world node profile.
 -/
 def mapBoundary {Party : Type u} {Δ₁ Δ₂ : PortBoundary} {X : Type w}
-    (φ : PortBoundary.Hom Δ₁ Δ₂) (ons : OpenNodeSemantics Party Δ₁ X) :
-    OpenNodeSemantics Party Δ₂ X where
-  toNodeSemantics := ons.toNodeSemantics
+    (φ : PortBoundary.Hom Δ₁ Δ₂) (ons : OpenNodeProfile Party Δ₁ X) :
+    OpenNodeProfile Party Δ₂ X where
+  toNodeProfile := ons.toNodeProfile
   boundary := ons.boundary.mapBoundary φ
 
 @[simp]
 theorem mapBoundary_id {Party : Type u} {Δ : PortBoundary} {X : Type w}
-    (ons : OpenNodeSemantics Party Δ X) :
+    (ons : OpenNodeProfile Party Δ X) :
     mapBoundary (PortBoundary.Hom.id Δ) ons = ons := by
   cases ons; simp [mapBoundary, BoundaryAction.mapBoundary_id]
 
@@ -293,18 +293,18 @@ theorem mapBoundary_id {Party : Type u} {Δ : PortBoundary} {X : Type w}
 theorem mapBoundary_comp {Party : Type u}
     {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
     (g : PortBoundary.Hom Δ₂ Δ₃) (f : PortBoundary.Hom Δ₁ Δ₂)
-    (ons : OpenNodeSemantics Party Δ₁ X) :
+    (ons : OpenNodeProfile Party Δ₁ X) :
     mapBoundary g (mapBoundary f ons) =
       mapBoundary (PortBoundary.Hom.comp g f) ons := by
   cases ons; simp [mapBoundary, BoundaryAction.mapBoundary_comp]
 
-end OpenNodeSemantics
+end OpenNodeProfile
 
 /--
 The open-world node context for processes with boundary `Δ`.
 
 At a node with move space `X`, the context value is
-`OpenNodeSemantics Party Δ X`: the usual controller-path and local-view data,
+`OpenNodeProfile Party Δ X`: the usual controller-path and local-view data,
 plus a `BoundaryAction` describing the node's external traffic.
 
 ## Polynomial reading
@@ -324,12 +324,12 @@ hand-rolled context-homs below (`forget`, `embed`, `map`, `inlTensor`,
 `inrTensor`, `wireLeft`, `wireRight`, `close`) are concrete instances of
 the universal projection / pairing maps for this product, specialized to
 the particular boundary-action transformations they perform. The structure
-form `OpenNodeSemantics extends NodeSemantics` is preserved as the working
-API because it gives clean `{ toNodeSemantics := ..., boundary := ... }`
+form `OpenNodeProfile extends NodeProfile` is preserved as the working
+API because it gives clean `{ toNodeProfile := ..., boundary := ... }`
 construction sites and definitional projections used pervasively below.
 -/
 abbrev OpenNodeContext (Party : Type u) (Δ : PortBoundary) :=
-  fun (X : Type w) => OpenNodeSemantics Party Δ X
+  fun (X : Type w) => OpenNodeProfile Party Δ X
 
 namespace OpenNodeContext
 
@@ -340,13 +340,13 @@ of the closed `StepContext Party` and the boundary-action context, and
 prove that the bridge is a definitional isomorphism (round trips reduce
 to `rfl` by `Prod.mk.eta` and structure eta). The product view lets one
 phrase universal-property arguments without repeatedly pattern-matching
-on `OpenNodeSemantics` literals; the structural API below is the working
+on `OpenNodeProfile` literals; the structural API below is the working
 form. -/
 
 /-- The polynomial-product view of `OpenNodeContext`. Lives in the same
 universes as `OpenNodeContext Party Δ` itself: the first universe is the
 move-space universe `w`, and the second is whatever Lean infers for
-`NodeSemantics Party X × BoundaryAction Δ X`. -/
+`NodeProfile Party X × BoundaryAction Δ X`. -/
 abbrev productView (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.Context.{w} :=
   Spec.Node.Context.prod (StepContext Party)
@@ -354,21 +354,21 @@ abbrev productView (Party : Type u) (Δ : PortBoundary) :
 
 /--
 Forward direction of the polynomial-product bridge: read off the
-`(NodeSemantics, BoundaryAction)` pair from an `OpenNodeSemantics`. -/
+`(NodeProfile, BoundaryAction)` pair from an `OpenNodeProfile`. -/
 def toProductView (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
       (OpenNodeContext Party Δ : Spec.Node.Context.{w})
       (productView.{u, w} Party Δ) :=
-  fun _ ons => (ons.toNodeSemantics, ons.boundary)
+  fun _ ons => (ons.toNodeProfile, ons.boundary)
 
 /--
 Inverse direction of the polynomial-product bridge: reassemble an
-`OpenNodeSemantics` from a `(NodeSemantics, BoundaryAction)` pair. -/
+`OpenNodeProfile` from a `(NodeProfile, BoundaryAction)` pair. -/
 def ofProductView (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
       (productView.{u, w} Party Δ)
       (OpenNodeContext Party Δ : Spec.Node.Context.{w}) :=
-  fun _ p => { toNodeSemantics := p.1, boundary := p.2 }
+  fun _ p => { toNodeProfile := p.1, boundary := p.2 }
 
 @[simp]
 theorem toProductView_ofProductView (Party : Type u) (Δ : PortBoundary) :
@@ -392,14 +392,14 @@ theorem ofProductView_toProductView (Party : Type u) (Δ : PortBoundary) :
 /--
 The forgetful map from the open-world context to the closed-world context.
 
-This drops the `BoundaryAction` and retains only the `NodeSemantics`
+This drops the `BoundaryAction` and retains only the `NodeProfile`
 (controllers and local views).
 -/
 def forget (Party : Type u) (Δ : PortBoundary) :
     Spec.Node.ContextHom
       (OpenNodeContext Party Δ : Spec.Node.Context.{w})
       (StepContext Party) :=
-  fun _ ons => ons.toNodeSemantics
+  fun _ ons => ons.toNodeProfile
 
 /--
 The embedding from the closed-world context into the open-world context.
@@ -438,7 +438,7 @@ theorem map_comp (Party : Type u)
       (OpenNodeContext.map.{u, w} Party g) (OpenNodeContext.map Party f) =
       OpenNodeContext.map Party (PortBoundary.Hom.comp g f) := by
   funext X ons; simp [map, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary_comp]
+    OpenNodeProfile.mapBoundary_comp]
 
 /--
 Embed the left factor's open-world context into the tensor boundary context.
@@ -452,7 +452,7 @@ def inlTensor (Party : Type u)
       (OpenNodeContext Party Δ₁ : Spec.Node.Context.{w})
       (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
-    toNodeSemantics := ons.toNodeSemantics
+    toNodeProfile := ons.toNodeProfile
     boundary := ons.boundary.embedInlTensor Δ₂
   }
 
@@ -468,7 +468,7 @@ def inrTensor (Party : Type u)
       (OpenNodeContext Party Δ₂ : Spec.Node.Context.{w})
       (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
-    toNodeSemantics := ons.toNodeSemantics
+    toNodeProfile := ons.toNodeProfile
     boundary := ons.boundary.embedInrTensor Δ₁
   }
 
@@ -483,7 +483,7 @@ def wireLeft (Party : Type u)
       (OpenNodeContext Party (PortBoundary.tensor Δ₁ Γ) : Spec.Node.Context.{w})
       (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
-    toNodeSemantics := ons.toNodeSemantics
+    toNodeProfile := ons.toNodeProfile
     boundary := ons.boundary.wireLeft Δ₂
   }
 
@@ -500,7 +500,7 @@ def wireRight (Party : Type u)
         Spec.Node.Context.{w})
       (OpenNodeContext Party (PortBoundary.tensor Δ₁ Δ₂) : Spec.Node.Context.{w}) :=
   fun _ ons => {
-    toNodeSemantics := ons.toNodeSemantics
+    toNodeProfile := ons.toNodeProfile
     boundary := ons.boundary.wireRight Δ₁
   }
 
@@ -514,7 +514,7 @@ def close (Party : Type u) (Δ : PortBoundary) :
       (OpenNodeContext Party Δ : Spec.Node.Context.{w})
       (OpenNodeContext Party PortBoundary.empty : Spec.Node.Context.{w}) :=
   fun _ ons => {
-    toNodeSemantics := ons.toNodeSemantics
+    toNodeProfile := ons.toNodeProfile
     boundary := ons.boundary.closed
   }
 
@@ -529,7 +529,7 @@ theorem map_tensor_comp_inlTensor (Party : Type u)
       (map Party f₁) := by
   funext X ons
   simp [map, inlTensor, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary]
+    OpenNodeProfile.mapBoundary]
 
 theorem map_tensor_comp_inrTensor (Party : Type u)
     {Δ₁ Δ₁' Δ₂ Δ₂' : PortBoundary}
@@ -542,7 +542,7 @@ theorem map_tensor_comp_inrTensor (Party : Type u)
       (map Party f₂) := by
   funext X ons
   simp [map, inrTensor, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary]
+    OpenNodeProfile.mapBoundary]
 
 theorem close_comp_map (Party : Type u)
     {Δ₁ Δ₂ : PortBoundary}
@@ -553,7 +553,7 @@ theorem close_comp_map (Party : Type u)
     close Party Δ₁ := by
   funext X ons
   simp [close, map, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary, BoundaryAction.closed, BoundaryAction.mapBoundary]
+    OpenNodeProfile.mapBoundary, BoundaryAction.closed, BoundaryAction.mapBoundary]
 
 theorem map_tensor_comp_wireLeft (Party : Type u)
     {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
@@ -566,7 +566,7 @@ theorem map_tensor_comp_wireLeft (Party : Type u)
       (map Party (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))) := by
   funext X ons
   simp [map, wireLeft, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary]
+    OpenNodeProfile.mapBoundary]
 
 theorem map_tensor_comp_wireRight (Party : Type u)
     {Δ₁ Δ₁' Γ Δ₂ Δ₂' : PortBoundary}
@@ -580,7 +580,7 @@ theorem map_tensor_comp_wireRight (Party : Type u)
         (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)) := by
   funext X ons
   simp [map, wireRight, Spec.Node.ContextHom.comp,
-    OpenNodeSemantics.mapBoundary]
+    OpenNodeProfile.mapBoundary]
 
 /-! #### Existing context-homs as polynomial-product operations
 
@@ -631,7 +631,7 @@ end OpenNodeContext
 /--
 The open-world specialization of `StepOver`.
 
-Here the node context carries `OpenNodeSemantics Party Δ`, so every node
+Here the node context carries `OpenNodeProfile Party Δ`, so every node
 records both the usual controller/view data and its boundary traffic against
 `Δ`.
 -/
@@ -642,7 +642,7 @@ abbrev OpenStep (Party : Type u) (Δ : PortBoundary) (P : Type v) :=
 The open-world specialization of `ProcessOver`.
 
 An `OpenProcess Party Δ` is a continuation-based process whose steps are
-decorated by `OpenNodeSemantics Party Δ`. It exposes the directed boundary
+decorated by `OpenNodeProfile Party Δ`. It exposes the directed boundary
 `Δ` to an external context.
 
 The closed-world `Process Party` is recovered by
@@ -753,7 +753,7 @@ theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundar
     IsSilentStep (p.mapBoundary φ) s tr ↔ IsSilentStep p s tr := by
   apply isSilentDecoration_iff_map
   intro X ons
-  simp [OpenNodeContext.map, OpenNodeSemantics.mapBoundary, BoundaryAction.mapBoundary]
+  simp [OpenNodeContext.map, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary]
 
 /-! ## OpenProcessIso: weak bisimulation equivalence for open processes -/
 

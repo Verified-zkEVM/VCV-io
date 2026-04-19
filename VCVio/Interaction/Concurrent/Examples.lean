@@ -381,7 +381,7 @@ section PhaseOneExamples
 /-- Node semantics for a tiny looping process:
 the adversary actively chooses the boolean step, Bob observes it, and Alice is
 hidden from it. -/
-def loopNode : NodeSemantics Party Bool where
+def loopNode : NodeProfile Party Bool where
   controllers := fun _ => [.adv]
   views
     | .adv => .active

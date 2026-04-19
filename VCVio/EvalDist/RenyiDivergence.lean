@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
 import VCVio.EvalDist.Defs.Basic
-import VCVio.EvalDist.Monad.Basic
 
 /-!
 # Rényi Divergence for SPMFs and Monadic Computations

@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.OneTime
+import ToMathlib.Control.StateT
 
 /-!
 # Asymmetric Encryption Schemes: Generic IND-CPA Lifts
