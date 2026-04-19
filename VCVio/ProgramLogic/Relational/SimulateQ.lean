@@ -724,4 +724,165 @@ theorem tvDist_simulateQ_le_probEvent_bad_dist
       (tvDist_map_le (m := OracleComp spec) (α := α × σ) (β := α) Prod.fst sim₁ sim₂)
   exact le_trans h_map h_tv_joint
 
+/-! ## "Identical until bad" with an output bad flag
+
+These variants record the bad event in the **output** state of each oracle step (not the input).
+The state has shape `σ × Bool` with the second component a monotone bad flag, and the two
+implementations may disagree on the very step that flips the flag. The standard pointwise
+agreement hypothesis of `tvDist_simulateQ_le_probEvent_bad{,_dist}` is too strong here: at the
+firing step, the input is non-bad but the outputs already differ. The output-bad pattern is the
+exact shape of `QueryImpl.withProgramming` (which sets `bad := true` only on policy-firing
+steps) and the `programming_collision_bound` argument that builds on it. -/
+
+open scoped Classical in
+private lemma probOutput_simulateQ_run_eq_of_not_output_bad
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
+      Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
+        Pr[= (u, (s', false)) | (impl₂ t).run (s, false)])
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (h_mono₂ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₂ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) (s₀ : σ) (x : α) (s : σ) :
+    Pr[= (x, (s, false)) | (simulateQ impl₁ oa).run (s₀, false)] =
+      Pr[= (x, (s, false)) | (simulateQ impl₂ oa).run (s₀, false)] := by
+  induction oa using OracleComp.inductionOn generalizing s₀ with
+  | pure a =>
+    simp only [simulateQ_pure]
+  | query_bind t oa ih =>
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+      id_map, StateT.run_bind]
+    rw [probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
+    refine tsum_congr ?_
+    rintro ⟨u, ⟨s', b⟩⟩
+    cases b with
+    | true =>
+      have h₁ : Pr[= (x, (s, false)) | (simulateQ impl₁ (oa u)).run (s', true)] = 0 :=
+        probOutput_simulateQ_run_eq_zero_of_bad impl₁ (fun p : σ × Bool => p.2 = true)
+          h_mono₁ (oa u) (s', true) rfl x (s, false) (by simp)
+      have h₂ : Pr[= (x, (s, false)) | (simulateQ impl₂ (oa u)).run (s', true)] = 0 :=
+        probOutput_simulateQ_run_eq_zero_of_bad impl₂ (fun p : σ × Bool => p.2 = true)
+          h_mono₂ (oa u) (s', true) rfl x (s, false) (by simp)
+      simp [h₁, h₂]
+    | false =>
+      rw [h_agree_good t s₀ u s', ih u s']
+
+open scoped Classical in
+private lemma probEvent_output_bad_eq
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
+      Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
+        Pr[= (u, (s', false)) | (impl₂ t).run (s, false)])
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (h_mono₂ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₂ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) (s₀ : σ) :
+    Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run (s₀, false)] =
+      Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₂ oa).run (s₀, false)] := by
+  set sim₁ := (simulateQ impl₁ oa).run (s₀, false)
+  set sim₂ := (simulateQ impl₂ oa).run (s₀, false)
+  have h₁ := probEvent_compl sim₁ (fun z : α × σ × Bool => z.2.2 = true)
+  have h₂ := probEvent_compl sim₂ (fun z : α × σ × Bool => z.2.2 = true)
+  simp only [NeverFail.probFailure_eq_zero, tsub_zero] at h₁ h₂
+  have h_not_eq :
+      Pr[fun z : α × σ × Bool => ¬z.2.2 = true | sim₁] =
+        Pr[fun z : α × σ × Bool => ¬z.2.2 = true | sim₂] := by
+    rw [probEvent_eq_tsum_ite, probEvent_eq_tsum_ite]
+    refine tsum_congr ?_
+    rintro ⟨a, s, b⟩
+    by_cases hb : b = true
+    · simp [hb]
+    · have hb' : b = false := by cases b <;> simp_all
+      subst hb'
+      simpa using
+        probOutput_simulateQ_run_eq_of_not_output_bad impl₁ impl₂ h_agree_good
+          h_mono₁ h_mono₂ oa s₀ a s
+  have hne₁ : Pr[fun z : α × σ × Bool => ¬z.2.2 = true | sim₁] ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top probEvent_le_one
+  calc Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁]
+      = 1 - Pr[fun z : α × σ × Bool => ¬z.2.2 = true | sim₁] := by
+        rw [← h₁]; exact (ENNReal.add_sub_cancel_right hne₁).symm
+    _ = 1 - Pr[fun z : α × σ × Bool => ¬z.2.2 = true | sim₂] := by rw [h_not_eq]
+    _ = Pr[fun z : α × σ × Bool => z.2.2 = true | sim₂] := by
+        rw [← h₂]; exact ENNReal.add_sub_cancel_right
+          (ne_top_of_le_ne_top one_ne_top probEvent_le_one)
+
+/-- "Identical until bad" with the bad flag tracked at the **output** of each oracle step.
+TV-distance between two state-extended simulations is bounded by the probability of the flag
+firing in the run of `impl₁`.
+
+Compared to `tvDist_simulateQ_le_probEvent_bad{,_dist}`, this version weakens the
+agreement hypothesis: the two implementations need only agree on **non-bad output transitions**
+from non-bad input states. They may disagree arbitrarily on the very step that flips the flag.
+
+Both implementations must satisfy bad-input monotonicity: once `b = true` in the input state of
+a step, every reachable output also has `b = true`. -/
+theorem tvDist_simulateQ_le_probEvent_output_bad
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (oa : OracleComp spec α) (s₀ : σ)
+    (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
+      Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
+        Pr[= (u, (s', false)) | (impl₂ t).run (s, false)])
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (h_mono₂ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₂ t).run p), z.2.2 = true) :
+    tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+        ((simulateQ impl₂ oa).run' (s₀, false))
+      ≤ Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run (s₀, false)].toReal := by
+  classical
+  set sim₁ := (simulateQ impl₁ oa).run (s₀, false)
+  set sim₂ := (simulateQ impl₂ oa).run (s₀, false)
+  have h_eq : ∀ (z : α × σ × Bool), ¬(z.2.2 = true) → Pr[= z | sim₁] = Pr[= z | sim₂] := by
+    rintro ⟨x, s, b⟩ hb
+    have hb' : b = false := by cases b <;> simp_all
+    subst hb'
+    exact probOutput_simulateQ_run_eq_of_not_output_bad impl₁ impl₂ h_agree_good
+      h_mono₁ h_mono₂ oa s₀ x s
+  have h_event_eq :
+      Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁] =
+        Pr[fun z : α × σ × Bool => z.2.2 = true | sim₂] :=
+    probEvent_output_bad_eq impl₁ impl₂ h_agree_good h_mono₁ h_mono₂ oa s₀
+  have h_tv_joint :
+      tvDist sim₁ sim₂ ≤ Pr[fun z : α × σ × Bool => z.2.2 = true | sim₁].toReal :=
+    tvDist_le_probEvent_of_probOutput_eq_of_not (mx := sim₁) (my := sim₂)
+      (fun z : α × σ × Bool => z.2.2 = true) h_eq h_event_eq
+  have h_map :
+      tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+          ((simulateQ impl₂ oa).run' (s₀, false))
+        ≤ tvDist sim₁ sim₂ := by
+    simpa [sim₁, sim₂, StateT.run'] using
+      (tvDist_map_le (m := OracleComp spec) (α := α × σ × Bool) (β := α) Prod.fst sim₁ sim₂)
+  exact le_trans h_map h_tv_joint
+
+/-- Ergonomic wrapper of `tvDist_simulateQ_le_probEvent_output_bad` for the very common case
+where the underlying oracle implementations live in `StateT σ (OracleComp spec)` and have been
+*lifted* to `StateT (σ × Bool) (OracleComp spec)` by attaching a bad flag.
+
+This is the exact shape consumed by the `QueryImpl.withProgramming` collision-bound argument:
+the impls agree on `(s, false)` input *modulo* the rare programming-fired step, and the bound
+is the probability of any policy hit during the run. -/
+theorem identical_until_bad_with_flag
+    {σ : Type} {ι : Type u} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec)))
+    (oa : OracleComp spec α) (s₀ : σ)
+    (h_agree_good : ∀ (t : spec.Domain) (s : σ) (u : spec.Range t) (s' : σ),
+      Pr[= (u, (s', false)) | (impl₁ t).run (s, false)] =
+        Pr[= (u, (s', false)) | (impl₂ t).run (s, false)])
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (h_mono₂ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₂ t).run p), z.2.2 = true) :
+    tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+        ((simulateQ impl₂ oa).run' (s₀, false))
+      ≤ Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run (s₀, false)].toReal :=
+  tvDist_simulateQ_le_probEvent_output_bad impl₁ impl₂ oa s₀ h_agree_good h_mono₁ h_mono₂
+
 end OracleComp.ProgramLogic.Relational
