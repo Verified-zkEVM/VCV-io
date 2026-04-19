@@ -136,9 +136,9 @@ theorem map_append {S T : Type u → Type v} (f : ∀ X, S X → T X)
     map f (s₁.append s₂) (rd₁.append rd₂) (append sd₁ sd₂) =
       append (map f s₁ rd₁ sd₁)
         (fun tr₁ => map f (s₂ tr₁) (rd₂ tr₁) (sd₂ tr₁)) := by
-  cases s₁ with
+  induction s₁ with
   | done => rfl
-  | node X rest =>
+  | node X rest ih =>
     rcases rd₁ with ⟨role, rRest⟩
     cases role with
     | sender =>
@@ -146,11 +146,11 @@ theorem map_append {S T : Type u → Type v} (f : ∀ X, S X → T X)
       simp only [append, map]
       refine Prod.ext rfl ?_
       funext x
-      exact map_append f (rr x) (fun p => sd₂ ⟨x, p⟩)
+      exact ih x (rr x) (fun p => sd₂ ⟨x, p⟩)
     | receiver =>
       simp only [append, map]
       funext x
-      exact map_append f (sd₁ x) (fun p => sd₂ ⟨x, p⟩)
+      exact ih x (sd₁ x) (fun p => sd₂ ⟨x, p⟩)
 
 theorem map_replicate {S T : Type u → Type v} (f : ∀ X, S X → T X)
     {spec : Spec} {roles : RoleDecoration spec}
