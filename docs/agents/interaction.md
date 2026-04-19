@@ -181,8 +181,8 @@ These require `LawfulCommMonad` (independent effects may be swapped).
 
 | Constructor | Meaning |
 |-------------|---------|
-| `.active` | Participant chooses the move |
-| `.observe` | Participant sees the full move |
+| `.active` | Participant locally selects the move (effectful Σ-of-X) |
+| `.observe` | Participant sees the full move (function-from-X) |
 | `.hidden` | Participant sees nothing |
 | `.quotient f` | Participant sees `f x` (partial information) |
 
@@ -191,6 +191,53 @@ Three packaged resolver patterns:
 - **`Broadcast.Strategy`**: one acting party per node, all others observe.
 - **`Directed.Strategy`**: sender/receiver pair per node.
 - **`Profile.Strategy`**: full per-party `ViewProfile` decoration.
+
+### Kernel vs operational shape
+
+`LocalView` carries information along **two orthogonal axes**:
+
+- **Information** — what observation does the participant make? Fully captured
+  by a single projection `toObs : X → Obs` packaged with its codomain `Obs`.
+  This polynomial-element form is `LocalView.Kernel X := Σ Obs : Type, X → Obs`.
+  Every `LocalView X` collapses to a `Kernel X` via `LocalView.toKernel`.
+- **Operational** — what continuation-passing shape does the participant use
+  for `Action`? `.active` (effectful Σ-of-X), `.observe` (function-from-X),
+  `.hidden` (function-into-Cont, prepared in advance), `.quotient` (function
+  on the observation, prepared in advance).
+
+The four-constructor `LocalView` is the *ergonomically convenient* form; it
+specializes `Action` to a definitionally simpler shape per pattern, which
+keeps protocol examples short. `Kernel` is the *semantically universal* form;
+protocols whose participants make arbitrary observations not captured by
+`active` / `observe` / `hidden` should build kernels directly. The two are
+related by `LocalView.toKernel` (collapse) and `LocalView.fromKernel` (lift
+into the universal `.quotient` constructor); on the operational side,
+`LocalView.Action (.quotient ..) = Kernel.Action ⟨..⟩` definitionally.
+
+Note that the operational distinction `.active` vs `.observe` is **not** the
+canonical authorship predicate. Authorship-of-move is recorded by
+`Concurrent.NodeAuthority.controllers : Party → Bool`. `LocalView.active`
+indicates only that the participant chooses *locally* in its endpoint; the
+protocol-level controller is recorded separately.
+
+### Literature
+
+Three independent traditions converge on the kernel form `Σ Obs, X → Obs`:
+
+- *Epistemic logic* (Halpern-Vardi "Reasoning About Knowledge"): agent
+  observation as a projection from global state to local indistinguishability
+  classes.
+- *Noninterference / info-flow* (Goguen-Meseguer; Sabelfeld-Myers
+  "Language-Based Information-Flow Security"): per-security-level projection
+  of observable outputs.
+- *Session types and endpoint projection* (Honda-Yoshida-Carbone "Multiparty
+  Asynchronous Session Types"; Cruz-Filipe-Montesi "A Core Model for
+  Choreographic Programming"): projection of a global type / global play to a
+  single role's local view.
+
+Closest type-theoretic ancestor: Hancock-Setzer "Interactive Programs in
+Dependent Type Theory" — Command/Response interfaces with embedded
+observation modes mirror the four-constructor operational shape.
 
 ## Concurrent processes (`Concurrent/`)
 
@@ -364,7 +411,7 @@ import VCVio.Interaction.Concurrent.Process
 
 | File | Purpose |
 |------|---------|
-| `Core.lean` | `LocalView`, `ObsType`, `Action`, `Multiparty.Strategy` |
+| `Core.lean` | `LocalView`, `ObsType`, `Action`, `Kernel`, `toKernel`/`fromKernel`, `Multiparty.Strategy` |
 | `Broadcast.lean` | `PartyDecoration`, `Broadcast.Strategy` |
 | `Directed.lean` | `EdgeDecoration`, `Directed.Strategy` |
 | `Profile.lean` | `ViewProfile`, `Profile.Decoration`, `Profile.Strategy` |

@@ -32,7 +32,10 @@ The definitions in this file are intentionally local and minimal.
 * `LocalView X` records how one fixed participant locally sees a chosen move
   `x : X` at one node.
 * `LocalView.Action` is the canonical local node shape associated to that view.
-* `localSyntax` packages that local node shape as a `Spec.SyntaxOver`.
+* `LocalView.Kernel` is the **maximally general single-projection form** of a
+  local view, packaging just the observation type and projection function.
+  Every `LocalView` collapses to a `Kernel` via `LocalView.toKernel`.
+* `localSyntax` packages the four-mode `Action` shape as a `Spec.SyntaxOver`.
 * `Strategy` is the induced whole-tree local endpoint type, obtained from
   arbitrary node-local metadata through `SyntaxOver.comap`.
 
@@ -45,6 +48,53 @@ model. In particular, it does not choose between:
 
 Those models are recovered later by choosing different node decorations and
 different resolvers.
+
+## Two layers of observation: kernel vs operational shape
+
+`LocalView` carries information along **two orthogonal axes**:
+
+* an **information axis**: what observation does the participant make? This is
+  fully captured by a single projection `toObs : X → Obs` packaged with its
+  codomain `Obs`. We call this the *kernel* of the local view; see
+  `LocalView.Kernel`.
+* an **operational axis**: how does the participant interact with that
+  observation in continuation passing? Does it choose the move (effectful
+  selection), wait for it (function-from-X), or commit to a uniform
+  continuation family in advance (function-into-Cont)? This is encoded in the
+  four constructors `active`, `observe`, `hidden`, `quotient`, each of which
+  specializes `Action` to a definitionally simpler shape.
+
+The four-constructor enumeration is the *ergonomically convenient* form for
+common patterns: it lets `LocalView.Action` reduce by `rfl` for each pattern,
+which keeps protocol examples short. `LocalView.Kernel` is the *semantically
+universal* form: any `LocalView` collapses to a kernel, and protocols that
+need only the observation can build kernels directly.
+
+This file does **not** carry authorship-of-move information; that lives in
+`Concurrent.NodeAuthority.controllers : Party → Bool`. In particular, the
+choice between `LocalView.active` and `LocalView.observe` is a *node shape*
+decision (effectful Σ-of-X vs function-from-X), not the canonical predicate
+for "this party authors the move".
+
+## Literature
+
+Three independent literature traditions converge on the kernel form
+`Σ Obs : Type, X → Obs`:
+
+* Halpern-Vardi epistemic logic ("Reasoning About Knowledge"): agent
+  observation as a projection from global state to local indistinguishability
+  classes;
+* Goguen-Meseguer noninterference / Sabelfeld-Myers info-flow: per-level
+  projection of observable outputs;
+* Honda-Yoshida-Carbone multiparty session types and Cruz-Filipe-Montesi
+  endpoint projection: projection of a global type / global play to a single
+  role's local view;
+* Hancock-Setzer interactive interfaces: the type-theoretic ancestor of the
+  four-constructor operational shape (Command/Response with embedded
+  observation modes).
+
+See `docs/agents/interaction.md` for a brief literature map and the design
+rationale for the kernel-vs-operational split.
 
 Naming note:
 this file does not introduce a new global multiparty protocol syntax. The
@@ -68,17 +118,34 @@ It answers the following question:
 > locally experience the actual chosen move `x : X` of that node?
 
 The possibilities are:
-* `active` — this participant chooses the next move;
-* `observe` — this participant is told the full chosen move and continues after
-  seeing it;
+* `active` — this participant locally selects the next move (effectful
+  Σ-of-X shape for `Action`);
+* `observe` — this participant is told the full chosen move and continues
+  after seeing it (function-from-X shape for `Action`);
 * `hidden` — this participant is not told the chosen move at the node itself,
   so any future behavior depending on that move must already be prepared
   uniformly over all possible moves;
 * `quotient Obs toObs` — this participant is told only the observation
   `toObs x : Obs`, not the full move `x`.
 
+These four constructors carry information along **two separate axes**:
+* **operational** — they pick out four definitionally distinct `Action` shapes
+  (see `LocalView.Action`), enabling `rfl` reductions for common patterns;
+* **observational** — they all collapse to a single quotient morphism
+  `X → Obs` packaged with its codomain (see `LocalView.Kernel`).
+
+The operational distinction between `active` and `observe` is **not** a
+canonical authorship predicate. Authorship-of-move is recorded by
+`Concurrent.NodeAuthority.controllers : Party → Bool`. `LocalView.active`
+indicates that a participant chooses *locally* in its endpoint type; whether
+it is the protocol-level controller is recorded separately.
+
 `LocalView` is intentionally local. It does not describe the global
 communication discipline that produced it, nor who else sees the move.
+
+For protocols whose participants make arbitrary observations not captured by
+the `active`/`observe`/`hidden` patterns, prefer `LocalView.Kernel` directly:
+it is the maximally general observation primitive.
 -/
 inductive LocalView (X : Type u) : Type (u + 1) where
   | active
@@ -149,6 +216,127 @@ def Action {X : Type u} (view : LocalView X) (m : Type u → Type u)
   | .observe => (x : X) → m (Cont x)
   | .hidden => m ((x : X) → Cont x)
   | .quotient Obs toObs => (o : Obs) → m ((x : X) → toObs x = o → Cont x)
+
+/--
+`LocalView.Kernel X` is the **polynomial-element** form of a local view: a
+single quotient morphism `toObs : X → Obs` packaged with its codomain `Obs`.
+
+This is the maximally general "what does a participant see" primitive. Three
+independent literature traditions converge on this exact object: epistemic
+logic (Halpern-Vardi), noninterference / info-flow (Goguen-Meseguer,
+Sabelfeld-Myers), and session-type / endpoint-projection frameworks
+(Honda-Yoshida-Carbone, Cruz-Filipe-Montesi).
+
+Every `LocalView X` collapses to a `Kernel X` via `LocalView.toKernel`,
+forgetting only the operational `Action` shape (the four-constructor
+enumeration is more ergonomic for `Action`-shape `rfl` reductions, but carries
+the same observational content as the corresponding kernel).
+
+Use `Kernel` directly when the protocol carries arbitrary observation types
+not captured by `active` / `observe` / `hidden`. Use `LocalView` when those
+specialized operational shapes are wanted.
+-/
+abbrev Kernel (X : Type u) : Type (u + 1) := Σ Obs : Type u, X → Obs
+
+namespace Kernel
+
+variable {X : Type u}
+
+/--
+`Kernel.Action k m Cont` is the maximally general local node shape associated
+to a kernel `k = ⟨Obs, toObs⟩`.
+
+It coincides definitionally with `LocalView.Action (.quotient Obs toObs) m Cont`
+(see `LocalView.Action_quotient_eq_kernel_Action`).
+-/
+def Action (k : Kernel X) (m : Type u → Type u) (Cont : X → Type u) : Type u :=
+  (o : k.1) → m ((x : X) → k.2 x = o → Cont x)
+
+end Kernel
+
+/--
+`toKernel v` is the canonical kernel form of a `LocalView v`: it forgets the
+operational `Action` shape and keeps only the observation type `Obs` and
+projection `toObs : X → Obs`.
+
+By construction:
+* `.active` and `.observe` both map to `⟨X, id⟩` (full information);
+* `.hidden` maps to `⟨PUnit, fun _ => PUnit.unit⟩` (zero information);
+* `.quotient Obs toObs` maps to `⟨Obs, toObs⟩`.
+
+`.active` and `.observe` collapse to the same kernel because they differ only
+in operational `Action` shape (effectful Σ-of-X vs function-from-X), not in
+observation content. The "this party authors the move" semantics that one
+might expect from `.active` lives instead in
+`Concurrent.NodeAuthority.controllers`.
+-/
+def toKernel {X : Type u} : LocalView X → Kernel X
+  | .active => ⟨X, id⟩
+  | .observe => ⟨X, id⟩
+  | .hidden => ⟨PUnit, fun _ => PUnit.unit⟩
+  | .quotient Obs toObs => ⟨Obs, toObs⟩
+
+@[simp] theorem toKernel_active {X : Type u} :
+    toKernel (X := X) .active = ⟨X, id⟩ := rfl
+
+@[simp] theorem toKernel_observe {X : Type u} :
+    toKernel (X := X) .observe = ⟨X, id⟩ := rfl
+
+@[simp] theorem toKernel_hidden {X : Type u} :
+    toKernel (X := X) .hidden = ⟨PUnit, fun _ => PUnit.unit⟩ := rfl
+
+@[simp] theorem toKernel_quotient {X : Type u} (Obs : Type u) (toObs : X → Obs) :
+    toKernel (.quotient Obs toObs) = ⟨Obs, toObs⟩ := rfl
+
+/--
+The `ObsType` of a `LocalView` agrees definitionally with the first projection
+of its kernel form, by case analysis.
+-/
+@[simp] theorem ObsType_eq_toKernel_fst {X : Type u} (v : LocalView X) :
+    v.ObsType = (toKernel v).1 := by
+  cases v <;> rfl
+
+/--
+The observation `obsOf v x` agrees with the kernel-form projection
+`(toKernel v).snd x` (modulo the type identification of
+`ObsType_eq_toKernel_fst`, hence stated as `HEq`).
+-/
+theorem obsOf_eq_toKernel_snd {X : Type u} (v : LocalView X) (x : X) :
+    HEq (obsOf v x) ((toKernel v).2 x) := by
+  cases v <;> rfl
+
+/--
+The `Action` shape of `.quotient Obs toObs` coincides definitionally with the
+maximally general `Kernel.Action` of the corresponding kernel.
+
+This makes `.quotient` the universal `Action` shape: any protocol that builds
+its endpoint with `Kernel.Action` can equivalently work with
+`LocalView.Action (.quotient ..)`.
+-/
+@[simp] theorem Action_quotient_eq_kernel_Action {X : Type u}
+    (Obs : Type u) (toObs : X → Obs)
+    (m : Type u → Type u) (Cont : X → Type u) :
+    LocalView.Action (.quotient Obs toObs) m Cont
+      = Kernel.Action ⟨Obs, toObs⟩ m Cont := rfl
+
+/--
+`fromKernel k` canonically embeds a kernel `k = ⟨Obs, toObs⟩` into `LocalView`
+via the universal `.quotient` constructor.
+
+`fromKernel` is a one-sided inverse of `toKernel`:
+`toKernel (fromKernel k) = k`. The reverse round-trip
+`fromKernel (toKernel v)` only equals `v` when `v` is itself a `.quotient`;
+for `.active` / `.observe` / `.hidden`, the round-trip lands on the
+corresponding `.quotient`, which is intended (those constructors carry
+operational shape information that the kernel form deliberately discards).
+-/
+def fromKernel {X : Type u} : Kernel X → LocalView X
+  | ⟨Obs, toObs⟩ => .quotient Obs toObs
+
+@[simp] theorem toKernel_fromKernel {X : Type u} (k : Kernel X) :
+    toKernel (fromKernel k) = k := by
+  rcases k with ⟨Obs, toObs⟩
+  rfl
 
 end LocalView
 
