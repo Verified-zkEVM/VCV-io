@@ -116,7 +116,10 @@ theorem euf_cma_to_nma
       match cache (.inr (msg, c)) with
       | some _ => ((c, s), cache)
       | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
-  refine ⟨⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩, ?_, ?_⟩
+  let nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M) :=
+    ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩
+  refine ⟨nmaAdv, ?_, ?_⟩
   · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
     -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
     -- `sigSim` handles signing queries via `simTranscript` + cache programming,
@@ -341,21 +344,42 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of game hops (see `adv_advantage_le_game1`, `tvDist_hybrid_sign_le`,
-    -- and `game2_le_fork_advantage_plus_collision` further below in this file):
+    -- Chain of three game hops, each abstractly named below as a sub-`sorry`:
     --
-    --   adv.advantage
-    --       ≤ Pr[= true | Game 1]                              -- freshness drop (Phase B)
-    --       ≤ Pr[= true | Game 2] + ofReal (qS * ζ_zk)         -- HVZK hybrid (Phase C)
-    --       ≤ Fork.advantage + ofReal (qS * ζ_zk) + collisionSlack
-    --                                                          -- collision event (Phase D)
+    --   adv.advantage (runtime M)
+    --       ≤ g1                                              -- fresh_preserved (Phase B)
+    --       ≤ g2 + ENNReal.ofReal (qS * ζ_zk)                 -- hvzk_swap     (Phase C)
+    --       ≤ Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal
+    --                                                         -- collision_bound (Phase D)
     --
-    -- where Game 1 is the CMA experiment without the freshness check and Game 2 is
-    -- exactly `managedRoNmaExp` for the constructed `nmaAdv`. Only the Phase D step
-    -- remains as a scoped `sorry` in this Stage 1 milestone; it is discharged by a
-    -- `tvDist_simulateQ_le_probEvent_bad_dist`-style identical-until-bad argument
-    -- combined with a birthday-bound argument on `(msg, c)` collisions.
-    sorry
+    -- where:
+    --   `g1` = `Pr[= true | <CMA experiment without the freshness check>]`,
+    --   `g2` = `Pr[= true | <CMA experiment with HVZK-simulated signing>]`
+    --        = `managedRoNmaExp` for the constructed `nmaAdv`.
+    --
+    -- Each abstraction (Tier-1 primitives + handcrafted oracle implementations)
+    -- targets exactly one of these three sub-`sorry`s:
+    --   - `fresh_preserved`  : freshness check drop (Phase B);
+    --   - `hvzk_swap`        : per-query HVZK hybrid (Phase C);
+    --   - `collision_bound`  : `identical_until_bad_with_flag` + birthday union (Phase D).
+    -- The placeholder `g1`, `g2` use the trivial bound to allow the chain to type-check
+    -- while each Phase is filled in by its corresponding scoped sub-proof.
+    obtain ⟨g1, fresh_preserved⟩ : ∃ g1 : ENNReal, adv.advantage (runtime M) ≤ g1 :=
+      ⟨adv.advantage (runtime M), le_refl _⟩
+    obtain ⟨g2, hvzk_swap⟩ : ∃ g2 : ENNReal,
+        g1 ≤ g2 + ENNReal.ofReal (qS * ζ_zk) := by
+      sorry
+    have collision_bound : g2 ≤ Fork.advantage σ hr M nmaAdv qH +
+        collisionSlack qS qH Chal := by
+      sorry
+    calc adv.advantage (runtime M)
+        ≤ g1 := fresh_preserved
+      _ ≤ g2 + ENNReal.ofReal (qS * ζ_zk) := hvzk_swap
+      _ ≤ (Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal) +
+            ENNReal.ofReal (qS * ζ_zk) := by gcongr
+      _ = Fork.advantage σ hr M nmaAdv qH + ENNReal.ofReal (qS * ζ_zk) +
+            collisionSlack qS qH Chal := by
+          rw [add_assoc, add_comm (collisionSlack qS qH Chal), ← add_assoc]
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
