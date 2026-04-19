@@ -389,6 +389,35 @@ theorem euf_cma_to_nma
         (runtime M) (fun f mx => runtime_evalDist_bind_pure M mx f) adv
     have hvzk_collision_swap : g1 ≤ Fork.advantage σ hr M nmaAdv qH +
         ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal := by
+      -- The combined HVZK simulator swap + collision absorption. The proof factors as:
+      --
+      --   g1 = Pr[= true | unforgeableExpNoFresh runtime adv]
+      --     = Pr[= true | (∗) :=
+      --         (StateT.run' (simulateQ (fwd_unif + randomOracle + signImpl_real) (adv.main pk))
+      --           (∅, false)).evalDist (after keygen + verify wrapper)]    -- (A) bridge_g1_real
+      --     ≤ Pr[= true | (†) :=
+      --         (StateT.run' (simulateQ (fwd_unif + randomOracle + sigSim_bad)
+      --           (adv.main pk)) (∅, false)).evalDist (after keygen + verify wrapper)]
+      --       + qS·ζ_zk + collisionSlack                                   -- (B) tv_real_to_sim
+      --     ≤ Fork.advantage σ hr M nmaAdv qH + qS·ζ_zk + collisionSlack   -- (C) bridge_sim_fork
+      --
+      -- (A) Reformulates the (SPMF-wrapped) experiment as a direct stateful simulation over the
+      --     unified `(QueryCache × Bool)` state. The bad flag is unused on the real side but is
+      --     present in the type so both sides are comparable.
+      -- (B) Direct application of `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad` (see
+      --     `VCVio/ProgramLogic/Relational/SimulateQ.lean`) instantiated with:
+      --       impl₁ := sigSim_bad (cache + bad flag, sets bad on programming a cached point)
+      --       impl₂ := real (forward + signingOracle, never sets bad)
+      --       ε     := ζ_zk (from per-query HVZK via `simChalUniformGivenCommit`)
+      --       q     := qS + qH (total queries from `_hQ pk`)
+      --     followed by the standard one-sided `Pr[E | sim impl₂] ≤ Pr[E | sim impl₁] + tvDist`
+      --     and the bound `Pr[bad on impl₁] ≤ collisionSlack qS qH Chal` from
+      --     `programming_collision_bound`.
+      -- (C) Connects the simulator-side simulation to `Fork.advantage` by showing every valid
+      --     forgery against `sigSim_bad` induces a fork point in `runTrace`.
+      --
+      -- Each of (A), (B), (C) is a substantive sub-lemma whose statement is concrete; the
+      -- single sorry below tracks the full assembly.
       sorry
     exact fresh_preserved.trans hvzk_collision_swap
 section evalDistBridge
