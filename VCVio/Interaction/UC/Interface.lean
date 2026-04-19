@@ -26,7 +26,8 @@ Every definition is an `abbrev` over existing `PFunctor` / chart / lens
 machinery, so the established theory is reused definitionally while
 presenting names that read naturally in the interaction setting.
 
-* `Interface` is `PFunctor`: ports `A` and per-port messages `B a`.
+* `Interface` is `PFunctor`, with interaction-facing accessors `I.port` and
+  `I.message a` for the raw polynomial fields `A` and `B a`.
 * `Interface.Packet I` is one concrete boundary message on interface `I`.
 * `Interface.Hom I J` is `PFunctor.Chart I J` (forward packet transport,
   covariant on both components).
@@ -84,8 +85,8 @@ namespace UC
 
 An interface packages:
 
-* a type of ports `A`, and
-* for each port `a : A`, a type of messages `B a`.
+* a type of ports, written `I.port`, and
+* for each port `a : I.port`, a type of messages `I.message a`.
 
 This is the same dependent-container structure already used throughout the
 existing `PFunctor` world. The point of the new name is only to reflect the
@@ -96,12 +97,28 @@ abbrev Interface := PFunctor
 namespace Interface
 
 /--
+The type of ports exposed by an interface.
+
+This is the interaction-facing name for `PFunctor.A`.
+-/
+abbrev port (I : Interface.{uA, uB}) : Type uA :=
+  I.A
+
+/--
+The type of messages carried on port `a` of an interface.
+
+This is the interaction-facing name for `PFunctor.B`.
+-/
+abbrev message (I : Interface.{uA, uB}) (a : I.port) : Type uB :=
+  I.B a
+
+/--
 `Packet I` is one concrete message on interface `I`.
 
 It consists of:
 
-* a chosen port `a : I.A`, and
-* a message `m : I.B a` carried on that port.
+* a chosen port `a : I.port`, and
+* a message `m : I.message a` carried on that port.
 
 This is exactly `PFunctor.Idx I`, reused under a boundary-oriented name.
 -/
@@ -204,7 +221,7 @@ This is the interaction-facing name for `PFunctor.Chart.toFunA`.
 abbrev onPort
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : Hom I J) : I.A → J.A :=
+    (f : Hom I J) : I.port → J.port :=
   f.toFunA
 
 /--
@@ -219,7 +236,7 @@ interaction-facing name for `PFunctor.Chart.toFunB`.
 abbrev onMsg
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : Hom I J) : {a : I.A} → I.B a → J.B (f.onPort a) :=
+    (f : Hom I J) : {a : I.port} → I.message a → J.message (f.onPort a) :=
   fun {a} => f.toFunB a
 
 /-- The identity interface translation. -/
@@ -415,7 +432,7 @@ This is the interaction-facing name for `PFunctor.Lens.toFunA`.
 abbrev onPort
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : QueryHom I J) : I.A → J.A :=
+    (f : QueryHom I J) : I.port → J.port :=
   f.toFunA
 
 /--
@@ -432,7 +449,7 @@ interaction-facing name for `PFunctor.Lens.toFunB`.
 abbrev onMsg
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : QueryHom I J) : ∀ a : I.A, J.B (f.onPort a) → I.B a :=
+    (f : QueryHom I J) : ∀ a : I.port, J.message (f.onPort a) → I.message a :=
   f.toFunB
 
 /-- The identity interface query hom. -/
@@ -765,13 +782,13 @@ polynomial functors; see Niu–Spivak 2024).
 
 A position of `comp I J` is a pair of:
 
-* a port `a : I.A` on the outer interface, and
-* for each response `m : I.B a` on that port, a port of the inner interface:
-  a function `I.B a → J.A`.
+* a port `a : I.port` on the outer interface, and
+* for each response `m : I.message a` on that port, a port of the inner
+  interface: a function `I.message a → J.port`.
 
 A direction at a composed position `⟨a, f⟩` is a dependent pair `⟨u, v⟩`
-where `u : I.B a` is a response on port `a` and `v : J.B (f u)` is a
-response on the resulting inner port.
+where `u : I.message a` is a response on port `a` and
+`v : J.message (f u)` is a response on the resulting inner port.
 
 This models sequential dependence: one interface's response determines which
 port of the next interface is activated.

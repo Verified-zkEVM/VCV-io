@@ -29,6 +29,16 @@ namespace OracleComp
 -- We want these to show up regardless of specifically opening `OracleSpec`
 export OracleSpec (query query_def)
 
+/-- Make one oracle query at input `t`, then continue with `k` on the response.
+
+This is the `PFunctor.FreeM.roll` constructor specialized to `OracleComp`;
+the `@[match_pattern]` attribute makes it usable both as a term and as a
+`match` pattern. -/
+@[match_pattern, reducible]
+def queryBind {α} (t : spec.Domain) (k : spec.Range t → OracleComp spec α) :
+    OracleComp spec α :=
+  PFunctor.FreeM.roll t k
+
 instance (spec : OracleSpec ι) : Monad (OracleComp spec) :=
   inferInstanceAs (Monad (PFunctor.FreeM spec.toPFunctor))
 
@@ -70,6 +80,41 @@ protected lemma pure_def (x : α) :
 
 protected lemma bind_def (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
     oa >>= ob = PFunctor.FreeM.bind oa ob := rfl
+
+/-- Cases eliminator on `OracleComp` exposing the high-level `pure` /
+`queryBind` alternatives. Registered as the default `cases` eliminator so that
+`cases oa with | pure x => ... | queryBind t k => ...` works transparently on
+top of the free-monad substrate. -/
+@[elab_as_elim, cases_eliminator]
+def casesOn {α} {motive : OracleComp spec α → Sort*}
+    (oa : OracleComp spec α)
+    (pure : (x : α) → motive (PFunctor.FreeM.pure x : OracleComp spec α))
+    (queryBind : (t : spec.Domain) →
+      (k : spec.Range t → OracleComp spec α) →
+      motive (OracleComp.queryBind (spec := spec) t k)) :
+    motive oa :=
+  match oa with
+  | .pure x => pure x
+  | .queryBind t k => queryBind t k
+
+/-- Structural recursion eliminator on `OracleComp` exposing the high-level
+`pure` / `queryBind` alternatives, with an induction hypothesis on every
+continuation in the `queryBind` case. Registered as the default `induction`
+eliminator so that
+`induction oa with | pure x => ... | queryBind t k ih => ...`
+works transparently on top of the free-monad substrate. -/
+@[elab_as_elim, induction_eliminator]
+def recOn {α} {motive : OracleComp spec α → Sort*}
+    (oa : OracleComp spec α)
+    (pure : (x : α) → motive (PFunctor.FreeM.pure x : OracleComp spec α))
+    (queryBind : (t : spec.Domain) →
+      (k : spec.Range t → OracleComp spec α) →
+      ((u : spec.Range t) → motive (k u)) →
+      motive (OracleComp.queryBind (spec := spec) t k)) :
+    motive oa :=
+  match oa with
+  | .pure x => pure x
+  | .queryBind t k => queryBind t k (fun u => recOn (k u) pure queryBind)
 
 protected lemma failure_def : (failure : OptionT (OracleComp spec) α) = OptionT.fail := rfl
 
@@ -188,8 +233,8 @@ variable (x : α) (y : β) (t : spec.Domain) (u : spec.Range t)
 
 /-- Returns `true` for computations that don't query any oracles or fail, else `false`. -/
 def isPure {α : Type _} : OracleComp spec α → Bool
-  | PFunctor.FreeM.pure _ => true
-  | PFunctor.FreeM.roll _ _ => false
+  | .pure _ => true
+  | .queryBind _ _ => false
 
 @[simp] lemma isPure_pure : isPure (pure x : OracleComp spec α) = true := rfl
 @[simp] lemma isPure_query : isPure (query t : OracleComp spec _) = false := rfl
