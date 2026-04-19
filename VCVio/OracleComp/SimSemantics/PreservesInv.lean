@@ -97,17 +97,17 @@ theorem simulateQ_run_preservesInv
       have hz' :
           z ∈ support
             (((simulateQ impl
-                  (liftM (OracleQuery.query t) : OracleComp spec (spec.Range t))).run σ0) >>=
+                  (OracleSpec.query t : OracleComp spec (spec.Range t))).run σ0) >>=
               fun us => (simulateQ impl (oa us.1)).run us.2) := by
         simpa [simulateQ_bind, OracleComp.liftM_def] using hz
       rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
       have hq_run :
-          (simulateQ impl (liftM (OracleQuery.query t) : OracleComp spec (spec.Range t))).run σ0 =
+          (simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t))).run σ0 =
             (impl t).run σ0 := by
         have hq :
-            simulateQ impl (liftM (OracleQuery.query t) : OracleComp spec (spec.Range t)) =
+            simulateQ impl (OracleSpec.query t : OracleComp spec (spec.Range t)) =
               (impl t) := by
-          simp [OracleQuery.query_def, simulateQ_query]
+          simp [OracleSpec.query_def, simulateQ_query]
         simp [hq]
       have hus' : us ∈ support ((impl t).run σ0) := by simpa [hq_run] using hus
       have hσ1 : Inv us.2 := himpl t σ0 hσ0 us hus'

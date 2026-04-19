@@ -19,7 +19,7 @@ open OracleSpec
 defined to be the object type of the corresponding `PFunctor`.
 In particular an element of `OracleQuery spec α` consists of an input value `t : spec.Domain`,
 and a continuation `f : spec.Range t → α` specifying what to do with the result.
-See `OracleQuery.query` for the case when the continuation `f` just returns the query result. -/
+See `OracleSpec.query` for the case when the continuation `f` just returns the query result. -/
 def OracleQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) :
     Type w → Type (max u v w) :=
   PFunctor.Obj spec.toPFunctor
@@ -27,9 +27,21 @@ def OracleQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) :
 @[reducible] protected def OracleQuery.mk {ι α} {spec : OracleSpec ι}
     (t : spec.Domain) (f : spec.Range t → α) : OracleQuery spec α := ⟨t, f⟩
 
+namespace OracleSpec
+
+variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
+
+/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
+Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
+def query (t : spec.Domain) : OracleQuery spec (spec.Range t) := OracleQuery.mk t id
+
+lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
+
+end OracleSpec
+
 namespace OracleQuery
 
-variable {ι} {spec : OracleSpec ι}
+variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
 
 /-- `OracleQuery spec` inherets the functorial structure from `PFunctor.Obj`. -/
 instance {spec : OracleSpec ι} : Functor (OracleQuery spec) where
@@ -88,12 +100,6 @@ instance {α} [h : Subsingleton ι] [h' : Subsingleton α] : Subsingleton (Oracl
     cases show t = t' from h.allEq t t'
     have h' : Subsingleton (spec.Range t → α) := by infer_instance
     exact OracleQuery.ext' t (h'.allEq cont cont')
-
-/-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
-Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
-def query (t : spec.Domain) : OracleQuery spec (spec.Range t) := OracleQuery.mk t id
-
-lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
 
 @[simp] lemma input_query (t : spec.Domain) : (query t).input = t := rfl
 @[simp] lemma cont_query (t : spec.Domain) : (query t).cont = id := rfl

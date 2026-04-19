@@ -70,7 +70,7 @@ lemma probOutput_map_bijective_uniformSample
 lemma probOutput_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (y : β) :
-    Pr[= y | f <$> ($ᵗ α : ProbComp α)] = Pr[= y | ($ᵗ β : ProbComp β)] := by
+    Pr[= y | f <$> ($ᵗ α)] = Pr[= y | ($ᵗ β)] := by
   classical
   letI := Fintype.ofFinite α
   letI := Fintype.ofBijective f hf
@@ -84,13 +84,13 @@ probabilities. -/
 lemma probOutput_bind_bijective_uniform_cross
     {β γ : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (g : β → ProbComp γ) (z : γ) :
-    Pr[= z | ($ᵗ α : ProbComp α) >>= fun x => g (f x)] =
-      Pr[= z | ($ᵗ β : ProbComp β) >>= fun y => g y] := by
+    Pr[= z | ($ᵗ α) >>= fun x => g (f x)] =
+      Pr[= z | ($ᵗ β) >>= fun y => g y] := by
   classical
   letI := Fintype.ofFinite α
   haveI := Fintype.ofBijective f hf
-  have h : (($ᵗ α : ProbComp α) >>= fun x => g (f x)) =
-      ((f <$> ($ᵗ α : ProbComp α)) >>= g) := by
+  have h : (($ᵗ α) >>= fun x => g (f x)) =
+      ((f <$> ($ᵗ α)) >>= g) := by
     simp [map_eq_bind_pure_comp, bind_assoc, pure_bind]
   rw [h, probOutput_bind_eq_tsum, probOutput_bind_eq_tsum]
   congr 1
@@ -153,17 +153,17 @@ lemma probOutput_bind_add_right_uniform [AddGroup α] {β : Type}
 /-- Translating a uniform additive sample preserves the full evaluation distribution. -/
 @[simp]
 lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
-    evalDist (((m + ·) : α → α) <$> ($ᵗ α : ProbComp α)) =
-      evalDist ($ᵗ α : ProbComp α) := by
+    evalDist (((m + ·) : α → α) <$> ($ᵗ α)) =
+      evalDist ($ᵗ α) := by
   apply evalDist_ext
   intro x
   exact probOutput_add_left_uniform (α := α) m x
 
 /-- Two additive translations of a uniform sample have the same evaluation distribution. -/
 lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
-    evalDist (((m₁ + ·) : α → α) <$> ($ᵗ α : ProbComp α)) =
-      evalDist (((m₂ + ·) : α → α) <$> ($ᵗ α : ProbComp α)) := by
-  trans evalDist ($ᵗ α : ProbComp α)
+    evalDist (((m₁ + ·) : α → α) <$> ($ᵗ α)) =
+      evalDist (((m₂ + ·) : α → α) <$> ($ᵗ α)) := by
+  trans evalDist ($ᵗ α)
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
@@ -171,17 +171,17 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
 uniform sample in `AddGroup α` preserves the full evaluation distribution. -/
 @[simp]
 lemma evalDist_add_right_uniform [AddGroup α] (m : α) :
-    evalDist (((· + m) : α → α) <$> ($ᵗ α : ProbComp α)) =
-      evalDist ($ᵗ α : ProbComp α) := by
+    evalDist (((· + m) : α → α) <$> ($ᵗ α)) =
+      evalDist ($ᵗ α) := by
   apply evalDist_ext
   intro x
   exact probOutput_add_right_uniform (α := α) m x
 
 /-- Two right-translations of a uniform sample have the same evaluation distribution. -/
 lemma evalDist_add_right_uniform_eq [AddGroup α] (m₁ m₂ : α) :
-    evalDist (((· + m₁) : α → α) <$> ($ᵗ α : ProbComp α)) =
-      evalDist (((· + m₂) : α → α) <$> ($ᵗ α : ProbComp α)) := by
-  trans evalDist ($ᵗ α : ProbComp α)
+    evalDist (((· + m₁) : α → α) <$> ($ᵗ α)) =
+      evalDist (((· + m₂) : α → α) <$> ($ᵗ α)) := by
+  trans evalDist ($ᵗ α)
   · exact evalDist_add_right_uniform (α := α) m₁
   · exact (evalDist_add_right_uniform (α := α) m₂).symm
 
@@ -189,7 +189,7 @@ lemma evalDist_add_right_uniform_eq [AddGroup α] (m₁ m₂ : α) :
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) :
-    evalDist (f <$> ($ᵗ α : ProbComp α)) = evalDist ($ᵗ β : ProbComp β) := by
+    evalDist (f <$> ($ᵗ α)) = evalDist ($ᵗ β) := by
   apply evalDist_ext
   intro y
   exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
@@ -204,17 +204,17 @@ on the uniform measure, so the sum is again uniform. -/
 lemma evalDist_bind_bijective_add_right_uniform {β γ : Type}
     [AddGroup β] [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (m : β) (cont : β → ProbComp γ) :
-    evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m)) =
-      evalDist (do let y ← ($ᵗ β : ProbComp β); cont y) := by
+    evalDist (do let x ← ($ᵗ α); cont (f x + m)) =
+      evalDist (do let y ← ($ᵗ β); cont y) := by
   have hbind :
-      (do let x ← ($ᵗ α : ProbComp α); cont (f x + m)) =
-        (f <$> ($ᵗ α : ProbComp α)) >>= fun y => cont (y + m) := by
+      (do let x ← ($ᵗ α); cont (f x + m)) =
+        (f <$> ($ᵗ α)) >>= fun y => cont (y + m) := by
     simp [map_eq_bind_pure_comp, bind_assoc]
   rw [hbind, evalDist_bind,
       evalDist_map_bijective_uniform_cross (α := α) (β := β) f hf, ← evalDist_bind]
   have hshift :
-      (do let y ← ($ᵗ β : ProbComp β); cont (y + m)) =
-        (((· + m) : β → β) <$> ($ᵗ β : ProbComp β)) >>= cont := by
+      (do let y ← ($ᵗ β); cont (y + m)) =
+        (((· + m) : β → β) <$> ($ᵗ β)) >>= cont := by
     simp [map_eq_bind_pure_comp, bind_assoc]
   rw [hshift, evalDist_bind, evalDist_add_right_uniform (α := β) m, ← evalDist_bind]
 
@@ -224,8 +224,8 @@ offsets produce the same evaluation distribution. -/
 lemma evalDist_bind_bijective_add_right_eq {β γ : Type}
     [AddGroup β] [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (m₁ m₂ : β) (cont : β → ProbComp γ) :
-    evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m₁)) =
-      evalDist (do let x ← ($ᵗ α : ProbComp α); cont (f x + m₂)) := by
+    evalDist (do let x ← ($ᵗ α); cont (f x + m₁)) =
+      evalDist (do let x ← ($ᵗ α); cont (f x + m₂)) := by
   rw [evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₁ cont,
       ← evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₂ cont]
 
@@ -426,17 +426,17 @@ lemma probOutput_bind_uniformBool {α : Type}
 the difference of the branch success probabilities. -/
 lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) :
     (Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
+      let b ← ($ᵗ Bool)
       let z ← if b then real else rand
       pure (b == z)]).toReal - 1 / 2 =
     ((Pr[= true | real]).toReal - (Pr[= true | rand]).toReal) / 2 := by
   have hgameRepr :
       Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
+        let b ← ($ᵗ Bool)
         let z ← if b then real else rand
         pure (b == z)] =
       Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
+        let b ← ($ᵗ Bool)
         if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] := by
     refine probOutput_bind_congr' ($ᵗ Bool) true ?_
     intro b
@@ -451,14 +451,14 @@ lemma probOutput_uniformBool_branch_toReal_sub_half (real rand : ProbComp Bool) 
       simp [hbeqTrue]
   have hmix :
       Pr[= true | do
-        let b ← ($ᵗ Bool : ProbComp Bool)
+        let b ← ($ᵗ Bool)
         if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand)] =
       (Pr[= true | (BEq.beq true <$> real)] + Pr[= true | (BEq.beq false <$> rand)]) / 2 :=
     probOutput_bind_uniformBool
       (f := fun b => if b then (BEq.beq true <$> real) else (BEq.beq false <$> rand))
       (x := true)
   have hformula : Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
+      let b ← ($ᵗ Bool)
       let z ← if b then real else rand
       pure (b == z)] =
     (Pr[= true | real] + Pr[= false | rand]) / 2 := by

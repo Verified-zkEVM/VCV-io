@@ -147,8 +147,8 @@ def romCRExp [DecidableEq X] [DecidableEq Y]
     OracleComp (ROMHashSpec X Y) (Bool × QueryCache (ROMHashSpec X Y)) :=
   (simulateQ cachingOracle (do
     let (x, x') ← A.run
-    let y ← query (spec := ROMHashSpec X Y) x
-    let y' ← query (spec := ROMHashSpec X Y) x'
+    let y ← (ROMHashSpec X Y).query x
+    let y' ← (ROMHashSpec X Y).query x'
     return decide (x ≠ x' ∧ y = y'))).run ∅
 
 /-- ROM collision-resistance advantage: probability that the adversary
@@ -163,8 +163,8 @@ private def romCRInner [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     OracleComp (ROMHashSpec X Y) Bool := do
   let (x, x') ← A.run
-  let y ← query (spec := ROMHashSpec X Y) x
-  let y' ← query (spec := ROMHashSpec X Y) x'
+  let y ← (ROMHashSpec X Y).query x
+  let y' ← (ROMHashSpec X Y).query x'
   return decide (x ≠ x' ∧ y = y')
 
 private lemma romCRExp_eq [DecidableEq X] [DecidableEq Y]

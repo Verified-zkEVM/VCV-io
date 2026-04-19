@@ -282,7 +282,7 @@ theorem cachingOracle_triple (t : spec.Domain) (cache₀ : QueryCache spec) :
           StateT (QueryCache spec) (OracleComp spec) (spec.Range t)) from rfl]
   mvcgen
   rename_i cache hle hnone
-  rw [show (liftM (OracleQuery.query t) : OracleComp spec _) = OracleComp.query t from rfl,
+  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
       wpProp_iff_forall_support]
   intro u _
   mvcgen
@@ -460,7 +460,7 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleQuery.query t) : OracleComp spec _) = OracleComp.query t from rfl,
+  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
       wpProp_iff_forall_support]
   intro a _
   mvcgen
@@ -477,7 +477,7 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleQuery.query t) : OracleComp spec _) = OracleComp.query t from rfl,
+  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
       wpProp_iff_forall_support]
   intro a _
   mvcgen
@@ -717,7 +717,7 @@ theorem cachingLoggingOracle_triple
   · -- none-branch: cache miss, falls through to query
     rename_i s hcond hnone
     obtain ⟨hle, hlog⟩ := hcond
-    rw [show (liftM (OracleQuery.query t) : OracleComp spec _) = OracleComp.query t from rfl,
+    rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
         wpProp_iff_forall_support]
     intro v _
     mvcgen

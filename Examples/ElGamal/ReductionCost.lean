@@ -242,7 +242,7 @@ def IND_CPA_OneTime_DDHReduction_open
     ProbComp Bool := do
   let (m₁, m₂, st) ← HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G))
     (.chooseMessages A)
-  let bit ← ($ᵗ Bool : ProbComp Bool)
+  let bit ← ($ᵗ Bool)
   let c : G × G := (B, T + if bit then m₁ else m₂)
   let bit' ← HasQuery.query (spec := oneTimeINDCPASpec G G State (G × G))
     (.distinguish st c)
@@ -376,7 +376,7 @@ lemma IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
           · exact AddWriterT.pathwiseCostEqOnSupport_probCompLift
               (m := ProbComp)
               (ω := ResourceProfile ω κ)
-              (x := ($ᵗ Bool : ProbComp Bool))
+              (x := ($ᵗ Bool))
           · refine AddWriterT.pathwiseCostEqOnSupport_bind_zero_right
               (m := ProbComp)
               (ω := ResourceProfile ω κ)

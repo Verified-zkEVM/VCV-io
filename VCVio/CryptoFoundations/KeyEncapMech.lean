@@ -189,7 +189,7 @@ theorem IND_CPA_Game_eq_IND_CCA_Game_toIND_CCA
       ext t
       simp only [QueryImpl.compose, QueryImpl.id']
       change simulateQ (QueryImpl.id' spec + impl₂)
-        (liftM (liftM (OracleQuery.query (spec := spec) t) :
+        (liftM (liftM (spec.query t) :
           OracleQuery (spec + (C →ₒ Option K)) _)) = _
       simp [simulateQ_query]
     rw [this, simulateQ_id']

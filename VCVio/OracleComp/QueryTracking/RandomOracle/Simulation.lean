@@ -97,14 +97,22 @@ lemma run'_liftM_bind {α β : Type} (oa : ProbComp α)
   rw [StateT.run_bind, run_liftM]
   simp [map_bind]
 
+@[simp]
+lemma simulateQ_liftM_spec_query (q : hashSpec.Domain) :
+    simulateQ (unifFwdImpl hashSpec + ro)
+      (liftM (hashSpec.query q) : OracleComp (unifSpec + hashSpec) _) =
+      ro q := by
+  change simulateQ (unifFwdImpl hashSpec + ro)
+    (liftM (liftM (hashSpec.query q) :
+      OracleQuery (unifSpec + hashSpec) _)) = _
+  simp [simulateQ_query]
+
 lemma simulateQ_HasQuery_query (q : hashSpec.Domain) :
     simulateQ (unifFwdImpl hashSpec + ro)
       (HasQuery.query (spec := hashSpec)
         (m := OracleComp (unifSpec + hashSpec)) q) =
       ro q := by
-  change simulateQ (unifFwdImpl hashSpec + ro)
-    (liftM (liftM (OracleQuery.query (spec := hashSpec) q) :
-      OracleQuery (unifSpec + hashSpec) _)) = _
-  simp [simulateQ_query]
+  rw [HasQuery.instOfMonadLift_query]
+  exact simulateQ_liftM_spec_query ro q
 
 end roSim
