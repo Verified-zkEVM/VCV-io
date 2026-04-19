@@ -1243,7 +1243,7 @@ private lemma phaseCWeakInvariant_phaseCImpl (pk : Stmt)
                     (((simulateQ
                         (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
                           (Resp := Resp))
-                        (liftM (OracleQuery.query t) :
+                        (liftM (unifSpec.query t) :
                           ProbComp (unifSpec.Range t))).run σ0) >>=
                       fun us => (simulateQ
                         (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
@@ -1254,11 +1254,11 @@ private lemma phaseCWeakInvariant_phaseCImpl (pk : Stmt)
                   (simulateQ
                       (phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
                         (Resp := Resp))
-                      (liftM (OracleQuery.query t) :
+                      (liftM (unifSpec.query t) :
                         ProbComp (unifSpec.Range t))).run σ0 =
                     ((phaseCUnifImpl (M := M) (Commit := Commit) (Chal := Chal)
                       (Resp := Resp)) t).run σ0 := by
-                simp [OracleQuery.query_def, simulateQ_query]
+                simp [OracleSpec.query_def, simulateQ_query]
               rw [husrun] at hus
               -- `phaseCUnifImpl t = StateT.lift _`, so `us.2 = σ0`.
               have hphase : us.2 = σ0 := by
