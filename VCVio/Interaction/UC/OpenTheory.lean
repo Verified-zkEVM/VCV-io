@@ -9,8 +9,10 @@ import VCVio.Interaction.UC.Interface
 # Open composition algebra with monoidal coherence
 
 This module defines `OpenTheory`, a boundary-indexed algebra of open systems,
-together with a hierarchy of lawfulness classes capturing increasingly strong
-equational properties.
+together with a granular hierarchy of lawfulness classes capturing
+increasingly strong equational properties. The split mirrors the categorical
+distinction between symmetric monoidal, traced symmetric monoidal
+(Joyal-Street-Verity), and compact closed categories.
 
 ## Operations
 
@@ -22,17 +24,46 @@ equational properties.
 
 ## Class hierarchy
 
+Data classes (operations beyond the four primitives):
+
+* `HasUnit`: a distinguished `unit : Obj empty` (the monoidal unit).
+* `HasIdWire`: a coevaluation `idWire : ∀ Γ, Obj (swap Γ ⊗ Γ)`.
+
+Naturality (Prop classes):
+
 * `IsLawfulMap`: functoriality of `map` (identity and composition).
 * `IsLawfulPar`/`IsLawfulWire`/`IsLawfulPlug`: naturality of each combinator
   with respect to boundary adaptation.
 * `IsLawful`: bundles all naturality laws.
-* `Monoidal`: symmetric monoidal coherence for `par` (associativity,
-  commutativity, left and right unit laws via a distinguished `unit` object).
-* `CompactClosed`: compact closed structure (`idWire` as coevaluation,
-  `plug` derivable from `wire`, zig-zag identity for `wire_idWire`).
 
-Concrete realizations include the free models (`Expr.theory`, `Interp.theory`)
-and the process-backed `openTheory` in `OpenProcessModel.lean`.
+Symmetric monoidal coherence:
+
+* `IsMonoidal` (extends `IsLawful`, `HasUnit`): associativity, commutativity
+  (braiding), and left/right unit laws for `par`.
+
+Trace algebra (JSV traced symmetric monoidal):
+
+* `IsTraced` (extends `IsMonoidal`): wire associativity, par-superposition,
+  and wire commutativity.
+
+Compact closure (snake / zig-zag):
+
+* `IsCompactClosed` (extends `IsTraced`, `HasIdWire`): left and right zig-zag
+  identities `wire_idWire`/`wire_idWire_right` and `unit_eq` identifying the
+  monoidal unit with the trivial coevaluation.
+
+Plug factorization:
+
+* `HasPlugWireFactor` (extends `IsCompactClosed`): `plug` derivable from
+  `wire` via the unit, and the two factorization laws relating closure of
+  parallel and wired composites to closure of one component.
+
+The chain `IsMonoidal → IsTraced → IsCompactClosed → HasPlugWireFactor` lets
+each model declare exactly the strength it can honestly satisfy. The free
+models (`Expr.theory`, `Interp.theory`) instantiate the entire chain. The
+process-backed `openTheory` in `OpenProcessModel.lean` instantiates only
+`IsLawful`; its monoidal coherence and snake equations hold up to
+`OpenProcessIso`, not strict equality.
 -/
 
 universe u
@@ -56,8 +87,9 @@ primitive composition operations:
 * `plug` closes an open system against a matching context on the swapped
   boundary, yielding a closed system.
 
-Lawfulness is stratified into three levels via the class hierarchy
-`IsLawful ≤ Monoidal ≤ CompactClosed` (see the module docstring).
+Lawfulness is stratified into a granular class hierarchy starting at
+`IsLawful` and continuing through `IsMonoidal`, `IsTraced`,
+`IsCompactClosed`, and `HasPlugWireFactor` (see the module docstring).
 
 Universe polymorphism: one ambient pair of universes for ports and
 messages on both sides of every boundary, keeping `PortBoundary.swap` inside
@@ -133,6 +165,35 @@ structure OpenTheory where
     Obj (PortBoundary.empty)
 
 namespace OpenTheory
+
+/-! ### Operation-only data classes -/
+
+/--
+`HasUnit T` distinguishes a closed object `unit : T.Obj empty`, intended to
+play the role of the symmetric monoidal unit.
+
+This is purely a data class. Whether `unit` actually behaves as a left/right
+unit for `par` (up to boundary equivalence) is the content of `IsMonoidal`.
+-/
+class HasUnit (T : _root_.Interaction.UC.OpenTheory.{u}) where
+  /-- The distinguished unit object on the empty boundary. -/
+  unit : T.Obj PortBoundary.empty
+
+/--
+`HasIdWire T` distinguishes a coevaluation morphism on every boundary,
+`idWire Γ : T.Obj (swap Γ ⊗ Γ)`, intended to play the role of the categorical
+unit of duality between `Γ` and `swap Γ`.
+
+This is purely a data class. Whether `idWire` actually satisfies the
+zig-zag (snake) identities is the content of `IsCompactClosed`.
+-/
+class HasIdWire (T : _root_.Interaction.UC.OpenTheory.{u}) where
+  /-- The identity-wire / coevaluation on boundary `Γ`: a process exposing
+  `swap Γ ⊗ Γ` that behaves as a bidirectional relay. -/
+  idWire : ∀ (Γ : PortBoundary),
+    T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Γ)
+
+/-! ### Naturality (functoriality of `map` and naturality of `par`/`wire`/`plug`) -/
 
 /--
 `IsLawfulMap T` states that boundary adaptation in `T` behaves functorially.
@@ -255,17 +316,19 @@ later, once the library settles on the right notion of boundary equivalence.
 class IsLawful (T : _root_.Interaction.UC.OpenTheory.{u}) :
     Prop extends IsLawfulPar T, IsLawfulWire T, IsLawfulPlug T
 
+/-! ### Symmetric monoidal coherence -/
+
 /--
-`Monoidal T` extends `IsLawful T` with the symmetric monoidal coherence
-laws for `par`: a unit object, plus associativity, commutativity (braiding),
+`IsMonoidal T` extends `IsLawful T` and `HasUnit T` with the symmetric
+monoidal coherence laws for `par`: associativity, commutativity (braiding),
 and left/right unit laws up to boundary equivalence.
 
 Pentagon and hexagon coherence conditions are deferred: they are derivable
 in the free models and hold trivially for the concrete model up to process
 isomorphism.
 -/
-class Monoidal (T : _root_.Interaction.UC.OpenTheory.{u}) extends IsLawful T where
-  unit : T.Obj PortBoundary.empty
+class IsMonoidal (T : _root_.Interaction.UC.OpenTheory.{u})
+    extends IsLawful T, HasUnit T where
   par_assoc :
     ∀ {Δ₁ Δ₂ Δ₃ : PortBoundary}
       (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) (W₃ : T.Obj Δ₃),
@@ -280,51 +343,28 @@ class Monoidal (T : _root_.Interaction.UC.OpenTheory.{u}) extends IsLawful T whe
   par_leftUnit :
     ∀ {Δ : PortBoundary} (W : T.Obj Δ),
       T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
-        (T.par unit W) = W
+        (T.par (HasUnit.unit (T := T)) W) = W
   par_rightUnit :
     ∀ {Δ : PortBoundary} (W : T.Obj Δ),
       T.map (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
-        (T.par W unit) = W
+        (T.par W (HasUnit.unit (T := T))) = W
+
+/-! ### Trace algebra (Joyal-Street-Verity traced symmetric monoidal) -/
 
 /--
-`CompactClosed T` extends `Monoidal T` with a coevaluation morphism
-(`idWire`) and laws that connect it to `wire` and `plug`.
+`IsTraced T` extends `IsMonoidal T` with the three trace axioms of a
+Joyal-Street-Verity traced symmetric monoidal category, formulated for the
+binary `wire` operator: wire associativity (vanishing II), wire-par
+superposition, and wire commutativity (yanking via the symmetry).
 
-The `idWire Γ` process relays messages on the boundary `swap Γ ⊗ Γ`. The
-key property `wire_idWire` says that wiring any process against the identity
-wire leaves it unchanged (zig-zag identity). Together with `plug_eq_wire`,
-this characterizes the compact closed structure.
+These axioms make sense without `HasIdWire` or any snake equation: they are
+purely about the algebra of `wire` itself and how it interacts with `par`.
+A model satisfies `IsTraced` exactly when its `wire` operation behaves like
+a JSV trace; the existence of duals (i.e., compact closure) is a separate
+class layered on top.
 -/
-class CompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
-    extends Monoidal T where
-  /-- The identity wire (coevaluation): a process on the boundary `swap Γ ⊗ Γ`
-  that relays messages bidirectionally. -/
-  idWire : ∀ (Γ : PortBoundary),
-    T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Γ)
-  /-- `plug` is derivable from `wire` plus boundary reshaping. -/
-  plug_eq_wire :
-    ∀ {Δ : PortBoundary}
-      (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)),
-      T.plug W K =
-        T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-          (T.wire
-            (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
-            (T.map (PortBoundary.Equiv.tensorEmptyRight
-              (PortBoundary.swap Δ)).symm.toHom K))
-  /-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
-  wire_idWire :
-    ∀ (Γ : PortBoundary) {Δ₂ : PortBoundary}
-      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
-      T.wire (idWire Γ) W₂ = W₂
-  /-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
-  wire_idWire_right :
-    ∀ (Γ : PortBoundary) {Δ₁ : PortBoundary}
-      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)),
-      T.wire W₁ (idWire Γ) = W₁
-  /-- The monoidal unit is the coevaluation at the trivial boundary. -/
-  unit_eq :
-    unit = T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-      (idWire PortBoundary.empty)
+class IsTraced (T : _root_.Interaction.UC.OpenTheory.{u})
+    extends IsMonoidal T where
   /-- Wire associativity: sequential wiring can be reassociated.
 
   Wiring `W₁` with `W₂` through `Γ₁` and then with `W₃` through `Γ₂`
@@ -338,8 +378,7 @@ class CompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
       T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃)
   /-- Wire-par superposition (left): if the left factor of a parallel
   composition does not share a boundary with the second wire argument,
-  it can be factored out of the wire. This is one of the axioms of
-  traced symmetric monoidal categories. -/
+  it can be factored out of the wire. -/
   wire_par_superpose :
     ∀ {Δ₁ Δ₂ Γ Δ₃ : PortBoundary}
       (W₁ : T.Obj Δ₁)
@@ -364,6 +403,64 @@ class CompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
               (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂).toHom
               W₂)
             (T.map (PortBoundary.Equiv.tensorComm Δ₁ Γ).toHom W₁))
+
+/-! ### Compact closure (snake / zig-zag identities) -/
+
+/--
+`IsCompactClosed T` extends `IsTraced T` and `HasIdWire T` with the snake
+(zig-zag) identities relating the coevaluation `idWire` to `wire`, plus the
+identification `unit_eq` of the monoidal unit with the trivial coevaluation.
+
+These laws say that `swap Γ` is a categorical dual of `Γ`, witnessed by
+`idWire Γ` as the coevaluation. In our setting the trace algebra and the
+duality structure are independent (since `wire` is a primitive, not derived
+from η/ε), so `IsCompactClosed` extends `IsTraced` rather than living
+side-by-side with it: a model that satisfies `IsCompactClosed` also has a
+JSV trace.
+-/
+class IsCompactClosed (T : _root_.Interaction.UC.OpenTheory.{u})
+    extends IsTraced T, HasIdWire T where
+  /-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
+  wire_idWire :
+    ∀ (Γ : PortBoundary) {Δ₂ : PortBoundary}
+      (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)),
+      T.wire (HasIdWire.idWire (T := T) Γ) W₂ = W₂
+  /-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
+  wire_idWire_right :
+    ∀ (Γ : PortBoundary) {Δ₁ : PortBoundary}
+      (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)),
+      T.wire W₁ (HasIdWire.idWire (T := T) Γ) = W₁
+  /-- The monoidal unit is the coevaluation at the trivial boundary. -/
+  unit_eq :
+    HasUnit.unit (T := T) =
+      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (HasIdWire.idWire (T := T) PortBoundary.empty)
+
+/-! ### Plug-wire factorization -/
+
+/--
+`HasPlugWireFactor T` extends `IsCompactClosed T` with the three laws
+identifying `plug` as a derived operation: `plug` factors through `wire`
+via the unit (`plug_eq_wire`), and closure of a parallel or wired composite
+factors through closure of one component (`plug_par_left`/`plug_wire_left`).
+
+This is the "everything bundle" used by downstream UC composition theorems:
+`[HasPlugWireFactor T]` automatically supplies all of `IsCompactClosed T`,
+`IsTraced T`, `IsMonoidal T`, `IsLawful T`, `HasUnit T`, and `HasIdWire T`
+through the inheritance chain.
+-/
+class HasPlugWireFactor (T : _root_.Interaction.UC.OpenTheory.{u})
+    extends IsCompactClosed T where
+  /-- `plug` is derivable from `wire` plus boundary reshaping. -/
+  plug_eq_wire :
+    ∀ {Δ : PortBoundary}
+      (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)),
+      T.plug W K =
+        T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+          (T.wire
+            (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
+            (T.map (PortBoundary.Equiv.tensorEmptyRight
+              (PortBoundary.swap Δ)).symm.toHom K))
   /-- Plug-par factorization (left): plugging a parallel composition against
   a context factors into wiring the right component into the context, then
   plugging the left component against the result.
@@ -652,99 +749,60 @@ theorem mapEquiv_plug
   simpa [OpenTheory.mapEquiv] using
     map_plug (T := T) e.toHom W K
 
+/-! ### Symmetric monoidal coherence -/
+
 /--
 Reassociating a nested parallel composition of three open systems.
 -/
 theorem par_assoc
-    [Monoidal T]
+    [IsMonoidal T]
     {Δ₁ Δ₂ Δ₃ : PortBoundary}
     (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) (W₃ : T.Obj Δ₃) :
     T.mapEquiv (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃)
       (T.par (T.par W₁ W₂) W₃) =
     T.par W₁ (T.par W₂ W₃) :=
-  Monoidal.par_assoc W₁ W₂ W₃
+  IsMonoidal.par_assoc W₁ W₂ W₃
 
 /--
 Swapping the components of a parallel composition along the tensor
 commutativity equivalence.
 -/
 theorem par_comm
-    [Monoidal T]
+    [IsMonoidal T]
     {Δ₁ Δ₂ : PortBoundary}
     (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂) :
     T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Δ₂)
       (T.par W₁ W₂) =
     T.par W₂ W₁ :=
-  Monoidal.par_comm W₁ W₂
+  IsMonoidal.par_comm W₁ W₂
 
 /-- The monoidal unit is a left identity for parallel composition. -/
 @[simp]
 theorem par_leftUnit
-    [Monoidal T]
+    [IsMonoidal T]
     {Δ : PortBoundary}
     (W : T.Obj Δ) :
     T.mapEquiv (PortBoundary.Equiv.tensorEmptyLeft Δ)
-      (T.par (Monoidal.unit (T := T)) W) = W :=
-  Monoidal.par_leftUnit W
+      (T.par (HasUnit.unit (T := T)) W) = W :=
+  IsMonoidal.par_leftUnit W
 
 /-- The monoidal unit is a right identity for parallel composition. -/
 @[simp]
 theorem par_rightUnit
-    [Monoidal T]
+    [IsMonoidal T]
     {Δ : PortBoundary}
     (W : T.Obj Δ) :
     T.mapEquiv (PortBoundary.Equiv.tensorEmptyRight Δ)
-      (T.par W (Monoidal.unit (T := T))) = W :=
-  Monoidal.par_rightUnit W
+      (T.par W (HasUnit.unit (T := T))) = W :=
+  IsMonoidal.par_rightUnit W
 
-/-- `plug` expressed via `wire` and boundary reshaping. -/
-theorem plug_eq_wire
-    [CompactClosed T]
-    {Δ : PortBoundary}
-    (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)) :
-    T.plug W K =
-      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-        (T.wire
-          (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
-          (T.map (PortBoundary.Equiv.tensorEmptyRight
-            (PortBoundary.swap Δ)).symm.toHom K)) :=
-  CompactClosed.plug_eq_wire W K
-
-/-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
-@[simp]
-theorem wire_idWire
-    [CompactClosed T]
-    {Γ : PortBoundary}
-    {Δ₂ : PortBoundary}
-    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
-    T.wire (CompactClosed.idWire (T := T) Γ) W₂ = W₂ :=
-  CompactClosed.wire_idWire Γ W₂
-
-/-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
-@[simp]
-theorem wire_idWire_right
-    [CompactClosed T]
-    {Γ : PortBoundary}
-    {Δ₁ : PortBoundary}
-    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)) :
-    T.wire W₁ (CompactClosed.idWire (T := T) Γ) = W₁ :=
-  CompactClosed.wire_idWire_right Γ W₁
-
-/-- The monoidal unit is the coevaluation at the trivial boundary. -/
-theorem unit_eq
-    [CompactClosed T] :
-    Monoidal.unit (T := T) =
-      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-        (CompactClosed.idWire (T := T) PortBoundary.empty) :=
-  CompactClosed.unit_eq
-
-/-! ### Wire algebra -/
+/-! ### Trace algebra -/
 
 /-- Wire-par superposition: the left factor of a parallel composition
 can be moved outside a wire when it doesn't share the contracted
 boundary. -/
 theorem wire_par_superpose
-    [CompactClosed T]
+    [IsTraced T]
     {Δ₁ Δ₂ Γ Δ₃ : PortBoundary}
     (W₁ : T.Obj Δ₁)
     (W₂ : T.Obj (PortBoundary.tensor Δ₂ Γ))
@@ -755,22 +813,22 @@ theorem wire_par_superpose
       W₃ =
     T.mapEquiv (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).symm
       (T.par W₁ (T.wire W₂ W₃)) :=
-  CompactClosed.wire_par_superpose W₁ W₂ W₃
+  IsTraced.wire_par_superpose W₁ W₂ W₃
 
 /-- Wire associativity: sequential wiring can be reassociated. -/
 theorem wire_assoc
-    [CompactClosed T]
+    [IsTraced T]
     {Δ₁ Γ₁ Γ₂ Δ₃ : PortBoundary}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ₁))
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₁) Γ₂))
     (W₃ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ₂) Δ₃)) :
     T.wire (T.wire W₁ W₂) W₃ = T.wire W₁ (T.wire W₂ W₃) :=
-  CompactClosed.wire_assoc W₁ W₂ W₃
+  IsTraced.wire_assoc W₁ W₂ W₃
 
 /-- Wire commutativity: the roles of the two wire factors are
 interchangeable up to boundary reshaping. -/
 theorem wire_comm
-    [CompactClosed T]
+    [IsTraced T]
     {Δ₁ Γ Δ₂ : PortBoundary}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
@@ -780,14 +838,59 @@ theorem wire_comm
           (T.mapEquiv
             (PortBoundary.Equiv.tensorComm (PortBoundary.swap Γ) Δ₂) W₂)
           (T.mapEquiv (PortBoundary.Equiv.tensorComm Δ₁ Γ) W₁)) :=
-  CompactClosed.wire_comm W₁ W₂
+  IsTraced.wire_comm W₁ W₂
+
+/-! ### Compact closure (snake / zig-zag) -/
+
+/-- Left zig-zag: wiring the identity wire on the left is a no-op. -/
+@[simp]
+theorem wire_idWire
+    [IsCompactClosed T]
+    {Γ : PortBoundary}
+    {Δ₂ : PortBoundary}
+    (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
+    T.wire (HasIdWire.idWire (T := T) Γ) W₂ = W₂ :=
+  IsCompactClosed.wire_idWire Γ W₂
+
+/-- Right zig-zag: wiring the identity wire on the right is a no-op. -/
+@[simp]
+theorem wire_idWire_right
+    [IsCompactClosed T]
+    {Γ : PortBoundary}
+    {Δ₁ : PortBoundary}
+    (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)) :
+    T.wire W₁ (HasIdWire.idWire (T := T) Γ) = W₁ :=
+  IsCompactClosed.wire_idWire_right Γ W₁
+
+/-- The monoidal unit is the coevaluation at the trivial boundary. -/
+theorem unit_eq
+    [IsCompactClosed T] :
+    HasUnit.unit (T := T) =
+      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (HasIdWire.idWire (T := T) PortBoundary.empty) :=
+  IsCompactClosed.unit_eq
+
+/-! ### Plug-wire factorization -/
+
+/-- `plug` expressed via `wire` and boundary reshaping. -/
+theorem plug_eq_wire
+    [HasPlugWireFactor T]
+    {Δ : PortBoundary}
+    (W : T.Obj Δ) (K : T.Obj (PortBoundary.swap Δ)) :
+    T.plug W K =
+      T.map (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
+        (T.wire
+          (T.map (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
+          (T.map (PortBoundary.Equiv.tensorEmptyRight
+            (PortBoundary.swap Δ)).symm.toHom K)) :=
+  HasPlugWireFactor.plug_eq_wire W K
 
 /-- Plug-par factorization (left): plugging a parallel composition against a
 context factors through the left component.
 
-See `CompactClosed.plug_par_left` for the full docstring. -/
+See `HasPlugWireFactor.plug_par_left` for the full docstring. -/
 theorem plug_par_left
-    [CompactClosed T]
+    [HasPlugWireFactor T]
     {Δ₁ Δ₂ : PortBoundary}
     (W₁ : T.Obj Δ₁) (W₂ : T.Obj Δ₂)
     (K : T.Obj (PortBoundary.swap (PortBoundary.tensor Δ₁ Δ₂))) :
@@ -799,14 +902,14 @@ theorem plug_par_left
             (Δ₂ := PortBoundary.empty)
             K
             (T.mapEquiv (PortBoundary.Equiv.tensorEmptyRight Δ₂).symm W₂))) :=
-  CompactClosed.plug_par_left W₁ W₂ K
+  HasPlugWireFactor.plug_par_left W₁ W₂ K
 
 /-- Plug-wire factorization (left): closing a wired composition against a
 context factors through the left wire component.
 
-See `CompactClosed.plug_wire_left` for the full docstring. -/
+See `HasPlugWireFactor.plug_wire_left` for the full docstring. -/
 theorem plug_wire_left
-    [CompactClosed T]
+    [HasPlugWireFactor T]
     {Δ₁ Γ Δ₂ : PortBoundary}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂))
@@ -820,7 +923,7 @@ theorem plug_wire_left
           K
           (T.mapEquiv (PortBoundary.Equiv.tensorComm
             (PortBoundary.swap Γ) Δ₂) W₂)) :=
-  CompactClosed.plug_wire_left W₁ W₂ K
+  HasPlugWireFactor.plug_wire_left W₁ W₂ K
 
 end Laws
 

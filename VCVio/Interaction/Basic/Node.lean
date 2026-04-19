@@ -152,6 +152,81 @@ def Context.extendMap
     ContextHom (Context.extend Γ A) (Context.extend Δ B) :=
   fun X ⟨γ, a⟩ => ⟨f X γ, g X γ a⟩
 
+/-! ## Non-dependent context product
+
+`Context.prod Γ Δ` is the non-dependent product of two realized node
+contexts: at each move space `X`, the value type is `Γ X × Δ X`. This is
+the polynomial product of `Γ` and `Δ` viewed as `(Type u → Type _)`-valued
+functors, and is the special case of `Context.extend` whose extension is
+constant in the base value.
+
+Use `Context.prod` when the two contexts carry independent per-node data
+(for example the closed-world `StepContext Party` and a boundary action
+context `BoundaryAction Δ`); use `Context.extend` when the second field
+genuinely depends on the first. -/
+
+/--
+The non-dependent product of two realized node contexts. At each move space
+`X`, the value type is `Γ X × Δ X`. -/
+def Context.prod (Γ : Type u → Type v) (Δ : Type u → Type w) :
+    Type u → Type (max v w) :=
+  fun X => Γ X × Δ X
+
+/-- First projection out of the non-dependent context product. -/
+def Context.prodFst (Γ : Type u → Type v) (Δ : Type u → Type w) :
+    ContextHom (Context.prod Γ Δ) Γ :=
+  fun _ p => p.1
+
+/-- Second projection out of the non-dependent context product. -/
+def Context.prodSnd (Γ : Type u → Type v) (Δ : Type u → Type w) :
+    ContextHom (Context.prod Γ Δ) Δ :=
+  fun _ p => p.2
+
+/--
+Pair two context morphisms into a single morphism into the product context.
+This is the universal property of the non-dependent context product. -/
+def Context.prodPair
+    {Γ : Type u → Type v} {Δ₁ : Type u → Type w} {Δ₂ : Type u → Type w₂}
+    (f : ContextHom Γ Δ₁) (g : ContextHom Γ Δ₂) :
+    ContextHom Γ (Context.prod Δ₁ Δ₂) :=
+  fun X x => (f X x, g X x)
+
+/--
+Map both factors of a non-dependent context product. -/
+def Context.prodMap
+    {Γ₁ : Type u → Type v} {Γ₂ : Type u → Type w}
+    {Δ₁ : Type u → Type w₂} {Δ₂ : Type u → Type w₃}
+    (f : ContextHom Γ₁ Δ₁) (g : ContextHom Γ₂ Δ₂) :
+    ContextHom (Context.prod Γ₁ Γ₂) (Context.prod Δ₁ Δ₂) :=
+  fun X p => (f X p.1, g X p.2)
+
+@[simp]
+theorem Context.prodMap_id {Γ : Context.{u, v}} {Δ : Context.{u, w}} :
+    Context.prodMap (ContextHom.id Γ) (ContextHom.id Δ) =
+      ContextHom.id (Context.prod Γ Δ) := by
+  funext X p
+  cases p
+  rfl
+
+theorem Context.prodMap_comp
+    {Γ₁ : Context.{u, v}} {Γ₂ : Context.{u, w}}
+    {Δ₁ : Context.{u, w₂}} {Δ₂ : Context.{u, w₃}}
+    {Λ₁ : Type u → Type _} {Λ₂ : Type u → Type _}
+    (g₁ : ContextHom Δ₁ Λ₁) (g₂ : ContextHom Δ₂ Λ₂)
+    (f₁ : ContextHom Γ₁ Δ₁) (f₂ : ContextHom Γ₂ Δ₂) :
+    ContextHom.comp (Context.prodMap g₁ g₂) (Context.prodMap f₁ f₂) =
+      Context.prodMap (ContextHom.comp g₁ f₁) (ContextHom.comp g₂ f₂) := by
+  funext X p
+  cases p
+  rfl
+
+/-
+Conceptually `Context.prod Γ Δ` is the constant-family case of
+`Context.extend`. The two are not definitionally equal as types because
+`Prod` and `Sigma` are distinct inductive types in Lean, so we keep
+`Context.prod` as its own primitive with `Prod`-shaped values to support
+the standard `(a, b)` pair syntax at construction sites. -/
+
 /--
 `Schema Γ` is a telescope whose realized node context is `Γ`.
 
