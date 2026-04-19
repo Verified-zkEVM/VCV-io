@@ -69,7 +69,7 @@ from `[DecidableEq Sid] [DecidableEq Pid]`) and over `Epoch = ℕ`.
 provides decidable equality on the identity type parameters.
 -/
 
-universe w
+universe w w₂
 
 namespace Interaction
 namespace UC
@@ -391,13 +391,13 @@ constrains which step transcripts (which carry the env event in their
 data) the environment is allowed to schedule.
 -/
 abbrev CorruptionPolicy
-    {Γ : Interaction.Spec.Node.Context.{w, w}}
+    {Γ : Interaction.Spec.Node.Context.{w, w₂}}
     (process : ProcessOver Γ) :=
   ProcessOver.StepPolicy process
 
 namespace CorruptionPolicy
 
-variable {Γ : Interaction.Spec.Node.Context.{w, w}} {process : ProcessOver Γ}
+variable {Γ : Interaction.Spec.Node.Context.{w, w₂}} {process : ProcessOver Γ}
 
 /-- Allow every step transcript: the unconstrained baseline. -/
 abbrev top : CorruptionPolicy process :=
