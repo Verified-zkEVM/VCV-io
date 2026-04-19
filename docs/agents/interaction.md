@@ -12,8 +12,9 @@ The framework is organized around a few stable principles:
   on the move chosen.
   All composition, decoration, and strategy types respect this structure.
 - **Control vs observation are orthogonal.**
-  Who *chooses* a move (`Control`) and who *sees* a move (`Profile`, `LocalView`)
-  are independent axes.
+  Who *chooses* a move (per-node: `NodeAuthority`; per-spec-tree: `Concurrent.Control`)
+  and who *sees* a move (per-node: `NodeObservation`; per-party-per-node:
+  `Multiparty.LocalView`; per-spec-tree: `Concurrent.Profile`) are independent axes.
   A party can control a node but see only a quotient of its own move, or observe
   a node fully without controlling it.
 - **Boundary vs composition.**
@@ -44,6 +45,77 @@ The framework is organized around a few stable principles:
 
 Dependencies flow downward: `Concurrent/` may import `Multiparty/` and `Basic/`;
 `TwoParty/` and `Multiparty/` import only `Basic/`.
+
+## Core concepts: Spec, Node, Party, Profile
+
+Before reading any one file, it helps to fix four words. They are the load-bearing
+vocabulary of the entire `Interaction/` layer.
+
+### Node — a structural location in the protocol tree
+
+A `Spec` is an interaction tree (`VCVio/Interaction/Basic/Spec.lean`). A **node** is one
+branching point of that tree: a pair `(Moves : Type, rest : Moves → Spec)`. It is *not*
+an actor; it is a location where some next move gets chosen. At the level of `Spec`
+alone, a node knows its move space and its continuation family, and nothing else: not
+who chooses, not who watches, not what monad runs, not what data is attached. Those
+concerns are deferred to companion layers (`Decoration`, `NodeProfile`, `StepOver`,
+`SyntaxOver`, `InteractionOver`).
+
+The namespace `Spec.Node.*` (`Context`, `Schema`, `ContextHom` in
+`VCVio/Interaction/Basic/Node.lean`) is *generic node-context infrastructure*: for any
+type family `Γ : Type → Type`, a `Γ`-decoration attaches one `Γ X` value at every node
+with move space `X`.
+
+### Party — an actor that plays across many nodes
+
+A `Party` is a free type parameter introduced by the *content* layers (`Multiparty/`,
+`Concurrent/`, `UC/`). A party is an actor that may control or observe moves at
+*various* nodes throughout the same protocol tree. A party is whole-tree (it has a
+strategy across the entire `Spec`); a node is local (it lives at one location in the
+tree). Typically there are *many more* nodes than parties: a long protocol may have
+unboundedly many nodes (or a continuation-based infinite stream of them via
+`ProcessOver`), but always the same finite party set.
+
+### LocalView — what a single party sees at a single node
+
+`Multiparty.LocalView X` (`Multiparty/Core.lean`) records how *one* party locally
+experiences a node whose move space is `X`. The four constructors
+`active` / `observe` / `hidden` / `quotient Obs toObs` are the canonical observation
+modes. A `LocalView` is the smallest atomic node × party × observation triple in the
+framework.
+
+### NodeProfile — per-node attribution of who-authors-what and who-sees-what
+
+`NodeProfile Party X` (`Concurrent/Process.lean`) is the bridge between a single node
+and the whole party set. It bundles two orthogonal factor structures:
+
+- `NodeAuthority Party X`: `controllers : X → List Party` — for each possible move,
+  which parties are credited as having authored it.
+- `NodeObservation Party X`: `views : Party → Multiparty.LocalView X` — for each
+  party, what local view they have at this node.
+
+The structure `extends` both factors, so dot-notation field access
+(`node.controllers x`, `node.views me`) and the structure-literal constructor
+`{ controllers := ..., views := ... }` work transparently. Code that depends only on
+authorship can take a `NodeAuthority Party X` parameter; code that depends only on
+observation can take a `NodeObservation Party X` parameter.
+
+`OpenNodeProfile Party Δ X` (`UC/OpenProcess.lean`) is the open-system extension that
+adds one `BoundaryAction Δ X` field for external traffic.
+
+### Mental picture
+
+The protocol tree is the stage; **nodes** are scenes on the stage; **parties** are
+actors who appear in many scenes; a **`NodeProfile`** is one scene's cast list and
+sightlines. `LocalView` is a single actor's vantage on a single scene.
+
+| Concept | Scope | Role |
+|---|---|---|
+| `Spec` | whole protocol tree | branching shape of all possible plays |
+| Node | one location in the tree | one scene: move space + continuation |
+| Party | spans the whole tree | actor; may control or observe at various nodes |
+| `Multiparty.LocalView X` | one node × one party | that party's vantage on that one scene |
+| `NodeProfile Party X` | one node × all parties | full cast list + sightlines for that scene |
 
 ## Core types
 
@@ -191,15 +263,29 @@ supporting `Packet`, `Query`, `Hom`, `comp` (Poly's composition product),
 `compUnit` (composition unit), and boundary equivalences.
 
 `OpenTheory` provides the compositional algebra: `map`, `par`, `wire`, `plug`.
-Lawfulness is stratified into a class hierarchy:
+Lawfulness is stratified into a granular Mathlib-style class hierarchy. Carriers:
+
+- `HasUnit` — distinguished monoidal unit object for `par`.
+- `HasIdWire` — distinguished identity-wire builder for `wire`.
+
+Naturality:
 
 - `IsLawfulMap` / `IsLawfulPar` / `IsLawfulWire` / `IsLawfulPlug`:
-  functoriality of `map` and naturality of combinators.
+  functoriality of `map` and naturality of each combinator.
 - `IsLawful`: bundles all naturality laws.
-- `Monoidal`: symmetric monoidal coherence for `par` (associativity,
-  commutativity, left/right unit laws via a distinguished `unit` object).
-- `CompactClosed`: compact closed structure with `idWire` as coevaluation,
-  derivation of `plug` from `wire`, and a zig-zag identity (`wire_idWire`).
+
+Coherence (each subsequent class adds laws on top of the previous):
+
+- `IsMonoidal`: symmetric monoidal coherence for `par` (associativity,
+  commutativity, left/right unit laws via the `HasUnit` object).
+- `IsTraced`: Joyal-Street-Verity traced symmetric monoidal structure
+  (`wire`-trace yanking, sliding, vanishing).
+- `IsCompactClosed`: compact closed structure (a `(Poly, ⊗)`-friendly
+  weakening; the strict snake equations are *not* asserted, since
+  `(Poly, ⊗)` is monoidal closed but not strictly compact closed; see
+  Spivak arXiv:2202.00534 §4.3).
+- `HasPlugWireFactor`: closure-factorization identities relating
+  `plug` to `wire` (`plug_eq_wire`, `plug_par_left`, `plug_wire_left`).
 
 `OpenProcessIso` (in `OpenProcess.lean`) provides a bisimulation-based
 equivalence for `OpenProcess`, used to state monoidal and compact closed laws
@@ -296,7 +382,7 @@ import VCVio.Interaction.Concurrent.Process
 | `Control.lean` | `Control`, `scheduler?`, `current?`, `controllers` |
 | `Profile.lean` | `Profile`, `observe`, `residual`, `frontierView` |
 | `Current.lean` | `view`, `observe`, `residualView` |
-| `Process.lean` | `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave` |
+| `Process.lean` | `NodeAuthority`, `NodeObservation`, `NodeProfile`, `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave`, `ProcessOver.{Behavior, behavior, ObsEq}` |
 | `Tree.lean` | Structural concurrent syntax → `Process` |
 | `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalg` instance |
 | `Execution.lean` | `Trace`, `ObservedTrace` for processes |
@@ -315,11 +401,11 @@ import VCVio.Interaction.Concurrent.Process
 | File | Purpose |
 |------|---------|
 | `Interface.lean` | `Interface`, `PortBoundary`, `Hom`, `Equiv`, `comp`/`compUnit`, tensor/swap |
-| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `Monoidal`, `CompactClosed` |
-| `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/CC equations) |
-| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), `Monoidal`/`CompactClosed` instances |
-| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), `Monoidal`/`CompactClosed` instances, `Expr.toInterp` |
-| `OpenProcess.lean` | `BoundaryAction`, `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
+| `OpenTheory.lean` | `OpenTheory` algebra, `IsLawful`, `HasUnit`, `HasIdWire`, `IsMonoidal`, `IsTraced`, `IsCompactClosed`, `HasPlugWireFactor` |
+| `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/traced/CC equations) |
+| `OpenSyntax/Interp.lean` | `Interp` (tagless-final), granular `HasUnit` / `HasIdWire` / `IsMonoidal` / `IsTraced` / `IsCompactClosed` / `HasPlugWireFactor` instances |
+| `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), granular `OpenTheory` lawfulness instances, `Expr.toInterp` |
+| `OpenProcess.lean` | `BoundaryAction`, `OpenNodeProfile`, `OpenNodeContext` (with polynomial-product bridge `productView`), `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
 | `OpenProcessModel.lean` | `openTheory` (concrete model), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 | `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |

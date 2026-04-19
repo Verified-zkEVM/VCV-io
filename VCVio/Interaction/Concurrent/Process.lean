@@ -28,7 +28,8 @@ The file is organized in two levels:
 * `StepOver Γ P` and `ProcessOver Γ` are the generic forms, parameterized by a
   realized node context `Γ`;
 * `Step Party P` and `Process Party` are the closed-world specializations whose
-  node metadata is exactly `NodeSemantics Party`.
+  node metadata is exactly `NodeProfile Party`, the bundled
+  `NodeAuthority + NodeObservation` view of node-local semantic data.
 
 So the intended reading is:
 
@@ -49,31 +50,65 @@ namespace Interaction
 namespace Concurrent
 
 /--
-`NodeSemantics Party X` records the local semantic data attached to one
+`NodeAuthority Party X` records the controller-attribution part of node-local
+semantic data: which parties are credited as controllers of each move
+`x : X`.
+
+This is one of the two orthogonal layers of `NodeProfile`. It is stored
+separately so that downstream reasoning that depends only on
+controller attribution (corruption policies, scheduler accountability,
+party-side responsibility arguments) can take a `NodeAuthority` parameter
+without committing to any particular observation structure.
+-/
+structure NodeAuthority (Party : Type u) (X : Type w) where
+  controllers : X → List Party := fun _ => []
+
+/--
+`NodeObservation Party X` records the view-attribution part of node-local
+semantic data: what each party `me : Party` locally observes of the
+chosen move `x : X`, expressed as a `Multiparty.LocalView X`.
+
+This is the second of the two orthogonal layers of `NodeProfile`. It
+is stored separately so that downstream reasoning that depends only on
+local views (information-flow arguments, projection / trace semantics,
+view-equivalence proofs) can take a `NodeObservation` parameter without
+committing to any particular controller attribution.
+-/
+structure NodeObservation (Party : Type u) (X : Type w) where
+  views : Party → Multiparty.LocalView X
+
+/--
+`NodeProfile Party X` records the local semantic data attached to one
 sequential interaction node whose move space is `X`.
 
-It packages two orthogonal pieces of information:
+It bundles two orthogonal layers:
 
-* `controllers x` is the controller-path contribution associated to choosing
-  the move `x : X`;
-* `views` assigns to each party its local view of the chosen move `x : X`.
+* `NodeAuthority Party X` — `controllers x` is the controller-path contribution
+  associated to choosing the move `x : X`;
+* `NodeObservation Party X` — `views me` assigns to party `me` its local view
+  of the chosen move.
 
-The controller-path contribution and the local views are intentionally stored
-separately. Many natural systems align them so that the first controller in
-`controllers x` has local view `active`, but this file does not force that
-relationship definitionally.
-Any desired coherence law can be imposed later as a separate well-formedness
-predicate.
+The two layers are intentionally stored as separate factor structures.
+Many natural systems align them so that the first controller in
+`controllers x` has local view `.active`, but this file does not force that
+relationship definitionally; any desired coherence law can be imposed later
+as a separate well-formedness predicate.
+
+Because `NodeProfile` `extends` both factors, the dot-notation accessors
+`node.controllers`, `node.views` and the structure-literal constructor
+`{ controllers := ..., views := ... }` work exactly as if the fields were
+declared inline. The factor projections `node.toNodeAuthority`,
+`node.toNodeObservation` are auto-generated and let downstream code restrict
+attention to a single layer.
 -/
-structure NodeSemantics (Party : Type u) (X : Type w) where
-  controllers : X → List Party := fun _ => []
-  views : Party → Multiparty.LocalView X
+structure NodeProfile (Party : Type u) (X : Type w)
+    extends NodeAuthority Party X, NodeObservation Party X
 
 /--
 The closed-world node context used by the current concurrent semantics.
 
 At a node with move space `X`, the context value is exactly the
-`NodeSemantics Party X` describing:
+`NodeProfile Party X` describing:
 
 * which parties are recorded as controllers of the chosen move, and
 * what each party locally observes of that move.
@@ -81,7 +116,7 @@ At a node with move space `X`, the context value is exactly the
 This is the context whose specialization recovers the existing closed-world
 `Step` / `Process` APIs.
 -/
-abbrev StepContext (Party : Type u) := fun X => NodeSemantics Party X
+abbrev StepContext (Party : Type u) := fun X => NodeProfile Party X
 
 /--
 `StepOver Γ P` is one finite sequential interaction episode whose nodes are
