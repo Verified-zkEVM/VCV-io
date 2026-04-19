@@ -95,7 +95,7 @@ private theorem finUniformSample_queryCostExactly_one
 private theorem challengeSample_queryCostExactly_one :
     letI : SampleableType F := FinEnum.SampleableType F
     AddWriterT.QueryCostExactly
-      (OracleComp.probCompUnitQueryRun ($ᵗ F : ProbComp F))
+      (OracleComp.probCompUnitQueryRun ($ᵗ F))
       1 := by
   letI : SampleableType F := FinEnum.SampleableType F
   haveI : NeZero (FinEnum.card F) := ⟨FinEnum.card_ne_zero (α := F)⟩
@@ -205,10 +205,10 @@ theorem fork_expectedQueryWork_le
         (OracleComp.probCompUnitQueryRun
           (generateSeed (challengeSpec F) (challengeBudget q) [()])) +
       AddWriterT.expectedCostNat
-        (OracleComp.probCompUnitQueryRun ($ᵗ F : ProbComp F)) +
+        (OracleComp.probCompUnitQueryRun ($ᵗ F)) +
       wp (generateSeed (challengeSpec F) (challengeBudget q) [()])
         (fun seed =>
-          wp ($ᵗ F : ProbComp F)
+          wp ($ᵗ F)
             (fun u =>
               expectedCost
                 (OracleComp.seededForkWithSeedValue main (challengeBudget q) () cf seed u)

@@ -120,17 +120,17 @@ private def loggingROQueryImpl :
 
 /-- Lift a `ProbComp` computation into the BR93 random-oracle world. -/
 private def liftProbComp {α : Type} (px : ProbComp α) : OracleComp (RO_Spec Rand M) α :=
-  OracleComp.liftComp (spec := unifSpec) (superSpec := RO_Spec Rand M) px
+  px
 
 /-- Real one-time CPA game in the random-oracle model. -/
 def cpaGame (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
   (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let b ← liftProbComp ($ᵗ Bool : ProbComp Bool)
+    let b ← liftProbComp ($ᵗ Bool)
     let (pk, _sk) ← liftProbComp tdp.keygen
     let (m₁, m₂, st) ← adv.choose pk
-    let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-    let h : M ← query (spec := RO_Spec Rand M) (Sum.inr r)
+    let r ← liftProbComp ($ᵗ Rand)
+    let h : M ← (RO_Spec Rand M).query (Sum.inr r)
     let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
     let b' ← adv.guess st c
     return (b == b'))).run' ∅
@@ -141,11 +141,11 @@ hidden challenge randomness `r`. -/
 def game1 (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
   (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
-    let b ← liftProbComp ($ᵗ Bool : ProbComp Bool)
+    let b ← liftProbComp ($ᵗ Bool)
     let (pk, _sk) ← liftProbComp tdp.keygen
     let (m₁, m₂, st) ← adv.choose pk
-    let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-    let h ← liftProbComp ($ᵗ M : ProbComp M)
+    let r ← liftProbComp ($ᵗ Rand)
+    let h ← liftProbComp ($ᵗ M)
     let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
     let b' ← adv.guess st c
     return (b == b'))).run' ∅
@@ -155,12 +155,12 @@ challenge message preserves uniformity, so the challenge ciphertext no longer de
 def game2 (tdp : TrapdoorPermutation PK SK Rand)
     (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) : ProbComp Bool :=
   do
-    let b ← ($ᵗ Bool : ProbComp Bool)
+    let b ← ($ᵗ Bool)
     let b' ← (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
       let (pk, _sk) ← liftProbComp tdp.keygen
       let (_m₁, _m₂, st) ← adv.choose pk
-      let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-      let h ← liftProbComp ($ᵗ M : ProbComp M)
+      let r ← liftProbComp ($ᵗ Rand)
+      let h ← liftProbComp ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h)
       adv.guess st c)).run' ∅
     return (b == b')
@@ -175,9 +175,9 @@ def badEventExp (tdp : TrapdoorPermutation PK SK Rand)
     (simulateQ loggingROQueryImpl <| (show OracleComp (RO_Spec Rand M) Rand from do
       let (pk, _sk) ← liftProbComp tdp.keygen
       let (m₁, m₂, st) ← adv.choose pk
-      let b ← liftProbComp ($ᵗ Bool : ProbComp Bool)
-      let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-      let h ← liftProbComp ($ᵗ M : ProbComp M)
+      let b ← liftProbComp ($ᵗ Bool)
+      let r ← liftProbComp ($ᵗ Rand)
+      let h ← liftProbComp ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h + if b then m₁ else m₂)
       let _b' ← adv.guess st c
       return r)).run
@@ -202,8 +202,8 @@ def inverter (tdp : TrapdoorPermutation PK SK Rand)
           (Unit × QueryLog (RO_Spec Rand M)) :=
       (simulateQ loggingROQueryImpl <| (show OracleComp (RO_Spec Rand M) Unit from do
         let (m₁, m₂, st) ← adv.choose pk
-        let b ← liftProbComp ($ᵗ Bool : ProbComp Bool)
-        let h ← liftProbComp ($ᵗ M : ProbComp M)
+        let b ← liftProbComp ($ᵗ Bool)
+        let h ← liftProbComp ($ᵗ M)
         let c : Rand × M := (y, h + if b then m₁ else m₂)
         let _b' ← adv.guess st c
         return ())).run
@@ -242,8 +242,8 @@ theorem game2_eq_half (adv : CPA_Adv (PK := PK) (Rand := Rand) (M := M)) :
     (simulateQ roQueryImpl <| (show OracleComp (RO_Spec Rand M) Bool from do
       let (pk, _sk) ← liftProbComp tdp.keygen
       let (_m₁, _m₂, st) ← adv.choose pk
-      let r ← liftProbComp ($ᵗ Rand : ProbComp Rand)
-      let h ← liftProbComp ($ᵗ M : ProbComp M)
+      let r ← liftProbComp ($ᵗ Rand)
+      let h ← liftProbComp ($ᵗ M)
       let c : Rand × M := (tdp.forward pk r, h)
       adv.guess st c)).run' ∅
   simpa [game2, f] using

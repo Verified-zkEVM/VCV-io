@@ -39,16 +39,16 @@ def bindingGame {t : ℕ} (A : BindingAdversary M S C t) :
     OracleComp (CMOracle M S C) (Bool × QueryCache (CMOracle M S C)) :=
   (simulateQ cachingOracle (do
     let (c, m₀, s₀, m₁, s₁) ← A.run
-    let c₀ ← query (spec := CMOracle M S C) (m₀, s₀)
-    let c₁ ← query (spec := CMOracle M S C) (m₁, s₁)
+    let c₀ ← (CMOracle M S C).query (m₀, s₀)
+    let c₁ ← (CMOracle M S C).query (m₁, s₁)
     return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run ∅
 
 /-- The inner oracle computation of the binding game (before `simulateQ`). -/
 private def bindingInner {t : ℕ} (A : BindingAdversary M S C t) :
     OracleComp (CMOracle M S C) Bool := do
   let (c, m₀, s₀, m₁, s₁) ← A.run
-  let c₀ ← query (spec := CMOracle M S C) (m₀, s₀)
-  let c₁ ← query (spec := CMOracle M S C) (m₁, s₁)
+  let c₀ ← (CMOracle M S C).query (m₀, s₀)
+  let c₁ ← (CMOracle M S C).query (m₁, s₁)
   return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))
 
 omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
@@ -84,7 +84,7 @@ private lemma binding_win_implies_collision {t : ℕ} (A : BindingAdversary M S 
   -- Cache monotonicity: cache₂ ≤ cache₃, so cache₃ also has (m₀, s₀) ↦ c₀
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (c₁, cache₃) ∈ support
-        ((cachingOracle (spec := CMOracle M S C) (m₁, s₁)).run cache₂) := by
+        (((CMOracle M S C).cachingOracle (m₁, s₁)).run cache₂) := by
       simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
@@ -118,10 +118,10 @@ private lemma binding_rest_noCollision_le_inv
     (cache₁ : QueryCache (CMOracle M S C))
     (hno : ¬ CacheHasCollision cache₁) :
     Pr[fun z => z.1 = true |
-      (simulateQ cachingOracle
-        ((liftM (query (spec := CMOracle M S C) (m₀, s₀))) >>= fun c₀ =>
-          (liftM (query (spec := CMOracle M S C) (m₁, s₁))) >>= fun c₁ =>
-          pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run cache₁] ≤
+      (simulateQ (CMOracle M S C).cachingOracle do
+        let c₀ ← (CMOracle M S C).query (m₀, s₀)
+        let c₁ ← (CMOracle M S C).query (m₁, s₁)
+        return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))).run cache₁] ≤
       (Fintype.card C : ℝ≥0∞)⁻¹ := by
   by_cases hneq : m₀ ≠ m₁
   · let q₀ : (CMOracle M S C).Domain := (m₀, s₀)
@@ -132,9 +132,9 @@ private lemma binding_rest_noCollision_le_inv
     by_cases hq₀_none : cache₁ q₀ = none
     · simpa [q₀, q₁] using probEvent_from_fresh_query_le_inv
         (t := q₀) (target := c) (cache₀ := cache₁) hq₀_none
-        (cont := fun u =>
-          (liftM (query (spec := CMOracle M S C) q₁)) >>= fun c₁ =>
-            pure (decide (m₀ ≠ m₁) && (u == c) && (c₁ == c))) (by
+        (cont := fun u => do
+          let c₁ ← (CMOracle M S C).query q₁
+          return (decide (m₀ ≠ m₁) && (u == c) && (c₁ == c))) (by
           intro u hu
           apply probEvent_eq_zero
           intro z hz hwin
@@ -148,16 +148,16 @@ private lemma binding_rest_noCollision_le_inv
           simp [hneq, hu] at hwin)
     · rcases Option.ne_none_iff_exists'.mp hq₀_none with ⟨v₀, hq₀⟩
       have hrun₀ :
-          (simulateQ cachingOracle
-            ((liftM (query (spec := CMOracle M S C) q₀)) >>= fun c₀ =>
-              (liftM (query (spec := CMOracle M S C) q₁)) >>= fun c₁ =>
-              pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c)))).run cache₁ =
-          (simulateQ cachingOracle
-            ((liftM (query (spec := CMOracle M S C) q₁)) >>= fun c₁ =>
-              pure (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c)))).run cache₁ := by
+          (simulateQ (CMOracle M S C).cachingOracle do
+            let c₀ ← (CMOracle M S C).query q₀
+            let c₁ ← (CMOracle M S C).query q₁
+            return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))).run cache₁ =
+          (simulateQ (CMOracle M S C).cachingOracle do
+            let c₁ ← (CMOracle M S C).query q₁
+            return (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c))).run cache₁ := by
         simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
         have hcache :
-            (liftM (cachingOracle (spec := CMOracle M S C) q₀) :
+            (liftM ((CMOracle M S C).cachingOracle q₀) :
               StateT (QueryCache (CMOracle M S C))
                 (OracleComp (CMOracle M S C)) _).run cache₁ =
             pure (v₀, cache₁) := by
@@ -181,13 +181,13 @@ private lemma binding_rest_noCollision_le_inv
             exact cache_lookup_eq_of_noCollision hno (hv₀ ▸ hq₀)
               ⟨v₁, hq₁, heq_of_eq hv₁⟩
           have hrun₁ :
-              (simulateQ cachingOracle
-                ((liftM (query (spec := CMOracle M S C) q₁)) >>= fun c₁ =>
-                  pure (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c)))).run cache₁ =
+              (simulateQ (CMOracle M S C).cachingOracle do
+                let c₁ ← (CMOracle M S C).query q₁
+                return (decide (m₀ ≠ m₁) && (v₀ == c) && (c₁ == c))).run cache₁ =
               pure (decide (m₀ ≠ m₁) && (v₀ == c) && (v₁ == c), cache₁) := by
             simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
             have hcache :
-                (liftM (cachingOracle (spec := CMOracle M S C) q₁) :
+                (liftM ((CMOracle M S C).cachingOracle q₁) :
                   StateT (QueryCache (CMOracle M S C))
                     (OracleComp (CMOracle M S C)) _).run cache₁ =
                 pure (v₁, cache₁) := by
@@ -238,10 +238,10 @@ private lemma binding_win_le_advCollision_add_fresh {t : ℕ}
     Pr[fun z => CacheHasCollision z.2 | (simulateQ cachingOracle A.run).run ∅] +
     (Fintype.card C : ℝ≥0∞)⁻¹ := by
   let restPart : (C × M × S × M × S) → OracleComp (CMOracle M S C) Bool
-    | (c, m₀, s₀, m₁, s₁) =>
-        (liftM (query (spec := CMOracle M S C) (m₀, s₀))) >>= fun c₀ =>
-          (liftM (query (spec := CMOracle M S C) (m₁, s₁))) >>= fun c₁ =>
-          pure (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))
+    | (c, m₀, s₀, m₁, s₁) => do
+        let c₀ ← (CMOracle M S C).query (m₀, s₀)
+        let c₁ ← (CMOracle M S C).query (m₁, s₁)
+        return (decide (m₀ ≠ m₁) && (c₀ == c) && (c₁ == c))
   have hdecomp : bindingInner A = A.run >>= restPart := by
     simp [bindingInner, restPart]
   rw [bindingGame_eq, hdecomp, simulateQ_bind, StateT.run_bind]

@@ -13,27 +13,36 @@ at the abstract `OpenTheory` level.
 
 ## Main definitions
 
-* `Emulates T real ideal ObsEq` says that the open system `real` *emulates*
-  `ideal` in theory `T` whenever, for every valid plug (context), the
-  resulting closed systems are observationally equivalent.
+* `Observation T` bundles a binary relation on closed systems together with a
+  proof that it is an equivalence relation. UC judgments are parameterized
+  uniformly over `Observation T` so that reflexivity, symmetry, and
+  transitivity are always available without per-call hypotheses.
 
-* `UCSecure T protocol ideal ObsEq SimSpace simulate` is the existential
-  simulator variant: there exists a simulator that transforms any context so
-  that the closed ideal system (with the simulated context) is observationally
-  equivalent to the closed real system.
+* `Emulates real ideal Obs` says that the open system `real` *emulates*
+  `ideal` whenever, for every valid plug (context), the resulting closed
+  systems are related by `Obs.rel`.
+
+* `UCSecure protocol ideal Obs SimSpace simulate` is the existential simulator
+  variant: there exists a simulator that transforms any context so that the
+  closed ideal system (with the simulated context) is `Obs.rel`-related to
+  the closed real system.
+
+The canonical `Observation.eq T` instantiates the framework with perfect
+syntactic equality on closed systems; downstream layers (e.g. open process
+isos, asymptotic computational indistinguishability) supply their own
+`Observation` constructors.
 
 ## Basic properties
 
-* `Emulates.refl` and `Emulates.trans` follow immediately from the
-  corresponding properties of the observation relation `ObsEq`.
+* `Emulates.refl` and `Emulates.trans` are immediate consequences of the
+  bundled `Equivalence` proof in `Observation`.
 
 * `Emulates.map_invariance` shows that adapting both sides of an emulation
   along the same boundary morphism preserves the emulation (requires a
   lawful theory).
 
 * `Emulates.plug_invariance` shows that plugging both sides of an emulation
-  with the same additional context preserves the emulation (requires a
-  lawful theory).
+  with the same additional context preserves the emulation.
 
 ## UC composition theorems
 
@@ -46,6 +55,20 @@ These rely on structural factorization lemmas
 (`close_par_left`, `close_par_right`, `close_wire_left`,
 `close_wire_right`, `plug_comm`) that capture monoidal coherence
 identities, derived from the `CompactClosed` axioms.
+
+## Design note: why `Observation` requires a full `Equivalence`
+
+Bundling the equivalence proof into `Observation` lets every UC theorem
+quantify over a single parameter `Obs : Observation T` rather than threading
+a relation plus separate `hRefl`/`hTrans`/`hSymm` hypotheses. The cost is
+that observation relations which are *not* equivalences (e.g. the fixed-`ε`
+computational distinguishability relation
+`fun c₁ c₂ => distAdvantage (sem c₁) (sem c₂) ≤ ε`, which fails transitivity
+because the triangle inequality only gives `2ε`) cannot be packaged as
+`Observation T`. The intended bridge from computational security to abstract
+`Emulates` therefore lives at the asymptotic level (where negligible
+distance is closed under sums and is a genuine equivalence), not at the
+fixed-`ε` level.
 -/
 
 universe u
@@ -56,48 +79,77 @@ namespace UC
 variable {T : OpenTheory.{u}}
 
 /--
-`Emulates T real ideal ObsEq` asserts that `real` contextually emulates
-`ideal` in the open-composition theory `T`.
+`Observation T` bundles a binary relation on the closed systems of an open
+theory `T` together with a proof that it is an equivalence relation.
+
+This is the parameter slot through which different security flavors
+(perfect, statistical, asymptotic computational) plug into the abstract UC
+judgments `Emulates` and `UCSecure`.
+-/
+structure Observation (T : OpenTheory.{u}) where
+  /-- The underlying binary relation on closed systems. -/
+  rel : T.Closed → T.Closed → Prop
+  /-- The relation is an equivalence (reflexive, symmetric, transitive). -/
+  equiv : Equivalence rel
+
+namespace Observation
+
+/-- Perfect syntactic equality on closed systems is an observation relation. -/
+def eq (T : OpenTheory.{u}) : Observation T where
+  rel := Eq
+  equiv := ⟨fun _ => rfl, Eq.symm, Eq.trans⟩
+
+@[simp]
+theorem eq_rel {T : OpenTheory.{u}} {c₁ c₂ : T.Closed} :
+    (Observation.eq T).rel c₁ c₂ ↔ c₁ = c₂ := Iff.rfl
+
+end Observation
+
+/--
+`Emulates real ideal Obs` asserts that `real` contextually emulates
+`ideal` in the open-composition theory `T`, judged by the observation
+relation `Obs : Observation T`.
 
 For every plug `K : T.Plug Δ`, the closed compositions `T.close real K`
-and `T.close ideal K` are related by `ObsEq`.
+and `T.close ideal K` are related by `Obs.rel`.
 
 This is the definitional core of UC security: no environment can
-distinguish `real` from `ideal`.
+distinguish `real` from `ideal` under the chosen observation.
 -/
 structure Emulates
     {Δ : PortBoundary}
     (real ideal : T.Obj Δ)
-    (ObsEq : T.Closed → T.Closed → Prop) : Prop where
-  compare : ∀ K : T.Plug Δ, ObsEq (T.close real K) (T.close ideal K)
+    (Obs : Observation T) : Prop where
+  compare : ∀ K : T.Plug Δ, Obs.rel (T.close real K) (T.close ideal K)
 
 namespace Emulates
 
-/--
-Every open system emulates itself, provided the observation relation is
-reflexive.
--/
+/-- Every open system emulates itself. -/
 theorem refl
     {Δ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hRefl : ∀ c, ObsEq c c)
+    (Obs : Observation T)
     (W : T.Obj Δ) :
-    Emulates W W ObsEq :=
-  ⟨fun _ => hRefl _⟩
+    Emulates W W Obs :=
+  ⟨fun _ => Obs.equiv.refl _⟩
 
-/--
-Emulation composes transitively, provided the observation relation is
-transitive.
--/
+/-- Emulation is symmetric. -/
+theorem symm
+    {Δ : PortBoundary}
+    {Obs : Observation T}
+    {W₁ W₂ : T.Obj Δ}
+    (h : Emulates W₁ W₂ Obs) :
+    Emulates W₂ W₁ Obs :=
+  ⟨fun K => Obs.equiv.symm (h.compare K)⟩
+
+/-- Emulation composes transitively. -/
 theorem trans
     {Δ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hTrans : ∀ a b c, ObsEq a b → ObsEq b c → ObsEq a c)
+    {Obs : Observation T}
     {W₁ W₂ W₃ : T.Obj Δ}
-    (h₁₂ : Emulates W₁ W₂ ObsEq)
-    (h₂₃ : Emulates W₂ W₃ ObsEq) :
-    Emulates W₁ W₃ ObsEq :=
-  ⟨fun K => hTrans _ _ _ (h₁₂.compare K) (h₂₃.compare K)⟩
+    (h₁₂ : Emulates W₁ W₂ Obs)
+    (h₂₃ : Emulates W₂ W₃ Obs) :
+    Emulates W₁ W₃ Obs :=
+  ⟨fun K => Obs.equiv.trans (h₁₂.compare K) (h₂₃.compare K)⟩
 
 /--
 Adapting both sides of an emulation along the same boundary morphism
@@ -109,11 +161,11 @@ which is the `map_plug` naturality law.
 theorem map_invariance
     [OpenTheory.IsLawfulPlug T]
     {Δ₁ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     (f : PortBoundary.Hom Δ₁ Δ₂)
     {real ideal : T.Obj Δ₁}
-    (h : Emulates real ideal ObsEq) :
-    Emulates (T.map f real) (T.map f ideal) ObsEq :=
+    (h : Emulates real ideal Obs) :
+    Emulates (T.map f real) (T.map f ideal) Obs :=
   ⟨fun K => by
     simp only [OpenTheory.close,
       OpenTheory.map_plug f real K, OpenTheory.map_plug f ideal K]
@@ -129,18 +181,16 @@ immediate from the definition.
 -/
 theorem plug_invariance
     {Δ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     {real ideal : T.Obj Δ}
-    (h : Emulates real ideal ObsEq)
+    (h : Emulates real ideal Obs)
     (K : T.Plug Δ) :
-    ObsEq (T.close real K) (T.close ideal K) :=
+    Obs.rel (T.close real K) (T.close ideal K) :=
   h.compare K
 
 end Emulates
 
--- ============================================================================
--- § Structural factorization of `close` under composition
--- ============================================================================
+/-! ## Structural factorization of `close` under composition -/
 
 section Factorization
 
@@ -312,9 +362,7 @@ theorem OpenTheory.plug_comm
 
 end Factorization
 
--- ============================================================================
--- § UC composition theorems
--- ============================================================================
+/-! ## UC composition theorems -/
 
 namespace Emulates
 
@@ -324,11 +372,11 @@ variable [OpenTheory.CompactClosed T]
 emulation, with the right component and environment held fixed. -/
 theorem par_left
     {Δ₁ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     {real₁ ideal₁ : T.Obj Δ₁}
-    (h₁ : Emulates real₁ ideal₁ ObsEq)
+    (h₁ : Emulates real₁ ideal₁ Obs)
     (W₂ : T.Obj Δ₂) :
-    Emulates (T.par real₁ W₂) (T.par ideal₁ W₂) ObsEq :=
+    Emulates (T.par real₁ W₂) (T.par ideal₁ W₂) Obs :=
   ⟨fun K => by
     rw [OpenTheory.close_par_left real₁ W₂ K,
         OpenTheory.close_par_left ideal₁ W₂ K]
@@ -338,11 +386,11 @@ theorem par_left
 emulation, with the left component and environment held fixed. -/
 theorem par_right
     {Δ₁ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     (W₁ : T.Obj Δ₁)
     {real₂ ideal₂ : T.Obj Δ₂}
-    (h₂ : Emulates real₂ ideal₂ ObsEq) :
-    Emulates (T.par W₁ real₂) (T.par W₁ ideal₂) ObsEq :=
+    (h₂ : Emulates real₂ ideal₂ Obs) :
+    Emulates (T.par W₁ real₂) (T.par W₁ ideal₂) Obs :=
   ⟨fun K => by
     rw [OpenTheory.close_par_right W₁ real₂ K,
         OpenTheory.close_par_right W₁ ideal₂ K]
@@ -357,22 +405,21 @@ each step reducing to emulation of a single component via
 `close_par_left` / `close_par_right`. -/
 theorem par_compose
     {Δ₁ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hTrans : ∀ a b c, ObsEq a b → ObsEq b c → ObsEq a c)
+    {Obs : Observation T}
     {real₁ ideal₁ : T.Obj Δ₁} {real₂ ideal₂ : T.Obj Δ₂}
-    (h₁ : Emulates real₁ ideal₁ ObsEq)
-    (h₂ : Emulates real₂ ideal₂ ObsEq) :
-    Emulates (T.par real₁ real₂) (T.par ideal₁ ideal₂) ObsEq :=
-  Emulates.trans hTrans (par_left h₁ real₂) (par_right ideal₁ h₂)
+    (h₁ : Emulates real₁ ideal₁ Obs)
+    (h₂ : Emulates real₂ ideal₂ Obs) :
+    Emulates (T.par real₁ real₂) (T.par ideal₁ ideal₂) Obs :=
+  Emulates.trans (par_left h₁ real₂) (par_right ideal₁ h₂)
 
 /-- Replacing the left factor of a wiring preserves emulation. -/
 theorem wire_left
     {Δ₁ Γ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
-    (h₁ : Emulates real₁ ideal₁ ObsEq)
+    (h₁ : Emulates real₁ ideal₁ Obs)
     (W₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
-    Emulates (T.wire real₁ W₂) (T.wire ideal₁ W₂) ObsEq :=
+    Emulates (T.wire real₁ W₂) (T.wire ideal₁ W₂) Obs :=
   ⟨fun K => by
     rw [OpenTheory.close_wire_left real₁ W₂ K,
         OpenTheory.close_wire_left ideal₁ W₂ K]
@@ -381,11 +428,11 @@ theorem wire_left
 /-- Replacing the right factor of a wiring preserves emulation. -/
 theorem wire_right
     {Δ₁ Γ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     (W₁ : T.Obj (PortBoundary.tensor Δ₁ Γ))
     {real₂ ideal₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
-    (h₂ : Emulates real₂ ideal₂ ObsEq) :
-    Emulates (T.wire W₁ real₂) (T.wire W₁ ideal₂) ObsEq :=
+    (h₂ : Emulates real₂ ideal₂ Obs) :
+    Emulates (T.wire W₁ real₂) (T.wire W₁ ideal₂) Obs :=
   ⟨fun K => by
     rw [OpenTheory.close_wire_right W₁ real₂ K,
         OpenTheory.close_wire_right W₁ ideal₂ K]
@@ -395,25 +442,24 @@ theorem wire_right
 ideal, then their wired composition emulates the wired ideal. -/
 theorem wire_compose
     {Δ₁ Γ Δ₂ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hTrans : ∀ a b c, ObsEq a b → ObsEq b c → ObsEq a c)
+    {Obs : Observation T}
     {real₁ ideal₁ : T.Obj (PortBoundary.tensor Δ₁ Γ)}
     {real₂ ideal₂ : T.Obj (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)}
-    (h₁ : Emulates real₁ ideal₁ ObsEq)
-    (h₂ : Emulates real₂ ideal₂ ObsEq) :
-    Emulates (T.wire real₁ real₂) (T.wire ideal₁ ideal₂) ObsEq :=
-  Emulates.trans hTrans (wire_left h₁ real₂) (wire_right ideal₁ h₂)
+    (h₁ : Emulates real₁ ideal₁ Obs)
+    (h₂ : Emulates real₂ ideal₂ Obs) :
+    Emulates (T.wire real₁ real₂) (T.wire ideal₁ ideal₂) Obs :=
+  Emulates.trans (wire_left h₁ real₂) (wire_right ideal₁ h₂)
 
 /-- Replacing the plug (environment) while keeping the protocol fixed
 preserves observational equivalence, using `plug_comm` to swap
 the protocol/environment roles. -/
 theorem plug_right
     {Δ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
+    {Obs : Observation T}
     (W : T.Obj Δ)
     {K₁ K₂ : T.Obj (PortBoundary.swap Δ)}
-    (hK : Emulates K₁ K₂ ObsEq) :
-    ObsEq (T.close W K₁) (T.close W K₂) := by
+    (hK : Emulates K₁ K₂ Obs) :
+    Obs.rel (T.close W K₁) (T.close W K₂) := by
   simp only [OpenTheory.close, OpenTheory.plug_comm W K₁,
     OpenTheory.plug_comm W K₂]
   exact hK.compare W
@@ -428,26 +474,25 @@ step 1 is `plug_invariance` (same environment, different protocol) and
 step 2 is `plug_right` (same protocol, different environment). -/
 theorem plug_compose
     {Δ : PortBoundary}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hTrans : ∀ a b c, ObsEq a b → ObsEq b c → ObsEq a c)
+    {Obs : Observation T}
     {real ideal : T.Obj Δ}
     {K_real K_ideal : T.Obj (PortBoundary.swap Δ)}
-    (hProt : Emulates real ideal ObsEq)
-    (hEnv : Emulates K_real K_ideal ObsEq) :
-    ObsEq (T.close real K_real) (T.close ideal K_ideal) :=
-  hTrans _ _ _
+    (hProt : Emulates real ideal Obs)
+    (hEnv : Emulates K_real K_ideal Obs) :
+    Obs.rel (T.close real K_real) (T.close ideal K_ideal) :=
+  Obs.equiv.trans
     (hProt.plug_invariance K_real)
     (plug_right ideal hEnv)
 
 end Emulates
 
 /--
-`UCSecure T protocol ideal ObsEq SimSpace simulate` is the UC security
-statement with an existential simulator.
+`UCSecure protocol ideal Obs SimSpace simulate` is the UC security statement
+with an existential simulator.
 
 There exists a simulator parameter `s : SimSpace` such that for every
 context `K`, the closed real-world execution `T.close protocol K` is
-observationally equivalent to the closed ideal-world execution
+related (under `Obs.rel`) to the closed ideal-world execution
 `T.close ideal (simulate s K)`.
 
 The simulator `simulate s` transforms the context rather than the ideal
@@ -458,10 +503,10 @@ real world.
 def UCSecure
     {Δ : PortBoundary}
     (protocol ideal : T.Obj Δ)
-    (ObsEq : T.Closed → T.Closed → Prop)
+    (Obs : Observation T)
     (SimSpace : Type*) (simulate : SimSpace → T.Plug Δ → T.Plug Δ) : Prop :=
   ∃ s : SimSpace, ∀ K : T.Plug Δ,
-    ObsEq (T.close protocol K) (T.close ideal (simulate s K))
+    Obs.rel (T.close protocol K) (T.close ideal (simulate s K))
 
 /--
 Emulation implies UC security with the trivial (identity) simulator.
@@ -469,9 +514,9 @@ Emulation implies UC security with the trivial (identity) simulator.
 theorem Emulates.toUCSecure
     {Δ : PortBoundary}
     {protocol ideal : T.Obj Δ}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (h : Emulates protocol ideal ObsEq) :
-    UCSecure protocol ideal ObsEq PUnit (fun _ K => K) :=
+    {Obs : Observation T}
+    (h : Emulates protocol ideal Obs) :
+    UCSecure protocol ideal Obs PUnit (fun _ K => K) :=
   ⟨⟨⟩, h.compare⟩
 
 /--
@@ -480,9 +525,9 @@ UC security with identity simulation recovers emulation.
 theorem UCSecure.toEmulates_id
     {Δ : PortBoundary}
     {protocol ideal : T.Obj Δ}
-    {ObsEq : T.Closed → T.Closed → Prop}
-    (hSec : UCSecure protocol ideal ObsEq PUnit (fun _ K => K)) :
-    Emulates protocol ideal ObsEq :=
+    {Obs : Observation T}
+    (hSec : UCSecure protocol ideal Obs PUnit (fun _ K => K)) :
+    Emulates protocol ideal Obs :=
   let ⟨_, h⟩ := hSec; ⟨h⟩
 
 end UC

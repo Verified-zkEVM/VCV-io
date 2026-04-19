@@ -147,8 +147,8 @@ def romCRExp [DecidableEq X] [DecidableEq Y]
     OracleComp (ROMHashSpec X Y) (Bool × QueryCache (ROMHashSpec X Y)) :=
   (simulateQ cachingOracle (do
     let (x, x') ← A.run
-    let y ← query (spec := ROMHashSpec X Y) x
-    let y' ← query (spec := ROMHashSpec X Y) x'
+    let y ← (ROMHashSpec X Y).query x
+    let y' ← (ROMHashSpec X Y).query x'
     return decide (x ≠ x' ∧ y = y'))).run ∅
 
 /-- ROM collision-resistance advantage: probability that the adversary
@@ -163,8 +163,8 @@ private def romCRInner [DecidableEq X] [DecidableEq Y]
     {t : ℕ} (A : BoundedROMCRAdversary X Y t) :
     OracleComp (ROMHashSpec X Y) Bool := do
   let (x, x') ← A.run
-  let y ← query (spec := ROMHashSpec X Y) x
-  let y' ← query (spec := ROMHashSpec X Y) x'
+  let y ← (ROMHashSpec X Y).query x
+  let y' ← (ROMHashSpec X Y).query x'
   return decide (x ≠ x' ∧ y = y')
 
 private lemma romCRExp_eq [DecidableEq X] [DecidableEq Y]
@@ -211,7 +211,7 @@ private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y]
     cachingOracle_query_caches x cache₁ y cache₂ hmem₂
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (y', cache₃) ∈ support
-        ((cachingOracle (spec := ROMHashSpec X Y) x').run cache₂) := by
+        (((ROMHashSpec X Y).cachingOracle x').run cache₂) := by
       simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le

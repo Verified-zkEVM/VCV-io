@@ -60,11 +60,42 @@ When in doubt, prefer:
   5. module docstring
   Keep exactly one blank line between these blocks.
 
+### Section Headers Within A File
+
+Use Mathlib-style doc-comment section headers, **not** ASCII banners.
+
+For an inline section break inside a Lean file, use a one-line docstring header that doc-gen will render in the generated documentation:
+
+```lean
+/-! ## Section title -/
+```
+
+Or, for a section with its own paragraph of explanation:
+
+```lean
+/-!
+## Section title
+
+Optional paragraph describing what the section contains.
+-/
+```
+
+Do **not** use ASCII banners such as:
+
+```lean
+-- ============================================================================
+-- § Section title
+-- ============================================================================
+```
+
+ASCII banners are visually loud, do not appear in the generated documentation, and make the file feel partitioned in a way that the type system does not enforce. Prefer the `/-!` form, which both reads as natural prose and surfaces in `doc-gen4` output. If a section is large enough to warrant its own banner, it is usually large enough to warrant its own `namespace` or its own file.
+
 ## Style Notes
 
 - Keep imports at the top of the file.
 - Follow Mathlib naming conventions where possible.
 - Respect the module layering documented in [`AGENTS.md`](AGENTS.md).
+- Use `/-! ## Title -/` doc-headers, not ASCII banners, for inline section breaks (see *Documentation Expectations* above).
 
 ## Licensing
 

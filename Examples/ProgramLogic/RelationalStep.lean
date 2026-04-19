@@ -53,8 +53,8 @@ example (f : α → OracleComp spec β) :
   rvcstep
 
 example (t : spec.Domain) :
-    ⟪(liftM (query t) : OracleComp spec (spec.Range t))
-     ~ (liftM (query t) : OracleComp spec (spec.Range t))
+    ⟪(query t : OracleComp spec (spec.Range t))
+     ~ (query t : OracleComp spec (spec.Range t))
      | EqRel (spec.Range t)⟫ := by
   rvcstep
 

@@ -91,7 +91,7 @@ end CacheMonotonicity
 end QueryImpl
 
 /-- Oracle for caching queries to the oracles in `spec`, querying fresh values if needed. -/
-@[inline, reducible] def cachingOracle :
+@[inline, reducible] def OracleSpec.cachingOracle :
     QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withCaching
 
@@ -111,7 +111,7 @@ because caching changes the oracle semantics (cache hits skip the underlying ora
 lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
-    Pr[⊥ | (simulateQ (cachingOracle (spec := spec₀)) oa).run cache] = Pr[⊥ | oa] := by
+    Pr[⊥ | (simulateQ spec₀.cachingOracle oa).run cache] = Pr[⊥ | oa] := by
   simp only [HasEvalPMF.probFailure_eq_zero]
 
 /-- Trivially true via `probFailure_eq_zero`; see `probFailure_run_simulateQ`. -/
@@ -119,7 +119,7 @@ lemma probFailure_run_simulateQ {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι�
 lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀} [DecidableEq ι₀]
     [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) (cache : QueryCache spec₀) :
-    NeverFail ((simulateQ (cachingOracle (spec := spec₀)) oa).run cache) ↔ NeverFail oa := by
+    NeverFail ((simulateQ spec₀.cachingOracle oa).run cache) ↔ NeverFail oa := by
   rw [← probFailure_eq_zero_iff, ← probFailure_eq_zero_iff,
     HasEvalPMF.probFailure_eq_zero, HasEvalPMF.probFailure_eq_zero]
 
@@ -149,9 +149,9 @@ Key properties:
 TODO: generalize `FiatShamir.runtime` to `runtimeWithCache cache` with
 `runtime = runtimeWithCache ∅`, deriving `randomOracle` evaluation from
 `withCacheOverlay` + `evalDist`. -/
-def withCacheOverlay {α : Type u} (cache : spec.QueryCache) (oa : OracleComp spec α) :
+def OracleSpec.withCacheOverlay {α : Type u} (cache : spec.QueryCache) (oa : OracleComp spec α) :
     OracleComp spec α :=
-  StateT.run' (simulateQ cachingOracle oa) cache
+  StateT.run' (simulateQ spec.cachingOracle oa) cache
 
 @[simp]
 lemma withCacheOverlay_pure {α : Type u} (cache : spec.QueryCache) (a : α) :
@@ -160,8 +160,7 @@ lemma withCacheOverlay_pure {α : Type u} (cache : spec.QueryCache) (a : α) :
 
 private lemma fst_map_cachingOracle_run_some (cache : spec.QueryCache) (t : spec.Domain)
     (v : spec.Range t) (hv : cache t = some v) :
-    Prod.fst <$> (cachingOracle (spec := spec) t).run cache =
-      (pure v : OracleComp spec (spec.Range t)) := by
+    Prod.fst <$> (cachingOracle t).run cache = pure v := by
   unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
   simp only [StateT.run_bind,
     show (get : StateT spec.QueryCache (OracleComp spec) _).run cache =
@@ -171,7 +170,7 @@ private lemma fst_map_cachingOracle_run_some (cache : spec.QueryCache) (t : spec
 
 private lemma fst_map_cachingOracle_run_none (cache : spec.QueryCache) (t : spec.Domain)
     (hv : cache t = none) :
-    Prod.fst <$> (cachingOracle (spec := spec) t).run cache =
+    Prod.fst <$> (cachingOracle t).run cache =
       (query t : OracleComp spec (spec.Range t)) := by
   unfold cachingOracle QueryImpl.withCaching QueryImpl.ofLift
   simp only [StateT.run_bind,

@@ -164,9 +164,7 @@ abbrev simSt (M Commit Chal : Type) [DecidableEq M] [DecidableEq Commit] : Type 
 touching the simulator state. -/
 noncomputable def unifFwd (M Commit Chal : Type) [DecidableEq M] [DecidableEq Commit] :
     QueryImpl unifSpec (StateT (simSt M Commit Chal) (OracleComp (wrappedSpec Chal))) :=
-  fun n => monadLift
-    (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) :
-      OracleComp (wrappedSpec Chal) _)
+  fun n => (wrappedSpec Chal).query (Sum.inl n)
 
 /-- Caching random-oracle implementation: on a cache hit the recorded answer is returned,
 on a cache miss a fresh `Sum.inr ()` query is issued, the answer is cached, and the
@@ -180,7 +178,7 @@ noncomputable def roImpl (M Commit Chal : Type) [DecidableEq M] [DecidableEq Com
     | some v => pure v
     | none =>
         let v : Chal ← monadLift
-          (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) :
+          ((wrappedSpec Chal).query (Sum.inr ()) :
             OracleComp (wrappedSpec Chal) Chal)
         set ((cache.cacheQuery mc v : (M × Commit →ₒ Chal).QueryCache),
           log ++ [mc])
@@ -272,18 +270,18 @@ private lemma support_step_inl
     (n : ℕ) (s : simSt M Commit Chal)
     (z : ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inl n) × simSt M Commit Chal) ×
       QueryLog (wrappedSpec Chal)) :
-    z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+    z ∈ support ((simulateQ (wrappedSpec Chal).loggingOracle
       (((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run s)).run) ↔
     ∃ u : (unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inl n),
       z = ((u, s), [⟨Sum.inl n, u⟩]) := by
   obtain ⟨c₀, l₀⟩ := s
   have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run (c₀, l₀) =
-      (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+      (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
         fun u => pure (u, (c₀, l₀)) := by
     simp [QueryImpl.add_apply_inl, unifFwd]
   rw [hrun]
   change z ∈ support (simulateQ loggingOracle
-      ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+      ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
         fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run ↔ _
   rw [OracleComp.run_simulateQ_loggingOracle_query_bind
     (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))]
@@ -302,7 +300,7 @@ private lemma support_step_inr
     (mc : M × Commit) (s : simSt M Commit Chal)
     (z : ((unifSpec + (M × Commit →ₒ Chal)).Range (Sum.inr mc) × simSt M Commit Chal) ×
       QueryLog (wrappedSpec Chal)) :
-    z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+    z ∈ support ((simulateQ (wrappedSpec Chal).loggingOracle
       (((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run s)).run) ↔
     (∃ v, s.1 mc = some v ∧ z = ((v, s), [])) ∨
     (s.1 mc = none ∧ ∃ v,
@@ -310,13 +308,13 @@ private lemma support_step_inr
   obtain ⟨c₀, l₀⟩ := s
   by_cases hcache : c₀ mc = none
   · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run (c₀, l₀) =
-        (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+        (liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
           fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
       simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
         StateT.run_set, hcache]
     rw [hrun]
     change z ∈ support (simulateQ loggingOracle
-        ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+        ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
           fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
             OracleComp _ _))).run ↔ _
     rw [OracleComp.run_simulateQ_loggingOracle_query_bind
@@ -362,7 +360,7 @@ private theorem preservesInv_layered
     (Inv : simSt M Commit Chal → QueryLog (wrappedSpec Chal) → Prop)
     (hstep : ∀ t (s : simSt M Commit Chal) (w : QueryLog (wrappedSpec Chal)),
       Inv s w →
-      ∀ z ∈ support ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ∀ z ∈ support ((simulateQ (wrappedSpec Chal).loggingOracle
         (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run s)).run),
       Inv z.1.2 (w ++ z.2))
     (Y : OracleComp (unifSpec + (M × Commit →ₒ Chal)) γ)
@@ -370,7 +368,7 @@ private theorem preservesInv_layered
     (hinit : Inv s₀ w₀)
     {z : (γ × simSt M Commit Chal) × QueryLog (wrappedSpec Chal)}
     (hz : z ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run s₀)).run)) :
     Inv z.1.2 (w₀ ++ z.2) := by
   classical
@@ -392,7 +390,7 @@ private theorem preservesInv_layered
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
       have hpres : Inv us_w.1.2 (w₀ ++ us_w.2) := hstep t s₀ w₀ hinit us_w hus_w
       have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w.1.1)).run us_w.1.2)).run) := hpw
       have hih := ih (us_w.1.1) (s₀ := us_w.1.2) (w₀ := w₀ ++ us_w.2)
@@ -418,7 +416,7 @@ private theorem queryLog_length_eq_outer_inr_count
     {z : γ × simSt M Commit Chal}
     {outerLog : QueryLog (wrappedSpec Chal)}
     (hz : (z, outerLog) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run)) :
     z.2.2.length = l₀.length + outerLog.countQ (· = Sum.inr ()) := by
@@ -469,7 +467,7 @@ private theorem queryLog_cache_outer_lockstep
     {z : γ × simSt M Commit Chal}
     {outerLog : QueryLog (wrappedSpec Chal)}
     (hz : (z, outerLog) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run)) :
     (∃ l_new, z.2.2 = l₀ ++ l_new) ∧
@@ -502,7 +500,7 @@ private theorem queryLog_cache_outer_lockstep
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at hz
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := hz
       have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w.1.1)).run us_w.1.2)).run) := by
         change pw ∈ support _
@@ -519,17 +517,17 @@ private theorem queryLog_cache_outer_lockstep
       subst hzeq
       subst houter_eq
       have houter : us_w ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run (c₀, l₀) =
-              (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
           rw [hrun] at houter
           change us_w ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
             (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter
@@ -556,13 +554,13 @@ private theorem queryLog_cache_outer_lockstep
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) =
-                (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                (liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
             rw [hrun] at houter
             change us_w ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
@@ -652,7 +650,7 @@ private theorem queryLog_extends_l₀
     {z : γ × simSt M Commit Chal}
     {outerLog : QueryLog (wrappedSpec Chal)}
     (h : (z, outerLog) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run)) :
     z.2.2.take l₀.length = l₀ := by
@@ -676,7 +674,7 @@ private theorem queryLog_extends_l₀
       simp only [Set.mem_iUnion, support_map, Set.mem_image] at h
       obtain ⟨us_w, hus_w, pw, hpw, hz_eq⟩ := h
       have hpw_split : (pw.1, pw.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w.1.1)).run us_w.1.2)).run) := by
         change pw ∈ support _
@@ -689,18 +687,18 @@ private theorem queryLog_extends_l₀
       have hzeq : z = pw.1 := hz_eq1.symm
       subst hzeq
       have houter : us_w ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
               (c₀, l₀) =
-              (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
           rw [hrun] at houter
           change us_w ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
             (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter
@@ -717,13 +715,13 @@ private theorem queryLog_extends_l₀
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) =
-                (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                (liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
             rw [hrun] at houter
             change us_w ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
@@ -769,11 +767,11 @@ private theorem inner_prefix_det
     {z₁ z₂ : γ × simSt M Commit Chal}
     {outerLog₁ outerLog₂ : QueryLog (wrappedSpec Chal)}
     (h₁ : (z₁, outerLog₁) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run))
     (h₂ : (z₂, outerLog₂) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run))
     (p suffix₁ suffix₂ : QueryLog (wrappedSpec Chal))
@@ -810,13 +808,13 @@ private theorem inner_prefix_det
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁
       obtain ⟨us_w₂, hus_w₂, pw₂, hpw₂, hz_eq₂⟩ := h₂
       have hpw₁_split : (pw₁.1, pw₁.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w₁.1.1)).run us_w₁.1.2)).run) := by
         change pw₁ ∈ support _
         exact hpw₁
       have hpw₂_split : (pw₂.1, pw₂.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w₂.1.1)).run us_w₂.1.2)).run) := by
         change pw₂ ∈ support _
@@ -838,24 +836,24 @@ private theorem inner_prefix_det
       have houter₁_eq : us_w₁.2 ++ pw₁.2 = p ++ suffix₁ := hz_eq2₁.trans hlog₁
       have houter₂_eq : us_w₂.2 ++ pw₂.2 = p ++ suffix₂ := hz_eq2₂.trans hlog₂
       have houter₁ : us_w₁ ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₁
       have houter₂ : us_w₂ ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₂
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
               (c₀, l₀) =
-              (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
           rw [hrun] at houter₁ houter₂
           change us_w₁ ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₁
           change us_w₂ ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₂
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
             (spec := wrappedSpec Chal) (Sum.inl n) (fun u => pure (u, (c₀, l₀)))] at houter₁ houter₂
@@ -903,17 +901,17 @@ private theorem inner_prefix_det
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) =
-                (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                (liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
             rw [hrun] at houter₁ houter₂
             change us_w₁ ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter₁
             change us_w₂ ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter₂
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind
@@ -1008,11 +1006,11 @@ private theorem inner_prefix_det_one_more_inr
     {z₁ z₂ : γ × simSt M Commit Chal}
     {outerLog₁ outerLog₂ : QueryLog (wrappedSpec Chal)}
     (h₁ : (z₁, outerLog₁) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run))
     (h₂ : (z₂, outerLog₂) ∈ support
-      ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+      ((simulateQ (wrappedSpec Chal).loggingOracle
         ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) Y).run
           (c₀, l₀))).run))
     (p : QueryLog (wrappedSpec Chal))
@@ -1043,13 +1041,13 @@ private theorem inner_prefix_det_one_more_inr
       obtain ⟨us_w₁, hus_w₁, pw₁, hpw₁, hz_eq₁⟩ := h₁
       obtain ⟨us_w₂, hus_w₂, pw₂, hpw₂, hz_eq₂⟩ := h₂
       have hpw₁_split : (pw₁.1, pw₁.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w₁.1.1)).run us_w₁.1.2)).run) := by
         change pw₁ ∈ support _
         exact hpw₁
       have hpw₂_split : (pw₂.1, pw₂.2) ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal)
               (oa us_w₂.1.1)).run us_w₂.1.2)).run) := by
         change pw₂ ∈ support _
@@ -1073,24 +1071,24 @@ private theorem inner_prefix_det_one_more_inr
       have houter₂_eq : us_w₂.2 ++ pw₂.2 = p ++ (⟨Sum.inr (), v₂⟩ :: rest₂) :=
         hz_eq2₂.trans hlog₂
       have houter₁ : us_w₁ ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₁
       have houter₂ : us_w₂ ∈ support
-          ((simulateQ (loggingOracle (spec := wrappedSpec Chal))
+          ((simulateQ (wrappedSpec Chal).loggingOracle
             (((unifFwd M Commit Chal + roImpl M Commit Chal) t).run (c₀, l₀))).run) := hus_w₂
       cases t with
       | inl n =>
           have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inl n)).run
               (c₀, l₀) =
-              (liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              (liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => pure (u, (c₀, l₀)) := by
             simp [QueryImpl.add_apply_inl, unifFwd]
           rw [hrun] at houter₁ houter₂
           change us_w₁ ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₁
           change us_w₂ ∈ support (simulateQ loggingOracle
-              ((liftM (query (spec := wrappedSpec Chal) (Sum.inl n)) : OracleComp _ _) >>=
+              ((liftM ((wrappedSpec Chal).query (Sum.inl n)) : OracleComp _ _) >>=
                 fun u => (pure (u, (c₀, l₀)) : OracleComp _ _))).run at houter₂
           rw [OracleComp.run_simulateQ_loggingOracle_query_bind
             (spec := wrappedSpec Chal) (Sum.inl n)
@@ -1131,17 +1129,17 @@ private theorem inner_prefix_det_one_more_inr
           by_cases hcache : c₀ mc = none
           · have hrun : ((unifFwd M Commit Chal + roImpl M Commit Chal) (Sum.inr mc)).run
                 (c₀, l₀) =
-                (liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                (liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) := by
               simp [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
                 StateT.run_set, hcache]
             rw [hrun] at houter₁ houter₂
             change us_w₁ ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter₁
             change us_w₂ ∈ support (simulateQ loggingOracle
-                ((liftM (query (spec := wrappedSpec Chal) (Sum.inr ())) : OracleComp _ _) >>=
+                ((liftM ((wrappedSpec Chal).query (Sum.inr ())) : OracleComp _ _) >>=
                   fun v => (pure (v, (c₀.cacheQuery mc v, l₀ ++ [mc])) :
                     OracleComp _ _))).run at houter₂
             rw [OracleComp.run_simulateQ_loggingOracle_query_bind

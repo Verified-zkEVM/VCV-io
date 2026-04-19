@@ -222,9 +222,9 @@ namespace Spec
 /-- Explicit-head spec for the `MonadLift OracleQuery OracleComp`-form of `query`.
 
 When `query t` appears inside a `do` block, Lean's elaborator inserts a single
-`MonadLift.monadLift _ (OracleQuery.query t)` (no `MonadLiftT` wrapper). The
+`MonadLift.monadLift _ (OracleSpec.query t)` (no `MonadLiftT` wrapper). The
 ascription form `(OracleComp.query t : OracleComp spec _)` instead elaborates
-to `liftM (instMonadLiftTOfMonadLift _ _) (OracleQuery.query t)`. The two are
+to `liftM (instMonadLiftTOfMonadLift _ _) (OracleSpec.query t)`. The two are
 definitionally equal but syntactically distinct, and
 `Lean.Elab.Tactic.Do.Spec.findSpec` matches keys syntactically against a
 `DiscrTree`. This lemma re-states the content of `Spec.query` with the
@@ -235,7 +235,7 @@ contexts. The two should be unified once core `mvcgen` normalizes
 @[spec] theorem monadLift_query (t : spec.Domain)
     {Q : Std.Do.PostCond (spec.Range t) .pure} :
     Std.Do.Triple
-      (MonadLift.monadLift (OracleQuery.query t) : OracleComp spec (spec.Range t))
+      (MonadLift.monadLift (OracleSpec.query t) : OracleComp spec (spec.Range t))
       (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
       Q := Spec.query t
 
@@ -262,7 +262,7 @@ to:
 
 2. The `Spec.monadLift_query` lemma below, which provides a
    `DiscrTree`-friendly `@[spec]` keyed by the explicit
-   `MonadLift.monadLift _ (OracleQuery.query t)` head that `do`-block
+   `MonadLift.monadLift _ (OracleSpec.query t)` head that `do`-block
    elaboration produces. The plain `Spec.query` above keys on a different
    syntactic head and doesn't fire inside `do` blocks.
 

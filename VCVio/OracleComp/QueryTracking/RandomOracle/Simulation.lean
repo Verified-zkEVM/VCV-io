@@ -49,16 +49,7 @@ lemma simulateQ_run {α : Type} (oa : ProbComp α) (s : hashSpec.QueryCache) :
     (simulateQ (unifFwdImpl hashSpec) oa).run s = (fun x => (x, s)) <$> oa := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
-  | query_bind t oa ih =>
-    change
-      (do
-        let a ← (liftM (query t) : ProbComp (unifSpec.Range t))
-        (simulateQ (unifFwdImpl hashSpec) (oa a)).run s) =
-        (do
-          let a ← liftM (query t)
-          (fun x => (x, s)) <$> oa a)
-    simp [show (fun a => (simulateQ (unifFwdImpl hashSpec) (oa a)).run s) =
-            (fun a => (fun x => (x, s)) <$> oa a) from funext fun a => ih a]
+  | query_bind t oa ih => simp [unifFwdImpl, ← ih]
 
 end unifFwdImpl
 
@@ -97,14 +88,20 @@ lemma run'_liftM_bind {α β : Type} (oa : ProbComp α)
   rw [StateT.run_bind, run_liftM]
   simp [map_bind]
 
+@[simp]
+lemma simulateQ_liftM_spec_query (q : hashSpec.Domain) :
+    simulateQ (unifFwdImpl hashSpec + ro) (hashSpec.query q) = ro q := by
+  change simulateQ (unifFwdImpl hashSpec + ro)
+    (liftM (liftM (hashSpec.query q) :
+      OracleQuery (unifSpec + hashSpec) _)) = _
+  simp [simulateQ_query]
+
 lemma simulateQ_HasQuery_query (q : hashSpec.Domain) :
     simulateQ (unifFwdImpl hashSpec + ro)
       (HasQuery.query (spec := hashSpec)
         (m := OracleComp (unifSpec + hashSpec)) q) =
       ro q := by
-  change simulateQ (unifFwdImpl hashSpec + ro)
-    (liftM (liftM (OracleQuery.query (spec := hashSpec) q) :
-      OracleQuery (unifSpec + hashSpec) _)) = _
-  simp [simulateQ_query]
+  rw [HasQuery.instOfMonadLift_query]
+  exact simulateQ_liftM_spec_query ro q
 
 end roSim

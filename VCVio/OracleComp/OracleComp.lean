@@ -13,6 +13,8 @@ import ToMathlib.PFunctor.Free
 
 universe u v w
 
+open OracleSpec
+
 /-- `OracleComp spec α` represents computations with oracle access to oracles in `spec`,
 where the final return value has type `α`, represented as a free monad over the `PFunctor`
 corresponding to `spec.` -/
@@ -24,7 +26,8 @@ variable {α β γ : Type v} {ι} {spec : OracleSpec.{u, v} ι}
 
 namespace OracleComp
 
-export OracleQuery (query query_def)
+-- We want these to show up regardless of specifically opening `OracleSpec`
+export OracleSpec (query query_def)
 
 instance (spec : OracleSpec ι) : Monad (OracleComp spec) :=
   inferInstanceAs (Monad (PFunctor.FreeM spec.toPFunctor))
@@ -57,10 +60,10 @@ protected lemma liftM_map (q : OracleQuery spec α) (f : α → β) :
 
 /-- `coin` is the computation representing a coin flip, given a coin flipping oracle. -/
 @[inline]
-def coin : OracleComp coinSpec Bool := query (spec := coinSpec) ()
+def coin : OracleComp coinSpec Bool := coinSpec.query ()
 
 @[grind =, aesop unsafe norm]
-lemma coin_def : coin = query (spec := coinSpec) () := rfl
+lemma coin_def : coin = coinSpec.query () := rfl
 
 protected lemma pure_def (x : α) :
     (pure x : OracleComp spec α) = PFunctor.FreeM.pure x := rfl

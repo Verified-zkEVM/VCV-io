@@ -39,11 +39,11 @@ random function. -/
 
 /-- Commit to message `m` with salt `s` by querying the random oracle. -/
 def CMCommit (m : M) (s : S) : OracleComp (CMOracle M S C) C :=
-  query (spec := CMOracle M S C) (m, s)
+  (CMOracle M S C).query (m, s)
 
 /-- Check commitment `c` against opening `(m, s)`: query oracle and compare. -/
 def CMCheck (c : C) (m : M) (s : S) : OracleComp (CMOracle M S C) Bool := do
-  let c' ← query (spec := CMOracle M S C) (m, s)
+  let c' ← (CMOracle M S C).query (m, s)
   return (c == c')
 
 open scoped Classical in
@@ -59,24 +59,28 @@ lemma probEvent_from_fresh_query_le_inv
       Pr[ fun z => z.1 = true |
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)] = 0) :
     Pr[fun z => z.1 = true |
-      (simulateQ cachingOracle
-        ((liftM (query (spec := CMOracle M S C) t)) >>= cont)).run cache₀] ≤
+      (simulateQ (CMOracle M S C).cachingOracle do
+        let u ← (CMOracle M S C).query t
+        cont u).run cache₀] ≤
       (Fintype.card C : ℝ≥0∞)⁻¹ := by
   have hrun :
-      (simulateQ cachingOracle
-        ((liftM (query (spec := CMOracle M S C) t)) >>= cont)).run cache₀ =
-      (liftM (query (spec := CMOracle M S C) t) >>= fun u =>
+      (simulateQ (CMOracle M S C).cachingOracle do
+        let u ← (CMOracle M S C).query t
+        cont u).run cache₀ =
+      (do
+        let u ← (CMOracle M S C).query t
         (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)) := by
     simp only [simulateQ_query_bind, OracleQuery.input_query, StateT.run_bind]
     have hstep :
-        (liftM (cachingOracle (spec := CMOracle M S C) t) :
+        (liftM ((CMOracle M S C).cachingOracle t) :
           StateT (QueryCache (CMOracle M S C))
             (OracleComp (CMOracle M S C)) _).run cache₀ =
-        (liftM (query (spec := CMOracle M S C) t) >>= fun u =>
-          pure (u, cache₀.cacheQuery t u) : OracleComp (CMOracle M S C) _) := by
+        (do
+          let u ← (CMOracle M S C).query t
+          pure (u, cache₀.cacheQuery t u)) := by
       simp only [cachingOracle.apply_eq, liftM, MonadLiftT.monadLift, MonadLift.monadLift,
         StateT.run_bind, StateT.run_get, pure_bind, hfresh]
-      change (StateT.lift (PFunctor.FreeM.lift (query (spec := CMOracle M S C) t)) cache₀ >>= _) = _
+      change (StateT.lift (PFunctor.FreeM.lift ((CMOracle M S C).query t)) cache₀ >>= _) = _
       simp only [StateT.lift, bind_assoc, pure_bind,
         modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
         StateT.modifyGet, StateT.run]
@@ -85,18 +89,18 @@ lemma probEvent_from_fresh_query_le_inv
     simp [OracleQuery.cont_query]
   rw [hrun, probEvent_bind_eq_tsum]
   calc
-    ∑' u, Pr[= u | (liftM (query (spec := CMOracle M S C) t) : OracleComp _ _)] *
+    ∑' u, Pr[= u | ((CMOracle M S C).query t : OracleComp (CMOracle M S C) _)] *
         Pr[fun z => z.1 = true |
           (simulateQ cachingOracle (cont u)).run (cache₀.cacheQuery t u)]
       ≤ ∑' u, if u = target then (Fintype.card C : ℝ≥0∞)⁻¹ else 0 := by
         refine ENNReal.tsum_le_tsum fun u => ?_
         by_cases hu : u = target
         · calc
-            Pr[= u | (liftM (query (spec := CMOracle M S C) t) : OracleComp _ _)] *
+            Pr[= u | ((CMOracle M S C).query t : OracleComp (CMOracle M S C) _)] *
                 Pr[fun z => z.1 = true |
                   (simulateQ cachingOracle (cont u)).run
                     (cache₀.cacheQuery t u)]
-              ≤ Pr[= u | (liftM (query (spec := CMOracle M S C) t) : OracleComp _ _)] * 1 :=
+              ≤ Pr[= u | ((CMOracle M S C).query t : OracleComp (CMOracle M S C) _)] * 1 :=
                   mul_le_mul' le_rfl probEvent_le_one
             _ = (Fintype.card C : ℝ≥0∞)⁻¹ := by
                 rw [mul_one]

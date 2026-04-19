@@ -53,7 +53,7 @@ end QueryImpl
 
 /-- Use pregenerated oracle responses for queries, falling back to the real oracle
 when the seed is exhausted. Seed consumption is tracked via `StateT`. -/
-def seededOracle :
+def OracleSpec.seededOracle :
     QueryImpl spec (StateT (QuerySeed spec) (OracleComp spec)) :=
   (QueryImpl.ofLift spec (OracleComp spec)).withPregen
 
@@ -84,7 +84,7 @@ lemma run_bind_query_eq_pop {α : Type u}
     (((seededOracle t) >>= fun u => simulateQ seededOracle (mx u)).run seed) =
       match seed.pop t with
       | none => do
-          let u ← liftM (query t)
+          let u ← spec.query t
           (simulateQ seededOracle (mx u)).run seed
       | some (u, seed') =>
           (simulateQ seededOracle (mx u)).run seed' := by
@@ -688,9 +688,9 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
     have hcomm : ∀ (g : spec₀.Range t → QuerySeed spec₀ → OracleComp spec₀ α),
         ∑' s, Pr[= s | generateSeed spec₀ qc js] *
           (h (s.takeAtIndex i₀ k) *
-            ∑' u, Pr[= u | (liftM (query t) : OracleComp spec₀ _)] *
+            ∑' u, Pr[= u | (spec₀.query t : OracleComp spec₀ _)] *
               Pr[= x | g u s]) =
-        ∑' u, Pr[= u | (liftM (query t) : OracleComp spec₀ _)] *
+        ∑' u, Pr[= u | (spec₀.query t : OracleComp spec₀ _)] *
           ∑' s, Pr[= s | generateSeed spec₀ qc js] *
             (h (s.takeAtIndex i₀ k) * Pr[= x | g u s]) := by
       intro g
@@ -823,7 +823,7 @@ lemma tsum_probOutput_generateSeed_weight_takeAtIndex
           congr 1
           rw [ENNReal.tsum_mul_left]; conv_rhs => rw [ENNReal.tsum_mul_left]
           congr 1
-          conv_rhs => rw [probOutput_bind_eq_tsum (liftM (query t) : OracleComp spec₀ _)]
+          conv_rhs => rw [probOutput_bind_eq_tsum (spec₀.query t : OracleComp spec₀ _)]
           conv_rhs => simp [probOutput_query]
           conv_rhs => rw [← Finset.mul_sum]
           have hcard_ne_zero : (↑(Fintype.card (spec₀.Range t)) : ENNReal) ≠ 0 := by

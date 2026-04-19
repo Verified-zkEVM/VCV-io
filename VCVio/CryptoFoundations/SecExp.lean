@@ -67,7 +67,7 @@ distinguishing advantage between those two branches. -/
 lemma ProbComp.boolBiasAdvantage_eq_boolDistAdvantage_uniformBool_branch
     (real rand : ProbComp Bool) :
     (do
-      let b ← ($ᵗ Bool : ProbComp Bool)
+      let b ← ($ᵗ Bool)
       let z ← if b then real else rand
       pure (b == z)).boolBiasAdvantage =
     real.boolDistAdvantage rand := by
@@ -90,7 +90,7 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
     {α : Type} (pref : ProbComp α) (real rand : α → ProbComp Bool) :
     (do
       let a ← pref
-      let b ← ($ᵗ Bool : ProbComp Bool)
+      let b ← ($ᵗ Bool)
       let z ← if b then real a else rand a
       pure (b == z)).boolBiasAdvantage =
     (do
@@ -101,7 +101,7 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
         rand a) := by
   let game : ProbComp Bool := do
     let a ← pref
-    let b ← ($ᵗ Bool : ProbComp Bool)
+    let b ← ($ᵗ Bool)
     let z ← if b then real a else rand a
     pure (b == z)
   let left : ProbComp Bool := do
@@ -111,7 +111,7 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
     let a ← pref
     rand a
   let branchGame : ProbComp Bool := do
-    let b ← ($ᵗ Bool : ProbComp Bool)
+    let b ← ($ᵗ Bool)
     let z ← if b then left else right
     pure (b == z)
   have hbranch : evalDist game = evalDist branchGame := by
@@ -120,18 +120,18 @@ lemma ProbComp.boolBiasAdvantage_bind_uniformBool_eq_boolDistAdvantage
     calc
       Pr[= x | game] =
           Pr[= x | do
-            let b ← ($ᵗ Bool : ProbComp Bool)
+            let b ← ($ᵗ Bool)
             let a ← pref
             let z ← if b then real a else rand a
             pure (b == z)] := by
               simpa [game, bind_assoc] using
-                (probOutput_bind_bind_swap pref ($ᵗ Bool : ProbComp Bool)
+                (probOutput_bind_bind_swap pref ($ᵗ Bool)
                   (fun a b => do
                     let z ← if b then real a else rand a
                     pure (b == z))
                   x)
       _ = Pr[= x | branchGame] := by
-            refine probOutput_bind_congr' ($ᵗ Bool : ProbComp Bool) x ?_
+            refine probOutput_bind_congr' ($ᵗ Bool) x ?_
             intro b
             cases b <;> simp [left, right]
   have hprob := evalDist_ext_iff.mp hbranch

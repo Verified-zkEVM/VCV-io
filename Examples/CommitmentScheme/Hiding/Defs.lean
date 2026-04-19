@@ -53,7 +53,7 @@ structure HidingAdversary (M : Type) (S : Type) (C : Type) (AUX : Type) (t : ℕ
   totalBound : ∀ s : S, IsTotalQueryBound
     (choose >>= fun x =>
       let (m, aux) := x
-      (liftM (query (spec := CMOracle M S C) (m, s)) >>= fun cm =>
+      ((CMOracle M S C).query (m, s) >>= fun cm =>
         distinguish aux cm))
     (t + 1)
 
@@ -65,7 +65,7 @@ def hidingReal {AUX : Type} {t : ℕ} (A : HidingAdversary M S C AUX t) (s : S) 
     OracleComp (CMOracle M S C) Bool :=
   (simulateQ cachingOracle (do
     let (m, aux) ← A.choose
-    let cm ← query (spec := CMOracle M S C) (m, s)
+    let cm ← (CMOracle M S C).query (m, s)
     A.distinguish aux cm)).run' ∅
 
 /-! ### Identical-until-bad infrastructure for hiding
@@ -102,7 +102,7 @@ def hidingImpl₁ (s : S) :
     match cache ms with
     | some u => return u
     | none => do
-      let u ← (liftM (query (spec := CMOracle M S C) ms) :
+      let u ← ((CMOracle M S C).query ms :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')
@@ -118,7 +118,7 @@ def hidingImplCountAll :
     match cache ms with
     | some u => return u
     | none => do
-      let u ← (liftM (query (spec := CMOracle M S C) ms) :
+      let u ← ((CMOracle M S C).query ms :
         StateT (QueryCache (CMOracle M S C) × (S → ℕ)) (OracleComp (CMOracle M S C)) C)
       let counts' := Function.update counts ms.2 (counts ms.2 + 1)
       set (cache.cacheQuery ms u, counts')
@@ -142,10 +142,10 @@ lemma hidingImpl₁_step_totalBound (s : S) (ms : M × S)
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound
-              (((liftM (query (spec := CMOracle M S C) ms) :
+              (((CMOracle M S C).query ms :
                   OracleComp (CMOracle M S C) C) >>= fun u =>
                 pure (u, (cache.cacheQuery ms u,
-                  if ms.2 == s then cnt + 1 else cnt))))
+                  if ms.2 == s then cnt + 1 else cnt)))
               1 from by
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
@@ -169,10 +169,10 @@ lemma hidingImplCountAll_step_totalBound (ms : M × S)
         StateT.run_set, StateT.run_pure, OracleComp.liftM_run_StateT, MonadLift.monadLift]
         using
           (show IsTotalQueryBound
-              (((liftM (query (spec := CMOracle M S C) ms) :
+              (((CMOracle M S C).query ms :
                   OracleComp (CMOracle M S C) C) >>= fun u =>
                 pure (u, (cache.cacheQuery ms u,
-                  Function.update counts ms.2 (counts ms.2 + 1)))))
+                  Function.update counts ms.2 (counts ms.2 + 1))))
               1 from by
             rw [isTotalQueryBound_query_bind_iff]
             exact ⟨Nat.one_pos, fun _ => trivial⟩)
@@ -211,7 +211,7 @@ theorem hidingImplCountAll_proj_eq_cachingOracle
     (st : QueryCache (CMOracle M S C) × (S → ℕ)) :
     Prod.map id Prod.fst <$>
         (hidingImplCountAll (M := M) (S := S) (C := C) ms).run st =
-      (cachingOracle (spec := CMOracle M S C) ms).run st.1 := by
+      ((CMOracle M S C).cachingOracle ms).run st.1 := by
   rcases st with ⟨cache, counts⟩
   cases hcache : cache ms with
   | some u =>
@@ -252,7 +252,7 @@ def hidingImpl₂ (s : S) :
     | none => do
       -- When bad (cnt ≥ 2) and salt matches, redirect query
       let queryPoint := if (decide (cnt ≥ 2)) && (ms.2 == s) then (default, default) else ms
-      let u ← (liftM (query (spec := CMOracle M S C) queryPoint) :
+      let u ← ((CMOracle M S C).query queryPoint :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')
@@ -278,7 +278,7 @@ def hidingImplSim (s : S) :
     | none => do
       -- Redirect ALL salt-s cache misses to (default, default)
       let queryPoint := if ms.2 == s then (default, default) else ms
-      let u ← (liftM (query (spec := CMOracle M S C) queryPoint) :
+      let u ← ((CMOracle M S C).query queryPoint :
         StateT (QueryCache (CMOracle M S C) × ℕ) (OracleComp (CMOracle M S C)) C)
       let cnt' := if ms.2 == s then cnt + 1 else cnt
       set (cache.cacheQuery ms u, cnt')
@@ -289,7 +289,7 @@ Both `hidingReal` and the intermediate game use this computation. -/
 def hidingOa {AUX : Type} {t : ℕ} (A : HidingAdversary M S C AUX t) (s : S) :
     OracleComp (CMOracle M S C) Bool := do
   let (m, aux) ← A.choose
-  let cm ← query (spec := CMOracle M S C) (m, s)
+  let cm ← (CMOracle M S C).query (m, s)
   A.distinguish aux cm
 
 omit [DecidableEq C] [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S]
@@ -324,7 +324,7 @@ lemma hiding_distinguish_totalBound_of_choose_support
     ∀ cm : C, IsTotalQueryBound (A.distinguish x.1.2 cm) (t - ∑ ms, x.2 ms) := by
   have hres :
       IsTotalQueryBound
-        ((liftM (query (spec := CMOracle M S C) (x.1.1, s))) >>= fun cm =>
+        (((CMOracle M S C).query (x.1.1, s) : OracleComp (CMOracle M S C) _) >>= fun cm =>
           A.distinguish x.1.2 cm)
         ((t + 1) - ∑ ms, x.2 ms) := by
     simpa [hidingOa] using
@@ -332,7 +332,7 @@ lemma hiding_distinguish_totalBound_of_choose_support
         (spec := CMOracle M S C)
         (oa := A.choose)
         (ob := fun a =>
-          (liftM (query (spec := CMOracle M S C) (a.1, s))) >>= fun cm =>
+          ((CMOracle M S C).query (a.1, s) : OracleComp (CMOracle M S C) _) >>= fun cm =>
             A.distinguish a.2 cm)
         (n := t + 1)
         (h := A.totalBound s)
