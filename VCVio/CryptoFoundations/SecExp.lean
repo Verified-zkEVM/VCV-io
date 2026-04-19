@@ -7,6 +7,8 @@ import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.EvalDist.TVDist
 import VCVio.EvalDist.Defs.Semantics
+import VCVio.EvalDist.Defs.Instances
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Security Experiments

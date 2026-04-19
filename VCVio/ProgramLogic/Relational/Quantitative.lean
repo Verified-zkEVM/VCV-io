@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.EvalDist.TVDist
+import ToMathlib.ProbabilityTheory.OptimalCoupling
 
 /-!
 # Quantitative Relational Program Logic (eRHL)

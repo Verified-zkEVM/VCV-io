@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Tactics.Relational.Internals
+import VCVio.ProgramLogic.Tactics.Common.Suggestions
 
 /-!
 # Relational VC Tactics

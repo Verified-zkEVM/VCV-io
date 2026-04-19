@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
+import VCVio.CryptoFoundations.SecExp
 
 /-!
 # Asymmetric Encryption Schemes: One-Time IND-CPA

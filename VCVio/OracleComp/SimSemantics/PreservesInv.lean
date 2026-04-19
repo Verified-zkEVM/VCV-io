@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.SimSemantics.StateT
-import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.EvalDist.Monad.Basic
 

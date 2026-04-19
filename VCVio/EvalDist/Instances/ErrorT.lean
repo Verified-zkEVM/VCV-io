@@ -3,7 +3,6 @@ Copyright (c) 2025 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.EvalDist.Defs.Instances
 import VCVio.EvalDist.Monad.Map
 import Mathlib.Control.Lawful
 

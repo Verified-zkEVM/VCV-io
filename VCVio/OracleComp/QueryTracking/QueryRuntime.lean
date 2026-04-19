@@ -7,6 +7,7 @@ Authors: Quang Dao
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.EvalDist.Monad.Map
+import ToMathlib.Control.WriterT
 import ToMathlib.General
 import ToMathlib.Probability.ProbabilityMassFunction.TailSums
 import Mathlib.Algebra.Order.Monoid.Defs

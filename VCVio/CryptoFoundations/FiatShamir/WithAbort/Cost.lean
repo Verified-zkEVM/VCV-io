@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
+import VCVio.OracleComp.QueryTracking.QueryRuntime
 
 /-!
 # Cost accounting for Fiat-Shamir with aborts

@@ -3,11 +3,9 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
+import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.ProbComp
-import VCVio.OracleComp.Coercions.SubSpec
-import VCVio.OracleComp.SimSemantics.Append
 import VCVio.EvalDist.Bool
 
 /-!

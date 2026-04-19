@@ -5,12 +5,12 @@ Authors: Quang Dao
 -/
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.Decoration
-import VCVio.Interaction.Basic.Strategy
 import VCVio.Interaction.Basic.Syntax
 import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Interaction
 import VCVio.Interaction.Basic.MonadDecoration
 import VCVio.Interaction.TwoParty.Decoration
+import VCVio.Interaction.Basic.Shape
 
 /-!
 # Role-dependent strategies and counterparts
