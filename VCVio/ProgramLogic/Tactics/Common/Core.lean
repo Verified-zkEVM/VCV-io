@@ -314,23 +314,73 @@ def runBoundedPassesCollect {α : Type} (label : String)
       Increase `set_option vcvio.vcgen.maxPasses <n>` or keep stepping manually."
   return batches
 
+/-- Fallback chain that tries rules whose LHS head is hidden behind a coercion
+(`liftM (query t)`, `simulateQ impl oa` projected through a transformer, etc.)
+or whose defining module is not imported into this file for a direct name
+dispatch. Used when fast head-dispatch cannot identify the rule. -/
+private def runWpStepRulesFallback : TacticM Bool := do
+  let qStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_query])
+  let uStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_uniformSample])
+  let sStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_simulateQ_eq])
+  let sRunStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_simulateQ_run'_eq])
+  let lStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_liftComp])
+  tryEvalTacticSyntax qStx <||>
+    tryEvalTacticSyntax uStx <||>
+    tryEvalTacticSyntax sStx <||>
+    tryEvalTacticSyntax sRunStx <||>
+    tryEvalTacticSyntax lStx
+
+/-- Pick the rewrite tactic for a `wp oa _` goal based on the head constant of
+`oa`. Returns `none` when no head-specific rule applies (the caller then runs
+the fallback chain). -/
+private def wpStepRewriteFor? (headName : Name) : TacticM (Option Bool) := do
+  match headName with
+  | ``Bind.bind =>
+      let stx ← `(tactic| rw [OracleComp.ProgramLogic.wp_bind])
+      return some (← tryEvalTacticSyntax stx)
+  | ``Pure.pure =>
+      let rwStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_pure])
+      let simpStx ← `(tactic| simp only [OracleComp.ProgramLogic.wp_pure])
+      return some (← tryEvalTacticSyntax rwStx <||> tryEvalTacticSyntax simpStx)
+  | ``ite =>
+      let stx ← `(tactic| rw [OracleComp.ProgramLogic.wp_ite])
+      return some (← tryEvalTacticSyntax stx)
+  | ``dite =>
+      let stx ← `(tactic| rw [OracleComp.ProgramLogic.wp_dite])
+      return some (← tryEvalTacticSyntax stx)
+  | ``Functor.map =>
+      let stx ← `(tactic| rw [OracleComp.ProgramLogic.wp_map])
+      return some (← tryEvalTacticSyntax stx)
+  | ``OracleComp.replicate =>
+      let zeroStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_zero])
+      let succStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_succ])
+      return some (← tryEvalTacticSyntax zeroStx <||> tryEvalTacticSyntax succStx)
+  | ``List.mapM =>
+      let nilStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_nil])
+      let consStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_cons])
+      return some (← tryEvalTacticSyntax nilStx <||> tryEvalTacticSyntax consStx)
+  | ``List.foldlM =>
+      let nilStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_nil])
+      let consStx ← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_cons])
+      return some (← tryEvalTacticSyntax nilStx <||> tryEvalTacticSyntax consStx)
+  | _ => return none
+
+/-- Advance a `wp`-shaped goal by one rewrite. Dispatches by the head of the
+computation inside `wp _ _`, so at most one or two rewrite attempts fire per
+call — the previous implementation tried all 16 rules sequentially. When the
+head is unknown or the `wp` sub-expression cannot be located, falls back to a
+narrower chain that covers rules whose LHS hides behind a coercion. -/
 def runWpStepRules : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_bind])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_pure])) <||>
-    tryEvalTacticSyntax (← `(tactic| simp only [OracleComp.ProgramLogic.wp_pure])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_zero])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_replicate_succ])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_nil])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_mapM_cons])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_nil])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_list_foldlM_cons])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_query])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_ite])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_dite])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_uniformSample])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_map])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_simulateQ_eq])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_simulateQ_run'_eq])) <||>
-    tryEvalTacticSyntax (← `(tactic| rw [OracleComp.ProgramLogic.wp_liftComp]))
+  let target ← instantiateMVars (← getMainTarget)
+  let some wpApp := findAppWithHead? ``OracleComp.ProgramLogic.wp target
+    | runWpStepRulesFallback
+  let some args := trailingArgs? wpApp 2
+    | runWpStepRulesFallback
+  let oa ← whnfReducible (← instantiateMVars args[0]!)
+  let some headName := headConstName? oa
+    | runWpStepRulesFallback
+  match ← wpStepRewriteFor? headName with
+  | some result => return result
+  | none => runWpStepRulesFallback
 
 end OracleComp.ProgramLogic

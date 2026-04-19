@@ -60,17 +60,15 @@ def CompiledRelationalVCSpecRule.replayText (rule : CompiledRelationalVCSpecRule
 def CompiledRelationalVCSpecRule.canUseConsequence (rule : CompiledRelationalVCSpecRule) : Bool :=
   rule.modes.contains .postConseq
 
+-- Consequence modes (`.tripleConseq` / `.postConseq`) remain in the enums and their executors
+-- remain in `Unary/Internals.lean` and `Relational/Internals.lean` so a future attribute can
+-- opt rules in explicitly. The default compilation emits only `.direct`: every `@[vcspec]`
+-- rule currently in the codebase is closed by direct application alone, and trying the
+-- consequence fallback on every failed direct application was a per-`vcstep` cost with no
+-- observed benefit.
 def compileUnaryVCSpecRule? (entry : VCSpecEntry) : Option CompiledUnaryVCSpecRule :=
   match entry.kind with
-  | .unaryTriple =>
-      let modes :=
-        if entry.spec.postShape == .concrete then
-          #[.direct, .tripleConseq]
-        else
-          #[.direct]
-      some { entry, modes }
-  | .unaryWP =>
-      some { entry, modes := #[.direct] }
+  | .unaryTriple | .unaryWP => some { entry, modes := #[.direct] }
   | _ => none
 
 def compileUnaryVCSpecRules (entries : Array VCSpecEntry) : Array CompiledUnaryVCSpecRule :=
@@ -79,12 +77,7 @@ def compileUnaryVCSpecRules (entries : Array VCSpecEntry) : Array CompiledUnaryV
 def compileRelationalVCSpecRule? (entry : VCSpecEntry) : Option CompiledRelationalVCSpecRule :=
   match entry.kind with
   | .relTriple | .eRelTriple | .relWP =>
-      let modes :=
-        if entry.spec.postShape == .concrete then
-          #[.direct, .postConseq]
-        else
-          #[.direct]
-      some { entry, modes }
+      some { entry, modes := #[.direct] }
   | _ => none
 
 def compileRelationalVCSpecRules
