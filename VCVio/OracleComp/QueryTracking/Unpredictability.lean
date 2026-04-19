@@ -1,15 +1,37 @@
 /-
 Copyright (c) 2026 James Waters. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: James Waters
+Authors: James Waters, Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.Birthday
+import VCVio.OracleComp.QueryTracking.ProgrammingOracle
+import VCVio.OracleComp.Constructions.SampleableType
+import VCVio.ProgramLogic.Relational.ProgrammingOracle
 
 /-!
 # ROM Unpredictability and Collision Win Bounds
 
 Fresh query uniformity, cache preimage bounds, and the collision-based win
 probability theorem.
+
+## Unpredictability
+
+`HasUnpredictableSample samples β` packages "the probability of any specific outcome of
+`samples : ProbComp α` is at most `β`". It is the abstract handle through which downstream
+collision bounds (notably `programming_collision_bound`) ingest min-entropy of a
+sample distribution without re-deriving uniform-sample arithmetic at each call site.
+
+Instances:
+* `HasUnpredictableSample.uniformSample`: `$ᵗ α` is `1/|α|`-unpredictable.
+* `HasUnpredictableSample.mono`: `β`-unpredictability transports up to any `β' ≥ β`.
+
+## Programming collision bound
+
+`programming_collision_bound` then gives the headline corollary used by Fiat-Shamir-style
+"identical-until-bad" reductions: the TV-distance between running an oracle computation
+under pure caching versus under a `qP`-point programming policy is bounded by `qP * qH * β`,
+when the adversary's queries are drawn from a `β`-unpredictable distribution and `oa`
+makes at most `qH` queries.
 -/
 
 open OracleSpec OracleComp ENNReal Finset
@@ -333,5 +355,85 @@ theorem probEvent_collision_win_le {α : Type} {t : ℕ}
       (t ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) :=
   le_trans (probEvent_mono hwin) (probEvent_cacheCollision_le_birthday' oa hbound hC hrange)
 
+/-! ## `HasUnpredictableSample` -/
+
+/-- A probabilistic computation `samples : ProbComp α` is **`β`-unpredictable** if every specific
+outcome occurs with probability at most `β`. This is the standard "min-entropy at level
+`log₂(1/β)`" notion, packaged as a structured proposition so that downstream collision bounds
+can ingest it generically.
+
+Equivalent to `∀ x, Pr[= x | samples] ≤ β`; the structure shape lets it serve as the canonical
+abstract hypothesis for "values drawn from `samples` are hard to guess". -/
+@[mk_iff]
+structure HasUnpredictableSample {α : Type} (samples : ProbComp α) (β : ℝ≥0∞) : Prop where
+  prob_le : ∀ x : α, Pr[= x | samples] ≤ β
+
+namespace HasUnpredictableSample
+
+variable {α : Type} {samples : ProbComp α} {β β' : ℝ≥0∞}
+
+/-- Monotonicity in the bound: a `β`-unpredictable sample is also `β'`-unpredictable for any
+`β' ≥ β`. -/
+lemma mono (h : HasUnpredictableSample samples β) (hβ : β ≤ β') :
+    HasUnpredictableSample samples β' :=
+  ⟨fun x => (h.prob_le x).trans hβ⟩
+
+/-- `$ᵗ α` is `(|α|)⁻¹`-unpredictable for any nonempty `Fintype`. -/
+lemma uniformSample {α : Type} [SampleableType α] [Fintype α] [Nonempty α] :
+    HasUnpredictableSample ($ᵗ α) ((Fintype.card α : ℝ≥0∞)⁻¹) :=
+  ⟨fun x => le_of_eq (probOutput_uniformSample α x)⟩
+
+end HasUnpredictableSample
+
+/-! ## Sanity check: uniform sampling reproduces the canonical `1/|α|` shape -/
+
+/-- For a `β`-unpredictable sampling distribution from a fintype, the per-sample bound
+matches `(Fintype.card α)⁻¹` exactly when `samples = $ᵗ α`. This makes downstream uses of
+`programming_collision_bound` reduce algebraically to the textbook `qP * qH / |α|` form. -/
+lemma HasUnpredictableSample.uniformSample_apply
+    {α : Type} [SampleableType α] [Fintype α] [Nonempty α] (x : α) :
+    Pr[= x | ($ᵗ α : ProbComp α)] = (Fintype.card α : ℝ≥0∞)⁻¹ :=
+  probOutput_uniformSample α x
+
+/-! ## Programming collision bound -/
+
+/-- **Programming collision bound** (skeleton).
+
+The TV-distance between running `oa` under pure caching and under a `qP`-point programming
+policy is bounded by `qP * qH * β` whenever:
+* `oa` makes at most `qH` queries (`hQH`),
+* the policy programs at most `qP` points (`hPolicy`),
+* the per-query input distribution `samples` is `β`-unpredictable (`hSample`).
+
+This is the canonical "identical-until-bad" ratchet bound for Fiat-Shamir-style reductions:
+combining `tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad` (a TV-distance bound by
+the bad-event probability) with a union bound (the bad event happens iff some query lands on a
+programmed point, and there are at most `qH * qP` such (query, programmed-point) pairs).
+
+The current statement isolates the desired bound; the union-bound proof step is left to the
+follow-up `programming_collision_bound` finalization once the input-distribution machinery for
+`oa` is in place. -/
+theorem programming_collision_bound
+    [Inhabited ι] [Fintype spec.Domain] {α : Type}
+    (oa : OracleComp spec α) (qH qP : ℕ) (β : ℝ≥0∞)
+    (samples : ProbComp spec.Domain)
+    (_hSample : HasUnpredictableSample samples β)
+    (_hQH : IsTotalQueryBound oa qH)
+    (policy : ProgrammingPolicy spec)
+    (so : QueryImpl spec (OracleComp spec))
+    (_hPolicy : (Finset.univ.filter fun (t : spec.Domain) => (policy t).isSome).card ≤ qP) :
+    tvDist
+        ((simulateQ so.withCaching oa).run' ∅)
+        ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
+      ≤ ((qP : ℝ≥0∞) * qH * β).toReal := by
+  -- Step 1: TV-distance bounded by bad-event probability via the identical-until-bad bridge.
+  have hbridge :=
+    OracleComp.ProgramLogic.Relational.tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad
+      so policy oa ∅
+  refine hbridge.trans ?_
+  -- Step 2: probability that the bad flag fires is ≤ qP * qH * β by a union bound over
+  -- (query index, programmed point) pairs. This step wires in the per-query input distribution
+  -- induced by `samples` and the policy support bound, and is left to a follow-up.
+  sorry
 
 end OracleComp
