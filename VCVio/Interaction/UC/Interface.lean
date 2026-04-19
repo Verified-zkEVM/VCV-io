@@ -257,12 +257,14 @@ abbrev comp
 
 /--
 Translate one concrete packet along an interface morphism.
+
+Boundary-oriented alias for `PFunctor.Chart.mapIdx`.
 -/
-def mapPacket
+abbrev mapPacket
     {I : Interface.{uA, uB}}
     {J : Interface.{vA, vB}}
-    (f : Hom I J) : Packet I → Packet J
-  | ⟨a, m⟩ => ⟨f.onPort a, f.onMsg m⟩
+    (f : Hom I J) : Packet I → Packet J :=
+  PFunctor.Chart.mapIdx f
 
 @[simp]
 theorem id_comp
@@ -292,10 +294,8 @@ theorem comp_assoc
 @[simp]
 theorem mapPacket_id
     {I : Interface.{uA, uB}} :
-    mapPacket (id I) = fun p => p := by
-  funext p
-  cases p
-  rfl
+    mapPacket (id I) = fun p => p :=
+  funext (PFunctor.Chart.mapIdx_id (P := I))
 
 @[simp]
 theorem mapPacket_comp
@@ -303,10 +303,8 @@ theorem mapPacket_comp
     {J : Interface.{vA, vB}}
     {K : Interface.{wA, wB}}
     (g : Hom J K) (f : Hom I J) :
-    mapPacket (comp g f) = mapPacket g ∘ mapPacket f := by
-  funext p
-  cases p
-  rfl
+    mapPacket (comp g f) = mapPacket g ∘ mapPacket f :=
+  funext (PFunctor.Chart.mapIdx_comp g f)
 
 end Hom
 
@@ -392,7 +390,7 @@ theorem mapPacket_comp
     (g : Hom J K) (f : Hom I J) (rp : RoutedPacket I M) :
     mapPacket g (mapPacket f rp) = mapPacket (Hom.comp g f) rp := by
   cases rp
-  simp [mapPacket, Hom.mapPacket_comp]
+  simp [mapPacket]
 
 @[simp]
 theorem mapSender_id
