@@ -131,7 +131,7 @@ private def waitForFinalSnapAndRender
       let html ← renderInferenceResult snap doc.meta.mod inferenceResult
       return ServerTask.mk <| Task.pure <| Except.ok html)
 
-@[server_rpc_method_cancellable]
+@[server_rpc_method]
 def rpc (_props : PanelWidgetProps) : RequestM (RequestTask Html) := do
   let doc ← RequestM.readDoc
   let latestSnap? ← liftM <| latestReadySnap? doc.cmdSnaps
