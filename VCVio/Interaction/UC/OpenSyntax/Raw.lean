@@ -335,10 +335,10 @@ theorem Equiv.interpret_eq
     {e₁ e₂ : Raw Atom Δ}
     (h : Equiv e₁ e₂)
     (T : OpenTheory)
-    [OpenTheory.CompactClosed T]
+    [OpenTheory.HasPlugWireFactor T]
     (interp : ∀ {Δ : PortBoundary}, Atom Δ → T.Obj Δ) :
-    e₁.interpret T interp OpenTheory.CompactClosed.idWire =
-      e₂.interpret T interp OpenTheory.CompactClosed.idWire := by
+    e₁.interpret T interp OpenTheory.HasIdWire.idWire =
+      e₂.interpret T interp OpenTheory.HasIdWire.idWire := by
   induction h with
   | refl => rfl
   | symm _ ih => exact ih.symm
