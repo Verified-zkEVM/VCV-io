@@ -25,6 +25,11 @@ private def binderIdentsToNames (ids : Syntax.TSepArray `Lean.binderIdent ",") :
 
 private def runVCGenFinish : TacticM Unit := do
   unless (← getGoals).isEmpty do
+    -- Only `wp_*`, `propInd_*`, and `game_rule` are kept here; generic ring/if normalization
+    -- (`one_mul`, `zero_add`, `ite_true`, `if_false`, `dite_true`, …) is already in Mathlib's
+    -- default simp-set and was rarely firing on the Triple/wp-shaped goals that reach this
+    -- finish pass — building those extra simp entries on every `vcgen` invocation was a
+    -- constant tax without an observed win.
     let _ ← tryEvalTacticSyntax
       (← `(tactic| all_goals try simp only [
         OracleComp.ProgramLogic.wp_pure, OracleComp.ProgramLogic.wp_bind,
@@ -34,8 +39,6 @@ private def runVCGenFinish : TacticM Unit := do
         OracleComp.ProgramLogic.wp_const,
         OracleComp.ProgramLogic.propInd_true, OracleComp.ProgramLogic.propInd_false,
         OracleComp.ProgramLogic.propInd_eq_ite,
-        ite_true, ite_false, if_true, if_false, dite_true, dite_false,
-        one_mul, mul_one, zero_mul, mul_zero, zero_add, add_zero,
         game_rule]))
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "vcgen finish" TacticInternals.Unary.runVCGenClosePass

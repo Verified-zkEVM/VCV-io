@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.EvalDist.Defs.Basic
+import ToMathlib.Data.ENNReal.Gauss
 
 /-!
 # Evaluation Distributions of Computations with `Bind`
