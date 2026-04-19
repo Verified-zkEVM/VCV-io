@@ -40,6 +40,7 @@ verification is `g^z = R · pk^c`.
 -/
 
 open OracleSpec OracleComp SigmaProtocol
+open scoped ENNReal
 
 namespace Schnorr
 
@@ -131,5 +132,87 @@ theorem sigma_hvzk (g : G) [Finite F] :
             simp [sub_eq_add_neg, add_left_comm, add_comm])
         (g := fun z => pure ((z • g - c • pk, c, z) : G × F × F))
         t)
+
+omit [Fintype F] [DecidableEq F] in
+/-- Closed-form for the Schnorr `realTranscript`: the real transcript is the joint
+distribution of `(r • g, c, r + c * sk)` where `r, c ← $ᵗ F` are sampled *independently*.
+This is the form in which the commitment `r • g` and the challenge `c` are literally
+independent (by sampling order), making conditional uniformity trivial. -/
+private lemma realTranscript_eq_indep (g : G) (pk : G) (sk : F) :
+    SigmaProtocol.realTranscript (sigma F G g) pk sk =
+      (do
+        let r ← $ᵗ F
+        let c ← $ᵗ F
+        pure ((r • g, c, r + c * sk) : G × F × F)) := by
+  simp only [SigmaProtocol.realTranscript, sigma, bind_assoc, pure_bind]
+
+omit [DecidableEq F] in
+/-- **`simChalUniformGivenCommit` for Schnorr.** The proof reduces to the joint distribution
+of independently-sampled `r, c ← $ᵗ F` via perfect HVZK and the closed form
+`realTranscript_eq_indep`. The commitment `r • g` and challenge `c` are then literally
+independent (by sampling order), so the joint factors as `Pr[commit = c₀] * (1/|F|)`. -/
+theorem sigma_simChalUniformGivenCommit (g : G) :
+    simChalUniformGivenCommit (sigma F G g) (simTranscript F G g) := by
+  classical
+  intro pk sk hsk c₀ ch₀
+  have hHVZK := sigma_hvzk F G g pk sk hsk
+  have hReal := realTranscript_eq_indep F G g pk sk
+  set ind : ProbComp (G × F × F) := do
+    let r ← $ᵗ F
+    let c ← $ᵗ F
+    pure (r • g, c, r + c * sk) with hind_def
+  have hSimEqIndep : evalDist (simTranscript F G g pk) = evalDist ind := by
+    rw [← hHVZK, hReal]
+  rw [probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep,
+      probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep]
+  -- Now both sides are `probEvent` over the explicit independent form.
+  have hcard_ne_zero : (Fintype.card F : ℝ≥0∞) ≠ 0 := by
+    exact_mod_cast Fintype.card_ne_zero (α := F)
+  have hcard_ne_top : (Fintype.card F : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  -- Define `M` = the per-`r` commit-marginal sum.
+  set M : ℝ≥0∞ := ∑' r : F, (Fintype.card F : ℝ≥0∞)⁻¹ *
+      (if r • g = c₀ then (1 : ℝ≥0∞) else 0) with hM_def
+  -- Compute the joint probability.
+  have hjoint :
+      Pr[fun t : G × F × F => t.1 = c₀ ∧ t.2.1 = ch₀ | ind] =
+        (Fintype.card F : ℝ≥0∞)⁻¹ * M := by
+    rw [hind_def, probEvent_bind_eq_tsum, hM_def, ← ENNReal.tsum_mul_left]
+    refine tsum_congr fun r => ?_
+    rw [probOutput_uniformSample, probEvent_bind_eq_tsum]
+    rw [show (∑' c : F,
+              Pr[= c | $ᵗ F] *
+                Pr[fun t : G × F × F => t.1 = c₀ ∧ t.2.1 = ch₀ |
+                  (pure ((r • g, c, r + c * sk) : G × F × F) : ProbComp _)]) =
+            (Fintype.card F : ℝ≥0∞)⁻¹ *
+              (if r • g = c₀ then (1 : ℝ≥0∞) else 0) by
+      simp_rw [probOutput_uniformSample, probEvent_pure]
+      rw [ENNReal.tsum_mul_left]
+      congr 1
+      by_cases hr : r • g = c₀
+      · simp only [hr, true_and]
+        rw [tsum_eq_single ch₀]
+        · simp
+        · intro c hc
+          simp [hc]
+      · simp [hr]]
+  -- Compute the marginal probability.
+  have hmarg :
+      Pr[fun t : G × F × F => t.1 = c₀ | ind] = M := by
+    rw [hind_def, probEvent_bind_eq_tsum, hM_def]
+    refine tsum_congr fun r => ?_
+    rw [probOutput_uniformSample, probEvent_bind_eq_tsum]
+    rw [show (∑' c : F,
+              Pr[= c | $ᵗ F] *
+                Pr[fun t : G × F × F => t.1 = c₀ |
+                  (pure ((r • g, c, r + c * sk) : G × F × F) : ProbComp _)]) =
+            (if r • g = c₀ then (1 : ℝ≥0∞) else 0) by
+      simp_rw [probOutput_uniformSample, probEvent_pure]
+      by_cases hr : r • g = c₀
+      · simp only [hr, if_true]
+        rw [ENNReal.tsum_mul_left, ENNReal.tsum_const,
+          ENat.card_eq_coe_fintype_card, mul_one, ENat.toENNReal_coe,
+          ENNReal.inv_mul_cancel hcard_ne_zero hcard_ne_top]
+      · simp [hr]]
+  rw [hjoint, hmarg, mul_comm]
 
 end Schnorr
