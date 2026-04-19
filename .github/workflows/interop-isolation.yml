@@ -6,12 +6,12 @@ name: Interop TCB Isolation
 # downstream libraries (`LatticeCrypto`, `Examples`, `LatticeCryptoTest`,
 # `FFI`, `VCVioWidgets`, `VCVioTest`).
 #
-# Runs on every PR and on pushes to `main` / `master`. The check is fast
+# Runs on every PR and on pushes to `main`. The check is fast
 # (a handful of `rg` invocations) and runs without a Lean toolchain.
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
