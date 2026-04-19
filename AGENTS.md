@@ -21,6 +21,7 @@ Follow [`CONTRIBUTING.md`](CONTRIBUTING.md) for the repo's explicit attribution 
 - Preserve existing headers on routine edits.
 - Only rewrite attribution when a file is genuinely new or materially replaced.
 - Do not add a separate AI-attribution line.
+- For inline section breaks within a Lean file, use Mathlib-style doc-comment headers `/-! ## Title -/` (or the multi-line `/-! ## Title \n\n explanation -/` form). **Do not use ASCII banners** such as `-- ====...===` flanking a `-- § Title` line. The `/-!` form is rendered by `doc-gen4`; ASCII banners are not, and they make the file feel artificially partitioned. If a section is large enough to want a loud header, it is usually large enough to want its own `namespace` or its own file. See *Section Headers Within A File* in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## What This Project Is
 
