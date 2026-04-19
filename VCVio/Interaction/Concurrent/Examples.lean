@@ -59,9 +59,9 @@ def delivery : Spec :=
 and the adversary sees only the public header. -/
 def deliveryProfile : Profile Party delivery :=
   .node (fun
-      | .alice => .active
+      | .alice => .pick
       | .bob => .observe
-      | .adv => .quotient Nat Prod.fst)
+      | .adv => .react ⟨Nat, Prod.fst⟩)
     (fun _ => .done)
 
 example : Profile.ObsType Party.alice deliveryProfile = (Nat × Bool) := rfl
@@ -150,7 +150,7 @@ example : Current.controller? inFlightControl = some .adv := rfl
 example : Current.scheduler? inFlightControl = some .adv := rfl
 
 example :
-    Current.view Party.adv inFlightControl inFlightProfile = Multiparty.LocalView.active := by
+    Current.view Party.adv inFlightControl inFlightProfile = Multiparty.ViewMode.pick := by
   rfl
 
 example :
@@ -174,11 +174,11 @@ example : Current.controller? afterDelivery = some .bob := rfl
 example : Current.scheduler? afterDelivery = none := rfl
 
 example :
-    Current.view Party.bob afterDelivery afterDeliveryProfile = Multiparty.LocalView.active := by
+    Current.view Party.bob afterDelivery afterDeliveryProfile = Multiparty.ViewMode.pick := by
   rfl
 
 example :
-    Current.view Party.adv afterDelivery afterDeliveryProfile = Multiparty.LocalView.hidden := by
+    Current.view Party.adv afterDelivery afterDeliveryProfile = Multiparty.ViewMode.hidden := by
   rfl
 
 example :
@@ -384,7 +384,7 @@ hidden from it. -/
 def loopNode : NodeProfile Party Bool where
   controllers := fun _ => [.adv]
   views
-    | .adv => .active
+    | .adv => .pick
     | .bob => .observe
     | .alice => .hidden
 

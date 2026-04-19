@@ -22,12 +22,12 @@ frontier event for a fixed party.
 This is the key conceptual bridge:
 
 * if the fixed party currently controls the next decision, its current local
-  view is `active`;
+  view is `pick`;
 * otherwise, its current local view is the observation view induced by the
   current frontier profile.
 
 At a `par` node, this means:
-* when both sides are live, the scheduler's local view is `active` on the full
+* when both sides are live, the scheduler's local view is `pick` on the full
   frontier event type `Front S`;
 * when only one side remains live, control collapses to that side's own current
   controller and local view.
@@ -89,14 +89,14 @@ This preserves the meaning of the local view while avoiding a spurious right
 branch tag in the observation when the right side is dead.
 -/
 private def liftLeftView {left right : Spec} (rightEmpty : IsEmpty (Front right)) :
-    Multiparty.LocalView (Front left) → Multiparty.LocalView (Front (.par left right))
-  | .active => .active
+    Multiparty.ViewMode (Front left) → Multiparty.ViewMode (Front (.par left right))
+  | .pick => .pick
   | .observe => .observe
   | .hidden => .hidden
-  | .quotient Obs toObs =>
-      .quotient Obs (fun
+  | .react ⟨Obs, toObs⟩ =>
+      .react ⟨Obs, fun
         | .left event => toObs event
-        | .right event => False.elim (rightEmpty.false event))
+        | .right event => False.elim (rightEmpty.false event)⟩
 
 /--
 Lift a local view on the right frontier into the full frontier of a parallel
@@ -106,14 +106,14 @@ This preserves the meaning of the local view while avoiding a spurious left
 branch tag in the observation when the left side is dead.
 -/
 private def liftRightView {left right : Spec} (leftEmpty : IsEmpty (Front left)) :
-    Multiparty.LocalView (Front right) → Multiparty.LocalView (Front (.par left right))
-  | .active => .active
+    Multiparty.ViewMode (Front right) → Multiparty.ViewMode (Front (.par left right))
+  | .pick => .pick
   | .observe => .observe
   | .hidden => .hidden
-  | .quotient Obs toObs =>
-      .quotient Obs (fun
+  | .react ⟨Obs, toObs⟩ =>
+      .react ⟨Obs, fun
         | .left event => False.elim (leftEmpty.false event)
-        | .right event => toObs event)
+        | .right event => toObs event⟩
 
 /--
 `view me control profile` is the current local view of the next frontier event
@@ -121,10 +121,10 @@ for the fixed party `me`.
 
 It is computed from both control and observation structure:
 
-* at an atomic node, the owner recorded by `control` gets `active`, while every
+* at an atomic node, the owner recorded by `control` gets `pick`, while every
   other party gets the frontier observation induced by `profile`;
 * at a parallel node with two live sides, the scheduler recorded by `control`
-  gets `active` on the full frontier event type, while every other party gets
+  gets `pick` on the full frontier event type, while every other party gets
   the profile-induced frontier observation;
 * at a parallel node with exactly one live side, control collapses to that
   side's current local view and is then lifted back to the full frontier type
@@ -134,17 +134,17 @@ It is computed from both control and observation structure:
 This is the fundamental current-step local interface for the concurrent layer.
 -/
 def view {Party : Type u} [DecidableEq Party] (me : Party) :
-    {S : Spec} → Control Party S → Profile Party S → Multiparty.LocalView (Front S)
+    {S : Spec} → Control Party S → Profile Party S → Multiparty.ViewMode (Front S)
   | .done, .done, .done => .hidden
   | .node _ _, .node owner _, profile =>
-      if me = owner then .active else Profile.frontierView me profile
+      if me = owner then .pick else Profile.frontierView me profile
   | .par left right, .par scheduler leftControl rightControl,
       profile@(.par leftProfile rightProfile) =>
       match hLeft : leftControl.isLive with
       | true =>
           match hRight : rightControl.isLive with
           | true =>
-              if me = scheduler then .active else Profile.frontierView me profile
+              if me = scheduler then .pick else Profile.frontierView me profile
           | false =>
               let rightEmpty : IsEmpty (Front right) := frontIsEmptyOfNotLive rightControl hRight
               liftLeftView rightEmpty (view me leftControl leftProfile)
@@ -188,7 +188,7 @@ interaction.
 -/
 def residualView {Party : Type u} [DecidableEq Party] (me : Party) :
     {S : Spec} → (control : Control Party S) → (profile : Profile Party S) →
-      (event : Front S) → Multiparty.LocalView (Front (Concurrent.residual event))
+      (event : Front S) → Multiparty.ViewMode (Front (Concurrent.residual event))
   | _, control, profile, event =>
       view me (Control.residual control event) (Profile.residual profile event)
 
