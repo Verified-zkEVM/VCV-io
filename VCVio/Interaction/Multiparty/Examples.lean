@@ -47,45 +47,45 @@ namespace ThreeParty
 `resolveBroadcastFor me owner` is the local-view projection of the broadcast
 model to the fixed participant `me`.
 
-At nodes owned by `me`, the result is `LocalView.active`.
-At all other nodes, the result is `LocalView.observe`.
+At nodes owned by `me`, the result is `ViewMode.pick`.
+At all other nodes, the result is `ViewMode.observe`.
 
 This definition is written by pattern matching, rather than by equality tests,
 so that endpoint types reduce definitionally in examples.
 -/
-def resolveBroadcastFor (me owner : ThreeParty) {X : Type u} : LocalView X :=
+def resolveBroadcastFor (me owner : ThreeParty) {X : Type u} : ViewMode X :=
       match me, owner with
-      | .prover, .prover => .active
+      | .prover, .prover => .pick
       | .prover, .verifier => .observe
       | .prover, .extractor => .observe
       | .verifier, .prover => .observe
-      | .verifier, .verifier => .active
+      | .verifier, .verifier => .pick
       | .verifier, .extractor => .observe
       | .extractor, .prover => .observe
       | .extractor, .verifier => .observe
-      | .extractor, .extractor => .active
+      | .extractor, .extractor => .pick
 
 /--
 `resolveDirectedFor me src dst` is the local-view projection of the directed
 model to the fixed participant `me`.
 
 It returns:
-* `active` when `me` is the node's source party;
+* `pick` when `me` is the node's source party;
 * `observe` when `me` is the node's designated destination party;
 * `hidden` otherwise.
 
 As in the broadcast model, this resolver is defined by pattern matching, so
 that local endpoint types unfold definitionally.
 -/
-def resolveDirectedFor (me src dst : ThreeParty) {X : Type u} : LocalView X :=
+def resolveDirectedFor (me src dst : ThreeParty) {X : Type u} : ViewMode X :=
       match me, src, dst with
-      | .prover, .prover, _ => .active
+      | .prover, .prover, _ => .pick
       | .prover, _, .prover => .observe
       | .prover, _, _ => .hidden
-      | .verifier, .verifier, _ => .active
+      | .verifier, .verifier, _ => .pick
       | .verifier, _, .verifier => .observe
       | .verifier, _, _ => .hidden
-      | .extractor, .extractor, _ => .active
+      | .extractor, .extractor, _ => .pick
       | .extractor, _, .extractor => .observe
       | .extractor, _, _ => .hidden
 
@@ -211,9 +211,9 @@ learns only the public tag, and the outsider learns nothing. -/
 private def scheduledViews :
     Profile.Decoration ScheduleParty (scheduledSpec Msg Flag) :=
   ⟨(fun
-      | .adversary => .active
+      | .adversary => .pick
       | .recipient => .observe
-      | .auditor => .quotient Flag Prod.fst
+      | .auditor => .react ⟨Flag, Prod.fst⟩
       | .outsider => .hidden), fun _ => ⟨⟩⟩
 
 /-- The adversary chooses the full scheduled event. -/
@@ -342,10 +342,10 @@ This single node already captures several adversarial powers:
 private def networkViews :
     Profile.Decoration DeliveryParty (networkSpec Msg) :=
   ⟨(fun
-      | .adversary => .active
-      | .bob => .quotient (Option Msg) (bobObservation (Msg := Msg))
-      | .carol => .quotient (Option Msg) (carolObservation (Msg := Msg))
-      | .auditor => .quotient DeliverySummary (deliverySummary (Msg := Msg))
+      | .adversary => .pick
+      | .bob => .react ⟨Option Msg, bobObservation (Msg := Msg)⟩
+      | .carol => .react ⟨Option Msg, carolObservation (Msg := Msg)⟩
+      | .auditor => .react ⟨DeliverySummary, deliverySummary (Msg := Msg)⟩
       | .outsider => .hidden), fun _ => ⟨⟩⟩
 
 /-- The adversary chooses the exact network action. -/
@@ -438,19 +438,19 @@ adversarially chosen moves.
 private def corruptionViews :
     Profile.Decoration CorruptionParty (corruptionSpec Secret) :=
   ⟨(fun
-      | .adversary => .active
+      | .adversary => .pick
       | .alice => .observe
       | .bob => .observe
       | .monitor => .observe), fun
       | .alice =>
           ⟨(fun
-              | .adversary => .active
+              | .adversary => .pick
               | .alice => .observe
               | .bob => .hidden
               | .monitor => .hidden), fun _ => ⟨⟩⟩
       | .bob =>
           ⟨(fun
-              | .adversary => .active
+              | .adversary => .pick
               | .alice => .hidden
               | .bob => .observe
               | .monitor => .hidden), fun _ => ⟨⟩⟩⟩
@@ -463,8 +463,8 @@ It is written explicitly so that the resulting endpoint computation reduces by
 `rfl`.
 -/
 private def corruptionAdversaryViews :
-    Spec.Decoration (fun X : Type u => LocalView X) (corruptionSpec Secret) :=
-  ⟨.active, fun _ => ⟨.active, fun _ => ⟨⟩⟩⟩
+    Spec.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
+  ⟨.pick, fun _ => ⟨.pick, fun _ => ⟨⟩⟩⟩
 
 /--
 `corruptionMonitorViews` is the local-view projection of `corruptionViews`
@@ -474,7 +474,7 @@ The monitor learns the public corruption decision but is hidden from the later
 secret-bearing move in every branch.
 -/
 private def corruptionMonitorViews :
-    Spec.Decoration (fun X : Type u => LocalView X) (corruptionSpec Secret) :=
+    Spec.Decoration (fun X : Type u => ViewMode X) (corruptionSpec Secret) :=
   ⟨.observe, fun _ => ⟨.hidden, fun _ => ⟨⟩⟩⟩
 
 /--
@@ -482,7 +482,7 @@ The post-corruption secret-bearing node viewed from the branch where Alice is
 the corrupted party.
 -/
 private def aliceAfterSelfCorruptionViews :
-    Spec.Decoration (fun X : Type u => LocalView X) (Spec.node Secret fun _ => .done) :=
+    Spec.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
   ⟨.observe, fun _ => ⟨⟩⟩
 
 /--
@@ -490,7 +490,7 @@ The same post-corruption secret-bearing node viewed from the branch where Bob
 is corrupted instead, so Alice is hidden from the move.
 -/
 private def aliceAfterBobCorruptionViews :
-    Spec.Decoration (fun X : Type u => LocalView X) (Spec.node Secret fun _ => .done) :=
+    Spec.Decoration (fun X : Type u => ViewMode X) (Spec.node Secret fun _ => .done) :=
   ⟨.hidden, fun _ => ⟨⟩⟩
 
 /--
@@ -511,7 +511,7 @@ adversary's first move can induce for Alice.
 -/
 example :
     Multiparty.Strategy m
-      (resolve := Spec.Node.ContextHom.id (fun X : Type u => LocalView X))
+      (resolve := Spec.Node.ContextHom.id (fun X : Type u => ViewMode X))
       (Spec.node Secret fun _ => .done) (aliceAfterSelfCorruptionViews Secret)
       (fun _ => α)
     = ((_ : Secret) → m α) := by
@@ -524,7 +524,7 @@ If Bob is corrupted instead, Alice is hidden from the same second-step node.
 -/
 example :
     Multiparty.Strategy m
-      (resolve := Spec.Node.ContextHom.id (fun X : Type u => LocalView X))
+      (resolve := Spec.Node.ContextHom.id (fun X : Type u => ViewMode X))
       (Spec.node Secret fun _ => .done) (aliceAfterBobCorruptionViews Secret)
       (fun _ => α)
     = m ((_ : Secret) → α) := by

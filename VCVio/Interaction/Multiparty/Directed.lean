@@ -36,8 +36,8 @@ ordered pair `(src, dst)` of parties.
 
 The intended semantics are directed point-to-point communication:
 `src` chooses the next move, `dst` receives that move, and all other parties
-are locally hidden at that node unless a richer resolver specifies a quotient
-observation.
+are locally hidden at that node unless a richer resolver specifies a partial
+observation kernel via `ViewMode.react`.
 -/
 abbrev EdgeDecoration (Party : Type u) :=
   Spec.Decoration (fun _ => Party × Party)
@@ -60,7 +60,7 @@ abbrev Strategy
     (m : Type u → Type u)
     {Party : Type u}
     (spec : Spec) (edges : EdgeDecoration Party spec)
-    (resolve : ∀ {X : Type u}, Party → Party → LocalView X)
+    (resolve : ∀ {X : Type u}, Party → Party → ViewMode X)
     (Output : Spec.Transcript spec → Type u) :=
   Multiparty.Strategy m
     (resolve := fun X edge => resolve (X := X) edge.1 edge.2) spec edges Output
