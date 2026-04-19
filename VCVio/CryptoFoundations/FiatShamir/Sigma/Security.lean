@@ -11,6 +11,8 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 
+set_option linter.style.longFile 3200
+
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
 
@@ -1017,6 +1019,9 @@ private theorem log_count_le_of_isQueryBound
           ih (u := u) (Q := Q) (hQ := by simpa [ht] using hQ.2 u) hz'
         simpa [QueryLog.countQ, QueryLog.getQ_cons, ht] using hrest
 
+-- Section instances are needed in proofs; `omit` breaks TC. Flexible `simp` is required for `hus'`.
+set_option linter.unusedSectionVars false in
+set_option linter.flexible false in
 omit [Fintype Chal] in
 private theorem runTraceImpl_cache_entry_or_mem
     {γ : Type}
@@ -1088,10 +1093,12 @@ private theorem runTraceImpl_cache_entry_or_mem
                 rw [hlog] at hIn ⊢
                 exact hIn
           · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
-            simp [Fork.roImpl, QueryImpl.add_apply_inr, StateT.run_bind, StateT.run_get, hv.symm] at hus'
+            simp [Fork.roImpl, QueryImpl.add_apply_inr, StateT.run_bind, StateT.run_get,
+              hv.symm] at hus'
             cases hus'
             exact ih (u := u) (cache₀ := cache₀) (log₀ := log₀) hrest
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private theorem runTrace_target_mem_queryLog
     [SampleableType Chal]
@@ -1204,6 +1211,7 @@ private theorem runTrace_target_mem_queryLog
     · simp at hinit
     · simpa using hmem
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma runTraceImpl_step_wrappedHashQueryBound
     [SampleableType Chal]
@@ -1230,6 +1238,7 @@ private lemma runTraceImpl_step_wrappedHashQueryBound
         simp [Fork.roImpl, QueryImpl.add_apply_inr, StateT.run_bind, StateT.run_get, hv.symm,
           wrappedHashQueryBound]
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private theorem runTrace_queryLog_length_le
     [SampleableType Chal]
@@ -1265,9 +1274,11 @@ private theorem runTrace_queryLog_length_le
       OracleComp (Fork.wrappedSpec Chal)
         ((((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) ×
           Fork.simSt M Commit Chal) :=
-    ((simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run (∅, []))
+    ((simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
+      (∅, []))
   have hwrapped :
-      nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := wrappedMain) (qH + 1) := by
+      nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := wrappedMain)
+        (qH + 1) := by
     refine FiatShamir.nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
       (Q₁ := qH) (Q₂ := 1) (hBound pk) ?_
     intro result
@@ -1325,8 +1336,7 @@ private theorem runTrace_queryLog_length_le
                 StateT.run_bind, StateT.run_get, hcache, OracleComp.isQueryBound_map_iff] using
                 (wrappedHashQueryBound_query_iff (Chal := Chal) (t := Sum.inr ()) (Q := 1))
             · rcases Option.ne_none_iff_exists.mp hcache with ⟨v, hv⟩
-              simpa [wrappedHashQueryBound, Fork.roImpl, QueryImpl.add_apply_inr,
-                StateT.run_bind, StateT.run_get, hv.symm])
+              simp [Fork.roImpl, QueryImpl.add_apply_inr, StateT.run_bind, StateT.run_get, hv.symm])
       (hcombine := by
         intro t b ht
         cases t with
@@ -1365,9 +1375,10 @@ private theorem runTrace_queryLog_length_le
     log_count_le_of_isQueryBound (oa := oa) (counted := counted) (hQ := hoaCounted) (hz := ha_mem)
   simpa [oa, counted] using hcountA
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private theorem runTrace_verified_imp_forkPoint
-    [SampleableType Chal] [DecidableEq Chal]
+    [SampleableType Chal]
     (nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qH : ℕ)
@@ -1378,7 +1389,9 @@ private theorem runTrace_verified_imp_forkPoint
     {outerLog : QueryLog (Fork.wrappedSpec Chal)}
     (hx : (x, outerLog) ∈ support (replayFirstRun (Fork.runTrace σ hr M nmaAdv pk)))
     (hv : x.verified = true) :
-    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH x).isSome = true := by
+    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH x).isSome =
+        true := by
+  classical
   have hmem : x.target ∈ x.queryLog :=
     runTrace_target_mem_queryLog (σ := σ) (hr := hr) (M := M) (Chal := Chal) nmaAdv pk hx
   have hlen : x.queryLog.length ≤ qH + 1 :=
@@ -1390,6 +1403,7 @@ private theorem runTrace_verified_imp_forkPoint
     lt_of_lt_of_le hidxLen hlen
   simp [Fork.forkPoint, hv, hmem, hidx]
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private def runTraceImplNoLog
     [SampleableType Chal] :
@@ -1408,6 +1422,7 @@ private def runTraceImplNoLog
               OracleComp (Fork.wrappedSpec Chal) ((Fork.wrappedSpec Chal).Range (.inr ())))
           modifyGet fun cache => (ω, cache.cacheQuery mc ω)
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma runTraceImpl_proj_eq
     [SampleableType Chal]
@@ -1429,6 +1444,7 @@ private lemma runTraceImpl_proj_eq
         simp [runTraceImplNoLog, Fork.roImpl, QueryImpl.add_apply_inr, StateT.run_bind,
           StateT.run_get, hω.symm]
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma support_simulateQ_unifChalImpl
     [SampleableType Chal]
@@ -1444,6 +1460,7 @@ private lemma support_simulateQ_unifChalImpl
       · simp [simulateQ_bind, simulateQ_query, ih]
       · simp [simulateQ_bind, simulateQ_query, ih, uniformSampleImpl]
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private def runTraceProbImpl
     [SampleableType Chal] :
@@ -1459,6 +1476,7 @@ private def runTraceProbImpl
           let ω ← $ᵗ Chal
           modifyGet fun cache => (ω, cache.cacheQuery mc ω)
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma runTraceProbImpl_query_eq
     [SampleableType Chal]
@@ -1473,12 +1491,11 @@ private lemma runTraceProbImpl_query_eq
   | inr mc =>
       by_cases hcache : cache mc = none
       · simp [runTraceProbImpl, runTraceImplNoLog, hcache, StateT.run_bind,
-          StateT.run_get, StateT.run_monadLift, monadLift_self, StateT.run_map,
-          StateT.run_set, simulateQ_bind, simulateQ_query, uniformSampleImpl]
+          StateT.run_get, StateT.run_monadLift, monadLift_self, uniformSampleImpl]
       · rcases Option.ne_none_iff_exists.mp hcache with ⟨ω, hω⟩
-        simp [runTraceProbImpl, runTraceImplNoLog, hω.symm, StateT.run_bind,
-          StateT.run_get, simulateQ_bind, simulateQ_query]
+        simp [runTraceProbImpl, runTraceImplNoLog, hω.symm, StateT.run_bind, StateT.run_get]
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma runTraceProbImpl_run_eq
     [SampleableType Chal]
@@ -1487,34 +1504,39 @@ private lemma runTraceProbImpl_run_eq
     (cache : (M × Commit →ₒ Chal).QueryCache) :
     (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal)) oa).run cache =
       simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
-        ((simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal)) oa).run cache) := by
+        ((simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal)) oa).run
+          cache) := by
   induction oa using OracleComp.inductionOn generalizing cache with
   | pure x =>
       simp
   | query_bind t oa ih =>
       simp only [simulateQ_query_bind, StateT.run_bind]
       calc
-        ((runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal) t).run cache >>= fun x =>
-            (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
+        ((runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal) t).run cache >>=
+            fun x =>
+          (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
               (oa x.1)).run x.2)
             =
           (simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
-              ((runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal) t).run cache) >>= fun x =>
+              ((runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal) t).run cache) >>=
+                fun x =>
                 simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
                   ((simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
-                    (oa x.1)).run x.2)) := by
+                      (oa x.1)).run x.2)) := by
               rw [runTraceProbImpl_query_eq (M := M) (Commit := Commit) (Chal := Chal) t cache]
               refine bind_congr fun x => ?_
               simpa using ih x.1 x.2
         _ =
           simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
-            (((runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal) t).run cache) >>= fun x =>
+            (((runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal) t).run cache) >>=
+              fun x =>
               (simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
-                (oa x.1)).run x.2) := by
+                  (oa x.1)).run x.2) := by
               rw [simulateQ_bind]
         _ = _ := by
-              simp [simulateQ_query_bind, StateT.run_bind]
+              simp
 
+set_option linter.unusedSectionVars false in
 omit [Fintype Chal] in
 private lemma runTraceProbImpl_run'_eq_runtime
     [SampleableType Chal]
@@ -1539,12 +1561,10 @@ private lemma runTraceProbImpl_run'_eq_runtime
       simp [runTraceProbImpl]
   | inr mc =>
       by_cases hcache : s mc = none
-      · simp [runTraceProbImpl, randomOracle.apply_eq, hcache, StateT.run_bind,
-          StateT.run_get, StateT.run_monadLift, monadLift_self, StateT.run_map,
-          StateT.run_set, uniformSampleImpl]
+      · simp [runTraceProbImpl, hcache, StateT.run_bind, StateT.run_get, StateT.run_monadLift,
+          monadLift_self, uniformSampleImpl]
       · rcases Option.ne_none_iff_exists.mp hcache with ⟨ω, hω⟩
-        simp [runTraceProbImpl, randomOracle.apply_eq, hω.symm, StateT.run_bind,
-          StateT.run_get]
+        simp [runTraceProbImpl, hω.symm, StateT.run_bind, StateT.run_get]
 
 /-!
 #### Phase D: fork bridge
@@ -1560,7 +1580,8 @@ present as well. Accordingly the core Phase D lemma is the exact inequality
 
 Any `collisionSlack qS qH β` bookkeeping belongs to the earlier simulation phase,
 not to the fork bridge itself. -/
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 2000000 in -- Phase D: large `simulateQ` / `StateT` / `bind` proof
+set_option linter.flexible false in
 omit [Fintype Chal] in
 /-- The managed-RO NMA experiment and `Fork.exp` agree on verification semantics:
 both use the same adversary, both implement a consistent random oracle, and both
@@ -1641,8 +1662,7 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
             (s := ∅))
       unfold SignatureAlg.managedRoNmaExp FiatShamir.runtime ProbCompRuntime.evalDist
         SPMFSemantics.evalDist SemanticsVia.denote
-      simp only [SPMFSemantics.withStateOracle, StateT.run'_eq, StateT.run_map, FiatShamir,
-        runtimeImpl]
+      simp only [SPMFSemantics.withStateOracle, StateT.run'_eq, FiatShamir, runtimeImpl]
       simpa [rhsComp, runtimeImpl, QueryImpl.ofLift_eq_id', ProbCompRuntime.probComp,
           ProbCompRuntime.evalDist, SPMFSemantics.evalDist, SPMFSemantics.ofHasEvalSPMF,
           SemanticsVia.denote, StateT.run'_eq] using
@@ -1692,11 +1712,13 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                   (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) (msg, c)
                 pure (result, ω)
           let verifyFn :
-              (((M × Commit × Resp) × (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) → Bool :=
+              (((M × Commit × Resp) ×
+                  (unifSpec + (M × Commit →ₒ Chal)).QueryCache) × Chal) → Bool :=
             fun z => σ.verify pkw.1 z.1.1.2.1 z.2 z.1.1.2.2
           have hprojRun :
               Prod.map id Prod.fst <$>
-                  (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
+                  (simulateQ
+                      (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
                     (∅, []) =
                 (simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
                   wrappedMain).run ∅ := by
@@ -1725,8 +1747,9 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                   (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
                   (result.1.1, result.1.2.1)
                 pure (σ.verify pkw.1 result.1.2.1 r' result.1.2.2))) ∅ =
-                verifyFn <$> (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
-                  wrappedMain).run' ∅ := by
+                verifyFn <$>
+                  (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
+                      wrappedMain).run' ∅ := by
             calc
               StateT.run' (simulateQ runtimeImpl (do
                 let result ← nmaAdv.main pkw.1
@@ -1736,18 +1759,21 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                 pure (σ.verify pkw.1 result.1.2.1 r' result.1.2.2))) ∅
                   = StateT.run' (simulateQ runtimeImpl (verifyFn <$> wrappedMain)) ∅ := by
                       simp [wrappedMain, verifyFn]
-              _ = verifyFn <$> (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
-                    wrappedMain).run' ∅ := by
+              _ =
+                verifyFn <$>
+                  (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
+                      wrappedMain).run' ∅ := by
                       rw [simulateQ_map]
                       simpa [runtimeImpl, wrappedMain, verifyFn] using
                         (congrArg (fun mx => verifyFn <$> mx)
-                          (runTraceProbImpl_run'_eq_runtime (M := M) (Commit := Commit) (Chal := Chal)
-                            (oa := wrappedMain) (cache := ∅))).symm
+                          (runTraceProbImpl_run'_eq_runtime (M := M) (Commit := Commit)
+                              (Chal := Chal) (oa := wrappedMain) (cache := ∅))).symm
           letI : DecidableEq M := instM
           letI : DecidableEq Commit := instCommit
           have hprojRun' :
               Prod.map id Prod.fst <$>
-                  (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
+                  (simulateQ
+                      (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
                     (∅, []) =
                 (simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
                   wrappedMain).run ∅ := by
@@ -1775,16 +1801,18 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                   (@Fork.runTrace Stmt Wit Commit PrvState Chal Resp rel σ hr M
                     instM instCommit (inferInstance : SampleableType Chal) nmaAdv pkw.1)
                 pure trace.verified) =
-                verifyFn <$> (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
-                  wrappedMain).run' ∅ := by
+                verifyFn <$>
+                  (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
+                      wrappedMain).run' ∅ := by
             have hprojRunMap :
                 verifyFn <$> simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
                   (Prod.fst <$>
-                    (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
+                    (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
+                        wrappedMain).run
                       (∅, [])) =
                   verifyFn <$> simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
                     ((simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
-                      wrappedMain).run' ∅) := by
+                          wrappedMain).run' ∅) := by
               simpa [StateT.run'] using
                 congrArg (fun mx =>
                   verifyFn <$> simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
@@ -1798,9 +1826,10 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                   =
                 verifyFn <$> simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
                   (Prod.fst <$>
-                    (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal) wrappedMain).run
+                    (simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
+                        wrappedMain).run
                       (∅, [])) := by
-                    simp [Fork.runTrace, wrappedMain, verifyFn, StateT.run', simulateQ_map,
+                    simp [Fork.runTrace, wrappedMain, verifyFn, simulateQ_map,
                       QueryImpl.ofLift_eq_id']
                     refine bind_congr (m := ProbComp) fun a => ?_
                     have hro :
@@ -1823,8 +1852,8 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                               (impl := Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
                               (q := (query (spec := (M × Commit →ₒ Chal))
                                 (a.1.1.1, a.1.1.2.1))))
-                        simpa using congrArg (fun st => st.run a.2) hquery.symm
-                      simpa [hinner]
+                        exact congrArg (fun st => st.run a.2) hquery.symm
+                      simp [hinner]
                     simpa [map_eq_bind_pure_comp] using
                       congrArg (fun mx =>
                         mx >>= pure ∘ fun a_1 =>
@@ -1834,15 +1863,17 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                   ((simulateQ (runTraceImplNoLog (M := M) (Commit := Commit) (Chal := Chal))
                     wrappedMain).run' ∅) := hprojRunMap
               _ =
-                verifyFn <$> (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
-                  wrappedMain).run' ∅ := by
+                verifyFn <$>
+                  (simulateQ (runTraceProbImpl (M := M) (Commit := Commit) (Chal := Chal))
+                      wrappedMain).run' ∅ := by
                     rw [hcomp']
           rw [hLeftPk, hRightPk]
           have hRunTraceProbEq :
-              (simulateQ (@runTraceProbImpl Commit Chal M (Classical.decEq M)
-                (Classical.decEq Commit) (inferInstance : SampleableType Chal)) wrappedMain).run' ∅ =
+              (simulateQ
+                  (@runTraceProbImpl Commit Chal M (Classical.decEq M) (Classical.decEq Commit)
+                    (inferInstance : SampleableType Chal)) wrappedMain).run' ∅ =
               (simulateQ (@runTraceProbImpl Commit Chal M instM instCommit
-                (inferInstance : SampleableType Chal)) wrappedMain).run' ∅ := by
+                    (inferInstance : SampleableType Chal)) wrappedMain).run' ∅ := by
             refine OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq'
               (impl₁ := @runTraceProbImpl Commit Chal M (Classical.decEq M)
                 (Classical.decEq Commit) (inferInstance : SampleableType Chal))
@@ -1856,7 +1887,7 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
             | inr mc =>
                 by_cases hcache : s mc = none
                 · simp [runTraceProbImpl, hcache, StateT.run_bind, StateT.run_get,
-                    StateT.run_monadLift, monadLift_self, StateT.run_map, StateT.run_set]
+                    StateT.run_monadLift, monadLift_self]
                   refine congrArg (fun f => f <$> ($ᵗ Chal)) ?_
                   funext a
                   refine Prod.ext rfl ?_
@@ -1926,7 +1957,7 @@ lemma nma_advantage_le_fork_advantage (qH : ℕ)
                     pure (σ.verify pkw.1 result.1.2.1 r' result.1.2.2)))
                   ∅) := by
             simp [simulateQ_bind]
-          simpa using congrArg (fun mx => Pr[= true | mx]) hManagedComp
+          exact congrArg (fun mx => Pr[= true | mx]) hManagedComp
         have hStep' :
             Pr[= true | hr.gen >>= fun pkw =>
               StateT.run'
@@ -2045,7 +2076,7 @@ simulator to obtain `β = 1/|Ω|`; we instead take `β` as a hypothesis
 with bounded commitment predictability. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
-    [Fintype Chal] [SampleableType Chal]
+    [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (β : ℝ≥0∞) (_hβ : SigmaProtocol.simCommitPredictability simTranscript β)
     (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
