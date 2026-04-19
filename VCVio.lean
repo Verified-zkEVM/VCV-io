@@ -104,6 +104,8 @@ import VCVio.Interaction.Multiparty.Broadcast
 import VCVio.Interaction.Multiparty.Core
 import VCVio.Interaction.Multiparty.Directed
 import VCVio.Interaction.Multiparty.Examples
+import VCVio.Interaction.Multiparty.Observation
+import VCVio.Interaction.Multiparty.ObservationProfile
 import VCVio.Interaction.Multiparty.Profile
 import VCVio.Interaction.TwoParty.Compose
 import VCVio.Interaction.TwoParty.Decoration

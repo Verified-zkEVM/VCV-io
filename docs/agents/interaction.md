@@ -13,8 +13,8 @@ The framework is organized around a few stable principles:
   All composition, decoration, and strategy types respect this structure.
 - **Control vs observation are orthogonal.**
   Who *chooses* a move (per-node: `NodeAuthority`; per-spec-tree: `Concurrent.Control`)
-  and who *sees* a move (per-node: `NodeObservation`; per-party-per-node:
-  `Multiparty.LocalView`; per-spec-tree: `Concurrent.Profile`) are independent axes.
+  and who *sees* a move (per-node: `NodeView`; per-party-per-node:
+  `Multiparty.ViewMode`; per-spec-tree: `Concurrent.Profile`) are independent axes.
   A party can control a node but see only a quotient of its own move, or observe
   a node fully without controlling it.
 - **Boundary vs composition.**
@@ -40,7 +40,7 @@ The framework is organized around a few stable principles:
 |-------|-----------|----------------|
 | Sequential core | `Basic/` | Specs, transcripts, decorations, strategies, composition |
 | Two-party | `TwoParty/` | Sender/receiver roles, counterparts, Fiat-Shamir replay |
-| Multiparty | `Multiparty/` | Per-party local views (active/observe/hidden/quotient) |
+| Multiparty | `Multiparty/` | Per-party local view modes (pick/observe/hidden/react) and observation kernels |
 | Concurrent | `Concurrent/` | Parallel composition, frontiers, processes, refinement, open systems |
 
 Dependencies flow downward: `Concurrent/` may import `Multiparty/` and `Basic/`;
@@ -76,13 +76,19 @@ tree). Typically there are *many more* nodes than parties: a long protocol may h
 unboundedly many nodes (or a continuation-based infinite stream of them via
 `ProcessOver`), but always the same finite party set.
 
-### LocalView — what a single party sees at a single node
+### ViewMode — what a single party sees at a single node
 
-`Multiparty.LocalView X` (`Multiparty/Core.lean`) records how *one* party locally
+`Multiparty.ViewMode X` (`Multiparty/Core.lean`) records how *one* party locally
 experiences a node whose move space is `X`. The four constructors
-`active` / `observe` / `hidden` / `quotient Obs toObs` are the canonical observation
-modes. A `LocalView` is the smallest atomic node × party × observation triple in the
-framework.
+`pick` / `observe` / `hidden` / `react ⟨Obs, toObs⟩` are the canonical
+observation modes. A `ViewMode` is the smallest atomic node × party ×
+observation triple in the framework.
+
+The information content of a `ViewMode` is captured by `Multiparty.Observation X`
+(`Multiparty/Observation.lean`), a `Σ Obs : Type, X → Obs` realized as
+`PFunctor.Idx (Observation.basePFunctor X)`. `Observation X` carries
+Mathlib's order typeclasses (`⊤`, `⊥`, `≤`, `⊔`) so refinement and join in
+the information lattice use standard notation.
 
 ### NodeProfile — per-node attribution of who-authors-what and who-sees-what
 
@@ -90,15 +96,20 @@ framework.
 and the whole party set. It bundles two orthogonal factor structures:
 
 - `NodeAuthority Party X`: `controllers : X → List Party` — for each possible move,
-  which parties are credited as having authored it.
-- `NodeObservation Party X`: `views : Party → Multiparty.LocalView X` — for each
+  which parties are credited as having authored it (move-dependent and possibly
+  multi-controller).
+- `NodeView Party X`: `views : Party → Multiparty.ViewMode X` — for each
   party, what local view they have at this node.
 
 The structure `extends` both factors, so dot-notation field access
 (`node.controllers x`, `node.views me`) and the structure-literal constructor
 `{ controllers := ..., views := ... }` work transparently. Code that depends only on
 authorship can take a `NodeAuthority Party X` parameter; code that depends only on
-observation can take a `NodeObservation Party X` parameter.
+observation can take a `NodeView Party X` parameter.
+
+The naming `NodeView` (rather than `NodeObservation`) deliberately avoids
+collision with `Multiparty.Observation X`, the kernel-level *information
+content* of a single party's view.
 
 `OpenNodeProfile Party Δ X` (`UC/OpenProcess.lean`) is the open-system extension that
 adds one `BoundaryAction Δ X` field for external traffic.
@@ -107,14 +118,15 @@ adds one `BoundaryAction Δ X` field for external traffic.
 
 The protocol tree is the stage; **nodes** are scenes on the stage; **parties** are
 actors who appear in many scenes; a **`NodeProfile`** is one scene's cast list and
-sightlines. `LocalView` is a single actor's vantage on a single scene.
+sightlines. `ViewMode` is a single actor's vantage on a single scene.
 
 | Concept | Scope | Role |
 |---|---|---|
 | `Spec` | whole protocol tree | branching shape of all possible plays |
 | Node | one location in the tree | one scene: move space + continuation |
 | Party | spans the whole tree | actor; may control or observe at various nodes |
-| `Multiparty.LocalView X` | one node × one party | that party's vantage on that one scene |
+| `Multiparty.ViewMode X` | one node × one party | that party's vantage on that one scene |
+| `Multiparty.Observation X` | one node × one party | information content (kernel) of that vantage |
 | `NodeProfile Party X` | one node × all parties | full cast list + sightlines for that scene |
 
 ## Core types
@@ -177,20 +189,90 @@ These require `LawfulCommMonad` (independent effects may be swapped).
 
 ## Multiparty local views (`Multiparty/`)
 
-`LocalView X` characterizes what a participant sees at a node with move type `X`:
+`ViewMode X` characterizes what a participant sees at a node with move type `X`:
 
 | Constructor | Meaning |
 |-------------|---------|
-| `.active` | Participant chooses the move |
-| `.observe` | Participant sees the full move |
+| `.pick` | Participant locally selects the move (effectful Σ-of-X) |
+| `.observe` | Participant sees the full move (function-from-X) |
 | `.hidden` | Participant sees nothing |
-| `.quotient f` | Participant sees `f x` (partial information) |
+| `.react ⟨Obs, toObs⟩` | Participant sees `toObs x : Obs` (partial information) |
 
 Three packaged resolver patterns:
 
 - **`Broadcast.Strategy`**: one acting party per node, all others observe.
 - **`Directed.Strategy`**: sender/receiver pair per node.
 - **`Profile.Strategy`**: full per-party `ViewProfile` decoration.
+
+### Information kernel vs operational shape
+
+`ViewMode` carries information along **two orthogonal axes**:
+
+- **Information** — what observation does the participant make? Fully captured
+  by a single projection `toObs : X → Obs` packaged with its codomain `Obs`.
+  This polynomial-element form is `Multiparty.Observation X`, defined as
+  `PFunctor.Idx (Observation.basePFunctor X)` where
+  `Observation.basePFunctor X := ⟨Type, (X → ·)⟩`. Concretely it unfolds to
+  `Σ Obs : Type, X → Obs`. Every `ViewMode X` collapses to an `Observation X`
+  via `ViewMode.toObservation`.
+- **Operational** — what continuation-passing shape does the participant use
+  for `Action`? `.pick` (effectful Σ-of-X), `.observe` (function-from-X),
+  `.hidden` (function-into-Cont, prepared in advance), `.react` (function on
+  the observation, prepared in advance).
+
+The four-constructor `ViewMode` is the *ergonomically convenient* form; it
+specializes `Action` to a definitionally simpler shape per pattern, which
+keeps protocol examples short. `Observation` is the *semantically universal*
+form; protocols whose participants make arbitrary observations not captured
+by `.pick` / `.observe` / `.hidden` should build observations directly. The
+two are related by `ViewMode.toObservation` (collapse) and
+`Observation.toViewMode` (lift into the universal `.react` constructor); on
+the operational side, `ViewMode.Action (.react ⟨..⟩) = Observation.Action ⟨..⟩`
+definitionally.
+
+The information lattice on `Observation X` is exposed via Mathlib's order
+typeclasses, so `⊤`, `⊥`, `≤`, `⊔` work directly:
+
+- `⊤ : Observation X` is `Observation.top X = ⟨X, id⟩` — full information.
+  This is exactly the kernel of `ViewMode.observe`.
+- `⊥ : Observation X` is `Observation.bot X = ⟨PUnit, fun _ => .unit⟩` —
+  no information. This is exactly the kernel of `ViewMode.hidden`.
+- `k₁ ≤ k₂` denotes `Observation.Refines k₁ k₂` — `k₁` is no more revealing
+  than `k₂`.
+- `k₁ ⊔ k₂` denotes `Observation.combine k₁ k₂` — the join (Σ-product) of
+  two observations.
+
+`Refines` is only a *preorder* (mutual refinement permits codomain
+bijections), so `Observation X` carries `Preorder`, `OrderTop`, `OrderBot`
+and `Max` instances but not `PartialOrder` / `SemilatticeSup`. Profile-level
+order theory comes through Mathlib's `Pi` instances on
+`ObservationProfile Party X = Party → Observation X` for free.
+
+Note that the operational distinction `.pick` vs `.observe` is **not** the
+canonical authorship attribution. Authorship-of-move is recorded by
+`Concurrent.NodeAuthority.controllers : X → List Party` (move-dependent,
+possibly multi-controller). `ViewMode.pick` indicates only that the
+participant chooses *locally* in its endpoint; the protocol-level controllers
+of a given move are recorded separately.
+
+### Literature
+
+Three independent traditions converge on the kernel form `Σ Obs, X → Obs`:
+
+- *Epistemic logic* (Halpern-Vardi "Reasoning About Knowledge"): agent
+  observation as a projection from global state to local indistinguishability
+  classes.
+- *Noninterference / info-flow* (Goguen-Meseguer; Sabelfeld-Myers
+  "Language-Based Information-Flow Security"): per-security-level projection
+  of observable outputs.
+- *Session types and endpoint projection* (Honda-Yoshida-Carbone "Multiparty
+  Asynchronous Session Types"; Cruz-Filipe-Montesi "A Core Model for
+  Choreographic Programming"): projection of a global type / global play to a
+  single role's local view.
+
+Closest type-theoretic ancestor: Hancock-Setzer "Interactive Programs in
+Dependent Type Theory" — Command/Response interfaces with embedded
+observation modes mirror the four-constructor operational shape.
 
 ## Concurrent processes (`Concurrent/`)
 
@@ -238,7 +320,7 @@ it produces a `ProcessOver Δ` with product state space
 ### Control and observation
 
 `Control Party S` assigns ownership of payload moves and scheduling decisions.
-`Profile Party S` assigns `LocalView`s to each party at frontier nodes.
+`Profile Party S` assigns `ViewMode`s to each party at frontier nodes.
 `Current.view` combines both to give a party's current-step interface.
 
 ### Fairness, safety, liveness
@@ -364,7 +446,9 @@ import VCVio.Interaction.Concurrent.Process
 
 | File | Purpose |
 |------|---------|
-| `Core.lean` | `LocalView`, `ObsType`, `Action`, `Multiparty.Strategy` |
+| `Core.lean` | `ViewMode`, `ObsType`, `Action`, `toObservation`/`fromObservation` (kernel bridges), `Multiparty.Strategy` |
+| `Observation.lean` | `Multiparty.Observation` (= `PFunctor.Idx (Observation.basePFunctor X)`), `top`/`bot`/`Refines`/`combine`/`postcomp`/`Action`, Mathlib order typeclasses (`Top`/`Bot`/`LE`/`Preorder`/`OrderTop`/`OrderBot`/`Max`) |
+| `ObservationProfile.lean` | `Multiparty.ObservationProfile Party X := Party → Observation X` (with pointwise `Pi` order instances), `toViewProfile` |
 | `Broadcast.lean` | `PartyDecoration`, `Broadcast.Strategy` |
 | `Directed.lean` | `EdgeDecoration`, `Directed.Strategy` |
 | `Profile.lean` | `ViewProfile`, `Profile.Decoration`, `Profile.Strategy` |
@@ -382,7 +466,7 @@ import VCVio.Interaction.Concurrent.Process
 | `Control.lean` | `Control`, `scheduler?`, `current?`, `controllers` |
 | `Profile.lean` | `Profile`, `observe`, `residual`, `frontierView` |
 | `Current.lean` | `view`, `observe`, `residualView` |
-| `Process.lean` | `NodeAuthority`, `NodeObservation`, `NodeProfile`, `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave`, `ProcessOver.{Behavior, behavior, ObsEq}` |
+| `Process.lean` | `NodeAuthority`, `NodeView`, `NodeProfile`, `StepOver`, `ProcessOver`, `Process`, systems, `Functor (StepOver Γ)`, `Coalg` instance, `interleave`, `ProcessOver.{Behavior, behavior, ObsEq}` |
 | `Tree.lean` | Structural concurrent syntax → `Process` |
 | `Machine.lean` | `Machine`, `Machine.toProcess`, `Machine.StepFun`, `Coalg` instance |
 | `Execution.lean` | `Trace`, `ObservedTrace` for processes |
