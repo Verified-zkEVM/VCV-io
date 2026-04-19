@@ -17,7 +17,7 @@ on:
       - "scripts/style-exceptions.txt"
       - ".github/workflows/linting.yml"
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
       - "VCVio/**/*.lean"
       - "FFI/**/*.lean"
