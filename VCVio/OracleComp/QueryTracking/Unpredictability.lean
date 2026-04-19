@@ -1,15 +1,33 @@
 /-
 Copyright (c) 2026 James Waters. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
-Authors: James Waters
+Authors: James Waters, Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.Birthday
+import VCVio.OracleComp.QueryTracking.ProgrammingOracle
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # ROM Unpredictability and Collision Win Bounds
 
 Fresh query uniformity, cache preimage bounds, and the collision-based win
 probability theorem.
+
+## Unpredictability
+
+`HasUnpredictableSample samples β` packages "the probability of any specific outcome of
+`samples : ProbComp α` is at most `β`". It is the abstract handle through which downstream
+collision bounds ingest min-entropy of a sample distribution without re-deriving uniform-sample
+arithmetic at each call site.
+
+Instances:
+* `HasUnpredictableSample.uniformSample`: `$ᵗ α` is `1/|α|`-unpredictable.
+* `HasUnpredictableSample.mono`: `β`-unpredictability transports up to any `β' ≥ β`.
+
+The TV-distance "programming collision" bound that consumes this typeclass lives downstream in
+`VCVio/ProgramLogic/Relational/ProgrammingOracle.lean` (see `programming_collision_bound` and
+its `qP * qH * β` repackaging), keeping the relational theorem in the `ProgramLogic` layer
+while the unpredictability primitive stays here in `QueryTracking`.
 -/
 
 open OracleSpec OracleComp ENNReal Finset
@@ -333,5 +351,45 @@ theorem probEvent_collision_win_le {α : Type} {t : ℕ}
       (t ^ 2 : ℝ≥0∞) / (2 * Fintype.card (spec.Range default)) :=
   le_trans (probEvent_mono hwin) (probEvent_cacheCollision_le_birthday' oa hbound hC hrange)
 
+/-! ## `HasUnpredictableSample` -/
+
+/-- A probabilistic computation `samples : ProbComp α` is **`β`-unpredictable** if every specific
+outcome occurs with probability at most `β`. This is the standard "min-entropy at level
+`log₂(1/β)`" notion, packaged as a structured proposition so that downstream collision bounds
+can ingest it generically.
+
+Equivalent to `∀ x, Pr[= x | samples] ≤ β`; the structure shape lets it serve as the canonical
+abstract hypothesis for "values drawn from `samples` are hard to guess". -/
+@[mk_iff]
+structure HasUnpredictableSample {α : Type} (samples : ProbComp α) (β : ℝ≥0∞) : Prop where
+  prob_le : ∀ x : α, Pr[= x | samples] ≤ β
+
+namespace HasUnpredictableSample
+
+variable {α : Type} {samples : ProbComp α} {β β' : ℝ≥0∞}
+
+/-- Monotonicity in the bound: a `β`-unpredictable sample is also `β'`-unpredictable for any
+`β' ≥ β`. -/
+lemma mono (h : HasUnpredictableSample samples β) (hβ : β ≤ β') :
+    HasUnpredictableSample samples β' :=
+  ⟨fun x => (h.prob_le x).trans hβ⟩
+
+/-- `$ᵗ α` is `(|α|)⁻¹`-unpredictable for any nonempty `Fintype`. -/
+lemma uniformSample {α : Type} [SampleableType α] [Fintype α] [Nonempty α] :
+    HasUnpredictableSample ($ᵗ α) ((Fintype.card α : ℝ≥0∞)⁻¹) :=
+  ⟨fun x => le_of_eq (probOutput_uniformSample α x)⟩
+
+end HasUnpredictableSample
+
+/-! ## Sanity check: uniform sampling reproduces the canonical `1/|α|` shape -/
+
+/-- For a `β`-unpredictable sampling distribution from a fintype, the per-sample bound
+matches `(Fintype.card α)⁻¹` exactly when `samples = $ᵗ α`. This pins the textbook
+"uniform draw from `α` has min-entropy `log₂|α|`" arithmetic so downstream collision bounds
+can substitute `β = 1/|α|` algebraically. -/
+lemma HasUnpredictableSample.uniformSample_apply
+    {α : Type} [SampleableType α] [Fintype α] [Nonempty α] (x : α) :
+    Pr[= x | ($ᵗ α : ProbComp α)] = (Fintype.card α : ℝ≥0∞)⁻¹ :=
+  probOutput_uniformSample α x
 
 end OracleComp

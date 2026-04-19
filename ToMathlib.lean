@@ -28,6 +28,7 @@ import ToMathlib.Control.StateT
 import ToMathlib.Control.Trace
 import ToMathlib.Control.WriterT
 import ToMathlib.Data.ENNReal.AbsDiff
+import ToMathlib.Data.ENNReal.Gauss
 import ToMathlib.Data.ENNReal.SumSquares
 import ToMathlib.Data.IndexedBinaryTree.Basic
 import ToMathlib.Data.IndexedBinaryTree.Equiv
