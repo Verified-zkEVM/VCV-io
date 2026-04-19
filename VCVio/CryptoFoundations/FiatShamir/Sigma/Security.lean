@@ -362,17 +362,27 @@ theorem euf_cma_to_nma
     -- realizable without introducing a *new* intermediate experiment: any `g2` satisfying
     -- `g1 ≤ g2 + qS·ζ_zk` *and* `g2 ≤ Fork.advantage + collisionSlack` collapses one of the
     -- two sub-bounds to the trivial step (e.g. `g2 := Fork.advantage + collisionSlack`
-    -- makes the second `le_refl`). Splitting honestly requires either:
-    --   (a) a per-query ε-perturbed identical-until-bad lemma in
-    --       `VCVio/ProgramLogic/Relational/SimulateQ.lean` (ε per step + bad event),
-    --       which is *not yet* in the codebase; or
-    --   (b) defining a no-overlay intermediate experiment `unforgeableExpNoFresh_sim`
-    --       that runs `adv.main` with `sigSim` substituted for the real signing oracle,
-    --       and then bridging it to `Fork.advantage` via overlay accounting.
+    -- makes the second `le_refl`). The honest split uses the per-query ε-perturbed
+    -- identical-until-bad lemma `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad` in
+    -- `VCVio/ProgramLogic/Relational/SimulateQ.lean`. Applying it requires:
+    --   (i)   a unified state combining the `QueryCache` for the random oracle and a `Bool`
+    --         flag tracking the collision-bad event (pre-image of a programmed challenge);
+    --   (ii)  two `QueryImpl` instantiations over the layered spec: `realImpl` (forwards
+    --         to the real signing oracle, no programming) and `simImpl` (substitutes
+    --         `sigSim pk` for signing queries, programs the RO with `simChalUniformGivenCommit`);
+    --   (iii) a per-query ε bound: for any signing query state, the joint distribution of the
+    --         real and simulated step over `(state, output)` is at TV distance ≤ ζ_zk
+    --         (this is exactly the per-query HVZK guarantee `simChalUniformGivenCommit_correct`);
+    --   (iv)  a bad-event monotonicity hypothesis on `simImpl` (programming a previously-queried
+    --         point sets the flag), and a "behaves identically when not bad" hypothesis;
+    --   (v)   a final reduction `g1 ≤ Pr[E | sim impl₂ (adv.main pk)]` where `E` is the valid
+    --         forgery predicate, plus `Pr[E | sim impl₂ (adv.main pk)] ≤ Fork.advantage` via
+    --         the structural connection that any valid FS forgery induces a fork point in
+    --         `runTrace`.
     -- See §D.10.4 of `Notes/vcvio-fs-schnorr-clean-chain.md`. The single sorry below tracks
-    -- this combined obligation; the freshness-drop hop (Phase B) is already discharged and
+    -- this combined application; the freshness-drop hop (Phase B) is already discharged and
     -- the structural framework (pk/sk binding, `nmaAdv` construction, query bounds) above
-    -- is sorry-free.
+    -- is sorry-free. The per-query ε lemma (Option 1 from the synthesis doc) is now in place.
     set g1 : ENNReal := Pr[= true | SignatureAlg.unforgeableExpNoFresh (runtime M) adv] with hg1
     have fresh_preserved : adv.advantage (runtime M) ≤ g1 :=
       SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
