@@ -42,13 +42,9 @@ empty policy, the flag stays `false` and the impl is structurally an `extendStat
 condition as `withProgramming` but **without actually programming**: the oracle is queried
 normally and the (fresh) value is cached. Its purpose is to be the relational bridge between
 `withCaching` (cache-side projection) and `withProgramming` (the "identical-until-bad" partner
-of `withProgramming`); see `OracleComp.ProgramLogic.Relational.ProgrammingOracle`.
-
-## TODO
-
-- `programming_collision_bound`: concrete probability bound on the bad flag in terms of the
-  policy size, query budget, and per-point predictability of the policy distribution. Requires
-  introducing a `HasUnpredictableSample` typeclass.
+of `withProgramming`); see `OracleComp.ProgramLogic.Relational.ProgrammingOracle` for the
+actual TV-distance bound (`tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad`)
+and its `programming_collision_bound{,_qP_qH_β}` repackagings.
 -/
 
 universe u v

@@ -6,7 +6,6 @@ Authors: James Waters, Quang Dao
 import VCVio.OracleComp.QueryTracking.Birthday
 import VCVio.OracleComp.QueryTracking.ProgrammingOracle
 import VCVio.OracleComp.Constructions.SampleableType
-import VCVio.ProgramLogic.Relational.ProgrammingOracle
 
 /-!
 # ROM Unpredictability and Collision Win Bounds
@@ -18,20 +17,17 @@ probability theorem.
 
 `HasUnpredictableSample samples β` packages "the probability of any specific outcome of
 `samples : ProbComp α` is at most `β`". It is the abstract handle through which downstream
-collision bounds (notably `programming_collision_bound`) ingest min-entropy of a
-sample distribution without re-deriving uniform-sample arithmetic at each call site.
+collision bounds ingest min-entropy of a sample distribution without re-deriving uniform-sample
+arithmetic at each call site.
 
 Instances:
 * `HasUnpredictableSample.uniformSample`: `$ᵗ α` is `1/|α|`-unpredictable.
 * `HasUnpredictableSample.mono`: `β`-unpredictability transports up to any `β' ≥ β`.
 
-## Programming collision bound
-
-`programming_collision_bound` then gives the headline corollary used by Fiat-Shamir-style
-"identical-until-bad" reductions: the TV-distance between running an oracle computation
-under pure caching versus under a `qP`-point programming policy is bounded by `qP * qH * β`,
-when the adversary's queries are drawn from a `β`-unpredictable distribution and `oa`
-makes at most `qH` queries.
+The TV-distance "programming collision" bound that consumes this typeclass lives downstream in
+`VCVio/ProgramLogic/Relational/ProgrammingOracle.lean` (see `programming_collision_bound` and
+its `qP * qH * β` repackaging), keeping the relational theorem in the `ProgramLogic` layer
+while the unpredictability primitive stays here in `QueryTracking`.
 -/
 
 open OracleSpec OracleComp ENNReal Finset
@@ -388,83 +384,12 @@ end HasUnpredictableSample
 /-! ## Sanity check: uniform sampling reproduces the canonical `1/|α|` shape -/
 
 /-- For a `β`-unpredictable sampling distribution from a fintype, the per-sample bound
-matches `(Fintype.card α)⁻¹` exactly when `samples = $ᵗ α`. This makes downstream uses of
-`programming_collision_bound` reduce algebraically to the textbook `qP * qH / |α|` form. -/
+matches `(Fintype.card α)⁻¹` exactly when `samples = $ᵗ α`. This pins the textbook
+"uniform draw from `α` has min-entropy `log₂|α|`" arithmetic so downstream collision bounds
+can substitute `β = 1/|α|` algebraically. -/
 lemma HasUnpredictableSample.uniformSample_apply
     {α : Type} [SampleableType α] [Fintype α] [Nonempty α] (x : α) :
     Pr[= x | ($ᵗ α : ProbComp α)] = (Fintype.card α : ℝ≥0∞)⁻¹ :=
   probOutput_uniformSample α x
-
-/-! ## Programming collision bound -/
-
-/-- The bad-event probability of `withProgramming policy` on input `oa`, started from an empty
-cache and `bad := false`. The bad flag flips on the first cache-miss whose query input lies in
-the policy's support; this abbreviation isolates that probability so downstream union-bound
-arguments can name it. -/
-noncomputable abbrev probEventBadOfWithProgramming
-    {α : Type} (so : QueryImpl spec (OracleComp spec))
-    (policy : ProgrammingPolicy spec) (oa : OracleComp spec α) : ℝ≥0∞ :=
-  Pr[fun z : α × spec.QueryCache × Bool => z.2.2 = true |
-      (simulateQ (so.withProgramming policy) oa).run (∅, false)]
-
-omit [spec.DecidableEq] in
-/-- **Programming collision bound.**
-
-The TV-distance between running `oa` under pure caching and under a `policy`-programming
-oracle is bounded by any upper bound `B` on the bad-event probability of
-`withProgramming policy` (provided `B < ∞`).
-
-This is the user-facing wrapper around
-`OracleComp.ProgramLogic.Relational.tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad`:
-the heavy lifting (the identical-until-bad bridge between `withCaching` and `withProgramming`)
-lives in `ProgramLogic/Relational/ProgrammingOracle.lean`; here we just expose it under the
-canonical name and combine it with a user-supplied bad-event bound `hBad`.
-
-The canonical `qP * qH * β` Fiat-Shamir slack is recovered by instantiating
-`B := (qP : ℝ≥0∞) * qH * β` (see `programming_collision_bound_qP_qH_β`) and discharging `hBad`
-via a union bound over the at most `qP` programmed points (each contributing at most `qH * β`
-by per-step unpredictability of the queried inputs). For Schnorr with `spec.Domain = M × Commit`,
-`β = 1/|G|`, `qP = qS`, and effective `qH = qS + qH`, this matches `collisionSlack qS qH G`.
-
-The per-point union bound itself depends on the structure of `oa`'s queries (specifically, an
-unpredictability hypothesis on each query's input distribution); it is discharged in the
-caller's setting. See `Examples/CommitmentScheme/` and `CryptoFoundations/FiatShamir/Sigma/`
-for FS-flavored applications. -/
-theorem programming_collision_bound
-    {α : Type}
-    (oa : OracleComp spec α)
-    (so : QueryImpl spec (OracleComp spec))
-    (policy : ProgrammingPolicy spec)
-    {B : ℝ≥0∞} (hB_lt_top : B < ∞)
-    (hBad : probEventBadOfWithProgramming so policy oa ≤ B) :
-    tvDist
-        ((simulateQ so.withCaching oa).run' ∅)
-        ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
-      ≤ B.toReal := by
-  open OracleComp.ProgramLogic.Relational in
-  have hbridge :=
-    tvDist_simulateQ_withCaching_withProgramming_le_probEvent_bad so policy oa ∅
-  exact hbridge.trans (ENNReal.toReal_mono hB_lt_top.ne hBad)
-
-omit [spec.DecidableEq] in
-/-- Convenience repackaging of `programming_collision_bound`: when the user has a bad-event
-bound of the canonical `qP * qH * β` shape, we get the canonical FS slack as the TV-distance
-bound. The caller need only discharge `hBad` (typically by a union bound over at most `qP`
-programmed points, each hit with probability `≤ qH * β`). -/
-theorem programming_collision_bound_qP_qH_β
-    {α : Type}
-    (oa : OracleComp spec α) (qH qP : ℕ) (β : ℝ≥0∞) (hβ_lt_top : β < ∞)
-    (so : QueryImpl spec (OracleComp spec))
-    (policy : ProgrammingPolicy spec)
-    (hBad : probEventBadOfWithProgramming so policy oa ≤ (qP : ℝ≥0∞) * qH * β) :
-    tvDist
-        ((simulateQ so.withCaching oa).run' ∅)
-        ((simulateQ (so.withProgramming policy) oa).run' (∅, false))
-      ≤ ((qP : ℝ≥0∞) * qH * β).toReal := by
-  have hBound_lt_top : (qP : ℝ≥0∞) * qH * β < ∞ := by
-    have hqPqH : (qP : ℝ≥0∞) * qH < ∞ :=
-      ENNReal.mul_lt_top (ENNReal.natCast_lt_top _) (ENNReal.natCast_lt_top _)
-    exact ENNReal.mul_lt_top hqPqH hβ_lt_top
-  exact programming_collision_bound oa so policy hBound_lt_top hBad
 
 end OracleComp
