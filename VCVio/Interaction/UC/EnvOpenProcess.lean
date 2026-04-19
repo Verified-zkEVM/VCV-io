@@ -32,11 +32,11 @@ The wrapper does two concrete jobs that an ad-hoc tuple does not:
    actions never imports this file. A consumer that does, gets the
    pair as a structure with a typed `react` projection. The env
    channel is **additive** above `OpenProcess` and never threaded
-   into `OpenNodeSemantics`, so adding it costs zero in the rest of
+   into `OpenNodeProfile`, so adding it costs zero in the rest of
    the framework.
 
 The alternative, threading the env-event alphabet `Σ` (with
-`Σ := Empty` default) directly through `OpenNodeSemantics`, would
+`Σ := Empty` default) directly through `OpenNodeProfile`, would
 touch every existing constructor and every `_iso` lemma in
 `OpenProcessModel.lean`. The wrapper achieves the same expressive
 power additively, with zero invasion.
@@ -102,7 +102,7 @@ The state type `State` is constrained to `Type` (universe 0) because
 `EnvAction.react` returns a `ProbComp State` and `ProbComp : Type → Type`.
 
 Existing `OpenProcess` consumers are unaffected: nothing here is
-threaded into `OpenNodeSemantics`. The wrapper is the structural
+threaded into `OpenNodeProfile`. The wrapper is the structural
 foundation for corruption-aware composition and for the canonical
 CJSV22 instantiation `MomentaryCorruption.Process` in
 `MomentaryCorruption.lean`.

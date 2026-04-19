@@ -145,7 +145,7 @@ step inside the richer interaction semantics.
 models to the more general process-centered concurrent layer.
 -/
 def toProcess {Party : Type u} (machine : Machine)
-    (semantics : (σ : machine.State) → NodeSemantics Party (machine.Enabled σ)) :
+    (semantics : (σ : machine.State) → NodeProfile Party (machine.Enabled σ)) :
     Process Party where
   Proc := machine.State
   step σ :=
@@ -160,7 +160,7 @@ Lift `Machine.toProcess` from bare dynamics to the verification-oriented
 invariant predicates.
 -/
 def System.toProcess {Party : Type u} (system : Machine.System)
-    (semantics : (σ : system.State) → NodeSemantics Party (system.Enabled σ)) :
+    (semantics : (σ : system.State) → NodeProfile Party (system.Enabled σ)) :
     Process.System Party where
   toProcess := system.toMachine.toProcess semantics
   init := system.init

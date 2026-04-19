@@ -62,7 +62,7 @@ inductive Observed {Party : Type u} [DecidableEq Party] (me : Party) :
     step
       {Moves : Type w}
       {rest : Moves → Interaction.Spec.{w}}
-      {node : NodeSemantics Party Moves}
+      {node : NodeProfile Party Moves}
       {semantics : (x : Moves) →
         Interaction.Spec.Decoration (StepContext Party) (rest x)}
       {x : Moves}
