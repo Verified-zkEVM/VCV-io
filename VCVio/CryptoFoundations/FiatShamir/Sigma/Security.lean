@@ -548,21 +548,223 @@ step:
 `probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage` then composes the
 two, replacing the old C7a/C7b chain. -/
 
+/-! #### C7 sub-lemma: extended managed-RO experiment with sign log -/
+
+/-- Extended state for the managed-RO experiment that additionally tracks the sign log.
+The `cache` field corresponds to the standard `QueryCache`, while `extSignLog` records
+which messages were signed, enabling the `!wasSigned` freshness filter. -/
+private structure ManagedRoExtState where
+  cache : PhaseCCache (M := M) (Commit := Commit) (Chal := Chal)
+  extSignLog : PhaseCSignLog (M := M) (Commit := Commit) (Resp := Resp)
+
+/-- Uniform-spec forwarder lifted to the extended managed-RO state: forwards uniform
+queries to the outer oracle without touching the state (mirroring `unifSimImpl`). -/
+private def unifSimImplExt :
+    QueryImpl unifSpec
+      (StateT (ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+        (OracleComp PhaseCOuterSpec)) :=
+  fun n => liftM (query (spec := PhaseCOuterSpec) (.inl n))
+
+/-- Caching RO simulator lifted to the extended managed-RO state: checks `cache`,
+on miss forwards to the outer oracle and caches the result (mirroring `roSimImpl`). -/
+private noncomputable def roSimImplExt :
+    QueryImpl (M × Commit →ₒ Chal)
+      (StateT (ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+        (OracleComp PhaseCOuterSpec)) :=
+  fun mc => do
+    let st ← get
+    match st.cache (.inr mc) with
+    | some v => pure v
+    | none =>
+        let v ← liftM (query (spec := PhaseCOuterSpec) (.inr mc))
+        set ({ st with cache := st.cache.cacheQuery (.inr mc) v } :
+          ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+        pure v
+
+/-- Base simulator lifted to the extended state. -/
+private noncomputable def baseSimImplExt :
+    QueryImpl PhaseCOuterSpec
+      (StateT (ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+        (OracleComp PhaseCOuterSpec)) :=
+  unifSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+    roSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+
+/-- Extended signing simulator: like `sigSimImpl` but additionally logs the signed
+message in `extSignLog`. -/
+private noncomputable def sigSimImplExt
+    (pk : Stmt) :
+    QueryImpl (M →ₒ (Commit × Resp))
+      (StateT (ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+        (OracleComp PhaseCOuterSpec)) :=
+  fun msg => do
+    let (c, ω, s) ← simulateQ
+      (unifSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (simTranscript pk)
+    modify fun st =>
+      ({ cache := st.cache.cacheQuery (.inr (msg, c)) ω
+         extSignLog := st.extSignLog.logQuery msg (c, s) } :
+        ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+    pure (c, s)
+
+/-- Extended managed-RO experiment: runs the CMA adversary with the HVZK signing simulator
+that additionally tracks a sign log, then verifies against the live outer oracle. -/
+private noncomputable def managedRoNmaExpExt : SPMF (Bool × Bool) :=
+  (runtime M).evalDist do
+    let sigAlg : SignatureAlg (OracleComp PhaseCOuterSpec) M Stmt Wit (Commit × Resp) :=
+      FiatShamir (m := OracleComp PhaseCOuterSpec) σ hr M
+    let (pk, _) ← sigAlg.keygen
+    let extImpl : QueryImpl PhaseCFullSpec
+        (StateT (ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+          (OracleComp PhaseCOuterSpec)) :=
+      baseSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        sigSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk
+    let initSt : ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) :=
+      ⟨∅, []⟩
+    let ((msg, sig), st) ← (simulateQ extImpl (adv.main pk)).run initSt
+    let verified ← sigAlg.verify pk msg sig
+    let wasSigned :=
+      (letI : DecidableEq (Commit × Resp) := Classical.decEq _
+       st.extSignLog.wasQueried msg)
+    pure (wasSigned, verified)
+
+omit [Fintype Chal] in
+/-- **C7a.** The `freshSuccess` probability of `simPhaseCExp` is at most the
+`!wasSigned && verified` probability in the extended managed-RO experiment.
+
+The core state-projection step: under `phaseCOverlayInvariant`, the hash
+behaviour of `phaseCHashImpl` agrees with `roSimImpl` via the projection
+`st ↦ st.overlayCache`. The signing simulators agree on `(c, s)` output
+and both record `(msg, c) ↦ ω`. For unsigned messages, verification through
+`phaseCBaseImpl` reduces to the same outer-oracle lookup as direct verification.
+
+The proof should proceed by:
+1. Defining the state relation `R st extSt` connecting `PhaseCState` to
+   `ManagedRoExtState` (overlayCache = cache, signLog = extSignLog, invariant holds)
+2. Showing each query implementation preserves `R` and produces the same output
+3. Applying `relTriple_simulateQ_run` (or a direct induction) to transport
+   the output equality through the full simulation
+4. Showing verification agrees on the `!wasSigned` branch -/
+private lemma probEvent_freshSuccess_simPhaseCExp_le_ext :
+    Pr[= true |
+        PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
+      Pr[= true |
+        (fun p : Bool × Bool => !p.1 && p.2) <$>
+          managedRoNmaExpExt σ hr M simTranscript adv] := by
+  sorry
+
+omit [Fintype Chal] [SampleableType Stmt] [SampleableType Chal] in
+private lemma extImpl_proj_eq (pk : Stmt)
+    (t : (PhaseCOuterSpec + (M →ₒ (Commit × Resp))).Domain)
+    (s : ManagedRoExtState (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)) :
+    Prod.map id ManagedRoExtState.cache <$>
+      ((baseSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+        sigSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+          simTranscript pk) t).run s =
+      ((baseSimImpl (M := M) (Commit := Commit) (Chal := Chal) +
+        sigSimImpl (M := M) simTranscript pk) t).run s.cache := by
+  match t with
+  | .inl (.inl n) =>
+    simp only [QueryImpl.add_apply_inl, baseSimImplExt, baseSimImpl]
+    simp [unifSimImplExt, unifSimImpl, fwdImpl, QueryImpl.liftTarget,
+      Functor.map_map, Prod.map_apply]
+  | .inl (.inr mc) =>
+    simp only [QueryImpl.add_apply_inl, QueryImpl.add_apply_inr,
+      baseSimImplExt, baseSimImpl]
+    change Prod.map id ManagedRoExtState.cache <$> (roSimImplExt M mc).run s =
+      (roSimImpl M mc).run s.cache
+    simp only [roSimImplExt, roSimImpl, fwdImpl, StateT.run_bind, StateT.run_get,
+      pure_bind]
+    split
+    · simp [StateT.run_pure, Prod.map_apply]
+    · simp [StateT.run_bind, StateT.run_set,
+        StateT.run_modifyGet, QueryImpl.liftTarget, map_pure,
+        Functor.map_map, Prod.map]
+  | .inr msg =>
+    simp only [QueryImpl.add_apply_inr]
+    change Prod.map id ManagedRoExtState.cache <$> (sigSimImplExt M simTranscript pk msg).run s =
+      (sigSimImpl M simTranscript pk msg).run s.cache
+    simp only [sigSimImplExt, sigSimImpl, StateT.run_bind, map_bind,
+      StateT.run_modify, StateT.run_pure, map_pure, StateT.run_modifyGet, pure_bind]
+    have hinner := OracleComp.ProgramLogic.Relational.map_run_simulateQ_eq_of_query_map_eq'
+      (unifSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
+      (unifSimImpl (M := M) (Commit := Commit) (Chal := Chal))
+      ManagedRoExtState.cache
+      (by intro n st
+          simp [unifSimImplExt, unifSimImpl, fwdImpl, QueryImpl.liftTarget,
+            Functor.map_map, Prod.map_apply])
+      (simTranscript pk) s
+    rw [← hinner, seq_bind_eq, Function.comp_def]
+    simp [Prod.map_apply, Prod.map_fst, Prod.map_snd, id_eq]
+
+omit [Fintype Chal] [SampleableType Wit] [SampleableType Stmt] in
+/-- **C7b.** The `!wasSigned && verified` probability in the extended managed-RO
+experiment is at most the `verified` probability in the standard `managedRoNmaExp`.
+
+This is the composition of two observations:
+1. Event monotonicity: `!wasSigned && verified → verified`
+2. State erasure: dropping the sign log from `ManagedRoExtState` does not
+   affect the `verified` distribution (by `run'_simulateQ_eq_of_query_map_eq'`
+   with projection `st ↦ st.cache`). -/
+private lemma probEvent_ext_le_managedRoAdvantage :
+    Pr[= true |
+        (fun p : Bool × Bool => !p.1 && p.2) <$>
+          managedRoNmaExpExt σ hr M simTranscript adv] ≤
+      SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
+  calc Pr[= true | (fun p ↦ !p.1 && p.2) <$> managedRoNmaExpExt σ hr M simTranscript adv]
+      ≤ Pr[= true | Prod.snd <$> managedRoNmaExpExt σ hr M simTranscript adv] := by
+          rw [← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
+              probEvent_map, probEvent_map]
+          exact probEvent_mono
+            (fun p _ hp => by
+              simp only [Function.comp, Bool.and_eq_true, Bool.not_eq_true'] at hp ⊢
+              exact hp.2)
+    _ = SignatureAlg.managedRoNmaAdv.advantage (runtime M)
+          (nmaAdvFromHVZK σ hr M simTranscript adv) := by
+        simp only [SignatureAlg.managedRoNmaAdv.advantage, SignatureAlg.managedRoNmaExp,
+          managedRoNmaExpExt, nmaAdvFromHVZK]
+        congr 1
+        rw [← runtime_evalDist_map]
+        congr 1
+        simp only [map_bind, map_pure]
+        congr 1 with ⟨pk, sk⟩
+        simp only [bind_pure]
+        have key : ∀ (σ' : Type)
+            (mx : OracleComp PhaseCOuterSpec ((M × (Commit × Resp)) × σ')),
+            (mx >>= fun a => (FiatShamir σ hr M).verify pk a.1.1 a.1.2) =
+            ((Prod.fst <$> mx) >>= fun ms =>
+              (FiatShamir σ hr M).verify pk ms.1 ms.2) := by
+          intro σ' mx
+          rw [show (fun a : (M × (Commit × Resp)) × σ' =>
+                (FiatShamir σ hr M).verify pk a.1.1 a.1.2) =
+              ((fun ms => (FiatShamir σ hr M).verify pk ms.1 ms.2) ∘ Prod.fst)
+            from rfl]
+          rw [← seq_bind_eq]
+        rw [key, key, ← StateT.run'_eq, ← StateT.run'_eq]
+        congr 1
+        exact OracleComp.ProgramLogic.Relational.run'_simulateQ_eq_of_query_map_eq'
+          (baseSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) +
+            sigSimImplExt (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+              simTranscript pk)
+          (baseSimImpl (M := M) (Commit := Commit) (Chal := Chal) +
+            sigSimImpl (M := M) simTranscript pk)
+          ManagedRoExtState.cache
+          (fun t s => extImpl_proj_eq M simTranscript pk t s)
+          (adv.main pk) _
+
 omit [Fintype Chal] in
 /-- **C7.** State-projection alignment between `simPhaseCExp` and
 `managedRoNmaExp (nmaAdvFromHVZK)` on the `freshSuccess = !wasSigned ∧ verified`
-event. On the `!wasSigned` branch, `phaseCHashImpl` reduces to a plain cache
-lookup against the `overlayCache`-projected state (by
-`phaseCAgreesAwayFromSigned`), so sim's verify behaviour agrees with managed's
-verify behaviour in distribution. Dropping the freshness filter on the managed
-side gives the unconditioned `verified` marginal, which is exactly
-`managedRoNmaAdv.advantage`. -/
+event. Composes C7a (state-projection) and C7b (event monotonicity + state erasure). -/
 private lemma probEvent_freshSuccess_simPhaseCExp_le_managedRoAdvantage :
     Pr[= true |
         PhaseCResult.freshSuccess <$> simPhaseCExp σ hr M simTranscript adv] ≤
       SignatureAlg.managedRoNmaAdv.advantage (runtime M)
-        (nmaAdvFromHVZK σ hr M simTranscript adv) := by
-  sorry
+        (nmaAdvFromHVZK σ hr M simTranscript adv) :=
+  le_trans
+    (probEvent_freshSuccess_simPhaseCExp_le_ext σ hr M simTranscript adv)
+    (probEvent_ext_le_managedRoAdvantage σ hr M simTranscript adv)
 
 omit [Fintype Chal] in
 /-- **C4.** Phase C hybrid step (composition of C1, C3, C2): the EUF-CMA
