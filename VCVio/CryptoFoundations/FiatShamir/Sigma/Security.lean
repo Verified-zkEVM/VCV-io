@@ -344,28 +344,28 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of three game hops, each abstractly named below as a sub-`sorry`:
+    -- Chain of three game hops:
     --
     --   adv.advantage (runtime M)
-    --       ≤ g1                                              -- fresh_preserved (Phase B)
+    --       ≤ g1                                              -- fresh_preserved (Phase B) ✓
     --       ≤ g2 + ENNReal.ofReal (qS * ζ_zk)                 -- hvzk_swap     (Phase C)
     --       ≤ Fork.advantage σ hr M nmaAdv qH + collisionSlack qS qH Chal
     --                                                         -- collision_bound (Phase D)
     --
     -- where:
-    --   `g1` = `Pr[= true | <CMA experiment without the freshness check>]`,
+    --   `g1` = `Pr[= true | unforgeableExpNoFresh (runtime M) adv]`,
     --   `g2` = `Pr[= true | <CMA experiment with HVZK-simulated signing>]`
     --        = `managedRoNmaExp` for the constructed `nmaAdv`.
     --
-    -- Each abstraction (Tier-1 primitives + handcrafted oracle implementations)
-    -- targets exactly one of these three sub-`sorry`s:
-    --   - `fresh_preserved`  : freshness check drop (Phase B);
+    -- Phase B is discharged via `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh`,
+    -- instantiated with `FiatShamir.runtime_evalDist_bind_pure` (the FS runtime commutes
+    -- with `_ >>= pure ∘ f`). The remaining two phases are scoped sub-`sorry`s:
     --   - `hvzk_swap`        : per-query HVZK hybrid (Phase C);
     --   - `collision_bound`  : `identical_until_bad_with_flag` + birthday union (Phase D).
-    -- The placeholder `g1`, `g2` use the trivial bound to allow the chain to type-check
-    -- while each Phase is filled in by its corresponding scoped sub-proof.
-    obtain ⟨g1, fresh_preserved⟩ : ∃ g1 : ENNReal, adv.advantage (runtime M) ≤ g1 :=
-      ⟨adv.advantage (runtime M), le_refl _⟩
+    set g1 : ENNReal := Pr[= true | SignatureAlg.unforgeableExpNoFresh (runtime M) adv] with hg1
+    have fresh_preserved : adv.advantage (runtime M) ≤ g1 :=
+      SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
+        (runtime M) (fun f mx => runtime_evalDist_bind_pure M mx f) adv
     obtain ⟨g2, hvzk_swap⟩ : ∃ g2 : ENNReal,
         g1 ≤ g2 + ENNReal.ofReal (qS * ζ_zk) := by
       sorry
@@ -1132,8 +1132,10 @@ The forking-lemma side (the two B1 prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
 `tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
 discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. Conditional only on the scoped `sorry` inside
-`euf_cma_to_nma` for the Phase D collision-event reduction. -/
+used by `euf_nma_bound`. The Phase B freshness-drop hop is discharged via
+`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated with
+`runtime_evalDist_bind_pure`. Conditional only on the scoped `sorry`s inside
+`euf_cma_to_nma` for the Phase C HVZK swap and Phase D collision-event reduction. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
