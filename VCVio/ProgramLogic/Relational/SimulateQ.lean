@@ -965,4 +965,72 @@ theorem simulateQ_run'_eq_of_snd_invariant
 
 end SndInvariant
 
+section ExtendState
+
+/-- Extend a stateful query implementation with an auxiliary state component `Q`.
+The base impl runs on the `σ` component; `aux t u q` updates the auxiliary `Q` after each query
+based on the input `t` and the produced output `u`.
+
+Inverse direction of `QueryImpl.fixSndStateT`: `extendState` adds a passive auxiliary, while
+`fixSndStateT` projects one away. Together they witness the universal property of the product
+state space. -/
+def QueryImpl.extendState
+    {ι : Type} {spec : OracleSpec ι} {σ Q : Type} {m : Type → Type _} [Monad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → spec.Range t → Q → Q) :
+    QueryImpl spec (StateT (σ × Q) m) :=
+  fun t => StateT.mk fun s => do
+    let (u, s') ← (so t).run s.1
+    pure (u, (s', aux t u s.2))
+
+@[simp] lemma QueryImpl.extendState_apply
+    {ι : Type} {spec : OracleSpec ι} {σ Q : Type} {m : Type → Type _} [Monad m]
+    (so : QueryImpl spec (StateT σ m))
+    (aux : (t : spec.Domain) → spec.Range t → Q → Q)
+    (t : spec.Domain) (s : σ × Q) :
+    (QueryImpl.extendState so aux t).run s =
+      ((so t).run s.1 >>= fun p => pure (p.1, (p.2, aux t p.1 s.2))) := rfl
+
+/-- Forgetting the auxiliary `Q` component commutes with the full simulation: running
+`so.extendState aux` and projecting away the `Q` component agrees with running `so` directly
+on the `σ` component, irrespective of the initial `Q` value or the `aux` update rule.
+
+This is the universal-property statement: the `Q` component is genuinely *passive* in the sense
+that it does not influence the `σ`-side of the simulation. Replaces the bespoke
+`ManagedRoExtState` projection lemmas (~80 LoC) used in the FS / Schnorr EUF-CMA chain. -/
+theorem QueryImpl.extendState_run_proj_eq
+    {ι : Type} {spec : OracleSpec ι} {σ Q : Type}
+    (so : QueryImpl spec (StateT σ ProbComp))
+    (aux : (t : spec.Domain) → spec.Range t → Q → Q)
+    (oa : OracleComp spec α) (s : σ) (q : Q) :
+    Prod.map id Prod.fst <$> (simulateQ (QueryImpl.extendState so aux) oa).run (s, q) =
+      (simulateQ so oa).run s := by
+  refine map_run_simulateQ_eq_of_query_map_eq
+    (impl₁ := QueryImpl.extendState so aux) (impl₂ := so)
+    (proj := Prod.fst) ?_ oa (s, q)
+  intro t ⟨s', q'⟩
+  change Prod.map id Prod.fst <$>
+      ((so t).run s' >>= fun p => pure (p.1, (p.2, aux t p.1 q'))) =
+      (so t).run s'
+  rw [map_bind]
+  conv_rhs => rw [← bind_pure ((so t).run s')]
+  refine bind_congr fun ⟨u, s''⟩ => ?_
+  rfl
+
+/-- `run'` projection corollary of `extendState_run_proj_eq`: dropping both the auxiliary `Q`
+and the `σ` state of the extended simulation gives the same output distribution as the base
+simulation. -/
+theorem QueryImpl.extendState_run'_eq
+    {ι : Type} {spec : OracleSpec ι} {σ Q : Type}
+    (so : QueryImpl spec (StateT σ ProbComp))
+    (aux : (t : spec.Domain) → spec.Range t → Q → Q)
+    (oa : OracleComp spec α) (s : σ) (q : Q) :
+    (simulateQ (QueryImpl.extendState so aux) oa).run' (s, q) =
+      (simulateQ so oa).run' s := by
+  have h := QueryImpl.extendState_run_proj_eq so aux oa s q
+  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  simpa [StateT.run'] using hmap
+
+end ExtendState
+
 end OracleComp.ProgramLogic.Relational
