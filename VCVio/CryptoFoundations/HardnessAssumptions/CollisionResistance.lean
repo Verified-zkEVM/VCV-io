@@ -211,7 +211,7 @@ private lemma romCRWin_implies_collision [DecidableEq X] [DecidableEq Y]
     cachingOracle_query_caches x cache₁ y cache₂ hmem₂
   have hcache_mono : cache₂ ≤ cache₃ := by
     have hmem₃_co : (y', cache₃) ∈ support
-        ((cachingOracle (spec := ROMHashSpec X Y) x').run cache₂) := by
+        (((ROMHashSpec X Y).cachingOracle x').run cache₂) := by
       simp only [cachingOracle.simulateQ_query] at hmem₃; exact hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le

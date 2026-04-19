@@ -152,7 +152,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
   -- Cache monotonicity: cache₂ ≤ cache₃
   have hcache_mono₂₃ : cache₂ ≤ cache₃ := by
     have hmem₃_co : (c, cache₃) ∈ support
-        ((cachingOracle (spec := CMOracle M S C) (m, s)).run cache₂) := hmem₃
+        (((CMOracle M S C).cachingOracle (m, s)).run cache₂) := hmem₃
     unfold cachingOracle at hmem₃_co
     exact QueryImpl.withCaching_cache_le
       (QueryImpl.ofLift (CMOracle M S C) (OracleComp (CMOracle M S C)))
@@ -284,12 +284,12 @@ private def extractabilityRestOa {t : ℕ}
     (A : ExtractAdversary M S C AUX t)
     (cm : C) (aux : AUX) (tr : QueryLog (CMOracle M S C)) :
     OracleComp (CMOracle M S C) Bool :=
-  A.open_ aux >>= fun (m, s) =>
-    (liftM ((CMOracle M S C).query (m, s))) >>= fun c =>
+  A.open_ aux >>= fun (m, s) => do
+    let c ← (CMOracle M S C).query (m, s)
     let extracted := CMExtract cm tr
-    pure (match extracted with
+    return match extracted with
       | some (m', s') => (c == cm) && decide ((m', s') ≠ (m, s))
-      | none => (c == cm))
+      | none => (c == cm)
 
 set_option maxHeartbeats 400000 in
 /- Under a collision-free commit cache, any extractability win must create a fresh

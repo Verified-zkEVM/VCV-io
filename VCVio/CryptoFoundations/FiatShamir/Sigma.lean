@@ -67,14 +67,75 @@ variable (M : Type)
 variable [SampleableType Chal]
 
 open scoped Classical in
-/-- Runtime bundle for the Fiat-Shamir random-oracle world. -/
-noncomputable def runtime :
+/-- Runtime bundle for the Fiat-Shamir random-oracle world starting from a fixed initial cache.
+
+This is the cache-parametric form of `runtime`: the random oracle is preloaded with `cache`, so
+queries that hit return the cached value and misses fall through to fresh uniform sampling and
+get cached for later. Specializing `cache := ∅` recovers the standard fresh-RO runtime
+(`runtime`).
+
+The `cache` parameter is the universal hook for **programming** the random oracle: any caller
+that wants to inject pre-decided answers at chosen points runs its experiment under
+`runtimeWithCache cache` instead of `runtime`. -/
+noncomputable def runtimeWithCache
+    (cache : (M × Commit →ₒ Chal).QueryCache) :
     ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal))) where
   toSPMFSemantics := SPMFSemantics.withStateOracle
     (hashImpl := (randomOracle :
       QueryImpl (M × Commit →ₒ Chal) (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)))
-    ∅
+    cache
   toProbCompLift := ProbCompLift.ofMonadLift _
+
+open scoped Classical in
+/-- Runtime bundle for the Fiat-Shamir random-oracle world.
+
+Definitionally equal to `runtimeWithCache ∅`: the standard runtime is the cache-parametric one
+preloaded with the empty cache. -/
+noncomputable def runtime :
+    ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal))) :=
+  runtimeWithCache M ∅
+
+@[simp] lemma runtime_eq_runtimeWithCache_empty :
+    (runtime M : ProbCompRuntime (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) =
+      runtimeWithCache M ∅ := rfl
+
+/-- The cache-parametric Fiat-Shamir runtime commutes with `<$>`: mapping a function over the
+surface computation is the same as mapping it over the observed `SPMF`. A direct corollary of
+`SPMFSemantics.withStateOracle_evalDist_map`. -/
+lemma runtimeWithCache_evalDist_map
+    (cache : (M × Commit →ₒ Chal).QueryCache)
+    {α β : Type} (f : α → β)
+    (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
+    (runtimeWithCache M cache).evalDist (f <$> mx) =
+      f <$> (runtimeWithCache M cache).evalDist mx :=
+  SPMFSemantics.withStateOracle_evalDist_map _ _ _ _
+
+/-- The cache-parametric Fiat-Shamir runtime commutes with `>>= pure ∘ f`. A direct corollary of
+`runtimeWithCache_evalDist_map`. -/
+lemma runtimeWithCache_evalDist_bind_pure
+    (cache : (M × Commit →ₒ Chal).QueryCache)
+    {α β : Type} (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (f : α → β) :
+    (runtimeWithCache M cache).evalDist (mx >>= fun x => pure (f x)) =
+      f <$> (runtimeWithCache M cache).evalDist mx := by
+  have heq : (mx >>= fun x => pure (f x)) = f <$> mx := by
+    rw [map_eq_bind_pure_comp]; rfl
+  rw [heq, runtimeWithCache_evalDist_map]
+
+/-- The Fiat-Shamir runtime commutes with `<$>`: `cache := ∅` instance of
+`runtimeWithCache_evalDist_map`. -/
+lemma runtime_evalDist_map
+    {α β : Type} (f : α → β)
+    (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
+    (runtime M).evalDist (f <$> mx) = f <$> (runtime M).evalDist mx :=
+  runtimeWithCache_evalDist_map M ∅ f mx
+
+/-- The Fiat-Shamir runtime commutes with `>>= pure ∘ f`: `cache := ∅` instance of
+`runtimeWithCache_evalDist_bind_pure`. -/
+lemma runtime_evalDist_bind_pure
+    {α β : Type} (mx : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (f : α → β) :
+    (runtime M).evalDist (mx >>= fun x => pure (f x)) =
+      f <$> (runtime M).evalDist mx :=
+  runtimeWithCache_evalDist_bind_pure M ∅ mx f
 
 end semantics
 

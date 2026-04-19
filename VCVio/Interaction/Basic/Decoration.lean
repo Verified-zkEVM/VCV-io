@@ -58,6 +58,33 @@ schemas: `Spec.Decoration.Schema.View` is the staged telescope view of a
 decoration by `S.toContext`, and `Spec.Decoration.Schema.equivView`
 identifies that staged view with an ordinary decoration of the realized
 context.
+
+## Polynomial substrate (`DecoratedSpec`)
+
+Just as `Spec` is `PFunctor.FreeM Spec.basePFunctor PUnit`, the bundle
+`(spec, Decoration Γ spec)` is `PFunctor.FreeM (Γ.toPFunctor) PUnit`:
+
+```
+DecoratedSpec Γ := PFunctor.FreeM (Γ.toPFunctor) PUnit
+```
+
+`Γ.toPFunctor` is the polynomial whose positions are `Σ X : Type u, Γ X`
+and whose child family is `Sigma.fst`. A free term over this polynomial is
+literally a tree where every internal node carries both a move space `X`
+and a `Γ`-value, with continuations indexed by the move type.
+
+Forgetting the `Γ`-component on positions yields a polynomial lens
+`Γ.toPFunctor → Spec.basePFunctor`, whose lift to free monads is the
+shape-forgetful map `DecoratedSpec.shape : DecoratedSpec Γ → Spec`. The
+fiber of `shape` over a fixed `spec : Spec` is exactly `Decoration Γ spec`,
+formalized as `decoratedSpecEquiv : DecoratedSpec Γ ≃ Σ spec, Decoration Γ spec`.
+
+This makes precise the slogan "a `Γ`-decorated spec is the same data as a
+spec together with a `Γ`-decoration on it". Downstream code can use either
+view: the `Spec`-indexed `Decoration` family is convenient for talking
+about decorations *over a fixed protocol*, while `DecoratedSpec` is the
+right object when shape and metadata vary together (e.g. for the polynomial
+coalgebraic semantics of `ProcessOver`).
 -/
 
 universe u v w w₂
@@ -314,6 +341,99 @@ def Decoration.equivOver {Γ : Node.Context.{u, v}} (A : ∀ X, Γ X → Type w)
   intro x
   cases x with
   | mk d r => exact Decoration.toOver_ofOver A spec d r
+
+/-! ## Polynomial substrate `DecoratedSpec`
+
+A `DecoratedSpec Γ` is the free term of the polynomial `Γ.toPFunctor` at the
+unit payload: a tree where every internal node carries both its move space
+`X` and a `Γ`-value of type `Γ X`, with continuations indexed by `X`.
+
+This is the polynomial substrate that justifies the `Spec`-indexed family
+`Decoration Γ spec`: forgetting the `Γ`-component on positions yields a
+polynomial lens `Γ.toPFunctor → Spec.basePFunctor` whose lift to free
+monads gives `DecoratedSpec.shape`. The fiber of `shape` over a fixed
+`spec` is exactly `Decoration Γ spec`, witnessed by `decoratedSpecEquiv`. -/
+
+/-- A `Γ`-decorated interaction spec, viewed polynomially.
+
+This is the free monad on `Γ.toPFunctor` at the unit payload. Equivalently
+(by `decoratedSpecEquiv`), it bundles a tree shape `spec : Spec` together
+with a `Decoration Γ spec` on it. -/
+def DecoratedSpec (Γ : Node.Context.{u, v}) : Type (max (u+1) v) :=
+  PFunctor.FreeM Γ.toPFunctor PUnit.{u+1}
+
+namespace DecoratedSpec
+
+variable {Γ : Node.Context.{u, v}}
+
+/-- Forget the `Γ`-component on every position, leaving only the underlying
+tree shape. This is the lift to free monads of the polynomial lens
+`Γ.toPFunctor → Spec.basePFunctor` whose position map is `Sigma.fst` and
+whose child map is the identity. -/
+def shape : DecoratedSpec Γ → Spec.{u}
+  | .pure _ => Spec.done
+  | .roll ⟨X, _⟩ rest => Spec.node X (fun x => DecoratedSpec.shape (rest x))
+
+/-- Read off the per-node `Γ`-decoration of a decorated spec, indexed by
+the spec's underlying `shape`. Together with `shape`, this exhibits the
+fiberwise structure of `DecoratedSpec Γ` over `Spec`. -/
+def decoration : (ds : DecoratedSpec Γ) → Decoration Γ (DecoratedSpec.shape ds)
+  | .pure _ => PUnit.unit
+  | .roll ⟨_, γ⟩ rest => ⟨γ, fun x => DecoratedSpec.decoration (rest x)⟩
+
+/-- Pack a tree shape together with a `Γ`-decoration on it into a single
+decorated spec. Inverse to the pair `(shape, decoration)`. -/
+def mk : (spec : Spec.{u}) → Decoration Γ spec → DecoratedSpec Γ
+  | .done, _ => PFunctor.FreeM.pure PUnit.unit
+  | .node X rest, ⟨γ, dRest⟩ =>
+      PFunctor.FreeM.roll ⟨X, γ⟩ (fun x => DecoratedSpec.mk (rest x) (dRest x))
+
+@[simp]
+theorem shape_mk : (spec : Spec.{u}) → (d : Decoration Γ spec) →
+    DecoratedSpec.shape (DecoratedSpec.mk spec d) = spec
+  | .done, _ => rfl
+  | .node X rest, ⟨_, dRest⟩ => by
+    change Spec.node X (fun x => DecoratedSpec.shape (DecoratedSpec.mk (rest x) (dRest x))) =
+      Spec.node X rest
+    exact congr_arg (Spec.node X) (funext fun x => shape_mk (rest x) (dRest x))
+
+theorem decoration_mk : (spec : Spec.{u}) → (d : Decoration Γ spec) →
+    DecoratedSpec.decoration (DecoratedSpec.mk spec d) ≍ d
+  | .done, ⟨⟩ => HEq.rfl
+  | .node X rest, ⟨γ, dRest⟩ => by
+    change ((γ, fun x => DecoratedSpec.decoration (DecoratedSpec.mk (rest x) (dRest x))) :
+        Γ X × (∀ x, Decoration Γ
+          (DecoratedSpec.shape (DecoratedSpec.mk (rest x) (dRest x))))) ≍
+      ((γ, dRest) : Γ X × (∀ x, Decoration Γ (rest x)))
+    refine prod_mk_heq ?_
+    refine Function.hfunext rfl ?_
+    intro x y hxy
+    cases hxy
+    exact decoration_mk (rest x) (dRest x)
+
+@[simp]
+theorem mk_shape_decoration : (ds : DecoratedSpec Γ) →
+    DecoratedSpec.mk (DecoratedSpec.shape ds) (DecoratedSpec.decoration ds) = ds
+  | .pure _ => rfl
+  | .roll ⟨X, γ⟩ rest => by
+    refine congr_arg (PFunctor.FreeM.roll (P := Γ.toPFunctor) ⟨X, γ⟩) ?_
+    funext x
+    exact mk_shape_decoration (rest x)
+
+end DecoratedSpec
+
+/-- The polynomial substrate equivalence: a `Γ`-decorated spec is the same
+data as a tree shape together with a `Γ`-decoration on it.
+
+This is the `Spec`-indexed fiberwise view of `DecoratedSpec Γ`. The forward
+direction takes `(shape, decoration)`; the backward direction is `mk`. -/
+def decoratedSpecEquiv {Γ : Node.Context.{u, v}} :
+    DecoratedSpec Γ ≃ Σ spec : Spec.{u}, Decoration Γ spec where
+  toFun ds := ⟨DecoratedSpec.shape ds, DecoratedSpec.decoration ds⟩
+  invFun p := DecoratedSpec.mk p.1 p.2
+  left_inv ds := DecoratedSpec.mk_shape_decoration ds
+  right_inv p :=
+    Sigma.ext (DecoratedSpec.shape_mk p.1 p.2) (DecoratedSpec.decoration_mk p.1 p.2)
 
 namespace Decoration
 namespace Schema

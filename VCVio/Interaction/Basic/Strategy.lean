@@ -58,9 +58,9 @@ def Strategy.mapOutput {m : Type u → Type u} [Functor m] :
 theorem Strategy.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor m] {spec : Spec}
     {A : Transcript spec → Type u} (σ : Strategy m spec A) :
     Strategy.mapOutput (fun _ x => x) σ = σ := by
-  cases spec with
+  induction spec with
   | done => rfl
-  | node X rest =>
+  | node X rest ih =>
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
@@ -69,7 +69,7 @@ theorem Strategy.mapOutput_id {m : Type u → Type u} [Functor m] [LawfulFunctor
             Strategy m (rest x) (fun p => A ⟨x, p⟩) → Strategy m (rest x) (fun p => A ⟨x, p⟩)) =
           id := by
       funext s
-      exact @mapOutput_id m _ _ (rest x) (fun p => A ⟨x, p⟩) s
+      exact ih x s
     rw [hid]
     exact LawfulFunctor.id_map cont
 
@@ -79,9 +79,9 @@ theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunct
     (σ : Strategy m spec A) :
     Strategy.mapOutput (fun tr x => g tr (f tr x)) σ =
       Strategy.mapOutput g (Strategy.mapOutput f σ) := by
-  cases spec with
+  induction spec with
   | done => rfl
-  | node X rest =>
+  | node X rest ih =>
     rcases σ with ⟨x, cont⟩
     simp only [Strategy.mapOutput]
     congr 1
@@ -93,9 +93,7 @@ theorem Strategy.mapOutput_comp {m : Type u → Type u} [Functor m] [LawfulFunct
             @mapOutput m _ (rest x) (fun p => A ⟨x, p⟩) (fun p => B ⟨x, p⟩)
               (fun p y => f ⟨x, p⟩ y)) := by
       funext s
-      exact
-        @mapOutput_comp m _ _ (rest x) (fun p => A ⟨x, p⟩) (fun p => B ⟨x, p⟩) (fun p => C ⟨x, p⟩)
-          (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
+      exact ih x (fun p y => g ⟨x, p⟩ y) (fun p y => f ⟨x, p⟩ y) s
     rw [hcomp, LawfulFunctor.comp_map]
 
 end Spec

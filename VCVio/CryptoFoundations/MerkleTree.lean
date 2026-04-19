@@ -219,7 +219,7 @@ theorem buildLayer_neverFails (α : Type _) [DecidableEq α]
     [SampleableType α] [(spec α).DecidableEq]
     (preexisting_cache : (spec α).QueryCache) (n : ℕ)
     (leaves : List.Vector α (2 ^ (n + 1))) : NeverFail
-      ((simulateQ (randomOracle (spec := spec α))
+      ((simulateQ (spec α).randomOracle
         (buildLayer α n leaves)).run preexisting_cache) := by
   grind only [buildLayer, = HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
 
@@ -232,7 +232,7 @@ theorem buildMerkleTree_neverFails (α : Type _) [DecidableEq α]
     [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
     (leaves : List.Vector α (2 ^ n)) (preexisting_cache : (spec α).QueryCache) :
     NeverFail
-      ((simulateQ (randomOracle (spec := spec α))
+      ((simulateQ (spec α).randomOracle
         (buildMerkleTree α n leaves)).run preexisting_cache) := by
   grind only [= HasEvalSPMF.neverFail_iff, = HasEvalPMF.probFailure_eq_zero]
 
@@ -425,7 +425,7 @@ theorem completeness [SampleableType α] {n : ℕ} [(spec α).DecidableEq]
     (leaves : List.Vector α (2 ^ n)) (i : Fin (2 ^ n))
     (preexisting_cache : (spec α).QueryCache) :
     NeverFail ((
-      simulateQ (randomOracle (spec := spec α)) (do
+      simulateQ (spec α).randomOracle (do
         let cache ← buildMerkleTree α n leaves
         let proof := generateProof α i cache
         let _ ← (verifyProof (m := OracleComp (spec α)) α i leaves[i]

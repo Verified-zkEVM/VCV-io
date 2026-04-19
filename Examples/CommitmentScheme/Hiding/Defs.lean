@@ -211,7 +211,7 @@ theorem hidingImplCountAll_proj_eq_cachingOracle
     (st : QueryCache (CMOracle M S C) × (S → ℕ)) :
     Prod.map id Prod.fst <$>
         (hidingImplCountAll (M := M) (S := S) (C := C) ms).run st =
-      (cachingOracle (spec := CMOracle M S C) ms).run st.1 := by
+      ((CMOracle M S C).cachingOracle ms).run st.1 := by
   rcases st with ⟨cache, counts⟩
   cases hcache : cache ms with
   | some u =>
@@ -324,7 +324,7 @@ lemma hiding_distinguish_totalBound_of_choose_support
     ∀ cm : C, IsTotalQueryBound (A.distinguish x.1.2 cm) (t - ∑ ms, x.2 ms) := by
   have hres :
       IsTotalQueryBound
-        ((liftM ((CMOracle M S C).query (x.1.1, s))) >>= fun cm =>
+        (((CMOracle M S C).query (x.1.1, s) : OracleComp (CMOracle M S C) _) >>= fun cm =>
           A.distinguish x.1.2 cm)
         ((t + 1) - ∑ ms, x.2 ms) := by
     simpa [hidingOa] using
@@ -332,7 +332,7 @@ lemma hiding_distinguish_totalBound_of_choose_support
         (spec := CMOracle M S C)
         (oa := A.choose)
         (ob := fun a =>
-          (liftM ((CMOracle M S C).query (a.1, s))) >>= fun cm =>
+          ((CMOracle M S C).query (a.1, s) : OracleComp (CMOracle M S C) _) >>= fun cm =>
             A.distinguish a.2 cm)
         (n := t + 1)
         (h := A.totalBound s)

@@ -157,6 +157,18 @@ lemma perfectHVZK_iff_hvzk_zero
         simpa using (tvDist_nonneg (σ.realTranscript x w) (simTranscript x)))
     simpa using (tvDist_eq_zero_iff (σ.realTranscript x w) (simTranscript x)).mp hzero
 
+open scoped ENNReal in
+/-- The simulator's commitment marginal has predictability at most `β`: no single
+commitment value is output with probability exceeding `β`. Equivalently, the commitment
+has min-entropy at least `-log₂ β`.
+
+This is a companion assumption to `HVZK` that bounds the collision probability of
+programmed cache entries in the Fiat-Shamir CMA-to-NMA reduction. For Schnorr,
+`β = 1/|G|` because the commitment `g^r` is uniform over the group. -/
+def simCommitPredictability
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (β : ℝ≥0∞) : Prop :=
+  ∀ x : Stmt, ∀ c₀ : Commit, probOutput (Prod.fst <$> simTranscript x) c₀ ≤ β
+
 end hvzk
 
 section uniqueResponses

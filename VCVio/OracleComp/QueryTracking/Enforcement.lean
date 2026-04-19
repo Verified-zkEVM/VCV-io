@@ -32,7 +32,7 @@ variable {ι : Type u} {spec : OracleSpec ι} {α : Type u}
 /-- Enforcement oracle: wraps the original oracle with a per-index budget tracked via `StateT`.
 When the remaining budget for the queried oracle is positive, the query is forwarded and
 the budget decremented. When the budget is exhausted, `default` is returned silently. -/
-def enforceOracle [DecidableEq ι] [spec.Inhabited] :
+def OracleSpec.enforceOracle [DecidableEq ι] [spec.Inhabited] :
     QueryImpl spec (StateT (ι → ℕ) (OracleComp spec)) :=
   fun t => StateT.mk fun budget =>
     if 0 < budget t then
@@ -46,7 +46,7 @@ variable [DecidableEq ι] [spec.Inhabited]
 
 @[simp]
 lemma run_apply (t : ι) (budget : ι → ℕ) :
-    (enforceOracle (spec := spec) t).run budget =
+    (spec.enforceOracle t).run budget =
       if 0 < budget t then
         (·, Function.update budget t (budget t - 1)) <$> liftM (query t)
       else
@@ -64,7 +64,7 @@ theorem fst_map_run_simulateQ
     rw [isPerIndexQueryBound_query_bind_iff] at h
     obtain ⟨hpos, hcont⟩ := h
     simp only [simulateQ_query_bind]
-    change Prod.fst <$> ((enforceOracle (spec := spec) t).run qb >>=
+    change Prod.fst <$> ((spec.enforceOracle t).run qb >>=
       fun p => (simulateQ enforceOracle (mx p.1)).run p.2) = liftM (query t) >>= mx
     rw [run_apply, if_pos hpos]
     simp only [map_eq_bind_pure_comp, Function.comp, bind_assoc, pure_bind]

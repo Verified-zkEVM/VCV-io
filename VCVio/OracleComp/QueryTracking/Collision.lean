@@ -127,7 +127,7 @@ theorem log_entry_in_cache_and_mono {α : Type}
     rw [StateT.run_bind] at hmem
     rw [support_bind] at hmem; simp only [Set.mem_iUnion] at hmem
     obtain ⟨⟨u, cache_mid⟩, hu_mem, hmem⟩ := hmem
-    have hu_mem' : (u, cache_mid) ∈ support ((cachingOracle (spec := spec) t).run cache₀) := by
+    have hu_mem' : (u, cache_mid) ∈ support ((spec.cachingOracle t).run cache₀) := by
       simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem ⊢
       exact hu_mem
     have hcache_mid_entry : cache_mid t = some u := by
@@ -249,7 +249,7 @@ theorem cache_entry_in_log_or_initial {α : Type}
         subst h1; rw [h2]
         exact QueryCache.cacheQuery_self w.2 t w.1
     have hcache₀_le_mid : cache₀ ≤ cache_mid := by
-      have hu_mem' : (u, cache_mid) ∈ support ((cachingOracle (spec := spec) t).run cache₀) := by
+      have hu_mem' : (u, cache_mid) ∈ support ((spec.cachingOracle t).run cache₀) := by
         simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem ⊢
         exact hu_mem
       unfold cachingOracle at hu_mem'
@@ -274,7 +274,7 @@ theorem cache_entry_in_log_or_initial {α : Type}
     rw [hz]
     have hcache_mid_eq : ∀ t₀ : spec.Domain, t₀ ≠ t → cache_mid t₀ = cache₀ t₀ := by
       intro t₀ hne
-      have hu_mem' : (u, cache_mid) ∈ support ((cachingOracle (spec := spec) t).run cache₀) := by
+      have hu_mem' : (u, cache_mid) ∈ support ((spec.cachingOracle t).run cache₀) := by
         simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem ⊢
         exact hu_mem
       simp only [cachingOracle.apply_eq, StateT.run_bind, StateT.run_get, pure_bind] at hu_mem'

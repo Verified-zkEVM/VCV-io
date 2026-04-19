@@ -94,6 +94,27 @@ specializations.
 def Context.empty : Context := fun _ => PUnit
 
 /--
+The polynomial functor whose free monad realizes `Γ`-decorated specs.
+
+Positions are `Σ X : Type u, Γ X`: each node records both its move space
+`X` and a `Γ`-value at that node. The child family is `Sigma.fst`, so a
+continuation at position `⟨X, _⟩` is indexed by `X` itself, exactly as in
+`Spec.basePFunctor`. The forgetful projection `Sigma.fst : Σ X, Γ X → Type u`
+on positions (combined with the identity on children) is a `PFunctor.Lens`
+from `Γ.toPFunctor` to `Spec.basePFunctor`; its lift to free monads is the
+shape-forgetful map `DecoratedSpec.shape` in `Basic/Decoration.lean`.
+
+This is the polynomial substrate that justifies the `Spec`-indexed
+recursion of `Spec.Decoration`: a decorated spec is a free term of this
+polynomial, and the existing `Decoration Γ spec` is exactly its fiber
+over the underlying `spec : Spec`.
+-/
+@[reducible]
+def Context.toPFunctor (Γ : Context.{u, v}) : PFunctor.{max (u+1) v, u} where
+  A := Σ X : Type u, Γ X
+  B := Sigma.fst
+
+/--
 Extend a realized node context by one dependent field.
 
 If `Γ` is the current context and `A X γ` is a new field whose type may depend
