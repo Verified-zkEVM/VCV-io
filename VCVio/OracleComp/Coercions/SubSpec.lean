@@ -68,7 +68,7 @@ distribution is preserved under the mapping. -/
 class LawfulSubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     [h : SubSpec spec superSpec] : Prop where
   cont_bijective (t : spec.Domain) :
-    Function.Bijective (h.toMonadLift.monadLift (query (spec := spec) t)).snd
+    Function.Bijective (h.toMonadLift.monadLift (spec.query t)).snd
 
 namespace LawfulSubSpec
 
@@ -78,8 +78,8 @@ variable {ι : Type u} {τ : Type v} {spec : OracleSpec ι} {superSpec : OracleS
 lemma evalDist_liftM_query [superSpec.Fintype] [superSpec.Inhabited]
     [spec.Fintype] [spec.Inhabited] (t : spec.Domain) :
     (PMF.uniformOfFintype (superSpec.Range
-      (h.toMonadLift.monadLift (query (spec := spec) t)).fst)).map
-      (h.toMonadLift.monadLift (query (spec := spec) t)).snd =
+      (h.toMonadLift.monadLift (spec.query t)).fst)).map
+      (h.toMonadLift.monadLift (spec.query t)).snd =
       PMF.uniformOfFintype (spec.Range t) :=
   PMF.uniformOfFintype_map_of_bijective _ (cont_bijective t)
 
@@ -97,14 +97,14 @@ Usually `liftM` should be preferred but this can allow more explicit annotation.
 def liftComp (mx : OracleComp spec α) (superSpec : OracleSpec τ)
     [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)] :
     OracleComp superSpec α :=
-    simulateQ (fun t => liftM (query (spec := spec) t)) mx
+    simulateQ (fun t => liftM (spec.query t)) mx
 
 variable (superSpec : OracleSpec τ)
     [h : MonadLiftT (OracleQuery spec) (OracleQuery superSpec)]
 
 @[grind =, aesop unsafe norm]
 lemma liftComp_def (mx : OracleComp spec α) : liftComp mx superSpec =
-    simulateQ (fun t => liftM (query (spec := spec) t)) mx := rfl
+    simulateQ (fun t => liftM (spec.query t)) mx := rfl
 
 @[simp]
 lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec = pure x := rfl
@@ -112,7 +112,7 @@ lemma liftComp_pure (x : α) : liftComp (pure x : OracleComp spec α) superSpec 
 @[simp]
 lemma liftComp_query (q : OracleQuery spec α) :
     liftComp (q : OracleComp spec _) superSpec =
-      q.cont <$> (liftM (query (spec := spec) q.input) : OracleComp superSpec _) := by
+      q.cont <$> (liftM (spec.query q.input) : OracleComp superSpec _) := by
   simp [liftComp]
 
 @[simp]

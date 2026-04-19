@@ -51,12 +51,12 @@ section uniformFin
 /-- `$[0..n]` is the computation choosing a random value in the given range, inclusively.
 By making this range inclusive we avoid the case of choosing from the empty range. -/
 def uniformFin (n : ℕ) : ProbComp (Fin (n + 1)) :=
-  query (spec := unifSpec) n
+  unifSpec.query n
 
 notation "$[0.." n "]" => uniformFin n
 
 @[grind =]
-lemma uniformFin_def (n : ℕ) : $[0..n] = query (spec := unifSpec) n := rfl
+lemma uniformFin_def (n : ℕ) : $[0..n] = unifSpec.query n := rfl
 
 @[simp]
 lemma support_uniformFin (n : ℕ) :

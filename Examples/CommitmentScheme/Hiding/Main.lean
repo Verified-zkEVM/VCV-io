@@ -69,14 +69,14 @@ theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
           (hidingMixedSim (M := M) (S := S) (C := C) A) ≤
         ∑' s : S,
           Pr[= s |
-              (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+              ((HidingAvgSpec M S C).query (Sum.inl ()) :
                 OracleComp (HidingAvgSpec M S C) S)].toReal *
             tvDist
               (OracleComp.liftComp (hidingReal A s) (HidingAvgSpec M S C))
               (OracleComp.liftComp (hidingSim A s) (HidingAvgSpec M S C)) := by
     simpa [hidingMixedReal, hidingMixedSim] using
       (_root_.tvDist_bind_left_le
-        (mx := (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+        (mx := ((HidingAvgSpec M S C).query (Sum.inl ()) :
           OracleComp (HidingAvgSpec M S C) S))
         (f := fun s => OracleComp.liftComp (hidingReal A s) (HidingAvgSpec M S C))
         (g := fun s => OracleComp.liftComp (hidingSim A s) (HidingAvgSpec M S C)))
@@ -84,14 +84,14 @@ theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
   calc
     ∑' s : S,
         Pr[= s |
-            (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+            ((HidingAvgSpec M S C).query (Sum.inl ()) :
               OracleComp (HidingAvgSpec M S C) S)].toReal *
           tvDist
             (OracleComp.liftComp (hidingReal A s) (HidingAvgSpec M S C))
             (OracleComp.liftComp (hidingSim A s) (HidingAvgSpec M S C))
       = ∑' s : S,
           Pr[= s |
-              (query (spec := HidingAvgSpec M S C) (Sum.inl ()) :
+              ((HidingAvgSpec M S C).query (Sum.inl ()) :
                 OracleComp (HidingAvgSpec M S C) S)].toReal *
             tvDist (hidingReal A s) (hidingSim A s) := by
             refine tsum_congr fun s => ?_

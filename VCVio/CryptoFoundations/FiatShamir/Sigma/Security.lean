@@ -151,7 +151,7 @@ theorem euf_cma_to_nma
             OracleComp.liftM_run_StateT] using
             (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
               (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (query (spec := spec) (.inl n))) 0 by
+                (oa := liftM (spec.query (.inl n))) 0 by
                   exact
                     (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
                       (.inl n) 0).2 trivial)
@@ -164,7 +164,7 @@ theorem euf_cma_to_nma
             OracleComp.liftM_run_StateT] using
             (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
               (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (query (spec := spec) (.inr mc))) 1 by
+                (oa := liftM (spec.query (.inr mc))) 1 by
                   exact
                     (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
                       (.inr mc) 1).2 (Nat.succ_pos 0))

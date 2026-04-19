@@ -178,7 +178,7 @@ the real and random DDH games. -/
 private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G) :
     Pr[= true | ddhExp g adversary] =
     Pr[= true | do
-      let bit ← ($ᵗ Bool : ProbComp Bool)
+      let bit ← ($ᵗ Bool)
       let z ← if bit then ddhExpReal g adversary
                else ddhExpRand g adversary
       pure (bit == z)] := by
@@ -198,7 +198,7 @@ lemma ddhExp_probOutput_sub_half (g : G) (adversary : DDHAdversary F G) :
       (Pr[= true | ddhExpRand g adversary]).toReal) / 2 := by
   rw [show (Pr[= true | ddhExp g adversary]).toReal =
       (Pr[= true | do
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let z ← if bit then ddhExpReal g adversary
                  else ddhExpRand g adversary
         pure (bit == z)]).toReal from by
@@ -234,7 +234,7 @@ theorem probOutput_ddhExpReal_cdhToDDHReduction_eq_cdhExp
 
 private lemma probOutput_decide_smul_eq_inv_card
     [Fintype F] (g : G) (hg : Function.Bijective (· • g : F → G)) (h : G) :
-    Pr[= true | ($ᵗ F : ProbComp F) >>= fun c => pure (decide (h = c • g))] =
+    Pr[= true | ($ᵗ F) >>= fun c => pure (decide (h = c • g))] =
       (Fintype.card F : ℝ≥0∞)⁻¹ := by
   obtain ⟨c₀, hc₀⟩ := hg.surjective h
   rw [probOutput_bind_eq_tsum]
@@ -255,7 +255,7 @@ theorem probOutput_ddhExpRand_cdhToDDHReduction_eq_uniformScalar
       (Fintype.card F : ℝ≥0∞)⁻¹ := by
   simp only [ddhExpRand, cdhToDDHReduction]
   have key : ∀ a b : F,
-      Pr[= true | ($ᵗ F : ProbComp F) >>= fun c =>
+      Pr[= true | ($ᵗ F) >>= fun c =>
         adversary g (a • g) (b • g) >>= fun h =>
           pure (decide (h = c • g))] =
         (Fintype.card F : ℝ≥0∞)⁻¹ := by

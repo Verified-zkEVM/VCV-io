@@ -42,7 +42,7 @@ probability at most `delta`. -/
 def deltaCorrect (delta : ℝ≥0∞) : Prop :=
   ∀ msg : M, Pr[= false | do
     let (pk, sk) ← pke.keygen
-    let r ← ($ᵗ R : ProbComp R)
+    let r ← ($ᵗ R)
     let c := pke.encrypt pk msg r
     let msg' := pke.decrypt sk c
     pure (decide (msg' = some msg))] ≤ delta
@@ -53,7 +53,7 @@ end Correct
 key and plaintext. -/
 def gammaSpread [SampleableType R] [DecidableEq C] (gamma : ℝ≥0∞) : Prop :=
   ∀ pk msg c, Pr[= c | do
-    let r ← ($ᵗ R : ProbComp R)
+    let r ← ($ᵗ R)
     pure (pke.encrypt pk msg r)] ≤ gamma
 
 section OW_CPA
@@ -76,7 +76,7 @@ abbrev OW_CPA_Adversary := PK → C → OracleComp pke.OW_CPA_oracleSpec M
 /-- Implementation of the OW-CPA encryption oracle. -/
 def OW_CPA_queryImpl (pk : PK) : QueryImpl pke.OW_CPA_oracleSpec ProbComp :=
   (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)) + fun msg => do
-    let r ← ($ᵗ R : ProbComp R)
+    let r ← ($ᵗ R)
     pure (pke.encrypt pk msg r)
 
 /-- Main one-way under chosen-plaintext attack (OW-CPA) experiment.
@@ -88,7 +88,7 @@ challenge message. -/
 def OW_CPA_Game (adversary : pke.OW_CPA_Adversary) : ProbComp Bool := do
   let (pk, _sk) ← pke.keygen
   let msg ← $ᵗ M
-  let r ← ($ᵗ R : ProbComp R)
+  let r ← ($ᵗ R)
   let c := pke.encrypt pk msg r
   let msg' ← simulateQ (pke.OW_CPA_queryImpl pk) (adversary pk c)
   return decide (msg' = msg)

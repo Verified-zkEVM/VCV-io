@@ -394,7 +394,7 @@ theorem IND_CPA_countedGame_eq_game_of_MakesAtMostQueries
     (adversary : encAlg'.IND_CPA_adversary) (q : ℕ)
     (hq : adversary.MakesAtMostQueries q) :
     (Pr[= true | do
-      let b ← ($ᵗ Bool : ProbComp Bool)
+      let b ← ($ᵗ Bool)
       let (pk, _sk) ← encAlg'.keygen
       let b' ← (simulateQ (implCounted pk b q) (adversary pk)).run' (∅, 0)
       pure (b == b')]).toReal =
@@ -510,7 +510,7 @@ private lemma IND_CPA_experiment_probOutput_eq_branch
     (adversary : encAlg'.IND_CPA_adversary) :
     Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary] =
       Pr[= true | do
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let z ← if bit then encAlg'.IND_CPA_LR_experiment adversary true
                  else encAlg'.IND_CPA_LR_experiment adversary false
         pure (bit == z)] := by
@@ -532,7 +532,7 @@ theorem IND_CPA_signedAdvantageReal_eq_lrDiff_half
   unfold IND_CPA_signedAdvantageReal
   rw [show (Pr[= true | IND_CPA_experiment (encAlg := encAlg') adversary]).toReal =
       (Pr[= true | do
-        let bit ← ($ᵗ Bool : ProbComp Bool)
+        let bit ← ($ᵗ Bool)
         let z ← if bit then encAlg'.IND_CPA_LR_experiment adversary true
                  else encAlg'.IND_CPA_LR_experiment adversary false
         pure (bit == z)]).toReal from by

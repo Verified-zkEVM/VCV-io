@@ -51,7 +51,7 @@ abbrev PRFAdversary (D R : Type) := OracleComp (PRFOracleSpec D R) Bool
 
 /-- A PRF has uniform key generation when its keygen algorithm is exactly uniform sampling. -/
 def UniformKey [SampleableType K] (prf : PRFScheme K D R) : Prop :=
-  prf.keygen = ($ᵗ K : ProbComp K)
+  prf.keygen = ($ᵗ K)
 
 /-- Query implementation for the real PRF experiment. Uniform-sampling queries are handled
 by the ambient `unifSpec`; function queries are answered by `prf.eval k`. -/

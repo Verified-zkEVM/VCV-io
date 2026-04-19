@@ -60,7 +60,7 @@ omit [Fintype F] [DecidableEq F] [SampleableType G] in
 theorem correct : (pedersenCommit (F := F) g).PerfectlyCorrect := by
   intro pp _hpp m cd hmem
   have hmem' : cd ∈ support (do
-      let d ← ($ᵗ F : ProbComp F); pure ((d : F) • g + m • pp, d)) := hmem
+      let d ← ($ᵗ F); pure ((d : F) • g + m • pp, d)) := hmem
   simp only [support_bind, support_pure, Set.mem_iUnion,
              Set.mem_singleton_iff] at hmem'
   obtain ⟨d', -, rfl, rfl⟩ := hmem'
@@ -83,7 +83,7 @@ omit [Fintype F] [DecidableEq F] [SampleableType G] in
 /-- Rewrite the commitment distribution as a mapped uniform sample. -/
 private lemma commit_fst_eq_map (pp : G) (m : F) :
     Prod.fst <$> (pedersenCommit (F := F) g).commit pp m =
-    (fun d : F => d • g + m • pp) <$> ($ᵗ F : ProbComp F) := by
+    (fun d : F => d • g + m • pp) <$> ($ᵗ F) := by
   simp [pedersenCommit]
 
 omit [Fintype F] [DecidableEq F] in

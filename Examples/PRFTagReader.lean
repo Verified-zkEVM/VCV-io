@@ -191,7 +191,7 @@ def authTagQueryImpl (hash : TagId → Nonce → Digest) :
     QueryImpl (TagId →ₒ TagTranscript Nonce Digest)
       (StateT (AuthState TagId Nonce Digest) ProbComp) := fun tag => do
         let st ← get
-        let nonce ← liftM ($ᵗ Nonce : ProbComp Nonce)
+        let nonce ← ($ᵗ Nonce : ProbComp Nonce)
         let auth := hash tag nonce
         let transcript : TagTranscript Nonce Digest := ⟨nonce, auth⟩
         set
@@ -245,13 +245,13 @@ def authIdealTagQueryImpl :
     QueryImpl (TagId →ₒ TagTranscript Nonce Digest)
       (StateT (AuthIdealState TagId Nonce Digest) ProbComp) := fun tag => do
         let st ← get
-        let nonce ← liftM ($ᵗ Nonce : ProbComp Nonce)
+        let nonce ← ($ᵗ Nonce : ProbComp Nonce)
         let key := (tag, nonce)
         let (auth, responses) ←
           match st.responses key with
           | some out => pure (out, st.responses)
           | none => do
-              let out ← liftM ($ᵗ Digest : ProbComp Digest)
+              let out ← ($ᵗ Digest : ProbComp Digest)
               pure (out, st.responses.cacheQuery key out)
         let transcript : TagTranscript Nonce Digest := ⟨nonce, auth⟩
         set
@@ -327,7 +327,7 @@ def unlinkTagQueryImpl (hash : Slot → Nonce → Digest)
         let st ← get
         if h : st.sessionsUsed tag < sessionsPerTag then
           let sid : Fin sessionsPerTag := ⟨st.sessionsUsed tag, h⟩
-          let nonce ← liftM ($ᵗ Nonce : ProbComp Nonce)
+          let nonce ← ($ᵗ Nonce : ProbComp Nonce)
           let auth := hash (pattern.slot tag sid) nonce
           let transcript : TagTranscript Nonce Digest := ⟨nonce, auth⟩
           set
@@ -418,8 +418,8 @@ def unlinkBadTagQueryImpl :
       (StateT (UnlinkBadState TagId Nonce Digest) ProbComp) := fun tag => do
         let st ← get
         if _h : st.sessionsUsed tag < sessionsPerTag then
-          let nonce ← liftM ($ᵗ Nonce : ProbComp Nonce)
-          let auth ← liftM ($ᵗ Digest : ProbComp Digest)
+          let nonce ← ($ᵗ Nonce : ProbComp Nonce)
+          let auth ← ($ᵗ Digest : ProbComp Digest)
           let outputs := auth :: Option.getD (st.responses (tag, nonce)) []
           let bad := st.bad || (st.responses (tag, nonce)).isSome
           let transcript : TagTranscript Nonce Digest := ⟨nonce, auth⟩
@@ -634,7 +634,7 @@ theorem unlinkBadExp_le_sessionCollisionBound
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ)
     (hmax : ∀ nonce : Nonce,
-      (Pr[= nonce | ($ᵗ Nonce : ProbComp Nonce)]).toReal ≤ maxNonceProb) :
+      (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ maxNonceProb) :
     (Pr[= true | unlinkBadExp (TagId := TagId) (Nonce := Nonce)
       (Digest := Digest) (sessionsPerTag := sessionsPerTag) adversary]).toReal ≤
       ((sessionsPerTag ^ 2 * Fintype.card TagId : ℕ) : ℝ) * maxNonceProb := by
@@ -646,7 +646,7 @@ theorem unlinkabilityAdvantage_le_two_prf_plus_sessionCollisionBound
     (adversary : UnlinkAdversary TagId Nonce Digest)
     (maxNonceProb : ℝ)
     (hmax : ∀ nonce : Nonce,
-      (Pr[= nonce | ($ᵗ Nonce : ProbComp Nonce)]).toReal ≤ maxNonceProb) :
+      (Pr[= nonce | ($ᵗ Nonce)]).toReal ≤ maxNonceProb) :
     ∃ multiAdv : PRFScheme.PRFAdversary (TagId × Nonce) Digest,
       ∃ singleAdv : PRFScheme.PRFAdversary ((TagId × Fin sessionsPerTag) × Nonce) Digest,
         unlinkabilityAdvantage (TagId := TagId) (Nonce := Nonce) (Digest := Digest)

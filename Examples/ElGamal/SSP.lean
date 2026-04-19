@@ -113,16 +113,16 @@ noncomputable def dhTripleReal (gen : G) :
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
-            let a ← ($ᵗ F : ProbComp F)
+            let a ← ($ᵗ F)
             pure (a • gen, some a)
         | some a => pure (a • gen, some a)
     | Sum.inr _ => fun st => match st with
         | none => do
-            let a ← ($ᵗ F : ProbComp F)
-            let b ← ($ᵗ F : ProbComp F)
+            let a ← ($ᵗ F)
+            let b ← ($ᵗ F)
             pure ((b • gen, (a * b) • gen), some a)
         | some a => do
-            let b ← ($ᵗ F : ProbComp F)
+            let b ← ($ᵗ F)
             pure ((b • gen, (a * b) • gen), some a)
 
 /-- The "random" DDH package (multi-query, shared-`a`). Identical to `dhTripleReal` except
@@ -133,18 +133,18 @@ noncomputable def dhTripleRand (gen : G) :
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
-            let a ← ($ᵗ F : ProbComp F)
+            let a ← ($ᵗ F)
             pure (a • gen, some a)
         | some a => pure (a • gen, some a)
     | Sum.inr _ => fun st => match st with
         | none => do
-            let a ← ($ᵗ F : ProbComp F)
-            let b ← ($ᵗ F : ProbComp F)
-            let c ← ($ᵗ F : ProbComp F)
+            let a ← ($ᵗ F)
+            let b ← ($ᵗ F)
+            let c ← ($ᵗ F)
             pure ((b • gen, c • gen), some a)
         | some a => do
-            let b ← ($ᵗ F : ProbComp F)
-            let c ← ($ᵗ F : ProbComp F)
+            let b ← ($ᵗ F)
+            let c ← ($ᵗ F)
             pure ((b • gen, c • gen), some a)
 
 /-! ### ElGamal LR-style games -/
@@ -164,16 +164,16 @@ noncomputable def elgamalLR_left (gen : G) :
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
-            let sk ← ($ᵗ F : ProbComp F)
+            let sk ← ($ᵗ F)
             pure (sk • gen, some sk)
         | some sk => pure (sk • gen, some sk)
     | Sum.inr (m₀, _) => fun st => match st with
         | none => do
-            let sk ← ($ᵗ F : ProbComp F)
-            let r ← ($ᵗ F : ProbComp F)
+            let sk ← ($ᵗ F)
+            let r ← ($ᵗ F)
             pure ((r • gen, (sk * r) • gen + m₀), some sk)
         | some sk => do
-            let r ← ($ᵗ F : ProbComp F)
+            let r ← ($ᵗ F)
             pure ((r • gen, (sk * r) • gen + m₀), some sk)
 
 /-- The "right-message" ElGamal LR game. Same as `elgamalLR_left` except `LR (_, m₁)` returns
@@ -184,16 +184,16 @@ noncomputable def elgamalLR_right (gen : G) :
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
-            let sk ← ($ᵗ F : ProbComp F)
+            let sk ← ($ᵗ F)
             pure (sk • gen, some sk)
         | some sk => pure (sk • gen, some sk)
     | Sum.inr (_, m₁) => fun st => match st with
         | none => do
-            let sk ← ($ᵗ F : ProbComp F)
-            let r ← ($ᵗ F : ProbComp F)
+            let sk ← ($ᵗ F)
+            let r ← ($ᵗ F)
             pure ((r • gen, (sk * r) • gen + m₁), some sk)
         | some sk => do
-            let r ← ($ᵗ F : ProbComp F)
+            let r ← ($ᵗ F)
             pure ((r • gen, (sk * r) • gen + m₁), some sk)
 
 /-! ### DDH-to-LR reductions -/
@@ -203,17 +203,17 @@ to `GETPK` on `dh`, and forwards `LR (m₀, _)` to `DHCHALLENGE` on `dh`, return
 `(B, T + m₀)` from the DDH challenge `(B, T)`. -/
 def dhToLR_leftHandler {G : Type} [Add G] :
     QueryImpl (lrSpec G) (OracleComp (dhSpec G))
-  | Sum.inl _ => (query (spec := dhSpec G) (Sum.inl ()) : OracleComp (dhSpec G) G)
+  | Sum.inl _ => ((dhSpec G).query (Sum.inl ()) : OracleComp (dhSpec G) G)
   | Sum.inr (m₀, _) => do
-      let bt ← (query (spec := dhSpec G) (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
+      let bt ← ((dhSpec G).query (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
       pure (bt.1, bt.2 + m₀)
 
 /-- Stateless reduction handler encrypting the *right* message. -/
 def dhToLR_rightHandler {G : Type} [Add G] :
     QueryImpl (lrSpec G) (OracleComp (dhSpec G))
-  | Sum.inl _ => (query (spec := dhSpec G) (Sum.inl ()) : OracleComp (dhSpec G) G)
+  | Sum.inl _ => ((dhSpec G).query (Sum.inl ()) : OracleComp (dhSpec G) G)
   | Sum.inr (_, m₁) => do
-      let bt ← (query (spec := dhSpec G) (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
+      let bt ← ((dhSpec G).query (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
       pure (bt.1, bt.2 + m₁)
 
 /-- DDH-to-LR reduction encrypting the left message, packaged as a stateless `Package`. -/
@@ -401,14 +401,14 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     | none =>
         simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
         change evalDist (do
-              let a ← ($ᵗ F : ProbComp F)
-              let b ← ($ᵗ F : ProbComp F)
-              let c ← ($ᵗ F : ProbComp F)
+              let a ← ($ᵗ F)
+              let b ← ($ᵗ F)
+              let c ← ($ᵗ F)
               pure ((b • gen, c • gen + m₀), some a)) =
           evalDist (do
-              let a ← ($ᵗ F : ProbComp F)
-              let b ← ($ᵗ F : ProbComp F)
-              let c ← ($ᵗ F : ProbComp F)
+              let a ← ($ᵗ F)
+              let b ← ($ᵗ F)
+              let c ← ($ᵗ F)
               pure ((b • gen, c • gen + m₁), some a))
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
@@ -422,12 +422,12 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     | some a =>
         simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
         change evalDist (do
-              let b ← ($ᵗ F : ProbComp F)
-              let c ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ F)
+              let c ← ($ᵗ F)
               pure ((b • gen, c • gen + m₀), some a)) =
           evalDist (do
-              let b ← ($ᵗ F : ProbComp F)
-              let c ← ($ᵗ F : ProbComp F)
+              let b ← ($ᵗ F)
+              let c ← ($ᵗ F)
               pure ((b • gen, c • gen + m₁), some a))
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
