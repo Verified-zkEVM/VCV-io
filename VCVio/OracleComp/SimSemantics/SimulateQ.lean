@@ -80,6 +80,16 @@ lemma simulateQ_ite (p : Prop) [Decidable p] (mx mx' : OracleComp spec α) :
     simulateQ impl (ite p mx mx') = ite p (simulateQ impl mx) (simulateQ impl mx') := by
   split_ifs <;> rfl
 
+@[simp]
+lemma simulateQ_liftTarget {m : Type u → Type v} {n : Type u → Type w}
+    [Monad m] [LawfulMonad m] [Monad n] [LawfulMonad n]
+    [MonadLiftT m n] [LawfulMonadLiftT m n]
+    (impl : QueryImpl spec m) (comp : OracleComp spec α) :
+    simulateQ (impl.liftTarget n) comp = liftM (simulateQ impl comp) := by
+  induction comp using OracleComp.inductionOn with
+  | pure x => simp [liftM_pure]
+  | query_bind t k ih => simp [ih, liftM_bind]
+
 end simulateQ
 
 variable {ι} {spec : OracleSpec ι} {n : Type u → Type v}
