@@ -55,7 +55,7 @@ private def IND_CPA_stepPrefix
             match st.1 mm with
             | some c => rec c
             | none =>
-                if hlt : st.2 < k then
+                if st.2 < k then
                   let c ← encAlg'.encrypt pk mm.1
                   let cache' := st.1.cacheQuery mm c
                   set (cache', st.2 + 1)
