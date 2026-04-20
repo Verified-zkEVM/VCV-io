@@ -104,7 +104,7 @@ end
 
 end extractor
 
-omit [DecidableEq F] [Fintype F] in
+omit [Fintype F] in
 /-- Completeness of the Schnorr signature follows from completeness of the
 underlying Schnorr Σ-protocol via the generic Fiat-Shamir completeness theorem. -/
 theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G))

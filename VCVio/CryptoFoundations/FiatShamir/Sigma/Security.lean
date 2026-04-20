@@ -388,24 +388,20 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
         rw [evalDist_uniformSample, evalDist_query]; rfl
       exact heq ▸ rfl
 
-/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
-private lemma probEvent_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
-    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
-  simp only [probEvent_eq_tsum_indicator]
-  refine tsum_congr fun x => ?_
-  unfold Set.indicator
-  split_ifs with hpx
-  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
-  · rfl
-
 /-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
 private lemma probOutput_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
     Pr[= x | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
       (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+
+/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probEvent_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
+    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  simp_rw [probEvent_eq_tsum_indicator, Set.indicator,
+    probOutput_simulateQ_unifChalImpl]
 
 end evalDistBridge
 section jensenIntegration

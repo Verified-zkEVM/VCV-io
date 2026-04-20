@@ -529,10 +529,7 @@ private lemma probOutput_collision_le_main_div (s : Fin (qb i + 1)) :
           Pr[= (some s : Option (Fin (qb i + 1))) |
             cf <$> (simulateQ seededOracle main).run' seed]) /
           ↑(Fintype.card (spec.Range i)) := by
-    simp_rw [div_eq_mul_inv]
-    rw [← ENNReal.tsum_mul_right]
-    refine tsum_congr fun seed => ?_
-    rw [mul_assoc]
+    simp_rw [div_eq_mul_inv, ← mul_assoc, ENNReal.tsum_mul_right]
   have hStep3 :
       (∑' seed : QuerySeed spec,
         Pr[= seed | liftComp (generateSeed spec qb js) spec] *

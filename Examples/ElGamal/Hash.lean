@@ -432,16 +432,7 @@ theorem esIdeal_eq_half
       simp_rw [hbool]
       have hsum : ∑' x : HK, Pr[= x | ($ᵗ HK)] = 1 :=
         HasEvalPMF.tsum_probOutput_eq_one ($ᵗ HK)
-      calc
-        ∑' x, Pr[= x | ($ᵗ HK)] * (1 / 2 : ℝ≥0∞) =
-            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ HK)] := by
-              refine tsum_congr ?_
-              intro x
-              rw [mul_comm]
-        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ HK)] := by
-              rw [ENNReal.tsum_mul_left]
-        _ = (1 / 2 : ℝ≥0∞) * 1 := by rw [hsum]
-        _ = 1 / 2 := by simp
+      rw [ENNReal.tsum_mul_right, hsum, one_mul]
 
 /-! ## Main theorem -/
 

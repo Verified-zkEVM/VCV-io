@@ -284,16 +284,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
       simp_rw [hbool]
       have hsum : ∑' x : G, Pr[= x | ($ᵗ G)] = 1 :=
         HasEvalPMF.tsum_probOutput_eq_one ($ᵗ G)
-      calc
-        ∑' x, Pr[= x | ($ᵗ G)] * (1 / 2 : ℝ≥0∞) =
-            ∑' x, (1 / 2 : ℝ≥0∞) * Pr[= x | ($ᵗ G)] := by
-              refine tsum_congr ?_
-              intro x
-              rw [mul_comm]
-        _ = (1 / 2 : ℝ≥0∞) * ∑' x, Pr[= x | ($ᵗ G)] := by
-              rw [ENNReal.tsum_mul_left]
-        _ = (1 / 2 : ℝ≥0∞) * 1 := by rw [hsum]
-        _ = 1 / 2 := by simp
+      rw [ENNReal.tsum_mul_right, hsum, one_mul]
 
 omit [DecidableEq G] in
 /-- The absolute one-time signed IND-CPA advantage of ElGamal is exactly twice the DDH guess
