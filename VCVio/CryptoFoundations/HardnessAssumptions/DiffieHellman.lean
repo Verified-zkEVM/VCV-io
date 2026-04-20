@@ -324,11 +324,7 @@ variable (g : G)
 def dlogGenerable :
     GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
   gen := do let sk ← $ᵗ F; return (sk • g, sk)
-  gen_sound := fun pk sk hmem => by
-    rw [decide_eq_true_eq]
-    simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
-               Prod.mk.injEq] at hmem
-    obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
+  gen_sound := fun _ _ _ => by grind
 
 end DLogGenerable
 

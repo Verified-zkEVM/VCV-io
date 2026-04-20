@@ -235,10 +235,8 @@ lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : Oracle
 lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple oa ob (EqRel α)) (x : α) : Pr[= x | oa] = Pr[= x | ob] := by
   rcases (relTriple_iff_relWP (oa := oa) (ob := ob) (R := EqRel α)).1 h with ⟨c, hc⟩
-  have hfst : Pr[= x | Prod.fst <$> c.1] = Pr[= x | oa] := by
-    simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_fst
-  have hsnd : Pr[= x | Prod.snd <$> c.1] = Pr[= x | ob] := by
-    simpa [probOutput_def] using congrArg (fun p : SPMF α => p x) c.2.map_snd
+  have hfst : Pr[= x | Prod.fst <$> c.1] = Pr[= x | oa] := by grind [c.2.map_fst]
+  have hsnd : Pr[= x | Prod.snd <$> c.1] = Pr[= x | ob] := by grind [c.2.map_snd]
   have hevent : Pr[ (fun z : α × α => z.1 = x) | c.1] = Pr[ (fun z : α × α => z.2 = x) | c.1] := by
     refine probEvent_ext (mx := c.1) fun z hz => ?_
     have hzEq : z.1 = z.2 := hc z hz; grind

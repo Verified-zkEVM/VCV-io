@@ -81,7 +81,7 @@ theorem idsWithAbort_complete' :
     (identificationScheme p prims nttOps).Complete := by
   classical
   intro pk sk hvalid
-  rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
+  rw [probOutput_eq_one_iff_forall]
   refine ⟨HasEvalPMF.probFailure_eq_zero _, ?_⟩
   intro b hb
   rw [support_bind] at hb
