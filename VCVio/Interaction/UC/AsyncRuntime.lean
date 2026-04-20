@@ -235,6 +235,42 @@ noncomputable def runStepsAsync
         procScheduler envScheduler n st'
       pure (final, event :: tail)
 
+/--
+Under the empty env alphabet (`EnvAction.empty Unit`) and the trivial env
+scheduler (always `processTick`), `runStepsAsync` reduces to
+`ProcessOver.runSteps` with the env state pinned to `()` and a constant
+`processTick` trace.
+
+This is the operational core of the sync-recovery story: it factors the
+async engine into the synchronous `ProcessOver.runSteps` plus a trivial
+trace bookkeeping pass, and is reused by
+`UC.processSemantics_eq_processSemanticsAsync_trivial`.
+-/
+theorem runStepsAsync_empty_trivial_eq
+    {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
+    {Γ : Spec.Node.Context}
+    (process : ProcessOver Γ)
+    (sampler : (s : process.Proc) → Spec.Sampler m (process.step s).spec)
+    (fuel : ℕ) (s : process.Proc) :
+    runStepsAsync (m := m) process (Interaction.UC.EnvAction.empty Unit)
+        (fun st => sampler st.proc)
+        (Interaction.UC.trivialEnvScheduler (m := m) Unit Empty)
+        fuel
+        (⟨s, ()⟩ : Interaction.UC.AsyncRuntimeState process.Proc Unit) =
+      (do
+        let s' ← ProcessOver.runSteps process sampler fuel s
+        pure
+          ((⟨s', ()⟩ : Interaction.UC.AsyncRuntimeState process.Proc Unit),
+            List.replicate fuel Interaction.UC.RuntimeEvent.processTick)) := by
+  induction fuel generalizing s with
+  | zero =>
+      simp [runStepsAsync, ProcessOver.runSteps]
+  | succ n ih =>
+      rw [runStepsAsync, ProcessOver.runSteps]
+      simp only [Interaction.UC.trivialEnvScheduler_apply, pure_bind,
+        bind_assoc, ih]
+      rfl
+
 end Concurrent
 
 namespace UC
@@ -315,14 +351,14 @@ The synchronous `processSemantics` is the special case of
 * the trivial env scheduler (always returns `processTick`);
 * an `observe` that ignores the env state and the trace.
 
-The proof is a fuel-induction relating `runStepsAsync` (with a trivial
-env scheduler and the empty alphabet) to
-`Concurrent.ProcessOver.runSteps`, plus a simulation argument on the
-closing morphism.
+The proof factors through `Concurrent.runStepsAsync_empty_trivial_eq`,
+which collapses the async engine to `ProcessOver.runSteps` together with
+a constant `processTick` trace; the observe-side argument then drops the
+trace and the unit env state.
 -/
 theorem processSemantics_eq_processSemanticsAsync_trivial
     (Party : Type u)
-    {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
+    {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
     (close : m Unit → ProbComp Unit)
     (init : ∀ p : Closed Party, p.Proc)
     (sampler : ∀ (p : Closed Party) (s : p.Proc),
@@ -338,7 +374,25 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s) := by
-  sorry
+  change (Semantics.mk (T := openTheory.{u, 0, 0} Party) _) =
+    Semantics.mk (T := openTheory.{u, 0, 0} Party) _
+  congr 1
+  funext process
+  show close _ = close _
+  congr 1
+  change (do
+      let finalState ← ProcessOver.runSteps process (sampler process) fuel
+        (init process)
+      observe process finalState) =
+    (do
+      let (final, _trace) ← Concurrent.runStepsAsync (m := m) process
+        (EnvAction.empty Unit)
+        (fun st => sampler process st.proc)
+        (trivialEnvScheduler (m := m) Unit Empty)
+        fuel ⟨init process, ()⟩
+      observe process final.proc)
+  rw [Concurrent.runStepsAsync_empty_trivial_eq]
+  simp only [bind_assoc, pure_bind]
 
 end UC
 end Interaction
