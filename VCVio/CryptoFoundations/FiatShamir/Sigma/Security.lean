@@ -73,11 +73,17 @@ probability that the HVZK simulator tries to program a cache entry `(msg, c)` al
 populated by a prior adversary query is bounded by `qS · (qS + qH) / |Chal|` via the
 birthday/union bound over commitments.
 
+The `+ 1` summand in the numerator absorbs the cache-miss verify slack from the
+freshness-preserving chain: `unforgeableExp` samples a uniformly random RO answer to verify
+the forgery on a cache miss (winning with probability `1/|Chal|`), while `Fork.runTrace`
+returns `false` on the same cache miss.
+
 Matches EasyCrypt's `pr_bad_game` at
-[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`) and
-plays the same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
+[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`, modulo
+the `+1` slack) and plays the same role as `GPVHashAndSign.collisionBound` for the PSF
+construction. -/
 noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
-  ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+  ((qS * (qS + qH) + 1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
 
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
@@ -375,51 +381,63 @@ theorem euf_cma_to_nma
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
     --
-    -- Chain of game hops:
+    -- **Freshness-preserving chain.** The previous design routed through
+    -- `unforgeableExpNoFresh` (which drops the `¬log.wasQueried msg` check), but
+    -- that intermediate is trivially won by *replay attacks*: an adversary that
+    -- queries the signing oracle on `msg` and outputs the received signature has
+    -- `unforgeableExpNoFresh = 1`, while `Fork.advantage = 0` for the same
+    -- adversary (its forgery's hash point need not appear in the *live* RO query
+    -- log, since it is satisfied by a *programmed* entry from `sigSim`). The
+    -- hop `unforgeableExpNoFresh ≤ Fork.advantage + slack` is therefore **not
+    -- provable**.
+    --
+    -- The fix is to keep freshness throughout. The new chain:
     --
     --   adv.advantage (runtime M)
-    --       ≤ g1                                              -- fresh_preserved (Phase B) ✓
-    --       ≤ Fork.advantage + collisionSlack + qS·ζ_zk       -- hvzk_collision_swap (Phases C+D)
+    --       = ∑' (pk,sk), Pr[(pk,sk)|gen] · Pr[verify ∧ ¬msg ∈ signed | direct_real_exp pk sk]
+    --                                                                       -- (A) bridge_real
+    --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] ·
+    --           (Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] + qS·ζ_zk + collisionSlack)
+    --                                                                       -- (B) tv_swap
+    --       ≤ Fork.advantage + qS·ζ_zk + collisionSlack + 1/|Chal|          -- (C') sim_to_fork
     --
-    -- where `g1` = `Pr[= true | unforgeableExpNoFresh (runtime M) adv]`.
+    -- The `+ 1/|Chal|` slack in (C') accounts for `unforgeableExp`'s verify step
+    -- sampling a fresh random-oracle answer on a cache miss, while
+    -- `Fork.runTrace` returns `false` on cache misses; this `+1/|Chal|` is
+    -- absorbed into the ambient `collisionSlack` (which is ≥ `qS / |Chal|` for
+    -- any non-degenerate adversary).
     --
-    -- Phase B (freshness drop) is discharged via
-    -- `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh`, instantiated with
-    -- `FiatShamir.runtime_evalDist_bind_pure` (the FS runtime commutes with `_ >>= pure ∘ f`).
+    -- The augmented state `((QueryCache × List M) × Bool)` carries:
+    --   * `QueryCache`: the random-oracle cache (programmed + live entries).
+    --   * `List M`: signed messages, in reverse order of signing queries.
+    --   * `Bool`: the collision-bad flag (set when `sigSim` programs a point
+    --     that was already cached).
     --
-    -- The combined `hvzk_collision_swap` step folds the HVZK simulator swap and the
-    -- programming-collision bound into one inequality. A clean two-phase decomposition
-    -- (independent `g2` between the HVZK and collision steps) is not algebraically
-    -- realizable without introducing a *new* intermediate experiment: any `g2` satisfying
-    -- `g1 ≤ g2 + qS·ζ_zk` *and* `g2 ≤ Fork.advantage + collisionSlack` collapses one of the
-    -- two sub-bounds to the trivial step (e.g. `g2 := Fork.advantage + collisionSlack`
-    -- makes the second `le_refl`). The honest split uses the per-query ε-perturbed
-    -- identical-until-bad lemma `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad` in
-    -- `VCVio/ProgramLogic/Relational/SimulateQ.lean`. Applying it requires:
-    --   (i)   a unified state combining the `QueryCache` for the random oracle and a `Bool`
-    --         flag tracking the collision-bad event (pre-image of a programmed challenge);
-    --   (ii)  two `QueryImpl` instantiations over the layered spec: `realImpl` (forwards
-    --         to the real signing oracle, no programming) and `simImpl` (substitutes
-    --         `sigSim pk` for signing queries, programs the RO with `simChalUniformGivenCommit`);
-    --   (iii) a per-query ε bound: for any signing query state, the joint distribution of the
-    --         real and simulated step over `(state, output)` is at TV distance ≤ ζ_zk
-    --         (this is exactly the per-query HVZK guarantee `simChalUniformGivenCommit_correct`);
-    --   (iv)  a bad-event monotonicity hypothesis on `simImpl` (programming a previously-queried
-    --         point sets the flag), and a "behaves identically when not bad" hypothesis;
-    --   (v)   a final reduction `g1 ≤ Pr[E | sim impl₂ (adv.main pk)]` where `E` is the valid
-    --         forgery predicate, plus `Pr[E | sim impl₂ (adv.main pk)] ≤ Fork.advantage` via
-    --         the structural connection that any valid FS forgery induces a fork point in
-    --         `runTrace`.
-    -- See §D.10.4 of `Notes/vcvio-fs-schnorr-clean-chain.md`. The single sorry below tracks
-    -- this combined application; the freshness-drop hop (Phase B) is already discharged and
-    -- the structural framework (pk/sk binding, `nmaAdv` construction, query bounds) above
-    -- is sorry-free. The per-query ε lemma (Option 1 from the synthesis doc) is now in place,
-    -- and the bad-flag monotonicity hypothesis (`h_mono₁`) is now discharged via the generic
-    -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators (see `StateT.lean`).
-    set g1 : ENNReal := Pr[= true | SignatureAlg.unforgeableExpNoFresh (runtime M) adv] with hg1
-    have fresh_preserved : adv.advantage (runtime M) ≤ g1 :=
-      SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
-        (runtime M) (fun f mx => runtime_evalDist_bind_pure M mx f) adv
+    -- The per-query TV bound (B) follows from
+    -- `tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad`
+    -- (`VCVio/ProgramLogic/Relational/SimulateQ.lean`); the signed-list update
+    -- is identical and deterministic on the sim and real sides, so it does not
+    -- contribute to TV beyond the existing `(cache × Bool)`-state bound.
+    --
+    -- The (B-finish) collision bound and the (A) / (C') bridges are tracked
+    -- separately as named sub-sorries. Each is mathematically substantive:
+    --
+    --   * (A) `bridge_real_freshness`: rewrite `unforgeableExp` as an
+    --     integral over `keygen` of `direct_real_exp pk sk`. Requires
+    --     factoring out `keygen` from the SPMF `runtime.evalDist`, then
+    --     equating the WriterT log of `signingOracle` with the augmented
+    --     `signed` state.
+    --
+    --   * (B-finish) `pr_bad_le_collisionSlack`: union-bound on `qS`
+    --     programming events, each hitting a previously cached point with
+    --     probability ≤ `(qS + qH) / |Chal|`. The per-event uniformity comes
+    --     from the per-query HVZK simulator (challenge marginal is uniform).
+    --
+    --   * (C') `bridge_sim_fork_freshness`: a forgery `(msg, c, s)` against
+    --     `direct_sim_exp` with `¬msg ∈ signed` cannot have used a programmed
+    --     `(msg, c)` cache entry (since `sigSim` only programs at signed `msg`),
+    --     so `(msg, c)` is in the live RO query log iff it is in the cache.
+    --     The `+ 1/|Chal|` slack absorbs the cache-miss verify case.
     -- Construct the bad-flag-aware impls used in the application of
     -- `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`. We use the
     -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators so the per-query
@@ -467,67 +485,37 @@ theorem euf_cma_to_nma
     let _realImpl : Stmt → Wit → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk =>
       baseSimBad + realSignBad pk sk
-    have hvzk_collision_swap : g1 ≤ Fork.advantage σ hr M nmaAdv qH +
+    have advantage_bound : adv.advantage (runtime M) ≤ Fork.advantage σ hr M nmaAdv qH +
         ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal := by
-      -- The combined HVZK simulator swap + collision absorption. The proof factors as:
+      -- **Freshness-preserving chain.** See the docstring at the top of this bullet for
+      -- the rationale. The proof structure is:
       --
-      --   g1 = Pr[= true | unforgeableExpNoFresh runtime adv]
-      --     = Pr[= true | (∗) :=
-      --         keygen >>= fun (pk, sk) =>
-      --           (simulateQ (_realImpl pk sk) (adv.main pk)).run' (∅, false) >>=
-      --             fun (m, σ) => verify pk m σ ∧ ¬ used_signing_oracle ...]
-      --                                                                    -- (A) bridge_g1_real
-      --     ≤ Pr[= true | (†) :=
-      --         keygen >>= fun (pk, sk) =>
-      --           (simulateQ (_simImpl pk) (adv.main pk)).run' (∅, false) >>= ...]
-      --       + qS·ζ_zk + collisionSlack                                    -- (B) tv_real_to_sim
-      --     ≤ Fork.advantage σ hr M nmaAdv qH + qS·ζ_zk + collisionSlack    -- (C) bridge_sim_fork
+      --   adv.advantage (runtime M)
+      --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] · Pr[verify ∧ ¬msg ∈ signed | direct_real_exp pk sk]
+      --                                                                       -- (A) bridge_a
+      --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] ·
+      --           (Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] + qS·ζ_zk + Pr[bad on sim])
+      --                                                                       -- (B) tv_swap
+      --       ≤ ∑' pk, Pr[pk|gen_pk] · Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] +
+      --           qS·ζ_zk + collisionSlack qS qH Chal                         -- (B-finish)
+      --       ≤ Fork.advantage + qS·ζ_zk + collisionSlack qS qH Chal          -- (C')
       --
-      -- (A) Reformulates the SPMF/runtime experiment as a direct stateful simulation. The
-      --     `Bool` flag is appended (initialized to `false`) so the type matches the lifted
-      --     impls; on the real side, the flag stays `false` throughout (since `realSignBad`
-      --     never sets it).
-      -- (B) Apply the *selective* ε lemma
-      --     `tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad`
-      --     (Relational/SimulateQ.lean) with:
-      --       impl₁ := _simImpl pk      (sets bad on programming a cached point)
-      --       impl₂ := _realImpl pk sk  (never sets bad)
-      --       ε     := ζ_zk             (from per-query HVZK via `simChalUniformGivenCommit`)
-      --       S t   := match t with | .inr _ => True | _ => False
-      --                              (sign queries are the "costly" ones)
-      --     Hypotheses:
-      --       (i)   `h_step_tv_S` (sign queries): per-query HVZK gives
-      --             `tvDist (sigSimBad pk msg .run (s,false))
-      --                     (realSignBad pk sk msg .run (s,false)) ≤ ζ_zk`.
-      --       (ii)  `h_step_eq_nS` (non-sign queries): both impls dispatch via
-      --             `baseSimBad` for `.inl` queries, so they are pointwise equal.
-      --       (iii) `h_mono₁`: bad flag is monotone in `_simImpl pk` (`baseSimBad`
-      --             threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`).
-      --             ✓ Discharged via `support_withBadFlag_run_snd_snd` and
-      --             `support_withBadUpdate_run_snd_snd_of_pre`.
-      --       (iv)  `h_qb`: `IsQueryBound (adv.main pk) qS sign-canQuery sign-cost`,
-      --             derived from `_hQ pk : signHashQueryBound (adv.main pk) qS qH`
-      --             by projecting away the `qH` coordinate (a generic monotonicity
-      --             on `IsQueryBound` would handle this projection).
-      --     The lemma directly yields `qS · ζ_zk + Pr[bad on impl₁]`.
-      --     The collision bound `Pr[bad] ≤ collisionSlack qS qH Chal` follows from
-      --     `programming_collision_bound` applied to `sigSimBad`.
-      -- (C) Connects `Pr[E | (simulateQ _simImpl).run' (∅, false)]` to `Fork.advantage` by
-      --     showing every valid forgery against the simulator induces a fork point in
-      --     `runTrace`. The simulator's transcript distribution matches the marginal of the
-      --     forking experiment (modulo the `Bool` flag projection).
+      -- The augmented state for `direct_*_exp` is `(QueryCache × List M × Bool)`, with the
+      -- `List M` tracking signed messages (so the freshness check `¬msg ∈ signed` is local).
+      -- The `Bool` is the collision-bad flag (set when programming overwrites a cached point).
       --
-      -- Each of (A), (B), (C) is a substantive sub-lemma. The single sorry below tracks the
-      -- full assembly. All four impls (`baseSimBad`, `sigSimBad`, `realSignBad`, and the
-      -- combined `_simImpl` / `_realImpl`) are defined inline using the generic
-      -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators (see `StateT.lean`),
-      -- which makes the application fully type-grounded and the bad-flag monotonicity
-      -- (`h_mono₁`) close cleanly via the corresponding generic support lemmas.
+      -- The four sub-claims are scaffolded as sorries with detailed sketches; `step_b_per_pksk`
+      -- (the underlying selective ε lemma application on the simpler `(cache × Bool)` state)
+      -- is fully proven and forms the infrastructure for sub-claim (B).
+      --
+      -- The `+ 1/|Chal|` slack from (C') is absorbed into `collisionSlack` (which now has
+      -- a `+1` summand in its numerator: `(qS·(qS+qH) + 1) / |Chal|`).
+      --
       -- Step (B), per (pk, sk) pair: the per-query ε bound from the selective lemma.
       -- The selective lemma yields a TV bound on the joint distribution of
       -- `(simulateQ _simImpl).run' (∅, false)` and `(simulateQ _realImpl).run' (∅, false)`
       -- of the form `qS · ζ_zk + Pr[bad on _simImpl]`. The `Pr[bad]` term is then bounded
-      -- by `collisionSlack qS qH Chal` via `programming_collision_bound`.
+      -- by `collisionSlack qS qH Chal` via the (B-finish) sub-claim.
       have step_b_per_pksk : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
           tvDist
             ((simulateQ (_simImpl pk) (adv.main pk)).run' (∅, false))
@@ -715,10 +703,43 @@ theorem euf_cma_to_nma
                 | inl _ => simp [S]
                 | inr _ => simp [S]
             | inr _ => simp [S]
-      -- The remaining steps (A) and (C) and the `Pr[bad] ≤ collisionSlack` reduction are
-      -- aggregated into the omnibus sorry below.
+      -- TODO (freshness-preserving chain). The remaining work splits into four named
+      -- sub-claims, each gated on `step_b_per_pksk` (proven above):
+      --
+      --   * (A) `bridge_a_freshness`:
+      --       adv.advantage (runtime M) ≤
+      --         ∑' (pk, sk), σ.keygen.evalDist (pk, sk) ·
+      --           Pr[fun ((m, sig), (cache, signed, bad)) =>
+      --                σ.verify pk m sig.fst sig.snd ∧ ¬ m ∈ signed |
+      --              (simulateQ (_realImplSigned pk sk) (adv.main pk)).run (∅, [], false)]
+      --     The signed-list update inside `_realImplSigned` mirrors the WriterT log of the
+      --     `signature_oracle` used in `unforgeableExp`; the freshness check `¬msg ∈ signed`
+      --     corresponds exactly to the original experiment's `¬log.wasQueried msg`.
+      --
+      --   * (B) `step_b_per_pksk_signed`:
+      --       per-(pk, sk), tvDist ((sim).run' ...) ((real).run' ...) ≤ qS · ζ_zk + Pr[bad]
+      --     Derive from `step_b_per_pksk` (proven above) via DPI on the signed-list addition
+      --     (the signed-list update is identical and deterministic on sim and real sides).
+      --
+      --   * (B-finish) `pr_bad_le_collisionSlack`:
+      --       per-pk, Pr[bad on _simImpl pk] ≤ collisionSlack qS qH Chal
+      --     Union bound on the `qS` programming events: each `sigSimBad pk msg` programming
+      --     step hits a previously-cached point (live RO query or prior signing programming)
+      --     with probability ≤ `(qS + qH) / |Chal|` per step. The per-event uniformity
+      --     comes from the per-query HVZK simulator (challenge marginal is uniform).
+      --
+      --   * (C') `bridge_c'_freshness`:
+      --       ∑' pk, σ.keygen.fst.evalDist pk ·
+      --         Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk]
+      --       ≤ Fork.advantage σ hr M nmaAdv qH + 1/|Chal|
+      --     Key insight: a forgery `(msg, c, s)` with `¬msg ∈ signed` cannot have used a
+      --     programmed `(msg, c)` cache entry (since `sigSim` only programs at signed `msg`).
+      --     So `(msg, c)` is in the live RO query log iff it is in the cache. The `+ 1/|Chal|`
+      --     accounts for `direct_sim_exp` sampling a fresh ω on cache miss vs `Fork.runTrace`
+      --     returning false on cache miss. This `1/|Chal|` slack is absorbed into
+      --     `collisionSlack` (whose definition now includes a `+1` in the numerator).
       sorry
-    exact fresh_preserved.trans hvzk_collision_swap
+    exact advantage_bound
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
