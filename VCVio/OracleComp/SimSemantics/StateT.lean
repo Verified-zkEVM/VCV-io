@@ -60,6 +60,25 @@ def withBadUpdate {ι : Type _} {spec : OracleSpec ι}
   StateT.mk fun | (s, b) => (fun (vs : spec.Range t × σ) => (vs.1, vs.2, b || f t s vs.1)) <$>
     (impl t).run s
 
+/-- Run-shape of `withBadFlag`: the lifted implementation maps the underlying run by tagging
+each `(value, state)` pair with the unchanged bad flag `b`. -/
+@[simp] lemma withBadFlag_apply_run {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m)) (t : spec.Domain) (s : σ) (b : Bool) :
+    (impl.withBadFlag t).run (s, b) =
+      (fun (vs : spec.Range t × σ) => (vs.1, vs.2, b)) <$> (impl t).run s := rfl
+
+/-- Run-shape of `withBadUpdate`: the lifted implementation maps the underlying run by
+appending the OR-updated bad flag `b || f t s vs.1`. -/
+@[simp] lemma withBadUpdate_apply_run {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m))
+    (f : (t : spec.Domain) → σ → spec.Range t → Bool)
+    (t : spec.Domain) (s : σ) (b : Bool) :
+    (impl.withBadUpdate f t).run (s, b) =
+      (fun (vs : spec.Range t × σ) =>
+        (vs.1, vs.2, b || f t s vs.1)) <$> (impl t).run s := rfl
+
 end QueryImpl
 
 namespace OracleComp

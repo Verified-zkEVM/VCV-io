@@ -528,7 +528,7 @@ theorem euf_cma_to_nma
       -- `(simulateQ _simImpl).run' (∅, false)` and `(simulateQ _realImpl).run' (∅, false)`
       -- of the form `qS · ζ_zk + Pr[bad on _simImpl]`. The `Pr[bad]` term is then bounded
       -- by `collisionSlack qS qH Chal` via `programming_collision_bound`.
-      have step_b_per_pksk : ∀ (pk : Stmt) (sk : Wit),
+      have step_b_per_pksk : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
           tvDist
             ((simulateQ (_simImpl pk) (adv.main pk)).run' (∅, false))
             ((simulateQ (_realImpl pk sk) (adv.main pk)).run' (∅, false))
@@ -537,7 +537,7 @@ theorem euf_cma_to_nma
                   (unifSpec + (M × Commit →ₒ Chal)).QueryCache × Bool =>
                 z.2.2 = true |
               (simulateQ (_simImpl pk) (adv.main pk)).run (∅, false)].toReal := by
-        intro pk sk
+        intro pk sk h_rel
         -- Sign-query selector: `S t := match t with | .inr _ => True | _ => False`.
         let S : (spec + (M →ₒ (Commit × Resp))).Domain → Prop :=
           fun t => match t with | .inr _ => True | .inl _ => False
@@ -584,7 +584,84 @@ theorem euf_cma_to_nma
           cases t with
           | inl _ => exact hSt.elim
           | inr msg =>
-              sorry
+              -- Helper lemma: `(simulateQ unifSim oa).run s'` factors as the lifted
+              -- comp paired with the unchanged state. This is the analog of
+              -- `unifFwdImpl.simulateQ_run` for `StateT _ (OracleComp spec)` instead of
+              -- `StateT _ ProbComp`.
+              -- `unifSim` is the lifted `inj` where `inj t = liftM (spec.query (Sum.inl t))`.
+              -- This `inj` is exactly `fun t => liftM (unifSpec.query t)` (the SubSpec lift),
+              -- which is the same map that `liftComp` uses to lift `ProbComp` to `OracleComp spec`.
+              have run_unifSim : ∀ (s' : spec.QueryCache) {β : Type} (oa : ProbComp β),
+                  (simulateQ unifSim oa).run s' =
+                    (fun x => (x, s')) <$> oa.liftComp spec := by
+                intro s' β oa
+                -- Define the equivalent `OracleComp spec`-valued `QueryImpl unifSpec`.
+                set inj : QueryImpl unifSpec (OracleComp spec) :=
+                  fun t => liftM (unifSpec.query t) with hinj
+                -- Step 1: `unifSim = inj.liftTarget _` (defeq via `MonadLift` resolution).
+                have unifSim_eq : unifSim = inj.liftTarget
+                    (StateT spec.QueryCache (OracleComp spec)) := rfl
+                rw [unifSim_eq, simulateQ_liftTarget]
+                -- LHS: `(liftM (simulateQ inj oa)).run s'`
+                -- `simulateQ inj oa = liftComp oa spec` by definition of `liftComp`.
+                have simulateQ_inj : simulateQ inj oa = oa.liftComp spec := rfl
+                rw [simulateQ_inj, OracleComp.liftM_run_StateT, bind_pure_comp]
+              -- Step 1: factor `(sigSim pk msg).run s` as deterministic post-processing
+              -- of `(simTranscript pk).liftComp spec`.
+              have h_sigSim_run : (sigSim pk msg).run s =
+                  (simTranscript pk).liftComp spec >>=
+                    fun cωπ : Commit × Chal × Resp =>
+                      pure (match s (.inr (msg, cωπ.1)) with
+                        | some _ => ((cωπ.1, cωπ.2.2), s)
+                        | none => ((cωπ.1, cωπ.2.2),
+                            s.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)) := by
+                dsimp only [sigSim]
+                rw [StateT.run_bind, run_unifSim s, bind_map_left]
+                refine bind_congr (fun cωπ => ?_)
+                simp only [modifyGet, MonadState.modifyGet,
+                  MonadStateOf.modifyGet, StateT.modifyGet, StateT.run]
+                congr 1
+                rcases s (.inr (msg, cωπ.1)) with _ | _ <;> simp
+              -- Step 2: factor `(realSign pk sk msg).run s` analogously.
+              have h_realSign_run : (realSign pk sk msg).run s =
+                  (σ.realTranscript pk sk).liftComp spec >>=
+                    fun cωπ : Commit × Chal × Resp =>
+                      pure (match s (.inr (msg, cωπ.1)) with
+                        | some _ => ((cωπ.1, cωπ.2.2), s)
+                        | none => ((cωπ.1, cωπ.2.2),
+                            s.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)) := by
+                dsimp only [realSign]
+                rw [StateT.run_bind, StateT.run_get, pure_bind, StateT.run_bind,
+                  OracleComp.liftM_run_StateT, bind_assoc]
+                refine bind_congr (fun cωπ => ?_)
+                rw [pure_bind]
+                simp only [modifyGet, MonadState.modifyGet,
+                  MonadStateOf.modifyGet, StateT.modifyGet, StateT.run]
+                congr 1
+                rcases s (.inr (msg, cωπ.1)) with _ | _ <;> simp
+              -- Step 3: unfold the bad-flag wrappers and reduce to inner computations.
+              -- `(_simImpl pk (.inr msg)).run (s, false) = (sigSimBad pk msg).run (s, false)`
+              -- by `add_apply_inr`, and similarly for `_realImpl`.
+              dsimp only [_simImpl, _realImpl, sigSimBad, realSignBad]
+              simp only [QueryImpl.add_apply_inr]
+              -- Apply `tvDist_map_le` to peel off the deterministic bad-flag map.
+              refine le_trans (tvDist_map_le _ _ _) ?_
+              -- Now reduce to the inner runs.
+              rw [h_sigSim_run, h_realSign_run]
+              -- Apply `tvDist_bind_right_le` to peel off the deterministic post-processing.
+              refine le_trans (tvDist_bind_right_le _ _ _) ?_
+              -- Goal: tvDist ((simTranscript pk).liftComp spec)
+              --             ((σ.realTranscript pk sk).liftComp spec) ≤ ζ_zk
+              -- Use `evalDist_liftComp` to drop the lift, then `tvDist_comm` and HVZK.
+              have h_eq : tvDist ((simTranscript pk).liftComp spec :
+                  OracleComp spec _)
+                  ((σ.realTranscript pk sk : ProbComp _).liftComp spec) =
+                  tvDist (simTranscript pk : ProbComp _)
+                    (σ.realTranscript pk sk) := by
+                unfold tvDist
+                simp only [OracleComp.evalDist_liftComp]
+              rw [h_eq, tvDist_comm]
+              exact _hhvzk pk sk h_rel
         case h_step_eq_nS =>
           -- On non-sign queries (`t = .inl _`), both `_simImpl` and `_realImpl` dispatch to
           -- `baseSimBad`, so they are pointwise equal.
