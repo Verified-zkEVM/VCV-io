@@ -82,6 +82,11 @@ namespace Spec
 A `Sampler` for `spec : Spec.{0}` provides an `m X` computation at each
 node whose move space is `X`, plus recursive samplers for every subtree.
 
+Structurally this is exactly a `Spec.Decoration` whose node context is
+`fun X => m X`: the per-node decoration stores an `m`-computation in
+the move type of that node, and the functorial `Decoration.map` /
+`Decoration.map_id` / `Decoration.map_comp` API applies immediately.
+
 The monad `m` is the intermediate execution monad. Typical choices:
 * `ProbComp` for coin-flip-only protocols.
 * `OracleComp (unifSpec + roSpec)` for protocols with shared random oracle
@@ -89,9 +94,8 @@ The monad `m` is the intermediate execution monad. Typical choices:
 * `OptionT ProbComp` for observation-style semantics that need to
   inject failure mass.
 -/
-def Sampler (m : Type → Type) : Spec.{0} → Type
-  | .done => PUnit
-  | .node X rest => m X × (∀ x, Sampler m (rest x))
+abbrev Sampler (m : Type → Type) (spec : Spec.{0}) : Type :=
+  Decoration (fun X => m X) spec
 
 /--
 Execute a sampler to produce a full transcript of `spec` in the monad `m`.
