@@ -19,7 +19,9 @@ The shape of every definition mirrors the synchronous `processSemantics`
 in `Runtime.lean`. The synchronous runtime is the special case in which
 the env scheduler always returns `processTick` and the env alphabet is
 empty; `processSemantics_eq_processSemanticsAsync_trivial` records that
-equivalence by name.
+equivalence by name, with `processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial`
+giving the `ProbComp`-specialized form most coin-flip-only protocol
+developments will reach for.
 
 ## Main definitions
 
@@ -393,6 +395,36 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
       observe process final.proc)
   rw [Concurrent.runStepsAsync_empty_trivial_eq]
   simp only [bind_assoc, pure_bind]
+
+/--
+The `ProbComp` specialization of `processSemantics_eq_processSemanticsAsync_trivial`:
+the synchronous `processSemanticsProbComp` equals the trivial async lift built
+from `processSemanticsAsyncProbComp` with the empty env alphabet, the trivial
+env scheduler, and an `observe` that ignores the env state and the trace.
+
+This is the form most coin-flip-only protocol developments will reach for: it
+discharges the `m`/`close`/`MonadLiftT` choices the general theorem leaves
+abstract, leaving only the protocol-specific data (`init`, `sampler`, `fuel`,
+`observe`) on each side of the equation.
+-/
+theorem processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
+    (Party : Type u)
+    (init : ∀ p : Closed Party, p.Proc)
+    (sampler : ∀ (p : Closed Party) (s : p.Proc),
+      Spec.Sampler ProbComp (p.step s).spec)
+    (fuel : ℕ)
+    (observe : ∀ p : Closed Party, p.Proc → ProbComp Unit) :
+    processSemanticsProbComp Party init sampler fuel observe =
+      processSemanticsAsyncProbComp Party
+        (EnvAction.empty Unit) ()
+        init
+        (fun p st => sampler p st.proc)
+        (fun p => trivialEnvScheduler (m := ProbComp)
+          (Proc := p.Proc) Unit Empty)
+        fuel
+        (fun p s _ _ => observe p s) := by
+  unfold processSemanticsProbComp processSemanticsAsyncProbComp
+  exact processSemantics_eq_processSemanticsAsync_trivial _ _ _ _ _ _
 
 end UC
 end Interaction

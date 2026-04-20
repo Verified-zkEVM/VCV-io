@@ -39,3 +39,4 @@ import Examples.SchnorrExtractorRuntime
 import Examples.SealedSender.AspectObservation
 import Examples.Signature
 import Examples.SimpleTwoServerPIR
+import Examples.UC.SyncRecoveryDemo
