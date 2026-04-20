@@ -19,6 +19,7 @@ import Examples.ElGamal.SSP
 import Examples.FrankingProtocol
 import Examples.OneTimePad.Basic
 import Examples.OneTimePad.LeakageFree
+import Examples.OneTimePad.UC
 import Examples.PRFTagReader
 import Examples.PRGfromPRF
 import Examples.Pedersen
@@ -35,5 +36,6 @@ import Examples.RF_RP_Switching_alt
 import Examples.Regev
 import Examples.Schnorr
 import Examples.SchnorrExtractorRuntime
+import Examples.SealedSender.AspectObservation
 import Examples.Signature
 import Examples.SimpleTwoServerPIR

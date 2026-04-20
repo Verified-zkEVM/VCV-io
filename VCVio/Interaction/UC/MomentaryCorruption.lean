@@ -82,7 +82,7 @@ The deterministic state updates require `[DecidableEq Sid]
 themselves do not.
 -/
 
-universe v w
+universe v w w'
 
 namespace Interaction
 namespace UC
@@ -367,8 +367,8 @@ Type-level definition does not depend on `[DecidableEq Sid]
 constructs the env action's reaction (e.g. via
 `MachineProcess.withMomentaryCorruption`).
 -/
-abbrev Process (Sid Pid : Type) (Δ : PortBoundary) :=
-  EnvOpenProcess.{0, 0, v, w} (MachineId Sid Pid) Δ
+abbrev Process (Sid Pid : Type) (m : Type w → Type w') (Δ : PortBoundary) :=
+  EnvOpenProcess.{0, 0, v, w, w'} m (MachineId Sid Pid) Δ
     (Alphabet Sid Pid) (State Sid Pid)
 
 end MomentaryCorruption
@@ -390,39 +390,41 @@ build their `EnvOpenProcess` directly with a bespoke `EnvAction`
 rather than going through this wrapping.
 -/
 def MachineProcess.withMomentaryCorruption
-    {Sid Pid : Type} {Δ : PortBoundary}
+    {Sid Pid : Type} {m : Type w → Type w'} {Δ : PortBoundary}
     [DecidableEq Sid] [DecidableEq Pid]
-    (P : MachineProcess.{0, v, w} Sid Pid Δ) :
-    MomentaryCorruption.Process.{v, w} Sid Pid Δ where
+    (P : MachineProcess.{0, v, w, w'} Sid Pid m Δ) :
+    MomentaryCorruption.Process.{v, w, w'} Sid Pid m Δ where
   process := P
   envAction := MomentaryCorruption.envAction
 
 namespace MachineProcess
 
-variable {Sid Pid : Type} {Δ : PortBoundary}
+variable {Sid Pid : Type} {m : Type w → Type w'} {Δ : PortBoundary}
   [DecidableEq Sid] [DecidableEq Pid]
 
 @[simp]
-theorem process_withMomentaryCorruption (P : MachineProcess.{0, v, w} Sid Pid Δ) :
+theorem process_withMomentaryCorruption
+    (P : MachineProcess.{0, v, w, w'} Sid Pid m Δ) :
     P.withMomentaryCorruption.process = P := rfl
 
 @[simp]
-theorem envAction_withMomentaryCorruption (P : MachineProcess.{0, v, w} Sid Pid Δ) :
+theorem envAction_withMomentaryCorruption
+    (P : MachineProcess.{0, v, w, w'} Sid Pid m Δ) :
     P.withMomentaryCorruption.envAction = MomentaryCorruption.envAction := rfl
 
 @[simp]
 theorem react_withMomentaryCorruption_compromise
-    (P : MachineProcess.{0, v, w} Sid Pid Δ)
-    (m : MachineId Sid Pid) (cs : MomentaryCorruption.State Sid Pid) :
-    P.withMomentaryCorruption.react (.compromise m) cs =
-      pure (MomentaryCorruption.State.applyCompromise m cs) := rfl
+    (P : MachineProcess.{0, v, w, w'} Sid Pid m Δ)
+    (mid : MachineId Sid Pid) (cs : MomentaryCorruption.State Sid Pid) :
+    P.withMomentaryCorruption.react (.compromise mid) cs =
+      pure (MomentaryCorruption.State.applyCompromise mid cs) := rfl
 
 @[simp]
 theorem react_withMomentaryCorruption_refresh
-    (P : MachineProcess.{0, v, w} Sid Pid Δ)
-    (m : MachineId Sid Pid) (cs : MomentaryCorruption.State Sid Pid) :
-    P.withMomentaryCorruption.react (.refresh m) cs =
-      pure (MomentaryCorruption.State.applyRefresh m cs) := rfl
+    (P : MachineProcess.{0, v, w, w'} Sid Pid m Δ)
+    (mid : MachineId Sid Pid) (cs : MomentaryCorruption.State Sid Pid) :
+    P.withMomentaryCorruption.react (.refresh mid) cs =
+      pure (MomentaryCorruption.State.applyRefresh mid cs) := rfl
 
 end MachineProcess
 

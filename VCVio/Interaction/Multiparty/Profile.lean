@@ -12,14 +12,14 @@ This file packages the most structured native multiparty interface built on top
 of `Interaction.Multiparty.Core`.
 
 A node of move space `X` is decorated not merely by one local view, but by a
-whole profile assigning each party its own `LocalView X`. The endpoint of one
+whole profile assigning each party its own `ViewMode X`. The endpoint of one
 fixed party is then obtained by projecting that profile to the chosen party.
 
 This is the most direct structured way to describe multiparty nodes with:
-* one active controller of the move;
-* parties that observe the full move;
-* parties that observe only a quotient of the move; and
-* parties that observe nothing at all.
+* one party that locally picks the move (`ViewMode.pick`);
+* parties that observe the full move (`ViewMode.observe`);
+* parties that observe only a kernel of the move (`ViewMode.react ⟨..⟩`); and
+* parties that observe nothing at all (`ViewMode.hidden`).
 -/
 
 universe u
@@ -37,7 +37,7 @@ multiparty interaction: one actual global move may give different local
 observations to different parties.
 -/
 abbrev ViewProfile (Party : Type u) : Spec.Node.Context.{u, u + 1} :=
-  fun X => Party → LocalView X
+  fun X => Party → ViewMode X
 
 /--
 A `Decoration Party spec` assigns one local-view profile to every node of

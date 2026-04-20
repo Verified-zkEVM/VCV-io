@@ -29,7 +29,7 @@ The file is organized in two levels:
   realized node context `Γ`;
 * `Step Party P` and `Process Party` are the closed-world specializations whose
   node metadata is exactly `NodeProfile Party`, the bundled
-  `NodeAuthority + NodeObservation` view of node-local semantic data.
+  `NodeAuthority + NodeView` view of node-local semantic data.
 
 So the intended reading is:
 
@@ -64,18 +64,24 @@ structure NodeAuthority (Party : Type u) (X : Type w) where
   controllers : X → List Party := fun _ => []
 
 /--
-`NodeObservation Party X` records the view-attribution part of node-local
+`NodeView Party X` records the view-attribution part of node-local
 semantic data: what each party `me : Party` locally observes of the
-chosen move `x : X`, expressed as a `Multiparty.LocalView X`.
+chosen move `x : X`, expressed as a `Multiparty.ViewMode X`.
 
 This is the second of the two orthogonal layers of `NodeProfile`. It
 is stored separately so that downstream reasoning that depends only on
 local views (information-flow arguments, projection / trace semantics,
-view-equivalence proofs) can take a `NodeObservation` parameter without
+view-equivalence proofs) can take a `NodeView` parameter without
 committing to any particular controller attribution.
+
+The name avoids confusion with `Multiparty.Observation X`, which is the
+unrelated **per-move information-lattice kernel** living in
+`Multiparty/Observation.lean`. `NodeView` is the per-party operational
+view assignment at one node; `Observation` is one quotient morphism
+`X → Obs` packaged with its codomain.
 -/
-structure NodeObservation (Party : Type u) (X : Type w) where
-  views : Party → Multiparty.LocalView X
+structure NodeView (Party : Type u) (X : Type w) where
+  views : Party → Multiparty.ViewMode X
 
 /--
 `NodeProfile Party X` records the local semantic data attached to one
@@ -85,7 +91,7 @@ It bundles two orthogonal layers:
 
 * `NodeAuthority Party X` — `controllers x` is the controller-path contribution
   associated to choosing the move `x : X`;
-* `NodeObservation Party X` — `views me` assigns to party `me` its local view
+* `NodeView Party X` — `views me` assigns to party `me` its local view
   of the chosen move.
 
 The two layers are intentionally stored as separate factor structures.
@@ -98,11 +104,11 @@ Because `NodeProfile` `extends` both factors, the dot-notation accessors
 `node.controllers`, `node.views` and the structure-literal constructor
 `{ controllers := ..., views := ... }` work exactly as if the fields were
 declared inline. The factor projections `node.toNodeAuthority`,
-`node.toNodeObservation` are auto-generated and let downstream code restrict
+`node.toNodeView` are auto-generated and let downstream code restrict
 attention to a single layer.
 -/
 structure NodeProfile (Party : Type u) (X : Type w)
-    extends NodeAuthority Party X, NodeObservation Party X
+    extends NodeAuthority Party X, NodeView Party X
 
 /--
 The closed-world node context used by the current concurrent semantics.

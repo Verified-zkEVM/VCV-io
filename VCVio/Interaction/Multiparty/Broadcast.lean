@@ -18,7 +18,7 @@ observed branch.
 
 The node metadata for this model is simply the acting party itself.
 A fixed participant's endpoint is then obtained by supplying a resolver from
-acting parties to `LocalView`.
+acting parties to `ViewMode`.
 
 For concrete finite party types, resolvers are intended to be written by
 pattern matching. This preserves the strongest definitional behavior of the
@@ -50,17 +50,17 @@ At each node, the acting party recorded by `parties` is passed to `resolve`,
 which determines how the fixed participant locally sees that node.
 
 Typical broadcast resolvers use only:
-* `LocalView.active` at the participant's own nodes, and
-* `LocalView.observe` at all other nodes.
+* `ViewMode.pick` at the participant's own nodes, and
+* `ViewMode.observe` at all other nodes.
 
 But the definition itself is intentionally more general: it exposes the full
-`LocalView` interface rather than hard-coding one particular resolver.
+`ViewMode` interface rather than hard-coding one particular resolver.
 -/
 abbrev Strategy
     (m : Type u → Type u)
     {Party : Type u}
     (spec : Spec) (parties : PartyDecoration Party spec)
-    (resolve : ∀ {X : Type u}, Party → LocalView X)
+    (resolve : ∀ {X : Type u}, Party → ViewMode X)
     (Output : Spec.Transcript spec → Type u) :=
   Multiparty.Strategy m (resolve := fun X owner => resolve (X := X) owner) spec parties Output
 

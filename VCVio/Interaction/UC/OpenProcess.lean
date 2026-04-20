@@ -3,6 +3,8 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import ToMathlib.PFunctor.Trace
+import VCVio.Interaction.Basic.Sampler
 import VCVio.Interaction.Concurrent.Process
 import VCVio.Interaction.UC.Interface
 
@@ -38,9 +40,17 @@ Boundary actions are structurally mappable along `PortBoundary.Hom` via
 boundary adaptation (only `emit` transforms), which ensures functoriality.
 The query-level decoding of how input messages determine node moves belongs
 in the runtime/execution layer, not the structural boundary action.
+
+The `emit` field is presented as a `PFunctor.Trace Δ.Out X` (the free-monoid
+trace on `Δ.Out`-events indexed by the node's move space `X`). This makes the
+structural boundary operations land directly in the generic `Trace` API:
+`mapBoundary` is `Trace.mapChart` on the output chart, and `wireLeft` /
+`wireRight` are `Trace.mapPartial` on the appropriate sum projections. The
+empty-emission default is the trace-monoid unit `1`, which is definitionally
+the constant-`[]` trace.
 -/
 
-universe u v w
+universe u v w w'
 
 namespace Interaction
 namespace UC
@@ -55,8 +65,10 @@ Fields:
 
 * `isActivated` flags whether this node is driven by external boundary
   input (`true`) or by the internal protocol dynamics (`false`).
-* `emit` maps each chosen move to the list of outbound packets it
-  contributes on `Δ.Out`.
+* `emit` is the `PFunctor.Trace Δ.Out X` recording, for each chosen move
+  `x : X`, the finite ordered list of outbound packets contributed on
+  `Δ.Out`. The default is the monoid unit `1`, which is definitionally
+  the constant-`[]` trace.
 
 The activation flag is a structural marker. The query-level information
 about *how* an input message determines the node's move belongs in the
@@ -70,7 +82,7 @@ concerns (buffering, duplication, scheduling, delivery) belong in a separate
 -/
 structure BoundaryAction (Δ : PortBoundary) (X : Type w) where
   isActivated : Bool := false
-  emit : X → List (Interface.Packet Δ.Out) := fun _ => []
+  emit : PFunctor.Trace Δ.Out X := 1
 
 namespace BoundaryAction
 
@@ -79,7 +91,7 @@ A purely internal node: not externally activated and no outbound packets.
 -/
 def internal (Δ : PortBoundary) (X : Type w) : BoundaryAction Δ X where
   isActivated := false
-  emit := fun _ => []
+  emit := 1
 
 /--
 A boundary-activated node that emits no outbound packets.
@@ -91,27 +103,27 @@ def activated (Δ : PortBoundary) (X : Type w) : BoundaryAction Δ X where
 An internally driven node that emits outbound packets.
 -/
 def outputOnly {Δ : PortBoundary} {X : Type w}
-    (e : X → List (Interface.Packet Δ.Out)) : BoundaryAction Δ X where
+    (e : PFunctor.Trace Δ.Out X) : BoundaryAction Δ X where
   emit := e
 
 /--
 Transform a boundary action along a boundary adaptation.
 
 The activation flag is preserved (it does not depend on the boundary
-presentation). The emitted packets are translated forward along
-`φ.onOut`.
+presentation). The emitted-trace is pushed forward along the output chart
+`φ.onOut` via `PFunctor.Trace.mapChart`.
 -/
 def mapBoundary {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂) (b : BoundaryAction Δ₁ X) :
     BoundaryAction Δ₂ X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket φ.onOut)
+  emit := PFunctor.Trace.mapChart φ.onOut b.emit
 
 @[simp]
 theorem mapBoundary_id {Δ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ X) :
     mapBoundary (PortBoundary.Hom.id Δ) b = b := by
-  simp [mapBoundary, PortBoundary.Hom.id, Interface.Hom.mapPacket_id]
+  simp [mapBoundary, PortBoundary.Hom.id, Interface.Hom.id]
 
 @[simp]
 theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
@@ -119,72 +131,88 @@ theorem mapBoundary_comp {Δ₁ Δ₂ Δ₃ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ₁ X) :
     mapBoundary g (mapBoundary f b) =
       mapBoundary (PortBoundary.Hom.comp g f) b := by
-  simp [mapBoundary, PortBoundary.Hom.comp, List.map_map,
-    Interface.Hom.mapPacket_comp]
+  simp [mapBoundary, PortBoundary.Hom.comp, Interface.Hom.comp,
+    PFunctor.Trace.mapChart_comp]
 
 /--
 Embed a boundary action on the left factor into the tensor boundary.
 
-Emitted packets are injected into the left summand of the combined output
-interface. The activation flag is preserved.
+The trace is pushed forward along the left-injection chart
+`Interface.Hom.inl Δ₁.Out Δ₂.Out` via `PFunctor.Trace.mapChart`. The
+activation flag is preserved.
 -/
 def embedInlTensor {Δ₁ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction Δ₁ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inl Δ₁.Out Δ₂.Out))
+  emit := PFunctor.Trace.mapChart (Interface.Hom.inl Δ₁.Out Δ₂.Out) b.emit
 
 /--
 Embed a boundary action on the right factor into the tensor boundary.
 
-Emitted packets are injected into the right summand of the combined output
-interface. The activation flag is preserved.
+The trace is pushed forward along the right-injection chart
+`Interface.Hom.inr Δ₁.Out Δ₂.Out` via `PFunctor.Trace.mapChart`. The
+activation flag is preserved.
 -/
 def embedInrTensor (Δ₁ : PortBoundary) {Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ₂ X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).map (Interface.Hom.mapPacket (Interface.Hom.inr Δ₁.Out Δ₂.Out))
+  emit := PFunctor.Trace.mapChart (Interface.Hom.inr Δ₁.Out Δ₂.Out) b.emit
 
 /--
 Transform a boundary action on `tensor Δ₁ Γ` into one on `tensor Δ₁ Δ₂`
 by keeping only the left-summand (Δ₁) packets and re-injecting them
 into the left summand of the combined output. Right-summand (Γ) packets
 are dropped (they become internal traffic handled by the runtime).
+
+Implemented as `PFunctor.Trace.mapPartial` on the appropriate index-level
+partial map.
 -/
 def wireLeft {Δ₁ Γ : PortBoundary} (Δ₂ : PortBoundary) {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor Δ₁ Γ) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).filterMap fun
-    | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
-    | ⟨Sum.inr _, _⟩ => none
+  emit := PFunctor.Trace.mapPartial
+    (P := (PortBoundary.tensor Δ₁ Γ).Out)
+    (Q := (PortBoundary.tensor Δ₁ Δ₂).Out)
+    (fun
+      | ⟨Sum.inl a₁, m⟩ => some ⟨Sum.inl a₁, m⟩
+      | ⟨Sum.inr _, _⟩ => none) b.emit
 
 /--
 Transform a boundary action on `tensor (swap Γ) Δ₂` into one on
 `tensor Δ₁ Δ₂` by keeping only the right-summand (Δ₂) packets and
 re-injecting them into the right summand of the combined output.
 Left-summand (swap Γ) packets are dropped (internal traffic).
+
+Implemented as `PFunctor.Trace.mapPartial` on the appropriate index-level
+partial map.
 -/
 def wireRight (Δ₁ : PortBoundary) {Γ Δ₂ : PortBoundary} {X : Type w}
     (b : BoundaryAction (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂) X) :
     BoundaryAction (PortBoundary.tensor Δ₁ Δ₂) X where
   isActivated := b.isActivated
-  emit x := (b.emit x).filterMap fun
-    | ⟨Sum.inl _, _⟩ => none
-    | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩
+  emit := PFunctor.Trace.mapPartial
+    (P := (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂).Out)
+    (Q := (PortBoundary.tensor Δ₁ Δ₂).Out)
+    (fun
+      | ⟨Sum.inl _, _⟩ => none
+      | ⟨Sum.inr a₂, m⟩ => some ⟨Sum.inr a₂, m⟩) b.emit
 
 /--
 Close a boundary action by dropping all external traffic.
 
 The result lives on `PortBoundary.empty` and has no activation or emission.
-This is used by `plug` to internalize all boundary interactions.
+This is used by `plug` to internalize all boundary interactions. The
+emitted-trace is the monoid unit `1`, which is definitionally the constant-`[]`
+trace.
 -/
 def closed {Δ : PortBoundary} {X : Type w}
     (b : BoundaryAction Δ X) :
     BoundaryAction PortBoundary.empty X where
   isActivated := b.isActivated
-  emit _ := []
+  emit := 1
 
 @[simp]
 theorem mapBoundary_embedInlTensor
@@ -193,8 +221,11 @@ theorem mapBoundary_embedInlTensor
     (b : BoundaryAction Δ₁ X) :
     (b.embedInlTensor Δ₂).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
       (b.mapBoundary f₁).embedInlTensor Δ₂' := by
-  simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor, List.map_map]
+  simp only [mapBoundary, embedInlTensor, PortBoundary.Hom.tensor]
   congr 1
+  rw [← PFunctor.Trace.mapChart_comp, ← PFunctor.Trace.mapChart_comp]
+  exact congrArg (PFunctor.Trace.mapChart · b.emit)
+    (Interface.Hom.comp_sum_inl f₁.onOut f₂.onOut)
 
 @[simp]
 theorem mapBoundary_embedInrTensor
@@ -203,16 +234,18 @@ theorem mapBoundary_embedInrTensor
     (b : BoundaryAction Δ₂ X) :
     (b.embedInrTensor Δ₁).mapBoundary (PortBoundary.Hom.tensor f₁ f₂) =
       (b.mapBoundary f₂).embedInrTensor Δ₁' := by
-  simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor, List.map_map]
+  simp only [mapBoundary, embedInrTensor, PortBoundary.Hom.tensor]
   congr 1
+  rw [← PFunctor.Trace.mapChart_comp, ← PFunctor.Trace.mapChart_comp]
+  exact congrArg (PFunctor.Trace.mapChart · b.emit)
+    (Interface.Hom.comp_sum_inr f₁.onOut f₂.onOut)
 
 @[simp]
 theorem closed_mapBoundary
     {Δ₁ Δ₂ : PortBoundary} {X : Type w}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
     (b : BoundaryAction Δ₁ X) :
-    (b.mapBoundary φ).closed = b.closed := by
-  simp [closed, mapBoundary]
+    (b.mapBoundary φ).closed = b.closed := rfl
 
 @[simp]
 theorem mapBoundary_wireLeft
@@ -223,12 +256,13 @@ theorem mapBoundary_wireLeft
       (b.mapBoundary
         (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ))).wireLeft Δ₂' := by
   simp only [wireLeft, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  funext x
+  simp only [PFunctor.Trace.mapChart_apply, PFunctor.Trace.mapPartial_apply,
+    List.filterMap_filterMap]
+  congr 1
+  funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port <;> rfl
 
 @[simp]
 theorem mapBoundary_wireRight
@@ -240,12 +274,13 @@ theorem mapBoundary_wireRight
         (PortBoundary.Hom.tensor
           (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)).wireRight Δ₁' := by
   simp only [wireRight, mapBoundary, PortBoundary.Hom.tensor, PortBoundary.Hom.id]
-  congr 1; funext x
-  rw [List.map_filterMap, List.filterMap_map]
-  congr 1; funext ⟨pkt_port, pkt_msg⟩
-  cases pkt_port with
-  | inl _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
-  | inr _ => dsimp [Interface.Hom.mapPacket, Interface.Hom.sum]; rfl
+  congr 1
+  funext x
+  simp only [PFunctor.Trace.mapChart_apply, PFunctor.Trace.mapPartial_apply,
+    List.filterMap_filterMap]
+  congr 1
+  funext ⟨pkt_port, pkt_msg⟩
+  cases pkt_port <;> rfl
 
 end BoundaryAction
 
@@ -636,22 +671,61 @@ records both the usual controller/view data and its boundary traffic against
 `Δ`.
 -/
 abbrev OpenStep (Party : Type u) (Δ : PortBoundary) (P : Type v) :=
-  StepOver (OpenNodeContext Party Δ : Spec.Node.Context.{w}) P
+  StepOver (OpenNodeContext Party Δ : Spec.Node.Context.{0}) P
 
 /--
-The open-world specialization of `ProcessOver`.
+An `m`-parametric open concurrent process exposing boundary `Δ`.
 
-An `OpenProcess Party Δ` is a continuation-based process whose steps are
-decorated by `OpenNodeProfile Party Δ`. It exposes the directed boundary
-`Δ` to an external context.
+`OpenProcess m Party Δ` bundles:
 
-The closed-world `Process Party` is recovered by
-`ProcessOver.mapContext (OpenNodeContext.forget Party Δ)`.
+* `Proc` — the residual state space of the process;
+* `step` — for each state, the protocol step observed by the open world
+  (move-tree `spec`, node-local semantics, and continuation `next`);
+* `stepSampler` — a per-state `Spec.Sampler m (step s).spec` resolving
+  each move of the step protocol in the intermediate monad `m`.
+
+Each state of an open process carries its own nodewise-monadic
+sampler as first-class data. `openTheory m` compositionally assembles
+the per-step samplers of composite processes through `par`, `wire`,
+and `plug` via `Spec.Sampler.interleave`, and the runtime layer
+(`processSemantics`, `processSemanticsAsync`) reads the sampler off
+the process rather than taking it as a separate argument.
+
+## Universe conventions
+
+The spec / move-type universe is pinned at `0` because `m : Type → Type`
+only operates on `Type` and the `Sampler m spec` abbrev therefore
+requires `spec : Spec.{0}`. The `Party` universe `u` and the state
+universe `v` remain free.
+
+## Recovering the structural layer
+
+`op.toProcess : ProcessOver ...` projects onto the underlying
+`ProcessOver`, feeding the structural lemmas in `Concurrent/Process.lean`
+and the bisimulation infrastructure below.
 -/
-abbrev OpenProcess (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+structure OpenProcess
+    (m : Type w → Type w')
+    (Party : Type u) (Δ : PortBoundary) where
+  /-- Residual state space of the process. -/
+  Proc : Type v
+  /-- Protocol step observed at state `s`. -/
+  step : Proc → StepOver (OpenNodeContext.{u, w} Party Δ) Proc
+  /-- Per-state nodewise-monadic sampler that resolves each move of the step
+  protocol in the intermediate monad `m`. -/
+  stepSampler : ∀ s, Spec.Sampler.{w, w'} m (step s).spec
 
 namespace OpenProcess
+
+/-- Structural projection onto the underlying `ProcessOver`, dropping
+the per-state sampler. The closed-world `ProcessOver` lemmas from
+`Concurrent/Process.lean` apply through this projection. -/
+@[reducible]
+def toProcess {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (op : OpenProcess.{u, v, w, w'} m Party Δ) :
+    ProcessOver (OpenNodeContext.{u, w} Party Δ) where
+  Proc := op.Proc
+  step := op.step
 
 /--
 Forget the boundary layer and view an open process as a plain closed-world
@@ -659,43 +733,88 @@ process.
 
 This is the canonical projection: it drops all `BoundaryAction` data from
 every node while preserving the process structure, controller paths, and
-local views.
+local views. The sampler is also discarded, so the result is a bare
+`ProcessOver` over the closed-world context.
 -/
-def toClosed {Party : Type u} {Δ : PortBoundary}
-    (op : OpenProcess.{u, v, w} Party Δ) : Process Party :=
-  op.mapContext (OpenNodeContext.forget Party Δ)
+def toClosed {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (op : OpenProcess.{u, v, w, w'} m Party Δ) : Process.{u, v, w} Party :=
+  op.toProcess.mapContext (OpenNodeContext.forget.{u, w} Party Δ)
 
 /--
-Embed a closed-world process as an open process with no boundary traffic.
+Embed a closed-world process as an open process with no boundary traffic,
+using a user-supplied per-state sampler.
 
 Every node is marked as purely internal: `isActivated = false` and `emit`
-produces no packets.
+produces no packets. The caller must supply the nodewise sampler because
+the closed-world process carries no monadic information.
 -/
-def ofClosed {Party : Type u} {Δ : PortBoundary}
-    (p : Process.{u, v, w} Party) : OpenProcess Party Δ :=
-  p.mapContext (OpenNodeContext.embed Party Δ)
+def ofClosed {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p : Process.{u, v, w} Party)
+    (sampler : ∀ s, Spec.Sampler.{w, w'} m (p.step s).spec) :
+    OpenProcess.{u, v, w, w'} m Party Δ where
+  Proc := (p.mapContext (OpenNodeContext.embed.{u, w} Party Δ)).Proc
+  step := (p.mapContext (OpenNodeContext.embed.{u, w} Party Δ)).step
+  stepSampler := sampler
 
 /--
 Adapt the exposed boundary of an open process along a structural boundary
 morphism.
 
 This transforms every node's boundary action along `φ` (translating emitted
-packets, preserving activation flags) while leaving the process structure
-and closed-world node semantics unchanged.
+packets, preserving activation flags) while leaving the process structure,
+closed-world node semantics, and per-step samplers unchanged. The sampler
+carries over verbatim because `StepOver.mapContext` preserves `step.spec`.
 -/
-def mapBoundary {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
-    (φ : PortBoundary.Hom Δ₁ Δ₂) (op : OpenProcess.{u, v, w} Party Δ₁) :
-    OpenProcess Party Δ₂ :=
-  op.mapContext (OpenNodeContext.map Party φ)
+def mapBoundary {m : Type w → Type w'} {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+    (φ : PortBoundary.Hom Δ₁ Δ₂) (op : OpenProcess.{u, v, w, w'} m Party Δ₁) :
+    OpenProcess.{u, v, w, w'} m Party Δ₂ where
+  Proc := op.Proc
+  step := fun s => (op.step s).mapContext (OpenNodeContext.map.{u, w} Party φ)
+  stepSampler := op.stepSampler
+
+/--
+Binary-choice interleaving of two open processes, targeting a common
+boundary `Δ` via structural injections `f₁`, `f₂` and a scheduling node
+context `schedulerCtx : OpenNodeContext Party Δ (ULift Bool)`.
+
+Structure on `Proc` and `step` is delegated to the underlying
+`Concurrent.ProcessOver.interleave`; the per-state sampler is assembled
+by `Spec.Sampler.interleave`, which threads the scheduler sampler
+`schedulerSampler : m (ULift Bool)` above the per-branch samplers so that
+the resulting step carries a well-typed nodewise-monadic sampler.
+
+This is the single ingredient shared by `openTheory.par`, `openTheory.wire`,
+and `openTheory.plug`: those operations differ only in which injection
+pair `f₁`, `f₂` they supply.
+-/
+def interleave {m : Type w → Type w'} {Party : Type u} {Δ₁ Δ₂ Δ : PortBoundary}
+    (p₁ : OpenProcess.{u, v, w, w'} m Party Δ₁)
+    (p₂ : OpenProcess.{u, v, w, w'} m Party Δ₂)
+    (f₁ : Spec.Node.ContextHom
+      (OpenNodeContext.{u, w} Party Δ₁)
+      (OpenNodeContext.{u, w} Party Δ))
+    (f₂ : Spec.Node.ContextHom
+      (OpenNodeContext.{u, w} Party Δ₂)
+      (OpenNodeContext.{u, w} Party Δ))
+    (schedulerCtx : OpenNodeContext.{u, w} Party Δ (ULift.{w, 0} Bool))
+    (schedulerSampler : m (ULift.{w, 0} Bool)) :
+    OpenProcess.{u, v, w, w'} m Party Δ where
+  Proc := p₁.Proc × p₂.Proc
+  step := (p₁.toProcess.interleave p₂.toProcess f₁ f₂ schedulerCtx).step
+  stepSampler := fun (s₁, s₂) =>
+    Spec.Sampler.interleave schedulerSampler
+      (p₁.stepSampler s₁) (p₂.stepSampler s₂)
 
 end OpenProcess
 
 /--
 `OpenProcess.System` augments an open process by the standard verification
-predicates used throughout VCVio.
+predicates used throughout VCVio. The verification predicates are about
+the structural `ProcessOver` layer, so `OpenProcess.System` is monad- and
+sampler-agnostic and refers to the underlying `ProcessOver.System`.
 -/
 abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver.System (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+  ProcessOver.System (OpenNodeContext.{u, w} Party Δ)
 
 /-! ## Silent steps and weak bisimulation -/
 
@@ -715,8 +834,8 @@ def IsSilentDecoration {Party : Type u} {Δ : PortBoundary} :
 
 /-- A complete step of an open process is **silent** when every node along
 the chosen transcript path has boundary-internal semantics. -/
-def IsSilentStep {Party : Type u} {Δ : PortBoundary}
-    (p : OpenProcess.{u, v, w} Party Δ) (s : p.Proc)
+def IsSilentStep {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p : OpenProcess.{u, v, w, w'} m Party Δ) (s : p.Proc)
     (tr : (p.step s).spec.Transcript) : Prop :=
   IsSilentDecoration (p.step s).semantics tr
 
@@ -746,9 +865,10 @@ theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
 /-- `IsSilentStep` is invariant under `OpenProcess.mapBoundary`: remapping
 the boundary does not change which transcripts are silent, because all
 boundary maps preserve `isActivated`. -/
-theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+theorem isSilentStep_mapBoundary_iff {m : Type w → Type w'}
+    {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
-    (p : OpenProcess.{u, v, w} Party Δ₁) (s : p.Proc)
+    (p : OpenProcess.{u, v, w, w'} m Party Δ₁) (s : p.Proc)
     (tr : (p.step s).spec.Transcript) :
     IsSilentStep (p.mapBoundary φ) s tr ↔ IsSilentStep p s tr := by
   apply isSilentDecoration_iff_map
@@ -774,8 +894,8 @@ right-nested interleaving) but the observable boundary traffic is the same.
 The scheduler nodes introduced by `ProcessOver.interleave` are always silent,
 so they can be absorbed by the weak bisimulation.
 -/
-def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
-    (p₁ p₂ : OpenProcess.{u, v, w} Party Δ) : Prop :=
+def OpenProcessIso {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p₁ p₂ : OpenProcess.{u, v, w, w'} m Party Δ) : Prop :=
   ∃ (rel : p₁.Proc → p₂.Proc → Prop),
     (∀ s₁, ∃ s₂, rel s₁ s₂) ∧
     (∀ s₂, ∃ s₁, rel s₁ s₂) ∧
@@ -800,10 +920,10 @@ def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
 
 namespace OpenProcessIso
 
-variable {Party : Type u} {Δ : PortBoundary}
+variable {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
 
 /-- Every open process is weakly bisimilar to itself. -/
-protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
+protected theorem refl (p : OpenProcess.{u, v, w, w'} m Party Δ) :
     OpenProcessIso p p :=
   ⟨Eq, fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩,
     fun s₁ _ h tr _ => by subst h; exact .inl ⟨tr, rfl⟩,
@@ -812,7 +932,7 @@ protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
     fun s₁ _ h tr hv => by subst h; exact ⟨tr, hv, rfl⟩⟩
 
 /-- Weak bisimilarity is symmetric. -/
-protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
+protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w, w'} m Party Δ}
     (h : OpenProcessIso p₁ p₂) :
     OpenProcessIso p₂ p₁ := by
   obtain ⟨rel, htot, hsurj, hfs, hfv, hbs, hbv⟩ := h
@@ -826,7 +946,7 @@ protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
 an intermediate: `∃ s₂, r₁₂ s₁ s₂ ∧ r₂₃ s₂ s₃`. For silent steps, the
 intermediate state can advance or stay, using `Classical.em` to case-split
 on whether the intermediate step is itself silent. -/
-protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w} Party Δ}
+protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w, w'} m Party Δ}
     (h₁₂ : OpenProcessIso p₁ p₂)
     (h₂₃ : OpenProcessIso p₂ p₃) :
     OpenProcessIso p₁ p₃ := by

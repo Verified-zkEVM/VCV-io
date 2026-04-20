@@ -118,11 +118,14 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - Concurrent specs and frontiers: `VCVio/Interaction/Concurrent/Spec.lean`, `VCVio/Interaction/Concurrent/Frontier.lean`
 - Concurrent processes and execution: `VCVio/Interaction/Concurrent/Process.lean`
 - Open systems (interfaces, composition): `VCVio/Interaction/UC/OpenTheory.lean`
-- Open processes (boundary traffic, UC bridge): `VCVio/Interaction/UC/OpenProcess.lean`
-- Concrete open-theory model: `VCVio/Interaction/UC/OpenProcessModel.lean`
+- Open processes (boundary traffic, UC bridge): `VCVio/Interaction/UC/OpenProcess.lean` (monad-parametric `OpenProcess m Party Δ` with intrinsic `stepSampler` field)
+- Concrete open-theory model: `VCVio/Interaction/UC/OpenProcessModel.lean` (`openTheory m Party schedulerSampler` threads `Spec.Sampler` through `map` / `par` / `wire` / `plug`)
 - UC emulation and security: `VCVio/Interaction/UC/Emulates.lean`
 - Computational UC observation layer: `VCVio/Interaction/UC/Computational.lean`
-- Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean`
+- Per-node samplers as data (`Spec.Sampler m spec` = `Decoration (fun X => m X) spec`): `VCVio/Interaction/Basic/Sampler.lean`
+- `Spec.Fintype` ornament + canonical uniform sampler: `VCVio/Interaction/Basic/SpecFintype.lean`, `VCVio/Interaction/UC/Runtime.lean`
+- Oracle-aware runtime semantics (monad-parametric process execution, `processSemanticsOracle`): `VCVio/Interaction/UC/Runtime.lean` (no `sampler` argument; pulled from `process.stepSampler`)
+- End-to-end UC `CompEmulates 0` at a three-port boundary: `Examples/OneTimePad/UC.lean`
 - Interaction examples: `VCVio/Interaction/TwoParty/Examples.lean`, `VCVio/Interaction/Multiparty/Examples.lean`, `VCVio/Interaction/Concurrent/Examples.lean`
 - Program logic tactics: `VCVio/ProgramLogic/Tactics.lean`
 - Generic lattice ring layer: `LatticeCrypto/Ring/Core.lean`, `LatticeCrypto/Ring/Kernel.lean`, `LatticeCrypto/Ring/VectorBackend.lean`, `LatticeCrypto/Ring/Transform.lean`, `LatticeCrypto/Ring/Norms.lean`, `LatticeCrypto/Ring/Rounding.lean`
