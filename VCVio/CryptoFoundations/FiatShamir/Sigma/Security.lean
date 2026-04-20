@@ -925,6 +925,37 @@ theorem euf_cma_to_nma
         -- (since `msg ∉ signed` rules out sign-programmed entries as the only other source
         -- of advCache writes); the lockstep invariant
         -- `(msg, c) ∈ roCache.domain ⟺ (msg, c) ∈ queryLog` then finishes.
+        -- Per-pk inequality, structured as three sub-claims:
+        --
+        --   (P1) Distributional equality: there is a "rich" simulation `richSim pk` over `spec`
+        --        that jointly tracks `direct_sim_exp pk`'s state `(advCache, signed, bad)` and
+        --        `runTrace pk`'s state `(roCache, queryLog)`. Projecting rich→sim recovers
+        --        `direct_sim_exp pk` exactly.
+        --   (P2) Distributional equality: converting rich's spec-level `(M × Commit →ₒ Chal)`
+        --        queries into `wrappedSpec`'s `(Unit →ₒ Chal)` queries and post-processing
+        --        `(roCache, queryLog)` into a `Trace` gives the same distribution as
+        --        `Fork.runTrace σ hr M nmaAdv pk` (treated as a ProbComp after Fork.exp's
+        --        outer `ofLift + uniformSampleImpl` conversion).
+        --   (P3) Pointwise implication: on the rich sim's support, `event pk z` implies
+        --        `forkPoint qH (trace_of z)).isSome`, where `trace_of` is the rich→trace
+        --        projection used in (P2). The proof uses the invariants:
+        --          (I1) `roCache mc = some v ⟹ advCache (.inr mc) = some v` (roSim caches);
+        --          (I2) `advCache (.inr (msg, c)) = some v ∧ msg ∉ signed ⟹
+        --                roCache (msg, c) = some v` (sign-programming only touches `msg∈signed`);
+        --          (I3) `roCache mc ≠ none ↔ mc ∈ queryLog` (lockstep);
+        --          (I4) `queryLog.length ≤ qH` (from `nmaHashQueryBound`).
+        --        Given event, (I2) yields roCache (msg, c) = some ω; then trace.verified = true
+        --        (since verify σ holds). (I3) yields (msg, c) ∈ queryLog, so target ∈ queryLog.
+        --        (I4) bounds `findIdx < qH + 1`. Hence forkPoint qH trace = some _.
+        --
+        -- Integration:  LHS = Pr[event | direct_sim_exp]  = Pr[event' | richSim]    (by P1)
+        --                                                ≤ Pr[forkPoint' | richSim] (by P3)
+        --                                                = Pr[forkPoint | runTrace] (by P2).
+        --
+        -- The construction of `richSim pk` and the three sub-claims (P1)–(P3) are
+        -- deferred to a follow-up proof round. The scaffolding below records the intended
+        -- signature of the per-pk inequality; filling in `richSim` + (P1), (P2), (P3)
+        -- discharges this `sorry` and closes the freshness-preserving `euf_cma_to_nma` chain.
         have per_pk_event_le_forkPoint : ∀ (pk : Stmt),
             Pr[event pk | direct_sim_exp pk] ≤
               Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
@@ -950,7 +981,7 @@ theorem euf_cma_to_nma
         -- Chain the per-pk bound over the sum.
         rw [hFork_tsum]
         refine ENNReal.tsum_le_tsum fun pksk => ?_
-        exact mul_le_mul_left' (per_pk_event_le_forkPoint pksk.1) _
+        exact mul_le_mul_right (per_pk_event_le_forkPoint pksk.1) _
       -- Wire the four sub-claims into the final advantage bound.
       --
       -- Abbreviations used below:
@@ -994,7 +1025,7 @@ theorem euf_cma_to_nma
           intro pksk
           by_cases hmem : pksk ∈ support hr.gen
           · have hrel : rel pksk.1 pksk.2 = true := hr.gen_sound _ _ hmem
-            exact mul_le_mul_left' (step_b_per_pksk_signed pksk.1 pksk.2 hrel) _
+            exact mul_le_mul_right (step_b_per_pksk_signed pksk.1 pksk.2 hrel) _
           · have h0 : evalDist hr.gen pksk = 0 :=
               probOutput_eq_zero_of_not_mem_support hmem
             simp [h0]
@@ -1045,7 +1076,7 @@ theorem euf_cma_to_nma
             evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1] ≤
               evalDist hr.gen pksk *
                 (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) :=
-          fun pksk => mul_le_mul_left' (pr_bad_le_signed pksk.1) _
+          fun pksk => mul_le_mul_right (pr_bad_le_signed pksk.1) _
         have h_step1 :
             (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                 Pr[badPred | direct_sim_exp pksk.1]) ≤
