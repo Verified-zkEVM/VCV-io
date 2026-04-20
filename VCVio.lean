@@ -115,6 +115,7 @@ import VCVio.Interaction.TwoParty.Role
 import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
 import VCVio.Interaction.UC.AsyncRuntime
+import VCVio.Interaction.UC.AsyncSecurity
 import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.CorruptionModel
 import VCVio.Interaction.UC.Emulates
