@@ -35,6 +35,37 @@ variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+/-! ### Bad-flag support lemmas
+
+Generic monotonicity lemmas about the `QueryImpl.withBadFlag` and `QueryImpl.withBadUpdate`
+combinators (see `VCVio/OracleComp/SimSemantics/StateT.lean`). They formalize the obvious facts
+that the boolean (bad) flag in the lifted state is *threaded unchanged* by `withBadFlag` and is
+*OR-monotone* under `withBadUpdate`. We use them below to discharge the monotonicity hypothesis
+of the per-query ε-perturbed identical-until-bad lemma. -/
+
+private lemma support_withBadFlag_run_snd_snd
+    {ι : Type*} {spec : OracleSpec ι} {ι' : Type*} {spec' : OracleSpec ι'}
+    {σ : Type _} (impl : QueryImpl spec (StateT σ (OracleComp spec')))
+    (t : spec.Domain) (s : σ) (b : Bool)
+    {z : spec.Range t × σ × Bool}
+    (hz : z ∈ support ((impl.withBadFlag t).run (s, b))) :
+    z.2.2 = b := by
+  simp only [QueryImpl.withBadFlag, StateT.run, StateT.mk, support_map] at hz
+  obtain ⟨_, _, rfl⟩ := hz
+  rfl
+
+private lemma support_withBadUpdate_run_snd_snd_of_pre
+    {ι : Type*} {spec : OracleSpec ι} {ι' : Type*} {spec' : OracleSpec ι'}
+    {σ : Type _} (impl : QueryImpl spec (StateT σ (OracleComp spec')))
+    (f : (t : spec.Domain) → σ → spec.Range t → Bool)
+    (t : spec.Domain) (s : σ)
+    {z : spec.Range t × σ × Bool}
+    (hz : z ∈ support ((impl.withBadUpdate f t).run (s, true))) :
+    z.2.2 = true := by
+  simp only [QueryImpl.withBadUpdate, StateT.run, StateT.mk, support_map] at hz
+  obtain ⟨_, _, rfl⟩ := hz
+  simp
+
 /-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
 
 For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
@@ -382,55 +413,56 @@ theorem euf_cma_to_nma
     -- See §D.10.4 of `Notes/vcvio-fs-schnorr-clean-chain.md`. The single sorry below tracks
     -- this combined application; the freshness-drop hop (Phase B) is already discharged and
     -- the structural framework (pk/sk binding, `nmaAdv` construction, query bounds) above
-    -- is sorry-free. The per-query ε lemma (Option 1 from the synthesis doc) is now in place.
+    -- is sorry-free. The per-query ε lemma (Option 1 from the synthesis doc) is now in place,
+    -- and the bad-flag monotonicity hypothesis (`h_mono₁`) is now discharged via the generic
+    -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators (see `StateT.lean`).
     set g1 : ENNReal := Pr[= true | SignatureAlg.unforgeableExpNoFresh (runtime M) adv] with hg1
     have fresh_preserved : adv.advantage (runtime M) ≤ g1 :=
       SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
         (runtime M) (fun f mx => runtime_evalDist_bind_pure M mx f) adv
     -- Construct the bad-flag-aware impls used in the application of
-    -- `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`.
-    -- `baseSimBad` lifts `baseSim` to `StateT (cache × Bool)`; the bad flag is
-    -- never set by the base oracles (uniform forwarding + RO caching).
+    -- `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`. We use the
+    -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators so the per-query
+    -- monotonicity follows from the generic `support_with*_run_snd_snd_*` lemmas.
+    -- `baseSimBad` lifts `baseSim` to `StateT (cache × Bool)` by threading the bad flag
+    -- unchanged (the base oracles never set it).
     let baseSimBad : QueryImpl spec
-        (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun t => do
-      let (cache, bad) ← get
-      let (v, cache') ← liftM ((baseSim t).run cache)
-      set (cache', bad)
-      pure v
+        (StateT (spec.QueryCache × Bool) (OracleComp spec)) :=
+      baseSim.withBadFlag
+    -- Predicate for the simulator's bad event: programming `(msg, c)` would overwrite a
+    -- previously cached entry (the cache is the *pre-state*, so this is the genuine
+    -- collision check that birthday bounds bound).
+    let sigBadF : (msg : M) → spec.QueryCache → Commit × Resp → Bool :=
+      fun msg cache vc => (cache (.inr (msg, vc.1))).isSome
     -- `sigSimBad pk` lifts `sigSim pk` to `StateT (cache × Bool)`; the bad flag is
-    -- set when sigSim would attempt to program an already-cached entry.
+    -- OR-updated with `sigBadF`.
     let sigSimBad : Stmt → QueryImpl (M →ₒ (Commit × Resp))
-        (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk msg => do
-      let (cache, bad) ← get
-      let ((c, s), cache') ← liftM ((sigSim pk msg).run cache)
-      let bad' := bad || (cache (.inr (msg, c))).isSome
-      set (cache', bad')
-      pure (c, s)
+        (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk =>
+      (sigSim pk).withBadUpdate sigBadF
     -- Combined "sim" implementation (per-pk): forwarders + sigSimBad.
     let _simImpl : Stmt → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk =>
       baseSimBad + sigSimBad pk
-    -- `realSignBad pk sk` is a *hypothetical* programming-style signing oracle: it samples
-    -- a real transcript `(c, ch, s) ← σ.realTranscript pk sk` and programs the cache at
-    -- `(msg, c) ↦ ch` (overwriting if already present). The bad flag is set when the cache
-    -- already has `(msg, c)` cached (matching the simulator's bad event). This shape mirrors
-    -- `sigSimBad` exactly: the only difference is the underlying transcript distribution
-    -- (`realTranscript` vs `simTranscript`), so per-query HVZK directly bounds their TV
-    -- distance by `ζ_zk`. A separate bridge step (`bridge_g1_real`, sub-claim (A)) connects
-    -- this hypothetical signer to the actual `FiatShamir.sign` oracle used in `g1`.
-    let realSignBad : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
-        (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk msg => do
-      let s : spec.QueryCache × Bool ← get
-      let (cache, bad) := s
+    -- `realSign pk sk` is a *hypothetical* programming-style signing oracle that samples a
+    -- real transcript `(c, ch, π) ← σ.realTranscript pk sk` and programs the RO cache at
+    -- `(msg, c) ↦ ch` (only on a cache miss; on a hit the cache is preserved). It mirrors
+    -- `sigSim` exactly except that it uses `realTranscript` in place of `simTranscript`,
+    -- so the per-query HVZK guarantee directly bounds their TV distance by `ζ_zk`.
+    let realSign : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT spec.QueryCache (OracleComp spec)) := fun pk sk msg => do
+      let cache ← get
       let (c, ch, π) ← liftM ((σ.realTranscript pk sk : ProbComp _).liftComp spec)
-      -- Soft programming: write `(msg, c) ↦ ch` only on cache miss; mirrors `sigSim`.
-      let bad' := bad || (cache (.inr (msg, c))).isSome
-      let cache' : spec.QueryCache := match cache (.inr (msg, c)) with
-        | some _ => cache
-        | none => cache.cacheQuery (.inr (msg, c)) ch
-      let s' : spec.QueryCache × Bool := (cache', bad')
-      set s'
-      pure (c, π)
+      modifyGet fun cache =>
+        match cache (.inr (msg, c)) with
+        | some _ => ((c, π), cache)
+        | none => ((c, π), cache.cacheQuery (.inr (msg, c)) ch)
+    -- `realSignBad pk sk` is the bad-flag-aware lift of `realSign pk sk`, OR-updated with
+    -- the same `sigBadF` predicate so its bad event matches the simulator's. A separate
+    -- bridge step (`bridge_g1_real`, sub-claim (A)) connects this hypothetical signer to the
+    -- actual `FiatShamir.sign` oracle used in `g1`.
+    let realSignBad : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk =>
+      (realSign pk sk).withBadUpdate sigBadF
     -- Combined "real" implementation (per-(pk, sk)): forwarders + realSignBad.
     let _realImpl : Stmt → Wit → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk =>
@@ -471,6 +503,8 @@ theorem euf_cma_to_nma
       --             `baseSimBad` for `.inl` queries, so they are pointwise equal.
       --       (iii) `h_mono₁`: bad flag is monotone in `_simImpl pk` (`baseSimBad`
       --             threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`).
+      --             ✓ Discharged via `support_withBadFlag_run_snd_snd` and
+      --             `support_withBadUpdate_run_snd_snd_of_pre`.
       --       (iv)  `h_qb`: `IsQueryBound (adv.main pk) qS sign-canQuery sign-cost`,
       --             derived from `_hQ pk : signHashQueryBound (adv.main pk) qS qH`
       --             by projecting away the `qH` coordinate (a generic monotonicity
@@ -485,8 +519,10 @@ theorem euf_cma_to_nma
       --
       -- Each of (A), (B), (C) is a substantive sub-lemma. The single sorry below tracks the
       -- full assembly. All four impls (`baseSimBad`, `sigSimBad`, `realSignBad`, and the
-      -- combined `_simImpl` / `_realImpl`) are defined inline so the application is fully
-      -- type-grounded.
+      -- combined `_simImpl` / `_realImpl`) are defined inline using the generic
+      -- `QueryImpl.withBadFlag` / `QueryImpl.withBadUpdate` combinators (see `StateT.lean`),
+      -- which makes the application fully type-grounded and the bad-flag monotonicity
+      -- (`h_mono₁`) close cleanly via the corresponding generic support lemmas.
       -- Step (B), per (pk, sk) pair: the per-query ε bound from the selective lemma.
       -- The selective lemma yields a TV bound on the joint distribution of
       -- `(simulateQ _simImpl).run' (∅, false)` and `(simulateQ _realImpl).run' (∅, false)`
@@ -558,24 +594,22 @@ theorem euf_cma_to_nma
           | inr _ => exact (hSt trivial).elim
         case h_mono₁ =>
           -- Bad flag monotonicity in `_simImpl pk`: once `bad = true`, it stays `true`.
-          -- `baseSimBad` threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`.
+          -- `baseSimBad := baseSim.withBadFlag` threads `bad` unchanged, and
+          -- `sigSimBad pk := (sigSim pk).withBadUpdate sigBadF` OR-updates `bad`.
+          -- Both monotonicity facts follow from the generic `support_with*_run_snd_snd_*`
+          -- lemmas above.
           intro t p hp z hz
           obtain ⟨cache, bad⟩ := p
           dsimp only at hp
           subst hp
+          dsimp only [_simImpl, baseSimBad, sigSimBad] at hz
           cases t with
           | inl t' =>
-              -- baseSimBad threads `bad` unchanged via `set (cache', bad)`. With
-              -- initial `bad = true`, every output state has `bad = true`.
-              -- The exact destructuring chain over `mem_support_bind_iff` requires
-              -- more bookkeeping than we can express tersely with anonymous
-              -- pattern variables; tracked under sub-claim (B) bookkeeping.
-              -- Cleanest fix: extract `baseSimBad`/`sigSimBad` as top-level
-              -- `private def`s in this file (parameterised by `baseSim`/`sigSim`),
-              -- then `simp [baseSimBad, sigSimBad]` will close the goal.
-              sorry
+              simp only [QueryImpl.add_apply_inl] at hz
+              exact support_withBadFlag_run_snd_snd baseSim t' cache true hz
           | inr msg =>
-              sorry
+              simp only [QueryImpl.add_apply_inr] at hz
+              exact support_withBadUpdate_run_snd_snd_of_pre (sigSim pk) sigBadF msg cache hz
         case h_qb =>
           -- Project `signHashQueryBound (adv.main pk) qS qH` (a `(qS, qH)`-paired budget) onto
           -- the `qS` coordinate via `IsQueryBound.proj` with `proj := Prod.fst`. The sign queries
