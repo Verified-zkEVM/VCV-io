@@ -89,6 +89,59 @@ the doubled birthday bound and the `+1` cache-miss slack) and plays the same rol
 noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
   ((2 * qS * (qS + qH) + 1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
 
+section evalDistBridge
+
+variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+
+/-- The `ofLift + uniformSampleImpl` simulation on `unifSpec + (Unit →ₒ Chal)` preserves
+`evalDist`. Both oracle components sample uniformly from their range (the `unifSpec`
+side via `liftM (query n) : ProbComp (Fin (n+1))`, the challenge side via `$ᵗ Chal`),
+so the simulated computation has the same distribution as the source. -/
+private lemma evalDist_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
+    evalDist (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalDist oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t mx ih =>
+    rcases t with n | u
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+        OracleQuery.input_query, QueryImpl.add_apply_inl, QueryImpl.ofLift_apply,
+        id_map, evalDist_bind, ih]
+      apply bind_congr
+      simp
+    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+        OracleQuery.input_query, QueryImpl.add_apply_inr, uniformSampleImpl,
+        id_map, evalDist_bind, ih]
+      have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
+            SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
+          (evalDist (liftM (query (Sum.inr u)) :
+            OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
+            SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
+        rw [evalDist_uniformSample, evalDist_query]; rfl
+      exact heq ▸ rfl
+
+/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probEvent_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
+    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  simp only [probEvent_eq_tsum_indicator]
+  refine tsum_congr fun x => ?_
+  unfold Set.indicator
+  split_ifs with hpx
+  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+  · rfl
+
+/-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probOutput_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
+    Pr[= x | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
+  congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+
+end evalDistBridge
+
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
@@ -833,16 +886,71 @@ theorem euf_cma_to_nma
       -- to `Fork.advantage`. No additional slack needed (the `1/|Chal|` cache-miss verify
       -- slack is absorbed into the (A) bridge).
       --
-      -- Key insight: a forgery `(msg, c, π)` with `¬msg ∈ signed` cannot have used a
-      -- programmed `(msg, c)` cache entry, since `sigSimSigned pk` only programs at signed
-      -- `msg`. So if `event pk z` holds (cache contains `(msg, c)` and verify succeeds),
-      -- then `(msg, c)` was queried via the live RO (recorded in `Fork.runTrace`'s
-      -- `queryLog`), exactly the condition for `forkPoint trace = some _`.
+      -- Proof structure:
+      --   (1) Distribute `Fork.advantage` as a keygen-indexed tsum, matching the shape of the
+      --       LHS (this mirrors `hAdv_eq_tsum` in `euf_nma_bound`).
+      --   (2) Apply a per-pk inequality
+      --         `Pr[event pk | direct_sim_exp pk] ≤ Pr[forkPoint.isSome | runTrace pk]`
+      --       which is the genuine coupling content (sub-sorry `per_pk_event_le_forkPoint`).
+      --   (3) Chain via `ENNReal.tsum_le_tsum` and `mul_le_mul_left'`.
+      --
+      -- Key insight driving (2): a forgery `(msg, c, π)` with `¬msg ∈ signed` cannot have
+      -- used a programmed `(msg, c)` cache entry, since `sigSimSigned pk` only programs at
+      -- signed `msg`. So if `event pk z` holds (cache contains `(msg, c)` and verify
+      -- succeeds), then `(msg, c)` was queried via the live RO (recorded in
+      -- `Fork.runTrace`'s `queryLog`), exactly the condition for `forkPoint trace = some _`.
+      -- Formally, this requires a coupling between `direct_sim_exp pk` and `runTrace pk`
+      -- that preserves the shared `(forgery, advCache)` marginal and tracks the
+      -- `advCache \ roCache` delta. See the sub-sorry's sketch for details.
       have bridge_sim_fork_freshness :
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
             Pr[event pksk.1 | direct_sim_exp pksk.1]) ≤
             Fork.advantage σ hr M nmaAdv qH := by
-        sorry
+        -- Per-pk inequality: the LHS event at `direct_sim_exp pk` is dominated by the
+        -- fork-point success probability at `runTrace pk`. This is the coupling content.
+        --
+        -- Proof strategy (deferred): build a "rich" simulator
+        --   `richSim pk : QueryImpl (spec + sigSpec)
+        --       (StateT ((QueryCache × List M × Bool) × (roCache × queryLog)) ProbComp)`
+        -- that simultaneously tracks `direct_sim_exp`'s and `runTrace`'s full state.
+        -- Prove two projection lemmas:
+        --   (P1) forgetting `(roCache, queryLog)` recovers `direct_sim_exp pk`;
+        --   (P2) forgetting `(signed, bad)` recovers `runTrace pk` (up to the `verified`
+        --        reconstruction from `roCache`).
+        -- Then show the pointwise event implication on the joint state: `event pk z ⟹
+        -- (forkPoint qH (trace_of z)).isSome`. This implication uses the key invariant
+        -- that in any rich-sim execution, `roCache ⊆ advCache` (roCache only receives
+        -- roSim-sourced entries, which are also cached in advCache), hence
+        -- `advCache (.inr (msg, c)) = some ω ∧ msg ∉ signed ⟹ roCache (msg, c) = some ω`
+        -- (since `msg ∉ signed` rules out sign-programmed entries as the only other source
+        -- of advCache writes); the lockstep invariant
+        -- `(msg, c) ∈ roCache.domain ⟺ (msg, c) ∈ queryLog` then finishes.
+        have per_pk_event_le_forkPoint : ∀ (pk : Stmt),
+            Pr[event pk | direct_sim_exp pk] ≤
+              Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                  (Chal := Chal) qH trace).isSome |
+                Fork.runTrace σ hr M nmaAdv pk] :=
+          sorry
+        -- Distribute `Fork.advantage` over keygen, mirroring the `hAdv_eq_tsum` pattern in
+        -- `euf_nma_bound`.
+        have hFork_tsum : Fork.advantage σ hr M nmaAdv qH =
+            ∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                  (Chal := Chal) qH trace).isSome |
+                Fork.runTrace σ hr M nmaAdv pksk.1] := by
+          change Pr[= true | Fork.exp σ hr M nmaAdv qH] = _
+          unfold Fork.exp
+          rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
+            probEvent_bind_eq_tsum]
+          refine tsum_congr fun pksk => ?_
+          rw [probOutput_liftComp]
+          congr 1
+          rcases pksk with ⟨pk, sk⟩
+          simp only [bind_pure_comp, probEvent_map, Function.comp_def]
+        -- Chain the per-pk bound over the sum.
+        rw [hFork_tsum]
+        refine ENNReal.tsum_le_tsum fun pksk => ?_
+        exact mul_le_mul_left' (per_pk_event_le_forkPoint pksk.1) _
       -- Wire the four sub-claims into the final advantage bound.
       --
       -- Abbreviations used below:
@@ -996,58 +1104,6 @@ theorem euf_cma_to_nma
               collisionSlack qS qH Chal := by
             rw [h_slack_eq]
     exact advantage_bound
-section evalDistBridge
-
-variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
-
-/-- The `ofLift + uniformSampleImpl` simulation on `unifSpec + (Unit →ₒ Chal)` preserves
-`evalDist`. Both oracle components sample uniformly from their range (the `unifSpec`
-side via `liftM (query n) : ProbComp (Fin (n+1))`, the challenge side via `$ᵗ Chal`),
-so the simulated computation has the same distribution as the source. -/
-private lemma evalDist_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
-    evalDist (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalDist oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t mx ih =>
-    rcases t with n | u
-    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, QueryImpl.add_apply_inl, QueryImpl.ofLift_apply,
-        id_map, evalDist_bind, ih]
-      apply bind_congr
-      simp
-    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, QueryImpl.add_apply_inr, uniformSampleImpl,
-        id_map, evalDist_bind, ih]
-      have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
-            SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
-          (evalDist (liftM (query (Sum.inr u)) :
-            OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
-            SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
-        rw [evalDist_uniformSample, evalDist_query]; rfl
-      exact heq ▸ rfl
-
-/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
-private lemma probEvent_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
-    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
-  simp only [probEvent_eq_tsum_indicator]
-  refine tsum_congr fun x => ?_
-  unfold Set.indicator
-  split_ifs with hpx
-  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
-  · rfl
-
-/-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
-private lemma probOutput_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
-    Pr[= x | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
-  congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
-
-end evalDistBridge
 section jensenIntegration
 
 /-- **Keygen-indexed Cauchy-Schwarz / Jensen step for the forking lemma.**
