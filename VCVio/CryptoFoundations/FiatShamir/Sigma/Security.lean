@@ -519,16 +519,35 @@ theorem euf_cma_to_nma
           ?h_step_tv_S ?h_step_eq_nS ?h_mono₁ (oa := adv.main pk) (qS := qS) ?h_qb
           (s₀ := (∅ : (unifSpec + (M × Commit →ₒ Chal)).QueryCache))
         case h_step_tv_S =>
-          -- Per-query HVZK: per-query TV bound between `sigSimBad pk msg` (the simulator,
-          -- which programs the cache) and `realSignBad pk sk msg` (the genuine signer)
-          -- is ≤ ζ_zk by `_hhvzk` (the HVZK guarantee on `simTranscript`).
+          -- Per-query HVZK: per-query TV bound between `sigSimBad pk msg` (programs from
+          -- `simTranscript pk`) and `realSignBad pk sk msg` (programs from
+          -- `realTranscript pk sk`) is ≤ ζ_zk by `_hhvzk`.
+          --
+          -- The proof structure (when discharged) is:
+          --   1. Both `(sigSimBad pk msg).run s` and `(realSignBad pk sk msg).run s` factor as
+          --        do  let (c, ch, π) ← TRANSCRIPT
+          --            let bad' := bad || (cache (.inr (msg, c))).isSome
+          --            let cache' := if cache (.inr (msg, c)).isSome then cache
+          --                          else cache.cacheQuery (.inr (msg, c)) ch
+          --            pure ((c, π), cache', bad')
+          --      with `TRANSCRIPT := simTranscript pk` (sim side) or `realTranscript pk sk`
+          --      (real side); the rest is *deterministic and identical* (same `cache, bad`).
+          --   2. By the data-processing inequality for `tvDist`, the joint output TV is
+          --      bounded by `tvDist (simTranscript pk) (realTranscript pk sk) ≤ ζ_zk`,
+          --      where the bound follows from `_hhvzk` (which requires `rel pk sk = true`).
+          --
+          -- Discharging this step requires:
+          --   (a) Threading `rel pk sk = true` from the keygen-output assumption (a separate
+          --       hypothesis on `keygen` that `(pk, sk) ∈ support keygen → rel pk sk = true`,
+          --       valid for the `FiatShamir` scheme via `hr.gen_correct`).
+          --   (b) The data-processing TV inequality for the deterministic programming step.
+          --   (c) An equality lemma `(simulateQ unifSim oa).run cache ≡ oa.liftComp ⊗ pure cache`
+          --       for any `oa : ProbComp _` (so that `sigSim`'s use of `simulateQ unifSim
+          --       (simTranscript pk)` projects cleanly to `simTranscript pk`).
           intro t hSt s
           cases t with
           | inl _ => exact hSt.elim
           | inr msg =>
-              -- The per-query HVZK swap: `simulateQ baseSim ((FiatShamir σ hr M).sign pk sk msg)`
-              -- vs the simulator's `(c, ω, s) ← simTranscript pk; programmingStep`. The TV bound
-              -- `ζ_zk` comes from the HVZK guarantee on `simTranscript pk`.
               sorry
         case h_step_eq_nS =>
           -- On non-sign queries (`t = .inl _`), both `_simImpl` and `_realImpl` dispatch to
