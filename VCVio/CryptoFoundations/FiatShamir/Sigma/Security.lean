@@ -77,7 +77,7 @@ bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schn
 `QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH Chal`. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
-    [Fintype Chal] [SampleableType Chal]
+    [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
     (_hhvzk : σ.HVZK simTranscript ζ_zk)
@@ -476,6 +476,91 @@ theorem euf_cma_to_nma
       -- full assembly. All four impls (`baseSimBad`, `sigSimBad`, `realSignBad`, and the
       -- combined `_simImpl` / `_realImpl`) are defined inline so the application is fully
       -- type-grounded.
+      -- Step (B), per (pk, sk) pair: the per-query ε bound from the selective lemma.
+      -- The selective lemma yields a TV bound on the joint distribution of
+      -- `(simulateQ _simImpl).run' (∅, false)` and `(simulateQ _realImpl).run' (∅, false)`
+      -- of the form `qS · ζ_zk + Pr[bad on _simImpl]`. The `Pr[bad]` term is then bounded
+      -- by `collisionSlack qS qH Chal` via `programming_collision_bound`.
+      have step_b_per_pksk : ∀ (pk : Stmt) (sk : Wit),
+          tvDist
+            ((simulateQ (_simImpl pk) (adv.main pk)).run' (∅, false))
+            ((simulateQ (_realImpl pk sk) (adv.main pk)).run' (∅, false))
+          ≤ qS * ζ_zk +
+            Pr[fun z : (M × (Commit × Resp)) ×
+                  (unifSpec + (M × Commit →ₒ Chal)).QueryCache × Bool =>
+                z.2.2 = true |
+              (simulateQ (_simImpl pk) (adv.main pk)).run (∅, false)].toReal := by
+        intro pk sk
+        -- Sign-query selector: `S t := match t with | .inr _ => True | _ => False`.
+        let S : (spec + (M →ₒ (Commit × Resp))).Domain → Prop :=
+          fun t => match t with | .inr _ => True | .inl _ => False
+        have hS_dec : DecidablePred S := by
+          intro t
+          cases t with
+          | inl _ => exact instDecidableFalse
+          | inr _ => exact instDecidableTrue
+        letI := hS_dec
+        have apply_selective :=
+          @OracleComp.ProgramLogic.Relational.tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
+        refine apply_selective
+          (impl₁ := _simImpl pk) (impl₂ := _realImpl pk sk)
+          (ε := ζ_zk) _hζ_zk S
+          ?h_step_tv_S ?h_step_eq_nS ?h_mono₁ (oa := adv.main pk) (qS := qS) ?h_qb
+          (s₀ := (∅ : (unifSpec + (M × Commit →ₒ Chal)).QueryCache))
+        case h_step_tv_S =>
+          -- Per-query HVZK: per-query TV bound between `sigSimBad pk msg` (the simulator,
+          -- which programs the cache) and `realSignBad pk sk msg` (the genuine signer)
+          -- is ≤ ζ_zk by `_hhvzk` (the HVZK guarantee on `simTranscript`).
+          intro t hSt s
+          cases t with
+          | inl _ => exact hSt.elim
+          | inr msg =>
+              -- The per-query HVZK swap: `simulateQ baseSim ((FiatShamir σ hr M).sign pk sk msg)`
+              -- vs the simulator's `(c, ω, s) ← simTranscript pk; programmingStep`. The TV bound
+              -- `ζ_zk` comes from the HVZK guarantee on `simTranscript pk`.
+              sorry
+        case h_step_eq_nS =>
+          -- On non-sign queries (`t = .inl _`), both `_simImpl` and `_realImpl` dispatch to
+          -- `baseSimBad`, so they are pointwise equal.
+          intro t hSt p
+          cases t with
+          | inl t' => rfl
+          | inr _ => exact (hSt trivial).elim
+        case h_mono₁ =>
+          -- Bad flag monotonicity in `_simImpl pk`: once `bad = true`, it stays `true`.
+          -- `baseSimBad` threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`.
+          intro t p hp z hz
+          sorry
+        case h_qb =>
+          -- Project `signHashQueryBound (adv.main pk) qS qH` (a `(qS, qH)`-paired budget) onto
+          -- the `qS` coordinate via `IsQueryBound.proj` with `proj := Prod.fst`. The sign queries
+          -- (`.inr _`) decrement `qS`; non-sign queries keep `qS` unchanged.
+          have h_full : OracleComp.IsQueryBound (adv.main pk) (qS, qH)
+              (fun t b => match t, b with
+                | .inl (.inl _), _ => True
+                | .inl (.inr _), (_, qH') => 0 < qH'
+                | .inr _, (qS', _) => 0 < qS')
+              (fun t b => match t, b with
+                | .inl (.inl _), b' => b'
+                | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+                | .inr _, (qS', qH') => (qS' - 1, qH')) := _hQ pk
+          refine OracleComp.IsQueryBound.proj Prod.fst ?_ ?_ h_full
+          · intro t ⟨qS', qH'⟩ h_can
+            cases t with
+            | inl t' =>
+                cases t' with
+                | inl _ => simp [S]
+                | inr _ => simp [S]
+            | inr _ => simpa [S] using h_can
+          · intro t ⟨qS', qH'⟩ h_can
+            cases t with
+            | inl t' =>
+                cases t' with
+                | inl _ => simp [S]
+                | inr _ => simp [S]
+            | inr _ => simp [S]
+      -- The remaining steps (A) and (C) and the `Pr[bad] ≤ collisionSlack` reduction are
+      -- aggregated into the omnibus sorry below.
       sorry
     exact fresh_preserved.trans hvzk_collision_swap
 section evalDistBridge
