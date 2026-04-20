@@ -4,9 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.Interaction.UC.Emulates
-import VCVio.CryptoFoundations.SecExp
 import VCVio.CryptoFoundations.Asymptotics.Negligible
 import VCVio.CryptoFoundations.Asymptotics.Security
+import VCVio.EvalDist.Defs.Semantics
+import VCVio.EvalDist.TVDist
 
 /-!
 # Computational observation layer for UC security
@@ -16,26 +17,52 @@ judgments (`Emulates`, `UCSecure`) in terms of distributional
 distinguishing advantage. It deliberately keeps the fixed-`ε` notion
 `CompEmulates` separate from the abstract `Emulates`-as-equivalence
 judgment, because the relation
-`fun c₁ c₂ => distAdvantage (sem c₁) (sem c₂) ≤ ε` is not transitive at
-fixed `ε` (the triangle inequality only gives `2ε`) and therefore cannot
-be packaged as `Observation T`. The principled bridge to abstract
+`fun c₁ c₂ => tvDist (sem c₁) (sem c₂) ≤ ε` is not transitive at fixed
+`ε` (the triangle inequality only gives `2ε`) and therefore cannot be
+packaged as `Observation T`. The principled bridge to abstract
 `Emulates` lives at the asymptotic level (`AsympCompEmulates`), where
 sums of negligibles are still negligible.
 
+## Design: bundled sub-probabilistic semantics
+
+A `Semantics T` bundles:
+
+1. an ambient surface monad `m : Type → Type` in which closed systems
+   are observed;
+2. a `SPMFSemantics m` factoring computations in `m` through an internal
+   semantic monad into an externally visible `SPMF`;
+3. a `run : T.Closed → m Unit` that extracts the probabilistic game
+   associated to each closed system.
+
+The observation target is `SPMF Unit`, so the resulting denotation
+carries genuine failure mass. Distinguishing advantage is the total
+variation distance between the two resulting `SPMF Unit` distributions.
+This lets the same framework express:
+
+* coin-flip-only protocols with `m = ProbComp` and
+  `SPMFSemantics.ofHasEvalSPMF ProbComp`;
+* protocols with shared oracles where `m = OracleComp superSpec` and
+  the internal semantic monad is `StateT σ ProbComp` via `simulateQ`;
+* observation-style semantics that deliberately introduce failure, for
+  example by querying with `OptionT ProbComp` and `guard`-ing on a
+  predicate over sampled values. This is how OTP-style privacy gets a
+  non-vacuous `CompEmulates 0` discharge.
+
 ## Main definitions
 
-* `Semantics T` is a function extracting a `ProbComp Unit` game from each
-  closed system in the theory `T`. This is the minimal bridge between the
-  structural open-composition layer and the probabilistic crypto layer.
-
-* `CompEmulates sem ε real ideal` asserts that for every environment (plug),
-  the distinguishing advantage between the real and ideal closed systems
-  is at most `ε`.
-
-* `AsympCompEmulates` is the asymptotic variant: for every PPT adversary
-  choosing environments, the advantage is negligible in the security
-  parameter.
-
+* `Semantics T` bundles a surface monad, its sub-probabilistic
+  semantics, and a `run` function extracting a game from each closed
+  system.
+* `Semantics.evalDist` is the `SPMF Unit` denotation of a closed system.
+* `Semantics.distAdvantage` is the total variation distance between two
+  such denotations, and the replacement for the old
+  `ProbComp.distAdvantage` pivot.
+* `CompEmulates sem ε real ideal` asserts that for every environment
+  (plug), the distinguishing advantage between the real and ideal
+  closed systems is at most `ε`.
+* `AsympCompEmulates` is the asymptotic variant: for every PPT
+  adversary choosing environments, the advantage is negligible in the
+  security parameter.
 * `CompUCSecure sem ε protocol ideal SimSpace simulate` is the
   simulator-based variant with bounded advantage.
 
@@ -46,8 +73,8 @@ sums of negligibles are still negligible.
 * `CompEmulates.map_invariance`: boundary adaptation preserves the bound.
 * `CompEmulates.par_compose`, `wire_compose`, `plug_compose`:
   advantages add under parallel, wired, and plugged composition.
-* `CompUCSecure.toCompEmulates`: simulator-based security implies
-  computational emulation when the simulator is the identity.
+* `CompUCSecure.toCompEmulates_id`: simulator-based security with the
+  identity simulator recovers computational emulation.
 * `AsympCompEmulates.par_compose`, `wire_compose`, `plug_compose`:
   asymptotic composition from pointwise negligible bounds.
 * `ucDistGame`: constructs the `SecurityGame` whose advantage is the
@@ -58,7 +85,7 @@ sums of negligibles are still negligible.
 
 universe u
 
-open OracleComp ProbComp ENNReal
+open OracleComp ENNReal
 
 namespace Interaction
 namespace UC
@@ -66,28 +93,78 @@ namespace UC
 variable {T : OpenTheory.{u}}
 
 /--
-`Semantics T` extracts a probabilistic game (`ProbComp Unit`) from each
-closed system in the open-composition theory `T`.
+`Semantics T` bundles a computational observation layer for closed
+systems in the open-composition theory `T`:
 
-The `Unit` return type matches the convention used by
-`ProbComp.distAdvantage`: success is `()` and failure is `⊥`.
-This is the minimal bridge needed to give computational meaning to the
-abstract `Emulates` judgment.
+* `m` is the surface monad in which the observation is written;
+* `sem` is a `SPMFSemantics m` giving `m` its sub-probabilistic
+  meaning;
+* `run` extracts a `m Unit` game from each closed system.
+
+The visible denotation of a closed system is therefore a
+`SPMF Unit`, where the `none` branch records failure mass (for example,
+a `guard` that rejected the sampled value). Distinguishing advantage
+is total variation on those `SPMF Unit` distributions.
 -/
 structure Semantics (T : OpenTheory.{u}) where
-  run : T.Closed → ProbComp Unit
+  /-- Surface monad in which closed systems are observed. -/
+  m : Type → Type
+  /-- Monad structure on the surface monad. -/
+  instMonad : Monad m
+  /-- Bundled sub-probabilistic semantics for the surface monad. The
+  internal semantic monad is kept in `Type → Type` so that every
+  protocol (`ProbComp`, `OracleComp superSpec`, `OptionT ProbComp`,
+  `StateT σ ProbComp`) fits uniformly. -/
+  sem : SPMFSemantics.{0, 0, 0} m
+  /-- The probabilistic game extracted from a closed system. -/
+  run : T.Closed → m Unit
+
+attribute [instance] Semantics.instMonad
+
+namespace Semantics
+
+variable {S : Semantics T}
+
+/-- The external `SPMF Unit` denotation of a closed system under `S`. -/
+noncomputable def evalDist (S : Semantics T) (p : T.Closed) : SPMF Unit :=
+  S.sem.evalDist (S.run p)
+
+/-- Distinguishing advantage between two closed systems under `S`,
+defined as the total variation distance of their `SPMF Unit`
+denotations. -/
+noncomputable def distAdvantage (S : Semantics T) (p q : T.Closed) : ℝ :=
+  SPMF.tvDist (S.evalDist p) (S.evalDist q)
+
+@[simp]
+lemma distAdvantage_self (S : Semantics T) (p : T.Closed) :
+    S.distAdvantage p p = 0 := SPMF.tvDist_self _
+
+lemma distAdvantage_comm (S : Semantics T) (p q : T.Closed) :
+    S.distAdvantage p q = S.distAdvantage q p := SPMF.tvDist_comm _ _
+
+lemma distAdvantage_nonneg (S : Semantics T) (p q : T.Closed) :
+    0 ≤ S.distAdvantage p q := SPMF.tvDist_nonneg _ _
+
+lemma distAdvantage_triangle (S : Semantics T) (p q r : T.Closed) :
+    S.distAdvantage p r ≤ S.distAdvantage p q + S.distAdvantage q r :=
+  SPMF.tvDist_triangle _ _ _
+
+lemma distAdvantage_le_one (S : Semantics T) (p q : T.Closed) :
+    S.distAdvantage p q ≤ 1 := SPMF.tvDist_le_one _ _
+
+end Semantics
 
 /--
 `CompEmulates sem ε real ideal` asserts that `real` computationally
 emulates `ideal` up to advantage `ε` under semantics `sem`.
 
-For every plug `K : T.Plug Δ`, the distinguishing advantage between the
-real-world and ideal-world closed executions is at most `ε`.
+For every plug `K : T.Plug Δ`, the total variation distance between the
+real-world and ideal-world closed-system denotations is at most `ε`.
 -/
 def CompEmulates (sem : Semantics T) (ε : ℝ)
     {Δ : PortBoundary} (real ideal : T.Obj Δ) : Prop :=
   ∀ K : T.Plug Δ,
-    (sem.run (T.close real K)).distAdvantage (sem.run (T.close ideal K)) ≤ ε
+    sem.distAdvantage (T.close real K) (T.close ideal K) ≤ ε
 
 namespace CompEmulates
 
@@ -96,11 +173,11 @@ Every system computationally emulates itself with advantage zero.
 -/
 theorem refl (sem : Semantics T) {Δ : PortBoundary} (W : T.Obj Δ) :
     CompEmulates sem 0 W W :=
-  fun K => by simp [ProbComp.distAdvantage_self]
+  fun _ => by simp
 
 /--
 Computational emulation composes transitively with additive advantage
-bounds (triangle inequality on distinguishing advantage).
+bounds (triangle inequality on total variation distance).
 -/
 theorem triangle {sem : Semantics T} {ε₁ ε₂ : ℝ}
     {Δ : PortBoundary} {W₁ W₂ W₃ : T.Obj Δ}
@@ -108,10 +185,10 @@ theorem triangle {sem : Semantics T} {ε₁ ε₂ : ℝ}
     (h₂₃ : CompEmulates sem ε₂ W₂ W₃) :
     CompEmulates sem (ε₁ + ε₂) W₁ W₃ :=
   fun K => calc
-    (sem.run (T.close W₁ K)).distAdvantage (sem.run (T.close W₃ K))
-      ≤ (sem.run (T.close W₁ K)).distAdvantage (sem.run (T.close W₂ K)) +
-        (sem.run (T.close W₂ K)).distAdvantage (sem.run (T.close W₃ K)) :=
-          ProbComp.distAdvantage_triangle _ _ _
+    sem.distAdvantage (T.close W₁ K) (T.close W₃ K)
+      ≤ sem.distAdvantage (T.close W₁ K) (T.close W₂ K) +
+        sem.distAdvantage (T.close W₂ K) (T.close W₃ K) :=
+          sem.distAdvantage_triangle _ _ _
     _ ≤ ε₁ + ε₂ := add_le_add (h₁₂ K) (h₂₃ K)
 
 /--
@@ -228,15 +305,11 @@ theorem plug_compose [OpenTheory.HasPlugWireFactor T]
     {K_real K_ideal : T.Obj (PortBoundary.swap Δ)}
     (hProt : CompEmulates sem ε₁ real ideal)
     (hEnv : CompEmulates sem ε₂ K_real K_ideal) :
-    (sem.run (T.close real K_real)).distAdvantage
-      (sem.run (T.close ideal K_ideal)) ≤ ε₁ + ε₂ := calc
-  (sem.run (T.close real K_real)).distAdvantage
-      (sem.run (T.close ideal K_ideal))
-    ≤ (sem.run (T.close real K_real)).distAdvantage
-        (sem.run (T.close ideal K_real)) +
-      (sem.run (T.close ideal K_real)).distAdvantage
-        (sem.run (T.close ideal K_ideal)) :=
-      ProbComp.distAdvantage_triangle _ _ _
+    sem.distAdvantage (T.close real K_real) (T.close ideal K_ideal) ≤ ε₁ + ε₂ := calc
+  sem.distAdvantage (T.close real K_real) (T.close ideal K_ideal)
+    ≤ sem.distAdvantage (T.close real K_real) (T.close ideal K_real) +
+      sem.distAdvantage (T.close ideal K_real) (T.close ideal K_ideal) :=
+      sem.distAdvantage_triangle _ _ _
   _ ≤ ε₁ + ε₂ := by
       apply add_le_add
       · exact hProt K_real
@@ -260,8 +333,7 @@ def CompUCSecure (sem : Semantics T) (ε : ℝ)
     (protocol ideal : T.Obj Δ)
     (SimSpace : Type*) (simulate : SimSpace → T.Plug Δ → T.Plug Δ) : Prop :=
   ∃ s : SimSpace, ∀ K : T.Plug Δ,
-    (sem.run (T.close protocol K)).distAdvantage
-      (sem.run (T.close ideal (simulate s K))) ≤ ε
+    sem.distAdvantage (T.close protocol K) (T.close ideal (simulate s K)) ≤ ε
 
 /--
 Computational emulation implies simulator-based UC security with the
@@ -301,9 +373,9 @@ def AsympCompEmulates
     (env : Adv → ∀ n, (T n).Plug Δ) : Prop :=
   ∀ A, isPPT A → negligible fun n =>
     ENNReal.ofReal <|
-      ProbComp.distAdvantage
-        ((sem n).run ((T n).close (real n) (env A n)))
-        ((sem n).run ((T n).close (ideal n) (env A n)))
+      (sem n).distAdvantage
+        ((T n).close (real n) (env A n))
+        ((T n).close (ideal n) (env A n))
 
 /--
 Pointwise bounded advantage implies asymptotic security: if at each
@@ -318,9 +390,9 @@ theorem AsympCompEmulates.of_pointwise_bound
     {env : Adv → ∀ n, (T n).Plug Δ}
     (f : ℕ → ℝ≥0∞) (hf : negligible f)
     (hbound : ∀ (_A : Adv) (n : ℕ) (K : (T n).Plug Δ),
-      ENNReal.ofReal (ProbComp.distAdvantage
-        ((sem n).run ((T n).close (real n) K))
-        ((sem n).run ((T n).close (ideal n) K))) ≤ f n) :
+      ENNReal.ofReal ((sem n).distAdvantage
+        ((T n).close (real n) K)
+        ((T n).close (ideal n) K)) ≤ f n) :
     AsympCompEmulates T sem real ideal Adv isPPT env :=
   fun A _ => negligible_of_le (fun n => hbound A n (env A n)) hf
 
@@ -412,9 +484,9 @@ theorem AsympCompEmulates.plug_compose
     (hEnv : ∀ n, CompEmulates (sem n) (ε₂ n) (K_real n) (K_ideal n)) :
     negligible fun n =>
       ENNReal.ofReal <|
-        ProbComp.distAdvantage
-          ((sem n).run ((T n).close (real n) (K_real n)))
-          ((sem n).run ((T n).close (ideal n) (K_ideal n))) :=
+        (sem n).distAdvantage
+          ((T n).close (real n) (K_real n))
+          ((T n).close (ideal n) (K_ideal n)) :=
   negligible_of_le
     (fun n => ENNReal.ofReal_le_ofReal
       (CompEmulates.plug_compose (hProt n) (hEnv n)))
@@ -426,8 +498,8 @@ theorem AsympCompEmulates.plug_compose
 
 /--
 The UC distinguishing game: a `SecurityGame` whose advantage at adversary
-`A` and security parameter `n` is the distributional distance between the
-real and ideal closed executions under the environment chosen by `A`.
+`A` and security parameter `n` is the total variation distance between
+the real and ideal closed executions under the environment chosen by `A`.
 -/
 noncomputable def ucDistGame
     (T : ℕ → OpenTheory.{u}) (sem : ∀ n, Semantics (T n))
@@ -435,9 +507,9 @@ noncomputable def ucDistGame
     (real ideal : ∀ n, (T n).Obj Δ)
     {Adv : Type*} (env : Adv → ∀ n, (T n).Plug Δ) : SecurityGame Adv where
   advantage A n := ENNReal.ofReal <|
-    ProbComp.distAdvantage
-      ((sem n).run ((T n).close (real n) (env A n)))
-      ((sem n).run ((T n).close (ideal n) (env A n)))
+    (sem n).distAdvantage
+      ((T n).close (real n) (env A n))
+      ((T n).close (ideal n) (env A n))
 
 /--
 `AsympCompEmulates` is exactly `secureAgainst isPPT` for the UC

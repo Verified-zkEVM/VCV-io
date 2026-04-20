@@ -452,11 +452,9 @@ def asympSecureAgainstFair
       (openTheory.{u, 0, 0} Party).Plug Δ) : Prop :=
   ∀ A, isPPT A → isFair A → negligible fun n =>
     ENNReal.ofReal <|
-      ProbComp.distAdvantage
-        ((mkSem n (extract A n).1).run
-          ((openTheory.{u, 0, 0} Party).close (real n) (extract A n).2))
-        ((mkSem n (extract A n).1).run
-          ((openTheory.{u, 0, 0} Party).close (ideal n) (extract A n).2))
+      (mkSem n (extract A n).1).distAdvantage
+        ((openTheory.{u, 0, 0} Party).close (real n) (extract A n).2)
+        ((openTheory.{u, 0, 0} Party).close (ideal n) (extract A n).2)
 
 namespace asympSecureAgainstFair
 
@@ -476,11 +474,9 @@ negligible function implies asymptotic fair-PPT security. -/
 theorem of_pointwise_bound
     (f : ℕ → ℝ≥0∞) (hf : negligible f)
     (hbound : ∀ (_A : Adv) (n : ℕ),
-      ENNReal.ofReal (ProbComp.distAdvantage
-        ((mkSem n (extract _A n).1).run
-          ((openTheory.{u, 0, 0} Party).close (real n) (extract _A n).2))
-        ((mkSem n (extract _A n).1).run
-          ((openTheory.{u, 0, 0} Party).close (ideal n) (extract _A n).2))) ≤ f n) :
+      ENNReal.ofReal ((mkSem n (extract _A n).1).distAdvantage
+        ((openTheory.{u, 0, 0} Party).close (real n) (extract _A n).2)
+        ((openTheory.{u, 0, 0} Party).close (ideal n) (extract _A n).2)) ≤ f n) :
     asympSecureAgainstFair mkSem real ideal Adv isPPT isFair extract :=
   fun A _ _ => negligible_of_le (fun n => hbound A n) hf
 

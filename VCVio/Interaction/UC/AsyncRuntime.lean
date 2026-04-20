@@ -16,9 +16,12 @@ schedulers; the alphabet of env events is supplied by an
 `EnvAction Event State` (see `EnvAction.lean`).
 
 The shape of every definition mirrors the synchronous `processSemantics`
-in `Runtime.lean`. The synchronous runtime is the special case in which
-the env scheduler always returns `processTick` and the env alphabet is
-empty; `processSemantics_eq_processSemanticsAsync_trivial` records that
+in `Runtime.lean`: the bundled `SPMFSemantics m` is threaded uniformly,
+so the same constructor serves coin-flip-only protocols, shared-oracle
+protocols, and observation-style semantics that introduce failure mass.
+The synchronous runtime is the special case in which the env scheduler
+always returns `processTick` and the env alphabet is empty;
+`processSemantics_eq_processSemanticsAsync_trivial` records that
 equivalence by name, with `processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial`
 giving the `ProbComp`-specialized form most coin-flip-only protocol
 developments will reach for.
@@ -286,11 +289,12 @@ private abbrev Closed (Party : Type u) :=
 Construct an async `Semantics` for the open-process theory.
 
 Threads an env-action channel and an env scheduler in addition to the
-process sampler that `processSemantics` already takes. The closing
-morphism `close : m Unit → ProbComp Unit` plays the same role as in
-`processSemantics` and supports the same instantiations
-(coin-flip-only via `processSemanticsAsyncProbComp`, shared-oracle via
-the analogous `OracleComp`-monad version).
+process sampler that `processSemantics` already takes. The bundled
+`SPMFSemantics m` plays the same role as in `processSemantics` and
+supports the same instantiations: coin-flip-only protocols via
+`processSemanticsAsyncProbComp`, shared-oracle protocols via an
+`OracleComp`-monad `SPMFSemantics` built with `simulateQ'`, and
+observation-style semantics over `OptionT ProbComp`.
 
 The `init`, `procScheduler`, and `envScheduler` arguments are
 quantified over the closed process `p : Closed Party`, matching the
@@ -299,7 +303,7 @@ shape of the synchronous `processSemantics`.
 noncomputable def processSemanticsAsync
     (Party : Type u)
     {m : Type → Type} [Monad m] [MonadLiftT ProbComp m]
-    (close : m Unit → ProbComp Unit)
+    (sem : SPMFSemantics.{0, 0, 0} m)
     {Event : Type} {State : Type}
     (envAction : EnvAction Event State)
     (initEnvState : State)
@@ -313,17 +317,20 @@ noncomputable def processSemanticsAsync
     (observe : ∀ p : Closed Party,
       p.Proc → State → RuntimeTrace Event → m Unit) :
     Semantics (openTheory.{u, 0, 0} Party) where
-  run process :=
-    close (do
-      let init0 : AsyncRuntimeState process.Proc State :=
-        ⟨init process, initEnvState⟩
-      let (final, trace) ← runStepsAsync process envAction
-        (procScheduler process) (envScheduler process) fuel init0
-      observe process final.proc final.envState trace)
+  m := m
+  instMonad := inferInstance
+  sem := sem
+  run process := do
+    let init0 : AsyncRuntimeState process.Proc State :=
+      ⟨init process, initEnvState⟩
+    let (final, trace) ← runStepsAsync process envAction
+      (procScheduler process) (envScheduler process) fuel init0
+    observe process final.proc final.envState trace
 
 /--
 Coin-flip-only specialization of `processSemanticsAsync` (`m = ProbComp`,
-`close = id`). Companion of `processSemanticsProbComp`.
+`sem := SPMFSemantics.ofHasEvalSPMF ProbComp`). Companion of
+`processSemanticsProbComp`.
 -/
 noncomputable def processSemanticsAsyncProbComp
     (Party : Type u)
@@ -340,7 +347,8 @@ noncomputable def processSemanticsAsyncProbComp
     (observe : ∀ p : Closed Party,
       p.Proc → State → RuntimeTrace Event → ProbComp Unit) :
     Semantics (openTheory.{u, 0, 0} Party) :=
-  processSemanticsAsync Party id envAction initEnvState
+  processSemanticsAsync Party (SPMFSemantics.ofHasEvalSPMF ProbComp)
+    envAction initEnvState
     init procScheduler envScheduler fuel observe
 
 /-! ## Sync recovery -/
@@ -361,14 +369,14 @@ trace and the unit env state.
 theorem processSemantics_eq_processSemanticsAsync_trivial
     (Party : Type u)
     {m : Type → Type} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
-    (close : m Unit → ProbComp Unit)
+    (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ p : Closed Party, p.Proc)
     (sampler : ∀ (p : Closed Party) (s : p.Proc),
       Spec.Sampler m (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party, p.Proc → m Unit) :
-    processSemantics Party close init sampler fuel observe =
-      processSemanticsAsync Party close
+    processSemantics Party sem init sampler fuel observe =
+      processSemanticsAsync Party sem
         (EnvAction.empty Unit) ()
         init
         (fun p st => sampler p st.proc)
@@ -376,12 +384,9 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s) := by
-  change (Semantics.mk (T := openTheory.{u, 0, 0} Party) _) =
-    Semantics.mk (T := openTheory.{u, 0, 0} Party) _
+  unfold processSemantics processSemanticsAsync
   congr 1
   funext process
-  show close _ = close _
-  congr 1
   change (do
       let finalState ← ProcessOver.runSteps process (sampler process) fuel
         (init process)

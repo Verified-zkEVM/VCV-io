@@ -85,10 +85,16 @@ example
 /-! ## Sync recovery pointwise on the trivial closed process -/
 
 /-- Specializing the recovery theorem to the trivial closed process and
-applying it on the `Semantics.run` field yields equality of the
-resulting `ProbComp Unit` distributions, demonstrating that the
-synchronous and trivial-async runtimes produce *the same* observable
-computation on a concrete closed-Party value. -/
+unfolding both runtimes yields equality of the resulting `ProbComp Unit`
+distributions, demonstrating that the synchronous and trivial-async
+runtimes produce *the same* observable computation on a concrete
+closed-Party value.
+
+Proven by `Semantics.run`-level unfolding followed by
+`Concurrent.runStepsAsync_empty_trivial_eq`. This mirrors the proof of
+`processSemantics_eq_processSemanticsAsync_trivial` but avoids the
+Semantics-level rewrite, which would have to transport through the
+dependent surface-monad field `Semantics.m`. -/
 example
     (init : ∀ p : (openTheory.{0, 0, 0} Party).Closed, p.Proc)
     (sampler : ∀ (p : (openTheory.{0, 0, 0} Party).Closed) (s : p.Proc),
@@ -106,6 +112,18 @@ example
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s)).run trivialClosed := by
-  rw [processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial]
+  change (do
+      let finalState ← Concurrent.ProcessOver.runSteps
+        trivialClosed (sampler trivialClosed) fuel (init trivialClosed)
+      observe trivialClosed finalState) =
+    (do
+      let (final, _trace) ← Concurrent.runStepsAsync (m := ProbComp)
+        trivialClosed (EnvAction.empty Unit)
+        (fun st => sampler trivialClosed st.proc)
+        (trivialEnvScheduler (m := ProbComp) Unit Empty)
+        fuel ⟨init trivialClosed, ()⟩
+      observe trivialClosed final.proc)
+  rw [Concurrent.runStepsAsync_empty_trivial_eq]
+  simp only [bind_assoc, pure_bind]
 
 end Examples.UC.SyncRecoveryDemo
