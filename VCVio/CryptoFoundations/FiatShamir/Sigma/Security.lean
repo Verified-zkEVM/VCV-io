@@ -410,16 +410,27 @@ theorem euf_cma_to_nma
     let _simImpl : Stmt → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk =>
       baseSimBad + sigSimBad pk
-    -- `realSignBad pk sk` implements the genuine signing oracle (commit + RO + respond),
-    -- run through `baseSim` to thread RO queries through the cache. The bad flag is
-    -- never set by the real signer (it has no programming step that could conflict).
+    -- `realSignBad pk sk` is a *hypothetical* programming-style signing oracle: it samples
+    -- a real transcript `(c, ch, s) ← σ.realTranscript pk sk` and programs the cache at
+    -- `(msg, c) ↦ ch` (overwriting if already present). The bad flag is set when the cache
+    -- already has `(msg, c)` cached (matching the simulator's bad event). This shape mirrors
+    -- `sigSimBad` exactly: the only difference is the underlying transcript distribution
+    -- (`realTranscript` vs `simTranscript`), so per-query HVZK directly bounds their TV
+    -- distance by `ζ_zk`. A separate bridge step (`bridge_g1_real`, sub-claim (A)) connects
+    -- this hypothetical signer to the actual `FiatShamir.sign` oracle used in `g1`.
     let realSignBad : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk msg => do
-      let (cache, bad) ← get
-      let (sig, cache') ← liftM
-        ((simulateQ baseSim ((FiatShamir σ hr M).sign pk sk msg)).run cache)
-      set (cache', bad)
-      pure sig
+      let s : spec.QueryCache × Bool ← get
+      let (cache, bad) := s
+      let (c, ch, π) ← liftM ((σ.realTranscript pk sk : ProbComp _).liftComp spec)
+      -- Soft programming: write `(msg, c) ↦ ch` only on cache miss; mirrors `sigSim`.
+      let bad' := bad || (cache (.inr (msg, c))).isSome
+      let cache' : spec.QueryCache := match cache (.inr (msg, c)) with
+        | some _ => cache
+        | none => cache.cacheQuery (.inr (msg, c)) ch
+      let s' : spec.QueryCache × Bool := (cache', bad')
+      set s'
+      pure (c, π)
     -- Combined "real" implementation (per-(pk, sk)): forwarders + realSignBad.
     let _realImpl : Stmt → Wit → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk =>
@@ -529,6 +540,11 @@ theorem euf_cma_to_nma
         case h_mono₁ =>
           -- Bad flag monotonicity in `_simImpl pk`: once `bad = true`, it stays `true`.
           -- `baseSimBad` threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`.
+          -- Both impls preserve `bad = true` since they only set `bad' := bad || _`
+          -- (sigSimBad) or `bad' := bad` (baseSimBad).
+          -- Semantically clear from the definitions of `baseSimBad` and `sigSimBad`,
+          -- but the syntactic proof requires unfolding the chained `let`-bindings
+          -- and `StateT` plumbing.  Tracked under sub-claim (B) bookkeeping.
           intro t p hp z hz
           sorry
         case h_qb =>
