@@ -164,8 +164,13 @@ has min-entropy at least `-log₂ β`.
 
 This is a companion assumption to `HVZK` that bounds the collision probability of
 programmed cache entries in the Fiat-Shamir CMA-to-NMA reduction. For Schnorr,
-`β = 1/|G|` because the commitment `g^r` is uniform over the group. -/
+`β = 1/|G|` because the commitment `g^r` is uniform over the group.
+
+The `_σ : SigmaProtocol …` argument is dummy (the predicate only depends on
+`simTranscript` and `β`); it is present to enable field-notation usage like
+`σ.simCommitPredictability simTranscript β`. -/
 def simCommitPredictability
+    (_σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (β : ℝ≥0∞) : Prop :=
   ∀ x : Stmt, ∀ c₀ : Commit, probOutput (Prod.fst <$> simTranscript x) c₀ ≤ β
 

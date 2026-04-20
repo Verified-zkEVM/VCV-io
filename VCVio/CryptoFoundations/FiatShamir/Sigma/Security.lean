@@ -66,28 +66,34 @@ private lemma support_withBadUpdate_run_snd_snd_of_pre
   obtain ⟨_, _, rfl⟩ := hz
   simp
 
-/-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
+/-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction,
+parameterized by the simulator's commit-predictability bound `β`:
 
-For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
-probability of a programming-collision on either side of the freshness-preserving chain
-is bounded by `qS · (qS + qH) / |Chal|` via a birthday/union bound on commitments.
+  `collisionSlack qS qH β Chal = 2 · qS · (qS + qH) · β + 1/|Chal|`.
 
-The full chain absorbs three slacks into this single numerator `2 · qS · (qS + qH) + 1`:
-* `qS · (qS + qH) / |Chal|` from the simulator-side bad event (sub-claim B-finish);
-* `qS · (qS + qH) / |Chal|` from the FS-vs-programming bad event in the (A) bridge,
-  which swaps the actual `FiatShamir.sign` oracle for the hypothetical programming-style
-  `realSign` (identical until the same cache-collision bad event);
-* `1 / |Chal|` from the cache-miss verify slack: `unforgeableExp` samples a uniformly
-  random RO answer when the forgery's hash point is *not* in the cache (winning with
-  probability `1/|Chal|` by special soundness / unique-response uniqueness), while
-  `Fork.runTrace` returns `false` on the same cache miss.
+The two `qS · (qS + qH) · β` summands come from the two programming-collision bad
+events along the freshness-preserving chain, union-bounded over `qS` signing queries
+and ≤ `qS + qH` cached points:
+* simulator-side collision (sub-claim B-finish), bounded by `qS · (qS + qH) · β`
+  directly from the `simCommitPredictability simTranscript β` hypothesis;
+* FS-vs-programming collision in the (A) bridge, bounded by `qS · (qS + qH) · β`
+  after absorbing the quadratic HVZK-transport term `qS · (qS + qH) · ζ_zk` into
+  the overall `qS · (qS + qH + 1) · ζ_zk` HVZK cost carried by the theorem.
+Plus `1 / |Chal|` for the cache-miss verify slack: `unforgeableExp` samples a
+uniformly random RO answer when the forgery's hash point is *not* in the cache
+(winning with probability `1/|Chal|` by special soundness / unique-response
+uniqueness), while `Fork.runTrace` returns `false` on the same cache miss.
+
+For Schnorr, `β = 1/|G|` (uniform commit over `⟨g⟩`). When `|G| = |Chal|` this
+specializes to the classical `(2 · qS · (qS + qH) + 1) / |Chal|` form.
 
 Matches EasyCrypt's `pr_bad_game` at
-[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`, modulo
-the doubled birthday bound and the `+1` cache-miss slack) and plays the same role as
-`GPVHashAndSign.collisionBound` for the PSF construction. -/
-noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
-  ((2 * qS * (qS + qH) + 1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`,
+modulo the doubled birthday bound and the `+1` cache-miss slack) and plays the
+same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
+noncomputable def collisionSlack (qS qH : ℕ) (β : ENNReal) (Chal : Type) [Fintype Chal] :
+    ENNReal :=
+  2 * (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β + (Fintype.card Chal : ENNReal)⁻¹
 
 section evalDistBridge
 
@@ -147,7 +153,14 @@ end evalDistBridge
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
 random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + qS · (qS + qH) / |Chal|`
+  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B)
+      + qS · (qS + qH + 1) · ζ_zk + collisionSlack qS qH β Chal`
+
+where `β` is the simulator's commit-predictability bound (see
+`SigmaProtocol.simCommitPredictability`). The HVZK cost picks up a quadratic
+`qS · (qS + qH) · ζ_zk` contribution from the HVZK-transport step in bridge (A),
+on top of the linear `qS · ζ_zk` from the direct per-query swap in bridge (B).
+When HVZK is perfect (`ζ_zk = 0`) this reduces to `Fork.advantage + collisionSlack`.
 
 The NMA adversary `B` is constructed by:
 - Forwarding `A`'s hash queries to the external oracle (visible to `Fork.fork`)
@@ -155,9 +168,12 @@ The NMA adversary `B` is constructed by:
   simulated challenge into the cache
 - Returning `A`'s forgery together with the accumulated `QueryCache`
 
-Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
-the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
-hash that `B` later programs.
+Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance
+(direct HVZK cost) and, via HVZK-transport, inflates the real-side commit predictability
+from `β` to `β + ζ_zk` for the (A)-bridge collision analysis. The birthday term
+`collisionSlack qS qH β Chal = 2·qS·(qS+qH)·β + 1/|Chal|` absorbs the two collision
+events (sim-side via `_hPredSim`, real-side via `_hPredSim` + HVZK) and the cache-miss
+verify slack.
 
 This step is independent of special soundness and the forking lemma; those are handled
 by `euf_nma_bound`.
@@ -168,13 +184,15 @@ The Lean bound matches Firsov-Janku's `pr_koa_cma` at
 `simulator_equiv` (per-query HVZK cost), handles RO reprogramming via `lro_redo_inv` +
 `ro_get_eq_except`, and absorbs the late-programming collision event through the `bad` flag,
 bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) as
-`QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH Chal`. -/
+`QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH β Chal` at `β = 1/|Ω|`. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
     [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
     (_hhvzk : σ.HVZK simTranscript ζ_zk)
+    (β : ENNReal)
+    (_hPredSim : σ.simCommitPredictability simTranscript β)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qS qH : ℕ)
@@ -186,8 +204,8 @@ theorem euf_cma_to_nma
         (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
-          ENNReal.ofReal (qS * ζ_zk) +
-          collisionSlack qS qH Chal := by
+          ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) +
+          collisionSlack qS qH β Chal := by
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
     (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
@@ -339,8 +357,8 @@ theorem euf_cma_to_nma
               match a.2 (.inr (msg, a.1.1)) with
               | some _ => ((a.1.1, a.1.2.2), a.2)
               | none =>
-                  ((a.1.1, a.1.2.2),
-                    QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
+              ((a.1.1, a.1.2.2),
+                QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
             (b := 0)
             (canQuery := fun t b => match t with
               | .inl _ => True
@@ -436,9 +454,9 @@ theorem euf_cma_to_nma
               simp [stepBudget])
         (s := ∅))
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
-    --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
+    --                      + ofReal(qS · (qS+qH+1) · ζ_zk) + collisionSlack qS qH β Chal`.
     --
-    -- **Freshness-preserving chain.** The previous design routed through
+    -- **Freshness-preserving chain, β-parametric.** The previous design routed through
     -- `unforgeableExpNoFresh` (which drops the `¬log.wasQueried msg` check), but
     -- that intermediate is trivially won by *replay attacks*: an adversary that
     -- queries the signing oracle on `msg` and outputs the received signature has
@@ -452,17 +470,19 @@ theorem euf_cma_to_nma
     --
     --   adv.advantage (runtime M)
     --       = ∑' (pk,sk), Pr[(pk,sk)|gen] · Pr[verify ∧ ¬msg ∈ signed | direct_real_exp pk sk]
-    --                                                                       -- (A) bridge_real
+    --           + qS·(qS+qH)·β + qS·(qS+qH)·ζ_zk + 1/|Chal|                 -- (A) bridge_real
     --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] ·
-    --           (Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] + qS·ζ_zk + collisionSlack)
-    --                                                                       -- (B) tv_swap
-    --       ≤ Fork.advantage + qS·ζ_zk + collisionSlack + 1/|Chal|          -- (C') sim_to_fork
+    --           (Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] + qS·ζ_zk + qS·(qS+qH)·β)
+    --           + qS·(qS+qH)·β + qS·(qS+qH)·ζ_zk + 1/|Chal|                 -- (B) tv_swap
+    --       ≤ Fork.advantage + qS·(qS+qH+1)·ζ_zk + 2·qS·(qS+qH)·β + 1/|Chal|
+    --                                                                       -- (C') sim_to_fork
+    --       = Fork.advantage + qS·(qS+qH+1)·ζ_zk + collisionSlack qS qH β Chal
     --
-    -- The `+ 1/|Chal|` slack in (C') accounts for `unforgeableExp`'s verify step
-    -- sampling a fresh random-oracle answer on a cache miss, while
-    -- `Fork.runTrace` returns `false` on cache misses; this `+1/|Chal|` is
-    -- absorbed into the ambient `collisionSlack` (which is ≥ `qS / |Chal|` for
-    -- any non-degenerate adversary).
+    -- The HVZK cost `qS·(qS+qH+1)·ζ_zk` decomposes as:
+    --   * `qS·ζ_zk`: direct per-query HVZK swap cost in step (B);
+    --   * `qS·(qS+qH)·ζ_zk`: HVZK-transport in step (A), since the real-side commit
+    --     predictability inherits a `ζ_zk` gap over the `β`-bound on the simulator side.
+    -- The `+ 1/|Chal|` slack in (C') (cache-miss verify) is absorbed into `collisionSlack`.
     --
     -- The augmented state `((QueryCache × List M) × Bool)` carries:
     --   * `QueryCache`: the random-oracle cache (programmed + live entries).
@@ -591,19 +611,20 @@ theorem euf_cma_to_nma
         (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) := fun pk sk =>
       baseSimSigned + realSignSigned pk sk
     have advantage_bound : adv.advantage (runtime M) ≤ Fork.advantage σ hr M nmaAdv qH +
-        ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal := by
-      -- **Freshness-preserving chain.** See the docstring at the top of this bullet for
-      -- the rationale. The proof structure is:
+        ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) + collisionSlack qS qH β Chal := by
+      -- **Freshness-preserving chain, β-parametric.** See the docstring at the top of this
+      -- bullet for the rationale. The proof structure is:
       --
       --   adv.advantage (runtime M)
       --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] · Pr[verify ∧ ¬msg ∈ signed | direct_real_exp pk sk]
-      --                                                                       -- (A) bridge_a
+      --           + qS·(qS+qH)·β + qS·(qS+qH)·ζ_zk + 1/|Chal|                -- (A) bridge_a
       --       ≤ ∑' (pk,sk), Pr[(pk,sk)|gen] ·
       --           (Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] + qS·ζ_zk + Pr[bad on sim])
-      --                                                                       -- (B) tv_swap
+      --           + qS·(qS+qH)·β + qS·(qS+qH)·ζ_zk + 1/|Chal|                -- (B) tv_swap
       --       ≤ ∑' pk, Pr[pk|gen_pk] · Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk] +
-      --           qS·ζ_zk + collisionSlack qS qH Chal                         -- (B-finish)
-      --       ≤ Fork.advantage + qS·ζ_zk + collisionSlack qS qH Chal          -- (C')
+      --           qS·ζ_zk + qS·(qS+qH)·ζ_zk + 2·qS·(qS+qH)·β + 1/|Chal|      -- (B-finish)
+      --       = ∑' pk, … + qS·(qS+qH+1)·ζ_zk + collisionSlack qS qH β Chal
+      --       ≤ Fork.advantage + qS·(qS+qH+1)·ζ_zk + collisionSlack qS qH β Chal -- (C')
       --
       -- The augmented state for `direct_*_exp` is `(QueryCache × List M × Bool)`, with the
       -- `List M` tracking signed messages (so the freshness check `¬msg ∈ signed` is local).
@@ -613,14 +634,17 @@ theorem euf_cma_to_nma
       -- (the underlying selective ε lemma application on the simpler `(cache × Bool)` state)
       -- is fully proven and forms the infrastructure for sub-claim (B).
       --
-      -- The `+ 1/|Chal|` slack from (C') is absorbed into `collisionSlack` (which now has
-      -- a `+1` summand in its numerator: `(qS·(qS+qH) + 1) / |Chal|`).
+      -- β-parameterization: bridges (A) and (B) each contribute a collision slack of
+      -- `qS·(qS+qH)·β` where `β = simCommitPredictability`. Bridge (A)'s slack additionally
+      -- picks up `qS·(qS+qH)·ζ_zk` from HVZK-transport (the real-side commit predictability
+      -- is bounded via HVZK by `β + ζ_zk`). The `+1/|Chal|` from cache-miss verify is in
+      -- `collisionSlack`'s definition.
       --
       -- Step (B), per (pk, sk) pair: the per-query ε bound from the selective lemma.
       -- The selective lemma yields a TV bound on the joint distribution of
       -- `(simulateQ _simImpl).run' (∅, false)` and `(simulateQ _realImpl).run' (∅, false)`
       -- of the form `qS · ζ_zk + Pr[bad on _simImpl]`. The `Pr[bad]` term is then bounded
-      -- by `collisionSlack qS qH Chal` via the (B-finish) sub-claim.
+      -- by `qS·(qS+qH)·β` via the (B-finish) sub-claim (union bound using `_hPredSim`).
       have step_b_per_pksk : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
           tvDist
             ((simulateQ (_simImpl pk) (adv.main pk)).run' (∅, false))
@@ -832,14 +856,18 @@ theorem euf_cma_to_nma
         fun z => z.2.2 = true
       -- (A) `bridge_real_freshness`: bridge `adv.advantage` to the augmented `direct_real_exp`.
       --
-      -- Two slacks are absorbed here:
-      --   * `qS · (qS + qH) / |Chal|`: FS-vs-`realSign` swap bad event. The actual
+      -- Three slacks are absorbed here (β-parametric):
+      --   * `qS · (qS + qH) · β`: FS-vs-`realSign` swap bad event, using the sim-side commit
+      --     predictability bound `β` on the real side *via HVZK-transport*. The actual
       --     `FiatShamir.sign` queries the live RO at `(msg, c)` (cached if already present),
       --     while `realSignSigned'` samples a fresh challenge from `realTranscript pk sk`
-      --     and programs `(msg, c) ↦ chSampled` on a cache miss. They are identical until
-      --     a cache hit at `(msg, c)` during signing, with collision probability bounded by
-      --     `(qS + qH) / |Chal|` per query (commitment marginal is uniform; live + programmed
-      --     entries before this query total ≤ `qS + qH`).
+      --     and programs `(msg, c) ↦ chSampled` on a cache miss. They are identical until a
+      --     cache hit at `(msg, c)` during signing. Per query bad probability ≤
+      --     (cache size) · β_real ≤ (cache size) · β, summed over `qS` queries.
+      --   * `qS · (qS + qH) · ζ_zk`: HVZK-transport correction for the real-side
+      --     predictability. The gap `β_real - β ≤ ζ_zk` (from HVZK's TV bound
+      --     `|Pr_real[commit = c₀] - Pr_sim[commit = c₀]| ≤ ζ_zk`) summed over the same
+      --     `qS · (qS + qH)` union-bound points contributes exactly this term.
       --   * `1 / |Chal|`: cache-miss verify slack. `unforgeableExp` queries the live RO when
       --     verifying the forgery, sampling a fresh ω on a cache miss; this matches the
       --     forger's response with probability `1/|Chal|` by special soundness / unique
@@ -853,8 +881,9 @@ theorem euf_cma_to_nma
           adv.advantage (runtime M) ≤
             (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
               Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
-              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+              (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+              ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) +
+              (Fintype.card Chal : ENNReal)⁻¹ := by
         sorry
       -- (B) `step_b_per_pksk_signed`: per-(pk, sk), the augmented-state event-level bound.
       --
@@ -871,16 +900,47 @@ theorem euf_cma_to_nma
               Pr[badPred | direct_sim_exp pk] := by
         sorry
       -- (B-finish) `pr_bad_le_signed`: per-pk, the simulator's bad event is bounded by
-      -- `qS · (qS + qH) / |Chal|`.
+      -- `qS · (qS + qH) · β` using the `simCommitPredictability simTranscript β` hypothesis.
       --
-      -- Union bound on the `qS` programming events. Each `sigSimSigned pk msg` programming
-      -- step hits a previously-cached point (live RO query or prior signing programming) with
-      -- probability ≤ `(qS + qH) / |Chal|`. The per-event uniformity comes from the per-query
-      -- HVZK simulator's challenge marginal (uniform over `Chal`); equivalently from the
-      -- commitment marginal being uniform when chosen by `simTranscript pk`.
+      -- **Union bound structure.** The bad flag `z.2.2 = true` flips at a `sigSimSigned pk msg`
+      -- query iff the sampled commit `c` (from `simTranscript pk`) hits a previously-cached
+      -- entry `(.inr (msg, c)) ↦ _`. The bound follows from three facts:
+      --   (F1) The flag is monotone: once `true`, every subsequent query preserves it
+      --        (by `support_withBadUpdate_run_snd_snd_of_pre` and `support_withBadFlag_run_snd_snd`
+      --        at the level of `sigSimSigned` and `baseSimSigned` respectively).
+      --   (F2) Per-step collision bound: at any signing query `msg` with cache state `c'`, the
+      --        probability that a freshly sampled commit `c ← simTranscript pk` satisfies
+      --        `c'.isSome (.inr (msg, c))` is at most
+      --        `|{c : c' (.inr (msg, c)) = some _}| · β ≤ |c'.dom| · β ≤ (qS + qH) · β`
+      --        (using `simCommitPredictability simTranscript β` and the query-count bound).
+      --   (F3) At most `qS` sign queries fire (by `signHashQueryBound.proj₁ _hQ pk`).
+      --
+      -- **Formal union bound.** Structure the proof as an induction on `adv.main pk` using
+      -- `OracleComp.inductionOn`, with invariant
+      --
+      --   Pr[z.2.2 = true | (simulateQ (_simImplSigned pk) oa).run ((c₀, ℓ₀), false)]
+      --     ≤ (qS_rem) · (qH_rem + |c₀.dom ∩ .inr|) · β
+      --
+      -- where `qS_rem`, `qH_rem` are the remaining sign / hash query budgets of `oa` and
+      -- `|c₀.dom ∩ .inr|` counts cached `.inr` entries. At the start `c₀ = ∅`, `qS_rem = qS`,
+      -- `qH_rem = qH`, giving the stated `qS · (qS + qH) · β` bound.
+      --
+      -- The `pure` case is `Pr[false | pure _] = 0`. The `.inl` query case (RO/unif) grows the
+      -- `.inl` cache entries and preserves the bad flag; the `.inr` query case (signing)
+      -- samples from `simTranscript pk` and contributes at most `(qH_rem + |c₀.dom ∩ .inr|) · β`
+      -- from this step (by `simCommitPredictability`), plus the IH bound with `qS_rem - 1` and
+      -- `|c'.dom ∩ .inr| ≤ |c₀.dom ∩ .inr| + 1`.
+      --
+      -- **Scope / deferral.** The induction requires:
+      --   * A per-step collision lemma `probEvent_sigSimSigned_bad_step_le` (~40 LOC) bounding
+      --     the per-sign-query bad flip probability using `simCommitPredictability`.
+      --   * A cache-size bookkeeping lemma `cache_inr_size_bound_of_signHashQueryBound` (~30 LOC).
+      --   * The induction itself (~150 LOC), lifting per-step bounds to the total bound
+      --     through `probEvent_bind_le_add` at each query step.
+      -- This is a substantial but routine union-bound proof; deferred to a follow-up round.
       have pr_bad_le_signed : ∀ (pk : Stmt),
           Pr[badPred | direct_sim_exp pk] ≤
-            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+            (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β := by
         sorry
       -- (C') `bridge_sim_fork_freshness`: bridge the (pk-summed) sim-side event probability
       -- to `Fork.advantage`. No additional slack needed (the `1/|Chal|` cache-miss verify
@@ -988,25 +1048,30 @@ theorem euf_cma_to_nma
       --   `S_real := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[event pk | direct_real_exp pk sk]`
       --   `S_sim  := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[event pk | direct_sim_exp pk]`
       --   `S_bad  := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[bad on direct_sim_exp pk]`
-      --   `slackA := (qS · (qS+qH) : ℕ) / |Chal|`, `slackOne := 1 / |Chal|`
+      --   `slackA    := qS · (qS+qH) · β` (ENNReal)
+      --   `slackHT   := ofReal(qS·(qS+qH)·ζ_zk)`        -- HVZK-transport for real predictability
+      --   `slackHVZK := ofReal(qS·ζ_zk)`                -- direct per-query HVZK cost
+      --   `slackOne  := 1 / |Chal|`
       --
       -- Chain:
       --   adv.advantage
-      --     ≤ S_real + slackA + slackOne                           [bridge_real_freshness]
-      --     ≤ (S_sim + ofReal(qS·ζ_zk) + S_bad) + slackA + slackOne [step_b_per_pksk_signed]
-      --     ≤ (Fork.advantage + ofReal(qS·ζ_zk) + slackA) + slackA + slackOne
-      --                                                            [bridge_sim_fork_freshness,
-      --                                                             pr_bad_le_signed]
-      --     = Fork.advantage + ofReal(qS·ζ_zk) + collisionSlack qS qH Chal
-      --                       [arith: 2·slackA + slackOne = collisionSlack]
+      --     ≤ S_real + slackA + slackHT + slackOne                 [bridge_real_freshness]
+      --     ≤ (S_sim + slackHVZK + S_bad) + slackA + slackHT + slackOne  [step_b_per_pksk_signed]
+      --     ≤ (Fork.advantage + slackHVZK + slackA) + slackA + slackHT + slackOne
+      --                                                             [bridge_sim_fork_freshness,
+      --                                                              pr_bad_le_signed]
+      --     = Fork.advantage + (slackHVZK + slackHT) + (2·slackA + slackOne)
+      --     = Fork.advantage + ofReal(qS·(qS+qH+1)·ζ_zk) + collisionSlack qS qH β Chal
+      --                       [arith: slackHVZK+slackHT combines via ofReal_add;
+      --                               2·slackA + slackOne = collisionSlack]
       --
       -- Step 2 uses `hr.gen_sound` on the support of `hr.gen` to supply `rel pk sk = true`
       -- to `step_b_per_pksk_signed`.
       -- Helper: `hr.gen` is a PMF, so its evalDist sums to 1.
       have h_keygen_sum_one : (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk) = 1 :=
         HasEvalPMF.tsum_probOutput_eq_one hr.gen
-      -- (B) distributed over the sum: `S_real ≤ S_sim + ofReal(qS·ζ_zk) + S_bad`.
-      -- The `ofReal(qS·ζ_zk)` factor pulls out via `h_keygen_sum_one`.
+      -- (B) distributed over the sum: `S_real ≤ S_sim + slackHVZK + S_bad`.
+      -- The `slackHVZK` factor pulls out via `h_keygen_sum_one`.
       have h_B_distributed :
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
               Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) ≤
@@ -1071,32 +1136,38 @@ theorem euf_cma_to_nma
       have h_bad_sum :
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
               Pr[badPred | direct_sim_exp pksk.1]) ≤
-            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+            (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β := by
         have h_per_term : ∀ (pksk : Stmt × Wit),
             evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1] ≤
               evalDist hr.gen pksk *
-                (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) :=
+                ((qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β) :=
           fun pksk => mul_le_mul_right (pr_bad_le_signed pksk.1) _
         have h_step1 :
             (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                 Pr[badPred | direct_sim_exp pksk.1]) ≤
               ∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) :=
+                ((qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β) :=
           ENNReal.tsum_le_tsum h_per_term
         have h_step2 :
             (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal))) =
-            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+              ((qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β)) =
+            (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β := by
           rw [ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
         exact h_step1.trans h_step2.le
-      -- Arithmetic: `2·slackA + slackOne = collisionSlack qS qH Chal`.
+      -- Arithmetic: `2·slackA + slackOne = collisionSlack qS qH β Chal`.
       have h_slack_eq :
-          ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-          ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-          ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) =
-          collisionSlack qS qH Chal := by
+          (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+          (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+          (Fintype.card Chal : ENNReal)⁻¹ =
+          collisionSlack qS qH β Chal := by
         unfold collisionSlack
-        rw [ENNReal.div_add_div_same, ENNReal.div_add_div_same]
+        ring
+      -- Arithmetic: `slackHVZK + slackHT = ofReal(qS·(qS+qH+1)·ζ_zk)`.
+      have h_hvzk_eq :
+          ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
+          ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) =
+          ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) := by
+        rw [← ENNReal.ofReal_add (by positivity) (by positivity)]
         congr 1
         push_cast
         ring
@@ -1104,36 +1175,40 @@ theorem euf_cma_to_nma
       calc adv.advantage (runtime M)
           _ ≤ (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                 Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
-              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) :=
+              (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+              ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) +
+              (Fintype.card Chal : ENNReal)⁻¹ :=
             bridge_real_freshness
           _ ≤ ((∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                   Pr[event pksk.1 | direct_sim_exp pksk.1]) +
                 ENNReal.ofReal (qS * ζ_zk) +
                 (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                   Pr[badPred | direct_sim_exp pksk.1])) +
-              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+              (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+              ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) +
+              (Fintype.card Chal : ENNReal)⁻¹ := by
             gcongr
           _ ≤ (Fork.advantage σ hr M nmaAdv qH +
                 ENNReal.ofReal (qS * ζ_zk) +
-                ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) +
-              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+                (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β) +
+              (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+              ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) +
+              (Fintype.card Chal : ENNReal)⁻¹ := by
             -- `gcongr` decomposes the compound inequality and closes the two leaf goals
             -- `S_sim ≤ Fork.advantage` and `S_bad ≤ slackA` using
             -- `bridge_sim_fork_freshness` and `h_bad_sum` from context.
             gcongr
           _ = Fork.advantage σ hr M nmaAdv qH +
-              ENNReal.ofReal (qS * ζ_zk) +
-              (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-                ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
-                ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) := by
-            simp only [add_assoc]
+              (ENNReal.ofReal (qS * ζ_zk) +
+                ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk)) +
+              ((qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+                (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
+                (Fintype.card Chal : ENNReal)⁻¹) := by
+            ring
           _ = Fork.advantage σ hr M nmaAdv qH +
-              ENNReal.ofReal (qS * ζ_zk) +
-              collisionSlack qS qH Chal := by
-            rw [h_slack_eq]
+              ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) +
+              collisionSlack qS qH β Chal := by
+            rw [h_hvzk_eq, h_slack_eq]
     exact advantage_bound
 section jensenIntegration
 
@@ -1812,24 +1887,29 @@ theorem euf_nma_bound
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
     hinv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
 
-/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
+/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK, β-parametric).**
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
 
 1. Replace the signing oracle with the HVZK simulator, losing
-   `qS · ζ_zk + collisionSlack qS qH Chal`.
+   `qS·(qS+qH+1)·ζ_zk + collisionSlack qS qH β Chal`, where `β` is the
+   simulator's commit-predictability bound.
 2. Apply the forking lemma to the resulting forkable managed-RO NMA experiment.
 
 The combined bound is:
 
-  `(ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) ·
-      ((ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) / (qH+1) - 1/|Ω|)
+  `(ε - qS·(qS+qH+1)·ζ_zk - 2·qS·(qS+qH)·β - 1/|Ω|) ·
+      ((ε - qS·(qS+qH+1)·ζ_zk - 2·qS·(qS+qH)·β - 1/|Ω|) / (qH+1) - 1/|Ω|)
     ≤ Pr[extraction succeeds]`
 
-where `ε = Adv^{EUF-CMA}(A)` and the concrete slack `qS·(qS+qH)/|Ω|` is the
-`collisionSlack qS qH Chal` birthday term. The ENNReal subtraction truncates at
-zero, so the bound is trivially satisfied when the simulation loss exceeds the
-advantage.
+where `ε = Adv^{EUF-CMA}(A)`, `2·qS·(qS+qH)·β + 1/|Ω|` is
+`collisionSlack qS qH β Chal`, and `qS·(qS+qH+1)·ζ_zk` is the inflated HVZK cost
+(`qS·ζ_zk` direct + `qS·(qS+qH)·ζ_zk` HVZK-transport). The ENNReal subtraction
+truncates at zero, so the bound is trivially satisfied when the simulation loss
+exceeds the advantage.
+
+When HVZK is perfect (`ζ_zk = 0`, e.g. Schnorr with `β = 1/|G|`), the HVZK term
+vanishes and the bound specializes to the classical `(ε - collisionSlack) · …`.
 
 The forking-lemma side (the two B1 prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
@@ -1837,10 +1917,8 @@ The forking-lemma side (the two B1 prefix-faithfulness identities
 discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
 used by `euf_nma_bound`. The Phase B freshness-drop hop is discharged via
 `SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated with
-`runtime_evalDist_bind_pure`. Conditional only on the single combined `hvzk_collision_swap`
-sorry inside `euf_cma_to_nma` (HVZK simulator swap and programming-collision bound merged
-into one inequality; see the comment there for the algebraic reason a clean two-phase
-decomposition is not realizable without new infrastructure). -/
+`runtime_evalDist_bind_pure`. Conditional only on the remaining sub-sorries inside
+`euf_cma_to_nma`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
@@ -1849,6 +1927,8 @@ theorem euf_cma_bound
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
+    (β : ENNReal)
+    (hPredSim : σ.simCommitPredictability simTranscript β)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qS qH : ℕ)
@@ -1856,17 +1936,17 @@ theorem euf_cma_bound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) -
-        (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal)
+        (ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) + collisionSlack qS qH β Chal)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
-    ζ_zk hζ_zk hhvzk adv qS qH hQ
+    ζ_zk hζ_zk hhvzk β hPredSim adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) -
-      (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal) ≤
+      (ENNReal.ofReal ((qS * (qS + qH + 1) : ℕ) * ζ_zk) + collisionSlack qS qH β Chal) ≤
       Fork.advantage σ hr M nmaAdv qH :=
     tsub_le_iff_right.mpr (by rw [← add_assoc]; exact hAdv)
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)

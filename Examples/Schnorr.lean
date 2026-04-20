@@ -147,6 +147,54 @@ private lemma realTranscript_eq_indep (g : G) (pk : G) (sk : F) :
   simp only [SigmaProtocol.realTranscript, sigma, bind_assoc, pure_bind]
 
 omit [DecidableEq F] in
+/-- **`simCommitPredictability` for Schnorr.** With the standard bijection hypothesis
+`hg : Function.Bijective (· • g : F → G)` (`F` acts simply transitively on `G`, so `g`
+generates the group), the simulator's commit marginal is uniform over `G`, giving
+predictability `β = 1/|F|` (equivalently `1/|G|`).
+
+Proof: for any fixed challenge `c`, the response map `z ↦ z • g - c • pk : F → G` is a
+bijection (composition of `· • g` with translation), so `(z • g - c • pk)` is uniform on
+`G` when `z ← $ᵗ F`. Averaging over `c ← $ᵗ F` preserves uniformity, and uniformity on
+`G` gives probability `1/|G| = 1/|F|` for any specific output. -/
+theorem sigma_simCommitPredictability (g : G)
+    (hg : Function.Bijective (· • g : F → G)) :
+    SigmaProtocol.simCommitPredictability (sigma F G g) (simTranscript F G g)
+      ((Fintype.card F : ℝ≥0∞)⁻¹) := by
+  classical
+  letI : Fintype G := Fintype.ofBijective _ hg
+  intro pk c₀
+  have hcard_FG : Fintype.card G = Fintype.card F := (Fintype.card_of_bijective hg).symm
+  have hinv_eq : (Fintype.card F : ℝ≥0∞)⁻¹ = (Fintype.card G : ℝ≥0∞)⁻¹ := by rw [hcard_FG]
+  have hbij_c : ∀ c : F, Function.Bijective (fun z : F => z • g - c • pk) := fun c =>
+    (Equiv.subRight (c • pk)).bijective.comp hg
+  have h_commit_uniform :
+      evalDist (Prod.fst <$> simTranscript F G g pk) = evalDist ($ᵗ G) := by
+    apply evalDist_ext
+    intro x
+    have h_rewrite : (Prod.fst <$> simTranscript F G g pk) =
+        (do let c ← ($ᵗ F); let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G) := by
+      simp [simTranscript, map_bind]
+    rw [h_rewrite, probOutput_bind_eq_tsum]
+    have h_inner_const : ∀ c : F,
+        Pr[= x | (do let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G)] =
+          (Fintype.card G : ℝ≥0∞)⁻¹ := by
+      intro c
+      have h_map : (do let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G) =
+          (fun z : F => z • g - c • pk) <$> ($ᵗ F) := by
+        simp [map_eq_bind_pure_comp]
+      rw [h_map,
+        probOutput_map_bijective_uniform_cross F (f := fun z : F => z • g - c • pk) (hbij_c c),
+        probOutput_uniformSample (α := G)]
+    simp_rw [h_inner_const]
+    rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul,
+      probOutput_uniformSample (α := G)]
+  have h_eq : probOutput (Prod.fst <$> simTranscript F G g pk) c₀ =
+      (Fintype.card F : ℝ≥0∞)⁻¹ := by
+    rw [probOutput_def, h_commit_uniform, ← probOutput_def,
+      probOutput_uniformSample (α := G), hcard_FG]
+  exact h_eq.le
+
+omit [DecidableEq F] in
 /-- **`simChalUniformGivenCommit` for Schnorr.** The proof reduces to the joint distribution
 of independently-sampled `r, c ← $ᵗ F` via perfect HVZK and the closed form
 `realTranscript_eq_indep`. The commitment `r • g` and challenge `c` are then literally

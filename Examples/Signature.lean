@@ -32,6 +32,7 @@ Given `Module F G`, a generator `g : G`, and a bijection proof
 
 
 open OracleComp OracleSpec DiffieHellman
+open scoped ENNReal
 
 namespace Schnorr
 
@@ -120,7 +121,9 @@ The bound includes:
 * explicit bounds on signing-oracle and random-oracle queries by the adversary;
 * an explicit DLog reduction target;
 * the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`;
-* the birthday-style late-programming collision term `collisionSlack qS qH F`.
+* the birthday-style late-programming collision term `collisionSlack qS qH (1/|F|) F`,
+  instantiated at the Schnorr commit-predictability bound `β = 1/|F|` from
+  `Schnorr.sigma_simCommitPredictability`.
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss vanishes
 and only the collision slack remains as simulation overhead. -/
@@ -133,7 +136,7 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
       (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
       let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
-        FiatShamir.collisionSlack qS qH F
+        FiatShamir.collisionSlack qS qH ((Fintype.card F : ℝ≥0∞)⁻¹) F
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   haveI : Fintype G := Fintype.ofFinite G
@@ -144,6 +147,8 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (Schnorr.simTranscript F G g)
     (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
+    (β := (Fintype.card F : ℝ≥0∞)⁻¹)
+    (Schnorr.sigma_simCommitPredictability F G g hg)
     adv qS qH hQ
   simp only [mul_zero, ENNReal.ofReal_zero, zero_add] at hred ⊢
   refine ⟨fun _ pk => red pk, hred.trans (le_of_eq ?_)⟩
