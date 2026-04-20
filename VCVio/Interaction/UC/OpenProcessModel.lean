@@ -115,13 +115,33 @@ instance lawfulMap_openTheory :
     exact congrArg₂ (StepOver.mk _)
       (Interaction.Spec.Decoration.map_comp _ _ _ _).symm rfl
 
-private theorem schedulerNode_mapBoundary
-    {Δ₁ Δ₂ : PortBoundary}
-    (φ : PortBoundary.Hom Δ₁ Δ₂) :
-    (schedulerNode Party Δ₁).mapBoundary φ =
-      schedulerNode Party Δ₂ := by
-  simp [schedulerNode, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary,
-    BoundaryAction.internal]
+/-- Extensionality for `OpenProcess` when both sides share the same
+residual state type `Proc` definitionally, the `step` fields are equal
+as functions, and the `stepSampler` fields are HEq (which reduces to
+literal equality once `step` agrees). -/
+private theorem OpenProcess.ext_of_step_eq
+    {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    {Proc : Type v}
+    {step₁ step₂ : Proc → StepOver (OpenNodeContext.{u, w} Party Δ) Proc}
+    {stepSampler₁ : ∀ s, Spec.Sampler.{w, w'} m (step₁ s).spec}
+    {stepSampler₂ : ∀ s, Spec.Sampler.{w, w'} m (step₂ s).spec}
+    (hstep : step₁ = step₂)
+    (hsampler : HEq stepSampler₁ stepSampler₂) :
+    (OpenProcess.mk Proc step₁ stepSampler₁ :
+      OpenProcess.{u, v, w, w'} m Party Δ) =
+      OpenProcess.mk Proc step₂ stepSampler₂ := by
+  subst hstep
+  cases hsampler
+  rfl
+
+/-- Derive step equality (as a function) from a `ProcessOver` equality,
+when both ProcessOvers have the same `.Proc` type definitionally. -/
+private theorem heq_step_of_processOver_eq.{v₀, w₀, w₂}
+    {Γ : Interaction.Spec.Node.Context.{w₀, w₂}}
+    {P₁ P₂ : Concurrent.ProcessOver.{v₀, w₀, w₂} Γ}
+    (h : P₁ = P₂) :
+    HEq P₁.step P₂.step :=
+  h ▸ HEq.rfl
 
 instance lawfulPar_openTheory :
     OpenTheory.IsLawfulPar (openTheory.{u, v, w, w'} Party m schedulerSampler) where
@@ -131,10 +151,36 @@ instance lawfulPar_openTheory :
         (W₁.interleave W₂ _ _ _ schedulerSampler) =
       (OpenProcess.mapBoundary f₁ W₁).interleave
         (OpenProcess.mapBoundary f₂ W₂) _ _ _ schedulerSampler
-    -- TODO(Phase C.1 fill): step-field equality via ProcessOver.mapContext_interleave
-    -- + ProcessOver.interleave_mapContext, then OpenNodeContext.map_tensor_comp_inlTensor
-    -- and inrTensor. Sampler fields agree by `rfl`.
-    sorry
+    -- The structural content lives at the `ProcessOver` layer: pushing a
+    -- tensor-boundary map across `interleave` matches mapping each side
+    -- first, using `map_tensor_comp_inlTensor`/`inrTensor` on the
+    -- injections. The scheduler argument closes definitionally because
+    -- boundary-mapping a purely internal node preserves the `.internal`
+    -- tag (the trace-monoid unit `1` is fixed by `PFunctor.Trace.mapChart`).
+    have hproc :
+        (W₁.toProcess.interleave W₂.toProcess
+            (OpenNodeContext.inlTensor Party Δ₁ Δ₂)
+            (OpenNodeContext.inrTensor Party Δ₁ Δ₂)
+            (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))).mapContext
+              (OpenNodeContext.map Party (PortBoundary.Hom.tensor f₁ f₂)) =
+          (W₁.toProcess.mapContext (OpenNodeContext.map Party f₁)).interleave
+            (W₂.toProcess.mapContext (OpenNodeContext.map Party f₂))
+            (OpenNodeContext.inlTensor Party Δ₁' Δ₂')
+            (OpenNodeContext.inrTensor Party Δ₁' Δ₂')
+            (schedulerNode Party (PortBoundary.tensor Δ₁' Δ₂')) := by
+      rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext,
+        OpenNodeContext.map_tensor_comp_inlTensor,
+        OpenNodeContext.map_tensor_comp_inrTensor]
+      congr 1
+    -- Lift to the `OpenProcess` equality: `Proc` is `Proc₁ × Proc₂` on
+    -- both sides; `step` is the `.step` of each side of `hproc` (defeq);
+    -- `stepSampler` is `Sampler.interleave schedulerSampler ...`, same
+    -- term on both sides (since `mapBoundary` preserves `stepSampler`).
+    cases W₁ with | mk Proc₁ step₁ stepSampler₁ =>
+    cases W₂ with | mk Proc₂ step₂ stepSampler₂ =>
+    simp only [OpenProcess.mapBoundary, OpenProcess.interleave]
+    exact OpenProcess.ext_of_step_eq
+      (eq_of_heq (heq_step_of_processOver_eq hproc)) HEq.rfl
 
 instance lawfulWire_openTheory :
     OpenTheory.IsLawfulWire (openTheory.{u, v, w, w'} Party m schedulerSampler) where
@@ -147,7 +193,35 @@ instance lawfulWire_openTheory :
         (OpenProcess.mapBoundary (PortBoundary.Hom.tensor
           (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂) W₂) _ _ _
         schedulerSampler
-    sorry
+    -- Same pattern as `map_par`, with the wire injections carrying the
+    -- shared boundary `Γ` as a fixed axis: `map_tensor_comp_wireLeft`
+    -- transports `f₁` past the left injection, and `map_tensor_comp_wireRight`
+    -- transports `f₂` past the right injection.
+    have hproc :
+        (W₁.toProcess.interleave W₂.toProcess
+            (OpenNodeContext.wireLeft Party Δ₁ Γ Δ₂)
+            (OpenNodeContext.wireRight Party Δ₁ Γ Δ₂)
+            (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))).mapContext
+              (OpenNodeContext.map Party (PortBoundary.Hom.tensor f₁ f₂)) =
+          (W₁.toProcess.mapContext
+              (OpenNodeContext.map Party
+                (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ)))).interleave
+            (W₂.toProcess.mapContext
+              (OpenNodeContext.map Party
+                (PortBoundary.Hom.tensor
+                  (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂)))
+            (OpenNodeContext.wireLeft Party Δ₁' Γ Δ₂')
+            (OpenNodeContext.wireRight Party Δ₁' Γ Δ₂')
+            (schedulerNode Party (PortBoundary.tensor Δ₁' Δ₂')) := by
+      rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext,
+        OpenNodeContext.map_tensor_comp_wireLeft,
+        OpenNodeContext.map_tensor_comp_wireRight]
+      congr 1
+    cases W₁ with | mk Proc₁ step₁ stepSampler₁ =>
+    cases W₂ with | mk Proc₂ step₂ stepSampler₂ =>
+    simp only [OpenProcess.mapBoundary, OpenProcess.interleave]
+    exact OpenProcess.ext_of_step_eq
+      (eq_of_heq (heq_step_of_processOver_eq hproc)) HEq.rfl
 
 instance lawfulPlug_openTheory :
     OpenTheory.IsLawfulPlug (openTheory.{u, v, w, w'} Party m schedulerSampler) where
@@ -156,7 +230,29 @@ instance lawfulPlug_openTheory :
     change (OpenProcess.mapBoundary f W).interleave K _ _ _ schedulerSampler =
       W.interleave (OpenProcess.mapBoundary (PortBoundary.Hom.swap f) K) _ _ _
         schedulerSampler
-    sorry
+    -- Only one side is boundary-mapped on each inequation: on the LHS, `W`
+    -- carries `map Party f`, absorbed by `close Party Δ₂` via `close_comp_map`;
+    -- on the RHS, `K` carries `map Party (swap f)`, absorbed by
+    -- `close Party (swap Δ₁)` via the same lemma applied to `swap f`.
+    have hproc :
+        (W.toProcess.mapContext (OpenNodeContext.map Party f)).interleave K.toProcess
+            (OpenNodeContext.close Party Δ₂)
+            (OpenNodeContext.close Party (PortBoundary.swap Δ₂))
+            (schedulerNode Party PortBoundary.empty) =
+          W.toProcess.interleave
+            (K.toProcess.mapContext
+              (OpenNodeContext.map Party (PortBoundary.Hom.swap f)))
+            (OpenNodeContext.close Party Δ₁)
+            (OpenNodeContext.close Party (PortBoundary.swap Δ₁))
+            (schedulerNode Party PortBoundary.empty) := by
+      rw [ProcessOver.interleave_mapContext_left,
+        ProcessOver.interleave_mapContext_right,
+        OpenNodeContext.close_comp_map, OpenNodeContext.close_comp_map]
+    cases W with | mk ProcW stepW stepSamplerW =>
+    cases K with | mk ProcK stepK stepSamplerK =>
+    simp only [OpenProcess.mapBoundary, OpenProcess.interleave]
+    exact OpenProcess.ext_of_step_eq
+      (eq_of_heq (heq_step_of_processOver_eq hproc)) HEq.rfl
 
 instance : OpenTheory.IsLawful (openTheory.{u, v, w, w'} Party m schedulerSampler) where
 
