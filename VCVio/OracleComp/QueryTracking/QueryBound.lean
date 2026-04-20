@@ -117,6 +117,36 @@ lemma isQueryBound_congr
     oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ :=
   isQueryBound_congr_aux oa canQuery₁ canQuery₂ cost₁ cost₂ hcan hcost
 
+/-- Project an `IsQueryBound` along a budget projection `proj : B → B'`.
+
+If the source bound at budget `b` validates queries at every step, the projected
+bound at `proj b` is also validated, provided:
+* `h_can`  — whenever a step is allowed in the source (`canQuery t b'`), it is
+  allowed in the projection (`canQuery' t (proj b')`);
+* `h_cost` — the projection commutes with the cost step on the allowed branch
+  (`proj (cost t b') = cost' t (proj b')`).
+
+Typical use: extract a single-coordinate query bound (e.g. `qS`-only) from a
+multi-coordinate bound (e.g. `(qS, qH)` from `signHashQueryBound`) by setting
+`proj := Prod.fst`. -/
+lemma IsQueryBound.proj
+    {B' : Type*} (proj : B → B')
+    {oa : OracleComp spec α} {b : B}
+    {canQuery : ι → B → Prop} {cost : ι → B → B}
+    {canQuery' : ι → B' → Prop} {cost' : ι → B' → B'}
+    (h_can : ∀ (t : ι) (b' : B), canQuery t b' → canQuery' t (proj b'))
+    (h_cost : ∀ (t : ι) (b' : B), canQuery t b' → proj (cost t b') = cost' t (proj b'))
+    (h : IsQueryBound oa b canQuery cost) :
+    IsQueryBound oa (proj b) canQuery' cost' := by
+  induction oa using OracleComp.inductionOn generalizing b with
+  | pure x => simp
+  | query_bind t mx ih =>
+      rw [isQueryBound_query_bind_iff] at h ⊢
+      refine ⟨h_can t b h.1, fun u => ?_⟩
+      have hu : IsQueryBound (mx u) (proj (cost t b)) canQuery' cost' :=
+        ih u (h.2 u)
+      rwa [h_cost t b h.1] at hu
+
 /-- Transfer a structural query bound through `simulateQ` into a stateful target semantics,
 provided each simulated source query has a target-side step bound and the target-side bind
 rule composes those step budgets with the recursive continuation budget. -/
