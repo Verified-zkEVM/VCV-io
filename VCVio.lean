@@ -74,8 +74,10 @@ import VCVio.Interaction.Basic.MonadDecoration
 import VCVio.Interaction.Basic.Node
 import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Replicate
+import VCVio.Interaction.Basic.Sampler
 import VCVio.Interaction.Basic.Shape
 import VCVio.Interaction.Basic.Spec
+import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.Basic.StateChain
 import VCVio.Interaction.Basic.Strategy
 import VCVio.Interaction.Basic.Syntax
@@ -114,6 +116,8 @@ import VCVio.Interaction.TwoParty.Refine
 import VCVio.Interaction.TwoParty.Role
 import VCVio.Interaction.TwoParty.Strategy
 import VCVio.Interaction.TwoParty.Swap
+import VCVio.Interaction.UC.AsyncRuntime
+import VCVio.Interaction.UC.AsyncSecurity
 import VCVio.Interaction.UC.Computational
 import VCVio.Interaction.UC.CorruptionModel
 import VCVio.Interaction.UC.Emulates

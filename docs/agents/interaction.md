@@ -386,6 +386,49 @@ for the concrete `openTheory` model up to isomorphism (see `OpenProcessModel.lea
 
 `Expr.toInterp` embeds quotiented expressions into the lawful `Interp` model.
 
+### Monad-parametric open processes and intrinsic samplers
+
+`OpenProcess m Party Δ` (`UC/OpenProcess.lean`) is the runtime-facing analogue of
+`Concurrent.ProcessOver`: an `m`-parametric structure that bundles, at every
+step, a `Spec.Sampler m` for resolving that step's nondeterminism. Samplers are
+carried as data, not threaded through as an external argument. Three concrete
+consequences:
+
+1. **Samplers are a decoration, not a side argument.**
+   `Spec.Sampler m spec` is definitionally `Decoration (fun X => m X) spec`
+   (`Basic/Sampler.lean`). Every move type `X` in the spec receives an `m X`
+   computation; `sampleTranscript` folds a sampler into an `m (Transcript spec)`.
+   Universe-polymorphic at `(w, w')` so that `m : Type w → Type w'` and
+   `spec : Spec.{w}`.
+2. **`OpenProcess` carries `stepSampler` as a field.**
+   For each reachable step, `OpenProcess.stepSampler` supplies the
+   `Spec.Sampler m` that resolves that step's move choices. The underlying pure
+   structure is still a `Concurrent.ProcessOver`, recoverable via
+   `OpenProcess.toProcess`. The structural layer (`StepOver`, `ProcessOver`) is
+   left untouched.
+3. **`openTheory m Party schedulerSampler` threads samplers compositionally.**
+   The monad `m` and a scheduler sampler (`m (ULift Bool)` resolving
+   binary-choice scheduler nodes introduced by `par` / `wire` / `plug`) become
+   parameters of the concrete model. Each combinator builds the new step's
+   sampler via `Spec.Sampler.interleave` from its inputs' samplers, so any law
+   about `map`/`par`/`wire`/`plug` that holds in the pure structural theory
+   lifts to the monad-parametric one once `schedulerSampler` is fixed.
+
+Runtime semantics drop the external `sampler` argument accordingly:
+`processSemantics`, `processSemanticsProbComp`, and `processSemanticsOracle`
+(`UC/Runtime.lean`) pull the per-step sampler from `process.stepSampler`, as do
+their asynchronous counterparts in `UC/AsyncRuntime.lean`. Typeclass ornaments
+(`Spec.Fintype` in `Basic/SpecFintype.lean`, mirroring `OracleSpec.Fintype`) let
+users recover canonical uniform samplers (`Sampler.uniformI`) without writing
+one by hand.
+
+The end-to-end flow is exhibited by `Examples/OneTimePad/UC.lean`: both the
+real and ideal one-time pads are built as
+`(openTheory (OptionT ProbComp) Party demoSchedulerSampler).Obj (Δ_otp sp)`
+with intrinsic uniform key-sampling nodes and genuine `BoundaryAction.emit`
+ciphertext packets, and `CompEmulates 0` is discharged from the structural
+equivalence of their emissions.
+
 ## Import guide
 
 Choose the minimal set for your task:
@@ -429,6 +472,8 @@ import VCVio.Interaction.Concurrent.Process
 | `Ownership.lean` | `LocalView`/`LocalRunner` builders for `SyntaxOver` |
 | `MonadDecoration.lean` | `MonadDecoration`, `Strategy.withMonads`, `runWithMonads` |
 | `BundledMonad.lean` | `BundledMonad` (monad packaged for inductive data) |
+| `Sampler.lean` | `Spec.Sampler m spec := Decoration (fun X => m X) spec` (per-node monadic samplers as data), `sampleTranscript`, `Sampler.interleave`, `Sampler.uniformI` |
+| `SpecFintype.lean` | `Spec.Fintype` per-spec ornament (recursive `Fintype` + `Nonempty` for every move type); enables canonical `Sampler.uniformI` |
 
 ### `TwoParty/`
 
@@ -489,11 +534,11 @@ import VCVio.Interaction.Concurrent.Process
 | `OpenSyntax/Raw.lean` | `Raw` syntax tree, `Raw.interpret`, `Raw.Equiv` (incl. monoidal/traced/CC equations) |
 | `OpenSyntax/Interp.lean` | `Interp` (tagless-final), granular `HasUnit` / `HasIdWire` / `IsMonoidal` / `IsTraced` / `IsCompactClosed` / `HasPlugWireFactor` instances |
 | `OpenSyntax/Expr.lean` | `Expr` (quotient of `Raw`), granular `OpenTheory` lawfulness instances, `Expr.toInterp` |
-| `OpenProcess.lean` | `BoundaryAction`, `OpenNodeProfile`, `OpenNodeContext` (with polynomial-product bridge `productView`), `OpenProcess`, `OpenProcessIso` (bisimulation equivalence) |
-| `OpenProcessModel.lean` | `openTheory` (concrete model), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
+| `OpenProcess.lean` | `BoundaryAction`, `OpenNodeProfile`, `OpenNodeContext` (with polynomial-product bridge `productView`), `OpenProcess m Party Δ` (monad-parametric, with intrinsic `stepSampler`), `toProcess`, `OpenProcessIso` (bisimulation equivalence) |
+| `OpenProcessModel.lean` | `openTheory m Party schedulerSampler` (monad-parametric concrete model threading `Spec.Sampler` through `map`/`par`/`wire`/`plug`), `IsLawful`, monoidal/CC laws up to `OpenProcessIso` |
 | `Emulates.lean` | `Emulates`, `UCSecure` (contextual emulation and UC security) |
 | `Computational.lean` | `Semantics`, `CompEmulates`, `AsympCompEmulates` (computational observation layer) |
-| `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (monad-parametric), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |
+| `Runtime.lean` | `Spec.Sampler m`, `sampleTranscript`, `ProcessOver.runSteps`, `processSemantics` (no external `sampler` arg; pulled from `process.stepSampler`), `processSemanticsProbComp`, `processSemanticsOracle` (oracle-aware runtime) |
 
 ## In-tree examples
 
