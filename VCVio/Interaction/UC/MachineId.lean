@@ -65,7 +65,7 @@ filter incoming routed packets explicitly through `allowed` at the
 appropriate boundary surface.
 -/
 
-universe u v w
+universe u v w w'
 
 namespace Interaction
 namespace UC
@@ -145,8 +145,8 @@ composition operates uniformly over this type.
 Existing examples that use a flat `Party` are unaffected; only protocols that
 need session-aware identity instantiate this abbreviation.
 -/
-abbrev MachineProcess (Sid Pid : Type u) (Δ : PortBoundary) :=
-  OpenProcess.{u, v, w} (MachineId Sid Pid) Δ
+abbrev MachineProcess (Sid Pid : Type u) (m : Type w → Type w') (Δ : PortBoundary) :=
+  OpenProcess.{u, v, w, w'} m (MachineId Sid Pid) Δ
 
 /-! ## Per-process access control -/
 
@@ -173,13 +173,13 @@ Until that integration lands, `HasAccessControl` is a *declarative* contract
 that downstream constructions must thread by hand.
 -/
 class HasAccessControl
-    {Party : Type u} {Δ : PortBoundary}
-    (P : OpenProcess.{u, v, w} Party Δ) where
+    {Party : Type u} {m : Type w → Type w'} {Δ : PortBoundary}
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) where
   allowed : Interface.RoutedPacket Δ.In Party → Bool
 
 namespace HasAccessControl
 
-variable {Party : Type u} {Δ : PortBoundary}
+variable {Party : Type u} {m : Type w → Type w'} {Δ : PortBoundary}
 
 /--
 The trivial **allow-all** access control: every routed packet is admissible.
@@ -189,12 +189,12 @@ filtering, and as the canonical baseline against which more restrictive
 instances are compared.
 -/
 @[reducible]
-def allowAll (P : OpenProcess.{u, v, w} Party Δ) : HasAccessControl P where
+def allowAll (P : OpenProcess.{u, v, w, w'} m Party Δ) : HasAccessControl P where
   allowed _ := true
 
 @[simp]
 theorem allowed_allowAll
-    (P : OpenProcess.{u, v, w} Party Δ)
+    (P : OpenProcess.{u, v, w, w'} m Party Δ)
     (rp : Interface.RoutedPacket Δ.In Party) :
     (HasAccessControl.allowAll P).allowed rp = true := rfl
 
@@ -214,16 +214,16 @@ discipline.
 -/
 @[reducible]
 def MachineProcess.allowSameSession
-    {Sid Pid : Type u} {Δ : PortBoundary} [DecidableEq Sid]
+    {Sid Pid : Type u} {m : Type w → Type w'} {Δ : PortBoundary} [DecidableEq Sid]
     (owner : MachineId Sid Pid)
-    (P : MachineProcess.{u, v, w} Sid Pid Δ) : HasAccessControl P where
+    (P : MachineProcess.{u, v, w, w'} Sid Pid m Δ) : HasAccessControl P where
   allowed rp := rp.sender.sameSession owner
 
 @[simp]
 theorem MachineProcess.allowed_allowSameSession
-    {Sid Pid : Type u} {Δ : PortBoundary} [DecidableEq Sid]
+    {Sid Pid : Type u} {m : Type w → Type w'} {Δ : PortBoundary} [DecidableEq Sid]
     (owner : MachineId Sid Pid)
-    (P : MachineProcess.{u, v, w} Sid Pid Δ)
+    (P : MachineProcess.{u, v, w, w'} Sid Pid m Δ)
     (rp : Interface.RoutedPacket Δ.In (MachineId Sid Pid)) :
     (MachineProcess.allowSameSession owner P).allowed rp =
       rp.sender.sameSession owner := rfl
@@ -280,8 +280,8 @@ accepted `RoutedPacket` has sender in session `sid`) lives at the
 `MachineProcess.allowSameSession`.
 -/
 def MachineProcess.SubroutineRespectingAt
-    {Sid Pid : Type u} {Δ : PortBoundary}
-    (sid : Sid) (P : MachineProcess.{u, v, w} Sid Pid Δ) : Prop :=
+    {Sid Pid : Type u} {m : Type w → Type w'} {Δ : PortBoundary}
+    (sid : Sid) (P : MachineProcess.{u, v, w, w'} Sid Pid m Δ) : Prop :=
   ∀ (s : P.Proc) (tr : (P.step s).spec.Transcript),
     DecorationSessionCoherentAt sid (P.step s).semantics tr
 

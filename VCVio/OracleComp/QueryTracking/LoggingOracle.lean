@@ -5,11 +5,23 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.Tracing
 import ToMathlib.Control.WriterT
 
 /-!
 # Logging Queries Made by a Computation
 
+`QueryImpl.withLogging` records every query/response pair `⟨t, u⟩` to a
+`WriterT (QueryLog spec)` writer layer. It is a response-dependent trace,
+defined as a specialisation of `QueryImpl.withTraceAppend` (see
+`Tracing.lean`): the log is appended *after* the underlying handler returns,
+so a handler failure leaves no log entry for the failed query.
+
+We use the `Append`-flavoured `withTraceAppend` (rather than the `Monoid`
+flavoured `withTrace`) because `QueryLog spec = List _` only carries an
+`[EmptyCollection, Append, LawfulAppend]` structure, not a `Monoid`. This
+matches the pre-existing `Monad (WriterT (QueryLog spec) m)` instance the
+rest of `WriterTBridge` / `mvcgen` infrastructure already targets.
 -/
 
 universe u v w
@@ -24,9 +36,16 @@ variable {m : Type u → Type v} [Monad m]
 
 /-- Given that `so` implements the oracles in `spec` using the monad `m`,
 `withLogging so` gives the same implementation in the extension `WriterT (QueryLog spec) m`,
-by logging all the queries to the writer monad before forwarding the response. -/
+by appending a single-entry log `[⟨t, u⟩]` *after* the handler returns response `u`.
+
+This is the response-dependent specialisation of `QueryImpl.withTraceAppend` with the
+trace function `fun t u => [⟨t, u⟩]` (a single-element list, the free-monoid
+generator of `QueryLog spec = List ((t : spec.Domain) × spec.Range t)`). -/
 def withLogging (so : QueryImpl spec m) : QueryImpl spec (WriterT (QueryLog spec) m) :=
-  fun t : spec.Domain => do let u ← so t; tell [⟨t, u⟩]; return u
+  so.withTraceAppend (fun t u => [⟨t, u⟩])
+
+lemma withLogging_eq_withTraceAppend (so : QueryImpl spec m) :
+    so.withLogging = so.withTraceAppend (fun t u => [⟨t, u⟩]) := rfl
 
 @[simp, grind =]
 lemma withLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
@@ -34,10 +53,8 @@ lemma withLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
 
 lemma fst_map_run_withLogging [LawfulMonad m] (so : QueryImpl spec m) (mx : OracleComp spec α) :
     Prod.fst <$> (simulateQ (so.withLogging) mx).run =
-    simulateQ so mx := by
-  induction mx using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => simp [h]
+    simulateQ so mx :=
+  fst_map_run_withTraceAppend so (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
 /-- Logging preserves failure probability: for any base monad `m` with `HasEvalSPMF`,
 wrapping an oracle implementation with `withLogging` does not change the probability of failure.
@@ -45,15 +62,15 @@ When `m = OracleComp spec`, both sides are `0` (trivially true). When `m` can ge
 (e.g. `OptionT (OracleComp spec)`), this is a non-trivial faithfulness property. -/
 lemma probFailure_run_simulateQ_withLogging [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
-    Pr[⊥ | (simulateQ (so.withLogging) mx).run] = Pr[⊥ | simulateQ so mx] := by
-  rw [show Pr[⊥ | (simulateQ (so.withLogging) mx).run] =
-    Pr[⊥ | Prod.fst <$> (simulateQ (so.withLogging) mx).run] from
-    (probFailure_map _ _).symm, fst_map_run_withLogging]
+    Pr[⊥ | (simulateQ (so.withLogging) mx).run] = Pr[⊥ | simulateQ so mx] :=
+  probFailure_run_simulateQ_withTraceAppend so
+    (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
 lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (mx : OracleComp spec α) :
-    NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) := by
-  simp only [HasEvalSPMF.neverFail_iff, probFailure_run_simulateQ_withLogging]
+    NeverFail (simulateQ (so.withLogging) mx).run ↔ NeverFail (simulateQ so mx) :=
+  NeverFail_run_simulateQ_withTraceAppend_iff so
+    (fun (t : spec.Domain) u => ([⟨t, u⟩] : QueryLog spec)) mx
 
 end QueryImpl
 
@@ -124,7 +141,7 @@ lemma run_simulateQ_loggingOracle_query_bind
       (query t : OracleComp spec _) >>= fun u =>
         (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i : spec.Domain) × spec.Range i) :: p.2))
           <$> (simulateQ loggingOracle (mx u)).run := by
-  simp [loggingOracle, QueryImpl.withLogging, OracleQuery.cont_query,
+  simp [loggingOracle, QueryImpl.withLogging_apply, OracleQuery.cont_query,
     Function.id_def]
 
 /-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of

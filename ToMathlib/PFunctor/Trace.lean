@@ -38,6 +38,14 @@ shape of a stateless effectful Mealy machine in the `List`-Writer Kleisli
 category.  Stateful executors (e.g. running over an `OracleComp`) are handled
 separately in `VCVio/OracleComp/QueryTracking/`.
 
+The canonical user inside this repository is `BoundaryAction.emit` in
+`VCVio/Interaction/UC/OpenProcess.lean`, where `Trace Δ.Out X` records the
+list of output-port packets a node emits when the local state transitions
+to `x : X`. Operations such as `mapBoundary`, `wireLeft`, `wireRight`, and
+the tensor embeddings of open processes are implemented directly by
+`PFunctor.Trace.mapChart` and `PFunctor.Trace.mapPartial` against
+appropriate boundary morphisms.
+
 
 ## References
 
@@ -138,6 +146,18 @@ theorem mapPartial_comp (g : Idx Q → Option (Idx R))
       (mapPartial (fun i => some (Chart.mapIdx f i)) t)
   rw [mapPartial_comp]
   rfl
+
+/-! ### Trivial-trace lemmas
+
+The unit trace `1 : Trace P X = fun _ => []` is annihilated by all relabel /
+filter operations.  These are needed downstream to reason about
+boundary actions whose default emission is the empty trace. -/
+
+@[simp] theorem mapPartial_one (f : Idx P → Option (Idx Q)) :
+    mapPartial f (1 : Trace P X) = 1 := rfl
+
+@[simp] theorem mapChart_one (φ : Chart P Q) :
+    mapChart φ (1 : Trace P X) = 1 := rfl
 
 /-! ### Naturality of `toMonoid`
 

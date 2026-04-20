@@ -79,21 +79,21 @@ The canonical CJSV22 instantiation `MomentaryCorruption.Process`
 value) lives in `MomentaryCorruption.lean`.
 -/
 
-universe u uE v w
+universe u uE v w w'
 
 namespace Interaction
 namespace UC
 
 /--
-`EnvOpenProcess Party Δ Event State` is an `OpenProcess Party Δ` paired
-with an `EnvAction Event State` describing how an environment-side state
-of type `State` evolves under environment events drawn from `Event`.
+`EnvOpenProcess m Party Δ Event State` is an `OpenProcess m Party Δ`
+paired with an `EnvAction Event State` describing how an environment-side
+state of type `State` evolves under environment events drawn from `Event`.
 
 The two fields encode orthogonal effect channels:
 
-* `process : OpenProcess Party Δ` — the standard open-process boundary
-  surface, with its own controllers, views, and `BoundaryAction` for
-  port traffic.
+* `process : OpenProcess m Party Δ` — the standard open-process boundary
+  surface, with its own controllers, views, per-step nodewise sampler,
+  and `BoundaryAction` for port traffic.
 * `envAction : EnvAction Event State` — an independent env-driven
   channel for actions whose semantics are *not* port-routed (CJSV22
   §3.2 corruption, broadcast resets, time advance).
@@ -109,16 +109,17 @@ CJSV22 instantiation `MomentaryCorruption.Process` in
 -/
 @[ext]
 structure EnvOpenProcess
+    (m : Type w → Type w')
     (Party : Type u) (Δ : PortBoundary)
     (Event : Type uE) (State : Type) where
   /-- The underlying open process exposing the boundary `Δ`. -/
-  process : OpenProcess.{u, v, w} Party Δ
+  process : OpenProcess.{u, v, w, w'} m Party Δ
   /-- The environment-event channel acting on `State` under `Event`. -/
   envAction : EnvAction Event State
 
 namespace EnvOpenProcess
 
-variable {Party : Type u} {Δ : PortBoundary}
+variable {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
   {Event : Type uE} {State : Type}
 
 /-! ## Projections -/
@@ -130,8 +131,8 @@ This is the canonical projection: it drops the env action and retains
 only the open-process boundary surface.
 -/
 @[reducible]
-def toOpenProcess (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State) :
-    OpenProcess.{u, v, w} Party Δ := E.process
+def toOpenProcess (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State) :
+    OpenProcess.{u, v, w, w'} m Party Δ := E.process
 
 /--
 React to an environment event on the env-side state, delegating to the
@@ -140,13 +141,13 @@ underlying `EnvAction.react`.
 Provided as a top-level projection so that downstream consumers can
 write `E.react e s` without unfolding the wrapper.
 -/
-def react (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
+def react (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State)
     (e : Event) (s : State) : ProbComp State :=
   E.envAction.react e s
 
 @[simp]
 theorem react_eq_envAction_react
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State)
     (e : Event) (s : State) :
     E.react e s = E.envAction.react e s := rfl
 
@@ -160,19 +161,19 @@ This is the canonical no-op wrapping: every existing `OpenProcess`
 embeds into `EnvOpenProcess _ _ Empty State` for any `State`.
 -/
 def ofOpenProcess
-    (P : OpenProcess.{u, v, w} Party Δ) (S : Type) :
-    EnvOpenProcess.{u, 0, v, w} Party Δ Empty S where
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (S : Type) :
+    EnvOpenProcess.{u, 0, v, w, w'} m Party Δ Empty S where
   process := P
   envAction := EnvAction.empty S
 
 @[simp]
 theorem process_ofOpenProcess
-    (P : OpenProcess.{u, v, w} Party Δ) (S : Type) :
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (S : Type) :
     (ofOpenProcess P S).process = P := rfl
 
 @[simp]
 theorem envAction_ofOpenProcess
-    (P : OpenProcess.{u, v, w} Party Δ) (S : Type) :
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (S : Type) :
     (ofOpenProcess P S).envAction = EnvAction.empty S := rfl
 
 /--
@@ -184,24 +185,24 @@ Useful when a process needs to participate in a non-trivial alphabet
 `State` types) but its own state is unaffected by every event.
 -/
 def passive
-    (P : OpenProcess.{u, v, w} Party Δ) (Event : Type uE) (S : Type) :
-    EnvOpenProcess.{u, uE, v, w} Party Δ Event S where
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (Event : Type uE) (S : Type) :
+    EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event S where
   process := P
   envAction := EnvAction.passive Event S
 
 @[simp]
 theorem process_passive
-    (P : OpenProcess.{u, v, w} Party Δ) (Event : Type uE) (S : Type) :
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (Event : Type uE) (S : Type) :
     (passive P Event S).process = P := rfl
 
 @[simp]
 theorem envAction_passive
-    (P : OpenProcess.{u, v, w} Party Δ) (Event : Type uE) (S : Type) :
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (Event : Type uE) (S : Type) :
     (passive P Event S).envAction = EnvAction.passive Event S := rfl
 
 @[simp]
 theorem react_passive
-    (P : OpenProcess.{u, v, w} Party Δ) (Event : Type uE) (S : Type)
+    (P : OpenProcess.{u, v, w, w'} m Party Δ) (Event : Type uE) (S : Type)
     (e : Event) (s : S) :
     (passive P Event S).react e s = pure s := rfl
 
@@ -221,33 +222,33 @@ The underlying open process is unchanged.
 -/
 def comapEvent {Event' : Type uE}
     (g : Event → Event')
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event' State) :
-    EnvOpenProcess.{u, uE, v, w} Party Δ Event State where
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event' State) :
+    EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State where
   process := E.process
   envAction := E.envAction.comap g
 
 @[simp]
 theorem process_comapEvent {Event' : Type uE}
     (g : Event → Event')
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event' State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event' State) :
     (comapEvent g E).process = E.process := rfl
 
 @[simp]
 theorem envAction_comapEvent {Event' : Type uE}
     (g : Event → Event')
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event' State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event' State) :
     (comapEvent g E).envAction = E.envAction.comap g := rfl
 
 @[simp]
 theorem comapEvent_id
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State) :
     comapEvent (id : Event → Event) E = E := by
   cases E; simp [comapEvent]
 
 @[simp]
 theorem comapEvent_comapEvent {Event' Event'' : Type uE}
     (h : Event → Event') (g : Event' → Event'')
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event'' State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event'' State) :
     comapEvent h (comapEvent g E) = comapEvent (g ∘ h) E := by
   cases E; simp [comapEvent]
 
@@ -260,21 +261,21 @@ channel (e.g. lifting from the canonical `MomentaryCorruption.react`
 reaction to a richer simulator-controlled reaction with its own state).
 -/
 def withEnvAction {Event' : Type uE} {State' : Type}
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State)
     (ea : EnvAction Event' State') :
-    EnvOpenProcess.{u, uE, v, w} Party Δ Event' State' where
+    EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event' State' where
   process := E.process
   envAction := ea
 
 @[simp]
 theorem process_withEnvAction {Event' : Type uE} {State' : Type}
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State)
     (ea : EnvAction Event' State') :
     (E.withEnvAction ea).process = E.process := rfl
 
 @[simp]
 theorem envAction_withEnvAction {Event' : Type uE} {State' : Type}
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ Event State)
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ Event State)
     (ea : EnvAction Event' State') :
     (E.withEnvAction ea).envAction = ea := rfl
 
@@ -292,21 +293,21 @@ through unchanged. This is the env-channel-aware analogue of
 -/
 def mapBoundary {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ₁ Event State) :
-    EnvOpenProcess.{u, uE, v, w} Party Δ₂ Event State where
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ₁ Event State) :
+    EnvOpenProcess.{u, uE, v, w, w'} m Party Δ₂ Event State where
   process := E.process.mapBoundary φ
   envAction := E.envAction
 
 @[simp]
 theorem process_mapBoundary {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ₁ Event State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ₁ Event State) :
     (E.mapBoundary φ).process = E.process.mapBoundary φ := rfl
 
 @[simp]
 theorem envAction_mapBoundary {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
-    (E : EnvOpenProcess.{u, uE, v, w} Party Δ₁ Event State) :
+    (E : EnvOpenProcess.{u, uE, v, w, w'} m Party Δ₁ Event State) :
     (E.mapBoundary φ).envAction = E.envAction := rfl
 
 end EnvOpenProcess

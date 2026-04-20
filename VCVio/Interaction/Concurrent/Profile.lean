@@ -18,7 +18,7 @@ what each party can observe when a frontier event is scheduled.
 
 The design here stays structural and continuation-based:
 
-* `Profile Party S` recursively attaches a `Multiparty.LocalView` to every
+* `Profile Party S` recursively attaches a `Multiparty.ViewMode` to every
   atomic node of the concurrent spec `S`;
 * `Profile.residual` transports such a profile across one scheduled frontier
   event;
@@ -27,7 +27,7 @@ The design here stays structural and continuation-based:
 * `Profile.observe me profile event` computes the actual observation exposed by
   a concrete frontier event `event`;
 * `Profile.frontierView me profile` packages the whole current frontier as a
-  single `Multiparty.LocalView`.
+  single `Multiparty.ViewMode`.
 
 This is intentionally only an observation/profile layer.
 It does **not** yet introduce:
@@ -67,7 +67,7 @@ inductive Profile (Party : Type u) : Spec → Type (u + 1) where
   | /-- Profile of an atomic node: each party gets a local view of the move
     type, and the continuation records residual profiles for each chosen move. -/
     node {Moves : Type u} {rest : Moves → Spec}
-      (views : Party → Multiparty.LocalView Moves)
+      (views : Party → Multiparty.ViewMode Moves)
       (cont : (x : Moves) → Profile Party (rest x)) :
       Profile Party (.node Moves rest)
   | /-- Profile of a parallel concurrent spec. -/
@@ -117,7 +117,7 @@ def ObsType {Party : Type u} (me : Party) :
 party `me` by the scheduled frontier event `event`.
 
 This is computed structurally:
-* at an atomic node, use the underlying `Multiparty.LocalView.obsOf`;
+* at an atomic node, use the underlying `Multiparty.ViewMode.obsOf`;
 * at a parallel node, tag observations by whether the event came from the left
   or right concurrent component.
 -/
@@ -130,31 +130,32 @@ def observe {Party : Type u} (me : Party) :
 
 /--
 `frontierView me profile` packages the entire current frontier of `profile`
-into a single `Multiparty.LocalView`.
+into a single `Multiparty.ViewMode`.
 
 This is useful when one wants to treat the current scheduled frontier event as a
 single global move:
-* atomic nodes reuse the party's underlying atomic local view, with `active`
+* atomic nodes reuse the party's underlying atomic local view, with `pick`
   collapsing to `observe` because the scheduled frontier event itself is already
   fixed;
-* parallel nodes expose a quotient view whose observations are exactly
+* parallel nodes expose a `react`-form view whose observations are exactly
   `ObsType me profile`.
 
 So `frontierView` is an observation-level concurrent local view, not yet a full
 local process semantics for the participant.
 -/
 def frontierView {Party : Type u} (me : Party) :
-    {S : Spec} → (profile : Profile Party S) → Multiparty.LocalView (Front S)
+    {S : Spec} → (profile : Profile Party S) → Multiparty.ViewMode (Front S)
   | .done, .done => .hidden
   | .node _ _, .node views _ =>
       match views me with
-      | .active => .observe
+      | .pick => .observe
       | .observe => .observe
       | .hidden => .hidden
-      | .quotient Obs toObs =>
-          .quotient (PLift Obs) (fun
-            | .move x => ⟨toObs x⟩)
-  | .par _ _, profile => .quotient (PLift (ObsType me profile)) (fun e => ⟨observe me profile e⟩)
+      | .react ⟨Obs, toObs⟩ =>
+          .react ⟨PLift Obs, fun
+            | .move x => ⟨toObs x⟩⟩
+  | .par _ _, profile =>
+      .react ⟨PLift (ObsType me profile), fun e => ⟨observe me profile e⟩⟩
 
 end Profile
 end Concurrent
