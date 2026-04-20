@@ -7,31 +7,38 @@ import VCVio.Interaction.UC.OpenProcess
 import VCVio.Interaction.UC.OpenTheory
 
 /-!
-# Concrete `OpenTheory` model backed by `OpenProcess`
+# Concrete `OpenTheory` model backed by `OpenProcess m`
 
 This file provides the first concrete realization of `UC.OpenTheory`
-using actual open processes (`OpenProcess Party Δ`).
+using actual open processes (`OpenProcess m Party Δ`), i.e., processes
+that carry a per-step nodewise-monadic sampler in the intermediate monad
+`m`.
 
 ## Implemented operations
 
 * `map` adapts boundary actions along a `PortBoundary.Hom`, with a proven
-  `IsLawfulMap` instance (functoriality).
+  `IsLawfulMap` instance (functoriality). The per-step sampler is left
+  unchanged; only the boundary-action decoration is pushed forward.
 
 * `par` places two open processes side by side using binary-choice
   interleaving: a scheduling node chooses left or right, then runs the
   selected subprocess's step protocol. Emitted packets are injected into
-  the appropriate summand of the tensor output interface.
+  the appropriate summand of the tensor output interface. The scheduler
+  move is resolved by the theory's shared `schedulerSampler : m (ULift
+  Bool)`; per-branch samplers are assembled via
+  `Spec.Sampler.interleave`.
 
 * `wire` connects a shared internal boundary between two processes.
   Packets on the shared boundary are filtered out (deferred to runtime
   routing), while packets on the remaining external boundaries are
-  preserved.
+  preserved. Samplers are threaded the same way as for `par`.
 
 * `plug` closes an open system against a matching context by
-  internalizing all boundary traffic.
+  internalizing all boundary traffic. Samplers are again threaded via
+  the scheduler-interleaving pattern.
 -/
 
-universe u v w
+universe u v w w'
 
 namespace Interaction
 namespace UC
@@ -41,50 +48,59 @@ open Concurrent
 section Model
 
 variable (Party : Type u)
+variable (m : Type w → Type w')
+variable (schedulerSampler : m (ULift.{w, 0} Bool))
 
 /-- The hidden scheduler node shared by `par`, `wire`, and `plug`. -/
 private def schedulerNode (Δ : PortBoundary) :
-    OpenNodeProfile Party Δ (ULift.{w} Bool) where
+    OpenNodeProfile.{u, w} Party Δ (ULift.{w, 0} Bool) where
   controllers := fun _ => []
   views := fun _ => .hidden
   boundary := .internal Δ _
 
 /--
-The concrete open-composition theory backed by `OpenProcess`.
+The concrete open-composition theory backed by `OpenProcess m`.
 
-* `Obj Δ` is `OpenProcess Party Δ`, the boundary-indexed family of open
-  concurrent processes.
-* `map` adapts boundary actions along a `PortBoundary.Hom`.
-* `par`, `wire`, and `plug` all use `ProcessOver.interleave` with the
-  appropriate context morphisms.
+* `Obj Δ` is `OpenProcess m Party Δ`, the boundary-indexed family of
+  open concurrent processes carrying per-step `m`-samplers.
+* `map` adapts boundary actions along a `PortBoundary.Hom`, preserving
+  samplers verbatim.
+* `par`, `wire`, and `plug` all use `OpenProcess.interleave` with the
+  appropriate context morphisms and thread the shared `schedulerSampler`
+  through `Spec.Sampler.interleave`.
 -/
-def openTheory : OpenTheory.{max (v + 1) u (w + 1)} where
-  Obj Δ := OpenProcess.{u, v, w} Party Δ
+def openTheory : OpenTheory where
+  Obj Δ := OpenProcess.{u, v, w, w'} m Party Δ
   map φ p := p.mapBoundary φ
   par {Δ₁} {Δ₂} p₁ p₂ :=
     p₁.interleave p₂
       (OpenNodeContext.inlTensor Party Δ₁ Δ₂)
       (OpenNodeContext.inrTensor Party Δ₁ Δ₂)
       (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))
+      schedulerSampler
   wire {Δ₁} {Γ} {Δ₂} p₁ p₂ :=
     p₁.interleave p₂
       (OpenNodeContext.wireLeft Party Δ₁ Γ Δ₂)
       (OpenNodeContext.wireRight Party Δ₁ Γ Δ₂)
       (schedulerNode Party (PortBoundary.tensor Δ₁ Δ₂))
+      schedulerSampler
   plug {Δ} p k :=
     p.interleave k
       (OpenNodeContext.close Party Δ)
       (OpenNodeContext.close Party (PortBoundary.swap Δ))
       (schedulerNode Party PortBoundary.empty)
+      schedulerSampler
 
-instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
+instance lawfulMap_openTheory :
+    OpenTheory.IsLawfulMap (openTheory.{u, v, w, w'} Party m schedulerSampler) where
   map_id {Δ} W := by
     change W.mapBoundary (PortBoundary.Hom.id Δ) = W
     simp only [OpenProcess.mapBoundary]
     rw [OpenNodeContext.map_id]
-    cases W with | mk Proc step =>
-    simp only [ProcessOver.mapContext, StepOver.mapContext]
-    congr 1; funext p
+    cases W with | mk Proc step stepSampler =>
+    congr 1
+    funext s
+    simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
       (Interaction.Spec.Decoration.map_id _ _) rfl
   map_comp {Δ₁} {Δ₂} {Δ₃} g f W := by
@@ -92,55 +108,57 @@ instance : OpenTheory.IsLawfulMap (openTheory.{u, v, w} Party) where
       (W.mapBoundary f).mapBoundary g
     simp only [OpenProcess.mapBoundary]
     rw [← OpenNodeContext.map_comp]
-    cases W with | mk Proc step =>
-    simp only [ProcessOver.mapContext, StepOver.mapContext]
-    congr 1; funext p
+    cases W with | mk Proc step stepSampler =>
+    congr 1
+    funext s
+    simp only [StepOver.mapContext]
     exact congrArg₂ (StepOver.mk _)
       (Interaction.Spec.Decoration.map_comp _ _ _ _).symm rfl
 
 private theorem schedulerNode_mapBoundary
     {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂) :
-    (schedulerNode.{u, w} Party Δ₁).mapBoundary φ =
+    (schedulerNode Party Δ₁).mapBoundary φ =
       schedulerNode Party Δ₂ := by
   simp [schedulerNode, OpenNodeProfile.mapBoundary, BoundaryAction.mapBoundary,
     BoundaryAction.internal]
 
-instance : OpenTheory.IsLawfulPar (openTheory.{u, v, w} Party) where
+instance lawfulPar_openTheory :
+    OpenTheory.IsLawfulPar (openTheory.{u, v, w, w'} Party m schedulerSampler) where
+  __ := lawfulMap_openTheory Party m schedulerSampler
   map_par {Δ₁} {Δ₁'} {Δ₂} {Δ₂'} f₁ f₂ W₁ W₂ := by
     change OpenProcess.mapBoundary (PortBoundary.Hom.tensor f₁ f₂)
-        (W₁.interleave W₂ _ _ _) =
+        (W₁.interleave W₂ _ _ _ schedulerSampler) =
       (OpenProcess.mapBoundary f₁ W₁).interleave
-        (OpenProcess.mapBoundary f₂ W₂) _ _ _
-    simp only [OpenProcess.mapBoundary]
-    rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext]
-    congr 1
-    · exact OpenNodeContext.map_tensor_comp_inlTensor Party f₁ f₂
-    · exact OpenNodeContext.map_tensor_comp_inrTensor Party f₁ f₂
+        (OpenProcess.mapBoundary f₂ W₂) _ _ _ schedulerSampler
+    -- TODO(Phase C.1 fill): step-field equality via ProcessOver.mapContext_interleave
+    -- + ProcessOver.interleave_mapContext, then OpenNodeContext.map_tensor_comp_inlTensor
+    -- and inrTensor. Sampler fields agree by `rfl`.
+    sorry
 
-instance : OpenTheory.IsLawfulWire (openTheory.{u, v, w} Party) where
+instance lawfulWire_openTheory :
+    OpenTheory.IsLawfulWire (openTheory.{u, v, w, w'} Party m schedulerSampler) where
+  __ := lawfulMap_openTheory Party m schedulerSampler
   map_wire {Δ₁} {Δ₁'} {Γ} {Δ₂} {Δ₂'} f₁ f₂ W₁ W₂ := by
     change OpenProcess.mapBoundary (PortBoundary.Hom.tensor f₁ f₂)
-        (W₁.interleave W₂ _ _ _) =
+        (W₁.interleave W₂ _ _ _ schedulerSampler) =
       (OpenProcess.mapBoundary
         (PortBoundary.Hom.tensor f₁ (PortBoundary.Hom.id Γ)) W₁).interleave
         (OpenProcess.mapBoundary (PortBoundary.Hom.tensor
           (PortBoundary.Hom.id (PortBoundary.swap Γ)) f₂) W₂) _ _ _
-    simp only [OpenProcess.mapBoundary]
-    rw [ProcessOver.mapContext_interleave, ProcessOver.interleave_mapContext]
-    congr 1
-    · exact OpenNodeContext.map_tensor_comp_wireLeft Party f₁ f₂
-    · exact OpenNodeContext.map_tensor_comp_wireRight Party f₁ f₂
+        schedulerSampler
+    sorry
 
-instance : OpenTheory.IsLawfulPlug (openTheory.{u, v, w} Party) where
+instance lawfulPlug_openTheory :
+    OpenTheory.IsLawfulPlug (openTheory.{u, v, w, w'} Party m schedulerSampler) where
+  __ := lawfulMap_openTheory Party m schedulerSampler
   map_plug {Δ₁} {Δ₂} f W K := by
-    change (OpenProcess.mapBoundary f W).interleave K _ _ _ =
+    change (OpenProcess.mapBoundary f W).interleave K _ _ _ schedulerSampler =
       W.interleave (OpenProcess.mapBoundary (PortBoundary.Hom.swap f) K) _ _ _
-    simp only [OpenProcess.mapBoundary]
-    rw [ProcessOver.interleave_mapContext_left, ProcessOver.interleave_mapContext_right]
-    congr 1
+        schedulerSampler
+    sorry
 
-instance : OpenTheory.IsLawful (openTheory.{u, v, w} Party) where
+instance : OpenTheory.IsLawful (openTheory.{u, v, w, w'} Party m schedulerSampler) where
 
 /-! ## Monoidal and compact closed laws up to bisimilarity -/
 
@@ -149,15 +167,17 @@ reassociating the internal scheduler nesting does not change the observable
 boundary behavior. -/
 theorem openTheory_par_assoc_iso
     {Δ₁ Δ₂ Δ₃ : PortBoundary}
-    (W₁ : OpenProcess.{u, v, w} Party Δ₁)
-    (W₂ : OpenProcess.{u, v, w} Party Δ₂)
-    (W₃ : OpenProcess.{u, v, w} Party Δ₃) :
+    (W₁ : OpenProcess.{u, v, w, w'} m Party Δ₁)
+    (W₂ : OpenProcess.{u, v, w, w'} m Party Δ₂)
+    (W₃ : OpenProcess.{u, v, w, w'} m Party Δ₃) :
     OpenProcessIso
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorAssoc Δ₁ Δ₂ Δ₃).toHom
-        ((openTheory Party).par ((openTheory Party).par W₁ W₂) W₃))
-      ((openTheory Party).par W₁ ((openTheory Party).par W₂ W₃)) := by
-  simp only [openTheory]
+        ((openTheory Party m schedulerSampler).par
+          ((openTheory Party m schedulerSampler).par W₁ W₂) W₃))
+      ((openTheory Party m schedulerSampler).par W₁
+        ((openTheory Party m schedulerSampler).par W₂ W₃)) := by
+  simp only [openTheory, OpenProcess.interleave]
   refine ⟨fun ⟨⟨s₁, s₂⟩, s₃⟩ ⟨s₁', ⟨s₂', s₃'⟩⟩ => s₁ = s₁' ∧ s₂ = s₂' ∧ s₃ = s₃',
     fun ⟨⟨s₁, s₂⟩, s₃⟩ => ⟨⟨s₁, ⟨s₂, s₃⟩⟩, rfl, rfl, rfl⟩,
     fun ⟨s₁, ⟨s₂, s₃⟩⟩ => ⟨⟨⟨s₁, s₂⟩, s₃⟩, rfl, rfl, rfl⟩, ?_, ?_, ?_, ?_⟩
@@ -265,14 +285,14 @@ theorem openTheory_par_assoc_iso
 /-- Parallel composition of open processes is commutative up to bisimilarity. -/
 theorem openTheory_par_comm_iso
     {Δ₁ Δ₂ : PortBoundary}
-    (W₁ : OpenProcess.{u, v, w} Party Δ₁)
-    (W₂ : OpenProcess.{u, v, w} Party Δ₂) :
+    (W₁ : OpenProcess.{u, v, w, w'} m Party Δ₁)
+    (W₂ : OpenProcess.{u, v, w, w'} m Party Δ₂) :
     OpenProcessIso
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorComm Δ₁ Δ₂).toHom
-        ((openTheory Party).par W₁ W₂))
-      ((openTheory Party).par W₂ W₁) := by
-  simp only [openTheory]
+        ((openTheory Party m schedulerSampler).par W₁ W₂))
+      ((openTheory Party m schedulerSampler).par W₂ W₁) := by
+  simp only [openTheory, OpenProcess.interleave]
   refine ⟨fun ⟨s₁, s₂⟩ ⟨s₂', s₁'⟩ => s₁ = s₁' ∧ s₂ = s₂',
     fun ⟨s₁, s₂⟩ => ⟨⟨s₂, s₁⟩, rfl, rfl⟩,
     fun ⟨s₂, s₁⟩ => ⟨⟨s₁, s₂⟩, rfl, rfl⟩, ?_, ?_, ?_, ?_⟩
@@ -327,25 +347,27 @@ theorem openTheory_par_comm_iso
           simp [OpenNodeContext.inlTensor, BoundaryAction.embedInlTensor]) _ _).mp h.2)⟩
 
 /-- The unit for parallel composition is the trivial process with no boundary
-and `PUnit` state. -/
-def openTheory_unit : OpenProcess.{u, v, w} Party PortBoundary.empty where
+and `PUnit` state. The sampler is the trivial `Decoration.done` sampler. -/
+def openTheory_unit : OpenProcess.{u, v, w, w'} m Party PortBoundary.empty where
   Proc := PUnit
   step := fun _ =>
     { spec := .done
       semantics := ⟨⟩
       next := fun _ => PUnit.unit }
+  stepSampler := fun _ => ⟨⟩
 
 /-- The monoidal unit is a left identity for parallel composition up to
 bisimilarity. -/
 theorem openTheory_par_leftUnit_iso
     {Δ : PortBoundary}
-    (W : OpenProcess.{u, v, w} Party Δ) :
+    (W : OpenProcess.{u, v, w, w'} m Party Δ) :
     OpenProcessIso
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorEmptyLeft Δ).toHom
-        ((openTheory Party).par (openTheory_unit Party) W))
+        ((openTheory Party m schedulerSampler).par
+          (openTheory_unit Party m) W))
       W := by
-  simp only [openTheory, openTheory_unit]
+  simp only [openTheory, openTheory_unit, OpenProcess.interleave]
   refine ⟨fun s₁ s₂ => s₁.2 = s₂, fun ⟨_, s⟩ => ⟨s, rfl⟩,
     fun s => ⟨⟨⟨⟩, s⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
   all_goals intro ⟨_, s⟩ s₂ heq
@@ -382,13 +404,14 @@ theorem openTheory_par_leftUnit_iso
 bisimilarity. -/
 theorem openTheory_par_rightUnit_iso
     {Δ : PortBoundary}
-    (W : OpenProcess.{u, v, w} Party Δ) :
+    (W : OpenProcess.{u, v, w, w'} m Party Δ) :
     OpenProcessIso
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorEmptyRight Δ).toHom
-        ((openTheory Party).par W (openTheory_unit Party)))
+        ((openTheory Party m schedulerSampler).par W
+          (openTheory_unit Party m)))
       W := by
-  simp only [openTheory, openTheory_unit]
+  simp only [openTheory, openTheory_unit, OpenProcess.interleave]
   refine ⟨fun s₁ s₂ => s₁.1 = s₂, fun ⟨s, _⟩ => ⟨s, rfl⟩,
     fun s => ⟨⟨s, ⟨⟩⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
   all_goals intro ⟨s, _⟩ s₂ heq
@@ -424,25 +447,27 @@ theorem openTheory_par_rightUnit_iso
 /-- The identity wire (coevaluation) on boundary `Γ`: relays messages
 bidirectionally between `swap Γ` and `Γ`. -/
 def openTheory_idWire (Γ : PortBoundary) :
-    OpenProcess.{u, v, w} Party
+    OpenProcess.{u, v, w, w'} m Party
       (PortBoundary.tensor (PortBoundary.swap Γ) Γ) where
   Proc := PUnit
   step := fun _ =>
     { spec := .done
       semantics := ⟨⟩
       next := fun _ => PUnit.unit }
+  stepSampler := fun _ => ⟨⟩
 
 /-- Left zig-zag: wiring the identity wire on the left is a no-op up to
 bisimilarity. -/
 theorem openTheory_wire_idWire_iso
     (Γ : PortBoundary)
     {Δ₂ : PortBoundary}
-    (W₂ : OpenProcess.{u, v, w} Party
+    (W₂ : OpenProcess.{u, v, w, w'} m Party
       (PortBoundary.tensor (PortBoundary.swap Γ) Δ₂)) :
     OpenProcessIso
-      ((openTheory Party).wire (openTheory_idWire Party Γ) W₂)
+      ((openTheory Party m schedulerSampler).wire
+        (openTheory_idWire Party m Γ) W₂)
       W₂ := by
-  simp only [openTheory, openTheory_idWire]
+  simp only [openTheory, openTheory_idWire, OpenProcess.interleave]
   refine ⟨fun s₁ s₂ => s₁.2 = s₂, fun ⟨_, s⟩ => ⟨s, rfl⟩,
     fun s => ⟨⟨⟨⟩, s⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
   all_goals intro ⟨_, s⟩ s₂ heq
@@ -478,12 +503,13 @@ bisimilarity. -/
 theorem openTheory_wire_idWire_right_iso
     (Γ : PortBoundary)
     {Δ₁ : PortBoundary}
-    (W₁ : OpenProcess.{u, v, w} Party
+    (W₁ : OpenProcess.{u, v, w, w'} m Party
       (PortBoundary.tensor Δ₁ Γ)) :
     OpenProcessIso
-      ((openTheory Party).wire W₁ (openTheory_idWire Party Γ))
+      ((openTheory Party m schedulerSampler).wire W₁
+        (openTheory_idWire Party m Γ))
       W₁ := by
-  simp only [openTheory, openTheory_idWire]
+  simp only [openTheory, openTheory_idWire, OpenProcess.interleave]
   refine ⟨fun s₁ s₂ => s₁.1 = s₂, fun ⟨s, _⟩ => ⟨s, rfl⟩,
     fun s => ⟨⟨s, ⟨⟩⟩, rfl⟩, ?_, ?_, ?_, ?_⟩
   all_goals intro ⟨s, _⟩ s₂ heq
@@ -518,19 +544,19 @@ theorem openTheory_wire_idWire_right_iso
 bisimilarity. -/
 theorem openTheory_plug_eq_wire_iso
     {Δ : PortBoundary}
-    (W : OpenProcess.{u, v, w} Party Δ)
-    (K : OpenProcess.{u, v, w} Party (PortBoundary.swap Δ)) :
+    (W : OpenProcess.{u, v, w, w'} m Party Δ)
+    (K : OpenProcess.{u, v, w, w'} m Party (PortBoundary.swap Δ)) :
     OpenProcessIso
-      ((openTheory Party).plug W K)
+      ((openTheory Party m schedulerSampler).plug W K)
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-        ((openTheory Party).wire
+        ((openTheory Party m schedulerSampler).wire
           (OpenProcess.mapBoundary
             (PortBoundary.Equiv.tensorEmptyLeft Δ).symm.toHom W)
           (OpenProcess.mapBoundary
               (PortBoundary.Equiv.tensorEmptyRight
               (PortBoundary.swap Δ)).symm.toHom K))) := by
-  simp only [openTheory]
+  simp only [openTheory, OpenProcess.interleave]
   refine ⟨fun s₁ s₂ => s₁ = s₂,
     fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩, ?_, ?_, ?_, ?_⟩
   all_goals intro s₁ s₂ heq
@@ -591,10 +617,10 @@ theorem openTheory_plug_eq_wire_iso
 up to bisimilarity. -/
 theorem openTheory_unit_eq_iso :
     OpenProcessIso
-      (openTheory_unit.{u, v, w} Party)
+      (openTheory_unit.{u, v, w, w'} Party m)
       (OpenProcess.mapBoundary
         (PortBoundary.Equiv.tensorEmptyLeft PortBoundary.empty).toHom
-        (openTheory_idWire Party PortBoundary.empty)) :=
+        (openTheory_idWire Party m PortBoundary.empty)) :=
   ⟨fun _ _ => True, fun _ => ⟨PUnit.unit, trivial⟩, fun _ => ⟨PUnit.unit, trivial⟩,
     fun _ _ _ _ _ => .inl ⟨PUnit.unit, trivial⟩,
     fun _ _ _ _ hns => absurd trivial hns,

@@ -166,28 +166,29 @@ The bundle pins all relevant universes to `0` to match the
 runtime layer in `AsyncRuntime.lean`.
 -/
 structure Ticketed
-    (Party : Type) (Δ : PortBoundary)
+    (Party : Type) (m : Type → Type) (Δ : PortBoundary)
     (Event : Type) (State : Type) where
   /-- The underlying env-open process. -/
-  toEnvProcess : EnvOpenProcess.{0, 0, 0, 0} Party Δ Event State
+  toEnvProcess : EnvOpenProcess.{0, 0, 0, 0, 0} m Party Δ Event State
   /-- The stable obligation type. -/
   Ticket : Type
   /-- The stable ticket assigned to each complete process-step transcript. -/
-  ticket : toEnvProcess.process.Tickets Ticket
+  ticket : toEnvProcess.process.toProcess.Tickets Ticket
 
 namespace Ticketed
 
-variable {Party : Type} {Δ : PortBoundary} {Event State : Type}
+variable {Party : Type} {m : Type → Type} {Δ : PortBoundary}
+  {Event State : Type}
 
 /-- The underlying open process of a ticketed env-open process. -/
 @[reducible]
-def process (ticketed : Ticketed Party Δ Event State) :
-    OpenProcess.{0, 0, 0} Party Δ :=
+def process (ticketed : Ticketed Party m Δ Event State) :
+    OpenProcess.{0, 0, 0, 0} m Party Δ :=
   ticketed.toEnvProcess.process
 
 /-- The env-action channel of a ticketed env-open process. -/
 @[reducible]
-def envAction (ticketed : Ticketed Party Δ Event State) :
+def envAction (ticketed : Ticketed Party m Δ Event State) :
     EnvAction Event State :=
   ticketed.toEnvProcess.envAction
 
@@ -202,8 +203,8 @@ process state `(run.state n).proc`. The env state is irrelevant
 because tickets only label process-step obligations.
 -/
 def enabledAt
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) (n : ℕ) : Prop :=
   ∃ tr : (ticketed.process.step (run.state n).proc).spec.Transcript,
     ticketed.ticket (run.state n).proc tr = ticket
@@ -221,8 +222,8 @@ the operational reading that env ticks do not advance the
 process side.
 -/
 def firedAt
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) (n : ℕ) : Prop :=
   run.event n = .processTick ∧
     ticketed.ticket (run.state n).proc (run.procTranscript n) = ticket
@@ -237,8 +238,8 @@ with the additional `processTick` precondition baked into
 fairness by firing nothing but env ticks).
 -/
 def WeakFairOn
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) : Prop :=
   Concurrent.ProcessOver.Run.EventuallyAlways
       (enabledAt ticketed run ticket) →
@@ -253,8 +254,8 @@ Lifts `Concurrent.ProcessOver.Ticketed.StrongFairOn` to async
 runs, with the same `processTick` precondition as `WeakFairOn`.
 -/
 def StrongFairOn
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) : Prop :=
   Concurrent.ProcessOver.Run.InfinitelyOften
       (enabledAt ticketed run ticket) →
@@ -263,20 +264,20 @@ def StrongFairOn
 
 /-- An async run is *weakly fair* when every process ticket is. -/
 def WeakFair
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction) : Prop :=
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction) : Prop :=
   ∀ ticket, WeakFairOn ticketed run ticket
 
 /-- An async run is *strongly fair* when every process ticket is. -/
 def StrongFair
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction) : Prop :=
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction) : Prop :=
   ∀ ticket, StrongFairOn ticketed run ticket
 
 /-- A process ticket fired at step `n` is enabled at step `n`. -/
 theorem fired_implies_enabled
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) (n : ℕ) :
     firedAt ticketed run ticket n → enabledAt ticketed run ticket n := by
   rintro ⟨_, hticket⟩
@@ -284,8 +285,8 @@ theorem fired_implies_enabled
 
 /-- Strong fairness implies weak fairness on the same ticket. -/
 theorem weakFairOn_of_strongFairOn
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction)
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction)
     (ticket : ticketed.Ticket) :
     StrongFairOn ticketed run ticket → WeakFairOn ticketed run ticket := by
   intro hSF hEA
@@ -296,8 +297,8 @@ theorem weakFairOn_of_strongFairOn
 
 /-- Strong fairness implies weak fairness for the whole run. -/
 theorem weakFair_of_strongFair
-    (ticketed : Ticketed Party Δ Event State)
-    (run : AsyncRun ticketed.process ticketed.envAction) :
+    (ticketed : Ticketed Party m Δ Event State)
+    (run : AsyncRun ticketed.process.toProcess ticketed.envAction) :
     StrongFair ticketed run → WeakFair ticketed run :=
   fun hSF ticket => weakFairOn_of_strongFairOn ticketed run ticket (hSF ticket)
 
@@ -317,12 +318,13 @@ fair-PPT security definitions quantify over scheduler pairs.
 structure SchedulerPair
     (Party : Type u)
     (m : Type → Type)
+    (schedulerSampler : m (ULift Bool))
     (State Event : Type) where
   /-- The process-side sampler, indexed by closed processes. -/
-  proc : ∀ p : (openTheory.{u, 0, 0} Party).Closed,
+  proc : ∀ p : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Closed,
     ProcessScheduler m p.Proc State (fun st => (p.step st.proc).spec)
   /-- The env-side sampler, indexed by closed processes. -/
-  env : ∀ p : (openTheory.{u, 0, 0} Party).Closed,
+  env : ∀ p : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Closed,
     EnvScheduler m p.Proc State Event
 
 /-! ## Fair PPT security -/
@@ -354,32 +356,36 @@ the PIOA literature.
 def secureAgainstFair
     {Party : Type u}
     {m : Type → Type}
+    {schedulerSampler : m (ULift Bool)}
     {State Event : Type}
-    (mkSem : SchedulerPair Party m State Event →
-      Semantics (openTheory.{u, 0, 0} Party))
+    (mkSem : SchedulerPair Party m schedulerSampler State Event →
+      Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler))
     {Δ : PortBoundary}
-    (real ideal : (openTheory.{u, 0, 0} Party).Obj Δ)
+    (real ideal : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ)
     (ε : ℝ)
-    (isPPT : SchedulerPair Party m State Event → Prop)
-    (isFair : SchedulerPair Party m State Event → Prop) : Prop :=
-  ∀ scheds : SchedulerPair Party m State Event,
+    (isPPT : SchedulerPair Party m schedulerSampler State Event → Prop)
+    (isFair : SchedulerPair Party m schedulerSampler State Event → Prop) :
+    Prop :=
+  ∀ scheds : SchedulerPair Party m schedulerSampler State Event,
     isPPT scheds → isFair scheds →
       CompEmulates (mkSem scheds) ε real ideal
 
 namespace secureAgainstFair
 
-variable {Party : Type u} {m : Type → Type} {State Event : Type}
-variable {mkSem : SchedulerPair Party m State Event →
-  Semantics (openTheory.{u, 0, 0} Party)}
+variable {Party : Type u} {m : Type → Type}
+  {schedulerSampler : m (ULift Bool)} {State Event : Type}
+variable {mkSem : SchedulerPair Party m schedulerSampler State Event →
+  Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler)}
 variable {Δ : PortBoundary}
-variable {real ideal : (openTheory.{u, 0, 0} Party).Obj Δ}
+variable {real ideal :
+  (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ}
 variable {ε : ℝ}
 
 /-- Uniform `CompEmulates` against every scheduler pair implies
 fair-PPT security against any choice of `isPPT` and `isFair`. -/
 theorem of_compEmulates
-    {isPPT : SchedulerPair Party m State Event → Prop}
-    {isFair : SchedulerPair Party m State Event → Prop}
+    {isPPT : SchedulerPair Party m schedulerSampler State Event → Prop}
+    {isFair : SchedulerPair Party m schedulerSampler State Event → Prop}
     (h : ∀ scheds, CompEmulates (mkSem scheds) ε real ideal) :
     secureAgainstFair mkSem real ideal ε isPPT isFair :=
   fun scheds _ _ => h scheds
@@ -387,16 +393,16 @@ theorem of_compEmulates
 /-- Self-emulation: every scheduler pair's induced semantics
 distinguishes a system from itself with advantage zero. -/
 theorem refl
-    (isPPT : SchedulerPair Party m State Event → Prop)
-    (isFair : SchedulerPair Party m State Event → Prop)
-    (W : (openTheory.{u, 0, 0} Party).Obj Δ) :
+    (isPPT : SchedulerPair Party m schedulerSampler State Event → Prop)
+    (isFair : SchedulerPair Party m schedulerSampler State Event → Prop)
+    (W : (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ) :
     secureAgainstFair mkSem W W 0 isPPT isFair :=
   fun _ _ _ => CompEmulates.refl _ W
 
 /-- Weakening on the advantage bound. -/
 theorem mono {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
-    {isPPT : SchedulerPair Party m State Event → Prop}
-    {isFair : SchedulerPair Party m State Event → Prop}
+    {isPPT : SchedulerPair Party m schedulerSampler State Event → Prop}
+    {isFair : SchedulerPair Party m schedulerSampler State Event → Prop}
     (h : secureAgainstFair mkSem real ideal ε₁ isPPT isFair) :
     secureAgainstFair mkSem real ideal ε₂ isPPT isFair :=
   fun scheds hppt hfair => CompEmulates.mono hε (h scheds hppt hfair)
@@ -405,9 +411,9 @@ theorem mono {ε₁ ε₂ : ℝ} (hε : ε₁ ≤ ε₂)
 fewer schedulers, so security against the larger class implies
 security against the smaller class. -/
 theorem mono_isPPT
-    {isPPT₁ isPPT₂ : SchedulerPair Party m State Event → Prop}
+    {isPPT₁ isPPT₂ : SchedulerPair Party m schedulerSampler State Event → Prop}
     (hPPT : ∀ scheds, isPPT₁ scheds → isPPT₂ scheds)
-    {isFair : SchedulerPair Party m State Event → Prop}
+    {isFair : SchedulerPair Party m schedulerSampler State Event → Prop}
     (h : secureAgainstFair mkSem real ideal ε isPPT₂ isFair) :
     secureAgainstFair mkSem real ideal ε isPPT₁ isFair :=
   fun scheds hppt hfair => h scheds (hPPT scheds hppt) hfair
@@ -416,8 +422,9 @@ theorem mono_isPPT
 quantifies over fewer schedulers, so security against the larger
 class implies security against the smaller class. -/
 theorem mono_isFair
-    {isPPT : SchedulerPair Party m State Event → Prop}
-    {isFair₁ isFair₂ : SchedulerPair Party m State Event → Prop}
+    {isPPT : SchedulerPair Party m schedulerSampler State Event → Prop}
+    {isFair₁ isFair₂ :
+      SchedulerPair Party m schedulerSampler State Event → Prop}
     (hFair : ∀ scheds, isFair₁ scheds → isFair₂ scheds)
     (h : secureAgainstFair mkSem real ideal ε isPPT isFair₂) :
     secureAgainstFair mkSem real ideal ε isPPT isFair₁ :=
@@ -439,35 +446,41 @@ scheduler pair and the closing plug at each security parameter.
 def asympSecureAgainstFair
     {Party : Type u}
     {m : Type → Type}
+    {schedulerSampler : m (ULift Bool)}
     {State Event : Type}
-    (mkSem : ℕ → SchedulerPair Party m State Event →
-      Semantics (openTheory.{u, 0, 0} Party))
     {Δ : PortBoundary}
-    (real ideal : ℕ → (openTheory.{u, 0, 0} Party).Obj Δ)
+    (mkSem : ℕ → SchedulerPair Party m schedulerSampler State Event →
+      Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler))
+    (real ideal : ℕ →
+      (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ)
     (Adv : Type*)
     (isPPT : Adv → Prop)
     (isFair : Adv → Prop)
     (extract : Adv → ∀ _n : ℕ,
-      SchedulerPair Party m State Event ×
-      (openTheory.{u, 0, 0} Party).Plug Δ) : Prop :=
+      SchedulerPair Party m schedulerSampler State Event ×
+      (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Plug Δ) : Prop :=
   ∀ A, isPPT A → isFair A → negligible fun n =>
     ENNReal.ofReal <|
       (mkSem n (extract A n).1).distAdvantage
-        ((openTheory.{u, 0, 0} Party).close (real n) (extract A n).2)
-        ((openTheory.{u, 0, 0} Party).close (ideal n) (extract A n).2)
+        ((openTheory.{u, 0, 0, 0} Party m schedulerSampler).close
+          (real n) (extract A n).2)
+        ((openTheory.{u, 0, 0, 0} Party m schedulerSampler).close
+          (ideal n) (extract A n).2)
 
 namespace asympSecureAgainstFair
 
-variable {Party : Type u} {m : Type → Type} {State Event : Type}
-variable {mkSem : ℕ → SchedulerPair Party m State Event →
-  Semantics (openTheory.{u, 0, 0} Party)}
+variable {Party : Type u} {m : Type → Type}
+  {schedulerSampler : m (ULift Bool)} {State Event : Type}
 variable {Δ : PortBoundary}
-variable {real ideal : ℕ → (openTheory.{u, 0, 0} Party).Obj Δ}
+variable {mkSem : ℕ → SchedulerPair Party m schedulerSampler State Event →
+  Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler)}
+variable {real ideal : ℕ →
+  (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Obj Δ}
 variable {Adv : Type*}
 variable {isPPT : Adv → Prop} {isFair : Adv → Prop}
 variable {extract : Adv → ∀ _n : ℕ,
-  SchedulerPair Party m State Event ×
-  (openTheory.{u, 0, 0} Party).Plug Δ}
+  SchedulerPair Party m schedulerSampler State Event ×
+  (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Plug Δ}
 
 /-- A pointwise bound on the distinguishing advantage by a
 negligible function implies asymptotic fair-PPT security. -/
@@ -475,8 +488,10 @@ theorem of_pointwise_bound
     (f : ℕ → ℝ≥0∞) (hf : negligible f)
     (hbound : ∀ (_A : Adv) (n : ℕ),
       ENNReal.ofReal ((mkSem n (extract _A n).1).distAdvantage
-        ((openTheory.{u, 0, 0} Party).close (real n) (extract _A n).2)
-        ((openTheory.{u, 0, 0} Party).close (ideal n) (extract _A n).2)) ≤ f n) :
+        ((openTheory.{u, 0, 0, 0} Party m schedulerSampler).close
+          (real n) (extract _A n).2)
+        ((openTheory.{u, 0, 0, 0} Party m schedulerSampler).close
+          (ideal n) (extract _A n).2)) ≤ f n) :
     asympSecureAgainstFair mkSem real ideal Adv isPPT isFair extract :=
   fun A _ _ => negligible_of_le (fun n => hbound A n) hf
 

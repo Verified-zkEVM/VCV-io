@@ -46,11 +46,18 @@ namespace Examples.UC.SyncRecoveryDemo
 /-- A single-party identity scheme: the demo only needs one party. -/
 abbrev Party : Type := Unit
 
+/-- The canonical scheduler sampler used throughout this demo: the trivial
+`ProbComp` computation returning `ULift.up true`. Any concrete choice would do;
+this one is the simplest. -/
+def trivialSchedulerSampler : ProbComp (ULift Bool) :=
+  pure (ULift.up true)
+
 /-- The trivial closed process: single party, no boundary, `PUnit` state,
 every step `.done`. This is the smallest object in the closed-Party
 theory of `openTheory`. -/
-def trivialClosed : (openTheory.{0, 0, 0} Party).Closed :=
-  openTheory_unit Party
+def trivialClosed :
+    (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed :=
+  openTheory_unit Party ProbComp
 
 /-! ## Sync recovery at the `Semantics` level -/
 
@@ -64,14 +71,20 @@ This is just a typed restatement of
 fully concrete closed-Party identity scheme without any unfolding
 boilerplate at the call site. -/
 example
-    (init : ∀ p : (openTheory.{0, 0, 0} Party).Closed, p.Proc)
-    (sampler : ∀ (p : (openTheory.{0, 0, 0} Party).Closed) (s : p.Proc),
+    (init : ∀ p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
+      p.Proc)
+    (sampler : ∀ (p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed)
+      (s : p.Proc),
       Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
-    (observe : ∀ p : (openTheory.{0, 0, 0} Party).Closed,
+    (observe : ∀ p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc → ProbComp Unit) :
-    processSemanticsProbComp Party init sampler fuel observe =
-      processSemanticsAsyncProbComp Party
+    processSemanticsProbComp Party trivialSchedulerSampler
+        init sampler fuel observe =
+      processSemanticsAsyncProbComp Party trivialSchedulerSampler
         (EnvAction.empty Unit) ()
         init
         (fun p st => sampler p st.proc)
@@ -80,7 +93,7 @@ example
         fuel
         (fun p s _ _ => observe p s) :=
   processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
-    Party init sampler fuel observe
+    Party trivialSchedulerSampler init sampler fuel observe
 
 /-! ## Sync recovery pointwise on the trivial closed process -/
 
@@ -96,15 +109,20 @@ Proven by `Semantics.run`-level unfolding followed by
 Semantics-level rewrite, which would have to transport through the
 dependent surface-monad field `Semantics.m`. -/
 example
-    (init : ∀ p : (openTheory.{0, 0, 0} Party).Closed, p.Proc)
-    (sampler : ∀ (p : (openTheory.{0, 0, 0} Party).Closed) (s : p.Proc),
+    (init : ∀ p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
+      p.Proc)
+    (sampler : ∀ (p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed)
+      (s : p.Proc),
       Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
-    (observe : ∀ p : (openTheory.{0, 0, 0} Party).Closed,
+    (observe : ∀ p :
+      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc → ProbComp Unit) :
-    (processSemanticsProbComp Party init sampler fuel observe).run
-        trivialClosed =
-      (processSemanticsAsyncProbComp Party
+    (processSemanticsProbComp Party trivialSchedulerSampler
+        init sampler fuel observe).run trivialClosed =
+      (processSemanticsAsyncProbComp Party trivialSchedulerSampler
         (EnvAction.empty Unit) ()
         init
         (fun p st => sampler p st.proc)
@@ -114,11 +132,12 @@ example
         (fun p s _ _ => observe p s)).run trivialClosed := by
   change (do
       let finalState ← Concurrent.ProcessOver.runSteps
-        trivialClosed (sampler trivialClosed) fuel (init trivialClosed)
+        trivialClosed.toProcess (sampler trivialClosed) fuel
+        (init trivialClosed)
       observe trivialClosed finalState) =
     (do
       let (final, _trace) ← Concurrent.runStepsAsync (m := ProbComp)
-        trivialClosed (EnvAction.empty Unit)
+        trivialClosed.toProcess (EnvAction.empty Unit)
         (fun st => sampler trivialClosed st.proc)
         (trivialEnvScheduler (m := ProbComp) Unit Empty)
         fuel ⟨init trivialClosed, ()⟩

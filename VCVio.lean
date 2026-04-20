@@ -74,6 +74,7 @@ import VCVio.Interaction.Basic.MonadDecoration
 import VCVio.Interaction.Basic.Node
 import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Replicate
+import VCVio.Interaction.Basic.Sampler
 import VCVio.Interaction.Basic.Shape
 import VCVio.Interaction.Basic.Spec
 import VCVio.Interaction.Basic.SpecFintype

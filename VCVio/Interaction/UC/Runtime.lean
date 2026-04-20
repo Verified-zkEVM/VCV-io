@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.Interaction.Basic.Sampler
 import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Computational
@@ -79,39 +80,6 @@ open OracleComp
 namespace Interaction
 
 namespace Spec
-
-/--
-A `Sampler` for `spec : Spec.{0}` provides an `m X` computation at each
-node whose move space is `X`, plus recursive samplers for every subtree.
-
-Structurally this is exactly a `Spec.Decoration` whose node context is
-`fun X => m X`: the per-node decoration stores an `m`-computation in
-the move type of that node, and the functorial `Decoration.map` /
-`Decoration.map_id` / `Decoration.map_comp` API applies immediately.
-
-The monad `m` is the intermediate execution monad. Typical choices:
-* `ProbComp` for coin-flip-only protocols.
-* `OracleComp (unifSpec + roSpec)` for protocols with shared random oracle
-  access, where samplers can issue oracle queries via `query`.
-* `OptionT ProbComp` for observation-style semantics that need to
-  inject failure mass.
--/
-abbrev Sampler (m : Type → Type) (spec : Spec.{0}) : Type :=
-  Decoration (fun X => m X) spec
-
-/--
-Execute a sampler to produce a full transcript of `spec` in the monad `m`.
-
-At each node the sampler monadically chooses a move; that move determines
-which subtree to continue sampling.
--/
-noncomputable def sampleTranscript {m : Type → Type} [Monad m] :
-    (spec : Spec.{0}) → Sampler m spec → m (Transcript spec)
-  | .done, _ => pure ⟨⟩
-  | .node _ rest, ⟨samp, sampRest⟩ => do
-      let x ← samp
-      let tr ← sampleTranscript (rest x) (sampRest x)
-      return ⟨x, tr⟩
 
 /--
 Uniform selection from a nonempty finite type as a `ProbComp` primitive,
@@ -199,8 +167,9 @@ namespace UC
 
 open Concurrent
 
-private abbrev Closed (Party : Type u) :=
-  (openTheory.{u, 0, 0} Party).Closed
+private abbrev Closed (Party : Type u) (m : Type → Type)
+    (schedulerSampler : m (ULift Bool)) :=
+  (openTheory.{u, 0, 0, 0} Party m schedulerSampler).Closed
 
 /--
 Construct a `Semantics` for the open-process theory, parameterized by a
@@ -217,18 +186,20 @@ and `processSemanticsOracle` for the shared-oracle specialization.
 -/
 noncomputable def processSemantics (Party : Type u)
     {m : Type → Type} [Monad m]
+    (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
-    (init : ∀ (p : Closed Party), p.Proc)
-    (sampler : ∀ (p : Closed Party) (s : p.Proc),
+    (init : ∀ (p : Closed Party m schedulerSampler), p.Proc)
+    (sampler : ∀ (p : Closed Party m schedulerSampler) (s : p.Proc),
       Spec.Sampler m (p.step s).spec)
     (fuel : ℕ)
-    (observe : ∀ (p : Closed Party), p.Proc → m Unit) :
-    Semantics (openTheory.{u, 0, 0} Party) where
+    (observe : ∀ (p : Closed Party m schedulerSampler), p.Proc → m Unit) :
+    Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler) where
   m := m
   instMonad := inferInstance
   sem := sem
   run process := do
-    let finalState ← process.runSteps (sampler process) fuel (init process)
+    let finalState ←
+      process.toProcess.runSteps (sampler process) fuel (init process)
     observe process finalState
 
 /--
@@ -239,13 +210,15 @@ This is the right entry point for coin-flip-only protocols with no
 shared oracles and no deliberate failure mass.
 -/
 noncomputable def processSemanticsProbComp (Party : Type u)
-    (init : ∀ (p : Closed Party), p.Proc)
-    (sampler : ∀ (p : Closed Party) (s : p.Proc),
+    (schedulerSampler : ProbComp (ULift Bool))
+    (init : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc)
+    (sampler : ∀ (p : Closed Party ProbComp schedulerSampler) (s : p.Proc),
       Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
-    (observe : ∀ (p : Closed Party), p.Proc → ProbComp Unit) :
-    Semantics (openTheory.{u, 0, 0} Party) :=
-  processSemantics Party (SPMFSemantics.ofHasEvalSPMF ProbComp)
+    (observe : ∀ (p : Closed Party ProbComp schedulerSampler),
+      p.Proc → ProbComp Unit) :
+    Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
+  processSemantics Party schedulerSampler (SPMFSemantics.ofHasEvalSPMF ProbComp)
     init sampler fuel observe
 
 /--
@@ -266,20 +239,25 @@ For a protocol in the random oracle model, a typical instantiation is:
 -/
 noncomputable def processSemanticsOracle (Party : Type u)
     {ι : Type} {superSpec : OracleSpec.{0, 0} ι} {σ : Type}
+    (schedulerSampler : OracleComp superSpec (ULift Bool))
     (impl : QueryImpl superSpec (StateT σ ProbComp))
     (initOracle : σ)
-    (init : ∀ (p : Closed Party), p.Proc)
-    (sampler : ∀ (p : Closed Party) (s : p.Proc),
+    (init : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
+      p.Proc)
+    (sampler : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler)
+      (s : p.Proc),
       Spec.Sampler (OracleComp superSpec) (p.step s).spec)
     (fuel : ℕ)
-    (observe : ∀ (p : Closed Party), p.Proc → OracleComp superSpec Unit) :
-    Semantics (openTheory.{u, 0, 0} Party) :=
+    (observe : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
+      p.Proc → OracleComp superSpec Unit) :
+    Semantics
+      (openTheory.{u, 0, 0, 0} Party (OracleComp superSpec) schedulerSampler) :=
   let oracleSem : SPMFSemantics.{0, 0, 0} (OracleComp superSpec) :=
     { Sem := StateT σ ProbComp
       instMonadSem := inferInstance
       interpret := simulateQ' impl
       observe := fun {_} mx => HasEvalSPMF.toSPMF (mx.run' initOracle) }
-  processSemantics Party (m := OracleComp superSpec) oracleSem
+  processSemantics Party (m := OracleComp superSpec) schedulerSampler oracleSem
     init sampler fuel observe
 
 end UC

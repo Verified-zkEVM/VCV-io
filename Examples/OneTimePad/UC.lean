@@ -130,8 +130,16 @@ namespace UC
 /-- The demo uses a single trivial party. -/
 abbrev Party : Type := Unit
 
+/-- The demo's fixed scheduler sampler: the trivial `OptionT ProbComp`
+computation returning `ULift.up true`. Any concrete choice would do;
+this one matches the observation monad used by the bundled semantics
+below. -/
+noncomputable def demoSchedulerSampler : OptionT ProbComp (ULift Bool) :=
+  pure (ULift.up true)
+
 /-- Shorthand for the concrete closed-Party open theory used in the demo. -/
-private abbrev T := openTheory.{0, 0, 0} Party
+private noncomputable abbrev T :=
+  openTheory.{0, 0, 0, 0} Party (OptionT ProbComp) demoSchedulerSampler
 
 /-! ## Real vs ideal cipher observation -/
 
@@ -270,6 +278,7 @@ noncomputable def msgClosed (sp : ℕ) (msg : BitVec sp) :
     { spec := .done
       semantics := ⟨⟩
       next := fun _ => msg }
+  stepSampler := fun _ => ⟨⟩
 
 /-- Distinct plaintexts give distinct closed processes. The two
 processes share the state type `BitVec sp` and the `.done` spec; they

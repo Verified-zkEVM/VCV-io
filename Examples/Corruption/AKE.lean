@@ -123,7 +123,7 @@ Body left as `sorry`; the concrete step function is filled in
 alongside the headline-proof obligation.
 -/
 noncomputable def real (_g : G) :
-    MomentaryCorruption.Process.{0, 0} Unit Bool Δ_AKE :=
+    MomentaryCorruption.Process.{0, 0, 0} Unit Bool ProbComp Δ_AKE :=
   sorry
 
 /--
@@ -139,8 +139,15 @@ Body left as `sorry`; the concrete ideal functionality is filled in
 alongside its simulator.
 -/
 noncomputable def ideal (_g : G) :
-    MomentaryCorruption.Process.{0, 0} Unit Bool Δ_AKE :=
+    MomentaryCorruption.Process.{0, 0, 0} Unit Bool ProbComp Δ_AKE :=
   sorry
+
+/--
+The canonical scheduler sampler for this AKE pilot: the trivial
+`ProbComp` computation returning `ULift.up true`. Any concrete choice
+would do; this one is the simplest. -/
+noncomputable def demoSchedulerSampler : ProbComp (ULift Bool) :=
+  pure (ULift.up true)
 
 /-! ## Async semantics -/
 
@@ -163,7 +170,8 @@ Body left as `sorry`; concrete instantiations of the four schedulers
 and the observer are filled in alongside the headline proof.
 -/
 noncomputable def asyncSemantics (_g : G) (_fuel : ℕ) :
-    Semantics (openTheory.{0, 0, 0} (MachineId Unit Bool)) :=
+    Semantics (openTheory.{0, 0, 0, 0} (MachineId Unit Bool)
+      ProbComp demoSchedulerSampler) :=
   sorry
 
 /-! ## Headline security claim -/

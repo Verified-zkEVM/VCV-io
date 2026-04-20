@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import ToMathlib.PFunctor.Trace
+import VCVio.Interaction.Basic.Sampler
 import VCVio.Interaction.Concurrent.Process
 import VCVio.Interaction.UC.Interface
 
@@ -49,7 +50,7 @@ empty-emission default is the trace-monoid unit `1`, which is definitionally
 the constant-`[]` trace.
 -/
 
-universe u v w
+universe u v w w'
 
 namespace Interaction
 namespace UC
@@ -670,22 +671,62 @@ records both the usual controller/view data and its boundary traffic against
 `Δ`.
 -/
 abbrev OpenStep (Party : Type u) (Δ : PortBoundary) (P : Type v) :=
-  StepOver (OpenNodeContext Party Δ : Spec.Node.Context.{w}) P
+  StepOver (OpenNodeContext Party Δ : Spec.Node.Context.{0}) P
 
 /--
-The open-world specialization of `ProcessOver`.
+An `m`-parametric open concurrent process exposing boundary `Δ`.
 
-An `OpenProcess Party Δ` is a continuation-based process whose steps are
-decorated by `OpenNodeProfile Party Δ`. It exposes the directed boundary
-`Δ` to an external context.
+`OpenProcess m Party Δ` bundles:
 
-The closed-world `Process Party` is recovered by
-`ProcessOver.mapContext (OpenNodeContext.forget Party Δ)`.
+* `Proc` — the residual state space of the process;
+* `step` — for each state, the protocol step observed by the open world
+  (move-tree `spec`, node-local semantics, and continuation `next`);
+* `stepSampler` — a per-state `Spec.Sampler m (step s).spec` resolving
+  each move of the step protocol in the intermediate monad `m`.
+
+The sampler is **intrinsic** rather than threaded externally: every
+state of every open process carries its own nodewise-monadic sampler
+as first-class data, following the ArkLib `MonadDecoration` pattern.
+`openTheory m` compositionally threads these per-step samplers through
+`par`, `wire`, and `plug` via `Spec.Sampler.interleave`, so the runtime
+layer (`processSemantics`, `processSemanticsAsync`) no longer needs a
+global `sampler` argument.
+
+## Universe conventions
+
+The spec / move-type universe is pinned at `0` because `m : Type → Type`
+only operates on `Type` and the `Sampler m spec` abbrev therefore
+requires `spec : Spec.{0}`. The `Party` universe `u` and the state
+universe `v` remain free.
+
+## Recovering the structural layer
+
+`op.toProcess : ProcessOver ...` projects onto the underlying
+sampler-free `ProcessOver`, which feeds the structural lemmas in
+`Concurrent/Process.lean` and the bisimulation infrastructure below.
 -/
-abbrev OpenProcess (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+structure OpenProcess
+    (m : Type w → Type w')
+    (Party : Type u) (Δ : PortBoundary) where
+  /-- Residual state space of the process. -/
+  Proc : Type v
+  /-- Protocol step observed at state `s`. -/
+  step : Proc → StepOver (OpenNodeContext.{u, w} Party Δ) Proc
+  /-- Per-state nodewise-monadic sampler that resolves each move of the step
+  protocol in the intermediate monad `m`. -/
+  stepSampler : ∀ s, Spec.Sampler.{w, w'} m (step s).spec
 
 namespace OpenProcess
+
+/-- Structural projection onto the underlying sampler-free `ProcessOver`.
+The closed-world `ProcessOver` lemmas from `Concurrent/Process.lean`
+apply through this projection. -/
+@[reducible]
+def toProcess {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (op : OpenProcess.{u, v, w, w'} m Party Δ) :
+    ProcessOver (OpenNodeContext.{u, w} Party Δ) where
+  Proc := op.Proc
+  step := op.step
 
 /--
 Forget the boundary layer and view an open process as a plain closed-world
@@ -693,43 +734,88 @@ process.
 
 This is the canonical projection: it drops all `BoundaryAction` data from
 every node while preserving the process structure, controller paths, and
-local views.
+local views. The sampler is also discarded, so the result is a bare
+`ProcessOver` over the closed-world context.
 -/
-def toClosed {Party : Type u} {Δ : PortBoundary}
-    (op : OpenProcess.{u, v, w} Party Δ) : Process Party :=
-  op.mapContext (OpenNodeContext.forget Party Δ)
+def toClosed {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (op : OpenProcess.{u, v, w, w'} m Party Δ) : Process.{u, v, w} Party :=
+  op.toProcess.mapContext (OpenNodeContext.forget.{u, w} Party Δ)
 
 /--
-Embed a closed-world process as an open process with no boundary traffic.
+Embed a closed-world process as an open process with no boundary traffic,
+using a user-supplied per-state sampler.
 
 Every node is marked as purely internal: `isActivated = false` and `emit`
-produces no packets.
+produces no packets. The caller must supply the nodewise sampler because
+the closed-world process carries no monadic information.
 -/
-def ofClosed {Party : Type u} {Δ : PortBoundary}
-    (p : Process.{u, v, w} Party) : OpenProcess Party Δ :=
-  p.mapContext (OpenNodeContext.embed Party Δ)
+def ofClosed {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p : Process.{u, v, w} Party)
+    (sampler : ∀ s, Spec.Sampler.{w, w'} m (p.step s).spec) :
+    OpenProcess.{u, v, w, w'} m Party Δ where
+  Proc := (p.mapContext (OpenNodeContext.embed.{u, w} Party Δ)).Proc
+  step := (p.mapContext (OpenNodeContext.embed.{u, w} Party Δ)).step
+  stepSampler := sampler
 
 /--
 Adapt the exposed boundary of an open process along a structural boundary
 morphism.
 
 This transforms every node's boundary action along `φ` (translating emitted
-packets, preserving activation flags) while leaving the process structure
-and closed-world node semantics unchanged.
+packets, preserving activation flags) while leaving the process structure,
+closed-world node semantics, and per-step samplers unchanged. The sampler
+carries over verbatim because `StepOver.mapContext` preserves `step.spec`.
 -/
-def mapBoundary {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
-    (φ : PortBoundary.Hom Δ₁ Δ₂) (op : OpenProcess.{u, v, w} Party Δ₁) :
-    OpenProcess Party Δ₂ :=
-  op.mapContext (OpenNodeContext.map Party φ)
+def mapBoundary {m : Type w → Type w'} {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+    (φ : PortBoundary.Hom Δ₁ Δ₂) (op : OpenProcess.{u, v, w, w'} m Party Δ₁) :
+    OpenProcess.{u, v, w, w'} m Party Δ₂ where
+  Proc := op.Proc
+  step := fun s => (op.step s).mapContext (OpenNodeContext.map.{u, w} Party φ)
+  stepSampler := op.stepSampler
+
+/--
+Binary-choice interleaving of two open processes, targeting a common
+boundary `Δ` via structural injections `f₁`, `f₂` and a scheduling node
+context `schedulerCtx : OpenNodeContext Party Δ (ULift Bool)`.
+
+Structure on `Proc` and `step` is delegated to the underlying
+`Concurrent.ProcessOver.interleave`; the per-state sampler is assembled
+by `Spec.Sampler.interleave`, which threads the scheduler sampler
+`schedulerSampler : m (ULift Bool)` above the per-branch samplers so that
+the resulting step carries a well-typed nodewise-monadic sampler.
+
+This is the single ingredient shared by `openTheory.par`, `openTheory.wire`,
+and `openTheory.plug`: those operations differ only in which injection
+pair `f₁`, `f₂` they supply.
+-/
+def interleave {m : Type w → Type w'} {Party : Type u} {Δ₁ Δ₂ Δ : PortBoundary}
+    (p₁ : OpenProcess.{u, v, w, w'} m Party Δ₁)
+    (p₂ : OpenProcess.{u, v, w, w'} m Party Δ₂)
+    (f₁ : Spec.Node.ContextHom
+      (OpenNodeContext.{u, w} Party Δ₁)
+      (OpenNodeContext.{u, w} Party Δ))
+    (f₂ : Spec.Node.ContextHom
+      (OpenNodeContext.{u, w} Party Δ₂)
+      (OpenNodeContext.{u, w} Party Δ))
+    (schedulerCtx : OpenNodeContext.{u, w} Party Δ (ULift.{w, 0} Bool))
+    (schedulerSampler : m (ULift.{w, 0} Bool)) :
+    OpenProcess.{u, v, w, w'} m Party Δ where
+  Proc := p₁.Proc × p₂.Proc
+  step := (p₁.toProcess.interleave p₂.toProcess f₁ f₂ schedulerCtx).step
+  stepSampler := fun (s₁, s₂) =>
+    Spec.Sampler.interleave schedulerSampler
+      (p₁.stepSampler s₁) (p₂.stepSampler s₂)
 
 end OpenProcess
 
 /--
 `OpenProcess.System` augments an open process by the standard verification
-predicates used throughout VCVio.
+predicates used throughout VCVio. The verification predicates are about
+the structural `ProcessOver` layer, so `OpenProcess.System` is monad- and
+sampler-agnostic and refers to the underlying `ProcessOver.System`.
 -/
 abbrev OpenProcess.System (Party : Type u) (Δ : PortBoundary) :=
-  ProcessOver.System (OpenNodeContext Party Δ : Spec.Node.Context.{w})
+  ProcessOver.System (OpenNodeContext.{u, w} Party Δ)
 
 /-! ## Silent steps and weak bisimulation -/
 
@@ -749,8 +835,8 @@ def IsSilentDecoration {Party : Type u} {Δ : PortBoundary} :
 
 /-- A complete step of an open process is **silent** when every node along
 the chosen transcript path has boundary-internal semantics. -/
-def IsSilentStep {Party : Type u} {Δ : PortBoundary}
-    (p : OpenProcess.{u, v, w} Party Δ) (s : p.Proc)
+def IsSilentStep {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p : OpenProcess.{u, v, w, w'} m Party Δ) (s : p.Proc)
     (tr : (p.step s).spec.Transcript) : Prop :=
   IsSilentDecoration (p.step s).semantics tr
 
@@ -780,9 +866,10 @@ theorem isSilentDecoration_iff_map {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
 /-- `IsSilentStep` is invariant under `OpenProcess.mapBoundary`: remapping
 the boundary does not change which transcripts are silent, because all
 boundary maps preserve `isActivated`. -/
-theorem isSilentStep_mapBoundary_iff {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
+theorem isSilentStep_mapBoundary_iff {m : Type w → Type w'}
+    {Party : Type u} {Δ₁ Δ₂ : PortBoundary}
     (φ : PortBoundary.Hom Δ₁ Δ₂)
-    (p : OpenProcess.{u, v, w} Party Δ₁) (s : p.Proc)
+    (p : OpenProcess.{u, v, w, w'} m Party Δ₁) (s : p.Proc)
     (tr : (p.step s).spec.Transcript) :
     IsSilentStep (p.mapBoundary φ) s tr ↔ IsSilentStep p s tr := by
   apply isSilentDecoration_iff_map
@@ -808,8 +895,8 @@ right-nested interleaving) but the observable boundary traffic is the same.
 The scheduler nodes introduced by `ProcessOver.interleave` are always silent,
 so they can be absorbed by the weak bisimulation.
 -/
-def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
-    (p₁ p₂ : OpenProcess.{u, v, w} Party Δ) : Prop :=
+def OpenProcessIso {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
+    (p₁ p₂ : OpenProcess.{u, v, w, w'} m Party Δ) : Prop :=
   ∃ (rel : p₁.Proc → p₂.Proc → Prop),
     (∀ s₁, ∃ s₂, rel s₁ s₂) ∧
     (∀ s₂, ∃ s₁, rel s₁ s₂) ∧
@@ -834,10 +921,10 @@ def OpenProcessIso {Party : Type u} {Δ : PortBoundary}
 
 namespace OpenProcessIso
 
-variable {Party : Type u} {Δ : PortBoundary}
+variable {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
 
 /-- Every open process is weakly bisimilar to itself. -/
-protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
+protected theorem refl (p : OpenProcess.{u, v, w, w'} m Party Δ) :
     OpenProcessIso p p :=
   ⟨Eq, fun s => ⟨s, rfl⟩, fun s => ⟨s, rfl⟩,
     fun s₁ _ h tr _ => by subst h; exact .inl ⟨tr, rfl⟩,
@@ -846,7 +933,7 @@ protected theorem refl (p : OpenProcess.{u, v, w} Party Δ) :
     fun s₁ _ h tr hv => by subst h; exact ⟨tr, hv, rfl⟩⟩
 
 /-- Weak bisimilarity is symmetric. -/
-protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
+protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w, w'} m Party Δ}
     (h : OpenProcessIso p₁ p₂) :
     OpenProcessIso p₂ p₁ := by
   obtain ⟨rel, htot, hsurj, hfs, hfv, hbs, hbv⟩ := h
@@ -860,7 +947,7 @@ protected theorem symm {p₁ p₂ : OpenProcess.{u, v, w} Party Δ}
 an intermediate: `∃ s₂, r₁₂ s₁ s₂ ∧ r₂₃ s₂ s₃`. For silent steps, the
 intermediate state can advance or stay, using `Classical.em` to case-split
 on whether the intermediate step is itself silent. -/
-protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w} Party Δ}
+protected theorem trans {p₁ p₂ p₃ : OpenProcess.{u, v, w, w'} m Party Δ}
     (h₁₂ : OpenProcessIso p₁ p₂)
     (h₂₃ : OpenProcessIso p₂ p₃) :
     OpenProcessIso p₁ p₃ := by

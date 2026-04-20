@@ -75,7 +75,7 @@ proof / lemma that is generic over the corruption model" — declare
 `M.Process Party Δ`.
 -/
 
-universe u v w
+universe u v w w'
 
 namespace Interaction
 namespace UC
@@ -116,8 +116,9 @@ with. For the canonical `MomentaryCorruption` instantiation, `Party`
 will be `MachineId Sid Pid` and the model fixes
 `Event := MomentaryCorruption.Alphabet Sid Pid`.
 -/
-abbrev Process (M : CorruptionModel) (Party : Type u) (Δ : PortBoundary) :=
-  EnvOpenProcess.{u, 0, v, w} Party Δ M.Event M.State
+abbrev Process (M : CorruptionModel) (m : Type w → Type w')
+    (Party : Type u) (Δ : PortBoundary) :=
+  EnvOpenProcess.{u, 0, v, w, w'} m Party Δ M.Event M.State
 
 end CorruptionModel
 
