@@ -444,20 +444,29 @@ theorem euf_cma_to_nma
       --     `Bool` flag is appended (initialized to `false`) so the type matches the lifted
       --     impls; on the real side, the flag stays `false` throughout (since `realSignBad`
       --     never sets it).
-      -- (B) Apply the per-query ε lemma `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`
+      -- (B) Apply the *selective* ε lemma
+      --     `tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad`
       --     (Relational/SimulateQ.lean) with:
       --       impl₁ := _simImpl pk      (sets bad on programming a cached point)
       --       impl₂ := _realImpl pk sk  (never sets bad)
       --       ε     := ζ_zk             (from per-query HVZK via `simChalUniformGivenCommit`)
-      --     The lemma's bound is `q · ε + Pr[bad on impl₁]` where `q` is the total query
-      --     count. The current lemma counts ALL queries (signing + RO + uniform), so the
-      --     direct application gives `(qS + qH) · ζ_zk + Pr[bad]`. To match the headline
-      --     `qS · ζ_zk`, the lemma needs refinement to count only signing queries (NEXT
-      --     STEP: add a selective variant of the ε-perturbed lemma in Relational/SimulateQ
-      --     that takes a query predicate `S` and an `IsQueryBound` parameterized by S, and
-      --     decrements only on S-queries; the per-non-S-query equality of impls then gives
-      --     the tight bound). The collision bound `Pr[bad] ≤ collisionSlack qS qH Chal`
-      --     follows from `programming_collision_bound` applied to `sigSimBad`.
+      --       S t   := match t with | .inr _ => True | _ => False
+      --                              (sign queries are the "costly" ones)
+      --     Hypotheses:
+      --       (i)   `h_step_tv_S` (sign queries): per-query HVZK gives
+      --             `tvDist (sigSimBad pk msg .run (s,false))
+      --                     (realSignBad pk sk msg .run (s,false)) ≤ ζ_zk`.
+      --       (ii)  `h_step_eq_nS` (non-sign queries): both impls dispatch via
+      --             `baseSimBad` for `.inl` queries, so they are pointwise equal.
+      --       (iii) `h_mono₁`: bad flag is monotone in `_simImpl pk` (`baseSimBad`
+      --             threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`).
+      --       (iv)  `h_qb`: `IsQueryBound (adv.main pk) qS sign-canQuery sign-cost`,
+      --             derived from `_hQ pk : signHashQueryBound (adv.main pk) qS qH`
+      --             by projecting away the `qH` coordinate (a generic monotonicity
+      --             on `IsQueryBound` would handle this projection).
+      --     The lemma directly yields `qS · ζ_zk + Pr[bad on impl₁]`.
+      --     The collision bound `Pr[bad] ≤ collisionSlack qS qH Chal` follows from
+      --     `programming_collision_bound` applied to `sigSimBad`.
       -- (C) Connects `Pr[E | (simulateQ _simImpl).run' (∅, false)]` to `Fork.advantage` by
       --     showing every valid forgery against the simulator induces a fork point in
       --     `runTrace`. The simulator's transcript distribution matches the marginal of the
