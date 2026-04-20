@@ -69,21 +69,25 @@ private lemma support_withBadUpdate_run_snd_snd_of_pre
 /-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
 
 For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
-probability that the HVZK simulator tries to program a cache entry `(msg, c)` already
-populated by a prior adversary query is bounded by `qS · (qS + qH) / |Chal|` via the
-birthday/union bound over commitments.
+probability of a programming-collision on either side of the freshness-preserving chain
+is bounded by `qS · (qS + qH) / |Chal|` via a birthday/union bound on commitments.
 
-The `+ 1` summand in the numerator absorbs the cache-miss verify slack from the
-freshness-preserving chain: `unforgeableExp` samples a uniformly random RO answer to verify
-the forgery on a cache miss (winning with probability `1/|Chal|`), while `Fork.runTrace`
-returns `false` on the same cache miss.
+The full chain absorbs three slacks into this single numerator `2 · qS · (qS + qH) + 1`:
+* `qS · (qS + qH) / |Chal|` from the simulator-side bad event (sub-claim B-finish);
+* `qS · (qS + qH) / |Chal|` from the FS-vs-programming bad event in the (A) bridge,
+  which swaps the actual `FiatShamir.sign` oracle for the hypothetical programming-style
+  `realSign` (identical until the same cache-collision bad event);
+* `1 / |Chal|` from the cache-miss verify slack: `unforgeableExp` samples a uniformly
+  random RO answer when the forgery's hash point is *not* in the cache (winning with
+  probability `1/|Chal|` by special soundness / unique-response uniqueness), while
+  `Fork.runTrace` returns `false` on the same cache miss.
 
 Matches EasyCrypt's `pr_bad_game` at
 [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`, modulo
-the `+1` slack) and plays the same role as `GPVHashAndSign.collisionBound` for the PSF
-construction. -/
+the doubled birthday bound and the `+1` cache-miss slack) and plays the same role as
+`GPVHashAndSign.collisionBound` for the PSF construction. -/
 noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
-  ((qS * (qS + qH) + 1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+  ((2 * qS * (qS + qH) + 1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
 
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
@@ -485,6 +489,54 @@ theorem euf_cma_to_nma
     let _realImpl : Stmt → Wit → QueryImpl (spec + (M →ₒ (Commit × Resp)))
         (StateT (spec.QueryCache × Bool) (OracleComp spec)) := fun pk sk =>
       baseSimBad + realSignBad pk sk
+    -- Augmented state for the freshness-preserving chain.
+    -- The state `((spec.QueryCache × List M) × Bool)` adds a `List M` of signed messages
+    -- (reverse-chronological) between the cache and the bad flag, so the freshness check
+    -- `¬msg ∈ signed` is local to the augmented experiment.
+    -- `baseSimSigned'` lifts `baseSim` to `StateT (cache × signed) (OracleComp spec)` by
+    -- threading `signed` unchanged. Base oracles never sign, so `signed` stays the same.
+    let baseSimSigned' : QueryImpl spec
+        (StateT (spec.QueryCache × List M) (OracleComp spec)) := fun t => do
+      let s ← get
+      let v ← (baseSim t).run s.1
+      set (v.2, s.2)
+      pure v.1
+    -- `sigSimSigned' pk msg` lifts `sigSim pk msg` and prepends `msg` to `signed`.
+    let sigSimSigned' : Stmt → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT (spec.QueryCache × List M) (OracleComp spec)) := fun pk msg => do
+      let s ← get
+      let v ← (sigSim pk msg).run s.1
+      set (v.2, msg :: s.2)
+      pure v.1
+    -- `realSignSigned' pk sk msg` lifts `realSign pk sk msg` and prepends `msg` to `signed`.
+    let realSignSigned' : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT (spec.QueryCache × List M) (OracleComp spec)) := fun pk sk msg => do
+      let s ← get
+      let v ← (realSign pk sk msg).run s.1
+      set (v.2, msg :: s.2)
+      pure v.1
+    -- Bad-flag predicate on the augmented state: programming `(msg, c)` would overwrite
+    -- a previously cached entry. Identical to `sigBadF` modulo the `signed` projection.
+    let sigBadFSigned : (msg : M) → spec.QueryCache × List M → Commit × Resp → Bool :=
+      fun msg s vc => (s.1 (.inr (msg, vc.1))).isSome
+    -- Bad-flag-aware lifts of the augmented impls.
+    let baseSimSigned : QueryImpl spec
+        (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) :=
+      baseSimSigned'.withBadFlag
+    let sigSimSigned : Stmt → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) := fun pk =>
+      (sigSimSigned' pk).withBadUpdate sigBadFSigned
+    let realSignSigned : Stmt → Wit → QueryImpl (M →ₒ (Commit × Resp))
+        (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) := fun pk sk =>
+      (realSignSigned' pk sk).withBadUpdate sigBadFSigned
+    -- Combined "sim" implementation on the augmented state.
+    let _simImplSigned : Stmt → QueryImpl (spec + (M →ₒ (Commit × Resp)))
+        (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) := fun pk =>
+      baseSimSigned + sigSimSigned pk
+    -- Combined "real" implementation on the augmented state.
+    let _realImplSigned : Stmt → Wit → QueryImpl (spec + (M →ₒ (Commit × Resp)))
+        (StateT ((spec.QueryCache × List M) × Bool) (OracleComp spec)) := fun pk sk =>
+      baseSimSigned + realSignSigned pk sk
     have advantage_bound : adv.advantage (runtime M) ≤ Fork.advantage σ hr M nmaAdv qH +
         ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal := by
       -- **Freshness-preserving chain.** See the docstring at the top of this bullet for
@@ -703,42 +755,246 @@ theorem euf_cma_to_nma
                 | inl _ => simp [S]
                 | inr _ => simp [S]
             | inr _ => simp [S]
-      -- TODO (freshness-preserving chain). The remaining work splits into four named
-      -- sub-claims, each gated on `step_b_per_pksk` (proven above):
+      -- The augmented "direct" experiments running over `(cache × signed × bad)` state.
+      -- These are the canonical objects in the freshness-preserving chain.
+      let direct_real_exp : Stmt → Wit → OracleComp spec
+          ((M × (Commit × Resp)) × (spec.QueryCache × List M) × Bool) := fun pk sk =>
+        (simulateQ (_realImplSigned pk sk) (adv.main pk)).run ((∅, []), false)
+      let direct_sim_exp : Stmt → OracleComp spec
+          ((M × (Commit × Resp)) × (spec.QueryCache × List M) × Bool) := fun pk =>
+        (simulateQ (_simImplSigned pk) (adv.main pk)).run ((∅, []), false)
+      -- The "successful fresh forgery on cache hit" event predicate. Captures: the cache
+      -- contains the forgery's hash point with some `ω` that makes `verify` succeed, AND
+      -- the forgery's message was not signed (freshness).
+      let event : Stmt →
+          ((M × (Commit × Resp)) × (spec.QueryCache × List M) × Bool) → Prop :=
+        fun pk z =>
+          (∃ ω, z.2.1.1 (.inr (z.1.1, z.1.2.1)) = some ω ∧
+            σ.verify pk z.1.2.1 ω z.1.2.2 = true) ∧
+          ¬ z.1.1 ∈ z.2.1.2
+      -- The collision-bad flag predicate. Extracted here to avoid inline
+      -- `fun z => z.2.2 = true` which interacts badly with the `Pr[… | …]` notation
+      -- delimiter inside `calc` first-terms.
+      let badPred : (M × (Commit × Resp)) × (spec.QueryCache × List M) × Bool → Prop :=
+        fun z => z.2.2 = true
+      -- (A) `bridge_real_freshness`: bridge `adv.advantage` to the augmented `direct_real_exp`.
       --
-      --   * (A) `bridge_a_freshness`:
-      --       adv.advantage (runtime M) ≤
-      --         ∑' (pk, sk), σ.keygen.evalDist (pk, sk) ·
-      --           Pr[fun ((m, sig), (cache, signed, bad)) =>
-      --                σ.verify pk m sig.fst sig.snd ∧ ¬ m ∈ signed |
-      --              (simulateQ (_realImplSigned pk sk) (adv.main pk)).run (∅, [], false)]
-      --     The signed-list update inside `_realImplSigned` mirrors the WriterT log of the
-      --     `signature_oracle` used in `unforgeableExp`; the freshness check `¬msg ∈ signed`
-      --     corresponds exactly to the original experiment's `¬log.wasQueried msg`.
+      -- Two slacks are absorbed here:
+      --   * `qS · (qS + qH) / |Chal|`: FS-vs-`realSign` swap bad event. The actual
+      --     `FiatShamir.sign` queries the live RO at `(msg, c)` (cached if already present),
+      --     while `realSignSigned'` samples a fresh challenge from `realTranscript pk sk`
+      --     and programs `(msg, c) ↦ chSampled` on a cache miss. They are identical until
+      --     a cache hit at `(msg, c)` during signing, with collision probability bounded by
+      --     `(qS + qH) / |Chal|` per query (commitment marginal is uniform; live + programmed
+      --     entries before this query total ≤ `qS + qH`).
+      --   * `1 / |Chal|`: cache-miss verify slack. `unforgeableExp` queries the live RO when
+      --     verifying the forgery, sampling a fresh ω on a cache miss; this matches the
+      --     forger's response with probability `1/|Chal|` by special soundness / unique
+      --     responses. The augmented event `event pk` only counts cache hits, so this slack
+      --     is added explicitly.
       --
-      --   * (B) `step_b_per_pksk_signed`:
-      --       per-(pk, sk), tvDist ((sim).run' ...) ((real).run' ...) ≤ qS · ζ_zk + Pr[bad]
-      --     Derive from `step_b_per_pksk` (proven above) via DPI on the signed-list addition
-      --     (the signed-list update is identical and deterministic on sim and real sides).
+      -- The `signed` list in the augmented state mirrors the WriterT log used in
+      -- `unforgeableExp`: each signing query prepends `msg`, so `¬msg ∈ signed` matches
+      -- `¬log.wasQueried msg`.
+      have bridge_real_freshness :
+          adv.advantage (runtime M) ≤
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
+              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+        sorry
+      -- (B) `step_b_per_pksk_signed`: per-(pk, sk), the augmented-state event-level bound.
       --
-      --   * (B-finish) `pr_bad_le_collisionSlack`:
-      --       per-pk, Pr[bad on _simImpl pk] ≤ collisionSlack qS qH Chal
-      --     Union bound on the `qS` programming events: each `sigSimBad pk msg` programming
-      --     step hits a previously-cached point (live RO query or prior signing programming)
-      --     with probability ≤ `(qS + qH) / |Chal|` per step. The per-event uniformity
-      --     comes from the per-query HVZK simulator (challenge marginal is uniform).
+      -- Derives from `step_b_per_pksk` (proven above on `(cache × Bool)` state) via the data
+      -- processing inequality: the `signed`-list update is deterministic and identical on the
+      -- `_simImplSigned` and `_realImplSigned` sides (both prepend `msg` on every signing
+      -- query, and base oracles never touch `signed`), so the augmented joint TV equals the
+      -- `(cache × Bool)`-state TV. Applying the standard "tvDist ⇒ probEvent absorption"
+      -- with the deterministic post-processing through `event pk` yields the bound.
+      have step_b_per_pksk_signed : ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
+          Pr[event pk | direct_real_exp pk sk] ≤
+            Pr[event pk | direct_sim_exp pk] +
+              ENNReal.ofReal (qS * ζ_zk) +
+              Pr[badPred | direct_sim_exp pk] := by
+        sorry
+      -- (B-finish) `pr_bad_le_signed`: per-pk, the simulator's bad event is bounded by
+      -- `qS · (qS + qH) / |Chal|`.
       --
-      --   * (C') `bridge_c'_freshness`:
-      --       ∑' pk, σ.keygen.fst.evalDist pk ·
-      --         Pr[verify ∧ ¬msg ∈ signed | direct_sim_exp pk]
-      --       ≤ Fork.advantage σ hr M nmaAdv qH + 1/|Chal|
-      --     Key insight: a forgery `(msg, c, s)` with `¬msg ∈ signed` cannot have used a
-      --     programmed `(msg, c)` cache entry (since `sigSim` only programs at signed `msg`).
-      --     So `(msg, c)` is in the live RO query log iff it is in the cache. The `+ 1/|Chal|`
-      --     accounts for `direct_sim_exp` sampling a fresh ω on cache miss vs `Fork.runTrace`
-      --     returning false on cache miss. This `1/|Chal|` slack is absorbed into
-      --     `collisionSlack` (whose definition now includes a `+1` in the numerator).
-      sorry
+      -- Union bound on the `qS` programming events. Each `sigSimSigned pk msg` programming
+      -- step hits a previously-cached point (live RO query or prior signing programming) with
+      -- probability ≤ `(qS + qH) / |Chal|`. The per-event uniformity comes from the per-query
+      -- HVZK simulator's challenge marginal (uniform over `Chal`); equivalently from the
+      -- commitment marginal being uniform when chosen by `simTranscript pk`.
+      have pr_bad_le_signed : ∀ (pk : Stmt),
+          Pr[badPred | direct_sim_exp pk] ≤
+            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+        sorry
+      -- (C') `bridge_sim_fork_freshness`: bridge the (pk-summed) sim-side event probability
+      -- to `Fork.advantage`. No additional slack needed (the `1/|Chal|` cache-miss verify
+      -- slack is absorbed into the (A) bridge).
+      --
+      -- Key insight: a forgery `(msg, c, π)` with `¬msg ∈ signed` cannot have used a
+      -- programmed `(msg, c)` cache entry, since `sigSimSigned pk` only programs at signed
+      -- `msg`. So if `event pk z` holds (cache contains `(msg, c)` and verify succeeds),
+      -- then `(msg, c)` was queried via the live RO (recorded in `Fork.runTrace`'s
+      -- `queryLog`), exactly the condition for `forkPoint trace = some _`.
+      have bridge_sim_fork_freshness :
+          (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+            Pr[event pksk.1 | direct_sim_exp pksk.1]) ≤
+            Fork.advantage σ hr M nmaAdv qH := by
+        sorry
+      -- Wire the four sub-claims into the final advantage bound.
+      --
+      -- Abbreviations used below:
+      --   `S_real := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[event pk | direct_real_exp pk sk]`
+      --   `S_sim  := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[event pk | direct_sim_exp pk]`
+      --   `S_bad  := ∑' (pk,sk), evalDist hr.gen (pk,sk) · Pr[bad on direct_sim_exp pk]`
+      --   `slackA := (qS · (qS+qH) : ℕ) / |Chal|`, `slackOne := 1 / |Chal|`
+      --
+      -- Chain:
+      --   adv.advantage
+      --     ≤ S_real + slackA + slackOne                           [bridge_real_freshness]
+      --     ≤ (S_sim + ofReal(qS·ζ_zk) + S_bad) + slackA + slackOne [step_b_per_pksk_signed]
+      --     ≤ (Fork.advantage + ofReal(qS·ζ_zk) + slackA) + slackA + slackOne
+      --                                                            [bridge_sim_fork_freshness,
+      --                                                             pr_bad_le_signed]
+      --     = Fork.advantage + ofReal(qS·ζ_zk) + collisionSlack qS qH Chal
+      --                       [arith: 2·slackA + slackOne = collisionSlack]
+      --
+      -- Step 2 uses `hr.gen_sound` on the support of `hr.gen` to supply `rel pk sk = true`
+      -- to `step_b_per_pksk_signed`.
+      -- Helper: `hr.gen` is a PMF, so its evalDist sums to 1.
+      have h_keygen_sum_one : (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk) = 1 :=
+        HasEvalPMF.tsum_probOutput_eq_one hr.gen
+      -- (B) distributed over the sum: `S_real ≤ S_sim + ofReal(qS·ζ_zk) + S_bad`.
+      -- The `ofReal(qS·ζ_zk)` factor pulls out via `h_keygen_sum_one`.
+      have h_B_distributed :
+          (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) ≤
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[event pksk.1 | direct_sim_exp pksk.1]) +
+            ENNReal.ofReal (qS * ζ_zk) +
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[badPred | direct_sim_exp pksk.1]) := by
+        have h_per_term : ∀ (pksk : Stmt × Wit),
+            evalDist hr.gen pksk *
+                Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] ≤
+              evalDist hr.gen pksk *
+                (Pr[event pksk.1 | direct_sim_exp pksk.1] +
+                  ENNReal.ofReal (qS * ζ_zk) +
+                  Pr[badPred | direct_sim_exp pksk.1]) := by
+          intro pksk
+          by_cases hmem : pksk ∈ support hr.gen
+          · have hrel : rel pksk.1 pksk.2 = true := hr.gen_sound _ _ hmem
+            exact mul_le_mul_left' (step_b_per_pksk_signed pksk.1 pksk.2 hrel) _
+          · have h0 : evalDist hr.gen pksk = 0 :=
+              probOutput_eq_zero_of_not_mem_support hmem
+            simp [h0]
+        have h_step1 :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) ≤
+              ∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                (Pr[event pksk.1 | direct_sim_exp pksk.1] +
+                  ENNReal.ofReal (qS * ζ_zk) +
+                  Pr[badPred | direct_sim_exp pksk.1]) :=
+          ENNReal.tsum_le_tsum h_per_term
+        have h_step2 :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              (Pr[event pksk.1 | direct_sim_exp pksk.1] +
+                ENNReal.ofReal (qS * ζ_zk) +
+                Pr[badPred | direct_sim_exp pksk.1])) =
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[event pksk.1 | direct_sim_exp pksk.1]) +
+              (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                ENNReal.ofReal (qS * ζ_zk)) +
+              (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[badPred | direct_sim_exp pksk.1]) := by
+          rw [← ENNReal.tsum_add, ← ENNReal.tsum_add]
+          refine tsum_congr (fun _ => ?_)
+          rw [mul_add, mul_add]
+        have h_step3 :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              ENNReal.ofReal (qS * ζ_zk)) = ENNReal.ofReal (qS * ζ_zk) := by
+          rw [ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
+        have h_target_eq :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              (Pr[event pksk.1 | direct_sim_exp pksk.1] +
+                ENNReal.ofReal (qS * ζ_zk) +
+                Pr[badPred | direct_sim_exp pksk.1])) =
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[event pksk.1 | direct_sim_exp pksk.1]) +
+              ENNReal.ofReal (qS * ζ_zk) +
+              (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[badPred | direct_sim_exp pksk.1]) := by
+          rw [h_step2, h_step3]
+        exact h_step1.trans_eq h_target_eq
+      -- (B-finish) distributed: `S_bad ≤ slackA` (since `hr.gen` is a PMF).
+      have h_bad_sum :
+          (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              Pr[badPred | direct_sim_exp pksk.1]) ≤
+            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+        have h_per_term : ∀ (pksk : Stmt × Wit),
+            evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1] ≤
+              evalDist hr.gen pksk *
+                (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) :=
+          fun pksk => mul_le_mul_left' (pr_bad_le_signed pksk.1) _
+        have h_step1 :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[badPred | direct_sim_exp pksk.1]) ≤
+              ∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) :=
+          ENNReal.tsum_le_tsum h_per_term
+        have h_step2 :
+            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+              (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal))) =
+            ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+          rw [ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
+        exact h_step1.trans h_step2.le
+      -- Arithmetic: `2·slackA + slackOne = collisionSlack qS qH Chal`.
+      have h_slack_eq :
+          ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+          ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+          ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) =
+          collisionSlack qS qH Chal := by
+        unfold collisionSlack
+        rw [ENNReal.div_add_div_same, ENNReal.div_add_div_same]
+        congr 1
+        push_cast
+        ring
+      -- Chain the pieces together.
+      calc adv.advantage (runtime M)
+          _ ≤ (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
+              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) :=
+            bridge_real_freshness
+          _ ≤ ((∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                  Pr[event pksk.1 | direct_sim_exp pksk.1]) +
+                ENNReal.ofReal (qS * ζ_zk) +
+                (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
+                  Pr[badPred | direct_sim_exp pksk.1])) +
+              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+            gcongr
+          _ ≤ (Fork.advantage σ hr M nmaAdv qH +
+                ENNReal.ofReal (qS * ζ_zk) +
+                ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) +
+              ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+              ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) := by
+            -- `gcongr` decomposes the compound inequality and closes the two leaf goals
+            -- `S_sim ≤ Fork.advantage` and `S_bad ≤ slackA` using
+            -- `bridge_sim_fork_freshness` and `h_bad_sum` from context.
+            gcongr
+          _ = Fork.advantage σ hr M nmaAdv qH +
+              ENNReal.ofReal (qS * ζ_zk) +
+              (((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+                ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal) +
+                ((1 : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)) := by
+            simp only [add_assoc]
+          _ = Fork.advantage σ hr M nmaAdv qH +
+              ENNReal.ofReal (qS * ζ_zk) +
+              collisionSlack qS qH Chal := by
+            rw [h_slack_eq]
     exact advantage_bound
 section evalDistBridge
 
