@@ -149,8 +149,7 @@ theorem idsWithAbort_commitment_recoverable :
       (prims.sampleInBall cTilde) z pk.t1), ?_⟩
   rintro s w' c ⟨z, h⟩ hverify
   unfold identificationScheme at hverify
-  simp only [Bool.and_eq_true, decide_eq_true_eq] at hverify
-  exact hverify.1.2
+  grind
 
 end Properties
 

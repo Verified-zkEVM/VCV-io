@@ -196,6 +196,7 @@ lemma probEvent_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind
 alias ⟨_, probEvent_eq_zero'⟩ := probEvent_eq_zero_iff'
 
+@[simp, grind =]
 lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by  grind
 alias ⟨_, probEvent_ne_zero⟩ := probEvent_ne_zero_iff
 
@@ -549,6 +550,7 @@ lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α]
 
 end sum_probOutput
 
+@[grind =]
 lemma probFailure_eq_sub_tsum [HasEvalSPMF m] (mx : m α) :
     Pr[⊥ | mx] = 1 - ∑' x : α, Pr[= x | mx] := by
   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)

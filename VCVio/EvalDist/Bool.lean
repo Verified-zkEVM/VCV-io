@@ -14,13 +14,13 @@ Specialization lemmas for `HasEvalSPMF` computations returning `Bool`.
 
 variable {m : Type _ → Type _} [Monad m] [HasEvalSPMF m] {α β : Type _}
 
-@[simp]
+@[simp, grind =]
 lemma probOutput_true_add_false (mx : m Bool) :
     Pr[= true | mx] + Pr[= false | mx] = 1 - Pr[⊥ | mx] := by
   have h := tsum_probOutput_eq_sub mx
   rwa [tsum_fintype (L := .unconditional _), Fintype.sum_bool] at h
 
-@[simp]
+@[simp, grind =]
 lemma probOutput_false_add_true (mx : m Bool) :
     Pr[= false | mx] + Pr[= true | mx] = 1 - Pr[⊥ | mx] := by
   rw [add_comm, probOutput_true_add_false]

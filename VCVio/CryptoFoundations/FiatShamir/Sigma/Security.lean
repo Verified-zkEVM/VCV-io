@@ -1030,12 +1030,7 @@ theorem euf_nma_bound
             eufNmaReduction σ hr M nmaAdv qH pkw.1] := by
     unfold hardRelationExp
     rw [← probEvent_eq_eq_probOutput]
-    simp only [bind_pure_comp, probEvent_bind_eq_tsum]
-    refine tsum_congr fun pkw => ?_
-    rcases pkw with ⟨pk, sk⟩
-    congr 1
-    rw [probEvent_map]
-    rfl
+    simp only [bind_pure_comp, probEvent_bind_eq_tsum, probEvent_map, Function.comp_def]
   -- ── Step (c): per-pk forking bound via `Fork.replayForkingBound` applied with the
   -- strengthened support invariant `forkSupportInvariant`.
   have hPerPk : ∀ pk : Stmt,

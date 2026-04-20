@@ -181,10 +181,8 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
                else ddhExpRand g adversary
       pure (bit == z)] := by
   unfold ddhExp
-  simp only [← probEvent_eq_eq_probOutput]
-  rw [probEvent_bind_congr fun a _ => probEvent_bind_bind_swap _ _ _ _,
-      probEvent_bind_bind_swap]
-  simp only [probEvent_eq_eq_probOutput]
+  rw [probOutput_bind_congr fun a _ => probOutput_bind_bind_swap _ _ _ _,
+      probOutput_bind_bind_swap]
   refine probOutput_bind_congr' ($ᵗ Bool) true ?_
   intro bit
   cases bit <;> simp [ddhExpReal, ddhExpRand]
