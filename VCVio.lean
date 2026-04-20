@@ -76,6 +76,7 @@ import VCVio.Interaction.Basic.Ownership
 import VCVio.Interaction.Basic.Replicate
 import VCVio.Interaction.Basic.Shape
 import VCVio.Interaction.Basic.Spec
+import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.Basic.StateChain
 import VCVio.Interaction.Basic.Strategy
 import VCVio.Interaction.Basic.Syntax

@@ -3,8 +3,10 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.Interaction.Basic.SpecFintype
 import VCVio.Interaction.UC.OpenProcessModel
 import VCVio.Interaction.UC.Computational
+import VCVio.OracleComp.Constructions.SampleableType
 
 /-!
 # Runtime execution semantics for open processes
@@ -110,6 +112,58 @@ noncomputable def sampleTranscript {m : Type → Type} [Monad m] :
       let x ← samp
       let tr ← sampleTranscript (rest x) (sampRest x)
       return ⟨x, tr⟩
+
+/--
+Uniform selection from a nonempty finite type as a `ProbComp` primitive,
+realized by reducing to uniform selection on `Fin (Fintype.card X)` via the
+classical equivalence `Fintype.equivFin`. This is the tree-node analogue of
+`PMF.uniformOfFintype`, landing in `ProbComp` so that it can be plugged
+directly into per-node components of a `Sampler ProbComp spec`.
+-/
+noncomputable def probCompUniformOfFintype
+    (X : Type) [Fintype X] [Nonempty X] : ProbComp X :=
+  haveI : NeZero (Fintype.card X) := ⟨Fintype.card_ne_zero⟩
+  (Fintype.equivFin X).symm <$> ($ᵗ Fin (Fintype.card X))
+
+/--
+Canonical uniform sampler on a `Spec.Fintype`-ornamented spec, built by
+recursion on the ornament: each node samples uniformly from its move
+space using `probCompUniformOfFintype`, and the continuation samplers
+are produced recursively from the per-branch ornament.
+
+This is the interaction-spec analogue of `SampleableType` for
+`OracleSpec`: concrete `spec` trees whose move types all carry `Fintype`
+and `Nonempty` synthesize an instance of `Spec.Fintype spec`
+automatically, yielding `Sampler.uniform spec` as the canonical
+coin-flip-only sampler for downstream runtime semantics
+(`processSemanticsProbComp`, etc.).
+-/
+noncomputable def Sampler.uniform :
+    (spec : Spec.{0}) → Spec.Fintype spec → Sampler ProbComp spec
+  | .done, _ => ⟨⟩
+  | .node X rest, .node hFin hNon hRec =>
+      haveI := hFin
+      haveI := hNon
+      (probCompUniformOfFintype X,
+        fun x => Sampler.uniform (rest x) (hRec x))
+
+/-- Instance-argument form of `Sampler.uniform`. -/
+@[reducible]
+noncomputable def Sampler.uniformI (spec : Spec.{0}) [h : Spec.Fintype spec] :
+    Sampler ProbComp spec :=
+  Sampler.uniform spec h
+
+/-! Smoke test: typeclass synthesis builds a `Spec.Fintype` instance for a
+concrete spec, and `Sampler.uniformI` elaborates against it. -/
+
+private example : Spec.Fintype
+    (Spec.node Bool (fun _ => Spec.node (Fin 4) (fun _ => Spec.done))) :=
+  inferInstance
+
+private noncomputable example :
+    Sampler ProbComp
+      (Spec.node Bool (fun _ => Spec.node (Fin 4) (fun _ => Spec.done))) :=
+  Sampler.uniformI _
 
 end Spec
 
