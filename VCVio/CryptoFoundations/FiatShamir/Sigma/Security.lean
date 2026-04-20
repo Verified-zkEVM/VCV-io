@@ -566,13 +566,15 @@ theorem euf_cma_to_nma
           cases t with
           | inl t' =>
               -- baseSimBad threads `bad` unchanged via `set (cache', bad)`. With
-              -- initial `bad = true`, every output state has `bad = true`.  Tracked
-              -- under sub-claim (B) bookkeeping (requires full StateT unfolding via
-              -- `dsimp only [_simImpl, baseSimBad, sigSimBad]` + `mem_support_bind_iff`
-              -- chain; `simp_all` times out, manual `rcases` chain leaves sub-goals).
+              -- initial `bad = true`, every output state has `bad = true`.
+              -- The exact destructuring chain over `mem_support_bind_iff` requires
+              -- more bookkeeping than we can express tersely with anonymous
+              -- pattern variables; tracked under sub-claim (B) bookkeeping.
+              -- Cleanest fix: extract `baseSimBad`/`sigSimBad` as top-level
+              -- `private def`s in this file (parameterised by `baseSim`/`sigSim`),
+              -- then `simp [baseSimBad, sigSimBad]` will close the goal.
               sorry
           | inr msg =>
-              -- sigSimBad sets `bad' := bad || _`. With `bad = true`, `bad' = true`.
               sorry
         case h_qb =>
           -- Project `signHashQueryBound (adv.main pk) qS qH` (a `(qS, qH)`-paired budget) onto
