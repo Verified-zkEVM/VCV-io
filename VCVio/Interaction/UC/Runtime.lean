@@ -38,8 +38,9 @@ Common instantiations:
 * Observation-style semantics that deliberately carry failure mass,
   for example `m = OptionT ProbComp` with
   `SPMFSemantics.ofHasEvalSPMF (OptionT ProbComp)`. This is what
-  cryptographic smoke tests (OTP-style privacy, guess games) use to
-  produce a non-vacuous `CompEmulates 0` discharge.
+  cryptographic smoke tests (OTP-style privacy, guess games) use so
+  that the `guard` branch contributes a real failure mass to the
+  resulting `SPMF Unit`.
 
 ## Main definitions
 
@@ -175,10 +176,9 @@ private abbrev Closed (Party : Type u) (m : Type → Type)
 Construct a `Semantics` for the open-process theory, parameterized by a
 surface execution monad `m` together with a bundled `SPMFSemantics m`.
 
-The execution runs entirely in `m`: per-step samplers come directly from
-the `OpenProcess`'s `stepSampler` field (no external `sampler` argument
-is threaded through the runtime), multi-step iteration threads them, and
-the observer extracts the final judgment as a `m Unit` value. The
+The execution runs entirely in `m`: per-step samplers come from the
+`OpenProcess`'s `stepSampler` field, multi-step iteration threads them,
+and the observer extracts the final judgment as an `m Unit` value. The
 bundled `sem` then collapses the `m Unit` game into a `SPMF Unit` via
 `Semantics.evalDist`.
 

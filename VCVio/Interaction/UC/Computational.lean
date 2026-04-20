@@ -46,7 +46,8 @@ This lets the same framework express:
 * observation-style semantics that deliberately introduce failure, for
   example by querying with `OptionT ProbComp` and `guard`-ing on a
   predicate over sampled values. This is how OTP-style privacy gets a
-  non-vacuous `CompEmulates 0` discharge.
+  `CompEmulates 0` statement against an `SPMF Unit` that carries a
+  real failure mass.
 
 ## Main definitions
 
@@ -55,8 +56,7 @@ This lets the same framework express:
   system.
 * `Semantics.evalDist` is the `SPMF Unit` denotation of a closed system.
 * `Semantics.distAdvantage` is the total variation distance between two
-  such denotations, and the replacement for the old
-  `ProbComp.distAdvantage` pivot.
+  such denotations.
 * `CompEmulates sem ε real ideal` asserts that for every environment
   (plug), the distinguishing advantage between the real and ideal
   closed systems is at most `ε`.

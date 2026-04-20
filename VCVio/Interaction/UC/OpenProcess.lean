@@ -684,13 +684,12 @@ An `m`-parametric open concurrent process exposing boundary `Δ`.
 * `stepSampler` — a per-state `Spec.Sampler m (step s).spec` resolving
   each move of the step protocol in the intermediate monad `m`.
 
-The sampler is **intrinsic** rather than threaded externally: every
-state of every open process carries its own nodewise-monadic sampler
-as first-class data, following the ArkLib `MonadDecoration` pattern.
-`openTheory m` compositionally threads these per-step samplers through
-`par`, `wire`, and `plug` via `Spec.Sampler.interleave`, so the runtime
-layer (`processSemantics`, `processSemanticsAsync`) no longer needs a
-global `sampler` argument.
+Each state of an open process carries its own nodewise-monadic
+sampler as first-class data. `openTheory m` compositionally assembles
+the per-step samplers of composite processes through `par`, `wire`,
+and `plug` via `Spec.Sampler.interleave`, and the runtime layer
+(`processSemantics`, `processSemanticsAsync`) reads the sampler off
+the process rather than taking it as a separate argument.
 
 ## Universe conventions
 
@@ -702,8 +701,8 @@ universe `v` remain free.
 ## Recovering the structural layer
 
 `op.toProcess : ProcessOver ...` projects onto the underlying
-sampler-free `ProcessOver`, which feeds the structural lemmas in
-`Concurrent/Process.lean` and the bisimulation infrastructure below.
+`ProcessOver`, feeding the structural lemmas in `Concurrent/Process.lean`
+and the bisimulation infrastructure below.
 -/
 structure OpenProcess
     (m : Type w → Type w')
@@ -718,9 +717,9 @@ structure OpenProcess
 
 namespace OpenProcess
 
-/-- Structural projection onto the underlying sampler-free `ProcessOver`.
-The closed-world `ProcessOver` lemmas from `Concurrent/Process.lean`
-apply through this projection. -/
+/-- Structural projection onto the underlying `ProcessOver`, dropping
+the per-state sampler. The closed-world `ProcessOver` lemmas from
+`Concurrent/Process.lean` apply through this projection. -/
 @[reducible]
 def toProcess {m : Type w → Type w'} {Party : Type u} {Δ : PortBoundary}
     (op : OpenProcess.{u, v, w, w'} m Party Δ) :

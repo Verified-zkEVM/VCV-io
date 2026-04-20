@@ -13,9 +13,8 @@ import VCVio.OracleComp.Constructions.BitVec
 # One-Time Pad at the UC Observation Layer
 
 This file wires the one-time pad from `Examples.OneTimePad.Basic` into
-the refactored `Interaction.UC.Semantics` observation framework,
-producing a **non-vacuous** `CompEmulates 0` statement at the
-observation level.
+the `Interaction.UC.Semantics` observation framework, giving a
+`CompEmulates 0` statement at the observation level.
 
 ## Canonical UC story being modeled
 
@@ -79,23 +78,10 @@ for every `W : T.Closed`. The UC indistinguishability statement
 semantics, any two closed systems are indistinguishable with
 advantage zero.
 
-## Non-vacuity
-
-1. **Type-level.** The `SPMF Unit` target carries genuine failure
-   mass (`probFailure_realCipherObserve`), escaping the pre-refactor
-   `ProbComp Unit` collapse to point mass.
-2. **Security-level.** The `run` field of `realSmcSemantics` is a
-   genuine function of its closed-system argument: picking a
-   discriminating `readMsg` makes `run W_real` and `run W_ideal`
-   literally different `OptionT ProbComp Unit` values. OTP privacy
-   is what collapses their `SPMF` denotations, not a definitional
-   coincidence. The discriminating-reader witness is
-   `realSmcSemantics_run_distinct`.
-
 ## Open-world layer: three-port boundary `Δ_otp`
 
-The second half of this file constructs a genuinely open UC-style
-model of the OTP at a three-port boundary
+The second half of this file constructs an open UC-style model of
+the OTP at a three-port boundary
 
 ```
 Δ_otp sp = ⟨ keyIn +ᵢ plaintextIn , ctxtOut ⟩
@@ -111,14 +97,13 @@ distinct open processes live at this boundary:
   directly and emits it verbatim on the `ctxtOut` port, ignoring the
   plaintext entirely.
 
-Both processes thread a genuine uniform sampler by lifting
-`Sampler.uniformI` from `ProbComp` to `OptionT ProbComp` through
-`Decoration.map`. They are structurally distinct whenever `msg ≠ 0`
-(`realOtp_ne_idealOtp`): their single-step boundary emissions
-disagree on the zero key. The indistinguishability statement
-`compEmulates_realOtp` falls out of `compEmulates_realSmcSemantics`
-since the latter closes over every pair of open processes at every
-boundary.
+Both processes thread a uniform sampler by lifting `Sampler.uniformI`
+from `ProbComp` to `OptionT ProbComp` through `Decoration.map`. They
+are structurally distinct whenever `msg ≠ 0` (`realOtp_ne_idealOtp`):
+their single-step boundary emissions disagree on the zero key. The
+indistinguishability statement `compEmulates_realOtp` follows from
+`compEmulates_realSmcSemantics`, which closes over every pair of open
+processes at every boundary.
 
 ## References
 
@@ -157,9 +142,8 @@ private noncomputable abbrev T :=
 a uniform key `k : BitVec sp`, compute the ciphertext `c := k ⊕ msg`,
 and `guard` that the distinguisher's predicate `P` holds at `c`.
 
-Lives in `OptionT ProbComp` so the `guard` branch carries genuine
-failure mass, which the old `ProbComp Unit` observation target could
-not represent. -/
+The `OptionT ProbComp` target lets `guard` contribute genuine failure
+mass to the resulting `SPMF Unit`. -/
 noncomputable def realCipherObserve (sp : ℕ) (msg : BitVec sp)
     (P : BitVec sp → Bool) : OptionT ProbComp Unit := do
   let k ← ($ᵗ BitVec sp : OptionT ProbComp (BitVec sp))
@@ -279,8 +263,7 @@ theorem evalDist_realCipherObserve_eq (sp : ℕ) (msg : BitVec sp)
 /-- A concrete closed process whose state space is `BitVec sp` and
 whose single step is a `.done` move that transitions to the fixed
 message `msg`. Plays the role of an environment that has pre-committed
-to a plaintext choice. Different `msg` values give structurally
-distinct closed processes, witnessed by `msgClosed_ne` below. -/
+to a plaintext choice. -/
 noncomputable def msgClosed (sp : ℕ) (msg : BitVec sp) :
     T.Closed where
   Proc := BitVec sp
@@ -290,10 +273,9 @@ noncomputable def msgClosed (sp : ℕ) (msg : BitVec sp) :
       next := fun _ => msg }
   stepSampler := fun _ => ⟨⟩
 
-/-- Distinct plaintexts give distinct closed processes. The two
-processes share the state type `BitVec sp` and the `.done` spec; they
-differ only in what `step.next` returns on the unit transcript, which
-gives a direct way to separate them. -/
+/-- Distinct plaintexts give distinct closed processes: the two
+processes share the state type `BitVec sp` and the `.done` spec and
+differ only in what `step.next` returns on the unit transcript. -/
 theorem msgClosed_ne (sp : ℕ) {msg₀ msg₁ : BitVec sp} (h : msg₀ ≠ msg₁) :
     msgClosed sp msg₀ ≠ msgClosed sp msg₁ := by
   intro heq
@@ -322,9 +304,9 @@ via `readMsg`, then run `realCipherObserve` against the fixed
 distinguisher predicate `P`. Models the environment's view under
 `π_OTP`.
 
-The `run` field is genuinely a function of its closed-system argument
-through `readMsg`. OTP privacy is what collapses the resulting
-`SPMF Unit` denotations into the plaintext-independent ideal one. -/
+The `run` field depends on the closed-system argument through
+`readMsg`; OTP privacy collapses the resulting `SPMF Unit`
+denotations into the plaintext-independent ideal one. -/
 noncomputable def realSmcSemantics (sp : ℕ)
     (readMsg : MsgReader sp) (P : BitVec sp → Bool) :
     Semantics T where
@@ -410,9 +392,9 @@ theorem compEmulates_realSmcSemantics (sp : ℕ)
 plaintexts `msg₀`, `msg₁` and any distinguisher predicate `P`, the
 closed systems `msgClosed sp msg₀` and `msgClosed sp msg₁` are
 indistinguishable under the real SMC semantics. When `msg₀ ≠ msg₁`
-the two closed systems are structurally distinct (`msgClosed_ne`), so
-the conclusion is a genuine indistinguishability obtained from OTP
-privacy, not a collapse of the framework. -/
+the two closed systems are themselves distinct (`msgClosed_ne`), so
+the indistinguishability comes from OTP privacy rather than from
+`W_real = W_ideal`. -/
 theorem compEmulates_msgClosed (sp : ℕ) (readMsg : MsgReader sp)
     (P : BitVec sp → Bool) (msg₀ msg₁ : BitVec sp) :
     CompEmulates (realSmcSemantics sp readMsg P) 0
@@ -420,24 +402,12 @@ theorem compEmulates_msgClosed (sp : ℕ) (readMsg : MsgReader sp)
   compEmulates_realSmcSemantics sp readMsg P
     (msgClosed sp msg₀) (msgClosed sp msg₁)
 
-/-- Sanity check: when `msg₀ ≠ msg₁`, the two `msgClosed` inputs on the
-left and right of `compEmulates_msgClosed` are not definitionally
-equal, so the `CompEmulates` conclusion is a real
-indistinguishability between two distinct closed systems. -/
-example (sp : ℕ) (msg₀ msg₁ : BitVec sp) (h : msg₀ ≠ msg₁) :
-    msgClosed sp msg₀ ≠ msgClosed sp msg₁ :=
-  msgClosed_ne sp h
-
-/-- **Security-level non-vacuity witness.** There exists a plaintext
-reader under which the real SMC semantics' `run` field produces
-literally distinct `OptionT ProbComp Unit` computations on
+/-- There is a plaintext reader under which `realSmcSemantics.run`
+produces distinct `OptionT ProbComp Unit` computations on
 `msgClosed sp msg₀` and `msgClosed sp msg₁`, namely
 `realCipherObserve sp msg₀ P` and `realCipherObserve sp msg₁ P`.
-
-This confirms that the `CompEmulates 0` conclusion of
-`compEmulates_msgClosed` is not a syntactic collapse: the two `run`
-values literally differ, and OTP privacy (`evalDist_realCipherObserve_eq`)
-is what equates their `SPMF Unit` denotations. -/
+OTP privacy (`evalDist_realCipherObserve_eq`) is what equates their
+`SPMF Unit` denotations despite the distinct `run` values. -/
 theorem realSmcSemantics_run_distinct
     (sp : ℕ) (P : BitVec sp → Bool) (msg₀ msg₁ : BitVec sp)
     (h : msg₀ ≠ msg₁) :
@@ -580,12 +550,12 @@ noncomputable def realOtp (sp : ℕ) (msg : BitVec sp) :
 
 State space `Unit`. Every step samples a uniform ciphertext
 `c ← BitVec sp` and emits `c` on the output port via `idealEmit`.
-The plaintext input is never consulted: the simulator is structural,
-realised by the emission directly.
+The plaintext input is never consulted: the simulator is realised
+directly by the emission.
 
-Distributional equivalence with `realOtp` is **not** structural, it
-is a theorem: OTP privacy (`evalDist_realCipherObserve_eq`) collapses
-the two bundled `SPMF Unit` observations. -/
+Distributional equivalence with `realOtp` is a theorem, not a
+structural identity: OTP privacy (`evalDist_realCipherObserve_eq`)
+collapses the two bundled `SPMF Unit` observations. -/
 noncomputable def idealOtp (sp : ℕ) : T.Obj (Δ_otp sp) where
   Proc := Unit
   step := fun _ =>
@@ -596,15 +566,11 @@ noncomputable def idealOtp (sp : ℕ) : T.Obj (Δ_otp sp) where
 
 /-! ### Structural distinctness -/
 
-/-- **Structural distinctness.** For any nonzero plaintext `msg`, the
-real and ideal OTP open processes at `Δ_otp sp` are not definitionally
-equal: they agree on `Proc`, `step.spec`, `step.next`, and
-`stepSampler`, but their `step.semantics`'s boundary emissions
-disagree on the all-zero key (`0#sp ^^^ msg = msg ≠ 0#sp`).
-
-This confirms that `compEmulates_realOtp` below is a genuine
-indistinguishability between two distinct open-world objects, not a
-syntactic collapse. -/
+/-- For any nonzero plaintext `msg`, the real and ideal OTP open
+processes at `Δ_otp sp` are not equal: they agree on `Proc`,
+`step.spec`, `step.next`, and `stepSampler`, but their
+`step.semantics`'s boundary emissions disagree on the all-zero key
+(`0#sp ^^^ msg = msg ≠ 0#sp`). -/
 theorem realOtp_ne_idealOtp (sp : ℕ) {msg : BitVec sp}
     (hmsg : msg ≠ 0#sp) :
     realOtp sp msg ≠ idealOtp sp := by
