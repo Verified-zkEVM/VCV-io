@@ -1214,4 +1214,186 @@ theorem tvDist_simulateQ_le_qeps_plus_probEvent_output_bad
 
 end IdenticalUntilBadEpsilon
 
+/-! ### Selective ε-perturbed identical-until-bad
+
+A refinement of `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad` where the per-step ε
+bound applies only to a designated subset `S` of queries (the "costly" or "perturbed"
+queries), and the impls are pointwise equal on the complement (the "free" queries). The
+bound counts only the S-queries, giving a tight `qS · ε` instead of `q_total · ε`.
+
+This is essential for cryptographic reductions where, e.g., signing-oracle queries are
+ε-close to a simulator (HVZK guarantee) but uniform / RO queries are exactly equal (both
+sides forward through the same RO cache). Direct application of the uniform-ε lemma would
+give `(qS + qH) · ε`, but for tight bounds we want `qS · ε`. -/
+
+section IdenticalUntilBadEpsilonSelective
+
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {α : Type} {σ : Type}
+
+/-- The `query_bind` step for a "free" query (impls pointwise equal on the no-bad branch).
+The budget `qS` is preserved (no decrement), since a free query doesn't count toward the
+S-query bound. -/
+private theorem tvDist_simulateQ_run_free_query_bind_le
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (t : spec.Domain) (h_step_eq : ∀ (p : σ × Bool), (impl₁ t).run p = (impl₂ t).run p)
+    (cont : spec.Range t → OracleComp spec α) {qS : ℕ}
+    (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
+      tvDist ((simulateQ impl₁ (cont u)).run p')
+          ((simulateQ impl₂ (cont u)).run p')
+        ≤ ↑qS * ε + Pr[ fun w : α × σ × Bool => w.2.2 = true |
+            (simulateQ impl₁ (cont u)).run p'].toReal)
+    (s : σ) :
+    tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false))
+      ≤ ↑qS * ε + Pr[ fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ (query t >>= cont)).run (s, false)].toReal := by
+  set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
+  have hmy_eq : (impl₂ t).run (s, false) = mx := (h_step_eq (s, false)).symm
+  set f₁ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
+  set f₂ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
+  have hsim₁_eq : (simulateQ impl₁ (query t >>= cont)).run (s, false) = mx >>= f₁ := by
+    simp [hmx_def, hf₁_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have hsim₂_eq : (simulateQ impl₂ (query t >>= cont)).run (s, false) = mx >>= f₂ := by
+    simp [hmy_eq, hf₂_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have h_bd : tvDist (mx >>= f₁) (mx >>= f₂)
+      ≤ ∑' z : spec.Range t × σ × Bool, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
+    tvDist_bind_left_le _ _ _
+  have h_summand_le : ∀ z : spec.Range t × σ × Bool,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤
+        Pr[= z | mx].toReal * (↑qS * ε + Pr[fun w : α × σ × Bool => w.2.2 = true |
+            f₁ z].toReal) := fun z => by
+    apply mul_le_mul_of_nonneg_left _ ENNReal.toReal_nonneg
+    simpa [hf₁_def, hf₂_def] using ih z.1 z.2
+  have h_qSε_nonneg : (0 : ℝ) ≤ ↑qS * ε := mul_nonneg (Nat.cast_nonneg _) hε
+  rw [hsim₁_eq, hsim₂_eq]
+  exact le_trans h_bd
+    (tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
+      (mx := mx) (f₁ := f₁) (f₂ := f₂) (c := ↑qS * ε) h_qSε_nonneg h_summand_le)
+
+/-- Auxiliary inductive lemma for the selective ε-perturbed bound. Inducts on `oa` and
+case-splits each query on whether it's in the costly set `S` (existing per-step argument
+with budget decrement) or free (`tvDist_simulateQ_run_free_query_bind_le` with budget
+preserved). -/
+private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (S : ι → Prop) [DecidablePred S]
+    (h_step_tv_S : ∀ (t : ι), S t → ∀ (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (h_step_eq_nS : ∀ (t : ι), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (p : σ × Bool) :
+    tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p)
+      ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run p].toReal := by
+  -- Construct a global per-step bound `tvDist ≤ ε` that holds for ALL queries:
+  -- for S-queries by `h_step_tv_S`, for non-S-queries since the impls are pointwise equal.
+  have h_step_tv_global : ∀ (t' : ι) (s' : σ),
+      tvDist ((impl₁ t').run (s', false)) ((impl₂ t').run (s', false)) ≤ ε := by
+    intro t' s'
+    by_cases hSt' : S t'
+    · exact h_step_tv_S t' hSt' s'
+    · rw [h_step_eq_nS t' hSt' (s', false), tvDist_self]; exact hε
+  induction oa using OracleComp.inductionOn generalizing qS p with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, tvDist_self]
+      exact add_nonneg (mul_nonneg (Nat.cast_nonneg _) hε) ENNReal.toReal_nonneg
+  | query_bind t cont ih =>
+      rcases p with ⟨s, b⟩
+      cases b with
+      | true =>
+          have h_bad₁ : Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ (query t >>= cont)).run (s, true)] = 1 :=
+            probEvent_simulateQ_run_bad_eq_one_of_bad impl₁ h_mono₁
+              (query t >>= cont) (s, true) rfl
+          have h_tv_le_one :
+              tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, true))
+                  ((simulateQ impl₂ (query t >>= cont)).run (s, true)) ≤ 1 :=
+            tvDist_le_one _ _
+          have h_target_ge_one :
+              (1 : ℝ) ≤ ↑qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+                (simulateQ impl₁ (query t >>= cont)).run (s, true)].toReal := by
+            rw [h_bad₁]
+            simp only [ENNReal.toReal_one]
+            have hqε : (0 : ℝ) ≤ ↑qS * ε := mul_nonneg (Nat.cast_nonneg _) hε
+            linarith
+          exact le_trans h_tv_le_one h_target_ge_one
+      | false =>
+          rw [isQueryBound_query_bind_iff] at h_qb
+          obtain ⟨h_can, h_cont⟩ := h_qb
+          by_cases hSt : S t
+          · -- Costly query: use the existing helper with budget `qS`, decrementing to `qS - 1`.
+            simp only [hSt, if_true] at h_can h_cont
+            have hqS_pos : 0 < qS := h_can
+            exact tvDist_simulateQ_run_query_bind_le impl₁ impl₂ hε h_step_tv_global
+              t cont hqS_pos
+              (fun u p' => ih u (h_cont u) p') s
+          · -- Free query: impls equal here; preserve the `qS` budget through the recursion.
+            simp only [hSt, if_false] at h_can h_cont
+            exact tvDist_simulateQ_run_free_query_bind_le impl₁ impl₂ hε t
+              (h_step_eq_nS t hSt) cont
+              (fun u p' => ih u (h_cont u) p') s
+
+/-- **Selective ε-perturbed identical-until-bad with output bad flag.**
+
+Like `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`, but the per-step ε bound
+applies only to queries `t` satisfying a designated predicate `S` (the "costly" queries),
+and the impls are pointwise equal on `¬ S` (the "free" queries). The bound counts only
+the S-queries (via `IsQueryBound` parameterized to decrement only on S), giving the tight
+`qS · ε` instead of the trivial `q_total · ε` from the uniform-ε lemma.
+
+The intended use is for cryptographic reductions: e.g., for Fiat-Shamir signing-oracle
+swaps, the "costly" queries are signing queries (HVZK gives per-query ε bound) and the
+"free" queries are the underlying spec queries (uniform sampling and RO caching, where
+both sides forward through the same `baseSim`). -/
+theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (S : ι → Prop) [DecidablePred S]
+    (h_step_tv_S : ∀ (t : ι), S t → ∀ (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (h_step_eq_nS : ∀ (t : ι), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (s₀ : σ) :
+    tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+        ((simulateQ impl₂ oa).run' (s₀, false))
+      ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run (s₀, false)].toReal := by
+  have h_joint :
+      tvDist ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false))
+        ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+            (simulateQ impl₁ oa).run (s₀, false)].toReal :=
+    tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
+      impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
+  have h_map :
+      tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+          ((simulateQ impl₂ oa).run' (s₀, false))
+        ≤ tvDist ((simulateQ impl₁ oa).run (s₀, false))
+            ((simulateQ impl₂ oa).run (s₀, false)) := by
+    simpa [StateT.run'] using
+      (tvDist_map_le (m := OracleComp spec') (α := α × σ × Bool) (β := α) Prod.fst
+        ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false)))
+  exact le_trans h_map h_joint
+
+end IdenticalUntilBadEpsilonSelective
+
 end OracleComp.ProgramLogic.Relational
