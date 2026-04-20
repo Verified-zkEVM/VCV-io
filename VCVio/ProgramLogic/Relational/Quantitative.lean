@@ -171,11 +171,8 @@ theorem relTriple'_iff_couplingPost
                 exact probEvent_map (mx := evalDist oa) (f := packA) (q := fun a : A => a.1 = x)
           _ = Pr[ fun y : α => (packA y).1 = x | evalDist oa] := rfl
           _ = Pr[ fun y : α => y = x | evalDist oa] := by
-                apply probEvent_ext
-                intro y hy
-                have hyfin : y ∈ finSupport oa :=
-                  mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy
-                simp [packA, hyfin]
+                refine probEvent_ext fun y hy => ?_
+                simp [packA, mem_finSupport_of_mem_support_evalDist (oa := oa) (x := y) hy]
           _ = Pr[= x | evalDist oa] := by simp
       have hvalB : Subtype.val <$> pb = evalDist ob := by
         apply SPMF.ext
@@ -190,11 +187,8 @@ theorem relTriple'_iff_couplingPost
                 exact probEvent_map (mx := evalDist ob) (f := packB) (q := fun b : B => b.1 = y)
           _ = Pr[ fun x : β => (packB x).1 = y | evalDist ob] := rfl
           _ = Pr[ fun x : β => x = y | evalDist ob] := by
-                apply probEvent_ext
-                intro x hx
-                have hxfin : x ∈ finSupport ob :=
-                  mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx
-                simp [packB, hxfin]
+                refine probEvent_ext fun x hx => ?_
+                simp [packB, mem_finSupport_of_mem_support_evalDist (oa := ob) (x := x) hx]
           _ = Pr[= y | evalDist ob] := by simp
       have hsub_nonempty : Nonempty (SPMF.Coupling pa pb) := by
         rcases hne with ⟨c₀⟩
@@ -455,22 +449,8 @@ private lemma probOutput_diag_le_min_marginals
     (c : SPMF.Coupling (evalDist oa) (evalDist ob)) (a : α) :
     Pr[= (a, a) | c.1] ≤ min (Pr[= a | evalDist oa]) (Pr[= a | evalDist ob]) := by
   refine le_min ?_ ?_
-  · calc Pr[= (a, a) | c.1]
-        = Pr[ (· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
-      _ ≤ Pr[ (· = a) ∘ Prod.fst | c.1] :=
-          probEvent_mono fun z _ h => h ▸ rfl
-      _ = Pr[ (· = a) | Prod.fst <$> c.1] :=
-          (probEvent_map c.1 Prod.fst (· = a)).symm
-      _ = Pr[= a | evalDist oa] := by
-          rw [probEvent_eq_eq_probOutput, c.2.map_fst]
-  · calc Pr[= (a, a) | c.1]
-        = Pr[ (· = (a, a)) | c.1] := (probEvent_eq_eq_probOutput c.1 (a, a)).symm
-      _ ≤ Pr[ (· = a) ∘ Prod.snd | c.1] :=
-          probEvent_mono fun z _ h => h ▸ rfl
-      _ = Pr[ (· = a) | Prod.snd <$> c.1] :=
-          (probEvent_map c.1 Prod.snd (· = a)).symm
-      _ = Pr[= a | evalDist ob] := by
-          rw [probEvent_eq_eq_probOutput, c.2.map_snd]
+  · have := c.2.map_fst; grind [probEvent_mono]
+  · have := c.2.map_snd; grind [probEvent_mono]
 
 private lemma eRelWP_indicator_eqRel_le
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α} :

@@ -84,6 +84,7 @@ lemma probOutput_map_eq_tsum_subtype_ite [DecidableEq β] (y : β) :
   simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum_subtype, Function.comp_apply,
     probOutput_pure, mul_ite, mul_one, mul_zero]
 
+@[grind =]
 lemma probOutput_map_eq_tsum_ite [DecidableEq β] (y : β) :
     Pr[= y | f <$> mx] = ∑' x : α, if y = f x then Pr[= x | mx] else 0 := by
   simp only [map_eq_bind_pure_comp, probOutput_bind_eq_tsum, Function.comp_apply, probOutput_pure,

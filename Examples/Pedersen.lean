@@ -175,24 +175,14 @@ theorem binding_le_dlog (hg : Function.Bijective (· • g : F → G))
         else 0) = x
   have hbinding :
       Pr[= true | (pedersenCommit g).bindingExp binder] = Pr[ bindingWin | base] := by
-    rw [← probEvent_eq_eq_probOutput]
     rw [show (pedersenCommit g).bindingExp binder = (fun z => decide (bindingWin z)) <$> base by
       simp [CommitmentScheme.bindingExp, pedersenCommit, base, bindingWin, Bool.and_assoc]]
-    rw [probEvent_map]
-    refine probEvent_ext ?_
-    intro z hz
-    rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
-    simp [bindingWin, Bool.and_eq_true, decide_eq_true_eq]
+    grind
   have hdlog :
       Pr[= true | dlogExp g (dlogReduction binder)] = Pr[ dlogWin | base] := by
-    rw [← probEvent_eq_eq_probOutput]
     rw [show dlogExp g (dlogReduction binder) = (fun z => decide (dlogWin z)) <$> base by
       simp [DiffieHellman.dlogExp, dlogReduction, base, dlogWin]]
-    rw [probEvent_map]
-    refine probEvent_ext ?_
-    intro z hz
-    rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩
-    simp [dlogWin, decide_eq_true_eq]
+    grind
   rw [hbinding, hdlog]
   exact OracleComp.ProgramLogic.probEvent_mono base (fun z hwin => by
     rcases z with ⟨x, ⟨c, m₁, d₁, m₂, d₂⟩⟩

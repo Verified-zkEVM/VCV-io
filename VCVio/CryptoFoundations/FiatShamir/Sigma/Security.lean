@@ -388,24 +388,20 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
         rw [evalDist_uniformSample, evalDist_query]; rfl
       exact heq ▸ rfl
 
-/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
-private lemma probEvent_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
-    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
-  simp only [probEvent_eq_tsum_indicator]
-  refine tsum_congr fun x => ?_
-  unfold Set.indicator
-  split_ifs with hpx
-  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
-  · rfl
-
 /-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
 private lemma probOutput_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
     Pr[= x | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
       (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+
+/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probEvent_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
+    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  simp_rw [probEvent_eq_tsum_indicator, Set.indicator,
+    probOutput_simulateQ_unifChalImpl]
 
 end evalDistBridge
 section jensenIntegration
@@ -1014,13 +1010,9 @@ theorem euf_nma_bound
         ∑' pkw : Stmt × Wit, Pr[= pkw | hr.gen] * acc pkw.1 := by
     change Pr[= true | Fork.exp σ hr M nmaAdv qH] = _
     unfold Fork.exp
-    rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
-      probEvent_bind_eq_tsum]
-    refine tsum_congr fun pkw => ?_
-    rw [probOutput_liftComp]
-    congr 1
-    rcases pkw with ⟨pk, sk⟩
-    simp only [bind_pure_comp, probEvent_map, Function.comp_def, acc]
+    simp only [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
+      probEvent_bind_eq_tsum, bind_pure_comp, probEvent_map, Function.comp_def,
+      probEvent_liftComp, acc]
   -- ── Step (b): rewrite `Pr[= true | hardRelationExp]` as a keygen-marginalized sum of
   -- per-pk relation-recovery probabilities.
   have hRHS_eq_tsum :
@@ -1029,13 +1021,8 @@ theorem euf_nma_bound
           Pr[ fun w : Wit => rel pkw.1 w = true |
             eufNmaReduction σ hr M nmaAdv qH pkw.1] := by
     unfold hardRelationExp
-    rw [← probEvent_eq_eq_probOutput]
-    simp only [bind_pure_comp, probEvent_bind_eq_tsum]
-    refine tsum_congr fun pkw => ?_
-    rcases pkw with ⟨pk, sk⟩
-    congr 1
-    rw [probEvent_map]
-    rfl
+    simp only [← probEvent_eq_eq_probOutput, bind_pure_comp, probEvent_bind_eq_tsum,
+      probEvent_map, Function.comp_def]
   -- ── Step (c): per-pk forking bound via `Fork.replayForkingBound` applied with the
   -- strengthened support invariant `forkSupportInvariant`.
   have hPerPk : ∀ pk : Stmt,
