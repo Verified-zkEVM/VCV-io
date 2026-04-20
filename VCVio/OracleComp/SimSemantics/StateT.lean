@@ -40,6 +40,45 @@ def piStateT {τ : Type} [DecidableEq τ] {ι : τ → Type _}
     QueryImpl (OracleSpec.sigma spec) (StateT ((t : τ) → σ t) m)
   | ⟨t, q⟩ => StateT.mk fun s => Prod.map id (Function.update s t) <$> (impl t q).run (s t)
 
+/-- Lift a stateful query implementation to a `(state × Bool)`-stateful version that threads
+the boolean (bad) flag unchanged. The output value and updated state come from the
+underlying `impl`; the second `Bool` component is preserved verbatim across each query. -/
+def withBadFlag {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m)) :
+    QueryImpl spec (StateT (σ × Bool) m) := fun t =>
+  StateT.mk fun | (s, b) => Prod.map id (·, b) <$> (impl t).run s
+
+/-- Lift a stateful query implementation to a `(state × Bool)`-stateful version that OR-updates
+the boolean (bad) flag with a predicate `f` evaluated on the pre-state and produced output.
+The flag is monotone: if it was already `true`, it stays `true`. -/
+def withBadUpdate {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m))
+    (f : (t : spec.Domain) → σ → spec.Range t → Bool) :
+    QueryImpl spec (StateT (σ × Bool) m) := fun t =>
+  StateT.mk fun | (s, b) => (fun (vs : spec.Range t × σ) => (vs.1, vs.2, b || f t s vs.1)) <$>
+    (impl t).run s
+
+/-- Run-shape of `withBadFlag`: the lifted implementation maps the underlying run by tagging
+each `(value, state)` pair with the unchanged bad flag `b`. -/
+@[simp] lemma withBadFlag_apply_run {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m)) (t : spec.Domain) (s : σ) (b : Bool) :
+    (impl.withBadFlag t).run (s, b) =
+      (fun (vs : spec.Range t × σ) => (vs.1, vs.2, b)) <$> (impl t).run s := rfl
+
+/-- Run-shape of `withBadUpdate`: the lifted implementation maps the underlying run by
+appending the OR-updated bad flag `b || f t s vs.1`. -/
+@[simp] lemma withBadUpdate_apply_run {ι : Type _} {spec : OracleSpec ι}
+    {m : Type _ → Type _} [Functor m] {σ : Type _}
+    (impl : QueryImpl spec (StateT σ m))
+    (f : (t : spec.Domain) → σ → spec.Range t → Bool)
+    (t : spec.Domain) (s : σ) (b : Bool) :
+    (impl.withBadUpdate f t).run (s, b) =
+      (fun (vs : spec.Range t × σ) =>
+        (vs.1, vs.2, b || f t s vs.1)) <$> (impl t).run s := rfl
+
 end QueryImpl
 
 namespace OracleComp
