@@ -559,13 +559,24 @@ theorem euf_cma_to_nma
         case h_mono₁ =>
           -- Bad flag monotonicity in `_simImpl pk`: once `bad = true`, it stays `true`.
           -- `baseSimBad` threads `bad` unchanged; `sigSimBad` sets `bad' := bad || …`.
-          -- Both impls preserve `bad = true` since they only set `bad' := bad || _`
-          -- (sigSimBad) or `bad' := bad` (baseSimBad).
-          -- Semantically clear from the definitions of `baseSimBad` and `sigSimBad`,
-          -- but the syntactic proof requires unfolding the chained `let`-bindings
-          -- and `StateT` plumbing.  Tracked under sub-claim (B) bookkeeping.
           intro t p hp z hz
-          sorry
+          obtain ⟨cache, bad⟩ := p
+          dsimp only at hp
+          subst hp
+          cases t with
+          | inl t' =>
+              -- Semantically clear: baseSimBad sets new state to `(cache', bad)` (threads
+              -- the bad flag unchanged), so the second component of every output is the
+              -- input bad = true.  The `simp` reduction fails because `baseSimBad` is a
+              -- local `let` binding (not a `def`) and Lean does not auto-unfold it; the
+              -- proof requires either pulling `baseSimBad` out as a top-level definition
+              -- or threading explicit `change`/`show` rewrites through the StateT/OracleComp
+              -- plumbing.  Tracked under sub-claim (B) bookkeeping.
+              sorry
+          | inr msg =>
+              -- Same caveat as above: sigSimBad sets state to `(cache', bad || _)`; with
+              -- bad = true, the new flag is `true || _ = true`.
+              sorry
         case h_qb =>
           -- Project `signHashQueryBound (adv.main pk) qS qH` (a `(qS, qH)`-paired budget) onto
           -- the `qS` coordinate via `IsQueryBound.proj` with `proj := Prod.fst`. The sign queries
