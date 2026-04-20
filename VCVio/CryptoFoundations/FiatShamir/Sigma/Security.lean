@@ -565,17 +565,14 @@ theorem euf_cma_to_nma
           subst hp
           cases t with
           | inl t' =>
-              -- Semantically clear: baseSimBad sets new state to `(cache', bad)` (threads
-              -- the bad flag unchanged), so the second component of every output is the
-              -- input bad = true.  The `simp` reduction fails because `baseSimBad` is a
-              -- local `let` binding (not a `def`) and Lean does not auto-unfold it; the
-              -- proof requires either pulling `baseSimBad` out as a top-level definition
-              -- or threading explicit `change`/`show` rewrites through the StateT/OracleComp
-              -- plumbing.  Tracked under sub-claim (B) bookkeeping.
+              -- baseSimBad threads `bad` unchanged via `set (cache', bad)`. With
+              -- initial `bad = true`, every output state has `bad = true`.  Tracked
+              -- under sub-claim (B) bookkeeping (requires full StateT unfolding via
+              -- `dsimp only [_simImpl, baseSimBad, sigSimBad]` + `mem_support_bind_iff`
+              -- chain; `simp_all` times out, manual `rcases` chain leaves sub-goals).
               sorry
           | inr msg =>
-              -- Same caveat as above: sigSimBad sets state to `(cache', bad || _)`; with
-              -- bad = true, the new flag is `true || _ = true`.
+              -- sigSimBad sets `bad' := bad || _`. With `bad = true`, `bad' = true`.
               sorry
         case h_qb =>
           -- Project `signHashQueryBound (adv.main pk) qS qH` (a `(qS, qH)`-paired budget) onto
