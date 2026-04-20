@@ -289,17 +289,19 @@ private abbrev Closed (Party : Type u) (m : Type → Type)
 /--
 Construct an async `Semantics` for the open-process theory.
 
-Threads an env-action channel and an env scheduler in addition to the
-process sampler that `processSemantics` already takes. The bundled
-`SPMFSemantics m` plays the same role as in `processSemantics` and
-supports the same instantiations: coin-flip-only protocols via
-`processSemanticsAsyncProbComp`, shared-oracle protocols via an
-`OracleComp`-monad `SPMFSemantics` built with `simulateQ'`, and
-observation-style semantics over `OptionT ProbComp`.
+Threads an env-action channel and an env scheduler. The per-step
+process sampler is obtained directly from the closed process's
+`stepSampler` (keyed by the underlying process state, ignoring any
+async env state). The bundled `SPMFSemantics m` plays the same role as
+in `processSemantics` and supports the same instantiations:
+coin-flip-only protocols via `processSemanticsAsyncProbComp`,
+shared-oracle protocols via an `OracleComp`-monad `SPMFSemantics` built
+with `simulateQ'`, and observation-style semantics over
+`OptionT ProbComp`.
 
-The `init`, `procScheduler`, and `envScheduler` arguments are
-quantified over the closed process `p : Closed Party`, matching the
-shape of the synchronous `processSemantics`.
+The `init` and `envScheduler` arguments are quantified over the closed
+process `p : Closed Party`, matching the shape of the synchronous
+`processSemantics`.
 -/
 noncomputable def processSemanticsAsync
     (Party : Type u)
@@ -310,9 +312,6 @@ noncomputable def processSemanticsAsync
     (envAction : EnvAction Event State)
     (initEnvState : State)
     (init : ∀ p : Closed Party m schedulerSampler, p.Proc)
-    (procScheduler : ∀ p : Closed Party m schedulerSampler,
-      ProcessScheduler m p.Proc State
-        (fun st => (p.step st.proc).spec))
     (envScheduler : ∀ p : Closed Party m schedulerSampler,
       EnvScheduler m p.Proc State Event)
     (fuel : ℕ)
@@ -326,7 +325,8 @@ noncomputable def processSemanticsAsync
     let init0 : AsyncRuntimeState process.Proc State :=
       ⟨init process, initEnvState⟩
     let (final, trace) ← runStepsAsync process.toProcess envAction
-      (procScheduler process) (envScheduler process) fuel init0
+      (fun st => process.stepSampler st.proc) (envScheduler process)
+      fuel init0
     observe process final.proc final.envState trace
 
 /--
@@ -341,9 +341,6 @@ noncomputable def processSemanticsAsyncProbComp
     (envAction : EnvAction Event State)
     (initEnvState : State)
     (init : ∀ p : Closed Party ProbComp schedulerSampler, p.Proc)
-    (procScheduler : ∀ p : Closed Party ProbComp schedulerSampler,
-      ProcessScheduler ProbComp p.Proc State
-        (fun st => (p.step st.proc).spec))
     (envScheduler : ∀ p : Closed Party ProbComp schedulerSampler,
       EnvScheduler ProbComp p.Proc State Event)
     (fuel : ℕ)
@@ -353,7 +350,7 @@ noncomputable def processSemanticsAsyncProbComp
   processSemanticsAsync Party schedulerSampler
     (SPMFSemantics.ofHasEvalSPMF ProbComp)
     envAction initEnvState
-    init procScheduler envScheduler fuel observe
+    init envScheduler fuel observe
 
 /-! ## Sync recovery -/
 
@@ -376,15 +373,12 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ p : Closed Party m schedulerSampler, p.Proc)
-    (sampler : ∀ (p : Closed Party m schedulerSampler) (s : p.Proc),
-      Spec.Sampler m (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party m schedulerSampler, p.Proc → m Unit) :
-    processSemantics Party schedulerSampler sem init sampler fuel observe =
+    processSemantics Party schedulerSampler sem init fuel observe =
       processSemanticsAsync Party schedulerSampler sem
         (EnvAction.empty Unit) ()
         init
-        (fun p st => sampler p st.proc)
         (fun p => trivialEnvScheduler (m := m)
           (Proc := p.Proc) Unit Empty)
         fuel
@@ -393,13 +387,13 @@ theorem processSemantics_eq_processSemanticsAsync_trivial
   congr 1
   funext process
   change (do
-      let finalState ← ProcessOver.runSteps process.toProcess (sampler process)
+      let finalState ← ProcessOver.runSteps process.toProcess process.stepSampler
         fuel (init process)
       observe process finalState) =
     (do
       let (final, _trace) ← Concurrent.runStepsAsync (m := m) process.toProcess
         (EnvAction.empty Unit)
-        (fun st => sampler process st.proc)
+        (fun st => process.stepSampler st.proc)
         (trivialEnvScheduler (m := m) Unit Empty)
         fuel ⟨init process, ()⟩
       observe process final.proc)
@@ -421,23 +415,20 @@ theorem processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
     (Party : Type u)
     (schedulerSampler : ProbComp (ULift Bool))
     (init : ∀ p : Closed Party ProbComp schedulerSampler, p.Proc)
-    (sampler : ∀ (p : Closed Party ProbComp schedulerSampler) (s : p.Proc),
-      Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ p : Closed Party ProbComp schedulerSampler,
       p.Proc → ProbComp Unit) :
     processSemanticsProbComp Party schedulerSampler
-        init sampler fuel observe =
+        init fuel observe =
       processSemanticsAsyncProbComp Party schedulerSampler
         (EnvAction.empty Unit) ()
         init
-        (fun p st => sampler p st.proc)
         (fun p => trivialEnvScheduler (m := ProbComp)
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s) := by
   unfold processSemanticsProbComp processSemanticsAsyncProbComp
-  exact processSemantics_eq_processSemanticsAsync_trivial _ _ _ _ _ _ _
+  exact processSemantics_eq_processSemanticsAsync_trivial _ _ _ _ _ _
 
 end UC
 end Interaction

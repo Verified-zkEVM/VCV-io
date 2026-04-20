@@ -175,10 +175,11 @@ private abbrev Closed (Party : Type u) (m : Type → Type)
 Construct a `Semantics` for the open-process theory, parameterized by a
 surface execution monad `m` together with a bundled `SPMFSemantics m`.
 
-The execution runs entirely in `m`: the sampler produces moves,
-multi-step iteration threads them, and the observer extracts the final
-judgment as a `m Unit` value. The bundled `sem` then collapses the
-`m Unit` game into a `SPMF Unit` via
+The execution runs entirely in `m`: per-step samplers come directly from
+the `OpenProcess`'s `stepSampler` field (no external `sampler` argument
+is threaded through the runtime), multi-step iteration threads them, and
+the observer extracts the final judgment as a `m Unit` value. The
+bundled `sem` then collapses the `m Unit` game into a `SPMF Unit` via
 `Semantics.evalDist`.
 
 See `processSemanticsProbComp` for the coin-flip-only specialization
@@ -189,8 +190,6 @@ noncomputable def processSemantics (Party : Type u)
     (schedulerSampler : m (ULift Bool))
     (sem : SPMFSemantics.{0, 0, 0} m)
     (init : ∀ (p : Closed Party m schedulerSampler), p.Proc)
-    (sampler : ∀ (p : Closed Party m schedulerSampler) (s : p.Proc),
-      Spec.Sampler m (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ (p : Closed Party m schedulerSampler), p.Proc → m Unit) :
     Semantics (openTheory.{u, 0, 0, 0} Party m schedulerSampler) where
@@ -199,7 +198,7 @@ noncomputable def processSemantics (Party : Type u)
   sem := sem
   run process := do
     let finalState ←
-      process.toProcess.runSteps (sampler process) fuel (init process)
+      process.toProcess.runSteps process.stepSampler fuel (init process)
     observe process finalState
 
 /--
@@ -212,14 +211,12 @@ shared oracles and no deliberate failure mass.
 noncomputable def processSemanticsProbComp (Party : Type u)
     (schedulerSampler : ProbComp (ULift Bool))
     (init : ∀ (p : Closed Party ProbComp schedulerSampler), p.Proc)
-    (sampler : ∀ (p : Closed Party ProbComp schedulerSampler) (s : p.Proc),
-      Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ (p : Closed Party ProbComp schedulerSampler),
       p.Proc → ProbComp Unit) :
     Semantics (openTheory.{u, 0, 0, 0} Party ProbComp schedulerSampler) :=
   processSemantics Party schedulerSampler (SPMFSemantics.ofHasEvalSPMF ProbComp)
-    init sampler fuel observe
+    init fuel observe
 
 /--
 `processSemanticsOracle` constructs semantics for protocols with shared
@@ -244,9 +241,6 @@ noncomputable def processSemanticsOracle (Party : Type u)
     (initOracle : σ)
     (init : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
       p.Proc)
-    (sampler : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler)
-      (s : p.Proc),
-      Spec.Sampler (OracleComp superSpec) (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ (p : Closed Party (OracleComp superSpec) schedulerSampler),
       p.Proc → OracleComp superSpec Unit) :
@@ -258,7 +252,7 @@ noncomputable def processSemanticsOracle (Party : Type u)
       interpret := simulateQ' impl
       observe := fun {_} mx => HasEvalSPMF.toSPMF (mx.run' initOracle) }
   processSemantics Party (m := OracleComp superSpec) schedulerSampler oracleSem
-    init sampler fuel observe
+    init fuel observe
 
 end UC
 end Interaction

@@ -74,26 +74,21 @@ example
     (init : ∀ p :
       (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc)
-    (sampler : ∀ (p :
-      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed)
-      (s : p.Proc),
-      Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ p :
       (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc → ProbComp Unit) :
     processSemanticsProbComp Party trivialSchedulerSampler
-        init sampler fuel observe =
+        init fuel observe =
       processSemanticsAsyncProbComp Party trivialSchedulerSampler
         (EnvAction.empty Unit) ()
         init
-        (fun p st => sampler p st.proc)
         (fun p => trivialEnvScheduler (m := ProbComp)
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s) :=
   processSemanticsProbComp_eq_processSemanticsAsyncProbComp_trivial
-    Party trivialSchedulerSampler init sampler fuel observe
+    Party trivialSchedulerSampler init fuel observe
 
 /-! ## Sync recovery pointwise on the trivial closed process -/
 
@@ -112,33 +107,28 @@ example
     (init : ∀ p :
       (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc)
-    (sampler : ∀ (p :
-      (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed)
-      (s : p.Proc),
-      Spec.Sampler ProbComp (p.step s).spec)
     (fuel : ℕ)
     (observe : ∀ p :
       (openTheory.{0, 0, 0, 0} Party ProbComp trivialSchedulerSampler).Closed,
       p.Proc → ProbComp Unit) :
     (processSemanticsProbComp Party trivialSchedulerSampler
-        init sampler fuel observe).run trivialClosed =
+        init fuel observe).run trivialClosed =
       (processSemanticsAsyncProbComp Party trivialSchedulerSampler
         (EnvAction.empty Unit) ()
         init
-        (fun p st => sampler p st.proc)
         (fun p => trivialEnvScheduler (m := ProbComp)
           (Proc := p.Proc) Unit Empty)
         fuel
         (fun p s _ _ => observe p s)).run trivialClosed := by
   change (do
       let finalState ← Concurrent.ProcessOver.runSteps
-        trivialClosed.toProcess (sampler trivialClosed) fuel
+        trivialClosed.toProcess trivialClosed.stepSampler fuel
         (init trivialClosed)
       observe trivialClosed finalState) =
     (do
       let (final, _trace) ← Concurrent.runStepsAsync (m := ProbComp)
         trivialClosed.toProcess (EnvAction.empty Unit)
-        (fun st => sampler trivialClosed st.proc)
+        (fun st => trivialClosed.stepSampler st.proc)
         (trivialEnvScheduler (m := ProbComp) Unit Empty)
         fuel ⟨init trivialClosed, ()⟩
       observe trivialClosed final.proc)
