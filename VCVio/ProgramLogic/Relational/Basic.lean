@@ -241,6 +241,27 @@ lemma relTriple_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ 
   apply (relTriple_iff_relWP (oa := oa) (ob := ob) (R := R')).2
   exact ⟨c, fun z hz => hpost (hc z hz)⟩
 
+/-- The trivial product coupling always exists for `OracleComp`, so any pair of computations
+satisfies the constantly-true postcondition.
+
+The witness is the product coupling `evalDist oa ⊗ evalDist ob`, which is well-defined because
+`OracleComp` computations have no failure mass. This discharges any `RelTriple` goal whose
+postcondition is structurally `fun _ _ => True` and is the foundation of the trivial-leaf
+closer in `tryCloseRelGoalImmediate`. -/
+lemma relTriple_true (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
+    RelTriple oa ob (fun _ _ => True) := by
+  apply (relTriple_iff_relWP (oa := oa) (ob := ob) (R := fun _ _ => True)).2
+  have hp : (evalDist oa).toPMF none = 0 := probFailure_eq_zero (mx := oa)
+  have hq : (evalDist ob).toPMF none = 0 := probFailure_eq_zero (mx := ob)
+  exact ⟨_root_.SPMF.Coupling.prod hp hq, fun _ _ => trivial⟩
+
+/-- Any postcondition that is unconditionally true gives a valid relational triple,
+via the product coupling. Useful as a closing rule for vacuous postconditions. -/
+lemma relTriple_post_const {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (h : ∀ a b, R a b) :
+    RelTriple oa ob R :=
+  relTriple_post_mono (relTriple_true oa ob) (fun _ _ _ => h _ _)
+
 /-- Bind composition rule for relational triples. -/
 lemma relTriple_bind
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}

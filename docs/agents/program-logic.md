@@ -137,10 +137,18 @@ strips pure-bind layers so that the bind decomposition rule fires on aligned sha
 goals that simplify to pure-pure or refl close immediately.
 
 **Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus its
-`rvcgen` finishing pass) tries the canonical `relTriple_refl` / `relTriple_eqRel_of_eq rfl` /
-`relTriple_pure_pure` / `eRelTriple_pure` family, then a `subst_vars`-driven retry that resolves
-syntactically-distinct pure values unified by local equality hypotheses, and finally a symmetric
-`relTriple_pure_pure ∘ symm` step for postconditions written in the swapped direction.
+`rvcgen` finishing pass) tries, in order:
+1. `assumption`
+2. `relTriple_true _ _` (the postcondition is structurally `fun _ _ => True`, discharged via
+   the universal product coupling, since `OracleComp` has no failure mass);
+3. `relTriple_post_const ?_; intros; trivial` (the postcondition reduces to a trivially provable
+   proposition such as `() = ()` after introduction);
+4. `relTriple_refl` / `relTriple_eqRel_of_eq rfl` / `relTriple_pure_pure` /
+   `eRelTriple_pure` (canonical reflexive and pure-pure leaves);
+5. a `subst_vars`-driven retry of the same closers (resolves syntactically-distinct pure
+   values unified by local equality hypotheses);
+6. a symmetric `relTriple_pure_pure ∘ symm` step for postconditions written in the swapped
+   direction.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
