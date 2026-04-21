@@ -53,6 +53,7 @@ import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Defs.Semantics
 import VCVio.EvalDist.Defs.Support
 import VCVio.EvalDist.Fintype
+import VCVio.EvalDist.Inequalities
 import VCVio.EvalDist.Instances.ErrorT
 import VCVio.EvalDist.Instances.FinRatPMF
 import VCVio.EvalDist.Instances.OptionT
