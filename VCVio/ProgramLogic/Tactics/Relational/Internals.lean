@@ -20,14 +20,50 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
 
+/-! ### Registered VC-spec rules
+
+Centralized `@[vcspec]` registrations for the relational planner. Lemmas added here become
+candidates for the registered-rule branch of `rvcstep`/`rvcgen` (and surface in the
+"Registered `@[vcspec]` candidates" hint when the planner gets stuck), in addition to any
+structural rule that `runRVCGenCore` already tries by goal shape. -/
+
 attribute [vcspec]
+  -- Core relational rules from `Relational/Basic.lean`
+  OracleComp.ProgramLogic.Relational.relTriple_pure_pure
+  OracleComp.ProgramLogic.Relational.relTriple_bind
+  OracleComp.ProgramLogic.Relational.relTriple_map
+  OracleComp.ProgramLogic.Relational.relTriple_if
+  OracleComp.ProgramLogic.Relational.relTriple_replicate
+  OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel
+  OracleComp.ProgramLogic.Relational.relTriple_list_mapM
+  OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel
+  OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
+  OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same
+  OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+  OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl
+  -- Quantitative (eRHL) rules from `Relational/Quantitative.lean`
+  OracleComp.ProgramLogic.Relational.eRelTriple_pure
+  OracleComp.ProgramLogic.Relational.eRelTriple_bind
+  OracleComp.ProgramLogic.Relational.eRelTriple_uniformSample_bij
+  -- `simulateQ`-aware rules from `Relational/SimulateQ.lean`
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
-attribute [vcspec]
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_query_map_eq
 
 private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
+/-- Attempt to close the current relational/eRHL leaf goal with the canonical fast paths.
+
+Tries, in order:
+* `assumption` (catches a hypothesis matching the relational triple verbatim);
+* `relTriple_refl` (identical computations, equality coupling);
+* `relTriple_eqRel_of_eq rfl` (syntactically identical computations);
+* `relTriple_pure_pure rfl` (`pure x ⨯ pure x` with reflexive postcondition);
+* `relTriple_pure_pure` together with `assumption` (`pure a ⨯ pure b` with `R a b` in scope);
+* `eRelTriple_pure _ _ _` (quantitative pure-pure leaf);
+* the same closers after `subst_vars` (resolves goals where the pure values are
+  syntactically distinct but unified via local equality hypotheses);
+* `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -37,7 +73,19 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) <||>
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption))
+    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    (try subst_vars
+     first
+       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+       | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)))) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption)))
 
 def tryCloseLeadingRelGoalImmediate : TacticM Unit := do
   let goals ← getGoals
@@ -85,6 +133,17 @@ def tryLowerRelGoal : TacticM Bool := withMainContext do
   else
     return false
 
+/-- Normalize the monad structure of both sides of a relational/eRHL goal.
+
+Applies the standard set of monad simplification lemmas (right-association, pure-bind
+elimination, `bind_pure_comp`, `Functor.map_map`, `map_pure`) to flatten nested binds
+and strip pure-bind layers so that downstream rule selection (especially
+`relTriple_bind`) sees aligned structures on both sides. The pass is best-effort:
+`try simp only` always succeeds and leaves the goal unchanged when no lemma applies. -/
+def tryNormalizeRelBindStructure : TacticM Unit := do
+  let _ ← tryEvalTacticSyntax (← `(tactic|
+    try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure]))
+
 def runERelPureRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _))
@@ -98,6 +157,9 @@ def runERelBindRuleUsing (cut : TSyntax `term) : TacticM Bool := do
     refine OracleComp.ProgramLogic.Relational.eRelTriple_bind (cut := $cut) ?_ ?_))
 
 def runRelBindRule : TacticM Bool := do
+  tryNormalizeRelBindStructure
+  if ← tryCloseRelGoalImmediate then
+    return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind
         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_)) then
@@ -235,11 +297,14 @@ def runRelSimDistRule : TacticM Bool := withMainContext do
   | none => return false
 
 def runRVCGenCore : TacticM Bool := withMainContext do
+  tryNormalizeRelBindStructure
   let target ← instantiateMVars (← getMainTarget)
   if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then
     let _ := pre
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
+    if ← tryCloseRelGoalImmediate then
+      return true
     if ← runERelPureRule then
       return true
     if isBindExpr oa && isBindExpr ob then
@@ -379,7 +444,15 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+      | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+      | (try subst_vars
+         first
+           | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+           | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+           | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+           | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption))))
 
 private def runRVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
@@ -787,7 +860,15 @@ def runRVCGenFinish : TacticM Unit := do
         | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+        | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+        | (try subst_vars
+           first
+             | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+             | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+             | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+             | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption))))
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "rvcgen finish" runRVCGenCloseConseqPass
 
