@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.ProgramLogic.Tactics.Unary
+import VCVio.ProgramLogic.Tactics.Relational
 
 /-!
 # Schnorr Sigma Protocol
@@ -98,6 +99,7 @@ def simTranscript (g : G) (pk : G) : ProbComp (G × F × F) := do
   let z ← $ᵗ F
   return (z • g - c • pk, c, z)
 
+open OracleComp.ProgramLogic OracleComp.ProgramLogic.Relational in
 omit [Fintype F] [DecidableEq F] in
 /-- Honest-verifier zero-knowledge: the real transcript distribution equals the simulated one.
 The proof swaps sampling order and uses uniformity of `F` to reindex via the bijection
@@ -116,20 +118,13 @@ theorem sigma_hvzk (g : G) [Finite F] :
   · simp only [SigmaProtocol.realTranscript, sigma]
     vcstep rw
     simp [h_eq, add_smul, mul_smul, add_sub_cancel_right]
-  · refine probOutput_bind_congr' ($ᵗ F) t ?_
-    intro c
-    simpa [simTranscript, map_eq_bind_pure_comp, bind_assoc, pure_bind] using
-      (probOutput_bind_bijective_uniform_cross
-        (α := F) (β := F)
-        (f := fun r => r + c * sk)
-        (hf := by
-          constructor
-          · intro r₁ r₂ h
-            exact add_right_cancel h
-          · intro z
-            refine ⟨z - c * sk, ?_⟩
-            simp [sub_eq_add_neg, add_left_comm, add_comm])
-        (g := fun z => pure ((z • g - c • pk, c, z) : G × F × F))
-        t)
+  · show _ = Pr[= t | simTranscript F G g pk]
+    unfold simTranscript
+    apply probOutput_eq_of_relTriple_eqRel (x := t)
+    rvcstep
+    intro c _ hc; subst hc
+    rvcstep using (· + c * sk)
+    · rvcgen
+    · exact ⟨fun _ _ h => add_right_cancel h, fun z => ⟨z - c * sk, sub_add_cancel z _⟩⟩
 
 end Schnorr

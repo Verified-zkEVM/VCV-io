@@ -80,8 +80,9 @@ example :
 /--
 error: rvcstep using hf: the explicit hint did not match the current relational goal shape.
 `using` is interpreted by goal shape as one of:
-- bind cut relation
-- random/query bijection
+- bind cut relation (`α → β → Prop`)
+- bind bijection coupling (`α → α`, on synchronized uniform/query binds)
+- random/query bijection (`α → α`)
 - `List.mapM` / `List.foldlM` input relation
 - `simulateQ` state relation
 
