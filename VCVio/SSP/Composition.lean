@@ -168,6 +168,41 @@ theorem simulateQ_link_run {α : Type v}
     refine bind_congr fun p => ?_
     exact ih p.1.1 p.1.2 p.2
 
+/-- Per-query state-projection transport through `Package.link`.
+
+If the outer package's handler commutes with a state projection `proj`, then the linked handler
+commutes with the corresponding product projection on the outer state factor. -/
+theorem map_run_link_impl_eq_of_query_map_eq'
+    {σ₁' : Type v}
+    (P₁ : Package M E σ₁) (P₂ : Package M E σ₁') (Q : Package I M σ₂)
+    (proj : σ₁ → σ₁')
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (P₁.impl t).run s = (P₂.impl t).run (proj s))
+    (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
+    Prod.map id (fun s : σ₁ × σ₂ => (proj s.1, s.2)) <$>
+        ((P₁.link Q).impl t).run (s₁, s₂) =
+      ((P₂.link Q).impl t).run (proj s₁, s₂) := by
+  change
+    Prod.map id (fun s : σ₁ × σ₂ => (proj s.1, s.2)) <$>
+        (linkReshape <$>
+          (simulateQ Q.impl ((P₁.impl t).run s₁)).run s₂) =
+      linkReshape <$>
+        (simulateQ Q.impl ((P₂.impl t).run (proj s₁))).run s₂
+  rw [← hproj t s₁, simulateQ_map, StateT.run_map]
+  simp [Functor.map_map, linkReshape]
+
+/-- Mapping any post-processing function over a linked simulation run can be pushed through to
+the nested `simulateQ` form from `simulateQ_link_run`. -/
+theorem map_simulateQ_link_run {α β : Type v}
+    (P : Package M E σ₁) (Q : Package I M σ₂)
+    (A : OracleComp E α) (s₁ : σ₁) (s₂ : σ₂)
+    (f : α × (σ₁ × σ₂) → β) :
+    f <$> (simulateQ (P.link Q).impl A).run (s₁, s₂) =
+      (f ∘ linkReshape) <$>
+        (simulateQ Q.impl ((simulateQ P.impl A).run s₁)).run s₂ := by
+  rw [simulateQ_link_run, Functor.map_map]
+  rfl
+
 /-! ### Shifted adversary and the program-level SSP reduction -/
 
 /-- The **shifted adversary** obtained by absorbing the outer reduction package `P` into the

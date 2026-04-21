@@ -10,6 +10,7 @@ import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
+import VCVio.SSP.Composition
 
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
@@ -319,6 +320,299 @@ private lemma probOutput_simulateQ_unifChalImpl {α : Type}
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
 
 end evalDistBridge
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+private def simulatedNmaAdv
+    [DecidableEq M] [DecidableEq Commit]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
+    SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M) :=
+  let spec := unifSpec + (M × Commit →ₒ Chal)
+  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+    fun n => fwd (.inl n)
+  let roSim : QueryImpl (M × Commit →ₒ Chal)
+      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+    let cache ← get
+    match cache (.inr mc) with
+    | some v => pure v
+    | none => do
+        let v ← fwd (.inr mc)
+        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    unifSim + roSim
+  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
+      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
+    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
+    modifyGet fun cache =>
+      match cache (.inr (msg, c)) with
+      | some _ => ((c, s), cache)
+      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
+  ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+private theorem simulatedNmaAdv_hashQueryBound
+    [DecidableEq M] [DecidableEq Commit]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qS qH : ℕ)
+    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (oa := (simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
+        (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
+  letI : Fintype Chal := Fintype.ofFinite Chal
+  let spec := unifSpec + (M × Commit →ₒ Chal)
+  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
+  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
+    fun n => fwd (.inl n)
+  let roSim : QueryImpl (M × Commit →ₒ Chal)
+      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
+    let cache ← get
+    match cache (.inr mc) with
+    | some v => pure v
+    | none => do
+        let v ← fwd (.inr mc)
+        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
+    unifSim + roSim
+  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
+      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
+    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
+    modifyGet fun cache =>
+      match cache (.inr (msg, c)) with
+      | some _ => ((c, s), cache)
+      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
+  let nmaAdv := simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
+    (simTranscript := simTranscript) (adv := adv)
+  -- Query bound: show the NMA adversary makes at most `qH` hash queries.
+  -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
+  -- `sigSim` handles signing queries via `simTranscript` + cache programming,
+  -- generating zero hash queries (only uniform queries from `simTranscript`).
+  -- Requires a general `IsQueryBound` transfer lemma for `simulateQ` + `StateT.run`.
+  intro pk
+  let stepBudget :
+      (spec + (M →ₒ (Commit × Resp))).Domain → ℕ × ℕ → ℕ := fun t _ =>
+    match t with
+    | .inl (.inl _) => 0
+    | .inl (.inr _) => 1
+    | .inr _ => 0
+  have hbind :
+      ∀ {α β : Type} {oa : OracleComp spec α} {ob : α → OracleComp spec β} {Q₁ Q₂ : ℕ},
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁ →
+        (∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := ob x) Q₂) →
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := oa >>= ob) (Q₁ + Q₂) := by
+    intro α β oa ob Q₁ Q₂ h1 h2
+    exact nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal) h1 h2
+  have hfwd :
+      ∀ (t : spec.Domain) (s : spec.QueryCache),
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (fwd t).run s) (match t with
+            | .inl _ => 0
+            | .inr _ => 1) := by
+    intro t s
+    cases t with
+    | inl n =>
+        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+          OracleComp.liftM_run_StateT] using
+          (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+            (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := liftM (spec.query (.inl n))) 0 by
+                exact
+                  (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+                    (.inl n) 0).2 trivial)
+            (fun u =>
+              show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := pure (u, s)) 0 by
+                  trivial))
+    | inr mc =>
+        simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+          OracleComp.liftM_run_StateT] using
+          (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+            (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := liftM (spec.query (.inr mc))) 1 by
+                exact
+                  (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
+                    (.inr mc) 1).2 (Nat.succ_pos 0))
+            (fun u =>
+              show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := pure (u, s)) 0 by
+                  trivial))
+  have hro :
+      ∀ (mc : M × Commit) (s : spec.QueryCache),
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (roSim mc).run s) 1 := by
+    intro mc s
+    cases hs : s (.inr mc) with
+    | some v =>
+        simp [roSim, hs, nmaHashQueryBound]
+    | none =>
+        simpa [roSim, hs] using
+          ((OracleComp.isQueryBound_map_iff
+              (oa := (fwd (.inr mc)).run s)
+              (f := fun a : Chal × spec.QueryCache =>
+                (a.1, a.2.cacheQuery (.inr mc) a.1))
+              (b := 1)
+              (canQuery := fun t b => match t with
+                | .inl _ => True
+                | .inr _ => 0 < b)
+              (cost := fun t b => match t with
+                | .inl _ => b
+                | .inr _ => b - 1)).2
+            (hfwd (.inr mc) s))
+  have hsig :
+      ∀ (msg : M) (s : spec.QueryCache),
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (sigSim pk msg).run s) 0 := by
+    intro msg s
+    have hsource : OracleComp.IsQueryBound
+        (simTranscript pk) () (fun _ _ => True) (fun _ _ => ()) := by
+      induction simTranscript pk using OracleComp.inductionOn with
+      | pure x =>
+          trivial
+      | query_bind t mx ih =>
+          simp [OracleComp.isQueryBound_query_bind_iff, ih]
+    have htranscript :
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
+      simpa [nmaHashQueryBound] using
+        (OracleComp.IsQueryBound.simulateQ_run_of_step
+          (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
+          (stepBudget := fun _ _ => 0) (impl := unifSim)
+          (hbind := by
+            intro γ δ oa' ob b₁ b₂ h1 h2
+            have h1' :
+                nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := oa') b₁ := by
+              simpa [nmaHashQueryBound] using h1
+            have h2' : ∀ x,
+                nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := ob x) b₂ := by
+              intro x
+              simpa [nmaHashQueryBound] using h2 x
+            simpa [nmaHashQueryBound] using
+              (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+                (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
+          )
+          (hstep := by
+            intro t b s' ht
+            simpa [unifSim] using hfwd (.inl t) s')
+          (hcombine := by
+            intro t b ht
+            simp)
+          (s := s))
+    simpa [sigSim, nmaHashQueryBound] using
+      ((OracleComp.isQueryBound_map_iff
+          (oa := (simulateQ unifSim (simTranscript pk)).run s)
+          (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
+            match a.2 (.inr (msg, a.1.1)) with
+            | some _ => ((a.1.1, a.1.2.2), a.2)
+            | none =>
+            ((a.1.1, a.1.2.2),
+              QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
+          (b := 0)
+          (canQuery := fun t b => match t with
+            | .inl _ => True
+            | .inr _ => 0 < b)
+          (cost := fun t b => match t with
+            | .inl _ => b
+            | .inr _ => b - 1)).2 htranscript)
+  have hstep :
+      ∀ t b s,
+        (match t, b with
+          | .inl (.inl _), _ => True
+          | .inl (.inr _), (_, qH') => 0 < qH'
+          | .inr _, (qS', _) => 0 < qS') →
+        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (oa := ((baseSim + sigSim pk) t).run s) (stepBudget t b) := by
+    intro t b s ht
+    rcases b with ⟨qS', qH'⟩
+    cases t with
+    | inl t =>
+        cases t with
+        | inl n =>
+            simpa [baseSim, stepBudget] using hfwd (.inl n) s
+        | inr mc =>
+            simpa [baseSim, stepBudget] using hro mc s
+    | inr msg =>
+        simpa [stepBudget] using hsig msg s
+  have hcombine :
+      ∀ t b,
+        (match t, b with
+          | .inl (.inl _), _ => True
+          | .inl (.inr _), (_, qH') => 0 < qH'
+          | .inr _, (qS', _) => 0 < qS') →
+        Nat.add (stepBudget t b)
+          (Prod.snd (match t, b with
+            | .inl (.inl _), b' => b'
+            | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+            | .inr _, (qS', qH') => (qS' - 1, qH'))) =
+          Prod.snd b := by
+    intro t b ht
+    rcases b with ⟨qS', qH'⟩
+    cases t with
+    | inl t =>
+        cases t with
+        | inl n =>
+            simp [stepBudget]
+        | inr mc =>
+            simp [stepBudget] at ht ⊢
+            omega
+    | inr msg =>
+        simp [stepBudget]
+  simpa [nmaAdv, simulatedNmaAdv, nmaHashQueryBound, signHashQueryBound] using
+    (OracleComp.IsQueryBound.simulateQ_run_of_step
+      (h := hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
+      (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
+      (hbind := by
+        intro γ δ oa' ob b₁ b₂ h1 h2
+        have h1' :
+            nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := oa') b₁ := by
+          simpa [nmaHashQueryBound] using h1
+        have h2' : ∀ x,
+            nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+              (oa := ob x) b₂ := by
+          intro x
+          simpa [nmaHashQueryBound] using h2 x
+        simpa [nmaHashQueryBound] using
+          (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
+      )
+      (hstep := by
+        intro t b s ht
+        rcases b with ⟨qS', qH'⟩
+        cases t with
+        | inl t =>
+            cases t with
+            | inl n =>
+                simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
+            | inr mc =>
+                simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
+        | inr msg =>
+            simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
+      (hcombine := by
+        intro t b ht
+        rcases b with ⟨qS', qH'⟩
+        cases t with
+        | inl t =>
+            cases t with
+            | inl n =>
+                simp [stepBudget]
+            | inr mc =>
+                simp [stepBudget] at ht ⊢
+                omega
+        | inr msg =>
+            simp [stepBudget])
+      (s := ∅))
 
 set_option maxHeartbeats 800000 in
 /-- **CMA-to-NMA reduction via HVZK simulation.**
@@ -4345,18 +4639,1453 @@ theorem euf_cma_to_nma
         -- deferred to a follow-up proof round. The scaffolding below records the intended
         -- signature of the per-pk inequality; filling in `richSim` + (P1), (P2), (P3)
         -- discharges this `sorry` and closes the freshness-preserving `euf_cma_to_nma` chain.
-        set forkAcc : Stmt → ENNReal := fun pk =>
-          Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
-              (Chal := Chal) qH trace).isSome |
-            Fork.runTrace σ hr M nmaAdv pk] with hforkAcc_def
         have per_pk_event_le_forkPoint : ∀ (pk : Stmt),
-            Pr[event pk | direct_sim_exp pk] ≤ forkAcc pk :=
-          sorry
+            Pr[event pk | direct_sim_exp pk] ≤
+              Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                  (Chal := Chal) qH trace).isSome |
+                Fork.runTrace σ hr M nmaAdv pk] :=
+          by
+            intro pk
+            let AdvState : Type := ((spec.QueryCache × List M) × Bool)
+            let RoState : Type := Fork.simSt M Commit Chal
+            let RichState : Type := AdvState × RoState
+            let TraceState : Type := spec.QueryCache × RoState
+            let cacheProj : AdvState → spec.QueryCache := fun s => s.1.1
+            let simProj : RichState → AdvState := Prod.fst
+            let traceProj : RichState → TraceState := fun s => (cacheProj s.1, s.2)
+            let advInit : AdvState := ((∅, []), false)
+            let roInit : RoState := (∅, [])
+            let traceCacheInit : spec.QueryCache := ∅
+            let richInit : RichState := (advInit, roInit)
+            let traceInit : TraceState := (traceCacheInit, roInit)
+            let innerPkg : VCVio.SSP.Package (Fork.wrappedSpec Chal) spec RoState :=
+              { init := pure roInit
+                impl := Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal }
+            let richOuter : VCVio.SSP.Package spec (spec + (M →ₒ (Commit × Resp))) AdvState :=
+              { init := pure advInit
+                impl := _simImplSigned pk }
+            let traceOuter :
+                VCVio.SSP.Package spec (spec + (M →ₒ (Commit × Resp))) spec.QueryCache :=
+              { init := pure traceCacheInit
+                impl := baseSim + sigSim pk }
+            let richImpl :
+                QueryImpl (spec + (M →ₒ (Commit × Resp)))
+                  (StateT RichState (OracleComp (Fork.wrappedSpec Chal))) :=
+              (richOuter.link innerPkg).impl
+            let traceImpl :
+                QueryImpl (spec + (M →ₒ (Commit × Resp)))
+                  (StateT TraceState (OracleComp (Fork.wrappedSpec Chal))) :=
+              (traceOuter.link innerPkg).impl
+            let traceOfState :
+                (M × (Commit × Resp)) × TraceState →
+                  Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) :=
+              fun z =>
+                let forgery := z.1
+                let advCache := z.2.1
+                let roCache := z.2.2.1
+                let queryLog := z.2.2.2
+                let verified :=
+                  match roCache (forgery.1, forgery.2.1) with
+                  | some ω => σ.verify pk forgery.2.1 ω forgery.2.2
+                  | none => false
+                { forgery := forgery
+                  advCache := advCache
+                  roCache := roCache
+                  queryLog := queryLog
+                  verified := verified }
+            let traceOfRich :
+                (M × (Commit × Resp)) × RichState →
+                  Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) :=
+              fun z => traceOfState (Prod.map id traceProj z)
+            let richExp : OracleComp (Fork.wrappedSpec Chal)
+                ((M × (Commit × Resp)) × RichState) :=
+              (simulateQ richImpl (adv.main pk)).run richInit
+            let traceExp : OracleComp (Fork.wrappedSpec Chal)
+                (Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+              traceOfRich <$> richExp
+            let richInv : RichState → Prop := fun s =>
+              (∀ mc ω, s.2.1 mc = some ω → s.1.1.1 (.inr mc) = some ω) ∧
+              (∀ msg c ω, s.1.1.1 (.inr (msg, c)) = some ω →
+                s.2.1 (msg, c) = some ω ∨ msg ∈ s.1.1.2) ∧
+              (∀ mc, (∃ ω, s.2.1 mc = some ω) ↔ mc ∈ s.2.2)
+            have h_nmaHashBound :
+                nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                  (oa := nmaAdv.main pk) qH := by
+              simpa [nmaAdv, simulatedNmaAdv] using
+                (simulatedNmaAdv_hashQueryBound
+                  (σ := σ) (hr := hr) (M := M)
+                  (simTranscript := simTranscript)
+                  (adv := adv) (qS := qS) (qH := qH) _hQ pk)
+            have h_queryLog_len_le_of_nmaHashQueryBound :
+                ∀ {α : Type} {oa : OracleComp spec α} {Q : ℕ}
+                  (hQ :
+                    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+                      (oa := oa) Q)
+                  (st : RoState) {z : α × RoState},
+                  z ∈ support ((simulateQ innerPkg.impl oa).run st) →
+                    z.2.2.length ≤ st.2.length + Q := by
+              intro α oa Q hQ st z hz
+              simpa [innerPkg] using
+                (Fork.queryLog_length_le_of_nmaHashQueryBound
+                  (M := M) (Commit := Commit) (Chal := Chal)
+                  (hQ := hQ) (st := st) (z := z) hz)
+            have h_unifFwd_run :
+                ∀ {α : Type} (oa : ProbComp α) (st : RoState),
+                  (simulateQ (Fork.unifFwd M Commit Chal) oa).run st =
+                    (fun x => (x, st)) <$> liftComp oa (Fork.wrappedSpec Chal) := by
+              intro α oa st
+              let inj : QueryImpl unifSpec (OracleComp (Fork.wrappedSpec Chal)) := fun t =>
+                liftM (unifSpec.query t)
+              have h_unifFwd_eq :
+                  Fork.unifFwd M Commit Chal =
+                    inj.liftTarget (StateT RoState (OracleComp (Fork.wrappedSpec Chal))) := rfl
+              rw [h_unifFwd_eq, simulateQ_liftTarget]
+              have h_simulateQ_inj :
+                  simulateQ inj oa = liftComp oa (Fork.wrappedSpec Chal) := rfl
+              rw [h_simulateQ_inj, OracleComp.liftM_run_StateT, bind_pure_comp]
+            have h_inner_liftComp_run :
+                ∀ {α : Type} (oa : ProbComp α) (st : RoState),
+                  (simulateQ innerPkg.impl (liftComp oa spec)).run st =
+                    (fun x => (x, st)) <$> liftComp oa (Fork.wrappedSpec Chal) := by
+              intro α oa st
+              rw [show simulateQ innerPkg.impl (liftComp oa spec) =
+                  simulateQ (Fork.unifFwd M Commit Chal) oa by
+                    simpa [innerPkg] using
+                      (QueryImpl.simulateQ_add_liftComp_left
+                        (impl₁' := Fork.unifFwd M Commit Chal)
+                        (impl₂' := Fork.roImpl M Commit Chal) oa)]
+              exact h_unifFwd_run oa st
+            have h_richInv_init : richInv richInit := by
+              constructor
+              · intro mc ω hω
+                simp [richInit, advInit, roInit] at hω
+              · constructor
+                · intro msg c ω hω
+                  simp [richInit, advInit, roInit] at hω
+                · intro mc
+                  simp [richInit, advInit, roInit]
+            have h_simImplSigned_unif_run :
+                ∀ (n : ℕ) (cache : spec.QueryCache) (signed : List M) (bad : Bool),
+                  ((_simImplSigned pk) (Sum.inl (Sum.inl n))).run ((cache, signed), bad) =
+                    show OracleComp spec
+                        (((spec + (M →ₒ (Commit × Resp))).Range (Sum.inl (Sum.inl n))) × AdvState) from
+                      ((fun u : spec.Range (Sum.inl n) => (u, (((cache, signed), bad) : AdvState))) <$>
+                        (liftM (query (Sum.inl n)) : OracleComp spec (spec.Range (Sum.inl n)))) := by
+              intro n cache signed bad
+              simp [fwd, _simImplSigned, baseSimSigned, baseSimSigned', baseSim, unifSim,
+                QueryImpl.add_apply_inl, QueryImpl.withBadFlag_apply_run,
+                QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
+                StateT.run_bind, StateT.run_get, StateT.run_set, bind_pure_comp]
+            have h_simImplSigned_hash_hit :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M)
+                  (bad : Bool) (ω : Chal),
+                  cache (.inr mc) = some ω →
+                    ((_simImplSigned pk) (.inl (.inr mc))).run ((cache, signed), bad) =
+                      pure (ω, ((cache, signed), bad)) := by
+              intro mc cache signed bad ω hcache
+              simp [_simImplSigned, baseSimSigned, baseSimSigned', QueryImpl.add_apply_inl,
+                QueryImpl.withBadFlag_apply_run, StateT.run_bind, StateT.run_get, StateT.run_set]
+              exact congrArg
+                (fun x : OracleComp spec (Chal × spec.QueryCache) =>
+                  (fun vs : Chal × spec.QueryCache =>
+                    (vs.1, (((vs.2, signed), bad) : AdvState))) <$> x)
+                (h_roSim_run_hit mc cache ω hcache)
+            have h_simImplSigned_hash_miss :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M)
+                  (bad : Bool),
+                  cache (.inr mc) = none →
+                    ((_simImplSigned pk) (.inl (.inr mc))).run ((cache, signed), bad) =
+                      show OracleComp spec
+                          (spec.Range (Sum.inr mc) × AdvState) from
+                        ((fun u : spec.Range (Sum.inr mc) =>
+                          (u, (((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState))) <$>
+                          (liftM (query (Sum.inr mc)) :
+                            OracleComp spec (spec.Range (Sum.inr mc)))) := by
+              intro mc cache signed bad hcache
+              simp [_simImplSigned, baseSimSigned, baseSimSigned', QueryImpl.add_apply_inl,
+                QueryImpl.withBadFlag_apply_run, StateT.run_bind, StateT.run_get, StateT.run_set]
+              exact congrArg
+                (fun x : OracleComp spec (spec.Range (Sum.inr mc) × spec.QueryCache) =>
+                  (fun vs : spec.Range (Sum.inr mc) × spec.QueryCache =>
+                    (vs.1, (((vs.2, signed), bad) : AdvState))) <$> x)
+                (h_roSim_run_miss mc cache hcache)
+            have h_simImplSigned_sign_run :
+                ∀ (msg : M) (cache : spec.QueryCache) (signed : List M) (bad : Bool),
+                  ((_simImplSigned pk) (.inr msg)).run ((cache, signed), bad) =
+                    (fun cωπ =>
+                      let newCache :=
+                        match cache (.inr (msg, cωπ.1)) with
+                        | some _ => cache
+                        | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                      ((cωπ.1, cωπ.2.2),
+                        (((newCache, msg :: signed),
+                          bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState))) <$>
+                      liftComp (simTranscript pk) spec := by
+              intro msg cache signed bad
+              simp [sigBadFSigned, _simImplSigned, sigSimSigned, sigSimSigned',
+                QueryImpl.add_apply_inr, QueryImpl.withBadUpdate_apply_run,
+                StateT.run_bind, StateT.run_get, StateT.run_set, h_sigSim_run pk msg cache]
+              congr 1
+              funext cωπ
+              cases hcache : cache (.inr (msg, cωπ.1)) <;> simp [hcache]
+            have h_outer_trace_proj :
+                ∀ t s,
+                  Prod.map id cacheProj <$> ((_simImplSigned pk) t).run s =
+                    ((baseSim + sigSim pk) t).run (cacheProj s) := by
+              intro t s
+              rcases s with ⟨⟨cache, signed⟩, bad⟩
+              cases t with
+              | inl t' =>
+                  simp [cacheProj, _simImplSigned, baseSimSigned, baseSimSigned',
+                    QueryImpl.add_apply_inl, QueryImpl.withBadFlag_apply_run,
+                    StateT.run_bind, StateT.run_get, StateT.run_set]
+              | inr msg =>
+                  simp [cacheProj, _simImplSigned, sigSimSigned, sigSimSigned',
+                    sigBadFSigned, QueryImpl.add_apply_inr,
+                    QueryImpl.withBadUpdate_apply_run, StateT.run_bind,
+                    StateT.run_get, StateT.run_set]
+            have h_rich_trace_proj :
+                ∀ t s,
+                  Prod.map id traceProj <$> (richImpl t).run s =
+                    (traceImpl t).run (traceProj s) := by
+              intro t s
+              rcases s with ⟨sAdv, sRo⟩
+              simpa [richImpl, traceImpl, traceProj] using
+                (VCVio.SSP.Package.map_run_link_impl_eq_of_query_map_eq'
+                  (P₁ := richOuter) (P₂ := traceOuter) (Q := innerPkg)
+                  (proj := cacheProj) (hproj := h_outer_trace_proj)
+                  (t := t) (s₁ := sAdv) (s₂ := sRo))
+            have h_rich_sim_run :
+                Prod.map id simProj <$> richExp =
+                  Prod.fst <$> (simulateQ innerPkg.impl (direct_sim_exp pk)).run
+                    roInit := by
+              simpa [richExp, direct_sim_exp, richOuter, innerPkg, richInit, advInit, roInit,
+                simProj] using
+                (VCVio.SSP.Package.map_simulateQ_link_run
+                  (P := richOuter) (Q := innerPkg)
+                  (A := adv.main pk) (s₁ := advInit) (s₂ := roInit)
+                  (f := fun z => (z.1, z.2.1)))
+            let unifSimWrapped :
+                QueryImpl unifSpec
+                  (StateT spec.QueryCache (OracleComp (Fork.wrappedSpec Chal))) :=
+              (HasQuery.toQueryImpl (spec := unifSpec)
+                (m := OracleComp (Fork.wrappedSpec Chal))).liftTarget _
+            let roSimWrapped :
+                QueryImpl (M × Commit →ₒ Chal)
+                  (StateT spec.QueryCache (OracleComp (Fork.wrappedSpec Chal))) := fun mc => do
+              let cache ← get
+              match cache (.inr mc) with
+              | some v => pure v
+              | none => do
+                  let v ←
+                    liftM (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                      OracleComp (Fork.wrappedSpec Chal) Chal)
+                  modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+            let baseSimWrapped :
+                QueryImpl spec
+                  (StateT spec.QueryCache (OracleComp (Fork.wrappedSpec Chal))) :=
+              unifSimWrapped + roSimWrapped
+            let sigSimWrapped :
+                QueryImpl (M →ₒ (Commit × Resp))
+                  (StateT spec.QueryCache (OracleComp (Fork.wrappedSpec Chal))) := fun msg => do
+              let (c, ω, s) ← simulateQ unifSimWrapped (simTranscript pk)
+              modifyGet fun cache =>
+                match cache (.inr (msg, c)) with
+                | some _ => ((c, s), cache)
+                | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
+            let baseSimSignedWrapped' :
+                QueryImpl spec
+                  (StateT (spec.QueryCache × List M)
+                    (OracleComp (Fork.wrappedSpec Chal))) := fun t => do
+              let s ← get
+              let v ← (baseSimWrapped t).run s.1
+              set (v.2, s.2)
+              pure v.1
+            let sigSimSignedWrapped' :
+                QueryImpl (M →ₒ (Commit × Resp))
+                  (StateT (spec.QueryCache × List M)
+                    (OracleComp (Fork.wrappedSpec Chal))) := fun msg => do
+              let s ← get
+              let v ← (sigSimWrapped msg).run s.1
+              set (v.2, msg :: s.2)
+              pure v.1
+            let baseSimSignedWrapped :
+                QueryImpl spec
+                  (StateT AdvState (OracleComp (Fork.wrappedSpec Chal))) :=
+              baseSimSignedWrapped'.withBadFlag
+            let sigSimSignedWrapped :
+                QueryImpl (M →ₒ (Commit × Resp))
+                  (StateT AdvState (OracleComp (Fork.wrappedSpec Chal))) :=
+              sigSimSignedWrapped'.withBadUpdate sigBadFSigned
+            let simWrappedImpl :
+                QueryImpl (spec + (M →ₒ (Commit × Resp)))
+                  (StateT AdvState (OracleComp (Fork.wrappedSpec Chal))) :=
+              baseSimSignedWrapped + sigSimSignedWrapped
+            have h_unifSimWrapped_run :
+                ∀ {α : Type} (oa : ProbComp α) (cache : spec.QueryCache),
+                  (simulateQ unifSimWrapped oa).run cache =
+                    (fun x => (x, cache)) <$> liftComp oa (Fork.wrappedSpec Chal) := by
+              intro α oa cache
+              let inj : QueryImpl unifSpec (OracleComp (Fork.wrappedSpec Chal)) :=
+                HasQuery.toQueryImpl (spec := unifSpec)
+                  (m := OracleComp (Fork.wrappedSpec Chal))
+              have hunif_eq :
+                  unifSimWrapped =
+                    inj.liftTarget
+                      (StateT spec.QueryCache (OracleComp (Fork.wrappedSpec Chal))) := rfl
+              rw [hunif_eq, simulateQ_liftTarget]
+              have hsim : simulateQ inj oa = liftComp oa (Fork.wrappedSpec Chal) := rfl
+              rw [hsim, OracleComp.liftM_run_StateT, bind_pure_comp]
+            have h_roSimWrapped_run_miss :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache),
+                  cache (.inr mc) = none →
+                    (roSimWrapped mc).run cache =
+                      (fun u => (u, cache.cacheQuery (.inr mc) u)) <$>
+                        ((((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                          OracleComp (Fork.wrappedSpec Chal) Chal)) := by
+              intro mc cache hcache
+              simp [roSimWrapped, hcache, StateT.run_bind, StateT.run_get, bind_pure_comp,
+                Functor.map_map]
+              rfl
+            have h_roSimWrapped_run_hit :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (u : Chal),
+                  cache (.inr mc) = some u →
+                    (roSimWrapped mc).run cache = pure (u, cache) := by
+              intro mc cache u hcache
+              simp [roSimWrapped, hcache]
+            have h_sigSimWrapped_run :
+                ∀ (msg : M) (cache : spec.QueryCache),
+                  (sigSimWrapped msg).run cache =
+                    liftComp (simTranscript pk) (Fork.wrappedSpec Chal) >>=
+                      fun cωπ : Commit × Chal × Resp =>
+                        pure (match cache (.inr (msg, cωπ.1)) with
+                          | some _ => ((cωπ.1, cωπ.2.2), cache)
+                          | none => ((cωπ.1, cωπ.2.2),
+                              cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)) := by
+              intro msg cache
+              dsimp only [sigSimWrapped]
+              rw [StateT.run_bind, h_unifSimWrapped_run (oa := simTranscript pk) (cache := cache),
+                bind_map_left]
+              refine bind_congr fun cωπ => ?_
+              simp only [modifyGet, MonadState.modifyGet, MonadStateOf.modifyGet,
+                StateT.modifyGet, StateT.run]
+              congr 1
+              rcases cache (.inr (msg, cωπ.1)) with _ | _ <;> simp
+            have h_baseSimSignedWrapped_unif :
+                ∀ (n : ℕ) (cache : spec.QueryCache) (signed : List M),
+                  (baseSimSignedWrapped' (.inl n)).run (cache, signed) =
+                    ((fun u : spec.Range (Sum.inl n) => (u, (cache, signed))) <$>
+                      ((((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                        OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))))) := by
+              intro n cache signed
+              have hunif :
+                  (baseSimWrapped (.inl n)).run cache =
+                    ((fun x => (x, cache)) <$>
+                      ((((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                        OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))))) := by
+                simpa [baseSimWrapped, QueryImpl.add_apply_inl, liftComp_eq_liftM] using
+                  (h_unifSimWrapped_run (oa := (unifSpec.query n : ProbComp (Fin (n + 1))))
+                    (cache := cache))
+              rw [show (baseSimSignedWrapped' (.inl n)).run (cache, signed) =
+                  ((baseSimWrapped (.inl n)).run cache >>= fun v =>
+                    pure (v.1, (v.2, signed))) by
+                    simp [baseSimSignedWrapped', StateT.run_bind, StateT.run_get, StateT.run_set]]
+              rw [hunif]
+              let mx : OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n)) :=
+                (((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                  OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n)))
+              change
+                ((fun v : spec.Range (Sum.inl n) × spec.QueryCache => (v.1, (v.2, signed))) <$>
+                  ((fun x : spec.Range (Sum.inl n) => (x, cache)) <$> mx)) =
+                  ((fun u : spec.Range (Sum.inl n) => (u, (cache, signed))) <$> mx)
+              simpa [mx, Functor.map_map, Function.comp_def]
+            have h_baseSimSignedWrapped_hash_hit :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M) (ω : Chal),
+                  cache (.inr mc) = some ω →
+                    (baseSimSignedWrapped' (.inr mc)).run (cache, signed) =
+                      pure (ω, (cache, signed)) := by
+              intro mc cache signed ω hcache
+              simp [baseSimSignedWrapped', StateT.run_bind, StateT.run_get, StateT.run_set]
+              exact congrArg
+                (fun x : OracleComp (Fork.wrappedSpec Chal) (Chal × spec.QueryCache) =>
+                  (fun vs : Chal × spec.QueryCache => (vs.1, (vs.2, signed))) <$> x)
+                (show (baseSimWrapped (.inr mc)).run cache = pure (ω, cache) by
+                  simpa [baseSimWrapped, QueryImpl.add_apply_inr] using
+                    (h_roSimWrapped_run_hit mc cache ω hcache))
+            have h_baseSimSignedWrapped_hash_miss :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M),
+                  cache (.inr mc) = none →
+                    (baseSimSignedWrapped' (.inr mc)).run (cache, signed) =
+                      ((fun u : spec.Range (Sum.inr mc) =>
+                          (u, (cache.cacheQuery (.inr mc) u, signed))) <$>
+                        ((((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                          OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inr mc))))) := by
+              intro mc cache signed hcache
+              simp [baseSimSignedWrapped', StateT.run_bind, StateT.run_get, StateT.run_set]
+              exact congrArg
+                (fun x : OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inr mc) × spec.QueryCache) =>
+                  (fun vs : spec.Range (Sum.inr mc) × spec.QueryCache =>
+                    (vs.1, (vs.2, signed))) <$> x)
+                (show (baseSimWrapped (.inr mc)).run cache =
+                    ((fun u => (u, cache.cacheQuery (.inr mc) u)) <$>
+                      ((((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                        OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inr mc))))) by
+                  simpa [baseSimWrapped, QueryImpl.add_apply_inr] using
+                    (h_roSimWrapped_run_miss mc cache hcache))
+            have h_simWrapped_unif_run :
+                ∀ (n : ℕ) (cache : spec.QueryCache) (signed : List M) (bad : Bool),
+                  (simWrappedImpl (Sum.inl (Sum.inl n))).run ((cache, signed), bad) =
+                    show OracleComp (Fork.wrappedSpec Chal)
+                      (((spec + (M →ₒ (Commit × Resp))).Range (Sum.inl (Sum.inl n))) × AdvState)
+                      from
+                        ((fun u : spec.Range (Sum.inl n) =>
+                            (u, (((cache, signed), bad) : AdvState))) <$>
+                          ((((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                            OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))))) := by
+              intro n cache signed bad
+              simpa [baseSimSignedWrapped, QueryImpl.add_apply_inl,
+                QueryImpl.withBadFlag_apply_run] using
+                congrArg
+                  (fun x :
+                    OracleComp (Fork.wrappedSpec Chal)
+                      (spec.Range (Sum.inl n) × (spec.QueryCache × List M)) =>
+                    (fun vs : spec.Range (Sum.inl n) × (spec.QueryCache × List M) =>
+                      (vs.1, ((vs.2, bad) : AdvState))) <$> x)
+                  (h_baseSimSignedWrapped_unif n cache signed)
+            have h_simWrapped_hash_hit :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M)
+                  (bad : Bool) (ω : Chal),
+                  cache (.inr mc) = some ω →
+                    (simWrappedImpl (Sum.inl (Sum.inr mc))).run ((cache, signed), bad) =
+                      pure (ω, ((cache, signed), bad)) := by
+              intro mc cache signed bad ω hcache
+              simpa [baseSimSignedWrapped, QueryImpl.add_apply_inr,
+                QueryImpl.withBadFlag_apply_run] using
+                congrArg
+                  (fun x :
+                    OracleComp (Fork.wrappedSpec Chal) (Chal × (spec.QueryCache × List M)) =>
+                    (fun vs : Chal × (spec.QueryCache × List M) =>
+                      (vs.1, ((vs.2, bad) : AdvState))) <$> x)
+                  (h_baseSimSignedWrapped_hash_hit mc cache signed ω hcache)
+            have h_simWrapped_hash_miss :
+                ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M)
+                  (bad : Bool),
+                  cache (.inr mc) = none →
+                    (simWrappedImpl (Sum.inl (Sum.inr mc))).run ((cache, signed), bad) =
+                      show OracleComp (Fork.wrappedSpec Chal)
+                        (spec.Range (Sum.inr mc) × AdvState) from
+                        ((fun u : spec.Range (Sum.inr mc) =>
+                            (u, (((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState))) <$>
+                          ((((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                            OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inr mc))))) := by
+              intro mc cache signed bad hcache
+              simpa [baseSimSignedWrapped, QueryImpl.add_apply_inr,
+                QueryImpl.withBadFlag_apply_run] using
+                congrArg
+                  (fun x :
+                    OracleComp (Fork.wrappedSpec Chal)
+                      (spec.Range (Sum.inr mc) × (spec.QueryCache × List M)) =>
+                    (fun vs : spec.Range (Sum.inr mc) × (spec.QueryCache × List M) =>
+                      (vs.1, ((vs.2, bad) : AdvState))) <$> x)
+                  (h_baseSimSignedWrapped_hash_miss mc cache signed hcache)
+            have h_simWrapped_sign_run :
+                ∀ (msg : M) (cache : spec.QueryCache) (signed : List M) (bad : Bool),
+                  (simWrappedImpl (.inr msg)).run ((cache, signed), bad) =
+                    (fun cωπ =>
+                      let newCache :=
+                        match cache (.inr (msg, cωπ.1)) with
+                        | some _ => cache
+                        | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                      ((cωπ.1, cωπ.2.2),
+                        (((newCache, msg :: signed),
+                          bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState))) <$>
+                      liftComp (simTranscript pk) (Fork.wrappedSpec Chal) := by
+              intro msg cache signed bad
+              have hsigSigned :
+                  (sigSimSignedWrapped' msg).run (cache, signed) =
+                    (fun cωπ =>
+                      ((cωπ.1, cωπ.2.2),
+                        (match cache (.inr (msg, cωπ.1)) with
+                        | some _ => cache
+                        | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1,
+                          msg :: signed))) <$>
+                      liftComp (simTranscript pk) (Fork.wrappedSpec Chal) := by
+                have hsigMap :
+                    (sigSimWrapped msg).run cache =
+                      (fun cωπ =>
+                        match cache (.inr (msg, cωπ.1)) with
+                        | some _ => ((cωπ.1, cωπ.2.2), cache)
+                        | none => ((cωπ.1, cωπ.2.2), cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)) <$>
+                        liftComp (simTranscript pk) (Fork.wrappedSpec Chal) := by
+                  simpa [map_eq_bind_pure_comp] using h_sigSimWrapped_run msg cache
+                rw [show (sigSimSignedWrapped' msg).run (cache, signed) =
+                    ((sigSimWrapped msg).run cache >>= fun v =>
+                      pure (v.1, (v.2, msg :: signed))) by
+                    simp [sigSimSignedWrapped', StateT.run_bind, StateT.run_get, StateT.run_set]]
+                rw [hsigMap]
+                change
+                  ((fun v : (Commit × Resp) × spec.QueryCache => (v.1, (v.2, msg :: signed))) <$>
+                    ((fun cωπ =>
+                        match cache (.inr (msg, cωπ.1)) with
+                        | some _ => ((cωπ.1, cωπ.2.2), cache)
+                        | none => ((cωπ.1, cωπ.2.2), cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)) <$>
+                      liftComp (simTranscript pk) (Fork.wrappedSpec Chal))) =
+                    ((fun cωπ =>
+                        ((cωπ.1, cωπ.2.2),
+                          (match cache (.inr (msg, cωπ.1)) with
+                          | some _ => cache
+                          | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1,
+                            msg :: signed))) <$>
+                      liftComp (simTranscript pk) (Fork.wrappedSpec Chal))
+                let innerF : Commit × Chal × Resp → (Commit × Resp) × spec.QueryCache :=
+                  fun cωπ =>
+                    match cache (.inr (msg, cωπ.1)) with
+                    | some _ => ((cωπ.1, cωπ.2.2), cache)
+                    | none => ((cωπ.1, cωπ.2.2), cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1)
+                let outerF : (Commit × Resp) × spec.QueryCache →
+                    (Commit × Resp) × (spec.QueryCache × List M) :=
+                  fun v => (v.1, (v.2, msg :: signed))
+                let finalF : Commit × Chal × Resp →
+                    (Commit × Resp) × (spec.QueryCache × List M) :=
+                  fun cωπ =>
+                    ((cωπ.1, cωπ.2.2),
+                      (match cache (.inr (msg, cωπ.1)) with
+                      | some _ => cache
+                      | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1,
+                        msg :: signed))
+                have hcomp : outerF ∘ innerF = finalF := by
+                  funext a
+                  cases hcache : cache (.inr (msg, a.1)) <;> simp [innerF, outerF, finalF, hcache]
+                simpa [innerF, outerF, finalF, Functor.map_map, Function.comp_def] using
+                  congrArg
+                    (fun f => f <$> liftComp (simTranscript pk) (Fork.wrappedSpec Chal))
+                    hcomp
+              simpa [simWrappedImpl, sigSimSignedWrapped, sigBadFSigned,
+                QueryImpl.add_apply_inr, QueryImpl.withBadUpdate_apply_run,
+                Functor.map_map, Function.comp_def] using
+                congrArg
+                  (fun x : OracleComp (Fork.wrappedSpec Chal)
+                    ((Commit × Resp) × (spec.QueryCache × List M)) =>
+                    (fun vs : (Commit × Resp) × (spec.QueryCache × List M) =>
+                      (vs.1, (vs.2, bad || sigBadFSigned msg (cache, signed) vs.1))) <$> x)
+                  hsigSigned
+            have h_rich_step_sim_link :
+                ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : RichState),
+                  Prod.map id simProj <$> (richImpl t).run s =
+                    Prod.fst <$> (simulateQ innerPkg.impl (((_simImplSigned pk) t).run s.1)).run
+                      s.2 := by
+              intro t s
+              rcases s with ⟨sAdv, sRo⟩
+              simpa [richImpl, richOuter, simProj, Function.comp_def] using
+                (VCVio.SSP.Package.map_simulateQ_link_run
+                  (P := richOuter) (Q := innerPkg)
+                  (A := OracleSpec.query t) (s₁ := sAdv) (s₂ := sRo)
+                  (f := fun z => (z.1, z.2.1)))
+            have h_simWrapped_step_evalDist :
+                ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : AdvState),
+                  evalDist ((simWrappedImpl t).run s) =
+                    evalDist (((_simImplSigned pk) t).run s) := by
+              intro t s
+              rcases s with ⟨⟨cache, signed⟩, bad⟩
+              cases t with
+              | inl t' =>
+                  cases t' with
+                  | inl n =>
+                      rw [h_simWrapped_unif_run n cache signed bad,
+                        h_simImplSigned_unif_run n cache signed bad]
+                      change
+                        evalDist
+                            ((fun u : spec.Range (Sum.inl n) =>
+                                (u, (((cache, signed), bad) : AdvState))) <$>
+                              ((liftM
+                                  (query (spec := Fork.wrappedSpec Chal) (Sum.inl n) :
+                                    OracleQuery (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))) :
+                                OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))))) =
+                          evalDist
+                            ((fun u : spec.Range (Sum.inl n) =>
+                                (u, (((cache, signed), bad) : AdvState))) <$>
+                              ((liftM
+                                  (query (spec := spec) (Sum.inl n) :
+                                    OracleQuery spec (spec.Range (Sum.inl n))) :
+                                OracleComp spec (spec.Range (Sum.inl n)))))
+                      have hLeft :
+                          evalDist
+                            ((liftM
+                                (query (spec := Fork.wrappedSpec Chal) (Sum.inl n) :
+                                  OracleQuery (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))) :
+                              OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n)))) =
+                            (liftM (PMF.uniformOfFintype (spec.Range (Sum.inl n))) :
+                              SPMF (spec.Range (Sum.inl n))) := by
+                        simpa using
+                          (evalDist_query (spec := Fork.wrappedSpec Chal) (t := Sum.inl n))
+                      have hRight :
+                          evalDist
+                            ((liftM
+                                (query (spec := spec) (Sum.inl n) :
+                                  OracleQuery spec (spec.Range (Sum.inl n))) :
+                              OracleComp spec (spec.Range (Sum.inl n)))) =
+                            (liftM (PMF.uniformOfFintype (spec.Range (Sum.inl n))) :
+                              SPMF (spec.Range (Sum.inl n))) := by
+                        simpa using (evalDist_query (spec := spec) (t := Sum.inl n))
+                      simpa [evalDist_map] using
+                        congrArg
+                          (fun p : SPMF (spec.Range (Sum.inl n)) =>
+                            (fun u : spec.Range (Sum.inl n) =>
+                              (u, (((cache, signed), bad) : AdvState))) <$> p)
+                          (hLeft.trans hRight.symm)
+                  | inr mc =>
+                      cases hcache : cache (.inr mc) with
+                      | none =>
+                          rw [h_simWrapped_hash_miss mc cache signed bad hcache,
+                            h_simImplSigned_hash_miss mc cache signed bad hcache]
+                          change
+                            evalDist
+                                ((fun u : Chal =>
+                                    (u, (((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState))) <$>
+                                  ((liftM
+                                      (query (spec := Fork.wrappedSpec Chal) (Sum.inr ()) :
+                                        OracleQuery (Fork.wrappedSpec Chal) Chal) :
+                                    OracleComp (Fork.wrappedSpec Chal) Chal))) =
+                              evalDist
+                                ((fun u : Chal =>
+                                    (u, (((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState))) <$>
+                                  ((liftM
+                                      (query (spec := spec) (Sum.inr mc) :
+                                        OracleQuery spec Chal) :
+                                    OracleComp spec Chal)))
+                          have hLeft :
+                              evalDist
+                                ((liftM
+                                    (query (spec := Fork.wrappedSpec Chal) (Sum.inr ()) :
+                                      OracleQuery (Fork.wrappedSpec Chal) Chal) :
+                                  OracleComp (Fork.wrappedSpec Chal) Chal)) =
+                                (liftM (PMF.uniformOfFintype Chal) : SPMF Chal) := by
+                            simpa [PMF.map_id] using
+                              (evalDist_liftM
+                                (q := (query (spec := Fork.wrappedSpec Chal) (Sum.inr ()) :
+                                  OracleQuery (Fork.wrappedSpec Chal) Chal)))
+                          have hRight :
+                              evalDist
+                                ((liftM
+                                    (query (spec := spec) (Sum.inr mc) :
+                                      OracleQuery spec Chal) :
+                                  OracleComp spec Chal)) =
+                                (liftM (PMF.uniformOfFintype Chal) : SPMF Chal) := by
+                            simpa [evalDist_liftM, PMF.map_id]
+                          simpa [evalDist_map] using
+                            congrArg
+                              (fun p : SPMF Chal =>
+                                (fun u : Chal =>
+                                  (u, (((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState))) <$> p)
+                              (hLeft.trans hRight.symm)
+                      | some ω =>
+                          rw [h_simWrapped_hash_hit mc cache signed bad ω hcache,
+                            h_simImplSigned_hash_hit mc cache signed bad ω hcache]
+                          rfl
+              | inr msg =>
+                  rw [h_simWrapped_sign_run msg cache signed bad,
+                    h_simImplSigned_sign_run msg cache signed bad]
+                  let outF : Commit × Chal × Resp → (Commit × Resp) × AdvState :=
+                    fun cωπ =>
+                      let newCache :=
+                        match cache (.inr (msg, cωπ.1)) with
+                        | some _ => cache
+                        | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                      ((cωπ.1, cωπ.2.2),
+                        (((newCache, msg :: signed),
+                          bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState))
+                  change
+                    evalDist (outF <$> liftComp (simTranscript pk) (Fork.wrappedSpec Chal)) =
+                      evalDist (outF <$> liftComp (simTranscript pk) spec)
+                  have hEq :
+                      evalDist (liftComp (simTranscript pk) (Fork.wrappedSpec Chal)) =
+                        evalDist (liftComp (simTranscript pk) spec) := by
+                    calc
+                      evalDist (liftComp (simTranscript pk) (Fork.wrappedSpec Chal))
+                          = evalDist (simTranscript pk) :=
+                            OracleComp.evalDist_liftComp (spec := unifSpec)
+                              (superSpec := Fork.wrappedSpec Chal)
+                              (mx := simTranscript pk)
+                      _ = evalDist (liftComp (simTranscript pk) spec) := by
+                            symm
+                            exact OracleComp.evalDist_liftComp (spec := unifSpec)
+                              (superSpec := spec) (mx := simTranscript pk)
+                  simpa [evalDist_map] using
+                    congrArg (fun p : SPMF (Commit × Chal × Resp) => outF <$> p) hEq
+            have h_rich_trace_run :
+                Prod.map id traceProj <$> richExp =
+                  (simulateQ traceImpl (adv.main pk)).run traceInit := by
+              simpa [richExp, traceInit, richInit, traceProj] using
+                (OracleComp.map_run_simulateQ_eq_of_query_map_eq'
+                  (impl₁ := richImpl) (impl₂ := traceImpl)
+                  (proj := traceProj) (hproj := h_rich_trace_proj)
+                  (oa := adv.main pk) (s := richInit))
+            have h_traceImpl_runTrace :
+                traceOfState <$> (simulateQ traceImpl (adv.main pk)).run traceInit =
+                  Fork.runTrace σ hr M nmaAdv pk := by
+              let traceMap :
+                  (((M × Commit × Resp) × spec.QueryCache) × RoState) →
+                    Fork.Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) :=
+                fun a =>
+                  { forgery := a.1.1
+                    advCache := a.1.2
+                    roCache := a.2.1
+                    queryLog := a.2.2
+                    verified :=
+                      match a.2.1 (a.1.1.1, a.1.1.2.1) with
+                      | some ω => σ.verify pk a.1.1.2.1 ω a.1.1.2.2
+                      | none => false }
+              have htraceMap :
+                  traceOfState ∘
+                      (fun x : (((M × Commit × Resp) × spec.QueryCache) × RoState) =>
+                        (x.1.1, (x.1.2, x.2))) =
+                    traceMap := by
+                funext x
+                rcases x with ⟨⟨forgery, advCache⟩, st⟩
+                rcases st with ⟨roCache, queryLog⟩
+                rcases forgery with ⟨msg, cs⟩
+                rcases cs with ⟨c, resp⟩
+                cases h : roCache (msg, c) <;> simp [traceOfState, traceMap, Function.comp_def, h]
+              calc
+                traceOfState <$> (simulateQ traceImpl (adv.main pk)).run traceInit
+                    = (traceOfState ∘
+                        (fun x : (((M × Commit × Resp) × spec.QueryCache) × RoState) =>
+                          (x.1.1, (x.1.2, x.2)))) <$>
+                        (simulateQ innerPkg.impl
+                          ((simulateQ traceOuter.impl (adv.main pk)).run traceCacheInit)).run
+                          roInit := by
+                            simpa [traceImpl, traceInit, traceCacheInit, roInit,
+                              Function.comp_def] using
+                              (VCVio.SSP.Package.map_simulateQ_link_run
+                                (P := traceOuter) (Q := innerPkg)
+                                (A := adv.main pk) (s₁ := traceCacheInit) (s₂ := roInit)
+                                (f := traceOfState))
+                _ = traceMap <$>
+                      (simulateQ innerPkg.impl
+                        ((simulateQ traceOuter.impl (adv.main pk)).run traceCacheInit)).run
+                        roInit := by
+                          simpa using
+                            congrArg
+                              (fun f =>
+                                f <$>
+                                  (simulateQ innerPkg.impl
+                                    ((simulateQ traceOuter.impl (adv.main pk)).run
+                                      traceCacheInit)).run roInit)
+                              htraceMap
+                _ = Fork.runTrace σ hr M nmaAdv pk := by
+                      rw [map_eq_bind_pure_comp, Fork.runTrace]
+                      unfold nmaAdv traceOuter innerPkg traceMap
+                      simp [Function.comp_def]
+                      congr
+                      · funext a
+                        rcases a with ⟨⟨forgery, advCache⟩, ⟨roCache, queryLog⟩⟩
+                        rcases forgery with ⟨msg, c, s⟩
+                        simp
+                        cases h : roCache (msg, c) <;> rfl
+            have h_traceExp_eq_runTrace :
+                traceExp = Fork.runTrace σ hr M nmaAdv pk := by
+              calc
+                traceExp
+                    = traceOfState <$> (Prod.map id traceProj <$> richExp) := by
+                        simp [traceExp, richExp, traceOfRich, traceOfState, Functor.map_map]
+                _ = traceOfState <$> (simulateQ traceImpl (adv.main pk)).run traceInit := by
+                        rw [h_rich_trace_run]
+                _ = Fork.runTrace σ hr M nmaAdv pk := h_traceImpl_runTrace
+            have h_rich_step_state :
+                ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : RichState),
+                  Prod.snd <$> (richImpl t).run s =
+                    (fun x :
+                        (((spec + (M →ₒ (Commit × Resp))).Range t × AdvState) × RoState) =>
+                      (x.1.2, x.2)) <$>
+                      (simulateQ innerPkg.impl (((_simImplSigned pk) t).run s.1)).run s.2 := by
+              intro t s
+              rcases s with ⟨sAdv, sRo⟩
+              simpa [richImpl, richOuter, Function.comp_def] using
+                (VCVio.SSP.Package.map_simulateQ_link_run
+                  (P := richOuter) (Q := innerPkg)
+                  (A := OracleSpec.query t) (s₁ := sAdv) (s₂ := sRo)
+                  (f := Prod.snd))
+            have h_richInv_step :
+                ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : RichState)
+                  {z : ((spec + (M →ₒ (Commit × Resp))).Range t) × RichState},
+                  richInv s →
+                    z ∈ support ((richImpl t).run s) →
+                      richInv z.2 := by
+              intro t s z hs hz
+              have hzState : z.2 ∈ support (Prod.snd <$> (richImpl t).run s) := by
+                rw [support_map]
+                exact ⟨z, hz, rfl⟩
+              rw [h_rich_step_state t s] at hzState
+              rw [support_map] at hzState
+              rcases hzState with ⟨w, hw, hwEq⟩
+              rcases s with ⟨sAdv, sRo⟩
+              rcases sAdv with ⟨⟨cache, signed⟩, bad⟩
+              rcases sRo with ⟨roCache, queryLog⟩
+              rcases hs with ⟨hRoToAdv, hAdvToRoOrSigned, hRoMem⟩
+              cases t with
+              | inl t' =>
+                  cases t' with
+                  | inl n =>
+                      have hinner :
+                          (simulateQ innerPkg.impl
+                              (liftM (spec.query (Sum.inl n)) :
+                                OracleComp spec ((spec + (M →ₒ (Commit × Resp))).Range
+                                  (Sum.inl (Sum.inl n))))).run
+                              (roCache, queryLog) =
+                            (fun u => (u, ((roCache, queryLog) : RoState))) <$>
+                              (((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                                OracleComp (Fork.wrappedSpec Chal)
+                                  ((spec + (M →ₒ (Commit × Resp))).Range
+                                    (Sum.inl (Sum.inl n)))) := by
+                        change
+                          (simulateQ innerPkg.impl
+                              (liftComp
+                                (unifSpec.query n :
+                                  ProbComp ((spec + (M →ₒ (Commit × Resp))).Range
+                                    (Sum.inl (Sum.inl n))))
+                                spec)).run
+                              ((roCache, queryLog) : RoState) =
+                            (fun u => (u, ((roCache, queryLog) : RoState))) <$>
+                              liftComp
+                                (unifSpec.query n :
+                                  ProbComp ((spec + (M →ₒ (Commit × Resp))).Range
+                                    (Sum.inl (Sum.inl n))))
+                                (Fork.wrappedSpec Chal)
+                        simpa [liftComp_eq_liftM] using
+                          (h_inner_liftComp_run
+                            (oa := (unifSpec.query n :
+                              ProbComp ((spec + (M →ₒ (Commit × Resp))).Range
+                                (Sum.inl (Sum.inl n)))))
+                            (st := ((roCache, queryLog) : RoState)))
+                      rw [h_simImplSigned_unif_run n cache signed bad] at hw
+                      have hw' :
+                          w ∈ support
+                            ((fun p => ((p.1, (cache, signed), bad), p.2)) <$>
+                              (simulateQ innerPkg.impl
+                                  (liftM (spec.query (Sum.inl n)) :
+                                    OracleComp spec
+                                      ((spec + (M →ₒ (Commit × Resp))).Range
+                                        (Sum.inl (Sum.inl n))))).run
+                                ((roCache, queryLog) : RoState)) := by
+                        simpa using hw
+                      rw [hinner] at hw'
+                      simp only [Functor.map_map, Function.comp_def, support_map] at hw'
+                      rcases hw' with ⟨u, hu, hw⟩
+                      subst w
+                      have huState : u.2 = ((roCache, queryLog) : RoState) := by
+                        have hu' :
+                            u ∈
+                              (fun u : (spec + (M →ₒ (Commit × Resp))).Range (Sum.inl (Sum.inl n)) =>
+                                  (u, ((roCache, queryLog) : RoState))) ''
+                                support
+                                  ((((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                                    OracleComp (Fork.wrappedSpec Chal)
+                                      ((spec + (M →ₒ (Commit × Resp))).Range
+                                        (Sum.inl (Sum.inl n))))) := by
+                          have hq :
+                              ((((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                                  OracleComp (Fork.wrappedSpec Chal)
+                                    ((spec + (M →ₒ (Commit × Resp))).Range
+                                      (Sum.inl (Sum.inl n))))) =
+                                ((liftM
+                                    (query (spec := Fork.wrappedSpec Chal) (Sum.inl n) :
+                                      OracleQuery (Fork.wrappedSpec Chal)
+                                        ((spec + (M →ₒ (Commit × Resp))).Range
+                                          (Sum.inl (Sum.inl n)))) :
+                                  OracleComp (Fork.wrappedSpec Chal)
+                                    ((spec + (M →ₒ (Commit × Resp))).Range
+                                      (Sum.inl (Sum.inl n))))) := by
+                            rfl
+                          rw [← support_map]
+                          convert hu using 1
+                        obtain ⟨u₀, _, huEq⟩ := hu'
+                        simpa using (congrArg Prod.snd huEq).symm
+                      have hzEq :
+                          z.2 =
+                            ((((cache, signed), bad) : AdvState), ((roCache, queryLog) : RoState)) := by
+                        calc
+                          z.2 = ((((cache, signed), bad) : AdvState), u.2) := by
+                            simpa using hwEq.symm
+                          _ = ((((cache, signed), bad) : AdvState), ((roCache, queryLog) : RoState)) := by
+                            simp [huState]
+                      rw [hzEq]
+                      exact ⟨hRoToAdv, hAdvToRoOrSigned, hRoMem⟩
+                  | inr mc =>
+                      cases hcache : cache (.inr mc) with
+                      | some ω =>
+                          rw [h_simImplSigned_hash_hit mc cache signed bad ω hcache] at hw
+                          simp at hw
+                          subst w
+                          have hzEq :
+                              z.2 =
+                                ((((cache, signed), bad) : AdvState),
+                                  ((roCache, queryLog) : RoState)) := by
+                            simpa using hwEq.symm
+                          rw [hzEq]
+                          exact ⟨hRoToAdv, hAdvToRoOrSigned, hRoMem⟩
+                      | none =>
+                          have hroMiss : roCache mc = none := by
+                            cases hro : roCache mc with
+                            | none =>
+                                exact rfl
+                            | some ω =>
+                                have hadv : cache (.inr mc) = some ω := hRoToAdv mc ω hro
+                                simp [hcache] at hadv
+                          have hinner :
+                              (simulateQ innerPkg.impl
+                                  (liftM (spec.query (Sum.inr mc)) :
+                                    OracleComp spec
+                                      ((spec + (M →ₒ (Commit × Resp))).Range
+                                        (Sum.inl (Sum.inr mc))))).run
+                                  (roCache, queryLog) =
+                                (fun u =>
+                                  (u,
+                                    ((roCache.cacheQuery mc u, queryLog ++ [mc]) :
+                                      RoState))) <$>
+                                  (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                                    OracleComp (Fork.wrappedSpec Chal)
+                                      ((spec + (M →ₒ (Commit × Resp))).Range
+                                        (Sum.inl (Sum.inr mc)))) := by
+                            change
+                              (simulateQ innerPkg.impl
+                                  (liftComp
+                                    (((M × Commit →ₒ Chal).query mc) :
+                                      OracleComp (M × Commit →ₒ Chal)
+                                        ((spec + (M →ₒ (Commit × Resp))).Range
+                                          (Sum.inl (Sum.inr mc))))
+                                    spec)).run
+                                  ((roCache, queryLog) : RoState) =
+                                (fun u =>
+                                  (u,
+                                    ((roCache.cacheQuery mc u, queryLog ++ [mc]) :
+                                      RoState))) <$>
+                                  (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                                    OracleComp (Fork.wrappedSpec Chal)
+                                      ((spec + (M →ₒ (Commit × Resp))).Range
+                                        (Sum.inl (Sum.inr mc))))
+                            rw [QueryImpl.simulateQ_add_liftComp_right
+                              (impl₁' := Fork.unifFwd M Commit Chal)
+                              (impl₂' := Fork.roImpl M Commit Chal)]
+                            rw [simulateQ_query]
+                            simp [innerPkg, QueryImpl.add_apply_inr, Fork.roImpl, StateT.run_bind,
+                              StateT.run_get, StateT.run_set, hroMiss, bind_pure_comp,
+                              liftComp_eq_liftM]
+                          rw [h_simImplSigned_hash_miss mc cache signed bad hcache] at hw
+                          have hw' :
+                              w ∈ support
+                                ((fun p =>
+                                    ((p.1, (cache.cacheQuery (.inr mc) p.1, signed), bad), p.2)) <$>
+                                  (simulateQ innerPkg.impl
+                                      (liftM (spec.query (Sum.inr mc)) :
+                                        OracleComp spec
+                                          ((spec + (M →ₒ (Commit × Resp))).Range
+                                            (Sum.inl (Sum.inr mc))))).run
+                                    ((roCache, queryLog) : RoState)) := by
+                            simpa using hw
+                          rw [hinner] at hw'
+                          rw [support_map] at hw'
+                          rcases hw' with ⟨⟨u, st'⟩, hp, hw⟩
+                          have hp' :
+                              (u, st') ∈
+                                (fun u =>
+                                  (u, ((roCache.cacheQuery mc u, queryLog ++ [mc]) : RoState))) ''
+                                  support
+                                    (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                                      OracleComp (Fork.wrappedSpec Chal)
+                                        ((spec + (M →ₒ (Commit × Resp))).Range
+                                          (Sum.inl (Sum.inr mc)))) := by
+                            rw [← support_map]
+                            exact hp
+                          have hst' :
+                              ((roCache.cacheQuery mc u, queryLog ++ [mc]) : RoState) = st' := by
+                            rcases hp' with ⟨u', hu', huEq⟩
+                            simp [support_query] at hu'
+                            cases huEq
+                            rfl
+                          cases hst'
+                          subst w
+                          have hzEq :
+                              z.2 =
+                                ((((cache.cacheQuery (.inr mc) u, signed), bad) : AdvState),
+                                  ((roCache.cacheQuery mc u, queryLog ++ [mc]) : RoState)) := by
+                            simpa using hwEq.symm
+                          rw [hzEq]
+                          constructor
+                          · intro mc' ω' hro'
+                            by_cases hEq : mc' = mc
+                            · subst hEq
+                              have hu : u = ω' := by
+                                simpa using hro'
+                              simpa only [QueryCache.cacheQuery_self] using
+                                (congrArg some hu : some u = some ω')
+                            · have hroOld : roCache mc' = some ω' := by
+                                simpa [QueryCache.cacheQuery_of_ne (cache := roCache) u hEq] using
+                                  hro'
+                              have hEqSum :
+                                  (Sum.inr mc' : spec.Domain) ≠ (Sum.inr mc : spec.Domain) := by
+                                intro hEq'
+                                apply hEq
+                                simpa using hEq'
+                              have hadvOld : cache (.inr mc') = some ω' := hRoToAdv mc' ω' hroOld
+                              simpa [QueryCache.cacheQuery_of_ne (cache := cache)
+                                (t' := Sum.inr mc') (t := Sum.inr mc) u hEqSum] using
+                                hadvOld
+                          · constructor
+                            · intro msg c ω' hadv'
+                              by_cases hEq : (msg, c) = mc
+                              · subst hEq
+                                left
+                                have hu : u = ω' := by
+                                  simpa using hadv'
+                                simpa only [QueryCache.cacheQuery_self] using
+                                  (congrArg some hu : some u = some ω')
+                              · have hadvOld : cache (.inr (msg, c)) = some ω' := by
+                                  have hEqSum :
+                                      (Sum.inr (msg, c) : spec.Domain) ≠ (Sum.inr mc : spec.Domain) := by
+                                    intro hEq'
+                                    apply hEq
+                                    simpa using hEq'
+                                  simpa [QueryCache.cacheQuery_of_ne (cache := cache)
+                                    (t' := Sum.inr (msg, c)) (t := Sum.inr mc) u hEqSum] using
+                                    hadv'
+                                rcases hAdvToRoOrSigned msg c ω' hadvOld with hroOld | hsigned
+                                · left
+                                  simpa [QueryCache.cacheQuery_of_ne (cache := roCache) u hEq] using
+                                    hroOld
+                                · right
+                                  exact hsigned
+                            · intro mc'
+                              by_cases hEq : mc' = mc
+                              · subst hEq
+                                simp
+                              · simpa [QueryCache.cacheQuery_of_ne (cache := roCache) u hEq,
+                                  List.mem_append, hEq] using hRoMem mc'
+              | inr msg =>
+                  rw [h_simImplSigned_sign_run msg cache signed bad] at hw
+                  let F : Commit × Chal × Resp → (Commit × Resp) × AdvState := fun cωπ =>
+                    let newCache :=
+                      match cache (.inr (msg, cωπ.1)) with
+                      | some _ => cache
+                      | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                    ((cωπ.1, cωπ.2.2),
+                      (((newCache, msg :: signed),
+                        bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState))
+                  have hinner :
+                      (simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec)).run
+                          ((roCache, queryLog) : RoState) =
+                        (fun cωπ => (F cωπ, ((roCache, queryLog) : RoState))) <$>
+                          liftComp (simTranscript pk) (Fork.wrappedSpec Chal) := by
+                    rw [show simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec) =
+                        F <$> simulateQ innerPkg.impl (liftComp (simTranscript pk) spec) by
+                          rw [simulateQ_map]]
+                    rw [StateT.run_map, h_inner_liftComp_run (oa := simTranscript pk)
+                      (st := ((roCache, queryLog) : RoState))]
+                    simp [Functor.map_map, Function.comp_def, F]
+                  have hw' :
+                      w ∈ support
+                        ((fun cωπ => (F cωπ, ((roCache, queryLog) : RoState))) <$>
+                          liftComp (simTranscript pk) (Fork.wrappedSpec Chal)) := by
+                    rw [← hinner]
+                    exact hw
+                  rw [support_map] at hw'
+                  rcases hw' with ⟨cωπ, _, hw⟩
+                  subst w
+                  let newCache : spec.QueryCache :=
+                    match cache (.inr (msg, cωπ.1)) with
+                    | some _ => cache
+                    | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                  have hzEq :
+                      z.2 =
+                        ((((newCache, msg :: signed),
+                          bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState),
+                          ((roCache, queryLog) : RoState)) := by
+                    simpa [newCache, F] using hwEq.symm
+                  rw [hzEq]
+                  constructor
+                  · intro mc ω hro
+                    by_cases hEq : mc = (msg, cωπ.1)
+                    · subst hEq
+                      cases hcache' : cache (.inr (msg, cωπ.1)) with
+                      | none =>
+                          have hadv : cache (.inr (msg, cωπ.1)) = some ω := hRoToAdv _ _ hro
+                          simp [hcache'] at hadv
+                      | some _ =>
+                          simpa [newCache, hcache'] using hRoToAdv _ _ hro
+                    · cases hcache' : cache (.inr (msg, cωπ.1)) with
+                      | none =>
+                          have hnewCache_ne : newCache (.inr mc) = cache (.inr mc) := by
+                            simp [newCache, hcache',
+                              QueryCache.cacheQuery_of_ne (cache := cache)
+                                (t' := Sum.inr mc) (t := Sum.inr (msg, cωπ.1)) cωπ.2.1
+                                (by simpa using hEq)]
+                          simpa [hnewCache_ne] using hRoToAdv mc ω hro
+                      | some _ =>
+                          simpa [newCache, hcache'] using hRoToAdv mc ω hro
+                  · constructor
+                    · intro msg' c ω hadv
+                      by_cases hEq : (msg', c) = (msg, cωπ.1)
+                      · cases hEq
+                        right
+                        simp
+                      · have hadvOld : cache (.inr (msg', c)) = some ω := by
+                          cases hcache' : cache (.inr (msg, cωπ.1)) with
+                          | none =>
+                              have hnewCache_ne :
+                                  newCache (.inr (msg', c)) = cache (.inr (msg', c)) := by
+                                simp [newCache, hcache',
+                                  QueryCache.cacheQuery_of_ne (cache := cache)
+                                    (t' := Sum.inr (msg', c)) (t := Sum.inr (msg, cωπ.1))
+                                    cωπ.2.1 (by simpa using hEq)]
+                              simpa [hnewCache_ne] using hadv
+                          | some _ =>
+                              simpa [newCache, hcache'] using hadv
+                        rcases hAdvToRoOrSigned msg' c ω hadvOld with hro | hsigned
+                        · left
+                          exact hro
+                        · right
+                          simp [hsigned]
+                    · intro mc
+                      simpa using hRoMem mc
+            have h_richInv_run :
+                ∀ {α : Type} (oa : OracleComp (spec + (M →ₒ (Commit × Resp))) α)
+                  (s : RichState),
+                  richInv s →
+                    ∀ z ∈ support ((simulateQ richImpl oa).run s), richInv z.2 := by
+              intro α oa
+              induction oa using OracleComp.inductionOn with
+              | pure x =>
+                  intro s hs z hz
+                  simp [simulateQ_pure, StateT.run_pure, support_pure] at hz
+                  subst z
+                  simpa using hs
+              | query_bind t oa ih =>
+                  intro s hs z hz
+                  have hz' :
+                      z ∈ support
+                        (((richImpl t).run s) >>= fun us =>
+                          (simulateQ richImpl (oa us.1)).run us.2) := by
+                    simpa [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+                      OracleQuery.cont_query, id_map, StateT.run_bind] using hz
+                  rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
+                  have husInv : richInv us.2 := h_richInv_step t s hs hus
+                  exact ih us.1 us.2 husInv z hzcont
+            have h_rich_simWrapped_step_proj :
+                ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : RichState),
+                  richInv s →
+                  Prod.map id simProj <$> (richImpl t).run s =
+                    (simWrappedImpl t).run (simProj s) := by
+              intro t s hs
+              rcases s with ⟨⟨⟨cache, signed⟩, bad⟩, ⟨roCache, queryLog⟩⟩
+              rcases hs with ⟨hRoToAdv, hAdvToRoOrSigned, hRoMem⟩
+              have hstep :=
+                h_rich_step_sim_link (t := t)
+                  (s := ((((cache, signed), bad) : AdvState), ((roCache, queryLog) : RoState)))
+              cases t with
+              | inl t' =>
+                  cases t' with
+                  | inl n =>
+                      have hinner :
+                          (simulateQ innerPkg.impl
+                              (liftM (spec.query (Sum.inl n)) :
+                                OracleComp spec (spec.Range (Sum.inl n)))).run
+                              ((roCache, queryLog) : RoState) =
+                            (fun u => (u, ((roCache, queryLog) : RoState))) <$>
+                              (((Fork.wrappedSpec Chal).query (Sum.inl n)) :
+                                OracleComp (Fork.wrappedSpec Chal) (spec.Range (Sum.inl n))) := by
+                        change
+                          (simulateQ innerPkg.impl
+                              (liftComp
+                                (unifSpec.query n : ProbComp (spec.Range (Sum.inl n)))
+                                spec)).run
+                              ((roCache, queryLog) : RoState) =
+                            (fun u => (u, ((roCache, queryLog) : RoState))) <$>
+                              liftComp
+                                (unifSpec.query n : ProbComp (spec.Range (Sum.inl n)))
+                                (Fork.wrappedSpec Chal)
+                        simpa [liftComp_eq_liftM] using
+                          (h_inner_liftComp_run
+                            (oa := (unifSpec.query n : ProbComp (Fin (n + 1))))
+                            (st := ((roCache, queryLog) : RoState)))
+                      have hlhs :
+                          Prod.fst <$>
+                              (simulateQ innerPkg.impl
+                                  ((fun u => (u, (cache, signed), bad)) <$>
+                                    liftM (spec.query (Sum.inl n)))).run
+                                ((roCache, queryLog) : RoState) =
+                            (simWrappedImpl (Sum.inl (Sum.inl n))).run
+                              (simProj ((((cache, signed), bad) : AdvState),
+                                ((roCache, queryLog) : RoState))) := by
+                        rw [simulateQ_map, StateT.run_map, hinner]
+                        simpa [h_simWrapped_unif_run n cache signed bad, Functor.map_map,
+                          Function.comp_def]
+                      rw [hstep, h_simImplSigned_unif_run n cache signed bad]
+                      simpa using hlhs
+                  | inr mc =>
+                      cases hcache : cache (.inr mc) with
+                      | some ω =>
+                          rw [hstep, h_simImplSigned_hash_hit mc cache signed bad ω hcache]
+                          simpa [simulateQ_pure, StateT.run_pure] using
+                            (h_simWrapped_hash_hit mc cache signed bad ω hcache).symm
+                      | none =>
+                          have hroMiss : roCache mc = none := by
+                            cases hro : roCache mc with
+                            | none =>
+                                exact rfl
+                            | some ω =>
+                                have hadv : cache (.inr mc) = some ω := hRoToAdv mc ω hro
+                                simp [hcache] at hadv
+                          have hinner :
+                              (simulateQ innerPkg.impl
+                                  (liftM (spec.query (Sum.inr mc)) :
+                                    OracleComp spec (spec.Range (Sum.inr mc)))).run
+                                  ((roCache, queryLog) : RoState) =
+                                (fun u =>
+                                  (u,
+                                    ((roCache.cacheQuery mc u, queryLog ++ [mc]) :
+                                      RoState))) <$>
+                                  (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                                    OracleComp (Fork.wrappedSpec Chal)
+                                      (spec.Range (Sum.inr mc))) := by
+                            change
+                              (simulateQ innerPkg.impl
+                                  (liftComp
+                                    (((M × Commit →ₒ Chal).query mc) :
+                                      OracleComp (M × Commit →ₒ Chal) (spec.Range (Sum.inr mc)))
+                                    spec)).run
+                                  ((roCache, queryLog) : RoState) =
+                                (fun u =>
+                                  (u,
+                                    ((roCache.cacheQuery mc u, queryLog ++ [mc]) :
+                                      RoState))) <$>
+                                  (((Fork.wrappedSpec Chal).query (Sum.inr ())) :
+                                    OracleComp (Fork.wrappedSpec Chal)
+                                      (spec.Range (Sum.inr mc)))
+                            rw [QueryImpl.simulateQ_add_liftComp_right
+                              (impl₁' := Fork.unifFwd M Commit Chal)
+                              (impl₂' := Fork.roImpl M Commit Chal)]
+                            rw [simulateQ_query]
+                            simp [innerPkg, QueryImpl.add_apply_inr, Fork.roImpl, hroMiss,
+                              StateT.run_bind, StateT.run_get, StateT.run_set, bind_pure_comp,
+                              liftComp_eq_liftM]
+                          have hlhs :
+                              Prod.fst <$>
+                                  (simulateQ innerPkg.impl
+                                      ((fun u =>
+                                          (u, (cache.cacheQuery (.inr mc) u, signed), bad)) <$>
+                                        liftM (spec.query (Sum.inr mc)))).run
+                                    ((roCache, queryLog) : RoState) =
+                                (simWrappedImpl (Sum.inl (Sum.inr mc))).run
+                                  (simProj ((((cache, signed), bad) : AdvState),
+                                    ((roCache, queryLog) : RoState))) := by
+                            rw [simulateQ_map, StateT.run_map, hinner]
+                            simpa [Functor.map_map, Function.comp_def, simProj] using
+                              (h_simWrapped_hash_miss mc cache signed bad hcache).symm
+                          rw [hstep, h_simImplSigned_hash_miss mc cache signed bad hcache]
+                          simpa using hlhs
+              | inr msg =>
+                  let F : Commit × Chal × Resp → (Commit × Resp) × AdvState := fun cωπ =>
+                    let newCache :=
+                      match cache (.inr (msg, cωπ.1)) with
+                      | some _ => cache
+                      | none => cache.cacheQuery (.inr (msg, cωπ.1)) cωπ.2.1
+                    ((cωπ.1, cωπ.2.2),
+                      (((newCache, msg :: signed),
+                        bad || (cache (.inr (msg, cωπ.1))).isSome) : AdvState))
+                  have hinner :
+                      (simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec)).run
+                          ((roCache, queryLog) : RoState) =
+                        (fun cωπ => (F cωπ, ((roCache, queryLog) : RoState))) <$>
+                          liftComp (simTranscript pk) (Fork.wrappedSpec Chal) := by
+                    rw [show simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec) =
+                        F <$> simulateQ innerPkg.impl (liftComp (simTranscript pk) spec) by
+                          rw [simulateQ_map]]
+                    rw [StateT.run_map, h_inner_liftComp_run (oa := simTranscript pk)
+                      (st := ((roCache, queryLog) : RoState))]
+                    simp [Functor.map_map, Function.comp_def, F]
+                  have hlhs :
+                      Prod.fst <$>
+                          (simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec)).run
+                            ((roCache, queryLog) : RoState) =
+                        (simWrappedImpl (Sum.inr msg)).run
+                          (simProj ((((cache, signed), bad) : AdvState),
+                            ((roCache, queryLog) : RoState))) := by
+                    rw [hinner]
+                    simpa [Functor.map_map, Function.comp_def, F, simProj] using
+                      (h_simWrapped_sign_run msg cache signed bad).symm
+                  rw [hstep, h_simImplSigned_sign_run msg cache signed bad]
+                  simpa [F] using hlhs
+            have h_pr_event_rich :
+                Pr[event pk | direct_sim_exp pk] =
+                  Pr[fun z => event pk (Prod.map id simProj z) | richExp] := by
+              let wrappedExp :
+                  OracleComp (Fork.wrappedSpec Chal) ((M × (Commit × Resp)) × AdvState) :=
+                (simulateQ simWrappedImpl (adv.main pk)).run advInit
+              have h_rich_proj :
+                  Prod.map id simProj <$> richExp = wrappedExp := by
+                simpa [wrappedExp, richExp] using
+                  (OracleComp.map_run_simulateQ_eq_of_query_map_eq_inv'
+                    (impl₁ := richImpl) (impl₂ := simWrappedImpl)
+                    (inv := richInv) (proj := simProj)
+                    (hinv := fun t s hs y hy => h_richInv_step t s hs hy)
+                    (hproj := h_rich_simWrapped_step_proj)
+                    (oa := adv.main pk) (s := richInit) h_richInv_init)
+              have h_step_rel :
+                  ∀ (t : (spec + (M →ₒ (Commit × Resp))).Domain) (s : AdvState),
+                    OracleComp.ProgramLogic.Relational.RelTriple
+                      ((simWrappedImpl t).run s) (((_simImplSigned pk) t).run s)
+                      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2) := by
+                intro t s
+                have hrel :
+                    OracleComp.ProgramLogic.Relational.RelTriple
+                      ((simWrappedImpl t).run s) (((_simImplSigned pk) t).run s)
+                      (OracleComp.ProgramLogic.Relational.EqRel
+                        (((spec + (M →ₒ (Commit × Resp))).Range t) × AdvState)) :=
+                  OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_evalDist_eq
+                    (h_simWrapped_step_evalDist t s)
+                exact OracleComp.ProgramLogic.Relational.relTriple_post_mono hrel (by
+                  intro p₁ p₂ hp
+                  rcases hp with rfl
+                  exact ⟨rfl, rfl⟩)
+              have h_wrapped_direct_rel :
+                  OracleComp.ProgramLogic.Relational.RelTriple wrappedExp (direct_sim_exp pk)
+                    (OracleComp.ProgramLogic.Relational.EqRel
+                      ((M × (Commit × Resp)) × AdvState)) := by
+                have hrun :
+                    OracleComp.ProgramLogic.Relational.RelTriple wrappedExp (direct_sim_exp pk)
+                      (fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2) := by
+                  exact OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run
+                    simWrappedImpl (_simImplSigned pk) (fun s₁ s₂ => s₁ = s₂) (adv.main pk)
+                    (fun t s₁ s₂ hsEq => by
+                      subst s₂
+                      exact h_step_rel t s₁)
+                    advInit advInit rfl
+                exact OracleComp.ProgramLogic.Relational.relTriple_post_mono hrun (by
+                  intro p₁ p₂ hp
+                  rcases hp with ⟨hfst, hsnd⟩
+                  simpa [OracleComp.ProgramLogic.Relational.EqRel] using Prod.ext hfst hsnd)
+              have h_wrapped_direct_eq :
+                  evalDist wrappedExp = evalDist (direct_sim_exp pk) :=
+                OracleComp.ProgramLogic.Relational.evalDist_eq_of_relTriple_eqRel
+                  h_wrapped_direct_rel
+              symm
+              calc
+                Pr[fun z => event pk (Prod.map id simProj z) | richExp]
+                    = Pr[event pk | Prod.map id simProj <$> richExp] := by
+                        exact
+                          (probEvent_map (mx := richExp) (f := Prod.map id simProj)
+                            (q := event pk)).symm
+                _ = Pr[event pk | wrappedExp] := by
+                        rw [h_rich_proj]
+                _ = Pr[event pk | direct_sim_exp pk] := by
+                        refine probEvent_congr' (oa := wrappedExp) (oa' := direct_sim_exp pk)
+                          (p := event pk) (q := event pk) ?_ h_wrapped_direct_eq
+                        intro x hx
+                        rfl
+            have h_event_imp_forkPoint :
+                ∀ z ∈ support richExp,
+                  event pk (Prod.map id simProj z) →
+                    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                      (Chal := Chal) qH (traceOfRich z)).isSome = true := by
+              intro z hz hzEvent
+              have hzInv : richInv z.2 :=
+                h_richInv_run (oa := adv.main pk) (s := richInit) h_richInv_init z hz
+              rcases z with ⟨⟨msg, cs⟩, s⟩
+              rcases cs with ⟨c, resp⟩
+              rcases s with ⟨sAdv, sRo⟩
+              rcases sAdv with ⟨⟨cache, signed⟩, bad⟩
+              rcases sRo with ⟨roCache, queryLog⟩
+              rcases hzInv with ⟨hRoToAdv, hAdvToRoOrSigned, hRoMem⟩
+              rcases hzEvent with ⟨⟨ω, hcache, hVerify⟩, hFresh⟩
+              have hro : roCache (msg, c) = some ω := by
+                rcases hAdvToRoOrSigned msg c ω hcache with hro | hsigned
+                · exact hro
+                · exact False.elim (hFresh hsigned)
+              have hmem : (msg, c) ∈ queryLog := by
+                exact (hRoMem (msg, c)).1 ⟨ω, hro⟩
+              have hzTrace :
+                  Prod.map id traceProj ((msg, (c, resp)), (((cache, signed), bad), (roCache, queryLog))) ∈
+                    support ((simulateQ traceImpl (adv.main pk)).run traceInit) := by
+                rw [← h_rich_trace_run]
+                rw [support_map]
+                exact ⟨((msg, (c, resp)), (((cache, signed), bad), (roCache, queryLog))), hz, rfl⟩
+              have h_traceRo_run :
+                  (fun y : (M × (Commit × Resp)) × TraceState => y.2.2) <$>
+                    (simulateQ traceImpl (adv.main pk)).run traceInit =
+                      Prod.snd <$> (simulateQ innerPkg.impl (nmaAdv.main pk)).run roInit := by
+                simpa [traceImpl, traceOuter, nmaAdv, traceInit, innerPkg, traceCacheInit,
+                  roInit, Function.comp_def] using
+                  (VCVio.SSP.Package.map_simulateQ_link_run
+                    (P := traceOuter) (Q := innerPkg)
+                    (A := adv.main pk) (s₁ := traceCacheInit) (s₂ := roInit)
+                    (f := fun y : (M × (Commit × Resp)) × TraceState => y.2.2))
+              have hzRo :
+                  ((roCache, queryLog) : RoState) ∈
+                    support (Prod.snd <$> (simulateQ innerPkg.impl (nmaAdv.main pk)).run
+                      roInit) := by
+                have hzRo' :
+                    ((roCache, queryLog) : RoState) ∈
+                      support ((fun y : (M × (Commit × Resp)) × TraceState => y.2.2) <$>
+                        (simulateQ traceImpl (adv.main pk)).run traceInit) := by
+                  rw [support_map]
+                  exact ⟨Prod.map id traceProj ((msg, (c, resp)),
+                    (((cache, signed), bad), (roCache, queryLog))), hzTrace, rfl⟩
+                rw [h_traceRo_run] at hzRo'
+                exact hzRo'
+              rw [support_map] at hzRo
+              rcases hzRo with ⟨w, hw, hwEq⟩
+              have hlen :
+                  queryLog.length ≤ qH := by
+                have hlen' :=
+                  h_queryLog_len_le_of_nmaHashQueryBound (hQ := h_nmaHashBound)
+                    (st := roInit) (z := w) hw
+                rw [hwEq] at hlen'
+                simpa [roInit] using hlen'
+              have hidxLen : queryLog.findIdx (· == (msg, c)) < queryLog.length := by
+                exact List.findIdx_lt_length_of_exists ⟨(msg, c), hmem, by simp⟩
+              have hidx : queryLog.findIdx (· == (msg, c)) < qH + 1 := by
+                omega
+              have hidx_le : queryLog.findIdx (· == (msg, c)) ≤ qH := by
+                exact Nat.lt_succ_iff.mp hidx
+              unfold Fork.forkPoint
+              simpa [traceOfRich, traceOfState, traceProj, cacheProj, Fork.Trace.target,
+                hro, hVerify, hmem, hidx_le]
+            calc
+              Pr[event pk | direct_sim_exp pk]
+                  = Pr[fun z => event pk (Prod.map id simProj z) | richExp] := by
+                      exact h_pr_event_rich
+              _ ≤ Pr[fun z =>
+                    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                      (Chal := Chal) qH (traceOfRich z)).isSome | richExp] := by
+                      refine probEvent_mono ?_
+                      intro z hz hzEvent
+                      exact h_event_imp_forkPoint z hz hzEvent
+              _ = Pr[fun trace =>
+                    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                      (Chal := Chal) qH trace).isSome | traceExp] := by
+                      change
+                        Pr[fun z =>
+                            (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                              (Chal := Chal) qH (traceOfRich z)).isSome | richExp] =
+                          Pr[fun trace =>
+                            (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                              (Chal := Chal) qH trace).isSome | traceOfRich <$> richExp]
+                      exact
+                        (probEvent_map
+                          (mx := richExp) (f := traceOfRich)
+                          (q := fun trace =>
+                            (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                              (Chal := Chal) qH trace).isSome)).symm
+              _ = Pr[fun trace =>
+                    (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                      (Chal := Chal) qH trace).isSome | Fork.runTrace σ hr M nmaAdv pk] := by
+                      rw [h_traceExp_eq_runTrace]
         -- Distribute `Fork.advantage` over keygen, mirroring the `hAdv_eq_tsum` pattern in
         -- `euf_nma_bound`.
         have hFork_tsum : Fork.advantage σ hr M nmaAdv qH =
             ∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              forkAcc pksk.1 := by
+              Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
+                  (Chal := Chal) qH trace).isSome |
+                Fork.runTrace σ hr M nmaAdv pksk.1] := by
           change Pr[= true | Fork.exp σ hr M nmaAdv qH] = _
           unfold Fork.exp
           rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
@@ -4365,7 +6094,7 @@ theorem euf_cma_to_nma
           rw [probOutput_liftComp]
           congr 1
           rcases pksk with ⟨pk, sk⟩
-          simp only [bind_pure_comp, probEvent_map, Function.comp_def, forkAcc]
+          simp only [bind_pure_comp, probEvent_map, Function.comp_def]
         -- Chain the per-pk bound over the sum.
         rw [hFork_tsum]
         refine ENNReal.tsum_le_tsum fun pksk => ?_
