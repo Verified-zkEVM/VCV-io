@@ -7,11 +7,13 @@ Authors: Quang Dao
 import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.ProbabilityTheory.Coupling
 import VCVio.EvalDist.Defs.Instances
+import VCVio.EvalDist.Defs.NeverFails
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.EvalDist.Monad.Map
 import VCVio.OracleComp.EvalDist
+import VCVio.ProgramLogic.Unary.HoarePropTriple
 
 /-!
 # Relational program-logic baseline
@@ -104,6 +106,74 @@ noncomputable instance instMAlgRelOrdered :
       have hz'' : z ∈ support (Classical.choose hcut).1 := by
         simpa [d, hcut] using hz'
       exact (Classical.choose_spec hcut) z hz''
+
+/-- Anchoring instance for the qualitative `Prop`-valued relational logic on `OracleComp`.
+
+When one of the two computations is `pure`, the relational coupling logic collapses to the
+unary support-based logic of the other side. This is the relational analogue of the
+*Dirac coupling* identity `c (a, b) = (evalDist y) b` whenever `c` couples `pure a` with `y`.
+
+Together with the unary `Prop` algebra in `VCVio/ProgramLogic/Unary/HoarePropTriple.lean`,
+this lets `wpExc` / `rwpExc`-style honest exception combinators (in
+`ToMathlib/Control/Monad/RelationalAlgebraAnchored.lean`) be derived uniformly. -/
+instance instAnchored :
+    MAlgRelOrdered.Anchored (OracleComp spec₁) (OracleComp spec₂) Prop where
+  rwp_pure_left {α β} a y post := by
+    apply propext
+    constructor
+    · -- (→) Use `apply_pure_left_eq` to extract the unary postcondition.
+      rintro ⟨c, hc⟩
+      rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support]
+      intro b hb
+      have hcPure : _root_.SPMF.IsCoupling c.1 (pure a) (evalDist y) := by
+        simpa [evalDist_pure] using c.2
+      have hpos : (evalDist y) b ≠ 0 :=
+        (mem_support_iff_evalDist_apply_ne_zero y b).1 hb
+      have hmass : c.1 (a, b) ≠ 0 := by
+        rw [hcPure.apply_pure_left_eq b]; exact hpos
+      have hmem : (a, b) ∈ support c.1 := (mem_support_iff c.1 (a, b)).2 hmass
+      exact hc (a, b) hmem
+    · -- (←) Construct the canonical Dirac coupling.
+      intro hwp
+      rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support] at hwp
+      have hnf : (evalDist y).toPMF none = 0 := probFailure_eq_zero (mx := y)
+      refine ⟨⟨((a, ·) : β → α × β) <$> evalDist y, ?_⟩, ?_⟩
+      · simpa [evalDist_pure] using
+          (_root_.SPMF.IsCoupling.dirac_left a hnf)
+      · intro z hz
+        rw [support_map] at hz
+        rcases hz with ⟨b, hb, hzeq⟩
+        rw [← hzeq]
+        refine hwp b ?_
+        exact (mem_support_iff_evalDist_apply_ne_zero y b).2
+          ((mem_support_iff_evalDist_apply_ne_zero (evalDist y) b).1 hb)
+  rwp_pure_right {α β} x b post := by
+    apply propext
+    constructor
+    · rintro ⟨c, hc⟩
+      rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support]
+      intro a ha
+      have hcPure : _root_.SPMF.IsCoupling c.1 (evalDist x) (pure b) := by
+        simpa [evalDist_pure] using c.2
+      have hpos : (evalDist x) a ≠ 0 :=
+        (mem_support_iff_evalDist_apply_ne_zero x a).1 ha
+      have hmass : c.1 (a, b) ≠ 0 := by
+        rw [hcPure.apply_pure_right_eq a]; exact hpos
+      have hmem : (a, b) ∈ support c.1 := (mem_support_iff c.1 (a, b)).2 hmass
+      exact hc (a, b) hmem
+    · intro hwp
+      rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support] at hwp
+      have hnf : (evalDist x).toPMF none = 0 := probFailure_eq_zero (mx := x)
+      refine ⟨⟨((·, b) : α → α × β) <$> evalDist x, ?_⟩, ?_⟩
+      · simpa [evalDist_pure] using
+          (_root_.SPMF.IsCoupling.dirac_right b hnf)
+      · intro z hz
+        rw [support_map] at hz
+        rcases hz with ⟨a, ha, hzeq⟩
+        rw [← hzeq]
+        refine hwp a ?_
+        exact (mem_support_iff_evalDist_apply_ne_zero x a).2
+          ((mem_support_iff_evalDist_apply_ne_zero (evalDist x) a).1 ha)
 
 /-- Relational weakest precondition induced by `MAlgRelOrdered` for `OracleComp`. -/
 abbrev RelWP (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)

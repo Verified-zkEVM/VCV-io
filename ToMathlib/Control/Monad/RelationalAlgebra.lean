@@ -6,6 +6,7 @@ Authors: Quang Dao
 module
 
 public import Mathlib.Order.CompleteLattice.Basic
+public import ToMathlib.Control.Monad.Algebra
 
 /-!
 # Relational monad algebras
@@ -607,5 +608,65 @@ instance instStrictBindStateTBoth [StrictBind m₁ m₂ l] (σ₁ σ₂ : Type u
     simpa [StateT.run_bind] using h
 
 end StrictBindInstances
+
+/-! ## Anchored subclass
+
+A relational logic is *anchored* (with respect to a unary algebra on each side) when
+relational reasoning collapses to unary reasoning whenever one of the two computations
+is a `pure` value. The two coherence axioms
+
+* `rwp_pure_left a y post = wp y (post a)`
+* `rwp_pure_right x b post = wp x (fun a => post a b)`
+
+freeze the relational `rwp` to the underlying unary `wp` at one of the two corners,
+recovering Maillard et al.'s "two unary triples + a relational triple" pattern from
+[*The Next 700 Relational Program Logics*, POPL 2020] without committing to the full
+relative-monad machinery. They are precisely the ingredient missing from the lossy
+exception lifts (see `instExceptTLeft` / `instExceptTRight` above): once anchored, one
+can derive *honest exception* combinators `wpExc` (unary) and `rwpExc` (relational)
+that track success and failure separately rather than collapsing failures to `⊥`.
+
+Anchoring is independent of `StrictBind`. The coupling-based `OracleComp` instance is
+anchored (Dirac couplings are unique) but is not strict, while a deterministic
+specification monad is strict and anchored.
+-/
+
+/-- A `MAlgRelOrdered` instance that *anchors* the relational WP to the unary WPs of
+the two sides at `pure`. The two axioms are the relational analogues of the coupling
+identities `IsCoupling c (pure a) q ↔ c = (a, ·) <$> q` (and symmetrically on the
+right): once one side is a Dirac, the relational WP collapses to the unary WP of the
+other side, specialized at the Dirac point. -/
+class Anchored (m₁ : Type u → Type v₁) (m₂ : Type u → Type v₂) (l : Type u)
+    [Monad m₁] [Monad m₂] [CompleteLattice l]
+    [MAlgOrdered m₁ l] [MAlgOrdered m₂ l] [MAlgRelOrdered m₁ m₂ l] : Prop where
+  /-- Left anchoring: when the left computation is `pure a`, the relational WP equals
+  the unary WP of the right computation evaluated at the postcondition specialized at
+  `a`. -/
+  rwp_pure_left {α β : Type u} (a : α) (y : m₂ β) (post : α → β → l) :
+    MAlgRelOrdered.rwp (pure a : m₁ α) y post = MAlgOrdered.wp y (post a)
+  /-- Right anchoring: when the right computation is `pure b`, the relational WP equals
+  the unary WP of the left computation evaluated at the postcondition specialized at
+  `b`. -/
+  rwp_pure_right {α β : Type u} (x : m₁ α) (b : β) (post : α → β → l) :
+    MAlgRelOrdered.rwp x (pure b : m₂ β) post = MAlgOrdered.wp x (fun a => post a b)
+
+namespace Anchored
+
+variable {m₁ : Type u → Type v₁} {m₂ : Type u → Type v₂} {l : Type u}
+variable [Monad m₁] [Monad m₂] [CompleteLattice l]
+variable [MAlgOrdered m₁ l] [MAlgOrdered m₂ l] [MAlgRelOrdered m₁ m₂ l]
+variable {α β : Type u}
+
+/-- `RelWP`-flavoured restatement of the left anchoring axiom. -/
+theorem relWP_pure_left [Anchored m₁ m₂ l] (a : α) (y : m₂ β) (post : α → β → l) :
+    RelWP (pure a : m₁ α) y post = MAlgOrdered.wp y (post a) :=
+  Anchored.rwp_pure_left a y post
+
+/-- `RelWP`-flavoured restatement of the right anchoring axiom. -/
+theorem relWP_pure_right [Anchored m₁ m₂ l] (x : m₁ α) (b : β) (post : α → β → l) :
+    RelWP x (pure b : m₂ β) post = MAlgOrdered.wp x (fun a => post a b) :=
+  Anchored.rwp_pure_right x b post
+
+end Anchored
 
 end MAlgRelOrdered
