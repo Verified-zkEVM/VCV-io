@@ -121,6 +121,28 @@ lemma runtimeWithCache_evalDist_bind_pure
     rw [map_eq_bind_pure_comp]; rfl
   rw [heq, runtimeWithCache_evalDist_map]
 
+/-- The Fiat-Shamir runtime commutes with binding a lifted `ProbComp` prefix:
+evaluating `liftM oa >>= rest` under the runtime is the same as first sampling
+`oa` in `SPMF` and then evaluating `rest x` under the runtime. -/
+lemma runtimeWithCache_evalDist_bind_liftComp
+    (cache : (M × Commit →ₒ Chal).QueryCache)
+    {α β : Type} (oa : ProbComp α)
+    (rest : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β) :
+    (runtimeWithCache M cache).evalDist (liftM oa >>= rest) =
+      evalDist oa >>= fun x => (runtimeWithCache M cache).evalDist (rest x) := by
+  classical
+  let ro : QueryImpl (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := randomOracle
+  let impl : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := unifFwdImpl (M × Commit →ₒ Chal) + ro
+  unfold runtimeWithCache ProbCompRuntime.evalDist SPMFSemantics.evalDist SemanticsVia.denote
+  change evalDist ((simulateQ impl (liftM oa >>= rest)).run' cache) =
+      evalDist oa >>= fun x => evalDist ((simulateQ impl (rest x)).run' cache)
+  rw [simulateQ_bind]
+  rw [roSim.run'_liftM_bind (ro := ro) (oa := oa)
+    (rest := fun x => simulateQ impl (rest x)) (s := cache)]
+  rw [evalDist_bind]
+
 /-- The Fiat-Shamir runtime commutes with `<$>`: `cache := ∅` instance of
 `runtimeWithCache_evalDist_map`. -/
 lemma runtime_evalDist_map
@@ -136,6 +158,14 @@ lemma runtime_evalDist_bind_pure
     (runtime M).evalDist (mx >>= fun x => pure (f x)) =
       f <$> (runtime M).evalDist mx :=
   runtimeWithCache_evalDist_bind_pure M ∅ mx f
+
+/-- `cache := ∅` instance of `runtimeWithCache_evalDist_bind_liftComp`. -/
+lemma runtime_evalDist_bind_liftComp
+    {α β : Type} (oa : ProbComp α)
+    (rest : α → OracleComp (unifSpec + (M × Commit →ₒ Chal)) β) :
+    (runtime M).evalDist (liftM oa >>= rest) =
+      evalDist oa >>= fun x => (runtime M).evalDist (rest x) :=
+  runtimeWithCache_evalDist_bind_liftComp M ∅ oa rest
 
 end semantics
 

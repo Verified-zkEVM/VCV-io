@@ -1359,6 +1359,32 @@ The intended use is for cryptographic reductions: e.g., for Fiat-Shamir signing-
 swaps, the "costly" queries are signing queries (HVZK gives per-query ε bound) and the
 "free" queries are the underlying spec queries (uniform sampling and RO caching, where
 both sides forward through the same `baseSim`). -/
+theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    {ε : ℝ} (hε : 0 ≤ ε)
+    (S : ι → Prop) [DecidablePred S]
+    (h_step_tv_S : ∀ (t : ι), S t → ∀ (s : σ),
+      tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)) ≤ ε)
+    (h_step_eq_nS : ∀ (t : ι), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (s₀ : σ) :
+    tvDist ((simulateQ impl₁ oa).run (s₀, false))
+        ((simulateQ impl₂ oa).run (s₀, false))
+      ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
+          (simulateQ impl₁ oa).run (s₀, false)].toReal :=
+  tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
+    impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
+
+/-- **Selective ε-perturbed identical-until-bad with output bad flag.**
+
+Like `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`, but projected to the
+computation output via `StateT.run'`. -/
 theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
@@ -1382,8 +1408,8 @@ theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
       tvDist ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false))
         ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
             (simulateQ impl₁ oa).run (s₀, false)].toReal :=
-    tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
-      impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
+    tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
+      impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb s₀
   have h_map :
       tvDist ((simulateQ impl₁ oa).run' (s₀, false))
           ((simulateQ impl₂ oa).run' (s₀, false))
