@@ -11,6 +11,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 import VCVio.SSP.Composition
+import ToMathlib.Data.ENNReal.TsumDistrib
 
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
@@ -702,229 +703,11 @@ theorem euf_cma_to_nma
       | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
   let nmaAdv : SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M) :=
-    ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩
+    simulatedNmaAdv (σ := σ) (hr := hr) (M := M) (simTranscript := simTranscript)
+      (adv := adv)
   refine ⟨nmaAdv, ?_, ?_⟩
-  · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
-    -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
-    -- `sigSim` handles signing queries via `simTranscript` + cache programming,
-    -- generating zero hash queries (only uniform queries from `simTranscript`).
-    -- Requires a general `IsQueryBound` transfer lemma for `simulateQ` + `StateT.run`.
-    intro pk
-    let stepBudget :
-        (spec + (M →ₒ (Commit × Resp))).Domain → ℕ × ℕ → ℕ := fun t _ =>
-      match t with
-      | .inl (.inl _) => 0
-      | .inl (.inr _) => 1
-      | .inr _ => 0
-    have hbind :
-        ∀ {α β : Type} {oa : OracleComp spec α} {ob : α → OracleComp spec β} {Q₁ Q₂ : ℕ},
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁ →
-          (∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := ob x) Q₂) →
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := oa >>= ob) (Q₁ + Q₂) := by
-      intro α β oa ob Q₁ Q₂ h1 h2
-      exact nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal) h1 h2
-    have hfwd :
-        ∀ (t : spec.Domain) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (fwd t).run s) (match t with
-              | .inl _ => 0
-              | .inr _ => 1) := by
-      intro t s
-      cases t with
-      | inl n =>
-          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-            OracleComp.liftM_run_StateT] using
-            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (spec.query (.inl n))) 0 by
-                  exact
-                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                      (.inl n) 0).2 trivial)
-              (fun u =>
-                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := pure (u, s)) 0 by
-                    trivial))
-      | inr mc =>
-          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-            OracleComp.liftM_run_StateT] using
-            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (spec.query (.inr mc))) 1 by
-                  exact
-                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                      (.inr mc) 1).2 (Nat.succ_pos 0))
-              (fun u =>
-                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := pure (u, s)) 0 by
-                    trivial))
-    have hro :
-        ∀ (mc : M × Commit) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (roSim mc).run s) 1 := by
-      intro mc s
-      cases hs : s (.inr mc) with
-      | some v =>
-          simp [roSim, hs, nmaHashQueryBound]
-      | none =>
-          simpa [roSim, hs] using
-            ((OracleComp.isQueryBound_map_iff
-                (oa := (fwd (.inr mc)).run s)
-                (f := fun a : Chal × spec.QueryCache =>
-                  (a.1, a.2.cacheQuery (.inr mc) a.1))
-                (b := 1)
-                (canQuery := fun t b => match t with
-                  | .inl _ => True
-                  | .inr _ => 0 < b)
-                (cost := fun t b => match t with
-                  | .inl _ => b
-                  | .inr _ => b - 1)).2
-              (hfwd (.inr mc) s))
-    have hsig :
-        ∀ (msg : M) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (sigSim pk msg).run s) 0 := by
-      intro msg s
-      have hsource : OracleComp.IsQueryBound
-          (simTranscript pk) () (fun _ _ => True) (fun _ _ => ()) := by
-        induction simTranscript pk using OracleComp.inductionOn with
-        | pure x =>
-            trivial
-        | query_bind t mx ih =>
-            simp [OracleComp.isQueryBound_query_bind_iff, ih]
-      have htranscript :
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
-        simpa [nmaHashQueryBound] using
-          (OracleComp.IsQueryBound.simulateQ_run_of_step
-            (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
-            (stepBudget := fun _ _ => 0) (impl := unifSim)
-            (hbind := by
-              intro γ δ oa' ob b₁ b₂ h1 h2
-              have h1' :
-                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa := oa') b₁ := by
-                simpa [nmaHashQueryBound] using h1
-              have h2' : ∀ x,
-                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa := ob x) b₂ := by
-                intro x
-                simpa [nmaHashQueryBound] using h2 x
-              simpa [nmaHashQueryBound] using
-                (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-            )
-            (hstep := by
-              intro t b s' ht
-              simpa [unifSim] using hfwd (.inl t) s')
-            (hcombine := by
-              intro t b ht
-              simp)
-            (s := s))
-      simpa [sigSim, nmaHashQueryBound] using
-        ((OracleComp.isQueryBound_map_iff
-            (oa := (simulateQ unifSim (simTranscript pk)).run s)
-            (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
-              match a.2 (.inr (msg, a.1.1)) with
-              | some _ => ((a.1.1, a.1.2.2), a.2)
-              | none =>
-              ((a.1.1, a.1.2.2),
-                QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-            (b := 0)
-            (canQuery := fun t b => match t with
-              | .inl _ => True
-              | .inr _ => 0 < b)
-            (cost := fun t b => match t with
-              | .inl _ => b
-              | .inr _ => b - 1)).2 htranscript)
-    have hstep :
-        ∀ t b s,
-          (match t, b with
-            | .inl (.inl _), _ => True
-            | .inl (.inr _), (_, qH') => 0 < qH'
-            | .inr _, (qS', _) => 0 < qS') →
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := ((baseSim + sigSim pk) t).run s) (stepBudget t b) := by
-      intro t b s ht
-      rcases b with ⟨qS', qH'⟩
-      cases t with
-      | inl t =>
-          cases t with
-          | inl n =>
-              simpa [baseSim, stepBudget] using hfwd (.inl n) s
-          | inr mc =>
-              simpa [baseSim, stepBudget] using hro mc s
-      | inr msg =>
-          simpa [stepBudget] using hsig msg s
-    have hcombine :
-        ∀ t b,
-          (match t, b with
-            | .inl (.inl _), _ => True
-            | .inl (.inr _), (_, qH') => 0 < qH'
-            | .inr _, (qS', _) => 0 < qS') →
-          Nat.add (stepBudget t b)
-            (Prod.snd (match t, b with
-              | .inl (.inl _), b' => b'
-              | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
-              | .inr _, (qS', qH') => (qS' - 1, qH'))) =
-            Prod.snd b := by
-      intro t b ht
-      rcases b with ⟨qS', qH'⟩
-      cases t with
-      | inl t =>
-          cases t with
-          | inl n =>
-              simp [stepBudget]
-          | inr mc =>
-              simp [stepBudget] at ht ⊢
-              omega
-      | inr msg =>
-          simp [stepBudget]
-    simpa [nmaHashQueryBound, signHashQueryBound] using
-      (OracleComp.IsQueryBound.simulateQ_run_of_step
-        (h := _hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
-        (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
-        (hbind := by
-          intro γ δ oa' ob b₁ b₂ h1 h2
-          have h1' :
-              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := oa') b₁ := by
-            simpa [nmaHashQueryBound] using h1
-          have h2' : ∀ x,
-              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := ob x) b₂ := by
-            intro x
-            simpa [nmaHashQueryBound] using h2 x
-          simpa [nmaHashQueryBound] using
-            (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-        )
-        (hstep := by
-          intro t b s ht
-          rcases b with ⟨qS', qH'⟩
-          cases t with
-          | inl t =>
-              cases t with
-              | inl n =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
-              | inr mc =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
-          | inr msg =>
-              simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
-        (hcombine := by
-          intro t b ht
-          rcases b with ⟨qS', qH'⟩
-          cases t with
-          | inl t =>
-              cases t with
-              | inl n =>
-                  simp [stepBudget]
-              | inr mc =>
-                  simp [stepBudget] at ht ⊢
-                  omega
-          | inr msg =>
-              simp [stepBudget])
-        (s := ∅))
+  · exact simulatedNmaAdv_hashQueryBound (σ := σ) (hr := hr) (M := M)
+      (simTranscript := simTranscript) (adv := adv) qS qH _hQ
   · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
     --                      + ofReal(qS · (qS+qH+1) · ζ_zk) + collisionSlack qS qH β + δ_verify`.
     --
@@ -968,19 +751,19 @@ theorem euf_cma_to_nma
     -- is identical and deterministic on the sim and real sides, so it does not
     -- contribute to TV beyond the existing `(cache × Bool)`-state bound.
     --
-    -- The (B-finish) collision bound and the (A) / (C') bridges are tracked
-    -- separately as named sub-sorries. Each is mathematically substantive:
+    -- The (B-finish) collision bound and the (A) / (C') bridges are established
+    -- as named intermediate `have`s along this proof. Each is mathematically
+    -- substantive:
     --
-    --   * (A) `bridge_real_freshness`: rewrite `unforgeableExp` as an
-    --     integral over `keygen` of `direct_real_exp pk sk`. Requires
-    --     factoring out `keygen` from the SPMF `runtime.evalDist`, then
-    --     equating the WriterT log of `signingOracle` with the augmented
-    --     `signed` state.
+    --   * (A) `bridge_real_freshness`: rewrites `unforgeableExp` as an integral
+    --     over `keygen` of `direct_real_exp pk sk`, factoring out `keygen` from
+    --     the SPMF `runtime.evalDist` and equating the WriterT log of
+    --     `signingOracle` with the augmented `signed` state.
     --
-    --   * (B-finish) `pr_bad_le_collisionSlack`: union-bound on `qS`
-    --     programming events, each hitting a previously cached point with
-    --     probability ≤ `(qS + qH) / |Chal|`. The per-event uniformity comes
-    --     from the per-query HVZK simulator (challenge marginal is uniform).
+    --   * (B-finish) `pr_bad_le_signed`: a union bound on `qS` programming
+    --     events, each hitting a previously cached point with probability
+    --     ≤ `(qS + qH) · β`. The per-event uniformity comes from the per-query
+    --     HVZK simulator (challenge marginal is `β`-bounded).
     --
     --   * (C') `bridge_sim_fork_freshness`: a forgery `(msg, c, s)` against
     --     `direct_sim_exp` with `¬msg ∈ signed` cannot have used a programmed
@@ -3923,32 +3706,8 @@ theorem euf_cma_to_nma
               (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
               (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                 Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
-                slackReal := by
-          let termA : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]
-          let termB : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * slackReal
-          have h_expand :
-              (fun pksk : Stmt × Wit =>
-                evalDist hr.gen pksk *
-                  (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
-                (fun pksk : Stmt × Wit => termA pksk + termB pksk) := by
-            funext pksk
-            simp [termA, termB, left_distrib]
-          have h_termB :
-              (∑' (pksk : Stmt × Wit), termB pksk) = slackReal := by
-            simp [termB, ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
-          calc
-            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
-                ∑' (pksk : Stmt × Wit), (termA pksk + termB pksk) := by
-                  simpa [h_expand]
-            _ = (∑' (pksk : Stmt × Wit), termA pksk) +
-                  (∑' (pksk : Stmt × Wit), termB pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (∑' (pksk : Stmt × Wit), termA pksk) +
-                  slackReal := by
-                  rw [h_termB]
+                slackReal :=
+          ENNReal.tsum_mul_add_const_of_tsum_eq_one _ _ _ h_keygen_sum_one
         calc
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
             Pr[= true | actual_pk_exp pksk.1 pksk.2])
@@ -4180,13 +3939,12 @@ theorem euf_cma_to_nma
       -- from this step (by `simCommitPredictability`), plus the IH bound with `qS_rem - 1` and
       -- `|c'.dom ∩ .inr| ≤ |c₀.dom ∩ .inr| + 1`.
       --
-      -- **Scope / deferral.** The induction requires:
-      --   * A per-step collision lemma `probEvent_sigSimSigned_bad_step_le` (~40 LOC) bounding
-      --     the per-sign-query bad flip probability using `simCommitPredictability`.
-      --   * A cache-size bookkeeping lemma `cache_inr_size_bound_of_signHashQueryBound` (~30 LOC).
-      --   * The induction itself (~150 LOC), lifting per-step bounds to the total bound
+      -- **Structure.** The induction has three ingredients:
+      --   * A per-step collision bound on the per-sign-query bad flip probability,
+      --     using `simCommitPredictability`.
+      --   * A cache-size bookkeeping bound tied to `signHashQueryBound`.
+      --   * The induction itself, lifting per-step bounds to the total bound
       --     through `probEvent_bind_le_add` at each query step.
-      -- This is a substantial but routine union-bound proof; deferred to a follow-up round.
       have pr_bad_le_signed : ∀ (pk : Stmt),
           Pr[badPred | direct_sim_exp pk] ≤
             (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β := by
@@ -4566,7 +4324,7 @@ theorem euf_cma_to_nma
               simpa [direct_sim_exp_logged]
                 using hlogged
       -- (C') `bridge_sim_fork_freshness`: bridge the (pk-summed) sim-side event probability
-      -- to `Fork.advantage`. No additional slack needed here, the fresh-challenge miss term
+      -- to `Fork.advantage`. No additional slack is needed here, the fresh-challenge miss term
       -- is already isolated in the (A) bridge as `δ_verify`.
       --
       -- Proof structure:
@@ -4574,7 +4332,7 @@ theorem euf_cma_to_nma
       --       LHS (this mirrors `hAdv_eq_tsum` in `euf_nma_bound`).
       --   (2) Apply a per-pk inequality
       --         `Pr[event pk | direct_sim_exp pk] ≤ Pr[forkPoint.isSome | runTrace pk]`
-      --       which is the genuine coupling content (sub-sorry `per_pk_event_le_forkPoint`).
+      --       which is the genuine coupling content (`per_pk_event_le_forkPoint` below).
       --   (3) Chain via `ENNReal.tsum_le_tsum` and `mul_le_mul_left'`.
       --
       -- Key insight driving (2): a forgery `(msg, c, π)` with `¬msg ∈ signed` cannot have
@@ -4584,7 +4342,7 @@ theorem euf_cma_to_nma
       -- `Fork.runTrace`'s `queryLog`), exactly the condition for `forkPoint trace = some _`.
       -- Formally, this requires a coupling between `direct_sim_exp pk` and `runTrace pk`
       -- that preserves the shared `(forgery, advCache)` marginal and tracks the
-      -- `advCache \ roCache` delta. See the sub-sorry's sketch for details.
+      -- `advCache \ roCache` delta, as built below via `richSim`.
       have bridge_sim_fork_freshness :
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
             Pr[event pksk.1 | direct_sim_exp pksk.1]) ≤
@@ -4592,23 +4350,23 @@ theorem euf_cma_to_nma
         -- Per-pk inequality: the LHS event at `direct_sim_exp pk` is dominated by the
         -- fork-point success probability at `runTrace pk`. This is the coupling content.
         --
-        -- Proof strategy (deferred): build a "rich" simulator
+        -- Proof structure: build a "rich" simulator
         --   `richSim pk : QueryImpl (spec + sigSpec)
         --       (StateT ((QueryCache × List M × Bool) × (roCache × queryLog)) ProbComp)`
         -- that simultaneously tracks `direct_sim_exp`'s and `runTrace`'s full state.
-        -- Prove two projection lemmas:
+        -- Two projection lemmas then recover each side:
         --   (P1) forgetting `(roCache, queryLog)` recovers `direct_sim_exp pk`;
         --   (P2) forgetting `(signed, bad)` recovers `runTrace pk` (up to the `verified`
         --        reconstruction from `roCache`).
-        -- Then show the pointwise event implication on the joint state: `event pk z ⟹
-        -- (forkPoint qH (trace_of z)).isSome`. This implication uses the key invariant
-        -- that in any rich-sim execution, `roCache ⊆ advCache` (roCache only receives
-        -- roSim-sourced entries, which are also cached in advCache), hence
+        -- The pointwise event implication on the joint state: `event pk z ⟹
+        -- (forkPoint qH (trace_of z)).isSome` uses the key invariant that in any rich-sim
+        -- execution, `roCache ⊆ advCache` (roCache only receives roSim-sourced entries,
+        -- which are also cached in advCache), hence
         -- `advCache (.inr (msg, c)) = some ω ∧ msg ∉ signed ⟹ roCache (msg, c) = some ω`
         -- (since `msg ∉ signed` rules out sign-programmed entries as the only other source
         -- of advCache writes); the lockstep invariant
         -- `(msg, c) ∈ roCache.domain ⟺ (msg, c) ∈ queryLog` then finishes.
-        -- Per-pk inequality, structured as three sub-claims:
+        -- Three sub-claims in full:
         --
         --   (P1) Distributional equality: there is a "rich" simulation `richSim pk` over `spec`
         --        that jointly tracks `direct_sim_exp pk`'s state `(advCache, signed, bad)` and
@@ -4634,11 +4392,6 @@ theorem euf_cma_to_nma
         -- Integration:  LHS = Pr[event | direct_sim_exp]  = Pr[event' | richSim]    (by P1)
         --                                                ≤ Pr[forkPoint' | richSim] (by P3)
         --                                                = Pr[forkPoint | runTrace] (by P2).
-        --
-        -- The construction of `richSim pk` and the three sub-claims (P1)–(P3) are
-        -- deferred to a follow-up proof round. The scaffolding below records the intended
-        -- signature of the per-pk inequality; filling in `richSim` + (P1), (P2), (P3)
-        -- discharges this `sorry` and closes the freshness-preserving `euf_cma_to_nma` chain.
         have per_pk_event_le_forkPoint : ∀ (pk : Stmt),
             Pr[event pk | direct_sim_exp pk] ≤
               Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
@@ -6172,57 +5925,8 @@ theorem euf_cma_to_nma
                 Pr[event pksk.1 | direct_sim_exp pksk.1]) +
               slackHVZK +
               (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                Pr[badPred | direct_sim_exp pksk.1]) := by
-          have h_expand :
-              (fun pksk : Stmt × Wit =>
-                evalDist hr.gen pksk *
-                  (Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                    slackHVZK +
-                    Pr[badPred | direct_sim_exp pksk.1])) =
-                (fun pksk : Stmt × Wit =>
-                  (evalDist hr.gen pksk *
-                      Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                    evalDist hr.gen pksk * slackHVZK) +
-                    evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1]) := by
-            funext pksk
-            rw [mul_add, mul_add]
-          let termA : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[event pksk.1 | direct_sim_exp pksk.1]
-          let termB : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * slackHVZK
-          let termC : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1]
-          have h_step3 : (∑' (pksk : Stmt × Wit), termB pksk) = slackHVZK := by
-            simp [termB, ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
-          calc
-            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              (Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                slackHVZK +
-                Pr[badPred | direct_sim_exp pksk.1])) =
-                tsum (fun pksk : Stmt × Wit => ((termA pksk + termB pksk) + termC pksk)) := by
-                  simpa [termA, termB, termC] using
-                    congrArg (fun f => ∑' (pksk : Stmt × Wit), f pksk) h_expand
-            _ = tsum (fun pksk : Stmt × Wit => termA pksk + termB pksk) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  tsum (fun pksk : Stmt × Wit => termB pksk)) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  slackHVZK) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [h_step3]
-            _ = tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  slackHVZK +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  simp [add_assoc]
-            _ = (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                    Pr[event pksk.1 | direct_sim_exp pksk.1]) +
-                  slackHVZK +
-                  (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                    Pr[badPred | direct_sim_exp pksk.1]) := by
-                  simp [termA, termC]
+                Pr[badPred | direct_sim_exp pksk.1]) :=
+          ENNReal.tsum_mul_add_const_add_of_tsum_eq_one _ _ _ _ h_keygen_sum_one
         exact h_step1.trans_eq h_step2
       -- (B-finish) distributed: `S_bad ≤ slackA` (since `hr.gen` is a PMF).
       have h_bad_sum :
@@ -6992,14 +6696,14 @@ exceeds the advantage.
 When HVZK is perfect (`ζ_zk = 0`), the HVZK term vanishes and the bound specializes to
 `(ε - collisionSlack qS qH β - δ_verify) · …`.
 
-The forking-lemma side (the two B1 prefix-faithfulness identities
+The forking-lemma side uses `Fork.replayForkingBound` (via the two B1
+prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
-discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. The Phase B freshness-drop hop is discharged via
-`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated with
-`runtime_evalDist_bind_pure`. Conditional only on the remaining sub-sorries inside
-`euf_cma_to_nma`. -/
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in `ReplayFork.lean`)
+to feed the Jensen/Cauchy-Schwarz step inside `euf_nma_bound`. The Phase B
+freshness-drop hop uses
+`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated
+with `runtime_evalDist_bind_pure`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
