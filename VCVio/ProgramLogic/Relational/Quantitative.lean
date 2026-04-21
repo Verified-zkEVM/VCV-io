@@ -684,4 +684,84 @@ theorem gameEquiv_of_relTriple'_eqRel
     evalDist oa = evalDist ob :=
   evalDist_eq_of_relTriple_eqRel (relTriple'_iff_relTriple.mp h)
 
+/-! ## Relational algebra instance -/
+
+/-- Pure values characterize the quantitative relational weakest precondition. -/
+theorem eRelWP_pure (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    eRelWP (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) post = post a b := by
+  apply le_antisymm
+  · unfold eRelWP
+    refine iSup_le fun c => ?_
+    have hcEq : c.1 = (pure (a, b) : SPMF (α × β)) := by
+      apply SPMF.IsCoupling.pure_iff.mp
+      simpa only [evalDist_pure] using c.2
+    rw [hcEq, tsum_eq_single (a, b)]
+    · simp [SPMF.probOutput_eq_apply]
+    · intro z hz
+      have hz0 : Pr[= z | (pure (a, b) : SPMF (α × β))] = 0 := by
+        rw [SPMF.probOutput_eq_apply]
+        simp [hz]
+      simp [hz0]
+  · simpa [eRelTriple] using
+      (eRelTriple_pure (spec₁ := spec₁) (spec₂ := spec₂) a b post)
+
+/-- Quantitative relational weakest precondition is monotone in the postcondition. -/
+theorem eRelWP_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {post post' : α → β → ℝ≥0∞}
+    (hpost : ∀ a b, post a b ≤ post' a b) :
+    eRelWP oa ob post ≤ eRelWP oa ob post' := by
+  have htriple : eRelTriple (eRelWP oa ob post) oa ob post := by
+    change eRelWP oa ob post ≤ eRelWP oa ob post
+    exact le_rfl
+  simpa [eRelTriple] using
+    (eRelTriple_conseq (spec₁ := spec₁) (spec₂ := spec₂)
+      (pre := eRelWP oa ob post) (pre' := eRelWP oa ob post)
+      (oa := oa) (ob := ob) (post := post) (post' := post')
+      le_rfl hpost htriple)
+
+/-- Quantitative relational weakest preconditions compose through bind. -/
+theorem eRelWP_bind_le
+    (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+    (fa : α → OracleComp spec₁ γ) (fb : β → OracleComp spec₂ δ)
+    (post : γ → δ → ℝ≥0∞) :
+    eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) ≤
+      eRelWP (oa >>= fa) (ob >>= fb) post := by
+  have hxy :
+      eRelTriple (eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post)) oa ob
+        (fun a b => eRelWP (fa a) (fb b) post) := by
+    change eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post) ≤
+      eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post)
+    exact le_rfl
+  have hfg : ∀ a b, eRelTriple (eRelWP (fa a) (fb b) post) (fa a) (fb b) post := by
+    intro a b
+    change eRelWP (fa a) (fb b) post ≤ eRelWP (fa a) (fb b) post
+    exact le_rfl
+  simpa [eRelTriple] using
+    (eRelTriple_bind (spec₁ := spec₁) (spec₂ := spec₂)
+      (pre := eRelWP oa ob (fun a b => eRelWP (fa a) (fb b) post))
+      (oa := oa) (ob := ob) (fa := fa) (fb := fb)
+      (cut := fun a b => eRelWP (fa a) (fb b) post)
+      (post := post) hxy hfg)
+
+/-- Quantitative relational algebra instance for `OracleComp`, based on `eRelWP`. -/
+noncomputable instance instMAlgRelOrdered_eRelWP :
+    MAlgRelOrdered (OracleComp spec₁) (OracleComp spec₂) ℝ≥0∞ where
+  rwp := fun oa ob post => eRelWP oa ob post
+  rwp_pure := fun a b post => eRelWP_pure (spec₁ := spec₁) (spec₂ := spec₂) a b post
+  rwp_mono := fun hpost => eRelWP_mono (spec₁ := spec₁) (spec₂ := spec₂) hpost
+  rwp_bind_le := fun oa ob fa fb post =>
+    eRelWP_bind_le (spec₁ := spec₁) (spec₂ := spec₂) oa ob fa fb post
+
+noncomputable example :
+    MAlgRelOrdered (OptionT (OracleComp spec₁)) (OracleComp spec₂) ℝ≥0∞ :=
+  inferInstance
+
+noncomputable example {ε : Type} :
+    MAlgRelOrdered (ExceptT ε (OracleComp spec₁)) (OracleComp spec₂) ℝ≥0∞ :=
+  inferInstance
+
+noncomputable example {σ : Type} :
+    MAlgRelOrdered (StateT σ (OracleComp spec₁)) (OracleComp spec₂) (σ → ℝ≥0∞) :=
+  inferInstance
+
 end OracleComp.ProgramLogic.Relational
