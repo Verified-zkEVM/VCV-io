@@ -750,19 +750,19 @@ theorem euf_cma_to_nma
     -- is identical and deterministic on the sim and real sides, so it does not
     -- contribute to TV beyond the existing `(cache × Bool)`-state bound.
     --
-    -- The (B-finish) collision bound and the (A) / (C') bridges are tracked
-    -- separately as named sub-sorries. Each is mathematically substantive:
+    -- The (B-finish) collision bound and the (A) / (C') bridges are established
+    -- as named intermediate `have`s along this proof. Each is mathematically
+    -- substantive:
     --
-    --   * (A) `bridge_real_freshness`: rewrite `unforgeableExp` as an
-    --     integral over `keygen` of `direct_real_exp pk sk`. Requires
-    --     factoring out `keygen` from the SPMF `runtime.evalDist`, then
-    --     equating the WriterT log of `signingOracle` with the augmented
-    --     `signed` state.
+    --   * (A) `bridge_real_freshness`: rewrites `unforgeableExp` as an integral
+    --     over `keygen` of `direct_real_exp pk sk`, factoring out `keygen` from
+    --     the SPMF `runtime.evalDist` and equating the WriterT log of
+    --     `signingOracle` with the augmented `signed` state.
     --
-    --   * (B-finish) `pr_bad_le_collisionSlack`: union-bound on `qS`
-    --     programming events, each hitting a previously cached point with
-    --     probability ≤ `(qS + qH) / |Chal|`. The per-event uniformity comes
-    --     from the per-query HVZK simulator (challenge marginal is uniform).
+    --   * (B-finish) `pr_bad_le_signed`: a union bound on `qS` programming
+    --     events, each hitting a previously cached point with probability
+    --     ≤ `(qS + qH) · β`. The per-event uniformity comes from the per-query
+    --     HVZK simulator (challenge marginal is `β`-bounded).
     --
     --   * (C') `bridge_sim_fork_freshness`: a forgery `(msg, c, s)` against
     --     `direct_sim_exp` with `¬msg ∈ signed` cannot have used a programmed
@@ -3962,13 +3962,12 @@ theorem euf_cma_to_nma
       -- from this step (by `simCommitPredictability`), plus the IH bound with `qS_rem - 1` and
       -- `|c'.dom ∩ .inr| ≤ |c₀.dom ∩ .inr| + 1`.
       --
-      -- **Scope / deferral.** The induction requires:
-      --   * A per-step collision lemma `probEvent_sigSimSigned_bad_step_le` (~40 LOC) bounding
-      --     the per-sign-query bad flip probability using `simCommitPredictability`.
-      --   * A cache-size bookkeeping lemma `cache_inr_size_bound_of_signHashQueryBound` (~30 LOC).
-      --   * The induction itself (~150 LOC), lifting per-step bounds to the total bound
+      -- **Structure.** The induction has three ingredients:
+      --   * A per-step collision bound on the per-sign-query bad flip probability,
+      --     using `simCommitPredictability`.
+      --   * A cache-size bookkeeping bound tied to `signHashQueryBound`.
+      --   * The induction itself, lifting per-step bounds to the total bound
       --     through `probEvent_bind_le_add` at each query step.
-      -- This is a substantial but routine union-bound proof; deferred to a follow-up round.
       have pr_bad_le_signed : ∀ (pk : Stmt),
           Pr[badPred | direct_sim_exp pk] ≤
             (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β := by
@@ -4348,7 +4347,7 @@ theorem euf_cma_to_nma
               simpa [direct_sim_exp_logged]
                 using hlogged
       -- (C') `bridge_sim_fork_freshness`: bridge the (pk-summed) sim-side event probability
-      -- to `Fork.advantage`. No additional slack needed here, the fresh-challenge miss term
+      -- to `Fork.advantage`. No additional slack is needed here, the fresh-challenge miss term
       -- is already isolated in the (A) bridge as `δ_verify`.
       --
       -- Proof structure:
@@ -4356,7 +4355,7 @@ theorem euf_cma_to_nma
       --       LHS (this mirrors `hAdv_eq_tsum` in `euf_nma_bound`).
       --   (2) Apply a per-pk inequality
       --         `Pr[event pk | direct_sim_exp pk] ≤ Pr[forkPoint.isSome | runTrace pk]`
-      --       which is the genuine coupling content (sub-sorry `per_pk_event_le_forkPoint`).
+      --       which is the genuine coupling content (`per_pk_event_le_forkPoint` below).
       --   (3) Chain via `ENNReal.tsum_le_tsum` and `mul_le_mul_left'`.
       --
       -- Key insight driving (2): a forgery `(msg, c, π)` with `¬msg ∈ signed` cannot have
@@ -4366,7 +4365,7 @@ theorem euf_cma_to_nma
       -- `Fork.runTrace`'s `queryLog`), exactly the condition for `forkPoint trace = some _`.
       -- Formally, this requires a coupling between `direct_sim_exp pk` and `runTrace pk`
       -- that preserves the shared `(forgery, advCache)` marginal and tracks the
-      -- `advCache \ roCache` delta. See the sub-sorry's sketch for details.
+      -- `advCache \ roCache` delta, as built below via `richSim`.
       have bridge_sim_fork_freshness :
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
             Pr[event pksk.1 | direct_sim_exp pksk.1]) ≤
@@ -4374,23 +4373,23 @@ theorem euf_cma_to_nma
         -- Per-pk inequality: the LHS event at `direct_sim_exp pk` is dominated by the
         -- fork-point success probability at `runTrace pk`. This is the coupling content.
         --
-        -- Proof strategy (deferred): build a "rich" simulator
+        -- Proof structure: build a "rich" simulator
         --   `richSim pk : QueryImpl (spec + sigSpec)
         --       (StateT ((QueryCache × List M × Bool) × (roCache × queryLog)) ProbComp)`
         -- that simultaneously tracks `direct_sim_exp`'s and `runTrace`'s full state.
-        -- Prove two projection lemmas:
+        -- Two projection lemmas then recover each side:
         --   (P1) forgetting `(roCache, queryLog)` recovers `direct_sim_exp pk`;
         --   (P2) forgetting `(signed, bad)` recovers `runTrace pk` (up to the `verified`
         --        reconstruction from `roCache`).
-        -- Then show the pointwise event implication on the joint state: `event pk z ⟹
-        -- (forkPoint qH (trace_of z)).isSome`. This implication uses the key invariant
-        -- that in any rich-sim execution, `roCache ⊆ advCache` (roCache only receives
-        -- roSim-sourced entries, which are also cached in advCache), hence
+        -- The pointwise event implication on the joint state: `event pk z ⟹
+        -- (forkPoint qH (trace_of z)).isSome` uses the key invariant that in any rich-sim
+        -- execution, `roCache ⊆ advCache` (roCache only receives roSim-sourced entries,
+        -- which are also cached in advCache), hence
         -- `advCache (.inr (msg, c)) = some ω ∧ msg ∉ signed ⟹ roCache (msg, c) = some ω`
         -- (since `msg ∉ signed` rules out sign-programmed entries as the only other source
         -- of advCache writes); the lockstep invariant
         -- `(msg, c) ∈ roCache.domain ⟺ (msg, c) ∈ queryLog` then finishes.
-        -- Per-pk inequality, structured as three sub-claims:
+        -- Three sub-claims in full:
         --
         --   (P1) Distributional equality: there is a "rich" simulation `richSim pk` over `spec`
         --        that jointly tracks `direct_sim_exp pk`'s state `(advCache, signed, bad)` and
@@ -4416,11 +4415,6 @@ theorem euf_cma_to_nma
         -- Integration:  LHS = Pr[event | direct_sim_exp]  = Pr[event' | richSim]    (by P1)
         --                                                ≤ Pr[forkPoint' | richSim] (by P3)
         --                                                = Pr[forkPoint | runTrace] (by P2).
-        --
-        -- The construction of `richSim pk` and the three sub-claims (P1)–(P3) are
-        -- deferred to a follow-up proof round. The scaffolding below records the intended
-        -- signature of the per-pk inequality; filling in `richSim` + (P1), (P2), (P3)
-        -- discharges this `sorry` and closes the freshness-preserving `euf_cma_to_nma` chain.
         have per_pk_event_le_forkPoint : ∀ (pk : Stmt),
             Pr[event pk | direct_sim_exp pk] ≤
               Pr[fun trace => (Fork.forkPoint (M := M) (Commit := Commit) (Resp := Resp)
@@ -6774,14 +6768,14 @@ exceeds the advantage.
 When HVZK is perfect (`ζ_zk = 0`), the HVZK term vanishes and the bound specializes to
 `(ε - collisionSlack qS qH β - δ_verify) · …`.
 
-The forking-lemma side (the two B1 prefix-faithfulness identities
+The forking-lemma side uses `Fork.replayForkingBound` (via the two B1
+prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
-discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. The Phase B freshness-drop hop is discharged via
-`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated with
-`runtime_evalDist_bind_pure`. Conditional only on the remaining sub-sorries inside
-`euf_cma_to_nma`. -/
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in `ReplayFork.lean`)
+to feed the Jensen/Cauchy-Schwarz step inside `euf_nma_bound`. The Phase B
+freshness-drop hop uses
+`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated
+with `runtime_evalDist_bind_pure`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
