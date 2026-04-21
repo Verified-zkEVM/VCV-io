@@ -105,11 +105,11 @@ variable (mx : m α) (x : α)
   rw [eq_comm, probOutput_eq_zero_iff]
 alias ⟨_, zero_eq_probOutput⟩ := zero_eq_probOutput_iff
 
-@[simp] lemma probOutput_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
+@[simp, grind =] lemma probOutput_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[= x | mx] = 0 ↔ x ∉ finSupport mx := by rw [mem_finSupport_iff_mem_support]; aesop
 alias ⟨not_mem_fin_support_of_probOutput_eq_zero, probOutput_eq_zero'⟩ := probOutput_eq_zero_iff'
 
-@[simp] lemma zero_eq_probOutput_iff' [HasEvalFinset m] [DecidableEq α] :
+@[simp, grind =] lemma zero_eq_probOutput_iff' [HasEvalFinset m] [DecidableEq α] :
     0 = Pr[= x | mx] ↔ x ∉ finSupport mx := by rw [eq_comm, probOutput_eq_zero_iff']
 alias ⟨_, zero_eq_probOutput'⟩ := zero_eq_probOutput_iff'
 
@@ -118,7 +118,7 @@ lemma probOutput_pos_iff : 0 < Pr[= x | mx] ↔ x ∈ support mx := by
   rw [pos_iff_ne_zero, ne_eq, probOutput_eq_zero_iff, not_not]
 alias ⟨mem_support_of_probOutput_pos, probOutput_pos⟩ := probOutput_pos_iff
 
-@[simp]
+@[simp, grind =]
 lemma probOutput_pos_iff' [HasEvalFinset m] [DecidableEq α] :
     0 < Pr[= x | mx] ↔ x ∈ finSupport mx := by grind
 alias ⟨mem_finSupport_of_probOutput_pos, probOutput_pos'⟩ := probOutput_pos_iff'
@@ -191,14 +191,16 @@ lemma probEvent_eq_zero_iff :
   rw [probEvent_eq_tsum_indicator]; aesop
 alias ⟨_, probEvent_eq_zero⟩ := probEvent_eq_zero_iff
 
-@[simp]
+@[simp, grind =]
 lemma probEvent_eq_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] = 0 ↔ ∀ x ∈ finSupport mx, ¬ p x := by grind
 alias ⟨_, probEvent_eq_zero'⟩ := probEvent_eq_zero_iff'
 
+@[simp, grind =]
 lemma probEvent_ne_zero_iff : Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ support mx, p x := by  grind
 alias ⟨_, probEvent_ne_zero⟩ := probEvent_ne_zero_iff
 
+@[simp, grind =]
 lemma probEvent_ne_zero_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] ≠ 0 ↔ ∃ x ∈ finSupport mx, p x := by aesop
 alias ⟨_, probEvent_ne_zero'⟩ := probEvent_ne_zero_iff'
@@ -208,7 +210,7 @@ lemma probEvent_pos_iff : 0 < Pr[ p | mx] ↔ ∃ x ∈ support mx, p x := by
   simp [pos_iff_ne_zero]
 alias ⟨_, probEvent_pos⟩ := probEvent_pos_iff
 
-@[simp]
+@[simp, grind =]
 lemma probEvent_pos_iff' [HasEvalFinset m] [DecidableEq α] :
     0 < Pr[ p | mx] ↔ ∃ x ∈ finSupport mx, p x := by grind
 alias ⟨_, probEvent_pos'⟩ := probEvent_pos_iff'
@@ -549,6 +551,7 @@ lemma sum_finSupport_probOutput_eq_one [HasEvalFinset m] [DecidableEq α]
 
 end sum_probOutput
 
+@[grind =]
 lemma probFailure_eq_sub_tsum [HasEvalSPMF m] (mx : m α) :
     Pr[⊥ | mx] = 1 - ∑' x : α, Pr[= x | mx] := by
   refine ENNReal.eq_sub_of_add_eq (ne_top_of_le_ne_top one_ne_top tsum_probOutput_le_one)
@@ -728,21 +731,30 @@ lemma probEvent_eq_one_iff :
 
 alias ⟨_, probEvent_eq_one⟩ := probEvent_eq_one_iff
 
-@[simp low]
+/-- Pointwise variant of `probOutput_eq_one_iff`: `Pr[= x | mx] = 1` iff the support is
+a subset of `{x}` (phrased as a forall over the support) and the computation never fails.
+
+More usable than `probOutput_eq_one_iff` when the caller wants to iterate over arbitrary
+support elements rather than prove a set equality. -/
+lemma probOutput_eq_one_iff_forall (mx : m α) (x : α) :
+    Pr[= x | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ y ∈ support mx, y = x := by
+  rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
+
+@[simp low, grind =]
 lemma one_eq_probEvent_iff :
     1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ support mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff]
 
 alias ⟨_, one_eq_probEvent⟩ := one_eq_probEvent_iff
 
-@[simp]
+@[simp, grind =]
 lemma probEvent_eq_one_iff' [HasEvalFinset m] [DecidableEq α] :
     Pr[ p | mx] = 1 ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   simp_rw [probEvent_eq_one_iff, mem_finSupport_iff_mem_support]
 
 alias ⟨_, probEvent_eq_one'⟩ := probEvent_eq_one_iff'
 
-@[simp]
+@[simp, grind =]
 lemma one_eq_probEvent_iff' [HasEvalFinset m] [DecidableEq α] :
     1 = Pr[ p | mx] ↔ Pr[⊥ | mx] = 0 ∧ ∀ x ∈ finSupport mx, p x := by
   rw [eq_comm, probEvent_eq_one_iff']

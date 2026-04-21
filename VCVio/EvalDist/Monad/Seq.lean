@@ -52,7 +52,7 @@ lemma probOutput_seq_eq_tsum_ite [HasEvalSPMF m] [LawfulMonad m] [DecidableEq β
   simp [seq_eq_bind_map, probOutput_bind_eq_tsum,
     probOutput_map_eq_tsum_ite, ← ENNReal.tsum_mul_left]
 
-@[simp]
+@[simp, grind =_]
 lemma probFailure_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
     Pr[⊥ | mf <*> mx] = Pr[⊥ | mf] + Pr[⊥ | mx] - Pr[⊥ | mf] * Pr[⊥ | mx] := by
   rw [seq_eq_bind_map]
@@ -83,7 +83,8 @@ section seqLeft
     evalDist (mx <* my) = evalDist mx <* evalDist my := by
   simp [seqLeft_eq]
 
-@[simp] lemma probOutput_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (x : α) :
+@[simp, grind =_]
+lemma probOutput_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (x : α) :
     Pr[= x | mx <* my] = (1 - Pr[⊥ | my]) * Pr[= x | mx] := by
   rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
   simp only [Function.comp_apply, pure_bind, probOutput_bind_eq_tsum]
@@ -92,11 +93,13 @@ section seqLeft
     mul_left_comm _ (1 - Pr[⊥ | my])]
   rw [ENNReal.tsum_mul_left, ← probOutput_bind_eq_tsum, bind_pure]
 
-@[simp] lemma probFailure_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+@[simp, grind =_]
+lemma probFailure_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
     Pr[⊥ | mx <* my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
   rw [seqLeft_eq, probFailure_seq, probFailure_map]
 
-@[simp] lemma probEvent_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+@[simp, grind =_]
+lemma probEvent_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
     (p : α → Prop) :
     Pr[ p | mx <* my] = (1 - Pr[⊥ | my]) * Pr[ p | mx] := by
   rw [seqLeft_eq, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc]
@@ -119,16 +122,19 @@ section seqRight
     evalDist (mx *> my) = evalDist mx *> evalDist my := by
   simp [seqRight_eq]
 
-@[simp] lemma probOutput_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (y : β) :
+@[simp, grind =_]
+lemma probOutput_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) (y : β) :
     Pr[= y | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[= y | my] := by
   have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]
   rw [h, probOutput_bind_const]
 
-@[simp] lemma probFailure_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
+@[simp, grind =_]
+lemma probFailure_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
     Pr[⊥ | mx *> my] = Pr[⊥ | mx] + Pr[⊥ | my] - Pr[⊥ | mx] * Pr[⊥ | my] := by
   rw [seqRight_eq, probFailure_seq, probFailure_map]
 
-@[simp] lemma probEvent_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
+@[simp, grind =_]
+lemma probEvent_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β)
     (p : β → Prop) :
     Pr[ p | mx *> my] = (1 - Pr[⊥ | mx]) * Pr[ p | my] := by
   have h : mx *> my = mx >>= fun _ => my := by simp [seqRight_eq, seq_eq_bind_map]

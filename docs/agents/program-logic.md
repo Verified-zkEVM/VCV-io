@@ -48,7 +48,13 @@ before generating the remaining subgoals.
 ### Optional arguments
 
 - `rvcstep using R` — on bind goals, provide the intermediate relation explicitly
-- `rvcstep using f` — on random/query goals, provide the coupling bijection explicitly
+- `rvcstep using f` — on random/query goals, provide the coupling bijection explicitly.
+  On a synchronized bind goal whose left/right scrutinees are uniform samples or queries,
+  the same `using f` form is also accepted as a *bijection-coupling bind*: it cuts with
+  `R := fun a b => b = f a`, closes the sample subgoal via
+  `relTriple_uniformSample_bij` (or `relTriple_query_bij`), and substitutes the equality
+  on the continuation, leaving the user with the continuation goal followed by the
+  `Function.Bijective f` side condition
 - `rvcstep using Rin` — on `List.mapM` / `List.foldlM` goals, provide the input relation
 - `rvcstep using R_state` — on `simulateQ` goals, provide the state invariant relation
 - `rvcstep with thm` — force one explicit registered/local relational theorem
@@ -124,7 +130,31 @@ one specific theorem/assumption step manually.
 with `@[vcspec]` to register it for the analogous bounded head-pair lookup on the relational side.
 This is especially useful for automation-oriented `simulateQ` transport lemmas whose outer
 computation heads are stable but whose inner invariants or projection arguments still come from
-the local context.
+the local context. The default registry already covers the structural relational rules
+(`relTriple_pure_pure`, `relTriple_bind`, `relTriple_map`, `relTriple_if`, the `replicate` /
+`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative `eRelTriple_pure` /
+`eRelTriple_bind` / `eRelTriple_uniformSample_bij`, and the two `simulateQ` transport rules),
+so user-defined rules slot into the same lookup pipeline without further wiring.
+
+**Bind normalization**: `rvcstep` (and therefore `rvcgen`) runs a best-effort
+`simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure]` pre-pass on the
+relational goal before deciding which structural rule to apply. This flattens nested binds and
+strips pure-bind layers so that the bind decomposition rule fires on aligned shapes, and so that
+goals that simplify to pure-pure or refl close immediately.
+
+**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus its
+`rvcgen` finishing pass) tries, in order:
+1. `assumption`
+2. `relTriple_true _ _` (the postcondition is structurally `fun _ _ => True`, discharged via
+   the universal product coupling, since `OracleComp` has no failure mass);
+3. `relTriple_post_const ?_; intros; trivial` (the postcondition reduces to a trivially provable
+   proposition such as `() = ()` after introduction);
+4. `relTriple_refl` / `relTriple_eqRel_of_eq rfl` / `relTriple_pure_pure` /
+   `eRelTriple_pure` (canonical reflexive and pure-pure leaves);
+5. a `subst_vars`-driven retry of the same closers (resolves syntactically-distinct pure
+   values unified by local equality hypotheses);
+6. a symmetric `relTriple_pure_pure ∘ symm` step for postconditions written in the swapped
+   direction.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay

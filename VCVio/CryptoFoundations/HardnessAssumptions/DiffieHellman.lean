@@ -181,10 +181,8 @@ private lemma ddhExp_probOutput_eq_branch (g : G) (adversary : DDHAdversary F G)
                else ddhExpRand g adversary
       pure (bit == z)] := by
   unfold ddhExp
-  simp only [← probEvent_eq_eq_probOutput]
-  rw [probEvent_bind_congr fun a _ => probEvent_bind_bind_swap _ _ _ _,
-      probEvent_bind_bind_swap]
-  simp only [probEvent_eq_eq_probOutput]
+  rw [probOutput_bind_congr fun a _ => probOutput_bind_bind_swap _ _ _ _,
+      probOutput_bind_bind_swap]
   refine probOutput_bind_congr' ($ᵗ Bool) true ?_
   intro bit
   cases bit <;> simp [ddhExpReal, ddhExpRand]
@@ -326,11 +324,7 @@ variable (g : G)
 def dlogGenerable :
     GenerableRelation G F (fun pk sk => decide (sk • g = pk)) where
   gen := do let sk ← $ᵗ F; return (sk • g, sk)
-  gen_sound := fun pk sk hmem => by
-    rw [decide_eq_true_eq]
-    simp only [support_bind, support_pure, Set.mem_iUnion, Set.mem_singleton_iff,
-               Prod.mk.injEq] at hmem
-    obtain ⟨_, -, rfl, rfl⟩ := hmem; rfl
+  gen_sound := fun _ _ _ => by grind
 
 end DLogGenerable
 

@@ -3464,10 +3464,9 @@ private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
       simp_rw [← ENNReal.tsum_mul_right]
       rw [ENNReal.tsum_comm]
       simp_rw [mul_assoc, ENNReal.tsum_mul_left]
-      refine tsum_congr fun u => ?_
-      refine congrArg _ ?_
-      exact tsum_probOutput_map_mul (replayFirstRun (mx u))
-        (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i' : ι) × spec.Range i') :: p.2)) g
+      exact tsum_congr fun u => congrArg _ <|
+        tsum_probOutput_map_mul (replayFirstRun (mx u))
+          (fun p : α × QueryLog spec => (p.1, (⟨t, u⟩ : (i' : ι) × spec.Range i') :: p.2)) g
     -- Step 3: apply `swap` to both sides.
     rw [swap fun p => h (QueryLog.takeBeforeForkAt p.2 i s) *
         Pr[= y | (f <$> (pure p.1 : OracleComp spec α) : OracleComp spec β)]]
@@ -3611,9 +3610,8 @@ private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
           simp only [map_bind]
         simp_rw [hPr_rhs]
         -- Apply IH with shifted `h`.
-        refine tsum_congr fun u => ?_
-        refine congrArg _ ?_
-        exact ih u k (fun τ => h ((⟨t, u⟩ : (i' : ι) × spec.Range i') :: τ))
+        exact tsum_congr fun u => congrArg _ <|
+          ih u k (fun τ => h ((⟨t, u⟩ : (i' : ι) × spec.Range i') :: τ))
     · -- Case `t ≠ i`: truncation preserves the `⟨t,u⟩` entry; reduce via
       -- `fst_map_replayRunWithTraceValue_query_bind_cons_ne` and IH.
       have htrunc : ∀ (u : spec.Range t) (p' : α × QueryLog spec),
@@ -3662,9 +3660,8 @@ private lemma tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt
         rw [heq]
         simp only [map_bind]
       simp_rw [hPr_rhs]
-      refine tsum_congr fun u => ?_
-      refine congrArg _ ?_
-      exact ih u s (fun τ => h ((⟨t, u⟩ : (i' : ι) × spec.Range i') :: τ))
+      exact tsum_congr fun u => congrArg _ <|
+        ih u s (fun τ => h ((⟨t, u⟩ : (i' : ι) × spec.Range i') :: τ))
 
 /-- Replay-side Jensen / Cauchy-Schwarz step. Squaring the probability that the first
 run satisfies `cf x₁ = some s` is bounded by the joint probability that *both* the
@@ -3726,16 +3723,14 @@ private lemma sq_probOutput_main_le_noGuardReplayComp
         = ∑' p, w p * I p.1 := hMain
       _ = ∑' p, Pr[= p | replayFirstRun main] *
             Pr[= y | (cf <$> (pure p.1 : OracleComp spec α) :
-              OracleComp spec (Option (Fin (qb i + 1))))] := by
-              refine tsum_congr fun p => ?_; rfl
+              OracleComp spec (Option (Fin (qb i + 1))))] := rfl
       _ = ∑' p, Pr[= p | replayFirstRun main] *
             Pr[= y | cf <$> Prod.fst <$> (do
               let u ← liftComp ($ᵗ spec.Range i) spec
               replayRunWithTraceValue main i
                 (QueryLog.takeBeforeForkAt p.2 i ↑s) ↑s u :
                   OracleComp spec (α × _))] := hB1h
-      _ = ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := by
-              refine tsum_congr fun p => ?_; rfl
+      _ = ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := rfl
   -- `hEq`: the two expansions of `Pr[= y | cf <$> main]` coincide.
   have hEq : ∑' p, w p * I p.1 =
       ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) := hMain.symm.trans hMainTake
@@ -3770,14 +3765,12 @@ private lemma sq_probOutput_main_le_noGuardReplayComp
                 let u ← liftComp ($ᵗ spec.Range i) spec
                 replayRunWithTraceValue main i
                   (QueryLog.takeBeforeForkAt p.2 i ↑s) ↑s u :
-                    OracleComp spec (α × _))]) := by
-            refine tsum_congr fun p => ?_; exact hsq_eq p
+                    OracleComp spec (α × _))]) := tsum_congr hsq_eq
       _ = ∑' p, Pr[= p | replayFirstRun main] *
             (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) *
               Pr[= y | (cf <$> (pure p.1 : OracleComp spec α) :
                 OracleComp spec (Option (Fin (qb i + 1))))]) := hB1h.symm
-      _ = ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := by
-            refine tsum_congr fun p => ?_; rfl
+      _ = ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := rfl
   -- `hFactor`: expand `Pr[= z | noGuardReplayComp]` as `E[I p.1 * Q(p.2)]`.
   have hFactor : Pr[= z | noGuardReplayComp main qb i cf s] =
       ∑' p, w p * (I p.1 * Q p.2) := by
@@ -3844,8 +3837,7 @@ private lemma sq_probOutput_main_le_noGuardReplayComp
       _ ≤ ∑' p, w p * Q (QueryLog.takeBeforeForkAt p.2 i ↑s) ^ 2 := hJensen
       _ = ∑' p, w p * (Q (QueryLog.takeBeforeForkAt p.2 i ↑s) * I p.1) := hEq2
       _ = ∑' p, w p * (I p.1 * Q (QueryLog.takeBeforeForkAt p.2 i ↑s)) := by
-            refine tsum_congr fun p => ?_
-            ring
+            simp_rw [mul_comm (Q _) (I _)]
       _ = Pr[= z | noGuardReplayComp main qb i cf s] := hFactorTrunc.symm
   change (Pr[= s | cf <$> main] : ℝ≥0∞) ^ 2 ≤ Pr[= z | noGuardReplayComp main qb i cf s]
   have : (Pr[= s | cf <$> main] : ℝ≥0∞) = Pr[= y | cf <$> main] := by

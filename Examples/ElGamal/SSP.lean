@@ -110,7 +110,7 @@ The first exponent `a` is lazily sampled on first access and cached in the state
 returns `a • gen` and `DHCHALLENGE` returns `(b • gen, (a * b) • gen)` for fresh `b`. -/
 noncomputable def dhTripleReal (gen : G) :
     Package unifSpec (dhSpec G) (Option F) where
-  init := none
+  init := pure none
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
@@ -130,7 +130,7 @@ noncomputable def dhTripleReal (gen : G) :
 `DHCHALLENGE` returns `(b • gen, c • gen)` for fresh `b, c`. -/
 noncomputable def dhTripleRand (gen : G) :
     Package unifSpec (dhSpec G) (Option F) where
-  init := none
+  init := pure none
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
@@ -161,7 +161,7 @@ output, so the equivalence with `dhToLR_left.link dhTripleReal` is definitional 
 alpha-renaming of the sampled exponents (`a, b` on the DDH side and `sk, r` here). -/
 noncomputable def elgamalLR_left (gen : G) :
     Package unifSpec (lrSpec G) (Option F) where
-  init := none
+  init := pure none
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
@@ -181,7 +181,7 @@ noncomputable def elgamalLR_left (gen : G) :
 `(r • gen, (sk * r) • gen + m₁)`. -/
 noncomputable def elgamalLR_right (gen : G) :
     Package unifSpec (lrSpec G) (Option F) where
-  init := none
+  init := pure none
   impl
     | Sum.inl _ => fun st => match st with
         | none => do
@@ -309,7 +309,10 @@ theorem evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left
   rw [show dhToLR_left = Package.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
     Package.run_link_left_ofStateless]
   unfold Package.run
-  rw [StateT.run'_eq, evalDist_map, evalDist_map]
+  -- Both packages have `init = pure none`, so the outer bind collapses on both sides.
+  simp only [show (dhTripleReal (F := F) gen).init = pure none from rfl,
+    show (elgamalLR_left (F := F) gen).init = pure none from rfl, pure_bind, StateT.run'_eq,
+    evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose]
   exact Package.simulateQ_StateT_evalDist_congr
@@ -325,7 +328,9 @@ theorem evalDist_runProb_dhToLR_right_link_real_eq_elgamalLR_right
   rw [show dhToLR_right = Package.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
     Package.run_link_left_ofStateless]
   unfold Package.run
-  rw [StateT.run'_eq, evalDist_map, evalDist_map]
+  simp only [show (dhTripleReal (F := F) gen).init = pure none from rfl,
+    show (elgamalLR_right (F := F) gen).init = pure none from rfl, pure_bind, StateT.run'_eq,
+    evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose]
   exact Package.simulateQ_StateT_evalDist_congr
@@ -449,12 +454,14 @@ theorem evalDist_runProb_dhToLR_link_rand_swap
   unfold Package.runProb
   rw [show dhToLR_left = Package.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
     show dhToLR_right = Package.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
-    Package.run_link_left_ofStateless, Package.run_link_left_ofStateless,
-    evalDist_map, evalDist_map]
+    Package.run_link_left_ofStateless, Package.run_link_left_ofStateless]
+  unfold Package.run
+  simp only [show (dhTripleRand (F := F) gen).init = pure none from rfl,
+    pure_bind, StateT.run'_eq, evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose, ← QueryImpl.simulateQ_compose]
   exact Package.simulateQ_StateT_evalDist_congr
-    (composed_rand_swap_handler_evalDist (F := F) gen hg) A (dhTripleRand gen).init
+    (composed_rand_swap_handler_evalDist (F := F) gen hg) A none
 
 end RandSwapSymmetry
 

@@ -20,16 +20,60 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
 
+/-! ### Registered VC-spec rules
+
+Centralized `@[vcspec]` registrations for the relational planner. Lemmas added here become
+candidates for the registered-rule branch of `rvcstep`/`rvcgen` (and surface in the
+"Registered `@[vcspec]` candidates" hint when the planner gets stuck), in addition to any
+structural rule that `runRVCGenCore` already tries by goal shape. -/
+
 attribute [vcspec]
+  -- Core relational rules from `Relational/Basic.lean`
+  OracleComp.ProgramLogic.Relational.relTriple_pure_pure
+  OracleComp.ProgramLogic.Relational.relTriple_bind
+  OracleComp.ProgramLogic.Relational.relTriple_map
+  OracleComp.ProgramLogic.Relational.relTriple_if
+  OracleComp.ProgramLogic.Relational.relTriple_replicate
+  OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel
+  OracleComp.ProgramLogic.Relational.relTriple_list_mapM
+  OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel
+  OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
+  OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same
+  OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+  OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl
+  -- Quantitative (eRHL) rules from `Relational/Quantitative.lean`
+  OracleComp.ProgramLogic.Relational.eRelTriple_pure
+  OracleComp.ProgramLogic.Relational.eRelTriple_bind
+  OracleComp.ProgramLogic.Relational.eRelTriple_uniformSample_bij
+  -- `simulateQ`-aware rules from `Relational/SimulateQ.lean`
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
-attribute [vcspec]
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_query_map_eq
 
 private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
+/-- Attempt to close the current relational/eRHL leaf goal with the canonical fast paths.
+
+Tries, in order:
+* `assumption` (catches a hypothesis matching the relational triple verbatim);
+* `relTriple_true _ _` (vacuous postcondition `fun _ _ => True`, via the product coupling);
+* `relTriple_post_const` together with `intros; trivial` (postcondition reduces to a
+  trivially provable proposition such as `() = ()`);
+* `relTriple_refl` (identical computations, equality coupling);
+* `relTriple_eqRel_of_eq rfl` (syntactically identical computations);
+* `relTriple_pure_pure rfl` (`pure x ⨯ pure x` with reflexive postcondition);
+* `relTriple_pure_pure` together with `assumption` (`pure a ⨯ pure b` with `R a b` in scope);
+* `eRelTriple_pure _ _ _` (quantitative pure-pure leaf);
+* the same closers after `subst_vars` (resolves goals where the pure values are
+  syntactically distinct but unified via local equality hypotheses);
+* `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.Relational.relTriple_true _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+    intros; trivial)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -37,26 +81,22 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) <||>
   tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption))
-
-def tryCloseLeadingRelGoalImmediate : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | [] => pure ()
-  | goal :: rest =>
-      setGoals [goal]
-      if ← tryCloseRelGoalImmediate then
-        let solvedPrefix ← getGoals
-        setGoals (solvedPrefix ++ rest)
-      else
-        setGoals goals
-
-def reorderRelBindGoals : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | first :: second :: rest =>
-      setGoals ([second, first] ++ rest)
-  | _ => pure ()
+    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    (try subst_vars
+     first
+       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+       | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
+       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+          intros; trivial)))) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption)))
 
 private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :=
   match relTripleGoalParts? target with
@@ -85,6 +125,17 @@ def tryLowerRelGoal : TacticM Bool := withMainContext do
   else
     return false
 
+/-- Normalize the monad structure of both sides of a relational/eRHL goal.
+
+Applies the standard set of monad simplification lemmas (right-association, pure-bind
+elimination, `bind_pure_comp`, `Functor.map_map`, `map_pure`) to flatten nested binds
+and strip pure-bind layers so that downstream rule selection (especially
+`relTriple_bind`) sees aligned structures on both sides. The pass is best-effort:
+`try simp only` always succeeds and leaves the goal unchanged when no lemma applies. -/
+def tryNormalizeRelBindStructure : TacticM Unit := do
+  let _ ← tryEvalTacticSyntax (← `(tactic|
+    try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure]))
+
 def runERelPureRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _))
@@ -97,25 +148,135 @@ def runERelBindRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     refine OracleComp.ProgramLogic.Relational.eRelTriple_bind (cut := $cut) ?_ ?_))
 
+/-- Monad-law normalization used as a fallback when a direct `relTriple_bind`
+attempt fails. Flattens nested binds (`bind_assoc`) and reduces `pure_bind` so
+that `commit`-style intermediate computations (e.g. `do x ← oa; pure (x, x)`)
+align with the corresponding flat form on the other side. -/
+def tryFlattenRelBindGoal : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+      OracleComp.bind_pure_comp]))
+
+/-- After `relTriple_bind ?_ ?_` produces `[sample, continuation, …pre-existing]`,
+this helper tries to auto-close the sample subgoal (typically `RelTriple oa oa
+(EqRel _)` closes via `relTriple_refl`) and the continuation subgoal in isolation,
+then puts any unclosed continuation first for the user's natural `intro`-style flow.
+
+Pre-existing goals (those already in the goal list before `relTriple_bind` produced
+the two new subgoals at the head) are preserved unchanged at the tail; the helper
+never touches or reorders them. This guards against the multi-goal scenario where
+`rvcstep` is invoked on a goal sitting alongside other open goals (for example,
+after `constructor`): a naive close-then-swap would, when the sample closes,
+swap the continuation with an unrelated trailing goal, and a follow-up close pass
+could fire on it. -/
+def closeSampleAndReorderBindGoals : TacticM Unit := do
+  let goalsBefore ← getGoals
+  match goalsBefore with
+  | sample :: continuation :: rest =>
+      setGoals [sample]
+      let _ ← tryCloseRelGoalImmediate
+      let postSample ← getGoals
+      setGoals [continuation]
+      let _ ← tryCloseRelGoalImmediate
+      let postCont ← getGoals
+      setGoals (postCont ++ postSample ++ rest)
+  | _ => pure ()
+
 def runRelBindRule : TacticM Bool := do
+  tryNormalizeRelBindStructure
+  if ← tryCloseRelGoalImmediate then
+    return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind
         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
     return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback: flatten nested binds via monad laws and retry the EqRel-bind cut.
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind
+         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))) then
+    closeSampleAndReorderBindGoals
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_))) then
+    closeSampleAndReorderBindGoals
     return true
   return false
+
+/-- Bijection-coupling interpretation of an `rvcstep using f` hint when both sides
+of a bind start with a uniform sample / query.
+
+Given a goal `RelTriple ((⋯ : OracleComp _ α) >>= fa) ((⋯ : OracleComp _ α) >>= fb) S`,
+applies `relTriple_bind` with the cut `R := fun a b => b = f a`, closes the sample
+subgoal via `relTriple_uniformSample_bij` (or `relTriple_query_bij`), and on the
+continuation introduces the coupled values together with the equality witness and
+substitutes it.
+
+Resulting goal order:
+1. The continuation `RelTriple (fa a) (fb (f a)) S` for an arbitrary fresh `a`.
+2. The bijectivity side condition `Function.Bijective f`.
+3. Any prior trailing goals.
+
+Returns `true` iff every step of the recipe fired; otherwise restores state and
+returns `false` so a caller can try a different interpretation of the hint. -/
+def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  -- Best-effort normalization so `<$>` / `bind_pure_comp` shapes are also
+  -- recognized as bind-on-both-sides for the purposes of the recipe.
+  let _ ← tryEvalTacticSyntax (← `(tactic|
+    try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure,
+      map_bind, OracleComp.bind_pure_comp]))
+  unless ← tryEvalTacticSyntax (← `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_bind
+        (R := fun a b => b = $f a) ?_ ?_)) do
+    saved.restore
+    return false
+  let bindGoals ← getGoals
+  match bindGoals with
+  | sample :: cont :: rest =>
+      setGoals [sample]
+      let sampleClosed ← tryEvalTacticSyntax (← `(tactic|
+        first
+          | refine OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+              (f := $f) ?_ _ (fun _ => rfl)
+          | refine OracleComp.ProgramLogic.Relational.relTriple_query_bij
+              _ (f := $f) ?_ _ (fun _ => rfl)))
+      unless sampleClosed do
+        saved.restore
+        return false
+      let bijGoals ← getGoals
+      setGoals [cont]
+      let _ ← tryEvalTacticSyntax (← `(tactic| intro _ _ heq; subst heq))
+      let contGoals ← getGoals
+      setGoals (contGoals ++ bijGoals ++ rest)
+      return true
+  | _ =>
+      saved.restore
+      return false
 
 def runRelBindRuleUsing (R : TSyntax `term) : TacticM Bool := do
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback 1: flatten nested binds and retry with the explicit cut.
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_))) then
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback 2: hint may be a bijection `f : α → α` (not a relation).
+  -- Try the bijection-coupling recipe used when both sides bind a uniform sample.
+  if ← runRelBindBijRuleUsing R then
     return true
   return false
 
@@ -235,11 +396,14 @@ def runRelSimDistRule : TacticM Bool := withMainContext do
   | none => return false
 
 def runRVCGenCore : TacticM Bool := withMainContext do
+  tryNormalizeRelBindStructure
   let target ← instantiateMVars (← getMainTarget)
   if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then
     let _ := pre
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
+    if ← tryCloseRelGoalImmediate then
+      return true
     if ← runERelPureRule then
       return true
     if isBindExpr oa && isBindExpr ob then
@@ -307,6 +471,13 @@ def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext 
         if ← runRelBindRuleUsing hint then
           return true
       if ← runRelRndRuleUsing hint then
+        return true
+      -- Generic bijection-coupling-bind fallback. Handles `<$>`-shaped goals (and
+      -- more generally any goal that normalizes to `bind` on both sides) by
+      -- treating the hint as a bijection `f : α → α`, cutting with
+      -- `R := fun a b => b = f a`, and discharging the sample subgoal via
+      -- `relTriple_uniformSample_bij` / `relTriple_query_bij`.
+      if ← runRelBindBijRuleUsing hint then
         return true
       if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
         runRelSimRuleUsing hint
@@ -376,10 +547,24 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
   discard <| tryEvalTacticSyntax (← `(tactic|
     all_goals first
       | assumption
+      | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+      | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+         intros; trivial)
       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+      | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+      | (try subst_vars
+         first
+           | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+           | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+           | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+           | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+           | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+           | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+              intros; trivial))))
 
 private def runRVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
@@ -747,8 +932,9 @@ def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainC
   throwError m!
     "rvcstep using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\
-    - bind cut relation\n\
-    - random/query bijection\n\
+    - bind cut relation (`α → β → Prop`)\n\
+    - bind bijection coupling (`α → α`, on synchronized uniform/query binds)\n\
+    - random/query bijection (`α → α`)\n\
     - `List.mapM` / `List.foldlM` input relation\n\
     - `simulateQ` state relation\n\
     {hintMsg}\n\
@@ -784,10 +970,24 @@ def runRVCGenFinish : TacticM Unit := do
     let _ ← tryEvalTacticSyntax
       (← `(tactic| all_goals first
         | assumption
+        | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+        | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+           intros; trivial)
         | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)))
+        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+        | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+        | (try subst_vars
+           first
+             | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+             | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+             | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+             | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+             | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+             | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+                intros; trivial))))
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "rvcgen finish" runRVCGenCloseConseqPass
 

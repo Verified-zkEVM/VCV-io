@@ -21,6 +21,7 @@ import ToMathlib.Control.Monad.Indexed
 import ToMathlib.Control.Monad.Ordered
 import ToMathlib.Control.Monad.Relation
 import ToMathlib.Control.Monad.RelationalAlgebra
+import ToMathlib.Control.Monad.RelationalAlgebraAnchored
 import ToMathlib.Control.Monad.Relative
 import ToMathlib.Control.Monad.Transformer
 import ToMathlib.Control.OptionT

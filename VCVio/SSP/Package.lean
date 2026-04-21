@@ -9,13 +9,21 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 # State-Separating Proofs: Packages
 
 A `Package I E σ` exposes an export oracle interface `E` while internally querying an import
-interface `I`, maintaining private state of type `σ` initialized to `init`. The handler
-`impl` runs a single export query inside `StateT σ (OracleComp I)`.
+interface `I`, maintaining private state of type `σ` set up by the monadic field
+`init : OracleComp I σ`. The handler `impl` runs a single export query inside
+`StateT σ (OracleComp I)`.
 
 This is the basic data type for the SSP layer. It corresponds to SSProve's `package`, but using
 VCVio's `OracleSpec` for interfaces, `OracleComp` as the underlying free monad, and a per-package
 functional `StateT` instead of a shared heap. Disjointness of state between two parallel packages
 is then a *structural* property of the product state `σ₁ × σ₂`.
+
+Making `init` monadic is a *strict* generalization of SSProve's setup: SSProve has no `init`
+field at all (per-location literal defaults on a shared heap; probabilistic setup is folded into
+oracle handlers via lazy write-on-first-use). Allowing `init : OracleComp I σ` keeps the
+one-time setup pattern first-class, at the cost of losing strict program equalities like
+`P.run (pure x) = pure x` (the init's effects now execute on every run even when the adversary
+is a pure value; see `run_pure` below).
 
 The two basic operations live in this file:
 
@@ -36,7 +44,9 @@ independent universes (`vᵢ` for `I.Range`, `v` for `E.Range`). The state `σ` 
 type `α` of any computation run against the package both live in `Type v` (i.e. the same
 universe as the export ranges); this constraint is forced by `simulateQ` operating on
 `StateT σ (OracleComp I) (E.Range x)`. The import range universe `vᵢ` is unconstrained: an
-`OracleComp I` can produce values in `Type v` regardless of where `I.Range` lives.
+`OracleComp I` can produce values in `Type v` regardless of where `I.Range` lives, and the
+monadic `init : OracleComp I σ` likewise elaborates at `Type (max uᵢ vᵢ v)` without forcing
+`vᵢ = v`.
 -/
 
 universe uᵢ uₑ vᵢ v
@@ -49,16 +59,19 @@ namespace VCVio.SSP
 `I`, maintaining a private state of type `σ`.
 
 The handler `impl` interprets each export query as a stateful `OracleComp I` computation. The
-field `init` is the initial state.
+field `init : OracleComp I σ` produces the initial state; it may sample or query imports, so
+probabilistic setup (e.g. sampling a long-term key once at start-of-game) is first-class data.
 
-Universe parameters: the index universes `uᵢ, uₑ` for the import and export specs are
-independent, as are the range universes `vᵢ` (for `I`) and `v` (for `E`). The state `σ` lives
-in the same universe `v` as the export ranges, since the handler must produce values of type
-`StateT σ (OracleComp I) (E.Range x)`. -/
+Universe parameters: the index universes `uᵢ, uₑ` for the import and export specs, and the
+import range universe `vᵢ`, are independent. The state `σ` lives in `Type v` together with
+the export ranges, since the handler must produce values of type
+`StateT σ (OracleComp I) (E.Range x)`. The monadic `init : OracleComp I σ` imposes no extra
+constraint: `OracleComp I` is universe-polymorphic in its value type. -/
 structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
     (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) where
-  /-- Initial value of the package's private state. -/
-  init : σ
+  /-- Initial value of the package's private state, as a (possibly probabilistic / query-using)
+  computation in the import interface. -/
+  init : OracleComp I σ
   /-- Implementation of each export query as a stateful `OracleComp I` computation. -/
   impl : QueryImpl E (StateT σ (OracleComp I))
 
@@ -75,7 +88,7 @@ Marked `protected` to prevent this name from shadowing `_root_.id` inside `names
 outside the namespace it is always written `Package.id`. -/
 @[simps]
 protected def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} where
-  init := PUnit.unit
+  init := pure PUnit.unit
   impl t :=
     (liftM (query t : OracleComp E (E.Range t)) : StateT PUnit.{v + 1} (OracleComp E) _)
 
@@ -83,81 +96,90 @@ protected def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PUnit.{v + 1} wh
 is `PUnit` and the handler ignores it. -/
 @[simps]
 def ofStateless (h : QueryImpl E (OracleComp I)) : Package I E PUnit.{v + 1} where
-  init := PUnit.unit
+  init := pure PUnit.unit
   impl := h.liftTarget (StateT PUnit.{v + 1} (OracleComp I))
 
 /-- Run a package against an "adversary" computation `A` that queries the package's exports.
 
 The result is an `OracleComp I` computation in the package's import interface. Most commonly
 `I` is a sampling-only spec like `unifSpec`, in which case the result is a `ProbComp` (see
-`VCVio.SSP.Advantage`). The package's final state is discarded; use `runState` to keep it. -/
+`VCVio.SSP.Advantage`). The package's final state is discarded; use `runState` to keep it.
+
+Operationally: first run the init to obtain a starting state `s₀`, then simulate `A` through
+the handler starting in state `s₀`. -/
 def run {α : Type v} (P : Package I E σ) (A : OracleComp E α) : OracleComp I α :=
-  (simulateQ P.impl A).run' P.init
+  P.init >>= fun s₀ => (simulateQ P.impl A).run' s₀
 
 /-- Variant of `run` that keeps the package's final state. -/
 def runState {α : Type v} (P : Package I E σ) (A : OracleComp E α) :
     OracleComp I (α × σ) :=
-  (simulateQ P.impl A).run P.init
+  P.init >>= fun s₀ => (simulateQ P.impl A).run s₀
 
 @[simp]
 lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I)) (A : OracleComp E α) :
     (Package.ofStateless h).runState A = (·, PUnit.unit) <$> simulateQ h A := by
+  -- After the `pure PUnit.unit` init binds trivially, the claim reduces to a direct induction
+  -- on `A`, identical in shape to the pre-monadic-init proof.
   unfold Package.runState
-  generalize (Package.ofStateless h).init = s
+  simp only [ofStateless_init, pure_bind]
+  -- Now the goal is
+  --   (simulateQ (ofStateless h).impl A).run PUnit.unit = (·, PUnit.unit) <$> simulateQ h A
   induction A using OracleComp.inductionOn with
   | pure x => simp [simulateQ_pure, StateT.run_pure]
   | query_bind t k ih =>
     simp only [simulateQ_query_bind, StateT.run_bind, ofStateless_impl,
       QueryImpl.liftTarget_apply, OracleQuery.input_query]
-    -- LHS contains `(liftM (liftM (h t))).run s`. The outer `liftM` is the StateT self-lift;
-    -- collapse it, then unfold the remaining `(liftM x).run s` and clean up.
     have houter : (liftM ((liftM (h t)) : StateT PUnit.{v + 1} (OracleComp I) (E.Range t))
         : StateT PUnit.{v + 1} (OracleComp I) (E.Range t)) = liftM (h t) :=
       monadLift_self _
     rw [houter, StateT.run_monadLift]
     simp only [bind_assoc, pure_bind, map_bind]
     refine bind_congr fun u => ?_
-    -- After this, the goal mentions `simulateQ` again; we need the IH for `k u`. Note that
-    -- because the outer state is `PUnit`, we can drop the `s ↦ ...` quantification: the
-    -- `pure (a, s)` we got back used `PUnit.unit`, which is the same as any other `s : PUnit`.
+    -- IH gives the result for `k u` after normalising `runState` with the trivial init bind.
     have hu : ((Package.ofStateless h).runState (k u)) = (·, PUnit.unit) <$> simulateQ h (k u) :=
       ih u
-    simp only [Package.runState] at hu
-    -- `s : PUnit` is forced to `PUnit.unit`, matching `(Package.ofStateless h).init` used in `hu`.
-    obtain rfl : s = PUnit.unit := Subsingleton.elim _ _
+    simp only [Package.runState, ofStateless_init, pure_bind] at hu
     exact hu
 
 @[simp]
 lemma run_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I)) (A : OracleComp E α) :
     (Package.ofStateless h).run A = simulateQ h A := by
-  rw [show (Package.ofStateless h).run A = Prod.fst <$> (Package.ofStateless h).runState A from
-    rfl, runState_ofStateless, ← Functor.map_map]
+  -- `run` factors through `runState` via `Prod.fst <$> _`.
+  have : (Package.ofStateless h).run A
+      = Prod.fst <$> (Package.ofStateless h).runState A := by
+    simp [Package.run, Package.runState, StateT.run'_eq]
+  rw [this, runState_ofStateless, ← Functor.map_map]
   simp
 
+/-- Running a pure adversary still executes the package's init (which may sample). Both sides
+evaluate to `P.init >>= fun _ => pure x`; under a probabilistic init interpretation such as
+`evalDist`, this is still the distribution of `x`, so advantages are unaffected. -/
 @[simp]
 lemma run_pure {α : Type v} (P : Package I E σ) (x : α) :
-    P.run (pure x) = pure x := by
+    P.run (pure x) = P.init >>= fun _ => pure x := by
   simp [run, simulateQ_pure, StateT.run'_eq, StateT.run_pure]
 
+/-- `runState` on a pure adversary returns `x` paired with the freshly-initialised state. -/
 @[simp]
 lemma runState_pure {α : Type v} (P : Package I E σ) (x : α) :
-    P.runState (pure x) = pure (x, P.init) := by
-  simp [runState, simulateQ_pure, StateT.run_pure]
+    P.runState (pure x) = (fun s₀ => (x, s₀)) <$> P.init := by
+  simp [runState, simulateQ_pure, StateT.run_pure, bind_pure_comp]
 
 @[simp]
 lemma runState_bind {α β : Type v}
     (P : Package I E σ) (A : OracleComp E α) (f : α → OracleComp E β) :
     P.runState (A >>= f) =
       P.runState A >>= fun (a, s) => (simulateQ P.impl (f a)).run s := by
-  simp [runState, simulateQ_bind, StateT.run_bind]
+  simp [runState, simulateQ_bind, StateT.run_bind, bind_assoc]
 
 end Package
 
 /-! ### Universe-polymorphism sanity checks
 
 The examples below exercise the four independent universe parameters of `Package`. They are
-purely typechecking tests: they ensure that the import / export index universes (`uᵢ`, `uₑ`)
-and the import / export range universes (`vᵢ`, `v`) all remain independent of each other. -/
+purely typechecking tests: they ensure that the import / export index universes (`uᵢ`, `uₑ`),
+the import range universe `vᵢ`, and the shared export-range / state universe `v` all remain
+independent. -/
 
 section UniverseTests
 

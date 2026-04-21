@@ -5175,13 +5175,9 @@ theorem euf_nma_bound
         ∑' pkw : Stmt × Wit, Pr[= pkw | hr.gen] * acc pkw.1 := by
     change Pr[= true | Fork.exp σ hr M nmaAdv qH] = _
     unfold Fork.exp
-    rw [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
-      probEvent_bind_eq_tsum]
-    refine tsum_congr fun pkw => ?_
-    rw [probOutput_liftComp]
-    congr 1
-    rcases pkw with ⟨pk, sk⟩
-    simp only [bind_pure_comp, probEvent_map, Function.comp_def, acc]
+    simp only [← probEvent_eq_eq_probOutput, probEvent_simulateQ_unifChalImpl,
+      probEvent_bind_eq_tsum, bind_pure_comp, probEvent_map, Function.comp_def,
+      probEvent_liftComp, acc]
   -- ── Step (b): rewrite `Pr[= true | hardRelationExp]` as a keygen-marginalized sum of
   -- per-pk relation-recovery probabilities.
   have hRHS_eq_tsum :
@@ -5190,13 +5186,8 @@ theorem euf_nma_bound
           Pr[ fun w : Wit => rel pkw.1 w = true |
             eufNmaReduction σ hr M nmaAdv qH pkw.1] := by
     unfold hardRelationExp
-    rw [← probEvent_eq_eq_probOutput]
-    simp only [bind_pure_comp, probEvent_bind_eq_tsum]
-    refine tsum_congr fun pkw => ?_
-    rcases pkw with ⟨pk, sk⟩
-    congr 1
-    rw [probEvent_map]
-    rfl
+    simp only [← probEvent_eq_eq_probOutput, bind_pure_comp, probEvent_bind_eq_tsum,
+      probEvent_map, Function.comp_def]
   -- ── Step (c): per-pk forking bound via `Fork.replayForkingBound` applied with the
   -- strengthened support invariant `forkSupportInvariant`.
   have hPerPk : ∀ pk : Stmt,

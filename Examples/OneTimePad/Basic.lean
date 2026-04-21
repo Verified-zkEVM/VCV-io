@@ -67,13 +67,7 @@ lemma perfectSecrecyAt (sp : ℕ) : (oneTimePad sp).perfectSecrecyAt := by
     simpa [SymmEncAlg.PerfectSecrecyExp, oneTimePad,
       bind_assoc, pure_bind] using
       probOutput_pair_xor_uniform sp (mx := mgen) msg σ
-  calc
-    Pr[= (msg, σ) | (oneTimePad sp).PerfectSecrecyExp mgen] =
-        Pr[= msg | mgen] *
-          (Fintype.card (BitVec sp) : ℝ≥0∞)⁻¹ := hpair
-    _ = Pr[= msg | mgen] *
-        Pr[= σ | (oneTimePad sp).PerfectSecrecyCipherExp mgen] := by
-          rw [probOutput_cipher_uniform]
+  rw [hpair, ← probOutput_cipher_uniform]
 
 /-- The one-time pad is perfectly secret for all security parameters. -/
 lemma perfectSecrecy : ∀ sp, (oneTimePad sp).perfectSecrecyAt := perfectSecrecyAt

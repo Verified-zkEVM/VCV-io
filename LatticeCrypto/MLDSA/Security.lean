@@ -81,7 +81,7 @@ theorem idsWithAbort_complete' :
     (identificationScheme p prims nttOps).Complete := by
   classical
   intro pk sk hvalid
-  rw [← probEvent_eq_eq_probOutput, probEvent_eq_one_iff]
+  rw [probOutput_eq_one_iff_forall]
   refine ⟨HasEvalPMF.probFailure_eq_zero _, ?_⟩
   intro b hb
   rw [support_bind] at hb
@@ -149,8 +149,7 @@ theorem idsWithAbort_commitment_recoverable :
       (prims.sampleInBall cTilde) z pk.t1), ?_⟩
   rintro s w' c ⟨z, h⟩ hverify
   unfold identificationScheme at hverify
-  simp only [Bool.and_eq_true, decide_eq_true_eq] at hverify
-  exact hverify.1.2
+  grind
 
 end Properties
 

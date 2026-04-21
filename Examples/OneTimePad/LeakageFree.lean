@@ -54,12 +54,9 @@ theorem tracedEncrypt_eq (sp : ℕ) (msg : BitVec sp) :
 produces identical observation traces. -/
 theorem otp_traceNoninterference (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     Leakage.TraceNoninterference (tracedEncrypt sp msg₀) (tracedEncrypt sp msg₁) := by
-  simp only [tracedEncrypt_eq]
-  unfold Leakage.TraceNoninterference
-  rw [ProgramLogic.Relational.relTriple'_iff_relTriple]
-  refine ProgramLogic.Relational.relTriple_bind
-    (ProgramLogic.Relational.relTriple_refl ($ᵗ BitVec sp)) fun _ _ _ => ?_
-  exact ProgramLogic.Relational.relTriple_pure_pure rfl
+  simp only [tracedEncrypt_eq, Leakage.TraceNoninterference,
+    ProgramLogic.Relational.relTriple'_iff_relTriple]
+  rvcgen
 
 /-- The traced OTP is probabilistically leak-free: the trace distribution is independent
 of the encrypted message. -/

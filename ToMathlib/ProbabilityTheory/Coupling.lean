@@ -17,6 +17,8 @@ public import ToMathlib.ProbabilityTheory.SPMF
 
 @[expose] public section
 
+open ENNReal
+
 universe u
 
 noncomputable section
@@ -195,6 +197,162 @@ theorem IsCoupling.prod {α β : Type u} {p : SPMF α} {q : SPMF β}
 noncomputable def Coupling.prod {α β : Type u} {p : SPMF α} {q : SPMF β}
     (hp : p.toPMF none = 0) (hq : q.toPMF none = 0) : Coupling p q :=
   ⟨p >>= fun a => q >>= fun b => pure (a, b), IsCoupling.prod hp hq⟩
+
+/-! ## Dirac couplings: when one marginal is `pure`
+
+When the left marginal is `pure a` (and analogously on the right), the coupling collapses
+to the Dirac product `(a, ·) <$> q`. This is the key combinatorial ingredient behind
+*anchoring*: the relational logic must agree with the unary logic in this corner. -/
+
+/-- Dirac coupling on the left: `(a, ·) <$> q` is a coupling between `pure a` and `q`,
+provided `q` has no failure mass. -/
+theorem IsCoupling.dirac_left {α β : Type u} (a : α) {q : SPMF β}
+    (hq : q.toPMF none = 0) :
+    IsCoupling (((a, ·) : β → α × β) <$> q) (pure a) q := by
+  have hmap : (((a, ·) : β → α × β) <$> q) = q >>= fun b => pure (a, b) :=
+    (bind_pure_comp _ _).symm
+  rw [hmap]
+  refine ⟨?_, ?_⟩
+  · rw [map_bind]
+    have : (fun b : β => (Prod.fst <$> pure (a, b) : SPMF α)) = fun _ => pure a := by
+      funext b; rw [map_pure]
+    rw [this]
+    exact bind_const_of_toPMF_none_eq_zero hq (pure a)
+  · rw [map_bind]
+    have : (fun b : β => (Prod.snd <$> pure (a, b) : SPMF β)) = pure := by
+      funext b; rw [map_pure]
+    rw [this]
+    exact bind_pure q
+
+/-- Dirac coupling on the right: `(·, b) <$> p` is a coupling between `p` and `pure b`,
+provided `p` has no failure mass. -/
+theorem IsCoupling.dirac_right {α β : Type u} {p : SPMF α} (b : β)
+    (hp : p.toPMF none = 0) :
+    IsCoupling (((·, b) : α → α × β) <$> p) p (pure b) := by
+  have hmap : (((·, b) : α → α × β) <$> p) = p >>= fun a => pure (a, b) :=
+    (bind_pure_comp _ _).symm
+  rw [hmap]
+  refine ⟨?_, ?_⟩
+  · rw [map_bind]
+    have : (fun a : α => (Prod.fst <$> pure (a, b) : SPMF α)) = pure := by
+      funext a; rw [map_pure]
+    rw [this]
+    exact bind_pure p
+  · rw [map_bind]
+    have : (fun a : α => (Prod.snd <$> pure (a, b) : SPMF β)) = fun _ => pure b := by
+      funext a; rw [map_pure]
+    rw [this]
+    exact bind_const_of_toPMF_none_eq_zero hp (pure b)
+
+/-- Pointwise characterization of any coupling whose left marginal is `pure a`:
+mass off the slice `{a} × β` is zero. -/
+theorem IsCoupling.apply_eq_zero_of_pure_left {α β : Type u} {a : α} {q : SPMF β}
+    {c : SPMF (α × β)} (hc : IsCoupling c (pure a) q) {x : α} (b : β) (hxa : x ≠ a) :
+    c (x, b) = 0 := by
+  have h1 := hc.map_fst
+  rw [SPMF.fmap_eq_map] at h1
+  change PMF.map (Option.map Prod.fst) c.toPMF = PMF.pure (some a) at h1
+  exact PMF.map_eq_pure_zero _ c.toPMF (some a) h1 (some (x, b)) (by simp [hxa])
+
+/-- Pointwise characterization of any coupling whose right marginal is `pure b`:
+mass off the slice `α × {b}` is zero. -/
+theorem IsCoupling.apply_eq_zero_of_pure_right {α β : Type u} {p : SPMF α} {b : β}
+    {c : SPMF (α × β)} (hc : IsCoupling c p (pure b)) (a : α) {y : β} (hyb : y ≠ b) :
+    c (a, y) = 0 := by
+  have h2 := hc.map_snd
+  rw [SPMF.fmap_eq_map] at h2
+  change PMF.map (Option.map Prod.snd) c.toPMF = PMF.pure (some b) at h2
+  exact PMF.map_eq_pure_zero _ c.toPMF (some b) h2 (some (a, y)) (by simp [hyb])
+
+/-- For a coupling whose left marginal is `pure a`, the value at `(a, b)` matches
+the right marginal `q b`. -/
+theorem IsCoupling.apply_pure_left_eq {α β : Type u} {a : α} {q : SPMF β}
+    {c : SPMF (α × β)} (hc : IsCoupling c (pure a) q) (b : β) :
+    c (a, b) = q b := by
+  have h2 := hc.map_snd
+  rw [SPMF.fmap_eq_map] at h2
+  change PMF.map (Option.map Prod.snd) c.toPMF = q.toPMF at h2
+  rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some]
+  refine Eq.symm ?_
+  rw [← h2, PMF.map_apply]
+  refine (tsum_eq_single (some (a, b)) ?_).trans ?_
+  · intro o ho
+    cases o with
+    | none => simp
+    | some p =>
+      obtain ⟨x, b'⟩ := p
+      have hne : x ≠ a ∨ b' ≠ b := by
+        by_contra h
+        push Not at h
+        exact ho (by rw [h.1, h.2])
+      cases hne with
+      | inl hxa =>
+        have hzero : c.toPMF (some (x, b')) = 0 :=
+          hc.apply_eq_zero_of_pure_left b' hxa
+        simp [Option.map, hzero]
+      | inr hb =>
+        have hne_some : (some b : Option β) ≠ some b' := fun h => hb (Option.some.inj h).symm
+        simp [Option.map, if_neg hne_some]
+  · simp
+
+/-- For a coupling whose right marginal is `pure b`, the value at `(a, b)` matches
+the left marginal `p a`. -/
+theorem IsCoupling.apply_pure_right_eq {α β : Type u} {p : SPMF α} {b : β}
+    {c : SPMF (α × β)} (hc : IsCoupling c p (pure b)) (a : α) :
+    c (a, b) = p a := by
+  have h1 := hc.map_fst
+  rw [SPMF.fmap_eq_map] at h1
+  change PMF.map (Option.map Prod.fst) c.toPMF = p.toPMF at h1
+  rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some]
+  refine Eq.symm ?_
+  rw [← h1, PMF.map_apply]
+  refine (tsum_eq_single (some (a, b)) ?_).trans ?_
+  · intro o ho
+    cases o with
+    | none => simp
+    | some q =>
+      obtain ⟨a', y⟩ := q
+      have hne : a' ≠ a ∨ y ≠ b := by
+        by_contra h
+        push Not at h
+        exact ho (by rw [h.1, h.2])
+      cases hne with
+      | inl ha =>
+        have hne_some : (some a : Option α) ≠ some a' := fun h => ha (Option.some.inj h).symm
+        simp [Option.map, if_neg hne_some]
+      | inr hyb =>
+        have hzero : c.toPMF (some (a', y)) = 0 :=
+          hc.apply_eq_zero_of_pure_right a' hyb
+        simp [Option.map, hzero]
+  · simp
+
+/-- Anchoring identity for tsum-style expectations on the left:
+the expected value of `g` under any coupling between `pure a` and `q` is
+the marginal expectation `∑' b, q b * g a b`. -/
+theorem IsCoupling.tsum_pure_left {α β : Type u} {a : α} {q : SPMF β}
+    {c : SPMF (α × β)} (hc : IsCoupling c (pure a) q) (g : α → β → ℝ≥0∞) :
+    ∑' z : α × β, c z * g z.1 z.2 = ∑' b, q b * g a b := by
+  rw [ENNReal.tsum_prod']
+  refine (tsum_eq_single a ?_).trans ?_
+  · intro x hx
+    have hzero : ∀ b, c (x, b) = 0 := fun b => hc.apply_eq_zero_of_pure_left b hx
+    simp_rw [hzero, zero_mul]
+    exact tsum_zero
+  · refine tsum_congr fun b => ?_
+    rw [hc.apply_pure_left_eq]
+
+/-- Anchoring identity for tsum-style expectations on the right:
+the expected value of `g` under any coupling between `p` and `pure b` is
+the marginal expectation `∑' a, p a * g a b`. -/
+theorem IsCoupling.tsum_pure_right {α β : Type u} {p : SPMF α} {b : β}
+    {c : SPMF (α × β)} (hc : IsCoupling c p (pure b)) (g : α → β → ℝ≥0∞) :
+    ∑' z : α × β, c z * g z.1 z.2 = ∑' a, p a * g a b := by
+  rw [ENNReal.tsum_prod']
+  refine tsum_congr fun a => ?_
+  refine (tsum_eq_single b ?_).trans ?_
+  · intro y hy
+    rw [hc.apply_eq_zero_of_pure_right a hy, zero_mul]
+  · rw [hc.apply_pure_right_eq]
 
 end SPMF
 

@@ -84,10 +84,31 @@ example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
     RelTriple (oa >>= fa) (ob >>= fb) S := by
   rvcstep using R
-  exact hxy
 
 example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
   rvcstep
+
+/-! ### Trivial postcondition discharge (via product coupling)
+
+The product coupling exists for any pair of `OracleComp` computations, so any goal whose
+postcondition is structurally `fun _ _ => True` (or reduces to one through bind/map normalization)
+is closed by the leaf closer without intermediate planning. -/
+
+example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
+    RelTriple oa ob (fun _ _ => True) := by
+  rvcgen
+
+example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
+    (fa : α → OracleComp spec₁ γ) (fb : β → OracleComp spec₂ δ) :
+    RelTriple (oa >>= fa) (ob >>= fb) (fun _ _ => True) := by
+  rvcgen
+
+example (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
+    RelTriple
+      (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₀, ()))
+      (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₁, ()))
+      (fun z₁ z₂ => z₁.2 = z₂.2) := by
+  rvcgen
 
 end OracleComp.ProgramLogic.Relational

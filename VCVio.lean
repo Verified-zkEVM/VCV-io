@@ -135,6 +135,7 @@ import VCVio.Interaction.UC.OpenSyntax.Interp
 import VCVio.Interaction.UC.OpenSyntax.Raw
 import VCVio.Interaction.UC.OpenTheory
 import VCVio.Interaction.UC.Runtime
+import VCVio.Interaction.UC.Standard
 import VCVio.Interaction.UC.StdDoBridge
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.Coercions.SubSpec
@@ -209,6 +210,7 @@ import VCVio.ProgramLogic.Tactics.Unary
 import VCVio.ProgramLogic.Tactics.Unary.Internals
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HandlerSpecs
+import VCVio.ProgramLogic.Unary.HoarePropTriple
 import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge

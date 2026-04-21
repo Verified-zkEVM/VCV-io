@@ -6,6 +6,7 @@ Authors: Quang Dao
 module
 
 public import Mathlib.Order.CompleteLattice.Basic
+public import ToMathlib.Control.Monad.Algebra
 
 /-!
 # Relational monad algebras
@@ -13,14 +14,29 @@ public import Mathlib.Order.CompleteLattice.Basic
 This file introduces a two-monad relational analogue of `MAlgOrdered`:
 
 * `MAlgRelOrdered m₁ m₂ l` with a relational weakest-precondition operator `rwp`.
-* Generic relational triple rules (`pure`, `consequence`, `bind`).
+* Generic relational triple rules (`pure`, `consequence`, `bind`, `map`).
+* Asynchronous (one-sided) bind rules `relWP_bind_left_le` / `relWP_bind_right_le`
+  and their `Triple` forms, recovering Maillard et al.'s asynchronous shapes.
+* Structural pure rules for `if`, `dite`, `Option.elim`, `Sum.elim`.
 * Side-lifting instances for heterogeneous stacks (`StateT`, `OptionT`, `ExceptT`).
+* `StrictBind` subclass capturing strict relational effect observations
+  (in the sense of Maillard et al.) together with `StateT` lifts that preserve it.
+
+The framework is the predicate-transformer specialization of Maillard et al.'s
+*simple framework* (POPL 2020, §2): the relational specification monad is fixed
+to `(α → β → l) → l` and the relational effect observation is inlined as the
+`rwp` field. Coupling-based `OracleComp` instances live downstream in
+`VCVio/ProgramLogic/Relational/Basic.lean` and
+`VCVio/ProgramLogic/Relational/Quantitative.lean`.
 
 Attribution:
 - Loom repository: https://github.com/verse-lab/loom
 - POPL 2026 paper: *Foundational Multi-Modal Program Verifiers*,
   Vladimir Gladshtein, George Pîrlea, Qiyuan Zhao, Vitaly Kurin, Ilya Sergey.
   DOI: https://doi.org/10.1145/3776719
+- POPL 2020 paper: *The Next 700 Relational Program Logics*,
+  Kenji Maillard, Cătălin Hriţcu, Exequiel Rivas, Antoine Van Muylder.
+  DOI: https://doi.org/10.1145/3371072
 -/
 
 @[expose] public section
@@ -108,6 +124,135 @@ theorem relWP_map_right [LawfulMonad m₁] [LawfulMonad m₂]
     RelWP x y (fun a b => post a (g b)) ≤ RelWP x (g <$> y) post := by
   have hbind := relWP_bind_le x y (fun a => pure a) (fun b => pure (g b)) post
   simpa [Functor.map, bind_pure_comp, relWP_pure] using hbind
+
+/-- `Triple` form of `relWP_map_left`. -/
+theorem triple_map_left [LawfulMonad m₁] [LawfulMonad m₂]
+    (f : α → γ) {pre : l} {x : m₁ α} {y : m₂ β} {post : γ → β → l}
+    (h : Triple pre x y (fun a b => post (f a) b)) :
+    Triple pre (f <$> x) y post :=
+  le_trans h (relWP_map_left f x y post)
+
+/-- `Triple` form of `relWP_map_right`. -/
+theorem triple_map_right [LawfulMonad m₁] [LawfulMonad m₂]
+    (g : β → δ) {pre : l} {x : m₁ α} {y : m₂ β} {post : α → δ → l}
+    (h : Triple pre x y (fun a b => post a (g b))) :
+    Triple pre x (g <$> y) post :=
+  le_trans h (relWP_map_right g x y post)
+
+/-! ### Asynchronous (one-sided) bind rules
+
+These are the relational counterparts of SSProve's `apply_left` /
+`apply_right` (`theories/Relational/GenericRulesSimple.v`) and Maillard
+et al.'s asynchronous bind shapes (Eqs. 5–6 of *The Next 700 Relational
+Program Logics*). They let one side bind without forcing the other side
+to bind in lockstep, by absorbing the inactive side as a `pure`. Both are
+direct consequences of `relWP_bind_le` and lawful right-unit.
+-/
+
+/-- Asynchronous bind on the left: the right side performs no bind step. -/
+theorem relWP_bind_left_le [LawfulMonad m₁] [LawfulMonad m₂]
+    (x : m₁ α) (f : α → m₁ γ) (y : m₂ β) (post : γ → β → l) :
+    RelWP x y (fun a b => RelWP (f a) (pure b : m₂ β) post) ≤ RelWP (x >>= f) y post := by
+  have h := relWP_bind_le (γ := γ) (δ := β) x y f (fun b : β => (pure b : m₂ β)) post
+  simpa [bind_pure] using h
+
+/-- Asynchronous bind on the right: the left side performs no bind step. -/
+theorem relWP_bind_right_le [LawfulMonad m₁] [LawfulMonad m₂]
+    (x : m₁ α) (y : m₂ β) (g : β → m₂ δ) (post : α → δ → l) :
+    RelWP x y (fun a b => RelWP (pure a : m₁ α) (g b) post) ≤ RelWP x (y >>= g) post := by
+  have h := relWP_bind_le (γ := α) (δ := δ) x y (fun a : α => (pure a : m₁ α)) g post
+  simpa [bind_pure] using h
+
+/-- `Triple` form of `relWP_bind_left_le`: chain a left-side `bind` against
+a right-side that stays inert. -/
+theorem triple_bind_left [LawfulMonad m₁] [LawfulMonad m₂]
+    {pre : l} {x : m₁ α} {y : m₂ β} {f : α → m₁ γ}
+    {cut : α → β → l} {post : γ → β → l}
+    (hxy : Triple pre x y cut)
+    (hf : ∀ a b, Triple (cut a b) (f a) (pure b : m₂ β) post) :
+    Triple pre (x >>= f) y post := by
+  have hcut : pre ≤ RelWP x y (fun a b => RelWP (f a) (pure b : m₂ β) post) :=
+    le_trans hxy (relWP_mono x y hf)
+  exact le_trans hcut (relWP_bind_left_le x f y post)
+
+/-- `Triple` form of `relWP_bind_right_le`: chain a right-side `bind` against
+a left-side that stays inert. -/
+theorem triple_bind_right [LawfulMonad m₁] [LawfulMonad m₂]
+    {pre : l} {x : m₁ α} {y : m₂ β} {g : β → m₂ δ}
+    {cut : α → β → l} {post : α → δ → l}
+    (hxy : Triple pre x y cut)
+    (hg : ∀ a b, Triple (cut a b) (pure a : m₁ α) (g b) post) :
+    Triple pre x (y >>= g) post := by
+  have hcut : pre ≤ RelWP x y (fun a b => RelWP (pure a : m₁ α) (g b) post) :=
+    le_trans hxy (relWP_mono x y hg)
+  exact le_trans hcut (relWP_bind_right_le x y g post)
+
+/-! ### Structural pure rules
+
+Generic case-split rules that let `vcgen`/`rvcgen`-style proofs peel
+boolean, decidable-propositional, dependent-`if`, `Option`, and `Sum`
+case splits without unfolding `rwp`. These are the relational analogues
+of SSProve's `if_rule` / `nat_rect_rule`
+(`theories/Relational/GenericRulesSimple.v`) and Maillard et al.'s R1
+rules. The `nat_rect` analogue is intentionally omitted: Lean's
+`induction n` is the idiomatic substitute.
+-/
+
+/-- Boolean if-then-else with the same scrutinee on both sides. -/
+theorem triple_ite (b : Bool) {pre : l} {x x' : m₁ α} {y y' : m₂ β}
+    {post : α → β → l}
+    (h_t : b = true → Triple pre x y post)
+    (h_f : b = false → Triple pre x' y' post) :
+    Triple pre (if b then x else x') (if b then y else y') post := by
+  cases hb : b
+  · simpa [hb] using h_f hb
+  · simpa [hb] using h_t hb
+
+/-- Decidable propositional if-then-else with the same scrutinee on both sides. -/
+theorem triple_ite_prop {p : Prop} [Decidable p]
+    {pre : l} {x x' : m₁ α} {y y' : m₂ β} {post : α → β → l}
+    (h_t : p → Triple pre x y post)
+    (h_f : ¬ p → Triple pre x' y' post) :
+    Triple pre (if p then x else x') (if p then y else y') post := by
+  by_cases hp : p
+  · simpa [hp] using h_t hp
+  · simpa [hp] using h_f hp
+
+/-- Dependent if-then-else with the same scrutinee on both sides. -/
+theorem triple_dite {p : Prop} [Decidable p] {pre : l}
+    {x : p → m₁ α} {x' : ¬ p → m₁ α}
+    {y : p → m₂ β} {y' : ¬ p → m₂ β}
+    {post : α → β → l}
+    (h_t : ∀ hp : p, Triple pre (x hp) (y hp) post)
+    (h_f : ∀ hnp : ¬ p, Triple pre (x' hnp) (y' hnp) post) :
+    Triple pre (if h : p then x h else x' h) (if h : p then y h else y' h) post := by
+  by_cases hp : p
+  · simpa [hp] using h_t hp
+  · simpa [hp] using h_f hp
+
+/-- `Option.elim` with the same scrutinee on both sides. -/
+theorem triple_option_elim {α' : Type u} (oa : Option α') {pre : l}
+    {x : m₁ α} {x' : α' → m₁ α}
+    {y : m₂ β} {y' : α' → m₂ β}
+    {post : α → β → l}
+    (h_none : oa = none → Triple pre x y post)
+    (h_some : ∀ a, oa = some a → Triple pre (x' a) (y' a) post) :
+    Triple pre (oa.elim x x') (oa.elim y y') post := by
+  cases oa with
+  | none => simpa using h_none rfl
+  | some a => simpa using h_some a rfl
+
+/-- `Sum.elim` with the same scrutinee on both sides. -/
+theorem triple_sum_elim {α' β' : Type u} (s : α' ⊕ β') {pre : l}
+    {x : α' → m₁ α} {x' : β' → m₁ α}
+    {y : α' → m₂ β} {y' : β' → m₂ β}
+    {post : α → β → l}
+    (h_inl : ∀ a, s = .inl a → Triple pre (x a) (y a) post)
+    (h_inr : ∀ b, s = .inr b → Triple pre (x' b) (y' b) post) :
+    Triple pre (s.elim x x') (s.elim y y') post := by
+  cases s with
+  | inl a => simpa using h_inl a rfl
+  | inr b => simpa using h_inr b rfl
 
 end MAlgRelOrdered
 
@@ -380,5 +525,148 @@ noncomputable instance instExceptTLeft (ε : Type u) :
             x.run y fRun g collapse)
 
 end FailureInstances
+
+/-! ## Strict bind subclass
+
+Maillard et al.'s "simple framework" distinguishes *lax* relational
+effect observations (the bind law is an inequality) from *strict* ones
+(the bind law is an equality). The default `MAlgRelOrdered` class
+records only the lax form via `rwp_bind_le`; the strict subclass
+`StrictBind` adds the equality. Strictness holds when the underlying
+relational specification monad is deterministic in both arguments
+(Reader-, Writer-, plain-State-style without sampling), and is
+preserved by every `StateT` lift in this file. The coupling-based
+`OracleComp` instances are intrinsically lax because the optimal
+coupling for a composite computation can be more precise than the
+sequential composition of optimal couplings.
+-/
+
+/-- A `MAlgRelOrdered` instance whose `rwp` bind law is an equality, not just an
+inequality. This is the strict relational effect observation in the sense of
+Maillard et al. (Def. 2 of *The Next 700 Relational Program Logics*). -/
+class StrictBind (m₁ : Type u → Type v₁) (m₂ : Type u → Type v₂) (l : Type u)
+    [Monad m₁] [Monad m₂] [Preorder l] [MAlgRelOrdered m₁ m₂ l] : Prop where
+  /-- Strict bind law: relational WP of a sequenced computation equals the
+  iterated relational WP. -/
+  rwp_bind {α β γ δ : Type u} (x : m₁ α) (y : m₂ β) (f : α → m₁ γ) (g : β → m₂ δ)
+      (post : γ → δ → l) :
+    MAlgRelOrdered.rwp x y (fun a b => MAlgRelOrdered.rwp (f a) (g b) post) =
+      MAlgRelOrdered.rwp (x >>= f) (y >>= g) post
+
+namespace StrictBind
+
+variable {m₁ : Type u → Type v₁} {m₂ : Type u → Type v₂} {l : Type u}
+variable [Monad m₁] [Monad m₂] [Preorder l]
+variable [MAlgRelOrdered m₁ m₂ l]
+variable {α β γ δ : Type u}
+
+/-- Strict version of `relWP_bind_le`: under `StrictBind` the bind law is an
+equality, so the relational WP of a sequenced computation can be rewritten in
+either direction. -/
+theorem relWP_bind [StrictBind m₁ m₂ l]
+    (x : m₁ α) (y : m₂ β) (f : α → m₁ γ) (g : β → m₂ δ) (post : γ → δ → l) :
+    RelWP x y (fun a b => RelWP (f a) (g b) post) = RelWP (x >>= f) (y >>= g) post :=
+  StrictBind.rwp_bind x y f g post
+
+end StrictBind
+
+section StrictBindInstances
+
+variable {m₁ : Type u → Type v₁} {m₂ : Type u → Type v₂} {l : Type u}
+variable [Monad m₁] [Monad m₂] [LawfulMonad m₁] [LawfulMonad m₂] [Preorder l]
+variable [MAlgRelOrdered m₁ m₂ l]
+
+/-- Strictness lifts through the left `StateT` instance. -/
+instance instStrictBindStateTLeft [StrictBind m₁ m₂ l] (σ : Type u) :
+    StrictBind (StateT σ m₁) m₂ (σ → l) where
+  rwp_bind {_ _ _ _} x y f g post := by
+    funext s
+    have h := StrictBind.rwp_bind (m₁ := m₁) (m₂ := m₂) (l := l)
+      (x := x.run s) (y := y) (f := fun xs => (f xs.1).run xs.2) (g := g)
+      (post := fun zs d => post zs.1 d zs.2)
+    simpa [StateT.run_bind] using h
+
+/-- Strictness lifts through the right `StateT` instance. -/
+instance instStrictBindStateTRight [StrictBind m₁ m₂ l] (σ : Type u) :
+    StrictBind m₁ (StateT σ m₂) (σ → l) where
+  rwp_bind {_ _ _ _} x y f g post := by
+    funext s
+    have h := StrictBind.rwp_bind (m₁ := m₁) (m₂ := m₂) (l := l)
+      (x := x) (y := y.run s) (f := f) (g := fun ys => (g ys.1).run ys.2)
+      (post := fun c td => post c td.1 td.2)
+    simpa [StateT.run_bind] using h
+
+/-- Strictness lifts through the two-sided `StateT` instance. -/
+instance instStrictBindStateTBoth [StrictBind m₁ m₂ l] (σ₁ σ₂ : Type u) :
+    StrictBind (StateT σ₁ m₁) (StateT σ₂ m₂) (σ₁ → σ₂ → l) where
+  rwp_bind {_ _ _ _} x y f g post := by
+    funext s₁ s₂
+    have h := StrictBind.rwp_bind (m₁ := m₁) (m₂ := m₂) (l := l)
+      (x := x.run s₁) (y := y.run s₂)
+      (f := fun p₁ => (f p₁.1).run p₁.2) (g := fun p₂ => (g p₂.1).run p₂.2)
+      (post := fun p₁ p₂ => post p₁.1 p₂.1 p₁.2 p₂.2)
+    simpa [StateT.run_bind] using h
+
+end StrictBindInstances
+
+/-! ## Anchored subclass
+
+A relational logic is *anchored* (with respect to a unary algebra on each side) when
+relational reasoning collapses to unary reasoning whenever one of the two computations
+is a `pure` value. The two coherence axioms
+
+* `rwp_pure_left a y post = wp y (post a)`
+* `rwp_pure_right x b post = wp x (fun a => post a b)`
+
+freeze the relational `rwp` to the underlying unary `wp` at one of the two corners,
+recovering Maillard et al.'s "two unary triples + a relational triple" pattern from
+[*The Next 700 Relational Program Logics*, POPL 2020] without committing to the full
+relative-monad machinery. They are precisely the ingredient missing from the lossy
+exception lifts (see `instExceptTLeft` / `instExceptTRight` above): once anchored, one
+can derive *honest exception* combinators `wpExc` (unary) and `rwpExc` (relational)
+that track success and failure separately rather than collapsing failures to `⊥`.
+
+Anchoring is independent of `StrictBind`. The coupling-based `OracleComp` instance is
+anchored (Dirac couplings are unique) but is not strict, while a deterministic
+specification monad is strict and anchored.
+-/
+
+/-- A `MAlgRelOrdered` instance that *anchors* the relational WP to the unary WPs of
+the two sides at `pure`. The two axioms are the relational analogues of the coupling
+identities `IsCoupling c (pure a) q ↔ c = (a, ·) <$> q` (and symmetrically on the
+right): once one side is a Dirac, the relational WP collapses to the unary WP of the
+other side, specialized at the Dirac point. -/
+class Anchored (m₁ : Type u → Type v₁) (m₂ : Type u → Type v₂) (l : Type u)
+    [Monad m₁] [Monad m₂] [CompleteLattice l]
+    [MAlgOrdered m₁ l] [MAlgOrdered m₂ l] [MAlgRelOrdered m₁ m₂ l] : Prop where
+  /-- Left anchoring: when the left computation is `pure a`, the relational WP equals
+  the unary WP of the right computation evaluated at the postcondition specialized at
+  `a`. -/
+  rwp_pure_left {α β : Type u} (a : α) (y : m₂ β) (post : α → β → l) :
+    MAlgRelOrdered.rwp (pure a : m₁ α) y post = MAlgOrdered.wp y (post a)
+  /-- Right anchoring: when the right computation is `pure b`, the relational WP equals
+  the unary WP of the left computation evaluated at the postcondition specialized at
+  `b`. -/
+  rwp_pure_right {α β : Type u} (x : m₁ α) (b : β) (post : α → β → l) :
+    MAlgRelOrdered.rwp x (pure b : m₂ β) post = MAlgOrdered.wp x (fun a => post a b)
+
+namespace Anchored
+
+variable {m₁ : Type u → Type v₁} {m₂ : Type u → Type v₂} {l : Type u}
+variable [Monad m₁] [Monad m₂] [CompleteLattice l]
+variable [MAlgOrdered m₁ l] [MAlgOrdered m₂ l] [MAlgRelOrdered m₁ m₂ l]
+variable {α β : Type u}
+
+/-- `RelWP`-flavoured restatement of the left anchoring axiom. -/
+theorem relWP_pure_left [Anchored m₁ m₂ l] (a : α) (y : m₂ β) (post : α → β → l) :
+    RelWP (pure a : m₁ α) y post = MAlgOrdered.wp y (post a) :=
+  Anchored.rwp_pure_left a y post
+
+/-- `RelWP`-flavoured restatement of the right anchoring axiom. -/
+theorem relWP_pure_right [Anchored m₁ m₂ l] (x : m₁ α) (b : β) (post : α → β → l) :
+    RelWP x (pure b : m₂ β) post = MAlgOrdered.wp x (fun a => post a b) :=
+  Anchored.rwp_pure_right x b post
+
+end Anchored
 
 end MAlgRelOrdered

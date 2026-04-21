@@ -94,8 +94,7 @@ theorem hiding_bound_finite [Finite M] {AUX : Type} {t : ℕ}
               ((HidingAvgSpec M S C).query (Sum.inl ()) :
                 OracleComp (HidingAvgSpec M S C) S)].toReal *
             tvDist (hidingReal A s) (hidingSim A s) := by
-            refine tsum_congr fun s => ?_
-            rw [tvDist_liftComp_hidingAvgSpec]
+            simp_rw [tvDist_liftComp_hidingAvgSpec]
     _ = ∑ s : S, ((Fintype.card S : ℝ≥0∞)⁻¹).toReal * tvDist (hidingReal A s) (hidingSim A s) := by
           rw [tsum_fintype]
           refine Finset.sum_congr rfl ?_

@@ -52,8 +52,12 @@ goals: synchronized conditionals, `simulateQ`, `Functor.map`, bounded traversals
 bind decomposition, or random/query coupling.
 
 `rvcstep using t` supplies the explicit witness needed for the current shape:
-- bind cut relation
-- random/query bijection
+- bind cut relation, where `t : α → β → Prop`
+- bind bijection coupling, where `t : α → α` and both sides start
+  with a uniform sample / query (the cut is inferred as `fun a b => b = t a`,
+  closing the sample subgoal via `relTriple_uniformSample_bij` /
+  `relTriple_query_bij` and substituting the equality on the continuation)
+- random/query bijection, where `t : α → α`
 - traversal input relation (`List.mapM` / `List.foldlM`)
 - `simulateQ` state relation
 
@@ -137,6 +141,9 @@ elab_rules : tactic
           "all_goals try simp only [game_rule]",
           String.intercalate "" [
             "all_goals first | assumption | ",
+            "exact OracleComp.ProgramLogic.Relational.relTriple_true _ _ | ",
+            "(refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_; ",
+            "intros; trivial) | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | ",
@@ -172,6 +179,9 @@ macro "rel_inline" ids:ident* : tactic =>
       (unfold $ids*
        try simp only [game_rule]
        try first
+         | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+         | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+            intros; trivial)
          | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
          | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
          | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
@@ -180,6 +190,9 @@ macro "rel_inline" ids:ident* : tactic =>
     `(tactic|
       (simp only [game_rule]
        try first
+         | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+         | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+            intros; trivial)
          | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
          | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
          | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
