@@ -137,6 +137,9 @@ elab_rules : tactic
           "all_goals try simp only [game_rule]",
           String.intercalate "" [
             "all_goals first | assumption | ",
+            "exact OracleComp.ProgramLogic.Relational.relTriple_true _ _ | ",
+            "(refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_; ",
+            "intros; trivial) | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | ",
             "exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | ",
@@ -172,6 +175,9 @@ macro "rel_inline" ids:ident* : tactic =>
       (unfold $ids*
        try simp only [game_rule]
        try first
+         | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+         | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+            intros; trivial)
          | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
          | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
          | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
@@ -180,6 +186,9 @@ macro "rel_inline" ids:ident* : tactic =>
     `(tactic|
       (simp only [game_rule]
        try first
+         | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+         | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+            intros; trivial)
          | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
          | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
          | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl

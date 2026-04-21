@@ -56,6 +56,9 @@ private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool)
 
 Tries, in order:
 * `assumption` (catches a hypothesis matching the relational triple verbatim);
+* `relTriple_true _ _` (vacuous postcondition `fun _ _ => True`, via the product coupling);
+* `relTriple_post_const` together with `intros; trivial` (postcondition reduces to a
+  trivially provable proposition such as `() = ()`);
 * `relTriple_refl` (identical computations, equality coupling);
 * `relTriple_eqRel_of_eq rfl` (syntactically identical computations);
 * `relTriple_pure_pure rfl` (`pure x ⨯ pure x` with reflexive postcondition);
@@ -66,6 +69,11 @@ Tries, in order:
 * `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
 def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.Relational.relTriple_true _ _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+    intros; trivial)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -79,11 +87,14 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     (try subst_vars
      first
+       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
        | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
        | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
        | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
        | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
-       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)))) <||>
+       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
+       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+          intros; trivial)))) <||>
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption)))
 
@@ -441,6 +452,9 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
   discard <| tryEvalTacticSyntax (← `(tactic|
     all_goals first
       | assumption
+      | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+      | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+         intros; trivial)
       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
@@ -448,11 +462,14 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
       | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
       | (try subst_vars
          first
+           | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
            | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
            | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
            | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
-           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption))))
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+           | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+              intros; trivial))))
 
 private def runRVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
@@ -857,6 +874,9 @@ def runRVCGenFinish : TacticM Unit := do
     let _ ← tryEvalTacticSyntax
       (← `(tactic| all_goals first
         | assumption
+        | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+        | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+           intros; trivial)
         | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
@@ -864,11 +884,14 @@ def runRVCGenFinish : TacticM Unit := do
         | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
         | (try subst_vars
            first
+             | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
              | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
              | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
              | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
              | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
-             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption))))
+             | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+             | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+                intros; trivial))))
   unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "rvcgen finish" runRVCGenCloseConseqPass
 
