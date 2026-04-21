@@ -98,25 +98,6 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption)))
 
-def tryCloseLeadingRelGoalImmediate : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | [] => pure ()
-  | goal :: rest =>
-      setGoals [goal]
-      if ← tryCloseRelGoalImmediate then
-        let solvedPrefix ← getGoals
-        setGoals (solvedPrefix ++ rest)
-      else
-        setGoals goals
-
-def reorderRelBindGoals : TacticM Unit := do
-  let goals ← getGoals
-  match goals with
-  | first :: second :: rest =>
-      setGoals ([second, first] ++ rest)
-  | _ => pure ()
-
 private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :=
   match relTripleGoalParts? target with
   | some parts => some parts
@@ -176,14 +157,30 @@ def tryFlattenRelBindGoal : TacticM Bool := do
     simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
       OracleComp.bind_pure_comp]))
 
-/-- After `relTriple_bind ?_ ?_` produces `[sample, continuation]`, this helper tries
-to auto-close the sample subgoal (typically `RelTriple oa oa (EqRel _)` closes via
-`relTriple_refl`), then swaps the remaining goals so the continuation lands first
-for the user's natural `intro`-style flow. -/
+/-- After `relTriple_bind ?_ ?_` produces `[sample, continuation, …pre-existing]`,
+this helper tries to auto-close the sample subgoal (typically `RelTriple oa oa
+(EqRel _)` closes via `relTriple_refl`) and the continuation subgoal in isolation,
+then puts any unclosed continuation first for the user's natural `intro`-style flow.
+
+Pre-existing goals (those already in the goal list before `relTriple_bind` produced
+the two new subgoals at the head) are preserved unchanged at the tail; the helper
+never touches or reorders them. This guards against the multi-goal scenario where
+`rvcstep` is invoked on a goal sitting alongside other open goals (for example,
+after `constructor`): a naive close-then-swap would, when the sample closes,
+swap the continuation with an unrelated trailing goal, and a follow-up close pass
+could fire on it. -/
 def closeSampleAndReorderBindGoals : TacticM Unit := do
-  tryCloseLeadingRelGoalImmediate
-  reorderRelBindGoals
-  tryCloseLeadingRelGoalImmediate
+  let goalsBefore ← getGoals
+  match goalsBefore with
+  | sample :: continuation :: rest =>
+      setGoals [sample]
+      let _ ← tryCloseRelGoalImmediate
+      let postSample ← getGoals
+      setGoals [continuation]
+      let _ ← tryCloseRelGoalImmediate
+      let postCont ← getGoals
+      setGoals (postCont ++ postSample ++ rest)
+  | _ => pure ()
 
 def runRelBindRule : TacticM Bool := do
   tryNormalizeRelBindStructure

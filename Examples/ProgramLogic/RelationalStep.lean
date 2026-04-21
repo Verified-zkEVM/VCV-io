@@ -1,4 +1,4 @@
-/- 
+/-
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
@@ -195,3 +195,24 @@ example {a : α} {f : α → OracleComp spec β} :
 example {oa : OracleComp spec α} {f : α → OracleComp spec β} {g : β → OracleComp spec γ} :
     ⟪((oa >>= f) >>= g) ~ (do let x ← oa; let y ← f x; g y) | EqRel γ⟫ := by
   rvcstep
+
+/-! ## Regression: multi-goal isolation
+
+Not an idiomatic-usage example. The deliberately unfocused `rvcstep` below
+exercises the corner case where `rvcstep` is invoked with sibling goals visible
+in the goal list (the pattern `linter.style.multiGoal` discourages on style
+grounds, but which must still behave *correctly* when used). Previously, when
+the sample subgoal of `relTriple_bind` auto-closed, an unconditional
+swap-and-close pass could pull a trailing sibling ahead of the bind continuation
+and silently discharge it. The fix in `closeSampleAndReorderBindGoals` keeps
+`rest` untouched at the tail. -/
+
+set_option linter.style.multiGoal false in
+example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
+    (ob : OracleComp spec α)
+    (hf : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
+    (⟪oa >>= f ~ oa >>= g | EqRel β⟫) ∧ (⟪ob ~ ob | EqRel α⟫) := by
+  refine ⟨?_, ?_⟩
+  rvcstep
+  · intro a₁ a₂ h; subst h; exact hf a₁
+  · rvcstep
