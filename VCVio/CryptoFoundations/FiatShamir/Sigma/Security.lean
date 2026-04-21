@@ -257,15 +257,18 @@ private lemma map_run_withLogging_inputs_eq_run_signedAppend
     baseS + signAppend
   induction oa using OracleComp.inductionOn generalizing signed₀ with
   | pure x =>
-      simp [implW, implAppend]
+      simp
   | query_bind t oa ih =>
       cases t with
       | inl t' =>
-          simp [implW, implAppend, baseW, baseS, QueryImpl.add_apply_inl, ih]
+          simp [QueryImpl.add_apply_inl, ih]
       | inr msg =>
-          simp [implW, implAppend, signAppend, baseW, baseS, QueryImpl.add_apply_inr,
-            QueryImpl.withLogging_apply, WriterT.run_bind', StateT.run_bind, StateT.run_get,
-            StateT.run_set]
+          simp only [add_apply_inr, simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+            OracleQuery.cont_query, QueryImpl.add_apply_inr, QueryImpl.withLogging_apply,
+            bind_pure_comp, map_bind, Functor.map_map, id_eq, bind_assoc, bind_map_left,
+            WriterT.run_bind', WriterT.run_liftM, List.empty_eq, WriterT.run_tell, pure_bind,
+            List.cons_append, List.nil_append, Prod.map_fst, Prod.map_snd, List.map_cons,
+            StateT.run_bind, StateT.run_get, StateT.run_monadLift, monadLift_self, StateT.run_set]
           refine bind_congr fun sig => ?_
           simpa [List.append_assoc] using ih sig (signed₀ ++ [msg])
 
@@ -1608,9 +1611,11 @@ theorem euf_cma_to_nma
                 rw [hlift]
                 simp [bind_pure_comp]
               rw [h_baseProb_inl]
-              show
-                  evalDist ((fun x => (x, cache)) <$> ((unifSpec.query n : ProbComp (Fin (n + 1))).liftComp spec)) =
-                    evalDist ((fun x => (x, cache)) <$> (unifSpec.query n : ProbComp (Fin (n + 1))))
+              change
+                  evalDist ((fun x => (x, cache)) <$>
+                      ((unifSpec.query n : ProbComp (Fin (n + 1))).liftComp spec)) =
+                    evalDist ((fun x => (x, cache)) <$>
+                      (unifSpec.query n : ProbComp (Fin (n + 1))))
               exact
                 evalDist_map_eq_of_evalDist_eq
                   (mx := ((unifSpec.query n : ProbComp (Fin (n + 1))).liftComp spec))
@@ -4511,7 +4516,7 @@ theorem euf_cma_to_nma
             have h_richInv_init : richInv richInit := by
               constructor
               · intro mc ω hω
-                simp [richInit, advInit, roInit] at hω
+                simp [richInit, roInit] at hω
               · constructor
                 · intro msg c ω hω
                   simp [richInit, advInit, roInit] at hω
@@ -5433,7 +5438,7 @@ theorem euf_cma_to_nma
                           rw [simulateQ_map]]
                     rw [StateT.run_map, h_inner_liftComp_run (oa := simTranscript pk)
                       (st := ((roCache, queryLog) : RoState))]
-                    simp [Functor.map_map, Function.comp_def, F]
+                    simp [Functor.map_map, F]
                   have hw' :
                       w ∈ support
                         ((fun cωπ => (F cωπ, ((roCache, queryLog) : RoState))) <$>
