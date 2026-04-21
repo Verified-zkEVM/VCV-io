@@ -13,6 +13,8 @@ import VCVio.CryptoFoundations.ReplayFork
 import VCVio.SSP.Composition
 import ToMathlib.Data.ENNReal.TsumDistrib
 
+set_option linter.style.longFile 6900
+
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
 
@@ -100,7 +102,7 @@ noncomputable def collisionSlack (qS qH : ℕ) (β : ENNReal) :
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma realCommit_probOutput_le_sim_plus_hvzk
-    [DecidableEq Commit] [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+    [DecidableEq Commit] [Inhabited Chal] [SampleableType Chal]
     {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
     {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
@@ -167,7 +169,7 @@ private lemma realCommit_probOutput_le_sim_plus_hvzk
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma realCommit_probOutput_le_beta_hvzk
-    [DecidableEq Commit] [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+    [DecidableEq Commit] [Inhabited Chal] [SampleableType Chal]
     {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
     {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
@@ -619,6 +621,8 @@ private theorem simulatedNmaAdv_hashQueryBound
       (s := ∅))
 
 set_option maxHeartbeats 800000 in
+-- The large structural case analysis over bridges (A)/(B)/(C) exceeds the default budget.
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- **CMA-to-NMA reduction via HVZK simulation.**
 
 For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
@@ -1570,7 +1574,7 @@ theorem euf_cma_to_nma
         have hlift : ∀ {α : Type} (x : ProbComp α) (s : spec.QueryCache),
             (liftM x : StateT spec.QueryCache ProbComp α).run s = x >>= fun a => pure (a, s) := by
           intro α x s
-          simpa using (StateT.run_liftM x s)
+          simp
         have hmod : ∀ {α : Type}
             (f : spec.QueryCache → α × spec.QueryCache) (s : spec.QueryCache),
             (modifyGet f : StateT spec.QueryCache ProbComp α).run s = pure (f s) := by
@@ -1652,7 +1656,7 @@ theorem euf_cma_to_nma
                     have h_uniform :
                         (evalDist ($ᵗ Chal : ProbComp Chal) : SPMF Chal) =
                           (liftM (PMF.uniformOfFintype Chal) : SPMF Chal) := by
-                      simpa [evalDist_uniformSample]
+                      simp [evalDist_uniformSample]
                     exact h_uniform.trans h_query.symm
                   have h_left_map :
                       evalDist
@@ -1665,7 +1669,7 @@ theorem euf_cma_to_nma
                             ((liftM (query (Sum.inr mc) : OracleQuery spec Chal)) :
                               OracleComp spec Chal) : SPMF Chal) :
                           SPMF (Chal × spec.QueryCache)) := by
-                    simpa [evalDist_map]
+                    simp [evalDist_map]
                   have h_right_map :
                       evalDist
                         (((fun u => (u, cache.cacheQuery (Sum.inr mc) u)) <$> ($ᵗ Chal : ProbComp Chal)) :
@@ -1673,7 +1677,7 @@ theorem euf_cma_to_nma
                         ((fun u => (u, cache.cacheQuery (Sum.inr mc) u)) <$>
                           (evalDist ($ᵗ Chal : ProbComp Chal) : SPMF Chal) :
                           SPMF (Chal × spec.QueryCache)) := by
-                    simpa [evalDist_map]
+                    simp [evalDist_map]
                   calc
                     evalDist
                         (((fun u => (u, cache.cacheQuery (Sum.inr mc) u)) <$>
@@ -1799,7 +1803,7 @@ theorem euf_cma_to_nma
                     have h_random_miss :
                         (runtimeRo mc).run (cacheProj cache) =
                           insert <$> ($ᵗ Chal : ProbComp Chal) := by
-                      simpa [runtimeRo, randomOracle.apply_eq, StateT.run_bind, StateT.run_get, hproj,
+                      simp [runtimeRo, randomOracle.apply_eq, StateT.run_bind, StateT.run_get, hproj,
                         StateT.run_pure, hliftRuntime, hmodRuntime, bind_assoc, bind_pure_comp,
                         uniformSampleImpl, insert]
                     have hinsert_proj :
@@ -1825,7 +1829,7 @@ theorem euf_cma_to_nma
                       simpa [runtimeImpl, QueryImpl.add_apply_inr] using h_random_miss
                     exact h_runtime_miss0.trans hinsert_map
                   rw [h_baseProb_miss, h_runtime_miss]
-                  simpa [Functor.map_map, Function.comp_def]
+                  simp [Functor.map_map, Function.comp_def]
               | some u =>
                   have h_baseProb_hit :
                       (baseProb (.inr mc)).run cache = pure (u, cache) := by
@@ -2203,12 +2207,7 @@ theorem euf_cma_to_nma
             rcases s with ⟨cache, signed⟩
             cases hcache : cache (.inr (msg, c)) with
             | some ω =>
-                simp [verifyFromState, eventNoBad, missVerifyComp, hcache]
-                have hnonneg :
-                    0 ≤ Pr[= true | missVerifyComp pk ((msg, (c, resp)), (cache, signed))] := by
-                  exact bot_le
-                simpa [missVerifyComp, and_left_comm, and_assoc, and_comm] using
-                  le_add_of_nonneg_right hnonneg
+                simp [verifyFromState, eventNoBad, missVerifyComp, hcache, and_comm]
             | none =>
                 by_cases hsigned : msg ∈ signed
                 · simp [verifyFromState, eventNoBad, missVerifyComp, hcache, hsigned]
@@ -2280,7 +2279,7 @@ theorem euf_cma_to_nma
                 ((fun x => x = true) ∘ fun z => decide (eventNoBad pk z)) = eventNoBad pk := by
               funext z
               simp
-            simpa using congrArg (probEvent (actual_stateful_exp_append pk sk)) hpred
+            exact congrArg (probEvent (actual_stateful_exp_append pk sk)) hpred
           intro pk sk
           calc
             Pr[= true | actual_pk_exp pk sk] =
@@ -2406,9 +2405,7 @@ theorem euf_cma_to_nma
               rw [hRunQuery]
               simp [h_respond_run, simulateQ_pure, baseSim, QueryImpl.add_apply_inr]
               refine bind_congr fun p => ?_
-              simpa using congrArg
-                (fun x => (fun a => ((c, a), p.2)) <$> x)
-                (rfl : liftM (σ.respond pk sk e p.1) = liftM (σ.respond pk sk e p.1))
+              simp
             have h_real_comp :
                 (realSign pk sk msg).run cache =
                   (σ.commit pk sk).liftComp spec >>= fun ce =>
@@ -2527,7 +2524,7 @@ theorem euf_cma_to_nma
                       | some v =>
                           simp [hmiss] at hcache
                       | none =>
-                          simpa [hcache]
+                          simp [hcache]
               rw [probOutput_def, probOutput_def]
               refine tsum_congr ?_
               intro x
@@ -2570,7 +2567,7 @@ theorem euf_cma_to_nma
               rcases hmem with ⟨ω, hω, hcont⟩
               rw [mem_support_bind_iff] at hcont
               rcases hcont with ⟨π, hπ, hEq⟩
-              simp only [StateT.run_pure, support_pure, Set.mem_singleton_iff] at hEq
+              simp only [support_pure, Set.mem_singleton_iff] at hEq
               have hpair : (c, π) = u := by
                 cases hcache : cache (Sum.inr (msg, c)) <;>
                   simpa [hcache] using (congrArg Prod.fst hEq).symm
@@ -2990,8 +2987,7 @@ theorem euf_cma_to_nma
                 simp [reverseSigned, realImplBadAppend, _realImplSigned, realSignBadAppend,
                   realSignSignedAppend, realSignSigned, realSignSigned', sigBadFSigned,
                   QueryImpl.add_apply_inr, QueryImpl.withBadUpdate_apply_run, StateT.run_bind,
-                  StateT.run_get, StateT.run_set, List.reverse_reverse, List.reverse_cons,
-                  List.reverse_append, List.reverse_singleton, List.append_assoc]
+                  StateT.run_get, StateT.run_set, List.reverse_cons]
           have h_direct_real_append_proj_bad : ∀ (pk : Stmt) (sk : Wit),
               Prod.map id reverseSigned <$> direct_real_exp pk sk =
                 direct_real_exp_append pk sk := by
@@ -3279,7 +3275,7 @@ theorem euf_cma_to_nma
                               simp only [simulateQ_query_bind, OracleQuery.input_query,
                                 StateT.run_bind]
                               rw [hstep]
-                              simp [qn, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                              simp [qn, OracleQuery.cont_query]
                         rw [hrun]
                         rw [probEvent_bind_eq_tsum]
                         calc
@@ -3333,7 +3329,7 @@ theorem euf_cma_to_nma
                                 simp only [simulateQ_query_bind, OracleQuery.input_query,
                                   StateT.run_bind]
                                 rw [hstep]
-                                simp [qmc, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                                simp [qmc, OracleQuery.cont_query]
                           rw [hrun]
                           rw [probEvent_bind_eq_tsum]
                           calc
@@ -3396,13 +3392,7 @@ theorem euf_cma_to_nma
                                           ((spec + (M →ₒ (Commit × Resp))).Range
                                             (Sum.inl (Sum.inr mc)) × (spec.QueryCache × Bool))) =
                                         pure (u, (cache, false), mc :: keys) := by
-                                      simpa [bind_pure_comp] using
-                                        (pure_bind
-                                          (f := fun a :
-                                            (spec + (M →ₒ (Commit × Resp))).Range
-                                              (Sum.inl (Sum.inr mc)) × (spec.QueryCache × Bool) =>
-                                              pure (a.1, a.2, mc :: keys))
-                                          (x := (u, (cache, false))))
+                                      simp
                                 exact hmap
                           have hrun :
                               (simulateQ (realImplLogged pk sk)
@@ -3465,7 +3455,7 @@ theorem euf_cma_to_nma
                           simp only [simulateQ_query_bind, OracleQuery.input_query,
                             StateT.run_bind]
                           rw [hstep]
-                          simp [qsig, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                          simp [qsig, OracleQuery.cont_query]
                     rw [hrun]
                     have hstepBad :
                         Pr[fun cωπ : Commit × Chal × Resp =>
@@ -3481,7 +3471,7 @@ theorem euf_cma_to_nma
                               qsig] := by
                         refine probEvent_congr' (oa := qsig) ?_ rfl
                         intro cωπ _
-                        cases hhit : (cache (.inr (msg, cωπ.1))).isSome <;> simp [hhit]
+                        cases (cache (.inr (msg, cωπ.1))).isSome <;> simp
                       calc
                         Pr[fun cωπ : Commit × Chal × Resp =>
                             ¬ ((cache (.inr (msg, cωπ.1))).isSome = false) |
@@ -3637,8 +3627,7 @@ theorem euf_cma_to_nma
                 simp [reverseSigned, realImplBadAppend, _realImplSigned, realSignBadAppend,
                   realSignSignedAppend, realSignSigned, realSignSigned', sigBadFSigned,
                   QueryImpl.add_apply_inr, QueryImpl.withBadUpdate_apply_run, StateT.run_bind,
-                  StateT.run_get, StateT.run_set, List.reverse_reverse, List.reverse_cons,
-                  List.reverse_append, List.reverse_singleton, List.append_assoc]
+                  StateT.run_get, StateT.run_set, List.reverse_cons]
           have h_direct_real_append_proj : ∀ (pk : Stmt) (sk : Wit),
               Prod.map id reverseSigned <$> direct_real_exp pk sk =
                 direct_real_exp_append pk sk := by
@@ -3725,7 +3714,7 @@ theorem euf_cma_to_nma
                 (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β +
                 ENNReal.ofReal ((qS * (qS + qH) : ℕ) * ζ_zk) +
                 δ_verify := by
-                  simpa [slackReal, add_assoc]
+                  simp [slackReal, add_assoc]
       -- (B) `step_b_per_pksk_signed`: per-(pk, sk), the augmented-state event-level bound.
       --
       -- Derives from `step_b_per_pksk` (proven above on `(cache × Bool)` state) via the data
@@ -4009,7 +3998,7 @@ theorem euf_cma_to_nma
                             simp only [simulateQ_query_bind, OracleQuery.input_query,
                               StateT.run_bind]
                             rw [hstep]
-                            simp [qn, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                            simp [qn, OracleQuery.cont_query]
                       rw [hrun]
                       rw [probEvent_bind_eq_tsum]
                       calc
@@ -4065,7 +4054,7 @@ theorem euf_cma_to_nma
                               simp only [simulateQ_query_bind, OracleQuery.input_query,
                                 StateT.run_bind]
                               rw [hstep]
-                              simp [qmc, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                              simp [qmc, OracleQuery.cont_query]
                         rw [hrun]
                         rw [probEvent_bind_eq_tsum]
                         calc
@@ -4130,13 +4119,7 @@ theorem euf_cma_to_nma
                                         ((spec + (M →ₒ (Commit × Resp))).Range
                                           (Sum.inl (Sum.inr mc)) × (spec.QueryCache × Bool))) =
                                       pure (u, (cache, false), mc :: keys) := by
-                                    simpa [bind_pure_comp] using
-                                      (pure_bind
-                                        (f := fun a :
-                                          (spec + (M →ₒ (Commit × Resp))).Range
-                                            (Sum.inl (Sum.inr mc)) × (spec.QueryCache × Bool) =>
-                                            pure (a.1, a.2, mc :: keys))
-                                        (x := (u, (cache, false))))
+                                    simp
                               exact hmap
                         have hrun :
                             (simulateQ (_simImplLogged pk)
@@ -4198,7 +4181,7 @@ theorem euf_cma_to_nma
                         simp only [simulateQ_query_bind, OracleQuery.input_query,
                           StateT.run_bind]
                         rw [hstep]
-                        simp [qsig, OracleQuery.cont_query, bind_assoc, bind_pure_comp]
+                        simp [qsig, OracleQuery.cont_query]
                   rw [hrun]
                   have hstepBad :
                       Pr[fun cωπ : Commit × Chal × Resp =>
@@ -4214,7 +4197,7 @@ theorem euf_cma_to_nma
                             qsig] := by
                       refine probEvent_congr' (oa := qsig) ?_ rfl
                       intro cωπ _
-                      cases hhit : (cache (.inr (msg, cωπ.1))).isSome <;> simp [hhit]
+                      cases (cache (.inr (msg, cωπ.1))).isSome <;> simp
                     calc
                       Pr[fun cωπ : Commit × Chal × Resp =>
                           ¬ ((cache (.inr (msg, cωπ.1))).isSome = false) |
@@ -4519,7 +4502,7 @@ theorem euf_cma_to_nma
                 simp [richInit, roInit] at hω
               · constructor
                 · intro msg c ω hω
-                  simp [richInit, advInit, roInit] at hω
+                  simp [richInit, advInit] at hω
                 · intro mc
                   simp [richInit, advInit, roInit]
             have h_simImplSigned_unif_run :
@@ -4756,7 +4739,7 @@ theorem euf_cma_to_nma
                 ((fun v : spec.Range (Sum.inl n) × spec.QueryCache => (v.1, (v.2, signed))) <$>
                   ((fun x : spec.Range (Sum.inl n) => (x, cache)) <$> mx)) =
                   ((fun u : spec.Range (Sum.inl n) => (u, (cache, signed))) <$> mx)
-              simpa [mx, Functor.map_map, Function.comp_def]
+              simp [mx, Functor.map_map]
             have h_baseSimSignedWrapped_hash_hit :
                 ∀ (mc : M × Commit) (cache : spec.QueryCache) (signed : List M) (ω : Chal),
                   cache (.inr mc) = some ω →
@@ -4984,7 +4967,7 @@ theorem euf_cma_to_nma
                               OracleComp spec (spec.Range (Sum.inl n)))) =
                             (liftM (PMF.uniformOfFintype (spec.Range (Sum.inl n))) :
                               SPMF (spec.Range (Sum.inl n))) := by
-                        simpa using (evalDist_query (spec := spec) (t := Sum.inl n))
+                        simp
                       simpa [evalDist_map] using
                         congrArg
                           (fun p : SPMF (spec.Range (Sum.inl n)) =>
@@ -5018,10 +5001,7 @@ theorem euf_cma_to_nma
                                       OracleQuery (Fork.wrappedSpec Chal) Chal) :
                                   OracleComp (Fork.wrappedSpec Chal) Chal)) =
                                 (liftM (PMF.uniformOfFintype Chal) : SPMF Chal) := by
-                            simpa [PMF.map_id] using
-                              (evalDist_liftM
-                                (q := (query (spec := Fork.wrappedSpec Chal) (Sum.inr ()) :
-                                  OracleQuery (Fork.wrappedSpec Chal) Chal)))
+                            simp [PMF.map_id]
                           have hRight :
                               evalDist
                                 ((liftM
@@ -5103,7 +5083,7 @@ theorem euf_cma_to_nma
                 rcases st with ⟨roCache, queryLog⟩
                 rcases forgery with ⟨msg, cs⟩
                 rcases cs with ⟨c, resp⟩
-                cases h : roCache (msg, c) <;> simp [traceOfState, traceMap, Function.comp_def, h]
+                cases h : roCache (msg, c) <;> simp [traceOfState, traceMap, h]
               calc
                 traceOfState <$> (simulateQ traceImpl (adv.main pk)).run traceInit
                     = (traceOfState ∘
@@ -5227,7 +5207,7 @@ theorem euf_cma_to_nma
                                 ((roCache, queryLog) : RoState)) := by
                         simpa using hw
                       rw [hinner] at hw'
-                      simp only [Functor.map_map, Function.comp_def, support_map] at hw'
+                      simp only [support_map] at hw'
                       rcases hw' with ⟨u, hu, hw⟩
                       subst w
                       have huState : u.2 = ((roCache, queryLog) : RoState) := by
@@ -5325,9 +5305,8 @@ theorem euf_cma_to_nma
                               (impl₁' := Fork.unifFwd M Commit Chal)
                               (impl₂' := Fork.roImpl M Commit Chal)]
                             rw [simulateQ_query]
-                            simp [innerPkg, QueryImpl.add_apply_inr, Fork.roImpl, StateT.run_bind,
-                              StateT.run_get, StateT.run_set, hroMiss, bind_pure_comp,
-                              liftComp_eq_liftM]
+                            simp [Fork.roImpl, StateT.run_bind,
+                              StateT.run_get, StateT.run_set, hroMiss, bind_pure_comp]
                           rw [h_simImplSigned_hash_miss mc cache signed bad hcache] at hw
                           have hw' :
                               w ∈ support
@@ -5357,7 +5336,7 @@ theorem euf_cma_to_nma
                           have hst' :
                               ((roCache.cacheQuery mc u, queryLog ++ [mc]) : RoState) = st' := by
                             rcases hp' with ⟨u', hu', huEq⟩
-                            simp [support_query] at hu'
+                            simp at hu'
                             cases huEq
                             rfl
                           cases hst'
@@ -5622,9 +5601,8 @@ theorem euf_cma_to_nma
                               (impl₁' := Fork.unifFwd M Commit Chal)
                               (impl₂' := Fork.roImpl M Commit Chal)]
                             rw [simulateQ_query]
-                            simp [innerPkg, QueryImpl.add_apply_inr, Fork.roImpl, hroMiss,
-                              StateT.run_bind, StateT.run_get, StateT.run_set, bind_pure_comp,
-                              liftComp_eq_liftM]
+                            simp [Fork.roImpl, hroMiss,
+                              StateT.run_bind, StateT.run_get, StateT.run_set, bind_pure_comp]
                           have hlhs :
                               Prod.fst <$>
                                   (simulateQ innerPkg.impl
@@ -5659,7 +5637,7 @@ theorem euf_cma_to_nma
                           rw [simulateQ_map]]
                     rw [StateT.run_map, h_inner_liftComp_run (oa := simTranscript pk)
                       (st := ((roCache, queryLog) : RoState))]
-                    simp [Functor.map_map, Function.comp_def, F]
+                    simp [Functor.map_map, F]
                   have hlhs :
                       Prod.fst <$>
                           (simulateQ innerPkg.impl (F <$> liftComp (simTranscript pk) spec)).run
@@ -6673,8 +6651,9 @@ theorem euf_nma_bound
     (B := fun pkw => Pr[ fun w : Wit => rel pkw.1 w = true |
       eufNmaReduction σ hr M nmaAdv qH pkw.1])
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
-    hinv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
+    hinv_ne_top (fun _ => probEvent_le_one)     (fun pkw => hPerPkFinal pkw.1)
 
+omit [SampleableType Stmt] in
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK, β-parametric).**
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
