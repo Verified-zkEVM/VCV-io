@@ -151,8 +151,6 @@ example [SampleableType α]
   conv_rhs => rw [← id_map ($ᵗ α : ProbComp α)]
   by_equiv
   rvcgen
-  · exact hf
-  · exact rfl
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ f₂ : α → OracleComp spec β}
