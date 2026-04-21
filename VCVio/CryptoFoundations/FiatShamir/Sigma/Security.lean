@@ -268,6 +268,38 @@ private lemma map_run_withLogging_inputs_eq_run_signedAppend
           refine bind_congr fun sig => ?_
           simpa [List.append_assoc] using ih sig (signed₀ ++ [msg])
 
+/-! ### Weighted `tsum` distributivity
+
+Two small algebraic identities used to factor keygen-indexed slack terms out of
+`∑' pksk, evalDist hr.gen pksk * …` expressions. Both rely only on
+`(∑' i, w i) = 1` (a PMF weight-sum condition) to turn a constant added inside
+the weighted sum into a constant added outside. -/
+
+private theorem tsum_mul_add_const_of_tsum_eq_one
+    {ι : Type*} (w : ι → ENNReal) (f : ι → ENNReal) (c : ENNReal)
+    (hw : (∑' i, w i) = 1) :
+    (∑' i, w i * (f i + c)) = (∑' i, w i * f i) + c := by
+  have hc : (∑' i, w i * c) = c := by
+    rw [ENNReal.tsum_mul_right, hw, one_mul]
+  calc (∑' i, w i * (f i + c))
+      = ∑' i, (w i * f i + w i * c) := by simp_rw [mul_add]
+    _ = (∑' i, w i * f i) + (∑' i, w i * c) := ENNReal.tsum_add
+    _ = (∑' i, w i * f i) + c := by rw [hc]
+
+private theorem tsum_mul_add_const_add_of_tsum_eq_one
+    {ι : Type*} (w : ι → ENNReal) (f g : ι → ENNReal) (c : ENNReal)
+    (hw : (∑' i, w i) = 1) :
+    (∑' i, w i * (f i + c + g i)) =
+      (∑' i, w i * f i) + c + (∑' i, w i * g i) := by
+  have hc : (∑' i, w i * c) = c := by
+    rw [ENNReal.tsum_mul_right, hw, one_mul]
+  calc (∑' i, w i * (f i + c + g i))
+      = ∑' i, ((w i * f i + w i * c) + w i * g i) := by simp_rw [mul_add]
+    _ = (∑' i, (w i * f i + w i * c)) + (∑' i, w i * g i) := ENNReal.tsum_add
+    _ = ((∑' i, w i * f i) + (∑' i, w i * c)) + (∑' i, w i * g i) := by
+        rw [ENNReal.tsum_add]
+    _ = (∑' i, w i * f i) + c + (∑' i, w i * g i) := by rw [hc]
+
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
@@ -3705,32 +3737,8 @@ theorem euf_cma_to_nma
               (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
               (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
                 Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]) +
-                slackReal := by
-          let termA : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2]
-          let termB : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * slackReal
-          have h_expand :
-              (fun pksk : Stmt × Wit =>
-                evalDist hr.gen pksk *
-                  (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
-                (fun pksk : Stmt × Wit => termA pksk + termB pksk) := by
-            funext pksk
-            simp [termA, termB, left_distrib]
-          have h_termB :
-              (∑' (pksk : Stmt × Wit), termB pksk) = slackReal := by
-            simp [termB, ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
-          calc
-            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              (Pr[event pksk.1 | direct_real_exp pksk.1 pksk.2] + slackReal)) =
-                ∑' (pksk : Stmt × Wit), (termA pksk + termB pksk) := by
-                  simpa [h_expand]
-            _ = (∑' (pksk : Stmt × Wit), termA pksk) +
-                  (∑' (pksk : Stmt × Wit), termB pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (∑' (pksk : Stmt × Wit), termA pksk) +
-                  slackReal := by
-                  rw [h_termB]
+                slackReal :=
+          tsum_mul_add_const_of_tsum_eq_one _ _ _ h_keygen_sum_one
         calc
           (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
             Pr[= true | actual_pk_exp pksk.1 pksk.2])
@@ -5948,57 +5956,8 @@ theorem euf_cma_to_nma
                 Pr[event pksk.1 | direct_sim_exp pksk.1]) +
               slackHVZK +
               (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                Pr[badPred | direct_sim_exp pksk.1]) := by
-          have h_expand :
-              (fun pksk : Stmt × Wit =>
-                evalDist hr.gen pksk *
-                  (Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                    slackHVZK +
-                    Pr[badPred | direct_sim_exp pksk.1])) =
-                (fun pksk : Stmt × Wit =>
-                  (evalDist hr.gen pksk *
-                      Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                    evalDist hr.gen pksk * slackHVZK) +
-                    evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1]) := by
-            funext pksk
-            rw [mul_add, mul_add]
-          let termA : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[event pksk.1 | direct_sim_exp pksk.1]
-          let termB : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * slackHVZK
-          let termC : Stmt × Wit → ENNReal := fun pksk =>
-            evalDist hr.gen pksk * Pr[badPred | direct_sim_exp pksk.1]
-          have h_step3 : (∑' (pksk : Stmt × Wit), termB pksk) = slackHVZK := by
-            simp [termB, ENNReal.tsum_mul_right, h_keygen_sum_one, one_mul]
-          calc
-            (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-              (Pr[event pksk.1 | direct_sim_exp pksk.1] +
-                slackHVZK +
-                Pr[badPred | direct_sim_exp pksk.1])) =
-                tsum (fun pksk : Stmt × Wit => ((termA pksk + termB pksk) + termC pksk)) := by
-                  simpa [termA, termB, termC] using
-                    congrArg (fun f => ∑' (pksk : Stmt × Wit), f pksk) h_expand
-            _ = tsum (fun pksk : Stmt × Wit => termA pksk + termB pksk) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  tsum (fun pksk : Stmt × Wit => termB pksk)) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [ENNReal.tsum_add]
-            _ = (tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  slackHVZK) +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  rw [h_step3]
-            _ = tsum (fun pksk : Stmt × Wit => termA pksk) +
-                  slackHVZK +
-                  tsum (fun pksk : Stmt × Wit => termC pksk) := by
-                  simp [add_assoc]
-            _ = (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                    Pr[event pksk.1 | direct_sim_exp pksk.1]) +
-                  slackHVZK +
-                  (∑' (pksk : Stmt × Wit), evalDist hr.gen pksk *
-                    Pr[badPred | direct_sim_exp pksk.1]) := by
-                  simp [termA, termC]
+                Pr[badPred | direct_sim_exp pksk.1]) :=
+          tsum_mul_add_const_add_of_tsum_eq_one _ _ _ _ h_keygen_sum_one
         exact h_step1.trans_eq h_step2
       -- (B-finish) distributed: `S_bad ≤ slackA` (since `hr.gen` is a PMF).
       have h_bad_sum :
