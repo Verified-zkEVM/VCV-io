@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
 import VCVio.EvalDist.TVDist
+import VCVio.ProgramLogic.Unary.HoareTriple
 import ToMathlib.ProbabilityTheory.OptimalCoupling
 
 /-!
@@ -958,6 +959,71 @@ noncomputable instance instMAlgRelOrdered_eRelWP :
   rwp_mono := fun hpost => eRelWP_mono (spec₁ := spec₁) (spec₂ := spec₂) hpost
   rwp_bind_le := fun oa ob fa fb post =>
     eRelWP_bind_le (spec₁ := spec₁) (spec₂ := spec₂) oa ob fa fb post
+
+/-- Anchoring instance for the quantitative `ℝ≥0∞`-valued relational logic on `OracleComp`.
+
+When one of the two computations is `pure`, the supremum over couplings collapses to the
+single Dirac coupling (existence: `IsCoupling.dirac_left`; uniqueness on the supports follows
+from `IsCoupling.apply_pure_left_eq`), and the relational expectation reduces to the unary
+expectation `wp y (post a)` (resp. `wp x (fun a => post a b)`). This is the genuinely
+quantitative analogue of the qualitative `Anchored Prop` instance in
+`VCVio/ProgramLogic/Relational/Basic.lean`. -/
+noncomputable instance instAnchored_eRelWP :
+    MAlgRelOrdered.Anchored (OracleComp spec₁) (OracleComp spec₂) ℝ≥0∞ where
+  rwp_pure_left {α β} a y post := by
+    change eRelWP (pure a : OracleComp spec₁ α) y post = wp y (post a)
+    rw [wp_eq_tsum]
+    apply le_antisymm
+    · -- (≤): every coupling collapses to the marginal expectation by `tsum_pure_left`.
+      refine iSup_le fun c => ?_
+      have hcPure : SPMF.IsCoupling c.1 (pure a) (evalDist y) := by
+        simpa [evalDist_pure] using c.2
+      have heq := hcPure.tsum_pure_left post
+      change ∑' z, c.1 z * post z.1 z.2 ≤ ∑' b, Pr[= b | y] * post a b
+      simp only [probOutput_def]
+      exact le_of_eq heq
+    · -- (≥): the canonical Dirac coupling exhibits this expectation.
+      have hnf : (evalDist y).toPMF none = 0 := probFailure_eq_zero (mx := y)
+      have hcPure : SPMF.IsCoupling (((a, ·) : β → α × β) <$> evalDist y) (pure a) (evalDist y) :=
+        SPMF.IsCoupling.dirac_left a hnf
+      have hCoupling : SPMF.IsCoupling (((a, ·) : β → α × β) <$> evalDist y)
+          (evalDist (pure a : OracleComp spec₁ α)) (evalDist y) := by
+        simpa [evalDist_pure] using hcPure
+      let c : SPMF.Coupling (evalDist (pure a : OracleComp spec₁ α)) (evalDist y) :=
+        ⟨((a, ·) : β → α × β) <$> evalDist y, hCoupling⟩
+      have heq := hcPure.tsum_pure_left post
+      change ∑' b, Pr[= b | y] * post a b ≤
+        ⨆ c : SPMF.Coupling (evalDist (pure a : OracleComp spec₁ α)) (evalDist y),
+          ∑' z, Pr[= z | c.1] * post z.1 z.2
+      apply le_iSup_of_le c
+      simp only [probOutput_def]
+      exact le_of_eq heq.symm
+  rwp_pure_right {α β} x b post := by
+    change eRelWP x (pure b : OracleComp spec₂ β) post = wp x (fun a => post a b)
+    rw [wp_eq_tsum]
+    apply le_antisymm
+    · refine iSup_le fun c => ?_
+      have hcPure : SPMF.IsCoupling c.1 (evalDist x) (pure b) := by
+        simpa [evalDist_pure] using c.2
+      have heq := hcPure.tsum_pure_right post
+      change ∑' z, c.1 z * post z.1 z.2 ≤ ∑' a, Pr[= a | x] * post a b
+      simp only [probOutput_def]
+      exact le_of_eq heq
+    · have hnf : (evalDist x).toPMF none = 0 := probFailure_eq_zero (mx := x)
+      have hcPure : SPMF.IsCoupling (((·, b) : α → α × β) <$> evalDist x) (evalDist x) (pure b) :=
+        SPMF.IsCoupling.dirac_right b hnf
+      have hCoupling : SPMF.IsCoupling (((·, b) : α → α × β) <$> evalDist x)
+          (evalDist x) (evalDist (pure b : OracleComp spec₂ β)) := by
+        simpa [evalDist_pure] using hcPure
+      let c : SPMF.Coupling (evalDist x) (evalDist (pure b : OracleComp spec₂ β)) :=
+        ⟨((·, b) : α → α × β) <$> evalDist x, hCoupling⟩
+      have heq := hcPure.tsum_pure_right post
+      change ∑' a, Pr[= a | x] * post a b ≤
+        ⨆ c : SPMF.Coupling (evalDist x) (evalDist (pure b : OracleComp spec₂ β)),
+          ∑' z, Pr[= z | c.1] * post z.1 z.2
+      apply le_iSup_of_le c
+      simp only [probOutput_def]
+      exact le_of_eq heq.symm
 
 noncomputable example :
     MAlgRelOrdered (OptionT (OracleComp spec₁)) (OracleComp spec₂) ℝ≥0∞ :=

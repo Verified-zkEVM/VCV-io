@@ -83,6 +83,42 @@ lemma not_mem_support_of_not_mem_finSupport [HasEvalSet m] [HasEvalFinset m] [De
 
 end support
 
+section forall_support
+
+variable {m : Type u → Type v} [Monad m] [HasEvalSet m] {α : Type u}
+
+/-- A predicate holds on every output reachable from a monadic computation `mx`,
+i.e. `∀ x ∈ support mx, p x`. This is the "almost-sure" assertion at the qualitative
+denotational level provided by `HasEvalSet`.
+
+For `OracleComp`, see also the structural-recursion variant
+`OracleComp.allOutputsSatisfyWhen` in `VCVio/OracleComp/Traversal.lean`, which is
+parameterized by a set of possible oracle outputs. -/
+def allOutputsSatisfy (p : α → Prop) (mx : m α) : Prop :=
+  ∀ x ∈ support mx, p x
+
+/-- A predicate holds on some output reachable from a monadic computation `mx`,
+i.e. `∃ x ∈ support mx, p x`. -/
+def someOutputSatisfies (p : α → Prop) (mx : m α) : Prop :=
+  ∃ x ∈ support mx, p x
+
+lemma allOutputsSatisfy_iff_forall_support (p : α → Prop) (mx : m α) :
+    allOutputsSatisfy p mx ↔ ∀ x ∈ support mx, p x := Iff.rfl
+
+lemma someOutputSatisfies_iff_exists_support (p : α → Prop) (mx : m α) :
+    someOutputSatisfies p mx ↔ ∃ x ∈ support mx, p x := Iff.rfl
+
+lemma allOutputsSatisfy_mono {p q : α → Prop} (hpq : ∀ a, p a → q a) (mx : m α) :
+    allOutputsSatisfy p mx → allOutputsSatisfy q mx :=
+  fun h x hx => hpq x (h x hx)
+
+lemma someOutputSatisfies_mono {p q : α → Prop} (hpq : ∀ a, p a → q a) (mx : m α) :
+    someOutputSatisfies p mx → someOutputSatisfies q mx := by
+  rintro ⟨x, hx, hpx⟩
+  exact ⟨x, hx, hpq x hpx⟩
+
+end forall_support
+
 variable (p : Prop) [Decidable p]
 
 @[simp] lemma support_ite [HasEvalSet m] (mx mx' : m α) :

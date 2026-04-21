@@ -321,6 +321,39 @@ lemma probFailure_bind_of_probFailure_eq_zero [HasEvalSPMF m] {mx : m α}
 end bind
 
 
+section forall_support
+
+variable [HasEvalSet m]
+
+@[simp] lemma allOutputsSatisfy_pure (p : α → Prop) (x : α) :
+    allOutputsSatisfy p (pure x : m α) ↔ p x := by
+  simp [allOutputsSatisfy]
+
+@[simp] lemma someOutputSatisfies_pure (p : α → Prop) (x : α) :
+    someOutputSatisfies p (pure x : m α) ↔ p x := by
+  simp [someOutputSatisfies]
+
+@[simp] lemma allOutputsSatisfy_bind
+    (mx : m α) (my : α → m β) (p : β → Prop) :
+    allOutputsSatisfy p (mx >>= my) ↔
+      allOutputsSatisfy (fun a => allOutputsSatisfy p (my a)) mx := by
+  simp only [allOutputsSatisfy, support_bind, Set.mem_iUnion, exists_prop]
+  exact ⟨fun h a ha b hb => h b ⟨a, ha, hb⟩, fun h b ⟨a, ha, hb⟩ => h a ha b hb⟩
+
+@[simp] lemma someOutputSatisfies_bind
+    (mx : m α) (my : α → m β) (p : β → Prop) :
+    someOutputSatisfies p (mx >>= my) ↔
+      someOutputSatisfies (fun a => someOutputSatisfies p (my a)) mx := by
+  simp only [someOutputSatisfies, support_bind, Set.mem_iUnion, exists_prop]
+  refine ⟨?_, ?_⟩
+  · rintro ⟨b, ⟨a, ha, hb⟩, hp⟩
+    exact ⟨a, ha, b, hb, hp⟩
+  · rintro ⟨a, ha, b, hb, hp⟩
+    exact ⟨b, ⟨a, ha, hb⟩, hp⟩
+
+end forall_support
+
+
 section congr_mono
 
 variable [HasEvalSPMF m]
