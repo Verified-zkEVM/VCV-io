@@ -100,8 +100,7 @@ lemma cipherGivenMsg_equiv (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
   · intro k₁ k₂ hk
     subst hk
     apply Relational.relTriple_pure_pure
-    change k₁ ^^^ msg₀ = k₁ ^^^ c ^^^ msg₁
-    simp only [show c = msg₀ ^^^ msg₁ from rfl,
+    simp only [Relational.EqRel, show c = msg₀ ^^^ msg₁ from rfl,
       BitVec.xor_assoc, BitVec.xor_self, BitVec.xor_zero]
 
 /-- The one-time pad has equal ciphertext rows: all messages yield the same

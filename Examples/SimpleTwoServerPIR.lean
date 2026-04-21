@@ -209,11 +209,9 @@ theorem pir_private (i₁ i₂ : Fin N) :
     simp only [ProgramLogic.Relational.EqRel] at hS
     rvcstep using (fun b₁ b₂ => b₁ = b₂)
     · intro b₁ b₂ hb; subst hb
-      cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte,
-        ProgramLogic.Relational.relTriple_iff_relWP, ProgramLogic.Relational.relWP_iff_couplingPost]
-        <;> (split <;> split <;>
-          apply ProgramLogic.Relational.relTriple_pure_pure <;>
-          simp_all [ProgramLogic.Relational.EqRel])
+      cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte] <;> split <;> split <;>
+        exact ProgramLogic.Relational.relTriple_pure_pure
+          (by simp_all [ProgramLogic.Relational.EqRel])
     · exact ProgramLogic.Relational.relTriple_uniformSample_bij
         Function.bijective_id _ (fun _ => rfl)
 
