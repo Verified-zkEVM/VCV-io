@@ -124,7 +124,23 @@ one specific theorem/assumption step manually.
 with `@[vcspec]` to register it for the analogous bounded head-pair lookup on the relational side.
 This is especially useful for automation-oriented `simulateQ` transport lemmas whose outer
 computation heads are stable but whose inner invariants or projection arguments still come from
-the local context.
+the local context. The default registry already covers the structural relational rules
+(`relTriple_pure_pure`, `relTriple_bind`, `relTriple_map`, `relTriple_if`, the `replicate` /
+`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative `eRelTriple_pure` /
+`eRelTriple_bind` / `eRelTriple_uniformSample_bij`, and the two `simulateQ` transport rules),
+so user-defined rules slot into the same lookup pipeline without further wiring.
+
+**Bind normalization**: `rvcstep` (and therefore `rvcgen`) runs a best-effort
+`simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure]` pre-pass on the
+relational goal before deciding which structural rule to apply. This flattens nested binds and
+strips pure-bind layers so that the bind decomposition rule fires on aligned shapes, and so that
+goals that simplify to pure-pure or refl close immediately.
+
+**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus its
+`rvcgen` finishing pass) tries the canonical `relTriple_refl` / `relTriple_eqRel_of_eq rfl` /
+`relTriple_pure_pure` / `eRelTriple_pure` family, then a `subst_vars`-driven retry that resolves
+syntactically-distinct pure values unified by local equality hypotheses, and finally a symmetric
+`relTriple_pure_pure ∘ symm` step for postconditions written in the swapped direction.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
