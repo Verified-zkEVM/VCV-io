@@ -764,4 +764,36 @@ noncomputable example {σ : Type} :
     MAlgRelOrdered (StateT σ (OracleComp spec₁)) (OracleComp spec₂) (σ → ℝ≥0∞) :=
   inferInstance
 
+/-! ## Specialisations of the generic asynchronous and structural rules
+
+The following examples confirm that the new generic rules in
+`ToMathlib/Control/Monad/RelationalAlgebra.lean` (asynchronous one-sided
+binds and structural pure rules) automatically apply to `eRelWP`. They are
+the quantitative counterparts of SSProve's `apply_left` / `apply_right` /
+`if_rule` style rules.
+-/
+
+example {α β γ : Type}
+    (oa : OracleComp spec₁ α) (fa : α → OracleComp spec₁ γ)
+    (ob : OracleComp spec₂ β) (post : γ → β → ℝ≥0∞) :
+    eRelWP oa ob (fun a b => eRelWP (fa a) (pure b : OracleComp spec₂ β) post)
+      ≤ eRelWP (oa >>= fa) ob post :=
+  MAlgRelOrdered.relWP_bind_left_le oa fa ob post
+
+example {α β δ : Type}
+    (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) (fb : β → OracleComp spec₂ δ)
+    (post : α → δ → ℝ≥0∞) :
+    eRelWP oa ob (fun a b => eRelWP (pure a : OracleComp spec₁ α) (fb b) post)
+      ≤ eRelWP oa (ob >>= fb) post :=
+  MAlgRelOrdered.relWP_bind_right_le oa ob fb post
+
+example {α β : Type}
+    (b : Bool) (oa oa' : OracleComp spec₁ α) (ob ob' : OracleComp spec₂ β)
+    (pre : ℝ≥0∞) (post : α → β → ℝ≥0∞)
+    (h_t : b = true → MAlgRelOrdered.Triple pre oa ob post)
+    (h_f : b = false → MAlgRelOrdered.Triple pre oa' ob' post) :
+    MAlgRelOrdered.Triple pre
+        (if b then oa else oa') (if b then ob else ob') post :=
+  MAlgRelOrdered.triple_ite b h_t h_f
+
 end OracleComp.ProgramLogic.Relational
