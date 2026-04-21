@@ -170,3 +170,31 @@ example {oa₁ oa₂ : OracleComp spec α}
     (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcgen
+
+/-! ## Leaf closure via equality hypotheses
+
+These exercise the augmented leaf closer that calls `subst_vars` and tries the
+canonical pure/refl rules afterward, so syntactically-distinct pure values that
+become equal under local equalities close automatically. -/
+
+example {a b : α} (h : a = b) :
+    ⟪(pure a : OracleComp spec α) ~ (pure b : OracleComp spec α) | EqRel α⟫ := by
+  rvcstep
+
+example {a b : α} (h : b = a) :
+    ⟪(pure a : OracleComp spec α) ~ (pure b : OracleComp spec α) | EqRel α⟫ := by
+  rvcstep
+
+/-! ## Bind normalization
+
+These exercise the monadic-normalization pre-pass: nested `>>=` and `pure`-binds
+get flattened so the relational planner sees aligned bind shapes (or bypasses
+the bind rule entirely when both sides reduce to a leaf). -/
+
+example {a : α} {f : α → OracleComp spec β} :
+    ⟪(do let x ← pure a; f x) ~ f a | EqRel β⟫ := by
+  rvcstep
+
+example {oa : OracleComp spec α} {f : α → OracleComp spec β} {g : β → OracleComp spec γ} :
+    ⟪((oa >>= f) >>= g) ~ (do let x ← oa; let y ← f x; g y) | EqRel γ⟫ := by
+  rvcstep
