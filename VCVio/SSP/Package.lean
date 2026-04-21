@@ -44,16 +44,12 @@ independent universes (`vᵢ` for `I.Range`, `v` for `E.Range`). The state `σ` 
 type `α` of any computation run against the package both live in `Type v` (i.e. the same
 universe as the export ranges); this constraint is forced by `simulateQ` operating on
 `StateT σ (OracleComp I) (E.Range x)`. The import range universe `vᵢ` is unconstrained: an
-`OracleComp I` can produce values in `Type v` regardless of where `I.Range` lives.
-
-Making `init` a `OracleComp I σ` (rather than a raw `σ`) constrains `σ` to live in the same
-universe as `I.Range`, i.e. `σ : Type vᵢ`. Previously `σ` was free in `Type v`. For all current
-use sites (and the SSP literature) this is harmless: `σ` and `I.Range` are typically both
-`Type 0`, and the rest of the API still requires `σ : Type v`, so the practical constraint is
-`σ : Type v` with `vᵢ = v`.
+`OracleComp I` can produce values in `Type v` regardless of where `I.Range` lives, and the
+monadic `init : OracleComp I σ` likewise elaborates at `Type (max uᵢ vᵢ v)` without forcing
+`vᵢ = v`.
 -/
 
-universe uᵢ uₑ v
+universe uᵢ uₑ vᵢ v
 
 open OracleSpec OracleComp
 
@@ -66,12 +62,13 @@ The handler `impl` interprets each export query as a stateful `OracleComp I` com
 field `init : OracleComp I σ` produces the initial state; it may sample or query imports, so
 probabilistic setup (e.g. sampling a long-term key once at start-of-game) is first-class data.
 
-Universe parameters: the index universes `uᵢ, uₑ` for the import and export specs are
-independent. The import range universe, the export range universe, and the state universe all
-coincide at `v`, since `simulateQ` requires the handler to produce values of type
-`StateT σ (OracleComp I) (E.Range x)` and `init` produces values of type `OracleComp I σ`. -/
+Universe parameters: the index universes `uᵢ, uₑ` for the import and export specs, and the
+import range universe `vᵢ`, are independent. The state `σ` lives in `Type v` together with
+the export ranges, since the handler must produce values of type
+`StateT σ (OracleComp I) (E.Range x)`. The monadic `init : OracleComp I σ` imposes no extra
+constraint: `OracleComp I` is universe-polymorphic in its value type. -/
 structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-    (I : OracleSpec.{uᵢ, v} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) where
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) where
   /-- Initial value of the package's private state, as a (possibly probabilistic / query-using)
   computation in the import interface. -/
   init : OracleComp I σ
@@ -81,7 +78,7 @@ structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
 namespace Package
 
 variable {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-  {I : OracleSpec.{uᵢ, v} ιᵢ} {E : OracleSpec.{uₑ, v} ιₑ}
+  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, v} ιₑ}
   {σ : Type v}
 
 /-- The identity package on `E`: each export query is forwarded as the corresponding import
@@ -179,18 +176,19 @@ end Package
 
 /-! ### Universe-polymorphism sanity checks
 
-The examples below exercise the three independent universe parameters of `Package`. They are
-purely typechecking tests: they ensure that the import / export index universes (`uᵢ`, `uₑ`)
-remain independent of each other and of the shared range / state universe `v`. -/
+The examples below exercise the four independent universe parameters of `Package`. They are
+purely typechecking tests: they ensure that the import / export index universes (`uᵢ`, `uₑ`),
+the import range universe `vᵢ`, and the shared export-range / state universe `v` all remain
+independent. -/
 
 section UniverseTests
 
 example {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-    (I : OracleSpec.{uᵢ, v} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) :
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) :
     Type _ := Package I E σ
 
 example {ιᵢ : Type 0} {ιₑ : Type 1}
-    (I : OracleSpec.{0, 0} ιᵢ) (E : OracleSpec.{1, 0} ιₑ) (σ : Type) :
+    (I : OracleSpec.{0, 2} ιᵢ) (E : OracleSpec.{1, 0} ιₑ) (σ : Type) :
     Type _ := Package I E σ
 
 end UniverseTests

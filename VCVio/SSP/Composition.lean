@@ -37,14 +37,18 @@ to the sum spec `I₁ + I₂`.
 
 ## Universe layout
 
-All four "module" universes (the indices `uᵢ, uₘ, uₑ` and the shared range / state universe
-`v`) are independent in the index dimension. Monadic init forces the state universe to agree
-with the import range universe; for `link` this means the outer import range `M.Range` and the
-inner import range `I.Range` must share the universe `v` of the exported range and state.
-For `par` the two imports likewise share a range universe `v`.
+The index universes `uᵢ, uₘ, uₑ` for the three specs and the import range universe `vᵢ` (for
+the outer composition's innermost imports) are all independent. The intermediate range
+`M.Range`, export range `E.Range`, and state factors `σ₁, σ₂` share a single universe `v`,
+because the handlers produce values of type `StateT σᵢ (OracleComp _) (·.Range _)` and the
+reduction lemmas need to identify the two sides. The monadic `init : OracleComp I σ` adds no
+extra constraint, since `OracleComp I` is universe-polymorphic in its value type.
+
+For `par` the same pattern repeats with two disjoint imports `I₁, I₂` sharing a common range
+universe `v` (tied to `E₁ + E₂` and the states).
 -/
 
-universe uᵢ uₘ uₑ v
+universe uᵢ uₘ uₑ vᵢ v
 
 open OracleSpec OracleComp
 
@@ -53,7 +57,7 @@ namespace VCVio.SSP
 namespace Package
 
 variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
-  {I : OracleSpec.{uᵢ, v} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
+  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
   {σ₁ σ₂ : Type v}
 
 /-! ### Sequential composition (`link`) -/
@@ -267,9 +271,9 @@ theorem run_link_ofStateless {α : Type v}
 
 The two summed specs in `par` must share the import range universe and the export range
 universe (otherwise the disjoint sums `I₁ + I₂` and `E₁ + E₂` cannot share a single
-`OracleSpec` type). Monadic init collapses the state universe onto the shared range universe
-as well, so all five universes (indices `ιᵢ₁, ιᵢ₂, ιₑ₁, ιₑ₂` and range / state `v`) are tied
-together at `v` for `par`. The index universes remain independent. -/
+`OracleSpec` type). The state factors then live in this same universe `v` because the
+handlers produce values in `StateT σᵢ (OracleComp _) (·.Range _)`. The index universes
+remain independent. -/
 
 variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {ιₑ₂ : Type uₑ}
   {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
@@ -317,11 +321,11 @@ end Package
 
 section UniverseTests
 
-/-- `link` accepts independent index universes for `I`, `M`, `E`. The range / state universe
-`v` is shared across all three specs and both state factors (forced by monadic init + the
-handler's `StateT` threading). -/
+/-- `link` accepts independent index universes for `I`, `M`, `E`, and an independent import
+range universe `vᵢ` for `I`. Only the intermediate / export ranges and the state factors share
+the universe `v`, because the handler and the composite state type tie them together. -/
 example {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
-    {I : OracleSpec.{uᵢ, v} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
     {σ₁ σ₂ : Type v} (P : Package M E σ₁) (Q : Package I M σ₂) :
     Package I E (σ₁ × σ₂) := P.link Q
 

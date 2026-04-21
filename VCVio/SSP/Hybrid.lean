@@ -28,13 +28,15 @@ inequality.
 
 ## Universe layout
 
-Everything in this file is fixed at `Type 0`, matching `Package.advantage`: `ProbComp : Type
-→ Type` and the adversary returns a `Bool : Type`, so the export / intermediate indices,
-ranges, and state are all `Type`. Only the export index universes remain free in `uₘ, uₑ`.
+`ProbComp : Type → Type` and the adversary's return type `Bool : Type` pin the intermediate
+range, export range, and state to `Type 0`. The index universes `uₘ, uₑ` for the intermediate
+and export specs remain *independent*, matching `VCVio.SSP.Advantage`.
 
-Note that the raw program-level `shiftLeft` and `run_link_eq_run_shiftLeft` retain their full
-universe polymorphism over `uᵢ, uₘ, uₑ, v`; they live in `VCVio.SSP.Composition`. The hybrid
-theorem and the advantage-level reduction below are pinned to `Type 0` by `ProbComp`. -/
+The raw program-level `shiftLeft` and `run_link_eq_run_shiftLeft` retain their full universe
+polymorphism over `uᵢ, uₘ, uₑ, vᵢ, v`; they live in `VCVio.SSP.Composition`. Only ranges and
+state are pinned to `Type 0` here, because `advantage` is already so pinned. -/
+
+universe uₘ uₑ
 
 open OracleSpec OracleComp ProbComp
 
@@ -46,7 +48,7 @@ namespace Package
 
 section Hybrid
 
-variable {ιₑ : Type} {E : OracleSpec.{0, 0} ιₑ}
+variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- **Hybrid lemma.** For any sequence of games `G 0, G 1, ..., G n` and any single Boolean
 adversary `A`, the distinguishing advantage between the endpoints is bounded by the sum of
@@ -74,8 +76,8 @@ end Hybrid
 
 /-! ### Advantage-form reduction -/
 
-variable {ιₘ ιₑ : Type}
-  {M : OracleSpec.{0, 0} ιₘ} {E : OracleSpec.{0, 0} ιₑ}
+variable {ιₘ : Type uₘ} {ιₑ : Type uₑ}
+  {M : OracleSpec.{uₘ, 0} ιₘ} {E : OracleSpec.{uₑ, 0} ιₑ}
   {σ₁ : Type}
 
 /-- **SSP reduction (advantage form).** With the same outer reduction package
