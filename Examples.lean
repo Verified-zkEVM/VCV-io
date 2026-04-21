@@ -26,6 +26,7 @@ import Examples.Pedersen
 import Examples.ProgramLogic.Probability
 import Examples.ProgramLogic.ProofMode
 import Examples.ProgramLogic.Relational
+import Examples.ProgramLogic.RelationalAnchored
 import Examples.ProgramLogic.RelationalDerived
 import Examples.ProgramLogic.RelationalStep
 import Examples.ProgramLogic.Unary

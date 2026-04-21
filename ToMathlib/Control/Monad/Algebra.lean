@@ -264,3 +264,167 @@ attribute [instance] instExceptT
 attribute [instance] instOptionT
 
 end MAlgOrdered
+
+/-! ## Honest exception WP
+
+`wpExc` is a derived weakest-precondition combinator for `ExceptT` that records *both*
+a success postcondition `postOk : α → l` and a failure postcondition `postErr : ε → l`,
+rather than collapsing failures to `⊥`. Symmetrically, `wpOpt` is the analogue for
+`OptionT`.
+
+These are derived: they use only the unary algebra `MAlgOrdered m l` of the underlying
+monad. The standard `MAlgOrdered (ExceptT ε m)` / `MAlgOrdered (OptionT m)` lifts then
+correspond to `wpExc · · (fun _ => ⊥)` and `wpOpt · · ⊥` respectively, which is the
+"lossy" case. The honest combinators come with their own `pure`/`throw`/`bind`/
+`tryCatch` rules that enable side-by-side reasoning about success and failure paths.
+-/
+
+namespace MAlgOrdered
+
+variable {m : Type u → Type v} {l : Type u}
+variable [Monad m] [CompleteLattice l] [MAlgOrdered m l]
+variable {α β ε : Type u}
+
+/-- Honest weakest precondition for `ExceptT`: takes a success postcondition `postOk`
+and a failure postcondition `postErr`, and returns the unary `wp` over the underlying
+monad with the postcondition split by case. -/
+def wpExc (x : ExceptT ε m α) (postOk : α → l) (postErr : ε → l) : l :=
+  MAlgOrdered.wp (m := m) x.run (fun ea =>
+    match ea with
+    | Except.ok a => postOk a
+    | Except.error e => postErr e)
+
+/-- Honest weakest precondition for `OptionT`: takes a `some` postcondition and a
+`none` postcondition. -/
+def wpOpt (x : OptionT m α) (postSome : α → l) (postNone : l) : l :=
+  MAlgOrdered.wp (m := m) x.run (fun oa =>
+    match oa with
+    | some a => postSome a
+    | none => postNone)
+
+variable [LawfulMonad m]
+
+/-- Generic case-split postcondition for `Except`-valued returns, used internally
+by `wpExc`. -/
+private def excPost (postOk : α → l) (postErr : ε → l) : Except ε α → l := fun ea =>
+  match ea with
+  | Except.ok a => postOk a
+  | Except.error e => postErr e
+
+omit [LawfulMonad m] in
+private theorem wpExc_def (x : ExceptT ε m α) (postOk : α → l) (postErr : ε → l) :
+    wpExc x postOk postErr = MAlgOrdered.wp (m := m) x.run (excPost postOk postErr) :=
+  rfl
+
+@[simp]
+theorem wpExc_pure (a : α) (postOk : α → l) (postErr : ε → l) :
+    wpExc (pure a : ExceptT ε m α) postOk postErr = postOk a := by
+  rw [wpExc_def, ExceptT.run_pure, wp_pure]
+  rfl
+
+/-- `throw e` is `ExceptT.mk (pure (Except.error e))`. -/
+@[simp]
+theorem wpExc_throw (e : ε) (postOk : α → l) (postErr : ε → l) :
+    wpExc (ExceptT.mk (pure (Except.error e)) : ExceptT ε m α) postOk postErr = postErr e := by
+  change MAlgOrdered.wp (m := m) (pure (Except.error e)) (excPost postOk postErr) = _
+  rw [wp_pure]
+  rfl
+
+/-- Bind law for `wpExc`: only the success branch threads through the post-bind
+continuation; the failure postcondition is preserved at every step. -/
+theorem wpExc_bind (x : ExceptT ε m α) (f : α → ExceptT ε m β)
+    (postOk : β → l) (postErr : ε → l) :
+    wpExc (x >>= f) postOk postErr =
+      wpExc x (fun a => wpExc (f a) postOk postErr) postErr := by
+  rw [wpExc_def, wpExc_def, ExceptT.run_bind, wp_bind]
+  congr 1
+  funext ea
+  cases ea with
+  | ok a => rfl
+  | error e =>
+      rw [wp_pure]
+      rfl
+
+/-- Catch law for `wpExc`: `tryCatch x h` exchanges its failure postcondition for the
+honest WP of the handler. -/
+theorem wpExc_tryCatch (x : ExceptT ε m α) (h : ε → ExceptT ε m α)
+    (postOk : α → l) (postErr : ε → l) :
+    wpExc (ExceptT.tryCatch x h) postOk postErr =
+      wpExc x postOk (fun e => wpExc (h e) postOk postErr) := by
+  unfold wpExc
+  unfold ExceptT.tryCatch ExceptT.run ExceptT.mk
+  rw [wp_bind]
+  congr 1
+  funext ea
+  cases ea with
+  | ok a => rw [wp_pure]
+  | error e => rfl
+
+omit [LawfulMonad m] in
+/-- `wpExc` is monotone in both postconditions. -/
+theorem wpExc_mono (x : ExceptT ε m α)
+    {postOk postOk' : α → l} {postErr postErr' : ε → l}
+    (hOk : ∀ a, postOk a ≤ postOk' a) (hErr : ∀ e, postErr e ≤ postErr' e) :
+    wpExc x postOk postErr ≤ wpExc x postOk' postErr' := by
+  rw [wpExc_def, wpExc_def]
+  apply wp_mono
+  intro ea
+  cases ea with
+  | ok a => exact hOk a
+  | error e => exact hErr e
+
+/-- Generic case-split postcondition for `Option`-valued returns. -/
+private def optPost (postSome : α → l) (postNone : l) : Option α → l := fun oa =>
+  match oa with
+  | some a => postSome a
+  | none => postNone
+
+omit [LawfulMonad m] in
+private theorem wpOpt_def (x : OptionT m α) (postSome : α → l) (postNone : l) :
+    wpOpt x postSome postNone = MAlgOrdered.wp (m := m) x.run (optPost postSome postNone) :=
+  rfl
+
+@[simp]
+theorem wpOpt_pure (a : α) (postSome : α → l) (postNone : l) :
+    wpOpt (pure a : OptionT m α) postSome postNone = postSome a := by
+  change MAlgOrdered.wp (m := m) (pure (some a)) (optPost postSome postNone) = _
+  rw [wp_pure]
+  rfl
+
+@[simp]
+theorem wpOpt_fail (postSome : α → l) (postNone : l) :
+    wpOpt (OptionT.mk (pure none) : OptionT m α) postSome postNone = postNone := by
+  change MAlgOrdered.wp (m := m) (pure none) (optPost postSome postNone) = _
+  rw [wp_pure]
+  rfl
+
+theorem wpOpt_bind (x : OptionT m α) (f : α → OptionT m β)
+    (postSome : β → l) (postNone : l) :
+    wpOpt (x >>= f) postSome postNone =
+      wpOpt x (fun a => wpOpt (f a) postSome postNone) postNone := by
+  rw [wpOpt_def, wpOpt_def, OptionT.run_bind]
+  change MAlgOrdered.wp (m := m) (x.run >>= fun oa =>
+      Option.elim oa (pure none) (fun a => (f a).run)) (optPost postSome postNone) = _
+  rw [wp_bind]
+  congr 1
+  funext oa
+  cases oa with
+  | some a => rfl
+  | none =>
+      change MAlgOrdered.wp (m := m) (pure none) _ = _
+      rw [wp_pure]
+      rfl
+
+omit [LawfulMonad m] in
+theorem wpOpt_mono (x : OptionT m α)
+    {postSome postSome' : α → l} {postNone postNone' : l}
+    (hSome : ∀ a, postSome a ≤ postSome' a) (hNone : postNone ≤ postNone') :
+    wpOpt x postSome postNone ≤ wpOpt x postSome' postNone' := by
+  rw [wpOpt_def, wpOpt_def]
+  apply wp_mono
+  intro oa
+  cases oa with
+  | some a => exact hSome a
+  | none => exact hNone
+
+end MAlgOrdered
