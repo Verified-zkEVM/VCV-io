@@ -208,14 +208,12 @@ theorem pir_private (i₁ i₂ : Fin N) :
   · intro j acc₁ acc₂ hS
     simp only [ProgramLogic.Relational.EqRel] at hS
     rvcstep using (fun b₁ b₂ => b₁ = b₂)
-    · intro b₁ b₂ hb; subst hb
-      cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte,
-        ProgramLogic.Relational.relTriple_iff_relWP, ProgramLogic.Relational.relWP_iff_couplingPost]
-        <;> (split <;> split <;>
-          apply ProgramLogic.Relational.relTriple_pure_pure <;>
-          simp_all [ProgramLogic.Relational.EqRel])
-    · exact ProgramLogic.Relational.relTriple_uniformSample_bij
-        Function.bijective_id _ (fun _ => rfl)
+    intro b₁ b₂ hb; subst hb
+    cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte,
+      ProgramLogic.Relational.relTriple_iff_relWP, ProgramLogic.Relational.relWP_iff_couplingPost]
+      <;> (split <;> split <;>
+        apply ProgramLogic.Relational.relTriple_pure_pure <;>
+        simp_all [ProgramLogic.Relational.EqRel])
 
 /-- Privacy of the second server view: the distribution of the second query set `s'`
 is independent of which index is being queried. Intuitively, each index `j` appears in `s'` with
@@ -241,10 +239,8 @@ theorem pir_private_snd (i₁ i₂ : Fin N) :
     -- Case 1: j = i₁ ∧ j = i₂ — identical, identity coupling
     · subst h₁; subst h₂
       rvcstep using (fun b₁ b₂ => b₁ = b₂)
-      · intro b₁ b₂ hb; subst hb; cases b₁ <;>
-          simp_all [ProgramLogic.Relational.EqRel]
-      · exact ProgramLogic.Relational.relTriple_uniformSample_bij
-          Function.bijective_id _ (fun _ => rfl)
+      intro b₁ b₂ hb; subst hb; cases b₁ <;>
+        simp_all [ProgramLogic.Relational.EqRel]
     -- Case 2: j = i₁ ∧ j ≠ i₂ — negation coupling
     · subst h₁
       rvcstep using (fun b₁ b₂ => b₂ = !b₁)
@@ -261,7 +257,5 @@ theorem pir_private_snd (i₁ i₂ : Fin N) :
           Bool.involutive_not.bijective _ (fun _ => rfl)
     -- Case 4: j ≠ i₁ ∧ j ≠ i₂ — identity coupling
     · rvcstep using (fun b₁ b₂ => b₁ = b₂)
-      · intro b₁ b₂ hb; subst hb; simp [h₁, h₂]; cases b₁ <;>
-          simp_all [ProgramLogic.Relational.EqRel]
-      · exact ProgramLogic.Relational.relTriple_uniformSample_bij
-          Function.bijective_id _ (fun _ => rfl)
+      intro b₁ b₂ hb; subst hb; simp [h₁, h₂]; cases b₁ <;>
+        simp_all [ProgramLogic.Relational.EqRel]

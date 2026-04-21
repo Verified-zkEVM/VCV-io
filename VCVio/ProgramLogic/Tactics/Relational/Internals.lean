@@ -167,6 +167,24 @@ def runERelBindRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     refine OracleComp.ProgramLogic.Relational.eRelTriple_bind (cut := $cut) ?_ ?_))
 
+/-- Monad-law normalization used as a fallback when a direct `relTriple_bind`
+attempt fails. Flattens nested binds (`bind_assoc`) and reduces `pure_bind` so
+that `commit`-style intermediate computations (e.g. `do x ← oa; pure (x, x)`)
+align with the corresponding flat form on the other side. -/
+def tryFlattenRelBindGoal : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+      OracleComp.bind_pure_comp]))
+
+/-- After `relTriple_bind ?_ ?_` produces `[sample, continuation]`, this helper tries
+to auto-close the sample subgoal (typically `RelTriple oa oa (EqRel _)` closes via
+`relTriple_refl`), then swaps the remaining goals so the continuation lands first
+for the user's natural `intro`-style flow. -/
+def closeSampleAndReorderBindGoals : TacticM Unit := do
+  tryCloseLeadingRelGoalImmediate
+  reorderRelBindGoals
+  tryCloseLeadingRelGoalImmediate
+
 def runRelBindRule : TacticM Bool := do
   tryNormalizeRelBindStructure
   if ← tryCloseRelGoalImmediate then
@@ -174,21 +192,94 @@ def runRelBindRule : TacticM Bool := do
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind
         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
     return true
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback: flatten nested binds via monad laws and retry the EqRel-bind cut.
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind
+         (R := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))) then
+    closeSampleAndReorderBindGoals
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind ?_ ?_))) then
+    closeSampleAndReorderBindGoals
     return true
   return false
+
+/-- Bijection-coupling interpretation of an `rvcstep using f` hint when both sides
+of a bind start with a uniform sample / query.
+
+Given a goal `RelTriple ((⋯ : OracleComp _ α) >>= fa) ((⋯ : OracleComp _ α) >>= fb) S`,
+applies `relTriple_bind` with the cut `R := fun a b => b = f a`, closes the sample
+subgoal via `relTriple_uniformSample_bij` (or `relTriple_query_bij`), and on the
+continuation introduces the coupled values together with the equality witness and
+substitutes it.
+
+Resulting goal order:
+1. The continuation `RelTriple (fa a) (fb (f a)) S` for an arbitrary fresh `a`.
+2. The bijectivity side condition `Function.Bijective f`.
+3. Any prior trailing goals.
+
+Returns `true` iff every step of the recipe fired; otherwise restores state and
+returns `false` so a caller can try a different interpretation of the hint. -/
+def runRelBindBijRuleUsing (f : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  -- Best-effort normalization so `<$>` / `bind_pure_comp` shapes are also
+  -- recognized as bind-on-both-sides for the purposes of the recipe.
+  let _ ← tryEvalTacticSyntax (← `(tactic|
+    try simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure,
+      map_bind, OracleComp.bind_pure_comp]))
+  unless ← tryEvalTacticSyntax (← `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_bind
+        (R := fun a b => b = $f a) ?_ ?_)) do
+    saved.restore
+    return false
+  let bindGoals ← getGoals
+  match bindGoals with
+  | sample :: cont :: rest =>
+      setGoals [sample]
+      let sampleClosed ← tryEvalTacticSyntax (← `(tactic|
+        first
+          | refine OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
+              (f := $f) ?_ _ (fun _ => rfl)
+          | refine OracleComp.ProgramLogic.Relational.relTriple_query_bij
+              _ (f := $f) ?_ _ (fun _ => rfl)))
+      unless sampleClosed do
+        saved.restore
+        return false
+      let bijGoals ← getGoals
+      setGoals [cont]
+      let _ ← tryEvalTacticSyntax (← `(tactic| intro _ _ heq; subst heq))
+      let contGoals ← getGoals
+      setGoals (contGoals ++ bijGoals ++ rest)
+      return true
+  | _ =>
+      saved.restore
+      return false
 
 def runRelBindRuleUsing (R : TSyntax `term) : TacticM Bool := do
   if ← tryEvalTacticSyntax (← `(tactic|
       refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_)) then
-    reorderRelBindGoals
-    tryCloseLeadingRelGoalImmediate
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback 1: flatten nested binds and retry with the explicit cut.
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (simp only [bind_assoc, pure_bind, bind_pure_comp, map_pure, map_bind,
+        OracleComp.bind_pure_comp]
+       refine OracleComp.ProgramLogic.Relational.relTriple_bind (R := $R) ?_ ?_))) then
+    closeSampleAndReorderBindGoals
+    return true
+  -- Fallback 2: hint may be a bijection `f : α → α` (not a relation).
+  -- Try the bijection-coupling recipe used when both sides bind a uniform sample.
+  if ← runRelBindBijRuleUsing R then
     return true
   return false
 
@@ -383,6 +474,13 @@ def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext 
         if ← runRelBindRuleUsing hint then
           return true
       if ← runRelRndRuleUsing hint then
+        return true
+      -- Generic bijection-coupling-bind fallback. Handles `<$>`-shaped goals (and
+      -- more generally any goal that normalizes to `bind` on both sides) by
+      -- treating the hint as a bijection `f : α → α`, cutting with
+      -- `R := fun a b => b = f a`, and discharging the sample subgoal via
+      -- `relTriple_uniformSample_bij` / `relTriple_query_bij`.
+      if ← runRelBindBijRuleUsing hint then
         return true
       if hasSimulateQRunLike oa && hasSimulateQRunLike ob then
         runRelSimRuleUsing hint
@@ -837,8 +935,9 @@ def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainC
   throwError m!
     "rvcstep using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\
-    - bind cut relation\n\
-    - random/query bijection\n\
+    - bind cut relation (`α → β → Prop`)\n\
+    - bind bijection coupling (`α → α`, on synchronized uniform/query binds)\n\
+    - random/query bijection (`α → α`)\n\
     - `List.mapM` / `List.foldlM` input relation\n\
     - `simulateQ` state relation\n\
     {hintMsg}\n\

@@ -48,7 +48,13 @@ before generating the remaining subgoals.
 ### Optional arguments
 
 - `rvcstep using R` — on bind goals, provide the intermediate relation explicitly
-- `rvcstep using f` — on random/query goals, provide the coupling bijection explicitly
+- `rvcstep using f` — on random/query goals, provide the coupling bijection explicitly.
+  On a synchronized bind goal whose left/right scrutinees are uniform samples or queries,
+  the same `using f` form is also accepted as a *bijection-coupling bind*: it cuts with
+  `R := fun a b => b = f a`, closes the sample subgoal via
+  `relTriple_uniformSample_bij` (or `relTriple_query_bij`), and substitutes the equality
+  on the continuation, leaving the user with the continuation goal followed by the
+  `Function.Bijective f` side condition
 - `rvcstep using Rin` — on `List.mapM` / `List.foldlM` goals, provide the input relation
 - `rvcstep using R_state` — on `simulateQ` goals, provide the state invariant relation
 - `rvcstep with thm` — force one explicit registered/local relational theorem

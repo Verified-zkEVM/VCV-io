@@ -84,7 +84,6 @@ example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (hfg : ∀ a b, R a b → RelTriple (fa a) (fb b) S) :
     RelTriple (oa >>= fa) (ob >>= fb) S := by
   rvcstep using R
-  exact hxy
 
 example (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by

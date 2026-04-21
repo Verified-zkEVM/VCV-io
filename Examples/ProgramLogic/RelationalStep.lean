@@ -36,7 +36,6 @@ example {oa₁ oa₂ : OracleComp spec α}
     (hf : ∀ a₁ a₂, EqRel α a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | EqRel β⟫) :
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | EqRel β⟫ := by
   rvcstep
-  exact hoa
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
@@ -45,7 +44,6 @@ example {oa₁ oa₂ : OracleComp spec α}
     (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcstep using S
-  · exact hoa
 
 example (f : α → OracleComp spec β) :
     ∀ x, ⟪f x ~ f x | EqRel β⟫ := by
@@ -161,7 +159,6 @@ example {oa₁ oa₂ : OracleComp spec α}
     (hf : ∀ a₁ a₂, S a₁ a₂ → ⟪f₁ a₁ ~ f₂ a₂ | R⟫) :
     ⟪oa₁ >>= f₁ ~ oa₂ >>= f₂ | R⟫ := by
   rvcstep
-  · exact hoa
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ : α → OracleComp spec β} {f₂ : α → OracleComp spec γ}
