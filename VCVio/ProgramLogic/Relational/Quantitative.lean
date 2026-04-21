@@ -442,6 +442,213 @@ theorem eRelTriple_bind
           _ = ∑' w, (∑' z, Pr[= z | c.1] * Pr[= w | d z.1 z.2]) * post w.1 w.2 := by
               congr 1; ext w; rw [ENNReal.tsum_mul_right]
 
+/-! ## Indicator-postcondition rules (`RelTriple'`)
+
+These are direct quantitative analogues of the pRHL effect-rule block in
+`VCVio.ProgramLogic.Relational.Basic`, expressed at the `eRelTriple 1 _ _ (RelPost.indicator R)`
+level via the `relTriple'_iff_relTriple` bridge. They give the eRHL-flavoured statement of
+every coupling primitive `OracleComp` already exposes, so downstream proofs can mix exact
+indicator rules with the genuinely quantitative bounds below without having to re-derive the
+bridge each time.
+
+Each rule is a one-line wrapper of its `RelTriple` cousin. The proofs that the underlying
+couplings exist live in `Basic.lean`; this section only repackages them at the `RelTriple'`
+level.
+-/
+
+/-- `RelTriple'` introduction from a pure-pure pair satisfying the post. -/
+theorem relTriple'_pure_pure {a : α} {b : β} {R : RelPost α β} (h : R a b) :
+    RelTriple' (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R :=
+  relTriple'_iff_relTriple.mpr (relTriple_pure_pure (spec₁ := spec₁) (spec₂ := spec₂) h)
+
+/-- Reflexivity rule for `RelTriple'` on the diagonal equality relation. -/
+theorem relTriple'_refl (oa : OracleComp spec₁ α) :
+    RelTriple' (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) :=
+  relTriple'_iff_relTriple.mpr (relTriple_refl (spec₁ := spec₁) oa)
+
+/-- Postcondition monotonicity for `RelTriple'`. -/
+theorem relTriple'_post_mono {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R R' : RelPost α β}
+    (h : RelTriple' oa ob R)
+    (hpost : ∀ ⦃x y⦄, R x y → R' x y) :
+    RelTriple' oa ob R' :=
+  relTriple'_iff_relTriple.mpr (relTriple_post_mono (relTriple'_iff_relTriple.mp h) hpost)
+
+/-- Sequential composition rule for `RelTriple'`. -/
+theorem relTriple'_bind
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {fa : α → OracleComp spec₁ γ} {fb : β → OracleComp spec₂ δ}
+    {R : RelPost α β} {S : RelPost γ δ}
+    (hxy : RelTriple' oa ob R)
+    (hfg : ∀ a b, R a b → RelTriple' (fa a) (fb b) S) :
+    RelTriple' (oa >>= fa) (ob >>= fb) S :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_bind (relTriple'_iff_relTriple.mp hxy)
+      (fun a b hR => relTriple'_iff_relTriple.mp (hfg a b hR))
+
+/-- Equality of programs lifts to a `RelTriple'` on `EqRel`. -/
+theorem relTriple'_eqRel_of_eq {oa ob : OracleComp spec₁ α}
+    (h : oa = ob) :
+    RelTriple' (spec₁ := spec₁) (spec₂ := spec₁) oa ob (EqRel α) :=
+  relTriple'_iff_relTriple.mpr (relTriple_eqRel_of_eq h)
+
+/-- Equality of evaluation distributions lifts to a `RelTriple'` on `EqRel`. -/
+theorem relTriple'_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (h : evalDist oa = evalDist ob) :
+    RelTriple' oa ob (EqRel α) :=
+  relTriple'_iff_relTriple.mpr (relTriple_eqRel_of_evalDist_eq h)
+
+/-- Pointwise output-probability equality lifts to a `RelTriple'` on `EqRel`. -/
+theorem relTriple'_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (h : ∀ x : α, Pr[= x | oa] = Pr[= x | ob]) :
+    RelTriple' oa ob (EqRel α) :=
+  relTriple'_iff_relTriple.mpr (relTriple_eqRel_of_probOutput_eq h)
+
+/-! ### Oracle-query coupling rules (eRHL level) -/
+
+/-- Same-type identity coupling for queries: `RelTriple'` analogue of `relTriple_query`. -/
+theorem relTriple'_query (t : spec₁.Domain) :
+    RelTriple'
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (EqRel (spec₁.Range t)) :=
+  relTriple'_iff_relTriple.mpr (relTriple_query (spec₁ := spec₁) t)
+
+/-- Bijection coupling for queries (the eRHL "rnd" rule). -/
+theorem relTriple'_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f) :
+    RelTriple'
+      (spec₁ := spec₁) (spec₂ := spec₁)
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (fun a b => f a = b) :=
+  relTriple'_iff_relTriple.mpr (relTriple_query_bij (spec₁ := spec₁) t hf)
+
+/-! ### Functorial / structural rules -/
+
+/-- `Functor.map` rule for `RelTriple'`. -/
+theorem relTriple'_map {R : RelPost γ δ}
+    {f : α → γ} {g : β → δ}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (h : RelTriple' oa ob (fun a b => R (f a) (g b))) :
+    RelTriple' (f <$> oa) (g <$> ob) R :=
+  relTriple'_iff_relTriple.mpr (relTriple_map (relTriple'_iff_relTriple.mp h))
+
+/-- Synchronized conditional rule for `RelTriple'`. -/
+theorem relTriple'_if {c : Prop} [Decidable c]
+    {oa₁ oa₂ : OracleComp spec₁ α} {ob₁ ob₂ : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (htrue : c → RelTriple' oa₁ ob₁ R)
+    (hfalse : ¬c → RelTriple' oa₂ ob₂ R) :
+    RelTriple' (if c then oa₁ else oa₂) (if c then ob₁ else ob₂) R :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_if
+      (fun hc => relTriple'_iff_relTriple.mp (htrue hc))
+      (fun hc => relTriple'_iff_relTriple.mp (hfalse hc))
+
+/-- Pure-left rule: lift the strengthened post `(· = a) ∧ R` back to `R`. -/
+theorem relTriple'_pure_left {a : α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (h : RelTriple' (pure a : OracleComp spec₁ α) ob (fun x y => x = a ∧ R x y)) :
+    RelTriple' (pure a : OracleComp spec₁ α) ob R :=
+  relTriple'_iff_relTriple.mpr (relTriple_pure_left (relTriple'_iff_relTriple.mp h))
+
+/-- Pure-right rule: lift the strengthened post `(· = b) ∧ R` back to `R`. -/
+theorem relTriple'_pure_right {oa : OracleComp spec₁ α} {b : β}
+    {R : RelPost α β}
+    (h : RelTriple' oa (pure b : OracleComp spec₂ β) (fun x y => y = b ∧ R x y)) :
+    RelTriple' oa (pure b : OracleComp spec₂ β) R :=
+  relTriple'_iff_relTriple.mpr (relTriple_pure_right (relTriple'_iff_relTriple.mp h))
+
+/-! ### Iteration / list-traversal rules -/
+
+/-- `RelTriple'` for `OracleComp.replicate`. -/
+theorem relTriple'_replicate
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (n : ℕ)
+    (hstep : RelTriple' oa ob R) :
+    RelTriple' (oa.replicate n) (ob.replicate n) (List.Forall₂ R) :=
+  relTriple'_iff_relTriple.mpr (relTriple_replicate n (relTriple'_iff_relTriple.mp hstep))
+
+/-- Equality-relation specialization of `relTriple'_replicate`. -/
+theorem relTriple'_replicate_eqRel
+    {oa ob : OracleComp spec₁ α} (n : ℕ)
+    (hstep : RelTriple' oa ob (EqRel α)) :
+    RelTriple' (oa.replicate n) (ob.replicate n) (EqRel (List α)) :=
+  relTriple'_iff_relTriple.mpr (relTriple_replicate_eqRel n (relTriple'_iff_relTriple.mp hstep))
+
+/-- `RelTriple'` for `List.mapM`. -/
+theorem relTriple'_list_mapM
+    {xs : List α} {ys : List β}
+    {f : α → OracleComp spec₁ γ} {g : β → OracleComp spec₂ δ}
+    {Rin : α → β → Prop} {Rout : γ → δ → Prop}
+    (hxy : List.Forall₂ Rin xs ys)
+    (hfg : ∀ a b, Rin a b → RelTriple' (f a) (g b) Rout) :
+    RelTriple' (xs.mapM f) (ys.mapM g) (List.Forall₂ Rout) :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_list_mapM hxy
+      (fun a b hab => relTriple'_iff_relTriple.mp (hfg a b hab))
+
+/-- Same-input specialization of `relTriple'_list_mapM`. -/
+theorem relTriple'_list_mapM_eqRel
+    {xs : List α}
+    {f : α → OracleComp spec₁ β} {g : α → OracleComp spec₂ β}
+    (hfg : ∀ a, RelTriple' (f a) (g a) (EqRel β)) :
+    RelTriple' (xs.mapM f) (xs.mapM g) (EqRel (List β)) :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_list_mapM_eqRel (fun a => relTriple'_iff_relTriple.mp (hfg a))
+
+/-- `RelTriple'` for `List.foldlM`. -/
+theorem relTriple'_list_foldlM
+    {σ₁ σ₂ : Type}
+    {xs : List α} {ys : List β}
+    {f : σ₁ → α → OracleComp spec₁ σ₁}
+    {g : σ₂ → β → OracleComp spec₂ σ₂}
+    {Rin : α → β → Prop} {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hxy : List.Forall₂ Rin xs ys)
+    (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → RelTriple' (f t₁ a) (g t₂ b) S) :
+    RelTriple' (xs.foldlM f s₁) (ys.foldlM g s₂) S :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_list_foldlM hs hxy
+      (fun a b hab t₁ t₂ ht => relTriple'_iff_relTriple.mp (hfg a b hab t₁ t₂ ht))
+
+/-- Same-input specialization of `relTriple'_list_foldlM`. -/
+theorem relTriple'_list_foldlM_same
+    {σ₁ σ₂ : Type}
+    {xs : List α}
+    {f : σ₁ → α → OracleComp spec₁ σ₁}
+    {g : σ₂ → α → OracleComp spec₂ σ₂}
+    {S : σ₁ → σ₂ → Prop}
+    {s₁ : σ₁} {s₂ : σ₂}
+    (hs : S s₁ s₂)
+    (hfg : ∀ a t₁ t₂, S t₁ t₂ → RelTriple' (f t₁ a) (g t₂ a) S) :
+    RelTriple' (xs.foldlM f s₁) (xs.foldlM g s₂) S :=
+  relTriple'_iff_relTriple.mpr <|
+    relTriple_list_foldlM_same hs
+      (fun a t₁ t₂ ht => relTriple'_iff_relTriple.mp (hfg a t₁ t₂ ht))
+
+section Sampling
+
+variable [SampleableType α]
+
+/-- Bijection coupling for uniform sampling at the `RelTriple'` level. -/
+theorem relTriple'_uniformSample_bij
+    {f : α → α} (hf : Function.Bijective f) (R : RelPost α α)
+    (hR : ∀ x, R x (f x)) :
+    RelTriple' ($ᵗ α) ($ᵗ α) R :=
+  relTriple'_iff_relTriple.mpr (relTriple_uniformSample_bij hf R hR)
+
+/-- Identity coupling for uniform sampling at the `RelTriple'` level. -/
+theorem relTriple'_uniformSample_refl :
+    RelTriple' ($ᵗ α) ($ᵗ α) (EqRel α) :=
+  relTriple'_iff_relTriple.mpr relTriple_uniformSample_refl
+
+end Sampling
+
 /-! ## Helpers for statistical distance / coupling characterization -/
 
 private lemma probOutput_diag_le_min_marginals
@@ -795,5 +1002,212 @@ example {α β : Type}
     MAlgRelOrdered.Triple pre
         (if b then oa else oa') (if b then ob else ob') post :=
   MAlgRelOrdered.triple_ite b h_t h_f
+
+/-! ## Quantitative effect-specific rules (eRHL primitives)
+
+These are the genuinely quantitative companions of the indicator wrappers above: they
+expose witness-based lower bounds for `eRelWP` on the basic `OracleComp` effect operations
+(uniform sampling and oracle queries under a bijection). Together with the existing closed
+form `eRelWP_pure` and the core `eRelTriple_pure / _conseq / _bind`, they are sufficient to
+discharge most apRHL-style goals without descending to the underlying coupling supremum.
+-/
+
+/-- A witness coupling provides a lower bound on the eRHL weakest precondition.
+
+This is the basic primitive used by every closed-form / lower-bound rule below, and is the
+right tool whenever a proof can exhibit a specific coupling. -/
+theorem eRelWP_ge_of_isCoupling
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (post : α → β → ℝ≥0∞)
+    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (evalDist oa) (evalDist ob)) :
+    (∑' z, Pr[= z | c] * post z.1 z.2) ≤ eRelWP oa ob post :=
+  le_iSup (f := fun c' : SPMF.Coupling (evalDist oa) (evalDist ob) =>
+    ∑' z, Pr[= z | c'.1] * post z.1 z.2) ⟨c, hc⟩
+
+/-- Triple form of `eRelWP_ge_of_isCoupling`: a witness coupling whose score dominates
+the precondition discharges an `eRelTriple` obligation. -/
+theorem eRelTriple_of_isCoupling
+    {pre : ℝ≥0∞}
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    (post : α → β → ℝ≥0∞)
+    (c : SPMF (α × β)) (hc : SPMF.IsCoupling c (evalDist oa) (evalDist ob))
+    (hpre : pre ≤ ∑' z, Pr[= z | c] * post z.1 z.2) :
+    eRelTriple pre oa ob post :=
+  hpre.trans (eRelWP_ge_of_isCoupling post c hc)
+
+/-! ### Uniform sampling under a bijection -/
+
+section Sampling
+
+variable [SampleableType α]
+
+/-- Quantitative lower bound for two uniform samples coupled by a bijection.
+
+The bijection coupling `(fun x => (x, f x)) <$> $ᵗ α` realises the sum on the left as a
+score, providing the sharpest "syntactic" lower bound on the coupling supremum. -/
+theorem eRelWP_uniformSample_bij_ge
+    {f : α → α} (hf : Function.Bijective f) (post : α → α → ℝ≥0∞) :
+    (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a))
+      ≤ eRelWP ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post := by
+  set c : SPMF (α × α) := evalDist ($ᵗ α : ProbComp α) >>= fun a => pure (a, f a)
+  have hc : SPMF.IsCoupling c (evalDist ($ᵗ α : ProbComp α))
+      (evalDist ($ᵗ α : ProbComp α)) := by
+    constructor
+    · simp [c]
+    · simp only [c, map_bind, map_pure]
+      calc
+        (do
+            let a ← evalDist ($ᵗ α : ProbComp α)
+            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := rfl
+        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) :=
+          (evalDist_map ($ᵗ α : ProbComp α) f).symm
+        _ = evalDist ($ᵗ α : ProbComp α) := by
+          apply evalDist_ext
+          intro x
+          obtain ⟨x', rfl⟩ := hf.surjective x
+          rw [probOutput_map_injective ($ᵗ α) hf.injective x']
+          simpa [uniformSample] using
+            SampleableType.probOutput_selectElem_eq (β := α) x' (f x')
+  have hscore : ∑' z : α × α, Pr[= z | c] * post z.1 z.2 =
+      ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a) := by
+    have hbind : ∀ z : α × α,
+        Pr[= z | c] = ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] *
+          Pr[= z | (pure (a, f a) : SPMF (α × α))] :=
+      fun z => probOutput_bind_eq_tsum (evalDist _) (fun a => pure (a, f a)) z
+    calc ∑' z : α × α, Pr[= z | c] * post z.1 z.2
+        = ∑' z : α × α, (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] *
+            Pr[= z | (pure (a, f a) : SPMF (α × α))]) * post z.1 z.2 := by
+          congr 1; ext z; rw [hbind z]
+      _ = ∑' z : α × α, ∑' a : α,
+            Pr[= a | ($ᵗ α : ProbComp α)] *
+              Pr[= z | (pure (a, f a) : SPMF (α × α))] * post z.1 z.2 := by
+          congr 1; ext z; rw [ENNReal.tsum_mul_right]
+      _ = ∑' a : α, ∑' z : α × α,
+            Pr[= a | ($ᵗ α : ProbComp α)] *
+              Pr[= z | (pure (a, f a) : SPMF (α × α))] * post z.1 z.2 :=
+          ENNReal.tsum_comm
+      _ = ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a) := by
+          congr 1; ext a
+          rw [tsum_eq_single (a, f a)]
+          · have : Pr[= (a, f a) | (pure (a, f a) : SPMF (α × α))] = 1 := by
+              rw [SPMF.probOutput_eq_apply]; simp
+            rw [this]; ring
+          · intro z hz
+            have : Pr[= z | (pure (a, f a) : SPMF (α × α))] = 0 := by
+              rw [SPMF.probOutput_eq_apply]; simp [hz]
+            simp [this]
+  rw [← hscore]
+  exact eRelWP_ge_of_isCoupling post c hc
+
+/-- Triple form of `eRelWP_uniformSample_bij_ge`: any precondition below the bijection
+average discharges an `eRelTriple` for two uniform samples. -/
+theorem eRelTriple_uniformSample_bij
+    {f : α → α} (hf : Function.Bijective f) (post : α → α → ℝ≥0∞)
+    {pre : ℝ≥0∞}
+    (hpre : pre ≤ ∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a)) :
+    eRelTriple pre ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post :=
+  hpre.trans (eRelWP_uniformSample_bij_ge hf post)
+
+end Sampling
+
+/-! ### Oracle queries under a bijection -/
+
+/-- Quantitative lower bound for two oracle queries coupled by a bijection on the range.
+This is the eRHL counterpart of `relTriple_query_bij`. -/
+theorem eRelWP_query_bij_ge (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f)
+    (post : spec₁.Range t → spec₁.Range t → ℝ≥0∞) :
+    (∑' a : spec₁.Range t,
+        Pr[= a | (liftM (query t) : OracleComp spec₁ (spec₁.Range t))] * post a (f a))
+      ≤ eRelWP (spec₁ := spec₁) (spec₂ := spec₁)
+          (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+          (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) post := by
+  set oq : OracleComp spec₁ (spec₁.Range t) := liftM (query t)
+  set c : SPMF (spec₁.Range t × spec₁.Range t) := evalDist oq >>= fun a => pure (a, f a)
+  have hc : SPMF.IsCoupling c (evalDist oq) (evalDist oq) := by
+    constructor
+    · simp [c]
+    · simp only [c, map_bind, map_pure, oq, evalDist_query]
+      change f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _)
+      rw [show f <$> (liftM (PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) =
+        (liftM (f <$> PMF.uniformOfFintype (spec₁.Range t)) : SPMF _) from by simp]
+      congr 1
+      exact PMF.uniformOfFintype_map_of_bijective f hf
+  have hscore : ∑' z : spec₁.Range t × spec₁.Range t, Pr[= z | c] * post z.1 z.2 =
+      ∑' a : spec₁.Range t, Pr[= a | oq] * post a (f a) := by
+    have hbind : ∀ z : spec₁.Range t × spec₁.Range t,
+        Pr[= z | c] = ∑' a : spec₁.Range t, Pr[= a | oq] *
+          Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] :=
+      fun z => probOutput_bind_eq_tsum (evalDist oq) (fun a => pure (a, f a)) z
+    calc ∑' z, Pr[= z | c] * post z.1 z.2
+        = ∑' z, (∑' a : spec₁.Range t, Pr[= a | oq] *
+            Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))]) *
+            post z.1 z.2 := by congr 1; ext z; rw [hbind z]
+      _ = ∑' z, ∑' a : spec₁.Range t,
+            Pr[= a | oq] *
+              Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] *
+              post z.1 z.2 := by
+          congr 1; ext z; rw [ENNReal.tsum_mul_right]
+      _ = ∑' a : spec₁.Range t, ∑' z,
+            Pr[= a | oq] *
+              Pr[= z | (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] *
+              post z.1 z.2 :=
+          ENNReal.tsum_comm
+      _ = ∑' a : spec₁.Range t, Pr[= a | oq] * post a (f a) := by
+          congr 1; ext a
+          rw [tsum_eq_single (a, f a)]
+          · have : Pr[= (a, f a) |
+              (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] = 1 := by
+              rw [SPMF.probOutput_eq_apply]; simp
+            rw [this]; ring
+          · intro z hz
+            have : Pr[= z |
+              (pure (a, f a) : SPMF (spec₁.Range t × spec₁.Range t))] = 0 := by
+              rw [SPMF.probOutput_eq_apply]; simp [hz]
+            simp [this]
+  rw [← hscore]
+  exact eRelWP_ge_of_isCoupling post c hc
+
+/-- Triple form of `eRelWP_query_bij_ge`. -/
+theorem eRelTriple_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    (hf : Function.Bijective f)
+    (post : spec₁.Range t → spec₁.Range t → ℝ≥0∞)
+    {pre : ℝ≥0∞}
+    (hpre : pre ≤ ∑' a : spec₁.Range t,
+        Pr[= a | (liftM (query t) : OracleComp spec₁ (spec₁.Range t))] * post a (f a)) :
+    eRelTriple pre
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t))
+      (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) post :=
+  hpre.trans (eRelWP_query_bij_ge t hf post)
+
+/-! ## Demonstration examples for the indicator wrappers and quantitative primitives
+
+Small examples illustrating how the `RelTriple'` wrappers and the closed-form / lower-bound
+`eRelWP` rules combine in practice.
+-/
+
+/-- Querying the same oracle on both sides, then mapping by a function, yields a `RelTriple'`
+on the equality of the mapped outputs. Uses `relTriple'_query` followed by
+`relTriple'_post_mono`. -/
+example (t : spec₁.Domain) (g : spec₁.Range t → α) :
+    RelTriple' (spec₁ := spec₁) (spec₂ := spec₁)
+      (g <$> (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+      (g <$> (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+      (EqRel α) :=
+  relTriple'_map (R := EqRel α)
+    (relTriple'_post_mono (relTriple'_query t)
+      (fun _ _ h => congrArg g h))
+
+/-- Quantitative bound via `eRelTriple_uniformSample_bij`: any precondition below the
+bijection-shifted average is realised by the bijection coupling. -/
+example [SampleableType α]
+    {f : α → α} (hf : Function.Bijective f) (post : α → α → ℝ≥0∞) :
+    eRelTriple
+      (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a (f a))
+      ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post :=
+  eRelTriple_uniformSample_bij hf post le_rfl
 
 end OracleComp.ProgramLogic.Relational
