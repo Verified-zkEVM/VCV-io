@@ -43,7 +43,7 @@ subsequent Phase E2-E5 commits.
 
 universe u
 
-open OracleSpec OracleComp ProbComp VCVio.SSP
+open ENNReal OracleSpec OracleComp ProbComp VCVio.SSP
 
 namespace FiatShamir.SSP
 
@@ -258,5 +258,106 @@ theorem cmaSim_impl_bad_monotone
       rfl
     · simp only [StateT.run, hkp, support_pure, Set.mem_singleton_iff] at hz
       rw [hz]
+
+/-! ### `h_step_tv_S`: per-step TV bound on costly queries
+
+For a sign query from a no-bad input state `(s, false)`, the real and
+simulated CMA impls are `ε(s)`-close in total variation, where
+
+  `ε(s) := ζ_zk + cacheCount s.1 · β`
+
+with `ζ_zk` the HVZK statistical distance, `β` the simulator commit-
+marginal predictability bound, and `cacheCount` the number of cached
+`(m', c')` entries in the RO cache. The `ζ_zk` summand comes from
+running `σ.realTranscript` versus `simT` on the current keypair
+(HVZK); the `cacheCount · β` summand comes from the programming
+collision gap (`simCommitPredictability` bounds each cache hit by `β`
+and we union-bound over the at most `cacheCount s.1` cached keys).
+
+The proof is the joint-coupling argument from §A.4.2 of the SSP plan
+(`.ignore/fs-ssp-plan.md`). It is intentionally stated as a standalone
+lemma so the caller can either use it directly with the state-dep ε
+bridge, or specialize to a constant ε via `(qS + qH) · β + ζ_zk`. -/
+
+/-- Number of cached entries in a random-oracle cache, as an `ℕ`.
+Computed via `Set.ncard` on the cache's graph. For the H3 hop this
+bounds the cache-hit probability `Pr[(m, sim.commit) ∈ cache] ≤
+cacheCount · β` via `simCommitPredictability β`. -/
+noncomputable def cacheCount {M : Type} [DecidableEq M]
+    {Commit : Type} [DecidableEq Commit] {Chal : Type}
+    (cache : (roSpec M Commit Chal).QueryCache) : ℕ :=
+  cache.toSet.ncard
+
+/-- Per-state ε for the H3 hop: HVZK gap `ζ_zk` plus cache-hit gap
+`cacheCount · β`. Used as the `ε` argument of the state-dep SSP
+identical-until-bad bridge `advantage_le_expectedSCost_plus_probEvent_bad`
+at the H3 instantiation `G₀ = cmaReal`, `G₁ = cmaSim`. -/
+noncomputable def cmaSignEps {M : Type} [DecidableEq M]
+    {Commit : Type} [DecidableEq Commit] {Chal Stmt Wit : Type}
+    (ζ_zk β : ℝ≥0∞) (s : cmaInnerState M Commit Chal Stmt Wit) : ℝ≥0∞ :=
+  ζ_zk + cacheCount s.1 * β
+
+/-- **Per-step TV bound for H3 on a sign query.** On a single sign
+query from a `(s, false)` input, the real and simulated CMA impls
+are `cmaSignEps ζ_zk β s`-close in total variation. This is the core
+HVZK + cache-collision coupling used in the H3 hop.
+
+Proof strategy (§A.4.2 of the SSP plan):
+1. Fetch the keypair (`kp` cache hit or `hr.gen` fresh) — no TV gap.
+2. On the remaining `(pk, sk) ↦ …` continuation, use the triangle
+   inequality through an intermediate "use real transcript, apply
+   sim's post-processing" computation:
+   * Real vs. intermediate: bounded by the cache-hit probability at
+     `simT`'s commit marginal (`cacheCount · β` by union bound via
+     `simCommitPredictability`).
+   * Intermediate vs. simulated: bounded by `ζ_zk` via HVZK on the
+     full transcript. -/
+theorem cmaReal_cmaSim_tv_sign_le_cmaSignEps
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
+    (hHVZK : σ.HVZK simT ζ_zk.toReal)
+    (hCommit : σ.simCommitPredictability simT β)
+    (m : M) (s : cmaInnerState M Commit Chal Stmt Wit) :
+    ENNReal.ofReal (tvDist
+      (((cmaReal M Commit Chal σ hr).impl
+        (Sum.inl (Sum.inr m) : (cmaSpec M Commit Chal Resp Stmt).Domain)).run
+          (s, false))
+      (((cmaSim M Commit Chal hr simT).impl
+        (Sum.inl (Sum.inr m))).run (s, false)))
+      ≤ cmaSignEps ζ_zk β s := by
+  sorry
+
+/-- The `h_step_tv_S` hypothesis of
+`Package.advantage_le_expectedSCost_plus_probEvent_bad` instantiated at
+`G₀ = cmaReal`, `G₁ = cmaSim`, `S = IsCostlyQuery`, and
+`ε = cmaSignEps ζ_zk β`. Only the sign-query branch has content; the
+other branches are vacuous (`¬ IsCostlyQuery t`).
+
+This is the canonical interface between the FS-specific HVZK coupling
+(in `cmaReal_cmaSim_tv_sign_le_cmaSignEps`) and the generic SSP bridge
+in `VCVio/SSP/IdenticalUntilBad.lean`. -/
+theorem cmaReal_cmaSim_tv_costly_le_cmaSignEps
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
+    (hHVZK : σ.HVZK simT ζ_zk.toReal)
+    (hCommit : σ.simCommitPredictability simT β)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (ht : IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) (Stmt := Stmt) t)
+    (s : cmaInnerState M Commit Chal Stmt Wit) :
+    ENNReal.ofReal (tvDist
+      (((cmaReal M Commit Chal σ hr).impl t).run (s, false))
+      (((cmaSim M Commit Chal hr simT).impl t).run (s, false)))
+      ≤ cmaSignEps ζ_zk β s := by
+  rcases t with ((_ | _) | m) | ⟨⟩
+  · exact (ht).elim
+  · exact (ht).elim
+  · exact cmaReal_cmaSim_tv_sign_le_cmaSignEps σ hr (M := M) simT ζ_zk β hζ_zk
+      hHVZK hCommit m s
+  · exact (ht).elim
 
 end FiatShamir.SSP
