@@ -1541,6 +1541,54 @@ lemma expectedSCostStep_free
         Pr[= z | (impl t).run (s, false)] * k z.1 qS z.2 := by
   simp [expectedSCostStep, hS]
 
+/-! #### Pointwise monotonicity of `expectedSCost` in `ε`
+
+If `ε ≤ ε'` pointwise (as functions `σ → ℝ≥0∞`), then
+`expectedSCost impl S ε oa qS p ≤ expectedSCost impl S ε' oa qS p`.
+The analogous monotonicity in the continuation `k` (for
+`expectedSCostStep`) is the step-level lemma, used in the inductive
+step of `expectedSCost_mono`. These lemmas are used to bound a
+state-dependent ε by a constant upper bound so the constant-ε bound
+`expectedSCost_const_le_qS_mul` applies. -/
+
+lemma expectedSCostStep_mono
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
+    (hε : ∀ s, ε s ≤ ε' s)
+    (t : spec.Domain) {k k' : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞}
+    (hk : ∀ u qS p, k u qS p ≤ k' u qS p)
+    (qS : ℕ) (p : σ × Bool) :
+    expectedSCostStep impl S ε t k qS p ≤ expectedSCostStep impl S ε' t k' qS p := by
+  rcases p with ⟨s, b⟩
+  cases b with
+  | true => simp [expectedSCostStep]
+  | false =>
+      by_cases hSt : S t
+      · by_cases hqS : 0 < qS
+        · rw [expectedSCostStep_costly_pos impl S ε t k qS s hSt hqS,
+              expectedSCostStep_costly_pos impl S ε' t k' qS s hSt hqS]
+          gcongr with z
+          · exact hε s
+          · exact hk z.1 (qS - 1) z.2
+        · simp [expectedSCostStep, hSt, hqS]
+      · rw [expectedSCostStep_free impl S ε t k qS s hSt,
+            expectedSCostStep_free impl S ε' t k' qS s hSt]
+        gcongr with z
+        exact hk z.1 qS z.2
+
+theorem expectedSCost_mono
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
+    (hε : ∀ s, ε s ≤ ε' s)
+    (oa : OracleComp spec α) (qS : ℕ) (p : σ × Bool) :
+    expectedSCost impl S ε oa qS p ≤ expectedSCost impl S ε' oa qS p := by
+  induction oa using OracleComp.inductionOn generalizing qS p with
+  | pure x => simp
+  | query_bind t cont ih =>
+      rw [expectedSCost_query_bind, expectedSCost_query_bind]
+      exact expectedSCostStep_mono impl S hε t
+        (fun u qS' p' => ih u qS' p') qS p
+
 /-! #### Helper lemma: per-summand IH bound implies the bind-sum bound -/
 
 /-- Sum bound for the inductive step: from a per-summand `ofReal (tvDist) ≤ cost z + Pr[bad]`
