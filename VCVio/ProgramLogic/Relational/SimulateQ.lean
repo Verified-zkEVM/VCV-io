@@ -1541,6 +1541,223 @@ lemma expectedSCostStep_free
         Pr[= z | (impl t).run (s, false)] * k z.1 qS z.2 := by
   simp [expectedSCostStep, hS]
 
+/-! #### Helper lemma: per-summand IH bound implies the bind-sum bound -/
+
+/-- Sum bound for the inductive step: from a per-summand `ofReal (tvDist) ≤ cost z + Pr[bad]`
+IH, conclude that `ofReal (∑' z, Pr[=z|mx].toReal · tvDist (f₁ z) (f₂ z))` is bounded by
+`(∑' z, Pr[=z|mx] · cost z) + Pr[bad | mx >>= f₁]`. The state-dep analogue of
+`tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad`, replacing the constant `c` by a
+per-summand `cost z : ℝ≥0∞`. -/
+private lemma tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
+    {γ : Type} (mx : OracleComp spec' γ) (f₁ f₂ : γ → OracleComp spec' (α × σ × Bool))
+    (cost : γ → ℝ≥0∞)
+    (h_summand_le : ∀ z : γ,
+      ENNReal.ofReal (tvDist (f₁ z) (f₂ z)) ≤
+        cost z + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z]) :
+    ENNReal.ofReal (∑' z, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
+      ≤ (∑' z, Pr[= z | mx] * cost z)
+        + Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁] := by
+  have h_p_sum_le_one : (∑' z : γ, Pr[= z | mx]) ≤ 1 := tsum_probOutput_le_one
+  have h_p_sum_ne_top : (∑' z : γ, Pr[= z | mx]) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top h_p_sum_le_one
+  have h_p_summable : Summable (fun z : γ => Pr[= z | mx].toReal) :=
+    ENNReal.summable_toReal h_p_sum_ne_top
+  have h_lhs_summand_nn : ∀ z : γ,
+      0 ≤ Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
+    fun z => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+  have h_lhs_summand_le : ∀ z : γ,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) ≤ Pr[= z | mx].toReal :=
+    fun z => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
+  have h_lhs_summable : Summable
+      (fun z : γ => Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) :=
+    Summable.of_nonneg_of_le h_lhs_summand_nn h_lhs_summand_le h_p_summable
+  have h_p_ne_top : ∀ z : γ, Pr[= z | mx] ≠ ⊤ := fun z =>
+    ne_top_of_le_ne_top one_ne_top probOutput_le_one
+  have h_summand_eq : ∀ z : γ,
+      ENNReal.ofReal (Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) =
+        Pr[= z | mx] * ENNReal.ofReal (tvDist (f₁ z) (f₂ z)) := fun z => by
+    rw [ENNReal.ofReal_mul ENNReal.toReal_nonneg, ENNReal.ofReal_toReal (h_p_ne_top z)]
+  have h_ofreal_tsum :
+      ENNReal.ofReal (∑' z, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z))
+        = ∑' z, Pr[= z | mx] * ENNReal.ofReal (tvDist (f₁ z) (f₂ z)) := by
+    rw [ENNReal.ofReal_tsum_of_nonneg h_lhs_summand_nn h_lhs_summable]
+    exact tsum_congr h_summand_eq
+  rw [h_ofreal_tsum]
+  calc
+    (∑' z : γ, Pr[= z | mx] * ENNReal.ofReal (tvDist (f₁ z) (f₂ z)))
+      ≤ ∑' z : γ, Pr[= z | mx] *
+          (cost z + Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z]) :=
+        ENNReal.tsum_le_tsum fun z => by gcongr; exact h_summand_le z
+    _ = (∑' z : γ, Pr[= z | mx] * cost z) +
+          ∑' z : γ, Pr[= z | mx] *
+            Pr[fun w : α × σ × Bool => w.2.2 = true | f₁ z] := by
+        rw [← ENNReal.tsum_add]
+        refine tsum_congr fun z => ?_
+        rw [mul_add]
+    _ = (∑' z : γ, Pr[= z | mx] * cost z) +
+          Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁] := by
+        rw [← probEvent_bind_eq_tsum mx f₁]
+
+/-! #### Per-step inductive helpers -/
+
+/-- The `query_bind` step for a costly S-query (`S t ∧ 0 < qS`), state-dep ε version.
+Combines triangle inequality through the coupled mid-distribution `mx >>= f₂` with
+`tvDist_bind_left_le` + the helper lemma to push the IH through the bind. -/
+private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
+    (t : spec.Domain) (cont : spec.Range t → OracleComp spec α)
+    {qS : ℕ} (hS : S t) (hqS : 0 < qS)
+    (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
+      ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
+          ((simulateQ impl₂ (cont u)).run p'))
+        ≤ expectedSCost impl₁ S ε (cont u) (qS - 1) p'
+          + Pr[fun w : α × σ × Bool => w.2.2 = true |
+              (simulateQ impl₁ (cont u)).run p'])
+    (s : σ) :
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
+      ≤ expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+        + Pr[fun z : α × σ × Bool => z.2.2 = true |
+            (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
+  set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
+  set my : OracleComp spec' (spec.Range t × σ × Bool) := (impl₂ t).run (s, false) with hmy_def
+  set f₁ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
+  set f₂ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
+  have hsim₁_eq : (simulateQ impl₁ (query t >>= cont)).run (s, false) = mx >>= f₁ := by
+    simp [hmx_def, hf₁_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have hsim₂_eq : (simulateQ impl₂ (query t >>= cont)).run (s, false) = my >>= f₂ := by
+    simp [hmy_def, hf₂_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  set sim₁ : OracleComp spec' (α × σ × Bool) := mx >>= f₁ with hsim₁_def
+  set sim₂ : OracleComp spec' (α × σ × Bool) := my >>= f₂ with hsim₂_def
+  set mid : OracleComp spec' (α × σ × Bool) := mx >>= f₂ with hmid_def
+  have h_tri_real : tvDist sim₁ sim₂ ≤ tvDist sim₁ mid + tvDist mid sim₂ :=
+    tvDist_triangle _ _ _
+  have h_first_real : tvDist sim₁ mid ≤ ∑' z : spec.Range t × σ × Bool,
+      Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) := by
+    rw [hsim₁_def, hmid_def]
+    exact tvDist_bind_left_le _ _ _
+  have h_second_real : tvDist mid sim₂ ≤ tvDist mx my := by
+    rw [hmid_def, hsim₂_def]
+    exact tvDist_bind_right_le _ _ _
+  have h_tri :
+      ENNReal.ofReal (tvDist sim₁ sim₂) ≤
+        ENNReal.ofReal (tvDist sim₁ mid) + ENNReal.ofReal (tvDist mid sim₂) := by
+    refine le_trans (ENNReal.ofReal_le_ofReal h_tri_real) ?_
+    rw [ENNReal.ofReal_add (tvDist_nonneg _ _) (tvDist_nonneg _ _)]
+  have h_second :
+      ENNReal.ofReal (tvDist mid sim₂) ≤ ε s :=
+    le_trans (ENNReal.ofReal_le_ofReal h_second_real)
+      (le_trans (by rw [hmx_def, hmy_def]) (h_step_tv_S t hS s))
+  have h_first :
+      ENNReal.ofReal (tvDist sim₁ mid) ≤
+        (∑' z : spec.Range t × σ × Bool,
+          Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+        + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
+    refine le_trans (ENNReal.ofReal_le_ofReal h_first_real) ?_
+    have hfsim₁ : sim₁ = mx >>= f₁ := hsim₁_def
+    rw [hfsim₁]
+    refine tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
+      (mx := mx) (f₁ := f₁) (f₂ := f₂)
+      (cost := fun z => expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+      (fun z => ?_)
+    simpa [hf₁_def, hf₂_def] using ih z.1 z.2
+  have h_recurse :
+      expectedSCost impl₁ S ε (query t >>= cont) qS (s, false) =
+        ε s + ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl₁ t).run (s, false)] *
+            expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2 := by
+    rw [expectedSCost_query_bind, expectedSCostStep_costly_pos _ _ _ _ _ _ _ hS hqS]
+  have h_sim₁_eq_again : sim₁ = (simulateQ impl₁ (query t >>= cont)).run (s, false) :=
+    hsim₁_eq.symm
+  calc
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
+      = ENNReal.ofReal (tvDist sim₁ sim₂) := by rw [hsim₁_eq, hsim₂_eq]
+    _ ≤ ENNReal.ofReal (tvDist sim₁ mid) + ENNReal.ofReal (tvDist mid sim₂) := h_tri
+    _ ≤ ((∑' z : spec.Range t × σ × Bool,
+            Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+          + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁])
+          + ε s := add_le_add h_first h_second
+    _ = (ε s + ∑' z : spec.Range t × σ × Bool,
+              Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+          + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
+        rw [add_assoc, add_comm (Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁]) (ε s),
+            ← add_assoc, add_comm (∑' _, _) (ε s)]
+    _ = expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+          + Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
+        rw [h_recurse, ← hmx_def, h_sim₁_eq_again]
+
+/-- The `query_bind` step for a free (non-S) query, state-dep ε version. The impls are
+pointwise equal at this query, so the only contribution is from the IH; the budget `qS`
+is preserved (no decrement). -/
+private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (t : spec.Domain) (cont : spec.Range t → OracleComp spec α)
+    {qS : ℕ} (hS : ¬ S t)
+    (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
+      ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
+          ((simulateQ impl₂ (cont u)).run p'))
+        ≤ expectedSCost impl₁ S ε (cont u) qS p'
+          + Pr[fun w : α × σ × Bool => w.2.2 = true |
+              (simulateQ impl₁ (cont u)).run p'])
+    (s : σ) :
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
+      ≤ expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+        + Pr[fun z : α × σ × Bool => z.2.2 = true |
+            (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
+  set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
+  have hmy_eq : (impl₂ t).run (s, false) = mx := (h_step_eq_nS t hS (s, false)).symm
+  set f₁ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₁ (cont z.1)).run z.2 with hf₁_def
+  set f₂ : spec.Range t × σ × Bool → OracleComp spec' (α × σ × Bool) :=
+    fun z => (simulateQ impl₂ (cont z.1)).run z.2 with hf₂_def
+  have hsim₁_eq : (simulateQ impl₁ (query t >>= cont)).run (s, false) = mx >>= f₁ := by
+    simp [hmx_def, hf₁_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have hsim₂_eq : (simulateQ impl₂ (query t >>= cont)).run (s, false) = mx >>= f₂ := by
+    simp [hmy_eq, hf₂_def, simulateQ_bind, simulateQ_query,
+      OracleQuery.input_query, OracleQuery.cont_query, StateT.run_bind]
+  have h_bd_real : tvDist (mx >>= f₁) (mx >>= f₂)
+      ≤ ∑' z : spec.Range t × σ × Bool, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
+    tvDist_bind_left_le _ _ _
+  have h_recurse :
+      expectedSCost impl₁ S ε (query t >>= cont) qS (s, false) =
+        ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl₁ t).run (s, false)] *
+            expectedSCost impl₁ S ε (cont z.1) qS z.2 := by
+    rw [expectedSCost_query_bind, expectedSCostStep_free _ _ _ _ _ _ _ hS]
+  calc
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
+        ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
+      = ENNReal.ofReal (tvDist (mx >>= f₁) (mx >>= f₂)) := by rw [hsim₁_eq, hsim₂_eq]
+    _ ≤ ENNReal.ofReal
+          (∑' z : spec.Range t × σ × Bool, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) :=
+        ENNReal.ofReal_le_ofReal h_bd_real
+    _ ≤ (∑' z : spec.Range t × σ × Bool,
+            Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) qS z.2)
+          + Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁] := by
+        refine tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
+          (mx := mx) (f₁ := f₁) (f₂ := f₂)
+          (cost := fun z => expectedSCost impl₁ S ε (cont z.1) qS z.2)
+          (fun z => ?_)
+        simpa [hf₁_def, hf₂_def] using ih z.1 z.2
+    _ = expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+          + Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
+        rw [h_recurse, ← hmx_def, ← hsim₁_eq]
+
 end IdenticalUntilBadEpsilonStateDep
 
 end OracleComp.ProgramLogic.Relational
