@@ -97,11 +97,122 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
   · exact (ht True.intro).elim
   · rfl
 
-/-! ### `h_mono₀`: `cmaSim`'s bad flag is monotonic -/
+/-! ### `h_mono₀`: bad-flag monotonicity for `cmaReal` and `cmaSim`
+
+The SSP bridge `Package.advantage_le_expectedSCost_plus_probEvent_bad`
+takes a monotonicity hypothesis for `G₀`'s impl: once the bad flag
+fires, every continuation preserves it. For the H3 hop we choose
+`G₀ = cmaReal`, which makes monotonicity trivial — `cmaReal` never
+touches the bad flag at all. We also prove the analogous fact for
+`cmaSim`; it is the only direction that genuinely uses the "sign
+programs the RO cache" branch, and is kept here as reusable
+infrastructure for bridging to other SSP hops (e.g. H4 and the
+runtime bound). -/
+
+/-- `cmaReal.impl` propagates the input bad flag through unchanged: on
+every query, the output state's bad flag equals the input state's bad
+flag. This is strictly stronger than monotonicity. -/
+theorem cmaReal_impl_bad_preserved
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (p : cmaGameState M Commit Chal Stmt Wit)
+    (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run p)) :
+    z.2.2 = p.2 := by
+  obtain ⟨⟨cache, kp, log⟩, bad⟩ := p
+  rcases t with ((_ | mc) | m) | ⟨⟩
+  · -- unif query: output form (a, (cache, kp, log), bad), bad preserved
+    rename_i n
+    have hz' : z ∈ support
+        ((unifSpec.query n : OracleComp unifSpec _) >>= fun r =>
+          (pure (r, (cache, kp, log), bad) :
+            OracleComp unifSpec
+              (_ × cmaGameState M Commit Chal Stmt Wit))) := hz
+    rw [support_bind] at hz'
+    obtain ⟨_, _, hz'⟩ := Set.mem_iUnion₂.mp hz'
+    rw [support_pure] at hz'
+    cases Set.eq_of_mem_singleton hz'
+    rfl
+  · -- hash query: cache hit/miss both preserve bad
+    rcases hmc : cache mc with _ | r
+    · have hz' : z ∈ support
+          ((($ᵗ Chal) : OracleComp unifSpec _) >>= fun r =>
+            (pure (r, (cache.cacheQuery mc r, kp, log), bad) :
+              OracleComp unifSpec
+                (_ × cmaGameState M Commit Chal Stmt Wit))) := by
+        simpa [cmaRealSubImpl, cmaRealUnifRoImpl, StateT.run, hmc] using hz
+      rw [support_bind] at hz'
+      obtain ⟨_, _, hz'⟩ := Set.mem_iUnion₂.mp hz'
+      rw [support_pure] at hz'
+      cases Set.eq_of_mem_singleton hz'
+      rfl
+    · have hz' : z = (r, (cache, kp, log), bad) := by
+        simpa [cmaRealSubImpl, cmaRealUnifRoImpl, StateT.run, hmc] using hz
+      rw [hz']
+  · -- sign query: every branch of `cmaRealSignImpl` ends with
+    -- `pure (…, …, bad)`, so the output's bad field is always `bad`.
+    -- Shared inner lemma: for any (pk, sk) and any commitment output (c, prvSt),
+    -- the cache-match-then-respond subcomputation preserves `bad`.
+    rcases hkp : kp with _ | ⟨pk', sk'⟩
+    · -- fresh keypair: hr.gen ≫= σ.commit ≫= (cache-match ch) ≫= σ.respond
+      simp only [add_apply_inl, add_apply_inr, StateT.run, cmaRealSubImpl, hkp,
+        QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, cmaRealSignImpl,
+        Prod.mk.eta, monadLift_self, bind_pure_comp, pure_bind,
+        support_bind] at hz
+      obtain ⟨pksk, _, hz⟩ := Set.mem_iUnion₂.mp hz
+      obtain ⟨c, _, hz⟩ := Set.mem_iUnion₂.mp hz
+      rcases hmc : cache (m, c.1) with _ | r
+      · rw [hmc] at hz
+        simp only [support_bind, Set.mem_iUnion, support_map, Set.mem_image,
+          exists_prop] at hz
+        obtain ⟨_, _, _, _, rfl⟩ := hz
+        rfl
+      · rw [hmc] at hz
+        simp only [support_map, Set.mem_image] at hz
+        obtain ⟨_, _, rfl⟩ := hz
+        rfl
+    · -- cached keypair: σ.commit ≫= (cache-match ch) ≫= σ.respond
+      simp only [add_apply_inl, add_apply_inr, StateT.run, cmaRealSubImpl, hkp,
+        QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, cmaRealSignImpl,
+        monadLift_self, bind_pure_comp, pure_bind,
+        support_bind] at hz
+      obtain ⟨c, _, hz⟩ := Set.mem_iUnion₂.mp hz
+      rcases hmc : cache (m, c.1) with _ | r
+      · rw [hmc] at hz
+        simp only [support_bind, Set.mem_iUnion, support_map, Set.mem_image,
+          exists_prop] at hz
+        obtain ⟨_, _, _, _, rfl⟩ := hz
+        rfl
+      · rw [hmc] at hz
+        simp only [support_map, Set.mem_image] at hz
+        obtain ⟨_, _, rfl⟩ := hz
+        rfl
+  · -- pk query
+    rcases hkp : kp with _ | ⟨pk', sk'⟩
+    · simp only [add_apply_inr, StateT.run, cmaRealPkImpl, hkp,
+        QueryImpl.add_apply_inr, bind_pure_comp, support_map] at hz
+      obtain ⟨_, _, rfl⟩ := hz
+      rfl
+    · have hz' : z = (pk', (cache, some (pk', sk'), log), bad) := by
+        simpa [cmaRealPkImpl, StateT.run, hkp] using hz
+      rw [hz']
+
+/-- `cmaReal`'s bad flag is monotonic: once set, it stays set. Immediate
+corollary of `cmaReal_impl_bad_preserved`. This is the `h_mono₀`
+hypothesis of the SSP bridge when instantiated with `G₀ = cmaReal`. -/
+theorem cmaReal_impl_bad_monotone
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (p : cmaGameState M Commit Chal Stmt Wit) (hp : p.2 = true)
+    (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run p)) :
+    z.2.2 = true := by
+  rw [cmaReal_impl_bad_preserved (M := M) σ hr t p z hz]; exact hp
 
 /-- Once `cmaSim`'s bad flag is `true`, every continuation of `cmaSim.impl`
-preserves it. This is the `h_mono₀` hypothesis of the SSP bridge when
-instantiated with `G₀ = cmaSim`. -/
+preserves it. This is not directly used by the H3 hop (which instantiates
+`G₀ = cmaReal`), but is reusable infrastructure for other SSP hops that
+expose `cmaSim` as the "low-adversary-advantage" side. -/
 theorem cmaSim_impl_bad_monotone
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
