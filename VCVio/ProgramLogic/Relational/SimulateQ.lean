@@ -1422,4 +1422,125 @@ theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
 
 end IdenticalUntilBadEpsilonSelective
 
+/-! ### State-dep ε-perturbed identical-until-bad
+
+A further refinement of `tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad` where the
+per-step ε bound is allowed to depend on the **input state** `s : σ` to the impl. The
+bound on `tvDist` is then expressed as the **expected sum** of `ε s` over the trace of
+S-queries fired during the simulation, captured by the recursive function `expectedSCost`.
+
+This is essential for cryptographic reductions where the per-step gap depends on a varying
+state quantity (e.g., for Fiat-Shamir signing-oracle swaps the gap is
+`ζ_zk + |s.cache| · β`, growing with cache size, with no uniform constant ε).
+The constant-ε lemma `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad` is a
+corollary (see Phase A2).
+
+To sidestep summability obligations, `expectedSCost` is valued in `ℝ≥0∞` and the bridge
+lemma is stated in `ℝ≥0∞` via `ENNReal.ofReal (tvDist …)`. A real-valued corollary
+`tvDist_…_toReal_…` is provided for users that supply a finiteness witness for
+`expectedSCost`. -/
+
+section IdenticalUntilBadEpsilonStateDep
+
+variable {ι : Type} {spec : OracleSpec ι}
+variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
+variable {α : Type} {σ : Type}
+
+/-- Per-`query_bind` step of `expectedSCost`. Given the impl, the costly-query
+predicate `S`, the per-state cost `ε`, the query symbol `t`, and the IH continuation
+`k : Range t → ℕ → (σ × Bool) → ℝ≥0∞`, returns the expected cost contributed by
+performing the query `t` from state `p` with budget `qS`:
+
+* if the bad flag is set in `p`, return `0` (the `Pr[bad]` term swallows the deficit);
+* if `t` is a free query (`¬ S t`), forward through the impl with budget unchanged;
+* if `t` is a costly query and the budget is exhausted, return `0` (vacuous via
+  `IsQueryBound`);
+* if `t` is a costly query with positive budget, pay `ε p.1` immediately, then forward
+  through the impl with budget decremented to `qS - 1`. -/
+noncomputable def expectedSCostStep
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S]
+    (ε : σ → ℝ≥0∞) (t : spec.Domain)
+    (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
+    (qS : ℕ) (p : σ × Bool) : ℝ≥0∞ :=
+  if p.2 then 0
+  else
+    if S t then
+      if 0 < qS then
+        ε p.1 + ∑' z : spec.Range t × σ × Bool,
+          Pr[= z | (impl t).run (p.1, false)] * k z.1 (qS - 1) z.2
+      else 0
+    else
+      ∑' z : spec.Range t × σ × Bool,
+        Pr[= z | (impl t).run (p.1, false)] * k z.1 qS z.2
+
+/-- Recursive expected sum-of-`ε(state)` over the S-queries fired during
+`(simulateQ impl oa).run p`. Defined by recursion on `oa` via `OracleComp.construct`. -/
+noncomputable def expectedSCost
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) :
+    {α : Type} → OracleComp spec α → ℕ → (σ × Bool) → ℝ≥0∞ :=
+  fun {_} oa => OracleComp.construct
+    (C := fun _ => ℕ → (σ × Bool) → ℝ≥0∞)
+    (fun _ _ _ => 0)
+    (fun t _ ih => expectedSCostStep impl S ε t ih)
+    oa
+
+@[simp]
+lemma expectedSCost_pure
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (x : α)
+    (qS : ℕ) (p : σ × Bool) :
+    expectedSCost impl S ε (pure x : OracleComp spec α) qS p = 0 := rfl
+
+lemma expectedSCost_query_bind
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (t : spec.Domain) (cont : spec.Range t → OracleComp spec α)
+    (qS : ℕ) (p : σ × Bool) :
+    expectedSCost impl S ε (query t >>= cont) qS p =
+      expectedSCostStep impl S ε t (fun u => expectedSCost impl S ε (cont u)) qS p := rfl
+
+@[simp]
+lemma expectedSCostStep_bad_eq_zero
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
+    (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
+    (qS : ℕ) (s : σ) :
+    expectedSCostStep impl S ε t k qS (s, true) = 0 := by
+  simp [expectedSCostStep]
+
+@[simp]
+lemma expectedSCost_bad_eq_zero
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (oa : OracleComp spec α) (qS : ℕ) (s : σ) :
+    expectedSCost impl S ε oa qS (s, true) = 0 := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => exact expectedSCost_pure impl S ε x qS (s, true)
+  | query_bind t cont _ =>
+      rw [expectedSCost_query_bind, expectedSCostStep_bad_eq_zero]
+
+lemma expectedSCostStep_costly_pos
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
+    (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
+    (qS : ℕ) (s : σ) (hS : S t) (hqS : 0 < qS) :
+    expectedSCostStep impl S ε t k qS (s, false) =
+      ε s + ∑' z : spec.Range t × σ × Bool,
+        Pr[= z | (impl t).run (s, false)] * k z.1 (qS - 1) z.2 := by
+  simp [expectedSCostStep, hS, hqS]
+
+lemma expectedSCostStep_free
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
+    (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
+    (qS : ℕ) (s : σ) (hS : ¬ S t) :
+    expectedSCostStep impl S ε t k qS (s, false) =
+      ∑' z : spec.Range t × σ × Bool,
+        Pr[= z | (impl t).run (s, false)] * k z.1 qS z.2 := by
+  simp [expectedSCostStep, hS]
+
+end IdenticalUntilBadEpsilonStateDep
+
 end OracleComp.ProgramLogic.Relational
