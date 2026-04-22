@@ -1899,11 +1899,10 @@ theorem ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
 
 Specializing `expectedSCost` to a constant cost function `fun _ => ε` and using `IsQueryBound`
 to bound the number of S-queries, the cumulative cost is dominated by `qS · ε`. Combined
-with the state-dep main lemma this re-derives `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`
-in `ENNReal` form, demonstrating that the state-dep version subsumes the selective constant-ε
-version. -/
+with the state-dep main lemma this re-derives the selective constant-ε bound
+in `ENNReal` form. -/
 
-private lemma expectedSCost_const_le_qS_mul
+lemma expectedSCost_const_le_qS_mul
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : ℝ≥0∞)
     (oa : OracleComp spec α) {qS : ℕ}
@@ -1984,9 +1983,10 @@ private lemma expectedSCost_const_le_qS_mul
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
 This is the ENNReal-form analogue of the existing real-valued
-`tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`. It demonstrates that the
-state-dep version subsumes the constant-ε version: instantiate `ε := fun _ => ENNReal.ofReal ε_const`
-and bound `expectedSCost` by `qS * ENNReal.ofReal ε_const`. -/
+`tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`. It demonstrates that
+the state-dep version subsumes the constant-ε version: instantiate
+`ε := fun _ => ENNReal.ofReal ε_const` and bound `expectedSCost` by
+`qS * ENNReal.ofReal ε_const`. -/
 theorem ofReal_tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (ε : ℝ≥0∞)
