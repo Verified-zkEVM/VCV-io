@@ -66,11 +66,13 @@ variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
 splice the outer state onto the left of the inner state. All three type arguments are implicit
 so that the pointfree `linkReshape <$> _` reads cleanly at use sites.
 
-`private` because this function is a purely internal gadget used by `link` and its reduction
-lemmas; external callers should use `Package.link` / `Package.run_link_eq_run_shiftLeft`
-directly. -/
+Marked `@[reducible]` so that downstream proofs can unfold it into the concrete lambda
+`fun p => (p.1.1, (p.1.2, p.2))` without additional rewriting. Kept at the
+`Package` namespace for use by structural equivalence proofs that need to reason about
+`link.impl`'s output shape (e.g. the H4 hop of the Fiat-Shamir EUF-CMA chain in
+`VCVio/CryptoFoundations/FiatShamir/Sigma/SSP/Hops.lean`). -/
 @[reducible]
-private def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
+def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
     (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))
 
 /-- Sequential composition of two packages: `outer ∘ inner`.
@@ -100,6 +102,17 @@ def link (outer : Package M E σ₁) (inner : Package I M σ₂) : Package I E (
 lemma link_init (outer : Package M E σ₁) (inner : Package I M σ₂) :
     (outer.link inner).init =
       inner.init >>= fun s₂₀ => (simulateQ inner.impl outer.init).run s₂₀ := rfl
+
+/-- Pointwise `run` form of the linked handler at a single query. The outer handler runs on
+`s₁` producing an `OracleComp M` step, which is then simulated against the inner handler at
+`s₂`; the final result is reshaped from `(α × σ₁) × σ₂` to `α × (σ₁ × σ₂)` via `linkReshape`.
+
+This is the primary unfolding lemma for `(outer.link inner).impl` used by downstream
+structural-equivalence proofs (e.g. H4 of the Fiat-Shamir EUF-CMA chain). -/
+lemma link_impl_apply_run (outer : Package M E σ₁) (inner : Package I M σ₂)
+    (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
+    ((outer.link inner).impl t).run (s₁, s₂) =
+      linkReshape <$> (simulateQ inner.impl ((outer.impl t).run s₁)).run s₂ := rfl
 
 /-- Sanity check: linking with the identity package on the right keeps the outer init's
 distribution, paired with a `PUnit` placeholder for the inner state. The full state-isomorphism
