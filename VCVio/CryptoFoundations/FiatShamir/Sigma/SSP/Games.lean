@@ -102,7 +102,7 @@ the same RO cache as the adversary's direct Hash queries, then respond. -/
               pure (r, st.1.cacheQuery (m, c) r)
         let π ← (liftM (σ.respond pk sk prvSt ch) :
           OracleComp unifSpec Resp)
-        pure ((c, π), cache', kp, m :: st.2.2)
+        pure ((c, π), cache', kp, st.2.2 ++ [m])
     | Sum.inr () => fun st =>
         match st.2.1 with
         | some (pk, _) => pure (pk, st)
@@ -152,7 +152,7 @@ with a different value, the bad flag is set (this is the only difference from
         let cache' := match st.1.1 (m, c) with
           | some _ => (st.1.1, true)
           | none => (st.1.1.cacheQuery (m, c) ch, st.1.2)
-        pure ((c, π), cache', kp, m :: st.2.2)
+        pure ((c, π), cache', kp, st.2.2 ++ [m])
     | Sum.inr () => fun st =>
         match st.2.1 with
         | some (pk, _) => pure (pk, st)
@@ -239,7 +239,7 @@ just re-uses the existing `nma` state through `link`. -/
           OracleComp (nmaSpec M Commit Chal Stmt) (Commit × Chal × Resp))
         let _ ← (((nmaSpec M Commit Chal Stmt).query (Sum.inl (Sum.inr (m, c, ch)))) :
           OracleComp (nmaSpec M Commit Chal Stmt) Unit)
-        pure ((c, π), m :: log)
+        pure ((c, π), log ++ [m])
     | Sum.inr () => fun log => do
         let pk ← (((nmaSpec M Commit Chal Stmt).query (Sum.inr ())) :
           OracleComp (nmaSpec M Commit Chal Stmt) Stmt)
