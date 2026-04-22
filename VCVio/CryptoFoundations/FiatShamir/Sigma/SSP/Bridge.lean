@@ -31,22 +31,20 @@ the SSP plan in `.ignore/fs-ssp-plan.md` §5:
   `((forgery), verified)`.
 * `cmaRealRun` — the joint output of running `cmaReal` against `signedAdv`,
   bundled with the signed-message log read out of `cmaReal`'s state.
-* `bridge_evalDist_cmaRealRun` — the equality
-  `evalDist (cmaRealRun) = evalDist (the joint of unforgeableExp's body)`.
-* `cmaRealAdvantage_eq_unforgeableExp` — the projection of the joint bridge
-  to the freshness-and-verified bool, matching `unforgeableExp`'s output.
-* `cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh` — the projection of
-  the joint bridge to the verified-only bool.
+* `cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh` — hop H2 of the SSP
+  plan (`Pr[unforgeableExpNoFresh] = Pr[cmaReal accepts forgery]`, the
+  projection to the verified bit, no freshness check).
 * `unforgeableAdv.advantage_le_runProb_cmaRealNoFresh` — the H1+H2
   composition: `adv.advantage ≤ Pr[cmaReal wins, ignoring freshness]`.
 
-The detailed equality `bridge_evalDist_cmaRealRun` is presently `sorry`'d;
-its proof is the main content of Phase D1.b. It reduces to:
+`cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh` is presently `sorry`'d;
+the proof reduces to:
 
 1. Pull the keypair sampling out of `cmaReal`'s lazy `pkSpec` handler via
    `Package.run`'s definition + the `signedAdv`-queries-`GetPK`-first
    structure (so the lazy keygen happens at the start, matching
-   `unforgeableExp`'s eager keygen).
+   `unforgeableExp`'s eager keygen). This step is captured in the private
+   lemma `cmaRealRun_eq_keygen_bind`.
 2. Match the random-oracle handling: `cmaReal`'s lazy `roSpec` handler
    coincides with `runtime`'s `randomOracle` impl, since both use the same
    `cacheQuery`-on-miss / cached-on-hit logic.
@@ -55,7 +53,9 @@ its proof is the main content of Phase D1.b. It reduces to:
    hash queries. The OLD `unforgeableExp` does the same via
    `signingOracle pk sk` in a `WriterT` log; the equivalence is the FS
    instance of `Security.lean`'s
-   `map_run_withLogging_inputs_eq_run_signedAppend`.
+   `map_run_withLogging_inputs_eq_run_signedAppend`. For the no-fresh
+   projection the `WriterT` log is discarded, so we only need the
+   distribution of the adversary's output + final cache to coincide.
 4. Match the verify call: both sides issue one `Hash (msg, c)` query
    through the same RO cache, then run the deterministic `σ.verify`.
 -/
@@ -124,66 +124,103 @@ the OLD `unforgeableExp` carries in a `WriterT` instead. -/
 /-! ### Bridge equalities (Phase D1.b)
 
 `cmaReal.impl` is, by construction in `Sigma/SSP/Games.lean`, the sum
-`cmaRealSubImpl σ hr + cmaRealPkImpl hr` along the decomposition
-`cmaSpec = (unifSpec + roSpec + signSpec) + pkSpec`. The `cmaRealSubImpl`
-half handles the parts the adversary drives (uniform sampling, hash queries,
-signing that internally hits the RO cache); the `cmaRealPkImpl` half
-handles the public-key oracle (lazy keypair sampling). This factoring lets
-the bridge proof apply `simulateQ_add_liftComp_left` directly to
-`simulateQ cmaReal.impl (liftM oa)` for an adversary `oa` that does not
-touch `pkSpec`. -/
+`(cmaRealUnifRoImpl + cmaRealSignImpl) + cmaRealPkImpl` along the
+decomposition `cmaSpec = ((unifSpec + roSpec) + signSpec) + pkSpec`. The
+bridge proof uses this factoring to strip the two lifts in `signedAdv`:
+`adv.main pk` is lifted through `+ pkSpec`, and Fiat-Shamir's `verify` is
+lifted through `+ signSpec` on top of that; applying
+`simulateQ_add_liftComp_left` twice reduces the simulations to
+`simulateQ cmaRealSubImpl (adv.main pk)` and
+`simulateQ cmaRealUnifRoImpl (verify pk msg sig)` respectively. -/
 
-/-- The headline bridge: the joint distribution of `cmaRealRun` matches the
-joint distribution of the `unforgeableExp` body before the final freshness
-check. Phase D1.b will replace the `sorry` with the structural proof
-sketched in the module docstring; the statement is what downstream phases
-consume. -/
-theorem bridge_evalDist_cmaRealRun
+/-! #### Factor-out-keygen helpers
+
+The first step of the bridge strips the `pkSpec` query from the start of
+`signedAdv`. Since `cmaReal` starts with no keypair (`none` in its state),
+the first query forces the lazy generator to run, and every subsequent
+query sees `some (pk, sk)`; the keypair never changes afterwards. We
+capture this in `cmaRealRun_eq_keygen_bind` below. -/
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
+  [SampleableType Chal] in
+/-- Running `cmaRealPkImpl` from the empty keypair is `hr.gen` followed by a
+pure state update. -/
+private lemma cmaRealPkImpl_empty_run
+    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) :
+    (cmaRealPkImpl M Commit Chal hr ()).run (cache, none, log) =
+      (fun p : Stmt × Wit => (p.1, cache, some (p.1, p.2), log)) <$> hr.gen := by
+  simp [cmaRealPkImpl, StateT.run, map_eq_bind_pure_comp]
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
+  [SampleableType Chal] in
+/-- Running `cmaRealPkImpl` with a pre-existing keypair just returns the public
+key, leaving state untouched. -/
+private lemma cmaRealPkImpl_some_run
+    (cache : (roSpec M Commit Chal).QueryCache) (pk : Stmt) (sk : Wit)
+    (log : List M) :
+    (cmaRealPkImpl M Commit Chal hr ()).run (cache, some (pk, sk), log) =
+      pure (pk, cache, some (pk, sk), log) := by
+  simp [cmaRealPkImpl, StateT.run]
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
+  [SampleableType Chal] in
+/-- Threading a continuation through `cmaRealPkImpl` from the empty keypair state
+extracts the `hr.gen` step. -/
+private lemma cmaRealPkImpl_bind_run_empty {α : Type}
+    (f : Stmt →
+      StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
+        (OracleComp unifSpec) α)
+    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) :
+    (cmaRealPkImpl M Commit Chal hr () >>= f) (cache, none, log) =
+      hr.gen >>= fun ps : Stmt × Wit => f ps.1 (cache, some ps, log) := by
+  change (StateT.bind _ _) _ = _
+  simp [cmaRealPkImpl, StateT.bind]
+
+/-- The "post-keygen" portion of `signedAdv`: the adversary's main routine
+followed by FS verification, with `pk` already fixed. All queries are through
+`cmaSpec`; the `pkSpec` summand is never touched. -/
+@[reducible] noncomputable def postKeygenAdv
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (pk : Stmt) :
+    OracleComp (cmaSpec M Commit Chal Resp Stmt) ((M × (Commit × Resp)) × Bool) := do
+  let (msg, sig) ← (liftM (adv.main pk) :
+    OracleComp (cmaSpec M Commit Chal Resp Stmt) (M × (Commit × Resp)))
+  let verified ← (liftM
+    ((FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
+      pk msg sig) :
+    OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
+  pure ((msg, sig), verified)
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- The first `pkSpec` query in `signedAdv` forces `cmaReal` to run its lazy
+keygen, leaving every subsequent query to see a stable `some (pk, sk)` in the
+state slot. The rest of `signedAdv` (the adversary's main routine plus FS
+verification) never touches `pkSpec`, so every subsequent query is handled
+by `cmaRealSubImpl = cmaRealUnifRoImpl + cmaRealSignImpl`. -/
+private lemma cmaRealRun_eq_keygen_bind
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
-    evalDist (cmaRealRun σ hr M adv) =
-      (FiatShamir.runtime M).evalDist (do
-        let (pk, sk) ←
-          (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
-            σ hr M).keygen
-        let impl :
-            QueryImpl ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ (Commit × Resp)))
-              (WriterT (QueryLog (M →ₒ (Commit × Resp)))
-                (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
-          (HasQuery.toQueryImpl
-              (spec := unifSpec + (M × Commit →ₒ Chal))
-              (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))).liftTarget
-            (WriterT (QueryLog (M →ₒ (Commit × Resp)))
-              (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) +
-            (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
-              σ hr M).signingOracle pk sk
-        let sim_adv :
-            WriterT (QueryLog (M →ₒ (Commit × Resp)))
-              (OracleComp (unifSpec + (M × Commit →ₒ Chal))) (M × (Commit × Resp)) :=
-          simulateQ impl (adv.main pk)
-        let ((msg, sig), log) ← sim_adv.run
-        let verified ←
-          (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))
-            σ hr M).verify pk msg sig
-        pure ((msg, sig), verified, log.map (fun e => e.1))) := by
-  sorry
+    cmaRealRun σ hr M adv =
+      (hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+        (simulateQ (cmaReal M Commit Chal σ hr).impl
+            (postKeygenAdv σ hr M adv ps.1)).run (∅, some ps, []) >>=
+          fun p => pure (p.1.1, p.1.2, p.2.2.2) := by
+  unfold cmaRealRun signedAdv Package.runState postKeygenAdv
+  simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
+    OracleQuery.input_query, QueryImpl.add_apply_inr,
+    id_map, StateT.run, pure_bind]
+  change (cmaRealPkImpl M Commit Chal hr () >>= _) (∅, none, []) >>= _ = _ >>= _
+  rw [cmaRealPkImpl_bind_run_empty (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
+    _ ∅ []]
+  simp only [bind_assoc]
 
-/-! ### Corollaries: scalar-bool projections -/
-
-/-- Project the joint bridge to the freshness-and-verified bool: matches
-`unforgeableExp`'s output. -/
-theorem cmaRealAdvantage_eq_unforgeableExp
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
-    Pr[= true |
-        (fun p : (M × (Commit × Resp)) × Bool × List M =>
-          !(p.2.2.contains p.1.1) && p.2.1) <$>
-            cmaRealRun σ hr M adv] =
-      adv.advantage (FiatShamir.runtime M) := by
-  sorry
-
-/-- Project the joint bridge to the verified-only bool: matches
-`unforgeableExpNoFresh`'s output. -/
+/-- Hop **H2** (freshness-dropped): the probability that `cmaReal` accepts
+the adversary's forgery (without the freshness post-check) equals the
+probability that the FS freshness-dropped experiment accepts. This is the
+one equality consumed by `cma_advantage_le_runProb_cmaRealNoFresh` below;
+the with-freshness and full-joint variants are not needed for the H1-H5
+chain and are therefore not stated. -/
 theorem cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
