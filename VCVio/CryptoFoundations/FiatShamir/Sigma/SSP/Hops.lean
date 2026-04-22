@@ -24,26 +24,44 @@ This file contributes hops H3, H4, H5 of the SSP plan in
 * **H4** (`cmaSim = cmaToNma.shiftLeft nma`): mechanical program-equivalence.
 * **H5** (`nma ≤ Fork`): bridge to `Fork.replayForkingBound`.
 
-This commit lands only the Phase E1 scaffolding for H3:
+Current content:
 
 * `IsCostlyQuery` — the predicate picking out `signSpec` queries inside
   `cmaSpec`, matching the `S` predicate consumed by
   `Package.advantage_le_expectedSCost_plus_probEvent_bad`.
-* `cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery` — non-sign queries are
-  pointwise identical between `cmaReal` and `cmaSim`. This is the
+* `cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery` — non-sign queries
+  are pointwise identical between `cmaReal` and `cmaSim`. This is the
   `h_step_eq_nS` hypothesis of the SSP bridge.
-* `cmaSim_impl_bad_monotone` — once `cmaSim`'s bad flag is set, every
-  continuation keeps it set. This is the `h_mono₀` hypothesis of the SSP
-  bridge, applied with `G₀ = cmaSim`.
+* `cmaReal_impl_bad_preserved` / `cmaSim_impl_bad_monotone` — strict
+  preservation of the bad flag on the `cmaReal` side and monotonicity on
+  the `cmaSim` side. Together they supply the `h_mono₀` hypothesis of
+  the SSP bridge (at either choice of `G₀`) and drive the
+  `Pr[bad | G₀ = cmaReal] = 0` corollary below.
+* `cmaReal_simulateQ_bad_preserved` /
+  `cmaReal_simulateQ_probEvent_bad_eq_zero` — lift bad-preservation
+  through the whole program by induction on `oa`, discharging the
+  `Pr[bad fires in G₀]` term of the SSP bridge.
+* `cmaSignEps` / `cacheCount` — the per-state ε function
+  `ε s = ζ_zk + cacheCount s.1 · β` used by the bridge's `expectedSCost`.
+* `cmaReal_cmaSim_tv_costly_le_cmaSignEps` — the `h_step_tv_S`
+  hypothesis, dispatched into the costly vs. non-costly branches and
+  delegating the sign case to `cmaReal_cmaSim_tv_sign_le_cmaSignEps`
+  (the mathematical heart of the H3 hop).
+* `cmaReal_cmaSim_advantage_le_H3_bound` — top-level H3 statement,
+  threading all of the above through
+  `Package.advantage_le_expectedSCost_plus_probEvent_bad`.
 
-The per-step TV bound on sign queries (`h_step_tv_S`), the bad-event
-probability bound, and the top-level H3 statement are scheduled for the
-subsequent Phase E2-E5 commits.
+Remaining work (isolated to two `sorry`s):
+
+* `cmaReal_cmaSim_tv_sign_le_cmaSignEps` — the HVZK + cache-collision
+  coupling proof on a single sign query.
+* `cmaSignEps_expectedSCost_le` — the cache-growth invariant closing the
+  `expectedSCost` term to the headline `qS · ζ_zk + qS · (qS + qH) · β`.
 -/
 
 universe u
 
-open ENNReal OracleSpec OracleComp ProbComp VCVio.SSP
+open ENNReal OracleSpec OracleComp ProbComp ProgramLogic.Relational VCVio.SSP
 
 namespace FiatShamir.SSP
 
@@ -359,5 +377,188 @@ theorem cmaReal_cmaSim_tv_costly_le_cmaSignEps
   · exact cmaReal_cmaSim_tv_sign_le_cmaSignEps σ hr (M := M) simT ζ_zk β hζ_zk
       hHVZK hCommit m s
   · exact (ht).elim
+
+/-! ### Bad-event probability: zero on the `cmaReal` side
+
+The state-dep SSP bridge `advantage_le_expectedSCost_plus_probEvent_bad`
+charges a `Pr[bad fires in G₀]` term on top of the cumulative per-step ε.
+For H3 we instantiate `G₀ = cmaReal`, whose bad flag is *preserved* (not
+merely monotone): every step leaves it unchanged. Starting from the
+no-bad init state `(s_init, false)`, every reachable simulation output
+therefore has `z.2.2 = false`, so the bad event has probability zero.
+
+The lemma `cmaReal_simulateQ_bad_preserved` lifts
+`cmaReal_impl_bad_preserved` over the whole simulation by induction
+on the program. Its corollary `cmaReal_simulateQ_probEvent_bad_eq_zero`
+discharges the bad-event term of the SSP bridge. -/
+
+/-- Lift per-step bad-preservation through the whole simulation: if
+`cmaReal.impl` preserves the bad flag on every query, then so does
+`simulateQ cmaReal.impl oa` (by induction on `oa`).
+
+This is the simulation-level analogue of `cmaReal_impl_bad_preserved`
+and is the key ingredient of `cmaReal_simulateQ_probEvent_bad_eq_zero`. -/
+theorem cmaReal_simulateQ_bad_preserved
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel) {α : Type}
+    (oa : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
+    (p : cmaGameState M Commit Chal Stmt Wit)
+    (z) (hz : z ∈ support ((simulateQ (cmaReal M Commit Chal σ hr).impl oa).run p)) :
+    z.2.2 = p.2 := by
+  induction oa using OracleComp.inductionOn generalizing p z with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, support_pure,
+        Set.mem_singleton_iff] at hz
+      subst hz
+      rfl
+  | query_bind t cont ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, StateT.run_bind, support_bind,
+        Set.mem_iUnion, exists_prop] at hz
+      obtain ⟨⟨u, p'⟩, h_mem, h_z⟩ := hz
+      have hp' : p'.2 = p.2 :=
+        cmaReal_impl_bad_preserved (M := M) σ hr t p (u, p') h_mem
+      have hz' : z.2.2 = p'.2 := ih u p' z h_z
+      exact hz'.trans hp'
+
+/-- The bad-event probability of any `cmaReal` simulation started from
+`(s, false)` is zero: every reachable output has `z.2.2 = false`.
+
+This discharges the `Pr[bad | G₀]` term of
+`Package.advantage_le_expectedSCost_plus_probEvent_bad` when
+instantiated at `G₀ = cmaReal`, leaving the advantage bounded purely
+by the per-step expected ε cost. -/
+theorem cmaReal_simulateQ_probEvent_bad_eq_zero
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel) {α : Type}
+    (oa : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
+    (s : cmaInnerState M Commit Chal Stmt Wit) :
+    Pr[fun z : α × cmaInnerState M Commit Chal Stmt Wit × Bool => z.2.2 = true |
+        (simulateQ (cmaReal M Commit Chal σ hr).impl oa).run (s, false)] = 0 := by
+  rw [probEvent_eq_zero_iff]
+  intro z hz
+  have : z.2.2 = false :=
+    cmaReal_simulateQ_bad_preserved (M := M) σ hr oa (s, false) z hz
+  simp [this]
+
+/-! ### Expected cumulative ε cost
+
+The `expectedSCost` term in the state-dep SSP bridge integrates
+`ε s = cmaSignEps ζ_zk β s = ζ_zk + cacheCount s.1 · β` over the
+reachable states of the simulation. At the i-th costly (sign) query,
+the cache contains at most `qH + (i - 1)` entries (the adversary has
+made at most `qH` hash queries and `i - 1` previous sign queries, each
+adding at most one cache entry). Summing `ζ_zk + (qH + i - 1) · β`
+from `i = 1` to `qS` yields `qS · ζ_zk + (qS · qH + qS · (qS - 1)/2) · β`,
+which is upper-bounded by the headline `qS · ζ_zk + qS · (qS + qH) · β`.
+
+The cache-growth invariant is specific to Fiat-Shamir; the bound
+itself is scheduled for Phase E3'. -/
+
+/-- Upper bound on the expected cumulative ε cost for the H3 hop.
+Integrates `cmaSignEps ζ_zk β` over the reachable states of
+`simulateQ cmaReal.impl A` from `(s_init, false)`, using the
+cache-growth invariant "at step `i`, `cacheCount ≤ qH + (i - 1)`".
+
+The headline bound `qS · ζ_zk + qS · (qS + qH) · β` matches the target
+H3 bound from §5 of the SSP plan. -/
+theorem cmaSignEps_expectedSCost_le
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (ζ_zk β : ℝ≥0∞) {α : Type}
+    (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
+    (qS qH : ℕ)
+    (h_qb : OracleComp.IsQueryBound A qS
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (_h_qH : True) -- placeholder; real E3' bound also needs a hash-query budget
+    (s : cmaInnerState M Commit Chal Stmt Wit) :
+    expectedSCost (cmaReal M Commit Chal σ hr).impl
+        (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+          (Resp := Resp) (Stmt := Stmt))
+        (cmaSignEps ζ_zk β) A qS (s, false)
+      ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
+  sorry
+
+/-! ### Top-level H3 hop
+
+The advantage between `cmaReal` and `cmaSim` is bounded by the cumulative
+ε cost (dominated by `qS · ζ_zk + qS · (qS + qH) · β`) plus the
+`cmaReal`-side bad-event probability (zero since bad is preserved).
+This is precisely the H3 bound from §5 of the SSP plan. -/
+
+/-- **H3 hop** via the SSP state-dep identical-until-bad bridge.
+
+`cmaReal` and `cmaSim` are ε(s)-close on sign queries and pointwise
+identical on all other queries; `cmaReal`'s bad flag is preserved.
+Threading this through the state-dep SSP bridge and bounding
+`expectedSCost` by `qS · ζ_zk + qS · (qS + qH) · β` yields the tight H3
+bound of the FS-on-Σ rewrite. -/
+theorem cmaReal_cmaSim_advantage_le_H3_bound
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
+    (hHVZK : σ.HVZK simT ζ_zk.toReal)
+    (hCommit : σ.simCommitPredictability simT β)
+    (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
+    (qS qH : ℕ)
+    (h_qb : OracleComp.IsQueryBound A qS
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
+    ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
+        (cmaSim M Commit Chal hr simT) A)
+      ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
+  have h_init : (cmaReal M Commit Chal σ hr).init = pure ((∅, none, []), false) := rfl
+  have h_init' : (cmaSim M Commit Chal hr simT).init = pure ((∅, none, []), false) := rfl
+  have h_mono₀ : ∀ (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+      (p : cmaGameState M Commit Chal Stmt Wit), p.2 = true →
+      ∀ z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run p), z.2.2 = true := by
+    intro t p hp z hz
+    exact cmaReal_impl_bad_monotone (M := M) σ hr t p hp z hz
+  have h_bridge := Package.advantage_le_expectedSCost_plus_probEvent_bad
+    (cmaReal M Commit Chal σ hr) (cmaSim M Commit Chal hr simT)
+    ((∅ : (roSpec M Commit Chal).QueryCache), (none : Option (Stmt × Wit)), ([] : List M))
+    h_init h_init'
+    (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
+    (cmaSignEps ζ_zk β)
+    (fun t ht s => cmaReal_cmaSim_tv_costly_le_cmaSignEps (M := M) σ hr simT ζ_zk β hζ_zk
+      hHVZK hCommit t ht s)
+    (fun t ht p => cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery (M := M) σ hr simT t ht p)
+    h_mono₀
+    A h_qb
+  have h_bad_zero :
+      Pr[fun z : Bool × cmaInnerState M Commit Chal Stmt Wit × Bool => z.2.2 = true |
+          (simulateQ (cmaReal M Commit Chal σ hr).impl A).run
+            ((∅, none, []), false)] = 0 :=
+    cmaReal_simulateQ_probEvent_bad_eq_zero (M := M) σ hr A _
+  have h_cost_le :
+      expectedSCost (cmaReal M Commit Chal σ hr).impl
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEps ζ_zk β) A qS (((∅, none, []) :
+            cmaInnerState M Commit Chal Stmt Wit), false)
+        ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β :=
+    cmaSignEps_expectedSCost_le (M := M) σ hr ζ_zk β A qS qH h_qb trivial _
+  calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
+          (cmaSim M Commit Chal hr simT) A)
+      ≤ expectedSCost (cmaReal M Commit Chal σ hr).impl
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEps ζ_zk β) A qS (((∅, none, []) :
+            cmaInnerState M Commit Chal Stmt Wit), false)
+        + Pr[fun z : Bool × cmaInnerState M Commit Chal Stmt Wit × Bool => z.2.2 = true |
+            (simulateQ (cmaReal M Commit Chal σ hr).impl A).run
+              ((∅, none, []), false)] := h_bridge
+    _ = expectedSCost (cmaReal M Commit Chal σ hr).impl
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEps ζ_zk β) A qS ((∅, none, []), false) := by
+        rw [h_bad_zero, add_zero]
+    _ ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := h_cost_le
 
 end FiatShamir.SSP
