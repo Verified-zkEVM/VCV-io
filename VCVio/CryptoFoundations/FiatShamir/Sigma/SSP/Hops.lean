@@ -595,6 +595,107 @@ lemma simulateQ_nma_impl_liftM_unifSpec_run
     refine bind_congr fun r => ?_
     exact ih r s
 
+/-- **Per-query H4 equivalence** on the uniform branch.
+
+On the uniform sub-branch of `cmaSpec` (i.e. `Sum.inl (Sum.inl (Sum.inl n))`
+for `n : ℕ`), running `cmaSim.impl` at state `s` is definitionally equal to
+running `(cmaToNma.link nma).impl` at the bijected link state `φ s`, post-
+projected by `Prod.map id φ.symm`. The bijection commutes with the query
+verbatim, so the equality is `rfl` after unfolding the atomic handler via
+`cmaSim_impl_unifRo_apply_run` and the link via `Package.link_impl_apply_run`. -/
+lemma cmaSim_impl_run_eq_link_under_bij_unif
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (n : ℕ) (s : cmaGameState M Commit Chal Stmt Wit) :
+    evalDist (((cmaSim M Commit Chal hr simT).impl (Sum.inl (Sum.inl (Sum.inl n)))).run s) =
+      evalDist (Prod.map id cmaLinkStateEquiv.symm <$>
+        (((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+            (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).impl
+            (Sum.inl (Sum.inl (Sum.inl n)))).run (cmaLinkStateEquiv s)) := by
+  rcases s with ⟨⟨cache, kp, msgs⟩, b⟩
+  rw [cmaSim_impl_unifRo_apply_run (t := Sum.inl n), Package.link_impl_apply_run]
+  -- Use evalDist_congr: both sides reduce to
+  -- `(fun a => (a, (cache, kp, msgs), b)) <$> ($ᵗ Fin (n+1))`.
+  congr 1
+
+/-- **Per-query H4 equivalence** on the RO branch. -/
+lemma cmaSim_impl_run_eq_link_under_bij_ro
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (mc : M × Commit) (s : cmaGameState M Commit Chal Stmt Wit) :
+    evalDist (((cmaSim M Commit Chal hr simT).impl (Sum.inl (Sum.inl (Sum.inr mc)))).run s) =
+      evalDist (Prod.map id cmaLinkStateEquiv.symm <$>
+        (((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+            (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).impl
+            (Sum.inl (Sum.inl (Sum.inr mc)))).run (cmaLinkStateEquiv s)) := by
+  -- Boilerplate per-query equivalence: both sides reduce to a `match cache mc`
+  -- expression with structurally-identical branches up to `cmaLinkStateEquiv`.
+  -- Fill in during Phase F cleanup; does not affect the main H4 structure.
+  sorry
+
+/-- **Per-query H4 equivalence** on the pk branch. -/
+lemma cmaSim_impl_run_eq_link_under_bij_pk
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (s : cmaGameState M Commit Chal Stmt Wit) :
+    evalDist (((cmaSim M Commit Chal hr simT).impl (Sum.inr ())).run s) =
+      evalDist (Prod.map id cmaLinkStateEquiv.symm <$>
+        (((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+            (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).impl
+            (Sum.inr ())).run (cmaLinkStateEquiv s)) := by
+  -- Boilerplate per-query equivalence: both sides reduce to a `match kp` expression
+  -- with structurally-identical branches up to `cmaLinkStateEquiv`.
+  -- Fill in during Phase F cleanup; does not affect the main H4 structure.
+  sorry
+
+/-- **Per-query H4 equivalence** (sign branch).
+
+On the sign branch of `cmaSpec`, running `cmaSim.impl (Sum.inl (Sum.inr m))`
+at state `s` is `evalDist`-equivalent to running
+`(cmaToNma.link nma).impl (Sum.inl (Sum.inr m))` at `cmaLinkStateEquiv s`
+composed with `Prod.map id φ.symm`.
+
+The two sides both (i) fetch-or-sample the keypair, (ii) sample
+`simT pk`, and (iii) conditionally program the RO cache at `(m, c)`.
+The `simulateQ_nma_impl_liftM_unifSpec_run` helper handles step (ii)
+for the `cmaToNma.link nma` side; the remaining algebra is a
+Boolean/`Option` case-split on the pre-cache at `(m, c)` and the
+pre-keypair. -/
+lemma cmaSim_impl_run_eq_link_under_bij_sign
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (m : M) (s : cmaGameState M Commit Chal Stmt Wit) :
+    evalDist ((((cmaSim M Commit Chal hr simT).impl (Sum.inl (Sum.inr m))).run s)) =
+      evalDist (Prod.map id cmaLinkStateEquiv.symm <$>
+        (((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+            (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).impl
+            (Sum.inl (Sum.inr m))).run
+          (cmaLinkStateEquiv s)) := by
+  rcases s with ⟨⟨cache, kp, msgs⟩, b⟩
+  -- LHS: unfold `cmaSim_impl_sign_apply_run` to expose `signSimInnerImpl`.
+  rw [cmaSim_impl_sign_apply_run]
+  -- RHS: unfold `link_impl_apply_run` (linkReshape + simulateQ nma.impl of the cmaToNma sign branch).
+  rw [Package.link_impl_apply_run]
+  -- Unfold `cmaToNma.impl (Sum.inl (Sum.inr m))` — sample pk, sample simT, program RO.
+  -- Both sides end up as `<keypair>; let (c, ch, π) ← simT pk; <cache-update>; ...`.
+  -- The inner `simulateQ nma.impl (liftM (simT pk))` on the RHS is handled by
+  -- `simulateQ_nma_impl_liftM_unifSpec_run`.
+  show evalDist ((fun vs => (vs.1, vs.2, b || progCollision m (cache, kp, msgs) vs.1)) <$>
+      ((signSimInnerImpl M Commit Chal hr simT m).run (cache, kp, msgs))) = _
+  -- Unfold `signSimInnerImpl`, `(cmaToNma.impl (Sum.inl (Sum.inr m))).run msgs`,
+  -- and `simulateQ nma.impl (...)` branch-by-branch on kp / cache (m, c).
+  unfold signSimInnerImpl cmaToNma
+  simp only [StateT.run_bind, StateT.run_pure, StateT.run_map]
+  -- Split on the pre-keypair: `kp ∈ {some (pk, sk), none}`.
+  rcases hkp : kp with _ | ⟨pk₀, sk₀⟩
+  all_goals simp only [simulateQ_bind, simulateQ_pure, simulateQ_map, StateT.run_bind,
+    StateT.run_pure, StateT.run_map, map_pure, map_bind, pure_bind, bind_pure_comp,
+    bind_assoc]
+  all_goals sorry
+  -- The remaining residue on each branch is a `simulateQ nma.impl (liftM (simT pk))` and
+  -- a `nma.impl (progSpec _)` step whose cache-hit vs. cache-miss case split matches the
+  -- LHS's `cache'` pattern-match plus the `b || progCollision …` bad-flag update.
+
 /-- **H4 hop** (program equivalence, Phase F).
 
 Running `cmaSim` against an adversary `A` is distributionally identical
@@ -617,16 +718,56 @@ theorem cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma
     evalDist ((cmaSim M Commit Chal hr simT).runProb A) =
       evalDist ((nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
         ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A)) := by
-  -- Proof sketch: rewrite both sides as `simulateQ … .run' init` on
-  -- their respective `Package.impl`s, then apply a
-  -- `simulateQ_StateT_evalDist_congr`-style argument matching the
-  -- `cmaSim` handlers branch-by-branch against the composite
-  -- `cmaToNma.impl ∘ nma.impl` handlers. Non-sign branches coincide
-  -- after stripping the `List M` from the cmaToNma side (it is only
-  -- touched on the sign branch); the sign branch matches because both
-  -- sides sample `simT pk`, install the challenge into the RO cache
-  -- (explicitly via `progSpec` on the NMA side, implicitly via
-  -- `signSimInnerImpl` on the `cmaSim` side), and return `(c, π)`.
-  sorry
+  -- Step 1: rewrite the RHS via `run_link_eq_run_shiftLeft` so both sides are
+  -- of the form `P.runProb A` with differing `P`.
+  rw [show (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
+        ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A) =
+          ((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+            (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).runProb A from
+    (Package.run_link_eq_run_shiftLeft _ _ A).symm]
+  -- Step 2: reduce both `runProb = run = init >>= fun s => (simulateQ impl A).run' s`
+  -- to `(simulateQ impl A).run' initialState` by evaluating the `pure`-inits.
+  simp only [Package.runProb_eq_run]
+  unfold Package.run
+  have hcmaSim_init : (cmaSim M Commit Chal hr simT).init =
+      (pure ((∅, none, []), false) : ProbComp _) := rfl
+  have hlink_init : ((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+      (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).init =
+      (pure ([], (∅, false, none)) : ProbComp _) := rfl
+  rw [hcmaSim_init, hlink_init]
+  simp only [pure_bind]
+  -- Step 3: reduce `.run'` to `Prod.fst <$> .run`, apply `simulateQ_StateT_evalDist_congr_of_bij`
+  -- to bring the RHS state to `Prod.map id φ.symm <$> ...` form, then collapse `Prod.fst` with
+  -- `Prod.map id φ.symm` (since `Prod.fst ∘ Prod.map id φ.symm = Prod.fst`).
+  rw [StateT.run'_eq, StateT.run'_eq]
+  -- Apply the bijection-congruence lemma. Per-query hypothesis splits over `unif | ro | sign | pk`.
+  have hbij : evalDist ((simulateQ (cmaSim M Commit Chal hr simT).impl A).run
+      ((∅, none, []), false)) =
+    evalDist (Prod.map id cmaLinkStateEquiv.symm <$>
+      (simulateQ ((cmaToNma (Stmt := Stmt) M Commit Chal simT).link
+          (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr)).impl A).run
+        ([], (∅, false, none))) := by
+    have hφ : cmaLinkStateEquiv (((∅, none, []), false) :
+        cmaGameState M Commit Chal Stmt Wit) = ([], (∅, false, none)) := rfl
+    rw [show (([], (∅, false, none)) :
+          List M × ((roSpec M Commit Chal).QueryCache × Bool × Option (Stmt × Wit))) =
+        cmaLinkStateEquiv (((∅, none, []), false) :
+            cmaGameState M Commit Chal Stmt Wit) from hφ.symm]
+    refine Package.simulateQ_StateT_evalDist_congr_of_bij _ _ cmaLinkStateEquiv
+      (fun q s => ?_) A _
+    rcases q with ((u | r) | m) | ⟨⟩
+    · exact cmaSim_impl_run_eq_link_under_bij_unif (M := M) (Commit := Commit) (Chal := Chal)
+        (Stmt := Stmt) (Wit := Wit) (rel := rel) hr simT u s
+    · exact cmaSim_impl_run_eq_link_under_bij_ro (M := M) (Commit := Commit) (Chal := Chal)
+        (Stmt := Stmt) (Wit := Wit) (rel := rel) hr simT r s
+    · exact cmaSim_impl_run_eq_link_under_bij_sign (M := M) (Commit := Commit) (Chal := Chal)
+        (Stmt := Stmt) (Wit := Wit) (rel := rel) hr simT m s
+    · exact cmaSim_impl_run_eq_link_under_bij_pk (M := M) (Commit := Commit) (Chal := Chal)
+        (Stmt := Stmt) (Wit := Wit) (rel := rel) hr simT s
+  -- Apply `hbij` and collapse via `Prod.fst ∘ Prod.map id φ.symm = Prod.fst`.
+  rw [evalDist_map, evalDist_map, hbij, ← evalDist_map, Functor.map_map, evalDist_map]
+  -- LHS: `(fun a => (Prod.map id φ.symm a).1) <$> evalDist ...`
+  -- RHS: `Prod.fst <$> evalDist ...`. They're equal since the two maps are extensionally equal.
+  congr 1
 
 end FiatShamir.SSP
