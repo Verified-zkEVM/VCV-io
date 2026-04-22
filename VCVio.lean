@@ -14,6 +14,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Spec
+import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Packages
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
