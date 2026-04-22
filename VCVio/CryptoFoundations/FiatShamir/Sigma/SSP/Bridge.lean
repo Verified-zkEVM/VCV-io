@@ -111,15 +111,16 @@ The wrapper:
 /-- Run `cmaReal` against `signedAdv` and pack the resulting forgery,
 verification bit, and signed-message log into a single `ProbComp`.
 
-The signed-message log lives in the third component of `cmaReal`'s state
-(`(cache, Option (pk, sk), List M)`); it is the freshness witness that
-the OLD `unforgeableExp` carries in a `WriterT` instead. -/
+The signed-message log lives in the third component of `cmaReal`'s inner
+state (`cmaInnerState = cache × Option (pk, sk) × List M`), under the
+top-level bad-flag slot of `cmaGameState`; it is the freshness witness
+that the OLD `unforgeableExp` carries in a `WriterT` instead. -/
 @[reducible] noncomputable def cmaRealRun
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
     ProbComp ((M × (Commit × Resp)) × Bool × List M) := do
   let p ← (cmaReal M Commit Chal σ hr).runState (signedAdv σ hr M adv)
-  pure (p.1.1, p.1.2, p.2.2.2)
+  pure (p.1.1, p.1.2, p.2.1.2.2)
 
 /-! ### Bridge equalities (Phase D1.b)
 
@@ -141,38 +142,34 @@ the first query forces the lazy generator to run, and every subsequent
 query sees `some (pk, sk)`; the keypair never changes afterwards. We
 capture this in `cmaRealRun_eq_keygen_bind` below. -/
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
-  [SampleableType Chal] in
+omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] in
 /-- Running `cmaRealPkImpl` from the empty keypair is `hr.gen` followed by a
-pure state update. -/
+pure state update. The top-level bad flag is unchanged. -/
 private lemma cmaRealPkImpl_empty_run
-    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) :
-    (cmaRealPkImpl M Commit Chal hr ()).run (cache, none, log) =
-      (fun p : Stmt × Wit => (p.1, cache, some (p.1, p.2), log)) <$> hr.gen := by
+    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) (bad : Bool) :
+    (cmaRealPkImpl M Commit Chal hr ()).run ((cache, none, log), bad) =
+      (fun p : Stmt × Wit => (p.1, (cache, some (p.1, p.2), log), bad)) <$> hr.gen := by
   simp [cmaRealPkImpl, StateT.run, map_eq_bind_pure_comp]
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
-  [SampleableType Chal] in
+omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] in
 /-- Running `cmaRealPkImpl` with a pre-existing keypair just returns the public
 key, leaving state untouched. -/
 private lemma cmaRealPkImpl_some_run
     (cache : (roSpec M Commit Chal).QueryCache) (pk : Stmt) (sk : Wit)
-    (log : List M) :
-    (cmaRealPkImpl M Commit Chal hr ()).run (cache, some (pk, sk), log) =
-      pure (pk, cache, some (pk, sk), log) := by
+    (log : List M) (bad : Bool) :
+    (cmaRealPkImpl M Commit Chal hr ()).run ((cache, some (pk, sk), log), bad) =
+      pure (pk, (cache, some (pk, sk), log), bad) := by
   simp [cmaRealPkImpl, StateT.run]
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit]
-  [SampleableType Chal] in
+omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] in
 /-- Threading a continuation through `cmaRealPkImpl` from the empty keypair state
 extracts the `hr.gen` step. -/
 private lemma cmaRealPkImpl_bind_run_empty {α : Type}
-    (f : Stmt →
-      StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
-        (OracleComp unifSpec) α)
-    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) :
-    (cmaRealPkImpl M Commit Chal hr () >>= f) (cache, none, log) =
-      hr.gen >>= fun ps : Stmt × Wit => f ps.1 (cache, some ps, log) := by
+    (f : Stmt → StateT (cmaGameState M Commit Chal Stmt Wit)
+      (OracleComp unifSpec) α)
+    (cache : (roSpec M Commit Chal).QueryCache) (log : List M) (bad : Bool) :
+    (cmaRealPkImpl M Commit Chal hr () >>= f) ((cache, none, log), bad) =
+      hr.gen >>= fun ps : Stmt × Wit => f ps.1 ((cache, some ps, log), bad) := by
   change (StateT.bind _ _) _ = _
   simp [cmaRealPkImpl, StateT.bind]
 
@@ -204,15 +201,15 @@ private lemma cmaRealRun_eq_keygen_bind
     cmaRealRun σ hr M adv =
       (hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
         (simulateQ (cmaReal M Commit Chal σ hr).impl
-            (postKeygenAdv σ hr M adv ps.1)).run (∅, some ps, []) >>=
-          fun p => pure (p.1.1, p.1.2, p.2.2.2) := by
+            (postKeygenAdv σ hr M adv ps.1)).run ((∅, some ps, []), false) >>=
+          fun p => pure (p.1.1, p.1.2, p.2.1.2.2) := by
   unfold cmaRealRun signedAdv Package.runState postKeygenAdv
   simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
     OracleQuery.input_query, QueryImpl.add_apply_inr,
     id_map, StateT.run, pure_bind]
-  change (cmaRealPkImpl M Commit Chal hr () >>= _) (∅, none, []) >>= _ = _ >>= _
+  change (cmaRealPkImpl M Commit Chal hr () >>= _) ((∅, none, []), false) >>= _ = _ >>= _
   rw [cmaRealPkImpl_bind_run_empty (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
-    _ ∅ []]
+    _ ∅ [] false]
   simp only [bind_assoc]
 
 /-- Hop **H2** (freshness-dropped): the probability that `cmaReal` accepts

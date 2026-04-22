@@ -58,17 +58,43 @@ variable (Chal : Type) [SampleableType Chal]
 variable {Stmt Wit : Type} {rel : Stmt → Wit → Bool}
 variable {Resp PrvState : Type}
 
+/-! ### Common state for `cmaReal` / `cmaSim`
+
+Both games thread the same three pieces of bookkeeping (random-oracle cache,
+lazily-sampled keypair, signed-message log) plus a top-level `Bool` bad flag
+tracking programming-collision events. For `cmaReal` the bad flag is vacuously
+`false` (real signing never programs the RO); for `cmaSim` the flag is set on
+a cache-hit during simulator-driven programming.
+
+Wrapping the common bookkeeping in `cmaInnerState` and the bad flag at the
+top gives both packages the canonical SSP "identical-until-bad" shape
+`σ × Bool`, which is the shape consumed by
+`Package.advantage_le_expectedSCost_plus_probEvent_bad` in
+`VCVio/SSP/IdenticalUntilBad.lean`. -/
+
+/-- Common inner state for the real and simulated CMA games:
+random-oracle cache, lazily-sampled keypair, signed-message log. -/
+@[reducible] def cmaInnerState (M : Type) [DecidableEq M]
+    (Commit : Type) [DecidableEq Commit] (Chal : Type) (Stmt Wit : Type) : Type :=
+  (roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M
+
+/-- Full SSP state for the real and simulated CMA games: the common inner
+state plus a top-level `Bool` bad flag. -/
+@[reducible] def cmaGameState (M : Type) [DecidableEq M]
+    (Commit : Type) [DecidableEq Commit] (Chal : Type) (Stmt Wit : Type) : Type :=
+  cmaInnerState M Commit Chal Stmt Wit × Bool
+
 /-! ### Real CMA game: `cmaReal`
 
-The real CMA game's state is `cache × Option (Stmt × Wit) × List M`:
-* the random-oracle cache `cache : (roSpec M Commit Chal).QueryCache`,
-* the optional lazily-sampled keypair `Option (Stmt × Wit)`,
-* the list `List M` of messages signed so far (used by the freshness post-check
-  in `Sigma/SSP/Bridge.lean`).
+The real CMA game's state is `cmaInnerState × Bool`. The bad flag is vacuously
+`false` (real signing samples fresh challenges and never programs the RO);
+it is carried along only so the package state matches `cmaSim`'s and the
+SSP identical-until-bad bridge applies uniformly to both sides.
 
-Init starts all three components empty. The signing handler runs the actual
-Σ-protocol transcript: commit, query Hash to derive the FS challenge through
-the same RO cache as the adversary's direct Hash queries, then respond.
+Init starts the inner state empty and the bad flag `false`. The signing
+handler runs the actual Σ-protocol transcript: commit, query Hash to derive
+the FS challenge through the same RO cache as the adversary's direct Hash
+queries, then respond.
 
 The implementation is split along the sum
 `cmaSpec = ((unifSpec + roSpec) + signSpec) + pkSpec` into three handlers
@@ -93,31 +119,30 @@ strip the additional lift through `+ signSpec`. -/
 queries return a fresh uniform sample and leave the state untouched; hash
 queries hit the internal cache, resample on miss, and leave the rest of
 the state untouched. -/
-@[reducible] noncomputable def cmaRealUnifRoImpl :
+@[reducible] noncomputable def cmaRealUnifRoImpl (Stmt Wit : Type) :
     QueryImpl (unifSpec + roSpec M Commit Chal)
-      (StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
-        (OracleComp unifSpec))
+      (StateT (cmaGameState M Commit Chal Stmt Wit) (OracleComp unifSpec))
   | Sum.inl n => fun st => do
       let r ← (unifSpec.query n : OracleComp unifSpec (Fin (n + 1)))
       pure (r, st)
   | Sum.inr mc => fun st =>
-      match st.1 mc with
+      match st.1.1 mc with
       | some r => pure (r, st)
       | none => do
           let r ← (($ᵗ Chal) : OracleComp unifSpec Chal)
-          pure (r, st.1.cacheQuery mc r, st.2)
+          pure (r, (st.1.1.cacheQuery mc r, st.1.2), st.2)
 
 /-- The `signSpec`-handling portion of `cmaReal.impl`. Runs the real
 Σ-protocol signer (`σ.commit` / RO-derived challenge / `σ.respond`),
 sharing the RO cache with `cmaRealUnifRoImpl` and appending the signed
-message to the log. -/
+message to the log. The bad flag is carried through unchanged. -/
 @[reducible] noncomputable def cmaRealSignImpl
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl (signSpec M Commit Resp)
-      (StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
+      (StateT (cmaGameState M Commit Chal Stmt Wit)
         (OracleComp unifSpec)) := fun msg st => do
-  let (pk, sk, kp) ← match st.2.1 with
+  let (pk, sk, kp) ← match st.1.2.1 with
     | some (pk, sk) => (pure (pk, sk, some (pk, sk)) :
         OracleComp unifSpec (Stmt × Wit × Option (Stmt × Wit)))
     | none => do
@@ -125,15 +150,15 @@ message to the log. -/
         pure (pk, sk, some (pk, sk))
   let (c, prvSt) ← (liftM (σ.commit pk sk) :
     OracleComp unifSpec (Commit × PrvState))
-  let (ch, cache') ← match st.1 (msg, c) with
-    | some r => (pure (r, st.1) :
+  let (ch, cache') ← match st.1.1 (msg, c) with
+    | some r => (pure (r, st.1.1) :
         OracleComp unifSpec (Chal × (roSpec M Commit Chal).QueryCache))
     | none => do
         let r ← (($ᵗ Chal) : OracleComp unifSpec Chal)
-        pure (r, st.1.cacheQuery (msg, c) r)
+        pure (r, st.1.1.cacheQuery (msg, c) r)
   let π ← (liftM (σ.respond pk sk prvSt ch) :
     OracleComp unifSpec Resp)
-  pure ((c, π), cache', kp, st.2.2 ++ [msg])
+  pure ((c, π), (cache', kp, st.1.2.2 ++ [msg]), st.2)
 
 /-- The `(unifSpec + roSpec) + signSpec`-handling portion of `cmaReal.impl`,
 obtained as the sum `cmaRealUnifRoImpl + cmaRealSignImpl`. -/
@@ -141,51 +166,53 @@ obtained as the sum `cmaRealUnifRoImpl + cmaRealSignImpl`. -/
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl ((unifSpec + roSpec M Commit Chal) + signSpec M Commit Resp)
-      (StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
+      (StateT (cmaGameState M Commit Chal Stmt Wit)
         (OracleComp unifSpec)) :=
-  cmaRealUnifRoImpl M Commit Chal (Stmt := Stmt) (Wit := Wit) +
+  cmaRealUnifRoImpl M Commit Chal Stmt Wit +
     cmaRealSignImpl M Commit Chal σ hr
 
 /-- The `pkSpec`-handling portion of `cmaReal.impl`. -/
 @[reducible] noncomputable def cmaRealPkImpl
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl (pkSpec Stmt)
-      (StateT ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M)
+      (StateT (cmaGameState M Commit Chal Stmt Wit)
         (OracleComp unifSpec)) := fun _ st =>
-  match st.2.1 with
+  match st.1.2.1 with
   | some (pk, _) => pure (pk, st)
   | none => do
       let (pk, sk) ← (hr.gen : OracleComp unifSpec _)
-      pure (pk, st.1, some (pk, sk), st.2.2)
+      pure (pk, (st.1.1, some (pk, sk), st.1.2.2), st.2)
 
 @[reducible] noncomputable def cmaReal
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel) :
     Package unifSpec (cmaSpec M Commit Chal Resp Stmt)
-      ((roSpec M Commit Chal).QueryCache × Option (Stmt × Wit) × List M) where
-  init := pure (∅, none, [])
+      (cmaGameState M Commit Chal Stmt Wit) where
+  init := pure ((∅, none, []), false)
   impl := cmaRealSubImpl M Commit Chal σ hr + cmaRealPkImpl M Commit Chal hr
 
 /-! ### Simulated CMA game: `cmaSim`
 
-The simulated CMA game's state is `(cache × Bool) × Option (Stmt × Wit) × List M`:
-* the programmable random-oracle cache plus collision-bad flag
-  `(roSpec M Commit Chal).QueryCache × Bool`,
-* the optional lazily-sampled keypair,
-* the signed-message log.
+The simulated CMA game's state is `cmaInnerState × Bool` (same shape as
+`cmaReal`): cache, lazily-sampled keypair, signed-message log, and a
+top-level bad flag. The bad flag tracks programming-collision events: it
+is set to `true` whenever the simulator-driven handler attempts to program
+`(m, c) ↦ ch` into the RO cache but `(m, c)` is already cached (with a
+possibly-different value). On the `coincide` / cache-miss branch the flag
+stays `false`, and the cache is programmed with the simulator's `ch`.
 
-Init starts the cache empty, the bad flag clear, and no keypair / no log. The
-signing handler samples a full HVZK transcript `(c, ch, π) ← simT pk` and
-programs the RO so that `Hash (m, c) = ch`; if `(m, c)` was already cached
-with a different value, the bad flag is set (this is the only difference from
-`cmaReal` aside from the per-step distribution of `(c, ch, π)`). -/
+Init starts everything empty and `false`. The signing handler samples a
+full HVZK transcript `(c, ch, π) ← simT pk` and programs the RO so that
+`Hash (m, c) = ch`; if `(m, c)` was already cached the bad flag is set
+(this is the only source of distributional disagreement with `cmaReal`
+beyond the per-step HVZK gap on the transcript triple). -/
 
 @[reducible] noncomputable def cmaSim
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) :
     Package unifSpec (cmaSpec M Commit Chal Resp Stmt)
-      (((roSpec M Commit Chal).QueryCache × Bool) × Option (Stmt × Wit) × List M) where
-  init := pure ((∅, false), none, [])
+      (cmaGameState M Commit Chal Stmt Wit) where
+  init := pure ((∅, none, []), false)
   impl
     | Sum.inl (Sum.inl (Sum.inl n)) => fun st => do
         let r ← (unifSpec.query n : OracleComp unifSpec (Fin (n + 1)))
@@ -197,7 +224,7 @@ with a different value, the bad flag is set (this is the only difference from
             let r ← (($ᵗ Chal) : OracleComp unifSpec Chal)
             pure (r, (st.1.1.cacheQuery mc r, st.1.2), st.2)
     | Sum.inl (Sum.inr m) => fun st => do
-        let (pk, kp) ← match st.2.1 with
+        let (pk, kp) ← match st.1.2.1 with
           | some (pk, sk) => (pure (pk, some (pk, sk)) :
               OracleComp unifSpec (Stmt × Option (Stmt × Wit)))
           | none => do
@@ -205,16 +232,16 @@ with a different value, the bad flag is set (this is the only difference from
               pure (pk, some (pk, sk))
         let (c, ch, π) ← (liftM (simT pk) :
           OracleComp unifSpec (Commit × Chal × Resp))
-        let cache' := match st.1.1 (m, c) with
+        let (cache', bad') := match st.1.1 (m, c) with
           | some _ => (st.1.1, true)
-          | none => (st.1.1.cacheQuery (m, c) ch, st.1.2)
-        pure ((c, π), cache', kp, st.2.2 ++ [m])
+          | none => (st.1.1.cacheQuery (m, c) ch, st.2)
+        pure ((c, π), (cache', kp, st.1.2.2 ++ [m]), bad')
     | Sum.inr () => fun st =>
-        match st.2.1 with
+        match st.1.2.1 with
         | some (pk, _) => pure (pk, st)
         | none => do
             let (pk, sk) ← (hr.gen : OracleComp unifSpec _)
-            pure (pk, st.1, some (pk, sk), st.2.2)
+            pure (pk, (st.1.1, some (pk, sk), st.1.2.2), st.2)
 
 /-! ### NMA game: `nma`
 
