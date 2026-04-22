@@ -108,7 +108,7 @@ lemma link_init (outer : Package M E σ₁) (inner : Package I M σ₂) :
 `s₂`; the final result is reshaped from `(α × σ₁) × σ₂` to `α × (σ₁ × σ₂)` via `linkReshape`.
 
 This is the primary unfolding lemma for `(outer.link inner).impl` used by downstream
-structural-equivalence proofs (e.g. H4 of the Fiat-Shamir EUF-CMA chain). -/
+structural-equivalence proofs. -/
 lemma link_impl_apply_run (outer : Package M E σ₁) (inner : Package I M σ₂)
     (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
     ((outer.link inner).impl t).run (s₁, s₂) =

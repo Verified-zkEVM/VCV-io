@@ -532,6 +532,69 @@ relies on:
 The proof is Phase F of the plan (estimated ~80 LoC: mostly mechanical
 `simulateQ`-congruence normalization). -/
 
+/-- State bijection between `cmaSim`'s `cmaGameState` and the nested link
+state `List M × nmaState` of `cmaToNma.link nma`.
+
+Both sides carry the same four pieces of data: the RO cache
+(`(roSpec M Commit Chal).QueryCache`), an optional keypair
+(`Option (Stmt × Wit)`), the signed-message log (`List M`), and the
+SSP bad flag (`Bool`). The bijection simply reshuffles them:
+
+```
+cmaGameState               link state
+((cache, kp, msgs), b)  ↔  (msgs, (cache, b, kp))
+```
+
+Used in `cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma` below to
+match `cmaSim.impl` branch-by-branch against
+`(cmaToNma.link nma).impl` via
+`Package.simulateQ_StateT_evalDist_congr_of_bij`. -/
+@[reducible] def cmaLinkStateEquiv
+    {M : Type} [DecidableEq M] {Commit : Type} [DecidableEq Commit]
+    {Chal Stmt Wit : Type} :
+    cmaGameState M Commit Chal Stmt Wit ≃
+      List M × ((roSpec M Commit Chal).QueryCache × Bool × Option (Stmt × Wit)) where
+  toFun := fun ((cache, kp, msgs), b) => (msgs, (cache, b, kp))
+  invFun := fun (msgs, cache, b, kp) => ((cache, kp, msgs), b)
+  left_inv := fun ⟨⟨_, _, _⟩, _⟩ => rfl
+  right_inv := fun ⟨_, _, _, _⟩ => rfl
+
+/-- Simulating a lifted `ProbComp` (`OC unifSpec`) through `nma.impl`
+threads the state unchanged: the output at state `s` is just the
+underlying `ProbComp` tagged with `s`.
+
+This is the key structural fact for the H4 sign-branch equivalence. The
+`cmaToNma` reduction feeds `simT pk : ProbComp _` into the NMA game via
+a `liftM`. Since `unifSpec`'s queries are handled by `nma.impl` as a
+pure pass-through (the `inl inl inl _` branch is `fun st => query t >>=
+fun r => pure (r, st)`), simulating through the lift never modifies
+the `nma` state. -/
+lemma simulateQ_nma_impl_liftM_unifSpec_run
+    (hr : GenerableRelation Stmt Wit rel) {α : Type}
+    (c : OracleComp unifSpec α)
+    (s : (roSpec M Commit Chal).QueryCache × Bool × Option (Stmt × Wit)) :
+    (simulateQ (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).impl
+        (liftComp c (nmaSpec M Commit Chal Stmt))).run s
+      = (·, s) <$> c := by
+  induction c using OracleComp.inductionOn generalizing s with
+  | pure x => simp [OracleComp.liftComp_pure]
+  | query_bind t k ih =>
+    simp only [OracleComp.liftComp_bind, OracleComp.liftComp_query,
+      OracleQuery.cont_query, OracleQuery.input_query, id_map,
+      simulateQ_bind, StateT.run_bind]
+    set impl :=
+      (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).impl with himpl
+    -- Reduce `simulateQ impl (liftM (unifSpec.query t))` to
+    -- `impl (inl inl inl t)`, then substitute its definition.
+    have hreduce : (simulateQ impl
+        (liftM (unifSpec.query t) : OracleComp (nmaSpec M Commit Chal Stmt) _)).run s
+        = (unifSpec.query t : OracleComp unifSpec _) >>= fun r => pure (r, s) := rfl
+    rw [hreduce]
+    rw [bind_assoc, map_bind]
+    simp only [pure_bind]
+    refine bind_congr fun r => ?_
+    exact ih r s
+
 /-- **H4 hop** (program equivalence, Phase F).
 
 Running `cmaSim` against an adversary `A` is distributionally identical
