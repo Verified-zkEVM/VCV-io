@@ -115,20 +115,27 @@ theorem signature_complete (g : G) (hg : Function.Bijective (· • g : F → G)
       (FiatShamir.runtime (Commit := G) (Chal := F) M) :=
   FiatShamir.perfectlyCorrect _ _ M (Schnorr.sigma_complete F G g)
 
-/-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures.
+/-- Pointcheval-Stern style EUF-CMA reduction for Schnorr signatures (tight bound).
 
 The bound includes:
 * explicit bounds on signing-oracle and random-oracle queries by the adversary;
 * an explicit DLog reduction target;
 * the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`;
-* the birthday-style late-programming collision term `collisionSlack qS qH (1/|F|)`,
+* the joint-coupling programming-collision term `qS · (qS + qH) · (1/|F|)`,
   instantiated at the Schnorr commit-predictability bound `β = 1/|F|` from
-  `Schnorr.sigma_simCommitPredictability`;
+  `Schnorr.sigma_simCommitPredictability` and matched against the strict-drop
+  HVZK strengthening `Schnorr.sigma_simChalUniformGivenCommit`;
 * an explicit fresh-challenge verification slack `δ_verify`, supplied through
   `SigmaProtocol.verifyChallengePredictability`.
 
-Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss vanishes
-and the simulation overhead is `collisionSlack qS qH (1/|F|) + δ_verify`. -/
+The collision coefficient drops from `2 · qS · (qS + qH)` (loose chain
+decomposition, matching `FiatShamir.collisionSlack qS qH β`) to
+`qS · (qS + qH)` (joint coupling); the `simChalUniformGivenCommit` hypothesis
+is the simulator-side property that powers this tightening.
+
+Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss
+vanishes and the simulation overhead reduces to
+`qS · (qS + qH) · (1/|F|) + δ_verify`. -/
 theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (hg : Function.Bijective (· • g : F → G))
     (M : Type) [DecidableEq M]
@@ -140,7 +147,7 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
       (S' := G × F) (oa := adv.main pk) qS qH) :
     ∃ reduction : DLogAdversary F G,
       let eps := adv.advantage (FiatShamir.runtime (Commit := G) (Chal := F) M) -
-        (FiatShamir.collisionSlack qS qH ((Fintype.card F : ℝ≥0∞)⁻¹) + δ_verify)
+        ((qS : ENNReal) * (qS + qH) * ((Fintype.card F : ℝ≥0∞)⁻¹) + δ_verify)
       eps * (eps / (qH + 1 : ENNReal) - FiatShamir.challengeSpaceInv F) ≤
         Pr[= true | dlogExp g reduction] := by
   haveI : Fintype G := Fintype.ofFinite G
@@ -151,6 +158,7 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (Schnorr.simTranscript F G g)
     (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
+    (Schnorr.sigma_simChalUniformGivenCommit F G g)
     (β := (Fintype.card F : ℝ≥0∞)⁻¹)
     (Schnorr.sigma_simCommitPredictability F G g hg)
     δ_verify hVerifyGuess
