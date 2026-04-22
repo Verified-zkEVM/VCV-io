@@ -121,7 +121,17 @@ the OLD `unforgeableExp` carries in a `WriterT` instead. -/
   let p ← (cmaReal M Commit Chal σ hr).runState (signedAdv σ hr M adv)
   pure (p.1.1, p.1.2, p.2.2.2)
 
-/-! ### Bridge equalities (Phase D1.b) -/
+/-! ### Bridge equalities (Phase D1.b)
+
+`cmaReal.impl` is, by construction in `Sigma/SSP/Games.lean`, the sum
+`cmaRealSubImpl σ hr + cmaRealPkImpl hr` along the decomposition
+`cmaSpec = (unifSpec + roSpec + signSpec) + pkSpec`. The `cmaRealSubImpl`
+half handles the parts the adversary drives (uniform sampling, hash queries,
+signing that internally hits the RO cache); the `cmaRealPkImpl` half
+handles the public-key oracle (lazy keypair sampling). This factoring lets
+the bridge proof apply `simulateQ_add_liftComp_left` directly to
+`simulateQ cmaReal.impl (liftM oa)` for an adversary `oa` that does not
+touch `pkSpec`. -/
 
 /-- The headline bridge: the joint distribution of `cmaRealRun` matches the
 joint distribution of the `unforgeableExp` body before the final freshness
