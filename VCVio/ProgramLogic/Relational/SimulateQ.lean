@@ -1758,6 +1758,143 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
               (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
         rw [h_recurse, ← hmx_def, ← hsim₁_eq]
 
+/-! #### Inductive auxiliary lemma -/
+
+/-- Auxiliary inductive lemma for the state-dep ε-perturbed bound. Inducts on `oa` and
+case-splits each query on whether it's in the costly set `S` (decrement budget, charge
+`ε s`) or free (no decrement, no charge). The bad-flag-true branch dominates the trivial
+`tvDist ≤ 1` bound via `Pr[bad | sim₁] = 1`, so `expectedSCost = 0` is enough there. -/
+private theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad_aux
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
+    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (p : σ × Bool) :
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
+      ≤ expectedSCost impl₁ S ε oa qS p
+        + Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run p] := by
+  induction oa using OracleComp.inductionOn generalizing qS p with
+  | pure x =>
+      simp only [simulateQ_pure, StateT.run_pure, tvDist_self, ENNReal.ofReal_zero]
+      exact zero_le _
+  | query_bind t cont ih =>
+      rcases p with ⟨s, b⟩
+      cases b with
+      | true =>
+          have h_bad₁ : Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ (query t >>= cont)).run (s, true)] = 1 :=
+            probEvent_simulateQ_run_bad_eq_one_of_bad impl₁ h_mono₁
+              (query t >>= cont) (s, true) rfl
+          have h_tv_le_one_real :
+              tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, true))
+                  ((simulateQ impl₂ (query t >>= cont)).run (s, true)) ≤ 1 :=
+            tvDist_le_one _ _
+          have h_lhs_le_one :
+              ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, true))
+                  ((simulateQ impl₂ (query t >>= cont)).run (s, true))) ≤ 1 := by
+            calc ENNReal.ofReal _
+                ≤ ENNReal.ofReal 1 := ENNReal.ofReal_le_ofReal h_tv_le_one_real
+              _ = 1 := ENNReal.ofReal_one
+          have h_cost_zero :
+              expectedSCost impl₁ S ε (query t >>= cont) qS (s, true) = 0 :=
+            expectedSCost_bad_eq_zero impl₁ S ε (query t >>= cont) qS s
+          rw [h_cost_zero, zero_add, h_bad₁]
+          exact h_lhs_le_one
+      | false =>
+          rw [isQueryBound_query_bind_iff] at h_qb
+          obtain ⟨h_can, h_cont⟩ := h_qb
+          by_cases hSt : S t
+          · simp only [hSt, if_true] at h_can h_cont
+            have hqS_pos : 0 < qS := h_can
+            exact ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
+              impl₁ impl₂ S ε h_step_tv_S t cont hSt hqS_pos
+              (fun u p' => ih u (h_cont u) p') s
+          · simp only [hSt, if_false] at h_can h_cont
+            exact ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
+              impl₁ impl₂ S ε h_step_eq_nS t cont hSt
+              (fun u p' => ih u (h_cont u) p') s
+
+/-! #### Public bridge lemmas -/
+
+/-- **State-dep ε-perturbed identical-until-bad with output bad flag (joint state).**
+
+Like `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`, but the per-step ε bound
+is allowed to depend on the input state `s : σ` to the impl. The `qS · ε` term is replaced
+by the **expected cumulative ε-cost** over the trace of S-queries fired during simulation,
+captured by the recursive function `expectedSCost`.
+
+Statement is in `ℝ≥0∞` to sidestep summability obligations on the cost trace; users that
+supply a finiteness witness for `expectedSCost` can recover a real-valued statement via
+`ENNReal.toReal`. -/
+theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
+    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (p : σ × Bool) :
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
+      ≤ expectedSCost impl₁ S ε oa qS p
+        + Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run p] :=
+  ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad_aux
+    impl₁ impl₂ S ε h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb p
+
+/-- **State-dep ε-perturbed identical-until-bad with output bad flag (projected output).**
+
+Composing the joint-state lemma with the projection `Prod.fst : α × σ × Bool → α`, which
+can only decrease TV distance (data-processing inequality `tvDist_map_le`). -/
+theorem ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
+    (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
+    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+      (impl₁ t).run p = (impl₂ t).run p)
+    (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
+      ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
+    (oa : OracleComp spec α) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (s₀ : σ) :
+    ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+        ((simulateQ impl₂ oa).run' (s₀, false)))
+      ≤ expectedSCost impl₁ S ε oa qS (s₀, false)
+        + Pr[fun z : α × σ × Bool => z.2.2 = true |
+            (simulateQ impl₁ oa).run (s₀, false)] := by
+  have h_joint :
+      ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run (s₀, false))
+          ((simulateQ impl₂ oa).run (s₀, false)))
+        ≤ expectedSCost impl₁ S ε oa qS (s₀, false)
+          + Pr[fun z : α × σ × Bool => z.2.2 = true |
+              (simulateQ impl₁ oa).run (s₀, false)] :=
+    ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
+      impl₁ impl₂ S ε h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
+  have h_map_real :
+      tvDist ((simulateQ impl₁ oa).run' (s₀, false))
+          ((simulateQ impl₂ oa).run' (s₀, false))
+        ≤ tvDist ((simulateQ impl₁ oa).run (s₀, false))
+            ((simulateQ impl₂ oa).run (s₀, false)) := by
+    simpa [StateT.run'] using
+      (tvDist_map_le (m := OracleComp spec') (α := α × σ × Bool) (β := α) Prod.fst
+        ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false)))
+  exact le_trans (ENNReal.ofReal_le_ofReal h_map_real) h_joint
+
 end IdenticalUntilBadEpsilonStateDep
 
 end OracleComp.ProgramLogic.Relational
