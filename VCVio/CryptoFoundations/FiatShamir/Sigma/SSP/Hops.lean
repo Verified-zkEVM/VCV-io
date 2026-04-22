@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Games
 import VCVio.SSP.IdenticalUntilBad
+import VCVio.SSP.Composition
 import VCVio.CryptoFoundations.SigmaProtocol
 
 /-!
@@ -51,12 +52,26 @@ Current content:
   threading all of the above through
   `Package.advantage_le_expectedSCost_plus_probEvent_bad`.
 
-Remaining work (isolated to two `sorry`s):
+* `cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma` — the H4 program
+  equivalence, routed through the SSP `run_link_eq_run_shiftLeft` +
+  a `Package`-level structural identity `cmaSim = cmaToNma.link nma`
+  (up to state reshuffling by `simulateQ_StateT_evalDist_congr`).
+
+Remaining work (isolated to `sorry`s):
 
 * `cmaReal_cmaSim_tv_sign_le_cmaSignEps` — the HVZK + cache-collision
-  coupling proof on a single sign query.
+  coupling proof on a single sign query (H3 heart).
 * `cmaSignEps_expectedSCost_le` — the cache-growth invariant closing the
-  `expectedSCost` term to the headline `qS · ζ_zk + qS · (qS + qH) · β`.
+  `expectedSCost` term to the headline `qS · ζ_zk + qS · (qS + qH) · β`
+  (H3 cost bookkeeping).
+* `cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma` — the H4 program-
+  equivalence distribution identity. The statement sits here so that the
+  full chain H1+H2 → H3 → H4 → H5 is visible in one view; the proof is
+  deferred to Phase F (see `.ignore/fs-ssp-plan.md`).
+
+The dual to this file (H5 + the top-level chain producing the EUF-CMA
+`Fork.advantage + qS·ζ_zk + qS·(qS+qH)·β + δ_verify` bound) lives in
+`Sigma/SSP/Chain.lean`.
 -/
 
 universe u
@@ -129,7 +144,13 @@ runtime bound). -/
 
 /-- `cmaReal.impl` propagates the input bad flag through unchanged: on
 every query, the output state's bad flag equals the input state's bad
-flag. This is strictly stronger than monotonicity. -/
+flag. This is strictly stronger than monotonicity.
+
+Since `cmaReal.impl` is built entirely from `QueryImpl.withBadFlag`
+(one instance per atomic handler), each branch reduces via
+`withBadFlag_apply_run` to the shape
+`(fun vs => (vs.1, vs.2, b)) <$> (innerImpl t').run s`, whence every
+element of the support has third component equal to the input bad `b`. -/
 theorem cmaReal_impl_bad_preserved
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel)
@@ -137,83 +158,11 @@ theorem cmaReal_impl_bad_preserved
     (p : cmaGameState M Commit Chal Stmt Wit)
     (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run p)) :
     z.2.2 = p.2 := by
-  obtain ⟨⟨cache, kp, log⟩, bad⟩ := p
-  rcases t with ((_ | mc) | m) | ⟨⟩
-  · -- unif query: output form (a, (cache, kp, log), bad), bad preserved
-    rename_i n
-    have hz' : z ∈ support
-        ((unifSpec.query n : OracleComp unifSpec _) >>= fun r =>
-          (pure (r, (cache, kp, log), bad) :
-            OracleComp unifSpec
-              (_ × cmaGameState M Commit Chal Stmt Wit))) := hz
-    rw [support_bind] at hz'
-    obtain ⟨_, _, hz'⟩ := Set.mem_iUnion₂.mp hz'
-    rw [support_pure] at hz'
-    cases Set.eq_of_mem_singleton hz'
-    rfl
-  · -- hash query: cache hit/miss both preserve bad
-    rcases hmc : cache mc with _ | r
-    · have hz' : z ∈ support
-          ((($ᵗ Chal) : OracleComp unifSpec _) >>= fun r =>
-            (pure (r, (cache.cacheQuery mc r, kp, log), bad) :
-              OracleComp unifSpec
-                (_ × cmaGameState M Commit Chal Stmt Wit))) := by
-        simpa [cmaRealSubImpl, cmaRealUnifRoImpl, StateT.run, hmc] using hz
-      rw [support_bind] at hz'
-      obtain ⟨_, _, hz'⟩ := Set.mem_iUnion₂.mp hz'
-      rw [support_pure] at hz'
-      cases Set.eq_of_mem_singleton hz'
-      rfl
-    · have hz' : z = (r, (cache, kp, log), bad) := by
-        simpa [cmaRealSubImpl, cmaRealUnifRoImpl, StateT.run, hmc] using hz
-      rw [hz']
-  · -- sign query: every branch of `cmaRealSignImpl` ends with
-    -- `pure (…, …, bad)`, so the output's bad field is always `bad`.
-    -- Shared inner lemma: for any (pk, sk) and any commitment output (c, prvSt),
-    -- the cache-match-then-respond subcomputation preserves `bad`.
-    rcases hkp : kp with _ | ⟨pk', sk'⟩
-    · -- fresh keypair: hr.gen ≫= σ.commit ≫= (cache-match ch) ≫= σ.respond
-      simp only [add_apply_inl, add_apply_inr, StateT.run, cmaRealSubImpl, hkp,
-        QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, cmaRealSignImpl,
-        Prod.mk.eta, monadLift_self, bind_pure_comp, pure_bind,
-        support_bind] at hz
-      obtain ⟨pksk, _, hz⟩ := Set.mem_iUnion₂.mp hz
-      obtain ⟨c, _, hz⟩ := Set.mem_iUnion₂.mp hz
-      rcases hmc : cache (m, c.1) with _ | r
-      · rw [hmc] at hz
-        simp only [support_bind, Set.mem_iUnion, support_map, Set.mem_image,
-          exists_prop] at hz
-        obtain ⟨_, _, _, _, rfl⟩ := hz
-        rfl
-      · rw [hmc] at hz
-        simp only [support_map, Set.mem_image] at hz
-        obtain ⟨_, _, rfl⟩ := hz
-        rfl
-    · -- cached keypair: σ.commit ≫= (cache-match ch) ≫= σ.respond
-      simp only [add_apply_inl, add_apply_inr, StateT.run, cmaRealSubImpl, hkp,
-        QueryImpl.add_apply_inl, QueryImpl.add_apply_inr, cmaRealSignImpl,
-        monadLift_self, bind_pure_comp, pure_bind,
-        support_bind] at hz
-      obtain ⟨c, _, hz⟩ := Set.mem_iUnion₂.mp hz
-      rcases hmc : cache (m, c.1) with _ | r
-      · rw [hmc] at hz
-        simp only [support_bind, Set.mem_iUnion, support_map, Set.mem_image,
-          exists_prop] at hz
-        obtain ⟨_, _, _, _, rfl⟩ := hz
-        rfl
-      · rw [hmc] at hz
-        simp only [support_map, Set.mem_image] at hz
-        obtain ⟨_, _, rfl⟩ := hz
-        rfl
-  · -- pk query
-    rcases hkp : kp with _ | ⟨pk', sk'⟩
-    · simp only [add_apply_inr, StateT.run, cmaRealPkImpl, hkp,
-        QueryImpl.add_apply_inr, bind_pure_comp, support_map] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      rfl
-    · have hz' : z = (pk', (cache, some (pk', sk'), log), bad) := by
-        simpa [cmaRealPkImpl, StateT.run, hkp] using hz
-      rw [hz']
+  obtain ⟨s, b⟩ := p
+  rw [cmaReal_impl_apply_run] at hz
+  simp only [support_map, Set.mem_image] at hz
+  obtain ⟨_, _, rfl⟩ := hz
+  rfl
 
 /-- `cmaReal`'s bad flag is monotonic: once set, it stays set. Immediate
 corollary of `cmaReal_impl_bad_preserved`. This is the `h_mono₀`
@@ -230,7 +179,11 @@ theorem cmaReal_impl_bad_monotone
 /-- Once `cmaSim`'s bad flag is `true`, every continuation of `cmaSim.impl`
 preserves it. This is not directly used by the H3 hop (which instantiates
 `G₀ = cmaReal`), but is reusable infrastructure for other SSP hops that
-expose `cmaSim` as the "low-adversary-advantage" side. -/
+expose `cmaSim` as the "low-adversary-advantage" side.
+
+All non-sign branches of `cmaSim.impl` are `*.withBadFlag`-lifts (bad
+preserved); the sign branch is a `*.withBadUpdate progCollision` lift
+(bad OR'd with a predicate), monotone by `Bool.or`. -/
 theorem cmaSim_impl_bad_monotone
     (hr : GenerableRelation Stmt Wit rel)
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
@@ -238,44 +191,35 @@ theorem cmaSim_impl_bad_monotone
     (p : cmaGameState M Commit Chal Stmt Wit) (hp : p.2 = true)
     (z) (hz : z ∈ support (((cmaSim M Commit Chal hr simT).impl t).run p)) :
     z.2.2 = true := by
-  obtain ⟨⟨cache, kp, log⟩, bad⟩ := p
-  cases (show bad = true from hp)
-  rcases t with ((_ | mc) | m) | ⟨⟩
-  · -- unif query: output form (r, state, true), state unchanged
-    simp only [StateT.run, support_bind, Set.mem_iUnion, support_pure,
-      Set.mem_singleton_iff, exists_prop] at hz
-    obtain ⟨_, _, rfl⟩ := hz
-    rfl
-  · -- hash query: cache hit/miss both preserve bad
-    rcases hmc : cache mc with _ | r
-    · -- miss
-      simp only [StateT.run, hmc, support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      rfl
-    · -- hit
-      simp only [StateT.run, hmc, support_pure, Set.mem_singleton_iff] at hz
-      rw [hz]
-  · -- sign query: bad' ∈ {bad, true}, so bad = true ⇒ bad' = true
-    rcases hkp : kp with _ | ⟨pk', sk'⟩
-    · -- fresh keypair
-      simp only [StateT.run, hkp, support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, _, _, _, _, _, rfl⟩ := hz
-      split <;> rfl
-    · -- cached keypair
-      simp only [StateT.run, hkp, support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, rfl, _, _, rfl⟩ := hz
-      split <;> rfl
-  · -- pk query: both branches preserve bad
-    rcases hkp : kp with _ | ⟨pk', sk'⟩
-    · simp only [StateT.run, hkp, support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      rfl
-    · simp only [StateT.run, hkp, support_pure, Set.mem_singleton_iff] at hz
-      rw [hz]
+  obtain ⟨s, b⟩ := p
+  rcases t with ((u | h) | m) | ⟨⟩
+  · rw [cmaSim_impl_unifRo_apply_run] at hz
+    have hz' := support_map (m := OracleComp unifSpec)
+        (fun (vs : (unifSpec + roSpec M Commit Chal).Range (Sum.inl u) ×
+            cmaInnerState M Commit Chal Stmt Wit) => (vs.1, vs.2, b))
+        ((unifRoInnerImpl M Commit Chal Stmt Wit (Sum.inl u)).run s) ▸ hz
+    obtain ⟨_, _, rfl⟩ := hz'; exact hp
+  · rw [cmaSim_impl_unifRo_apply_run] at hz
+    have hz' := support_map (m := OracleComp unifSpec)
+        (fun (vs : (unifSpec + roSpec M Commit Chal).Range (Sum.inr h) ×
+            cmaInnerState M Commit Chal Stmt Wit) => (vs.1, vs.2, b))
+        ((unifRoInnerImpl M Commit Chal Stmt Wit (Sum.inr h)).run s) ▸ hz
+    obtain ⟨_, _, rfl⟩ := hz'; exact hp
+  · rw [cmaSim_impl_sign_apply_run] at hz
+    have hz' := support_map (m := OracleComp unifSpec)
+        (fun (vs : (signSpec M Commit Resp).Range m ×
+            cmaInnerState M Commit Chal Stmt Wit) =>
+          (vs.1, vs.2, b || progCollision m s vs.1))
+        ((signSimInnerImpl M Commit Chal hr simT m).run s) ▸ hz
+    obtain ⟨_, _, rfl⟩ := hz'
+    change (b || _) = true
+    simp [show b = true from hp]
+  · rw [cmaSim_impl_pk_apply_run] at hz
+    have hz' := support_map (m := OracleComp unifSpec)
+        (fun (vs : (pkSpec Stmt).Range () ×
+            cmaInnerState M Commit Chal Stmt Wit) => (vs.1, vs.2, b))
+        ((pkInnerImpl M Commit Chal hr ()).run s) ▸ hz
+    obtain ⟨_, _, rfl⟩ := hz'; exact hp
 
 /-! ### `h_step_tv_S`: per-step TV bound on costly queries
 
@@ -560,5 +504,66 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
           (cmaSignEps ζ_zk β) A qS ((∅, none, []), false) := by
         rw [h_bad_zero, add_zero]
     _ ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := h_cost_le
+
+/-! ### H4 hop: `cmaSim` equals `nma · cmaToNma` as a package
+
+Hop H4 of the SSP plan states that running `cmaSim` against an adversary
+`A` is program-equivalent to first running the CMA-to-NMA reduction
+`cmaToNma` against `A` (absorbing the reduction's `signSpec` translation
+into the adversary) and then running the `nma` game:
+
+  `cmaSim.runProb A  =  nma.runProb (cmaToNma.shiftLeft A)`.
+
+This is a pure program-equivalence hop (zero advantage gap) whose proof
+relies on:
+
+* `Package.run_link_eq_run_shiftLeft` — the SSP-level identity
+  `(P.link Q).run A = Q.run (P.shiftLeft A)` from
+  `VCVio/SSP/Composition.lean`, which collapses the composition at
+  `P = cmaToNma`, `Q = nma`.
+* A structural `Package`-level identity
+  `cmaSim = cmaToNma.link nma` up to state reshuffling. The state shapes
+  differ (`cmaSim`'s state is `cmaInnerState × Bool`; the link's state
+  is `List M × (cache × Bool × Option (Stmt × Wit))`) but the output
+  distributions coincide; the equality is at the level of `evalDist`
+  via `Package.simulateQ_StateT_evalDist_congr`
+  (`VCVio/SSP/Advantage.lean`).
+
+The proof is Phase F of the plan (estimated ~80 LoC: mostly mechanical
+`simulateQ`-congruence normalization). -/
+
+/-- **H4 hop** (program equivalence, Phase F).
+
+Running `cmaSim` against an adversary `A` is distributionally identical
+to running the CMA-to-NMA reduction against `A` and then running the NMA
+game. This is the "zero-advantage" hop that rewrites `cmaSim` as a
+composition `cmaToNma.link nma`, which is then consumed by the SSP
+link-shift identity `run_link_eq_run_shiftLeft`.
+
+Statement is at the `evalDist`-level (rather than strict `ProbComp`
+equality) because `cmaSim`'s state (`cmaInnerState × Bool`) and the
+link state (`List M × nma-state`) are isomorphic in output but not
+syntactically equal; the distributional equivalence is all we need
+downstream (for `Package.advantage_eq_of_evalDist_runProb_eq`). -/
+theorem cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    {α : Type}
+    (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α) :
+    evalDist ((cmaSim M Commit Chal hr simT).runProb A) =
+      evalDist ((nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
+        ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A)) := by
+  -- Proof sketch: rewrite both sides as `simulateQ … .run' init` on
+  -- their respective `Package.impl`s, then apply a
+  -- `simulateQ_StateT_evalDist_congr`-style argument matching the
+  -- `cmaSim` handlers branch-by-branch against the composite
+  -- `cmaToNma.impl ∘ nma.impl` handlers. Non-sign branches coincide
+  -- after stripping the `List M` from the cmaToNma side (it is only
+  -- touched on the sign branch); the sign branch matches because both
+  -- sides sample `simT pk`, install the challenge into the RO cache
+  -- (explicitly via `progSpec` on the NMA side, implicitly via
+  -- `signSimInnerImpl` on the `cmaSim` side), and return `(c, π)`.
+  sorry
 
 end FiatShamir.SSP

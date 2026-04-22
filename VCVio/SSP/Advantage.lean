@@ -151,6 +151,20 @@ lemma simulateQ_StateT_evalDist_congr {α : Type}
     refine bind_congr fun p => ?_
     exact ih p.1 p.2
 
+/-! ### Functoriality of `runProb`
+
+`Package.runProb` commutes with monadic map on the adversary: rerouting the output of an
+adversary `A : OracleComp E α` through a post-processing function `f : α → β` before running the
+package yields the same distribution as running the package and then applying `f`. -/
+
+lemma runProb_map {α β : Type} (P : Package unifSpec E σ) (f : α → β) (A : OracleComp E α) :
+    P.runProb (f <$> A) = f <$> P.runProb A := by
+  change P.run (f <$> A) = f <$> P.run A
+  unfold Package.run
+  rw [simulateQ_map, map_bind]
+  refine bind_congr fun s₀ => ?_
+  rw [StateT.run'_eq, StateT.run'_eq, StateT.run_map, Functor.map_map, Functor.map_map]
+
 end Package
 
 end VCVio.SSP

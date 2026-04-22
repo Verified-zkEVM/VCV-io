@@ -149,7 +149,9 @@ private lemma cmaRealPkImpl_empty_run
     (cache : (roSpec M Commit Chal).QueryCache) (log : List M) (bad : Bool) :
     (cmaRealPkImpl M Commit Chal hr ()).run ((cache, none, log), bad) =
       (fun p : Stmt × Wit => (p.1, (cache, some (p.1, p.2), log), bad)) <$> hr.gen := by
-  simp [cmaRealPkImpl, StateT.run, map_eq_bind_pure_comp]
+  change ((pkInnerImpl M Commit Chal hr).withBadFlag ()).run ((cache, none, log), bad) = _
+  rw [QueryImpl.withBadFlag_apply_run]
+  simp [pkInnerImpl, StateT.run, map_eq_bind_pure_comp]
 
 omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] in
 /-- Running `cmaRealPkImpl` with a pre-existing keypair just returns the public
@@ -159,7 +161,10 @@ private lemma cmaRealPkImpl_some_run
     (log : List M) (bad : Bool) :
     (cmaRealPkImpl M Commit Chal hr ()).run ((cache, some (pk, sk), log), bad) =
       pure (pk, (cache, some (pk, sk), log), bad) := by
-  simp [cmaRealPkImpl, StateT.run]
+  change ((pkInnerImpl M Commit Chal hr).withBadFlag ()).run
+      ((cache, some (pk, sk), log), bad) = _
+  rw [QueryImpl.withBadFlag_apply_run]
+  simp [pkInnerImpl, StateT.run]
 
 omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal] in
 /-- Threading a continuation through `cmaRealPkImpl` from the empty keypair state
@@ -170,8 +175,10 @@ private lemma cmaRealPkImpl_bind_run_empty {α : Type}
     (cache : (roSpec M Commit Chal).QueryCache) (log : List M) (bad : Bool) :
     (cmaRealPkImpl M Commit Chal hr () >>= f) ((cache, none, log), bad) =
       hr.gen >>= fun ps : Stmt × Wit => f ps.1 ((cache, some ps, log), bad) := by
-  change (StateT.bind _ _) _ = _
-  simp [cmaRealPkImpl, StateT.bind]
+  change (cmaRealPkImpl M Commit Chal hr ()).run ((cache, none, log), bad) >>=
+    (fun vs => (f vs.1).run vs.2) = _
+  rw [cmaRealPkImpl_empty_run (hr := hr), map_eq_bind_pure_comp, bind_assoc]
+  congr 1
 
 /-- The "post-keygen" portion of `signedAdv`: the adversary's main routine
 followed by FS verification, with `pk` already fixed. All queries are through

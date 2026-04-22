@@ -328,7 +328,17 @@ private lemma probOutput_simulateQ_unifChalImpl {α : Type}
 end evalDistBridge
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private def simulatedNmaAdv
+/-- CMA-to-NMA reduction at the managed-RO interface.
+
+Builds a `managedRoNmaAdv` from a CMA adversary `adv` and an HVZK
+simulator `simTranscript`: runs `adv.main pk` under a handler that
+forwards live RO queries (with cache side-effects), handles signing
+queries by sampling from `simTranscript` and programming the cache,
+and returns the final cache together with the forgery.
+
+This is the concrete-interface reduction entering the forking lemma
+(`Fork.replayForkingBound`) in `euf_nma_bound`. -/
+def simulatedNmaAdv
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
@@ -361,7 +371,11 @@ private def simulatedNmaAdv
   ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩
 
 omit [SampleableType Stmt] [SampleableType Wit] in
-private theorem simulatedNmaAdv_hashQueryBound
+/-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
+`qS` signing-oracle queries and `qH` random-oracle queries, the NMA reduction
+makes at most `qH` live hash queries. The `qS` signing queries are absorbed
+into the managed cache rather than issued live. -/
+theorem simulatedNmaAdv_hashQueryBound
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))

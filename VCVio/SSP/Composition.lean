@@ -228,6 +228,16 @@ lemma shiftLeft_pure (P : Package M E σ₁) {α : Type v} (x : α) :
     P.shiftLeft (pure x) = P.init >>= fun _ => pure x := by
   simp [shiftLeft, simulateQ_pure, StateT.run_pure, bind_pure_comp]
 
+/-- `shiftLeft` commutes with functorial mapping: pushing a pure postprocessing step through
+`shiftLeft` is equivalent to postprocessing the shifted adversary. This is the key lemma used
+in SSP reductions to align differently-projected forms of the same adversary. -/
+lemma shiftLeft_map (P : Package M E σ₁) {α β : Type v} (f : α → β) (A : OracleComp E α) :
+    P.shiftLeft (f <$> A) = f <$> P.shiftLeft A := by
+  unfold Package.shiftLeft
+  rw [map_bind, simulateQ_map]
+  refine bind_congr fun s₁ => ?_
+  rw [StateT.run_map, Functor.map_map, Functor.map_map]
+
 /-- **SSP reduction (program form).** Running the linked game `(P.link Q)` against adversary
 `A` produces the same `OracleComp` distribution as running the inner game `Q` against the
 *shifted* adversary `P.shiftLeft A`.
