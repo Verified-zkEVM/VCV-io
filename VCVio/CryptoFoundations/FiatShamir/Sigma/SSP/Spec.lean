@@ -20,18 +20,26 @@ specs in `VCVio` (`unifSpec`, `coinSpec`, `lrSpec`, `dhSpec`, …).
 
 * `roSpec M Commit Chal` — random-oracle interface: `(M × Commit) →ₒ Chal`.
 * `signSpec M Commit Resp` — signing-oracle interface: `M →ₒ (Commit × Resp)`.
-* `pkSpec Stmt` — key-distribution interface: `Unit →ₒ Stmt`.
+* `pkSpec Stmt` — public-key interface: `Unit →ₒ Stmt`.
 * `progSpec M Commit Chal` — programming interface, used internally by the
   programmable-RO package between the Σ-simulator and the cache:
   `(M × Commit × Chal) →ₒ Unit`.
 * `cmaSpec M Commit Chal Resp Stmt` — CMA adversary's view, the parallel sum
-  `roSpec + signSpec + pkSpec`.
+  `unifSpec + roSpec + signSpec + pkSpec`. Includes `unifSpec` so that the
+  external `unforgeableAdv`'s `OracleComp (unifSpec + roSpec + signSpec)` lifts
+  cleanly into `OracleComp cmaSpec` via `SubSpec`.
 * `nmaSpec M Commit Chal Stmt` — NMA adversary's view, the parallel sum
-  `roSpec + pkSpec` (no signing oracle).
+  `unifSpec + roSpec + progSpec + pkSpec`. Includes `unifSpec` so that the
+  CMA-to-NMA reduction can sample the HVZK simulator transcript, and `progSpec`
+  so the reduction can program the random oracle. The external NMA adversary
+  (used in the H5 forking-lemma bridge) uses only the `unifSpec + roSpec + pkSpec`
+  sub-portion; `progSpec` is an internal channel between the reduction and the
+  programmable-RO game.
 
-The CMA-to-NMA reduction is then a `Package nmaSpec cmaSpec PUnit` (no state)
-that forwards `roSpec` and `pkSpec` queries unchanged and re-implements
-`signSpec` queries by inlining the HVZK simulator.
+The CMA-to-NMA reduction is then a `Package nmaSpec cmaSpec _` (with a small
+shadow-cache state) that forwards `unifSpec`, `roSpec`, and `pkSpec` queries
+unchanged and re-implements `signSpec` queries by inlining the HVZK simulator,
+using `progSpec` to install the simulator's challenge into the random oracle.
 -/
 
 universe u
@@ -80,26 +88,32 @@ the adversary. -/
 
 /-! ### Combined adversary-facing specs -/
 
-/-- The CMA adversary's complete oracle view: random-oracle queries on
-`(M × Commit) →ₒ Chal`, signing-oracle queries on `M →ₒ (Commit × Resp)`, and
-the public-key oracle on `Unit →ₒ Stmt`.
+/-- The CMA adversary's complete oracle view: uniform sampling, random-oracle
+queries on `(M × Commit) →ₒ Chal`, signing-oracle queries on `M →ₒ (Commit × Resp)`,
+and the public-key oracle on `Unit →ₒ Stmt`.
 
-The order `roSpec + signSpec + pkSpec` is fixed for the rest of the SSP
-hops; the CMA-to-NMA reduction's stateless package
-(`Sigma/SSP/Games.lean::cmaToNma`) is typed to convert from `nmaSpec` (which
-omits `signSpec`) to this spec by re-implementing the middle component. -/
+The order `unifSpec + roSpec + signSpec + pkSpec` is fixed for the rest of the
+SSP hops. The bridge layer in `Sigma/SSP/Bridge.lean` lifts the existing
+`unforgeableAdv` (which queries `unifSpec + roSpec + signSpec`) into this spec
+by initializing the public-key channel from the lazily-sampled keypair. -/
 @[reducible] def cmaSpec (M Commit Chal Resp Stmt : Type) :
-    OracleSpec ((M × Commit ⊕ M) ⊕ Unit) :=
-  roSpec M Commit Chal + signSpec M Commit Resp + pkSpec Stmt
+    OracleSpec (((ℕ ⊕ M × Commit) ⊕ M) ⊕ Unit) :=
+  unifSpec + roSpec M Commit Chal + signSpec M Commit Resp + pkSpec Stmt
 
-/-- The NMA adversary's complete oracle view: random-oracle queries on
-`(M × Commit) →ₒ Chal` and the public-key oracle on `Unit →ₒ Stmt`. There is
-no signing oracle.
+/-- The NMA-game oracle interface used internally by the SSP-level CMA-to-NMA
+reduction. Includes `unifSpec` (so the reduction can sample the HVZK simulator
+transcript), the random-oracle channel `roSpec`, the programming channel
+`progSpec` (so the reduction can install the simulator's challenge into the
+RO), and the public-key channel `pkSpec`.
 
-Used as the export interface of the `nma` game package and as the import
-interface of the CMA-to-NMA reduction. -/
+The external NMA adversary used by the forking-lemma bridge sees only the
+`unifSpec + roSpec + pkSpec` sub-portion of this spec; `progSpec` is private
+to the simulator-side of the reduction and never exposed to a real NMA
+adversary. The split is enforced at the `Sigma/SSP/Hops.lean::H5` boundary
+where the external NMA adversary is wrapped into an `OracleComp nmaSpec` that
+simply never queries the `progSpec` summand. -/
 @[reducible] def nmaSpec (M Commit Chal Stmt : Type) :
-    OracleSpec ((M × Commit) ⊕ Unit) :=
-  roSpec M Commit Chal + pkSpec Stmt
+    OracleSpec (((ℕ ⊕ M × Commit) ⊕ M × Commit × Chal) ⊕ Unit) :=
+  unifSpec + roSpec M Commit Chal + progSpec M Commit Chal + pkSpec Stmt
 
 end FiatShamir.SSP
