@@ -1501,6 +1501,24 @@ lemma expectedSCost_query_bind
     expectedSCost impl S ε (query t >>= cont) qS p =
       expectedSCostStep impl S ε t (fun u => expectedSCost impl S ε (cont u)) qS p := rfl
 
+lemma expectedSCost_bind_eq_of_right_zero
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    {β : Type} (oa : OracleComp spec α) (ob : α → OracleComp spec β)
+    (hzero : ∀ x qS p, expectedSCost impl S ε (ob x) qS p = 0)
+    (qS : ℕ) (p : σ × Bool) :
+    expectedSCost impl S ε (oa >>= ob) qS p =
+      expectedSCost impl S ε oa qS p := by
+  induction oa using OracleComp.inductionOn generalizing qS p with
+  | pure x =>
+      simp [hzero x qS p]
+  | query_bind t cont ih =>
+      simp only [bind_assoc]
+      rw [expectedSCost_query_bind, expectedSCost_query_bind]
+      congr
+      funext u qS' p'
+      exact ih u qS' p'
+
 @[simp]
 lemma expectedSCostStep_bad_eq_zero
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))

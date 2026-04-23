@@ -1357,10 +1357,195 @@ theorem cmaSignEps_expectedSCost_le
           _ = (qS : ℝ≥0∞) * ζ_zk +
                 (qS : ℝ≥0∞) * (cacheCount s.2.1 + qS + qH) * β := one_mul _
 
+/-- Initial-state `cmaSignEpsCore` version of
+`cmaSignEps_expectedSCost_le`.
+
+The bridge charges the valid-state core cost, while the inductive cache-growth
+bound is more convenient for the total cost `cmaSignEps`. This lemma packages
+the invariant rewrite and the empty-cache specialization. -/
+theorem cmaSignEpsCore_expectedSCost_le
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (ζ_zk β : ℝ≥0∞) {α : Type}
+    (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
+    (qS qH : ℕ)
+    (h_qb : OracleComp.IsQueryBound A qS
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (h_qH : OracleComp.IsQueryBound A qH
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
+    expectedSCost
+        (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+          (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
+        (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+          (Resp := Resp) (Stmt := Stmt))
+        (cmaSignEpsCore ζ_zk β) A qS
+        (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false)
+      ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
+  set φ := cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit) with hφ
+  set s_init := cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit) with hs_init
+  have h_valid_init : CmaInnerData.Valid (rel := rel) s_init := by
+    rw [hs_init]
+    exact cmaInitData_valid M Commit Chal
+  have h_pres_valid :
+      ∀ (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+        (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool),
+        p.2 = false → CmaInnerData.Valid (rel := rel) p.1 →
+          ∀ z ∈ support
+              ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
+            CmaInnerData.Valid (rel := rel) z.2.1 := by
+    intro t p hpbad hpvalid z hz
+    rcases p with ⟨s, b⟩
+    cases b with
+    | false =>
+        exact cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
+    | true =>
+        cases hpbad
+  have h_cacheCount_init : cacheCount s_init.2.1 = 0 := by
+    rw [hs_init]
+    exact cacheCount_cmaInitData M Commit Chal
+  have h_cost_eq :
+      expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEpsCore ζ_zk β) A qS (s_init, false)
+        =
+        expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEps (rel := rel) ζ_zk β) A qS (s_init, false) :=
+    expectedSCost_eq_of_inv
+      (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt))
+      (CmaInnerData.Valid (rel := rel))
+      (ε := cmaSignEpsCore ζ_zk β) (ε' := cmaSignEps (rel := rel) ζ_zk β)
+      (fun s hs => by simp [cmaSignEps, cmaSignEpsCore, hs])
+      h_pres_valid A qS (s_init, false) (by intro _; exact h_valid_init)
+  have h_gen :=
+    cmaSignEps_expectedSCost_le M Commit Chal σ hr ζ_zk β A qS qH h_qb h_qH
+      s_init h_valid_init
+  rw [h_cacheCount_init, zero_add] at h_gen
+  simpa [hφ, hs_init] using (h_cost_eq ▸ h_gen)
+
 /-! ### Top-level H3 hop
 
 State-dep identical-until-bad bridge instantiated at
 `G₀ = cmaReal`, `G₁ = cmaSim`, `φ = cmaHeapStateEquiv`. -/
+
+/-- **H3 bridge with caller-supplied expected-cost bound.**
+
+This factors the HeapSSP identical-until-bad argument from the cache-growth
+bookkeeping used to bound `expectedSCost`. The generic
+`cmaReal_cmaSim_advantage_le_H3_bound` below supplies that bookkeeping from
+global sign/hash query bounds. Specialized chains can instead prove a sharper
+expected-cost bound for a factored adversary shape, for example when a final
+verification hash occurs after all signing behavior and therefore contributes
+zero sign-replacement cost. -/
+theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk β : ℝ≥0∞) (hζ_zk : ζ_zk < ∞)
+    (hHVZK : σ.HVZK simT ζ_zk.toReal)
+    (hCommit : σ.simCommitPredictability simT β)
+    (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
+    (qS : ℕ) (εBound : ℝ≥0∞)
+    (h_qb : OracleComp.IsQueryBound A qS
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (h_cost_le :
+      expectedSCost
+        (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+          (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
+        (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+          (Resp := Resp) (Stmt := Stmt))
+        (cmaSignEpsCore ζ_zk β) A qS
+        (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false)
+        ≤ εBound) :
+    ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
+        (cmaSim M Commit Chal hr simT) A)
+      ≤ εBound := by
+  set φ := cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit) with hφ
+  set s_init := cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit) with hs_init
+  have h_init₀ : (cmaReal M Commit Chal σ hr).init
+      = pure (φ.symm (s_init, false)) := by
+    rw [cmaHeapStateEquiv_symm_init]; rfl
+  have h_init₁ : (cmaSim M Commit Chal hr simT).init
+      = pure (φ.symm (s_init, false)) := by
+    rw [cmaHeapStateEquiv_symm_init, cmaSim_init_eq]
+  have h_valid_init : CmaInnerData.Valid (rel := rel) s_init := by
+    rw [hs_init]
+    exact cmaInitData_valid M Commit Chal
+  have h_pres_valid :
+      ∀ (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+        (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool),
+        p.2 = false → CmaInnerData.Valid (rel := rel) p.1 →
+          ∀ z ∈ support
+              ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
+            CmaInnerData.Valid (rel := rel) z.2.1 := by
+    intro t p hpbad hpvalid z hz
+    rcases p with ⟨s, b⟩
+    cases b with
+    | false =>
+        exact cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
+    | true =>
+        cases hpbad
+  have h_bridge := Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
+    (cmaReal M Commit Chal σ hr) (cmaSim M Commit Chal hr simT)
+    φ s_init h_init₀ h_init₁
+    (CmaInnerData.Valid (rel := rel)) h_valid_init h_pres_valid
+    (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
+    (cmaSignEpsCore ζ_zk β)
+    (fun t ht s hs => cmaReal_cmaSim_tv_costly_le_cmaSignEpsCore_of_valid
+      M Commit Chal σ hr simT ζ_zk β hζ_zk hHVZK hCommit t ht s hs)
+    (fun t ht h => cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery M Commit Chal σ hr simT t ht h)
+    (by
+      intro t h hbad z hz
+      have hbad' : h (Sum.inr .bad) = true := by
+        have : (φ h).2 = h (Sum.inr .bad) := rfl
+        simpa [this] using hbad
+      have h_out : z.2 (Sum.inr .bad) = true :=
+        cmaReal_impl_bad_monotone M Commit Chal σ hr t h hbad' z hz
+      change (φ z.2).2 = true
+      have : (φ z.2).2 = z.2 (Sum.inr .bad) := rfl
+      rw [this]; exact h_out)
+    A h_qb
+  have h_bad_zero :
+      Pr[fun z : Bool × Heap (CmaCells M Commit Chal Stmt Wit) =>
+          (φ z.2).2 = true |
+          (simulateQ (cmaReal M Commit Chal σ hr).impl A).run
+            (φ.symm (s_init, false))] = 0 := by
+    rw [cmaHeapStateEquiv_symm_init]
+    have h := cmaReal_simulateQ_probEvent_bad_eq_zero M Commit Chal σ hr A
+    have heq :
+        (fun z : Bool × Heap (CmaCells M Commit Chal Stmt Wit) =>
+            (φ z.2).2 = true)
+          = fun z => z.2 (Sum.inr .bad) = true := by
+      funext z; rfl
+    rw [heq]; exact h
+  have h_cost_le' :
+      expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEpsCore ζ_zk β) A qS (s_init, false) ≤ εBound := by
+    simpa [hφ, hs_init] using h_cost_le
+  calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
+          (cmaSim M Commit Chal hr simT) A)
+      ≤ _ := h_bridge
+    _ = expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt))
+          (cmaSignEpsCore ζ_zk β) A qS (s_init, false) := by
+        rw [h_bad_zero, add_zero]
+    _ ≤ εBound := h_cost_le'
 
 /-- **H3 hop** via the HeapSSP state-dep identical-until-bad bridge.
 `cmaReal` / `cmaSim` are ε(s)-close on sign queries and pointwise
