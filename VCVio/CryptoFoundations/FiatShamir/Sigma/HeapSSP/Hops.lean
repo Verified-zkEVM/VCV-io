@@ -135,6 +135,23 @@ instance : DecidablePred (IsCostlyQuery (M := M) (Commit := Commit)
   | Sum.inl (Sum.inr _) => isTrue trivial
   | Sum.inr _ => isFalse fun h => h
 
+/-- The "hash" query predicate: a query into `cmaSpec` is a random-oracle
+query iff it targets the `roSpec` summand, i.e. `Sum.inl (Sum.inl (Sum.inr _))`.
+Used alongside `IsCostlyQuery` to bound cache growth during the H3 hop:
+`cacheCount` at any reachable state is bounded by the number of prior
+sign queries plus the number of prior hash queries. -/
+def IsHashQuery : (cmaSpec M Commit Chal Resp Stmt).Domain → Prop
+  | Sum.inl (Sum.inl (Sum.inr _)) => True
+  | _ => False
+
+instance : DecidablePred (IsHashQuery (M := M) (Commit := Commit)
+    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) := fun t =>
+  match t with
+  | Sum.inl (Sum.inl (Sum.inl _)) => isFalse fun h => h
+  | Sum.inl (Sum.inl (Sum.inr _)) => isTrue trivial
+  | Sum.inl (Sum.inr _) => isFalse fun h => h
+  | Sum.inr _ => isFalse fun h => h
+
 /-! ### `h_step_eq_nS`: non-sign queries coincide
 
 On every non-sign query, `cmaReal.impl` and `cmaSim.impl` reduce to the
@@ -500,7 +517,19 @@ invariant and sum bound `Σ (qH + i) ≤ qS (qS + qH)` are kept as
 /-- Upper bound on the expected cumulative ε cost for the H3 hop,
 integrating `cmaSignEps ζ_zk β` over the reachable states of
 `simulateQ cmaReal.impl A`, after conjugation through
-`cmaHeapStateEquiv`. -/
+`cmaHeapStateEquiv`.
+
+Parameters:
+* `h_qb` — sign-query budget: `A` issues at most `qS` signing queries.
+* `h_qH` — hash-query budget: `A` issues at most `qH` random-oracle
+  queries.
+
+The quantitative bound `qS * ζ_zk + qS * (qS + qH) * β` decomposes as
+`qS` independent payments of `ζ_zk` (HVZK per sign query), plus a
+cache-growth term bounding cumulative `cacheCount` by `qS * (qS + qH)`:
+each sign query's cache-collision ε-cost is `cacheCount · β`, and
+`cacheCount` is bounded by `qS + qH` at every reachable state, giving
+an `qS · (qS + qH) · β` bound when summed over `qS` sign queries. -/
 theorem cmaSignEps_expectedSCost_le
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel)
@@ -512,7 +541,11 @@ theorem cmaSignEps_expectedSCost_le
         (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
-    (_h_qH : True) -- placeholder for an eventual hash-query budget
+    (h_qH : OracleComp.IsQueryBound A qH
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit)) :
     expectedSCost
       (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
@@ -546,6 +579,11 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (h_qH : OracleComp.IsQueryBound A qH
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
     ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
         (cmaSim M Commit Chal hr simT) A)
@@ -604,7 +642,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEps ζ_zk β) A qS (s_init, false)
         ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β :=
-    cmaSignEps_expectedSCost_le M Commit Chal σ hr ζ_zk β A qS qH h_qb trivial _
+    cmaSignEps_expectedSCost_le M Commit Chal σ hr ζ_zk β A qS qH h_qb h_qH _
   -- Chain the inequalities.
   calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
           (cmaSim M Commit Chal hr simT) A)

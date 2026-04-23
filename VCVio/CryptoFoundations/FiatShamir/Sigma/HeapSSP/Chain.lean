@@ -191,16 +191,25 @@ theorem cma_advantage_le_fork_bound
     (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH)
     -- `hQB`: translated query bound on the Bool-valued adversary
-    -- `Prod.snd <$> signedAdv`. This is the H3 hypothesis, obtainable from
-    -- `hQ` by tracking `signedAdv`'s pre/post-keygen layout
-    -- (1 pkSpec + lifted `adv.main pk` + liftM verify). Left as an
-    -- assumption at this layer so that the chain's arithmetic is
+    -- `Prod.snd <$> signedAdv`. This is the H3 sign-query hypothesis,
+    -- obtainable from `hQ` by tracking `signedAdv`'s pre/post-keygen
+    -- layout (1 pkSpec + lifted `adv.main pk` + liftM verify). Left as
+    -- an assumption at this layer so that the chain's arithmetic is
     -- independent of the bound-translation bookkeeping.
     (hQB : OracleComp.IsQueryBound
       ((Prod.snd : (M × (Commit × Resp)) × Bool → Bool) <$> signedAdv σ hr M adv) qS
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    -- `hQBH`: translated hash-query bound on the same Bool-valued
+    -- adversary. Obtained from `hQ` by the same layout-tracking
+    -- argument; left as an assumption at this layer.
+    (hQBH : OracleComp.IsQueryBound
+      ((Prod.snd : (M × (Commit × Resp)) × Bool → Bool) <$> signedAdv σ hr M adv) qH
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
+      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
     ∃ nmaAdv : SignatureAlg.managedRoNmaAdv
         (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
@@ -225,7 +234,7 @@ theorem cma_advantage_le_fork_bound
             ((cmaSim M Commit Chal hr simT).runProb A))
         ≤ (qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β :=
     cmaReal_cmaSim_advantage_le_H3_bound M Commit Chal σ hr simT
-      (ENNReal.ofReal ζ_zk) β hζ_zk_lt hHVZK' hCommit A qS qH hQB
+      (ENNReal.ofReal ζ_zk) β hζ_zk_lt hHVZK' hCommit A qS qH hQB hQBH
   have hH3_prob : Pr[= true | (cmaReal M Commit Chal σ hr).runProb A] ≤
       Pr[= true | (cmaSim M Commit Chal hr simT).runProb A] +
         ((qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β) :=
