@@ -1589,6 +1589,66 @@ theorem expectedSCost_mono
       exact expectedSCostStep_mono impl S hε t
         (fun u qS' p' => ih u qS' p') qS p
 
+/-! #### Invariant support congruence for `expectedSCost` -/
+
+/-- If two per-state cost functions agree on an invariant and the real handler preserves
+that invariant from no-bad states, then `expectedSCost` is insensitive to their values on
+unreachable states.
+
+The input hypothesis is phrased as `p.2 = false → Inv p.1` so that bad states remain
+vacuous: `expectedSCost` is definitionally zero once the bad flag is set. -/
+theorem expectedSCost_eq_of_inv
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
+    (Inv : σ → Prop)
+    (hε : ∀ s, Inv s → ε s = ε' s)
+    (h_pres : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false → Inv p.1 →
+      ∀ z ∈ support ((impl t).run p), Inv z.2.1)
+    (oa : OracleComp spec α) (qS : ℕ) (p : σ × Bool)
+    (hp : p.2 = false → Inv p.1) :
+    expectedSCost impl S ε oa qS p = expectedSCost impl S ε' oa qS p := by
+  induction oa using OracleComp.inductionOn generalizing qS p with
+  | pure x => simp
+  | query_bind t cont ih =>
+      rcases p with ⟨s, b⟩
+      cases b with
+      | true => simp [expectedSCost_bad_eq_zero]
+      | false =>
+          have hInv : Inv s := hp rfl
+          by_cases hSt : S t
+          · by_cases hqS : 0 < qS
+            · rw [expectedSCost_query_bind, expectedSCost_query_bind,
+                expectedSCostStep_costly_pos impl S ε t
+                  (fun u => expectedSCost impl S ε (cont u)) qS s hSt hqS,
+                expectedSCostStep_costly_pos impl S ε' t
+                  (fun u => expectedSCost impl S ε' (cont u)) qS s hSt hqS,
+                hε s hInv]
+              congr 1
+              refine tsum_congr fun z => ?_
+              by_cases hz : z ∈ support ((impl t).run (s, false))
+              · rw [ih z.1 (qS := qS - 1) (p := z.2)]
+                intro _
+                exact h_pres t (s, false) rfl hInv z hz
+              · have hprob :
+                    Pr[= z | (impl t).run (s, false)] = 0 :=
+                  probOutput_eq_zero_of_not_mem_support hz
+                rw [hprob, zero_mul, zero_mul]
+            · simp [expectedSCost_query_bind, expectedSCostStep, hSt, hqS]
+          · rw [expectedSCost_query_bind, expectedSCost_query_bind,
+              expectedSCostStep_free impl S ε t
+                (fun u => expectedSCost impl S ε (cont u)) qS s hSt,
+              expectedSCostStep_free impl S ε' t
+                (fun u => expectedSCost impl S ε' (cont u)) qS s hSt]
+            refine tsum_congr fun z => ?_
+            by_cases hz : z ∈ support ((impl t).run (s, false))
+            · rw [ih z.1 (qS := qS) (p := z.2)]
+              intro _
+              exact h_pres t (s, false) rfl hInv z hz
+            · have hprob :
+                  Pr[= z | (impl t).run (s, false)] = 0 :=
+                probOutput_eq_zero_of_not_mem_support hz
+              rw [hprob, zero_mul, zero_mul]
+
 /-! #### Helper lemma: per-summand IH bound implies the bind-sum bound -/
 
 /-- Sum bound for the inductive step: from a per-summand `ofReal (tvDist) ≤ cost z + Pr[bad]`
