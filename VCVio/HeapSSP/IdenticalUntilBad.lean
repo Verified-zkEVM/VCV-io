@@ -36,6 +36,9 @@ bad-event-probability terms are translated back to the heap side using
   SSP-shape handler on state `σ × Bool`.
 * `Package.advantage_le_expectedSCost_plus_probEvent_bad` — the
   state-dep ε form. Mirrors the SSP lemma of the same name.
+* `Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv` — the
+  invariant-gated form, where the costly-step TV hypothesis is needed
+  only on states satisfying a user-supplied invariant.
 * `Package.advantage_le_qSeps_plus_probEvent_bad` — the constant-ε
   corollary, derived from the state-dep form.
 -/
@@ -226,6 +229,56 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
           + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
               (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
           rw [h_probEvent_eq]
+
+/-! ### Invariant-gated state-dep ε bridge -/
+
+/-- **Heap-SSP invariant-gated state-dep ε-perturbed identical-until-bad.**
+
+Variant of `advantage_le_expectedSCost_plus_probEvent_bad` where the
+costly-step TV hypothesis is required only for states satisfying an
+invariant `Inv`. The generated cost function charges the intended `ε s`
+on invariant states and the conservative fallback cost `1` elsewhere.
+
+This is the first reusable layer for proofs whose package handler only
+has a meaningful cryptographic interpretation on reachable states. A
+separate preservation/cost-congruence lemma can later eliminate the
+fallback branch when the real handler preserves `Inv` from the initial
+state. -/
+theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
+    (G₀ G₁ : Package unifSpec E Ident)
+    (φ : Heap Ident ≃ σ × Bool) (s_init : σ)
+    (h_init₀ : G₀.init = pure (φ.symm (s_init, false)))
+    (h_init₁ : G₁.init = pure (φ.symm (s_init, false)))
+    (Inv : σ → Prop) [DecidablePred Inv]
+    (S : E.Domain → Prop) [DecidablePred S]
+    (ε : σ → ℝ≥0∞)
+    (h_step_tv_S : ∀ (t : E.Domain), S t → ∀ (s : σ), Inv s →
+      ENNReal.ofReal
+        (tvDist ((G₀.impl t).run (φ.symm (s, false)))
+                ((G₁.impl t).run (φ.symm (s, false)))) ≤ ε s)
+    (h_step_eq_nS : ∀ (t : E.Domain), ¬ S t → ∀ (h : Heap Ident),
+      (G₀.impl t).run h = (G₁.impl t).run h)
+    (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
+      ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
+    (A : OracleComp E Bool) {qS : ℕ}
+    (h_qb : OracleComp.IsQueryBound A qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b)) :
+    ENNReal.ofReal (G₀.advantage G₁ A)
+      ≤ expectedSCost (implConjugate G₀.impl φ) S
+          (fun s => if Inv s then ε s else 1) A qS (s_init, false)
+        + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
+            (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
+  refine advantage_le_expectedSCost_plus_probEvent_bad
+    G₀ G₁ φ s_init h_init₀ h_init₁ S (fun s => if Inv s then ε s else 1) ?_
+    h_step_eq_nS h_mono₀ A h_qb
+  intro t hSt s
+  by_cases hs : Inv s
+  · simpa [hs] using h_step_tv_S t hSt s hs
+  · simpa [hs] using
+      ENNReal.ofReal_le_ofReal (tvDist_le_one
+        ((G₀.impl t).run (φ.symm (s, false)))
+        ((G₁.impl t).run (φ.symm (s, false))))
 
 /-! ### Constant-ε corollary -/
 

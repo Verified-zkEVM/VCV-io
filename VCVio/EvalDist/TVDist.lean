@@ -246,6 +246,119 @@ lemma tvDist_bind_left_le
           refine tsum_congr fun a => ?_
           simp [probOutput_def, tvDist, HasEvalPMF.evalDist_of_hasEvalPMF_def]
 
+/-! ### TV distance for bind with a bad event -/
+
+/-- Bound the weighted TV sum from `tvDist_bind_left_le` by the probability of a bad event
+when the two continuations are distributionally equal off that event. -/
+lemma tsum_probOutput_toReal_mul_tvDist_le_probEvent
+    {m : Type u → Type v} [Monad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    (∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a))
+      ≤ Pr[bad | mx].toReal := by
+  classical
+  have h_p_sum_le_one : (∑' a : α, Pr[= a | mx]) ≤ 1 := tsum_probOutput_le_one
+  have h_p_sum_ne_top : (∑' a : α, Pr[= a | mx]) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top h_p_sum_le_one
+  have h_p_summable : Summable (fun a : α => Pr[= a | mx].toReal) :=
+    ENNReal.summable_toReal h_p_sum_ne_top
+  have h_lhs_nonneg : ∀ a : α, 0 ≤ Pr[= a | mx].toReal * tvDist (f a) (g a) :=
+    fun a => mul_nonneg ENNReal.toReal_nonneg (tvDist_nonneg _ _)
+  have h_lhs_le_p : ∀ a : α,
+      Pr[= a | mx].toReal * tvDist (f a) (g a) ≤ Pr[= a | mx].toReal :=
+    fun a => mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one _ _)
+  have h_lhs_summable :
+      Summable (fun a : α => Pr[= a | mx].toReal * tvDist (f a) (g a)) :=
+    Summable.of_nonneg_of_le h_lhs_nonneg h_lhs_le_p h_p_summable
+  have h_rhs_nonneg : ∀ a : α, 0 ≤ (if bad a then Pr[= a | mx].toReal else 0) :=
+    fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg]
+  have h_rhs_le_p : ∀ a : α,
+      (if bad a then Pr[= a | mx].toReal else 0) ≤ Pr[= a | mx].toReal :=
+    fun a => by by_cases ha : bad a <;> simp [ha, ENNReal.toReal_nonneg]
+  have h_rhs_summable :
+      Summable (fun a : α => if bad a then Pr[= a | mx].toReal else 0) :=
+    Summable.of_nonneg_of_le h_rhs_nonneg h_rhs_le_p h_p_summable
+  have h_point : ∀ a : α,
+      Pr[= a | mx].toReal * tvDist (f a) (g a)
+        ≤ if bad a then Pr[= a | mx].toReal else 0 := by
+    intro a
+    by_cases ha : bad a
+    · simpa [ha] using
+        mul_le_of_le_one_right ENNReal.toReal_nonneg (tvDist_le_one (f a) (g a))
+    · have htv : tvDist (f a) (g a) = 0 := by
+        rw [tvDist_eq_zero_iff]
+        exact h_eq a ha
+      simp [ha, htv]
+  have h_sum_le :
+      (∑' a, Pr[= a | mx].toReal * tvDist (f a) (g a))
+        ≤ ∑' a, if bad a then Pr[= a | mx].toReal else 0 :=
+    Summable.tsum_le_tsum h_point h_lhs_summable h_rhs_summable
+  have h_event_toReal :
+      (∑' a, if bad a then Pr[= a | mx].toReal else 0)
+        = Pr[bad | mx].toReal := by
+    have h_term_ne_top : ∀ a : α, (if bad a then Pr[= a | mx] else 0) ≠ ⊤ := by
+      intro a
+      by_cases ha : bad a
+      · simp [ha, ne_top_of_le_ne_top one_ne_top (probOutput_le_one (mx := mx) (x := a))]
+      · simp [ha]
+    rw [probEvent_eq_tsum_ite, ENNReal.tsum_toReal_eq h_term_ne_top]
+    refine tsum_congr fun a => ?_
+    by_cases ha : bad a <;> simp [ha]
+  exact le_trans h_sum_le (le_of_eq h_event_toReal)
+
+/-- If two continuations are equal off a bad event, binding them over the same base
+computation changes TV distance by at most the probability of that bad event. -/
+lemma tvDist_bind_left_event_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    tvDist (mx >>= f) (mx >>= g) ≤ Pr[bad | mx].toReal := by
+  exact le_trans (tvDist_bind_left_le mx f g)
+    (tsum_probOutput_toReal_mul_tvDist_le_probEvent mx f g bad h_eq)
+
+/-- `ENNReal` form of `tvDist_bind_left_event_le`, matching the quantitative
+identical-until-bad APIs. -/
+lemma ofReal_tvDist_bind_left_event_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    ENNReal.ofReal (tvDist (mx >>= f) (mx >>= g)) ≤ Pr[bad | mx] := by
+  refine le_trans (ENNReal.ofReal_le_ofReal
+    (tvDist_bind_left_event_le mx f g bad h_eq)) ?_
+  rw [ENNReal.ofReal_toReal probEvent_ne_top]
+
+/-- Bind/event TV bound with different base computations: the base TV distance plus the
+bad-event probability controls the whole bind. -/
+lemma tvDist_bind_event_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx my : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    tvDist (mx >>= f) (my >>= g) ≤ Pr[bad | mx].toReal + tvDist mx my := by
+  calc
+    tvDist (mx >>= f) (my >>= g)
+        ≤ tvDist (mx >>= f) (mx >>= g) + tvDist (mx >>= g) (my >>= g) :=
+          tvDist_triangle _ _ _
+    _ ≤ Pr[bad | mx].toReal + tvDist mx my :=
+        add_le_add (tvDist_bind_left_event_le mx f g bad h_eq)
+          (tvDist_bind_right_le g mx my)
+
+/-- `ENNReal` form of `tvDist_bind_event_le`. -/
+lemma ofReal_tvDist_bind_event_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx my : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    ENNReal.ofReal (tvDist (mx >>= f) (my >>= g))
+      ≤ Pr[bad | mx] + ENNReal.ofReal (tvDist mx my) := by
+  refine le_trans (ENNReal.ofReal_le_ofReal
+    (tvDist_bind_event_le mx my f g bad h_eq)) ?_
+  rw [ENNReal.ofReal_add ENNReal.toReal_nonneg (tvDist_nonneg mx my),
+    ENNReal.ofReal_toReal probEvent_ne_top]
+
 section bool_tvdist
 
 variable {m : Type → Type v} [Monad m] [HasEvalSPMF m]

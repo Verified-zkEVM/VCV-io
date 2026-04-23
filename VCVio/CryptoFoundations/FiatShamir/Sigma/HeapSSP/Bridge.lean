@@ -71,6 +71,55 @@ The wrapper:
     OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
   pure ((msg, sig), verified)
 
+/-- Instrument a `cmaSpec` computation with a local list of signing-query
+messages while forwarding every query to the surrounding `cmaSpec`.
+
+This is deliberately adversary-side logging: it records the signing queries
+visible in the syntax of the adversary computation, not the package's private
+heap log. Keeping this log in the output lets the H3 Boolean-output bridge
+reason about freshness without a separate final-state event theorem. -/
+@[reducible] noncomputable def cmaSignLogImpl :
+    QueryImpl (cmaSpec M Commit Chal Resp Stmt)
+      (StateT (List M) (OracleComp (cmaSpec M Commit Chal Resp Stmt)))
+  | Sum.inl (Sum.inl (Sum.inl n)) => do
+      let r ← (((cmaSpec M Commit Chal Resp Stmt).query
+        (Sum.inl (Sum.inl (Sum.inl n)))) :
+          OracleComp (cmaSpec M Commit Chal Resp Stmt) (Fin (n + 1)))
+      pure r
+  | Sum.inl (Sum.inl (Sum.inr mc)) => do
+      let r ← (((cmaSpec M Commit Chal Resp Stmt).query
+        (Sum.inl (Sum.inl (Sum.inr mc)))) :
+          OracleComp (cmaSpec M Commit Chal Resp Stmt) Chal)
+      pure r
+  | Sum.inl (Sum.inr m) => do
+      let signed ← get
+      let sig ← (((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inr m))) :
+        OracleComp (cmaSpec M Commit Chal Resp Stmt) (Commit × Resp))
+      set (signed ++ [m])
+      pure sig
+  | Sum.inr () => do
+      let pk ← (((cmaSpec M Commit Chal Resp Stmt).query (Sum.inr ())) :
+        OracleComp (cmaSpec M Commit Chal Resp Stmt) Stmt)
+      pure pk
+
+/-- Freshness-preserving Boolean adversary for the HeapSSP CMA chain.
+
+It runs `signedAdv`, locally logs all signing-query messages, and returns
+`true` exactly when the final forgery verifies and its message was not among
+the locally logged signing queries. This is the Boolean game that should flow
+through H3/H4/H5; using the no-fresh `verified` bit here would make the H5
+forking hop false for replay adversaries. -/
+@[reducible] noncomputable def signedFreshAdv
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
+    OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool := do
+  let p : ((M × (Commit × Resp)) × Bool) × List M ←
+    (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) (Stmt := Stmt)) (signedAdv σ hr M adv)).run []
+  let out := p.1
+  let signed := p.2
+  pure (!decide (out.1.1 ∈ signed) && out.2)
+
 /-! ### Joint output of `cmaReal` -/
 
 /-- Run `cmaReal` against `signedAdv` and pack the resulting forgery,
@@ -181,9 +230,9 @@ private lemma cmaRealRun_eq_keygen_bind
   simp only [bind_assoc]
   rfl
 
-/-- Hop **H2** (freshness-dropped): the probability that `cmaReal` accepts
-the adversary's forgery (without the freshness post-check) equals the
-probability that the FS freshness-dropped experiment accepts.
+/-- Hop **H2** (freshness-preserving): running the syntactically logged
+Boolean adversary through `cmaReal` matches the original Fiat-Shamir
+EUF-CMA experiment.
 
 The top-level proof reduces to matching:
 
@@ -193,51 +242,32 @@ The top-level proof reduces to matching:
    `Context.randomOracle` in `runtime`);
 3. the signing handler (runs FS signing through the same RO cache vs
    `signingOracle pk sk` in a `WriterT` log);
-4. the verify call (one further `Hash (msg, c)` through the same cache).
+4. the verify call (one further `Hash (msg, c)` through the same cache);
+5. the signing-query log produced by `cmaSignLogImpl` against the
+   `WriterT` log in `SignatureAlg.unforgeableExp`.
 
 Kept as `sorry` pending the full distributional proof; the body reuses
 the FS-specific `signedAppend` /
 `map_run_withLogging_inputs_eq_run_signedAppend` lemma chain from
 `Sigma/Security.lean`. -/
-theorem cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh
+theorem cmaRealFreshAdvantage_eq_unforgeableExp
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
-    Pr[= true |
-        (fun p : (M × (Commit × Resp)) × Bool × List M => p.2.1) <$>
-            cmaRealRun σ hr M adv] =
-      Pr[= true | SignatureAlg.unforgeableExpNoFresh
-        (FiatShamir.runtime M) adv] := by
+    Pr[= true | (cmaReal M Commit Chal σ hr).runProb (signedFreshAdv σ hr M adv)] =
+      adv.advantage (FiatShamir.runtime M) := by
   sorry
 
 /-! ### H1 + H2 composition -/
 
-omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit] in
-/-- Hop **H1** (drop-fresh): the CMA advantage is bounded above by the
-freshness-dropped no-fresh experiment. The `runtime`-side instance of
-`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh`,
-applied to the Fiat-Shamir scheme. -/
-theorem cma_advantage_le_unforgeableExpNoFresh
+/-- H2 in inequality form: the CMA advantage is bounded by the probability
+that `cmaReal` accepts the freshness-preserving Boolean adversary. Entry
+point for the rest of the HeapSSP hop chain
+(`cmaReal → cmaSim → nma → Fork`). -/
+theorem cma_advantage_le_runProb_cmaRealFresh
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
     adv.advantage (FiatShamir.runtime M) ≤
-      Pr[= true | SignatureAlg.unforgeableExpNoFresh
-        (FiatShamir.runtime M) adv] :=
-  SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh
-    (FiatShamir.runtime M)
-    (fun {_ _} f mx => FiatShamir.runtime_evalDist_bind_pure M mx f) adv
-
-/-- Composition of H1 (drop-fresh) and H2 (the bridge): the CMA
-advantage is bounded by the probability that `cmaReal` accepts a
-forgery, ignoring freshness. Entry point for the rest of the HeapSSP
-hop chain (`cmaReal → cmaSim → nma → Fork`). -/
-theorem cma_advantage_le_runProb_cmaRealNoFresh
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
-    adv.advantage (FiatShamir.runtime M) ≤
-      Pr[= true |
-        (fun p : (M × (Commit × Resp)) × Bool × List M => p.2.1) <$>
-            cmaRealRun σ hr M adv] := by
-  rw [cmaRealNoFreshAdvantage_eq_unforgeableExpNoFresh]
-  exact cma_advantage_le_unforgeableExpNoFresh σ hr M adv
+      Pr[= true | (cmaReal M Commit Chal σ hr).runProb (signedFreshAdv σ hr M adv)] := by
+  rw [cmaRealFreshAdvantage_eq_unforgeableExp]
 
 end FiatShamir.HeapSSP
