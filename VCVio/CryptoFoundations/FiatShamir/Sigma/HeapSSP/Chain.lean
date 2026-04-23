@@ -5,8 +5,8 @@ Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
+import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
-import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.HeapSSP.Composition
 
@@ -102,7 +102,7 @@ theorem nmaAdvFromCma_nmaHashQueryBound
     (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := Prod.fst <$> (nmaAdvFromCma σ hr M adv simT).main pk) qH := by
+      (oa := (nmaAdvFromCma σ hr M adv simT).main pk) qH := by
   intro pk
   have hbase :=
     FiatShamir.simulatedNmaAdv_hashQueryBound σ hr M simT adv qS qH hQ pk
@@ -315,7 +315,7 @@ theorem cma_advantage_le_fork_bound
     ∃ nmaAdv : SignatureAlg.managedRoNmaAdv
         (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
       (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-        (oa := Prod.fst <$> nmaAdv.main pk) qH) ∧
+        (oa := nmaAdv.main pk) qH) ∧
       adv.advantage (runtime M) ≤
         Fork.advantage σ hr M nmaAdv qH +
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) +

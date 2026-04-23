@@ -214,6 +214,12 @@ Recent concrete progress:
 - Updated `cma_advantage_le_fork_bound` so the beta term is
   `qS * (qS + qH) * β`, while the final verification query remains in the H5
   Boolean event.
+- Moved `simulatedNmaAdv` and its query-bound theorem from
+  `Sigma/Security.lean` to `Sigma/CmaToNma.lean`, then routed
+  `Sigma/Security.lean`'s public `euf_cma_to_nma` theorem through the HeapSSP
+  chain.
+- Removed the obsolete legacy `hashAndSign_cma_to_nma_bound` sorry. The
+  non-HeapSSP CMA-to-NMA theorem is no longer a parallel proof path.
 
 ### Phase B: Build core reusable infrastructure
 
