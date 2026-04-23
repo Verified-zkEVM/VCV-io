@@ -9,15 +9,25 @@ import VCVio.HeapSSP.Composition
 /-!
 # HeapSSP: Distributional Equivalence
 
-`Package.DistEquiv G₀ G₁` (notation `G₀ ≡ᵈ G₁`) says that two probability-only
-heap-packages produce identical output distributions against *every*
-adversary, on every output type. The heap-package counterpart of
-`VCVio.SSP.DistEquiv`.
+`Package.DistEquiv G₀ G₁` (notation `G₀ ≡ᵈ G₁`) says that two heap-packages
+sharing an export interface `E` and an import interface `I` produce
+identical output distributions against *every* adversary, on every output
+type. The heap-package counterpart of `VCVio.SSP.DistEquiv`.
+
+The relation is polymorphic in the import: a `≡ᵈ`-hop is meaningful for any
+`I : OracleSpec.{uᵢ, 0} ιᵢ` with `[I.Fintype]` `[I.Inhabited]`. The two key
+instantiations are:
+
+* **`I = unifSpec`** — the "probability-only" case. The bridge
+  `advantage_zero` collapses a `≡ᵈ`-hop to a zero entry in
+  `Package.advantage`, recovering the classical SSP "perfect indistinguish-
+  ability" reading.
+* **`I = I₁ + I₂`** — the parallel-composition case. `par_congr` swaps
+  one factor of a `Package.par` along a `≡ᵈ`-hop, leveraging the
+  congruence directly *inside* the still-open import `I₁ + I₂`.
 
 The identifier sets `Ident₀, Ident₁` of the two games may be unrelated; only
-their behaviour against adversaries matters. This is exactly the
-"behavioural equivalence" of state-separating proofs, ported to the heap
-framework.
+their behaviour against adversaries matters.
 
 ## API surface
 
@@ -27,6 +37,8 @@ framework.
 * **Constructors**:
   * `of_run_evalDist`: from a per-adversary `evalDist` equality (the
     unfolded definition).
+  * `of_run_eq`: from a per-adversary *propositional* equality at the
+    `Package.run` level.
   * `of_step`: same identifier set, agree per-query under `evalDist`. The
     lemma version of `Package.simulateQ_StateT_evalDist_congr` from
     `VCVio.HeapSSP.Advantage`.
@@ -34,10 +46,10 @@ framework.
     `evalDist` modulo the bijection. The lemma version of
     `Package.simulateQ_StateT_evalDist_congr_of_bij`. Useful for
     `Heap.split`-based reshapes inside `par`-composed packages.
-* **Bridge to `Package.advantage`**: `advantage_left`, `advantage_right`,
-  `advantage_zero`. A `≡ᵈ`-hop on either side preserves the Boolean
-  distinguishing advantage.
-* **Bridge to `runProb`**: `runProb_evalDist_eq`, the inverse of
+* **Bridge to `Package.advantage`** (specialised to `I = unifSpec`):
+  `advantage_left`, `advantage_right`, `advantage_zero`. A `≡ᵈ`-hop on
+  either side preserves the Boolean distinguishing advantage.
+* **Bridge to `run`**: `run_evalDist_eq`, the inverse of
   `of_run_evalDist`.
 
 ## Composition
@@ -46,14 +58,13 @@ framework.
   inner game of a linked composition along a `≡ᵈ`-hop, leveraging
   `Package.run_link_eq_run_shiftLeft`. The bound (perfect) case is exactly
   the SSProve "ε = 0 in the inner game" reduction.
-* The outer-side congruence and `par_congr` are not yet in this file: the
-  former requires a notion of equivalence for *open* packages (per-handler
-  under `evalDist`), and the latter requires parallel-composition
-  structural reductions specific to the heap framework. Both are scheduled
-  as follow-ups.
+* **`par` congruence on both sides**: `par_congr` swaps either factor of
+  a `Package.par`-composite along per-handler `evalDist` equalities (one
+  per side). The result is a `≡ᵈ`-hop *with the still-open import*
+  `I₁ + I₂`, ready to be plugged into a further `link` or `par` step.
 -/
 
-universe uₘ uₑ
+universe uᵢ uₘ uₑ
 
 open OracleSpec OracleComp ProbComp
 
@@ -62,27 +73,28 @@ namespace VCVio.HeapSSP
 namespace Package
 
 variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
+  {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, 0} ιᵢ} [I.Fintype] [I.Inhabited]
 
-/-- Two probability-only heap-packages are *distributionally equivalent* if
-they produce the same output distribution against every adversary, on every
-output type.
+/-- Two heap-packages sharing an export `E` and an import `I` are
+*distributionally equivalent* if they produce the same output distribution
+against every adversary, on every output type.
 
 Equivalent characterisations:
-* The Boolean distinguishing advantage `G₀.advantage G₁ A` is zero on every
-  Boolean-valued adversary `A` (`DistEquiv.advantage_zero`).
+* When `I = unifSpec`, the Boolean distinguishing advantage
+  `G₀.advantage G₁ A` is zero on every Boolean-valued adversary `A`
+  (`DistEquiv.advantage_zero`).
 * For every `α` and every adversary `A : OracleComp E α`,
-  `evalDist (G₀.runProb A) = evalDist (G₁.runProb A)` (the literal
-  definition).
+  `evalDist (G₀.run A) = evalDist (G₁.run A)` (the literal definition).
 
 The identifier sets `Ident₀, Ident₁` of the two games are independent: only
 the export interface and the resulting output distribution matter from an
 adversary's point of view. -/
 def DistEquiv {Ident₀ Ident₁ : Type}
     [CellSpec.{0, 0} Ident₀] [CellSpec.{0, 0} Ident₁]
-    (G₀ : Package unifSpec E Ident₀) (G₁ : Package unifSpec E Ident₁) :
+    (G₀ : Package I E Ident₀) (G₁ : Package I E Ident₁) :
     Prop :=
   ∀ {α : Type} (A : OracleComp E α),
-    evalDist (G₀.runProb A) = evalDist (G₁.runProb A)
+    evalDist (G₀.run A) = evalDist (G₁.run A)
 
 @[inherit_doc DistEquiv]
 scoped infix:50 " ≡ᵈ " => Package.DistEquiv
@@ -96,32 +108,33 @@ variable {Ident Ident₀ Ident₁ Ident₂ : Type}
 /-! ### Relation laws -/
 
 @[refl]
-protected theorem refl (G : Package unifSpec E Ident) : G ≡ᵈ G :=
+protected theorem refl (G : Package I E Ident) : G ≡ᵈ G :=
   fun _ => rfl
 
 @[symm]
 protected theorem symm
-    {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
+    {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : G₀ ≡ᵈ G₁) : G₁ ≡ᵈ G₀ :=
   fun A => (h A).symm
 
 @[trans]
 protected theorem trans
-    {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
-    {G₂ : Package unifSpec E Ident₂}
+    {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
+    {G₂ : Package I E Ident₂}
     (h₀₁ : G₀ ≡ᵈ G₁) (h₁₂ : G₁ ≡ᵈ G₂) : G₀ ≡ᵈ G₂ :=
   fun A => (h₀₁ A).trans (h₁₂ A)
 
 instance trans_instance :
-    @Trans (Package unifSpec E Ident₀) (Package unifSpec E Ident₁)
-      (Package unifSpec E Ident₂) DistEquiv DistEquiv DistEquiv where
+    @Trans (Package I E Ident₀) (Package I E Ident₁)
+      (Package I E Ident₂) DistEquiv DistEquiv DistEquiv where
   trans := DistEquiv.trans
 
 /-- When the identifier set is fixed, `≡ᵈ` is an `Equivalence`. -/
 theorem _root_.VCVio.HeapSSP.Package.equivalence_distEquiv
+    (I : OracleSpec.{uᵢ, 0} ιᵢ) [I.Fintype] [I.Inhabited]
     (E : OracleSpec.{uₑ, 0} ιₑ) (Ident : Type) [CellSpec.{0, 0} Ident] :
     Equivalence
-      (DistEquiv (E := E) (Ident₀ := Ident) (Ident₁ := Ident)) where
+      (DistEquiv (I := I) (E := E) (Ident₀ := Ident) (Ident₁ := Ident)) where
   refl := DistEquiv.refl
   symm := DistEquiv.symm
   trans := DistEquiv.trans
@@ -132,42 +145,41 @@ theorem _root_.VCVio.HeapSSP.Package.equivalence_distEquiv
 The unfolded definition, exposed for clients that already have the
 distribution equality in hand. -/
 theorem of_run_evalDist
-    {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
+    {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : ∀ {α : Type} (A : OracleComp E α),
-        evalDist (G₀.runProb A) = evalDist (G₁.runProb A)) :
+        evalDist (G₀.run A) = evalDist (G₁.run A)) :
     G₀ ≡ᵈ G₁ := h
 
 /-- Recover the per-adversary `evalDist` equality from a `DistEquiv`
 witness. The inverse of `of_run_evalDist`. -/
-theorem runProb_evalDist_eq
-    {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
+theorem run_evalDist_eq
+    {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : G₀ ≡ᵈ G₁) {α : Type} (A : OracleComp E α) :
-    evalDist (G₀.runProb A) = evalDist (G₁.runProb A) := h A
+    evalDist (G₀.run A) = evalDist (G₁.run A) := h A
 
-/-- Build a `DistEquiv` from a per-adversary *propositional* equality at the
-`runProb` level. -/
+/-- Build a `DistEquiv` from a per-adversary *propositional* equality at
+the `Package.run` level. -/
 theorem of_run_eq
-    {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
-    (h : ∀ {α : Type} (A : OracleComp E α), G₀.runProb A = G₁.runProb A) :
+    {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
+    (h : ∀ {α : Type} (A : OracleComp E α), G₀.run A = G₁.run A) :
     G₀ ≡ᵈ G₁ :=
   fun A => by rw [h A]
 
-/-- **Step constructor (same identifier set).** Two probability-only
-heap-packages with identical identifier set are distributionally equivalent
-if their inits agree under `evalDist` and their per-query handlers agree
-under `evalDist` on every heap.
+/-- **Step constructor (same identifier set).** Two heap-packages with
+identical identifier set are distributionally equivalent if their inits
+agree under `evalDist` and their per-query handlers agree under `evalDist`
+on every heap.
 
 The lemma form of `Package.simulateQ_StateT_evalDist_congr` from
 `VCVio.HeapSSP.Advantage`, lifted to the package level: the per-handler
 hypothesis discharges the simulation step, and the init hypothesis
 discharges the setup step. -/
-theorem of_step {G₀ G₁ : Package unifSpec E Ident}
+theorem of_step {G₀ G₁ : Package I E Ident}
     (h_init : evalDist G₀.init = evalDist G₁.init)
     (h_impl : ∀ (q : E.Domain) (h : Heap Ident),
         evalDist ((G₀.impl q).run h) = evalDist ((G₁.impl q).run h)) :
     G₀ ≡ᵈ G₁ := by
   intro α A
-  change evalDist (G₀.run A) = evalDist (G₁.run A)
   unfold Package.run
   rw [evalDist_bind, evalDist_bind, h_init]
   refine bind_congr fun s₀ => ?_
@@ -175,12 +187,12 @@ theorem of_step {G₀ G₁ : Package unifSpec E Ident}
   congr 1
   exact simulateQ_StateT_evalDist_congr h_impl A s₀
 
-/-- **Step constructor (under heap bijection).** Two probability-only
-heap-packages with isomorphic *heap types* `Heap Ident₀ ≃ Heap Ident₁` are
-distributionally equivalent if their inits agree under `evalDist` modulo
-the bijection (RHS init is mapped through `φ.symm`) and their per-query
-handlers agree under `evalDist` modulo the bijection (RHS handler output
-is mapped through `Prod.map id φ.symm`).
+/-- **Step constructor (under heap bijection).** Two heap-packages with
+isomorphic *heap types* `Heap Ident₀ ≃ Heap Ident₁` are distributionally
+equivalent if their inits agree under `evalDist` modulo the bijection
+(RHS init is mapped through `φ.symm`) and their per-query handlers agree
+under `evalDist` modulo the bijection (RHS handler output is mapped
+through `Prod.map id φ.symm`).
 
 The lemma form of `Package.simulateQ_StateT_evalDist_congr_of_bij` from
 `VCVio.HeapSSP.Advantage`, lifted to the package level. The bijection is
@@ -189,7 +201,7 @@ sets directly, so it accommodates the canonical
 `Heap.split : Heap (α ⊕ β) ≃ Heap α × Heap β` reshape used by
 `par`-composed packages. -/
 theorem of_step_bij
-    (G₀ : Package unifSpec E Ident₀) (G₁ : Package unifSpec E Ident₁)
+    (G₀ : Package I E Ident₀) (G₁ : Package I E Ident₁)
     (φ : Heap Ident₀ ≃ Heap Ident₁)
     (h_init : evalDist G₀.init = evalDist (φ.symm <$> G₁.init))
     (h_impl : ∀ (q : E.Domain) (h : Heap Ident₀),
@@ -197,7 +209,6 @@ theorem of_step_bij
           evalDist (Prod.map id φ.symm <$> (G₁.impl q).run (φ h))) :
     G₀ ≡ᵈ G₁ := by
   intro α A
-  change evalDist (G₀.run A) = evalDist (G₁.run A)
   unfold Package.run
   rw [evalDist_bind, evalDist_bind, h_init, evalDist_map]
   rw [bind_map_left]
@@ -210,7 +221,13 @@ theorem of_step_bij
   rw [hbij, evalDist_map]
   simp only [Functor.map_map, Prod.map_fst, id_eq]
 
-/-! ### Bridge to `Package.advantage` -/
+/-! ### Bridge to `Package.advantage` (probability-only case)
+
+`Package.advantage` is `unifSpec`-tied (it uses `boolDistAdvantage` on
+`ProbComp`), so the bridge lemmas below specialise the import `I` to
+`unifSpec`. They are statements about `≡ᵈ`-hops at the `unifSpec`-imports
+layer; the *general* import-polymorphic `≡ᵈ` machinery above (especially
+`par_congr`) lives one layer below. -/
 
 /-- A distributional equivalence on the LEFT side preserves the Boolean
 distinguishing advantage. -/
@@ -254,15 +271,103 @@ The SSP "replace the inner game" rule, the program-level counterpart of
 `Package.advantage_link_left_eq_advantage_shiftLeft` in
 `VCVio.HeapSSP.Hybrid`. -/
 theorem link_inner_congr (P : Package M E Ident_P)
-    {Q₀ : Package unifSpec M Ident₀} {Q₁ : Package unifSpec M Ident₁}
+    {Q₀ : Package I M Ident₀} {Q₁ : Package I M Ident₁}
     (h : Q₀ ≡ᵈ Q₁) :
     P.link Q₀ ≡ᵈ P.link Q₁ := by
   intro α A
-  change evalDist ((P.link Q₀).run A) = evalDist ((P.link Q₁).run A)
   rw [run_link_eq_run_shiftLeft, run_link_eq_run_shiftLeft]
   exact h (P.shiftLeft A)
 
 end LinkCongr
+
+end DistEquiv
+
+end Package
+
+/-! ### Compositional congruences (`par`)
+
+Stated outside `namespace Package` because we need fresh import / export
+variables `I₁, I₂, E₁, E₂` for the two factors that are independent of
+the ambient `I, E`. -/
+
+namespace Package
+
+namespace DistEquiv
+
+section ParCongr
+
+variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ}
+  {I₁ : OracleSpec.{uᵢ, 0} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, 0} ιᵢ₂}
+  [I₁.Fintype] [I₁.Inhabited] [I₂.Fintype] [I₂.Inhabited]
+  {ιₑ₁ : Type uₑ} {ιₑ₂ : Type uₑ}
+  {E₁ : OracleSpec.{uₑ, 0} ιₑ₁} {E₂ : OracleSpec.{uₑ, 0} ιₑ₂}
+  {α β : Type} [CellSpec.{0, 0} α] [CellSpec.{0, 0} β]
+
+/-- **`par` congruence on both sides.** Two `par`-composites are
+distributionally equivalent (over the *open* import `I₁ + I₂`) if their
+factor inits and per-handler outputs agree under `evalDist` componentwise.
+
+The proof reduces to `of_step` on the parallel package: the init step
+collapses through `evalDist_bind`/`evalDist_liftComp` to the per-factor
+init equalities; each query case (left or right) collapses through the
+parametric `par_impl_*_apply_run` lemmas to the corresponding per-factor
+handler equality, with the *other* factor's heap component threaded
+through unchanged. The hypotheses are stated factorwise — one
+`(init, impl)` pair per side — to exactly match the shape of typical
+`Package.par`-cutover proofs (e.g. parallel OTP channels). -/
+theorem par_congr
+    {p₁ p₁' : Package I₁ E₁ α} {p₂ p₂' : Package I₂ E₂ β}
+    (h₁_init : evalDist p₁.init = evalDist p₁'.init)
+    (h₁_impl : ∀ (q : E₁.Domain) (h : Heap α),
+        evalDist ((p₁.impl q).run h) = evalDist ((p₁'.impl q).run h))
+    (h₂_init : evalDist p₂.init = evalDist p₂'.init)
+    (h₂_impl : ∀ (q : E₂.Domain) (h : Heap β),
+        evalDist ((p₂.impl q).run h) = evalDist ((p₂'.impl q).run h)) :
+    p₁.par p₂ ≡ᵈ p₁'.par p₂' := by
+  refine of_step ?_ ?_
+  · -- Init equivalence: rewrite `par`'s init into nested binds and apply
+    -- the per-factor init equalities pointwise under `evalDist_bind`.
+    rw [par_init, par_init]
+    rw [evalDist_bind, evalDist_bind, evalDist_liftComp, evalDist_liftComp,
+      h₁_init]
+    refine bind_congr fun h_α => ?_
+    rw [evalDist_bind, evalDist_bind, evalDist_liftComp, evalDist_liftComp,
+      h₂_init]
+  · -- Per-query handler equivalence: split on the sum index. Both sides of
+    -- `par.impl` reduce *definitionally* (after `let`-substitution of the
+    -- `Heap.split` projections of `h`) to the same `Prod.map`-shaped lift
+    -- of the corresponding factor's handler. We expose that shared shape
+    -- with `change`, then close with `evalDist_map_eq_of_evalDist_eq` on
+    -- the `liftComp`-of-handler equality, which itself follows from the
+    -- factor's `h_impl` hypothesis under `evalDist_liftComp`.
+    intro q h
+    rcases q with t | t
+    · -- Left channel.
+      change evalDist (
+          (Prod.map id (fun h_α' =>
+              (Heap.split α β).symm (h_α', (Heap.split α β h).2))) <$>
+            liftComp ((p₁.impl t).run (Heap.split α β h).1) (I₁ + I₂)) =
+        evalDist (
+          (Prod.map id (fun h_α' =>
+              (Heap.split α β).symm (h_α', (Heap.split α β h).2))) <$>
+            liftComp ((p₁'.impl t).run (Heap.split α β h).1) (I₁ + I₂))
+      refine evalDist_map_eq_of_evalDist_eq ?_ _
+      rw [evalDist_liftComp, evalDist_liftComp]
+      exact h₁_impl t _
+    · -- Right channel: dual to the left case.
+      change evalDist (
+          (Prod.map id (fun h_β' =>
+              (Heap.split α β).symm ((Heap.split α β h).1, h_β'))) <$>
+            liftComp ((p₂.impl t).run (Heap.split α β h).2) (I₁ + I₂)) =
+        evalDist (
+          (Prod.map id (fun h_β' =>
+              (Heap.split α β).symm ((Heap.split α β h).1, h_β'))) <$>
+            liftComp ((p₂'.impl t).run (Heap.split α β h).2) (I₁ + I₂))
+      refine evalDist_map_eq_of_evalDist_eq ?_ _
+      rw [evalDist_liftComp, evalDist_liftComp]
+      exact h₂_impl t _
+
+end ParCongr
 
 end DistEquiv
 

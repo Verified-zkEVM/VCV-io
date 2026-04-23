@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Examples.OneTimePad.HeapBasic
+import VCVio.HeapSSP.DistEquiv
 
 /-!
 # Two parallel OTP channels via `Package.par`
@@ -13,13 +14,14 @@ the One-Time Pad. Take the single-channel `realPkg` / `idealPkg`
 from `HeapBasic.lean` and form
 
 * `pairRealPkg sp := (realPkg sp).par (realPkg sp)` with state
-  `Heap (KeyIdent sp ⊕ KeyIdent sp)` (two independent key cells), and
-* `pairIdealPkg sp := (idealPkg sp).par (idealPkg sp)` with state
-  `Heap (PEmpty ⊕ PEmpty)` (still trivially stateless on each side).
+  `Heap (UsedFlag ⊕ UsedFlag)` (one single-call gate per channel), and
+* `pairIdealPkg sp := (idealPkg sp).par (idealPkg sp)` with the same
+  state shape (each channel still single-call gated).
 
 The composite export `otpSpec sp + otpSpec sp` exposes two channels:
-`Sum.inl (.enc m)` routes to the first OTP (under key `key_α`),
-`Sum.inr (.enc m)` routes to the second (under key `key_β`).
+`Sum.inl (.enc m)` routes to the first OTP, `Sum.inr (.enc m)`
+routes to the second. The composite import `unifSpec + unifSpec`
+threads each channel's uniform sampling through its own slot.
 
 ## What this file builds
 
@@ -27,52 +29,82 @@ The composite export `otpSpec sp + otpSpec sp` exposes two channels:
   hit the left or right channel.
 * `encOncePair sp m₁ m₂` issues one query on each channel and pairs
   the ciphertexts.
-* `evalDist_run_encOncePair_eq` is the headline two-channel
-  indistinguishability. **Currently a `sorry`**, pending the HeapSSP
-  `DistEquiv` / `IndistAt` infrastructure (mirror of `VCVio/SSP/`).
-  The intended cut is "single-channel `realPkg ≡ᵈ idealPkg`, lifted
-  through `par_left_congr` / `par_right_congr` plus transitivity".
+* `pairRealPkg_distEquiv_pairIdealPkg` is the headline two-channel
+  *unconditional* distributional equivalence, proved by feeding the
+  per-(query, heap) handler equality from
+  `realPkg_impl_evalDist_idealPkg` (HeapBasic.lean) into
+  `Package.DistEquiv.par_congr` once per channel.
+* `evalDist_run_encOncePair_eq` is the corollary on the canonical
+  two-call adversary, a one-line specialisation via
+  `Package.DistEquiv.run_evalDist_eq`.
+
+## Why no operational reduction here
+
+The previous version of this file proved the two-channel statement
+operationally, by walking `simulateQ` over `encOncePair`'s
+query-bind chain and discharging each `liftComp` shell from
+`Package.par`'s sum-spec import by hand. That worked, but it
+reproved the OTP cryptographic core (XOR with uniform is uniform)
+inside the `par`-composite — which scales poorly to deeper
+compositions and is unnecessary now that:
+
+* `realPkg_impl_evalDist_idealPkg` (in `HeapBasic.lean`) packages
+  the OTP cryptographic core as a *per-(query, heap) handler
+  equality* between the gated real and ideal single-channel
+  packages, and
+* `Package.DistEquiv.par_congr` (in `VCVio.HeapSSP.DistEquiv`)
+  lifts a pair of such per-handler equalities to a `≡ᵈ`-hop on the
+  parallel composite, without any operational `liftComp`
+  bookkeeping.
+
+The two combine to give `pairRealPkg ≡ᵈ pairIdealPkg` against
+*every* two-channel adversary, not just `encOncePair`.
 
 ## What `Package.par` buys here vs. a flat product state
 
-In the SSP product-state model, building a two-channel OTP would
-yield state type `(Option (BitVec sp)) × (Option (BitVec sp))` (or
-similar), with an explicit "left handler reads `.1`, writes back
-to `.1`, leaves `.2` alone" frame to discharge by hand each time.
+In the SSP product-state model, a two-channel OTP would carry state
+type `(Option (BitVec sp)) × (Option (BitVec sp))` (or similar),
+with an explicit "left handler reads `.1`, writes back to `.1`,
+leaves `.2` alone" frame to discharge by hand at every query.
 HeapSSP gives this frame *structurally* via `Heap.split`: the two
 channel handlers each touch only one half of the heap, with the
-other half threaded as an opaque parameter, and frame reasoning
-reduces to `Heap.split_apply_inl` / `Heap.split_apply_inr` plus the
-right inverse `Heap.split.symm ∘ Heap.split = id` (definitional
-after `cases`).
+other half threaded through opaquely, and frame reasoning reduces
+to `Heap.split.symm ∘ Heap.split = id` (definitional).
 -/
 
 open OracleSpec OracleComp ENNReal
 
 namespace VCVio.HeapSSP.OneTimePad
 
+open VCVio.HeapSSP.Package
+
 /-! ## Parallel OTP packages -/
 
-/-- The two-channel real OTP package: two independent OTP keys live
-in the cells `KeyIdent sp ⊕ KeyIdent sp`.
+/-- The two-channel real OTP package: two independently-gated OTP
+single-channel packages composed in parallel.
 
 The composite imports `unifSpec + unifSpec` (one uniform-sampling
 oracle per child, threaded through `liftComp`) and exports
-`otpSpec sp + otpSpec sp` (one encryption channel per child). -/
+`otpSpec sp + otpSpec sp` (one encryption channel per child). The
+identifier set is `UsedFlag ⊕ UsedFlag`: each channel carries its
+own single-call gate, sampled and updated independently. -/
 def pairRealPkg (sp : ℕ) :
     Package (unifSpec + unifSpec) (otpSpec sp + otpSpec sp)
-      (KeyIdent sp ⊕ KeyIdent sp) :=
+      (UsedFlag ⊕ UsedFlag) :=
   (realPkg sp).par (realPkg sp)
 
-/-- The two-channel ideal OTP package: both channels are
-stateless (cells `PEmpty ⊕ PEmpty`); each query samples a fresh
-uniform ciphertext. -/
+/-- The two-channel ideal OTP package: two independently-gated OTP
+ideal-channel packages composed in parallel.
+
+Same shape as `pairRealPkg`: two `UsedFlag` cells, one per channel.
+Each channel samples a fresh uniform ciphertext on its first call
+(then short-circuits to the dummy `0#sp` on subsequent calls). -/
 def pairIdealPkg (sp : ℕ) :
     Package (unifSpec + unifSpec) (otpSpec sp + otpSpec sp)
-      (PEmpty.{1} ⊕ PEmpty.{1}) :=
+      (UsedFlag ⊕ UsedFlag) :=
   (idealPkg sp).par (idealPkg sp)
 
-/-! ## Single-channel adversaries -/
+/-! ## Single-channel and two-channel adversaries -/
 
 /-- Single-call adversary on the **left** channel: issues one
 `enc m` query routed to the first OTP. -/
@@ -96,24 +128,45 @@ def encOncePair (sp : ℕ) (m₁ m₂ : BitVec sp) :
 
 /-! ## Headline two-channel indistinguishability
 
-The proof of this theorem is deferred until the HeapSSP `DistEquiv` /
-`IndistAt` infrastructure is in place (mirror of `VCVio/SSP/`). The
-intended cut is:
+Both ingredients live one layer below:
 
-1. `realPkg sp ≡ᵈ idealPkg sp` at the single-channel level (via
-   `HeapSSP.Package.DistEquiv.of_run_evalDist` reusing
-   `evalDist_run_encOnce_eq` from `HeapBasic.lean`, **for single-call
-   adversaries** -- OTP secrecy is single-query only).
-2. Lift through `par_left_congr` / `par_right_congr` (to be added in
-   `VCVio/HeapSSP/DistEquiv.lean` once basic API is in place) plus
-   transitivity. -/
+* `realPkg_impl_evalDist_idealPkg` (HeapBasic.lean): per-(query,
+  heap) handler `evalDist`-equality at the single-channel layer.
+* `Package.DistEquiv.par_congr` (VCVio.HeapSSP.DistEquiv): lift
+  per-handler `evalDist`-equalities on each factor to a `≡ᵈ`-hop on
+  the parallel composite.
 
-/-- **OTP two-channel indistinguishability (sorry, pending HeapSSP
-dist-equiv layer).** The parallel real and ideal packages produce
-the same output distribution on `encOncePair`. -/
+Stitching them gives the two-channel statement against *every*
+adversary, not just `encOncePair`. The one-call corollary is then
+a `Package.DistEquiv.run_evalDist_eq` specialisation. -/
+
+/-- **OTP two-channel unconditional distributional equivalence.**
+The parallel real and ideal packages produce identical output
+distributions against every two-channel adversary.
+
+Proof: feed the per-(query, heap) handler equality from
+`realPkg_impl_evalDist_idealPkg` into `par_congr` twice — once per
+channel — with `rfl` discharging both per-channel `init`
+equalities (both are `pure Heap.empty`). -/
+theorem pairRealPkg_distEquiv_pairIdealPkg (sp : ℕ) :
+    pairRealPkg sp ≡ᵈ pairIdealPkg sp :=
+  Package.DistEquiv.par_congr
+    (p₁ := realPkg sp) (p₁' := idealPkg sp)
+    (p₂ := realPkg sp) (p₂' := idealPkg sp)
+    (h₁_init := rfl)
+    (h₁_impl := realPkg_impl_evalDist_idealPkg sp)
+    (h₂_init := rfl)
+    (h₂_impl := realPkg_impl_evalDist_idealPkg sp)
+
+/-- **OTP two-channel indistinguishability on `encOncePair`.** The
+parallel real and ideal packages agree on output distribution for
+the canonical two-call adversary, recovered from the universal
+`pairRealPkg_distEquiv_pairIdealPkg` by specialisation via
+`Package.DistEquiv.run_evalDist_eq`. -/
 theorem evalDist_run_encOncePair_eq (sp : ℕ) (m₁ m₂ : BitVec sp) :
     evalDist ((pairRealPkg sp).run (encOncePair sp m₁ m₂)) =
-      evalDist ((pairIdealPkg sp).run (encOncePair sp m₁ m₂)) := by
-  sorry
+      evalDist ((pairIdealPkg sp).run (encOncePair sp m₁ m₂)) :=
+  Package.DistEquiv.run_evalDist_eq
+    (pairRealPkg_distEquiv_pairIdealPkg sp) (encOncePair sp m₁ m₂)
 
 end VCVio.HeapSSP.OneTimePad

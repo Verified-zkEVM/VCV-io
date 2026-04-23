@@ -21,7 +21,11 @@ Heap-package counterpart of `VCVio.SSP.Advantage`.
 * `Package.simulateQ_evalDist_congr` and its stateful generalisation
   `simulateQ_StateT_evalDist_congr` are the heap-package analogues of the
   SSP "rewrite the handler up to evalDist" rule: per-input handler equality
-  under `evalDist` upgrades to a whole-adversary `evalDist` equality.
+  under `evalDist` upgrades to a whole-adversary `evalDist` equality. They
+  are stated for *any* import spec `I` with `[I.Fintype]` `[I.Inhabited]`,
+  so that they apply uniformly to `unifSpec`-imports games (the bridge to
+  `Package.advantage`) and to sum-imports games such as
+  `Package.par`-composites (where the import is `I₁ + I₂`).
 * `Package.simulateQ_StateT_evalDist_congr_of_bij` is the bijection-aware
   variant, used when the two heaps differ but are isomorphic. The bijection
   is on the *underlying state type* (here `Heap Ident`) rather than on
@@ -33,12 +37,16 @@ The program-level reduction lemmas (`simulateQ_link_run`,
 
 ## Universe layout
 
-Everything in this file is fixed at `Type 0`: `ProbComp : Type → Type` and
-the adversary returns a `Bool : Type`, so the export indices, ranges, and
-cell-value type are all `Type`. The import is pinned to `unifSpec : OracleSpec
-ℕ` whose own indices and ranges are in `Type`. -/
+The advantage-bridge lemmas (`runProb`, `advantage`, ...) are pinned to
+`unifSpec : OracleSpec ℕ`, since `ProbComp.boolDistAdvantage` is itself
+`unifSpec`-specific. The handler-congruence lemmas
+(`simulateQ_evalDist_congr`, `simulateQ_StateT_evalDist_congr`,
+`simulateQ_StateT_evalDist_congr_of_bij`) accept an arbitrary import
+`I : OracleSpec.{uᵢ, 0} ιᵢ` with `[I.Fintype]` `[I.Inhabited]`. The export
+index lives in `Type uₑ`; everything else (state, output type) is `Type 0`,
+matching the rest of the HeapSSP layer. -/
 
-universe uₑ
+universe uᵢ uₑ
 
 open OracleSpec OracleComp ProbComp
 
@@ -130,13 +138,21 @@ lemma advantage_triangle {Ident₀ Ident₁ Ident₂ : Type}
     G₀.advantage G₂ A ≤ G₀.advantage G₁ A + G₁.advantage G₂ A :=
   ProbComp.boolDistAdvantage_triangle _ _ _
 
-/-! ### `evalDist` congruence for handlers -/
+/-! ### `evalDist` congruence for handlers
 
-/-- Two `ProbComp`-valued query implementations that agree on every input
-*under `evalDist`* yield identical evaluations of any `simulateQ`. The
-heap-SSP-flavoured "rewrite the handler up to evalDist" rule. -/
+Stated for an arbitrary import `I : OracleSpec.{uᵢ, 0} ιᵢ` with
+`[I.Fintype]` `[I.Inhabited]`. The `unifSpec`-imports specialisation is
+recovered by instantiating `I := unifSpec`. -/
+
+section EvalDistCongr
+
+variable {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, 0} ιᵢ} [I.Fintype] [I.Inhabited]
+
+/-- Two `OracleComp I`-valued query implementations that agree on every
+input *under `evalDist`* yield identical evaluations of any `simulateQ`.
+The heap-SSP-flavoured "rewrite the handler up to evalDist" rule. -/
 lemma simulateQ_evalDist_congr {α : Type}
-    {h₁ h₂ : QueryImpl E ProbComp}
+    {h₁ h₂ : QueryImpl E (OracleComp I)}
     (hh : ∀ (q : E.Domain), evalDist (h₁ q) = evalDist (h₂ q))
     (A : OracleComp E α) :
     evalDist (simulateQ h₁ A) = evalDist (simulateQ h₂ A) := by
@@ -149,16 +165,18 @@ lemma simulateQ_evalDist_congr {α : Type}
     refine bind_congr fun u => ?_
     exact ih u
 
-/-- Stateful generalization of `simulateQ_evalDist_congr`: two
-`StateT (Heap Ident) ProbComp`-valued query implementations that agree
-on every (input, heap) pair *under `evalDist`* yield identical evaluations
-of `(simulateQ _ A).run h` for every starting heap `h`.
+/-- Stateful generalisation of `simulateQ_evalDist_congr`: two
+`StateT (Heap Ident) (OracleComp I)`-valued query implementations that
+agree on every (input, heap) pair *under `evalDist`* yield identical
+evaluations of `(simulateQ _ A).run h` for every starting heap `h`.
 
 The lemma to use when both sides of a game equivalence are stateful
 heap-packages with the same identifier set and only their per-query
-handlers differ up to distribution. -/
+handlers differ up to distribution. Polymorphic in the import `I`, so it
+applies both to probability-only games (`I = unifSpec`) and to compound
+games such as `Package.par`-composites (`I = I₁ + I₂`). -/
 lemma simulateQ_StateT_evalDist_congr {α : Type}
-    {h₁ h₂ : QueryImpl E (StateT (Heap Ident) ProbComp)}
+    {h₁ h₂ : QueryImpl E (StateT (Heap Ident) (OracleComp I))}
     (hh : ∀ (q : E.Domain) (h : Heap Ident),
         evalDist ((h₁ q).run h) = evalDist ((h₂ q).run h))
     (A : OracleComp E α) (h : Heap Ident) :
@@ -187,8 +205,8 @@ inside a `par`-composed package). -/
 lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type}
     {Ident₁ Ident₂ : Type}
     [CellSpec.{0, 0} Ident₁] [CellSpec.{0, 0} Ident₂]
-    (h₁ : QueryImpl E (StateT (Heap Ident₁) ProbComp))
-    (h₂ : QueryImpl E (StateT (Heap Ident₂) ProbComp))
+    (h₁ : QueryImpl E (StateT (Heap Ident₁) (OracleComp I)))
+    (h₂ : QueryImpl E (StateT (Heap Ident₂) (OracleComp I)))
     (φ : Heap Ident₁ ≃ Heap Ident₂)
     (hh : ∀ (q : E.Domain) (h : Heap Ident₁),
       evalDist ((h₁ q).run h) =
@@ -210,6 +228,8 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type}
     have hih := ih x (φ.symm h')
     rw [Equiv.apply_symm_apply] at hih
     simpa [Prod.map] using hih
+
+end EvalDistCongr
 
 /-! ### Functoriality of `runProb`
 
