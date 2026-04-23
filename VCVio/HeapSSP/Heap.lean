@@ -1,0 +1,252 @@
+/-
+Copyright (c) 2026 Quang Dao. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Quang Dao
+-/
+import Mathlib.Logic.Equiv.Sum
+
+/-!
+# HeapSSP: typed heaps over identifier sets
+
+`Heap Ident` (with `[CellSpec Ident]`) is a dependent function
+`(i : Ident) → CellSpec.type i`. It models the *state of an SSP package* as a
+collection of named, typed cells indexed by an identifier set `Ident`.
+
+This is the foundational data type of the experimental `HeapSSP` namespace,
+the heap-based variant of the existing `VCVio.SSP` framework. Both
+frameworks coexist for side-by-side comparison; see
+`Notes/vcvio-fs-schnorr-clean-chain.md` §D.13 for the design rationale.
+
+## What this gives us, vs the product-state framework in `VCVio.SSP`
+
+* **State is canonical.** A heap is a function `Ident → Value`; no nested
+  `Prod`s, no tuple-shape choices.
+* **Composition is `Sum`.** Two packages with identifier sets `α` and `β`
+  compose into one with identifier set `α ⊕ β`; the canonical reshape lemmas
+  are `Equiv.sumComm`, `Equiv.sumAssoc`, `Equiv.sumEmpty` (Mathlib).
+* **`Heap.split` is `funext`-definitional.**
+  `Heap (α ⊕ β) ≃ Heap α × Heap β` holds by case-analysis on the identifier;
+  both directions are `rfl` after `cases i`.
+* **Per-cell frame holds definitionally.** Reading cell `j` after writing
+  cell `i ≠ j` returns the old value (`get_update_of_ne`). No bisimulation
+  hypothesis or invariant required.
+
+## Usage
+
+```
+inductive MyCells
+  | counter
+  | flag
+  deriving DecidableEq
+
+instance : CellSpec MyCells where
+  type    | .counter => Nat | .flag => Bool
+  default | .counter => 0   | .flag => false
+
+def initial : Heap MyCells := Heap.empty
+def stepped : Heap MyCells := initial.update .counter 5
+example : stepped.get .counter = 5 := by simp [stepped]
+example : stepped.get .flag    = false := by simp [stepped]
+```
+
+`HeapSSP.Package` (`VCVio/HeapSSP/Package.lean`) consumes this layer: it is
+parameterized by `(Ident : Type) [CellSpec Ident]` and uses `Heap Ident` as
+the package's private state. -/
+
+universe u v
+
+namespace VCVio.HeapSSP
+
+/-! ## `CellSpec` : a typed cell directory
+
+A `CellSpec Ident` says: each identifier `i : Ident` carries a value type
+`CellSpec.type i : Type v`, with a designated `CellSpec.default i`. The
+default plays the role of SSProve's "per-location literal initializer" — it
+is what the heap holds before any cell is written.
+
+`Ident` lives in `Type u`, value types in `Type v`; both universes are
+independent. Sum composition (`Sum.instCellSpec` below) requires both
+operands' universes to match. -/
+class CellSpec (Ident : Type u) where
+  /-- Value type carried by the cell at identifier `i`. -/
+  type : Ident → Type v
+  /-- Default value of the cell at identifier `i`, used to initialize a fresh
+  heap (`Heap.empty`). -/
+  default : (i : Ident) → type i
+
+-- Mark the projections reducible so that the cell-type and cell-default
+-- projections unfold during typeclass synthesis, elaboration, and `simp`.
+-- Without this, an expression like `Heap.update h .counter 5` would fail
+-- to elaborate because Lean could not see that `CellSpec.type .counter`
+-- reduces to `Nat`; and `simp` could not reduce `Heap.empty.get .counter`
+-- to the user-supplied default.
+attribute [reducible] CellSpec.type CellSpec.default
+
+/-! ## `Heap` : the dependent-function heap
+
+`Heap Ident` is the type of states: one cell-value per identifier. Lives in
+`Type max u v`. -/
+abbrev Heap (Ident : Type u) [CellSpec.{u, v} Ident] : Type max u v :=
+  (i : Ident) → CellSpec.type i
+
+namespace Heap
+
+variable {Ident : Type u} [CellSpec.{u, v} Ident]
+
+/-- The default heap: every cell holds its `CellSpec`-prescribed default. -/
+def empty : Heap Ident := fun i => CellSpec.default i
+
+instance : Inhabited (Heap Ident) where
+  default := empty
+
+/-- Read the cell at identifier `i`. -/
+@[reducible]
+def get (h : Heap Ident) (i : Ident) : CellSpec.type i := h i
+
+/-- Write `v : CellSpec.type i` to cell `i`, leaving all other cells
+unchanged. -/
+def update [DecidableEq Ident] (h : Heap Ident) (i : Ident) (v : CellSpec.type i) :
+    Heap Ident := Function.update h i v
+
+@[simp]
+theorem get_empty (i : Ident) : (empty : Heap Ident).get i = CellSpec.default i :=
+  rfl
+
+@[simp]
+theorem get_update_self [DecidableEq Ident] (h : Heap Ident) (i : Ident)
+    (v : CellSpec.type i) : (h.update i v).get i = v :=
+  Function.update_self ..
+
+@[simp]
+theorem get_update_of_ne [DecidableEq Ident] {h : Heap Ident} {i j : Ident}
+    (hij : j ≠ i) (v : CellSpec.type i) : (h.update i v).get j = h.get j :=
+  Function.update_of_ne hij ..
+
+@[simp]
+theorem update_eq_self [DecidableEq Ident] (h : Heap Ident) (i : Ident) :
+    h.update i (h.get i) = h :=
+  Function.update_eq_self ..
+
+@[simp]
+theorem update_idem [DecidableEq Ident] (h : Heap Ident) (i : Ident)
+    (v w : CellSpec.type i) : (h.update i v).update i w = h.update i w :=
+  Function.update_idem ..
+
+end Heap
+
+/-! ## `Sum` of identifier sets : `CellSpec` instance
+
+Composing two packages with identifier sets `α` and `β` yields one with
+identifier set `α ⊕ β`. The cell directory is the disjoint union of the two,
+defaults too. -/
+instance Sum.instCellSpec {α β : Type u}
+    [CellSpec.{u, v} α] [CellSpec.{u, v} β] : CellSpec.{u, v} (α ⊕ β) where
+  type
+    | .inl a => CellSpec.type a
+    | .inr b => CellSpec.type b
+  default
+    | .inl a => CellSpec.default a
+    | .inr b => CellSpec.default b
+
+/-! ## `PEmpty` : `CellSpec` instance for the empty identifier set
+
+The trivial heap `Heap PEmpty` has a unique inhabitant (the empty function).
+This is the heap-side analogue of `PUnit` state and is used by stateless
+packages (`HeapSSP.Package.id`, `HeapSSP.Package.ofStateless`). -/
+instance PEmpty.instCellSpec : CellSpec.{u, v} PEmpty where
+  type i := i.elim
+  default i := i.elim
+
+namespace Heap
+
+/-! ## `Heap.split` : the canonical decomposition
+
+`Heap (α ⊕ β) ≃ Heap α × Heap β`, the lynchpin of state-separating
+composition in this layer. The forward direction restricts to `inl` / `inr`
+cells; the inverse is `Sum.rec` on the identifier. Both directions reduce by
+case-analysis on the identifier and are `rfl`-definitional after `cases`.
+
+This is the canonical reshape combinator that replaces bespoke per-package
+state bijections in the product-state model. -/
+def split (α β : Type u) [CellSpec.{u, v} α] [CellSpec.{u, v} β] :
+    Heap (α ⊕ β) ≃ Heap α × Heap β where
+  toFun h := (fun a => h (.inl a), fun b => h (.inr b))
+  invFun p := fun i => match i with
+    | .inl a => p.1 a
+    | .inr b => p.2 b
+  left_inv h := funext fun i => by cases i <;> rfl
+  right_inv := fun ⟨_, _⟩ => rfl
+
+@[simp]
+theorem split_apply_inl {α β : Type u} [CellSpec.{u, v} α] [CellSpec.{u, v} β]
+    (h : Heap (α ⊕ β)) (a : α) : (split α β h).1 a = h (.inl a) := rfl
+
+@[simp]
+theorem split_apply_inr {α β : Type u} [CellSpec.{u, v} α] [CellSpec.{u, v} β]
+    (h : Heap (α ⊕ β)) (b : β) : (split α β h).2 b = h (.inr b) := rfl
+
+@[simp]
+theorem split_symm_apply_inl {α β : Type u} [CellSpec.{u, v} α] [CellSpec.{u, v} β]
+    (p : Heap α × Heap β) (a : α) : (split α β).symm p (.inl a) = p.1 a := rfl
+
+@[simp]
+theorem split_symm_apply_inr {α β : Type u} [CellSpec.{u, v} α] [CellSpec.{u, v} β]
+    (p : Heap α × Heap β) (b : β) : (split α β).symm p (.inr b) = p.2 b := rfl
+
+@[simp]
+theorem split_empty (α β : Type u) [CellSpec.{u, v} α] [CellSpec.{u, v} β] :
+    split α β (empty : Heap (α ⊕ β)) = (empty, empty) := by
+  ext i <;> rfl
+
+end Heap
+
+end VCVio.HeapSSP
+
+/-! ## Sanity check: a two-cell heap
+
+A small example demonstrating cell access, frame, and the canonical
+`Sum`-split. If you're reading this to learn the API, this is the right
+starting point. -/
+
+namespace VCVio.HeapSSP.HeapExample
+
+open VCVio.HeapSSP
+
+inductive Id
+  | counter
+  | flag
+  deriving DecidableEq
+
+instance : CellSpec Id where
+  type
+    | .counter => Nat
+    | .flag    => Bool
+  default
+    | .counter => 0
+    | .flag    => false
+
+example : (Heap.empty : Heap Id).get .counter = 0 := rfl
+
+example : ((Heap.empty : Heap Id).update .counter 5).get .counter = 5 := by
+  simp
+
+example : ((Heap.empty : Heap Id).update .counter 5).get .flag = false := by
+  rw [Heap.get_update_of_ne (by decide : (Id.flag : Id) ≠ .counter)]
+  rfl
+
+example : (Heap.split Id Id (Heap.empty : Heap (Id ⊕ Id))).1.get .counter = 0 :=
+  rfl
+
+example :
+    let h0 : Heap Id := Heap.empty
+    let h1 : Heap Id := h0.update .counter 7
+    (Heap.split Id Id).symm (h1, h0) (.inl .counter) = 7 := by
+  simp
+
+example :
+    let h0 : Heap Id := Heap.empty
+    let h1 : Heap Id := h0.update .counter 7
+    (Heap.split Id Id).symm (h1, h0) (.inr .counter) = 0 := by
+  simp
+
+end VCVio.HeapSSP.HeapExample

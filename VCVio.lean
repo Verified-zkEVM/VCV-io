@@ -223,6 +223,10 @@ import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.StdDoExamples
 import VCVio.ProgramLogic.Unary.WriterTBridge
+import VCVio.HeapSSP.Composition
+import VCVio.HeapSSP.Examples
+import VCVio.HeapSSP.Heap
+import VCVio.HeapSSP.Package
 import VCVio.SSP.Advantage
 import VCVio.SSP.Composition
 import VCVio.SSP.Hybrid
