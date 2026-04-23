@@ -38,8 +38,6 @@ The important remaining proof obligations are:
   programming collision probability.
 - H5: bound the shifted NMA/freshness event by the fork advantage plus the
   verify-challenge miss term.
-- Public theorem cutover: route the final EUF-CMA theorem through the HeapSSP
-  chain, rather than through the legacy `hashAndSign_cma_to_nma_bound` sorry.
 
 The current proofs are hard because the framework exposes too much low-level
 state: heap cells, random-oracle caches, query logs, adversary wrappers,
@@ -220,13 +218,20 @@ Recent concrete progress:
   chain.
 - Removed the obsolete legacy `hashAndSign_cma_to_nma_bound` sorry. The
   non-HeapSSP CMA-to-NMA theorem is no longer a parallel proof path.
+- Removed the stale `simChalUniformGivenCommit` hypothesis from the public
+  Sigma FS CMA bounds; the current HeapSSP chain consumes HVZK and simulator
+  commit predictability directly.
+- Added `Package.runStateProb`, output-event bridge lemmas, and
+  `Package.run_bind` so H2/H5 proofs can reason over output plus final heap
+  without unfolding package execution.
 
 ### Phase B: Build core reusable infrastructure
 
 TODO:
 
 - Add invariant-aware HeapSSP identical-until-bad.
-- Add event-level package probability/advantage API.
+- Extend the initial event-level package probability API into the H2/H5
+  proofs.
 - Add TV bind plus bad-event lemmas.
 - Add query-bound transport lemmas.
 
@@ -256,14 +261,16 @@ TODO:
 
 ### Phase E: Route public EUF-CMA through HeapSSP
 
-TODO:
+Status: complete for the non-aborting Sigma FS-CMA path.
 
-- Replace the public `euf_cma_to_nma` dependency on the legacy
+Completed:
+
+- Replaced the public `euf_cma_to_nma` dependency on the legacy
   `hashAndSign_cma_to_nma_bound` proof path with the HeapSSP chain.
-- Make the legacy theorem a thin wrapper if it remains useful, or remove it if
-  no caller needs the old statement.
-- Ensure the final `euf_cma_bound` theorem depends on the shared HeapSSP and
-  replay-fork infrastructure.
+- Removed the legacy theorem because no caller needs the old parallel
+  statement.
+- Tightened the final `euf_cma_bound` theorem so it depends only on the shared
+  HeapSSP and replay-fork infrastructure hypotheses it actually consumes.
 
 ### Phase F: Cut over existing proven hybrids
 

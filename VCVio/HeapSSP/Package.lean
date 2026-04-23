@@ -172,6 +172,13 @@ lemma runState_bind {α β : Type v}
       P.runState A >>= fun (a, h) => (simulateQ P.impl (f a)).run h := by
   simp [runState, simulateQ_bind, StateT.run_bind, bind_assoc]
 
+@[simp]
+lemma run_bind {α β : Type v}
+    (P : Package I E Ident) (A : OracleComp E α) (f : α → OracleComp E β) :
+    P.run (A >>= f) =
+      P.runState A >>= fun (a, h) => (simulateQ P.impl (f a)).run' h := by
+  simp [run, runState, simulateQ_bind, StateT.run_bind, bind_assoc]
+
 end Package
 
 /-! ### Universe-polymorphism sanity checks

@@ -123,15 +123,13 @@ The bound includes:
 * the standard forking-lemma loss term `eps * (eps / (qH + 1) - 1 / |F|)`;
 * the joint-coupling programming-collision term `qS · (qS + qH) · (1/|F|)`,
   instantiated at the Schnorr commit-predictability bound `β = 1/|F|` from
-  `Schnorr.sigma_simCommitPredictability` and matched against the strict-drop
-  HVZK strengthening `Schnorr.sigma_simChalUniformGivenCommit`;
+  `Schnorr.sigma_simCommitPredictability`;
 * an explicit fresh-challenge verification slack `δ_verify`, supplied through
   `SigmaProtocol.verifyChallengePredictability`.
 
 The collision coefficient drops from `2 · qS · (qS + qH)` (loose chain
 decomposition, matching `FiatShamir.collisionSlack qS qH β`) to
-`qS · (qS + qH)` (joint coupling); the `simChalUniformGivenCommit` hypothesis
-is the simulator-side property that powers this tightening.
+`qS · (qS + qH)` by using the HeapSSP joint-coupling theorem.
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss
 vanishes and the simulation overhead reduces to
@@ -158,7 +156,6 @@ theorem signature_euf_cma [Finite G] [Inhabited F] (g : G)
     (Schnorr.simTranscript F G g)
     (ζ_zk := 0) le_rfl
     ((SigmaProtocol.perfectHVZK_iff_hvzk_zero _ _).mp (Schnorr.sigma_hvzk F G g))
-    (Schnorr.sigma_simChalUniformGivenCommit F G g)
     (β := (Fintype.card F : ℝ≥0∞)⁻¹)
     (Schnorr.sigma_simCommitPredictability F G g hg)
     δ_verify hVerifyGuess

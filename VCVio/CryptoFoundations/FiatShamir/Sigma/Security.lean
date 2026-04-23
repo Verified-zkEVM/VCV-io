@@ -102,13 +102,15 @@ noncomputable def collisionSlack (qS qH : ℕ) (β : ENNReal) :
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma realCommit_probOutput_le_sim_plus_hvzk
-    [DecidableEq Commit] [Inhabited Chal] [SampleableType Chal]
+    [Inhabited Chal] [SampleableType Chal]
     {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
     {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
     {x : Stmt} {w : Wit} (hx : rel x w = true) (c₀ : Commit) :
     Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] ≤
       Pr[= c₀ | Prod.fst <$> simTranscript x] + ENNReal.ofReal ζ_zk := by
+  classical
+  letI := Classical.decEq Commit
   let eventDec : Commit × Chal × Resp → Bool := fun z => decide (z.1 = c₀)
   let eventReal : ProbComp Bool := eventDec <$> σ.realTranscript x w
   let eventSim : ProbComp Bool := eventDec <$> simTranscript x
@@ -169,7 +171,7 @@ private lemma realCommit_probOutput_le_sim_plus_hvzk
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma realCommit_probOutput_le_beta_hvzk
-    [DecidableEq Commit] [Inhabited Chal] [SampleableType Chal]
+    [Inhabited Chal] [SampleableType Chal]
     {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
     {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
@@ -344,11 +346,8 @@ where `β` is the simulator's commit-predictability bound (see
 `SigmaProtocol.simCommitPredictability`) and `δ_verify` bounds fresh-challenge
 verification acceptance (see `SigmaProtocol.verifyChallengePredictability`).
 
-The bound is tight in the joint-coupling sense: per-step `ζ_zk` paid `qS` times,
-single-side `β`-collision with no factor of 2. The `simChalUniformGivenCommit`
-hypothesis lets us treat the programming step as a strict drop-in from the real
-RO, eliminating the factor of `(qS + qH + 1)` in the HVZK term and the factor
-of `2` in the collision term that the loose chain-decomposition bound has.
+The bound is tight in the joint-coupling sense: per-step `ζ_zk` paid `qS` times
+and a single-side `β` collision term with no factor of 2.
 
 The NMA adversary `B` is constructed by the simulator from `A` (running
 `A.main pk` with the signing oracle replaced by the HVZK simulator and the
@@ -359,11 +358,10 @@ This step is independent of special soundness and the forking lemma; those are
 handled by `euf_nma_bound`. -/
 theorem euf_cma_to_nma
     [DecidableEq M] [DecidableEq Commit]
-    [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hHVZK : σ.HVZK simTranscript ζ_zk)
-    (_hChalU : σ.simChalUniformGivenCommit simTranscript)
     (β : ENNReal)
     (hPredSim : σ.simCommitPredictability simTranscript β)
     (δ_verify : ENNReal)
@@ -995,11 +993,9 @@ quadratic blow-up). The ENNReal subtraction truncates at zero, so the bound is
 trivially satisfied when the simulation loss exceeds the advantage.
 
 The tightening compared to the chain-decomposition form (which has
-`qS·(qS+qH+1)·ζ_zk + 2·qS·(qS+qH)·β`) requires the simulator to satisfy
-`SigmaProtocol.simChalUniformGivenCommit` in addition to the HVZK distance
-bound. Concrete Σ-protocols (Schnorr / Okamoto / Pointcheval-Stern style) all
-satisfy this strengthening when the underlying language is in the relation's
-image; see `Examples/Schnorr.lean#sigma_simChalUniformGivenCommit`.
+`qS·(qS+qH+1)·ζ_zk + 2·qS·(qS+qH)·β`) is carried by the HeapSSP H3
+joint-coupling theorem: it pays the HVZK distance once per signing query and
+charges the simulator-commit collision event once.
 
 When HVZK is perfect (`ζ_zk = 0`), the HVZK term vanishes and the bound
 specializes to `(ε - qS·(qS+qH)·β - δ_verify) · …`.
@@ -1020,7 +1016,6 @@ theorem euf_cma_bound
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
-    (hChalU : σ.simChalUniformGivenCommit simTranscript)
     (β : ENNReal)
     (hPredSim : σ.simCommitPredictability simTranscript β)
     (δ_verify : ENNReal)
@@ -1039,7 +1034,7 @@ theorem euf_cma_bound
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
-    ζ_zk hζ_zk hhvzk hChalU β hPredSim δ_verify hVerifyGuess adv qS qH hQ
+    ζ_zk hζ_zk hhvzk β hPredSim δ_verify hVerifyGuess adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) -

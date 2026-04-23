@@ -67,12 +67,52 @@ def runProb {α : Type} (P : Package unifSpec E Ident) (A : OracleComp E α) :
     ProbComp α :=
   P.run A
 
+/-- Run a probability-only heap-package against an adversary and keep the
+final heap. This is the event-level counterpart of `runProb`: use it when
+the success predicate depends on package state such as a log, cache, or bad
+flag. -/
+@[reducible]
+def runStateProb {α : Type} (P : Package unifSpec E Ident) (A : OracleComp E α) :
+    ProbComp (α × Heap Ident) :=
+  P.runState A
+
 /-- `runProb` unfolds to `run` definitionally. Exposed as a simp lemma so
 that heap-SSP-facing lemmas phrased in terms of `runProb` rewrite cleanly
 against `run`-phrased ones in `VCVio.HeapSSP.Composition`. -/
 @[simp]
 lemma runProb_eq_run {α : Type} (P : Package unifSpec E Ident)
     (A : OracleComp E α) : P.runProb A = P.run A := rfl
+
+/-- `runStateProb` unfolds to `runState` definitionally. -/
+@[simp]
+lemma runStateProb_eq_runState {α : Type} (P : Package unifSpec E Ident)
+    (A : OracleComp E α) : P.runStateProb A = P.runState A := rfl
+
+/-- Discarding the final heap from `runStateProb` recovers `runProb`. -/
+lemma runProb_eq_fst_map_runStateProb {α : Type}
+    (P : Package unifSpec E Ident) (A : OracleComp E α) :
+    P.runProb A = Prod.fst <$> P.runStateProb A := by
+  unfold runProb runStateProb Package.run Package.runState
+  simp [StateT.run'_eq, map_bind]
+
+/-- Output-only events over `runProb` can be read as event predicates over
+`runStateProb` that ignore the final heap. This is the bridge used when a
+proof first reasons at event/final-state granularity and then returns to the
+traditional Boolean-output API. -/
+lemma probEvent_runProb_eq_runStateProb {α : Type}
+    (P : Package unifSpec E Ident) (A : OracleComp E α) (p : α → Prop) :
+    Pr[p | P.runProb A] = Pr[fun z : α × Heap Ident => p z.1 | P.runStateProb A] := by
+  rw [runProb_eq_fst_map_runStateProb]
+  rw [probEvent_map]
+  rfl
+
+/-- Boolean-output specialization of `probEvent_runProb_eq_runStateProb`. -/
+lemma probOutput_true_runProb_eq_runStateProb
+    (P : Package unifSpec E Ident) (A : OracleComp E Bool) :
+    Pr[= true | P.runProb A] =
+      Pr[fun z : Bool × Heap Ident => z.1 = true | P.runStateProb A] := by
+  rw [← probEvent_eq_eq_probOutput]
+  exact probEvent_runProb_eq_runStateProb P A (· = true)
 
 /-! ### Advantage and triangle inequality -/
 
