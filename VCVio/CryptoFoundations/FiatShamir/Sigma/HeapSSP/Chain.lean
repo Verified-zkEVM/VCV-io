@@ -108,6 +108,29 @@ theorem nmaAdvFromCma_nmaHashQueryBound
     FiatShamir.simulatedNmaAdv_hashQueryBound σ hr M simT adv qS qH hQ pk
   simpa [nmaHashQueryBound, nmaAdvFromCma] using hbase
 
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit]
+  [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
+/-- Shifted H5 adversary factored at the candidate/verify boundary.
+
+The H3 bound already uses this split to keep the final verifier query out of
+the signing-replacement cost. H5 needs the same split for a different reason:
+candidate production is the forkable managed-RO run, while `verifyFreshComp`
+is the single final check that either hits the live query log or pays the
+fresh-challenge `δ_verify` term. -/
+theorem cmaToNma_shiftLeft_signedFreshAdv_eq_bind
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (simT : Stmt → ProbComp (Commit × Chal × Resp)) :
+    (cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft
+        (signedFreshAdv σ hr M adv) =
+      (cmaToNma (Stmt := Stmt) M Commit Chal simT).init >>= fun h =>
+        (simulateQ (cmaToNma (Stmt := Stmt) M Commit Chal simT).impl
+          (signedCandidateAdv σ hr M adv)).run h >>= fun (p, h') =>
+          Prod.fst <$> (simulateQ (cmaToNma (Stmt := Stmt) M Commit Chal simT).impl
+            (verifyFreshComp (σ := σ) (hr := hr) (M := M)
+              (Commit := Commit) (Chal := Chal) (Resp := Resp) p)).run h' := by
+  rw [signedFreshAdv, Package.shiftLeft_bind]
+
 /-- **H5 hop**: NMA-side fresh-forgery acceptance probability is bounded
 by `Fork.advantage + δ_verify`.
 

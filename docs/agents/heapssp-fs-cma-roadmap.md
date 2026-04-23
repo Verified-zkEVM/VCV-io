@@ -224,6 +224,9 @@ Recent concrete progress:
 - Added `Package.runStateProb`, output-event bridge lemmas, and
   `Package.run_bind` so H2/H5 proofs can reason over output plus final heap
   without unfolding package execution.
+- Added `Package.shiftLeft_bind` and the FS-specific
+  `cmaToNma_shiftLeft_signedFreshAdv_eq_bind` lemma, pinning H5 to the same
+  candidate/verify split used by H3.
 
 ### Phase B: Build core reusable infrastructure
 

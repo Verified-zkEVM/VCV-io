@@ -114,6 +114,14 @@ lemma probOutput_true_runProb_eq_runStateProb
   rw [← probEvent_eq_eq_probOutput]
   exact probEvent_runProb_eq_runStateProb P A (· = true)
 
+/-- Probability-only specialization of `Package.run_bind`, phrased with
+`runProb` and `runStateProb`. -/
+lemma runProb_bind {α β : Type}
+    (P : Package unifSpec E Ident) (A : OracleComp E α) (f : α → OracleComp E β) :
+    P.runProb (A >>= f) =
+      P.runStateProb A >>= fun (a, h) => Prod.fst <$> (simulateQ P.impl (f a)).run h := by
+  simp [runProb, runStateProb]
+
 /-! ### Advantage and triangle inequality -/
 
 /-- The Boolean distinguishing advantage between two probability-only

@@ -207,6 +207,15 @@ lemma shiftLeft_map (P : Package M E α) {γ δ : Type v} (f : γ → δ)
   refine bind_congr fun h_α => ?_
   rw [StateT.run_map, Functor.map_map, Functor.map_map]
 
+lemma shiftLeft_bind (P : Package M E α) {γ δ : Type v}
+    (A : OracleComp E γ) (f : γ → OracleComp E δ) :
+    P.shiftLeft (A >>= f) =
+      P.init >>= fun h_α =>
+        (simulateQ P.impl A).run h_α >>= fun (a, h_α') =>
+          Prod.fst <$> (simulateQ P.impl (f a)).run h_α' := by
+  unfold Package.shiftLeft
+  simp [simulateQ_bind, StateT.run_bind, map_bind]
+
 /-- **SSP reduction (program form).** Running the linked game `P.link Q`
 against adversary `A` produces the same `OracleComp` distribution as
 running the inner game `Q` against the shifted adversary `P.shiftLeft A`.
