@@ -448,6 +448,19 @@ noncomputable def cacheCount {M : Type} [DecidableEq M]
     (cache : (roSpec M Commit Chal).QueryCache) : ℕ :=
   cache.toSet.ncard
 
+/-- The empty cache has zero entries. -/
+lemma cacheCount_empty {M : Type} [DecidableEq M]
+    {Commit : Type} [DecidableEq Commit] {Chal : Type} :
+    cacheCount (∅ : (roSpec M Commit Chal).QueryCache) = 0 := by
+  simp [cacheCount, QueryCache.toSet_empty]
+
+omit [SampleableType Chal] in
+/-- `cacheCount` of the initial inner data (empty RO cache) is zero. -/
+lemma cacheCount_cmaInitData :
+    cacheCount (cmaInitData M Commit Chal
+      (Stmt := Stmt) (Wit := Wit)).2.1 = 0 :=
+  cacheCount_empty
+
 /-- Per-state ε for the H3 hop, read off `CmaInnerData`'s RO cache. -/
 noncomputable def cmaSignEps {M : Type} [DecidableEq M]
     {Commit : Type} [DecidableEq Commit] {Chal Stmt Wit : Type}
@@ -519,17 +532,21 @@ integrating `cmaSignEps ζ_zk β` over the reachable states of
 `simulateQ cmaReal.impl A`, after conjugation through
 `cmaHeapStateEquiv`.
 
+The general form accommodates an arbitrary starting `CmaInnerData`
+through its current `cacheCount`: the sum over at most `qS` sign
+queries plus `qH` hash queries grows the RO cache by at most one per
+step (sign calls internally perform one hash lookup), so along any
+trace `cacheCount` stays at most `cacheCount s.2.1 + qS + qH`.
+
 Parameters:
 * `h_qb` — sign-query budget: `A` issues at most `qS` signing queries.
 * `h_qH` — hash-query budget: `A` issues at most `qH` random-oracle
   queries.
 
-The quantitative bound `qS * ζ_zk + qS * (qS + qH) * β` decomposes as
-`qS` independent payments of `ζ_zk` (HVZK per sign query), plus a
-cache-growth term bounding cumulative `cacheCount` by `qS * (qS + qH)`:
-each sign query's cache-collision ε-cost is `cacheCount · β`, and
-`cacheCount` is bounded by `qS + qH` at every reachable state, giving
-an `qS · (qS + qH) · β` bound when summed over `qS` sign queries. -/
+At `s = cmaInitData` (empty cache), `cacheCount s.2.1 = 0` and the
+bound specializes to the tight form
+`qS * ζ_zk + qS * (qS + qH) * β` expected by the H3 hop
+(`cmaReal_cmaSim_advantage_le_H3_bound`). -/
 theorem cmaSignEps_expectedSCost_le
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel)
@@ -553,7 +570,8 @@ theorem cmaSignEps_expectedSCost_le
       (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt))
       (cmaSignEps ζ_zk β) A qS (s, false)
-      ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
+      ≤ (qS : ℝ≥0∞) * ζ_zk
+        + (qS : ℝ≥0∞) * ((cacheCount s.2.1 : ℝ≥0∞) + qS + qH) * β := by
   sorry
 
 /-! ### Top-level H3 hop
@@ -636,13 +654,18 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
       funext z; rfl
     rw [heq]; exact h
   -- Bound expectedSCost via cmaSignEps_expectedSCost_le.
+  have h_cacheCount_init : (cacheCount s_init.2.1 : ℝ≥0∞) = 0 := by
+    rw [cacheCount_cmaInitData]; simp
   have h_cost_le :
       expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEps ζ_zk β) A qS (s_init, false)
-        ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β :=
-    cmaSignEps_expectedSCost_le M Commit Chal σ hr ζ_zk β A qS qH h_qb h_qH _
+        ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
+    have h_gen :=
+      cmaSignEps_expectedSCost_le M Commit Chal σ hr ζ_zk β A qS qH h_qb h_qH s_init
+    rw [h_cacheCount_init, zero_add] at h_gen
+    exact h_gen
   -- Chain the inequalities.
   calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
           (cmaSim M Commit Chal hr simT) A)
