@@ -69,8 +69,7 @@ so that the pointfree `linkReshape <$> _` reads cleanly at use sites.
 Marked `@[reducible]` so that downstream proofs can unfold it into the concrete lambda
 `fun p => (p.1.1, (p.1.2, p.2))` without additional rewriting. Kept at the
 `Package` namespace for use by structural equivalence proofs that need to reason about
-`link.impl`'s output shape (e.g. the H4 hop of the Fiat-Shamir EUF-CMA chain in
-`VCVio/CryptoFoundations/FiatShamir/Sigma/SSP/Hops.lean`). -/
+`link.impl`'s output shape. -/
 @[reducible]
 def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
     (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))

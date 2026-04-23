@@ -155,9 +155,9 @@ This is the lemma form of `Package.simulateQ_StateT_evalDist_congr_of_bij` from
 `VCVio.SSP.Advantage`, lifted to the package level: the per-handler hypothesis with bijection
 discharges the simulation step, and the init hypothesis discharges the setup step.
 
-This is the constructor used in `VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Hops` to relate
-`cmaSim` to `cmaToNma.link nma`, where the state types are isomorphic but not propositionally
-equal. -/
+This is the go-to constructor for relating two packages whose state types are isomorphic
+but not propositionally equal (for example, a monolithic package and a link composition
+that happen to share an isomorphic state space). -/
 theorem of_step_bij
     (G₀ : Package unifSpec E σ₀) (G₁ : Package unifSpec E σ₁) (φ : σ₀ ≃ σ₁)
     (h_init : evalDist G₀.init = evalDist (φ.symm <$> G₁.init))

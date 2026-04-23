@@ -13,11 +13,11 @@ import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Bridge
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Chain
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Games
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Hops
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Spec
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
@@ -78,6 +78,7 @@ import VCVio.HeapSSP.DistEquiv
 import VCVio.HeapSSP.Examples
 import VCVio.HeapSSP.Heap
 import VCVio.HeapSSP.Hybrid
+import VCVio.HeapSSP.IdenticalUntilBad
 import VCVio.HeapSSP.IndistAt
 import VCVio.HeapSSP.Package
 import VCVio.Interaction.Basic.Append

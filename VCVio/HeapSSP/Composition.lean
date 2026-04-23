@@ -102,6 +102,35 @@ lemma link_impl_apply_run (outer : Package M E α) (inner : Package I M β)
     ((outer.link inner).impl t).run ((Heap.split α β).symm (h_α, h_β)) =
       linkReshape <$> (simulateQ inner.impl ((outer.impl t).run h_α)).run h_β := rfl
 
+/-! ### Forwarding reduction for `link`
+
+If the outer handler on query `t` is a pure *forwarder* over some
+oracle computation `q : OracleComp M (E.Range t)` (i.e. it is
+`fun h_α => (fun a => (a, h_α)) <$> q`, threading `h_α` through
+unchanged), the linked handler reduces to one `<$>` over
+`simulateQ inner.impl q` with the outer heap `h_α` re-inserted via
+`(Heap.split α β).symm`. This captures the common "outer just delegates"
+pattern that shows up whenever a reduction package only touches a
+single inner channel on a given query. -/
+
+/-- Closed form for the linked handler on a query whose outer handler is a
+pure forwarder through `q : OracleComp M (E.Range t)`. The linked result on
+heap `(Heap.split α β).symm (h_α, h_β)` is one reshape over the inner
+simulation of `q`, with `h_α` threaded back via `(Heap.split α β).symm`. -/
+lemma link_impl_apply_run_of_outer_forward
+    (outer : Package M E α) (inner : Package I M β)
+    (t : E.Domain) (q : OracleComp M (E.Range t))
+    (houter : outer.impl t =
+      StateT.mk fun h_α => (fun a => (a, h_α)) <$> q)
+    (h_α : Heap α) (h_β : Heap β) :
+    ((outer.link inner).impl t).run ((Heap.split α β).symm (h_α, h_β)) =
+      (fun (p : E.Range t × Heap β) =>
+        (p.1, (Heap.split α β).symm (h_α, p.2))) <$>
+          (simulateQ inner.impl q).run h_β := by
+  rw [link_impl_apply_run, houter]
+  simp only [StateT.run_mk, simulateQ_map, StateT.run_map, Functor.map_map,
+    linkReshape]
+
 /-! ### `link` reduction lemma (parametric in the heap factors) -/
 
 /-- Structural fact: running `(P.link Q).impl` against an adversary `A`,

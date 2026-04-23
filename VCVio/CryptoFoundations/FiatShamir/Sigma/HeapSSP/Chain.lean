@@ -3,62 +3,43 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Bridge
-import VCVio.CryptoFoundations.FiatShamir.Sigma.SSP.Hops
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
-import VCVio.SSP.Composition
+import VCVio.HeapSSP.Composition
 
 /-!
-# SSP Chain: H5 and the top-level EUF-CMA-to-Fork bound
+# HeapSSP Chain: H5 and the top-level EUF-CMA-to-Fork bound
 
-The capstone of the SSP-style Fiat-Shamir EUF-CMA proof: chains
-H1+H2+H3+H4+H5 to produce the EUF-CMA-to-`Fork.advantage` bound. This
-file is the endpoint of the SSP rewrite; matched against
-`FiatShamir.euf_cma_to_nma` in `Sigma/Security.lean`, which it is
-scheduled to replace in Phase G of `.ignore/fs-ssp-plan.md`.
+Endpoint of the HeapSSP-style Fiat-Shamir EUF-CMA proof: chains
+H1+H2+H3+H4+H5 to produce the EUF-CMA-to-`Fork.advantage` bound.
+
+State access is heap-based. `cmaRealRun` packages the signed-message
+log via `p.2 (Sum.inl .log)`; the `hProj` step in the final chain
+reduction reads off the `.inl .log` cell verbatim. H4 is a direct
+instance of `Package.run_link_eq_run_shiftLeft`, so no per-state
+equivalence scaffolding is needed.
 
 ## Contents
 
 * `nmaAdvFromCma` — reduction construction: from a CMA adversary and an
   HVZK simulator, build a managed-RO NMA adversary suitable as input
   to the replay-forking lemma (`Fork.replayForkingBound`).
-* `nma_runProb_shiftLeft_signedAdv_le_fork` — **H5 hop**: the NMA-side
-  probability of accepting a forgery is bounded above by
-  `Fork.advantage σ hr M nmaAdv qH + δ_verify`, where the
-  `δ_verify`-slack accounts for forgeries verifying through challenge
-  values never queried live (fresh-challenge verification, bounded by
-  `SigmaProtocol.verifyChallengePredictability`).
-* `cma_advantage_le_fork_bound` — **top-level chain** (`SSP` cut of
-  `FiatShamir.euf_cma_to_nma`). Threads H1+H2 through H3, H4, H5:
-  ```
-  adv.advantage (runtime M)
-    ≤ Fork.advantage σ hr M nmaAdv qH
-      + ENNReal.ofReal (qS · ζ_zk)
-      + qS · (qS + qH) · β
-      + δ_verify.
-  ```
-  This is the tight Pointcheval-Stern-with-HVZK bound, saving
-  `qS · (qS + qH) · (β + ζ_zk)` over the OLD chain-decomposition form
-  (see §5 of `.ignore/fs-ssp-plan.md`).
-
-Combined with `FiatShamir.euf_nma_bound` in `Sigma/Security.lean` (which
-this file does not touch, since that hop is already stated in the
-existing style and is fully independent of the SSP rewrite), the result
-is `FiatShamir.euf_cma_bound`, the EUF-CMA-to-`hardRelationExp` bound.
-
-All three headline theorems are presently stated as `sorry`-bodied
-scaffolding. Proofs correspond to Phases F (H5 + chain) and G (retire
-`CmaToNma.lean`, replace `euf_cma_to_nma`'s body with this chain) of
-the plan.
+* `nma_runProb_shiftLeft_signedAdv_le_fork` — **H5 hop**: bounds the
+  NMA-side probability of accepting a forgery by
+  `Fork.advantage σ hr M nmaAdv qH + δ_verify`; kept as `sorry` pending
+  the forking-lemma reduction proof.
+* `cma_advantage_le_fork_bound` — **top-level chain**. Tight
+  Pointcheval-Stern-with-HVZK bound assembled from H1+H2+H3+H4+H5.
 -/
 
 universe u
 
-open ENNReal OracleSpec OracleComp ProbComp VCVio.SSP
+open ENNReal OracleSpec OracleComp ProbComp VCVio.HeapSSP
 
-namespace FiatShamir.SSP
+namespace FiatShamir.HeapSSP
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
 variable [SampleableType Stmt] [SampleableType Wit]
@@ -91,10 +72,8 @@ The `advCache` output is the union of all entries installed by the
 simulator across signing queries, packaged as the managed-RO cache
 consumed by `managedRoNmaExp`.
 
-Alias for `FiatShamir.simulatedNmaAdv` under the SSP-namespace
-spelling used by the chain theorem below. Phase G of the SSP rewrite
-plan will promote this to the primary name and retire the current
-`simulatedNmaAdv` spelling. -/
+Alias for `FiatShamir.simulatedNmaAdv` under the HeapSSP-namespace
+spelling used by the chain theorem below. -/
 noncomputable def nmaAdvFromCma
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -143,7 +122,8 @@ decomposed as:
   challenge; bounded by `SigmaProtocol.verifyChallengePredictability σ
   δ_verify`.
 
-Proof outline (Phase F, ~100 LoC):
+Proof outline:
+
 1. Split the event `verify = true` by whether the forgery's hash point
    `(msg, c)` was ever queried live during the simulation.
 2. For the "queried live" branch, the verifying challenge matches the
@@ -174,16 +154,16 @@ theorem nma_runProb_shiftLeft_signedAdv_le_fork
 
 /-! ### Top-level chain: H1 + H2 + H3 + H4 + H5 -/
 
-/-- **Top-level SSP chain** — tight EUF-CMA-to-Fork bound.
+/-- **Top-level HeapSSP chain** — tight EUF-CMA-to-Fork bound.
 
-This is the SSP-native counterpart of `FiatShamir.euf_cma_to_nma`
+HeapSSP-native counterpart of `FiatShamir.euf_cma_to_nma`
 (see `Sigma/Security.lean`). The chain is:
 
   `H1` (drop-fresh)                     +0
     ≤ `H2` (`unforgeableExpNoFresh = cmaReal.runProb signedAdv`)   +0
     ≤ `H3` (identical-until-bad, HVZK + cache-collision)
           +`qS · ζ_zk + qS · (qS + qH) · β`
-    = `H4` (`cmaSim = nma · cmaToNma` as a package)           +0
+    = `H4` (`cmaSim = cmaToNma.link nma`)           +0
     ≤ `H5` (fork + fresh-challenge)
           +`Fork.advantage σ hr M (nmaAdvFromCma …) qH + δ_verify`
 
@@ -196,11 +176,7 @@ Summing the per-hop slacks delivers the tight bound:
       + δ_verify`.
 
 Downstream, composing with `FiatShamir.euf_nma_bound` (the forking
-lemma with special soundness) yields `FiatShamir.euf_cma_bound`.
-
-Matches the signature of `FiatShamir.euf_cma_to_nma` verbatim so that
-Phase G can substitute this theorem for that one in
-`Sigma/Security.lean` and retire `Sigma/CmaToNma.lean`. -/
+lemma with special soundness) yields `FiatShamir.euf_cma_bound`. -/
 theorem cma_advantage_le_fork_bound
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
@@ -214,11 +190,12 @@ theorem cma_advantage_le_fork_bound
     (qS qH : ℕ)
     (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (S' := Commit × Resp) (oa := adv.main pk) qS qH)
-    -- `hQB`: translated query bound on the Bool-valued adversary `Prod.snd <$> signedAdv`.
-    -- This is the H3 hypothesis, obtainable from `hQ` by tracking `signedAdv`'s pre/post-keygen
-    -- layout (1 pkSpec + lifted `adv.main pk` + liftM verify). Left as an assumption at this
-    -- layer so that the chain's arithmetic is independent of the bound-translation bookkeeping,
-    -- which is scheduled for Phase G.
+    -- `hQB`: translated query bound on the Bool-valued adversary
+    -- `Prod.snd <$> signedAdv`. This is the H3 hypothesis, obtainable from
+    -- `hQ` by tracking `signedAdv`'s pre/post-keygen layout
+    -- (1 pkSpec + lifted `adv.main pk` + liftM verify). Left as an
+    -- assumption at this layer so that the chain's arithmetic is
+    -- independent of the bound-translation bookkeeping.
     (hQB : OracleComp.IsQueryBound
       ((Prod.snd : (M × (Commit × Resp)) × Bool → Bool) <$> signedAdv σ hr M adv) qS
       (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
@@ -247,7 +224,7 @@ theorem cma_advantage_le_fork_bound
           (((cmaReal M Commit Chal σ hr).runProb A).boolDistAdvantage
             ((cmaSim M Commit Chal hr simT).runProb A))
         ≤ (qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β :=
-    cmaReal_cmaSim_advantage_le_H3_bound (M := M) σ hr simT
+    cmaReal_cmaSim_advantage_le_H3_bound M Commit Chal σ hr simT
       (ENNReal.ofReal ζ_zk) β hζ_zk_lt hHVZK' hCommit A qS qH hQB
   have hH3_prob : Pr[= true | (cmaReal M Commit Chal σ hr).runProb A] ≤
       Pr[= true | (cmaSim M Commit Chal hr simT).runProb A] +
@@ -257,13 +234,13 @@ theorem cma_advantage_le_fork_bound
         ((cmaReal M Commit Chal σ hr).runProb A)
         ((cmaSim M Commit Chal hr simT).runProb A))
       (add_le_add le_rfl hH3_abs)
-  have hH4 := cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma (M := M) σ hr simT
+  have hH4 := cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma M Commit Chal hr simT
     (A := A)
   have hH4_pr : Pr[= true | (cmaSim M Commit Chal hr simT).runProb A] =
       Pr[= true |
         (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
           ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A)] :=
-    probOutput_congr rfl hH4
+    probOutput_congr rfl (congrArg evalDist hH4)
   have hA_fst_snd : A = (Prod.snd ∘ id) <$> signedAdv σ hr M adv := by
     rw [hA_def]; rfl
   have hH5' :
@@ -279,7 +256,7 @@ theorem cma_advantage_le_fork_bound
     have hA_eq : A = Prod.snd <$> signedAdv σ hr M adv := hA_def
     rw [hA_eq, hShift, hRun]
     rw [probOutput_map_eq_tsum_ite]
-    -- Now goal is `∑' x : _ × Bool, (if true = x.2 then Pr[= x | ...] else 0) ≤ Fork.adv + δ_v`.
+    -- Now goal: `∑' x, (if true = x.2 then Pr[= x | ...] else 0) ≤ Fork.adv + δ_v`.
     -- Convert back to probEvent.
     have : Pr[= true |
         Prod.snd (α := M × (Commit × Resp)) (β := Bool) <$>
@@ -291,7 +268,7 @@ theorem cma_advantage_le_fork_bound
       rw [← probEvent_eq_eq_probOutput, probEvent_map]; rfl
     rw [← probOutput_map_eq_tsum_ite]
     rw [this]
-    exact nma_runProb_shiftLeft_signedAdv_le_fork (M := M) σ hr adv simT qS qH hQ
+    exact nma_runProb_shiftLeft_signedAdv_le_fork σ hr M adv simT qS qH hQ
       δ_verify hVerifyGuess
   have hH1H2 : adv.advantage (FiatShamir.runtime M) ≤
       Pr[= true | (cmaReal M Commit Chal σ hr).runProb A] := by
@@ -304,10 +281,12 @@ theorem cma_advantage_le_fork_bound
           (fun p : (M × (Commit × Resp)) × Bool × List M => p.2.1) <$>
               cmaRealRun σ hr M adv =
             (cmaReal M Commit Chal σ hr).runProb A := by
-        -- LHS reduces to `(fun q => q.1.2) <$> runState signedAdv` after unfolding
-        -- `cmaRealRun` and eliminating the pure bind.
-        -- RHS: `runProb (Prod.snd <$> signedAdv) = Prod.snd <$> runProb signedAdv` (runProb_map)
-        -- `= Prod.snd <$> (Prod.fst <$> runState signedAdv) = (fun q => q.1.2) <$> runState`.
+        -- LHS reduces to `(fun q => q.1.2) <$> runState signedAdv` after
+        -- unfolding `cmaRealRun` and eliminating the pure bind.
+        -- RHS: `runProb (Prod.snd <$> signedAdv) = Prod.snd <$> runProb signedAdv`
+        --   (runProb_map)
+        -- `= Prod.snd <$> (Prod.fst <$> runState signedAdv)`
+        -- `= (fun q => q.1.2) <$> runState`.
         rw [hA_def, Package.runProb_map]
         unfold cmaRealRun
         rw [map_bind]
@@ -343,4 +322,4 @@ theorem cma_advantage_le_fork_bound
               ENNReal.ofReal_natCast _]
         ring
 
-end FiatShamir.SSP
+end FiatShamir.HeapSSP

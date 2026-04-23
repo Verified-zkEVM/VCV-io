@@ -17,6 +17,7 @@ import Examples.ElGamal.Hash
 import Examples.ElGamal.ReductionCost
 import Examples.ElGamal.SSP
 import Examples.FrankingProtocol
+import Examples.MiniFS.HeapSSP
 import Examples.OneTimePad.Basic
 import Examples.OneTimePad.HeapBasic
 import Examples.OneTimePad.HeapPar
