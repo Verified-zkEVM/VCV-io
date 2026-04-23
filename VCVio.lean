@@ -229,6 +229,8 @@ import VCVio.HeapSSP.Heap
 import VCVio.HeapSSP.Package
 import VCVio.SSP.Advantage
 import VCVio.SSP.Composition
+import VCVio.SSP.DistEquiv
 import VCVio.SSP.Hybrid
 import VCVio.SSP.IdenticalUntilBad
+import VCVio.SSP.IndistAt
 import VCVio.SSP.Package
