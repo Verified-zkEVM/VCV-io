@@ -37,6 +37,20 @@ instances) or the dedicated combinators `IndistAt.trans` / `IndistAt.distEquiv_l
 `IndistAt.distEquiv_right` to chain hops; `IndistAt.hybrid` is the right tool for chains of
 length ≥ 3.
 
+TODO: design a dedicated `calc`-style tactic / macro for "approximate-with-error" chains
+(`indist_calc` / `indist_chain` / similar). The macro would parse a syntax such as
+```text
+indist_calc
+  G₀ ≡ᵈ G₀'   := h₀
+  G₀' ≈ᵈ[ε₁] G₁ := h₁
+  G₁ ≡ᵈ G₁'   := h₂
+```
+elaborate each step against the existing `Trans` instances, and return a single witness
+`G₀ ≈ᵈ[ε₁] G₁'`. This belongs in a follow-up PR once the surrounding game-hopping API is
+stable (it has nontrivial design overlap with how `IndistAt.hybrid` and the per-hop bound
+list should be threaded). See the `## API surface` section above for the underlying
+combinators that the macro would compose.
+
 ## Note on the `ε = 0` case
 
 In the Bool-adversary world, `IndistAt G₀ G₁ 0` is a strictly weaker statement than `G₀ ≡ᵈ G₁`

@@ -256,6 +256,68 @@ lemma par_init (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β) :
       liftComp p₂.init (I₁ + I₂) >>= fun h_β =>
       pure ((Heap.split α β).symm (h_α, h_β)) := rfl
 
+/-- Parametric form of `(par p₁ p₂).impl (Sum.inl t)` applied to a heap built
+from `(Heap.split α β).symm (h_α, h_β)`. The `Heap.split` projections inside
+the parallel handler collapse via the right-inverse of `Heap.split`, leaving
+a clean expression in `h_α` and `h_β`. -/
+lemma par_impl_inl_apply_run
+    (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β)
+    (t : E₁.Domain) (h_α : Heap α) (h_β : Heap β) :
+    ((p₁.par p₂).impl (Sum.inl t)).run ((Heap.split α β).symm (h_α, h_β)) =
+      (Prod.map id (fun h_α' => (Heap.split α β).symm (h_α', h_β))) <$>
+        liftComp ((p₁.impl t).run h_α) (I₁ + I₂) := rfl
+
+/-- Parametric form of `(par p₁ p₂).impl (Sum.inr t)` applied to a heap built
+from `(Heap.split α β).symm (h_α, h_β)`. -/
+lemma par_impl_inr_apply_run
+    (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β)
+    (t : E₂.Domain) (h_α : Heap α) (h_β : Heap β) :
+    ((p₁.par p₂).impl (Sum.inr t)).run ((Heap.split α β).symm (h_α, h_β)) =
+      (Prod.map id (fun h_β' => (Heap.split α β).symm (h_α, h_β'))) <$>
+        liftComp ((p₂.impl t).run h_β) (I₁ + I₂) := rfl
+
+/-- Closed form for simulating a single left-channel query against the parallel
+handler, on a heap of the split-canonical shape.
+
+The composite `simulateQ` of the lifted query reduces to `liftComp` of the
+corresponding single-channel `(p₁.impl t).run h_α`, with the right-half heap
+`h_β` threaded through unchanged via `(Heap.split α β).symm`. This bundles
+`simulateQ_spec_query` (which removes the `id <$>` artifact in parametric
+sum-spec contexts) with `par_impl_inl_apply_run` (which collapses the
+`Heap.split` projections inside the parallel handler).
+
+Stated in `.run` form to match the shape produced by `StateT.run_bind`, which
+leaves `(simulateQ ... (liftM ...)).run state_arg` on the proof state.
+
+Using this lemma directly is the canonical way to step a left-channel
+adversary query through `Package.par.run`; without it, one has to manage the
+`simulateQ`/`<$>`/`StateT.run` interleaving by hand. -/
+@[simp]
+lemma simulateQ_par_query_inl_run
+    (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β)
+    (t : E₁.Domain) (h_α : Heap α) (h_β : Heap β) :
+    (simulateQ (p₁.par p₂).impl
+        (liftM ((E₁ + E₂).query (Sum.inl t)))).run
+      ((Heap.split α β).symm (h_α, h_β)) =
+        (Prod.map id (fun h_α' => (Heap.split α β).symm (h_α', h_β))) <$>
+          liftComp ((p₁.impl t).run h_α) (I₁ + I₂) := by
+  rw [simulateQ_spec_query]
+  exact par_impl_inl_apply_run p₁ p₂ t h_α h_β
+
+/-- Closed form for simulating a single right-channel query against the
+parallel handler, dual to `simulateQ_par_query_inl_run`. -/
+@[simp]
+lemma simulateQ_par_query_inr_run
+    (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β)
+    (t : E₂.Domain) (h_α : Heap α) (h_β : Heap β) :
+    (simulateQ (p₁.par p₂).impl
+        (liftM ((E₁ + E₂).query (Sum.inr t)))).run
+      ((Heap.split α β).symm (h_α, h_β)) =
+        (Prod.map id (fun h_β' => (Heap.split α β).symm (h_α, h_β'))) <$>
+          liftComp ((p₂.impl t).run h_β) (I₁ + I₂) := by
+  rw [simulateQ_spec_query]
+  exact par_impl_inr_apply_run p₁ p₂ t h_α h_β
+
 end Package
 
 /-! ### Universe-polymorphism sanity checks for `link` and `par` -/
