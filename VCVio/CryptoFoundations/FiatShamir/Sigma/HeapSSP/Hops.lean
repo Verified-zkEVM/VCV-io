@@ -467,20 +467,9 @@ lemma cacheCount_cacheQuery_le {M : Type} [DecidableEq M]
     {Commit : Type} [DecidableEq Commit] {Chal : Type}
     (cache : (roSpec M Commit Chal).QueryCache) (mc : M × Commit) (r : Chal) :
     cacheCount (cache.cacheQuery mc r) ≤ cacheCount cache + 1 := by
-  have hsubset :
-      (cache.cacheQuery mc r).toSet ⊆ insert ⟨mc, r⟩ cache.toSet := by
-    rintro ⟨mc', r'⟩ hmem
-    by_cases hmc : mc' = mc
-    · subst hmc
-      have hr : r = r' := by
-        simpa [QueryCache.mem_toSet] using hmem
-      subst hr
-      exact Set.mem_insert _ _
-    · exact Or.inr (by
-        simpa [QueryCache.mem_toSet, QueryCache.cacheQuery_of_ne cache r hmc] using hmem)
   have hencard :
       (cache.cacheQuery mc r).toSet.encard ≤ cache.toSet.encard + 1 :=
-    le_trans (Set.encard_le_encard hsubset) (Set.encard_insert_le cache.toSet ⟨mc, r⟩)
+    QueryCache.toSet_encard_cacheQuery_le cache mc r
   change ((cache.cacheQuery mc r).toSet.encard : ℝ≥0∞) ≤
     (cache.toSet.encard : ℝ≥0∞) + (1 : ℝ≥0∞)
   rw [← ENat.toENNReal_one, ← ENat.toENNReal_add]

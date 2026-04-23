@@ -172,7 +172,9 @@ TODO:
 
 - Add reusable heap read/update/frame simp lemmas for common package proof
   patterns.
-- Add cache-growth lemmas for `QueryCache.cacheQuery`.
+- Use the generic `QueryCache.cacheQuery` growth lemmas in new package proofs;
+  add finite-cardinality specializations only if future call sites genuinely
+  need `ncard` instead of `encard`.
 - Add package-handler invariant preservation lemmas close to the package
   definitions.
 - Consider a small `heap_frame` or `package_step` tactic only after the lemmas
@@ -227,6 +229,16 @@ Recent concrete progress:
 - Added `Package.shiftLeft_bind` and the FS-specific
   `cmaToNma_shiftLeft_signedFreshAdv_eq_bind` lemma, pinning H5 to the same
   candidate/verify split used by H3.
+- Promoted the private FS-specific WriterT/StateT signed-message log bridge to
+  the generic `QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog`
+  theorem in `VCVio/OracleComp/QueryTracking/LoggingOracle.lean`, and removed
+  the duplicate private proof from `Sigma/Security.lean`.
+- Added generic `QueryCache.toSet_cacheQuery_subset_insert` and
+  `QueryCache.toSet_encard_cacheQuery_le` lemmas so cache-growth reasoning is
+  no longer proved inside the FS-CMA hop file.
+- Promoted the query-log freshness bridge to
+  `QueryLog.wasQueried_eq_decide_mem_map_fst`, removing another private
+  Sigma-only helper.
 
 ### Phase B: Build core reusable infrastructure
 
@@ -246,8 +258,11 @@ structural.
 TODO:
 
 - Prove H2 using public logging/runtime equivalence lemmas.
-- Move reusable WriterT/StateT logging facts out of private legacy proof
-  sections.
+- Instantiate `QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog` for
+  the public signing oracle and the HeapSSP signing-log state.
+- Finish the remaining runtime/cache equivalence lemmas that identify the
+  public `FiatShamir.runtime` random-oracle cache with the HeapSSP `roCache`
+  cell through signing and final verification.
 - Remove duplicate proof obligations between the legacy CMA-to-NMA file and the
   HeapSSP bridge.
 

@@ -783,10 +783,10 @@ The top-level proof reduces to matching:
 5. the signing-query log produced by `cmaSignLogImpl` against the
    `WriterT` log in `SignatureAlg.unforgeableExp`.
 
-Kept as `sorry` pending the full distributional proof; the body reuses
-the FS-specific `signedAppend` /
-`map_run_withLogging_inputs_eq_run_signedAppend` lemma chain from
-`Sigma/Security.lean`. -/
+Kept as `sorry` pending the full distributional proof; the body should reuse
+the generic WriterT/StateT input-log bridge
+`QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog` from
+`QueryTracking/LoggingOracle.lean`. -/
 theorem cmaRealFreshAdvantage_eq_unforgeableExp
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
