@@ -239,9 +239,21 @@ variable {M : Type}
 open scoped Classical in
 /-- **Main Security Theorem (EUF-CMA, Theorem 4, CRYPTO 2023).**
 
-THIS THEOREM STATEMENT NEEDS TO BE UPDATED ONCE WE FIGURE OUT THE CORRECT BOUND TO STATE
-DIRECTLY FOR ML-DSA. For now it is parameterized by an explicit quantitative HVZK
-simulator hypothesis.
+**WARNING: this is a placeholder statement, not the final theorem.** The current shape is
+unsound as written: `ε`, `p_abort`, and `δ : ℝ` are unconstrained signed reals (only
+`hp : p_abort < 1` is assumed). Inherited from
+`FiatShamirWithAbort.cmaToNmaLoss`, the loss term
+`2qS(qH+1)ε/(1-p) + qS·ε(qS+1)/(2(1-p)²) + qS·ζ_zk + δ` can be made arbitrarily negative
+by taking `ε`, `δ` very negative; `ENNReal.ofReal` then clamps it to `0`, collapsing the
+bound to `adv.advantage ≤ Adv^MLWE + Adv^SelfTargetMSIS` with no statistical slack, which
+is generally false. In the final statement `ε`, `p_abort`, `δ` should be nonnegative
+(e.g. `ℝ≥0` or constrained by `0 ≤ ε`, `0 ≤ p_abort`, `0 ≤ δ` hypotheses) and identified
+with the concrete commitment guessing probability, abort probability, and regularity
+failure probability of the ML-DSA identification scheme.
+
+The proof is intentionally deferred. The statement also needs to be specialized to the
+actual ML-DSA parameters (eliminating the explicit quantitative HVZK simulator hypothesis)
+once that derivation is finalized.
 
 For any classical EUF-CMA adversary `A` making at most `qS` signing queries and `qH` random
 oracle queries, and for the adversaries `B` (against MLWE) and `C` (against SelfTargetMSIS)

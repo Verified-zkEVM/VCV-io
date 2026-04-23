@@ -160,7 +160,17 @@ The proof composes three reductions:
 1. **FO transform** (HHK17 Corollary): IND-CCA of the FO-constructed KEM reduces to
    IND-CPA of K-PKE + PRF security of J + correctness + message entropy.
 2. **IND-CPA → MLWE**: Each IND-CPA term reduces to an MLWE advantage.
-3. **Concrete parameters**: `ε_msg = 1/|Message| = 2⁻²⁵⁶` and `δ` from FIPS 203 Table 1. -/
+3. **Concrete parameters**: `ε_msg = 1/|Message| = 2⁻²⁵⁶` and `δ` from FIPS 203 Table 1.
+
+**WARNING: this is a placeholder statement, not the final theorem.** The current shape is
+unsound as written: `correctnessBound : ℝ` is constrained only via
+`h_correct : … .deltaCorrect (ENNReal.ofReal correctnessBound)`, but `ENNReal.ofReal` clamps
+negative reals to `0`, so `correctnessBound = -10⁹` satisfies `h_correct` whenever
+`deltaCorrect 0` does. The right-hand side then has `((2qHK + 3 : ℕ) : ℝ) * correctnessBound`,
+which can be made arbitrarily negative, while the left-hand side is a probability and hence
+nonnegative. In the final statement `correctnessBound` should be a nonnegative real (e.g.
+`ℝ≥0` or `ENNReal`) directly identified with the K-PKE `δ`-correctness error, rather than a
+signed `ℝ` filtered through `ENNReal.ofReal`. The proof is intentionally deferred. -/
 theorem ind_cca_security
     (correctnessBound epsMsg : ℝ) (qHK : ℕ)
     (h_correct :
