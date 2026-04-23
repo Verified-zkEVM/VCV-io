@@ -239,6 +239,9 @@ Recent concrete progress:
 - Promoted the query-log freshness bridge to
   `QueryLog.wasQueried_eq_decide_mem_map_fst`, removing another private
   Sigma-only helper.
+- Added `withCacheOverlay_bind`, `withCacheOverlay_map`, and
+  `withCacheOverlay_bind_pure` so runtime/cache proofs can decompose cached
+  computations without unfolding the `StateT` implementation.
 
 ### Phase B: Build core reusable infrastructure
 
@@ -263,6 +266,8 @@ TODO:
 - Finish the remaining runtime/cache equivalence lemmas that identify the
   public `FiatShamir.runtime` random-oracle cache with the HeapSSP `roCache`
   cell through signing and final verification.
+- Use the new `withCacheOverlay_*` API rather than unfolding `cachingOracle`
+  directly, except at the single-query hit/miss boundary.
 - Remove duplicate proof obligations between the legacy CMA-to-NMA file and the
   HeapSSP bridge.
 

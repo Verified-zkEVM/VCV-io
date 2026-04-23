@@ -158,6 +158,32 @@ lemma withCacheOverlay_pure {α : Type u} (cache : spec.QueryCache) (a : α) :
     withCacheOverlay cache (pure a : OracleComp spec α) = pure a := by
   change Prod.fst <$> (pure (a, cache) : OracleComp spec _) = _; simp
 
+lemma withCacheOverlay_bind {α β : Type u} (cache : spec.QueryCache)
+    (oa : OracleComp spec α) (ob : α → OracleComp spec β) :
+    withCacheOverlay cache (oa >>= ob) =
+      ((simulateQ cachingOracle oa).run cache >>= fun p =>
+        withCacheOverlay p.2 (ob p.1)) := by
+  simp only [withCacheOverlay, simulateQ_bind, StateT.run']
+  change Prod.fst <$> (((simulateQ cachingOracle oa >>=
+    fun x => simulateQ cachingOracle (ob x)) :
+      StateT (QueryCache spec) (OracleComp spec) β).run cache) = _
+  rw [StateT.run_bind, map_bind]
+  refine bind_congr fun p => ?_
+  rfl
+
+lemma withCacheOverlay_map {α β : Type u} (cache : spec.QueryCache)
+    (f : α → β) (oa : OracleComp spec α) :
+    withCacheOverlay cache (f <$> oa) = f <$> withCacheOverlay cache oa := by
+  rw [map_eq_bind_pure_comp, withCacheOverlay_bind]
+  simp [withCacheOverlay]
+
+lemma withCacheOverlay_bind_pure {α β : Type u} (cache : spec.QueryCache)
+    (oa : OracleComp spec α) (f : α → β) :
+    withCacheOverlay cache (oa >>= fun x => pure (f x)) =
+      f <$> withCacheOverlay cache oa := by
+  change withCacheOverlay cache (f <$> oa) = f <$> withCacheOverlay cache oa
+  exact withCacheOverlay_map cache f oa
+
 private lemma fst_map_cachingOracle_run_some (cache : spec.QueryCache) (t : spec.Domain)
     (v : spec.Range t) (hv : cache t = some v) :
     Prod.fst <$> (cachingOracle t).run cache = pure v := by
