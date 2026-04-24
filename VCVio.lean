@@ -169,11 +169,13 @@ import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.QueryTracking.Birthday
+import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.Collision
 import VCVio.OracleComp.QueryTracking.CostModel
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.Enforcement
+import VCVio.OracleComp.QueryTracking.HandlerSimp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.ObservationOracle
 import VCVio.OracleComp.QueryTracking.ProgrammingOracle
