@@ -21,6 +21,10 @@ The standard equational theory for the simulation operators:
   `mapSpec`.
 * `mapSpec_id`, `mapSpec_comp` — functoriality of `mapSpec` over the lens
   category on `PFunctor`.
+* `mapSpec_bind` — `mapSpec` is a monad morphism (it distributes over `bind`).
+  The proof is by **strong bisimulation** (`PFunctor.M.bisim`), in contrast to
+  `simulate_bind` which only holds up to weak bisim because `simulate` inserts
+  τ-steps. (`mapSpec_iter` is left to a follow-up; see the unification plan.)
 * `simulate_ofLens` — relating `simulate` and `mapSpec` on a renaming.
 
 Each proof is built by coinduction on the shared `ITree` shape and combines
@@ -507,6 +511,59 @@ theorem mapSpec_comp (φ : PFunctor.Lens E F) (ψ : PFunctor.Lens F G) (t : ITre
             fun b => mapSpec φ (c ((ψ ∘ₗ φ).toFunB a b))⟩
         rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
         rfl
+
+/-! ### Monad-morphism laws for `mapSpec`
+
+`mapSpec` is a monad morphism: it distributes over `bind` and `iter`
+strictly (no τ-step insertion), in contrast to `simulate ∘ Handler.ofLens`
+which only matches `mapSpec` up to weak bisim. The proofs are by
+`PFunctor.M.bisim` with a relation that encodes the *defining equation*
+(left-hand side ↔ right-hand side) plus the trivial diagonal closure. -/
+
+theorem mapSpec_bind (φ : PFunctor.Lens E F)
+    (t : ITree E α) (k : α → ITree E β) :
+    mapSpec φ (bind t k) = bind (mapSpec φ t) (fun a => mapSpec φ (k a)) := by
+  refine PFunctor.M.bisim
+    (fun (u v : ITree F β) =>
+      u = v ∨ ∃ t : ITree E α,
+        u = mapSpec φ (bind t k) ∧
+        v = bind (mapSpec φ t) (fun a => mapSpec φ (k a)))
+    ?_ _ _ (Or.inr ⟨t, rfl, rfl⟩)
+  rintro u v (rfl | ⟨t, rfl, rfl⟩)
+  · rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+    exact ⟨sh, c, c, rfl, rfl, fun _ => Or.inl rfl⟩
+  · rcases h : PFunctor.M.dest t with ⟨sh, c⟩
+    cases sh with
+    | pure r =>
+        have ht : t = pure r := by
+          apply PFunctor.M.eq_of_dest_eq; rw [h]
+          change (⟨.pure r, c⟩ : (Poly E α).Obj _) = ⟨.pure r, PEmpty.elim⟩
+          congr 1; funext z; exact z.elim
+        subst ht
+        rw [bind_pure_left, mapSpec_pure, bind_pure_left]
+        rcases hk : PFunctor.M.dest (mapSpec φ (k r)) with ⟨sh', c'⟩
+        exact ⟨sh', c', c', rfl, rfl, fun _ => Or.inl rfl⟩
+    | step =>
+        have ht : t = step (c PUnit.unit) := by
+          apply PFunctor.M.eq_of_dest_eq; rw [h]; rfl
+        subst ht
+        rw [bind_step, mapSpec_step, mapSpec_step, bind_step]
+        refine ⟨.step,
+          fun _ => mapSpec φ (bind (c PUnit.unit) k),
+          fun _ => bind (mapSpec φ (c PUnit.unit)) (fun a => mapSpec φ (k a)),
+          shape'_step _, shape'_step _,
+          fun _ => Or.inr ⟨c PUnit.unit, rfl, rfl⟩⟩
+    | query a =>
+        have ht : t = query a c := by
+          apply PFunctor.M.eq_of_dest_eq; rw [h]; rfl
+        subst ht
+        rw [bind_query, mapSpec_query, mapSpec_query, bind_query]
+        refine ⟨.query (φ.toFunA a),
+          fun b => mapSpec φ (bind (c (φ.toFunB a b)) k),
+          fun b =>
+            bind (mapSpec φ (c (φ.toFunB a b))) (fun a => mapSpec φ (k a)),
+          shape'_query _ _, shape'_query _ _,
+          fun b => Or.inr ⟨c (φ.toFunB a b), rfl, rfl⟩⟩
 
 /-! ### Relating `simulate` and `mapSpec` -/
 
