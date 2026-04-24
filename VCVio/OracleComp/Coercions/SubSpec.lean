@@ -6,13 +6,15 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.EvalDist
 import ToMathlib.General
+import ToMathlib.PFunctor.Lens.Cartesian
 
 /-!
 # Coercions Between Computations With Additional Oracles
 
 This file defines the `SubSpec` relation between pairs of `OracleSpec`s. An
 instance `spec ⊂ₒ superSpec` packages the data of a polynomial-functor lens
-between the underlying `PFunctor`s, given by
+`PFunctor.Lens spec.toPFunctor superSpec.toPFunctor` between the underlying
+`PFunctor`s, given by
 
 * `onQuery : spec.Domain → superSpec.Domain` --- forward translation on query
   inputs (oracle indices), and
@@ -31,9 +33,14 @@ non-inclusive subset symbol reflects that we avoid defining `SubSpec`
 reflexively, since `MonadLiftT.refl` already handles the identity case.
 
 `LawfulSubSpec` refines `SubSpec` with the requirement that `onResponse` is
-bijective on every fiber. This is exactly the data of a `PFunctor.Equiv`-style
-embedding and is what is needed to preserve the uniform distribution under
-lifting.
+bijective on every fiber, i.e. that the underlying lens is **cartesian** in
+the sense of `PFunctor.Lens.IsCartesian`. This is *strictly weaker* than
+`PFunctor.Lens.Equiv` (which would also require `onQuery` to be a bijection,
+ruling out the basic case `spec ⊂ₒ (spec + spec')` where `onQuery = Sum.inl`).
+Cartesianness is exactly the condition needed to preserve the uniform
+distribution under lifting (`evalDist_liftComp`); see
+`LawfulSubSpec.toLens_isCartesian` for the bridge to the lens-level
+predicate.
 -/
 
 open OracleSpec OracleComp BigOperators ENNReal
@@ -93,6 +100,23 @@ backward fiber on the continuation. Used as the canonical reduced form of
     OracleQuery superSpec α :=
   ⟨h.onQuery q.input, q.cont ∘ h.onResponse q.input⟩
 
+/-- The polynomial-functor lens between the underlying `PFunctor`s carried by
+a `SubSpec` instance. This is the lens-level view of the data; concrete
+properties (like cartesianness via `LawfulSubSpec`) are stated on this lens.
+
+The other half of the data, `monadLift`, is fixed by `liftM_eq_lift` to be
+the standard action of this lens on `OracleQuery`. -/
+def toLens (h : SubSpec spec superSpec) :
+    PFunctor.Lens spec.toPFunctor superSpec.toPFunctor where
+  toFunA := h.onQuery
+  toFunB := h.onResponse
+
+@[simp] lemma toLens_toFunA (h : SubSpec spec superSpec) :
+    h.toLens.toFunA = h.onQuery := rfl
+
+@[simp] lemma toLens_toFunB (h : SubSpec spec superSpec) :
+    h.toLens.toFunB = h.onResponse := rfl
+
 /-- Transitivity of `SubSpec`: lens composition. -/
 @[reducible] def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) :
     spec ⊂ₒ spec₃ where
@@ -102,13 +126,26 @@ backward fiber on the continuation. Used as the canonical reduced form of
   onQuery t := h₂.onQuery (h₁.onQuery t)
   onResponse t r := h₁.onResponse t (h₂.onResponse (h₁.onQuery t) r)
 
+@[simp] lemma trans_toLens (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) :
+    (SubSpec.trans h₁ h₂).toLens = h₂.toLens ∘ₗ h₁.toLens := rfl
+
 end SubSpec
 
 /-- `LawfulSubSpec` extends `SubSpec` with the requirement that the backward
 translation `onResponse` is bijective on every fiber. Equivalently: the
-continuation of each lifted base query `liftM (spec.query t)` is a bijection
-from the super-range to the sub-range. This is what is needed to preserve the
-uniform distribution under the lift. -/
+underlying lens `SubSpec.toLens` is *cartesian* in the sense of
+`PFunctor.Lens.IsCartesian`, i.e. it is a fiberwise isomorphism over an
+arbitrary forward map on positions.
+
+This is *strictly weaker* than `PFunctor.Lens.Equiv`, which would also force
+`onQuery` to be a bijection. We intentionally only require fiberwise
+bijectivity because the canonical `SubSpec` instances embed a small spec
+into a larger one (e.g. `spec₁ ⊂ₒ (spec₁ + spec₂)` with `onQuery = Sum.inl`),
+and these embeddings are essential to the API.
+
+Cartesianness is exactly what is needed to preserve the uniform distribution
+under the lift: see `evalDist_liftM_query` and the bridge
+`LawfulSubSpec.toLens_isCartesian`. -/
 class LawfulSubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     [h : SubSpec spec superSpec] : Prop where
   /-- The backward translation is bijective on every fiber. -/
@@ -119,6 +156,12 @@ namespace LawfulSubSpec
 
 variable {ι : Type u} {τ : Type v} {spec : OracleSpec ι} {superSpec : OracleSpec τ}
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+
+/-- The lens-level statement of `LawfulSubSpec`: the underlying
+`PFunctor.Lens` is cartesian. This makes the dictionary between the
+oracle-spec layer and the polynomial-functor lens layer explicit. -/
+lemma toLens_isCartesian : h.toLens.IsCartesian := fun t =>
+  onResponse_bijective (h := h) t
 
 /-- Pushing the uniform distribution on `superSpec.Range` through the lens's
 backward fiber recovers the uniform distribution on `spec.Range`. Load-bearing
