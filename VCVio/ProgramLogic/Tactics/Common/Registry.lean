@@ -10,16 +10,42 @@ import VCVio.ProgramLogic.Tactics.Common.SpecIR
 /-!
 # VCSpec Registry
 
-Shared registry structures for looking up VC specification lemmas by head symbol.
+Discrimination-tree backed registry for `@[vcspec]` lemmas used by the unary and relational
+program-logic tactics.
+
+The registry indexes each registered theorem by the *computation* sub-expression
+of its conclusion: for unary triples / `wp` goals this is the `OracleComp` argument,
+and for relational triples / `RelWP` / `eRelTriple` goals this is the left-hand
+computation. A separate constant-name filter on the right-hand head keeps relational
+lookups precise without paying for two structural matches.
+
+Two concrete benefits over the previous `NameMap` storage:
+
+1. Multi-level structural discrimination: rules whose computation has the same head but
+   different argument structure (e.g. different inner heads under `Bind.bind`) can be
+   distinguished at lookup time, and rules whose head only appears under a coercion are
+   matched naturally because `DiscrTree.getMatch` runs `withReducible` whnf on subterms.
+2. Sub-linear lookup: the discrimination tree shares prefixes of keys across rules,
+   so adding more rules does not slow down dispatch on unrelated heads.
 -/
 
-open Lean Elab Meta
+open Lean Elab Meta Lean.Meta
 
 namespace OracleComp.ProgramLogic
 
+/-- Pre-computed discrimination-tree keys for the indexed sub-expression of a
+`@[vcspec]` theorem (the unary `comp` or the relational `oa`). -/
+abbrev VCSpecPatternKeys := Array DiscrTree.Key
+
+/-- A registered `@[vcspec]` lemma together with everything the planner needs:
+its declaration name, the normalized IR description, the discrimination-tree
+keys for fast structural lookup, and (for relational entries) the head
+constant of the right-hand computation used as a secondary filter. -/
 structure VCSpecEntry where
   decl : Name
   spec : NormalizedVCSpec
+  patternKeys : VCSpecPatternKeys
+  rightHead? : Option Name := none
   deriving Inhabited, BEq, Repr
 
 def VCSpecEntry.kind (entry : VCSpecEntry) : VCSpecKind :=
@@ -28,30 +54,22 @@ def VCSpecEntry.kind (entry : VCSpecEntry) : VCSpecKind :=
 def VCSpecEntry.lookupKey (entry : VCSpecEntry) : VCSpecLookupKey :=
   entry.spec.lookupKey
 
+/-- Persistent state for the `@[vcspec]` registry.
+
+* `all` retains insertion order, used by `kind`-indexed iteration helpers.
+* `unary` indexes unary entries by their `comp` discrimination-tree path.
+* `relational` indexes relational entries by their `oa` discrimination-tree path;
+  the right-hand head check happens at lookup time. -/
 structure VCSpecRegistry where
   all : Array VCSpecEntry := #[]
-  unary : NameMap (Array VCSpecEntry) := {}
-  relational : NameMap (NameMap (Array VCSpecEntry)) := {}
+  unary : DiscrTree VCSpecEntry := .empty
+  relational : DiscrTree VCSpecEntry := .empty
   deriving Inhabited
 
-private def VCSpecRegistry.addUnary
-    (registry : VCSpecRegistry) (head : Name) (entry : VCSpecEntry) : VCSpecRegistry :=
-  let prev := match registry.unary.find? head with
-    | some prev => prev
-    | none => #[]
-  { registry with unary := registry.unary.insert head (prev.push entry) }
-
-private def VCSpecRegistry.addRelational
-    (registry : VCSpecRegistry) (leftHead rightHead : Name) (entry : VCSpecEntry) :
-    VCSpecRegistry :=
-  let inner := match registry.relational.find? leftHead with
-    | some inner => inner
-    | none => {}
-  let prev := match inner.find? rightHead with
-    | some prev => prev
-    | none => #[]
-  { registry with
-      relational := registry.relational.insert leftHead (inner.insert rightHead (prev.push entry)) }
+private def VCSpecRegistry.addToTree (tree : DiscrTree VCSpecEntry) (entry : VCSpecEntry) :
+    DiscrTree VCSpecEntry :=
+  if entry.patternKeys.isEmpty then tree
+  else tree.insertKeyValue entry.patternKeys entry
 
 initialize vcSpecRegistry :
     SimpleScopedEnvExtension
@@ -61,48 +79,61 @@ initialize vcSpecRegistry :
     addEntry := fun registry entry =>
       let registry := { registry with all := registry.all.push entry }
       match entry.lookupKey with
-      | .unary head => registry.addUnary head entry
-      | .relational leftHead rightHead => registry.addRelational leftHead rightHead entry
+      | .unary _ =>
+          { registry with unary := VCSpecRegistry.addToTree registry.unary entry }
+      | .relational _ _ =>
+          { registry with
+              relational := VCSpecRegistry.addToTree registry.relational entry }
     initial := {}
   }
+
+/-- Build a registry entry for `decl` from its type by extracting the indexed
+sub-expressions and converting them into `DiscrTree` keys.
+
+The `comp` / `oa` expressions live in the metavariable context introduced by
+`forallMetaTelescopeReducing` inside `normalizeAndExtractVCSpecTarget`, so all
+key computation happens before the surrounding `MetaM.run'` finishes. -/
+private def buildVCSpecEntry (decl : Name) (declTy : Expr) : MetaM VCSpecEntry := do
+  let (spec, idx) ← normalizeAndExtractVCSpecTarget `vcspec declTy
+  let (patternKeys, rightHead?) ← match idx.comp?, idx.pair? with
+    | some comp, _ => do
+        let keys ← DiscrTree.mkPath comp
+        pure (keys, none)
+    | _, some (oa, ob) => do
+        let keys ← DiscrTree.mkPath oa
+        let obWhnf ← whnfReducible ob
+        pure (keys, headConstName? obWhnf)
+    | _, _ =>
+        throwError m!"@[vcspec] internal error: no indexed sub-expression for `{decl}`"
+  return { decl, spec, patternKeys, rightHead? }
 
 initialize registerBuiltinAttribute {
   name := `vcspec
   descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen lookup."
   add := fun decl _ kind => MetaM.run' do
     let declTy := (← getConstInfo decl).type
-    let spec ← normalizeVCSpecTarget `vcspec declTy
-    vcSpecRegistry.add { decl, spec } kind
+    let entry ← buildVCSpecEntry decl declTy
+    vcSpecRegistry.add entry kind
 }
 
-private def getUnaryEntriesForHead (head : Name) : CoreM (Array VCSpecEntry) := do
-  pure <| match (vcSpecRegistry.getState (← getEnv)).unary.find? head with
-    | some entries => entries
-    | none => #[]
-
-private def getRelationalEntriesForHeads (leftHead rightHead : Name) :
-    CoreM (Array VCSpecEntry) := do
-  pure <| match (vcSpecRegistry.getState (← getEnv)).relational.find? leftHead with
-    | none => #[]
-    | some inner =>
-        match inner.find? rightHead with
-        | some entries => entries
-        | none => #[]
+private def headOfWhnf (e : Expr) : MetaM (Option Name) := do
+  let e ← whnfReducible (← instantiateMVars e)
+  return headConstName? e
 
 def getRegisteredUnaryVCSpecEntries (comp : Expr) : MetaM (Array VCSpecEntry) := do
-  let comp ← whnfReducible (← instantiateMVars comp)
-  let some head := headConstName? comp
-    | return #[]
-  getUnaryEntriesForHead head
+  let comp ← instantiateMVars comp
+  let registry := vcSpecRegistry.getState (← getEnv)
+  registry.unary.getMatch comp
 
 def getRegisteredRelationalVCSpecEntries (oa ob : Expr) : MetaM (Array VCSpecEntry) := do
-  let oa ← whnfReducible (← instantiateMVars oa)
-  let ob ← whnfReducible (← instantiateMVars ob)
-  let some leftHead := headConstName? oa
-    | return #[]
-  let some rightHead := headConstName? ob
-    | return #[]
-  getRelationalEntriesForHeads leftHead rightHead
+  let oa ← instantiateMVars oa
+  let some rightHead ← headOfWhnf ob | return #[]
+  let registry := vcSpecRegistry.getState (← getEnv)
+  let candidates ← registry.relational.getMatch oa
+  return candidates.filter fun entry =>
+    match entry.rightHead? with
+    | some h => h == rightHead
+    | none => false
 
 def getRegisteredUnaryVCSpecTheorems (comp : Expr) : MetaM (Array Name) := do
   return (← getRegisteredUnaryVCSpecEntries comp).map (·.decl)
