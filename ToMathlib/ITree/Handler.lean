@@ -6,6 +6,7 @@ Authors: Quang Dao
 module
 
 public import ToMathlib.ITree.Basic
+public import ToMathlib.PFunctor.Lens.Basic
 
 /-! # Event handlers
 
@@ -13,62 +14,27 @@ A *handler* `Handler E F` interprets each event of the source spec `E` as an
 interaction tree over the target spec `F`. Equivalently, a handler is a
 choice of `F`-program for every `E`-event. Handlers are the data of the
 fundamental ITree simulation operator `ITree.simulate` (see
-`ToMathlib.ITree.Sim.Defs`) and the natural ingredient for layered
-interpretation of programs.
+`ToMathlib.ITree.Sim.Defs`).
 
-This file also provides a lightweight notion of *PFunctor morphism*
-(`PFunctor.Hom`), the "natural transformation" between event signatures
-(matching answer types pointwise). PFunctor morphisms are used by
-`ITree.mapSpec` to perform a pure renaming of events without involving
-`bind`.
+For pure event renaming (no extra silent steps and no extra queries),
+`ITree.mapSpec` consumes a `PFunctor.Lens`. A `Lens E F` carries a forward
+shape map `E.A → F.A` together with a backward arity map
+`∀ a, F.B (toFunA a) → E.B a`, which is precisely the data needed to relabel
+each `query` node of an interaction tree along an event-spec morphism.
 
 ## Naming
 
-| Coq                | Lean                          |
-| ------------------ | ----------------------------- |
-| `E ~> itree F`     | `ITree.Handler E F`           |
-| `E ~> F`           | `PFunctor.Hom E F`            |
-| `handler E := ...` | `id_handler`                  |
-| `case_ E F`        | (TODO, see `ToMathlib.ITree.Events`) |
+| Coq                | Lean                              |
+| ------------------ | --------------------------------- |
+| `E ~> itree F`     | `ITree.Handler E F`               |
+| `E ~> F`           | `PFunctor.Lens E F`               |
+| `handler E := ...` | `Handler.id`                      |
+| `case_ E F`        | (TODO; coproduct routing on top of `PFunctor.sum`) |
 -/
 
 @[expose] public section
 
 universe u
-
-namespace PFunctor
-
-/-- A morphism of polynomial functors `E ⟶ F` is a polymorphic event renaming
-that preserves answer types. Concretely, each event of `E` gets mapped to an
-event of `F` with *the same* answer type.
-
-In Coq's `InteractionTrees`, this is the type `E ~> F`. -/
-structure Hom (E F : PFunctor.{u, u}) where
-  /-- Map source event names to target event names. -/
-  shape : E.A → F.A
-  /-- The answer type of the renamed event must agree with the answer type
-  of the original. We take the equality in the form `F.B (shape a) = E.B a`
-  so that `Eq.mp / Eq.mpr` can transport answers naturally in either
-  direction. -/
-  arity (a : E.A) : F.B (shape a) = E.B a
-
-namespace Hom
-
-variable {E F G : PFunctor.{u, u}}
-
-/-- Identity morphism. -/
-def id (E : PFunctor.{u, u}) : Hom E E where
-  shape := _root_.id
-  arity _ := rfl
-
-/-- Composition of polynomial-functor morphisms. -/
-def comp (g : Hom F G) (f : Hom E F) : Hom E G where
-  shape := g.shape ∘ f.shape
-  arity a := (g.arity (f.shape a)).trans (f.arity a)
-
-end Hom
-
-end PFunctor
 
 namespace ITree
 
@@ -91,10 +57,15 @@ single-step `lift` from `ToMathlib.ITree.Basic`. -/
 def id (E : PFunctor.{u, u}) : Handler E E :=
   fun a => lift a
 
-/-- Promote a polynomial-functor morphism to a handler that performs a pure
-renaming (no extra silent steps, no extra queries). -/
-def ofHom (φ : PFunctor.Hom E F) : Handler E F :=
-  fun a => (φ.arity a) ▸ lift (φ.shape a)
+/-- Promote a polynomial-functor lens to a handler that performs a pure
+renaming. For each source event `a : E.A`, the handler issues the renamed
+event `φ.toFunA a` and feeds the answer back through the lens's backward
+arity map.
+
+There are no extra silent steps and no extra queries: this is the canonical
+"event-renaming" handler. -/
+def ofLens (φ : PFunctor.Lens E F) : Handler E F :=
+  fun a => query (φ.toFunA a) (fun b => pure (φ.toFunB a b))
 
 end Handler
 

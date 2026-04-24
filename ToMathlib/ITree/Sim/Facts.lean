@@ -19,8 +19,9 @@ The standard equational theory for the simulation operators:
   identity.
 * `mapSpec_pure`, `mapSpec_step`, `mapSpec_query` — one-step unfoldings of
   `mapSpec`.
-* `mapSpec_id`, `mapSpec_comp` — functoriality of `mapSpec`.
-* `simulate_mapSpec` — relating `simulate` and `mapSpec` on a renaming.
+* `mapSpec_id`, `mapSpec_comp` — functoriality of `mapSpec` over the lens
+  category on `PFunctor`.
+* `simulate_ofLens` — relating `simulate` and `mapSpec` on a renaming.
 
 The proofs are scaffolded with `sorry`; they reduce to one-step `M.corec`
 unfoldings combined with the (sorry-blocked) bisimulation laws of
@@ -135,7 +136,7 @@ These are direct `M.corec` unfoldings using `dest_corec_eq` and the fact
 that `M.dest` is injective (`PFunctor.M.eq_of_dest_eq`). They do **not**
 need any bisimulation tooling. -/
 
-@[simp] theorem mapSpec_pure (φ : PFunctor.Hom E F) (r : α) :
+@[simp] theorem mapSpec_pure (φ : PFunctor.Lens E F) (r : α) :
     mapSpec φ (pure (F := E) r) = pure r := by
   apply PFunctor.M.eq_of_dest_eq
   rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_pure φ r)]
@@ -145,16 +146,16 @@ need any bisimulation tooling. -/
   funext b
   exact b.elim
 
-@[simp] theorem mapSpec_step (φ : PFunctor.Hom E F) (t : ITree E α) :
+@[simp] theorem mapSpec_step (φ : PFunctor.Lens E F) (t : ITree E α) :
     mapSpec φ (step t) = step (mapSpec φ t) := by
   apply PFunctor.M.eq_of_dest_eq
   rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_step φ t)]
   unfold ITree.step
   rw [PFunctor.M.dest_mk]
 
-@[simp] theorem mapSpec_query (φ : PFunctor.Hom E F) (a : E.A) (k : E.B a → ITree E α) :
+@[simp] theorem mapSpec_query (φ : PFunctor.Lens E F) (a : E.A) (k : E.B a → ITree E α) :
     mapSpec φ (query a k) =
-      query (φ.shape a) (fun b => mapSpec φ (k ((φ.arity a).mp b))) := by
+      query (φ.toFunA a) (fun b => mapSpec φ (k (φ.toFunB a b))) := by
   apply PFunctor.M.eq_of_dest_eq
   rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_query φ a k)]
   unfold ITree.query
@@ -163,10 +164,10 @@ need any bisimulation tooling. -/
 /-! ### Functoriality of `mapSpec` -/
 
 theorem mapSpec_id (t : ITree E α) :
-    mapSpec (PFunctor.Hom.id E) t = t := by
+    mapSpec (PFunctor.Lens.id E) t = t := by
   conv_rhs => rw [← PFunctor.M.corec_dest t]
   refine PFunctor.M.corec_eq_corec
-    (mapSpecStep (PFunctor.Hom.id E)) PFunctor.M.dest Eq t t rfl ?_
+    (mapSpecStep (PFunctor.Lens.id E)) PFunctor.M.dest Eq t t rfl ?_
   rintro u v rfl
   rcases h : PFunctor.M.dest u with ⟨sh, c⟩
   cases sh with
@@ -180,35 +181,34 @@ theorem mapSpec_id (t : ITree E α) :
       simp only [mapSpecStep, shape', h]
   | query a =>
       refine ⟨.query a, c, c, ?_, rfl, fun _ => rfl⟩
-      show mapSpecStep (PFunctor.Hom.id E) u = ⟨.query a, c⟩
+      show mapSpecStep (PFunctor.Lens.id E) u = ⟨.query a, c⟩
       simp only [mapSpecStep, shape', h]
       rfl
 
 /-- Computing one `M.dest` step of `mapSpec`, in terms of `mapSpecStep`. -/
-theorem dest_mapSpec (φ : PFunctor.Hom E F) (u : ITree E α) :
+theorem dest_mapSpec (φ : PFunctor.Lens E F) (u : ITree E α) :
     PFunctor.M.dest (mapSpec φ u) =
       ⟨(mapSpecStep φ u).1, fun b => mapSpec φ ((mapSpecStep φ u).2 b)⟩ := by
   rw [mapSpec, PFunctor.M.dest_corec_apply]
 
 /-- Same as `dest_mapSpec` but stated with `shape'` on the LHS. -/
-theorem shape'_mapSpec (φ : PFunctor.Hom E F) (u : ITree E α) :
+theorem shape'_mapSpec (φ : PFunctor.Lens E F) (u : ITree E α) :
     shape' (mapSpec φ u) =
       ⟨(mapSpecStep φ u).1, fun b => mapSpec φ ((mapSpecStep φ u).2 b)⟩ :=
   dest_mapSpec φ u
 
-theorem mapSpec_comp (φ : PFunctor.Hom E F) (ψ : PFunctor.Hom F G) (t : ITree E α) :
-    mapSpec (ψ.comp φ) t = mapSpec ψ (mapSpec φ t) := by
+theorem mapSpec_comp (φ : PFunctor.Lens E F) (ψ : PFunctor.Lens F G) (t : ITree E α) :
+    mapSpec (ψ ∘ₗ φ) t = mapSpec ψ (mapSpec φ t) := by
   refine PFunctor.M.corec_eq_corec
-    (mapSpecStep (ψ.comp φ)) (mapSpecStep ψ)
+    (mapSpecStep (ψ ∘ₗ φ)) (mapSpecStep ψ)
     (fun u v => v = mapSpec φ u) t (mapSpec φ t) rfl ?_
   rintro u v rfl
   rcases h : PFunctor.M.dest u with ⟨sh, c⟩
-  -- `shape' u = dest u`, so we can rewrite `mapSpecStep` definitionally.
   have hu : shape' u = ⟨sh, c⟩ := h
   cases sh with
   | pure r =>
       refine ⟨.pure r, PEmpty.elim, PEmpty.elim, ?_, ?_, ?_⟩
-      · show mapSpecStep (ψ.comp φ) u = ⟨.pure r, PEmpty.elim⟩
+      · show mapSpecStep (ψ ∘ₗ φ) u = ⟨.pure r, PEmpty.elim⟩
         rw [mapSpecStep, hu]
       · show mapSpecStep ψ (mapSpec φ u) = ⟨.pure r, PEmpty.elim⟩
         rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
@@ -216,33 +216,29 @@ theorem mapSpec_comp (φ : PFunctor.Hom E F) (ψ : PFunctor.Hom F G) (t : ITree 
   | step =>
       refine ⟨.step, fun _ => c PUnit.unit, fun _ => mapSpec φ (c PUnit.unit),
         ?_, ?_, fun _ => rfl⟩
-      · show mapSpecStep (ψ.comp φ) u = ⟨.step, fun _ => c PUnit.unit⟩
+      · show mapSpecStep (ψ ∘ₗ φ) u = ⟨.step, fun _ => c PUnit.unit⟩
         rw [mapSpecStep, hu]
       · show mapSpecStep ψ (mapSpec φ u) = ⟨.step, fun _ => mapSpec φ (c PUnit.unit)⟩
         rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
   | query a =>
-      refine ⟨.query (ψ.shape (φ.shape a)),
-        fun b => c (((ψ.comp φ).arity a).mp b),
-        fun b => mapSpec φ (c (((ψ.comp φ).arity a).mp b)),
+      refine ⟨.query (ψ.toFunA (φ.toFunA a)),
+        fun b => c ((ψ ∘ₗ φ).toFunB a b),
+        fun b => mapSpec φ (c ((ψ ∘ₗ φ).toFunB a b)),
         ?_, ?_, fun _ => rfl⟩
-      · show mapSpecStep (ψ.comp φ) u =
-          ⟨.query (ψ.shape (φ.shape a)), fun b => c (((ψ.comp φ).arity a).mp b)⟩
+      · show mapSpecStep (ψ ∘ₗ φ) u =
+          ⟨.query (ψ.toFunA (φ.toFunA a)), fun b => c ((ψ ∘ₗ φ).toFunB a b)⟩
         rw [mapSpecStep, hu]
         rfl
       · show mapSpecStep ψ (mapSpec φ u) =
-          ⟨.query (ψ.shape (φ.shape a)),
-            fun b => mapSpec φ (c (((ψ.comp φ).arity a).mp b))⟩
+          ⟨.query (ψ.toFunA (φ.toFunA a)),
+            fun b => mapSpec φ (c ((ψ ∘ₗ φ).toFunB a b))⟩
         rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
-        dsimp only
-        congr 1
-        funext b
-        congr 2
-        exact (Eq.mp_trans (ψ.arity (φ.shape a)) (φ.arity a) b).symm
+        rfl
 
 /-! ### Relating `simulate` and `mapSpec` -/
 
-theorem simulate_ofHom (φ : PFunctor.Hom E F) (t : ITree E α) :
-    WeakBisim (simulate (Handler.ofHom φ) t) (mapSpec φ t) := by
+theorem simulate_ofLens (φ : PFunctor.Lens E F) (t : ITree E α) :
+    WeakBisim (simulate (Handler.ofLens φ) t) (mapSpec φ t) := by
   sorry
 
 end ITree
