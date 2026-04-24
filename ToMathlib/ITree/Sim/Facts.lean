@@ -761,6 +761,17 @@ These follow directly from `mapSpec_bind` + `mapSpec_pure`. -/
   rw [mapSpec_bind]
   rfl
 
+/-- `mapSpec` distributes over `Seq.seq`, i.e. it is an Applicative
+morphism. Falls out of `mapSpec_bind` + `mapSpec_functorMap` after unfolding
+the default `seq` of `Monad (ITree F)` to `bind`. -/
+@[simp] theorem mapSpec_seq (φ : PFunctor.Lens E F) (mf : ITree E (α → β))
+    (mx : ITree E α) :
+    mapSpec φ (mf <*> mx) = mapSpec φ mf <*> mapSpec φ mx := by
+  change mapSpec φ (bind mf (fun f => f <$> mx)) =
+    bind (mapSpec φ mf) (fun f => f <$> mapSpec φ mx)
+  rw [mapSpec_bind]
+  simp only [mapSpec_functorMap]
+
 /-! ### Relating `simulate` and `mapSpec` -/
 
 theorem simulate_ofLens (φ : PFunctor.Lens E F) (t : ITree E α) :
