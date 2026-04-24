@@ -192,8 +192,14 @@ theorem simulateQ_flattenStateT_run
   | pure x =>
       simp [simulateQ_pure]
   | query_bind t k ih =>
-      simp [simulateQ_bind, simulateQ_query, QueryImpl.flattenStateT,
-        StateT.run_bind]
+      suffices
+          ((impl t).run s).run q >>= (fun x =>
+            (simulateQ impl.flattenStateT (k x.1.1)).run (x.1.2, x.2)) =
+          ((impl t).run s).run q >>= fun x =>
+            (fun y : (α × σ) × τ => (y.1.1, (y.1.2, y.2))) <$>
+              ((simulateQ impl (k x.1.1)).run x.1.2).run x.2 by
+        simpa [simulateQ_bind, simulateQ_query, QueryImpl.flattenStateT,
+          StateT.run_bind, map_eq_bind_pure_comp, bind_assoc] using this
       refine bind_congr (m := m) fun x => ?_
       rcases x with ⟨⟨u, s'⟩, q'⟩
       simpa [map_eq_bind_pure_comp] using ih u s' q'
@@ -221,6 +227,6 @@ theorem simulateQ_stateTMapBase_run_eq_map_flattenStateT
       (fun z : α × (σ × τ) => ((z.1, z.2.1), z.2.2)) <$>
         (simulateQ (outer.stateTMapBase inner).flattenStateT oa).run (s, q) := by
   rw [QueryImpl.simulateQ_stateTMapBase_run, simulateQ_flattenStateT_run]
-  simp [map_bind, Functor.map_map]
+  simp [Functor.map_map]
 
 end OracleComp

@@ -1740,7 +1740,7 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
       ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
           ((simulateQ impl₂ (cont u)).run p'))
         ≤ expectedSCost impl₁ S ε (cont u) (qS - 1) p'
-          + Pr[fun w : α × σ × Bool => w.2.2 = true |
+          + Pr[ fun w : α × σ × Bool => w.2.2 = true |
               (simulateQ impl₁ (cont u)).run p'])
     (s : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
@@ -1785,7 +1785,7 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
       ENNReal.ofReal (tvDist sim₁ mid) ≤
         (∑' z : spec.Range t × σ × Bool,
           Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
-        + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
+        + Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
     refine le_trans (ENNReal.ofReal_le_ofReal h_first_real) ?_
     have hfsim₁ : sim₁ = mx >>= f₁ := hsim₁_def
     rw [hfsim₁]
@@ -1809,12 +1809,12 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
     _ ≤ ENNReal.ofReal (tvDist sim₁ mid) + ENNReal.ofReal (tvDist mid sim₂) := h_tri
     _ ≤ ((∑' z : spec.Range t × σ × Bool,
             Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
-          + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁])
+          + Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁])
           + ε s := add_le_add h_first h_second
     _ = (ε s + ∑' z : spec.Range t × σ × Bool,
               Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
           + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
-        rw [add_assoc, add_comm (Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁]) (ε s),
+        rw [add_assoc, add_comm (Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁]) (ε s),
             ← add_assoc, add_comm (∑' _, _) (ε s)]
     _ = expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
           + Pr[fun z : α × σ × Bool => z.2.2 = true |
@@ -1835,7 +1835,7 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
       ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
           ((simulateQ impl₂ (cont u)).run p'))
         ≤ expectedSCost impl₁ S ε (cont u) qS p'
-          + Pr[fun w : α × σ × Bool => w.2.2 = true |
+          + Pr[ fun w : α × σ × Bool => w.2.2 = true |
               (simulateQ impl₁ (cont u)).run p'])
     (s : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
