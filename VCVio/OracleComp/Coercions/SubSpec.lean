@@ -169,8 +169,8 @@ for `evalDist_liftComp` below. -/
 lemma evalDist_liftM_query [superSpec.Fintype] [superSpec.Inhabited]
     [spec.Fintype] [spec.Inhabited] (t : spec.Domain) :
     (PMF.uniformOfFintype (superSpec.Range
-      ((liftM (n := OracleQuery superSpec) (spec.query t)).fst))).map
-      ((liftM (n := OracleQuery superSpec) (spec.query t)).snd) =
+      ((liftM (n := OracleQuery superSpec) (spec.query t)).input))).map
+      ((liftM (n := OracleQuery superSpec) (spec.query t)).cont) =
       PMF.uniformOfFintype (spec.Range t) := by
   have lift_eq : (liftM (spec.query t) : OracleQuery superSpec (spec.Range t)) =
       ⟨h.onQuery t, h.onResponse t⟩ := h.liftM_eq_lift _
