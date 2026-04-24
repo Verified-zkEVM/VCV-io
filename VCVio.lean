@@ -203,12 +203,13 @@ import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.SeededFork
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
-import VCVio.ProgramLogic.Tactics.Common.CompiledRules
 import VCVio.ProgramLogic.Tactics.Common.Core
 import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.Registry
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
+import VCVio.ProgramLogic.Tactics.Common.WpStepDispatch
+import VCVio.ProgramLogic.Tactics.Common.WpStepRegistry
 import VCVio.ProgramLogic.Tactics.Relational
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Unary
