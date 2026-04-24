@@ -100,18 +100,3 @@ theorem corec_dest (u : M P) : M.corec M.dest u = u := by
 end M
 
 end PFunctor
-
-namespace Eq
-
-universe w
-
-variable {α β γ : Sort w}
-
-/-- `Eq.mp` of a transitive equality factors as a composition. -/
-theorem mp_trans (h₁ : α = β) (h₂ : β = γ) (x : α) :
-    (h₁.trans h₂).mp x = h₂.mp (h₁.mp x) := by
-  subst h₁
-  subst h₂
-  rfl
-
-end Eq
