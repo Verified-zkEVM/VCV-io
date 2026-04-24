@@ -20,6 +20,7 @@ import ToMathlib.Control.Monad.Hom
 import ToMathlib.Control.Monad.Indexed
 import ToMathlib.Control.Monad.Iter
 import ToMathlib.Control.Monad.Ordered
+import ToMathlib.Control.Monad.RelWP
 import ToMathlib.Control.Monad.Relation
 import ToMathlib.Control.Monad.RelationalAlgebra
 import ToMathlib.Control.Monad.RelationalAlgebraAnchored
