@@ -314,8 +314,20 @@ def OW_PCVA_Adversary.MakesAtMostQueries
       | .inr (.inl _), (qH', qP', qV') => (qH', qP' - 1, qV')
       | .inr (.inr _), (qH', qP', qV') => (qH', qP', qV' - 1))
 
-/-- The T-transform security statement. The exact reduction is still deferred, but the oracle
-surface and query-budget parameters now match the HHK-style OW-PCVA game. -/
+/-- The T-transform OW-PCVA security statement.
+
+**WARNING: this is a placeholder statement, not the final theorem.** The current shape is
+unsound as written: `correctnessBound`, `gamma`, and `epsMsg` are unconstrained `ℝ`
+parameters, so the right-hand side can be driven arbitrarily negative while the left-hand
+side is a probability and hence nonnegative. In the final HHK-style statement these slack
+terms must be constrained (typically `correctnessBound` is the underlying PKE's
+`δ`-correctness error, `gamma` is the `γ`-spreadness bound on ciphertexts, and `epsMsg` is
+the message-distribution collision/min-entropy term, all of which are provably nonnegative
+quantities derived from `pke`).
+
+The proof is intentionally deferred. The oracle surface and query-budget parameters
+(`qH`, `qP`, `qV`) now match the HHK OW-PCVA game, but the bound itself still needs to be
+tightened before this can be a meaningful security claim. -/
 theorem OW_PCVA_bound
     {M PK SK R C : Type}
     [DecidableEq M] [DecidableEq C] [SampleableType M] [SampleableType R]

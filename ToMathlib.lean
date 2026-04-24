@@ -18,6 +18,7 @@ import ToMathlib.Control.Monad.FreeCont
 import ToMathlib.Control.Monad.Graded
 import ToMathlib.Control.Monad.Hom
 import ToMathlib.Control.Monad.Indexed
+import ToMathlib.Control.Monad.Iter
 import ToMathlib.Control.Monad.Ordered
 import ToMathlib.Control.Monad.Relation
 import ToMathlib.Control.Monad.RelationalAlgebra
@@ -36,6 +37,17 @@ import ToMathlib.Data.IndexedBinaryTree.Basic
 import ToMathlib.Data.IndexedBinaryTree.Equiv
 import ToMathlib.Data.IndexedBinaryTree.Lemmas
 import ToMathlib.General
+import ToMathlib.ITree.Basic
+import ToMathlib.ITree.Bisim.Bind
+import ToMathlib.ITree.Bisim.Defs
+import ToMathlib.ITree.Bisim.Equiv
+import ToMathlib.ITree.Construct
+import ToMathlib.ITree.Events.Exception
+import ToMathlib.ITree.Events.State
+import ToMathlib.ITree.Handler
+import ToMathlib.ITree.Rec
+import ToMathlib.ITree.Sim.Defs
+import ToMathlib.ITree.Sim.Facts
 import ToMathlib.OrderEnrichedCategory
 import ToMathlib.PFunctor.Basic
 import ToMathlib.PFunctor.Category
@@ -44,6 +56,8 @@ import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
+import ToMathlib.PFunctor.Lens.Cartesian
+import ToMathlib.PFunctor.MFacts
 import ToMathlib.PFunctor.Trace
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence
 import ToMathlib.Probability.ProbabilityMassFunction.TailSums

@@ -41,7 +41,7 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 ### 8. Universe polymorphism
 
-`OracleComp` has 3 universe parameters, `SubSpec` has 6. Universe unification errors are common when composing specs or building reductions.
+`OracleComp` has 3 universe parameters, `SubSpec` has 3 (`u, v, w`: indices `ι : Type u`, `τ : Type v`, shared response universe `w`). Universe unification errors are still common when composing specs or building reductions because the lens-style `MonadLift` parent can drag extra metavariables in.
 
 **Fix**: Use `{ι : Type*}` instead of `{ι : Type u}` to let universes resolve independently. Keep `α β : Type` (not `Type u`).
 
