@@ -37,13 +37,82 @@ variable {E F G : PFunctor.{u, u}} {α β : Type u}
 
 /-! ### One-step unfoldings of `simulate` -/
 
+/-- Step transformer used internally by `simulate`. -/
+private def simulateStep (h : Handler E F) :
+    ITree E α → ITree F (ITree E α ⊕ α) := fun t =>
+  match shape' t with
+  | ⟨.pure r, _⟩ => pure (.inr r)
+  | ⟨.step, c⟩ => pure (.inl (c PUnit.unit))
+  | ⟨.query a, c⟩ => bind (h a) (fun b => pure (.inl (c b)))
+
+private theorem simulate_eq_iter (h : Handler E F) (t : ITree E α) :
+    simulate h t = iter (simulateStep h) t := rfl
+
+private theorem simulateStep_pure (h : Handler E F) (r : α) :
+    simulateStep h (pure (F := E) r) = (pure (.inr r) : ITree F (ITree E α ⊕ α)) := by
+  change (match shape' (pure (F := E) r) with
+      | ⟨.pure r, _⟩ => (pure (.inr r) : ITree F (ITree E α ⊕ α))
+      | ⟨.step, c⟩ => pure (.inl (c PUnit.unit))
+      | ⟨.query a, c⟩ => bind (h a) (fun b => pure (.inl (c b)))) = pure (.inr r)
+  rw [shape'_pure]
+
 theorem simulate_pure (h : Handler E F) (r : α) :
     simulate h (pure (F := E) r) = pure r := by
-  sorry
+  apply PFunctor.M.eq_of_dest_eq
+  rw [simulate_eq_iter, iter, PFunctor.M.dest_corec_eq _ _
+      (show iterStep (simulateStep h) (simulateStep h (pure r)) =
+            ⟨.pure r, PEmpty.elim⟩ by
+        rw [simulateStep_pure]
+        change (match PFunctor.M.dest (pure (.inr r) : ITree F (ITree E α ⊕ α)) with
+          | ⟨.pure (.inl j), _⟩ => (⟨.step, fun _ => simulateStep h j⟩ :
+              (Poly F α).Obj (ITree F (ITree E α ⊕ α)))
+          | ⟨.pure (.inr r), _⟩ => ⟨.pure r, PEmpty.elim⟩
+          | ⟨.step, c⟩ => ⟨.step, fun u => c u⟩
+          | ⟨.query a, c⟩ => ⟨.query a, fun b => c b⟩) = ⟨.pure r, PEmpty.elim⟩
+        rw [show PFunctor.M.dest (pure (.inr r) : ITree F (ITree E α ⊕ α)) =
+          ⟨.pure (.inr r), PEmpty.elim⟩ from shape'_pure _]),
+      show PFunctor.M.dest (pure (F := F) r) = ⟨.pure r, PEmpty.elim⟩
+        from shape'_pure r]
+  congr 1
+  funext b
+  exact b.elim
+
+private theorem simulateStep_step (h : Handler E F) (t : ITree E α) :
+    simulateStep h (step t) = (pure (.inl t) : ITree F (ITree E α ⊕ α)) := by
+  change (match shape' (step t) with
+      | ⟨.pure r, _⟩ => (pure (.inr r) : ITree F (ITree E α ⊕ α))
+      | ⟨.step, c⟩ => pure (.inl (c PUnit.unit))
+      | ⟨.query a, c⟩ => bind (h a) (fun b => pure (.inl (c b)))) = pure (.inl t)
+  rw [shape'_step]
+
+/-- One-step strong unfolding: `simulate` distributes over a leading silent
+step. -/
+theorem simulate_step_eq (h : Handler E F) (t : ITree E α) :
+    simulate h (step t) = step (simulate h t) := by
+  apply PFunctor.M.eq_of_dest_eq
+  rw [simulate_eq_iter, iter, PFunctor.M.dest_corec_eq _ _
+      (show iterStep (simulateStep h) (simulateStep h (step t)) =
+            ⟨.step, fun _ => simulateStep h t⟩ by
+        rw [simulateStep_step]
+        change (match PFunctor.M.dest (pure (.inl t) : ITree F (ITree E α ⊕ α)) with
+          | ⟨.pure (.inl j), _⟩ => (⟨.step, fun _ => simulateStep h j⟩ :
+              (Poly F α).Obj (ITree F (ITree E α ⊕ α)))
+          | ⟨.pure (.inr r), _⟩ => ⟨.pure r, PEmpty.elim⟩
+          | ⟨.step, c⟩ => ⟨.step, fun u => c u⟩
+          | ⟨.query a, c⟩ => ⟨.query a, fun b => c b⟩) =
+            ⟨.step, fun _ => simulateStep h t⟩
+        rw [show PFunctor.M.dest (pure (.inl t) : ITree F (ITree E α ⊕ α)) =
+          ⟨.pure (.inl t), PEmpty.elim⟩ from shape'_pure _])]
+  show ⟨.step, fun _ => PFunctor.M.corec _ (simulateStep h t)⟩ =
+    PFunctor.M.dest (step (simulate h t))
+  rw [show PFunctor.M.dest (step (simulate h t)) = ⟨.step, fun _ => simulate h t⟩
+      from shape'_step _]
+  rfl
 
 theorem simulate_step (h : Handler E F) (t : ITree E α) :
     WeakBisim (simulate h (step t)) (simulate h t) := by
-  sorry
+  rw [simulate_step_eq]
+  exact step_weakBisim _
 
 theorem simulate_query (h : Handler E F) (a : E.A) (k : E.B a → ITree E α) :
     WeakBisim (simulate h (query a k))
@@ -60,30 +129,115 @@ theorem simulate_id (t : ITree E α) :
     WeakBisim (simulate (Handler.id E) t) t := by
   sorry
 
-/-! ### One-step unfoldings of `mapSpec` -/
+/-! ### One-step unfoldings of `mapSpec`
 
-theorem mapSpec_pure (φ : PFunctor.Hom E F) (r : α) :
+These are direct `M.corec` unfoldings using `dest_corec_eq` and the fact
+that `M.dest` is injective (`PFunctor.M.eq_of_dest_eq`). They do **not**
+need any bisimulation tooling. -/
+
+@[simp] theorem mapSpec_pure (φ : PFunctor.Hom E F) (r : α) :
     mapSpec φ (pure (F := E) r) = pure r := by
-  sorry
+  apply PFunctor.M.eq_of_dest_eq
+  rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_pure φ r)]
+  unfold ITree.pure
+  rw [PFunctor.M.dest_mk]
+  congr 1
+  funext b
+  exact b.elim
 
-theorem mapSpec_step (φ : PFunctor.Hom E F) (t : ITree E α) :
+@[simp] theorem mapSpec_step (φ : PFunctor.Hom E F) (t : ITree E α) :
     mapSpec φ (step t) = step (mapSpec φ t) := by
-  sorry
+  apply PFunctor.M.eq_of_dest_eq
+  rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_step φ t)]
+  unfold ITree.step
+  rw [PFunctor.M.dest_mk]
 
-theorem mapSpec_query (φ : PFunctor.Hom E F) (a : E.A) (k : E.B a → ITree E α) :
+@[simp] theorem mapSpec_query (φ : PFunctor.Hom E F) (a : E.A) (k : E.B a → ITree E α) :
     mapSpec φ (query a k) =
       query (φ.shape a) (fun b => mapSpec φ (k ((φ.arity a).mp b))) := by
-  sorry
+  apply PFunctor.M.eq_of_dest_eq
+  rw [mapSpec, PFunctor.M.dest_corec_eq _ _ (mapSpecStep_query φ a k)]
+  unfold ITree.query
+  rw [PFunctor.M.dest_mk]
 
 /-! ### Functoriality of `mapSpec` -/
 
 theorem mapSpec_id (t : ITree E α) :
     mapSpec (PFunctor.Hom.id E) t = t := by
-  sorry
+  conv_rhs => rw [← PFunctor.M.corec_dest t]
+  refine PFunctor.M.corec_eq_corec
+    (mapSpecStep (PFunctor.Hom.id E)) PFunctor.M.dest Eq t t rfl ?_
+  rintro u v rfl
+  rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+  cases sh with
+  | pure r =>
+      refine ⟨.pure r, c, c, ?_, rfl, fun b => b.elim⟩
+      simp only [mapSpecStep, shape', h]
+      congr 1
+      funext b; exact b.elim
+  | step =>
+      refine ⟨.step, c, c, ?_, rfl, fun _ => rfl⟩
+      simp only [mapSpecStep, shape', h]
+  | query a =>
+      refine ⟨.query a, c, c, ?_, rfl, fun _ => rfl⟩
+      show mapSpecStep (PFunctor.Hom.id E) u = ⟨.query a, c⟩
+      simp only [mapSpecStep, shape', h]
+      rfl
+
+/-- Computing one `M.dest` step of `mapSpec`, in terms of `mapSpecStep`. -/
+theorem dest_mapSpec (φ : PFunctor.Hom E F) (u : ITree E α) :
+    PFunctor.M.dest (mapSpec φ u) =
+      ⟨(mapSpecStep φ u).1, fun b => mapSpec φ ((mapSpecStep φ u).2 b)⟩ := by
+  rw [mapSpec, PFunctor.M.dest_corec_apply]
+
+/-- Same as `dest_mapSpec` but stated with `shape'` on the LHS. -/
+theorem shape'_mapSpec (φ : PFunctor.Hom E F) (u : ITree E α) :
+    shape' (mapSpec φ u) =
+      ⟨(mapSpecStep φ u).1, fun b => mapSpec φ ((mapSpecStep φ u).2 b)⟩ :=
+  dest_mapSpec φ u
 
 theorem mapSpec_comp (φ : PFunctor.Hom E F) (ψ : PFunctor.Hom F G) (t : ITree E α) :
     mapSpec (ψ.comp φ) t = mapSpec ψ (mapSpec φ t) := by
-  sorry
+  refine PFunctor.M.corec_eq_corec
+    (mapSpecStep (ψ.comp φ)) (mapSpecStep ψ)
+    (fun u v => v = mapSpec φ u) t (mapSpec φ t) rfl ?_
+  rintro u v rfl
+  rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+  -- `shape' u = dest u`, so we can rewrite `mapSpecStep` definitionally.
+  have hu : shape' u = ⟨sh, c⟩ := h
+  cases sh with
+  | pure r =>
+      refine ⟨.pure r, PEmpty.elim, PEmpty.elim, ?_, ?_, ?_⟩
+      · show mapSpecStep (ψ.comp φ) u = ⟨.pure r, PEmpty.elim⟩
+        rw [mapSpecStep, hu]
+      · show mapSpecStep ψ (mapSpec φ u) = ⟨.pure r, PEmpty.elim⟩
+        rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
+      · intro b; exact b.elim
+  | step =>
+      refine ⟨.step, fun _ => c PUnit.unit, fun _ => mapSpec φ (c PUnit.unit),
+        ?_, ?_, fun _ => rfl⟩
+      · show mapSpecStep (ψ.comp φ) u = ⟨.step, fun _ => c PUnit.unit⟩
+        rw [mapSpecStep, hu]
+      · show mapSpecStep ψ (mapSpec φ u) = ⟨.step, fun _ => mapSpec φ (c PUnit.unit)⟩
+        rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
+  | query a =>
+      refine ⟨.query (ψ.shape (φ.shape a)),
+        fun b => c (((ψ.comp φ).arity a).mp b),
+        fun b => mapSpec φ (c (((ψ.comp φ).arity a).mp b)),
+        ?_, ?_, fun _ => rfl⟩
+      · show mapSpecStep (ψ.comp φ) u =
+          ⟨.query (ψ.shape (φ.shape a)), fun b => c (((ψ.comp φ).arity a).mp b)⟩
+        rw [mapSpecStep, hu]
+        rfl
+      · show mapSpecStep ψ (mapSpec φ u) =
+          ⟨.query (ψ.shape (φ.shape a)),
+            fun b => mapSpec φ (c (((ψ.comp φ).arity a).mp b))⟩
+        rw [mapSpecStep, shape'_mapSpec, mapSpecStep, hu]
+        dsimp only
+        congr 1
+        funext b
+        congr 2
+        exact (Eq.mp_trans (ψ.arity (φ.shape a)) (φ.arity a) b).symm
 
 /-! ### Relating `simulate` and `mapSpec` -/
 

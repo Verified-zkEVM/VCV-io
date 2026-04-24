@@ -204,6 +204,20 @@ def bindStep (k : α → ITree F β) :
       match PFunctor.M.dest u with
       | ⟨s, c⟩ => ⟨s, fun b => .inr (c b)⟩
 
+theorem bindStep_inl (k : α → ITree F β) (t : ITree F α) :
+    bindStep k (.inl t) =
+      (match PFunctor.M.dest t with
+        | ⟨.pure r, _⟩ =>
+            match PFunctor.M.dest (k r) with
+            | ⟨s, c⟩ => ⟨s, fun b => .inr (c b)⟩
+        | ⟨.step, c⟩ => ⟨.step, fun _ => .inl (c PUnit.unit)⟩
+        | ⟨.query a, c⟩ => ⟨.query a, fun b => .inl (c b)⟩) := rfl
+
+theorem bindStep_inr (k : α → ITree F β) (u : ITree F β) :
+    bindStep k (.inr u) =
+      (match PFunctor.M.dest u with
+        | ⟨s, c⟩ => ⟨s, fun b => .inr (c b)⟩) := rfl
+
 /-- Monadic bind on ITrees. `t.bind k` runs `t` until it reaches a `.pure r`
 leaf and then continues with `k r`. (Coq `ITree.bind`.) -/
 def bind (t : ITree F α) (k : α → ITree F β) : ITree F β :=

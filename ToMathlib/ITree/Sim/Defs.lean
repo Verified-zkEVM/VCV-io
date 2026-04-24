@@ -50,6 +50,29 @@ def simulate (h : Handler E F) (t : ITree E α) : ITree F α :=
 
 /-! ### Event renaming -/
 
+/-- Step transformer used by `mapSpec`. Given a polynomial-functor morphism
+`φ : PFunctor.Hom E F` and the current ITree node, produce one node of the
+target ITree by relabelling the head event. -/
+def mapSpecStep (φ : PFunctor.Hom E F) (t : ITree E α) : (Poly F α).Obj (ITree E α) :=
+  match shape' t with
+  | ⟨.pure r, _⟩ => ⟨.pure r, PEmpty.elim⟩
+  | ⟨.step, c⟩ => ⟨.step, fun _ => c PUnit.unit⟩
+  | ⟨.query a, c⟩ => ⟨.query (φ.shape a), fun b => c ((φ.arity a).mp b)⟩
+
+@[simp] theorem mapSpecStep_pure (φ : PFunctor.Hom E F) (r : α) :
+    mapSpecStep (α := α) φ (pure (F := E) r) = ⟨.pure r, PEmpty.elim⟩ := by
+  simp [mapSpecStep]
+
+@[simp] theorem mapSpecStep_step (φ : PFunctor.Hom E F) (t : ITree E α) :
+    mapSpecStep φ (step t) = ⟨.step, fun _ => t⟩ := by
+  simp [mapSpecStep]
+
+@[simp] theorem mapSpecStep_query (φ : PFunctor.Hom E F) (a : E.A)
+    (k : E.B a → ITree E α) :
+    mapSpecStep (α := α) φ (query a k) =
+      ⟨.query (φ.shape a), fun b => k ((φ.arity a).mp b)⟩ := by
+  simp [mapSpecStep]
+
 /-- Apply a polynomial-functor morphism `φ : PFunctor.Hom E F` to every event
 of an interaction tree, leaving the leaves and silent steps untouched.
 
@@ -60,12 +83,6 @@ defining it directly via `M.corec` produces a strongly bisimilar but more
 efficient implementation that does not insert the silent step that `iter`
 would otherwise add. -/
 def mapSpec (φ : PFunctor.Hom E F) : ITree E α → ITree F α :=
-  PFunctor.M.corec
-    (F := Poly F α)
-    (fun t : ITree E α =>
-      match shape' t with
-      | ⟨.pure r, _⟩ => ⟨.pure r, PEmpty.elim⟩
-      | ⟨.step, c⟩ => ⟨.step, fun _ => c PUnit.unit⟩
-      | ⟨.query a, c⟩ => ⟨.query (φ.shape a), fun b => c ((φ.arity a).mp b)⟩)
+  PFunctor.M.corec (F := Poly F α) (mapSpecStep φ)
 
 end ITree
