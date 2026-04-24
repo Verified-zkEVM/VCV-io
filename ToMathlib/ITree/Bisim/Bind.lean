@@ -16,20 +16,16 @@ equality of M-types) or weak bisimulations (`WeakBisim`).
 ## Main statements
 
 * `bind_pure_left`, `bind_pure_right`, `bind_assoc` — monad laws on
-  `ITree.bind`. The first two are strong bisimulations via `M.bisim`; the
-  third likewise.
+  `ITree.bind`, as strong bisimulations (i.e. definitional equalities on
+  `PFunctor.M`).
+* `bind_step`, `bind_query` — `bind` distributes over a leading silent
+  step / visible query.
 * `iter_unfold` — the canonical fixed-point equation for `ITree.iter`,
   matching the Coq `unfold_iter` (`Core/ITreeDefinition.v`).
 * `iter_bind` — left-distributive interaction between `iter` and `bind`.
 * `step_weakBisim` — silent steps are absorbed by weak bisimulation
   (`step t ≈ t`); the defining feature of `eutt`.
-
-The proofs are scaffolded with `sorry`. The strong-bisimulation laws
-(`bind_pure_left`, `bind_pure_right`, `bind_assoc`) reduce to constructing
-explicit `PFunctor.M`-bisimulations and discharging them with
-`PFunctor.M.bisim`. The weak-bisimulation laws (`iter_unfold`, `iter_bind`,
-`step_weakBisim`) require the project's coinductive proof tooling, which is
-under active development.
+* `bind_weakBisim_cont` — weak bind-congruence on the continuation.
 -/
 
 @[expose] public section
@@ -111,18 +107,34 @@ theorem bind_pure_right (t : ITree F α) :
     simp only [hdest]
 
 /-- Compute one `M.dest` step of `bind` whose head is a step. -/
-private theorem dest_bind_step (k : α → ITree F β) (t : ITree F α)
+theorem dest_bind_step (k : α → ITree F β) (t : ITree F α)
     (c : PUnit → ITree F α) (h : PFunctor.M.dest t = ⟨.step, c⟩) :
     PFunctor.M.dest (bind t k) = ⟨.step, fun _ => bind (c PUnit.unit) k⟩ := by
   rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
   rfl
 
 /-- Compute one `M.dest` step of `bind` whose head is a query. -/
-private theorem dest_bind_query (k : α → ITree F β) (t : ITree F α) (a : F.A)
+theorem dest_bind_query (k : α → ITree F β) (t : ITree F α) (a : F.A)
     (c : F.B a → ITree F α) (h : PFunctor.M.dest t = ⟨.query a, c⟩) :
     PFunctor.M.dest (bind t k) = ⟨.query a, fun b => bind (c b) k⟩ := by
   rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
   rfl
+
+/-- `bind` distributes over a leading silent step. -/
+theorem bind_step (t : ITree F α) (k : α → ITree F β) :
+    bind (step t) k = step (bind t k) := by
+  apply PFunctor.M.eq_of_dest_eq
+  rw [dest_bind_step k (step t) (fun _ => t) (shape'_step t),
+      show PFunctor.M.dest (step (bind t k)) = ⟨.step, fun _ => bind t k⟩
+        from shape'_step _]
+
+/-- `bind` distributes over a leading query node. -/
+theorem bind_query (a : F.A) (k : F.B a → ITree F α) (f : α → ITree F β) :
+    bind (query a k) f = query a (fun b => bind (k b) f) := by
+  apply PFunctor.M.eq_of_dest_eq
+  rw [dest_bind_query f (query a k) a k (shape'_query a k),
+      show PFunctor.M.dest (query a (fun b => bind (k b) f)) =
+          ⟨.query a, fun b => bind (k b) f⟩ from shape'_query _ _]
 
 theorem bind_assoc (t : ITree F α) (k : α → ITree F β) (k' : β → ITree F γ) :
     bind (bind t k) k' = bind t (fun a => bind (k a) k') := by
@@ -521,7 +533,49 @@ theorem iter_bind (body : β → ITree F (β ⊕ α)) (k : α → ITree F γ) (i
 
 /-! ### Step is weakly absorbed -/
 
+/-- A leading silent step is weakly absorbed: `step t ≈ t`. -/
 theorem step_weakBisim (t : ITree F α) : WeakBisim (step t) t :=
-  WeakBisim.tauL (step t) t t (shape'_step _) (WeakBisim.refl t)
+  WeakBisim.absorb_tauSteps_left
+    (TauSteps.one (fun _ => t) (shape'_step t)) (WeakBisim.refl t)
+
+/-! ### Weak bind-congruence on the continuation
+
+Pointwise-weak-bisimilar continuations yield weakly-bisimilar `bind`s. This
+is the `eutt` congruence lemma for `bind` on its second argument; the
+standard tool for replacing a continuation up to weak equivalence. -/
+
+/-- If `f a ≈ g a` for every `a`, then `bind u f ≈ bind u g`. -/
+theorem bind_weakBisim_cont {u : ITree F α} {f g : α → ITree F β}
+    (hfg : ∀ a, WeakBisim (f a) (g a)) :
+    WeakBisim (bind u f) (bind u g) := by
+  refine WeakBisim.coinduct
+    (fun x y => (∃ u : ITree F α, x = bind u f ∧ y = bind u g) ∨ WeakBisim x y)
+    ?_ (Or.inl ⟨u, rfl, rfl⟩)
+  rintro a b (⟨u, rfl, rfl⟩ | hab)
+  · rcases hu : PFunctor.M.dest u with ⟨sh, c⟩
+    cases sh with
+    | pure r =>
+        have hu_eq : u = pure r := by
+          apply PFunctor.M.eq_of_dest_eq; rw [hu]
+          change (⟨.pure r, c⟩ : (Poly F α).Obj _) = ⟨.pure r, PEmpty.elim⟩
+          congr 1; funext z; exact z.elim
+        subst hu_eq
+        rw [bind_pure_left, bind_pure_left]
+        obtain ⟨x', y', hx, hy, M⟩ := (hfg r).dest
+        exact ⟨x', y', hx, hy, M.mono (fun _ _ hxy => Or.inr hxy)⟩
+    | step =>
+        refine ⟨bind u f, bind u g, .refl _, .refl _, ?_⟩
+        refine Match.tau (fun _ => bind (c PUnit.unit) f)
+          (fun _ => bind (c PUnit.unit) g) (dest_bind_step f u c hu)
+          (dest_bind_step g u c hu) ?_
+        exact Or.inl ⟨c PUnit.unit, rfl, rfl⟩
+    | query a =>
+        refine ⟨bind u f, bind u g, .refl _, .refl _, ?_⟩
+        refine Match.query a (fun b => bind (c b) f) (fun b => bind (c b) g)
+          (dest_bind_query f u a c hu) (dest_bind_query g u a c hu) ?_
+        intro b
+        exact Or.inl ⟨c b, rfl, rfl⟩
+  · obtain ⟨x', y', hx, hy, M⟩ := hab.dest
+    exact ⟨x', y', hx, hy, M.mono (fun _ _ hxy => Or.inr hxy)⟩
 
 end ITree
