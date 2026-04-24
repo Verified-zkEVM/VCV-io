@@ -12,7 +12,7 @@ public import ToMathlib.ITree.Handler
 
 `ITree.simulate` interprets every event of the source spec via a `Handler`
 to produce an interaction tree over the target spec. `ITree.mapSpec`
-specialises this to event-renaming via a `PFunctor.Hom`, performing a pure
+specialises this to event-renaming via a `PFunctor.Lens`, performing a pure
 relabelling without inserting any extra silent steps or queries.
 
 The shape of `simulate` mirrors Coq's `interp` (`Core/Subevent.v`): we run
@@ -50,39 +50,39 @@ def simulate (h : Handler E F) (t : ITree E α) : ITree F α :=
 
 /-! ### Event renaming -/
 
-/-- Step transformer used by `mapSpec`. Given a polynomial-functor morphism
-`φ : PFunctor.Hom E F` and the current ITree node, produce one node of the
+/-- Step transformer used by `mapSpec`. Given a polynomial-functor lens
+`φ : PFunctor.Lens E F` and the current ITree node, produce one node of the
 target ITree by relabelling the head event. -/
-def mapSpecStep (φ : PFunctor.Hom E F) (t : ITree E α) : (Poly F α).Obj (ITree E α) :=
+def mapSpecStep (φ : PFunctor.Lens E F) (t : ITree E α) : (Poly F α).Obj (ITree E α) :=
   match shape' t with
   | ⟨.pure r, _⟩ => ⟨.pure r, PEmpty.elim⟩
   | ⟨.step, c⟩ => ⟨.step, fun _ => c PUnit.unit⟩
-  | ⟨.query a, c⟩ => ⟨.query (φ.shape a), fun b => c ((φ.arity a).mp b)⟩
+  | ⟨.query a, c⟩ => ⟨.query (φ.toFunA a), fun b => c (φ.toFunB a b)⟩
 
-@[simp] theorem mapSpecStep_pure (φ : PFunctor.Hom E F) (r : α) :
+@[simp] theorem mapSpecStep_pure (φ : PFunctor.Lens E F) (r : α) :
     mapSpecStep (α := α) φ (pure (F := E) r) = ⟨.pure r, PEmpty.elim⟩ := by
   simp [mapSpecStep]
 
-@[simp] theorem mapSpecStep_step (φ : PFunctor.Hom E F) (t : ITree E α) :
+@[simp] theorem mapSpecStep_step (φ : PFunctor.Lens E F) (t : ITree E α) :
     mapSpecStep φ (step t) = ⟨.step, fun _ => t⟩ := by
   simp [mapSpecStep]
 
-@[simp] theorem mapSpecStep_query (φ : PFunctor.Hom E F) (a : E.A)
+@[simp] theorem mapSpecStep_query (φ : PFunctor.Lens E F) (a : E.A)
     (k : E.B a → ITree E α) :
     mapSpecStep (α := α) φ (query a k) =
-      ⟨.query (φ.shape a), fun b => k ((φ.arity a).mp b)⟩ := by
+      ⟨.query (φ.toFunA a), fun b => k (φ.toFunB a b)⟩ := by
   simp [mapSpecStep]
 
-/-- Apply a polynomial-functor morphism `φ : PFunctor.Hom E F` to every event
+/-- Apply a polynomial-functor lens `φ : PFunctor.Lens E F` to every event
 of an interaction tree, leaving the leaves and silent steps untouched.
 
 This is the Lean analogue of Coq's `translate (h : E ~> F) : itree E ~> itree F`.
 
-It coincides with `simulate (Handler.ofHom φ)` up to (weak) bisimulation;
+It coincides with `simulate (Handler.ofLens φ)` up to (weak) bisimulation;
 defining it directly via `M.corec` produces a strongly bisimilar but more
 efficient implementation that does not insert the silent step that `iter`
 would otherwise add. -/
-def mapSpec (φ : PFunctor.Hom E F) : ITree E α → ITree F α :=
+def mapSpec (φ : PFunctor.Lens E F) : ITree E α → ITree F α :=
   PFunctor.M.corec (F := Poly F α) (mapSpecStep φ)
 
 end ITree
