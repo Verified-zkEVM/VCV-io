@@ -740,6 +740,27 @@ theorem mapSpec_iter (φ : PFunctor.Lens E F)
         simp only [dest_mapSpec, mapSpecStep, shape']
         rw [hL]
 
+/-! ### Derived `mapSpec` lemmas
+
+These follow directly from `mapSpec_bind` + `mapSpec_pure`. -/
+
+@[simp] theorem mapSpec_map (φ : PFunctor.Lens E F) (f : α → β) (t : ITree E α) :
+    mapSpec φ (ITree.map f t) = ITree.map f (mapSpec φ t) := by
+  simp only [ITree.map, mapSpec_bind, mapSpec_pure]
+
+@[simp] theorem mapSpec_functorMap (φ : PFunctor.Lens E F) (f : α → β)
+    (t : ITree E α) : mapSpec φ (f <$> t) = f <$> mapSpec φ t := by
+  simp only [map_eq_functor_map, mapSpec_map]
+
+@[simp] theorem mapSpec_cat {γ : Type u} (φ : PFunctor.Lens E F)
+    (f : α → ITree E β) (g : β → ITree E γ) (a : α) :
+    mapSpec φ (ITree.cat f g a) =
+      ITree.cat (mapSpec φ ∘ f) (mapSpec φ ∘ g) a := by
+  change mapSpec φ (bind (f a) g) =
+    bind ((mapSpec φ ∘ f) a) (fun b => (mapSpec φ ∘ g) b)
+  rw [mapSpec_bind]
+  rfl
+
 /-! ### Relating `simulate` and `mapSpec` -/
 
 theorem simulate_ofLens (φ : PFunctor.Lens E F) (t : ITree E α) :
