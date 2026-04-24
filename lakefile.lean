@@ -34,6 +34,22 @@ require Hax from git
   "492a34e3" / "hax-lib/proof-libs/lean"
 
 /-
+Loom2 (Verse Lab fork): foundation for the Loom-style WP / Triple program-logic
+abstractions used in `VCVio/ProgramLogic/`. Tracks Volo Gladshtein's unmerged
+upstream PR https://github.com/leanprover/lean4/pull/12965 in the
+`Std.Internal.Do.{WPMonad,PredTrans,Triple,Assertion,ExceptPost}` namespace
+(temporarily prefixed `Std.Do'` in Loom2 to avoid clashing once it merges).
+
+Pinned to our `quangvdao/loom2` fork on branch `v4.29.0`, which patches only
+the toolchain (4 config-only commits over upstream `verse-lab/loom2`). When
+upstream Lean ships these foundations in a stable release, drop this require
+and re-import from `Std.Do.…` directly.
+-/
+require loom2 from git
+  "https://github.com/quangvdao/loom2" @
+  "589fbd53"
+
+/-
 Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against
 our root Mathlib v4.29.0 and Lean v4.29.0, but aeneas's source has three
 real regressions under that stack — see `Interop/Aeneas/README.md` for the
