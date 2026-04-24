@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.SimSemantics.StateProjection
 
 /-!
 # Combined Caching + Logging Handlers
@@ -109,22 +110,19 @@ theorem fst_map_run_simulateQ {α : Type u}
     (oa : OracleComp spec α) (s : QueryCache spec × QueryLog spec) :
     Prod.map id Prod.fst <$> (simulateQ cachingLoggingOracle oa).run s =
       (simulateQ cachingOracle oa).run s.1 := by
-  induction oa using OracleComp.inductionOn generalizing s with
-  | pure x =>
+  refine OracleComp.map_run_simulateQ_eq_of_query_map_eq
+    (impl₁ := cachingLoggingOracle) (impl₂ := cachingOracle)
+    (proj := Prod.fst) ?_ oa s
+  intro t ⟨cache, trace⟩
+  cases hcache : cache t with
+  | some u =>
+      simp [apply_eq, hcache]
+  | none =>
+      simp only [apply_eq, cachingOracle.apply_eq, StateT.run_bind,
+        StateT.run_get, pure_bind, hcache, StateT.run_monadLift, map_bind,
+        bind_assoc]
+      refine bind_congr fun u => ?_
       simp
-  | query_bind t oa ih =>
-      cases hcache : s.1 t with
-      | some u =>
-          simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-            OracleQuery.cont_query, apply_eq, cachingOracle.apply_eq, StateT.run_bind,
-            StateT.run_get, pure_bind, hcache, map_bind]
-          simpa using ih u (s.1, s.2 ++ [⟨t, u⟩])
-      | none =>
-          simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-            OracleQuery.cont_query, apply_eq, cachingOracle.apply_eq, StateT.run_bind,
-            StateT.run_get, pure_bind, hcache, StateT.run_monadLift, map_bind, bind_assoc]
-          refine bind_congr fun u => ?_
-          simpa [Functor.map_map] using ih u (s.1.cacheQuery t u, s.2 ++ [⟨t, u⟩])
 
 /-- Output-only projection corollary of `fst_map_run_simulateQ`. -/
 @[simp]

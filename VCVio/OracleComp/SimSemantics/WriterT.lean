@@ -4,18 +4,87 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma
 -/
 import VCVio.OracleComp.EvalDist
+import ToMathlib.Control.WriterT
 
 /-!
-# Simulation using `WriterT` Monad Transformers
+# Simulation through `WriterT` Handlers
 
-Lemmas about `simulateQ` with output monad `WriterT ω (OracleComp spec)` for some `ω`
-
-Note we only handle `monoid` version of `WriterT`, append should be added eventually.
+Output-preservation lemmas for writer-instrumented query implementations.
 -/
 
 open OracleSpec Function Prod
 
 universe u v w
+
+namespace QueryImpl
+
+variable {ι : Type u} {spec : OracleSpec ι} {α : Type u}
+variable {m : Type u → Type v} [Monad m] [LawfulMonad m]
+
+section monoid
+
+variable {ω : Type u} [Monoid ω]
+
+/-- A `WriterT`-valued handler preserves the output marginal of a whole
+simulation as soon as it preserves the output marginal of each query.
+
+This is the generic output-preservation principle for writer-style handler
+instrumentation. Specializations such as trace, cost, and counting handlers
+only need to prove the one-query hypothesis. -/
+lemma simulateQ_writerT_fst_map_run_eq_of_query
+    (implW : QueryImpl spec (WriterT ω m)) (impl : QueryImpl spec m)
+    (himpl : ∀ t, Prod.fst <$> (implW t).run = impl t)
+    (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ implW oa).run = simulateQ impl oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp [WriterT.run_pure]
+  | query_bind t oa ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, WriterT.run_bind, map_bind,
+        Functor.map_map, ih]
+      calc
+        (do
+            let a ← (implW t).run
+            simulateQ impl (oa a.1))
+            = (Prod.fst <$> (implW t).run >>= fun x => simulateQ impl (oa x)) := by
+                exact (bind_map_left (m := m) Prod.fst (implW t).run
+                  (fun x => simulateQ impl (oa x))).symm
+        _ = (impl t >>= fun x => simulateQ impl (oa x)) := by rw [himpl t]
+
+end monoid
+
+section append
+
+variable {ω : Type u} [EmptyCollection ω] [Append ω] [LawfulAppend ω]
+
+/-- Append-flavoured version of
+`QueryImpl.simulateQ_writerT_fst_map_run_eq_of_query`.
+
+This targets the `WriterT` instance that accumulates logs via `∅` and `++`,
+used by query logging. -/
+lemma simulateQ_writerT_append_fst_map_run_eq_of_query
+    (implW : QueryImpl spec (WriterT ω m)) (impl : QueryImpl spec m)
+    (himpl : ∀ t, Prod.fst <$> (implW t).run = impl t)
+    (oa : OracleComp spec α) :
+    Prod.fst <$> (simulateQ implW oa).run = simulateQ impl oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t oa ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
+        OracleQuery.cont_query, id_map, WriterT.run_bind', map_bind,
+        Functor.map_map, map_fst, id_eq, ih]
+      calc
+        (do
+            let a ← (implW t).run
+            simulateQ impl (oa a.1))
+            = (Prod.fst <$> (implW t).run >>= fun x => simulateQ impl (oa x)) := by
+                exact (bind_map_left (m := m) Prod.fst (implW t).run
+                  (fun x => simulateQ impl (oa x))).symm
+        _ = (impl t >>= fun x => simulateQ impl (oa x)) := by rw [himpl t]
+
+end append
+
+end QueryImpl
 
 namespace OracleComp
 

@@ -151,9 +151,7 @@ theorem fst_map_runObs [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev �
     (fun z : α × ω => z.1) <$> runObs base encode oa = eraseObs base oa := by
   change Prod.fst <$> (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode)) oa).run =
     simulateQ (eraseObsImpl base) oa
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t oa h => simp [h]
+  exact QueryImpl.fst_map_run_withCost (eraseObsImpl base) (obsCostFn encode) oa
 
 /-- Failure preservation: observations do not change the probability of failure. -/
 theorem probFailure_runObs [LawfulMonad m] [HasEvalSPMF m]

@@ -415,7 +415,7 @@ theorem withCachingTrackingPolicy_run_proj_eq'
     Prod.map id Prod.fst <$>
         (simulateQ (so.withCachingTrackingPolicy policy) oa).run (cache, bad) =
       (simulateQ so.withCaching oa).run cache := by
-  refine map_run_simulateQ_eq_of_query_map_eq'
+  refine map_run_simulateQ_eq_of_query_map_eq
     (impl₁ := so.withCachingTrackingPolicy policy)
     (impl₂ := so.withCaching)
     (proj := Prod.fst) ?_ oa (cache, bad)
