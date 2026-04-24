@@ -213,6 +213,10 @@ import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HandlerSpecs
 import VCVio.ProgramLogic.Unary.HoarePropTriple
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.ProgramLogic.Unary.Loom.Coherence
+import VCVio.ProgramLogic.Unary.Loom.Probabilistic
+import VCVio.ProgramLogic.Unary.Loom.Qualitative
+import VCVio.ProgramLogic.Unary.Loom.Quantitative
 import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.StdDoExamples
