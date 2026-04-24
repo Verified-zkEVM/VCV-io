@@ -274,12 +274,250 @@ theorem iter_unfold (body : β → ITree F (β ⊕ α)) (init : β) :
         · rw [PFunctor.M.dest_corec_apply, iterStep, h]
         · exact dest_bind_query kk t a c h
 
+/-- Helper: `M.dest (bind u (fun c => pure (.inr c)))` when `u` has a pure head. -/
+private theorem dest_bind_pureInr_of_pure (u : ITree F γ) (r : γ)
+    (c_in : (Poly F γ).B (.pure r) → (Poly F γ).M)
+    (h : PFunctor.M.dest u = ⟨.pure r, c_in⟩) :
+    PFunctor.M.dest (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.pure (.inr r), PEmpty.elim⟩ := by
+  rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
+  change (match PFunctor.M.dest (pure (F := F) (.inr r : β ⊕ γ)) with
+      | ⟨s, c'⟩ => Sigma.mk s
+          (fun b => PFunctor.M.corec (bindStep (fun c : γ => pure (.inr c)))
+            (.inr (c' b))) :
+      (Poly F (β ⊕ γ)).Obj _) = _
+  rw [show PFunctor.M.dest (pure (F := F) (.inr r : β ⊕ γ)) =
+    ⟨.pure (.inr r), PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+  change (Sigma.mk (.pure (.inr r) : Shape F (β ⊕ γ))
+    (fun b : PEmpty => PFunctor.M.corec
+      (bindStep (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))
+      (.inr (PEmpty.elim b))) : (Poly F (β ⊕ γ)).Obj _) = ⟨.pure (.inr r), PEmpty.elim⟩
+  congr 1
+  funext z
+  exact z.elim
+
+/-- Helper: `M.dest (bind u (fun c => pure (.inr c)))` when `u` has a step head. -/
+private theorem dest_bind_pureInr_of_step (u : ITree F γ)
+    (c : PUnit → ITree F γ) (h : PFunctor.M.dest u = ⟨.step, c⟩) :
+    PFunctor.M.dest (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.step, fun _ =>
+        bind (c PUnit.unit) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))⟩ := by
+  rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
+  rfl
+
+/-- Helper: `M.dest (bind u (fun c => pure (.inr c)))` when `u` has a query head. -/
+private theorem dest_bind_pureInr_of_query (u : ITree F γ) (a : F.A)
+    (c : F.B a → ITree F γ) (h : PFunctor.M.dest u = ⟨.query a, c⟩) :
+    PFunctor.M.dest (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.query a, fun b =>
+        bind (c b) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))⟩ := by
+  rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
+  rfl
+
+/-- Helper: `iterStep newBody (bind u (pure ∘ Sum.inr))` reduces to
+`⟨.pure r, PEmpty.elim⟩` when `u` has a pure head carrying `r`. -/
+private theorem iterStep_bind_pureInr_of_pure
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ) (r : γ)
+    (c_in : (Poly F γ).B (.pure r) → (Poly F γ).M)
+    (h : PFunctor.M.dest u = ⟨.pure r, c_in⟩) :
+    iterStep newBody (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.pure r, PEmpty.elim⟩ := by
+  rw [iterStep, dest_bind_pureInr_of_pure u r c_in h]
+
+/-- Helper: `iterStep newBody (bind u (pure ∘ Sum.inr))` reduces to
+`⟨.step, _⟩` when `u` has a step head. -/
+private theorem iterStep_bind_pureInr_of_step
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ)
+    (c : PUnit → ITree F γ) (h : PFunctor.M.dest u = ⟨.step, c⟩) :
+    iterStep newBody (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.step, fun _ =>
+        bind (c PUnit.unit) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))⟩ := by
+  rw [iterStep, dest_bind_pureInr_of_step u c h]
+
+/-- Helper: `iterStep newBody (bind u (pure ∘ Sum.inr))` reduces to
+`⟨.query a, _⟩` when `u` has a query head. -/
+private theorem iterStep_bind_pureInr_of_query
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ) (a : F.A)
+    (c : F.B a → ITree F γ) (h : PFunctor.M.dest u = ⟨.query a, c⟩) :
+    iterStep newBody (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))) =
+      ⟨.query a, fun b =>
+        bind (c b) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))⟩ := by
+  rw [iterStep, dest_bind_pureInr_of_query u a c h]
+
+/-- Helper: one `M.dest` step of `M.corec (iterStep newBody) (bind u wrapper_inr)`
+when `u` has a pure head. -/
+private theorem dest_corec_iter_bind_inr_of_pure
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ) (r : γ)
+    (c_in : (Poly F γ).B (.pure r) → (Poly F γ).M)
+    (h : PFunctor.M.dest u = ⟨.pure r, c_in⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep newBody)
+        (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))) =
+      ⟨.pure r, PEmpty.elim⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep_bind_pureInr_of_pure newBody u r c_in h]
+  congr 1
+  funext z
+  exact z.elim
+
+/-- Helper: one `M.dest` step of `M.corec (iterStep newBody) (bind u wrapper_inr)`
+when `u` has a step head. -/
+private theorem dest_corec_iter_bind_inr_of_step
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ)
+    (c : PUnit → ITree F γ) (h : PFunctor.M.dest u = ⟨.step, c⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep newBody)
+        (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))) =
+      ⟨.step, fun _ => PFunctor.M.corec (iterStep newBody)
+        (bind (c PUnit.unit) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep_bind_pureInr_of_step newBody u c h]
+
+/-- Helper: one `M.dest` step of `M.corec (iterStep newBody) (bind u wrapper_inr)`
+when `u` has a query head. -/
+private theorem dest_corec_iter_bind_inr_of_query
+    (newBody : β → ITree F (β ⊕ γ)) (u : ITree F γ) (a : F.A)
+    (c : F.B a → ITree F γ) (h : PFunctor.M.dest u = ⟨.query a, c⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep newBody)
+        (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))) =
+      ⟨.query a, fun b => PFunctor.M.corec (iterStep newBody)
+        (bind (c b) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep_bind_pureInr_of_query newBody u a c h]
+
 theorem iter_bind (body : β → ITree F (β ⊕ α)) (k : α → ITree F γ) (init : β) :
     bind (iter body init) k =
       iter (fun b => bind (body b) (fun rj => match rj with
         | .inl j => pure (.inl j)
         | .inr r => bind (k r) (fun c => pure (.inr c)))) init := by
-  sorry
+  set wrapper : β ⊕ α → ITree F (β ⊕ γ) := fun rj => match rj with
+    | .inl j => pure (.inl j)
+    | .inr r => bind (k r) (fun c => pure (.inr c)) with hwrapper
+  set newBody : β → ITree F (β ⊕ γ) := fun b => bind (body b) wrapper with hnewBody
+  change bind (PFunctor.M.corec (iterStep body) (body init)) k =
+    PFunctor.M.corec (iterStep newBody) (newBody init)
+  refine PFunctor.M.bisim
+    (fun (lhs rhs : ITree F γ) =>
+      (∃ t : ITree F (β ⊕ α),
+        lhs = bind (PFunctor.M.corec (iterStep body) t) k ∧
+        rhs = PFunctor.M.corec (iterStep newBody) (bind t wrapper)) ∨
+      (∃ u : ITree F γ,
+        lhs = u ∧
+        rhs = PFunctor.M.corec (iterStep newBody)
+          (bind u (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))))))
+    ?_ _ _ (Or.inl ⟨body init, rfl, rfl⟩)
+  rintro lhs rhs (⟨t, hlhs, hrhs⟩ | ⟨u, hlhs, hrhs⟩)
+  · -- Phase A: running iter body wrapped in bind k.
+    subst hlhs; subst hrhs
+    rcases h : PFunctor.M.dest t with ⟨sh, c⟩
+    cases sh with
+    | pure rj =>
+        -- Promote `t` to literally `pure rj` via funext on `PEmpty`.
+        have ht : t = pure rj := by
+          apply PFunctor.M.eq_of_dest_eq
+          rw [h]
+          change (⟨.pure rj, c⟩ : (Poly F (β ⊕ α)).Obj _) = ⟨.pure rj, PEmpty.elim⟩
+          congr 1; funext z; exact z.elim
+        clear h
+        subst ht
+        rw [bind_pure_left]
+        cases rj with
+        | inl j =>
+            -- RHS: wrapper (.inl j) = pure (.inl j).
+            have hw : wrapper (.inl j) = (pure (.inl j) : ITree F (β ⊕ γ)) := by rw [hwrapper]
+            rw [hw]
+            -- Compute destructors: both sides have a step head.
+            have hL : PFunctor.M.dest
+                (PFunctor.M.corec (iterStep body) (pure (.inl j) : ITree F (β ⊕ α))) =
+                ⟨.step, fun _ => PFunctor.M.corec (iterStep body) (body j)⟩ := by
+              rw [PFunctor.M.dest_corec_apply, iterStep,
+                show PFunctor.M.dest (pure (F := F) (.inl j : β ⊕ α)) =
+                  ⟨.pure (.inl j), PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+            refine ⟨.step,
+              fun _ => bind (PFunctor.M.corec (iterStep body) (body j)) k,
+              fun _ => PFunctor.M.corec (iterStep newBody) (bind (body j) wrapper),
+              ?_, ?_, fun _ => Or.inl ⟨body j, rfl, rfl⟩⟩
+            · exact dest_bind_step k _ _ hL
+            · rw [PFunctor.M.dest_corec_apply, iterStep,
+                  show PFunctor.M.dest (pure (F := F) (.inl j : β ⊕ γ)) =
+                    ⟨.pure (.inl j), PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+        | inr r =>
+            -- RHS: wrapper (.inr r) = bind (k r) (pure ∘ inr).
+            have hw : wrapper (.inr r) =
+                bind (k r) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ))) := by
+              rw [hwrapper]
+            rw [hw]
+            -- LHS: M.corec (iterStep body) (pure (.inr r)) is defeq to pure r (mod funext).
+            have hcorec : PFunctor.M.corec (iterStep body) (pure (.inr r) : ITree F (β ⊕ α))
+                = (pure r : ITree F α) := by
+              apply PFunctor.M.eq_of_dest_eq
+              rw [PFunctor.M.dest_corec_apply, iterStep,
+                show PFunctor.M.dest (pure (F := F) (.inr r : β ⊕ α)) =
+                  ⟨.pure (.inr r), PEmpty.elim⟩ from PFunctor.M.dest_mk _,
+                show PFunctor.M.dest (pure (F := F) r) =
+                  ⟨.pure r, PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+              change (⟨.pure r, fun b : PEmpty =>
+                  PFunctor.M.corec (iterStep body) (PEmpty.elim b)⟩
+                : (Poly F α).Obj _) = ⟨.pure r, PEmpty.elim⟩
+              congr 1; funext z; exact z.elim
+            rw [hcorec, bind_pure_left]
+            -- Transition into Phase B with `u := k r`; case-split on `M.dest (k r)`.
+            rcases hk : PFunctor.M.dest (k r) with ⟨sk, ck⟩
+            cases sk with
+            | pure r' =>
+                refine ⟨.pure r', ck, PEmpty.elim, rfl, ?_, fun b => b.elim⟩
+                exact dest_corec_iter_bind_inr_of_pure newBody (k r) r' ck hk
+            | step =>
+                refine ⟨.step, ck,
+                  fun _ => PFunctor.M.corec (iterStep newBody)
+                    (bind (ck PUnit.unit)
+                      (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))),
+                  rfl, ?_, fun _ => Or.inr ⟨ck PUnit.unit, rfl, rfl⟩⟩
+                exact dest_corec_iter_bind_inr_of_step newBody (k r) ck hk
+            | query a =>
+                refine ⟨.query a, ck,
+                  fun b => PFunctor.M.corec (iterStep newBody)
+                    (bind (ck b) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))),
+                  rfl, ?_, fun b => Or.inr ⟨ck b, rfl, rfl⟩⟩
+                exact dest_corec_iter_bind_inr_of_query newBody (k r) a ck hk
+    | step =>
+        refine ⟨.step,
+          fun _ => bind (PFunctor.M.corec (iterStep body) (c PUnit.unit)) k,
+          fun _ => PFunctor.M.corec (iterStep newBody)
+            (bind (c PUnit.unit) wrapper),
+          ?_, ?_, fun _ => Or.inl ⟨c PUnit.unit, rfl, rfl⟩⟩
+        · rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl,
+              PFunctor.M.dest_corec_apply, iterStep, h]
+          rfl
+        · have hdest_bind : PFunctor.M.dest (bind t wrapper) =
+              ⟨.step, fun _ => bind (c PUnit.unit) wrapper⟩ := dest_bind_step wrapper t c h
+          rw [PFunctor.M.dest_corec_apply, iterStep, hdest_bind]
+    | query a =>
+        refine ⟨.query a,
+          fun b => bind (PFunctor.M.corec (iterStep body) (c b)) k,
+          fun b => PFunctor.M.corec (iterStep newBody) (bind (c b) wrapper),
+          ?_, ?_, fun b => Or.inl ⟨c b, rfl, rfl⟩⟩
+        · rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl,
+              PFunctor.M.dest_corec_apply, iterStep, h]
+          rfl
+        · have hdest_bind : PFunctor.M.dest (bind t wrapper) =
+              ⟨.query a, fun b => bind (c b) wrapper⟩ := dest_bind_query wrapper t a c h
+          rw [PFunctor.M.dest_corec_apply, iterStep, hdest_bind]
+  · -- Phase B: `k r` has been spliced in; rhs is running `bind lhs (pure ∘ inr)`.
+    -- `rintro`'s substitution eliminated `u` in favor of `lhs`.
+    subst hlhs; subst hrhs
+    rcases h : PFunctor.M.dest lhs with ⟨sh, c⟩
+    cases sh with
+    | pure r =>
+        refine ⟨.pure r, c, PEmpty.elim, rfl, ?_, fun b => b.elim⟩
+        exact dest_corec_iter_bind_inr_of_pure newBody lhs r c h
+    | step =>
+        refine ⟨.step, c,
+          fun _ => PFunctor.M.corec (iterStep newBody)
+            (bind (c PUnit.unit) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))),
+          rfl, ?_, fun _ => Or.inr ⟨c PUnit.unit, rfl, rfl⟩⟩
+        exact dest_corec_iter_bind_inr_of_step newBody lhs c h
+    | query a =>
+        refine ⟨.query a, c,
+          fun b => PFunctor.M.corec (iterStep newBody)
+            (bind (c b) (fun c : γ => (pure (.inr c) : ITree F (β ⊕ γ)))),
+          rfl, ?_, fun b => Or.inr ⟨c b, rfl, rfl⟩⟩
+        exact dest_corec_iter_bind_inr_of_query newBody lhs a c h
 
 /-! ### Step is weakly absorbed -/
 
