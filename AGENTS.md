@@ -147,11 +147,12 @@ For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
 For the tactic reference, proof-mode entry points, and workflow details, see
 [`docs/agents/program-logic.md`](docs/agents/program-logic.md). The two
 `@[vcspec]` and `@[wpStep]` registries are indexed via
-`Lean.Meta.Sym.Pattern` / `Lean.Meta.Sym.DiscrTree` / `Lean.Meta.Sym.Simp.Theorems`.
-`Sym.*` is under active development in core Lean; see the
-*Internal Architecture* and *SymM Stability Note* sections of that doc
-for the churn classes to watch at each toolchain bump and the re-entry
-plan for the deferred `mvcgen'`/`SymM` rewriter bridge.
+`Lean.Meta.Sym.Pattern` / `Lean.Meta.Sym.DiscrTree`. `Sym.*` is under active
+development in core Lean; see the *Internal Architecture* and *SymM
+Stability Note* sections of that doc for the churn classes to watch at each
+toolchain bump and the re-entry plan for the deferred `mvcgen'`/`SymM`
+rewriter bridge (when it lands, `Sym.Simp.mkTheoremFromDecl` rebuilds the
+bundle on demand).
 
 ## Building
 

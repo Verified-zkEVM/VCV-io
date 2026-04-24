@@ -495,21 +495,24 @@ with its normalizing preprocess (`preprocessType` unfolds reducible
 abbreviations, beta/zeta/eta-reduces, and elaborates universes); `Sym.DiscrTree`
 is a thin wrapper over `Lean.Meta.DiscrTree` whose insertion keys come from
 those preprocessed patterns and whose lookup is the pure structural
-`getMatch`; and `Sym.Simp.Theorems` is a ready-made bundle of
-discrimination-tree + `Sym.Simp.Theorem` records already used by Lean's
-upcoming `mvcgen'` frontend.
+`getMatch`. Core also ships a `Sym.Simp.Theorems` bundle (discrimination-tree
++ `Sym.Simp.Theorem` records) used by the upcoming `mvcgen'` frontend; we do
+not consume it today (see *Future `mvcgen` bridge (deferred)* below) but
+`Sym.Simp.mkTheoremFromDecl` lets us reconstruct it on demand from the
+`@[wpStep]` registry once the `SymM → TacticM` proof-application bridge
+stabilises in core.
 
-Building on these means our registries share the same pattern preprocessing
-and lookup cost profile as future core tactics, and we can hand off directly
-to `Sym.Simp.Main.simpImpl` / `Sym.Simp.Theorems.rewrite` once the `SymM →
-TacticM` proof-application bridge stabilises in core.
+Building on `Sym.Pattern` + `Sym.DiscrTree` means our registries share the
+same pattern preprocessing and lookup cost profile as future core tactics,
+and the migration to `Sym.Simp.*`-driven rewriting is a localised follow-up
+in two registry files rather than a framework rewrite.
 
 ### Registries and what they index
 
 | File | Attribute | Role |
 |------|-----------|------|
 | `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / `eRelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
-| `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites. Each entry stores **both** a `Sym.Pattern` on `oa` (consulted today by `runWpStepRules` via `TacticM` rewriting) **and** a `Sym.Simp.Theorem` keyed on the full `wp oa post` LHS (held in a `Sym.Simp.Theorems` bundle for the eventual `SymM`-side rewriter) |
+| `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
 
 Each entry carries a `SpecProof` (reusing the core-Lean type from
 `Lean.Elab.Tactic.Do.SpecAttr`) so origins can be distinguished between a
@@ -551,9 +554,8 @@ same candidate pool.
 ## SymM Stability Note and Future Proof Repair
 
 `Lean.Meta.Sym.*` is still under active development in core Lean. The APIs
-we depend on today (`Sym.Pattern`, `Sym.DiscrTree`, `Sym.Simp.Theorems`,
-`Sym.Simp.mkTheoremFromDecl`, `Sym.insertPattern`, `Sym.getMatch`,
-`Sym.mkPatternFromDeclWithKey`, and `SpecProof` in
+we depend on today (`Sym.Pattern`, `Sym.DiscrTree`, `Sym.insertPattern`,
+`Sym.getMatch`, `Sym.mkPatternFromDeclWithKey`, and `SpecProof` in
 `Lean.Elab.Tactic.Do.SpecAttr`) are all used by `mvcgen`/`mvcgen'` in core
 too, so their direction is broadly stable, but none of them carry a
 compat-preservation promise yet. Expect the following classes of churn each
@@ -569,9 +571,11 @@ time we bump the toolchain:
   (`headIsOneOf`, `tripleBodyParts?`, `relTripleBodyParts?`, etc. in
   `Registry.lean`) may need to grow new cases. All of these live in a
   clearly-marked `Preprocessed-body head matchers` section.
-- **`Sym.Simp.Theorem` field renames / `mkTheoremFromDecl` moves**. Our only
-  current consumer is `buildWpStepEntry` in `WpStepRegistry.lean`; a
-  trivial rename is localised there.
+- **`Sym.Simp.Theorem` field renames / `mkTheoremFromDecl` moves**. We do
+  *not* call `mkTheoremFromDecl` today (the dispatcher works off the
+  `Sym.DiscrTree` alone). When the deferred `mvcgen'`/`SymM` bridge lands,
+  this is where we'll need to pick the bundle back up; until then this
+  churn class is no-op for us.
 - **`SpecProof` variants**. We only use `.global` today. If core splits or
   merges variants, `VCSpecEntry.declName?` / `WpStepEntry.declName?` plus
   the matching `MetaM` inserts need to be adjusted.
@@ -595,8 +599,10 @@ but does *not* expose a `SymM`-level rewriter we can hand a goal to (the
 bridge, for when the API lands:
 
 1. Build a `Sym.Simp.Theorems` bundle from the union of `@[wpStep]` and
-   `@[vcspec]` registries (`WpStepRegistry.theorems` already does this
-   for `wp`-shaped rules; extend the same idea to spec rules).
+   `@[vcspec]` registries by mapping `Sym.Simp.mkTheoremFromDecl` over
+   `getAllWpStepEntries` (and the analogous `@[vcspec]` accessor). We do
+   not eagerly maintain the bundle in the env extension because it only
+   feeds the deferred SymM rewriter and pulls in `Lean.Meta.Sym.Simp.*`.
 2. Translate the current `wp`-bearing goal into `Sym.Simp.SimpM` and run
    `Sym.Simp.Theorems.rewrite thms goal` (or whichever `simpImpl` variant
    core exposes). Results come back as a `Sym.Simp.Step`.
