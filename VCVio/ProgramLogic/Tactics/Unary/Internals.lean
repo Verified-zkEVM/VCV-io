@@ -176,22 +176,12 @@ private def runVCGenStepWithTheoremConseq
   saved.restore
   return false
 
-private def runCompiledUnaryRuleMode
-    (rule : CompiledUnaryVCSpecRule)
-    (mode : UnaryRuleApplicationMode)
-    (requireClosed : Bool := false) : TacticM Bool := do
-  match mode with
-  | .direct =>
-      runVCGenStepWithTheoremDirect (mkIdent rule.theoremName) requireClosed
-  | .tripleConseq =>
-      runVCGenStepWithTheoremConseq (mkIdent rule.theoremName) requireClosed
-
-private def runCompiledUnaryRule
-    (rule : CompiledUnaryVCSpecRule) (requireClosed : Bool := false) : TacticM Bool := do
-  for mode in rule.modes do
-    if ← runCompiledUnaryRuleMode rule mode requireClosed then
-      return true
-  return false
+/-- Apply a `@[vcspec]` unary rule to the current goal.
+Default `vcstep` fires rules only in `direct` mode; a future attribute could
+re-enable `triple_conseq` fallback by extending this helper. -/
+private def runUnaryVCSpecRule
+    (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
+  runVCGenStepWithTheoremDirect (mkIdent entry.theoremName!) requireClosed
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.
 When `requireClosed` is true, the step only succeeds if no goals remain afterwards. -/
@@ -396,40 +386,44 @@ private def unaryGoalKindAndComp? (target : Expr) : Option (VCSpecKind × Expr) 
       | some comp => some (.unaryWP, comp)
       | none => none
 
-/-- Find the registered compiled rules whose bounded application makes progress. -/
-def findRegisteredVCGenRuleCandidates : TacticM (Array CompiledUnaryVCSpecRule) := do
+/-- Find the registered unary `@[vcspec]` entries whose bounded application
+makes progress on the current goal. Prefers direct discrimination-tree hits on
+the goal's `comp`, falling back to kind-matched entries filtered by structural
+compatibility. -/
+def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
   let target ← instantiateMVars (← getMainTarget)
   let some (kind, comp) := unaryGoalKindAndComp? target | return #[]
   let goalPattern := classifyUnaryCompPattern comp
   let direct :=
-    (← getCompiledUnaryVCSpecRules comp).filter (·.kind == kind)
+    (← getRegisteredUnaryVCSpecEntries comp).filter (·.kind == kind)
   let fallbackAll :=
-    (← getCompiledUnaryVCSpecRulesOfKind kind).filter fun rule =>
-      !(direct.any fun directRule => directRule.theoremName == rule.theoremName)
-  let fallbackPreferred := fallbackAll.filter (·.entry.spec.compPattern == goalPattern)
-  let fallbackFallback := fallbackAll.filter (·.entry.spec.compPattern != goalPattern)
-  let mut found : Array CompiledUnaryVCSpecRule := #[]
-  for rule in direct.toList.take 8 do
+    (← getVCSpecEntriesOfKind kind).filter fun entry =>
+      !(direct.any fun directEntry => directEntry.theoremName! == entry.theoremName!)
+  let fallbackPreferred := fallbackAll.filter (·.spec.compPattern == goalPattern)
+  let fallbackFallback := fallbackAll.filter (·.spec.compPattern != goalPattern)
+  let mut found : Array VCSpecEntry := #[]
+  for entry in direct.toList.take 8 do
     let saved ← saveState
-    let ok ← runCompiledUnaryRule rule
+    let ok ← runUnaryVCSpecRule entry
     saved.restore
     if ok then
-      found := found.push rule
+      found := found.push entry
   unless found.isEmpty do
     return found
   for fallback in #[fallbackPreferred, fallbackFallback] do
-    for rule in fallback.toList.take 8 do
+    for entry in fallback.toList.take 8 do
       let saved ← saveState
-      let ok ← runCompiledUnaryRule rule
+      let ok ← runUnaryVCSpecRule entry
       saved.restore
       if ok then
-        found := found.push rule
+        found := found.push entry
     unless found.isEmpty do
       return found
   return found
 
-/-- Find the first registered compiled rule whose bounded application makes progress. -/
-def findRegisteredVCGenRule? : TacticM (Option CompiledUnaryVCSpecRule) := do
+/-- Find the first registered unary `@[vcspec]` entry whose bounded
+application makes progress. -/
+def findRegisteredVCGenRule? : TacticM (Option VCSpecEntry) := do
   return (← findRegisteredVCGenRuleCandidates).toList.head?
 
 def throwVCGenStepError : TacticM Unit := withMainContext do
@@ -455,7 +449,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
       else if let some comp := wpGoalComp? target then
         let comp ← whnfReducible (← instantiateMVars comp)
         let theoremMsg ← do
-          let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName)
+          let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName!)
           pure <| if thms.isEmpty then "" else
             s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
         throwError
@@ -482,7 +476,7 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
         else
           pure ""
       let theoremMsg ← do
-        let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName)
+        let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName!)
         pure <| if thms.isEmpty then "" else
           s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
       throwError
@@ -943,11 +937,11 @@ private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewRe
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestTheoremStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← findRegisteredVCGenRuleCandidates).map fun rule =>
+  let steps := (← findRegisteredVCGenRuleCandidates).map fun entry =>
     mkVCGenPlannedStep
-      "vcgen compiled theorem rule"
-      rule.replayText
-      (runCompiledUnaryRule rule)
+      "vcgen @[vcspec] theorem rule"
+      s!"vcstep with {entry.theoremName!}"
+      (runUnaryVCSpecRule entry)
   chooseBestPlannedStepCandidate? steps
 
 private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
@@ -1053,8 +1047,8 @@ def runVCGenStep : TacticM Bool := do
       return true
   if ← runVCGenStructuralCore then
     return true
-  if let some rule ← findRegisteredVCGenRule? then
-    if ← runCompiledUnaryRule rule then
+  if let some entry ← findRegisteredVCGenRule? then
+    if ← runUnaryVCSpecRule entry then
       return true
   tryCloseSpecGoal
 

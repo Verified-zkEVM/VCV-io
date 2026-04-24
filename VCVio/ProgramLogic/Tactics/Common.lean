@@ -8,7 +8,6 @@ import VCVio.ProgramLogic.Tactics.Common.Core
 import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 import VCVio.ProgramLogic.Tactics.Common.Registry
-import VCVio.ProgramLogic.Tactics.Common.CompiledRules
 import VCVio.ProgramLogic.Tactics.Common.WpStepRegistry
 import VCVio.ProgramLogic.Tactics.Common.WpStepDispatch
 import VCVio.ProgramLogic.Tactics.Common.Suggestions

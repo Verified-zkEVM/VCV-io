@@ -198,7 +198,6 @@ import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.SeededFork
 import VCVio.ProgramLogic.Tactics
 import VCVio.ProgramLogic.Tactics.Common
-import VCVio.ProgramLogic.Tactics.Common.CompiledRules
 import VCVio.ProgramLogic.Tactics.Common.Core
 import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.Registry
