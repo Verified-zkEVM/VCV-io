@@ -21,10 +21,13 @@ The standard equational theory for the simulation operators:
   `mapSpec`.
 * `mapSpec_id`, `mapSpec_comp` — functoriality of `mapSpec` over the lens
   category on `PFunctor`.
-* `mapSpec_bind` — `mapSpec` is a monad morphism (it distributes over `bind`).
-  The proof is by **strong bisimulation** (`PFunctor.M.bisim`), in contrast to
-  `simulate_bind` which only holds up to weak bisim because `simulate` inserts
-  τ-steps. (`mapSpec_iter` is left to a follow-up; see the unification plan.)
+* `mapSpec_bind`, `mapSpec_iter` — `mapSpec` is a monad morphism (it distributes
+  over `bind` and `iter`). Both proofs are by **strong bisimulation**
+  (`PFunctor.M.bisim`), in contrast to `simulate_bind` which only holds up to
+  weak bisim because `simulate` inserts τ-steps. The `iter` case is factored
+  through four small `dest_corec_iterStep_*` helpers that compute one M-dest
+  step of `M.corec (iterStep body)` in each of the four cases for the head of
+  the input ITree.
 * `simulate_ofLens` — relating `simulate` and `mapSpec` on a renaming.
 
 Each proof is built by coinduction on the shared `ITree` shape and combines
@@ -564,6 +567,178 @@ theorem mapSpec_bind (φ : PFunctor.Lens E F)
             bind (mapSpec φ (c (φ.toFunB a b))) (fun a => mapSpec φ (k a)),
           shape'_query _ _, shape'_query _ _,
           fun b => Or.inr ⟨c (φ.toFunB a b), rfl, rfl⟩⟩
+
+/-! ### One-step `M.dest` lemmas for `M.corec (iterStep _)`
+
+Used by `mapSpec_iter` below. They factor the case analysis on `shape' t`
+out of the bisimulation proof. -/
+
+private theorem dest_corec_iterStep_pure_inl
+    (body : β → ITree E (β ⊕ α)) (t : ITree E (β ⊕ α)) (j : β)
+    (cIn : (Poly E (β ⊕ α)).B (.pure (.inl j)) → (Poly E (β ⊕ α)).M)
+    (h : PFunctor.M.dest t = ⟨.pure (.inl j), cIn⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep body) t) =
+      ⟨.step, fun _ => PFunctor.M.corec (iterStep body) (body j)⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep, h]
+
+private theorem dest_corec_iterStep_pure_inr
+    (body : β → ITree E (β ⊕ α)) (t : ITree E (β ⊕ α)) (r : α)
+    (cIn : (Poly E (β ⊕ α)).B (.pure (.inr r)) → (Poly E (β ⊕ α)).M)
+    (h : PFunctor.M.dest t = ⟨.pure (.inr r), cIn⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep body) t) =
+      ⟨.pure r, PEmpty.elim⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep, h]
+  congr 1
+  funext z
+  exact z.elim
+
+private theorem dest_corec_iterStep_step
+    (body : β → ITree E (β ⊕ α)) (t : ITree E (β ⊕ α))
+    (c : PUnit → ITree E (β ⊕ α))
+    (h : PFunctor.M.dest t = ⟨.step, c⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep body) t) =
+      ⟨.step, fun u => PFunctor.M.corec (iterStep body) (c u)⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep, h]
+
+private theorem dest_corec_iterStep_query
+    (body : β → ITree E (β ⊕ α)) (t : ITree E (β ⊕ α)) (a : E.A)
+    (c : E.B a → ITree E (β ⊕ α))
+    (h : PFunctor.M.dest t = ⟨.query a, c⟩) :
+    PFunctor.M.dest (PFunctor.M.corec (iterStep body) t) =
+      ⟨.query a, fun b => PFunctor.M.corec (iterStep body) (c b)⟩ := by
+  rw [PFunctor.M.dest_corec_apply, iterStep, h]
+
+theorem mapSpec_iter (φ : PFunctor.Lens E F)
+    (body : β → ITree E (β ⊕ α)) (init : β) :
+    mapSpec φ (iter body init) = iter (fun j => mapSpec φ (body j)) init := by
+  refine PFunctor.M.bisim
+    (fun (u v : ITree F α) =>
+      u = v ∨ ∃ t : ITree E (β ⊕ α),
+        u = mapSpec φ (PFunctor.M.corec (iterStep body) t) ∧
+        v = PFunctor.M.corec
+              (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ t))
+    ?_ _ _ (Or.inr ⟨body init, rfl, rfl⟩)
+  rintro u v (rfl | ⟨t, rfl, rfl⟩)
+  · rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+    exact ⟨sh, c, c, rfl, rfl, fun _ => Or.inl rfl⟩
+  · rcases h : PFunctor.M.dest t with ⟨sh, c⟩
+    cases sh with
+    | pure rj =>
+        cases rj with
+        | inl j =>
+            have hL : PFunctor.M.dest
+                (PFunctor.M.corec (iterStep body) t) =
+                ⟨.step, fun _ => PFunctor.M.corec (iterStep body) (body j)⟩ :=
+              dest_corec_iterStep_pure_inl body t j c h
+            have hMt : mapSpec φ t = pure (.inl j) := by
+              have ht : t = pure (.inl j) := by
+                apply PFunctor.M.eq_of_dest_eq; rw [h]
+                change (⟨.pure (.inl j), c⟩ : (Poly E (β ⊕ α)).Obj _) =
+                  ⟨.pure (.inl j), PEmpty.elim⟩
+                congr 1; funext z; exact z.elim
+              rw [ht, mapSpec_pure]
+            have hR : PFunctor.M.dest
+                (PFunctor.M.corec
+                  (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ t)) =
+                ⟨.step, fun _ => PFunctor.M.corec
+                  (iterStep (fun j => mapSpec φ (body j)))
+                  (mapSpec φ (body j))⟩ := by
+              rw [hMt]
+              exact dest_corec_iterStep_pure_inl
+                (fun j => mapSpec φ (body j)) (pure (.inl j)) j PEmpty.elim
+                (PFunctor.M.dest_mk _)
+            refine ⟨.step,
+              fun _ => mapSpec φ (PFunctor.M.corec (iterStep body) (body j)),
+              fun _ => PFunctor.M.corec
+                (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ (body j)),
+              ?_, hR, fun _ => Or.inr ⟨body j, rfl, rfl⟩⟩
+            simp only [dest_mapSpec, mapSpecStep, shape']
+            rw [hL]
+        | inr r =>
+            have hL : PFunctor.M.dest
+                (PFunctor.M.corec (iterStep body) t) =
+                ⟨.pure r, PEmpty.elim⟩ :=
+              dest_corec_iterStep_pure_inr body t r c h
+            have hMt : mapSpec φ t = pure (.inr r) := by
+              have ht : t = pure (.inr r) := by
+                apply PFunctor.M.eq_of_dest_eq; rw [h]
+                change (⟨.pure (.inr r), c⟩ : (Poly E (β ⊕ α)).Obj _) =
+                  ⟨.pure (.inr r), PEmpty.elim⟩
+                congr 1; funext z; exact z.elim
+              rw [ht, mapSpec_pure]
+            have hR : PFunctor.M.dest
+                (PFunctor.M.corec
+                  (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ t)) =
+                ⟨.pure r, PEmpty.elim⟩ := by
+              rw [hMt]
+              exact dest_corec_iterStep_pure_inr
+                (fun j => mapSpec φ (body j)) (pure (.inr r)) r PEmpty.elim
+                (PFunctor.M.dest_mk _)
+            refine ⟨.pure r, PEmpty.elim, PEmpty.elim, ?_, hR, fun b => b.elim⟩
+            simp only [dest_mapSpec, mapSpecStep, shape']
+            rw [hL]
+            congr 1
+            funext z
+            exact z.elim
+    | step =>
+        have hL : PFunctor.M.dest
+            (PFunctor.M.corec (iterStep body) t) =
+            ⟨.step, fun u => PFunctor.M.corec (iterStep body) (c u)⟩ :=
+          dest_corec_iterStep_step body t c h
+        have hMt : mapSpec φ t = step (mapSpec φ (c PUnit.unit)) := by
+          have ht : t = step (c PUnit.unit) := by
+            apply PFunctor.M.eq_of_dest_eq; rw [h]; rfl
+          rw [ht, mapSpec_step]
+        have hR : PFunctor.M.dest
+            (PFunctor.M.corec
+              (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ t)) =
+            ⟨.step, fun _ => PFunctor.M.corec
+              (iterStep (fun j => mapSpec φ (body j)))
+              (mapSpec φ (c PUnit.unit))⟩ := by
+          rw [hMt]
+          exact dest_corec_iterStep_step
+            (fun j => mapSpec φ (body j)) (step (mapSpec φ (c PUnit.unit)))
+            (fun _ => mapSpec φ (c PUnit.unit)) (PFunctor.M.dest_mk _)
+        refine ⟨.step,
+          fun _ => mapSpec φ (PFunctor.M.corec (iterStep body) (c PUnit.unit)),
+          fun _ => PFunctor.M.corec
+            (iterStep (fun j => mapSpec φ (body j)))
+            (mapSpec φ (c PUnit.unit)),
+          ?_, hR, fun _ => Or.inr ⟨c PUnit.unit, rfl, rfl⟩⟩
+        simp only [dest_mapSpec, mapSpecStep, shape']
+        rw [hL]
+    | query a =>
+        have hL : PFunctor.M.dest
+            (PFunctor.M.corec (iterStep body) t) =
+            ⟨.query a, fun b => PFunctor.M.corec (iterStep body) (c b)⟩ :=
+          dest_corec_iterStep_query body t a c h
+        have hMt : mapSpec φ t =
+            query (φ.toFunA a) (fun b => mapSpec φ (c (φ.toFunB a b))) := by
+          have ht : t = query a c := by
+            apply PFunctor.M.eq_of_dest_eq; rw [h]; rfl
+          rw [ht, mapSpec_query]
+        have hR : PFunctor.M.dest
+            (PFunctor.M.corec
+              (iterStep (fun j => mapSpec φ (body j))) (mapSpec φ t)) =
+            ⟨.query (φ.toFunA a), fun b => PFunctor.M.corec
+              (iterStep (fun j => mapSpec φ (body j)))
+              (mapSpec φ (c (φ.toFunB a b)))⟩ := by
+          rw [hMt]
+          exact dest_corec_iterStep_query
+            (fun j => mapSpec φ (body j))
+            (query (φ.toFunA a) (fun b => mapSpec φ (c (φ.toFunB a b))))
+            (φ.toFunA a)
+            (fun b => mapSpec φ (c (φ.toFunB a b)))
+            (PFunctor.M.dest_mk _)
+        refine ⟨.query (φ.toFunA a),
+          fun b => mapSpec φ (PFunctor.M.corec (iterStep body)
+            (c (φ.toFunB a b))),
+          fun b => PFunctor.M.corec
+            (iterStep (fun j => mapSpec φ (body j)))
+            (mapSpec φ (c (φ.toFunB a b))),
+          ?_, hR, fun b => Or.inr ⟨c (φ.toFunB a b), rfl, rfl⟩⟩
+        simp only [dest_mapSpec, mapSpecStep, shape']
+        rw [hL]
 
 /-! ### Relating `simulate` and `mapSpec` -/
 
