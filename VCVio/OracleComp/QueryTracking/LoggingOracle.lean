@@ -36,6 +36,40 @@ namespace QueryImpl
 
 variable {m : Type u → Type v} [Monad m]
 
+section writerTMapBase
+
+variable {ι₀ ι₁ : Type} {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+variable {m₁ : Type u → Type v} [Monad m₁]
+variable {ω : Type u} [EmptyCollection ω] [Append ω]
+
+/-- Push an outer oracle interpretation through the base monad of a
+`WriterT`-valued query implementation. -/
+noncomputable def writerTMapBase
+    (outer : QueryImpl spec₁ m₁)
+    (inner : QueryImpl spec₀ (WriterT ω (OracleComp spec₁))) :
+    QueryImpl spec₀ (WriterT ω m₁) := fun t =>
+  WriterT.mk (simulateQ outer ((inner t).run))
+
+/-- Running a `WriterT` handler and then interpreting its base oracle
+computations is the same as first mapping the handler's base through the
+outer interpreter. -/
+theorem simulateQ_writerTMapBase_run [LawfulMonad m₁] [LawfulAppend ω]
+    (outer : QueryImpl spec₁ m₁)
+    (inner : QueryImpl spec₀ (WriterT ω (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) :
+    simulateQ outer ((simulateQ inner oa).run) =
+      (simulateQ (outer.writerTMapBase inner) oa).run := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => simp
+  | query_bind t k ih =>
+      simp only [simulateQ_bind, WriterT.run_bind']
+      simp only [simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+        id_map, writerTMapBase]
+      refine bind_congr fun x => ?_
+      rw [simulateQ_map, ih x.1]
+
+end writerTMapBase
+
 /-- Given that `so` implements the oracles in `spec` using the monad `m`,
 `withLogging so` gives the same implementation in the extension `WriterT (QueryLog spec) m`,
 by appending a single-entry log `[⟨t, u⟩]` *after* the handler returns response `u`.

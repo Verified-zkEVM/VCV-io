@@ -19,6 +19,49 @@ open OracleSpec
 
 namespace QueryImpl
 
+/-- Push an outer oracle interpretation through the base monad of a
+`StateT`-valued query implementation. -/
+noncomputable def stateTMapBase {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁))) :
+    QueryImpl spec₀ (StateT σ m) := fun t =>
+  StateT.mk fun s => simulateQ outer ((inner t).run s)
+
+/-- Running a `StateT` handler and then interpreting its base oracle
+computations is the same as first mapping the handler's base through the
+outer interpreter. -/
+theorem simulateQ_stateTMapBase_run {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) (s : σ) :
+    simulateQ outer ((simulateQ inner oa).run s) =
+      (simulateQ (outer.stateTMapBase inner) oa).run s := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x => simp
+  | query_bind t k ih =>
+      simp only [simulateQ_bind, StateT.run_bind]
+      simp only [simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+        id_map, stateTMapBase]
+      refine bind_congr fun z => ?_
+      exact ih z.1 z.2
+
+/-- Output-only corollary of `simulateQ_stateTMapBase_run`. -/
+theorem simulateQ_stateTMapBase_run' {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) (s : σ) :
+    simulateQ outer ((simulateQ inner oa).run' s) =
+      (simulateQ (outer.stateTMapBase inner) oa).run' s := by
+  change simulateQ outer (Prod.fst <$> (simulateQ inner oa).run s) = _
+  rw [simulateQ_map, simulateQ_stateTMapBase_run]
+  rfl
+
 /-- Given implementations for oracles in `spec₁` and `spec₂` in terms of state monads for
 two different contexts `σ₁` and `σ₂`, implement the combined set `spec₁ + spec₂` in terms
 of a combined `σ₁ × σ₂` state. -/

@@ -358,13 +358,43 @@ lifted into the HeapSSP `cmaSpec` by re-adding `pkSpec`. -/
       pk msg sig)
   pure ((msg, sig), verified)
 
+omit [DecidableEq M] [DecidableEq Commit] in
 /-- The public random-oracle runtime for the fixed-key post-keygen experiment,
 viewed as a `QueryRuntime` with explicit cache state. -/
 @[reducible] noncomputable def fsBaseRuntime :
     QueryRuntime (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) where
-  impl := unifFwdImpl (M × Commit →ₒ Chal) +
-    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _)
+  impl := by
+    letI : DecidableEq (M × Commit) := Classical.decEq _
+    exact unifFwdImpl (M × Commit →ₒ Chal) +
+      (randomOracle : QueryImpl (M × Commit →ₒ Chal) _)
+
+omit [DecidableEq M] [DecidableEq Commit] in
+/-- The bundled Fiat-Shamir runtime is the explicit cache-state runtime
+`fsBaseRuntime`, observed from the chosen initial cache. -/
+lemma runtimeWithCache_evalDist_eq_fsBaseRuntime
+    (cache : (M × Commit →ₒ Chal).QueryCache)
+    {α : Type}
+    (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
+    (FiatShamir.runtimeWithCache M cache).evalDist oa =
+      evalDist ((simulateQ
+        (fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)).impl oa).run'
+        cache) := by
+  unfold FiatShamir.runtimeWithCache ProbCompRuntime.evalDist
+    SPMFSemantics.evalDist SemanticsVia.denote fsBaseRuntime
+  unfold SPMFSemantics.withStateOracle unifFwdImpl simulateQ' evalDist
+  have hbase :
+      (QueryImpl.ofLift unifSpec ProbComp).liftTarget
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
+        = (HasQuery.toQueryImpl (spec := unifSpec) (m := ProbComp)).liftTarget
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := by
+    funext t
+    simp [QueryImpl.liftTarget_apply, HasQuery.toQueryImpl]
+  rw [hbase]
+  dsimp
+  congr 6
+  funext a b
+  exact Subsingleton.elim _ _
 
 /-- The public signing oracle for a fixed keypair, interpreted directly in the
 explicit cache-state random-oracle runtime. -/
