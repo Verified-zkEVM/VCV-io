@@ -37,7 +37,7 @@ structure CompiledRelationalVCSpecRule where
   deriving Inhabited
 
 def CompiledUnaryVCSpecRule.theoremName (rule : CompiledUnaryVCSpecRule) : Name :=
-  rule.entry.decl
+  rule.entry.theoremName!
 
 def CompiledUnaryVCSpecRule.kind (rule : CompiledUnaryVCSpecRule) : VCSpecKind :=
   rule.entry.kind
@@ -49,7 +49,7 @@ def CompiledUnaryVCSpecRule.canUseConsequence (rule : CompiledUnaryVCSpecRule) :
   rule.modes.contains .tripleConseq
 
 def CompiledRelationalVCSpecRule.theoremName (rule : CompiledRelationalVCSpecRule) : Name :=
-  rule.entry.decl
+  rule.entry.theoremName!
 
 def CompiledRelationalVCSpecRule.kind (rule : CompiledRelationalVCSpecRule) : VCSpecKind :=
   rule.entry.kind

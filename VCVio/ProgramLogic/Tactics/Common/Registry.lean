@@ -7,6 +7,7 @@ Authors: Quang Dao
 import Lean
 import Lean.Meta.Sym.Pattern
 import Lean.Meta.Sym.Simp.DiscrTree
+import Lean.Elab.Tactic.Do.Attr
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 
 /-!
@@ -38,6 +39,22 @@ folded abbreviations as a safety net). On the lookup side we apply
 `withReducible <| whnf` to the goal's computation before querying, matching the
 normalization performed during pattern preprocessing.
 
+## Alignment with core `SpecTheorem`
+
+Entries mirror the layout of `Lean.Elab.Tactic.Do.SpecAttr.SpecTheorem`
+wherever possible:
+
+* `proof : SpecProof` is reused directly, so entries can be global
+  declarations (the common case for `@[vcspec]`), local hypotheses, or raw
+  proof expressions. This anticipates the Phase F bridge where a subset of
+  our entries (the `Triple`-shaped ones) is exposed to `mvcgen'` via the
+  core `SpecExtension`.
+* `pattern : Sym.Pattern` is the Sym-side analogue of the combined
+  `SpecTheorem.{prog, keys}` pair; it carries the program sub-expression,
+  ∀-binder types, level parameters, and proof/instance slot metadata.
+* `priority : Nat` uses the same default as `SpecTheorem` so attribute
+  overrides carry over cleanly.
+
 ## Future-proofing note
 
 `Lean.Meta.Sym` is under active development upstream; minor shape changes to
@@ -45,27 +62,62 @@ normalization performed during pattern preprocessing.
 releases should be expected. If a toolchain bump breaks the registry, the
 affected surface is confined to the selector in `buildVCSpecEntry` and the
 lookup path in `getRegisteredUnaryVCSpecEntries` /
-`getRegisteredRelationalVCSpecEntries`; the downstream tactic dispatch sees
-only `VCSpecEntry.decl` and is insulated from `Sym` API churn.
+`getRegisteredRelationalVCSpecEntries`; downstream tactic dispatch works
+through `VCSpecEntry.declName?` / `VCSpecEntry.theoremName!` and is
+insulated from `Sym` API churn.
 -/
 
 open Lean Elab Meta Lean.Meta
+open Lean.Elab.Tactic.Do.SpecAttr (SpecProof)
 
 namespace OracleComp.ProgramLogic
 
-/-- A registered `@[vcspec]` lemma together with everything the planner needs:
-its declaration name, the normalized IR description, the `Sym.Pattern` used for
-discrimination-tree indexing, and (for relational entries) the head constant of
-the right-hand computation used as a secondary filter. -/
+/-- A registered `@[vcspec]` lemma together with everything the planner needs.
+
+Layout mirrors `Lean.Elab.Tactic.Do.SpecAttr.SpecTheorem` so the Phase F
+bridge can lift entries into the core `SpecExtension` without an extra
+conversion pass: `proof` is a shared `SpecProof`, `pattern` is the Sym
+analogue of `SpecTheorem.{prog, keys}`, and `priority` uses the same default
+macro expansion. `spec` and `rightHead?` are VCVio-specific diagnostic /
+planner extras that core does not need. -/
 structure VCSpecEntry where
-  decl : Name
-  spec : NormalizedVCSpec
+  /-- Origin of the proof: a global declaration, a local hypothesis, or a
+  raw proof expression. For `@[vcspec]` attribute registrations this is
+  always `.global declName`, but keeping the full `SpecProof` ADT leaves
+  room for a future tactic-level `vcspec` syntax that feeds hypotheses in
+  directly, and for direct interop with core `SpecTheorem`. -/
+  proof : SpecProof
+  /-- Sym-level pattern used for discrimination-tree indexing. The pattern
+  stores the program sub-expression plus enough bookkeeping (level params,
+  ∀-binder types, proof / instance slots) for `Sym.insertPattern` and
+  `Sym.getMatch` to work; it is the Sym-side analogue of
+  `SpecTheorem.{prog, keys}`. -/
   pattern : Lean.Meta.Sym.Pattern
+  /-- Normalized IR summary attached for diagnostics and planner ranking.
+  Not consumed by the discrimination-tree layer. -/
+  spec : NormalizedVCSpec
+  /-- Right-hand head constant used as a secondary filter for relational
+  entries. `none` for unary entries. -/
   rightHead? : Option Name := none
+  /-- User-supplied priority; same default as `SpecTheorem.priority`. -/
+  priority : Nat := eval_prio default
   deriving Inhabited
 
 instance : BEq VCSpecEntry where
-  beq a b := a.decl == b.decl
+  beq a b := a.proof == b.proof
+
+/-- Global declaration name for entries registered via `@[vcspec]`; `none`
+for entries backed by a local hypothesis or raw proof expression. -/
+def VCSpecEntry.declName? (entry : VCSpecEntry) : Option Name :=
+  match entry.proof with
+  | .global n => some n
+  | _ => none
+
+/-- Extract the global declaration name, assuming the entry was registered
+via `@[vcspec]` on a global theorem. Panics on local / stx proofs; intended
+for legacy call sites that pre-date local-hypothesis support. -/
+def VCSpecEntry.theoremName! (entry : VCSpecEntry) : Name :=
+  entry.declName?.getD Name.anonymous
 
 def VCSpecEntry.kind (entry : VCSpecEntry) : VCSpecKind :=
   entry.spec.kind
@@ -331,17 +383,18 @@ where
 
 /-- Build a registry entry for `decl` from its type by extracting the indexed
 sub-expression and producing a `Sym.Pattern` for discrimination-tree indexing. -/
-private def buildVCSpecEntry (decl : Name) : MetaM VCSpecEntry := do
+private def buildVCSpecEntry (decl : Name) (priority : Nat) : MetaM VCSpecEntry := do
   let (pattern, extras) ←
     Lean.Meta.Sym.mkPatternFromDeclWithKey decl selectVCSpecKey
   let (spec, rightHead?) := extras
-  return { decl, spec, pattern, rightHead? }
+  return { proof := .global decl, spec, pattern, rightHead?, priority }
 
 initialize registerBuiltinAttribute {
   name := `vcspec
   descr := "Register a unary or relational program-logic theorem for vcgen/rvcgen lookup."
-  add := fun decl _ kind => MetaM.run' do
-    let entry ← buildVCSpecEntry decl
+  add := fun decl stx kind => MetaM.run' do
+    let prio ← getAttrParamOptPrio stx[1]
+    let entry ← buildVCSpecEntry decl prio
     vcSpecRegistry.add entry kind
 }
 
@@ -367,17 +420,17 @@ def getRegisteredRelationalVCSpecEntries (oa ob : Expr) : MetaM (Array VCSpecEnt
     | none => false
 
 def getRegisteredUnaryVCSpecTheorems (comp : Expr) : MetaM (Array Name) := do
-  return (← getRegisteredUnaryVCSpecEntries comp).map (·.decl)
+  return (← getRegisteredUnaryVCSpecEntries comp).filterMap (·.declName?)
 
 def getRegisteredRelationalVCSpecTheorems (oa ob : Expr) : MetaM (Array Name) := do
-  return (← getRegisteredRelationalVCSpecEntries oa ob).map (·.decl)
+  return (← getRegisteredRelationalVCSpecEntries oa ob).filterMap (·.declName?)
 
 def getVCSpecEntriesOfKind (kind : VCSpecKind) : CoreM (Array VCSpecEntry) := do
   let registry := vcSpecRegistry.getState (← getEnv)
   return registry.all.filter (·.kind == kind)
 
 def getVCSpecTheoremsOfKind (kind : VCSpecKind) : CoreM (Array Name) := do
-  return (← getVCSpecEntriesOfKind kind).map (·.decl)
+  return (← getVCSpecEntriesOfKind kind).filterMap (·.declName?)
 
 def getNormalizedUnaryVCSpecs (comp : Expr) : MetaM (Array NormalizedVCSpec) := do
   return (← getRegisteredUnaryVCSpecEntries comp).map (·.spec)

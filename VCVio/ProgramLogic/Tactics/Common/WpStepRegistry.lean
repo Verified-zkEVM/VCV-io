@@ -7,6 +7,7 @@ Authors: Quang Dao
 import Lean
 import Lean.Meta.Sym.Pattern
 import Lean.Meta.Sym.Simp.DiscrTree
+import Lean.Elab.Tactic.Do.Attr
 import VCVio.ProgramLogic.Tactics.Common.Core
 
 /-!
@@ -25,24 +26,51 @@ pure `Sym.DiscrTree.getMatch`, run in `MetaM` only to read the persistent
 environment and to run a `withReducible whnf` on the goal's `comp` so the head
 agrees with the preprocessed pattern.
 
+Entries share the core `SpecProof` origin abstraction and a `priority` field
+with `Lean.Elab.Tactic.Do.SpecAttr.SpecTheorem`, so the Phase F bridge can lift
+rewrite-shaped rules into the core infrastructure without an extra conversion.
+
 The dispatch tactic `runWpStepRules`, together with the canonical registrations
 for every shipped `wp_*` lemma, lives in
 `VCVio.ProgramLogic.Tactics.Common.WpStepDispatch`.
 -/
 
 open Lean Elab Meta Lean.Meta
+open Lean.Elab.Tactic.Do.SpecAttr (SpecProof)
 
 namespace OracleComp.ProgramLogic
 
-/-- A registered `@[wpStep]` lemma: its declaration name plus the preprocessed
-`Sym.Pattern` keyed on the LHS computation of the rule. -/
+/-- A registered `@[wpStep]` lemma.
+
+Layout mirrors `Lean.Elab.Tactic.Do.SpecAttr.SpecTheorem` as much as the
+VCVio-specific shape (equational `wp` rewrites rather than Hoare triples)
+allows: `proof` reuses `SpecProof`, `pattern` carries the Sym-level key, and
+`priority` uses the shared default. -/
 structure WpStepEntry where
-  decl : Name
+  /-- Origin of the proof; currently always `.global declName` for
+  attribute-registered rules, but kept as a `SpecProof` for future local
+  hypothesis support and core interop. -/
+  proof : SpecProof
+  /-- Sym-level pattern used for discrimination-tree indexing. -/
   pattern : Lean.Meta.Sym.Pattern
+  /-- User-supplied priority, matching core's convention. -/
+  priority : Nat := eval_prio default
   deriving Inhabited
 
 instance : BEq WpStepEntry where
-  beq a b := a.decl == b.decl
+  beq a b := a.proof == b.proof
+
+/-- Global declaration name of a `@[wpStep]` entry, if any. -/
+def WpStepEntry.declName? (entry : WpStepEntry) : Option Name :=
+  match entry.proof with
+  | .global n => some n
+  | _ => none
+
+/-- Extract the global declaration name, assuming the entry was registered
+via `@[wpStep]` on a global theorem. Returns `Name.anonymous` for non-global
+proofs (safe: such entries are not produced today). -/
+def WpStepEntry.theoremName! (entry : WpStepEntry) : Name :=
+  entry.declName?.getD Name.anonymous
 
 /-- Persistent state for the `@[wpStep]` registry.
 
@@ -88,15 +116,16 @@ private def selectWpStepLhsComp (body : Expr) : MetaM (Expr × Unit) := do
   let oa := lhs.getArg! (n - 2)
   return (oa, ())
 
-private def buildWpStepEntry (decl : Name) : MetaM WpStepEntry := do
+private def buildWpStepEntry (decl : Name) (priority : Nat) : MetaM WpStepEntry := do
   let (pattern, _) ← Lean.Meta.Sym.mkPatternFromDeclWithKey decl selectWpStepLhsComp
-  return { decl, pattern }
+  return { proof := .global decl, pattern, priority }
 
 initialize registerBuiltinAttribute {
   name := `wpStep
   descr := "Register an equational `wp comp post = …` rule for the runWpStepRules planner."
-  add := fun decl _ kind => MetaM.run' do
-    let entry ← buildWpStepEntry decl
+  add := fun decl stx kind => MetaM.run' do
+    let prio ← getAttrParamOptPrio stx[1]
+    let entry ← buildWpStepEntry decl prio
     wpStepRegistry.add entry kind
 }
 

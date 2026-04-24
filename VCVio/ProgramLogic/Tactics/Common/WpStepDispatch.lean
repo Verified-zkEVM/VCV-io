@@ -67,9 +67,10 @@ def runWpStepRules : TacticM Bool := do
   let oa ← instantiateMVars args[0]!
   let entries ← getRegisteredWpStepEntries oa
   for entry in entries do
-    let rwStx ← `(tactic| rw [$(mkIdent entry.decl):ident])
+    let some declName := entry.declName? | continue
+    let rwStx ← `(tactic| rw [$(mkIdent declName):ident])
     if ← tryEvalTacticSyntax rwStx then return true
-    let simpStx ← `(tactic| simp only [$(mkIdent entry.decl):ident])
+    let simpStx ← `(tactic| simp only [$(mkIdent declName):ident])
     if ← tryEvalTacticSyntax simpStx then return true
   return false
 
