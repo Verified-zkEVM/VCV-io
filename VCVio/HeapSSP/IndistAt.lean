@@ -12,9 +12,7 @@ import Mathlib.Algebra.Order.BigOperators.Group.Finset
 
 `Package.IndistAt G₀ G₁ ε` (notation `G₀ ≈ᵈ[ε] G₁`) says that the Boolean
 distinguishing advantage between two probability-only heap-packages is
-bounded by `ε` against *every* Boolean adversary. The standard
-ε-indistinguishability of state-separating proofs, ported to the heap
-framework. The heap-package counterpart of `VCVio.SSP.IndistAt`.
+bounded by `ε` against every Boolean client.
 
 ## API surface
 
@@ -45,8 +43,7 @@ combinators `IndistAt.trans` / `IndistAt.distEquiv_left` /
 tool for chains of length ≥ 3.
 
 A dedicated `calc`-style tactic / macro for "approximate-with-error"
-chains is a follow-up; the same `TODO` discussion applies as in
-`VCVio.SSP.IndistAt` (the macro design is shared between both layers).
+chains is a follow-up.
 
 ## Composition
 
@@ -54,7 +51,7 @@ chains is a follow-up; the same `TODO` discussion applies as in
   the inner game of a linked composition along an `≈ᵈ[ε]`-hop, leveraging
   `Package.advantage_link_left_eq_advantage_shiftLeft`. The bound is
   preserved exactly: the outer reduction `P` is absorbed into the shifted
-  adversary.
+  client.
 * `par_congr` and outer-side congruences live in follow-up files once
   parallel-composition structural reductions and a notion of equivalence
   for *open* packages stabilise.
@@ -71,18 +68,18 @@ namespace Package
 variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- Two probability-only heap-packages are *ε-indistinguishable* if every
-Boolean-valued adversary's distinguishing advantage is bounded by `ε`.
+Boolean-valued client's distinguishing advantage is bounded by `ε`.
 
 Equivalent characterisations:
 * The Boolean distinguishing advantage `G₀.advantage G₁ A ≤ ε` for every
-  adversary `A` (the literal definition).
+  client `A` (the literal definition).
 * When `ε = 0`, this asserts zero distinguishing advantage; cf. `DistEquiv`
   for the strictly stronger "perfect equivalence" against arbitrary-typed
-  adversaries.
+  clients.
 
 The identifier sets `Ident₀, Ident₁` of the two games are independent: only
 the export interface and the distinguishing advantage matter from an
-adversary's point of view. -/
+client's point of view. -/
 def IndistAt {Ident₀ Ident₁ : Type}
     [CellSpec.{0, 0} Ident₀] [CellSpec.{0, 0} Ident₁]
     (G₀ : Package unifSpec E Ident₀) (G₁ : Package unifSpec E Ident₁)
@@ -112,8 +109,8 @@ protected theorem symm
   rw [advantage_symm]; exact h A
 
 /-- ε-indistinguishability composes by adding bounds: a chain of two hops
-with bounds `ε₀` and `ε₁` yields a hop with bound `ε₀ + ε₁`. The SSP
-triangle inequality, packaged for game-hopping. -/
+with bounds `ε₀` and `ε₁` yields a hop with bound `ε₀ + ε₁`. This is the
+triangle inequality for distinguishing advantage, packaged for game-hopping. -/
 @[trans]
 protected theorem trans
     {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
@@ -145,10 +142,7 @@ theorem refl_le {ε : ℝ} (G : Package unifSpec E Ident) (h : 0 ≤ ε) :
 
 /-! ### Bridge from `DistEquiv` -/
 
-/-- A perfect distributional equivalence implies `0`-indistinguishability.
-
-The reverse direction (`IndistAt 0` implies `DistEquiv`) is *not* proved
-here; see `VCVio.SSP.IndistAt`'s file header for discussion. -/
+/-- A perfect distributional equivalence implies `0`-indistinguishability. -/
 theorem of_distEquiv
     {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
     (h : G₀ ≡ᵈ G₁) : G₀ ≈ᵈ[0] G₁ := fun A => by
@@ -191,14 +185,14 @@ instance trans_indistAt_distEquiv {ε : ℝ} :
 
 /-! ### Bridge to `Package.advantage` -/
 
-/-- The literal definition: an `IndistAt` witness yields the per-adversary
+/-- The literal definition: an `IndistAt` witness yields the per-client
 bound. -/
 theorem advantage_le
     {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
     {ε : ℝ} (h : G₀ ≈ᵈ[ε] G₁) (A : OracleComp E Bool) :
     G₀.advantage G₁ A ≤ ε := h A
 
-/-- Build an `IndistAt` witness from a per-adversary bound. -/
+/-- Build an `IndistAt` witness from a per-client bound. -/
 theorem of_advantage_le
     {G₀ : Package unifSpec E Ident₀} {G₁ : Package unifSpec E Ident₁}
     {ε : ℝ} (h : ∀ (A : OracleComp E Bool), G₀.advantage G₁ A ≤ ε) :
@@ -211,8 +205,7 @@ a sequence of heap-packages with potentially different identifier sets
 collapses to a single endpoint bound, with the cumulative ε given by the
 sum of the per-hop bounds.
 
-The standard SSP/SSProve hybrid argument: chain `n` per-hop bounds and
-read off the overall bound from the sum. The identifier sets `Ident i` are
+The identifier sets `Ident i` are
 allowed to differ across the chain, so this scales to chains that
 interleave structural (heap-bijection) and quantitative hops. -/
 theorem hybrid {n : ℕ} {Ident : ℕ → Type} [∀ i, CellSpec.{0, 0} (Ident i)]
@@ -230,7 +223,7 @@ variable {Ident_P : Type} [CellSpec.{0, 0} Ident_P]
 
 /-- **Inner-game congruence for `link`.** Swapping the inner game of a
 linked composition along an `≈ᵈ[ε]`-hop preserves the bound exactly: the
-outer reduction `P` is absorbed into the shifted adversary `P.shiftLeft A`
+outer reduction `P` is absorbed into the shifted client `P.shiftLeft A`
 via `Package.advantage_link_left_eq_advantage_shiftLeft`. -/
 theorem link_inner_congr (P : Package M E Ident_P)
     {Q₀ : Package unifSpec M Ident₀} {Q₁ : Package unifSpec M Ident₁}

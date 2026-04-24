@@ -9,30 +9,16 @@ import VCVio.OracleComp.Coercions.Add
 /-!
 # HeapSSP: Composition of heap-packages
 
-Sequential `link` and parallel `par` for `HeapSSP.Package`, and the
-program-level reduction lemma `run_link_eq_run_shiftLeft` analogous to its
-counterpart in `VCVio.SSP.Composition`.
+Sequential `link` and parallel `par` for `HeapSSP.Package`.
 
-Key differences from `VCVio.SSP.Composition`:
+Composed packages use the disjoint sum of their identifier sets. The
+canonical state form is `Heap (α ⊕ β)`, while `Heap.split α β` exposes the
+two component heaps when running one side of the composition. The main
+reduction lemma, `run_link_eq_run_shiftLeft`, states that running a linked
+package is the same as running the inner package against the outer package
+absorbed into the client computation. -/
 
-* The state of a composed package is `Heap (α ⊕ β)`, *not* `Heap α × Heap β`.
-  The two are isomorphic via `Heap.split α β` (an `Equiv`), but the canonical
-  form is the heap on the disjoint sum of identifier sets.
-* `linkReshape : (γ × Heap α) × Heap β → γ × Heap (α ⊕ β)` plays the role of
-  the SSP version's `(γ × σ₁) × σ₂ → γ × (σ₁ × σ₂)`. It uses
-  `(Heap.split α β).symm` to rebuild the composite heap.
-* The reduction lemma `simulateQ_link_run` is stated in *parametric* form,
-  i.e. with the heap given as `(Heap.split α β).symm (h_α, h_β)`. This makes
-  the LHS and RHS match shape-for-shape with the SSP version and lets the
-  proof carry over unchanged. The "raw" form
-  `(simulateQ (P.link Q).impl A).run h` is recovered by setting
-  `(h_α, h_β) := Heap.split α β h`.
-
-Per-cell frame reasoning for the composed package follows directly from
-`Heap.split_apply_inl/inr` together with the `get_update_of_ne` lemmas in
-`VCVio/HeapSSP/Heap.lean`. -/
-
-universe uᵢ uₘ uₑ vᵢ v
+universe uᵢ uₘ uₑ uₛ vᵢ v
 
 open OracleSpec OracleComp
 
@@ -41,8 +27,10 @@ namespace VCVio.HeapSSP
 namespace Package
 
 variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
-  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
-  {α β : Type} [CellSpec.{0, v} α] [CellSpec.{0, v} β]
+  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ}
+  {M : OracleSpec.{uₘ, max uₛ v} ιₘ}
+  {E : OracleSpec.{uₑ, max uₛ v} ιₑ}
+  {α β : Type uₛ} [CellSpec.{uₛ, v} α] [CellSpec.{uₛ, v} β]
 
 /-! ### Sequential composition (`link`) -/
 
@@ -53,7 +41,7 @@ composite heap on the disjoint sum of identifier sets.
 `@[reducible]` so downstream proofs can unfold it into the concrete lambda
 without additional rewriting. -/
 @[reducible]
-def linkReshape {γ : Type v} :
+def linkReshape {γ : Type (max uₛ v)} :
     (γ × Heap α) × Heap β → γ × Heap (α ⊕ β) :=
   fun p => (p.1.1, (Heap.split α β).symm (p.1.2, p.2))
 
@@ -133,16 +121,13 @@ lemma link_impl_apply_run_of_outer_forward
 
 /-! ### `link` reduction lemma (parametric in the heap factors) -/
 
-/-- Structural fact: running `(P.link Q).impl` against an adversary `A`,
+/-- Structural fact: running `(P.link Q).impl` against a client computation `A`,
 starting from a composite heap `(Heap.split α β).symm (h_α, h_β)`, is the
 same as nesting the simulations and reshaping via `linkReshape`.
 
-This is the parametric form of the SSP `simulateQ_link_run`; the difference
-is that the composite state is built from `(h_α, h_β)` via `Heap.split.symm`
-rather than being literally a pair `(s₁, s₂)`. The proof follows the same
-structure as the SSP version, with the `Heap.split` projections collapsing
-definitionally on `(Heap.split α β).symm (h_α, h_β)`. -/
-theorem simulateQ_link_run {γ : Type v}
+The parametric starting heap exposes the two component heaps explicitly, so
+the `Heap.split` projections collapse definitionally during the proof. -/
+theorem simulateQ_link_run {γ : Type (max uₛ v)}
     (P : Package M E α) (Q : Package I M β)
     (A : OracleComp E γ) (h_α : Heap α) (h_β : Heap β) :
     (simulateQ (P.link Q).impl A).run ((Heap.split α β).symm (h_α, h_β)) =
@@ -185,21 +170,20 @@ theorem simulateQ_link_run {γ : Type v}
     refine bind_congr fun p => ?_
     exact ih p.1.1 p.1.2 p.2
 
-/-! ### Shifted adversary and the program-level SSP reduction -/
+/-! ### Shifted clients and the link reduction -/
 
-/-- The **shifted adversary** obtained by absorbing the outer reduction
-package `P` into the adversary. Identical in shape to its `VCVio.SSP`
-counterpart; only the state type changes (`Heap α` instead of `σ₁`). -/
-def shiftLeft (P : Package M E α) {γ : Type v} (A : OracleComp E γ) :
+/-- The shifted client obtained by absorbing the outer package `P` into the
+client computation. -/
+def shiftLeft (P : Package M E α) {γ : Type (max uₛ v)} (A : OracleComp E γ) :
     OracleComp M γ :=
   P.init >>= fun h_α => Prod.fst <$> (simulateQ P.impl A).run h_α
 
 @[simp]
-lemma shiftLeft_pure (P : Package M E α) {γ : Type v} (x : γ) :
+lemma shiftLeft_pure (P : Package M E α) {γ : Type (max uₛ v)} (x : γ) :
     P.shiftLeft (pure x) = P.init >>= fun _ => pure x := by
   simp [shiftLeft, simulateQ_pure, StateT.run_pure, bind_pure_comp]
 
-lemma shiftLeft_map (P : Package M E α) {γ δ : Type v} (f : γ → δ)
+lemma shiftLeft_map (P : Package M E α) {γ δ : Type (max uₛ v)} (f : γ → δ)
     (A : OracleComp E γ) :
     P.shiftLeft (f <$> A) = f <$> P.shiftLeft A := by
   unfold Package.shiftLeft
@@ -207,7 +191,7 @@ lemma shiftLeft_map (P : Package M E α) {γ δ : Type v} (f : γ → δ)
   refine bind_congr fun h_α => ?_
   rw [StateT.run_map, Functor.map_map, Functor.map_map]
 
-lemma shiftLeft_bind (P : Package M E α) {γ δ : Type v}
+lemma shiftLeft_bind (P : Package M E α) {γ δ : Type (max uₛ v)}
     (A : OracleComp E γ) (f : γ → OracleComp E δ) :
     P.shiftLeft (A >>= f) =
       P.init >>= fun h_α =>
@@ -216,14 +200,12 @@ lemma shiftLeft_bind (P : Package M E α) {γ δ : Type v}
   unfold Package.shiftLeft
   simp [simulateQ_bind, StateT.run_bind, map_bind]
 
-/-- **SSP reduction (program form).** Running the linked game `P.link Q`
-against adversary `A` produces the same `OracleComp` distribution as
-running the inner game `Q` against the shifted adversary `P.shiftLeft A`.
-
-Structurally identical to `VCVio.SSP.Package.run_link_eq_run_shiftLeft`;
-the only differences are the state type (`Heap (α ⊕ β)` instead of
-`σ₁ × σ₂`) and the reshape (`(Heap.split α β).symm` instead of pairing). -/
-theorem run_link_eq_run_shiftLeft {γ : Type v}
+/-- **Link reduction, program form.** Running the linked game `P.link Q`
+against client computation `A` produces the same `OracleComp` distribution as
+running the inner game `Q` against the shifted client `P.shiftLeft A`.
+The outer package is absorbed into the client, leaving the inner package as the
+only game being run. -/
+theorem run_link_eq_run_shiftLeft {γ : Type (max uₛ v)}
     (P : Package M E α) (Q : Package I M β) (A : OracleComp E γ) :
     (P.link Q).run A = Q.run (P.shiftLeft A) := by
   -- Both sides reduce to `Q.runState P.init >>= F` for the same `F`.
@@ -249,14 +231,11 @@ theorem run_link_eq_run_shiftLeft {γ : Type v}
     simp [hF, Functor.map_map]
   rw [hLHS, hRHS]
 
-/-! ### Parallel composition (`par`)
-
-Same shape as `VCVio.SSP.Package.par`, with composite identifier set
-`α ⊕ β` and composite state `Heap (α ⊕ β)`. -/
+/-! ### Parallel composition (`par`) -/
 
 variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {ιₑ₂ : Type uₑ}
-  {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
-  {E₁ : OracleSpec.{uₑ, v} ιₑ₁} {E₂ : OracleSpec.{uₑ, v} ιₑ₂}
+  {I₁ : OracleSpec.{uᵢ, max uₛ v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, max uₛ v} ιᵢ₂}
+  {E₁ : OracleSpec.{uₑ, max uₛ v} ιₑ₁} {E₂ : OracleSpec.{uₑ, max uₛ v} ιₑ₂}
 
 /-- Parallel composition of two heap-packages.
 
@@ -265,10 +244,8 @@ Given `p₁` exporting `E₁`, importing `I₁`, with identifier set `α`; and
 composite exports `E₁ + E₂`, imports `I₁ + I₂`, and has identifier set
 `α ⊕ β` with composite state `Heap (α ⊕ β)`.
 
-State separation is automatic: each side's handler reads/writes only its
-own component (`Heap.split α β _`'s `.1` for `p₁`, `.2` for `p₂`). This is
-the structural-typing counterpart of SSProve's `fseparate` side-condition,
-specialized to the heap framework. -/
+State separation is automatic: each side's handler runs on its component heap,
+and the result is rebuilt into the composite heap. -/
 def par (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β) :
     Package (I₁ + I₂) (E₁ + E₂) (α ⊕ β) where
   init := do
@@ -327,8 +304,8 @@ sum-spec contexts) with `par_impl_inl_apply_run` (which collapses the
 Stated in `.run` form to match the shape produced by `StateT.run_bind`, which
 leaves `(simulateQ ... (liftM ...)).run state_arg` on the proof state.
 
-Using this lemma directly is the canonical way to step a left-channel
-adversary query through `Package.par.run`; without it, one has to manage the
+Using this lemma directly is the canonical way to step a left-channel client
+query through `Package.par.run`; without it, one has to manage the
 `simulateQ`/`<$>`/`StateT.run` interleaving by hand. -/
 @[simp]
 lemma simulateQ_par_query_inl_run
@@ -363,15 +340,19 @@ end Package
 section UniverseTests
 
 example {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
-    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
-    {α β : Type} [CellSpec.{0, v} α] [CellSpec.{0, v} β]
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ}
+    {M : OracleSpec.{uₘ, max uₛ v} ιₘ}
+    {E : OracleSpec.{uₑ, max uₛ v} ιₑ}
+    {α β : Type uₛ} [CellSpec.{uₛ, v} α] [CellSpec.{uₛ, v} β]
     (P : Package M E α) (Q : Package I M β) :
     Package I E (α ⊕ β) := P.link Q
 
 example {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {ιₑ₂ : Type uₑ}
-    {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
-    {E₁ : OracleSpec.{uₑ, v} ιₑ₁} {E₂ : OracleSpec.{uₑ, v} ιₑ₂}
-    {α β : Type} [CellSpec.{0, v} α] [CellSpec.{0, v} β]
+    {I₁ : OracleSpec.{uᵢ, max uₛ v} ιᵢ₁}
+    {I₂ : OracleSpec.{uᵢ, max uₛ v} ιᵢ₂}
+    {E₁ : OracleSpec.{uₑ, max uₛ v} ιₑ₁}
+    {E₂ : OracleSpec.{uₑ, max uₛ v} ιₑ₂}
+    {α β : Type uₛ} [CellSpec.{uₛ, v} α] [CellSpec.{uₛ, v} β]
     (p₁ : Package I₁ E₁ α) (p₂ : Package I₂ E₂ β) :
     Package (I₁ + I₂) (E₁ + E₂) (α ⊕ β) := p₁.par p₂
 

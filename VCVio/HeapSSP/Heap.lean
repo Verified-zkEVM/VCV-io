@@ -9,27 +9,13 @@ import Mathlib.Logic.Equiv.Sum
 # HeapSSP: typed heaps over identifier sets
 
 `Heap Ident` (with `[CellSpec Ident]`) is a dependent function
-`(i : Ident) → CellSpec.type i`. It models the *state of an SSP package* as a
-collection of named, typed cells indexed by an identifier set `Ident`.
+`(i : Ident) → CellSpec.type i`. It models package state as a collection of
+named, typed cells indexed by an identifier set `Ident`.
 
-This is the foundational data type of the experimental `HeapSSP` namespace,
-the heap-based variant of the existing `VCVio.SSP` framework. Both
-frameworks coexist for side-by-side comparison; see
-`Notes/vcvio-fs-schnorr-clean-chain.md` §D.13 for the design rationale.
-
-## What this gives us, vs the product-state framework in `VCVio.SSP`
-
-* **State is canonical.** A heap is a function `Ident → Value`; no nested
-  `Prod`s, no tuple-shape choices.
-* **Composition is `Sum`.** Two packages with identifier sets `α` and `β`
-  compose into one with identifier set `α ⊕ β`; the canonical reshape lemmas
-  are `Equiv.sumComm`, `Equiv.sumAssoc`, `Equiv.sumEmpty` (Mathlib).
-* **`Heap.split` is `funext`-definitional.**
-  `Heap (α ⊕ β) ≃ Heap α × Heap β` holds by case-analysis on the identifier;
-  both directions are `rfl` after `cases i`.
-* **Per-cell frame holds definitionally.** Reading cell `j` after writing
-  cell `i ≠ j` returns the old value (`get_update_of_ne`). No bisimulation
-  hypothesis or invariant required.
+Composition uses disjoint sums of identifier sets. A heap over `α ⊕ β` splits
+canonically into a heap over `α` and a heap over `β`, and cell framing follows
+from ordinary function update: reading cell `j` after writing cell `i ≠ j`
+returns the old value.
 
 ## Usage
 
@@ -61,8 +47,7 @@ namespace VCVio.HeapSSP
 
 A `CellSpec Ident` says: each identifier `i : Ident` carries a value type
 `CellSpec.type i : Type v`, with a designated `CellSpec.default i`. The
-default plays the role of SSProve's "per-location literal initializer" — it
-is what the heap holds before any cell is written.
+default is what the heap holds before any cell is written.
 
 `Ident` lives in `Type u`, value types in `Type v`; both universes are
 independent. Sum composition (`Sum.instCellSpec` below) requires both
@@ -151,8 +136,8 @@ instance Sum.instCellSpec {α β : Type u}
 /-! ## `PEmpty` : `CellSpec` instance for the empty identifier set
 
 The trivial heap `Heap PEmpty` has a unique inhabitant (the empty function).
-This is the heap-side analogue of `PUnit` state and is used by stateless
-packages (`HeapSSP.Package.id`, `HeapSSP.Package.ofStateless`). -/
+It is used by stateless packages (`HeapSSP.Package.id` and
+`HeapSSP.Package.ofStateless`). -/
 instance PEmpty.instCellSpec : CellSpec.{u, v} PEmpty where
   type i := i.elim
   default i := i.elim
@@ -165,9 +150,7 @@ namespace Heap
 composition in this layer. The forward direction restricts to `inl` / `inr`
 cells; the inverse is `Sum.rec` on the identifier. Both directions reduce by
 case-analysis on the identifier and are `rfl`-definitional after `cases`.
-
-This is the canonical reshape combinator that replaces bespoke per-package
-state bijections in the product-state model. -/
+-/
 def split (α β : Type u) [CellSpec.{u, v} α] [CellSpec.{u, v} β] :
     Heap (α ⊕ β) ≃ Heap α × Heap β where
   toFun h := (fun a => h (.inl a), fun b => h (.inr b))

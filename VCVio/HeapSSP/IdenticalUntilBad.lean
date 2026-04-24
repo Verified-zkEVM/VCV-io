@@ -9,33 +9,20 @@ import VCVio.SSP.IdenticalUntilBad
 /-!
 # HeapSSP: Identical-Until-Bad
 
-Heap-package counterpart of `VCVio.SSP.IdenticalUntilBad`, lifting the
-state-dependent ε-perturbed identical-until-bad TV-distance bridge to
-pairs of `HeapSSP.Package`s.
+State-dependent ε-perturbed identical-until-bad bounds for heap packages.
 
-The HeapSSP `Package`'s native state is `Heap Ident`, but the bad-flag
-accounting in the underlying
-`ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad`
-is specialised to `σ × Bool`. We bridge the two shapes by a user-supplied
-bijection `φ : Heap Ident ≃ σ × Bool` together with an initial state
-`s_init : σ` witnessing that both packages' init lands deterministically
-in the no-bad heap `φ.symm (s_init, false)`. Users pick `φ` once per
-game; the typical choice projects out a designated cell that carries the
-bad flag. All per-query hypotheses remain in heap-native form, with the
-bad flag accessed as `(φ h).2`.
-
-Internally the proof routes through `VCVio.SSP.IdenticalUntilBad`: the
-two heap impls are *conjugated* into SSP-shape impls on state `σ × Bool`
-via `φ`, the SSP wrapper is applied, and the resulting advantage /
-bad-event-probability terms are translated back to the heap side using
-`simulateQ_StateT_evalDist_congr_of_bij` and `probEvent_congr'`.
+The bad-flag accounting theorem expects a state of shape `σ × Bool`. A
+user-supplied bijection `φ : Heap Ident ≃ σ × Bool` exposes that view of
+the heap, while all step hypotheses remain phrased over `Heap Ident`.
+Internally this file reuses the existing product-state theorem through that
+conjugation; the public statements are heap-native.
 
 ## API
 
 * `Package.implConjugate` — conjugate a heap handler through `φ` to an
-  SSP-shape handler on state `σ × Bool`.
+  handler on state `σ × Bool`.
 * `Package.advantage_le_expectedSCost_plus_probEvent_bad` — the
-  state-dep ε form. Mirrors the SSP lemma of the same name.
+  state-dependent ε form.
 * `Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv` — the
   invariant-gated form, where the costly-step TV hypothesis is needed
   only on states satisfying a user-supplied invariant.
@@ -56,11 +43,11 @@ namespace Package
 variable {ιₑ : Type} {E : OracleSpec.{0, 0} ιₑ}
   {Ident : Type} [CellSpec.{0, 0} Ident] {σ : Type}
 
-/-! ### Conjugating a heap handler to an SSP handler -/
+/-! ### Conjugating a heap handler -/
 
-/-- Conjugate a heap-SSP handler through a bijection `φ : Heap Ident ≃ σ × Bool`
-to an SSP handler on state `σ × Bool`. Each step unpacks the SSP state to a
-heap via `φ.symm`, runs the heap handler, and repacks the result via `φ`. -/
+/-- Conjugate a heap handler through a bijection `φ : Heap Ident ≃ σ × Bool`.
+Each step unpacks the paired state to a heap via `φ.symm`, runs the heap
+handler, and repacks the result via `φ`. -/
 def implConjugate
     (impl : QueryImpl E (StateT (Heap Ident) ProbComp))
     (φ : Heap Ident ≃ σ × Bool) :
@@ -73,13 +60,12 @@ def implConjugate
     (implConjugate impl φ q).run p =
       Prod.map id φ <$> (impl q).run (φ.symm p) := rfl
 
-/-! ### Bridging the heap `simulateQ` to the conjugated SSP `simulateQ` -/
+/-! ### Bridging the heap `simulateQ` to the conjugated `simulateQ` -/
 
-/-- The whole-adversary analogue of `implConjugate_run_apply`: running a
-`simulateQ` of the conjugated handler from an SSP state equals running
+/-- The whole-client analogue of `implConjugate_run_apply`: running a
+`simulateQ` of the conjugated handler from a paired state equals running
 the heap-handler `simulateQ` from the heap state, mapped forward through
-`φ`. Obtained from `simulateQ_StateT_evalDist_congr_of_bij` (the
-SSP-level bijection lemma over arbitrary state types). -/
+`φ`. -/
 lemma evalDist_simulateQ_conjugate_run_eq {α : Type}
     (impl : QueryImpl E (StateT (Heap Ident) ProbComp))
     (φ : Heap Ident ≃ σ × Bool)
@@ -92,7 +78,7 @@ lemma evalDist_simulateQ_conjugate_run_eq {α : Type}
       (fun q p => by simp) A s
   simpa using h
 
-/-- On `run'` (discarding the state), the heap and conjugated SSP
+/-- On `run'` (discarding the state), the heap and conjugated
 simulations have the same output distribution: the bijection `φ` cancels
 with `Prod.fst`. -/
 lemma evalDist_simulateQ_run'_eq {α : Type}
@@ -108,17 +94,14 @@ lemma evalDist_simulateQ_run'_eq {α : Type}
 
 /-! ### The state-dep ε bridge -/
 
-/-- **Heap-SSP state-dep ε-perturbed identical-until-bad.**
+/-- State-dependent ε-perturbed identical-until-bad.
 
-Heap counterpart of
-`VCVio.SSP.Package.advantage_le_expectedSCost_plus_probEvent_bad`.
 With a bijection `φ : Heap Ident ≃ σ × Bool` extracting the bad flag,
 and both games' init landing in the no-bad heap `φ.symm (s_init, false)`,
 the advantage `G₀.advantage G₁ A` is bounded by the cumulative expected
-ε-cost (computed on the conjugated SSP handler) plus the heap-side
+ε-cost (computed on the conjugated handler) plus the heap-side
 probability that the bad flag fires in `G₀`'s execution.
 
-The hypotheses mirror the SSP version, phrased in heap-native form:
 * `h_step_tv_S` — on a costly query from a no-bad heap (as witnessed by
   `φ.symm (s, false)`), the two heap handlers are ε-close in TV.
 * `h_step_eq_nS` — on a free query, the handlers are pointwise equal on
@@ -235,7 +218,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
 
 /-! ### Invariant-gated state-dep ε bridge -/
 
-/-- **Heap-SSP invariant-gated state-dep ε-perturbed identical-until-bad.**
+/-- Invariant-gated state-dependent ε-perturbed identical-until-bad.
 
 Variant of `advantage_le_expectedSCost_plus_probEvent_bad` where the
 costly-step TV hypothesis is required only for states satisfying an
@@ -283,7 +266,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
         ((G₀.impl t).run (φ.symm (s, false)))
         ((G₁.impl t).run (φ.symm (s, false))))
 
-/-- **Heap-SSP invariant-preserving state-dep ε-perturbed identical-until-bad.**
+/-- Invariant-preserving state-dependent ε-perturbed identical-until-bad.
 
 Corollary of `advantage_le_expectedSCost_plus_probEvent_bad_of_inv` for
 handlers that preserve `Inv` from the initial no-bad state. Unlike the
@@ -334,7 +317,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
 
 /-! ### Constant-ε corollary -/
 
-/-- **Heap-SSP constant-ε identical-until-bad.**
+/-- Constant-ε identical-until-bad.
 
 Constant-ε corollary of `advantage_le_expectedSCost_plus_probEvent_bad`,
 derived by specialising `ε := fun _ => ε_const` and bounding

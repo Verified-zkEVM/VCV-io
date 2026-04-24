@@ -9,23 +9,17 @@ import VCVio.HeapSSP.Package
 /-!
 # HeapSSP: Advantage and `evalDist` congruences
 
-Heap-package counterpart of `VCVio.SSP.Advantage`.
+This file contains the probability-facing API for heap packages.
 
-* `Package.runProb` reads off the `ProbComp` produced by running a
-  probability-only heap-package (imports `= unifSpec`) against an adversary.
+* `Package.runProb` runs a package whose import interface is `unifSpec` and
+  returns the output computation used by probability lemmas.
 * `Package.advantage` measures the Boolean distinguishing advantage between
-  two probability-only heap-packages
-  `G₀ G₁ : Package unifSpec E Ident` against an external Boolean adversary
-  `A : OracleComp E Bool`. Built directly on `ProbComp.boolDistAdvantage`
-  from `VCVio.CryptoFoundations.SecExp`, and inherits its triangle inequality.
-* `Package.simulateQ_evalDist_congr` and its stateful generalisation
-  `simulateQ_StateT_evalDist_congr` are the heap-package analogues of the
-  SSP "rewrite the handler up to evalDist" rule: per-input handler equality
-  under `evalDist` upgrades to a whole-adversary `evalDist` equality. They
-  are stated for *any* import spec `I` with `[I.Fintype]` `[I.Inhabited]`,
-  so that they apply uniformly to `unifSpec`-imports games (the bridge to
-  `Package.advantage`) and to sum-imports games such as
-  `Package.par`-composites (where the import is `I₁ + I₂`).
+  two such packages against an external Boolean client computation. It is
+  built from `ProbComp.boolDistAdvantage` and inherits its triangle
+  inequality.
+* `Package.simulateQ_evalDist_congr` and
+  `simulateQ_StateT_evalDist_congr` lift per-query `evalDist` equalities to
+  whole-computation equalities.
 * `Package.simulateQ_StateT_evalDist_congr_of_bij` is the bijection-aware
   variant, used when the two heaps differ but are isomorphic. The bijection
   is on the *underlying state type* (here `Heap Ident`) rather than on
@@ -37,14 +31,11 @@ The program-level reduction lemmas (`simulateQ_link_run`,
 
 ## Universe layout
 
-The advantage-bridge lemmas (`runProb`, `advantage`, ...) are pinned to
-`unifSpec : OracleSpec ℕ`, since `ProbComp.boolDistAdvantage` is itself
-`unifSpec`-specific. The handler-congruence lemmas
-(`simulateQ_evalDist_congr`, `simulateQ_StateT_evalDist_congr`,
-`simulateQ_StateT_evalDist_congr_of_bij`) accept an arbitrary import
-`I : OracleSpec.{uᵢ, 0} ιᵢ` with `[I.Fintype]` `[I.Inhabited]`. The export
-index lives in `Type uₑ`; everything else (state, output type) is `Type 0`,
-matching the rest of the HeapSSP layer. -/
+The Boolean advantage API is intentionally `Type 0`: `Bool`, `ProbComp`, and
+the current `StateT`-based package runner all meet at that universe. The
+handler-congruence lemmas are polymorphic in the import index universe, but
+their exported ranges and heap states are kept in `Type 0` so they compose
+directly with the advantage API. -/
 
 universe uᵢ uₑ
 
@@ -60,14 +51,14 @@ variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 /-! ### Bridging to `ProbComp` -/
 
 /-- Run a probability-only heap-package (imports = `unifSpec`) against an
-adversary. The result is a `ProbComp`, ready to be measured with
+client computation. The result is a `ProbComp`, ready to be measured with
 `Pr[= true | _]` and `boolDistAdvantage`. -/
 @[reducible]
 def runProb {α : Type} (P : Package unifSpec E Ident) (A : OracleComp E α) :
     ProbComp α :=
   P.run A
 
-/-- Run a probability-only heap-package against an adversary and keep the
+/-- Run a probability-only heap-package against a client computation and keep the
 final heap. This is the event-level counterpart of `runProb`: use it when
 the success predicate depends on package state such as a log, cache, or bad
 flag. -/
@@ -77,7 +68,7 @@ def runStateProb {α : Type} (P : Package unifSpec E Ident) (A : OracleComp E α
   P.runState A
 
 /-- `runProb` unfolds to `run` definitionally. Exposed as a simp lemma so
-that heap-SSP-facing lemmas phrased in terms of `runProb` rewrite cleanly
+that heap-package lemmas phrased in terms of `runProb` rewrite cleanly
 against `run`-phrased ones in `VCVio.HeapSSP.Composition`. -/
 @[simp]
 lemma runProb_eq_run {α : Type} (P : Package unifSpec E Ident)
@@ -125,9 +116,9 @@ lemma runProb_bind {α β : Type}
 /-! ### Advantage and triangle inequality -/
 
 /-- The Boolean distinguishing advantage between two probability-only
-heap-packages, against a single Boolean-valued adversary. The internal
+heap-packages, against a single Boolean-valued client. The internal
 identifier sets `Ident₀, Ident₁` of the two games are independent: from
-the adversary's point of view only the export interface and the resulting
+the client's point of view only the export interface and the resulting
 output distribution matter.
 
 This quantity is always nonnegative and symmetric in its first two
@@ -152,10 +143,10 @@ lemma advantage_symm {Ident₀ Ident₁ : Type}
   unfold advantage ProbComp.boolDistAdvantage
   exact abs_sub_comm _ _
 
-/-- If two heap-packages run an adversary to the same `ProbComp Bool`
+/-- If two heap-packages run a client to the same `ProbComp Bool`
 *up to `evalDist`*, their distinguishing advantages against any third
 heap-package coincide. The basic "replace by equivalent game" rule
-underlying SSP-style game-hopping at the advantage level. -/
+underlying game-hopping at the advantage level. -/
 lemma advantage_eq_of_evalDist_runProb_eq {Ident₀ Ident₀' Ident₁ : Type}
     [CellSpec.{0, 0} Ident₀] [CellSpec.{0, 0} Ident₀']
     [CellSpec.{0, 0} Ident₁]
@@ -198,7 +189,7 @@ variable {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, 0} ιᵢ} [I.Fintype] [I.Inh
 
 /-- Two `OracleComp I`-valued query implementations that agree on every
 input *under `evalDist`* yield identical evaluations of any `simulateQ`.
-The heap-SSP-flavoured "rewrite the handler up to evalDist" rule. -/
+The handler-level "rewrite up to `evalDist`" rule. -/
 lemma simulateQ_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (OracleComp I)}
     (hh : ∀ (q : E.Domain), evalDist (h₁ q) = evalDist (h₂ q))
@@ -243,7 +234,7 @@ lemma simulateQ_StateT_evalDist_congr {α : Type}
 stateful handlers on *different* heap types `Heap Ident₁`, `Heap Ident₂`
 agree under a heap-level bijection `φ : Heap Ident₁ ≃ Heap Ident₂`
 pointwise at each query (via `Prod.map id φ.symm` on the output pair),
-then their whole-adversary runs agree pointwise at corresponding starting
+then their whole-client runs agree pointwise at corresponding starting
 heaps.
 
 Used when matching two heap representations that are isomorphic as
@@ -281,8 +272,8 @@ end EvalDistCongr
 
 /-! ### Functoriality of `runProb`
 
-`Package.runProb` commutes with monadic map on the adversary: rerouting
-the output of an adversary `A : OracleComp E α` through a post-processing
+`Package.runProb` commutes with monadic map on the client: rerouting
+the output of a client computation `A : OracleComp E α` through a post-processing
 function `f : α → β` before running the package yields the same
 distribution as running the package and then applying `f`. -/
 

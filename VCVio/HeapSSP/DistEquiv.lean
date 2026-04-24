@@ -11,8 +11,8 @@ import VCVio.HeapSSP.Composition
 
 `Package.DistEquiv G₀ G₁` (notation `G₀ ≡ᵈ G₁`) says that two heap-packages
 sharing an export interface `E` and an import interface `I` produce
-identical output distributions against *every* adversary, on every output
-type. The heap-package counterpart of `VCVio.SSP.DistEquiv`.
+identical output distributions against every client computation, on every
+output type in this probability layer.
 
 The relation is polymorphic in the import: a `≡ᵈ`-hop is meaningful for any
 `I : OracleSpec.{uᵢ, 0} ιᵢ` with `[I.Fintype]` `[I.Inhabited]`. The two key
@@ -20,14 +20,13 @@ instantiations are:
 
 * **`I = unifSpec`** — the "probability-only" case. The bridge
   `advantage_zero` collapses a `≡ᵈ`-hop to a zero entry in
-  `Package.advantage`, recovering the classical SSP "perfect indistinguish-
-  ability" reading.
+  `Package.advantage`.
 * **`I = I₁ + I₂`** — the parallel-composition case. `par_congr` swaps
   one factor of a `Package.par` along a `≡ᵈ`-hop, leveraging the
   congruence directly *inside* the still-open import `I₁ + I₂`.
 
 The identifier sets `Ident₀, Ident₁` of the two games may be unrelated; only
-their behaviour against adversaries matters.
+their behaviour against clients matters.
 
 ## API surface
 
@@ -35,9 +34,9 @@ their behaviour against adversaries matters.
   `calc` blocks and a named `Equivalence` witness when the identifier set
   is fixed.
 * **Constructors**:
-  * `of_run_evalDist`: from a per-adversary `evalDist` equality (the
+  * `of_run_evalDist`: from a per-client `evalDist` equality (the
     unfolded definition).
-  * `of_run_eq`: from a per-adversary *propositional* equality at the
+  * `of_run_eq`: from a per-client *propositional* equality at the
     `Package.run` level.
   * `of_step`: same identifier set, agree per-query under `evalDist`. The
     lemma version of `Package.simulateQ_StateT_evalDist_congr` from
@@ -56,8 +55,7 @@ their behaviour against adversaries matters.
 
 * **`link` congruence in the inner argument**: `link_inner_congr` swaps the
   inner game of a linked composition along a `≡ᵈ`-hop, leveraging
-  `Package.run_link_eq_run_shiftLeft`. The bound (perfect) case is exactly
-  the SSProve "ε = 0 in the inner game" reduction.
+  `Package.run_link_eq_run_shiftLeft`.
 * **`par` congruence on both sides**: `par_congr` swaps either factor of
   a `Package.par`-composite along per-handler `evalDist` equalities (one
   per side). The result is a `≡ᵈ`-hop *with the still-open import*
@@ -77,18 +75,18 @@ variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- Two heap-packages sharing an export `E` and an import `I` are
 *distributionally equivalent* if they produce the same output distribution
-against every adversary, on every output type.
+against every client computation, on every output type.
 
 Equivalent characterisations:
 * When `I = unifSpec`, the Boolean distinguishing advantage
-  `G₀.advantage G₁ A` is zero on every Boolean-valued adversary `A`
+  `G₀.advantage G₁ A` is zero on every Boolean-valued client `A`
   (`DistEquiv.advantage_zero`).
-* For every `α` and every adversary `A : OracleComp E α`,
+* For every `α` and every client computation `A : OracleComp E α`,
   `evalDist (G₀.run A) = evalDist (G₁.run A)` (the literal definition).
 
 The identifier sets `Ident₀, Ident₁` of the two games are independent: only
 the export interface and the resulting output distribution matter from an
-adversary's point of view. -/
+client's point of view. -/
 def DistEquiv {Ident₀ Ident₁ : Type}
     [CellSpec.{0, 0} Ident₀] [CellSpec.{0, 0} Ident₁]
     (G₀ : Package I E Ident₀) (G₁ : Package I E Ident₁) :
@@ -141,7 +139,7 @@ theorem _root_.VCVio.HeapSSP.Package.equivalence_distEquiv
 
 /-! ### Constructors -/
 
-/-- Build a `DistEquiv` from the literal per-adversary `evalDist` equality.
+/-- Build a `DistEquiv` from the literal per-client `evalDist` equality.
 The unfolded definition, exposed for clients that already have the
 distribution equality in hand. -/
 theorem of_run_evalDist
@@ -150,14 +148,14 @@ theorem of_run_evalDist
         evalDist (G₀.run A) = evalDist (G₁.run A)) :
     G₀ ≡ᵈ G₁ := h
 
-/-- Recover the per-adversary `evalDist` equality from a `DistEquiv`
+/-- Recover the per-client `evalDist` equality from a `DistEquiv`
 witness. The inverse of `of_run_evalDist`. -/
 theorem run_evalDist_eq
     {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : G₀ ≡ᵈ G₁) {α : Type} (A : OracleComp E α) :
     evalDist (G₀.run A) = evalDist (G₁.run A) := h A
 
-/-- Build a `DistEquiv` from a per-adversary *propositional* equality at
+/-- Build a `DistEquiv` from a per-client *propositional* equality at
 the `Package.run` level. -/
 theorem of_run_eq
     {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
@@ -264,12 +262,10 @@ variable {Ident_P : Type} [CellSpec.{0, 0} Ident_P]
 
 /-- **Inner-game congruence for `link`.** Swapping the inner game of a
 linked composition along a `≡ᵈ`-hop preserves distributional equivalence:
-the outer reduction `P` is absorbed into the shifted adversary
+the outer reduction `P` is absorbed into the shifted client
 `P.shiftLeft A`, and the equivalence on the inner game closes the proof.
 
-The SSP "replace the inner game" rule, the program-level counterpart of
-`Package.advantage_link_left_eq_advantage_shiftLeft` in
-`VCVio.HeapSSP.Hybrid`. -/
+This is the perfect inner-game replacement rule for linked packages. -/
 theorem link_inner_congr (P : Package M E Ident_P)
     {Q₀ : Package I M Ident₀} {Q₁ : Package I M Ident₁}
     (h : Q₀ ≡ᵈ Q₁) :

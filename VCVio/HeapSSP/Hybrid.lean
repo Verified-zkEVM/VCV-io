@@ -10,27 +10,25 @@ import VCVio.HeapSSP.Composition
 /-!
 # HeapSSP: Hybrid arguments and the linked-game reduction
 
-Heap-package counterpart of `VCVio.SSP.Hybrid`.
-
 * `Package.advantage_hybrid` — iterated triangle inequality for an `n`-step
   hybrid. Given a sequence of heap-packages `G₀, G₁, ..., Gₙ` (with
-  potentially different identifier sets) and a single Boolean adversary
+  potentially different identifier sets) and a single Boolean client
   `A`, the distinguishing advantage between `G₀` and `Gₙ` is bounded by
   the sum of consecutive advantages.
 
 * `Package.advantage_link_left_eq_advantage_shiftLeft` — advantage-level
   corollary of the program-level `run_link_eq_run_shiftLeft` (proved in
   `VCVio.HeapSSP.Composition`): replacing the inner game in `P.link _`
-  only shifts the adversary; the outer reduction package `P` becomes
-  part of the new adversary, exactly as in SSProve and the SSP layer.
+  only shifts the client; the outer reduction package `P` becomes part of
+  the new client.
 
-These two ingredients together justify the standard SSP game-hopping
-pattern: produce a chain of intermediate games related by `link`-ed
-reductions, then collapse the chain via the hybrid inequality.
+These two ingredients are the standard shape of a game-hopping proof:
+produce a chain of intermediate games related by linked reductions, then
+collapse the chain via the hybrid inequality.
 
 ## Universe layout
 
-`ProbComp : Type → Type` and the adversary's return type `Bool : Type`
+`ProbComp : Type → Type` and the client's return type `Bool : Type`
 pin the intermediate range, export range, and cell-value type to `Type 0`.
 The index universes `uₘ, uₑ` for the intermediate and export specs remain
 *independent*, matching `VCVio.HeapSSP.Advantage`.
@@ -55,13 +53,13 @@ section Hybrid
 variable {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, 0} ιₑ}
 
 /-- **Hybrid lemma.** For any sequence of heap-packages `G 0, G 1, ..., G n`
-and any single Boolean adversary `A`, the distinguishing advantage between
+and any single Boolean client `A`, the distinguishing advantage between
 the endpoints is bounded by the sum of consecutive advantages.
 
 The identifier sets may differ from step to step: `Ident : ℕ → Type`,
 `[CellSpec (Ident i)]`, and `G i : Package unifSpec E (Ident i)`. The
-iterated `boolDistAdvantage` triangle inequality, packaged for SSP-style
-game-hopping proofs in the heap framework. -/
+iterated `boolDistAdvantage` triangle inequality, packaged for heap-based
+game-hopping proofs. -/
 theorem advantage_hybrid {Ident : ℕ → Type} [∀ i, CellSpec.{0, 0} (Ident i)]
     (G : (i : ℕ) → Package unifSpec E (Ident i))
     (A : OracleComp E Bool) (n : ℕ) :
@@ -86,12 +84,12 @@ variable {ιₘ : Type uₘ} {ιₑ : Type uₑ}
   {M : OracleSpec.{uₘ, 0} ιₘ} {E : OracleSpec.{uₑ, 0} ιₑ}
   {Ident_P : Type} [CellSpec.{0, 0} Ident_P]
 
-/-- **SSP reduction (advantage form).** With the same outer reduction package
+/-- **Linked reduction (advantage form).** With the same outer reduction package
 `P : Package M E Ident_P` linked to two candidate inner games `Q₀, Q₁`
 exporting `M`, the distinguishing advantage between the linked games equals
-the advantage between the inner games against the *shifted adversary*
+the advantage between the inner games against the *shifted client*
 `P.shiftLeft A`. The outer reduction package `P` is absorbed into the
-adversary. -/
+client. -/
 theorem advantage_link_left_eq_advantage_shiftLeft
     {Ident_Q₀ Ident_Q₁ : Type}
     [CellSpec.{0, 0} Ident_Q₀] [CellSpec.{0, 0} Ident_Q₁]

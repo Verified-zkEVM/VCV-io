@@ -73,6 +73,7 @@ import VCVio.EvalDist.Prod
 import VCVio.EvalDist.RenyiDivergence
 import VCVio.EvalDist.TVDist
 import VCVio.HeapSSP.Advantage
+import VCVio.HeapSSP.CellRef
 import VCVio.HeapSSP.Composition
 import VCVio.HeapSSP.DistEquiv
 import VCVio.HeapSSP.Examples
@@ -222,6 +223,7 @@ import VCVio.ProgramLogic.Tactics.Common.Naming
 import VCVio.ProgramLogic.Tactics.Common.Registry
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
+import VCVio.ProgramLogic.Tactics.Handler
 import VCVio.ProgramLogic.Tactics.Relational
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Unary

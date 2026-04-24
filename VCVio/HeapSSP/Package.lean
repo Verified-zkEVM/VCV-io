@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.HeapSSP.Heap
+import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.PreservesInv
 
@@ -16,40 +17,20 @@ typed cells set up by the monadic field `init : OracleComp I (Heap Ident)`.
 The handler `impl` runs a single export query inside
 `StateT (Heap Ident) (OracleComp I)`.
 
-This is the heap-based variant of `VCVio.SSP.Package`. The two frameworks
-coexist for side-by-side comparison; see
-`Notes/vcvio-fs-schnorr-clean-chain.md` §D.13 for the design rationale and
-the migration plan.
-
-## What changes vs `VCVio.SSP.Package`
-
-* The state type goes from a free `σ : Type v` to a structured
-  `Heap Ident : Type v` indexed by an identifier set `Ident : Type`.
-* The trivial empty state (used by `Package.id`, `Package.ofStateless`)
-  becomes `Heap PEmpty.{1}`, a singleton type, instead of `PUnit.{v + 1}`.
-* The structural API (`run`, `runState`, `run_pure`, `runState_bind`, ...)
-  is identical in shape; only the state type changes.
-
-The crucial divergence is in `VCVio.HeapSSP.Composition`: composition of
-identifier sets uses `Sum`, with `Heap.split` as the canonical reshape.
-This is what the heap layer is *for*; the present file is just the basic
-data type.
+Identifier sets are first-class: package composition combines them with `Sum`,
+and `Heap.split` provides the canonical reshape between a composite heap and
+its two component heaps. Stateless packages use the empty identifier set
+`PEmpty`, whose heap is the unique empty function.
 
 ## Universe layout
 
-`Ident` lives in `Type` (i.e. `Type 0`); concrete identifier types in the
-intended use case are inductive types with finitely many constructors (one
-per cell in a game), so the universe-0 restriction is not limiting in
-practice and keeps universe inference simple.
+The import and export index universes are independent. Identifier sets live in
+`Type uₛ`, while cell values live in `Type v`; therefore `Heap Ident` lives in
+`Type (max uₛ v)`. Since `StateT` uses the same universe for state and return
+values, the export interface and interpreted computations live in that same
+state universe. -/
 
-The other parameters are independent: `uᵢ`, `uₑ` for the import / export
-spec indices; `vᵢ` for the import range universe; and `v` for the export
-range universe (which is also the universe of cell value types and of the
-result type `α` of any computation run against the package). With
-`Ident : Type` and `[CellSpec.{0, v} Ident]`, the heap `Heap Ident` lives
-in `Type max 0 v = Type v`, matching the SSP state universe exactly. -/
-
-universe uᵢ uₑ vᵢ v
+universe uᵢ uₑ uₛ vᵢ v w
 
 open OracleSpec OracleComp
 
@@ -65,8 +46,8 @@ initial heap; it may sample or query imports, so probabilistic setup (e.g.
 sampling a long-term key once at start-of-game and writing it to a cell)
 is first-class data. -/
 structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ)
-    (Ident : Type) [CellSpec.{0, v} Ident] where
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, max uₛ v} ιₑ)
+    (Ident : Type uₛ) [CellSpec.{uₛ, v} Ident] where
   /-- Initial value of the package's private heap, as a (possibly
   probabilistic / query-using) computation in the import interface. -/
   init : OracleComp I (Heap Ident)
@@ -77,8 +58,8 @@ structure Package {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
 namespace Package
 
 variable {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, v} ιₑ}
-  {Ident : Type} [CellSpec.{0, v} Ident]
+  {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, max uₛ v} ιₑ}
+  {Ident : Type uₛ} [CellSpec.{uₛ, v} Ident]
 
 /-- The identity package on `E`: each export query is forwarded as the
 corresponding import query, with no private state.
@@ -86,7 +67,8 @@ corresponding import query, with no private state.
 The empty identifier set `PEmpty.{1}` is the unit of `Sum` on identifiers;
 its heap `Heap PEmpty.{1}` is a singleton (the unique empty function). -/
 @[simps]
-protected def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PEmpty.{1} where
+protected def id {ιₑ : Type uₑ} (E : OracleSpec.{uₑ, w} ιₑ) :
+    Package E E PEmpty.{1} where
   init := pure Heap.empty
   impl t :=
     (liftM (query t : OracleComp E (E.Range t))
@@ -96,27 +78,31 @@ protected def id (E : OracleSpec.{uₑ, v} ιₑ) : Package E E PEmpty.{1} where
 The internal heap is `Heap PEmpty.{1}` (singleton) and the handler ignores
 it. -/
 @[simps]
-def ofStateless (h : QueryImpl E (OracleComp I)) : Package I E PEmpty.{1} where
+def ofStateless {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, w} ιₑ}
+    (h : QueryImpl E (OracleComp I)) : Package I E PEmpty.{1} where
   init := pure Heap.empty
   impl := h.liftTarget (StateT (Heap PEmpty.{1}) (OracleComp I))
 
-/-- Run a package against an "adversary" computation `A` that queries the
-package's exports.
+/-- Run a package against a client computation `A` that queries the package's
+exports.
 
 The result is an `OracleComp I` computation in the package's import
 interface. The package's final heap is discarded; use `runState` to keep
 it. -/
-def run {α : Type v} (P : Package I E Ident) (A : OracleComp E α) :
+def run {α : Type (max uₛ v)} (P : Package I E Ident) (A : OracleComp E α) :
     OracleComp I α :=
   P.init >>= fun h₀ => (simulateQ P.impl A).run' h₀
 
 /-- Variant of `run` that keeps the package's final heap. -/
-def runState {α : Type v} (P : Package I E Ident) (A : OracleComp E α) :
+def runState {α : Type (max uₛ v)} (P : Package I E Ident) (A : OracleComp E α) :
     OracleComp I (α × Heap Ident) :=
   P.init >>= fun h₀ => (simulateQ P.impl A).run h₀
 
 @[simp]
-lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
+lemma runState_ofStateless {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, w} ιₑ}
+    {α : Type w} (h : QueryImpl E (OracleComp I))
     (A : OracleComp E α) :
     (Package.ofStateless h).runState A =
       (·, Heap.empty) <$> simulateQ h A := by
@@ -141,7 +127,9 @@ lemma runState_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
     exact hu
 
 @[simp]
-lemma run_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
+lemma run_ofStateless {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
+    {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {E : OracleSpec.{uₑ, w} ιₑ}
+    {α : Type w} (h : QueryImpl E (OracleComp I))
     (A : OracleComp E α) :
     (Package.ofStateless h).run A = simulateQ h A := by
   have : (Package.ofStateless h).run A
@@ -150,31 +138,31 @@ lemma run_ofStateless {α : Type v} (h : QueryImpl E (OracleComp I))
   rw [this, runState_ofStateless, ← Functor.map_map]
   simp
 
-/-- Running a pure adversary still executes the package's init (which may
+/-- Running a pure client computation still executes the package's init (which may
 sample). Both sides evaluate to `P.init >>= fun _ => pure x`; under a
 probabilistic init interpretation such as `evalDist`, this is still the
 distribution of `x`, so advantages are unaffected. -/
 @[simp]
-lemma run_pure {α : Type v} (P : Package I E Ident) (x : α) :
+lemma run_pure {α : Type (max uₛ v)} (P : Package I E Ident) (x : α) :
     P.run (pure x) = P.init >>= fun _ => pure x := by
   simp [run, simulateQ_pure, StateT.run'_eq, StateT.run_pure]
 
-/-- `runState` on a pure adversary returns `x` paired with the freshly-
+/-- `runState` on a pure client computation returns `x` paired with the freshly-
 initialised heap. -/
 @[simp]
-lemma runState_pure {α : Type v} (P : Package I E Ident) (x : α) :
+lemma runState_pure {α : Type (max uₛ v)} (P : Package I E Ident) (x : α) :
     P.runState (pure x) = (fun h₀ => (x, h₀)) <$> P.init := by
   simp [runState, simulateQ_pure, StateT.run_pure, bind_pure_comp]
 
 @[simp]
-lemma runState_bind {α β : Type v}
+lemma runState_bind {α β : Type (max uₛ v)}
     (P : Package I E Ident) (A : OracleComp E α) (f : α → OracleComp E β) :
     P.runState (A >>= f) =
       P.runState A >>= fun (a, h) => (simulateQ P.impl (f a)).run h := by
   simp [runState, simulateQ_bind, StateT.run_bind, bind_assoc]
 
 @[simp]
-lemma run_bind {α β : Type v}
+lemma run_bind {α β : Type (max uₛ v)}
     (P : Package I E Ident) (A : OracleComp E α) (f : α → OracleComp E β) :
     P.run (A >>= f) =
       P.runState A >>= fun (a, h) => (simulateQ P.impl (f a)).run' h := by
@@ -185,30 +173,53 @@ lemma run_bind {α β : Type v}
 /-- If every query handler step preserves a heap invariant `Inv`, then the
 whole simulated computation preserves `Inv` on every reachable final heap. -/
 theorem simulateQ_run_preservesInv
-    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
-    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
-    (impl : QueryImpl E' (StateT (Heap Ident') ProbComp))
-    (Inv : Heap Ident' → Prop)
-    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'), Inv h →
+    {I' : OracleSpec.{uᵢ, max uₛ v} ιᵢ}
+    {α : Type (max uₛ v)}
+    (impl : QueryImpl E (StateT (Heap Ident) (OracleComp I')))
+    (Inv : Heap Ident → Prop)
+    (hstep : ∀ (t : E.Domain) (h : Heap Ident), Inv h →
       ∀ z ∈ support ((impl t).run h), Inv z.2)
-    (A : OracleComp E' α) (h : Heap Ident') (hinv : Inv h) :
+    (A : OracleComp E α) (h : Heap Ident) (hinv : Inv h) :
     ∀ z ∈ support ((simulateQ impl A).run h), Inv z.2 := by
-  intro z hz
-  have himpl : QueryImpl.PreservesInv impl Inv := hstep
-  exact OracleComp.simulateQ_run_preservesInv impl Inv
-    (himpl := himpl) A h hinv z hz
+  revert h
+  induction A using OracleComp.inductionOn with
+  | pure a =>
+      intro h hinv z hz
+      have hz_eq : z = (a, h) := by
+        simpa using (mem_support_pure_iff z (a, h)).1 hz
+      simpa [hz_eq] using hinv
+  | query_bind t oa ih =>
+      intro h hinv z hz
+      have hz' :
+          z ∈ support
+            (((simulateQ impl
+                  (OracleSpec.query t : OracleComp E (E.Range t))).run h) >>=
+              fun us => (simulateQ impl (oa us.1)).run us.2) := by
+        simpa [simulateQ_bind, OracleComp.liftM_def] using hz
+      rcases (mem_support_bind_iff _ _ _).1 hz' with ⟨us, hus, hzcont⟩
+      have hq_run :
+          (simulateQ impl (OracleSpec.query t : OracleComp E (E.Range t))).run h =
+            (impl t).run h := by
+        have hq :
+            simulateQ impl (OracleSpec.query t : OracleComp E (E.Range t)) =
+              impl t := by
+          simp [OracleSpec.query_def, simulateQ_query]
+        simp [hq]
+      have hus' : us ∈ support ((impl t).run h) := by
+        simpa [hq_run] using hus
+      exact ih us.1 us.2 (hstep t h hinv us hus') z hzcont
 
 /-- Cell-preservation specialization of `simulateQ_run_preservesInv`. If each
 query step leaves cell `i` unchanged, then the full simulation leaves `i`
 unchanged on every reachable final heap. -/
 theorem simulateQ_run_preservesCell
-    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
-    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
-    (impl : QueryImpl E' (StateT (Heap Ident') ProbComp))
-    (i : Ident')
-    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'),
+    {I' : OracleSpec.{uᵢ, max uₛ v} ιᵢ}
+    {α : Type (max uₛ v)}
+    (impl : QueryImpl E (StateT (Heap Ident) (OracleComp I')))
+    (i : Ident)
+    (hstep : ∀ (t : E.Domain) (h : Heap Ident),
       ∀ z ∈ support ((impl t).run h), z.2.get i = h.get i)
-    (A : OracleComp E' α) (h : Heap Ident') :
+    (A : OracleComp E α) (h : Heap Ident) :
     ∀ z ∈ support ((simulateQ impl A).run h), z.2.get i = h.get i := by
   intro z hz
   have hpres :=
@@ -221,13 +232,13 @@ theorem simulateQ_run_preservesCell
 lies in `Inv` and each handler step preserves `Inv`, then every reachable
 final heap of `runState` satisfies `Inv`. -/
 theorem runState_preservesInv
-    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
-    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
-    (P : Package unifSpec E' Ident') (Inv : Heap Ident' → Prop)
+    {I' : OracleSpec.{uᵢ, max uₛ v} ιᵢ}
+    {α : Type (max uₛ v)}
+    (P : Package I' E Ident) (Inv : Heap Ident → Prop)
     (hinit : ∀ h ∈ support P.init, Inv h)
-    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'), Inv h →
+    (hstep : ∀ (t : E.Domain) (h : Heap Ident), Inv h →
       ∀ z ∈ support ((P.impl t).run h), Inv z.2)
-    (A : OracleComp E' α) :
+    (A : OracleComp E α) :
     ∀ z ∈ support (P.runState A), Inv z.2 := by
   intro z hz
   unfold Package.runState at hz
@@ -247,13 +258,13 @@ export-range / cell-value universe `v` all remain independent. -/
 section UniverseTests
 
 example {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
-    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ)
-    (Ident : Type) [CellSpec.{0, v} Ident] :
+    (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, max uₛ v} ιₑ)
+    (Ident : Type uₛ) [CellSpec.{uₛ, v} Ident] :
     Type _ := Package I E Ident
 
-example {ιᵢ : Type 0} {ιₑ : Type 1}
-    (I : OracleSpec.{0, 2} ιᵢ) (E : OracleSpec.{1, 0} ιₑ)
-    (Ident : Type) [CellSpec.{0, 0} Ident] :
+example {ιᵢ : Type 0} {ιₑ : Type 1} {Ident : Type 1}
+    (I : OracleSpec.{0, 2} ιᵢ) (E : OracleSpec.{1, 1} ιₑ)
+    [CellSpec.{1, 0} Ident] :
     Type _ := Package I E Ident
 
 end UniverseTests
