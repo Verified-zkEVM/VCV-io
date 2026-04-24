@@ -136,6 +136,15 @@ the local context. The default registry already covers the structural relational
 `eRelTriple_bind` / `eRelTriple_uniformSample_bij`, and the two `simulateQ` transport rules),
 so user-defined rules slot into the same lookup pipeline without further wiring.
 
+**Opt-in `wp`-rewrite lookup**: mark an equational rewrite of shape
+`wp comp post = …` with `@[wpStep]` to extend the inner `wp`-stepping driver
+(`runWpStepRules`). The driver indexes registered rules by the discrimination-tree
+path of `comp` and tries `rw`, then `simp only`, on each match. The default registry
+already covers `wp_pure`, `wp_bind`, `wp_ite`, `wp_dite`, `wp_map`, the `replicate` /
+`mapM` / `foldlM` families, `wp_query`, `wp_uniformSample`, and the
+`simulateQ` / `liftComp` transport rules, so user-authored `wp` lemmas slot into the
+same dispatch without further wiring.
+
 **Bind normalization**: `rvcstep` (and therefore `rvcgen`) runs a best-effort
 `simp only [bind_assoc, pure_bind, bind_pure_comp, Functor.map_map, map_pure]` pre-pass on the
 relational goal before deciding which structural rule to apply. This flattens nested binds and
