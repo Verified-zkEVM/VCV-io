@@ -23,18 +23,18 @@ variable {α β : Type}
 /-! ## OracleComp-focused API examples -/
 
 example (x : α) (post : α → ℝ≥0∞) :
-    wp (spec := spec) (pure x) post = post x :=
+    wp (pure x : OracleComp spec α) post = post x :=
   wp_pure (spec := spec) x post
 
 example (pre : ℝ≥0∞) (oa : OracleComp spec α) (ob : α → OracleComp spec β)
     (cut : α → ℝ≥0∞) (post : β → ℝ≥0∞)
-    (hoa : Triple (spec := spec) pre oa cut)
+    (hoa : Triple pre oa cut)
     (hob : ∀ x, Triple (cut x) (ob x) post) :
     Triple pre (oa >>= ob) post :=
   triple_bind (spec := spec) hoa hob
 
 example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
-    wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
+    wp (query t : OracleComp spec (spec.Range t)) post =
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u :=
   wp_query (spec := spec) t post
 

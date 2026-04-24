@@ -39,7 +39,8 @@ then `wp` of the simulated computation equals `wp` of the original. -/
     (hImpl : ∀ (t : spec.Domain),
       evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
-    wp (simulateQ impl oa) post = wp oa post := by
+    wp (simulateQ impl oa) post =
+      wp oa post := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t oa ih =>
@@ -55,7 +56,8 @@ then `wp` of the simulated computation equals `wp` of the original. -/
     [superSpec.Fintype] [superSpec.Inhabited]
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
     (mx : OracleComp spec α) (post : α → ℝ≥0∞) :
-    wp (liftComp mx superSpec) post = wp mx post := by
+    wp (liftComp mx superSpec) post =
+      wp mx post := by
   change @μ _ superSpec _ _ (liftComp mx superSpec >>= fun a => pure (post a)) =
        μ (mx >>= fun a => pure (post a))
   exact μ_cross_congr_evalDist
@@ -70,7 +72,8 @@ original computation. -/
       evalDist ((impl t).run' s) =
         OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (oa : OracleComp spec α) (s : σ) (post : α → ℝ≥0∞) :
-    wp ((simulateQ impl oa).run' s) post = wp oa post :=
+    wp ((simulateQ impl oa).run' s) post =
+      wp oa post :=
   wp_congr_evalDist (evalDist_simulateQ_run'_eq_evalDist impl hImpl s oa) post
 
 end OracleComp.ProgramLogic

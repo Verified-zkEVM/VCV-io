@@ -971,7 +971,8 @@ quantitative analogue of the qualitative `Anchored Prop` instance in
 noncomputable instance instAnchored_eRelWP :
     MAlgRelOrdered.Anchored (OracleComp spec₁) (OracleComp spec₂) ℝ≥0∞ where
   rwp_pure_left {α β} a y post := by
-    change eRelWP (pure a : OracleComp spec₁ α) y post = wp y (post a)
+    change eRelWP (pure a : OracleComp spec₁ α) y post =
+      wp y (post a)
     rw [wp_eq_tsum]
     apply le_antisymm
     · -- (≤): every coupling collapses to the marginal expectation by `tsum_pure_left`.
@@ -999,7 +1000,8 @@ noncomputable instance instAnchored_eRelWP :
       simp only [probOutput_def]
       exact le_of_eq heq.symm
   rwp_pure_right {α β} x b post := by
-    change eRelWP x (pure b : OracleComp spec₂ β) post = wp x (fun a => post a b)
+    change eRelWP x (pure b : OracleComp spec₂ β) post =
+      wp x (fun a => post a b)
     rw [wp_eq_tsum]
     apply le_antisymm
     · refine iSup_le fun c => ?_

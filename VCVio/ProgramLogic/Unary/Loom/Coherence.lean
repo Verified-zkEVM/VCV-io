@@ -42,7 +42,7 @@ are `scoped instance`s. To use `Std.Do'.wp` for both at once we would have to
 `outParam`, which would back out instance synthesis. Stating the lemmas
 against `MAlgOrdered.wp` (specialised to `Prop` and `ℝ≥0∞`) sidesteps
 the conflict; once a downstream user has chosen a single carrier, they
-can rewrite from `Std.Do'.wp _ _ EPost.nil.mk` to `MAlgOrdered.wp _ _`
+can rewrite from `wp _ _ EPost.nil.mk` to `MAlgOrdered.wp _ _`
 via the keystone `rfl` lemmas in the per-carrier files.
 
 See `.ignore/wp-cutover-plan.md` §"Three-tier carrier design" for the
@@ -89,7 +89,7 @@ theorem wp_qual_iff_wp_prob_indicator_eq_one
           (fun a => if post a then 1 else 0) = 1 := by
   rw [wp_iff_forall_support]
   change (∀ x ∈ support oa, post x) ↔
-        OracleComp.ProgramLogic.wp oa (fun a => if post a then 1 else 0) = 1
+        wp oa (fun a => if post a then 1 else 0) = 1
   rw [← probEvent_eq_wp_indicator, probEvent_eq_one_iff]
   exact ⟨fun h => ⟨probFailure_eq_zero (mx := oa), h⟩, fun h => h.2⟩
 

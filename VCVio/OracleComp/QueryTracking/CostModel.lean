@@ -137,7 +137,8 @@ noncomputable abbrev expectedCostNat (oa : OracleComp spec α)
 expectation of the instrumented `costDist`. -/
 theorem expectedCost_eq_wp_costDist (oa : OracleComp spec α) (cm : CostModel spec ω)
     (val : ω → ℝ≥0∞) :
-    expectedCost oa cm val = wp (costDist oa cm) (fun z => val z.2) := by
+    expectedCost oa cm val =
+      wp (costDist oa cm) (fun z => val z.2) := by
   unfold expectedCost costDist instrumentedRun
   simpa using
     (AddWriterT.expectedCost_eq_wp_run
@@ -221,10 +222,13 @@ theorem probEvent_cost_gt_mul_le_expectedCost
     Pr[ fun z => t < val z.2 | costDist oa cm] * t ≤ expectedCost oa cm val := by
   rw [expectedCost_eq_wp_costDist]
   rw [probEvent_eq_wp_indicator]
-  change wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t ≤
+  change wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0)
+      * t ≤
     wp (costDist oa cm) (fun z => val z.2)
-  calc wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0) * t
-      = wp (costDist oa cm) (fun z => t * (if t < val z.2 then 1 else 0)) := by
+  calc wp (costDist oa cm) (fun z => if t < val z.2 then 1 else 0)
+        * t
+      = wp (costDist oa cm)
+          (fun z => t * (if t < val z.2 then 1 else 0)) := by
         rw [wp_mul_const]; ring
     _ ≤ wp (costDist oa cm) (fun z => val z.2) := by
         apply wp_mono

@@ -36,11 +36,12 @@ theorem triple_seededFork :
        acc * (acc / q - h⁻¹))
       (seededFork main qb js i cf)
       (fun r => if r.isSome then 1 else 0) :=
-  Triple.ofLE
+  triple_ofLE
     (le_trans
       (OracleComp.le_probEvent_isSome_seededFork
         (main := main) (qb := qb) (js := js) (i := i) (cf := cf))
-      (triple_probEvent_indicator
-        (oa := seededFork main qb js i cf) (p := fun r => r.isSome)).toLE)
+      (triple_toLE
+        (triple_probEvent_indicator
+          (oa := seededFork main qb js i cf) (p := fun r => r.isSome))))
 
 end OracleComp.ProgramLogic

@@ -151,6 +151,31 @@ instance : Lean.Order.CompleteLattice ℝ≥0∞ where
     · intro h
       exact sSup_le (fun y hy => h y hy)
 
+end OracleComp.ProgramLogic.Loom
+
+/-! ## `Lean.Order.CCPO` instance for `Std.Do'.EPost.nil`
+
+Loom2's Hoare-triple notation `⦃ pre ⦄ x ⦃ post ⦄` (defined in
+`Loom.Triple.Basic`) expands to `Std.Do'.Triple pre x post ⊥` where
+`⊥` is the `Lean.Order.CCPO`-bottom (`Lean.Order.bot`). For monads
+with no exception layer, the `EPred` is `Std.Do'.EPost.nil`, which
+Loom2 ships only with a `Lean.Order.CompleteLattice` instance, not a
+`CCPO` one. (`CCPO` and `CompleteLattice` are independent sibling
+classes in Lean core's `Init.Internal.Order`.)
+
+We provide the missing `CCPO` instance here. `EPost.nil` is a
+single-element type, so the chain-supremum is trivial: every chain has
+the unique element `EPost.nil.mk` as its least upper bound. -/
+
+namespace Std.Do'
+
+instance : Lean.Order.CCPO EPost.nil where
+  has_csup _ := ⟨EPost.nil.mk, fun _ => ⟨fun _ _ _ => trivial, fun _ => trivial⟩⟩
+
+end Std.Do'
+
+namespace OracleComp.ProgramLogic.Loom
+
 /-! ## `Std.Do'.WP` instance for `OracleComp` -/
 
 variable {ι : Type u} {spec : OracleSpec ι}
