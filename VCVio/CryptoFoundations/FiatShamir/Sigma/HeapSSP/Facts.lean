@@ -359,4 +359,52 @@ theorem cmaReal_impl_preserves_badRef
   intro t h z hz
   exact cmaReal_impl_preserves_badCell M Commit Chal σ hr t h z hz
 
+/-- Once `cmaReal` has sampled a keypair, a single handler step preserves
+that exact keypair. -/
+theorem cmaReal_impl_preserves_keypair_some
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (pk : Stmt) (sk : Wit)
+    (h : Heap (CmaCells M Commit Chal Stmt Wit))
+    (hh : h (Sum.inr .keypair) = some (pk, sk))
+    (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run h)) :
+    z.2 (Sum.inr .keypair) = some (pk, sk) := by
+  rcases t with ((n | mc) | m) | ⟨⟩
+  · simp only [cmaReal, StateT.run_mk, support_bind, Set.mem_iUnion,
+      support_pure, Set.mem_singleton_iff, exists_prop] at hz
+    obtain ⟨_, _, rfl⟩ := hz
+    exact hh
+  · simp only [cmaReal, StateT.run_mk] at hz
+    rcases hcache : h (Sum.inr .roCache) mc with _ | r₀
+    · rw [hcache] at hz
+      simp only [support_bind, Set.mem_iUnion, support_pure,
+        Set.mem_singleton_iff, exists_prop] at hz
+      obtain ⟨r, _, rfl⟩ := hz
+      simp [Heap.update, hh]
+    · rw [hcache] at hz
+      simp only [support_pure, Set.mem_singleton_iff] at hz
+      subst hz
+      exact hh
+  · simp only [cmaReal, StateT.run_mk] at hz
+    rw [hh] at hz
+    simp only [pure_bind, support_bind, Set.mem_iUnion, exists_prop] at hz
+    obtain ⟨⟨c, prvSt⟩, _, h_rest⟩ := hz
+    rcases hcache : h (Sum.inr .roCache) (m, c) with _ | ch₀
+    · rw [hcache] at h_rest
+      simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
+        Set.mem_singleton_iff] at h_rest
+      obtain ⟨ch, _, π, _, rfl⟩ := h_rest
+      simp [Heap.update, hh]
+    · rw [hcache] at h_rest
+      simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
+        Set.mem_singleton_iff] at h_rest
+      obtain ⟨π, _, rfl⟩ := h_rest
+      simp [Heap.update, hh]
+  · simp only [cmaReal, StateT.run_mk] at hz
+    rw [hh] at hz
+    simp only [support_pure, Set.mem_singleton_iff] at hz
+    subst hz
+    exact hh
+
 end FiatShamir.HeapSSP

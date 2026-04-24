@@ -38,6 +38,76 @@ variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
+/-! ### Simulator handler components -/
+
+abbrev fsRoSpec (M Commit Chal : Type) : OracleSpec (ℕ ⊕ (M × Commit)) :=
+  unifSpec + (M × Commit →ₒ Chal)
+
+abbrev cmaOracleSpec (M Commit Chal Resp : Type) :
+    OracleSpec ((ℕ ⊕ (M × Commit)) ⊕ M) :=
+  fsRoSpec M Commit Chal + (M →ₒ (Commit × Resp))
+
+noncomputable def simulatedNmaFwd
+    [DecidableEq M] [DecidableEq Commit] :
+    QueryImpl (fsRoSpec M Commit Chal)
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))) :=
+  (HasQuery.toQueryImpl (spec := fsRoSpec M Commit Chal)
+    (m := OracleComp (fsRoSpec M Commit Chal))).liftTarget _
+
+noncomputable def simulatedNmaUnifSim
+    [DecidableEq M] [DecidableEq Commit] :
+    QueryImpl unifSpec
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))) :=
+  fun n => simulatedNmaFwd (M := M) (Commit := Commit) (Chal := Chal) (.inl n)
+
+noncomputable def simulatedNmaRoSim
+    [DecidableEq M] [DecidableEq Commit] :
+    QueryImpl (M × Commit →ₒ Chal)
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))):= fun mc => do
+  let cache ← get
+  match cache (.inr mc) with
+  | some v => pure v
+  | none => do
+      let v ← simulatedNmaFwd (M := M) (Commit := Commit) (Chal := Chal) (.inr mc)
+      modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
+
+noncomputable def simulatedNmaBaseSim
+    [DecidableEq M] [DecidableEq Commit] :
+    QueryImpl (fsRoSpec M Commit Chal)
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))) :=
+  simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal) +
+    simulatedNmaRoSim (M := M) (Commit := Commit) (Chal := Chal)
+
+noncomputable def simulatedNmaSigSim
+    [DecidableEq M] [DecidableEq Commit]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
+    QueryImpl (M →ₒ (Commit × Resp))
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))) := fun msg => do
+  let (c, ω, s) ← simulateQ
+    (simulatedNmaUnifSim (M := M) (Commit := Commit) (Chal := Chal))
+    (simTranscript pk)
+  modifyGet fun cache =>
+    match cache (.inr (msg, c)) with
+    | some _ => ((c, s), cache)
+    | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
+
+noncomputable def simulatedNmaImpl
+    [DecidableEq M] [DecidableEq Commit]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
+    QueryImpl (cmaOracleSpec M Commit Chal Resp)
+      (StateT (fsRoSpec M Commit Chal).QueryCache
+        (OracleComp (fsRoSpec M Commit Chal))) :=
+  simulatedNmaBaseSim (M := M) (Commit := Commit) (Chal := Chal) +
+    simulatedNmaSigSim (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) simTranscript pk
+
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- CMA-to-NMA reduction at the managed-RO interface.
 
@@ -48,7 +118,7 @@ queries by sampling from `simTranscript` and programming the cache,
 and returns the final cache together with the forgery.
 
 This is the concrete-interface reduction entering the replay-forking lemma. -/
-def simulatedNmaAdv
+noncomputable def simulatedNmaAdv
     [DecidableEq M] [DecidableEq Commit]
     [Finite Chal] [Inhabited Chal] [SampleableType Chal]
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
@@ -56,29 +126,10 @@ def simulatedNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M)) :
     SignatureAlg.managedRoNmaAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M) :=
-  let spec := unifSpec + (M × Commit →ₒ Chal)
-  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
-    fun n => fwd (.inl n)
-  let roSim : QueryImpl (M × Commit →ₒ Chal)
-      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
-    let cache ← get
-    match cache (.inr mc) with
-    | some v => pure v
-    | none => do
-        let v ← fwd (.inr mc)
-        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
-  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    unifSim + roSim
-  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
-      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
-    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
-    modifyGet fun cache =>
-      match cache (.inr (msg, c)) with
-      | some _ => ((c, s), cache)
-      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
-  ⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩
+  ⟨fun pk => (simulateQ
+    (simulatedNmaImpl (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) simTranscript pk)
+    (adv.main pk)).run ∅⟩
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hash-query bound for `simulatedNmaAdv`: if the CMA adversary makes at most
