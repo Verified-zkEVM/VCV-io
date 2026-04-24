@@ -360,28 +360,27 @@ lifted into the HeapSSP `cmaSpec` by re-adding `pkSpec`. -/
 
 omit [DecidableEq M] [DecidableEq Commit] in
 /-- The public random-oracle runtime for the fixed-key post-keygen experiment,
-viewed as a `QueryRuntime` with explicit cache state. -/
-@[reducible] noncomputable def fsBaseRuntime :
-    QueryRuntime (unifSpec + (M × Commit →ₒ Chal))
-      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) where
-  impl := by
-    letI : DecidableEq (M × Commit) := Classical.decEq _
-    exact unifFwdImpl (M × Commit →ₒ Chal) +
-      (randomOracle : QueryImpl (M × Commit →ₒ Chal) _)
+implemented by an explicit cache-state `QueryImpl`. -/
+@[reducible] noncomputable def fsBaseImpl :
+    QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := by
+  letI : DecidableEq (M × Commit) := Classical.decEq _
+  exact unifFwdImpl (M × Commit →ₒ Chal) +
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _)
 
 omit [DecidableEq M] [DecidableEq Commit] in
-/-- The bundled Fiat-Shamir runtime is the explicit cache-state runtime
-`fsBaseRuntime`, observed from the chosen initial cache. -/
-lemma runtimeWithCache_evalDist_eq_fsBaseRuntime
+/-- The Fiat-Shamir runtime-with-cache semantics is the explicit cache-state implementation
+`fsBaseImpl`, observed from the chosen initial cache. -/
+lemma runtimeWithCache_evalDist_eq_fsBaseImpl
     (cache : (M × Commit →ₒ Chal).QueryCache)
     {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
     (FiatShamir.runtimeWithCache M cache).evalDist oa =
       evalDist ((simulateQ
-        (fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)).impl oa).run'
+        (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)) oa).run'
         cache) := by
   unfold FiatShamir.runtimeWithCache ProbCompRuntime.evalDist
-    SPMFSemantics.evalDist SemanticsVia.denote fsBaseRuntime
+    SPMFSemantics.evalDist SemanticsVia.denote fsBaseImpl
   unfold SPMFSemantics.withStateOracle unifFwdImpl simulateQ' evalDist
   have hbase :
       (QueryImpl.ofLift unifSpec ProbComp).liftTarget
@@ -420,7 +419,7 @@ appending each queried message to a `StateT` list. -/
         (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) := by
   letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
-    (fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)).toHasQuery
+    (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).toHasQuery
   let baseS : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
       (StateT (List M)
         (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
@@ -438,7 +437,7 @@ private theorem postKeygenWriterLog_eq_inputLog
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (pk : Stmt) (sk : Wit) :
-    let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+    let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
     letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
         (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
     let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
@@ -464,7 +463,7 @@ private theorem postKeygenWriterLog_eq_inputLog
           (adv.main pk)).run [] :
         StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
           ((M × (Commit × Resp)) × List M)) := by
-  let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+  let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
   letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
   let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
@@ -485,7 +484,7 @@ so it is definitionally aligned with `postKeygenFreshProb` after applying
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (pk : Stmt) (sk : Wit) : ProbComp Bool := by
-  let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+  let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
   letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
   let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
@@ -551,7 +550,7 @@ private theorem postKeygenFreshWriterProb_eq_postKeygenFreshProb
     postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk := by
   unfold postKeygenFreshWriterProb postKeygenFreshProb
-  let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+  let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
   letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
       (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
   let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)

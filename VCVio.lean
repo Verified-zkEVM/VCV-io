@@ -25,6 +25,7 @@ import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.ExpectedCost
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Security
 import VCVio.CryptoFoundations.Fischlin
+import VCVio.CryptoFoundations.FujisakiOkamoto
 import VCVio.CryptoFoundations.FujisakiOkamoto.Composed
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.CryptoFoundations.FujisakiOkamoto.TTransform
@@ -170,6 +171,7 @@ import VCVio.OracleComp.OracleQuery
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.ProbCompLift
+import VCVio.OracleComp.QueryTracking
 import VCVio.OracleComp.QueryTracking.Birthday
 import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
@@ -182,7 +184,7 @@ import VCVio.OracleComp.QueryTracking.LoggingOracle
 import VCVio.OracleComp.QueryTracking.ObservationOracle
 import VCVio.OracleComp.QueryTracking.ProgrammingOracle
 import VCVio.OracleComp.QueryTracking.QueryBound
-import VCVio.OracleComp.QueryTracking.QueryRuntime
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Eager
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
@@ -191,6 +193,7 @@ import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.QueryTracking.Tracing
 import VCVio.OracleComp.QueryTracking.Unpredictability
+import VCVio.OracleComp.QueryTracking.WriterCost
 import VCVio.OracleComp.RunIO
 import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.BundledSemantics

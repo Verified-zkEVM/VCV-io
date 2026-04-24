@@ -10,7 +10,7 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.OracleComp.HasQuery
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
-import VCVio.OracleComp.QueryTracking.QueryRuntime
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.ProgramLogic.NotationCore
@@ -198,7 +198,7 @@ theorem map_construction
     SignatureAlg.map F.toMonadHom (FiatShamir (m := m) σ hr M) =
       FiatShamir (m := n) σ hr M := by
   apply SignatureAlg.ext
-  · simpa [FiatShamir, liftM, MonadLiftT.monadLift, -QueryRuntime.toHasQuery_query]
+  · simpa [FiatShamir, liftM, MonadLiftT.monadLift, -QueryImpl.toHasQuery_query]
       using hLift hr.gen
   · funext pk sk msg
     have hCommit :
@@ -209,10 +209,10 @@ theorem map_construction
         ∀ e r, F.toMonadHom (monadLift (σ.respond pk sk e r) : m Resp) =
           (monadLift (σ.respond pk sk e r) : n Resp) :=
       fun e r => hLift (σ.respond pk sk e r)
-    simp [FiatShamir, hCommit, hRespond, HasQuery.map_query, -QueryRuntime.toHasQuery_query]
+    simp [FiatShamir, hCommit, hRespond, HasQuery.map_query, -QueryImpl.toHasQuery_query]
   · funext pk msg sig
     cases sig
-    simp [FiatShamir, HasQuery.map_query, -QueryRuntime.toHasQuery_query]
+    simp [FiatShamir, HasQuery.map_query, -QueryImpl.toHasQuery_query]
 
 end naturality
 
@@ -227,33 +227,33 @@ variable {m : Type → Type u} [Monad m] [LawfulMonad m]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.outputs
-        (HasQuery.withAddCost
+        (HasQuery.Program.withAddCost
           (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
             (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
           runtime costFn) =
-      HasQuery.inRuntime
+      HasQuery.Program.eval
         (fun [HasQuery (M × Commit →ₒ Chal) m] =>
           (FiatShamir (m := m) σ hr M).sign pk sk msg)
         runtime := by
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (Commit × PrvState))
-        let r ← runtime.impl (msg, a.1.1)
+        let r ← runtime (msg, a.1.1)
         (fun z : Resp × Multiplicative ω => (a.1.1, z.1)) <$>
           WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m Resp)) =
       (do
         let a ← (monadLift (σ.commit pk sk) : m (Commit × PrvState))
-        let r ← runtime.impl (msg, a.1)
+        let r ← runtime (msg, a.1)
         Prod.mk a.1 <$> (monadLift (σ.respond pk sk a.2 r) : m Resp)) by
-    simpa [HasQuery.inRuntime, HasQuery.withAddCost, AddWriterT.outputs, FiatShamir,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+    simpa [HasQuery.Program.eval, HasQuery.Program.withAddCost, AddWriterT.outputs, FiatShamir,
+      QueryImpl.withAddCost_apply, AddWriterT.addTell] using h
   change (do
       let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (Commit × PrvState))) :
         AddWriterT ω m (Commit × PrvState))
-      let r ← runtime.impl (msg, a.1.1)
+      let r ← runtime (msg, a.1.1)
       (fun z : Resp × Multiplicative ω => (a.1.1, z.1)) <$>
         WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m Resp)) :
           AddWriterT ω m Resp)) = _
@@ -261,36 +261,36 @@ private lemma sign_outputs_formula_withAddCost {ω : Type} [AddMonoid ω]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma sign_costs_formula_withAddCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     AddWriterT.costs
-        (HasQuery.withAddCost
+        (HasQuery.Program.withAddCost
           (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
             (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
           runtime costFn) =
       (fun sig ↦ costFn (msg, sig.1)) <$>
-        HasQuery.inRuntime
+        HasQuery.Program.eval
           (fun [HasQuery (M × Commit →ₒ Chal) m] =>
             (FiatShamir (m := m) σ hr M).sign pk sk msg)
           runtime := by
   suffices h :
       (do
         let a ← WriterT.run (monadLift (σ.commit pk sk) : AddWriterT ω m (Commit × PrvState))
-        let r ← runtime.impl (msg, a.1.1)
+        let r ← runtime (msg, a.1.1)
         (fun z : Resp × Multiplicative ω =>
           a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
           WriterT.run (monadLift (σ.respond pk sk a.1.2 r) : AddWriterT ω m Resp)) =
       (do
         let a ← (monadLift (σ.commit pk sk) : m (Commit × PrvState))
-        let r ← runtime.impl (msg, a.1)
+        let r ← runtime (msg, a.1)
         (fun _ ↦ Multiplicative.ofAdd (costFn (msg, a.1))) <$>
           (monadLift (σ.respond pk sk a.2 r) : m Resp)) by
-    simpa [HasQuery.inRuntime, HasQuery.withAddCost, AddWriterT.costs, FiatShamir,
-      QueryRuntime.withAddCost_impl, AddWriterT.addTell] using h
+    simpa [HasQuery.Program.eval, HasQuery.Program.withAddCost, AddWriterT.costs, FiatShamir,
+      QueryImpl.withAddCost_apply, AddWriterT.addTell] using h
   change (do
       let a ← WriterT.run (monadLift ((monadLift (σ.commit pk sk) : m (Commit × PrvState))) :
         AddWriterT ω m (Commit × PrvState))
-      let r ← runtime.impl (msg, a.1.1)
+      let r ← runtime (msg, a.1.1)
       (fun z : Resp × Multiplicative ω =>
         a.2 * (Multiplicative.ofAdd (costFn (msg, a.1.1)) * z.2)) <$>
         WriterT.run (monadLift ((monadLift (σ.respond pk sk a.1.2 r) : m Resp)) :
@@ -302,7 +302,7 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 the unique queried commitment `c`, so the total weighted query cost is exactly
 `costFn (msg, c)`. -/
 theorem sign_usesCostAsQueryCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) :
     HasQuery.UsesCostAs
       (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
@@ -320,13 +320,13 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing has expected weighted query cost equal to the expectation of the queried
 commitment cost over the output signature distribution. -/
 theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [HasEvalSPMF m]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : M × Commit → ω) (val : ω → ENNReal) :
     ExpectedQueryCost[
       (FiatShamir σ hr M).sign pk sk msg in runtime by costFn via val
     ] =
       ∑' sig : Commit × Resp,
-        Pr[= sig | HasQuery.inRuntime
+        Pr[= sig | HasQuery.Program.eval
           (fun [HasQuery (M × Commit →ₒ Chal) m] =>
             (FiatShamir (m := m) σ hr M).sign pk sk msg)
           runtime] * val (costFn (msg, sig.1)) := by
@@ -336,7 +336,7 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
     ] =
       ∑' sig : Commit × Resp,
         Pr[= sig | AddWriterT.outputs
-          (HasQuery.withAddCost
+          (HasQuery.Program.withAddCost
             (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
               (FiatShamir (m := AddWriterT ω m) σ hr M).sign pk sk msg)
             runtime costFn)] * val (costFn (msg, sig.1)) :=
@@ -349,7 +349,7 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
               (σ := σ) (hr := hr) (M := M) (runtime := runtime) (pk := pk) (sk := sk)
               (msg := msg) (costFn := costFn))
     _ = ∑' sig : Commit × Resp,
-          Pr[= sig | HasQuery.inRuntime
+          Pr[= sig | HasQuery.Program.eval
             (fun [HasQuery (M × Commit →ₒ Chal) m] =>
               (FiatShamir (m := m) σ hr M).sign pk sk msg)
             runtime] * val (costFn (msg, sig.1)) := by
@@ -360,9 +360,9 @@ theorem sign_expectedQueryCost_eq_outputExpectation {ω : Type} [AddMonoid ω] [
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir signing makes exactly one random-oracle query under unit-cost instrumentation. -/
 theorem sign_usesExactlyOneQuery
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (sk : Wit) (msg : M) :
     Queries[ (FiatShamir σ hr M).sign pk sk msg in runtime ] = 1 := by
-  simpa [HasQuery.withUnitCost] using
+  simpa [HasQuery.Program.withUnitCost] using
     sign_usesCostAsQueryCost (σ := σ) (hr := hr) (M := M) (runtime := runtime)
       (pk := pk) (sk := sk) (msg := msg) (costFn := fun _ ↦ (1 : ℕ))
 
@@ -370,26 +370,26 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification incurs exactly the weighted cost assigned to the single
 random-oracle query on `(msg, sig.1)`. -/
 theorem verify_usesExactQueryCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M) (sig : Commit × Resp)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M) (sig : Commit × Resp)
     (costFn : M × Commit → ω) :
     QueryCost[ (FiatShamir σ hr M).verify pk msg sig in runtime by costFn ] =
       costFn (msg, sig.1) := by
   rcases sig with ⟨c, s⟩
   change Cost[
-    HasQuery.withAddCost
+    HasQuery.Program.withAddCost
       (fun [HasQuery (M × Commit →ₒ Chal) (AddWriterT ω m)] =>
         (FiatShamir (m := AddWriterT ω m) σ hr M).verify pk msg (c, s))
       runtime costFn
   ] = costFn (msg, c)
   rw [AddWriterT.hasCost_iff]
-  simp [HasQuery.withAddCost, FiatShamir, QueryRuntime.withAddCost_impl,
+  simp [HasQuery.Program.withAddCost, FiatShamir, QueryImpl.withAddCost_apply,
     AddWriterT.outputs, AddWriterT.costs, AddWriterT.addTell]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification has expected weighted query cost equal to the weight of its single
 random-oracle query. -/
 theorem verify_expectedQueryCost_eq {ω : Type} [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M)
     (sig : Commit × Resp) (costFn : M × Commit → ω) (val : ω → ENNReal) (hval : Monotone val) :
     ExpectedQueryCost[
       (FiatShamir σ hr M).verify pk msg sig in runtime by costFn via val
@@ -404,7 +404,7 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Fiat-Shamir verification makes exactly one random-oracle query under unit-cost
 instrumentation. -/
 theorem verify_usesExactlyOneQuery
-    (runtime : QueryRuntime (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M)
+    (runtime : QueryImpl (M × Commit →ₒ Chal) m) (pk : Stmt) (msg : M)
     (sig : Commit × Resp) :
     Queries[ (FiatShamir σ hr M).verify pk msg sig in runtime ] = 1 := by
   simpa [HasQuery.UsesExactlyQueries] using

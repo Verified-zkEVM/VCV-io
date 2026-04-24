@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import Examples.ElGamal.Basic
 import VCVio.CryptoFoundations.Asymptotics.ReductionCost
-import VCVio.OracleComp.QueryTracking.QueryRuntime
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 
 /-!
@@ -285,13 +285,12 @@ noncomputable def IND_CPA_OneTime_DDHReduction_openCost
     (fun k ↦ ResourceProfile.single (ω := ω) k)
     _gen A B T
 
-/-- Runtime that interprets the reified one-time IND-CPA interface using a concrete adversary. -/
-def oneTimeINDCPARuntime {gen : G}
+/-- Implementation of the reified one-time IND-CPA interface using a concrete adversary. -/
+def oneTimeINDCPAImpl {gen : G}
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)) :
-    QueryRuntime (oneTimeINDCPASpec G G adv.State (G × G)) ProbComp where
-  impl
-    | .chooseMessages pk => adv.chooseMessages pk
-    | .distinguish st c => adv.distinguish st c
+    QueryImpl (oneTimeINDCPASpec G G adv.State (G × G)) ProbComp
+  | .chooseMessages pk => adv.chooseMessages pk
+  | .distinguish st c => adv.distinguish st c
 
 section OpenCostTheorems
 
@@ -430,7 +429,7 @@ noncomputable def IND_CPA_OneTime_DDHReduction_profiled
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)) :
     G → G → G → G → AddWriterT (ResourceProfile ω κ) ProbComp Bool :=
   fun g A B T => by
-    letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
+    letI := (oneTimeINDCPAImpl (gen := gen) adv).toHasQuery
     exact IND_CPA_OneTime_DDHReduction_openProfiled
       (State := adv.State) (ω := ω) (κ := κ) intrinsic profile g A B T
 
@@ -448,14 +447,14 @@ noncomputable def IND_CPA_OneTime_DDHReduction_costed
 /-- Instantiating the open reduction with a concrete adversary recovers the existing closed DDH
 reduction `IND_CPA_OneTime_DDHReduction` from `Examples.ElGamal.Basic`. -/
 @[simp]
-lemma IND_CPA_OneTime_DDHReduction_open_inRuntime
+lemma IND_CPA_OneTime_DDHReduction_open_eval
     {gen : G}
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen))
     (g A B T : G) :
-    HasQuery.inRuntime
+    HasQuery.Program.eval
       (IND_CPA_OneTime_DDHReduction_open
         (State := adv.State) g A B T)
-      (oneTimeINDCPARuntime (gen := gen) adv)
+      (oneTimeINDCPAImpl (gen := gen) adv)
       = IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv g A B T := rfl
 
 /-- Cost-transform theorem for the closed one-time ElGamal DDH reduction.
@@ -473,7 +472,7 @@ lemma IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_profiled
         (F := F) (G := G) (gen := gen) (ω := ω) (κ := κ) intrinsic profile adv g A B T)
       (OneTimeINDCPACapability.reductionTransform intrinsic profile) := by
-  letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
+  letI := (oneTimeINDCPAImpl (gen := gen) adv).toHasQuery
   simpa [IND_CPA_OneTime_DDHReduction_profiled] using
     (IND_CPA_OneTime_DDHReduction_openProfiled_pathwiseCostEqOnSupport
       (State := adv.State) (ω := ω) (κ := κ) intrinsic profile g A B T)
@@ -689,7 +688,7 @@ lemma IND_CPA_OneTime_DDHReduction_costed_pathwiseCostEqOnSupport
       (IND_CPA_OneTime_DDHReduction_costed
         (F := F) (G := G) (gen := gen) (ω := ω) intrinsic adv g A B T)
       (OneTimeINDCPACapability.reductionProfile intrinsic) := by
-  letI := (oneTimeINDCPARuntime (gen := gen) adv).toHasQuery
+  letI := (oneTimeINDCPAImpl (gen := gen) adv).toHasQuery
   simpa [IND_CPA_OneTime_DDHReduction_costed] using
     (IND_CPA_OneTime_DDHReduction_profiled_pathwiseCostEqOnSupport
       (F := F) (G := G) (gen := gen) (ω := ω) (κ := OneTimeINDCPACapability)
