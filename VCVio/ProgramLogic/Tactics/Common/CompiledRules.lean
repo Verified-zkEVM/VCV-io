@@ -29,12 +29,12 @@ inductive RelationalRuleApplicationMode where
 structure CompiledUnaryVCSpecRule where
   entry : VCSpecEntry
   modes : Array UnaryRuleApplicationMode
-  deriving Inhabited, Repr
+  deriving Inhabited
 
 structure CompiledRelationalVCSpecRule where
   entry : VCSpecEntry
   modes : Array RelationalRuleApplicationMode
-  deriving Inhabited, Repr
+  deriving Inhabited
 
 def CompiledUnaryVCSpecRule.theoremName (rule : CompiledUnaryVCSpecRule) : Name :=
   rule.entry.decl
