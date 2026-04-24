@@ -10,13 +10,30 @@ import ToMathlib.General
 /-!
 # Coercions Between Computations With Additional Oracles
 
-This file defines a `isSubSpec` relation for pairs of `oracleSpec` where one can be
-thought of as an extension of the other with additional oracles.
-The definition consists is a thin wrapper around a `MonadLift` instance on `OracleQuery`,
-which extends to a lifting operation on `OracleComp`.
+This file defines the `SubSpec` relation between pairs of `OracleSpec`s. An
+instance `spec ⊂ₒ superSpec` packages the data of a polynomial-functor lens
+between the underlying `PFunctor`s, given by
 
-We use the notation `spec ⊂ₒ spec'` to represent that one set of oracles is a subset of another,
-where the non-inclusive subset symbol reflects that we avoid defining this instance reflexively.
+* `onQuery : spec.Domain → superSpec.Domain` --- forward translation on query
+  inputs (oracle indices), and
+* `onResponse : (t : spec.Domain) → superSpec.Range (onQuery t) → spec.Range t`
+  --- fiberwise backward translation on query responses.
+
+By the Yoneda lemma this lens data is in bijection with natural transformations
+`OracleQuery spec → OracleQuery superSpec`. The class therefore `extends
+MonadLift (OracleQuery spec) (OracleQuery superSpec)`. Concrete instances
+spell `monadLift` out alongside the lens data and discharge the
+propositional coherence `liftM_eq_lift` (typically `rfl`); see the class
+docstring for why the `monadLift` field is not defaulted.
+
+We use the notation `spec ⊂ₒ spec'` to represent this inclusion. The
+non-inclusive subset symbol reflects that we avoid defining `SubSpec`
+reflexively, since `MonadLiftT.refl` already handles the identity case.
+
+`LawfulSubSpec` refines `SubSpec` with the requirement that `onResponse` is
+bijective on every fiber. This is exactly the data of a `PFunctor.Equiv`-style
+embedding and is what is needed to preserve the uniform distribution under
+lifting.
 -/
 
 open OracleSpec OracleComp BigOperators ENNReal
@@ -28,60 +45,94 @@ variable {ι : Type u} {τ : Type v}
 
 namespace OracleSpec
 
-/-- Relation defining an inclusion of one set of oracles into another, where the mapping
-doesn't affect the underlying probability distribution of the computation.
-Informally, `spec ⊂ₒ superSpec` means that for any query to an oracle of `sub_spec`,
-it can be perfectly simulated by a computation using the oracles of `superSpec`.
+/-- Inclusion of one set of oracles into another, packaged as a polynomial-functor
+lens between the underlying `OracleSpec`s. Carries the forward translation
+`onQuery` on query inputs and the fiberwise backward translation `onResponse`
+on query responses, plus the resulting `MonadLift` action.
 
-We avoid implementing this via the built-in subset notation as we care about the actual data
-of the mapping rather than just its existence, which is needed when defining type coercions. -/
+We `extends MonadLift (OracleQuery spec) (OracleQuery superSpec)` so that
+typeclass synthesis can derive `MonadLift` (and therefore `MonadLiftT`)
+through the structure projection `SubSpec.toMonadLift`. The `monadLift`
+field is **not** defaulted: each concrete `SubSpec` instance must spell it
+out, alongside `onQuery` / `onResponse`, and discharge the propositional
+coherence `liftM_eq_lift` (typically by `rfl`).
+
+Spelling `monadLift` out explicitly (rather than defaulting it from the
+lens data) is what makes the lifted query fully reduce during `rw` / `simp`
+pattern matching against lemmas like `probEvent_liftComp`. A defaulted
+`monadLift` field becomes opaque to `isDefEq` once it travels through the
+`MonadLiftT` instance chain, which silently breaks rewriting.
+
+Informally, `spec ⊂ₒ superSpec` says that any query to an oracle of `spec`
+can be perfectly simulated by a query to an oracle of `superSpec`. We avoid
+the built-in `Subset` notation because we care about the actual data of the
+mapping (it is needed when defining type coercions), not just its existence. -/
 class SubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
-  liftM_map {α β : Type _} (q : OracleQuery spec α) (f : α → β) :
-      liftM (n := OracleQuery superSpec) (f <$> q) = f <$> liftM q
+  /-- Forward translation on query inputs (oracle indices). -/
+  onQuery : spec.Domain → superSpec.Domain
+  /-- Fiberwise backward translation on query responses. -/
+  onResponse : (t : spec.Domain) → superSpec.Range (onQuery t) → spec.Range t
+  /-- Coherence between the `MonadLift` action and the lens data: lifting a
+  query is the lens applied to that query. Concrete instances supply
+  `monadLift` directly in the lens form, making this `rfl`. -/
+  liftM_eq_lift : ∀ {β : Type w} (q : OracleQuery spec β),
+      monadLift q = ⟨onQuery q.input, q.cont ∘ onResponse q.input⟩ := by
+    intros; rfl
 
-infix : 50 " ⊂ₒ " => SubSpec
+@[inherit_doc] infix : 50 " ⊂ₒ " => SubSpec
 
 namespace SubSpec
 
 variable {κ : Type w'} {spec₃ : OracleSpec κ}
 
-/-- Transitivity for `SubSpec`: if `spec₁ ⊂ₒ spec₂` and `spec₂ ⊂ₒ spec₃`,
-then `spec₁ ⊂ₒ spec₃`. -/
-@[reducible] def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) : spec ⊂ₒ spec₃ where
-  monadLift q := h₂.monadLift (h₁.monadLift q)
-  liftM_map q f := by
-    have h₁map := h₁.liftM_map (q := q) (f := f)
-    have h₁map' := congrArg h₂.monadLift h₁map
-    calc
-      h₂.monadLift (h₁.monadLift (f <$> q))
-          = h₂.monadLift (f <$> h₁.monadLift q) := h₁map'
-      _ = f <$> h₂.monadLift (h₁.monadLift q) := by
-          simpa using (h₂.liftM_map (q := h₁.monadLift q) (f := f))
+/-- The lens action on a single query: forward on the input, post-compose the
+backward fiber on the continuation. Used as the canonical reduced form of
+`liftM q` for proofs that need to inspect the resulting query. -/
+@[reducible] def liftQuery [h : SubSpec spec superSpec] (q : OracleQuery spec α) :
+    OracleQuery superSpec α :=
+  ⟨h.onQuery q.input, q.cont ∘ h.onResponse q.input⟩
+
+/-- Transitivity of `SubSpec`: lens composition. -/
+@[reducible] def trans (h₁ : spec ⊂ₒ superSpec) (h₂ : superSpec ⊂ₒ spec₃) :
+    spec ⊂ₒ spec₃ where
+  monadLift q :=
+    ⟨h₂.onQuery (h₁.onQuery q.input),
+      q.cont ∘ h₁.onResponse q.input ∘ h₂.onResponse (h₁.onQuery q.input)⟩
+  onQuery t := h₂.onQuery (h₁.onQuery t)
+  onResponse t r := h₁.onResponse t (h₂.onResponse (h₁.onQuery t) r)
 
 end SubSpec
 
-/-- `LawfulSubSpec` extends `SubSpec` with the requirement that lifting preserves
-distributions. The axiom requires that the continuation of each lifted query is a
-bijection from the super-range to the sub-range, which guarantees that the uniform
-distribution is preserved under the mapping. -/
+/-- `LawfulSubSpec` extends `SubSpec` with the requirement that the backward
+translation `onResponse` is bijective on every fiber. Equivalently: the
+continuation of each lifted base query `liftM (spec.query t)` is a bijection
+from the super-range to the sub-range. This is what is needed to preserve the
+uniform distribution under the lift. -/
 class LawfulSubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
     [h : SubSpec spec superSpec] : Prop where
-  cont_bijective (t : spec.Domain) :
-    Function.Bijective (h.toMonadLift.monadLift (spec.query t)).snd
+  /-- The backward translation is bijective on every fiber. -/
+  onResponse_bijective (t : spec.Domain) :
+    Function.Bijective (h.onResponse t)
 
 namespace LawfulSubSpec
 
 variable {ι : Type u} {τ : Type v} {spec : OracleSpec ι} {superSpec : OracleSpec τ}
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
 
+/-- Pushing the uniform distribution on `superSpec.Range` through the lens's
+backward fiber recovers the uniform distribution on `spec.Range`. Load-bearing
+for `evalDist_liftComp` below. -/
 lemma evalDist_liftM_query [superSpec.Fintype] [superSpec.Inhabited]
     [spec.Fintype] [spec.Inhabited] (t : spec.Domain) :
     (PMF.uniformOfFintype (superSpec.Range
-      (h.toMonadLift.monadLift (spec.query t)).fst)).map
-      (h.toMonadLift.monadLift (spec.query t)).snd =
-      PMF.uniformOfFintype (spec.Range t) :=
-  PMF.uniformOfFintype_map_of_bijective _ (cont_bijective t)
+      ((liftM (n := OracleQuery superSpec) (spec.query t)).fst))).map
+      ((liftM (n := OracleQuery superSpec) (spec.query t)).snd) =
+      PMF.uniformOfFintype (spec.Range t) := by
+  have lift_eq : (liftM (spec.query t) : OracleQuery superSpec (spec.Range t)) =
+      ⟨h.onQuery t, h.onResponse t⟩ := h.liftM_eq_lift _
+  rw [lift_eq]
+  exact PMF.uniformOfFintype_map_of_bijective _ (onResponse_bijective t)
 
 end LawfulSubSpec
 
