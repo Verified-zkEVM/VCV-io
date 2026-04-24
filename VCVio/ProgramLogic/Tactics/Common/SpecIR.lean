@@ -10,16 +10,18 @@ import VCVio.ProgramLogic.Tactics.Common.Core
 /-! # VC Spec Intermediate Representation
 
 Tactic-level intermediate representation used to classify program-logic
-specification rules for diagnostic messages, registry bookkeeping, and the
-compiled-rule layer. The discrimination-tree indexing itself lives in
-`Registry.lean` and operates on `Lean.Meta.Sym.Pattern`; the IR defined here is
-a light-weight summary attached to each `@[vcspec]` entry.
+specification rules for diagnostic messages, registry bookkeeping, and
+structural candidate filtering. The discrimination-tree indexing itself lives
+in `Registry.lean` and operates on `Lean.Meta.Sym.Pattern`; the IR defined
+here is a light-weight summary attached to each `@[vcspec]` entry.
 -/
 
 open Lean Elab Meta
 
 namespace OracleComp.ProgramLogic
 
+/-- Broad category of a `@[vcspec]` rule, derived from the head of the
+theorem's statement (`Triple`, `wp`, `RelTriple`, `RelWP`, `eRelTriple`). -/
 inductive VCSpecKind where
   | unaryTriple
   | unaryWP
@@ -28,16 +30,16 @@ inductive VCSpecKind where
   | eRelTriple
   deriving Inhabited, BEq, Repr
 
+/-- Coarse lookup shape used to route a rule into the right discrimination
+tree partition (unary vs relational) at registration time. -/
 inductive VCSpecLookupKey where
   | unary (head : Name)
   | relational (leftHead rightHead : Name)
   deriving Inhabited, BEq, Repr
 
-inductive VCSpecArgShape where
-  | schematic
-  | concrete
-  deriving Inhabited, BEq, Repr
-
+/-- Outer syntactic shape of a single oracle computation slot of a
+`@[vcspec]` rule. Used for coarse secondary filtering when the
+discrimination tree returns multiple candidates. -/
 inductive VCSpecCompForm where
   | bind
   | pure
@@ -51,39 +53,25 @@ inductive VCSpecCompForm where
   | other
   deriving Inhabited, BEq, Repr
 
+/-- Combined comp-form of a rule's computation slot(s). Unary rules record
+a single form; relational rules record both sides. -/
 inductive VCSpecCompPattern where
   | unary (form : VCSpecCompForm)
   | relational (leftForm rightForm : VCSpecCompForm)
   deriving Inhabited, BEq, Repr
 
+/-- Normalized summary of a `@[vcspec]` rule attached to every registered
+entry. The discrimination tree is the primary index; this summary powers
+kind-filtered iteration helpers and structural-compatibility scoring in
+the planner. -/
 structure NormalizedVCSpec where
   kind : VCSpecKind
   lookupKey : VCSpecLookupKey
   compPattern : VCSpecCompPattern
-  theoremBinderCount : Nat
-  preShape : Option VCSpecArgShape
-  postShape : VCSpecArgShape
   deriving Inhabited, BEq, Repr
 
-def VCSpecLookupKey.toLegacyKey : VCSpecLookupKey → Sum Name (Name × Name)
-  | .unary head => .inl head
-  | .relational leftHead rightHead => .inr (leftHead, rightHead)
-
-/-- Rough structural summary of a single argument slot of a `@[vcspec]` rule.
-`.schematic` means the argument is a bare free variable or metavariable in the
-rule statement (the user has not constrained its shape); `.concrete` means the
-argument has some structural shape at the rule level. The planner uses this
-classification as a coarse secondary filter when ranking candidates. -/
-def classifyArgShape (e : Expr) : VCSpecArgShape :=
-  let e := e.consumeMData
-  if e.isFVar || e.isMVar then
-    .schematic
-  else
-    .concrete
-
-/-- Rough structural summary of a single oracle computation slot of a
-`@[vcspec]` rule, keyed on the outer head introduced by the standard monad
-operations (`>>=`, `pure`, `query`, `if`, …). -/
+/-- Rough structural summary of the outer head of a computation slot,
+keyed on the standard monad operations (`>>=`, `pure`, `query`, `if`, …). -/
 def classifyVCSpecCompForm (comp : Expr) : VCSpecCompForm :=
   let comp := comp.consumeMData
   if isBindExpr comp then

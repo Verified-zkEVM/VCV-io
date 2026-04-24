@@ -278,76 +278,52 @@ the abbreviations in the source theorem before we see the body. -/
 private def selectVCSpecKey (body : Expr) :
     MetaM (Expr × NormalizedVCSpec × Option Name) := do
   let body := body.consumeMData
-  let binderCount := 0
-    -- `Sym.mkPatternFromDeclWithKey` telescopes ∀-quantifiers *before* calling
-    -- the selector and records the binder count on the returned `Pattern`. The
-    -- `theoremBinderCount` field on `NormalizedVCSpec` is advisory only and
-    -- consumed by documentation / diagnostic paths; the registry itself
-    -- treats binders uniformly.
-  if let some (pre, oa, post) := tripleBodyParts? body then
+  if let some (_pre, oa, _post) := tripleBodyParts? body then
     let head ← headConstNameOrUnary oa
     let spec : NormalizedVCSpec := {
       kind := .unaryTriple
       lookupKey := .unary head
       compPattern := classifyUnaryCompPattern oa
-      theoremBinderCount := binderCount
-      preShape := some (classifyArgShape pre)
-      postShape := classifyArgShape post
     }
     return (oa, spec, none)
-  if let some (pre, oa, post) := rawWpBodyParts? body then
+  if let some (_pre, oa, _post) := rawWpBodyParts? body then
     let head ← headConstNameOrUnary oa
     let spec : NormalizedVCSpec := {
       kind := .unaryWP
       lookupKey := .unary head
       compPattern := classifyUnaryCompPattern oa
-      theoremBinderCount := binderCount
-      preShape := some (classifyArgShape pre)
-      postShape := classifyArgShape post
     }
     return (oa, spec, none)
-  if let some (oa, post) := wpBodyParts? body then
+  if let some (oa, _post) := wpBodyParts? body then
     let head ← headConstNameOrUnary oa
     let spec : NormalizedVCSpec := {
       kind := .unaryWP
       lookupKey := .unary head
       compPattern := classifyUnaryCompPattern oa
-      theoremBinderCount := binderCount
-      preShape := none
-      postShape := classifyArgShape post
     }
     return (oa, spec, none)
-  if let some (oa, ob, post) := relTripleBodyParts? body then
+  if let some (oa, ob, _post) := relTripleBodyParts? body then
     let (leftHead, rightHead) ← relationalHeads oa ob
     let spec : NormalizedVCSpec := {
       kind := .relTriple
       lookupKey := .relational leftHead rightHead
       compPattern := classifyRelationalCompPattern oa ob
-      theoremBinderCount := binderCount
-      preShape := none
-      postShape := classifyArgShape post
     }
     return (oa, spec, some rightHead)
-  if let some (oa, ob, post) := relWpBodyParts? body then
+  if let some (oa, ob, _post) := relWpBodyParts? body then
     let (leftHead, rightHead) ← relationalHeads oa ob
     let spec : NormalizedVCSpec := {
       kind := .relWP
       lookupKey := .relational leftHead rightHead
       compPattern := classifyRelationalCompPattern oa ob
-      theoremBinderCount := binderCount
-      preShape := none
-      postShape := classifyArgShape post
     }
     return (oa, spec, some rightHead)
-  if let some (pre, oa, ob, post) := eRelTripleBodyParts? body then
+  if let some (_pre, oa, ob, _post) := eRelTripleBodyParts? body then
     let (leftHead, rightHead) ← relationalHeads oa ob
     let spec : NormalizedVCSpec := {
       kind := .eRelTriple
       lookupKey := .relational leftHead rightHead
       compPattern := classifyRelationalCompPattern oa ob
-      theoremBinderCount := binderCount
-      preShape := some (classifyArgShape pre)
-      postShape := classifyArgShape post
     }
     return (oa, spec, some rightHead)
   throwError
@@ -431,11 +407,5 @@ def getVCSpecEntriesOfKind (kind : VCSpecKind) : CoreM (Array VCSpecEntry) := do
 
 def getVCSpecTheoremsOfKind (kind : VCSpecKind) : CoreM (Array Name) := do
   return (← getVCSpecEntriesOfKind kind).filterMap (·.declName?)
-
-def getNormalizedUnaryVCSpecs (comp : Expr) : MetaM (Array NormalizedVCSpec) := do
-  return (← getRegisteredUnaryVCSpecEntries comp).map (·.spec)
-
-def getNormalizedRelationalVCSpecs (oa ob : Expr) : MetaM (Array NormalizedVCSpec) := do
-  return (← getRegisteredRelationalVCSpecEntries oa ob).map (·.spec)
 
 end OracleComp.ProgramLogic
