@@ -53,18 +53,26 @@ attribute [wpStep]
 /-! ## Dispatch -/
 
 /-- Advance a `wp`-shaped goal by one rewrite, dispatching via the `@[wpStep]`
-discrimination-tree registry.
+registry.
 
-Locates the `wp oa post` sub-expression of the main target, asks the registry for
-entries whose LHS pattern matches `oa`, and tries each in turn (`rw`, then
-`simp only` as a fallback to cover bound-variable LHSs that block `rw`). Returns
-`false` when no candidate succeeds, or when the goal contains no `wp`
+Locates the `wp oa post` sub-expression of the main target, normalizes its
+`oa` argument, asks the registry for rules whose LHS `comp` pattern matches,
+and tries each candidate in turn. The candidates are fed as `rw` / `simp only`
+arguments; the Sym-side discrimination tree is consulted for lookup rather
+than Lean's standard `DiscrTree`, so we benefit from `Sym.Pattern`'s
+normalizing preprocessing without yet fully handing the goal over to the
+`SymM` rewriter (that requires a `SymM → TacticM` proof-application bridge
+we defer to a later phase, to keep behavior stable against Sym churn).
+
+Returns `false` when no candidate succeeds, or when the goal contains no `wp`
 application at all. -/
 def runWpStepRules : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   let some wpApp := findAppWithHead? ``OracleComp.ProgramLogic.wp target | return false
-  let some args := trailingArgs? wpApp 2 | return false
-  let oa ← instantiateMVars args[0]!
+  let wpApp ← instantiateMVars wpApp
+  let argCount := wpApp.getAppNumArgs
+  if argCount < 2 then return false
+  let oa := wpApp.getArg! (argCount - 2)
   let entries ← getRegisteredWpStepEntries oa
   for entry in entries do
     let some declName := entry.declName? | continue
