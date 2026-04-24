@@ -3,7 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Facts
 import VCVio.HeapSSP.IdenticalUntilBad
 import VCVio.HeapSSP.Composition
 import VCVio.CryptoFoundations.SigmaProtocol
@@ -58,7 +58,7 @@ variable (Chal : Type) [SampleableType Chal]
 variable {Stmt Wit : Type} {rel : Stmt → Wit → Bool}
 variable {Resp PrvState : Type}
 
-/-! ### Heap-to-SSP state bijection
+/-! ### Heap-to-extracted-state bijection
 
 The identical-until-bad bridge in
 `VCVio/HeapSSP/IdenticalUntilBad.lean` expects a bijection
@@ -118,40 +118,6 @@ lemma cmaHeapStateEquiv_symm_init :
   cases i with
   | inl a => cases a; rfl
   | inr b => cases b <;> rfl
-
-/-! ### Costly-query predicate for H3 -/
-
-/-- The "costly" query predicate for the H3 identical-until-bad hop: a
-query into `cmaSpec` is costly iff it targets the `signSpec` summand.
-This is the only branch on which `cmaReal` and `cmaSim` disagree. -/
-def IsCostlyQuery : (cmaSpec M Commit Chal Resp Stmt).Domain → Prop
-  | Sum.inl (Sum.inr _) => True
-  | _ => False
-
-instance : DecidablePred (IsCostlyQuery (M := M) (Commit := Commit)
-    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) := fun t =>
-  match t with
-  | Sum.inl (Sum.inl (Sum.inl _)) => isFalse fun h => h
-  | Sum.inl (Sum.inl (Sum.inr _)) => isFalse fun h => h
-  | Sum.inl (Sum.inr _) => isTrue trivial
-  | Sum.inr _ => isFalse fun h => h
-
-/-- The "hash" query predicate: a query into `cmaSpec` is a random-oracle
-query iff it targets the `roSpec` summand, i.e. `Sum.inl (Sum.inl (Sum.inr _))`.
-Used alongside `IsCostlyQuery` to bound cache growth during the H3 hop:
-`cacheCount` at any reachable state is bounded by the number of prior
-sign queries plus the number of prior hash queries. -/
-def IsHashQuery : (cmaSpec M Commit Chal Resp Stmt).Domain → Prop
-  | Sum.inl (Sum.inl (Sum.inr _)) => True
-  | _ => False
-
-instance : DecidablePred (IsHashQuery (M := M) (Commit := Commit)
-    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) := fun t =>
-  match t with
-  | Sum.inl (Sum.inl (Sum.inl _)) => isFalse fun h => h
-  | Sum.inl (Sum.inl (Sum.inr _)) => isTrue trivial
-  | Sum.inl (Sum.inr _) => isFalse fun h => h
-  | Sum.inr _ => isFalse fun h => h
 
 /-! ### `h_step_eq_nS`: non-sign queries coincide
 
@@ -279,90 +245,8 @@ theorem cmaReal_impl_bad_preserved
     (h : Heap (CmaCells M Commit Chal Stmt Wit))
     (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run h)) :
     z.2 (Sum.inr .bad) = h (Sum.inr .bad) := by
-  have h_roCache_ne_bad :
-      (Sum.inr .bad : CmaCells M Commit Chal Stmt Wit)
-        ≠ Sum.inr .roCache := by intro heq; injection heq; contradiction
-  have h_keypair_ne_bad :
-      (Sum.inr .bad : CmaCells M Commit Chal Stmt Wit)
-        ≠ Sum.inr .keypair := by intro heq; injection heq; contradiction
-  have h_log_ne_bad :
-      (Sum.inr .bad : CmaCells M Commit Chal Stmt Wit)
-        ≠ Sum.inl .log := by intro heq; injection heq
-  rcases t with ((n | mc) | m) | ⟨⟩ <;>
-    simp only [cmaReal, StateT.run_mk] at hz
-  · -- Uniform branch: `h` unchanged.
-    simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-      exists_prop] at hz
-    obtain ⟨_, _, rfl⟩ := hz
-    rfl
-  · -- RO branch: cache hit (pure), or miss (update `.roCache`).
-    rcases hcache : h (Sum.inr .roCache) mc with _ | r
-    · rw [hcache] at hz
-      simp only [support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      simp
-    · rw [hcache] at hz
-      simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst hz
-      rfl
-  · -- Sign branch: successive updates to `.keypair`, `.roCache`, `.log`;
-    -- none of them touch `.inr .bad`. Case-split on keypair-hit and
-    -- cache-hit, destructure the four `∃`-witnesses, and close each leaf
-    -- by `simp` via `Heap.get_update_of_ne` at the three non-bad cells.
-    rcases hkp : h (Sum.inr .keypair) with _ | ⟨pk₀, sk₀⟩
-    · -- Keypair miss: lazily sample (pk, sk) and update `.keypair`.
-      rw [hkp] at hz
-      -- Flatten the inner `do let (pk, sk) ← hr.gen; pure (pk, sk, h.update …)`
-      -- and collapse the outer `pure … >>= fun ⟨pk', sk', h₁⟩ => rest` via
-      -- `pure_bind`; the leading `∃` is then over `hr.gen`'s pair.
-      simp only [pure_bind, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨⟨pk, sk⟩, _, h_rest⟩ := hz
-      obtain ⟨⟨c, prvSt⟩, _, h_rest⟩ := h_rest
-      set h₁ := h.update (Sum.inr .keypair) (some (pk, sk)) with hh₁
-      rcases hcache : h₁ (Sum.inr .roCache) (m, c) with _ | ch₀
-      · -- RO cache miss: sample challenge and update `.roCache`.
-        rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨ch, _, π, _, rfl⟩ := h_rest
-        simp [hh₁]
-      · -- RO cache hit: use cached challenge `ch₀`.
-        rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨π, _, rfl⟩ := h_rest
-        simp [hh₁]
-    · -- Keypair hit: reuse `(pk₀, sk₀)` with `h₁ = h`.
-      rw [hkp] at hz
-      simp only [pure_bind, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨⟨c, prvSt⟩, _, h_rest⟩ := hz
-      rcases hcache : h (Sum.inr .roCache) (m, c) with _ | ch₀
-      · -- RO cache miss.
-        rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨ch, _, π, _, rfl⟩ := h_rest
-        simp
-      · -- RO cache hit.
-        rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨π, _, rfl⟩ := h_rest
-        simp
-  · -- PK branch.
-    rcases hkp : h (Sum.inr .keypair) with _ | ⟨pk₀, sk₀⟩
-    · rw [hkp] at hz
-      simp only [support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      simp
-    · rw [hkp] at hz
-      simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst hz
-      rfl
+  simpa [cmaBadRef, CellRef.get] using
+    cmaReal_impl_preserves_badCell M Commit Chal σ hr t h z hz
 
 /-- Monotonicity corollary of `cmaReal_impl_bad_preserved`: once the
 `.bad` cell is `true`, it stays `true`. This is the `h_mono₀`
@@ -390,10 +274,10 @@ theorem cmaReal_simulateQ_bad_preserved
     (h : Heap (CmaCells M Commit Chal Stmt Wit))
     (z) (hz : z ∈ support ((simulateQ (cmaReal M Commit Chal σ hr).impl oa).run h)) :
     z.2 (Sum.inr .bad) = h (Sum.inr .bad) := by
-  exact Package.simulateQ_run_preservesCell
-    ((cmaReal M Commit Chal σ hr).impl) (Sum.inr .bad)
-    (fun t h z hz => cmaReal_impl_bad_preserved M Commit Chal σ hr t h z hz)
-    oa h z hz
+  simpa [cmaBadRef, CellRef.get] using
+    OracleComp.simulateQ_run_cellPreserved ((cmaReal M Commit Chal σ hr).impl)
+      (cmaBadRef M Commit Chal) (cmaReal_impl_preserves_badRef M Commit Chal σ hr)
+      oa h z hz
 
 /-- The bad-event probability of any `cmaReal` simulation started from
 the empty heap is zero: every reachable output has `.bad = false`. -/
@@ -424,35 +308,6 @@ pointwise step hypothesis. The sign-branch HVZK + cache-collision
 coupling is the mathematical heart of H3 and is kept as `sorry`
 pending the full distributional argument. -/
 
-/-- Size of a random-oracle cache as an `ENNReal`.
-
-For finite caches this is the ordinary finite cardinality. For arbitrary
-function-shaped `QueryCache`s whose graph is infinite, the size is `⊤`.
-This avoids the `Set.ncard` junk value (`0` on infinite sets) in
-state-dependent security bounds that quantify over all heap states. -/
-noncomputable def cacheCount {M : Type} [DecidableEq M]
-    {Commit : Type} [DecidableEq Commit] {Chal : Type}
-    (cache : (roSpec M Commit Chal).QueryCache) : ℝ≥0∞ :=
-  (cache.toSet.encard : ℝ≥0∞)
-
-/-- The empty cache has zero entries. -/
-lemma cacheCount_empty {M : Type} [DecidableEq M]
-    {Commit : Type} [DecidableEq Commit] {Chal : Type} :
-    cacheCount (∅ : (roSpec M Commit Chal).QueryCache) = 0 := by
-  simp [cacheCount, QueryCache.toSet_empty]
-
-lemma cacheCount_cacheQuery_le {M : Type} [DecidableEq M]
-    {Commit : Type} [DecidableEq Commit] {Chal : Type}
-    (cache : (roSpec M Commit Chal).QueryCache) (mc : M × Commit) (r : Chal) :
-    cacheCount (cache.cacheQuery mc r) ≤ cacheCount cache + 1 := by
-  have hencard :
-      (cache.cacheQuery mc r).toSet.encard ≤ cache.toSet.encard + 1 :=
-    QueryCache.toSet_encard_cacheQuery_le cache mc r
-  change ((cache.cacheQuery mc r).toSet.encard : ℝ≥0∞) ≤
-    (cache.toSet.encard : ℝ≥0∞) + (1 : ℝ≥0∞)
-  rw [← ENat.toENNReal_one, ← ENat.toENNReal_add]
-  exact ENat.toENNReal_mono hencard
-
 theorem cmaReal_impl_cacheCount_le_of_costly_or_hash
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (hr : GenerableRelation Stmt Wit rel)
@@ -465,52 +320,7 @@ theorem cmaReal_impl_cacheCount_le_of_costly_or_hash
     (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run h)) :
     cacheCount (z.2 (Sum.inr .roCache)) ≤
       cacheCount (h (Sum.inr .roCache)) + 1 := by
-  rcases t with ((n | mc) | m) | ⟨⟩
-  · rcases ht with ht | ht <;> exact ht.elim
-  · simp only [cmaReal, StateT.run_mk] at hz
-    rcases hcache : h (Sum.inr .roCache) mc with _ | r₀
-    · rw [hcache] at hz
-      simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-        exists_prop] at hz
-      obtain ⟨r, _, rfl⟩ := hz
-      simpa using cacheCount_cacheQuery_le (h (Sum.inr .roCache)) mc r
-    · rw [hcache] at hz
-      simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst hz
-      exact le_self_add
-  · simp only [cmaReal, StateT.run_mk] at hz
-    rcases hkp : h (Sum.inr .keypair) with _ | ⟨pk₀, sk₀⟩
-    · rw [hkp] at hz
-      simp only [pure_bind, support_bind, Set.mem_iUnion, exists_prop] at hz
-      obtain ⟨⟨pk, sk⟩, _, h_rest⟩ := hz
-      obtain ⟨⟨c, prvSt⟩, _, h_rest⟩ := h_rest
-      set h₁ := h.update (Sum.inr .keypair) (some (pk, sk)) with hh₁
-      rcases hcache : h₁ (Sum.inr .roCache) (m, c) with _ | ch₀
-      · rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨ch, _, π, _, rfl⟩ := h_rest
-        simpa [hh₁] using cacheCount_cacheQuery_le (h (Sum.inr .roCache)) (m, c) ch
-      · rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨π, _, rfl⟩ := h_rest
-        simp [hh₁]
-    · rw [hkp] at hz
-      simp only [pure_bind, support_bind, Set.mem_iUnion, exists_prop] at hz
-      obtain ⟨⟨c, prvSt⟩, _, h_rest⟩ := hz
-      rcases hcache : h (Sum.inr .roCache) (m, c) with _ | ch₀
-      · rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨ch, _, π, _, rfl⟩ := h_rest
-        simpa using cacheCount_cacheQuery_le (h (Sum.inr .roCache)) (m, c) ch
-      · rw [hcache] at h_rest
-        simp only [support_bind, Set.mem_iUnion, exists_prop,
-          support_pure, Set.mem_singleton_iff] at h_rest
-        obtain ⟨π, _, rfl⟩ := h_rest
-        exact le_self_add
-  · rcases ht with ht | ht <;> exact ht.elim
+  exact cmaReal_impl_roCacheCount_le_of_costly_or_hash M Commit Chal σ hr t ht h z hz
 
 theorem cmaReal_impl_cacheCount_le_of_not_costly_not_hash
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
@@ -523,25 +333,8 @@ theorem cmaReal_impl_cacheCount_le_of_not_costly_not_hash
     (h : Heap (CmaCells M Commit Chal Stmt Wit))
     (z) (hz : z ∈ support (((cmaReal M Commit Chal σ hr).impl t).run h)) :
     cacheCount (z.2 (Sum.inr .roCache)) ≤ cacheCount (h (Sum.inr .roCache)) := by
-  rcases t with ((n | mc) | m) | ⟨⟩
-  · simp only [cmaReal, StateT.run_mk] at hz
-    simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-      exists_prop] at hz
-    obtain ⟨_, _, rfl⟩ := hz
-    rfl
-  · exact (hhash True.intro).elim
-  · exact (hcost True.intro).elim
-  · simp only [cmaReal, StateT.run_mk] at hz
-    rcases hkp : h (Sum.inr .keypair) with _ | ⟨pk₀, sk₀⟩
-    · rw [hkp] at hz
-      simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-        exists_prop] at hz
-      obtain ⟨_, _, rfl⟩ := hz
-      simp
-    · rw [hkp] at hz
-      simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst hz
-      rfl
+  exact cmaReal_impl_roCacheCount_le_of_not_costly_not_hash M Commit Chal σ hr t
+    hcost hhash h z hz
 
 theorem cmaReal_implConjugate_cacheCount_le_of_costly_or_hash
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
@@ -846,6 +639,30 @@ theorem cmaReal_implConjugate_preserves_valid
   | true =>
       cases hpbad
 
+/-- Real signing-step distribution for H3 at an extracted CMA state. -/
+@[reducible] noncomputable def cmaRealSignStepDist
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (m : M)
+    (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit)) :
+    OracleComp unifSpec ((Commit × Resp) × Heap (CmaCells M Commit Chal Stmt Wit)) :=
+  (((cmaReal M Commit Chal σ hr).impl
+      (Sum.inl (Sum.inr m) : (cmaSpec M Commit Chal Resp Stmt).Domain)).run
+      ((cmaHeapStateEquiv M Commit Chal
+        (Stmt := Stmt) (Wit := Wit)).symm (s, false)))
+
+/-- Simulated signing-step distribution for H3 at an extracted CMA state. -/
+@[reducible] noncomputable def cmaSimSignStepDist
+    (hr : GenerableRelation Stmt Wit rel)
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (m : M)
+    (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit)) :
+    OracleComp unifSpec ((Commit × Resp) × Heap (CmaCells M Commit Chal Stmt Wit)) :=
+  (((cmaSim M Commit Chal hr simT).impl
+      (Sum.inl (Sum.inr m) : (cmaSpec M Commit Chal Resp Stmt).Domain)).run
+      ((cmaHeapStateEquiv M Commit Chal
+        (Stmt := Stmt) (Wit := Wit)).symm (s, false)))
+
 /-- **Per-step TV bound for H3 on a sign query.** Core HVZK + cache-
 collision coupling. Left as `sorry` pending the HVZK + commit-marginal
 coupling proof. -/
@@ -858,14 +675,8 @@ theorem cmaReal_cmaSim_tv_sign_le_cmaSignEps
     (hCommit : σ.simCommitPredictability simT β)
     (m : M) (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit)) :
     ENNReal.ofReal (tvDist
-      (((cmaReal M Commit Chal σ hr).impl
-          (Sum.inl (Sum.inr m) : (cmaSpec M Commit Chal Resp Stmt).Domain)).run
-          ((cmaHeapStateEquiv M Commit Chal
-              (Stmt := Stmt) (Wit := Wit)).symm (s, false)))
-      (((cmaSim M Commit Chal hr simT).impl
-          (Sum.inl (Sum.inr m))).run
-          ((cmaHeapStateEquiv M Commit Chal
-              (Stmt := Stmt) (Wit := Wit)).symm (s, false))))
+      (cmaRealSignStepDist M Commit Chal σ hr m s)
+      (cmaSimSignStepDist M Commit Chal hr simT m s))
       ≤ cmaSignEps (rel := rel) ζ_zk β s := by
   by_cases hvalid : CmaInnerData.Valid (rel := rel) s
   · -- Reachable branch: the cached keypair is generated/valid, so the
@@ -874,14 +685,8 @@ theorem cmaReal_cmaSim_tv_sign_le_cmaSignEps
     sorry
   · have htv :
         ENNReal.ofReal (tvDist
-          (((cmaReal M Commit Chal σ hr).impl
-              (Sum.inl (Sum.inr m) : (cmaSpec M Commit Chal Resp Stmt).Domain)).run
-              ((cmaHeapStateEquiv M Commit Chal
-                  (Stmt := Stmt) (Wit := Wit)).symm (s, false)))
-          (((cmaSim M Commit Chal hr simT).impl
-              (Sum.inl (Sum.inr m))).run
-              ((cmaHeapStateEquiv M Commit Chal
-                  (Stmt := Stmt) (Wit := Wit)).symm (s, false)))) ≤ 1 := by
+          (cmaRealSignStepDist M Commit Chal σ hr m s)
+          (cmaSimSignStepDist M Commit Chal hr simT m s)) ≤ 1 := by
       rw [ENNReal.ofReal_le_one]
       exact tvDist_le_one _ _
     simpa [cmaSignEps, hvalid] using htv
@@ -1555,15 +1360,8 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
     ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
         (cmaSim M Commit Chal hr simT) A)
       ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
-  -- Set up the bridge arguments.
   set φ := cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit) with hφ
   set s_init := cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit) with hs_init
-  have h_init₀ : (cmaReal M Commit Chal σ hr).init
-      = pure (φ.symm (s_init, false)) := by
-    rw [cmaHeapStateEquiv_symm_init]; rfl
-  have h_init₁ : (cmaSim M Commit Chal hr simT).init
-      = pure (φ.symm (s_init, false)) := by
-    rw [cmaHeapStateEquiv_symm_init, cmaSim_init_eq]
   have h_valid_init : CmaInnerData.Valid (rel := rel) s_init := by
     rw [hs_init]
     exact cmaInitData_valid M Commit Chal
@@ -1577,48 +1375,6 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
     intro t p hpbad hpvalid z hz
     simpa [hφ] using
       cmaReal_implConjugate_preserves_valid M Commit Chal σ hr t p hpbad hpvalid z hz
-  -- Apply the invariant-preserving bridge. The step TV obligation is needed
-  -- only on valid/reachable CMA inner states, and the final cost is the tight
-  -- valid-state loss `cmaSignEpsCore`.
-  have h_bridge := Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
-    (cmaReal M Commit Chal σ hr) (cmaSim M Commit Chal hr simT)
-    φ s_init h_init₀ h_init₁
-    (CmaInnerData.Valid (rel := rel)) h_valid_init h_pres_valid
-    (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-    (cmaSignEpsCore ζ_zk β)
-    (fun t ht s hs => cmaReal_cmaSim_tv_costly_le_cmaSignEpsCore_of_valid
-      M Commit Chal σ hr simT ζ_zk β hζ_zk hHVZK hCommit t ht s hs)
-    (fun t ht h => cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery M Commit Chal σ hr simT t ht h)
-    (by
-      intro t h hbad z hz
-      -- The monotonicity hypothesis is phrased on `(φ h).2 = true`, i.e. the
-      -- extracted bad-bit. Translate back to the heap-cell form used by
-      -- `cmaReal_impl_bad_monotone`.
-      have hbad' : h (Sum.inr .bad) = true := by
-        have : (φ h).2 = h (Sum.inr .bad) := rfl
-        simpa [this] using hbad
-      have h_out : z.2 (Sum.inr .bad) = true :=
-        cmaReal_impl_bad_monotone M Commit Chal σ hr t h hbad' z hz
-      change (φ z.2).2 = true
-      have : (φ z.2).2 = z.2 (Sum.inr .bad) := rfl
-      rw [this]; exact h_out)
-    A h_qb
-  -- The bad-probability term is zero since `cmaReal` preserves `.bad` and
-  -- the init heap has `.bad = false`.
-  have h_bad_zero :
-      Pr[fun z : Bool × Heap (CmaCells M Commit Chal Stmt Wit) =>
-          (φ z.2).2 = true |
-          (simulateQ (cmaReal M Commit Chal σ hr).impl A).run
-            (φ.symm (s_init, false))] = 0 := by
-    rw [cmaHeapStateEquiv_symm_init]
-    have h := cmaReal_simulateQ_probEvent_bad_eq_zero M Commit Chal σ hr A
-    have heq :
-        (fun z : Bool × Heap (CmaCells M Commit Chal Stmt Wit) =>
-            (φ z.2).2 = true)
-          = fun z => z.2 (Sum.inr .bad) = true := by
-      funext z; rfl
-    rw [heq]; exact h
-  -- Bound expectedSCost via cmaSignEps_expectedSCost_le.
   have h_cacheCount_init : cacheCount s_init.2.1 = 0 := by
     rw [hs_init]
     exact cacheCount_cmaInitData M Commit Chal
@@ -1652,16 +1408,9 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
     rw [h_cacheCount_init, zero_add] at h_gen
     rw [h_cost_eq]
     exact h_gen
-  -- Chain the inequalities.
-  calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
-          (cmaSim M Commit Chal hr simT) A)
-      ≤ _ := h_bridge
-    _ = expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
-          (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-            (Resp := Resp) (Stmt := Stmt))
-          (cmaSignEpsCore ζ_zk β) A qS (s_init, false) := by
-        rw [h_bad_zero, add_zero]
-    _ ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := h_cost_le
+  exact cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
+    M Commit Chal σ hr simT ζ_zk β hζ_zk hHVZK hCommit A qS
+    ((qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β) h_qb h_cost_le
 
 /-! ### H4 hop: program-equivalence via `run_link_eq_run_shiftLeft`
 

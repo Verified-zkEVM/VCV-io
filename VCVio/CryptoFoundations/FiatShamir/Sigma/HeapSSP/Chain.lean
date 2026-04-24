@@ -161,7 +161,7 @@ Proof outline:
    `verifyChallengePredictability`.
 4. The decomposition is tight: the two branches are disjoint, so the
    two bounds add without a union-bound factor. -/
-theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
+theorem shiftedFreshAdv_nmaRunProb_le_fork
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
@@ -176,6 +176,25 @@ theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
             (signedFreshAdv σ hr M adv))]
       ≤ Fork.advantage σ hr M (nmaAdvFromCma σ hr M adv simT) qH + δ_verify := by
   sorry
+
+/-- Public H5 wrapper used by the final chain. The proof obligation is isolated
+in `shiftedFreshAdv_nmaRunProb_le_fork`, whose statement is the reusable
+managed-RO/fresh-verifier boundary targeted by the replay-forking cutover. -/
+theorem nma_runProb_shiftLeft_signedFreshAdv_le_fork
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (simT : Stmt → ProbComp (Commit × Chal × Resp))
+    (qS qH : ℕ)
+    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH)
+    (δ_verify : ENNReal)
+    (_hVerifyGuess : SigmaProtocol.verifyChallengePredictability σ δ_verify) :
+    Pr[= true |
+        (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
+          ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft
+            (signedFreshAdv σ hr M adv))]
+      ≤ Fork.advantage σ hr M (nmaAdvFromCma σ hr M adv simT) qH + δ_verify := by
+  exact shiftedFreshAdv_nmaRunProb_le_fork σ hr M adv simT qS qH _hQ δ_verify _hVerifyGuess
 
 /-! ### Projecting transported CMA query bounds -/
 

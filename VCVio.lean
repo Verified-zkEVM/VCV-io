@@ -15,6 +15,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Facts
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
