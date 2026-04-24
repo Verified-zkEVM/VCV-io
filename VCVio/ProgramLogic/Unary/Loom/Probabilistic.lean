@@ -185,7 +185,7 @@ This is a `scoped instance` rather than a normal `instance`: only one
 (`Pred` is an `outParam`), and the default is the quantitative `ℝ≥0∞`
 carrier. Open `OracleComp.Probabilistic` to switch into the
 probabilistic carrier. -/
-noncomputable scoped instance instWP_prob :
+noncomputable scoped instance (priority := 1100) instWP_prob :
     Std.Do'.WP (OracleComp spec) Prob Std.Do'.EPost.nil where
   wpTrans oa := ⟨fun post _epost =>
     ⟨wpVal oa post, wpVal_le_one oa post⟩⟩
@@ -216,7 +216,7 @@ so quantitative theorems still apply after coercing through `.val`. -/
 
 theorem wp_val_eq_mAlgOrdered_wp
     (oa : OracleComp spec α) (post : α → Prob) :
-    (Std.Do'.wp oa post Std.Do'.EPost.nil.mk).val =
+    (Std.Do'.wp oa post Lean.Order.bot).val =
       MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => (post a).val) := rfl
 
 end OracleComp.Probabilistic

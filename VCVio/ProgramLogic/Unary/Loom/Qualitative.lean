@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import Loom.WP.Basic
+import Loom.ExceptPost
 import VCVio.ProgramLogic.Unary.HoarePropTriple
 
 /-!
@@ -57,6 +58,8 @@ See `.ignore/wp-cutover-plan.md` §"Three-tier carrier design" and
 
 universe u
 
+open Std.Do'
+
 namespace OracleComp.Qualitative
 
 variable {ι : Type u} {spec : OracleSpec ι}
@@ -74,7 +77,7 @@ This is a `scoped instance` rather than a normal `instance` because
 `Std.Do'.WP`'s `Pred` is an `outParam`; making it scoped means it only
 participates in synthesis when the user `open`s this namespace,
 sidestepping the conflict with the default `ℝ≥0∞` carrier. -/
-noncomputable scoped instance instWP :
+noncomputable scoped instance (priority := 1100) instWP :
     Std.Do'.WP (OracleComp spec) Prop Std.Do'.EPost.nil where
   wpTrans x := ⟨fun post _epost =>
     MAlgOrdered.wp (m := OracleComp spec) (l := Prop) x post⟩
@@ -102,7 +105,7 @@ theorem in `HoarePropTriple.lean` (and the support-style lemma
 
 theorem wp_eq_mAlgOrdered_wp_prop
     (oa : OracleComp spec α) (post : α → Prop) :
-    Std.Do'.wp oa post Std.Do'.EPost.nil.mk =
+    Std.Do'.wp oa post Lean.Order.bot =
       MAlgOrdered.wp (m := OracleComp spec) (l := Prop) oa post := rfl
 
 end OracleComp.Qualitative

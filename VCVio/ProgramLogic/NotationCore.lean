@@ -134,11 +134,12 @@ scoped notation "⌜" P "⌝" => propInd P
 /-- Quantitative WP: `wp⟦c⟧ post` or just `wp⟦c⟧` for partial application. -/
 scoped notation "wp⟦" c "⟧" => wp c
 
-/-- Quantitative Hoare triple: `⦃P⦄ c ⦃Q⦄` means `P ≤ wp c Q`.
-Uses `syntax` + `macro_rules` (not `notation`) because `⦃⦄` overlaps
-with Lean's strict-implicit binder syntax. -/
-scoped syntax:lead "⦃" term "⦄ " term:lead " ⦃" term "⦄" : term
-macro_rules | `(⦃$P⦄ $c ⦃$Q⦄) => `(Triple $P $c $Q)
+/- Quantitative Hoare triple: `⦃P⦄ c ⦃Q⦄` is the inductive
+`Std.Do'.Triple`-based `Triple` here. We piggy-back on Loom2's global
+`⦃ _ ⦄ _ ⦃ _ ⦄` notation (in `Loom.Triple.Basic`), which expands to
+`Std.Do'.Triple … Lean.Order.bot`. Our `OracleComp.ProgramLogic.Triple`
+is definitionally `Std.Do'.Triple … Lean.Order.bot`, so the surface
+form matches our `Triple` at use sites. -/
 
 /-- Game equivalence: `g₁ ≡ₚ g₂` means `evalDist g₁ = evalDist g₂`.
 Uses `syntax` + `macro_rules` because `≡` conflicts with Mathlib's
@@ -181,8 +182,7 @@ lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
     Triple (spec := spec) ⌜True⌝ oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1 := by
-  change ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1
-  rw [propInd_true, ← probEvent_eq_wp_propInd]
+  rw [triple_iff_le_wp, propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
 /-- Lower-bound event goals are exactly quantitative triples with `⌜p⌝` postconditions. -/
@@ -190,8 +190,7 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
     Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa] := by
-  change r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa]
-  rw [← probEvent_eq_wp_propInd]
+  rw [triple_iff_le_wp, ← probEvent_eq_wp_propInd]
 
 /-! ## Expectation-level bridge lemmas -/
 
