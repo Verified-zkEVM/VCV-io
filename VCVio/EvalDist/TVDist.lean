@@ -359,6 +359,36 @@ lemma ofReal_tvDist_bind_event_le
   rw [ENNReal.ofReal_add ENNReal.toReal_nonneg (tvDist_nonneg mx my),
     ENNReal.ofReal_toReal probEvent_ne_top]
 
+/-- Bind/event TV bound with different base computations, charging the bad-event
+probability under the right base computation. This is the symmetric orientation of
+`tvDist_bind_event_le`, useful when the bad event is introduced by the simulated side. -/
+lemma tvDist_bind_event_right_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx my : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    tvDist (mx >>= f) (my >>= g) ≤ tvDist mx my + Pr[bad | my].toReal := by
+  calc
+    tvDist (mx >>= f) (my >>= g)
+        ≤ tvDist (mx >>= f) (my >>= f) + tvDist (my >>= f) (my >>= g) :=
+          tvDist_triangle _ _ _
+    _ ≤ tvDist mx my + Pr[bad | my].toReal :=
+        add_le_add (tvDist_bind_right_le f mx my)
+          (tvDist_bind_left_event_le my f g bad h_eq)
+
+/-- `ENNReal` form of `tvDist_bind_event_right_le`. -/
+lemma ofReal_tvDist_bind_event_right_le
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] [HasEvalPMF m]
+    {α : Type u} {β : Type u}
+    (mx my : m α) (f g : α → m β) (bad : α → Prop)
+    (h_eq : ∀ a, ¬ bad a → evalDist (f a) = evalDist (g a)) :
+    ENNReal.ofReal (tvDist (mx >>= f) (my >>= g))
+      ≤ ENNReal.ofReal (tvDist mx my) + Pr[bad | my] := by
+  refine le_trans (ENNReal.ofReal_le_ofReal
+    (tvDist_bind_event_right_le mx my f g bad h_eq)) ?_
+  rw [ENNReal.ofReal_add (tvDist_nonneg mx my) ENNReal.toReal_nonneg,
+    ENNReal.ofReal_toReal probEvent_ne_top]
+
 section bool_tvdist
 
 variable {m : Type → Type v} [Monad m] [HasEvalSPMF m]

@@ -38,7 +38,7 @@ variable {m : Type u → Type v} [Monad m]
 
 section writerTMapBase
 
-variable {ι₀ ι₁ : Type} {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+variable {ι₀ ι₁ : Type u} {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
 variable {m₁ : Type u → Type v} [Monad m₁]
 variable {ω : Type u} [EmptyCollection ω] [Append ω]
 

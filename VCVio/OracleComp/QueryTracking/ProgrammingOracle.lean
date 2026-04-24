@@ -117,29 +117,26 @@ Specialising to `policy = ProgrammingPolicy.empty` recovers `withCaching` lifted
 def withProgramming
     (so : QueryImpl spec m) (policy : ProgrammingPolicy spec) :
     QueryImpl spec (StateT (spec.QueryCache × Bool) m) :=
-  fun t => do
-    let (cache, bad) ← get
-    match cache t with
-    | some v => pure v
-    | none =>
+  withCachingAux
+    (fun _ _ _ bad => bad)
+    (fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
       match policy t with
-      | some v => modifyGet fun _ => (v, (cache.cacheQuery t v, true))
-      | none => do
-        let u ← liftM (so t)
-        modifyGet fun _ => (u, (cache.cacheQuery t u, bad))
+      | some v => (pure (v, true) : m (spec.Range t × Bool))
+      | none => (fun u => (u, bad)) <$> so t)
 
 @[simp] lemma withProgramming_apply (so : QueryImpl spec m) (policy : ProgrammingPolicy spec)
     (t : spec.Domain) :
-    so.withProgramming policy t = (do
-      let (cache, bad) ← get
-      match cache t with
-      | some v => pure v
+    so.withProgramming policy t =
+      StateT.mk fun s => match s.1 t with
+      | some v => pure (v, s)
       | none =>
-        match policy t with
-        | some v => modifyGet fun _ => (v, (cache.cacheQuery t v, true))
-        | none => do
-          let u ← liftM (so t)
-          modifyGet fun _ => (u, (cache.cacheQuery t u, bad))) := rfl
+          (fun p : spec.Range t × Bool => (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
+            (match policy t with
+            | some v => pure (v, true)
+            | none => (fun u => (u, s.2)) <$> so t) := by
+  ext s
+  rw [withProgramming, withCachingAux_apply]
+  rfl
 
 /-! ## Bad-flag monotonicity -/
 
@@ -151,42 +148,29 @@ lemma withProgramming_bad_monotone
     (t : spec.Domain) (cache : spec.QueryCache)
     (z) (hz : z ∈ support ((so.withProgramming policy t).run (cache, true))) :
     z.2.2 = true := by
-  simp only [withProgramming_apply, StateT.run_bind] at hz
-  have hget : (get : StateT (spec.QueryCache × Bool) m _).run (cache, true) =
-      pure ((cache, true), (cache, true)) := rfl
-  rw [hget, pure_bind] at hz
-  cases hcache : cache t with
-  | some v =>
-    simp only [hcache] at hz
-    have : (pure v : StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-        pure (v, (cache, true)) := rfl
-    rw [this, support_pure, Set.mem_singleton_iff] at hz
-    rw [hz]
-  | none =>
-    simp only [hcache] at hz
-    cases hpol : policy t with
-    | some v =>
-      simp only [hpol] at hz
-      have hmod : (modifyGet (fun _ : spec.QueryCache × Bool =>
-          (v, (cache.cacheQuery t v, true))) :
-          StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-          pure (v, (cache.cacheQuery t v, true)) := rfl
-      rw [hmod, support_pure, Set.mem_singleton_iff] at hz
-      rw [hz]
-    | none =>
-      simp only [hpol, StateT.run_bind] at hz
-      have hlift : (liftM (so t) :
-          StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-          so t >>= fun u => pure (u, (cache, true)) := rfl
-      rw [hlift, bind_assoc] at hz
-      simp only [pure_bind] at hz
-      rcases (mem_support_bind_iff _ _ _).1 hz with ⟨u, _, hmod⟩
-      have : (modifyGet (fun _ : spec.QueryCache × Bool =>
-          (u, (cache.cacheQuery t u, true))) :
-          StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-          pure (u, (cache.cacheQuery t u, true)) := rfl
-      rw [this, support_pure, Set.mem_singleton_iff] at hmod
-      rw [hmod]
+  simpa [withProgramming] using withCachingAux_aux_inv_of_mem
+    (hit := fun _ _ _ bad => bad)
+    (miss := fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
+      match policy t with
+      | some v => (pure (v, true) : m (spec.Range t × Bool))
+      | none => (fun u => (u, bad)) <$> so t)
+    (inv := fun bad => bad = true)
+    (by
+      intro _ _ _ _ hbad
+      exact hbad)
+    (by
+      intro t _ bad hbad p hp
+      cases hpol : policy t with
+      | some v =>
+          have hp' : p = (v, true) := by
+            simpa [hpol] using hp
+          rw [hp']
+      | none =>
+          simp only [hpol] at hp
+          rw [support_map] at hp
+          rcases hp with ⟨u, _, hp⟩
+          rw [← hp, hbad])
+    rfl hz
 
 /-- `PreservesInv` packaging of `withProgramming_bad_monotone` for `ProbComp`. -/
 lemma PreservesInv.withProgramming_bad
@@ -215,26 +199,23 @@ That is the exact shape needed to apply the output-bad version of "identical unt
 def withCachingTrackingPolicy
     (so : QueryImpl spec m) (policy : ProgrammingPolicy spec) :
     QueryImpl spec (StateT (spec.QueryCache × Bool) m) :=
-  fun t => do
-    let (cache, bad) ← get
-    match cache t with
-    | some v => pure v
-    | none => do
-      let u ← liftM (so t)
-      modifyGet fun _ =>
-        (u, (cache.cacheQuery t u, if (policy t).isSome then true else bad))
+  withCachingAux
+    (fun _ _ _ bad => bad)
+    (fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
+      (fun u => (u, if (policy t).isSome then true else bad)) <$> so t)
 
 omit [LawfulMonad m] [HasEvalSet m] in
 @[simp] lemma withCachingTrackingPolicy_apply
     (so : QueryImpl spec m) (policy : ProgrammingPolicy spec) (t : spec.Domain) :
-    so.withCachingTrackingPolicy policy t = (do
-      let (cache, bad) ← get
-      match cache t with
-      | some v => pure v
-      | none => do
-        let u ← liftM (so t)
-        modifyGet fun _ =>
-          (u, (cache.cacheQuery t u, if (policy t).isSome then true else bad))) := rfl
+    so.withCachingTrackingPolicy policy t =
+      StateT.mk fun s => match s.1 t with
+      | some v => pure (v, s)
+      | none =>
+          (fun p : spec.Range t × Bool => (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
+            ((fun u => (u, if (policy t).isSome then true else s.2)) <$> so t) := by
+  ext s
+  rw [withCachingTrackingPolicy, withCachingAux_apply]
+  rfl
 
 /-- The bad flag of `withCachingTrackingPolicy` is monotone: once set, every query keeps it
 set. -/
@@ -243,32 +224,21 @@ lemma withCachingTrackingPolicy_bad_monotone
     (t : spec.Domain) (cache : spec.QueryCache)
     (z) (hz : z ∈ support ((so.withCachingTrackingPolicy policy t).run (cache, true))) :
     z.2.2 = true := by
-  simp only [withCachingTrackingPolicy_apply, StateT.run_bind] at hz
-  have hget : (get : StateT (spec.QueryCache × Bool) m _).run (cache, true) =
-      pure ((cache, true), (cache, true)) := rfl
-  rw [hget, pure_bind] at hz
-  cases hcache : cache t with
-  | some v =>
-    simp only [hcache] at hz
-    have : (pure v : StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-        pure (v, (cache, true)) := rfl
-    rw [this, support_pure, Set.mem_singleton_iff] at hz
-    rw [hz]
-  | none =>
-    simp only [hcache, StateT.run_bind] at hz
-    have hlift : (liftM (so t) :
-        StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-        so t >>= fun u => pure (u, (cache, true)) := rfl
-    rw [hlift, bind_assoc] at hz
-    simp only [pure_bind] at hz
-    rcases (mem_support_bind_iff _ _ _).1 hz with ⟨u, _, hmod⟩
-    have : (modifyGet (fun _ : spec.QueryCache × Bool =>
-        (u, (cache.cacheQuery t u, if (policy t).isSome then true else true))) :
-        StateT (spec.QueryCache × Bool) m (spec.Range t)).run (cache, true) =
-        pure (u, (cache.cacheQuery t u, if (policy t).isSome then true else true)) := rfl
-    rw [this, support_pure, Set.mem_singleton_iff] at hmod
-    rw [hmod]
-    by_cases hpol : (policy t).isSome <;> simp [hpol]
+  simpa [withCachingTrackingPolicy] using withCachingAux_aux_inv_of_mem
+    (hit := fun _ _ _ bad => bad)
+    (miss := fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
+      (fun u => (u, if (policy t).isSome then true else bad)) <$> so t)
+    (inv := fun bad => bad = true)
+    (by
+      intro _ _ _ _ hbad
+      exact hbad)
+    (by
+      intro t _ bad hbad p hp
+      rw [support_map] at hp
+      rcases hp with ⟨u, _, hp⟩
+      rw [← hp]
+      by_cases hpol : (policy t).isSome <;> simp [hpol, hbad])
+    rfl hz
 
 /-- `PreservesInv` packaging of `withCachingTrackingPolicy_bad_monotone` for `ProbComp`. -/
 lemma PreservesInv.withCachingTrackingPolicy_bad
@@ -288,47 +258,6 @@ namespace OracleComp.ProgramLogic.Relational
 
 variable {α : Type}
 
-/-- Per-query equation: with the empty policy and bad flag at value `bad`, projecting away the
-bad flag from a single `withProgramming` step gives the corresponding `withCaching` step. -/
-private lemma withProgramming_empty_query_proj_eq
-    {ι : Type} [DecidableEq ι] {spec : OracleSpec ι}
-    (so : QueryImpl spec ProbComp)
-    (t : spec.Domain) (cache : spec.QueryCache) (bad : Bool) :
-    Prod.map id Prod.fst <$>
-        (so.withProgramming ProgrammingPolicy.empty t).run (cache, bad) =
-      (so.withCaching t).run cache := by
-  simp only [QueryImpl.withProgramming_apply, QueryImpl.withCaching_apply,
-    StateT.run_bind, StateT.run_get, pure_bind]
-  cases hcache : cache t with
-  | some v =>
-    have h1 : (pure v : StateT (spec.QueryCache × Bool) ProbComp (spec.Range t)).run (cache, bad) =
-        pure (v, (cache, bad)) := rfl
-    have h2 : (pure v : StateT spec.QueryCache ProbComp (spec.Range t)).run cache =
-        pure (v, cache) := rfl
-    rw [h1, h2, map_pure]
-    rfl
-  | none =>
-    simp only [StateT.run_bind]
-    have hlift1 : (liftM (so t) :
-        StateT (spec.QueryCache × Bool) ProbComp (spec.Range t)).run (cache, bad) =
-        so t >>= fun u => pure (u, (cache, bad)) := rfl
-    have hlift2 : (liftM (so t) :
-        StateT spec.QueryCache ProbComp (spec.Range t)).run cache =
-        so t >>= fun u => pure (u, cache) := rfl
-    rw [hlift1, hlift2, bind_assoc, bind_assoc]
-    simp only [pure_bind, map_bind]
-    refine bind_congr fun u => ?_
-    have hmod1 : (modifyGet (fun _ : spec.QueryCache × Bool =>
-        (u, (cache.cacheQuery t u, bad))) :
-        StateT (spec.QueryCache × Bool) ProbComp (spec.Range t)).run (cache, bad) =
-        pure (u, (cache.cacheQuery t u, bad)) := rfl
-    have hmod2 : (modifyGet (fun cache : spec.QueryCache =>
-        (u, cache.cacheQuery t u)) :
-        StateT spec.QueryCache ProbComp (spec.Range t)).run cache =
-        pure (u, cache.cacheQuery t u) := rfl
-    rw [hmod1, hmod2, map_pure]
-    rfl
-
 /-- Cache-side projection: running `withProgramming so empty` and projecting away the bad flag
 gives the same distribution as running `so.withCaching` directly.
 
@@ -341,12 +270,16 @@ theorem withProgramming_empty_run_proj_eq
     Prod.map id Prod.fst <$>
         (simulateQ (so.withProgramming ProgrammingPolicy.empty) oa).run (cache, bad) =
       (simulateQ so.withCaching oa).run cache := by
-  refine map_run_simulateQ_eq_of_query_map_eq
-    (impl₁ := so.withProgramming ProgrammingPolicy.empty)
-    (impl₂ := so.withCaching)
-    (proj := Prod.fst) ?_ oa (cache, bad)
-  intro t ⟨cache', bad'⟩
-  exact withProgramming_empty_query_proj_eq so t cache' bad'
+  simpa [QueryImpl.withProgramming, ProgrammingPolicy.empty] using
+    (QueryImpl.withCachingAux_run_proj_eq
+      (base := so)
+      (hit := fun _ _ _ bad => bad)
+      (miss := fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
+        (fun u => (u, bad)) <$> so t)
+      (hmiss := by
+        intro _ _ _
+        simp [Functor.map_map])
+      (oa := oa) (cache := cache) (q := bad))
 
 /-- `run'` projection corollary of `withProgramming_empty_run_proj_eq`. -/
 theorem withProgramming_empty_run'_eq
@@ -361,50 +294,6 @@ theorem withProgramming_empty_run'_eq
 
 /-! ## `withCachingTrackingPolicy` ≡ `withCaching` (cache-side projection) -/
 
-/-- Per-query equation: projecting away the bad flag from a single
-`withCachingTrackingPolicy` step gives the corresponding `withCaching` step, regardless of
-the input bad value or the policy.
-
-Stated over an arbitrary underlying spec `spec'`. -/
-private lemma withCachingTrackingPolicy_query_proj_eq'
-    {ι ι' : Type} [DecidableEq ι] {spec : OracleSpec ι} {spec' : OracleSpec ι'}
-    (so : QueryImpl spec (OracleComp spec')) (policy : ProgrammingPolicy spec)
-    (t : spec.Domain) (cache : spec.QueryCache) (bad : Bool) :
-    Prod.map id Prod.fst <$>
-        (so.withCachingTrackingPolicy policy t).run (cache, bad) =
-      (so.withCaching t).run cache := by
-  simp only [QueryImpl.withCachingTrackingPolicy_apply, QueryImpl.withCaching_apply,
-    StateT.run_bind, StateT.run_get, pure_bind]
-  cases hcache : cache t with
-  | some v =>
-    have h1 : (pure v : StateT (spec.QueryCache × Bool) (OracleComp spec')
-          (spec.Range t)).run (cache, bad) = pure (v, (cache, bad)) := rfl
-    have h2 : (pure v : StateT spec.QueryCache (OracleComp spec') (spec.Range t)).run cache =
-        pure (v, cache) := rfl
-    rw [h1, h2, map_pure]
-    rfl
-  | none =>
-    simp only [StateT.run_bind]
-    have hlift1 : (liftM (so t) :
-        StateT (spec.QueryCache × Bool) (OracleComp spec') (spec.Range t)).run (cache, bad) =
-        so t >>= fun u => pure (u, (cache, bad)) := rfl
-    have hlift2 : (liftM (so t) :
-        StateT spec.QueryCache (OracleComp spec') (spec.Range t)).run cache =
-        so t >>= fun u => pure (u, cache) := rfl
-    rw [hlift1, hlift2, bind_assoc, bind_assoc]
-    simp only [pure_bind, map_bind]
-    refine bind_congr fun u => ?_
-    have hmod1 : (modifyGet (fun _ : spec.QueryCache × Bool =>
-        (u, (cache.cacheQuery t u, if (policy t).isSome then true else bad))) :
-        StateT (spec.QueryCache × Bool) (OracleComp spec') (spec.Range t)).run (cache, bad) =
-        pure (u, (cache.cacheQuery t u, if (policy t).isSome then true else bad)) := rfl
-    have hmod2 : (modifyGet (fun cache : spec.QueryCache =>
-        (u, cache.cacheQuery t u)) :
-        StateT spec.QueryCache (OracleComp spec') (spec.Range t)).run cache =
-        pure (u, cache.cacheQuery t u) := rfl
-    rw [hmod1, hmod2, map_pure]
-    rfl
-
 /-- Cache-side projection (general spec'): running `so.withCachingTrackingPolicy policy` and
 projecting away the bad flag gives the same distribution as running `so.withCaching` directly,
 irrespective of the initial bad value or the policy used to compute the (discarded) tracking. -/
@@ -415,12 +304,16 @@ theorem withCachingTrackingPolicy_run_proj_eq'
     Prod.map id Prod.fst <$>
         (simulateQ (so.withCachingTrackingPolicy policy) oa).run (cache, bad) =
       (simulateQ so.withCaching oa).run cache := by
-  refine map_run_simulateQ_eq_of_query_map_eq
-    (impl₁ := so.withCachingTrackingPolicy policy)
-    (impl₂ := so.withCaching)
-    (proj := Prod.fst) ?_ oa (cache, bad)
-  intro t ⟨cache', bad'⟩
-  exact withCachingTrackingPolicy_query_proj_eq' so policy t cache' bad'
+  simpa [QueryImpl.withCachingTrackingPolicy] using
+    (QueryImpl.withCachingAux_run_proj_eq
+      (base := so)
+      (hit := fun _ _ _ bad => bad)
+      (miss := fun (t : spec.Domain) (_ : spec.QueryCache) (bad : Bool) =>
+        (fun u => (u, if (policy t).isSome then true else bad)) <$> so t)
+      (hmiss := by
+        intro _ _ _
+        simp [Functor.map_map])
+      (oa := oa) (cache := cache) (q := bad))
 
 /-- `run'` projection corollary of `withCachingTrackingPolicy_run_proj_eq'`. -/
 theorem withCachingTrackingPolicy_run'_eq'

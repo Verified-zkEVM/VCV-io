@@ -5,7 +5,6 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.SimSemantics.StateProjection
 
 /-!
 # Combined Caching + Logging Handlers
@@ -43,27 +42,19 @@ installed in the cache before the trace is appended. -/
 def withCachingTraceAppend (so : QueryImpl spec m)
     (traceFn : (t : spec.Domain) → spec.Range t → ω) :
     QueryImpl spec (StateT (QueryCache spec × ω) m) :=
-  fun t => do
-    let (cache, trace) ← get
-    match cache t with
-    | some u =>
-        modifyGet fun _ => (u, (cache, trace ++ traceFn t u))
-    | none =>
-        let u ← so t
-        modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ traceFn t u))
+  withCachingAux
+    (fun t u _ trace => trace ++ traceFn t u)
+    (fun t _ trace => (fun u => (u, trace ++ traceFn t u)) <$> so t)
 
 omit [spec.DecidableEq] [EmptyCollection ω] in
 @[simp, grind =]
 lemma withCachingTraceAppend_apply (so : QueryImpl spec m)
     (traceFn : (t : spec.Domain) → spec.Range t → ω) (t : spec.Domain) :
-    so.withCachingTraceAppend traceFn t = (do
-      let (cache, trace) ← get
-      match cache t with
-      | some u =>
-          modifyGet fun _ => (u, (cache, trace ++ traceFn t u))
-      | none =>
-          let u ← so t
-          modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ traceFn t u))) := rfl
+    so.withCachingTraceAppend traceFn t =
+      StateT.mk fun s => match s.1 t with
+      | some u => pure (u, (s.1, s.2 ++ traceFn t u))
+      | none => (fun p : spec.Range t × ω => (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
+          ((fun u => (u, s.2 ++ traceFn t u)) <$> so t) := rfl
 
 /-- Specialization of `withCachingTraceAppend` to the canonical query log
 `QueryLog spec`. -/
@@ -74,14 +65,13 @@ def withCachingLogging (so : QueryImpl spec m) :
 omit [spec.DecidableEq] in
 @[simp, grind =]
 lemma withCachingLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
-    so.withCachingLogging t = (do
-      let (cache, trace) ← get
-      match cache t with
-      | some u =>
-          modifyGet fun _ => (u, (cache, trace ++ [⟨t, u⟩]))
-      | none =>
-          let u ← so t
-          modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ [⟨t, u⟩]))) := rfl
+    so.withCachingLogging t =
+      StateT.mk fun s => match s.1 t with
+      | some u => pure (u, (s.1, s.2 ++ [⟨t, u⟩]))
+      | none => (fun p : spec.Range t × QueryLog spec =>
+          (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
+          ((fun u => (u, s.2 ++ [⟨t, u⟩])) <$> so t) := by
+  simp [withCachingLogging, withCachingTraceAppend_apply]
 
 end QueryImpl
 
@@ -103,26 +93,32 @@ lemma apply_eq (t : spec.Domain) :
           modifyGet fun _ => (u, (cache, trace ++ [⟨t, u⟩]))
       | none =>
           let u ← query t
-          modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ [⟨t, u⟩]))) := rfl
+          modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ [⟨t, u⟩]))) := by
+  ext s
+  rw [cachingLoggingOracle, QueryImpl.withCachingLogging, QueryImpl.withCachingTraceAppend,
+    QueryImpl.withCachingAux_apply]
+  cases hcache : s.1 t with
+  | some u =>
+      simp [hcache]
+  | none =>
+      simp [hcache, StateT.run_bind, StateT.run_monadLift, Functor.map_map]
 
 /-- Projecting away the log component recovers the ordinary caching semantics. -/
 theorem fst_map_run_simulateQ {α : Type u}
     (oa : OracleComp spec α) (s : QueryCache spec × QueryLog spec) :
     Prod.map id Prod.fst <$> (simulateQ cachingLoggingOracle oa).run s =
       (simulateQ cachingOracle oa).run s.1 := by
-  refine OracleComp.map_run_simulateQ_eq_of_query_map_eq
-    (impl₁ := cachingLoggingOracle) (impl₂ := cachingOracle)
-    (proj := Prod.fst) ?_ oa s
-  intro t ⟨cache, trace⟩
-  cases hcache : cache t with
-  | some u =>
-      simp [apply_eq, hcache]
-  | none =>
-      simp only [apply_eq, cachingOracle.apply_eq, StateT.run_bind,
-        StateT.run_get, pure_bind, hcache, StateT.run_monadLift, map_bind,
-        bind_assoc]
-      refine bind_congr fun u => ?_
-      simp
+  simpa [cachingLoggingOracle, QueryImpl.withCachingLogging, QueryImpl.withCachingTraceAppend,
+    cachingOracle] using
+    (QueryImpl.withCachingAux_run_proj_eq
+      (base := QueryImpl.ofLift spec (OracleComp spec))
+      (hit := fun t u _ trace => trace ++ [⟨t, u⟩])
+      (miss := fun t _ trace => (fun u => (u, trace ++ [⟨t, u⟩])) <$>
+        (QueryImpl.ofLift spec (OracleComp spec) t))
+      (hmiss := by
+        intro t cache trace
+        simp [Functor.map_map])
+      (oa := oa) (cache := s.1) (q := s.2))
 
 /-- Output-only projection corollary of `fst_map_run_simulateQ`. -/
 @[simp]

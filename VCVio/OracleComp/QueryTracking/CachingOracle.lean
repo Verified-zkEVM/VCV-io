@@ -6,6 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.OracleComp.SimSemantics.PreservesInv
+import VCVio.OracleComp.SimSemantics.StateProjection
 
 /-!
 # Caching Queries Made by a Computation
@@ -41,6 +42,153 @@ def withCaching (so : QueryImpl spec m) : QueryImpl spec (StateT spec.QueryCache
     | Option.none =>
         let u ← so t
         modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
+
+lemma withCaching_run_some [LawfulMonad m] (so : QueryImpl spec m) {t : spec.Domain}
+    {cache : spec.QueryCache} {u : spec.Range t} (hcache : cache t = some u) :
+    (so.withCaching t).run cache = pure (u, cache) := by
+  simp only [withCaching_apply, StateT.run_bind]
+  rw [show (get : StateT spec.QueryCache m spec.QueryCache).run cache =
+      pure (cache, cache) from rfl, pure_bind]
+  simp [hcache]
+
+lemma withCaching_run_none [LawfulMonad m] (so : QueryImpl spec m) {t : spec.Domain}
+    {cache : spec.QueryCache} (hcache : cache t = none) :
+    (so.withCaching t).run cache =
+      (fun u => (u, cache.cacheQuery t u)) <$> so t := by
+  simp only [withCaching_apply, StateT.run_bind]
+  rw [show (get : StateT spec.QueryCache m spec.QueryCache).run cache =
+      pure (cache, cache) from rfl, pure_bind]
+  simp [hcache, StateT.run_bind, StateT.run_monadLift, bind_pure_comp]
+
+/-! ## Caching with auxiliary state -/
+
+section CachingAux
+
+variable {Q : Type w} {m' : Type (max u w) → Type v} [Monad m']
+
+/-- Cache responses while threading an auxiliary state component.
+
+The cache is consulted first. On a hit, the cached response is returned and the auxiliary state is
+updated by `hit`. On a miss, `miss` produces both the response and the next auxiliary state; the
+response is then installed in the cache. -/
+def withCachingAux
+    (hit : (t : spec.Domain) → spec.Range t → spec.QueryCache → Q → Q)
+    (miss : (t : spec.Domain) → spec.QueryCache → Q → m' (spec.Range t × Q)) :
+    QueryImpl spec (StateT (spec.QueryCache × Q) m') :=
+  fun t => StateT.mk fun s =>
+    match s with
+    | (cache, q) =>
+        match cache t with
+        | some u => pure (u, (cache, hit t u cache q))
+        | none => (fun p : spec.Range t × Q => (p.1, (cache.cacheQuery t p.1, p.2))) <$>
+            miss t cache q
+
+@[simp, grind =]
+lemma withCachingAux_apply
+    (hit : (t : spec.Domain) → spec.Range t → spec.QueryCache → Q → Q)
+    (miss : (t : spec.Domain) → spec.QueryCache → Q → m' (spec.Range t × Q))
+    (t : spec.Domain) (s : spec.QueryCache × Q) :
+    (withCachingAux (spec := spec) hit miss t).run s =
+      (match s.1 t with
+      | some u => pure (u, (s.1, hit t u s.1 s.2))
+      | none =>
+          (fun p : spec.Range t × Q => (p.1, (s.1.cacheQuery t p.1, p.2))) <$>
+            miss t s.1 s.2) := by
+  cases s
+  rfl
+
+end CachingAux
+
+section CacheAuxProjection
+
+variable {Q : Type u}
+variable [LawfulMonad m]
+
+/-- Projecting away the auxiliary state of `withCachingAux` recovers ordinary caching whenever
+the miss handler has the same output marginal as the base implementation. -/
+theorem withCachingAux_run_proj_eq
+    (base : QueryImpl spec m)
+    (hit : (t : spec.Domain) → spec.Range t → spec.QueryCache → Q → Q)
+    (miss : (t : spec.Domain) → spec.QueryCache → Q → m (spec.Range t × Q))
+    (hmiss : ∀ t cache q, Prod.fst <$> miss t cache q = base t)
+    {α : Type u} (oa : OracleComp spec α) (cache : spec.QueryCache) (q : Q) :
+    Prod.map id Prod.fst <$> (simulateQ (withCachingAux hit miss) oa).run (cache, q) =
+      (simulateQ base.withCaching oa).run cache := by
+  refine OracleComp.map_run_simulateQ_eq_of_query_map_eq
+    (impl₁ := withCachingAux hit miss) (impl₂ := base.withCaching)
+    (proj := Prod.fst) ?_ oa (cache, q)
+  intro t ⟨cache', q'⟩
+  cases hcache : cache' t with
+  | some u =>
+      rw [withCachingAux_apply, withCaching_run_some base hcache]
+      simp [hcache]
+  | none =>
+      rw [withCachingAux_apply, withCaching_run_none base hcache]
+      simp only [hcache, Functor.map_map]
+      change (fun p : spec.Range t × Q => (p.1, cache'.cacheQuery t p.1)) <$>
+          miss t cache' q' =
+        (fun u => (u, cache'.cacheQuery t u)) <$> base t
+      rw [← hmiss t cache' q', Functor.map_map]
+
+/-- Output-only corollary of `withCachingAux_run_proj_eq`. -/
+theorem withCachingAux_run'_eq
+    (base : QueryImpl spec m)
+    (hit : (t : spec.Domain) → spec.Range t → spec.QueryCache → Q → Q)
+    (miss : (t : spec.Domain) → spec.QueryCache → Q → m (spec.Range t × Q))
+    (hmiss : ∀ t cache q, Prod.fst <$> miss t cache q = base t)
+    {α : Type u} (oa : OracleComp spec α) (cache : spec.QueryCache) (q : Q) :
+    (simulateQ (withCachingAux hit miss) oa).run' (cache, q) =
+      (simulateQ base.withCaching oa).run' cache := by
+  have h := withCachingAux_run_proj_eq base hit miss hmiss oa cache q
+  have hmap := congrArg (fun p => Prod.fst <$> p) h
+  simpa [StateT.run'] using hmap
+
+end CacheAuxProjection
+
+section CachingAuxInvariant
+
+variable {Q : Type w} {m' : Type (max u w) → Type v} [Monad m'] [LawfulMonad m']
+  [HasEvalSet m']
+
+/-- One-step invariant preservation for the auxiliary component of `withCachingAux`. -/
+theorem withCachingAux_aux_inv_of_mem
+    (hit : (t : spec.Domain) → spec.Range t → spec.QueryCache → Q → Q)
+    (miss : (t : spec.Domain) → spec.QueryCache → Q → m' (spec.Range t × Q))
+    (inv : Q → Prop)
+    (hhit : ∀ t u cache q, inv q → inv (hit t u cache q))
+    (hmiss : ∀ t cache q, inv q → ∀ p ∈ support (miss t cache q), inv p.2)
+    {t : spec.Domain} {cache : spec.QueryCache} {q : Q}
+    {z : spec.Range t × spec.QueryCache × Q}
+    (hq : inv q) (hz : z ∈ support ((withCachingAux hit miss t).run (cache, q))) :
+    inv z.2.2 := by
+  rw [withCachingAux_apply] at hz
+  cases hcache : cache t with
+  | some u =>
+      simp only [hcache, support_pure, Set.mem_singleton_iff] at hz
+      rw [hz]
+      exact hhit t u cache q hq
+  | none =>
+      simp only [hcache] at hz
+      rw [support_map] at hz
+      rcases hz with ⟨p, hp, hz⟩
+      rw [← hz]
+      exact hmiss t cache q hq p hp
+
+end CachingAuxInvariant
+
+/-- A `withCachingAux` handler preserves an invariant on its auxiliary component when both hit and
+miss auxiliary updates preserve it. -/
+theorem PreservesInv.withCachingAux_aux
+    {ι₀ : Type} [DecidableEq ι₀] {spec₀ : OracleSpec.{0, 0} ι₀} {Q₀ : Type}
+    (hit : (t : spec₀.Domain) → spec₀.Range t → spec₀.QueryCache → Q₀ → Q₀)
+    (miss : (t : spec₀.Domain) → spec₀.QueryCache → Q₀ → ProbComp (spec₀.Range t × Q₀))
+    (inv : Q₀ → Prop)
+    (hhit : ∀ t u cache q, inv q → inv (hit t u cache q))
+    (hmiss : ∀ t cache q, inv q → ∀ p ∈ support (miss t cache q), inv p.2) :
+    QueryImpl.PreservesInv (withCachingAux hit miss)
+      (fun s : spec₀.QueryCache × Q₀ => inv s.2) := by
+  intro t ⟨cache, q⟩ hq z hz
+  exact withCachingAux_aux_inv_of_mem hit miss inv hhit hmiss hq hz
 
 section CacheMonotonicity
 
