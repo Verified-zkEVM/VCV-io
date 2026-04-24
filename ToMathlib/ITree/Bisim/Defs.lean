@@ -19,30 +19,39 @@ algebraic theory:
   for that reason we set `Bisim = (· = ·)`.
 
 * `ITree.WeakBisim t s` — *weak* bisimulation (Coq `eutt`). Two ITrees are
-  weakly bisimilar iff they reach matching one-step shapes after stripping
-  any number of leading `step` (silent τ) nodes from either side. This
-  collapses the `step`-equivalence class and is the *intended* notion of
-  ITree equivalence for reasoning about programs.
+  weakly bisimilar iff, after stripping any *finitely many* leading `step`
+  nodes from each side, their observable heads agree (pure leaves, visible
+  queries, or paired silent steps) and continuations are pointwise weakly
+  bisimilar. This is the intended notion of ITree equivalence for
+  reasoning about programs.
 
-The `WeakBisimF` Shape-level functor packaged here exposes the one-step
-"bisimulation up to step" relation underlying `WeakBisim`. Definitions of the
-algebraic laws (reflexivity, symmetry, transitivity, and the bind/iter
-unfoldings) live in the sibling files
-`ToMathlib.ITree.Bisim.Equiv` and `ToMathlib.ITree.Bisim.Bind`.
+## Design
+
+The naive coinductive definition with `tauL` / `tauR` constructors
+directly appearing in a coinductive predicate is **unsound**: it admits
+`WeakBisim (pure r) diverge` via repeated `tauR` applications, because
+the greatest fixed point closes under the (unbounded) coinductive
+stripping. The fix follows Xia et al. (POPL 2020): wrap τ-stripping in
+an *inductive* relation `TauSteps` (so each stripping chain is finite),
+and let each coinductive "step" of `WeakBisim` consist of stripping
+finitely many τ's from each side and then matching observable heads via
+the `Match` functor.
+
+We define `WeakBisim` as the Tarski greatest fixed point of the
+one-step functor packaged by `TauSteps` + `Match`, i.e. as the largest
+relation `R` that is closed under the functor. This `∃ R, …` form is
+used because Lean 4.29's `coinductive` keyword requires syntactic
+monotonicity, which does not see through the separately-declared
+`Match` inductive.
 
 ## Implementation notes
 
-Lean 4.29 supports `coinductive` *predicates* via the `coinductive` keyword,
-producing the greatest fixpoint of a monotone Prop-valued functor. We use
-that for `WeakBisim`. For `Bisim`, the situation is degenerate: `M.bisim`
-already proves that any one-step bisimulation between two `M`-values
-implies definitional equality, so we expose `Bisim` as `=` plus a
-convenience destructor `Bisim.dest` matching the Coq presentation.
-
-The algebraic laws are scaffolded with `sorry` and will be filled in as
-the project's bisimulation tooling matures. The intent is that *clients*
-can write program-logic proofs against the API now; the proofs will be
-discharged later.
+Lean 4.29 supports `coinductive` *predicates*, but the monotonicity
+checker is syntactic. We therefore use the explicit Tarski formulation
+`∃ R, R t s ∧ closure`. The coinduction principle is then the
+constructor itself (`WeakBisim.coinduct`), and the standard algebraic
+laws (reflexivity, symmetry, transitivity) are recovered by exhibiting
+an appropriate witness relation `R` in each case.
 -/
 
 @[expose] public section
@@ -75,59 +84,170 @@ variable {t s u : ITree F α}
 @[trans] theorem trans' (h₁ : t ≅ s) (h₂ : s ≅ u) : t ≅ u := Eq.trans h₁ h₂
 
 /-- One-step characterisation: two ITrees are strongly bisimilar iff their
-`shape'` agrees on the head shape and on each child up to bisimilarity.
-
-This is the explicit destructor matching the Coq `eqit`/`bisim` constructor
-shape; it is provable by `PFunctor.M.bisim`. -/
+`shape'` agrees. Provable by `PFunctor.M.bisim`. -/
 theorem dest (h : t ≅ s) : shape' t = shape' s := by
   cases h; rfl
 
 end Bisim
 
-/-! ### Weak bisimulation -/
+/-! ### Finite τ-stripping
 
-/-- Weak bisimulation (a.k.a. equivalence up to taus, Coq `eutt`). Two ITrees
-are weakly bisimilar iff after stripping leading `step` nodes from each side
-their one-step shapes agree and continuations are pointwise weakly bisimilar.
+`TauSteps t t'` captures the (deterministic, partial) operation of
+stripping finitely many leading silent-step nodes from `t` to reach `t'`.
+Being an inductive family, every derivation has a finite length. -/
 
-This is the intended notion of equivalence for ITrees: it identifies all
-silent-step-padded variants of the same observable program. -/
-coinductive WeakBisim {F : PFunctor.{u, u}} {α : Type u} :
+/-- `TauSteps t t'` iff `t'` is obtained from `t` by stripping finitely
+many leading `step` nodes. -/
+inductive TauSteps : ITree F α → ITree F α → Prop where
+  /-- Strip zero steps: `t` is reachable from itself. -/
+  | refl (t : ITree F α) : TauSteps t t
+  /-- Strip one step from a step-headed tree and continue stripping. -/
+  | step {t t' : ITree F α} (c : PUnit.{u + 1} → ITree F α)
+      (ht : shape' t = ⟨.step, c⟩) (hr : TauSteps (c PUnit.unit) t') :
+      TauSteps t t'
+
+namespace TauSteps
+
+/-- Transitivity of τ-stripping. -/
+theorem trans {t s u : ITree F α} (h₁ : TauSteps t s) (h₂ : TauSteps s u) :
+    TauSteps t u := by
+  induction h₁ with
+  | refl _ => exact h₂
+  | step c ht _ ih => exact .step c ht (ih h₂)
+
+/-- Stripping one step is available when the head is a step. -/
+theorem one {t : ITree F α} (c : PUnit.{u + 1} → ITree F α)
+    (ht : shape' t = ⟨.step, c⟩) : TauSteps t (c PUnit.unit) :=
+  TauSteps.step (t' := c PUnit.unit) c ht (TauSteps.refl _)
+
+/-- The `.step` relation is deterministic on step-headed trees. -/
+theorem cont_eq {t : ITree F α} {c c' : PUnit.{u + 1} → ITree F α}
+    (h : shape' t = ⟨.step, c⟩) (h' : shape' t = ⟨.step, c'⟩) : c = c' := by
+  have hmk := h.symm.trans h'
+  exact eq_of_heq (Sigma.mk.inj hmk).2
+
+/-- `TauSteps` is linear: any two strippings from the same tree are
+comparable. Uses determinism of `shape'`. -/
+theorem linear {t a b : ITree F α}
+    (ha : TauSteps t a) (hb : TauSteps t b) :
+    TauSteps a b ∨ TauSteps b a := by
+  induction ha generalizing b with
+  | refl _ => exact Or.inl hb
+  | @step t t' c ht hr ih =>
+      cases hb with
+      | refl _ => exact Or.inr (TauSteps.step (t' := t') c ht hr)
+      | @step _ _ c' ht' hr' =>
+          have hcc : c = c' := cont_eq ht ht'
+          subst hcc
+          exact ih hr'
+
+end TauSteps
+
+/-! ### Head match relation
+
+`Match R t s` pins two trees whose observable heads agree. There is no
+τ-stripping here: stripping happens separately via `TauSteps` before
+invoking `Match`. -/
+
+/-- One-step observable head match. Two trees have matching heads iff
+both are pure leaves carrying the same value, both are queries with the
+same event name and pointwise `R`-related continuations, or both are
+step-headed with `R`-related step continuations. -/
+inductive Match (R : ITree F α → ITree F α → Prop) :
     ITree F α → ITree F α → Prop where
-  /-- Both heads are pure leaves carrying the same value. -/
-  | pure (t s : ITree F α) (r : α)
+  /-- Both heads are pure leaves with the same value. -/
+  | pure {t s : ITree F α} (r : α)
       (ht : shape' t = ⟨.pure r, PEmpty.elim⟩)
       (hs : shape' s = ⟨.pure r, PEmpty.elim⟩) :
-      WeakBisim t s
-  /-- Both heads are visible queries on the same event with pointwise
-  weakly-bisimilar continuations. -/
-  | query (t s : ITree F α) (a : F.A) (c c' : F.B a → ITree F α)
+      Match R t s
+  /-- Both heads are visible queries on the same event. -/
+  | query {t s : ITree F α} (a : F.A) (c c' : F.B a → ITree F α)
       (ht : shape' t = ⟨.query a, c⟩) (hs : shape' s = ⟨.query a, c'⟩)
-      (h : ∀ b, WeakBisim (c b) (c' b)) :
-      WeakBisim t s
-  /-- Strip a `step` from the left. -/
-  | tauL (t s t' : ITree F α) (ht : shape' t = ⟨.step, fun _ => t'⟩)
-      (h : WeakBisim t' s) : WeakBisim t s
-  /-- Strip a `step` from the right. -/
-  | tauR (t s s' : ITree F α) (hs : shape' s = ⟨.step, fun _ => s'⟩)
-      (h : WeakBisim t s') : WeakBisim t s
+      (h : ∀ b, R (c b) (c' b)) :
+      Match R t s
+  /-- Both heads are silent steps, with continuations related by `R`. -/
+  | tau {t s : ITree F α} (ct cs : PUnit.{u + 1} → ITree F α)
+      (ht : shape' t = ⟨.step, ct⟩) (hs : shape' s = ⟨.step, cs⟩)
+      (h : R (ct PUnit.unit) (cs PUnit.unit)) :
+      Match R t s
+
+namespace Match
+
+/-- Monotonicity: `Match` is monotone in its relation parameter. -/
+theorem mono {R R' : ITree F α → ITree F α → Prop}
+    (h : ∀ a b, R a b → R' a b) {t s : ITree F α}
+    (hM : Match R t s) : Match R' t s := by
+  cases hM with
+  | pure r ht hs => exact .pure r ht hs
+  | query a c c' ht hs hcc => exact .query a c c' ht hs (fun b => h _ _ (hcc b))
+  | tau ct cs ht hs hr => exact .tau ct cs ht hs (h _ _ hr)
+
+/-- `Match` is symmetric in the two sides when `R` is swapped. -/
+theorem swap {R : ITree F α → ITree F α → Prop} {t s : ITree F α}
+    (hM : Match R t s) : Match (fun x y => R y x) s t := by
+  cases hM with
+  | pure r ht hs => exact .pure r hs ht
+  | query a c c' ht hs hcc => exact .query a c' c hs ht (fun b => hcc b)
+  | tau ct cs ht hs hr => exact .tau cs ct hs ht hr
+
+end Match
+
+/-! ### Weak bisimulation -/
+
+/-- One-step unfolding functor for weak bisimulation: strip finitely many
+τ's from each side (via `TauSteps`) and then match observable heads (via
+`Match`). `WeakBisim` is the Tarski greatest fixed point of this functor. -/
+def WeakBisimF (R : ITree F α → ITree F α → Prop) (t s : ITree F α) : Prop :=
+  ∃ t' s' : ITree F α, TauSteps t t' ∧ TauSteps s s' ∧ Match R t' s'
+
+/-- `WeakBisimF` is monotone in its relation parameter. -/
+theorem WeakBisimF.mono {R R' : ITree F α → ITree F α → Prop}
+    (h : ∀ a b, R a b → R' a b) {t s : ITree F α}
+    (hF : WeakBisimF R t s) : WeakBisimF R' t s := by
+  obtain ⟨t', s', ht, hs, hm⟩ := hF
+  exact ⟨t', s', ht, hs, hm.mono h⟩
+
+/-- Weak bisimulation (Coq `eutt`). Two trees are weakly bisimilar iff
+there exists a relation `R` containing the pair that is closed under
+one-step unfolding into `WeakBisimF`. Equivalently, `WeakBisim` is the
+largest such relation (Tarski greatest fixed point). -/
+def WeakBisim (t s : ITree F α) : Prop :=
+  ∃ R : ITree F α → ITree F α → Prop,
+    (∀ a b, R a b → WeakBisimF R a b) ∧ R t s
 
 @[inherit_doc] scoped infix:50 " ≈ " => ITree.WeakBisim
 
-/-- One-step "bisimulation up to silent steps" functor on shapes. Given a
-relation `R` on `ITree F α`, `WeakBisimF R sh sh'` says that the
-shapes `sh, sh' : (Poly F α).Obj (ITree F α)` agree on a non-`step` constructor
-and the corresponding continuations are pointwise in `R`.
+namespace WeakBisim
 
-This Shape-level functor is used by `ToMathlib.ITree.Bisim.Equiv` to phrase
-the `WeakBisim` "destructor" lemma after silent-step stripping. -/
-inductive WeakBisimF (R : ITree F α → ITree F α → Prop) :
-    (Poly F α).Obj (ITree F α) → (Poly F α).Obj (ITree F α) → Prop where
-  /-- Pure leaves agree. -/
-  | pure (r : α) (h h' : (Poly F α).B (.pure r) → ITree F α) :
-      WeakBisimF R ⟨.pure r, h⟩ ⟨.pure r, h'⟩
-  /-- Visible queries agree on the event name and pointwise on continuations. -/
-  | query (a : F.A) (c c' : F.B a → ITree F α) (hcc : ∀ b, R (c b) (c' b)) :
-      WeakBisimF R ⟨.query a, c⟩ ⟨.query a, c'⟩
+/-- Coinduction principle: any relation closed under `WeakBisimF` is
+contained in `WeakBisim`. This is the Tarski greatest fixed point
+characterization. -/
+theorem coinduct (R : ITree F α → ITree F α → Prop)
+    (h : ∀ a b, R a b → WeakBisimF R a b)
+    {a b : ITree F α} (hab : R a b) : a ≈ b :=
+  ⟨R, h, hab⟩
+
+/-- `WeakBisim` is closed under `WeakBisimF`. -/
+theorem unfold {t s : ITree F α} (h : t ≈ s) : WeakBisimF WeakBisim t s := by
+  obtain ⟨R, hcl, hR⟩ := h
+  obtain ⟨t', s', ht, hs, hm⟩ := hcl _ _ hR
+  exact ⟨t', s', ht, hs, hm.mono (fun x y hxy => ⟨R, hcl, hxy⟩)⟩
+
+/-- Extract the stripped-heads match witness. -/
+theorem dest {t s : ITree F α} (h : t ≈ s) :
+    ∃ t' s' : ITree F α, TauSteps t t' ∧ TauSteps s s' ∧ Match WeakBisim t' s' :=
+  unfold h
+
+/-- Folding rule: supplying a `WeakBisimF WeakBisim`-match recovers
+`WeakBisim`. -/
+theorem fold {t s : ITree F α} (h : WeakBisimF WeakBisim t s) : t ≈ s := by
+  obtain ⟨t', s', ht, hs, hm⟩ := h
+  refine coinduct (fun a b => a ≈ b ∨
+      (a = t ∧ b = s)) ?_ (Or.inr ⟨rfl, rfl⟩)
+  rintro a b (hab | ⟨rfl, rfl⟩)
+  · exact (unfold hab).mono (fun x y hxy => Or.inl hxy)
+  · exact ⟨t', s', ht, hs, hm.mono (fun x y hxy => Or.inl hxy)⟩
+
+end WeakBisim
 
 end ITree
