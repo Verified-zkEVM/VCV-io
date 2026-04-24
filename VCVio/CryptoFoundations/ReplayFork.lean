@@ -21,9 +21,7 @@ coverage.
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
 
-/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
-the same construct in `VCVio.OracleComp.OracleComp`. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 namespace QueryLog
 

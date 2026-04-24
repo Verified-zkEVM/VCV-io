@@ -18,9 +18,7 @@ open OracleSpec OracleComp
 
 universe u v w
 
-/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
-the same construct in `VCVio.OracleComp.OracleComp`. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 /-- Specifies a way to implement queries to oracles in `spec` using the monad `m`.
 This is defined in terms of a mapping of input elements to oracle outputs,

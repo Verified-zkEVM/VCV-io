@@ -47,9 +47,7 @@ open OracleSpec OracleComp BigOperators ENNReal
 
 universe u u' v v' w w'
 
-/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
-the same construct in `VCVio.OracleComp.OracleComp`. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 variable {ι : Type u} {τ : Type v}
   {spec : OracleSpec ι} {superSpec : OracleSpec τ} {α β γ : Type w}

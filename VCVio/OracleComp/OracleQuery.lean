@@ -46,6 +46,29 @@ protected lemma query_def (t : spec.Domain) :
 
 end OracleSpec
 
+/-! ### Primitive `query` notation
+
+`OracleSpec.query` is `protected` so the bare identifier `query` resolves to
+`HasQuery.query` (exported in `VCVio.OracleComp.HasQueryClass`) for
+ergonomic monadic use. Files that work *structurally* on the primitive
+single-query syntax `OracleQuery spec _` (e.g. `liftM (query t)`,
+`(query t).cont`, induction on `query_bind`) can opt back into the
+primitive interpretation of bare `query` with a single line:
+
+```
+open scoped OracleSpec.PrimitiveQuery
+```
+
+The notation is `scoped` to this namespace, so it never leaks past a file
+boundary; you must explicitly opt in. -/
+namespace OracleSpec.PrimitiveQuery
+
+/-- Inside `open scoped OracleSpec.PrimitiveQuery`, the bare identifier
+`query` aliases the primitive single-query syntax `OracleSpec.query`. -/
+scoped notation "query" => OracleSpec.query
+
+end OracleSpec.PrimitiveQuery
+
 namespace OracleQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι}

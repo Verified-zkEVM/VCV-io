@@ -26,20 +26,7 @@ variable {α β γ : Type v} {ι} {spec : OracleSpec.{u, v} ι}
 
 namespace OracleComp
 
-/-! ### Local `query` resolution
-
-This file is upstream of `VCVio.OracleComp.HasQuery`'s richer API and
-defines the *primitive* free-monad syntax. Within this module, the bare
-`query` should resolve to `OracleSpec.query` (the `OracleQuery spec _`
-constructor) rather than to `HasQuery.query` (the ambient-monad form
-exported by `HasQueryClass`). The two would otherwise both elaborate at
-sites such as `liftM (query t) >>= oa`, producing an ambiguity even though
-they are definitionally equal.
-
-Downstream code that imports this module sees both `OracleSpec.query` and
-`HasQuery.query`. The `protected` marker on `OracleSpec.query` ensures
-bare `query` resolves uniquely to `HasQuery.query` there. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 /-- Make one oracle query at input `t`, then continue with `k` on the response.
 

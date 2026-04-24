@@ -15,10 +15,7 @@ indicator function analysis. These feed into the averaged hiding bound.
 
 open OracleSpec OracleComp ENNReal
 
-/-! Locally rebind `query` to the primitive `OracleSpec.query` form. This file
-manipulates oracle queries structurally (via `OracleQuery.cont`, `liftM`, and
-related forms) and predates the `HasQuery` ergonomic cutover. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]

@@ -20,9 +20,7 @@ either `OracleSpec.add` or `OracleSpec.sigma`. Each instance spells out the
 
 open OracleSpec
 
-/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
-the same construct in `VCVio.OracleComp.OracleComp`. -/
-local notation "query" => OracleSpec.query
+open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleQuery
 
