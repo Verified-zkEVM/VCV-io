@@ -198,6 +198,76 @@ theorem split_empty (α β : Type u) [CellSpec.{u, v} α] [CellSpec.{u, v} β] :
     split α β (empty : Heap (α ⊕ β)) = (empty, empty) := by
   ext i <;> rfl
 
+/-- Splitting after an update on the left identifier set updates only the
+left split component. -/
+@[simp]
+theorem split_update_inl {α β : Type u}
+    [CellSpec.{u, v} α] [CellSpec.{u, v} β] [DecidableEq α] [DecidableEq β]
+    (h : Heap (α ⊕ β)) (a : α) (v : CellSpec.type a) :
+    split α β (h.update (.inl a) v) =
+      ((split α β h).1.update a v, (split α β h).2) := by
+  apply Prod.ext
+  · funext i
+    by_cases hi : i = a
+    · subst hi
+      simp [split, Heap.update]
+    · simp [split, Heap.update, hi]
+  · funext i
+    simp [split, Heap.update]
+
+/-- Splitting after an update on the right identifier set updates only the
+right split component. -/
+@[simp]
+theorem split_update_inr {α β : Type u}
+    [CellSpec.{u, v} α] [CellSpec.{u, v} β] [DecidableEq α] [DecidableEq β]
+    (h : Heap (α ⊕ β)) (b : β) (v : CellSpec.type b) :
+    split α β (h.update (.inr b) v) =
+      ((split α β h).1, (split α β h).2.update b v) := by
+  apply Prod.ext
+  · funext i
+    simp [split, Heap.update]
+  · funext i
+    by_cases hi : i = b
+    · subst hi
+      simp [split, Heap.update]
+    · simp [split, Heap.update, hi]
+
+/-- Rebuilding a split heap after updating the left component is the same as
+updating the composite heap at the corresponding `Sum.inl` cell. -/
+@[simp]
+theorem split_symm_update_inl {α β : Type u}
+    [CellSpec.{u, v} α] [CellSpec.{u, v} β] [DecidableEq α] [DecidableEq β]
+    (p : Heap α × Heap β) (a : α) (v : CellSpec.type a) :
+    (split α β).symm (p.1.update a v, p.2) =
+      ((split α β).symm p).update (.inl a) v := by
+  funext i
+  cases i with
+  | inl a' =>
+      by_cases ha' : a' = a
+      · subst ha'
+        simp [split, Heap.update]
+      · simp [split, Heap.update, ha']
+  | inr b =>
+      simp [split, Heap.update]
+
+/-- Rebuilding a split heap after updating the right component is the same as
+updating the composite heap at the corresponding `Sum.inr` cell. -/
+@[simp]
+theorem split_symm_update_inr {α β : Type u}
+    [CellSpec.{u, v} α] [CellSpec.{u, v} β] [DecidableEq α] [DecidableEq β]
+    (p : Heap α × Heap β) (b : β) (v : CellSpec.type b) :
+    (split α β).symm (p.1, p.2.update b v) =
+      ((split α β).symm p).update (.inr b) v := by
+  funext i
+  cases i with
+  | inl a =>
+      simp [split, Heap.update]
+  | inr b' =>
+      by_cases hb' : b' = b
+      · subst hb'
+        simp [split, Heap.update]
+      · simp [split, Heap.update, hb']
+
 end Heap
 
 end VCVio.HeapSSP

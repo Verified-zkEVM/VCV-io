@@ -76,20 +76,26 @@ lemma NeverFail_run_simulateQ_withLogging_iff [LawfulMonad m] [HasEvalSPMF m]
 
 variable {κ : Type} {loggedSpec : OracleSpec κ}
 
+section inputLog
+
+variable {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι₀}
+variable {κ : Type} {loggedSpec : OracleSpec.{0, 0} κ}
+variable {m₀ : Type → Type v} [Monad m₀]
+
 /-- Run an implementation and append each queried input to a `StateT` list.
 
 This is the state-transformer analogue of `withLogging` when only the query
 inputs are needed: responses are returned exactly as in the base
 implementation, while the state records the input sequence in order. -/
-def appendInputLog (so : QueryImpl loggedSpec (OracleComp spec)) :
-    QueryImpl loggedSpec (StateT (List loggedSpec.Domain) (OracleComp spec)) := fun t => do
+def appendInputLog (so : QueryImpl loggedSpec m₀) :
+    QueryImpl loggedSpec (StateT (List loggedSpec.Domain) m₀) := fun t => do
   let inputs ← get
   let u ← liftM (so t)
   set (inputs ++ [t])
   pure u
 
 @[simp, grind =]
-lemma appendInputLog_apply (so : QueryImpl loggedSpec (OracleComp spec))
+lemma appendInputLog_apply (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) :
     appendInputLog so t = (do
       let inputs ← get
@@ -98,18 +104,19 @@ lemma appendInputLog_apply (so : QueryImpl loggedSpec (OracleComp spec))
       pure u) := rfl
 
 @[simp]
-lemma run_withLogging_apply (so : QueryImpl loggedSpec (OracleComp spec))
+lemma run_withLogging_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) :
     (so.withLogging t).run =
-      (so t >>= fun u => pure (u, [⟨t, u⟩])) := by
+      (so t >>= fun u =>
+        (pure (u, [⟨t, u⟩]) : m₀ (loggedSpec.Range t × QueryLog loggedSpec))) := by
   simp [QueryImpl.withLogging_apply, WriterT.run_tell]
 
-@[simp]
-lemma run_appendInputLog_apply (so : QueryImpl loggedSpec (OracleComp spec))
+lemma run_appendInputLog_apply [LawfulMonad m₀] (so : QueryImpl loggedSpec m₀)
     (t : loggedSpec.Domain) (inputs : List loggedSpec.Domain) :
     (appendInputLog so t).run inputs =
       (so t >>= fun u => pure (u, inputs ++ [t])) := by
-  simp [QueryImpl.appendInputLog_apply]
+  simp [QueryImpl.appendInputLog_apply, StateT.run_bind, StateT.run_get,
+    StateT.run_set, StateT.run_monadLift]
 
 /-- A `WriterT` query log can be replayed as a `StateT` input log.
 
@@ -122,37 +129,37 @@ implementations:
   inputs to a state list.
 
 Mapping the WriterT result to `(output, initialInputs ++ loggedInputs)` yields
-exactly the same `OracleComp spec` computation as running the StateT
+exactly the same base-monad computation as running the StateT
 implementation from `initialInputs`. -/
 theorem map_run_withLogging_inputs_eq_run_appendInputLog
+    [LawfulMonad m₀] [HasQuery spec₀ m₀]
     {α' : Type}
-    (so : QueryImpl loggedSpec (OracleComp spec))
-    (oa : OracleComp (spec + loggedSpec) α')
+    (so : QueryImpl loggedSpec m₀)
+    (oa : OracleComp (spec₀ + loggedSpec) α')
     (initialInputs : List loggedSpec.Domain) :
-    let baseW : QueryImpl spec (WriterT (QueryLog loggedSpec) (OracleComp spec)) :=
-      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-    let implW : QueryImpl (spec + loggedSpec)
-        (WriterT (QueryLog loggedSpec) (OracleComp spec)) :=
+    let baseW : QueryImpl spec₀ (WriterT (QueryLog loggedSpec) m₀) :=
+      (HasQuery.toQueryImpl (spec := spec₀) (m := m₀)).liftTarget _
+    let implW : QueryImpl (spec₀ + loggedSpec)
+        (WriterT (QueryLog loggedSpec) m₀) :=
       baseW + QueryImpl.withLogging so
-    let baseS : QueryImpl spec (StateT (List loggedSpec.Domain) (OracleComp spec)) :=
-      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-    let implAppend : QueryImpl (spec + loggedSpec)
-        (StateT (List loggedSpec.Domain) (OracleComp spec)) :=
+    let baseS : QueryImpl spec₀ (StateT (List loggedSpec.Domain) m₀) :=
+      (HasQuery.toQueryImpl (spec := spec₀) (m := m₀)).liftTarget _
+    let implAppend : QueryImpl (spec₀ + loggedSpec)
+        (StateT (List loggedSpec.Domain) m₀) :=
       baseS + appendInputLog so
     ((fun z : α' × QueryLog loggedSpec =>
         (z.1, initialInputs ++ z.2.map (fun e => e.1))) <$>
-          ((simulateQ implW oa).run : OracleComp spec (α' × QueryLog loggedSpec))) =
-      ((simulateQ implAppend oa).run initialInputs :
-        OracleComp spec (α' × List loggedSpec.Domain)) := by
-  let baseW : QueryImpl spec (WriterT (QueryLog loggedSpec) (OracleComp spec)) :=
-    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  let implW : QueryImpl (spec + loggedSpec)
-      (WriterT (QueryLog loggedSpec) (OracleComp spec)) :=
+          ((simulateQ implW oa).run : m₀ (α' × QueryLog loggedSpec))) =
+      ((simulateQ implAppend oa).run initialInputs : m₀ (α' × List loggedSpec.Domain)) := by
+  let baseW : QueryImpl spec₀ (WriterT (QueryLog loggedSpec) m₀) :=
+    (HasQuery.toQueryImpl (spec := spec₀) (m := m₀)).liftTarget _
+  let implW : QueryImpl (spec₀ + loggedSpec)
+      (WriterT (QueryLog loggedSpec) m₀) :=
     baseW + QueryImpl.withLogging so
-  let baseS : QueryImpl spec (StateT (List loggedSpec.Domain) (OracleComp spec)) :=
-    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  let implAppend : QueryImpl (spec + loggedSpec)
-      (StateT (List loggedSpec.Domain) (OracleComp spec)) :=
+  let baseS : QueryImpl spec₀ (StateT (List loggedSpec.Domain) m₀) :=
+    (HasQuery.toQueryImpl (spec := spec₀) (m := m₀)).liftTarget _
+  let implAppend : QueryImpl (spec₀ + loggedSpec)
+      (StateT (List loggedSpec.Domain) m₀) :=
     baseS + appendInputLog so
   induction oa using OracleComp.inductionOn generalizing initialInputs with
   | pure x =>
@@ -171,6 +178,8 @@ theorem map_run_withLogging_inputs_eq_run_appendInputLog
             monadLift_self, StateT.run_set]
           refine bind_congr fun u => ?_
           simpa [List.append_assoc] using ih u (initialInputs ++ [t'])
+
+end inputLog
 
 end QueryImpl
 

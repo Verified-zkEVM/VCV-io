@@ -189,25 +189,6 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
       (Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).symm (hα, hβ)
         = h :=
     (Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).left_inv h
-  -- Helper: the `(split).symm (hα, hβ.update b v)` reshape produces
-  -- `h.update (Sum.inr b) v`, since `hβ.update b v` differs from `hβ` only
-  -- at `b`, and `split.symm` routes `Sum.inr b` to `hβ`.
-  have h_reshape_inr :
-      ∀ (b : InnerCell M Commit Chal Stmt Wit)
-        (v : CellSpec.type (Sum.inr b : CmaCells M Commit Chal Stmt Wit)),
-        (Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).symm
-          (hα, hβ.update b v) = h.update (Sum.inr b) v := by
-    intro b v
-    funext j
-    rcases j with j | j
-    · simp [hα, Heap.split_symm_apply_inl]
-    · by_cases hj : j = b
-      · subst hj
-        simp [Heap.split_symm_apply_inr, Heap.get_update_self]
-      · have hneq : (Sum.inr j : CmaCells M Commit Chal Stmt Wit) ≠ Sum.inr b :=
-          fun heq => hj (Sum.inr.injEq _ _ |>.mp heq)
-        simp [hβ, Heap.split_symm_apply_inr, Heap.get_update_of_ne hj,
-          Heap.get_update_of_ne hneq]
   -- Unfold `cmaSim` and apply the outer-forward reduction lemma; for every
   -- non-costly `t`, `cmaToNma.impl t` is a pure forwarder through the
   -- corresponding `nmaSpec.query`, and `simulateQ nma.impl` on the forwarded
@@ -242,7 +223,11 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
         bind_pure_comp, Functor.map_map]
       congr 1
       funext a
-      exact Prod.mk.injEq _ _ _ _ |>.mpr ⟨rfl, (h_reshape_inr .roCache _).symm⟩
+      exact Prod.mk.injEq _ _ _ _ |>.mpr ⟨rfl, by
+        simpa [h_split_symm] using
+          (Heap.split_symm_update_inr
+            (α := OuterCell M) (β := InnerCell M Commit Chal Stmt Wit)
+            (p := (hα, hβ)) .roCache ((h (Sum.inr .roCache)).cacheQuery mc a)).symm⟩
     · -- Cache hit: return cached `r`, heap unchanged.
       simp only [cmaReal, nma, StateT.run_mk, hβcache_eq, hcache,
         map_pure, h_split_symm]
@@ -263,7 +248,11 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
         bind_pure_comp, Functor.map_map]
       congr 1
       funext p
-      exact Prod.mk.injEq _ _ _ _ |>.mpr ⟨rfl, (h_reshape_inr .keypair _).symm⟩
+      exact Prod.mk.injEq _ _ _ _ |>.mpr ⟨rfl, by
+        simpa [h_split_symm] using
+          (Heap.split_symm_update_inr
+            (α := OuterCell M) (β := InnerCell M Commit Chal Stmt Wit)
+            (p := (hα, hβ)) .keypair (some p)).symm⟩
     · -- Keypair hit: return stored `pk`, heap unchanged.
       simp only [cmaReal, nma, StateT.run_mk, hβkp_eq, hkp,
         map_pure, h_split_symm]
@@ -401,21 +390,10 @@ theorem cmaReal_simulateQ_bad_preserved
     (h : Heap (CmaCells M Commit Chal Stmt Wit))
     (z) (hz : z ∈ support ((simulateQ (cmaReal M Commit Chal σ hr).impl oa).run h)) :
     z.2 (Sum.inr .bad) = h (Sum.inr .bad) := by
-  induction oa using OracleComp.inductionOn generalizing h z with
-  | pure x =>
-      simp only [simulateQ_pure, StateT.run_pure, support_pure,
-        Set.mem_singleton_iff] at hz
-      subst hz
-      rfl
-  | query_bind t cont ih =>
-      simp only [simulateQ_bind, simulateQ_query, OracleQuery.input_query,
-        OracleQuery.cont_query, id_map, StateT.run_bind, support_bind,
-        Set.mem_iUnion, exists_prop] at hz
-      obtain ⟨⟨u, h'⟩, h_mem, h_z⟩ := hz
-      have hp' : h' (Sum.inr .bad) = h (Sum.inr .bad) :=
-        cmaReal_impl_bad_preserved M Commit Chal σ hr t h (u, h') h_mem
-      have hz' : z.2 (Sum.inr .bad) = h' (Sum.inr .bad) := ih u h' z h_z
-      exact hz'.trans hp'
+  exact Package.simulateQ_run_preservesCell
+    ((cmaReal M Commit Chal σ hr).impl) (Sum.inr .bad)
+    (fun t h z hz => cmaReal_impl_bad_preserved M Commit Chal σ hr t h z hz)
+    oa h z hz
 
 /-- The bad-event probability of any `cmaReal` simulation started from
 the empty heap is zero: every reachable output has `.bad = false`. -/
@@ -845,6 +823,28 @@ theorem cmaReal_implConjugate_valid_of_valid
     cmaReal_impl_valid_of_valid M Commit Chal σ hr t
       ((cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)).symm (s, false))
       (by simpa [cmaHeapStateEquiv, CmaInnerData.Valid] using hvalid) w hw
+
+/-- Conjugated-step invariant preservation for the reachable CMA inner-state
+predicate `CmaInnerData.Valid`. This packages the `p.2 = false` case split
+used by the invariant-gated HeapSSP bridge. -/
+theorem cmaReal_implConjugate_preserves_valid
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool)
+    (hpbad : p.2 = false)
+    (hpvalid : CmaInnerData.Valid (rel := rel) p.1)
+    (z) (hz : z ∈ support
+      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+        (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run p)) :
+    CmaInnerData.Valid (rel := rel) z.2.1 := by
+  rcases p with ⟨s, b⟩
+  cases b with
+  | false =>
+      simpa using
+        cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
+  | true =>
+      cases hpbad
 
 /-- **Per-step TV bound for H3 on a sign query.** Core HVZK + cache-
 collision coupling. Left as `sorry` pending the HVZK + commit-marginal
@@ -1389,12 +1389,8 @@ theorem cmaSignEpsCore_expectedSCost_le
               ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
-    rcases p with ⟨s, b⟩
-    cases b with
-    | false =>
-        exact cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
-    | true =>
-        cases hpbad
+    simpa [hφ] using
+      cmaReal_implConjugate_preserves_valid M Commit Chal σ hr t p hpbad hpvalid z hz
   have h_cacheCount_init : cacheCount s_init.2.1 = 0 := by
     rw [hs_init]
     exact cacheCount_cmaInitData M Commit Chal
@@ -1481,12 +1477,8 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
               ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
-    rcases p with ⟨s, b⟩
-    cases b with
-    | false =>
-        exact cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
-    | true =>
-        cases hpbad
+    simpa [hφ] using
+      cmaReal_implConjugate_preserves_valid M Commit Chal σ hr t p hpbad hpvalid z hz
   have h_bridge := Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
     (cmaReal M Commit Chal σ hr) (cmaSim M Commit Chal hr simT)
     φ s_init h_init₀ h_init₁
@@ -1583,12 +1575,8 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
               ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
-    rcases p with ⟨s, b⟩
-    cases b with
-    | false =>
-        exact cmaReal_implConjugate_valid_of_valid M Commit Chal σ hr t s hpvalid z hz
-    | true =>
-        cases hpbad
+    simpa [hφ] using
+      cmaReal_implConjugate_preserves_valid M Commit Chal σ hr t p hpbad hpvalid z hz
   -- Apply the invariant-preserving bridge. The step TV obligation is needed
   -- only on valid/reachable CMA inner states, and the final cost is the tight
   -- valid-state loss `cmaSignEpsCore`.

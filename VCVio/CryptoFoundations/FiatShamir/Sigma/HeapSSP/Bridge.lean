@@ -7,6 +7,9 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.HeapSSP.Advantage
+import VCVio.OracleComp.QueryTracking.LoggingOracle
+import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
+import VCVio.OracleComp.SimSemantics.StateProjection
 
 /-!
 # Bridge between `unforgeableExp` and `cmaReal.runProb` (HeapSSP)
@@ -336,6 +339,133 @@ instead. -/
     ProbComp ((M × (Commit × Resp)) × Bool × List M) := do
   let p ← (cmaReal M Commit Chal σ hr).runState (signedAdv σ hr M adv)
   pure (p.1.1, p.1.2, p.2 (Sum.inl .log))
+
+/-! ### Fixed-key post-keygen experiment -/
+
+/-- The post-keygen adversary/verification computation over the public
+Fiat-Shamir oracle interface `unifSpec + roSpec + signSpec`, before it is
+lifted into the HeapSSP `cmaSpec` by re-adding `pkSpec`. -/
+@[reducible] noncomputable def postKeygenAdvBase
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (pk : Stmt) :
+    OracleComp (((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ (Commit × Resp)))
+        : OracleSpec _)
+      ((M × (Commit × Resp)) × Bool) := do
+  let (msg, sig) ← adv.main pk
+  let verified ← liftM
+    ((FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M).verify
+      pk msg sig)
+  pure ((msg, sig), verified)
+
+/-- The public random-oracle runtime for the fixed-key post-keygen experiment,
+viewed as a `QueryRuntime` with explicit cache state. -/
+@[reducible] noncomputable def fsBaseRuntime :
+    QueryRuntime (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) where
+  impl := unifFwdImpl (M × Commit →ₒ Chal) +
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _)
+
+/-- The public signing oracle for a fixed keypair, interpreted directly in the
+explicit cache-state random-oracle runtime. -/
+@[reducible] noncomputable def postKeygenSignCore (pk : Stmt) (sk : Wit) :
+    QueryImpl (M →ₒ (Commit × Resp))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := by
+  letI : HasQuery (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _).toHasQuery
+  exact
+    (FiatShamir (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) σ hr M).sign
+      pk sk
+
+/-- The public post-keygen adversary handler with signing-query input logging.
+
+Base queries (`unifSpec + roSpec`) run through the explicit cache-state runtime;
+signing queries are handled by the fixed-key Fiat-Shamir signing oracle while
+appending each queried message to a `StateT` list. -/
+@[reducible] noncomputable def postKeygenAppendImpl (pk : Stmt) (sk : Wit) :
+    QueryImpl (((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ (Commit × Resp)))
+        : OracleSpec _)
+      (StateT (List M)
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) := by
+  letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    (fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)).toHasQuery
+  let baseS : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+      (StateT (List M)
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+    (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+      (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)).liftTarget _
+  exact baseS +
+    QueryImpl.appendInputLog
+      (postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+
+/-- Fixed-key specialization of the generic WriterT-to-StateT signing-log
+bridge, in the explicit cache-state Fiat-Shamir runtime. -/
+private theorem postKeygenWriterLog_eq_inputLog
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (pk : Stmt) (sk : Wit) :
+    let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+    letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
+        (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
+    let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+      (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk
+    let baseW : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+        (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)).liftTarget _
+    let implW : QueryImpl (((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ (Commit × Resp)))
+        : OracleSpec _)
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      baseW + QueryImpl.withLogging so
+    ((fun z : (M × (Commit × Resp)) × QueryLog (M →ₒ (Commit × Resp)) =>
+        (z.1, z.2.map (fun e => e.1))) <$>
+        ((simulateQ implW (adv.main pk)).run :
+          StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+            ((M × (Commit × Resp)) × QueryLog (M →ₒ (Commit × Resp))))) =
+      ((simulateQ
+          (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
+            (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+          (adv.main pk)).run [] :
+        StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+          ((M × (Commit × Resp)) × List M)) := by
+  let runtime := fsBaseRuntime (M := M) (Commit := Commit) (Chal := Chal)
+  letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) := runtime.toHasQuery
+  let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+    (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk
+  simpa [postKeygenAppendImpl, runtime, so] using
+    (QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog
+      (spec₀ := unifSpec + (M × Commit →ₒ Chal))
+      (loggedSpec := (M →ₒ (Commit × Resp)))
+      (m₀ := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
+      so (adv.main pk) ([] : List M))
+
+/-- The fixed-key public post-keygen experiment in the explicit
+`List M × QueryCache` stateful runtime. -/
+@[reducible] noncomputable def postKeygenFreshProb
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (pk : Stmt) (sk : Wit) : ProbComp Bool := by
+  letI : HasQuery (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _).toHasQuery
+  exact
+    (((simulateQ
+        (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+        (adv.main pk)).run [] >>= fun z => do
+          let msg := z.1.1
+          let sig := z.1.2
+          let signed := z.2
+          let verified ←
+            (FiatShamir (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) σ hr M).verify
+              pk msg sig
+          pure (!decide (msg ∈ signed) && verified)).run' ∅)
 
 /-! ### Bridge equalities
 

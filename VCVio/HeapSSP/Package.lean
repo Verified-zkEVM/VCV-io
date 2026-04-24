@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.HeapSSP.Heap
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import VCVio.OracleComp.SimSemantics.PreservesInv
 
 /-!
 # HeapSSP: Packages with heap-based state
@@ -178,6 +179,61 @@ lemma run_bind {α β : Type v}
     P.run (A >>= f) =
       P.runState A >>= fun (a, h) => (simulateQ P.impl (f a)).run' h := by
   simp [run, runState, simulateQ_bind, StateT.run_bind, bind_assoc]
+
+/-! ### Support-level invariant preservation -/
+
+/-- If every query handler step preserves a heap invariant `Inv`, then the
+whole simulated computation preserves `Inv` on every reachable final heap. -/
+theorem simulateQ_run_preservesInv
+    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
+    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
+    (impl : QueryImpl E' (StateT (Heap Ident') ProbComp))
+    (Inv : Heap Ident' → Prop)
+    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'), Inv h →
+      ∀ z ∈ support ((impl t).run h), Inv z.2)
+    (A : OracleComp E' α) (h : Heap Ident') (hinv : Inv h) :
+    ∀ z ∈ support ((simulateQ impl A).run h), Inv z.2 := by
+  intro z hz
+  have himpl : QueryImpl.PreservesInv impl Inv := hstep
+  exact OracleComp.simulateQ_run_preservesInv impl Inv
+    (himpl := himpl) A h hinv z hz
+
+/-- Cell-preservation specialization of `simulateQ_run_preservesInv`. If each
+query step leaves cell `i` unchanged, then the full simulation leaves `i`
+unchanged on every reachable final heap. -/
+theorem simulateQ_run_preservesCell
+    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
+    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
+    (impl : QueryImpl E' (StateT (Heap Ident') ProbComp))
+    (i : Ident')
+    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'),
+      ∀ z ∈ support ((impl t).run h), z.2.get i = h.get i)
+    (A : OracleComp E' α) (h : Heap Ident') :
+    ∀ z ∈ support ((simulateQ impl A).run h), z.2.get i = h.get i := by
+  intro z hz
+  have hpres :=
+    simulateQ_run_preservesInv impl (fun h' => h'.get i = h.get i)
+      (fun t h' hinv z hz => by
+        exact (hstep t h' z hz).trans hinv) A h rfl
+  exact hpres z hz
+
+/-- Package-level invariant preservation on `runState`: if the init support
+lies in `Inv` and each handler step preserves `Inv`, then every reachable
+final heap of `runState` satisfies `Inv`. -/
+theorem runState_preservesInv
+    {ιₑ' : Type} {E' : OracleSpec.{0, 0} ιₑ'}
+    {Ident' : Type} [CellSpec.{0, 0} Ident'] {α : Type}
+    (P : Package unifSpec E' Ident') (Inv : Heap Ident' → Prop)
+    (hinit : ∀ h ∈ support P.init, Inv h)
+    (hstep : ∀ (t : E'.Domain) (h : Heap Ident'), Inv h →
+      ∀ z ∈ support ((P.impl t).run h), Inv z.2)
+    (A : OracleComp E' α) :
+    ∀ z ∈ support (P.runState A), Inv z.2 := by
+  intro z hz
+  unfold Package.runState at hz
+  simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
+  obtain ⟨h₀, hh₀, hz⟩ := hz
+  exact simulateQ_run_preservesInv P.impl Inv hstep A h₀ (hinit h₀ hh₀) z hz
 
 end Package
 
