@@ -481,3 +481,135 @@ theorem my_security : g₁ ≡ₚ gₙ := by
    (bind cut, bijection, traversal input relation, or simulation invariant), provide it explicitly.
 
 5. **`StdDoBridge` is deliberately narrow**: use it for unary almost-sure `.pure` `Std.Do` experiments, not as the default path for quantitative or relational proofs.
+
+## Internal Architecture (`Sym`-backed Registries)
+
+### Why `Lean.Meta.Sym.*`?
+
+The planner needs to ask "given this `wp comp post` or `Triple pre comp post`
+goal, which registered rules could fire?" *fast*, and without the cost or
+surprises of `isDefEq` unfolding. Core Lean has been building a dedicated
+symbolic toolkit under `Lean.Meta.Sym` precisely for this: `Sym.Pattern`
+records a de Bruijn-encoded skeleton of the indexed sub-expression together
+with its normalizing preprocess (`preprocessType` unfolds reducible
+abbreviations, beta/zeta/eta-reduces, and elaborates universes); `Sym.DiscrTree`
+is a thin wrapper over `Lean.Meta.DiscrTree` whose insertion keys come from
+those preprocessed patterns and whose lookup is the pure structural
+`getMatch`; and `Sym.Simp.Theorems` is a ready-made bundle of
+discrimination-tree + `Sym.Simp.Theorem` records already used by Lean's
+upcoming `mvcgen'` frontend.
+
+Building on these means our registries share the same pattern preprocessing
+and lookup cost profile as future core tactics, and we can hand off directly
+to `Sym.Simp.Main.simpImpl` / `Sym.Simp.Theorems.rewrite` once the `SymM →
+TacticM` proof-application bridge stabilises in core.
+
+### Registries and what they index
+
+| File | Attribute | Role |
+|------|-----------|------|
+| `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / `eRelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
+| `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites. Each entry stores **both** a `Sym.Pattern` on `oa` (consulted today by `runWpStepRules` via `TacticM` rewriting) **and** a `Sym.Simp.Theorem` keyed on the full `wp oa post` LHS (held in a `Sym.Simp.Theorems` bundle for the eventual `SymM`-side rewriter) |
+
+Each entry carries a `SpecProof` (reusing the core-Lean type from
+`Lean.Elab.Tactic.Do.SpecAttr`) so origins can be distinguished between a
+global declaration, a local hypothesis, or a raw term. Priorities are parsed
+from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
+
+### Dispatch flow
+
+1. **Unary / relational VC-gen** (`Unary/Internals.lean`,
+   `Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/`eRelTriple`
+   goal, the planner extracts the computation slot(s), `whnfReducible`s them,
+   asks the registry for candidate `VCSpecEntry`s via
+   `getRegisteredUnaryVCSpecEntries` / `getRegisteredRelationalVCSpecEntries`,
+   filters by `kind` and `spec.compPattern`, previews each candidate (via the
+   shared `runUnaryVCSpecRule` / `runRelationalVCSpecRule` helpers which call
+   the `runVCGenStepWithTheoremDirect` / `runRVCGenStepWithTheoremDirect`
+   applicators), and picks the best plan.
+2. **`wp`-rewrite driver** (`Common/WpStepDispatch.lean`): on any goal
+   containing `wp _ _`, `runWpStepRules` pulls the `oa` argument out of the
+   first matching `wp` application, `whnfReducible`s it, asks
+   `getRegisteredWpStepEntries` for hits on the `oa`-keyed `Sym.DiscrTree`,
+   and tries each via `rw` then `simp only` until one lands.
+3. **Handler `@[spec]` rules**: unary handlers (`loggingOracle`,
+   `cachingOracle`, …) use core Lean's `Std.Do.Triple` + `@[spec]` catalogue
+   directly; those are indexed by Lean itself and consumed by `mvcgen`.
+
+### Extending the registries
+
+| Want to add… | Tag it with | Expected shape |
+|--------------|-------------|----------------|
+| A unary Triple lemma usable by `vcstep` / `vcgen` | `@[vcspec]` | `Triple pre oa post` or raw `wp oa post ≥ pre` |
+| A relational lemma usable by `rvcstep` / `rvcgen` | `@[vcspec]` | `RelTriple oa ob R`, `RelWP oa ob post`, or `eRelTriple pre oa ob post` |
+| A `wp`-driven equational rewrite | `@[wpStep]` | `wp comp post = …` (exact head `wp`) |
+
+Priorities (`@[vcspec (prio := 200)]`, `@[wpStep (prio := 200)]`) follow the
+standard Lean convention: higher priority entries are tried first within the
+same candidate pool.
+
+## SymM Stability Note and Future Proof Repair
+
+`Lean.Meta.Sym.*` is still under active development in core Lean. The APIs
+we depend on today (`Sym.Pattern`, `Sym.DiscrTree`, `Sym.Simp.Theorems`,
+`Sym.Simp.mkTheoremFromDecl`, `Sym.insertPattern`, `Sym.getMatch`,
+`Sym.mkPatternFromDeclWithKey`, and `SpecProof` in
+`Lean.Elab.Tactic.Do.SpecAttr`) are all used by `mvcgen`/`mvcgen'` in core
+too, so their direction is broadly stable, but none of them carry a
+compat-preservation promise yet. Expect the following classes of churn each
+time we bump the toolchain:
+
+- **Signature changes on `Sym.mkPatternFromDeclWithKey`**. If the selector
+  signature changes (e.g. becomes `Expr → MetaM (Pattern × α)` instead of
+  `Expr → MetaM (Expr × α)`), update `buildVCSpecEntry` /
+  `buildWpStepEntry` in `Registry.lean` / `WpStepRegistry.lean` to match.
+- **`Sym.Pattern` preprocessing behaviour**. If the default reducibility
+  used by `preprocessType` shifts (e.g. stops unfolding certain abbreviations
+  or starts unfolding more), the "folded vs unfolded head" helpers
+  (`headIsOneOf`, `tripleBodyParts?`, `relTripleBodyParts?`, etc. in
+  `Registry.lean`) may need to grow new cases. All of these live in a
+  clearly-marked `Preprocessed-body head matchers` section.
+- **`Sym.Simp.Theorem` field renames / `mkTheoremFromDecl` moves**. Our only
+  current consumer is `buildWpStepEntry` in `WpStepRegistry.lean`; a
+  trivial rename is localised there.
+- **`SpecProof` variants**. We only use `.global` today. If core splits or
+  merges variants, `VCSpecEntry.declName?` / `WpStepEntry.declName?` plus
+  the matching `MetaM` inserts need to be adjusted.
+- **`registerSimpleScopedEnvExtension` purity**. `addEntry` is pure today
+  and we rely on that in both registries; if it changes, the attribute
+  handlers already compute their patterns inside `MetaM` before calling
+  `.add`, so the fix is to thread the `MetaM` result differently, not to
+  restructure the registry.
+
+The compensating design choices are: keep `Sym`-aware logic contained to the
+registry modules (`Registry.lean`, `WpStepRegistry.lean`), prefer the
+structural `getMatch` over `isDefEq`, and keep an explicit `TacticM`
+fallback path (`rw` / `simp only`) so failures in any single `Sym` lookup
+stage degrade gracefully.
+
+### Future `mvcgen` bridge (deferred)
+
+Lean v4.29.0 ships `mvcgen` with the classical `Std.Do` handler catalogue
+but does *not* expose a `SymM`-level rewriter we can hand a goal to (the
+`mvcgen'` pilot lives on a newer toolchain). The planned shape of that
+bridge, for when the API lands:
+
+1. Build a `Sym.Simp.Theorems` bundle from the union of `@[wpStep]` and
+   `@[vcspec]` registries (`WpStepRegistry.theorems` already does this
+   for `wp`-shaped rules; extend the same idea to spec rules).
+2. Translate the current `wp`-bearing goal into `Sym.Simp.SimpM` and run
+   `Sym.Simp.Theorems.rewrite thms goal` (or whichever `simpImpl` variant
+   core exposes). Results come back as a `Sym.Simp.Step`.
+3. Reify the resulting rewritten goal and proof term back into `TacticM`
+   via the standard `SymM → MetaM` reifier that accompanies `mvcgen'` in
+   core. Until that reifier is public, we cannot close the loop; the
+   current `TacticM`-side dispatch covers the same rules without it.
+
+Treat any `Sym.*` bump to Lean core as a signal to re-read the two
+registry files and the `runWpStepRules` docstring. If a bump breaks us,
+the fastest recovery path is: (1) open the failing file, (2) check that
+`Sym.mkPatternFromDeclWithKey`, `Sym.insertPattern`, `Sym.getMatch`, and
+`Sym.Simp.mkTheoremFromDecl` still have matching signatures, (3) rebuild
+the single `Common/Registry.lean` or `Common/WpStepRegistry.lean`
+target, and (4) regenerate the full library. No user-visible tactic
+surface changes.
