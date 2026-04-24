@@ -192,6 +192,10 @@ import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.FromUnary
 import VCVio.ProgramLogic.Relational.HandlerFromUnary
 import VCVio.ProgramLogic.Relational.Leakage
+import VCVio.ProgramLogic.Relational.Loom.Coherence
+import VCVio.ProgramLogic.Relational.Loom.Probabilistic
+import VCVio.ProgramLogic.Relational.Loom.Qualitative
+import VCVio.ProgramLogic.Relational.Loom.Quantitative
 import VCVio.ProgramLogic.Relational.ProgrammingOracle
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
