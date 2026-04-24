@@ -13,12 +13,13 @@ public import ToMathlib.ITree.Sim.Defs
 procedure-call combinators built on top of `simulate` / `iter`. The event
 `CallE α β` describes "one recursive call expecting an `α`-argument and
 returning a `β`-result", and is used as the source signature passed to
-`mutualRec`.
+`fixRec`.
 
-This file currently contains only the skeleton shapes; the productive
-definitions of `mutualRec` and `fixRec` will be filled in by the next
-implementation pass once `simulate` / `iter` interaction with
-sum-of-PFunctors (`ToMathlib.ITree.Events`) is in place.
+The productive definitions are upcoming: the file currently contains only
+the skeleton shapes. Sum-of-polynomial-functor infrastructure already exists
+(`PFunctor.sum` / `+` in `ToMathlib.PFunctor.Basic`, `Lens.sumPair`, `Chart.sumPair`),
+so the planned implementation routes recursive calls into the body via the
+existing `Lens.inl`/`Lens.inr`/`Lens.sumPair` combinators.
 
 Coq references:
 
