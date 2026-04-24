@@ -7,6 +7,7 @@ Authors: Quang Dao
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.WriterTBridge
+import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
@@ -25,7 +26,8 @@ Connects the oracle-simulation handlers (`cachingOracle`, `seededOracle`,
 The bridge is two-layered:
 
 * *Per-query (leaf) specs* are proven once. Modern handlers (`cachingOracle`,
-  `loggingOracle`, `cachingLoggingOracle`) are written in `do` notation
+  `loggingOracle`, `cachingLoggingOracle`) are defined in
+  `VCVio/OracleComp/QueryTracking/*` and written in `do` notation
   with `get` / `match` / `query` / `modify` / `tell`, and their `_triple`
   lemmas use `mvcgen` directly to walk the body. Each `query` step is
   bridged to a support-based statement via `wpProp_iff_forall_support`;
@@ -651,7 +653,8 @@ independent sub-states. The single-`StateT`-layer pattern (with
 handlers, because it stays inside the `(.arg σ .pure)` postcondition
 shape that our `Std.Do` bridge supports cleanly.
 
-The worked example is `cachingLoggingOracle`, which on every query both:
+The worked example is the query-tracking handler `cachingLoggingOracle`, which
+on every query both:
 * logs the query/response pair into the right component, and
 * caches the response in the left component (querying the underlying
   oracle only on a cache miss).
@@ -669,30 +672,6 @@ section stackedHandlers
 
 variable [spec.DecidableEq]
 
-/-- A combined caching + logging handler over a product state.
-
-Behavior on a query `t`:
-* if the cache already has a value `v` at `t`, return `v`, leave the cache
-  unchanged, and append `⟨t, v⟩` to the log;
-* otherwise sample `v` from the underlying oracle, install `(t, v)` into
-  the cache, and append `⟨t, v⟩` to the log.
-
-The log always grows by exactly one entry per call; the cache grows by at
-most one entry per call. Defined in `do`-notation form so that `mvcgen`
-walks the body directly. -/
-def cachingLoggingOracle :
-    QueryImpl spec (StateT (QueryCache spec × QueryLog spec) (OracleComp spec)) :=
-  fun t => do
-    let s ← get
-    match s.1 t with
-    | some v =>
-        modify (fun s => (s.1, s.2 ++ [⟨t, v⟩]))
-        pure v
-    | none =>
-        let v ← (OracleComp.query t : OracleComp spec _)
-        modify (fun s => (QueryCache.cacheQuery s.1 t v, s.2 ++ [⟨t, v⟩]))
-        pure v
-
 /-- Per-call spec for `cachingLoggingOracle t`: the log is extended by exactly
 one entry `⟨t, v⟩`, the cache only grows, and the returned value is now
 cached at `t`. Proved purely with `mvcgen` plus a single bridging step in
@@ -707,7 +686,7 @@ theorem cachingLoggingOracle_triple
         StateT (QueryCache spec × QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun s => ⌜cache₀ ≤ s.1 ∧ s.2 = log₀⌝))
       (⇓ v s' => ⌜cache₀ ≤ s'.1 ∧ s'.1 t = some v ∧ s'.2 = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold cachingLoggingOracle
+  rw [cachingLoggingOracle.apply_eq]
   mvcgen
   · -- some-branch: cache hit
     rename_i s hcond v hsome _t

@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
+import VCVio.ProgramLogic.Tactics.Handler
 import VCVio.ProgramLogic.Tactics.Unary
 import VCVio.ProgramLogic.Tactics.Relational
 

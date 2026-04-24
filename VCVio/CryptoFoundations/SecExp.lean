@@ -51,6 +51,28 @@ lemma ProbComp.boolDistAdvantage_triangle (p q r : ProbComp Bool) :
     p.boolDistAdvantage r ≤ p.boolDistAdvantage q + q.boolDistAdvantage r := by
   unfold ProbComp.boolDistAdvantage
   exact abs_sub_le _ _ _
+
+/-- The `true`-branch probability of one Boolean-valued game is bounded above by the
+`true`-branch probability of another game plus their distinguishing advantage.
+
+This is the `ENNReal`-level interpretation of the real-valued identity `a ≤ b + |a - b|`,
+packaged for SSP game-hopping: converting an `advantage p q ≤ ε` assumption into a direct
+probability inequality `Pr[true|p] ≤ Pr[true|q] + ENNReal.ofReal ε` that plugs into chained
+`calc`-style bounds. -/
+lemma ProbComp.probOutput_true_le_add_ofReal_boolDistAdvantage (p q : ProbComp Bool) :
+    Pr[= true | p] ≤ Pr[= true | q] + ENNReal.ofReal (p.boolDistAdvantage q) := by
+  unfold ProbComp.boolDistAdvantage
+  set a : ℝ := (Pr[= true | p]).toReal with ha_def
+  set b : ℝ := (Pr[= true | q]).toReal with hb_def
+  have h_abs : a ≤ b + |a - b| := by
+    have : a - b ≤ |a - b| := le_abs_self _
+    linarith
+  have h_p : Pr[= true | p] = ENNReal.ofReal a :=
+    (ENNReal.ofReal_toReal probOutput_ne_top).symm
+  have h_q : Pr[= true | q] = ENNReal.ofReal b :=
+    (ENNReal.ofReal_toReal probOutput_ne_top).symm
+  rw [h_p, h_q, ← ENNReal.ofReal_add ENNReal.toReal_nonneg (abs_nonneg _)]
+  exact ENNReal.ofReal_le_ofReal h_abs
 /-- Re-express Boolean bias as twice the absolute deviation of `Pr[true]` from `1/2`. -/
 lemma ProbComp.boolBiasAdvantage_eq_two_mul_abs_sub_half (p : ProbComp Bool) :
     p.boolBiasAdvantage = 2 * |(Pr[= true | p]).toReal - 1 / 2| := by

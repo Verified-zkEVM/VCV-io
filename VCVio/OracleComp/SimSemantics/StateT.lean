@@ -19,6 +19,49 @@ open OracleSpec
 
 namespace QueryImpl
 
+/-- Push an outer oracle interpretation through the base monad of a
+`StateT`-valued query implementation. -/
+noncomputable def stateTMapBase {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁))) :
+    QueryImpl spec₀ (StateT σ m) := fun t =>
+  StateT.mk fun s => simulateQ outer ((inner t).run s)
+
+/-- Running a `StateT` handler and then interpreting its base oracle
+computations is the same as first mapping the handler's base through the
+outer interpreter. -/
+theorem simulateQ_stateTMapBase_run {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) (s : σ) :
+    simulateQ outer ((simulateQ inner oa).run s) =
+      (simulateQ (outer.stateTMapBase inner) oa).run s := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x => simp
+  | query_bind t k ih =>
+      simp only [simulateQ_bind, StateT.run_bind]
+      simp only [simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query,
+        id_map, stateTMapBase]
+      refine bind_congr fun z => ?_
+      exact ih z.1 z.2
+
+/-- Output-only corollary of `simulateQ_stateTMapBase_run`. -/
+theorem simulateQ_stateTMapBase_run' {ι₀ ι₁ : Type _}
+    {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ : Type u}
+    (outer : QueryImpl spec₁ m)
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) (s : σ) :
+    simulateQ outer ((simulateQ inner oa).run' s) =
+      (simulateQ (outer.stateTMapBase inner) oa).run' s := by
+  change simulateQ outer (Prod.fst <$> (simulateQ inner oa).run s) = _
+  rw [simulateQ_map, simulateQ_stateTMapBase_run]
+  rfl
+
 /-- Given implementations for oracles in `spec₁` and `spec₂` in terms of state monads for
 two different contexts `σ₁` and `σ₂`, implement the combined set `spec₁ + spec₂` in terms
 of a combined `σ₁ × σ₂` state. -/
@@ -30,6 +73,27 @@ def prodStateT {ι₁ ι₂ : Type _}
     QueryImpl (spec₁ + spec₂) (StateT (σ₁ × σ₂) m)
   | .inl t => StateT.mk fun | (s₁, s₂) => Prod.map id (·, s₂) <$> (impl₁ t).run s₁
   | .inr t => StateT.mk fun | (s₁, s₂) => Prod.map id (s₁, ·) <$> (impl₂ t).run s₂
+
+/-- Reassociate a nested state transformer into one product state.
+
+The outer state is the first component of the product; the inner/base state is
+the second component. This is the state-transformer analogue of reassociating
+handler stacks into an explicit joint state before applying projection lemmas. -/
+def flattenStateT {ι : Type _} {spec : OracleSpec ι}
+    {m : Type u → Type v} [Monad m] {σ τ : Type u}
+    (impl : QueryImpl spec (StateT σ (StateT τ m))) :
+    QueryImpl spec (StateT (σ × τ) m) := fun t =>
+  StateT.mk fun (s, q) => do
+    let ((u, s'), q') ← (impl t).run s |>.run q
+    pure (u, (s', q'))
+
+@[simp] theorem flattenStateT_liftTarget_apply_run {ι : Type _} {spec : OracleSpec ι}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ τ : Type u}
+    (impl : QueryImpl spec (StateT τ m)) (t : spec.Domain) (s : σ) (q : τ) :
+    ((impl.liftTarget (StateT σ (StateT τ m))).flattenStateT t).run (s, q) =
+      (fun y : spec.Range t × τ => (y.1, (s, y.2))) <$> (impl t).run q := by
+  simp [flattenStateT, QueryImpl.liftTarget_apply, StateT.run_bind,
+    StateT.run_monadLift, map_eq_bind_pure_comp]
 
 /-- Indexed version of `QueryImpl.prodStateT`. Note that `m` cannot vary with `t`.
 dtumad: The `Function.update` thing is nice but forces `DecidableEq`. -/
@@ -111,5 +175,52 @@ omit [LawfulMonad m] in
 lemma liftM_run_StateT {α : Type u} (x : m α) (s : σ) :
     (liftM x : StateT σ m α).run s = x >>= fun a => pure (a, s) :=
   StateT.run_lift x s
+
+variable {τ : Type u}
+
+/-- Running a computation under a flattened nested-state implementation is the
+same as running the original nested computation and reassociating the final
+states into a product. -/
+theorem simulateQ_flattenStateT_run
+    (impl : QueryImpl spec (StateT σ (StateT τ m)))
+    {α : Type u} (oa : OracleComp spec α) (s : σ) (q : τ) :
+    (simulateQ impl.flattenStateT oa).run (s, q) =
+      (do
+        let ((a, s'), q') ← (simulateQ impl oa).run s |>.run q
+        pure (a, (s', q')) : m (α × (σ × τ))) := by
+  induction oa using OracleComp.inductionOn generalizing s q with
+  | pure x =>
+      simp [simulateQ_pure]
+  | query_bind t k ih =>
+      simp [simulateQ_bind, simulateQ_query, QueryImpl.flattenStateT,
+        StateT.run_bind]
+      refine bind_congr (m := m) fun x => ?_
+      rcases x with ⟨⟨u, s'⟩, q'⟩
+      simpa [map_eq_bind_pure_comp] using ih u s' q'
+
+/-- Output-only corollary of `simulateQ_flattenStateT_run`. -/
+theorem simulateQ_flattenStateT_run'
+    (impl : QueryImpl spec (StateT σ (StateT τ m)))
+    {α : Type u} (oa : OracleComp spec α) (s : σ) (q : τ) :
+    (simulateQ impl.flattenStateT oa).run' (s, q) =
+      (Prod.fst <$> (simulateQ impl oa).run s).run' q := by
+  rw [StateT.run'_eq, simulateQ_flattenStateT_run]
+  simp [StateT.run'_eq, Functor.map_map]
+
+/-- Running an adversary-side `StateT` handler under an outer stateful
+interpreter produces the same distribution as the flattened product-state
+handler, up to reassociating `((output, localState), outerState)` and
+`(output, (localState, outerState))`. -/
+theorem simulateQ_stateTMapBase_run_eq_map_flattenStateT
+    {ι₀ ι₁ : Type _} {spec₀ : OracleSpec ι₀} {spec₁ : OracleSpec ι₁}
+    {m : Type u → Type v} [Monad m] [LawfulMonad m] {σ τ : Type u}
+    (outer : QueryImpl spec₁ (StateT τ m))
+    (inner : QueryImpl spec₀ (StateT σ (OracleComp spec₁)))
+    {α : Type u} (oa : OracleComp spec₀ α) (s : σ) (q : τ) :
+    (simulateQ outer ((simulateQ inner oa).run s)).run q =
+      (fun z : α × (σ × τ) => ((z.1, z.2.1), z.2.2)) <$>
+        (simulateQ (outer.stateTMapBase inner).flattenStateT oa).run (s, q) := by
+  rw [QueryImpl.simulateQ_stateTMapBase_run, simulateQ_flattenStateT_run]
+  simp [map_bind, Functor.map_map]
 
 end OracleComp
