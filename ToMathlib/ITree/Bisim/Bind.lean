@@ -110,9 +110,90 @@ theorem bind_pure_right (t : ITree F α) :
     unfold bindStep
     simp only [hdest]
 
+/-- Compute one `M.dest` step of `bind` whose head is a step. -/
+private theorem dest_bind_step (k : α → ITree F β) (t : ITree F α)
+    (c : PUnit → ITree F α) (h : PFunctor.M.dest t = ⟨.step, c⟩) :
+    PFunctor.M.dest (bind t k) = ⟨.step, fun _ => bind (c PUnit.unit) k⟩ := by
+  rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
+  rfl
+
+/-- Compute one `M.dest` step of `bind` whose head is a query. -/
+private theorem dest_bind_query (k : α → ITree F β) (t : ITree F α) (a : F.A)
+    (c : F.B a → ITree F α) (h : PFunctor.M.dest t = ⟨.query a, c⟩) :
+    PFunctor.M.dest (bind t k) = ⟨.query a, fun b => bind (c b) k⟩ := by
+  rw [bind, PFunctor.M.dest_corec_apply, bindStep_inl, h]
+  rfl
+
 theorem bind_assoc (t : ITree F α) (k : α → ITree F β) (k' : β → ITree F γ) :
     bind (bind t k) k' = bind t (fun a => bind (k a) k') := by
-  sorry
+  refine PFunctor.M.bisim
+    (fun (u v : ITree F γ) =>
+      u = v ∨
+      (∃ s : ITree F β, u = bind s k' ∧ v = bind s k') ∨
+      ∃ t : ITree F α,
+        u = bind (bind t k) k' ∧ v = bind t (fun a => bind (k a) k'))
+    ?_ _ _ (Or.inr (Or.inr ⟨t, rfl, rfl⟩))
+  rintro u v (rfl | ⟨s, rfl, rfl⟩ | ⟨t, rfl, rfl⟩)
+  · -- u = v case: trivially bisimilar.
+    rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+    exact ⟨sh, c, c, rfl, rfl, fun _ => Or.inl rfl⟩
+  · -- bind s k' on both sides: same destructor.
+    rcases h : PFunctor.M.dest s with ⟨sh, c⟩
+    cases sh with
+    | pure r =>
+        have hs : s = pure r := by
+          apply PFunctor.M.eq_of_dest_eq
+          rw [h]
+          change (⟨.pure r, c⟩ : (Poly F β).Obj _) = ⟨.pure r, PEmpty.elim⟩
+          congr 1; funext z; exact z.elim
+        clear h
+        subst hs
+        rw [bind_pure_left]
+        rcases hk : PFunctor.M.dest (k' r) with ⟨sh', c'⟩
+        exact ⟨sh', c', c', rfl, rfl, fun _ => Or.inl rfl⟩
+    | step =>
+        refine ⟨.step, fun _ => bind (c PUnit.unit) k',
+          fun _ => bind (c PUnit.unit) k', ?_, ?_,
+          fun _ => Or.inr (.inl ⟨_, rfl, rfl⟩)⟩
+        · exact dest_bind_step k' s c h
+        · exact dest_bind_step k' s c h
+    | query a =>
+        refine ⟨.query a, fun b => bind (c b) k', fun b => bind (c b) k',
+          ?_, ?_, fun _ => Or.inr (.inl ⟨_, rfl, rfl⟩)⟩
+        · exact dest_bind_query k' s a c h
+        · exact dest_bind_query k' s a c h
+  · -- the main "associativity" case.
+    rcases h : PFunctor.M.dest t with ⟨sh, c⟩
+    cases sh with
+    | pure r =>
+        have ht : t = pure r := by
+          apply PFunctor.M.eq_of_dest_eq
+          rw [h]
+          change (⟨.pure r, c⟩ : (Poly F α).Obj _) = ⟨.pure r, PEmpty.elim⟩
+          congr 1; funext z; exact z.elim
+        clear h
+        subst ht
+        rw [bind_pure_left, bind_pure_left]
+        rcases hkr : PFunctor.M.dest (bind (k r) k') with ⟨sh', c'⟩
+        exact ⟨sh', c', c', rfl, rfl, fun _ => Or.inl rfl⟩
+    | step =>
+        have hbind : PFunctor.M.dest (bind t k) =
+            ⟨.step, fun _ => bind (c PUnit.unit) k⟩ := dest_bind_step k t c h
+        refine ⟨.step,
+          fun _ => bind (bind (c PUnit.unit) k) k',
+          fun _ => bind (c PUnit.unit) (fun a => bind (k a) k'),
+          ?_, ?_, fun _ => Or.inr (.inr ⟨_, rfl, rfl⟩)⟩
+        · exact dest_bind_step k' (bind t k) _ hbind
+        · exact dest_bind_step (fun a => bind (k a) k') t c h
+    | query a =>
+        have hbind : PFunctor.M.dest (bind t k) =
+            ⟨.query a, fun b => bind (c b) k⟩ := dest_bind_query k t a c h
+        refine ⟨.query a,
+          fun b => bind (bind (c b) k) k',
+          fun b => bind (c b) (fun a => bind (k a) k'),
+          ?_, ?_, fun _ => Or.inr (.inr ⟨_, rfl, rfl⟩)⟩
+        · exact dest_bind_query k' (bind t k) a _ hbind
+        · exact dest_bind_query (fun a => bind (k a) k') t a c h
 
 /-! ### `iter` unfolding and interaction with `bind` -/
 
@@ -122,7 +203,76 @@ theorem iter_unfold (body : β → ITree F (β ⊕ α)) (init : β) :
         (fun rj => match rj with
           | .inl j => step (iter body j)
           | .inr r => pure r) := by
-  sorry
+  set kk : β ⊕ α → ITree F α := fun rj => match rj with
+    | .inl j => step (iter body j)
+    | .inr r => pure r with hkk
+  refine PFunctor.M.bisim
+    (fun (u v : ITree F α) =>
+      u = v ∨ ∃ t : ITree F (β ⊕ α),
+        u = PFunctor.M.corec (iterStep body) t ∧ v = bind t kk)
+    ?_ _ _ (Or.inr ⟨body init, rfl, rfl⟩)
+  rintro u v (rfl | ⟨t, rfl, rfl⟩)
+  · -- u = v case.
+    rcases h : PFunctor.M.dest u with ⟨sh, c⟩
+    exact ⟨sh, c, c, rfl, rfl, fun _ => Or.inl rfl⟩
+  · rcases h : PFunctor.M.dest t with ⟨sh, c⟩
+    cases sh with
+    | pure rj =>
+        cases rj with
+        | inl j =>
+            have ht : t = pure (.inl j) := by
+              apply PFunctor.M.eq_of_dest_eq
+              rw [h]
+              change (⟨.pure (.inl j), c⟩ : (Poly F (β ⊕ α)).Obj _) =
+                  ⟨.pure (.inl j), PEmpty.elim⟩
+              congr 1; funext z; exact z.elim
+            clear h
+            subst ht
+            refine ⟨.step, fun _ => iter body j, fun _ => iter body j,
+              ?_, ?_, fun _ => Or.inl rfl⟩
+            · -- M.dest (M.corec (iterStep body) (pure (.inl j))) = ⟨.step, _⟩
+              rw [PFunctor.M.dest_corec_apply, iterStep,
+                  show PFunctor.M.dest (pure (F := F) (.inl j : β ⊕ α)) =
+                    ⟨.pure (.inl j), PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+              rfl
+            · rw [bind_pure_left]
+              show PFunctor.M.dest (kk (.inl j)) = ⟨.step, fun _ => iter body j⟩
+              rw [hkk]
+              exact shape'_step _
+        | inr r =>
+            have ht : t = pure (.inr r) := by
+              apply PFunctor.M.eq_of_dest_eq
+              rw [h]
+              change (⟨.pure (.inr r), c⟩ : (Poly F (β ⊕ α)).Obj _) =
+                  ⟨.pure (.inr r), PEmpty.elim⟩
+              congr 1; funext z; exact z.elim
+            clear h
+            subst ht
+            refine ⟨.pure r, PEmpty.elim, PEmpty.elim, ?_, ?_, fun b => b.elim⟩
+            · rw [PFunctor.M.dest_corec_apply, iterStep,
+                  show PFunctor.M.dest (pure (F := F) (.inr r : β ⊕ α)) =
+                    ⟨.pure (.inr r), PEmpty.elim⟩ from PFunctor.M.dest_mk _]
+              congr 1
+              funext z
+              exact z.elim
+            · rw [bind_pure_left]
+              show PFunctor.M.dest (kk (.inr r)) = ⟨.pure r, PEmpty.elim⟩
+              rw [hkk]
+              exact shape'_pure r
+    | step =>
+        refine ⟨.step,
+          fun _ => PFunctor.M.corec (iterStep body) (c PUnit.unit),
+          fun _ => bind (c PUnit.unit) kk,
+          ?_, ?_, fun _ => Or.inr ⟨c PUnit.unit, rfl, rfl⟩⟩
+        · rw [PFunctor.M.dest_corec_apply, iterStep, h]
+        · exact dest_bind_step kk t c h
+    | query a =>
+        refine ⟨.query a,
+          fun b => PFunctor.M.corec (iterStep body) (c b),
+          fun b => bind (c b) kk,
+          ?_, ?_, fun b => Or.inr ⟨c b, rfl, rfl⟩⟩
+        · rw [PFunctor.M.dest_corec_apply, iterStep, h]
+        · exact dest_bind_query kk t a c h
 
 theorem iter_bind (body : β → ITree F (β ⊕ α)) (k : α → ITree F γ) (init : β) :
     bind (iter body init) k =
