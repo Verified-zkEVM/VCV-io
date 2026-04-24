@@ -43,6 +43,10 @@ noncomputable section
 
 open OracleComp OracleSpec
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 namespace QueryImpl
 
 /-- `PreservesInv impl Inv` means every oracle query implementation step preserves `Inv`
@@ -355,7 +359,7 @@ theorem simulateQ_run_writerPreservesInv
             ((impl t).run >>= fun us =>
               (fun vs : α × ω => (vs.1, us.2 * vs.2)) <$>
                 (simulateQ impl (oa us.1)).run) := by
-        simp [simulateQ_bind, simulateQ_query, WriterT.run_bind, OracleComp.query_def]
+        simp [simulateQ_bind, simulateQ_query, WriterT.run_bind, OracleSpec.query_def]
       rw [hrun_eq] at hz
       rcases (mem_support_bind_iff _ _ _).1 hz with ⟨us, hus, hzcont⟩
       have hInv_us : Inv (s₀ * us.2) := himpl t s₀ hs₀ us hus

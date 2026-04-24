@@ -18,6 +18,10 @@ open OracleSpec Option ENNReal BigOperators
 
 universe u v w
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 namespace OracleComp
 
 variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}

@@ -23,6 +23,10 @@ namespace MerkleTree
 
 open List OracleSpec OracleComp
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 variable (α : Type _)
 
 /-- Define the domain & range of the (single) oracle needed for constructing a Merkle tree with

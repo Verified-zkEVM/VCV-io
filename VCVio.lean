@@ -147,6 +147,7 @@ import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.FinRatPMF
 import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.HasQueryClass
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery

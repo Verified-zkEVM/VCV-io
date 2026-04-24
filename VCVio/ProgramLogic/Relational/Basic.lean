@@ -26,6 +26,10 @@ This file defines `RelTriple` via the generic two-monad algebra interface
 
 universe u
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 namespace OracleComp.ProgramLogic.Relational
 
 variable {ι₁ : Type u} {ι₂ : Type u}

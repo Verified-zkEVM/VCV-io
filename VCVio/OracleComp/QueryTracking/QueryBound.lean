@@ -29,6 +29,10 @@ open OracleSpec
 
 universe u
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}

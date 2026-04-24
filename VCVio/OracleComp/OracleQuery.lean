@@ -32,10 +32,17 @@ namespace OracleSpec
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
 
 /-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
-Note: could consider putting this in the `OracleQuery` monad, type inference struggles tho. -/
-def query (t : spec.Domain) : OracleQuery spec (spec.Range t) := OracleQuery.mk t id
 
-lemma query_def (t : spec.Domain) : query t = ⟨t, id⟩ := rfl
+Marked `protected`: the bare identifier `query` resolves to `HasQuery.query`
+(exported in `VCVio.OracleComp.HasQueryClass`), which yields a value in the
+ambient monad and lets Lean recover `spec` from the expected type without an
+ascription. Use `spec.query t` or `OracleSpec.query t` when you specifically
+want the primitive single-query syntax `OracleQuery spec (spec.Range t)`. -/
+protected def query (t : spec.Domain) : OracleQuery spec (spec.Range t) :=
+  OracleQuery.mk t id
+
+protected lemma query_def (t : spec.Domain) :
+    OracleSpec.query t = ⟨t, id⟩ := rfl
 
 end OracleSpec
 
@@ -101,25 +108,25 @@ instance {α} [h : Subsingleton ι] [h' : Subsingleton α] : Subsingleton (Oracl
     have h' : Subsingleton (spec.Range t → α) := by infer_instance
     exact OracleQuery.ext' t (h'.allEq cont cont')
 
-@[simp] lemma input_query (t : spec.Domain) : (query t).input = t := rfl
-@[simp] lemma cont_query (t : spec.Domain) : (query t).cont = id := rfl
+@[simp] lemma input_query (t : spec.Domain) : (OracleSpec.query t).input = t := rfl
+@[simp] lemma cont_query (t : spec.Domain) : (OracleSpec.query t).cont = id := rfl
 
-@[simp] lemma fst_query (t : spec.Domain) : (query t).1 = t := rfl
-@[simp] lemma snd_query (t : spec.Domain) : (query t).2 = id := rfl
+@[simp] lemma fst_query (t : spec.Domain) : (OracleSpec.query t).1 = t := rfl
+@[simp] lemma snd_query (t : spec.Domain) : (OracleSpec.query t).2 = id := rfl
 
 @[simp] lemma cont_map_query_input {α} (q : OracleQuery spec α) :
-    q.cont <$> (query q.input) = q := rfl
+    q.cont <$> (OracleSpec.query q.input) = q := rfl
 
 @[simp] lemma cont_map_query_input' {α} (q : OracleQuery spec α) :
-    PFunctor.map spec.toPFunctor q.cont (query q.input) = q := rfl
+    PFunctor.map spec.toPFunctor q.cont (OracleSpec.query q.input) = q := rfl
 
 @[simp] lemma query_eq_mk_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
-    query t = OracleQuery.mk t cont ↔ cont = id := by
+    OracleSpec.query t = OracleQuery.mk t cont ↔ cont = id := by
   rw [OracleQuery.ext_iff]
   aesop
 
 @[simp] lemma mk_eq_query_iff (t : spec.Domain) (cont : spec.Range t → spec.Range t) :
-    OracleQuery.mk t cont = query t ↔ cont = id := by
+    OracleQuery.mk t cont = OracleSpec.query t ↔ cont = id := by
   rw [OracleQuery.ext_iff]
   aesop
 

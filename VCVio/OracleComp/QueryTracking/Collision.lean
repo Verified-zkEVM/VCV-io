@@ -30,6 +30,10 @@ inside `cachingOracle`.
 
 open OracleSpec OracleComp ENNReal Finset
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}

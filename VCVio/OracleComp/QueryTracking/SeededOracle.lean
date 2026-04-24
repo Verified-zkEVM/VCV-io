@@ -25,6 +25,10 @@ open OracleComp OracleSpec
 
 universe u v w
 
+/-! Locally rebind `query` to the primitive `OracleSpec.query` form. See
+the same construct in `VCVio.OracleComp.OracleComp`. -/
+local notation "query" => OracleSpec.query
+
 variable {ι : Type u} {spec : OracleSpec ι} [DecidableEq ι]
 
 namespace QueryImpl
@@ -76,7 +80,7 @@ lemma apply_eq (t : spec.Domain) :
     seededOracle t = StateT.mk fun seed =>
       match seed t with
       | u :: us => pure (u, Function.update seed t us)
-      | [] => (·, seed) <$> OracleComp.query t := rfl
+      | [] => (·, seed) <$> OracleSpec.query t := rfl
 
 lemma run_bind_query_eq_pop {α : Type u}
     (t : spec.Domain) (mx : spec.Range t → OracleComp spec α) (seed : QuerySeed spec) :

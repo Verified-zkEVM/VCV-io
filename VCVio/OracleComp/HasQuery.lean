@@ -9,30 +9,30 @@ import VCVio.OracleComp.ProbComp
 import ToMathlib.Control.Monad.Hom
 
 /-!
-# Generic Oracle Query Capability
+# Generic Oracle Query Capability: bridges and morphisms
 
-This file defines `HasQuery spec m`, a thin capability interface for monads that can issue
-queries to an oracle family `spec`.
+The core `HasQuery spec m` class and the two foundational instances
+(`HasQuery spec (OracleQuery spec)` and the `MonadLiftT`-driven
+`(priority := low) instOfMonadLift`) live upstream in
+`VCVio.OracleComp.HasQueryClass`, where they are visible to the core
+`OracleComp` syntax and the `export HasQuery (query)` line places `query`
+in scope as the bare identifier. This file extends that capability with:
 
-`OracleComp spec` remains the canonical free syntax for explicit oracle computations, structural
-induction, and query-bound reasoning. `HasQuery` is the lighter interface used when a
-construction only needs to *ask* oracle queries, without reifying or analyzing the query syntax.
+* `QueryImpl.toHasQuery` / `HasQuery.toQueryImpl`, the bridges between
+  oracle implementations and capability.
+* `QueryHom`, the right notion of morphism between two `HasQuery` monads.
+* `PreservesProbCompLift`, a side-condition recording compatibility with
+  the canonical `ProbComp` lift.
 
-The key design choice is that `HasQuery` is just a facade over the existing lifting story:
-the primitive single-query syntax `OracleQuery spec` is itself a `HasQuery spec` instance, and
-any monad that supports `MonadLiftT (OracleQuery spec) m` automatically gets a `HasQuery spec m`
-instance as well. As a result, the capability composes with the existing `SubSpec` coercions
-and with standard transformer lifts such as `StateT`, `ReaderT`, `ExceptT`, and `WriterT`.
+`OracleComp spec` remains the canonical free syntax for explicit oracle
+computations, structural induction, and query-bound reasoning. `HasQuery`
+is the lighter interface used when a construction only needs to *ask*
+oracle queries, without reifying or analyzing the query syntax.
 -/
 
 open OracleSpec
 
 universe u v w x
-
-/-- Capability to issue queries to the oracle family `spec` inside the ambient monad `m`. -/
-class HasQuery {ι : Type u} (spec : OracleSpec.{u, v} ι) (m : Type v → Type w) where
-  /-- Issue a single oracle query. -/
-  query : (t : spec.Domain) → m (spec.Range t)
 
 namespace QueryImpl
 
@@ -49,19 +49,10 @@ lemma toHasQuery_query (impl : QueryImpl spec m) (t : spec.Domain) :
     (toHasQuery (spec := spec) (m := m) impl).query t = impl t := rfl
 
 end QueryImpl
+
 namespace HasQuery
 
 variable {ι : Type u} {spec : OracleSpec.{u, v} ι} {m : Type v → Type w}
-
-/-- The primitive single-query syntax `OracleQuery spec` has the obvious query capability. -/
-instance instOracleQuery : HasQuery spec (OracleQuery spec) where
-  query := OracleSpec.query
-
-@[simp]
-lemma instOracleQuery_query (t : spec.Domain) :
-    HasQuery.query (spec := spec) (m := OracleQuery spec) t =
-      spec.query t :=
-  rfl
 
 /-- Repackage `HasQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
 implementations. -/
@@ -71,18 +62,6 @@ def toQueryImpl [HasQuery spec m] : QueryImpl spec m :=
 @[simp]
 lemma toQueryImpl_apply [HasQuery spec m] (t : spec.Domain) :
     toQueryImpl (spec := spec) (m := m) t = HasQuery.query (spec := spec) (m := m) t := rfl
-
-/-- Any lawful lift of `OracleQuery spec` into `m` gives query capability in `m`. This is the
-main bridge that makes `HasQuery` compose with `SubSpec` lifts and standard transformer lifts. -/
-instance (priority := low) instOfMonadLift [MonadLiftT (OracleQuery spec) m] :
-    HasQuery spec m where
-  query t := liftM (spec.query t)
-
-@[simp]
-lemma instOfMonadLift_query [MonadLiftT (OracleQuery spec) m] (t : spec.Domain) :
-    HasQuery.query (spec := spec) (m := m) t =
-      liftM (spec.query t) :=
-  rfl
 
 section Morphisms
 
