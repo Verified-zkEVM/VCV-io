@@ -30,7 +30,7 @@ variable {α β : Type}
 /-- Proposition-level bridge from quantitative WP (`= 1` threshold). -/
 noncomputable def wpProp (oa : OracleComp spec α) (post : α → Prop) : Prop := by
   classical
-  exact OracleComp.ProgramLogic.wp (spec := spec) oa (fun x => if post x then 1 else 0) = 1
+  exact wp oa (fun x => if post x then 1 else 0) = 1
 
 /-- Proposition-style triple alias used by the `Std.Do` bridge. -/
 def tripleProp (pre : Prop) (oa : OracleComp spec α) (post : α → Prop) : Prop :=

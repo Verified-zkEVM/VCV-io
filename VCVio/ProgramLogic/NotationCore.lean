@@ -131,14 +131,26 @@ lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
 Mirrors Std.Do's `⌜P⌝ : SPred` but targets `ℝ≥0∞`. -/
 scoped notation "⌜" P "⌝" => propInd P
 
-/-- Quantitative WP: `wp⟦c⟧ post` or just `wp⟦c⟧` for partial application. -/
-scoped notation "wp⟦" c "⟧" => wp c
+/-- Quantitative WP notation. `wp⟦c⟧ post` directly elaborates to
+`wp c post`; `wp⟦c⟧` standalone elaborates to
+the lambda `fun post => wp c post` for partial
+application sites (e.g. `change wp⟦c⟧` or composition with `≤`). -/
+scoped syntax:max (name := wpBracket) "wp⟦" term "⟧" : term
+scoped syntax:max (name := wpBracketApp) "wp⟦" term "⟧" term:max : term
 
-/-- Quantitative Hoare triple: `⦃P⦄ c ⦃Q⦄` means `P ≤ wp c Q`.
-Uses `syntax` + `macro_rules` (not `notation`) because `⦃⦄` overlaps
-with Lean's strict-implicit binder syntax. -/
-scoped syntax:lead "⦃" term "⦄ " term:lead " ⦃" term "⦄" : term
-macro_rules | `(⦃$P⦄ $c ⦃$Q⦄) => `(Triple $P $c $Q)
+scoped macro_rules
+  | `(wp⟦ $c ⟧ $post:term) => `(wp $c $post)
+  | `(wp⟦ $c ⟧)            => `(fun post => wp $c post)
+
+/-- Quantitative Hoare triple notation: `⦃P⦄ c ⦃Q⦄` means `Triple P c Q`,
+which is `pre ≤ wp c post` after `triple_iff_le_wp`. The wrapper avoids
+needing `open Lean.Order` at use sites: our `Triple` abbrev fixes the
+exception postcondition to `Lean.Order.bot` internally. -/
+scoped syntax:lead (name := tripleBracket)
+  "⦃" term "⦄ " term:lead " ⦃" term "⦄" : term
+
+scoped macro_rules (kind := tripleBracket)
+  | `(⦃$P⦄ $c ⦃$Q⦄) => `(Triple $P $c $Q)
 
 /-- Game equivalence: `g₁ ≡ₚ g₂` means `evalDist g₁ = evalDist g₂`.
 Uses `syntax` + `macro_rules` because `≡` conflicts with Mathlib's
@@ -180,18 +192,17 @@ lemma Relational.RelPost.indicator_eq_propInd {α β : Type}
 lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Triple (spec := spec) ⌜True⌝ oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1 := by
-  change ⌜True⌝ ≤ wp oa (fun x => ⌜p x⌝) ↔ Pr[ p | oa] = 1
-  rw [propInd_true, ← probEvent_eq_wp_propInd]
+    Triple (⌜True⌝ : ℝ≥0∞) oa (fun x => ⌜p x⌝) ↔
+      Pr[ p | oa] = 1 := by
+  rw [triple_iff_le_wp, propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
 /-- Lower-bound event goals are exactly quantitative triples with `⌜p⌝` postconditions. -/
 lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
-    Triple (spec := spec) r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa] := by
-  change r ≤ wp oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa]
-  rw [← probEvent_eq_wp_propInd]
+    Triple r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa] := by
+  rw [triple_iff_le_wp, ← probEvent_eq_wp_propInd]
 
 /-! ## Expectation-level bridge lemmas -/
 
@@ -199,7 +210,9 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
 theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p q : α → Prop) :
-    wp oa (fun x => ⌜p x ∨ q x⌝) ≤ wp oa (fun x => ⌜p x⌝) + wp oa (fun x => ⌜q x⌝) := by
+    wp oa (fun x => ⌜p x ∨ q x⌝) ≤
+        wp oa (fun x => ⌜p x⌝) +
+          wp oa (fun x => ⌜q x⌝) := by
   rw [← probEvent_eq_wp_propInd, ← probEvent_eq_wp_propInd, ← probEvent_eq_wp_propInd]
   exact probEvent_or_le _ _ _
 
@@ -228,7 +241,7 @@ theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
 theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (h : ∀ x ∈ support oa, p x) :
-    Triple (spec := spec) 1 oa (fun x => ⌜p x⌝) := by
+    Triple (1 : ℝ≥0∞) oa (fun x => ⌜p x⌝) := by
   rw [show (1 : ℝ≥0∞) = ⌜True⌝ from propInd_true.symm]
   exact (triple_propInd_iff_probEvent_eq_one oa p).mpr
     (probEvent_eq_one ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩)

@@ -106,7 +106,9 @@ def tryCloseSpecGoalImmediate : TacticM Bool := do
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_zero _ _)) <||>
-  tryEvalTacticSyntax (← `(tactic| exact le_refl _))
+  tryEvalTacticSyntax (← `(tactic| exact le_refl _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.triple_ofLE le_rfl))
 
 /-- Try bounded local proof search on a closed goal.
 We only invoke `solve_by_elim` once the target has no unresolved expression metavariables; this
@@ -117,7 +119,7 @@ def tryCloseSpecGoalSearch : TacticM Bool := do
     return false
   tryEvalTacticSyntax (← `(tactic| (
     repeat intro
-    simp only [OracleComp.ProgramLogic.Triple] at *
+    simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
     solve_by_elim (maxDepth := 6) [OracleComp.ProgramLogic.wp_mono, le_trans]
   )))
 
@@ -136,7 +138,7 @@ private def closeTheoremStepGoals : TacticM Unit := do
         | assumption
         | (
             repeat intro
-            simp only [OracleComp.ProgramLogic.Triple] at *
+            simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
             solve_by_elim (maxDepth := 4) [OracleComp.ProgramLogic.wp_mono, le_trans]
           )))
 
@@ -215,6 +217,8 @@ def tryCloseSpecGoalFinal : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_probOutput_eq_one _ _ (by assumption))) <||>
   tryEvalTacticSyntax (← `(tactic| exact le_refl _)) <||>
+  tryEvalTacticSyntax (← `(tactic|
+    exact OracleComp.ProgramLogic.triple_ofLE le_rfl)) <||>
   tryCloseSpecGoalSearch
 
 /-- Run one bounded finish/closure pass across all current goals. -/
@@ -802,6 +806,9 @@ def tryLowerProbGoal : TacticM Bool := do
         rw [← OracleComp.ProgramLogic.triple_propInd_iff_le_probEvent])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
+        rw [ge_iff_le, ← OracleComp.ProgramLogic.triple_propInd_iff_le_probEvent])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probEvent_eq_wp_propInd])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
@@ -816,6 +823,9 @@ def tryLowerProbGoal : TacticM Bool := do
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.le_probOutput_iff_triple_indicator])) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        rw [ge_iff_le, OracleComp.ProgramLogic.le_probOutput_iff_triple_indicator])) then
       return true
     if ← tryEvalTacticSyntax (← `(tactic|
         rw [OracleComp.ProgramLogic.probOutput_eq_wp_indicator])) then

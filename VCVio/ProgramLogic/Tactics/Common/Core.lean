@@ -150,17 +150,23 @@ def eRelTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr × Expr)
   let #[pre, oa, ob, post] := args | none
   some (pre, oa, ob, post)
 
+private def findWpApp? (target : Expr) : Option (Expr × Nat) := do
+  if let some app := findAppWithHead? ``OracleComp.ProgramLogic.wp target then
+    some (app, 2)
+  else if let some app := findAppWithHead? ``Std.Do'.wp target then
+    some (app, 3)
+  else
+    none
+
 def wpGoalComp? (target : Expr) : Option Expr := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
-  let args ← trailingArgs? app 2
-  let #[oa, _post] := args | none
-  some oa
+  let (app, k) ← findWpApp? target
+  let args ← trailingArgs? app k
+  some args[0]!
 
 def wpGoalParts? (target : Expr) : Option (Expr × Expr) := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.wp target
-  let args ← trailingArgs? app 2
-  let #[oa, post] := args | none
-  some (oa, post)
+  let (app, k) ← findWpApp? target
+  let args ← trailingArgs? app k
+  some (args[0]!, args[1]!)
 
 def rawWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   let target := target.consumeMData
@@ -172,17 +178,23 @@ def rawWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   else
     none
 
+private def findTripleApp? (target : Expr) : Option (Expr × Nat) := do
+  if let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple target then
+    some (app, 3)
+  else if let some app := findAppWithHead? ``Std.Do'.Triple target then
+    some (app, 4)
+  else
+    none
+
 def tripleGoalComp? (target : Expr) : Option Expr := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
-  let args ← trailingArgs? app 3
-  let #[_pre, oa, _post] := args | none
-  some oa
+  let (app, k) ← findTripleApp? target
+  let args ← trailingArgs? app k
+  some args[1]!
 
 def tripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple target
-  let args ← trailingArgs? app 3
-  let #[pre, oa, post] := args | none
-  some (pre, oa, post)
+  let (app, k) ← findTripleApp? target
+  let args ← trailingArgs? app k
+  some (args[0]!, args[1]!, args[2]!)
 
 def isSimulateQAction (e : Expr) : Bool :=
   (findAppWithHead? ``simulateQ e).isSome

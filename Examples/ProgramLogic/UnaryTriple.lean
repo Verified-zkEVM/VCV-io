@@ -1,4 +1,4 @@
-/- 
+/-
 Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
@@ -57,24 +57,24 @@ example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
 
 example (oa : OracleComp spec α) (n : ℕ) (pre : ℝ≥0∞) (post : List α → ℝ≥0∞)
     (h :
-      pre ≤ wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs)))) :
+      pre ≤ wp⟦oa⟧(fun x => wp⟦oa.replicate n⟧(fun xs => post (x :: xs)))) :
     ⦃pre⦄ oa.replicate (n + 1) ⦃post⦄ := by
   vcstep
-  exact h
+  exact triple_ofLE h
 
 example (x : α) (xs : List α) (f : α → OracleComp spec β)
     (pre : ℝ≥0∞) (post : List β → ℝ≥0∞)
-    (h : pre ≤ wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys)))) :
+    (h : pre ≤ wp⟦f x⟧(fun y => wp⟦xs.mapM f⟧(fun ys => post (y :: ys)))) :
     ⦃pre⦄ (x :: xs).mapM f ⦃post⦄ := by
   vcstep
-  exact h
+  exact triple_ofLE h
 
 example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
     (init : β) (pre : ℝ≥0∞) (post : β → ℝ≥0∞)
-    (h : pre ≤ wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post)) :
+    (h : pre ≤ wp⟦f init x⟧(fun s => wp⟦xs.foldlM f s⟧post)) :
     ⦃pre⦄ (x :: xs).foldlM f init ⦃post⦄ := by
   vcstep
-  exact h
+  exact triple_ofLE h
 
 /-! ## `vcgen` exhaustive driver -/
 
@@ -133,7 +133,7 @@ example (c : Prop) [Decidable c] {oa ob : OracleComp spec α}
 
 example (n : ℕ) {oa : n > 0 → OracleComp spec α} {ob : ¬(n > 0) → OracleComp spec α}
     {pre : ℝ≥0∞} {post : α → ℝ≥0∞}
-    (ht : ∀ h, ⦃pre⦄ oa h ⦃post⦄) (hf : ∀ h, ⦃pre⦄ ob h ⦃post⦄) :
+    (ht : ∀ h, ⦃ pre ⦄ oa h ⦃ post ⦄) (hf : ∀ h, ⦃ pre ⦄ ob h ⦃ post ⦄) :
     ⦃pre⦄ (dite (n > 0) oa ob) ⦃post⦄ := by
   vcstep
   · exact ht _
@@ -154,12 +154,12 @@ example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
 
 example {σ : Type} {f : σ → α → OracleComp spec σ} {l : List α} {s₀ : σ}
     {I : σ → ℝ≥0∞}
-    (hstep : ∀ s x, x ∈ l → ⦃I s⦄ f s x ⦃I⦄) :
+    (hstep : ∀ s x, x ∈ l → ⦃ I s ⦄ f s x ⦃ I ⦄) :
     ⦃I s₀⦄ l.foldlM f s₀ ⦃I⦄ := by
   vcgen
 
 example {f : α → OracleComp spec β} {l : List α} {I : ℝ≥0∞}
-    (hstep : ∀ x, x ∈ l → ⦃I⦄ f x ⦃fun _ => I⦄) :
+    (hstep : ∀ x, x ∈ l → ⦃ I ⦄ f x ⦃ fun _ => I ⦄) :
     ⦃I⦄ l.mapM f ⦃fun _ => I⦄ := by
   vcgen
 
