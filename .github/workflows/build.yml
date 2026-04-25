@@ -73,8 +73,8 @@ jobs:
           echo "BUILD_TIMING_SOURCE_BRANCH=${{ github.head_ref || github.ref_name }}" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_BASE_REF=" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_MERGE_BASE_SHA=" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
-          echo "BUILD_TIMING_WARM_COMMAND=lake build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_CLEAN_COMMAND=rm -rf .lake/build && lake -KweakLeanArgs='#[\"-j1\"]' build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
+          echo "BUILD_TIMING_WARM_COMMAND=lake -KweakLeanArgs='#[\"-j1\"]' build ToMathlib VCVio FFI LatticeCrypto Examples Interop" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_NAME=Smoke test" >> "$GITHUB_ENV"
           echo "BUILD_TIMING_TEST_COMMAND=lake env lean VCVioTest/Smoke.lean" >> "$GITHUB_ENV"
           {
