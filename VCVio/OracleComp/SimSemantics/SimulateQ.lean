@@ -50,6 +50,22 @@ lemma simulateQ_query [LawfulMonad r] (q : OracleQuery spec α) :
     simulateQ impl (liftM q) = q.cont <$> (impl q.input) := by
   unfold simulateQ; simp [OracleComp.liftM_def]
 
+/-- Specialized form of `simulateQ_query` for the canonical `spec.query t`
+constructor: `simulateQ impl (liftM (spec.query t)) = impl t`.
+
+The general `simulateQ_query` rewrite leaves an `id <$>` artifact when applied
+to `spec.query t` (because `(spec.query t).cont = id`). That artifact is
+harmless when `spec.Range t` is concrete (it disappears under definitional
+reduction), but in *parametric* sum-spec contexts (`(E₁ + E₂).Range (Sum.inl t)`
+vs `E₁.Range t`, both abstract atoms) the type annotations diverge and
+`id_map` no longer fires under `simp only`. This lemma sidesteps the artifact
+entirely and is the canonical entry point for simplifying `simulateQ` over an
+explicit `spec.query t`. -/
+@[simp, grind =]
+lemma simulateQ_spec_query [LawfulMonad r] (t : spec.Domain) :
+    simulateQ impl (liftM (spec.query t)) = impl t := by
+  rw [simulateQ_query]; simp
+
 @[simp]
 lemma simulateQ_query_bind [LawfulMonad r] (q : OracleQuery spec α)
     (ou : α → OracleComp spec β) : simulateQ impl (liftM q >>= ou) =

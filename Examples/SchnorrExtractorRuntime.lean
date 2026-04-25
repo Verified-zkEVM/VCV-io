@@ -75,20 +75,20 @@ abbrev challengeBudget (q : ℕ) : QueryCount Unit :=
 private theorem finUniformSample_queryCostExactly_one
     (n : ℕ) [NeZero n] :
     AddWriterT.QueryCostExactly
-      (simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl)
+      (simulateQ ((QueryImpl.ofLift unifSpec ProbComp).withUnitCost)
         (uniformSample (Fin n) : ProbComp (Fin n)))
       1 := by
   cases n with
   | zero => cases (NeZero.ne (n := 0) rfl)
   | succ k =>
       change AddWriterT.QueryCostExactly
-        (HasQuery.withUnitCost
+        (HasQuery.Program.withUnitCost
           (fun [HasQuery unifSpec (AddWriterT ℕ ProbComp)] =>
             HasQuery.query (spec := unifSpec) (m := AddWriterT ℕ ProbComp) k)
-          (QueryRuntime.oracleCompRuntime (spec := unifSpec)))
+          (QueryImpl.ofLift unifSpec ProbComp))
         1
       exact HasQuery.queryCostExactly_withUnitCost_query
-        (runtime := QueryRuntime.oracleCompRuntime (spec := unifSpec))
+        (runtime := QueryImpl.ofLift unifSpec ProbComp)
         (t := k)
 
 /-- Sampling `F` uniformly (via its `FinEnum` encoding) costs exactly 1 in the unit-cost model. -/

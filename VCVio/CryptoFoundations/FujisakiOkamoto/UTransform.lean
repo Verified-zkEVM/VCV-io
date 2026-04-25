@@ -196,7 +196,7 @@ variable {m : Type → Type v} [Monad m] [LawfulMonad m] [MonadLiftT ProbComp m]
 /-- If each of the two U-transform oracle families is assigned a constant weight, encapsulation
 incurs exactly the sum of those family weights. -/
 theorem encaps_usesExactFamilyWeightedCost {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -210,19 +210,19 @@ theorem encaps_usesExactFamilyWeightedCost {ω : Type} [AddMonoid ω]
   rw [HasQuery.UsesCostExactly]
   change Cost[
     ((monadLift ((monadLift ($ᵗ M : ProbComp M) : m M)) : AddWriterT ω m M) >>= fun msg => do
-      let r ← (runtime.withAddCost costFn).impl (Sum.inl msg)
+      let r ← (runtime.withAddCost costFn) (Sum.inl msg)
       let c := pke.encrypt pk msg r
-      let k ← (runtime.withAddCost costFn).impl (Sum.inr (kdInput msg c))
+      let k ← (runtime.withAddCost costFn) (Sum.inr (kdInput msg c))
       pure (c, k))
   ] = wCoins + wKey
   rw [AddWriterT.hasCost_iff]
-  simp [QueryRuntime.withAddCost_impl, AddWriterT.outputs, AddWriterT.costs, hCoins, hKeys]
+  simp [QueryImpl.withAddCost_apply, AddWriterT.outputs, AddWriterT.costs, hCoins, hKeys]
 
 /-- Under per-family upper bounds on the two U-transform oracle families, encapsulation incurs
 weighted query cost at most the sum of those bounds. -/
 theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [HasEvalSet m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -234,8 +234,8 @@ theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
       wCoins + wKey := by
   rw [HasQuery.UsesCostAtMost]
   let f : M → AddWriterT ω m (C × K) := fun msg =>
-    ((runtime.withAddCost costFn).impl (Sum.inl msg)) >>= fun r =>
-      ((runtime.withAddCost costFn).impl (Sum.inr (kdInput msg (pke.encrypt pk msg r)))) >>=
+    ((runtime.withAddCost costFn) (Sum.inl msg)) >>= fun r =>
+      ((runtime.withAddCost costFn) (Sum.inr (kdInput msg (pke.encrypt pk msg r)))) >>=
         fun k => pure (pke.encrypt pk msg r, k)
   change AddWriterT.PathwiseCostAtMost
     (((monadLift ((monadLift ($ᵗ M : ProbComp M) : m M)) : AddWriterT ω m M) >>= f))
@@ -250,14 +250,14 @@ theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
     intro msg
     refine AddWriterT.pathwiseCostAtMost_bind (w₁ := wCoins) (w₂ := wKey) ?_ ?_
     · change AddWriterT.PathwiseCostAtMost
-          ((runtime.withAddCost costFn).impl (Sum.inl msg)) wCoins
+          ((runtime.withAddCost costFn) (Sum.inl msg)) wCoins
       exact HasQuery.usesCostAtMost_query_of_le
         (runtime := runtime) (costFn := costFn) (t := Sum.inl msg) (b := wCoins) (hCoins msg)
     · intro r
       let c := pke.encrypt pk msg r
       have hk :
           AddWriterT.PathwiseCostAtMost
-            ((((runtime.withAddCost costFn).impl (Sum.inr (kdInput msg c))) >>= fun k =>
+            ((((runtime.withAddCost costFn) (Sum.inr (kdInput msg c))) >>= fun k =>
               pure (c, k)))
             (wKey + 0) := by
         refine AddWriterT.pathwiseCostAtMost_bind (w₁ := wKey) (w₂ := 0) ?_ ?_
@@ -272,7 +272,7 @@ theorem encaps_usesWeightedQueryCostAtMost {ω : Type}
 /-- Unit-cost specialization: U-transform encapsulation always makes exactly two oracle queries,
 one to derive coins and one to derive the shared key. -/
 theorem encaps_usesExactlyTwoQueries
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -287,7 +287,7 @@ theorem encaps_usesExactlyTwoQueries
 /-- Expected weighted query cost of U-transform encapsulation under constant per-family weights. -/
 theorem encaps_expectedQueryCost_eq_of_constantOracleWeights {ω : Type}
     [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -308,7 +308,7 @@ theorem encaps_expectedQueryCost_eq_of_constantOracleWeights {ω : Type}
 per-family bounds. -/
 theorem encaps_expectedQueryCost_le {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -327,7 +327,7 @@ theorem encaps_expectedQueryCost_le {ω : Type}
 
 /-- Expected query count of U-transform encapsulation is exactly `2`. -/
 theorem encaps_expectedQueries_eq_two [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -340,7 +340,7 @@ theorem encaps_expectedQueries_eq_two [HasEvalPMF m]
 /-- If deterministic decryption fails immediately, U-transform decapsulation incurs zero weighted
 query cost. -/
 theorem decaps_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -355,9 +355,9 @@ theorem decaps_usesZeroQueryCost_of_decrypt_eq_none {ω : Type} [AddMonoid ω]
     (match pke.decrypt sk c with
     | none => pure (policy.onReject fb c)
     | some msg => do
-        let r ← (runtime.withAddCost costFn).impl (Sum.inl msg)
+        let r ← (runtime.withAddCost costFn) (Sum.inl msg)
         if pke.encrypt pk msg r = c then
-          let k ← (runtime.withAddCost costFn).impl (Sum.inr (kdInput msg c))
+          let k ← (runtime.withAddCost costFn) (Sum.inr (kdInput msg c))
           pure (some k)
         else
           pure (policy.onReject fb c) : AddWriterT ω m (Option K))
@@ -370,7 +370,7 @@ weighted query cost at most the sum of those bounds. -/
 theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [CanonicallyOrderedAdd ω]
     [HasEvalSet m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -401,7 +401,7 @@ theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
               some <$> (variant.deriveKey (m := AddWriterT ω m) pk msg c)
             else pure (policy.onReject fb c)))
           (wCoins + wKey) by
-      simpa [HasQuery.withAddCost, UTransform, FujisakiOkamoto.scheme, hdec] using hbranch
+      simpa [HasQuery.Program.withAddCost, UTransform, FujisakiOkamoto.scheme, hdec] using hbranch
     refine AddWriterT.pathwiseCostAtMost_bind (w₁ := wCoins) (w₂ := wKey) ?_ ?_
     · change AddWriterT.PathwiseCostAtMost
           (HasQuery.query
@@ -435,7 +435,7 @@ theorem decaps_usesWeightedQueryCostAtMost {ω : Type}
 `0`. -/
 theorem decaps_expectedQueryCost_eq_zero_of_decrypt_eq_none {ω : Type}
     [AddMonoid ω] [Preorder ω] [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -457,7 +457,7 @@ per-family bounds. -/
 theorem decaps_expectedQueryCost_le {ω : Type}
     [AddCommMonoid ω] [PartialOrder ω] [IsOrderedAddMonoid ω] [CanonicallyOrderedAdd ω]
     [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -478,7 +478,7 @@ theorem decaps_expectedQueryCost_le {ω : Type}
 
 /-- Unit-cost specialization: U-transform decapsulation makes at most two oracle queries. -/
 theorem decaps_usesAtMostTwoQueries [HasEvalSet m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)
@@ -492,7 +492,7 @@ theorem decaps_usesAtMostTwoQueries [HasEvalSet m]
 
 /-- Expected query count of U-transform decapsulation is at most `2`. -/
 theorem decaps_expectedQueries_le_two [HasEvalPMF m]
-    (runtime : QueryRuntime (UTransform.hashOracleSpec M R KD K) m)
+    (runtime : QueryImpl (UTransform.hashOracleSpec M R KD K) m)
     (pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C)
     (kdInput : M → C → KD)
     (policy : FujisakiOkamoto.RejectionPolicy K C)

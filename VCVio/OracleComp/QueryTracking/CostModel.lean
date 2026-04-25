@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
-import VCVio.OracleComp.QueryTracking.QueryRuntime
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.ProgramLogic.Unary.HoareTriple
 
@@ -52,14 +52,13 @@ variable {ι : Type} {spec : OracleSpec ι} {α : Type} {ω : Type}
 to get additive accumulation through the existing `WriterT` infrastructure. -/
 def addCostOracle [AddCommMonoid ω] (costFn : spec.Domain → ω) :
     QueryImpl spec (AddWriterT ω (OracleComp spec)) :=
-  ((QueryRuntime.oracleCompRuntime (spec := spec)).withAddCost costFn).impl
+  ((QueryImpl.ofLift spec (OracleComp spec)).withAddCost costFn)
 
 @[simp]
 lemma fst_map_run_simulateQ_addCostOracle [AddCommMonoid ω] (costFn : spec.Domain → ω)
     (oa : OracleComp spec α) :
     Prod.fst <$> (simulateQ (addCostOracle costFn) oa).run = oa := by
-  simp [addCostOracle, QueryRuntime.withAddCost, QueryImpl.fst_map_run_withCost,
-    QueryRuntime.oracleCompRuntime_impl_eq_ofLift]
+  simp [addCostOracle, QueryImpl.withAddCost, QueryImpl.fst_map_run_withCost]
 
 /-- A cost model assigns a cost in `ω` to each oracle query.
 The cost type `ω` can be `ℕ`, `ℝ≥0∞`, `ι → ℕ` (per-oracle), or any `AddCommMonoid`. -/
@@ -78,7 +77,7 @@ end CostModel
 query-cost function. This is the semantic core of `CostModel`. -/
 abbrev instrumentedRun [AddCommMonoid ω] (oa : OracleComp spec α) (cm : CostModel spec ω) :
     AddWriterT ω (OracleComp spec) α :=
-  simulateQ ((QueryRuntime.oracleCompRuntime (spec := spec)).withAddCost cm.queryCost).impl oa
+  simulateQ ((QueryImpl.ofLift spec (OracleComp spec)).withAddCost cm.queryCost) oa
 
 /-- The joint distribution of `(output, totalCost)` obtained by running `oa` with
 additive cost tracking. Cost accumulates via `+` through `AddWriterT`.
@@ -143,7 +142,7 @@ theorem expectedCost_eq_wp_costDist (oa : OracleComp spec α) (cm : CostModel sp
     (AddWriterT.expectedCost_eq_wp_run
       (spec := spec)
       (oa := simulateQ
-        ((QueryRuntime.oracleCompRuntime (spec := spec)).withAddCost cm.queryCost).impl oa)
+        ((QueryImpl.ofLift spec (OracleComp spec)).withAddCost cm.queryCost) oa)
       (val := val))
 
 @[simp]
@@ -259,8 +258,8 @@ private lemma addCostOracle_unit_run_apply (t : spec.Domain) :
     (addCostOracle CostModel.unit.queryCost t).run =
       (fun u => (u, Multiplicative.ofAdd 1)) <$>
         (spec.query t : OracleComp spec (spec.Range t)) := by
-  simp [CostModel.unit, addCostOracle, QueryRuntime.withAddCost,
-    QueryRuntime.oracleCompRuntime_impl_eq_ofLift, QueryImpl.withCost]
+  simp [CostModel.unit, addCostOracle, QueryImpl.withAddCost,
+    QueryImpl.withCost]
 
 section UnitCostBridge
 
@@ -402,13 +401,13 @@ theorem IsPerIndexQueryBound.toWorstCaseCostBound_unit_sum
                 (spec.query t : OracleComp spec (spec.Range t))
                 CostModel.unit) 1 := by
           change AddWriterT.QueryBoundedAboveBy
-            (HasQuery.withUnitCost
+            (HasQuery.Program.withUnitCost
               (fun [HasQuery spec (AddWriterT ℕ (OracleComp spec))] =>
                 HasQuery.query (spec := spec) (m := AddWriterT ℕ (OracleComp spec)) t)
-              (QueryRuntime.oracleCompRuntime (spec := spec)))
+              (QueryImpl.ofLift spec (OracleComp spec)))
             1
           exact HasQuery.queryBoundedAboveBy_withUnitCost_query
-            (runtime := QueryRuntime.oracleCompRuntime (spec := spec)) t
+            (runtime := QueryImpl.ofLift spec (OracleComp spec)) t
         have hcont :
             ∀ u,
               AddWriterT.QueryBoundedAboveBy
@@ -457,7 +456,7 @@ namespace OracleComp
 is counted as cost 1. -/
 abbrev probCompUnitQueryRun {β : Type} (oa : ProbComp β) :
     AddWriterT ℕ ProbComp β :=
-  simulateQ ((QueryRuntime.oracleCompRuntime (spec := unifSpec)).withUnitCost.impl) oa
+  simulateQ ((QueryImpl.ofLift unifSpec ProbComp).withUnitCost) oa
 
 end OracleComp
 
