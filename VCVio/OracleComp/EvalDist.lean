@@ -351,6 +351,23 @@ section simulateQ_evalDist
 
 variable [spec.Fintype] [spec.Inhabited]
 
+/-- If an oracle implementation preserves the distribution of each source query, then
+`simulateQ` preserves the distribution of every source computation. -/
+lemma evalDist_simulateQ_eq_evalDist
+    [spec'.Fintype] [spec'.Inhabited]
+    (so : QueryImpl spec' (OracleComp spec))
+    (h : ∀ t : spec'.Domain, evalDist (so t) =
+      evalDist (liftM (query t) : OracleComp spec' (spec'.Range t)))
+    (oa : OracleComp spec' α) :
+    evalDist (simulateQ so oa) = evalDist oa := by
+  induction oa using OracleComp.inductionOn with
+  | pure x =>
+      simp
+  | query_bind t mx ih =>
+      simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
+        OracleQuery.input_query, evalDist_bind, ih]
+      rw [h t]
+
 /-- If a `StateT` oracle implementation preserves distributions (each oracle query produces a
 uniform distribution after discarding state), then `simulateQ` followed by `run'` preserves
 `evalDist`. This is the key lemma for security proofs: it shows that stateful oracle

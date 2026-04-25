@@ -78,22 +78,28 @@ def attachPlannerChoiceNotes
 
 def chooseBestPlannedStepCandidate? (steps : Array PlannedStep) :
     TacticM (Option (PlannedStep × PreviewResult)) := do
+  let traceSteps := vcvio.vcgen.traceSteps.get (← getOptions)
   let mut best? : Option (PlannedStep × PreviewResult) := none
   let mut accepted : Array String := #[]
   for step in steps do
     let preview ← previewPlannedStepWithGoals step
     if preview.ok then
-      accepted := accepted.push (renderPlannedStepPreview step preview)
+      if traceSteps then
+        accepted := accepted.push (renderPlannedStepPreview step preview)
       match best? with
       | none => best? := some (step, preview)
       | some (_, bestPreview) =>
           if preview.goalCount < bestPreview.goalCount then
             best? := some (step, preview)
+      if !traceSteps && preview.goalCount == 0 then
+        return some (step, preview)
   match best? with
   | none => return none
   | some (step, preview) =>
-      let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
-      return some (attachPlannerChoiceNotes step preview alternatives, preview)
+      if traceSteps then
+        let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+        return some (attachPlannerChoiceNotes step preview alternatives, preview)
+      return some (step, preview)
 
 def logPlannedStep (step : PlannedStep) (beforeGoals afterGoals : Nat) : TacticM Unit := do
   if vcvio.vcgen.traceSteps.get (← getOptions) then

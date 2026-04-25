@@ -1019,6 +1019,8 @@ def planVCGenStep? : TacticM (Option PlannedStep) := do
       if let some (invStep, _) ← chooseBestInvariantStep? then
         return some invStep
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
+  if structuralPreview.ok && structuralPreview.goalCount == 0 then
+    return some structuralStep
   if let some explicitProbEqStep ← planExplicitProbEqStep? structuralPreview then
     return some explicitProbEqStep
   let theoremCandidate? ← chooseBestTheoremStep?

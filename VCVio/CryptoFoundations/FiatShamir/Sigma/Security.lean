@@ -200,25 +200,20 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
     evalDist (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
       (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalDist oa := by
-  induction oa using OracleComp.inductionOn with
-  | pure x => simp
-  | query_bind t mx ih =>
-    rcases t with n | u
-    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, QueryImpl.add_apply_inl, QueryImpl.ofLift_apply,
-        id_map, evalDist_bind, ih]
-      apply bind_congr
-      simp
-    · simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query,
-        OracleQuery.input_query, QueryImpl.add_apply_inr, uniformSampleImpl,
-        id_map, evalDist_bind, ih]
-      have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
-            SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
-          (evalDist (liftM (query (Sum.inr u)) :
-            OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
-            SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
-        rw [evalDist_uniformSample, evalDist_query]; rfl
-      exact heq ▸ rfl
+  apply OracleComp.evalDist_simulateQ_eq_evalDist
+  intro t
+  rcases t with n | u
+  · simp only [QueryImpl.add_apply_inl, QueryImpl.ofLift_eq_id', QueryImpl.id'_apply]
+    rw [evalDist_query (spec := unifSpec + (Unit →ₒ Chal))]
+    exact (evalDist_query (spec := unifSpec) n)
+  · simp only [QueryImpl.add_apply_inr, uniformSampleImpl]
+    have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
+          SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
+        (evalDist (liftM (query (Sum.inr u)) :
+          OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
+          SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
+      rw [evalDist_uniformSample, evalDist_query]; rfl
+    exact heq
 
 /-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
 private lemma probEvent_simulateQ_unifChalImpl {α : Type}
