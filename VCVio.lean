@@ -165,7 +165,8 @@ import VCVio.OracleComp.Constructions.Replicate
 import VCVio.OracleComp.Constructions.SampleableType
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.FinRatPMF
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.HasQuery.Basic
+import VCVio.OracleComp.HasQuery.Morphism
 import VCVio.OracleComp.OracleComp
 import VCVio.OracleComp.OracleContext
 import VCVio.OracleComp.OracleQuery
@@ -215,6 +216,10 @@ import VCVio.ProgramLogic.Relational.Examples
 import VCVio.ProgramLogic.Relational.FromUnary
 import VCVio.ProgramLogic.Relational.HandlerFromUnary
 import VCVio.ProgramLogic.Relational.Leakage
+import VCVio.ProgramLogic.Relational.Loom.Coherence
+import VCVio.ProgramLogic.Relational.Loom.Probabilistic
+import VCVio.ProgramLogic.Relational.Loom.Qualitative
+import VCVio.ProgramLogic.Relational.Loom.Quantitative
 import VCVio.ProgramLogic.Relational.ProgrammingOracle
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
@@ -229,6 +234,10 @@ import VCVio.ProgramLogic.Tactics.Common.SpecIR
 import VCVio.ProgramLogic.Tactics.Common.Suggestions
 import VCVio.ProgramLogic.Tactics.Common.WpStepDispatch
 import VCVio.ProgramLogic.Tactics.Common.WpStepRegistry
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpec
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackwardDemo
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecDemo
 import VCVio.ProgramLogic.Tactics.Handler
 import VCVio.ProgramLogic.Tactics.Relational
 import VCVio.ProgramLogic.Tactics.Relational.Internals
@@ -238,6 +247,10 @@ import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HandlerSpecs
 import VCVio.ProgramLogic.Unary.HoarePropTriple
 import VCVio.ProgramLogic.Unary.HoareTriple
+import VCVio.ProgramLogic.Unary.Loom.Coherence
+import VCVio.ProgramLogic.Unary.Loom.Probabilistic
+import VCVio.ProgramLogic.Unary.Loom.Qualitative
+import VCVio.ProgramLogic.Unary.Loom.Quantitative
 import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.StdDoExamples

@@ -31,6 +31,7 @@ are:
 -/
 
 open Std.Do OracleSpec OracleComp
+open scoped OracleSpec.PrimitiveQuery
 
 namespace Interop.Hax.Examples
 

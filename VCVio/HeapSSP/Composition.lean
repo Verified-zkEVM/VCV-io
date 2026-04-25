@@ -21,6 +21,7 @@ absorbed into the client computation. -/
 universe uᵢ uₘ uₑ uₛ vᵢ v
 
 open OracleSpec OracleComp
+open scoped OracleSpec.PrimitiveQuery
 
 namespace VCVio.HeapSSP
 

@@ -52,6 +52,8 @@ universe uᵢ uₘ uₑ vᵢ v
 
 open OracleSpec OracleComp
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace VCVio.SSP
 
 namespace Package

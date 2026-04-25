@@ -1453,7 +1453,8 @@ private lemma evalDist_simulateQ_forkWrappedUniformImpl [Fintype Chal]
         have heq :
             (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
               SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
-            (evalDist (liftM (query (Sum.inr u)) :
+            (evalDist (liftM
+                (OracleSpec.query (Sum.inr u)) :
               OracleComp (Fork.wrappedSpec Chal) _) :
               SPMF ((Fork.wrappedSpec Chal).Range (Sum.inr u))) := by
           rw [evalDist_uniformSample, evalDist_query]

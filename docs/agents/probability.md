@@ -124,4 +124,4 @@ Available for: `Bool`, `Fin n` (for `[NeZero n]`), `ZMod n`, `BitVec n`, `α × 
 
 3. **Forgetting `probOutput_eq_zero_of_not_mem_support`**: useful when restricting sums.
 
-4. **`evalDist` on bare `query t`**: fails because `query t : OracleQuery`, not `OracleComp`. Use `liftM (query t)`.
+4. **`evalDist` on bare `query t`**: works directly when the expected type pins `query t` to a monadic form, since `query` resolves to `HasQuery.query`. Write `evalDist (query t : OracleComp spec _)` (or hand the result to a context that provides the same ascription). If you need the primitive `OracleQuery spec _` (e.g. for `OracleQuery.cont`), use `spec.query t` instead.

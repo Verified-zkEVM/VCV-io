@@ -20,6 +20,8 @@ open OracleSpec
 
 universe u v w
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp
 
 variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type v}

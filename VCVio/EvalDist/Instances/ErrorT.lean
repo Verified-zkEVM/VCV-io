@@ -81,13 +81,14 @@ lemma mem_support_iff (mx : ExceptT ε m α) (x : α) :
 
 omit [HasEvalSet m] in
 @[simp]
-lemma run_liftM (mx : m α) : (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
+lemma run_liftM_eq_map_ok (mx : m α) :
+    (liftM mx : ExceptT ε m α).run = Except.ok <$> mx := rfl
 
 @[simp]
 lemma support_liftM [LawfulMonad m] (mx : m α) :
     support (liftM mx : ExceptT ε m α) = support mx := by
   ext x
-  simp only [mem_support_iff, run_liftM, support_map, Set.mem_image]
+  simp only [mem_support_iff, run_liftM_eq_map_ok, support_map, Set.mem_image]
   constructor
   · rintro ⟨a, ha, h⟩; cases h; exact ha
   · exact fun h => ⟨x, h, rfl⟩

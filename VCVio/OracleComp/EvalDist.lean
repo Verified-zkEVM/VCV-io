@@ -18,6 +18,8 @@ open OracleSpec Option ENNReal BigOperators
 
 universe u v w
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp
 
 variable {ι ι'} {spec : OracleSpec ι} {spec' : OracleSpec ι'} {α β γ : Type w}

@@ -92,7 +92,7 @@ lemma apply_eq (t : spec.Domain) :
       | some u =>
           modifyGet fun _ => (u, (cache, trace ++ [⟨t, u⟩]))
       | none =>
-          let u ← query t
+          let u ← (HasQuery.query t : OracleComp spec _)
           modifyGet fun _ => (u, (cache.cacheQuery t u, trace ++ [⟨t, u⟩]))) := by
   ext s
   rw [cachingLoggingOracle, QueryImpl.withCachingLogging, QueryImpl.withCachingTraceAppend,

@@ -6,6 +6,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.FujisakiOkamoto.Defs
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.QueryTracking.QueryCost
+import VCVio.OracleComp.HasQuery.Morphism
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 import VCVio.CryptoFoundations.AsymmEncAlg.INDCPA.Oracle

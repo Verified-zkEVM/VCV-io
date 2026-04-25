@@ -80,6 +80,7 @@ schemes reduces to exactly this pattern.
 -/
 
 open Std.Do OracleSpec OracleComp
+open scoped OracleSpec.PrimitiveQuery
 
 namespace Interop.Hax.Examples.Barrett
 

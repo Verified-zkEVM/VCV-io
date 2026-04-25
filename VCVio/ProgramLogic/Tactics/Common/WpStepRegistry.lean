@@ -123,18 +123,25 @@ initialize wpStepRegistry :
 from the LHS of a `wp comp post = …` equation.
 
 After `Sym.preprocessType`, the abbrev `OracleComp.ProgramLogic.wp` has been
-unfolded to `MAlgOrdered.wp`. Both forms are accepted defensively in case a
-rule has been written for the more general algebra interface. The `comp` is
-the second-to-last explicit argument of the `wp` head application. -/
+unfolded to either `MAlgOrdered.wp` (legacy structural form) or
+`Std.Do'.wp _ _ Order.bot` (Loom2-routed form, the canonical post-cutover
+shape). All three heads are accepted; the `comp` argument is positionally:
+* `MAlgOrdered.wp m l … oa post` → 2nd-to-last explicit argument.
+* `OracleComp.ProgramLogic.wp ι spec … oa post` → 2nd-to-last explicit argument.
+* `Std.Do'.wp m Pred EPred α … oa post epost` → 3rd-to-last explicit argument. -/
 private def selectWpStepLhsComp (body : Expr) : MetaM (Expr × Unit) := do
   let body := body.consumeMData
   unless body.isAppOfArity ``Eq 3 do
     throwError m!"@[wpStep] expects an equational target; got:{indentExpr body}"
   let lhs := (body.getArg! 1).consumeMData
   let fn := lhs.getAppFn
+  let n := lhs.getAppNumArgs
+  if fn.isConstOf ``Std.Do'.wp then
+    unless n ≥ 3 do
+      throwError m!"@[wpStep] `Std.Do'.wp` LHS has too few arguments:{indentExpr lhs}"
+    return (lhs.getArg! (n - 3), ())
   unless fn.isConstOf ``MAlgOrdered.wp || fn.isConstOf ``OracleComp.ProgramLogic.wp do
     throwError m!"@[wpStep] expects an `wp _ _` LHS; got:{indentExpr lhs}"
-  let n := lhs.getAppNumArgs
   unless n ≥ 2 do
     throwError m!"@[wpStep] LHS has too few arguments:{indentExpr lhs}"
   let oa := lhs.getArg! (n - 2)

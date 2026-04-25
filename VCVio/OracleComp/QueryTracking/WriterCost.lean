@@ -4,8 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.QueryTracking.CountingOracle
+import VCVio.OracleComp.ProbComp
 import VCVio.EvalDist.Monad.Map
 import ToMathlib.Control.WriterT
 import ToMathlib.General
