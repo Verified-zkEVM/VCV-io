@@ -231,14 +231,7 @@ lemma cmaSignHashQueryBound_query_bind_iff {α : Type}
             (Resp := Resp) (Stmt := Stmt) t (qS, qH)).1)
           ((cmaSignHashCost (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt) t (qS, qH)).2) := by
-  simpa [cmaSignHashQueryBound] using
-    (OracleComp.isQueryBound_query_bind_iff
-      (spec := cmaSpec M Commit Chal Resp Stmt) (α := α) (t := t)
-      (mx := oa) (b := (qS, qH))
-      (canQuery := cmaSignHashCanQuery (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-      (cost := cmaSignHashCost (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt)))
+  apply OracleComp.isQueryBound_query_bind_iff
 
 omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 @[simp]
@@ -1423,42 +1416,14 @@ private theorem liftAdv_cmaSignHashQueryBound
   | pure x =>
       simp [cmaSignHashQueryBound]
   | query_bind t cont ih =>
-      simp only [signHashQueryBound, OracleComp.isQueryBound_query_bind_iff] at hQ
-      rcases hQ with ⟨hcan, hcont⟩
+      simp only [signHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff] at hQ
+      rcases hQ with ⟨hinr, hinl⟩
       rcases t with (n | mc) | m
-      · simp only [liftM_bind]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-              (Sum.inl (Sum.inl (Sum.inl n)))) >>= fun u =>
-            (liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) α))
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        exact ⟨trivial, fun u => by
-          simpa [cmaSignHashQueryBound] using ih u qS qH (hcont u)⟩
-      · simp only [liftM_bind]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-              (Sum.inl (Sum.inl (Sum.inr mc)))) >>= fun u =>
-            (liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) α))
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        exact ⟨hcan, fun u => by
-          simpa [cmaSignHashQueryBound] using ih u qS (qH - 1) (hcont u)⟩
-      · simp only [liftM_bind]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inr m))) >>=
-            fun u =>
-            (liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) α))
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        exact ⟨hcan, fun u => by
-          simpa [cmaSignHashQueryBound] using ih u (qS - 1) qH (hcont u)⟩
+      all_goals simp only [Bool.false_eq_true, not_false_eq_true, true_or, add_apply_inl,
+        add_apply_inr, ↓reduceIte, true_and, not_true_eq_false, false_or] at hinr hinl
+      · exact ⟨trivial, fun u => by simpa using ih u qS qH ⟨hinr u, hinl u⟩⟩
+      · exact ⟨hinl.1, fun u => by simpa using ih u qS (qH - 1) ⟨hinr u, hinl.2 u⟩⟩
+      · exact ⟨hinr.1, fun u => by simpa using ih u (qS - 1) qH ⟨hinr.2 u, hinl u⟩⟩
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
@@ -1525,49 +1490,18 @@ private theorem liftAdv_bind_verify_cmaSignHashQueryBound
           (Commit := Commit) (Chal := Chal) (Resp := Resp) pk msg sig qS (qH + 1)
           (Nat.succ_pos qH)
   | query_bind t cont ih =>
-      simp only [signHashQueryBound, OracleComp.isQueryBound_query_bind_iff] at hQ
+      simp only [signHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff] at hQ
       rcases hQ with ⟨hcan, hcont⟩
       rcases t with (n | mc) | m
-      · simp only [liftM_bind, bind_assoc]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-              (Sum.inl (Sum.inl (Sum.inl n)))) >>= fun u =>
-            ((liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) (M × (Commit × Resp))) >>=
-              postVerifyComp (σ := σ) (hr := hr) (M := M)
-                (Commit := Commit) (Chal := Chal) (Resp := Resp) pk))
-          qS (qH + 1)
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨trivial, fun u => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih u qS qH (hcont u)
-      · simp only [liftM_bind, bind_assoc]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-              (Sum.inl (Sum.inl (Sum.inr mc)))) >>= fun u =>
-            ((liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) (M × (Commit × Resp))) >>=
-              postVerifyComp (σ := σ) (hr := hr) (M := M)
-                (Commit := Commit) (Chal := Chal) (Resp := Resp) pk))
-          qS (qH + 1)
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨Nat.succ_pos qH, fun u => ?_⟩
-        have hEq : qH - 1 + 1 = qH := Nat.sub_add_cancel hcan
-        simpa [cmaSignHashQueryBound, hEq] using ih u qS (qH - 1) (hcont u)
-      · simp only [liftM_bind, bind_assoc]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inr m))) >>=
-            fun u =>
-            ((liftM (cont u) :
-              OracleComp (cmaSpec M Commit Chal Resp Stmt) (M × (Commit × Resp))) >>=
-              postVerifyComp (σ := σ) (hr := hr) (M := M)
-                (Commit := Commit) (Chal := Chal) (Resp := Resp) pk))
-          qS (qH + 1)
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨hcan, fun u => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih u (qS - 1) qH (hcont u)
+      all_goals simp only [Bool.false_eq_true, not_false_eq_true, true_or, add_apply_inl,
+        add_apply_inr, ↓reduceIte, true_and, not_true_eq_false, false_or] at hcan hcont
+      · refine ⟨trivial, fun u => ?_⟩
+        simpa [cmaSignHashQueryBound] using ih u qS qH ⟨hcan u, hcont u⟩
+      · refine ⟨Nat.succ_pos qH, fun u => ?_⟩
+        have hEq : qH - 1 + 1 = qH := Nat.sub_add_cancel hcont.1
+        simpa [cmaSignHashQueryBound, hEq] using ih u qS (qH - 1) ⟨hcan u, hcont.2 u⟩
+      · refine ⟨hcan.1, fun u => ?_⟩
+        simpa [cmaSignHashQueryBound] using ih u (qS - 1) qH ⟨hcan.2 u, hcont u⟩
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in

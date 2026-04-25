@@ -148,6 +148,7 @@ theorem simulatedNmaAdv_hashQueryBound
     ∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := (simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
         (simTranscript := simTranscript) (adv := adv)).main pk) qH := by
+  classical
   letI : Fintype Chal := Fintype.ofFinite Chal
   let spec := unifSpec + (M × Commit →ₒ Chal)
   let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
@@ -171,24 +172,8 @@ theorem simulatedNmaAdv_hashQueryBound
       match cache (.inr (msg, c)) with
       | some _ => ((c, s), cache)
       | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
-  let nmaAdv := simulatedNmaAdv (σ := σ) (hr := hr) (M := M)
-    (simTranscript := simTranscript) (adv := adv)
   intro pk
-  let stepBudget :
-      (spec + (M →ₒ (Commit × Resp))).Domain → ℕ × ℕ → ℕ := fun t _ =>
-    match t with
-    | .inl (.inl _) => 0
-    | .inl (.inr _) => 1
-    | .inr _ => 0
-  have hbind :
-      ∀ {α β : Type} {oa : OracleComp spec α} {ob : α → OracleComp spec β} {Q₁ Q₂ : ℕ},
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁ →
-        (∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := ob x) Q₂) →
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := oa >>= ob) (Q₁ + Q₂) := by
-    intro α β oa ob Q₁ Q₂ h1 h2
-    exact nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal) h1 h2
+  -- Step bound for `fwd`: 0 hash queries on `.inl`, ≤ 1 on `.inr`.
   have hfwd :
       ∀ (t : spec.Domain) (s : spec.QueryCache),
         nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
@@ -232,162 +217,60 @@ theorem simulatedNmaAdv_hashQueryBound
     | some v =>
         simp [roSim, hs, nmaHashQueryBound]
     | none =>
-        simpa [roSim, hs] using
-          ((OracleComp.isQueryBound_map_iff
-              (oa := (fwd (.inr mc)).run s)
-              (f := fun a : Chal × spec.QueryCache =>
-                (a.1, a.2.cacheQuery (.inr mc) a.1))
-              (b := 1)
-              (canQuery := fun t b => match t with
-                | .inl _ => True
-                | .inr _ => 0 < b)
-              (cost := fun t b => match t with
-                | .inl _ => b
-                | .inr _ => b - 1)).2
-            (hfwd (.inr mc) s))
+        simp only [nmaHashQueryBound, Sum.forall, Prod.forall, StateT.run_bind, StateT.run_get,
+          pure_bind, hs, StateT.run_modifyGet, bind_pure_comp, isQueryBoundP_map_iff,
+          roSim] at ⊢ hfwd
+        exact hfwd.2 mc.1 mc.2 s
+  -- Step bound for `sigSim`: signing-oracle simulation issues no live hash queries.
+  -- The transcript is sampled under `unifSim` (uniform-only) and then cached, neither of
+  -- which touches the random oracle.
   have hsig :
       ∀ (msg : M) (s : spec.QueryCache),
         nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
           (oa := (sigSim pk msg).run s) 0 := by
     intro msg s
-    have hsource : OracleComp.IsQueryBound
-        (simTranscript pk) () (fun _ _ => True) (fun _ _ => ()) := by
-      induction simTranscript pk using OracleComp.inductionOn with
-      | pure x =>
-          trivial
-      | query_bind t mx ih =>
-          simp [OracleComp.isQueryBound_query_bind_iff, ih]
     have htranscript :
         nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
           (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
-      simpa [nmaHashQueryBound] using
-        (OracleComp.IsQueryBound.simulateQ_run_of_step
-          (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
-          (stepBudget := fun _ _ => 0) (impl := unifSim)
-          (hbind := by
-            intro γ δ oa' ob b₁ b₂ h1 h2
-            have h1' :
-                nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := oa') b₁ := by
-              simpa [nmaHashQueryBound] using h1
-            have h2' : ∀ x,
-                nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := ob x) b₂ := by
-              intro x
-              simpa [nmaHashQueryBound] using h2 x
-            simpa [nmaHashQueryBound] using
-              (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-          )
-          (hstep := by
-            intro t b s' ht
-            simpa [unifSim] using hfwd (.inl t) s')
-          (hcombine := by
-            intro t b ht
-            simp)
-          (s := s))
+      unfold nmaHashQueryBound
+      refine OracleComp.IsQueryBoundP.simulateQ_run_of_step
+        (p := fun _ : ℕ => False) (impl := unifSim) (oa := simTranscript pk)
+        (OracleComp.isQueryBoundP_false _ _)
+        (fun _ h _ => h.elim)
+        ?_ s
+      intro n _ s'
+      have := hfwd (.inl n) s'
+      simpa [unifSim, nmaHashQueryBound] using this
+    change OracleComp.IsQueryBoundP _ _ _ at htranscript
     simpa [sigSim, nmaHashQueryBound] using
-      ((OracleComp.isQueryBound_map_iff
+      (OracleComp.isQueryBoundP_map_iff
           (oa := (simulateQ unifSim (simTranscript pk)).run s)
           (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
             match a.2 (.inr (msg, a.1.1)) with
             | some _ => ((a.1.1, a.1.2.2), a.2)
             | none =>
-            ((a.1.1, a.1.2.2),
-              QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-          (b := 0)
-          (canQuery := fun t b => match t with
-            | .inl _ => True
-            | .inr _ => 0 < b)
-          (cost := fun t b => match t with
-            | .inl _ => b
-            | .inr _ => b - 1)).2 htranscript)
-  have hstep :
-      ∀ t b s,
-        (match t, b with
-          | .inl (.inl _), _ => True
-          | .inl (.inr _), (_, qH') => 0 < qH'
-          | .inr _, (qS', _) => 0 < qS') →
-        nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := ((baseSim + sigSim pk) t).run s) (stepBudget t b) := by
-    intro t b s ht
-    rcases b with ⟨qS', qH'⟩
+                ((a.1.1, a.1.2.2),
+                  QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
+          (n := 0)).2 htranscript
+  -- The source `signHashQueryBound` predicate `(· matches .inl (.inr _))` is uniformly
+  -- false on the signing-oracle (`.inr _`) component, so we apply the left-only sum
+  -- transfer lemma. Inside the `.inl _` arm we case on the inner sum and dispatch to
+  -- `hfwd` / `hro`.
+  change nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+    (oa := (simulateQ (simulatedNmaImpl (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) simTranscript pk) (adv.main pk)).run ∅) qH
+  unfold nmaHashQueryBound simulatedNmaImpl
+  refine OracleComp.IsQueryBoundP.simulateQ_run_add_inl_of_step
+    (fun _ => Bool.false_ne_true) (hQ pk).2 ?_ ?_ ?_ ∅
+  · intro t hp s'
     cases t with
-    | inl t =>
-        cases t with
-        | inl n =>
-            simpa [baseSim, stepBudget] using hfwd (.inl n) s
-        | inr mc =>
-            simpa [baseSim, stepBudget] using hro mc s
-    | inr msg =>
-        simpa [stepBudget] using hsig msg s
-  have hcombine :
-      ∀ t b,
-        (match t, b with
-          | .inl (.inl _), _ => True
-          | .inl (.inr _), (_, qH') => 0 < qH'
-          | .inr _, (qS', _) => 0 < qS') →
-        Nat.add (stepBudget t b)
-          (Prod.snd (match t, b with
-            | .inl (.inl _), b' => b'
-            | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
-            | .inr _, (qS', qH') => (qS' - 1, qH'))) =
-          Prod.snd b := by
-    intro t b ht
-    rcases b with ⟨qS', qH'⟩
+    | inl _ => simp at hp
+    | inr mc => exact hro mc s'
+  · intro t hnp s'
     cases t with
-    | inl t =>
-        cases t with
-        | inl n =>
-            simp [stepBudget]
-        | inr mc =>
-            simp [stepBudget] at ht ⊢
-            omega
-    | inr msg =>
-        simp [stepBudget]
-  simpa [nmaAdv, simulatedNmaAdv, nmaHashQueryBound, signHashQueryBound] using
-    (OracleComp.IsQueryBound.simulateQ_run_of_step
-      (h := hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
-      (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
-      (hbind := by
-        intro γ δ oa' ob b₁ b₂ h1 h2
-        have h1' :
-            nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-              (oa := oa') b₁ := by
-          simpa [nmaHashQueryBound] using h1
-        have h2' : ∀ x,
-            nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-              (oa := ob x) b₂ := by
-          intro x
-          simpa [nmaHashQueryBound] using h2 x
-        simpa [nmaHashQueryBound] using
-          (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-      )
-      (hstep := by
-        intro t b s ht
-        rcases b with ⟨qS', qH'⟩
-        cases t with
-        | inl t =>
-            cases t with
-            | inl n =>
-                simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
-            | inr mc =>
-                simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
-        | inr msg =>
-            simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
-      (hcombine := by
-        intro t b ht
-        rcases b with ⟨qS', qH'⟩
-        cases t with
-        | inl t =>
-            cases t with
-            | inl n =>
-                simp [stepBudget]
-            | inr mc =>
-                simp [stepBudget] at ht ⊢
-                omega
-        | inr msg =>
-            simp [stepBudget])
-      (s := ∅))
+    | inl n => exact hfwd (.inl n) s'
+    | inr _ => simp at hnp
+  · intro msg s'
+    exact hsig msg s'
 
 end FiatShamir
