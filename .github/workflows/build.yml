@@ -48,6 +48,8 @@ jobs:
   build:
     name: Build Project
     runs-on: ubuntu-latest
+    env:
+      LEAN_NUM_THREADS: "2"
     permissions:
       actions: read
       contents: read
