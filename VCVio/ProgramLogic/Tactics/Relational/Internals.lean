@@ -963,12 +963,12 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
 
 def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  let hintCandidates ← potentialRelHintNames
+  let hintCandidates ← findRelHintCandidates
   let hintMsg :=
     if hintCandidates.isEmpty then
       ""
     else
-      s!"\nPotential local `using` hints here: {formatCandidateNames hintCandidates}"
+      s!"\nViable local `using` hints here: {formatCandidateNames hintCandidates}"
   throwError m!
     "rvcstep using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\
