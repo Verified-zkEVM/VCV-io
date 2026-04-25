@@ -231,14 +231,7 @@ lemma cmaSignHashQueryBound_query_bind_iff {α : Type}
             (Resp := Resp) (Stmt := Stmt) t (qS, qH)).1)
           ((cmaSignHashCost (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt) t (qS, qH)).2) := by
-  simpa [cmaSignHashQueryBound] using
-    (OracleComp.isQueryBound_query_bind_iff
-      (spec := cmaSpec M Commit Chal Resp Stmt) (α := α) (t := t)
-      (mx := oa) (b := (qS, qH))
-      (canQuery := cmaSignHashCanQuery (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-      (cost := cmaSignHashCost (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt)))
+  apply OracleComp.isQueryBound_query_bind_iff
 
 omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 @[simp]

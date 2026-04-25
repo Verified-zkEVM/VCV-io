@@ -217,7 +217,9 @@ theorem simulatedNmaAdv_hashQueryBound
     | some v =>
         simp [roSim, hs, nmaHashQueryBound]
     | none =>
-        simp [roSim, hs, nmaHashQueryBound] at ⊢ hfwd
+        simp only [nmaHashQueryBound, Sum.forall, Prod.forall, StateT.run_bind, StateT.run_get,
+          pure_bind, hs, StateT.run_modifyGet, bind_pure_comp, isQueryBoundP_map_iff,
+          roSim] at ⊢ hfwd
         exact hfwd.2 mc.1 mc.2 s
   -- Step bound for `sigSim`: signing-oracle simulation issues no live hash queries.
   -- The transcript is sampled under `unifSim` (uniform-only) and then cached, neither of
