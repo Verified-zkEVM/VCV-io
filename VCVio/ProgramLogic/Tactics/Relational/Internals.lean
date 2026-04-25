@@ -849,7 +849,8 @@ def runRVCGenPassPlanned : TacticM (Array PlannedStep) := do
     setGoals [goal]
     if let some step ← runRVCGenPlannedStep? then
       steps := steps.push step
-      newGoals := newGoals ++ (← getGoals).toArray
+      for newGoal in ← getGoals do
+        newGoals := newGoals.push newGoal
     else
       newGoals := newGoals.push goal
   setGoals newGoals.toList
@@ -865,7 +866,8 @@ def runRVCGenPass : TacticM Bool := do
     setGoals [goal]
     if ← runRVCGenStep then
       progress := true
-      newGoals := newGoals ++ (← getGoals).toArray
+      for newGoal in ← getGoals do
+        newGoals := newGoals.push newGoal
     else
       newGoals := newGoals.push goal
   setGoals newGoals.toList

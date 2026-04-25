@@ -1103,7 +1103,8 @@ def runVCGenPassPlanned : TacticM (Array PlannedStep) := do
     setGoals [goal]
     if let some step ← runVCGenPlannedStep? then
       steps := steps.push step
-      newGoals := newGoals ++ (← getGoals).toArray
+      for newGoal in ← getGoals do
+        newGoals := newGoals.push newGoal
     else
       newGoals := newGoals.push goal
   setGoals newGoals.toList
@@ -1120,7 +1121,8 @@ def runVCGenPass : TacticM Bool := do
     setGoals [goal]
     if ← runVCGenStep then
       progress := true
-      newGoals := newGoals ++ (← getGoals).toArray
+      for newGoal in ← getGoals do
+        newGoals := newGoals.push newGoal
     else
       newGoals := newGoals.push goal
   setGoals newGoals.toList
