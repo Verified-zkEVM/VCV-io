@@ -53,8 +53,6 @@ The designated `bad` flag is `InnerCell.bad`; the bridge bijection in
 `Hops.lean` reads it out via `Heap.get (.inr .bad)`.
 -/
 
-universe u
-
 open OracleSpec
 
 namespace FiatShamir.HeapSSP

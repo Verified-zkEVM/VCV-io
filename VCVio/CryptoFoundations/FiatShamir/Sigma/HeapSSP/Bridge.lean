@@ -309,20 +309,14 @@ lemma cmaSignHashQueryBound_bind {α β : Type}
       · refine ⟨Nat.add_pos_left hcan qH₂, fun u => ?_⟩
         have hrec := ih u (hcont u)
         have hEq : qH₁ - 1 + qH₂ = qH₁ + qH₂ - 1 := by
-          calc
-            qH₁ - 1 + qH₂ = qH₂ + (qH₁ - 1) := Nat.add_comm _ _
-            _ = qH₂ + qH₁ - 1 :=
-              (Nat.add_sub_assoc (Nat.succ_le_of_lt hcan) qH₂).symm
-            _ = qH₁ + qH₂ - 1 := by rw [Nat.add_comm qH₂ qH₁]
+          have hpos : 1 ≤ qH₁ := Nat.succ_le_of_lt hcan
+          omega
         simpa [cmaSignHashCost, hEq] using hrec
       · refine ⟨Nat.add_pos_left hcan qS₂, fun u => ?_⟩
         have hrec := ih u (hcont u)
         have hEq : qS₁ - 1 + qS₂ = qS₁ + qS₂ - 1 := by
-          calc
-            qS₁ - 1 + qS₂ = qS₂ + (qS₁ - 1) := Nat.add_comm _ _
-            _ = qS₂ + qS₁ - 1 :=
-              (Nat.add_sub_assoc (Nat.succ_le_of_lt hcan) qS₂).symm
-            _ = qS₁ + qS₂ - 1 := by rw [Nat.add_comm qS₂ qS₁]
+          have hpos : 1 ≤ qS₁ := Nat.succ_le_of_lt hcan
+          omega
         simpa [cmaSignHashCost, hEq] using hrec
       · refine ⟨trivial, fun u => ?_⟩
         simpa [cmaSignHashCost] using ih u (hcont u)

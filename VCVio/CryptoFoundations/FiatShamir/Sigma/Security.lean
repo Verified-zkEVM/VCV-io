@@ -239,6 +239,7 @@ private lemma probOutput_simulateQ_unifChalImpl {α : Type}
 
 end evalDistBridge
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- **CMA-to-NMA reduction via the HeapSSP theorem chain.**
 
 This is the public Σ-protocol-on-`FiatShamir` CMA-to-NMA bound. It routes
@@ -880,6 +881,7 @@ theorem euf_nma_bound
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
     hinv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
 
+omit [SampleableType Stmt] in
 /-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK, β-parametric, tight).**
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
