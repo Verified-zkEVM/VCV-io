@@ -47,7 +47,7 @@ and re-import from `Std.Do.…` directly.
 -/
 require loom2 from git
   "https://github.com/quangvdao/loom2" @
-  "e3949ab2"
+  "eccaa1eb"
 
 /-
 Aeneas: upstream pins Lean 4.28.0-rc1. Lake happily resolves aeneas against
