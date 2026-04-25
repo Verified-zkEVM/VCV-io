@@ -443,7 +443,8 @@ private abbrev cmaPostKeygenState
     (M Commit Chal Stmt Wit : Type) :=
   List M × Heap (CmaCells M Commit Chal Stmt Wit)
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+  [SampleableType Stmt] [SampleableType Wit] in
 private lemma postKeygenSpec_liftM_query_eq_cmaSpec_query
     (t : (postKeygenSpec M Commit Chal Resp).Domain) :
     (liftM (liftM ((postKeygenSpec M Commit Chal Resp).query t) :
@@ -456,7 +457,8 @@ private lemma postKeygenSpec_liftM_query_eq_cmaSpec_query
         ((postKeygenSpec M Commit Chal Resp).Range t)) := by
   rcases t with (n | mc) | m <;> rfl
 
-omit [SampleableType Stmt] [SampleableType Wit] in
+omit [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+  [SampleableType Stmt] [SampleableType Wit] in
 private lemma roSpec_liftM_query_eq_cmaSpec_query
     (mc : M × Commit) :
     (liftM (liftM ((M × Commit →ₒ Chal).query mc) :
@@ -543,10 +545,9 @@ private lemma cmaRealLoggedProdImpl_left_eq_cmaRealAppendProdImpl
     | none =>
         simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
           QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, hcache,
-          Heap.update, uniformSampleImpl]
+          Heap.update]
   · simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-      QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, postKeygenSignCore,
-      FiatShamir, uniformSampleImpl, StateT.run_bind]
+      QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, StateT.run_bind]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
@@ -625,9 +626,6 @@ private lemma cmaRealLoggedProdImpl_pkSpec_bind_output_none {α : Type}
         (Sum.inr ())).run (signed, h) >>= fun z => f z.1 z.2) =
       hr.gen >>= fun ps : Stmt × Wit =>
         f ps.1 (signed, h.update (Sum.inr .keypair) (some (ps.1, ps.2))) := by
-  change (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
-      (Commit := Commit) (Chal := Chal) (Resp := Resp)
-      (Sum.inr ())).run (signed, h) >>= (fun z => f z.1 z.2) = _
   simp [cmaRealLoggedProdImpl, cmaSignLogImpl, QueryImpl.stateTMapBase,
     QueryImpl.flattenStateT, cmaReal, hkp]
 
@@ -657,8 +655,11 @@ private lemma cmaRealAppendProdImpl_project_step
     | none =>
         simp [cmaRealAppendProdImpl, postKeygenAppendProdImpl, cmaPostKeygenProj,
           cmaReal, hcache, Heap.update, uniformSampleImpl]
-  · simp [cmaRealAppendProdImpl, postKeygenAppendProdImpl, cmaPostKeygenProj,
-      cmaReal, postKeygenSignCore, FiatShamir, hst, uniformSampleImpl]
+  · conv_lhs =>
+      simp [cmaRealAppendProdImpl, cmaPostKeygenProj, cmaReal, hst]
+    conv_rhs =>
+      simp [postKeygenAppendProdImpl, cmaPostKeygenProj, postKeygenSignCore,
+        FiatShamir, uniformSampleImpl]
     refine bind_congr fun cp => ?_
     cases hcache : h (Sum.inr InnerCell.roCache) (m, cp.1) with
     | some ch =>
@@ -681,12 +682,14 @@ private lemma cmaRealAppendProdImpl_preserves_inv
   simp only [cmaPostKeygenInv] at hst ⊢
   rcases t with (n | mc) | m
   · intro z hz
-    simp [cmaRealAppendProdImpl, support_map] at hz
-    rcases hz with ⟨r, _hr, rfl⟩
+    have hz' := by
+      simpa [cmaRealAppendProdImpl] using hz
+    rcases hz' with ⟨r, _hr, rfl⟩
     exact hst
   · intro z hz
-    simp [cmaRealAppendProdImpl, support_map] at hz
-    rcases hz with ⟨y, hy, rfl⟩
+    have hz' := by
+      simpa [cmaRealAppendProdImpl] using hz
+    rcases hz' with ⟨y, hy, rfl⟩
     exact cmaReal_impl_preserves_keypair_some (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) (PrvState := PrvState)
       (σ := σ) (hr := hr)
@@ -694,8 +697,9 @@ private lemma cmaRealAppendProdImpl_preserves_inv
         (cmaSpec M Commit Chal Resp Stmt).Domain))
       pk sk h hst y hy
   · intro z hz
-    simp [cmaRealAppendProdImpl, support_map] at hz
-    rcases hz with ⟨y, hy, rfl⟩
+    have hz' := by
+      simpa [cmaRealAppendProdImpl] using hz
+    rcases hz' with ⟨y, hy, rfl⟩
     exact cmaReal_impl_preserves_keypair_some (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) (PrvState := PrvState)
       (σ := σ) (hr := hr)
@@ -894,6 +898,7 @@ private noncomputable def postKeygenFreshProdProb
       (Commit := Commit) (Chal := Chal) (Resp := Resp) pk).run'
     (([] : List M), (∅ : postKeygenCache M Commit Chal)))
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma postKeygenAppendProdImpl_eq_flattenStateT
     (pk : Stmt) (sk : Wit) :
     postKeygenAppendProdImpl (σ := σ) (hr := hr) (M := M)
@@ -904,7 +909,10 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
   rcases t with (n | mc) | m
   · ext st
     rcases st with ⟨signed, cache⟩
-    simp [postKeygenAppendProdImpl, postKeygenAppendImpl]
+    conv_lhs =>
+      simp [postKeygenAppendProdImpl]
+    conv_rhs =>
+      simp [postKeygenAppendImpl]
     change _ =
       (((fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget
           (StateT (List M) (StateT (postKeygenCache M Commit Chal) ProbComp))).flattenStateT
@@ -913,7 +921,10 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
     simp [fsBaseImpl, unifFwdImpl]
   · ext st
     rcases st with ⟨signed, cache⟩
-    simp [postKeygenAppendProdImpl, postKeygenAppendImpl]
+    conv_lhs =>
+      simp [postKeygenAppendProdImpl]
+    conv_rhs =>
+      simp [postKeygenAppendImpl]
     change _ =
       (((fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget
           (StateT (List M) (StateT (postKeygenCache M Commit Chal) ProbComp))).flattenStateT
@@ -926,6 +937,7 @@ private lemma postKeygenAppendProdImpl_eq_flattenStateT
       postKeygenSignCore, StateT.run_get, StateT.run_set, StateT.run_monadLift,
       StateT.run_bind]
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 private theorem postKeygenFreshProdProb_eq_postKeygenFreshProb
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
@@ -939,8 +951,7 @@ private theorem postKeygenFreshProdProb_eq_postKeygenFreshProb
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk]
   rw [StateT.run'_eq, StateT.run_bind]
   rw [OracleComp.simulateQ_flattenStateT_run]
-  simp [StateT.run'_eq, StateT.run_bind, postKeygenSignCore, FiatShamir,
-    randomOracle]
+  simp [StateT.run'_eq, StateT.run_bind, FiatShamir, randomOracle]
 
 private noncomputable def cmaRealPostKeygenVerifyProd
     (pk : Stmt) (x : M × (Commit × Resp)) :
@@ -986,8 +997,10 @@ private lemma cmaReal_verifyFreshComp_run'_eq
     rw [simulateQ_spec_query]
   cases hcache : h (Sum.inr InnerCell.roCache) (msg, c) with
   | some ch =>
-      simp [verifyFreshComp, cmaRealPostKeygenVerifyProd, StateT.run'_eq,
-        FiatShamir]
+      conv_lhs =>
+        simp [verifyFreshComp, StateT.run'_eq, FiatShamir]
+      conv_rhs =>
+        simp [cmaRealPostKeygenVerifyProd, StateT.run'_eq]
       rw [show (simulateQ (cmaReal M Commit Chal σ hr).impl
             (liftM (liftM ((M × Commit →ₒ Chal).query (msg, c)) :
               OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal) :
@@ -998,8 +1011,10 @@ private lemma cmaReal_verifyFreshComp_run'_eq
         from congrArg (fun q => q.run h) hquery]
       simp [cmaReal, hcache]
   | none =>
-      simp [verifyFreshComp, cmaRealPostKeygenVerifyProd, StateT.run'_eq,
-        FiatShamir]
+      conv_lhs =>
+        simp [verifyFreshComp, StateT.run'_eq, FiatShamir]
+      conv_rhs =>
+        simp [cmaRealPostKeygenVerifyProd, StateT.run'_eq]
       rw [show (simulateQ (cmaReal M Commit Chal σ hr).impl
             (liftM (liftM ((M × Commit →ₒ Chal).query (msg, c)) :
               OracleComp (unifSpec + (M × Commit →ₒ Chal)) Chal) :
@@ -1233,9 +1248,12 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
     (inner := implW) (oa := adv.main pk)]
   rw [hmap]
   letI : DecidableEq (Commit × Resp) := Classical.decEq _
-  simp [implS, baseS, fsBaseImpl, postKeygenSignCore, FiatShamir,
-    randomOracle, HasQuery.toQueryImpl, QueryImpl.toHasQuery,
-    QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
+  conv_lhs =>
+    simp [implS, baseS, fsBaseImpl, postKeygenSignCore, FiatShamir,
+      randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
+  conv_rhs =>
+    simp [implS, baseS, fsBaseImpl, postKeygenSignCore, FiatShamir,
+      randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
   refine bind_congr fun a => ?_
   congr 1
   funext ch
@@ -1786,7 +1804,10 @@ private lemma cmaRealRunProb_signedFreshAdv_eq_keygen_bind
   rw [Package.run_bind]
   rw [cmaRealRunState_signedCandidateAdv_eq (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv]
-  simp [map_eq_bind_pure_comp, bind_assoc]
+  simp only [simulateQ_bind, add_apply_inr, simulateQ_query, OracleQuery.input_query,
+    OracleQuery.cont_query, id_map, bind_pure_comp, simulateQ_map, StateT.run_bind,
+    StateT.run_map, map_bind, Functor.map_map, simulateQ_pure, StateT.run'_eq,
+    bind_assoc, bind_map_left, Prod.mk.eta]
   let cont : Stmt → cmaPostKeygenState M Commit Chal Stmt Wit → ProbComp Bool :=
     fun pk st =>
       (simulateQ (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
@@ -1822,6 +1843,7 @@ private lemma cmaRealRunProb_signedFreshAdv_eq_keygen_bind
       (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
       (pk := ps.1) (x := z.1) (signed := z.2.1) (h := z.2.2)
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Hop **H2** (freshness-preserving): running the syntactically logged
 Boolean adversary through `cmaReal` matches the original Fiat-Shamir
 EUF-CMA experiment. -/
@@ -1844,6 +1866,7 @@ theorem cmaRealFreshAdvantage_eq_unforgeableExp
 
 /-! ### H1 + H2 composition -/
 
+omit [SampleableType Stmt] [SampleableType Wit] in
 /-- H2 in inequality form: the CMA advantage is bounded by the probability
 that `cmaReal` accepts the freshness-preserving Boolean adversary. Entry
 point for the rest of the HeapSSP hop chain
