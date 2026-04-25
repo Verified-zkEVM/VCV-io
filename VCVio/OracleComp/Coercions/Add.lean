@@ -20,6 +20,8 @@ either `OracleSpec.add` or `OracleSpec.sigma`. Each instance spells out the
 
 open OracleSpec
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleQuery
 
 universe u v w
@@ -207,7 +209,7 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
         | .inl t => query (Sum.inl (Sum.inl t))
         | .inr (.inl t) => query (Sum.inl (Sum.inr t))
         | .inr (.inr t) => query (Sum.inr t) := by
-  rcases t with t | t | t <;> simp [query_def]
+  rcases t with t | t | t <;> simp [OracleSpec.query_def]
 
 instance lawfulSubSpec_add_assoc :
     OracleSpec.LawfulSubSpec (spec₁ + (spec₂ + spec₃)) (spec₁ + spec₂ + spec₃) where

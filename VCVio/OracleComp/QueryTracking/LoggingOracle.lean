@@ -6,7 +6,7 @@ Authors: Devon Tuma, Quang Dao
 import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.QueryTracking.Tracing
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.Append
 import ToMathlib.Control.WriterT
 
@@ -29,6 +29,8 @@ rest of `WriterTBridge` / `mvcgen` infrastructure already targets.
 universe u v w
 
 open OracleSpec OracleComp
+
+open scoped OracleSpec.PrimitiveQuery
 
 variable {ι} {spec : OracleSpec ι} {α β γ : Type u}
 

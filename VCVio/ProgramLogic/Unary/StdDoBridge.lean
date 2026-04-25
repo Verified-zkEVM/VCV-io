@@ -202,40 +202,41 @@ end StatefulBridges
 
 namespace Spec
 
-/-- Query specification for `mspec`/`mvcgen` in the `.pure` `Std.Do` view. -/
+/-- Query specification for `mspec`/`mvcgen` in the `.pure` `Std.Do` view.
+
+The bare `query` here resolves to `HasQuery.query (m := OracleComp spec)`, which
+unfolds to `liftM (OracleSpec.query t)`. -/
 @[spec] theorem query (t : spec.Domain) {Q : Std.Do.PostCond (spec.Range t) .pure} :
-    Std.Do.Triple (OracleComp.query t : OracleComp spec (spec.Range t))
-      (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
+    Std.Do.Triple (HasQuery.query t : OracleComp spec (spec.Range t))
+      (⌜wpProp (spec := spec) (HasQuery.query t) (fun a => (Q.1 a).down)⌝)
       Q := by
   simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
 
 /-- Bind-chain specification shape for `mspec`/`mvcgen` in OracleComp do-blocks. -/
 @[spec] theorem query_bind (t : spec.Domain) {f : spec.Range t → OracleComp spec α}
     {Q : Std.Do.PostCond α .pure} :
-    Std.Do.Triple ((OracleComp.query t : OracleComp spec (spec.Range t)) >>= f)
+    Std.Do.Triple ((HasQuery.query t : OracleComp spec (spec.Range t)) >>= f)
       (⌜wpProp (spec := spec)
-        ((OracleComp.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
+        ((HasQuery.query t : OracleComp spec (spec.Range t)) >>= f) (fun a => (Q.1 a).down)⌝)
       Q := by
   simp [Std.Do.Triple, Std.Do.WP.wp, PredTrans.apply]
 
 /-- Explicit-head spec for the `MonadLift OracleQuery OracleComp`-form of `query`.
 
-When `query t` appears inside a `do` block, Lean's elaborator inserts a single
-`MonadLift.monadLift _ (OracleSpec.query t)` (no `MonadLiftT` wrapper). The
-ascription form `(OracleComp.query t : OracleComp spec _)` instead elaborates
-to `liftM (instMonadLiftTOfMonadLift _ _) (OracleSpec.query t)`. The two are
-definitionally equal but syntactically distinct, and
+When `query t` appears inside a `do` block via `MonadLift`, Lean's elaborator
+inserts a single `MonadLift.monadLift _ (OracleSpec.query t)` (no `MonadLiftT`
+wrapper). The `HasQuery.query` form (the bare `query` after the ergonomic
+cutover) instead elaborates via `MonadLiftT`. The two are definitionally
+equal but syntactically distinct, and
 `Lean.Elab.Tactic.Do.Spec.findSpec` matches keys syntactically against a
 `DiscrTree`. This lemma re-states the content of `Spec.query` with the
 explicit `MonadLift.monadLift` head so `mvcgen` finds a match in `do`-block
-contexts. The two should be unified once core `mvcgen` normalizes
-`liftM`/`MonadLiftT` chains in its discrimination-tree key construction
-(upstream issue). -/
+contexts. -/
 @[spec] theorem monadLift_query (t : spec.Domain)
     {Q : Std.Do.PostCond (spec.Range t) .pure} :
     Std.Do.Triple
       (MonadLift.monadLift (OracleSpec.query t) : OracleComp spec (spec.Range t))
-      (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
+      (⌜wpProp (spec := spec) (HasQuery.query t) (fun a => (Q.1 a).down)⌝)
       Q := Spec.query t
 
 /-!

@@ -29,6 +29,7 @@ relational coupling through oracle simulation, and the "identical until bad" lem
 -/
 
 open ENNReal OracleSpec OracleComp
+open scoped OracleSpec.PrimitiveQuery
 
 universe u
 

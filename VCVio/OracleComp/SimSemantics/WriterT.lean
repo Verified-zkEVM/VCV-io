@@ -16,6 +16,8 @@ open OracleSpec Function Prod
 
 universe u v w
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace QueryImpl
 
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u}

@@ -42,6 +42,8 @@ open ENNReal OracleSpec OracleComp
 
 universe u v
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp.ProgramLogic.Relational
 
 variable {ι₁ : Type u} {ι₂ : Type u}

@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle

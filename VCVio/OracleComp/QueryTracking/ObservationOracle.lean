@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.Coercions.Add
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.HasQuery.Basic
 import ToMathlib.Control.WriterT
 
 /-!
@@ -217,10 +217,10 @@ lemma runObs_map [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → ω)
 @[simp]
 lemma runObs_liftM_query_inl [LawfulMonad m] (base : QueryImpl spec m)
     (encode : Ev → ω) (t : spec.Domain) :
-    runObs base encode ((liftM (query t : OracleQuery spec _) :
+    runObs base encode ((liftM (OracleSpec.query t : OracleQuery spec _) :
         OracleComp (spec + ObsSpec Ev) _)) = (·, 1) <$> base t := by
   change (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode))
-    (liftM (liftM (query t : OracleQuery spec _) :
+    (liftM (liftM (OracleSpec.query t : OracleQuery spec _) :
       OracleQuery (spec + ObsSpec Ev) _))).run = _
   simp [QueryImpl.withCost, eraseObsImpl, obsCostFn]
 
@@ -238,7 +238,8 @@ lemma runObs_liftComp [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev →
       OracleQuery.cont_query, id_map, OracleQuery.input_query, runObs_bind,
       simulateQ_bind, simulateQ_query, map_bind, bind_map_left, ih]
     have hquery : runObs base encode
-        ((liftM (query t : OracleQuery spec _) : OracleComp (spec + ObsSpec Ev) _)) =
+        ((liftM (OracleSpec.query t : OracleQuery spec _) :
+          OracleComp (spec + ObsSpec Ev) _)) =
         (·, 1) <$> base t := runObs_liftM_query_inl base encode t
     rw [hquery]
     simp
@@ -250,7 +251,7 @@ lemma runObs_observe [LawfulMonad m] (base : QueryImpl spec m) (encode : Ev → 
         OracleComp (spec + ObsSpec Ev) PUnit) =
       pure (PUnit.unit, encode e) := by
   change (simulateQ ((eraseObsImpl base).withCost (obsCostFn encode))
-    (liftM (liftM (query e : OracleQuery (ObsSpec Ev) _) :
+    (liftM (liftM (OracleSpec.query e : OracleQuery (ObsSpec Ev) _) :
       OracleQuery (spec + ObsSpec Ev) _))).run = _
   simp [QueryImpl.withCost, eraseObsImpl, obsCostFn]
 

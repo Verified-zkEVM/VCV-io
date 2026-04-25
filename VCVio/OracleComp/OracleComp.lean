@@ -3,7 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
-import VCVio.OracleComp.OracleQuery
+import VCVio.OracleComp.HasQuery.Basic
 import ToMathlib.PFunctor.Free
 
 /-!
@@ -26,8 +26,7 @@ variable {α β γ : Type v} {ι} {spec : OracleSpec.{u, v} ι}
 
 namespace OracleComp
 
--- We want these to show up regardless of specifically opening `OracleSpec`
-export OracleSpec (query query_def)
+open scoped OracleSpec.PrimitiveQuery
 
 /-- Make one oracle query at input `t`, then continue with `k` on the response.
 
@@ -238,10 +237,12 @@ def isPure {α : Type _} : OracleComp spec α → Bool
 
 @[simp] lemma isPure_pure : isPure (pure x : OracleComp spec α) = true := rfl
 @[simp] lemma isPure_query : isPure (query t : OracleComp spec _) = false := rfl
-@[simp] lemma isPure_query_bind : isPure (liftM (query t) >>= ou) = false := rfl
+@[simp] lemma isPure_query_bind : isPure (liftM (OracleSpec.query t) >>= ou) = false := rfl
 
-@[simp] lemma pure_ne_query : (pure u : OracleComp spec _) ≠ query t := by simp [query_def]
-@[simp] lemma query_ne_pure : (query t : OracleComp spec _) ≠ pure u := by simp [query_def]
+@[simp] lemma pure_ne_query :
+    (pure u : OracleComp spec _) ≠ query t := by simp [OracleSpec.query_def]
+@[simp] lemma query_ne_pure :
+    (query t : OracleComp spec _) ≠ pure u := by simp [OracleSpec.query_def]
 
 lemma pure_eq_query_iff_false : pure u = (query t : OracleComp spec _) ↔ False := by simp
 lemma query_eq_pure_iff_false : (query t : OracleComp spec _) = pure u ↔ False := by simp

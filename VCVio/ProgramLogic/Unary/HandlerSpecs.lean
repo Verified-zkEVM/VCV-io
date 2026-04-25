@@ -279,13 +279,12 @@ theorem cachingOracle_triple (t : spec.Domain) (cache₀ : QueryCache spec) :
         (do match (← get) t with
             | Option.some u => return u
             | Option.none =>
-                let u ← (OracleComp.query t : OracleComp spec _)
+                let u ← (HasQuery.query t : OracleComp spec _)
                 modifyGet (fun cache => (u, cache.cacheQuery t u)) :
           StateT (QueryCache spec) (OracleComp spec) (spec.Range t)) from rfl]
   mvcgen
   rename_i cache hle hnone
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro u _
   mvcgen
   exact ⟨le_trans hle (QueryCache.le_cacheQuery cache hnone),
@@ -462,8 +461,7 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
 
@@ -479,8 +477,7 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
   exact ⟨[⟨t, a⟩], rfl⟩
@@ -527,15 +524,15 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
   have hrun : (countingOracle t :
       WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run =
         (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
-          (OracleComp.query t : OracleComp spec _) := by
+          (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
+      bind_assoc, map_eq_bind_pure_comp]
   rw [hrun] at hmem
-  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
-    Prod.mk.injEq] at hmem
+  simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
-  subst hw
-  -- After `subst` the state is `qc * (QueryCount.single t * 1)` which simps
+  cases hw
+  -- After `cases` the state is `qc * (QueryCount.single t * 1)` which simps
   -- to `qc + QueryCount.single t` via `QueryCount.monoid_mul_def`.
   simp
 
@@ -596,14 +593,14 @@ theorem costOracle_triple (costFn : spec.Domain → ω)
   intro s hs v w hmem
   have hrun : (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run =
       (fun x => (x, costFn t * (1 : ω))) <$>
-        (OracleComp.query t : OracleComp spec _) := by
+        (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
+      bind_assoc, map_eq_bind_pure_comp]
   rw [hrun] at hmem
-  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
-    Prod.mk.injEq] at hmem
+  simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
-  subst hw
+  cases hw
   change s * (costFn t * (1 : ω)) = s₀ * costFn t
   rw [hs, mul_one]
 
@@ -696,8 +693,7 @@ theorem cachingLoggingOracle_triple
   · -- none-branch: cache miss, falls through to query
     rename_i s hcond hnone
     obtain ⟨hle, hlog⟩ := hcond
-    rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-        wpProp_iff_forall_support]
+    rw [wpProp_iff_forall_support]
     intro v _
     mvcgen
     change cache₀ ≤ s.1.cacheQuery t v ∧ (s.1.cacheQuery t v) t = some v ∧
