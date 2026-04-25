@@ -285,6 +285,32 @@ lemma isQueryBoundP_map_iff (oa : OracleComp spec α) (f : α → β) (n : ℕ) 
     IsQueryBoundP (f <$> oa) p n ↔ IsQueryBoundP oa p n :=
   isQueryBound_map_aux oa f _ _
 
+/-- The conjunction of two scalar `IsQueryBoundP` bounds combines into a vector-budget
+`IsQueryBound` whose `canQuery` admits a query iff every active predicate has positive
+budget, and whose cost decrements only the matching coordinates.
+
+This is the canonical bridge from the predicate-targeted scalar API to the vector-budget API:
+proofs that decompose a multi-oracle adversary into per-oracle counts can use the conjunction
+form for hypothesis statements while reusing the existing `IsQueryBound` propagation machinery
+(such as `simulateQ_run_of_step`) on the combined bound. The two predicates need not be
+disjoint — at an overlapping query both coordinates decrement and both must be positive,
+which exactly tracks the independent per-predicate counts. -/
+theorem IsQueryBoundP.and_isQueryBound_pair
+    {oa : OracleComp spec α}
+    {p₁ p₂ : ι → Prop} [DecidablePred p₁] [DecidablePred p₂]
+    {n₁ n₂ : ℕ}
+    (h₁ : oa.IsQueryBoundP p₁ n₁) (h₂ : oa.IsQueryBoundP p₂ n₂) :
+    oa.IsQueryBound (n₁, n₂)
+      (fun t b => (¬ p₁ t ∨ 0 < b.1) ∧ (¬ p₂ t ∨ 0 < b.2))
+      (fun t b => (if p₁ t then b.1 - 1 else b.1, if p₂ t then b.2 - 1 else b.2)) := by
+  induction oa using OracleComp.inductionOn generalizing n₁ n₂ with
+  | pure x => trivial
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff] at h₁ h₂
+      rw [isQueryBound_query_bind_iff]
+      refine ⟨⟨h₁.1, h₂.1⟩, fun u => ?_⟩
+      exact ih u (h₁.2 u) (h₂.2 u)
+
 end IsQueryBoundP
 
 section IsPerIndexQueryBound

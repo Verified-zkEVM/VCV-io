@@ -181,13 +181,14 @@ theorem euf_cma_to_nma
       | some v =>
           simp [roSim, hs, nmaHashQueryBound]
       | none =>
+          have hfwd' := hfwd (.inr mc) s
+          change OracleComp.IsQueryBoundP _ _ _ at hfwd'
           simpa [roSim, hs, nmaHashQueryBound] using
             (OracleComp.isQueryBoundP_map_iff
                 (oa := (fwd (.inr mc)).run s)
                 (f := fun a : Chal × spec.QueryCache =>
                   (a.1, a.2.cacheQuery (.inr mc) a.1))
-                (n := 1) (p := fun t => Sum.isRight t = true)).2
-              (hfwd (.inr mc) s)
+                (n := 1)).2 hfwd'
     have hsig :
         ∀ (msg : M) (s : spec.QueryCache),
           nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
@@ -230,6 +231,7 @@ theorem euf_cma_to_nma
               intro t b ht
               simp)
             (s := s))
+      change OracleComp.IsQueryBoundP _ _ _ at htranscript
       simpa [sigSim, nmaHashQueryBound] using
         (OracleComp.isQueryBoundP_map_iff
             (oa := (simulateQ unifSim (simTranscript pk)).run s)
@@ -239,7 +241,7 @@ theorem euf_cma_to_nma
               | none =>
                   ((a.1.1, a.1.2.2),
                     QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-            (n := 0) (p := fun t => Sum.isRight t = true)).2 htranscript
+            (n := 0)).2 htranscript
     have hstep :
         ∀ t b s,
           (match t, b with
@@ -283,9 +285,25 @@ theorem euf_cma_to_nma
               omega
       | inr msg =>
           simp [stepBudget]
+    -- Convert the conjunction to the vector-budget form expected by the proof template.
+    have _hQ_pair := OracleComp.IsQueryBoundP.and_isQueryBound_pair
+      (oa := adv.main pk) (n₁ := qS) (n₂ := qH)
+      (h₁ := (_hQ pk).1) (h₂ := (_hQ pk).2)
+    have _hQ_vec : (adv.main pk).IsQueryBound (qS, qH)
+        (fun t b => match t, b with
+          | .inl (.inl _), _ => True
+          | .inl (.inr _), (_, qH') => 0 < qH'
+          | .inr _, (qS', _) => 0 < qS')
+        (fun t b => match t, b with
+          | .inl (.inl _), b' => b'
+          | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
+          | .inr _, (qS', qH') => (qS' - 1, qH')) := by
+      refine (OracleComp.isQueryBound_congr ?_ ?_).1 _hQ_pair
+      · rintro (((_) | (_)) | _) ⟨a, b⟩ <;> simp
+      · rintro (((_) | (_)) | _) ⟨a, b⟩ <;> simp
     simpa [nmaHashQueryBound, signHashQueryBound, OracleComp.IsQueryBoundP] using
       (OracleComp.IsQueryBound.simulateQ_run_of_step
-        (h := _hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
+        (h := _hQ_vec) (combine := Nat.add) (mapBudget := Prod.snd)
         (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
         (hbind := by
           intro γ δ oa' ob b₁ b₂ h1 h2

@@ -296,23 +296,20 @@ noncomputable def runtime
 
 /-- Structural query bound for T-transform OW-PCVA adversaries: uniform-sampling queries are
 unrestricted, while `qH`, `qP`, and `qV` bound the hash, plaintext-checking, and validity
-oracles respectively. -/
+oracles respectively.
+
+Defined as the conjunction of three predicate-targeted query bounds `IsQueryBoundP`, one per
+counted oracle. Because the three index predicates are pairwise disjoint, the conjunction is
+equivalent to the prior single-vector `IsQueryBound` formulation. -/
 def OW_PCVA_Adversary.MakesAtMostQueries
     {M PK SK R C : Type} [DecidableEq M] [DecidableEq C] [SampleableType R]
     {pke : AsymmEncAlg.ExplicitCoins ProbComp M PK SK R C}
     (adversary : OW_PCVA_Adversary
       (TTransform (m := OracleComp (TTransform.oracleSpec M R)) pke)) (qH qP qV : ℕ) : Prop :=
-  ∀ pk cStar, OracleComp.IsQueryBound (adversary pk cStar) (qH, qP, qV)
-    (fun t b => match t, b with
-      | .inl (.inl _), _ => True
-      | .inl (.inr _), (qH', _, _) => 0 < qH'
-      | .inr (.inl _), (_, qP', _) => 0 < qP'
-      | .inr (.inr _), (_, _, qV') => 0 < qV')
-    (fun t b => match t, b with
-      | .inl (.inl _), b' => b'
-      | .inl (.inr _), (qH', qP', qV') => (qH' - 1, qP', qV')
-      | .inr (.inl _), (qH', qP', qV') => (qH', qP' - 1, qV')
-      | .inr (.inr _), (qH', qP', qV') => (qH', qP', qV' - 1))
+  ∀ pk cStar,
+    (adversary pk cStar).IsQueryBoundP (· matches .inl (.inr _)) qH ∧
+    (adversary pk cStar).IsQueryBoundP (· matches .inr (.inl _)) qP ∧
+    (adversary pk cStar).IsQueryBoundP (· matches .inr (.inr _)) qV
 
 /-- The T-transform OW-PCVA security statement.
 

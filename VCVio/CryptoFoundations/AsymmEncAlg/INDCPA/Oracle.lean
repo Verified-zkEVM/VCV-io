@@ -48,7 +48,7 @@ Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the p
 selecting the right (challenge-oracle) component of the index sum. -/
 def IND_CPA_adversary.MakesAtMostQueries {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) (q : ℕ) : Prop :=
-  ∀ pk, (adversary pk).IsQueryBoundP (fun t => Sum.isRight t = true) q
+  ∀ pk, (adversary pk).IsQueryBoundP (· matches .inr _) q
 
 /-- Cache state for the cached left/right oracle implementations. -/
 abbrev IND_CPA_Cache (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
@@ -297,10 +297,12 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
     (pk : PK) (b : Bool) (q : ℕ)
     {α : Type} (comp : OracleComp encAlg'.IND_CPA_oracleSpec α)
     (budget : ℕ)
-    (hbound : comp.IsQueryBoundP (fun t => Sum.isRight t = true) budget)
+    (hbound : comp.IsQueryBoundP (· matches .inr _) budget)
     (cache : (M × M →ₒ C).QueryCache) (n : ℕ) (hn : n + budget ≤ q) :
     evalDist ((simulateQ (implCounted pk b q) comp).run' (cache, n)) =
       evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache) := by
+  have hbound : comp.IsQueryBoundP (fun t => Sum.isRight t = true) budget :=
+    (OracleComp.isQueryBoundP_congr_pred (fun t => by cases t <;> simp)).mp hbound
   set canQuery : encAlg'.IND_CPA_oracleSpec.Domain → ℕ → Prop :=
     fun t n => ¬ (Sum.isRight t = true) ∨ 0 < n with hcanQuery
   set cost : encAlg'.IND_CPA_oracleSpec.Domain → ℕ → ℕ :=

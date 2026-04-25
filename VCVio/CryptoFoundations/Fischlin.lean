@@ -888,7 +888,7 @@ selecting the right (random-oracle) component of the index sum. -/
 def ROQueryBound {α : Type}
     (oa : OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) α)
     (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBoundP oa (fun t => Sum.isRight t = true) Q
+  OracleComp.IsQueryBoundP oa (· matches .inr _) Q
 
 /-- A cheating prover (knowledge soundness adversary) for the Fischlin transform.
 The adversary receives a statement and message, has access to both the random oracle

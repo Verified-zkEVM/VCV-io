@@ -38,27 +38,20 @@ Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the p
 selecting the nested `.inl (.inr _)` (random-oracle) component of the index sum. -/
 def hashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBoundP oa
-    (fun t =>
-      (match t with
-        | .inl (.inr _) => true
-        | _ => false) = true) Q
+  OracleComp.IsQueryBoundP oa (· matches .inl (.inr _)) Q
 
 /-- Structural query bound for Fiat-Shamir EUF-CMA adversaries that tracks both
 signing-oracle queries (`qS`) and random-oracle queries (`qH`).
-Uniform-sampling queries are unrestricted. -/
+Uniform-sampling queries are unrestricted.
+
+Defined as the conjunction of two predicate-targeted query bounds `IsQueryBoundP`, one per
+counted oracle. Because the two index predicates are disjoint, the conjunction is
+equivalent to the prior single-vector `IsQueryBound` formulation. -/
 def signHashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α)
     (qS qH : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa (qS, qH)
-    (fun t b => match t, b with
-      | .inl (.inl _), _ => True
-      | .inl (.inr _), (_, qH') => 0 < qH'
-      | .inr _, (qS', _) => 0 < qS')
-    (fun t b => match t, b with
-      | .inl (.inl _), b' => b'
-      | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
-      | .inr _, (qS', qH') => (qS' - 1, qH'))
+  oa.IsQueryBoundP (· matches .inr _) qS ∧
+  oa.IsQueryBoundP (· matches .inl (.inr _)) qH
 
 /-- Structural bound on random-oracle queries for an NMA adversary (no signing oracle).
 Uniform-sampling queries are unrestricted.
@@ -67,7 +60,7 @@ Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the p
 selecting the right (random-oracle) component of the index sum. -/
 def nmaHashQueryBound {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBoundP oa (fun t => Sum.isRight t = true) Q
+  OracleComp.IsQueryBoundP oa (· matches .inr _) Q
 
 @[simp]
 lemma nmaHashQueryBound_query_bind_iff {α : Type}
