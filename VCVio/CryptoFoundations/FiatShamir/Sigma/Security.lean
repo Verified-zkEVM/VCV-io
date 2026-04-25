@@ -5,11 +5,15 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.CryptoFoundations.FiatShamir.Sigma
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
+import VCVio.EvalDist.Inequalities
+import VCVio.SSP.Composition
+import ToMathlib.Data.ENNReal.TsumDistrib
 
 /-!
 # EUF-CMA security of the Fiat-Shamir Σ-protocol transform
@@ -37,327 +41,153 @@ variable [SampleableType Stmt] [SampleableType Wit]
 variable (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
   (hr : GenerableRelation Stmt Wit rel) (M : Type)
 
-/-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction.
+/-! ### Bad-flag support lemmas
 
-For `qS` signing queries and `qH` random-oracle queries with challenge space `Chal`, the
-probability that the HVZK simulator tries to program a cache entry `(msg, c)` already
-populated by a prior adversary query is bounded by `qS · (qS + qH) / |Chal|` via the
-birthday/union bound over commitments.
+Generic monotonicity lemmas about the `QueryImpl.withBadFlag` and `QueryImpl.withBadUpdate`
+combinators (see `VCVio/OracleComp/SimSemantics/StateT.lean`). They formalize the obvious facts
+that the boolean (bad) flag in the lifted state is *threaded unchanged* by `withBadFlag` and is
+*OR-monotone* under `withBadUpdate`. We use them below to discharge the monotonicity hypothesis
+of the per-query ε-perturbed identical-until-bad lemma. -/
+
+private lemma support_withBadFlag_run_snd_snd
+    {ι : Type*} {spec : OracleSpec ι} {ι' : Type*} {spec' : OracleSpec ι'}
+    {σ : Type _} (impl : QueryImpl spec (StateT σ (OracleComp spec')))
+    (t : spec.Domain) (s : σ) (b : Bool)
+    {z : spec.Range t × σ × Bool}
+    (hz : z ∈ support ((impl.withBadFlag t).run (s, b))) :
+    z.2.2 = b := by
+  simp only [QueryImpl.withBadFlag, StateT.run, StateT.mk, support_map] at hz
+  obtain ⟨_, _, rfl⟩ := hz
+  rfl
+
+private lemma support_withBadUpdate_run_snd_snd_of_pre
+    {ι : Type*} {spec : OracleSpec ι} {ι' : Type*} {spec' : OracleSpec ι'}
+    {σ : Type _} (impl : QueryImpl spec (StateT σ (OracleComp spec')))
+    (f : (t : spec.Domain) → σ → spec.Range t → Bool)
+    (t : spec.Domain) (s : σ)
+    {z : spec.Range t × σ × Bool}
+    (hz : z ∈ support ((impl.withBadUpdate f t).run (s, true))) :
+    z.2.2 = true := by
+  simp only [QueryImpl.withBadUpdate, StateT.run, StateT.mk, support_map] at hz
+  obtain ⟨_, _, rfl⟩ := hz
+  simp
+
+/-- Birthday-bound collision slack for the Fiat-Shamir CMA-to-NMA reduction,
+parameterized by the simulator's commit-predictability bound `β`:
+
+  `collisionSlack qS qH β = 2 · qS · (qS + qH) · β`.
+
+The two `qS · (qS + qH) · β` summands come from the two programming-collision bad
+events along the freshness-preserving chain, union-bounded over `qS` signing queries
+and ≤ `qS + qH` cached points:
+* simulator-side collision (sub-claim B-finish), bounded by `qS · (qS + qH) · β`
+  directly from the `simCommitPredictability simTranscript β` hypothesis;
+* FS-vs-programming collision in the (A) bridge, bounded by `qS · (qS + qH) · β`
+  after absorbing the quadratic HVZK-transport term `qS · (qS + qH) · ζ_zk` into
+  the overall `qS · (qS + qH + 1) · ζ_zk` HVZK cost carried by the theorem.
+
+The cache-miss verification contribution is intentionally *not* folded into
+`collisionSlack`: it depends on an additional scheme-specific fresh-challenge
+acceptance bound (`SigmaProtocol.verifyChallengePredictability`) and is carried
+separately in `euf_cma_to_nma`.
+
+For Schnorr, `β = 1/|G|` (uniform commit over `⟨g⟩`), so the collision term is
+`2 · qS · (qS + qH) / |G|`.
 
 Matches EasyCrypt's `pr_bad_game` at
-[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`) and
-plays the same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
-noncomputable def collisionSlack (qS qH : ℕ) (Chal : Type) [Fintype Chal] : ENNReal :=
-  ((qS * (qS + qH) : ℕ) : ENNReal) / (Fintype.card Chal : ENNReal)
+[fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) (`QS · (QS+QR) / |Ω|`,
+modulo the doubled birthday bound and the separate cache-miss verification term) and plays the
+same role as `GPVHashAndSign.collisionBound` for the PSF construction. -/
+noncomputable def collisionSlack (qS qH : ℕ) (β : ENNReal) :
+    ENNReal :=
+  2 * (qS : ENNReal) * ((qS + qH : ℕ) : ENNReal) * β
 
-/-- **CMA-to-NMA reduction via HVZK simulation.**
+omit [SampleableType Stmt] [SampleableType Wit] in
+private lemma realCommit_probOutput_le_sim_plus_hvzk
+    [Inhabited Chal] [SampleableType Chal]
+    {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
+    {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
+    (hhvzk : σ.HVZK simTranscript ζ_zk)
+    {x : Stmt} {w : Wit} (hx : rel x w = true) (c₀ : Commit) :
+    Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] ≤
+      Pr[= c₀ | Prod.fst <$> simTranscript x] + ENNReal.ofReal ζ_zk := by
+  classical
+  letI := Classical.decEq Commit
+  let eventDec : Commit × Chal × Resp → Bool := fun z => decide (z.1 = c₀)
+  let eventReal : ProbComp Bool := eventDec <$> σ.realTranscript x w
+  let eventSim : ProbComp Bool := eventDec <$> simTranscript x
+  have htv_event : tvDist eventReal eventSim ≤ ζ_zk := by
+    dsimp [eventReal, eventSim]
+    exact le_trans (tvDist_map_le (f := eventDec) _ _) (hhvzk x w hx)
+  have h_eventPred_eq :
+      ((fun b : Bool => b = true) ∘ eventDec) = (fun z : Commit × Chal × Resp => z.1 = c₀) := by
+    funext z
+    simp [eventDec]
+  have h_event_real :
+      Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] = Pr[= true | eventReal] := by
+    rw [← probEvent_eq_eq_probOutput]
+    calc
+      Pr[fun c : Commit => c = c₀ | Prod.fst <$> σ.realTranscript x w] =
+          Pr[fun z : Commit × Chal × Resp => z.1 = c₀ | σ.realTranscript x w] := by
+            exact probEvent_map (mx := σ.realTranscript x w) (f := Prod.fst)
+              (q := fun c : Commit => c = c₀)
+      _ = Pr[(· = true) | eventReal] := by
+            simpa [eventReal, h_eventPred_eq] using
+              (probEvent_map (mx := σ.realTranscript x w)
+                (f := eventDec) (q := fun b : Bool => b = true)).symm
+      _ = Pr[= true | eventReal] := by
+            simp
+  have h_event_sim :
+      Pr[= c₀ | Prod.fst <$> simTranscript x] = Pr[= true | eventSim] := by
+    rw [← probEvent_eq_eq_probOutput]
+    calc
+      Pr[fun c : Commit => c = c₀ | Prod.fst <$> simTranscript x] =
+          Pr[fun z : Commit × Chal × Resp => z.1 = c₀ | simTranscript x] := by
+            exact probEvent_map (mx := simTranscript x) (f := Prod.fst)
+              (q := fun c : Commit => c = c₀)
+      _ = Pr[(· = true) | eventSim] := by
+            simpa [eventSim, h_eventPred_eq] using
+              (probEvent_map (mx := simTranscript x)
+                (f := eventDec) (q := fun b : Bool => b = true)).symm
+      _ = Pr[= true | eventSim] := by
+            simp
+  have hdiff :
+      |Pr[= true | eventReal].toReal - Pr[= true | eventSim].toReal| ≤ ζ_zk := by
+    exact le_trans (abs_probOutput_toReal_sub_le_tvDist eventReal eventSim) htv_event
+  have h_toReal :
+      Pr[= c₀ | Prod.fst <$> σ.realTranscript x w].toReal ≤
+        Pr[= c₀ | Prod.fst <$> simTranscript x].toReal + ζ_zk := by
+    rw [← h_event_real, ← h_event_sim] at hdiff
+    rw [abs_le] at hdiff
+    linarith
+  have h_real_ne : Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] ≠ ⊤ := probOutput_ne_top
+  have h_sim_ne : Pr[= c₀ | Prod.fst <$> simTranscript x] ≠ ⊤ := probOutput_ne_top
+  calc
+    Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] =
+        ENNReal.ofReal (Pr[= c₀ | Prod.fst <$> σ.realTranscript x w].toReal) := by
+          rw [ENNReal.ofReal_toReal h_real_ne]
+    _ ≤ ENNReal.ofReal (Pr[= c₀ | Prod.fst <$> simTranscript x].toReal + ζ_zk) := by
+          exact ENNReal.ofReal_le_ofReal h_toReal
+    _ = Pr[= c₀ | Prod.fst <$> simTranscript x] + ENNReal.ofReal ζ_zk := by
+          rw [ENNReal.ofReal_add ENNReal.toReal_nonneg hζ_zk, ENNReal.ofReal_toReal h_sim_ne]
 
-For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
-random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
+omit [SampleableType Stmt] [SampleableType Wit] in
+private lemma realCommit_probOutput_le_beta_hvzk
+    [Inhabited Chal] [SampleableType Chal]
+    {simTranscript : Stmt → ProbComp (Commit × Chal × Resp)}
+    {ζ_zk : ℝ} (hζ_zk : 0 ≤ ζ_zk)
+    (hhvzk : σ.HVZK simTranscript ζ_zk)
+    {β : ENNReal} (hPredSim : σ.simCommitPredictability simTranscript β)
+    {x : Stmt} {w : Wit} (hx : rel x w = true) (c₀ : Commit) :
+    Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] ≤ β + ENNReal.ofReal ζ_zk := by
+  calc
+    Pr[= c₀ | Prod.fst <$> σ.realTranscript x w] ≤
+        Pr[= c₀ | Prod.fst <$> simTranscript x] + ENNReal.ofReal ζ_zk :=
+      realCommit_probOutput_le_sim_plus_hvzk (σ := σ) hζ_zk hhvzk hx c₀
+    _ ≤ β + ENNReal.ofReal ζ_zk := by
+      gcongr
+      exact hPredSim x c₀
 
-  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B) + qS · ζ_zk + qS · (qS + qH) / |Chal|`
-
-The NMA adversary `B` is constructed by:
-- Forwarding `A`'s hash queries to the external oracle (visible to `Fork.fork`)
-- Simulating `A`'s signing queries using the HVZK simulator, programming the
-  simulated challenge into the cache
-- Returning `A`'s forgery together with the accumulated `QueryCache`
-
-Each of the `qS` signing simulations introduces at most `ζ_zk` total-variation distance;
-the birthday term `collisionSlack qS qH Chal` absorbs collisions where `A` queries a
-hash that `B` later programs.
-
-This step is independent of special soundness and the forking lemma; those are handled
-by `euf_nma_bound`.
-
-The Lean bound matches Firsov-Janku's `pr_koa_cma` at
-[fsec/proof/Schnorr.ec:943](../../../fsec/proof/Schnorr.ec): the CMA-to-KOA reduction uses
-`eq_except (signed qs) LRO.m{1} LRO.m{2}` as the RO-cache invariant, swaps real signing with
-`simulator_equiv` (per-query HVZK cost), handles RO reprogramming via `lro_redo_inv` +
-`ro_get_eq_except`, and absorbs the late-programming collision event through the `bad` flag,
-bounded by `pr_bad_game` at [fsec/proof/Schnorr.ec:793](../../../fsec/proof/Schnorr.ec) as
-`QS · (QS+QR) / |Ω|`, matching our `collisionSlack qS qH Chal`. -/
-theorem euf_cma_to_nma
-    [DecidableEq M] [DecidableEq Commit]
-    [Fintype Chal] [SampleableType Chal]
-    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
-    (ζ_zk : ℝ) (_hζ_zk : 0 ≤ ζ_zk)
-    (_hhvzk : σ.HVZK simTranscript ζ_zk)
-    (adv : SignatureAlg.unforgeableAdv
-      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
-    (qS qH : ℕ)
-    (_hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
-    ∃ nmaAdv : SignatureAlg.managedRoNmaAdv
-        (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
-      (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-        (oa := nmaAdv.main pk) qH) ∧
-      adv.advantage (runtime M) ≤
-        Fork.advantage σ hr M nmaAdv qH +
-          ENNReal.ofReal (qS * ζ_zk) +
-          collisionSlack qS qH Chal := by
-  let spec := unifSpec + (M × Commit →ₒ Chal)
-  let fwd : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget _
-  let unifSim : QueryImpl unifSpec (StateT spec.QueryCache (OracleComp spec)) :=
-    fun n => fwd (.inl n)
-  let roSim : QueryImpl (M × Commit →ₒ Chal)
-      (StateT spec.QueryCache (OracleComp spec)) := fun mc => do
-    let cache ← get
-    match cache (.inr mc) with
-    | some v => pure v
-    | none =>
-        let v ← fwd (.inr mc)
-        modifyGet fun cache => (v, cache.cacheQuery (.inr mc) v)
-  let baseSim : QueryImpl spec (StateT spec.QueryCache (OracleComp spec)) :=
-    unifSim + roSim
-  let sigSim : Stmt → QueryImpl (M →ₒ (Commit × Resp))
-      (StateT spec.QueryCache (OracleComp spec)) := fun pk msg => do
-    let (c, ω, s) ← simulateQ unifSim (simTranscript pk)
-    modifyGet fun cache =>
-      match cache (.inr (msg, c)) with
-      | some _ => ((c, s), cache)
-      | none => ((c, s), cache.cacheQuery (.inr (msg, c)) ω)
-  refine ⟨⟨fun pk => (simulateQ (baseSim + sigSim pk) (adv.main pk)).run ∅⟩, ?_, ?_⟩
-  · -- Query bound: show the NMA adversary makes at most `qH` hash queries.
-    -- `fwd` forwards each hash query as-is (1 hash query per CMA hash query).
-    -- `sigSim` handles signing queries via `simTranscript` + cache programming,
-    -- generating zero hash queries (only uniform queries from `simTranscript`).
-    -- Requires a general `IsQueryBound` transfer lemma for `simulateQ` + `StateT.run`.
-    intro pk
-    let stepBudget :
-        (spec + (M →ₒ (Commit × Resp))).Domain → ℕ × ℕ → ℕ := fun t _ =>
-      match t with
-      | .inl (.inl _) => 0
-      | .inl (.inr _) => 1
-      | .inr _ => 0
-    have hbind :
-        ∀ {α β : Type} {oa : OracleComp spec α} {ob : α → OracleComp spec β} {Q₁ Q₂ : ℕ},
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁ →
-          (∀ x, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := ob x) Q₂) →
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := oa >>= ob) (Q₁ + Q₂) := by
-      intro α β oa ob Q₁ Q₂ h1 h2
-      exact nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal) h1 h2
-    have hfwd :
-        ∀ (t : spec.Domain) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (fwd t).run s) (match t with
-              | .inl _ => 0
-              | .inr _ => 1) := by
-      intro t s
-      cases t with
-      | inl n =>
-          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-            OracleComp.liftM_run_StateT] using
-            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (spec.query (.inl n))) 0 by
-                  exact
-                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                      (.inl n) 0).2 trivial)
-              (fun u =>
-                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := pure (u, s)) 0 by
-                    trivial))
-      | inr mc =>
-          simpa [fwd, QueryImpl.liftTarget_apply, HasQuery.toQueryImpl_apply,
-            OracleComp.liftM_run_StateT] using
-            (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-              (show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := liftM (spec.query (.inr mc))) 1 by
-                  exact
-                    (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-                      (.inr mc) 1).2 (Nat.succ_pos 0))
-              (fun u =>
-                show nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := pure (u, s)) 0 by
-                    trivial))
-    have hro :
-        ∀ (mc : M × Commit) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (roSim mc).run s) 1 := by
-      intro mc s
-      cases hs : s (.inr mc) with
-      | some v =>
-          simp [roSim, hs, nmaHashQueryBound]
-      | none =>
-          simpa [roSim, hs] using
-            ((OracleComp.isQueryBound_map_iff
-                (oa := (fwd (.inr mc)).run s)
-                (f := fun a : Chal × spec.QueryCache =>
-                  (a.1, a.2.cacheQuery (.inr mc) a.1))
-                (b := 1)
-                (canQuery := fun t b => match t with
-                  | .inl _ => True
-                  | .inr _ => 0 < b)
-                (cost := fun t b => match t with
-                  | .inl _ => b
-                  | .inr _ => b - 1)).2
-              (hfwd (.inr mc) s))
-    have hsig :
-        ∀ (msg : M) (s : spec.QueryCache),
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (sigSim pk msg).run s) 0 := by
-      intro msg s
-      have hsource : OracleComp.IsQueryBound
-          (simTranscript pk) () (fun _ _ => True) (fun _ _ => ()) := by
-        induction simTranscript pk using OracleComp.inductionOn with
-        | pure x =>
-            trivial
-        | query_bind t mx ih =>
-            simp [OracleComp.isQueryBound_query_bind_iff, ih]
-      have htranscript :
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
-        simpa [nmaHashQueryBound] using
-          (OracleComp.IsQueryBound.simulateQ_run_of_step
-            (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
-            (stepBudget := fun _ _ => 0) (impl := unifSim)
-            (hbind := by
-              intro γ δ oa' ob b₁ b₂ h1 h2
-              have h1' :
-                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa := oa') b₁ := by
-                simpa [nmaHashQueryBound] using h1
-              have h2' : ∀ x,
-                  nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                    (oa := ob x) b₂ := by
-                intro x
-                simpa [nmaHashQueryBound] using h2 x
-              simpa [nmaHashQueryBound] using
-                (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-                  (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-            )
-            (hstep := by
-              intro t b s' ht
-              simpa [unifSim] using hfwd (.inl t) s')
-            (hcombine := by
-              intro t b ht
-              simp)
-            (s := s))
-      simpa [sigSim, nmaHashQueryBound] using
-        ((OracleComp.isQueryBound_map_iff
-            (oa := (simulateQ unifSim (simTranscript pk)).run s)
-            (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
-              match a.2 (.inr (msg, a.1.1)) with
-              | some _ => ((a.1.1, a.1.2.2), a.2)
-              | none =>
-                  ((a.1.1, a.1.2.2),
-                    QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-            (b := 0)
-            (canQuery := fun t b => match t with
-              | .inl _ => True
-              | .inr _ => 0 < b)
-            (cost := fun t b => match t with
-              | .inl _ => b
-              | .inr _ => b - 1)).2 htranscript)
-    have hstep :
-        ∀ t b s,
-          (match t, b with
-            | .inl (.inl _), _ => True
-            | .inl (.inr _), (_, qH') => 0 < qH'
-            | .inr _, (qS', _) => 0 < qS') →
-          nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (oa := ((baseSim + sigSim pk) t).run s) (stepBudget t b) := by
-      intro t b s ht
-      rcases b with ⟨qS', qH'⟩
-      cases t with
-      | inl t =>
-          cases t with
-          | inl n =>
-              simpa [baseSim, stepBudget] using hfwd (.inl n) s
-          | inr mc =>
-              simpa [baseSim, stepBudget] using hro mc s
-      | inr msg =>
-          simpa [stepBudget] using hsig msg s
-    have hcombine :
-        ∀ t b,
-          (match t, b with
-            | .inl (.inl _), _ => True
-            | .inl (.inr _), (_, qH') => 0 < qH'
-            | .inr _, (qS', _) => 0 < qS') →
-          Nat.add (stepBudget t b)
-            (Prod.snd (match t, b with
-              | .inl (.inl _), b' => b'
-              | .inl (.inr _), (qS', qH') => (qS', qH' - 1)
-              | .inr _, (qS', qH') => (qS' - 1, qH'))) =
-            Prod.snd b := by
-      intro t b ht
-      rcases b with ⟨qS', qH'⟩
-      cases t with
-      | inl t =>
-          cases t with
-          | inl n =>
-              simp [stepBudget]
-          | inr mc =>
-              simp [stepBudget] at ht ⊢
-              omega
-      | inr msg =>
-          simp [stepBudget]
-    simpa [nmaHashQueryBound, signHashQueryBound] using
-      (OracleComp.IsQueryBound.simulateQ_run_of_step
-        (h := _hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
-        (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
-        (hbind := by
-          intro γ δ oa' ob b₁ b₂ h1 h2
-          have h1' :
-              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := oa') b₁ := by
-            simpa [nmaHashQueryBound] using h1
-          have h2' : ∀ x,
-              nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (oa := ob x) b₂ := by
-            intro x
-            simpa [nmaHashQueryBound] using h2 x
-          simpa [nmaHashQueryBound] using
-            (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
-        )
-        (hstep := by
-          intro t b s ht
-          rcases b with ⟨qS', qH'⟩
-          cases t with
-          | inl t =>
-              cases t with
-              | inl n =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
-              | inr mc =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
-          | inr msg =>
-              simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
-        (hcombine := by
-          intro t b ht
-          rcases b with ⟨qS', qH'⟩
-          cases t with
-          | inl t =>
-              cases t with
-              | inl n =>
-                  simp [stepBudget]
-              | inr mc =>
-                  simp [stepBudget] at ht ⊢
-                  omega
-          | inr msg =>
-              simp [stepBudget])
-        (s := ∅))
-  · -- Advantage bound: `adv.advantage ≤ Adv^{fork-NMA}_{qH}(nmaAdv)
-    --                      + ofReal(qS * ζ_zk) + collisionSlack qS qH Chal`.
-    --
-    -- Chain of game hops (see `adv_advantage_le_game1`, `tvDist_hybrid_sign_le`,
-    -- and `game2_le_fork_advantage_plus_collision` further below in this file):
-    --
-    --   adv.advantage
-    --       ≤ Pr[= true | Game 1]                              -- freshness drop (Phase B)
-    --       ≤ Pr[= true | Game 2] + ofReal (qS * ζ_zk)         -- HVZK hybrid (Phase C)
-    --       ≤ Fork.advantage + ofReal (qS * ζ_zk) + collisionSlack
-    --                                                          -- collision event (Phase D)
-    --
-    -- where Game 1 is the CMA experiment without the freshness check and Game 2 is
-    -- exactly `managedRoNmaExp` for the constructed `nmaAdv`. Only the Phase D step
-    -- remains as a scoped `sorry` in this Stage 1 milestone; it is discharged by a
-    -- `tvDist_simulateQ_le_probEvent_bad_dist`-style identical-until-bad argument
-    -- combined with a birthday-bound argument on `(msg, c)` collisions.
-    sorry
 section evalDistBridge
 
 variable [Fintype Chal] [Inhabited Chal] [SampleableType Chal]
@@ -390,6 +220,18 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
         rw [evalDist_uniformSample, evalDist_query]; rfl
       exact heq ▸ rfl
 
+/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
+private lemma probEvent_simulateQ_unifChalImpl {α : Type}
+    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
+    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
+  simp only [probEvent_eq_tsum_indicator]
+  refine tsum_congr fun x => ?_
+  unfold Set.indicator
+  split_ifs with hpx
+  · exact congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
+  · rfl
+
 /-- Corollary: `probOutput` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
 private lemma probOutput_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (x : α) :
@@ -397,95 +239,62 @@ private lemma probOutput_simulateQ_unifChalImpl {α : Type}
       (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ_unifChalImpl oa)) x
 
-/-- Corollary: `probEvent` is preserved by the `ofLift + uniformSampleImpl` simulation. -/
-private lemma probEvent_simulateQ_unifChalImpl {α : Type}
-    (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) (p : α → Prop) :
-    Pr[ p | simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = Pr[ p | oa] := by
-  simp_rw [probEvent_eq_tsum_indicator, Set.indicator,
-    probOutput_simulateQ_unifChalImpl]
-
 end evalDistBridge
-section jensenIntegration
 
-/-- **Keygen-indexed Cauchy-Schwarz / Jensen step for the forking lemma.**
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- **CMA-to-NMA reduction via the HeapSSP theorem chain.**
 
-Given a per-element bound `acc x · (acc x / q - hinv) ≤ B x`, integrating over a
-probabilistic key-generator `gen : ProbComp X` yields the "lifted" bound:
+This is the public Σ-protocol-on-`FiatShamir` CMA-to-NMA bound. It routes
+through `VCVio/CryptoFoundations/FiatShamir/Sigma/HeapSSP/Chain.lean`; the
+lower `CmaToNma.lean` module supplies the managed-RO adversary construction and
+query-bound transport used by that chain.
 
-  `μ · (μ / q - hinv) ≤ 𝔼[B]`
+For any EUF-CMA adversary `A` making at most `qS` signing-oracle queries and `qH`
+random-oracle queries, there exists a managed-RO NMA adversary `B` such that:
 
-where `μ = 𝔼[acc] = ∑' x, Pr[= x | gen] · acc x`.
+  `Adv^{EUF-CMA}(A) ≤ Adv^{fork-NMA}_{qH}(B)
+      + ofReal (qS · ζ_zk) + qS · (qS + qH) · β + δ_verify`
 
-The proof goes through the convexity identity `μ² ≤ 𝔼[acc²]` (Cauchy-Schwarz on the
-probability distribution `Pr[= · | gen]`), together with `ENNReal.mul_sub` to handle the
-truncated subtraction. -/
-private lemma jensen_keygen_forking_bound
-    {X : Type} (gen : ProbComp X)
-    (acc B : X → ENNReal) (q hinv : ENNReal)
-    (hinv_ne_top : hinv ≠ ⊤)
-    (hacc_le : ∀ x, acc x ≤ 1)
-    (hper : ∀ x, acc x * (acc x / q - hinv) ≤ B x) :
-    (∑' x, Pr[= x | gen] * acc x) *
-        ((∑' x, Pr[= x | gen] * acc x) / q - hinv) ≤
-      ∑' x, Pr[= x | gen] * B x := by
-  classical
-  set w : X → ENNReal := fun x => Pr[= x | gen] with hw_def
-  set μ : ENNReal := ∑' x, w x * acc x with hμ_def
-  have hw_tsum_le_one : ∑' x, w x ≤ 1 := tsum_probOutput_le_one
-  have hμ_le_one : μ ≤ 1 := by
-    calc μ = ∑' x, w x * acc x := rfl
-      _ ≤ ∑' x, w x * 1 := by gcongr with x; exact hacc_le x
-      _ = ∑' x, w x := by simp
-      _ ≤ 1 := hw_tsum_le_one
-  have hμ_ne_top : μ ≠ ⊤ := ne_top_of_le_ne_top ENNReal.one_ne_top hμ_le_one
-  -- The integrand `w x * acc x * hinv`, with total sum `μ * hinv`.
-  have hμ_hinv_ne_top : μ * hinv ≠ ⊤ := ENNReal.mul_ne_top hμ_ne_top hinv_ne_top
-  -- Cauchy-Schwarz: `μ² ≤ ∑' w * acc²`.
-  have hCS : μ ^ 2 ≤ ∑' x, w x * acc x ^ 2 :=
-    ENNReal.sq_tsum_le_tsum_sq w acc hw_tsum_le_one
-  -- Split off the key reverse-Jensen inequality as an intermediate calc.
-  -- Integrate the per-element bound.
-  calc μ * (μ / q - hinv)
-      = μ * (μ / q) - μ * hinv :=
-        ENNReal.mul_sub (fun _ _ => hμ_ne_top)
-    _ = μ ^ 2 / q - μ * hinv := by
-        rw [sq, mul_div_assoc]
-    _ ≤ (∑' x, w x * acc x ^ 2) / q - μ * hinv := by
-        gcongr
-    _ = (∑' x, w x * acc x ^ 2 / q) - ∑' x, w x * acc x * hinv := by
-        congr 1
-        · simp only [div_eq_mul_inv]
-          rw [ENNReal.tsum_mul_right]
-        · rw [hμ_def, ENNReal.tsum_mul_right]
-    _ ≤ ∑' x, (w x * acc x ^ 2 / q - w x * acc x * hinv) := by
-        -- Reverse-Jensen: `∑' f - ∑' g ≤ ∑' (f - g)` in ENNReal when `∑' g ≠ ⊤`.
-        set f : X → ENNReal := fun x => w x * acc x ^ 2 / q with hf_def
-        set g : X → ENNReal := fun x => w x * acc x * hinv with hg_def
-        have hg_sum_ne_top : ∑' x, g x ≠ ⊤ := by
-          change ∑' x, w x * acc x * hinv ≠ ⊤
-          rw [ENNReal.tsum_mul_right]; exact hμ_hinv_ne_top
-        have hfg : ∑' x, f x ≤ ∑' x, (f x - g x) + ∑' x, g x := by
-          calc ∑' x, f x ≤ ∑' x, ((f x - g x) + g x) := by
-                exact ENNReal.tsum_le_tsum fun x => le_tsub_add
-            _ = ∑' x, (f x - g x) + ∑' x, g x := ENNReal.tsum_add
-        exact tsub_le_iff_right.2 hfg
-    _ = ∑' x, w x * (acc x ^ 2 / q - acc x * hinv) := by
-        refine tsum_congr fun x => ?_
-        have hwx_ne_top : w x ≠ ⊤ :=
-          ne_top_of_le_ne_top ENNReal.one_ne_top probOutput_le_one
-        rw [ENNReal.mul_sub (fun _ _ => hwx_ne_top), mul_div_assoc, mul_assoc]
-    _ = ∑' x, w x * (acc x * (acc x / q - hinv)) := by
-        refine tsum_congr fun x => ?_
-        have hax_ne_top : acc x ≠ ⊤ :=
-          ne_top_of_le_ne_top ENNReal.one_ne_top (hacc_le x)
-        congr 1
-        rw [ENNReal.mul_sub (fun _ _ => hax_ne_top), sq, mul_div_assoc]
-    _ ≤ ∑' x, w x * B x := by
-        gcongr with x
-        exact hper x
+where `β` is the simulator's commit-predictability bound (see
+`SigmaProtocol.simCommitPredictability`) and `δ_verify` bounds fresh-challenge
+verification acceptance (see `SigmaProtocol.verifyChallengePredictability`).
 
-end jensenIntegration
+The bound is tight in the joint-coupling sense: per-step `ζ_zk` paid `qS` times
+and a single-side `β` collision term with no factor of 2.
+
+The NMA adversary `B` is constructed by the simulator from `A` (running
+`A.main pk` with the signing oracle replaced by the HVZK simulator and the
+random oracle programmed on each simulated signature) and returning `A`'s
+forgery alongside the live RO query log.
+
+This step is independent of special soundness and the forking lemma; those are
+handled by `euf_nma_bound`. -/
+theorem euf_cma_to_nma
+    [DecidableEq M] [DecidableEq Commit]
+    [Finite Chal] [Inhabited Chal] [SampleableType Chal]
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
+    (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
+    (hHVZK : σ.HVZK simTranscript ζ_zk)
+    (β : ENNReal)
+    (hPredSim : σ.simCommitPredictability simTranscript β)
+    (δ_verify : ENNReal)
+    (hVerifyGuess : SigmaProtocol.verifyChallengePredictability σ δ_verify)
+    (adv : SignatureAlg.unforgeableAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qS qH : ℕ)
+    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    ∃ nmaAdv : SignatureAlg.managedRoNmaAdv
+        (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M),
+      (∀ pk, nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+        (oa := nmaAdv.main pk) qH) ∧
+      adv.advantage (runtime M) ≤
+        Fork.advantage σ hr M nmaAdv qH +
+          ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
+          (qS : ENNReal) * (qS + qH) * β +
+          δ_verify :=
+  HeapSSP.cma_advantage_le_fork_bound (σ := σ) (hr := hr) (M := M)
+    simTranscript ζ_zk hζ_zk hHVZK β hPredSim δ_verify hVerifyGuess adv qS qH hQ
 
 section eufNmaHelpers
 
@@ -1053,7 +862,7 @@ theorem euf_nma_bound
       (hreach := Fork.runTrace_forkPoint_CfReachable
         (σ := σ) (hr := hr) (M := M) nmaAdv qH pk)
   -- ── Step (d): compose (c) with `perPk_extraction_bound`, then integrate over keygen
-  -- via `jensen_keygen_forking_bound`.
+  -- via `OracleComp.EvalDist.marginalized_jensen_forking_bound`.
   have hPerPkFinal : ∀ pk : Stmt,
       acc pk * (acc pk / (qH + 1 : ENNReal) - challengeSpaceInv Chal) ≤
         Pr[ fun w : Wit => rel pk w = true |
@@ -1067,38 +876,52 @@ theorem euf_nma_bound
     exact ENNReal.inv_le_one.2 hcard
   have hinv_ne_top : challengeSpaceInv Chal ≠ ⊤ :=
     ne_top_of_le_ne_top ENNReal.one_ne_top hinv_le
-  exact jensen_keygen_forking_bound (gen := hr.gen)
+  exact OracleComp.EvalDist.marginalized_jensen_forking_bound (mx := hr.gen)
     (acc := fun pkw => acc pkw.1)
     (B := fun pkw => Pr[ fun w : Wit => rel pkw.1 w = true |
       eufNmaReduction σ hr M nmaAdv qH pkw.1])
     (q := (qH : ENNReal) + 1) (hinv := challengeSpaceInv Chal)
     hinv_ne_top (fun _ => probEvent_le_one) (fun pkw => hPerPkFinal pkw.1)
 
-/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK).**
+omit [SampleableType Stmt] in
+/-- **Combined EUF-CMA bound (Pointcheval-Stern with quantitative HVZK, β-parametric, tight).**
 
 Composes `euf_cma_to_nma` and `euf_nma_bound`:
 
 1. Replace the signing oracle with the HVZK simulator, losing
-   `qS · ζ_zk + collisionSlack qS qH Chal`.
+   `qS·ζ_zk + qS·(qS+qH)·β + δ_verify`, where `β` is the simulator's
+   commit-predictability bound and `δ_verify` bounds fresh-challenge
+   verification acceptance.
 2. Apply the forking lemma to the resulting forkable managed-RO NMA experiment.
 
 The combined bound is:
 
-  `(ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) ·
-      ((ε - qS·ζ_zk - qS·(qS+qH)/|Ω|) / (qH+1) - 1/|Ω|)
+  `(ε - qS·ζ_zk - qS·(qS+qH)·β - δ_verify) ·
+      ((ε - qS·ζ_zk - qS·(qS+qH)·β - δ_verify) / (qH+1) - 1/|Ω|)
     ≤ Pr[extraction succeeds]`
 
-where `ε = Adv^{EUF-CMA}(A)` and the concrete slack `qS·(qS+qH)/|Ω|` is the
-`collisionSlack qS qH Chal` birthday term. The ENNReal subtraction truncates at
-zero, so the bound is trivially satisfied when the simulation loss exceeds the
-advantage.
+where `ε = Adv^{EUF-CMA}(A)`, `qS·(qS+qH)·β` is the joint-coupling
+programming-collision slack (no factor of 2), `δ_verify` is the fresh-challenge
+verification slack, and `qS·ζ_zk` is the per-signing-query HVZK loss (no
+quadratic blow-up). The ENNReal subtraction truncates at zero, so the bound is
+trivially satisfied when the simulation loss exceeds the advantage.
 
-The forking-lemma side (the two B1 prefix-faithfulness identities
+The tightening compared to the chain-decomposition form (which has
+`qS·(qS+qH+1)·ζ_zk + 2·qS·(qS+qH)·β`) is carried by the HeapSSP H3
+joint-coupling theorem: it pays the HVZK distance once per signing query and
+charges the simulator-commit collision event once.
+
+When HVZK is perfect (`ζ_zk = 0`), the HVZK term vanishes and the bound
+specializes to `(ε - qS·(qS+qH)·β - δ_verify) · …`.
+
+The forking-lemma side uses `Fork.replayForkingBound` (via the two B1
+prefix-faithfulness identities
 `evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt` and
-`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in ReplayFork.lean) is
-discharged and feeds the Jensen/Cauchy-Schwarz step inside `Fork.replayForkingBound`
-used by `euf_nma_bound`. Conditional only on the scoped `sorry` inside
-`euf_cma_to_nma` for the Phase D collision-event reduction. -/
+`tsum_probOutput_replayFirstRun_weight_takeBeforeForkAt` in `ReplayFork.lean`)
+to feed the Jensen/Cauchy-Schwarz step inside `euf_nma_bound`. The Phase B
+freshness-drop hop uses
+`SignatureAlg.unforgeableAdv.advantage_le_unforgeableExpNoFresh` instantiated
+with `runtime_evalDist_bind_pure`. -/
 theorem euf_cma_bound
     [SampleableType Chal]
     (hss : σ.SpeciallySound)
@@ -1107,6 +930,10 @@ theorem euf_cma_bound
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)
     (hhvzk : σ.HVZK simTranscript ζ_zk)
+    (β : ENNReal)
+    (hPredSim : σ.simCommitPredictability simTranscript β)
+    (δ_verify : ENNReal)
+    (hVerifyGuess : SigmaProtocol.verifyChallengePredictability σ δ_verify)
     (adv : SignatureAlg.unforgeableAdv
       (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
     (qS qH : ℕ)
@@ -1114,19 +941,21 @@ theorem euf_cma_bound
       (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
     ∃ reduction : Stmt → ProbComp Wit,
       let eps := adv.advantage (runtime M) -
-        (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal)
+        (ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
+          (qS : ENNReal) * (qS + qH) * β + δ_verify)
       (eps * (eps / (qH + 1 : ENNReal) - challengeSpaceInv Chal)) ≤
         Pr[= true | hardRelationExp hr reduction] := by
   haveI : DecidableEq M := Classical.decEq M
   haveI : DecidableEq Commit := Classical.decEq Commit
   obtain ⟨nmaAdv, hBound, hAdv⟩ := euf_cma_to_nma σ hr M simTranscript
-    ζ_zk hζ_zk hhvzk adv qS qH hQ
+    ζ_zk hζ_zk hhvzk β hPredSim δ_verify hVerifyGuess adv qS qH hQ
   obtain ⟨reduction, hRed⟩ := euf_nma_bound σ hr M hss hss_nf nmaAdv qH hBound
   refine ⟨reduction, le_trans ?_ hRed⟩
   have hle : adv.advantage (runtime M) -
-      (ENNReal.ofReal (qS * ζ_zk) + collisionSlack qS qH Chal) ≤
+      (ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
+        (qS : ENNReal) * (qS + qH) * β + δ_verify) ≤
       Fork.advantage σ hr M nmaAdv qH :=
-    tsub_le_iff_right.mpr (by rw [← add_assoc]; exact hAdv)
+    tsub_le_iff_right.mpr (by simpa [add_assoc] using hAdv)
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)
 
 end FiatShamir

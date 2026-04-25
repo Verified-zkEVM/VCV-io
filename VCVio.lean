@@ -11,7 +11,14 @@ import VCVio.CryptoFoundations.CommitmentScheme
 import VCVio.CryptoFoundations.DataEncapMech
 import VCVio.CryptoFoundations.FiatShamir.QueryBounds
 import VCVio.CryptoFoundations.FiatShamir.Sigma
+import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Facts
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
