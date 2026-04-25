@@ -1369,9 +1369,7 @@ theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
     (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (s₀ : σ) :
     tvDist ((simulateQ impl₁ oa).run (s₀, false))
         ((simulateQ impl₂ oa).run (s₀, false))
