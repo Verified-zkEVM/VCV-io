@@ -151,6 +151,61 @@ lemma simulateQ_StateT_evalDist_congr {α : Type}
     refine bind_congr fun p => ?_
     exact ih p.1 p.2
 
+/-- Bijection-aware variant of `simulateQ_StateT_evalDist_congr`. If two stateful handlers on
+*different* state types `σ₁, σ₂` agree under a state bijection `φ : σ₁ ≃ σ₂` pointwise at each
+query (via `Prod.map id φ.symm` on the output pair), then their whole-adversary runs agree
+pointwise at corresponding starting states.
+
+Concretely the per-query hypothesis
+`evalDist ((h₁ q).run s) = evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ s))`
+lifts to
+`evalDist ((simulateQ h₁ A).run s) = evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s))`
+for every adversary `A`.
+
+Used when matching two state representations that are isomorphic but not propositionally
+equal (e.g., `(σ₁ × σ₂) × Bool` vs `σ₁ × (σ₂ × Bool)`, or nested state reshuffling from
+`Package.link`). -/
+lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
+    (h₁ : QueryImpl E (StateT σ₁ ProbComp))
+    (h₂ : QueryImpl E (StateT σ₂ ProbComp))
+    (φ : σ₁ ≃ σ₂)
+    (hh : ∀ (q : E.Domain) (s : σ₁),
+      evalDist ((h₁ q).run s) =
+      evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ s)))
+    (A : OracleComp E α) (s : σ₁) :
+    evalDist ((simulateQ h₁ A).run s) =
+    evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)) := by
+  induction A using OracleComp.inductionOn generalizing s with
+  | pure x =>
+    simp only [simulateQ_pure, StateT.run_pure, map_pure, Prod.map_apply, id_eq,
+      Equiv.symm_apply_apply]
+  | query_bind t k ih =>
+    -- Unfold both sides to `(impl t).run >>= continuation` and apply evalDist_bind / evalDist_map.
+    simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
+      id_map, StateT.run_bind, map_bind, evalDist_bind, evalDist_map, hh t s]
+    -- LHS head is `(Prod.map id φ.symm <$> evalDist (h₂ t .run (φ s))) >>= …h₁.run…`;
+    -- push the head map into the bind via `f <$> m >>= g = m >>= (g ∘ f)`.
+    simp only [map_eq_bind_pure_comp, bind_assoc]
+    refine bind_congr fun p => ?_
+    rcases p with ⟨x, s'⟩
+    have hih := ih x (φ.symm s')
+    rw [Equiv.apply_symm_apply] at hih
+    simpa [Prod.map] using hih
+
+/-! ### Functoriality of `runProb`
+
+`Package.runProb` commutes with monadic map on the adversary: rerouting the output of an
+adversary `A : OracleComp E α` through a post-processing function `f : α → β` before running the
+package yields the same distribution as running the package and then applying `f`. -/
+
+lemma runProb_map {α β : Type} (P : Package unifSpec E σ) (f : α → β) (A : OracleComp E α) :
+    P.runProb (f <$> A) = f <$> P.runProb A := by
+  change P.run (f <$> A) = f <$> P.run A
+  unfold Package.run
+  rw [simulateQ_map, map_bind]
+  refine bind_congr fun s₀ => ?_
+  rw [StateT.run'_eq, StateT.run'_eq, StateT.run_map, Functor.map_map, Functor.map_map]
+
 end Package
 
 end VCVio.SSP

@@ -186,6 +186,80 @@ noncomputable def roImpl (M Commit Chal : Type) [DecidableEq M] [DecidableEq Com
           log ++ [mc])
         pure v
 
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Running the inner `unifFwd + roImpl` simulator against a source computation with
+an `nmaHashQueryBound Q` can grow the internal `queryLog` by at most `Q`.
+
+Each source `Sum.inr` step consumes one unit of the `nmaHashQueryBound` budget, while
+`roImpl` appends to `queryLog` only on a cache miss, hence at most once per such step. -/
+theorem queryLog_length_le_of_nmaHashQueryBound
+    [DecidableEq M] [DecidableEq Commit] [SampleableType Chal]
+    {α : Type} {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q : ℕ}
+    (hQ : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q)
+    (st : simSt M Commit Chal) {z : α × simSt M Commit Chal}
+    (hz : z ∈ support ((simulateQ (unifFwd M Commit Chal + roImpl M Commit Chal) oa).run st)) :
+    z.2.2.length ≤ st.2.length + Q := by
+  induction oa using OracleComp.inductionOn generalizing Q st z with
+  | pure x =>
+      simp [simulateQ_pure, StateT.run_pure, support_pure] at hz
+      subst z
+      simp
+  | query_bind t mx ih =>
+      rw [nmaHashQueryBound_query_bind_iff (M := M) (Commit := Commit) (Chal := Chal)] at hQ
+      rw [simulateQ_query_bind, StateT.run_bind] at hz
+      rw [support_bind] at hz
+      simp only [Set.mem_iUnion] at hz
+      obtain ⟨us, hus, hz'⟩ := hz
+      cases t with
+      | inl n =>
+          rcases st with ⟨cache, log⟩
+          have hus' :
+              us ∈ support
+                ((fun u => (u, (cache, log))) <$>
+                  ((wrappedSpec Chal).query (Sum.inl n) :
+                    OracleComp (wrappedSpec Chal) ((wrappedSpec Chal).Range (Sum.inl n)))) := by
+            simpa [QueryImpl.add_apply_inl, unifFwd] using hus
+          rw [support_map] at hus'
+          obtain ⟨u, _, hus_eq⟩ := hus'
+          subst us
+          simpa using ih u (hQ.2 u) (cache, log) hz'
+      | inr mc =>
+          rcases st with ⟨cache, log⟩
+          have hQpos : 0 < Q := hQ.1
+          cases hcache : cache mc with
+          | some v =>
+              have hus' : us = (v, (cache, log)) := by
+                simpa [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
+                  hcache, support_pure, Set.mem_singleton_iff] using hus
+              subst us
+              have hrec : z.2.2.length ≤ log.length + (Q - 1) := by
+                simpa using ih v (hQ.2 v) (cache, log) hz'
+              exact le_trans hrec (Nat.add_le_add_left (Nat.sub_le _ _) _)
+          | none =>
+              have hus' :
+                  us ∈ support
+                    ((fun u : Chal =>
+                        (u,
+                          ((cache.cacheQuery mc u : (M × Commit →ₒ Chal).QueryCache),
+                            log ++ [mc]))) <$>
+                      ((wrappedSpec Chal).query (Sum.inr ()) :
+                        OracleComp (wrappedSpec Chal) Chal)) := by
+                simpa [QueryImpl.add_apply_inr, roImpl, StateT.run_bind, StateT.run_get,
+                  hcache, StateT.run_set, bind_map_left] using hus
+              rw [support_map] at hus'
+              obtain ⟨u, _, hus_eq⟩ := hus'
+              subst us
+              have hrec : z.2.2.length ≤ (log ++ [mc]).length + (Q - 1) := by
+                simpa using
+                  ih u (hQ.2 u)
+                    ((cache.cacheQuery mc u : (M × Commit →ₒ Chal).QueryCache), log ++ [mc]) hz'
+              have hlen : (log ++ [mc]).length = log.length + 1 := by
+                simp [List.length_append]
+              rw [hlen] at hrec
+              have hbudget : log.length + 1 + (Q - 1) = log.length + Q := by
+                omega
+              simpa [hbudget] using hrec
+
 /-- Replay a managed-RO NMA adversary against a single counted challenge oracle, keeping both
 the adversary-returned cache and the live query log that the forking lemma can rewind.
 

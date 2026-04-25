@@ -136,6 +136,17 @@ the local context. The default registry already covers the structural relational
 `eRelTriple_bind` / `eRelTriple_uniformSample_bij`, and the two `simulateQ` transport rules),
 so user-defined rules slot into the same lookup pipeline without further wiring.
 
+### Handler Normalization
+
+| Tactic | Goal shape | What it does |
+|--------|-----------|--------------|
+| `handler_step` | handler-heavy `QueryImpl` / `simulateQ` / `StateT` goals | Runs one `simp only [handler_simp]` normalization pass to expose the next handler body or run-shape |
+
+`handler_step` is deliberately thin. Use it when a proof is stuck behind
+handler combinators such as cache overlays, logging handlers, counting
+handlers, or state-transformer maps; then continue with `vcstep`, `rvcstep`,
+`rvcgen`, or direct proof steps.
+
 **Opt-in `wp`-rewrite lookup**: mark an equational rewrite of shape
 `wp comp post = …` with `@[wpStep]` to extend the inner `wp`-stepping driver
 (`runWpStepRules`). The driver indexes registered rules by the path of `comp`
