@@ -7,22 +7,16 @@ Authors: Quang Dao
 import VCVio.OracleComp.OracleQuery
 
 /-!
-# `HasQuery` capability class
+# Basic `HasQuery` Capability
 
-Defines the lightweight `HasQuery spec m` capability interface and the two
-canonical instances (the primitive query syntax and the `MonadLiftT`-driven
-ambient instance).
+This is the lightweight dependency boundary for the query capability.
+It defines `HasQuery spec m`, exports the bare identifier `query`, and provides
+only the foundational instances for primitive query syntax and monad lifts.
 
-This file lives upstream of `VCVio.OracleComp.OracleComp` so that the
-`export HasQuery (query)` line below makes the bare identifier `query`
-resolve to `HasQuery.query` everywhere downstream (rather than the
-`protected` `OracleSpec.query`). Downstream code that wants the primitive
-`OracleQuery spec _` form should write `spec.query t` or
-`OracleSpec.query t` explicitly.
-
-The heavier `QueryHom`, `PreservesProbCompLift`, and `QueryImpl` bridges
-live in `VCVio.OracleComp.HasQuery`, which depends on `QueryImpl` and
-`ProbComp`.
+Core syntax modules, especially `VCVio.OracleComp.OracleComp`, should import
+this file when they need the class or the bare `query` export.
+Do not add `QueryImpl`, `ProbComp`, or monad-morphism APIs here; those live in
+downstream modules with explicit imports.
 -/
 
 universe u v w

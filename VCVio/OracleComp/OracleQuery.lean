@@ -34,7 +34,7 @@ variable {ι : Type u} {spec : OracleSpec.{u, v} ι}
 /-- Query an oracle on in input `t` to get a result in the corresponding `range t`.
 
 Marked `protected`: the bare identifier `query` resolves to `HasQuery.query`
-(exported in `VCVio.OracleComp.HasQueryClass`), which yields a value in the
+(exported in `VCVio.OracleComp.HasQuery.Basic`), which yields a value in the
 ambient monad and lets Lean recover `spec` from the expected type without an
 ascription. Use `spec.query t` or `OracleSpec.query t` when you specifically
 want the primitive single-query syntax `OracleQuery spec (spec.Range t)`. -/
@@ -49,7 +49,7 @@ end OracleSpec
 /-! ### Primitive `query` notation
 
 `OracleSpec.query` is `protected` so the bare identifier `query` resolves to
-`HasQuery.query` (exported in `VCVio.OracleComp.HasQueryClass`) for
+`HasQuery.query` (exported in `VCVio.OracleComp.HasQuery.Basic`) for
 ergonomic monadic use. Files that work *structurally* on the primitive
 single-query syntax `OracleQuery spec _` (e.g. `liftM (query t)`,
 `(query t).cont`, induction on `query_bind`) can opt back into the
