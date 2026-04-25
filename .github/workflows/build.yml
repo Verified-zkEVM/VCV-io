@@ -107,6 +107,8 @@ jobs:
           use-mathlib-cache: false
       - name: Fetch Mathlib cache
         run: lake exe cache get
+      - name: Prebuild Loom dependency
+        run: lake build @loom2
       - name: Time clean build
         run: |
           bash scripts/build_timing_report.sh run clean_build "$BUILD_TIMING_RESULTS" -- \
