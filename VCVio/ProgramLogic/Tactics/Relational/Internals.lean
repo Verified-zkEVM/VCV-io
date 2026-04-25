@@ -697,29 +697,53 @@ def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
       return found
   return #[]
 
-private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
+private def relHintCandidateSteps (hintName : Name) : TacticM (Array PlannedStep) := do
+  let genericStep :=
+    mkRVCGenPlannedStep
+      "rvcgen explicit hint"
+      s!"rvcstep using {hintName}"
+      (runRVCGenExplicitHintStep (mkIdent hintName))
   let target ← instantiateMVars (← getMainTarget)
-  if let some (oa, ob, _) := relationalGoalParts? target then
-    let oa ← whnfReducible (← instantiateMVars oa)
-    let ob ← whnfReducible (← instantiateMVars ob)
-    if isBindExpr oa && isBindExpr ob then
-      let names ← getRelBindNames
-      let namedHintStep :=
-        mkRVCGenPlannedStep
-          "rvcgen explicit hint with names"
-          s!"rvcstep using {hintName}{renderAsClause names}"
-          (runRVCGenStepUsingWithNames (mkIdent hintName) names)
-      if ← previewPlannedStep namedHintStep then
-        return namedHintStep
-  return mkRVCGenPlannedStep
-    "rvcgen explicit hint"
-    s!"rvcstep using {hintName}"
-    (runRVCGenExplicitHintStep (mkIdent hintName))
+  let some (oa, ob, _) := relationalGoalParts? target | return #[genericStep]
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless isBindExpr oa && isBindExpr ob do
+    return #[genericStep]
+  let names ← getRelBindNames
+  let namedHintStep :=
+    mkRVCGenPlannedStep
+      "rvcgen explicit hint with names"
+      s!"rvcstep using {hintName}{renderAsClause names}"
+      (runRVCGenStepUsingWithNames (mkIdent hintName) names)
+  return #[namedHintStep, genericStep]
 
 private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
   let hintNames ← potentialRelHintNames
-  let steps ← hintNames.mapM buildRelHintStep
-  chooseBestPlannedStepCandidate? steps
+  let traceSteps := vcvio.vcgen.traceSteps.get (← getOptions)
+  let mut best? : Option (PlannedStep × PreviewResult) := none
+  let mut accepted : Array String := #[]
+  for hintName in hintNames do
+    for step in ← relHintCandidateSteps hintName do
+      let preview ← previewPlannedStepWithGoals step
+      if preview.ok then
+        if traceSteps then
+          accepted := accepted.push (renderPlannedStepPreview step preview)
+        match best? with
+        | none => best? := some (step, preview)
+        | some (_, bestPreview) =>
+            if preview.goalCount < bestPreview.goalCount then
+              best? := some (step, preview)
+        if !traceSteps && preview.goalCount == 0 then
+          return some (step, preview)
+        break
+  match best? with
+  | none => return none
+  | some (step, preview) =>
+      if traceSteps then
+        let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+        return some (attachPlannerChoiceNotes step preview alternatives, preview)
+      return some (step, preview)
+
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
     TacticM (Option (PlannedStep × PreviewResult)) := do
