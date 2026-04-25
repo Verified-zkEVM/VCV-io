@@ -44,6 +44,7 @@ attribute [wpStep]
   OracleComp.ProgramLogic.wp_list_foldlM_cons
   -- Sampling / queries
   OracleComp.ProgramLogic.wp_query
+  OracleComp.ProgramLogic.wp_HasQuery_query
   OracleComp.ProgramLogic.wp_uniformSample
   -- `simulateQ` / coercion-bridging from `Unary/SimulateQ.lean`
   OracleComp.ProgramLogic.wp_simulateQ_eq

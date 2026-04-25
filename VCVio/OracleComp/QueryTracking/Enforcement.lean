@@ -27,6 +27,8 @@ open OracleSpec OracleComp
 
 universe u
 
+open scoped OracleSpec.PrimitiveQuery
+
 variable {ι : Type u} {spec : OracleSpec ι} {α : Type u}
 
 /-- Enforcement oracle: wraps the original oracle with a per-index budget tracked via `StateT`.

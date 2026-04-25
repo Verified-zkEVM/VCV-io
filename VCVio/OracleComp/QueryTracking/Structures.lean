@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
+import Mathlib.Data.Set.Card
 
 /-!
 # Structures For Tracking a Computation's Oracle Queries
@@ -112,6 +113,25 @@ omit [spec.DecidableEq] in
 lemma cacheQuery_of_ne {t' t : spec.Domain} (u : spec.Range t) (h : t' ≠ t) :
     (cache.cacheQuery t u) t' = cache t' := by
   simp [cacheQuery, h]
+
+omit [spec.DecidableEq] in
+lemma toSet_cacheQuery_subset_insert (t : spec.Domain) (u : spec.Range t) :
+    (cache.cacheQuery t u).toSet ⊆ insert ⟨t, u⟩ cache.toSet := by
+  rintro ⟨t', u'⟩ hmem
+  by_cases ht : t' = t
+  · subst ht
+    have hu : u = u' := by
+      simpa [mem_toSet] using hmem
+    subst hu
+    exact Set.mem_insert _ _
+  · exact Or.inr (by
+      simpa [mem_toSet, cacheQuery_of_ne cache u ht] using hmem)
+
+omit [spec.DecidableEq] in
+lemma toSet_encard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
+    (cache.cacheQuery t u).toSet.encard ≤ cache.toSet.encard + 1 :=
+  le_trans (Set.encard_le_encard (toSet_cacheQuery_subset_insert cache t u))
+    (Set.encard_insert_le cache.toSet ⟨t, u⟩)
 
 omit [spec.DecidableEq] in
 lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :
@@ -344,6 +364,44 @@ end countQ
 Relies on decidable equality of the domain types of oracles. -/
 def wasQueried [spec.DecidableEq] (log : QueryLog spec) (t : spec.Domain) : Bool :=
   log.getQ (· = t) ≠ []
+
+lemma getQ_ne_nil_iff_mem_map_fst [spec.DecidableEq]
+    (log : QueryLog spec) (t : spec.Domain) :
+    log.getQ (· = t) ≠ [] ↔ t ∈ log.map (fun e => e.1) := by
+  induction log with
+  | nil =>
+      simp [getQ]
+  | cons hd tl ih =>
+      by_cases h : hd.1 = t
+      · simp [List.map, List.mem_cons, getQ_cons, h]
+      · have hne : t ≠ hd.1 := by
+          simpa [eq_comm] using h
+        constructor
+        · intro hq
+          have hq' : getQ tl (· = t) ≠ [] := by
+            simpa [getQ_cons, h] using hq
+          simpa [List.map, List.mem_cons] using Or.inr (ih.mp hq')
+        · intro hm
+          have hm_cons : t = hd.1 ∨ t ∈ tl.map (fun e => e.1) := by
+            simpa [List.map, List.mem_cons] using hm
+          have hm' : t ∈ tl.map (fun e => e.1) := by
+            rcases hm_cons with hm | hm
+            · exact (hne hm).elim
+            · exact hm
+          have hq' : getQ tl (· = t) ≠ [] := ih.mpr hm'
+          simpa [getQ_cons, h] using hq'
+
+lemma wasQueried_eq_decide_mem_map_fst [spec.DecidableEq]
+    (log : QueryLog spec) (t : spec.Domain) :
+    log.wasQueried t = decide (t ∈ log.map (fun e => e.1)) := by
+  by_cases hq : log.getQ (· = t) ≠ []
+  · have hm : t ∈ log.map (fun e => e.1) :=
+      (getQ_ne_nil_iff_mem_map_fst log t).mp hq
+    simp [wasQueried, hq, hm]
+  · have hm : t ∉ log.map (fun e => e.1) := by
+      intro hm
+      exact hq ((getQ_ne_nil_iff_mem_map_fst log t).mpr hm)
+    simp [wasQueried, hq, hm]
 
 section prod
 

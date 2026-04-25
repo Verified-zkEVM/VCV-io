@@ -21,6 +21,8 @@ coverage.
 
 open OracleSpec OracleComp OracleComp.ProgramLogic ENNReal Function Finset
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace QueryLog
 
 variable {ι : Type} {spec : OracleSpec ι}
