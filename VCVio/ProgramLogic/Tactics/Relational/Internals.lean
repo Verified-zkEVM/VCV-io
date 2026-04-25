@@ -513,6 +513,22 @@ def findUniqueRelHint? : TacticM (Option Name) := do
   return found.toList.head? >>= fun first =>
     if found.size = 1 then some first else none
 
+private def potentialRelHintNames : TacticM (Array Name) := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  unless relationalGoalParts? target |>.isSome do return #[]
+  let mut found : Array Name := #[]
+  for localDecl in ← getLCtx do
+    unless localDecl.isImplementationDetail do
+      let name := localDecl.userName
+      if isUsableBinderName name then
+        let type ← instantiateMVars localDecl.type
+        unless type.isSort do
+          unless ← isProp type do
+            let whnfType ← whnfReducible type
+            if whnfType.isForall then
+              found := found.push name
+  return found
+
 private def runRVCGenExplicitHintStep (hint : TSyntax `term) : TacticM Bool := do
   if (← getGoals).isEmpty then
     return false
@@ -642,11 +658,10 @@ private def relationalGoalKind? (target : Expr) : Option VCSpecKind :=
   else
     none
 
-/-- Find the registered relational `@[vcspec]` entries whose bounded
-application makes progress on the current goal. Prefers direct
-discrimination-tree hits on `(oa, ob)`, falling back to kind-matched entries
-filtered by structural compatibility. -/
-def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
+private def takeCandidatePrefix (entries : Array VCSpecEntry) : Array VCSpecEntry :=
+  (entries.toList.take 8).toArray
+
+private def registeredRVCGenRuleCandidateTiers : TacticM (Array (Array VCSpecEntry)) := do
   let target ← instantiateMVars (← getMainTarget)
   let some kind := relationalGoalKind? target | return #[]
   let some (oa, ob, _) := relationalGoalParts? target | return #[]
@@ -658,17 +673,21 @@ def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
       !(direct.any fun directEntry => directEntry.theoremName! == entry.theoremName!)
   let fallbackPreferred := fallbackAll.filter (·.spec.compPattern == goalPattern)
   let fallbackFallback := fallbackAll.filter (·.spec.compPattern != goalPattern)
-  let mut found : Array VCSpecEntry := #[]
-  for entry in direct.toList.take 8 do
-    let saved ← saveState
-    let ok ← runRelationalVCSpecRule entry
-    saved.restore
-    if ok then
-      found := found.push entry
-  unless found.isEmpty do
-    return found
-  for fallback in [fallbackPreferred, fallbackFallback] do
-    for entry in fallback.toList.take 8 do
+  let mut tiers : Array (Array VCSpecEntry) := #[]
+  for tier in #[direct, fallbackPreferred, fallbackFallback] do
+    let tier := takeCandidatePrefix tier
+    unless tier.isEmpty do
+      tiers := tiers.push tier
+  return tiers
+
+/-- Find the registered relational `@[vcspec]` entries whose bounded
+application makes progress on the current goal. Prefers direct
+discrimination-tree hits on `(oa, ob)`, falling back to kind-matched entries
+filtered by structural compatibility. -/
+def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
+  for tier in ← registeredRVCGenRuleCandidateTiers do
+    let mut found : Array VCSpecEntry := #[]
+    for entry in tier do
       let saved ← saveState
       let ok ← runRelationalVCSpecRule entry
       saved.restore
@@ -676,7 +695,7 @@ def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
         found := found.push entry
     unless found.isEmpty do
       return found
-  return found
+  return #[]
 
 private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
   let target ← instantiateMVars (← getMainTarget)
@@ -698,19 +717,21 @@ private def buildRelHintStep (hintName : Name) : TacticM PlannedStep := do
     (runRVCGenExplicitHintStep (mkIdent hintName))
 
 private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let hintNames ← findRelHintCandidates
+  let hintNames ← potentialRelHintNames
   let steps ← hintNames.mapM buildRelHintStep
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
     TacticM (Option (PlannedStep × PreviewResult)) := do
-  let theoremEntries ← findRegisteredRVCGenRuleCandidates
-  let steps := theoremEntries.map fun entry =>
-    mkRVCGenPlannedStep
-      "rvcgen @[vcspec] theorem rule"
-      s!"rvcstep with {entry.theoremName!}"
-      (runRelationalVCSpecRule entry)
-  chooseBestPlannedStepCandidate? steps
+  for tier in ← registeredRVCGenRuleCandidateTiers do
+    let steps := tier.map fun entry =>
+      mkRVCGenPlannedStep
+        "rvcgen @[vcspec] theorem rule"
+        s!"rvcstep with {entry.theoremName!}"
+        (runRelationalVCSpecRule entry)
+    if let some chosen ← chooseBestPlannedStepCandidate? steps then
+      return some chosen
+  return none
 
 /-- Structural/default relational VCGen step, excluding explicit `using`-hint fallbacks. -/
 def runRVCGenStructuralCore : TacticM Bool := do
@@ -798,16 +819,16 @@ def runRVCGenPassPlanned : TacticM (Array PlannedStep) := do
   let goals ← getGoals
   if goals.isEmpty then
     return #[]
-  let mut newGoals : List MVarId := []
+  let mut newGoals : Array MVarId := #[]
   let mut steps := #[]
   for goal in goals do
     setGoals [goal]
     if let some step ← runRVCGenPlannedStep? then
       steps := steps.push step
-      newGoals := newGoals ++ (← getGoals)
+      newGoals := newGoals ++ (← getGoals).toArray
     else
-      newGoals := newGoals ++ [goal]
-  setGoals newGoals
+      newGoals := newGoals.push goal
+  setGoals newGoals.toList
   return steps
 
 def runRVCGenPass : TacticM Bool := do
@@ -815,15 +836,15 @@ def runRVCGenPass : TacticM Bool := do
   if goals.isEmpty then
     return false
   let mut progress := false
-  let mut newGoals : List MVarId := []
+  let mut newGoals : Array MVarId := #[]
   for goal in goals do
     setGoals [goal]
     if ← runRVCGenStep then
       progress := true
-      newGoals := newGoals ++ (← getGoals)
+      newGoals := newGoals ++ (← getGoals).toArray
     else
-      newGoals := newGoals ++ [goal]
-  setGoals newGoals
+      newGoals := newGoals.push goal
+  setGoals newGoals.toList
   return progress
 
 def throwRVCGenStepError : TacticM Unit := withMainContext do
@@ -840,8 +861,10 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
-      let hintCandidates ← findRelHintCandidates
-      let theoremCandidates := (← findRegisteredRVCGenRuleCandidates).map (·.theoremName!)
+      let hintCandidates ← potentialRelHintNames
+      let theoremCandidateTiers ← registeredRVCGenRuleCandidateTiers
+      let theoremCandidates := theoremCandidateTiers.foldl (init := #[]) fun acc tier =>
+        acc ++ tier.map (·.theoremName!)
       let goalLabel :=
         if isERelTripleGoal target then
           "`eRelTriple`"
@@ -853,7 +876,7 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
         if hintCandidates.isEmpty then
           ""
         else
-          s!"\nViable local `using` hints: {formatCandidateNames hintCandidates}"
+          s!"\nPotential local `using` hints: {formatCandidateNames hintCandidates}"
       let theoremMsg :=
         if theoremCandidates.isEmpty then
           ""
@@ -914,12 +937,12 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
 
 def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  let hintCandidates ← findRelHintCandidates
+  let hintCandidates ← potentialRelHintNames
   let hintMsg :=
     if hintCandidates.isEmpty then
       ""
     else
-      s!"\nViable local `using` hints here: {formatCandidateNames hintCandidates}"
+      s!"\nPotential local `using` hints here: {formatCandidateNames hintCandidates}"
   throwError m!
     "rvcstep using {hint}: the explicit hint did not match the current relational goal shape.\n\
     `using` is interpreted by goal shape as one of:\n\

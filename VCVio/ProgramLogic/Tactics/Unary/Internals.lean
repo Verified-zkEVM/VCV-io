@@ -382,6 +382,17 @@ def findUniqueLoopInvHint? : TacticM (Option Name) := do
   return found.toList.head? >>= fun first =>
     if found.size = 1 then some first else none
 
+private def potentialLocalHintNames : TacticM (Array Name) := withMainContext do
+  let mut names : Array Name := #[]
+  for localDecl in ← getLCtx do
+    unless localDecl.isImplementationDetail do
+      let name := localDecl.userName
+      if isUsableBinderName name then
+        let type ← instantiateMVars localDecl.type
+        unless type.isSort do
+          names := names.push name
+  return names
+
 private def unaryGoalKindAndComp? (target : Expr) : Option (VCSpecKind × Expr) :=
   match tripleGoalComp? target with
   | some comp => some (.unaryTriple, comp)
@@ -390,11 +401,10 @@ private def unaryGoalKindAndComp? (target : Expr) : Option (VCSpecKind × Expr) 
       | some comp => some (.unaryWP, comp)
       | none => none
 
-/-- Find the registered unary `@[vcspec]` entries whose bounded application
-makes progress on the current goal. Prefers direct discrimination-tree hits on
-the goal's `comp`, falling back to kind-matched entries filtered by structural
-compatibility. -/
-def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
+private def takeCandidatePrefix (entries : Array VCSpecEntry) : Array VCSpecEntry :=
+  (entries.toList.take 8).toArray
+
+private def registeredVCGenRuleCandidateTiers : TacticM (Array (Array VCSpecEntry)) := do
   let target ← instantiateMVars (← getMainTarget)
   let some (kind, comp) := unaryGoalKindAndComp? target | return #[]
   let goalPattern := classifyUnaryCompPattern comp
@@ -405,17 +415,21 @@ def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
       !(direct.any fun directEntry => directEntry.theoremName! == entry.theoremName!)
   let fallbackPreferred := fallbackAll.filter (·.spec.compPattern == goalPattern)
   let fallbackFallback := fallbackAll.filter (·.spec.compPattern != goalPattern)
-  let mut found : Array VCSpecEntry := #[]
-  for entry in direct.toList.take 8 do
-    let saved ← saveState
-    let ok ← runUnaryVCSpecRule entry
-    saved.restore
-    if ok then
-      found := found.push entry
-  unless found.isEmpty do
-    return found
-  for fallback in #[fallbackPreferred, fallbackFallback] do
-    for entry in fallback.toList.take 8 do
+  let mut tiers : Array (Array VCSpecEntry) := #[]
+  for tier in #[direct, fallbackPreferred, fallbackFallback] do
+    let tier := takeCandidatePrefix tier
+    unless tier.isEmpty do
+      tiers := tiers.push tier
+  return tiers
+
+/-- Find the registered unary `@[vcspec]` entries whose bounded application
+makes progress on the current goal. Prefers direct discrimination-tree hits on
+the goal's `comp`, falling back to kind-matched entries filtered by structural
+compatibility. -/
+def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
+  for tier in ← registeredVCGenRuleCandidateTiers do
+    let mut found : Array VCSpecEntry := #[]
+    for entry in tier do
       let saved ← saveState
       let ok ← runUnaryVCSpecRule entry
       saved.restore
@@ -423,12 +437,19 @@ def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
         found := found.push entry
     unless found.isEmpty do
       return found
-  return found
+  return #[]
 
 /-- Find the first registered unary `@[vcspec]` entry whose bounded
 application makes progress. -/
 def findRegisteredVCGenRule? : TacticM (Option VCSpecEntry) := do
-  return (← findRegisteredVCGenRuleCandidates).toList.head?
+  for tier in ← registeredVCGenRuleCandidateTiers do
+    for entry in tier do
+      let saved ← saveState
+      let ok ← runUnaryVCSpecRule entry
+      saved.restore
+      if ok then
+        return some entry
+  return none
 
 def throwVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -453,7 +474,9 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
       else if let some comp := wpGoalComp? target then
         let comp ← whnfReducible (← instantiateMVars comp)
         let theoremMsg ← do
-          let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName!)
+          let tiers ← registeredVCGenRuleCandidateTiers
+          let thms := tiers.foldl (init := #[]) fun acc tier =>
+            acc ++ tier.map (·.theoremName!)
           pure <| if thms.isEmpty then "" else
             s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
         throwError
@@ -467,20 +490,22 @@ def throwVCGenStepError : TacticM Unit := withMainContext do
       let comp ← whnfReducible (← instantiateMVars comp)
       let cutMsg ←
         if isBindExpr comp then
-          let cuts ← findHoareCutHintCandidates
+          let cuts ← potentialLocalHintNames
           pure <| if cuts.isEmpty then "" else
-            s!"\nViable local cut candidates: {formatCandidateNames cuts}"
+            s!"\nPotential local cut candidates: {formatCandidateNames cuts}"
         else
           pure ""
       let invMsg ←
         if isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp then
-          let invs ← findLoopInvHintCandidates
+          let invs ← potentialLocalHintNames
           pure <| if invs.isEmpty then "" else
-            s!"\nViable local invariant candidates: {formatCandidateNames invs}"
+            s!"\nPotential local invariant candidates: {formatCandidateNames invs}"
         else
           pure ""
       let theoremMsg ← do
-        let thms := (← findRegisteredVCGenRuleCandidates).map (·.theoremName!)
+        let tiers ← registeredVCGenRuleCandidateTiers
+        let thms := tiers.foldl (init := #[]) fun acc tier =>
+          acc ++ tier.map (·.theoremName!)
         pure <| if thms.isEmpty then "" else
           s!"\nRegistered `@[vcspec]` candidates: {formatCandidateNames thms}"
       throwError
@@ -931,7 +956,7 @@ private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool 
   return false
 
 private def chooseBestCutStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← findHoareCutHintCandidates).map fun cutName =>
+  let steps := (← potentialLocalHintNames).map fun cutName =>
     mkVCGenPlannedStep
       "vcgen explicit cut"
       s!"vcstep using {cutName}"
@@ -939,7 +964,7 @@ private def chooseBestCutStep? : TacticM (Option (PlannedStep × PreviewResult))
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← findLoopInvHintCandidates).map fun invName =>
+  let steps := (← potentialLocalHintNames).map fun invName =>
     mkVCGenPlannedStep
       "vcgen explicit invariant"
       s!"vcstep inv {invName}"
@@ -947,12 +972,15 @@ private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewRe
   chooseBestPlannedStepCandidate? steps
 
 private def chooseBestTheoremStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← findRegisteredVCGenRuleCandidates).map fun entry =>
-    mkVCGenPlannedStep
-      "vcgen @[vcspec] theorem rule"
-      s!"vcstep with {entry.theoremName!}"
-      (runUnaryVCSpecRule entry)
-  chooseBestPlannedStepCandidate? steps
+  for tier in ← registeredVCGenRuleCandidateTiers do
+    let steps := tier.map fun entry =>
+      mkVCGenPlannedStep
+        "vcgen @[vcspec] theorem rule"
+        s!"vcstep with {entry.theoremName!}"
+        (runUnaryVCSpecRule entry)
+    if let some chosen ← chooseBestPlannedStepCandidate? steps then
+      return some chosen
+  return none
 
 private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
     TacticM (Option PlannedStep) := do
@@ -1069,16 +1097,16 @@ def runVCGenPassPlanned : TacticM (Array PlannedStep) := do
   let goals ← getGoals
   if goals.isEmpty then
     return #[]
-  let mut newGoals : List MVarId := []
+  let mut newGoals : Array MVarId := #[]
   let mut steps := #[]
   for goal in goals do
     setGoals [goal]
     if let some step ← runVCGenPlannedStep? then
       steps := steps.push step
-      newGoals := newGoals ++ (← getGoals)
+      newGoals := newGoals ++ (← getGoals).toArray
     else
-      newGoals := newGoals ++ [goal]
-  setGoals newGoals
+      newGoals := newGoals.push goal
+  setGoals newGoals.toList
   return steps
 
 /-- Run one VCGen pass across all current goals. -/
@@ -1087,15 +1115,15 @@ def runVCGenPass : TacticM Bool := do
   if goals.isEmpty then
     return false
   let mut progress := false
-  let mut newGoals : List MVarId := []
+  let mut newGoals : Array MVarId := #[]
   for goal in goals do
     setGoals [goal]
     if ← runVCGenStep then
       progress := true
-      newGoals := newGoals ++ (← getGoals)
+      newGoals := newGoals ++ (← getGoals).toArray
     else
-      newGoals := newGoals ++ [goal]
-  setGoals newGoals
+      newGoals := newGoals.push goal
+  setGoals newGoals.toList
   return progress
 
 end Unary
