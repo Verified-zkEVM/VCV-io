@@ -56,6 +56,7 @@ import ToMathlib.PFunctor.Cofree
 import ToMathlib.PFunctor.Equiv.Basic
 import ToMathlib.PFunctor.Free
 import ToMathlib.PFunctor.Lens.Basic
+import ToMathlib.PFunctor.Lens.Cartesian
 import ToMathlib.PFunctor.MFacts
 import ToMathlib.PFunctor.Trace
 import ToMathlib.Probability.ProbabilityMassFunction.RenyiDivergence

@@ -25,6 +25,8 @@ providing rules that let program logic proofs pass through oracle simulation bou
 
 open ENNReal OracleSpec OracleComp
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type*} {spec : OracleSpec ι}

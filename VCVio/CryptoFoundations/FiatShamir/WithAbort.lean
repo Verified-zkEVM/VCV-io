@@ -7,7 +7,7 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.IdenSchemeWithAbort
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.HasQuery.Basic
 import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics

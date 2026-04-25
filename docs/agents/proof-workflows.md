@@ -335,8 +335,8 @@ before changing definitions or tactics for eRHL, pRHL, or apRHL.
 
 ## Debugging Common Stuck States
 
-### "typeclass instance problem ... Monad (OracleQuery spec)"
-You wrote `evalDist (query t)` but `query t : OracleQuery`, not `OracleComp`. Fix: `evalDist (liftM (query t) : OracleComp spec _)`.
+### "typeclass instance problem ... HasQuery spec ?m" or "Monad (OracleQuery spec)"
+After the `HasQuery` cutover, the bare `query t` is `HasQuery.query t` and needs an expected type so Lean can pick the ambient monad. Either ascribe `(query t : OracleComp spec _)`, or use the primitive form `spec.query t : OracleQuery spec _` (e.g. when applying `liftM` or projecting `OracleQuery.cont`).
 
 ### "failed to synthesize ... spec.Fintype"
 Add `[spec.Fintype]` and `[spec.Inhabited]` to your hypotheses. These are required for all probability reasoning.

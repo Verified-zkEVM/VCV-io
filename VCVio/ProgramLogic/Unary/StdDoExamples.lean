@@ -28,8 +28,8 @@ example (x : α) :
   mvcgen
 
 example (t : spec.Domain) {Q : Std.Do.PostCond (spec.Range t) .pure} :
-    Std.Do.Triple (OracleComp.query t : OracleComp spec (spec.Range t))
-      (⌜wpProp (spec := spec) (OracleComp.query t) (fun a => (Q.1 a).down)⌝)
+    Std.Do.Triple (HasQuery.query t : OracleComp spec (spec.Range t))
+      (⌜wpProp (spec := spec) (HasQuery.query t) (fun a => (Q.1 a).down)⌝)
       Q := by
   unfold Std.Do.Triple
   intro h

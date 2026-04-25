@@ -31,9 +31,9 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 ## Type System
 
-### 6. `query t` is `OracleQuery`, not `OracleComp`
+### 6. `query` resolves to `HasQuery.query`; use `spec.query` for the primitive
 
-`query t : OracleQuery spec _`, not `OracleComp spec _`. To use `evalDist` on it, write `evalDist (liftM (query t) : OracleComp spec _)`. Bare `evalDist (query t)` causes `Monad (OracleQuery spec)` errors.
+The bare `query` identifier is the `export`ed `HasQuery.query`, so writing `query t : OracleComp spec _` produces a monadic value directly and works with `evalDist`. The primitive single-query syntax `OracleQuery spec _` is `OracleSpec.query` (marked `protected`); reach it via dot notation `spec.query t` (or the fully qualified `OracleSpec.query t`) when you need to apply `liftM`, project `OracleQuery.cont`, or pattern-match on the query structure.
 
 ### 7. Core types are `@[reducible]` thin wrappers
 
@@ -41,7 +41,7 @@ Files like `Fork.lean`, `Sigma.lean`, and `RF_RP_Switching_alt.lean` contain lar
 
 ### 8. Universe polymorphism
 
-`OracleComp` has 3 universe parameters, `SubSpec` has 6. Universe unification errors are common when composing specs or building reductions.
+`OracleComp` has 3 universe parameters, `SubSpec` has 3 (`u, v, w`: indices `ι : Type u`, `τ : Type v`, shared response universe `w`). Universe unification errors are still common when composing specs or building reductions because the lens-style `MonadLift` parent can drag extra metavariables in.
 
 **Fix**: Use `{ι : Type*}` instead of `{ι : Type u}` to let universes resolve independently. Keep `α β : Type` (not `Type u`).
 

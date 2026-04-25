@@ -6,7 +6,7 @@ Authors: Quang Dao
 
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.EvalDist
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.SimSemantics.Append

@@ -10,12 +10,17 @@ import VCVio.OracleComp.ProbComp
 # Coercing Computations to Larger Oracle Sets
 
 This file defines `SubSpec` instances for oracle specs constructed with
-either `OracleSpec.add` or `OracleSpec.sigma`.
-
-TODO: document the "canonical forms" that work well with this
+either `OracleSpec.add` or `OracleSpec.sigma`. Each instance spells out the
+`monadLift` action explicitly (rather than letting it default from
+`onQuery` / `onResponse`) so that the lifted query reduces fully under
+`isDefEq`. This is load-bearing for `rw` / `simp` lemmas like
+`probEvent_liftComp` to find their pattern through the synthesized
+`MonadLiftT` instance chain.
 -/
 
 open OracleSpec
+
+open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleQuery
 
@@ -30,19 +35,22 @@ section instances
 /-- We need `Inhabited` to prevent infinite type-class searching. -/
 instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v} τ} :
     OracleSpec.emptySpec.{u,v} ⊂ₒ spec where
-  monadLift | q => PEmpty.elim q.input
-  liftM_map q := PEmpty.elim q.input
+  monadLift q := PEmpty.elim q.input
+  onQuery t := t.elim
+  onResponse t := t.elim
+  liftM_eq_lift q := PEmpty.elim q.input
 
 instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v} τ} :
     OracleSpec.LawfulSubSpec OracleSpec.emptySpec spec where
-  cont_bijective t := PEmpty.elim t
+  onResponse_bijective t := PEmpty.elim t
 
 section add_left
 
 /-- Add additional oracles to the right side of the existing ones. -/
 instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
-  monadLift | q => .mk (.inl q.input) q.cont
-  liftM_map | _ => fun _ => rfl
+  monadLift q := ⟨.inl q.input, q.cont⟩
+  onQuery := Sum.inl
+  onResponse _ := id
 
 @[simp] lemma liftM_add_left_def (q : OracleQuery spec₁ α) :
     (liftM q : OracleQuery (spec₁ + spec₂) α) = .mk (.inl q.input) q.cont := rfl
@@ -51,7 +59,7 @@ instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₁.Range t)) = query (Sum.inl t) := rfl
 
 instance lawfulSubSpec_add_left : OracleSpec.LawfulSubSpec spec₁ (spec₁ + spec₂) where
-  cont_bijective _ := Function.bijective_id
+  onResponse_bijective _ := Function.bijective_id
 
 end add_left
 
@@ -59,8 +67,9 @@ section add_right
 
 /-- Add additional oracles to the left side of the exiting ones. -/
 instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
-  monadLift | q => .mk (.inr q.input) q.cont
-  liftM_map | _ => fun _ => rfl
+  monadLift q := ⟨.inr q.input, q.cont⟩
+  onQuery := Sum.inr
+  onResponse _ := id
 
 @[simp] lemma liftM_add_right_def (q : OracleQuery spec₂ α) :
     (liftM q : OracleQuery (spec₁ + spec₂) α) = .mk (.inr q.input) q.cont := rfl
@@ -69,7 +78,7 @@ instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₂.Range t)) = query (Sum.inr t) := rfl
 
 instance lawfulSubSpec_add_right : OracleSpec.LawfulSubSpec spec₂ (spec₁ + spec₂) where
-  cont_bijective _ := Function.bijective_id
+  onResponse_bijective _ := Function.bijective_id
 
 end add_right
 
@@ -78,32 +87,30 @@ section left_add_left_add
 instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
     spec₁ + spec₂ ⊂ₒ spec₃ + spec₂ where
   monadLift
-    | .mk (.inl q) f => liftM (OracleQuery.mk q f)
-    | .mk (.inr q) f => .mk (.inr q) f
-  liftM_map
-    | .mk (.inl q) f => by
-      intro g
-      calc
-        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
-            OracleQuery (spec₃ + spec₂) _) =
-            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
-              OracleQuery (spec₃ + spec₂) _) := by
-              simpa [liftM, monadLift] using
-                congrArg (fun z => (liftM z : OracleQuery (spec₃ + spec₂) _))
-                  (OracleSpec.SubSpec.liftM_map (spec := spec₁) (superSpec := spec₃)
-                    (q := OracleQuery.mk q f) (f := g))
-        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
-            OracleQuery (spec₃ + spec₂) _) := by
-              simpa [liftM, monadLift] using
-                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₃ + spec₂)
-                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
-    | .mk (.inr q) f => fun _ => rfl
+    | ⟨.inl t, f⟩ => ⟨.inl (h.onQuery t), f ∘ h.onResponse t⟩
+    | ⟨.inr t, f⟩ => ⟨.inr t, f⟩
+  onQuery
+    | .inl t => .inl (h.onQuery t)
+    | .inr t => .inr t
+  onResponse
+    | .inl t => h.onResponse t
+    | .inr _ => id
+  liftM_eq_lift q := by rcases q with ⟨_ | _, _⟩ <;> rfl
 
 @[simp] lemma liftM_left_add_left_add_def
     [h : spec₁ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :
     (liftM q : OracleQuery (spec₃ + spec₂) α) = match q with
       | .mk (.inl q) f => liftM ((liftM (OracleQuery.mk q f) : OracleQuery spec₃ _))
-      | .mk (.inr q) f => .mk (.inr q) f := rfl
+      | .mk (.inr q) f => .mk (.inr q) f := by
+  rcases q with ⟨t | t, f⟩
+  · let qOuter : OracleQuery (spec₁ + spec₂) α := ⟨Sum.inl t, f⟩
+    let qInner : OracleQuery spec₁ α := ⟨t, f⟩
+    change (liftM qOuter : OracleQuery (spec₃ + spec₂) α) =
+        liftM (liftM qInner : OracleQuery spec₃ α)
+    rw [show (liftM qInner : OracleQuery spec₃ α) =
+        ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift qInner]
+    rfl
+  · rfl
 
 @[simp high] lemma liftM_left_add_left_add_query
     [h : spec₁ ⊂ₒ spec₃] (t : (spec₁ + spec₂).Domain) :
@@ -115,9 +122,10 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
 instance lawfulSubSpec_left_add_left_add [spec₁ ⊂ₒ spec₃]
     [OracleSpec.LawfulSubSpec spec₁ spec₃] :
     OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₃ + spec₂) where
-  cont_bijective t := by
+  onResponse_bijective t := by
     match t with
-    | .inl t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₁) (superSpec := spec₃) t
+    | .inl t =>
+      exact OracleSpec.LawfulSubSpec.onResponse_bijective (spec := spec₁) (superSpec := spec₃) t
     | .inr _ => exact Function.bijective_id
 
 end left_add_left_add
@@ -127,32 +135,30 @@ section right_add_right_add
 instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
     spec₁ + spec₂ ⊂ₒ spec₁ + spec₃ where
   monadLift
-    | .mk (.inl q) f => .mk (.inl q) f
-    | .mk (.inr q) f => liftM (OracleQuery.mk q f)
-  liftM_map
-    | .mk (.inl q) f => fun _ => rfl
-    | .mk (.inr q) f => by
-      intro g
-      calc
-        (liftM (liftM (OracleQuery.mk q (g ∘ f)) : OracleQuery spec₃ _) :
-            OracleQuery (spec₁ + spec₃) _) =
-            (liftM (g <$> (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) :
-              OracleQuery (spec₁ + spec₃) _) := by
-              simpa [liftM, monadLift] using
-                congrArg (fun z => (liftM z : OracleQuery (spec₁ + spec₃) _))
-                  (OracleSpec.SubSpec.liftM_map (spec := spec₂) (superSpec := spec₃)
-                    (q := OracleQuery.mk q f) (f := g))
-        _ = g <$> (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _) :
-            OracleQuery (spec₁ + spec₃) _) := by
-              simpa [liftM, monadLift] using
-                (OracleSpec.SubSpec.liftM_map (spec := spec₃) (superSpec := spec₁ + spec₃)
-                  (q := (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) (f := g))
+    | ⟨.inl t, f⟩ => ⟨.inl t, f⟩
+    | ⟨.inr t, f⟩ => ⟨.inr (h.onQuery t), f ∘ h.onResponse t⟩
+  onQuery
+    | .inl t => .inl t
+    | .inr t => .inr (h.onQuery t)
+  onResponse
+    | .inl _ => id
+    | .inr t => h.onResponse t
+  liftM_eq_lift q := by rcases q with ⟨_ | _, _⟩ <;> rfl
 
 @[simp] lemma liftM_right_add_right_add_def
     [h : spec₂ ⊂ₒ spec₃] (q : OracleQuery (spec₁ + spec₂) α) :
     (liftM q : OracleQuery (spec₁ + spec₃) α) = match q with
       | .mk (.inl q) f => .mk (.inl q) f
-      | .mk (.inr q) f => (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) := rfl
+      | .mk (.inr q) f => (liftM (liftM (OracleQuery.mk q f) : OracleQuery spec₃ _)) := by
+  rcases q with ⟨t | t, f⟩
+  · rfl
+  · let qOuter : OracleQuery (spec₁ + spec₂) α := ⟨Sum.inr t, f⟩
+    let qInner : OracleQuery spec₂ α := ⟨t, f⟩
+    change (liftM qOuter : OracleQuery (spec₁ + spec₃) α) =
+        liftM (liftM qInner : OracleQuery spec₃ α)
+    rw [show (liftM qInner : OracleQuery spec₃ α) =
+        ⟨h.onQuery t, f ∘ h.onResponse t⟩ from h.liftM_eq_lift qInner]
+    rfl
 
 @[simp high] lemma liftM_right_add_right_add_query
     [h : spec₂ ⊂ₒ spec₃] (t : (spec₁ + spec₂).Domain) :
@@ -164,10 +170,11 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
 instance lawfulSubSpec_right_add_right_add [spec₂ ⊂ₒ spec₃]
     [OracleSpec.LawfulSubSpec spec₂ spec₃] :
     OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₁ + spec₃) where
-  cont_bijective t := by
+  onResponse_bijective t := by
     match t with
     | .inl _ => exact Function.bijective_id
-    | .inr t => exact OracleSpec.LawfulSubSpec.cont_bijective (spec := spec₂) (superSpec := spec₃) t
+    | .inr t =>
+      exact OracleSpec.LawfulSubSpec.onResponse_bijective (spec := spec₂) (superSpec := spec₃) t
 
 end right_add_right_add
 
@@ -178,17 +185,23 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
     | ⟨.inl t, f⟩ => ⟨.inl (.inl t), f⟩
     | ⟨.inr (.inl t), f⟩ => ⟨.inl (.inr t), f⟩
     | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩
-  liftM_map
-    | ⟨.inl _, _⟩ => fun _ => rfl
-    | ⟨.inr (.inl _), _⟩ => fun _ => rfl
-    | ⟨.inr (.inr _), _⟩ => fun _ => rfl
+  onQuery
+    | .inl t => .inl (.inl t)
+    | .inr (.inl t) => .inl (.inr t)
+    | .inr (.inr t) => .inr t
+  onResponse
+    | .inl _ => id
+    | .inr (.inl _) => id
+    | .inr (.inr _) => id
+  liftM_eq_lift q := by rcases q with ⟨_ | _ | _, _⟩ <;> rfl
 
 @[simp] lemma liftM_add_assoc_def (q : OracleQuery (spec₁ + (spec₂ + spec₃)) α) :
     (liftM q : OracleQuery (spec₁ + spec₂ + spec₃) α) =
     match q with
     | ⟨.inl t, f⟩ => ⟨.inl (.inl t), f⟩
     | ⟨.inr (.inl t), f⟩ => ⟨.inl (.inr t), f⟩
-    | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩ := rfl
+    | ⟨.inr (.inr t), f⟩ => ⟨.inr t, f⟩ := by
+  rcases q with ⟨t | t | t, f⟩ <;> rfl
 
 @[simp] lemma liftM_add_assoc_query (t : (spec₁ + (spec₂ + spec₃)).Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂ + spec₃) ((spec₁ + (spec₂ + spec₃)).Range t)) =
@@ -196,11 +209,11 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
         | .inl t => query (Sum.inl (Sum.inl t))
         | .inr (.inl t) => query (Sum.inl (Sum.inr t))
         | .inr (.inr t) => query (Sum.inr t) := by
-  rcases t with t | t | t <;> simp [query_def]
+  rcases t with t | t | t <;> simp [OracleSpec.query_def]
 
 instance lawfulSubSpec_add_assoc :
     OracleSpec.LawfulSubSpec (spec₁ + (spec₂ + spec₃)) (spec₁ + spec₂ + spec₃) where
-  cont_bijective t := by
+  onResponse_bijective t := by
     rcases t with t | t | t <;> exact Function.bijective_id
 
 end add_assoc
@@ -213,8 +226,9 @@ variable {σ ι} (specs : σ → OracleSpec ι)
 
 instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
     specs j ⊂ₒ OracleSpec.sigma specs where
-  monadLift | .mk t f => .mk ⟨j, t⟩ f
-  liftM_map | _ => fun _ => rfl
+  monadLift q := ⟨⟨j, q.input⟩, q.cont⟩
+  onQuery t := ⟨j, t⟩
+  onResponse _ := id
 
 @[simp low] lemma liftM_sigma_def (j : σ) (q : OracleQuery (specs j) α) :
     (liftM q : OracleQuery (OracleSpec.sigma specs) _) = .mk ⟨j, q.input⟩ q.cont := rfl
@@ -225,7 +239,7 @@ instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
 
 instance lawfulSubSpec_sigma (j : σ) :
     OracleSpec.LawfulSubSpec (specs j) (OracleSpec.sigma specs) where
-  cont_bijective _ := Function.bijective_id
+  onResponse_bijective _ := Function.bijective_id
 
 end sigma
 

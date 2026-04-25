@@ -21,6 +21,8 @@ open ENNReal
 
 universe u
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp.ProgramLogic
 
 variable {ι : Type u} {spec : OracleSpec ι}
@@ -295,6 +297,15 @@ theorem wp_liftM_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
     wp (spec := spec) (query t : OracleComp spec (spec.Range t)) post =
       ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u := by
   simpa using wp_liftM_query (spec := spec) t post
+
+/-- `HasQuery.query` form of `wp_query`: after the `HasQuery` ergonomic
+cutover, the bare `query t : OracleComp spec _` in user code elaborates to
+`HasQuery.query t`. This restates the rule with that head so the
+`@[game_rule]` registry can dispatch on user-facing goals without unfolding. -/
+@[game_rule] theorem wp_HasQuery_query (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    wp (spec := spec) (HasQuery.query t : OracleComp spec (spec.Range t)) post =
+      ∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u :=
+  wp_liftM_query (spec := spec) t post
 
 section Sampling
 

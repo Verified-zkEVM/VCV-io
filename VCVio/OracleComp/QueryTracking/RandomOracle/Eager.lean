@@ -22,6 +22,8 @@ open OracleComp OracleSpec
 
 universe u v w
 
+open scoped OracleSpec.PrimitiveQuery
+
 variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
 
 /-- The eager random oracle: serves answers from a pre-generated `QuerySeed`, consuming

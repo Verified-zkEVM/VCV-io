@@ -104,7 +104,7 @@ Structures use UpperCamelCase: `SecExp`, `SymmEncAlg`, `RelTriple`.
 - SubSpec / coercions: `VCVio/OracleComp/Coercions/SubSpec.lean`
 - DLog / CDH / DDH via HHS: `VCVio/CryptoFoundations/HardnessAssumptions/DiffieHellman.lean`
 - Cost model / polynomial time: `VCVio/OracleComp/QueryTracking/CostModel.lean`
-- Query runtime / weighted expected cost: `VCVio/OracleComp/QueryTracking/QueryRuntime.lean`
+- Query cost / weighted expected cost: `VCVio/OracleComp/QueryTracking/QueryCost.lean`, `VCVio/OracleComp/QueryTracking/WriterCost.lean`
 - Asymptotic security games: `VCVio/CryptoFoundations/Asymptotics/Security.lean`
 - Negligible function algebra: `VCVio/CryptoFoundations/Asymptotics/Negligible.lean`
 - Query enforcement: `VCVio/OracleComp/QueryTracking/Enforcement.lean`
@@ -145,7 +145,14 @@ For new program-logic proofs, import `VCVio.ProgramLogic.Tactics`.
 `Tactics.lean` is the canonical interactive proof mode.
 
 For the tactic reference, proof-mode entry points, and workflow details, see
-[`docs/agents/program-logic.md`](docs/agents/program-logic.md).
+[`docs/agents/program-logic.md`](docs/agents/program-logic.md). The two
+`@[vcspec]` and `@[wpStep]` registries are indexed via
+`Lean.Meta.Sym.Pattern` / `Lean.Meta.Sym.DiscrTree`. `Sym.*` is under active
+development in core Lean; see the *Internal Architecture* and *SymM
+Stability Note* sections of that doc for the churn classes to watch at each
+toolchain bump and the re-entry plan for the deferred `mvcgen'`/`SymM`
+rewriter bridge (when it lands, `Sym.Simp.mkTheoremFromDecl` rebuilds the
+bundle on demand).
 
 ## Building
 

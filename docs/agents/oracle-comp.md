@@ -36,8 +36,9 @@ def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) : Type w → Type _ :=
 
 | Function | Purpose |
 |----------|---------|
-| `query t` | Single oracle query (returns `OracleQuery spec (spec.Range t)`) |
-| `liftM (query t)` | Lift query to `OracleComp` (needed for `evalDist`) |
+| `query t` | Issue an oracle query in the ambient monad (resolves to `HasQuery.query`) |
+| `spec.query t` | Primitive single-query syntax (returns `OracleQuery spec (spec.Range t)`) |
+| `OracleSpec.query t` | Same as `spec.query t` (the `protected` definition's full name) |
 | `OracleComp.inductionOn` | Induction: `pure` case + `query_bind` case |
 | `OracleComp.construct` | Same but result is `Type*` (not `Prop`) |
 | `isPure` | Check if computation is `pure` (no queries) |
@@ -50,9 +51,9 @@ def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) : Type w → Type _ :=
 | `bind_eq_pure_iff` | `oa >>= ob = pure y ↔ ∃ x, oa = pure x ∧ ob x = pure y` |
 | `pure_ne_query` | `pure x ≠ query t >>= f` |
 
-### Gotcha: `query t` is `OracleQuery`, not `OracleComp`
+### `query` resolution: `HasQuery.query` (monadic) vs `spec.query` (primitive)
 
-`query t : OracleQuery spec _`, not `OracleComp spec _`. To use `evalDist` on a bare query, write `evalDist (liftM (query t) : OracleComp spec _)`.
+The bare identifier `query` is the `export`ed `HasQuery.query`, so `query t : OracleComp spec _` (or any `m` with `HasQuery spec m`) returns the result in the ambient monad and supports `evalDist (query t : OracleComp spec _)` directly. Use `spec.query t` (or `OracleSpec.query t`) when you need the primitive single-query syntax `OracleQuery spec _` for `liftM`, `OracleQuery.cont`, structural induction, etc. The `OracleSpec.query` definition is `protected`; the dot-notation form `spec.query t` works regardless.
 
 ### Elimination pattern
 
@@ -69,9 +70,48 @@ induction oa using OracleComp.inductionOn with
 `spec ⊂ₒ superSpec` means every query in `spec` can be simulated in `superSpec` without changing the distribution.
 
 ```lean
-class SubSpec (spec : OracleSpec ι) (superSpec : OracleSpec τ)
-    extends MonadLift (OracleQuery spec) (OracleQuery superSpec)
+class SubSpec (spec : OracleSpec.{u, w} ι) (superSpec : OracleSpec.{v, w} τ)
+    extends MonadLift (OracleQuery spec) (OracleQuery superSpec) where
+  onQuery    : spec.Domain → superSpec.Domain
+  onResponse : (t : spec.Domain) → superSpec.Range (onQuery t) → spec.Range t
+  liftM_eq_lift :
+    ∀ {β} (q : OracleQuery spec β),
+      monadLift q = ⟨onQuery q.input, q.cont ∘ onResponse q.input⟩ := by intros; rfl
 ```
+
+### Lens semantics
+
+`onQuery` and `onResponse` together package a `PFunctor.Lens spec.toPFunctor superSpec.toPFunctor` (call it `h.toLens`):
+
+| Class field | Lens field |
+|-------------|------------|
+| `onQuery : spec.Domain → superSpec.Domain` | `toFunA : P.A → Q.A` |
+| `onResponse t : superSpec.Range (onQuery t) → spec.Range t` | `toFunB t : Q.B (toFunA t) → P.B t` |
+
+By the Yoneda lemma for polynomial functors this lens data is in bijection with natural transformations `OracleQuery spec ⟹ OracleQuery superSpec`. The `MonadLift` parent records that natural transformation; the `liftM_eq_lift` field is the propositional coherence axiom forcing it to agree with the lens. Concrete `SubSpec` instances spell `monadLift` out *by hand* (rather than letting it default from the lens data), so that the lifted query reduces fully under `isDefEq` — this is what makes pattern-matching simp lemmas like `probEvent_liftComp` actually fire.
+
+`SubSpec.toLens` exposes the underlying lens; `SubSpec.trans` is composition of these lenses; `MonadLiftT.refl` covers the identity.
+
+#### Why `SubSpec` extends `MonadLift` rather than `PFunctor.Lens`
+
+The fields *are* a lens. We extend `MonadLift` for two pragmatic reasons:
+
+1. **Typeclass synthesis.** Lifting `OracleComp spec α → OracleComp superSpec α` is plumbed through the `MonadLift` / `MonadLiftT` mechanism; bridging through `PFunctor.Lens` separately would require an instance of the form `PFunctor.Lens A B → MonadLift (Obj A) (Obj B)`, which Lean cannot synthesize from `OracleQuery spec` because `OracleQuery` is a `def` (and `def`-headed instance heads cannot be matched).
+2. **Reducibility under `rw` / `simp`.** A defaulted `monadLift` field becomes opaque to `isDefEq` during pattern matching. Hand-written `monadLift` per instance keeps the lifted query fully reducible.
+
+### LawfulSubSpec ↔ cartesian lens
+
+`LawfulSubSpec spec superSpec` extends `SubSpec spec superSpec` with the propositional requirement that **every backward fiber `onResponse t` is a bijection**. This is *exactly* the `PFunctor.Lens.IsCartesian` predicate from `ToMathlib/PFunctor/Lens/Cartesian.lean`:
+
+```lean
+def Lens.IsCartesian (l : Lens P Q) : Prop := ∀ a, Function.Bijective (l.toFunB a)
+```
+
+The bridge lemma `LawfulSubSpec.toLens_isCartesian` is the one-line statement that the underlying lens of a `LawfulSubSpec` is cartesian.
+
+A *cartesian* lens is a fiberwise isomorphism over an arbitrary forward map on positions. This is **strictly weaker** than `PFunctor.Lens.Equiv` (an isomorphism in the lens category), which would *also* require `onQuery` to be a bijection. We intentionally only require fiberwise bijectivity because the basic `SubSpec` instances embed a small spec into a larger one (e.g. `spec₁ ⊂ₒ (spec₁ + spec₂)` with `onQuery = Sum.inl`); these embeddings are essential and would be ruled out by `Equiv`.
+
+Cartesianness is the precise condition needed to push uniform distributions through the lift: `LawfulSubSpec.evalDist_liftM_query` shows that pulling the uniform distribution on `superSpec.Range (onQuery t)` back through `onResponse t` recovers the uniform distribution on `spec.Range t`.
 
 ### When you need SubSpec
 

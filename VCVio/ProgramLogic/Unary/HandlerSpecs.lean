@@ -7,6 +7,7 @@ Authors: Quang Dao
 import Std.Tactic.Do
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.WriterTBridge
+import VCVio.OracleComp.QueryTracking.CachingLoggingOracle
 import VCVio.OracleComp.QueryTracking.CachingOracle
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.QueryTracking.SeededOracle
@@ -25,7 +26,8 @@ Connects the oracle-simulation handlers (`cachingOracle`, `seededOracle`,
 The bridge is two-layered:
 
 * *Per-query (leaf) specs* are proven once. Modern handlers (`cachingOracle`,
-  `loggingOracle`, `cachingLoggingOracle`) are written in `do` notation
+  `loggingOracle`, `cachingLoggingOracle`) are defined in
+  `VCVio/OracleComp/QueryTracking/*` and written in `do` notation
   with `get` / `match` / `query` / `modify` / `tell`, and their `_triple`
   lemmas use `mvcgen` directly to walk the body. Each `query` step is
   bridged to a support-based statement via `wpProp_iff_forall_support`;
@@ -277,13 +279,12 @@ theorem cachingOracle_triple (t : spec.Domain) (cache₀ : QueryCache spec) :
         (do match (← get) t with
             | Option.some u => return u
             | Option.none =>
-                let u ← (OracleComp.query t : OracleComp spec _)
+                let u ← (HasQuery.query t : OracleComp spec _)
                 modifyGet (fun cache => (u, cache.cacheQuery t u)) :
           StateT (QueryCache spec) (OracleComp spec) (spec.Range t)) from rfl]
   mvcgen
   rename_i cache hle hnone
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro u _
   mvcgen
   exact ⟨le_trans hle (QueryCache.le_cacheQuery cache hnone),
@@ -460,8 +461,7 @@ theorem loggingOracle_triple (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
 
@@ -477,8 +477,7 @@ theorem loggingOracle_triple_prefix (t : spec.Domain) (log₀ : QueryLog spec) :
   mvcgen
   rename_i s _ heq
   subst heq
-  rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-      wpProp_iff_forall_support]
+  rw [wpProp_iff_forall_support]
   intro a _
   mvcgen
   exact ⟨[⟨t, a⟩], rfl⟩
@@ -525,15 +524,15 @@ theorem countingOracle_triple (t : spec.Domain) (qc₀ : QueryCount ι) :
   have hrun : (countingOracle t :
       WriterT (QueryCount ι) (OracleComp spec) (spec.Range t)).run =
         (fun x => (x, QueryCount.single t * (1 : QueryCount ι))) <$>
-          (OracleComp.query t : OracleComp spec _) := by
+          (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
+      bind_assoc, map_eq_bind_pure_comp]
   rw [hrun] at hmem
-  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
-    Prod.mk.injEq] at hmem
+  simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
-  subst hw
-  -- After `subst` the state is `qc * (QueryCount.single t * 1)` which simps
+  cases hw
+  -- After `cases` the state is `qc * (QueryCount.single t * 1)` which simps
   -- to `qc + QueryCount.single t` via `QueryCount.monoid_mul_def`.
   simp
 
@@ -594,14 +593,14 @@ theorem costOracle_triple (costFn : spec.Domain → ω)
   intro s hs v w hmem
   have hrun : (costOracle costFn t : WriterT ω (OracleComp spec) (spec.Range t)).run =
       (fun x => (x, costFn t * (1 : ω))) <$>
-        (OracleComp.query t : OracleComp spec _) := by
+        (HasQuery.query t : OracleComp spec _) := by
     change (_ >>= _ : OracleComp _ _) = _
-    simp [WriterT.run_tell, OracleComp.query, bind_assoc, map_eq_bind_pure_comp]
+    simp [WriterT.run_tell, HasQuery.instOfMonadLift_query,
+      bind_assoc, map_eq_bind_pure_comp]
   rw [hrun] at hmem
-  simp only [support_map, support_query, Set.image_univ, Set.mem_range,
-    Prod.mk.injEq] at hmem
+  simp only [support_map] at hmem
   obtain ⟨_, _, hw⟩ := hmem
-  subst hw
+  cases hw
   change s * (costFn t * (1 : ω)) = s₀ * costFn t
   rw [hs, mul_one]
 
@@ -651,7 +650,8 @@ independent sub-states. The single-`StateT`-layer pattern (with
 handlers, because it stays inside the `(.arg σ .pure)` postcondition
 shape that our `Std.Do` bridge supports cleanly.
 
-The worked example is `cachingLoggingOracle`, which on every query both:
+The worked example is the query-tracking handler `cachingLoggingOracle`, which
+on every query both:
 * logs the query/response pair into the right component, and
 * caches the response in the left component (querying the underlying
   oracle only on a cache miss).
@@ -669,30 +669,6 @@ section stackedHandlers
 
 variable [spec.DecidableEq]
 
-/-- A combined caching + logging handler over a product state.
-
-Behavior on a query `t`:
-* if the cache already has a value `v` at `t`, return `v`, leave the cache
-  unchanged, and append `⟨t, v⟩` to the log;
-* otherwise sample `v` from the underlying oracle, install `(t, v)` into
-  the cache, and append `⟨t, v⟩` to the log.
-
-The log always grows by exactly one entry per call; the cache grows by at
-most one entry per call. Defined in `do`-notation form so that `mvcgen`
-walks the body directly. -/
-def cachingLoggingOracle :
-    QueryImpl spec (StateT (QueryCache spec × QueryLog spec) (OracleComp spec)) :=
-  fun t => do
-    let s ← get
-    match s.1 t with
-    | some v =>
-        modify (fun s => (s.1, s.2 ++ [⟨t, v⟩]))
-        pure v
-    | none =>
-        let v ← (OracleComp.query t : OracleComp spec _)
-        modify (fun s => (QueryCache.cacheQuery s.1 t v, s.2 ++ [⟨t, v⟩]))
-        pure v
-
 /-- Per-call spec for `cachingLoggingOracle t`: the log is extended by exactly
 one entry `⟨t, v⟩`, the cache only grows, and the returned value is now
 cached at `t`. Proved purely with `mvcgen` plus a single bridging step in
@@ -707,7 +683,7 @@ theorem cachingLoggingOracle_triple
         StateT (QueryCache spec × QueryLog spec) (OracleComp spec) (spec.Range t))
       (spred(fun s => ⌜cache₀ ≤ s.1 ∧ s.2 = log₀⌝))
       (⇓ v s' => ⌜cache₀ ≤ s'.1 ∧ s'.1 t = some v ∧ s'.2 = log₀ ++ [⟨t, v⟩]⌝) := by
-  unfold cachingLoggingOracle
+  rw [cachingLoggingOracle.apply_eq]
   mvcgen
   · -- some-branch: cache hit
     rename_i s hcond v hsome _t
@@ -717,8 +693,7 @@ theorem cachingLoggingOracle_triple
   · -- none-branch: cache miss, falls through to query
     rename_i s hcond hnone
     obtain ⟨hle, hlog⟩ := hcond
-    rw [show (liftM (OracleSpec.query t) : OracleComp spec _) = OracleComp.query t from rfl,
-        wpProp_iff_forall_support]
+    rw [wpProp_iff_forall_support]
     intro v _
     mvcgen
     change cache₀ ≤ s.1.cacheQuery t v ∧ (s.1.cacheQuery t v) t = some v ∧
