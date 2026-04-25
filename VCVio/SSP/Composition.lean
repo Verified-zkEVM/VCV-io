@@ -52,6 +52,8 @@ universe uᵢ uₘ uₑ vᵢ v
 
 open OracleSpec OracleComp
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace VCVio.SSP
 
 namespace Package
@@ -66,11 +68,12 @@ variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
 splice the outer state onto the left of the inner state. All three type arguments are implicit
 so that the pointfree `linkReshape <$> _` reads cleanly at use sites.
 
-`private` because this function is a purely internal gadget used by `link` and its reduction
-lemmas; external callers should use `Package.link` / `Package.run_link_eq_run_shiftLeft`
-directly. -/
+Marked `@[reducible]` so that downstream proofs can unfold it into the concrete lambda
+`fun p => (p.1.1, (p.1.2, p.2))` without additional rewriting. Kept at the
+`Package` namespace for use by structural equivalence proofs that need to reason about
+`link.impl`'s output shape. -/
 @[reducible]
-private def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
+def linkReshape {α : Type v} {s₁ : Type v} {s₂ : Type v} :
     (α × s₁) × s₂ → α × (s₁ × s₂) := fun p => (p.1.1, (p.1.2, p.2))
 
 /-- Sequential composition of two packages: `outer ∘ inner`.
@@ -100,6 +103,17 @@ def link (outer : Package M E σ₁) (inner : Package I M σ₂) : Package I E (
 lemma link_init (outer : Package M E σ₁) (inner : Package I M σ₂) :
     (outer.link inner).init =
       inner.init >>= fun s₂₀ => (simulateQ inner.impl outer.init).run s₂₀ := rfl
+
+/-- Pointwise `run` form of the linked handler at a single query. The outer handler runs on
+`s₁` producing an `OracleComp M` step, which is then simulated against the inner handler at
+`s₂`; the final result is reshaped from `(α × σ₁) × σ₂` to `α × (σ₁ × σ₂)` via `linkReshape`.
+
+This is the primary unfolding lemma for `(outer.link inner).impl` used by downstream
+structural-equivalence proofs. -/
+lemma link_impl_apply_run (outer : Package M E σ₁) (inner : Package I M σ₂)
+    (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
+    ((outer.link inner).impl t).run (s₁, s₂) =
+      linkReshape <$> (simulateQ inner.impl ((outer.impl t).run s₁)).run s₂ := rfl
 
 /-- Sanity check: linking with the identity package on the right keeps the outer init's
 distribution, paired with a `PUnit` placeholder for the inner state. The full state-isomorphism
@@ -168,6 +182,41 @@ theorem simulateQ_link_run {α : Type v}
     refine bind_congr fun p => ?_
     exact ih p.1.1 p.1.2 p.2
 
+/-- Per-query state-projection transport through `Package.link`.
+
+If the outer package's handler commutes with a state projection `proj`, then the linked handler
+commutes with the corresponding product projection on the outer state factor. -/
+theorem map_run_link_impl_eq_of_query_map_eq'
+    {σ₁' : Type v}
+    (P₁ : Package M E σ₁) (P₂ : Package M E σ₁') (Q : Package I M σ₂)
+    (proj : σ₁ → σ₁')
+    (hproj : ∀ t s,
+      Prod.map id proj <$> (P₁.impl t).run s = (P₂.impl t).run (proj s))
+    (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
+    Prod.map id (fun s : σ₁ × σ₂ => (proj s.1, s.2)) <$>
+        ((P₁.link Q).impl t).run (s₁, s₂) =
+      ((P₂.link Q).impl t).run (proj s₁, s₂) := by
+  change
+    Prod.map id (fun s : σ₁ × σ₂ => (proj s.1, s.2)) <$>
+        (linkReshape <$>
+          (simulateQ Q.impl ((P₁.impl t).run s₁)).run s₂) =
+      linkReshape <$>
+        (simulateQ Q.impl ((P₂.impl t).run (proj s₁))).run s₂
+  rw [← hproj t s₁, simulateQ_map, StateT.run_map]
+  simp [Functor.map_map, linkReshape]
+
+/-- Mapping any post-processing function over a linked simulation run can be pushed through to
+the nested `simulateQ` form from `simulateQ_link_run`. -/
+theorem map_simulateQ_link_run {α β : Type v}
+    (P : Package M E σ₁) (Q : Package I M σ₂)
+    (A : OracleComp E α) (s₁ : σ₁) (s₂ : σ₂)
+    (f : α × (σ₁ × σ₂) → β) :
+    f <$> (simulateQ (P.link Q).impl A).run (s₁, s₂) =
+      (f ∘ linkReshape) <$>
+        (simulateQ Q.impl ((simulateQ P.impl A).run s₁)).run s₂ := by
+  rw [simulateQ_link_run, Functor.map_map]
+  rfl
+
 /-! ### Shifted adversary and the program-level SSP reduction -/
 
 /-- The **shifted adversary** obtained by absorbing the outer reduction package `P` into the
@@ -192,6 +241,16 @@ distribution is still `pure x`, but the two sides are no longer propositionally 
 lemma shiftLeft_pure (P : Package M E σ₁) {α : Type v} (x : α) :
     P.shiftLeft (pure x) = P.init >>= fun _ => pure x := by
   simp [shiftLeft, simulateQ_pure, StateT.run_pure, bind_pure_comp]
+
+/-- `shiftLeft` commutes with functorial mapping: pushing a pure postprocessing step through
+`shiftLeft` is equivalent to postprocessing the shifted adversary. This is the key lemma used
+in SSP reductions to align differently-projected forms of the same adversary. -/
+lemma shiftLeft_map (P : Package M E σ₁) {α β : Type v} (f : α → β) (A : OracleComp E α) :
+    P.shiftLeft (f <$> A) = f <$> P.shiftLeft A := by
+  unfold Package.shiftLeft
+  rw [map_bind, simulateQ_map]
+  refine bind_congr fun s₁ => ?_
+  rw [StateT.run_map, Functor.map_map, Functor.map_map]
 
 /-- **SSP reduction (program form).** Running the linked game `(P.link Q)` against adversary
 `A` produces the same `OracleComp` distribution as running the inner game `Q` against the

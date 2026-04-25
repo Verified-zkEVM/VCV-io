@@ -15,6 +15,8 @@ indicator function analysis. These feed into the averaged hiding bound.
 
 open OracleSpec OracleComp ENNReal
 
+open scoped OracleSpec.PrimitiveQuery
+
 variable {M S C : Type}
   [DecidableEq M] [DecidableEq S] [DecidableEq C]
   [Fintype M] [Fintype S] [Fintype C]

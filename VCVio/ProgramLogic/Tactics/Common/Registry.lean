@@ -169,10 +169,10 @@ robust to future reducibility shifts.
 /-- Unfolded cores of the unary triple / wp abbreviations; matched on the
 preprocessed theorem body alongside the folded heads. -/
 private def unaryTripleHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.Triple, ``MAlgOrdered.Triple]
+  #[``OracleComp.ProgramLogic.Triple, ``MAlgOrdered.Triple, ``Std.Do'.Triple]
 
 private def unaryWpHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.wp, ``MAlgOrdered.wp]
+  #[``OracleComp.ProgramLogic.wp, ``MAlgOrdered.wp, ``Std.Do'.wp]
 
 private def relTripleHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.Relational.RelTriple, ``MAlgRelOrdered.Triple]
@@ -202,22 +202,35 @@ private def trailingArgsN? (e : Expr) (n : Nat) : Option (Array Expr) :=
     none
 
 /-- Preprocessed-body variant of `tripleGoalParts?` that also matches the
-unfolded `MAlgOrdered.Triple` head. Returns `(pre, oa, post)`. -/
+unfolded `MAlgOrdered.Triple` head, as well as Loom2's `Std.Do'.Triple`
+which carries an extra trailing exception postcondition. Returns
+`(pre, oa, post)`. -/
 private def tripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
   unless headIsOneOf body unaryTripleHeadNames do none
-  let args ← trailingArgsN? body 3
-  let #[pre, oa, post] := args | none
-  some (pre, oa, post)
+  let n := if body.getAppFn.isConstOf ``Std.Do'.Triple then 4 else 3
+  let args ← trailingArgsN? body n
+  if n == 4 then
+    let #[pre, oa, post, _epost] := args | none
+    some (pre, oa, post)
+  else
+    let #[pre, oa, post] := args | none
+    some (pre, oa, post)
 
 /-- Preprocessed-body variant of `wpGoalParts?` that also matches the unfolded
-`MAlgOrdered.wp` head. Returns `(oa, post)`. -/
+`MAlgOrdered.wp` head and Loom2's `Std.Do'.wp` (which carries a trailing
+exception postcondition). Returns `(oa, post)`. -/
 private def wpBodyParts? (body : Expr) : Option (Expr × Expr) := do
   let body := body.consumeMData
   unless headIsOneOf body unaryWpHeadNames do none
-  let args ← trailingArgsN? body 2
-  let #[oa, post] := args | none
-  some (oa, post)
+  let n := if body.getAppFn.isConstOf ``Std.Do'.wp then 3 else 2
+  let args ← trailingArgsN? body n
+  if n == 3 then
+    let #[oa, post, _epost] := args | none
+    some (oa, post)
+  else
+    let #[oa, post] := args | none
+    some (oa, post)
 
 /-- Preprocessed-body variant of `rawWPGoalParts?` that also matches the
 unfolded `MAlgOrdered.wp` head under `≤`. Returns `(pre, oa, post)`. -/

@@ -41,6 +41,7 @@ verification is `g^z = R · pk^c`.
 -/
 
 open OracleSpec OracleComp SigmaProtocol
+open scoped ENNReal
 
 namespace Schnorr
 
@@ -126,5 +127,135 @@ theorem sigma_hvzk (g : G) [Finite F] :
     rvcstep using (· + c * sk)
     · rvcgen
     · exact ⟨fun _ _ h => add_right_cancel h, fun z => ⟨z - c * sk, sub_add_cancel z _⟩⟩
+
+omit [Fintype F] [DecidableEq F] in
+/-- Closed-form for the Schnorr `realTranscript`: the real transcript is the joint
+distribution of `(r • g, c, r + c * sk)` where `r, c ← $ᵗ F` are sampled *independently*.
+This is the form in which the commitment `r • g` and the challenge `c` are literally
+independent (by sampling order), making conditional uniformity trivial. -/
+private lemma realTranscript_eq_indep (g : G) (pk : G) (sk : F) :
+    SigmaProtocol.realTranscript (sigma F G g) pk sk =
+      (do
+        let r ← $ᵗ F
+        let c ← $ᵗ F
+        pure ((r • g, c, r + c * sk) : G × F × F)) := by
+  simp only [SigmaProtocol.realTranscript, sigma, bind_assoc, pure_bind]
+
+omit [DecidableEq F] in
+/-- **`simCommitPredictability` for Schnorr.** With the standard bijection hypothesis
+`hg : Function.Bijective (· • g : F → G)` (`F` acts simply transitively on `G`, so `g`
+generates the group), the simulator's commit marginal is uniform over `G`, giving
+predictability `β = 1/|F|` (equivalently `1/|G|`).
+
+Proof: for any fixed challenge `c`, the response map `z ↦ z • g - c • pk : F → G` is a
+bijection (composition of `· • g` with translation), so `(z • g - c • pk)` is uniform on
+`G` when `z ← $ᵗ F`. Averaging over `c ← $ᵗ F` preserves uniformity, and uniformity on
+`G` gives probability `1/|G| = 1/|F|` for any specific output. -/
+theorem sigma_simCommitPredictability (g : G)
+    (hg : Function.Bijective (· • g : F → G)) :
+    SigmaProtocol.simCommitPredictability (sigma F G g) (simTranscript F G g)
+      ((Fintype.card F : ℝ≥0∞)⁻¹) := by
+  classical
+  letI : Fintype G := Fintype.ofBijective _ hg
+  intro pk c₀
+  have hcard_FG : Fintype.card G = Fintype.card F := (Fintype.card_of_bijective hg).symm
+  have hinv_eq : (Fintype.card F : ℝ≥0∞)⁻¹ = (Fintype.card G : ℝ≥0∞)⁻¹ := by rw [hcard_FG]
+  have hbij_c : ∀ c : F, Function.Bijective (fun z : F => z • g - c • pk) := fun c =>
+    (Equiv.subRight (c • pk)).bijective.comp hg
+  have h_commit_uniform :
+      evalDist (Prod.fst <$> simTranscript F G g pk) = evalDist ($ᵗ G) := by
+    apply evalDist_ext
+    intro x
+    have h_rewrite : (Prod.fst <$> simTranscript F G g pk) =
+        (do let c ← ($ᵗ F); let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G) := by
+      simp [simTranscript, map_bind]
+    rw [h_rewrite, probOutput_bind_eq_tsum]
+    have h_inner_const : ∀ c : F,
+        Pr[= x | (do let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G)] =
+          (Fintype.card G : ℝ≥0∞)⁻¹ := by
+      intro c
+      have h_map : (do let z ← ($ᵗ F); pure (z • g - c • pk) : ProbComp G) =
+          (fun z : F => z • g - c • pk) <$> ($ᵗ F) := by
+        simp [map_eq_bind_pure_comp]
+      rw [h_map,
+        probOutput_map_bijective_uniform_cross F (f := fun z : F => z • g - c • pk) (hbij_c c),
+        probOutput_uniformSample (α := G)]
+    simp_rw [h_inner_const]
+    rw [ENNReal.tsum_mul_right, HasEvalPMF.tsum_probOutput_eq_one, one_mul,
+      probOutput_uniformSample (α := G)]
+  have h_eq : probOutput (Prod.fst <$> simTranscript F G g pk) c₀ =
+      (Fintype.card F : ℝ≥0∞)⁻¹ := by
+    rw [probOutput_def, h_commit_uniform, ← probOutput_def,
+      probOutput_uniformSample (α := G), hcard_FG]
+  exact h_eq.le
+
+omit [DecidableEq F] in
+/-- **`simChalUniformGivenCommit` for Schnorr.** The proof reduces to the joint distribution
+of independently-sampled `r, c ← $ᵗ F` via perfect HVZK and the closed form
+`realTranscript_eq_indep`. The commitment `r • g` and challenge `c` are then literally
+independent (by sampling order), so the joint factors as `Pr[commit = c₀] * (1/|F|)`. -/
+theorem sigma_simChalUniformGivenCommit (g : G) :
+    simChalUniformGivenCommit (sigma F G g) (simTranscript F G g) := by
+  classical
+  intro pk sk hsk c₀ ch₀
+  have hHVZK := sigma_hvzk F G g pk sk hsk
+  have hReal := realTranscript_eq_indep F G g pk sk
+  set ind : ProbComp (G × F × F) := do
+    let r ← $ᵗ F
+    let c ← $ᵗ F
+    pure (r • g, c, r + c * sk) with hind_def
+  have hSimEqIndep : evalDist (simTranscript F G g pk) = evalDist ind := by
+    rw [← hHVZK, hReal]
+  rw [probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep,
+      probEvent_congr' (fun _ _ => Iff.rfl) hSimEqIndep]
+  -- Now both sides are `probEvent` over the explicit independent form.
+  have hcard_ne_zero : (Fintype.card F : ℝ≥0∞) ≠ 0 := by
+    exact_mod_cast Fintype.card_ne_zero (α := F)
+  have hcard_ne_top : (Fintype.card F : ℝ≥0∞) ≠ ⊤ := ENNReal.natCast_ne_top _
+  -- Define `M` = the per-`r` commit-marginal sum.
+  set M : ℝ≥0∞ := ∑' r : F, (Fintype.card F : ℝ≥0∞)⁻¹ *
+      (if r • g = c₀ then (1 : ℝ≥0∞) else 0) with hM_def
+  -- Compute the joint probability.
+  have hjoint :
+      Pr[fun t : G × F × F => t.1 = c₀ ∧ t.2.1 = ch₀ | ind] =
+        (Fintype.card F : ℝ≥0∞)⁻¹ * M := by
+    rw [hind_def, probEvent_bind_eq_tsum, hM_def, ← ENNReal.tsum_mul_left]
+    refine tsum_congr fun r => ?_
+    rw [probOutput_uniformSample, probEvent_bind_eq_tsum]
+    rw [show (∑' c : F,
+              Pr[= c | $ᵗ F] *
+                Pr[fun t : G × F × F => t.1 = c₀ ∧ t.2.1 = ch₀ |
+                  (pure ((r • g, c, r + c * sk) : G × F × F) : ProbComp _)]) =
+            (Fintype.card F : ℝ≥0∞)⁻¹ *
+              (if r • g = c₀ then (1 : ℝ≥0∞) else 0) by
+      simp_rw [probOutput_uniformSample, probEvent_pure]
+      rw [ENNReal.tsum_mul_left]
+      congr 1
+      by_cases hr : r • g = c₀
+      · simp only [hr, true_and]
+        rw [tsum_eq_single ch₀]
+        · simp
+        · intro c hc
+          simp [hc]
+      · simp [hr]]
+  -- Compute the marginal probability.
+  have hmarg :
+      Pr[fun t : G × F × F => t.1 = c₀ | ind] = M := by
+    rw [hind_def, probEvent_bind_eq_tsum, hM_def]
+    refine tsum_congr fun r => ?_
+    rw [probOutput_uniformSample, probEvent_bind_eq_tsum]
+    rw [show (∑' c : F,
+              Pr[= c | $ᵗ F] *
+                Pr[fun t : G × F × F => t.1 = c₀ |
+                  (pure ((r • g, c, r + c * sk) : G × F × F) : ProbComp _)]) =
+            (if r • g = c₀ then (1 : ℝ≥0∞) else 0) by
+      simp_rw [probOutput_uniformSample, probEvent_pure]
+      by_cases hr : r • g = c₀
+      · simp only [hr, if_true]
+        rw [ENNReal.tsum_mul_left, ENNReal.tsum_const,
+          ENat.card_eq_coe_fintype_card, mul_one, ENat.toENNReal_coe,
+          ENNReal.inv_mul_cancel hcard_ne_zero hcard_ne_top]
+      · simp [hr]]
+  rw [hjoint, hmarg, mul_comm]
 
 end Schnorr

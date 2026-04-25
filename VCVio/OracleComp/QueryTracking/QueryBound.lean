@@ -7,6 +7,7 @@ import Mathlib.Algebra.Polynomial.Eval.Defs
 import ToMathlib.General
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
+import VCVio.OracleComp.SimSemantics.Append
 import VCVio.OracleComp.SimSemantics.StateT
 
 /-!
@@ -29,6 +30,8 @@ and `IsTotalQueryBound`.
 open OracleSpec
 
 universe u
+
+open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleComp
 
@@ -917,6 +920,78 @@ theorem IsQueryBoundP.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec �
         · simp only [if_neg hpt]; omega
       have := isQueryBoundP_bind hlift hrest
       simpa [hbound] using this
+
+/-- Transfer a predicate-targeted bound through `simulateQ` with a sum-of-implementations
+`impl₁ + impl₂` on a sum source spec `spec₁ + spec₂`. The source predicate `p` is split into
+its `.inl` and `.inr` branches, with separate step hypotheses for each impl on its own
+sub-predicate. -/
+theorem IsQueryBoundP.simulateQ_run_add_of_step
+    {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    {spec' : OracleSpec ι'} {σ : Type u}
+    {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
+    {q : ι' → Prop} [DecidablePred q]
+    {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
+    {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
+    {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
+    (h : IsQueryBoundP oa p n)
+    (hstep_p₁ : ∀ t, p (.inl t) → ∀ s, IsQueryBoundP ((impl₁ t).run s) q 1)
+    (hstep_np₁ : ∀ t, ¬ p (.inl t) → ∀ s, IsQueryBoundP ((impl₁ t).run s) q 0)
+    (hstep_p₂ : ∀ t, p (.inr t) → ∀ s, IsQueryBoundP ((impl₂ t).run s) q 1)
+    (hstep_np₂ : ∀ t, ¬ p (.inr t) → ∀ s, IsQueryBoundP ((impl₂ t).run s) q 0)
+    (s : σ) :
+    IsQueryBoundP ((simulateQ (impl₁ + impl₂) oa).run s) q n := by
+  refine IsQueryBoundP.simulateQ_run_of_step h ?_ ?_ s
+  · rintro (t | t) hp s
+    · exact hstep_p₁ t hp s
+    · exact hstep_p₂ t hp s
+  · rintro (t | t) hnp s
+    · exact hstep_np₁ t hnp s
+    · exact hstep_np₂ t hnp s
+
+/-- Specialization of `IsQueryBoundP.simulateQ_run_add_of_step` when the source predicate
+is vacuously false on `.inr _` queries: only `impl₁` interacts with the predicate, and
+`impl₂` only needs a uniform 0-bound step. -/
+theorem IsQueryBoundP.simulateQ_run_add_inl_of_step
+    {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    {spec' : OracleSpec ι'} {σ : Type u}
+    {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
+    {q : ι' → Prop} [DecidablePred q]
+    {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
+    {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
+    {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
+    (hp_inr : ∀ t, ¬ p (.inr t))
+    (h : IsQueryBoundP oa p n)
+    (hstep_p₁ : ∀ t, p (.inl t) → ∀ s, IsQueryBoundP ((impl₁ t).run s) q 1)
+    (hstep_np₁ : ∀ t, ¬ p (.inl t) → ∀ s, IsQueryBoundP ((impl₁ t).run s) q 0)
+    (hstep_right : ∀ t s, IsQueryBoundP ((impl₂ t).run s) q 0)
+    (s : σ) :
+    IsQueryBoundP ((simulateQ (impl₁ + impl₂) oa).run s) q n :=
+  IsQueryBoundP.simulateQ_run_add_of_step h hstep_p₁ hstep_np₁
+    (fun t hp _ => absurd hp (hp_inr t))
+    (fun t _ s => hstep_right t s) s
+
+/-- Specialization of `IsQueryBoundP.simulateQ_run_add_of_step` when the source predicate
+is vacuously false on `.inl _` queries: only `impl₂` interacts with the predicate, and
+`impl₁` only needs a uniform 0-bound step. -/
+theorem IsQueryBoundP.simulateQ_run_add_inr_of_step
+    {ι₁ ι₂ ι' : Type u} {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
+    {spec' : OracleSpec ι'} {σ : Type u}
+    {p : ι₁ ⊕ ι₂ → Prop} [DecidablePred p]
+    {q : ι' → Prop} [DecidablePred q]
+    {impl₁ : QueryImpl spec₁ (StateT σ (OracleComp spec'))}
+    {impl₂ : QueryImpl spec₂ (StateT σ (OracleComp spec'))}
+    {oa : OracleComp (spec₁ + spec₂) α} {n : ℕ}
+    (hp_inl : ∀ t, ¬ p (.inl t))
+    (h : IsQueryBoundP oa p n)
+    (hstep_left : ∀ t s, IsQueryBoundP ((impl₁ t).run s) q 0)
+    (hstep_p₂ : ∀ t, p (.inr t) → ∀ s, IsQueryBoundP ((impl₂ t).run s) q 1)
+    (hstep_np₂ : ∀ t, ¬ p (.inr t) → ∀ s, IsQueryBoundP ((impl₂ t).run s) q 0)
+    (s : σ) :
+    IsQueryBoundP ((simulateQ (impl₁ + impl₂) oa).run s) q n :=
+  IsQueryBoundP.simulateQ_run_add_of_step h
+    (fun t hp _ => absurd hp (hp_inl t))
+    (fun t _ s => hstep_left t s)
+    hstep_p₂ hstep_np₂ s
 
 /-- Worst-case per-index query bound as a function of input size:
 for all inputs `x` with `size x ≤ n`, the computation `f x` makes at most `bound n i`

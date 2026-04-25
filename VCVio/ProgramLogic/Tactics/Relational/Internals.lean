@@ -743,11 +743,9 @@ def planRVCGenStep? : TacticM (Option PlannedStep) := do
       "rvcstep"
       runRVCGenStructuralCore
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
-  let hintCandidate? ← do
-    if structuralPreview.ok && structuralPreview.goalCount = 0 then
-      pure none
-    else
-      chooseBestRelHintStep?
+  if structuralPreview.ok && structuralPreview.goalCount == 0 then
+    return some structuralStep
+  let hintCandidate? ← chooseBestRelHintStep?
   let theoremCandidate? ← chooseBestRegisteredRVCGenTheoremStep?
   if structuralPreview.ok then
     if let some (hintStep, hintPreview) := hintCandidate? then

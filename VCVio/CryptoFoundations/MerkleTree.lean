@@ -23,6 +23,8 @@ namespace MerkleTree
 
 open List OracleSpec OracleComp
 
+open scoped OracleSpec.PrimitiveQuery
+
 variable (α : Type _)
 
 /-- Define the domain & range of the (single) oracle needed for constructing a Merkle tree with

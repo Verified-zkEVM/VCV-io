@@ -30,7 +30,7 @@ theorem hidingRun_countAll_proj_eq_impl₁ {AUX : Type} {t : ℕ}
     (simulateQ hidingImplCountAll (hidingOa A s)).run' (∅, fun _ => 0) =
       (simulateQ (hidingImpl₁ s) (hidingOa A s)).run' (∅, 0) := by
   simpa [StateT.run'] using
-    (OracleComp.run'_simulateQ_eq_of_query_map_eq'
+    (OracleComp.run'_simulateQ_eq_of_query_map_eq
       hidingImplCountAll (hidingImpl₁ s) (fun st => (st.1, st.2 s))
       (fun ms st => by
         simpa [Prod.map] using hidingImplCountAll_proj_eq_hidingImpl₁
@@ -52,7 +52,7 @@ theorem probEvent_hidingBad_eq_countAll {AUX : Type} {t : ℕ}
           (simulateQ hidingImplCountAll (hidingOa A s)).run (∅, fun _ => 0) =
         (simulateQ (hidingImpl₁ s) (hidingOa A s)).run (∅, 0) := by
     simpa using
-      (OracleComp.map_run_simulateQ_eq_of_query_map_eq'
+      (OracleComp.map_run_simulateQ_eq_of_query_map_eq
         hidingImplCountAll (hidingImpl₁ s) (fun st => (st.1, st.2 s))
         (fun ms st => by
           simpa [Prod.map] using hidingImplCountAll_proj_eq_hidingImpl₁

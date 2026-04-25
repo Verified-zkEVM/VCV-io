@@ -9,7 +9,8 @@ The current design is intentionally **weighted-first**:
 
 The stack is also intentionally split into:
 
-- a generic `HasQuery` runtime layer
+- a writer-cost layer for pathwise and expected-cost facts
+- a generic `HasQuery.Program` accounting layer, evaluated against `QueryImpl`
 - a thin `OracleComp` facade
 - a small `ToMathlib` probability layer for reusable tail-sum facts
 
@@ -17,7 +18,8 @@ The stack is also intentionally split into:
 
 | File | Role |
 |------|------|
-| `VCVio/OracleComp/QueryTracking/QueryRuntime.lean` | Generic query-cost accounting for `HasQuery` computations |
+| `VCVio/OracleComp/QueryTracking/WriterCost.lean` | `AddWriterT` cost facts and `QueryImpl` writer-cost instrumentation |
+| `VCVio/OracleComp/QueryTracking/QueryCost.lean` | Generic query-cost accounting for direct-style `HasQuery.Program` computations |
 | `VCVio/OracleComp/QueryTracking/CostModel.lean` | `OracleComp`-specific facade over the generic semantics |
 | `ToMathlib/Control/WriterT.lean` | Pathwise and output-indexed cost predicates for `AddWriterT` |
 | `ToMathlib/Probability/ProbabilityMassFunction/TailSums.lean` | Generic PMF tail-sum identities used for expected runtime |
@@ -50,16 +52,14 @@ This means:
 That is stronger than a pathwise bound. It is useful when exact cost is determined by the final
 result, but it is not the default semantic notion.
 
-### 2. `QueryRuntime`: generic `HasQuery` accounting
+### 2. `QueryCost`: generic `HasQuery.Program` accounting
 
-`QueryRuntime spec m` packages a concrete runtime for a generic `HasQuery spec m` world.
+`HasQuery.Program spec m α` is the direct-style shape
+`[HasQuery spec m] → m α`. This layer evaluates such programs against a
+concrete `impl : QueryImpl spec m`, or against the writer-instrumented
+implementations `impl.withAddCost` and `impl.withUnitCost`.
 
-This layer interprets generic constructions in:
-
-- the base monad `m`
-- the instrumented monad `AddWriterT ω m`
-
-and exposes the public API:
+It exposes the public API:
 
 - exact weighted cost:
   `QueryCost[ oa in runtime by costFn ] = w`
@@ -87,7 +87,7 @@ second independent cost semantics.
 
 The important design point is:
 
-- `QueryRuntime` and `AddWriterT` are the semantic core
+- `QueryImpl`, `HasQuery.Program`, and `AddWriterT` are the semantic core
 - `CostModel` is now a thin facade for `OracleComp`-specific theorems and asymptotic packaging
 
 Use `CostModel` when you want:
@@ -96,9 +96,9 @@ Use `CostModel` when you want:
 - `OracleComp`-specific reductions
 - the older asymptotic query-cost packaging
 
-Use `QueryRuntime` when you want:
+Use `QueryCost` when you want:
 
-- a generic theorem over any `HasQuery` construction
+- a generic theorem over a direct-style `HasQuery.Program`
 - runtime-instantiated cryptographic constructions
 - weighted expected cost and expected query count
 
@@ -108,7 +108,7 @@ Expected-cost proofs should avoid hard-coding query semantics when the real theo
 probabilistic.
 
 `ToMathlib/Probability/ProbabilityMassFunction/TailSums.lean` contains the generic discrete
-tail-sum identities used by the query-runtime layer:
+tail-sum identities used by the query-cost layer:
 
 - `E[T] = ∑ Pr[i < T]`
 - tail domination implies expectation domination
@@ -205,7 +205,7 @@ computations.
 ### Prove expectation via a bridge
 
 After a pathwise bound or a `UsesCostAs` theorem is in place, derive expectation theorems using the
-generic bridge lemmas in `QueryRuntime.lean`.
+generic bridge lemmas in `QueryCost.lean`.
 
 There are two main patterns:
 

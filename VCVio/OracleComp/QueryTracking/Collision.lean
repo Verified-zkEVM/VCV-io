@@ -30,6 +30,8 @@ inside `cachingOracle`.
 
 open OracleSpec OracleComp ENNReal Finset
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp
 
 variable {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι}

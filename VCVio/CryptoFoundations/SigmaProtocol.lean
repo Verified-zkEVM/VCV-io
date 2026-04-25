@@ -164,12 +164,78 @@ has min-entropy at least `-log₂ β`.
 
 This is a companion assumption to `HVZK` that bounds the collision probability of
 programmed cache entries in the Fiat-Shamir CMA-to-NMA reduction. For Schnorr,
-`β = 1/|G|` because the commitment `g^r` is uniform over the group. -/
+`β = 1/|G|` because the commitment `g^r` is uniform over the group.
+
+The `_σ : SigmaProtocol …` argument is dummy (the predicate only depends on
+`simTranscript` and `β`); it is present to enable field-notation usage like
+`σ.simCommitPredictability simTranscript β`. -/
 def simCommitPredictability
+    (_σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
     (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) (β : ℝ≥0∞) : Prop :=
   ∀ x : Stmt, ∀ c₀ : Commit, probOutput (Prod.fst <$> simTranscript x) c₀ ≤ β
 
+open scoped ENNReal in
+/-- Conditional uniformity of the simulator's challenge given its commitment, expressed
+in product form: for any statement `x` admitting a witness, any commit value `c₀`, and
+any challenge value `ch₀`, the joint marginal `Pr[(commit, chal) = (c₀, ch₀)]` factors as
+`Pr[commit = c₀] * (1 / |Chal|)`.
+
+This is a strengthening of `simCommitPredictability` (which only bounds the commit
+marginal). Where the latter says "no commit value is too likely", `simChalUniformGivenCommit`
+says "the challenge is uniform conditional on any commit value", which is exactly the
+hypothesis required by `identical_until_bad_with_flag` when bridging the Fiat-Shamir
+programming-oracle and no-programming-oracle worlds: cache misses on programmed points
+return the simulator's challenge, and the bridge needs that challenge to be marginally
+uniform conditional on the simulator's commit (which is what gets compared against the
+random oracle's would-be answer).
+
+The product form `P[(c₀, ch₀)] = P[c₀] * 1/|Chal|` avoids conditional-probability
+ambiguities when `P[c₀] = 0` and is the most directly-usable shape inside the `tvDist`
+calculation.
+
+The `rel pk sk = true` hypothesis is needed because typical Schnorr-style simulators only
+satisfy this when `pk` admits a witness (the proof uses a witness-indexed bijection on the
+response variable); for statements outside the relation's image, the simulator's joint may
+have any structure. -/
+def simChalUniformGivenCommit [Fintype Chal]
+    (_σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (simTranscript : Stmt → ProbComp (Commit × Chal × Resp)) : Prop :=
+  ∀ (pk : Stmt) (sk : Wit), rel pk sk = true →
+    ∀ (c₀ : Commit) (ch₀ : Chal),
+      Pr[fun t : Commit × Chal × Resp => t.1 = c₀ ∧ t.2.1 = ch₀ | simTranscript pk] =
+        Pr[fun t : Commit × Chal × Resp => t.1 = c₀ | simTranscript pk] *
+          (Fintype.card Chal : ℝ≥0∞)⁻¹
+
 end hvzk
+
+section randomChallengeVerification
+
+variable [SampleableType Chal] [unifSpec.Fintype] [unifSpec.Inhabited]
+
+open scoped ENNReal in
+/-- `verifyChallengePredictability δ` means that for any fixed statement, commitment, and
+response, a uniformly random challenge is accepted by the verifier with probability at most `δ`.
+
+This isolates the "cache-miss verify" term in the Fiat-Shamir security reduction: when the
+forgery's hash point was never queried, final verification samples a fresh challenge from the
+random oracle, and the reduction needs an external bound on that acceptance probability.
+Unlike `simCommitPredictability`, this is a property of the verifier relation itself rather than
+of the simulator transcript. -/
+def verifyChallengePredictability
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (δ : ℝ≥0∞) : Prop :=
+  ∀ x pc p, Pr[fun ω : Chal => σ.verify x pc ω p = true | ($ᵗ Chal : ProbComp Chal)] ≤ δ
+
+/-- Trivial upper bound for `verifyChallengePredictability`. Useful when a sharper
+scheme-specific estimate is unavailable. -/
+lemma verifyChallengePredictability_one
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel) :
+    σ.verifyChallengePredictability 1 := by
+  dsimp [verifyChallengePredictability]
+  intro x pc p
+  exact probEvent_le_one
+
+end randomChallengeVerification
 
 section uniqueResponses
 

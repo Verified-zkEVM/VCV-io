@@ -26,6 +26,8 @@ This file defines `RelTriple` via the generic two-monad algebra interface
 
 universe u
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace OracleComp.ProgramLogic.Relational
 
 variable {ι₁ : Type u} {ι₂ : Type u}

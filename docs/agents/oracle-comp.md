@@ -36,8 +36,9 @@ def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) : Type w → Type _ :=
 
 | Function | Purpose |
 |----------|---------|
-| `query t` | Single oracle query (returns `OracleQuery spec (spec.Range t)`) |
-| `liftM (query t)` | Lift query to `OracleComp` (needed for `evalDist`) |
+| `query t` | Issue an oracle query in the ambient monad (resolves to `HasQuery.query`) |
+| `spec.query t` | Primitive single-query syntax (returns `OracleQuery spec (spec.Range t)`) |
+| `OracleSpec.query t` | Same as `spec.query t` (the `protected` definition's full name) |
 | `OracleComp.inductionOn` | Induction: `pure` case + `query_bind` case |
 | `OracleComp.construct` | Same but result is `Type*` (not `Prop`) |
 | `isPure` | Check if computation is `pure` (no queries) |
@@ -50,9 +51,9 @@ def OracleComp {ι : Type u} (spec : OracleSpec.{u,v} ι) : Type w → Type _ :=
 | `bind_eq_pure_iff` | `oa >>= ob = pure y ↔ ∃ x, oa = pure x ∧ ob x = pure y` |
 | `pure_ne_query` | `pure x ≠ query t >>= f` |
 
-### Gotcha: `query t` is `OracleQuery`, not `OracleComp`
+### `query` resolution: `HasQuery.query` (monadic) vs `spec.query` (primitive)
 
-`query t : OracleQuery spec _`, not `OracleComp spec _`. To use `evalDist` on a bare query, write `evalDist (liftM (query t) : OracleComp spec _)`.
+The bare identifier `query` is the `export`ed `HasQuery.query`, so `query t : OracleComp spec _` (or any `m` with `HasQuery spec m`) returns the result in the ambient monad and supports `evalDist (query t : OracleComp spec _)` directly. Use `spec.query t` (or `OracleSpec.query t`) when you need the primitive single-query syntax `OracleQuery spec _` for `liftM`, `OracleQuery.cont`, structural induction, etc. The `OracleSpec.query` definition is `protected`; the dot-notation form `spec.query t` works regardless.
 
 ### Elimination pattern
 

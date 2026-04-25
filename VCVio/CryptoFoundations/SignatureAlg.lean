@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.EvalDist.Defs.Instances
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.ProbCompLift
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.QueryTracking.LoggingOracle
@@ -176,6 +176,102 @@ noncomputable def unforgeableAdv.advantage
     {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
     (runtime : ProbCompRuntime (OracleComp spec))
     (adv : unforgeableAdv sigAlg) : ℝ≥0∞ := Pr[= true | unforgeableExp runtime adv]
+
+/-- The CMA experiment with the freshness check dropped: the same body as `unforgeableExp`
+but the final return is just the `verified` bit, ignoring whether the forged message was
+queried by the adversary to the signing oracle.
+
+Without the freshness check, an adversary trivially wins by replaying any received
+signature; the bound `adv.advantage ≤ Pr[unforgeableExpNoFresh ⇒ true]` (see
+`unforgeableAdv.advantage_le_unforgeableExpNoFresh`) is the first game-hop
+in standard CMA-to-NMA reductions. -/
+noncomputable def unforgeableExpNoFresh
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (adv : unforgeableAdv sigAlg) : SPMF Bool :=
+  letI : DecidableEq M := Classical.decEq M
+  letI : DecidableEq S := Classical.decEq S
+  runtime.evalDist do
+    let (pk, sk) ← sigAlg.keygen
+    let impl : QueryImpl (spec + (M →ₒ S))
+        (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
+        (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
+        sigAlg.signingOracle pk sk
+    let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+      simulateQ impl (adv.main pk)
+    let ((msg, σ), _) ← sim_adv.run
+    sigAlg.verify pk msg σ
+
+omit [DecidableEq M] [DecidableEq S] in
+/-- **Phase B (freshness-drop) bound.** The CMA advantage is bounded above by the success
+probability of the same experiment with the freshness check dropped.
+
+Both `unforgeableExp` and `unforgeableExpNoFresh` factor as `runtime.evalDist (joint >>= ...)`
+sharing the same prefix `joint`. The hypothesis `h_pull` packages the runtime-specific
+factoring step that pulls a pure-returning bind out of `runtime.evalDist`, and is satisfied
+by `withStateOracle`-style runtimes via `SPMFSemantics.withStateOracle_evalDist_bind_pure`
+(see e.g. `FiatShamir.runtime_evalDist_bind_pure`). -/
+lemma unforgeableAdv.advantage_le_unforgeableExpNoFresh
+    {sigAlg : SignatureAlg (OracleComp spec) M PK SK S}
+    (runtime : ProbCompRuntime (OracleComp spec))
+    (h_pull : ∀ {α β : Type} (f : α → β) (mx : OracleComp spec α),
+      runtime.evalDist (mx >>= fun x => pure (f x)) = f <$> runtime.evalDist mx)
+    (adv : unforgeableAdv sigAlg) :
+    adv.advantage runtime ≤ Pr[= true | unforgeableExpNoFresh runtime adv] := by
+  letI : DecidableEq M := Classical.decEq M
+  letI : DecidableEq S := Classical.decEq S
+  unfold unforgeableAdv.advantage unforgeableExp unforgeableExpNoFresh
+  -- Express both as `runtime.evalDist (joint >>= pure ∘ <combiner>)` so that `h_pull`
+  -- pulls the runtime past the final return on both sides.
+  set joint : OracleComp spec (M × QueryLog (M →ₒ S) × Bool) := do
+    let (pk, sk) ← sigAlg.keygen
+    let impl : QueryImpl (spec + (M →ₒ S))
+        (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
+      (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
+        (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
+        sigAlg.signingOracle pk sk
+    let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+      simulateQ impl (adv.main pk)
+    let ((msg, σ), log) ← sim_adv.run
+    let verified ← sigAlg.verify pk msg σ
+    pure (msg, log, verified) with hjoint_def
+  have hExp : (runtime.evalDist do
+        let (pk, sk) ← sigAlg.keygen
+        let impl : QueryImpl (spec + (M →ₒ S))
+            (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
+          (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
+            (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
+            sigAlg.signingOracle pk sk
+        let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+          simulateQ impl (adv.main pk)
+        let ((msg, σ), log) ← sim_adv.run
+        let verified ← sigAlg.verify pk msg σ
+        pure (!log.wasQueried msg && verified)) =
+      (fun t : M × QueryLog (M →ₒ S) × Bool => !t.2.1.wasQueried t.1 && t.2.2) <$>
+        runtime.evalDist joint := by
+    rw [← h_pull]
+    congr 1
+    simp only [hjoint_def, bind_assoc, pure_bind]
+  have hNoFresh : (runtime.evalDist do
+        let (pk, sk) ← sigAlg.keygen
+        let impl : QueryImpl (spec + (M →ₒ S))
+            (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) :=
+          (HasQuery.toQueryImpl (spec := spec) (m := OracleComp spec)).liftTarget
+            (WriterT (QueryLog (M →ₒ S)) (OracleComp spec)) +
+            sigAlg.signingOracle pk sk
+        let sim_adv : WriterT (QueryLog (M →ₒ S)) (OracleComp spec) (M × S) :=
+          simulateQ impl (adv.main pk)
+        let ((msg, σ), _) ← sim_adv.run
+        sigAlg.verify pk msg σ) =
+      (fun t : M × QueryLog (M →ₒ S) × Bool => t.2.2) <$> runtime.evalDist joint := by
+    rw [← h_pull]
+    congr 1
+    simp only [hjoint_def, bind_assoc, pure_bind, bind_pure]
+  rw [hExp, hNoFresh, ← probEvent_eq_eq_probOutput, ← probEvent_eq_eq_probOutput,
+    probEvent_map, probEvent_map]
+  refine probEvent_mono fun _ _ hv => ?_
+  exact ((Bool.and_eq_true _ _).mp hv).2
 
 end unforgeable
 
