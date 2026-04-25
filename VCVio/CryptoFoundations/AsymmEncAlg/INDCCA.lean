@@ -5,7 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 
 import VCVio.CryptoFoundations.AsymmEncAlg.Defs
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.Coercions.SubSpec
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.SimSemantics.Append

@@ -7,10 +7,10 @@ Authors: Quang Dao
 import VCVio.CryptoFoundations.SigmaProtocol
 import VCVio.CryptoFoundations.SignatureAlg
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
-import VCVio.OracleComp.HasQuery
+import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.QueryTracking.RandomOracle.Basic
 import VCVio.OracleComp.QueryTracking.LoggingOracle
-import VCVio.OracleComp.QueryTracking.QueryRuntime
+import VCVio.OracleComp.QueryTracking.QueryCost
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.BundledSemantics
 import Mathlib.Data.FinEnum
@@ -192,7 +192,7 @@ private def fischlinSearchAuxWithUnitCost
     {Stmt Wit Commit PrvState Chal Resp M : Type} {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
     AddWriterT ℕ m (Option (Chal × Resp)) :=
@@ -201,7 +201,7 @@ private def fischlinSearchAuxWithUnitCost
   | ω :: rest => do
       let resp ← monadLift (σ.respond pk sk sc ω)
       AddWriterT.addTell (M := m) 1
-      let h ← monadLift (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩)
+      let h ← monadLift (runtime ⟨pk, msg, comList, i, ω, resp⟩)
       if h.val = 0 then
         pure (some (ω, resp))
       else
@@ -212,7 +212,7 @@ private def fischlinSearchAuxWithUnitCost
         fischlinSearchAuxWithUnitCost σ runtime pk sk sc msg comList i rest newBest
 
 private lemma fischlinSearchAux_eq_withUnitCost
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
     let _ : HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) (AddWriterT ℕ m) :=
@@ -227,11 +227,11 @@ private lemma fischlinSearchAux_eq_withUnitCost
       simp [fischlinSearchAux, fischlinSearchAuxWithUnitCost]
   | cons ω rest ih =>
       simp [fischlinSearchAux, fischlinSearchAuxWithUnitCost,
-        QueryRuntime.withUnitCost_impl, liftM, MonadLiftT.monadLift, ih]
+        QueryImpl.withUnitCost_apply, liftM, MonadLiftT.monadLift, ih]
 
 private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
     [HasEvalSet m]
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b))) :
     AddWriterT.QueryBoundedAboveBy
@@ -246,7 +246,7 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
   | cons ω rest ih =>
       let hashStep : Resp → AddWriterT ℕ m (Option (Chal × Resp)) := fun resp =>
         (AddWriterT.addTell (M := m) 1 : AddWriterT ℕ m PUnit) >>= fun _ =>
-          (monadLift (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩) :
+          (monadLift (runtime ⟨pk, msg, comList, i, ω, resp⟩) :
             AddWriterT ℕ m (Fin (2 ^ b))) >>= fun h =>
               if h.val = 0 then
                 pure (some (ω, resp))
@@ -272,7 +272,7 @@ private lemma fischlinSearchAuxWithUnitCost_queryBoundedAboveBy
       refine AddWriterT.queryBoundedAboveBy_mono
         (AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := rest.length)
           (AddWriterT.queryBoundedAboveBy_monadLift (m := m)
-            (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩))
+            (runtime ⟨pk, msg, comList, i, ω, resp⟩))
           (fun h => ?_))
         (by omega)
       by_cases hh : h.val = 0
@@ -292,7 +292,7 @@ private def fischlinSearchAuxWithAddCost
     {Stmt Wit Commit PrvState Chal Resp M : Type} {rel : Stmt → Wit → Bool} {ρ b : ℕ}
     {m : Type → Type v} [Monad m] [MonadLiftT ProbComp m]
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
     (costFn : (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain → κ) :
@@ -302,7 +302,7 @@ private def fischlinSearchAuxWithAddCost
   | ω :: rest => do
       let resp ← monadLift (σ.respond pk sk sc ω)
       AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, ω, resp⟩)
-      let h ← monadLift (runtime.impl ⟨pk, msg, comList, i, ω, resp⟩)
+      let h ← monadLift (runtime ⟨pk, msg, comList, i, ω, resp⟩)
       if h.val = 0 then
         pure (some (ω, resp))
       else
@@ -314,7 +314,7 @@ private def fischlinSearchAuxWithAddCost
 
 private lemma fischlinSearchAux_eq_withAddCost
     {κ : Type} [AddMonoid κ]
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
     (costFn : (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain → κ) :
@@ -330,13 +330,13 @@ private lemma fischlinSearchAux_eq_withAddCost
       simp [fischlinSearchAux, fischlinSearchAuxWithAddCost]
   | cons ω rest ih =>
       simp [fischlinSearchAux, fischlinSearchAuxWithAddCost,
-        QueryRuntime.withAddCost_impl, liftM, MonadLiftT.monadLift, ih]
+        QueryImpl.withAddCost_apply, liftM, MonadLiftT.monadLift, ih]
 
 private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
     [CanonicallyOrderedAdd κ]
     [HasEvalSet m]
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (sc : PrvState) (msg : M) (comList : List Commit) (i : Fin ρ)
     (challenges : List Chal) (best : Option (Chal × Resp × Fin (2 ^ b)))
     (costFn : (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain → κ) {w : κ}
@@ -355,7 +355,7 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
       let hashStep : Resp → AddWriterT κ m (Option (Chal × Resp)) := fun resp =>
         (AddWriterT.addTell (M := m) (costFn ⟨pk, msg, comList, i, chal, resp⟩) :
           AddWriterT κ m PUnit) >>= fun _ =>
-          (monadLift (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩) :
+          (monadLift (runtime ⟨pk, msg, comList, i, chal, resp⟩) :
             AddWriterT κ m (Fin (2 ^ b))) >>= fun h =>
               if h.val = 0 then
                 pure (some (chal, resp))
@@ -383,7 +383,7 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
         intro _
         have hhash :
             AddWriterT.PathwiseCostAtMost
-              (((monadLift (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩) :
+              (((monadLift (runtime ⟨pk, msg, comList, i, chal, resp⟩) :
                     AddWriterT κ m (Fin (2 ^ b))) >>= fun h =>
                   if h.val = 0 then
                     pure (some (chal, resp))
@@ -397,7 +397,7 @@ private lemma fischlinSearchAuxWithAddCost_pathwiseCostAtMost
               (0 + rest.length • w) := by
           refine AddWriterT.pathwiseCostAtMost_bind (w₁ := 0) (w₂ := rest.length • w)
             (AddWriterT.pathwiseCostAtMost_monadLift
-              (m := m) (runtime.impl ⟨pk, msg, comList, i, chal, resp⟩)) ?_
+              (m := m) (runtime ⟨pk, msg, comList, i, chal, resp⟩)) ?_
           intro h
           by_cases hh : h.val = 0
           · simpa [hh] using
@@ -425,7 +425,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
 /-- Fischlin verification makes at most `ρ` random-oracle queries under unit-cost
 instrumentation. -/
 theorem verify_usesAtMostRhoQueries
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (msg : M) (π : FischlinProof Commit Chal Resp ρ) :
     Queries[ (Fischlin σ hr ρ b S M).verify pk msg π in runtime ] ≤ ρ := by
   classical
@@ -433,14 +433,14 @@ theorem verify_usesAtMostRhoQueries
   let step : Fin ρ → AddWriterT ℕ m (Bool × ℕ) := fun i => do
     let (_, ω_i, resp_i) := π i
     AddWriterT.addTell (M := m) 1
-    let h_i ← monadLift (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, ω_i, resp_i⟩)
+    let h_i ← monadLift (runtime ⟨pk, msg, List.ofFn fun j => (π j).1, i, ω_i, resp_i⟩)
     pure (σ.verify pk (π i).1 ω_i resp_i, h_i.val)
   have hstep : ∀ i, AddWriterT.QueryBoundedAboveBy (step i) 1 := by
     intro i
     change AddWriterT.QueryBoundedAboveBy
       (do
         AddWriterT.addTell (M := m) 1
-        let h_i ← monadLift (runtime.impl
+        let h_i ← monadLift (runtime
           ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
         pure (σ.verify pk (π i).1 (π i).2.1 (π i).2.2, h_i.val))
       1
@@ -449,16 +449,17 @@ theorem verify_usesAtMostRhoQueries
     · intro _
       apply AddWriterT.queryBoundedAboveBy_bind (n₁ := 0) (n₂ := 0)
       · exact AddWriterT.queryBoundedAboveBy_monadLift
-          (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
+          (runtime ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
       · intro _
         exact AddWriterT.queryBoundedAboveBy_pure _
   change AddWriterT.QueryBoundedAboveBy
-      (HasQuery.withUnitCost
+      (HasQuery.Program.withUnitCost
         (fun [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) (AddWriterT ℕ m)] =>
           (Fischlin (m := AddWriterT ℕ m) σ hr ρ b S M).verify pk msg π)
         runtime)
       ρ
-  simpa [Fischlin, HasQuery.withUnitCost, QueryRuntime.withUnitCost_impl, AddWriterT.addTell, step]
+  simpa [Fischlin, HasQuery.Program.withUnitCost, QueryImpl.withUnitCost_apply,
+    AddWriterT.addTell, step]
     using
       (AddWriterT.queryBoundedAboveBy_bind
         (oa := Fin.mOfFn ρ step)
@@ -474,7 +475,7 @@ theorem verify_usesAtMostRhoQueries
 /-- Fischlin verification makes at least `ρ` random-oracle queries under unit-cost
 instrumentation. -/
 theorem verify_usesAtLeastRhoQueries
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (msg : M) (π : FischlinProof Commit Chal Resp ρ) :
     Queries[ (Fischlin σ hr ρ b S M).verify pk msg π in runtime ] ≥ ρ := by
   classical
@@ -482,14 +483,14 @@ theorem verify_usesAtLeastRhoQueries
   let step : Fin ρ → AddWriterT ℕ m (Bool × ℕ) := fun i => do
     let (_, ω_i, resp_i) := π i
     AddWriterT.addTell (M := m) 1
-    let h_i ← monadLift (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, ω_i, resp_i⟩)
+    let h_i ← monadLift (runtime ⟨pk, msg, List.ofFn fun j => (π j).1, i, ω_i, resp_i⟩)
     pure (σ.verify pk (π i).1 ω_i resp_i, h_i.val)
   have hstep : ∀ i, AddWriterT.QueryBoundedBelowBy (step i) 1 := by
     intro i
     change AddWriterT.QueryBoundedBelowBy
       (do
         AddWriterT.addTell (M := m) 1
-        let h_i ← monadLift (runtime.impl
+        let h_i ← monadLift (runtime
           ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
         pure (σ.verify pk (π i).1 (π i).2.1 (π i).2.2, h_i.val))
       1
@@ -498,16 +499,17 @@ theorem verify_usesAtLeastRhoQueries
     · intro _
       apply AddWriterT.queryBoundedBelowBy_bind (n₁ := 0) (n₂ := 0)
       · exact AddWriterT.queryBoundedBelowBy_monadLift
-          (runtime.impl ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
+          (runtime ⟨pk, msg, List.ofFn fun j => (π j).1, i, (π i).2.1, (π i).2.2⟩)
       · intro _
         exact AddWriterT.queryBoundedBelowBy_pure _
   change AddWriterT.QueryBoundedBelowBy
-      (HasQuery.withUnitCost
+      (HasQuery.Program.withUnitCost
         (fun [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) (AddWriterT ℕ m)] =>
           (Fischlin (m := AddWriterT ℕ m) σ hr ρ b S M).verify pk msg π)
         runtime)
       ρ
-  simpa [Fischlin, HasQuery.withUnitCost, QueryRuntime.withUnitCost_impl, AddWriterT.addTell, step]
+  simpa [Fischlin, HasQuery.Program.withUnitCost, QueryImpl.withUnitCost_apply,
+    AddWriterT.addTell, step]
     using
       (AddWriterT.queryBoundedBelowBy_bind
         (oa := Fin.mOfFn ρ step)
@@ -532,7 +534,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
 /-- Fischlin signing makes at most `ρ * |Ω|` random-oracle queries under unit-cost
 instrumentation. -/
 theorem sign_usesAtMostRhoCardOmegaQueries
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (msg : M) :
     Queries[ (Fischlin σ hr ρ b S M).sign pk sk msg in runtime ] ≤ ρ * FinEnum.card Chal := by
   classical
@@ -606,12 +608,12 @@ theorem sign_usesAtMostRhoCardOmegaQueries
         (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits))
         (ρ * FinEnum.card Chal) by
     have hsign :
-        HasQuery.withUnitCost
+        HasQuery.Program.withUnitCost
           (fun [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) (AddWriterT ℕ m)] =>
             (Fischlin (m := AddWriterT ℕ m) σ hr ρ b S M).sign pk sk msg)
           runtime =
           (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits)) := by
-      simp only [Fischlin, HasQuery.withUnitCost, repStep, commitComp]
+      simp only [Fischlin, HasQuery.Program.withUnitCost, repStep, commitComp]
       refine congrArg
         (fun k => commitComp >>= k) ?_
       funext commits
@@ -643,7 +645,7 @@ query carries cost at most `w`. -/
 theorem sign_usesWeightedQueryCostAtMost
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
     [CanonicallyOrderedAdd κ]
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain → κ) (w : κ)
     (hcost : ∀ t, costFn t ≤ w) :
@@ -720,12 +722,12 @@ theorem sign_usesWeightedQueryCostAtMost
         (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits))
         (ρ • (FinEnum.card Chal • w)) by
     have hsign :
-        HasQuery.withAddCost
+        HasQuery.Program.withAddCost
           (fun [HasQuery (fischlinROSpec Stmt Commit Chal Resp ρ b M) (AddWriterT κ m)] =>
             (Fischlin (m := AddWriterT κ m) σ hr ρ b S M).sign pk sk msg)
           runtime costFn =
           (commitComp >>= fun commits => Fin.mOfFn ρ (repStep commits)) := by
-      simp only [Fischlin, HasQuery.withAddCost, repStep, commitComp]
+      simp only [Fischlin, HasQuery.Program.withAddCost, repStep, commitComp]
       refine congrArg
         (fun k => commitComp >>= k) ?_
       funext commits
@@ -766,7 +768,7 @@ random-oracle query is weighted by at most `w`. -/
 theorem sign_expectedQueryCost_le
     {κ : Type} [AddCommMonoid κ] [PartialOrder κ] [IsOrderedAddMonoid κ]
     [CanonicallyOrderedAdd κ]
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (msg : M)
     (costFn : (fischlinROSpec Stmt Commit Chal Resp ρ b M).Domain → κ) (w : κ)
     (val : κ → ENNReal) (hcost : ∀ t, costFn t ≤ w) (hval : Monotone val) :
@@ -795,7 +797,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
 This is the expectation-level counterpart of
 [`Fischlin.sign_usesAtMostRhoCardOmegaQueries`]. -/
 theorem sign_expectedQueries_le_rhoCardOmega
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (sk : Wit) (msg : M) :
     ExpectedQueries[ (Fischlin σ hr ρ b S M).sign pk sk msg in runtime ]
       ≤ ρ * FinEnum.card Chal := by
@@ -816,7 +818,7 @@ variable [FinEnum Chal] [Inhabited Chal] [Inhabited Resp]
 
 /-- Fischlin verification has expected query count exactly `ρ` in the unit-cost runtime model. -/
 theorem verify_expectedQueries_eq_rho
-    (runtime : QueryRuntime (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
+    (runtime : QueryImpl (fischlinROSpec Stmt Commit Chal Resp ρ b M) m)
     (pk : Stmt) (msg : M) (π : FischlinProof Commit Chal Resp ρ) :
     ExpectedQueries[ (Fischlin σ hr ρ b S M).verify pk msg π in runtime ] = ρ := by
   letI : HasEvalSPMF m := HasEvalPMF.toHasEvalSPMF

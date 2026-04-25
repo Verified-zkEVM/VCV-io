@@ -12,11 +12,15 @@ import Mathlib.Algebra.MvPolynomial.Eval
 
 This file defines a type `QueryImpl spec m` to represent implementations
 of queries to `spec` in terms of the monad `m`.
+It also provides the bridge between explicit `QueryImpl`s and the lightweight
+`HasQuery` capability from `VCVio.OracleComp.HasQuery.Basic`.
 -/
 
 open OracleSpec OracleComp
 
 universe u v w
+
+open scoped OracleSpec.PrimitiveQuery
 
 /-- Specifies a way to implement queries to oracles in `spec` using the monad `m`.
 This is defined in terms of a mapping of input elements to oracle outputs,
@@ -36,6 +40,16 @@ instance [spec.Inhabited] [Pure m] : Inhabited (QueryImpl spec m) where
 /-- Two query implementations are the same if they are the same on all query inputs. -/
 @[ext] lemma ext {so so' : QueryImpl spec m}
     (h : ∀ x : spec.Domain, so x = so' x) : so = so' := funext h
+
+/-- View a concrete query implementation as query capability in the same monad. This is useful
+when instantiating a generic `HasQuery` construction directly inside an analysis monad such as
+`StateT σ ProbComp` or `WriterT ω (OracleComp spec)`. -/
+abbrev toHasQuery (impl : QueryImpl spec m) : HasQuery spec m :=
+  ⟨impl⟩
+
+@[simp]
+lemma toHasQuery_query (impl : QueryImpl spec m) (t : spec.Domain) :
+    HasQuery.query (spec := spec) (m := m) (self := toHasQuery impl) t = impl t := rfl
 
 /-- Embed an oracle query into a new functor by applying the implementation to the input value
 before applying the continuation of the element. -/
@@ -164,3 +178,18 @@ end ofFn?
   .ofFn fun t : Fin n => v[t]
 
 end QueryImpl
+
+namespace HasQuery
+
+variable {ι} {spec : OracleSpec ι} {m : Type u → Type v}
+
+/-- Repackage `HasQuery` as a `QueryImpl`, for APIs that still consume explicit oracle
+implementations. -/
+def toQueryImpl [HasQuery spec m] : QueryImpl spec m :=
+  fun t => HasQuery.query t
+
+@[simp]
+lemma toQueryImpl_apply [HasQuery spec m] (t : spec.Domain) :
+    toQueryImpl (spec := spec) (m := m) t = HasQuery.query (spec := spec) (m := m) t := rfl
+
+end HasQuery

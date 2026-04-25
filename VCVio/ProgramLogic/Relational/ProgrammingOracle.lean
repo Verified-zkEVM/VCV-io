@@ -65,13 +65,11 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
     have hL : (so.withProgramming policy t).run (cache, false) =
         (pure (v, (cache, false)) :
           OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-      change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-      simp [hcache]
+      simp [QueryImpl.withProgramming_apply, hcache]
     have hR : (so.withCachingTrackingPolicy policy t).run (cache, false) =
         (pure (v, (cache, false)) :
           OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-      change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-      simp [hcache]
+      simp [QueryImpl.withCachingTrackingPolicy_apply, hcache]
     rw [hL, hR]
   | none =>
     cases hpol : policy t with
@@ -79,13 +77,11 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
       have hL : (so.withProgramming policy t).run (cache, false) =
           (so t >>= fun u' => pure (u', (cache.cacheQuery t u', false)) :
             OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-        simp [hcache, hpol, StateT.run_bind]
+        simp [QueryImpl.withProgramming_apply, hcache, hpol, Functor.map_map]
       have hR : (so.withCachingTrackingPolicy policy t).run (cache, false) =
           (so t >>= fun u' => pure (u', (cache.cacheQuery t u', false)) :
             OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-        simp [hcache, hpol, StateT.run_bind]
+        simp [QueryImpl.withCachingTrackingPolicy_apply, hcache, hpol, Functor.map_map]
       rw [hL, hR]
     | some v =>
       have hne : ∀ (w : spec.Range t) (c : spec.QueryCache),
@@ -97,13 +93,11 @@ private lemma probOutput_withProgramming_eq_withCachingTrackingPolicy_of_not_bad
       have hL_run : (so.withProgramming policy t).run (cache, false) =
           (pure (v, (cache.cacheQuery t v, true)) :
             OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-        simp [hcache, hpol]
+        simp [QueryImpl.withProgramming_apply, hcache, hpol]
       have hR_run : (so.withCachingTrackingPolicy policy t).run (cache, false) =
           (so t >>= fun u' => pure (u', (cache.cacheQuery t u', true)) :
             OracleComp spec (spec.Range t × spec.QueryCache × Bool)) := by
-        change (do let s ← (get : StateT _ (OracleComp spec) _); _).run (cache, false) = _
-        simp [hcache, hpol, StateT.run_bind]
+        simp [QueryImpl.withCachingTrackingPolicy_apply, hcache, hpol, Functor.map_map]
       rw [hL_run, hR_run]
       rw [probOutput_pure, if_neg (hne v _)]
       rw [probOutput_bind_eq_tsum]

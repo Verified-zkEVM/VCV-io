@@ -27,6 +27,8 @@ open OracleSpec OracleComp
 
 universe u v w
 
+open scoped OracleSpec.PrimitiveQuery
+
 variable {ι : Type u} {spec : OracleSpec ι} {α β γ : Type u}
 
 namespace QueryImpl

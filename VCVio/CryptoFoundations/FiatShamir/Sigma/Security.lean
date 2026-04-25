@@ -28,6 +28,8 @@ universe u v
 
 open OracleComp OracleSpec
 
+open scoped OracleSpec.PrimitiveQuery
+
 namespace FiatShamir
 
 variable {Stmt Wit Commit PrvState Chal Resp : Type} {rel : Stmt → Wit → Bool}
