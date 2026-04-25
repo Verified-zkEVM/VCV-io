@@ -14,7 +14,9 @@ import VCVio.ProgramLogic.Relational.Loom.Quantitative
 /-!
 # Unified `@[lspec_spike]` Attribute (spike, attr defs)
 
-**Status: experimental spike. Not exported via `VCVio.lean`.**
+**Status: experimental spike.** Imported by `VCVio.lean` because CI
+checks that every library file is reachable from its umbrella file, but
+not wired into the production `vcstep` / `rvcstep` tactics.
 
 This file defines the attribute and its registry. The demo
 (actual `attribute [lspec_spike] …` registrations) lives in
@@ -124,7 +126,15 @@ private def matchLeBody? (body : Expr) : Option LeForm := Id.run do
 
 /-! ## Key selector -/
 
+/-- Mirror the registration-time normalization done by `Sym.preprocessType`
+on lookup keys and secondary relational keys. -/
+private def preprocessKey (e : Expr) : MetaM Expr := do
+  let e ← Lean.Meta.Sym.unfoldReducible e
+  let e ← Core.betaReduce e
+  Lean.Meta.Sym.etaReduceAll e
+
 private def relRightHead? (y : Expr) : MetaM Name := do
+  let y ← preprocessKey y
   match y.getAppFn.constName? with
   | some n => return n
   | none =>
@@ -176,6 +186,7 @@ def lookup (target : Expr) : MetaM (Array LSpecEntry) := do
         | .unary => true
         | _ => false
   | some (.relational _ x y _) => do
+      let y ← preprocessKey y
       match y.getAppFn.constName? with
       | none => return #[]
       | some goalRightHead =>
@@ -186,13 +197,4 @@ def lookup (target : Expr) : MetaM (Array LSpecEntry) := do
           match e.kind with
           | .relational rh => rh == goalRightHead
           | _ => false
-where
-  /-- Mirror the registration-time normalization done by
-  `Sym.preprocessType` on the lookup key, so `Sym.getMatch` keys
-  agree with the patterns that were inserted. -/
-  preprocessKey (e : Expr) : MetaM Expr := do
-    let e ← Lean.Meta.Sym.unfoldReducible e
-    let e ← Core.betaReduce e
-    Lean.Meta.Sym.etaReduceAll e
-
 end OracleComp.ProgramLogic.Experimental

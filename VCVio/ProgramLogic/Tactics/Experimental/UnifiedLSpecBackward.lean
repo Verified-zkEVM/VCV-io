@@ -9,7 +9,9 @@ import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpec
 /-!
 # Phase 1: backward-rule application for `@[lspec_spike]` (spike)
 
-**Status: experimental spike. Not exported via `VCVio.lean`.**
+**Status: experimental spike.** Imported by `VCVio.lean` because CI
+checks that every library file is reachable from its umbrella file, but
+not wired into the production `vcstep` / `rvcstep` tactics.
 
 This file is Phase 1 of the migration plan tracked in issue #351.
 It builds the smallest piece of machinery on top of

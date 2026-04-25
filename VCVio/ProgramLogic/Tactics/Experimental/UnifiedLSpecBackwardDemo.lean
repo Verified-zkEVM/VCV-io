@@ -11,7 +11,9 @@ import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecDemo
 /-!
 # Phase 1: backward-rule demo for `@[lspec_spike]` (spike)
 
-**Status: experimental spike. Not exported via `VCVio.lean`.**
+**Status: experimental spike.** Imported by `VCVio.lean` because CI
+checks that every library file is reachable from its umbrella file, but
+not wired into the production `vcstep` / `rvcstep` tactics.
 
 This file demonstrates that `tryApplyMatching` from
 `UnifiedLSpecBackward.lean` can actually **close** a goal end-to-end,
@@ -79,7 +81,7 @@ run_meta demoBackward
 unary goal type:  0 ≤ Std.Do'.wp (pure 7) (fun x ↦ 0) epost⟨⟩
   → tryApplyMatching applied: OracleComp.ProgramLogic.triple_pure
       remaining subgoals: 0
-relational goal type:  0 ≤ Std.Do'.rwp (pure 1) (pure 2) (fun x x_1 ↦ 0) epost⟨⟩ epost⟨⟩
+relational goal type:  0 ≤ Std.Do'.rwp (pure 1) Demo.relRightAlias (fun x x_1 ↦ 0) epost⟨⟩ epost⟨⟩
   → tryApplyMatching applied: Std.Do'.RelWP.rwp_pure
       remaining subgoals: 0
 ```
@@ -93,9 +95,9 @@ kind, with no remaining subgoals.  Concretely:
   `x := 7`, `post := fun _ => 0`, and the LHS β-reduces to `0`.
 
 * `rwp_pure : post a b ⊑ rwp (pure a) (pure b) post epost₁ epost₂`
-  needs no bridging (already in `⊑`-form).  Unification fixes
-  `a := 1`, `b := 2`, `post := fun _ _ => 0`, and the LHS β-reduces
-  to `0`.
+  needs no bridging (already in `⊑`-form).  Unification sees through
+  `relRightAlias`, fixes `a := 1`, `b := 2`, `post := fun _ _ => 0`,
+  and the LHS β-reduces to `0`.
 
 This is the smallest end-to-end proof that the unified `@[lspec_spike]`
 registry can support a backward-chaining tactic with no per-kind

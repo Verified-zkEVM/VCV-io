@@ -9,7 +9,9 @@ import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpec
 /-!
 # Unified `@[lspec_spike]` Attribute (spike, demo)
 
-**Status: experimental spike. Not exported via `VCVio.lean`.**
+**Status: experimental spike.** Imported by `VCVio.lean` because CI
+checks that every library file is reachable from its umbrella file, but
+not wired into the production `vcstep` / `rvcstep` tactics.
 
 This file demonstrates Route A from the relational-tactic-alignment
 investigation: a *single* attribute, indexed by program head, that
@@ -107,10 +109,18 @@ def unaryProbe : (0 : ENNReal) ≤
       Std.Do'.EPost.nil.mk := by
   exact zero_le _
 
+/-- Reducible alias used to ensure relational right-head filtering sees
+through definitionally equal wrappers. -/
+abbrev relRightAlias : ProbComp ℕ := pure 2
+
 /-- Bench: the *type* of this term is the relational `⊑`-form goal we
-want to look up against. -/
+want to look up against.
+
+The right program intentionally uses `relRightAlias`, so lookup must
+normalize the right-hand side before applying the secondary right-head
+filter. -/
 def relProbe : (0 : ENNReal) ≤
-    Std.Do'.rwp (pure 1 : ProbComp ℕ) (pure 2 : ProbComp ℕ)
+    Std.Do'.rwp (pure 1 : ProbComp ℕ) relRightAlias
       (fun _ _ => (0 : ENNReal)) Std.Do'.EPost.nil.mk Std.Do'.EPost.nil.mk := by
   exact zero_le _
 
@@ -148,7 +158,7 @@ unified-lspec-spike: 2 registered entries
 unary goal type:  0 ≤ Std.Do'.wp (pure 7) (fun x ↦ 0) epost⟨⟩
   → unary lookup hits: 1
       OracleComp.ProgramLogic.triple_pure
-relational goal type:  0 ≤ Std.Do'.rwp (pure 1) (pure 2) (fun x x_1 ↦ 0) epost⟨⟩ epost⟨⟩
+relational goal type:  0 ≤ Std.Do'.rwp (pure 1) relRightAlias (fun x x_1 ↦ 0) epost⟨⟩ epost⟨⟩
   → relational lookup hits: 1
       Std.Do'.RelWP.rwp_pure
 ```
@@ -165,7 +175,8 @@ The two key claims of the spike are confirmed:
    each goal recovers exactly the matching-kind entries:
 
    * The unary `≤ Std.Do'.wp` goal returns only `triple_pure`.
-   * The relational `≤ Std.Do'.rwp` goal returns only `rwp_pure`.
+   * The relational `≤ Std.Do'.rwp` goal returns only `rwp_pure`, even
+     when the right program is wrapped in a reducible alias.
 
 The code in `UnifiedLSpec.lean` is ~190 lines including comments;
 real migration to this kernel would replace `@[vcspec]` and friends
