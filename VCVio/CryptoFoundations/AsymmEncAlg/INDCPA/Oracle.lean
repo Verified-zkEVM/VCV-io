@@ -42,12 +42,13 @@ def IND_CPA_adversary (encAlg : AsymmEncAlg ProbComp M PK SK C) :=
   PK → OracleComp encAlg.IND_CPA_oracleSpec Bool
 
 /-- An IND-CPA adversary `MakesAtMostQueries q` when it issues at most `q` total fresh queries
-to the challenge oracle, regardless of public key. Uniform-sampling queries are unrestricted. -/
+to the challenge oracle, regardless of public key. Uniform-sampling queries are unrestricted.
+
+Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the predicate
+selecting the right (challenge-oracle) component of the index sum. -/
 def IND_CPA_adversary.MakesAtMostQueries {encAlg : AsymmEncAlg ProbComp M PK SK C}
     (adversary : encAlg.IND_CPA_adversary) (q : ℕ) : Prop :=
-  ∀ pk, (adversary pk).IsQueryBound q
-    (fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
-    (fun t n => match t with | .inl _ => n | .inr _ => n - 1)
+  ∀ pk, (adversary pk).IsQueryBoundP (fun t => Sum.isRight t = true) q
 
 /-- Cache state for the cached left/right oracle implementations. -/
 abbrev IND_CPA_Cache (_encAlg : AsymmEncAlg ProbComp M PK SK C) :=
@@ -296,29 +297,15 @@ theorem IND_CPA_run'_evalDist_eq_queryImpl'_of_bounded_eq
     (pk : PK) (b : Bool) (q : ℕ)
     {α : Type} (comp : OracleComp encAlg'.IND_CPA_oracleSpec α)
     (budget : ℕ)
-    (hbound : comp.IsQueryBound budget
-      (fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
-      (fun t n => match t with | .inl _ => n | .inr _ => n - 1))
+    (hbound : comp.IsQueryBoundP (fun t => Sum.isRight t = true) budget)
     (cache : (M × M →ₒ C).QueryCache) (n : ℕ) (hn : n + budget ≤ q) :
     evalDist ((simulateQ (implCounted pk b q) comp).run' (cache, n)) =
       evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl' pk b) comp).run' cache) := by
   set canQuery : encAlg'.IND_CPA_oracleSpec.Domain → ℕ → Prop :=
-    fun t n => match t with | .inl _ => True | .inr _ => 0 < n
+    fun t n => ¬ (Sum.isRight t = true) ∨ 0 < n with hcanQuery
   set cost : encAlg'.IND_CPA_oracleSpec.Domain → ℕ → ℕ :=
-    fun t n => match t with | .inl _ => n | .inr _ => n - 1
-  have hbound' : comp.IsQueryBound budget canQuery cost := by
-    refine (isQueryBound_congr
-      (oa := comp)
-      (canQuery₁ := fun t n => match t with | .inl _ => True | .inr _ => 0 < n)
-      (canQuery₂ := canQuery)
-      (cost₁ := fun t n => match t with | .inl _ => n | .inr _ => n - 1)
-      (cost₂ := cost)
-      (hcan := ?_) (hcost := ?_)).1 ?_
-    · intro t n
-      cases t <;> simp [canQuery]
-    · intro t n
-      cases t <;> simp [cost]
-    · exact hbound
+    fun t n => if Sum.isRight t = true then n - 1 else n with hcost
+  have hbound' : comp.IsQueryBound budget canQuery cost := hbound
   have hrun :
       evalDist ((simulateQ (implCounted pk b q) comp).run (cache, n)) =
       evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl'_counted pk b) comp).run (cache, n)) := by

@@ -181,19 +181,13 @@ theorem euf_cma_to_nma
       | some v =>
           simp [roSim, hs, nmaHashQueryBound]
       | none =>
-          simpa [roSim, hs] using
-            ((OracleComp.isQueryBound_map_iff
+          simpa [roSim, hs, nmaHashQueryBound] using
+            (OracleComp.isQueryBoundP_map_iff
                 (oa := (fwd (.inr mc)).run s)
                 (f := fun a : Chal × spec.QueryCache =>
                   (a.1, a.2.cacheQuery (.inr mc) a.1))
-                (b := 1)
-                (canQuery := fun t b => match t with
-                  | .inl _ => True
-                  | .inr _ => 0 < b)
-                (cost := fun t b => match t with
-                  | .inl _ => b
-                  | .inr _ => b - 1)).2
-              (hfwd (.inr mc) s))
+                (n := 1) (p := fun t => Sum.isRight t = true)).2
+              (hfwd (.inr mc) s)
     have hsig :
         ∀ (msg : M) (s : spec.QueryCache),
           nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
@@ -209,7 +203,7 @@ theorem euf_cma_to_nma
       have htranscript :
           nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
             (oa := (simulateQ unifSim (simTranscript pk)).run s) 0 := by
-        simpa [nmaHashQueryBound] using
+        simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using
           (OracleComp.IsQueryBound.simulateQ_run_of_step
             (h := hsource) (combine := Nat.add) (mapBudget := fun _ => 0)
             (stepBudget := fun _ _ => 0) (impl := unifSim)
@@ -218,25 +212,26 @@ theorem euf_cma_to_nma
               have h1' :
                   nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
                     (oa := oa') b₁ := by
-                simpa [nmaHashQueryBound] using h1
+                simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using h1
               have h2' : ∀ x,
                   nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
                     (oa := ob x) b₂ := by
                 intro x
-                simpa [nmaHashQueryBound] using h2 x
-              simpa [nmaHashQueryBound] using
+                simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using h2 x
+              simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using
                 (nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
                   (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
             )
             (hstep := by
               intro t b s' ht
-              simpa [unifSim] using hfwd (.inl t) s')
+              simpa [unifSim, nmaHashQueryBound, OracleComp.IsQueryBoundP] using
+                hfwd (.inl t) s')
             (hcombine := by
               intro t b ht
               simp)
             (s := s))
       simpa [sigSim, nmaHashQueryBound] using
-        ((OracleComp.isQueryBound_map_iff
+        (OracleComp.isQueryBoundP_map_iff
             (oa := (simulateQ unifSim (simTranscript pk)).run s)
             (f := fun a : (Commit × Chal × Resp) × spec.QueryCache =>
               match a.2 (.inr (msg, a.1.1)) with
@@ -244,13 +239,7 @@ theorem euf_cma_to_nma
               | none =>
                   ((a.1.1, a.1.2.2),
                     QueryCache.cacheQuery a.2 (.inr (msg, a.1.1)) a.1.2.1))
-            (b := 0)
-            (canQuery := fun t b => match t with
-              | .inl _ => True
-              | .inr _ => 0 < b)
-            (cost := fun t b => match t with
-              | .inl _ => b
-              | .inr _ => b - 1)).2 htranscript)
+            (n := 0) (p := fun t => Sum.isRight t = true)).2 htranscript
     have hstep :
         ∀ t b s,
           (match t, b with
@@ -294,7 +283,7 @@ theorem euf_cma_to_nma
               omega
       | inr msg =>
           simp [stepBudget]
-    simpa [nmaHashQueryBound, signHashQueryBound] using
+    simpa [nmaHashQueryBound, signHashQueryBound, OracleComp.IsQueryBoundP] using
       (OracleComp.IsQueryBound.simulateQ_run_of_step
         (h := _hQ pk) (combine := Nat.add) (mapBudget := Prod.snd)
         (stepBudget := stepBudget) (impl := baseSim + sigSim pk)
@@ -303,13 +292,13 @@ theorem euf_cma_to_nma
           have h1' :
               nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
                 (oa := oa') b₁ := by
-            simpa [nmaHashQueryBound] using h1
+            simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using h1
           have h2' : ∀ x,
               nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
                 (oa := ob x) b₂ := by
             intro x
-            simpa [nmaHashQueryBound] using h2 x
-          simpa [nmaHashQueryBound] using
+            simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using h2 x
+          simpa [nmaHashQueryBound, OracleComp.IsQueryBoundP] using
             (hbind (oa := oa') (ob := ob) (Q₁ := b₁) (Q₂ := b₂) h1' h2')
         )
         (hstep := by
@@ -319,11 +308,14 @@ theorem euf_cma_to_nma
           | inl t =>
               cases t with
               | inl n =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hfwd (.inl n) s
+                  simpa [nmaHashQueryBound, baseSim, stepBudget,
+                    OracleComp.IsQueryBoundP] using hfwd (.inl n) s
               | inr mc =>
-                  simpa [nmaHashQueryBound, baseSim, stepBudget] using hro mc s
+                  simpa [nmaHashQueryBound, baseSim, stepBudget,
+                    OracleComp.IsQueryBoundP] using hro mc s
           | inr msg =>
-              simpa [nmaHashQueryBound, stepBudget] using hsig msg s)
+              simpa [nmaHashQueryBound, stepBudget,
+                OracleComp.IsQueryBoundP] using hsig msg s)
         (hcombine := by
           intro t b ht
           rcases b with ⟨qS', qH'⟩

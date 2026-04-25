@@ -32,16 +32,17 @@ section bounds
 variable (M : Type)
 
 /-- Structural bound that counts only random-oracle queries in a Fiat-Shamir
-EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted. -/
+EUF-CMA adversary. Uniform-sampling and signing-oracle queries are unrestricted.
+
+Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the predicate
+selecting the nested `.inl (.inr _)` (random-oracle) component of the index sum. -/
 def hashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (M × Commit →ₒ Chal)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => True
-      | .inl (.inr _) => 0 < b)
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => b
-      | .inl (.inr _) => b - 1)
+  OracleComp.IsQueryBoundP oa
+    (fun t =>
+      (match t with
+        | .inl (.inr _) => true
+        | _ => false) = true) Q
 
 /-- Structural query bound for Fiat-Shamir EUF-CMA adversaries that tracks both
 signing-oracle queries (`qS`) and random-oracle queries (`qH`).
@@ -60,16 +61,13 @@ def signHashQueryBound {S' α : Type}
       | .inr _, (qS', qH') => (qS' - 1, qH'))
 
 /-- Structural bound on random-oracle queries for an NMA adversary (no signing oracle).
-Uniform-sampling queries are unrestricted. -/
+Uniform-sampling queries are unrestricted.
+
+Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the predicate
+selecting the right (random-oracle) component of the index sum. -/
 def nmaHashQueryBound {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl _ => True
-      | .inr _ => 0 < b)
-    (fun t b => match t with
-      | .inl _ => b
-      | .inr _ => b - 1)
+  OracleComp.IsQueryBoundP oa (fun t => Sum.isRight t = true) Q
 
 @[simp]
 lemma nmaHashQueryBound_query_bind_iff {α : Type}
@@ -87,29 +85,8 @@ lemma nmaHashQueryBound_query_bind_iff {α : Type}
           (oa := oa u) (match t with
             | .inl _ => Q
             | .inr _ => Q - 1) := by
-  cases t with
-  | inl n =>
-      simpa [nmaHashQueryBound] using
-        (OracleComp.isQueryBound_query_bind_iff
-          (spec := unifSpec + (M × Commit →ₒ Chal))
-          (α := α) (t := Sum.inl n) (mx := oa) (b := Q)
-          (canQuery := fun t b => match t with
-            | .inl _ => True
-            | .inr _ => 0 < b)
-          (cost := fun t b => match t with
-            | .inl _ => b
-            | .inr _ => b - 1))
-  | inr mc =>
-      simpa [nmaHashQueryBound] using
-        (OracleComp.isQueryBound_query_bind_iff
-          (spec := unifSpec + (M × Commit →ₒ Chal))
-          (α := α) (t := Sum.inr mc) (mx := oa) (b := Q)
-          (canQuery := fun t b => match t with
-            | .inl _ => True
-            | .inr _ => 0 < b)
-          (cost := fun t b => match t with
-            | .inl _ => b
-            | .inr _ => b - 1))
+  simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_bind_iff]
+  cases t <;> simp
 
 @[simp]
 lemma nmaHashQueryBound_query_iff
@@ -119,45 +96,15 @@ lemma nmaHashQueryBound_query_iff
       match t with
       | .inl _ => True
       | .inr _ => 0 < Q := by
-  cases t with
-  | inl n =>
-      simpa [nmaHashQueryBound] using
-        (OracleComp.isQueryBound_query_iff
-          (spec := unifSpec + (M × Commit →ₒ Chal))
-          (t := Sum.inl n) (b := Q)
-          (canQuery := fun t b => match t with
-            | .inl _ => True
-            | .inr _ => 0 < b)
-          (cost := fun t b => match t with
-            | .inl _ => b
-            | .inr _ => b - 1))
-  | inr mc =>
-      simpa [nmaHashQueryBound] using
-        (OracleComp.isQueryBound_query_iff
-          (spec := unifSpec + (M × Commit →ₒ Chal))
-          (t := Sum.inr mc) (b := Q)
-          (canQuery := fun t b => match t with
-            | .inl _ => True
-            | .inr _ => 0 < b)
-          (cost := fun t b => match t with
-            | .inl _ => b
-            | .inr _ => b - 1))
+  simp only [nmaHashQueryBound, OracleComp.isQueryBoundP_query_iff]
+  cases t <;> simp
 
 lemma nmaHashQueryBound_mono {α : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α} {Q₁ Q₂ : ℕ}
     (h : nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₁)
     (hQ : Q₁ ≤ Q₂) :
-    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ := by
-  induction oa using OracleComp.inductionOn generalizing Q₁ Q₂ with
-  | pure _ =>
-      trivial
-  | query_bind t mx ih =>
-      rw [nmaHashQueryBound_query_bind_iff] at h ⊢
-      cases t with
-      | inl n =>
-          exact ⟨trivial, fun u => ih u (h.2 u) hQ⟩
-      | inr mc =>
-          exact ⟨Nat.lt_of_lt_of_le h.1 hQ, fun u => ih u (h.2 u) (Nat.sub_le_sub_right hQ 1)⟩
+    nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := oa) Q₂ :=
+  OracleComp.IsQueryBoundP.mono h hQ
 
 lemma nmaHashQueryBound_bind {α β : Type}
     {oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α}
@@ -167,24 +114,8 @@ lemma nmaHashQueryBound_bind {α β : Type}
     (h2 : ∀ x,
       nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal) (oa := ob x) Q₂) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (oa := oa >>= ob) (Q₁ + Q₂) := by
-  induction oa using OracleComp.inductionOn generalizing Q₁ with
-  | pure x =>
-      simpa [pure_bind] using
-        (nmaHashQueryBound_mono (M := M) (Commit := Commit) (Chal := Chal)
-          (oa := ob x) (Q₁ := Q₂) (Q₂ := Q₁ + Q₂) (h := h2 x) (hQ := by omega))
-  | query_bind t mx ih =>
-      rw [nmaHashQueryBound_query_bind_iff] at h1
-      rw [bind_assoc, nmaHashQueryBound_query_bind_iff]
-      cases t with
-      | inl n =>
-          refine ⟨trivial, fun u => ?_⟩
-          simpa using ih u (h1.2 u)
-      | inr mc =>
-          refine ⟨Nat.add_pos_left h1.1 _, fun u => ?_⟩
-          have h3 := ih u (h1.2 u)
-          have hEq : (Q₁ - 1) + Q₂ = Q₁ + Q₂ - 1 := by omega
-          simpa [hEq] using h3
+      (oa := oa >>= ob) (Q₁ + Q₂) :=
+  OracleComp.isQueryBoundP_bind h1 (fun x _ => h2 x)
 
 lemma nmaHashQueryBound_liftComp_zero {α : Type}
     (oa : ProbComp α) :

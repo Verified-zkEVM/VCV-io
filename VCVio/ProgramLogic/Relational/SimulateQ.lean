@@ -1292,9 +1292,7 @@ private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
     (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (p : σ × Bool) :
     tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p)
       ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
@@ -1332,17 +1330,17 @@ private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
             linarith
           exact le_trans h_tv_le_one h_target_ge_one
       | false =>
-          rw [isQueryBound_query_bind_iff] at h_qb
+          rw [isQueryBoundP_query_bind_iff] at h_qb
           obtain ⟨h_can, h_cont⟩ := h_qb
           by_cases hSt : S t
           · -- Costly query: use the existing helper with budget `qS`, decrementing to `qS - 1`.
-            simp only [hSt, if_true] at h_can h_cont
-            have hqS_pos : 0 < qS := h_can
+            simp only [if_pos hSt] at h_cont
+            have hqS_pos : 0 < qS := h_can.resolve_left (· hSt)
             exact tvDist_simulateQ_run_query_bind_le impl₁ impl₂ hε h_step_tv_global
               t cont hqS_pos
               (fun u p' => ih u (h_cont u) p') s
           · -- Free query: impls equal here; preserve the `qS` budget through the recursion.
-            simp only [hSt, if_false] at h_can h_cont
+            simp only [if_neg hSt] at h_cont
             exact tvDist_simulateQ_run_free_query_bind_le impl₁ impl₂ hε t
               (h_step_eq_nS t hSt) cont
               (fun u p' => ih u (h_cont u) p') s
@@ -1352,8 +1350,8 @@ private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
 Like `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`, but the per-step ε bound
 applies only to queries `t` satisfying a designated predicate `S` (the "costly" queries),
 and the impls are pointwise equal on `¬ S` (the "free" queries). The bound counts only
-the S-queries (via `IsQueryBound` parameterized to decrement only on S), giving the tight
-`qS · ε` instead of the trivial `q_total · ε` from the uniform-ε lemma.
+the S-queries (via `IsQueryBoundP oa S qS`), giving the tight `qS · ε` instead of the
+trivial `q_total · ε` from the uniform-ε lemma.
 
 The intended use is for cryptographic reductions: e.g., for Fiat-Shamir signing-oracle
 swaps, the "costly" queries are signing queries (HVZK gives per-query ε bound) and the
@@ -1370,9 +1368,7 @@ theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
     (h_mono₁ : ∀ (t : ι) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (s₀ : σ) :
     tvDist ((simulateQ impl₁ oa).run' (s₀, false))
         ((simulateQ impl₂ oa).run' (s₀, false))

@@ -881,13 +881,14 @@ theorem almostComplete (hρ : 0 < ρ) (hc : σ.PerfectlyComplete) (msg : M) :
 /-! ### Online Extraction / Knowledge Soundness -/
 
 /-- Structural query bound: the computation makes at most `Q` total hash oracle queries
-(`Sum.inr` queries), with no restriction on `unifSpec` queries (`Sum.inl`). -/
+(`Sum.inr` queries), with no restriction on `unifSpec` queries (`Sum.inl`).
+
+Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the predicate
+selecting the right (random-oracle) component of the index sum. -/
 def ROQueryBound {α : Type}
     (oa : OracleComp (unifSpec + fischlinROSpec Stmt Commit Chal Resp ρ b M) α)
     (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with | .inl _ => True | .inr _ => 0 < b)
-    (fun t b => match t with | .inl _ => b | .inr _ => b - 1)
+  OracleComp.IsQueryBoundP oa (fun t => Sum.isRight t = true) Q
 
 /-- A cheating prover (knowledge soundness adversary) for the Fischlin transform.
 The adversary receives a statement and message, has access to both the random oracle
