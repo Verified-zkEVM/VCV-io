@@ -55,6 +55,18 @@ lemma replicate_succ_bind :
       let xs ← replicate n oa
       pure (x :: xs)) := rfl
 
+/-- The tail-recursive `replicateTR` agrees with the recursive `replicate`. The
+`@[simp]` annotation lets every later proof about `replicateTR` reduce to the
+recursive form automatically. -/
+@[simp]
+lemma replicateTR_eq_replicate : replicateTR n oa = replicate n oa := by
+  change (List.replicateTR n ()).mapM (fun _ => oa) = replicate n oa
+  rw [show List.replicateTR n () = List.replicate n () from
+    congrFun (congrFun (congrFun List.replicate_eq_replicateTR.symm Unit) n) ()]
+  induction n with
+  | zero => simp
+  | succ n ih => simp [List.replicate, List.mapM_cons, ih]
+
 lemma replicate_succ : replicate (n + 1) oa = List.cons <$> oa <*> replicate n oa := by
   simp [replicate_succ_bind, seq_eq_bind_map, map_eq_bind_pure_comp, bind_assoc, Function.comp]
 
