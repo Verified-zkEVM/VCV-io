@@ -29,6 +29,119 @@ register_option vcvio.vcgen.traceSteps : Bool := {
   descr := "Emit opt-in trace messages for chosen vcgen/rvcgen planned steps."
 }
 
+register_option vcvio.vcgen.time : Bool := {
+  defValue := false
+  descr := "Emit cumulative timing for internal vcgen/rvcgen planner phases."
+}
+
+structure VCGenTimingData where
+  previewNs : UInt64 := 0
+  structuralNs : UInt64 := 0
+  wpStepNs : UInt64 := 0
+  probPlannerNs : UInt64 := 0
+  localHintNs : UInt64 := 0
+  registeredNs : UInt64 := 0
+  closeNs : UInt64 := 0
+  passNs : UInt64 := 0
+  finishNs : UInt64 := 0
+  deriving Inhabited
+
+initialize vcGenTimingRef : IO.Ref VCGenTimingData ← IO.mkRef {}
+
+def timeNs {m : Type → Type} {α : Type} [Monad m] [MonadLiftT BaseIO m]
+    (k : m α) : m (α × UInt64) := do
+  let start ← IO.monoNanosNow
+  let a ← k
+  let stop ← IO.monoNanosNow
+  return (a, (stop - start).toUInt64)
+
+private def addVCGenTiming (f : VCGenTimingData → VCGenTimingData) : BaseIO Unit :=
+  vcGenTimingRef.modify f
+
+private def addPreviewTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with previewNs := d.previewNs + ns }
+
+private def addStructuralTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with structuralNs := d.structuralNs + ns }
+
+private def addWpStepTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with wpStepNs := d.wpStepNs + ns }
+
+private def addProbPlannerTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with probPlannerNs := d.probPlannerNs + ns }
+
+private def addLocalHintTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with localHintNs := d.localHintNs + ns }
+
+private def addRegisteredTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with registeredNs := d.registeredNs + ns }
+
+private def addCloseTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with closeNs := d.closeNs + ns }
+
+private def addPassTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with passNs := d.passNs + ns }
+
+private def addFinishTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with finishNs := d.finishNs + ns }
+
+def withVCGenTiming {α : Type} (add : UInt64 → BaseIO Unit) (k : TacticM α) : TacticM α := do
+  if vcvio.vcgen.time.get (← getOptions) then
+    let (a, ns) ← timeNs k
+    add ns
+    return a
+  else
+    k
+
+def withVCGenPreviewTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addPreviewTime k
+
+def withVCGenStructuralTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addStructuralTime k
+
+def withVCGenWpStepTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addWpStepTime k
+
+def withVCGenProbPlannerTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addProbPlannerTime k
+
+def withVCGenLocalHintTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addLocalHintTime k
+
+def withVCGenRegisteredTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addRegisteredTime k
+
+def withVCGenCloseTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addCloseTime k
+
+def withVCGenPassTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addPassTime k
+
+def withVCGenFinishTiming {α : Type} (k : TacticM α) : TacticM α :=
+  withVCGenTiming addFinishTime k
+
+def resetVCGenTimingIfEnabled : TacticM Unit := do
+  if vcvio.vcgen.time.get (← getOptions) then
+    vcGenTimingRef.set {}
+
+private def formatNsMs (ns : UInt64) : String :=
+  s!"{ns / 1000000}ms"
+
+def logVCGenTimingIfEnabled (label : String) : TacticM Unit := do
+  if vcvio.vcgen.time.get (← getOptions) then
+    let d ← vcGenTimingRef.get
+    logInfo m!"[{label} timing] preview={formatNsMs d.previewNs}, \
+      structural={formatNsMs d.structuralNs}, wpStep={formatNsMs d.wpStepNs}, \
+      probPlanner={formatNsMs d.probPlannerNs}, localHints={formatNsMs d.localHintNs}, \
+      registered={formatNsMs d.registeredNs}, close={formatNsMs d.closeNs}, \
+      passes={formatNsMs d.passNs}, finish={formatNsMs d.finishNs}"
+
+def withVCGenRunTiming {α : Type} (label : String) (k : TacticM α) : TacticM α := do
+  resetVCGenTimingIfEnabled
+  let a ← k
+  logVCGenTimingIfEnabled label
+  return a
+
 structure PlannedStep where
   label : String
   replayText : String
@@ -47,13 +160,13 @@ def formatCandidateNames (names : Array Name) : String :=
 
 def previewAction (action : TacticM Bool) : TacticM Bool := do
   let saved ← saveState
-  let ok ← action
+  let ok ← withVCGenPreviewTiming action
   saved.restore
   return ok
 
 def previewActionWithGoals (action : TacticM Bool) : TacticM PreviewResult := do
   let saved ← saveState
-  let ok ← action
+  let ok ← withVCGenPreviewTiming action
   let goalCount := (← getGoals).length
   saved.restore
   return { ok, goalCount }
@@ -299,12 +412,12 @@ def runBoundedPasses (label : String) (step : TacticM Bool) : TacticM Nat := do
   let maxPasses := vcvio.vcgen.maxPasses.get (← getOptions)
   let mut passes := 0
   while passes < maxPasses do
-    if ← step then
+    if ← withVCGenPassTiming step then
       passes := passes + 1
     else
       return passes
   let saved ← saveState
-  let more ← step
+  let more ← withVCGenPassTiming step
   saved.restore
   if more then
     throwError m!
@@ -318,13 +431,13 @@ def runBoundedPassesCollect {α : Type} (label : String)
   let mut passes := 0
   let mut batches := #[]
   while passes < maxPasses do
-    let batch ← step
+    let batch ← withVCGenPassTiming step
     if batch.isEmpty then
       return batches
     passes := passes + 1
     batches := batches.push batch
   let saved ← saveState
-  let more ← step
+  let more ← withVCGenPassTiming step
   saved.restore
   if !more.isEmpty then
     throwError m!

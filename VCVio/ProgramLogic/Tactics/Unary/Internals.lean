@@ -230,7 +230,7 @@ def runVCGenClosePass : TacticM Bool := do
   let mut newGoals : List MVarId := []
   for goal in goals do
     setGoals [goal]
-    if ← tryCloseSpecGoalFinal then
+    if ← withVCGenCloseTiming tryCloseSpecGoalFinal then
       progress := true
       newGoals := newGoals ++ (← getGoals)
     else
@@ -328,24 +328,25 @@ def runLoopInvExplicit (inv : TSyntax `term) : TacticM Bool := do
       return false
 
 /-- Find the local hypotheses that work as explicit bind cuts. -/
-def findHoareCutHintCandidates : TacticM (Array Name) := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return #[]
-  let comp ← whnfReducible (← instantiateMVars comp)
-  unless isBindExpr comp do return #[]
-  let mut found : Array Name := #[]
-  for localDecl in ← getLCtx do
-    unless localDecl.isImplementationDetail do
-      let name := localDecl.userName
-      if isUsableBinderName name then
-        let type ← instantiateMVars localDecl.type
-        unless type.isSort do
-          let saved ← saveState
-          let ok ← runHoareStepRuleUsing (mkIdent name)
-          saved.restore
-          if ok then
-            found := found.push name
-  return found
+def findHoareCutHintCandidates : TacticM (Array Name) :=
+  withVCGenLocalHintTiming <| withMainContext do
+    let target ← instantiateMVars (← getMainTarget)
+    let some comp := tripleGoalComp? target | return #[]
+    let comp ← whnfReducible (← instantiateMVars comp)
+    unless isBindExpr comp do return #[]
+    let mut found : Array Name := #[]
+    for localDecl in ← getLCtx do
+      unless localDecl.isImplementationDetail do
+        let name := localDecl.userName
+        if isUsableBinderName name then
+          let type ← instantiateMVars localDecl.type
+          unless type.isSort do
+            let saved ← saveState
+            let ok ← runHoareStepRuleUsing (mkIdent name)
+            saved.restore
+            if ok then
+              found := found.push name
+    return found
 
 /-- Find the unique local hypothesis that works as an explicit bind cut.
 Returns `none` if there are 0 or ≥ 2 viable candidates. -/
@@ -355,25 +356,26 @@ def findUniqueHoareCutHint? : TacticM (Option Name) := do
     if found.size = 1 then some first else none
 
 /-- Find the local hypotheses that work as explicit loop invariants. -/
-def findLoopInvHintCandidates : TacticM (Array Name) := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return #[]
-  let comp ← whnfReducible (← instantiateMVars comp)
-  unless isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp do
-    return #[]
-  let mut found : Array Name := #[]
-  for localDecl in ← getLCtx do
-    unless localDecl.isImplementationDetail do
-      let name := localDecl.userName
-      if isUsableBinderName name then
-        let type ← instantiateMVars localDecl.type
-        unless type.isSort do
-          let saved ← saveState
-          let ok ← runLoopInvExplicit (mkIdent name)
-          saved.restore
-          if ok then
-            found := found.push name
-  return found
+def findLoopInvHintCandidates : TacticM (Array Name) :=
+  withVCGenLocalHintTiming <| withMainContext do
+    let target ← instantiateMVars (← getMainTarget)
+    let some comp := tripleGoalComp? target | return #[]
+    let comp ← whnfReducible (← instantiateMVars comp)
+    unless isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp do
+      return #[]
+    let mut found : Array Name := #[]
+    for localDecl in ← getLCtx do
+      unless localDecl.isImplementationDetail do
+        let name := localDecl.userName
+        if isUsableBinderName name then
+          let type ← instantiateMVars localDecl.type
+          unless type.isSort do
+            let saved ← saveState
+            let ok ← runLoopInvExplicit (mkIdent name)
+            saved.restore
+            if ok then
+              found := found.push name
+    return found
 
 /-- Find the unique local hypothesis that works as an explicit loop invariant.
 Returns `none` if there are 0 or ≥ 2 viable candidates. -/
@@ -427,29 +429,31 @@ makes progress on the current goal. Prefers direct discrimination-tree hits on
 the goal's `comp`, falling back to kind-matched entries filtered by structural
 compatibility. -/
 def findRegisteredVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
-  for tier in ← registeredVCGenRuleCandidateTiers do
-    let mut found : Array VCSpecEntry := #[]
-    for entry in tier do
-      let saved ← saveState
-      let ok ← runUnaryVCSpecRule entry
-      saved.restore
-      if ok then
-        found := found.push entry
-    unless found.isEmpty do
-      return found
-  return #[]
+  withVCGenRegisteredTiming do
+    for tier in ← registeredVCGenRuleCandidateTiers do
+      let mut found : Array VCSpecEntry := #[]
+      for entry in tier do
+        let saved ← saveState
+        let ok ← runUnaryVCSpecRule entry
+        saved.restore
+        if ok then
+          found := found.push entry
+      unless found.isEmpty do
+        return found
+    return #[]
 
 /-- Find the first registered unary `@[vcspec]` entry whose bounded
 application makes progress. -/
 def findRegisteredVCGenRule? : TacticM (Option VCSpecEntry) := do
-  for tier in ← registeredVCGenRuleCandidateTiers do
-    for entry in tier do
-      let saved ← saveState
-      let ok ← runUnaryVCSpecRule entry
-      saved.restore
-      if ok then
-        return some entry
-  return none
+  withVCGenRegisteredTiming do
+    for tier in ← registeredVCGenRuleCandidateTiers do
+      for entry in tier do
+        let saved ← saveState
+        let ok ← runUnaryVCSpecRule entry
+        saved.restore
+        if ok then
+          return some entry
+    return none
 
 def throwVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -696,18 +700,19 @@ def tryProbEqActions (steps : List ProbEqAction) : TacticM Bool := do
 
 private def chooseBestProbEqPlan? (plans : List (List ProbEqAction)) :
     TacticM (Option (List ProbEqAction × PreviewResult)) := do
-  let mut best? : Option (List ProbEqAction × PreviewResult) := none
-  for plan in plans do
-    let preview ← previewActionWithGoals (tryProbEqActions plan)
-    if preview.ok then
-      if preview.goalCount = 0 then
-        return some (plan, preview)
-      match best? with
-      | none => best? := some (plan, preview)
-      | some (_, bestPreview) =>
-          if preview.goalCount < bestPreview.goalCount then
-            best? := some (plan, preview)
-  return best?
+  withVCGenProbPlannerTiming do
+    let mut best? : Option (List ProbEqAction × PreviewResult) := none
+    for plan in plans do
+      let preview ← previewActionWithGoals (tryProbEqActions plan)
+      if preview.ok then
+        if preview.goalCount = 0 then
+          return some (plan, preview)
+        match best? with
+        | none => best? := some (plan, preview)
+        | some (_, bestPreview) =>
+            if preview.goalCount < bestPreview.goalCount then
+              best? := some (plan, preview)
+    return best?
 
 private def mkRewriteChain (depth : Nat) : List ProbEqAction :=
   ((List.range depth).reverse.map fun idx => ProbEqAction.rewriteUnder (idx + 1)) ++
@@ -888,7 +893,7 @@ def trySupportCutBind (comp : Expr) : TacticM Bool := do
 
 /-- Structural/default unary VCGen step, excluding explicit cut/invariant/theorem-driven
 fallbacks and the final close/search phase. -/
-def runVCGenStructuralCore : TacticM Bool := do
+def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
   if (← getGoals).isEmpty then return false
   let target ← instantiateMVars (← getMainTarget)
   if ← tryLowerProbGoal then
@@ -956,31 +961,34 @@ private def runVCGenStructuralCoreWithNames (names : Array Name) : TacticM Bool 
   return false
 
 private def chooseBestCutStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← potentialLocalHintNames).map fun cutName =>
-    mkVCGenPlannedStep
-      "vcgen explicit cut"
-      s!"vcstep using {cutName}"
-      (runHoareStepRuleUsing (mkIdent cutName))
-  chooseBestPlannedStepCandidate? steps
+  withVCGenLocalHintTiming do
+    let steps := (← potentialLocalHintNames).map fun cutName =>
+      mkVCGenPlannedStep
+        "vcgen explicit cut"
+        s!"vcstep using {cutName}"
+        (runHoareStepRuleUsing (mkIdent cutName))
+    chooseBestPlannedStepCandidate? steps
 
 private def chooseBestInvariantStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let steps := (← potentialLocalHintNames).map fun invName =>
-    mkVCGenPlannedStep
-      "vcgen explicit invariant"
-      s!"vcstep inv {invName}"
-      (runLoopInvExplicit (mkIdent invName))
-  chooseBestPlannedStepCandidate? steps
+  withVCGenLocalHintTiming do
+    let steps := (← potentialLocalHintNames).map fun invName =>
+      mkVCGenPlannedStep
+        "vcgen explicit invariant"
+        s!"vcstep inv {invName}"
+        (runLoopInvExplicit (mkIdent invName))
+    chooseBestPlannedStepCandidate? steps
 
 private def chooseBestTheoremStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  for tier in ← registeredVCGenRuleCandidateTiers do
-    let steps := tier.map fun entry =>
-      mkVCGenPlannedStep
-        "vcgen @[vcspec] theorem rule"
-        s!"vcstep with {entry.theoremName!}"
-        (runUnaryVCSpecRule entry)
-    if let some chosen ← chooseBestPlannedStepCandidate? steps then
-      return some chosen
-  return none
+  withVCGenRegisteredTiming do
+    for tier in ← registeredVCGenRuleCandidateTiers do
+      let steps := tier.map fun entry =>
+        mkVCGenPlannedStep
+          "vcgen @[vcspec] theorem rule"
+          s!"vcstep with {entry.theoremName!}"
+          (runUnaryVCSpecRule entry)
+      if let some chosen ← chooseBestPlannedStepCandidate? steps then
+        return some chosen
+    return none
 
 private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
     TacticM (Option PlannedStep) := do

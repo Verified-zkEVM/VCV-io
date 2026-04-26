@@ -245,29 +245,29 @@ syntax "vcgen" &"inv" term : tactic
 syntax "vcgen?" : tactic
 
 elab_rules : tactic
-  | `(tactic| vcgen) => do
+  | `(tactic| vcgen) => withVCGenRunTiming "vcgen" do
       discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
-      runVCGenFinish
-  | `(tactic| vcgen using $cut) => do
+      withVCGenFinishTiming runVCGenFinish
+  | `(tactic| vcgen using $cut) => withVCGenRunTiming "vcgen" do
       discard <| TacticInternals.Unary.tryLowerProbGoal
       if ← TacticInternals.Unary.runHoareStepRuleUsing cut then
         discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
-        runVCGenFinish
+        withVCGenFinishTiming runVCGenFinish
       else
         TacticInternals.Unary.throwVCGenStepError
-  | `(tactic| vcgen inv $inv) => do
+  | `(tactic| vcgen inv $inv) => withVCGenRunTiming "vcgen" do
       discard <| TacticInternals.Unary.tryLowerProbGoal
       if ← TacticInternals.Unary.runLoopInvExplicit inv then
         discard <| runBoundedPasses "vcgen" TacticInternals.Unary.runVCGenPass
-        runVCGenFinish
+        withVCGenFinishTiming runVCGenFinish
       else
         throwError
           "vcgen inv: expected a `Triple` goal about `replicate`, `List.foldlM`, \
           or `List.mapM`."
-  | `(tactic| vcgen?) => do
+  | `(tactic| vcgen?) => withVCGenRunTiming "vcgen?" do
       let batches ← runBoundedPassesCollect "vcgen?" TacticInternals.Unary.runVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
-      runVCGenFinish
+      withVCGenFinishTiming runVCGenFinish
       for batch in batches do
         logPlannerNotes batch
       let mut lines : List String :=

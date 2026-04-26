@@ -395,7 +395,7 @@ def runRelSimDistRule : TacticM Bool := withMainContext do
         apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_impl_evalDist_eq))
   | none => return false
 
-def runRVCGenCore : TacticM Bool := withMainContext do
+def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure
   let target ← instantiateMVars (← getMainTarget)
   if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then
@@ -484,27 +484,73 @@ def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext 
       else
         return false
 
-/-- Find the local hypotheses that work as relational `using` hints. -/
-def findRelHintCandidates : TacticM (Array Name) := withMainContext do
+private def potentialRelHintNames : TacticM (Array Name) :=
+  withVCGenLocalHintTiming <| withMainContext do
+    let target ← instantiateMVars (← getMainTarget)
+    unless relationalGoalParts? target |>.isSome do return #[]
+    let mut found : Array Name := #[]
+    for localDecl in ← getLCtx do
+      unless localDecl.isImplementationDetail do
+        let name := localDecl.userName
+        if isUsableBinderName name then
+          let type ← instantiateMVars localDecl.type
+          unless type.isSort do
+            unless ← isProp type do
+              let whnfType ← whnfReducible type
+              if whnfType.isForall then
+                found := found.push name
+    return found
+
+private def localNameOfExpr? (expr : Expr) : TacticM (Option Name) := do
+  match expr.consumeMData with
+  | .fvar fvarId =>
+      match (← getLCtx).find? fvarId with
+      | some decl =>
+          if isUsableBinderName decl.userName then
+            return some decl.userName
+          return none
+      | none => return none
+  | _ => return none
+
+private def pushNameIfNew (names : Array Name) (name : Name) : Array Name :=
+  if names.contains name then names else names.push name
+
+private def relTripleTopParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  let app := target.consumeMData
+  guard <| app.getAppFn.isConstOf ``OracleComp.ProgramLogic.Relational.RelTriple
+  let args ← trailingArgs? app 3
+  let #[oa, ob, post] := args | none
+  some (oa, ob, post)
+
+private def provenRelPostHintNames : TacticM (Array Name) := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  unless relationalGoalParts? target |>.isSome do return #[]
+  unless relationalGoalParts? target |>.isSome do
+    return #[]
   let mut found : Array Name := #[]
   for localDecl in ← getLCtx do
     unless localDecl.isImplementationDetail do
-      let name := localDecl.userName
-      if isUsableBinderName name then
-        let type ← instantiateMVars localDecl.type
-        unless type.isSort do
-          unless ← isProp type do
-            let whnfType ← whnfReducible type
-            if whnfType.isForall then
-              let saved ← saveState
-              let hint := mkIdent name
-              let ok ← runRVCGenCoreUsing hint
-              saved.restore
-              if ok then
-                found := found.push name
+      let type ← instantiateMVars localDecl.type
+      if ← isProp type then
+        if let some (_, _, post) := relTripleTopParts? type then
+          if let some name ← localNameOfExpr? post then
+            found := pushNameIfNew found name
   return found
+
+/-- Find the local hypotheses that work as relational `using` hints. -/
+def findRelHintCandidates : TacticM (Array Name) :=
+  withVCGenLocalHintTiming <| withMainContext do
+    let proven ← provenRelPostHintNames
+    unless proven.isEmpty do
+      return proven
+    let mut found : Array Name := #[]
+    for name in ← potentialRelHintNames do
+      let saved ← saveState
+      let hint := mkIdent name
+      let ok ← runRVCGenCoreUsing hint
+      saved.restore
+      if ok then
+        found := found.push name
+    return found
 
 /-- Find the unique local hypothesis that works as a relational `using` hint.
 Returns `none` if there are 0 or ≥ 2 viable hints (keeping ambiguity explicit). -/
@@ -512,22 +558,6 @@ def findUniqueRelHint? : TacticM (Option Name) := do
   let found ← findRelHintCandidates
   return found.toList.head? >>= fun first =>
     if found.size = 1 then some first else none
-
-private def potentialRelHintNames : TacticM (Array Name) := withMainContext do
-  let target ← instantiateMVars (← getMainTarget)
-  unless relationalGoalParts? target |>.isSome do return #[]
-  let mut found : Array Name := #[]
-  for localDecl in ← getLCtx do
-    unless localDecl.isImplementationDetail do
-      let name := localDecl.userName
-      if isUsableBinderName name then
-        let type ← instantiateMVars localDecl.type
-        unless type.isSort do
-          unless ← isProp type do
-            let whnfType ← whnfReducible type
-            if whnfType.isForall then
-              found := found.push name
-  return found
 
 private def runRVCGenExplicitHintStep (hint : TSyntax `term) : TacticM Bool := do
   if (← getGoals).isEmpty then
@@ -581,6 +611,12 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
            | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
               intros; trivial))))
+
+/-- Try to close a relational goal by applying postcondition monotonicity and
+closing both the inner triple and the implication from local hypotheses. -/
+def tryCloseRelGoalConseq : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    apply OracleComp.ProgramLogic.Relational.relTriple_post_mono <;> assumption))
 
 private def runRVCGenStepWithTheoremDirect
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
@@ -685,17 +721,18 @@ application makes progress on the current goal. Prefers direct
 discrimination-tree hits on `(oa, ob)`, falling back to kind-matched entries
 filtered by structural compatibility. -/
 def findRegisteredRVCGenRuleCandidates : TacticM (Array VCSpecEntry) := do
-  for tier in ← registeredRVCGenRuleCandidateTiers do
-    let mut found : Array VCSpecEntry := #[]
-    for entry in tier do
-      let saved ← saveState
-      let ok ← runRelationalVCSpecRule entry
-      saved.restore
-      if ok then
-        found := found.push entry
-    unless found.isEmpty do
-      return found
-  return #[]
+  withVCGenRegisteredTiming do
+    for tier in ← registeredRVCGenRuleCandidateTiers do
+      let mut found : Array VCSpecEntry := #[]
+      for entry in tier do
+        let saved ← saveState
+        let ok ← runRelationalVCSpecRule entry
+        saved.restore
+        if ok then
+          found := found.push entry
+      unless found.isEmpty do
+        return found
+    return #[]
 
 private def relHintCandidateSteps (hintName : Name) : TacticM (Array PlannedStep) := do
   let genericStep :=
@@ -718,44 +755,46 @@ private def relHintCandidateSteps (hintName : Name) : TacticM (Array PlannedStep
   return #[namedHintStep, genericStep]
 
 private def chooseBestRelHintStep? : TacticM (Option (PlannedStep × PreviewResult)) := do
-  let hintNames ← potentialRelHintNames
-  let traceSteps := vcvio.vcgen.traceSteps.get (← getOptions)
-  let mut best? : Option (PlannedStep × PreviewResult) := none
-  let mut accepted : Array String := #[]
-  for hintName in hintNames do
-    for step in ← relHintCandidateSteps hintName do
-      let preview ← previewPlannedStepWithGoals step
-      if preview.ok then
+  withVCGenLocalHintTiming do
+    let hintNames ← findRelHintCandidates
+    let traceSteps := vcvio.vcgen.traceSteps.get (← getOptions)
+    let mut best? : Option (PlannedStep × PreviewResult) := none
+    let mut accepted : Array String := #[]
+    for hintName in hintNames do
+      for step in ← relHintCandidateSteps hintName do
+        let preview ← previewPlannedStepWithGoals step
+        if preview.ok then
+          if traceSteps then
+            accepted := accepted.push (renderPlannedStepPreview step preview)
+          match best? with
+          | none => best? := some (step, preview)
+          | some (_, bestPreview) =>
+              if preview.goalCount < bestPreview.goalCount then
+                best? := some (step, preview)
+          if !traceSteps && preview.goalCount == 0 then
+            return some (step, preview)
+          break
+    match best? with
+    | none => return none
+    | some (step, preview) =>
         if traceSteps then
-          accepted := accepted.push (renderPlannedStepPreview step preview)
-        match best? with
-        | none => best? := some (step, preview)
-        | some (_, bestPreview) =>
-            if preview.goalCount < bestPreview.goalCount then
-              best? := some (step, preview)
-        if !traceSteps && preview.goalCount == 0 then
-          return some (step, preview)
-        break
-  match best? with
-  | none => return none
-  | some (step, preview) =>
-      if traceSteps then
-        let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
-        return some (attachPlannerChoiceNotes step preview alternatives, preview)
-      return some (step, preview)
+          let alternatives := accepted.filter (· != renderPlannedStepPreview step preview)
+          return some (attachPlannerChoiceNotes step preview alternatives, preview)
+        return some (step, preview)
 
 
 private def chooseBestRegisteredRVCGenTheoremStep? :
     TacticM (Option (PlannedStep × PreviewResult)) := do
-  for tier in ← registeredRVCGenRuleCandidateTiers do
-    let steps := tier.map fun entry =>
-      mkRVCGenPlannedStep
-        "rvcgen @[vcspec] theorem rule"
-        s!"rvcstep with {entry.theoremName!}"
-        (runRelationalVCSpecRule entry)
-    if let some chosen ← chooseBestPlannedStepCandidate? steps then
-      return some chosen
-  return none
+  withVCGenRegisteredTiming do
+    for tier in ← registeredRVCGenRuleCandidateTiers do
+      let steps := tier.map fun entry =>
+        mkRVCGenPlannedStep
+          "rvcgen @[vcspec] theorem rule"
+          s!"rvcstep with {entry.theoremName!}"
+          (runRelationalVCSpecRule entry)
+      if let some chosen ← chooseBestPlannedStepCandidate? steps then
+        return some chosen
+    return none
 
 /-- Structural/default relational VCGen step, excluding explicit `using`-hint fallbacks. -/
 def runRVCGenStructuralCore : TacticM Bool := do
@@ -790,9 +829,19 @@ def planRVCGenStep? : TacticM (Option PlannedStep) := do
   let structuralPreview ← previewPlannedStepWithGoals structuralStep
   if structuralPreview.ok && structuralPreview.goalCount == 0 then
     return some structuralStep
+  let closeStep :=
+    mkRVCGenPlannedStep
+      "rvcgen consequence close"
+      "rvcstep"
+      (withVCGenCloseTiming tryCloseRelGoalConseq)
+  let closePreview ← previewPlannedStepWithGoals closeStep
+  if closePreview.ok && closePreview.goalCount == 0 then
+    return some closeStep
   let hintCandidate? ← chooseBestRelHintStep?
   let theoremCandidate? ← chooseBestRegisteredRVCGenTheoremStep?
   if structuralPreview.ok then
+    if closePreview.ok && closePreview.goalCount < structuralPreview.goalCount then
+      return some closeStep
     if let some (hintStep, hintPreview) := hintCandidate? then
       if hintPreview.goalCount < structuralPreview.goalCount then
         return some hintStep
@@ -830,6 +879,8 @@ def runRVCGenStep : TacticM Bool := do
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true
   if ← runRVCGenCore then
+    return true
+  if ← withVCGenCloseTiming tryCloseRelGoalConseq then
     return true
   if let some entry := (← findRegisteredRVCGenRuleCandidates).toList.head? then
     if ← runRelationalVCSpecRule entry then
@@ -980,12 +1031,6 @@ def throwRVCGenStepUsingError (hint : TSyntax `term) : TacticM Unit := withMainC
     {hintMsg}\n\
     Goal:{indentExpr target}"
 
-/-- Try to close a relational goal by applying postcondition monotonicity and
-closing both the inner triple and the implication from local hypotheses. -/
-def tryCloseRelGoalConseq : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_post_mono <;> assumption))
-
 def runRVCGenCloseConseqPass : TacticM Bool := do
   let goals ← getGoals
   if goals.isEmpty then
@@ -994,7 +1039,7 @@ def runRVCGenCloseConseqPass : TacticM Bool := do
   let mut newGoals : List MVarId := []
   for goal in goals do
     setGoals [goal]
-    if ← tryCloseRelGoalConseq then
+    if ← withVCGenCloseTiming tryCloseRelGoalConseq then
       progress := true
       newGoals := newGoals ++ (← getGoals)
     else
