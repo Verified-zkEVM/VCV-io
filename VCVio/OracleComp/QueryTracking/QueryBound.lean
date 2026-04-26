@@ -5,6 +5,7 @@ Authors: Devon Tuma
 -/
 import Mathlib.Algebra.Polynomial.Eval.Defs
 import ToMathlib.General
+import ToMathlib.PFunctor.Bound
 import VCVio.OracleComp.QueryTracking.CountingOracle
 import VCVio.OracleComp.EvalDist
 import VCVio.OracleComp.SimSemantics.Append
@@ -35,7 +36,7 @@ open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleComp
 
-variable {ι : Type u} {spec : OracleSpec ι} {α β : Type u}
+variable {ι : Type u} {spec : OracleSpec.{u, u} ι} {α β : Type u}
 
 section IsQueryBound
 
@@ -43,14 +44,24 @@ variable {B : Type*}
 
 /-- Generalized query bound parameterized by a budget type, a validity check, and a cost
 function. `pure` satisfies any bound; `query t >>= mx` satisfies the bound when
-`canQuery t b` and every continuation satisfies the bound at `cost t b`. -/
+`canQuery t b` and every continuation satisfies the bound at `cost t b`.
+
+This is the specialization of `PFunctor.FreeM.IsRollBound` to
+`OracleComp spec α = FreeM spec.toPFunctor α`: an oracle index `t : ι` plays
+the role of a polynomial-functor position, and a query continuation
+`spec t → OracleComp spec α` is the FreeM `roll` continuation. Most
+structural lemmas defer to their FreeM analogues. -/
 def IsQueryBound (oa : OracleComp spec α) (budget : B)
     (canQuery : ι → B → Prop) (cost : ι → B → B) : Prop :=
-  OracleComp.construct
-    (C := fun _ => B → Prop)
-    (fun _ _ => True)
-    (fun t _mx ih b => canQuery t b ∧ ∀ u, ih u (cost t b))
-    oa budget
+  PFunctor.FreeM.IsRollBound (P := spec.toPFunctor) oa budget canQuery cost
+
+/-- The bridge to the FreeM-level predicate is `Iff.rfl`: `IsQueryBound` is
+literally `PFunctor.FreeM.IsRollBound` on the underlying free monad. -/
+theorem isQueryBound_iff_isRollBound (oa : OracleComp spec α) (budget : B)
+    (canQuery : ι → B → Prop) (cost : ι → B → B) :
+    IsQueryBound oa budget canQuery cost ↔
+      PFunctor.FreeM.IsRollBound (P := spec.toPFunctor) oa budget canQuery cost :=
+  Iff.rfl
 
 @[simp, grind .]
 lemma isQueryBound_pure (x : α) (b : B)
@@ -68,26 +79,20 @@ lemma isQueryBound_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α)
 lemma isQueryBound_query_iff (t : ι) (b : B)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
     IsQueryBound (liftM (spec.query t) : OracleComp spec _) b canQuery cost ↔
-    canQuery t b := by
-  simp [IsQueryBound]
+    canQuery t b :=
+  PFunctor.FreeM.isRollBound_liftA_iff (P := spec.toPFunctor) t b canQuery cost
 
 private lemma isQueryBound_map_aux (oa : OracleComp spec α) (f : α → β)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
     ∀ {b : B}, (f <$> oa).IsQueryBound b canQuery cost ↔
-      oa.IsQueryBound b canQuery cost := by
-  induction oa using OracleComp.inductionOn with
-  | pure _ => simp
-  | query_bind t mx ih =>
-    intro b
-    simp only [map_eq_bind_pure_comp, Function.comp_def, bind_assoc]
-    rw [isQueryBound_query_bind_iff, isQueryBound_query_bind_iff]
-    exact and_congr_right fun _ => forall_congr' fun u => ih u
+      oa.IsQueryBound b canQuery cost :=
+  fun {b} => PFunctor.FreeM.isRollBound_map_iff oa f b canQuery cost
 
 @[simp, grind =]
 lemma isQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (b : B)
     (canQuery : ι → B → Prop) (cost : ι → B → B) :
-    IsQueryBound (f <$> oa) b canQuery cost ↔ IsQueryBound oa b canQuery cost := by
-  exact isQueryBound_map_aux oa f canQuery cost
+    IsQueryBound (f <$> oa) b canQuery cost ↔ IsQueryBound oa b canQuery cost :=
+  PFunctor.FreeM.isRollBound_map_iff oa f b canQuery cost
 
 /-- If `f <$> oa = ob` for any `f`, the query-bound predicate transfers between them. The
 standard shape is `oa = (simulateQ wrapped mx).run s` and `ob = simulateQ inner mx` (or
@@ -98,33 +103,8 @@ projection identity such as `withCachingAux_run_proj_eq` (with `f = Prod.map id 
 lemma isQueryBound_iff_of_map_eq
     {β : Type u} {oa : OracleComp spec α} {ob : OracleComp spec β} {f : α → β} {b : B}
     (h : f <$> oa = ob) (canQuery : ι → B → Prop) (cost : ι → B → B) :
-    IsQueryBound oa b canQuery cost ↔ IsQueryBound ob b canQuery cost := by
-  rw [← h]; exact (isQueryBound_map_iff oa f b canQuery cost).symm
-
-private lemma isQueryBound_congr_aux
-    (oa : OracleComp spec α)
-    (canQuery₁ canQuery₂ : ι → B → Prop) (cost₁ cost₂ : ι → B → B)
-    (hcan : ∀ (t : ι) (b : B), canQuery₁ t b ↔ canQuery₂ t b)
-    (hcost : ∀ (t : ι) (b : B), cost₁ t b = cost₂ t b) :
-    ∀ {b : B}, oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ := by
-  induction oa using OracleComp.inductionOn with
-  | pure _ =>
-      intro b
-      simp
-  | query_bind t mx ih =>
-      intro b
-      rw [isQueryBound_query_bind_iff, isQueryBound_query_bind_iff]
-      constructor
-      · intro h
-        refine ⟨(hcan t b).1 h.1, fun u => ?_⟩
-        have hu : IsQueryBound (mx u) (cost₁ t b) canQuery₂ cost₂ :=
-          (ih u (b := cost₁ t b)).1 (h.2 u)
-        simpa [hcost t b] using hu
-      · intro h
-        refine ⟨(hcan t b).2 h.1, fun u => ?_⟩
-        have hu : IsQueryBound (mx u) (cost₁ t b) canQuery₂ cost₂ := by
-          simpa [hcost t b] using h.2 u
-        exact (ih u (b := cost₁ t b)).2 hu
+    IsQueryBound oa b canQuery cost ↔ IsQueryBound ob b canQuery cost :=
+  PFunctor.FreeM.isRollBound_iff_of_map_eq h canQuery cost
 
 lemma isQueryBound_congr
     {oa : OracleComp spec α} {b : B}
@@ -132,7 +112,7 @@ lemma isQueryBound_congr
     (hcan : ∀ (t : ι) (b : B), canQuery₁ t b ↔ canQuery₂ t b)
     (hcost : ∀ (t : ι) (b : B), cost₁ t b = cost₂ t b) :
     oa.IsQueryBound b canQuery₁ cost₁ ↔ oa.IsQueryBound b canQuery₂ cost₂ :=
-  isQueryBound_congr_aux oa canQuery₁ canQuery₂ cost₁ cost₂ hcan hcost
+  PFunctor.FreeM.isRollBound_congr hcan hcost
 
 /-- Project an `IsQueryBound` along a budget projection `proj : B → B'`.
 
@@ -154,15 +134,8 @@ lemma IsQueryBound.proj
     (h_can : ∀ (t : ι) (b' : B), canQuery t b' → canQuery' t (proj b'))
     (h_cost : ∀ (t : ι) (b' : B), canQuery t b' → proj (cost t b') = cost' t (proj b'))
     (h : IsQueryBound oa b canQuery cost) :
-    IsQueryBound oa (proj b) canQuery' cost' := by
-  induction oa using OracleComp.inductionOn generalizing b with
-  | pure x => simp
-  | query_bind t mx ih =>
-      rw [isQueryBound_query_bind_iff] at h ⊢
-      refine ⟨h_can t b h.1, fun u => ?_⟩
-      have hu : IsQueryBound (mx u) (proj (cost t b)) canQuery' cost' :=
-        ih u (h.2 u)
-      rwa [h_cost t b h.1] at hu
+    IsQueryBound oa (proj b) canQuery' cost' :=
+  PFunctor.FreeM.IsRollBound.proj proj h_can h_cost h
 
 /-- Generic bind composition for `IsQueryBound` parameterised by an arbitrary budget type
 `B` and a binary `combine` operation on it. The natural-number versions
@@ -185,21 +158,23 @@ lemma isQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec �
       cost t (combine b b₂') = combine (cost t b) b₂')
     (h₁ : IsQueryBound oa b₁ canQuery cost)
     (h₂ : ∀ x, IsQueryBound (ob x) b₂ canQuery cost) :
-    IsQueryBound (oa >>= ob) (combine b₁ b₂) canQuery cost := by
-  induction oa using OracleComp.inductionOn generalizing b₁ with
-  | pure x =>
-      simp only [pure_bind]
-      exact IsQueryBound.proj (combine b₁)
-        (fun t b hcan => (h_can t b₁ b₂ b hcan).1)
-        (fun t b hcan => (h_cost t b₁ b₂ b hcan).1)
-        (h₂ x)
-  | query_bind t mx ih =>
-      rw [isQueryBound_query_bind_iff] at h₁
-      rw [bind_assoc, isQueryBound_query_bind_iff]
-      refine ⟨(h_can t b₁ b₂ b₁ h₁.1).2, fun u => ?_⟩
-      have hrec := ih u (h₁.2 u)
-      rw [(h_cost t b₁ b₂ b₁ h₁.1).2]
-      exact hrec
+    IsQueryBound (oa >>= ob) (combine b₁ b₂) canQuery cost :=
+  PFunctor.FreeM.isRollBound_bind combine h_can h_cost h₁ h₂
+
+/-- Forward-direction `seq` analogue of `isQueryBound_bind`. Reduces to the bind case via
+`seq_eq_bind_map` plus `isQueryBound_map_iff` to discharge the constant continuation. -/
+lemma isQueryBound_seq {og : OracleComp spec (α → β)} {oa : OracleComp spec α}
+    {canQuery : ι → B → Prop} {cost : ι → B → B}
+    (combine : B → B → B) {b₁ b₂ : B}
+    (h_can : ∀ t b₁' b₂' b, canQuery t b → canQuery t (combine b₁' b) ∧
+      canQuery t (combine b b₂'))
+    (h_cost : ∀ t b₁' b₂' b, canQuery t b →
+      combine b₁' (cost t b) = cost t (combine b₁' b) ∧
+      cost t (combine b b₂') = combine (cost t b) b₂')
+    (h₁ : IsQueryBound og b₁ canQuery cost)
+    (h₂ : IsQueryBound oa b₂ canQuery cost) :
+    IsQueryBound (og <*> oa) (combine b₁ b₂) canQuery cost :=
+  PFunctor.FreeM.isRollBound_seq combine h_can h_cost h₁ h₂
 
 /-- Transfer a structural query bound through `simulateQ` into a stateful target semantics,
 provided each simulated source query has a target-side step bound and the target-side bind
@@ -262,6 +237,15 @@ variable (p : ι → Prop) [DecidablePred p]
 lemma isQueryBoundP_def (oa : OracleComp spec α) (n : ℕ) : IsQueryBoundP oa p n ↔
     IsQueryBound oa n (fun t qb => ¬ p t ∨ 0 < qb)
       (fun t qb => if p t then qb - 1 else qb) := Iff.rfl
+
+/-- `IsQueryBoundP` is `IsRollBound` on the underlying `FreeM` with the
+predicate-targeted validity and cost. -/
+theorem isQueryBoundP_iff_isRollBound (oa : OracleComp spec α) (n : ℕ) :
+    IsQueryBoundP oa p n ↔
+      PFunctor.FreeM.IsRollBound (P := spec.toPFunctor) oa n
+        (fun t qb => ¬ p t ∨ 0 < qb)
+        (fun t qb => if p t then qb - 1 else qb) :=
+  Iff.rfl
 
 @[simp, grind =]
 lemma isQueryBoundP_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α) (n : ℕ) :
@@ -337,6 +321,15 @@ lemma isQueryBoundP_map_iff (oa : OracleComp spec α) (f : α → β) (n : ℕ) 
     IsQueryBoundP (f <$> oa) p n ↔ IsQueryBoundP oa p n :=
   isQueryBound_map_aux oa f _ _
 
+/-- Forward-direction `seq` analogue of `isQueryBoundP_bind`. Reduces to the bind case via
+`seq_eq_bind_map` plus `isQueryBoundP_map_iff` to discharge the constant continuation. -/
+lemma isQueryBoundP_seq {og : OracleComp spec (α → β)} {oa : OracleComp spec α} {n m : ℕ}
+    (h : IsQueryBoundP og p n) (h' : IsQueryBoundP oa p m) :
+    IsQueryBoundP (og <*> oa) p (n + m) := by
+  rw [seq_eq_bind_map]
+  exact isQueryBoundP_bind h
+    (fun g _ => (isQueryBoundP_map_iff oa g m).mpr h')
+
 /-- Predicate-targeted analogue of `isQueryBound_iff_of_map_eq`: if `f <$> oa = ob` for any `f`,
 then `IsQueryBoundP` transfers between them. -/
 lemma isQueryBoundP_iff_of_map_eq
@@ -381,6 +374,15 @@ variable [DecidableEq ι]
 Each query to `t` decrements `qb t` by one. Recovers the classical notion. -/
 abbrev IsPerIndexQueryBound (oa : OracleComp spec α) (qb : ι → ℕ) : Prop :=
   IsQueryBound oa qb (fun t qb => 0 < qb t) (fun t qb => Function.update qb t (qb t - 1))
+
+/-- `IsPerIndexQueryBound` is `IsRollBound` on the underlying `FreeM` with the
+per-index validity and cost. -/
+theorem isPerIndexQueryBound_iff_isRollBound (oa : OracleComp spec α) (qb : ι → ℕ) :
+    IsPerIndexQueryBound oa qb ↔
+      PFunctor.FreeM.IsRollBound (P := spec.toPFunctor) oa qb
+        (fun t qb => 0 < qb t)
+        (fun t qb => Function.update qb t (qb t - 1)) :=
+  Iff.rfl
 
 @[simp]
 lemma isPerIndexQueryBound_pure (x : α) (qb : ι → ℕ) :
@@ -457,6 +459,17 @@ lemma isPerIndexQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleCom
 lemma isPerIndexQueryBound_map_iff (oa : OracleComp spec α) (f : α → β) (qb : ι → ℕ) :
     IsPerIndexQueryBound (f <$> oa) qb ↔ IsPerIndexQueryBound oa qb :=
   isQueryBound_map_aux oa f _ _
+
+/-- Forward-direction `seq` analogue of `isPerIndexQueryBound_bind`. Reduces to the bind
+case via `seq_eq_bind_map` plus `isPerIndexQueryBound_map_iff` to discharge the constant
+continuation. -/
+lemma isPerIndexQueryBound_seq {og : OracleComp spec (α → β)} {oa : OracleComp spec α}
+    {qb₁ qb₂ : ι → ℕ}
+    (h1 : IsPerIndexQueryBound og qb₁) (h2 : IsPerIndexQueryBound oa qb₂) :
+    IsPerIndexQueryBound (og <*> oa) (qb₁ + qb₂) := by
+  rw [seq_eq_bind_map]
+  exact isPerIndexQueryBound_bind h1
+    (fun g => (isPerIndexQueryBound_map_iff oa g qb₂).mpr h2)
 
 /-- Per-index analogue of `isQueryBound_iff_of_map_eq`: if `f <$> oa = ob` for any `f`, then
 `IsPerIndexQueryBound` transfers between them. -/
@@ -586,6 +599,15 @@ end IsPerIndexQueryBound
 def IsTotalQueryBound (oa : OracleComp spec α) (n : ℕ) : Prop :=
   IsQueryBound oa n (fun _ b => 0 < b) (fun _ b => b - 1)
 
+/-- `IsTotalQueryBound` is `IsRollBound` on the underlying `FreeM` with a
+single-counter validity (`0 < b`) and cost (`b - 1`), independent of the
+oracle index. -/
+theorem isTotalQueryBound_iff_isRollBound (oa : OracleComp spec α) (n : ℕ) :
+    IsTotalQueryBound oa n ↔
+      PFunctor.FreeM.IsRollBound (P := spec.toPFunctor) oa n
+        (fun _ b => 0 < b) (fun _ b => b - 1) :=
+  Iff.rfl
+
 lemma isTotalQueryBound_query_bind_iff {t : spec.Domain}
     {mx : spec.Range t → OracleComp spec α} {n : ℕ} :
     IsTotalQueryBound (liftM (query t) >>= mx) n ↔
@@ -612,6 +634,17 @@ lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp s
   refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2
   · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
   · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
+
+/-- Forward-direction `seq` analogue of `isTotalQueryBound_bind`. Reduces to the bind case
+via `seq_eq_bind_map` plus the `IsTotalQueryBound`-flavoured `isQueryBound_map_iff` to
+discharge the constant continuation. -/
+lemma isTotalQueryBound_seq {og : OracleComp spec (α → β)} {oa : OracleComp spec α}
+    {n₁ n₂ : ℕ}
+    (h1 : IsTotalQueryBound og n₁) (h2 : IsTotalQueryBound oa n₂) :
+    IsTotalQueryBound (og <*> oa) (n₁ + n₂) := by
+  rw [seq_eq_bind_map]
+  exact isTotalQueryBound_bind h1
+    (fun g => (isQueryBound_map_iff oa g n₂ _ _).mpr h2)
 
 lemma not_isTotalQueryBound_bind_query_prefix_zero
     {oa : OracleComp spec α}
@@ -845,6 +878,57 @@ theorem IsTotalQueryBound.counting_total_le
           (Finset.single_le_sum (fun _ _ => Nat.zero_le _) (Finset.mem_univ t))
       omega
 
+omit [Fintype ι] in
+/-- The counting-oracle simulation of any `OracleComp` has non-empty support whenever every
+oracle range is inhabited. Used by the converse direction of
+`isTotalQueryBound_iff_counting_total_le`. -/
+lemma countingOracle.support_simulate_nonempty [spec.Inhabited]
+    (oa : OracleComp spec α) :
+    (support (countingOracle.simulate oa 0)).Nonempty := by
+  induction oa using OracleComp.inductionOn with
+  | pure x => exact ⟨(x, 0), by rw [countingOracle.mem_support_simulate_pure_iff]⟩
+  | query_bind t mx ih =>
+      obtain ⟨z, hz⟩ := ih default
+      refine ⟨(z.1, QueryCount.single t + z.2), ?_⟩
+      exact countingOracle.add_single_mem_support_simulate_queryBind hz
+
+/-- Converse of `IsTotalQueryBound.counting_total_le`: a counting-oracle bound on every
+support path implies the structural total query bound. Together they characterize
+`IsTotalQueryBound` purely in terms of the counting-oracle support. -/
+theorem isTotalQueryBound_iff_counting_total_le [spec.Inhabited]
+    {oa : OracleComp spec α} {n : ℕ} :
+    IsTotalQueryBound oa n ↔
+      ∀ z ∈ support (countingOracle.simulate oa 0), (∑ i, z.2 i) ≤ n := by
+  refine ⟨fun h _ hz => IsTotalQueryBound.counting_total_le h hz, fun h => ?_⟩
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure _ => trivial
+  | query_bind t mx ih =>
+      rw [isTotalQueryBound_query_bind_iff]
+      have hsum_single : (∑ i, QueryCount.single t i) = 1 := by
+        rw [QueryCount.single, Finset.sum_update_of_mem (Finset.mem_univ t)]
+        simp
+      have hsplit : ∀ (q : QueryCount ι),
+          (∑ i, (QueryCount.single t + q) i) = 1 + ∑ i, q i := by
+        intro q
+        have : (∑ i, (QueryCount.single t + q) i) =
+            (∑ i, QueryCount.single t i) + ∑ i, q i := by
+          simp [Pi.add_apply, Finset.sum_add_distrib]
+        rw [this, hsum_single]
+      obtain ⟨z₀, hz₀⟩ := countingOracle.support_simulate_nonempty (mx default)
+      have hbig : (z₀.1, QueryCount.single t + z₀.2) ∈
+          support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
+        countingOracle.add_single_mem_support_simulate_queryBind hz₀
+      have hbound : 1 + (∑ i, z₀.2 i) ≤ n := (hsplit z₀.2) ▸ h _ hbig
+      have hpos : 0 < n := by omega
+      refine ⟨hpos, fun u => ?_⟩
+      apply ih u
+      intro z hz
+      have hbig' : (z.1, QueryCount.single t + z.2) ∈
+          support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
+        countingOracle.add_single_mem_support_simulate_queryBind hz
+      have hb : 1 + (∑ i, z.2 i) ≤ n := (hsplit z.2) ▸ h _ hbig'
+      omega
+
 omit [Fintype ι] [DecidableEq ι] in
 /-- If a stateful simulation has support cost at most one per query step, then any support
 point of the simulated prefix leaves the continuation bounded by the residual budget measured
@@ -1027,6 +1111,65 @@ theorem IsQueryBoundP.residual_of_mem_support_counting [DecidableEq ι] [Fintype
       · simp only [if_neg hpt] at hrec
         rw [sum_filter_update_of_not_pred hpt] at hrec
         exact hrec
+
+/-- Predicate-targeted analogue of `isTotalQueryBound_iff_counting_total_le`: a
+counting-oracle filtered-sum bound characterizes the structural `IsQueryBoundP` bound. -/
+theorem isQueryBoundP_iff_counting_filter_le
+    [DecidableEq ι] [Fintype ι] [spec.Inhabited]
+    {oa : OracleComp spec α} {n : ℕ} :
+    IsQueryBoundP oa p n ↔
+      ∀ z ∈ support (countingOracle.simulate oa 0),
+        (∑ i ∈ Finset.univ.filter p, z.2 i) ≤ n := by
+  refine ⟨fun h _ hz => IsQueryBoundP.counting_bounded h hz, fun h => ?_⟩
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure _ => trivial
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff]
+      have hsplit : ∀ (q : QueryCount ι),
+          (∑ i ∈ Finset.univ.filter p, (QueryCount.single t + q) i) =
+          (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) +
+          (∑ i ∈ Finset.univ.filter p, q i) := by
+        intro q
+        simp [Pi.add_apply, Finset.sum_add_distrib]
+      refine ⟨?_, fun u => ?_⟩
+      · by_cases hpt : p t
+        · refine Or.inr ?_
+          obtain ⟨z₀, hz₀⟩ := countingOracle.support_simulate_nonempty (mx default)
+          have hbig : (z₀.1, QueryCount.single t + z₀.2) ∈
+              support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
+            countingOracle.add_single_mem_support_simulate_queryBind hz₀
+          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 1 := by
+            rw [QueryCount.single,
+              Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
+            simp
+          have hbound := h _ hbig
+          rw [hsplit, hsum_single] at hbound
+          omega
+        · exact Or.inl hpt
+      · apply ih u
+        intro z hz
+        have hbig' : (z.1, QueryCount.single t + z.2) ∈
+            support (countingOracle.simulate ((query t : OracleComp spec _) >>= mx) 0) :=
+          countingOracle.add_single_mem_support_simulate_queryBind hz
+        have hbound := h _ hbig'
+        rw [hsplit] at hbound
+        by_cases hpt : p t
+        · simp only [if_pos hpt]
+          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 1 := by
+            rw [QueryCount.single,
+              Finset.sum_update_of_mem (Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩)]
+            simp
+          rw [hsum_single] at hbound
+          omega
+        · simp only [if_neg hpt]
+          have hsum_single : (∑ i ∈ Finset.univ.filter p, QueryCount.single t i) = 0 := by
+            apply Finset.sum_eq_zero
+            intro j hj
+            have hjp : p j := (Finset.mem_filter.mp hj).2
+            have hjt : j ≠ t := fun he => hpt (he ▸ hjp)
+            simp [QueryCount.single, Function.update_of_ne hjt]
+          rw [hsum_single, zero_add] at hbound
+          exact hbound
 
 end IsQueryBoundPRelations
 
