@@ -127,9 +127,8 @@ The bound includes:
 * an explicit fresh-challenge verification slack `δ_verify`, supplied through
   `SigmaProtocol.verifyChallengePredictability`.
 
-The collision coefficient drops from `2 · qS · (qS + qH)` (loose chain
-decomposition, matching `FiatShamir.collisionSlack qS qH β`) to
-`qS · (qS + qH)` by using the HeapSSP joint-coupling theorem.
+The HeapSSP joint-coupling theorem charges the simulator-side programming
+collision once, giving coefficient `qS · (qS + qH)`.
 
 Because Schnorr has perfect HVZK (`ζ_zk = 0`), the per-query simulation loss
 vanishes and the simulation overhead reduces to

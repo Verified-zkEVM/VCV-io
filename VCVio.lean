@@ -19,6 +19,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Facts
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Reductions
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost

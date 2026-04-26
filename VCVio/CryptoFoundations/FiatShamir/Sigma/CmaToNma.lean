@@ -22,9 +22,9 @@ bound below shows that live NMA random-oracle queries are exactly the source
 adversary's live hash queries; simulator-programmed signing queries are
 absorbed into the managed cache.
 
-The quantitative CMA-to-NMA theorem itself lives in
-`Sigma/HeapSSP/Chain.lean`, so the public proof path has a single HeapSSP
-source of truth.
+The quantitative CMA-to-NMA theorem itself is exposed from
+`Sigma/Reductions.lean`, with the current proof discharged by the HeapSSP
+game chain.
 -/
 
 universe u v

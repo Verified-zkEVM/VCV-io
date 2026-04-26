@@ -206,7 +206,8 @@ The canonical `qP * qH * β` Fiat-Shamir slack is recovered by instantiating
 `B := (qP : ℝ≥0∞) * qH * β` (see `programming_collision_bound_qP_qH_β`) and discharging `hBad`
 via a union bound over the at most `qP` programmed points (each contributing at most `qH * β`
 by per-step unpredictability of the queried inputs). For Schnorr with `spec.Domain = M × Commit`,
-`β = 1/|G|`, `qP = qS`, and effective `qH = qS + qH`, this matches `collisionSlack qS qH G`.
+`β = 1/|G|`, `qP = qS`, and effective `qH = qS + qH`, this is the
+`qS * (qS + qH) * β` programming-collision term in the Fiat-Shamir bound.
 
 The per-point union bound itself depends on the structure of `oa`'s queries (specifically, an
 unpredictability hypothesis on each query's input distribution); it is discharged in the
