@@ -164,6 +164,43 @@ lemma IsQueryBound.proj
         ih u (h.2 u)
       rwa [h_cost t b h.1] at hu
 
+/-- Generic bind composition for `IsQueryBound` parameterised by an arbitrary budget type
+`B` and a binary `combine` operation on it. The natural-number versions
+(`isTotalQueryBound_bind`, `isQueryBoundP_bind`, `isPerIndexQueryBound_bind`) are special
+cases at `combine := (· + ·)`; the vector-budget `cmaSignHashQueryBound_bind` uses this
+directly with component-wise `+`.
+
+The two side conditions are universally quantified so they survive recursion under
+`generalizing b₁`:
+* `h_can` — extending any validated budget on either side via `combine` keeps the query
+  valid;
+* `h_cost` — `cost` distributes left and right over `combine` on validated budgets. -/
+lemma isQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
+    {canQuery : ι → B → Prop} {cost : ι → B → B}
+    (combine : B → B → B) {b₁ b₂ : B}
+    (h_can : ∀ t b₁' b₂' b, canQuery t b → canQuery t (combine b₁' b) ∧
+      canQuery t (combine b b₂'))
+    (h_cost : ∀ t b₁' b₂' b, canQuery t b →
+      combine b₁' (cost t b) = cost t (combine b₁' b) ∧
+      cost t (combine b b₂') = combine (cost t b) b₂')
+    (h₁ : IsQueryBound oa b₁ canQuery cost)
+    (h₂ : ∀ x, IsQueryBound (ob x) b₂ canQuery cost) :
+    IsQueryBound (oa >>= ob) (combine b₁ b₂) canQuery cost := by
+  induction oa using OracleComp.inductionOn generalizing b₁ with
+  | pure x =>
+      simp only [pure_bind]
+      exact IsQueryBound.proj (combine b₁)
+        (fun t b hcan => (h_can t b₁ b₂ b hcan).1)
+        (fun t b hcan => (h_cost t b₁ b₂ b hcan).1)
+        (h₂ x)
+  | query_bind t mx ih =>
+      rw [isQueryBound_query_bind_iff] at h₁
+      rw [bind_assoc, isQueryBound_query_bind_iff]
+      refine ⟨(h_can t b₁ b₂ b₁ h₁.1).2, fun u => ?_⟩
+      have hrec := ih u (h₁.2 u)
+      rw [(h_cost t b₁ b₂ b₁ h₁.1).2]
+      exact hrec
+
 /-- Transfer a structural query bound through `simulateQ` into a stateful target semantics,
 provided each simulated source query has a target-side step bound and the target-side bind
 rule composes those step budgets with the recursive continuation budget. -/
@@ -510,6 +547,36 @@ theorem IsPerIndexQueryBound.simulateQ_run_of_uniform_step
       rw [hadd]
       simpa [StateT.run_bind] using isPerIndexQueryBound_bind hstep' hrest
 
+/-- Stateless analogue of `IsPerIndexQueryBound.simulateQ_run_of_uniform_step`: when the
+simulation target monad is `OracleComp spec` directly (no `StateT` layer), each step's
+single-`t`-query bound transfers without an external state argument. -/
+theorem IsPerIndexQueryBound.simulateQ_of_uniform_step
+    {impl : QueryImpl spec (OracleComp spec)}
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb)
+    (hstep : ∀ t : spec.Domain,
+      IsPerIndexQueryBound (impl t) (Function.update 0 t 1)) :
+    IsPerIndexQueryBound (simulateQ impl oa) qb := by
+  induction oa using OracleComp.inductionOn generalizing qb with
+  | pure x => simp [simulateQ_pure]
+  | query_bind t mx ih =>
+      rw [isPerIndexQueryBound_query_bind_iff] at h
+      simp only [simulateQ_query_bind, OracleQuery.input_query, monadLift_self]
+      have hqb_pos : 0 < qb t := h.1
+      have hrest : ∀ u, IsPerIndexQueryBound (simulateQ impl (mx u))
+          (Function.update qb t (qb t - 1)) :=
+        fun u => ih u (h.2 u)
+      have hadd : qb =
+          (Function.update (0 : ι → ℕ) t 1) + Function.update qb t (qb t - 1) := by
+        ext j
+        by_cases hj : j = t
+        · subst hj
+          simp only [Pi.add_apply, Function.update_self]
+          omega
+        · simp [Function.update_of_ne hj]
+      rw [hadd]
+      exact isPerIndexQueryBound_bind (hstep t) hrest
+
 end IsPerIndexQueryBound
 
 /-! ### Total query bounds -/
@@ -536,22 +603,15 @@ lemma IsTotalQueryBound.mono {oa : OracleComp spec α} {n₁ n₂ : ℕ}
       exact ⟨Nat.lt_of_lt_of_le h.1 hle,
         fun u => ih u (h.2 u) (Nat.sub_le_sub_right hle 1)⟩
 
+/-- `IsTotalQueryBound` instantiates the generic vector-budget bind at `B := ℕ`,
+`combine := (· + ·)`, with the canQuery / cost obligations both discharged by `omega`. -/
 lemma isTotalQueryBound_bind {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {n₁ n₂ : ℕ}
     (h1 : IsTotalQueryBound oa n₁) (h2 : ∀ x, IsTotalQueryBound (ob x) n₂) :
     IsTotalQueryBound (oa >>= ob) (n₁ + n₂) := by
-  induction oa using OracleComp.inductionOn generalizing n₁ with
-  | pure x =>
-      simp only [pure_bind]
-      exact (h2 x).mono (Nat.le_add_left _ _)
-  | query_bind t mx ih =>
-      rw [isTotalQueryBound_query_bind_iff] at h1
-      rw [bind_assoc, isTotalQueryBound_query_bind_iff]
-      refine ⟨Nat.add_pos_left h1.1 _, fun u => ?_⟩
-      have h3 := ih u (h1.2 u)
-      have heq : n₁ - 1 + n₂ = n₁ + n₂ - 1 := by omega
-      rw [heq] at h3
-      exact h3
+  refine isQueryBound_bind (combine := fun a b => a + b) ?_ ?_ h1 h2
+  · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
+  · intros _ _ _ _ hcan; exact ⟨by simp; omega, by simp; omega⟩
 
 lemma not_isTotalQueryBound_bind_query_prefix_zero
     {oa : OracleComp spec α}
@@ -624,6 +684,28 @@ theorem IsTotalQueryBound.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSp
         fun p => ih p.1 (h.2 p.1) p.2
       have hn : 1 + (n - 1) = n := by omega
       simpa [StateT.run_bind, hn] using isTotalQueryBound_bind hstep' hrest
+
+/-- Stateless analogue of `IsTotalQueryBound.simulateQ_run_of_step`: when the simulation
+target monad is `OracleComp spec'` directly (no `StateT` layer), every per-step bound
+applies without an external state argument. Captures the `liftComp` shape, where each
+source query becomes one query in the larger spec. -/
+theorem IsTotalQueryBound.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec ι'}
+    {impl : QueryImpl spec (OracleComp spec')}
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsTotalQueryBound oa n)
+    (hstep : ∀ t : spec.Domain, IsTotalQueryBound (impl t) 1) :
+    IsTotalQueryBound (simulateQ impl oa) n := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure x =>
+      simpa [simulateQ_pure] using
+        (show IsTotalQueryBound (pure x : OracleComp spec' α) n from trivial)
+  | query_bind t mx ih =>
+      rw [isTotalQueryBound_query_bind_iff] at h
+      simp only [simulateQ_query_bind, OracleQuery.input_query, monadLift_self]
+      have hrest : ∀ u, IsTotalQueryBound (simulateQ impl (mx u)) (n - 1) :=
+        fun u => ih u (h.2 u)
+      have hn : 1 + (n - 1) = n := by have := h.1; omega
+      simpa [hn] using isTotalQueryBound_bind (hstep t) hrest
 
 namespace countingOracle
 
@@ -990,6 +1072,38 @@ theorem IsQueryBoundP.simulateQ_run_of_step {ι' : Type u} {spec' : OracleSpec �
         · simp only [if_neg hpt]; omega
       have := isQueryBoundP_bind hlift hrest
       simpa [hbound] using this
+
+/-- Stateless analogue of `IsQueryBoundP.simulateQ_run_of_step`: when the simulation target
+monad is `OracleComp spec'` directly (no `StateT` layer), the per-step bounds apply without
+an external state argument. Captures the `liftComp` shape, where each `p`-step becomes one
+`q`-query and each `¬ p`-step is `q`-free. -/
+theorem IsQueryBoundP.simulateQ_of_step {ι' : Type u} {spec' : OracleSpec ι'}
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
+    {impl : QueryImpl spec (OracleComp spec')}
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → IsQueryBoundP (impl t) q 1)
+    (hstep_np : ∀ t, ¬ p t → IsQueryBoundP (impl t) q 0) :
+    IsQueryBoundP (simulateQ impl oa) q n := by
+  induction oa using OracleComp.inductionOn generalizing n with
+  | pure x => simp [simulateQ_pure]
+  | query_bind t mx ih =>
+      rw [isQueryBoundP_query_bind_iff] at h
+      simp only [simulateQ_query_bind, OracleQuery.input_query, monadLift_self]
+      have hlift : IsQueryBoundP (impl t) q (if p t then 1 else 0) := by
+        by_cases hpt : p t
+        · simpa [if_pos hpt] using hstep_p t hpt
+        · simpa [if_neg hpt] using hstep_np t hpt
+      have hrest : ∀ u, IsQueryBoundP (simulateQ impl (mx u)) q (if p t then n - 1 else n) :=
+        fun u => ih u (h.2 u)
+      have hbound : (if p t then 1 else 0) + (if p t then n - 1 else n) = n := by
+        by_cases hpt : p t
+        · simp only [if_pos hpt]
+          rcases h.1 with hnp | hn
+          · exact absurd hpt hnp
+          · omega
+        · simp only [if_neg hpt]; omega
+      simpa [hbound] using isQueryBoundP_bind hlift (fun u _ => hrest u)
 
 /-- Transfer a predicate-targeted bound through `simulateQ` with a sum-of-implementations
 `impl₁ + impl₂` on a sum source spec `spec₁ + spec₂`. The source predicate `p` is split into

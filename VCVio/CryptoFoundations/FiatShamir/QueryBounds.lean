@@ -114,22 +114,21 @@ lemma nmaHashQueryBound_liftComp_zero {α : Type}
     (oa : ProbComp α) :
     nmaHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (oa := OracleComp.liftComp oa (unifSpec + (M × Commit →ₒ Chal))) 0 := by
-  induction oa using OracleComp.inductionOn with
-  | pure x =>
-      trivial
-  | query_bind t mx ih =>
-      rw [OracleComp.liftComp_bind]
-      refine nmaHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
-        (oa := OracleComp.liftComp
-          ($[0..t])
-          (unifSpec + (M × Commit →ₒ Chal)))
-        (ob := fun u => OracleComp.liftComp (mx u) (unifSpec + (M × Commit →ₒ Chal)))
-        (Q₁ := 0) (Q₂ := 0) ?_ ?_
-      · simpa using
-          (nmaHashQueryBound_query_iff (M := M) (Commit := Commit) (Chal := Chal)
-            (.inl t) 0).2 trivial
-      · intro u
-        exact ih u
+  -- The lifted handler routes every uniform query into the `.inl` arm, which never matches
+  -- `(· matches .inr _)`, so the predicate-targeted bound is uniformly 0 per step.
+  rw [nmaHashQueryBound, OracleComp.liftComp_def]
+  refine OracleComp.IsQueryBoundP.simulateQ_of_step
+    (p := fun _ : ℕ => False)
+    (impl := fun t => (liftM (unifSpec.query t) :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal)) (unifSpec.Range t)))
+    (OracleComp.isQueryBoundP_false oa 0)
+    (fun _ h => h.elim) ?_
+  intro t _
+  -- `liftM (query t)` lifts to `query (Sum.inl t)` which never matches `.inr _`.
+  change (liftM ((unifSpec + (M × Commit →ₒ Chal)).query (Sum.inl t)) :
+      OracleComp (unifSpec + (M × Commit →ₒ Chal)) _).IsQueryBoundP _ 0
+  rw [OracleComp.isQueryBoundP_query_iff]
+  intro hcontra; cases hcontra
 
 /-- Reciprocal of the finite challenge-space size. -/
 noncomputable def challengeSpaceInv (challenge : Type) [Fintype challenge] : ENNReal :=

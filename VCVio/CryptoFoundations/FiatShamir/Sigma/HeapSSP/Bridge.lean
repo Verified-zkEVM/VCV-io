@@ -253,29 +253,6 @@ lemma cmaSignHashQueryBound_pure {α : Type} (x : α) (qS qH : ℕ) :
   trivial
 
 omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
-lemma cmaSignHashQueryBound_mono {α : Type}
-    {oa : OracleComp (cmaSpec M Commit Chal Resp Stmt) α}
-    {qS₁ qH₁ qS₂ qH₂ : ℕ}
-    (h : cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp) (Stmt := Stmt) oa qS₁ qH₁)
-    (hS : qS₁ ≤ qS₂) (hH : qH₁ ≤ qH₂) :
-    cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-      (Resp := Resp) (Stmt := Stmt) oa qS₂ qH₂ := by
-  induction oa using OracleComp.inductionOn generalizing qS₁ qH₁ qS₂ qH₂ with
-  | pure x =>
-      trivial
-  | query_bind t cont ih =>
-      rw [cmaSignHashQueryBound_query_bind_iff] at h ⊢
-      rcases h with ⟨hcan, hcont⟩
-      rcases t with ((n | mc) | m) | ⟨⟩
-      · exact ⟨trivial, fun u => ih u (hcont u) hS hH⟩
-      · exact ⟨Nat.lt_of_lt_of_le hcan hH, fun u =>
-          ih u (hcont u) hS (Nat.sub_le_sub_right hH 1)⟩
-      · exact ⟨Nat.lt_of_lt_of_le hcan hS, fun u =>
-          ih u (hcont u) (Nat.sub_le_sub_right hS 1) hH⟩
-      · exact ⟨trivial, fun u => ih u (hcont u) hS hH⟩
-
-omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
 lemma cmaSignHashQueryBound_bind {α β : Type}
     {oa : OracleComp (cmaSpec M Commit Chal Resp Stmt) α}
     {ob : α → OracleComp (cmaSpec M Commit Chal Resp Stmt) β}
@@ -286,33 +263,37 @@ lemma cmaSignHashQueryBound_bind {α β : Type}
       (Resp := Resp) (Stmt := Stmt) (ob x) qS₂ qH₂) :
     cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) (oa >>= ob) (qS₁ + qS₂) (qH₁ + qH₂) := by
-  induction oa using OracleComp.inductionOn generalizing qS₁ qH₁ with
-  | pure x =>
-      simpa [pure_bind] using
-        cmaSignHashQueryBound_mono (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt) (oa := ob x) (h := h₂ x)
-          (hS := by omega) (hH := by omega)
-  | query_bind t cont ih =>
-      rw [cmaSignHashQueryBound_query_bind_iff] at h₁
-      rw [bind_assoc, cmaSignHashQueryBound_query_bind_iff]
-      rcases h₁ with ⟨hcan, hcont⟩
-      rcases t with ((n | mc) | m) | ⟨⟩
-      · refine ⟨trivial, fun u => ?_⟩
-        simpa [cmaSignHashCost] using ih u (hcont u)
-      · refine ⟨Nat.add_pos_left hcan qH₂, fun u => ?_⟩
-        have hrec := ih u (hcont u)
-        have hEq : qH₁ - 1 + qH₂ = qH₁ + qH₂ - 1 := by
-          have hpos : 1 ≤ qH₁ := Nat.succ_le_of_lt hcan
-          omega
-        simpa [cmaSignHashCost, hEq] using hrec
-      · refine ⟨Nat.add_pos_left hcan qS₂, fun u => ?_⟩
-        have hrec := ih u (hcont u)
-        have hEq : qS₁ - 1 + qS₂ = qS₁ + qS₂ - 1 := by
-          have hpos : 1 ≤ qS₁ := Nat.succ_le_of_lt hcan
-          omega
-        simpa [cmaSignHashCost, hEq] using hrec
-      · refine ⟨trivial, fun u => ?_⟩
-        simpa [cmaSignHashCost] using ih u (hcont u)
+  -- Reduce to the generic vector-budget bind: combine = component-wise `+`,
+  -- canQuery monotonicity and cost left/right-additivity follow case-by-case from `omega`.
+  refine OracleComp.isQueryBound_bind
+    (combine := fun p q => (p.1 + q.1, p.2 + q.2))
+    (b₁ := (qS₁, qH₁)) (b₂ := (qS₂, qH₂)) ?_ ?_ h₁ h₂
+  · rintro t ⟨a₁, b₁'⟩ ⟨a₂, b₂'⟩ ⟨a, b⟩ hcan
+    rcases t with ((n | mc) | m) | ⟨⟩ <;>
+      simp [cmaSignHashCanQuery] at hcan ⊢ <;> omega
+  · rintro t ⟨a₁, b₁'⟩ ⟨a₂, b₂'⟩ ⟨a, b⟩ hcan
+    rcases t with ((n | mc) | m) | ⟨⟩ <;>
+      simp [cmaSignHashCost, cmaSignHashCanQuery] at hcan ⊢ <;> omega
+
+omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
+lemma cmaSignHashQueryBound_mono {α : Type}
+    {oa : OracleComp (cmaSpec M Commit Chal Resp Stmt) α}
+    {qS₁ qH₁ qS₂ qH₂ : ℕ}
+    (h : cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) (Stmt := Stmt) oa qS₁ qH₁)
+    (hS : qS₁ ≤ qS₂) (hH : qH₁ ≤ qH₂) :
+    cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) (Stmt := Stmt) oa qS₂ qH₂ := by
+  -- Phrase the weakening as binding `oa` with the trivial `pure`-continuation: the latter
+  -- has bound `(qS₂ - qS₁, qH₂ - qH₁)`, and the bind composition recovers `(qS₂, qH₂)`.
+  have hbind := cmaSignHashQueryBound_bind (M := M) (Commit := Commit) (Chal := Chal)
+    (Resp := Resp) (Stmt := Stmt)
+    (oa := oa) (ob := fun x => (pure x : OracleComp (cmaSpec M Commit Chal Resp Stmt) α))
+    (qS₁ := qS₁) (qH₁ := qH₁) (qS₂ := qS₂ - qS₁) (qH₂ := qH₂ - qH₁)
+    h (fun _ => trivial)
+  have heqS : qS₁ + (qS₂ - qS₁) = qS₂ := by omega
+  have heqH : qH₁ + (qH₂ - qH₁) = qH₂ := by omega
+  simpa [bind_pure, heqS, heqH] using hbind
 
 /-! ### Joint output of `cmaReal` -/
 
@@ -1539,6 +1520,38 @@ theorem signedAdv_cmaSignHashQueryBound
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
+/-- `cmaSignLogImpl` issues exactly one underlying query per source step and only mutates
+its `List M` state on the sign branch, so projecting the result coordinate of the run
+reconstructs the source computation. -/
+private lemma fst_map_run_simulateQ_cmaSignLogImpl
+    {α : Type} (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α) (signed : List M) :
+    Prod.fst <$> (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) A).run signed = A := by
+  induction A using OracleComp.inductionOn generalizing signed with
+  | pure x => simp [simulateQ_pure, StateT.run_pure]
+  | query_bind t cont ih =>
+      rw [simulateQ_query_bind, StateT.run_bind, map_bind]
+      rcases t with ((n | mc) | m) | ⟨⟩
+      · simp only [cmaSignLogImpl, add_apply_inl, OracleQuery.input_query, bind_pure,
+          monadLift_self, StateT.run_monadLift, bind_pure_comp, bind_map_left]
+        exact bind_congr (fun u => ih u signed)
+      · simp only [cmaSignLogImpl, add_apply_inl, add_apply_inr, OracleQuery.input_query,
+          bind_pure, monadLift_self, StateT.run_monadLift, bind_pure_comp, bind_map_left]
+        exact bind_congr (fun u => ih u signed)
+      · -- Sign branch: state changes from `signed` to `signed ++ [m]`. The `change` step
+        -- exposes the post-`set` state so the IH instance picks `signed ++ [m]`.
+        simp only [add_apply_inl, add_apply_inr, OracleQuery.input_query, monadLift_self]
+        change (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inr m))) >>=
+          fun sig => Prod.fst <$> (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
+            (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
+            (cont sig)).run (signed ++ [m])) = _
+        exact bind_congr (fun sig => ih sig (signed ++ [m]))
+      · simp only [cmaSignLogImpl, add_apply_inr, OracleQuery.input_query, bind_pure,
+          monadLift_self, StateT.run_monadLift, bind_pure_comp, bind_map_left]
+        exact bind_congr (fun pk => ih pk signed)
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
+  [DecidableEq Commit] [SampleableType Chal] in
 theorem cmaSignLogImpl_cmaSignHashQueryBound
     {α : Type}
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
@@ -1548,61 +1561,10 @@ theorem cmaSignLogImpl_cmaSignHashQueryBound
     cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt)
       ((simulateQ (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt)) A).run signed) qS qH := by
-  induction A using OracleComp.inductionOn generalizing qS qH signed with
-  | pure x =>
-      simp [simulateQ_pure, cmaSignHashQueryBound]
-  | query_bind t cont ih =>
-      rw [cmaSignHashQueryBound_query_bind_iff] at hA
-      rcases hA with ⟨hcan, hcont⟩
-      rcases t with ((n | mc) | m) | ⟨⟩
-      · rw [simulateQ_query_bind, StateT.run_bind]
-        simp only [add_apply_inl, OracleQuery.input_query, bind_pure, monadLift_self,
-          StateT.run_monadLift, bind_pure_comp, bind_map_left]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inl (Sum.inl n)))) >>=
-            fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨trivial, fun u => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih u signed qS qH (hcont u)
-      · rw [simulateQ_query_bind, StateT.run_bind]
-        simp only [add_apply_inl, add_apply_inr, OracleQuery.input_query, bind_pure,
-          monadLift_self, StateT.run_monadLift, bind_pure_comp, bind_map_left]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inl (Sum.inr mc)))) >>=
-            fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨hcan, fun u => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih u signed qS (qH - 1) (hcont u)
-      · rw [simulateQ_query_bind, StateT.run_bind]
-        simp only [add_apply_inl, add_apply_inr, OracleQuery.input_query, monadLift_self]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inl (Sum.inr m))) >>=
-            fun sig => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont sig)).run (signed ++ [m]))
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨hcan, fun sig => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih sig (signed ++ [m]) (qS - 1) qH (hcont sig)
-      · rw [simulateQ_query_bind, StateT.run_bind]
-        simp only [add_apply_inr, OracleQuery.input_query, bind_pure, monadLift_self,
-          StateT.run_monadLift, bind_pure_comp, bind_map_left]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (Sum.inr ())) >>=
-            fun pk => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont pk)).run signed)
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨trivial, fun pk => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih pk signed qS qH (hcont pk)
+        (Resp := Resp) (Stmt := Stmt)) A).run signed) qS qH :=
+  (OracleComp.isQueryBound_iff_of_map_eq
+    (fst_map_run_simulateQ_cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
+      (Resp := Resp) (Stmt := Stmt) A signed) _ _).mpr hA
 
 omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
   [DecidableEq M] [DecidableEq Commit] in
