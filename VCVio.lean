@@ -15,8 +15,10 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.CmaToNma
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Fork
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Bridge
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.CmaState
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Facts
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
+import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hop5
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Hops
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
@@ -207,6 +209,7 @@ import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateProjection
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
+import VCVio.OracleComp.SimSemantics.WritesOnly
 import VCVio.OracleComp.Traversal
 import VCVio.Prelude
 import VCVio.ProgramLogic.Notation

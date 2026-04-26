@@ -958,4 +958,6 @@ theorem euf_cma_bound
     tsub_le_iff_right.mpr (by simpa [add_assoc] using hAdv)
   exact mul_le_mul' hle (tsub_le_tsub_right (ENNReal.div_le_div_right hle _) _)
 
+#print axioms euf_cma_bound
+
 end FiatShamir

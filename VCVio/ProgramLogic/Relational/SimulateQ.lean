@@ -2107,6 +2107,34 @@ lemma expectedSCost_const_le_qS_mul
                   exact tsum_probOutput_le_one
               _ = (qS : ℕ) * ε := one_mul _
 
+/-- Quadratic-cost bound from a uniform per-state upper bound.
+
+This packages the common Fiat-Shamir pattern: if every costly step has
+state-dependent cost bounded by `ε₀ + (qS + qH) * ε₁`, then a computation with
+at most `qS` costly queries accumulates at most
+`qS * ε₀ + qS * (qS + qH) * ε₁`. -/
+lemma expectedSCost_le_quadratic_of_forall_le
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
+    (ε₀ ε₁ : ℝ≥0∞) (oa : OracleComp spec α) {qS qH : ℕ}
+    (h_qb : OracleComp.IsQueryBound oa qS
+      (fun t b => if S t then 0 < b else True)
+      (fun t b => if S t then b - 1 else b))
+    (hε : ∀ s, ε s ≤ ε₀ + ((qS : ℝ≥0∞) + qH) * ε₁)
+    (p : σ × Bool) :
+    expectedSCost impl S ε oa qS p ≤
+      (qS : ℝ≥0∞) * ε₀ + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + qH) * ε₁ := by
+  calc
+    expectedSCost impl S ε oa qS p
+        ≤ expectedSCost impl S (fun _ => ε₀ + ((qS : ℝ≥0∞) + qH) * ε₁) oa qS p :=
+          expectedSCost_mono impl S hε oa qS p
+    _ ≤ (qS : ℝ≥0∞) * (ε₀ + ((qS : ℝ≥0∞) + qH) * ε₁) := by
+          simpa using
+            expectedSCost_const_le_qS_mul impl S
+              (ε₀ + ((qS : ℝ≥0∞) + qH) * ε₁) oa h_qb p
+    _ = (qS : ℝ≥0∞) * ε₀ + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + qH) * ε₁ := by
+          ring
+
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
 This is the ENNReal-form analogue of the existing real-valued

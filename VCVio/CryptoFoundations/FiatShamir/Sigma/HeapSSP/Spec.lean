@@ -4,53 +4,24 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.OracleComp.OracleSpec
-import VCVio.OracleComp.QueryTracking.Structures
-import VCVio.HeapSSP.Heap
 
 /-!
-# Oracle interfaces and heap-cell directories for the HeapSSP Fiat-Shamir proof
+# Oracle interfaces for the HeapSSP Fiat-Shamir proof
 
-The oracle interfaces (`OracleSpec`s) and heap-cell identifier sets
-(`CellSpec`) that the HeapSSP reformulation of the Fiat-Shamir Σ-protocol
-EUF-CMA proof is typed against. Every game, component package, and
-reduction adversary in `Sigma/HeapSSP/*` exports/imports along one of the
-oracle specs defined here and owns one of the cell directories defined
-here.
+The oracle interfaces (`OracleSpec`s) used by the HeapSSP reformulation of
+the Fiat-Shamir Sigma-protocol EUF-CMA proof. State ownership is deliberately
+kept out of this file; see
+`VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.CmaState` for the package
+cell directories and record-style projections.
 
-## Oracle specs
+The combined interfaces mirror `Sigma/CmaToNma.lean`:
 
-Mirrors `Sigma/CmaToNma.lean`: five single-oracle specs plus two combined
-adversary-facing parallel sums.
-
-* `roSpec M Commit Chal` — random-oracle interface: `(M × Commit) →ₒ Chal`.
-* `signSpec M Commit Resp` — signing-oracle interface:
-  `M →ₒ (Commit × Resp)`.
-* `pkSpec Stmt` — public-key interface: `Unit →ₒ Stmt`.
-* `progSpec M Commit Chal` — programming interface, used internally by
-  the programmable-RO package between the Σ-simulator and the cache:
-  `(M × Commit × Chal) →ₒ Unit`.
-* `cmaSpec M Commit Chal Resp Stmt` — CMA adversary's view, the parallel
-  sum `unifSpec + roSpec + signSpec + pkSpec`.
-* `nmaSpec M Commit Chal Stmt` — NMA adversary's view, the parallel sum
-  `unifSpec + roSpec + progSpec + pkSpec`.
-
-## Heap-cell directories
-
-The HeapSSP restructure expresses game state as `Heap Ident` for an
-identifier set `Ident`. For Fiat-Shamir we take:
-
-* `OuterCell M` (singleton) — owns the signed-message log `List M`.
-* `InnerCell M Commit Chal Stmt Wit` — owns the three "inner" cells:
-    - `.roCache` : `(roSpec M Commit Chal).QueryCache`
-    - `.keypair` : `Option (Stmt × Wit)`
-    - `.bad`     : `Bool`
-* `CmaCells M Commit Chal Stmt Wit := OuterCell M ⊕ InnerCell …` — the
-  composite directory shared by `cmaReal` (monolithic) and
-  `cmaSim := cmaToNma.link nma` (link-composite), see
-  `VCVio/CryptoFoundations/FiatShamir/Sigma/HeapSSP/Games.lean`.
-
-The designated `bad` flag is `InnerCell.bad`; the bridge bijection in
-`Hops.lean` reads it out via `Heap.get (.inr .bad)`.
+* `roSpec M Commit Chal` is the random-oracle interface `(M × Commit) →ₒ Chal`.
+* `signSpec M Commit Resp` is the signing interface `M →ₒ (Commit × Resp)`.
+* `pkSpec Stmt` is a public-key oracle `Unit →ₒ Stmt`.
+* `progSpec M Commit Chal` is the simulator's private programming interface.
+* `cmaSpec M Commit Chal Resp Stmt` is the CMA adversary view.
+* `nmaSpec M Commit Chal Stmt` is the managed-RO NMA view.
 -/
 
 open OracleSpec
@@ -92,76 +63,5 @@ CMA-to-NMA reduction. Includes `unifSpec`, `roSpec`, `progSpec`, and
 @[reducible] def nmaSpec (M Commit Chal Stmt : Type) :
     OracleSpec (((ℕ ⊕ M × Commit) ⊕ M × Commit × Chal) ⊕ Unit) :=
   unifSpec + roSpec M Commit Chal + progSpec M Commit Chal + pkSpec Stmt
-
-/-! ### Heap-cell directories
-
-`OuterCell M` and `InnerCell M Commit Chal Stmt Wit` are phantom-typed by
-the underlying payload's type parameters, so that their `CellSpec`
-instances can reference those parameters without requiring `section
-variable`-indirection at every use site. -/
-
-/-- Outer cell directory for `cmaToNma` (and for the outer half of
-`cmaReal`): a single `log` cell holding the signed-message list.
-
-The `M` parameter is phantom: it pins down the `CellSpec` instance
-below, but the constructor itself carries no data. The explicit
-`DecidableEq` instance side-steps typeclass-synthesis timeouts that the
-machine-generated `deriving` instance would otherwise induce when
-`Heap.update` is called on the composite cell directory `CmaCells`. -/
-inductive OuterCell (M : Type) where
-  | log
-
-instance (M : Type) : DecidableEq (OuterCell M) := fun a b =>
-  match a, b with
-  | .log, .log => .isTrue rfl
-
-instance (M : Type) : VCVio.HeapSSP.CellSpec.{0, 0} (OuterCell M) where
-  type
-    | .log => List M
-  default
-    | .log => []
-
-/-- Inner cell directory for `nma` (and for the inner half of `cmaReal`):
-RO cache, optional keypair, and a Boolean bad flag.
-
-As with `OuterCell`, the type parameters are phantom and the
-`DecidableEq` instance is supplied explicitly to keep typeclass
-synthesis lightweight on the composite cell directory `CmaCells`. -/
-inductive InnerCell (M Commit Chal Stmt Wit : Type) where
-  | roCache
-  | keypair
-  | bad
-
-instance (M Commit Chal Stmt Wit : Type) :
-    DecidableEq (InnerCell M Commit Chal Stmt Wit) := fun a b =>
-  match a, b with
-  | .roCache, .roCache => .isTrue rfl
-  | .keypair, .keypair => .isTrue rfl
-  | .bad,     .bad     => .isTrue rfl
-  | .roCache, .keypair => .isFalse (fun h => by cases h)
-  | .roCache, .bad     => .isFalse (fun h => by cases h)
-  | .keypair, .roCache => .isFalse (fun h => by cases h)
-  | .keypair, .bad     => .isFalse (fun h => by cases h)
-  | .bad,     .roCache => .isFalse (fun h => by cases h)
-  | .bad,     .keypair => .isFalse (fun h => by cases h)
-
-instance (M Commit Chal Stmt Wit : Type) :
-    VCVio.HeapSSP.CellSpec.{0, 0} (InnerCell M Commit Chal Stmt Wit) where
-  type
-    | .roCache => (roSpec M Commit Chal).QueryCache
-    | .keypair => Option (Stmt × Wit)
-    | .bad => Bool
-  default
-    | .roCache => ∅
-    | .keypair => none
-    | .bad => false
-
-/-- Composite cell directory for `cmaReal` (monolithic) and
-`cmaSim := cmaToNma.link nma` (link-composite). By construction of
-`Package.link`, the two shapes have state type `Heap (CmaCells …)`
-verbatim, so H4 (`cmaSim = cmaToNma.link nma`) is *definitionally* true.
--/
-abbrev CmaCells (M Commit Chal Stmt Wit : Type) : Type :=
-  OuterCell M ⊕ InnerCell M Commit Chal Stmt Wit
 
 end FiatShamir.HeapSSP

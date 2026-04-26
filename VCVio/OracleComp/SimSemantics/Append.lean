@@ -159,6 +159,22 @@ lemma simulateQ_liftM_eq_of_query
       rw [liftM_bind, simulateQ_bind, simulateQ_bind, h t, simulateQ_spec_query]
       exact bind_congr fun u => ih u
 
+/-- Probability-facing form of `simulateQ_liftM_eq_of_query`.
+
+If every lifted source query handled by `impl` is the same program as the
+corresponding source handler `impl₁`, then the lifted whole computation has
+the same output distribution after simulation. -/
+lemma evalDist_simulateQ_liftWrap
+    (impl : QueryImpl spec₂' ProbComp) (impl₁ : QueryImpl spec₁' ProbComp)
+    (h : ∀ t, simulateQ impl
+      (liftM (liftM (spec₁'.query t) :
+        OracleComp spec₁' (spec₁'.Range t)) :
+        OracleComp spec₂' (spec₁'.Range t)) = impl₁ t)
+    (oa : OracleComp spec₁' α) :
+    evalDist (simulateQ impl (liftM oa : OracleComp spec₂' α)) =
+      evalDist (simulateQ impl₁ oa) := by
+  rw [simulateQ_liftM_eq_of_query impl impl₁ h oa]
+
 end simulateQ_liftM
 
 end QueryImpl
