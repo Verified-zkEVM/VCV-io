@@ -7,6 +7,7 @@ Authors: Quang Dao
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics.Common
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
 
 /-!
 # Relational VCGen Internals
@@ -19,6 +20,8 @@ open Lean Elab Tactic Meta
 namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
+
+attribute [lspec_spike] Std.Do'.RelWP.rwp_pure
 
 /-! ### Registered VC-spec rules
 
@@ -395,8 +398,21 @@ def runRelSimDistRule : TacticM Bool := withMainContext do
         apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_impl_evalDist_eq))
   | none => return false
 
+private def runUnifiedLSpecBackward : TacticM Bool := do
+  let goals ← getGoals
+  match goals with
+  | [] => return false
+  | goal :: rest =>
+      match ← liftMetaM <| Experimental.tryApplyMatchingCached goal with
+      | none => return false
+      | some (_, subgoals) =>
+          setGoals (subgoals ++ rest)
+          return true
+
 def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure
+  if ← runUnifiedLSpecBackward then
+    return true
   let target ← instantiateMVars (← getMainTarget)
   if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then
     let _ := pre
@@ -536,10 +552,38 @@ private def provenRelPostHintNames : TacticM (Array Name) := withMainContext do
             found := pushNameIfNew found name
   return found
 
+private def provenBijectiveHintNames : TacticM (Array Name) := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  unless relationalGoalParts? target |>.isSome do
+    return #[]
+  let mut found : Array Name := #[]
+  for localDecl in ← getLCtx do
+    unless localDecl.isImplementationDetail do
+      let type ← instantiateMVars localDecl.type
+      if ← isProp type then
+        if let some app := findAppWithHead? ``Function.Bijective type then
+          if let some args := trailingArgs? app 1 then
+            if let some name ← localNameOfExpr? args[0]! then
+              found := pushNameIfNew found name
+  return found
+
+private def priorityRelHintNames : TacticM (Array Name) := do
+  let mut found := #[]
+  for name in ← provenRelPostHintNames do
+    found := pushNameIfNew found name
+  for name in ← provenBijectiveHintNames do
+    found := pushNameIfNew found name
+  return found
+
+private def findUniquePriorityRelHint? : TacticM (Option Name) := do
+  let found ← priorityRelHintNames
+  return found.toList.head? >>= fun first =>
+    if found.size = 1 then some first else none
+
 /-- Find the local hypotheses that work as relational `using` hints. -/
 def findRelHintCandidates : TacticM (Array Name) :=
   withVCGenLocalHintTiming <| withMainContext do
-    let proven ← provenRelPostHintNames
+    let proven ← priorityRelHintNames
     unless proven.isEmpty do
       return proven
     let mut found : Array Name := #[]
@@ -875,11 +919,14 @@ def runRVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       progress := true
-  if let some hintName ← findUniqueRelHint? then
+  if let some hintName ← findUniquePriorityRelHint? then
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true
   if ← runRVCGenCore then
     return true
+  if let some hintName ← findUniqueRelHint? then
+    if ← runRVCGenCoreUsing (mkIdent hintName) then
+      return true
   if ← withVCGenCloseTiming tryCloseRelGoalConseq then
     return true
   if let some entry := (← findRegisteredRVCGenRuleCandidates).toList.head? then

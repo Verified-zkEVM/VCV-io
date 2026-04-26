@@ -95,5 +95,13 @@ The first measured pass above has now been turned into two focused relational ch
   This preserves the existing ambiguity checks while avoiding replay for the common bind-cut pattern.
 - The second timing run on `Examples/ProgramLogic/RelationalStep.lean` reduced the main local-hint
   hotspot from about `460ms` to `0ms`.
-  One proof-mode example still reports about `139ms` in local hints, so the next measured target is a
-  stricter goal-shape/type filter for fallback hint candidates rather than another broad planner pass.
+- The remaining proof-mode local-hint hotspot is now handled by the same priority path for local
+  bijection proofs, such as `hf : Function.Bijective f`.
+  The follow-up `ProofMode` sweep reports `localHints=0ms` on the previously expensive example.
+- The unified `@[lspec_spike]` backward path now has a cached production entry point and is called
+  side by side from raw `wp`/`rwp` structural stepping.
+  This keeps the current `@[vcspec]` path as the main engine while giving the unified registry a
+  real production consumer for the narrow pure-rule class.
+- Probability-equality planning now uses a bind-spine depth estimate to bound the generated
+  rewrite/congruence plans for `vcgen?`.
+  The current probability examples remain cheap, with `probPlanner` at `0-4ms`.

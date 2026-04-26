@@ -6,6 +6,7 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Relational.Basic
+import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 
 /-!
@@ -19,6 +20,8 @@ open Lean Elab Tactic Meta
 namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Unary
+
+attribute [lspec_spike] OracleComp.ProgramLogic.triple_pure
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -756,6 +759,53 @@ private def probEqPlannerActionPlans : List (List ProbEqAction) :=
     , [.swap]
     ]
 
+private def probExprComp? (expr : Expr) : Option Expr := do
+  let app ←
+    match findAppWithHead? ``probOutput expr with
+    | some app => some app
+    | none => findAppWithHead? ``probEvent expr
+  let args ← trailingArgs? app 2
+  let #[comp, _] := args | none
+  some comp
+
+private partial def topBindDepth (expr : Expr) : Nat :=
+  let expr := expr.consumeMData
+  if isBindExpr expr then
+    let args := expr.getAppArgs
+    if h : 0 < args.size then
+      let k := args[args.size - 1]
+      match k.consumeMData with
+      | .lam _ _ body _ => topBindDepth body + 1
+      | _ => 1
+    else
+      1
+  else
+    0
+
+private def probEqBindDepth? (target : Expr) : Option Nat := do
+  let target := target.consumeMData
+  guard <| target.isAppOfArity ``Eq 3
+  let lhsComp ← probExprComp? (target.getArg! 1)
+  let rhsComp ← probExprComp? (target.getArg! 2)
+  some (Nat.min (topBindDepth lhsComp) (topBindDepth rhsComp))
+
+private def probEqPlannerActionPlansForDepth (bindDepth : Nat) : List (List ProbEqAction) :=
+  let maxRewriteDepth := Nat.min 4 (bindDepth - 2)
+  let maxCongrDepth := Nat.min 3 bindDepth
+  probEqRewritePlans maxRewriteDepth ++ probEqCongrPlans maxCongrDepth ++
+    [ [.congr]
+    , [.congrNoSupport]
+    , [.congr, .swap]
+    , [.congrNoSupport, .swap]
+    , [.swap]
+    ]
+
+private def probEqPlannerActionPlansForGoal : TacticM (List (List ProbEqAction)) := do
+  let target ← instantiateMVars (← getMainTarget)
+  match probEqBindDepth? target with
+  | some depth => return probEqPlannerActionPlansForDepth depth
+  | none => return probEqPlannerActionPlans
+
 def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
   match ← chooseBestProbEqPlan? plans with
   | none => return false
@@ -787,6 +837,17 @@ def tryProbEqGoal : TacticM Bool := do
   if ← tryProbEqPlans probEqActionPlans then
     return true
   runProbOutputEqRelBridge
+
+private def runUnifiedLSpecBackward : TacticM Bool := do
+  let goals ← getGoals
+  match goals with
+  | [] => return false
+  | goal :: rest =>
+      match ← liftMetaM <| Experimental.tryApplyMatchingCached goal with
+      | none => return false
+      | some (_, subgoals) =>
+          setGoals (subgoals ++ rest)
+          return true
 
 def throwVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -871,6 +932,8 @@ def tryRawWpStructuralStep : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   let some comp := wpGoalComp? target | return false
   let comp ← whnfReducible (← instantiateMVars comp)
+  if ← runUnifiedLSpecBackward then
+    return true
   if ← runWpStepRules then
     return true
   if ← tryMatchDecomp comp then
@@ -996,7 +1059,7 @@ private def planExplicitProbEqStep? (plainPreview : PreviewResult) :
   unless isProbEqGoal target do
     return none
   let mut steps : Array PlannedStep := #[]
-  for plan in probEqPlannerActionPlans do
+  for plan in ← probEqPlannerActionPlansForGoal do
     let replayText ← renderProbEqPlan plan
     steps := steps.push <| mkVCGenPlannedStep
       "vcgen probability plan"
