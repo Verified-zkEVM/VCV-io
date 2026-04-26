@@ -420,7 +420,7 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
     let entries ← getRegisteredRelationalVCSpecEntries oa ob
     for entry in (entries.filter (·.kind == .relWP)).toList.take 8 do
       let saved ← saveState
-      if ← runVCSpecEntryBackward entry then
+      if ← runVCSpecEntryCachedBackward entry then
         return true
       saved.restore
     return false
@@ -738,7 +738,7 @@ private def runRelationalVCSpecRule
   let saved ← saveState
   let ok ←
     match ← observing? do
-      unless ← runVCSpecEntryBackward entry do
+      unless ← runVCSpecEntryCachedBackward entry do
         throwError "rvcstep: registered `@[vcspec]` rule did not apply"
       closeRelTheoremStepGoals
     with

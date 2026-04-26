@@ -188,11 +188,8 @@ private def runUnaryVCSpecRule
   let saved ← saveState
   let ok ←
     match ← observing? do
-      let cachedSaved ← saveState
       unless ← runVCSpecEntryCachedBackward entry do
-        cachedSaved.restore
-        unless ← runVCSpecEntryBackward entry do
-          throwError "vcstep: registered `@[vcspec]` rule did not apply"
+        throwError "vcstep: registered `@[vcspec]` rule did not apply"
       closeTheoremStepGoals
     with
     | some _ => pure true

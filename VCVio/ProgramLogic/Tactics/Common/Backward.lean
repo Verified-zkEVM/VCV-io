@@ -22,6 +22,7 @@ entry is kept for diagnostics and replay text. -/
 structure VCSpecBackwardRule where
   source : VCSpecEntry
   rawGoal : Bool
+  proof : AbstractMVarsResult
   rule : Lean.Meta.Sym.BackwardRule
 
 private abbrev VCSpecBackwardRuleCacheKey := Name × Bool
@@ -94,6 +95,18 @@ private def stdDoWpParts? (rhs : Expr) : Option (Expr × Expr × Expr) := do
   let epost := args[args.size - 1]!
   some (oa, post, epost)
 
+private def stdDoRelWpParts? (rhs : Expr) : Option (Expr × Expr × Expr × Expr × Expr) := do
+  let rhs := rhs.consumeMData
+  unless rhs.getAppFn.isConstOf ``Std.Do'.rwp do none
+  let args := rhs.getAppArgs
+  unless args.size ≥ 5 do none
+  let oa := args[args.size - 5]!
+  let ob := args[args.size - 4]!
+  let post := args[args.size - 3]!
+  let epost₁ := args[args.size - 2]!
+  let epost₂ := args[args.size - 1]!
+  some (oa, ob, post, epost₁, epost₂)
+
 /-- Build the pointwise postcondition premise used when a concrete unary post
 from a spec theorem is generalized to the goal's postcondition. -/
 private def mkUnaryPostPointwisePremise (postSpec postTarget postTy : Expr) :
@@ -105,6 +118,21 @@ private def mkUnaryPostPointwisePremise (postSpec postTarget postTy : Expr) :
     let rhs := mkApp postTarget a
     let rel ← mkAppM ``Lean.Order.PartialOrder.rel #[lhs, rhs]
     mkForallFVars #[a] rel
+
+/-- Build the pointwise relational-postcondition premise used when a concrete
+relational post from a spec theorem is generalized to the goal's postcondition. -/
+private def mkRelPostPointwisePremise (postSpec postTarget postTy : Expr) :
+    MetaM Expr := do
+  let .forallE _ α body _ := postTy.consumeMData
+    | throwError "expected a relational postcondition, got:{indentExpr postTy}"
+  let .forallE _ β _ _ := body.consumeMData
+    | throwError "expected a binary relational postcondition, got:{indentExpr postTy}"
+  withLocalDeclD `a α fun a => do
+    withLocalDeclD `b β fun b => do
+      let lhs := mkApp2 postSpec a b
+      let rhs := mkApp2 postTarget a b
+      let rel ← mkAppM ``Lean.Order.PartialOrder.rel #[lhs, rhs]
+      mkForallFVars #[a, b] rel
 
 /-- Generalize a raw unary `pre ⊑ wp prog post epost` proof into a reusable
 backward rule source by abstracting concrete `post` and always abstracting
@@ -129,12 +157,37 @@ private def mkUnarySpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := 
   let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
   mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
 
-private def mkBackwardRuleFromProofExpr (prf : Expr) : MetaM Lean.Meta.Sym.BackwardRule := do
+/-- Generalize a raw relational `pre ⊑ rwp left right post epost₁ epost₂`
+proof into a reusable backward rule source. This is the qualitative relational
+analogue of `mkUnarySpecBackwardProof`; quantitative `eRelTriple` stays on its
+own path for now. -/
+private def mkRelSpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := do
+  let some (oa, ob, postSpec, epost₁, epost₂) := stdDoRelWpParts? rhs
+    | throwError "expected a Std.Do'.rwp RHS, got:{indentExpr rhs}"
+  let mut postAbstract := postSpec.consumeMData
+  let mut specApplied := specProof
+  unless postAbstract.isMVar do
+    let postTy ← inferType postSpec
+    postAbstract ← mkFreshExprMVar (userName := `post) postTy
+    let hpostTy ← mkRelPostPointwisePremise postSpec postAbstract postTy
+    let hpost ← mkFreshExprMVar (userName := `postImpl) hpostTy
+    specApplied ←
+      mkAppM ``Std.Do'.RelWP.rwp_consequence_rel
+        #[oa, ob, postSpec, postAbstract, epost₁, epost₂, hpost, specApplied]
+  let preTy ← inferType pre
+  let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
+  let hpreTy ← mkAppM ``Lean.Order.PartialOrder.rel #[preAbstract, pre]
+  let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
+  mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
+
+private def mkBackwardRuleFromProofExpr (prf : Expr) :
+    MetaM (AbstractMVarsResult × Lean.Meta.Sym.BackwardRule) := do
   let prf ← instantiateMVars prf
   let res ← abstractMVars prf
   let type ← instantiateMVars (← inferType res.expr)
   let decl ← mkAuxLemma res.paramNames.toList type res.expr
-  Lean.Meta.Sym.mkBackwardRuleFromDecl decl
+  let rule ← Lean.Meta.Sym.mkBackwardRuleFromDecl decl
+  return (res, rule)
 
 private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
@@ -150,13 +203,15 @@ private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
       | some (pre, rhs) =>
           if (stdDoWpParts? rhs).isSome then
             mkUnarySpecBackwardProof pre rhs prf
+          else if (stdDoRelWpParts? rhs).isSome then
+            mkRelSpecBackwardProof pre rhs prf
           else
             pure prf
       | none => pure prf
     else
       pure prf
-  let rule ← mkBackwardRuleFromProofExpr prf
-  return { source := entry, rawGoal, rule }
+  let (proof, rule) ← mkBackwardRuleFromProofExpr prf
+  return { source := entry, rawGoal, proof, rule }
 
 private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
@@ -180,7 +235,17 @@ def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
   let rawGoal ← isRawBackwardGoal goalTy
   let rule ← getVCSpecBackwardRuleCached entry rawGoal
   match ← Lean.Meta.Sym.SymM.run <| rule.rule.apply mvarId with
-  | .failed => return none
+  | .failed =>
+      -- `Sym.BackwardRule` matches against its preprocessed pattern. Some
+      -- folded VCVio-facing goals are still better handled by Lean's ordinary
+      -- elaborated application, but we still apply the cached abstracted proof
+      -- source, not the original theorem entry.
+      try
+        let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
+        let subgoals ← mvarId.apply prf
+        return some subgoals
+      catch _ =>
+        return none
   | .goals subgoals => return some subgoals
 
 /-- Try to apply a registered `@[vcspec]` entry directly to a goal metavariable.
