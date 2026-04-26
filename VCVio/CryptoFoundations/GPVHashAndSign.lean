@@ -149,32 +149,26 @@ noncomputable def runtime :
     ∅
   toProbCompLift := ProbCompLift.ofMonadLift _
 
-/-- Structural bound that counts only random-oracle queries in a GPV EUF-CMA adversary. -/
+/-- Structural bound that counts only random-oracle queries in a GPV EUF-CMA adversary.
+
+Defined as the generic predicate-targeted query bound `IsQueryBoundP` with the predicate
+selecting the nested `.inl (.inr _)` (random-oracle) component of the index sum. -/
 def hashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ S')) α) (Q : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa Q
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => True
-      | .inl (.inr _) => 0 < b)
-    (fun t b => match t with
-      | .inl (.inl _) | .inr _ => b
-      | .inl (.inr _) => b - 1)
+  OracleComp.IsQueryBoundP oa (· matches .inl (.inr _)) Q
 
 /-- Structural query bound for GPV EUF-CMA adversaries that tracks both signing-oracle
 queries (`qSign`) and random-oracle queries (`qHash`). Uniform-sampling queries are
-unrestricted. -/
+unrestricted.
+
+Defined as the conjunction of two predicate-targeted query bounds `IsQueryBoundP`, one per
+counted oracle. Because the two index predicates are disjoint, the conjunction is
+equivalent to the prior single-vector `IsQueryBound` formulation. -/
 def signHashQueryBound {S' α : Type}
     (oa : OracleComp ((unifSpec + (Salt × M →ₒ Range)) + (M →ₒ S')) α)
     (qSign qHash : ℕ) : Prop :=
-  OracleComp.IsQueryBound oa (qSign, qHash)
-    (fun t b => match t, b with
-      | .inl (.inl _), _ => True
-      | .inl (.inr _), (_, qHash') => 0 < qHash'
-      | .inr _, (qSign', _) => 0 < qSign')
-    (fun t b => match t, b with
-      | .inl (.inl _), b' => b'
-      | .inl (.inr _), (qSign', qHash') => (qSign', qHash' - 1)
-      | .inr _, (qSign', qHash') => (qSign' - 1, qHash'))
+  oa.IsQueryBoundP (· matches .inr _) qSign ∧
+  oa.IsQueryBoundP (· matches .inl (.inr _)) qHash
 
 /-- A collision-finding adversary receives a public key and must produce two distinct
 short preimages with the same image under `psf.eval`. -/

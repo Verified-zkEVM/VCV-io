@@ -58,6 +58,56 @@ lemma sum_update_succ_count {ι : Type} [Fintype ι] [DecidableEq ι]
     _ = (∑ j : ι, counts j) + 1 := by
           rw [← Finset.univ.add_sum_erase (f := fun j : ι => counts j) (Finset.mem_univ i)]
 
+/-- Updating one coordinate of a `ℕ`-valued function by `-1` at a positive-valued coordinate
+decreases the total sum by exactly one. -/
+lemma sum_update_pred {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {qc : ι → ℕ} {t : ι} (ht : 0 < qc t) :
+    ∑ i, Function.update qc t (qc t - 1) i = (∑ i, qc i) - 1 := by
+  have hsub : ∑ i, Function.update qc t (qc t - 1) i + 1 = (∑ i, qc i) := by
+    rw [← Finset.add_sum_erase Finset.univ (fun i => Function.update qc t (qc t - 1) i)
+      (Finset.mem_univ t)]
+    simp only [Function.update_self]
+    conv_rhs => rw [← Finset.add_sum_erase Finset.univ qc (Finset.mem_univ t)]
+    have herase : ∑ x ∈ Finset.univ.erase t,
+        Function.update qc t (qc t - 1) x = ∑ x ∈ Finset.univ.erase t, qc x := by
+      apply Finset.sum_congr rfl
+      intro i hi
+      rw [Function.update_of_ne (Finset.ne_of_mem_erase hi)]
+    rw [herase]
+    omega
+  omega
+
+/-- Filtered sum after updating a `ℕ`-valued function by `-1` at a positive-valued coordinate
+inside the filter. -/
+lemma sum_filter_update_of_pred_pos {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {p : ι → Prop} [DecidablePred p] {qc : ι → ℕ} {t : ι} (hpt : p t) (hqt : 0 < qc t) :
+    ∑ i ∈ Finset.univ.filter p, Function.update qc t (qc t - 1) i =
+      (∑ i ∈ Finset.univ.filter p, qc i) - 1 := by
+  have htmem : t ∈ Finset.univ.filter p :=
+    Finset.mem_filter.mpr ⟨Finset.mem_univ t, hpt⟩
+  have hsub :
+      ∑ i ∈ Finset.univ.filter p, Function.update qc t (qc t - 1) i + 1 =
+        ∑ i ∈ Finset.univ.filter p, qc i := by
+    rw [← Finset.add_sum_erase _ (fun i => Function.update qc t (qc t - 1) i) htmem]
+    simp only [Function.update_self]
+    conv_rhs => rw [← Finset.add_sum_erase _ qc htmem]
+    have herase : ∑ x ∈ (Finset.univ.filter p).erase t,
+        Function.update qc t (qc t - 1) x = ∑ x ∈ (Finset.univ.filter p).erase t, qc x := by
+      refine Finset.sum_congr rfl (fun i hi => ?_)
+      rw [Function.update_of_ne (Finset.ne_of_mem_erase hi)]
+    rw [herase]; omega
+  omega
+
+/-- Updating a `ℕ`-valued function at an index outside the filter leaves the filtered sum
+unchanged. -/
+lemma sum_filter_update_of_not_pred {ι : Type*} [Fintype ι] [DecidableEq ι]
+    {p : ι → Prop} [DecidablePred p] {qc : ι → ℕ} {t : ι} (hpt : ¬ p t) :
+    ∑ i ∈ Finset.univ.filter p, Function.update qc t (qc t - 1) i =
+      ∑ i ∈ Finset.univ.filter p, qc i := by
+  refine Finset.sum_congr rfl (fun i hi => ?_)
+  have hit : i ≠ t := fun heq => hpt (heq ▸ (Finset.mem_filter.mp hi).2)
+  rw [Function.update_of_ne hit]
+
 lemma Prod.fst_comp_map {α : Type u} {β : Type v} {γ : Type w} {δ : Type x}
     (f : α → γ) (g : β → δ) : Prod.fst ∘ Prod.map f g = f ∘ Prod.fst :=
   funext fun ⟨_, _⟩ => rfl
