@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 
+import Lean.Meta.Sym.Apply
 import VCVio.ProgramLogic.Tactics.Common.Registry
 
 /-!
@@ -15,6 +16,19 @@ Shared native application helpers for `@[vcspec]` entries.
 open Lean Elab Tactic Meta
 
 namespace OracleComp.ProgramLogic
+
+/-- Cached VCVio wrapper around Lean's symbolic backward rule. The source
+entry is kept for diagnostics and replay text. -/
+structure VCSpecBackwardRule where
+  source : VCSpecEntry
+  rawGoal : Bool
+  rule : Lean.Meta.Sym.BackwardRule
+
+private abbrev VCSpecBackwardRuleCacheKey := Name × Bool
+
+initialize vcSpecBackwardRuleCache :
+    IO.Ref (Std.HashMap VCSpecBackwardRuleCacheKey VCSpecBackwardRule) ←
+  IO.mkRef {}
 
 /--
 If `(prf, type)` proves a `Std.Do'.Triple`, return the corresponding
@@ -63,6 +77,112 @@ private def isRawBackwardGoal (target : Expr) : MetaM Bool := do
   return target.isAppOfArity ``LE.le 4 ||
     target.isAppOfArity ``Lean.Order.PartialOrder.rel 4
 
+private def rawRelParts? (type : Expr) : MetaM (Option (Expr × Expr)) := do
+  let type ← whnfR type
+  if type.isAppOfArity ``Lean.Order.PartialOrder.rel 4 ||
+      type.isAppOfArity ``LE.le 4 then
+    return some (type.getArg! 2, type.getArg! 3)
+  return none
+
+private def stdDoWpParts? (rhs : Expr) : Option (Expr × Expr × Expr) := do
+  let rhs := rhs.consumeMData
+  unless rhs.getAppFn.isConstOf ``Std.Do'.wp do none
+  let args := rhs.getAppArgs
+  unless args.size ≥ 3 do none
+  let oa := args[args.size - 3]!
+  let post := args[args.size - 2]!
+  let epost := args[args.size - 1]!
+  some (oa, post, epost)
+
+/-- Build the pointwise postcondition premise used when a concrete unary post
+from a spec theorem is generalized to the goal's postcondition. -/
+private def mkUnaryPostPointwisePremise (postSpec postTarget postTy : Expr) :
+    MetaM Expr := do
+  let .forallE _ α _ _ := postTy.consumeMData
+    | throwError "expected a unary postcondition, got:{indentExpr postTy}"
+  withLocalDeclD `a α fun a => do
+    let lhs := mkApp postSpec a
+    let rhs := mkApp postTarget a
+    let rel ← mkAppM ``Lean.Order.PartialOrder.rel #[lhs, rhs]
+    mkForallFVars #[a] rel
+
+/-- Generalize a raw unary `pre ⊑ wp prog post epost` proof into a reusable
+backward rule source by abstracting concrete `post` and always abstracting
+`pre` through transitivity. This is the unary, flat-carrier subset of Loom2's
+`mkSpecBackwardProof`. -/
+private def mkUnarySpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := do
+  let some (prog, postSpec, epostSpec) := stdDoWpParts? rhs
+    | throwError "expected a Std.Do'.wp RHS, got:{indentExpr rhs}"
+  let mut postAbstract := postSpec.consumeMData
+  let mut specApplied := specProof
+  unless postAbstract.isMVar do
+    let postTy ← inferType postSpec
+    postAbstract ← mkFreshExprMVar (userName := `post) postTy
+    let hpostTy ← mkUnaryPostPointwisePremise postSpec postAbstract postTy
+    let hpost ← mkFreshExprMVar (userName := `postImpl) hpostTy
+    specApplied ←
+      mkAppM ``Std.Do'.WP.wp_consequence_rel
+        #[prog, postSpec, postAbstract, epostSpec, hpost, specApplied]
+  let preTy ← inferType pre
+  let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
+  let hpreTy ← mkAppM ``Lean.Order.PartialOrder.rel #[preAbstract, pre]
+  let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
+  mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
+
+private def mkBackwardRuleFromProofExpr (prf : Expr) : MetaM Lean.Meta.Sym.BackwardRule := do
+  let prf ← instantiateMVars prf
+  let res ← abstractMVars prf
+  let type ← instantiateMVars (← inferType res.expr)
+  let decl ← mkAuxLemma res.paramNames.toList type res.expr
+  Lean.Meta.Sym.mkBackwardRuleFromDecl decl
+
+private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
+    MetaM VCSpecBackwardRule := do
+  let (_xs, _bis, prf, type) ← entry.proof.instantiate
+  let (prf, type) ←
+    if rawGoal then
+      bridgeTriple? prf type
+    else
+      pure (prf, type)
+  let prf ←
+    if rawGoal then
+      match ← rawRelParts? type with
+      | some (pre, rhs) =>
+          if (stdDoWpParts? rhs).isSome then
+            mkUnarySpecBackwardProof pre rhs prf
+          else
+            pure prf
+      | none => pure prf
+    else
+      pure prf
+  let rule ← mkBackwardRuleFromProofExpr prf
+  return { source := entry, rawGoal, rule }
+
+private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
+    MetaM VCSpecBackwardRule := do
+  let some declName := entry.declName?
+    | mkVCSpecBackwardRule entry rawGoal
+  let key : VCSpecBackwardRuleCacheKey := (declName, rawGoal)
+  let cache ← vcSpecBackwardRuleCache.get
+  match cache[key]? with
+  | some rule => return rule
+  | none =>
+      let rule ← mkVCSpecBackwardRule entry rawGoal
+      vcSpecBackwardRuleCache.modify fun cache => cache.insert key rule
+      return rule
+
+/-- Try to apply a cached symbolic backward rule for a registered `@[vcspec]`
+entry. This is currently intended for unary rules; callers keep saved-state
+fallbacks while the generated-rule path is being broadened. -/
+def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
+    MetaM (Option (List MVarId)) := do
+  let goalTy ← instantiateMVars (← mvarId.getType)
+  let rawGoal ← isRawBackwardGoal goalTy
+  let rule ← getVCSpecBackwardRuleCached entry rawGoal
+  match ← Lean.Meta.Sym.SymM.run <| rule.rule.apply mvarId with
+  | .failed => return none
+  | .goals subgoals => return some subgoals
+
 /-- Try to apply a registered `@[vcspec]` entry directly to a goal metavariable.
 
 This instantiates the stored `SpecProof`, bridges `Triple` proofs when the goal
@@ -95,6 +215,18 @@ def runVCSpecEntryBackward (entry : VCSpecEntry) : TacticM Bool := do
   | [] => return false
   | goal :: rest =>
       match ← liftMetaM <| entry.tryApplyBackward goal with
+      | none => return false
+      | some subgoals =>
+          setGoals (subgoals ++ rest)
+          return true
+
+/-- Apply a cached symbolic backward rule for a `@[vcspec]` entry to the
+current main goal, preserving the tail goals. -/
+def runVCSpecEntryCachedBackward (entry : VCSpecEntry) : TacticM Bool := do
+  match ← getGoals with
+  | [] => return false
+  | goal :: rest =>
+      match ← liftMetaM <| entry.tryApplyCachedBackward goal with
       | none => return false
       | some subgoals =>
           setGoals (subgoals ++ rest)
