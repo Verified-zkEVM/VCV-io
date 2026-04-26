@@ -7,7 +7,6 @@ Authors: Quang Dao
 import VCVio.ProgramLogic.Relational.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics.Common
-import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
 
 /-!
 # Relational VCGen Internals
@@ -20,8 +19,6 @@ open Lean Elab Tactic Meta
 namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Relational
-
-attribute [lspec_spike] Std.Do'.RelWP.rwp_pure
 
 /-! ### Registered VC-spec rules
 
@@ -48,6 +45,8 @@ attribute [vcspec]
   OracleComp.ProgramLogic.Relational.eRelTriple_pure
   OracleComp.ProgramLogic.Relational.eRelTriple_bind
   OracleComp.ProgramLogic.Relational.eRelTriple_uniformSample_bij
+  -- Raw relational WP rule from the Std.Do bridge
+  Std.Do'.RelWP.rwp_pure
   -- `simulateQ`-aware rules from `Relational/SimulateQ.lean`
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run_eqRel_of_impl_eq_preservesInv
   OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_query_map_eq
@@ -398,20 +397,37 @@ def runRelSimDistRule : TacticM Bool := withMainContext do
         apply OracleComp.ProgramLogic.Relational.relTriple_simulateQ_run'_of_impl_evalDist_eq))
   | none => return false
 
-private def runUnifiedLSpecBackward : TacticM Bool := do
-  let goals ← getGoals
-  match goals with
-  | [] => return false
-  | goal :: rest =>
-      match ← liftMetaM <| Experimental.tryApplyMatchingCached goal with
-      | none => return false
-      | some (_, subgoals) =>
-          setGoals (subgoals ++ rest)
-          return true
+private def rawRelWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
+  if let some parts := relWPGoalParts? target then
+    return parts
+  let target := target.consumeMData
+  let rhs ←
+    if target.isAppOfArity ``LE.le 4 ||
+        target.isAppOfArity ``Lean.Order.PartialOrder.rel 4 then
+      some (target.getArg! 3)
+    else
+      none
+  let app ← findAppWithHead? ``Std.Do'.rwp rhs
+  let args ← trailingArgs? app 5
+  let #[oa, ob, post, _epost₁, _epost₂] := args | none
+  some (oa, ob, post)
+
+/-- Try direct-hit registered `@[vcspec]` rules against a raw relational WP goal. -/
+private def runRawRelWPVCSpecBackward : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    let target ← instantiateMVars (← getMainTarget)
+    let some (oa, ob, _) := rawRelWPGoalParts? target | return false
+    let entries ← getRegisteredRelationalVCSpecEntries oa ob
+    for entry in (entries.filter (·.kind == .relWP)).toList.take 8 do
+      let saved ← saveState
+      if ← runVCSpecEntryBackward entry then
+        return true
+      saved.restore
+    return false
 
 def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure
-  if ← runUnifiedLSpecBackward then
+  if ← runRawRelWPVCSpecBackward then
     return true
   let target ← instantiateMVars (← getMainTarget)
   if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then

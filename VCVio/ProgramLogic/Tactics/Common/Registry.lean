@@ -8,6 +8,7 @@ import Lean
 import Lean.Meta.Sym.Pattern
 import Lean.Meta.Sym.Simp.DiscrTree
 import Lean.Elab.Tactic.Do.Attr
+import ToMathlib.Control.Monad.RelWP
 import VCVio.ProgramLogic.Tactics.Common.SpecIR
 
 /-!
@@ -180,7 +181,8 @@ private def relTripleHeadNames : Array Name :=
 private def relWpHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.Relational.RelWP,
     ``MAlgRelOrdered.RelWP,
-    ``MAlgRelOrdered.rwp]
+    ``MAlgRelOrdered.rwp,
+    ``Std.Do'.rwp]
 
 private def eRelTripleHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.Relational.eRelTriple]
@@ -236,7 +238,8 @@ private def wpBodyParts? (body : Expr) : Option (Expr × Expr) := do
 unfolded `MAlgOrdered.wp` head under `≤`. Returns `(pre, oa, post)`. -/
 private def rawWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
-  unless body.isAppOfArity ``LE.le 4 do none
+  unless body.isAppOfArity ``LE.le 4 || body.isAppOfArity ``Lean.Order.PartialOrder.rel 4 do
+    none
   let pre := body.getArg! 2
   let rhs := body.getArg! 3
   let (oa, post) ← wpBodyParts? rhs
@@ -265,9 +268,25 @@ unfolded `MAlgRelOrdered.rwp` head. Returns `(oa, ob, post)`. -/
 private def relWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
   unless headIsOneOf body relWpHeadNames do none
-  let args ← trailingArgsN? body 3
-  let #[oa, ob, post] := args | none
-  some (oa, ob, post)
+  let n := if body.getAppFn.isConstOf ``Std.Do'.rwp then 5 else 3
+  let args ← trailingArgsN? body n
+  if n == 5 then
+    let #[oa, ob, post, _epost₁, _epost₂] := args | none
+    some (oa, ob, post)
+  else
+    let #[oa, ob, post] := args | none
+    some (oa, ob, post)
+
+/-- Preprocessed-body variant of a raw relational WP goal under `≤` / `⊑`.
+Returns `(pre, oa, ob, post)`. -/
+private def rawRelWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr × Expr) := do
+  let body := body.consumeMData
+  unless body.isAppOfArity ``LE.le 4 || body.isAppOfArity ``Lean.Order.PartialOrder.rel 4 do
+    none
+  let pre := body.getArg! 2
+  let rhs := body.getArg! 3
+  let (oa, ob, post) ← relWpBodyParts? rhs
+  some (pre, oa, ob, post)
 
 /-- Preprocessed-body variant of `eRelTripleGoalParts?`. Returns
 `(pre, oa, ob, post)`. `eRelTriple` is a `def` rather than an `abbrev`, so its
@@ -324,6 +343,14 @@ private def selectVCSpecKey (body : Expr) :
     }
     return (oa, spec, some rightHead)
   if let some (oa, ob, _post) := relWpBodyParts? body then
+    let (leftHead, rightHead) ← relationalHeads oa ob
+    let spec : NormalizedVCSpec := {
+      kind := .relWP
+      lookupKey := .relational leftHead rightHead
+      compPattern := classifyRelationalCompPattern oa ob
+    }
+    return (oa, spec, some rightHead)
+  if let some (_pre, oa, ob, _post) := rawRelWpBodyParts? body then
     let (leftHead, rightHead) ← relationalHeads oa ob
     let spec : NormalizedVCSpec := {
       kind := .relWP

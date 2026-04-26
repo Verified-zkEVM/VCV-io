@@ -6,7 +6,6 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Relational.Basic
-import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 
 /-!
@@ -21,7 +20,7 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Unary
 
-attribute [lspec_spike] OracleComp.ProgramLogic.triple_pure
+attribute [vcspec] OracleComp.ProgramLogic.triple_pure
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -470,6 +469,23 @@ def findRegisteredVCGenRule? : TacticM (Option VCSpecEntry) := do
           return some entry
     return none
 
+/-- Try registered `@[vcspec]` rules against a raw `wp` goal.
+
+This is intentionally direct-hit only: raw `wp` stepping is on the hot path, so
+we use the discrimination tree and avoid same-kind fallback scans. -/
+private def runRawWpVCSpecBackward : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    let target ← instantiateMVars (← getMainTarget)
+    let some comp := wpGoalComp? target | return false
+    let comp ← whnfReducible (← instantiateMVars comp)
+    let entries :=
+      takeCandidatePrefix <| (← getRegisteredUnaryVCSpecEntries comp).filter fun entry =>
+        entry.kind == .unaryWP || entry.kind == .unaryTriple
+    for entry in entries do
+      if ← runUnaryVCSpecRule entry then
+        return true
+    return false
+
 def throwVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
@@ -850,17 +866,6 @@ def tryProbEqGoal : TacticM Bool := do
     return true
   runProbOutputEqRelBridge
 
-private def runUnifiedLSpecBackward : TacticM Bool := do
-  let goals ← getGoals
-  match goals with
-  | [] => return false
-  | goal :: rest =>
-      match ← liftMetaM <| Experimental.tryApplyMatchingCached goal with
-      | none => return false
-      | some (_, subgoals) =>
-          setGoals (subgoals ++ rest)
-          return true
-
 def throwVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   if depth = 0 then
@@ -944,7 +949,7 @@ def tryRawWpStructuralStep : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   let some comp := wpGoalComp? target | return false
   let comp ← whnfReducible (← instantiateMVars comp)
-  if ← runUnifiedLSpecBackward then
+  if ← runRawWpVCSpecBackward then
     return true
   if ← runWpStepRules then
     return true
