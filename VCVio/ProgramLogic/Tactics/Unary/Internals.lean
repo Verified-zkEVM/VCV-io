@@ -186,7 +186,19 @@ Default `vcstep` fires rules only in `direct` mode; a future attribute could
 re-enable `triple_conseq` fallback by extending this helper. -/
 private def runUnaryVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
-  runVCGenStepWithTheoremDirect (mkIdent entry.theoremName!) requireClosed
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      unless ← runVCSpecEntryBackward entry do
+        throwError "vcstep: registered `@[vcspec]` rule did not apply"
+      closeTheoremStepGoals
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+    return true
+  saved.restore
+  return false
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.
 When `requireClosed` is true, the step only succeeds if no goals remain afterwards. -/

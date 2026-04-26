@@ -719,7 +719,19 @@ Default `rvcstep` fires rules only in `direct` mode; a future attribute could
 re-enable the relational consequence fallback by extending this helper. -/
 private def runRelationalVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
-  runRVCGenStepWithTheoremDirect (mkIdent entry.theoremName!) requireClosed
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      unless ← runVCSpecEntryBackward entry do
+        throwError "rvcstep: registered `@[vcspec]` rule did not apply"
+      closeRelTheoremStepGoals
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (!requireClosed || (← getGoals).isEmpty) then
+    return true
+  saved.restore
+  return false
 
 /-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
 def runRVCGenStepWithTheorem (thm : TSyntax `term) (requireClosed : Bool := false) :
