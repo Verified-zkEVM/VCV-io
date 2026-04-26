@@ -289,23 +289,62 @@ lemma run_simulateQ_loggingOracle_query_bind
   simp [loggingOracle, QueryImpl.withLogging_apply, OracleQuery.cont_query,
     Function.id_def]
 
-/-- `loggingOracle` preserves `IsTotalQueryBound`: the query structure of
-`(simulateQ loggingOracle oa).run` is identical to that of `oa` (each query passes through
-unchanged, with only the writer log being appended). -/
+/-! ### Bidirectional query-bound transfer for `loggingOracle` / `withLogging`
+
+The writer log overlay leaves the underlying query structure untouched, so all three
+query-bound flavors transfer biconditionally via `fst_map_run_simulateQ` /
+`QueryImpl.fst_map_run_withLogging` and `isXQueryBound_iff_of_map_eq`. -/
+
 theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
     {ι : Type} {spec : OracleSpec.{0, 0} ι}
     [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (n : ℕ) :
     IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔
-    IsTotalQueryBound oa n := by
-  induction oa using OracleComp.inductionOn generalizing n with
-  | pure _ =>
-      constructor <;> intro _ <;> trivial
-  | query_bind t mx ih =>
-      rw [run_simulateQ_loggingOracle_query_bind]
-      rw [isTotalQueryBound_query_bind_iff, isTotalQueryBound_query_bind_iff]
-      exact and_congr_right fun _ => forall_congr' fun u =>
-        (isQueryBound_map_iff _ _ _ _ _).trans (ih u (n - 1))
+    IsTotalQueryBound oa n :=
+  isQueryBound_iff_of_map_eq (loggingOracle.fst_map_run_simulateQ oa) _ _
+
+theorem isQueryBoundP_run_simulateQ_loggingOracle_iff
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) :
+    IsQueryBoundP ((simulateQ loggingOracle oa).run) p n ↔
+    IsQueryBoundP oa p n :=
+  isQueryBoundP_iff_of_map_eq (p := p) (loggingOracle.fst_map_run_simulateQ oa)
+
+theorem isTotalQueryBound_run_simulateQ_withLogging_iff
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'}
+    (so : QueryImpl spec (OracleComp spec'))
+    {α : Type} (mx : OracleComp spec α) (n : ℕ) :
+    IsTotalQueryBound ((simulateQ (so.withLogging) mx).run) n ↔
+    IsTotalQueryBound (simulateQ so mx) n :=
+  isQueryBound_iff_of_map_eq (QueryImpl.fst_map_run_withLogging so mx) _ _
+
+theorem isQueryBoundP_run_simulateQ_withLogging_iff
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    {ι' : Type} {spec' : OracleSpec.{0, 0} ι'}
+    (so : QueryImpl spec (OracleComp spec'))
+    {α : Type} (mx : OracleComp spec α)
+    (q : ι' → Prop) [DecidablePred q] (n : ℕ) :
+    IsQueryBoundP ((simulateQ (so.withLogging) mx).run) q n ↔
+    IsQueryBoundP (simulateQ so mx) q n :=
+  isQueryBoundP_iff_of_map_eq (p := q) (QueryImpl.fst_map_run_withLogging so mx)
+
+theorem isPerIndexQueryBound_run_simulateQ_loggingOracle_iff
+    {ι : Type} [DecidableEq ι] {spec : OracleSpec.{0, 0} ι} {α : Type}
+    (oa : OracleComp spec α) (qb : ι → ℕ) :
+    IsPerIndexQueryBound ((simulateQ loggingOracle oa).run) qb ↔
+    IsPerIndexQueryBound oa qb :=
+  isPerIndexQueryBound_iff_of_map_eq (loggingOracle.fst_map_run_simulateQ oa)
+
+theorem isPerIndexQueryBound_run_simulateQ_withLogging_iff
+    {ι : Type} {spec : OracleSpec.{0, 0} ι}
+    {ι' : Type} [DecidableEq ι'] {spec' : OracleSpec.{0, 0} ι'}
+    (so : QueryImpl spec (OracleComp spec'))
+    {α : Type} (mx : OracleComp spec α) (qb : ι' → ℕ) :
+    IsPerIndexQueryBound ((simulateQ (so.withLogging) mx).run) qb ↔
+    IsPerIndexQueryBound (simulateQ so mx) qb :=
+  isPerIndexQueryBound_iff_of_map_eq (QueryImpl.fst_map_run_withLogging so mx)
 
 /-- A total query bound controls the length of every `loggingOracle` trace in support:
 if `oa` makes at most `n` queries, then every support point of

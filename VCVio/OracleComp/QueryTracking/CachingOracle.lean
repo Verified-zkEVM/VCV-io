@@ -3,6 +3,7 @@ Copyright (c) 2024 Devon Tuma. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
+import VCVio.OracleComp.QueryTracking.QueryBound
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.Constructions
 import VCVio.OracleComp.SimSemantics.PreservesInv
@@ -238,7 +239,100 @@ lemma PreservesInv.withCaching_le {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 
 end CacheMonotonicity
 
+/-! ## Forward query bounds for `withCaching`
+
+A wrapped step makes ≤ 1 underlying query (zero on a hit, one on a miss), so any bound on
+`so t` transfers to `(so.withCaching t).run cache`. -/
+
+section QueryBound
+
+variable {ι' : Type u} {spec' : OracleSpec ι'}
+
+lemma isQueryBoundP_run_withCaching
+    (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain)
+    {p : ι' → Prop} [DecidablePred p] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP (so t) p n) (cache : spec.QueryCache) :
+    OracleComp.IsQueryBoundP ((so.withCaching t).run cache) p n := by
+  cases hcache : cache t with
+  | none =>
+      rw [withCaching_run_none _ hcache]
+      exact (OracleComp.isQueryBoundP_map_iff (p := p) _ _ _).mpr h
+  | some u =>
+      rw [withCaching_run_some _ hcache]
+      trivial
+
+lemma isTotalQueryBound_run_withCaching
+    (so : QueryImpl spec (OracleComp spec')) (t : spec.Domain) {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound (so t) n) (cache : spec.QueryCache) :
+    OracleComp.IsTotalQueryBound ((so.withCaching t).run cache) n := by
+  cases hcache : cache t with
+  | none =>
+      rw [withCaching_run_none _ hcache]
+      exact (OracleComp.isQueryBound_map_iff _ _ _ _ _).mpr h
+  | some u =>
+      rw [withCaching_run_some _ hcache]
+      trivial
+
+lemma isPerIndexQueryBound_run_withCaching
+    (so : QueryImpl spec (OracleComp spec)) (t : spec.Domain) {qb : ι → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound (so t) qb) (cache : spec.QueryCache) :
+    OracleComp.IsPerIndexQueryBound ((so.withCaching t).run cache) qb := by
+  cases hcache : cache t with
+  | none =>
+      rw [withCaching_run_none _ hcache]
+      exact (OracleComp.isPerIndexQueryBound_map_iff _ _ _).mpr h
+  | some u =>
+      rw [withCaching_run_some _ hcache]
+      trivial
+
+end QueryBound
+
 end QueryImpl
+
+/-! ### Parametric `simulateQ` lifts for `withCaching` -/
+
+namespace OracleComp
+
+variable {ι : Type u} [DecidableEq ι] {spec : OracleSpec ι}
+  {ι' : Type u} {spec' : OracleSpec ι'} {α : Type u}
+
+theorem IsQueryBoundP.simulateQ_run_withCaching
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q]
+    (so : QueryImpl spec (OracleComp spec'))
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → IsQueryBoundP (so t) q 1)
+    (hstep_np : ∀ t, ¬ p t → IsQueryBoundP (so t) q 0)
+    (cache : spec.QueryCache) :
+    IsQueryBoundP ((simulateQ so.withCaching oa).run cache) q n :=
+  IsQueryBoundP.simulateQ_run_of_step h
+    (fun t hp s' => QueryImpl.isQueryBoundP_run_withCaching so t (hstep_p t hp) s')
+    (fun t hnp s' => QueryImpl.isQueryBoundP_run_withCaching so t (hstep_np t hnp) s')
+    cache
+
+theorem IsTotalQueryBound.simulateQ_run_withCaching
+    (so : QueryImpl spec (OracleComp spec'))
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : IsTotalQueryBound oa n)
+    (hstep : ∀ t, IsTotalQueryBound (so t) 1)
+    (cache : spec.QueryCache) :
+    IsTotalQueryBound ((simulateQ so.withCaching oa).run cache) n :=
+  IsTotalQueryBound.simulateQ_run_of_step h
+    (fun t s' => QueryImpl.isTotalQueryBound_run_withCaching so t (hstep t) s')
+    cache
+
+theorem IsPerIndexQueryBound.simulateQ_run_withCaching
+    (so : QueryImpl spec (OracleComp spec))
+    {oa : OracleComp spec α} {qb : ι → ℕ}
+    (h : IsPerIndexQueryBound oa qb)
+    (hstep : ∀ t, IsPerIndexQueryBound (so t) (Function.update 0 t 1))
+    (cache : spec.QueryCache) :
+    IsPerIndexQueryBound ((simulateQ so.withCaching oa).run cache) qb :=
+  IsPerIndexQueryBound.simulateQ_run_of_uniform_step h
+    (fun t s' => QueryImpl.isPerIndexQueryBound_run_withCaching so t (hstep t) s')
+    cache
+
+end OracleComp
 
 /-- Oracle for caching queries to the oracles in `spec`, querying fresh values if needed. -/
 @[inline, reducible] def OracleSpec.cachingOracle :
@@ -247,12 +341,28 @@ end QueryImpl
 
 namespace cachingOracle
 
+/-- Definitional unfold of `cachingOracle` as caching wrapped around the lifting handler. -/
+lemma eq_withCaching :
+    (spec.cachingOracle : QueryImpl spec (StateT spec.QueryCache (OracleComp spec))) =
+      (QueryImpl.ofLift spec (OracleComp spec)).withCaching := rfl
+
 lemma apply_eq (t : spec.Domain) : cachingOracle t =
     (do match (← get) t with
       | Option.some u => return u
       | Option.none =>
           let u ← query t
           modifyGet fun cache => (u, cache.cacheQuery t u)) := rfl
+
+/-- Cache hit: `cachingOracle t` returns the stored value without an underlying query. -/
+lemma run_some {t : spec.Domain} {cache : spec.QueryCache} {u : spec.Range t}
+    (h : cache t = some u) : (cachingOracle t).run cache = pure (u, cache) :=
+  QueryImpl.withCaching_run_some _ h
+
+/-- Cache miss: `cachingOracle t` issues a single underlying `query t` and stores it. -/
+lemma run_none {t : spec.Domain} {cache : spec.QueryCache} (h : cache t = none) :
+    (cachingOracle t).run cache =
+      (fun u => (u, cache.cacheQuery t u)) <$> (liftM (query t) : OracleComp spec _) := by
+  rw [eq_withCaching, QueryImpl.withCaching_run_none _ h, QueryImpl.ofLift_apply]
 
 /-- Trivially true via `probFailure_eq_zero` since both sides are `OracleComp` computations.
 A generic `withCaching` version for arbitrary base monads would require a separate argument
@@ -277,6 +387,42 @@ lemma NeverFail_run_simulateQ_iff {ι₀ : Type} {spec₀ : OracleSpec.{0, 0} ι
 lemma simulateQ_query (t : spec.Domain) :
     simulateQ cachingOracle (liftM (query t)) = cachingOracle t := by
   simp [_root_.simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query]
+
+/-! ### Forward query bounds for `cachingOracle`
+
+Forward only — the reverse fails because cache hits strictly reduce the simulated count. -/
+
+theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} {α : Type}
+    {oa : OracleComp spec₀ α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n) (cache : spec₀.QueryCache) :
+    OracleComp.IsTotalQueryBound ((simulateQ spec₀.cachingOracle oa).run cache) n := by
+  rw [eq_withCaching]
+  exact OracleComp.IsTotalQueryBound.simulateQ_run_withCaching _ h
+    (fun t => (OracleComp.isQueryBound_query_iff t 1 _ _).mpr Nat.one_pos) cache
+
+theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} {α : Type}
+    {oa : OracleComp spec₀ α} {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n) (cache : spec₀.QueryCache) :
+    OracleComp.IsQueryBoundP ((simulateQ spec₀.cachingOracle oa).run cache) p n := by
+  rw [eq_withCaching]
+  exact OracleComp.IsQueryBoundP.simulateQ_run_withCaching _ h
+    (fun t _ => (OracleComp.isQueryBoundP_query_iff p t 1).mpr (fun _ => Nat.one_pos))
+    (fun t hnp => (OracleComp.isQueryBoundP_query_iff p t 0).mpr (fun hpt => absurd hpt hnp))
+    cache
+
+theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} {α : Type}
+    {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound oa qb) (cache : spec₀.QueryCache) :
+    OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.cachingOracle oa).run cache) qb := by
+  rw [eq_withCaching]
+  refine OracleComp.IsPerIndexQueryBound.simulateQ_run_withCaching _ h ?_ cache
+  intro t
+  rw [QueryImpl.ofLift_apply]
+  exact (OracleComp.isPerIndexQueryBound_query_iff t (Function.update 0 t 1)).mpr (by
+    simp [Function.update_self])
 
 end cachingOracle
 
