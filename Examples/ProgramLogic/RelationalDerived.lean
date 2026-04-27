@@ -64,6 +64,10 @@ example :
   rvcstep
 
 example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => True⟫ := by
+  rvcstep
+
+example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep with relTriple_wrappedTruePair
 

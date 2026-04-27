@@ -194,7 +194,11 @@ private def mkBackwardRuleFromProofExpr (prf : Expr) :
 private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
   let (_xs, _bis, prf, type) ← entry.proof.instantiate
-  let (prf, type) ← bridgeTriple? prf type
+  let (prf, type) ←
+    if rawGoal then
+      bridgeTriple? prf type
+    else
+      pure (prf, type)
   let prf ←
     match ← rawRelParts? type with
     | some (pre, rhs) =>
