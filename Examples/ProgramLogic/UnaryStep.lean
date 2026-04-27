@@ -117,6 +117,17 @@ example :
       (fun _ => (1 : ℝ≥0∞)) epost⟨⟩ := by
   vcstep
 
+@[local vcspec] theorem rawWP_wrappedTrue :
+    (1 : ℝ≥0∞) ⊑
+      Std.Do'.wp (wrappedTrue (spec := spec))
+        (fun y => if y = true then (1 : ℝ≥0∞) else 0) epost⟨⟩ := by
+  exact Std.Do'.Triple.iff.mp (stdDoTriple_wrappedTrue (spec := spec))
+
+example :
+    (1 : ℝ≥0∞) ⊑
+      Std.Do'.wp (wrappedTrue (spec := spec)) (fun _ => (1 : ℝ≥0∞)) epost⟨⟩ := by
+  vcstep
+
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrueStep (_haux : True) :
@@ -129,16 +140,29 @@ example :
       ⦃ fun y => if y = true then (1 : ℝ≥0∞) else 0 ⦄ := by
   vcstep
 
-/--
-`vcstep?` can get the specific path used to create a `vcstep` proof
-example :
-    ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
-  vcstep?
-  trivial
--/
 example :
     ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   vcstep with triple_wrappedTrueStep
+
+@[irreducible] def cacheTraceWrapped : OracleComp spec Bool := pure true
+
+@[local vcspec] theorem triple_cacheTraceWrapped :
+    ⦃ 1 ⦄ cacheTraceWrapped (spec := spec)
+      ⦃ fun y => if y = true then (1 : ℝ≥0∞) else 0 ⦄ := by
+  simpa [cacheTraceWrapped] using
+    (triple_pure (spec := spec) true (fun y => if y = true then (1 : ℝ≥0∞) else 0))
+
+/--
+info: [vcspec cache] hit `triple_cacheTraceWrapped` (folded, unaryTriple)
+---
+info: [vcspec cache] hit `triple_cacheTraceWrapped` (folded, unaryTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example :
+    (⦃ (1 : ℝ≥0∞) ⦄ (cacheTraceWrapped (spec := spec)) ⦃ fun _ => (1 : ℝ≥0∞) ⦄) ∧
+      (⦃ (1 : ℝ≥0∞) ⦄ (cacheTraceWrapped (spec := spec)) ⦃ fun _ => (1 : ℝ≥0∞) ⦄) := by
+  constructor <;> vcstep
 
 /-! ## `liftComp` -/
 

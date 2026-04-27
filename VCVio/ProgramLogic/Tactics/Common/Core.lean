@@ -34,6 +34,11 @@ register_option vcvio.vcgen.time : Bool := {
   descr := "Emit cumulative timing for internal vcgen/rvcgen planner phases."
 }
 
+register_option vcvio.vcgen.traceCachedRules : Bool := {
+  defValue := false
+  descr := "Emit opt-in trace messages for cached `@[vcspec]` backward-rule hits and misses."
+}
+
 structure VCGenTimingData where
   previewNs : UInt64 := 0
   structuralNs : UInt64 := 0
@@ -41,6 +46,9 @@ structure VCGenTimingData where
   probPlannerNs : UInt64 := 0
   localHintNs : UInt64 := 0
   registeredNs : UInt64 := 0
+  cachedRuleBuildNs : UInt64 := 0
+  cachedRuleHits : Nat := 0
+  cachedRuleMisses : Nat := 0
   closeNs : UInt64 := 0
   passNs : UInt64 := 0
   finishNs : UInt64 := 0
@@ -75,6 +83,15 @@ private def addLocalHintTime (ns : UInt64) : BaseIO Unit :=
 
 private def addRegisteredTime (ns : UInt64) : BaseIO Unit :=
   addVCGenTiming fun d => { d with registeredNs := d.registeredNs + ns }
+
+def addCachedRuleBuildTime (ns : UInt64) : BaseIO Unit :=
+  addVCGenTiming fun d => { d with cachedRuleBuildNs := d.cachedRuleBuildNs + ns }
+
+def addCachedRuleHit : BaseIO Unit :=
+  addVCGenTiming fun d => { d with cachedRuleHits := d.cachedRuleHits + 1 }
+
+def addCachedRuleMiss : BaseIO Unit :=
+  addVCGenTiming fun d => { d with cachedRuleMisses := d.cachedRuleMisses + 1 }
 
 private def addCloseTime (ns : UInt64) : BaseIO Unit :=
   addVCGenTiming fun d => { d with closeNs := d.closeNs + ns }
@@ -133,7 +150,9 @@ def logVCGenTimingIfEnabled (label : String) : TacticM Unit := do
     logInfo m!"[{label} timing] preview={formatNsMs d.previewNs}, \
       structural={formatNsMs d.structuralNs}, wpStep={formatNsMs d.wpStepNs}, \
       probPlanner={formatNsMs d.probPlannerNs}, localHints={formatNsMs d.localHintNs}, \
-      registered={formatNsMs d.registeredNs}, close={formatNsMs d.closeNs}, \
+      registered={formatNsMs d.registeredNs}, \
+      cachedRules={formatNsMs d.cachedRuleBuildNs} \
+      (hits={d.cachedRuleHits}, misses={d.cachedRuleMisses}), close={formatNsMs d.closeNs}, \
       passes={formatNsMs d.passNs}, finish={formatNsMs d.finishNs}"
 
 def withVCGenRunTiming {α : Type} (label : String) (k : TacticM α) : TacticM α := do

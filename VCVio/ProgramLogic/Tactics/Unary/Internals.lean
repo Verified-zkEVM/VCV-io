@@ -137,8 +137,8 @@ private def closeTheoremStepGoals : TacticM Unit := do
     discard <| tryEvalTacticSyntax (← `(tactic|
       all_goals first
         | assumption
-        | simp
-        | (repeat intro; split_ifs <;> simp_all)
+        | simp [Lean.Order.PartialOrder.rel]
+        | (repeat intro; split_ifs <;> simp_all [Lean.Order.PartialOrder.rel])
         | (
             repeat intro
             simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
@@ -185,6 +185,19 @@ which lets a registered concrete postcondition theorem feed a weaker goal
 postcondition. -/
 private def runUnaryVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
+  if entry.kind == .unaryWP then
+    let saved ← saveState
+    let ok ←
+      match ← observing? do
+        unless ← runVCSpecEntryRawUnaryConsequence entry do
+          throwError "vcstep: raw unary `@[vcspec]` consequence did not apply"
+        closeTheoremStepGoals
+      with
+      | some _ => pure true
+      | none => pure false
+    if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+      return true
+    saved.restore
   let saved ← saveState
   let ok ←
     match ← observing? do

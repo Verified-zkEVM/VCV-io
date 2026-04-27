@@ -26,6 +26,15 @@ structure VCSpecBackwardRule where
   declName : Name
   rule : Lean.Meta.Sym.BackwardRule
 
+/-- Cache key for global `@[vcspec]` backward rules.
+
+Local hypotheses and raw syntax proofs are intentionally not cached here.
+For global declarations, the declaration name fixes the theorem body while the
+raw/folded mode and normalized `VCSpecKind` select the consequence wrapper shape.
+Carrier, WP/RWP instance, exception-post, and state arguments remain abstracted
+in the cached proof and are reopened freshly at each application. If future local
+or structurally specialized entries are cached, this key should be widened
+rather than reused. -/
 private abbrev VCSpecBackwardRuleCacheKey := Name × Bool × Nat
 
 private def VCSpecKind.cacheKey : VCSpecKind → Nat
@@ -34,9 +43,25 @@ private def VCSpecKind.cacheKey : VCSpecKind → Nat
   | .relTriple => 2
   | .relWP => 3
 
+private def VCSpecKind.traceLabel : VCSpecKind → String
+  | .unaryTriple => "unaryTriple"
+  | .unaryWP => "unaryWP"
+  | .relTriple => "relTriple"
+  | .relWP => "relWP"
+
+private def rawGoalTraceLabel (rawGoal : Bool) : String :=
+  if rawGoal then "raw" else "folded"
+
 initialize vcSpecBackwardRuleCache :
     IO.Ref (Std.HashMap VCSpecBackwardRuleCacheKey VCSpecBackwardRule) ←
   IO.mkRef {}
+
+private def traceVCSpecCacheEvent (event : String) (entry : VCSpecEntry)
+    (rawGoal : Bool) : MetaM Unit := do
+  if vcvio.vcgen.traceCachedRules.get (← getOptions) then
+    let source := entry.declName?.map Name.toString |>.getD "<local>"
+    logInfo m!"[vcspec cache] {event} `{source}` \
+      ({rawGoalTraceLabel rawGoal}, {entry.kind.traceLabel})"
 
 private def instantiateProofNoBridge (proof : Lean.Elab.Tactic.Do.SpecAttr.SpecProof) :
     MetaM (Array Expr × Array BinderInfo × Expr × Expr) := do
@@ -354,16 +379,31 @@ private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
   let (proof, declName, rule) ← mkBackwardRuleFromProofExpr prf
   return { source := entry, rawGoal, proof, declName, rule }
 
+private def mkVCSpecBackwardRuleTimed (entry : VCSpecEntry) (rawGoal : Bool) :
+    MetaM VCSpecBackwardRule := do
+  if vcvio.vcgen.time.get (← getOptions) then
+    let (rule, ns) ← timeNs (mkVCSpecBackwardRule entry rawGoal)
+    addCachedRuleBuildTime ns
+    return rule
+  else
+    mkVCSpecBackwardRule entry rawGoal
+
 private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
   let some declName := entry.declName?
-    | mkVCSpecBackwardRule entry rawGoal
+    | traceVCSpecCacheEvent "uncached-build" entry rawGoal
+      mkVCSpecBackwardRuleTimed entry rawGoal
   let key : VCSpecBackwardRuleCacheKey := (declName, rawGoal, entry.kind.cacheKey)
   let cache ← vcSpecBackwardRuleCache.get
   match cache[key]? with
-  | some rule => return rule
+  | some rule =>
+      addCachedRuleHit
+      traceVCSpecCacheEvent "hit" entry rawGoal
+      return rule
   | none =>
-      let rule ← mkVCSpecBackwardRule entry rawGoal
+      addCachedRuleMiss
+      traceVCSpecCacheEvent "miss" entry rawGoal
+      let rule ← mkVCSpecBackwardRuleTimed entry rawGoal
       vcSpecBackwardRuleCache.modify fun cache => cache.insert key rule
       return rule
 
@@ -377,6 +417,51 @@ def VCSpecEntry.hasProofPremise (entry : VCSpecEntry) : MetaM Bool := do
       if ← isProp (← inferType x) then
         return true
   return false
+
+/-- Apply a raw unary `@[vcspec]` theorem under consequence, constructing the
+proof directly against the current target. This is the unary analogue of the
+direct raw relational path and covers raw `Std.Do'.wp` goals with `epost⟨⟩`
+without going through theorem-syntax replay. -/
+def VCSpecEntry.tryApplyRawUnaryConsequence (entry : VCSpecEntry) (mvarId : MVarId) :
+    MetaM (Option (List MVarId)) := do
+  let goalTy ← instantiateMVars (← mvarId.getType)
+  let some (preTarget, rhsTarget) ← rawRelParts? goalTy
+    | return none
+  let some (progTarget, postTarget, _epostTarget) := stdDoWpParts? rhsTarget
+    | return none
+  let (_xs, _bis, specProof, specType) ← entry.proof.instantiate
+  let some (preSpec, rhsSpec) ← rawRelParts? specType
+    | return none
+  let some (progSpec, postSpec, epostSpec) := stdDoWpParts? rhsSpec
+    | return none
+  unless ← isDefEq progSpec progTarget do
+    return none
+  let postTy ← inferType postSpec
+  let hpostTy ← mkUnaryPostPointwisePremise postSpec postTarget postTy
+  let hpost ← mkFreshExprMVar (userName := `postImpl) hpostTy
+  let specApplied ←
+    mkAppM ``Std.Do'.WP.wp_consequence_rel
+      #[progSpec, postSpec, postTarget, epostSpec, hpost, specProof]
+  let hpreTy ← mkOrderRel preTarget preSpec
+  let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
+  let prf ← mkOrderRelTrans hpre specApplied
+  try
+    let subgoals ← mvarId.apply prf
+    return some subgoals
+  catch _ =>
+    return none
+
+/-- Apply a raw unary consequence proof for a `@[vcspec]` entry to the current
+main goal, preserving tail goals. -/
+def runVCSpecEntryRawUnaryConsequence (entry : VCSpecEntry) : TacticM Bool := do
+  match ← getGoals with
+  | [] => return false
+  | goal :: rest =>
+      match ← liftMetaM <| entry.tryApplyRawUnaryConsequence goal with
+      | none => return false
+      | some subgoals =>
+          setGoals (subgoals ++ rest)
+          return true
 
 /-- Apply a raw relational `@[vcspec]` theorem under consequence, constructing
 the consequence proof against the current target directly. This avoids asking
@@ -429,9 +514,8 @@ private def VCSpecBackwardRule.applyProof (rule : VCSpecBackwardRule) (mvarId : 
     (goalTy : Expr) : MetaM (Option (List MVarId)) := do
   try
     let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
-    unless rule.rawGoal do
-      let prfTy ← instantiateMVars (← inferType prf)
-      fixPredFromGoal? prfTy goalTy
+    let prfTy ← instantiateMVars (← inferType prf)
+    fixPredFromGoal? prfTy goalTy
     let subgoals ← mvarId.apply prf
     return some subgoals
   catch _ =>
