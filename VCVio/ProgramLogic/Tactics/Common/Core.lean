@@ -358,7 +358,8 @@ def isEqRelPost (e : Expr) : Bool :=
   (findAppWithHead? ``OracleComp.ProgramLogic.Relational.EqRel e).isSome
 
 def isBindExpr (e : Expr) : Bool :=
-  e.consumeMData.getAppFn.isConstOf ``Bind.bind
+  let fn := e.consumeMData.getAppFn
+  fn.isConstOf ``Bind.bind || fn.isConstOf ``StateT.bind
 
 def isPureExpr (e : Expr) : Bool :=
   e.consumeMData.getAppFn.isConstOf ``Pure.pure

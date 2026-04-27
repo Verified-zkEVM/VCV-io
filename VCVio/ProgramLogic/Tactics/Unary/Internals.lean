@@ -7,6 +7,7 @@ Authors: Quang Dao
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Tactics.Relational.Internals
+import Loom.Triple.SpecLemmas
 
 /-!
 # Unary VCGen Internals
@@ -20,7 +21,7 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Unary
 
-universe u
+universe u v
 
 /-- Cached raw-`wp` structural leaf for `pure`.
 
@@ -101,6 +102,20 @@ theorem wp_uniformSample_le_vcspec {α : Type} [SampleableType α] (post : α �
       wp ($ᵗ α : ProbComp α) post := by
   rw [OracleComp.ProgramLogic.wp_uniformSample]
 
+/-- Generic Loom triple bind step with the intermediate postcondition fixed to
+the weakest precondition of the continuation. This is the `Std.Do'.Triple`
+counterpart of `OracleComp.ProgramLogic.triple_bind_wp`, and lets unary
+automation walk transformer-stack `do` blocks without guessing a user cut. -/
+theorem stdDoTriple_bind_wp {m : Type u → Type v}
+    {Pred EPred : Type u} {α β : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {pre : Pred} (x : m α) (f : α → m β) (post : β → Pred) (epost : EPred) :
+    Std.Do'.Triple pre x (fun a => Std.Do'.wp (f a) post epost) epost →
+      Std.Do'.Triple pre (x >>= f) post epost := by
+  intro h
+  exact Std.Do'.Triple.bind x f (fun a => Std.Do'.wp (f a) post epost) h
+    (fun _ => Std.Do'.Triple.iff.mpr Lean.Order.PartialOrder.rel_refl)
+
 attribute [vcspec]
   OracleComp.ProgramLogic.triple_pure
   wp_pure_le_vcspec
@@ -113,6 +128,10 @@ attribute [vcspec]
   wp_query_le_vcspec
   wp_HasQuery_query_le_vcspec
   wp_uniformSample_le_vcspec
+  Std.Do'.Spec.get_StateT
+  Std.Do'.Spec.set_StateT
+  Std.Do'.Spec.modifyGet_StateT
+  Std.Do'.Spec.monadLift_StateT
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -195,6 +214,10 @@ def tryCloseSpecGoalImmediate : TacticM Bool := do
   tryApplyTripleHyp <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic| solve_by_elim (maxDepth := 2))) <||>
+  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.get_StateT)) <||>
+  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.set_StateT)) <||>
+  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.modifyGet_StateT)) <||>
+  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.monadLift_StateT)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -391,7 +414,10 @@ def tryBindImmediate (comp : Expr) : TacticM Bool := do
   if !isBindExpr comp then
     return false
   match ← observing? do
-    evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_bind))
+    evalTactic (← `(tactic|
+      first
+        | apply OracleComp.ProgramLogic.triple_bind
+        | apply Std.Do'.Triple.bind))
     unless ← tryCloseSpecGoalImmediate do throwError "" with
   | some _ => return true
   | none => return false
@@ -1105,6 +1131,40 @@ def trySupportCutBind (comp : Expr) : TacticM Bool := do
   | some _ => return true
   | none => return false
 
+/-- Structural `StateT` operations from Loom's generic transformer specs.
+
+This is deliberately unary-only automation: stepping through `get`, `set`,
+`modifyGet`, or a lifted base computation does not choose a cut, invariant, or
+coupling frontier. -/
+private def tryStateTSpecStep : TacticM Bool := do
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      evalTactic (← `(tactic|
+        first
+          | apply Std.Do'.Spec.get_StateT
+          | apply Std.Do'.Spec.set_StateT
+          | apply Std.Do'.Spec.modifyGet_StateT
+          | apply Std.Do'.Spec.monadLift_StateT))
+      closeTheoremStepGoals
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (← getGoals).isEmpty then
+    return true
+  saved.restore
+  return false
+
+private def normalizeStateTWPInGoal : TacticM Unit := do
+  discard <| tryEvalTacticSyntax (← `(tactic|
+    simp only [
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind,
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind',
+      OracleComp.ProgramLogic.Loom.wp_StateT_get,
+      OracleComp.ProgramLogic.Loom.wp_StateT_set,
+      OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
+      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift]))
+
 /-- Structural/default unary VCGen step, excluding explicit cut/invariant/theorem-driven
 fallbacks and the final close/search phase. -/
 def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
@@ -1125,6 +1185,9 @@ def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
+      normalizeStateTWPInGoal
+      if ← tryStateTSpecStep then
+        return true
       if isBindExpr comp then
         if ← tryBindImmediate comp then
           return true
@@ -1132,6 +1195,9 @@ def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
           return true
         if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.triple_bind_wp)) then
+          return true
+        if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_bind_wp)) then
           return true
       if isIfExpr comp then
         if comp.consumeMData.getAppFn.isConstOf ``dite then

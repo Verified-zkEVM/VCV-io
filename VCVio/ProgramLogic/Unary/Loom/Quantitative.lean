@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import ToMathlib.Control.Monad.Algebra
+import ToMathlib.Control.StateT
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.EvalDist
 import Loom.WP.Basic
@@ -223,6 +224,76 @@ theorem wp_eq_mAlgOrdered_wp
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     Std.Do'.wp oa post Lean.Order.bot =
       MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post := rfl
+
+/-! ## `StateT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_StateT_bind {σ : Type} (x : StateT σ (OracleComp spec) α)
+    (f : α → StateT σ (OracleComp spec) β) (post : β → σ → ℝ≥0∞) :
+    Std.Do'.wp (StateT.bind x f) post Lean.Order.bot =
+      fun s => Std.Do'.wp x (fun a s' => Std.Do'.wp (f a) post Lean.Order.bot s')
+        Lean.Order.bot s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run s)
+      (fun p : β × σ => post p.1 p.2) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (x.run s)
+      (fun p : α × σ =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((f p.1).run p.2)
+          (fun q : β × σ => post q.1 q.2))
+  rw [StateT.run_bind, MAlgOrdered.wp_bind]
+
+@[simp]
+theorem wp_StateT_bind' {σ : Type} (x : StateT σ (OracleComp spec) α)
+    (f : α → StateT σ (OracleComp spec) β) (post : β → σ → ℝ≥0∞) :
+    Std.Do'.wp (x >>= f) post Lean.Order.bot =
+      fun s => Std.Do'.wp x (fun a s' => Std.Do'.wp (f a) post Lean.Order.bot s')
+        Lean.Order.bot s := by
+  exact wp_StateT_bind x f post
+
+@[simp]
+theorem wp_StateT_get {σ : Type} (post : σ → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.get : StateT σ (OracleComp spec) σ) post Lean.Order.bot =
+      fun s => post s s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (s, s) : OracleComp spec (σ × σ))
+      (fun p : σ × σ => post p.1 p.2) = post s s
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_set {σ : Type} (s' : σ) (post : PUnit → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.set s' : StateT σ (OracleComp spec) PUnit) post
+      Lean.Order.bot = fun _ => post ⟨⟩ s' := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (PUnit.unit, s') : OracleComp spec (PUnit × σ))
+      (fun p : PUnit × σ => post p.1 p.2) = post ⟨⟩ s'
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_modifyGet {σ : Type} (f : σ → α × σ) (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadStateOf.modifyGet f : StateT σ (OracleComp spec) α) post
+      Lean.Order.bot = fun s => post (f s).1 (f s).2 := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (f s) : OracleComp spec (α × σ))
+      (fun p : α × σ => post p.1 p.2) = post (f s).1 (f s).2
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_StateT_monadLift {σ : Type} (oa : OracleComp spec α)
+    (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (MonadLift.monadLift oa : StateT σ (OracleComp spec) α) post
+      Lean.Order.bot = fun s => Std.Do'.wp oa (fun a => post a s) Lean.Order.bot := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (a, s))
+      (fun p : α × σ => post p.1 p.2) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => post a s)
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
 
 /-- `Std.Do'.Triple` agrees with `MAlgOrdered.Triple` propositionally.
 

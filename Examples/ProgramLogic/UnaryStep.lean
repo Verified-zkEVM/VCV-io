@@ -78,6 +78,32 @@ example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp⟦f <$> oa⟧ post = wp⟦oa⟧ (post ∘ f) := by
   vcstep
 
+/-! ## `StateT (OracleComp spec)` transformer steps -/
+
+example (post : Nat → Nat → ℝ≥0∞) :
+    ⦃fun s => post s s⦄
+      (MonadStateOf.get : StateT Nat (OracleComp spec) Nat)
+    ⦃post⦄ := by
+  vcstep
+
+example (s' : Nat) (post : PUnit → Nat → ℝ≥0∞) :
+    ⦃fun _ => post ⟨⟩ s'⦄
+      (MonadStateOf.set s' : StateT Nat (OracleComp spec) PUnit)
+    ⦃post⦄ := by
+  vcstep
+
+example (f : Nat → α × Nat) (post : α → Nat → ℝ≥0∞) :
+    ⦃fun s => post (f s).1 (f s).2⦄
+      (MonadStateOf.modifyGet f : StateT Nat (OracleComp spec) α)
+    ⦃post⦄ := by
+  vcstep
+
+example (oa : OracleComp spec α) (post : α → Nat → ℝ≥0∞) :
+    ⦃fun s => wp⟦oa⟧ (fun a => post a s)⦄
+      (MonadLift.monadLift oa : StateT Nat (OracleComp spec) α)
+    ⦃post⦄ := by
+  vcstep
+
 /--
 info: [wpstep cache] hit `OracleComp.ProgramLogic.wp_replicate_succ`
 ---
