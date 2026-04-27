@@ -18,7 +18,7 @@ Hops H3, H4, H5 on `HeapSSP.Package`s over `Heap (CmaCells …)` state.
 ## Structural facts
 
 * **H4 is definitional.** `cmaSim := cmaToNma.link nma`, so the program-
-  equivalence hop H4 falls out of `Package.run_link_eq_run_shiftLeft`.
+  equivalence hop H4 falls out of `VCVio.HeapSSP.Package.run_link_eq_run_shiftLeft`.
   No inter-state bijection is needed.
 * **H3 uses the heap-native bridge.** `VCVio/HeapSSP/IdenticalUntilBad.lean`
   provides `advantage_le_expectedSCost_plus_probEvent_bad` parameterised
@@ -35,20 +35,20 @@ Hops H3, H4, H5 on `HeapSSP.Package`s over `Heap (CmaCells …)` state.
 
 * **H3**: `| Pr[cmaReal accepts] - Pr[cmaSim accepts] | ≤ qS · ζ_zk + qS
   · (qS + qH) · β`, via
-  `Package.advantage_le_expectedSCost_plus_probEvent_bad` instantiated
+  `VCVio.HeapSSP.Package.advantage_le_expectedSCost_plus_probEvent_bad` instantiated
   at `G₀ = cmaReal`, `G₁ = cmaSim`, `φ = cmaHeapStateEquiv`. The
   cache-growth cost bookkeeping is discharged below with a validity
   invariant for the cached keypair. The remaining mathematical core is
   the HVZK + cache-collision coupling in
   `cmaReal_cmaSim_tv_sign_le_cmaSignEps`.
 * **H4**: `cmaSim.run A = nma.run (cmaToNma.shiftLeft A)`, a
-  direct instance of `Package.run_link_eq_run_shiftLeft`.
+  direct instance of `VCVio.HeapSSP.Package.run_link_eq_run_shiftLeft`.
 * **H5**: forking-lemma bridge (delegated to `Chain.lean`).
 -/
 
 universe u
 
-open ENNReal OracleSpec OracleComp ProbComp VCVio.HeapSSP
+open ENNReal OracleSpec OracleComp ProbComp VCVio.StateSeparating
   OracleComp.ProgramLogic.Relational
 
 namespace FiatShamir.HeapSSP
@@ -164,7 +164,7 @@ handling. -/
 /-- The handler components of `cmaReal.impl` and `cmaSim.impl` are
 pointwise identical on every non-sign query. Discharged branch-by-branch
 after replacing `h` with `(split).symm (split h)`, applying
-`Package.link_impl_apply_run`, and collapsing the resulting
+`VCVio.HeapSSP.Package.link_impl_apply_run`, and collapsing the resulting
 `linkReshape <$> …` against the direct `cmaReal` handler.
 -/
 theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
@@ -202,20 +202,20 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
     change _ = (((cmaToNma M Commit Chal simT).link (nma M Commit Chal hr)).impl
         (Sum.inl (Sum.inl (Sum.inl n)))).run
       ((Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).symm (hα, hβ))
-    rw [Package.link_impl_apply_run]
+    rw [VCVio.HeapSSP.Package.link_impl_apply_run]
     simp only [cmaToNma, nma, cmaReal, StateT.run_mk, bind_pure_comp,
       simulateQ_map, simulateQ_spec_query, StateT.run_map,
-      Functor.map_map, Package.linkReshape, h_split_symm]
+      Functor.map_map, VCVio.HeapSSP.Package.linkReshape, h_split_symm]
   · -- RO: `cmaToNma.impl (Sum.inl (Sum.inl (Sum.inr mc)))` forwards to
     -- `nma.impl` on the same tag; case on cache hit/miss.
     have hβcache_eq : hβ .roCache = h (Sum.inr .roCache) := rfl
     change _ = (((cmaToNma M Commit Chal simT).link (nma M Commit Chal hr)).impl
         (Sum.inl (Sum.inl (Sum.inr mc)))).run
       ((Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).symm (hα, hβ))
-    rw [Package.link_impl_apply_run]
+    rw [VCVio.HeapSSP.Package.link_impl_apply_run]
     simp only [cmaToNma, StateT.run_mk, bind_pure_comp,
       simulateQ_map, simulateQ_spec_query, StateT.run_map,
-      Functor.map_map, Package.linkReshape]
+      Functor.map_map, VCVio.HeapSSP.Package.linkReshape]
     rcases hcache : h (Sum.inr .roCache) mc with _ | r
     · -- Cache miss: both sides sample `r ← $ᵗ Chal`, update `.roCache`.
       simp only [cmaReal, nma, StateT.run_mk, hβcache_eq, hcache,
@@ -237,10 +237,10 @@ theorem cmaReal_impl_eq_cmaSim_impl_of_not_isCostlyQuery
     change _ = (((cmaToNma M Commit Chal simT).link (nma M Commit Chal hr)).impl
         (Sum.inr ())).run
       ((Heap.split (OuterCell M) (InnerCell M Commit Chal Stmt Wit)).symm (hα, hβ))
-    rw [Package.link_impl_apply_run]
+    rw [VCVio.HeapSSP.Package.link_impl_apply_run]
     simp only [cmaToNma, StateT.run_mk, bind_pure_comp,
       simulateQ_map, simulateQ_spec_query, StateT.run_map,
-      Functor.map_map, Package.linkReshape]
+      Functor.map_map, VCVio.HeapSSP.Package.linkReshape]
     rcases hkp : h (Sum.inr .keypair) with _ | ⟨pk₀, sk₀⟩
     · -- Keypair miss: sample `(pk, sk)`, update `.keypair`.
       simp only [cmaReal, nma, StateT.run_mk, hβkp_eq, hkp,
@@ -378,11 +378,11 @@ theorem cmaReal_implConjugate_cacheCount_le_of_costly_or_hash
         (Resp := Resp) (Stmt := Stmt) t)
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (z) (hz : z ∈ support
-      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run
         (s, false))) :
     cacheCount z.2.1.2.1 ≤ cacheCount s.2.1 + 1 := by
-  simp only [Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
+  simp only [VCVio.HeapSSP.Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
   obtain ⟨w, hw, rfl⟩ := hz
   simpa [Prod.map, cmaHeapStateEquiv] using
     cmaReal_impl_cacheCount_le_of_costly_or_hash M Commit Chal σ hr t ht
@@ -398,11 +398,11 @@ theorem cmaReal_implConjugate_cacheCount_le_of_not_costly_not_hash
       (Resp := Resp) (Stmt := Stmt) t)
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (z) (hz : z ∈ support
-      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run
         (s, false))) :
     cacheCount z.2.1.2.1 ≤ cacheCount s.2.1 := by
-  simp only [Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
+  simp only [VCVio.HeapSSP.Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
   obtain ⟨w, hw, rfl⟩ := hz
   simpa [Prod.map, cmaHeapStateEquiv] using
     cmaReal_impl_cacheCount_le_of_not_costly_not_hash M Commit Chal σ hr t hcost hhash
@@ -414,11 +414,11 @@ theorem cmaReal_implConjugate_bad_eq_false
     (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (z) (hz : z ∈ support
-      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run
         (s, false))) :
     z.2.2 = false := by
-  simp only [Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
+  simp only [VCVio.HeapSSP.Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
   obtain ⟨w, hw, rfl⟩ := hz
   have hbad :=
     cmaReal_impl_bad_preserved M Commit Chal σ hr t
@@ -638,11 +638,11 @@ theorem cmaReal_implConjugate_valid_of_valid
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (hvalid : CmaInnerData.Valid (rel := rel) s)
     (z) (hz : z ∈ support
-      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run
         (s, false))) :
     CmaInnerData.Valid (rel := rel) z.2.1 := by
-  simp only [Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
+  simp only [VCVio.HeapSSP.Package.implConjugate_run_apply, support_map, Set.mem_image] at hz
   obtain ⟨w, hw, rfl⟩ := hz
   simpa [Prod.map, cmaHeapStateEquiv] using
     cmaReal_impl_valid_of_valid M Commit Chal σ hr t
@@ -660,7 +660,7 @@ theorem cmaReal_implConjugate_preserves_valid
     (hpbad : p.2 = false)
     (hpvalid : CmaInnerData.Valid (rel := rel) p.1)
     (z) (hz : z ∈ support
-      ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) t).run p)) :
     CmaInnerData.Valid (rel := rel) z.2.1 := by
   rcases p with ⟨s, b⟩
@@ -1311,10 +1311,10 @@ private lemma cmaSimSignStepDist_evalDist_eq_public
         | inl a => cases a; rfl
         | inr b => cases b <;> rfl
       unfold cmaSimSignStepDist
-      rw [hstart, Package.link_impl_apply_run]
+      rw [hstart, VCVio.HeapSSP.Package.link_impl_apply_run]
       conv_lhs =>
         simp [cmaToNma, nma_simulateQ_liftM_unif_run,
-          StateT.run_mk, Package.linkReshape, hα]
+          StateT.run_mk, VCVio.HeapSSP.Package.linkReshape, hα]
       conv_rhs =>
         simp [cmaSimSignPublicDist, cmaSignKeySource]
       have hpk :
@@ -1370,10 +1370,10 @@ private lemma cmaSimSignStepDist_evalDist_eq_public
         | inl a => cases a; rfl
         | inr b => cases b <;> rfl
       unfold cmaSimSignStepDist
-      rw [hstart, Package.link_impl_apply_run]
+      rw [hstart, VCVio.HeapSSP.Package.link_impl_apply_run]
       conv_lhs =>
         simp [cmaToNma, nma_simulateQ_liftM_unif_run,
-          StateT.run_mk, Package.linkReshape, hα]
+          StateT.run_mk, VCVio.HeapSSP.Package.linkReshape, hα]
       conv_rhs =>
         simp [cmaSimSignPublicDist, cmaSignKeySource]
       have hpk :
@@ -1606,14 +1606,14 @@ theorem cmaSignEps_expectedSCost_le
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (h_valid : CmaInnerData.Valid (rel := rel) s) :
     expectedSCost
-      (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+      (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
         (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
       (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt))
       (cmaSignEps (rel := rel) ζ_zk β) A qS (s, false)
       ≤ (qS : ℝ≥0∞) * ζ_zk
         + (qS : ℝ≥0∞) * (cacheCount s.2.1 + qS + qH) * β := by
-  set G := Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+  set G := VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
     (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)) with hG
   change expectedSCost G
       (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
@@ -1990,7 +1990,7 @@ theorem cmaSignEpsCore_expectedSCost_le
       (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
     expectedSCost
-        (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+        (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
           (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
         (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt))
@@ -2007,7 +2007,7 @@ theorem cmaSignEpsCore_expectedSCost_le
         (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool),
         p.2 = false → CmaInnerData.Valid (rel := rel) p.1 →
           ∀ z ∈ support
-              ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
+              ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
     simpa [hφ] using
@@ -2016,17 +2016,17 @@ theorem cmaSignEpsCore_expectedSCost_le
     rw [hs_init]
     exact cacheCount_cmaInitData M Commit Chal
   have h_cost_eq :
-      expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+      expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEpsCore ζ_zk β) A qS (s_init, false)
         =
-        expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+        expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEps (rel := rel) ζ_zk β) A qS (s_init, false) :=
     expectedSCost_eq_of_inv
-      (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+      (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
       (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt))
       (CmaInnerData.Valid (rel := rel))
@@ -2069,7 +2069,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
         (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
     (h_cost_le :
       expectedSCost
-        (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+        (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
           (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
         (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt))
@@ -2095,12 +2095,13 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
         (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool),
         p.2 = false → CmaInnerData.Valid (rel := rel) p.1 →
           ∀ z ∈ support
-              ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
+              ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
     simpa [hφ] using
       cmaReal_implConjugate_preserves_valid M Commit Chal σ hr t p hpbad hpvalid z hz
-  have h_bridge := Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
+  have h_bridge :=
+    VCVio.HeapSSP.Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
     (cmaReal M Commit Chal σ hr) (cmaSim M Commit Chal hr simT)
     φ s_init h_init₀ h_init₁
     (CmaInnerData.Valid (rel := rel)) h_valid_init h_pres_valid
@@ -2134,7 +2135,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
       funext z; rfl
     rw [heq]; exact h
   have h_cost_le' :
-      expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+      expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEpsCore ζ_zk β) A qS (s_init, false) ≤ εBound := by
@@ -2142,7 +2143,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
   calc ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
           (cmaSim M Commit Chal hr simT) A)
       ≤ _ := h_bridge
-    _ = expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+    _ = expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEpsCore ζ_zk β) A qS (s_init, false) := by
@@ -2186,7 +2187,7 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
         (p : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool),
         p.2 = false → CmaInnerData.Valid (rel := rel) p.1 →
           ∀ z ∈ support
-              ((Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
+              ((VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ t).run p),
             CmaInnerData.Valid (rel := rel) z.2.1 := by
     intro t p hpbad hpvalid z hz
     simpa [hφ] using
@@ -2195,23 +2196,23 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
     rw [hs_init]
     exact cacheCount_cmaInitData M Commit Chal
   have h_cost_le :
-      expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+      expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
           (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
             (Resp := Resp) (Stmt := Stmt))
           (cmaSignEpsCore ζ_zk β) A qS (s_init, false)
         ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by
     have h_cost_eq :
-        expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+        expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))
             (cmaSignEpsCore ζ_zk β) A qS (s_init, false)
           =
-          expectedSCost (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+          expectedSCost (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))
             (cmaSignEps (rel := rel) ζ_zk β) A qS (s_init, false) :=
       expectedSCost_eq_of_inv
-        (Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
+        (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ)
         (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt))
         (CmaInnerData.Valid (rel := rel))
@@ -2234,7 +2235,7 @@ Because `cmaSim := cmaToNma.link nma` by definition, H4 is a direct
 instance of the generic link-shift identity. No state bijection. -/
 
 /-- **H4 hop** (program equivalence). Instance of
-`Package.run_link_eq_run_shiftLeft` at
+`VCVio.HeapSSP.Package.run_link_eq_run_shiftLeft` at
 `P = cmaToNma`, `Q = nma`. -/
 theorem cmaSim_run_eq_nma_run_shiftLeft_cmaToNma
     (hr : GenerableRelation Stmt Wit rel)
@@ -2244,7 +2245,7 @@ theorem cmaSim_run_eq_nma_run_shiftLeft_cmaToNma
     (cmaSim M Commit Chal hr simT).run A =
       (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).run
         ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A) :=
-  Package.run_link_eq_run_shiftLeft _ _ A
+  VCVio.HeapSSP.Package.run_link_eq_run_shiftLeft _ _ A
 
 /-- **H4 hop** (runProb form), specialising to `runProb`. -/
 theorem cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma
@@ -2254,7 +2255,7 @@ theorem cmaSim_runProb_eq_nma_runProb_shiftLeft_cmaToNma
     (cmaSim M Commit Chal hr simT).runProb A =
       (nma (Stmt := Stmt) (Wit := Wit) M Commit Chal hr).runProb
         ((cmaToNma (Stmt := Stmt) M Commit Chal simT).shiftLeft A) := by
-  unfold Package.runProb
+  unfold VCVio.HeapSSP.Package.runProb
   exact cmaSim_run_eq_nma_run_shiftLeft_cmaToNma M Commit Chal hr simT A
 
 end FiatShamir.HeapSSP

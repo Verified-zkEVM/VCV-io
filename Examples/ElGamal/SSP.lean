@@ -3,17 +3,18 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.SSP.Hybrid
+import VCVio.StateSeparating.Hybrid
 import VCVio.OracleComp.SimSemantics.Constructions
 
 /-!
 # State-Separating Proofs: ElGamal IND-CPA via DDH
 
-A package-level formulation of the many-query *left-or-right* IND-CPA game for ElGamal in the
-SSProve style. The example wraps the ElGamal / DDH machinery from `Examples.ElGamal.Basic` and
-`VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman` into the `Package` API of
-`VCVio.SSP`, illustrating how the SSP combinators (`link`, `advantage`, `shiftLeft`,
-`advantage_hybrid`) organize a security proof.
+A handler-level formulation of the many-query *left-or-right* IND-CPA game for
+ElGamal in the state-separating style.
+The example wraps the ElGamal / DDH machinery from `Examples.ElGamal.Basic` and
+`VCVio.CryptoFoundations.HardnessAssumptions.DiffieHellman` into the
+`QueryImpl.Stateful` API, illustrating how `link`, `advantage`, and
+`shiftLeft` organize a security proof.
 
 The game defined here is strictly stronger than the one-time IND-CPA game proved secure in
 `Examples/ElGamal/Basic.lean`: the adversary may make an unbounded number of `LR` and `GETPK`
@@ -40,29 +41,29 @@ distribution: the single secret exponent `a` is shared across all `GETPK` and `D
 answers. The multi-query DDH assumption (`dhTripleReal` and `dhTripleRand` are
 computationally indistinguishable) is the cryptographic primitive the headline bound reduces
 to; the standard multi-to-single-query hybrid (which bounds this multi-query gap by `q` times
-the single-query DDH advantage) is orthogonal to the SSP argument presented here.
+the single-query DDH advantage) is orthogonal to the state-separating argument presented here.
 
-## Game packages
+## Game handlers
 
 * `elgamalLR_left F gen` and `elgamalLR_right F gen` are the two LR-style games. The secret
-  key `sk` is *lazily sampled* on the first `GETPK` or `LR` query and cached in the package
+  key `sk` is *lazily sampled* on the first `GETPK` or `LR` query and cached in the handler
   state `Option F` so that all subsequent queries share the same `sk`. Each `LR` query samples
   fresh randomness `r`, producing independent encryptions under the shared key.
 * `dhTripleReal F gen` and `dhTripleRand F gen` are the corresponding "real" and "random" DDH
-  packages. They cache the secret exponent `a` lazily (state `Option F`) and sample fresh
+  handlers. They cache the secret exponent `a` lazily (state `Option F`) and sample fresh
   per-query exponents `b` (and `c` in the random case). Each `GETPK` answer thus uses a
   consistent `pk = a • gen` across queries, while each `DHCHALLENGE` uses fresh `b`.
 
-## Reduction packages
+## Reduction handlers
 
 * `dhToLR_leftHandler` and `dhToLR_rightHandler` are stateless reduction handlers. Each LR
   query is forwarded to the corresponding DDH oracle, then projected: `GETPK` is forwarded
   unchanged, while `LR (m₀, m₁)` maps `DHCHALLENGE`'s `(B, T)` to the ciphertext `(B, T + m_b)`
   for `m_b ∈ {m₀, m₁}`.
-* `dhToLR_left` and `dhToLR_right` are the corresponding `Package`s built via
-  `Package.ofStateless`.
+* `dhToLR_left` and `dhToLR_right` are the corresponding `QueryImpl.Stateful`s built via
+  `QueryImpl.Stateful.ofStateless`.
 
-## SSP-style hybrid bound
+## state-separating-style hybrid bound
 
 The classical 5-game / 4-hop hybrid
 
@@ -74,17 +75,17 @@ elgamalLR_left  ↔  dhToLR_left.link dhTripleReal
                 ↔  elgamalLR_right
 ```
 
-collapses through `Package.advantage_triangle` and
-`Package.advantage_link_left_eq_advantage_shiftLeft` into the bound on `elgamalLR_left`
+collapses through `QueryImpl.Stateful.advantage_triangle` and
+`QueryImpl.Stateful.advantage_link_left_eq_advantage_shiftLeft` into the bound on `elgamalLR_left`
 versus `elgamalLR_right`. The three program-equivalence hops (1, 3, 5) are discharged as
 `evalDist_runProb_*` lemmas below. The two remaining gaps (2, 4) are exactly the multi-query
 DDH advantages of the shifted reduction adversaries `dhToLR_{left,right}.shiftLeft A`; they
 appear on the right-hand side of the final bound `elgamalLR_left_advantage_right_le`.
 -/
 
-open OracleSpec OracleComp ProbComp VCVio.SSP
+open OracleSpec OracleComp ProbComp
 
-namespace VCVio.SSP.Examples.ElGamal
+namespace VCVio.StateSeparating.Examples.ElGamal
 
 /-! ### Oracle interfaces -/
 
@@ -102,17 +103,15 @@ under the secret bit. The adversary may interleave calls to both oracles in any 
 variable {F : Type} [CommRing F] [SampleableType F]
 variable {G : Type} [AddCommGroup G] [Module F G]
 
-/-! ### DDH triple packages -/
+/-! ### DDH triple handlers -/
 
-/-- The "real" DDH package (multi-query, shared-`a`).
+/-- The "real" DDH handler (multi-query, shared-`a`).
 
 The first exponent `a` is lazily sampled on first access and cached in the state. `GETPK`
 returns `a • gen` and `DHCHALLENGE` returns `(b • gen, (a * b) • gen)` for fresh `b`. -/
 noncomputable def dhTripleReal (gen : G) :
-    Package unifSpec (dhSpec G) (Option F) where
-  init := pure none
-  impl
-    | Sum.inl _ => fun st => match st with
+    QueryImpl.Stateful unifSpec (dhSpec G) (Option F)
+  | Sum.inl _ => fun st => match st with
         | none => do
             let a ← ($ᵗ F)
             pure (a • gen, some a)
@@ -126,13 +125,11 @@ noncomputable def dhTripleReal (gen : G) :
             let b ← ($ᵗ F)
             pure ((b • gen, (a * b) • gen), some a)
 
-/-- The "random" DDH package (multi-query, shared-`a`). Identical to `dhTripleReal` except
+/-- The "random" DDH handler (multi-query, shared-`a`). Identical to `dhTripleReal` except
 `DHCHALLENGE` returns `(b • gen, c • gen)` for fresh `b, c`. -/
 noncomputable def dhTripleRand (gen : G) :
-    Package unifSpec (dhSpec G) (Option F) where
-  init := pure none
-  impl
-    | Sum.inl _ => fun st => match st with
+    QueryImpl.Stateful unifSpec (dhSpec G) (Option F)
+  | Sum.inl _ => fun st => match st with
         | none => do
             let a ← ($ᵗ F)
             pure (a • gen, some a)
@@ -160,10 +157,8 @@ The convention `(B, T + m_b)` (rather than `(B, m_b + T)`) matches the DDH-to-LR
 output, so the equivalence with `dhToLR_left.link dhTripleReal` is definitional up to
 alpha-renaming of the sampled exponents (`a, b` on the DDH side and `sk, r` here). -/
 noncomputable def elgamalLR_left (gen : G) :
-    Package unifSpec (lrSpec G) (Option F) where
-  init := pure none
-  impl
-    | Sum.inl _ => fun st => match st with
+    QueryImpl.Stateful unifSpec (lrSpec G) (Option F)
+  | Sum.inl _ => fun st => match st with
         | none => do
             let sk ← ($ᵗ F)
             pure (sk • gen, some sk)
@@ -180,10 +175,8 @@ noncomputable def elgamalLR_left (gen : G) :
 /-- The "right-message" ElGamal LR game. Same as `elgamalLR_left` except `LR (_, m₁)` returns
 `(r • gen, (sk * r) • gen + m₁)`. -/
 noncomputable def elgamalLR_right (gen : G) :
-    Package unifSpec (lrSpec G) (Option F) where
-  init := pure none
-  impl
-    | Sum.inl _ => fun st => match st with
+    QueryImpl.Stateful unifSpec (lrSpec G) (Option F)
+  | Sum.inl _ => fun st => match st with
         | none => do
             let sk ← ($ᵗ F)
             pure (sk • gen, some sk)
@@ -217,18 +210,19 @@ def dhToLR_rightHandler {G : Type} [Add G] :
       let bt ← ((dhSpec G).query (Sum.inr ()) : OracleComp (dhSpec G) (G × G))
       pure (bt.1, bt.2 + m₁)
 
-/-- DDH-to-LR reduction encrypting the left message, packaged as a stateless `Package`. -/
-def dhToLR_left {G : Type} [Add G] : Package (dhSpec G) (lrSpec G) PUnit.{1} :=
-  Package.ofStateless dhToLR_leftHandler
+/-- DDH-to-LR reduction encrypting the left message as a stateless handler. -/
+def dhToLR_left {G : Type} [Add G] : QueryImpl.Stateful (dhSpec G) (lrSpec G) PUnit :=
+  QueryImpl.Stateful.ofStateless dhToLR_leftHandler
 
-/-- DDH-to-LR reduction encrypting the right message, packaged as a stateless `Package`. -/
-def dhToLR_right {G : Type} [Add G] : Package (dhSpec G) (lrSpec G) PUnit.{1} :=
-  Package.ofStateless dhToLR_rightHandler
+/-- DDH-to-LR reduction encrypting the right message as a stateless handler. -/
+def dhToLR_right {G : Type} [Add G] : QueryImpl.Stateful (dhSpec G) (lrSpec G) PUnit :=
+  QueryImpl.Stateful.ofStateless dhToLR_rightHandler
 
 /-! ### Reduction equivalences (Hops #1 and #5)
 
-Each of the two named lemmas below shows that two SSP packages produce the same
-distribution against any adversary `A`. They are the SSP-level analogues of the rewrites in
+Each of the two named lemmas below shows that two state-separating handlers
+produce the same distribution against any adversary `A`.
+They are the state-separating-level analogues of the rewrites in
 `Examples.ElGamal.Basic.IND_CPA_OneTime_game_evalDist_eq_ddhExpReal`. -/
 
 section ReductionEquivalences
@@ -243,9 +237,9 @@ final `pure (B, T + m₀)` map through the bind. -/
 private theorem composed_real_left_handler_evalDist (gen : G)
     (q : Unit ⊕ (G × G)) (s : Option F) :
     evalDist
-        ((simulateQ (dhTripleReal (F := F) gen).impl
+        ((simulateQ (dhTripleReal (F := F) gen)
           ((dhToLR_leftHandler (G := G)) q)).run s) =
-      evalDist (((elgamalLR_left (F := F) gen).impl q).run s) := by
+      evalDist (((elgamalLR_left (F := F) gen) q).run s) := by
   rcases q with ⟨⟩ | ⟨m₀, _⟩
   · cases s with
     | none =>
@@ -273,9 +267,9 @@ private theorem composed_real_left_handler_evalDist (gen : G)
 private theorem composed_real_right_handler_evalDist (gen : G)
     (q : Unit ⊕ (G × G)) (s : Option F) :
     evalDist
-        ((simulateQ (dhTripleReal (F := F) gen).impl
+        ((simulateQ (dhTripleReal (F := F) gen)
           ((dhToLR_rightHandler (G := G)) q)).run s) =
-      evalDist (((elgamalLR_right (F := F) gen).impl q).run s) := by
+      evalDist (((elgamalLR_right (F := F) gen) q).run s) := by
   rcases q with ⟨⟩ | ⟨_, m₁⟩
   · cases s with
     | none =>
@@ -298,42 +292,38 @@ private theorem composed_real_right_handler_evalDist (gen : G)
         dsimp only [StateT.run]
         simp only [Functor.map_map]
 
-/-- Hop #1: the SSP-level analogue of `IND_CPA_OneTime_game_evalDist_eq_ddhExpReal`: linking
-the DDH-real package under the *left*-message reduction produces the same output distribution
-as the LR-left game itself. -/
+/-- Hop #1: linking the DDH-real handler under the *left*-message reduction
+produces the same output distribution as the LR-left game itself. -/
 theorem evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left
     (gen : G) {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_left.link (dhTripleReal (F := F) gen)).runProb A) =
-      evalDist ((elgamalLR_left (F := F) gen).runProb A) := by
-  unfold Package.runProb
-  rw [show dhToLR_left = Package.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
-    Package.run_link_left_ofStateless]
-  unfold Package.run
-  -- Both packages have `init = pure none`, so the outer bind collapses on both sides.
-  simp only [show (dhTripleReal (F := F) gen).init = pure none from rfl,
-    show (elgamalLR_left (F := F) gen).init = pure none from rfl, pure_bind, StateT.run'_eq,
-    evalDist_map]
+    evalDist ((dhToLR_left.link (dhTripleReal (F := F) gen)).runProb
+        (PUnit.unit, none) A) =
+      evalDist ((elgamalLR_left (F := F) gen).runProb none A) := by
+  unfold QueryImpl.Stateful.runProb
+  rw [show dhToLR_left = QueryImpl.Stateful.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
+    QueryImpl.Stateful.run_link_left_ofStateless]
+  unfold QueryImpl.Stateful.run
+  rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose]
-  exact Package.simulateQ_StateT_evalDist_congr
+  exact QueryImpl.Stateful.simulateQ_StateT_evalDist_congr
     (composed_real_left_handler_evalDist (F := F) gen) A none
 
 /-- Hop #5: the right-message analogue of
 `evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left`. -/
 theorem evalDist_runProb_dhToLR_right_link_real_eq_elgamalLR_right
     (gen : G) {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_right.link (dhTripleReal (F := F) gen)).runProb A) =
-      evalDist ((elgamalLR_right (F := F) gen).runProb A) := by
-  unfold Package.runProb
-  rw [show dhToLR_right = Package.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
-    Package.run_link_left_ofStateless]
-  unfold Package.run
-  simp only [show (dhTripleReal (F := F) gen).init = pure none from rfl,
-    show (elgamalLR_right (F := F) gen).init = pure none from rfl, pure_bind, StateT.run'_eq,
-    evalDist_map]
+    evalDist ((dhToLR_right.link (dhTripleReal (F := F) gen)).runProb
+        (PUnit.unit, none) A) =
+      evalDist ((elgamalLR_right (F := F) gen).runProb none A) := by
+  unfold QueryImpl.Stateful.runProb
+  rw [show dhToLR_right = QueryImpl.Stateful.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
+    QueryImpl.Stateful.run_link_left_ofStateless]
+  unfold QueryImpl.Stateful.run
+  rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose]
-  exact Package.simulateQ_StateT_evalDist_congr
+  exact QueryImpl.Stateful.simulateQ_StateT_evalDist_congr
     (composed_real_right_handler_evalDist (F := F) gen) A none
 
 end ReductionEquivalences
@@ -345,9 +335,10 @@ Under `dhTripleRand`, the DDH-challenge oracle returns a fresh, uniform third co
 element of `G` and acts as a one-time pad additively masking `m₀` or `m₁`. Pointwise,
 `(b • gen, c • gen + m₀)` and `(b • gen, c • gen + m₁)` therefore have the same distribution.
 
-This is the SSP analogue of `Examples.ElGamal.Basic.IND_CPA_OneTime_DDHReduction_rand_half`:
-a handler-level uniform-masking argument lifted across the whole adversary via
-`Package.simulateQ_StateT_evalDist_congr`. -/
+This is the state-separating analogue of
+`Examples.ElGamal.Basic.IND_CPA_OneTime_DDHReduction_rand_half`: a handler-level
+uniform-masking argument lifted across the whole adversary via
+`simulateQ_StateT_evalDist_congr`. -/
 
 section RandSwapSymmetry
 
@@ -362,10 +353,10 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     (hg : Function.Bijective (fun x : F => x • gen))
     (q : Unit ⊕ (G × G)) (s : Option F) :
     evalDist
-        ((simulateQ (dhTripleRand (F := F) gen).impl
+        ((simulateQ (dhTripleRand (F := F) gen)
           ((dhToLR_leftHandler (G := G)) q)).run s) =
       evalDist
-        ((simulateQ (dhTripleRand (F := F) gen).impl
+        ((simulateQ (dhTripleRand (F := F) gen)
           ((dhToLR_rightHandler (G := G)) q)).run s) := by
   rcases q with ⟨⟩ | ⟨m₀, m₁⟩
   · -- GETPK: both sides are the same `simulateQ` applied to the identical
@@ -376,11 +367,11 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     -- concrete `do b; c; pure ((b•gen, c•gen + m), some _)` ProbComp (modulo the state `s`).
     have step : ∀ (m : G),
         evalDist
-            ((simulateQ (dhTripleRand (F := F) gen).impl
+            ((simulateQ (dhTripleRand (F := F) gen)
               ((dhToLR_leftHandler (G := G)) (Sum.inr (m, m)))).run s) =
           evalDist
             (do
-              let bt ← (((dhTripleRand (F := F) gen).impl (Sum.inr ())).run s
+              let bt ← (((dhTripleRand (F := F) gen) (Sum.inr ())).run s
                 : ProbComp ((G × G) × Option F))
               pure ((bt.1.1, bt.1.2 + m), bt.2)) := by
       intro m
@@ -391,17 +382,17 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     -- (Sum.inr (m₀, m₁))` only depends on `m₁`. Re-express both handler applications via
     -- the unified `step` helper.
     have left_eq :
-        evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+        evalDist ((simulateQ (dhTripleRand (F := F) gen)
             ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
-          evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+          evalDist ((simulateQ (dhTripleRand (F := F) gen)
             ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₀)))).run s) := rfl
     have right_eq :
-        evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+        evalDist ((simulateQ (dhTripleRand (F := F) gen)
             ((dhToLR_rightHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
-          evalDist ((simulateQ (dhTripleRand (F := F) gen).impl
+          evalDist ((simulateQ (dhTripleRand (F := F) gen)
             ((dhToLR_leftHandler (G := G)) (Sum.inr (m₁, m₁)))).run s) := rfl
     rw [left_eq, right_eq, step m₀, step m₁]
-    -- Now the goal depends only on `((dhTripleRand gen).impl (Sum.inr ())).run s`, which
+    -- Now the goal depends only on `((dhTripleRand gen) (Sum.inr ())).run s`, which
     -- unfolds to a concrete ProbComp. Case-split on `s` and apply the uniform-masking lemma.
     cases s with
     | none =>
@@ -442,25 +433,26 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
           (α := F) (β := G) (fun x : F => x • gen) hg m₀ m₁
           (fun y => pure ((b • gen, y), some a))
 
-/-- Hop #3: under the DDH-random package, the left- and right-message reductions produce the
+/-- Hop #3: under the DDH-random handler, the left- and right-message reductions produce the
 same output distribution against any adversary. The proof lifts the per-query uniform-masking
 argument `evalDist_bind_bijective_add_right_eq` across the full adversary via
-`Package.simulateQ_StateT_evalDist_congr`. -/
+`simulateQ_StateT_evalDist_congr`. -/
 theorem evalDist_runProb_dhToLR_link_rand_swap
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_left.link (dhTripleRand (F := F) gen)).runProb A) =
-      evalDist ((dhToLR_right.link (dhTripleRand (F := F) gen)).runProb A) := by
-  unfold Package.runProb
-  rw [show dhToLR_left = Package.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
-    show dhToLR_right = Package.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
-    Package.run_link_left_ofStateless, Package.run_link_left_ofStateless]
-  unfold Package.run
-  simp only [show (dhTripleRand (F := F) gen).init = pure none from rfl,
-    pure_bind, StateT.run'_eq, evalDist_map]
+    evalDist ((dhToLR_left.link (dhTripleRand (F := F) gen)).runProb
+        (PUnit.unit, none) A) =
+      evalDist ((dhToLR_right.link (dhTripleRand (F := F) gen)).runProb
+        (PUnit.unit, none) A) := by
+  unfold QueryImpl.Stateful.runProb
+  rw [show dhToLR_left = QueryImpl.Stateful.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
+    show dhToLR_right = QueryImpl.Stateful.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
+    QueryImpl.Stateful.run_link_left_ofStateless, QueryImpl.Stateful.run_link_left_ofStateless]
+  unfold QueryImpl.Stateful.run
+  rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
   congr 1
   rw [← QueryImpl.simulateQ_compose, ← QueryImpl.simulateQ_compose]
-  exact Package.simulateQ_StateT_evalDist_congr
+  exact QueryImpl.Stateful.simulateQ_StateT_evalDist_congr
     (composed_rand_swap_handler_evalDist (F := F) gen hg) A none
 
 end RandSwapSymmetry
@@ -471,7 +463,7 @@ The headline security statement: the many-query LR-IND-CPA advantage of ElGamal 
 the sum of two multi-query DDH advantages (one for each message slot). The multi-query DDH
 advantage is the standard cryptographic hardness assumption in this model; reducing it further
 to the single-query `DiffieHellman.ddhGuessAdvantage` is a separate hybrid argument orthogonal
-to the SSP reasoning here. -/
+to the state-separating reasoning here. -/
 
 /-- The advantage of distinguishing `elgamalLR_left gen` from `elgamalLR_right gen` is bounded
 by the sum of two multi-query DDH advantages, one against the shifted left-message reduction
@@ -480,64 +472,72 @@ theorem elgamalLR_left_advantage_right_le
     [Finite F] [SampleableType G]
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     (A : OracleComp (lrSpec G) Bool) :
-    (elgamalLR_left (F := F) gen).advantage (elgamalLR_right (F := F) gen) A ≤
-      (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-          (dhToLR_left.shiftLeft A)
-      + (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-          (dhToLR_right.shiftLeft A) := by
+    (elgamalLR_left (F := F) gen).advantage none
+        (elgamalLR_right (F := F) gen) none A ≤
+      (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen) none
+          (dhToLR_left.shiftLeft PUnit.unit A)
+      + (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen) none
+          (dhToLR_right.shiftLeft PUnit.unit A) := by
   set G₁ := dhToLR_left.link (dhTripleReal (F := F) gen) with hG₁
   set G₂ := dhToLR_left.link (dhTripleRand (F := F) gen) with hG₂
   set G₃ := dhToLR_right.link (dhTripleRand (F := F) gen) with hG₃
   set G₄ := dhToLR_right.link (dhTripleReal (F := F) gen) with hG₄
   -- Hop #1: (elgamalLR_left).advantage G₁ A = 0
-  have h1 : (elgamalLR_left (F := F) gen).advantage G₁ A = 0 := by
-    rw [hG₁, Package.advantage_eq_of_evalDist_runProb_eq_right
+  have h1 : (elgamalLR_left (F := F) gen).advantage none G₁ (PUnit.unit, none) A = 0 := by
+    rw [hG₁, QueryImpl.Stateful.advantage_eq_of_evalDist_runProb_eq_right
       (evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left (F := F) gen A)]
-    exact Package.advantage_self _ _
+    exact QueryImpl.Stateful.advantage_self _ _ _
   -- Hop #3: G₂.advantage G₃ A = 0
-  have h3 : G₂.advantage G₃ A = 0 := by
-    rw [hG₂, hG₃, Package.advantage_eq_of_evalDist_runProb_eq_right
+  have h3 : G₂.advantage (PUnit.unit, none) G₃ (PUnit.unit, none) A = 0 := by
+    rw [hG₂, hG₃, QueryImpl.Stateful.advantage_eq_of_evalDist_runProb_eq_right
       (evalDist_runProb_dhToLR_link_rand_swap (F := F) gen hg A).symm]
-    exact Package.advantage_self _ _
+    exact QueryImpl.Stateful.advantage_self _ _ _
   -- Hop #5: G₄.advantage elgamalLR_right A = 0
-  have h5 : G₄.advantage (elgamalLR_right (F := F) gen) A = 0 := by
-    rw [hG₄, Package.advantage_eq_of_evalDist_runProb_eq
+  have h5 : G₄.advantage (PUnit.unit, none) (elgamalLR_right (F := F) gen) none A = 0 := by
+    rw [hG₄, QueryImpl.Stateful.advantage_eq_of_evalDist_runProb_eq
       (evalDist_runProb_dhToLR_right_link_real_eq_elgamalLR_right (F := F) gen A)]
-    exact Package.advantage_self _ _
+    exact QueryImpl.Stateful.advantage_self _ _ _
   -- Hop #2: G₁.advantage G₂ A = (dhTripleReal).advantage (dhTripleRand) (shiftLeft dhToLR_left A)
-  have h2 : G₁.advantage G₂ A =
-      (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-        (dhToLR_left.shiftLeft A) := by
-    rw [hG₁, hG₂, Package.advantage_link_left_eq_advantage_shiftLeft]
+  have h2 : G₁.advantage (PUnit.unit, none) G₂ (PUnit.unit, none) A =
+      (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen) none
+        (dhToLR_left.shiftLeft PUnit.unit A) := by
+    rw [hG₁, hG₂, QueryImpl.Stateful.advantage_link_left_eq_advantage_shiftLeft]
   -- Hop #4: G₃.advantage G₄ A = (dhTripleReal).advantage (dhTripleRand) (shiftLeft dhToLR_right A)
-  have h4 : G₃.advantage G₄ A =
-      (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-        (dhToLR_right.shiftLeft A) := by
-    rw [hG₃, hG₄, Package.advantage_link_left_eq_advantage_shiftLeft,
-      Package.advantage_symm]
+  have h4 : G₃.advantage (PUnit.unit, none) G₄ (PUnit.unit, none) A =
+      (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen) none
+        (dhToLR_right.shiftLeft PUnit.unit A) := by
+    rw [hG₃, hG₄, QueryImpl.Stateful.advantage_link_left_eq_advantage_shiftLeft,
+      QueryImpl.Stateful.advantage_symm]
   -- Four applications of the triangle inequality collapse the chain.
-  calc (elgamalLR_left (F := F) gen).advantage (elgamalLR_right (F := F) gen) A
-      ≤ (elgamalLR_left (F := F) gen).advantage G₁ A
-          + G₁.advantage (elgamalLR_right (F := F) gen) A := Package.advantage_triangle _ _ _ _
-    _ ≤ (elgamalLR_left (F := F) gen).advantage G₁ A
-          + (G₁.advantage G₂ A + G₂.advantage (elgamalLR_right (F := F) gen) A) := by
+  calc (elgamalLR_left (F := F) gen).advantage none (elgamalLR_right (F := F) gen) none A
+      ≤ (elgamalLR_left (F := F) gen).advantage none G₁ (PUnit.unit, none) A
+          + G₁.advantage (PUnit.unit, none) (elgamalLR_right (F := F) gen) none A :=
+            QueryImpl.Stateful.advantage_triangle _ _ _ _ _ _ _
+    _ ≤ (elgamalLR_left (F := F) gen).advantage none G₁ (PUnit.unit, none) A
+          + (G₁.advantage (PUnit.unit, none) G₂ (PUnit.unit, none) A
+            + G₂.advantage (PUnit.unit, none) (elgamalLR_right (F := F) gen) none A) := by
         gcongr
-        exact Package.advantage_triangle _ _ _ _
-    _ ≤ (elgamalLR_left (F := F) gen).advantage G₁ A
-          + (G₁.advantage G₂ A
-            + (G₂.advantage G₃ A + G₃.advantage (elgamalLR_right (F := F) gen) A)) := by
+        exact QueryImpl.Stateful.advantage_triangle _ _ _ _ _ _ _
+    _ ≤ (elgamalLR_left (F := F) gen).advantage none G₁ (PUnit.unit, none) A
+          + (G₁.advantage (PUnit.unit, none) G₂ (PUnit.unit, none) A
+            + (G₂.advantage (PUnit.unit, none) G₃ (PUnit.unit, none) A
+              + G₃.advantage (PUnit.unit, none) (elgamalLR_right (F := F) gen) none A)) := by
         gcongr
-        exact Package.advantage_triangle _ _ _ _
-    _ ≤ (elgamalLR_left (F := F) gen).advantage G₁ A
-          + (G₁.advantage G₂ A
-            + (G₂.advantage G₃ A
-              + (G₃.advantage G₄ A + G₄.advantage (elgamalLR_right (F := F) gen) A))) := by
+        exact QueryImpl.Stateful.advantage_triangle _ _ _ _ _ _ _
+    _ ≤ (elgamalLR_left (F := F) gen).advantage none G₁ (PUnit.unit, none) A
+          + (G₁.advantage (PUnit.unit, none) G₂ (PUnit.unit, none) A
+            + (G₂.advantage (PUnit.unit, none) G₃ (PUnit.unit, none) A
+              + (G₃.advantage (PUnit.unit, none) G₄ (PUnit.unit, none) A
+                + G₄.advantage (PUnit.unit, none) (elgamalLR_right (F := F) gen) none A))) := by
         gcongr
-        exact Package.advantage_triangle _ _ _ _
-    _ = G₁.advantage G₂ A + G₃.advantage G₄ A := by rw [h1, h3, h5]; ring
-    _ = (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-          (dhToLR_left.shiftLeft A)
-        + (dhTripleReal (F := F) gen).advantage (dhTripleRand (F := F) gen)
-          (dhToLR_right.shiftLeft A) := by rw [h2, h4]
+        exact QueryImpl.Stateful.advantage_triangle _ _ _ _ _ _ _
+    _ = G₁.advantage (PUnit.unit, none) G₂ (PUnit.unit, none) A
+        + G₃.advantage (PUnit.unit, none) G₄ (PUnit.unit, none) A := by
+        rw [h1, h3, h5]
+        ring
+    _ = (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen)
+          none (dhToLR_left.shiftLeft PUnit.unit A)
+        + (dhTripleReal (F := F) gen).advantage none (dhTripleRand (F := F) gen)
+          none (dhToLR_right.shiftLeft PUnit.unit A) := by rw [h2, h4]
 
-end VCVio.SSP.Examples.ElGamal
+end VCVio.StateSeparating.Examples.ElGamal

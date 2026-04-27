@@ -39,6 +39,11 @@ dtumad: I think we should eventually just deprecate this, just say `toSPMF`. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
 
+/-- Evaluation distribution notation for any monad with `HasEvalSPMF`.
+For monads with `HasEvalPMF`, this uses the inherited `HasEvalSPMF`
+semantics. -/
+notation "𝒟[" mx "]" => evalDist mx
+
 lemma evalDist_def [HasEvalSPMF m] {α : Type u} (mx : m α) :
     evalDist mx = HasEvalSPMF.toSPMF mx := rfl
 

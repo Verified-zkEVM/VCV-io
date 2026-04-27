@@ -3,25 +3,26 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.HeapSSP.DistEquiv
+import VCVio.StateSeparating.DistEquiv
 import VCVio.OracleComp.Constructions.BitVec
+import ToMathlib.Data.Heap
 
 /-!
-# One-Time Pad as a HeapSSP package
+# One-Time Pad as a state-separating handler
 
-Pilot port of `Examples.OneTimePad.Basic` to the experimental `HeapSSP`
-framework: the OTP perfect-secrecy story, rebuilt as a `HeapSSP.Package`
+Pilot port of `Examples.OneTimePad.Basic` to the experimental `state-separating`
+framework: the OTP perfect-secrecy story, rebuilt as a `state-separating.Handler`
 "real vs ideal" pair, with the SSProve-style "single-call gate" idiom
 applied so that distributional equivalence holds *unconditionally* at
-the package level.
+the handler level.
 
 ## SSProve "single-call gate" idiom
 
 OTP secrecy is structurally one-shot: encrypting two messages under the
-same key reveals their XOR. To make `realPkg ≡ᵈ idealPkg` hold against
+same key reveals their XOR. To make `realImpl ≡ᵈ idealImpl` hold against
 *every* adversary (rather than the "adversary issues at most one query"
-fragment), both packages bake the call-counting into their state. Each
-package carries a single `UsedFlag.used : Bool` cell, gated as follows:
+fragment), both handlers bake the call-counting into their state. Each
+handler carries a single `UsedFlag.used : Bool` cell, gated as follows:
 
 * On the **first** `enc m` call (`h .used = false`), the handler does
   its real work (real: sample `k`, return `k ⊕ m`; ideal: sample a
@@ -31,15 +32,15 @@ package carries a single `UsedFlag.used : Bool` cell, gated as follows:
 
 Because the gate makes the second-and-later calls deterministic and
 identical on both sides, and because the first call's outputs have the
-same distribution (XOR with a uniform key is uniform), the two packages
+same distribution (XOR with a uniform key is uniform), the two handlers
 are distributionally equivalent against every adversary. This is the
 standard SSProve playbook for bounded-query primitives: enforce the
-bound *in the package*, then quantify the equivalence over all
+bound *in the handler*, then quantify the equivalence over all
 adversaries.
 
 ## Sampling deferred into the handler
 
-A second SSProve-style choice: the real package's key is **not** sampled
+A second SSProve-style choice: the real handler's key is **not** sampled
 at `init` and stored in the heap. Instead, both `init`s are
 `pure Heap.empty`, and the real handler samples its key locally on the
 first call. This keeps the two `init`s `evalDist`-equal (so the simple
@@ -52,12 +53,12 @@ because the key is single-use anyway.
 * `otpSpec sp` exposes a single export query `enc m` taking a plaintext
   `m : BitVec sp` and returning a ciphertext `BitVec sp`.
 * `UsedFlag` is the single-cell identifier set carrying `.used : Bool`,
-  shared by both packages.
-* `realPkg sp` and `idealPkg sp` are the gated real and ideal packages
+  shared by both handlers.
+* `realImpl sp` and `idealImpl sp` are the gated real and ideal handlers
   on `UsedFlag`.
-* `realPkg_distEquiv_idealPkg : realPkg sp ≡ᵈ idealPkg sp` is the
+* `realImpl_distEquiv_idealImpl : realImpl sp ≡ᵈ idealImpl sp` is the
   unconditional `DistEquiv` headline, proved via
-  `Package.DistEquiv.of_step`.
+  `QueryImpl.Stateful.DistEquiv.of_step`.
 * `encOnce sp m` is the canonical single-call adversary; the
   `evalDist_run_encOnce_eq` corollary on it is now a one-line
   consequence of the distributional equivalence.
@@ -66,17 +67,16 @@ because the key is single-use anyway.
 
 `Basic.lean` uses the `SymmEncAlg` abstraction layer (with
 `PerfectSecrecyExp`, `Complete`, `perfectSecrecyAt`); it does not use
-the SSP package layer. This file uses the HeapSSP package layer
-directly, in the SSProve-style "package as bounded-query gate" idiom.
+the SSP handler layer. This file uses the state-separating handler layer
+directly, in the SSProve-style "handler as bounded-query gate" idiom.
 The arithmetic core, "XOR with a uniform key is uniform", is shared
 verbatim via `evalDist_map_bijective_uniform_cross` against the XOR
 involution. -/
 
 open OracleSpec OracleComp ENNReal
+open scoped QueryImpl.Stateful
 
-namespace VCVio.HeapSSP.OneTimePad
-
-open VCVio.HeapSSP.Package
+namespace VCVio.StateSeparating.OneTimePad
 
 /-! ## Export oracle interface
 
@@ -95,7 +95,7 @@ ciphertext. -/
 
 /-! ## Single-call gate
 
-Both `realPkg` and `idealPkg` use the same one-cell identifier set
+Both `realImpl` and `idealImpl` use the same one-cell identifier set
 `UsedFlag`. The lone cell `.used : Bool` records whether the (one)
 encryption has already been issued. -/
 
@@ -110,26 +110,24 @@ instance instCellSpecUsedFlag : CellSpec UsedFlag where
   type    | .used => Bool
   default | .used => false
 
-/-! ## Real and ideal packages with the call gate -/
+/-! ## Real and ideal handlers with the call gate -/
 
-/-- The **real-world OTP package** with single-call gating.
+/-- The **real-world OTP handler** with single-call gating.
 
 * **State.** A single `UsedFlag.used : Bool` cell.
 * **Init.** Trivial (`pure Heap.empty`); the key is sampled on demand.
 * **Handler.** On the first `enc m` call (`h .used = false`), sample a
   uniform key `k` *locally*, return `k ⊕ m`, and flip `.used := true`.
   On subsequent calls (`h .used = true`), short-circuit to `0#sp`. -/
-def realPkg (sp : ℕ) : Package unifSpec (otpSpec sp) UsedFlag where
-  init := pure Heap.empty
-  impl
-    | .enc m => StateT.mk fun (h : Heap UsedFlag) =>
+def realImpl (sp : ℕ) : QueryImpl.Stateful unifSpec (otpSpec sp) (Heap UsedFlag)
+  | .enc m => StateT.mk fun (h : Heap UsedFlag) =>
         if h .used then
           pure (0#sp, h)
         else do
           let k ← ($ᵗ BitVec sp : ProbComp (BitVec sp))
           pure (k ^^^ m, h.update .used true)
 
-/-- The **ideal-world OTP package** with single-call gating.
+/-- The **ideal-world OTP handler** with single-call gating.
 
 * **State.** A single `UsedFlag.used : Bool` cell.
 * **Init.** Trivial (`pure Heap.empty`).
@@ -137,14 +135,12 @@ def realPkg (sp : ℕ) : Package unifSpec (otpSpec sp) UsedFlag where
   ciphertext, return it, and flip `.used := true`. On subsequent calls,
   short-circuit to `0#sp`.
 
-The same identifier set as `realPkg` is shared on purpose: it lets the
-proof `realPkg_distEquiv_idealPkg` use the simple
-`Package.DistEquiv.of_step` constructor (per-handler `evalDist`
+The same identifier set as `realImpl` is shared on purpose: it lets the
+proof `realImpl_distEquiv_idealImpl` use the simple
+`QueryImpl.Stateful.DistEquiv.of_step` constructor (per-handler `evalDist`
 equality), avoiding any heap bijection bookkeeping. -/
-def idealPkg (sp : ℕ) : Package unifSpec (otpSpec sp) UsedFlag where
-  init := pure Heap.empty
-  impl
-    | .enc _ => StateT.mk fun (h : Heap UsedFlag) =>
+def idealImpl (sp : ℕ) : QueryImpl.Stateful unifSpec (otpSpec sp) (Heap UsedFlag)
+  | .enc _ => StateT.mk fun (h : Heap UsedFlag) =>
         if h .used then
           pure (0#sp, h)
         else do
@@ -166,15 +162,15 @@ private lemma bitVec_xor_right_bijective (sp : ℕ) (m : BitVec sp) :
 
 /-! ## Per-(query, heap) handler equivalence
 
-The arithmetic core of OTP perfect secrecy at the package layer:
-on every (query, heap) pair, `realPkg`'s and `idealPkg`'s handlers
+The arithmetic core of OTP perfect secrecy at the handler layer:
+on every (query, heap) pair, `realImpl`'s and `idealImpl`'s handlers
 have the same `evalDist`. Exposed as a stand-alone lemma so that
 parallel-channel cutovers (e.g. `Examples.OneTimePad.HeapPar`) can
-feed it to `Package.DistEquiv.par_congr` without re-running the
+feed it to `QueryImpl.Stateful.DistEquiv.par_congr` without re-running the
 case-split. -/
 
-/-- **Per-handler `evalDist` equality** between `realPkg sp` and
-`idealPkg sp`. On every input `(query, heap)`, the two handlers
+/-- **Per-handler `evalDist` equality** between `realImpl sp` and
+`idealImpl sp`. On every input `(query, heap)`, the two handlers
 produce the same output distribution.
 
 Splits on `h .used`:
@@ -186,10 +182,10 @@ Splits on `h .used`:
   XOR-with-`m` on the sampled value, which `(· ^^^ m)` being a
   bijection on `BitVec sp` makes distributionally invisible (via
   `probOutput_bind_bijective_uniform_cross`). -/
-theorem realPkg_impl_evalDist_idealPkg (sp : ℕ) (q : (otpSpec sp).Domain)
+theorem realImpl_impl_evalDist_idealImpl (sp : ℕ) (q : (otpSpec sp).Domain)
     (h : Heap UsedFlag) :
-    evalDist (((realPkg sp).impl q).run h) =
-      evalDist (((idealPkg sp).impl q).run h) := by
+    evalDist (((realImpl sp) q).run h) =
+      evalDist (((idealImpl sp) q).run h) := by
   cases q with
   | enc m =>
     change evalDist
@@ -214,22 +210,21 @@ theorem realPkg_impl_evalDist_idealPkg (sp : ℕ) (q : (otpSpec sp).Domain)
 
 /-! ## Unconditional distributional equivalence
 
-The headline statement: `realPkg sp ≡ᵈ idealPkg sp`. Once the
+The headline statement: `realImpl sp ≡ᵈ idealImpl sp`. Once the
 `UsedFlag` gate is in place, the equivalence holds against *every*
 adversary, not just single-call ones. -/
 
 /-- **OTP unconditional distributional equivalence.** With the
-single-call gate baked into both packages, the real and ideal OTP
-packages produce identical output distributions against every
+single-call gate baked into both handlers, the real and ideal OTP
+handlers produce identical output distributions against every
 adversary, on every output type.
 
-Proof shape: `Package.DistEquiv.of_step`. The two `init`s are both
-`pure Heap.empty` so agree definitionally; the per-(query, heap)
-handler equivalence is `realPkg_impl_evalDist_idealPkg`. -/
-theorem realPkg_distEquiv_idealPkg (sp : ℕ) :
-    realPkg sp ≡ᵈ idealPkg sp :=
-  DistEquiv.of_step (G₀ := realPkg sp) (G₁ := idealPkg sp)
-    rfl (realPkg_impl_evalDist_idealPkg sp)
+Proof shape: `QueryImpl.Stateful.DistEquiv.of_step` from the default initial
+heap state, using the per-(query, heap) handler equivalence
+`realImpl_impl_evalDist_idealImpl`. -/
+theorem realImpl_distEquiv_idealImpl (sp : ℕ) :
+    realImpl sp ≡ᵈ₀ idealImpl sp :=
+  QueryImpl.Stateful.DistEquiv.of_step (realImpl_impl_evalDist_idealImpl sp) Heap.empty
 
 /-! ## Single-call adversary and corollary -/
 
@@ -245,19 +240,19 @@ def encOnce (sp : ℕ) (m : BitVec sp) : OracleComp (otpSpec sp) (BitVec sp) :=
   (otpSpec sp).query (.enc m)
 
 /-- **OTP single-query indistinguishability**, recovered as a corollary
-of `realPkg_distEquiv_idealPkg` by specialising the universal `≡ᵈ` to
+of `realImpl_distEquiv_idealImpl` by specialising the universal `≡ᵈ` to
 the canonical single-call adversary `encOnce sp m`.
 
 The same content, framed as `SymmEncAlg.PerfectSecrecyCipherGivenMsgExp`
 equivalence, is proved as `cipherGivenMsg_equiv` in
-`Examples.OneTimePad.Basic`. The HeapSSP framing replaces the
+`Examples.OneTimePad.Basic`. The state-separating framing replaces the
 "reductive bijection" of that proof with the "per-call gate" idiom: a
-direct existence statement at the package level rather than a
+direct existence statement at the handler level rather than a
 per-message reduction. -/
 theorem evalDist_run_encOnce_eq (sp : ℕ) (m : BitVec sp) :
-    evalDist ((realPkg sp).run (encOnce sp m)) =
-      evalDist ((idealPkg sp).run (encOnce sp m)) :=
-  Package.DistEquiv.run_evalDist_eq
-    (realPkg_distEquiv_idealPkg sp) (encOnce sp m)
+    𝒟[(realImpl sp).runProb₀ (encOnce sp m)] =
+      𝒟[(idealImpl sp).runProb₀ (encOnce sp m)] :=
+  QueryImpl.Stateful.DistEquiv.runProb₀_evalDist_eq
+    (realImpl_distEquiv_idealImpl sp) (encOnce sp m)
 
-end VCVio.HeapSSP.OneTimePad
+end VCVio.StateSeparating.OneTimePad

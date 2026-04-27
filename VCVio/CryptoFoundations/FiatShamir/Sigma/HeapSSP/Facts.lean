@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Games
-import VCVio.HeapSSP.CellRef
+import VCVio.StateSeparating.CellRef
 import Mathlib.Data.Real.ENatENNReal
 
 /-!
@@ -21,7 +21,7 @@ hybrid argument.
 
 universe u
 
-open ENNReal OracleSpec OracleComp ProbComp VCVio.HeapSSP
+open ENNReal OracleSpec OracleComp ProbComp VCVio.StateSeparating
 
 namespace FiatShamir.HeapSSP
 

@@ -5,7 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.QueryTracking.Structures
-import VCVio.HeapSSP.Heap
+import ToMathlib.Data.Heap
 
 /-!
 # Oracle interfaces and heap-cell directories for the HeapSSP Fiat-Shamir proof
@@ -115,7 +115,7 @@ instance (M : Type) : DecidableEq (OuterCell M) := fun a b =>
   match a, b with
   | .log, .log => .isTrue rfl
 
-instance (M : Type) : VCVio.HeapSSP.CellSpec.{0, 0} (OuterCell M) where
+instance (M : Type) : CellSpec.{0, 0} (OuterCell M) where
   type
     | .log => List M
   default
@@ -146,7 +146,7 @@ instance (M Commit Chal Stmt Wit : Type) :
   | .bad,     .keypair => .isFalse (fun h => by cases h)
 
 instance (M Commit Chal Stmt Wit : Type) :
-    VCVio.HeapSSP.CellSpec.{0, 0} (InnerCell M Commit Chal Stmt Wit) where
+    CellSpec.{0, 0} (InnerCell M Commit Chal Stmt Wit) where
   type
     | .roCache => (roSpec M Commit Chal).QueryCache
     | .keypair => Option (Stmt × Wit)

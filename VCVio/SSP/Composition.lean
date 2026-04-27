@@ -353,7 +353,7 @@ State separation is automatic: each side's handler can only access its own state
 modifications to the other side are behaviorally invisible. This is the structural-typing
 counterpart of SSProve's `fseparate` side-condition.
 
-We do not use `QueryImpl.prodStateT` here because of awkward universe unification through
+We do not use `QueryImpl.parallelStateT` here because of awkward universe unification through
 `OracleSpec` sums; the body is the same up to the obvious lifts. -/
 def par (p₁ : Package I₁ E₁ σ₁) (p₂ : Package I₂ E₂ σ₂) :
     Package (I₁ + I₂) (E₁ + E₂) (σ₁ × σ₂) where

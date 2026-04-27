@@ -51,7 +51,7 @@ inductive CounterCell
   | count
   deriving DecidableEq
 
-instance : VCVio.HeapSSP.CellSpec CounterCell where
+instance : CellSpec CounterCell where
   type    | .count => Nat
   default | .count => 0
 
@@ -60,11 +60,10 @@ inductive LogCell
   | entries
   deriving DecidableEq
 
-instance : VCVio.HeapSSP.CellSpec LogCell where
+instance : CellSpec LogCell where
   type    | .entries => List Nat
   default | .entries => []
 
-open VCVio.HeapSSP
 
 /-- Counter package: state is `Heap CounterCell`. -/
 def counterPkg : Package unifSpec counterSpec CounterCell where

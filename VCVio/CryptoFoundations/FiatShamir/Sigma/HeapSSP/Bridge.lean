@@ -509,7 +509,7 @@ private noncomputable def cmaRealAppendProdImpl :
 private noncomputable def cmaRealLoggedProdImpl :
     QueryImpl (cmaSpec M Commit Chal Resp Stmt)
       (StateT (cmaPostKeygenState M Commit Chal Stmt Wit) ProbComp) :=
-  ((cmaReal M Commit Chal σ hr).impl.stateTMapBase
+  ((cmaReal M Commit Chal σ hr).impl.mapStateTBase
     (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt))).flattenStateT
 
@@ -524,17 +524,17 @@ private lemma cmaRealLoggedProdImpl_left_eq_cmaRealAppendProdImpl
   rcases st with ⟨signed, h⟩
   rcases t with (n | mc) | m
   · simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-      QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal]
+      QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal]
   · cases hcache : h (Sum.inr InnerCell.roCache) mc with
     | some ch =>
         simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-          QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, hcache]
+          QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal, hcache]
     | none =>
         simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-          QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, hcache,
+          QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal, hcache,
           Heap.update]
   · simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-      QueryImpl.stateTMapBase, QueryImpl.flattenStateT, cmaReal, StateT.run_bind]
+      QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal, StateT.run_bind]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
@@ -599,7 +599,7 @@ private lemma cmaRealLoggedProdImpl_pkSpec_bind_run_none {α : Type}
   change (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp)
       (Sum.inr ())).run (signed, h) >>= (fun z => (f z.1).run z.2) = _
-  simp [cmaRealLoggedProdImpl, cmaSignLogImpl, QueryImpl.stateTMapBase,
+  simp [cmaRealLoggedProdImpl, cmaSignLogImpl, QueryImpl.mapStateTBase,
     QueryImpl.flattenStateT, cmaReal, hkp]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -613,7 +613,7 @@ private lemma cmaRealLoggedProdImpl_pkSpec_bind_output_none {α : Type}
         (Sum.inr ())).run (signed, h) >>= fun z => f z.1 z.2) =
       hr.gen >>= fun ps : Stmt × Wit =>
         f ps.1 (signed, h.update (Sum.inr .keypair) (some (ps.1, ps.2))) := by
-  simp [cmaRealLoggedProdImpl, cmaSignLogImpl, QueryImpl.stateTMapBase,
+  simp [cmaRealLoggedProdImpl, cmaSignLogImpl, QueryImpl.mapStateTBase,
     QueryImpl.flattenStateT, cmaReal, hkp]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -1706,7 +1706,7 @@ private lemma cmaRealRunState_signedCandidateAdv_eq
             (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
             (candidateAdv σ hr M adv)).run ([] : List M))).run h₀) = _
   simp only [pure_bind]
-  rw [OracleComp.simulateQ_stateTMapBase_run_eq_map_flattenStateT
+  rw [OracleComp.simulateQ_mapStateTBase_run_eq_map_flattenStateT
     (outer := (cmaReal M Commit Chal σ hr).impl)
     (inner := cmaSignLogImpl (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
