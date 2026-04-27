@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import ToMathlib.Control.Monad.Algebra
+import ToMathlib.Control.OptionT
 import ToMathlib.Control.StateT
 import VCVio.EvalDist.Monad.Basic
 import VCVio.OracleComp.EvalDist
@@ -300,6 +301,55 @@ theorem wp_StateT_monadLift {σ : Type} (oa : OracleComp spec α)
       (oa >>= fun a => pure (a, s))
       (fun p : α × σ => post p.1 p.2) =
     MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa (fun a => post a s)
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+/-! ## `OptionT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_OptionT_bind (x : OptionT (OracleComp spec) α)
+    (f : α → OptionT (OracleComp spec) β) (post : β → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (x >>= f) post epost =
+      Std.Do'.wp x (fun a => Std.Do'.wp (f a) post epost) epost := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run)
+      (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (epost.pushOption fun a =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f a).run
+          (epost.pushOption post))
+  simp only [OptionT.run_bind, Option.elimM]
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext o
+  cases o <;> simp [EPost.cons.pushOption]
+
+@[simp]
+theorem wp_OptionT_pure (x : α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (pure x : OptionT (OracleComp spec) α) post epost = post x := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (some x) : OracleComp spec (Option α)) (epost.pushOption post) = post x
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_OptionT_failure (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (failure : OptionT (OracleComp spec) α) post epost = epost.head := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure none : OracleComp spec (Option α)) (epost.pushOption post) = epost.head
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_OptionT_monadLift (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons ℝ≥0∞ EPost.nil) :
+    Std.Do'.wp (MonadLift.monadLift oa : OptionT (OracleComp spec) α) post epost =
+      Std.Do'.wp oa post Lean.Order.bot := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (some a)) (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post
   rw [MAlgOrdered.wp_bind]
   refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
   funext a

@@ -1176,17 +1176,21 @@ private def normalizeKnownTransformerWPInGoal : TacticM Bool := do
       OracleComp.ProgramLogic.Loom.wp_StateT_get,
       OracleComp.ProgramLogic.Loom.wp_StateT_set,
       OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
-      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift]))
+      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_bind,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_pure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_failure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift]))
 
 private def tryCloseNormalizedTransformerWP : TacticM Bool := do
   let saved ← saveState
   let target ← instantiateMVars (← getMainTarget)
   let some comp := tripleGoalComp? target | return false
   let compType ← instantiateMVars (← inferType comp)
-  -- The normalizer set below currently contains StateT rules. The closing
-  -- theorem is transformer-generic, so extending the normalizer set is enough
-  -- to cover additional transformer stacks.
-  unless (findAppWithHead? ``StateT compType).isSome do
+  -- The theorem bridge is transformer-generic; each supported transformer adds
+  -- a syntactic gate here and WP equations to `normalizeKnownTransformerWPInGoal`.
+  unless (findAppWithHead? ``StateT compType).isSome ||
+      (findAppWithHead? ``OptionT compType).isSome do
     return false
   if ← tryEvalTacticSyntax (← `(tactic|
       apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_of_wp_le)) then

@@ -130,6 +130,28 @@ example (f : Nat → α × Nat) (post : α → Nat → ℝ≥0∞) :
     ⦃post⦄ := by
   vcgen
 
+/-! ## `OptionT (OracleComp spec)` transformer steps -/
+
+example (oa : OracleComp spec α) (post : α → ℝ≥0∞) (nonePost : ℝ≥0∞) :
+    Std.Do'.Triple (wp⟦oa⟧ post)
+      (MonadLift.monadLift oa : OptionT (OracleComp spec) α)
+      post epost⟨nonePost⟩ := by
+  vcgen
+
+example (oa : OracleComp spec α) (post : α → ℝ≥0∞) (nonePost : ℝ≥0∞) :
+    Std.Do'.Triple (wp⟦oa⟧ post)
+      (do
+        let a ← (MonadLift.monadLift oa : OptionT (OracleComp spec) α)
+        pure a)
+      post epost⟨nonePost⟩ := by
+  vcgen
+
+example (post : α → ℝ≥0∞) (nonePost : ℝ≥0∞) :
+    Std.Do'.Triple nonePost
+      (failure : OptionT (OracleComp spec) α)
+      post epost⟨nonePost⟩ := by
+  vcgen
+
 /--
 info: [wpstep cache] hit `OracleComp.ProgramLogic.wp_replicate_succ`
 ---
