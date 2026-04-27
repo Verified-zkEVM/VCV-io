@@ -111,9 +111,7 @@ example {xs : List α} {ys : List β}
     (hxy : List.Forall₂ S xs ys)
     (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
     ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
-  rvcstep using S
-  · exact hxy
-  · exact hfg
+  rvcstep
 
 example {σ₁ σ₂ : Type}
     {xs : List α}
@@ -137,10 +135,7 @@ example {σ₁ σ₂ : Type}
     (hxy : List.Forall₂ Rin xs ys)
     (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ b | S⟫) :
     ⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ | S⟫ := by
-  rvcstep using Rin
-  · exact hs
-  · exact hxy
-  · exact hfg
+  rvcstep
 
 /-! ## Pure / ite rules -/
 

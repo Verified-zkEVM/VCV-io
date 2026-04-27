@@ -324,19 +324,32 @@ def runRelMapMRule : TacticM Bool := do
     refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
       (Rin := OracleComp.ProgramLogic.Relational.EqRel _) ?_ ?_))
 
+private def closeRelAssumptionSideGoals : TacticM Unit := do
+  discard <| tryEvalTacticSyntax (← `(tactic|
+    all_goals first
+      | assumption
+      | trivial
+      | (intro _; assumption)))
+
 def runRelMapMRuleUsing (R : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
-      (Rin := $R) ?_ ?_))
+  if ← tryEvalTacticSyntax (← `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_list_mapM
+        (Rin := $R) ?_ ?_)) then
+    closeRelAssumptionSideGoals
+    return true
+  return false
 
 def runRelFoldlMRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same))
 
 def runRelFoldlMRuleUsing (R : TSyntax `term) : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
-      (Rin := $R) ?_ ?_ ?_))
+  if ← tryEvalTacticSyntax (← `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_list_foldlM
+        (Rin := $R) ?_ ?_ ?_)) then
+    closeRelAssumptionSideGoals
+    return true
+  return false
 
 def runRelRndRuleUsing (f : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
