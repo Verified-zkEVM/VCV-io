@@ -164,6 +164,16 @@ theorem relTriple_uniformSample_bij [SampleableType α]
     ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post
   exact OracleComp.ProgramLogic.Relational.eRelWP_uniformSample_bij hf post hpre
 
+/-- Identity coupling for uniform sampling under the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_uniformSample_refl [SampleableType α]
+    (post : α → α → ℝ≥0∞) :
+    Std.Do'.RelTriple
+      (∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a)
+      ($ᵗ α : ProbComp α) ($ᵗ α : ProbComp α) post
+      Lean.Order.bot Lean.Order.bot := by
+  exact relTriple_uniformSample_bij Function.bijective_id post le_rfl
+
 /-- Oracle query under a bijection for the default quantitative
 `Std.Do'.RelTriple` carrier. -/
 theorem relTriple_query_bij (t : spec₁.Domain)
@@ -188,5 +198,21 @@ theorem relTriple_query_bij (t : spec₁.Domain)
     (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
       OracleComp spec₁ (spec₁.Range t)) post
   exact OracleComp.ProgramLogic.Relational.eRelWP_query_bij t hf post hpre
+
+/-- Identity coupling for oracle queries under the default quantitative
+`Std.Do'.RelTriple` carrier. -/
+theorem relTriple_query_refl (t : spec₁.Domain)
+    (post : spec₁.Range t → spec₁.Range t → ℝ≥0∞) :
+    Std.Do'.RelTriple
+      (∑' a : spec₁.Range t,
+        Pr[= a |
+          (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+            OracleComp spec₁ (spec₁.Range t))] * post a a)
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t))
+      (liftM (HasQuery.query (spec := spec₁) (m := OracleComp spec₁) t) :
+        OracleComp spec₁ (spec₁.Range t)) post
+      Lean.Order.bot Lean.Order.bot := by
+  exact relTriple_query_bij t Function.bijective_id post le_rfl
 
 end OracleComp.ProgramLogic.Relational.Loom

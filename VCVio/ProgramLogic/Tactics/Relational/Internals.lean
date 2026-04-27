@@ -46,6 +46,9 @@ attribute [vcspec]
   OracleComp.ProgramLogic.Relational.Loom.relTriple_pure
   OracleComp.ProgramLogic.Relational.Loom.relTriple_bind
   OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_bij
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_query_bij
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl
   -- Raw relational WP rule from the Std.Do bridge
   Std.Do'.RelWP.rwp_pure
   -- `simulateQ`-aware rules from `Relational/SimulateQ.lean`
@@ -1014,7 +1017,9 @@ private def deterministicRelVCSpecDecls : List Name := [
   ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,
   ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same,
   ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl,
-  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_pure
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_pure,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl
 ]
 
 private def isDeterministicRelVCSpecEntry (entry : VCSpecEntry) : Bool :=

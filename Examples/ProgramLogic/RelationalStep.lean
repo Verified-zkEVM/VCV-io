@@ -86,6 +86,20 @@ example [SampleableType α]
   · intro x
     rfl
 
+example [SampleableType α] (post : α → α → ℝ≥0∞) :
+    ⦃∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a⦄
+      ($ᵗ α : ProbComp α) ≈ₑ ($ᵗ α : ProbComp α)
+    ⦃post⦄ := by
+  rvcstep
+
+example (t : spec.Domain) (post : spec.Range t → spec.Range t → ℝ≥0∞) :
+    ⦃∑' a : spec.Range t,
+      Pr[= a | (query t : OracleComp spec (spec.Range t))] * post a a⦄
+      (query t : OracleComp spec (spec.Range t)) ≈ₑ
+      (query t : OracleComp spec (spec.Range t))
+    ⦃post⦄ := by
+  rvcstep
+
 /-! ## Iteration rules -/
 
 example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
