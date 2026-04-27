@@ -261,6 +261,7 @@ query log. -/
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) :
     OracleComp (unifSpec + (M × Commit →ₒ Chal)) Bool := by
+  letI : DecidableEq M := Classical.decEq _
   letI : DecidableEq (Commit × Resp) := Classical.decEq _
   let baseW : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
       (WriterT (QueryLog (M →ₒ (Commit × Resp)))
@@ -542,6 +543,13 @@ private theorem simulateQ_fsBaseImpl_postKeygenFreshWriterComp_run'_eq
   conv_rhs =>
     simp [implS, baseS, fsBaseImpl, postKeygenSignCore, _root_.FiatShamir,
       randomOracle, QueryLog.wasQueried_eq_decide_mem_map_fst, StateT.run_bind]
+  refine bind_congr fun a => ?_
+  congr 1
+  funext ch
+  congr 1
+  by_cases hmem : a.1.1.1 ∈ List.map (fun e => e.fst) a.1.2
+  · simp [hmem]
+  · simp [hmem]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Evaluating the fixed-key WriterT post-keygen body under the public
@@ -562,6 +570,76 @@ private theorem runtime_evalDist_postKeygenFreshWriterComp_eq
     (Resp := Resp) adv pk sk]
   rw [postKeygenFreshWriterProb_eq_postKeygenFreshProb (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk]
+
+omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M] [DecidableEq Commit] in
+/-- The public EUF-CMA experiment factors into key generation followed by the
+fixed-key WriterT post-keygen computation. The right side keeps the pair
+destructuring shape of `SignatureAlg.unforgeableExp`, which makes the equality
+definitionally transparent. -/
+private theorem unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
+    SignatureAlg.unforgeableExp (_root_.FiatShamir.runtime M) adv =
+      (_root_.FiatShamir.runtime M).evalDist
+        (do
+          let (pk, sk) ← (monadLift (hr.gen : ProbComp (Stmt × Wit)) :
+            OracleComp (unifSpec + (M × Commit →ₒ Chal)) (Stmt × Wit))
+          postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
+            (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) := by
+  unfold SignatureAlg.unforgeableExp postKeygenFreshWriterComp
+  simp [_root_.FiatShamir]
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Public EUF-CMA advantage in the shared fixed-key post-keygen normal form. -/
+private theorem unforgeableAdvantage_eq_keygen_postKeygenFreshProb
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
+    adv.advantage (_root_.FiatShamir.runtime M) =
+      Pr[= true | ((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+        let pk := ps.1
+        let sk := ps.2
+        postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk)] := by
+  unfold SignatureAlg.unforgeableAdv.advantage
+  rw [unforgeableExp_eq_runtime_bind_postKeygenFreshWriterComp (σ := σ)
+    (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
+    (Resp := Resp) adv]
+  change
+    Pr[= true | (_root_.FiatShamir.runtime M).evalDist
+      ((liftM (hr.gen : ProbComp (Stmt × Wit))) >>= fun ps =>
+        let pk := ps.1
+        let sk := ps.2
+        postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk)] =
+    Pr[= true | 𝒟[(((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+      let pk := ps.1
+      let sk := ps.2
+      postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) :
+      ProbComp Bool)]]
+  rw [_root_.FiatShamir.runtime_evalDist_bind_liftComp (M := M)
+    (oa := (hr.gen : ProbComp (Stmt × Wit)))
+    (rest := fun ps =>
+      let pk := ps.1
+      let sk := ps.2
+      postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk)]
+  change
+    Pr[= true | (𝒟[(hr.gen : ProbComp (Stmt × Wit))] >>= fun ps =>
+      (_root_.FiatShamir.runtime M).evalDist
+        (let pk := ps.1
+         let sk := ps.2
+         postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
+          (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk))] =
+    Pr[= true | 𝒟[(((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+      let pk := ps.1
+      let sk := ps.2
+      postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) :
+      ProbComp Bool)]]
+  rw [evalDist_bind]
+  apply congrArg (fun p => Pr[= true | p])
+  refine bind_congr fun ps => ?_
+  rw [runtime_evalDist_postKeygenFreshWriterComp_eq (σ := σ) (hr := hr)
+    (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2]
 
 /-! ## Joint output of `cmaReal` -/
 
