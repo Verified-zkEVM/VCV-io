@@ -200,6 +200,10 @@ class DisjointSubSpec
   disjoint_onQuery (t₁ : spec₁.Domain) (t₂ : spec₂.Domain) :
     h₁.onQuery t₁ ≠ h₂.onQuery t₂
 
+/-- Oracle-spec inclusions with disjoint query images in an ambient interface. -/
+macro:50 lhs:term " ⊥ₒ[" ambient:term "] " rhs:term : term =>
+  `(DisjointSubSpec $lhs $rhs $ambient)
+
 end OracleSpec
 
 

@@ -491,7 +491,7 @@ def parRouteSeparatedWith
     {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
     {E : OracleSpec.{uₑ, v} ιₑ} (F : Frame σ σ₁ σ₂)
     (R : ExportRoute E E₁ E₂) [I₁ ⊂ₒ I] [I₁ ˡ⊂ₒ I] [I₂ ⊂ₒ I] [I₂ ˡ⊂ₒ I]
-    [OracleSpec.DisjointSubSpec I₁ I₂ I]
+    [I₁ ⊥ₒ[I] I₂]
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
     QueryImpl.Stateful I E σ :=
   parRouteWith F R h₁ h₂
