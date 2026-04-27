@@ -254,13 +254,6 @@ import VCVio.ProgramLogic.Unary.SimulateQ
 import VCVio.ProgramLogic.Unary.StdDoBridge
 import VCVio.ProgramLogic.Unary.StdDoExamples
 import VCVio.ProgramLogic.Unary.WriterTBridge
-import VCVio.SSP.Advantage
-import VCVio.SSP.Composition
-import VCVio.SSP.DistEquiv
-import VCVio.SSP.Hybrid
-import VCVio.SSP.IdenticalUntilBad
-import VCVio.SSP.IndistAt
-import VCVio.SSP.Package
 import VCVio.StateSeparating.Advantage
 import VCVio.StateSeparating.CellRef
 import VCVio.StateSeparating.DistEquiv

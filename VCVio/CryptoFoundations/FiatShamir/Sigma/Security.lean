@@ -12,7 +12,6 @@ import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.CryptoFoundations.SeededFork
 import VCVio.CryptoFoundations.ReplayFork
 import VCVio.EvalDist.Inequalities
-import VCVio.SSP.Composition
 import ToMathlib.Data.ENNReal.TsumDistrib
 
 /-!

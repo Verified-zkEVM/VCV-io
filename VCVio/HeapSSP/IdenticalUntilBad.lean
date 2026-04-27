@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
 import VCVio.HeapSSP.Advantage
-import VCVio.SSP.IdenticalUntilBad
+import VCVio.StateSeparating.IdenticalUntilBad
 
 /-!
 # HeapSSP: Identical-Until-Bad
@@ -73,7 +73,7 @@ lemma evalDist_simulateQ_conjugate_run_eq {α : Type}
     𝒟[(simulateQ (implConjugate impl φ) A).run s] =
       𝒟[Prod.map id φ <$> (simulateQ impl A).run (φ.symm s)] := by
   have h :=
-    VCVio.SSP.Package.simulateQ_StateT_evalDist_congr_of_bij
+    QueryImpl.Stateful.simulateQ_StateT_evalDist_congr_of_bij
       (h₁ := implConjugate impl φ) (h₂ := impl) (φ := φ.symm)
       (fun q p => by simp) A s
   simpa using h
