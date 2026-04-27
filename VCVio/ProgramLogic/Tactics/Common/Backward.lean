@@ -250,6 +250,17 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
       vcSpecBackwardRuleCache.modify fun cache => cache.insert key rule
       return rule
 
+private def VCSpecBackwardRule.applyProof (rule : VCSpecBackwardRule) (mvarId : MVarId)
+    (goalTy : Expr) : MetaM (Option (List MVarId)) := do
+  try
+    let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
+    let prfTy ← instantiateMVars (← inferType prf)
+    fixPredFromGoal? prfTy goalTy
+    let subgoals ← mvarId.apply prf
+    return some subgoals
+  catch _ =>
+    return none
+
 /-- Try to apply a cached symbolic backward rule for a registered `@[vcspec]`
 entry. Unary and relational rules are normalized through raw `wp` / `rwp`
 sources when their theorem statements expose those forms definitionally. -/
@@ -258,6 +269,8 @@ def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
   let goalTy ← instantiateMVars (← mvarId.getType)
   let rawGoal ← isRawBackwardGoal goalTy
   let rule ← getVCSpecBackwardRuleCached entry rawGoal
+  if rawGoal then
+    return (← rule.applyProof mvarId goalTy)
   let symResult ←
     try
       Lean.Meta.Sym.SymM.run <| rule.rule.apply mvarId
@@ -269,14 +282,7 @@ def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
       -- folded VCVio-facing goals are still better handled by Lean's ordinary
       -- elaborated application, but we still apply the cached abstracted proof
       -- source, not the original theorem entry.
-      try
-        let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
-        let prfTy ← instantiateMVars (← inferType prf)
-        fixPredFromGoal? prfTy goalTy
-        let subgoals ← mvarId.apply prf
-        return some subgoals
-      catch _ =>
-        return none
+      rule.applyProof mvarId goalTy
   | .goals subgoals => return some subgoals
 
 /-- Try to apply a registered `@[vcspec]` entry directly to a goal metavariable.
