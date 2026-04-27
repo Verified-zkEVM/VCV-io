@@ -299,15 +299,15 @@ theorem correct
         let (pk, sk) ← sigAlg.keygen
         let sig ← sigAlg.sign pk sk msg
         sigAlg.verify pk msg sig) =
-      evalDist (do
+      𝒟[do
         let (pk, sk) ← hr.gen
-        signVerify pk sk) by
+        signVerify pk sk] by
     rw [hRewrite]
     apply SignatureAlg.probOutput_bind_ge_of_forall_support
     intro ⟨pk, sk⟩ hmem
     have hrel : rel pk sk = true := hr.gen_sound pk sk hmem
     have habort := h_abort pk sk hrel msg
-    have habort' : Pr[= none | evalDist (signOnly pk sk)] ≤ δ := by
+    have habort' : Pr[= none | 𝒟[signOnly pk sk]] ≤ δ := by
       convert habort using 2
     have hnoFail : Pr[⊥ | signVerify pk sk] = 0 := HasEvalPMF.probFailure_eq_zero _
     rw [show (1 : ENNReal) - δ = 1 - δ from rfl]
@@ -315,7 +315,7 @@ theorem correct
       Pr[= true | signVerify pk sk]
         = 1 - Pr[= false | signVerify pk sk] := by
           rw [probOutput_true_eq_sub, hnoFail, tsub_zero]
-      _ ≥ 1 - Pr[= none | evalDist (signOnly pk sk)] := by
+      _ ≥ 1 - Pr[= none | 𝒟[signOnly pk sk]] := by
           apply tsub_le_tsub_left _ 1
           set S := (simulateQ impl (sigAlg.sign pk sk msg)).run ∅
           have hSV : signVerify pk sk = S >>= fun p =>
@@ -327,7 +327,7 @@ theorem correct
             change Prod.fst <$> ((simulateQ impl (sigAlg.sign pk sk msg) >>=
                 fun sig => simulateQ impl (sigAlg.verify pk msg sig)).run ∅) = _
             rw [StateT.run_bind, map_bind]; rfl
-          have hSO : Pr[= none | evalDist (signOnly pk sk)] =
+          have hSO : Pr[= none | 𝒟[signOnly pk sk]] =
               Pr[= none | Prod.fst <$> S] := by rfl
           rw [hSV, probOutput_bind_eq_tsum, hSO, probOutput_map_eq_tsum]
           refine ENNReal.tsum_le_tsum fun p => ?_
@@ -353,13 +353,13 @@ theorem correct
                   hVerifyTrue, mul_zero, le_refl]
               · simp [probOutput_eq_zero_of_not_mem_support hmem]
       _ ≥ 1 - δ := tsub_le_tsub_left habort' 1
-  change evalDist ((simulateQ impl (do
+  change 𝒟[(simulateQ impl (do
       let (pk, sk) ← sigAlg.keygen
       let sig ← sigAlg.sign pk sk msg
-      sigAlg.verify pk msg sig)).run' ∅) =
-    evalDist (do
+      sigAlg.verify pk msg sig)).run' ∅] =
+    𝒟[do
       let (pk, sk) ← hr.gen
-      signVerify pk sk)
+      signVerify pk sk]
   simp only [sigAlg, signVerify, FiatShamirWithAbort, simulateQ_bind]
   congr 1
   rw [roSim.run'_liftM_bind]

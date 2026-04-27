@@ -39,7 +39,7 @@ then `wp` of the simulated computation equals `wp` of the original. -/
 @[game_rule] theorem wp_simulateQ_eq
     (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
-      evalDist (impl t) = evalDist (liftM (query t) : OracleComp spec (spec.Range t)))
+      𝒟[impl t] = 𝒟[(liftM (query t) : OracleComp spec (spec.Range t))])
     (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (simulateQ impl oa) post =
       wp oa post := by
@@ -71,7 +71,7 @@ original computation. -/
 @[game_rule] theorem wp_simulateQ_run'_eq {σ : Type}
     (impl : QueryImpl spec (StateT σ (OracleComp spec)))
     (hImpl : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((impl t).run' s) =
+      𝒟[(impl t).run' s] =
         OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (oa : OracleComp spec α) (s : σ) (post : α → ℝ≥0∞) :
     wp ((simulateQ impl oa).run' s) post =

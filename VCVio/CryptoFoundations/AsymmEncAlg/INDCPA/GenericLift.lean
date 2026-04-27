@@ -133,14 +133,11 @@ private lemma IND_CPA_hybridLR_counted_run'_evalDist_eq_above
     (oa : OracleComp encAlg'.IND_CPA_oracleSpec α)
     (st : encAlg'.IND_CPA_CountedState)
     (hst : st.2 ≥ k + 1) :
-    evalDist
-      ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run' st) =
-      evalDist
-        ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run' st) := by
+    𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run' st] =
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run' st] := by
   have hrun :
-      evalDist ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run st) =
-        evalDist
-          ((simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run st) := by
+      𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) oa).run st] =
+        𝒟[(simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (k + 1)) oa).run st] := by
     apply evalDist_ext
     intro z
     exact OracleComp.ProgramLogic.Relational.probOutput_simulateQ_run_eq_of_impl_eq_preservesInv
@@ -165,19 +162,17 @@ private lemma IND_CPA_stepPrefix_resume_eq_hybridLR
     (oa : OracleComp encAlg'.IND_CPA_oracleSpec α)
     (st : encAlg'.IND_CPA_CountedState)
     (hst : st.2 ≤ k) :
-    evalDist
-      (do
+    𝒟[(do
         let ⟨res, st'⟩ ← (IND_CPA_stepPrefix (encAlg' := encAlg') pk k oa).run st
         match res with
         | .done a => pure a
         | .paused mm cont =>
             let c ← encAlg'.encrypt pk (if branch then mm.1 else mm.2)
             let st'' := (st'.1.cacheQuery mm c, st'.2 + 1)
-            (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run' st'') =
-      evalDist
-        ((simulateQ
+            (simulateQ (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk k) (cont c)).run' st'')] =
+      𝒟[(simulateQ
             (encAlg'.IND_CPA_queryImpl_hybridLR_counted pk (if branch then k + 1 else k))
-            oa).run' st) := by
+            oa).run' st] := by
   revert st hst
   induction oa using OracleComp.inductionOn with
   | pure a =>
@@ -547,15 +542,13 @@ uniform-bit branch between adjacent LR hybrids. This is the theorem that convert
 decomposition above into a clean hybrid-gap statement. -/
 private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     (adversary : encAlg'.IND_CPA_adversary) (k : ℕ) :
-    evalDist
-      (IND_CPA_OneTime_Game_ProbComp (encAlg := encAlg')
-        (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)) =
-      evalDist
-        (do
+    𝒟[IND_CPA_OneTime_Game_ProbComp (encAlg := encAlg')
+        (IND_CPA_stepAdversary (encAlg' := encAlg') adversary k)] =
+      𝒟[do
           let bit ← ($ᵗ Bool)
           let z ← if bit then encAlg'.IND_CPA_LR_hybridGame adversary (k + 1)
                    else encAlg'.IND_CPA_LR_hybridGame adversary k
-          pure (bit == z)) := by
+          pure (bit == z)] := by
   apply evalDist_ext
   intro x
   refine probOutput_bind_congr' ($ᵗ Bool) x ?_
@@ -576,7 +569,7 @@ private lemma IND_CPA_stepAdversary_game_eq_hybridBranch [Inhabited M]
     (refine probOutput_bind_congr' encAlg'.keygen x ?_) <;>
     intro pk_sk <;>
     simp only [IND_CPA_stepAdversary, bind_assoc] <;>
-    (change (evalDist _) x = (evalDist _) x) <;>
+    (change (𝒟[_]) x = (𝒟[_]) x) <;>
     congr 1
   · rename_i pk_sk
     have hresume := IND_CPA_stepPrefix_resume_eq_hybridLR (encAlg' := encAlg')

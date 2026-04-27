@@ -82,7 +82,7 @@ Equivalent characterisations:
   `G₀.advantage G₁ A` is zero on every Boolean-valued client `A`
   (`DistEquiv.advantage_zero`).
 * For every `α` and every client computation `A : OracleComp E α`,
-  `evalDist (G₀.run A) = evalDist (G₁.run A)` (the literal definition).
+  `evalDist G₀.run A = evalDist G₁.run A` (the literal definition).
 
 The identifier sets `Ident₀, Ident₁` of the two games are independent: only
 the export interface and the resulting output distribution matter from an
@@ -92,7 +92,7 @@ def DistEquiv {Ident₀ Ident₁ : Type}
     (G₀ : Package I E Ident₀) (G₁ : Package I E Ident₁) :
     Prop :=
   ∀ {α : Type} (A : OracleComp E α),
-    evalDist (G₀.run A) = evalDist (G₁.run A)
+    𝒟[G₀.run A] = 𝒟[G₁.run A]
 
 @[inherit_doc DistEquiv]
 scoped infix:50 " ≡ᵈ " => Package.DistEquiv
@@ -145,7 +145,7 @@ distribution equality in hand. -/
 theorem of_run_evalDist
     {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : ∀ {α : Type} (A : OracleComp E α),
-        evalDist (G₀.run A) = evalDist (G₁.run A)) :
+        𝒟[G₀.run A] = 𝒟[G₁.run A]) :
     G₀ ≡ᵈ G₁ := h
 
 /-- Recover the per-client `evalDist` equality from a `DistEquiv`
@@ -153,7 +153,7 @@ witness. The inverse of `of_run_evalDist`. -/
 theorem run_evalDist_eq
     {G₀ : Package I E Ident₀} {G₁ : Package I E Ident₁}
     (h : G₀ ≡ᵈ G₁) {α : Type} (A : OracleComp E α) :
-    evalDist (G₀.run A) = evalDist (G₁.run A) := h A
+    𝒟[G₀.run A] = 𝒟[G₁.run A] := h A
 
 /-- Build a `DistEquiv` from a per-client *propositional* equality at
 the `Package.run` level. -/
@@ -173,9 +173,9 @@ The lemma form of `Package.simulateQ_StateT_evalDist_congr` from
 hypothesis discharges the simulation step, and the init hypothesis
 discharges the setup step. -/
 theorem of_step {G₀ G₁ : Package I E Ident}
-    (h_init : evalDist G₀.init = evalDist G₁.init)
+    (h_init : 𝒟[G₀.init] = 𝒟[G₁.init])
     (h_impl : ∀ (q : E.Domain) (h : Heap Ident),
-        evalDist ((G₀.impl q).run h) = evalDist ((G₁.impl q).run h)) :
+        𝒟[(G₀.impl q).run h] = 𝒟[(G₁.impl q).run h]) :
     G₀ ≡ᵈ G₁ := by
   intro α A
   unfold Package.run
@@ -201,10 +201,10 @@ sets directly, so it accommodates the canonical
 theorem of_step_bij
     (G₀ : Package I E Ident₀) (G₁ : Package I E Ident₁)
     (φ : Heap Ident₀ ≃ Heap Ident₁)
-    (h_init : evalDist G₀.init = evalDist (φ.symm <$> G₁.init))
+    (h_init : 𝒟[G₀.init] = 𝒟[φ.symm <$> G₁.init])
     (h_impl : ∀ (q : E.Domain) (h : Heap Ident₀),
-        evalDist ((G₀.impl q).run h) =
-          evalDist (Prod.map id φ.symm <$> (G₁.impl q).run (φ h))) :
+        𝒟[(G₀.impl q).run h] =
+          𝒟[Prod.map id φ.symm <$> (G₁.impl q).run (φ h)]) :
     G₀ ≡ᵈ G₁ := by
   intro α A
   unfold Package.run
@@ -313,12 +313,12 @@ through unchanged. The hypotheses are stated factorwise — one
 `Package.par`-cutover proofs (e.g. parallel OTP channels). -/
 theorem par_congr
     {p₁ p₁' : Package I₁ E₁ α} {p₂ p₂' : Package I₂ E₂ β}
-    (h₁_init : evalDist p₁.init = evalDist p₁'.init)
+    (h₁_init : 𝒟[p₁.init] = 𝒟[p₁'.init])
     (h₁_impl : ∀ (q : E₁.Domain) (h : Heap α),
-        evalDist ((p₁.impl q).run h) = evalDist ((p₁'.impl q).run h))
-    (h₂_init : evalDist p₂.init = evalDist p₂'.init)
+        𝒟[(p₁.impl q).run h] = 𝒟[(p₁'.impl q).run h])
+    (h₂_init : 𝒟[p₂.init] = 𝒟[p₂'.init])
     (h₂_impl : ∀ (q : E₂.Domain) (h : Heap β),
-        evalDist ((p₂.impl q).run h) = evalDist ((p₂'.impl q).run h)) :
+        𝒟[(p₂.impl q).run h] = 𝒟[(p₂'.impl q).run h]) :
     p₁.par p₂ ≡ᵈ p₁'.par p₂' := by
   refine of_step ?_ ?_
   · -- Init equivalence: rewrite `par`'s init into nested binds and apply
@@ -339,26 +339,26 @@ theorem par_congr
     intro q h
     rcases q with t | t
     · -- Left channel.
-      change evalDist (
+      change 𝒟[
           (Prod.map id (fun h_α' =>
               (Heap.split α β).symm (h_α', (Heap.split α β h).2))) <$>
-            liftComp ((p₁.impl t).run (Heap.split α β h).1) (I₁ + I₂)) =
-        evalDist (
+            liftComp ((p₁.impl t).run (Heap.split α β h).1) (I₁ + I₂)] =
+        𝒟[
           (Prod.map id (fun h_α' =>
               (Heap.split α β).symm (h_α', (Heap.split α β h).2))) <$>
-            liftComp ((p₁'.impl t).run (Heap.split α β h).1) (I₁ + I₂))
+            liftComp ((p₁'.impl t).run (Heap.split α β h).1) (I₁ + I₂)]
       refine evalDist_map_eq_of_evalDist_eq ?_ _
       rw [evalDist_liftComp, evalDist_liftComp]
       exact h₁_impl t _
     · -- Right channel: dual to the left case.
-      change evalDist (
+      change 𝒟[
           (Prod.map id (fun h_β' =>
               (Heap.split α β).symm ((Heap.split α β h).1, h_β'))) <$>
-            liftComp ((p₂.impl t).run (Heap.split α β h).2) (I₁ + I₂)) =
-        evalDist (
+            liftComp ((p₂.impl t).run (Heap.split α β h).2) (I₁ + I₂)] =
+        𝒟[
           (Prod.map id (fun h_β' =>
               (Heap.split α β).symm ((Heap.split α β h).1, h_β'))) <$>
-            liftComp ((p₂'.impl t).run (Heap.split α β h).2) (I₁ + I₂))
+            liftComp ((p₂'.impl t).run (Heap.split α β h).2) (I₁ + I₂)]
       refine evalDist_map_eq_of_evalDist_eq ?_ _
       rw [evalDist_liftComp, evalDist_liftComp]
       exact h₂_impl t _

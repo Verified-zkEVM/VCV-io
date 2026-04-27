@@ -70,8 +70,8 @@ lemma evalDist_simulateQ_conjugate_run_eq {α : Type}
     (impl : QueryImpl E (StateT (Heap Ident) ProbComp))
     (φ : Heap Ident ≃ σ × Bool)
     (A : OracleComp E α) (s : σ × Bool) :
-    evalDist ((simulateQ (implConjugate impl φ) A).run s) =
-      evalDist (Prod.map id φ <$> (simulateQ impl A).run (φ.symm s)) := by
+    𝒟[(simulateQ (implConjugate impl φ) A).run s] =
+      𝒟[Prod.map id φ <$> (simulateQ impl A).run (φ.symm s)] := by
   have h :=
     VCVio.SSP.Package.simulateQ_StateT_evalDist_congr_of_bij
       (h₁ := implConjugate impl φ) (h₂ := impl) (φ := φ.symm)
@@ -85,8 +85,8 @@ lemma evalDist_simulateQ_run'_eq {α : Type}
     (impl : QueryImpl E (StateT (Heap Ident) ProbComp))
     (φ : Heap Ident ≃ σ × Bool)
     (A : OracleComp E α) (s_init : σ) :
-    evalDist ((simulateQ impl A).run' (φ.symm (s_init, false)))
-      = evalDist ((simulateQ (implConjugate impl φ) A).run' (s_init, false)) := by
+    𝒟[(simulateQ impl A).run' (φ.symm (s_init, false))]
+      = 𝒟[(simulateQ (implConjugate impl φ) A).run' (s_init, false)] := by
   simp only [StateT.run'_eq, evalDist_map]
   rw [evalDist_simulateQ_conjugate_run_eq impl φ A (s_init, false), evalDist_map,
       Functor.map_map]
@@ -169,12 +169,12 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
               (simulateQ G₀' A).run (s_init, false)] :=
     ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
       G₀' G₁' S ε h_step_tv_S' h_step_eq_nS' h_mono₀' A h_qb s_init
-  have h_runProb₀ : evalDist (G₀.runProb A)
-      = evalDist ((simulateQ G₀' A).run' (s_init, false)) := by
+  have h_runProb₀ : 𝒟[G₀.runProb A]
+      = 𝒟[(simulateQ G₀' A).run' (s_init, false)] := by
     simp only [Package.runProb, Package.run, h_init₀, pure_bind]
     exact evalDist_simulateQ_run'_eq G₀.impl φ A s_init
-  have h_runProb₁ : evalDist (G₁.runProb A)
-      = evalDist ((simulateQ G₁' A).run' (s_init, false)) := by
+  have h_runProb₁ : 𝒟[G₁.runProb A]
+      = 𝒟[(simulateQ G₁' A).run' (s_init, false)] := by
     simp only [Package.runProb, Package.run, h_init₁, pure_bind]
     exact evalDist_simulateQ_run'_eq G₁.impl φ A s_init
   have h_adv_le_tv :

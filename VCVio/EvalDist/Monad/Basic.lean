@@ -38,7 +38,7 @@ lemma mem_finSupport_pure_iff' [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
 
 @[simp, grind =, game_rule]
 lemma evalDist_pure [HasEvalSPMF m] {α : Type u} (x : α) :
-    evalDist (pure x : m α) = pure x := by simp [evalDist]
+    𝒟[(pure x : m α)] = pure x := by simp [evalDist]
 
 @[simp]
 lemma evalDist_comp_pure [HasEvalSPMF m] :
@@ -125,11 +125,11 @@ lemma mem_finSupport_bind_iff [HasEvalSet m] [HasEvalFinset m] [DecidableEq α]
 
 @[simp, grind =, game_rule]
 lemma evalDist_bind [HasEvalSPMF m] (mx : m α) (my : α → m β) :
-    evalDist (mx >>= my) = evalDist mx >>= fun x => evalDist (my x) :=
+    𝒟[mx >>= my] = 𝒟[mx] >>= fun x => 𝒟[my x] :=
   MonadHom.toFun_bind' _ mx my
 
 lemma evalDist_bind_of_support_eq_empty [HasEvalSPMF m] (mx : m α) (my : α → m β)
-    (h : support mx = ∅) : evalDist (mx >>= my) = failure := by
+    (h : support mx = ∅) : 𝒟[mx >>= my] = failure := by
   simp [SPMF.ext_iff, ← probOutput_def, h]
 
 @[grind =, game_rule]

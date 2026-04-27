@@ -363,9 +363,9 @@ lemma runtimeWithCache_evalDist_eq_fsBaseImpl
     {α : Type}
     (oa : OracleComp (unifSpec + (M × Commit →ₒ Chal)) α) :
     (FiatShamir.runtimeWithCache M cache).evalDist oa =
-      evalDist ((simulateQ
+      𝒟[(simulateQ
         (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)) oa).run'
-        cache) := by
+        cache] := by
   unfold FiatShamir.runtimeWithCache ProbCompRuntime.evalDist
     SPMFSemantics.evalDist SemanticsVia.denote fsBaseImpl
   unfold SPMFSemantics.withStateOracle unifFwdImpl simulateQ' evalDist
@@ -1257,8 +1257,8 @@ private theorem runtime_evalDist_postKeygenFreshWriterComp_eq
     (FiatShamir.runtime M).evalDist
         (postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) =
-      evalDist (postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
-        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk) := by
+      𝒟[postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) adv pk sk] := by
   rw [FiatShamir.runtime_eq_runtimeWithCache_empty (M := M)]
   rw [runtimeWithCache_evalDist_eq_fsBaseImpl (M := M) (Commit := Commit)
     (Chal := Chal) (cache := (∅ : (M × Commit →ₒ Chal).QueryCache))]
@@ -1301,14 +1301,14 @@ private theorem unforgeableAdvantage_eq_keygen_postKeygenFreshProb
       postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2)]
   change
-    Pr[= true | (evalDist (hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+    Pr[= true | (𝒟[(hr.gen : ProbComp (Stmt × Wit))] >>= fun ps =>
       (FiatShamir.runtime M).evalDist
         (postKeygenFreshWriterComp (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2))] =
-    Pr[= true | evalDist (((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
+    Pr[= true | 𝒟[(((hr.gen : ProbComp (Stmt × Wit)) >>= fun ps =>
       postKeygenFreshProb (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp) adv ps.1 ps.2) :
-      ProbComp Bool)]
+      ProbComp Bool)]]
   rw [evalDist_bind]
   apply congrArg (fun p => Pr[= true | p])
   refine bind_congr fun ps => ?_

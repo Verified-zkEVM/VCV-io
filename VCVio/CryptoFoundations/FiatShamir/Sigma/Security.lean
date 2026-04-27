@@ -198,8 +198,8 @@ side via `liftM (query n) : ProbComp (Fin (n+1))`, the challenge side via `$ᵗ 
 so the simulated computation has the same distribution as the source. -/
 private lemma evalDist_simulateQ_unifChalImpl {α : Type}
     (oa : OracleComp (unifSpec + (Unit →ₒ Chal)) α) :
-    evalDist (simulateQ (QueryImpl.ofLift unifSpec ProbComp +
-      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa) = evalDist oa := by
+    𝒟[simulateQ (QueryImpl.ofLift unifSpec ProbComp +
+      (uniformSampleImpl (spec := (Unit →ₒ Chal)))) oa] = 𝒟[oa] := by
   apply OracleComp.evalDist_simulateQ_eq_evalDist
   intro t
   rcases t with n | u
@@ -207,10 +207,10 @@ private lemma evalDist_simulateQ_unifChalImpl {α : Type}
     rw [evalDist_query (spec := unifSpec + (Unit →ₒ Chal))]
     exact (evalDist_query (spec := unifSpec) n)
   · simp only [QueryImpl.add_apply_inr, uniformSampleImpl]
-    have heq : (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
+    have heq : (𝒟[$ᵗ ((ofFn fun _ : Unit => Chal).Range u)] :
           SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
-        (evalDist (liftM (query (Sum.inr u)) :
-          OracleComp (unifSpec + (Unit →ₒ Chal)) _) :
+        (𝒟[(liftM (query (Sum.inr u)) :
+          OracleComp (unifSpec + (Unit →ₒ Chal)) _)] :
           SPMF ((unifSpec + (Unit →ₒ Chal)).Range (Sum.inr u))) := by
       rw [evalDist_uniformSample, evalDist_query]; rfl
     exact heq

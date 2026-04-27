@@ -19,7 +19,7 @@ H1+H2+H3+H4+H5 to produce the EUF-CMA-to-`Fork.advantage` bound.
 State access is heap-based. `cmaRealRun` packages the signed-message
 log via `p.2 (Sum.inl .log)`; the `hProj` step in the final chain
 reduction reads off the `.inl .log` cell verbatim. H4 is a direct
-instance of `Package.run_link_eq_run_shiftLeft`, so no per-state
+instance of `VCVio.HeapSSP.Package.run_link_eq_run_shiftLeft`, so no per-state
 equivalence scaffolding is needed.
 
 ## Contents
@@ -128,7 +128,7 @@ theorem cmaToNma_shiftLeft_signedFreshAdv_eq_bind
           Prod.fst <$> (simulateQ (cmaToNma (Stmt := Stmt) M Commit Chal simT).impl
             (verifyFreshComp (σ := σ) (hr := hr) (M := M)
               (Commit := Commit) (Chal := Chal) (Resp := Resp) p)).run h' := by
-  rw [signedFreshAdv, Package.shiftLeft_bind]
+  rw [signedFreshAdv, VCVio.HeapSSP.Package.shiftLeft_bind]
 
 /-! ### Fork-aware simulator state -/
 
@@ -842,26 +842,26 @@ private lemma cmaSimLoggedLeftImpl_project_step
   · simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
       cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
       cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
-      QueryImpl.flattenStateT, QueryImpl.mapStateTBase, Package.link,
-      Package.linkReshape, simulatedNmaImpl, simulatedNmaBaseSim,
+      QueryImpl.flattenStateT, QueryImpl.mapStateTBase, VCVio.HeapSSP.Package.link,
+      VCVio.HeapSSP.Package.linkReshape, simulatedNmaImpl, simulatedNmaBaseSim,
       simulatedNmaUnifSim, simulatedNmaFwd]
   · cases hcache : h (Sum.inr InnerCell.roCache) mc with
     | some ch =>
         simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
           cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
           cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
-          QueryImpl.flattenStateT, QueryImpl.mapStateTBase, Package.link,
-          Package.linkReshape, simulatedNmaImpl, simulatedNmaBaseSim,
+          QueryImpl.flattenStateT, QueryImpl.mapStateTBase, VCVio.HeapSSP.Package.link,
+          VCVio.HeapSSP.Package.linkReshape, simulatedNmaImpl, simulatedNmaBaseSim,
           simulatedNmaRoSim, simulatedNmaFwd, hcache]
     | none =>
         simp only [add_apply_inl, add_apply_inr, cmaSimLoggedLeftImpl,
           cmaSimLoggedImpl, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
-          cmaSim, Package.link, nma, bind_pure_comp, Prod.mk.eta, cmaToNma,
+          cmaSim, VCVio.HeapSSP.Package.link, nma, bind_pure_comp, Prod.mk.eta, cmaToNma,
           simulateQ_pure, StateT.run_pure, map_pure, cmaSignLogImpl, bind_pure,
           StateT.run_monadLift, monadLift_self, simulateQ_map, simulateQ_query,
           OracleQuery.input_query, OracleQuery.cont_query, StateT.run_mk, id_map,
           StateT.run_map, Heap.split_apply_inr, Functor.map_map,
-          Package.linkReshape, hcache, Heap.split_symm_update_inr,
+          VCVio.HeapSSP.Package.linkReshape, hcache, Heap.split_symm_update_inr,
           Equiv.symm_apply_apply, Prod.map_apply, id_eq, cmaSimLoggedProj,
           Heap.get_update_self, simulatedNmaLoggedProbImpl, QueryImpl.extendState,
           fsUniformImpl, QueryImpl.ofLift_eq_id', simulatedNmaImpl,
@@ -876,13 +876,13 @@ private lemma cmaSimLoggedLeftImpl_project_step
         ext t <;> cases t <;> simp [QueryCache.cacheQuery]
   · simp only [add_apply_inr, cmaSimLoggedLeftImpl, cmaSimLoggedImpl,
       QueryImpl.flattenStateT, add_apply_inl, QueryImpl.mapStateTBase, cmaSim,
-      Package.link, nma, bind_pure_comp, Prod.mk.eta, cmaToNma, simulateQ_pure,
+      VCVio.HeapSSP.Package.link, nma, bind_pure_comp, Prod.mk.eta, cmaToNma, simulateQ_pure,
       StateT.run_pure, map_pure, cmaSignLogImpl, StateT.run_bind,
       StateT.run_get, StateT.run_monadLift, monadLift_self, StateT.run_map,
       StateT.run_set, Functor.map_map, pure_bind, simulateQ_map, simulateQ_query,
       OracleQuery.input_query, OracleQuery.cont_query, StateT.run_mk,
       Heap.split_apply_inl, simulateQ_bind, id_map, Heap.split_apply_inr,
-      map_bind, Package.linkReshape, hs, Prod.map_apply, id_eq, cmaSimLoggedProj,
+      map_bind, VCVio.HeapSSP.Package.linkReshape, hs, Prod.map_apply, id_eq, cmaSimLoggedProj,
       Heap.split_symm_apply_inr, simulatedNmaLoggedProbImpl, QueryImpl.extendState,
       fsUniformImpl, QueryImpl.ofLift_eq_id', simulatedNmaImpl,
       QueryImpl.add_apply_inr, simulatedNmaSigSim, StateT.run_modifyGet,
@@ -955,7 +955,7 @@ private lemma cmaSimLoggedLeftImpl_preserves_fixedKey
     have hz' := by
       simpa [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
         cmaSignLogImpl, cmaOracleSpec, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
-        Package.link, Package.linkReshape, simulatedNmaImpl,
+        VCVio.HeapSSP.Package.link, VCVio.HeapSSP.Package.linkReshape, simulatedNmaImpl,
         simulatedNmaBaseSim, simulatedNmaUnifSim, simulatedNmaFwd] using hz
     rcases hz' with ⟨u, _hu, rfl⟩
     exact hs
@@ -965,7 +965,7 @@ private lemma cmaSimLoggedLeftImpl_preserves_fixedKey
         have hz' := by
           simpa [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
             cmaSignLogImpl, cmaOracleSpec, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
-            Package.link, Package.linkReshape, hcache, simulatedNmaImpl,
+            VCVio.HeapSSP.Package.link, VCVio.HeapSSP.Package.linkReshape, hcache, simulatedNmaImpl,
             simulatedNmaBaseSim, simulatedNmaRoSim, simulatedNmaFwd] using hz
         rcases hz' with ⟨rfl, rfl⟩
         exact hs
@@ -973,8 +973,8 @@ private lemma cmaSimLoggedLeftImpl_preserves_fixedKey
         have hz' := by
           simpa [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
             cmaSignLogImpl, cmaOracleSpec, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
-            Package.link, Package.linkReshape, hcache, uniformSampleImpl,
-            simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaRoSim,
+            VCVio.HeapSSP.Package.link, VCVio.HeapSSP.Package.linkReshape, hcache,
+            uniformSampleImpl, simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaRoSim,
             simulatedNmaFwd] using hz
         rcases hz' with ⟨ch, _hch, rfl⟩
         simpa [Heap.update] using hs
@@ -982,7 +982,7 @@ private lemma cmaSimLoggedLeftImpl_preserves_fixedKey
     have hz' := by
       simpa [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
         cmaSignLogImpl, cmaOracleSpec, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
-        Package.link, Package.linkReshape, hs, simulatedNmaImpl,
+        VCVio.HeapSSP.Package.link, VCVio.HeapSSP.Package.linkReshape, hs, simulatedNmaImpl,
         simulatedNmaSigSim, simulatedNmaUnifSim, simulatedNmaFwd] using hz
     rcases Set.mem_iUnion₂.mp hz' with ⟨x, hxmem, hzimg⟩
     simp only [Set.mem_image] at hzimg
@@ -1134,10 +1134,10 @@ private lemma cmaSim_impl_lift_ro_query_run
         (Sum.inl (Sum.inl (Sum.inr mc')))).run h' =
       (implRo mc').run h'
     conv_lhs => rw [← h_split_symm]
-    rw [Package.link_impl_apply_run]
+    rw [VCVio.HeapSSP.Package.link_impl_apply_run]
     simp only [cmaToNma, StateT.run_mk, bind_pure_comp,
       simulateQ_map, simulateQ_spec_query, StateT.run_map,
-      Functor.map_map, Package.linkReshape]
+      Functor.map_map, VCVio.HeapSSP.Package.linkReshape]
     rcases hcache : h' (Sum.inr .roCache) mc' with _ | r
     · simp only [implRo, nma, StateT.run_mk, hβcache_eq, hcache,
         bind_pure_comp, Functor.map_map]
@@ -1437,8 +1437,8 @@ private lemma forkLoggedProbImpl_project_run
 omit [Finite Chal] in
 private lemma evalDist_simulateQ_forkWrappedUniformImpl [Fintype Chal]
     {α : Type} (oa : OracleComp (Fork.wrappedSpec Chal) α) :
-    evalDist (simulateQ (forkWrappedUniformImpl (Chal := Chal)) oa) =
-      evalDist oa := by
+    𝒟[simulateQ (forkWrappedUniformImpl (Chal := Chal)) oa] =
+      𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp [forkWrappedUniformImpl]
   | query_bind t mx ih =>
@@ -1451,11 +1451,11 @@ private lemma evalDist_simulateQ_forkWrappedUniformImpl [Fintype Chal]
           OracleQuery.input_query, QueryImpl.add_apply_inr, forkWrappedUniformImpl,
           uniformSampleImpl, id_map, evalDist_bind]
         have heq :
-            (evalDist ($ᵗ ((ofFn fun _ : Unit => Chal).Range u)) :
+            (𝒟[$ᵗ ((ofFn fun _ : Unit => Chal).Range u)] :
               SPMF ((ofFn fun _ : Unit => Chal).Range u)) =
-            (evalDist (liftM
+            (𝒟[(liftM
                 (OracleSpec.query (Sum.inr u)) :
-              OracleComp (Fork.wrappedSpec Chal) _) :
+              OracleComp (Fork.wrappedSpec Chal) _)] :
               SPMF ((Fork.wrappedSpec Chal).Range (Sum.inr u))) := by
           rw [evalDist_uniformSample, evalDist_query]
           rfl
@@ -1531,7 +1531,7 @@ private lemma cmaSimRunState_signedCandidateAdv_eq
           (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit) hr simT)
           (candidateAdv σ hr M adv)).run
           (([] : List M), Heap.empty) := by
-  unfold Package.runState signedCandidateAdv
+  unfold VCVio.HeapSSP.Package.runState signedCandidateAdv
   change ((pure (Heap.empty : Heap (CmaCells M Commit Chal Stmt Wit)) :
       OracleComp unifSpec _) >>= fun h₀ =>
         (simulateQ (cmaSim M Commit Chal hr simT).impl
@@ -1558,13 +1558,13 @@ private lemma cmaSimLoggedImpl_pkSpec_run_empty
           (([] : List M),
             (Heap.empty : Heap (CmaCells M Commit Chal Stmt Wit)).update
               (Sum.inr .keypair) (some (ps.1, ps.2)))) := by
-  simp only [add_apply_inr, cmaSimLoggedImpl, QueryImpl.flattenStateT,
-    QueryImpl.mapStateTBase, cmaSim, Package.link, nma, add_apply_inl,
-    bind_pure_comp, Prod.mk.eta, cmaToNma, simulateQ_pure, StateT.run_pure,
-    map_pure, cmaSignLogImpl, bind_pure, StateT.run_monadLift, monadLift_self,
-    simulateQ_map, simulateQ_query, OracleQuery.input_query,
+  simp only [add_apply_inr, cmaSimLoggedImpl, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
+    cmaSim, VCVio.HeapSSP.Package.link, nma, add_apply_inl,
+    bind_pure_comp, Prod.mk.eta, cmaToNma, simulateQ_pure,
+    StateT.run_pure, map_pure, cmaSignLogImpl, bind_pure, StateT.run_monadLift,
+    monadLift_self, simulateQ_map, simulateQ_query, OracleQuery.input_query,
     OracleQuery.cont_query, StateT.run_mk, id_map, StateT.run_map,
-    Heap.split_apply_inr, Functor.map_map, Package.linkReshape,
+    Heap.split_apply_inr, Functor.map_map, VCVio.HeapSSP.Package.linkReshape,
     Heap.split_empty, Heap.get_empty]
   refine congrArg
     (fun f : Stmt × Wit → Stmt × List M × Heap (CmaCells M Commit Chal Stmt Wit) =>
@@ -1913,7 +1913,7 @@ private lemma nma_runProb_shiftLeft_signedFreshAdv_eq_forkH5Body
   rw [show (cmaSim M Commit Chal hr simT).runProb (signedFreshAdv σ hr M adv) =
       (cmaSim M Commit Chal hr simT).run (signedFreshAdv σ hr M adv) from rfl]
   rw [signedFreshAdv]
-  rw [Package.run_bind]
+  rw [VCVio.HeapSSP.Package.run_bind]
   rw [cmaSimRunState_signedCandidateAdv_eq (σ := σ) (hr := hr)
     (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp) adv simT]
   simp only [bind_map_left]
@@ -2458,7 +2458,7 @@ theorem cma_advantage_le_fork_bound
         ≤ (qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk
           + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + (qH : ℝ≥0∞)) * β := by
     set φ := cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit) with hφ
-    set G := Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ with hG
+    set G := VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ with hG
     have h_cost_candidate :
         expectedSCost G
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
@@ -2496,7 +2496,7 @@ theorem cma_advantage_le_fork_bound
         qS (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false)
     have h_cost_full :
         expectedSCost
-            (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
+            (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
               (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))

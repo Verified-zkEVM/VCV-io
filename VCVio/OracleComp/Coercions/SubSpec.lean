@@ -242,7 +242,7 @@ variable [spec.Fintype] [spec.Inhabited] [superSpec.Fintype] [superSpec.Inhabite
     [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
 
 @[simp] lemma evalDist_liftComp (mx : OracleComp spec α) :
-    evalDist (liftComp mx superSpec) = evalDist mx := by
+    𝒟[liftComp mx superSpec] = 𝒟[mx] := by
   induction mx using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx ih =>

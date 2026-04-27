@@ -583,8 +583,8 @@ lemma evalDist_fst_map_simulateQ_replayOracle_of_live [spec.DecidableEq]
     [spec.Fintype] [spec.Inhabited]
     (i : ι) (main : OracleComp spec α) (st : ReplayForkState spec i)
     (hst : st.forkConsumed = true ∨ st.mismatch = true) :
-    evalDist (Prod.fst <$> (simulateQ (replayOracle i) main).run st :
-      OracleComp spec α) = evalDist main := by
+    𝒟[(Prod.fst <$> (simulateQ (replayOracle i) main).run st :
+      OracleComp spec α)] = 𝒟[main] := by
   rw [fst_map_simulateQ_replayOracle_of_live i main st hst]
 
 section support
@@ -2330,14 +2330,14 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
           (stL.forkQuery - stL.distinguishedCount) →
       stL.forkQuery - stL.distinguishedCount <
         (QueryLog.getQ (stL.trace.drop stL.cursor) (· = i)).length →
-      evalDist (do
+      𝒟[(do
         let u ← liftComp ($ᵗ spec.Range i) spec
         Prod.fst <$> (simulateQ (replayOracle i) main).run
-          {stL with replacement := u} : OracleComp spec α) =
-      evalDist (do
+          {stL with replacement := u} : OracleComp spec α)] =
+      𝒟[do
         let u ← liftComp ($ᵗ spec.Range i) spec
         Prod.fst <$> (simulateQ (replayOracle i) main).run
-          {stR with replacement := u}) := by
+          {stR with replacement := u}] := by
   classical
   induction main using OracleComp.inductionOn with
   | pure x =>
@@ -2369,7 +2369,7 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
     --      - `t ≠ t₀`: both sides go live via `replayOracle_run_mismatch_ne`. After this
     --        step both states satisfy `mismatch = true`, so
     --        `fst_map_simulateQ_replayOracle_of_live` collapses the α-marginal to
-    --        `evalDist (oa u_live)`, which coincides on both sides.
+    --        `evalDist oa u_live`, which coincides on both sides.
     --    * Case B: `t₀ = i` and `d = 0`. Then `takeBeforeForkAt_cons_self_zero` gives
     --      `R_tail = []`, so `stR.nextEntry? = none`. Sub-case:
     --      - `t = i`: LHS fires the fork (`replayOracle_run_fork_fires`, using the outer
@@ -2377,14 +2377,14 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
     --        live via `replayOracle_run_nextEntry_none`, sampling a fresh uniform via
     --        `liftM (query i)`. After one step both sides are in live mode, so
     --        `fst_map_simulateQ_replayOracle_of_live` applies. The LHS α-marginal after
-    --        averaging over `u` becomes `do u ← $ᵗ; evalDist (oa u)`; the RHS becomes
-    --        `do u_live ← liftM (query i); evalDist (oa u_live)`. These coincide because
+    --        averaging over `u` becomes `do u ← $ᵗ; evalDist oa u`; the RHS becomes
+    --        `do u_live ← liftM (query i); evalDist oa u_live`. These coincide because
     --        `liftM (query i)` is distributionally equal to `$ᵗ (spec.Range i)` under
     --        the `[spec.Fintype] [spec.Inhabited]` assumptions.
     --      - `t ≠ i`: LHS goes live (type mismatch) via `replayOracle_run_mismatch_ne`;
     --        RHS goes live via `replayOracle_run_nextEntry_none`. Both sides transition to
     --        `mismatch = true`; `fst_map_simulateQ_replayOracle_of_live` collapses both
-    --        α-marginals to `evalDist (oa u_live)`.
+    --        α-marginals to `evalDist oa u_live`.
     --    * Case C: `t₀ = i` and `d ≥ 1`. Then `takeBeforeForkAt_cons_self_succ` gives
     --      `R_tail = ⟨i, u'₀⟩ :: takeBeforeForkAt L_tail' i (d - 1)`, so both
     --      `stL.nextEntry? = stR.nextEntry? = some ⟨i, u'₀⟩`. Sub-case on `t`:
@@ -2475,9 +2475,9 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
                 (Or.inr (by
                   simp [ReplayForkState.noteObserved, ReplayForkState.markMismatch]))
             simp_rw [hliveL, hliveR]
-            -- Goal: `evalDist (do u ← liftComp ($ᵗ); oa u) =
-            --       evalDist (do u ← liftComp ($ᵗ); liftM (query t) >>= oa)`.
-            -- Both sides equal `evalDist (liftM (query t) >>= oa)`.
+            -- Goal: `evalDist do u ← liftComp ($ᵗ); oa u =
+            --       evalDist do u ← liftComp ($ᵗ); liftM (query t) >>= oa`.
+            -- Both sides equal `evalDist liftM (query t) >>= oa`.
             apply evalDist_ext; intro a
             conv_rhs => rw [probOutput_bind_const]
             have hne : Pr[⊥ | (liftComp ($ᵗ spec.Range t) spec :
@@ -2487,8 +2487,8 @@ private theorem evalDist_uniform_bind_fst_simulateQ_replayOracle_run_coupled_aux
             rw [hne, tsub_zero, one_mul]
             -- Goal: `Pr[= a | do u ← liftComp ($ᵗ); oa u] = Pr[= a | liftM (query t) >>= oa]`.
             -- Use `evalDist_liftComp + evalDist_uniformSample = evalDist_query`.
-            have heq : evalDist (liftComp ($ᵗ spec.Range t) spec >>= oa) =
-                evalDist ((spec.query t : OracleComp spec (spec.Range t)) >>= oa) := by
+            have heq : 𝒟[liftComp ($ᵗ spec.Range t) spec >>= oa] =
+                𝒟[(spec.query t : OracleComp spec (spec.Range t)) >>= oa] := by
               rw [evalDist_bind, evalDist_bind, evalDist_liftComp, evalDist_uniformSample,
                 evalDist_query]
             exact congrFun (congrArg DFunLike.coe heq) a
@@ -3171,12 +3171,12 @@ Proof structure:
   `stL = init log s _`, `stR = init (takeBeforeForkAt log i s) s _`. -/
 private lemma evalDist_uniform_bind_fst_replayRunWithTraceValue_takeBeforeForkAt
     (main : OracleComp spec α) (i : ι) (log : QueryLog spec) (s : ℕ) :
-    evalDist (do
+    𝒟[(do
       let u ← liftComp ($ᵗ spec.Range i) spec
-      Prod.fst <$> replayRunWithTraceValue main i log s u : OracleComp spec α) =
-    evalDist (do
+      Prod.fst <$> replayRunWithTraceValue main i log s u : OracleComp spec α)] =
+    𝒟[do
       let u ← liftComp ($ᵗ spec.Range i) spec
-      Prod.fst <$> replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u) := by
+      Prod.fst <$> replayRunWithTraceValue main i (QueryLog.takeBeforeForkAt log i s) s u] := by
   classical
   by_cases hlen : (log.getQ (· = i)).length ≤ s
   · rw [QueryLog.takeBeforeForkAt_of_getQ_length_le log i s hlen]

@@ -234,8 +234,8 @@ preserves the cardinality of the success filter, which is the
 familiar "XOR with a uniform key is uniform" fact in disguise. -/
 theorem evalDist_realCipherObserve_eq (sp : ℕ) (msg : BitVec sp)
     (P : BitVec sp → Bool) :
-    evalDist (realCipherObserve sp msg P) =
-      evalDist (idealCipherObserve sp P) := by
+    𝒟[realCipherObserve sp msg P] =
+      𝒟[idealCipherObserve sp P] := by
   apply SPMF.ext
   intro _
   change Pr[= () | realCipherObserve sp msg P] =
@@ -353,8 +353,8 @@ theorem realSmcSemantics_eq_idealSmcSemantics (sp : ℕ)
     (readMsg : MsgReader sp) (P : BitVec sp → Bool) (W : T.Closed) :
     (realSmcSemantics sp readMsg P).evalDist W =
       (idealSmcSemantics sp P).evalDist W := by
-  change evalDist (realCipherObserve sp (readMsg W) P) =
-      evalDist (idealCipherObserve sp P)
+  change 𝒟[realCipherObserve sp (readMsg W) P] =
+      𝒟[idealCipherObserve sp P]
   exact evalDist_realCipherObserve_eq sp (readMsg W) P
 
 /-! ## `CompEmulates 0` via observation-layer OTP privacy -/
@@ -382,8 +382,8 @@ theorem compEmulates_realSmcSemantics (sp : ℕ)
       realSmcSemantics_eq_idealSmcSemantics sp readMsg P
         (T.close W_ideal K)]
   change SPMF.tvDist
-      (evalDist (idealCipherObserve sp P))
-      (evalDist (idealCipherObserve sp P)) ≤ 0
+      (𝒟[idealCipherObserve sp P])
+      (𝒟[idealCipherObserve sp P]) ≤ 0
   simp [SPMF.tvDist_self]
 
 /-! ## Concrete instantiation: two structurally distinct closed systems -/

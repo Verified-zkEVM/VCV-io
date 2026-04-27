@@ -152,17 +152,17 @@ lemma probOutput_bind_add_right_uniform [AddGroup α] {β : Type}
 /-- Translating a uniform additive sample preserves the full evaluation distribution. -/
 @[simp]
 lemma evalDist_add_left_uniform [AddGroup α] (m : α) :
-    evalDist (((m + ·) : α → α) <$> ($ᵗ α)) =
-      evalDist ($ᵗ α) := by
+    𝒟[((m + ·) : α → α) <$> ($ᵗ α)] =
+      𝒟[$ᵗ α] := by
   apply evalDist_ext
   intro x
   exact probOutput_add_left_uniform (α := α) m x
 
 /-- Two additive translations of a uniform sample have the same evaluation distribution. -/
 lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
-    evalDist (((m₁ + ·) : α → α) <$> ($ᵗ α)) =
-      evalDist (((m₂ + ·) : α → α) <$> ($ᵗ α)) := by
-  trans evalDist ($ᵗ α)
+    𝒟[((m₁ + ·) : α → α) <$> ($ᵗ α)] =
+      𝒟[((m₂ + ·) : α → α) <$> ($ᵗ α)] := by
+  trans 𝒟[$ᵗ α]
   · exact evalDist_add_left_uniform (α := α) m₁
   · exact (evalDist_add_left_uniform (α := α) m₂).symm
 
@@ -170,17 +170,17 @@ lemma evalDist_add_left_uniform_eq [AddGroup α] (m₁ m₂ : α) :
 uniform sample in `AddGroup α` preserves the full evaluation distribution. -/
 @[simp]
 lemma evalDist_add_right_uniform [AddGroup α] (m : α) :
-    evalDist (((· + m) : α → α) <$> ($ᵗ α)) =
-      evalDist ($ᵗ α) := by
+    𝒟[((· + m) : α → α) <$> ($ᵗ α)] =
+      𝒟[$ᵗ α] := by
   apply evalDist_ext
   intro x
   exact probOutput_add_right_uniform (α := α) m x
 
 /-- Two right-translations of a uniform sample have the same evaluation distribution. -/
 lemma evalDist_add_right_uniform_eq [AddGroup α] (m₁ m₂ : α) :
-    evalDist (((· + m₁) : α → α) <$> ($ᵗ α)) =
-      evalDist (((· + m₂) : α → α) <$> ($ᵗ α)) := by
-  trans evalDist ($ᵗ α)
+    𝒟[((· + m₁) : α → α) <$> ($ᵗ α)] =
+      𝒟[((· + m₂) : α → α) <$> ($ᵗ α)] := by
+  trans 𝒟[$ᵗ α]
   · exact evalDist_add_right_uniform (α := α) m₁
   · exact (evalDist_add_right_uniform (α := α) m₂).symm
 
@@ -188,7 +188,7 @@ lemma evalDist_add_right_uniform_eq [AddGroup α] (m₁ m₂ : α) :
 lemma evalDist_map_bijective_uniform_cross
     {β : Type} [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) :
-    evalDist (f <$> ($ᵗ α)) = evalDist ($ᵗ β) := by
+    𝒟[f <$> ($ᵗ α)] = 𝒟[$ᵗ β] := by
   apply evalDist_ext
   intro y
   exact probOutput_map_bijective_uniform_cross (α := α) (β := β) f hf y
@@ -203,8 +203,8 @@ on the uniform measure, so the sum is again uniform. -/
 lemma evalDist_bind_bijective_add_right_uniform {β γ : Type}
     [AddGroup β] [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (m : β) (cont : β → ProbComp γ) :
-    evalDist (do let x ← ($ᵗ α); cont (f x + m)) =
-      evalDist (do let y ← ($ᵗ β); cont y) := by
+    𝒟[do let x ← ($ᵗ α); cont (f x + m)] =
+      𝒟[do let y ← ($ᵗ β); cont y] := by
   have hbind :
       (do let x ← ($ᵗ α); cont (f x + m)) =
         (f <$> ($ᵗ α)) >>= fun y => cont (y + m) := by
@@ -223,8 +223,8 @@ offsets produce the same evaluation distribution. -/
 lemma evalDist_bind_bijective_add_right_eq {β γ : Type}
     [AddGroup β] [SampleableType β] [Finite α]
     (f : α → β) (hf : Function.Bijective f) (m₁ m₂ : β) (cont : β → ProbComp γ) :
-    evalDist (do let x ← ($ᵗ α); cont (f x + m₁)) =
-      evalDist (do let x ← ($ᵗ α); cont (f x + m₂)) := by
+    𝒟[do let x ← ($ᵗ α); cont (f x + m₁)] =
+      𝒟[do let x ← ($ᵗ α); cont (f x + m₂)] := by
   rw [evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₁ cont,
       ← evalDist_bind_bijective_add_right_uniform (α := α) (β := β) f hf m₂ cont]
 
@@ -234,7 +234,7 @@ lemma probFailure_uniformSample : Pr[⊥ | $ᵗ α] = 0 := by aesop
 
 @[simp, grind =]
 lemma evalDist_uniformSample [Fintype α] [Nonempty α] :
-    evalDist ($ᵗ α) = liftM (PMF.uniformOfFintype α) := by aesop
+    𝒟[$ᵗ α] = liftM (PMF.uniformOfFintype α) := by aesop
 
 @[simp, grind =]
 lemma support_uniformSample : support ($ᵗ α) = Set.univ := by
@@ -479,7 +479,7 @@ bit by running `f` has success probability exactly 1/2.
 This is the core lemma behind "all-random hybrid has probability 1/2" arguments. -/
 lemma probOutput_decide_eq_uniformBool_half
     (f : Bool → ProbComp Bool)
-    (heq : evalDist (f true) = evalDist (f false)) :
+    (heq : 𝒟[f true] = 𝒟[f false]) :
     Pr[= true | do let b ← $ᵗ Bool; let b' ← f b; return decide (b = b')] = 1 / 2 := by
   have h := evalDist_ext_iff.mp heq
   rw [probOutput_bind_eq_tsum]

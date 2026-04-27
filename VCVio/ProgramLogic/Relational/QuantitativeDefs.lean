@@ -30,7 +30,7 @@ variable {α β : Type}
 under `c`. -/
 noncomputable def eRelWP (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (g : α → β → ℝ≥0∞) : ℝ≥0∞ :=
-  ⨆ (c : SPMF.Coupling (evalDist oa) (evalDist ob)),
+  ⨆ (c : SPMF.Coupling (𝒟[oa]) (𝒟[ob])),
     ∑' z, Pr[= z | c.1] * g z.1 z.2
 
 /-- eRHL triple: `pre ≤ eRelWP oa ob post`. -/

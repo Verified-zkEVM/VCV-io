@@ -86,7 +86,7 @@ variable {m : Type u → Type v} [Monad m] [HasEvalSPMF m] {α : Type u}
 /-- Rényi divergence between two monadic computations,
 defined via their evaluation distributions. -/
 noncomputable def renyiDiv (a : ℝ) (mx my : m α) : ℝ≥0∞ :=
-  SPMF.renyiDiv a (evalDist mx) (evalDist my)
+  SPMF.renyiDiv a (𝒟[mx]) (𝒟[my])
 
 @[simp]
 theorem renyiDiv_self (a : ℝ) (mx : m α) : renyiDiv a mx mx = 1 :=
@@ -113,11 +113,11 @@ theorem probOutput_le_of_renyiDiv (a : ℝ) (ha : 1 < a) (mx my : m α)
     Pr[= x | mx] ^ (a / (a - 1) : ℝ) / R ≤ Pr[= x | my] := by
   simp only [probOutput, renyiDiv, SPMF.renyiDiv] at *
   rw [SPMF.apply_eq_toPMF_some, SPMF.apply_eq_toPMF_some]
-  calc ((evalDist mx).toPMF (some x)) ^ (a / (a - 1) : ℝ) / R
-      ≤ ((evalDist mx).toPMF (some x)) ^ (a / (a - 1) : ℝ) /
-          ((evalDist mx).toPMF.renyiDiv a (evalDist my).toPMF) :=
+  calc ((𝒟[mx]).toPMF (some x)) ^ (a / (a - 1) : ℝ) / R
+      ≤ ((𝒟[mx]).toPMF (some x)) ^ (a / (a - 1) : ℝ) /
+          ((𝒟[mx]).toPMF.renyiDiv a (𝒟[my]).toPMF) :=
         ENNReal.div_le_div_left hR _
-    _ ≤ (evalDist my).toPMF (some x) :=
+    _ ≤ (𝒟[my]).toPMF (some x) :=
         PMF.renyiDiv_apply_bound a ha _ _ _
 
 end monadic

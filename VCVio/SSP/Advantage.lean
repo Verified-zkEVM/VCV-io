@@ -91,7 +91,7 @@ output distributions matter, not the syntactic form of the resulting `OracleComp
 lemma advantage_eq_of_evalDist_runProb_eq {σ₀ σ₀' σ₁ : Type}
     {G₀ : Package unifSpec E σ₀} {G₀' : Package unifSpec E σ₀'}
     {G₁ : Package unifSpec E σ₁} {A : OracleComp E Bool}
-    (h : evalDist (G₀.runProb A) = evalDist (G₀'.runProb A)) :
+    (h : 𝒟[G₀.runProb A] = 𝒟[G₀'.runProb A]) :
     G₀.advantage G₁ A = G₀'.advantage G₁ A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h]
@@ -100,7 +100,7 @@ lemma advantage_eq_of_evalDist_runProb_eq_right {σ₀ σ₁ σ₁' : Type}
     {G₀ : Package unifSpec E σ₀}
     {G₁ : Package unifSpec E σ₁} {G₁' : Package unifSpec E σ₁'}
     {A : OracleComp E Bool}
-    (h : evalDist (G₁.runProb A) = evalDist (G₁'.runProb A)) :
+    (h : 𝒟[G₁.runProb A] = 𝒟[G₁'.runProb A]) :
     G₀.advantage G₁ A = G₀.advantage G₁' A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h]
@@ -119,8 +119,8 @@ up to evalDist" rule used to discharge program equivalences whose underlying com
 are not propositionally equal but agree distributionally. -/
 lemma simulateQ_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E ProbComp}
-    (hh : ∀ (q : E.Domain), evalDist (h₁ q) = evalDist (h₂ q)) (A : OracleComp E α) :
-    evalDist (simulateQ h₁ A) = evalDist (simulateQ h₂ A) := by
+    (hh : ∀ (q : E.Domain), 𝒟[h₁ q] = 𝒟[h₂ q]) (A : OracleComp E α) :
+    𝒟[simulateQ h₁ A] = 𝒟[simulateQ h₂ A] := by
   induction A using OracleComp.inductionOn with
   | pure x => simp [simulateQ_pure]
   | query_bind t k ih =>
@@ -139,9 +139,9 @@ same internal state type and only their per-query handlers differ up to distribu
 `dhTripleReal`-vs-`dhTripleRand` swap propagated through a stateless reduction). -/
 lemma simulateQ_StateT_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (StateT σ ProbComp)}
-    (hh : ∀ (q : E.Domain) (s : σ), evalDist ((h₁ q).run s) = evalDist ((h₂ q).run s))
+    (hh : ∀ (q : E.Domain) (s : σ), 𝒟[(h₁ q).run s] = 𝒟[(h₂ q).run s])
     (A : OracleComp E α) (s : σ) :
-    evalDist ((simulateQ h₁ A).run s) = evalDist ((simulateQ h₂ A).run s) := by
+    𝒟[(simulateQ h₁ A).run s] = 𝒟[(simulateQ h₂ A).run s] := by
   induction A using OracleComp.inductionOn generalizing s with
   | pure x => simp [simulateQ_pure, StateT.run_pure]
   | query_bind t k ih =>
@@ -157,9 +157,9 @@ query (via `Prod.map id φ.symm` on the output pair), then their whole-adversary
 pointwise at corresponding starting states.
 
 Concretely the per-query hypothesis
-`evalDist ((h₁ q).run s) = evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ s))`
+`evalDist (h₁ q).run s = evalDist Prod.map id φ.symm <$> (h₂ q).run (φ s)`
 lifts to
-`evalDist ((simulateQ h₁ A).run s) = evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s))`
+`evalDist (simulateQ h₁ A).run s = evalDist Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)`
 for every adversary `A`.
 
 Used when matching two state representations that are isomorphic but not propositionally
@@ -170,11 +170,11 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
     (h₂ : QueryImpl E (StateT σ₂ ProbComp))
     (φ : σ₁ ≃ σ₂)
     (hh : ∀ (q : E.Domain) (s : σ₁),
-      evalDist ((h₁ q).run s) =
-      evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ s)))
+      𝒟[(h₁ q).run s] =
+      𝒟[Prod.map id φ.symm <$> (h₂ q).run (φ s)])
     (A : OracleComp E α) (s : σ₁) :
-    evalDist ((simulateQ h₁ A).run s) =
-    evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)) := by
+    𝒟[(simulateQ h₁ A).run s] =
+    𝒟[Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)] := by
   induction A using OracleComp.inductionOn generalizing s with
   | pure x =>
     simp only [simulateQ_pure, StateT.run_pure, map_pure, Prod.map_apply, id_eq,
@@ -183,7 +183,7 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
     -- Unfold both sides to `(impl t).run >>= continuation` and apply evalDist_bind / evalDist_map.
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map, StateT.run_bind, map_bind, evalDist_bind, evalDist_map, hh t s]
-    -- LHS head is `(Prod.map id φ.symm <$> evalDist (h₂ t .run (φ s))) >>= …h₁.run…`;
+    -- LHS head is `(Prod.map id φ.symm <$> evalDist h₂ t .run (φ s)) >>= …h₁.run…`;
     -- push the head map into the bind via `f <$> m >>= g = m >>= (g ∘ f)`.
     simp only [map_eq_bind_pure_comp, bind_assoc]
     refine bind_congr fun p => ?_

@@ -184,18 +184,16 @@ Splits on `h .used`:
   `probOutput_bind_bijective_uniform_cross`). -/
 theorem realImpl_impl_evalDist_idealImpl (sp : ℕ) (q : (otpSpec sp).Domain)
     (h : Heap UsedFlag) :
-    evalDist (((realImpl sp) q).run h) =
-      evalDist (((idealImpl sp) q).run h) := by
+    𝒟[((realImpl sp) q).run h] =
+      𝒟[((idealImpl sp) q).run h] := by
   cases q with
   | enc m =>
-    change evalDist
-        (if h .used then (pure (0#sp, h) : OracleComp unifSpec _)
+    change 𝒟[if h .used then (pure (0#sp, h) : OracleComp unifSpec _)
          else do let k ← ($ᵗ BitVec sp : ProbComp (BitVec sp));
-                 pure (k ^^^ m, h.update .used true)) =
-      evalDist
-        (if h .used then (pure (0#sp, h) : OracleComp unifSpec _)
+                 pure (k ^^^ m, h.update .used true)] =
+      𝒟[if h .used then (pure (0#sp, h) : OracleComp unifSpec _)
          else do let c ← ($ᵗ BitVec sp : ProbComp (BitVec sp));
-                 pure (c, h.update .used true))
+                 pure (c, h.update .used true)]
     by_cases hused : h .used
     · rw [if_pos hused, if_pos hused]
     · rw [if_neg hused, if_neg hused]

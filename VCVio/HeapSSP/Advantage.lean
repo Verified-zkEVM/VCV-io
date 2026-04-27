@@ -152,7 +152,7 @@ lemma advantage_eq_of_evalDist_runProb_eq {Ident₀ Ident₀' Ident₁ : Type}
     [CellSpec.{0, 0} Ident₁]
     {G₀ : Package unifSpec E Ident₀} {G₀' : Package unifSpec E Ident₀'}
     {G₁ : Package unifSpec E Ident₁} {A : OracleComp E Bool}
-    (h : evalDist (G₀.runProb A) = evalDist (G₀'.runProb A)) :
+    (h : 𝒟[G₀.runProb A] = 𝒟[G₀'.runProb A]) :
     G₀.advantage G₁ A = G₀'.advantage G₁ A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h]
@@ -164,7 +164,7 @@ lemma advantage_eq_of_evalDist_runProb_eq_right
     {G₀ : Package unifSpec E Ident₀}
     {G₁ : Package unifSpec E Ident₁} {G₁' : Package unifSpec E Ident₁'}
     {A : OracleComp E Bool}
-    (h : evalDist (G₁.runProb A) = evalDist (G₁'.runProb A)) :
+    (h : 𝒟[G₁.runProb A] = 𝒟[G₁'.runProb A]) :
     G₀.advantage G₁ A = G₀.advantage G₁' A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h]
@@ -192,9 +192,9 @@ input *under `evalDist`* yield identical evaluations of any `simulateQ`.
 The handler-level "rewrite up to `evalDist`" rule. -/
 lemma simulateQ_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (OracleComp I)}
-    (hh : ∀ (q : E.Domain), evalDist (h₁ q) = evalDist (h₂ q))
+    (hh : ∀ (q : E.Domain), 𝒟[h₁ q] = 𝒟[h₂ q])
     (A : OracleComp E α) :
-    evalDist (simulateQ h₁ A) = evalDist (simulateQ h₂ A) := by
+    𝒟[simulateQ h₁ A] = 𝒟[simulateQ h₂ A] := by
   induction A using OracleComp.inductionOn with
   | pure x => simp [simulateQ_pure]
   | query_bind t k ih =>
@@ -217,10 +217,10 @@ games such as `Package.par`-composites (`I = I₁ + I₂`). -/
 lemma simulateQ_StateT_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (StateT (Heap Ident) (OracleComp I))}
     (hh : ∀ (q : E.Domain) (h : Heap Ident),
-        evalDist ((h₁ q).run h) = evalDist ((h₂ q).run h))
+        𝒟[(h₁ q).run h] = 𝒟[(h₂ q).run h])
     (A : OracleComp E α) (h : Heap Ident) :
-    evalDist ((simulateQ h₁ A).run h) =
-      evalDist ((simulateQ h₂ A).run h) := by
+    𝒟[(simulateQ h₁ A).run h] =
+      𝒟[(simulateQ h₂ A).run h] := by
   induction A using OracleComp.inductionOn generalizing h with
   | pure x => simp [simulateQ_pure, StateT.run_pure]
   | query_bind t k ih =>
@@ -248,11 +248,11 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type}
     (h₂ : QueryImpl E (StateT (Heap Ident₂) (OracleComp I)))
     (φ : Heap Ident₁ ≃ Heap Ident₂)
     (hh : ∀ (q : E.Domain) (h : Heap Ident₁),
-      evalDist ((h₁ q).run h) =
-      evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ h)))
+      𝒟[(h₁ q).run h] =
+      𝒟[Prod.map id φ.symm <$> (h₂ q).run (φ h)])
     (A : OracleComp E α) (h : Heap Ident₁) :
-    evalDist ((simulateQ h₁ A).run h) =
-    evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ h)) := by
+    𝒟[(simulateQ h₁ A).run h] =
+    𝒟[Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ h)] := by
   induction A using OracleComp.inductionOn generalizing h with
   | pure x =>
     simp only [simulateQ_pure, StateT.run_pure, map_pure, Prod.map_apply,

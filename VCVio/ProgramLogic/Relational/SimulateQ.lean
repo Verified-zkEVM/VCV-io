@@ -114,7 +114,7 @@ theorem relTriple_simulateQ_run'_of_impl_evalDist_eq
     (impl₂ : QueryImpl spec (StateT σ (OracleComp spec₂)))
     (oa : OracleComp spec α)
     (himpl : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+      𝒟[(impl₁ t).run s] = 𝒟[(impl₂ t).run s])
     (s₁ s₂ : σ) (hs : s₁ = s₂) :
     RelTriple
       ((simulateQ impl₁ oa).run' s₁)
@@ -208,10 +208,10 @@ theorem relTriple_simulateQ_run_writerT_of_impl_eq
       apply (relTriple_iff_relWP
         (oa := (impl₂ t).run) (ob := (impl₂ t).run)
         (R := fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2)).2
-      refine ⟨_root_.SPMF.Coupling.refl (evalDist ((impl₂ t).run)), ?_⟩
+      refine ⟨_root_.SPMF.Coupling.refl (𝒟[(impl₂ t).run]), ?_⟩
       intro z hz
       rcases (mem_support_bind_iff
-        (evalDist ((impl₂ t).run))
+        (𝒟[(impl₂ t).run])
         (fun a => (pure (a, a) : SPMF ((spec.Range t × ω) × (spec.Range t × ω)))) z).1 hz with
         ⟨a, _ha, hz'⟩
       have hzEq : z = (a, a) := by
@@ -247,8 +247,8 @@ theorem evalDist_simulateQ_run_writerT_eq_of_impl_eq
     (impl₁ impl₂ : QueryImpl spec (WriterT ω (OracleComp spec₁)))
     (himpl_eq : ∀ (t : spec.Domain), (impl₁ t).run = (impl₂ t).run)
     (oa : OracleComp spec α) :
-    evalDist (simulateQ impl₁ oa).run =
-      evalDist (simulateQ impl₂ oa).run :=
+    𝒟[(simulateQ impl₁ oa).run] =
+      𝒟[(simulateQ impl₂ oa).run] :=
   evalDist_eq_of_relTriple_eqRel
     (relTriple_simulateQ_run_writerT_of_impl_eq impl₁ impl₂ himpl_eq oa)
 
@@ -310,10 +310,10 @@ theorem relTriple_simulateQ_run_of_impl_eq_preservesInv
       (oa := (impl₂ t).run s₁)
       (ob := (impl₂ t).run s₁)
       (R := fun p₁ p₂ => p₁.1 = p₂.1 ∧ p₁.2 = p₂.2 ∧ Inv p₁.2)).2
-    refine ⟨_root_.SPMF.Coupling.refl (evalDist ((impl₂ t).run s₁)), ?_⟩
+    refine ⟨_root_.SPMF.Coupling.refl (𝒟[(impl₂ t).run s₁]), ?_⟩
     intro z hz
     rcases (mem_support_bind_iff
-      (evalDist ((impl₂ t).run s₁))
+      (𝒟[(impl₂ t).run s₁])
       (fun a => (pure (a, a) : SPMF ((spec.Range t × σ) × (spec.Range t × σ)))) z).1 hz with
       ⟨a, ha, hz'⟩
     have hzEq : z = (a, a) := by

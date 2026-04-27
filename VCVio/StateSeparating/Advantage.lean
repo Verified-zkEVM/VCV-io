@@ -78,7 +78,7 @@ lemma advantage_eq_of_evalDist_runProb_eq {σ₀ σ₀' σ₁ : Type}
     {h₀' : QueryImpl.Stateful unifSpec E σ₀'} {s₀' : σ₀'}
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁}
     {A : OracleComp E Bool}
-    (h_eq : evalDist (h₀.runProb s₀ A) = evalDist (h₀'.runProb s₀' A)) :
+    (h_eq : 𝒟[h₀.runProb s₀ A] = 𝒟[h₀'.runProb s₀' A]) :
     h₀.advantage s₀ h₁ s₁ A = h₀'.advantage s₀' h₁ s₁ A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h_eq]
@@ -88,7 +88,7 @@ lemma advantage_eq_of_evalDist_runProb_eq_right {σ₀ σ₁ σ₁' : Type}
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁}
     {h₁' : QueryImpl.Stateful unifSpec E σ₁'} {s₁' : σ₁'}
     {A : OracleComp E Bool}
-    (h_eq : evalDist (h₁.runProb s₁ A) = evalDist (h₁'.runProb s₁' A)) :
+    (h_eq : 𝒟[h₁.runProb s₁ A] = 𝒟[h₁'.runProb s₁' A]) :
     h₀.advantage s₀ h₁ s₁ A = h₀.advantage s₀ h₁' s₁' A := by
   unfold advantage ProbComp.boolDistAdvantage
   rw [probOutput_congr rfl h_eq]
@@ -106,9 +106,9 @@ lemma advantage_triangle {σ₀ σ₁ σ₂ : Type}
 
 lemma simulateQ_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E ProbComp}
-    (hh : ∀ (q : E.Domain), evalDist (h₁ q) = evalDist (h₂ q))
+    (hh : ∀ (q : E.Domain), 𝒟[h₁ q] = 𝒟[h₂ q])
     (A : OracleComp E α) :
-    evalDist (simulateQ h₁ A) = evalDist (simulateQ h₂ A) := by
+    𝒟[simulateQ h₁ A] = 𝒟[simulateQ h₂ A] := by
   induction A using OracleComp.inductionOn with
   | pure x => simp [simulateQ_pure]
   | query_bind t k ih =>
@@ -121,9 +121,9 @@ lemma simulateQ_evalDist_congr {α : Type}
 lemma simulateQ_StateT_evalDist_congr {α : Type}
     {h₁ h₂ : QueryImpl E (StateT σ ProbComp)}
     (hh : ∀ (q : E.Domain) (s : σ),
-      evalDist ((h₁ q).run s) = evalDist ((h₂ q).run s))
+      𝒟[(h₁ q).run s] = 𝒟[(h₂ q).run s])
     (A : OracleComp E α) (s : σ) :
-    evalDist ((simulateQ h₁ A).run s) = evalDist ((simulateQ h₂ A).run s) := by
+    𝒟[(simulateQ h₁ A).run s] = 𝒟[(simulateQ h₂ A).run s] := by
   induction A using OracleComp.inductionOn generalizing s with
   | pure x => simp [simulateQ_pure, StateT.run_pure]
   | query_bind t k ih =>
@@ -138,11 +138,11 @@ lemma simulateQ_StateT_evalDist_congr_of_bij {α : Type} {σ₁ σ₂ : Type}
     (h₂ : QueryImpl E (StateT σ₂ ProbComp))
     (φ : σ₁ ≃ σ₂)
     (hh : ∀ (q : E.Domain) (s : σ₁),
-      evalDist ((h₁ q).run s) =
-      evalDist (Prod.map id φ.symm <$> (h₂ q).run (φ s)))
+      𝒟[(h₁ q).run s] =
+      𝒟[Prod.map id φ.symm <$> (h₂ q).run (φ s)])
     (A : OracleComp E α) (s : σ₁) :
-    evalDist ((simulateQ h₁ A).run s) =
-    evalDist (Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)) := by
+    𝒟[(simulateQ h₁ A).run s] =
+    𝒟[Prod.map id φ.symm <$> (simulateQ h₂ A).run (φ s)] := by
   induction A using OracleComp.inductionOn generalizing s with
   | pure x =>
     simp only [simulateQ_pure, StateT.run_pure, map_pure, Prod.map_apply, id_eq,

@@ -56,7 +56,7 @@ variable {α β : Type}
 
 /-- Two games have the same output distribution. -/
 def GameEquiv (g₁ g₂ : OracleComp spec₁ α) : Prop :=
-  evalDist g₁ = evalDist g₂
+  𝒟[g₁] = 𝒟[g₂]
 
 /-- Advantage of a Boolean game is at most `ε` (measured as deviation from 1/2). -/
 def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
@@ -73,7 +73,7 @@ def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
 
 theorem GameEquiv.probOutput_eq {g₁ g₂ : OracleComp spec₁ α}
     (h : GameEquiv g₁ g₂) (x : α) : Pr[= x | g₁] = Pr[= x | g₂] := by
-  change evalDist g₁ x = evalDist g₂ x
+  change 𝒟[g₁] x = 𝒟[g₂] x
   rw [h]
 
 /-! ## Prop-to-ℝ≥0∞ indicator -/

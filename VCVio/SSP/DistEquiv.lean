@@ -58,14 +58,14 @@ output distribution against every adversary, on every output type.
 Equivalent characterisations:
 * The Boolean distinguishing advantage `G₀.advantage G₁ A` is zero on every Boolean-valued
   adversary `A` (`DistEquiv.advantage_zero`).
-* For every `α` and every adversary `A : OracleComp E α`, `evalDist (G₀.runProb A) =
-  evalDist (G₁.runProb A)` (the literal definition).
+* For every `α` and every adversary `A : OracleComp E α`, `evalDist G₀.runProb A =
+  evalDist G₁.runProb A` (the literal definition).
 
 The state types `σ₀, σ₁` of the two games are independent: only the export interface and the
 resulting output distribution matter from an adversary's point of view. -/
 def DistEquiv {σ₀ σ₁ : Type}
     (G₀ : Package unifSpec E σ₀) (G₁ : Package unifSpec E σ₁) : Prop :=
-  ∀ {α : Type} (A : OracleComp E α), evalDist (G₀.runProb A) = evalDist (G₁.runProb A)
+  ∀ {α : Type} (A : OracleComp E α), 𝒟[G₀.runProb A] = 𝒟[G₁.runProb A]
 
 @[inherit_doc DistEquiv]
 scoped infix:50 " ≡ᵈ " => Package.DistEquiv
@@ -108,7 +108,7 @@ definition, exposed for clients that already have the distribution equality in h
 theorem of_run_evalDist
     {G₀ : Package unifSpec E σ₀} {G₁ : Package unifSpec E σ₁}
     (h : ∀ {α : Type} (A : OracleComp E α),
-        evalDist (G₀.runProb A) = evalDist (G₁.runProb A)) :
+        𝒟[G₀.runProb A] = 𝒟[G₁.runProb A]) :
     G₀ ≡ᵈ G₁ := h
 
 /-- Recover the per-adversary `evalDist` equality from a `DistEquiv` witness. The inverse of
@@ -116,7 +116,7 @@ theorem of_run_evalDist
 theorem runProb_evalDist_eq
     {G₀ : Package unifSpec E σ₀} {G₁ : Package unifSpec E σ₁}
     (h : G₀ ≡ᵈ G₁) {α : Type} (A : OracleComp E α) :
-    evalDist (G₀.runProb A) = evalDist (G₁.runProb A) := h A
+    𝒟[G₀.runProb A] = 𝒟[G₁.runProb A] := h A
 
 /-- Build a `DistEquiv` from a per-adversary *propositional* equality at the `runProb` level. -/
 theorem of_run_eq
@@ -133,12 +133,12 @@ This is the lemma form of `Package.simulateQ_StateT_evalDist_congr` from
 `VCVio.SSP.Advantage`, lifted to the package level: the per-handler hypothesis
 discharges the simulation step, and the init hypothesis discharges the setup step. -/
 theorem of_step {G₀ G₁ : Package unifSpec E σ}
-    (h_init : evalDist G₀.init = evalDist G₁.init)
+    (h_init : 𝒟[G₀.init] = 𝒟[G₁.init])
     (h_impl : ∀ (q : E.Domain) (s : σ),
-        evalDist ((G₀.impl q).run s) = evalDist ((G₁.impl q).run s)) :
+        𝒟[(G₀.impl q).run s] = 𝒟[(G₁.impl q).run s]) :
     G₀ ≡ᵈ G₁ := by
   intro α A
-  change evalDist (G₀.run A) = evalDist (G₁.run A)
+  change 𝒟[G₀.run A] = 𝒟[G₁.run A]
   unfold Package.run
   rw [evalDist_bind, evalDist_bind, h_init]
   refine bind_congr fun s₀ => ?_
@@ -160,27 +160,27 @@ but not propositionally equal (for example, a monolithic package and a link comp
 that happen to share an isomorphic state space). -/
 theorem of_step_bij
     (G₀ : Package unifSpec E σ₀) (G₁ : Package unifSpec E σ₁) (φ : σ₀ ≃ σ₁)
-    (h_init : evalDist G₀.init = evalDist (φ.symm <$> G₁.init))
+    (h_init : 𝒟[G₀.init] = 𝒟[φ.symm <$> G₁.init])
     (h_impl : ∀ (q : E.Domain) (s : σ₀),
-        evalDist ((G₀.impl q).run s) =
-          evalDist (Prod.map id φ.symm <$> (G₁.impl q).run (φ s))) :
+        𝒟[(G₀.impl q).run s] =
+          𝒟[Prod.map id φ.symm <$> (G₁.impl q).run (φ s)]) :
     G₀ ≡ᵈ G₁ := by
   intro α A
-  change evalDist (G₀.run A) = evalDist (G₁.run A)
+  change 𝒟[G₀.run A] = 𝒟[G₁.run A]
   unfold Package.run
   rw [evalDist_bind, evalDist_bind, h_init, evalDist_map]
   -- LHS bind is now `(φ.symm <$> evalDist G₁.init) >>= …`. Push the map into the bind.
   rw [bind_map_left]
   refine bind_congr fun s₁ => ?_
-  -- Goal: evalDist ((simulateQ G₀.impl A).run' (φ.symm s₁))
-  --      = evalDist ((simulateQ G₁.impl A).run' s₁)
+  -- Goal: evalDist (simulateQ G₀.impl A).run' (φ.symm s₁)
+  --      = evalDist (simulateQ G₁.impl A).run' s₁
   rw [StateT.run'_eq, StateT.run'_eq, evalDist_map, evalDist_map]
   -- Apply the bijected congruence at state s₀ := φ.symm s₁; then `φ (φ.symm s₁) = s₁`.
   have hbij := simulateQ_StateT_evalDist_congr_of_bij G₀.impl G₁.impl φ h_impl A (φ.symm s₁)
   rw [Equiv.apply_symm_apply] at hbij
   rw [hbij, evalDist_map]
-  -- Goal: Prod.fst <$> Prod.map id φ.symm <$> evalDist (...)
-  --     = Prod.fst <$> evalDist (...)
+  -- Goal: Prod.fst <$> Prod.map id φ.symm <$> evalDist ...
+  --     = Prod.fst <$> evalDist ...
   -- Combine the two `<$>` and collapse `(Prod.map id φ.symm a).1 = a.1`.
   simp only [Functor.map_map, Prod.map_fst, id_eq]
 
@@ -229,7 +229,7 @@ theorem link_inner_congr (P : Package M E σ_P)
     (h : Q₀ ≡ᵈ Q₁) :
     P.link Q₀ ≡ᵈ P.link Q₁ := by
   intro α A
-  change evalDist ((P.link Q₀).run A) = evalDist ((P.link Q₁).run A)
+  change 𝒟[(P.link Q₀).run A] = 𝒟[(P.link Q₁).run A]
   rw [run_link_eq_run_shiftLeft, run_link_eq_run_shiftLeft]
   exact h (P.shiftLeft A)
 

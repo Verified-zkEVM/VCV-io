@@ -28,7 +28,7 @@ def DistEquiv [I.Fintype] [I.Inhabited] {σ₀ σ₁ : Type}
     (h₀ : QueryImpl.Stateful I E σ₀) (s₀ : σ₀)
     (h₁ : QueryImpl.Stateful I E σ₁) (s₁ : σ₁) : Prop :=
   ∀ {α : Type} (A : OracleComp E α),
-    evalDist (h₀.run s₀ A) = evalDist (h₁.run s₁ A)
+    𝒟[h₀.run s₀ A] = 𝒟[h₁.run s₁ A]
 
 @[inherit_doc DistEquiv]
 scoped notation:50 "(" h₀ ", " s₀ ")" " ≡ᵈ " "(" h₁ ", " s₁ ")" =>
@@ -51,9 +51,9 @@ variable [I.Fintype] [I.Inhabited]
 private lemma simulateQ_StateT_evalDist_congr_import {α : Type}
     {h₀ h₁ : QueryImpl E (StateT σ (OracleComp I))}
     (hh : ∀ (q : E.Domain) (s : σ),
-      evalDist ((h₀ q).run s) = evalDist ((h₁ q).run s))
+      𝒟[(h₀ q).run s] = 𝒟[(h₁ q).run s])
     (A : OracleComp E α) (s : σ) :
-    evalDist ((simulateQ h₀ A).run s) = evalDist ((simulateQ h₁ A).run s) := by
+    𝒟[(simulateQ h₀ A).run s] = 𝒟[(simulateQ h₁ A).run s] := by
   induction A using OracleComp.inductionOn generalizing s with
   | pure x => simp [simulateQ_pure, StateT.run_pure]
   | query_bind t k ih =>
@@ -88,27 +88,27 @@ theorem of_run_evalDist
     {h₀ : QueryImpl.Stateful I E σ₀} {s₀ : σ₀}
     {h₁ : QueryImpl.Stateful I E σ₁} {s₁ : σ₁}
     (h : ∀ {α : Type} (A : OracleComp E α),
-      evalDist (h₀.run s₀ A) = evalDist (h₁.run s₁ A)) :
+      𝒟[h₀.run s₀ A] = 𝒟[h₁.run s₁ A]) :
     (h₀, s₀) ≡ᵈ (h₁, s₁) := fun A => h A
 
 theorem run_evalDist_eq
     {h₀ : QueryImpl.Stateful I E σ₀} {s₀ : σ₀}
     {h₁ : QueryImpl.Stateful I E σ₁} {s₁ : σ₁}
     (h : (h₀, s₀) ≡ᵈ (h₁, s₁)) {α : Type} (A : OracleComp E α) :
-    evalDist (h₀.run s₀ A) = evalDist (h₁.run s₁ A) := h A
+    𝒟[h₀.run s₀ A] = 𝒟[h₁.run s₁ A] := h A
 
 theorem run₀_evalDist_eq
     {h₀ : QueryImpl.Stateful I E σ₀} {h₁ : QueryImpl.Stateful I E σ₁}
     [Inhabited σ₀] [Inhabited σ₁]
     (h : h₀ ≡ᵈ₀ h₁) {α : Type} (A : OracleComp E α) :
-    evalDist (h₀.run₀ A) = evalDist (h₁.run₀ A) :=
+    𝒟[h₀.run₀ A] = 𝒟[h₁.run₀ A] :=
   h A
 
 theorem runProb_evalDist_eq
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {s₀ : σ₀}
     {h₁ : QueryImpl.Stateful unifSpec E σ₁} {s₁ : σ₁}
     (h : (h₀, s₀) ≡ᵈ (h₁, s₁)) {α : Type} (A : OracleComp E α) :
-    evalDist (h₀.runProb s₀ A) = evalDist (h₁.runProb s₁ A) := by
+    𝒟[h₀.runProb s₀ A] = 𝒟[h₁.runProb s₁ A] := by
   rw [runProb_eq_run, runProb_eq_run]
   exact h A
 
@@ -116,7 +116,7 @@ theorem runProb₀_evalDist_eq
     {h₀ : QueryImpl.Stateful unifSpec E σ₀} {h₁ : QueryImpl.Stateful unifSpec E σ₁}
     [Inhabited σ₀] [Inhabited σ₁]
     (h : h₀ ≡ᵈ₀ h₁) {α : Type} (A : OracleComp E α) :
-    evalDist (h₀.runProb₀ A) = evalDist (h₁.runProb₀ A) := by
+    𝒟[h₀.runProb₀ A] = 𝒟[h₁.runProb₀ A] := by
   rw [runProb₀, runProb₀]
   exact run₀_evalDist_eq h A
 
@@ -130,7 +130,7 @@ theorem of_run_eq
 theorem of_step
     {h₀ h₁ : QueryImpl.Stateful I E σ}
     (h_impl : ∀ (q : E.Domain) (s : σ),
-      evalDist ((h₀ q).run s) = evalDist ((h₁ q).run s))
+      𝒟[(h₀ q).run s] = 𝒟[(h₁ q).run s])
     (s₀ : σ) :
     (h₀, s₀) ≡ᵈ (h₁, s₀) := by
   intro α A
@@ -143,8 +143,8 @@ theorem of_step_bij
     (h₀ : QueryImpl.Stateful unifSpec E σ₀)
     (h₁ : QueryImpl.Stateful unifSpec E σ₁) (φ : σ₀ ≃ σ₁)
     (h_impl : ∀ (q : E.Domain) (s : σ₀),
-      evalDist ((h₀ q).run s) =
-        evalDist (Prod.map id φ.symm <$> (h₁ q).run (φ s)))
+      𝒟[(h₀ q).run s] =
+        𝒟[Prod.map id φ.symm <$> (h₁ q).run (φ s)])
     (s₀ : σ₀) :
     (h₀, s₀) ≡ᵈ (h₁, φ s₀) := by
   intro α A
@@ -192,8 +192,8 @@ theorem link_inner_congr (outer : QueryImpl.Stateful M E σ_P) (sP : σ_P)
     (h : (inner₀, s₀) ≡ᵈ (inner₁, s₁)) :
     (outer.link inner₀, (sP, s₀)) ≡ᵈ (outer.link inner₁, (sP, s₁)) := by
   intro α A
-  change evalDist ((outer.link inner₀).runProb (sP, s₀) A) =
-    evalDist ((outer.link inner₁).runProb (sP, s₁) A)
+  change 𝒟[(outer.link inner₀).runProb (sP, s₀) A] =
+    𝒟[(outer.link inner₁).runProb (sP, s₁) A]
   rw [runProb_eq_run, runProb_eq_run, run_link_eq_run_shiftLeft,
     run_link_eq_run_shiftLeft]
   exact h (outer.shiftLeft sP A)
@@ -215,20 +215,20 @@ theorem par_congr
     {h₁ h₁' : QueryImpl.Stateful I₁ E₁ σ₁} {s₁ : σ₁}
     {h₂ h₂' : QueryImpl.Stateful I₂ E₂ σ₂} {s₂ : σ₂}
     (hh₁ : ∀ (q : E₁.Domain) (s : σ₁),
-      evalDist ((h₁ q).run s) = evalDist ((h₁' q).run s))
+      𝒟[(h₁ q).run s] = 𝒟[(h₁' q).run s])
     (hh₂ : ∀ (q : E₂.Domain) (s : σ₂),
-      evalDist ((h₂ q).run s) = evalDist ((h₂' q).run s)) :
+      𝒟[(h₂ q).run s] = 𝒟[(h₂' q).run s]) :
     (h₁.par h₂, (s₁, s₂)) ≡ᵈ (h₁'.par h₂', (s₁, s₂)) := by
   refine of_step ?_ (s₁, s₂)
   intro q s
   rcases q with t | t
-  · change evalDist ((Prod.map id (·, s.2)) <$> liftComp ((h₁ t).run s.1) (I₁ + I₂)) =
-      evalDist ((Prod.map id (·, s.2)) <$> liftComp ((h₁' t).run s.1) (I₁ + I₂))
+  · change 𝒟[(Prod.map id (·, s.2)) <$> liftComp ((h₁ t).run s.1) (I₁ + I₂)] =
+      𝒟[(Prod.map id (·, s.2)) <$> liftComp ((h₁' t).run s.1) (I₁ + I₂)]
     refine evalDist_map_eq_of_evalDist_eq ?_ _
     rw [evalDist_liftComp, evalDist_liftComp]
     exact hh₁ t s.1
-  · change evalDist ((Prod.map id (s.1, ·)) <$> liftComp ((h₂ t).run s.2) (I₁ + I₂)) =
-      evalDist ((Prod.map id (s.1, ·)) <$> liftComp ((h₂' t).run s.2) (I₁ + I₂))
+  · change 𝒟[(Prod.map id (s.1, ·)) <$> liftComp ((h₂ t).run s.2) (I₁ + I₂)] =
+      𝒟[(Prod.map id (s.1, ·)) <$> liftComp ((h₂' t).run s.2) (I₁ + I₂)]
     refine evalDist_map_eq_of_evalDist_eq ?_ _
     rw [evalDist_liftComp, evalDist_liftComp]
     exact hh₂ t s.2

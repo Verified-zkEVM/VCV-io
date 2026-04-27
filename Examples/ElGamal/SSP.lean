@@ -236,10 +236,9 @@ sampling `sk` from `$ᵗ F`. The `Sum.inr` (LR) cases reduce to the same `do let
 final `pure (B, T + m₀)` map through the bind. -/
 private theorem composed_real_left_handler_evalDist (gen : G)
     (q : Unit ⊕ (G × G)) (s : Option F) :
-    evalDist
-        ((simulateQ (dhTripleReal (F := F) gen)
-          ((dhToLR_leftHandler (G := G)) q)).run s) =
-      evalDist (((elgamalLR_left (F := F) gen) q).run s) := by
+    𝒟[(simulateQ (dhTripleReal (F := F) gen)
+          ((dhToLR_leftHandler (G := G)) q)).run s] =
+      𝒟[((elgamalLR_left (F := F) gen) q).run s] := by
   rcases q with ⟨⟩ | ⟨m₀, _⟩
   · cases s with
     | none =>
@@ -266,10 +265,9 @@ private theorem composed_real_left_handler_evalDist (gen : G)
 "reduction ∘ dhTripleReal" and the ElGamal LR-right game. -/
 private theorem composed_real_right_handler_evalDist (gen : G)
     (q : Unit ⊕ (G × G)) (s : Option F) :
-    evalDist
-        ((simulateQ (dhTripleReal (F := F) gen)
-          ((dhToLR_rightHandler (G := G)) q)).run s) =
-      evalDist (((elgamalLR_right (F := F) gen) q).run s) := by
+    𝒟[(simulateQ (dhTripleReal (F := F) gen)
+          ((dhToLR_rightHandler (G := G)) q)).run s] =
+      𝒟[((elgamalLR_right (F := F) gen) q).run s] := by
   rcases q with ⟨⟩ | ⟨_, m₁⟩
   · cases s with
     | none =>
@@ -296,9 +294,9 @@ private theorem composed_real_right_handler_evalDist (gen : G)
 produces the same output distribution as the LR-left game itself. -/
 theorem evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left
     (gen : G) {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_left.link (dhTripleReal (F := F) gen)).runProb
-        (PUnit.unit, none) A) =
-      evalDist ((elgamalLR_left (F := F) gen).runProb none A) := by
+    𝒟[(dhToLR_left.link (dhTripleReal (F := F) gen)).runProb
+        (PUnit.unit, none) A] =
+      𝒟[(elgamalLR_left (F := F) gen).runProb none A] := by
   unfold QueryImpl.Stateful.runProb
   rw [show dhToLR_left = QueryImpl.Stateful.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
     QueryImpl.Stateful.run_link_left_ofStateless]
@@ -313,9 +311,9 @@ theorem evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left
 `evalDist_runProb_dhToLR_left_link_real_eq_elgamalLR_left`. -/
 theorem evalDist_runProb_dhToLR_right_link_real_eq_elgamalLR_right
     (gen : G) {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_right.link (dhTripleReal (F := F) gen)).runProb
-        (PUnit.unit, none) A) =
-      evalDist ((elgamalLR_right (F := F) gen).runProb none A) := by
+    𝒟[(dhToLR_right.link (dhTripleReal (F := F) gen)).runProb
+        (PUnit.unit, none) A] =
+      𝒟[(elgamalLR_right (F := F) gen).runProb none A] := by
   unfold QueryImpl.Stateful.runProb
   rw [show dhToLR_right = QueryImpl.Stateful.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
     QueryImpl.Stateful.run_link_left_ofStateless]
@@ -352,12 +350,10 @@ after pushing the reductions' post-processing `pure (B, T + m_b)` through the bi
 private theorem composed_rand_swap_handler_evalDist (gen : G)
     (hg : Function.Bijective (fun x : F => x • gen))
     (q : Unit ⊕ (G × G)) (s : Option F) :
-    evalDist
-        ((simulateQ (dhTripleRand (F := F) gen)
-          ((dhToLR_leftHandler (G := G)) q)).run s) =
-      evalDist
-        ((simulateQ (dhTripleRand (F := F) gen)
-          ((dhToLR_rightHandler (G := G)) q)).run s) := by
+    𝒟[(simulateQ (dhTripleRand (F := F) gen)
+          ((dhToLR_leftHandler (G := G)) q)).run s] =
+      𝒟[(simulateQ (dhTripleRand (F := F) gen)
+          ((dhToLR_rightHandler (G := G)) q)).run s] := by
   rcases q with ⟨⟩ | ⟨m₀, m₁⟩
   · -- GETPK: both sides are the same `simulateQ` applied to the identical
     -- `query (Sum.inl ())`, hence definitionally equal.
@@ -366,14 +362,12 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     -- The `step` helper shows that for any offset `m`, the composed handler reduces to a
     -- concrete `do b; c; pure ((b•gen, c•gen + m), some _)` ProbComp (modulo the state `s`).
     have step : ∀ (m : G),
-        evalDist
-            ((simulateQ (dhTripleRand (F := F) gen)
-              ((dhToLR_leftHandler (G := G)) (Sum.inr (m, m)))).run s) =
-          evalDist
-            (do
+        𝒟[(simulateQ (dhTripleRand (F := F) gen)
+              ((dhToLR_leftHandler (G := G)) (Sum.inr (m, m)))).run s] =
+          𝒟[do
               let bt ← (((dhTripleRand (F := F) gen) (Sum.inr ())).run s
                 : ProbComp ((G × G) × Option F))
-              pure ((bt.1.1, bt.1.2 + m), bt.2)) := by
+              pure ((bt.1.1, bt.1.2 + m), bt.2)] := by
       intro m
       simp only [dhToLR_leftHandler, simulateQ_query_bind, simulateQ_pure,
         OracleQuery.input_query, StateT.run_bind, monadLift_self, StateT.run_pure]
@@ -382,31 +376,31 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
     -- (Sum.inr (m₀, m₁))` only depends on `m₁`. Re-express both handler applications via
     -- the unified `step` helper.
     have left_eq :
-        evalDist ((simulateQ (dhTripleRand (F := F) gen)
-            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
-          evalDist ((simulateQ (dhTripleRand (F := F) gen)
-            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₀)))).run s) := rfl
+        𝒟[(simulateQ (dhTripleRand (F := F) gen)
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₁)))).run s] =
+          𝒟[(simulateQ (dhTripleRand (F := F) gen)
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₀, m₀)))).run s] := rfl
     have right_eq :
-        evalDist ((simulateQ (dhTripleRand (F := F) gen)
-            ((dhToLR_rightHandler (G := G)) (Sum.inr (m₀, m₁)))).run s) =
-          evalDist ((simulateQ (dhTripleRand (F := F) gen)
-            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₁, m₁)))).run s) := rfl
+        𝒟[(simulateQ (dhTripleRand (F := F) gen)
+            ((dhToLR_rightHandler (G := G)) (Sum.inr (m₀, m₁)))).run s] =
+          𝒟[(simulateQ (dhTripleRand (F := F) gen)
+            ((dhToLR_leftHandler (G := G)) (Sum.inr (m₁, m₁)))).run s] := rfl
     rw [left_eq, right_eq, step m₀, step m₁]
     -- Now the goal depends only on `((dhTripleRand gen) (Sum.inr ())).run s`, which
     -- unfolds to a concrete ProbComp. Case-split on `s` and apply the uniform-masking lemma.
     cases s with
     | none =>
         simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
-        change evalDist (do
+        change 𝒟[do
               let a ← ($ᵗ F)
               let b ← ($ᵗ F)
               let c ← ($ᵗ F)
-              pure ((b • gen, c • gen + m₀), some a)) =
-          evalDist (do
+              pure ((b • gen, c • gen + m₀), some a)] =
+          𝒟[do
               let a ← ($ᵗ F)
               let b ← ($ᵗ F)
               let c ← ($ᵗ F)
-              pure ((b • gen, c • gen + m₁), some a))
+              pure ((b • gen, c • gen + m₁), some a)]
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun a => ?_
@@ -418,14 +412,14 @@ private theorem composed_rand_swap_handler_evalDist (gen : G)
           (fun y => pure ((b • gen, y), some a))
     | some a =>
         simp only [dhTripleRand, StateT.run, bind_assoc, pure_bind]
-        change evalDist (do
+        change 𝒟[do
               let b ← ($ᵗ F)
               let c ← ($ᵗ F)
-              pure ((b • gen, c • gen + m₀), some a)) =
-          evalDist (do
+              pure ((b • gen, c • gen + m₀), some a)] =
+          𝒟[do
               let b ← ($ᵗ F)
               let c ← ($ᵗ F)
-              pure ((b • gen, c • gen + m₁), some a))
+              pure ((b • gen, c • gen + m₁), some a)]
         rw [evalDist_bind]
         conv_rhs => rw [evalDist_bind]
         refine bind_congr fun b => ?_
@@ -440,10 +434,10 @@ argument `evalDist_bind_bijective_add_right_eq` across the full adversary via
 theorem evalDist_runProb_dhToLR_link_rand_swap
     (gen : G) (hg : Function.Bijective (fun x : F => x • gen))
     {α : Type} (A : OracleComp (lrSpec G) α) :
-    evalDist ((dhToLR_left.link (dhTripleRand (F := F) gen)).runProb
-        (PUnit.unit, none) A) =
-      evalDist ((dhToLR_right.link (dhTripleRand (F := F) gen)).runProb
-        (PUnit.unit, none) A) := by
+    𝒟[(dhToLR_left.link (dhTripleRand (F := F) gen)).runProb
+        (PUnit.unit, none) A] =
+      𝒟[(dhToLR_right.link (dhTripleRand (F := F) gen)).runProb
+        (PUnit.unit, none) A] := by
   unfold QueryImpl.Stateful.runProb
   rw [show dhToLR_left = QueryImpl.Stateful.ofStateless (dhToLR_leftHandler (G := G)) from rfl,
     show dhToLR_right = QueryImpl.Stateful.ofStateless (dhToLR_rightHandler (G := G)) from rfl,
