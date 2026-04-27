@@ -205,7 +205,7 @@ import VCVio.OracleComp.SimSemantics.QueryImpl
 import VCVio.OracleComp.SimSemantics.ReaderT
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import VCVio.OracleComp.SimSemantics.StateProjection
-import VCVio.OracleComp.SimSemantics.Stateful
+import VCVio.OracleComp.SimSemantics.StateSeparating
 import VCVio.OracleComp.SimSemantics.StateT
 import VCVio.OracleComp.SimSemantics.WriterT
 import VCVio.OracleComp.Traversal
