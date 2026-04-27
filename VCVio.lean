@@ -75,11 +75,9 @@ import VCVio.EvalDist.Prod
 import VCVio.EvalDist.RenyiDivergence
 import VCVio.EvalDist.TVDist
 import VCVio.HeapSSP.Advantage
-import VCVio.StateSeparating.CellRef
 import VCVio.HeapSSP.Composition
 import VCVio.HeapSSP.DistEquiv
 import VCVio.HeapSSP.Examples
-import ToMathlib.Data.Heap
 import VCVio.HeapSSP.Hybrid
 import VCVio.HeapSSP.IdenticalUntilBad
 import VCVio.HeapSSP.IndistAt
@@ -244,11 +242,6 @@ import VCVio.ProgramLogic.Tactics.Relational
 import VCVio.ProgramLogic.Tactics.Relational.Internals
 import VCVio.ProgramLogic.Tactics.Unary
 import VCVio.ProgramLogic.Tactics.Unary.Internals
-import VCVio.StateSeparating.Advantage
-import VCVio.StateSeparating.DistEquiv
-import VCVio.StateSeparating.Hybrid
-import VCVio.StateSeparating.IdenticalUntilBad
-import VCVio.StateSeparating.IndistAt
 import VCVio.ProgramLogic.Unary.Examples
 import VCVio.ProgramLogic.Unary.HandlerSpecs
 import VCVio.ProgramLogic.Unary.HoarePropTriple
@@ -268,3 +261,9 @@ import VCVio.SSP.Hybrid
 import VCVio.SSP.IdenticalUntilBad
 import VCVio.SSP.IndistAt
 import VCVio.SSP.Package
+import VCVio.StateSeparating.Advantage
+import VCVio.StateSeparating.CellRef
+import VCVio.StateSeparating.DistEquiv
+import VCVio.StateSeparating.Hybrid
+import VCVio.StateSeparating.IdenticalUntilBad
+import VCVio.StateSeparating.IndistAt

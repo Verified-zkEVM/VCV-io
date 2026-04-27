@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 import VCVio.OracleComp.Coercions.Add
 import VCVio.OracleComp.SimSemantics.StateT
+import ToMathlib.PFunctor.Lens.State
 
 /-!
 # Stateful query implementations
@@ -24,8 +25,18 @@ open scoped OracleSpec.PrimitiveQuery
 
 namespace QueryImpl
 
-/-- A stateful implementation of export queries `E` using import queries `I`
-and private state `σ`. -/
+/-- A stateful implementation of export queries `E` using import queries `I`.
+
+`QueryImpl.Stateful I E σ` is the raw handler shape
+`QueryImpl E (StateT σ (OracleComp I))`: each export query may inspect and
+update private state `σ`, while making import queries in `I`.
+
+The surrounding `QueryImpl.Stateful` namespace develops the state-separating
+composition API for these handlers. Composition can use the canonical product
+state, via `link` and `par`, or an explicit `Frame` that describes how two
+component states are embedded as separated lawful state lenses inside a larger
+state.
+-/
 def Stateful
     {ιᵢ : Type uᵢ} {ιₑ : Type uₑ}
     (I : OracleSpec.{uᵢ, vᵢ} ιᵢ) (E : OracleSpec.{uₑ, v} ιₑ) (σ : Type v) :
@@ -37,6 +48,63 @@ namespace Stateful
 variable {ιᵢ : Type uᵢ} {ιₘ : Type uₘ} {ιₑ : Type uₑ}
   {I : OracleSpec.{uᵢ, vᵢ} ιᵢ} {M : OracleSpec.{uₘ, v} ιₘ} {E : OracleSpec.{uₑ, v} ιₑ}
   {σ σ₁ σ₂ σ' : Type v}
+
+/-! ## State frames -/
+
+/-- A frame specifying how two component states sit inside a larger state.
+
+The component projections are state lenses in the sense of
+`PFunctor.Lens.State`: each one has a getter and a putter satisfying the
+standard very-well-behaved lens laws. The `separated` field says the two lenses
+are non-interfering: each update leaves the other view unchanged, and the two
+updates commute. Composition operators such as `linkWith` and `parWith` use
+this explicit frame to run handlers over a larger state than the canonical
+product state.
+-/
+structure Frame (σ σ₁ σ₂ : Type v) where
+  /-- Lens selecting and updating the left component state. -/
+  left : PFunctor.Lens.State σ σ₁
+  /-- Lens selecting and updating the right component state. -/
+  right : PFunctor.Lens.State σ σ₂
+  /-- The left component lens satisfies `PutGet`, `GetPut`, and `PutPut`. -/
+  [left_isVeryWellBehaved : PFunctor.Lens.State.IsVeryWellBehaved left]
+  /-- The right component lens satisfies `PutGet`, `GetPut`, and `PutPut`. -/
+  [right_isVeryWellBehaved : PFunctor.Lens.State.IsVeryWellBehaved right]
+  /-- The two component lenses are non-interfering separated views of the source state. -/
+  [separated : PFunctor.Lens.State.IsSeparated left right]
+
+namespace Frame
+
+/-- The canonical product-state frame. -/
+def prod (σ₁ σ₂ : Type v) : Frame (σ₁ × σ₂) σ₁ σ₂ where
+  left := PFunctor.Lens.State.fst σ₁ σ₂
+  right := PFunctor.Lens.State.snd σ₁ σ₂
+
+instance instLeftIsVeryWellBehaved (F : Frame σ σ₁ σ₂) :
+    PFunctor.Lens.State.IsVeryWellBehaved F.left :=
+  F.left_isVeryWellBehaved
+
+instance instRightIsVeryWellBehaved (F : Frame σ σ₁ σ₂) :
+    PFunctor.Lens.State.IsVeryWellBehaved F.right :=
+  F.right_isVeryWellBehaved
+
+instance instSeparated (F : Frame σ σ₁ σ₂) :
+    PFunctor.Lens.State.IsSeparated F.left F.right :=
+  F.separated
+
+/-- Reshape the result of a linked handler run back into the source state
+described by a frame.
+
+The input carries an output value, the updated left component state, and the
+updated right component state. The frame writes those component states back into
+the original source state `s`.
+-/
+@[reducible]
+def linkReshape {α : Type v} (F : Frame σ σ₁ σ₂) (s : σ) :
+    (α × σ₁) × σ₂ → α × σ := fun p =>
+  (p.1.1, F.right.put p.2 (F.left.put p.1.2 s))
+
+end Frame
 
 /-! ## Basic handlers and evaluation -/
 
@@ -137,35 +205,55 @@ lemma transportState_apply_run (h : QueryImpl.Stateful I E σ) (φ : σ ≃ σ')
 
 /-! ## Sequential composition -/
 
-/-- The product-state reshape used by linked handlers. -/
-@[reducible]
-def linkReshape {α : Type v} {σ₁ : Type v} {σ₂ : Type v} :
-    (α × σ₁) × σ₂ → α × (σ₁ × σ₂) := fun p => (p.1.1, (p.1.2, p.2))
+/-- Sequential composition of two stateful handlers using an explicit
+state frame.
+
+The frame specifies how the outer state `σ₁` and inner state `σ₂` are viewed
+and updated inside the combined state `σ`. The linked handler reads both
+component states from the source state, runs the usual nested simulation, then
+writes back the updated outer and inner states through the frame lenses.
+-/
+def linkWith (F : Frame σ σ₁ σ₂)
+    (outer : QueryImpl.Stateful M E σ₁) (inner : QueryImpl.Stateful I M σ₂) :
+    QueryImpl.Stateful I E σ := fun t =>
+  StateT.mk fun s =>
+    F.linkReshape s <$>
+      (simulateQ inner ((outer t).run (F.left.get s))).run (F.right.get s)
+
+@[simp]
+lemma linkWith_apply_run (F : Frame σ σ₁ σ₂)
+    (outer : QueryImpl.Stateful M E σ₁) (inner : QueryImpl.Stateful I M σ₂)
+    (t : E.Domain) (s : σ) :
+    ((outer.linkWith F inner) t).run s =
+      F.linkReshape s <$>
+        (simulateQ inner ((outer t).run (F.left.get s))).run (F.right.get s) := rfl
 
 /-- Sequential composition of two stateful handlers. The outer handler exports
 `E` and imports `M`; the inner handler exports `M` and imports `I`. -/
 def link (outer : QueryImpl.Stateful M E σ₁) (inner : QueryImpl.Stateful I M σ₂) :
-    QueryImpl.Stateful I E (σ₁ × σ₂) := fun t =>
-  StateT.mk fun (s₁, s₂) =>
-    linkReshape <$> (simulateQ inner ((outer t).run s₁)).run s₂
+    QueryImpl.Stateful I E (σ₁ × σ₂) :=
+  outer.linkWith (Frame.prod σ₁ σ₂) inner
 
 lemma link_impl_apply_run (outer : QueryImpl.Stateful M E σ₁)
     (inner : QueryImpl.Stateful I M σ₂) (t : E.Domain) (s₁ : σ₁) (s₂ : σ₂) :
     ((outer.link inner) t).run (s₁, s₂) =
-      linkReshape <$> (simulateQ inner ((outer t).run s₁)).run s₂ := rfl
+      (Frame.prod σ₁ σ₂).linkReshape (s₁, s₂) <$>
+        (simulateQ inner ((outer t).run s₁)).run s₂ := rfl
 
 /-- Structural form of linked simulation as nested simulations. -/
 theorem simulateQ_link_run {α : Type v}
     (outer : QueryImpl.Stateful M E σ₁) (inner : QueryImpl.Stateful I M σ₂)
     (A : OracleComp E α) (s₁ : σ₁) (s₂ : σ₂) :
     (simulateQ (outer.link inner) A).run (s₁, s₂) =
-      linkReshape <$>
+      (Frame.prod σ₁ σ₂).linkReshape (s₁, s₂) <$>
         (simulateQ inner ((simulateQ outer A).run s₁)).run s₂ := by
   induction A using OracleComp.inductionOn generalizing s₁ s₂ with
   | pure x =>
     change (pure (x, (s₁, s₂)) : OracleComp I (α × (σ₁ × σ₂))) =
-      linkReshape <$> (simulateQ inner (pure (x, s₁))).run s₂
+      (Frame.prod σ₁ σ₂).linkReshape (s₁, s₂) <$>
+        (simulateQ inner (pure (x, s₁))).run s₂
     rw [simulateQ_pure, StateT.run_pure, map_pure]
+    rfl
   | query_bind t k ih =>
     have hLHS : (simulateQ (outer.link inner) (liftM (query t) >>= k)).run (s₁, s₂) =
         (simulateQ inner ((outer t).run s₁)).run s₂ >>=
@@ -176,6 +264,7 @@ theorem simulateQ_link_run {α : Type v}
       change ((outer.link inner t >>= fun a => simulateQ (outer.link inner) (k a)).run
         (s₁, s₂)) = _
       rw [StateT.run_bind, link_impl_apply_run, bind_map_left]
+      rfl
     have hRHS : (simulateQ inner ((simulateQ outer (liftM (query t) >>= k)).run s₁)).run s₂ =
         (simulateQ inner ((outer t).run s₁)).run s₂ >>=
           fun (p : (E.Range t × σ₁) × σ₂) =>
@@ -236,13 +325,44 @@ variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {�
   {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
   {E₁ : OracleSpec.{uₑ, v} ιₑ₁} {E₂ : OracleSpec.{uₑ, v} ιₑ₂}
 
+/-- Parallel composition of two stateful handlers using an explicit state
+frame.
+
+The frame specifies where each side's private state lives in the shared source
+state. A left query updates only the left view, and a right query updates only
+the right view. The frame's separation law records that these two updates are
+non-interfering.
+-/
+def parWith (F : Frame σ σ₁ σ₂)
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+    QueryImpl.Stateful (I₁ + I₂) (E₁ + E₂) σ
+  | .inl t => StateT.mk fun s =>
+      (Prod.map id fun s₁' => F.left.put s₁' s) <$>
+        liftComp ((h₁ t).run (F.left.get s)) (I₁ + I₂)
+  | .inr t => StateT.mk fun s =>
+      (Prod.map id fun s₂' => F.right.put s₂' s) <$>
+        liftComp ((h₂ t).run (F.right.get s)) (I₁ + I₂)
+
+@[simp]
+lemma parWith_apply_inl_run (F : Frame σ σ₁ σ₂)
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂)
+    (t : E₁.Domain) (s : σ) :
+    ((h₁.parWith F h₂) (Sum.inl t)).run s =
+      (Prod.map id fun s₁' => F.left.put s₁' s) <$>
+        liftComp ((h₁ t).run (F.left.get s)) (I₁ + I₂) := rfl
+
+@[simp]
+lemma parWith_apply_inr_run (F : Frame σ σ₁ σ₂)
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂)
+    (t : E₂.Domain) (s : σ) :
+    ((h₁.parWith F h₂) (Sum.inr t)).run s =
+      (Prod.map id fun s₂' => F.right.put s₂' s) <$>
+        liftComp ((h₂ t).run (F.right.get s)) (I₁ + I₂) := rfl
+
 /-- Parallel composition of two stateful handlers over disjoint sum interfaces. -/
 def par (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
-    QueryImpl.Stateful (I₁ + I₂) (E₁ + E₂) (σ₁ × σ₂)
-  | .inl t => StateT.mk fun (s₁, s₂) =>
-      (Prod.map id (·, s₂)) <$> liftComp ((h₁ t).run s₁) (I₁ + I₂)
-  | .inr t => StateT.mk fun (s₁, s₂) =>
-      (Prod.map id (s₁, ·)) <$> liftComp ((h₂ t).run s₂) (I₁ + I₂)
+    QueryImpl.Stateful (I₁ + I₂) (E₁ + E₂) (σ₁ × σ₂) :=
+  h₁.parWith (Frame.prod σ₁ σ₂) h₂
 
 @[simp]
 lemma par_apply_inl_run (h₁ : QueryImpl.Stateful I₁ E₁ σ₁)
