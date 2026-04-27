@@ -454,64 +454,19 @@ theorem cmaSignLogImpl_cmaSignHashQueryBound
       (Resp := Resp) (Stmt := Stmt)
       ((simulateQ (cmaSignLogImpl (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt)) A).run signed) qS qH := by
-  induction A using OracleComp.inductionOn generalizing qS qH signed with
-  | pure x =>
-      simp [simulateQ_pure, cmaSignHashQueryBound]
-  | query_bind t cont ih =>
-      rw [cmaSignHashQueryBound_query_bind_iff] at hA
-      rcases hA with ⟨hcan, hcont⟩
-      cases t with
-      | unif n =>
-          rw [simulateQ_query_bind, StateT.run_bind]
-          simp only [OracleQuery.input_query, bind_pure, monadLift_self,
-            StateT.run_monadLift, bind_pure_comp, bind_map_left]
-          change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (Resp := Resp) (Stmt := Stmt)
-            (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.unif n)) >>=
-              fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-            qS qH
-          rw [cmaSignHashQueryBound_query_bind_iff]
-          refine ⟨⟨by simp [IsCostlyQuery], by simp [IsHashQuery]⟩, fun u => ?_⟩
-          simpa [cmaSignHashQueryBound] using ih u signed qS qH (hcont u)
-      | ro mc =>
-          rw [simulateQ_query_bind, StateT.run_bind]
-          simp only [OracleQuery.input_query, bind_pure, monadLift_self,
-            StateT.run_monadLift, bind_pure_comp, bind_map_left]
-          change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (Resp := Resp) (Stmt := Stmt)
-            (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.ro mc)) >>=
-              fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-            qS qH
-          rw [cmaSignHashQueryBound_query_bind_iff]
-          refine ⟨hcan, fun u => ?_⟩
-          simpa [cmaSignHashQueryBound] using ih u signed qS (qH - 1) (hcont u)
-      | sign m =>
-        rw [simulateQ_query_bind, StateT.run_bind]
-        simp only [OracleQuery.input_query, monadLift_self]
-        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt)
-          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.sign m)) >>=
-            fun sig => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont sig)).run (signed ++ [m]))
-          qS qH
-        rw [cmaSignHashQueryBound_query_bind_iff]
-        refine ⟨hcan, fun sig => ?_⟩
-        simpa [cmaSignHashQueryBound] using ih sig (signed ++ [m]) (qS - 1) qH (hcont sig)
-      | pk =>
-          rw [simulateQ_query_bind, StateT.run_bind]
-          simp only [OracleQuery.input_query, bind_pure, monadLift_self,
-            StateT.run_monadLift, bind_pure_comp, bind_map_left]
-          change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-            (Resp := Resp) (Stmt := Stmt)
-            (liftM ((cmaSpec M Commit Chal Resp Stmt).query .pk) >>=
-              fun pk => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont pk)).run signed)
-            qS qH
-          rw [cmaSignHashQueryBound_query_bind_iff]
-          refine ⟨⟨by simp [IsCostlyQuery], by simp [IsHashQuery]⟩, fun pk => ?_⟩
-          simpa [cmaSignHashQueryBound] using ih pk signed qS qH (hcont pk)
+  constructor
+  · exact OracleComp.IsQueryBoundP.simulateQ_run_StateT_of_step hA.1
+      (fun t s => by
+        cases t <;>
+          simp [cmaSignLogImpl, IsCostlyQuery, StateT.run_monadLift,
+            StateT.run_get, StateT.run_set, monadLift_self, bind_pure_comp])
+      signed
+  · exact OracleComp.IsQueryBoundP.simulateQ_run_StateT_of_step hA.2
+      (fun t s => by
+        cases t <;>
+          simp [cmaSignLogImpl, IsHashQuery, StateT.run_monadLift,
+            StateT.run_get, StateT.run_set, monadLift_self, bind_pure_comp])
+      signed
 
 omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
   [DecidableEq Commit] in
