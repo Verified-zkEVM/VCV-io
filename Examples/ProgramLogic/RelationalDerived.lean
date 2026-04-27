@@ -68,6 +68,22 @@ example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => True⟫ := by
   rvcstep
 
+@[irreducible] def wrappedAuxLeft : OracleComp spec Bool := pure true
+@[irreducible] def wrappedAuxRight : OracleComp spec Bool := pure true
+
+@[local vcspec] theorem relTriple_wrappedAuxPairStep (_haux : True) :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
+  simpa [wrappedAuxLeft, wrappedAuxRight] using
+    (relTriple_refl (pure true : OracleComp spec Bool))
+
+example :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
+  rvcstep
+
+example :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | fun _ _ => True⟫ := by
+  rvcstep
+
 @[local vcspec] theorem rawRWP_wrappedTruePair :
     (1 : ℝ≥0∞) ⊑
       rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |

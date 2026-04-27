@@ -816,12 +816,13 @@ def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : Ta
   return progress
 
 private def closeRelTheoremStepGoals : TacticM Unit := do
-  discard <| tryEvalTacticSyntax (← `(tactic| all_goals try simp only [game_rule]))
   discard <| tryEvalTacticSyntax (← `(tactic|
     all_goals try (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
   discard <| tryEvalTacticSyntax (← `(tactic|
     all_goals first
       | assumption
+      | trivial
+      | simp [Lean.Order.PartialOrder.rel]
       | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_

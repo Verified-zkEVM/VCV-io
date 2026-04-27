@@ -26,7 +26,13 @@ structure VCSpecBackwardRule where
   declName : Name
   rule : Lean.Meta.Sym.BackwardRule
 
-private abbrev VCSpecBackwardRuleCacheKey := Name × Bool
+private abbrev VCSpecBackwardRuleCacheKey := Name × Bool × Nat
+
+private def VCSpecKind.cacheKey : VCSpecKind → Nat
+  | .unaryTriple => 0
+  | .unaryWP => 1
+  | .relTriple => 2
+  | .relWP => 3
 
 initialize vcSpecBackwardRuleCache :
     IO.Ref (Std.HashMap VCSpecBackwardRuleCacheKey VCSpecBackwardRule) ←
@@ -352,7 +358,7 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
   let some declName := entry.declName?
     | mkVCSpecBackwardRule entry rawGoal
-  let key : VCSpecBackwardRuleCacheKey := (declName, rawGoal)
+  let key : VCSpecBackwardRuleCacheKey := (declName, rawGoal, entry.kind.cacheKey)
   let cache ← vcSpecBackwardRuleCache.get
   match cache[key]? with
   | some rule => return rule
@@ -364,14 +370,10 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
 private def VCSpecBackwardRule.applyProof (rule : VCSpecBackwardRule) (mvarId : MVarId)
     (goalTy : Expr) : MetaM (Option (List MVarId)) := do
   try
-    let prf ←
-      if rule.rawGoal then
-        mkConstWithFreshMVarLevels rule.declName
-      else
-        let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
-        pure prf
-    let prfTy ← instantiateMVars (← inferType prf)
-    fixPredFromGoal? prfTy goalTy
+    let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
+    unless rule.rawGoal do
+      let prfTy ← instantiateMVars (← inferType prf)
+      fixPredFromGoal? prfTy goalTy
     let subgoals ← mvarId.apply prf
     return some subgoals
   catch _ =>
