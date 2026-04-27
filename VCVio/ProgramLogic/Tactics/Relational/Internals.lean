@@ -413,14 +413,104 @@ private def rawRelWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :
   let #[oa, ob, post, _epost₁, _epost₂] := args | none
   some (oa, ob, post)
 
+private def rawRelWPGoalFullParts? (target : Expr) :
+    Option (Expr × Expr × Expr × Expr × Expr × Expr) := do
+  let target := target.consumeMData
+  let pre ←
+    if target.isAppOfArity ``LE.le 4 ||
+        target.isAppOfArity ``Lean.Order.PartialOrder.rel 4 then
+      some (target.getArg! 2)
+    else
+      none
+  let rhs := target.getArg! 3
+  let app ← findAppWithHead? ``Std.Do'.rwp rhs
+  let args ← trailingArgs? app 5
+  let #[oa, ob, post, epost₁, epost₂] := args | none
+  some (pre, oa, ob, post, epost₁, epost₂)
+
+private def pureValue? (e : Expr) : Option Expr := do
+  let e := e.consumeMData
+  guard <| e.getAppFn.isConstOf ``Pure.pure
+  e.getAppArgs.back?
+
+private def monadFnFromCompType? (type : Expr) : Option Expr := do
+  let type := type.consumeMData
+  let args := type.getAppArgs
+  guard <| 0 < args.size
+  some <| mkAppN type.getAppFn (args.extract 0 (args.size - 1))
+
+private def rawOrderBounds? (type : Expr) : MetaM (Option (Expr × Expr)) := do
+  let type ← whnfR type
+  if type.isAppOfArity ``LE.le 4 ||
+      type.isAppOfArity ``Lean.Order.PartialOrder.rel 4 then
+    return some (type.getArg! 2, type.getArg! 3)
+  return none
+
+private def runRawRelWPReflRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (lhs, rhs) ← rawOrderBounds? target | return false
+  unless (← isDefEq lhs rhs) do
+    return false
+  tryEvalTacticSyntax (← `(tactic| exact Lean.Order.PartialOrder.rel_refl))
+
+/-- Direct leaf rule for raw `Std.Do'.rwp` pure-pure goals.
+This handles the raw counterpart of the folded quantitative `RelTriple` pure
+case without first manufacturing a registered-rule consequence wrapper. -/
+private def runRawRelWPPureRule : TacticM Bool := do
+  match ← getGoals with
+  | [] => return false
+  | goal :: rest =>
+      let target ← instantiateMVars (← goal.getType)
+      let some (_pre, oa, ob, post, epost₁, epost₂) := rawRelWPGoalFullParts? target
+        | return false
+      let oa ← whnfReducible (← instantiateMVars oa)
+      let ob ← whnfReducible (← instantiateMVars ob)
+      let some a := pureValue? oa | return false
+      let some b := pureValue? ob | return false
+      try
+        let some m₁ := monadFnFromCompType? (← inferType oa) | return false
+        let some m₂ := monadFnFromCompType? (← inferType ob) | return false
+        let pred ← inferType (mkApp2 post a b)
+        let epred₁ ← inferType epost₁
+        let epred₂ ← inferType epost₂
+        let prf ← mkAppOptM ``Std.Do'.RelWP.rwp_pure
+          #[some m₁, some m₂, some pred, some epred₁, some epred₂,
+            none, none, none, none, none, none, none, none,
+            none, none, some a, some b, some post, some epost₁, some epost₂]
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing (ignoreStuckTC := true)
+        let prf ← instantiateMVars prf
+        if prf.hasExprMVar then
+          throwError "raw rwp pure proof still has metavariables:{indentExpr prf}"
+        let prfTy ← instantiateMVars (← inferType prf)
+        unless ← isDefEq target prfTy do
+          return false
+        goal.assign prf
+        setGoals rest
+        return true
+      catch _ =>
+        return false
+
+/-- Direct bind rule for raw `Std.Do'.rwp` goals with binds on both sides. -/
+private def runRawRelWPBindRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (_pre, oa, ob, _post, _epost₁, _epost₂) := rawRelWPGoalFullParts? target
+    | return false
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless isBindExpr oa && isBindExpr ob do
+    return false
+  tryEvalTacticSyntax (← `(tactic|
+    refine Lean.Order.PartialOrder.rel_trans ?_
+      (Std.Do'.RelWP.rwp_bind_le _ _ _ _ _ _ _)))
+
 /-- Try direct-hit registered `@[vcspec]` rules against a raw relational WP goal. -/
 private def runRawRelWPVCSpecBackward : TacticM Bool := do
   withVCGenRegisteredTiming do
     let target ← instantiateMVars (← getMainTarget)
     let some (oa, ob, _) := rawRelWPGoalParts? target | return false
     let entries ← getRegisteredRelationalVCSpecEntries oa ob
-    let entries := entries.filter fun entry =>
-      entry.kind == .relWP || entry.kind == .relTriple
+    let entries :=
+      entries.filter (·.kind == .relWP) ++ entries.filter (·.kind == .relTriple)
     for entry in entries.toList.take 8 do
       let saved ← saveState
       if ← runVCSpecEntryCachedBackward entry then
@@ -430,6 +520,12 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
 
 def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure
+  if ← runRawRelWPReflRule then
+    return true
+  if ← runRawRelWPPureRule then
+    return true
+  if ← runRawRelWPBindRule then
+    return true
   if ← runRawRelWPVCSpecBackward then
     return true
   let target ← instantiateMVars (← getMainTarget)

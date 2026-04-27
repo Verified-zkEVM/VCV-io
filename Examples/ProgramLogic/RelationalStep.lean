@@ -16,13 +16,14 @@ This file validates one-step relational tactic behavior.
 open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
 open OracleComp.ProgramLogic.Relational
+open Lean.Order
 open scoped OracleComp.ProgramLogic
 
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
-variable {α β γ : Type}
+variable {α β γ δ : Type}
 
 /-! ## Basic relational stepping -/
 
@@ -224,3 +225,22 @@ example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
       (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
       Lean.Order.bot Lean.Order.bot := by
   rvcstep
+
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    post a b ⊑ (Std.Do'.rwp
+      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
+      (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
+      Lean.Order.bot Lean.Order.bot) := by
+  rvcstep
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ) (g : β → OracleComp spec δ)
+    (post : γ → δ → ℝ≥0∞) :
+    Std.Do'.rwp
+        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
+        (f a) (g b) post Lean.Order.bot Lean.Order.bot ⊑
+      Std.Do'.rwp
+        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
+        ((pure a : OracleComp spec α) >>= f) ((pure b : OracleComp spec β) >>= g) post
+        Lean.Order.bot Lean.Order.bot := by
+  rvcgen

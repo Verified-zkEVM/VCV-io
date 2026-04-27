@@ -63,15 +63,19 @@ private def bridgeTriple? (prf type : Expr) : MetaM (Expr × Expr) := do
     return (prf', type')
   return (prf, type)
 
-/-- If a raw `≤` goal fixes the predicate carrier, push that information into
-a universe-polymorphic `⊑` proof before `Meta.apply`. -/
+/-- Extract the predicate carrier from a raw order relation. -/
+private def rawOrderCarrier? (type : Expr) : MetaM (Option Expr) := do
+  let type ← whnfR type
+  if type.isAppOfArity ``Lean.Order.PartialOrder.rel 4 ||
+      type.isAppOfArity ``LE.le 4 then
+    return some (type.getArg! 0)
+  return none
+
+/-- If a raw order goal fixes the predicate carrier, push that information into
+a universe-polymorphic `⊑` / `≤` proof before `Meta.apply`. -/
 private def fixPredFromGoal? (prfTy goalTy : Expr) : MetaM Unit := do
-  let prfTy ← whnfR prfTy
-  let goalTy ← whnfR goalTy
-  unless prfTy.isAppOfArity ``Lean.Order.PartialOrder.rel 4 do return
-  unless goalTy.isAppOfArity ``LE.le 4 do return
-  let prfPred := prfTy.getArg! 0
-  let goalPred := goalTy.getArg! 0
+  let some prfPred ← rawOrderCarrier? prfTy | return
+  let some goalPred ← rawOrderCarrier? goalTy | return
   _ ← isDefEq prfPred goalPred
 
 /-- A goal whose target is already in `≤`/`⊑` weakest-precondition form. -/
@@ -109,6 +113,27 @@ private def stdDoRelWpParts? (rhs : Expr) : Option (Expr × Expr × Expr × Expr
   let epost₂ := args[args.size - 1]!
   some (oa, ob, post, epost₁, epost₂)
 
+private def mkOrderRel (lhs rhs : Expr) : MetaM Expr := do
+  let pred ← inferType lhs
+  mkAppOptM ``Lean.Order.PartialOrder.rel #[some pred, none, some lhs, some rhs]
+
+private def rawOrderParts? (type : Expr) : MetaM (Option (Expr × Expr × Expr)) := do
+  let type ← whnfR type
+  if type.isAppOfArity ``Lean.Order.PartialOrder.rel 4 ||
+      type.isAppOfArity ``LE.le 4 then
+    return some (type.getArg! 0, type.getArg! 2, type.getArg! 3)
+  return none
+
+private def mkOrderRelTrans (hxy hyz : Expr) : MetaM Expr := do
+  let hxyTy ← instantiateMVars (← inferType hxy)
+  let hyzTy ← instantiateMVars (← inferType hyz)
+  let some (pred, x, y) ← rawOrderParts? hxyTy
+    | mkAppM ``Lean.Order.PartialOrder.rel_trans #[hxy, hyz]
+  let some (_, _, z) ← rawOrderParts? hyzTy
+    | mkAppM ``Lean.Order.PartialOrder.rel_trans #[hxy, hyz]
+  mkAppOptM ``Lean.Order.PartialOrder.rel_trans
+    #[some pred, none, some x, some y, some z, some hxy, some hyz]
+
 /-- Build the pointwise postcondition premise used when a concrete unary post
 from a spec theorem is generalized to the goal's postcondition. -/
 private def mkUnaryPostPointwisePremise (postSpec postTarget postTy : Expr) :
@@ -118,7 +143,7 @@ private def mkUnaryPostPointwisePremise (postSpec postTarget postTy : Expr) :
   withLocalDeclD `a α fun a => do
     let lhs := mkApp postSpec a
     let rhs := mkApp postTarget a
-    let rel ← mkAppM ``Lean.Order.PartialOrder.rel #[lhs, rhs]
+    let rel ← mkOrderRel lhs rhs
     mkForallFVars #[a] rel
 
 /-- Build the pointwise relational-postcondition premise used when a concrete
@@ -133,7 +158,7 @@ private def mkRelPostPointwisePremise (postSpec postTarget postTy : Expr) :
     withLocalDeclD `b β fun b => do
       let lhs := mkApp2 postSpec a b
       let rhs := mkApp2 postTarget a b
-      let rel ← mkAppM ``Lean.Order.PartialOrder.rel #[lhs, rhs]
+      let rel ← mkOrderRel lhs rhs
       mkForallFVars #[a, b] rel
 
 /-- Generalize a raw unary `pre ⊑ wp prog post epost` proof into a reusable
@@ -155,9 +180,9 @@ private def mkUnarySpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := 
         #[prog, postSpec, postAbstract, epostSpec, hpost, specApplied]
   let preTy ← inferType pre
   let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
-  let hpreTy ← mkAppM ``Lean.Order.PartialOrder.rel #[preAbstract, pre]
+  let hpreTy ← mkOrderRel preAbstract pre
   let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
-  mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
+  mkOrderRelTrans hpre specApplied
 
 /-- Generalize a raw relational `pre ⊑ rwp left right post epost₁ epost₂`
 proof into a reusable backward rule source. This is the relational analogue of
@@ -178,9 +203,9 @@ private def mkRelSpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := do
         #[oa, ob, postSpec, postAbstract, epost₁, epost₂, hpost, specApplied]
   let preTy ← inferType pre
   let preAbstract ← mkFreshExprMVar (userName := `pre) preTy
-  let hpreTy ← mkAppM ``Lean.Order.PartialOrder.rel #[preAbstract, pre]
+  let hpreTy ← mkOrderRel preAbstract pre
   let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
-  mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
+  mkOrderRelTrans hpre specApplied
 
 private def mkBackwardRuleFromProofExpr (prf : Expr) :
     MetaM (AbstractMVarsResult × Lean.Meta.Sym.BackwardRule) := do
@@ -233,7 +258,12 @@ def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
   let goalTy ← instantiateMVars (← mvarId.getType)
   let rawGoal ← isRawBackwardGoal goalTy
   let rule ← getVCSpecBackwardRuleCached entry rawGoal
-  match ← Lean.Meta.Sym.SymM.run <| rule.rule.apply mvarId with
+  let symResult ←
+    try
+      Lean.Meta.Sym.SymM.run <| rule.rule.apply mvarId
+    catch _ =>
+      pure .failed
+  match symResult with
   | .failed =>
       -- `Sym.BackwardRule` matches against its preprocessed pattern. Some
       -- folded VCVio-facing goals are still better handled by Lean's ordinary
