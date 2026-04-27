@@ -17,6 +17,7 @@ registered `@[vcspec]` hints, and `liftComp`.
 -/
 
 open ENNReal OracleSpec OracleComp
+open Lean.Order
 open OracleComp.ProgramLogic
 open scoped OracleComp.ProgramLogic
 
@@ -89,16 +90,16 @@ example (impl : QueryImpl spec (OracleComp spec))
 @[irreducible] def wrappedTrue : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrue :
-    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    Triple 1 (wrappedTrue (spec := spec)) (fun y => if y = true then 1 else 0) := by
   simpa [wrappedTrue] using
     (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
 
 example :
-    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    Triple 1 (wrappedTrue (spec := spec)) (fun y => if y = true then 1 else 0) := by
   vcstep
 
 example :
-    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun _ => 1⦄ := by
+    Triple 1 (wrappedTrue (spec := spec)) (fun _ => 1) := by
   vcstep
 
 @[local vcspec] theorem stdDoTriple_wrappedTrue :
@@ -107,7 +108,7 @@ example :
   exact triple_wrappedTrue (spec := spec)
 
 example :
-    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun _ => 1⦄ := by
+    Triple 1 (wrappedTrue (spec := spec)) (fun _ => 1) := by
   vcstep with stdDoTriple_wrappedTrue
 
 example :
@@ -118,24 +119,24 @@ example :
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrueStep (_haux : True) :
-    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    Triple 1 (wrappedTrueStep (spec := spec)) (fun y => if y = true then 1 else 0) := by
   simpa [wrappedTrueStep] using
     (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
 
 example :
-    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    Triple 1 (wrappedTrueStep (spec := spec)) (fun y => if y = true then 1 else 0) := by
   vcstep
   trivial
 
 /--
 `vcstep?` can get the specific path used to create a `vcstep` proof
 example :
-    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   vcstep?
   trivial
 -/
 example :
-    ⦃1⦄ wrappedTrueStep (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
+    ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   vcstep with triple_wrappedTrueStep
   trivial
 

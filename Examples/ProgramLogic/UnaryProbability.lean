@@ -26,17 +26,17 @@ variable {α β γ : Type}
 /-! ### Probability goal lowering -/
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
-    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    (h : Triple 1 oa (fun x => ⌜p x⌝)) :
     Pr[ p | oa] = 1 := by
   vcgen
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
-    (h : ⦃1⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    (h : Triple 1 oa (fun x => ⌜p x⌝)) :
     1 = Pr[ p | oa] := by
   vcgen
 
 example {oa : OracleComp spec Bool}
-    (h : ⦃1⦄ oa ⦃fun y => if y = true then 1 else 0⦄) :
+    (h : Triple 1 oa (fun y => if y = true then 1 else 0)) :
     Pr[= true | oa] = 1 := by
   vcgen
 
@@ -92,13 +92,13 @@ example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
 /-! ### Probability lower bounds -/
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p] {r : ℝ≥0∞}
-    (h : ⦃r⦄ oa ⦃fun x => ⌜p x⌝⦄) :
+    (h : Triple r oa (fun x => ⌜p x⌝)) :
     r ≤ Pr[ p | oa] := by
   vcstep
   exact h
 
 example {oa : OracleComp spec α} [DecidableEq α] {x : α} {r : ℝ≥0∞}
-    (h : ⦃r⦄ oa ⦃fun y => if y = x then 1 else 0⦄) :
+    (h : Triple r oa (fun y => if y = x then 1 else 0)) :
     Pr[= x | oa] ≥ r := by
   vcstep
   exact h
@@ -139,7 +139,7 @@ set_option maxHeartbeats 400000 in
 -- `vcstep` needs a bit more fuel here under Lean 4.29.
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
-    ⦃1⦄ (do let x ← oa; f x) ⦃fun y => if y = true then 1 else 0⦄ := by
+    Triple 1 (do let x ← oa; f x) (fun y => if y = true then 1 else 0) := by
   vcstep
   intro x
   by_cases hx : x ∈ support oa

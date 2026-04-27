@@ -155,16 +155,6 @@ scoped macro_rules (kind := relWpBracket)
   | `(rwp⟦ $c₁ ~ $c₂ | $post ; $epost₁, $epost₂ ⟧) =>
       `(Std.Do'.rwp $c₁ $c₂ $post $epost₁ $epost₂)
 
-/-- Quantitative Hoare triple notation: `⦃P⦄ c ⦃Q⦄` means `Triple P c Q`,
-which is `pre ≤ wp c post` after `triple_iff_le_wp`. The wrapper avoids
-needing `open Lean.Order` at use sites: our `Triple` abbrev fixes the
-exception postcondition to `Lean.Order.bot` internally. -/
-scoped syntax:lead (name := tripleBracket)
-  "⦃" term "⦄ " term:lead " ⦃" term "⦄" : term
-
-scoped macro_rules (kind := tripleBracket)
-  | `(⦃$P⦄ $c ⦃$Q⦄) => `(Triple $P $c $Q)
-
 /-- Game equivalence: `g₁ ≡ₚ g₂` means `evalDist g₁ = evalDist g₂`.
 Uses `syntax` + `macro_rules` because `≡` conflicts with Mathlib's
 modular equivalence notation (`a ≡ b [MOD n]`). -/
