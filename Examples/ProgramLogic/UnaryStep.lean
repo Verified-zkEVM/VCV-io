@@ -100,8 +100,6 @@ example :
 example :
     ⦃1⦄ wrappedTrue (spec := spec) ⦃fun _ => 1⦄ := by
   vcstep
-  intro y
-  split_ifs <;> simp
 
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 

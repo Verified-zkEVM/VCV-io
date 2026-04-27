@@ -138,6 +138,7 @@ private def closeTheoremStepGoals : TacticM Unit := do
     discard <| tryEvalTacticSyntax (← `(tactic|
       all_goals first
         | assumption
+        | (repeat intro; split_ifs <;> simp)
         | (
             repeat intro
             simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
