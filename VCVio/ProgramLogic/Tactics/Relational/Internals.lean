@@ -866,6 +866,7 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
     all_goals first
       | assumption
       | trivial
+      | (intro _; assumption)
       | simp [Lean.Order.PartialOrder.rel]
       | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
       | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
@@ -885,6 +886,7 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
            | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
            | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
+           | (intro _; assumption)
            | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; symm; assumption)
@@ -993,6 +995,7 @@ subgoals, but they do not choose cuts, bijections, or one-sided bind frontiers. 
 private def deterministicRelVCSpecDecls : List Name := [
   ``OracleComp.ProgramLogic.Relational.relTriple_pure_pure,
   ``OracleComp.ProgramLogic.Relational.relTriple_map,
+  ``OracleComp.ProgramLogic.Relational.relTriple_if,
   ``OracleComp.ProgramLogic.Relational.relTriple_replicate,
   ``OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel,
   ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,

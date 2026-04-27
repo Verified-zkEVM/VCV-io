@@ -153,14 +153,17 @@ example (a : α) :
     ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
   rvcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_if` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
 example {c : Prop} [Decidable c]
     {oa₁ oa₂ ob₁ ob₂ : OracleComp spec α}
     (h1 : ⟪oa₁ ~ ob₁ | EqRel α⟫)
     (h2 : ⟪oa₂ ~ ob₂ | EqRel α⟫) :
     ⟪(if c then oa₁ else oa₂) ~ (if c then ob₁ else ob₂) | EqRel α⟫ := by
   rvcstep
-  · exact h1
-  · exact h2
 
 /-! ## Auto relational hint consumption -/
 
