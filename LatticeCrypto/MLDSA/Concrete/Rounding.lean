@@ -951,9 +951,7 @@ private theorem useHintCoeff_shift_sub_bound_of_isApproved (p : Params)
     simpa [alpha, m, dec, r1] using highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
   have hr0bound : r0.natAbs ≤ p.gamma2 := by
     simpa [dec, r0] using lowBitsCoeff_bound (r := r) (gamma2 := p.gamma2) hγ
-  have hr0bounds := neg_le_and_le_of_natAbs_le hr0bound
-  have hr0low : -(p.gamma2 : ℤ) ≤ r0 := hr0bounds.1
-  have hr0up : r0 ≤ p.gamma2 := hr0bounds.2
+  obtain ⟨hr0low, hr0up⟩ := neg_le_and_le_of_natAbs_le hr0bound
   cases h with
   | false =>
       have huse : useHintCoeff false r p.gamma2 = r1 := by
@@ -1250,12 +1248,8 @@ private theorem useHintCoeff_correct_of_small_of_isApproved (p : Params)
     simpa [alpha, m, decr, r1] using highBitsCoeff_lt_useHintModulus_of_isApproved p hp r
   have hr0bound : r0.natAbs ≤ p.gamma2 := by
     simpa [decr, r0] using lowBitsCoeff_bound (r := r) (gamma2 := p.gamma2) hγ
-  have hr0bounds := neg_le_and_le_of_natAbs_le hr0bound
-  have hr0low : -(p.gamma2 : ℤ) ≤ r0 := hr0bounds.1
-  have hr0up : r0 ≤ p.gamma2 := hr0bounds.2
-  have hzbounds := neg_le_and_le_of_natAbs_le hz
-  have hzlow : -(p.gamma2 : ℤ) ≤ z0 := hzbounds.1
-  have hzup : z0 ≤ p.gamma2 := hzbounds.2
+  obtain ⟨hr0low, hr0up⟩ := neg_le_and_le_of_natAbs_le hr0bound
+  obtain ⟨hzlow, hzup⟩ := neg_le_and_le_of_natAbs_le hz
   have hzcast : z = intToCoeff z0 := by
     simpa [z0] using LatticeCrypto.centeredRepr_intCast z
   have hdecomp :
