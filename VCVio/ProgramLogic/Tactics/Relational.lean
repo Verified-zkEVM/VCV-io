@@ -47,9 +47,9 @@ private def runRVCGenStepWithTheoremNames
 /-- `rvcstep` applies one relational VCGen step.
 
 It first lowers `GameEquiv` / `evalDist` equality goals into relational mode, then
-tries the obvious structural relational rule on `RelTriple` / `RelWP` / `eRelTriple`
-goals: synchronized conditionals, `simulateQ`, `Functor.map`, bounded traversals,
-bind decomposition, or random/query coupling.
+tries the obvious structural relational rule on `RelTriple` / `RelWP` / quantitative
+`Std.Do'.RelTriple` goals: synchronized conditionals, `simulateQ`, `Functor.map`,
+bounded traversals, bind decomposition, or random/query coupling.
 
 `rvcstep using t` supplies the explicit witness needed for the current shape:
 - bind cut relation, where `t : α → β → Prop`

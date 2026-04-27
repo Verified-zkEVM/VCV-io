@@ -252,10 +252,15 @@ def findAppWithHead? (head : Name) (e : Expr) : Option Expr :=
   (e.find? fun e' => e'.consumeMData.getAppFn.isConstOf head).map Expr.consumeMData
 
 def relTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.RelTriple target
-  let args ← trailingArgs? app 3
-  let #[oa, ob, post] := args | none
-  some (oa, ob, post)
+  if let some app := findAppWithHead? ``OracleComp.ProgramLogic.Relational.RelTriple target then
+    let args ← trailingArgs? app 3
+    let #[oa, ob, post] := args | none
+    some (oa, ob, post)
+  else
+    let app ← findAppWithHead? ``Std.Do'.RelTriple target
+    let args ← trailingArgs? app 6
+    let #[_pre, oa, ob, post, _epost₁, _epost₂] := args | none
+    some (oa, ob, post)
 
 def relWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.RelWP target
@@ -263,10 +268,10 @@ def relWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) := do
   let #[oa, ob, post] := args | none
   some (oa, ob, post)
 
-def eRelTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr × Expr) := do
-  let app ← findAppWithHead? ``OracleComp.ProgramLogic.Relational.eRelTriple target
-  let args ← trailingArgs? app 4
-  let #[pre, oa, ob, post] := args | none
+def stdDoRelTripleGoalParts? (target : Expr) : Option (Expr × Expr × Expr × Expr) := do
+  let app ← findAppWithHead? ``Std.Do'.RelTriple target
+  let args ← trailingArgs? app 6
+  let #[pre, oa, ob, post, _epost₁, _epost₂] := args | none
   some (pre, oa, ob, post)
 
 private def findWpApp? (target : Expr) : Option (Expr × Nat) := do

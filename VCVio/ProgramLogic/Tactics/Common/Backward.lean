@@ -158,9 +158,9 @@ private def mkUnarySpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := 
   mkAppM ``Lean.Order.PartialOrder.rel_trans #[hpre, specApplied]
 
 /-- Generalize a raw relational `pre ⊑ rwp left right post epost₁ epost₂`
-proof into a reusable backward rule source. This is the qualitative relational
-analogue of `mkUnarySpecBackwardProof`; quantitative `eRelTriple` stays on its
-own path for now. -/
+proof into a reusable backward rule source. This is the relational analogue of
+`mkUnarySpecBackwardProof`; qualitative and quantitative carriers share this
+path once they are expressed as `Std.Do'.RelTriple` / raw `Std.Do'.rwp`. -/
 private def mkRelSpecBackwardProof (pre rhs specProof : Expr) : MetaM Expr := do
   let some (oa, ob, postSpec, epost₁, epost₂) := stdDoRelWpParts? rhs
     | throwError "expected a Std.Do'.rwp RHS, got:{indentExpr rhs}"

@@ -5,6 +5,7 @@ Authors: Quang Dao
 -/
 
 import VCVio.ProgramLogic.Relational.Quantitative
+import VCVio.ProgramLogic.Relational.Loom.Quantitative
 import VCVio.ProgramLogic.Relational.SimulateQ
 import VCVio.ProgramLogic.Tactics.Common
 
@@ -41,10 +42,10 @@ attribute [vcspec]
   OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same
   OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij
   OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl
-  -- Quantitative (eRHL) rules from `Relational/Quantitative.lean`
-  OracleComp.ProgramLogic.Relational.eRelTriple_pure
-  OracleComp.ProgramLogic.Relational.eRelTriple_bind
-  OracleComp.ProgramLogic.Relational.eRelTriple_uniformSample_bij
+  -- Quantitative rules from the default `Std.Do'.RelTriple` carrier.
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_pure
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_bind
+  OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_bij
   -- Raw relational WP rule from the Std.Do bridge
   Std.Do'.RelWP.rwp_pure
   -- `simulateQ`-aware rules from `Relational/SimulateQ.lean`
@@ -65,7 +66,7 @@ Tries, in order:
 * `relTriple_eqRel_of_eq rfl` (syntactically identical computations);
 * `relTriple_pure_pure rfl` (`pure x ⨯ pure x` with reflexive postcondition);
 * `relTriple_pure_pure` together with `assumption` (`pure a ⨯ pure b` with `R a b` in scope);
-* `eRelTriple_pure _ _ _` (quantitative pure-pure leaf);
+* quantitative `Std.Do'.RelTriple` pure-pure leaves;
 * the same closers after `subst_vars` (resolves goals where the pure values are
   syntactically distinct but unified via local equality hypotheses);
 * `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
@@ -85,7 +86,7 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _)) <||>
+    exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _)) <||>
   tryEvalTacticSyntax (← `(tactic|
     (try subst_vars
      first
@@ -93,7 +94,7 @@ def tryCloseRelGoalImmediate : TacticM Bool := do
        | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
        | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
        | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-       | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+       | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
        | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
        | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
           intros; trivial)))) <||>
@@ -107,12 +108,12 @@ private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr)
       match relWPGoalParts? target with
       | some parts => some parts
       | none =>
-          match eRelTripleGoalParts? target with
+          match stdDoRelTripleGoalParts? target with
           | some (_, oa, ob, post) => some (oa, ob, post)
           | none => none
 
-private def isERelTripleGoal (target : Expr) : Bool :=
-  (eRelTripleGoalParts? target).isSome
+private def isStdDoRelTripleGoal (target : Expr) : Bool :=
+  (stdDoRelTripleGoalParts? target).isSome
 
 def tryLowerRelGoal : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -140,15 +141,15 @@ def tryNormalizeRelBindStructure : TacticM Unit := do
 
 def runERelPureRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _))
+    exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _))
 
 def runERelBindRule : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.eRelTriple_bind ?_ ?_))
+    refine OracleComp.ProgramLogic.Relational.Loom.relTriple_bind ?_ ?_))
 
 def runERelBindRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.eRelTriple_bind (cut := $cut) ?_ ?_))
+    refine OracleComp.ProgramLogic.Relational.Loom.relTriple_bind (cut := $cut) ?_ ?_))
 
 /-- Monad-law normalization used as a fallback when a direct `relTriple_bind`
 attempt fails. Flattens nested binds (`bind_assoc`) and reduces `pure_bind` so
@@ -430,7 +431,7 @@ def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext
   if ← runRawRelWPVCSpecBackward then
     return true
   let target ← instantiateMVars (← getMainTarget)
-  if let some (pre, oa, ob, _) := eRelTripleGoalParts? target then
+  if let some (pre, oa, ob, _) := stdDoRelTripleGoalParts? target then
     let _ := pre
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
@@ -478,7 +479,7 @@ def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext
 
 def runRVCGenCoreUsing (hint : TSyntax `term) : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
-  if let some (_, oa, ob, _) := eRelTripleGoalParts? target then
+  if let some (_, oa, ob, _) := stdDoRelTripleGoalParts? target then
     let oa ← whnfReducible (← instantiateMVars oa)
     let ob ← whnfReducible (← instantiateMVars ob)
     if isBindExpr oa && isBindExpr ob then
@@ -660,14 +661,14 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
-      | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+      | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
       | (try subst_vars
          first
            | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
            | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
            | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-           | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+           | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
            | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
               intros; trivial))))
@@ -705,9 +706,9 @@ private def runRVCGenStepWithTheoremConseq
         refine le_trans ?_
           (MAlgRelOrdered.relWP_mono
             (m₁ := OracleComp _) (m₂ := OracleComp _) (l := Prop) _ _ ?_)))
-    else if (eRelTripleGoalParts? target).isSome then
+    else if (stdDoRelTripleGoalParts? target).isSome then
       pure <| some (← `(tactic|
-        refine OracleComp.ProgramLogic.Relational.eRelTriple_conseq le_rfl ?_ ?_))
+        refine OracleComp.ProgramLogic.Relational.Loom.relTriple_conseq le_rfl ?_ ?_))
     else
       pure none
   let some wrapper := wrapper? | return false
@@ -718,7 +719,7 @@ private def runRVCGenStepWithTheoremConseq
       unless ← focusFirstGoalSatisfying fun target =>
           (relTripleGoalParts? target).isSome ||
           (relWPGoalParts? target).isSome ||
-          (eRelTripleGoalParts? target).isSome do
+          (stdDoRelTripleGoalParts? target).isSome do
         throwError "rvcstep with theorem: failed to focus theorem subgoal after consequence rule"
       evalTactic (← `(tactic| apply $thm))
       closeRelTheoremStepGoals
@@ -761,8 +762,6 @@ private def relationalGoalKind? (target : Expr) : Option VCSpecKind :=
     some .relTriple
   else if (relWPGoalParts? target).isSome then
     some .relWP
-  else if (eRelTripleGoalParts? target).isSome then
-    some .eRelTriple
   else
     none
 
@@ -1009,7 +1008,7 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
   | none =>
       throwError m!
         "rvcstep: expected a `GameEquiv`, `evalDist` equality, `RelTriple`, `RelWP`,\n\
-        or `eRelTriple` goal; got:{indentExpr target}"
+        or quantitative `Std.Do'.RelTriple` goal; got:{indentExpr target}"
   | some (oa, ob, post) =>
       let oa ← whnfReducible (← instantiateMVars oa)
       let ob ← whnfReducible (← instantiateMVars ob)
@@ -1018,8 +1017,8 @@ def throwRVCGenStepError : TacticM Unit := withMainContext do
       let theoremCandidates := theoremCandidateTiers.foldl (init := #[]) fun acc tier =>
         acc ++ tier.map (·.theoremName!)
       let goalLabel :=
-        if isERelTripleGoal target then
-          "`eRelTriple`"
+        if isStdDoRelTripleGoal target then
+          "quantitative `Std.Do'.RelTriple`"
         else if (relWPGoalParts? target).isSome then
           "`RelWP`"
         else
@@ -1137,14 +1136,14 @@ def runRVCGenFinish : TacticM Unit := do
         | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
         | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
         | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
-        | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+        | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
         | (try subst_vars
            first
              | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
              | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
              | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
              | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-             | exact OracleComp.ProgramLogic.Relational.eRelTriple_pure _ _ _
+             | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
              | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
              | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
                 intros; trivial))))

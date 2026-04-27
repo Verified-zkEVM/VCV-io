@@ -8,6 +8,7 @@ import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.EvalDist.TVDist
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
+import ToMathlib.Control.Monad.RelWP
 
 /-!
 # Ergonomic Notation and Convenience Layer for Program Logic
@@ -166,9 +167,11 @@ scoped notation "⟪" c₁ " ≈[" ε "] " c₂ " | " R "⟫" =>
   Relational.ApproxRelTriple ε c₁ c₂ R
 
 /-- eRHL quantitative relational triple:
-`⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` means `eRelTriple f c₁ c₂ g`. -/
+`⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` means the quantitative `Std.Do'.RelTriple` form. -/
 scoped syntax:lead "⦃" term "⦄ " term:lead " ≈ₑ " term:lead " ⦃" term "⦄" : term
-macro_rules | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) => `(Relational.eRelTriple $f $c₁ $c₂ $g)
+macro_rules
+  | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) =>
+      `(Std.Do'.RelTriple $f $c₁ $c₂ $g Lean.Order.bot Lean.Order.bot)
 
 /-! ## Bridge lemmas: `⌜⌝` and existing API -/
 

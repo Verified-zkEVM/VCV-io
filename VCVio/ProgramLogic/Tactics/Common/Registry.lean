@@ -19,9 +19,9 @@ program-logic tactics.
 
 The registry indexes each registered theorem by the *computation* sub-expression
 of its conclusion: for unary triples / `wp` goals this is the `OracleComp` argument,
-and for relational triples / `RelWP` / `eRelTriple` goals this is the left-hand
-computation. A separate constant-name filter on the right-hand head keeps relational
-lookups precise without paying for two structural matches.
+and for relational triples / `RelWP` goals this is the left-hand computation. A separate
+constant-name filter on the right-hand head keeps relational lookups precise without
+paying for two structural matches.
 
 ## Implementation notes
 
@@ -176,16 +176,13 @@ private def unaryWpHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.wp, ``MAlgOrdered.wp, ``Std.Do'.wp]
 
 private def relTripleHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.Relational.RelTriple, ``MAlgRelOrdered.Triple]
+  #[``OracleComp.ProgramLogic.Relational.RelTriple, ``MAlgRelOrdered.Triple, ``Std.Do'.RelTriple]
 
 private def relWpHeadNames : Array Name :=
   #[``OracleComp.ProgramLogic.Relational.RelWP,
     ``MAlgRelOrdered.RelWP,
     ``MAlgRelOrdered.rwp,
     ``Std.Do'.rwp]
-
-private def eRelTripleHeadNames : Array Name :=
-  #[``OracleComp.ProgramLogic.Relational.eRelTriple]
 
 /-- Head check that tolerates varying numbers of implicit / instance arguments.
 Each `@[vcspec]` target has a fixed number of *explicit* trailing arguments
@@ -246,9 +243,11 @@ private def rawWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   some (pre, oa, post)
 
 /-- Preprocessed-body variant of `relTripleGoalParts?` that also matches the
-unfolded `MAlgRelOrdered.Triple` head. The folded `RelTriple` has three
-explicit trailing args `(oa, ob, post)`; the unfolded `MAlgRelOrdered.Triple`
-has four `(pre, oa, ob, post)`. Returns `(oa, ob, post)` in both cases. -/
+unfolded `MAlgRelOrdered.Triple` head and Loom2's `Std.Do'.RelTriple`.
+The folded `RelTriple` has three explicit trailing args `(oa, ob, post)`;
+the unfolded `MAlgRelOrdered.Triple` has four `(pre, oa, ob, post)`;
+`Std.Do'.RelTriple` has six `(pre, oa, ob, post, epost₁, epost₂)`.
+Returns `(oa, ob, post)` in all cases. -/
 private def relTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr) := do
   let body := body.consumeMData
   let fn := body.getAppFn
@@ -259,6 +258,10 @@ private def relTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr) :=
   else if fn.isConstOf ``MAlgRelOrdered.Triple then
     let args ← trailingArgsN? body 4
     let #[_pre, oa, ob, post] := args | none
+    some (oa, ob, post)
+  else if fn.isConstOf ``Std.Do'.RelTriple then
+    let args ← trailingArgsN? body 6
+    let #[_pre, oa, ob, post, _epost₁, _epost₂] := args | none
     some (oa, ob, post)
   else
     none
@@ -286,16 +289,6 @@ private def rawRelWpBodyParts? (body : Expr) : Option (Expr × Expr × Expr × E
   let pre := body.getArg! 2
   let rhs := body.getArg! 3
   let (oa, ob, post) ← relWpBodyParts? rhs
-  some (pre, oa, ob, post)
-
-/-- Preprocessed-body variant of `eRelTripleGoalParts?`. Returns
-`(pre, oa, ob, post)`. `eRelTriple` is a `def` rather than an `abbrev`, so its
-name is preserved through `Sym.preprocessType`. -/
-private def eRelTripleBodyParts? (body : Expr) : Option (Expr × Expr × Expr × Expr) := do
-  let body := body.consumeMData
-  unless headIsOneOf body eRelTripleHeadNames do none
-  let args ← trailingArgsN? body 4
-  let #[pre, oa, ob, post] := args | none
   some (pre, oa, ob, post)
 
 /-- Selector fed to `Sym.mkPatternFromDeclWithKey`. Given the preprocessed body
@@ -358,21 +351,12 @@ private def selectVCSpecKey (body : Expr) :
       compPattern := classifyRelationalCompPattern oa ob
     }
     return (oa, spec, some rightHead)
-  if let some (_pre, oa, ob, _post) := eRelTripleBodyParts? body then
-    let (leftHead, rightHead) ← relationalHeads oa ob
-    let spec : NormalizedVCSpec := {
-      kind := .eRelTriple
-      lookupKey := .relational leftHead rightHead
-      compPattern := classifyRelationalCompPattern oa ob
-    }
-    return (oa, spec, some rightHead)
   throwError
     m!"@[vcspec] expects a theorem whose target is one of:\n\
     - a unary `Triple`\n\
     - a unary raw `wp` goal\n\
     - a relational `RelTriple`\n\
     - a relational raw `RelWP`\n\
-    - an `eRelTriple`\n\
     got:{indentExpr body}"
 where
   /-- Extract the head constant of a preprocessed computation expression,

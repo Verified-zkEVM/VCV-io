@@ -33,26 +33,22 @@ noncomputable def eRelWP (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ �
   ⨆ (c : SPMF.Coupling (evalDist oa) (evalDist ob)),
     ∑' z, Pr[= z | c.1] * g z.1 z.2
 
-/-- eRHL triple: `pre ≤ eRelWP oa ob post`. -/
-def eRelTriple (pre : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
-    (post : α → β → ℝ≥0∞) : Prop :=
-  pre ≤ eRelWP oa ob post
-
 /-- Indicator postcondition: lifts a `Prop`-valued relation to an `ℝ≥0∞`-valued one. -/
 noncomputable def RelPost.indicator (R : RelPost α β) (a : α) (b : β) : ℝ≥0∞ :=
   letI := Classical.dec (R a b)
   if R a b then 1 else 0
 
-/-- pRHL-style exact relational triple, defined via eRHL with indicator postcondition. -/
+/-- pRHL-style exact relational triple, defined via quantitative relational WP with an
+indicator postcondition. -/
 def RelTriple' (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
-  eRelTriple 1 oa ob (RelPost.indicator R)
+  1 ≤ eRelWP oa ob (RelPost.indicator R)
 
-/-- ε-approximate relational triple via eRHL:
-"`R` holds except with probability at most `ε`." -/
+/-- ε-approximate relational triple via quantitative relational WP:
+`R` holds except with probability at most `ε`. -/
 def ApproxRelTriple (ε : ℝ≥0∞) (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
-  eRelTriple (1 - ε) oa ob (RelPost.indicator R)
+  1 - ε ≤ eRelWP oa ob (RelPost.indicator R)
 
 /-- Exact coupling is the zero-error special case of approximate coupling. -/
 theorem relTriple'_eq_approxRelTriple_zero
