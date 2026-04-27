@@ -96,7 +96,7 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
 
 example (x : α) (post : α → ℝ≥0∞) :
     ⦃ post x ⦄ (pure x : OracleComp spec α) ⦃ post ⦄ := by
-  exact triple_pure (spec := spec) x post
+  vcgen
 
 example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
     {pre : ℝ≥0∞} {post : List α → ℝ≥0∞}

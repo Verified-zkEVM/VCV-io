@@ -90,14 +90,14 @@ example (impl : QueryImpl spec (OracleComp spec))
 @[irreducible] def wrappedTrue : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrue :
-    Triple 1 (wrappedTrue (spec := spec)) (fun y => if y = true then 1 else 0) := by
+    ⦃ 1 ⦄ wrappedTrue (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   simpa [wrappedTrue] using
     (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
 
 example :
     ⦃ (1 : ℝ≥0∞) ⦄ (wrappedTrue (spec := spec))
       ⦃ fun y => if y = true then (1 : ℝ≥0∞) else 0 ⦄ := by
-  exact triple_wrappedTrue (spec := spec)
+  vcstep
 
 example :
     ⦃ (1 : ℝ≥0∞) ⦄ (wrappedTrue (spec := spec)) ⦃ fun _ => (1 : ℝ≥0∞) ⦄ := by
@@ -120,14 +120,15 @@ example :
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrueStep (_haux : True) :
-    Triple 1 (wrappedTrueStep (spec := spec)) (fun y => if y = true then 1 else 0) := by
+    ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   simpa [wrappedTrueStep] using
     (triple_pure (spec := spec) true (fun y => if y = true then 1 else 0))
 
 example :
     ⦃ (1 : ℝ≥0∞) ⦄ (wrappedTrueStep (spec := spec))
       ⦃ fun y => if y = true then (1 : ℝ≥0∞) else 0 ⦄ := by
-  exact triple_wrappedTrueStep (spec := spec) trivial
+  vcstep
+  trivial
 
 /--
 `vcstep?` can get the specific path used to create a `vcstep` proof

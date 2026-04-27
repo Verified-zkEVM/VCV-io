@@ -214,6 +214,19 @@ canonical leaf rules, or bounded local consequence search. -/
 def tryCloseSpecGoal : TacticM Bool := do
   tryCloseSpecGoalImmediate <||> tryCloseSpecGoalSearch
 
+/-- Normalize Loom's unary triple head to VCVio's quantitative `Triple` abbrev.
+
+The two goals are definitionally equal for `OracleComp` with the no-exception
+postcondition, but proof terms produced directly against the `Std.Do'.Triple`
+head can trip Lean's kernel on anonymous proofs. Normalizing before structural
+steps keeps the Loom notation surface while making the unary tactic operate on
+its historical canonical head. -/
+private def normalizeStdDoTripleGoal : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  unless (findAppWithHead? ``Std.Do'.Triple target).isSome do
+    return false
+  tryEvalTacticSyntax (← `(tactic| change OracleComp.ProgramLogic.Triple _ _ _))
+
 /-- Finish-only closure step: includes the support-sensitive leaf rules that are too expensive
 for the default `vcstep` hot path. -/
 def tryCloseSpecGoalFinal : TacticM Bool := do
@@ -975,6 +988,7 @@ def trySupportCutBind (comp : Expr) : TacticM Bool := do
 fallbacks and the final close/search phase. -/
 def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
   if (← getGoals).isEmpty then return false
+  discard <| normalizeStdDoTripleGoal
   let target ← instantiateMVars (← getMainTarget)
   if ← tryLowerProbGoal then
     if (← getGoals).isEmpty then
