@@ -419,7 +419,9 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
     let target ← instantiateMVars (← getMainTarget)
     let some (oa, ob, _) := rawRelWPGoalParts? target | return false
     let entries ← getRegisteredRelationalVCSpecEntries oa ob
-    for entry in (entries.filter (·.kind == .relWP)).toList.take 8 do
+    let entries := entries.filter fun entry =>
+      entry.kind == .relWP || entry.kind == .relTriple
+    for entry in entries.toList.take 8 do
       let saved ← saveState
       if ← runVCSpecEntryCachedBackward entry then
         return true

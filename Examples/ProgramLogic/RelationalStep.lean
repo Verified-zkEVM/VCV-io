@@ -216,3 +216,11 @@ example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
   rvcstep
   · intro a₁ a₂ h; subst h; exact hf a₁
   · rvcstep
+
+/-! ## Quantitative `Std.Do'.RelTriple` path -/
+
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    Std.Do'.RelTriple (post a b)
+      (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
+      Lean.Order.bot Lean.Order.bot := by
+  rvcstep

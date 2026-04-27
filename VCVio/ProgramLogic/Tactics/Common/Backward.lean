@@ -34,6 +34,8 @@ initialize vcSpecBackwardRuleCache :
 /--
 If `(prf, type)` proves a `Std.Do'.Triple`, return the corresponding
 `pre ⊑ wp ...` proof via `Std.Do'.Triple.iff`.
+Relational `Std.Do'.RelTriple` is a reducible definition, so later raw
+normalization sees it by weak-head reducing the type to `pre ⊑ rwp ...`.
 Otherwise return the proof unchanged.
 -/
 private def bridgeTriple? (prf type : Expr) : MetaM (Expr × Expr) := do
@@ -192,24 +194,17 @@ private def mkBackwardRuleFromProofExpr (prf : Expr) :
 private def mkVCSpecBackwardRule (entry : VCSpecEntry) (rawGoal : Bool) :
     MetaM VCSpecBackwardRule := do
   let (_xs, _bis, prf, type) ← entry.proof.instantiate
-  let (prf, type) ←
-    if rawGoal then
-      bridgeTriple? prf type
-    else
-      pure (prf, type)
+  let (prf, type) ← bridgeTriple? prf type
   let prf ←
-    if rawGoal then
-      match ← rawRelParts? type with
-      | some (pre, rhs) =>
-          if (stdDoWpParts? rhs).isSome then
-            mkUnarySpecBackwardProof pre rhs prf
-          else if (stdDoRelWpParts? rhs).isSome then
-            mkRelSpecBackwardProof pre rhs prf
-          else
-            pure prf
-      | none => pure prf
-    else
-      pure prf
+    match ← rawRelParts? type with
+    | some (pre, rhs) =>
+        if (stdDoWpParts? rhs).isSome then
+          mkUnarySpecBackwardProof pre rhs prf
+        else if (stdDoRelWpParts? rhs).isSome then
+          mkRelSpecBackwardProof pre rhs prf
+        else
+          pure prf
+    | none => pure prf
   let (proof, rule) ← mkBackwardRuleFromProofExpr prf
   return { source := entry, rawGoal, proof, rule }
 
@@ -227,8 +222,8 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
       return rule
 
 /-- Try to apply a cached symbolic backward rule for a registered `@[vcspec]`
-entry. This is currently intended for unary rules; callers keep saved-state
-fallbacks while the generated-rule path is being broadened. -/
+entry. Unary and relational rules are normalized through raw `wp` / `rwp`
+sources when their theorem statements expose those forms definitionally. -/
 def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
     MetaM (Option (List MVarId)) := do
   let goalTy ← instantiateMVars (← mvarId.getType)
