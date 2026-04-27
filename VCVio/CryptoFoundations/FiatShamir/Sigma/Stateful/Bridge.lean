@@ -95,20 +95,17 @@ abbrev SourceCmaComp (α : Type) :=
 @[reducible] noncomputable def cmaSignLogImpl :
     QueryImpl (cmaSpec M Commit Chal Resp Stmt)
       (StateT (List M) (OracleComp (cmaSpec M Commit Chal Resp Stmt)))
-  | .source (.unif n) => do
-      let r ← (((cmaSpec M Commit Chal Resp Stmt).query
-        (.source (.unif n))) :
+  | .unif n => do
+      let r ← (((cmaSpec M Commit Chal Resp Stmt).query (.unif n)) :
         OracleComp (cmaSpec M Commit Chal Resp Stmt) (Fin (n + 1)))
       pure r
-  | .source (.ro mc) => do
-      let r ← (((cmaSpec M Commit Chal Resp Stmt).query
-        (.source (.ro mc))) :
+  | .ro mc => do
+      let r ← (((cmaSpec M Commit Chal Resp Stmt).query (.ro mc)) :
         OracleComp (cmaSpec M Commit Chal Resp Stmt) Chal)
       pure r
-  | .source (.sign m) => do
+  | .sign m => do
       let signed ← get
-      let sig ← (((cmaSpec M Commit Chal Resp Stmt).query
-        (.source (.sign m))) :
+      let sig ← (((cmaSpec M Commit Chal Resp Stmt).query (.sign m)) :
         OracleComp (cmaSpec M Commit Chal Resp Stmt) (Commit × Resp))
       set (signed ++ [m])
       pure sig
@@ -272,45 +269,45 @@ omit [SampleableType Stmt] [SampleableType Wit] in
 /-- A named CMA query is costly for H3 exactly when it targets the signing
 oracle. -/
 def IsCostlyQuery : (cmaSpec M Commit Chal Resp Stmt).Domain → Prop
-  | .source (.sign _) => True
+  | .sign _ => True
   | _ => False
 
 instance : DecidablePred (IsCostlyQuery (M := M) (Commit := Commit)
     (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) := fun t =>
   match t with
-  | .source (.unif _) => isFalse fun h => h
-  | .source (.ro _) => isFalse fun h => h
-  | .source (.sign _) => isTrue trivial
+  | .unif _ => isFalse fun h => h
+  | .ro _ => isFalse fun h => h
+  | .sign _ => isTrue trivial
   | .pk => isFalse fun h => h
 
 /-- A named CMA query is a hash query exactly when it targets the random
 oracle. -/
 def IsHashQuery : (cmaSpec M Commit Chal Resp Stmt).Domain → Prop
-  | .source (.ro _) => True
+  | .ro _ => True
   | _ => False
 
 instance : DecidablePred (IsHashQuery (M := M) (Commit := Commit)
     (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) := fun t =>
   match t with
-  | .source (.unif _) => isFalse fun h => h
-  | .source (.ro _) => isTrue trivial
-  | .source (.sign _) => isFalse fun h => h
+  | .unif _ => isFalse fun h => h
+  | .ro _ => isTrue trivial
+  | .sign _ => isFalse fun h => h
   | .pk => isFalse fun h => h
 
 /-- Joint signing/hash query admissibility for the named CMA interface. -/
 def cmaSignHashCanQuery :
     (cmaSpec M Commit Chal Resp Stmt).Domain → ℕ × ℕ → Prop
-  | .source (.unif _), _ => True
-  | .source (.ro _), (_, qH') => 0 < qH'
-  | .source (.sign _), (qS', _) => 0 < qS'
+  | .unif _, _ => True
+  | .ro _, (_, qH') => 0 < qH'
+  | .sign _, (qS', _) => 0 < qS'
   | .pk, _ => True
 
 /-- Joint signing/hash query budget update for the named CMA interface. -/
 def cmaSignHashCost :
     (cmaSpec M Commit Chal Resp Stmt).Domain → ℕ × ℕ → ℕ × ℕ
-  | .source (.unif _), b => b
-  | .source (.ro _), (qS', qH') => (qS', qH' - 1)
-  | .source (.sign _), (qS', qH') => (qS' - 1, qH')
+  | .unif _, b => b
+  | .ro _, (qS', qH') => (qS', qH' - 1)
+  | .sign _, (qS', qH') => (qS' - 1, qH')
   | .pk, b => b
 
 /-- Joint signing/hash query bound for computations over the named CMA interface. -/
@@ -386,13 +383,11 @@ lemma cmaSignHashQueryBound_mono {α : Type}
       rw [cmaSignHashQueryBound_query_bind_iff] at h ⊢
       rcases h with ⟨hcan, hcont⟩
       cases t with
-      | source q =>
-          cases q with
-          | unif n => exact ⟨trivial, fun u => ih u (hcont u) hS hH⟩
-          | ro mc => exact ⟨Nat.lt_of_lt_of_le hcan hH, fun u =>
-              ih u (hcont u) hS (Nat.sub_le_sub_right hH 1)⟩
-          | sign m => exact ⟨Nat.lt_of_lt_of_le hcan hS, fun u =>
-              ih u (hcont u) (Nat.sub_le_sub_right hS 1) hH⟩
+      | unif n => exact ⟨trivial, fun u => ih u (hcont u) hS hH⟩
+      | ro mc => exact ⟨Nat.lt_of_lt_of_le hcan hH, fun u =>
+          ih u (hcont u) hS (Nat.sub_le_sub_right hH 1)⟩
+      | sign m => exact ⟨Nat.lt_of_lt_of_le hcan hS, fun u =>
+          ih u (hcont u) (Nat.sub_le_sub_right hS 1) hH⟩
       | pk => exact ⟨trivial, fun u => ih u (hcont u) hS hH⟩
 
 omit [SampleableType Stmt] [DecidableEq M] [DecidableEq Commit] [SampleableType Chal] in
@@ -419,25 +414,23 @@ lemma cmaSignHashQueryBound_bind {α β : Type}
       rw [bind_assoc, cmaSignHashQueryBound_query_bind_iff]
       rcases h₁ with ⟨hcan, hcont⟩
       cases t with
-      | source q =>
-          cases q with
-          | unif n =>
-              refine ⟨trivial, fun u => ?_⟩
-              simpa [cmaSignHashCost] using ih u (hcont u)
-          | ro mc =>
-              refine ⟨Nat.add_pos_left hcan qH₂, fun u => ?_⟩
-              have hrec := ih u (hcont u)
-              have hEq : qH₁ - 1 + qH₂ = qH₁ + qH₂ - 1 := by
-                have hpos : 1 ≤ qH₁ := Nat.succ_le_of_lt hcan
-                omega
-              simpa [cmaSignHashCost, hEq] using hrec
-          | sign m =>
-            refine ⟨Nat.add_pos_left hcan qS₂, fun u => ?_⟩
-            have hrec := ih u (hcont u)
-            have hEq : qS₁ - 1 + qS₂ = qS₁ + qS₂ - 1 := by
-              have hpos : 1 ≤ qS₁ := Nat.succ_le_of_lt hcan
-              omega
-            simpa [cmaSignHashCost, hEq] using hrec
+      | unif n =>
+          refine ⟨trivial, fun u => ?_⟩
+          simpa [cmaSignHashCost] using ih u (hcont u)
+      | ro mc =>
+          refine ⟨Nat.add_pos_left hcan qH₂, fun u => ?_⟩
+          have hrec := ih u (hcont u)
+          have hEq : qH₁ - 1 + qH₂ = qH₁ + qH₂ - 1 := by
+            have hpos : 1 ≤ qH₁ := Nat.succ_le_of_lt hcan
+            omega
+          simpa [cmaSignHashCost, hEq] using hrec
+      | sign m =>
+        refine ⟨Nat.add_pos_left hcan qS₂, fun u => ?_⟩
+        have hrec := ih u (hcont u)
+        have hEq : qS₁ - 1 + qS₂ = qS₁ + qS₂ - 1 := by
+          have hpos : 1 ≤ qS₁ := Nat.succ_le_of_lt hcan
+          omega
+        simpa [cmaSignHashCost, hEq] using hrec
       | pk =>
           refine ⟨trivial, fun u => ?_⟩
           simpa [cmaSignHashCost] using ih u (hcont u)
@@ -461,7 +454,7 @@ lemma fiatShamir_verify_cmaSignHashQueryBound
   simpa [_root_.FiatShamir, cmaSignHashCanQuery] using
     (cmaSignHashQueryBound_query_iff (M := M) (Commit := Commit)
       (Chal := Chal) (Resp := Resp) (Stmt := Stmt)
-      (t := CmaQuery.source (M := M) (Commit := Commit) (.ro (msg, c))) qS qH).2 hQ
+      (t := CmaQuery.ro (M := M) (Commit := Commit) (msg, c)) qS qH).2 hQ
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] in
@@ -619,49 +612,44 @@ theorem cmaSignLogImpl_cmaSignHashQueryBound
       rw [cmaSignHashQueryBound_query_bind_iff] at hA
       rcases hA with ⟨hcan, hcont⟩
       cases t with
-      | source q =>
-          cases q with
-          | unif n =>
-              rw [simulateQ_query_bind, StateT.run_bind]
-              simp only [OracleQuery.input_query, bind_pure, monadLift_self,
-                StateT.run_monadLift, bind_pure_comp, bind_map_left]
-              change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (Resp := Resp) (Stmt := Stmt)
-                (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-                  (.source (.unif n))) >>=
-                  fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-                qS qH
-              rw [cmaSignHashQueryBound_query_bind_iff]
-              refine ⟨trivial, fun u => ?_⟩
-              simpa [cmaSignHashQueryBound] using ih u signed qS qH (hcont u)
-          | ro mc =>
-              rw [simulateQ_query_bind, StateT.run_bind]
-              simp only [OracleQuery.input_query, bind_pure, monadLift_self,
-                StateT.run_monadLift, bind_pure_comp, bind_map_left]
-              change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-                (Resp := Resp) (Stmt := Stmt)
-                (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-                  (.source (.ro mc))) >>=
-                  fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
-                qS qH
-              rw [cmaSignHashQueryBound_query_bind_iff]
-              refine ⟨hcan, fun u => ?_⟩
-              simpa [cmaSignHashQueryBound] using ih u signed qS (qH - 1) (hcont u)
-          | sign m =>
-            rw [simulateQ_query_bind, StateT.run_bind]
-            simp only [OracleQuery.input_query, monadLift_self]
-            change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
-              (Resp := Resp) (Stmt := Stmt)
-              (liftM ((cmaSpec M Commit Chal Resp Stmt).query
-                (.source (.sign m))) >>=
-                fun sig => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
-                  (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont sig)).run (signed ++ [m]))
-              qS qH
-            rw [cmaSignHashQueryBound_query_bind_iff]
-            refine ⟨hcan, fun sig => ?_⟩
-            simpa [cmaSignHashQueryBound] using ih sig (signed ++ [m]) (qS - 1) qH (hcont sig)
+      | unif n =>
+          rw [simulateQ_query_bind, StateT.run_bind]
+          simp only [OracleQuery.input_query, bind_pure, monadLift_self,
+            StateT.run_monadLift, bind_pure_comp, bind_map_left]
+          change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt)
+            (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.unif n)) >>=
+              fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
+                (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
+            qS qH
+          rw [cmaSignHashQueryBound_query_bind_iff]
+          refine ⟨trivial, fun u => ?_⟩
+          simpa [cmaSignHashQueryBound] using ih u signed qS qH (hcont u)
+      | ro mc =>
+          rw [simulateQ_query_bind, StateT.run_bind]
+          simp only [OracleQuery.input_query, bind_pure, monadLift_self,
+            StateT.run_monadLift, bind_pure_comp, bind_map_left]
+          change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt)
+            (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.ro mc)) >>=
+              fun u => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
+                (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont u)).run signed)
+            qS qH
+          rw [cmaSignHashQueryBound_query_bind_iff]
+          refine ⟨hcan, fun u => ?_⟩
+          simpa [cmaSignHashQueryBound] using ih u signed qS (qH - 1) (hcont u)
+      | sign m =>
+        rw [simulateQ_query_bind, StateT.run_bind]
+        simp only [OracleQuery.input_query, monadLift_self]
+        change cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+          (Resp := Resp) (Stmt := Stmt)
+          (liftM ((cmaSpec M Commit Chal Resp Stmt).query (.sign m)) >>=
+            fun sig => (simulateQ (cmaSignLogImpl (M := M) (Commit := Commit)
+              (Chal := Chal) (Resp := Resp) (Stmt := Stmt)) (cont sig)).run (signed ++ [m]))
+          qS qH
+        rw [cmaSignHashQueryBound_query_bind_iff]
+        refine ⟨hcan, fun sig => ?_⟩
+        simpa [cmaSignHashQueryBound] using ih sig (signed ++ [m]) (qS - 1) qH (hcont sig)
       | pk =>
           rw [simulateQ_query_bind, StateT.run_bind]
           simp only [OracleQuery.input_query, bind_pure, monadLift_self,
@@ -763,14 +751,12 @@ theorem cmaSignHashQueryBound_to_costly {α : Type}
     ?_ ?_ ?_
   · intro t b hcan
     cases t with
-    | source q =>
-        cases q with
-        | unif n => exact Or.inl (fun h => h)
-        | ro mc => exact Or.inl (fun h => h)
-        | sign m => exact Or.inr hcan
+    | unif n => exact Or.inl (fun h => h)
+    | ro mc => exact Or.inl (fun h => h)
+    | sign m => exact Or.inr hcan
     | pk => exact Or.inl (fun h => h)
   · intro t b hcan
-    rcases t with ((_ | _) | _) | _ <;>
+    cases t <;>
       simp [cmaSignHashCanQuery, cmaSignHashCost, IsCostlyQuery] at hcan ⊢
   · simpa [cmaSignHashQueryBound] using hA
 
@@ -802,14 +788,12 @@ theorem cmaSignHashQueryBound_to_hash {α : Type}
     ?_ ?_ ?_
   · intro t b hcan
     cases t with
-    | source q =>
-        cases q with
-        | unif n => exact Or.inl (fun h => h)
-        | ro mc => exact Or.inr hcan
-        | sign m => exact Or.inl (fun h => h)
+    | unif n => exact Or.inl (fun h => h)
+    | ro mc => exact Or.inr hcan
+    | sign m => exact Or.inl (fun h => h)
     | pk => exact Or.inl (fun h => h)
   · intro t b hcan
-    rcases t with ((_ | _) | _) | _ <;>
+    cases t <;>
       simp [cmaSignHashCanQuery, cmaSignHashCost, IsHashQuery] at hcan ⊢
   · simpa [cmaSignHashQueryBound] using hA
 

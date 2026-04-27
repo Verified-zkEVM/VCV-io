@@ -32,8 +32,12 @@ inductive CmaSourceQuery (M Commit : Type) where
 
 /-- Named query constructors for the CMA adversary's oracle view. -/
 inductive CmaQuery (M Commit : Type) where
-  /-- A source CMA adversary query: uniform sampling, RO, or signing. -/
-  | source (q : CmaSourceQuery M Commit)
+  /-- Uniform sampling query. -/
+  | unif (n : ℕ)
+  /-- Random-oracle query. -/
+  | ro (mc : M × Commit)
+  /-- Signing query. -/
+  | sign (m : M)
   /-- Public-key query. -/
   | pk
 
@@ -50,8 +54,12 @@ inductive CmaPublicQuery (M Commit : Type) where
 /-- Named query constructors for the NMA interface used internally by the
 CMA-to-NMA reduction. -/
 inductive NmaQuery (M Commit Chal : Type) where
-  /-- A public query: uniform sampling, RO, or public key. -/
-  | pub (q : CmaPublicQuery M Commit)
+  /-- Uniform sampling query. -/
+  | unif (n : ℕ)
+  /-- Random-oracle query. -/
+  | ro (mc : M × Commit)
+  /-- Public-key query. -/
+  | pk
   /-- Programmable-random-oracle query. -/
   | prog (mch : M × Commit × Chal)
 
@@ -85,7 +93,9 @@ and public-key oracles. -/
 @[reducible] def cmaSpec (M Commit Chal Resp Stmt : Type) :
     OracleSpec (CmaQuery M Commit) :=
   OracleSpec.ofFn fun
-    | .source q => (cmaSourceSpec M Commit Chal Resp).Range q
+    | .unif n => Fin (n + 1)
+    | .ro _ => Chal
+    | .sign _ => Commit × Resp
     | .pk => Stmt
 
 /-- The non-signing portion of the CMA adversary's oracle view. -/
@@ -101,7 +111,9 @@ Includes uniform sampling, RO, programmable RO, and public-key queries. -/
 @[reducible] def nmaSpec (M Commit Chal Stmt : Type) :
     OracleSpec (NmaQuery M Commit Chal) :=
   OracleSpec.ofFn fun
-    | .pub q => (cmaPublicSpec M Commit Chal Stmt).Range q
+    | .unif n => Fin (n + 1)
+    | .ro _ => Chal
+    | .pk => Stmt
     | .prog _ => Unit
 
 /-- Route named CMA queries to the public-forwarding component or the signing
@@ -112,24 +124,24 @@ def cmaRoute (M Commit Chal Resp Stmt : Type) :
       (cmaPublicSpec M Commit Chal Stmt)
       (signSpec M Commit Resp) where
   route
-    | .source (.unif n) => .inl ⟨.unif n, Equiv.refl _⟩
-    | .source (.ro mc) => .inl ⟨.ro mc, Equiv.refl _⟩
-    | .source (.sign m) => .inr ⟨m, Equiv.refl _⟩
+    | .unif n => .inl ⟨.unif n, Equiv.refl _⟩
+    | .ro mc => .inl ⟨.ro mc, Equiv.refl _⟩
+    | .sign m => .inr ⟨m, Equiv.refl _⟩
     | .pk => .inl ⟨.pk, Equiv.refl _⟩
   targetEquiv := {
     toFun
-      | .source (.unif n) => Sum.inl (CmaPublicQuery.unif n)
-      | .source (.ro mc) => Sum.inl (CmaPublicQuery.ro mc)
-      | .source (.sign m) => Sum.inr m
+      | .unif n => Sum.inl (CmaPublicQuery.unif n)
+      | .ro mc => Sum.inl (CmaPublicQuery.ro mc)
+      | .sign m => Sum.inr m
       | .pk => Sum.inl CmaPublicQuery.pk
     invFun
-      | Sum.inl (CmaPublicQuery.unif n) => CmaQuery.source (.unif n)
-      | Sum.inl (CmaPublicQuery.ro mc) => CmaQuery.source (.ro mc)
+      | Sum.inl (CmaPublicQuery.unif n) => CmaQuery.unif n
+      | Sum.inl (CmaPublicQuery.ro mc) => CmaQuery.ro mc
       | Sum.inl CmaPublicQuery.pk => CmaQuery.pk
-      | Sum.inr m => CmaQuery.source (.sign m)
+      | Sum.inr m => CmaQuery.sign m
     left_inv := by
       intro t
-      rcases t with (_ | _) | _ <;> rfl
+      cases t <;> rfl
     right_inv := by
       intro t
       rcases t with (t | m)
@@ -142,8 +154,8 @@ def cmaRoute (M Commit Chal Resp Stmt : Type) :
 
 instance subSpec_unif_nmaSpec (M Commit Chal Stmt : Type) :
     unifSpec ⊂ₒ nmaSpec M Commit Chal Stmt where
-  monadLift q := ⟨.pub (.unif q.input), q.cont⟩
-  onQuery n := .pub (.unif n)
+  monadLift q := ⟨.unif q.input, q.cont⟩
+  onQuery n := .unif n
   onResponse _ := id
   liftM_eq_lift _ := rfl
 
@@ -153,8 +165,8 @@ instance lawfulSubSpec_unif_nmaSpec (M Commit Chal Stmt : Type) :
 
 instance subSpec_unif_cmaSpec (M Commit Chal Resp Stmt : Type) :
     unifSpec ⊂ₒ cmaSpec M Commit Chal Resp Stmt where
-  monadLift q := ⟨.source (.unif q.input), q.cont⟩
-  onQuery n := .source (.unif n)
+  monadLift q := ⟨.unif q.input, q.cont⟩
+  onQuery n := .unif n
   onResponse _ := id
 
 instance lawfulSubSpec_unif_cmaSpec (M Commit Chal Resp Stmt : Type) :
@@ -163,8 +175,8 @@ instance lawfulSubSpec_unif_cmaSpec (M Commit Chal Resp Stmt : Type) :
 
 instance subSpec_ro_cmaSpec (M Commit Chal Resp Stmt : Type) :
     roSpec M Commit Chal ⊂ₒ cmaSpec M Commit Chal Resp Stmt where
-  monadLift q := ⟨.source (.ro q.input), q.cont⟩
-  onQuery mc := .source (.ro mc)
+  monadLift q := ⟨.ro q.input, q.cont⟩
+  onQuery mc := .ro mc
   onResponse _ := id
 
 instance lawfulSubSpec_ro_cmaSpec (M Commit Chal Resp Stmt : Type) :
@@ -173,8 +185,8 @@ instance lawfulSubSpec_ro_cmaSpec (M Commit Chal Resp Stmt : Type) :
 
 instance subSpec_sign_cmaSpec (M Commit Chal Resp Stmt : Type) :
     signSpec M Commit Resp ⊂ₒ cmaSpec M Commit Chal Resp Stmt where
-  monadLift q := ⟨.source (.sign q.input), q.cont⟩
-  onQuery m := .source (.sign m)
+  monadLift q := ⟨.sign q.input, q.cont⟩
+  onQuery m := .sign m
   onResponse _ := id
 
 instance lawfulSubSpec_sign_cmaSpec (M Commit Chal Resp Stmt : Type) :
@@ -198,11 +210,11 @@ constructors. -/
 instance subSpec_fsRo_cmaSpec (M Commit Chal Resp Stmt : Type) :
     (unifSpec + roSpec M Commit Chal) ⊂ₒ cmaSpec M Commit Chal Resp Stmt where
   monadLift
-    | ⟨.inl n, f⟩ => ⟨.source (.unif n), f⟩
-    | ⟨.inr mc, f⟩ => ⟨.source (.ro mc), f⟩
+    | ⟨.inl n, f⟩ => ⟨.unif n, f⟩
+    | ⟨.inr mc, f⟩ => ⟨.ro mc, f⟩
   onQuery
-    | .inl n => .source (.unif n)
-    | .inr mc => .source (.ro mc)
+    | .inl n => .unif n
+    | .inr mc => .ro mc
   onResponse
     | .inl _ => id
     | .inr _ => id
@@ -220,13 +232,13 @@ instance subSpec_sourceCma_cmaSpec (M Commit Chal Resp Stmt : Type) :
     (unifSpec + roSpec M Commit Chal + signSpec M Commit Resp) ⊂ₒ
       cmaSpec M Commit Chal Resp Stmt where
   monadLift
-    | ⟨.inl (.inl n), f⟩ => ⟨.source (.unif n), f⟩
-    | ⟨.inl (.inr mc), f⟩ => ⟨.source (.ro mc), f⟩
-    | ⟨.inr m, f⟩ => ⟨.source (.sign m), f⟩
+    | ⟨.inl (.inl n), f⟩ => ⟨.unif n, f⟩
+    | ⟨.inl (.inr mc), f⟩ => ⟨.ro mc, f⟩
+    | ⟨.inr m, f⟩ => ⟨.sign m, f⟩
   onQuery
-    | .inl (.inl n) => .source (.unif n)
-    | .inl (.inr mc) => .source (.ro mc)
-    | .inr m => .source (.sign m)
+    | .inl (.inl n) => .unif n
+    | .inl (.inr mc) => .ro mc
+    | .inr m => .sign m
   onResponse
     | .inl (.inl _) => id
     | .inl (.inr _) => id

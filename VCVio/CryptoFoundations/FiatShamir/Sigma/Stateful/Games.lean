@@ -74,7 +74,9 @@ noncomputable def nma
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl.Stateful unifSpec (nmaSpec M Commit Chal Stmt)
       (NmaState M Commit Chal Stmt Wit)
-  | .pub q => nmaPublic M Commit Chal hr q
+  | .unif n => nmaPublic M Commit Chal hr (.unif n)
+  | .ro mc => nmaPublic M Commit Chal hr (.ro mc)
+  | .pk => nmaPublic M Commit Chal hr .pk
   | .prog mch => nmaProgram M Commit Chal mch
 
 /-! ## `cmaToNma`: CMA-to-NMA reduction -/
@@ -87,15 +89,15 @@ programming queries interact through one inner random-oracle cache. -/
 noncomputable def cmaPublicForward :
     QueryImpl.Stateful (nmaSpec M Commit Chal Stmt) (cmaPublicSpec M Commit Chal Stmt) PUnit
   | .unif n => StateT.mk fun u => do
-      let r ← (((nmaSpec M Commit Chal Stmt).query (.pub (.unif n))) :
+      let r ← (((nmaSpec M Commit Chal Stmt).query (.unif n)) :
         OracleComp (nmaSpec M Commit Chal Stmt) (Fin (n + 1)))
       pure (r, u)
   | .ro mc => StateT.mk fun u => do
-      let r ← (((nmaSpec M Commit Chal Stmt).query (.pub (.ro mc))) :
+      let r ← (((nmaSpec M Commit Chal Stmt).query (.ro mc)) :
         OracleComp (nmaSpec M Commit Chal Stmt) Chal)
       pure (r, u)
   | .pk => StateT.mk fun u => do
-      let pk ← (((nmaSpec M Commit Chal Stmt).query (.pub .pk)) :
+      let pk ← (((nmaSpec M Commit Chal Stmt).query .pk) :
         OracleComp (nmaSpec M Commit Chal Stmt) Stmt)
       pure (pk, u)
 
@@ -108,7 +110,7 @@ noncomputable def cmaSignSim
     QueryImpl.Stateful (nmaSpec M Commit Chal Stmt) (signSpec M Commit Resp)
       (OuterState M)
   | m => StateT.mk fun log => do
-      let pk ← (((nmaSpec M Commit Chal Stmt).query (.pub .pk)) :
+      let pk ← (((nmaSpec M Commit Chal Stmt).query .pk) :
         OracleComp (nmaSpec M Commit Chal Stmt) Stmt)
       let (c, ch, π) ← (liftM (simT pk) :
         OracleComp (nmaSpec M Commit Chal Stmt) (Commit × Chal × Resp))
@@ -231,7 +233,9 @@ noncomputable def cmaReal
     (hr : GenerableRelation Stmt Wit rel) :
     QueryImpl.Stateful unifSpec (cmaSpec M Commit Chal Resp Stmt)
       (CmaState M Commit Chal Stmt Wit)
-  | .source q => cmaRealSourceFull M Commit Chal sigma hr q
+  | .unif n => cmaRealSourceFull M Commit Chal sigma hr (.unif n)
+  | .ro mc => cmaRealSourceFull M Commit Chal sigma hr (.ro mc)
+  | .sign m => cmaRealSourceFull M Commit Chal sigma hr (.sign m)
   | .pk => StateT.mk fun s =>
       let log := s.1.1
       let cache := s.1.2.1
