@@ -73,31 +73,29 @@ variable {F : Type} [FloatLike F] {ε : ℝ} [self : HasRealSemantics F ε]
 
 /-! ### Derived Bounds -/
 
+/-- A relative-error bound `|result - target| ≤ ε · |target|` implies two-sided absolute
+bounds `(1 - ε)·|target| ≤ |result| ≤ (1 + ε)·|target|`. Specialized to each operation
+below. -/
+private theorem result_bounds_of_error {target result : ℝ}
+    (herr : |result - target| ≤ ε * |target|) :
+    (1 - ε) * |target| ≤ |result| ∧ |result| ≤ (1 + ε) * |target| := by
+  refine ⟨?_, ?_⟩
+  · linarith [abs_sub_abs_le_abs_sub target result, abs_sub_comm target result]
+  · linarith [abs_sub_abs_le_abs_sub result target]
+
 /-- The result of an addition lies in `[(1-ε)(a+b), (1+ε)(a+b)]`. -/
 theorem add_result_bounds (a b : F) :
     (1 - ε) * |self.interp a + self.interp b| ≤ |self.interp (FloatLike.add a b)| ∧
     |self.interp (FloatLike.add a b)| ≤
-      (1 + ε) * |self.interp a + self.interp b| := by
-  have herr := self.add_error a b
-  constructor
-  · linarith [abs_sub_abs_le_abs_sub (self.interp a + self.interp b)
-      (self.interp (FloatLike.add a b)),
-      abs_sub_comm (self.interp a + self.interp b) (self.interp (FloatLike.add a b))]
-  · linarith [abs_sub_abs_le_abs_sub (self.interp (FloatLike.add a b))
-      (self.interp a + self.interp b)]
+      (1 + ε) * |self.interp a + self.interp b| :=
+  result_bounds_of_error (self.add_error a b)
 
 /-- The result of a multiplication lies in `[(1-ε)(a·b), (1+ε)(a·b)]`. -/
 theorem mul_result_bounds (a b : F) :
     (1 - ε) * |self.interp a * self.interp b| ≤ |self.interp (FloatLike.mul a b)| ∧
     |self.interp (FloatLike.mul a b)| ≤
-      (1 + ε) * |self.interp a * self.interp b| := by
-  have herr := self.mul_error a b
-  constructor
-  · linarith [abs_sub_abs_le_abs_sub (self.interp a * self.interp b)
-      (self.interp (FloatLike.mul a b)),
-      abs_sub_comm (self.interp a * self.interp b) (self.interp (FloatLike.mul a b))]
-  · linarith [abs_sub_abs_le_abs_sub (self.interp (FloatLike.mul a b))
-      (self.interp a * self.interp b)]
+      (1 + ε) * |self.interp a * self.interp b| :=
+  result_bounds_of_error (self.mul_error a b)
 
 /-! ### Compound Expression Error Bounds -/
 
