@@ -128,7 +128,6 @@ example :
     ⦃ (1 : ℝ≥0∞) ⦄ (wrappedTrueStep (spec := spec))
       ⦃ fun y => if y = true then (1 : ℝ≥0∞) else 0 ⦄ := by
   vcstep
-  trivial
 
 /--
 `vcstep?` can get the specific path used to create a `vcstep` proof
@@ -140,7 +139,6 @@ example :
 example :
     ⦃ 1 ⦄ wrappedTrueStep (spec := spec) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   vcstep with triple_wrappedTrueStep
-  trivial
 
 /-! ## `liftComp` -/
 

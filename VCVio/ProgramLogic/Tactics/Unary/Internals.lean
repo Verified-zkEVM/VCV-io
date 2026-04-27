@@ -137,7 +137,8 @@ private def closeTheoremStepGoals : TacticM Unit := do
     discard <| tryEvalTacticSyntax (← `(tactic|
       all_goals first
         | assumption
-        | (repeat intro; split_ifs <;> simp)
+        | simp
+        | (repeat intro; split_ifs <;> simp_all)
         | (
             repeat intro
             simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
@@ -196,9 +197,6 @@ private def runUnaryVCSpecRule
   if ok && (!(requireClosed) || (← getGoals).isEmpty) then
     return true
   saved.restore
-  if let some declName := entry.declName? then
-    if ← runVCGenStepWithTheoremConseq (mkIdent declName) requireClosed then
-      return true
   return false
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.
