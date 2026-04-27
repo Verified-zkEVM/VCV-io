@@ -2323,7 +2323,7 @@ omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit]
   [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
 /-- The final freshness/verification continuation performs one random-oracle
 query but no signing query, hence contributes zero cumulative H3 sign cost. -/
-private lemma verifyFreshComp_expectedSCost_eq_zero
+private lemma verifyFreshComp_expectedQuerySlack_eq_zero
     (G : QueryImpl (cmaSpec M Commit Chal Resp Stmt)
       (StateT (CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool)
         (OracleComp unifSpec)))
@@ -2331,7 +2331,7 @@ private lemma verifyFreshComp_expectedSCost_eq_zero
     (p : (Stmt × (M × (Commit × Resp))) × List M)
     (qS : ℕ)
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit) × Bool) :
-    expectedSCost G
+    expectedQuerySlack G
       (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) (Stmt := Stmt))
       ε
@@ -2342,7 +2342,7 @@ private lemma verifyFreshComp_expectedSCost_eq_zero
   rcases sig with ⟨c, resp⟩
   rcases s with ⟨s, bad⟩
   cases bad
-  · change expectedSCost G
+  · change expectedQuerySlack G
         (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt))
         ε
@@ -2350,11 +2350,11 @@ private lemma verifyFreshComp_expectedSCost_eq_zero
             (Sum.inl (Sum.inl (Sum.inr (msg, c))))) >>= fun a =>
           pure (!decide (msg ∈ signed) && σ.verify pk c a resp))
         qS (s, false) = 0
-    rw [expectedSCost_query_bind]
-    rw [expectedSCostStep_free]
+    rw [expectedQuerySlack_query_bind]
+    rw [expectedQuerySlackStep_free]
     · simp
     · simp [IsCostlyQuery]
-  · simp [verifyFreshComp, expectedSCost_bad_eq_zero]
+  · simp [verifyFreshComp, expectedQuerySlack_bad_eq_zero]
 
 /-! ### Top-level chain: H1 + H2 + H3 + H4 + H5 -/
 
@@ -2460,7 +2460,7 @@ theorem cma_advantage_le_fork_bound
     set φ := cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit) with hφ
     set G := VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl φ with hG
     have h_cost_candidate :
-        expectedSCost G
+        expectedQuerySlack G
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))
             (cmaSignEpsCore (ENNReal.ofReal ζ_zk) β) Apre qS
@@ -2468,34 +2468,34 @@ theorem cma_advantage_le_fork_bound
           ≤ (qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk
             + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + (qH : ℝ≥0∞)) * β := by
       simpa [hG, hφ] using
-        cmaSignEpsCore_expectedSCost_le M Commit Chal σ hr (ENNReal.ofReal ζ_zk) β
+        cmaSignEpsCore_expectedQuerySlack_le M Commit Chal σ hr (ENNReal.ofReal ζ_zk) β
           Apre qS qH hQBpre hQBHpre
     have h_cost_bind :
-        expectedSCost G
+        expectedQuerySlack G
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))
             (cmaSignEpsCore (ENNReal.ofReal ζ_zk) β) A qS
             (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false)
           =
-        expectedSCost G
+        expectedQuerySlack G
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt))
             (cmaSignEpsCore (ENNReal.ofReal ζ_zk) β) Apre qS
             (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false) := by
       rw [hA_def, hApre_def, signedFreshAdv]
-      exact expectedSCost_bind_eq_of_right_zero G
+      exact expectedQuerySlack_bind_eq_of_right_zero G
         (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt))
         (cmaSignEpsCore (ENNReal.ofReal ζ_zk) β)
         (signedCandidateAdv σ hr M adv)
         (verifyFreshComp (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp))
-        (fun x q p => verifyFreshComp_expectedSCost_eq_zero (σ := σ) (hr := hr)
+        (fun x q p => verifyFreshComp_expectedQuerySlack_eq_zero (σ := σ) (hr := hr)
           (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
           (G := G) (ε := cmaSignEpsCore (ENNReal.ofReal ζ_zk) β) x q p)
         qS (cmaInitData M Commit Chal (Stmt := Stmt) (Wit := Wit), false)
     have h_cost_full :
-        expectedSCost
+        expectedQuerySlack
             (VCVio.HeapSSP.Package.implConjugate (cmaReal M Commit Chal σ hr).impl
               (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
             (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
@@ -2505,7 +2505,7 @@ theorem cma_advantage_le_fork_bound
           ≤ (qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk
             + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + (qH : ℝ≥0∞)) * β := by
       have hc :
-          expectedSCost G
+          expectedQuerySlack G
               (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
                 (Resp := Resp) (Stmt := Stmt))
               (cmaSignEpsCore (ENNReal.ofReal ζ_zk) β) A qS
@@ -2516,7 +2516,7 @@ theorem cma_advantage_le_fork_bound
         exact h_cost_candidate
       simpa [hG, hφ] using hc
     simpa [VCVio.HeapSSP.Package.advantage] using
-      cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost M Commit Chal σ hr simT
+      cmaReal_cmaSim_advantage_le_H3_bound_of_expectedQuerySlack M Commit Chal σ hr simT
         (ENNReal.ofReal ζ_zk) β hζ_zk_lt hHVZK' hCommit A qS
         ((qS : ℝ≥0∞) * ENNReal.ofReal ζ_zk
           + (qS : ℝ≥0∞) * ((qS : ℝ≥0∞) + (qH : ℝ≥0∞)) * β)

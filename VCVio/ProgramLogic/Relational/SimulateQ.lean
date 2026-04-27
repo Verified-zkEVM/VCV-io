@@ -1220,12 +1220,12 @@ end IdenticalUntilBadEpsilon
 A refinement of `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad` where the per-step ε
 bound applies only to a designated subset `S` of queries (the "costly" or "perturbed"
 queries), and the impls are pointwise equal on the complement (the "free" queries). The
-bound counts only the S-queries, giving a tight `qS · ε` instead of `q_total · ε`.
+bound counts only the charged queries, giving a tight `q · ε` instead of `q_total · ε`.
 
 This is essential for cryptographic reductions where, e.g., signing-oracle queries are
 ε-close to a simulator (HVZK guarantee) but uniform / RO queries are exactly equal (both
 sides forward through the same RO cache). Direct application of the uniform-ε lemma would
-give `(qS + qH) · ε`, but for tight bounds we want `qS · ε`. -/
+give `(qS + qH) · ε`, but for tight bounds we want `q · ε`. -/
 
 section IdenticalUntilBadEpsilonSelective
 
@@ -1234,8 +1234,8 @@ variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 variable {α : Type} {σ : Type}
 
 /-- The `query_bind` step for a "free" query (impls pointwise equal on the no-bad branch).
-The budget `qS` is preserved (no decrement), since a free query doesn't count toward the
-S-query bound. -/
+The budget `qS` is preserved (no decrement), since a uncharged query doesn't count toward the
+charged query bound. -/
 private theorem tvDist_simulateQ_run_free_query_bind_le
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
@@ -1278,11 +1278,12 @@ private theorem tvDist_simulateQ_run_free_query_bind_le
     (tsum_probOutput_mul_tvDist_le_const_plus_probEvent_bad
       (mx := mx) (f₁ := f₁) (f₂ := f₂) (c := ↑qS * ε) h_qSε_nonneg h_summand_le)
 
-/-- Auxiliary inductive lemma for the selective ε-perturbed bound. Inducts on `oa` and
-case-splits each query on whether it's in the costly set `S` (existing per-step argument
-with budget decrement) or free (`tvDist_simulateQ_run_free_query_bind_le` with budget
-preserved). -/
-private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
+/-- Auxiliary inductive lemma for the selective ε-perturbed bound.
+
+Inducts on `oa` and case-splits each query on whether it is charged
+(use the per-step argument and decrement the budget) or uncharged
+(`tvDist_simulateQ_run_free_query_bind_le`, preserving the budget). -/
+private theorem tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad_aux
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (S : ι → Prop) [DecidablePred S]
@@ -1298,8 +1299,8 @@ private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
     tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p)
       ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
           (simulateQ impl₁ oa).run p].toReal := by
-  -- Construct a global per-step bound `tvDist ≤ ε` that holds for ALL queries:
-  -- for S-queries by `h_step_tv_S`, for non-S-queries since the impls are pointwise equal.
+  -- Construct a global per-step bound `tvDist ≤ ε` that holds for all queries.
+  -- Charged queries use `h_step_tv_S`; uncharged queries are pointwise equal.
   have h_step_tv_global : ∀ (t' : ι) (s' : σ),
       tvDist ((impl₁ t').run (s', false)) ((impl₂ t').run (s', false)) ≤ ε := by
     intro t' s'
@@ -1351,14 +1352,14 @@ private theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
 Like `tvDist_simulateQ_le_qeps_plus_probEvent_output_bad`, but the per-step ε bound
 applies only to queries `t` satisfying a designated predicate `S` (the "costly" queries),
 and the impls are pointwise equal on `¬ S` (the "free" queries). The bound counts only
-the S-queries (via `IsQueryBoundP oa S qS`), giving the tight `qS · ε` instead of the
+the charged queries (via `IsQueryBoundP oa S qS`), giving the tight `q · ε` instead of the
 trivial `q_total · ε` from the uniform-ε lemma.
 
 The intended use is for cryptographic reductions: e.g., for Fiat-Shamir signing-oracle
 swaps, the "costly" queries are signing queries (HVZK gives per-query ε bound) and the
 "free" queries are the underlying spec queries (uniform sampling and RO caching, where
 both sides forward through the same `baseSim`). -/
-theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
+theorem tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (S : ι → Prop) [DecidablePred S]
@@ -1375,14 +1376,14 @@ theorem tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
         ((simulateQ impl₂ oa).run (s₀, false))
       ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
           (simulateQ impl₁ oa).run (s₀, false)].toReal :=
-  tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad_aux
+  tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad_aux
     impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
 
 /-- **Selective ε-perturbed identical-until-bad with output bad flag.**
 
-Like `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`, but projected to the
+Like `tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad`, but projected to the
 computation output via `StateT.run'`. -/
-theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
+theorem tvDist_simulateQ_le_queryBound_mul_slack_plus_probEvent_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     {ε : ℝ} (hε : 0 ≤ ε)
     (S : ι → Prop) [DecidablePred S]
@@ -1403,7 +1404,7 @@ theorem tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad
       tvDist ((simulateQ impl₁ oa).run (s₀, false)) ((simulateQ impl₂ oa).run (s₀, false))
         ≤ qS * ε + Pr[fun z : α × σ × Bool => z.2.2 = true |
             (simulateQ impl₁ oa).run (s₀, false)].toReal :=
-    tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
+    tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad
       impl₁ impl₂ hε S h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb s₀
   have h_map :
       tvDist ((simulateQ impl₁ oa).run' (s₀, false))
@@ -1419,21 +1420,20 @@ end IdenticalUntilBadEpsilonSelective
 
 /-! ### State-dep ε-perturbed identical-until-bad
 
-A further refinement of `tvDist_simulateQ_le_qSeps_plus_probEvent_output_bad` where the
+A further refinement of `tvDist_simulateQ_le_queryBound_mul_slack_plus_probEvent_bad` where the
 per-step ε bound is allowed to depend on the **input state** `s : σ` to the impl. The
 bound on `tvDist` is then expressed as the **expected sum** of `ε s` over the trace of
-S-queries fired during the simulation, captured by the recursive function `expectedSCost`.
+charged queries fired during the simulation, captured by the recursive function
+`expectedQuerySlack`.
 
 This is essential for cryptographic reductions where the per-step gap depends on a varying
 state quantity (e.g., for Fiat-Shamir signing-oracle swaps the gap is
 `ζ_zk + |s.cache| · β`, growing with cache size, with no uniform constant ε).
-The constant-ε lemma `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad` is a
-corollary (see Phase A2).
+The constant-ε lemma `tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad`
+is a corollary.
 
-To sidestep summability obligations, `expectedSCost` is valued in `ℝ≥0∞` and the bridge
-lemma is stated in `ℝ≥0∞` via `ENNReal.ofReal (tvDist …)`. A real-valued corollary
-`tvDist_…_toReal_…` is provided for users that supply a finiteness witness for
-`expectedSCost`. -/
+To sidestep summability obligations, `expectedQuerySlack` is valued in `ℝ≥0∞` and the
+bridge lemma is stated in `ℝ≥0∞` via `ENNReal.ofReal (tvDist …)`. -/
 
 section IdenticalUntilBadEpsilonStateDep
 
@@ -1441,18 +1441,18 @@ variable {ι : Type} {spec : OracleSpec ι}
 variable {ι' : Type} {spec' : OracleSpec ι'} [spec'.Fintype] [spec'.Inhabited]
 variable {α : Type} {σ : Type}
 
-/-- Per-`query_bind` step of `expectedSCost`. Given the impl, the costly-query
-predicate `S`, the per-state cost `ε`, the query symbol `t`, and the IH continuation
+/-- Per-`query_bind` step of `expectedQuerySlack`. Given the impl, the charged-query
+predicate `S`, the per-state query slack `ε`, the query symbol `t`, and the IH continuation
 `k : Range t → ℕ → (σ × Bool) → ℝ≥0∞`, returns the expected cost contributed by
 performing the query `t` from state `p` with budget `qS`:
 
 * if the bad flag is set in `p`, return `0` (the `Pr[bad]` term swallows the deficit);
-* if `t` is a free query (`¬ S t`), forward through the impl with budget unchanged;
-* if `t` is a costly query and the budget is exhausted, return `0` (vacuous via
+* if `t` is a uncharged query (`¬ S t`), forward through the impl with budget unchanged;
+* if `t` is a charged query and the budget is exhausted, return `0` (vacuous via
   `IsQueryBound`);
-* if `t` is a costly query with positive budget, pay `ε p.1` immediately, then forward
+* if `t` is a charged query with positive budget, pay `ε p.1` immediately, then forward
   through the impl with budget decremented to `qS - 1`. -/
-noncomputable def expectedSCostStep
+noncomputable def expectedQuerySlackStep
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S]
     (ε : σ → ℝ≥0∞) (t : spec.Domain)
@@ -1469,148 +1469,148 @@ noncomputable def expectedSCostStep
       ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (p.1, false)] * k z.1 qS z.2
 
-/-- Recursive expected sum-of-`ε(state)` over the S-queries fired during
+/-- Recursive expected accumulated query slack over the charged queries fired during
 `(simulateQ impl oa).run p`. Defined by recursion on `oa` via `OracleComp.construct`. -/
-noncomputable def expectedSCost
+noncomputable def expectedQuerySlack
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) :
     {α : Type} → OracleComp spec α → ℕ → (σ × Bool) → ℝ≥0∞ :=
   fun {_} oa => OracleComp.construct
     (C := fun _ => ℕ → (σ × Bool) → ℝ≥0∞)
     (fun _ _ _ => 0)
-    (fun t _ ih => expectedSCostStep impl S ε t ih)
+    (fun t _ ih => expectedQuerySlackStep impl S ε t ih)
     oa
 
 @[simp]
-lemma expectedSCost_pure
+lemma expectedQuerySlack_pure
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (x : α)
     (qS : ℕ) (p : σ × Bool) :
-    expectedSCost impl S ε (pure x : OracleComp spec α) qS p = 0 := rfl
+    expectedQuerySlack impl S ε (pure x : OracleComp spec α) qS p = 0 := rfl
 
-lemma expectedSCost_query_bind
+lemma expectedQuerySlack_query_bind
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
     (t : spec.Domain) (cont : spec.Range t → OracleComp spec α)
     (qS : ℕ) (p : σ × Bool) :
-    expectedSCost impl S ε (query t >>= cont) qS p =
-      expectedSCostStep impl S ε t (fun u => expectedSCost impl S ε (cont u)) qS p := rfl
+    expectedQuerySlack impl S ε (query t >>= cont) qS p =
+      expectedQuerySlackStep impl S ε t (fun u => expectedQuerySlack impl S ε (cont u)) qS p := rfl
 
-lemma expectedSCost_bind_eq_of_right_zero
+lemma expectedQuerySlack_bind_eq_of_right_zero
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
     {β : Type} (oa : OracleComp spec α) (ob : α → OracleComp spec β)
-    (hzero : ∀ x qS p, expectedSCost impl S ε (ob x) qS p = 0)
+    (hzero : ∀ x qS p, expectedQuerySlack impl S ε (ob x) qS p = 0)
     (qS : ℕ) (p : σ × Bool) :
-    expectedSCost impl S ε (oa >>= ob) qS p =
-      expectedSCost impl S ε oa qS p := by
+    expectedQuerySlack impl S ε (oa >>= ob) qS p =
+      expectedQuerySlack impl S ε oa qS p := by
   induction oa using OracleComp.inductionOn generalizing qS p with
   | pure x =>
       simp [hzero x qS p]
   | query_bind t cont ih =>
       simp only [bind_assoc]
-      rw [expectedSCost_query_bind, expectedSCost_query_bind]
+      rw [expectedQuerySlack_query_bind, expectedQuerySlack_query_bind]
       congr
       funext u qS' p'
       exact ih u qS' p'
 
 @[simp]
-lemma expectedSCostStep_bad_eq_zero
+lemma expectedQuerySlackStep_bad_eq_zero
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
     (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
     (qS : ℕ) (s : σ) :
-    expectedSCostStep impl S ε t k qS (s, true) = 0 := by
-  simp [expectedSCostStep]
+    expectedQuerySlackStep impl S ε t k qS (s, true) = 0 := by
+  simp [expectedQuerySlackStep]
 
 @[simp]
-lemma expectedSCost_bad_eq_zero
+lemma expectedQuerySlack_bad_eq_zero
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
     (oa : OracleComp spec α) (qS : ℕ) (s : σ) :
-    expectedSCost impl S ε oa qS (s, true) = 0 := by
+    expectedQuerySlack impl S ε oa qS (s, true) = 0 := by
   induction oa using OracleComp.inductionOn with
-  | pure x => exact expectedSCost_pure impl S ε x qS (s, true)
+  | pure x => exact expectedQuerySlack_pure impl S ε x qS (s, true)
   | query_bind t cont _ =>
-      rw [expectedSCost_query_bind, expectedSCostStep_bad_eq_zero]
+      rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_bad_eq_zero]
 
-lemma expectedSCostStep_costly_pos
+lemma expectedQuerySlackStep_costly_pos
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
     (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
     (qS : ℕ) (s : σ) (hS : S t) (hqS : 0 < qS) :
-    expectedSCostStep impl S ε t k qS (s, false) =
+    expectedQuerySlackStep impl S ε t k qS (s, false) =
       ε s + ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (s, false)] * k z.1 (qS - 1) z.2 := by
-  simp [expectedSCostStep, hS, hqS]
+  simp [expectedQuerySlackStep, hS, hqS]
 
-lemma expectedSCostStep_free
+lemma expectedQuerySlackStep_free
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞) (t : spec.Domain)
     (k : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞)
     (qS : ℕ) (s : σ) (hS : ¬ S t) :
-    expectedSCostStep impl S ε t k qS (s, false) =
+    expectedQuerySlackStep impl S ε t k qS (s, false) =
       ∑' z : spec.Range t × σ × Bool,
         Pr[= z | (impl t).run (s, false)] * k z.1 qS z.2 := by
-  simp [expectedSCostStep, hS]
+  simp [expectedQuerySlackStep, hS]
 
-/-! #### Pointwise monotonicity of `expectedSCost` in `ε`
+/-! #### Pointwise monotonicity of `expectedQuerySlack` in `ε`
 
 If `ε ≤ ε'` pointwise (as functions `σ → ℝ≥0∞`), then
-`expectedSCost impl S ε oa qS p ≤ expectedSCost impl S ε' oa qS p`.
+`expectedQuerySlack impl S ε oa qS p ≤ expectedQuerySlack impl S ε' oa qS p`.
 The analogous monotonicity in the continuation `k` (for
-`expectedSCostStep`) is the step-level lemma, used in the inductive
-step of `expectedSCost_mono`. These lemmas are used to bound a
+`expectedQuerySlackStep`) is the step-level lemma, used in the inductive
+step of `expectedQuerySlack_mono`. These lemmas are used to bound a
 state-dependent ε by a constant upper bound so the constant-ε bound
-`expectedSCost_const_le_qS_mul` applies. -/
+`expectedQuerySlack_const_le_queryBudget_mul` applies. -/
 
-lemma expectedSCostStep_mono
+lemma expectedQuerySlackStep_mono
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
     (hε : ∀ s, ε s ≤ ε' s)
     (t : spec.Domain) {k k' : spec.Range t → ℕ → (σ × Bool) → ℝ≥0∞}
     (hk : ∀ u qS p, k u qS p ≤ k' u qS p)
     (qS : ℕ) (p : σ × Bool) :
-    expectedSCostStep impl S ε t k qS p ≤ expectedSCostStep impl S ε' t k' qS p := by
+    expectedQuerySlackStep impl S ε t k qS p ≤ expectedQuerySlackStep impl S ε' t k' qS p := by
   rcases p with ⟨s, b⟩
   cases b with
-  | true => simp [expectedSCostStep]
+  | true => simp [expectedQuerySlackStep]
   | false =>
       by_cases hSt : S t
       · by_cases hqS : 0 < qS
-        · rw [expectedSCostStep_costly_pos impl S ε t k qS s hSt hqS,
-              expectedSCostStep_costly_pos impl S ε' t k' qS s hSt hqS]
+        · rw [expectedQuerySlackStep_costly_pos impl S ε t k qS s hSt hqS,
+              expectedQuerySlackStep_costly_pos impl S ε' t k' qS s hSt hqS]
           gcongr with z
           · exact hε s
           · exact hk z.1 (qS - 1) z.2
-        · simp [expectedSCostStep, hSt, hqS]
-      · rw [expectedSCostStep_free impl S ε t k qS s hSt,
-            expectedSCostStep_free impl S ε' t k' qS s hSt]
+        · simp [expectedQuerySlackStep, hSt, hqS]
+      · rw [expectedQuerySlackStep_free impl S ε t k qS s hSt,
+            expectedQuerySlackStep_free impl S ε' t k' qS s hSt]
         gcongr with z
         exact hk z.1 qS z.2
 
-theorem expectedSCost_mono
+theorem expectedQuerySlack_mono
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
     (hε : ∀ s, ε s ≤ ε' s)
     (oa : OracleComp spec α) (qS : ℕ) (p : σ × Bool) :
-    expectedSCost impl S ε oa qS p ≤ expectedSCost impl S ε' oa qS p := by
+    expectedQuerySlack impl S ε oa qS p ≤ expectedQuerySlack impl S ε' oa qS p := by
   induction oa using OracleComp.inductionOn generalizing qS p with
   | pure x => simp
   | query_bind t cont ih =>
-      rw [expectedSCost_query_bind, expectedSCost_query_bind]
-      exact expectedSCostStep_mono impl S hε t
+      rw [expectedQuerySlack_query_bind, expectedQuerySlack_query_bind]
+      exact expectedQuerySlackStep_mono impl S hε t
         (fun u qS' p' => ih u qS' p') qS p
 
-/-! #### Invariant support congruence for `expectedSCost` -/
+/-! #### Invariant support congruence for `expectedQuerySlack` -/
 
-/-- If two per-state cost functions agree on an invariant and the real handler preserves
-that invariant from no-bad states, then `expectedSCost` is insensitive to their values on
+/-- If two per-state query slack functions agree on an invariant and the real handler preserves
+that invariant from no-bad states, then `expectedQuerySlack` is insensitive to their values on
 unreachable states.
 
 The input hypothesis is phrased as `p.2 = false → Inv p.1` so that bad states remain
-vacuous: `expectedSCost` is definitionally zero once the bad flag is set. -/
-theorem expectedSCost_eq_of_inv
+vacuous: `expectedQuerySlack` is definitionally zero once the bad flag is set. -/
+theorem expectedQuerySlack_eq_of_inv
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] {ε ε' : σ → ℝ≥0∞}
     (Inv : σ → Prop)
@@ -1619,22 +1619,22 @@ theorem expectedSCost_eq_of_inv
       ∀ z ∈ support ((impl t).run p), Inv z.2.1)
     (oa : OracleComp spec α) (qS : ℕ) (p : σ × Bool)
     (hp : p.2 = false → Inv p.1) :
-    expectedSCost impl S ε oa qS p = expectedSCost impl S ε' oa qS p := by
+    expectedQuerySlack impl S ε oa qS p = expectedQuerySlack impl S ε' oa qS p := by
   induction oa using OracleComp.inductionOn generalizing qS p with
   | pure x => simp
   | query_bind t cont ih =>
       rcases p with ⟨s, b⟩
       cases b with
-      | true => simp [expectedSCost_bad_eq_zero]
+      | true => simp [expectedQuerySlack_bad_eq_zero]
       | false =>
           have hInv : Inv s := hp rfl
           by_cases hSt : S t
           · by_cases hqS : 0 < qS
-            · rw [expectedSCost_query_bind, expectedSCost_query_bind,
-                expectedSCostStep_costly_pos impl S ε t
-                  (fun u => expectedSCost impl S ε (cont u)) qS s hSt hqS,
-                expectedSCostStep_costly_pos impl S ε' t
-                  (fun u => expectedSCost impl S ε' (cont u)) qS s hSt hqS,
+            · rw [expectedQuerySlack_query_bind, expectedQuerySlack_query_bind,
+                expectedQuerySlackStep_costly_pos impl S ε t
+                  (fun u => expectedQuerySlack impl S ε (cont u)) qS s hSt hqS,
+                expectedQuerySlackStep_costly_pos impl S ε' t
+                  (fun u => expectedQuerySlack impl S ε' (cont u)) qS s hSt hqS,
                 hε s hInv]
               congr 1
               refine tsum_congr fun z => ?_
@@ -1646,12 +1646,12 @@ theorem expectedSCost_eq_of_inv
                     Pr[= z | (impl t).run (s, false)] = 0 :=
                   probOutput_eq_zero_of_not_mem_support hz
                 rw [hprob, zero_mul, zero_mul]
-            · simp [expectedSCost_query_bind, expectedSCostStep, hSt, hqS]
-          · rw [expectedSCost_query_bind, expectedSCost_query_bind,
-              expectedSCostStep_free impl S ε t
-                (fun u => expectedSCost impl S ε (cont u)) qS s hSt,
-              expectedSCostStep_free impl S ε' t
-                (fun u => expectedSCost impl S ε' (cont u)) qS s hSt]
+            · simp [expectedQuerySlack_query_bind, expectedQuerySlackStep, hSt, hqS]
+          · rw [expectedQuerySlack_query_bind, expectedQuerySlack_query_bind,
+              expectedQuerySlackStep_free impl S ε t
+                (fun u => expectedQuerySlack impl S ε (cont u)) qS s hSt,
+              expectedQuerySlackStep_free impl S ε' t
+                (fun u => expectedQuerySlack impl S ε' (cont u)) qS s hSt]
             refine tsum_congr fun z => ?_
             by_cases hz : z ∈ support ((impl t).run (s, false))
             · rw [ih z.1 (qS := qS) (p := z.2)]
@@ -1721,10 +1721,10 @@ private lemma tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
 
 /-! #### Per-step inductive helpers -/
 
-/-- The `query_bind` step for a costly S-query (`S t ∧ 0 < qS`), state-dep ε version.
+/-- The `query_bind` step for a charged query (`S t ∧ 0 < qS`), state-dep ε version.
 Combines triangle inequality through the coupled mid-distribution `mx >>= f₂` with
 `tvDist_bind_left_le` + the helper lemma to push the IH through the bind. -/
-private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
+private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedQuerySlack
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
     (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
@@ -1734,13 +1734,13 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
     (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
       ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
           ((simulateQ impl₂ (cont u)).run p'))
-        ≤ expectedSCost impl₁ S ε (cont u) (qS - 1) p'
+        ≤ expectedQuerySlack impl₁ S ε (cont u) (qS - 1) p'
           + Pr[ fun w : α × σ × Bool => w.2.2 = true |
               (simulateQ impl₁ (cont u)).run p'])
     (s : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
         ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
-      ≤ expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+      ≤ expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false)
         + Pr[fun z : α × σ × Bool => z.2.2 = true |
             (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
   set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
@@ -1779,22 +1779,22 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
   have h_first :
       ENNReal.ofReal (tvDist sim₁ mid) ≤
         (∑' z : spec.Range t × σ × Bool,
-          Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+          Pr[= z | mx] * expectedQuerySlack impl₁ S ε (cont z.1) (qS - 1) z.2)
         + Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
     refine le_trans (ENNReal.ofReal_le_ofReal h_first_real) ?_
     have hfsim₁ : sim₁ = mx >>= f₁ := hsim₁_def
     rw [hfsim₁]
     refine tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
       (mx := mx) (f₁ := f₁) (f₂ := f₂)
-      (cost := fun z => expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+      (cost := fun z => expectedQuerySlack impl₁ S ε (cont z.1) (qS - 1) z.2)
       (fun z => ?_)
     simpa [hf₁_def, hf₂_def] using ih z.1 z.2
   have h_recurse :
-      expectedSCost impl₁ S ε (query t >>= cont) qS (s, false) =
+      expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false) =
         ε s + ∑' z : spec.Range t × σ × Bool,
           Pr[= z | (impl₁ t).run (s, false)] *
-            expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2 := by
-    rw [expectedSCost_query_bind, expectedSCostStep_costly_pos _ _ _ _ _ _ _ hS hqS]
+            expectedQuerySlack impl₁ S ε (cont z.1) (qS - 1) z.2 := by
+    rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hS hqS]
   have h_sim₁_eq_again : sim₁ = (simulateQ impl₁ (query t >>= cont)).run (s, false) :=
     hsim₁_eq.symm
   calc
@@ -1803,15 +1803,15 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
       = ENNReal.ofReal (tvDist sim₁ sim₂) := by rw [hsim₁_eq, hsim₂_eq]
     _ ≤ ENNReal.ofReal (tvDist sim₁ mid) + ENNReal.ofReal (tvDist mid sim₂) := h_tri
     _ ≤ ((∑' z : spec.Range t × σ × Bool,
-            Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+            Pr[= z | mx] * expectedQuerySlack impl₁ S ε (cont z.1) (qS - 1) z.2)
           + Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁])
           + ε s := add_le_add h_first h_second
     _ = (ε s + ∑' z : spec.Range t × σ × Bool,
-              Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) (qS - 1) z.2)
+              Pr[= z | mx] * expectedQuerySlack impl₁ S ε (cont z.1) (qS - 1) z.2)
           + Pr[fun w : α × σ × Bool => w.2.2 = true | sim₁] := by
         rw [add_assoc, add_comm (Pr[ fun w : α × σ × Bool => w.2.2 = true | sim₁]) (ε s),
             ← add_assoc, add_comm (∑' _, _) (ε s)]
-    _ = expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+    _ = expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false)
           + Pr[fun z : α × σ × Bool => z.2.2 = true |
               (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
         rw [h_recurse, ← hmx_def, h_sim₁_eq_again]
@@ -1819,7 +1819,7 @@ private theorem ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
 /-- The `query_bind` step for a free (non-S) query, state-dep ε version. The impls are
 pointwise equal at this query, so the only contribution is from the IH; the budget `qS`
 is preserved (no decrement). -/
-private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
+private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedQuerySlack
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
     (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
@@ -1829,13 +1829,13 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
     (ih : ∀ (u : spec.Range t) (p' : σ × Bool),
       ENNReal.ofReal (tvDist ((simulateQ impl₁ (cont u)).run p')
           ((simulateQ impl₂ (cont u)).run p'))
-        ≤ expectedSCost impl₁ S ε (cont u) qS p'
+        ≤ expectedQuerySlack impl₁ S ε (cont u) qS p'
           + Pr[ fun w : α × σ × Bool => w.2.2 = true |
               (simulateQ impl₁ (cont u)).run p'])
     (s : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
         ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
-      ≤ expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+      ≤ expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false)
         + Pr[fun z : α × σ × Bool => z.2.2 = true |
             (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
   set mx : OracleComp spec' (spec.Range t × σ × Bool) := (impl₁ t).run (s, false) with hmx_def
@@ -1854,11 +1854,11 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
       ≤ ∑' z : spec.Range t × σ × Bool, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z) :=
     tvDist_bind_left_le _ _ _
   have h_recurse :
-      expectedSCost impl₁ S ε (query t >>= cont) qS (s, false) =
+      expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false) =
         ∑' z : spec.Range t × σ × Bool,
           Pr[= z | (impl₁ t).run (s, false)] *
-            expectedSCost impl₁ S ε (cont z.1) qS z.2 := by
-    rw [expectedSCost_query_bind, expectedSCostStep_free _ _ _ _ _ _ _ hS]
+            expectedQuerySlack impl₁ S ε (cont z.1) qS z.2 := by
+    rw [expectedQuerySlack_query_bind, expectedQuerySlackStep_free _ _ _ _ _ _ _ hS]
   calc
     ENNReal.ofReal (tvDist ((simulateQ impl₁ (query t >>= cont)).run (s, false))
         ((simulateQ impl₂ (query t >>= cont)).run (s, false)))
@@ -1867,14 +1867,14 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
           (∑' z : spec.Range t × σ × Bool, Pr[= z | mx].toReal * tvDist (f₁ z) (f₂ z)) :=
         ENNReal.ofReal_le_ofReal h_bd_real
     _ ≤ (∑' z : spec.Range t × σ × Bool,
-            Pr[= z | mx] * expectedSCost impl₁ S ε (cont z.1) qS z.2)
+            Pr[= z | mx] * expectedQuerySlack impl₁ S ε (cont z.1) qS z.2)
           + Pr[fun w : α × σ × Bool => w.2.2 = true | mx >>= f₁] := by
         refine tsum_probOutput_mul_ofReal_tvDist_le_tsum_cost_plus_probEvent_bad
           (mx := mx) (f₁ := f₁) (f₂ := f₂)
-          (cost := fun z => expectedSCost impl₁ S ε (cont z.1) qS z.2)
+          (cost := fun z => expectedQuerySlack impl₁ S ε (cont z.1) qS z.2)
           (fun z => ?_)
         simpa [hf₁_def, hf₂_def] using ih z.1 z.2
-    _ = expectedSCost impl₁ S ε (query t >>= cont) qS (s, false)
+    _ = expectedQuerySlack impl₁ S ε (query t >>= cont) qS (s, false)
           + Pr[fun z : α × σ × Bool => z.2.2 = true |
               (simulateQ impl₁ (query t >>= cont)).run (s, false)] := by
         rw [h_recurse, ← hmx_def, ← hsim₁_eq]
@@ -1882,27 +1882,27 @@ private theorem ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
 /-! #### Inductive auxiliary lemma -/
 
 /-- Auxiliary inductive lemma for the state-dep ε-perturbed bound. Inducts on `oa` and
-case-splits each query on whether it's in the costly set `S` (decrement budget, charge
+case-splits each query on whether it's in the charged query predicate `S` (decrement budget, charge
 `ε s`) or free (no decrement, no charge). The bad-flag-true branch dominates the trivial
-`tvDist ≤ 1` bound via `Pr[bad | sim₁] = 1`, so `expectedSCost = 0` is enough there. -/
-private theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad_aux
+`tvDist ≤ 1` bound via `Pr[bad | sim₁] = 1`, so `expectedQuerySlack = 0` is enough there. -/
+private theorem ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad_aux
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
-    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
-    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
-      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
-    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+    (chargedQuery : spec.Domain → Prop) [DecidablePred chargedQuery]
+    (querySlack : σ → ℝ≥0∞)
+    (h_step_tv_charged : ∀ (t : spec.Domain), chargedQuery t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤
+        querySlack s)
+    (h_step_eq_uncharged : ∀ (t : spec.Domain), ¬ chargedQuery t → ∀ (p : σ × Bool),
       (impl₁ t).run p = (impl₂ t).run p)
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
-    (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (oa : OracleComp spec α) {queryBudget : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa chargedQuery queryBudget)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
-      ≤ expectedSCost impl₁ S ε oa qS p
+      ≤ expectedQuerySlack impl₁ chargedQuery querySlack oa queryBudget p
         + Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run p] := by
-  induction oa using OracleComp.inductionOn generalizing qS p with
+  induction oa using OracleComp.inductionOn generalizing queryBudget p with
   | pure x =>
       simp only [simulateQ_pure, StateT.run_pure, tvDist_self, ENNReal.ofReal_zero]
       exact zero_le _
@@ -1925,87 +1925,89 @@ private theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_outp
                 ≤ ENNReal.ofReal 1 := ENNReal.ofReal_le_ofReal h_tv_le_one_real
               _ = 1 := ENNReal.ofReal_one
           have h_cost_zero :
-              expectedSCost impl₁ S ε (query t >>= cont) qS (s, true) = 0 :=
-            expectedSCost_bad_eq_zero impl₁ S ε (query t >>= cont) qS s
+              expectedQuerySlack impl₁ chargedQuery querySlack
+                (query t >>= cont) queryBudget (s, true) = 0 :=
+            expectedQuerySlack_bad_eq_zero impl₁ chargedQuery querySlack
+              (query t >>= cont) queryBudget s
           rw [h_cost_zero, zero_add, h_bad₁]
           exact h_lhs_le_one
       | false =>
-          rw [isQueryBound_query_bind_iff] at h_qb
+          rw [isQueryBoundP_query_bind_iff] at h_qb
           obtain ⟨h_can, h_cont⟩ := h_qb
-          by_cases hSt : S t
-          · simp only [hSt, if_true] at h_can h_cont
-            have hqS_pos : 0 < qS := h_can
-            exact ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
-              impl₁ impl₂ S ε h_step_tv_S t cont hSt hqS_pos
+          by_cases hSt : chargedQuery t
+          · simp only [hSt, if_true] at h_cont
+            have hq_pos : 0 < queryBudget := h_can.resolve_left (· hSt)
+            exact ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedQuerySlack
+              impl₁ impl₂ chargedQuery querySlack h_step_tv_charged t cont hSt hq_pos
               (fun u p' => ih u (h_cont u) p') s
-          · simp only [hSt, if_false] at h_can h_cont
-            exact ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
-              impl₁ impl₂ S ε h_step_eq_nS t cont hSt
+          · simp only [hSt, if_false] at h_cont
+            exact ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedQuerySlack
+              impl₁ impl₂ chargedQuery querySlack h_step_eq_uncharged t cont hSt
               (fun u p' => ih u (h_cont u) p') s
 
 /-! #### Public bridge lemmas -/
 
 /-- **State-dep ε-perturbed identical-until-bad with output bad flag (joint state).**
 
-Like `tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`, but the per-step ε bound
-is allowed to depend on the input state `s : σ` to the impl. The `qS · ε` term is replaced
-by the **expected cumulative ε-cost** over the trace of S-queries fired during simulation,
-captured by the recursive function `expectedSCost`.
+Like `tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad`, but the
+per-step ε bound is allowed to depend on the input state `s : σ` to the impl.
+The `q · ε` term is replaced by the **expected accumulated query slack** over
+the trace of charged queries fired during simulation, captured by
+`expectedQuerySlack`.
 
-Statement is in `ℝ≥0∞` to sidestep summability obligations on the cost trace; users that
-supply a finiteness witness for `expectedSCost` can recover a real-valued statement via
-`ENNReal.toReal`. -/
-theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
+Statement is in `ℝ≥0∞` to sidestep summability obligations on the query-slack trace. -/
+theorem ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
-    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
-    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
-      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
-    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+    (chargedQuery : spec.Domain → Prop) [DecidablePred chargedQuery]
+    (querySlack : σ → ℝ≥0∞)
+    (h_step_tv_charged : ∀ (t : spec.Domain), chargedQuery t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤
+        querySlack s)
+    (h_step_eq_uncharged : ∀ (t : spec.Domain), ¬ chargedQuery t → ∀ (p : σ × Bool),
       (impl₁ t).run p = (impl₂ t).run p)
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
-    (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (oa : OracleComp spec α) {queryBudget : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa chargedQuery queryBudget)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
-      ≤ expectedSCost impl₁ S ε oa qS p
+      ≤ expectedQuerySlack impl₁ chargedQuery querySlack oa queryBudget p
         + Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run p] :=
-  ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad_aux
-    impl₁ impl₂ S ε h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb p
+  ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad_aux
+    impl₁ impl₂ chargedQuery querySlack h_step_tv_charged h_step_eq_uncharged h_mono₁ oa h_qb p
 
 /-- **State-dep ε-perturbed identical-until-bad with output bad flag (projected output).**
 
 Composing the joint-state lemma with the projection `Prod.fst : α × σ × Bool → α`, which
 can only decrease TV distance (data-processing inequality `tvDist_map_le`). -/
-theorem ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
+theorem ofReal_tvDist_simulateQ_le_expectedQuerySlack_plus_probEvent_output_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
-    (S : spec.Domain → Prop) [DecidablePred S] (ε : σ → ℝ≥0∞)
-    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
-      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε s)
-    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+    (chargedQuery : spec.Domain → Prop) [DecidablePred chargedQuery]
+    (querySlack : σ → ℝ≥0∞)
+    (h_step_tv_charged : ∀ (t : spec.Domain), chargedQuery t → ∀ (s : σ),
+      ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤
+        querySlack s)
+    (h_step_eq_uncharged : ∀ (t : spec.Domain), ¬ chargedQuery t → ∀ (p : σ × Bool),
       (impl₁ t).run p = (impl₂ t).run p)
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
-    (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (oa : OracleComp spec α) {queryBudget : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa chargedQuery queryBudget)
     (s₀ : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run' (s₀, false))
         ((simulateQ impl₂ oa).run' (s₀, false)))
-      ≤ expectedSCost impl₁ S ε oa qS (s₀, false)
+      ≤ expectedQuerySlack impl₁ chargedQuery querySlack oa queryBudget (s₀, false)
         + Pr[fun z : α × σ × Bool => z.2.2 = true |
             (simulateQ impl₁ oa).run (s₀, false)] := by
   have h_joint :
       ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run (s₀, false))
           ((simulateQ impl₂ oa).run (s₀, false)))
-        ≤ expectedSCost impl₁ S ε oa qS (s₀, false)
+        ≤ expectedQuerySlack impl₁ chargedQuery querySlack oa queryBudget (s₀, false)
           + Pr[fun z : α × σ × Bool => z.2.2 = true |
               (simulateQ impl₁ oa).run (s₀, false)] :=
-    ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
-      impl₁ impl₂ S ε h_step_tv_S h_step_eq_nS h_mono₁ oa h_qb (s₀, false)
+    ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad
+      impl₁ impl₂ chargedQuery querySlack h_step_tv_charged h_step_eq_uncharged
+        h_mono₁ oa h_qb (s₀, false)
   have h_map_real :
       tvDist ((simulateQ impl₁ oa).run' (s₀, false))
           ((simulateQ impl₂ oa).run' (s₀, false))
@@ -2018,122 +2020,127 @@ theorem ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
 
 /-! #### Constant-ε corollary (Phase A2 regression)
 
-Specializing `expectedSCost` to a constant cost function `fun _ => ε` and using `IsQueryBound`
-to bound the number of S-queries, the cumulative cost is dominated by `qS · ε`. Combined
+Specializing `expectedQuerySlack` to a constant query-slack function `fun _ => ε` and using
+`IsQueryBoundP` to bound the number of charged queries, the accumulated slack is dominated by
+`q · ε`. Combined
 with the state-dep main lemma this re-derives the selective constant-ε bound
 in `ENNReal` form. -/
 
-lemma expectedSCost_const_le_qS_mul
+lemma expectedQuerySlack_const_le_queryBudget_mul
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
-    (S : spec.Domain → Prop) [DecidablePred S] (ε : ℝ≥0∞)
-    (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (chargedQuery : spec.Domain → Prop) [DecidablePred chargedQuery] (ε : ℝ≥0∞)
+    (oa : OracleComp spec α) {queryBudget : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa chargedQuery queryBudget)
     (p : σ × Bool) :
-    expectedSCost impl S (fun _ => ε) oa qS p ≤ qS * ε := by
-  induction oa using OracleComp.inductionOn generalizing qS p with
+    expectedQuerySlack impl chargedQuery (fun _ => ε) oa queryBudget p ≤ queryBudget * ε := by
+  induction oa using OracleComp.inductionOn generalizing queryBudget p with
   | pure x => simp
   | query_bind t cont ih =>
       rcases p with ⟨s, b⟩
       cases b with
-      | true => simp [expectedSCost_bad_eq_zero]
+      | true => simp [expectedQuerySlack_bad_eq_zero]
       | false =>
-          rw [isQueryBound_query_bind_iff] at h_qb
+          rw [isQueryBoundP_query_bind_iff] at h_qb
           obtain ⟨h_can, h_cont⟩ := h_qb
-          by_cases hSt : S t
-          · simp only [hSt, if_true] at h_can h_cont
-            have hqS_pos : 0 < qS := h_can
-            rw [expectedSCost_query_bind,
-                expectedSCostStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
+          by_cases hSt : chargedQuery t
+          · simp only [hSt, if_true] at h_cont
+            have hq_pos : 0 < queryBudget := h_can.resolve_left (· hSt)
+            rw [expectedQuerySlack_query_bind,
+                expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hq_pos]
             have h_tsum_le : (∑' z : spec.Range t × σ × Bool,
                 Pr[= z | (impl t).run (s, false)] *
-                  expectedSCost impl S (fun _ => ε) (cont z.1) (qS - 1) z.2)
-                ≤ (qS - 1 : ℕ) * ε := by
+                  expectedQuerySlack impl chargedQuery (fun _ => ε)
+                    (cont z.1) (queryBudget - 1) z.2)
+                ≤ (queryBudget - 1 : ℕ) * ε := by
               calc (∑' z : spec.Range t × σ × Bool,
                     Pr[= z | (impl t).run (s, false)] *
-                      expectedSCost impl S (fun _ => ε) (cont z.1) (qS - 1) z.2)
+                      expectedQuerySlack impl chargedQuery (fun _ => ε)
+                        (cont z.1) (queryBudget - 1) z.2)
                   ≤ ∑' z : spec.Range t × σ × Bool,
-                      Pr[= z | (impl t).run (s, false)] * ((qS - 1 : ℕ) * ε) :=
+                      Pr[= z | (impl t).run (s, false)] *
+                        ((queryBudget - 1 : ℕ) * ε) :=
                     ENNReal.tsum_le_tsum fun z => by
                       gcongr
-                      exact ih z.1 (qS := qS - 1) (h_cont z.1) z.2
+                      exact ih z.1 (queryBudget := queryBudget - 1) (h_cont z.1) z.2
                 _ = (∑' z : spec.Range t × σ × Bool,
-                        Pr[= z | (impl t).run (s, false)]) * ((qS - 1 : ℕ) * ε) :=
+                        Pr[= z | (impl t).run (s, false)]) *
+                      ((queryBudget - 1 : ℕ) * ε) :=
                     ENNReal.tsum_mul_right
-                _ ≤ 1 * ((qS - 1 : ℕ) * ε) := by
+                _ ≤ 1 * ((queryBudget - 1 : ℕ) * ε) := by
                     gcongr
                     exact tsum_probOutput_le_one
-                _ = (qS - 1 : ℕ) * ε := one_mul _
+                _ = (queryBudget - 1 : ℕ) * ε := one_mul _
             have h_main : ε +
                   (∑' z : spec.Range t × σ × Bool,
                     Pr[= z | (impl t).run (s, false)] *
-                      expectedSCost impl S (fun _ => ε) (cont z.1) (qS - 1) z.2)
-                ≤ (qS : ℕ) * ε := by
+                      expectedQuerySlack impl chargedQuery (fun _ => ε)
+                        (cont z.1) (queryBudget - 1) z.2)
+                ≤ (queryBudget : ℕ) * ε := by
               calc ε + (∑' z : spec.Range t × σ × Bool,
                     Pr[= z | (impl t).run (s, false)] *
-                      expectedSCost impl S (fun _ => ε) (cont z.1) (qS - 1) z.2)
-                  ≤ ε + ((qS - 1 : ℕ) * ε) := by
+                      expectedQuerySlack impl chargedQuery (fun _ => ε)
+                        (cont z.1) (queryBudget - 1) z.2)
+                  ≤ ε + ((queryBudget - 1 : ℕ) * ε) := by
                     gcongr
-                _ = ((qS - 1 : ℕ) + 1) * ε := by
+                _ = ((queryBudget - 1 : ℕ) + 1) * ε := by
                     rw [add_mul, one_mul, add_comm]
-                _ = (qS : ℕ) * ε := by
+                _ = (queryBudget : ℕ) * ε := by
                     congr 2
-                    have : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
+                    have : (queryBudget - 1) + 1 = queryBudget := Nat.sub_add_cancel hq_pos
                     exact_mod_cast this
             exact h_main
-          · simp only [hSt, if_false] at h_can h_cont
-            rw [expectedSCost_query_bind,
-                expectedSCostStep_free _ _ _ _ _ _ _ hSt]
+          · simp only [hSt, if_false] at h_cont
+            rw [expectedQuerySlack_query_bind,
+                expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
             calc (∑' z : spec.Range t × σ × Bool,
                   Pr[= z | (impl t).run (s, false)] *
-                    expectedSCost impl S (fun _ => ε) (cont z.1) qS z.2)
+                    expectedQuerySlack impl chargedQuery (fun _ => ε)
+                      (cont z.1) queryBudget z.2)
                 ≤ ∑' z : spec.Range t × σ × Bool,
-                    Pr[= z | (impl t).run (s, false)] * ((qS : ℕ) * ε) :=
+                    Pr[= z | (impl t).run (s, false)] * ((queryBudget : ℕ) * ε) :=
                   ENNReal.tsum_le_tsum fun z => by
                     gcongr
-                    exact ih z.1 (qS := qS) (h_cont z.1) z.2
+                    exact ih z.1 (queryBudget := queryBudget) (h_cont z.1) z.2
               _ = (∑' z : spec.Range t × σ × Bool,
-                      Pr[= z | (impl t).run (s, false)]) * ((qS : ℕ) * ε) :=
+                      Pr[= z | (impl t).run (s, false)]) * ((queryBudget : ℕ) * ε) :=
                   ENNReal.tsum_mul_right
-              _ ≤ 1 * ((qS : ℕ) * ε) := by
+              _ ≤ 1 * ((queryBudget : ℕ) * ε) := by
                   gcongr
                   exact tsum_probOutput_le_one
-              _ = (qS : ℕ) * ε := one_mul _
+              _ = (queryBudget : ℕ) * ε := one_mul _
 
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
 This is the ENNReal-form analogue of the existing real-valued
-`tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad`. It demonstrates that
+`tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad`. It demonstrates that
 the state-dep version subsumes the constant-ε version: instantiate
-`ε := fun _ => ENNReal.ofReal ε_const` and bound `expectedSCost` by
-`qS * ENNReal.ofReal ε_const`. -/
-theorem ofReal_tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
+`ε := fun _ => ENNReal.ofReal ε_const` and bound `expectedQuerySlack` by
+`queryBudget * ENNReal.ofReal ε_const`. -/
+theorem ofReal_tvDist_simulateQ_run_le_queryBound_mul_slack_plus_probEvent_bad
     (impl₁ impl₂ : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (ε : ℝ≥0∞)
-    (S : spec.Domain → Prop) [DecidablePred S]
-    (h_step_tv_S : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+    (chargedQuery : spec.Domain → Prop) [DecidablePred chargedQuery]
+    (h_step_tv_charged : ∀ (t : spec.Domain), chargedQuery t → ∀ (s : σ),
       ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false))) ≤ ε)
-    (h_step_eq_nS : ∀ (t : spec.Domain), ¬ S t → ∀ (p : σ × Bool),
+    (h_step_eq_uncharged : ∀ (t : spec.Domain), ¬ chargedQuery t → ∀ (p : σ × Bool),
       (impl₁ t).run p = (impl₂ t).run p)
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
-    (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (oa : OracleComp spec α) {queryBudget : ℕ}
+    (h_qb : OracleComp.IsQueryBoundP oa chargedQuery queryBudget)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
-      ≤ qS * ε
+      ≤ queryBudget * ε
         + Pr[fun z : α × σ × Bool => z.2.2 = true | (simulateQ impl₁ oa).run p] := by
-  have h_step_tv_S' : ∀ (t : spec.Domain), S t → ∀ (s : σ),
+  have h_step_tv_charged' : ∀ (t : spec.Domain), chargedQuery t → ∀ (s : σ),
       ENNReal.ofReal (tvDist ((impl₁ t).run (s, false)) ((impl₂ t).run (s, false)))
-        ≤ (fun _ : σ => ε) s := h_step_tv_S
+        ≤ (fun _ : σ => ε) s := h_step_tv_charged
   refine le_trans
-    (ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
-      impl₁ impl₂ S (fun _ => ε) h_step_tv_S' h_step_eq_nS h_mono₁ oa h_qb p) ?_
+    (ofReal_tvDist_simulateQ_run_le_expectedQuerySlack_plus_probEvent_output_bad
+      impl₁ impl₂ chargedQuery (fun _ => ε) h_step_tv_charged'
+      h_step_eq_uncharged h_mono₁ oa h_qb p) ?_
   gcongr
-  exact expectedSCost_const_le_qS_mul impl₁ S ε oa h_qb p
+  exact expectedQuerySlack_const_le_queryBudget_mul impl₁ chargedQuery ε oa h_qb p
 
 end IdenticalUntilBadEpsilonStateDep
 

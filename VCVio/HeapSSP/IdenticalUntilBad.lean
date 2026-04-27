@@ -21,15 +21,15 @@ conjugation; the public statements are heap-native.
 
 * `Package.implConjugate` — conjugate a heap handler through `φ` to an
   handler on state `σ × Bool`.
-* `Package.advantage_le_expectedSCost_plus_probEvent_bad` — the
+* `Package.advantage_le_expectedQuerySlack_plus_probEvent_bad` — the
   state-dependent ε form.
-* `Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv` — the
+* `Package.advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv` — the
   invariant-gated form, where the costly-step TV hypothesis is needed
   only on states satisfying a user-supplied invariant.
-* `Package.advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved` —
+* `Package.advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv_preserved` —
   the invariant-preserving corollary, whose final cost bound uses the
   tight ε directly.
-* `Package.advantage_le_qSeps_plus_probEvent_bad` — the constant-ε
+* `Package.advantage_le_queryBound_mul_slack_plus_probEvent_bad` — the constant-ε
   corollary, derived from the state-dep form.
 -/
 
@@ -102,13 +102,13 @@ the advantage `G₀.advantage G₁ A` is bounded by the cumulative expected
 ε-cost (computed on the conjugated handler) plus the heap-side
 probability that the bad flag fires in `G₀`'s execution.
 
-* `h_step_tv_S` — on a costly query from a no-bad heap (as witnessed by
+* `h_step_tv_S` — on a charged query from a no-bad heap (as witnessed by
   `φ.symm (s, false)`), the two heap handlers are ε-close in TV.
-* `h_step_eq_nS` — on a free query, the handlers are pointwise equal on
+* `h_step_eq_nS` — on a uncharged query, the handlers are pointwise equal on
   every heap.
 * `h_mono₀` — once bad has fired in `G₀`'s heap, every reachable next
   heap also has bad fired. -/
-theorem advantage_le_expectedSCost_plus_probEvent_bad
+theorem advantage_le_expectedQuerySlack_plus_probEvent_bad
     (G₀ G₁ : Package unifSpec E Ident)
     (φ : Heap Ident ≃ σ × Bool) (s_init : σ)
     (h_init₀ : G₀.init = pure (φ.symm (s_init, false)))
@@ -124,11 +124,9 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
-      ≤ expectedSCost (implConjugate G₀.impl φ) S ε A qS (s_init, false)
+      ≤ expectedQuerySlack (implConjugate G₀.impl φ) S ε A qS (s_init, false)
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
             (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
   set G₀' := implConjugate G₀.impl φ with hG₀'_def
@@ -164,10 +162,10 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
       ENNReal.ofReal
           (tvDist ((simulateQ G₀' A).run' (s_init, false))
                   ((simulateQ G₁' A).run' (s_init, false)))
-        ≤ expectedSCost G₀' S ε A qS (s_init, false)
+        ≤ expectedQuerySlack G₀' S ε A qS (s_init, false)
           + Pr[fun z : Bool × σ × Bool => z.2.2 = true |
               (simulateQ G₀' A).run (s_init, false)] :=
-    ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
+    ofReal_tvDist_simulateQ_le_expectedQuerySlack_plus_probEvent_output_bad
       G₀' G₁' S ε h_step_tv_S' h_step_eq_nS' h_mono₀' A h_qb s_init
   have h_runProb₀ : 𝒟[G₀.runProb A]
       = 𝒟[(simulateQ G₀' A).run' (s_init, false)] := by
@@ -208,10 +206,10 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
     rfl
   calc ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ _ := h_ofreal_adv
-    _ ≤ expectedSCost G₀' S ε A qS (s_init, false)
+    _ ≤ expectedQuerySlack G₀' S ε A qS (s_init, false)
           + Pr[fun z : Bool × σ × Bool => z.2.2 = true |
               (simulateQ G₀' A).run (s_init, false)] := h_bridge
-    _ = expectedSCost G₀' S ε A qS (s_init, false)
+    _ = expectedQuerySlack G₀' S ε A qS (s_init, false)
           + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
               (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
           rw [h_probEvent_eq]
@@ -220,9 +218,9 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
 
 /-- Invariant-gated state-dependent ε-perturbed identical-until-bad.
 
-Variant of `advantage_le_expectedSCost_plus_probEvent_bad` where the
+Variant of `advantage_le_expectedQuerySlack_plus_probEvent_bad` where the
 costly-step TV hypothesis is required only for states satisfying an
-invariant `Inv`. The generated cost function charges the intended `ε s`
+invariant `Inv`. The generated query-slack function charges the intended `ε s`
 on invariant states and the conservative fallback cost `1` elsewhere.
 
 This is the first reusable layer for proofs whose package handler only
@@ -230,7 +228,7 @@ has a meaningful cryptographic interpretation on reachable states. A
 separate preservation/cost-congruence lemma can later eliminate the
 fallback branch when the real handler preserves `Inv` from the initial
 state. -/
-theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
+theorem advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv
     (G₀ G₁ : Package unifSpec E Ident)
     (φ : Heap Ident ≃ σ × Bool) (s_init : σ)
     (h_init₀ : G₀.init = pure (φ.symm (s_init, false)))
@@ -247,15 +245,13 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
-      ≤ expectedSCost (implConjugate G₀.impl φ) S
+      ≤ expectedQuerySlack (implConjugate G₀.impl φ) S
           (fun s => if Inv s then ε s else 1) A qS (s_init, false)
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
             (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
-  refine advantage_le_expectedSCost_plus_probEvent_bad
+  refine advantage_le_expectedQuerySlack_plus_probEvent_bad
     G₀ G₁ φ s_init h_init₀ h_init₁ S (fun s => if Inv s then ε s else 1) ?_
     h_step_eq_nS h_mono₀ A h_qb
   intro t hSt s
@@ -268,13 +264,13 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
 
 /-- Invariant-preserving state-dependent ε-perturbed identical-until-bad.
 
-Corollary of `advantage_le_expectedSCost_plus_probEvent_bad_of_inv` for
+Corollary of `advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv` for
 handlers that preserve `Inv` from the initial no-bad state. Unlike the
 basic invariant-gated theorem, the final expected-cost term is stated
-with the tight cost function `ε`; the generic
-`expectedSCost_eq_of_inv` lemma removes the fallback branch because it is
+with the tight query-slack function `ε`; the generic
+`expectedQuerySlack_eq_of_inv` lemma removes the fallback branch because it is
 unreachable under `G₀`'s support. -/
-theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
+theorem advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv_preserved
     (G₀ G₁ : Package unifSpec E Ident)
     (φ : Heap Ident ≃ σ × Bool) (s_init : σ)
     (h_init₀ : G₀.init = pure (φ.symm (s_init, false)))
@@ -294,22 +290,20 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
-      ≤ expectedSCost (implConjugate G₀.impl φ) S ε A qS (s_init, false)
+      ≤ expectedQuerySlack (implConjugate G₀.impl φ) S ε A qS (s_init, false)
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
             (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
   classical
-  have h_bridge := advantage_le_expectedSCost_plus_probEvent_bad_of_inv
+  have h_bridge := advantage_le_expectedQuerySlack_plus_probEvent_bad_of_inv
     G₀ G₁ φ s_init h_init₀ h_init₁ Inv S ε h_step_tv_S
     h_step_eq_nS h_mono₀ A h_qb
   have h_cost_eq :
-      expectedSCost (implConjugate G₀.impl φ) S
+      expectedQuerySlack (implConjugate G₀.impl φ) S
           (fun s => if Inv s then ε s else 1) A qS (s_init, false)
-        = expectedSCost (implConjugate G₀.impl φ) S ε A qS (s_init, false) :=
-    expectedSCost_eq_of_inv (implConjugate G₀.impl φ) S Inv
+        = expectedQuerySlack (implConjugate G₀.impl φ) S ε A qS (s_init, false) :=
+    expectedQuerySlack_eq_of_inv (implConjugate G₀.impl φ) S Inv
       (ε := fun s => if Inv s then ε s else 1) (ε' := ε)
       (fun s hs => by simp [hs]) h_pres A qS (s_init, false)
       (by intro _; exact h_init_inv)
@@ -319,10 +313,10 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
 
 /-- Constant-ε identical-until-bad.
 
-Constant-ε corollary of `advantage_le_expectedSCost_plus_probEvent_bad`,
+Constant-ε corollary of `advantage_le_expectedQuerySlack_plus_probEvent_bad`,
 derived by specialising `ε := fun _ => ε_const` and bounding
-`expectedSCost` by `qS · ε_const` via `expectedSCost_const_le_qS_mul`. -/
-theorem advantage_le_qSeps_plus_probEvent_bad
+`expectedQuerySlack` by `q · ε_const` via `expectedQuerySlack_const_le_queryBudget_mul`. -/
+theorem advantage_le_queryBound_mul_slack_plus_probEvent_bad
     (G₀ G₁ : Package unifSpec E Ident)
     (φ : Heap Ident ≃ σ × Bool) (s_init : σ)
     (h_init₀ : G₀.init = pure (φ.symm (s_init, false)))
@@ -338,19 +332,18 @@ theorem advantage_le_qSeps_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ qS * ε
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
             (simulateQ G₀.impl A).run (φ.symm (s_init, false))] := by
   refine le_trans
-    (advantage_le_expectedSCost_plus_probEvent_bad
+    (advantage_le_expectedQuerySlack_plus_probEvent_bad
       G₀ G₁ φ s_init h_init₀ h_init₁ S (fun _ => ε)
       h_step_tv_S h_step_eq_nS h_mono₀ A h_qb) ?_
   gcongr
-  exact expectedSCost_const_le_qS_mul (implConjugate G₀.impl φ) S ε A h_qb (s_init, false)
+  exact expectedQuerySlack_const_le_queryBudget_mul
+    (implConjugate G₀.impl φ) S ε A h_qb (s_init, false)
 
 end Package
 
