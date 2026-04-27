@@ -1078,10 +1078,15 @@ def tryRawWpStructuralStep : TacticM Bool := do
     | none => wpGoalComp? target
   let some comp := comp? | return false
   let comp ← instantiateMVars comp
-  if ← runRawWpVCSpecBackward then
-    return true
+  let isLowerBoundGoal := (rawWPGoalParts? target).isSome
+  if isLowerBoundGoal then
+    if ← runRawWpVCSpecBackward then
+      return true
   if ← runWpStepRules then
     return true
+  unless isLowerBoundGoal do
+    if ← runRawWpVCSpecBackward then
+      return true
   if ← tryMatchDecomp comp then
     return true
   return false
