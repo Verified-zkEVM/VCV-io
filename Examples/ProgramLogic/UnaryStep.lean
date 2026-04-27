@@ -104,6 +104,32 @@ example (oa : OracleComp spec α) (post : α → Nat → ℝ≥0∞) :
     ⦃post⦄ := by
   vcstep
 
+example (oa : OracleComp spec α) (post : Nat × α → Nat → ℝ≥0∞) :
+    ⦃fun s => wp⟦oa⟧ (fun a => post (s, a) (s + 1))⦄
+      (do
+        let s ← (MonadStateOf.get : StateT Nat (OracleComp spec) Nat)
+        MonadStateOf.set (s + 1)
+        let a ← (MonadLift.monadLift oa : StateT Nat (OracleComp spec) α)
+        pure (s, a))
+    ⦃post⦄ := by
+  vcgen
+
+example (s' : Nat) (oa : OracleComp spec α) (post : α → Nat → ℝ≥0∞) :
+    ⦃fun _ => wp⟦oa⟧ (fun a => post a s')⦄
+      (do
+        MonadStateOf.set s'
+        MonadLift.monadLift oa : StateT Nat (OracleComp spec) α)
+    ⦃post⦄ := by
+  vcgen
+
+example (f : Nat → α × Nat) (post : α → Nat → ℝ≥0∞) :
+    ⦃fun s => post (f s).1 (f s).2⦄
+      (do
+        let a ← (MonadStateOf.modifyGet f : StateT Nat (OracleComp spec) α)
+        pure a)
+    ⦃post⦄ := by
+  vcgen
+
 /--
 info: [wpstep cache] hit `OracleComp.ProgramLogic.wp_replicate_succ`
 ---

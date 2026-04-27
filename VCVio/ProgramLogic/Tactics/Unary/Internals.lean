@@ -116,6 +116,18 @@ theorem stdDoTriple_bind_wp {m : Type u → Type v}
   exact Std.Do'.Triple.bind x f (fun a => Std.Do'.wp (f a) post epost) h
     (fun _ => Std.Do'.Triple.iff.mpr Lean.Order.PartialOrder.rel_refl)
 
+/-- Close a Loom triple from the corresponding WP entailment.
+
+This is just `Std.Do'.Triple.iff.mpr` packaged as a theorem so tactic code can expose
+the weakest-precondition side condition and then run transformer-specific WP normalizers. -/
+theorem stdDoTriple_of_wp_le {m : Type u → Type v}
+    {Pred EPred : Type u} {α : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {pre : Pred} (x : m α) (post : α → Pred) (epost : EPred)
+    (hpre : Lean.Order.PartialOrder.rel pre (Std.Do'.wp x post epost)) :
+    Std.Do'.Triple pre x post epost :=
+  Std.Do'.Triple.iff.mpr hpre
+
 attribute [vcspec]
   OracleComp.ProgramLogic.triple_pure
   wp_pure_le_vcspec
@@ -1155,15 +1167,36 @@ private def tryStateTSpecStep : TacticM Bool := do
   saved.restore
   return false
 
-private def normalizeStateTWPInGoal : TacticM Unit := do
-  discard <| tryEvalTacticSyntax (← `(tactic|
+private def normalizeKnownTransformerWPInGoal : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
     simp only [
       OracleComp.ProgramLogic.Loom.wp_StateT_bind,
       OracleComp.ProgramLogic.Loom.wp_StateT_bind',
+      OracleComp.ProgramLogic.Loom.wp_StateT_pure,
       OracleComp.ProgramLogic.Loom.wp_StateT_get,
       OracleComp.ProgramLogic.Loom.wp_StateT_set,
       OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
       OracleComp.ProgramLogic.Loom.wp_StateT_monadLift]))
+
+private def tryCloseNormalizedTransformerWP : TacticM Bool := do
+  let saved ← saveState
+  let target ← instantiateMVars (← getMainTarget)
+  let some comp := tripleGoalComp? target | return false
+  let compType ← instantiateMVars (← inferType comp)
+  -- The normalizer set below currently contains StateT rules. The closing
+  -- theorem is transformer-generic, so extending the normalizer set is enough
+  -- to cover additional transformer stacks.
+  unless (findAppWithHead? ``StateT compType).isSome do
+    return false
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_of_wp_le)) then
+    discard <| normalizeKnownTransformerWPInGoal
+    discard <| tryEvalTacticSyntax (← `(tactic| try intro _))
+    if ← tryEvalTacticSyntax (← `(tactic| exact le_rfl)) then
+      if (← getGoals).isEmpty then
+        return true
+  saved.restore
+  return false
 
 /-- Structural/default unary VCGen step, excluding explicit cut/invariant/theorem-driven
 fallbacks and the final close/search phase. -/
@@ -1185,7 +1218,7 @@ def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
-      normalizeStateTWPInGoal
+      discard <| normalizeKnownTransformerWPInGoal
       if ← tryStateTSpecStep then
         return true
       if isBindExpr comp then
@@ -1374,7 +1407,11 @@ def runVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       return true
+  if ← tryCloseNormalizedTransformerWP then
+    return true
   if ← runVCGenStructuralCore then
+    return true
+  if ← tryCloseSpecGoal then
     return true
   if let some entry ← findRegisteredVCGenRule? then
     if ← runUnaryVCSpecRule entry then

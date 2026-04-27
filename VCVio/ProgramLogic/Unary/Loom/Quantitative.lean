@@ -251,6 +251,16 @@ theorem wp_StateT_bind' {σ : Type} (x : StateT σ (OracleComp spec) α)
   exact wp_StateT_bind x f post
 
 @[simp]
+theorem wp_StateT_pure {σ : Type} (x : α) (post : α → σ → ℝ≥0∞) :
+    Std.Do'.wp (pure x : StateT σ (OracleComp spec) α) post Lean.Order.bot =
+      fun s => post x s := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (x, s) : OracleComp spec (α × σ))
+      (fun p : α × σ => post p.1 p.2) = post x s
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
 theorem wp_StateT_get {σ : Type} (post : σ → σ → ℝ≥0∞) :
     Std.Do'.wp (MonadStateOf.get : StateT σ (OracleComp spec) σ) post Lean.Order.bot =
       fun s => post s s := by
