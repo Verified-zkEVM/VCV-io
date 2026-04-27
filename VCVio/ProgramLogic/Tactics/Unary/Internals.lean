@@ -1180,7 +1180,11 @@ private def normalizeKnownTransformerWPInGoal : TacticM Bool := do
       OracleComp.ProgramLogic.Loom.wp_OptionT_bind,
       OracleComp.ProgramLogic.Loom.wp_OptionT_pure,
       OracleComp.ProgramLogic.Loom.wp_OptionT_failure,
-      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift]))
+      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_bind,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_pure,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_throw,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_monadLift]))
 
 private def tryCloseNormalizedTransformerWP : TacticM Bool := do
   let saved ← saveState
@@ -1190,7 +1194,8 @@ private def tryCloseNormalizedTransformerWP : TacticM Bool := do
   -- The theorem bridge is transformer-generic; each supported transformer adds
   -- a syntactic gate here and WP equations to `normalizeKnownTransformerWPInGoal`.
   unless (findAppWithHead? ``StateT compType).isSome ||
-      (findAppWithHead? ``OptionT compType).isSome do
+      (findAppWithHead? ``OptionT compType).isSome ||
+      (findAppWithHead? ``ExceptT compType).isSome do
     return false
   if ← tryEvalTacticSyntax (← `(tactic|
       apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_of_wp_le)) then

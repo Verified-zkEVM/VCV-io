@@ -355,6 +355,55 @@ theorem wp_OptionT_monadLift (oa : OracleComp spec α) (post : α → ℝ≥0∞
   funext a
   rw [MAlgOrdered.wp_pure]
 
+/-! ## `ExceptT (OracleComp spec)` WP normalization -/
+
+@[simp]
+theorem wp_ExceptT_bind {ε : Type} (x : ExceptT ε (OracleComp spec) α)
+    (f : α → ExceptT ε (OracleComp spec) β) (post : β → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (x >>= f) post epost =
+      Std.Do'.wp x (fun a => Std.Do'.wp (f a) post epost) epost := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) ((x >>= f).run)
+      (epost.pushExcept post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run
+      (epost.pushExcept fun a =>
+        MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) (f a).run
+          (epost.pushExcept post))
+  rw [ExceptT.run_bind, MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) x.run) ?_
+  funext ea
+  cases ea <;> simp [EPost.cons.pushExcept, MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_pure {ε : Type} (x : α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (pure x : ExceptT ε (OracleComp spec) α) post epost = post x := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (Except.ok x) : OracleComp spec (Except ε α)) (epost.pushExcept post) = post x
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_throw {ε : Type} (e : ε) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (throw e : ExceptT ε (OracleComp spec) α) post epost = epost.head e := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (pure (Except.error e) : OracleComp spec (Except ε α)) (epost.pushExcept post) =
+    epost.head e
+  rw [MAlgOrdered.wp_pure]
+
+@[simp]
+theorem wp_ExceptT_monadLift {ε : Type} (oa : OracleComp spec α) (post : α → ℝ≥0∞)
+    (epost : EPost.cons (ε → ℝ≥0∞) EPost.nil) :
+    Std.Do'.wp (MonadLift.monadLift oa : ExceptT ε (OracleComp spec) α) post epost =
+      Std.Do'.wp oa post Lean.Order.bot := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞)
+      (oa >>= fun a => pure (Except.ok a)) (epost.pushExcept post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa post
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ℝ≥0∞) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
 /-- `Std.Do'.Triple` agrees with `MAlgOrdered.Triple` propositionally.
 
 Use as a forward iff: `triple_iff_mAlgOrdered_triple.mp` extracts

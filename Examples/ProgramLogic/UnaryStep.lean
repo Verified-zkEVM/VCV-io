@@ -152,6 +152,28 @@ example (post : α → ℝ≥0∞) (nonePost : ℝ≥0∞) :
       post epost⟨nonePost⟩ := by
   vcgen
 
+/-! ## `ExceptT (OracleComp spec)` transformer steps -/
+
+example (oa : OracleComp spec α) (post : α → ℝ≥0∞) (errPost : String → ℝ≥0∞) :
+    Std.Do'.Triple (wp⟦oa⟧ post)
+      (MonadLift.monadLift oa : ExceptT String (OracleComp spec) α)
+      post epost⟨errPost⟩ := by
+  vcgen
+
+example (oa : OracleComp spec α) (post : α → ℝ≥0∞) (errPost : String → ℝ≥0∞) :
+    Std.Do'.Triple (wp⟦oa⟧ post)
+      (do
+        let a ← (MonadLift.monadLift oa : ExceptT String (OracleComp spec) α)
+        pure a)
+      post epost⟨errPost⟩ := by
+  vcgen
+
+example (err : String) (post : α → ℝ≥0∞) (errPost : String → ℝ≥0∞) :
+    Std.Do'.Triple (errPost err)
+      (throw err : ExceptT String (OracleComp spec) α)
+      post epost⟨errPost⟩ := by
+  vcgen
+
 /--
 info: [wpstep cache] hit `OracleComp.ProgramLogic.wp_replicate_succ`
 ---
