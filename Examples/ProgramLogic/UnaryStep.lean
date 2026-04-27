@@ -103,7 +103,7 @@ example :
 
 @[local vcspec] theorem stdDoTriple_wrappedTrue :
     Std.Do'.Triple (1 : ℝ≥0∞) (wrappedTrue (spec := spec))
-      (fun y => if y = true then (1 : ℝ≥0∞) else 0) ⊥ₗ := by
+      (fun y => if y = true then (1 : ℝ≥0∞) else 0) epost⟨⟩ := by
   exact triple_wrappedTrue (spec := spec)
 
 example :

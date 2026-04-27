@@ -128,14 +128,6 @@ lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
 
 /-! ## Notation -/
 
-/-- Lean-core order bottom for Loom/Std.Do exception postconditions.
-
-This is scoped because `Std.Do'.Triple` / `Std.Do'.RelTriple` use
-`Lean.Order.bot`, while Mathlib's ordinary `⊥` notation resolves through a
-different order hierarchy.  We use a distinct token to avoid ambiguity with
-the ordinary bottom notation. -/
-scoped notation "⊥ₗ" => Lean.Order.bot
-
 /-- Prop indicator: `⌜P⌝ = 1` if `P` holds, `0` otherwise.
 Mirrors Std.Do's `⌜P⌝ : SPred` but targets `ℝ≥0∞`. -/
 scoped notation "⌜" P "⌝" => propInd P
@@ -150,6 +142,18 @@ scoped syntax:max (name := wpBracketApp) "wp⟦" term "⟧" term:max : term
 scoped macro_rules
   | `(wp⟦ $c ⟧ $post:term) => `(wp $c $post)
   | `(wp⟦ $c ⟧)            => `(fun post => wp $c post)
+
+/-- Raw relational WP notation.
+`rwp⟦c₁ ~ c₂ | post ; epost₁, epost₂⟧` elaborates to `Std.Do'.rwp`.
+The normal assertion carrier and both exception-post carriers are inferred from
+`post`, `epost₁`, and `epost₂`, so this notation also works for stateful and
+exception-aware `RelWP` instances. -/
+scoped syntax:max (name := relWpBracket)
+  "rwp⟦" term:lead " ~ " term:lead " | " term " ; " term ", " term "⟧" : term
+
+scoped macro_rules (kind := relWpBracket)
+  | `(rwp⟦ $c₁ ~ $c₂ | $post ; $epost₁, $epost₂ ⟧) =>
+      `(Std.Do'.rwp $c₁ $c₂ $post $epost₁ $epost₂)
 
 /-- Quantitative Hoare triple notation: `⦃P⦄ c ⦃Q⦄` means `Triple P c Q`,
 which is `pre ≤ wp c post` after `triple_iff_le_wp`. The wrapper avoids
@@ -179,7 +183,7 @@ scoped notation "⟪" c₁ " ≈[" ε "] " c₂ " | " R "⟫" =>
 scoped syntax:lead "⦃" term "⦄ " term:lead " ≈ₑ " term:lead " ⦃" term "⦄" : term
 macro_rules
   | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) =>
-      `(Std.Do'.RelTriple $f $c₁ $c₂ $g ⊥ₗ ⊥ₗ)
+      `(Std.Do'.RelTriple $f $c₁ $c₂ $g Lean.Order.bot Lean.Order.bot)
 
 /-! ## Bridge lemmas: `⌜⌝` and existing API -/
 

@@ -69,24 +69,20 @@ example :
   rvcstep
 
 @[local vcspec] theorem rawRWP_wrappedTruePair :
-    (1 : ℝ≥0∞) ⊑ (Std.Do'.rwp
-      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-      (wrappedTrueLeft (spec := spec)) (wrappedTrueRight (spec := spec))
-      (fun x y => if x = y then (1 : ℝ≥0∞) else 0)
-      ⊥ₗ ⊥ₗ) := by
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
   simpa [wrappedTrueLeft, wrappedTrueRight] using
     (Std.Do'.RelWP.rwp_pure
       (m₁ := OracleComp spec) (m₂ := OracleComp spec)
       (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
       true true (fun x y => if x = y then (1 : ℝ≥0∞) else 0)
-      ⊥ₗ ⊥ₗ)
+      epost⟨⟩ epost⟨⟩)
 
 example :
-    (1 : ℝ≥0∞) ⊑ (Std.Do'.rwp
-      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-      (wrappedTrueLeft (spec := spec)) (wrappedTrueRight (spec := spec))
-      (fun _ _ => (1 : ℝ≥0∞))
-      ⊥ₗ ⊥ₗ) := by
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
 
 example :

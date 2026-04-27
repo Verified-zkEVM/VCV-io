@@ -151,6 +151,30 @@ def runERelBindRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   tryEvalTacticSyntax (← `(tactic|
     refine OracleComp.ProgramLogic.Relational.Loom.relTriple_bind (cut := $cut) ?_ ?_))
 
+private def runStdDoRelTripleBindLeftRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (_pre, oa, ob, _post) := stdDoRelTripleGoalParts? target
+    | return false
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless isBindExpr oa && !isBindExpr ob do
+    return false
+  tryEvalTacticSyntax (← `(tactic|
+    refine Lean.Order.PartialOrder.rel_trans ?_
+      (Std.Do'.RelWP.rwp_bind_left_le _ _ _ _ _ _)))
+
+private def runStdDoRelTripleBindRightRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (_pre, oa, ob, _post) := stdDoRelTripleGoalParts? target
+    | return false
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless !isBindExpr oa && isBindExpr ob do
+    return false
+  tryEvalTacticSyntax (← `(tactic|
+    refine Lean.Order.PartialOrder.rel_trans ?_
+      (Std.Do'.RelWP.rwp_bind_right_le _ _ _ _ _ _)))
+
 /-- Monad-law normalization used as a fallback when a direct `relTriple_bind`
 attempt fails. Flattens nested binds (`bind_assoc`) and reduces `pure_bind` so
 that `commit`-style intermediate computations (e.g. `do x ← oa; pure (x, x)`)
@@ -507,6 +531,32 @@ private def runRawRelWPBindRule : TacticM Bool := do
     refine Lean.Order.PartialOrder.rel_trans ?_
       (Std.Do'.RelWP.rwp_bind_le _ _ _ _ _ _ _)))
 
+/-- Explicit left-bind rule for raw `Std.Do'.rwp` goals. -/
+private def runRawRelWPBindLeftRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (_pre, oa, ob, _post, _epost₁, _epost₂) := rawRelWPGoalFullParts? target
+    | return false
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless isBindExpr oa && !isBindExpr ob do
+    return false
+  tryEvalTacticSyntax (← `(tactic|
+    refine Lean.Order.PartialOrder.rel_trans ?_
+      (Std.Do'.RelWP.rwp_bind_left_le _ _ _ _ _ _)))
+
+/-- Explicit right-bind rule for raw `Std.Do'.rwp` goals. -/
+private def runRawRelWPBindRightRule : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  let some (_pre, oa, ob, _post, _epost₁, _epost₂) := rawRelWPGoalFullParts? target
+    | return false
+  let oa ← whnfReducible (← instantiateMVars oa)
+  let ob ← whnfReducible (← instantiateMVars ob)
+  unless !isBindExpr oa && isBindExpr ob do
+    return false
+  tryEvalTacticSyntax (← `(tactic|
+    refine Lean.Order.PartialOrder.rel_trans ?_
+      (Std.Do'.RelWP.rwp_bind_right_le _ _ _ _ _ _)))
+
 /-- Try direct-hit registered `@[vcspec]` rules against a raw relational WP goal. -/
 private def runRawRelWPVCSpecBackward : TacticM Bool := do
   withVCGenRegisteredTiming do
@@ -527,6 +577,14 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
         return true
       saved.restore
     return false
+
+/-- Controlled one-sided relational bind step on the left. -/
+def runRVCGenRawBindLeftStep : TacticM Bool := withMainContext do
+  runRawRelWPBindLeftRule <||> runStdDoRelTripleBindLeftRule
+
+/-- Controlled one-sided relational bind step on the right. -/
+def runRVCGenRawBindRightStep : TacticM Bool := withMainContext do
+  runRawRelWPBindRightRule <||> runStdDoRelTripleBindRightRule
 
 def runRVCGenCore : TacticM Bool := withVCGenStructuralTiming <| withMainContext do
   tryNormalizeRelBindStructure

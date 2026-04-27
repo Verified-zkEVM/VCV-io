@@ -221,38 +221,95 @@ example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
 /-! ## Quantitative `Std.Do'.RelTriple` path -/
 
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
-    Std.Do'.RelTriple (post a b)
-      (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
-      ⊥ₗ ⊥ₗ := by
+    ⦃post a b⦄
+      (pure a : OracleComp spec α) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
   rvcstep
 
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
-    post a b ⊑ (Std.Do'.rwp
-      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-      (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
-      ⊥ₗ ⊥ₗ) := by
+    post a b ⊑
+      rwp⟦(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) |
+        post ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
 
 example (a : α) (b : β)
     (f : α → OracleComp spec γ) (g : β → OracleComp spec δ)
     (post : γ → δ → ℝ≥0∞) :
-    Std.Do'.rwp
-        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-        (f a) (g b) post ⊥ₗ ⊥ₗ ⊑
-      Std.Do'.rwp
-        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-        ((pure a : OracleComp spec α) >>= f) ((pure b : OracleComp spec β) >>= g) post
-        ⊥ₗ ⊥ₗ := by
+    rwp⟦f a ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcgen
 
 example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
     (f : α → γ) (g : β → δ)
     (post : γ → δ → ℝ≥0∞) :
     post (f a) (g b) ⊑
-      Std.Do'.rwp
-        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-        ((pure a : OracleComp spec α) >>= fun x => pure (f x))
-        ((pure b : OracleComp spec β) >>= fun y => pure (g y))
-        post ⊥ₗ ⊥ₗ := by
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          pure (f x))
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          pure (g y))
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (pure b : OracleComp spec β)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (pure a : OracleComp spec α)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep right
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    ⦃rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (do
+        let x ← (pure a : OracleComp spec α)
+        f x) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    ⦃rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (pure a : OracleComp spec α) ≈ₑ
+      (do
+        let y ← (pure b : OracleComp spec β)
+        g y)
+    ⦃post⦄ := by
+  rvcstep right
   rvcgen
 

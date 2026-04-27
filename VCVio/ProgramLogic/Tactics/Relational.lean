@@ -61,8 +61,15 @@ bounded traversals, bind decomposition, or random/query coupling.
 - traversal input relation (`List.mapM` / `List.foldlM`)
 - `simulateQ` state relation
 
+`rvcstep left` and `rvcstep right` expose controlled one-sided bind steps for
+raw `Std.Do'.rwp` and folded `Std.Do'.RelTriple` goals. They do not run as part
+of default relational automation, because choosing an asynchronous split fixes a
+coupling frontier.
+
 `rvcstep with thm` forces one explicit relational theorem/assumption step. -/
 syntax "rvcstep" ("using" term)? : tactic
+syntax "rvcstep" "left" : tactic
+syntax "rvcstep" "right" : tactic
 syntax "rvcstep" "with" term : tactic
 syntax "rvcstep" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
@@ -93,6 +100,14 @@ elab_rules : tactic
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcstep left) => do
+      if ← TacticInternals.Relational.runRVCGenRawBindLeftStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep right) => do
+      if ← TacticInternals.Relational.runRVCGenRawBindRightStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep with $thm) => do
       if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
         return
