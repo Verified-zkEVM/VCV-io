@@ -1593,16 +1593,12 @@ theorem cmaSignEps_expectedSCost_le
     (ζ_zk β : ℝ≥0∞) {α : Type}
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
     (qS qH : ℕ)
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
-    (h_qH : OracleComp.IsQueryBound A qH
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS)
+    (h_qH : OracleComp.IsQueryBoundP A
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qH)
     (s : CmaInnerData M Commit Chal (Stmt := Stmt) (Wit := Wit))
     (h_valid : CmaInnerData.Valid (rel := rel) s) :
     expectedSCost
@@ -1625,12 +1621,12 @@ theorem cmaSignEps_expectedSCost_le
   | pure x =>
       simp
   | query_bind t cont ih =>
-      rw [isQueryBound_query_bind_iff] at h_qb h_qH
+      rw [isQueryBoundP_query_bind_iff] at h_qb h_qH
       obtain ⟨hcanS, hcontS⟩ := h_qb
       obtain ⟨hcanH, hcontH⟩ := h_qH
       rcases t with ((n | mc) | m) | ⟨⟩
       · -- Uniform query: no charge, no cache growth, budgets unchanged.
-        simp only [IsCostlyQuery, IsHashQuery, if_false] at hcanS hcontS hcanH hcontH
+        simp only [IsCostlyQuery, IsHashQuery, if_false] at hcontS hcontH
         have hnotCost :
             ¬ IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt) (Sum.inl (Sum.inl (Sum.inl n))) := by
@@ -1706,8 +1702,8 @@ theorem cmaSignEps_expectedSCost_le
           _ = (qS : ℝ≥0∞) * ζ_zk +
                 (qS : ℝ≥0∞) * (cacheCount s.2.1 + qS + qH) * β := one_mul _
       · -- Random-oracle query: no sign charge, one unit of hash budget may grow the cache.
-        simp only [IsCostlyQuery, IsHashQuery, if_false, if_true] at hcanS hcontS hcanH hcontH
-        have hqH_pos : 0 < qH := hcanH
+        simp only [IsCostlyQuery, IsHashQuery, if_false, if_true] at hcontS hcontH
+        have hqH_pos : 0 < qH := by simpa [IsHashQuery] using hcanH
         have hnotCost :
             ¬ IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt) (Sum.inl (Sum.inl (Sum.inr mc))) := by
@@ -1781,8 +1777,8 @@ theorem cmaSignEps_expectedSCost_le
           _ = (qS : ℝ≥0∞) * ζ_zk +
                 (qS : ℝ≥0∞) * (cacheCount s.2.1 + qS + qH) * β := one_mul _
       · -- Signing query: pay current ε and recurse with one less sign budget.
-        simp only [IsCostlyQuery, IsHashQuery, if_true, if_false] at hcanS hcontS hcanH hcontH
-        have hqS_pos : 0 < qS := hcanS
+        simp only [IsCostlyQuery, IsHashQuery, if_true, if_false] at hcontS hcontH
+        have hqS_pos : 0 < qS := by simpa [IsCostlyQuery] using hcanS
         have hcost :
             IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt) (Sum.inl (Sum.inr m)) := True.intro
@@ -1891,7 +1887,7 @@ theorem cmaSignEps_expectedSCost_le
                 simpa [cmaSignEps, h_valid] using
                   cmaSignEps_accum_step_le ζ_zk β (cacheCount s.2.1) qS qH hqS_pos
       · -- Public-key query: no charge, no cache growth, budgets unchanged.
-        simp only [IsCostlyQuery, IsHashQuery, if_false] at hcanS hcontS hcanH hcontH
+        simp only [IsCostlyQuery, IsHashQuery, if_false] at hcontS hcontH
         have hnotCost :
             ¬ IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp) (Stmt := Stmt) (Sum.inr ()) := by
@@ -1979,16 +1975,12 @@ theorem cmaSignEpsCore_expectedSCost_le
     (ζ_zk β : ℝ≥0∞) {α : Type}
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) α)
     (qS qH : ℕ)
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
-    (h_qH : OracleComp.IsQueryBound A qH
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS)
+    (h_qH : OracleComp.IsQueryBoundP A
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qH) :
     expectedSCost
         (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
           (cmaHeapStateEquiv M Commit Chal (Stmt := Stmt) (Wit := Wit)))
@@ -2062,11 +2054,9 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound_of_expectedSCost
     (hCommit : σ.simCommitPredictability simT β)
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
     (qS : ℕ) (εBound : ℝ≥0∞)
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS)
     (h_cost_le :
       expectedSCost
         (Package.implConjugate (cmaReal M Commit Chal σ hr).impl
@@ -2163,16 +2153,12 @@ theorem cmaReal_cmaSim_advantage_le_H3_bound
     (hCommit : σ.simCommitPredictability simT β)
     (A : OracleComp (cmaSpec M Commit Chal Resp Stmt) Bool)
     (qS qH : ℕ)
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b))
-    (h_qH : OracleComp.IsQueryBound A qH
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS)
+    (h_qH : OracleComp.IsQueryBoundP A
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qH) :
     ENNReal.ofReal ((cmaReal M Commit Chal σ hr).advantage
         (cmaSim M Commit Chal hr simT) A)
       ≤ (qS : ℝ≥0∞) * ζ_zk + (qS : ℝ≥0∞) * (qS + qH) * β := by

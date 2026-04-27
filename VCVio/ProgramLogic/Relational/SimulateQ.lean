@@ -1895,9 +1895,7 @@ private theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_outp
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
       ≤ expectedSCost impl₁ S ε oa qS p
@@ -1930,15 +1928,15 @@ private theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_outp
           rw [h_cost_zero, zero_add, h_bad₁]
           exact h_lhs_le_one
       | false =>
-          rw [isQueryBound_query_bind_iff] at h_qb
+          rw [isQueryBoundP_query_bind_iff] at h_qb
           obtain ⟨h_can, h_cont⟩ := h_qb
           by_cases hSt : S t
-          · simp only [hSt, if_true] at h_can h_cont
-            have hqS_pos : 0 < qS := h_can
+          · have hqS_pos : 0 < qS := h_can.resolve_left (not_not_intro hSt)
+            simp only [if_pos hSt] at h_cont
             exact ofReal_tvDist_simulateQ_run_costly_query_bind_le_expectedSCost
               impl₁ impl₂ S ε h_step_tv_S t cont hSt hqS_pos
               (fun u p' => ih u (h_cont u) p') s
-          · simp only [hSt, if_false] at h_can h_cont
+          · simp only [if_neg hSt] at h_cont
             exact ofReal_tvDist_simulateQ_run_free_query_bind_le_expectedSCost
               impl₁ impl₂ S ε h_step_eq_nS t cont hSt
               (fun u p' => ih u (h_cont u) p') s
@@ -1965,9 +1963,7 @@ theorem ofReal_tvDist_simulateQ_run_le_expectedSCost_plus_probEvent_output_bad
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
       ≤ expectedSCost impl₁ S ε oa qS p
@@ -1989,9 +1985,7 @@ theorem ofReal_tvDist_simulateQ_le_expectedSCost_plus_probEvent_output_bad
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (s₀ : σ) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run' (s₀, false))
         ((simulateQ impl₂ oa).run' (s₀, false)))
@@ -2027,9 +2021,7 @@ lemma expectedSCost_const_le_qS_mul
     (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
     (S : spec.Domain → Prop) [DecidablePred S] (ε : ℝ≥0∞)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (p : σ × Bool) :
     expectedSCost impl S (fun _ => ε) oa qS p ≤ qS * ε := by
   induction oa using OracleComp.inductionOn generalizing qS p with
@@ -2039,11 +2031,11 @@ lemma expectedSCost_const_le_qS_mul
       cases b with
       | true => simp [expectedSCost_bad_eq_zero]
       | false =>
-          rw [isQueryBound_query_bind_iff] at h_qb
+          rw [isQueryBoundP_query_bind_iff] at h_qb
           obtain ⟨h_can, h_cont⟩ := h_qb
           by_cases hSt : S t
-          · simp only [hSt, if_true] at h_can h_cont
-            have hqS_pos : 0 < qS := h_can
+          · have hqS_pos : 0 < qS := h_can.resolve_left (not_not_intro hSt)
+            simp only [if_pos hSt] at h_cont
             rw [expectedSCost_query_bind,
                 expectedSCostStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
             have h_tsum_le : (∑' z : spec.Range t × σ × Bool,
@@ -2082,7 +2074,7 @@ lemma expectedSCost_const_le_qS_mul
                     have : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
                     exact_mod_cast this
             exact h_main
-          · simp only [hSt, if_false] at h_can h_cont
+          · simp only [if_neg hSt] at h_cont
             rw [expectedSCost_query_bind,
                 expectedSCostStep_free _ _ _ _ _ _ _ hSt]
             calc (∑' z : spec.Range t × σ × Bool,
@@ -2119,9 +2111,7 @@ theorem ofReal_tvDist_simulateQ_run_le_qSeps_plus_probEvent_output_bad
     (h_mono₁ : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((impl₁ t).run p), z.2.2 = true)
     (oa : OracleComp spec α) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound oa qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b))
+    (h_qb : OracleComp.IsQueryBoundP oa S qS)
     (p : σ × Bool) :
     ENNReal.ofReal (tvDist ((simulateQ impl₁ oa).run p) ((simulateQ impl₂ oa).run p))
       ≤ qS * ε

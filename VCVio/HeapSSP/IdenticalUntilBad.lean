@@ -124,9 +124,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ expectedSCost (implConjugate G₀.impl φ) S ε A qS (s_init, false)
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
@@ -247,9 +245,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ expectedSCost (implConjugate G₀.impl φ) S
           (fun s => if Inv s then ε s else 1) A qS (s_init, false)
@@ -294,9 +290,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad_of_inv_preserved
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ expectedSCost (implConjugate G₀.impl φ) S ε A qS (s_init, false)
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |
@@ -338,9 +332,7 @@ theorem advantage_le_qSeps_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (h : Heap Ident), (φ h).2 = true →
       ∀ z ∈ support ((G₀.impl t).run h), (φ z.2).2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ qS * ε
         + Pr[fun z : Bool × Heap Ident => (φ z.2).2 = true |

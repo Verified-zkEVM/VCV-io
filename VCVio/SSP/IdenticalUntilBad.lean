@@ -78,8 +78,7 @@ The hypotheses come in three flavours, mirroring the underlying simulateQ-level 
   bad-input branch via `Pr[bad | sim] = 1 ≥ tvDist`.
 
 `h_qb` constrains the adversary `A` to make at most `qS` costly queries (free queries are
-unconstrained), via the `IsQueryBound` parameterised by `if S t then 0 < b else True` and
-`if S t then b - 1 else b`. -/
+unconstrained), via `IsQueryBoundP A S qS`. -/
 theorem advantage_le_expectedSCost_plus_probEvent_bad
     (G₀ G₁ : Package unifSpec E (σ × Bool))
     (s_init : σ) (h_init₀ : G₀.init = pure (s_init, false))
@@ -93,9 +92,7 @@ theorem advantage_le_expectedSCost_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((G₀.impl t).run p), z.2.2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ expectedSCost G₀.impl S ε A qS (s_init, false)
         + Pr[fun z : Bool × σ × Bool => z.2.2 = true |
@@ -144,9 +141,7 @@ theorem advantage_le_qSeps_plus_probEvent_bad
     (h_mono₀ : ∀ (t : E.Domain) (p : σ × Bool), p.2 = true →
       ∀ z ∈ support ((G₀.impl t).run p), z.2.2 = true)
     (A : OracleComp E Bool) {qS : ℕ}
-    (h_qb : OracleComp.IsQueryBound A qS
-      (fun t b => if S t then 0 < b else True)
-      (fun t b => if S t then b - 1 else b)) :
+    (h_qb : OracleComp.IsQueryBoundP A S qS) :
     ENNReal.ofReal (G₀.advantage G₁ A)
       ≤ qS * ε
         + Pr[fun z : Bool × σ × Bool => z.2.2 = true |

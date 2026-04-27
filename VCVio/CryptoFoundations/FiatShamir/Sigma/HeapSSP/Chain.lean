@@ -2252,34 +2252,18 @@ theorem cmaSignHashQueryBound_to_costly {α : Type}
     {qS qH : ℕ}
     (hA : cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) A qS qH) :
-    OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b) := by
-  refine OracleComp.IsQueryBound.proj
-    (B := ℕ × ℕ) (B' := ℕ)
-    (proj := fun b : ℕ × ℕ => b.1)
-    (oa := A) (b := (qS, qH))
-    (canQuery := cmaSignHashCanQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-    (cost := cmaSignHashCost (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-    (canQuery' := fun t b => if IsCostlyQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-    (cost' := fun t b => if IsCostlyQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)
-    ?_ ?_ ?_
-  · intro t b hcan
-    rcases t with ((n | mc) | m) | u
-    · trivial
-    · trivial
-    · simpa [IsCostlyQuery] using hcan
-    · trivial
+    OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS := by
+  refine OracleComp.IsQueryBoundP.proj (b := (qS, qH))
+    (proj := fun b : ℕ × ℕ => b.1) ?_ ?_
+    (by simpa [cmaSignHashQueryBound] using hA)
+  · intro t b hcan hcost
+    rcases t with ((n | mc) | m) | u <;>
+      first | exact hcost.elim | simpa [cmaSignHashCanQuery] using hcan
   · intro t b hcan
     rcases t with ((n | mc) | m) | u <;>
       simp [cmaSignHashCanQuery, cmaSignHashCost, IsCostlyQuery] at hcan ⊢
-  · simpa [cmaSignHashQueryBound] using hA
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq M]
   [DecidableEq Commit] [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
@@ -2290,34 +2274,18 @@ theorem cmaSignHashQueryBound_to_hash {α : Type}
     {qS qH : ℕ}
     (hA : cmaSignHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) A qS qH) :
-    OracleComp.IsQueryBound A qH
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b) := by
-  refine OracleComp.IsQueryBound.proj
-    (B := ℕ × ℕ) (B' := ℕ)
-    (proj := fun b : ℕ × ℕ => b.2)
-    (oa := A) (b := (qS, qH))
-    (canQuery := cmaSignHashCanQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-    (cost := cmaSignHashCost (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt))
-    (canQuery' := fun t b => if IsHashQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-    (cost' := fun t b => if IsHashQuery (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) t then b - 1 else b)
-    ?_ ?_ ?_
-  · intro t b hcan
-    rcases t with ((n | mc) | m) | u
-    · trivial
-    · simpa [IsHashQuery] using hcan
-    · trivial
-    · trivial
+    OracleComp.IsQueryBoundP A
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qH := by
+  refine OracleComp.IsQueryBoundP.proj (b := (qS, qH))
+    (proj := fun b : ℕ × ℕ => b.2) ?_ ?_
+    (by simpa [cmaSignHashQueryBound] using hA)
+  · intro t b hcan hcost
+    rcases t with ((n | mc) | m) | u <;>
+      first | exact hcost.elim | simpa [cmaSignHashCanQuery] using hcan
   · intro t b hcan
     rcases t with ((n | mc) | m) | u <;>
       simp [cmaSignHashCanQuery, cmaSignHashCost, IsHashQuery] at hcan ⊢
-  · simpa [cmaSignHashQueryBound] using hA
 
 omit [SampleableType Stmt] [SampleableType Wit] [DecidableEq Commit]
   [SampleableType Chal] [Finite Chal] [Inhabited Chal] in
@@ -2426,25 +2394,19 @@ theorem cma_advantage_le_fork_bound
     rw [hApre_def]
     exact signedCandidateAdv_cmaSignHashQueryBound (σ := σ) (hr := hr) (M := M)
       (Commit := Commit) (Chal := Chal) (Resp := Resp) adv qS qH hQ
-  have hQB : OracleComp.IsQueryBound A qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b) :=
+  have hQB : OracleComp.IsQueryBoundP A
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS :=
     cmaSignHashQueryBound_to_costly (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) (A := A) hA_bound
-  have hQBpre : OracleComp.IsQueryBound Apre qS
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b) :=
+  have hQBpre : OracleComp.IsQueryBoundP Apre
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS :=
     cmaSignHashQueryBound_to_costly (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) (A := Apre) hApre_bound
-  have hQBHpre : OracleComp.IsQueryBound Apre qH
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then 0 < b else True)
-      (fun t b => if IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-        (Resp := Resp) (Stmt := Stmt) t then b - 1 else b) :=
+  have hQBHpre : OracleComp.IsQueryBoundP Apre
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qH :=
     cmaSignHashQueryBound_to_hash (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) (Stmt := Stmt) (A := Apre) hApre_bound
   have hCommit : σ.simCommitPredictability simT β := hPredSim

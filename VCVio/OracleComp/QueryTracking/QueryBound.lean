@@ -247,6 +247,18 @@ theorem isQueryBoundP_iff_isRollBound (oa : OracleComp spec α) (n : ℕ) :
         (fun t qb => if p t then qb - 1 else qb) :=
   Iff.rfl
 
+/-- `IsQueryBoundP` rephrased with the `if … then 0 < b else True` validity check.
+This is the shape that arises naturally in `expectedSCost` hypotheses, where the
+gap between the two implementations is paid only on `p`-queries. -/
+theorem isQueryBoundP_iff_isQueryBound_if (oa : OracleComp spec α) (n : ℕ) :
+    IsQueryBoundP oa p n ↔
+      IsQueryBound oa n
+        (fun t b => if p t then 0 < b else True)
+        (fun t b => if p t then b - 1 else b) :=
+  isQueryBound_congr
+    (fun t b => by by_cases ht : p t <;> simp [ht])
+    (fun _ _ => rfl)
+
 @[simp, grind =]
 lemma isQueryBoundP_query_bind_iff (t : ι) (mx : spec t → OracleComp spec α) (n : ℕ) :
     IsQueryBoundP (liftM (spec.query t) >>= mx) p n ↔
@@ -263,6 +275,33 @@ lemma isQueryBoundP_query_iff (t : spec.Domain) (n : ℕ) :
   simp [IsQueryBoundP, imp_iff_not_or]
 
 variable {p}
+
+/-- Projection variant of `IsQueryBound.proj` that lands directly in
+`IsQueryBoundP`. Given a vector-budget bound on `oa`, project to a scalar
+budget along `proj : B → ℕ` and conclude an `IsQueryBoundP` bound at the
+projected coordinate. The two side conditions only have to address `p`-queries:
+allowed source steps must keep the projected budget positive when `p` fires
+(`h_can`), and the projection must commute with the cost step in the shape
+that `IsQueryBoundP` decrements on (`h_cost`).
+
+Typical use: extract a per-predicate scalar bound (e.g. signing-only `qS`
+from a `(qS, qH)` pair) without spelling out the `if … then 0 < b else True`
+boilerplate at the call site. -/
+lemma IsQueryBoundP.proj
+    {B : Type*} {oa : OracleComp spec α} {b : B}
+    {canQuery : ι → B → Prop} {cost : ι → B → B}
+    (proj : B → ℕ)
+    (h_can : ∀ (t : ι) (b' : B), canQuery t b' → p t → 0 < proj b')
+    (h_cost : ∀ (t : ι) (b' : B), canQuery t b' →
+      proj (cost t b') = if p t then proj b' - 1 else proj b')
+    (h : IsQueryBound oa b canQuery cost) :
+    IsQueryBoundP oa p (proj b) := by
+  rw [isQueryBoundP_iff_isQueryBound_if]
+  refine OracleComp.IsQueryBound.proj proj ?_ h_cost h
+  intro t b' hcan
+  by_cases hpt : p t
+  · simp [hpt, h_can t b' hcan hpt]
+  · simp [hpt]
 
 theorem IsQueryBoundP.mono {oa : OracleComp spec α} {n m : ℕ}
     (h : IsQueryBoundP oa p n) (hnm : n ≤ m) : IsQueryBoundP oa p m := by
