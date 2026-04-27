@@ -237,6 +237,8 @@ def VCSpecEntry.tryApplyCachedBackward (entry : VCSpecEntry) (mvarId : MVarId) :
       -- source, not the original theorem entry.
       try
         let (_xs, _bis, prf) ← openAbstractMVarsResult rule.proof
+        let prfTy ← instantiateMVars (← inferType prf)
+        fixPredFromGoal? prfTy goalTy
         let subgoals ← mvarId.apply prf
         return some subgoals
       catch _ =>
