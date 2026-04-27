@@ -167,10 +167,7 @@ private def runVCGenStepWithTheoremConseq
   let saved ← saveState
   let ok ←
     match ← observing? do
-      evalTactic (← `(tactic| refine OracleComp.ProgramLogic.triple_conseq le_rfl ?_ ?_))
-      unless ← focusFirstGoalSatisfying (fun target => (tripleGoalComp? target).isSome) do
-        throwError "vcstep with theorem: failed to focus theorem subgoal after `triple_conseq`"
-      evalTactic (← `(tactic| apply $thm))
+      evalTactic (← `(tactic| refine OracleComp.ProgramLogic.triple_conseq le_rfl ?_ $thm))
       closeTheoremStepGoals
     with
     | some _ => pure true
@@ -181,8 +178,10 @@ private def runVCGenStepWithTheoremConseq
   return false
 
 /-- Apply a `@[vcspec]` unary rule to the current goal.
-Default `vcstep` fires rules only in `direct` mode; a future attribute could
-re-enable `triple_conseq` fallback by extending this helper. -/
+Default `vcstep` first tries the cached rule directly. For folded unary
+`Triple` goals, a global declaration can also be applied under `triple_conseq`,
+which lets a registered concrete postcondition theorem feed a weaker goal
+postcondition. -/
 private def runUnaryVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
   let saved ← saveState
@@ -197,6 +196,9 @@ private def runUnaryVCSpecRule
   if ok && (!(requireClosed) || (← getGoals).isEmpty) then
     return true
   saved.restore
+  if let some declName := entry.declName? then
+    if ← runVCGenStepWithTheoremConseq (mkIdent declName) requireClosed then
+      return true
   return false
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.

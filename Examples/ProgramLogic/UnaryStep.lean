@@ -97,6 +97,12 @@ example :
     ⦃1⦄ wrappedTrue (spec := spec) ⦃fun y => if y = true then 1 else 0⦄ := by
   vcstep
 
+example :
+    ⦃1⦄ wrappedTrue (spec := spec) ⦃fun _ => 1⦄ := by
+  vcstep
+  intro y
+  split_ifs <;> simp
+
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrueStep (_haux : True) :
