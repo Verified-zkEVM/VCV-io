@@ -67,7 +67,7 @@ we defer to a later phase, to keep behavior stable against Sym churn).
 
 Returns `false` when no candidate succeeds, or when the goal contains no `wp`
 application at all. -/
-def runWpStepRules : TacticM Bool := do
+def runWpStepRules : TacticM Bool := withVCGenWpStepTiming do
   let target ← instantiateMVars (← getMainTarget)
   let some wpApp := findAppWithHead? ``OracleComp.ProgramLogic.wp target | return false
   let wpApp ← instantiateMVars wpApp

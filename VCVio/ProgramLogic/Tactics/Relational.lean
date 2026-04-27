@@ -114,26 +114,26 @@ syntax "rvcgen" "with" term : tactic
 syntax "rvcgen?" : tactic
 
 elab_rules : tactic
-  | `(tactic| rvcgen) => do
+  | `(tactic| rvcgen) => withVCGenRunTiming "rvcgen" do
       discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
-      TacticInternals.Relational.runRVCGenFinish
-  | `(tactic| rvcgen using $hint) => do
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
+  | `(tactic| rvcgen using $hint) => withVCGenRunTiming "rvcgen" do
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
-        TacticInternals.Relational.runRVCGenFinish
+        withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
       else
         TacticInternals.Relational.throwRVCGenStepUsingError hint
-  | `(tactic| rvcgen with $thm) => do
+  | `(tactic| rvcgen with $thm) => withVCGenRunTiming "rvcgen" do
       if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
         discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
-        TacticInternals.Relational.runRVCGenFinish
+        withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
       else
         TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcgen?) => do
+  | `(tactic| rvcgen?) => withVCGenRunTiming "rvcgen?" do
       let batches ←
         runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
       let needsFinish := !(← getGoals).isEmpty
-      TacticInternals.Relational.runRVCGenFinish
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
       let mut lines : List String :=
         batches.toList.filterMap renderPassReplayLine
       if needsFinish then

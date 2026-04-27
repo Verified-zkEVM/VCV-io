@@ -57,9 +57,10 @@ What it intentionally does **not** cover:
   carriers are flat (`ℝ≥0∞`, `Prob`), so no state binders are
   required for the spike.
 
-* Caching.  `tryApply` rebuilds the bridged proof on every call.  Adding
-  a `Std.HashMap (Name × Expr) BackwardRule` cache, modeled on
-  Loom2's `mkBackwardRuleFromSpecCached`, is mechanical follow-up.
+* Full `BackwardRule` caching.  The production entry point below caches
+  lookup results by normalized target expression, but still rebuilds the
+  bridged proof at application time so each attempt gets fresh
+  metavariables.
 
 The goal of Phase 1 is to demonstrate end-to-end usefulness of the
 unified registry, not to ship a production tactic.  See
@@ -217,6 +218,38 @@ def tryApplyMatching (mvarId : MVarId) :
     MetaM (Option (LSpecEntry × List MVarId)) := do
   let target ← instantiateMVars (← mvarId.getType)
   let candidates ← lookup target
+  for entry in candidates do
+    match ← tryApply mvarId entry with
+    | none           => continue
+    | some subgoals  => return some (entry, subgoals)
+  return none
+
+initialize lspecBackwardLookupCache : IO.Ref (Std.HashMap Expr (Array LSpecEntry)) ←
+  IO.mkRef {}
+
+private def backwardLookupKey (target : Expr) : MetaM Expr := do
+  let target ← instantiateMVars target
+  whnfR target
+
+/-- Cached lookup for the production side-by-side backward path.
+
+The cached value is the set of registry entries selected for a normalized target.
+`tryApply` is intentionally rerun with fresh metavariables for each goal. -/
+def lookupCached (target : Expr) : MetaM (Array LSpecEntry) := do
+  let key ← backwardLookupKey target
+  let cache ← lspecBackwardLookupCache.get
+  match cache[key]? with
+  | some candidates => return candidates
+  | none =>
+      let candidates ← lookup key
+      lspecBackwardLookupCache.modify fun cache => cache.insert key candidates
+      return candidates
+
+/-- Cached end-to-end backward chaining used by production tactics. -/
+def tryApplyMatchingCached (mvarId : MVarId) :
+    MetaM (Option (LSpecEntry × List MVarId)) := do
+  let target ← instantiateMVars (← mvarId.getType)
+  let candidates ← lookupCached target
   for entry in candidates do
     match ← tryApply mvarId entry with
     | none           => continue
