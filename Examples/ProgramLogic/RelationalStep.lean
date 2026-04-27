@@ -144,6 +144,11 @@ example {σ₁ σ₂ : Type}
 
 /-! ## Pure / ite rules -/
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_pure_pure` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
 example (a : α) :
     ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
   rvcstep
@@ -226,6 +231,11 @@ example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
 
 /-! ## Quantitative `Std.Do'.RelTriple` path -/
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.Loom.relTriple_pure` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     ⦃post a b⦄
       (pure a : OracleComp spec α) ≈ₑ (pure b : OracleComp spec β)

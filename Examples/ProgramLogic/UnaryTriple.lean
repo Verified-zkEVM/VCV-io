@@ -86,13 +86,21 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
   vcgen
 
 /-
-`vcgen?` can expand the construction of a `vcgen` proof
+These replay guards are regression sensors for VCVio-native suggestions.
+The exact scripts below are allowed to improve as the planner evolves.
+-/
+/--
+info: Try this:
+
+  [apply] all_goals first | vcstep as ⟨x⟩ | skip
+  all_goals first | vcstep | skip
+-/
+#guard_msgs in
 example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
     {cut : α → ℝ≥0∞} {post : β → ℝ≥0∞}
     (h1 : ⦃ 1 ⦄ oa ⦃ cut ⦄) (h2 : ∀ x, ⦃ cut x ⦄ ob x ⦃ post ⦄) :
     ⦃ 1 ⦄ (oa >>= ob) ⦃ post ⦄ := by
   vcgen?
--/
 
 example (x : α) (post : α → ℝ≥0∞) :
     ⦃ post x ⦄ (pure x : OracleComp spec α) ⦃ post ⦄ := by

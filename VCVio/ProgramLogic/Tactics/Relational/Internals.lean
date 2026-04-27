@@ -867,6 +867,7 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
       | assumption
       | trivial
       | simp [Lean.Order.PartialOrder.rel]
+      | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
       | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
@@ -875,6 +876,7 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+      | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; symm; assumption)
       | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
       | (try subst_vars
          first
@@ -883,7 +885,9 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
            | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
            | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
+           | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; symm; assumption)
            | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
            | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
               intros; trivial))))
@@ -987,12 +991,14 @@ private def runRelationalVCSpecRule
 cached `@[vcspec]` path. These rules apply a theorem and leave explicit
 subgoals, but they do not choose cuts, bijections, or one-sided bind frontiers. -/
 private def deterministicRelVCSpecDecls : List Name := [
+  ``OracleComp.ProgramLogic.Relational.relTriple_pure_pure,
   ``OracleComp.ProgramLogic.Relational.relTriple_map,
   ``OracleComp.ProgramLogic.Relational.relTriple_replicate,
   ``OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel,
   ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,
   ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same,
-  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl
+  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl,
+  ``OracleComp.ProgramLogic.Relational.Loom.relTriple_pure
 ]
 
 private def isDeterministicRelVCSpecEntry (entry : VCSpecEntry) : Bool :=

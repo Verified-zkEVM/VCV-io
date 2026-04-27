@@ -393,6 +393,9 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
   let some declName := entry.declName?
     | traceVCSpecCacheEvent "uncached-build" entry rawGoal
       mkVCSpecBackwardRuleTimed entry rawGoal
+  -- Only global declarations use the shared cache. Local hypotheses and syntax
+  -- proofs can share pretty names while carrying different closed-over terms, so
+  -- they must build a fresh rule unless the cache key grows expression identity.
   let key : VCSpecBackwardRuleCacheKey := (declName, rawGoal, entry.kind.cacheKey)
   let cache ← vcSpecBackwardRuleCache.get
   match cache[key]? with

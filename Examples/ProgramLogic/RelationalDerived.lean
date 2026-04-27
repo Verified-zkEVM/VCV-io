@@ -125,6 +125,11 @@ example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep with relTriple_wrappedTruePair
 
+/-
+These diagnostic guards preserve the shape of useful user-facing messages:
+source theorem names and VCVio replay commands should remain visible, while the
+exact wording may improve as the relational planner gets stronger.
+-/
 /--
 info: Try this:
 
@@ -134,6 +139,24 @@ info: Try this:
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep?
+
+/--
+error: rvcstep: found a `RelTriple` goal, but no relational VCGen rule matched.
+
+Registered `@[vcspec]` candidates: `relTriple_wrappedTruePair`, `OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij`, `OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl`, `OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_bij`, `relTriple_wrappedAuxPairStep`, `OracleComp.ProgramLogic.Relational.relTriple_pure_pure`, `OracleComp.ProgramLogic.Relational.relTriple_bind`, `OracleComp.ProgramLogic.Relational.relTriple_map`, `OracleComp.ProgramLogic.Relational.relTriple_if`, `OracleComp.ProgramLogic.Relational.relTriple_replicate`, `OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel`, `OracleComp.ProgramLogic.Relational.relTriple_list_mapM`, `OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel`
+Try `rvcstep?` or `rvcstep with <theorem>` for an explicit replay.
+Left side:
+  wrappedTrueLeft
+Right side:
+  wrappedTrueRight
+Postcondition:
+  fun x x_1 ↦ False
+Consider `rel_conseq`, `rel_inline`, or `rel_dist` for a non-structural step.
+-/
+#guard_msgs in
+example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => False⟫ := by
+  rvcstep
 
 /--
 error: rvcstep using hf: the explicit hint did not match the current relational goal shape.
