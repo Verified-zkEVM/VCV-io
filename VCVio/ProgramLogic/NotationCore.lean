@@ -146,15 +146,15 @@ scoped macro_rules
   | `(wp⟦ $c ⟧)            => `(fun post => wp $c post)
 
 /-- Raw relational WP notation.
-`rwp⟦c₁ ~ c₂ | post ; epost₁, epost₂⟧` elaborates to `Std.Do'.rwp`.
+`rwp⟦c₁ ~ c₂ | post; epost₁, epost₂⟧` elaborates to `Std.Do'.rwp`.
 The normal assertion carrier and both exception-post carriers are inferred from
 `post`, `epost₁`, and `epost₂`, so this notation also works for stateful and
 exception-aware `RelWP` instances. -/
 scoped syntax:max (name := relWpBracket)
-  "rwp⟦" term:lead " ~ " term:lead " | " term " ; " term ", " term "⟧" : term
+  "rwp⟦" term:lead " ~ " term:lead " | " term ";" term ", " term "⟧" : term
 
 scoped macro_rules (kind := relWpBracket)
-  | `(rwp⟦ $c₁ ~ $c₂ | $post ; $epost₁, $epost₂ ⟧) =>
+  | `(rwp⟦ $c₁ ~ $c₂ | $post; $epost₁, $epost₂ ⟧) =>
       `(Std.Do'.rwp $c₁ $c₂ $post $epost₁ $epost₂)
 
 /-- Game equivalence: `g₁ ≡ₚ g₂` means `evalDist g₁ = evalDist g₂`.
