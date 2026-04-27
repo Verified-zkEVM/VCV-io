@@ -153,165 +153,57 @@ local instance : Zero Rq := Vector.instZero
 local instance : Sub Rq := Vector.instSub
 local instance : Neg Rq := Vector.instNeg
 
-@[simp] theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 := by
-  calc
-    (0 : Rq).get i = (0 : Rq)[i.1] := by
-      simp [Vector.get_eq_getElem]
-      rfl
-    _ = 0 := Vector.getElem_zero i.1 i.2
+@[simp] theorem Rq.get_zero (i : Fin ringDegree) : (0 : Rq).get i = 0 :=
+  Vector.getElem_zero i.1 i.2
 
 @[simp] theorem Rq.get_add (a b : Rq) (i : Fin ringDegree) :
-    (a + b).get i = a.get i + b.get i := by
-  calc
-    (a + b).get i = (a + b)[i.1] := by
-      simp [Vector.get_eq_getElem]
-      rfl
-    _ = a[i.1] + b[i.1] := Vector.getElem_add a b i.1 i.2
-    _ = a.get i + b.get i := by
-      simp [Vector.get_eq_getElem]
-      rfl
+    (a + b).get i = a.get i + b.get i :=
+  Vector.getElem_add a b i.1 i.2
 
 @[simp] theorem Rq.get_neg (a : Rq) (i : Fin ringDegree) :
-    (-a).get i = -a.get i := by
-  calc
-    (-a).get i = (-a)[i.1] := by
-      simp [Vector.get_eq_getElem]
-      rfl
-    _ = -a[i.1] := Vector.getElem_neg a i.1 i.2
-    _ = -a.get i := by
-      simp [Vector.get_eq_getElem]
-      rfl
+    (-a).get i = -a.get i :=
+  Vector.getElem_neg a i.1 i.2
 
 @[simp] theorem Rq.get_sub (a b : Rq) (i : Fin ringDegree) :
-    (a - b).get i = a.get i - b.get i := by
-  calc
-    (a - b).get i = (a - b)[i.1] := by
-      simp [Vector.get_eq_getElem]
-      rfl
-    _ = a[i.1] - b[i.1] := Vector.getElem_sub a b i.1 i.2
-    _ = a.get i - b.get i := by
-      simp [Vector.get_eq_getElem]
-      rfl
+    (a - b).get i = a.get i - b.get i :=
+  Vector.getElem_sub a b i.1 i.2
 
 local instance instRqAddCommGroup : AddCommGroup Rq where
   add := (· + ·)
-  add_assoc a b c := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (a + b + c).get j = (a + (b + c)).get j
+  add_assoc a b c := Poly.ext_get_eq fun j => by
     rw [Rq.get_add (a + b) c j, Rq.get_add a b j, Rq.get_add a (b + c) j, Rq.get_add b c j]
     exact add_assoc _ _ _
   zero := 0
-  zero_add a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (0 + a).get j = a.get j
-    rw [Rq.get_add 0 a j, Rq.get_zero j]
-    exact zero_add _
-  add_zero a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (a + 0).get j = a.get j
-    rw [Rq.get_add a 0 j, Rq.get_zero j]
-    exact add_zero _
+  zero_add a := Poly.ext_get_eq fun j => by
+    rw [Rq.get_add 0 a j, Rq.get_zero j]; exact zero_add _
+  add_zero a := Poly.ext_get_eq fun j => by
+    rw [Rq.get_add a 0 j, Rq.get_zero j]; exact add_zero _
   nsmul := rqNSMul
-  nsmul_zero x := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (rqNSMul 0 x).get j = (0 : Rq).get j
-    rw [Rq.get_zero j]
-    simp [rqNSMul]
-  nsmul_succ n x := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (rqNSMul (n + 1) x).get j = (rqNSMul n x + x).get j
+  nsmul_zero x := Poly.ext_get_eq fun j => by
+    rw [Rq.get_zero j]; simp [rqNSMul]
+  nsmul_succ n x := Poly.ext_get_eq fun j => by
     rw [Rq.get_add (rqNSMul n x) x j]
     simpa [rqNSMul] using AddMonoid.nsmul_succ n (x.get j)
   neg := Neg.neg
   sub := Sub.sub
-  sub_eq_add_neg a b := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (a - b).get j = (a + -b).get j
+  sub_eq_add_neg a b := Poly.ext_get_eq fun j => by
     rw [Rq.get_sub a b j, Rq.get_add a (-b) j, Rq.get_neg b j]
     exact sub_eq_add_neg _ _
   zsmul := rqZSMul
-  zsmul_zero' a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (rqZSMul 0 a).get j = (0 : Rq).get j
-    rw [Rq.get_zero j]
-    simp [rqZSMul]
-  zsmul_succ' n a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (rqZSMul (↑n.succ) a).get j = (rqZSMul (↑n) a + a).get j
+  zsmul_zero' a := Poly.ext_get_eq fun j => by
+    rw [Rq.get_zero j]; simp [rqZSMul]
+  zsmul_succ' n a := Poly.ext_get_eq fun j => by
     rw [Rq.get_add (rqZSMul (↑n) a) a j]
     simpa [rqZSMul] using SubNegMonoid.zsmul_succ' n (a.get j)
-  zsmul_neg' n a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (rqZSMul (Int.negSucc n) a).get j = (-rqZSMul (↑n.succ) a).get j
+  zsmul_neg' n a := Poly.ext_get_eq fun j => by
     rw [Rq.get_neg (rqZSMul (↑n.succ) a) j]
     simpa [rqZSMul] using SubNegMonoid.zsmul_neg' n (a.get j)
-  neg_add_cancel a := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (-a + a).get j = (0 : Rq).get j
+  neg_add_cancel a := Poly.ext_get_eq fun j => by
     rw [Rq.get_add (-a) a j, Rq.get_neg a j, Rq.get_zero j]
     exact neg_add_cancel _
-  add_comm a b := by
-    apply Vector.ext
-    intro i hi
-    let j : Fin ringDegree := ⟨i, hi⟩
-    change (a + b).get j = (b + a).get j
+  add_comm a b := Poly.ext_get_eq fun j => by
     rw [Rq.get_add a b j, Rq.get_add b a j]
     exact add_comm _ _
-
-/-- Casting `centeredRepr` back into `ZMod q` recovers the original coefficient. -/
-private theorem centeredRepr_cast (x : Coeff) :
-    x = intToCoeff (LatticeCrypto.centeredRepr x) := by
-  by_cases h : (x.val : ℤ) ≤ (modulus : ℤ) / 2
-  · rw [LatticeCrypto.centeredRepr_of_le h, intToCoeff, Int.cast_natCast, ZMod.natCast_zmod_val]
-  · have hgt : (modulus : ℤ) / 2 < x.val := lt_of_not_ge h
-    rw [LatticeCrypto.centeredRepr_of_gt hgt, intToCoeff, Int.cast_sub, Int.cast_natCast,
-      Int.cast_natCast, ZMod.natCast_zmod_val, ZMod.natCast_self]
-    simp
-
-/-- `centeredRepr x` lies in the `valMinAbs` interval `(-q/2, q/2]`. -/
-private theorem centeredRepr_mem_Ioc (x : Coeff) :
-    LatticeCrypto.centeredRepr x * 2 ∈ Set.Ioc (-(modulus : ℤ)) modulus := by
-  by_cases h : (x.val : ℤ) ≤ (modulus : ℤ) / 2
-  · rw [LatticeCrypto.centeredRepr_of_le h]
-    have hx : 0 ≤ (x.val : ℤ) := by positivity
-    have hmod : (0 : ℤ) < modulus := by norm_num [modulus]
-    constructor <;> omega
-  · have hgt : (modulus : ℤ) / 2 < x.val := lt_of_not_ge h
-    rw [LatticeCrypto.centeredRepr_of_gt hgt]
-    have hval := ZMod.val_lt x
-    constructor <;> omega
-
-/-- `centeredRepr` agrees with Mathlib's `valMinAbs` on `ZMod q`. -/
-private theorem centeredRepr_eq_valMinAbs (x : Coeff) :
-    LatticeCrypto.centeredRepr x = x.valMinAbs := by
-  simpa using ((ZMod.valMinAbs_spec x (LatticeCrypto.centeredRepr x)).2
-    ⟨centeredRepr_cast x, centeredRepr_mem_Ioc x⟩).symm
-
-private theorem centeredRepr_intToCoeff_eq (z : ℤ)
-    (hzlo : -(modulus : ℤ) < z * 2) (hzhi : z * 2 ≤ modulus) :
-    LatticeCrypto.centeredRepr (intToCoeff z) = z := by
-  rw [centeredRepr_eq_valMinAbs]
-  exact (ZMod.valMinAbs_spec (intToCoeff z) z).2 ⟨rfl, ⟨hzlo, hzhi⟩⟩
 
 private theorem power2RoundCoeff_eq (r : Coeff) :
     let (r1, r0) := power2RoundCoeff r
@@ -358,25 +250,8 @@ private theorem power2RoundCoeff_bound (r : Coeff) :
 
 theorem centeredRepr_eq_of_natAbs_le (z : ℤ) {b : ℕ}
     (hbound : z.natAbs ≤ b) (hbq : 2 * b < modulus) :
-    LatticeCrypto.centeredRepr (intToCoeff z) = z := by
-  have hzupper : z ≤ b := by
-    have hz : z ≤ (z.natAbs : ℤ) := by
-      simpa using (Int.le_natAbs (a := z))
-    have hb : (z.natAbs : ℤ) ≤ b := by
-      exact_mod_cast hbound
-    omega
-  have hzlower : -(b : ℤ) ≤ z := by
-    have hz : -z ≤ (z.natAbs : ℤ) := by
-      have hz' := Int.le_natAbs (a := -z)
-      simpa using hz'
-    have hb : (z.natAbs : ℤ) ≤ b := by
-      exact_mod_cast hbound
-    omega
-  have hbqz : ((2 * b : ℕ) : ℤ) < modulus := by
-    exact_mod_cast hbq
-  apply centeredRepr_intToCoeff_eq
-  · omega
-  · omega
+    LatticeCrypto.centeredRepr (intToCoeff z) = z :=
+  LatticeCrypto.centeredRepr_intCast_eq_of_natAbs_le z hbound hbq
 
 private theorem power2RoundLow_centeredRepr (r : Coeff) :
     LatticeCrypto.centeredRepr (intToCoeff ((power2RoundCoeff r).2)) = (power2RoundCoeff r).2 := by
@@ -505,32 +380,6 @@ private theorem lowBits_centeredRepr (r : Coeff) {gamma2 : ℕ}
   · exact lowBitsCoeff_bound r hγ
   · linarith
 
-private theorem neg_le_and_le_of_natAbs_le {z : ℤ} {b : ℕ}
-    (hbound : z.natAbs ≤ b) : -(b : ℤ) ≤ z ∧ z ≤ b := by
-  constructor
-  · have hz : -z ≤ (z.natAbs : ℤ) := by
-      have hz' := Int.le_natAbs (a := -z)
-      simpa using hz'
-    have hb : (z.natAbs : ℤ) ≤ b := by
-      exact_mod_cast hbound
-    omega
-  · have hz : z ≤ (z.natAbs : ℤ) := by
-      simpa using (Int.le_natAbs (a := z))
-    have hb : (z.natAbs : ℤ) ≤ b := by
-      exact_mod_cast hbound
-    omega
-
-private theorem natAbs_le_of_bounds {z : ℤ} {b : ℕ}
-    (hl : -(b : ℤ) ≤ z) (hu : z ≤ b) : z.natAbs ≤ b := by
-  exact_mod_cast (show (z.natAbs : ℤ) ≤ b from by
-    by_cases hz : 0 ≤ z
-    · rw [Int.natAbs_of_nonneg hz]
-      exact hu
-    · have hnegz : 0 ≤ -z := by omega
-      have hnat : (z.natAbs : ℤ) = -z := by
-        simpa [Int.natAbs_neg] using (Int.natAbs_of_nonneg (a := -z) hnegz)
-      rw [hnat]
-      omega)
 
 private theorem power2RoundShift_high_get (r : Rq) (i : Fin ringDegree) :
     (power2RoundShift (power2RoundHigh r)).get i =
@@ -542,24 +391,16 @@ private theorem power2RoundLow_get (r : Rq) (i : Fin ringDegree) :
   simp [power2RoundLow]
 
 theorem concretePower2Round_high_low_decomp (r : Rq) :
-    power2RoundShift (power2RoundHigh r) + power2RoundLow r = r := by
-  apply Vector.ext
-  intro i hi
-  let j : Fin ringDegree := ⟨i, hi⟩
-  change (power2RoundShift (power2RoundHigh r) + power2RoundLow r).get j = r.get j
-  rw [Rq.get_add]
-  rw [power2RoundShift_high_get, power2RoundLow_get]
-  exact power2RoundCoeff_eq (r.get j)
+    power2RoundShift (power2RoundHigh r) + power2RoundLow r = r :=
+  Poly.ext_get_eq fun j => by
+    rw [Rq.get_add, power2RoundShift_high_get, power2RoundLow_get]
+    exact power2RoundCoeff_eq (r.get j)
 
 theorem concretePower2Round_remainder_eq_low (r : Rq) :
-    r - power2RoundShift (power2RoundHigh r) = power2RoundLow r := by
-  apply Vector.ext
-  intro i hi
-  let j : Fin ringDegree := ⟨i, hi⟩
-  change (r - power2RoundShift (power2RoundHigh r)).get j = (power2RoundLow r).get j
-  rw [Rq.get_sub]
-  rw [power2RoundShift_high_get, power2RoundLow_get]
-  exact sub_eq_iff_eq_add'.2 (power2RoundCoeff_eq (r.get j)).symm
+    r - power2RoundShift (power2RoundHigh r) = power2RoundLow r :=
+  Poly.ext_get_eq fun j => by
+    rw [Rq.get_sub, power2RoundShift_high_get, power2RoundLow_get]
+    exact sub_eq_iff_eq_add'.2 (power2RoundCoeff_eq (r.get j)).symm
 
 theorem concretePower2Round_bound (r : Rq) :
     LatticeCrypto.cInfNorm (r - power2RoundShift (power2RoundHigh r)) ≤ 2 ^ (droppedBits - 1) := by
@@ -580,14 +421,10 @@ private theorem lowBits_get (p : Params) (r : Rq) (i : Fin ringDegree) :
   simp [lowBits]
 
 theorem concreteRounding_high_low_decomp (p : Params) (hγ : 0 < p.gamma2) (r : Rq) :
-    highBitsShift p (highBits p r) + lowBits p r = r := by
-  apply Vector.ext
-  intro i hi
-  let j : Fin ringDegree := ⟨i, hi⟩
-  change (highBitsShift p (highBits p r) + lowBits p r).get j = r.get j
-  rw [Rq.get_add]
-  rw [highBitsShift_high_get, lowBits_get]
-  simpa [highBitsCoeff, lowBitsCoeff] using decomposeCoeff_eq (r.get j) hγ
+    highBitsShift p (highBits p r) + lowBits p r = r :=
+  Poly.ext_get_eq fun j => by
+    rw [Rq.get_add, highBitsShift_high_get, lowBits_get]
+    simpa [highBitsCoeff, lowBitsCoeff] using decomposeCoeff_eq (r.get j) hγ
 
 theorem concreteRounding_lowBits_bound (p : Params)
     (hγ : 0 < p.gamma2) (hq : 2 * p.gamma2 < modulus) (r : Rq) :
@@ -764,9 +601,9 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
     dsimp [v]
     omega
   have hvbound : v.natAbs ≤ p.gamma2 - 1 :=
-    natAbs_le_of_bounds hvlower hvupper
+    natAbs_le_of_neg_le_and_le hvlower hvupper
   have hzcast : s = intToCoeff z := by
-    simpa [z] using centeredRepr_cast s
+    simpa [z] using LatticeCrypto.centeredRepr_intCast s
   have hcandidate : (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v = r + s := by
     calc
       (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff v
@@ -789,7 +626,7 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
   have hdifflower : -((alpha - 1 : ℕ) : ℤ) ≤ v - w := by
     omega
   have hdiffbound : (v - w).natAbs ≤ alpha - 1 :=
-    natAbs_le_of_bounds hdifflower hdiffupper
+    natAbs_le_of_neg_le_and_le hdifflower hdiffupper
   have hrepr_diff : LatticeCrypto.centeredRepr (intToCoeff (v - w)) = v - w :=
     centeredRepr_eq_of_natAbs_le (z := v - w) hdiffbound hsmallq
   have heq :
@@ -879,7 +716,7 @@ private theorem highBitsCoeff_add_eq_of_small_of_isApproved (p : Params)
       have hdiffbound' : (w - v).natAbs ≤ alpha - 1 := by
         have hwvupper : w - v ≤ ((alpha - 1 : ℕ) : ℤ) := by omega
         have hwvlower : -((alpha - 1 : ℕ) : ℤ) ≤ w - v := by omega
-        exact natAbs_le_of_bounds hwvlower hwvupper
+        exact natAbs_le_of_neg_le_and_le hwvlower hwvupper
       have hrepr_diff' : LatticeCrypto.centeredRepr (intToCoeff (w - v)) = w - v :=
         centeredRepr_eq_of_natAbs_le (z := w - v) hdiffbound' hsmallq
       have hrepr_eq := congrArg LatticeCrypto.centeredRepr hdeltaeq
@@ -1420,7 +1257,7 @@ private theorem useHintCoeff_correct_of_small_of_isApproved (p : Params)
   have hzlow : -(p.gamma2 : ℤ) ≤ z0 := hzbounds.1
   have hzup : z0 ≤ p.gamma2 := hzbounds.2
   have hzcast : z = intToCoeff z0 := by
-    simpa [z0] using centeredRepr_cast z
+    simpa [z0] using LatticeCrypto.centeredRepr_intCast z
   have hdecomp :
       (((alpha : ℕ) : Coeff) * (r1 : Coeff)) + intToCoeff r0 = r := by
     simpa [alpha, decr, r1, r0] using decomposeCoeff_eq (r := r) (gamma2 := p.gamma2) hγ
@@ -1828,9 +1665,7 @@ theorem highBitsShift_injective_of_isApproved (p : Params)
     (hp : p.isApproved) :
     Function.Injective (highBitsShift p) := by
   intro x y hxy
-  apply Vector.ext
-  intro i hi
-  let j : Fin ringDegree := ⟨i, hi⟩
+  refine Poly.ext_get_eq fun j => ?_
   have hcoeff :
       (((2 * p.gamma2 : ℕ) : Coeff) * x.get j) =
         (((2 * p.gamma2 : ℕ) : Coeff) * y.get j) := by
@@ -1899,22 +1734,14 @@ theorem concreteRounding_useHint_correct_of_isApproved (p : Params)
     LatticeCrypto.cInfNorm z ≤ p.gamma2 →
     useHint p (makeHint p z r) r = highBits p (r + z) := by
   intro hz
-  apply Vector.ext
-  intro i hi
-  let j : Fin ringDegree := ⟨i, hi⟩
-  have hzj : (LatticeCrypto.centeredRepr (z.get j)).natAbs ≤ p.gamma2 := by
-    exact (LatticeCrypto.cInfNorm_le_iff.mp hz) j
-  have hcoef :
-      (useHint p (makeHint p z r) r).get j = (highBits p (r + z)).get j := by
-    rw [useHint_get]
-    rw [makeHint_get]
-    rw [highBits, Vector.get_ofFn]
-    have hadd : (r + z).get j = r.get j + z.get j := by
-      rw [Rq.get_add]
-    rw [hadd]
-    exact congrArg (fun n : ℕ => (n : Coeff))
-      (useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj)
-  simpa [Vector.get_eq_getElem] using hcoef
+  refine Poly.ext_get_eq fun j => ?_
+  have hzj : (LatticeCrypto.centeredRepr (z.get j)).natAbs ≤ p.gamma2 :=
+    (LatticeCrypto.cInfNorm_le_iff.mp hz) j
+  rw [useHint_get, makeHint_get, highBits, Vector.get_ofFn]
+  have hadd : (r + z).get j = r.get j + z.get j := by rw [Rq.get_add]
+  rw [hadd]
+  exact congrArg (fun n : ℕ => (n : Coeff))
+    (useHintCoeff_correct_of_small_of_isApproved p hp (z := z.get j) (r := r.get j) hzj)
 
 theorem concreteRounding_useHint_bound_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :
@@ -1957,9 +1784,7 @@ theorem concreteRounding_hide_low_of_isApproved (p : Params)
     exact congrArg (fun n : ℕ => (n : Coeff))
       (highBitsCoeff_add_eq_of_small_of_isApproved p hp (r := r.get j)
         (s := s.get j) (b := b) hsj hlowj)
-  apply Vector.ext
-  intro i hi
-  exact hfin ⟨i, hi⟩
+  exact Poly.ext_get_eq hfin
 
 theorem concreteRounding_useHint_bound_field_of_isApproved (p : Params)
     (hp : p.isApproved) (r : Rq) (h : Hint) :

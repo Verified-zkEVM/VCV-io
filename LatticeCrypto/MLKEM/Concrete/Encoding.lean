@@ -976,20 +976,15 @@ private theorem byteArray_byteEncode1Msg (f : Rq) :
   simpa using toArray_byteEncode1Msg (f := f)
 
 private theorem byteDecode1Msg_eq_byteDecode1 (msg : Message) :
-    byteDecode1Msg msg = byteDecode 1 (ByteArray.mk msg.toArray) := by
-  apply Vector.ext
-  intro i hi
-  let idx : Fin ringDegree := ⟨i, hi⟩
-  apply (ZMod.val_injective modulus)
-  change (((byteDecode1Msg msg).get idx : Coeff).val) =
-    (((byteDecode 1 (ByteArray.mk msg.toArray)).get idx : Coeff).val)
-  calc
-    (((byteDecode1Msg msg).get idx : Coeff).val)
-        = (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 := by
-            simpa [idx] using byteDecode1Msg_val (msg := msg) idx
-    _ = (((byteDecode 1 (ByteArray.mk msg.toArray)).get idx : Coeff).val) := by
-        symm
-        simpa [idx] using byteDecode_one_coeff (ByteArray.mk msg.toArray) idx
+    byteDecode1Msg msg = byteDecode 1 (ByteArray.mk msg.toArray) :=
+  LatticeCrypto.Poly.ext_get_eq fun idx => by
+    apply (ZMod.val_injective modulus)
+    calc
+      (((byteDecode1Msg msg).get idx : Coeff).val)
+          = (bytesToBits (ByteArray.mk msg.toArray)).getD idx.val 0 :=
+              byteDecode1Msg_val (msg := msg) idx
+      _ = (((byteDecode 1 (ByteArray.mk msg.toArray)).get idx : Coeff).val) :=
+          (byteDecode_one_coeff (ByteArray.mk msg.toArray) idx).symm
 
 private theorem byteEncode1Msg_byteDecode1Msg (msg : Message) :
     byteEncode1Msg (byteDecode1Msg msg) = msg := by
