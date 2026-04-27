@@ -558,6 +558,33 @@ private def runRawRelWPBindRightRule : TacticM Bool := do
       (Std.Do'.RelWP.rwp_bind_right_le _ _ _ _ _ _)))
 
 /-- Try direct-hit registered `@[vcspec]` rules against a raw relational WP goal. -/
+private def runRawRelWPTheoremConseq (thm : TSyntax `term)
+    (requireClosed : Bool := false) : TacticM Bool := do
+  unless isRawStdDoRelWPGoal (← instantiateMVars (← getMainTarget)) do
+    return false
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      evalTactic (← `(tactic|
+        refine Std.Do'.RelWP.rwp_consequence_rel _ _ _ _ _ _
+          (by
+            intro a b
+            by_cases h : a = b <;> simp [h, Lean.Order.PartialOrder.rel])
+          $thm))
+      discard <| tryEvalTacticSyntax (← `(tactic|
+        all_goals first
+          | assumption
+          | trivial
+          | simp [Lean.Order.PartialOrder.rel]
+          | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (!requireClosed || (← getGoals).isEmpty) then
+    return true
+  saved.restore
+  return false
+
 private def runRawRelWPVCSpecBackward : TacticM Bool := do
   withVCGenRegisteredTiming do
     let target ← instantiateMVars (← getMainTarget)
@@ -567,6 +594,23 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
       entries.filter (·.kind == .relWP) ++ entries.filter (·.kind == .relTriple)
     for entry in entries.toList.take 8 do
       let saved ← saveState
+      if ← liftMetaM <| entry.hasProofPremise then
+        let ok ←
+          match ← observing? do
+            unless ← runVCSpecEntryRawRelConsequence entry do
+              throwError "raw relational consequence rule did not apply"
+            discard <| tryEvalTacticSyntax (← `(tactic|
+              all_goals first
+                | assumption
+                | trivial
+                | simp [Lean.Order.PartialOrder.rel]
+                | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+          with
+          | some _ => pure true
+          | none => pure false
+        if ok then
+          return true
+        saved.restore
       let ok ←
         match ← observing? do
           runVCSpecEntryCachedBackward entry
@@ -869,22 +913,7 @@ private def runRVCGenStepWithTheoremConseq
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   if isRawStdDoRelWPGoal target then
-    let saved ← saveState
-    let ok ←
-      match ← observing? do
-        evalTactic (← `(tactic|
-          refine Std.Do'.RelWP.rwp_consequence_rel _ _ _ _ _ _
-            (by
-              intro a b
-              by_cases h : a = b <;> simp [h, Lean.Order.PartialOrder.rel])
-            $thm))
-      with
-      | some _ => pure true
-      | none => pure false
-    if ok && (!requireClosed || (← getGoals).isEmpty) then
-      return true
-    saved.restore
-    return false
+    return (← runRawRelWPTheoremConseq thm requireClosed)
   let wrapper? ←
     if (relTripleGoalParts? target).isSome then
       pure <| some (← `(tactic|
@@ -927,6 +956,19 @@ before the cached path sees the concrete target carrier. -/
 private def runRelationalVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
+  if isRawStdDoRelWPGoal target && (← liftMetaM <| entry.hasProofPremise) then
+    let saved ← saveState
+    let ok ←
+      match ← observing? do
+        unless ← runVCSpecEntryRawRelConsequence entry do
+          throwError "raw relational consequence rule did not apply"
+        closeRelTheoremStepGoals
+      with
+      | some _ => pure true
+      | none => pure false
+    if ok && (!requireClosed || (← getGoals).isEmpty) then
+      return true
+    saved.restore
   let saved ← saveState
   let ok ←
     match ← observing? do

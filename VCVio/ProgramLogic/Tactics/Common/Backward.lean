@@ -367,6 +367,64 @@ private def getVCSpecBackwardRuleCached (entry : VCSpecEntry) (rawGoal : Bool) :
       vcSpecBackwardRuleCache.modify fun cache => cache.insert key rule
       return rule
 
+/-- Whether applying this registered theorem is expected to leave an ordinary
+proof obligation, such as an auxiliary premise. Instance arguments and data
+arguments are ignored. -/
+def VCSpecEntry.hasProofPremise (entry : VCSpecEntry) : MetaM Bool := do
+  let (xs, bis, _prf, _type) ← entry.proof.instantiate
+  for x in xs, bi in bis do
+    if bi == .default then
+      if ← isProp (← inferType x) then
+        return true
+  return false
+
+/-- Apply a raw relational `@[vcspec]` theorem under consequence, constructing
+the consequence proof against the current target directly. This avoids asking
+elaboration to infer the target `rwp` shape from an underscore-heavy `refine`
+term, which is expensive for premised raw relational rules. -/
+def VCSpecEntry.tryApplyRawRelConsequence (entry : VCSpecEntry) (mvarId : MVarId) :
+    MetaM (Option (List MVarId)) := do
+  let goalTy ← instantiateMVars (← mvarId.getType)
+  let some (preTarget, rhsTarget) ← rawRelParts? goalTy
+    | return none
+  let some (oaTarget, obTarget, postTarget, _epostTarget₁, _epostTarget₂) :=
+      stdDoRelWpParts? rhsTarget
+    | return none
+  let (_xs, _bis, specProof, specType) ← entry.proof.instantiate
+  let some (preSpec, rhsSpec) ← rawRelParts? specType
+    | return none
+  let some (oaSpec, obSpec, postSpec, epostSpec₁, epostSpec₂) :=
+      stdDoRelWpParts? rhsSpec
+    | return none
+  unless (← isDefEq oaSpec oaTarget) && (← isDefEq obSpec obTarget) do
+    return none
+  let postTy ← inferType postSpec
+  let hpostTy ← mkRelPostPointwisePremise postSpec postTarget postTy
+  let hpost ← mkFreshExprMVar (userName := `postImpl) hpostTy
+  let specApplied ←
+    mkAppM ``Std.Do'.RelWP.rwp_consequence_rel
+      #[oaSpec, obSpec, postSpec, postTarget, epostSpec₁, epostSpec₂, hpost, specProof]
+  let hpreTy ← mkOrderRel preTarget preSpec
+  let hpre ← mkFreshExprMVar (userName := `vc) hpreTy
+  let prf ← mkOrderRelTrans hpre specApplied
+  try
+    let subgoals ← mvarId.apply prf
+    return some subgoals
+  catch _ =>
+    return none
+
+/-- Apply a raw relational consequence proof for a `@[vcspec]` entry to the
+current main goal, preserving tail goals. -/
+def runVCSpecEntryRawRelConsequence (entry : VCSpecEntry) : TacticM Bool := do
+  match ← getGoals with
+  | [] => return false
+  | goal :: rest =>
+      match ← liftMetaM <| entry.tryApplyRawRelConsequence goal with
+      | none => return false
+      | some subgoals =>
+          setGoals (subgoals ++ rest)
+          return true
+
 private def VCSpecBackwardRule.applyProof (rule : VCSpecBackwardRule) (mvarId : MVarId)
     (goalTy : Expr) : MetaM (Option (List MVarId)) := do
   try

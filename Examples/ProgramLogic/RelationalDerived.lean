@@ -101,6 +101,26 @@ example :
         (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
 
+@[irreducible] def rawAuxLeft : OracleComp spec Bool := pure true
+@[irreducible] def rawAuxRight : OracleComp spec Bool := pure true
+
+@[local vcspec] theorem rawRWP_wrappedAuxPairStep (_haux : True) :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
+  simpa [rawAuxLeft, rawAuxRight] using
+    (Std.Do'.RelWP.rwp_pure
+      (m₁ := OracleComp spec) (m₂ := OracleComp spec)
+      (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
+      true true (fun x y => if x = y then (1 : ℝ≥0∞) else 0)
+      epost⟨⟩ epost⟨⟩)
+
+example :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep
+
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep with relTriple_wrappedTruePair
