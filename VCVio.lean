@@ -24,6 +24,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Bridge
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Compatibility
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Games
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Hops
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Spec
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost
