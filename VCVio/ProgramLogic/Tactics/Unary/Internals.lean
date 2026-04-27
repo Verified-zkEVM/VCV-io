@@ -960,7 +960,7 @@ def tryRawWpStructuralStep : TacticM Bool := do
 /-- Try to synthesize a support-based intermediate postcondition for a bind step.
 When the computation is `oa >>= f` and no explicit spec is available, tries applying
 `triple_bind` with an inferred cut and closing the spec subgoal via `triple_support`,
-which unifies the cut to `fun x => ⌜x ∈ support oa⌝`. -/
+which unifies the cut to `fun x => 𝟙⟦x ∈ support oa⟧`. -/
 def trySupportCutBind (comp : Expr) : TacticM Bool := do
   if !isBindExpr comp then return false
   match ← observing? do

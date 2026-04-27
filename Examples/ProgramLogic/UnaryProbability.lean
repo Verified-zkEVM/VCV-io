@@ -14,6 +14,7 @@ and `by_hoare` support in the unary tactic layer.
 -/
 
 open ENNReal OracleSpec OracleComp
+open Lean.Order
 open OracleComp.ProgramLogic
 open scoped OracleComp.ProgramLogic
 
@@ -26,17 +27,17 @@ variable {α β γ : Type}
 /-! ### Probability goal lowering -/
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
-    (h : Triple 1 oa (fun x => ⌜p x⌝)) :
+    (h : ⦃ 1 ⦄ oa ⦃ fun x => 𝟙⟦p x⟧ ⦄) :
     Pr[ p | oa] = 1 := by
   vcgen
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p]
-    (h : Triple 1 oa (fun x => ⌜p x⌝)) :
+    (h : ⦃ 1 ⦄ oa ⦃ fun x => 𝟙⟦p x⟧ ⦄) :
     1 = Pr[ p | oa] := by
   vcgen
 
 example {oa : OracleComp spec Bool}
-    (h : Triple 1 oa (fun y => if y = true then 1 else 0)) :
+    (h : ⦃ 1 ⦄ oa ⦃ fun y => if y = true then 1 else 0 ⦄) :
     Pr[= true | oa] = 1 := by
   vcgen
 
@@ -86,19 +87,19 @@ example {mx : OracleComp spec α} {my : OracleComp spec β}
   vcstep rw congr' as ⟨x, y⟩
   exact h x y
 
-example : ⌜(True : Prop)⌝ * ⌜(True : Prop)⌝ = (1 : ℝ≥0∞) := by
+example : 𝟙⟦(True : Prop)⟧ * 𝟙⟦(True : Prop)⟧ = (1 : ℝ≥0∞) := by
   exp_norm
 
 /-! ### Probability lower bounds -/
 
 example {oa : OracleComp spec α} {p : α → Prop} [DecidablePred p] {r : ℝ≥0∞}
-    (h : Triple r oa (fun x => ⌜p x⌝)) :
+    (h : ⦃ r ⦄ oa ⦃ fun x => 𝟙⟦p x⟧ ⦄) :
     r ≤ Pr[ p | oa] := by
   vcstep
   exact h
 
 example {oa : OracleComp spec α} [DecidableEq α] {x : α} {r : ℝ≥0∞}
-    (h : Triple r oa (fun y => if y = x then 1 else 0)) :
+    (h : ⦃ r ⦄ oa ⦃ fun y => if y = x then 1 else 0 ⦄) :
     Pr[= x | oa] ≥ r := by
   vcstep
   exact h
@@ -106,7 +107,7 @@ example {oa : OracleComp spec α} [DecidableEq α] {x : α} {r : ℝ≥0∞}
 example (c : Prop) [Decidable c] (oa ob : OracleComp spec α)
     (p : α → Prop) [DecidablePred p] :
     Pr[ p | if c then oa else ob] =
-      if c then wp⟦oa⟧ (fun x => ⌜p x⌝) else wp⟦ob⟧ (fun x => ⌜p x⌝) := by
+      if c then wp⟦oa⟧ (fun x => 𝟙⟦p x⟧) else wp⟦ob⟧ (fun x => 𝟙⟦p x⟧) := by
   vcstep
 
 /-! ### `by_hoare` -/
@@ -139,7 +140,7 @@ set_option maxHeartbeats 400000 in
 -- `vcstep` needs a bit more fuel here under Lean 4.29.
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
-    Triple 1 (do let x ← oa; f x) (fun y => if y = true then 1 else 0) := by
+    ⦃ 1 ⦄ (do let x ← oa; f x) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   vcstep
   intro x
   by_cases hx : x ∈ support oa

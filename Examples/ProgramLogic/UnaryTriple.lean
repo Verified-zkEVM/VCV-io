@@ -44,11 +44,11 @@ example {oa : OracleComp spec α} {f : α → OracleComp spec β}
 
 example (oa : OracleComp spec α) (f : α → OracleComp spec Bool)
     (h : ∀ x ∈ support oa, Pr[= true | f x] = 1) :
-    Triple 1 (do
+    ⦃ 1 ⦄ (do
       let x ← oa
-      f x) (fun y => if y = true then 1 else 0) := by
+      f x) ⦃ fun y => if y = true then 1 else 0 ⦄ := by
   classical
-  vcstep using (fun x => OracleComp.ProgramLogic.propInd (x ∈ support oa))
+  vcstep using (fun x => 𝟙⟦x ∈ support oa⟧)
   · simpa [propInd_eq_ite] using triple_support (oa := oa)
   · intro x
     by_cases hx : x ∈ support oa
@@ -95,8 +95,8 @@ example {oa : OracleComp spec α} {ob : α → OracleComp spec β}
 -/
 
 example (x : α) (post : α → ℝ≥0∞) :
-    Triple (post x) (pure x : OracleComp spec α) post := by
-  vcgen
+    ⦃ post x ⦄ (pure x : OracleComp spec α) ⦃ post ⦄ := by
+  exact triple_pure (spec := spec) x post
 
 example {oa : OracleComp spec α} {I : ℝ≥0∞} {n : ℕ}
     {pre : ℝ≥0∞} {post : List α → ℝ≥0∞}
