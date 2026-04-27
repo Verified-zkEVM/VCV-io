@@ -126,9 +126,7 @@ registry.
 
 Locates the `wp oa post` sub-expression of the main target, first asks the
 registry for syntactic candidates, and then appends normalized fallback
-candidates. Each candidate is tried through the cached `SymM` rewrite path,
-with the older `rw` / `simp only` path retained as a fallback for rules the
-Sym rewriter cannot yet replay.
+candidates. Each candidate is tried through the cached `SymM` rewrite path.
 
 Returns `false` when no candidate succeeds, or when the goal contains no `wp`
 application at all. -/
@@ -146,10 +144,6 @@ def runWpStepRules : TacticM Bool := withVCGenWpStepTiming do
   for entry in entries do
     let some declName := entry.declName? | continue
     if ← runWpStepRewriteRule declName then return true
-    let rwStx ← `(tactic| rw [$(mkIdent declName):ident])
-    if ← tryEvalTacticSyntax rwStx then return true
-    let simpStx ← `(tactic| simp only [$(mkIdent declName):ident])
-    if ← tryEvalTacticSyntax simpStx then return true
   return false
 
 end OracleComp.ProgramLogic
