@@ -413,6 +413,10 @@ private def rawRelWPGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :
   let #[oa, ob, post, _epost₁, _epost₂] := args | none
   some (oa, ob, post)
 
+private def isRawStdDoRelWPGoal (target : Expr) : Bool :=
+  (rawRelWPGoalParts? target).isSome ||
+    (findAppWithHead? ``Std.Do'.rwp target).isSome
+
 private def rawRelWPGoalFullParts? (target : Expr) :
     Option (Expr × Expr × Expr × Expr × Expr × Expr) := do
   let target := target.consumeMData
@@ -513,7 +517,13 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
       entries.filter (·.kind == .relWP) ++ entries.filter (·.kind == .relTriple)
     for entry in entries.toList.take 8 do
       let saved ← saveState
-      if ← runVCSpecEntryCachedBackward entry then
+      let ok ←
+        match ← observing? do
+          runVCSpecEntryCachedBackward entry
+        with
+        | some ok => pure ok
+        | none => pure false
+      if ok then
         return true
       saved.restore
     return false
@@ -750,8 +760,11 @@ def runRVCGenStepUsingWithNames (hint : TSyntax `term) (names : Array Name) : Ta
 private def closeRelTheoremStepGoals : TacticM Unit := do
   discard <| tryEvalTacticSyntax (← `(tactic| all_goals try simp only [game_rule]))
   discard <| tryEvalTacticSyntax (← `(tactic|
+    all_goals try (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+  discard <| tryEvalTacticSyntax (← `(tactic|
     all_goals first
       | assumption
+      | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
          intros; trivial)
@@ -768,6 +781,7 @@ private def closeRelTheoremStepGoals : TacticM Unit := do
            | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
            | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
            | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)
+           | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])
            | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
               intros; trivial))))
 
@@ -795,6 +809,23 @@ private def runRVCGenStepWithTheoremDirect
 private def runRVCGenStepWithTheoremConseq
     (thm : TSyntax `term) (requireClosed : Bool := false) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
+  if isRawStdDoRelWPGoal target then
+    let saved ← saveState
+    let ok ←
+      match ← observing? do
+        evalTactic (← `(tactic|
+          refine Std.Do'.RelWP.rwp_consequence_rel _ _ _ _ _ _
+            (by
+              intro a b
+              by_cases h : a = b <;> simp [h, Lean.Order.PartialOrder.rel])
+            $thm))
+      with
+      | some _ => pure true
+      | none => pure false
+    if ok && (!requireClosed || (← getGoals).isEmpty) then
+      return true
+    saved.restore
+    return false
   let wrapper? ←
     if (relTripleGoalParts? target).isSome then
       pure <| some (← `(tactic|
@@ -817,7 +848,8 @@ private def runRVCGenStepWithTheoremConseq
       unless ← focusFirstGoalSatisfying fun target =>
           (relTripleGoalParts? target).isSome ||
           (relWPGoalParts? target).isSome ||
-          (stdDoRelTripleGoalParts? target).isSome do
+          (stdDoRelTripleGoalParts? target).isSome ||
+          isRawStdDoRelWPGoal target do
         throwError "rvcstep with theorem: failed to focus theorem subgoal after consequence rule"
       evalTactic (← `(tactic| apply $thm))
       closeRelTheoremStepGoals
@@ -830,10 +862,12 @@ private def runRVCGenStepWithTheoremConseq
   return false
 
 /-- Apply a `@[vcspec]` relational rule to the current goal.
-Default `rvcstep` fires rules only in `direct` mode; a future attribute could
-re-enable the relational consequence fallback by extending this helper. -/
+Default `rvcstep` fires cached rules directly. Raw `Std.Do'.rwp` goals also get
+a narrow theorem-consequence fallback because their carrier inference can fail
+before the cached path sees the concrete target carrier. -/
 private def runRelationalVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
   let saved ← saveState
   let ok ←
     match ← observing? do
@@ -846,6 +880,10 @@ private def runRelationalVCSpecRule
   if ok && (!requireClosed || (← getGoals).isEmpty) then
     return true
   saved.restore
+  if isRawStdDoRelWPGoal target then
+    if let some declName := entry.declName? then
+      if ← runRVCGenStepWithTheoremConseq (mkIdent declName) requireClosed then
+        return true
   return false
 
 /-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
@@ -858,7 +896,7 @@ def runRVCGenStepWithTheorem (thm : TSyntax `term) (requireClosed : Bool := fals
 private def relationalGoalKind? (target : Expr) : Option VCSpecKind :=
   if (relTripleGoalParts? target).isSome then
     some .relTriple
-  else if (relWPGoalParts? target).isSome then
+  else if (relWPGoalParts? target).isSome || isRawStdDoRelWPGoal target then
     some .relWP
   else
     none
@@ -869,7 +907,7 @@ private def takeCandidatePrefix (entries : Array VCSpecEntry) : Array VCSpecEntr
 private def registeredRVCGenRuleCandidateTiers : TacticM (Array (Array VCSpecEntry)) := do
   let target ← instantiateMVars (← getMainTarget)
   let some kind := relationalGoalKind? target | return #[]
-  let some (oa, ob, _) := relationalGoalParts? target | return #[]
+  let some (oa, ob, _) := relationalGoalParts? target <|> rawRelWPGoalParts? target | return #[]
   let goalPattern := classifyRelationalCompPattern oa ob
   let direct :=
     (← getRegisteredRelationalVCSpecEntries oa ob).filter (·.kind == kind)

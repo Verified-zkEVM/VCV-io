@@ -223,14 +223,14 @@ example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     Std.Do'.RelTriple (post a b)
       (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
-      Lean.Order.bot Lean.Order.bot := by
+      ⊥ₗ ⊥ₗ := by
   rvcstep
 
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     post a b ⊑ (Std.Do'.rwp
       (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
       (pure a : OracleComp spec α) (pure b : OracleComp spec β) post
-      Lean.Order.bot Lean.Order.bot) := by
+      ⊥ₗ ⊥ₗ) := by
   rvcstep
 
 example (a : α) (b : β)
@@ -238,9 +238,21 @@ example (a : α) (b : β)
     (post : γ → δ → ℝ≥0∞) :
     Std.Do'.rwp
         (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
-        (f a) (g b) post Lean.Order.bot Lean.Order.bot ⊑
+        (f a) (g b) post ⊥ₗ ⊥ₗ ⊑
       Std.Do'.rwp
         (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
         ((pure a : OracleComp spec α) >>= f) ((pure b : OracleComp spec β) >>= g) post
-        Lean.Order.bot Lean.Order.bot := by
+        ⊥ₗ ⊥ₗ := by
   rvcgen
+
+example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
+    (f : α → γ) (g : β → δ)
+    (post : γ → δ → ℝ≥0∞) :
+    post (f a) (g b) ⊑
+      Std.Do'.rwp
+        (Pred := ℝ≥0∞) (EPred₁ := Std.Do'.EPost.nil) (EPred₂ := Std.Do'.EPost.nil)
+        ((pure a : OracleComp spec α) >>= fun x => pure (f x))
+        ((pure b : OracleComp spec β) >>= fun y => pure (g y))
+        post ⊥ₗ ⊥ₗ := by
+  rvcgen
+

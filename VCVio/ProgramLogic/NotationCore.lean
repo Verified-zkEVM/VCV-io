@@ -128,6 +128,14 @@ lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
 
 /-! ## Notation -/
 
+/-- Lean-core order bottom for Loom/Std.Do exception postconditions.
+
+This is scoped because `Std.Do'.Triple` / `Std.Do'.RelTriple` use
+`Lean.Order.bot`, while Mathlib's ordinary `⊥` notation resolves through a
+different order hierarchy.  We use a distinct token to avoid ambiguity with
+the ordinary bottom notation. -/
+scoped notation "⊥ₗ" => Lean.Order.bot
+
 /-- Prop indicator: `⌜P⌝ = 1` if `P` holds, `0` otherwise.
 Mirrors Std.Do's `⌜P⌝ : SPred` but targets `ℝ≥0∞`. -/
 scoped notation "⌜" P "⌝" => propInd P
@@ -171,7 +179,7 @@ scoped notation "⟪" c₁ " ≈[" ε "] " c₂ " | " R "⟫" =>
 scoped syntax:lead "⦃" term "⦄ " term:lead " ≈ₑ " term:lead " ⦃" term "⦄" : term
 macro_rules
   | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) =>
-      `(Std.Do'.RelTriple $f $c₁ $c₂ $g Lean.Order.bot Lean.Order.bot)
+      `(Std.Do'.RelTriple $f $c₁ $c₂ $g ⊥ₗ ⊥ₗ)
 
 /-! ## Bridge lemmas: `⌜⌝` and existing API -/
 
