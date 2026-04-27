@@ -22,6 +22,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Spec
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Reductions
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Security
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Bridge
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Compatibility
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Games
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Spec
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
@@ -195,6 +196,7 @@ import VCVio.OracleComp.QueryTracking.RandomOracle.Simulation
 import VCVio.OracleComp.QueryTracking.ResourceProfile
 import VCVio.OracleComp.QueryTracking.SeededOracle
 import VCVio.OracleComp.QueryTracking.Structures
+import VCVio.OracleComp.QueryTracking.SubSpec
 import VCVio.OracleComp.QueryTracking.Tracing
 import VCVio.OracleComp.QueryTracking.Unpredictability
 import VCVio.OracleComp.QueryTracking.WriterCost
