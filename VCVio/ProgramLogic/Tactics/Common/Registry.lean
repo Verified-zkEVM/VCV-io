@@ -408,6 +408,16 @@ def getRegisteredUnaryVCSpecEntries (comp : Expr) : MetaM (Array VCSpecEntry) :=
   let registry := vcSpecRegistry.getState (← getEnv)
   return Lean.Meta.Sym.getMatch registry.unary comp
 
+/-- Retrieve unary `@[vcspec]` entries without reducible `whnf` on the computation.
+
+This is only for raw `wp` structural dispatch, where the syntactic head is already
+the surface we want to step and reducing zero/nil iterator terms can unfold into
+larger monadic expressions. -/
+def getRegisteredUnaryVCSpecEntriesNoWhnf (comp : Expr) : MetaM (Array VCSpecEntry) := do
+  let comp ← instantiateMVars comp
+  let registry := vcSpecRegistry.getState (← getEnv)
+  return Lean.Meta.Sym.getMatch registry.unary comp
+
 def getRegisteredRelationalVCSpecEntries (oa ob : Expr) : MetaM (Array VCSpecEntry) := do
   let oa ← instantiateMVars oa
   let oa ← whnfReducible oa

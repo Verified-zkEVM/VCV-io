@@ -597,9 +597,9 @@ private def runRawWpVCSpecBackward : TacticM Bool := do
       | some (_, comp, _) => some comp
       | none => wpGoalComp? target
     let some comp := comp? | return false
-    let comp ← whnfReducible (← instantiateMVars comp)
+    let comp ← instantiateMVars comp
     let goalPattern := classifyUnaryCompPattern comp
-    let entries ← getRegisteredUnaryVCSpecEntries comp
+    let entries ← getRegisteredUnaryVCSpecEntriesNoWhnf comp
     let entries :=
       takeCandidatePrefix <|
         entries.filter (fun entry =>
@@ -1077,7 +1077,7 @@ def tryRawWpStructuralStep : TacticM Bool := do
     | some (_, comp, _) => some comp
     | none => wpGoalComp? target
   let some comp := comp? | return false
-  let comp ← whnfReducible (← instantiateMVars comp)
+  let comp ← instantiateMVars comp
   if ← runRawWpVCSpecBackward then
     return true
   if ← runWpStepRules then
