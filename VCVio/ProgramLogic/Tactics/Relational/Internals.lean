@@ -594,7 +594,7 @@ private def runRawRelWPVCSpecBackward : TacticM Bool := do
       entries.filter (·.kind == .relWP) ++ entries.filter (·.kind == .relTriple)
     for entry in entries.toList.take 8 do
       let saved ← saveState
-      if ← liftMetaM <| entry.hasProofPremise then
+      if entry.kind == .relWP then
         let ok ←
           match ← observing? do
             unless ← runVCSpecEntryRawRelConsequence entry do
@@ -956,7 +956,7 @@ before the cached path sees the concrete target carrier. -/
 private def runRelationalVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  if isRawStdDoRelWPGoal target && (← liftMetaM <| entry.hasProofPremise) then
+  if isRawStdDoRelWPGoal target && entry.kind == .relWP then
     let saved ← saveState
     let ok ←
       match ← observing? do
@@ -981,10 +981,6 @@ private def runRelationalVCSpecRule
   if ok && (!requireClosed || (← getGoals).isEmpty) then
     return true
   saved.restore
-  if isRawStdDoRelWPGoal target then
-    if let some declName := entry.declName? then
-      if ← runRVCGenStepWithTheoremConseq (mkIdent declName) requireClosed then
-        return true
   return false
 
 /-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
