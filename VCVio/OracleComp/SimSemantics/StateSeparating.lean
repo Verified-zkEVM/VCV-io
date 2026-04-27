@@ -356,12 +356,12 @@ variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {�
   {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
   {E₁ : OracleSpec.{uₑ, v} ιₑ₁} {E₂ : OracleSpec.{uₑ, v} ιₑ₂}
 
-/-- A typed routing of a named export interface into a binary parallel
+/-- A typed routing of a named export interface into a two-component parallel
 composition.
 
 Each external query is owned by exactly one component. The equivalence transports
 between the external response type and the selected component response type. -/
-structure BinaryRoute
+structure ExportRoute
     {ιₑ : Type uₑ} (E : OracleSpec.{uₑ, v} ιₑ)
     {ιₑ₁ : Type uₑ} (E₁ : OracleSpec.{uₑ, v} ιₑ₁)
     {ιₑ₂ : Type uₑ} (E₂ : OracleSpec.{uₑ, v} ιₑ₂) where
@@ -369,15 +369,74 @@ structure BinaryRoute
     (Σ t₁ : E₁.Domain, E.Range t ≃ E₁.Range t₁) ⊕
     (Σ t₂ : E₂.Domain, E.Range t ≃ E₂.Range t₂)
 
-namespace BinaryRoute
+namespace ExportRoute
+
+/-- The tagged component query selected by an export route. -/
+def target {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, v} ιₑ}
+    (R : ExportRoute E E₁ E₂) (t : E.Domain) : E₁.Domain ⊕ E₂.Domain :=
+  match R.route t with
+  | .inl q => .inl q.1
+  | .inr q => .inr q.1
 
 /-- The canonical route for the sum of two export interfaces. -/
-def sum : BinaryRoute (E₁ + E₂) E₁ E₂ where
+def sum : ExportRoute (E₁ + E₂) E₁ E₂ where
   route
     | .inl t => .inl ⟨t, Equiv.refl _⟩
     | .inr t => .inr ⟨t, Equiv.refl _⟩
 
-end BinaryRoute
+end ExportRoute
+
+/-- An export route with no aliases.
+
+This says the named external interface is injective into the tagged component
+query space. It is the right assumption for transporting query-count predicates
+from a routed interface to its component interfaces without double-counting
+aliases. -/
+structure LawfulExportRoute
+    {ιₑ : Type uₑ} (E : OracleSpec.{uₑ, v} ιₑ)
+    {ιₑ₁ : Type uₑ} (E₁ : OracleSpec.{uₑ, v} ιₑ₁)
+    {ιₑ₂ : Type uₑ} (E₂ : OracleSpec.{uₑ, v} ιₑ₂)
+    extends ExportRoute E E₁ E₂ where
+  /-- The route does not alias two external query names to one tagged component query. -/
+  target_injective : Function.Injective toExportRoute.target
+
+/-- A named export interface that is equivalent to the sum of two component
+interfaces.
+
+This is the strongest route law: every component query is exposed exactly once,
+and every external query is a named presentation of a tagged component query. -/
+structure ExportRouteEquiv
+    {ιₑ : Type uₑ} (E : OracleSpec.{uₑ, v} ιₑ)
+    {ιₑ₁ : Type uₑ} (E₁ : OracleSpec.{uₑ, v} ιₑ₁)
+    {ιₑ₂ : Type uₑ} (E₂ : OracleSpec.{uₑ, v} ιₑ₂)
+    extends ExportRoute E E₁ E₂ where
+  /-- The query-domain equivalence induced by the route. -/
+  targetEquiv : E.Domain ≃ E₁.Domain ⊕ E₂.Domain
+  /-- The route's tagged target agrees with `targetEquiv`. -/
+  target_eq : ∀ t, toExportRoute.target t = targetEquiv t
+
+namespace ExportRouteEquiv
+
+/-- Forget an equivalence route to a no-alias lawful route. -/
+def toLawfulExportRoute
+    {ιₑ : Type uₑ} {E : OracleSpec.{uₑ, v} ιₑ}
+    (R : ExportRouteEquiv E E₁ E₂) : LawfulExportRoute E E₁ E₂ where
+  toExportRoute := R.toExportRoute
+  target_injective := by
+    intro t₁ t₂ h
+    apply R.targetEquiv.injective
+    rw [← R.target_eq t₁, ← R.target_eq t₂]
+    exact h
+
+/-- The canonical equivalence route for the sum of two export interfaces. -/
+def sum : ExportRouteEquiv (E₁ + E₂) E₁ E₂ where
+  toExportRoute := ExportRoute.sum
+  targetEquiv := Equiv.refl _
+  target_eq := by
+    intro t
+    cases t <;> rfl
+
+end ExportRouteEquiv
 
 /-- Parallel composition of two stateful handlers over a named export interface
 using an explicit state frame and ambient import interface.
@@ -390,7 +449,7 @@ non-interfering.
 def parRouteWith
     {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
     {E : OracleSpec.{uₑ, v} ιₑ} (F : Frame σ σ₁ σ₂)
-    (R : BinaryRoute E E₁ E₂)
+    (R : ExportRoute E E₁ E₂)
     [MonadLiftT (OracleQuery I₁) (OracleQuery I)]
     [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
@@ -407,7 +466,7 @@ def parRouteWith
 and canonical product state. -/
 def parRoute
     {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
-    {E : OracleSpec.{uₑ, v} ιₑ} (R : BinaryRoute E E₁ E₂)
+    {E : OracleSpec.{uₑ, v} ιₑ} (R : ExportRoute E E₁ E₂)
     [MonadLiftT (OracleQuery I₁) (OracleQuery I)]
     [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
@@ -422,7 +481,7 @@ def parWithImports
     [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
     QueryImpl.Stateful I (E₁ + E₂) σ :=
-  parRouteWith F BinaryRoute.sum h₁ h₂
+  parRouteWith F ExportRoute.sum h₁ h₂
 
 /-- Routed parallel composition over an ambient import interface whose two
 component import embeddings are known to have disjoint query images. The
@@ -431,7 +490,7 @@ to downstream proofs that need sum-like import separation. -/
 def parRouteSeparatedWith
     {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
     {E : OracleSpec.{uₑ, v} ιₑ} (F : Frame σ σ₁ σ₂)
-    (R : BinaryRoute E E₁ E₂) [I₁ ⊂ₒ I] [I₁ ˡ⊂ₒ I] [I₂ ⊂ₒ I] [I₂ ˡ⊂ₒ I]
+    (R : ExportRoute E E₁ E₂) [I₁ ⊂ₒ I] [I₁ ˡ⊂ₒ I] [I₂ ⊂ₒ I] [I₂ ˡ⊂ₒ I]
     [OracleSpec.DisjointSubSpec I₁ I₂ I]
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
     QueryImpl.Stateful I E σ :=

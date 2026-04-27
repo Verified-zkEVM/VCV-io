@@ -102,7 +102,7 @@ Includes uniform sampling, RO, programmable RO, and public-key queries. -/
 /-- Route named CMA queries to the public-forwarding component or the signing
 component of the CMA-to-NMA reduction. -/
 def cmaRoute (M Commit Chal Resp Stmt : Type) :
-    QueryImpl.Stateful.BinaryRoute
+    QueryImpl.Stateful.ExportRouteEquiv
       (cmaSpec M Commit Chal Resp Stmt)
       (cmaPublicSpec M Commit Chal Stmt)
       (signSpec M Commit Resp) where
@@ -111,6 +111,29 @@ def cmaRoute (M Commit Chal Resp Stmt : Type) :
     | .ro mc => .inl ⟨.ro mc, Equiv.refl _⟩
     | .sign m => .inr ⟨m, Equiv.refl _⟩
     | .pk => .inl ⟨.pk, Equiv.refl _⟩
+  targetEquiv := {
+    toFun
+      | .unif n => Sum.inl (CmaPublicQuery.unif n)
+      | .ro mc => Sum.inl (CmaPublicQuery.ro mc)
+      | .sign m => Sum.inr m
+      | .pk => Sum.inl CmaPublicQuery.pk
+    invFun
+      | Sum.inl (CmaPublicQuery.unif n) => CmaQuery.unif n
+      | Sum.inl (CmaPublicQuery.ro mc) => CmaQuery.ro mc
+      | Sum.inl CmaPublicQuery.pk => CmaQuery.pk
+      | Sum.inr m => CmaQuery.sign m
+    left_inv := by
+      intro t
+      cases t <;> rfl
+    right_inv := by
+      intro t
+      rcases t with (t | m)
+      · cases t <;> rfl
+      · rfl
+  }
+  target_eq := by
+    intro t
+    cases t <;> rfl
 
 instance subSpec_unif_nmaSpec (M Commit Chal Stmt : Type) :
     unifSpec ⊂ₒ nmaSpec M Commit Chal Stmt where

@@ -110,7 +110,7 @@ noncomputable def cmaToNma
     QueryImpl.Stateful (nmaSpec M Commit Chal Stmt) (cmaSpec M Commit Chal Resp Stmt)
       (OuterState M) :=
   QueryImpl.Stateful.parRouteWith
-    (cmaToNmaFrame M) (cmaRoute M Commit Chal Resp Stmt)
+    (cmaToNmaFrame M) (cmaRoute M Commit Chal Resp Stmt).toExportRoute
     (cmaPublicForward M Commit Chal) (cmaSignSim M Commit Chal simT)
 
 /-! ## `cmaSim`: simulated CMA game -/
