@@ -100,6 +100,37 @@ example (c : Prop) [Decidable c]
     (if h : c then wp⟦a h⟧ post else wp⟦b h⟧ post) ≤ wp⟦dite c a b⟧ post := by
   vcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.TacticInternals.Unary.wp_replicate_succ_le_vcspec` (raw, unaryWP)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example (oa : OracleComp spec α) (n : ℕ) (post : List α → ℝ≥0∞) :
+    wp⟦oa⟧ (fun x => wp⟦oa.replicate n⟧ (fun xs => post (x :: xs))) ≤
+      wp⟦oa.replicate (n + 1)⟧ post := by
+  vcstep
+
+example (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β → ℝ≥0∞) :
+    wp⟦f x⟧ (fun y => wp⟦xs.mapM f⟧ (fun ys => post (y :: ys))) ≤
+      wp⟦(x :: xs).mapM f⟧ post := by
+  vcstep
+
+example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
+    (init : β) (post : β → ℝ≥0∞) :
+    wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post) ≤
+      wp⟦(x :: xs).foldlM f init⟧ post := by
+  vcstep
+
+example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
+    (∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ℝ≥0∞) * post u) ≤
+      wp⟦(query t : OracleComp spec (spec.Range t))⟧ post := by
+  vcstep
+
+example [SampleableType α] (post : α → ℝ≥0∞) :
+    (∑' u : α, Pr[= u | ($ᵗ α : ProbComp α)] * post u) ≤
+      wp⟦($ᵗ α : ProbComp α)⟧ post := by
+  vcstep
+
 example (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
       evalDist (impl t) = evalDist (query t : OracleComp spec (spec.Range t)))

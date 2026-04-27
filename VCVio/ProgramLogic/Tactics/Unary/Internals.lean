@@ -54,12 +54,65 @@ theorem wp_dite_le_vcspec {ι : Type u} {spec : OracleSpec ι}
     (if h : c then wp (oa h) post else wp (ob h) post) ≤ wp (dite c oa ob) post := by
   rw [OracleComp.ProgramLogic.wp_dite]
 
+/-- Cached raw-`wp` structural leaf for `replicate (n + 1)`. -/
+theorem wp_replicate_succ_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type}
+    (oa : OracleComp spec α) (n : Nat) (post : List α → ENNReal) :
+    wp oa (fun x => wp (oa.replicate n) (fun xs => post (x :: xs))) ≤
+      wp (oa.replicate (n + 1)) post := by
+  rw [OracleComp.ProgramLogic.wp_replicate_succ]
+
+/-- Cached raw-`wp` structural leaf for `List.mapM` on `x :: xs`. -/
+theorem wp_list_mapM_cons_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α β : Type}
+    (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β → ENNReal) :
+    wp (f x) (fun y => wp (xs.mapM f) (fun ys => post (y :: ys))) ≤
+      wp ((x :: xs).mapM f) post := by
+  rw [OracleComp.ProgramLogic.wp_list_mapM_cons]
+
+/-- Cached raw-`wp` structural leaf for `List.foldlM` on `x :: xs`. -/
+theorem wp_list_foldlM_cons_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α σ : Type}
+    (x : α) (xs : List α) (f : σ → α → OracleComp spec σ)
+    (init : σ) (post : σ → ENNReal) :
+    wp (f init x) (fun s => wp (xs.foldlM f s) post) ≤
+      wp ((x :: xs).foldlM f init) post := by
+  rw [OracleComp.ProgramLogic.wp_list_foldlM_cons]
+
+/-- Cached raw-`wp` structural leaf for oracle queries. -/
+theorem wp_query_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    (t : spec.Domain) (post : spec.Range t → ENNReal) :
+    (∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ENNReal) * post u) ≤
+      wp (query t : OracleComp spec (spec.Range t)) post := by
+  simpa using le_of_eq (OracleComp.ProgramLogic.wp_HasQuery_query (spec := spec) t post).symm
+
+/-- Cached raw-`wp` structural leaf for `HasQuery.query`. -/
+theorem wp_HasQuery_query_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    (t : spec.Domain) (post : spec.Range t → ENNReal) :
+    (∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ENNReal) * post u) ≤
+      wp (spec := spec) (HasQuery.query t : OracleComp spec (spec.Range t)) post := by
+  simpa using le_of_eq (OracleComp.ProgramLogic.wp_HasQuery_query (spec := spec) t post).symm
+
+/-- Cached raw-`wp` structural leaf for uniform sampling. -/
+theorem wp_uniformSample_le_vcspec {α : Type} [SampleableType α] (post : α → ENNReal) :
+    (∑' u : α, Pr[= u | ($ᵗ α : ProbComp α)] * post u) ≤
+      wp ($ᵗ α : ProbComp α) post := by
+  rw [OracleComp.ProgramLogic.wp_uniformSample]
+
 attribute [vcspec]
   OracleComp.ProgramLogic.triple_pure
   wp_pure_le_vcspec
   wp_map_le_vcspec
   wp_ite_le_vcspec
   wp_dite_le_vcspec
+  wp_replicate_succ_le_vcspec
+  wp_list_mapM_cons_le_vcspec
+  wp_list_foldlM_cons_le_vcspec
+  wp_query_le_vcspec
+  wp_HasQuery_query_le_vcspec
+  wp_uniformSample_le_vcspec
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
