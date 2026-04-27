@@ -241,6 +241,15 @@ lemma liftComp_bind (mx : OracleComp spec α) (ob : α → OracleComp spec β) :
   grind
 
 @[simp]
+lemma liftComp_self (mx : OracleComp spec α) :
+    liftComp mx spec = mx := by
+  induction mx using OracleComp.inductionOn with
+  | pure x =>
+      rfl
+  | query_bind t k ih =>
+      simp [liftComp_bind, liftComp_query, ih]
+
+@[simp]
 lemma liftComp_map (mx : OracleComp spec α) (f : α → β) :
     liftComp (f <$> mx) superSpec = f <$> liftComp mx superSpec := by
   simp [liftComp]

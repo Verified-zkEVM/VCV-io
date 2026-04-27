@@ -193,6 +193,52 @@ lemma runState_bind {α β : Type v}
       h.runState s₀ A >>= fun (a, s) => (simulateQ h (f a)).run s := by
   simp [runState, simulateQ_bind, StateT.run_bind]
 
+/-- A stateful handler that transparently forwards lifted queries also
+forwards every lifted computation.
+
+The hypothesis is query-local: each lifted input query runs as the same query in
+the base interface and leaves the state unchanged. The conclusion lifts this to
+all computations by free-monad induction. -/
+theorem simulateQ_liftComp_run_of_query
+    {I₀ : OracleSpec.{uᵢ, v} ιᵢ} {M₀ : OracleSpec.{uₘ, v} ιₘ}
+    [MonadLiftT (OracleQuery I₀) (OracleQuery M₀)]
+    (h : QueryImpl.Stateful I₀ M₀ σ)
+    (hquery : ∀ (t : I₀.Domain) (s : σ),
+      (simulateQ h (OracleComp.liftComp (liftM (I₀.query t) :
+        OracleComp I₀ (I₀.Range t)) M₀)).run s =
+        (fun a => (a, s)) <$> (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)))
+    {α : Type v} (oa : OracleComp I₀ α) (s : σ) :
+    (simulateQ h (OracleComp.liftComp oa M₀)).run s =
+      (fun a => (a, s)) <$> oa := by
+  induction oa using OracleComp.inductionOn generalizing s with
+  | pure x =>
+      simp
+  | query_bind t k ih =>
+      simp only [OracleComp.liftComp_bind, simulateQ_bind, StateT.run_bind]
+      calc
+        (simulateQ h (OracleComp.liftComp
+              (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) M₀)).run s >>=
+            (fun p => (simulateQ h (OracleComp.liftComp (k p.1) M₀)).run p.2)
+            = (((fun a => (a, s)) <$>
+                (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))) >>=
+                (fun p => (simulateQ h (OracleComp.liftComp (k p.1) M₀)).run p.2)) := by
+                rw [hquery t s]
+        _ = (fun a => (a, s)) <$>
+              ((liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) >>= k) := by
+                rw [bind_map_left]
+                calc
+                  (do
+                    let u ← (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))
+                    (simulateQ h (OracleComp.liftComp (k u) M₀)).run s)
+                      = (do
+                        let u ← (liftM (I₀.query t) : OracleComp I₀ (I₀.Range t))
+                        (fun a => (a, s)) <$> k u) := by
+                          refine bind_congr fun u => ?_
+                          exact ih u s
+                  _ = (fun a => (a, s)) <$>
+                        ((liftM (I₀.query t) : OracleComp I₀ (I₀.Range t)) >>= k) := by
+                          simp [map_bind]
+
 /-- Transport a stateful handler along a state equivalence. -/
 def transportState (h : QueryImpl.Stateful I E σ) (φ : σ ≃ σ') :
     QueryImpl.Stateful I E σ' := fun t =>

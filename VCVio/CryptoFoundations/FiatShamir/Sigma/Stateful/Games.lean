@@ -112,8 +112,7 @@ noncomputable def cmaSignSim
   | m => StateT.mk fun log => do
       let pk ← (((nmaSpec M Commit Chal Stmt).query .pk) :
         OracleComp (nmaSpec M Commit Chal Stmt) Stmt)
-      let (c, ch, π) ← (liftM (simT pk) :
-        OracleComp (nmaSpec M Commit Chal Stmt) (Commit × Chal × Resp))
+      let (c, ch, π) ← OracleComp.liftComp (simT pk) (nmaSpec M Commit Chal Stmt)
       let _ ← (((nmaSpec M Commit Chal Stmt).query (.prog (m, c, ch))) :
         OracleComp (nmaSpec M Commit Chal Stmt) Unit)
       pure ((c, π), log ++ [m])
