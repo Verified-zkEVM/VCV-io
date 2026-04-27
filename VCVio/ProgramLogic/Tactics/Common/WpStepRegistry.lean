@@ -182,4 +182,14 @@ def getRegisteredWpStepEntries (oa : Expr) : MetaM (Array WpStepEntry) := do
   let registry := wpStepRegistry.getState (← getEnv)
   return Lean.Meta.Sym.getMatch registry.compTree oa
 
+/-- Retrieve `@[wpStep]` entries without normalizing the computation first.
+
+Raw `wp` dispatch uses this as the first pass so syntactic zero/nil iterator
+redexes are offered to their exact rewrite rules before normalized fallback
+candidates such as successor/cons unfoldings. -/
+def getRegisteredWpStepEntriesNoWhnf (oa : Expr) : MetaM (Array WpStepEntry) := do
+  let oa ← instantiateMVars oa
+  let registry := wpStepRegistry.getState (← getEnv)
+  return Lean.Meta.Sym.getMatch registry.compTree oa
+
 end OracleComp.ProgramLogic

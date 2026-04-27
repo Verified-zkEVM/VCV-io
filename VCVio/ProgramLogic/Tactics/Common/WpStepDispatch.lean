@@ -114,17 +114,21 @@ private def runWpStepRewriteRule (declName : Name) : TacticM Bool := do
           setGoals (goals ++ rest)
           return true
 
+private def mergeWpStepCandidateEntries (preferred fallback : Array WpStepEntry) :
+    Array WpStepEntry :=
+  fallback.foldl (init := preferred) fun entries entry =>
+    let duplicate := entries.any fun existing =>
+      existing.declName? == entry.declName?
+    if duplicate then entries else entries.push entry
+
 /-- Advance a `wp`-shaped goal by one rewrite, dispatching via the `@[wpStep]`
 registry.
 
-Locates the `wp oa post` sub-expression of the main target, normalizes its
-`oa` argument, asks the registry for rules whose LHS `comp` pattern matches,
-and tries each candidate in turn. The candidates are fed as `rw` / `simp only`
-arguments; the Sym-side discrimination tree is consulted for lookup rather
-than Lean's standard `DiscrTree`, so we benefit from `Sym.Pattern`'s
-normalizing preprocessing without yet fully handing the goal over to the
-`SymM` rewriter (that requires a `SymM → TacticM` proof-application bridge
-we defer to a later phase, to keep behavior stable against Sym churn).
+Locates the `wp oa post` sub-expression of the main target, first asks the
+registry for syntactic candidates, and then appends normalized fallback
+candidates. Each candidate is tried through the cached `SymM` rewrite path,
+with the older `rw` / `simp only` path retained as a fallback for rules the
+Sym rewriter cannot yet replay.
 
 Returns `false` when no candidate succeeds, or when the goal contains no `wp`
 application at all. -/
@@ -135,7 +139,10 @@ def runWpStepRules : TacticM Bool := withVCGenWpStepTiming do
   let argCount := wpApp.getAppNumArgs
   if argCount < 2 then return false
   let oa := wpApp.getArg! (argCount - 2)
-  let entries ← getRegisteredWpStepEntries oa
+  let entries :=
+    mergeWpStepCandidateEntries
+      (← getRegisteredWpStepEntriesNoWhnf oa)
+      (← getRegisteredWpStepEntries oa)
   for entry in entries do
     let some declName := entry.declName? | continue
     if ← runWpStepRewriteRule declName then return true

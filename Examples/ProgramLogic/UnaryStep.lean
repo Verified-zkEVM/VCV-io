@@ -126,10 +126,18 @@ example (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β 
       wp⟦(x :: xs).mapM f⟧ post := by
   vcstep
 
+example (f : α → OracleComp spec β) (post : List β → ℝ≥0∞) :
+    wp⟦([].mapM f : OracleComp spec (List β))⟧ post = post [] := by
+  vcstep
+
 example (x : α) (xs : List α) (f : β → α → OracleComp spec β)
     (init : β) (post : β → ℝ≥0∞) :
     wp⟦f init x⟧ (fun s => wp⟦xs.foldlM f s⟧ post) ≤
       wp⟦(x :: xs).foldlM f init⟧ post := by
+  vcstep
+
+example (f : β → α → OracleComp spec β) (init : β) (post : β → ℝ≥0∞) :
+    wp⟦([].foldlM f init : OracleComp spec β)⟧ post = post init := by
   vcstep
 
 example (t : spec.Domain) (post : spec.Range t → ℝ≥0∞) :
