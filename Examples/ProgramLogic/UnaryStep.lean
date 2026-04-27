@@ -110,6 +110,11 @@ example :
     ⦃1⦄ wrappedTrue (spec := spec) ⦃fun _ => 1⦄ := by
   vcstep with stdDoTriple_wrappedTrue
 
+example :
+    Std.Do'.Triple (1 : ℝ≥0∞) (wrappedTrue (spec := spec))
+      (fun _ => (1 : ℝ≥0∞)) epost⟨⟩ := by
+  vcstep
+
 @[irreducible] def wrappedTrueStep : OracleComp spec Bool := pure true
 
 @[local vcspec] theorem triple_wrappedTrueStep (_haux : True) :

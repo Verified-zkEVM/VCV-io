@@ -54,24 +54,23 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   | none => return false
 
 /-- Check whether an expression (possibly under `∀` quantifiers and `mdata`) contains
-a `Triple` application as its head. -/
+ a unary triple application as its head. -/
 private def hasTripleHead (e : Expr) : Bool :=
   let rec go : Expr → Bool
     | .forallE _ _ body _ => go body
     | .mdata _ e => go e
-    | e => (findAppWithHead? ``OracleComp.ProgramLogic.Triple e).isSome
+    | e => (tripleGoalComp? e).isSome
   go e
 
-/-- Extract the head function of the computation argument from a `Triple` application,
-after stripping `∀` quantifiers and `mdata`. -/
+/-- Extract the head function of the computation argument from a unary triple
+application, after stripping `∀` quantifiers and `mdata`. -/
 private def tripleCompFn? (e : Expr) : Option Expr :=
   let rec go : Expr → Option Expr
     | .forallE _ _ body _ => go body
     | .mdata _ e => go e
     | e => do
-        let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple e
-        let args ← trailingArgs? app 3
-        some (args[1]!).consumeMData.getAppFn
+        let comp ← tripleGoalComp? e
+        some comp.consumeMData.getAppFn
   go e
 
 /-- Try to close a `Triple` goal by targeted application of local hypotheses
@@ -284,9 +283,7 @@ def tryBindImmediate (comp : Expr) : TacticM Bool := do
 /-- Try only the automatic loop-invariant rules, without the structural fallback rules. -/
 def tryLoopInvariantRuleAuto (comp : Expr) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple target | return false
-  let some args := trailingArgs? app 3 | return false
-  let post := args[2]!
+  let some (_pre, _comp, post) := tripleGoalParts? target | return false
   if isReplicateHead comp then
     if isConstantLambda post then
       match ← observing? do
