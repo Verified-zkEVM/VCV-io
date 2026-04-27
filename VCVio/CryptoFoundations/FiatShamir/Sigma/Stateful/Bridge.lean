@@ -249,6 +249,146 @@ message to a `StateT` list. -/
       (postKeygenSignCore (σ := σ) (hr := hr) (M := M)
         (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
 
+/-! ## Fixed-key post-keygen probability normal form -/
+
+/-- Fixed-key public post-keygen experiment before interpreting the public
+random-oracle runtime.
+
+This is the literal post-keygen body of `SignatureAlg.unforgeableExp`: the
+signing oracle is a WriterT logger, and the final freshness check reads that
+query log. -/
+@[reducible] noncomputable def postKeygenFreshWriterComp
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
+    (pk : Stmt) (sk : Wit) :
+    OracleComp (unifSpec + (M × Commit →ₒ Chal)) Bool := by
+  letI : DecidableEq (Commit × Resp) := Classical.decEq _
+  let baseW : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+      (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+        (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
+    (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+      (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))).liftTarget _
+  let implW : QueryImpl (SourceCmaSpec (M := M) (Commit := Commit)
+      (Chal := Chal) (Resp := Resp))
+      (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+        (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
+    baseW +
+      (SourceSigAlg (σ := σ) (hr := hr) (M := M)).signingOracle pk sk
+  exact do
+    let ((msg, sig), log) ← (simulateQ implW (adv.main pk)).run
+    let verified ← (SourceSigAlg (σ := σ) (hr := hr) (M := M)).verify pk msg sig
+    pure (!log.wasQueried msg && verified)
+
+/-- Fixed-key public post-keygen experiment in the explicit cache-state
+Fiat-Shamir runtime.
+
+This is the public `unforgeableExp` body after key generation has been factored
+out: run the adversary with the real signing oracle, log signing inputs, and
+perform the final freshness-and-verification check. -/
+@[reducible] noncomputable def postKeygenFreshProb
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
+    (pk : Stmt) (sk : Wit) : ProbComp Bool := by
+  letI : HasQuery (M × Commit →ₒ Chal)
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    (randomOracle : QueryImpl (M × Commit →ₒ Chal) _).toHasQuery
+  exact
+  (((simulateQ
+      (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
+        (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+      (adv.main pk)).run [] >>= fun z => do
+      let msg := z.1.1
+      let sig := z.1.2
+      let signed := z.2
+      let verified ←
+        (_root_.FiatShamir
+          (m := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) σ hr M).verify
+          pk msg sig
+      pure (!decide (msg ∈ signed) && verified)).run'
+    (∅ : (M × Commit →ₒ Chal).QueryCache))
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- WriterT signing-query logs and StateT input logs agree for the fixed-key
+post-keygen adversary run. -/
+private theorem postKeygenWriterLog_eq_inputLog
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
+    (pk : Stmt) (sk : Wit) :
+    let baseW : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget _
+    let implW : QueryImpl (SourceCmaSpec (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      baseW +
+        QueryImpl.withLogging
+          (postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+            (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+    ((fun z : (M × (Commit × Resp)) × QueryLog (M →ₒ (Commit × Resp)) =>
+        (z.1, z.2.map (fun e => e.1))) <$> ((simulateQ implW (adv.main pk)).run :
+          StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+            ((M × (Commit × Resp)) × QueryLog (M →ₒ (Commit × Resp))))) =
+      ((simulateQ
+          (postKeygenAppendImpl (σ := σ) (hr := hr) (M := M)
+            (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+          (adv.main pk)).run [] :
+        StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp
+          ((M × (Commit × Resp)) × List M)) := by
+  let runtime := fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
+  let so := postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+    (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk
+  letI : HasQuery (unifSpec + (M × Commit →ₒ Chal))
+      (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp) :=
+    runtime.toHasQuery
+  simpa [postKeygenAppendImpl, runtime, so] using
+    (QueryImpl.map_run_withLogging_inputs_eq_run_appendInputLog
+      (spec₀ := unifSpec + (M × Commit →ₒ Chal))
+      (loggedSpec := M →ₒ (Commit × Resp))
+      (m₀ := StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)
+      (so := so) (oa := adv.main pk) (initialInputs := ([] : List M)))
+
+omit [SampleableType Stmt] [SampleableType Wit] in
+/-- Mapping the public random-oracle runtime through the WriterT signing oracle
+produces the explicit cache-state WriterT handler. -/
+private lemma fsBaseImpl_writerTMapBase_signingOracle_eq
+    (pk : Stmt) (sk : Wit) :
+    let baseW : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
+      (HasQuery.toQueryImpl (spec := unifSpec + (M × Commit →ₒ Chal))
+        (m := OracleComp (unifSpec + (M × Commit →ₒ Chal)))).liftTarget _
+    let implW : QueryImpl (SourceCmaSpec (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (OracleComp (unifSpec + (M × Commit →ₒ Chal)))) :=
+      baseW +
+        (SourceSigAlg (σ := σ) (hr := hr) (M := M)).signingOracle pk sk
+    let baseS : QueryImpl (unifSpec + (M × Commit →ₒ Chal))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).liftTarget _
+    let implS : QueryImpl (SourceCmaSpec (M := M) (Commit := Commit)
+        (Chal := Chal) (Resp := Resp))
+        (WriterT (QueryLog (M →ₒ (Commit × Resp)))
+          (StateT ((M × Commit →ₒ Chal).QueryCache) ProbComp)) :=
+      baseS +
+        QueryImpl.withLogging
+          (postKeygenSignCore (σ := σ) (hr := hr) (M := M)
+            (Commit := Commit) (Chal := Chal) (Resp := Resp) pk sk)
+    (fsBaseImpl (M := M) (Commit := Commit) (Chal := Chal)).writerTMapBase implW =
+      implS := by
+  funext t
+  rcases t with (n | mc) | m
+  · ext cache
+    simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
+      HasQuery.toQueryImpl_apply, fsBaseImpl, unifFwdImpl]
+  · ext cache
+    simp [QueryImpl.writerTMapBase, QueryImpl.liftTarget_apply,
+      HasQuery.toQueryImpl_apply, fsBaseImpl, unifFwdImpl, randomOracle]
+  · ext cache
+    simp [QueryImpl.writerTMapBase, SignatureAlg.signingOracle,
+      QueryImpl.withLogging_apply, postKeygenSignCore, _root_.FiatShamir,
+      fsBaseImpl, randomOracle, StateT.run_bind, roSim.run_liftM]
+
 /-! ## Joint output of `cmaReal` -/
 
 /-- Run the direct stateful `cmaReal` game against `signedAdv` and pack the
@@ -816,5 +956,41 @@ theorem cmaSignHashQueryBound_to_hash {α : Type}
   · intro t b hcan
     cases t <;> simp [cmaSignHashCanQuery, cmaSignHashCost, IsHashQuery] at hcan ⊢
   · simpa [cmaSignHashQueryBound] using hA
+
+omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
+  [DecidableEq Commit] in
+/-- Predicate-targeted signing-query bound for the final freshness-preserving
+CMA adversary. -/
+theorem signedFreshAdv_isQueryBoundP_costly
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
+    (qS qH : ℕ)
+    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    (signedFreshAdv σ hr M adv).IsQueryBoundP
+      (IsCostlyQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) qS :=
+  cmaSignHashQueryBound_to_costly (M := M) (Commit := Commit)
+    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)
+    (hA := signedFreshAdv_cmaSignHashQueryBound (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      adv qS qH hQ)
+
+omit [SampleableType Stmt] [SampleableType Wit] [SampleableType Chal]
+  [DecidableEq Commit] in
+/-- Predicate-targeted hash-query bound for the final freshness-preserving CMA
+adversary. The extra query is the final Fiat-Shamir verification. -/
+theorem signedFreshAdv_isQueryBoundP_hash
+    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
+    (qS qH : ℕ)
+    (hQ : ∀ pk, signHashQueryBound (M := M) (Commit := Commit) (Chal := Chal)
+      (S' := Commit × Resp) (oa := adv.main pk) qS qH) :
+    (signedFreshAdv σ hr M adv).IsQueryBoundP
+      (IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+        (Resp := Resp) (Stmt := Stmt)) (qH + 1) :=
+  cmaSignHashQueryBound_to_hash (M := M) (Commit := Commit)
+    (Chal := Chal) (Resp := Resp) (Stmt := Stmt)
+    (hA := signedFreshAdv_cmaSignHashQueryBound (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      adv qS qH hQ)
 
 end FiatShamir.Stateful
