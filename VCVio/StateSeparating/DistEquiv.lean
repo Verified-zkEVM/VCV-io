@@ -209,16 +209,16 @@ variable {ιᵢ₁ : Type uₘ} {ιᵢ₂ : Type uₘ}
   {E₁ : OracleSpec.{uₑ, 0} ιₑ₁} {E₂ : OracleSpec.{uₑ, 0} ιₑ₂}
   {σ₁ σ₂ : Type}
 
-/-- `par` congruence on both sides from per-factor handler equivalences with
+/-- `parSum` congruence on both sides from per-factor handler equivalences with
 explicit initial states. -/
-theorem par_congr
+theorem parSum_congr
     {h₁ h₁' : QueryImpl.Stateful I₁ E₁ σ₁} {s₁ : σ₁}
     {h₂ h₂' : QueryImpl.Stateful I₂ E₂ σ₂} {s₂ : σ₂}
     (hh₁ : ∀ (q : E₁.Domain) (s : σ₁),
       𝒟[(h₁ q).run s] = 𝒟[(h₁' q).run s])
     (hh₂ : ∀ (q : E₂.Domain) (s : σ₂),
       𝒟[(h₂ q).run s] = 𝒟[(h₂' q).run s]) :
-    (h₁.par h₂, (s₁, s₂)) ≡ᵈ (h₁'.par h₂', (s₁, s₂)) := by
+    (h₁.parSum h₂, (s₁, s₂)) ≡ᵈ (h₁'.parSum h₂', (s₁, s₂)) := by
   refine of_step ?_ (s₁, s₂)
   intro q s
   rcases q with t | t

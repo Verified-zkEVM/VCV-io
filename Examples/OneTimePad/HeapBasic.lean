@@ -166,7 +166,7 @@ The arithmetic core of OTP perfect secrecy at the handler layer:
 on every (query, heap) pair, `realImpl`'s and `idealImpl`'s handlers
 have the same `evalDist`. Exposed as a stand-alone lemma so that
 parallel-channel cutovers (e.g. `Examples.OneTimePad.HeapPar`) can
-feed it to `QueryImpl.Stateful.DistEquiv.par_congr` without re-running the
+feed it to `QueryImpl.Stateful.DistEquiv.parSum_congr` without re-running the
 case-split. -/
 
 /-- **Per-handler `evalDist` equality** between `realImpl sp` and

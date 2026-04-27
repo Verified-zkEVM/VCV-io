@@ -1524,7 +1524,7 @@ discharge `hreach` by establishing this correspondence at the level of `runTrace
 
 **On typeclass requirements.** The `wrappedSpec Chal` oracle space is
 `unifSpec + (Unit →ₒ Chal)`, and the quantitative section of `ReplayFork.lean` requires the
-typeclass `[OracleSpec.LawfulSubSpec unifSpec spec]` (to factor `probOutput_uniformSample`
+typeclass `[unifSpec ˡ⊂ₒ spec]` (to factor `probOutput_uniformSample`
 through `liftComp` on the `forkReplay` side). This instance is discharged by Mathlib
 automation at this call site.
 

@@ -56,7 +56,7 @@ then `wp` of the simulated computation equals `wp` of the original. -/
 /-- Lifting a computation to a larger oracle spec via `liftComp` preserves `wp`. -/
 @[game_rule] theorem wp_liftComp {ι' : Type*} {superSpec : OracleSpec ι'}
     [superSpec.Fintype] [superSpec.Inhabited]
-    [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+    [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
     (mx : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp (liftComp mx superSpec) post =
       wp mx post := by

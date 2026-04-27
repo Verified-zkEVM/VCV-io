@@ -64,7 +64,7 @@ namespace seededOracle
 lemma probEvent_liftComp_uniformSample_eq_of_eq
     {ι : Type} {spec : OracleSpec ι}
     [(i : ι) → SampleableType (spec.Range i)]
-    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec]
+    [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec]
     [spec.Fintype] [spec.Inhabited]
     {i : ι} (u₀ : spec.Range i) :
     probEvent (liftComp (uniformSample (spec.Range i)) spec)
@@ -98,7 +98,7 @@ lemma run_bind_query_eq_pop {α : Type u}
 private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α : Type} (oa : OracleComp spec₀ α) :
@@ -241,7 +241,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
@@ -265,7 +265,7 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
 lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
@@ -284,7 +284,7 @@ what would otherwise be a fresh uniform oracle response. -/
 lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (σ : QuerySeed spec₀) (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) :
     𝒟[(do
@@ -398,7 +398,7 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
 lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) (n : ℕ) :
     ∀ (σ : QuerySeed spec₀),
@@ -433,7 +433,7 @@ the distribution when averaging over seeds from `generateSeed`. -/
 lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) :
@@ -625,7 +625,7 @@ lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
 lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
@@ -652,7 +652,7 @@ by an arbitrary function of the seed prefix `σ.takeAtIndex i₀ k`. -/
 lemma tsum_probOutput_generateSeed_weight_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) (x : α)

@@ -7,15 +7,15 @@ import Examples.OneTimePad.HeapBasic
 import VCVio.StateSeparating.DistEquiv
 
 /-!
-# Two parallel OTP channels via `QueryImpl.Stateful.par`
+# Two parallel OTP channels via `QueryImpl.Stateful.parSum`
 
 Pilot demonstration of state-separating's parallel-composition machinery on
 the One-Time Pad. Take the single-channel `realImpl` / `idealImpl`
 from `HeapBasic.lean` and form
 
-* `pairRealImpl sp := (realImpl sp).par (realImpl sp)` with state
+* `pairRealImpl sp := (realImpl sp).parSum (realImpl sp)` with state
   `Heap (UsedFlag ⊕ UsedFlag)` (one single-call gate per channel), and
-* `pairIdealImpl sp := (idealImpl sp).par (idealImpl sp)` with the same
+* `pairIdealImpl sp := (idealImpl sp).parSum (idealImpl sp)` with the same
   state shape (each channel still single-call gated).
 
 The composite export `otpSpec sp + otpSpec sp` exposes two channels:
@@ -33,7 +33,7 @@ threads each channel's uniform sampling through its own slot.
   *unconditional* distributional equivalence, proved by feeding the
   per-(query, heap) handler equality from
   `realImpl_impl_evalDist_idealImpl` (HeapBasic.lean) into
-  `QueryImpl.Stateful.DistEquiv.par_congr` once per channel.
+  `QueryImpl.Stateful.DistEquiv.parSum_congr` once per channel.
 * `evalDist_run_encOncePair_eq` is the corollary on the canonical
   two-call adversary, a one-line specialisation via
   `QueryImpl.Stateful.DistEquiv.run_evalDist_eq`.
@@ -43,16 +43,16 @@ threads each channel's uniform sampling through its own slot.
 The previous version of this file proved the two-channel statement
 operationally, by walking `simulateQ` over `encOncePair`'s
 query-bind chain and discharging each `liftComp` shell from
-`QueryImpl.Stateful.par`'s sum-spec import by hand. That worked, but it
+`QueryImpl.Stateful.parSum`'s sum-spec import by hand. That worked, but it
 reproved the OTP cryptographic core (XOR with uniform is uniform)
-inside the `par`-composite — which scales poorly to deeper
+inside the `parSum`-composite, which scales poorly to deeper
 compositions and is unnecessary now that:
 
 * `realImpl_impl_evalDist_idealImpl` (in `HeapBasic.lean`) handlers
   the OTP cryptographic core as a *per-(query, heap) handler
   equality* between the gated real and ideal single-channel
   handlers, and
-* `QueryImpl.Stateful.DistEquiv.par_congr` (in `VCVio.state-separating.DistEquiv`)
+* `QueryImpl.Stateful.DistEquiv.parSum_congr` (in `VCVio.state-separating.DistEquiv`)
   lifts a pair of such per-handler equalities to a `≡ᵈ`-hop on the
   parallel composite, without any operational `liftComp`
   bookkeeping.
@@ -60,7 +60,7 @@ compositions and is unnecessary now that:
 The two combine to give `pairRealImpl ≡ᵈ pairIdealImpl` against
 *every* two-channel adversary, not just `encOncePair`.
 
-## What `QueryImpl.Stateful.par` buys here vs. a flat product state
+## What `QueryImpl.Stateful.parSum` buys here vs. a flat product state
 
 In the SSP product-state model, a two-channel OTP would carry state
 type `(Option (BitVec sp)) × (Option (BitVec sp))` (or similar),
@@ -90,7 +90,7 @@ own single-call gate, sampled and updated independently. -/
 def pairRealImpl (sp : ℕ) :
     QueryImpl.Stateful (unifSpec + unifSpec) (otpSpec sp + otpSpec sp)
       (Heap UsedFlag × Heap UsedFlag) :=
-  (realImpl sp).par (realImpl sp)
+  (realImpl sp).parSum (realImpl sp)
 
 /-- The two-channel ideal OTP handler: two independently-gated OTP
 ideal-channel handlers composed in parallel.
@@ -101,7 +101,7 @@ Each channel samples a fresh uniform ciphertext on its first call
 def pairIdealImpl (sp : ℕ) :
     QueryImpl.Stateful (unifSpec + unifSpec) (otpSpec sp + otpSpec sp)
       (Heap UsedFlag × Heap UsedFlag) :=
-  (idealImpl sp).par (idealImpl sp)
+  (idealImpl sp).parSum (idealImpl sp)
 
 /-! ## Single-channel and two-channel adversaries -/
 
@@ -131,7 +131,7 @@ Both ingredients live one layer below:
 
 * `realImpl_impl_evalDist_idealImpl` (HeapBasic.lean): per-(query,
   heap) handler `evalDist`-equality at the single-channel layer.
-* `QueryImpl.Stateful.DistEquiv.par_congr` (VCVio.state-separating.DistEquiv): lift
+* `QueryImpl.Stateful.DistEquiv.parSum_congr` (VCVio.state-separating.DistEquiv): lift
   per-handler `evalDist`-equalities on each factor to a `≡ᵈ`-hop on
   the parallel composite.
 
@@ -144,11 +144,11 @@ The parallel real and ideal handlers produce identical output
 distributions against every two-channel adversary.
 
 Proof: feed the per-(query, heap) handler equality from
-`realImpl_impl_evalDist_idealImpl` into `par_congr` twice, once per
+`realImpl_impl_evalDist_idealImpl` into `parSum_congr` twice, once per
 channel, from the default heap state on each side. -/
 theorem pairRealImpl_distEquiv_pairIdealImpl (sp : ℕ) :
     pairRealImpl sp ≡ᵈ₀ pairIdealImpl sp :=
-  QueryImpl.Stateful.DistEquiv.par_congr
+  QueryImpl.Stateful.DistEquiv.parSum_congr
     (h₁ := realImpl sp) (h₁' := idealImpl sp)
     (h₂ := realImpl sp) (h₂' := idealImpl sp)
     (s₁ := (default : Heap UsedFlag)) (s₂ := (default : Heap UsedFlag))

@@ -57,7 +57,7 @@ The component projections are state lenses in the sense of
 `PFunctor.Lens.State`: each one has a getter and a putter satisfying the
 standard very-well-behaved lens laws. The `separated` field says the two lenses
 are non-interfering: each update leaves the other view unchanged, and the two
-updates commute. Composition operators such as `linkWith` and `parWith` use
+updates commute. Composition operators such as `linkWith` and `parSumWith` use
 this explicit frame to run handlers over a larger state than the canonical
 product state.
 -/
@@ -356,15 +356,90 @@ variable {ιᵢ₁ : Type uᵢ} {ιᵢ₂ : Type uᵢ} {ιₑ₁ : Type uₑ} {�
   {I₁ : OracleSpec.{uᵢ, v} ιᵢ₁} {I₂ : OracleSpec.{uᵢ, v} ιᵢ₂}
   {E₁ : OracleSpec.{uₑ, v} ιₑ₁} {E₂ : OracleSpec.{uₑ, v} ιₑ₂}
 
-/-- Parallel composition of two stateful handlers using an explicit state
-frame.
+/-- A typed routing of a named export interface into a binary parallel
+composition.
+
+Each external query is owned by exactly one component. The equivalence transports
+between the external response type and the selected component response type. -/
+structure BinaryRoute
+    {ιₑ : Type uₑ} (E : OracleSpec.{uₑ, v} ιₑ)
+    {ιₑ₁ : Type uₑ} (E₁ : OracleSpec.{uₑ, v} ιₑ₁)
+    {ιₑ₂ : Type uₑ} (E₂ : OracleSpec.{uₑ, v} ιₑ₂) where
+  route : (t : E.Domain) →
+    (Σ t₁ : E₁.Domain, E.Range t ≃ E₁.Range t₁) ⊕
+    (Σ t₂ : E₂.Domain, E.Range t ≃ E₂.Range t₂)
+
+namespace BinaryRoute
+
+/-- The canonical route for the sum of two export interfaces. -/
+def sum : BinaryRoute (E₁ + E₂) E₁ E₂ where
+  route
+    | .inl t => .inl ⟨t, Equiv.refl _⟩
+    | .inr t => .inr ⟨t, Equiv.refl _⟩
+
+end BinaryRoute
+
+/-- Parallel composition of two stateful handlers over a named export interface
+using an explicit state frame and ambient import interface.
 
 The frame specifies where each side's private state lives in the shared source
 state. A left query updates only the left view, and a right query updates only
 the right view. The frame's separation law records that these two updates are
 non-interfering.
 -/
-def parWith (F : Frame σ σ₁ σ₂)
+def parRouteWith
+    {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
+    {E : OracleSpec.{uₑ, v} ιₑ} (F : Frame σ σ₁ σ₂)
+    (R : BinaryRoute E E₁ E₂)
+    [MonadLiftT (OracleQuery I₁) (OracleQuery I)]
+    [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+    QueryImpl.Stateful I E σ := fun t =>
+  match R.route t with
+  | .inl q => StateT.mk fun s =>
+      (Prod.map q.2.symm fun s₁' => F.left.put s₁' s) <$>
+        liftComp ((h₁ q.1).run (F.left.get s)) I
+  | .inr q => StateT.mk fun s =>
+      (Prod.map q.2.symm fun s₂' => F.right.put s₂' s) <$>
+        liftComp ((h₂ q.1).run (F.right.get s)) I
+
+/-- Parallel composition of two stateful handlers over a named export interface
+and canonical product state. -/
+def parRoute
+    {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
+    {E : OracleSpec.{uₑ, v} ιₑ} (R : BinaryRoute E E₁ E₂)
+    [MonadLiftT (OracleQuery I₁) (OracleQuery I)]
+    [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+    QueryImpl.Stateful I E (σ₁ × σ₂) :=
+  parRouteWith (Frame.prod σ₁ σ₂) R h₁ h₂
+
+/-- Parallel composition of two stateful handlers using an explicit state
+frame and ambient import interface. The export interface is the canonical sum. -/
+def parWithImports
+    {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} (F : Frame σ σ₁ σ₂)
+    [MonadLiftT (OracleQuery I₁) (OracleQuery I)]
+    [MonadLiftT (OracleQuery I₂) (OracleQuery I)]
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+    QueryImpl.Stateful I (E₁ + E₂) σ :=
+  parRouteWith F BinaryRoute.sum h₁ h₂
+
+/-- Routed parallel composition over an ambient import interface whose two
+component import embeddings are known to have disjoint query images. The
+implementation is the same as `parRouteWith`; the extra hypothesis is available
+to downstream proofs that need sum-like import separation. -/
+def parRouteSeparatedWith
+    {ιᵢ : Type uᵢ} {I : OracleSpec.{uᵢ, v} ιᵢ} {ιₑ : Type uₑ}
+    {E : OracleSpec.{uₑ, v} ιₑ} (F : Frame σ σ₁ σ₂)
+    (R : BinaryRoute E E₁ E₂) [I₁ ⊂ₒ I] [I₁ ˡ⊂ₒ I] [I₂ ⊂ₒ I] [I₂ ˡ⊂ₒ I]
+    [OracleSpec.DisjointSubSpec I₁ I₂ I]
+    (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+    QueryImpl.Stateful I E σ :=
+  parRouteWith F R h₁ h₂
+
+/-- Parallel composition of two stateful handlers using an explicit state
+frame and disjoint sum import and export interfaces. -/
+def parSumWith (F : Frame σ σ₁ σ₂)
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
     QueryImpl.Stateful (I₁ + I₂) (E₁ + E₂) σ
   | .inl t => StateT.mk fun s =>
@@ -375,36 +450,36 @@ def parWith (F : Frame σ σ₁ σ₂)
         liftComp ((h₂ t).run (F.right.get s)) (I₁ + I₂)
 
 @[simp]
-lemma parWith_apply_inl_run (F : Frame σ σ₁ σ₂)
+lemma parSumWith_apply_inl_run (F : Frame σ σ₁ σ₂)
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂)
     (t : E₁.Domain) (s : σ) :
-    ((h₁.parWith F h₂) (Sum.inl t)).run s =
+    ((h₁.parSumWith F h₂) (Sum.inl t)).run s =
       (Prod.map id fun s₁' => F.left.put s₁' s) <$>
         liftComp ((h₁ t).run (F.left.get s)) (I₁ + I₂) := rfl
 
 @[simp]
-lemma parWith_apply_inr_run (F : Frame σ σ₁ σ₂)
+lemma parSumWith_apply_inr_run (F : Frame σ σ₁ σ₂)
     (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂)
     (t : E₂.Domain) (s : σ) :
-    ((h₁.parWith F h₂) (Sum.inr t)).run s =
+    ((h₁.parSumWith F h₂) (Sum.inr t)).run s =
       (Prod.map id fun s₂' => F.right.put s₂' s) <$>
         liftComp ((h₂ t).run (F.right.get s)) (I₁ + I₂) := rfl
 
 /-- Parallel composition of two stateful handlers over disjoint sum interfaces. -/
-def par (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
+def parSum (h₁ : QueryImpl.Stateful I₁ E₁ σ₁) (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) :
     QueryImpl.Stateful (I₁ + I₂) (E₁ + E₂) (σ₁ × σ₂) :=
-  h₁.parWith (Frame.prod σ₁ σ₂) h₂
+  h₁.parSumWith (Frame.prod σ₁ σ₂) h₂
 
 @[simp]
-lemma par_apply_inl_run (h₁ : QueryImpl.Stateful I₁ E₁ σ₁)
+lemma parSum_apply_inl_run (h₁ : QueryImpl.Stateful I₁ E₁ σ₁)
     (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) (t : E₁.Domain) (s₁ : σ₁) (s₂ : σ₂) :
-    ((h₁.par h₂) (Sum.inl t)).run (s₁, s₂) =
+    ((h₁.parSum h₂) (Sum.inl t)).run (s₁, s₂) =
       (Prod.map id (·, s₂)) <$> liftComp ((h₁ t).run s₁) (I₁ + I₂) := rfl
 
 @[simp]
-lemma par_apply_inr_run (h₁ : QueryImpl.Stateful I₁ E₁ σ₁)
+lemma parSum_apply_inr_run (h₁ : QueryImpl.Stateful I₁ E₁ σ₁)
     (h₂ : QueryImpl.Stateful I₂ E₂ σ₂) (t : E₂.Domain) (s₁ : σ₁) (s₂ : σ₂) :
-    ((h₁.par h₂) (Sum.inr t)).run (s₁, s₂) =
+    ((h₁.parSum h₂) (Sum.inr t)).run (s₁, s₂) =
       (Prod.map id (s₁, ·)) <$> liftComp ((h₂ t).run s₂) (I₁ + I₂) := rfl
 
 end Stateful

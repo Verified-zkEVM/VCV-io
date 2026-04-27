@@ -127,7 +127,7 @@ section LiftComp
 
 variable {ι' : Type} {superSpec : OracleSpec ι'}
 variable [superSpec.Fintype] [superSpec.Inhabited]
-variable [h : spec ⊂ₒ superSpec] [LawfulSubSpec spec superSpec]
+variable [h : spec ⊂ₒ superSpec] [spec ˡ⊂ₒ superSpec]
 
 example (oa : OracleComp spec α) (post : α → ℝ≥0∞) :
     wp⟦liftComp oa superSpec⟧ post = wp⟦oa⟧ post := by
