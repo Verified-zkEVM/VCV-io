@@ -57,6 +57,17 @@ example (t : spec.Domain) :
      | EqRel (spec.Range t)⟫ := by
   rvcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost γ δ} {f : α → γ} {g : β → δ}
+    (h : ⟪oa ~ ob | fun a b => R (f a) (g b)⟫) :
+    ⟪f <$> oa ~ g <$> ob | R⟫ := by
+  rvcstep
+
 /-! ## Bijective random sampling -/
 
 example [SampleableType α]
@@ -81,20 +92,17 @@ example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
     (h : ⟪oa₁ ~ oa₂ | EqRel α⟫) :
     ⟪oa₁.replicate n ~ oa₂.replicate n | EqRel (List α)⟫ := by
   rvcstep
-  exact h
 
 example {oa : OracleComp spec α} {ob : OracleComp spec β} (n : ℕ)
     {R : RelPost α β}
     (h : ⟪oa ~ ob | R⟫) :
     ⟪oa.replicate n ~ ob.replicate n | List.Forall₂ R⟫ := by
   rvcstep
-  exact h
 
 example {xs : List α} {f : α → OracleComp spec β} {g : α → OracleComp spec β}
     (hfg : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
     ⟪xs.mapM f ~ xs.mapM g | EqRel (List β)⟫ := by
   rvcstep
-  exact hfg
 
 example {xs : List α} {ys : List β}
     {S : α → β → Prop}
@@ -117,8 +125,6 @@ example {σ₁ σ₂ : Type}
     (hfg : ∀ a t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ a | S⟫) :
     ⟪xs.foldlM f s₁ ~ xs.foldlM g s₂ | S⟫ := by
   rvcstep
-  · exact hs
-  · exact hfg
 
 example {σ₁ σ₂ : Type}
     {xs : List α} {ys : List β}

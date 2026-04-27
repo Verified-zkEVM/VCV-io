@@ -78,6 +78,28 @@ example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
     wp⟦f <$> oa⟧ post = wp⟦oa⟧ (post ∘ f) := by
   vcstep
 
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.TacticInternals.Unary.wp_pure_le_vcspec` (raw, unaryWP)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example (x : α) (post : α → ℝ≥0∞) :
+    post x ≤ wp⟦(pure x : OracleComp spec α)⟧ post := by
+  vcstep
+
+example (f : α → β) (oa : OracleComp spec α) (post : β → ℝ≥0∞) :
+    wp⟦oa⟧ (post ∘ f) ≤ wp⟦f <$> oa⟧ post := by
+  vcstep
+
+example (c : Prop) [Decidable c] (a b : OracleComp spec α) (post : α → ℝ≥0∞) :
+    (if c then wp⟦a⟧ post else wp⟦b⟧ post) ≤ wp⟦if c then a else b⟧ post := by
+  vcstep
+
+example (c : Prop) [Decidable c]
+    (a : c → OracleComp spec α) (b : ¬c → OracleComp spec α) (post : α → ℝ≥0∞) :
+    (if h : c then wp⟦a h⟧ post else wp⟦b h⟧ post) ≤ wp⟦dite c a b⟧ post := by
+  vcstep
+
 example (impl : QueryImpl spec (OracleComp spec))
     (hImpl : ∀ (t : spec.Domain),
       evalDist (impl t) = evalDist (query t : OracleComp spec (spec.Range t)))

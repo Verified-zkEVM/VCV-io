@@ -983,6 +983,36 @@ private def runRelationalVCSpecRule
   saved.restore
   return false
 
+/-- Deterministic relational structural rules that are safe to try through the
+cached `@[vcspec]` path. These rules apply a theorem and leave explicit
+subgoals, but they do not choose cuts, bijections, or one-sided bind frontiers. -/
+private def deterministicRelVCSpecDecls : List Name := [
+  ``OracleComp.ProgramLogic.Relational.relTriple_map,
+  ``OracleComp.ProgramLogic.Relational.relTriple_replicate,
+  ``OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel,
+  ``OracleComp.ProgramLogic.Relational.relTriple_list_foldlM_same,
+  ``OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl
+]
+
+private def isDeterministicRelVCSpecEntry (entry : VCSpecEntry) : Bool :=
+  match entry.declName? with
+  | some declName => deterministicRelVCSpecDecls.contains declName
+  | none => false
+
+/-- Try deterministic relational structural rules via cached `@[vcspec]`
+before the bespoke structural dispatcher. -/
+private def runDeterministicRelVCSpecRule : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    let target ← instantiateMVars (← getMainTarget)
+    let some (oa, ob, _) := relationalGoalParts? target | return false
+    let entries ← getRegisteredRelationalVCSpecEntries oa ob
+    for entry in entries do
+      if entry.kind == .relTriple && isDeterministicRelVCSpecEntry entry then
+        if ← runRelationalVCSpecRule entry then
+          return true
+    return false
+
 /-- Apply an explicit relational theorem/assumption step and try to close any easy side goals. -/
 def runRVCGenStepWithTheorem (thm : TSyntax `term) (requireClosed : Bool := false) :
     TacticM Bool := do
@@ -1107,6 +1137,8 @@ def runRVCGenStructuralCore : TacticM Bool := do
   let mut progress := false
   if ← tryLowerRelGoal then
     progress := true
+  if ← runDeterministicRelVCSpecRule then
+    return true
   if ← runRVCGenCore then
     return true
   return progress
@@ -1182,6 +1214,8 @@ def runRVCGenStep : TacticM Bool := do
   if let some hintName ← findUniquePriorityRelHint? then
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true
+  if ← runDeterministicRelVCSpecRule then
+    return true
   if ← runRVCGenCore then
     return true
   if let some hintName ← findUniqueRelHint? then

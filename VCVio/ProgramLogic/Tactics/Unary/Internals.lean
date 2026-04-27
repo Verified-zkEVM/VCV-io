@@ -20,7 +20,46 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Unary
 
-attribute [vcspec] OracleComp.ProgramLogic.triple_pure
+universe u
+
+/-- Cached raw-`wp` structural leaf for `pure`.
+
+The equality theorem `wp_pure` remains the canonical rewrite rule.
+This lower-bound form lets raw `wp` goals use the cached `@[vcspec]`
+backward-rule path before falling back to `@[wpStep]`. -/
+theorem wp_pure_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (x : α)
+    (post : α → ENNReal) :
+    post x ≤ wp (pure x : OracleComp spec α) post := by
+  rw [OracleComp.ProgramLogic.wp_pure]
+
+/-- Cached raw-`wp` structural leaf for functorial map. -/
+theorem wp_map_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α β : Type}
+    (f : α → β) (oa : OracleComp spec α) (post : β → ENNReal) :
+    wp oa (post ∘ f) ≤ wp (f <$> oa) post := by
+  rw [OracleComp.ProgramLogic.wp_map]
+
+/-- Cached raw-`wp` structural leaf for conditionals. -/
+theorem wp_ite_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (c : Prop) [Decidable c]
+    (oa ob : OracleComp spec α) (post : α → ENNReal) :
+    (if c then wp oa post else wp ob post) ≤ wp (if c then oa else ob) post := by
+  rw [OracleComp.ProgramLogic.wp_ite]
+
+/-- Cached raw-`wp` structural leaf for dependent conditionals. -/
+theorem wp_dite_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (c : Prop) [Decidable c]
+    (oa : c → OracleComp spec α) (ob : ¬c → OracleComp spec α) (post : α → ENNReal) :
+    (if h : c then wp (oa h) post else wp (ob h) post) ≤ wp (dite c oa ob) post := by
+  rw [OracleComp.ProgramLogic.wp_dite]
+
+attribute [vcspec]
+  OracleComp.ProgramLogic.triple_pure
+  wp_pure_le_vcspec
+  wp_map_le_vcspec
+  wp_ite_le_vcspec
+  wp_dite_le_vcspec
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -500,11 +539,20 @@ we use the discrimination tree and avoid same-kind fallback scans. -/
 private def runRawWpVCSpecBackward : TacticM Bool := do
   withVCGenRegisteredTiming do
     let target ← instantiateMVars (← getMainTarget)
-    let some comp := wpGoalComp? target | return false
+    let comp? :=
+      match rawWPGoalParts? target with
+      | some (_, comp, _) => some comp
+      | none => wpGoalComp? target
+    let some comp := comp? | return false
     let comp ← whnfReducible (← instantiateMVars comp)
+    let goalPattern := classifyUnaryCompPattern comp
+    let entries ← getRegisteredUnaryVCSpecEntries comp
     let entries :=
-      takeCandidatePrefix <| (← getRegisteredUnaryVCSpecEntries comp).filter fun entry =>
-        entry.kind == .unaryWP || entry.kind == .unaryTriple
+      takeCandidatePrefix <|
+        entries.filter (fun entry =>
+          entry.kind == .unaryWP && entry.spec.compPattern == goalPattern) ++
+          entries.filter (fun entry => entry.kind == .unaryTriple &&
+            entry.spec.compPattern == goalPattern)
     for entry in entries do
       if ← runUnaryVCSpecRule entry then
         return true
@@ -971,7 +1019,11 @@ def tryLowerProbGoal : TacticM Bool := do
 `wp`-level work. This stays deliberately smaller than the `Triple` path. -/
 def tryRawWpStructuralStep : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  let some comp := wpGoalComp? target | return false
+  let comp? :=
+    match rawWPGoalParts? target with
+    | some (_, comp, _) => some comp
+    | none => wpGoalComp? target
+  let some comp := comp? | return false
   let comp ← whnfReducible (← instantiateMVars comp)
   if ← runRawWpVCSpecBackward then
     return true
