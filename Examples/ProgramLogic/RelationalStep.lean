@@ -71,6 +71,60 @@ example {oa : OracleComp spec α} {ob : OracleComp spec β}
   · intro a b hab
     exact ⟨hab, trivial⟩
 
+example {oa mid : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost α β}
+    (hleft : ⟪oa ~ mid | EqRel α⟫) (hright : ⟪mid ~ ob | R⟫) :
+    ⟪oa ~ ob | R⟫ := by
+  fail_if_success rvcstep
+  rvcstep trans mid
+  · exact hleft
+  · exact hright
+
+example {oa : OracleComp spec α} {mid ob : OracleComp spec β}
+    {R : RelPost α β}
+    (hleft : ⟪oa ~ mid | R⟫) (hright : ⟪mid ~ ob | EqRel β⟫) :
+    ⟪oa ~ ob | R⟫ := by
+  fail_if_success rvcstep
+  rvcstep trans mid
+  · exact hleft
+  · exact hright
+
+theorem rvcstep_trans_postprocess_right [SampleableType α] (f : α → β) (g : β → γ) :
+    ⟪(do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (f x))
+      ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (g (f x)))
+      | fun y z => z = g y⟫ := by
+  rvcstep trans
+    (do
+      let x ← ($ᵗ α : ProbComp α)
+      pure (f x))
+  · exact relTriple_refl _
+  · rvcstep using EqRel α
+    intro x₁ x₂ h
+    subst h
+    rvcfinish
+
+theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : α → β) :
+    ⟪(do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (f (g x)))
+      ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (g x))
+      | fun y z => y = f z⟫ := by
+  rvcstep trans
+    (do
+      let x ← ($ᵗ α : ProbComp α)
+      pure (g x))
+  · rvcstep using EqRel α
+    intro x₁ x₂ h
+    subst h
+    rvcfinish
+  · exact relTriple_refl _
+
 /--
 info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
 -/

@@ -47,6 +47,7 @@ before generating the remaining subgoals.
 | `rvcstep left` / `rvcstep right` | raw `Std.Do'.rwp` or folded `Std.Do'.RelTriple` goals | Exposes a controlled one-sided bind step |
 | `rvcstep sym` | qualitative `RelTriple` goals | Swaps the two sides and the relational postcondition |
 | `rvcstep upto R` | qualitative `RelTriple` goals | Changes the current postcondition to an explicit intermediate relation |
+| `rvcstep trans mid` | qualitative `RelTriple` goals | Splits through an explicit intermediate computation using an `EqRel` transport side |
 | `rvcstep?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
@@ -202,9 +203,13 @@ Consequence/search closing is opt-in through `rvcfinish` or `rvcgen!`; plain
 `rvcgen` keeps to structural steps plus cheap leaf closure so rule-order changes
 stay predictable.
 
-**Explicit relational strategies**: `rvcstep sym` and `rvcstep upto R` are strategy commands,
-not default automation. A future `rvcstep trans mid` should wait for a semantic transitivity
-lemma and a settled goal shape; do not emulate it with broad theorem search.
+**Explicit relational strategies**: `rvcstep sym`, `rvcstep upto R`, and
+`rvcstep trans mid` are strategy commands, not default automation.
+The initial `trans` support is the equality-transport shape: it splits
+`⟪oa ~ ob | R⟫` into either `⟪oa ~ mid | EqRel _⟫` / `⟪mid ~ ob | R⟫`
+or the dual `⟪oa ~ mid | R⟫` / `⟪mid ~ ob | EqRel _⟫`.
+Do not emulate stronger coupling transitivity with broad theorem search until
+the full semantic gluing lemma and goal shape are added.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay

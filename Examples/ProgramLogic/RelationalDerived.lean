@@ -96,6 +96,8 @@ example :
       rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
         (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
+  intro a b
+  split_ifs <;> simp
 
 @[irreducible] def rawAuxLeft : OracleComp spec Bool := pure true
 @[irreducible] def rawAuxRight : OracleComp spec Bool := pure true
@@ -112,6 +114,8 @@ example :
       rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
         (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
   rvcstep
+  intro a b
+  split_ifs <;> simp
 
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by

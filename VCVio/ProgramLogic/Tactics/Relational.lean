@@ -73,12 +73,17 @@ the relational postcondition accordingly.
 intermediate relation `R`, leaving the transformed relational goal and the
 postcondition implication as subgoals.
 
+`rvcstep trans mid` introduces an explicit intermediate computation. It first
+tries the shape `oa ~ mid | EqRel _` followed by `mid ~ ob | R`, and then the
+dual shape `oa ~ mid | R` followed by `mid ~ ob | EqRel _`.
+
 `rvcstep with thm` forces one explicit relational theorem/assumption step. -/
 syntax "rvcstep" ("using" term)? : tactic
 syntax "rvcstep" "left" : tactic
 syntax "rvcstep" "right" : tactic
 syntax "rvcstep" "sym" : tactic
 syntax "rvcstep" "upto" term : tactic
+syntax "rvcstep" "trans" term : tactic
 syntax "rvcstep" "with" term : tactic
 syntax "rvcstep" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
@@ -123,6 +128,10 @@ elab_rules : tactic
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep upto $R) => do
       if ← TacticInternals.Relational.runRelUptoRule R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep trans $mid) => do
+      if ← TacticInternals.Relational.runRelTransRule mid then
         return
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep with $thm) => do
