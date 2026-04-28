@@ -77,7 +77,15 @@ postcondition implication as subgoals.
 tries the shape `oa ~ mid | EqRel _` followed by `mid ~ ob | R`, and then the
 dual shape `oa ~ mid | R` followed by `mid ~ ob | EqRel _`.
 
+`rvcstep swap left` and `rvcstep swap right` explicitly commute two adjacent
+independent binds on one side through EqRel transport. Add `using R` to
+immediately decompose the aligned residual bind with cut relation `R`.
+
 `rvcstep with thm` forces one explicit relational theorem/assumption step. -/
+syntax "rvcstep" &"swap" &"left" "using" term : tactic
+syntax "rvcstep" &"swap" &"right" "using" term : tactic
+syntax "rvcstep" &"swap" &"left" : tactic
+syntax "rvcstep" &"swap" &"right" : tactic
 syntax "rvcstep" ("using" term)? : tactic
 syntax "rvcstep" "left" : tactic
 syntax "rvcstep" "right" : tactic
@@ -106,8 +114,20 @@ elab_rules : tactic
       if ← runRVCGenStepWithTheoremNames thm names then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcstep) => do
-      if ← TacticInternals.Relational.runRVCGenStep then
+  | `(tactic| rvcstep swap left using $R) => do
+      if ← TacticInternals.Relational.runRelSwapLeftRuleUsing R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap right using $R) => do
+      if ← TacticInternals.Relational.runRelSwapRightRuleUsing R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap left) => do
+      if ← TacticInternals.Relational.runRelSwapLeftRule then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap right) => do
+      if ← TacticInternals.Relational.runRelSwapRightRule then
         return
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep using $hint) => do
@@ -134,6 +154,10 @@ elab_rules : tactic
       if ← TacticInternals.Relational.runRelTransRule mid then
         return
       TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep) => do
+      if ← TacticInternals.Relational.runRVCGenStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep with $thm) => do
       if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
         return
@@ -154,7 +178,8 @@ with ordinary hint-free relational VCGen on all remaining goals.
 `rvcfinish` runs the opt-in residual search/consequence closer.
 
 `rvcgen!` runs ordinary `rvcgen` and then `rvcfinish`. -/
-syntax "rvcgen" ("using" term)? : tactic
+syntax "rvcgen" : tactic
+syntax "rvcgen" "using" term : tactic
 syntax "rvcgen" "with" term : tactic
 syntax "rvcfinish" : tactic
 syntax "rvcgen!" : tactic

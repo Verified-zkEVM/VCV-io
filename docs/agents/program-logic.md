@@ -48,6 +48,8 @@ before generating the remaining subgoals.
 | `rvcstep sym` | qualitative `RelTriple` goals | Swaps the two sides and the relational postcondition |
 | `rvcstep upto R` | qualitative `RelTriple` goals | Changes the current postcondition to an explicit intermediate relation |
 | `rvcstep trans mid` | qualitative `RelTriple` goals | Splits through an explicit intermediate computation using an `EqRel` transport side |
+| `rvcstep swap left` / `rvcstep swap right` | qualitative `RelTriple` goals | Commutes two adjacent independent binds on one side through `EqRel` transport |
+| `rvcstep swap left using R` / `rvcstep swap right using R` | qualitative `RelTriple` goals | Commutes the binds, then immediately decomposes the aligned residual bind using cut relation `R` |
 | `rvcstep?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
@@ -205,11 +207,15 @@ Consequence/search closing is opt-in through `rvcfinish` or `rvcgen!`; plain
 `rvcgen` keeps to structural steps plus cheap leaf closure so rule-order changes
 stay predictable.
 
-**Explicit relational strategies**: `rvcstep sym`, `rvcstep upto R`, and
-`rvcstep trans mid` are strategy commands, not default automation.
+**Explicit relational strategies**: `rvcstep sym`, `rvcstep upto R`,
+`rvcstep trans mid`, and `rvcstep swap left/right` are strategy commands, not
+default automation.
 The initial `trans` support is the equality-transport shape: it splits
 `⟪oa ~ ob | R⟫` into either `⟪oa ~ mid | EqRel _⟫` / `⟪mid ~ ob | R⟫`
 or the dual `⟪oa ~ mid | R⟫` / `⟪mid ~ ob | EqRel _⟫`.
+The `swap` variants use that EqRel transport shape with the independent-bind
+commutativity lemma, then leave the aligned relational goal. The `using R`
+variants immediately take the next aligned bind step with cut relation `R`.
 Do not emulate stronger coupling transitivity with broad theorem search until
 the full semantic gluing lemma and goal shape are added.
 

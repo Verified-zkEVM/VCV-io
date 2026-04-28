@@ -640,6 +640,32 @@ def runRelTransRule (mid : TSyntax `term) : TacticM Bool := do
     refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_right
       (mid := $mid) ?_ ?_))
 
+def runRelSwapLeftRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_left
+      (hleft := OracleComp.ProgramLogic.Relational.relTriple_bind_bind_swap_eqRel) ?_))
+
+def runRelSwapRightRule : TacticM Bool := do
+  tryEvalTacticSyntax (← `(tactic|
+    refine OracleComp.ProgramLogic.Relational.relTriple_trans_eqRel_right
+      (hright := OracleComp.ProgramLogic.Relational.relTriple_bind_bind_swap_eqRel) ?_))
+
+def runRelSwapLeftRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  if ← runRelSwapLeftRule then
+    if ← runRelBindRuleUsing R then
+      return true
+  saved.restore
+  return false
+
+def runRelSwapRightRuleUsing (R : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  if ← runRelSwapRightRule then
+    if ← runRelBindRuleUsing R then
+      return true
+  saved.restore
+  return false
+
 def runRelSimRule : TacticM Bool := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   match relTripleGoalParts? target with
@@ -1628,6 +1654,8 @@ def runRVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       progress := true
+  if ← tryCloseRelGoalImmediate then
+    return true
   if let some hintName ← findUniquePriorityRelHint? then
     if ← runRVCGenCoreUsing (mkIdent hintName) then
       return true

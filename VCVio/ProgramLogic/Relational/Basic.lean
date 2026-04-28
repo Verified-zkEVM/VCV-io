@@ -381,6 +381,16 @@ lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : Oracle
   relTriple_eqRel_of_evalDist_eq (spec₁ := spec₁) (spec₂ := spec₂) (oa := oa) (ob := ob)
     (evalDist_ext h)
 
+/-- Swapping two adjacent independent binds preserves the output distribution. -/
+lemma relTriple_bind_bind_swap_eqRel
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₁ β}
+    {f : α → β → OracleComp spec₁ γ} :
+    RelTriple
+      (oa >>= fun a => ob >>= fun b => f a b)
+      (ob >>= fun b => oa >>= fun a => f a b)
+      (EqRel γ) :=
+  relTriple_eqRel_of_probOutput_eq fun z => probOutput_bind_bind_swap oa ob f z
+
 /-- Equality-relation relational triples imply equality of point output probabilities. -/
 lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple oa ob (EqRel α)) (x : α) : Pr[= x | oa] = Pr[= x | ob] := by
