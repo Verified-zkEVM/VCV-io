@@ -135,7 +135,7 @@ example :
 /--
 error: rvcstep: found a `RelTriple` goal, but no relational VCGen rule matched.
 
-Registered `@[vcspec]` candidates: `relTriple_wrappedTruePair`, `OracleComp.ProgramLogic.Relational.relTriple_uniformSample_bij`, `OracleComp.ProgramLogic.Relational.relTriple_uniformSample_refl`, `OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_bij`, `OracleComp.ProgramLogic.Relational.Loom.relTriple_uniformSample_refl`, `relTriple_wrappedAuxPairStep`, `OracleComp.ProgramLogic.Relational.relTriple_pure_pure`, `OracleComp.ProgramLogic.Relational.relTriple_bind`, `OracleComp.ProgramLogic.Relational.relTriple_map`, `OracleComp.ProgramLogic.Relational.relTriple_if`, `OracleComp.ProgramLogic.Relational.relTriple_replicate`, `OracleComp.ProgramLogic.Relational.relTriple_replicate_eqRel`, `OracleComp.ProgramLogic.Relational.relTriple_list_mapM`, `OracleComp.ProgramLogic.Relational.relTriple_list_mapM_eqRel`
+Registered `@[vcspec]` candidates: `relTriple_wrappedTruePair`
 Try `rvcstep?` or `rvcstep with <theorem>` for an explicit replay.
 Left side:
   wrappedTrueLeft
@@ -173,6 +173,19 @@ example {oa₁ oa₂ : OracleComp spec α}
   rvcstep using hf
 
 /-! ## Relational consequence close -/
+
+/--
+info: Try this:
+
+  [apply] rvcfinish
+-/
+#guard_msgs in
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
+  rvcstep?
 
 example {oa : OracleComp spec α} {ob : OracleComp spec β}
     {R R' : RelPost α β}
