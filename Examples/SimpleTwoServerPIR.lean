@@ -208,9 +208,11 @@ theorem pir_private (i₁ i₂ : Fin N) :
   · intro j acc₁ acc₂ hS
     simp only [ProgramLogic.Relational.EqRel] at hS
     rvcstep using (fun b : Bool => b)
-    · simp_all <;> split <;> split <;> split <;>
+    · simp only [ProgramLogic.Relational.relTriple_iff_relWP,
+        ProgramLogic.Relational.relWP_iff_couplingPost]
+      split <;> split <;> split <;>
         apply ProgramLogic.Relational.relTriple_pure_pure <;>
-        simp_all [ProgramLogic.Relational.EqRel]
+        simp [ProgramLogic.Relational.EqRel, hS]
     · exact Function.bijective_id
 
 /-- Privacy of the second server view: the distribution of the second query set `s'`
@@ -237,19 +239,25 @@ theorem pir_private_snd (i₁ i₂ : Fin N) :
     -- Case 1: j = i₁ ∧ j = i₂ — identical, identity coupling
     · subst h₁; subst h₂
       rvcstep using (fun b : Bool => b)
-      · simp_all [ProgramLogic.Relational.EqRel] <;> split <;> rfl
+      · simp [ProgramLogic.Relational.EqRel, hS]
+        split <;> rfl
       · exact Function.bijective_id
     -- Case 2: j = i₁ ∧ j ≠ i₂ — negation coupling
     · subst h₁
       rvcstep using (fun b : Bool => !b)
-      · simp [h₂] <;> split <;> simp_all [ProgramLogic.Relational.EqRel]
+      · simp [h₂]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at * <;>
+          cases ‹Bool› <;> simp at *
       · exact Bool.involutive_not.bijective
     -- Case 3: j ≠ i₁ ∧ j = i₂ — negation coupling
     · subst h₂
       rvcstep using (fun b : Bool => !b)
-      · simp [h₁] <;> split <;> simp_all [ProgramLogic.Relational.EqRel]
+      · simp [h₁]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at * <;>
+          cases ‹Bool› <;> simp at *
       · exact Bool.involutive_not.bijective
     -- Case 4: j ≠ i₁ ∧ j ≠ i₂ — identity coupling
     · rvcstep using (fun b : Bool => b)
-      · simp [h₁, h₂] <;> split <;> simp_all [ProgramLogic.Relational.EqRel]
+      · simp [h₁, h₂]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at *
       · exact Function.bijective_id
