@@ -58,6 +58,34 @@ attribute [vcspec]
 private def mkRVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
 
+private structure RelGoalShape where
+  oa : Expr
+  ob : Expr
+  isStdDo : Bool
+
+private def relGoalShape? (target : Expr) : Option RelGoalShape := do
+  if let some (_pre, oa, ob, _post) := stdDoRelTripleGoalParts? target then
+    some { oa, ob, isStdDo := true }
+  else if let some (oa, ob, _post) := relTripleGoalParts? target then
+    some { oa, ob, isStdDo := false }
+  else
+    none
+
+private def currentRelGoalShape? : TacticM (Option RelGoalShape) := do
+  let target ← instantiateMVars (← getMainTarget)
+  match relGoalShape? target with
+  | none => return none
+  | some shape =>
+      let oa ← whnfReducible (← instantiateMVars shape.oa)
+      let ob ← whnfReducible (← instantiateMVars shape.ob)
+      return some { shape with oa, ob }
+
+private def relCompsDefEq (oa ob : Expr) : TacticM Bool := do
+  let saved ← saveState
+  let ok ← isDefEq oa ob
+  saved.restore
+  return ok
+
 /-- Attempt to close the current relational/eRHL leaf goal with the canonical fast paths.
 
 Tries, in order:
@@ -74,35 +102,72 @@ Tries, in order:
   syntactically distinct but unified via local equality hypotheses);
 * `relTriple_pure_pure ∘ symm` (`pure a ⨯ pure b` with `R b a` in scope). -/
 def tryCloseRelGoalImmediate : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic| assumption)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_true _ _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-    intros; trivial)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _)) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    (try subst_vars
-     first
-       | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
-       | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
-       | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
-       | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
-       | exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _
-       | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
-       | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
-          intros; trivial)))) <||>
-  tryEvalTacticSyntax (← `(tactic|
-    apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption)))
+  if ← tryEvalTacticSyntax (← `(tactic| assumption)) then
+    return true
+  let some shape ← currentRelGoalShape? | return false
+  if shape.isStdDo then
+    if isPureExpr shape.oa && isPureExpr shape.ob then
+      return (← tryEvalTacticSyntax (← `(tactic|
+        exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _)))
+    return false
+  if ← tryEvalTacticSyntax (← `(tactic|
+      exact OracleComp.ProgramLogic.Relational.relTriple_true _ _)) then
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+      intros; trivial)) then
+    return true
+  if ← relCompsDefEq shape.oa shape.ob then
+    if ← tryEvalTacticSyntax (← `(tactic|
+        exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl)) then
+      return true
+  if isPureExpr shape.oa && isPureExpr shape.ob then
+    if ← tryEvalTacticSyntax (← `(tactic|
+        exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        (try subst_vars
+         first
+           | exact OracleComp.ProgramLogic.Relational.relTriple_true _ _
+           | exact OracleComp.ProgramLogic.Relational.relTriple_refl _
+           | exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl
+           | exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl
+           | (apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)
+           | (refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_
+              intros; trivial)))) then
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic|
+        apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> (symm; assumption))) then
+      return true
+  let saved ← saveState
+  if ← tryEvalTacticSyntax (← `(tactic| subst_vars)) then
+    let some shape ← currentRelGoalShape? | saved.restore; return false
+    if !shape.isStdDo && (← relCompsDefEq shape.oa shape.ob) then
+      if ← tryEvalTacticSyntax (← `(tactic|
+          exact OracleComp.ProgramLogic.Relational.relTriple_refl _)) then
+        return true
+      if ← tryEvalTacticSyntax (← `(tactic|
+          exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl)) then
+        return true
+    if !shape.isStdDo && isPureExpr shape.oa && isPureExpr shape.ob then
+      if ← tryEvalTacticSyntax (← `(tactic|
+          exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl)) then
+        return true
+      if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure <;> assumption)) then
+        return true
+    if shape.isStdDo && isPureExpr shape.oa && isPureExpr shape.ob then
+      if ← tryEvalTacticSyntax (← `(tactic|
+          exact OracleComp.ProgramLogic.Relational.Loom.relTriple_pure _ _ _)) then
+        return true
+    saved.restore
+  return false
 
 private def relationalGoalParts? (target : Expr) : Option (Expr × Expr × Expr) :=
   match relTripleGoalParts? target with
