@@ -215,23 +215,23 @@ theorem cmaReal_bad_preserved
     z.2.2 = p.2 := by
   rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
   rcases t with n | mc | m | ⟨⟩
-  · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+  · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
       support_pure, Set.mem_singleton_iff, exists_prop] at hz
     obtain ⟨r, _, rfl⟩ := hz
     rfl
   · cases hcache : cache mc with
     | none =>
-        simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, hcache, support_bind,
+        simp only [fs_simp, StateT.run_mk, hcache, support_bind,
           Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz
         obtain ⟨r, _, rfl⟩ := hz
         rfl
     | some r =>
-        simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, hcache, support_pure,
+        simp only [fs_simp, StateT.run_mk, hcache, support_pure,
           Set.mem_singleton_iff] at hz
         subst z
         rfl
   · rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
         exists_prop] at hz
       obtain ⟨pk_sk, _, i, _, hrest⟩ := hz
       cases hcache : cache (m, i.1) with
@@ -245,7 +245,7 @@ theorem cmaReal_bad_preserved
             Set.mem_singleton_iff, exists_prop] at hrest
           obtain ⟨π, _, rfl⟩ := hrest
           rfl
-    · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
         exists_prop] at hz
       obtain ⟨i, _, hrest⟩ := hz
       cases hcache : cache (m, i.1) with
@@ -259,7 +259,7 @@ theorem cmaReal_bad_preserved
             Set.mem_singleton_iff, exists_prop] at hrest
           obtain ⟨π, _, rfl⟩ := hrest
           rfl
-  · simp only [cmaReal, StateT.run_mk] at hz
+  · simp only [fs_simp, StateT.run_mk] at hz
     rcases keypair with keypair | ⟨pk, sk⟩
     · simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
         exists_prop] at hz
@@ -310,23 +310,23 @@ theorem cmaReal_valid_preserved
     CmaData.Valid (rel := rel) z.2.1 := by
   rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
   rcases t with n | mc | m | ⟨⟩
-  · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+  · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
       support_pure, Set.mem_singleton_iff, exists_prop] at hz
     obtain ⟨r, _, rfl⟩ := hz
     simpa [CmaData.Valid] using hpvalid
   · cases hcache : cache mc with
     | none =>
-        simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, hcache, support_bind,
+        simp only [fs_simp, StateT.run_mk, hcache, support_bind,
           Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz
         obtain ⟨r, _, rfl⟩ := hz
         simpa [CmaData.Valid] using hpvalid
     | some r =>
-        simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, hcache, support_pure,
+        simp only [fs_simp, StateT.run_mk, hcache, support_pure,
           Set.mem_singleton_iff] at hz
         subst z
         simpa [CmaData.Valid] using hpvalid
   · rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
         exists_prop] at hz
       obtain ⟨pk_sk, hgen, i, _, hrest⟩ := hz
       cases hcache : cache (m, i.1) with
@@ -340,7 +340,7 @@ theorem cmaReal_valid_preserved
             Set.mem_singleton_iff, exists_prop] at hrest
           obtain ⟨π, _, rfl⟩ := hrest
           exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
-    · simp only [cmaReal, cmaRealSourceFull, StateT.run_mk, support_bind, Set.mem_iUnion,
+    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
         exists_prop] at hz
       obtain ⟨i, _, hrest⟩ := hz
       cases hcache : cache (m, i.1) with
@@ -354,7 +354,7 @@ theorem cmaReal_valid_preserved
             Set.mem_singleton_iff, exists_prop] at hrest
           obtain ⟨π, _, rfl⟩ := hrest
           simpa [CmaData.Valid] using hpvalid
-  · simp only [cmaReal, StateT.run_mk] at hz
+  · simp only [fs_simp, StateT.run_mk] at hz
     rcases keypair with keypair | ⟨pk, sk⟩
     · simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
         exists_prop] at hz
@@ -389,12 +389,12 @@ theorem cmaReal_roCacheCount_step_le
           (Resp := Resp) (Stmt := Stmt) t then (1 : ℝ≥0∞) else 0 := by
   rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
   rcases t with n | mc | m | ⟨⟩
-  · simp only [cmaReal, cmaRealSourceFull, cmaH3Costly, IsCostlyQuery,
+  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery,
       IsHashQuery, false_or, if_false, StateT.run_mk, support_bind,
       Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz ⊢
     obtain ⟨r, _, rfl⟩ := hz
     simp
-  · simp only [cmaReal, cmaRealSourceFull, cmaH3Costly, IsCostlyQuery,
+  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery,
       IsHashQuery, false_or, if_true, StateT.run_mk] at hz ⊢
     cases hcache : cache mc with
     | none =>
@@ -408,7 +408,7 @@ theorem cmaReal_roCacheCount_step_le
         simp only [support_pure, Set.mem_singleton_iff] at hz
         subst z
         exact le_self_add
-  · simp only [cmaReal, cmaRealSourceFull,
+  · simp only [fs_simp,
       cmaH3Costly, IsCostlyQuery, IsHashQuery, true_or, if_true, StateT.run_mk] at hz ⊢
     rcases keypair with keypair | ⟨pk, sk⟩
     · simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
@@ -525,29 +525,24 @@ theorem cmaReal_eq_cmaSim_of_not_costly
       ((cmaSim M Commit Chal hr simT) t).run p := by
   rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
   rcases t with n | mc | m | ⟨⟩
-  · simp [cmaReal, cmaRealSourceFull, cmaSim, cmaToNma, nma, nmaPublic,
-      QueryImpl.Stateful.linkWith_apply_run, QueryImpl.Stateful.Frame.linkReshape,
-      cmaFrame, cmaOuterLens, cmaNmaLens]
+  · simp [fs_simp, QueryImpl.Stateful.linkWith_apply_run,
+      QueryImpl.Stateful.Frame.linkReshape]
   · cases hcache : cache mc with
     | none =>
-        simp [cmaReal, cmaRealSourceFull, cmaSim, cmaToNma, nma, nmaPublic,
-          QueryImpl.Stateful.linkWith_apply_run, QueryImpl.Stateful.Frame.linkReshape,
-          cmaFrame, cmaOuterLens, cmaNmaLens, hcache]
+        simp [fs_simp, QueryImpl.Stateful.linkWith_apply_run,
+          QueryImpl.Stateful.Frame.linkReshape, hcache]
     | some r =>
-        simp [cmaReal, cmaRealSourceFull, cmaSim, cmaToNma, nma, nmaPublic,
-          QueryImpl.Stateful.linkWith_apply_run, QueryImpl.Stateful.Frame.linkReshape,
-          cmaFrame, cmaOuterLens, cmaNmaLens, hcache]
+        simp [fs_simp, QueryImpl.Stateful.linkWith_apply_run,
+          QueryImpl.Stateful.Frame.linkReshape, hcache]
   · exact (ht True.intro).elim
   · cases hkp : keypair with
     | none =>
-        simp [cmaReal, cmaSim, cmaToNma, nma, nmaPublic,
-          QueryImpl.Stateful.linkWith_apply_run, QueryImpl.Stateful.Frame.linkReshape,
-          cmaFrame, cmaOuterLens, cmaNmaLens]
+        simp [fs_simp, QueryImpl.Stateful.linkWith_apply_run,
+          QueryImpl.Stateful.Frame.linkReshape]
     | some key =>
         rcases key with ⟨pk, sk⟩
-        simp [cmaReal, cmaSim, cmaToNma, nma, nmaPublic,
-          QueryImpl.Stateful.linkWith_apply_run, QueryImpl.Stateful.Frame.linkReshape,
-          cmaFrame, cmaOuterLens, cmaNmaLens]
+        simp [fs_simp, QueryImpl.Stateful.linkWith_apply_run,
+          QueryImpl.Stateful.Frame.linkReshape]
 
 /-! ## Native signing-step TV ingredients -/
 
@@ -953,8 +948,7 @@ private lemma cmaRealSignStep_evalDist_eq_ghost
   cases keypair with
   | some key =>
       conv_lhs =>
-        simp [cmaReal, cmaRealSourceFull, cmaRealFixedSign, _root_.FiatShamir,
-          StateT.run_mk]
+        simp [fs_simp, _root_.FiatShamir, StateT.run_mk]
       conv_rhs =>
         simp [cmaRealSignGhostDist, cmaSignKeySource]
       refine bind_congr fun cp => ?_
@@ -977,8 +971,7 @@ private lemma cmaRealSignStep_evalDist_eq_ghost
             exact probFailure_evalDist_eq_zero (σ.respond key.1 key.2 cp.2 ch)
   | none =>
       conv_lhs =>
-        simp [cmaReal, cmaRealSourceFull, cmaRealFixedSign, _root_.FiatShamir,
-          StateT.run_mk]
+        simp [fs_simp, _root_.FiatShamir, StateT.run_mk]
       conv_rhs =>
         simp [cmaRealSignGhostDist, cmaSignKeySource]
       refine bind_congr fun key => ?_

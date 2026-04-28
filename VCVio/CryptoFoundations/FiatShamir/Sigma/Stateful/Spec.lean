@@ -3,6 +3,7 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.SimpAttr
 import VCVio.OracleComp.OracleSpec
 import VCVio.OracleComp.QueryTracking.Structures
 import VCVio.OracleComp.SimSemantics.StateSeparating
@@ -13,6 +14,10 @@ import VCVio.OracleComp.SimSemantics.StateSeparating
 This file contains the oracle interfaces and direct product-state shapes used
 by the `QueryImpl.Stateful` Fiat-Shamir CMA games. The games store their private
 data in ordinary product types.
+
+The `fs_simp` simp attribute used to tag handler definitions, frames, lenses,
+and adversary wrappers throughout the stateful FS-CMA development is declared
+in `Stateful/SimpAttr.lean` and imported above.
 -/
 
 open OracleSpec
@@ -289,13 +294,13 @@ abbrev CmaState (M Commit Chal Stmt Wit : Type) :=
 /-! ## Frame for linking CMA-to-NMA over direct CMA state -/
 
 /-- Lens selecting the signed-message log from direct CMA state. -/
-def cmaOuterLens (M Commit Chal Stmt Wit : Type) :
+@[fs_simp] def cmaOuterLens (M Commit Chal Stmt Wit : Type) :
     PFunctor.Lens.State (CmaState M Commit Chal Stmt Wit) (OuterState M) :=
   PFunctor.Lens.State.mk (fun s => s.1.1)
     (fun log s => ((log, s.1.2.1, s.1.2.2), s.2))
 
 /-- Lens selecting the NMA state from direct CMA state. -/
-def cmaNmaLens (M Commit Chal Stmt Wit : Type) :
+@[fs_simp] def cmaNmaLens (M Commit Chal Stmt Wit : Type) :
     PFunctor.Lens.State (CmaState M Commit Chal Stmt Wit)
       (NmaState M Commit Chal Stmt Wit) :=
   PFunctor.Lens.State.mk (fun s => (s.1.2.1, s.1.2.2, s.2))
@@ -342,7 +347,7 @@ instance cmaOuterLens_cmaNmaLens_isSeparated (M Commit Chal Stmt Wit : Type) :
     rfl
 
 /-- The direct CMA frame used by `cmaToNma.linkWith nma`. -/
-def cmaFrame (M Commit Chal Stmt Wit : Type) :
+@[fs_simp] def cmaFrame (M Commit Chal Stmt Wit : Type) :
     QueryImpl.Stateful.Frame (CmaState M Commit Chal Stmt Wit)
       (OuterState M) (NmaState M Commit Chal Stmt Wit) where
   left := cmaOuterLens M Commit Chal Stmt Wit
@@ -351,7 +356,7 @@ def cmaFrame (M Commit Chal Stmt Wit : Type) :
 /-! ## Frame for routing the CMA-to-NMA reduction -/
 
 /-- Trivial lens into a `PUnit` component. -/
-def unitLens (σ : Type) : PFunctor.Lens.State σ PUnit :=
+@[fs_simp] def unitLens (σ : Type) : PFunctor.Lens.State σ PUnit :=
   PFunctor.Lens.State.mk (fun _ => PUnit.unit) (fun _ s => s)
 
 instance unitLens_isVeryWellBehaved (σ : Type) :
@@ -368,7 +373,7 @@ instance unitLens_id_isSeparated (σ : Type) :
 
 /-- Frame used to compose the stateless forwarding part of `cmaToNma` with the
 stateful signing simulator while keeping only the signing log as state. -/
-def cmaToNmaFrame (M : Type) :
+@[fs_simp] def cmaToNmaFrame (M : Type) :
     QueryImpl.Stateful.Frame (OuterState M) PUnit (OuterState M) where
   left := unitLens (OuterState M)
   right := PFunctor.Lens.State.id (OuterState M)

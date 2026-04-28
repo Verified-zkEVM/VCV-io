@@ -20,6 +20,7 @@ import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Compatibility
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Games
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Hops
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.SimpAttr
 import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Spec
 import VCVio.CryptoFoundations.FiatShamir.WithAbort
 import VCVio.CryptoFoundations.FiatShamir.WithAbort.Cost

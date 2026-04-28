@@ -184,7 +184,7 @@ theorem statefulCmaFreshAdvantage_eq_statefulPostKeygenFreshAdvantage
 /-! ## Public WriterT compatibility -/
 
 /-- Fixed-key public signing-query handler in the generic `appendInputLog` form. -/
-@[reducible] private noncomputable def postKeygenAppendImpl
+@[reducible, fs_simp] private noncomputable def postKeygenAppendImpl
     (pk : Stmt) (sk : Wit) :
     QueryImpl (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (StateT (List M) (StateT (RoCache M Commit Chal) ProbComp)) := by
@@ -205,7 +205,7 @@ private abbrev postKeygenState (M Commit Chal : Type) :=
 
 /-- Product-state version of `postKeygenAppendImpl`, used to compare with the
 full `CmaState` handler by projection. -/
-private noncomputable def postKeygenAppendProdImpl (pk : Stmt) (sk : Wit) :
+@[fs_simp] private noncomputable def postKeygenAppendProdImpl (pk : Stmt) (sk : Wit) :
     QueryImpl (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (StateT (postKeygenState M Commit Chal) ProbComp) := fun t =>
   StateT.mk fun (signed, cache) =>
@@ -224,7 +224,7 @@ private noncomputable def postKeygenAppendProdImpl (pk : Stmt) (sk : Wit) :
             (Resp := Resp) σ hr pk sk m).run cache
         pure (sig, (signed ++ [m], cache'))
 
-private def cmaPostKeygenProj
+@[fs_simp] private def cmaPostKeygenProj
     (s : CmaState M Commit Chal Stmt Wit) :
     postKeygenState M Commit Chal :=
   (s.1.1, s.1.2.1)
@@ -295,28 +295,24 @@ private lemma cmaRealSourceFullSum_project_step
   subst keypair
   subst bad
   rcases t with (n | mc) | m
-  · simp [cmaRealSourceFullSum, cmaRealSourceFull, postKeygenAppendProdImpl,
-      cmaPostKeygenProj]
+  · simp [fs_simp]
   · cases hcache : cache mc with
     | some ch =>
-        simp [cmaRealSourceFullSum, cmaRealSourceFull, postKeygenAppendProdImpl,
-          cmaPostKeygenProj, hcache]
+        simp [fs_simp, hcache]
     | none =>
-        simp [cmaRealSourceFullSum, cmaRealSourceFull, postKeygenAppendProdImpl,
-          cmaPostKeygenProj, hcache, uniformSampleImpl]
-  · simp only [add_apply_inr, cmaRealSourceFullSum, cmaRealSourceFull, bind_pure_comp,
+        simp [fs_simp, hcache, uniformSampleImpl]
+  · simp only [add_apply_inr, fs_simp, bind_pure_comp,
       map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk, bind_assoc,
-      postKeygenAppendProdImpl, cmaRealFixedSign, FiatShamir, QueryImpl.toHasQuery_query,
+      FiatShamir, QueryImpl.toHasQuery_query,
       randomOracle, QueryImpl.withCaching_apply, StateT.run_bind, StateT.run_monadLift,
-      monadLift_self, StateT.run_get, Function.comp_apply, StateT.run_pure, pure_bind,
-      cmaPostKeygenProj]
+      monadLift_self, StateT.run_get, Function.comp_apply, StateT.run_pure, pure_bind]
     refine bind_congr (m := ProbComp) fun cp => ?_
     rcases cp with ⟨c, prv⟩
     cases hcache : cache (m, c) with
     | some ch =>
-        simp [cmaPostKeygenProj, map_eq_bind_pure_comp]
+        simp [fs_simp, map_eq_bind_pure_comp]
     | none =>
-        simp [cmaPostKeygenProj, uniformSampleImpl, StateT.run_modifyGet,
+        simp [fs_simp, uniformSampleImpl, StateT.run_modifyGet,
           map_eq_bind_pure_comp, bind_assoc]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -337,19 +333,19 @@ private lemma cmaRealSourceFullSum_preserves_inv
   rcases t with (n | mc) | m
   · intro z hz
     have hz' := by
-      simpa [cmaRealSourceFullSum, cmaRealSourceFull] using hz
+      simpa [fs_simp] using hz
     rcases hz' with ⟨r, _hr, rfl⟩
     exact ⟨rfl, rfl⟩
   · intro z hz
     cases hcache : cache mc with
     | some ch =>
         have hz' := by
-          simpa [cmaRealSourceFullSum, cmaRealSourceFull, hcache] using hz
+          simpa [fs_simp, hcache] using hz
         subst hz'
         exact ⟨rfl, rfl⟩
     | none =>
         have hz' := by
-          simpa [cmaRealSourceFullSum, cmaRealSourceFull, hcache] using hz
+          simpa [fs_simp, hcache] using hz
         rcases hz' with ⟨ch, _hch, rfl⟩
         exact ⟨rfl, rfl⟩
   · intro z hz
@@ -546,7 +542,7 @@ private theorem postKeygenFreshAppendProb_eq_statefulPostKeygenFreshProb
   | none =>
       simp [cmaRealSourceFullSum, cmaRealSourceFull, hcache, uniformSampleImpl]
 
-private noncomputable def cmaRealAppendProdImpl :
+@[fs_simp] private noncomputable def cmaRealAppendProdImpl :
     QueryImpl (SourceCmaSpec (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp))
       (StateT (List M × CmaState M Commit Chal Stmt Wit) ProbComp) := fun t =>
   StateT.mk fun (signed, st) =>
@@ -561,7 +557,7 @@ private noncomputable def cmaRealAppendProdImpl :
         Prod.map id (fun st' => (signed ++ [m], st')) <$>
           (cmaRealSourceFullSum M Commit Chal σ hr (.inr m)).run st
 
-private noncomputable def cmaRealLoggedProdImpl :
+@[fs_simp] private noncomputable def cmaRealLoggedProdImpl :
     QueryImpl (cmaSpec M Commit Chal Resp Stmt)
       (StateT (List M × CmaState M Commit Chal Stmt Wit) ProbComp) :=
   ((cmaReal M Commit Chal σ hr).mapStateTBase
@@ -591,10 +587,8 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     rw [simulateQ_spec_query]
     ext st
     rcases st with ⟨signed, st⟩
-    simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-        QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal,
-        cmaRealSourceFullSum, map_eq_bind_pure_comp]
-    rfl
+    simp [fs_simp, QueryImpl.mapStateTBase, QueryImpl.flattenStateT,
+      map_eq_bind_pure_comp]
   · change simulateQ
         (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp))
@@ -606,13 +600,9 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     rcases st with ⟨signed, st⟩
     cases hcache : st.1.2.1 mc with
     | some ch =>
-        simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-          QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal,
-          cmaRealSourceFullSum, cmaRealSourceFull, hcache]
+        simp [fs_simp, QueryImpl.mapStateTBase, QueryImpl.flattenStateT, hcache]
     | none =>
-        simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-          QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal,
-          cmaRealSourceFullSum, cmaRealSourceFull, hcache]
+        simp [fs_simp, QueryImpl.mapStateTBase, QueryImpl.flattenStateT, hcache]
   · change simulateQ
         (cmaRealLoggedProdImpl (σ := σ) (hr := hr) (M := M)
           (Commit := Commit) (Chal := Chal) (Resp := Resp))
@@ -622,10 +612,8 @@ private lemma cmaRealLoggedProdImpl_lift_query_eq_cmaRealAppendProdImpl
     rw [simulateQ_spec_query]
     ext st
     rcases st with ⟨signed, st⟩
-    simp [cmaRealLoggedProdImpl, cmaRealAppendProdImpl, cmaSignLogImpl,
-      QueryImpl.mapStateTBase, QueryImpl.flattenStateT, cmaReal,
-      cmaRealSourceFullSum, StateT.run_bind, map_eq_bind_pure_comp,
-      bind_assoc]
+    simp [fs_simp, QueryImpl.mapStateTBase, QueryImpl.flattenStateT,
+      StateT.run_bind, map_eq_bind_pure_comp, bind_assoc]
     rfl
 
 omit [SampleableType Stmt] [SampleableType Wit] in
@@ -650,7 +638,7 @@ private lemma cmaRealLoggedProdImpl_liftAdv_run {α : Type}
           (Chal := Chal) (Resp := Resp) t)
       (oa := oa))
 
-private def cmaRealAppendProj
+@[fs_simp] private def cmaRealAppendProj
     (st : CmaState M Commit Chal Stmt Wit) :
     List M × CmaState M Commit Chal Stmt Wit :=
   (st.1.1, st)
@@ -668,40 +656,37 @@ private lemma cmaRealAppendProdImpl_project_step
           (Chal := Chal) (Stmt := Stmt) (Wit := Wit) st) := by
   rcases st with ⟨⟨signed, cache, keypair⟩, bad⟩
   rcases t with (n | mc) | m
-  · simp [cmaRealAppendProdImpl, cmaRealAppendProj, cmaRealSourceFullSum,
-      cmaRealSourceFull, map_eq_bind_pure_comp]
+  · simp [fs_simp, map_eq_bind_pure_comp]
   · cases hcache : cache mc with
     | some ch =>
-        simp [cmaRealAppendProdImpl, cmaRealAppendProj, cmaRealSourceFullSum,
-          cmaRealSourceFull, hcache, map_eq_bind_pure_comp]
+        simp [fs_simp, hcache, map_eq_bind_pure_comp]
     | none =>
-        simp [cmaRealAppendProdImpl, cmaRealAppendProj, cmaRealSourceFullSum,
-          cmaRealSourceFull, hcache, map_eq_bind_pure_comp]
+        simp [fs_simp, hcache, map_eq_bind_pure_comp]
   · cases hkp : keypair with
     | none =>
-        simp only [add_apply_inr, cmaRealSourceFullSum, cmaRealSourceFull,
+        simp only [add_apply_inr, fs_simp,
           bind_pure_comp, map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk,
-          bind_assoc, cmaRealAppendProdImpl, cmaRealAppendProj]
+          bind_assoc]
         refine bind_congr (m := ProbComp) fun ps => ?_
         refine bind_congr (m := ProbComp) fun cp => ?_
         rcases cp with ⟨c, prv⟩
         cases hcache : cache (m, c) with
         | some ch =>
-            simp [cmaRealAppendProj, map_eq_bind_pure_comp]
+            simp [fs_simp, map_eq_bind_pure_comp]
         | none =>
-            simp [cmaRealAppendProj, map_eq_bind_pure_comp, bind_assoc]
+            simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
     | some ps =>
         rcases ps with ⟨pk, sk⟩
-        simp only [add_apply_inr, cmaRealSourceFullSum, cmaRealSourceFull,
+        simp only [add_apply_inr, fs_simp,
           bind_pure_comp, map_eq_bind_pure_comp, Prod.mk.eta, StateT.run_mk,
-          bind_assoc, cmaRealAppendProdImpl, cmaRealAppendProj]
+          bind_assoc]
         refine bind_congr (m := ProbComp) fun cp => ?_
         rcases cp with ⟨c, prv⟩
         cases hcache : cache (m, c) with
         | some ch =>
-            simp [cmaRealAppendProj, map_eq_bind_pure_comp, bind_assoc]
+            simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
         | none =>
-            simp [cmaRealAppendProj, map_eq_bind_pure_comp, bind_assoc]
+            simp [fs_simp, map_eq_bind_pure_comp, bind_assoc]
 
 omit [SampleableType Stmt] [SampleableType Wit] in
 private lemma cmaReal_cmaSignLog_liftM_run_eq_cmaRealSourceFullSum_run
