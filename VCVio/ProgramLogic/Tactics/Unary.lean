@@ -41,7 +41,76 @@ private def runVCGenFinish : TacticM Unit := do
         OracleComp.ProgramLogic.propInd_eq_ite,
         game_rule]))
   unless (← getGoals).isEmpty do
+    discard <| tryEvalTacticSyntax
+      (← `(tactic| all_goals try
+        (refine Std.Do'.Triple.iff.mpr ?_
+         repeat intro _
+         simp [Lean.Order.PartialOrder.rel,
+           MonadStateOf.get, MonadStateOf.set, MonadReaderOf.read, MonadWriter.tell,
+           StateT.get, StateT.set, StateT.lift, ReaderT.read,
+           StateT.run_bind, StateT.run_pure, StateT.run_get, StateT.run_set,
+           StateT.run_lift, StateT.run_map,
+           ReaderT.run_bind, ReaderT.run_pure, ReaderT.run_monadLift, ReaderT.run_read,
+           ReaderT.run_map,
+           Std.Do'.WriterT.apply_wp,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_map,
+           WriterT.run_bind, WriterT.run_pure, WriterT.run_tell, WriterT.run_map,
+           MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+           MonadLift.monadLift, pure_bind, bind_assoc, map_pure, Functor.map_map,
+           one_mul, mul_one, mul_assoc]
+         try exact le_rfl)))
+  unless (← getGoals).isEmpty do
+    discard <| tryEvalTacticSyntax
+      (← `(tactic| all_goals try
+        (simp_rw [← mul_assoc]
+         dsimp [StateT.set, ReaderT.run, WriterT.run]
+         simp [
+           StateT.set, StateT.run_set, StateT.run_pure, StateT.run_monadLift,
+           TacticInternals.Unary.wp_StateT_run_set_layer,
+           TacticInternals.Unary.wp_StateT_run_set_layer',
+           ReaderT.run, ReaderT.run_read, ReaderT.run_pure, ReaderT.run_monadLift,
+           TacticInternals.Unary.wp_ReaderT_run_read_layer,
+           TacticInternals.Unary.wp_ReaderT_run_read_layer',
+           Std.Do'.WriterT.apply_wp,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+           WriterT.run_tell, WriterT.run_pure, WriterT.run_monadLift, WriterT.run_map,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+           MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+           MonadLift.monadLift, pure_bind, bind_assoc, map_pure, Functor.map_map,
+           one_mul, mul_one, mul_assoc]
+         try exact le_rfl)))
+  unless (← getGoals).isEmpty do
     discard <| runBoundedPasses "vcgen finish" TacticInternals.Unary.runVCGenClosePass
+  unless (← getGoals).isEmpty do
+    discard <| tryEvalTacticSyntax
+      (← `(tactic| all_goals try
+        (simp_rw [← mul_assoc]
+         dsimp [StateT.set, ReaderT.run, WriterT.run]
+         simp [
+           StateT.set, StateT.run_set, StateT.run_pure, StateT.run_monadLift,
+           TacticInternals.Unary.wp_StateT_run_set_layer,
+           TacticInternals.Unary.wp_StateT_run_set_layer',
+           ReaderT.run, ReaderT.run_read, ReaderT.run_pure, ReaderT.run_monadLift,
+           TacticInternals.Unary.wp_ReaderT_run_read_layer,
+           TacticInternals.Unary.wp_ReaderT_run_read_layer',
+           Std.Do'.WriterT.apply_wp,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+           OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+           WriterT.run_tell, WriterT.run_pure, WriterT.run_monadLift, WriterT.run_map,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+           OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+           MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+           MonadLift.monadLift, pure_bind, bind_assoc, map_pure, Functor.map_map,
+           one_mul, mul_one, mul_assoc]
+         try exact le_rfl)))
 
 private def runVCGenStepWithNames (names : Array Name) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
@@ -104,6 +173,7 @@ Variants:
 - `vcstep inv I` to apply a loop invariant `I` to a `replicate`/`foldlM`/`mapM` goal.
 - `vcstep rw` to perform one explicit top-level probability-equality rewrite step.
 - `vcstep rw under n` to rewrite one bind-swap under `n` shared bind prefixes.
+- `vcstep rw normalize` to run the bounded probability-equality planner explicitly.
 - `vcstep rw congr` to expose one shared bind plus its support hypothesis.
 - `vcstep rw congr'` to expose one shared bind without a support hypothesis.
 
@@ -148,6 +218,7 @@ elab_rules : tactic
 
 syntax "vcstep" &"rw" : tactic
 syntax "vcstep" &"rw" " under " num : tactic
+syntax "vcstep" &"rw" &"normalize" : tactic
 syntax "vcstep" &"rw" &"congr" : tactic
 syntax "vcstep" &"rw" &"congr'" : tactic
 syntax "vcstep" &"rw" "as" "⟨" binderIdent,* "⟩" : tactic
@@ -186,6 +257,9 @@ elab_rules : tactic
       let depth := n.getNat
       if ← TacticInternals.Unary.runProbEqAction (.rewriteUnder depth) then return
       TacticInternals.Unary.throwVCGenStepRwError depth
+  | `(tactic| vcstep rw normalize) => do
+      if ← TacticInternals.Unary.runProbEqNormalize then return
+      TacticInternals.Unary.throwVCGenStepRwNormalizeError
   | `(tactic| vcstep rw congr) => do
       if ← TacticInternals.Unary.runProbEqAction .congr then return
       TacticInternals.Unary.throwVCGenStepRwCongrError true

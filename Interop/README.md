@@ -21,12 +21,12 @@ The contract is enforced at three levels:
    `import Interop.…`, `import Hax.…`, or `import Aeneas.…`.
 2. **CI**: `scripts/check-interop-isolation.sh` greps for forbidden imports
    and exits non-zero on violation. `.github/workflows/interop-isolation.yml`
-   runs it on every PR.
+   runs it on every PR and on pushes to `main`.
 3. **Reverse direction**: `Interop/**` is allowed to depend on `VCVio/**`,
    `ToMathlib/**`, hax (`Hax.…`), and aeneas (`Aeneas.…`), but **not** on
-   `LatticeCrypto/**`, `Examples/**`, `LatticeCryptoTest/**`, `FFI/**`, or
-   `VCVioWidgets/**` (those are themselves clients of VCVio). The same
-   script checks this.
+   `LatticeCrypto/**`, `Examples/**`, `LatticeCryptoTest/**`, `FFI/**`,
+   `VCVioWidgets/**`, or `VCVioTest/**`.
+   Those are themselves clients of VCVio. The same script checks this.
 
 If you need to share infrastructure between Interop and another library,
 move the shared piece into `VCVio/` first.

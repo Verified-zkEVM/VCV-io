@@ -14,6 +14,7 @@
 
 | Notation | Meaning | Defined in |
 |----------|---------|------------|
+| `𝒟[mx]` | `evalDist mx` | `VCVio/EvalDist/Defs/Basic.lean` |
 | `Pr[= x \| mx]` | `probOutput mx x` | `VCVio/EvalDist/Defs/Basic.lean` |
 | `Pr[p \| mx]` | `probEvent mx p` | `VCVio/EvalDist/Defs/Basic.lean` |
 | `Pr[⊥ \| mx]` | `probFailure mx` | `VCVio/EvalDist/Defs/Basic.lean` |
@@ -35,13 +36,15 @@
 
 | Notation | Meaning | Defined in |
 |----------|---------|------------|
-| `⌜P⌝` | Prop indicator (`propInd P`) | `VCVio/ProgramLogic/Notation.lean` |
-| `wp⟦c⟧` | Quantitative WP (`wp c`) | `VCVio/ProgramLogic/Notation.lean` |
-| `⦃P⦄ c ⦃Q⦄` | Hoare triple (`Triple P c Q`) | `VCVio/ProgramLogic/Notation.lean` |
-| `g₁ ≡ₚ g₂` | Game equivalence (`GameEquiv`) | `VCVio/ProgramLogic/Notation.lean` |
+| `𝟙⟦P⟧` | Numeric proposition indicator (`propInd P`) | `VCVio/ProgramLogic/NotationCore.lean` |
+| `⌜P⌝` | Loom pure proposition assertion | `VCVio/ProgramLogic/NotationCore.lean` |
+| `wp⟦c⟧` | Quantitative WP (`wp c`) | `VCVio/ProgramLogic/NotationCore.lean` |
+| `rwp⟦c₁ ~ c₂ \| post; epost₁, epost₂⟧` | Relational WP (`Std.Do'.rwp c₁ c₂ post epost₁ epost₂`) | `VCVio/ProgramLogic/NotationCore.lean` |
+| `⦃P⦄ c ⦃Q⦄` | Loom unary Hoare triple (`Std.Do'.Triple`) | `VCVio/ProgramLogic/NotationCore.lean` |
+| `g₁ ≡ₚ g₂` | Game equivalence (`GameEquiv`) | `VCVio/ProgramLogic/NotationCore.lean` |
 | `⟪c₁ ~ c₂ \| R⟫` | pRHL coupling (`RelTriple c₁ c₂ R`) | `VCVio/ProgramLogic/Notation.lean` |
 | `⟪c₁ ≈[ε] c₂ \| R⟫` | Approximate coupling (`ApproxRelTriple ε c₁ c₂ R`) | `VCVio/ProgramLogic/Notation.lean` |
-| `⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` | eRHL triple (`eRelTriple f c₁ c₂ g`) | `VCVio/ProgramLogic/Notation.lean` |
+| `⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` | Quantitative relational triple (`Std.Do'.RelTriple f c₁ c₂ g Lean.Order.bot Lean.Order.bot`) | `VCVio/ProgramLogic/Notation.lean` |
 
 ## UC Composition Notations
 

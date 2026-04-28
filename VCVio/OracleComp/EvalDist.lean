@@ -161,17 +161,17 @@ noncomputable instance : HasEvalPMF (OracleComp spec) where
   __ := OracleComp.hasEvalSet (spec := spec)
 
 lemma evalDist_eq_simulateQ (mx : OracleComp spec α) :
-    evalDist mx = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
+    𝒟[mx] = simulateQ (fun t => PMF.uniformOfFintype (spec.Range t)) mx := rfl
 
 @[simp low, grind =]
 lemma evalDist_liftM (q : OracleQuery spec α) :
-    evalDist (liftM q : OracleComp spec α) =
+    𝒟[(liftM q : OracleComp spec α)] =
       (PMF.uniformOfFintype (spec.Range q.input)).map q.cont := by
   simp [evalDist_eq_simulateQ, SPMF.liftM_eq_map, PMF.map_comp, PMF.monad_map_eq_map]
 
 @[simp, grind =]
 lemma evalDist_query (t : spec.Domain) :
-    evalDist (liftM (query t) : OracleComp spec _) = PMF.uniformOfFintype (spec.Range t) := by
+    𝒟[(liftM (query t) : OracleComp spec _)] = PMF.uniformOfFintype (spec.Range t) := by
   simp [PMF.map_id]
 
 @[simp low, grind =]
@@ -218,7 +218,7 @@ variable [spec.Fintype] [spec.Inhabited] (oa : OracleComp spec α) (x : α)
 /-- An output has non-zero probability in `evalDist` iff it is in computation support. -/
 @[simp]
 lemma mem_support_evalDist_iff :
-    some x ∈ (evalDist oa).run.support ↔ x ∈ support oa := by
+    some x ∈ (𝒟[oa]).run.support ↔ x ∈ support oa := by
   rw [PMF.mem_support_iff]
   simpa [probOutput_def, SPMF.apply_eq_toPMF_some] using
     (mem_support_iff (mx := oa) (x := x)).symm
@@ -228,7 +228,7 @@ alias ⟨mem_support_of_mem_support_evalDist, mem_support_evalDist⟩ := mem_sup
 /-- Finite-support variant of `mem_support_evalDist_iff`. -/
 @[simp]
 lemma mem_support_evalDist_iff' [DecidableEq α] :
-    some x ∈ (evalDist oa).run.support ↔ x ∈ finSupport oa := by
+    some x ∈ (𝒟[oa]).run.support ↔ x ∈ finSupport oa := by
   rw [mem_support_evalDist_iff (oa := oa) (x := x), mem_finSupport_iff_mem_support]
 
 alias ⟨mem_finSupport_of_mem_support_evalDist, mem_support_evalDist'⟩ := mem_support_evalDist_iff'
@@ -261,19 +261,19 @@ variable [spec.Fintype] [spec.Inhabited]
 
 lemma evalDist_query_bind
     (t : spec.Domain) (ou : spec.Range t → OracleComp spec α) :
-    evalDist ((query t : OracleComp spec _) >>= ou) =
+    𝒟[(query t : OracleComp spec _) >>= ou] =
       (OptionT.lift (PMF.uniformOfFintype (spec.Range t))) >>= (evalDist ∘ ou) := by
   rw [evalDist_bind, evalDist_query]; rfl
 
 lemma probOutput_congr {x y : α} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
     [spec'.Fintype] [spec'.Inhabited]
-    (h1 : x = y) (h2 : evalDist oa = evalDist oa') : Pr[= x | oa] = Pr[= y | oa'] := by
+    (h1 : x = y) (h2 : 𝒟[oa] = 𝒟[oa']) : Pr[= x | oa] = Pr[= y | oa'] := by
   simp_rw [probOutput_def, h1, h2]
 
 lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : OracleComp spec' α}
     [spec'.Fintype] [spec'.Inhabited]
     (h1 : ∀ x, x ∈ support oa → (p x ↔ q x))
-    (h2 : evalDist oa = evalDist oa') : Pr[ p | oa] = Pr[ q | oa'] := by
+    (h2 : 𝒟[oa] = 𝒟[oa']) : Pr[ p | oa] = Pr[ q | oa'] := by
   simp only [probEvent_eq_tsum_indicator, probOutput_def, h2]
   congr 1; ext x
   by_cases hx : x ∈ support oa
@@ -284,15 +284,15 @@ lemma probEvent_congr' {p q : α → Prop} {oa : OracleComp spec α} {oa' : Orac
     · exact absurd ((h1 x hx).mpr hq) hp
     · rfl
   · unfold Set.indicator
-    have : (evalDist oa) x = 0 := by
+    have : (𝒟[oa]) x = 0 := by
       rwa [← probOutput_def, probOutput_eq_zero_iff]
     rw [h2] at this
     split_ifs <;> simp [this]
 
 lemma evalDist_ext_probEvent {oa : OracleComp spec α} {oa' : OracleComp spec' α}
     [spec'.Fintype] [spec'.Inhabited]
-    (h : ∀ x, Pr[= x | oa] = Pr[= x | oa']) : (evalDist oa).run = (evalDist oa').run := by
-  have heval : evalDist oa = evalDist oa' := evalDist_ext h
+    (h : ∀ x, Pr[= x | oa] = Pr[= x | oa']) : (𝒟[oa]).run = (𝒟[oa']).run := by
+  have heval : 𝒟[oa] = 𝒟[oa'] := evalDist_ext h
   simp [heval]
 
 lemma probFailure_eq_sub_probEvent' (oa : OracleComp spec α) :
@@ -356,10 +356,10 @@ variable [spec.Fintype] [spec.Inhabited]
 lemma evalDist_simulateQ_eq_evalDist
     [spec'.Fintype] [spec'.Inhabited]
     (so : QueryImpl spec' (OracleComp spec))
-    (h : ∀ t : spec'.Domain, evalDist (so t) =
-      evalDist (liftM (query t) : OracleComp spec' (spec'.Range t)))
+    (h : ∀ t : spec'.Domain, 𝒟[so t] =
+      𝒟[(liftM (query t) : OracleComp spec' (spec'.Range t))])
     (oa : OracleComp spec' α) :
-    evalDist (simulateQ so oa) = evalDist oa := by
+    𝒟[simulateQ so oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x =>
       simp
@@ -375,9 +375,9 @@ implementations (e.g. counting/logging oracles) don't change outcome probabiliti
 lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
     (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+      𝒟[(so t).run' s] = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (s : σ) (oa : OracleComp spec τ) :
-    evalDist ((simulateQ so oa).run' s) = evalDist oa := by
+    𝒟[(simulateQ so oa).run' s] = 𝒟[oa] := by
   revert s
   induction oa using OracleComp.inductionOn with
   | pure x => intro s; simp
@@ -385,8 +385,8 @@ lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
     intro s
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, id_map,
       OracleQuery.input_query]
-    change evalDist (Prod.fst <$> ((so t).run s >>= fun p =>
-      (simulateQ so (mx p.1)).run p.2)) = _
+    change 𝒟[Prod.fst <$> ((so t).run s >>= fun p =>
+      (simulateQ so (mx p.1)).run p.2)] = _
     rw [@map_bind (OracleComp spec), show (fun p : spec.Range t × σ =>
         Prod.fst <$> (simulateQ so (mx p.1)).run p.2) =
       (fun p => (simulateQ so (mx p.1)).run' p.2) from rfl]
@@ -396,8 +396,8 @@ lemma evalDist_simulateQ_run'_eq_evalDist {σ τ : Type u}
       ((so t).run' s >>= mx) from
       (bind_map_left (m := OracleComp spec) Prod.fst ((so t).run s) mx).symm]
     rw [evalDist_bind, h t s]
-    change OptionT.lift (PMF.uniformOfFintype (spec.Range t)) >>= (fun u => evalDist (mx u)) = _
-    rw [show (fun u => evalDist (mx u)) = evalDist ∘ mx from rfl]
+    change OptionT.lift (PMF.uniformOfFintype (spec.Range t)) >>= (fun u => 𝒟[mx u]) = _
+    rw [show (fun u => 𝒟[mx u]) = evalDist ∘ mx from rfl]
     exact (evalDist_query_bind t mx).symm
 
 /-- Stronger version with computational hypothesis: if the implementation passes through
@@ -406,14 +406,14 @@ lemma evalDist_simulateQ_run'_of_run'_eq_query {σ τ : Type u}
     (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ t s, (so t).run' s = query t)
     (s : σ) (oa : OracleComp spec τ) :
-    evalDist ((simulateQ so oa).run' s) = evalDist oa := by
+    𝒟[(simulateQ so oa).run' s] = 𝒟[oa] := by
   rw [StateT_run'_simulateQ_eq_self so h]
 
 /-- Corollary for `probOutput`: stateful simulation preserves output probabilities. -/
 lemma probOutput_simulateQ_run'_eq {σ τ : Type u}
     (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+      𝒟[(so t).run' s] = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (s : σ) (oa : OracleComp spec τ) (x : τ) :
     Pr[= x | (simulateQ so oa).run' s] = Pr[= x | oa] :=
   congrFun (congrArg DFunLike.coe (evalDist_simulateQ_run'_eq_evalDist so h s oa)) x
@@ -422,7 +422,7 @@ lemma probOutput_simulateQ_run'_eq {σ τ : Type u}
 lemma probEvent_simulateQ_run'_eq {σ τ : Type u}
     (so : QueryImpl spec (StateT σ (OracleComp spec)))
     (h : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((so t).run' s) = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
+      𝒟[(so t).run' s] = OptionT.lift (PMF.uniformOfFintype (spec.Range t)))
     (s : σ) (oa : OracleComp spec τ) (p : τ → Prop) :
     Pr[ p | (simulateQ so oa).run' s] = Pr[ p | oa] := by
   simp only [probEvent_eq_tsum_indicator]
@@ -434,10 +434,10 @@ lemma evalDist_simulateQ_run_eq_of_impl_evalDist_eq
     {σ α : Type}
     (impl₁ impl₂ : QueryImpl spec' (StateT σ (OracleComp spec)))
     (h : ∀ (t : spec'.Domain) (s : σ),
-      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+      𝒟[(impl₁ t).run s] = 𝒟[(impl₂ t).run s])
     (comp : OracleComp spec' α) (s : σ) :
-    evalDist ((simulateQ impl₁ comp).run s) =
-      evalDist ((simulateQ impl₂ comp).run s) := by
+    𝒟[(simulateQ impl₁ comp).run s] =
+      𝒟[(simulateQ impl₂ comp).run s] := by
   revert s
   induction comp using OracleComp.inductionOn with
   | pure _ => intro _; rfl

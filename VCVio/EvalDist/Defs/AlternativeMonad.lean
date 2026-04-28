@@ -53,4 +53,4 @@ lemma probFailure_failure [HasEvalSPMF m] [LawfulFailure m] :
 
 @[simp, grind =]
 lemma evalDist_failure [HasEvalSPMF m] [LawfulFailure m] :
-    evalDist (failure : m α) = SPMF.mk (PMF.pure none) := by simp
+    𝒟[(failure : m α)] = SPMF.mk (PMF.pure none) := by simp

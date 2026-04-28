@@ -163,7 +163,7 @@ initial state, as long as the initial state satisfies `Inv`.
 This is distributional equality of `run'` (which discards the final state). -/
 def OutputIndependent {σ α : Type} (mx : StateT σ ProbComp α) (Inv : σ → Prop) : Prop :=
   ∀ σ0 σ1, Inv σ0 → Inv σ1 →
-    evalDist (mx.run' σ0) = evalDist (mx.run' σ1)
+    𝒟[mx.run' σ0] = 𝒟[mx.run' σ1]
 
 @[simp] lemma statePreserving_pure {σ α : Type} (a : α) :
     StatePreserving (pure a : StateT σ ProbComp α) := by
@@ -217,7 +217,7 @@ lemma outputIndependent_after_preservesInv {σ α β : Type}
     (hmx : OutputIndependent mx Inv)
     (hmyInv : PreservesInv my Inv) :
     ∀ σ0, Inv σ0 →
-      evalDist ((my.run σ0) >>= fun us => mx.run' us.2) = evalDist (mx.run' σ0) := by
+      𝒟[(my.run σ0) >>= fun us => mx.run' us.2] = 𝒟[mx.run' σ0] := by
   classical
   intro σ0 hσ0
   ext y
@@ -225,14 +225,14 @@ lemma outputIndependent_after_preservesInv {σ α β : Type}
       ∀ us : support (my.run σ0), Pr[= y | mx.run' us.1.2] = Pr[= y | mx.run' σ0] := by
     intro us
     have husInv : Inv us.1.2 := hmyInv σ0 hσ0 us.1 us.2
-    have hdist : evalDist (mx.run' us.1.2) = evalDist (mx.run' σ0) :=
+    have hdist : 𝒟[mx.run' us.1.2] = 𝒟[mx.run' σ0] :=
       hmx _ _ husInv hσ0
     simpa [probOutput_def] using congrArg (fun d => d y) hdist
   have hsum_support : (∑' us : support (my.run σ0), Pr[= us | my.run σ0]) = 1 := by
     have hsum_all :
         (∑' us : β × σ, Pr[= us | my.run σ0]) = 1 - Pr[⊥ | my.run σ0] := by
       simpa [probOutput_def, probFailure, SPMF.apply_eq_toPMF_some] using
-        (SPMF.tsum_run_some_eq_one_sub (p := evalDist (my.run σ0)))
+        (SPMF.tsum_run_some_eq_one_sub (p := 𝒟[my.run σ0]))
     have hsum_all' : (∑' us : β × σ, Pr[= us | my.run σ0]) = 1 := by
       simp [hsum_all]
     have hrestrict :

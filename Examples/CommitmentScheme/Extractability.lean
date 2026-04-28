@@ -188,7 +188,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
     exact ⟨entry.1, (m, s), entry.2, c, hne, hcache₃_entry, hcache₃,
       heq_of_eq (by rw [hentry_cm, hceq])⟩
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited C] [Inhabited M] [Inhabited S] in
 /-- `IsTotalQueryBound` for the extractability game's inner computation.
 
 The inner computation consists of:
@@ -237,7 +237,7 @@ private lemma extractabilityInner_totalBound [Finite C] {t : ℕ}
     have := A.totalBound
     omega)
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] [Inhabited C] in
 /-- The tagged inner computation has the same query bound as the untagged one. -/
 private lemma extractabilityInner_tagged_totalBound [Finite C] {t : ℕ}
     (A : ExtractAdversary M S C AUX t) :

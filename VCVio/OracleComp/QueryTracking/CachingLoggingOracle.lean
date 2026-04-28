@@ -73,6 +73,56 @@ lemma withCachingLogging_apply (so : QueryImpl spec m) (t : spec.Domain) :
           ((fun u => (u, s.2 ++ [⟨t, u⟩])) <$> so t) := by
   simp [withCachingLogging, withCachingTraceAppend_apply]
 
+/-! ### Forward-direction query bounds for `withCachingTraceAppend`
+
+The trace overlay does not change the underlying query count, so the `withCaching` bounds
+transfer through `withCachingAux_run_proj_eq` via `isQueryBound_iff_of_map_eq`. -/
+
+variable {α : Type u} {ι' : Type u} {spec' : OracleSpec ι'}
+
+omit [Monad m] [spec.DecidableEq] in
+private lemma _root_.QueryImpl.withCachingTraceAppend_run_proj_eq
+    {ι₂ : Type u} {spec₂ : OracleSpec ι₂} [LawfulAppend ω]
+    (so : QueryImpl spec (OracleComp spec₂))
+    (traceFn : (t : spec.Domain) → spec.Range t → ω)
+    {α : Type u} (oa : OracleComp spec α) (s : QueryCache spec × ω) :
+    Prod.map id Prod.fst <$> (simulateQ (so.withCachingTraceAppend traceFn) oa).run s =
+      (simulateQ so.withCaching oa).run s.1 :=
+  QueryImpl.withCachingAux_run_proj_eq so _ _
+    (by intro t cache q; simp [Functor.map_map]) oa s.1 s.2
+
+omit [Monad m] [spec.DecidableEq] in
+theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
+    [LawfulAppend ω]
+    (so : QueryImpl spec (OracleComp spec))
+    (traceFn : (t : spec.Domain) → spec.Range t → ω)
+    {oa : OracleComp spec α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n)
+    (hstep : ∀ t, OracleComp.IsTotalQueryBound (so t) 1)
+    (s : QueryCache spec × ω) :
+    OracleComp.IsTotalQueryBound
+      ((simulateQ (so.withCachingTraceAppend traceFn) oa).run s) n :=
+  (OracleComp.isQueryBound_iff_of_map_eq
+      (QueryImpl.withCachingTraceAppend_run_proj_eq so traceFn oa s) _ _).mpr
+    (OracleComp.IsTotalQueryBound.simulateQ_run_withCaching so h hstep s.1)
+
+omit [Monad m] [spec.DecidableEq] in
+theorem isQueryBoundP_run_simulateQ_withCachingTraceAppend
+    [LawfulAppend ω]
+    (so : QueryImpl spec (OracleComp spec'))
+    (traceFn : (t : spec.Domain) → spec.Range t → ω)
+    {oa : OracleComp spec α}
+    {p : ι → Prop} [DecidablePred p] {q : ι' → Prop} [DecidablePred q] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n)
+    (hstep_p : ∀ t, p t → OracleComp.IsQueryBoundP (so t) q 1)
+    (hstep_np : ∀ t, ¬ p t → OracleComp.IsQueryBoundP (so t) q 0)
+    (s : QueryCache spec × ω) :
+    OracleComp.IsQueryBoundP
+      ((simulateQ (so.withCachingTraceAppend traceFn) oa).run s) q n :=
+  (OracleComp.isQueryBoundP_iff_of_map_eq
+      (QueryImpl.withCachingTraceAppend_run_proj_eq so traceFn oa s)).mpr
+    (OracleComp.IsQueryBoundP.simulateQ_run_withCaching so h hstep_p hstep_np s.1)
+
 end QueryImpl
 
 /-- Canonical combined caching + logging oracle over `OracleComp spec`. -/
@@ -129,5 +179,37 @@ theorem run'_simulateQ_eq {α : Type u}
   have hrun := fst_map_run_simulateQ oa s
   have hmap := congrArg (fun p => Prod.fst <$> p) hrun
   simpa [StateT.run'] using hmap
+
+/-! ### Forward-direction query bounds
+
+The log overlay does not change the underlying query count, so the `cachingOracle` bounds
+transfer through `fst_map_run_simulateQ` via `isQueryBound_iff_of_map_eq`. -/
+
+theorem isTotalQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] {α : Type}
+    {oa : OracleComp spec₀ α} {n : ℕ}
+    (h : OracleComp.IsTotalQueryBound oa n)
+    (s : QueryCache spec₀ × QueryLog spec₀) :
+    OracleComp.IsTotalQueryBound ((simulateQ spec₀.cachingLoggingOracle oa).run s) n :=
+  (OracleComp.isQueryBound_iff_of_map_eq (fst_map_run_simulateQ oa s) _ _).mpr
+    (cachingOracle.isTotalQueryBound_run_simulateQ h s.1)
+
+theorem isQueryBoundP_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] {α : Type}
+    {oa : OracleComp spec₀ α} {p : ι₀ → Prop} [DecidablePred p] {n : ℕ}
+    (h : OracleComp.IsQueryBoundP oa p n)
+    (s : QueryCache spec₀ × QueryLog spec₀) :
+    OracleComp.IsQueryBoundP ((simulateQ spec₀.cachingLoggingOracle oa).run s) p n :=
+  (OracleComp.isQueryBoundP_iff_of_map_eq (fst_map_run_simulateQ oa s)).mpr
+    (cachingOracle.isQueryBoundP_run_simulateQ h s.1)
+
+theorem isPerIndexQueryBound_run_simulateQ {ι₀ : Type} [DecidableEq ι₀]
+    {spec₀ : OracleSpec.{0, 0} ι₀} [spec₀.DecidableEq] {α : Type}
+    {oa : OracleComp spec₀ α} {qb : ι₀ → ℕ}
+    (h : OracleComp.IsPerIndexQueryBound oa qb)
+    (s : QueryCache spec₀ × QueryLog spec₀) :
+    OracleComp.IsPerIndexQueryBound ((simulateQ spec₀.cachingLoggingOracle oa).run s) qb :=
+  (OracleComp.isPerIndexQueryBound_iff_of_map_eq (fst_map_run_simulateQ oa s)).mpr
+    (cachingOracle.isPerIndexQueryBound_run_simulateQ h s.1)
 
 end cachingLoggingOracle

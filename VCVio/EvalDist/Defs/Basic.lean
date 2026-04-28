@@ -39,22 +39,27 @@ dtumad: I think we should eventually just deprecate this, just say `toSPMF`. -/
 def evalDist [HasEvalSPMF m] {α : Type u} (mx : m α) : SPMF α :=
   HasEvalSPMF.toSPMF mx
 
+/-- Evaluation distribution notation for any monad with `HasEvalSPMF`.
+For monads with `HasEvalPMF`, this uses the inherited `HasEvalSPMF`
+semantics. -/
+notation "𝒟[" mx "]" => evalDist mx
+
 lemma evalDist_def [HasEvalSPMF m] {α : Type u} (mx : m α) :
-    evalDist mx = HasEvalSPMF.toSPMF mx := rfl
+    𝒟[mx] = HasEvalSPMF.toSPMF mx := rfl
 
 section probability_notation
 
 /-- Probability that a computation `mx` returns the value `x`. -/
 def probOutput [HasEvalSPMF m] (mx : m α) (x : α) : ℝ≥0∞ :=
-  evalDist mx x
+  𝒟[mx] x
 
 /-- Probability that a computation `mx` outputs a value satisfying `p`. -/
 noncomputable def probEvent [HasEvalSPMF m] (mx : m α) (p : α → Prop) : ℝ≥0∞ :=
-  (evalDist mx).run.toOuterMeasure (some '' {x | p x})
+  (𝒟[mx]).run.toOuterMeasure (some '' {x | p x})
 
 /-- Probability that a computation `mx` will fail to return a value. -/
 def probFailure [HasEvalSPMF m] (mx : m α) : ℝ≥0∞ :=
-  (evalDist mx).run none
+  (𝒟[mx]).run none
 
 /-- Probability that a computation returns a particular output. -/
 notation "Pr[= " x " | " mx "]" => probOutput mx x
@@ -80,7 +85,7 @@ lemma mem_support_iff (mx : m α) (x : α) :
   simp [HasEvalSPMF.support_eq, probOutput_def, evalDist_def]
 
 lemma mem_support_iff_evalDist_apply_ne_zero (mx : m α) (x : α) :
-    x ∈ support mx ↔ evalDist mx x ≠ 0 := by grind
+    x ∈ support mx ↔ 𝒟[mx] x ≠ 0 := by grind
 
 @[grind =]
 lemma mem_finSupport_iff [DecidableEq α] [HasEvalFinset m] (mx : m α) (x : α) :
@@ -146,7 +151,7 @@ section probEvent
 
 @[aesop norm (rule_sets := [UnfoldEvalDist])]
 lemma probEvent_def [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
-    Pr[ p | mx] = (evalDist mx).run.toOuterMeasure (some '' {x | p x}) := rfl
+    Pr[ p | mx] = (𝒟[mx]).run.toOuterMeasure (some '' {x | p x}) := rfl
 
 @[grind =]
 lemma probEvent_eq_tsum_indicator [HasEvalSPMF m] (mx : m α) (p : α → Prop) :
@@ -278,7 +283,7 @@ section probFailure
 
 @[aesop norm (rule_sets := [UnfoldEvalDist]), grind =]
 lemma probFailure_def [HasEvalSPMF m] (mx : m α) :
-    Pr[⊥ | mx] = (evalDist mx).run none := rfl
+    Pr[⊥ | mx] = (𝒟[mx]).run none := rfl
 
 end probFailure
 
@@ -312,38 +317,38 @@ end probability_notation
 
 @[simp] -- TODO: versions for other constructions?
 lemma evalDist_cast {m} [Monad m] [HasEvalSPMF m] (h : α = β) (mx : m α) :
-    evalDist (cast (congrArg m h) mx) =
-      cast (congrArg SPMF h) (evalDist mx) := by
+    𝒟[cast (congrArg m h) mx] =
+      cast (congrArg SPMF h) (𝒟[mx]) := by
   induction h; rfl
 
 lemma evalDist_ext {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
-    {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : evalDist mx = evalDist mx' :=
+    {mx : m α} {mx' : n α} (h : ∀ x, Pr[= x | mx] = Pr[= x | mx']) : 𝒟[mx] = 𝒟[mx'] :=
   SPMF.ext h
 
 lemma evalDist_ext_iff {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
-    {mx : m α} {mx' : n α} : evalDist mx = evalDist mx' ↔ ∀ x, Pr[= x | mx] = Pr[= x | mx'] := by
+    {mx : m α} {mx' : n α} : 𝒟[mx] = 𝒟[mx'] ↔ ∀ x, Pr[= x | mx] = Pr[= x | mx'] := by
   refine ⟨fun h => ?_, evalDist_ext⟩
   simp [probOutput_def, h]
 
 @[simp, grind =]
 lemma evalDist_eq_liftM_iff [HasEvalSPMF m] (mx : m α) (p : PMF α) :
-    evalDist mx = liftM p ↔ ∀ x, Pr[= x | mx] = p x := by
+    𝒟[mx] = liftM p ↔ ∀ x, Pr[= x | mx] = p x := by
   refine ⟨fun h x => ?_, fun h => ?_⟩
   · simp [probOutput_def, h]
   · simpa [SPMF.eq_liftM_iff_forall, probOutput_def] using h
 
 @[simp, grind =]
 lemma evalDist_eq_mk_iff [HasEvalSPMF m] (mx : m α) (p : PMF (Option α)) :
-    evalDist mx = SPMF.mk p ↔ ∀ x, Pr[= x | mx] = p (some x) := by aesop
+    𝒟[mx] = SPMF.mk p ↔ ∀ x, Pr[= x | mx] = p (some x) := by aesop
 
 @[aesop unsafe apply]
 lemma evalDist_eq_liftM [HasEvalSPMF m] {mx : m α} {p : PMF α}
-    (h : ∀ x, Pr[= x | mx] = p x) : evalDist mx = liftM p := by aesop
+    (h : ∀ x, Pr[= x | mx] = p x) : 𝒟[mx] = liftM p := by aesop
 
 @[simp]
 lemma evalDist_apply_eq_zero_iff [HasEvalSPMF m] (mx : m α)
     (x : Option α) :
-    (evalDist mx).run x = 0 ↔ x.rec (Pr[⊥ | mx] = 0) (· ∉ support mx) := by
+    (𝒟[mx]).run x = 0 ↔ x.rec (Pr[⊥ | mx] = 0) (· ∉ support mx) := by
   induction x with
   | none => simp [probFailure_def]
   | some y => simp [OptionT.run, mem_support_iff_evalDist_apply_ne_zero,
@@ -351,7 +356,7 @@ lemma evalDist_apply_eq_zero_iff [HasEvalSPMF m] (mx : m α)
 
 @[simp]
 lemma evalDist_apply_eq_zero_iff' [HasEvalSPMF m] [HasEvalFinset m] [DecidableEq α] (mx : m α)
-    (x : Option α) : (evalDist mx).run x = 0 ↔ x.rec (Pr[⊥ | mx] = 0) (· ∉ finSupport mx) := by
+    (x : Option α) : (𝒟[mx]).run x = 0 ↔ x.rec (Pr[⊥ | mx] = 0) (· ∉ finSupport mx) := by
   rw [evalDist_apply_eq_zero_iff]
   grind
 
@@ -360,7 +365,7 @@ section ite
 variable (p : Prop) [Decidable p]
 
 @[simp] lemma evalDist_ite [HasEvalSPMF m] (mx mx' : m α) :
-    evalDist (if p then mx else mx') = if p then evalDist mx else evalDist mx' := by grind
+    𝒟[if p then mx else mx'] = if p then 𝒟[mx] else 𝒟[mx'] := by grind
 
 @[simp] lemma probOutput_ite [HasEvalSPMF m] (x : α) (mx mx' : m α) :
     Pr[= x | if p then mx else mx'] = if p then Pr[= x | mx] else Pr[= x | mx'] := by aesop
@@ -376,7 +381,7 @@ end ite
 section eqRec
 
 lemma evalDist_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) :
-    evalDist (h ▸ mx : m β) = h ▸ evalDist mx := by grind
+    𝒟[(h ▸ mx : m β)] = h ▸ 𝒟[mx] := by grind
 
 lemma probOutput_eqRec [HasEvalSPMF m] (h : α = β) (mx : m α) (y : β) :
     Pr[= y | h ▸ mx] = Pr[= h ▸ y | mx] := by grind
@@ -412,11 +417,11 @@ section bounds
 variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 @[simp, grind .] lemma probOutput_le_one [HasEvalSPMF m] :
-    Pr[= x | mx] ≤ 1 := PMF.coe_le_one (evalDist mx) x
+    Pr[= x | mx] ≤ 1 := PMF.coe_le_one (𝒟[mx]) x
 @[simp, grind .] lemma probOutput_ne_top [HasEvalSPMF m] :
-    Pr[= x | mx] ≠ ∞ := PMF.apply_ne_top (evalDist mx) x
+    Pr[= x | mx] ≠ ∞ := PMF.apply_ne_top (𝒟[mx]) x
 @[simp, grind .] lemma probOutput_lt_top [HasEvalSPMF m] :
-    Pr[= x | mx] < ∞ := PMF.apply_lt_top (evalDist mx) x
+    Pr[= x | mx] < ∞ := PMF.apply_lt_top (𝒟[mx]) x
 @[simp, grind .] lemma not_one_lt_probOutput [HasEvalSPMF m] :
     ¬ 1 < Pr[= x | mx] := not_lt.2 probOutput_le_one
 
@@ -427,7 +432,7 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
 
 @[simp, grind .] lemma probEvent_le_one [HasEvalSPMF m] : Pr[ p | mx] ≤ 1 := by
   rw [probEvent_def, PMF.toOuterMeasure_apply]
-  refine le_of_le_of_eq (ENNReal.tsum_le_tsum ?_) ((evalDist mx).tsum_coe)
+  refine le_of_le_of_eq (ENNReal.tsum_le_tsum ?_) ((𝒟[mx]).tsum_coe)
   exact Set.indicator_le_self (some '' {x | p x}) _
 
 @[simp, grind .] lemma probEvent_ne_top [HasEvalSPMF m] :
@@ -438,11 +443,11 @@ variable {mx : m α} {mxe : OptionT m α} {x : α} {p : α → Prop}
     ¬ 1 < Pr[ p | mx] := not_lt.2 probEvent_le_one
 
 @[simp, grind .] lemma probFailure_le_one [HasEvalSPMF m] :
-    Pr[⊥ | mx] ≤ 1 := PMF.coe_le_one (evalDist mx) none
+    Pr[⊥ | mx] ≤ 1 := PMF.coe_le_one (𝒟[mx]) none
 @[simp, grind .] lemma probFailure_ne_top [HasEvalSPMF m] :
-    Pr[⊥ | mx] ≠ ∞ := PMF.apply_ne_top (evalDist mx) none
+    Pr[⊥ | mx] ≠ ∞ := PMF.apply_ne_top (𝒟[mx]) none
 @[simp, grind .] lemma probFailure_lt_top [HasEvalSPMF m] :
-    Pr[⊥ | mx] < ∞ := PMF.apply_lt_top (evalDist mx) none
+    Pr[⊥ | mx] < ∞ := PMF.apply_lt_top (𝒟[mx]) none
 @[simp, grind .] lemma not_one_lt_probFailure [HasEvalSPMF m] :
     ¬ 1 < Pr[⊥ | mx] := not_lt.2 probFailure_le_one
 
@@ -483,6 +488,18 @@ lemma one_eq_probOutput_iff' [HasEvalSPMF m] [HasEvalFinset m] [DecidableEq α] 
     1 = Pr[= x | mx] ↔ Pr[⊥ | mx] = 0 ∧ finSupport mx = {x} := by
   rw [eq_comm, probOutput_eq_one_iff']
 alias ⟨_, one_eq_probOutput'⟩ := one_eq_probOutput_iff'
+
+/-- If a non-failing computation can only return `x`, then it returns `x` with probability one. -/
+lemma probOutput_eq_one_of_support_subset_singleton [HasEvalSPMF m]
+    (hnf : Pr[⊥ | mx] = 0) (huniq : ∀ y ∈ support mx, y = x) :
+    Pr[= x | mx] = 1 := by
+  have hnot : ∀ y ≠ x, Pr[= y | mx] = 0 :=
+    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
+  have hsum : ∑' y, Pr[= y | mx] = Pr[= x | mx] :=
+    tsum_eq_single x hnot
+  have htot := probFailure_add_tsum_probOutput mx
+  rw [hnf, hsum, zero_add] at htot
+  exact htot
 
 end bounds
 
@@ -621,7 +638,7 @@ variable {α β γ : Type u} {m : Type u → Type v} [Monad m]
   [HasEvalPMF m] (mx : m α) (x : α)
 
 lemma evalDist_of_hasEvalPMF_def (mx : m α) :
-    evalDist mx = liftM (HasEvalPMF.toPMF mx) := by
+    𝒟[mx] = liftM (HasEvalPMF.toPMF mx) := by
   simp [evalDist_def, HasEvalPMF.toSPMF_eq]
 
 /-- The `evalDist` arising from a `HasEvalPMF` instance never fails. -/
@@ -767,13 +784,13 @@ lemma function_support_probOutput :
   simp only [Function.support, ne_eq, probOutput_eq_zero_iff, not_not, Set.setOf_mem_eq]
 
 lemma mem_support_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
-    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    {mx : m α} {mx' : n α} (h : 𝒟[mx] = 𝒟[mx']) (x : α) :
     x ∈ support mx ↔ x ∈ support mx' := by
   simp only [mem_support_iff, probOutput_def, h]
 
 lemma mem_finSupport_iff_of_evalDist_eq {m n} [Monad m] [HasEvalSPMF m] [Monad n] [HasEvalSPMF n]
     [HasEvalFinset m] [HasEvalFinset n] [DecidableEq α]
-    {mx : m α} {mx' : n α} (h : evalDist mx = evalDist mx') (x : α) :
+    {mx : m α} {mx' : n α} (h : 𝒟[mx] = 𝒟[mx']) (x : α) :
     x ∈ finSupport mx ↔ x ∈ finSupport mx' := by
   simp only [mem_finSupport_iff_mem_support, mem_support_iff_of_evalDist_eq h]
 

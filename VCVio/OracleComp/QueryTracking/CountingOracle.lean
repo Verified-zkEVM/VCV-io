@@ -106,8 +106,8 @@ probability-level reasoning about traced computations. -/
 
 lemma evalDist_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
     (so : QueryImpl spec m) (costFn : spec.Domain → ω) (mx : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (so.withCost costFn) mx).run) =
-      evalDist (simulateQ so mx) :=
+    𝒟[Prod.fst <$> (simulateQ (so.withCost costFn) mx).run] =
+      𝒟[simulateQ so mx] :=
   evalDist_fst_run_withTraceBefore so costFn mx
 
 lemma probOutput_fst_run_withCost [LawfulMonad m] [HasEvalSPMF m]
@@ -172,7 +172,7 @@ lemma fst_map_run_simulateQ (costFn : spec.Domain → ω) (oa : OracleComp spec 
 @[simp]
 lemma evalDist_fst_run_simulateQ [spec.Fintype] [spec.Inhabited]
     (costFn : spec.Domain → ω) (oa : OracleComp spec α) :
-    evalDist (Prod.fst <$> (simulateQ (costOracle costFn) oa).run) = evalDist oa := by
+    𝒟[Prod.fst <$> (simulateQ (costOracle costFn) oa).run] = 𝒟[oa] := by
   rw [fst_map_run_simulateQ]
 
 @[simp]

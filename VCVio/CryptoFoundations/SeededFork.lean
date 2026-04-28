@@ -344,9 +344,9 @@ end generateSeedCoverage
 variable (main : OracleComp spec α) (qb : ι → ℕ)
     (js : List ι) (i : ι) (cf : α → Option (Fin (qb i + 1)))
     [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq] [unifSpec ⊂ₒ spec]
-    [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec]
+    [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec]
 
-omit [spec.Fintype] [spec.Inhabited] [OracleSpec.LawfulSubSpec unifSpec spec] in
+omit [spec.Fintype] [spec.Inhabited] [unifSpec ˡ⊂ₒ spec] in
 /-- If `seededFork` succeeds (returns `some`), both runs agree on the fork index. -/
 theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
     (h : some (x₁, x₂) ∈ support (seededFork main qb js i cf)) :
@@ -367,7 +367,7 @@ theorem cf_eq_of_mem_support_seededFork (x₁ x₂ : α)
         exact ⟨s, hcf, hcf₂⟩
       · simp_all
 
-omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+omit [unifSpec ˡ⊂ₒ spec] in
 /-- On `seededFork` support, first-projection success equals old pair-style success event. -/
 theorem probEvent_seededFork_fst_eq_probEvent_pair (s : Fin (qb i + 1)) :
     Pr[ fun r => r.map (cf ∘ Prod.fst) = some (some s) | seededFork main qb js i cf] =
@@ -989,7 +989,7 @@ theorem le_probOutput_seededFork (s : Fin (qb i + 1)) :
     (tsub_le_tsub_right hNoGuardGeSquare (Pr[= (some s : Option (Fin (qb i + 1))) | collisionComp]))
     hNoGuardMinusLeRhs
 
-omit [OracleSpec.LawfulSubSpec unifSpec spec] in
+omit [unifSpec ˡ⊂ₒ spec] in
 /-- Sum of disjoint fork-success events is at most the total `some` probability. -/
 private lemma sum_probEvent_fork_le_tsum_some :
     ∑ s : Fin (qb i + 1),
@@ -1019,7 +1019,7 @@ private lemma sum_probEvent_fork_le_tsum_some :
     simp
 
 omit [DecidableEq ι] [∀ i, SampleableType (spec.Range i)] [spec.DecidableEq]
-  [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec] in
+  [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec] in
 /-- The standard forking-lemma precondition is itself a valid probability bound. -/
 theorem seededFork_precondition_le_one :
     (let acc : ℝ≥0∞ := ∑ s, Pr[= some s | cf <$> main]

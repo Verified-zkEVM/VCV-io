@@ -15,6 +15,7 @@ This file validates relational consequence, inlining, and `@[vcspec]` lookup.
 open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
 open OracleComp.ProgramLogic.Relational
+open Lean.Order
 open scoped OracleComp.ProgramLogic
 
 universe u
@@ -56,17 +57,75 @@ example (oa : OracleComp spec α) :
 
 @[local vcspec] theorem relTriple_wrappedTruePair :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
-  simpa [wrappedTrueLeft, wrappedTrueRight] using
-    (relTriple_refl (pure true : OracleComp spec Bool))
+  unfold wrappedTrueLeft wrappedTrueRight
+  rvcstep
 
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep
 
 example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => True⟫ := by
+  rvcstep
+
+@[irreducible] def wrappedAuxLeft : OracleComp spec Bool := pure true
+@[irreducible] def wrappedAuxRight : OracleComp spec Bool := pure true
+
+@[local vcspec] theorem relTriple_wrappedAuxPairStep (_haux : True) :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
+  unfold wrappedAuxLeft wrappedAuxRight
+  rvcstep
+
+example :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | EqRel Bool⟫ := by
+  rvcstep
+
+example :
+    ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | fun _ _ => True⟫ := by
+  rvcstep
+
+@[local vcspec] theorem rawRWP_wrappedTruePair :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
+  unfold wrappedTrueLeft wrappedTrueRight
+  rvcstep
+
+example :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) |
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep
+  intro a b
+  split_ifs <;> simp
+
+@[irreducible] def rawAuxLeft : OracleComp spec Bool := pure true
+@[irreducible] def rawAuxRight : OracleComp spec Bool := pure true
+
+@[local vcspec] theorem rawRWP_wrappedAuxPairStep (_haux : True) :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
+        (fun x y => if x = y then (1 : ℝ≥0∞) else 0) ; epost⟨⟩, epost⟨⟩⟧ := by
+  unfold rawAuxLeft rawAuxRight
+  rvcstep
+
+example :
+    (1 : ℝ≥0∞) ⊑
+      rwp⟦rawAuxLeft (spec := spec) ~ rawAuxRight (spec := spec) |
+        (fun _ _ => (1 : ℝ≥0∞)) ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep
+  intro a b
+  split_ifs <;> simp
+
+example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep with relTriple_wrappedTruePair
 
+/-
+These diagnostic guards preserve the shape of useful user-facing messages:
+source theorem names and VCVio replay commands should remain visible, while the
+exact wording may improve as the relational planner gets stronger.
+-/
 /--
 info: Try this:
 
@@ -76,6 +135,24 @@ info: Try this:
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | EqRel Bool⟫ := by
   rvcstep?
+
+/--
+error: rvcstep: found a `RelTriple` goal, but no relational VCGen rule matched.
+
+Registered `@[vcspec]` candidates: `relTriple_wrappedTruePair`
+Try `rvcstep?` or `rvcstep with <theorem>` for an explicit replay.
+Left side:
+  wrappedTrueLeft
+Right side:
+  wrappedTrueRight
+Postcondition:
+  fun x x_1 ↦ False
+Consider `rel_conseq`, `rel_inline`, or `rel_dist` for a non-structural step.
+-/
+#guard_msgs in
+example :
+    ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => False⟫ := by
+  rvcstep
 
 /--
 error: rvcstep using hf: the explicit hint did not match the current relational goal shape.
@@ -101,9 +178,22 @@ example {oa₁ oa₂ : OracleComp spec α}
 
 /-! ## Relational consequence close -/
 
+/--
+info: Try this:
+
+  [apply] rvcfinish
+-/
+#guard_msgs in
 example {oa : OracleComp spec α} {ob : OracleComp spec β}
     {R R' : RelPost α β}
     (h : ⟪oa ~ ob | R⟫)
     (hpost : ∀ x y, R x y → R' x y) :
     ⟪oa ~ ob | R'⟫ := by
-  rvcgen
+  rvcstep?
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R R' : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫)
+    (hpost : ∀ x y, R x y → R' x y) :
+    ⟪oa ~ ob | R'⟫ := by
+  rvcgen!

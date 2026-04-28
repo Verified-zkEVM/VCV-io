@@ -24,27 +24,27 @@ This file defines `RelTriple` via the generic two-monad algebra interface
 `HasCoupling` and coupling lemmas remain as semantic bridge lemmas.
 -/
 
-universe u
+universe u v w x
 
 open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleComp.ProgramLogic.Relational
 
-variable {ι₁ : Type u} {ι₂ : Type u}
+variable {ι₁ : Type u} {ι₂ : Type v}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
 variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {α β γ δ : Type}
 
 /-- Relational postconditions over two output spaces. -/
-abbrev RelPost (α : Type) (β : Type) := α → β → Prop
+abbrev RelPost (α : Sort w) (β : Sort x) := α → β → Prop
 
 /-- Equality relation helper for same-type outputs. -/
-def EqRel (α : Type) : RelPost α α := fun x y => x = y
+def EqRel (α : Sort w) : RelPost α α := fun x y => x = y
 
 /-- Coupling-based semantic relational WP for `OracleComp`. -/
 def CouplingPost (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (R : RelPost α β) : Prop :=
-  ∃ c : _root_.SPMF.Coupling (evalDist oa) (evalDist ob),
+  ∃ c : _root_.SPMF.Coupling (𝒟[oa]) (𝒟[ob]),
     ∀ z ∈ support c.1, R z.1 z.2
 
 /-- Relational algebra instance for `OracleComp`, based on coupling semantics. -/
@@ -84,20 +84,20 @@ noncomputable instance instMAlgRelOrdered :
       if hcut : CouplingPost (fa a) (fb b) post then (Classical.choose hcut).1 else failure
     have hd :
         ∀ a b, c.1.1 (some (a, b)) ≠ 0 →
-          _root_.SPMF.IsCoupling (d a b) (evalDist (fa a)) (evalDist (fb b)) := by
+          _root_.SPMF.IsCoupling (d a b) (𝒟[fa a]) (𝒟[fb b]) := by
       intro a b hmass
       have hsupp : (a, b) ∈ support c.1 :=
         (mem_support_iff c.1 (a, b)).2 (by
           simpa [SPMF.apply_eq_toPMF_some] using hmass)
       have hcut : CouplingPost (fa a) (fb b) post := hcCut (a, b) hsupp
-      have hCouple : _root_.SPMF.IsCoupling (Classical.choose hcut).1 (evalDist (fa a))
-          (evalDist (fb b)) := (Classical.choose hcut).2
+      have hCouple : _root_.SPMF.IsCoupling (Classical.choose hcut).1 (𝒟[fa a])
+          (𝒟[fb b]) := (Classical.choose hcut).2
       simpa [d, hcut] using hCouple
     have hbind :
         _root_.SPMF.IsCoupling
           (c.1 >>= fun p => d p.1 p.2)
-          (evalDist oa >>= fun a => evalDist (fa a))
-          (evalDist ob >>= fun b => evalDist (fb b)) :=
+          (𝒟[oa] >>= fun a => 𝒟[fa a])
+          (𝒟[ob] >>= fun b => 𝒟[fb b]) :=
       _root_.SPMF.IsCoupling.bind c d hd
     refine ⟨⟨c.1 >>= fun p => d p.1 p.2, ?_⟩, ?_⟩
     · simpa [evalDist_bind] using hbind
@@ -127,9 +127,9 @@ instance instAnchored :
       rintro ⟨c, hc⟩
       rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support]
       intro b hb
-      have hcPure : _root_.SPMF.IsCoupling c.1 (pure a) (evalDist y) := by
+      have hcPure : _root_.SPMF.IsCoupling c.1 (pure a) (𝒟[y]) := by
         simpa [evalDist_pure] using c.2
-      have hpos : (evalDist y) b ≠ 0 :=
+      have hpos : (𝒟[y]) b ≠ 0 :=
         (mem_support_iff_evalDist_apply_ne_zero y b).1 hb
       have hmass : c.1 (a, b) ≠ 0 := by
         rw [hcPure.apply_pure_left_eq b]; exact hpos
@@ -138,8 +138,8 @@ instance instAnchored :
     · -- (←) Construct the canonical Dirac coupling.
       intro hwp
       rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support] at hwp
-      have hnf : (evalDist y).toPMF none = 0 := probFailure_eq_zero (mx := y)
-      refine ⟨⟨((a, ·) : β → α × β) <$> evalDist y, ?_⟩, ?_⟩
+      have hnf : (𝒟[y]).toPMF none = 0 := probFailure_eq_zero (mx := y)
+      refine ⟨⟨((a, ·) : β → α × β) <$> 𝒟[y], ?_⟩, ?_⟩
       · simpa [evalDist_pure] using
           (_root_.SPMF.IsCoupling.dirac_left a hnf)
       · intro z hz
@@ -148,16 +148,16 @@ instance instAnchored :
         rw [← hzeq]
         refine hwp b ?_
         exact (mem_support_iff_evalDist_apply_ne_zero y b).2
-          ((mem_support_iff_evalDist_apply_ne_zero (evalDist y) b).1 hb)
+          ((mem_support_iff_evalDist_apply_ne_zero (𝒟[y]) b).1 hb)
   rwp_pure_right {α β} x b post := by
     apply propext
     constructor
     · rintro ⟨c, hc⟩
       rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support]
       intro a ha
-      have hcPure : _root_.SPMF.IsCoupling c.1 (evalDist x) (pure b) := by
+      have hcPure : _root_.SPMF.IsCoupling c.1 (𝒟[x]) (pure b) := by
         simpa [evalDist_pure] using c.2
-      have hpos : (evalDist x) a ≠ 0 :=
+      have hpos : (𝒟[x]) a ≠ 0 :=
         (mem_support_iff_evalDist_apply_ne_zero x a).1 ha
       have hmass : c.1 (a, b) ≠ 0 := by
         rw [hcPure.apply_pure_right_eq a]; exact hpos
@@ -165,8 +165,8 @@ instance instAnchored :
       exact hc (a, b) hmem
     · intro hwp
       rw [OracleComp.ProgramLogic.PropLogic.wp_iff_forall_support] at hwp
-      have hnf : (evalDist x).toPMF none = 0 := probFailure_eq_zero (mx := x)
-      refine ⟨⟨((·, b) : α → α × β) <$> evalDist x, ?_⟩, ?_⟩
+      have hnf : (𝒟[x]).toPMF none = 0 := probFailure_eq_zero (mx := x)
+      refine ⟨⟨((·, b) : α → α × β) <$> 𝒟[x], ?_⟩, ?_⟩
       · simpa [evalDist_pure] using
           (_root_.SPMF.IsCoupling.dirac_right b hnf)
       · intro z hz
@@ -175,7 +175,7 @@ instance instAnchored :
         rw [← hzeq]
         refine hwp a ?_
         exact (mem_support_iff_evalDist_apply_ne_zero x a).2
-          ((mem_support_iff_evalDist_apply_ne_zero (evalDist x) a).1 ha)
+          ((mem_support_iff_evalDist_apply_ne_zero (𝒟[x]) a).1 ha)
 
 /-- Relational weakest precondition induced by `MAlgRelOrdered` for `OracleComp`. -/
 abbrev RelWP (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
@@ -204,7 +204,7 @@ abbrev RelTriple (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
 
 /-- Existence of an `SPMF` coupling witness between two computations. -/
 def HasCoupling (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) : Prop :=
-  Nonempty (_root_.SPMF.Coupling (evalDist oa) (evalDist ob))
+  Nonempty (_root_.SPMF.Coupling (𝒟[oa]) (𝒟[ob]))
 
 /-- Any relational triple yields a coupling witness. -/
 lemma hasCoupling_of_relTriple {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
@@ -225,10 +225,10 @@ lemma relTriple_pure_pure {a : α} {b : β} {R : RelPost α β} (h : R a b) :
 lemma relTriple_refl (oa : OracleComp spec₁ α) :
     RelTriple (spec₁ := spec₁) (spec₂ := spec₁) oa oa (EqRel α) := by
   apply (relTriple_iff_relWP (oa := oa) (ob := oa) (R := EqRel α)).2
-  refine ⟨_root_.SPMF.Coupling.refl (evalDist oa), ?_⟩
+  refine ⟨_root_.SPMF.Coupling.refl (𝒟[oa]), ?_⟩
   intro z hz
   rcases (mem_support_bind_iff
-    (evalDist oa) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with ⟨a, _, hz'⟩
+    (𝒟[oa]) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with ⟨a, _, hz'⟩
   have hzEq : z = (a, a) := by
     simpa [support_pure, Set.mem_singleton_iff] using hz'
   simp [EqRel, hzEq]
@@ -253,8 +253,8 @@ closer in `tryCloseRelGoalImmediate`. -/
 lemma relTriple_true (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
     RelTriple oa ob (fun _ _ => True) := by
   apply (relTriple_iff_relWP (oa := oa) (ob := ob) (R := fun _ _ => True)).2
-  have hp : (evalDist oa).toPMF none = 0 := probFailure_eq_zero (mx := oa)
-  have hq : (evalDist ob).toPMF none = 0 := probFailure_eq_zero (mx := ob)
+  have hp : (𝒟[oa]).toPMF none = 0 := probFailure_eq_zero (mx := oa)
+  have hq : (𝒟[ob]).toPMF none = 0 := probFailure_eq_zero (mx := ob)
   exact ⟨_root_.SPMF.Coupling.prod hp hq, fun _ _ => trivial⟩
 
 /-- Any postcondition that is unconditionally true gives a valid relational triple,
@@ -263,6 +263,63 @@ lemma relTriple_post_const {oa : OracleComp spec₁ α} {ob : OracleComp spec₂
     {R : RelPost α β} (h : ∀ a b, R a b) :
     RelTriple oa ob R :=
   relTriple_post_mono (relTriple_true oa ob) (fun _ _ _ => h _ _)
+
+/-- Symmetry for relational triples, swapping the two computations and the postcondition. -/
+lemma relTriple_symm {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (h : RelTriple oa ob R) :
+    RelTriple ob oa (fun b a => R a b) := by
+  rw [relTriple_iff_relWP, relWP_iff_couplingPost] at h ⊢
+  rcases h with ⟨c, hc⟩
+  refine ⟨⟨Prod.swap <$> c.1, ?_⟩, ?_⟩
+  · constructor
+    · calc
+        Prod.fst <$> (Prod.swap <$> c.1) = Prod.snd <$> c.1 := by
+          simp [Functor.map_map]
+        _ = evalDist ob := c.2.map_snd
+    · calc
+        Prod.snd <$> (Prod.swap <$> c.1) = Prod.fst <$> c.1 := by
+          simp [Functor.map_map]
+        _ = evalDist oa := c.2.map_fst
+  · intro z hz
+    rw [support_map] at hz
+    rcases hz with ⟨z', hz', hzz⟩
+    rw [← hzz]
+    exact hc z' hz'
+
+/-- Transport a relational triple across equality of the left output distribution. -/
+lemma relTriple_of_evalDist_eq_left
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {oa' : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ β} {R : RelPost α β}
+    (heq : 𝒟[oa] = 𝒟[oa']) (h : RelTriple oa' ob R) :
+    RelTriple oa ob R := by
+  rcases (relTriple_iff_relWP (spec₁ := spec₂) (spec₂ := spec₃)
+    (oa := oa') (ob := ob) (R := R)).1 h with ⟨c, hc⟩
+  apply (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₃)
+    (oa := oa) (ob := ob) (R := R)).2
+  refine ⟨⟨c.1, ?_⟩, hc⟩
+  constructor
+  · simpa [heq] using c.2.map_fst
+  · exact c.2.map_snd
+
+/-- Transport a relational triple across equality of the right output distribution. -/
+lemma relTriple_of_evalDist_eq_right
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α}
+    {ob : OracleComp spec₂ β} {ob' : OracleComp spec₃ β}
+    {R : RelPost α β}
+    (heq : 𝒟[ob] = 𝒟[ob']) (h : RelTriple oa ob R) :
+    RelTriple oa ob' R := by
+  rcases (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₂)
+    (oa := oa) (ob := ob) (R := R)).1 h with ⟨c, hc⟩
+  apply (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₃)
+    (oa := oa) (ob := ob') (R := R)).2
+  refine ⟨⟨c.1, ?_⟩, hc⟩
+  constructor
+  · exact c.2.map_fst
+  · simpa [heq] using c.2.map_snd
 
 /-- Bind composition rule for relational triples. -/
 lemma relTriple_bind
@@ -288,17 +345,17 @@ lemma relTriple_eqRel_of_eq {oa ob : OracleComp spec₁ α}
 
 /-- Equality of evaluation distributions gives an equality-relation relational triple. -/
 lemma relTriple_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
-    (h : evalDist oa = evalDist ob) :
+    (h : 𝒟[oa] = 𝒟[ob]) :
     RelTriple oa ob (EqRel α) := by
   apply (relTriple_iff_relWP (oa := oa) (ob := ob) (R := EqRel α)).2
-  let cdiag := _root_.SPMF.Coupling.refl (evalDist oa)
+  let cdiag := _root_.SPMF.Coupling.refl (𝒟[oa])
   refine ⟨⟨cdiag.1, ?_⟩, ?_⟩
   · constructor
     · exact cdiag.2.map_fst
     · simpa [h] using cdiag.2.map_snd
   · intro z hz
     rcases (mem_support_bind_iff
-      (evalDist oa) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with ⟨a, _, hz'⟩
+      (𝒟[oa]) (fun a => (pure (a, a) : SPMF (α × α))) z).1 hz with ⟨a, _, hz'⟩
     have hzEq : z = (a, a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [EqRel, hzEq]
@@ -307,7 +364,7 @@ lemma relTriple_eqRel_of_evalDist_eq {oa : OracleComp spec₁ α} {ob : OracleCo
 lemma relTriple_of_evalDist_eq
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     {R : RelPost α α}
-    (h : evalDist oa = evalDist ob)
+    (h : 𝒟[oa] = 𝒟[ob])
     (hR : ∀ x, R x x) :
     RelTriple oa ob R := by
   refine relTriple_post_mono
@@ -324,6 +381,16 @@ lemma relTriple_eqRel_of_probOutput_eq {oa : OracleComp spec₁ α} {ob : Oracle
   relTriple_eqRel_of_evalDist_eq (spec₁ := spec₁) (spec₂ := spec₂) (oa := oa) (ob := ob)
     (evalDist_ext h)
 
+/-- Swapping two adjacent independent binds preserves the output distribution. -/
+lemma relTriple_bind_bind_swap_eqRel
+    {oa : OracleComp spec₁ α} {ob : OracleComp spec₁ β}
+    {f : α → β → OracleComp spec₁ γ} :
+    RelTriple
+      (oa >>= fun a => ob >>= fun b => f a b)
+      (ob >>= fun b => oa >>= fun a => f a b)
+      (EqRel γ) :=
+  relTriple_eqRel_of_probOutput_eq fun z => probOutput_bind_bind_swap oa ob f z
+
 /-- Equality-relation relational triples imply equality of point output probabilities. -/
 lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple oa ob (EqRel α)) (x : α) : Pr[= x | oa] = Pr[= x | ob] := by
@@ -338,8 +405,46 @@ lemma probOutput_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : Oracle
 /-- Equality-relation relational triples imply equality of evaluation distributions. -/
 lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
     (h : RelTriple oa ob (EqRel α)) :
-    evalDist oa = evalDist ob :=
+    𝒟[oa] = 𝒟[ob] :=
   evalDist_ext (fun x => probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h x)
+
+/-- Transitivity through an intermediate computation related to the left side by `EqRel`. -/
+lemma relTriple_trans_eqRel_left
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ β} {R : RelPost α β}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
+    RelTriple oa ob R :=
+  relTriple_of_evalDist_eq_left
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃)
+    (oa := oa) (oa' := mid) (ob := ob)
+    (evalDist_eq_of_relTriple_eqRel hleft) hright
+
+/-- Transitivity through an intermediate computation related to the right side by `EqRel`. -/
+lemma relTriple_trans_eqRel_right
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α}
+    {mid : OracleComp spec₂ β} {ob : OracleComp spec₃ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid R) (hright : RelTriple mid ob (EqRel β)) :
+    RelTriple oa ob R :=
+  relTriple_of_evalDist_eq_right
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃)
+    (oa := oa) (ob := mid) (ob' := ob)
+    (evalDist_eq_of_relTriple_eqRel hright) hleft
+
+/-- Transitivity of equality-relation relational triples through an intermediate computation. -/
+lemma relTriple_trans_eqRel
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ α}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob (EqRel α)) :
+    RelTriple oa ob (EqRel α) :=
+  relTriple_trans_eqRel_left
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃) hleft hright
 
 /-- Bool-specialized bridge from relational triples to game success equality. -/
 lemma probOutput_true_eq_of_relTriple_eqRel
@@ -375,7 +480,7 @@ lemma relTriple_query_bij (t : spec₁.Domain)
     (oa := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
     (ob := (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
     (R := fun a b => f a = b)).2
-  refine ⟨⟨evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fun a =>
+  refine ⟨⟨𝒟[(liftM (query t) : OracleComp spec₁ (spec₁.Range t))] >>= fun a =>
       pure (a, f a), ?_⟩, ?_⟩
   · constructor
     · simp
@@ -388,12 +493,33 @@ lemma relTriple_query_bij (t : spec₁.Domain)
       exact PMF.uniformOfFintype_map_of_bijective f hf
   · intro z hz
     rcases (mem_support_bind_iff
-      (evalDist (liftM (query t) : OracleComp spec₁ (spec₁.Range t)))
+      (𝒟[(liftM (query t) : OracleComp spec₁ (spec₁.Range t))])
       (fun a => (pure (a, f a) : SPMF ((spec₁.Range t) × (spec₁.Range t)))) z).1 hz with
       ⟨a, _, hz'⟩
     have hzEq : z = (a, f a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [hzEq]
+
+/-- Bind rule specialized to two equal oracle queries coupled by a bijection.
+
+The continuation is stated over the left sample only, with the right sample
+already rewritten to `f a`. This is the stable continuation shape used by
+the relational tactic for unary bijection hints. -/
+lemma relTriple_bind_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    {fa : spec₁.Range t → OracleComp spec₁ γ}
+    {fb : spec₁.Range t → OracleComp spec₁ δ}
+    {S : RelPost γ δ}
+    (hfg : ∀ a, RelTriple (fa a) (fb (f a)) S)
+    (hf : Function.Bijective f) :
+    RelTriple
+      ((liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fa)
+      ((liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fb)
+      S := by
+  refine relTriple_bind (R := fun a b => b = f a) ?_ ?_
+  · exact relTriple_post_mono (relTriple_query_bij t hf) (fun _ _ h => h.symm)
+  · intro a b hb
+    simpa [hb] using hfg a
 
 lemma relTriple_map {R : RelPost γ δ}
     {f : α → γ} {g : β → δ}
@@ -412,7 +538,7 @@ lemma evalDist_map_eq_of_relTriple {σ : Type}
     {f : α → σ} {g : β → σ}
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     (h : RelTriple oa ob (fun a b => f a = g b)) :
-    evalDist (f <$> oa) = evalDist (g <$> ob) :=
+    𝒟[f <$> oa] = 𝒟[g <$> ob] :=
   evalDist_eq_of_relTriple_eqRel (relTriple_map (R := EqRel σ) h)
 
 private lemma list_eq_of_forall₂_eqRel {xs ys : List α}
@@ -580,18 +706,18 @@ lemma relTriple_uniformSample_bij
     (oa := ($ᵗ α : ProbComp α))
     (ob := ($ᵗ α : ProbComp α))
     (R := R)).2
-  refine ⟨⟨evalDist ($ᵗ α : ProbComp α) >>= fun a =>
+  refine ⟨⟨𝒟[($ᵗ α : ProbComp α)] >>= fun a =>
       pure (a, f a), ?_⟩, ?_⟩
   · constructor
     · simp
     · simp only [map_bind, map_pure]
       calc
         (do
-            let a ← evalDist ($ᵗ α : ProbComp α)
-            pure (f a)) = f <$> evalDist ($ᵗ α : ProbComp α) := rfl
-        _ = evalDist (f <$> ($ᵗ α : ProbComp α)) :=
+            let a ← 𝒟[($ᵗ α : ProbComp α)]
+            pure (f a)) = f <$> 𝒟[($ᵗ α : ProbComp α)] := rfl
+        _ = 𝒟[f <$> ($ᵗ α : ProbComp α)] :=
           (evalDist_map ($ᵗ α : ProbComp α) f).symm
-        _ = evalDist ($ᵗ α : ProbComp α) := by
+        _ = 𝒟[($ᵗ α : ProbComp α)] := by
           apply evalDist_ext
           intro x
           obtain ⟨x', rfl⟩ := hf.surjective x
@@ -600,12 +726,29 @@ lemma relTriple_uniformSample_bij
             SampleableType.probOutput_selectElem_eq (β := α) x' (f x')
   · intro z hz
     rcases (mem_support_bind_iff
-      (evalDist ($ᵗ α : ProbComp α))
+      (𝒟[($ᵗ α : ProbComp α)])
       (fun a => (pure (a, f a) : SPMF (α × α))) z).1 hz with
       ⟨a, _, hz'⟩
     have hzEq : z = (a, f a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simpa [hzEq] using hR a
+
+/-- Bind rule specialized to two uniform samples coupled by a bijection.
+
+The continuation is stated over the left sample only, with the right sample
+already rewritten to `f a`. This avoids exposing an auxiliary equality witness
+to proof scripts after `rvcstep using f`. -/
+lemma relTriple_bind_uniformSample_bij
+    {f : α → α}
+    {fa : α → ProbComp γ} {fb : α → ProbComp δ}
+    {S : RelPost γ δ}
+    (hfg : ∀ a, RelTriple (fa a) (fb (f a)) S)
+    (hf : Function.Bijective f) :
+    RelTriple (($ᵗ α : ProbComp α) >>= fa) (($ᵗ α : ProbComp α) >>= fb) S := by
+  refine relTriple_bind (R := fun a b => b = f a) ?_ ?_
+  · exact relTriple_uniformSample_bij hf _ (fun _ => rfl)
+  · intro a b hb
+    simpa [hb] using hfg a
 
 /-- Identity coupling for uniform sampling. -/
 lemma relTriple_uniformSample_refl :

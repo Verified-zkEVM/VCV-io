@@ -118,7 +118,7 @@ example
     (impl₂ : QueryImpl spec (StateT σ (OracleComp spec)))
     (oa : OracleComp spec α)
     (himpl : ∀ (t : spec.Domain) (s : σ),
-      evalDist ((impl₁ t).run s) = evalDist ((impl₂ t).run s))
+      𝒟[(impl₁ t).run s] = 𝒟[(impl₂ t).run s])
     (s₁ s₂ : σ) (hs : s₁ = s₂) :
     ⟪(simulateQ impl₁ oa).run' s₁
      ~ (simulateQ impl₂ oa).run' s₂
@@ -150,7 +150,8 @@ example [SampleableType α]
     (f <$> ($ᵗ α : ProbComp α)) ≡ₚ ($ᵗ α : ProbComp α) := by
   conv_rhs => rw [← id_map ($ᵗ α : ProbComp α)]
   by_equiv
-  rvcgen
+  rvcstep using f
+  exact hf
 
 example {oa₁ oa₂ : OracleComp spec α}
     {f₁ f₂ : α → OracleComp spec β}
@@ -184,7 +185,7 @@ variable {ι : Type} {spec : OracleSpec ι} [spec.Fintype] [spec.Inhabited]
 variable {α : Type}
 
 example {oa ob : OracleComp spec α}
-    (h : evalDist oa = evalDist ob) :
+    (h : 𝒟[oa] = 𝒟[ob]) :
     ⟪oa ~ ob | EqRel α⟫ := by
   rel_dist
   exact h

@@ -8,6 +8,7 @@ import VCVio.ProgramLogic.Unary.HoareTriple
 import VCVio.EvalDist.TVDist
 import VCVio.ProgramLogic.Relational.Basic
 import VCVio.ProgramLogic.Relational.QuantitativeDefs
+import ToMathlib.Control.Monad.RelWP
 
 /-!
 # Ergonomic Notation and Convenience Layer for Program Logic
@@ -20,8 +21,8 @@ The canonical proof mode lives in `VCVio/ProgramLogic/Tactics.lean`.
 
 ## Notation (activate with `open scoped OracleComp.ProgramLogic`)
 
-### Prop indicator (Std.Do-inspired)
-- `⌜P⌝` — inject `Prop` into `ℝ≥0∞` (1 if true, 0 if false)
+### Prop indicator
+- `𝟙⟦P⟧` — inject `Prop` into `ℝ≥0∞` (1 if true, 0 if false)
 
 ### Unary (Std.Do-inspired)
 - `wp⟦c⟧` — quantitative WP (partial application, use as `wp⟦c⟧ post`)
@@ -56,7 +57,7 @@ variable {α β : Type}
 
 /-- Two games have the same output distribution. -/
 def GameEquiv (g₁ g₂ : OracleComp spec₁ α) : Prop :=
-  evalDist g₁ = evalDist g₂
+  𝒟[g₁] = 𝒟[g₂]
 
 /-- Advantage of a Boolean game is at most `ε` (measured as deviation from 1/2). -/
 def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
@@ -73,14 +74,15 @@ def AdvBound (game : OracleComp spec₁ Bool) (ε : ℝ) : Prop :=
 
 theorem GameEquiv.probOutput_eq {g₁ g₂ : OracleComp spec₁ α}
     (h : GameEquiv g₁ g₂) (x : α) : Pr[= x | g₁] = Pr[= x | g₂] := by
-  change evalDist g₁ x = evalDist g₂ x
+  change 𝒟[g₁] x = 𝒟[g₂] x
   rw [h]
 
 /-! ## Prop-to-ℝ≥0∞ indicator -/
 
 open scoped Classical in
 /-- Indicator embedding: lifts `P : Prop` into `ℝ≥0∞` as `1` (true) or `0` (false).
-This is the quantitative analogue of Std.Do's `⌜P⌝ : SPred`. -/
+This is the quantitative analogue of Loom's pure proposition assertion, but
+targets the expectation carrier rather than the current assertion lattice. -/
 noncomputable def propInd (P : Prop) : ℝ≥0∞ := if P then 1 else 0
 
 @[simp] lemma propInd_true : propInd True = 1 := if_pos trivial
@@ -127,9 +129,10 @@ lemma propInd_not {P : Prop} : propInd (¬P) = 1 - propInd P := by
 
 /-! ## Notation -/
 
-/-- Prop indicator: `⌜P⌝ = 1` if `P` holds, `0` otherwise.
-Mirrors Std.Do's `⌜P⌝ : SPred` but targets `ℝ≥0∞`. -/
-scoped notation "⌜" P "⌝" => propInd P
+/-- Numeric proposition indicator: `𝟙⟦P⟧ = 1` if `P` holds, `0` otherwise.
+This is deliberately distinct from Loom's `⌜P⌝`, which embeds propositions as
+top/bottom in the active assertion lattice. -/
+scoped notation "𝟙⟦" P "⟧" => propInd P
 
 /-- Quantitative WP notation. `wp⟦c⟧ post` directly elaborates to
 `wp c post`; `wp⟦c⟧` standalone elaborates to
@@ -142,15 +145,17 @@ scoped macro_rules
   | `(wp⟦ $c ⟧ $post:term) => `(wp $c $post)
   | `(wp⟦ $c ⟧)            => `(fun post => wp $c post)
 
-/-- Quantitative Hoare triple notation: `⦃P⦄ c ⦃Q⦄` means `Triple P c Q`,
-which is `pre ≤ wp c post` after `triple_iff_le_wp`. The wrapper avoids
-needing `open Lean.Order` at use sites: our `Triple` abbrev fixes the
-exception postcondition to `Lean.Order.bot` internally. -/
-scoped syntax:lead (name := tripleBracket)
-  "⦃" term "⦄ " term:lead " ⦃" term "⦄" : term
+/-- Raw relational WP notation.
+`rwp⟦c₁ ~ c₂ | post; epost₁, epost₂⟧` elaborates to `Std.Do'.rwp`.
+The normal assertion carrier and both exception-post carriers are inferred from
+`post`, `epost₁`, and `epost₂`, so this notation also works for stateful and
+exception-aware `RelWP` instances. -/
+scoped syntax:max (name := relWpBracket)
+  "rwp⟦" term:lead " ~ " term:lead " | " term ";" term ", " term "⟧" : term
 
-scoped macro_rules (kind := tripleBracket)
-  | `(⦃$P⦄ $c ⦃$Q⦄) => `(Triple $P $c $Q)
+scoped macro_rules (kind := relWpBracket)
+  | `(rwp⟦ $c₁ ~ $c₂ | $post; $epost₁, $epost₂ ⟧) =>
+      `(Std.Do'.rwp $c₁ $c₂ $post $epost₁ $epost₂)
 
 /-- Game equivalence: `g₁ ≡ₚ g₂` means `evalDist g₁ = evalDist g₂`.
 Uses `syntax` + `macro_rules` because `≡` conflicts with Mathlib's
@@ -166,42 +171,45 @@ scoped notation "⟪" c₁ " ≈[" ε "] " c₂ " | " R "⟫" =>
   Relational.ApproxRelTriple ε c₁ c₂ R
 
 /-- eRHL quantitative relational triple:
-`⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` means `eRelTriple f c₁ c₂ g`. -/
+`⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄` means the quantitative `Std.Do'.RelTriple` form. -/
 scoped syntax:lead "⦃" term "⦄ " term:lead " ≈ₑ " term:lead " ⦃" term "⦄" : term
-macro_rules | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) => `(Relational.eRelTriple $f $c₁ $c₂ $g)
+macro_rules
+  | `(⦃$f⦄ $c₁ ≈ₑ $c₂ ⦃$g⦄) =>
+      `(Std.Do'.RelTriple $f $c₁ $c₂ $g Lean.Order.bot Lean.Order.bot)
 
-/-! ## Bridge lemmas: `⌜⌝` and existing API -/
+/-! ## Bridge lemmas: numeric indicators and existing API -/
 
 /-- `probEvent` equals WP of propInd postcondition. -/
 lemma probEvent_eq_wp_propInd {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Pr[ p | oa] = wp oa (fun x => ⌜p x⌝) := by
+    Pr[ p | oa] = wp oa (fun x => 𝟙⟦p x⟧) := by
   classical
   have h := probEvent_eq_wp_indicator oa p
   simp only [propInd_eq_ite] at *
   exact h
 
-/-- `RelPost.indicator` is pointwise `⌜⌝`. -/
+/-- `RelPost.indicator` is pointwise `𝟙⟦_⟧`. -/
 lemma Relational.RelPost.indicator_eq_propInd {α β : Type}
     (R : Relational.RelPost α β) (a : α) (b : β) :
-    Relational.RelPost.indicator R a b = ⌜R a b⌝ := by
+    Relational.RelPost.indicator R a b = 𝟙⟦R a b⟧ := by
   simp [Relational.RelPost.indicator, propInd]
 
-/-- Almost-sure correctness: `⦃⌜True⌝⦄ c ⦃fun x => ⌜p x⌝⦄` iff `Pr[ p | c] = 1`. -/
+/-- Almost-sure correctness: `Triple 𝟙⟦True⟧ c (fun x => 𝟙⟦p x⟧)` iff
+`Pr[ p | c] = 1`. -/
 lemma triple_propInd_iff_probEvent_eq_one {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) :
-    Triple (⌜True⌝ : ℝ≥0∞) oa (fun x => ⌜p x⌝) ↔
+    Triple (𝟙⟦True⟧ : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) ↔
       Pr[ p | oa] = 1 := by
   rw [triple_iff_le_wp, propInd_true, ← probEvent_eq_wp_propInd]
   exact one_le_probEvent_iff
 
-/-- Lower-bound event goals are exactly quantitative triples with `⌜p⌝` postconditions. -/
+/-- Lower-bound event goals are exactly quantitative triples with indicator postconditions. -/
 lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (r : ℝ≥0∞) :
-    Triple r oa (fun x => ⌜p x⌝) ↔ r ≤ Pr[ p | oa] := by
+    Triple r oa (fun x => 𝟙⟦p x⟧) ↔ r ≤ Pr[ p | oa] := by
   rw [triple_iff_le_wp, ← probEvent_eq_wp_propInd]
 
 /-! ## Expectation-level bridge lemmas -/
@@ -210,9 +218,9 @@ lemma triple_propInd_iff_le_probEvent {ι : Type u} {spec : OracleSpec ι}
 theorem wp_propInd_or_le {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p q : α → Prop) :
-    wp oa (fun x => ⌜p x ∨ q x⌝) ≤
-        wp oa (fun x => ⌜p x⌝) +
-          wp oa (fun x => ⌜q x⌝) := by
+    wp oa (fun x => 𝟙⟦p x ∨ q x⟧) ≤
+        wp oa (fun x => 𝟙⟦p x⟧) +
+          wp oa (fun x => 𝟙⟦q x⟧) := by
   rw [← probEvent_eq_wp_propInd, ← probEvent_eq_wp_propInd, ← probEvent_eq_wp_propInd]
   exact probEvent_or_le _ _ _
 
@@ -241,8 +249,8 @@ theorem markov_bound {ι : Type u} {spec : OracleSpec ι}
 theorem triple_propInd_of_support {ι : Type u} {spec : OracleSpec ι}
     [spec.Fintype] [spec.Inhabited] {α : Type}
     (oa : OracleComp spec α) (p : α → Prop) (h : ∀ x ∈ support oa, p x) :
-    Triple (1 : ℝ≥0∞) oa (fun x => ⌜p x⌝) := by
-  rw [show (1 : ℝ≥0∞) = ⌜True⌝ from propInd_true.symm]
+    Triple (1 : ℝ≥0∞) oa (fun x => 𝟙⟦p x⟧) := by
+  rw [show (1 : ℝ≥0∞) = 𝟙⟦True⟧ from propInd_true.symm]
   exact (triple_propInd_iff_probEvent_eq_one oa p).mpr
     (probEvent_eq_one ⟨HasEvalPMF.probFailure_eq_zero oa, h⟩)
 

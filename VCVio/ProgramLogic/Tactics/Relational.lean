@@ -47,9 +47,9 @@ private def runRVCGenStepWithTheoremNames
 /-- `rvcstep` applies one relational VCGen step.
 
 It first lowers `GameEquiv` / `evalDist` equality goals into relational mode, then
-tries the obvious structural relational rule on `RelTriple` / `RelWP` / `eRelTriple`
-goals: synchronized conditionals, `simulateQ`, `Functor.map`, bounded traversals,
-bind decomposition, or random/query coupling.
+tries the obvious structural relational rule on `RelTriple` / `RelWP` / quantitative
+`Std.Do'.RelTriple` goals: synchronized conditionals, `simulateQ`, `Functor.map`,
+bounded traversals, bind decomposition, or random/query coupling.
 
 `rvcstep using t` supplies the explicit witness needed for the current shape:
 - bind cut relation, where `t : α → β → Prop`
@@ -61,8 +61,37 @@ bind decomposition, or random/query coupling.
 - traversal input relation (`List.mapM` / `List.foldlM`)
 - `simulateQ` state relation
 
+`rvcstep left` and `rvcstep right` expose controlled one-sided bind steps for
+raw `Std.Do'.rwp` and folded `Std.Do'.RelTriple` goals. They do not run as part
+of default relational automation, because choosing an asynchronous split fixes a
+coupling frontier.
+
+`rvcstep sym` swaps the two sides of a qualitative `RelTriple` goal and swaps
+the relational postcondition accordingly.
+
+`rvcstep upto R` changes the current qualitative postcondition to an explicit
+intermediate relation `R`, leaving the transformed relational goal and the
+postcondition implication as subgoals.
+
+`rvcstep trans mid` introduces an explicit intermediate computation. It first
+tries the shape `oa ~ mid | EqRel _` followed by `mid ~ ob | R`, and then the
+dual shape `oa ~ mid | R` followed by `mid ~ ob | EqRel _`.
+
+`rvcstep swap left` and `rvcstep swap right` explicitly commute two adjacent
+independent binds on one side through EqRel transport. Add `using R` to
+immediately decompose the aligned residual bind with cut relation `R`.
+
 `rvcstep with thm` forces one explicit relational theorem/assumption step. -/
+syntax "rvcstep" &"swap" &"left" "using" term : tactic
+syntax "rvcstep" &"swap" &"right" "using" term : tactic
+syntax "rvcstep" &"swap" &"left" : tactic
+syntax "rvcstep" &"swap" &"right" : tactic
 syntax "rvcstep" ("using" term)? : tactic
+syntax "rvcstep" "left" : tactic
+syntax "rvcstep" "right" : tactic
+syntax "rvcstep" "sym" : tactic
+syntax "rvcstep" "upto" term : tactic
+syntax "rvcstep" "trans" term : tactic
 syntax "rvcstep" "with" term : tactic
 syntax "rvcstep" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
@@ -85,14 +114,50 @@ elab_rules : tactic
       if ← runRVCGenStepWithTheoremNames thm names then
         return
       TacticInternals.Relational.throwRVCGenStepError
-  | `(tactic| rvcstep) => do
-      if ← TacticInternals.Relational.runRVCGenStep then
+  | `(tactic| rvcstep swap left using $R) => do
+      if ← TacticInternals.Relational.runRelSwapLeftRuleUsing R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap right using $R) => do
+      if ← TacticInternals.Relational.runRelSwapRightRuleUsing R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap left) => do
+      if ← TacticInternals.Relational.runRelSwapLeftRule then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep swap right) => do
+      if ← TacticInternals.Relational.runRelSwapRightRule then
         return
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep using $hint) => do
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         return
       TacticInternals.Relational.throwRVCGenStepUsingError hint
+  | `(tactic| rvcstep left) => do
+      if ← TacticInternals.Relational.runRVCGenRawBindLeftStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep right) => do
+      if ← TacticInternals.Relational.runRVCGenRawBindRightStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep sym) => do
+      if ← TacticInternals.Relational.runRelSymmRule then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep upto $R) => do
+      if ← TacticInternals.Relational.runRelUptoRule R then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep trans $mid) => do
+      if ← TacticInternals.Relational.runRelTransRule mid then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep) => do
+      if ← TacticInternals.Relational.runRVCGenStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep with $thm) => do
       if ← TacticInternals.Relational.runRVCGenStepWithTheorem thm then
         return
@@ -107,16 +172,30 @@ elab_rules : tactic
 `rvcgen using t` uses the explicit hint `t` for the first step on the main goal, then
 continues with ordinary hint-free relational VCGen on all remaining goals.
 
+`rvcgen using [t₁, t₂, ...]` applies explicit cuts in sequence, introducing and
+substituting EqRel continuation equalities between cuts when present.
+
 `rvcgen with thm` forces one explicit relational theorem step on the main goal, then continues
-with ordinary hint-free relational VCGen on all remaining goals. -/
-syntax "rvcgen" ("using" term)? : tactic
+with ordinary hint-free relational VCGen on all remaining goals.
+
+`rvcfinish` runs the opt-in residual search/consequence closer.
+
+`rvcgen!` runs ordinary `rvcgen` and then `rvcfinish`. -/
+syntax "rvcgen" : tactic
+syntax (name := rvcgenUsingList) (priority := high) "rvcgen" "using" "[" term,* "]" : tactic
+syntax "rvcgen" "using" term:max : tactic
 syntax "rvcgen" "with" term : tactic
+syntax "rvcfinish" : tactic
+syntax "rvcgen!" : tactic
 syntax "rvcgen?" : tactic
 
 elab_rules : tactic
   | `(tactic| rvcgen) => withVCGenRunTiming "rvcgen" do
       discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
       withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
+  | `(tactic| rvcgen!) => withVCGenRunTiming "rvcgen!" do
+      discard <| runBoundedPasses "rvcgen!" TacticInternals.Relational.runRVCGenPass
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenSearchFinish
   | `(tactic| rvcgen using $hint) => withVCGenRunTiming "rvcgen" do
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
@@ -129,6 +208,8 @@ elab_rules : tactic
         withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
       else
         TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcfinish) => withVCGenRunTiming "rvcfinish" do
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenSearchFinish
   | `(tactic| rvcgen?) => withVCGenRunTiming "rvcgen?" do
       let batches ←
         runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
@@ -138,21 +219,21 @@ elab_rules : tactic
         batches.toList.filterMap renderPassReplayLine
       if needsFinish then
         lines := lines ++ [
-          "all_goals try simp only [game_rule]",
-          String.intercalate "" [
-            "all_goals first | assumption | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_true _ _ | ",
-            "(refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_; ",
-            "intros; trivial) | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | ",
-            "(apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)",
-          ]
+          "rvcfinish"
         ]
       if lines.isEmpty then
         lines := ["rvcgen"]
       addTryThisTextSuggestion (← getRef) <| String.intercalate "\n" lines
+
+elab_rules (kind := rvcgenUsingList) : tactic
+  | `(tactic| rvcgen using [ $hints,* ]) => withVCGenRunTiming "rvcgen" do
+      for hint in hints.getElems do
+        discard <| tryEvalTacticSyntax (← `(tactic|
+          try (intro _ _ h; subst h)))
+        unless ← TacticInternals.Relational.runRVCGenStrictStepUsing hint do
+          TacticInternals.Relational.throwRVCGenStepUsingError hint
+        discard <| tryEvalTacticSyntax (← `(tactic|
+          try (intro _ _ h; subst h)))
 
 /-- `rel_conseq` weakens or strengthens the postcondition of a `RelTriple` goal.
 

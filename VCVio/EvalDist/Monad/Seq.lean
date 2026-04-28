@@ -36,7 +36,7 @@ lemma mem_support_seq_iff [HasEvalSet m] [LawfulMonad m] (mf : m (α → β)) (m
   simp [seq_eq_bind_map]
 
 @[simp] lemma evalDist_seq [HasEvalSPMF m] [LawfulMonad m] (mf : m (α → β)) (mx : m α) :
-    evalDist (mf <*> mx) = evalDist mf <*> evalDist mx := by simp [seq_eq_bind_map]
+    𝒟[mf <*> mx] = 𝒟[mf] <*> 𝒟[mx] := by simp [seq_eq_bind_map]
 
 lemma probOutput_seq_eq_tsum [HasEvalSPMF m] [LawfulMonad m]
     (mf : m (α → β)) (mx : m α) (y : β) :
@@ -80,7 +80,7 @@ section seqLeft
   rw [seqLeft_eq, Set.ext_iff]; aesop
 
 @[simp] lemma evalDist_seqLeft [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
-    evalDist (mx <* my) = evalDist mx <* evalDist my := by
+    𝒟[mx <* my] = 𝒟[mx] <* 𝒟[my] := by
   simp [seqLeft_eq]
 
 @[simp, grind =_]
@@ -119,7 +119,7 @@ section seqRight
   rw [seqRight_eq, Set.ext_iff]; aesop
 
 @[simp] lemma evalDist_seqRight [HasEvalSPMF m] [LawfulMonad m] (mx : m α) (my : m β) :
-    evalDist (mx *> my) = evalDist mx *> evalDist my := by
+    𝒟[mx *> my] = 𝒟[mx] *> 𝒟[my] := by
   simp [seqRight_eq]
 
 @[simp, grind =_]
@@ -158,7 +158,7 @@ lemma finSupport_seq_map_eq_image2 [HasEvalSet m] [HasEvalFinset m]
   ext z; simp [seq_eq_bind_map, Finset.mem_image₂]
 
 lemma evalDist_seq_map [HasEvalSPMF m] :
-    evalDist (f <$> mx <*> my) = f <$> evalDist mx <*> evalDist my := by
+    𝒟[f <$> mx <*> my] = f <$> 𝒟[mx] <*> 𝒟[my] := by
   rw [evalDist_seq, evalDist_map]
 
 lemma probOutput_seq_map_eq_tsum [HasEvalSPMF m]
@@ -214,7 +214,7 @@ lemma probOutput_seq_map_swap [HasEvalSPMF m] (z : γ) :
   rw [mul_comm (Pr[= y' | my])]
 
 lemma evalDist_seq_map_swap [HasEvalSPMF m] :
-    evalDist (Function.swap f <$> my <*> mx) = evalDist (f <$> mx <*> my) := by
+    𝒟[Function.swap f <$> my <*> mx] = 𝒟[f <$> mx <*> my] := by
   have : DecidableEq γ := Classical.decEq γ
   exact evalDist_ext (probOutput_seq_map_swap mx my f)
 

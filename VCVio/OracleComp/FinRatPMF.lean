@@ -61,13 +61,13 @@ local instance instSpecFintypeOfFinEnum : spec.Fintype where
           simp [NNRat.cast_inv]
 
 @[simp] lemma evalDist_apply (t : spec.Domain) :
-    evalDist (finRatImpl (spec := spec) t) = liftM (PMF.uniformOfFintype (spec.Range t)) := by
+    𝒟[finRatImpl (spec := spec) t] = liftM (PMF.uniformOfFintype (spec.Range t)) := by
   rw [HasEvalPMF.evalDist_of_hasEvalPMF_def]
   change liftM (@Raw.toPMF _ (Classical.decEq _) (finRatImpl (spec := spec) t)) = _
   rw [toPMF_apply]
 
 @[simp] lemma evalDist_simulateQ {α : Type v} (oa : OracleComp spec α) :
-    evalDist (simulateQ (finRatImpl (spec := spec)) oa) = evalDist oa := by
+    𝒟[simulateQ (finRatImpl (spec := spec)) oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx h => simp [evalDist_bind, evalDist_apply, OracleComp.evalDist_query, h]

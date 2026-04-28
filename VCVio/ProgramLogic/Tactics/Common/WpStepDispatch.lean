@@ -5,6 +5,9 @@ Authors: Quang Dao
 -/
 
 import Lean.Elab.Tactic
+import Lean.Meta.Sym.Simp.Goal
+import Lean.Meta.Sym.Simp.Rewrite
+import Lean.Meta.Sym.Util
 import VCVio.ProgramLogic.Tactics.Common.WpStepRegistry
 import VCVio.ProgramLogic.Unary.SimulateQ
 
@@ -53,17 +56,77 @@ attribute [wpStep]
 
 /-! ## Dispatch -/
 
+/-- Cache of Sym rewrite theorem objects for global `@[wpStep]` declarations. -/
+initialize wpStepRewriteRuleCache :
+    IO.Ref (Std.HashMap Name Lean.Meta.Sym.Simp.Theorem) ←
+  IO.mkRef {}
+
+private def traceWpStepCacheEvent (event : String) (declName : Name) : MetaM Unit := do
+  if vcvio.vcgen.traceCachedRules.get (← getOptions) then
+    logInfo m!"[wpstep cache] {event} `{declName}`"
+
+private def getWpStepRewriteRuleCached (declName : Name) :
+    MetaM Lean.Meta.Sym.Simp.Theorem := do
+  let cache ← wpStepRewriteRuleCache.get
+  match cache[declName]? with
+  | some thm =>
+      addCachedRuleHit
+      traceWpStepCacheEvent "hit" declName
+      return thm
+  | none =>
+      addCachedRuleMiss
+      traceWpStepCacheEvent "miss" declName
+      let thm ←
+        if vcvio.vcgen.time.get (← getOptions) then
+          let (thm, ns) ← timeNs (Lean.Meta.Sym.Simp.mkTheoremFromDecl declName)
+          addCachedRuleBuildTime ns
+          return thm
+        else
+          Lean.Meta.Sym.Simp.mkTheoremFromDecl declName
+      wpStepRewriteRuleCache.modify fun cache => cache.insert declName thm
+      return thm
+
+private def wpStepMethods (thm : Lean.Meta.Sym.Simp.Theorem) :
+    Lean.Meta.Sym.Simp.Methods :=
+  let thms := ({} : Lean.Meta.Sym.Simp.Theorems).insert thm
+  { post := thms.rewrite }
+
+/-- Apply a cached Sym rewrite theorem to the current goal target. -/
+private def runWpStepRewriteRule (declName : Name) : TacticM Bool := do
+  match ← getGoals with
+  | [] => return false
+  | goal :: rest =>
+      let thm ← liftMetaM <| getWpStepRewriteRuleCached declName
+      match ← observing? do
+          liftMetaM <| Lean.Meta.Sym.SymM.run do
+            let goal ← Lean.Meta.Sym.preprocessMVar goal
+            Lean.Meta.Sym.simpGoal goal (wpStepMethods thm)
+        with
+      | none => return false
+      | some .noProgress => return false
+      | some .closed =>
+          setGoals rest
+          return true
+      | some (.goal goal') =>
+          setGoals [goal']
+          discard <| tryEvalTacticSyntax (← `(tactic| rfl))
+          let goals ← getGoals
+          setGoals (goals ++ rest)
+          return true
+
+private def mergeWpStepCandidateEntries (preferred fallback : Array WpStepEntry) :
+    Array WpStepEntry :=
+  fallback.foldl (init := preferred) fun entries entry =>
+    let duplicate := entries.any fun existing =>
+      existing.declName? == entry.declName?
+    if duplicate then entries else entries.push entry
+
 /-- Advance a `wp`-shaped goal by one rewrite, dispatching via the `@[wpStep]`
 registry.
 
-Locates the `wp oa post` sub-expression of the main target, normalizes its
-`oa` argument, asks the registry for rules whose LHS `comp` pattern matches,
-and tries each candidate in turn. The candidates are fed as `rw` / `simp only`
-arguments; the Sym-side discrimination tree is consulted for lookup rather
-than Lean's standard `DiscrTree`, so we benefit from `Sym.Pattern`'s
-normalizing preprocessing without yet fully handing the goal over to the
-`SymM` rewriter (that requires a `SymM → TacticM` proof-application bridge
-we defer to a later phase, to keep behavior stable against Sym churn).
+Locates the `wp oa post` sub-expression of the main target, first asks the
+registry for syntactic candidates, and then appends normalized fallback
+candidates. Each candidate is tried through the cached `SymM` rewrite path.
 
 Returns `false` when no candidate succeeds, or when the goal contains no `wp`
 application at all. -/
@@ -74,13 +137,13 @@ def runWpStepRules : TacticM Bool := withVCGenWpStepTiming do
   let argCount := wpApp.getAppNumArgs
   if argCount < 2 then return false
   let oa := wpApp.getArg! (argCount - 2)
-  let entries ← getRegisteredWpStepEntries oa
+  let entries :=
+    mergeWpStepCandidateEntries
+      (← getRegisteredWpStepEntriesNoWhnf oa)
+      (← getRegisteredWpStepEntries oa)
   for entry in entries do
     let some declName := entry.declName? | continue
-    let rwStx ← `(tactic| rw [$(mkIdent declName):ident])
-    if ← tryEvalTacticSyntax rwStx then return true
-    let simpStx ← `(tactic| simp only [$(mkIdent declName):ident])
-    if ← tryEvalTacticSyntax simpStx then return true
+    if ← runWpStepRewriteRule declName then return true
   return false
 
 end OracleComp.ProgramLogic

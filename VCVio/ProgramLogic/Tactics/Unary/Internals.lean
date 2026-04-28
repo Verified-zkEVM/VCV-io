@@ -6,8 +6,8 @@ Authors: Quang Dao
 
 import VCVio.ProgramLogic.Tactics.Common
 import VCVio.ProgramLogic.Relational.Basic
-import VCVio.ProgramLogic.Tactics.Experimental.UnifiedLSpecBackward
 import VCVio.ProgramLogic.Tactics.Relational.Internals
+import Loom.Triple.SpecLemmas
 
 /-!
 # Unary VCGen Internals
@@ -21,7 +21,512 @@ namespace OracleComp.ProgramLogic
 namespace TacticInternals
 namespace Unary
 
-attribute [lspec_spike] OracleComp.ProgramLogic.triple_pure
+universe u v
+
+/-- Cached raw-`wp` structural leaf for `pure`.
+
+The equality theorem `wp_pure` remains the canonical rewrite rule.
+This lower-bound form lets raw `wp` goals use the cached `@[vcspec]`
+backward-rule path before falling back to `@[wpStep]`. -/
+theorem wp_pure_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (x : α)
+    (post : α → ENNReal) :
+    post x ≤ wp (pure x : OracleComp spec α) post := by
+  rw [OracleComp.ProgramLogic.wp_pure]
+
+/-- Cached raw-`wp` structural leaf for functorial map. -/
+theorem wp_map_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α β : Type}
+    (f : α → β) (oa : OracleComp spec α) (post : β → ENNReal) :
+    wp oa (post ∘ f) ≤ wp (f <$> oa) post := by
+  rw [OracleComp.ProgramLogic.wp_map]
+
+/-- Cached raw-`wp` structural leaf for conditionals. -/
+theorem wp_ite_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (c : Prop) [Decidable c]
+    (oa ob : OracleComp spec α) (post : α → ENNReal) :
+    (if c then wp oa post else wp ob post) ≤ wp (if c then oa else ob) post := by
+  rw [OracleComp.ProgramLogic.wp_ite]
+
+/-- Cached raw-`wp` structural leaf for dependent conditionals. -/
+theorem wp_dite_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type} (c : Prop) [Decidable c]
+    (oa : c → OracleComp spec α) (ob : ¬c → OracleComp spec α) (post : α → ENNReal) :
+    (if h : c then wp (oa h) post else wp (ob h) post) ≤ wp (dite c oa ob) post := by
+  rw [OracleComp.ProgramLogic.wp_dite]
+
+/-- Cached raw-`wp` structural leaf for `replicate (n + 1)`. -/
+theorem wp_replicate_succ_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type}
+    (oa : OracleComp spec α) (n : Nat) (post : List α → ENNReal) :
+    wp oa (fun x => wp (oa.replicate n) (fun xs => post (x :: xs))) ≤
+      wp (oa.replicate (n + 1)) post := by
+  rw [OracleComp.ProgramLogic.wp_replicate_succ]
+
+/-- Cached raw-`wp` structural leaf for `List.mapM` on `x :: xs`. -/
+theorem wp_list_mapM_cons_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α β : Type}
+    (x : α) (xs : List α) (f : α → OracleComp spec β) (post : List β → ENNReal) :
+    wp (f x) (fun y => wp (xs.mapM f) (fun ys => post (y :: ys))) ≤
+      wp ((x :: xs).mapM f) post := by
+  rw [OracleComp.ProgramLogic.wp_list_mapM_cons]
+
+/-- Cached raw-`wp` structural leaf for `List.foldlM` on `x :: xs`. -/
+theorem wp_list_foldlM_cons_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α σ : Type}
+    (x : α) (xs : List α) (f : σ → α → OracleComp spec σ)
+    (init : σ) (post : σ → ENNReal) :
+    wp (f init x) (fun s => wp (xs.foldlM f s) post) ≤
+      wp ((x :: xs).foldlM f init) post := by
+  rw [OracleComp.ProgramLogic.wp_list_foldlM_cons]
+
+/-- Cached raw-`wp` structural leaf for oracle queries. -/
+theorem wp_query_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    (t : spec.Domain) (post : spec.Range t → ENNReal) :
+    (∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ENNReal) * post u) ≤
+      wp (query t : OracleComp spec (spec.Range t)) post := by
+  simpa using le_of_eq (OracleComp.ProgramLogic.wp_HasQuery_query (spec := spec) t post).symm
+
+/-- Cached raw-`wp` structural leaf for `HasQuery.query`. -/
+theorem wp_HasQuery_query_le_vcspec {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    (t : spec.Domain) (post : spec.Range t → ENNReal) :
+    (∑' u : spec.Range t, (1 / Fintype.card (spec.Range t) : ENNReal) * post u) ≤
+      wp (spec := spec) (HasQuery.query t : OracleComp spec (spec.Range t)) post := by
+  simpa using le_of_eq (OracleComp.ProgramLogic.wp_HasQuery_query (spec := spec) t post).symm
+
+/-- Cached raw-`wp` structural leaf for uniform sampling. -/
+theorem wp_uniformSample_le_vcspec {α : Type} [SampleableType α] (post : α → ENNReal) :
+    (∑' u : α, Pr[= u | ($ᵗ α : ProbComp α)] * post u) ≤
+      wp ($ᵗ α : ProbComp α) post := by
+  rw [OracleComp.ProgramLogic.wp_uniformSample]
+
+/-- Generic Loom triple bind step with the intermediate postcondition fixed to
+the weakest precondition of the continuation. This is the `Std.Do'.Triple`
+counterpart of `OracleComp.ProgramLogic.triple_bind_wp`, and lets unary
+automation walk transformer-stack `do` blocks without guessing a user cut. -/
+theorem stdDoTriple_bind_wp {m : Type u → Type v}
+    {Pred EPred : Type u} {α β : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {pre : Pred} (x : m α) (f : α → m β) (post : β → Pred) (epost : EPred) :
+    Std.Do'.Triple pre x (fun a => Std.Do'.wp (f a) post epost) epost →
+      Std.Do'.Triple pre (x >>= f) post epost := by
+  intro h
+  exact Std.Do'.Triple.bind x f (fun a => Std.Do'.wp (f a) post epost) h
+    (fun _ => Std.Do'.Triple.iff.mpr Lean.Order.PartialOrder.rel_refl)
+
+/-- Close a Loom triple from the corresponding WP entailment.
+
+This is just `Std.Do'.Triple.iff.mpr` packaged as a theorem so tactic code can expose
+the weakest-precondition side condition and then run transformer-specific WP normalizers. -/
+theorem stdDoTriple_of_wp_le {m : Type u → Type v}
+    {Pred EPred : Type u} {α : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {pre : Pred} (x : m α) (post : α → Pred) (epost : EPred)
+    (hpre : Lean.Order.PartialOrder.rel pre (Std.Do'.wp x post epost)) :
+    Std.Do'.Triple pre x post epost :=
+  Std.Do'.Triple.iff.mpr hpre
+
+theorem wp_StateT_get_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadStateOf.get : StateT σ m σ) post epost =
+      fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
+        (fun p : σ × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
+      (fun p : σ × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+  rfl
+
+theorem wp_StateT_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (StateT.get : StateT σ m σ) post epost =
+      fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
+        (fun p : σ × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
+      (fun p : σ × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+  rfl
+
+theorem stdDoTriple_StateT_get_of_rel {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (pre : σ → Pred) (post : σ → σ → Pred) (epost : EPred)
+    (h : ∀ s, Lean.Order.PartialOrder.rel (pre s) (post s s)) :
+    Std.Do'.Triple pre (StateT.get : StateT σ m σ) post epost := by
+  refine Std.Do'.Triple.iff.mpr ?_
+  intro s
+  change Lean.Order.PartialOrder.rel (pre s)
+    (Std.Do'.wp (pure (s, s) : m (σ × σ))
+      (fun p : σ × σ => post p.1 p.2) epost)
+  exact Lean.Order.PartialOrder.rel_trans (h s)
+    (Std.Do'.WP.wp_pure (m := m) (x := (s, s))
+      (post := fun p : σ × σ => post p.1 p.2) (epost := epost))
+
+theorem wp_StateT_set_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadStateOf.set s' : StateT σ m PUnit) post epost =
+      fun _ => Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
+      (fun p : PUnit × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+      (fun p : PUnit × σ => post p.1 p.2) epost
+  rfl
+
+theorem wp_StateT_run_get_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
+        (fun p : σ × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
+        (fun p : σ × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_set_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
+        (fun p : PUnit × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_set_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((StateT.set s' : StateT σ m PUnit).run s)
+        (fun p : PUnit × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ α β : Type u} (f : α → β) (x : StateT σ m α) (post : β → σ → Pred)
+    (epost : EPred) :
+    Std.Do'.wp (f <$> x) post epost =
+      fun s => Std.Do'.wp ((f <$> x).run s)
+        (fun p : β × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_ReaderT_read_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadReaderOf.read : ReaderT ρ m ρ) post epost =
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
+  funext r
+  change Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r)
+      (fun a : ρ => post a r) epost =
+    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+  rfl
+
+theorem wp_ReaderT_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp (ReaderT.read : ReaderT ρ m ρ) post epost =
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
+  funext r
+  change Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r)
+      (fun a : ρ => post a r) epost =
+    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+  rfl
+
+theorem stdDoTriple_ReaderT_read_of_rel {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (pre : ρ → Pred) (post : ρ → ρ → Pred) (epost : EPred)
+    (h : ∀ r, Lean.Order.PartialOrder.rel (pre r) (post r r)) :
+    Std.Do'.Triple pre (MonadReaderOf.read : ReaderT ρ m ρ) post epost := by
+  refine Std.Do'.Triple.iff.mpr ?_
+  intro r
+  change Lean.Order.PartialOrder.rel (pre r)
+    (Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost)
+  exact Lean.Order.PartialOrder.rel_trans (h r)
+    (Std.Do'.WP.wp_pure (m := m) (x := r)
+      (post := fun a : ρ => post a r) (epost := epost))
+
+theorem wp_ReaderT_run_read_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
+        epost =
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+  rfl
+
+theorem wp_ReaderT_run_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
+        epost =
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+  rfl
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_get {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ : Type} (s : σ)
+    (post : σ → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((StateT.get : StateT σ (OptionT (OracleComp spec)) σ).run s).run)
+      (epost.pushOption (fun p : σ × σ => post p.1 p.2)) = post s s := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (pure (some (s, s)) : OracleComp spec (Option (σ × σ)))
+      (epost.pushOption (fun p : σ × σ => post p.1 p.2)) = post s s
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_set {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ : Type} (s s' : σ)
+    (post : PUnit → σ → ENNReal) (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((StateT.set s' : StateT σ (OptionT (OracleComp spec)) PUnit).run s).run)
+      (epost.pushOption (fun p : PUnit × σ => post p.1 p.2)) = post PUnit.unit s' := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (pure (some (PUnit.unit, s')) : OracleComp spec (Option (PUnit × σ)))
+      (epost.pushOption (fun p : PUnit × σ => post p.1 p.2)) = post PUnit.unit s'
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_lift {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type}
+    (oa : OracleComp spec α) (post : α → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) (OptionT.lift oa).run
+      (epost.pushOption post) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa post := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (oa >>= fun a => pure (some a) : OracleComp spec (Option α))
+      (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa post
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift {ι : Type u}
+    {spec : OracleSpec ι} [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    {σ α : Type} (oa : OracleComp spec α) (s : σ) (post : α → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (epost.pushOption (fun p : α × σ => post p.1 p.2)) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa (fun a => post a s) := by
+  simp [MonadLift.monadLift, OptionT.run_lift, MAlgOrdered.wp_map,
+    Std.Do'.EPost.cons.pushOption]
+
+theorem wp_StateT_OptionT_monadLift_lift {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ α : Type}
+    (oa : OracleComp spec α) (post : α → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    Std.Do'.wp
+      (MonadLift.monadLift (OptionT.lift oa) : StateT σ (OptionT (OracleComp spec)) α)
+      post epost =
+        fun s => MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa
+          (fun a => post a s) := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (epost.pushOption (fun p : α × σ => post p.1 p.2)) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa (fun a => post a s)
+  exact mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift (spec := spec) oa s post epost
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map {ι : Type u}
+    {spec : OracleSpec ι} [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    {σ α β : Type} (oa : OracleComp spec α) (s : σ) (f : α × σ → β)
+    (post : β → ENNReal) (nonePost : ENNReal) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (fun o => match Option.map f o with | some b => post b | none => nonePost) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa
+          (fun a => post (f (a, s))) := by
+  simp [MonadLift.monadLift, OptionT.run_lift, MAlgOrdered.wp_map]
+
+theorem wp_ReaderT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ α β : Type u} (f : α → β) (x : ReaderT ρ m α) (post : β → ρ → Pred)
+    (epost : EPred) :
+    Std.Do'.wp (f <$> x) post epost =
+      fun r => Std.Do'.wp ((f <$> x).run r) (fun b : β => post b r) epost := by
+  rfl
+
+attribute [vcspec]
+  OracleComp.ProgramLogic.triple_pure
+  wp_pure_le_vcspec
+  wp_map_le_vcspec
+  wp_ite_le_vcspec
+  wp_dite_le_vcspec
+  wp_replicate_succ_le_vcspec
+  wp_list_mapM_cons_le_vcspec
+  wp_list_foldlM_cons_le_vcspec
+  wp_query_le_vcspec
+  wp_HasQuery_query_le_vcspec
+  wp_uniformSample_le_vcspec
+  -- StateT
+  Std.Do'.Spec.get_StateT
+  Std.Do'.Spec.set_StateT
+  Std.Do'.Spec.modifyGet_StateT
+  Std.Do'.Spec.monadLift_StateT
+  -- ReaderT
+  Std.Do'.Spec.read_ReaderT
+  Std.Do'.Spec.monadLift_ReaderT
+  Std.Do'.Spec.adapt_ReaderT
+  Std.Do'.Spec.withReader_ReaderT
+  -- WriterT
+  Std.Do'.Spec.tell_WriterT
+  Std.Do'.Spec.monadLift_WriterT
+  Std.Do'.Spec.mk_WriterT
+  Std.Do'.WriterT.wp_pure
+  Std.Do'.WriterT.wp_bind
+  Std.Do'.WriterT.wp_tell
+  Std.Do'.WriterT.wp_monadLift
+  Std.Do'.WriterT.wp_map
+  -- OptionT
+  Std.Do'.Spec.run_OptionT
+  Std.Do'.Spec.throw_OptionT
+  Std.Do'.Spec.tryCatch_OptionT
+  Std.Do'.Spec.orElse_OptionT
+  Std.Do'.Spec.monadLift_OptionT
+  -- ExceptT
+  Std.Do'.Spec.run_ExceptT
+  Std.Do'.Spec.throw_ExceptT
+  Std.Do'.Spec.tryCatch_ExceptT
+  Std.Do'.Spec.orElse_ExceptT
+  Std.Do'.Spec.adapt_ExceptT
+  Std.Do'.Spec.monadLift_ExceptT
+  -- Lifted MonadExceptOf
+  Std.Do'.Spec.throw_MonadExcept
+  Std.Do'.Spec.tryCatch_MonadExcept
+  Std.Do'.Spec.throw_ReaderT
+  Std.Do'.Spec.throw_StateT
+  Std.Do'.Spec.throw_ExceptT_lift
+  Std.Do'.Spec.throw_Option_lift
+  Std.Do'.Spec.tryCatch_ReaderT
+  Std.Do'.Spec.tryCatch_StateT
+  Std.Do'.Spec.tryCatch_ExceptT_lift
+  Std.Do'.Spec.tryCatch_OptionT_lift
+  -- Generic monad-transformer hooks
+  Std.Do'.Spec.monadMap_StateT
+  Std.Do'.Spec.monadMap_ReaderT
+  Std.Do'.Spec.monadMap_ExceptT
+  Std.Do'.Spec.monadMap_OptionT
+  Std.Do'.Spec.monadMap_refl
+  Std.Do'.Spec.monadMap_trans
+  Std.Do'.Spec.liftWith_StateT
+  Std.Do'.Spec.liftWith_ReaderT
+  Std.Do'.Spec.liftWith_ExceptT
+  Std.Do'.Spec.liftWith_OptionT
+  Std.Do'.Spec.liftWith_refl
+  Std.Do'.Spec.liftWith_trans
+  Std.Do'.Spec.restoreM_StateT
+  Std.Do'.Spec.restoreM_ReaderT
+  Std.Do'.Spec.restoreM_ExceptT
+  Std.Do'.Spec.restoreM_OptionT
+  Std.Do'.Spec.restoreM_refl
+
+/-! ## `vcspec_simp` normalization set
+
+Centralized registration of the transformer-`wp` peel lemmas, `*.run`
+projections, monadic-algebra rewrites, and the `Loom.wp_eq_mAlgOrdered_wp`
+bridges that the unary tactic uses to expose spec-applicable goal shapes.
+The single simp set is consumed by `runVCSpecSimp`. New normalization rewrites
+should be tagged here (or at definition) rather than inserted into a
+tactic-local `simp only [...]` list. -/
+
+attribute [vcspec_simp]
+  -- `Std.Do'` transformer apply_wp / `*.run` peeling
+  Std.Do'.StateT.apply_wp
+  Std.Do'.ReaderT.apply_wp
+  Std.Do'.WriterT.apply_wp
+  StateT.run_bind StateT.run_pure StateT.run_get StateT.run_set
+  StateT.run_modifyGet StateT.run_monadLift StateT.run_map StateT.run_lift
+  ReaderT.run_bind ReaderT.run_pure ReaderT.run_monadLift ReaderT.run_read
+  ReaderT.run_map
+  WriterT.run_bind WriterT.run_pure WriterT.run_tell WriterT.run_monadLift
+  WriterT.run_liftM WriterT.run_map
+  OptionT.run_bind OptionT.run_pure OptionT.run_lift OptionT.run_failure
+  OptionT.run_map
+  ExceptT.run_bind ExceptT.run_pure ExceptT.run_lift ExceptT.run_throw
+  ExceptT.run_map
+  -- VCVio Loom bridges and the underlying quantitative `MAlgOrdered.wp`
+  OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp
+  OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost
+  MAlgOrdered.wp_bind MAlgOrdered.wp_pure MAlgOrdered.wp_map
+  -- VCVio per-transformer `Loom.wp_*` peeling lemmas
+  OracleComp.ProgramLogic.Loom.wp_StateT_bind
+  OracleComp.ProgramLogic.Loom.wp_StateT_bind'
+  OracleComp.ProgramLogic.Loom.wp_StateT_pure
+  OracleComp.ProgramLogic.Loom.wp_StateT_get
+  OracleComp.ProgramLogic.Loom.wp_StateT_set
+  OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet
+  OracleComp.ProgramLogic.Loom.wp_StateT_monadLift
+  OracleComp.ProgramLogic.Loom.wp_OptionT_bind
+  OracleComp.ProgramLogic.Loom.wp_OptionT_pure
+  OracleComp.ProgramLogic.Loom.wp_OptionT_failure
+  OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift
+  OracleComp.ProgramLogic.Loom.wp_OptionT_lift
+  OracleComp.ProgramLogic.Loom.wp_OptionT_map
+  OracleComp.ProgramLogic.Loom.wp_ExceptT_bind
+  OracleComp.ProgramLogic.Loom.wp_ExceptT_pure
+  OracleComp.ProgramLogic.Loom.wp_ExceptT_throw
+  OracleComp.ProgramLogic.Loom.wp_ExceptT_monadLift
+  OracleComp.ProgramLogic.Loom.wp_ReaderT_bind
+  OracleComp.ProgramLogic.Loom.wp_ReaderT_pure
+  OracleComp.ProgramLogic.Loom.wp_ReaderT_read
+  OracleComp.ProgramLogic.Loom.wp_ReaderT_monadLift
+  OracleComp.ProgramLogic.Loom.WriterT.wp_bind
+  OracleComp.ProgramLogic.Loom.WriterT.wp_pure
+  OracleComp.ProgramLogic.Loom.WriterT.wp_tell
+  OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift
+  OracleComp.ProgramLogic.Loom.WriterT.wp_map
+  -- VCVio transformer-internal layer lemmas (defined above in this file)
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer'
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer'
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_set_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer'
+  OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_get
+  OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_set
+  OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_lift
+  mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift
+  mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_OptionT_monadLift_lift
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_map_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer'
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer'
+  OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_map_layer
+  -- Algebraic monad/`EPost`/scalar rewrites used by both peel and close passes
+  Std.Do'.EPost.cons.pushOption
+  Std.Do'.EPost.cons.pushExcept
+  Option.elimM
+  pure_bind
+  bind_pure_comp
+  bind_map_left
+  map_bind
+  bind_assoc
+  map_pure
+  Functor.map_map
+  MonadLift.monadLift
+  monadLift_self
+  monadLift_eq_self
+  one_mul
+  mul_one
+  mul_assoc
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -35,7 +540,7 @@ def throwWpStepError : TacticM Unit := withMainContext do
   | none =>
       throwError "vcstep: expected a goal containing `wp`; got:{indentExpr target}"
   | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
+      let comp ← instantiateMVars comp
       throwError
         "vcstep: found a `wp` goal, but none of the current single-step rules apply to:\n\
         {indentExpr comp}\n\
@@ -46,7 +551,7 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
   | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
+      let comp ← instantiateMVars comp
       if isBindExpr comp then
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.triple_bind (cut := $cut)))
@@ -55,24 +560,23 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   | none => return false
 
 /-- Check whether an expression (possibly under `∀` quantifiers and `mdata`) contains
-a `Triple` application as its head. -/
+ a unary triple application as its head. -/
 private def hasTripleHead (e : Expr) : Bool :=
   let rec go : Expr → Bool
     | .forallE _ _ body _ => go body
     | .mdata _ e => go e
-    | e => (findAppWithHead? ``OracleComp.ProgramLogic.Triple e).isSome
+    | e => (tripleGoalComp? e).isSome
   go e
 
-/-- Extract the head function of the computation argument from a `Triple` application,
-after stripping `∀` quantifiers and `mdata`. -/
+/-- Extract the head function of the computation argument from a unary triple
+application, after stripping `∀` quantifiers and `mdata`. -/
 private def tripleCompFn? (e : Expr) : Option Expr :=
   let rec go : Expr → Option Expr
     | .forallE _ _ body _ => go body
     | .mdata _ e => go e
     | e => do
-        let app ← findAppWithHead? ``OracleComp.ProgramLogic.Triple e
-        let args ← trailingArgs? app 3
-        some (args[1]!).consumeMData.getAppFn
+        let comp ← tripleGoalComp? e
+        some comp.consumeMData.getAppFn
   go e
 
 /-- Try to close a `Triple` goal by targeted application of local hypotheses
@@ -98,11 +602,88 @@ private def tryApplyTripleHyp : TacticM Bool := withMainContext do
       saved.restore
   return false
 
+/-- Peel known transformer `wp` layers in the current goal via the cached
+`vcspec_simp` simp set. Always succeeds (errors and unchanged-goal results are
+swallowed), since callers always `discard` the outcome and rely on later
+structural dispatch to decide whether the goal can close. -/
+private def peelKnownTransformerWPInGoal : TacticM Unit :=
+  runVCSpecSimp
+
+/-- Class-method unfolds used by the close passes to expose `apply_wp` /
+`*.run` projections through overloaded `Monad{State,Reader,Writer}Of` /
+`StateT.{get,set,lift}` calls, plus the `Lean.Order.PartialOrder.rel` head
+needed for the final `le_refl` step. Kept inline (rather than in
+`vcspec_simp`) to avoid eager class-projection unfolding outside of close
+contexts. -/
+private def runVCSpecCloseUnfolds : TacticM Unit := do
+  discard <| tryEvalTacticSyntax (← `(tactic|
+    simp only [Lean.Order.PartialOrder.rel,
+      MonadStateOf.get, MonadStateOf.set, MonadReaderOf.read, MonadWriter.tell,
+      StateT.get, StateT.set, StateT.lift, ReaderT.read, WriterT.tell]))
+
+private def tryCloseNormalizedTransformerWP : TacticM Bool := do
+  let saved ← saveState
+  let target ← instantiateMVars (← getMainTarget)
+  unless (tripleGoalComp? target).isSome do
+    return false
+  -- Overloaded operations such as `MonadStateOf.get` may not expose their
+  -- concrete transformer type until the triple theorem has been applied.
+  -- Speculate cheaply, then restore if the layer peeler cannot close.
+  if ← tryEvalTacticSyntax (← `(tactic| refine Std.Do'.Triple.iff.mpr ?_)) then
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    runVCSpecCloseUnfolds
+    runVCSpecSimp
+    if (← getGoals).isEmpty then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic| exact le_refl _)) then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+    runVCSpecCloseUnfolds
+    runVCSpecSimp
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    if (← getGoals).isEmpty then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic| exact le_refl _)) then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+  saved.restore
+  return false
+
+private def tryApplySpecThenPeel (stx : TSyntax `tactic) : TacticM Bool := do
+  let saved ← saveState
+  if ← tryEvalTacticSyntax stx then
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    peelKnownTransformerWPInGoal
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    runVCSpecCloseUnfolds
+    runVCSpecSimp
+    if (← getGoals).isEmpty then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+    if ← tryEvalTacticSyntax (← `(tactic| exact le_refl _)) then
+      Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+      return true
+  saved.restore
+  return false
+
 /-- Try to close the current goal using only immediate local information.
 This is intentionally cheap: it is used while speculating on `triple_bind`, so it must not
 launch expensive proof search on goals with unresolved cut metavariables. -/
 def tryCloseSpecGoalImmediate : TacticM Bool := do
   tryApplyTripleHyp <||>
+  tryCloseNormalizedTransformerWP <||>
+  tryApplySpecThenPeel (← `(tactic| apply
+    OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_StateT_get_of_rel)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply
+    OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_ReaderT_read_of_rel)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.get_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.set_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.modifyGet_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.monadLift_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.read_ReaderT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.monadLift_ReaderT)) <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic| solve_by_elim (maxDepth := 2))) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -132,13 +713,15 @@ private def closeTheoremStepGoals : TacticM Unit := do
   for goal in goals do
     if ← goal.isAssigned then continue
     setGoals [goal]
-    unless ← tryApplyTripleHyp do
+    unless ← tryCloseSpecGoalImmediate do
       remaining := remaining ++ [goal]
   setGoals remaining
   unless remaining.isEmpty do
     discard <| tryEvalTacticSyntax (← `(tactic|
       all_goals first
         | assumption
+        | simp [Lean.Order.PartialOrder.rel]
+        | (repeat intro; split_ifs <;> simp_all [Lean.Order.PartialOrder.rel])
         | (
             repeat intro
             simp only [OracleComp.ProgramLogic.triple_iff_le_wp] at *
@@ -168,10 +751,7 @@ private def runVCGenStepWithTheoremConseq
   let saved ← saveState
   let ok ←
     match ← observing? do
-      evalTactic (← `(tactic| refine OracleComp.ProgramLogic.triple_conseq le_rfl ?_ ?_))
-      unless ← focusFirstGoalSatisfying (fun target => (tripleGoalComp? target).isSome) do
-        throwError "vcstep with theorem: failed to focus theorem subgoal after `triple_conseq`"
-      evalTactic (← `(tactic| apply $thm))
+      evalTactic (← `(tactic| refine OracleComp.ProgramLogic.triple_conseq le_rfl ?_ $thm))
       closeTheoremStepGoals
     with
     | some _ => pure true
@@ -182,11 +762,38 @@ private def runVCGenStepWithTheoremConseq
   return false
 
 /-- Apply a `@[vcspec]` unary rule to the current goal.
-Default `vcstep` fires rules only in `direct` mode; a future attribute could
-re-enable `triple_conseq` fallback by extending this helper. -/
+Default `vcstep` first tries the cached rule directly. For folded unary
+`Triple` goals, a global declaration can also be applied under `triple_conseq`,
+which lets a registered concrete postcondition theorem feed a weaker goal
+postcondition. -/
 private def runUnaryVCSpecRule
     (entry : VCSpecEntry) (requireClosed : Bool := false) : TacticM Bool := do
-  runVCGenStepWithTheoremDirect (mkIdent entry.theoremName!) requireClosed
+  if entry.kind == .unaryWP then
+    let saved ← saveState
+    let ok ←
+      match ← observing? do
+        unless ← runVCSpecEntryRawUnaryConsequence entry do
+          throwError "vcstep: raw unary `@[vcspec]` consequence did not apply"
+        closeTheoremStepGoals
+      with
+      | some _ => pure true
+      | none => pure false
+    if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+      return true
+    saved.restore
+  let saved ← saveState
+  let ok ←
+    match ← observing? do
+      unless ← runVCSpecEntryCachedBackward entry do
+        throwError "vcstep: registered `@[vcspec]` rule did not apply"
+      closeTheoremStepGoals
+    with
+    | some _ => pure true
+    | none => pure false
+  if ok && (!(requireClosed) || (← getGoals).isEmpty) then
+    return true
+  saved.restore
+  return false
 
 /-- Apply an explicit unary theorem/assumption step and try to close any easy side goals.
 When `requireClosed` is true, the step only succeeds if no goals remain afterwards. -/
@@ -201,10 +808,24 @@ canonical leaf rules, or bounded local consequence search. -/
 def tryCloseSpecGoal : TacticM Bool := do
   tryCloseSpecGoalImmediate <||> tryCloseSpecGoalSearch
 
+/-- Normalize Loom's unary triple head to VCVio's quantitative `Triple` abbrev.
+
+The two goals are definitionally equal for `OracleComp` with the no-exception
+postcondition, but proof terms produced directly against the `Std.Do'.Triple`
+head can trip Lean's kernel on anonymous proofs. Normalizing before structural
+steps keeps the Loom notation surface while making the unary tactic operate on
+its historical canonical head. -/
+private def normalizeStdDoTripleGoal : TacticM Bool := do
+  let target ← instantiateMVars (← getMainTarget)
+  unless (findAppWithHead? ``Std.Do'.Triple target).isSome do
+    return false
+  tryEvalTacticSyntax (← `(tactic| change OracleComp.ProgramLogic.Triple _ _ _))
+
 /-- Finish-only closure step: includes the support-sensitive leaf rules that are too expensive
 for the default `vcstep` hot path. -/
 def tryCloseSpecGoalFinal : TacticM Bool := do
   tryApplyTripleHyp <||>
+  tryCloseNormalizedTransformerWP <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
@@ -262,7 +883,10 @@ def tryBindImmediate (comp : Expr) : TacticM Bool := do
   if !isBindExpr comp then
     return false
   match ← observing? do
-    evalTactic (← `(tactic| apply OracleComp.ProgramLogic.triple_bind))
+    evalTactic (← `(tactic|
+      first
+        | apply OracleComp.ProgramLogic.triple_bind
+        | apply Std.Do'.Triple.bind))
     unless ← tryCloseSpecGoalImmediate do throwError "" with
   | some _ => return true
   | none => return false
@@ -270,9 +894,7 @@ def tryBindImmediate (comp : Expr) : TacticM Bool := do
 /-- Try only the automatic loop-invariant rules, without the structural fallback rules. -/
 def tryLoopInvariantRuleAuto (comp : Expr) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  let some app := findAppWithHead? ``OracleComp.ProgramLogic.Triple target | return false
-  let some args := trailingArgs? app 3 | return false
-  let post := args[2]!
+  let some (_pre, _comp, post) := tripleGoalParts? target | return false
   if isReplicateHead comp then
     if isConstantLambda post then
       match ← observing? do
@@ -457,6 +1079,32 @@ def findRegisteredVCGenRule? : TacticM (Option VCSpecEntry) := do
         if ok then
           return some entry
     return none
+
+/-- Try registered `@[vcspec]` rules against a raw `wp` goal.
+
+This is intentionally direct-hit only: raw `wp` stepping is on the hot path, so
+we use the discrimination tree and avoid same-kind fallback scans. -/
+private def runRawWpVCSpecBackward : TacticM Bool := do
+  withVCGenRegisteredTiming do
+    let target ← instantiateMVars (← getMainTarget)
+    let comp? :=
+      match rawWPGoalParts? target with
+      | some (_, comp, _) => some comp
+      | none => wpGoalComp? target
+    let some comp := comp? | return false
+    let comp ← instantiateMVars comp
+    let goalPattern := classifyUnaryCompPattern comp
+    let entries ← getRegisteredUnaryVCSpecEntriesNoWhnf comp
+    let entries :=
+      takeCandidatePrefix <|
+        entries.filter (fun entry =>
+          entry.kind == .unaryWP && entry.spec.compPattern == goalPattern) ++
+          entries.filter (fun entry => entry.kind == .unaryTriple &&
+            entry.spec.compPattern == goalPattern)
+    for entry in entries do
+      if ← runUnaryVCSpecRule entry then
+        return true
+    return false
 
 def throwVCGenStepError : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
@@ -811,6 +1459,17 @@ def tryProbEqPlans (plans : List (List ProbEqAction)) : TacticM Bool := do
   | none => return false
   | some (plan, _) => tryProbEqActions plan
 
+/-- Explicit probability-equality normalization.
+
+This runs the deeper planner-backed bind-rewrite/congruence search used by `vcstep?`, but only
+when the user asks for it. Plain `vcstep` keeps the smaller default plan set. -/
+def runProbEqNormalize : TacticM Bool := do
+  for plan in ← probEqPlannerActionPlansForGoal do
+    let preview ← previewActionWithGoals (tryProbEqActions plan)
+    if preview.ok && preview.goalCount = 0 then
+      return (← tryProbEqActions plan)
+  return false
+
 /-- Try to handle a `Pr[ ...] = Pr[ ...]` equality goal by swap, congr, or swap+congr.
 Also tries a fallback bridge from exact `probOutput` equalities into relational VCGen. -/
 def runProbOutputEqRelBridge : TacticM Bool := do
@@ -838,17 +1497,6 @@ def tryProbEqGoal : TacticM Bool := do
     return true
   runProbOutputEqRelBridge
 
-private def runUnifiedLSpecBackward : TacticM Bool := do
-  let goals ← getGoals
-  match goals with
-  | [] => return false
-  | goal :: rest =>
-      match ← liftMetaM <| Experimental.tryApplyMatchingCached goal with
-      | none => return false
-      | some (_, subgoals) =>
-          setGoals (subgoals ++ rest)
-          return true
-
 def throwVCGenStepRwError (depth : Nat) : TacticM Unit := withMainContext do
   let target ← instantiateMVars (← getMainTarget)
   if depth = 0 then
@@ -874,6 +1522,13 @@ def throwVCGenStepRwCongrError (supportSensitive : Bool) : TacticM Unit := withM
       "vcstep rw congr': expected a `Pr[ ...] = Pr[ ...]` goal with a shared outer\n\
       bind, leaving only the bound variable.\n\
       Goal:{indentExpr target}"
+
+def throwVCGenStepRwNormalizeError : TacticM Unit := withMainContext do
+  let target ← instantiateMVars (← getMainTarget)
+  throwError
+    "vcstep rw normalize: expected a `Pr[ ...] = Pr[ ...]` goal where the bounded\n\
+    probability-equality planner can close the goal by bind-swap and congruence steps.\n\
+    Goal:{indentExpr target}"
 
 /-- Try to lower a probability goal into a `Triple`, `wp`, or probability-equality goal. -/
 def tryLowerProbGoal : TacticM Bool := do
@@ -930,12 +1585,21 @@ def tryLowerProbGoal : TacticM Bool := do
 `wp`-level work. This stays deliberately smaller than the `Triple` path. -/
 def tryRawWpStructuralStep : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
-  let some comp := wpGoalComp? target | return false
-  let comp ← whnfReducible (← instantiateMVars comp)
-  if ← runUnifiedLSpecBackward then
-    return true
+  let comp? :=
+    match rawWPGoalParts? target with
+    | some (_, comp, _) => some comp
+    | none => wpGoalComp? target
+  let some comp := comp? | return false
+  let comp ← instantiateMVars comp
+  let isLowerBoundGoal := (rawWPGoalParts? target).isSome
+  if isLowerBoundGoal then
+    if ← runRawWpVCSpecBackward then
+      return true
   if ← runWpStepRules then
     return true
+  unless isLowerBoundGoal do
+    if ← runRawWpVCSpecBackward then
+      return true
   if ← tryMatchDecomp comp then
     return true
   return false
@@ -943,7 +1607,7 @@ def tryRawWpStructuralStep : TacticM Bool := do
 /-- Try to synthesize a support-based intermediate postcondition for a bind step.
 When the computation is `oa >>= f` and no explicit spec is available, tries applying
 `triple_bind` with an inferred cut and closing the spec subgoal via `triple_support`,
-which unifies the cut to `fun x => ⌜x ∈ support oa⌝`. -/
+which unifies the cut to `fun x => 𝟙⟦x ∈ support oa⟧`. -/
 def trySupportCutBind (comp : Expr) : TacticM Bool := do
   if !isBindExpr comp then return false
   match ← observing? do
@@ -954,55 +1618,159 @@ def trySupportCutBind (comp : Expr) : TacticM Bool := do
   | some _ => return true
   | none => return false
 
-/-- Structural/default unary VCGen step, excluding explicit cut/invariant/theorem-driven
-fallbacks and the final close/search phase. -/
-def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
-  if (← getGoals).isEmpty then return false
-  let target ← instantiateMVars (← getMainTarget)
-  if ← tryLowerProbGoal then
-    if (← getGoals).isEmpty then
-      return true
-    let target ← instantiateMVars (← getMainTarget)
-    if (tripleGoalComp? target |>.isNone) && (relTripleGoalParts? target |>.isNone) &&
-        (wpGoalComp? target).isSome then
-      if ← tryRawWpStructuralStep then
-        return true
-    return true
-  if relTripleGoalParts? target |>.isSome then
-    return (← TacticInternals.Relational.runRVCGenStep)
+/-! ### Goal classification and per-kind dispatch
+
+Mirrors `Loom.Tactic.VCGen.GoalKind` and `classifyGoalKind`: the structural
+core picks one strategy per goal kind instead of falling through a procedural
+cascade. New monad transformers / combinators become a new
+`UnaryGoalKind` constructor plus a registered `@[vcspec]` rule, not another
+`tryEvalTacticSyntax` block.
+
+Probability lowering is run opportunistically *before* classification, since
+`Pr[…]` may appear inside `wp …` goals that should ultimately dispatch via
+raw `wp` or `Triple` rules; only goals where lowering actually fires bypass
+the rest of the pipeline. -/
+
+/-- High-level classification of a unary VCGen target.
+
+Kept intentionally coarse: structural details (the bind continuation,
+ite condition, matcher app, …) live in the `comp` payload, not in the
+constructor, so per-kind handlers can share `tryEvalTacticSyntax`-style logic
+with the existing helpers. -/
+inductive UnaryGoalKind where
+  /-- A relational `RelTriple` / `RelWP` goal; defer to the relational planner. -/
+  | relational
+  /-- A unary `Triple` whose computation is a `>>=` application. -/
+  | tripleBind (comp : Expr)
+  /-- A unary `Triple` whose computation is `ite c a b` (non-dependent). -/
+  | tripleIte
+  /-- A unary `Triple` whose computation is `dite c a b` (dependent). -/
+  | tripleDite
+  /-- A unary `Triple` whose computation is a compiled `match` matcher. -/
+  | tripleMatch (comp : Expr)
+  /-- A unary `Triple` whose computation is a `replicate` / `List.mapM` /
+  `List.foldlM` head. -/
+  | tripleLoop (comp : Expr)
+  /-- A unary `Triple` whose computation does not match the cases above; the
+  dispatcher unfolds to raw `wp` and lets `@[wpStep]` rewrite. -/
+  | tripleOther
+  /-- A raw `wp` / `≤ wp` goal. -/
+  | rawWp
+  /-- Unrecognized goal shape. -/
+  | unknown
+  deriving Inhabited
+
+/-- Classify the current goal target as a `UnaryGoalKind`.
+
+Probability lowering is intentionally not a kind here: it runs opportunistically
+in `runVCGenStructuralCore` before classification, so a `wp … = ∑' u, Pr[…] * …`
+goal still classifies as `rawWp` / `tripleOther` rather than getting stuck in a
+non-lowerable prob branch. -/
+def classifyUnaryGoalKind (target : Expr) : MetaM UnaryGoalKind := do
+  if (relTripleGoalParts? target).isSome then return .relational
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
-      if isBindExpr comp then
-        if ← tryBindImmediate comp then
-          return true
-        if ← trySupportCutBind comp then
-          return true
-        if ← tryEvalTacticSyntax (← `(tactic|
-          apply OracleComp.ProgramLogic.triple_bind_wp)) then
-          return true
+      if isBindExpr comp then return .tripleBind comp
       if isIfExpr comp then
-        if comp.consumeMData.getAppFn.isConstOf ``dite then
-          if ← tryEvalTacticSyntax (← `(tactic|
-            apply OracleComp.ProgramLogic.triple_dite <;> intro)) then
-            return true
-        if ← tryEvalTacticSyntax (← `(tactic|
+        return if comp.consumeMData.getAppFn.isConstOf ``dite then
+          .tripleDite else .tripleIte
+      if (← Lean.Meta.matchMatcherApp? comp).isSome then return .tripleMatch comp
+      if isReplicateHead comp || isListFoldlMHead comp || isListMapMHead comp then
+        return .tripleLoop comp
+      return .tripleOther
+  | none =>
+      if (wpGoalComp? target).isSome then return .rawWp
+      else return .unknown
+
+/-- Lower the current probability goal and, when the residual goal is a raw
+`wp`, follow up with one structural raw-`wp` step. Returns `true` whenever
+lowering actually fired (matching the original cascade's behaviour). -/
+private def runProbStep : TacticM Bool := do
+  unless ← tryLowerProbGoal do return false
+  if (← getGoals).isEmpty then
+    return true
+  let target ← instantiateMVars (← getMainTarget)
+  if (tripleGoalComp? target).isNone && (relTripleGoalParts? target).isNone
+      && (wpGoalComp? target).isSome then
+    discard <| tryRawWpStructuralStep
+  return true
+
+/-- Bind dispatch family: try `triple_bind` immediately, then a support-based
+cut, then the explicit `triple_bind_wp` / `stdDoTriple_bind_wp` closers. -/
+private def runTripleBindStep (comp : Expr) : TacticM Bool := do
+  if ← tryBindImmediate comp then return true
+  if ← trySupportCutBind comp then return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply OracleComp.ProgramLogic.triple_bind_wp)) then
+    closeTheoremStepGoals
+    return true
+  if ← tryEvalTacticSyntax (← `(tactic|
+      apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_bind_wp)) then
+    closeTheoremStepGoals
+    return true
+  return false
+
+/-- Last-ditch triple step: unfold to a raw `wp` goal and dispatch via
+`@[wpStep]`. Used when the specialized triple dispatchers do not match. -/
+private def runTripleFallback : TacticM Bool := do
+  match ← observing? do
+      evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))
+      evalTactic (← `(tactic| change _ ≤ OracleComp.ProgramLogic.wp _ _))
+      unless ← runWpStepRules do
+        throwError "vcstep: no matching wp rule after unfolding `Triple`"
+    with
+  | some _ => return true
+  | none => return false
+
+/-- Structural/default unary VCGen step, excluding explicit cut/invariant/theorem-driven
+fallbacks and the final close/search phase.
+
+Implemented as a single goal-kind dispatch (mirroring
+`Loom.Tactic.VCGen.solve`): each kind picks one cluster of strategies, with
+the `triple*` kinds optionally chaining into `runTripleFallback` so that
+specialized dispatchers can defer cleanly. Probability lowering is run
+opportunistically before classification so that goals where lowering does not
+fire still flow through the structural dispatcher. -/
+def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
+  if (← getGoals).isEmpty then return false
+  discard <| normalizeStdDoTripleGoal
+  if hasProbGoal (← instantiateMVars (← getMainTarget)) then
+    if ← runProbStep then return true
+  -- For triple-shaped goals, normalize transformer `wp` layers and try an
+  -- immediate close before structural dispatch.
+  if (tripleGoalComp? (← instantiateMVars (← getMainTarget))).isSome then
+    peelKnownTransformerWPInGoal
+    if ← tryCloseNormalizedTransformerWP then return true
+  let target ← instantiateMVars (← getMainTarget)
+  match ← classifyUnaryGoalKind target with
+  | .relational => TacticInternals.Relational.runRVCGenStep
+  | .tripleBind comp =>
+      if ← runTripleBindStep comp then return true
+      runTripleFallback
+  | .tripleIte =>
+      if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.triple_ite <;> intro)) then
-          return true
-      if ← tryMatchDecomp comp then
         return true
-      if ← tryLoopInvariantRuleAuto comp then
+      runTripleFallback
+  | .tripleDite =>
+      if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_dite <;> intro)) then
         return true
-      if ← tryLoopFallback comp then
+      if ← tryEvalTacticSyntax (← `(tactic|
+          apply OracleComp.ProgramLogic.triple_ite <;> intro)) then
         return true
-      match ← (observing? do
-        evalTactic (← `(tactic| unfold OracleComp.ProgramLogic.Triple))
-        evalTactic (← `(tactic| change _ ≤ OracleComp.ProgramLogic.wp _ _))
-        unless ← runWpStepRules do
-          throwError "vcstep: no matching wp rule after unfolding `Triple`") with
-      | some _ => return true
-      | none => return false
-  | none => return (← tryRawWpStructuralStep)
+      runTripleFallback
+  | .tripleMatch comp =>
+      if ← tryMatchDecomp comp then return true
+      runTripleFallback
+  | .tripleLoop comp =>
+      if ← tryLoopInvariantRuleAuto comp then return true
+      if ← tryLoopFallback comp then return true
+      runTripleFallback
+  | .tripleOther => runTripleFallback
+  | .rawWp => tryRawWpStructuralStep
+  | .unknown => return false
 
 private def mkStructuralStepForTarget (target : Expr) : PlannedStep :=
   let step := mkVCGenPlannedStep
@@ -1156,7 +1924,23 @@ def runVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       return true
+  let cheapCloseState ← saveState
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (refine Std.Do'.Triple.iff.mpr ?_
+       repeat intro _
+       simp [Lean.Order.PartialOrder.rel, MonadLift.monadLift,
+         OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+         OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+         MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+         one_mul, mul_one]))) then
+    if (← getGoals).isEmpty then
+      return true
+  cheapCloseState.restore
+  if ← tryCloseNormalizedTransformerWP then
+    return true
   if ← runVCGenStructuralCore then
+    return true
+  if ← tryCloseSpecGoal then
     return true
   if let some entry ← findRegisteredVCGenRule? then
     if ← runUnaryVCSpecRule entry then

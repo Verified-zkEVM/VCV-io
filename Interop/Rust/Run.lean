@@ -9,7 +9,7 @@ import Interop.Rust.Common
 /-!
 # Peeling the `RustOracleComp` transformer stack
 
-The canonical intermediate form for any probabilistic / support / evalDist
+The canonical intermediate form for any probabilistic / support / `evalDist`
 claim on `RustOracleComp spec α` is
 ```
 OracleComp spec (Option (Except Interop.Rust.Error α))

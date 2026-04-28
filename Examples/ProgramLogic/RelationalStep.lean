@@ -16,13 +16,14 @@ This file validates one-step relational tactic behavior.
 open ENNReal OracleSpec OracleComp
 open OracleComp.ProgramLogic
 open OracleComp.ProgramLogic.Relational
+open Lean.Order
 open scoped OracleComp.ProgramLogic
 
 universe u
 
 variable {ι : Type u} {spec : OracleSpec ι}
 variable [spec.Fintype] [spec.Inhabited]
-variable {α β γ : Type}
+variable {α β γ δ : Type}
 
 /-! ## Basic relational stepping -/
 
@@ -56,6 +57,79 @@ example (t : spec.Domain) :
      | EqRel (spec.Range t)⟫ := by
   rvcstep
 
+example {oa : OracleComp spec α} {ob : OracleComp spec β} {R : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫) :
+    ⟪ob ~ oa | fun b a => R a b⟫ := by
+  rvcstep sym
+  exact h
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost α β} (h : ⟪oa ~ ob | R⟫) :
+    ⟪oa ~ ob | fun a b => R a b ∧ True⟫ := by
+  rvcstep upto R
+  · exact h
+  · intro a b hab
+    exact ⟨hab, trivial⟩
+
+example {oa mid : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost α β}
+    (hleft : ⟪oa ~ mid | EqRel α⟫) (hright : ⟪mid ~ ob | R⟫) :
+    ⟪oa ~ ob | R⟫ := by
+  fail_if_success rvcstep
+  rvcstep trans mid
+  · exact hleft
+  · exact hright
+
+example {oa : OracleComp spec α} {mid ob : OracleComp spec β}
+    {R : RelPost α β}
+    (hleft : ⟪oa ~ mid | R⟫) (hright : ⟪mid ~ ob | EqRel β⟫) :
+    ⟪oa ~ ob | R⟫ := by
+  fail_if_success rvcstep
+  rvcstep trans mid
+  · exact hleft
+  · exact hright
+
+theorem rvcstep_trans_postprocess_right [SampleableType α] (f : α → β) (g : β → γ) :
+    ⟪(do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (f x))
+      ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (g (f x)))
+      | fun y z => z = g y⟫ := by
+  rvcstep trans
+    (do
+      let x ← ($ᵗ α : ProbComp α)
+      pure (f x))
+  · rvcstep
+  · rvcstep using EqRel α
+
+theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : α → β) :
+    ⟪(do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (f (g x)))
+      ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        pure (g x))
+      | fun y z => y = f z⟫ := by
+  rvcstep trans
+    (do
+      let x ← ($ᵗ α : ProbComp α)
+      pure (g x))
+  · rvcstep using EqRel α
+  · rvcstep
+
+/--
+info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
+-/
+#guard_msgs in
+set_option vcvio.vcgen.traceCachedRules true in
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost γ δ} {f : α → γ} {g : β → δ}
+    (h : ⟪oa ~ ob | fun a b => R (f a) (g b)⟫) :
+    ⟪f <$> oa ~ g <$> ob | R⟫ := by
+  rvcstep
+
 /-! ## Bijective random sampling -/
 
 example [SampleableType α]
@@ -74,26 +148,129 @@ example [SampleableType α]
   · intro x
     rfl
 
+example [SampleableType α]
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪(($ᵗ α : ProbComp α) >>= fun x => pure x)
+     ~ (($ᵗ α : ProbComp α) >>= fun x => pure x)
+     | fun x y => y = f x⟫ := by
+  rvcstep using f
+  exact hf
+
+/-! ## Bind swap -/
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} :
+    ⟪(mx >>= fun a => my >>= fun b => f a b)
+     ~ (my >>= fun b => mx >>= fun a => f a b)
+     | EqRel γ⟫ := by
+  rvcstep swap left
+  rvcfinish
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} :
+    ⟪(my >>= fun b => mx >>= fun a => f a b)
+     ~ (mx >>= fun a => my >>= fun b => f a b)
+     | EqRel γ⟫ := by
+  rvcstep swap right
+  rvcfinish
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {g : β → α → OracleComp spec δ}
+    {R : RelPost γ δ}
+    (hfg : ∀ b a, ⟪f a b ~ g b a | R⟫) :
+    ⟪(mx >>= fun a => my >>= fun b => f a b)
+     ~ (my >>= fun b => mx >>= fun a => g b a)
+     | R⟫ := by
+  rvcstep swap left
+  rvcgen using [EqRel β, EqRel α]
+  exact hfg _ _
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {g : β → α → OracleComp spec δ}
+    {R : RelPost δ γ}
+    (hgf : ∀ b a, ⟪g b a ~ f a b | R⟫) :
+    ⟪(my >>= fun b => mx >>= fun a => g b a)
+     ~ (mx >>= fun a => my >>= fun b => f a b)
+     | R⟫ := by
+  rvcstep swap right
+  rvcgen using [EqRel β, EqRel α]
+  exact hgf _ _
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {k : α → β → δ} :
+    ⟪(mx >>= fun a => my >>= fun b => pure (k a b))
+     ~ (my >>= fun b => mx >>= fun a => pure (k a b))
+     | EqRel δ⟫ := by
+  rvcstep swap left
+  rvcfinish
+
+example [SampleableType α] {my : ProbComp β}
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪(do
+        let x ← ($ᵗ α : ProbComp α)
+        let y ← my
+        pure (x, y))
+     ~ (do
+        let y ← my
+        let x ← ($ᵗ α : ProbComp α)
+        pure (x, y))
+     | fun p q => q.1 = f p.1 ∧ q.2 = p.2⟫ := by
+  rvcstep swap left using EqRel β
+  intro y₁ y₂ hy
+  subst hy
+  rvcstep using f
+  · exact relTriple_pure_pure ⟨rfl, rfl⟩
+  · exact hf
+
+example [SampleableType α] {my : ProbComp β}
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪(do
+        let y ← my
+        let x ← ($ᵗ α : ProbComp α)
+        pure (x, y))
+     ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        let y ← my
+        pure (x, y))
+     | fun p q => q.1 = f p.1 ∧ q.2 = p.2⟫ := by
+  rvcstep swap right using EqRel β
+  intro y₁ y₂ hy
+  subst hy
+  rvcstep using f
+  · exact relTriple_pure_pure ⟨rfl, rfl⟩
+  · exact hf
+
+example [SampleableType α] (post : α → α → ℝ≥0∞) :
+    ⦃∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a⦄
+      ($ᵗ α : ProbComp α) ≈ₑ ($ᵗ α : ProbComp α)
+    ⦃post⦄ := by
+  rvcstep
+
+example (t : spec.Domain) (post : spec.Range t → spec.Range t → ℝ≥0∞) :
+    ⦃∑' a : spec.Range t,
+      Pr[= a | (query t : OracleComp spec (spec.Range t))] * post a a⦄
+      (query t : OracleComp spec (spec.Range t)) ≈ₑ
+      (query t : OracleComp spec (spec.Range t))
+    ⦃post⦄ := by
+  exact OracleComp.ProgramLogic.Relational.Loom.relTriple_query_refl t post
+
 /-! ## Iteration rules -/
 
 example {oa₁ oa₂ : OracleComp spec α} (n : ℕ)
     (h : ⟪oa₁ ~ oa₂ | EqRel α⟫) :
     ⟪oa₁.replicate n ~ oa₂.replicate n | EqRel (List α)⟫ := by
   rvcstep
-  exact h
 
 example {oa : OracleComp spec α} {ob : OracleComp spec β} (n : ℕ)
     {R : RelPost α β}
     (h : ⟪oa ~ ob | R⟫) :
     ⟪oa.replicate n ~ ob.replicate n | List.Forall₂ R⟫ := by
   rvcstep
-  exact h
 
 example {xs : List α} {f : α → OracleComp spec β} {g : α → OracleComp spec β}
     (hfg : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
     ⟪xs.mapM f ~ xs.mapM g | EqRel (List β)⟫ := by
   rvcstep
-  exact hfg
 
 example {xs : List α} {ys : List β}
     {S : α → β → Prop}
@@ -103,8 +280,6 @@ example {xs : List α} {ys : List β}
     (hfg : ∀ a b, S a b → ⟪f a ~ g b | R⟫) :
     ⟪xs.mapM f ~ ys.mapM g | List.Forall₂ R⟫ := by
   rvcstep using S
-  · exact hxy
-  · exact hfg
 
 example {σ₁ σ₂ : Type}
     {xs : List α}
@@ -116,8 +291,6 @@ example {σ₁ σ₂ : Type}
     (hfg : ∀ a t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ a | S⟫) :
     ⟪xs.foldlM f s₁ ~ xs.foldlM g s₂ | S⟫ := by
   rvcstep
-  · exact hs
-  · exact hfg
 
 example {σ₁ σ₂ : Type}
     {xs : List α} {ys : List β}
@@ -131,9 +304,6 @@ example {σ₁ σ₂ : Type}
     (hfg : ∀ a b, Rin a b → ∀ t₁ t₂, S t₁ t₂ → ⟪f t₁ a ~ g t₂ b | S⟫) :
     ⟪xs.foldlM f s₁ ~ ys.foldlM g s₂ | S⟫ := by
   rvcstep using Rin
-  · exact hs
-  · exact hxy
-  · exact hfg
 
 /-! ## Pure / ite rules -/
 
@@ -147,8 +317,6 @@ example {c : Prop} [Decidable c]
     (h2 : ⟪oa₂ ~ ob₂ | EqRel α⟫) :
     ⟪(if c then oa₁ else oa₂) ~ (if c then ob₁ else ob₂) | EqRel α⟫ := by
   rvcstep
-  · exact h1
-  · exact h2
 
 /-! ## Auto relational hint consumption -/
 
@@ -190,11 +358,12 @@ the bind rule entirely when both sides reduce to a leaf). -/
 
 example {a : α} {f : α → OracleComp spec β} :
     ⟪(do let x ← pure a; f x) ~ f a | EqRel β⟫ := by
-  rvcstep
+  simpa only [pure_bind] using (relTriple_refl (oa := f a))
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β} {g : β → OracleComp spec γ} :
     ⟪((oa >>= f) >>= g) ~ (do let x ← oa; let y ← f x; g y) | EqRel γ⟫ := by
-  rvcstep
+  simpa only [bind_assoc] using
+    (relTriple_refl (oa := oa >>= fun x => f x >>= g))
 
 /-! ## Regression: multi-goal isolation
 
@@ -207,12 +376,109 @@ swap-and-close pass could pull a trailing sibling ahead of the bind continuation
 and silently discharge it. The fix in `closeSampleAndReorderBindGoals` keeps
 `rest` untouched at the tail. -/
 
-set_option linter.style.multiGoal false in
 example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
     (ob : OracleComp spec α)
     (hf : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
     (⟪oa >>= f ~ oa >>= g | EqRel β⟫) ∧ (⟪ob ~ ob | EqRel α⟫) := by
-  refine ⟨?_, ?_⟩
+  constructor
+  · refine relTriple_bind (R := EqRel α) (relTriple_refl (oa := oa)) ?_
+    intro a₁ a₂ h
+    subst h
+    exact hf a₁
+  · exact relTriple_refl (oa := ob)
+
+/-! ## Quantitative `Std.Do'.RelTriple` path -/
+
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    ⦃post a b⦄
+      (pure a : OracleComp spec α) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
   rvcstep
-  · intro a₁ a₂ h; subst h; exact hf a₁
-  · rvcstep
+
+example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
+    post a b ⊑
+      rwp⟦(pure a : OracleComp spec α) ~ (pure b : OracleComp spec β) |
+        post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ) (g : β → OracleComp spec δ)
+    (post : γ → δ → ℝ≥0∞) :
+    rwp⟦f a ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcgen
+
+example [DecidableEq γ] [DecidableEq δ] (a : α) (b : β)
+    (f : α → γ) (g : β → δ)
+    (post : γ → δ → ℝ≥0∞) :
+    post (f a) (g b) ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          pure (f x))
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          pure (g y))
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (do
+          let x ← (pure a : OracleComp spec α)
+          f x)
+        ~
+        (pure b : OracleComp spec β)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧ ⊑
+      rwp⟦
+        (pure a : OracleComp spec α)
+        ~
+        (do
+          let y ← (pure b : OracleComp spec β)
+          g y)
+      | post ; epost⟨⟩, epost⟨⟩⟧ := by
+  rvcstep right
+  rvcgen
+
+example (a : α) (b : β)
+    (f : α → OracleComp spec γ)
+    (post : γ → β → ℝ≥0∞) :
+    ⦃rwp⟦f a ~ (pure b : OracleComp spec β) | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (do
+        let x ← (pure a : OracleComp spec α)
+        f x) ≈ₑ (pure b : OracleComp spec β)
+    ⦃post⦄ := by
+  rvcstep left
+  rvcgen
+
+example (a : α) (b : β)
+    (g : β → OracleComp spec δ)
+    (post : α → δ → ℝ≥0∞) :
+    ⦃rwp⟦(pure a : OracleComp spec α) ~ g b | post ; epost⟨⟩, epost⟨⟩⟧⦄
+      (pure a : OracleComp spec α) ≈ₑ
+      (do
+        let y ← (pure b : OracleComp spec β)
+        g y)
+    ⦃post⦄ := by
+  rvcstep right
+  rvcgen
+

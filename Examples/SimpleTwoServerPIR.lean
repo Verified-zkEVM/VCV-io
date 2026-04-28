@@ -178,16 +178,8 @@ theorem pir_correct (hchar : ∀ x : W, x + x = 0)
       (List.nodup_finRange N) ([], []) ss hss
     simp only [pirResponse, List.foldl_nil, add_zero, List.mem_finRange, ↓reduceIte, zero_add] at h
     exact hy.trans h
-  -- All outputs other than a i₀ have probability 0
-  have hnot : ∀ y ≠ a i₀, Pr[= y | pirMain a i₀] = 0 :=
-    fun y hy => (probOutput_eq_zero_iff _ _).mpr (fun hmem => hy (huniq y hmem))
-  -- The total probability collapses to Pr[= a i₀ | ...]
-  have hsum : ∑' x, Pr[= x | pirMain a i₀] = Pr[= a i₀ | pirMain a i₀] :=
-    tsum_eq_single (a i₀) hnot
-  -- ProbComp never fails; combine with total probability = 1
-  have htot := probFailure_add_tsum_probOutput (pirMain a i₀)
-  rw [NeverFail.probFailure_eq_zero, hsum, zero_add] at htot
-  exact htot
+  exact probOutput_eq_one_of_support_subset_singleton
+    (NeverFail.probFailure_eq_zero (mx := pirMain a i₀)) huniq
 
 /-- Privacy of the first server view: the distribution of the first query set `s`
 is independent of which index is being queried. Intuitively, each index `j` appears in `s` with
@@ -198,8 +190,8 @@ probability 1/2 regardless of whether `j = i₀` or not:
 This is one half of the information-theoretic privacy guarantee; the second
 server view is handled by `pir_private_snd`. -/
 theorem pir_private (i₁ i₂ : Fin N) :
-    evalDist (Prod.fst <$> pirQuery i₁) =
-    evalDist (Prod.fst <$> pirQuery i₂) := by
+    𝒟[Prod.fst <$> pirQuery i₁] =
+    𝒟[Prod.fst <$> pirQuery i₂] := by
   simp only [pirQuery]
   by_equiv
   rvcstep -- handle map
@@ -207,13 +199,13 @@ theorem pir_private (i₁ i₂ : Fin N) :
   · rfl -- initial states: ([], []).1 = ([], []).1
   · intro j acc₁ acc₂ hS
     simp only [ProgramLogic.Relational.EqRel] at hS
-    rvcstep using (fun b₁ b₂ => b₁ = b₂)
-    intro b₁ b₂ hb; subst hb
-    cases b₁ <;> simp only [Bool.false_eq_true, ↓reduceIte,
-      ProgramLogic.Relational.relTriple_iff_relWP, ProgramLogic.Relational.relWP_iff_couplingPost]
-      <;> (split <;> split <;>
+    rvcstep using (fun b : Bool => b)
+    · simp only [ProgramLogic.Relational.relTriple_iff_relWP,
+        ProgramLogic.Relational.relWP_iff_couplingPost]
+      split <;> split <;> split <;>
         apply ProgramLogic.Relational.relTriple_pure_pure <;>
-        simp_all [ProgramLogic.Relational.EqRel])
+        simp [ProgramLogic.Relational.EqRel, hS]
+    · exact Function.bijective_id
 
 /-- Privacy of the second server view: the distribution of the second query set `s'`
 is independent of which index is being queried. Intuitively, each index `j` appears in `s'` with
@@ -226,8 +218,8 @@ The proof uses a coupling argument with four cases depending on whether `j` equa
 both, or neither. When `j` equals exactly one of them, the coupling negates the coin (`b ↦ !b`),
 exploiting the symmetry of the uniform distribution on `Bool`. -/
 theorem pir_private_snd (i₁ i₂ : Fin N) :
-    evalDist (Prod.snd <$> pirQuery i₁) =
-    evalDist (Prod.snd <$> pirQuery i₂) := by
+    𝒟[Prod.snd <$> pirQuery i₁] =
+    𝒟[Prod.snd <$> pirQuery i₂] := by
   simp only [pirQuery]
   by_equiv
   rvcstep -- handle map
@@ -238,24 +230,26 @@ theorem pir_private_snd (i₁ i₂ : Fin N) :
     by_cases h₁ : j = i₁ <;> by_cases h₂ : j = i₂
     -- Case 1: j = i₁ ∧ j = i₂ — identical, identity coupling
     · subst h₁; subst h₂
-      rvcstep using (fun b₁ b₂ => b₁ = b₂)
-      intro b₁ b₂ hb; subst hb; cases b₁ <;>
-        simp_all [ProgramLogic.Relational.EqRel]
+      rvcstep using (fun b : Bool => b)
+      · simp [ProgramLogic.Relational.EqRel, hS]
+        split <;> rfl
+      · exact Function.bijective_id
     -- Case 2: j = i₁ ∧ j ≠ i₂ — negation coupling
     · subst h₁
-      rvcstep using (fun b₁ b₂ => b₂ = !b₁)
-      · intro b₁ b₂ hb; subst hb; simp [h₂]; cases b₁ <;>
-          simp_all [ProgramLogic.Relational.EqRel]
-      · exact ProgramLogic.Relational.relTriple_uniformSample_bij
-          Bool.involutive_not.bijective _ (fun _ => rfl)
+      rvcstep using (fun b : Bool => !b)
+      · simp [h₂]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at * <;>
+          cases ‹Bool› <;> simp at *
+      · exact Bool.involutive_not.bijective
     -- Case 3: j ≠ i₁ ∧ j = i₂ — negation coupling
     · subst h₂
-      rvcstep using (fun b₁ b₂ => b₂ = !b₁)
-      · intro b₁ b₂ hb; subst hb; simp [h₁]; cases b₁ <;>
-          simp_all [ProgramLogic.Relational.EqRel]
-      · exact ProgramLogic.Relational.relTriple_uniformSample_bij
-          Bool.involutive_not.bijective _ (fun _ => rfl)
+      rvcstep using (fun b : Bool => !b)
+      · simp [h₁]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at * <;>
+          cases ‹Bool› <;> simp at *
+      · exact Bool.involutive_not.bijective
     -- Case 4: j ≠ i₁ ∧ j ≠ i₂ — identity coupling
-    · rvcstep using (fun b₁ b₂ => b₁ = b₂)
-      intro b₁ b₂ hb; subst hb; simp [h₁, h₂]; cases b₁ <;>
-        simp_all [ProgramLogic.Relational.EqRel]
+    · rvcstep using (fun b : Bool => b)
+      · simp [h₁, h₂]
+        split_ifs <;> simp [ProgramLogic.Relational.EqRel, hS] at *
+      · exact Function.bijective_id

@@ -21,13 +21,12 @@ open Lean Elab Meta
 namespace OracleComp.ProgramLogic
 
 /-- Broad category of a `@[vcspec]` rule, derived from the head of the
-theorem's statement (`Triple`, `wp`, `RelTriple`, `RelWP`, `eRelTriple`). -/
+theorem's statement (`Triple`, `wp`, `RelTriple`, `RelWP`). -/
 inductive VCSpecKind where
   | unaryTriple
   | unaryWP
   | relTriple
   | relWP
-  | eRelTriple
   deriving Inhabited, BEq, Repr
 
 /-- Coarse lookup shape used to route a rule into the right discrimination

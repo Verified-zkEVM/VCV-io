@@ -43,7 +43,7 @@ protected lemma support_eq_support (p : SPMF α) : support p = SPMF.support p :=
 lemma probOutput_eq_apply (p : SPMF α) (x : α) : Pr[= x | p] = p x := rfl
 
 lemma evalDist_eq_iff {m} [Monad m] [HasEvalSPMF m] (mx : m α) (p : SPMF α) :
-    evalDist mx = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
+    𝒟[mx] = p ↔ ∀ x, Pr[= x | mx] = p x := by aesop
 
 end SPMF
 
@@ -63,7 +63,7 @@ noncomputable instance : HasEvalPMF PMF where
 end PMF
 
 @[simp] lemma SPMF.evalDist_liftM (p : PMF α) :
-    evalDist (m := SPMF) (liftM p) = evalDist p := rfl
+    evalDist (m := SPMF) (liftM p) = 𝒟[p] := rfl
 
 @[simp] lemma SPMF.probOutput_liftM (p : PMF α) (x : α) :
     Pr[= x | (liftM p : SPMF α)] = Pr[= x | p] := rfl
