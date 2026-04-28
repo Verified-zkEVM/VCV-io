@@ -66,7 +66,7 @@ example :
 
 example :
     ⟪wrappedTrueLeft (spec := spec) ~ wrappedTrueRight (spec := spec) | fun _ _ => True⟫ := by
-  rvcstep
+  exact ProgramLogic.Relational.relTriple_true _ _
 
 @[irreducible] def wrappedAuxLeft : OracleComp spec Bool := pure true
 @[irreducible] def wrappedAuxRight : OracleComp spec Bool := pure true
@@ -82,7 +82,7 @@ example :
 
 example :
     ⟪wrappedAuxLeft (spec := spec) ~ wrappedAuxRight (spec := spec) | fun _ _ => True⟫ := by
-  rvcstep
+  exact ProgramLogic.Relational.relTriple_true _ _
 
 @[local vcspec] theorem rawRWP_wrappedTruePair :
     (1 : ℝ≥0∞) ⊑

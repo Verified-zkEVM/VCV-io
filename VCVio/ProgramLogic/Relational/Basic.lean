@@ -264,6 +264,28 @@ lemma relTriple_post_const {oa : OracleComp spec₁ α} {ob : OracleComp spec₂
     RelTriple oa ob R :=
   relTriple_post_mono (relTriple_true oa ob) (fun _ _ _ => h _ _)
 
+/-- Symmetry for relational triples, swapping the two computations and the postcondition. -/
+lemma relTriple_symm {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β} (h : RelTriple oa ob R) :
+    RelTriple ob oa (fun b a => R a b) := by
+  rw [relTriple_iff_relWP, relWP_iff_couplingPost] at h ⊢
+  rcases h with ⟨c, hc⟩
+  refine ⟨⟨Prod.swap <$> c.1, ?_⟩, ?_⟩
+  · constructor
+    · calc
+        Prod.fst <$> (Prod.swap <$> c.1) = Prod.snd <$> c.1 := by
+          simp [Functor.map_map]
+        _ = evalDist ob := c.2.map_snd
+    · calc
+        Prod.snd <$> (Prod.swap <$> c.1) = Prod.fst <$> c.1 := by
+          simp [Functor.map_map]
+        _ = evalDist oa := c.2.map_fst
+  · intro z hz
+    rw [support_map] at hz
+    rcases hz with ⟨z', hz', hzz⟩
+    rw [← hzz]
+    exact hc z' hz'
+
 /-- Bind composition rule for relational triples. -/
 lemma relTriple_bind
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
@@ -394,6 +416,27 @@ lemma relTriple_query_bij (t : spec₁.Domain)
     have hzEq : z = (a, f a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simp [hzEq]
+
+/-- Bind rule specialized to two equal oracle queries coupled by a bijection.
+
+The continuation is stated over the left sample only, with the right sample
+already rewritten to `f a`. This is the stable continuation shape used by
+the relational tactic for unary bijection hints. -/
+lemma relTriple_bind_query_bij (t : spec₁.Domain)
+    {f : spec₁.Range t → spec₁.Range t}
+    {fa : spec₁.Range t → OracleComp spec₁ γ}
+    {fb : spec₁.Range t → OracleComp spec₁ δ}
+    {S : RelPost γ δ}
+    (hfg : ∀ a, RelTriple (fa a) (fb (f a)) S)
+    (hf : Function.Bijective f) :
+    RelTriple
+      ((liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fa)
+      ((liftM (query t) : OracleComp spec₁ (spec₁.Range t)) >>= fb)
+      S := by
+  refine relTriple_bind (R := fun a b => b = f a) ?_ ?_
+  · exact relTriple_post_mono (relTriple_query_bij t hf) (fun _ _ h => h.symm)
+  · intro a b hb
+    simpa [hb] using hfg a
 
 lemma relTriple_map {R : RelPost γ δ}
     {f : α → γ} {g : β → δ}
@@ -606,6 +649,23 @@ lemma relTriple_uniformSample_bij
     have hzEq : z = (a, f a) := by
       simpa [support_pure, Set.mem_singleton_iff] using hz'
     simpa [hzEq] using hR a
+
+/-- Bind rule specialized to two uniform samples coupled by a bijection.
+
+The continuation is stated over the left sample only, with the right sample
+already rewritten to `f a`. This avoids exposing an auxiliary equality witness
+to proof scripts after `rvcstep using f`. -/
+lemma relTriple_bind_uniformSample_bij
+    {f : α → α}
+    {fa : α → ProbComp γ} {fb : α → ProbComp δ}
+    {S : RelPost γ δ}
+    (hfg : ∀ a, RelTriple (fa a) (fb (f a)) S)
+    (hf : Function.Bijective f) :
+    RelTriple (($ᵗ α : ProbComp α) >>= fa) (($ᵗ α : ProbComp α) >>= fb) S := by
+  refine relTriple_bind (R := fun a b => b = f a) ?_ ?_
+  · exact relTriple_uniformSample_bij hf _ (fun _ => rfl)
+  · intro a b hb
+    simpa [hb] using hfg a
 
 /-- Identity coupling for uniform sampling. -/
 lemma relTriple_uniformSample_refl :

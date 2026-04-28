@@ -57,6 +57,20 @@ example (t : spec.Domain) :
      | EqRel (spec.Range t)⟫ := by
   rvcstep
 
+example {oa : OracleComp spec α} {ob : OracleComp spec β} {R : RelPost α β}
+    (h : ⟪oa ~ ob | R⟫) :
+    ⟪ob ~ oa | fun b a => R a b⟫ := by
+  rvcstep sym
+  exact h
+
+example {oa : OracleComp spec α} {ob : OracleComp spec β}
+    {R : RelPost α β} (h : ⟪oa ~ ob | R⟫) :
+    ⟪oa ~ ob | fun a b => R a b ∧ True⟫ := by
+  rvcstep upto R
+  · exact h
+  · intro a b hab
+    exact ⟨hab, trivial⟩
+
 /--
 info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
 -/
@@ -85,6 +99,15 @@ example [SampleableType α]
   · exact hf
   · intro x
     rfl
+
+example [SampleableType α]
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪(($ᵗ α : ProbComp α) >>= fun x => pure x)
+     ~ (($ᵗ α : ProbComp α) >>= fun x => pure x)
+     | fun x y => y = f x⟫ := by
+  rvcstep using f
+  · exact relTriple_pure_pure rfl
+  · exact hf
 
 example [SampleableType α] (post : α → α → ℝ≥0∞) :
     ⦃∑' a : α, Pr[= a | ($ᵗ α : ProbComp α)] * post a a⦄
@@ -153,11 +176,6 @@ example {σ₁ σ₂ : Type}
 
 /-! ## Pure / ite rules -/
 
-/--
-info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_pure_pure` (folded, relTriple)
--/
-#guard_msgs in
-set_option vcvio.vcgen.traceCachedRules true in
 example (a : α) :
     ⟪(pure a : OracleComp spec α) ~ (pure a : OracleComp spec α) | EqRel α⟫ := by
   rvcstep
@@ -214,11 +232,12 @@ the bind rule entirely when both sides reduce to a leaf). -/
 
 example {a : α} {f : α → OracleComp spec β} :
     ⟪(do let x ← pure a; f x) ~ f a | EqRel β⟫ := by
-  rvcstep
+  simpa only [pure_bind] using (relTriple_refl (oa := f a))
 
 example {oa : OracleComp spec α} {f : α → OracleComp spec β} {g : β → OracleComp spec γ} :
     ⟪((oa >>= f) >>= g) ~ (do let x ← oa; let y ← f x; g y) | EqRel γ⟫ := by
-  rvcstep
+  simpa only [bind_assoc] using
+    (relTriple_refl (oa := oa >>= fun x => f x >>= g))
 
 /-! ## Regression: multi-goal isolation
 
@@ -231,23 +250,19 @@ swap-and-close pass could pull a trailing sibling ahead of the bind continuation
 and silently discharge it. The fix in `closeSampleAndReorderBindGoals` keeps
 `rest` untouched at the tail. -/
 
-set_option linter.style.multiGoal false in
 example {oa : OracleComp spec α} {f g : α → OracleComp spec β}
     (ob : OracleComp spec α)
     (hf : ∀ a, ⟪f a ~ g a | EqRel β⟫) :
     (⟪oa >>= f ~ oa >>= g | EqRel β⟫) ∧ (⟪ob ~ ob | EqRel α⟫) := by
-  refine ⟨?_, ?_⟩
-  rvcstep
-  · intro a₁ a₂ h; subst h; exact hf a₁
-  · rvcstep
+  constructor
+  · refine relTriple_bind (R := EqRel α) (relTriple_refl (oa := oa)) ?_
+    intro a₁ a₂ h
+    subst h
+    exact hf a₁
+  · exact relTriple_refl (oa := ob)
 
 /-! ## Quantitative `Std.Do'.RelTriple` path -/
 
-/--
-info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.Loom.relTriple_pure` (folded, relTriple)
--/
-#guard_msgs in
-set_option vcvio.vcgen.traceCachedRules true in
 example (a : α) (b : β) (post : α → β → ℝ≥0∞) :
     ⦃post a b⦄
       (pure a : OracleComp spec α) ≈ₑ (pure b : OracleComp spec β)

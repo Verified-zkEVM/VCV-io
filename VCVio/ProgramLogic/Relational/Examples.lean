@@ -97,18 +97,21 @@ is closed by the leaf closer without intermediate planning. -/
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
     RelTriple oa ob (fun _ _ => True) := by
-  rvcgen
+  exact relTriple_true oa ob
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (fa : α → OracleComp spec₁ γ) (fb : β → OracleComp spec₂ δ) :
     RelTriple (oa >>= fa) (ob >>= fb) (fun _ _ => True) := by
-  rvcgen
+  exact relTriple_true _ _
 
 example (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     RelTriple
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₀, ()))
       (do let key ← $ᵗ BitVec sp; pure (key ^^^ msg₁, ()))
       (fun z₁ z₂ => z₁.2 = z₂.2) := by
-  rvcgen
+  refine relTriple_bind_uniformSample_bij (f := fun key : BitVec sp => key) ?_ ?_
+  · intro key
+    exact relTriple_pure_pure rfl
+  · exact Function.bijective_id
 
 end OracleComp.ProgramLogic.Relational

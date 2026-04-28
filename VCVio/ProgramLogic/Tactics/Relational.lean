@@ -66,10 +66,19 @@ raw `Std.Do'.rwp` and folded `Std.Do'.RelTriple` goals. They do not run as part
 of default relational automation, because choosing an asynchronous split fixes a
 coupling frontier.
 
+`rvcstep sym` swaps the two sides of a qualitative `RelTriple` goal and swaps
+the relational postcondition accordingly.
+
+`rvcstep upto R` changes the current qualitative postcondition to an explicit
+intermediate relation `R`, leaving the transformed relational goal and the
+postcondition implication as subgoals.
+
 `rvcstep with thm` forces one explicit relational theorem/assumption step. -/
 syntax "rvcstep" ("using" term)? : tactic
 syntax "rvcstep" "left" : tactic
 syntax "rvcstep" "right" : tactic
+syntax "rvcstep" "sym" : tactic
+syntax "rvcstep" "upto" term : tactic
 syntax "rvcstep" "with" term : tactic
 syntax "rvcstep" "as" "⟨" binderIdent,* "⟩" : tactic
 syntax "rvcstep" "using" term "as" "⟨" binderIdent,* "⟩" : tactic
@@ -106,6 +115,14 @@ elab_rules : tactic
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep right) => do
       if ← TacticInternals.Relational.runRVCGenRawBindRightStep then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep sym) => do
+      if ← TacticInternals.Relational.runRelSymmRule then
+        return
+      TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcstep upto $R) => do
+      if ← TacticInternals.Relational.runRelUptoRule R then
         return
       TacticInternals.Relational.throwRVCGenStepError
   | `(tactic| rvcstep with $thm) => do
