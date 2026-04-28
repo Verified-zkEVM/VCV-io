@@ -133,15 +133,15 @@ private lemma rqvec_add_get {k : ℕ} (v u : RqVec k) (j : Fin k) :
     (v + u).get j = v.get j + u.get j :=
   congr_fun (Vector.vectorAdd_get v u) j
 
-private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a := by
-  apply Vector.ext; intro i hi
-  change ((coeffRing.add (coeffRing.sub a b) b) : Rq).get ⟨i, hi⟩ = a.get ⟨i, hi⟩
-  simp [sub_add_cancel]
+private lemma rq_sub_add_cancel (a b : Rq) : a - b + b = a :=
+  LatticeCrypto.Poly.ext_get_eq fun i => by
+    change ((coeffRing.add (coeffRing.sub a b) b) : Rq).get i = a.get i
+    simp [sub_add_cancel]
 
-private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a := by
-  apply Vector.ext; intro i hi
-  change ((coeffRing.add (coeffRing.add a b) (coeffRing.neg b)) : Rq).get ⟨i, hi⟩ = a.get ⟨i, hi⟩
-  simp [add_neg_cancel_right]
+private lemma rq_add_neg_cancel (a b : Rq) : a + b + (-b) = a :=
+  LatticeCrypto.Poly.ext_get_eq fun i => by
+    change ((coeffRing.add (coeffRing.add a b) (coeffRing.neg b)) : Rq).get i = a.get i
+    simp [add_neg_cancel_right]
 
 private lemma neg_rq_get (f : Rq) (i : Fin ringDegree) : (-f).get i = -(f.get i) := by
   change (coeffRing.neg f).get i = _
