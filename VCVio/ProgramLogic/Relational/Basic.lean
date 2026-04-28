@@ -286,6 +286,41 @@ lemma relTriple_symm {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
     rw [← hzz]
     exact hc z' hz'
 
+/-- Transport a relational triple across equality of the left output distribution. -/
+lemma relTriple_of_evalDist_eq_left
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {oa' : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ β} {R : RelPost α β}
+    (heq : 𝒟[oa] = 𝒟[oa']) (h : RelTriple oa' ob R) :
+    RelTriple oa ob R := by
+  rcases (relTriple_iff_relWP (spec₁ := spec₂) (spec₂ := spec₃)
+    (oa := oa') (ob := ob) (R := R)).1 h with ⟨c, hc⟩
+  apply (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₃)
+    (oa := oa) (ob := ob) (R := R)).2
+  refine ⟨⟨c.1, ?_⟩, hc⟩
+  constructor
+  · simpa [heq] using c.2.map_fst
+  · exact c.2.map_snd
+
+/-- Transport a relational triple across equality of the right output distribution. -/
+lemma relTriple_of_evalDist_eq_right
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α}
+    {ob : OracleComp spec₂ β} {ob' : OracleComp spec₃ β}
+    {R : RelPost α β}
+    (heq : 𝒟[ob] = 𝒟[ob']) (h : RelTriple oa ob R) :
+    RelTriple oa ob' R := by
+  rcases (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₂)
+    (oa := oa) (ob := ob) (R := R)).1 h with ⟨c, hc⟩
+  apply (relTriple_iff_relWP (spec₁ := spec₁) (spec₂ := spec₃)
+    (oa := oa) (ob := ob') (R := R)).2
+  refine ⟨⟨c.1, ?_⟩, hc⟩
+  constructor
+  · exact c.2.map_fst
+  · simpa [heq] using c.2.map_snd
+
 /-- Bind composition rule for relational triples. -/
 lemma relTriple_bind
     {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
@@ -362,6 +397,44 @@ lemma evalDist_eq_of_relTriple_eqRel {oa : OracleComp spec₁ α} {ob : OracleCo
     (h : RelTriple oa ob (EqRel α)) :
     𝒟[oa] = 𝒟[ob] :=
   evalDist_ext (fun x => probOutput_eq_of_relTriple_eqRel (spec₁ := spec₁) (spec₂ := spec₂) h x)
+
+/-- Transitivity through an intermediate computation related to the left side by `EqRel`. -/
+lemma relTriple_trans_eqRel_left
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ β} {R : RelPost α β}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
+    RelTriple oa ob R :=
+  relTriple_of_evalDist_eq_left
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃)
+    (oa := oa) (oa' := mid) (ob := ob)
+    (evalDist_eq_of_relTriple_eqRel hleft) hright
+
+/-- Transitivity through an intermediate computation related to the right side by `EqRel`. -/
+lemma relTriple_trans_eqRel_right
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α}
+    {mid : OracleComp spec₂ β} {ob : OracleComp spec₃ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid R) (hright : RelTriple mid ob (EqRel β)) :
+    RelTriple oa ob R :=
+  relTriple_of_evalDist_eq_right
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃)
+    (oa := oa) (ob := mid) (ob' := ob)
+    (evalDist_eq_of_relTriple_eqRel hright) hleft
+
+/-- Transitivity of equality-relation relational triples through an intermediate computation. -/
+lemma relTriple_trans_eqRel
+    {ι₃ : Type w} {spec₃ : OracleSpec ι₃}
+    [spec₃.Fintype] [spec₃.Inhabited]
+    {oa : OracleComp spec₁ α} {mid : OracleComp spec₂ α}
+    {ob : OracleComp spec₃ α}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob (EqRel α)) :
+    RelTriple oa ob (EqRel α) :=
+  relTriple_trans_eqRel_left
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₃) hleft hright
 
 /-- Bool-specialized bridge from relational triples to game success equality. -/
 lemma probOutput_true_eq_of_relTriple_eqRel

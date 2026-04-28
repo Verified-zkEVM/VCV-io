@@ -75,6 +75,26 @@ example {a : α} {b : β} {R : RelPost α β} (h : R a b) :
       (pure a : OracleComp spec₁ α) (pure b : OracleComp spec₂ β) R :=
   relTriple_pure_pure h
 
+example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob R) :
+    RelTriple oa ob R :=
+  relTriple_trans_eqRel_left
+    (spec₁ := spec₁) (spec₂ := spec₁) (spec₃ := spec₂) hleft hright
+
+example {oa : OracleComp spec₁ α} {mid ob : OracleComp spec₂ β}
+    {R : RelPost α β}
+    (hleft : RelTriple oa mid R) (hright : RelTriple mid ob (EqRel β)) :
+    RelTriple oa ob R :=
+  relTriple_trans_eqRel_right
+    (spec₁ := spec₁) (spec₂ := spec₂) (spec₃ := spec₂) hleft hright
+
+example {oa mid : OracleComp spec₁ α} {ob : OracleComp spec₂ α}
+    (hleft : RelTriple oa mid (EqRel α)) (hright : RelTriple mid ob (EqRel α)) :
+    RelTriple oa ob (EqRel α) :=
+  relTriple_trans_eqRel
+    (spec₁ := spec₁) (spec₂ := spec₁) (spec₃ := spec₂) hleft hright
+
 /-! ### Tactic-mode examples (using `rvcstep`) -/
 
 example {oa : OracleComp spec₁ α} {ob : OracleComp spec₂ β}

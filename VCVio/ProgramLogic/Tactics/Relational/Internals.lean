@@ -315,9 +315,16 @@ private def tryCloseRelOwnedGoal : TacticM Bool := do
         | assumption
         | trivial
         | (intro _; assumption)
-        | simp [Lean.Order.PartialOrder.rel]
-        | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)
-        | (repeat intro; split_ifs <;> simp [Lean.Order.PartialOrder.rel])))
+        | (simp only [OracleComp.ProgramLogic.Relational.EqRel]; symm; assumption)))
+  if ok then
+    return (← getGoals).isEmpty
+  let target ← instantiateMVars (← getMainTarget)
+  if (relationalGoalParts? target).isSome || (findAppWithHead? ``Std.Do'.rwp target).isSome then
+    return false
+  let ok ← tryEvalTacticSyntax (← `(tactic|
+      first
+        | simp only [Lean.Order.PartialOrder.rel]
+        | (repeat intro; split_ifs <;> simp only [Lean.Order.PartialOrder.rel])))
   return ok && (← getGoals).isEmpty
 
 private def closeOwnedRelSubgoals (owned : List MVarId) : TacticM (List MVarId) := do
