@@ -147,7 +147,7 @@ abbrev SourceCmaComp (α : Type) :=
 
 /-- The public post-keygen adversary/verification computation before it is
 interpreted by the explicit random-oracle cache runtime. -/
-@[reducible, fs_simp] noncomputable def postKeygenAdvBase
+@[fs_simp] noncomputable def postKeygenAdvBase
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) :
     SourceCmaComp (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
@@ -170,7 +170,7 @@ noncomputable def postVerifyComp
   pure (x, verified)
 
 /-- Fixed-key adversary and verification computation over the named CMA interface. -/
-@[reducible, fs_simp] noncomputable def postKeygenAdv
+@[fs_simp] noncomputable def postKeygenAdv
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) :
     OracleComp (cmaSpec M Commit Chal Resp Stmt)
@@ -213,7 +213,7 @@ lemma runtimeWithCache_evalDist_eq_fsBaseImpl
 The keypair is installed before the adversary runs, and the final freshness
 check reads the signed-message log from the resulting `CmaState`. This is the
 canonical normal form used by the stateful CMA chain. -/
-@[reducible, fs_simp] noncomputable def postKeygenFreshProb
+@[fs_simp] noncomputable def postKeygenFreshProb
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
     (pk : Stmt) (sk : Wit) : ProbComp Bool := by
   exact
@@ -232,7 +232,7 @@ canonical normal form used by the stateful CMA chain. -/
 /-- Run the direct stateful `cmaReal` game against `signedAdv` and pack the
 forgery, verification bit, and signed-message log into one probability
 computation. -/
-@[reducible, fs_simp] noncomputable def cmaRealRun
+@[fs_simp] noncomputable def cmaRealRun
     (adv : SourceAdv (σ := σ) (hr := hr) (M := M)) :
     ProbComp ((M × (Commit × Resp)) × Bool × List M) := do
   let p ← (cmaReal M Commit Chal σ hr).runState
