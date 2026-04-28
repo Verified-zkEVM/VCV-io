@@ -291,7 +291,71 @@ theorem dlogSuccess_sq_le_cdhSuccess_dlogToCDHReduction
     (g : G) (adversary : DLogAdversary F G) :
     (Pr[= true | dlogExp g adversary]).toReal ^ 2 ≤
       (Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)]).toReal := by
-  sorry
+  rw [← ENNReal.toReal_pow]
+  refine ENNReal.toReal_mono probOutput_ne_top ?_
+  set w : F → ℝ≥0∞ := fun x => Pr[= x | $ᵗ F] with hw
+  set f : F → ℝ≥0∞ := fun x => Pr[= x | adversary g (x • g)] with hff
+  -- Step 1: Pr[dlog] decomposes as ∑'_x w(x) * f(x).
+  have hdlog : Pr[= true | dlogExp g adversary] = ∑' x : F, w x * f x := by
+    unfold dlogExp
+    rw [probOutput_bind_eq_tsum]
+    refine tsum_congr fun x => ?_
+    congr 1
+    rw [probOutput_bind_eq_tsum]
+    refine (tsum_eq_single x ?_).trans ?_
+    · intro x' hx'
+      have : (decide (x' = x) : Bool) = false := by simp [hx']
+      simp [this]
+    · simp [f]
+  -- Step 2: Pr[dlog]^2 expands to a double tsum over independent copies.
+  have h_sq : Pr[= true | dlogExp g adversary] ^ 2 =
+      ∑' (a : F) (b : F), w a * f a * (w b * f b) := by
+    rw [sq, hdlog, ← ENNReal.tsum_mul_right]
+    refine tsum_congr fun _ => ?_
+    rw [← ENNReal.tsum_mul_left]
+  rw [h_sq]
+  -- Step 3: Pr[cdh] expands to a 4-fold tsum, with each weight pushed under the inner tsum.
+  have hcdh : Pr[= true | cdhExp g (dlogToCDHReduction (F := F) adversary)] =
+    ∑' (a : F) (b : F) (a' : F) (b' : F),
+      w a * (w b * (Pr[= a' | adversary g (a • g)] *
+        (Pr[= b' | adversary g (b • g)] *
+          (if (a' * b') • g = (a * b) • g then 1 else 0)))) := by
+    unfold cdhExp dlogToCDHReduction
+    simp only [bind_assoc, pure_bind, probOutput_bind_eq_tsum, ← ENNReal.tsum_mul_left]
+    refine tsum_congr fun a => ?_
+    refine tsum_congr fun b => ?_
+    refine tsum_congr fun a' => ?_
+    refine tsum_congr fun b' => ?_
+    by_cases hP : (a' * b') • g = (a * b) • g
+    · simp only [hP, if_true, mul_one, decide_true, probOutput_pure_self]
+      rfl
+    · have hPdec : (decide ((a' * b') • g = (a * b) • g) : Bool) = false := by simp [hP]
+      simp only [if_neg hP, mul_zero, hPdec]
+      rw [show Pr[= true | (pure false : ProbComp Bool)] = 0 from by simp]
+      ring
+  rw [hcdh]
+  -- Step 4: pointwise lower bound — keep only the (a' = a, b' = b) terms.
+  refine ENNReal.tsum_le_tsum fun a => ?_
+  refine ENNReal.tsum_le_tsum fun b => ?_
+  have heq_diag : w a * f a * (w b * f b) =
+      w a * (w b * (Pr[= a | adversary g (a • g)] *
+        (Pr[= b | adversary g (b • g)] *
+          (if (a * b) • g = (a * b) • g then 1 else 0)))) := by
+    change w a * f a * (w b * f b) =
+      w a * (w b * (f a * (f b * (if (a * b) • g = (a * b) • g then 1 else 0))))
+    simp only [if_true, mul_one]; ring
+  calc w a * f a * (w b * f b)
+      = w a * (w b * (Pr[= a | adversary g (a • g)] *
+          (Pr[= b | adversary g (b • g)] *
+            (if (a * b) • g = (a * b) • g then 1 else 0)))) := heq_diag
+    _ ≤ ∑' (b' : F), w a * (w b * (Pr[= a | adversary g (a • g)] *
+          (Pr[= b' | adversary g (b • g)] *
+            (if (a * b') • g = (a * b) • g then 1 else 0)))) :=
+        ENNReal.le_tsum b
+    _ ≤ ∑' (a' : F) (b' : F), w a * (w b * (Pr[= a' | adversary g (a • g)] *
+          (Pr[= b' | adversary g (b • g)] *
+            (if (a' * b') • g = (a * b) • g then 1 else 0)))) :=
+        ENNReal.le_tsum a
 
 /-- Concrete form of the hardness implication `DDH ⇒ DLog`, obtained by composing the previous two
 adversary-map reductions. -/

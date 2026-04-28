@@ -644,7 +644,80 @@ theorem etvDist_le_of_maxDiv (p q : PMF α) :
     p.etvDist q ≤ 1 - (p.maxDiv q)⁻¹ := by
   by_cases hD : p.maxDiv q = ⊤
   · rw [hD, ENNReal.inv_top, tsub_zero]; exact etvDist_le_one p q
-  · sorry
+  set D := p.maxDiv q with hDdef
+  have hD1 : 1 ≤ D := maxDiv_one_le p q
+  have hD0 : D ≠ 0 := (zero_lt_one.trans_le hD1).ne'
+  have hDinv_le_one : D⁻¹ ≤ 1 := ENNReal.inv_le_one.mpr hD1
+  have hDinv_ne_top : D⁻¹ ≠ ⊤ := ne_top_of_le_ne_top one_ne_top hDinv_le_one
+  have h_le_D : ∀ x, p x / q x ≤ D :=
+    fun x => hDdef ▸ le_iSup (fun y => p y / q y) x
+  -- Pointwise bounds: p x / D ≤ q x and p x / D ≤ p x, hence ≤ p x ⊓ q x.
+  have h_div_le_q : ∀ x, p x / D ≤ q x := by
+    intro x
+    by_cases hq : q x = 0
+    · by_cases hp : p x = 0
+      · simp [hp, hq]
+      · exact absurd (top_unique
+          (by simpa [hq, ENNReal.div_zero hp] using h_le_D x)) hD
+    · have h := h_le_D x
+      rw [ENNReal.div_le_iff hq (PMF.apply_ne_top q x)] at h
+      rwa [ENNReal.div_le_iff hD0 hD, mul_comm]
+  have h_div_le_p : ∀ x, p x / D ≤ p x := by
+    intro x
+    rw [ENNReal.div_le_iff hD0 hD]
+    nth_rw 1 [← mul_one (p x)]
+    gcongr
+  have h_div_le_min : ∀ x, p x / D ≤ p x ⊓ q x :=
+    fun x => le_inf (h_div_le_p x) (h_div_le_q x)
+  -- Identity: |p x - q x| + 2 * (p x ⊓ q x) = p x + q x
+  have h_absDiff_eq : ∀ x, ENNReal.absDiff (p x) (q x) + 2 * (p x ⊓ q x) = p x + q x := by
+    intro x
+    have h1 : p x - q x + (p x ⊓ q x) = p x := tsub_add_min
+    have h2 : q x - p x + (q x ⊓ p x) = q x := tsub_add_min
+    have h2' : q x - p x + (p x ⊓ q x) = q x := by rwa [inf_comm]
+    rw [ENNReal.absDiff, two_mul]
+    calc p x - q x + (q x - p x) + ((p x ⊓ q x) + (p x ⊓ q x))
+        = (p x - q x + (p x ⊓ q x)) + (q x - p x + (p x ⊓ q x)) := by ac_rfl
+      _ = p x + q x := by rw [h1, h2']
+  -- ∑ (p x ⊓ q x) ≥ 1 / D.
+  have h_div_ne_top : ∀ x, p x / D ≠ ⊤ := fun x =>
+    ENNReal.div_ne_top (PMF.apply_ne_top p x) hD0
+  have h_sum_min : D⁻¹ ≤ ∑' x, p x ⊓ q x := by
+    calc D⁻¹
+        = (∑' x, p x) * D⁻¹ := by rw [p.tsum_coe, one_mul]
+      _ = ∑' x, p x * D⁻¹ := ENNReal.tsum_mul_right.symm
+      _ = ∑' x, p x / D := by simp_rw [← div_eq_mul_inv]
+      _ ≤ ∑' x, p x ⊓ q x := ENNReal.tsum_le_tsum h_div_le_min
+  -- ∑ |p x - q x| + 2 * ∑ (p x ⊓ q x) = 2.
+  have h_sum_split :
+      (∑' x, ENNReal.absDiff (p x) (q x)) + 2 * (∑' x, p x ⊓ q x) = 2 := by
+    rw [← ENNReal.tsum_mul_left, ← ENNReal.tsum_add]
+    simp only [h_absDiff_eq]
+    rw [ENNReal.tsum_add, p.tsum_coe, q.tsum_coe]
+    norm_num
+  have h_sum_min_ne_top : (∑' x, p x ⊓ q x) ≠ ⊤ :=
+    ne_top_of_le_ne_top one_ne_top (by
+      calc ∑' x, p x ⊓ q x ≤ ∑' x, p x := ENNReal.tsum_le_tsum (fun x => inf_le_left)
+        _ = 1 := p.tsum_coe)
+  -- ∑ |p x - q x| ≤ 2 - 2/D.
+  have h_two_inv_ne_top : (2 : ℝ≥0∞) * D⁻¹ ≠ ⊤ :=
+    ENNReal.mul_ne_top (by norm_num) hDinv_ne_top
+  have h_two_inv_le_two : (2 : ℝ≥0∞) * D⁻¹ ≤ 2 := by
+    calc (2 : ℝ≥0∞) * D⁻¹ ≤ 2 * 1 := by gcongr
+      _ = 2 := mul_one _
+  have h_sum_absDiff_le : (∑' x, ENNReal.absDiff (p x) (q x)) ≤ 2 - 2 * D⁻¹ := by
+    rw [ENNReal.le_sub_iff_add_le_right h_two_inv_ne_top h_two_inv_le_two]
+    calc (∑' x, ENNReal.absDiff (p x) (q x)) + 2 * D⁻¹
+        ≤ (∑' x, ENNReal.absDiff (p x) (q x)) + 2 * (∑' x, p x ⊓ q x) := by
+          gcongr
+      _ = 2 := h_sum_split
+  -- Conclude: etvDist = (∑ |p - q|) / 2 ≤ (2 - 2/D) / 2 = 1 - 1/D.
+  unfold PMF.etvDist
+  rw [ENNReal.div_le_iff_le_mul (Or.inl (by norm_num)) (Or.inl (by norm_num))]
+  calc ∑' x, ENNReal.absDiff (p x) (q x)
+      ≤ 2 - 2 * D⁻¹ := h_sum_absDiff_le
+    _ = (1 - D⁻¹) * 2 := by
+        rw [ENNReal.sub_mul (fun _ _ => by norm_num), one_mul, mul_comm 2 D⁻¹]
 
 /-- Finite-order Rényi divergence bounds TV distance (squared form):
 `TV(p, q)² ≤ 1 - R_a(p ‖ q)⁻¹`.
