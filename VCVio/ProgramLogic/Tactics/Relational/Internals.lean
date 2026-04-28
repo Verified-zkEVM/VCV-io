@@ -1675,6 +1675,14 @@ def runRVCGenStep : TacticM Bool := do
 def runRVCGenStepUsing (hint : TSyntax `term) : TacticM Bool := do
   runRVCGenExplicitHintStep hint
 
+def runRVCGenStrictStepUsing (hint : TSyntax `term) : TacticM Bool := do
+  let saved ← saveState
+  discard <| tryLowerRelGoal
+  if ← runRVCGenCoreUsing hint then
+    return true
+  saved.restore
+  return false
+
 def runRVCGenPassPlanned : TacticM (Array PlannedStep) := do
   let goals ← getGoals
   if goals.isEmpty then

@@ -172,6 +172,9 @@ elab_rules : tactic
 `rvcgen using t` uses the explicit hint `t` for the first step on the main goal, then
 continues with ordinary hint-free relational VCGen on all remaining goals.
 
+`rvcgen using [t₁, t₂, ...]` applies explicit cuts in sequence, introducing and
+substituting EqRel continuation equalities between cuts when present.
+
 `rvcgen with thm` forces one explicit relational theorem step on the main goal, then continues
 with ordinary hint-free relational VCGen on all remaining goals.
 
@@ -179,7 +182,8 @@ with ordinary hint-free relational VCGen on all remaining goals.
 
 `rvcgen!` runs ordinary `rvcgen` and then `rvcfinish`. -/
 syntax "rvcgen" : tactic
-syntax "rvcgen" "using" term : tactic
+syntax (name := rvcgenUsingList) (priority := high) "rvcgen" "using" "[" term,* "]" : tactic
+syntax "rvcgen" "using" term:max : tactic
 syntax "rvcgen" "with" term : tactic
 syntax "rvcfinish" : tactic
 syntax "rvcgen!" : tactic
@@ -220,6 +224,16 @@ elab_rules : tactic
       if lines.isEmpty then
         lines := ["rvcgen"]
       addTryThisTextSuggestion (← getRef) <| String.intercalate "\n" lines
+
+elab_rules (kind := rvcgenUsingList) : tactic
+  | `(tactic| rvcgen using [ $hints,* ]) => withVCGenRunTiming "rvcgen" do
+      for hint in hints.getElems do
+        discard <| tryEvalTacticSyntax (← `(tactic|
+          try (intro _ _ h; subst h)))
+        unless ← TacticInternals.Relational.runRVCGenStrictStepUsing hint do
+          TacticInternals.Relational.throwRVCGenStepUsingError hint
+        discard <| tryEvalTacticSyntax (← `(tactic|
+          try (intro _ _ h; subst h)))
 
 /-- `rel_conseq` weakens or strengthens the postcondition of a `RelTriple` goal.
 

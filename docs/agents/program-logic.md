@@ -53,6 +53,7 @@ before generating the remaining subgoals.
 | `rvcstep?` | same | Performs one relational step and emits a `Try this` script, usually surfacing a needed `using` hint, `with theorem`, or `as ⟨...⟩` clause |
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcgen using [t₁, t₂, ...]` | same | Applies explicit cut hints in sequence, introducing and substituting EqRel continuation equalities between cuts |
 | `rvcgen with thm` | same | Uses `thm` for the first step on the main goal, then continues with ordinary `rvcgen` |
 | `rvcfinish` | residual relational VCs | Runs the opt-in consequence/search finishing pass |
 | `rvcgen!` | same | Runs `rvcgen`, then `rvcfinish` |

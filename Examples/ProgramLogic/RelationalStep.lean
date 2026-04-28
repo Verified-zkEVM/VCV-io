@@ -101,7 +101,7 @@ theorem rvcstep_trans_postprocess_right [SampleableType α] (f : α → β) (g :
     (do
       let x ← ($ᵗ α : ProbComp α)
       pure (f x))
-  · exact relTriple_refl _
+  · rvcstep
   · rvcstep using EqRel α
 
 theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : α → β) :
@@ -117,7 +117,7 @@ theorem rvcstep_trans_postprocess_left [SampleableType α] (f : β → γ) (g : 
       let x ← ($ᵗ α : ProbComp α)
       pure (g x))
   · rvcstep using EqRel α
-  · exact relTriple_refl _
+  · rvcstep
 
 /--
 info: [vcspec cache] miss `OracleComp.ProgramLogic.Relational.relTriple_map` (folded, relTriple)
@@ -181,13 +181,20 @@ example {mx : OracleComp spec α} {my : OracleComp spec β}
     ⟪(mx >>= fun a => my >>= fun b => f a b)
      ~ (my >>= fun b => mx >>= fun a => g b a)
      | R⟫ := by
-  rvcstep swap left using EqRel β
-  intro b₁ b₂ hb
-  subst hb
-  rvcstep
-  intro a₁ a₂ ha
-  subst ha
+  rvcstep swap left
+  rvcgen using [EqRel β, EqRel α]
   exact hfg _ _
+
+example {mx : OracleComp spec α} {my : OracleComp spec β}
+    {f : α → β → OracleComp spec γ} {g : β → α → OracleComp spec δ}
+    {R : RelPost δ γ}
+    (hgf : ∀ b a, ⟪g b a ~ f a b | R⟫) :
+    ⟪(my >>= fun b => mx >>= fun a => g b a)
+     ~ (mx >>= fun a => my >>= fun b => f a b)
+     | R⟫ := by
+  rvcstep swap right
+  rvcgen using [EqRel β, EqRel α]
+  exact hgf _ _
 
 example {mx : OracleComp spec α} {my : OracleComp spec β}
     {k : α → β → δ} :
@@ -209,6 +216,24 @@ example [SampleableType α] {my : ProbComp β}
         pure (x, y))
      | fun p q => q.1 = f p.1 ∧ q.2 = p.2⟫ := by
   rvcstep swap left using EqRel β
+  intro y₁ y₂ hy
+  subst hy
+  rvcstep using f
+  · exact relTriple_pure_pure ⟨rfl, rfl⟩
+  · exact hf
+
+example [SampleableType α] {my : ProbComp β}
+    {f : α → α} (hf : Function.Bijective f) :
+    ⟪(do
+        let y ← my
+        let x ← ($ᵗ α : ProbComp α)
+        pure (x, y))
+     ~ (do
+        let x ← ($ᵗ α : ProbComp α)
+        let y ← my
+        pure (x, y))
+     | fun p q => q.1 = f p.1 ∧ q.2 = p.2⟫ := by
+  rvcstep swap right using EqRel β
   intro y₁ y₂ hy
   subst hy
   rvcstep using f
