@@ -188,7 +188,7 @@ private lemma extractability_someWin_implies_collision {t : ℕ}
     exact ⟨entry.1, (m, s), entry.2, c, hne, hcache₃_entry, hcache₃,
       heq_of_eq (by rw [hentry_cm, hceq])⟩
 
-omit [Fintype M] [Fintype S] [Fintype C] [Inhabited M] [Inhabited S] in
+omit [Fintype M] [Fintype S] [Fintype C] [Inhabited C] [Inhabited M] [Inhabited S] in
 /-- `IsTotalQueryBound` for the extractability game's inner computation.
 
 The inner computation consists of:
