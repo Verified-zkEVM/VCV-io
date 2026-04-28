@@ -296,16 +296,14 @@ query-bound flavors transfer biconditionally via `fst_map_run_simulateQ` /
 `QueryImpl.fst_map_run_withLogging` and `isXQueryBound_iff_of_map_eq`. -/
 
 theorem isTotalQueryBound_run_simulateQ_loggingOracle_iff
-    {ι : Type} {spec : OracleSpec.{0, 0} ι}
-    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
     (oa : OracleComp spec α) (n : ℕ) :
     IsTotalQueryBound ((simulateQ loggingOracle oa).run) n ↔
     IsTotalQueryBound oa n :=
   isQueryBound_iff_of_map_eq (loggingOracle.fst_map_run_simulateQ oa) _ _
 
 theorem isQueryBoundP_run_simulateQ_loggingOracle_iff
-    {ι : Type} {spec : OracleSpec.{0, 0} ι}
-    [spec.DecidableEq] [spec.Fintype] [spec.Inhabited] {α : Type}
+    {ι : Type} {spec : OracleSpec.{0, 0} ι} {α : Type}
     (oa : OracleComp spec α) (p : ι → Prop) [DecidablePred p] (n : ℕ) :
     IsQueryBoundP ((simulateQ loggingOracle oa).run) p n ↔
     IsQueryBoundP oa p n :=

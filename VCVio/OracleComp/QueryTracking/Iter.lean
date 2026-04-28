@@ -283,37 +283,33 @@ lemma isQueryBoundP_listFoldlM
 lemma isPerIndexQueryBound_listMapM [DecidableEq ι]
     {f : α → OracleComp spec β} {qb : α → ι → ℕ}
     (h : ∀ x, IsPerIndexQueryBound (f x) (qb x)) (xs : List α) :
-    IsPerIndexQueryBound (xs.mapM f) ((xs.map qb).foldr (· + ·) 0) := by
+    IsPerIndexQueryBound (xs.mapM f) ((xs.map qb).sum) := by
   induction xs with
   | nil => simp [List.mapM_nil]
   | cons a xs ih =>
-      rw [List.mapM_cons, List.map_cons, List.foldr_cons]
+      rw [List.mapM_cons, List.map_cons, List.sum_cons]
       refine isPerIndexQueryBound_bind (h a) fun y => ?_
       have hrest : IsPerIndexQueryBound (xs.mapM f >>= fun ys => pure (y :: ys))
-          ((xs.map qb).foldr (· + ·) 0 + 0) :=
+          ((xs.map qb).sum + 0) :=
         isPerIndexQueryBound_bind ih fun _ => trivial
       simpa using hrest
-
-private lemma map_const_foldr_eq_length_smul (qb : ι → ℕ) (xs : List α) :
-    (xs.map fun _ => qb).foldr (· + ·) 0 = xs.length • qb := by
-  rw [show (xs.map fun _ => qb).foldr (· + ·) 0 = (xs.map fun _ => qb).sum from rfl,
-    List.map_const', List.sum_replicate]
 
 lemma isPerIndexQueryBound_listMapM_const [DecidableEq ι]
     {f : α → OracleComp spec β} {qb : ι → ℕ}
     (h : ∀ x, IsPerIndexQueryBound (f x) qb) (xs : List α) :
     IsPerIndexQueryBound (xs.mapM f) (xs.length • qb) := by
-  have hgen := isPerIndexQueryBound_listMapM (qb := fun _ => qb) h xs
-  rwa [map_const_foldr_eq_length_smul] at hgen
+  have := isPerIndexQueryBound_listMapM h xs
+  rwa [show (xs.map fun _ => qb).sum = xs.length • qb by
+    rw [List.map_const', List.sum_replicate]] at this
 
 lemma isPerIndexQueryBound_listFoldlM [DecidableEq ι]
     {f : β → α → OracleComp spec β} {qb : α → ι → ℕ}
     (h : ∀ b x, IsPerIndexQueryBound (f b x) (qb x)) (b₀ : β) (xs : List α) :
-    IsPerIndexQueryBound (xs.foldlM f b₀) ((xs.map qb).foldr (· + ·) 0) := by
+    IsPerIndexQueryBound (xs.foldlM f b₀) ((xs.map qb).sum) := by
   induction xs generalizing b₀ with
   | nil => simp [List.foldlM_nil]
   | cons a xs ih =>
-      rw [List.foldlM_cons, List.map_cons, List.foldr_cons]
+      rw [List.foldlM_cons, List.map_cons, List.sum_cons]
       refine isPerIndexQueryBound_bind (h b₀ a) fun b' => ?_
       exact ih b'
 

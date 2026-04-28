@@ -91,9 +91,9 @@ private lemma _root_.QueryImpl.withCachingTraceAppend_run_proj_eq
   QueryImpl.withCachingAux_run_proj_eq so _ _
     (by intro t cache q; simp [Functor.map_map]) oa s.1 s.2
 
-omit [spec.DecidableEq] in
+omit [Monad m] [spec.DecidableEq] in
 theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
-    [LawfulMonad m] [LawfulAppend ω]
+    [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
     {oa : OracleComp spec α} {n : ℕ}
@@ -106,9 +106,9 @@ theorem isTotalQueryBound_run_simulateQ_withCachingTraceAppend
       (QueryImpl.withCachingTraceAppend_run_proj_eq so traceFn oa s) _ _).mpr
     (OracleComp.IsTotalQueryBound.simulateQ_run_withCaching so h hstep s.1)
 
-omit [spec.DecidableEq] in
+omit [Monad m] [spec.DecidableEq] in
 theorem isQueryBoundP_run_simulateQ_withCachingTraceAppend
-    [LawfulMonad m] [LawfulAppend ω]
+    [LawfulAppend ω]
     (so : QueryImpl spec (OracleComp spec'))
     (traceFn : (t : spec.Domain) → spec.Range t → ω)
     {oa : OracleComp spec α}
