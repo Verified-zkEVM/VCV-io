@@ -126,14 +126,16 @@ explicit hint opportunities, `vcstep` / `vcgen` consult only `@[vcspec]` theorem
 computation head matches the current goal. Use `vcstep with myLemma` when you want to force
 one specific theorem/assumption step manually.
 
-**Opt-in relational lookup**: mark a relational `RelTriple`, `RelWP`, or `eRelTriple` theorem
-with `@[vcspec]` to register it for the analogous bounded head-pair lookup on the relational side.
+**Opt-in relational lookup**: mark a relational `RelTriple`, `RelWP`, or quantitative
+`Std.Do'.RelTriple` theorem with `@[vcspec]` to register it for the analogous bounded
+head-pair lookup on the relational side.
 This is especially useful for automation-oriented `simulateQ` transport lemmas whose outer
 computation heads are stable but whose inner invariants or projection arguments still come from
 the local context. The default registry already covers the structural relational rules
 (`relTriple_pure_pure`, `relTriple_bind`, `relTriple_map`, `relTriple_if`, the `replicate` /
-`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative `eRelTriple_pure` /
-`eRelTriple_bind` / `eRelTriple_uniformSample_bij`, and the two `simulateQ` transport rules),
+`mapM` / `foldlM` / `uniformSample_bij` families, the quantitative
+`Std.Do'.RelTriple` pure / bind / uniform-sampling families, and the two `simulateQ`
+transport rules),
 so user-defined rules slot into the same lookup pipeline without further wiring.
 
 ### Handler Normalization
@@ -178,7 +180,7 @@ goals that simplify to pure-pure or refl close immediately.
 3. `relTriple_post_const ?_; intros; trivial` (the postcondition reduces to a trivially provable
    proposition such as `() = ()` after introduction);
 4. `relTriple_refl` / `relTriple_eqRel_of_eq rfl` / `relTriple_pure_pure` /
-   `eRelTriple_pure` (canonical reflexive and pure-pure leaves);
+   quantitative `Std.Do'.RelTriple` pure (canonical reflexive and pure-pure leaves);
 5. a `subst_vars`-driven retry of the same closers (resolves syntactically-distinct pure
    values unified by local equality hypotheses);
 6. a symmetric `relTriple_pure_pure ∘ symm` step for postconditions written in the swapped
@@ -433,12 +435,13 @@ tvDist_simulateQ_le_probEvent_bad :
 
 ```lean
 -- ⦃f⦄ c₁ ≈ₑ c₂ ⦃g⦄
-def eRelTriple (pre : ℝ≥0∞) (oa ob : ...) (post : α → β → ℝ≥0∞) : Prop :=
-  pre ≤ eRelWP oa ob post
+Std.Do'.RelTriple pre oa ob post Lean.Order.bot Lean.Order.bot
+-- definitionally unfolds to:
+pre ≤ eRelWP oa ob post
 
 -- ⟪c₁ ≈[ε] c₂ | R⟫
 def ApproxRelTriple (ε : ℝ≥0∞) (oa ob : ...) (R : RelPost α β) : Prop :=
-  eRelTriple (1 - ε) oa ob (RelPost.indicator R)
+  1 - ε ≤ eRelWP oa ob (RelPost.indicator R)
 ```
 
 pRHL is the special case where `ε = 0` (exact coupling).
@@ -522,7 +525,7 @@ in two registry files rather than a framework rewrite.
 
 | File | Attribute | Role |
 |------|-----------|------|
-| `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / `eRelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
+| `Common/Registry.lean` | `@[vcspec]` | Unary and relational `Triple` / `RelTriple` / `RelWP` / quantitative `Std.Do'.RelTriple` rules, indexed by a `Sym.Pattern` on the computation slot (`oa` for unary, `oa` with a secondary `rightHead?` filter for relational) |
 | `Common/WpStepRegistry.lean` | `@[wpStep]` | Equational `wp comp post = …` rewrites, indexed by a `Sym.Pattern` on `oa` and consulted by `runWpStepRules` via `TacticM` rewriting (`rw` then `simp only`). The `Sym.Simp.Theorem` bundle for an eventual `SymM`-side rewriter is *not* eagerly built; `Sym.Simp.mkTheoremFromDecl` can rebuild it on demand from `getAllWpStepEntries` |
 
 Each entry carries a `SpecProof` (reusing the core-Lean type from
@@ -533,7 +536,8 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
 ### Dispatch flow
 
 1. **Unary / relational VC-gen** (`Unary/Internals.lean`,
-   `Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/`eRelTriple`
+   `Relational/Internals.lean`): on a `Triple`/`wp`/`RelTriple`/`RelWP`/quantitative
+   `Std.Do'.RelTriple`
    goal, the planner extracts the computation slot(s), `whnfReducible`s them,
    asks the registry for candidate `VCSpecEntry`s via
    `getRegisteredUnaryVCSpecEntries` / `getRegisteredRelationalVCSpecEntries`,
@@ -555,7 +559,7 @@ from the attribute's optional priority argument (`@[vcspec (prio := 200)]`).
 | Want to add… | Tag it with | Expected shape |
 |--------------|-------------|----------------|
 | A unary Triple lemma usable by `vcstep` / `vcgen` | `@[vcspec]` | `Triple pre oa post` or raw `wp oa post ≥ pre` |
-| A relational lemma usable by `rvcstep` / `rvcgen` | `@[vcspec]` | `RelTriple oa ob R`, `RelWP oa ob post`, or `eRelTriple pre oa ob post` |
+| A relational lemma usable by `rvcstep` / `rvcgen` | `@[vcspec]` | `RelTriple oa ob R`, `RelWP oa ob post`, or quantitative `Std.Do'.RelTriple pre oa ob post Lean.Order.bot Lean.Order.bot` |
 | A `wp`-driven equational rewrite | `@[wpStep]` | `wp comp post = …` (exact head `wp`) |
 
 Priorities (`@[vcspec (prio := 200)]`, `@[wpStep (prio := 200)]`) follow the

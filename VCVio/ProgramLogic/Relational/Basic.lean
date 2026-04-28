@@ -24,22 +24,22 @@ This file defines `RelTriple` via the generic two-monad algebra interface
 `HasCoupling` and coupling lemmas remain as semantic bridge lemmas.
 -/
 
-universe u
+universe u v w x
 
 open scoped OracleSpec.PrimitiveQuery
 
 namespace OracleComp.ProgramLogic.Relational
 
-variable {ι₁ : Type u} {ι₂ : Type u}
+variable {ι₁ : Type u} {ι₂ : Type v}
 variable {spec₁ : OracleSpec ι₁} {spec₂ : OracleSpec ι₂}
 variable [spec₁.Fintype] [spec₁.Inhabited] [spec₂.Fintype] [spec₂.Inhabited]
 variable {α β γ δ : Type}
 
 /-- Relational postconditions over two output spaces. -/
-abbrev RelPost (α : Type) (β : Type) := α → β → Prop
+abbrev RelPost (α : Sort w) (β : Sort x) := α → β → Prop
 
 /-- Equality relation helper for same-type outputs. -/
-def EqRel (α : Type) : RelPost α α := fun x y => x = y
+def EqRel (α : Sort w) : RelPost α α := fun x y => x = y
 
 /-- Coupling-based semantic relational WP for `OracleComp`. -/
 def CouplingPost (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
