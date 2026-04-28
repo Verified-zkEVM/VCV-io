@@ -40,6 +40,8 @@ before generating the remaining subgoals.
 | `rvcgen` | same | Repeats relational VCGen across all current goals until stuck |
 | `rvcgen using t` | same | Uses `t` for the first step on the main goal, then continues with ordinary `rvcgen` |
 | `rvcgen with thm` | same | Uses `thm` for the first step on the main goal, then continues with ordinary `rvcgen` |
+| `rvcfinish` | residual relational VCs | Runs the opt-in consequence/search finishing pass |
+| `rvcgen!` | same | Runs `rvcgen`, then `rvcfinish` |
 | `rvcgen?` | same | Runs `rvcgen` and emits the corresponding explicit script |
 | `rel_conseq` | `⟪oa ~ ob \| R'⟫` | Weakens/strengthens postcondition |
 | `rel_inline foo` | `⟪... ~ ... \| R⟫` | Unfolds definitions, simplifies |
@@ -172,8 +174,8 @@ relational goal before deciding which structural rule to apply. This flattens ne
 strips pure-bind layers so that the bind decomposition rule fires on aligned shapes, and so that
 goals that simplify to pure-pure or refl close immediately.
 
-**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus its
-`rvcgen` finishing pass) tries, in order:
+**Augmented leaf closure**: the relational leaf closer (`tryCloseRelGoalImmediate`, plus the
+cheap leaf finish at the end of `rvcgen`) tries, in order:
 1. `assumption`
 2. `relTriple_true _ _` (the postcondition is structurally `fun _ _ => True`, discharged via
    the universal product coupling, since `OracleComp` has no failure mass);
@@ -185,6 +187,10 @@ goals that simplify to pure-pure or refl close immediately.
    values unified by local equality hypotheses);
 6. a symmetric `relTriple_pure_pure ∘ symm` step for postconditions written in the swapped
    direction.
+
+Consequence/search closing is opt-in through `rvcfinish` or `rvcgen!`; plain
+`rvcgen` keeps to structural steps plus cheap leaf closure so rule-order changes
+stay predictable.
 
 **Pass budget**: exhaustive `vcgen` / `rvcgen` runs are bounded by
 `set_option vcvio.vcgen.maxPasses <n>`. The default is conservative so large proofs stay
@@ -216,7 +222,8 @@ All probability-equality control now lives under `vcstep`.
 
 | Tactic | What it does |
 |--------|--------------|
-| `rvcgen` | Exhaustive relational VCGen over all open goals, with automatic lowering from `GameEquiv` / `evalDist` equality |
+| `rvcgen` | Exhaustive relational VCGen over all open goals, with automatic lowering from `GameEquiv` / `evalDist` equality and cheap leaf closure |
+| `rvcfinish` / `rvcgen!` | Opt-in residual search and consequence closing |
 | `rel_dist` | Turns `RelTriple oa ob (EqRel α)` into `evalDist oa = evalDist ob` |
 
 ## Probability Equality Guide

@@ -97,12 +97,12 @@ is closed by the leaf closer without intermediate planning. -/
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β) :
     RelTriple oa ob (fun _ _ => True) := by
-  exact relTriple_true oa ob
+  rvcstep
 
 example (oa : OracleComp spec₁ α) (ob : OracleComp spec₂ β)
     (fa : α → OracleComp spec₁ γ) (fb : β → OracleComp spec₂ δ) :
     RelTriple (oa >>= fa) (ob >>= fb) (fun _ _ => True) := by
-  exact relTriple_true _ _
+  rvcstep
 
 example (sp : ℕ) (msg₀ msg₁ : BitVec sp) :
     RelTriple

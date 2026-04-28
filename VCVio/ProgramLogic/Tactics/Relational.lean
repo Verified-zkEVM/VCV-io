@@ -140,15 +140,24 @@ elab_rules : tactic
 continues with ordinary hint-free relational VCGen on all remaining goals.
 
 `rvcgen with thm` forces one explicit relational theorem step on the main goal, then continues
-with ordinary hint-free relational VCGen on all remaining goals. -/
+with ordinary hint-free relational VCGen on all remaining goals.
+
+`rvcfinish` runs the opt-in residual search/consequence closer.
+
+`rvcgen!` runs ordinary `rvcgen` and then `rvcfinish`. -/
 syntax "rvcgen" ("using" term)? : tactic
 syntax "rvcgen" "with" term : tactic
+syntax "rvcfinish" : tactic
+syntax "rvcgen!" : tactic
 syntax "rvcgen?" : tactic
 
 elab_rules : tactic
   | `(tactic| rvcgen) => withVCGenRunTiming "rvcgen" do
       discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
       withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
+  | `(tactic| rvcgen!) => withVCGenRunTiming "rvcgen!" do
+      discard <| runBoundedPasses "rvcgen!" TacticInternals.Relational.runRVCGenPass
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenSearchFinish
   | `(tactic| rvcgen using $hint) => withVCGenRunTiming "rvcgen" do
       if ← TacticInternals.Relational.runRVCGenStepUsing hint then
         discard <| runBoundedPasses "rvcgen" TacticInternals.Relational.runRVCGenPass
@@ -161,6 +170,8 @@ elab_rules : tactic
         withVCGenFinishTiming TacticInternals.Relational.runRVCGenFinish
       else
         TacticInternals.Relational.throwRVCGenStepError
+  | `(tactic| rvcfinish) => withVCGenRunTiming "rvcfinish" do
+      withVCGenFinishTiming TacticInternals.Relational.runRVCGenSearchFinish
   | `(tactic| rvcgen?) => withVCGenRunTiming "rvcgen?" do
       let batches ←
         runBoundedPassesCollect "rvcgen?" TacticInternals.Relational.runRVCGenPassPlanned
@@ -170,17 +181,7 @@ elab_rules : tactic
         batches.toList.filterMap renderPassReplayLine
       if needsFinish then
         lines := lines ++ [
-          "all_goals try simp only [game_rule]",
-          String.intercalate "" [
-            "all_goals first | assumption | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_true _ _ | ",
-            "(refine OracleComp.ProgramLogic.Relational.relTriple_post_const ?_; ",
-            "intros; trivial) | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_refl _ | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_eqRel_of_eq rfl | ",
-            "exact OracleComp.ProgramLogic.Relational.relTriple_pure_pure rfl | ",
-            "(apply OracleComp.ProgramLogic.Relational.relTriple_pure_pure; assumption)",
-          ]
+          "rvcfinish"
         ]
       if lines.isEmpty then
         lines := ["rvcgen"]

@@ -129,12 +129,15 @@ rvcgen                      -- auto-selects hf as the bind-cut relation
 If there are 0 or ≥ 2 viable hints, the tactic keeps ambiguity explicit and
 falls back to `EqRel`. Use `using` to disambiguate.
 
-The relational finish pass also handles postcondition weakening automatically:
+The opt-in relational finish pass also handles postcondition weakening:
 
 ```lean
 -- Goal: ⟪oa ~ ob | R'⟫ with h : ⟪oa ~ ob | R⟫ and hpost : ∀ x y, R x y → R' x y
-rvcgen                      -- closes via relTriple_post_mono + assumption
+rvcgen!                     -- runs rvcgen, then rvcfinish
 ```
+
+Use plain `rvcgen` when you only want structural steps plus cheap leaf closure;
+use `rvcfinish` or `rvcgen!` when residual consequence/search is intended.
 
 ```lean
 -- Same workflow, but ask the tactic to surface the explicit script:
