@@ -11,8 +11,8 @@ import VCVio.OracleComp.SimSemantics.StateSeparating
 # Oracle interfaces and plain states for the stateful Fiat-Shamir CMA proof
 
 This file contains the oracle interfaces and direct product-state shapes used
-by the `QueryImpl.Stateful` Fiat-Shamir CMA games. Unlike the transitional
-`HeapSSP` layer, the games store their private data in ordinary product types.
+by the `QueryImpl.Stateful` Fiat-Shamir CMA games. The games store their private
+data in ordinary product types.
 -/
 
 open OracleSpec

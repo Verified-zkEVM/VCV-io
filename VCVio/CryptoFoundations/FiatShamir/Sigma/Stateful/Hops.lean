@@ -11,9 +11,8 @@ import Mathlib.Data.Real.ENatENNReal
 /-!
 # Native stateful Fiat-Shamir CMA game hops
 
-This file is the replacement path for the old Fiat-Shamir HeapSSP H3 proof.
-The theorems here are stated directly over `QueryImpl.Stateful` handlers and
-the concrete `CmaState` product state.
+The theorems here are stated directly over `QueryImpl.Stateful` handlers and the
+concrete `CmaState` product state.
 -/
 
 universe u

@@ -133,8 +133,8 @@ instance Sum.instCellSpec {α β : Type u}
 /-! ## `PEmpty` : `CellSpec` instance for the empty identifier set
 
 The trivial heap `Heap PEmpty` has a unique inhabitant (the empty function).
-It is used by stateless packages (`HeapSSP.Package.id` and
-`HeapSSP.Package.ofStateless`). -/
+It is useful whenever a typed-heap construction needs a stateless identifier
+set. -/
 instance PEmpty.instCellSpec : CellSpec.{u, v} PEmpty where
   type i := i.elim
   default i := i.elim

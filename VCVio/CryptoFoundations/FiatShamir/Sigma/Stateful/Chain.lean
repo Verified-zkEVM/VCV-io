@@ -2281,9 +2281,8 @@ theorem cmaSim_signedFreshAdv_le_fork
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Native stateful top-level chain, assuming the H5 replay-forking boundary.
 
-This theorem already removes the HeapSSP H1/H2/H3/H4 arithmetic from the final
-chain. The remaining porting task is to prove the supplied H5 hypothesis
-natively. -/
+This theorem carries the H1/H2/H3/H4 arithmetic directly in the stateful chain.
+The remaining porting task is to prove the supplied H5 hypothesis natively. -/
 theorem cma_advantage_le_fork_bound_of_h5
     (simT : Stmt → ProbComp (Commit × Chal × Resp))
     (ζ_zk : ℝ) (hζ_zk : 0 ≤ ζ_zk)

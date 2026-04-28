@@ -75,14 +75,6 @@ import VCVio.EvalDist.Option
 import VCVio.EvalDist.Prod
 import VCVio.EvalDist.RenyiDivergence
 import VCVio.EvalDist.TVDist
-import VCVio.HeapSSP.Advantage
-import VCVio.HeapSSP.Composition
-import VCVio.HeapSSP.DistEquiv
-import VCVio.HeapSSP.Examples
-import VCVio.HeapSSP.Hybrid
-import VCVio.HeapSSP.IdenticalUntilBad
-import VCVio.HeapSSP.IndistAt
-import VCVio.HeapSSP.Package
 import VCVio.Interaction.Basic.Append
 import VCVio.Interaction.Basic.BundledMonad
 import VCVio.Interaction.Basic.Chain
