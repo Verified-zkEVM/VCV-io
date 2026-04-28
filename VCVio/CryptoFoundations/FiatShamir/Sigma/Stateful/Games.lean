@@ -117,18 +117,28 @@ noncomputable def cmaSignSim
         OracleComp (nmaSpec M Commit Chal Stmt) Unit)
       pure ((c, π), log ++ [m])
 
-/-- The CMA-to-NMA reduction as a route-based direct stateful handler.
+/-- The CMA-to-NMA reduction as a direct stateful handler.
 
-Public queries are forwarded by a stateless component; signing queries are
-handled by a stateful component that owns the signed-message log. Both components
-share the same `nmaSpec` imports on purpose. -/
+Public queries are forwarded to the NMA interface; signing queries are handled
+by the simulator component that owns the signed-message log. Both paths share
+the same `nmaSpec` imports on purpose. -/
 noncomputable def cmaToNma
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) :
     QueryImpl.Stateful (nmaSpec M Commit Chal Stmt) (cmaSpec M Commit Chal Resp Stmt)
-      (OuterState M) :=
-  QueryImpl.Stateful.parRouteWith
-    (cmaToNmaFrame M) (cmaRoute M Commit Chal Resp Stmt).toExportRoute
-    (cmaPublicForward M Commit Chal) (cmaSignSim M Commit Chal simT)
+      (OuterState M)
+  | .unif n => StateT.mk fun log => do
+      let r ← (((nmaSpec M Commit Chal Stmt).query (.unif n)) :
+        OracleComp (nmaSpec M Commit Chal Stmt) (Fin (n + 1)))
+      pure (r, log)
+  | .ro mc => StateT.mk fun log => do
+      let r ← (((nmaSpec M Commit Chal Stmt).query (.ro mc)) :
+        OracleComp (nmaSpec M Commit Chal Stmt) Chal)
+      pure (r, log)
+  | .pk => StateT.mk fun log => do
+      let pk ← (((nmaSpec M Commit Chal Stmt).query .pk) :
+        OracleComp (nmaSpec M Commit Chal Stmt) Stmt)
+      pure (pk, log)
+  | .sign m => cmaSignSim M Commit Chal simT m
 
 /-! ## `cmaSim`: simulated CMA game -/
 
@@ -178,38 +188,45 @@ noncomputable def cmaRealSourceFull
       let cache := s.1.2.1
       let keypair := s.1.2.2
       let bad := s.2
-      (liftM (((fsBaseImpl M Commit Chal) (Sum.inl n)).run cache) :
-        OracleComp unifSpec (Fin (n + 1) × RoCache M Commit Chal)) >>= fun rc =>
-        let r := rc.1
-        let cache₁ := rc.2
-        pure (r, ((log, cache₁, keypair), bad))
+      let r ← (unifSpec.query n : OracleComp unifSpec (Fin (n + 1)))
+      pure (r, ((log, cache, keypair), bad))
   | .ro mc => StateT.mk fun s =>
       let log := s.1.1
       let cache := s.1.2.1
       let keypair := s.1.2.2
       let bad := s.2
-      (liftM (((fsBaseImpl M Commit Chal) (Sum.inr mc)).run cache) :
-        OracleComp unifSpec (Chal × RoCache M Commit Chal)) >>= fun rc =>
-        let r := rc.1
-        let cache₁ := rc.2
-        pure (r, ((log, cache₁, keypair), bad))
+      match cache mc with
+      | some r => pure (r, ((log, cache, keypair), bad))
+      | none => do
+          let r ← (($ᵗ Chal) : OracleComp unifSpec Chal)
+          pure (r, ((log, cache.cacheQuery mc r, keypair), bad))
   | .sign m => StateT.mk fun s => do
       let log := s.1.1
       let cache := s.1.2.1
       let keypair := s.1.2.2
       let bad := s.2
-      let (pk, sk, keypair₁) ← match keypair with
-        | some (pk, sk) =>
-            (pure (pk, sk, keypair) :
-              OracleComp unifSpec (Stmt × Wit × Option (Stmt × Wit)))
-        | none => do
-            let (pk, sk) ← (hr.gen : OracleComp unifSpec _)
-            pure (pk, sk, some (pk, sk))
-      (liftM ((cmaRealFixedSign M Commit Chal sigma hr pk sk m).run cache) :
-        OracleComp unifSpec ((Commit × Resp) × RoCache M Commit Chal)) >>= fun sc =>
-        let sig := sc.1
-        let cache₁ := sc.2
-        pure (sig, ((log ++ [m], cache₁, keypair₁), bad))
+      match keypair with
+      | some (pk, sk) => do
+          let (c, prv) ← sigma.commit pk sk
+          match cache (m, c) with
+          | some ch => do
+              let π ← sigma.respond pk sk prv ch
+              pure ((c, π), ((log ++ [m], cache, some (pk, sk)), bad))
+          | none => do
+              let ch ← (($ᵗ Chal) : OracleComp unifSpec Chal)
+              let π ← sigma.respond pk sk prv ch
+              pure ((c, π), ((log ++ [m], cache.cacheQuery (m, c) ch, some (pk, sk)), bad))
+      | none => do
+          let (pk, sk) ← (hr.gen : OracleComp unifSpec _)
+          let (c, prv) ← sigma.commit pk sk
+          match cache (m, c) with
+          | some ch => do
+              let π ← sigma.respond pk sk prv ch
+              pure ((c, π), ((log ++ [m], cache, some (pk, sk)), bad))
+          | none => do
+              let ch ← (($ᵗ Chal) : OracleComp unifSpec Chal)
+              let π ← sigma.respond pk sk prv ch
+              pure ((c, π), ((log ++ [m], cache.cacheQuery (m, c) ch, some (pk, sk)), bad))
 
 /-- Source-query part of the real CMA game over the concrete sum interface used
 by `SignatureAlg.unforgeableAdv`. -/

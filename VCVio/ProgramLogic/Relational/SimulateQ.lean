@@ -2109,6 +2109,259 @@ lemma expectedQuerySlack_const_le_queryBudget_mul
                   exact tsum_probOutput_le_one
               _ = (queryBudget : ℕ) * ε := one_mul _
 
+/-- State-dependent resource bound for `expectedQuerySlack`.
+
+If each charged query pays `ζ + R s * β`, and the resource `R` can increase by
+at most one on charged or growth queries and never increases otherwise, then a
+computation with at most `qS` charged queries and at most `qH` growth queries
+has accumulated slack at most
+`qS * ζ + qS * (R s + qS + qH) * β`. -/
+lemma expectedQuerySlack_resource_le
+    (impl : QueryImpl spec (StateT (σ × Bool) (OracleComp spec')))
+    (chargedQuery growthQuery : spec.Domain → Prop)
+    [DecidablePred chargedQuery] [DecidablePred growthQuery]
+    (R : σ → ℝ≥0∞) (ζ β : ℝ≥0∞)
+    (h_growth : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false →
+      chargedQuery t ∨ growthQuery t →
+      ∀ z ∈ support ((impl t).run p), R z.2.1 ≤ R p.1 + 1)
+    (h_free : ∀ (t : spec.Domain) (p : σ × Bool), p.2 = false →
+      ¬ chargedQuery t → ¬ growthQuery t →
+      ∀ z ∈ support ((impl t).run p), R z.2.1 ≤ R p.1)
+    (oa : OracleComp spec α) {qS qH : ℕ}
+    (h_qS : OracleComp.IsQueryBoundP oa chargedQuery qS)
+    (h_qH : OracleComp.IsQueryBoundP oa growthQuery qH)
+    (s : σ) :
+    expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β) oa qS (s, false)
+      ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
+  induction oa using OracleComp.inductionOn generalizing qS qH s with
+  | pure x =>
+      simp
+  | query_bind t cont ih =>
+      rw [isQueryBoundP_query_bind_iff] at h_qS h_qH
+      obtain ⟨hcanS, hcontS⟩ := h_qS
+      obtain ⟨hcanH, hcontH⟩ := h_qH
+      by_cases hSt : chargedQuery t
+      · simp only [hSt, if_true] at hcontS
+        have hqS_pos : 0 < qS := hcanS.resolve_left (· hSt)
+        rw [expectedQuerySlack_query_bind,
+          expectedQuerySlackStep_costly_pos _ _ _ _ _ _ _ hSt hqS_pos]
+        let qH' := if growthQuery t then qH - 1 else qH
+        have hcontH' : ∀ u, OracleComp.IsQueryBoundP (cont u) growthQuery qH' := by
+          by_cases hHt : growthQuery t
+          · simp only [hHt, if_true] at hcontH
+            simpa [qH', hHt] using hcontH
+          · simp only [hHt, if_false] at hcontH
+            simpa [qH', hHt] using hcontH
+        have h_tail :
+            (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
+                    (cont z.1) (qS - 1) z.2)
+              ≤ (qS - 1 : ℕ) * ζ +
+                  (qS - 1 : ℕ) * (R s + qS + qH) * β := by
+          calc
+            (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
+                    (cont z.1) (qS - 1) z.2)
+                ≤ ∑' z : spec.Range t × σ × Bool,
+                    Pr[= z | (impl t).run (s, false)] *
+                      ((qS - 1 : ℕ) * ζ +
+                        (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+                  refine ENNReal.tsum_le_tsum fun z => ?_
+                  by_cases hz : z ∈ support ((impl t).run (s, false))
+                  · rcases z with ⟨u, s', bad'⟩
+                    gcongr
+                    cases bad'
+                    · have hih := ih u (qS := qS - 1) (qH := qH')
+                        (hcontS u) (hcontH' u) s'
+                      refine hih.trans ?_
+                      have hRz := h_growth t (s, false) rfl (Or.inl hSt)
+                        (u, s', false) hz
+                      have hRz' : R s' ≤ R s + 1 := by
+                        simpa [hSt] using hRz
+                      have hbudget : R s' + (qS - 1 : ℕ) + qH' ≤ R s + qS + qH := by
+                        by_cases hHt : growthQuery t
+                        · have hqH_pos : 0 < qH := hcanH.resolve_left (· hHt)
+                          have hqH_cast :
+                              (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                            have hnat : (qH - 1) + 1 = qH := Nat.sub_add_cancel hqH_pos
+                            exact_mod_cast hnat
+                          have hqS_cast :
+                              (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
+                            have hnat : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
+                            exact_mod_cast hnat
+                          simp only [qH', hHt, if_true]
+                          calc
+                            R s' + (qS - 1 : ℕ) + (qH - 1 : ℕ)
+                                ≤ (R s + 1) + (qS - 1 : ℕ) + (qH - 1 : ℕ) := by
+                                  gcongr
+                            _ = R s + qS + (qH - 1 : ℕ) := by
+                                  rw [show (R s + 1) + ((qS - 1 : ℕ) : ℝ≥0∞) +
+                                      ((qH - 1 : ℕ) : ℝ≥0∞) =
+                                    R s + (((qS - 1 : ℕ) : ℝ≥0∞) + 1) +
+                                      ((qH - 1 : ℕ) : ℝ≥0∞) by
+                                      simp only [add_assoc, add_comm], hqS_cast]
+                            _ ≤ R s + qS + qH := by
+                                  gcongr
+                                  exact_mod_cast Nat.sub_le qH 1
+                        · have hqS_cast :
+                              (((qS - 1 : ℕ) : ℝ≥0∞) + 1) = (qS : ℝ≥0∞) := by
+                            have hnat : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
+                            exact_mod_cast hnat
+                          simp only [qH', hHt, if_false]
+                          calc
+                            R s' + (qS - 1 : ℕ) + qH
+                                ≤ (R s + 1) + (qS - 1 : ℕ) + qH := by
+                                  gcongr
+                            _ = R s + qS + qH := by
+                                  rw [show (R s + 1) + ((qS - 1 : ℕ) : ℝ≥0∞) +
+                                      (qH : ℝ≥0∞) =
+                                    R s + (((qS - 1 : ℕ) : ℝ≥0∞) + 1) +
+                                      (qH : ℝ≥0∞) by
+                                      simp only [add_assoc, add_left_comm, add_comm], hqS_cast]
+                      have hmul :
+                          ((qS - 1 : ℕ) : ℝ≥0∞) *
+                              (R s' + (qS - 1 : ℕ) + qH') * β
+                            ≤ ((qS - 1 : ℕ) : ℝ≥0∞) *
+                                (R s + qS + qH) * β :=
+                        mul_le_mul' (mul_le_mul' le_rfl hbudget) le_rfl
+                      simpa only [add_assoc, add_left_comm, add_comm] using
+                        add_le_add_left hmul (((qS - 1 : ℕ) : ℝ≥0∞) * ζ)
+                    ·
+                      simp
+                  · have hprob :
+                        Pr[= z | (impl t).run (s, false)] = 0 :=
+                      probOutput_eq_zero_of_not_mem_support hz
+                    rw [hprob, zero_mul, zero_mul]
+              _ = (∑' z : spec.Range t × σ × Bool,
+                    Pr[= z | (impl t).run (s, false)]) *
+                  ((qS - 1 : ℕ) * ζ +
+                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+                    rw [ENNReal.tsum_mul_right]
+              _ ≤ 1 * ((qS - 1 : ℕ) * ζ +
+                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+                    gcongr
+                    exact tsum_probOutput_le_one
+              _ = (qS - 1 : ℕ) * ζ +
+                    (qS - 1 : ℕ) * (R s + qS + qH) * β := one_mul _
+        calc
+          ζ + R s * β +
+              (∑' z : spec.Range t × σ × Bool,
+                Pr[= z | (impl t).run (s, false)] *
+                  expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
+                    (cont z.1) (qS - 1) z.2)
+              ≤ ζ + R s * β +
+                  ((qS - 1 : ℕ) * ζ +
+                    (qS - 1 : ℕ) * (R s + qS + qH) * β) := by
+                    gcongr
+          _ ≤ (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
+                    set B : ℝ≥0∞ := R s + qS + qH with hB
+                    have hqS_cast :
+                        (1 : ℝ≥0∞) + ((qS - 1 : ℕ) : ℝ≥0∞) = (qS : ℝ≥0∞) := by
+                      rw [add_comm]
+                      have hnat : (qS - 1) + 1 = qS := Nat.sub_add_cancel hqS_pos
+                      exact_mod_cast hnat
+                    calc
+                      ζ + R s * β +
+                          (((qS - 1 : ℕ) : ℝ≥0∞) * ζ +
+                            ((qS - 1 : ℕ) : ℝ≥0∞) * (R s + qS + qH) * β)
+                          ≤ ζ + B * β +
+                              (((qS - 1 : ℕ) : ℝ≥0∞) * ζ +
+                                ((qS - 1 : ℕ) : ℝ≥0∞) * B * β) := by
+                                gcongr
+                                rw [hB]
+                                exact (le_self_add : R s ≤ R s + (qS : ℝ≥0∞)).trans
+                                  le_self_add
+                      _ = ((1 : ℝ≥0∞) + ((qS - 1 : ℕ) : ℝ≥0∞)) * ζ +
+                            ((1 : ℝ≥0∞) + ((qS - 1 : ℕ) : ℝ≥0∞)) * B * β := by
+                                ring_nf
+                      _ = (qS : ℝ≥0∞) * ζ + (qS : ℝ≥0∞) * B * β := by
+                                rw [hqS_cast]
+                      _ = (qS : ℝ≥0∞) * ζ +
+                            (qS : ℝ≥0∞) * (R s + qS + qH) * β := by
+                                rw [hB]
+      · simp only [hSt, if_false] at hcontS
+        rw [expectedQuerySlack_query_bind,
+          expectedQuerySlackStep_free _ _ _ _ _ _ _ hSt]
+        let qH' := if growthQuery t then qH - 1 else qH
+        have hcontH' : ∀ u, OracleComp.IsQueryBoundP (cont u) growthQuery qH' := by
+          by_cases hHt : growthQuery t
+          · simp only [hHt, if_true] at hcontH
+            simpa [qH', hHt] using hcontH
+          · simp only [hHt, if_false] at hcontH
+            simpa [qH', hHt] using hcontH
+        calc
+          (∑' z : spec.Range t × σ × Bool,
+              Pr[= z | (impl t).run (s, false)] *
+                expectedQuerySlack impl chargedQuery (fun s => ζ + R s * β)
+                  (cont z.1) qS z.2)
+              ≤ ∑' z : spec.Range t × σ × Bool,
+                  Pr[= z | (impl t).run (s, false)] *
+                    ((qS : ℝ≥0∞) * ζ +
+                      (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
+                refine ENNReal.tsum_le_tsum fun z => ?_
+                by_cases hz : z ∈ support ((impl t).run (s, false))
+                · rcases z with ⟨u, s', bad'⟩
+                  gcongr
+                  cases bad'
+                  · have hih := ih u (qS := qS) (qH := qH')
+                      (hcontS u) (hcontH' u) s'
+                    refine hih.trans ?_
+                    have hRz : R s' ≤ R s + if growthQuery t then (1 : ℝ≥0∞) else 0 := by
+                      by_cases hHt : growthQuery t
+                      · simpa [hHt] using
+                          h_growth t (s, false) rfl (Or.inr hHt) (u, s', false) hz
+                      · simpa [hHt] using
+                          h_free t (s, false) rfl hSt hHt (u, s', false) hz
+                    have hbudget : R s' + qS + qH' ≤ R s + qS + qH := by
+                      by_cases hHt : growthQuery t
+                      · have hqH_pos : 0 < qH := hcanH.resolve_left (· hHt)
+                        have hqH_cast :
+                            (((qH - 1 : ℕ) : ℝ≥0∞) + 1) = (qH : ℝ≥0∞) := by
+                          have hnat : (qH - 1) + 1 = qH := Nat.sub_add_cancel hqH_pos
+                          exact_mod_cast hnat
+                        simp only [qH', hHt, if_true]
+                        have hRz' : R s' ≤ R s + 1 := by
+                          simpa [hSt, hHt] using hRz
+                        calc
+                          R s' + qS + (qH - 1 : ℕ)
+                              ≤ (R s + 1) + qS + (qH - 1 : ℕ) := by
+                                gcongr
+                          _ = R s + qS + qH := by
+                                rw [show (R s + 1) + (qS : ℝ≥0∞) +
+                                    ((qH - 1 : ℕ) : ℝ≥0∞) =
+                                  R s + (qS : ℝ≥0∞) +
+                                    (((qH - 1 : ℕ) : ℝ≥0∞) + 1) by
+                                    simp only [add_assoc, add_left_comm, add_comm], hqH_cast]
+                      · simp only [qH', hHt, if_false]
+                        have hRz' : R s' ≤ R s := by
+                          simpa [hSt, hHt] using hRz
+                        gcongr
+                    have hmul :
+                        (qS : ℝ≥0∞) * (R s' + qS + qH') * β
+                          ≤ (qS : ℝ≥0∞) * (R s + qS + qH) * β :=
+                      mul_le_mul' (mul_le_mul' le_rfl hbudget) le_rfl
+                    simpa only [add_assoc, add_left_comm, add_comm] using
+                      add_le_add_left hmul ((qS : ℝ≥0∞) * ζ)
+                  ·
+                    simp
+                · have hprob :
+                      Pr[= z | (impl t).run (s, false)] = 0 :=
+                    probOutput_eq_zero_of_not_mem_support hz
+                  rw [hprob, zero_mul, zero_mul]
+            _ = (∑' z : spec.Range t × σ × Bool,
+                  Pr[= z | (impl t).run (s, false)]) *
+                ((qS : ℝ≥0∞) * ζ +
+                  (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
+                  rw [ENNReal.tsum_mul_right]
+            _ ≤ 1 * ((qS : ℝ≥0∞) * ζ +
+                  (qS : ℝ≥0∞) * (R s + qS + qH) * β) := by
+                  gcongr
+                  exact tsum_probOutput_le_one
+            _ = (qS : ℝ≥0∞) * ζ +
+                  (qS : ℝ≥0∞) * (R s + qS + qH) * β := one_mul _
+
 /-- **Constant-ε version of the bridge as a corollary of the state-dep version.**
 
 This is the ENNReal-form analogue of the existing real-valued

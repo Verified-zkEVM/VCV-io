@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Devon Tuma, Quang Dao
 -/
 
-import VCVio.CryptoFoundations.FiatShamir.Sigma.HeapSSP.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Chain
+import VCVio.CryptoFoundations.FiatShamir.Sigma.Stateful.Compatibility
 import VCVio.CryptoFoundations.HardnessAssumptions.HardRelation
 import VCVio.EvalDist.Inequalities
 
@@ -12,7 +13,7 @@ import VCVio.EvalDist.Inequalities
 # Fiat-Shamir reductions for Sigma protocols
 
 This file exposes the CMA-to-NMA reduction used by the public Sigma security
-theorem. The current proof is discharged by the HeapSSP game chain, but callers
+theorem. The proof is discharged by the direct stateful game chain; callers
 depend only on the reduction statement here.
 -/
 
@@ -54,9 +55,24 @@ theorem cma_to_nma_advantage_bound
         Fork.advantage σ hr M nmaAdv qH +
           ENNReal.ofReal ((qS : ℝ) * ζ_zk) +
           (qS : ENNReal) * (qS + qH) * β +
-          δ_verify :=
-  HeapSSP.cma_advantage_le_fork_bound (σ := σ) (hr := hr) (M := M)
-    simTranscript ζ_zk hζ_zk hHVZK β hPredSim δ_verify hVerifyGuess adv qS qH hQ
+          δ_verify := by
+  refine ⟨Stateful.nmaAdvFromCma σ hr M adv simTranscript, ?_, ?_⟩
+  · exact Stateful.nmaAdvFromCma_nmaHashQueryBound (σ := σ) (hr := hr)
+      (M := M) (Commit := Commit) (Chal := Chal) (Resp := Resp)
+      adv simTranscript qS qH hQ
+  · exact Stateful.cma_advantage_le_fork_bound_of_h1h2 σ hr M
+      simTranscript ζ_zk hζ_zk hHVZK β hPredSim δ_verify hVerifyGuess adv qS qH hQ
+      (by
+        have hFresh :
+            adv.advantage (_root_.FiatShamir.runtime M) ≤
+              Stateful.statefulPostKeygenFreshAdvantage σ hr M adv := by
+          rw [← Stateful.publicUnforgeableAdvantage_eq_statefulPostKeygenFreshAdvantage
+            (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) adv]
+          rfl
+        rwa [Stateful.statefulPostKeygenFreshAdvantage_eq_cmaRealRunProb_signedFreshAdv
+          (σ := σ) (hr := hr) (M := M) (Commit := Commit) (Chal := Chal)
+          (Resp := Resp) adv] at hFresh)
 
 section evalDistBridge
 
