@@ -91,11 +91,12 @@ private noncomputable def forkBaseImpl
     (simulatedNmaImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)).flattenStateT
 
-private def forkSignLogAux
+private def cmaOracleSignLogAux
+    {S : Type}
     (t : (cmaOracleSpec M Commit Chal Resp).Domain)
-    (_s : ForkBaseState M Commit Chal)
+    (_s : S)
     (_u : (cmaOracleSpec M Commit Chal Resp).Range t)
-    (_s' : ForkBaseState M Commit Chal) (signed : List M) :
+    (_s' : S) (signed : List M) :
     List M :=
   match t with
   | .inl _ => signed
@@ -109,7 +110,7 @@ private noncomputable def forkLoggedImpl
   QueryImpl.extendState
     (forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)
-    (forkSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+    (cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp))
 
 
@@ -135,16 +136,6 @@ private noncomputable def fsUniformImpl :
   QueryImpl.ofLift unifSpec ProbComp +
     (uniformSampleImpl (spec := (M × Commit →ₒ Chal)))
 
-private def simSignLogAux
-    (t : (cmaOracleSpec M Commit Chal Resp).Domain)
-    (_s : (fsRoSpec M Commit Chal).QueryCache)
-    (_u : (cmaOracleSpec M Commit Chal Resp).Range t)
-    (_s' : (fsRoSpec M Commit Chal).QueryCache) (signed : List M) :
-    List M :=
-  match t with
-  | .inl _ => signed
-  | .inr m => signed ++ [m]
-
 private noncomputable def simulatedNmaLoggedProbImpl
     (simT : Stmt → ProbComp (Commit × Chal × Resp)) (pk : Stmt) :
     QueryImpl (cmaOracleSpec M Commit Chal Resp)
@@ -153,7 +144,7 @@ private noncomputable def simulatedNmaLoggedProbImpl
     ((fsUniformImpl (M := M) (Commit := Commit) (Chal := Chal)).mapStateTBase
       (simulatedNmaImpl (M := M) (Commit := Commit) (Chal := Chal)
         (Resp := Resp) simT pk))
-    (simSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+    (cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp))
 
 private noncomputable def cmaSimLoggedImpl
@@ -292,38 +283,6 @@ private lemma cmaSimLoggedImpl_liftAdv_run_expanded
           hr simT oa (([] : List M), st)]
 
 omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
-private lemma cmaSimLoggedImpl_candidateAdv_fixedKey_run
-    (hr : GenerableRelation Stmt Wit rel)
-    (simT : Stmt → ProbComp (Commit × Chal × Resp))
-    (adv : SourceAdv (σ := σ) (hr := hr) (M := M))
-    (ps : Stmt × Wit) :
-    (simulateQ (cmaSimLoggedImpl (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-      hr simT) (candidateAdv (σ := σ) (hr := hr) (M := M) adv)).run
-      (cmaSimFixedKeyInitialState (M := M) (Commit := Commit)
-        (Chal := Chal) (Stmt := Stmt) (Wit := Wit) ps) =
-    (fun z : (M × (Commit × Resp)) × List M × CmaState M Commit Chal Stmt Wit =>
-      ((ps.1, z.1), z.2)) <$>
-      (simulateQ (cmaSimLoggedLeftImpl (M := M) (Commit := Commit)
-        (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-        hr simT) (adv.main ps.1)).run
-        (cmaSimFixedKeyInitialState (M := M) (Commit := Commit)
-          (Chal := Chal) (Stmt := Stmt) (Wit := Wit) ps) := by
-  simp only [candidateAdv, postKeygenCandidateAdv, simulateQ_bind,
-    simulateQ_query, OracleQuery.input_query, OracleQuery.cont_query, id_map,
-    StateT.run_bind]
-  simp [cmaSimLoggedImpl, cmaSim, cmaToNma, nma, nmaPublic,
-    cmaSimFixedKeyInitialState, cmaSignLogImpl, QueryImpl.flattenStateT,
-    QueryImpl.mapStateTBase, cmaFrame, cmaOuterLens, cmaNmaLens,
-    QueryImpl.Stateful.Frame.linkReshape, QueryImpl.Stateful.linkWith]
-  simpa [cmaSimLoggedImpl, cmaSimFixedKeyInitialState, map_eq_bind_pure_comp] using
-    cmaSimLoggedImpl_liftAdv_run (M := M) (Commit := Commit)
-      (Chal := Chal) (Resp := Resp) (Stmt := Stmt) (Wit := Wit)
-      hr simT (adv.main ps.1)
-      (cmaSimFixedKeyInitialState (M := M) (Commit := Commit)
-        (Chal := Chal) (Stmt := Stmt) (Wit := Wit) ps)
-
-omit [SampleableType Stmt] [SampleableType Wit] [Finite Chal] [Inhabited Chal] in
 private lemma nma_lift_unif_run
     (hr : GenerableRelation Stmt Wit rel)
     {α : Type} (oa : ProbComp α)
@@ -404,7 +363,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
   simp only [cmaSimFixedKeyInv] at hs
   rcases t with ((n | mc) | m)
   · simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
-      nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
+      nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, cmaOracleSignLogAux,
       cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
       QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaFrame,
       cmaOuterLens, cmaNmaLens,
@@ -414,7 +373,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
   · cases hcache : cache mc with
     | some ch =>
         simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
-          nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
+          nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, cmaOracleSignLogAux,
           cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
           QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaFrame,
           cmaOuterLens, cmaNmaLens,
@@ -424,7 +383,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
     | none =>
         conv_lhs =>
           simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
-            nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
+            nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, cmaOracleSignLogAux,
             cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
             QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaFrame,
             cmaOuterLens, cmaNmaLens,
@@ -434,7 +393,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
             uniformSampleImpl, QueryCache.cacheQuery, hcache]
         conv_rhs =>
           simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
-            nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, simSignLogAux,
+            nmaPublic, cmaSignLogImpl, simulatedNmaLoggedProbImpl, cmaOracleSignLogAux,
             cmaSimLoggedProj, fsUniformImpl, QueryImpl.extendState,
             QueryImpl.flattenStateT, QueryImpl.mapStateTBase, cmaFrame,
             cmaOuterLens, cmaNmaLens,
@@ -450,7 +409,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
     conv_lhs =>
       simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
         nmaPublic, nmaProgram, cmaSignSim, cmaSignLogImpl,
-        simulatedNmaLoggedProbImpl, simSignLogAux, cmaSimLoggedProj,
+        simulatedNmaLoggedProbImpl, cmaOracleSignLogAux, cmaSimLoggedProj,
         fsUniformImpl, QueryImpl.extendState, QueryImpl.flattenStateT,
         QueryImpl.mapStateTBase, cmaFrame, cmaOuterLens, cmaNmaLens,
         QueryImpl.Stateful.Frame.linkReshape,
@@ -463,7 +422,7 @@ private lemma cmaSimLoggedLeftImpl_project_step
     conv_rhs =>
       simp [cmaSimLoggedLeftImpl, cmaSimLoggedImpl, cmaSim, cmaToNma, nma,
         nmaPublic, nmaProgram, cmaSignSim, cmaSignLogImpl,
-        simulatedNmaLoggedProbImpl, simSignLogAux, cmaSimLoggedProj,
+        simulatedNmaLoggedProbImpl, cmaOracleSignLogAux, cmaSimLoggedProj,
         fsUniformImpl, QueryImpl.extendState, QueryImpl.flattenStateT,
         QueryImpl.mapStateTBase, cmaFrame, cmaOuterLens, cmaNmaLens,
         QueryImpl.Stateful.Frame.linkReshape,
@@ -793,11 +752,6 @@ private def forkLoggedProj (s : ForkBaseState M Commit Chal × List M) :
     SimLoggedState M Commit Chal :=
   (s.1.1, s.2)
 
-private def forkLiveHashCost :
-    (cmaOracleSpec M Commit Chal Resp).Domain → ℕ
-  | .inl (.inr _) => 1
-  | _ => 0
-
 private def forkInitialState (M Commit Chal : Type)
     [DecidableEq M] [DecidableEq Commit] :
     ForkBaseState M Commit Chal × List M :=
@@ -885,7 +839,7 @@ private lemma forkLoggedImpl_preserves_inv_step
   rcases hs with ⟨hfreshInv, hlogInv⟩
   rcases t with ((n | mc) | m)
   · have hz' := by
-      simpa [forkLoggedImpl, forkBaseImpl, forkSignLogAux, QueryImpl.extendState,
+      simpa [forkLoggedImpl, forkBaseImpl, cmaOracleSignLogAux, QueryImpl.extendState,
         QueryImpl.flattenStateT, QueryImpl.mapStateTBase, simulatedNmaImpl,
         simulatedNmaBaseSim, simulatedNmaUnifSim, simulatedNmaFwd,
         Fork.unifFwd] using hz
@@ -893,7 +847,7 @@ private lemma forkLoggedImpl_preserves_inv_step
     exact ⟨hfreshInv, hlogInv⟩
   · by_cases hadv : advCache (.inr mc) = none
     · have hz' := by
-        simpa [forkLoggedImpl, forkBaseImpl, forkSignLogAux, QueryImpl.extendState,
+        simpa [forkLoggedImpl, forkBaseImpl, cmaOracleSignLogAux, QueryImpl.extendState,
           QueryImpl.flattenStateT, QueryImpl.mapStateTBase, simulatedNmaImpl,
           simulatedNmaBaseSim, simulatedNmaRoSim, simulatedNmaFwd,
           Fork.roImpl, hadv] using hz
@@ -935,7 +889,7 @@ private lemma forkLoggedImpl_preserves_inv_step
     · rcases hadv' : advCache (.inr mc) with _ | advCh
       · exact (hadv hadv').elim
       · have hz' := by
-          simpa [forkLoggedImpl, forkBaseImpl, forkSignLogAux, QueryImpl.extendState,
+          simpa [forkLoggedImpl, forkBaseImpl, cmaOracleSignLogAux, QueryImpl.extendState,
           QueryImpl.flattenStateT, QueryImpl.mapStateTBase, simulatedNmaImpl,
           simulatedNmaBaseSim, simulatedNmaRoSim, simulatedNmaFwd,
           hadv'] using hz
@@ -946,7 +900,7 @@ private lemma forkLoggedImpl_preserves_inv_step
         · intro mc' ch' hcache'
           exact hlogInv mc' ch' hcache'
   · have hz' := by
-      simpa [forkLoggedImpl, forkBaseImpl, forkSignLogAux, QueryImpl.extendState,
+      simpa [forkLoggedImpl, forkBaseImpl, cmaOracleSignLogAux, QueryImpl.extendState,
         QueryImpl.flattenStateT, QueryImpl.mapStateTBase, simulatedNmaImpl,
         simulatedNmaSigSim] using hz
     rcases hz' with ⟨x, _hx, hcache, rfl⟩
@@ -1288,7 +1242,7 @@ private lemma forkLoggedProbImpl_project_step
   rcases s with ⟨⟨advCache, liveCache, queryLog⟩, signed⟩
   rcases t with ((n | mc) | m)
   · simp [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-      simulatedNmaLoggedProbImpl, forkSignLogAux, simSignLogAux,
+      simulatedNmaLoggedProbImpl, cmaOracleSignLogAux, cmaOracleSignLogAux,
       forkLoggedProj, fsUniformImpl, forkWrappedUniformImpl,
       QueryImpl.extendState, QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
       simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaUnifSim,
@@ -1296,7 +1250,7 @@ private lemma forkLoggedProbImpl_project_step
   · cases hadv : advCache (.inr mc) with
     | some ch =>
         simp [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-          simulatedNmaLoggedProbImpl, forkSignLogAux, simSignLogAux,
+          simulatedNmaLoggedProbImpl, cmaOracleSignLogAux, cmaOracleSignLogAux,
           forkLoggedProj, fsUniformImpl, forkWrappedUniformImpl,
           QueryImpl.extendState, QueryImpl.flattenStateT,
           QueryImpl.mapStateTBase, simulatedNmaImpl, simulatedNmaBaseSim,
@@ -1309,7 +1263,7 @@ private lemma forkLoggedProbImpl_project_step
             cases hcontra
         | none =>
             simp [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-              simulatedNmaLoggedProbImpl, forkSignLogAux, simSignLogAux,
+              simulatedNmaLoggedProbImpl, cmaOracleSignLogAux, cmaOracleSignLogAux,
               forkLoggedProj, fsUniformImpl, forkWrappedUniformImpl,
               QueryImpl.extendState, QueryImpl.flattenStateT,
               QueryImpl.mapStateTBase, simulatedNmaImpl, simulatedNmaBaseSim,
@@ -1321,8 +1275,8 @@ private lemma forkLoggedProbImpl_project_step
       simulatedNmaImpl, QueryImpl.add_apply_inr, simulatedNmaSigSim,
       StateT.run_bind, StateT.run_modifyGet, Prod.mk.eta, bind_pure_comp,
       simulateQ_map, StateT.run_mk, StateT.run_map, Functor.map_map,
-      forkSignLogAux, Prod.map_apply, id_eq, forkLoggedProj,
-      simulatedNmaLoggedProbImpl, fsUniformImpl, simSignLogAux]
+      cmaOracleSignLogAux, Prod.map_apply, id_eq, forkLoggedProj,
+      simulatedNmaLoggedProbImpl, fsUniformImpl, cmaOracleSignLogAux]
     have hleft :
         simulateQ (QueryImpl.id' unifSpec + uniformSampleImpl)
             ((simulateQ (Fork.unifFwd M Commit Chal + Fork.roImpl M Commit Chal)
@@ -1362,7 +1316,7 @@ private lemma forkLoggedProbImpl_preserves_liveCacheAdvCacheInv
   · intro z hz
     have hz' := by
       simpa [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-        forkSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
+        cmaOracleSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
         QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
         simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaUnifSim,
         simulatedNmaFwd, Fork.unifFwd] using hz
@@ -1373,7 +1327,7 @@ private lemma forkLoggedProbImpl_preserves_liveCacheAdvCacheInv
     | some ch =>
         have hz' := by
           simpa [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-            forkSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
+            cmaOracleSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
             QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
             simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaRoSim,
             simulatedNmaFwd, hadv] using hz
@@ -1388,7 +1342,7 @@ private lemma forkLoggedProbImpl_preserves_liveCacheAdvCacheInv
         | none =>
             have hz' := by
               simpa [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-                forkSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
+                cmaOracleSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
                 QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
                 simulatedNmaImpl, simulatedNmaBaseSim, simulatedNmaRoSim,
                 simulatedNmaFwd, Fork.roImpl, hadv, hlive,
@@ -1405,7 +1359,7 @@ private lemma forkLoggedProbImpl_preserves_liveCacheAdvCacheInv
   · intro z hz
     have hz' := by
       simpa [forkLoggedProbImpl, forkLoggedImpl, forkBaseImpl,
-        forkSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
+        cmaOracleSignLogAux, forkWrappedUniformImpl, QueryImpl.extendState,
         QueryImpl.flattenStateT, QueryImpl.mapStateTBase,
         simulatedNmaImpl, simulatedNmaSigSim] using hz
     rcases hz' with ⟨x, _hx, hcache, rfl⟩
@@ -1581,7 +1535,7 @@ private lemma forkLogged_base_support
   have hproj := OracleComp.extendState_run_proj_eq
     (so := forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)
-    (aux := forkSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+    (aux := cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp))
     (oa := adv.main pk)
     (s := forkInitialBaseState M Commit Chal)
@@ -1592,7 +1546,7 @@ private lemma forkLogged_base_support
           (simulateQ (QueryImpl.extendState
             (forkBaseImpl (M := M) (Commit := Commit)
               (Chal := Chal) (Resp := Resp) simT pk)
-            (forkSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+            (cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
               (Resp := Resp))) (adv.main pk)).run
             (forkInitialBaseState M Commit Chal, ([] : List M))) := by
     rw [support_map]
@@ -1689,7 +1643,7 @@ private lemma forkLogged_forkPoint_prob_true_eq_runTrace
   have hproj := OracleComp.extendState_run_proj_eq
     (so := forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp) simT pk)
-    (aux := forkSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+    (aux := cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
       (Resp := Resp))
     (oa := adv.main pk)
     (s := forkInitialBaseState M Commit Chal)
@@ -1711,7 +1665,7 @@ private lemma forkLogged_forkPoint_prob_true_eq_runTrace
             (simulateQ (QueryImpl.extendState
               (forkBaseImpl (M := M) (Commit := Commit) (Chal := Chal)
                 (Resp := Resp) simT pk)
-              (forkSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
+              (cmaOracleSignLogAux (M := M) (Commit := Commit) (Chal := Chal)
                 (Resp := Resp))) (adv.main pk)).run
               (forkInitialBaseState M Commit Chal, ([] : List M))) >>= fun z =>
             pure ((Fork.forkPoint (M := M) (Commit := Commit)
