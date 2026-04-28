@@ -115,7 +115,7 @@ lemma of_probFailure_eq_zero (mx : m α) (h : Pr[⊥ | mx] = 0) : NeverFail mx :
 
 /--
 If `mx` is a pure return, it never fails.
-This follows since `evalDist (pure x)` is the Dirac distribution on `some x`.
+This follows since `evalDist pure x` is the Dirac distribution on `some x`.
 -/
 @[simp, grind .]
 instance instPure {x} : NeverFail (pure x : m α) where

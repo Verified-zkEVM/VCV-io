@@ -3,13 +3,13 @@ Copyright (c) 2026 Quang Dao. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Quang Dao
 -/
-import VCVio.HeapSSP.Heap
+import ToMathlib.Data.Heap
 import VCVio.EvalDist.Defs.Instances
 import VCVio.OracleComp.ProbComp
 import VCVio.OracleComp.SimSemantics.Constructions
 
 /-!
-# HeapSSP Cell References
+# State-separating cell references
 
 `Heap Ident` stores typed cells at stable identifiers. `CellRef Ident` packages
 one identifier as a typed reference, so heap programs can say explicitly which
@@ -30,7 +30,7 @@ The file is organized around four small layers:
 
 universe u v uι u₀
 
-namespace VCVio.HeapSSP
+namespace VCVio.StateSeparating
 
 variable {Ident : Type u} [CellSpec.{u, max u v} Ident]
 
@@ -1274,4 +1274,4 @@ example :
 
 end CellRefExample
 
-end VCVio.HeapSSP
+end VCVio.StateSeparating

@@ -1489,6 +1489,191 @@ lemma runTrace_queryLog_take_eq
 
 end Coupling
 
+/- If two successful replay-fork runs of `runTrace` select the same fork index,
+their forgery targets agree.
+
+The replay transcript gives a common outer-log prefix up to the consumed fork query.
+`runTrace_queryLog_take_eq` transfers that prefix equality to the internal logical
+`queryLog`, and `forkPoint_getElem?_eq_some_target` identifies each target with
+the selected logical query. -/
+omit [SampleableType Stmt] [SampleableType Wit] in
+open scoped Classical in
+lemma runTrace_target_eq_of_mem_forkReplay
+    [DecidableEq M] [DecidableEq Commit] [DecidableEq Chal] [SampleableType Chal]
+    (nmaAdv : SignatureAlg.managedRoNmaAdv
+      (FiatShamir (m := OracleComp (unifSpec + (M × Commit →ₒ Chal))) σ hr M))
+    (qH : ℕ) (pk : Stmt)
+    (x₁ x₂ : Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal))
+    (s : Fin (qH + 1))
+    (hsup : some (x₁, x₂) ∈ support (forkReplay (runTrace σ hr M nmaAdv pk)
+      (fun j : ℕ ⊕ Unit => match j with | .inl _ => 0 | .inr () => qH) (Sum.inr ())
+      (forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)))
+    (h₁ : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      qH x₁ = some s)
+    (h₂ : forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)
+      qH x₂ = some s) :
+    x₁.target = x₂.target := by
+  classical
+  let qb : ℕ ⊕ Unit → ℕ := fun j => match j with | .inl _ => 0 | .inr () => qH
+  obtain ⟨log₁, log₂, s', hx₁, hx₂, hcf₁, _hcf₂, _hneq, replacement, st, hz, hlog₂,
+    _hmismatch, hfork, _hprefix⟩ := forkReplay_success_log_props
+      (main := runTrace σ hr M nmaAdv pk)
+      (qb := qb) (i := Sum.inr ())
+      (cf := forkPoint (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal) qH)
+      hsup
+  have hs_eq : s' = s := by
+    rw [hcf₁] at h₁
+    exact Option.some.inj h₁
+  cases hs_eq
+  set main : OracleComp (wrappedSpec Chal)
+      (Trace (M := M) (Commit := Commit) (Resp := Resp) (Chal := Chal)) :=
+    runTrace σ hr M nmaAdv pk
+  have htrace_eq : st.trace = log₁ :=
+    replayRunWithTraceValue_trace_eq
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  have hforkq : st.forkQuery = (↑s : ℕ) :=
+    replayRunWithTraceValue_forkQuery_eq
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  obtain ⟨hcur_pos, htrace_in, hobs_in⟩ :=
+    replayRunWithTraceValue_forkConsumed_imp_last_input
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz hfork
+  change 0 < st.cursor at hcur_pos
+  change QueryLog.inputAt? st.trace (st.cursor - 1) = some (Sum.inr ()) at htrace_in
+  change QueryLog.inputAt? st.observed (st.cursor - 1) = some (Sum.inr ()) at hobs_in
+  rw [htrace_eq] at htrace_in
+  rw [hlog₂] at hobs_in
+  have hInv := replayRunWithTraceValue_preservesPrefixInvariant
+    (main := main) (i := Sum.inr ())
+    (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+  have hcur_trace : st.cursor ≤ log₁.length := by rw [← htrace_eq]; exact hInv.1
+  have hcur_obs : st.cursor ≤ log₂.length := by rw [← hlog₂]; exact hInv.2.1
+  have hc1_lt_t : st.cursor - 1 < log₁.length := by omega
+  have hc1_lt_o : st.cursor - 1 < log₂.length := by omega
+  have hcount_obs :=
+    replayRunWithTraceValue_forkConsumed_imp_prefix_count
+      (main := main) (i := Sum.inr ())
+      (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz hfork
+  change (QueryLog.getQ (st.observed.take (st.cursor - 1))
+    (· = Sum.inr ())).length = st.forkQuery at hcount_obs
+  rw [hforkq, hlog₂] at hcount_obs
+  have htake_len₁ : (log₁.take (st.cursor - 1)).length = st.cursor - 1 :=
+    List.length_take_of_le (by omega)
+  have htake_len₂ : (log₂.take (st.cursor - 1)).length = st.cursor - 1 :=
+    List.length_take_of_le (by omega)
+  have hprefix_val : log₁.take (st.cursor - 1) = log₂.take (st.cursor - 1) := by
+    apply List.ext_getElem?
+    intro n
+    by_cases hn : n < st.cursor - 1
+    · have hgetEq : st.observed[n]? = st.trace[n]? :=
+        replayRunWithTraceValue_prefix_getElem?_eq
+          (main := main) (i := Sum.inr ())
+          (trace := log₁) (forkQuery := (↑s : ℕ)) (replacement := replacement) hz
+          (n := n) (by rw [if_pos hfork]; exact hn)
+      rw [hlog₂, htrace_eq] at hgetEq
+      have hn_t : n < log₁.length := by omega
+      have hn_o : n < log₂.length := by omega
+      have hlen₁ : n < (log₁.take (st.cursor - 1)).length := by rw [htake_len₁]; exact hn
+      have hlen₂ : n < (log₂.take (st.cursor - 1)).length := by rw [htake_len₂]; exact hn
+      rw [List.getElem?_eq_getElem hlen₁, List.getElem?_eq_getElem hlen₂,
+        List.getElem_take, List.getElem_take,
+        ← List.getElem?_eq_getElem hn_t, ← List.getElem?_eq_getElem hn_o]
+      exact hgetEq.symm
+    · push Not at hn
+      have hlen₁ : (log₁.take (st.cursor - 1)).length ≤ n := by rw [htake_len₁]; exact hn
+      have hlen₂ : (log₂.take (st.cursor - 1)).length ≤ n := by rw [htake_len₂]; exact hn
+      rw [List.getElem?_eq_none hlen₁, List.getElem?_eq_none hlen₂]
+  have hget₁ : log₁[st.cursor - 1]? = some (log₁[st.cursor - 1]'hc1_lt_t) :=
+    List.getElem?_eq_getElem hc1_lt_t
+  have hget₂ : log₂[st.cursor - 1]? = some (log₂[st.cursor - 1]'hc1_lt_o) :=
+    List.getElem?_eq_getElem hc1_lt_o
+  have hfst₁ : (log₁[st.cursor - 1]'hc1_lt_t).1 = Sum.inr () := by
+    have := htrace_in
+    unfold QueryLog.inputAt? at this
+    rw [hget₁] at this
+    simpa using this
+  have hfst₂ : (log₂[st.cursor - 1]'hc1_lt_o).1 = Sum.inr () := by
+    have := hobs_in
+    unfold QueryLog.inputAt? at this
+    rw [hget₂] at this
+    simpa using this
+  obtain ⟨v₁, hv₁⟩ : ∃ v : Chal, log₁[st.cursor - 1]'hc1_lt_t =
+      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) := by
+    rcases hsig : log₁[st.cursor - 1]'hc1_lt_t with ⟨i, v⟩
+    rw [hsig] at hfst₁
+    cases i with
+    | inl n => cases hfst₁
+    | inr u => cases u; exact ⟨v, rfl⟩
+  obtain ⟨v₂, hv₂⟩ : ∃ v : Chal, log₂[st.cursor - 1]'hc1_lt_o =
+      (⟨Sum.inr (), v⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) := by
+    rcases hsig : log₂[st.cursor - 1]'hc1_lt_o with ⟨i, v⟩
+    rw [hsig] at hfst₂
+    cases i with
+    | inl n => cases hfst₂
+    | inr u => cases u; exact ⟨v, rfl⟩
+  have hcsub : st.cursor - 1 + 1 = st.cursor := by omega
+  have hdec₁ : log₁ = log₁.take (st.cursor - 1) ++
+      ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
+        log₁.drop st.cursor) := by
+    have hdrop :
+        log₁.drop (st.cursor - 1) =
+          (log₁[st.cursor - 1]'hc1_lt_t) :: log₁.drop (st.cursor - 1 + 1) :=
+      List.drop_eq_getElem_cons hc1_lt_t
+    rw [hcsub] at hdrop
+    rw [hv₁] at hdrop
+    calc log₁ = log₁.take (st.cursor - 1) ++ log₁.drop (st.cursor - 1) :=
+        (List.take_append_drop _ _).symm
+      _ = log₁.take (st.cursor - 1) ++
+          ((⟨Sum.inr (), v₁⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
+            log₁.drop st.cursor) := by rw [hdrop]
+  have hdec₂ : log₂ = log₁.take (st.cursor - 1) ++
+      ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
+        log₂.drop st.cursor) := by
+    have hdrop :
+        log₂.drop (st.cursor - 1) =
+          (log₂[st.cursor - 1]'hc1_lt_o) :: log₂.drop (st.cursor - 1 + 1) :=
+      List.drop_eq_getElem_cons hc1_lt_o
+    rw [hcsub] at hdrop
+    rw [hv₂] at hdrop
+    calc log₂ = log₂.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) :=
+        (List.take_append_drop _ _).symm
+      _ = log₁.take (st.cursor - 1) ++ log₂.drop (st.cursor - 1) := by rw [hprefix_val]
+      _ = log₁.take (st.cursor - 1) ++
+          ((⟨Sum.inr (), v₂⟩ : (i : ℕ ⊕ Unit) × (wrappedSpec Chal).Range i) ::
+            log₂.drop st.cursor) := by rw [hdrop]
+  have hpref_count :
+      QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) = (↑s : ℕ) := by
+    unfold QueryLog.countQ
+    rw [hprefix_val]
+    exact hcount_obs
+  have htakeEq :
+      x₁.queryLog.take (QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) + 1) =
+        x₂.queryLog.take
+          (QueryLog.countQ (log₁.take (st.cursor - 1)) (· = Sum.inr ()) + 1) :=
+    runTrace_queryLog_take_eq σ hr M (Resp := Resp) nmaAdv pk
+      (x₁ := x₁) (x₂ := x₂) (outerLog₁ := log₁) (outerLog₂ := log₂) hx₁ hx₂
+      (p := log₁.take (st.cursor - 1)) (v₁ := v₁) (v₂ := v₂)
+      (rest₁ := log₁.drop st.cursor) (rest₂ := log₂.drop st.cursor) hdec₁ hdec₂
+  rw [hpref_count] at htakeEq
+  have htgt₁ : x₁.queryLog[(↑s : ℕ)]? = some x₁.target :=
+    forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) h₁
+  have htgt₂ : x₂.queryLog[(↑s : ℕ)]? = some x₂.target :=
+    forkPoint_getElem?_eq_some_target (M := M) (Commit := Commit) (Resp := Resp)
+      (Chal := Chal) h₂
+  have hgetElem_take :
+      ∀ l : List (M × Commit),
+        (l.take ((↑s : ℕ) + 1))[(↑s : ℕ)]? = l[(↑s : ℕ)]? := fun l => by
+    rw [List.getElem?_take]
+    split_ifs with h
+    · rfl
+    · exact absurd (Nat.lt_succ_self _) h
+  have : some x₁.target = some x₂.target := by
+    rw [← htgt₁, ← htgt₂, ← hgetElem_take x₁.queryLog, ← hgetElem_take x₂.queryLog, htakeEq]
+  exact Option.some.inj this
+
 omit [SampleableType Stmt] [SampleableType Wit] in
 /-- Managed-RO replay-fork convenience theorem at a fixed public key, stated at the
 `OracleComp (unifSpec + (Unit →ₒ Chal))` level.

@@ -6,7 +6,7 @@ Authors: Quang Dao
 import Mathlib.Logic.Equiv.Sum
 
 /-!
-# HeapSSP: typed heaps over identifier sets
+# Typed heaps over identifier sets
 
 `Heap Ident` (with `[CellSpec Ident]`) is a dependent function
 `(i : Ident) → CellSpec.type i`. It models package state as a collection of
@@ -35,13 +35,10 @@ example : stepped.get .counter = 5 := by simp [stepped]
 example : stepped.get .flag    = false := by simp [stepped]
 ```
 
-`HeapSSP.Package` (`VCVio/HeapSSP/Package.lean`) consumes this layer: it is
-parameterized by `(Ident : Type) [CellSpec Ident]` and uses `Heap Ident` as
-the package's private state. -/
+Stateful handlers can use this layer as a typed cell-keyed state convention:
+`Heap Ident` stores one value of the cell-specific type at every identifier. -/
 
 universe u v
-
-namespace VCVio.HeapSSP
 
 /-! ## `CellSpec` : a typed cell directory
 
@@ -136,8 +133,8 @@ instance Sum.instCellSpec {α β : Type u}
 /-! ## `PEmpty` : `CellSpec` instance for the empty identifier set
 
 The trivial heap `Heap PEmpty` has a unique inhabitant (the empty function).
-It is used by stateless packages (`HeapSSP.Package.id` and
-`HeapSSP.Package.ofStateless`). -/
+It is useful whenever a typed-heap construction needs a stateless identifier
+set. -/
 instance PEmpty.instCellSpec : CellSpec.{u, v} PEmpty where
   type i := i.elim
   default i := i.elim
@@ -253,17 +250,13 @@ theorem split_symm_update_inr {α β : Type u}
 
 end Heap
 
-end VCVio.HeapSSP
-
 /-! ## Sanity check: a two-cell heap
 
 A small example demonstrating cell access, frame, and the canonical
 `Sum`-split. If you're reading this to learn the API, this is the right
 starting point. -/
 
-namespace VCVio.HeapSSP.HeapExample
-
-open VCVio.HeapSSP
+namespace HeapExample
 
 inductive Id
   | counter
@@ -302,4 +295,4 @@ example :
     (Heap.split Id Id).symm (h1, h0) (.inr .counter) = 0 := by
   simp
 
-end VCVio.HeapSSP.HeapExample
+end HeapExample

@@ -5,6 +5,7 @@ Authors: Devon Tuma, Quang Dao
 -/
 import VCVio.OracleComp.SimSemantics.SimulateQ
 import Mathlib.Data.Set.Card
+import Mathlib.Data.Real.ENatENNReal
 
 /-!
 # Structures For Tracking a Computation's Oracle Queries
@@ -13,7 +14,7 @@ This file defines types like `QueryLog` and `QueryCache` for use with
 simulation oracles and implementation transformers defined in the same directory.
 -/
 
-open OracleSpec OracleComp
+open ENNReal OracleSpec OracleComp
 
 universe u v w
 
@@ -93,6 +94,14 @@ lemma toSet_empty : (∅ : QueryCache spec).toSet = ∅ := by
 lemma toSet_mono {c₁ c₂ : QueryCache spec} (h : c₁ ≤ c₂) : c₁.toSet ⊆ c₂.toSet :=
   fun ⟨_, _⟩ hx => h hx
 
+/-- Number of live entries in a query cache, as an `ℝ≥0∞` resource. -/
+noncomputable def enncard (cache : QueryCache spec) : ℝ≥0∞ :=
+  (cache.toSet.encard : ℝ≥0∞)
+
+@[simp]
+lemma enncard_empty : enncard (∅ : QueryCache spec) = 0 := by
+  simp [enncard]
+
 /-! ### Cache update -/
 
 variable [spec.DecidableEq] [DecidableEq ι] (cache : QueryCache spec)
@@ -132,6 +141,17 @@ lemma toSet_encard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
     (cache.cacheQuery t u).toSet.encard ≤ cache.toSet.encard + 1 :=
   le_trans (Set.encard_le_encard (toSet_cacheQuery_subset_insert cache t u))
     (Set.encard_insert_le cache.toSet ⟨t, u⟩)
+
+omit [spec.DecidableEq] in
+lemma enncard_cacheQuery_le (t : spec.Domain) (u : spec.Range t) :
+    enncard (cache.cacheQuery t u) ≤ enncard cache + 1 := by
+  have hencard :
+      (cache.cacheQuery t u).toSet.encard ≤ cache.toSet.encard + 1 :=
+    toSet_encard_cacheQuery_le cache t u
+  change ((cache.cacheQuery t u).toSet.encard : ℝ≥0∞) ≤
+    (cache.toSet.encard : ℝ≥0∞) + (1 : ℝ≥0∞)
+  rw [← ENat.toENNReal_one, ← ENat.toENNReal_add]
+  exact ENat.toENNReal_mono hencard
 
 omit [spec.DecidableEq] in
 lemma le_cacheQuery {t : spec.Domain} {u : spec.Range t} (h : cache t = none) :

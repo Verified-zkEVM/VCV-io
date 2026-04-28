@@ -107,12 +107,10 @@ omit [DecidableEq G] in
 `IND_CPA_OneTime_DDHReduction`, both sides normalize to the same sample space. -/
 private lemma IND_CPA_OneTime_game_evalDist_eq_ddhExpReal
     (adv : AsymmEncAlg.IND_CPA_Adv (elGamalAsymmEnc F G gen)) :
-    evalDist
-      (AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
-        (encAlg := elGamalAsymmEnc F G gen) adv) =
-      evalDist
-        (DiffieHellman.ddhExpReal (F := F) gen
-          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)) := by
+    𝒟[AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp
+        (encAlg := elGamalAsymmEnc F G gen) adv] =
+      𝒟[DiffieHellman.ddhExpReal (F := F) gen
+          (IND_CPA_OneTime_DDHReduction (F := F) (G := G) (gen := gen) adv)] := by
   simp only [AsymmEncAlg.IND_CPA_OneTime_Game_ProbComp,
     DiffieHellman.ddhExpReal, IND_CPA_OneTime_DDHReduction, elGamalAsymmEnc]
   ext z
@@ -160,7 +158,7 @@ private lemma IND_CPA_OneTime_DDHReduction_rand_half
     let (m₁, m₂, st) ← adv.chooseMessages pk
     let mask ← ($ᵗ G)
     adv.distinguish st (head, mask + if bit then m₁ else m₂)
-  have hf : ∀ pk, evalDist (f pk true) = evalDist (f pk false) := by
+  have hf : ∀ pk, 𝒟[f pk true] = 𝒟[f pk false] := by
     intro pk
     unfold f
     rw [evalDist_bind, evalDist_bind]

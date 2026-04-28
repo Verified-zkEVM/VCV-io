@@ -62,7 +62,7 @@ variable {ι₀ : Type} {spec₀ : OracleSpec ι₀} [∀ i, SampleableType (spe
 @[simp]
 lemma evalDist_simulateQ [spec₀.Fintype] [spec₀.Inhabited] {α : Type}
     (oa : OracleComp spec₀ α) :
-    evalDist (simulateQ uniformSampleImpl oa) = evalDist oa := by
+    𝒟[simulateQ uniformSampleImpl oa] = 𝒟[oa] := by
   induction oa using OracleComp.inductionOn with
   | pure x => simp
   | query_bind t mx h => simp [h, uniformSampleImpl]

@@ -41,7 +41,7 @@ instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v
   liftM_eq_lift q := PEmpty.elim q.input
 
 instance (priority := low) {τ : Type u} [Inhabited τ] {spec : OracleSpec.{u, v} τ} :
-    OracleSpec.LawfulSubSpec OracleSpec.emptySpec spec where
+    OracleSpec.emptySpec ˡ⊂ₒ spec where
   onResponse_bijective t := PEmpty.elim t
 
 section add_left
@@ -58,7 +58,7 @@ instance subSpec_add_left : spec₁ ⊂ₒ (spec₁ + spec₂) where
 @[simp high] lemma liftM_add_left_query (t : spec₁.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₁.Range t)) = query (Sum.inl t) := rfl
 
-instance lawfulSubSpec_add_left : OracleSpec.LawfulSubSpec spec₁ (spec₁ + spec₂) where
+instance lawfulSubSpec_add_left : spec₁ ˡ⊂ₒ (spec₁ + spec₂) where
   onResponse_bijective _ := Function.bijective_id
 
 end add_left
@@ -77,8 +77,20 @@ instance subSpec_add_right : spec₂ ⊂ₒ (spec₁ + spec₂) where
 @[simp high] lemma liftM_add_right_query (t : spec₂.Domain) :
     (liftM (query t) : OracleQuery (spec₁ + spec₂) (spec₂.Range t)) = query (Sum.inr t) := rfl
 
-instance lawfulSubSpec_add_right : OracleSpec.LawfulSubSpec spec₂ (spec₁ + spec₂) where
+instance lawfulSubSpec_add_right : spec₂ ˡ⊂ₒ (spec₁ + spec₂) where
   onResponse_bijective _ := Function.bijective_id
+
+instance disjointSubSpec_add_left_right :
+    OracleSpec.DisjointSubSpec spec₁ spec₂ (spec₁ + spec₂) where
+  disjoint_onQuery t₁ t₂ := by
+    intro h
+    cases h
+
+instance disjointSubSpec_add_right_left :
+    OracleSpec.DisjointSubSpec spec₂ spec₁ (spec₁ + spec₂) where
+  disjoint_onQuery t₂ t₁ := by
+    intro h
+    cases h
 
 end add_right
 
@@ -120,8 +132,8 @@ instance subSpec_left_add_left_add_of_subSpec [h : spec₁ ⊂ₒ spec₃] :
         | .inr t => query (Sum.inr t) := by aesop
 
 instance lawfulSubSpec_left_add_left_add [spec₁ ⊂ₒ spec₃]
-    [OracleSpec.LawfulSubSpec spec₁ spec₃] :
-    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₃ + spec₂) where
+    [spec₁ ˡ⊂ₒ spec₃] :
+    spec₁ + spec₂ ˡ⊂ₒ spec₃ + spec₂ where
   onResponse_bijective t := by
     match t with
     | .inl t =>
@@ -168,8 +180,8 @@ instance subSpec_right_add_right_add_of_subSpec [h : spec₂ ⊂ₒ spec₃] :
         | .inr t => liftM (liftM (query t) : OracleQuery spec₃ _) := by aesop
 
 instance lawfulSubSpec_right_add_right_add [spec₂ ⊂ₒ spec₃]
-    [OracleSpec.LawfulSubSpec spec₂ spec₃] :
-    OracleSpec.LawfulSubSpec (spec₁ + spec₂) (spec₁ + spec₃) where
+    [spec₂ ˡ⊂ₒ spec₃] :
+    spec₁ + spec₂ ˡ⊂ₒ spec₁ + spec₃ where
   onResponse_bijective t := by
     match t with
     | .inl _ => exact Function.bijective_id
@@ -212,7 +224,7 @@ instance subSpec_add_assoc : spec₁ + (spec₂ + spec₃) ⊂ₒ spec₁ + spec
   rcases t with t | t | t <;> simp [OracleSpec.query_def]
 
 instance lawfulSubSpec_add_assoc :
-    OracleSpec.LawfulSubSpec (spec₁ + (spec₂ + spec₃)) (spec₁ + spec₂ + spec₃) where
+    spec₁ + (spec₂ + spec₃) ˡ⊂ₒ spec₁ + spec₂ + spec₃ where
   onResponse_bijective t := by
     rcases t with t | t | t <;> exact Function.bijective_id
 
@@ -238,7 +250,7 @@ instance subSpec_sigma {σ ι} (specs : σ → OracleSpec ι) (j : σ) :
       (OracleSpec.sigma specs).query ⟨j, t⟩ := rfl
 
 instance lawfulSubSpec_sigma (j : σ) :
-    OracleSpec.LawfulSubSpec (specs j) (OracleSpec.sigma specs) where
+    specs j ˡ⊂ₒ OracleSpec.sigma specs where
   onResponse_bijective _ := Function.bijective_id
 
 end sigma

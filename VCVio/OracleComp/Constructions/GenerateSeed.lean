@@ -376,7 +376,7 @@ lemma probOutput_generateSeed' [spec.Fintype]
 lemma evalDist_generateSeed_eq_of_countEq [spec.Fintype] [spec.Inhabited]
     (qc' : ι → ℕ) (js' : List ι)
     (hcount : ∀ i, qc i * js.count i = qc' i * js'.count i) :
-    evalDist (generateSeed spec qc js) = evalDist (generateSeed spec qc' js') := by
+    𝒟[generateSeed spec qc js] = 𝒟[generateSeed spec qc' js'] := by
   classical
   ext seed
   change Pr[= seed | generateSeed spec qc js] = Pr[= seed | generateSeed spec qc' js']

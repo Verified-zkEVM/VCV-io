@@ -64,7 +64,7 @@ namespace seededOracle
 lemma probEvent_liftComp_uniformSample_eq_of_eq
     {ι : Type} {spec : OracleSpec ι}
     [(i : ι) → SampleableType (spec.Range i)]
-    [unifSpec ⊂ₒ spec] [OracleSpec.LawfulSubSpec unifSpec spec]
+    [unifSpec ⊂ₒ spec] [unifSpec ˡ⊂ₒ spec]
     [spec.Fintype] [spec.Inhabited]
     {i : ι} (u₀ : spec.Range i) :
     probEvent (liftComp (uniformSample (spec.Range i)) spec)
@@ -98,14 +98,14 @@ lemma run_bind_query_eq_pop {α : Type u}
 private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α : Type} (oa : OracleComp spec₀ α) :
-    evalDist (do
+    𝒟[(do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      (simulateQ seededOracle oa).run' seed : OracleComp spec₀ α) =
-    evalDist oa := by
+      (simulateQ seededOracle oa).run' seed : OracleComp spec₀ α)] =
+    𝒟[oa] := by
   classical
   revert qc js
   induction oa using OracleComp.inductionOn with
@@ -115,7 +115,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
     simp
   | query_bind t mx ih =>
     intro qc js
-    -- Prove at the evalDist level, not pointwise
+    -- Prove at the `evalDist` level, not pointwise
     -- First establish the run' decomposition
     have hrun' : ∀ s : QuerySeed spec₀,
         (do let u ← seededOracle t; simulateQ seededOracle (mx u) :
@@ -130,7 +130,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
       cases s.pop t with
       | none => simp [map_bind]
       | some p => rfl
-    -- Use the decomposition to prove evalDist equality
+    -- Use the decomposition to prove `evalDist` equality
     simp only [simulateQ_bind, simulateQ_query, OracleQuery.cont_query, OracleQuery.input_query,
       id_map]
     apply evalDist_ext; intro x
@@ -241,7 +241,7 @@ private lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'
 lemma probOutput_generateSeed_bind_simulateQ_bind
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (ob : α → OracleComp spec₀ β) (y : β) :
@@ -265,7 +265,7 @@ lemma probOutput_generateSeed_bind_simulateQ_bind
 lemma probOutput_generateSeed_bind_map_simulateQ
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
@@ -284,13 +284,13 @@ what would otherwise be a fresh uniform oracle response. -/
 lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (σ : QuerySeed spec₀) (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) :
-    evalDist (do
+    𝒟[(do
       let u ← liftComp ($ᵗ spec₀.Range i) spec₀
-      (simulateQ seededOracle oa).run' (σ.addValue i u) : OracleComp spec₀ α) =
-    evalDist ((simulateQ seededOracle oa).run' σ : OracleComp spec₀ α) := by
+      (simulateQ seededOracle oa).run' (σ.addValue i u) : OracleComp spec₀ α)] =
+    𝒟[((simulateQ seededOracle oa).run' σ : OracleComp spec₀ α)] := by
   revert σ
   induction oa using OracleComp.inductionOn with
   | pure x =>
@@ -398,14 +398,14 @@ lemma evalDist_liftComp_uniformSample_bind_simulateQ_run'_addValue
 lemma evalDist_liftComp_replicate_uniformSample_bind_simulateQ_run'_addValues
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ j, SampleableType (spec₀.Range j)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (i : ι₀) {α : Type} (oa : OracleComp spec₀ α) (n : ℕ) :
     ∀ (σ : QuerySeed spec₀),
-    evalDist (do
+    𝒟[(do
       let us ← liftComp (replicate n ($ᵗ spec₀.Range i)) spec₀
-      (simulateQ seededOracle oa).run' (σ.addValues us) : OracleComp spec₀ α) =
-    evalDist ((simulateQ seededOracle oa).run' σ : OracleComp spec₀ α) := by
+      (simulateQ seededOracle oa).run' (σ.addValues us) : OracleComp spec₀ α)] =
+    𝒟[((simulateQ seededOracle oa).run' σ : OracleComp spec₀ α)] := by
   induction n with
   | zero => intro σ; simp [replicate_zero, QuerySeed.addValues_nil]
   | succ n ih =>
@@ -433,14 +433,14 @@ the distribution when averaging over seeds from `generateSeed`. -/
 lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) :
-    evalDist (do
+    𝒟[(do
       let seed ← liftComp (generateSeed spec₀ qc js) spec₀
-      (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k) : OracleComp spec₀ α) =
-    evalDist oa := by
+      (simulateQ seededOracle oa).run' (seed.takeAtIndex i₀ k) : OracleComp spec₀ α)] =
+    𝒟[oa] := by
   classical
   revert qc js k
   induction oa using OracleComp.inductionOn with
@@ -625,7 +625,7 @@ lemma evalDist_liftComp_generateSeed_bind_simulateQ_run'_takeAtIndex
 lemma probOutput_generateSeed_bind_map_simulateQ_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α β : Type} (oa : OracleComp spec₀ α) (f : α → β) (y : β) :
@@ -652,7 +652,7 @@ by an arbitrary function of the seed prefix `σ.takeAtIndex i₀ k`. -/
 lemma tsum_probOutput_generateSeed_weight_takeAtIndex
     {ι₀ : Type} {spec₀ : OracleSpec ι₀} [DecidableEq ι₀]
     [∀ i, SampleableType (spec₀.Range i)] [unifSpec ⊂ₒ spec₀]
-    [OracleSpec.LawfulSubSpec unifSpec spec₀]
+    [unifSpec ˡ⊂ₒ spec₀]
     [spec₀.Fintype] [spec₀.Inhabited]
     (qc : ι₀ → ℕ) (js : List ι₀) (i₀ : ι₀) (k : ℕ)
     {α : Type} (oa : OracleComp spec₀ α) (x : α)
