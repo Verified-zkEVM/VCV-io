@@ -165,6 +165,13 @@ bundle on demand).
 lake exe cache get && lake build
 ```
 
+CI runs the timed build on the non-test Lean libraries:
+`ToMathlib`, `VCVio`, `FFI`, `LatticeCrypto`, `Examples`,
+`VCVioWidgets`, and `Interop`.
+The timing report parses per-file build times only for that same set.
+Test libraries and test executables are not part of the timed build; CI only
+times the smoke module separately with `lake env lean VCVioTest/Smoke.lean`.
+
 After adding new `.lean` files: `./scripts/update-lib.sh`
 
 Lean toolchain and Mathlib must stay in sync (both currently `v4.29.0`). Files should stay under 1500 lines.
