@@ -174,6 +174,98 @@ example (err : String) (post : α → ℝ≥0∞) (errPost : String → ℝ≥0�
       post epost⟨errPost⟩ := by
   vcgen
 
+/-! ## `ReaderT (OracleComp spec)` transformer steps -/
+
+example (oa : OracleComp spec α) (post : α → String → ℝ≥0∞) :
+    ⦃fun r => wp⟦oa⟧ (fun a => post a r)⦄
+      (MonadLift.monadLift oa : ReaderT String (OracleComp spec) α)
+    ⦃post⦄ := by
+  vcgen
+
+example (oa : OracleComp spec α) (post : String × α → String → ℝ≥0∞) :
+    ⦃fun r => wp⟦oa⟧ (fun a => post (r, a) r)⦄
+      (do
+        let r ← (MonadReaderOf.read : ReaderT String (OracleComp spec) String)
+        let a ← (MonadLift.monadLift oa : ReaderT String (OracleComp spec) α)
+        pure (r, a))
+    ⦃post⦄ := by
+  vcgen
+
+/-! ## Mixed transformer stack steps -/
+
+example (oa : OracleComp spec α) (post : Nat × α → Nat → ℝ≥0∞) (nonePost : ℝ≥0∞) :
+    Std.Do'.Triple (fun s => wp⟦oa⟧ (fun a => post (s, a) (s + 1)))
+      (do
+        let s ← (MonadStateOf.get : StateT Nat (OptionT (OracleComp spec)) Nat)
+        (MonadStateOf.set (s + 1) : StateT Nat (OptionT (OracleComp spec)) PUnit)
+        let a ← (MonadLift.monadLift (OptionT.lift oa) :
+          StateT Nat (OptionT (OracleComp spec)) α)
+        pure (s, a))
+      post epost⟨nonePost⟩ := by
+  vcgen
+
+/-! ## `WriterT (OracleComp spec)` transformer steps -/
+
+example (oa : OracleComp spec α) (post : α → Multiplicative Nat → ℝ≥0∞) :
+    ⦃fun w => wp⟦oa⟧ (fun a => post a w)⦄
+      (MonadLift.monadLift oa : WriterT (Multiplicative Nat) (OracleComp spec) α)
+    ⦃post⦄ := by
+  vcgen
+
+example (out : Multiplicative Nat) (post : PUnit → Multiplicative Nat → ℝ≥0∞) :
+    ⦃fun w => post ⟨⟩ (w * out)⦄
+      (MonadWriter.tell out : WriterT (Multiplicative Nat) (OracleComp spec) PUnit)
+    ⦃post⦄ := by
+  vcgen
+
+example (oa : OracleComp spec α) (out : Multiplicative Nat)
+    (post : PUnit × α → Multiplicative Nat → ℝ≥0∞) :
+    ⦃fun w => wp⟦oa⟧ (fun a => post (PUnit.unit, a) (w * out))⦄
+      (do
+        MonadWriter.tell out
+        let a ← (MonadLift.monadLift oa : WriterT (Multiplicative Nat) (OracleComp spec) α)
+        pure (PUnit.unit, a))
+    ⦃post⦄ := by
+  vcgen
+
+example (oa : OracleComp spec α) (out : Multiplicative Nat)
+    (post : Nat × α → Nat → Multiplicative Nat → ℝ≥0∞) :
+    Std.Do'.Triple (fun s w => wp⟦oa⟧ (fun a => post (s, a) (s + 1) (w * out)))
+      ((do
+        let s ← (MonadStateOf.get :
+          StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) Nat)
+        (MonadStateOf.set (s + 1) :
+          StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) PUnit)
+        (MonadLift.monadLift
+          (MonadWriter.tell out : WriterT (Multiplicative Nat) (OracleComp spec) PUnit) :
+          StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) PUnit)
+        let a ← (MonadLift.monadLift
+          (MonadLift.monadLift oa : WriterT (Multiplicative Nat) (OracleComp spec) α) :
+          StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) α)
+        (pure (s, a) :
+          StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) (Nat × α))) :
+        StateT Nat (WriterT (Multiplicative Nat) (OracleComp spec)) (Nat × α))
+      post Lean.Order.bot := by
+  vcgen
+
+example (oa : OracleComp spec α) (out : Multiplicative Nat)
+    (post : String × α → String → Multiplicative Nat → ℝ≥0∞) :
+    Std.Do'.Triple (fun r w => wp⟦oa⟧ (fun a => post (r, a) r (w * out)))
+      ((do
+        let r ← (MonadReaderOf.read :
+          ReaderT String (WriterT (Multiplicative Nat) (OracleComp spec)) String)
+        (MonadLift.monadLift
+          (MonadWriter.tell out : WriterT (Multiplicative Nat) (OracleComp spec) PUnit) :
+          ReaderT String (WriterT (Multiplicative Nat) (OracleComp spec)) PUnit)
+        let a ← (MonadLift.monadLift
+          (MonadLift.monadLift oa : WriterT (Multiplicative Nat) (OracleComp spec) α) :
+          ReaderT String (WriterT (Multiplicative Nat) (OracleComp spec)) α)
+        (pure (r, a) :
+          ReaderT String (WriterT (Multiplicative Nat) (OracleComp spec)) (String × α))) :
+        ReaderT String (WriterT (Multiplicative Nat) (OracleComp spec)) (String × α))
+      post Lean.Order.bot := by
+  vcgen
+
 /--
 info: [wpstep cache] hit `OracleComp.ProgramLogic.wp_replicate_succ`
 ---

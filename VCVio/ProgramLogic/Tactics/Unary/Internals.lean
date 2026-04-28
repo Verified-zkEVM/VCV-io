@@ -128,6 +128,239 @@ theorem stdDoTriple_of_wp_le {m : Type u → Type v}
     Std.Do'.Triple pre x post epost :=
   Std.Do'.Triple.iff.mpr hpre
 
+theorem wp_StateT_get_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadStateOf.get : StateT σ m σ) post epost =
+      fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
+        (fun p : σ × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
+      (fun p : σ × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+  rfl
+
+theorem wp_StateT_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (StateT.get : StateT σ m σ) post epost =
+      fun s => Std.Do'.wp (pure (s, s) : m (σ × σ))
+        (fun p : σ × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
+      (fun p : σ × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost
+  rfl
+
+theorem stdDoTriple_StateT_get_of_rel {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (pre : σ → Pred) (post : σ → σ → Pred) (epost : EPred)
+    (h : ∀ s, Lean.Order.PartialOrder.rel (pre s) (post s s)) :
+    Std.Do'.Triple pre (StateT.get : StateT σ m σ) post epost := by
+  refine Std.Do'.Triple.iff.mpr ?_
+  intro s
+  change Lean.Order.PartialOrder.rel (pre s)
+    (Std.Do'.wp (pure (s, s) : m (σ × σ))
+      (fun p : σ × σ => post p.1 p.2) epost)
+  exact Lean.Order.PartialOrder.rel_trans (h s)
+    (Std.Do'.WP.wp_pure (m := m) (x := (s, s))
+      (post := fun p : σ × σ => post p.1 p.2) (epost := epost))
+
+theorem wp_StateT_set_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadStateOf.set s' : StateT σ m PUnit) post epost =
+      fun _ => Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  funext s
+  change Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
+      (fun p : PUnit × σ => post p.1 p.2) epost =
+    Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+      (fun p : PUnit × σ => post p.1 p.2) epost
+  rfl
+
+theorem wp_StateT_run_get_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadStateOf.get : StateT σ m σ).run s)
+        (fun p : σ × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_get_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s : σ) (post : σ → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((StateT.get : StateT σ m σ).run s)
+        (fun p : σ × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (s, s) : m (σ × σ)) (fun p : σ × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_set_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadStateOf.set s' : StateT σ m PUnit).run s)
+        (fun p : PUnit × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_run_set_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ : Type u} (s s' : σ) (post : PUnit → σ → Pred) (epost : EPred) :
+    Std.Do'.wp ((StateT.set s' : StateT σ m PUnit).run s)
+        (fun p : PUnit × σ => post p.1 p.2) epost =
+      Std.Do'.wp (pure (PUnit.unit, s') : m (PUnit × σ))
+        (fun p : PUnit × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_StateT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {σ α β : Type u} (f : α → β) (x : StateT σ m α) (post : β → σ → Pred)
+    (epost : EPred) :
+    Std.Do'.wp (f <$> x) post epost =
+      fun s => Std.Do'.wp ((f <$> x).run s)
+        (fun p : β × σ => post p.1 p.2) epost := by
+  rfl
+
+theorem wp_ReaderT_read_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp (MonadReaderOf.read : ReaderT ρ m ρ) post epost =
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
+  funext r
+  change Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r)
+      (fun a : ρ => post a r) epost =
+    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+  rfl
+
+theorem wp_ReaderT_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp (ReaderT.read : ReaderT ρ m ρ) post epost =
+      fun r => Std.Do'.wp (pure r : m ρ) (fun a => post a r) epost := by
+  funext r
+  change Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r)
+      (fun a : ρ => post a r) epost =
+    Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost
+  rfl
+
+theorem stdDoTriple_ReaderT_read_of_rel {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (pre : ρ → Pred) (post : ρ → ρ → Pred) (epost : EPred)
+    (h : ∀ r, Lean.Order.PartialOrder.rel (pre r) (post r r)) :
+    Std.Do'.Triple pre (MonadReaderOf.read : ReaderT ρ m ρ) post epost := by
+  refine Std.Do'.Triple.iff.mpr ?_
+  intro r
+  change Lean.Order.PartialOrder.rel (pre r)
+    (Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost)
+  exact Lean.Order.PartialOrder.rel_trans (h r)
+    (Std.Do'.WP.wp_pure (m := m) (x := r)
+      (post := fun a : ρ => post a r) (epost := epost))
+
+theorem wp_ReaderT_run_read_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp ((MonadReaderOf.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
+        epost =
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+  rfl
+
+theorem wp_ReaderT_run_read_layer' {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ : Type u} (r : ρ) (post : ρ → ρ → Pred) (epost : EPred) :
+    Std.Do'.wp ((ReaderT.read : ReaderT ρ m ρ).run r) (fun a : ρ => post a r)
+        epost =
+      Std.Do'.wp (pure r : m ρ) (fun a : ρ => post a r) epost := by
+  rfl
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_get {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ : Type} (s : σ)
+    (post : σ → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((StateT.get : StateT σ (OptionT (OracleComp spec)) σ).run s).run)
+      (epost.pushOption (fun p : σ × σ => post p.1 p.2)) = post s s := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (pure (some (s, s)) : OracleComp spec (Option (σ × σ)))
+      (epost.pushOption (fun p : σ × σ => post p.1 p.2)) = post s s
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_set {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ : Type} (s s' : σ)
+    (post : PUnit → σ → ENNReal) (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((StateT.set s' : StateT σ (OptionT (OracleComp spec)) PUnit).run s).run)
+      (epost.pushOption (fun p : PUnit × σ => post p.1 p.2)) = post PUnit.unit s' := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (pure (some (PUnit.unit, s')) : OracleComp spec (Option (PUnit × σ)))
+      (epost.pushOption (fun p : PUnit × σ => post p.1 p.2)) = post PUnit.unit s'
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_lift {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {α : Type}
+    (oa : OracleComp spec α) (post : α → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) (OptionT.lift oa).run
+      (epost.pushOption post) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa post := by
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (oa >>= fun a => pure (some a) : OracleComp spec (Option α))
+      (epost.pushOption post) =
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa post
+  rw [MAlgOrdered.wp_bind]
+  refine congrArg (MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa) ?_
+  funext a
+  rw [MAlgOrdered.wp_pure]
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift {ι : Type u}
+    {spec : OracleSpec ι} [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    {σ α : Type} (oa : OracleComp spec α) (s : σ) (post : α → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (epost.pushOption (fun p : α × σ => post p.1 p.2)) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa (fun a => post a s) := by
+  simp [MonadLift.monadLift, OptionT.run_lift, MAlgOrdered.wp_map,
+    Std.Do'.EPost.cons.pushOption]
+
+theorem wp_StateT_OptionT_monadLift_lift {ι : Type u} {spec : OracleSpec ι}
+    [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec] {σ α : Type}
+    (oa : OracleComp spec α) (post : α → σ → ENNReal)
+    (epost : Std.Do'.EPost.cons ENNReal Std.Do'.EPost.nil) :
+    Std.Do'.wp
+      (MonadLift.monadLift (OptionT.lift oa) : StateT σ (OptionT (OracleComp spec)) α)
+      post epost =
+        fun s => MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa
+          (fun a => post a s) := by
+  funext s
+  change MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (epost.pushOption (fun p : α × σ => post p.1 p.2)) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa (fun a => post a s)
+  exact mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift (spec := spec) oa s post epost
+
+theorem mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map {ι : Type u}
+    {spec : OracleSpec ι} [OracleSpec.Fintype spec] [OracleSpec.Inhabited spec]
+    {σ α β : Type} (oa : OracleComp spec α) (s : σ) (f : α × σ → β)
+    (post : β → ENNReal) (nonePost : ENNReal) :
+    MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal)
+      (((MonadLift.monadLift (OptionT.lift oa) :
+        StateT σ (OptionT (OracleComp spec)) α).run s).run)
+      (fun o => match Option.map f o with | some b => post b | none => nonePost) =
+        MAlgOrdered.wp (m := OracleComp spec) (l := ENNReal) oa
+          (fun a => post (f (a, s))) := by
+  simp [MonadLift.monadLift, OptionT.run_lift, MAlgOrdered.wp_map]
+
+theorem wp_ReaderT_map_layer {m : Type u → Type v} {Pred EPred : Type u}
+    [Monad m] [Std.Do'.Assertion Pred] [Std.Do'.Assertion EPred] [Std.Do'.WP m Pred EPred]
+    {ρ α β : Type u} (f : α → β) (x : ReaderT ρ m α) (post : β → ρ → Pred)
+    (epost : EPred) :
+    Std.Do'.wp (f <$> x) post epost =
+      fun r => Std.Do'.wp ((f <$> x).run r) (fun b : β => post b r) epost := by
+  rfl
+
 attribute [vcspec]
   OracleComp.ProgramLogic.triple_pure
   wp_pure_le_vcspec
@@ -144,6 +377,16 @@ attribute [vcspec]
   Std.Do'.Spec.set_StateT
   Std.Do'.Spec.modifyGet_StateT
   Std.Do'.Spec.monadLift_StateT
+  Std.Do'.Spec.read_ReaderT
+  Std.Do'.Spec.monadLift_ReaderT
+  Std.Do'.Spec.tell_WriterT
+  Std.Do'.Spec.monadLift_WriterT
+  Std.Do'.Spec.mk_WriterT
+  Std.Do'.WriterT.wp_pure
+  Std.Do'.WriterT.wp_bind
+  Std.Do'.WriterT.wp_tell
+  Std.Do'.WriterT.wp_monadLift
+  Std.Do'.WriterT.wp_map
 
 private def mkVCGenPlannedStep (label replayText : String) (run : TacticM Bool) : PlannedStep :=
   { label, replayText, run }
@@ -157,7 +400,7 @@ def throwWpStepError : TacticM Unit := withMainContext do
   | none =>
       throwError "vcstep: expected a goal containing `wp`; got:{indentExpr target}"
   | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
+      let comp ← instantiateMVars comp
       throwError
         "vcstep: found a `wp` goal, but none of the current single-step rules apply to:\n\
         {indentExpr comp}\n\
@@ -168,7 +411,7 @@ def runHoareStepRuleUsing (cut : TSyntax `term) : TacticM Bool := do
   let target ← instantiateMVars (← getMainTarget)
   match tripleGoalComp? target with
   | some comp =>
-      let comp ← whnfReducible (← instantiateMVars comp)
+      let comp ← instantiateMVars comp
       if isBindExpr comp then
         tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.triple_bind (cut := $cut)))
@@ -219,17 +462,318 @@ private def tryApplyTripleHyp : TacticM Bool := withMainContext do
       saved.restore
   return false
 
+private def peelKnownTransformerWPInGoal : TacticM Bool := do
+  discard <| tryEvalTacticSyntax (← `(tactic|
+    simp only [
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind,
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind',
+      OracleComp.ProgramLogic.Loom.wp_StateT_pure,
+      OracleComp.ProgramLogic.Loom.wp_StateT_get,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer',
+      OracleComp.ProgramLogic.Loom.wp_StateT_set,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_set_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_get,
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_set,
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_lift,
+      mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift,
+      mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_OptionT_monadLift_lift,
+      OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
+      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_map_layer,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_bind,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_pure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_failure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_lift,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_map,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_bind,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_pure,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_throw,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_bind,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_pure,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_read,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer',
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_monadLift,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_map_layer,
+      Std.Do'.WriterT.apply_wp,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_map]))
+  tryEvalTacticSyntax (← `(tactic|
+    simp only [
+      Std.Do'.StateT.apply_wp,
+      Std.Do'.ReaderT.apply_wp,
+      Std.Do'.WriterT.apply_wp,
+      StateT.run_bind,
+      StateT.run_pure,
+      StateT.run_get,
+      StateT.run_set,
+      StateT.run_modifyGet,
+      StateT.run_monadLift,
+      StateT.run_map,
+      StateT.run_lift,
+      StateT.run_pure,
+      ReaderT.run_bind,
+      ReaderT.run_pure,
+      ReaderT.run_monadLift,
+      ReaderT.run_read,
+      ReaderT.run_map,
+      WriterT.run_bind,
+      WriterT.run_pure,
+      WriterT.run_tell,
+      WriterT.run_monadLift,
+      WriterT.run_liftM,
+      WriterT.run_map,
+      OptionT.run_bind,
+      OptionT.run_pure,
+      OptionT.run_lift,
+      OptionT.run_failure,
+      OptionT.run_map,
+      ExceptT.run_bind,
+      ExceptT.run_pure,
+      ExceptT.run_lift,
+      ExceptT.run_throw,
+      ExceptT.run_map,
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind,
+      OracleComp.ProgramLogic.Loom.wp_StateT_bind',
+      OracleComp.ProgramLogic.Loom.wp_StateT_pure,
+      OracleComp.ProgramLogic.Loom.wp_StateT_get,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_get_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer',
+      OracleComp.ProgramLogic.Loom.wp_StateT_set,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_set_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_get,
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_set,
+      OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_lift,
+      mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift,
+      mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_OptionT_monadLift_lift,
+      OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
+      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_map_layer,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_bind,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_pure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_failure,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_lift,
+      OracleComp.ProgramLogic.Loom.wp_OptionT_map,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_bind,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_pure,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_throw,
+      OracleComp.ProgramLogic.Loom.wp_ExceptT_monadLift,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_bind,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_pure,
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_read,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_read_layer',
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer',
+      OracleComp.ProgramLogic.Loom.wp_ReaderT_monadLift,
+      OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_map_layer,
+      Std.Do'.WriterT.apply_wp,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+      OracleComp.ProgramLogic.Loom.WriterT.wp_map,
+      MAlgOrdered.wp_bind,
+      MAlgOrdered.wp_pure,
+      MAlgOrdered.wp_map,
+      Std.Do'.EPost.cons.pushOption,
+      Std.Do'.EPost.cons.pushExcept,
+      Option.elimM,
+      OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+      OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+      pure_bind,
+      bind_pure_comp,
+      bind_map_left,
+      map_bind,
+      bind_assoc,
+      map_pure,
+      Functor.map_map,
+      MonadLift.monadLift,
+      monadLift_self,
+      monadLift_eq_self,
+      one_mul,
+      mul_one,
+      mul_assoc]))
+
+private def tryCloseNormalizedTransformerWP : TacticM Bool := do
+  let saved ← saveState
+  let target ← instantiateMVars (← getMainTarget)
+  unless (tripleGoalComp? target).isSome do
+    return false
+  -- Overloaded operations such as `MonadStateOf.get` may not expose their
+  -- concrete transformer type until the triple theorem has been applied.
+  -- Speculate cheaply, then restore if the layer peeler cannot close.
+  if ← tryEvalTacticSyntax (← `(tactic| refine Std.Do'.Triple.iff.mpr ?_)) then
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    if ← tryEvalTacticSyntax (← `(tactic|
+        first
+        | simp [Lean.Order.PartialOrder.rel,
+            MonadStateOf.get, MonadStateOf.set, MonadReaderOf.read, MonadWriter.tell,
+            StateT.get, StateT.set, StateT.lift, ReaderT.read, WriterT.tell,
+            StateT.run_bind, StateT.run_pure, StateT.run_get, StateT.run_set,
+            StateT.run_modifyGet, StateT.run_monadLift, StateT.run_lift, StateT.run_map,
+            ReaderT.run_bind, ReaderT.run_pure, ReaderT.run_monadLift, ReaderT.run_read,
+            ReaderT.run_map,
+            Std.Do'.WriterT.apply_wp,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_map,
+            WriterT.run_bind, WriterT.run_pure, WriterT.run_tell, WriterT.run_liftM,
+            WriterT.run_map,
+            OptionT.run_bind, OptionT.run_pure, OptionT.run_lift, OptionT.run_failure,
+            OptionT.run_map,
+            MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+            Std.Do'.EPost.cons.pushOption, Std.Do'.EPost.cons.pushExcept, Option.elimM,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+            pure_bind, bind_pure_comp, bind_map_left, map_bind, bind_assoc, map_pure,
+            Functor.map_map, MonadLift.monadLift, monadLift_self, monadLift_eq_self,
+            one_mul, mul_one, mul_assoc]
+        | exact le_refl _)) then
+      if (← getGoals).isEmpty then
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+        return true
+    discard <| peelKnownTransformerWPInGoal
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    if ← tryEvalTacticSyntax (← `(tactic|
+        first
+        | simp [Lean.Order.PartialOrder.rel,
+            MonadStateOf.get, MonadStateOf.set, MonadReaderOf.read, MonadWriter.tell,
+            StateT.get, StateT.set, ReaderT.read, WriterT.tell,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer',
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer',
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_get,
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_set,
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_lift,
+            mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift,
+            mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_OptionT_monadLift_lift,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer',
+            StateT.run_bind, StateT.run_pure, StateT.run_get, StateT.run_set,
+            StateT.run_modifyGet, StateT.run_monadLift, StateT.run_lift, StateT.run_map,
+            ReaderT.run_bind, ReaderT.run_pure, ReaderT.run_monadLift, ReaderT.run_read,
+            ReaderT.run_map,
+            Std.Do'.WriterT.apply_wp,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_map,
+            WriterT.run_bind, WriterT.run_pure, WriterT.run_tell, WriterT.run_liftM,
+            WriterT.run_map,
+            OptionT.run_bind, OptionT.run_pure, OptionT.run_lift, OptionT.run_failure,
+            OptionT.run_map,
+            ExceptT.run_bind, ExceptT.run_pure, ExceptT.run_lift, ExceptT.run_throw,
+            ExceptT.run_map,
+            MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+            Std.Do'.EPost.cons.pushOption, Std.Do'.EPost.cons.pushExcept, Option.elimM,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+            pure_bind, bind_pure_comp, bind_map_left, map_bind, bind_assoc, map_pure,
+            Functor.map_map, MonadLift.monadLift, monadLift_self, monadLift_eq_self,
+            one_mul, mul_one, mul_assoc]
+        | exact le_refl _)) then
+      if (← getGoals).isEmpty then
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+        return true
+  saved.restore
+  return false
+
+private def tryApplySpecThenPeel (stx : TSyntax `tactic) : TacticM Bool := do
+  let saved ← saveState
+  if ← tryEvalTacticSyntax stx then
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    discard <| peelKnownTransformerWPInGoal
+    discard <| tryEvalTacticSyntax (← `(tactic| repeat intro _))
+    if ← tryEvalTacticSyntax (← `(tactic|
+        first
+        | simp [Lean.Order.PartialOrder.rel,
+            MonadStateOf.get, MonadStateOf.set, MonadReaderOf.read, MonadWriter.tell,
+            StateT.get, StateT.set, ReaderT.read, WriterT.tell,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_get_layer',
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_run_set_layer',
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_get,
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_StateT_set,
+            OracleComp.ProgramLogic.TacticInternals.Unary.mAlgOrdered_wp_OptionT_run_lift,
+            mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift,
+            mAlgOrdered_wp_OptionT_run_StateT_monadLift_lift_map,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_StateT_OptionT_monadLift_lift,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer,
+            OracleComp.ProgramLogic.TacticInternals.Unary.wp_ReaderT_run_read_layer',
+            StateT.run_bind, StateT.run_pure, StateT.run_get, StateT.run_set,
+            StateT.run_modifyGet, StateT.run_monadLift, StateT.run_lift, StateT.run_map,
+            ReaderT.run_bind, ReaderT.run_pure, ReaderT.run_monadLift, ReaderT.run_read,
+            ReaderT.run_map,
+            Std.Do'.WriterT.apply_wp,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_bind,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_pure,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_tell,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_monadLift,
+            OracleComp.ProgramLogic.Loom.WriterT.wp_map,
+            WriterT.run_bind, WriterT.run_pure, WriterT.run_tell, WriterT.run_liftM,
+            WriterT.run_map,
+            OptionT.run_bind, OptionT.run_pure, OptionT.run_lift, OptionT.run_failure,
+            OptionT.run_map,
+            ExceptT.run_bind, ExceptT.run_pure, ExceptT.run_lift, ExceptT.run_throw,
+            ExceptT.run_map,
+            MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+            Std.Do'.EPost.cons.pushOption, Std.Do'.EPost.cons.pushExcept, Option.elimM,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+            OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+            pure_bind, bind_pure_comp, bind_map_left, map_bind, bind_assoc, map_pure,
+            Functor.map_map, MonadLift.monadLift, monadLift_self, monadLift_eq_self,
+            one_mul, mul_one, mul_assoc]
+        | exact le_refl _)) then
+      if (← getGoals).isEmpty then
+        Lean.Elab.Term.synthesizeSyntheticMVarsNoPostponing
+        return true
+  saved.restore
+  return false
+
 /-- Try to close the current goal using only immediate local information.
 This is intentionally cheap: it is used while speculating on `triple_bind`, so it must not
 launch expensive proof search on goals with unresolved cut metavariables. -/
 def tryCloseSpecGoalImmediate : TacticM Bool := do
   tryApplyTripleHyp <||>
+  tryCloseNormalizedTransformerWP <||>
+  tryApplySpecThenPeel (← `(tactic| apply
+    OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_StateT_get_of_rel)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply
+    OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_ReaderT_read_of_rel)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.get_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.set_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.modifyGet_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.monadLift_StateT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.read_ReaderT)) <||>
+  tryApplySpecThenPeel (← `(tactic| apply Std.Do'.Spec.monadLift_ReaderT)) <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic| solve_by_elim (maxDepth := 2))) <||>
-  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.get_StateT)) <||>
-  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.set_StateT)) <||>
-  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.modifyGet_StateT)) <||>
-  tryEvalTacticSyntax (← `(tactic| apply Std.Do'.Spec.monadLift_StateT)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
   tryEvalTacticSyntax (← `(tactic|
@@ -257,7 +801,7 @@ private def closeTheoremStepGoals : TacticM Unit := do
   for goal in goals do
     if ← goal.isAssigned then continue
     setGoals [goal]
-    unless ← tryApplyTripleHyp do
+    unless ← tryCloseSpecGoalImmediate do
       remaining := remaining ++ [goal]
   setGoals remaining
   unless remaining.isEmpty do
@@ -369,6 +913,7 @@ private def normalizeStdDoTripleGoal : TacticM Bool := do
 for the default `vcstep` hot path. -/
 def tryCloseSpecGoalFinal : TacticM Bool := do
   tryApplyTripleHyp <||>
+  tryCloseNormalizedTransformerWP <||>
   tryEvalTacticSyntax (← `(tactic| assumption)) <||>
   tryEvalTacticSyntax (← `(tactic|
     exact OracleComp.ProgramLogic.triple_pure _ _)) <||>
@@ -1143,12 +1688,12 @@ def trySupportCutBind (comp : Expr) : TacticM Bool := do
   | some _ => return true
   | none => return false
 
-/-- Structural `StateT` operations from Loom's generic transformer specs.
+/-- Structural transformer operations from Loom's generic transformer specs.
 
-This is deliberately unary-only automation: stepping through `get`, `set`,
-`modifyGet`, or a lifted base computation does not choose a cut, invariant, or
+This is deliberately unary-only automation: stepping through local transformer
+operations or a lifted base computation does not choose a cut, invariant, or
 coupling frontier. -/
-private def tryStateTSpecStep : TacticM Bool := do
+private def tryTransformerSpecStep : TacticM Bool := do
   let saved ← saveState
   let ok ←
     match ← observing? do
@@ -1157,53 +1702,15 @@ private def tryStateTSpecStep : TacticM Bool := do
           | apply Std.Do'.Spec.get_StateT
           | apply Std.Do'.Spec.set_StateT
           | apply Std.Do'.Spec.modifyGet_StateT
-          | apply Std.Do'.Spec.monadLift_StateT))
+          | apply Std.Do'.Spec.monadLift_StateT
+          | apply Std.Do'.Spec.read_ReaderT
+          | apply Std.Do'.Spec.monadLift_ReaderT))
       closeTheoremStepGoals
     with
     | some _ => pure true
     | none => pure false
   if ok && (← getGoals).isEmpty then
     return true
-  saved.restore
-  return false
-
-private def normalizeKnownTransformerWPInGoal : TacticM Bool := do
-  tryEvalTacticSyntax (← `(tactic|
-    simp only [
-      OracleComp.ProgramLogic.Loom.wp_StateT_bind,
-      OracleComp.ProgramLogic.Loom.wp_StateT_bind',
-      OracleComp.ProgramLogic.Loom.wp_StateT_pure,
-      OracleComp.ProgramLogic.Loom.wp_StateT_get,
-      OracleComp.ProgramLogic.Loom.wp_StateT_set,
-      OracleComp.ProgramLogic.Loom.wp_StateT_modifyGet,
-      OracleComp.ProgramLogic.Loom.wp_StateT_monadLift,
-      OracleComp.ProgramLogic.Loom.wp_OptionT_bind,
-      OracleComp.ProgramLogic.Loom.wp_OptionT_pure,
-      OracleComp.ProgramLogic.Loom.wp_OptionT_failure,
-      OracleComp.ProgramLogic.Loom.wp_OptionT_monadLift,
-      OracleComp.ProgramLogic.Loom.wp_ExceptT_bind,
-      OracleComp.ProgramLogic.Loom.wp_ExceptT_pure,
-      OracleComp.ProgramLogic.Loom.wp_ExceptT_throw,
-      OracleComp.ProgramLogic.Loom.wp_ExceptT_monadLift]))
-
-private def tryCloseNormalizedTransformerWP : TacticM Bool := do
-  let saved ← saveState
-  let target ← instantiateMVars (← getMainTarget)
-  let some comp := tripleGoalComp? target | return false
-  let compType ← instantiateMVars (← inferType comp)
-  -- The theorem bridge is transformer-generic; each supported transformer adds
-  -- a syntactic gate here and WP equations to `normalizeKnownTransformerWPInGoal`.
-  unless (findAppWithHead? ``StateT compType).isSome ||
-      (findAppWithHead? ``OptionT compType).isSome ||
-      (findAppWithHead? ``ExceptT compType).isSome do
-    return false
-  if ← tryEvalTacticSyntax (← `(tactic|
-      apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_of_wp_le)) then
-    discard <| normalizeKnownTransformerWPInGoal
-    discard <| tryEvalTacticSyntax (← `(tactic| try intro _))
-    if ← tryEvalTacticSyntax (← `(tactic| exact le_rfl)) then
-      if (← getGoals).isEmpty then
-        return true
   saved.restore
   return false
 
@@ -1227,8 +1734,8 @@ def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
   match tripleGoalComp? target with
   | some comp =>
       let comp ← whnfReducible (← instantiateMVars comp)
-      discard <| normalizeKnownTransformerWPInGoal
-      if ← tryStateTSpecStep then
+      discard <| peelKnownTransformerWPInGoal
+      if ← tryCloseNormalizedTransformerWP then
         return true
       if isBindExpr comp then
         if ← tryBindImmediate comp then
@@ -1237,10 +1744,14 @@ def runVCGenStructuralCore : TacticM Bool := withVCGenStructuralTiming do
           return true
         if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.triple_bind_wp)) then
+          closeTheoremStepGoals
           return true
         if ← tryEvalTacticSyntax (← `(tactic|
           apply OracleComp.ProgramLogic.TacticInternals.Unary.stdDoTriple_bind_wp)) then
+          closeTheoremStepGoals
           return true
+      if ← tryTransformerSpecStep then
+        return true
       if isIfExpr comp then
         if comp.consumeMData.getAppFn.isConstOf ``dite then
           if ← tryEvalTacticSyntax (← `(tactic|
@@ -1416,6 +1927,18 @@ def runVCGenStep : TacticM Bool := do
     let names ← getSuggestedIntroNames 1
     if ← introMainGoalNames names then
       return true
+  let cheapCloseState ← saveState
+  if ← tryEvalTacticSyntax (← `(tactic|
+      (refine Std.Do'.Triple.iff.mpr ?_
+       repeat intro _
+       simp [Lean.Order.PartialOrder.rel, MonadLift.monadLift,
+         OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp,
+         OracleComp.ProgramLogic.Loom.wp_eq_mAlgOrdered_wp_epost,
+         MAlgOrdered.wp_bind, MAlgOrdered.wp_pure, MAlgOrdered.wp_map,
+         one_mul, mul_one]))) then
+    if (← getGoals).isEmpty then
+      return true
+  cheapCloseState.restore
   if ← tryCloseNormalizedTransformerWP then
     return true
   if ← runVCGenStructuralCore then
