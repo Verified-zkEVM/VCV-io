@@ -204,6 +204,108 @@ theorem simulateQ_bad_preserved_of_step
       obtain ⟨up, hup, hz⟩ := hz
       exact (ih up.1 up.2 hz).trans (hstep t p up hup)
 
+/-- Unified per-step structure of `cmaReal`: at every query, the bad flag is
+preserved, the `Valid` predicate is preserved on the data, and the random-oracle
+cache count grows by at most one if and only if the query is `cmaH3Costly` or
+`IsHashQuery`. The three callable corollaries below are projections of this
+single case-blast. -/
+private theorem cmaReal_step_normal_form
+    (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
+    (hr : GenerableRelation Stmt Wit rel)
+    (t : (cmaSpec M Commit Chal Resp Stmt).Domain)
+    (p : CmaState M Commit Chal Stmt Wit)
+    (z : (cmaSpec M Commit Chal Resp Stmt).Range t × CmaState M Commit Chal Stmt Wit)
+    (hz : z ∈ support (((cmaReal M Commit Chal σ hr) t).run p)) :
+    z.2.2 = p.2 ∧
+    (CmaData.Valid (rel := rel) p.1 → CmaData.Valid (rel := rel) z.2.1) ∧
+    QueryCache.enncard z.2.1.2.1 ≤ QueryCache.enncard p.1.2.1 +
+      (if cmaH3Costly (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt) t ∨
+          IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
+            (Resp := Resp) (Stmt := Stmt) t then (1 : ℝ≥0∞) else 0) := by
+  rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
+  rcases t with n | mc | m | ⟨⟩
+  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery, IsHashQuery, false_or, if_false,
+      StateT.run_mk, support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
+      exists_prop] at hz ⊢
+    obtain ⟨r, _, rfl⟩ := hz
+    refine ⟨rfl, fun h => ?_, ?_⟩
+    · simpa [CmaData.Valid] using h
+    · simp
+  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery, IsHashQuery, false_or, if_true,
+      StateT.run_mk] at hz ⊢
+    cases hcache : cache mc with
+    | none =>
+        rw [hcache] at hz
+        simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
+          exists_prop] at hz
+        obtain ⟨r, _, rfl⟩ := hz
+        refine ⟨rfl, fun h => ?_, ?_⟩
+        · simpa [CmaData.Valid] using h
+        · exact QueryCache.enncard_cacheQuery_le cache mc r
+    | some r =>
+        rw [hcache] at hz
+        simp only [support_pure, Set.mem_singleton_iff] at hz
+        subst z
+        refine ⟨rfl, fun h => ?_, ?_⟩
+        · simpa [CmaData.Valid] using h
+        · exact le_self_add
+  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery, IsHashQuery, true_or, if_true,
+      StateT.run_mk] at hz ⊢
+    rcases keypair with keypair | ⟨pk, sk⟩
+    · simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
+      obtain ⟨pk_sk, hgen, i, _, hrest⟩ := hz
+      cases hcache : cache (m, i.1) with
+      | none =>
+          rw [hcache] at hrest
+          simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
+            Set.mem_singleton_iff] at hrest
+          obtain ⟨ch, _, π, _, rfl⟩ := hrest
+          refine ⟨rfl, fun _ => ?_, ?_⟩
+          · exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
+          · exact QueryCache.enncard_cacheQuery_le cache (m, i.1) ch
+      | some ch =>
+          rw [hcache] at hrest
+          simp only [support_bind, Set.mem_iUnion, support_pure,
+            Set.mem_singleton_iff, exists_prop] at hrest
+          obtain ⟨π, _, rfl⟩ := hrest
+          refine ⟨rfl, fun _ => ?_, ?_⟩
+          · exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
+          · exact le_self_add
+    · simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
+      obtain ⟨i, _, hrest⟩ := hz
+      cases hcache : cache (m, i.1) with
+      | none =>
+          rw [hcache] at hrest
+          simp only [support_bind, Set.mem_iUnion, support_pure,
+            Set.mem_singleton_iff, exists_prop] at hrest
+          obtain ⟨ch, _, π, _, rfl⟩ := hrest
+          refine ⟨rfl, fun h => ?_, ?_⟩
+          · simpa [CmaData.Valid] using h
+          · exact QueryCache.enncard_cacheQuery_le cache (m, i.1) ch
+      | some ch =>
+          rw [hcache] at hrest
+          simp only [support_bind, Set.mem_iUnion, support_pure,
+            Set.mem_singleton_iff, exists_prop] at hrest
+          obtain ⟨π, _, rfl⟩ := hrest
+          refine ⟨rfl, fun h => ?_, ?_⟩
+          · simpa [CmaData.Valid] using h
+          · exact le_self_add
+  · simp only [fs_simp, cmaReal, cmaH3Costly, IsCostlyQuery, IsHashQuery, false_or,
+      if_false, StateT.run_mk] at hz ⊢
+    rcases keypair with keypair | ⟨pk, sk⟩
+    · simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
+        exists_prop] at hz
+      obtain ⟨pk_sk, hgen, rfl⟩ := hz
+      refine ⟨rfl, fun _ => ?_, ?_⟩
+      · exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
+      · simp
+    · simp only [support_pure, Set.mem_singleton_iff] at hz
+      subst z
+      refine ⟨rfl, fun h => ?_, ?_⟩
+      · simpa [CmaData.Valid] using h
+      · simp
+
 /-- One step of the real CMA game preserves the bad flag exactly. -/
 theorem cmaReal_bad_preserved
     (σ : SigmaProtocol Stmt Wit Commit PrvState Chal Resp rel)
@@ -212,62 +314,8 @@ theorem cmaReal_bad_preserved
     (p : CmaState M Commit Chal Stmt Wit)
     (z : (cmaSpec M Commit Chal Resp Stmt).Range t × CmaState M Commit Chal Stmt Wit)
     (hz : z ∈ support (((cmaReal M Commit Chal σ hr) t).run p)) :
-    z.2.2 = p.2 := by
-  rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
-  rcases t with n | mc | m | ⟨⟩
-  · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-      support_pure, Set.mem_singleton_iff, exists_prop] at hz
-    obtain ⟨r, _, rfl⟩ := hz
-    rfl
-  · cases hcache : cache mc with
-    | none =>
-        simp only [fs_simp, StateT.run_mk, hcache, support_bind,
-          Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz
-        obtain ⟨r, _, rfl⟩ := hz
-        rfl
-    | some r =>
-        simp only [fs_simp, StateT.run_mk, hcache, support_pure,
-          Set.mem_singleton_iff] at hz
-        subst z
-        rfl
-  · rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨pk_sk, _, i, _, hrest⟩ := hz
-      cases hcache : cache (m, i.1) with
-      | none =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          rfl
-      | some ch =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          rfl
-    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨i, _, hrest⟩ := hz
-      cases hcache : cache (m, i.1) with
-      | none =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          rfl
-      | some ch =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          rfl
-  · simp only [fs_simp, StateT.run_mk] at hz
-    rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-        exists_prop] at hz
-      obtain ⟨pk_sk, _, rfl⟩ := hz
-      rfl
-    · simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst z
-      rfl
+    z.2.2 = p.2 :=
+  (cmaReal_step_normal_form M Commit Chal σ hr t p z hz).1
 
 /-- Once the real CMA bad flag is true, one real step keeps it true. -/
 theorem cmaReal_bad_mono
@@ -307,62 +355,8 @@ theorem cmaReal_valid_preserved
     (hpvalid : CmaData.Valid (rel := rel) p.1)
     (z : (cmaSpec M Commit Chal Resp Stmt).Range t × CmaState M Commit Chal Stmt Wit)
     (hz : z ∈ support (((cmaReal M Commit Chal σ hr) t).run p)) :
-    CmaData.Valid (rel := rel) z.2.1 := by
-  rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
-  rcases t with n | mc | m | ⟨⟩
-  · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-      support_pure, Set.mem_singleton_iff, exists_prop] at hz
-    obtain ⟨r, _, rfl⟩ := hz
-    simpa [CmaData.Valid] using hpvalid
-  · cases hcache : cache mc with
-    | none =>
-        simp only [fs_simp, StateT.run_mk, hcache, support_bind,
-          Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz
-        obtain ⟨r, _, rfl⟩ := hz
-        simpa [CmaData.Valid] using hpvalid
-    | some r =>
-        simp only [fs_simp, StateT.run_mk, hcache, support_pure,
-          Set.mem_singleton_iff] at hz
-        subst z
-        simpa [CmaData.Valid] using hpvalid
-  · rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨pk_sk, hgen, i, _, hrest⟩ := hz
-      cases hcache : cache (m, i.1) with
-      | none =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
-      | some ch =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
-    · simp only [fs_simp, StateT.run_mk, support_bind, Set.mem_iUnion,
-        exists_prop] at hz
-      obtain ⟨i, _, hrest⟩ := hz
-      cases hcache : cache (m, i.1) with
-      | none =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          simpa [CmaData.Valid] using hpvalid
-      | some ch =>
-          simp only [hcache, support_bind, Set.mem_iUnion, support_pure,
-            Set.mem_singleton_iff, exists_prop] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          simpa [CmaData.Valid] using hpvalid
-  · simp only [fs_simp, StateT.run_mk] at hz
-    rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-        exists_prop] at hz
-      obtain ⟨pk_sk, hgen, rfl⟩ := hz
-      exact hr.gen_sound pk_sk.1 pk_sk.2 hgen
-    · simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst z
-      simpa [CmaData.Valid] using hpvalid
+    CmaData.Valid (rel := rel) z.2.1 :=
+  (cmaReal_step_normal_form M Commit Chal σ hr t p z hz).2.1 hpvalid
 
 /-- The real CMA handler preserves keypair validity while bad is false. -/
 theorem cmaReal_preserves_valid
@@ -386,72 +380,8 @@ theorem cmaReal_roCacheCount_step_le
       if cmaH3Costly (M := M) (Commit := Commit) (Chal := Chal)
           (Resp := Resp) (Stmt := Stmt) t ∨
         IsHashQuery (M := M) (Commit := Commit) (Chal := Chal)
-          (Resp := Resp) (Stmt := Stmt) t then (1 : ℝ≥0∞) else 0 := by
-  rcases p with ⟨⟨log, cache, keypair⟩, bad⟩
-  rcases t with n | mc | m | ⟨⟩
-  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery,
-      IsHashQuery, false_or, if_false, StateT.run_mk, support_bind,
-      Set.mem_iUnion, support_pure, Set.mem_singleton_iff, exists_prop] at hz ⊢
-    obtain ⟨r, _, rfl⟩ := hz
-    simp
-  · simp only [fs_simp, cmaH3Costly, IsCostlyQuery,
-      IsHashQuery, false_or, if_true, StateT.run_mk] at hz ⊢
-    cases hcache : cache mc with
-    | none =>
-        rw [hcache] at hz
-        simp only [support_bind, Set.mem_iUnion, support_pure, Set.mem_singleton_iff,
-          exists_prop] at hz
-        obtain ⟨r, _, rfl⟩ := hz
-        exact QueryCache.enncard_cacheQuery_le cache mc r
-    | some r =>
-        rw [hcache] at hz
-        simp only [support_pure, Set.mem_singleton_iff] at hz
-        subst z
-        exact le_self_add
-  · simp only [fs_simp,
-      cmaH3Costly, IsCostlyQuery, IsHashQuery, true_or, if_true, StateT.run_mk] at hz ⊢
-    rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
-      obtain ⟨key, _, hrest⟩ := hz
-      obtain ⟨cp, _, hrest⟩ := hrest
-      cases hcache : cache (m, cp.1) with
-      | none =>
-          rw [hcache] at hrest
-          simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
-            Set.mem_singleton_iff] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          exact QueryCache.enncard_cacheQuery_le cache (m, cp.1) ch
-      | some ch₀ =>
-          rw [hcache] at hrest
-          simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
-            Set.mem_singleton_iff] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          exact le_self_add
-    · simp only [support_bind, Set.mem_iUnion, exists_prop] at hz
-      obtain ⟨cp, _, hrest⟩ := hz
-      cases hcache : cache (m, cp.1) with
-      | none =>
-          rw [hcache] at hrest
-          simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
-            Set.mem_singleton_iff] at hrest
-          obtain ⟨ch, _, π, _, rfl⟩ := hrest
-          exact QueryCache.enncard_cacheQuery_le cache (m, cp.1) ch
-      | some ch₀ =>
-          rw [hcache] at hrest
-          simp only [support_bind, Set.mem_iUnion, exists_prop, support_pure,
-            Set.mem_singleton_iff] at hrest
-          obtain ⟨π, _, rfl⟩ := hrest
-          exact le_self_add
-  · simp only [cmaReal, cmaH3Costly, IsCostlyQuery, IsHashQuery, false_or,
-      if_false, StateT.run_mk] at hz ⊢
-    rcases keypair with keypair | ⟨pk, sk⟩
-    · simp only [support_bind, Set.mem_iUnion, support_pure,
-        Set.mem_singleton_iff, exists_prop] at hz
-      obtain ⟨key, _, rfl⟩ := hz
-      simp
-    · simp only [support_pure, Set.mem_singleton_iff] at hz
-      subst z
-      simp
+          (Resp := Resp) (Stmt := Stmt) t then (1 : ℝ≥0∞) else 0 :=
+  (cmaReal_step_normal_form M Commit Chal σ hr t p z hz).2.2
 
 /-- Expected H3 loss from direct signing and hash query bounds.
 
