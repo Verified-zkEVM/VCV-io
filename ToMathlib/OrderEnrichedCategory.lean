@@ -71,8 +71,7 @@ variable (C : Type u₁) (D : Type u₂) [𝒞 : EnrichedCategory V C] [𝒟 : E
 @[simps]
 instance instProduct : EnrichedCategory V (C × D) where
   Hom X Y := (𝒞.Hom X.1 Y.1) ⊗ (𝒟.Hom X.2 Y.2)
-  id X := (λ_ _).inv ≫ (sorry)
-  -- ((𝒞.id X.1) ⊗ (𝒟.id X.2))
+  id X := (λ_ _).inv ≫ ((𝒞.id X.1) ⊗ₘ (𝒟.id X.2))
   comp X Y Z := by stop simpa using (𝒞.comp X.1 Y.1 Z.1) ⊗ (𝒟.comp X.2 Y.2 Z.2)
   -- (α_ _ _ _).inv ≫ (
   -- id_comp X Y := by
@@ -138,8 +137,6 @@ end EnrichedCategory
 
 /-- Categories enriched over the monoidal category of preorders are preorder-enriched categories. -/
 abbrev PreordEnrichedCategory (C : Type u) := EnrichedCategory Preord C
-
-#check Category.assoc
 
 namespace PreordEnrichedCategory
 
